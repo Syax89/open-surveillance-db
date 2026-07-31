@@ -1,8 +1,9 @@
-# ADR 0002: Edge-level access control for the moderation interface
+# ADR 0003: Edge-level access control for the moderation interface
 
 - **Status:** accepted
 - **Date:** 2026-07-31
 - **Related:** ADR 0001, legal review 2026-07-31 (H1: `/moderation` without authentication)
+- **Note:** originally numbered 0002; renumbered to 0003 in PR #8 to resolve the ADR numbering collision with 0002-legal-pre-launch-deliverables.
 
 ## Context
 

@@ -1,52 +1,50 @@
-# Retention schedule
+# Retention schedule (operational)
 
-Status: **DRAFT proposal — values to be confirmed by the maintainers and by
-external legal review before launch.**
+- **Status:** draft for pre-launch review (ADR 0004)
+- **Owner:** Rosa (DPO / privacy)
+- **Legal basis:** GDPR art. 5(1)(e) (storage limitation), art. 17 (erasure); D.Lgs. 196/2003 (Codice Privacy, IT) as primary jurisdiction; consistent with `../PRIVACY_AND_SAFETY.md` and `../MODERATION.md`.
+- **Scope:** all data held by OpenSurveillanceDB, including submissions, moderation data, evidence, correction requests and backups.
 
-Legal anchors:
+> **Disclaimer:** this document is product guidance / not legal advice. It is a draft for pre-launch review and requires external counsel review before launch.
 
-- GDPR art. 5(1)(e): personal data must be kept no longer than necessary
-  ("storage limitation"); every retention term must be justified and published.
-- GDPR art. 17: the right to erasure is exercised on request regardless of this
-  schedule (an individual request overrides the default terms below).
-- GDPR art. 5(2): the controller must be able to demonstrate compliance.
+## 1. Retention table
 
-Scope: every data category the prototype currently stores or is planned to
-store (see `docs/DATA_MODEL.md`, `drizzle/*.sql`, `db/cameras.ts`). The
-schedule applies to production data. Demo/synthetic records are covered
-separately at the bottom.
+| # | Data category | Retention | Trigger / start | Action at expiry | Notes |
+|---|---------------|-----------|-----------------|------------------|-------|
+| R1 | `pending` report (non-verified submission) | **90 days** | Submission date; reset on last moderator activity when clarification was requested | Hard delete of the record and its evidence | Covers the moderation queue and the requester's chance to supply clarification. |
+| R2 | `rejected` report | **30 days** | Rejection decision | Hard delete of the record and its evidence | Leaves a short appeal window (see MODERATION_SLA.md); rejected content is never public. |
+| R3 | `verified` record (published) | **Review cycle (initial proposal: re-verification ≥ every 12 months)** | Date of verification / last re-verification | If not re-verified: `needs_review` → after 6 months unverified → `removed` (record and evidence deleted) | Retention is justified by the public-interest dataset purpose; periodic review keeps data accurate (art. 5(1)(d)) and current. |
+| R4 | Correction / takedown request | **2 years** | Resolution date | Archive the entry in the internal audit log, then delete | Accountability trail (art. 5(2)); aligned with the moderation audit log (M3). |
+| R5 | Moderation audit log entry (decision, reason code, timestamp, reviewer pseudonym) | **2 years** | Decision time | Delete | Aligned with R4; contains no personal data of reporters; reviewer identities are pseudonymous and never logged as raw emails. |
+| R6 | Evidence (files / links supporting a record) | **Tied to the record it supports** | Same lifecycle as R1/R2/R3 | Deleted with the record; hard-deleted immediately if the record is rejected/removed | Evidence containing incidental personal data (e.g. faces, plates, interiors) is redacted or deleted on the spot; never published. |
+| R7 | Contributor metadata (pseudonymous internal ID, submission timestamp) | **90 days as pending, then tied to the record** | Submission date | Deleted with the record; on verified records kept as provenance (source, date) as long as the record is public | Pseudonymous by design (GDPR art. 25(1)); raw contact data of contributors is not collected. |
+| R8 | Moderator identity (ChatGPT sign-in: email, display name, full name) | **Not stored** | — | — | Used for authentication only; emails are never logged in application logs (M4); audit logs carry a reviewer pseudonym only. |
+| R9 | Correspondence with the privacy contact (privacy@…) | **2 years** | Last message date | Delete | Applies to data-subject requests and breach communication. |
+| R10 | Backups (Cloudflare D1: hourly automatic backups, Time Travel PITR) | **Provider-managed: 24 h hourly snapshots, 30 days point-in-time recovery** | Continuous | Automatic rotation by the provider | An erasure under art. 17 becomes fully effective at the next backup rotation; the remaining window (max 30 days) is disclosed in the erasure response. R2 is not used (`hosting.json` `r2: null`): no long-term export backups exist. |
+| R11 | Application / operational logs | **≤ 12 months** | Log entry creation | Delete; aggregate-only | Logs must not contain personal data by design (M4: never log emails); used for security, availability and abuse prevention; retained in aggregate only. |
+| R12 | `demo` records | As long as the prototype needs them | — | Purged before public launch | Fictional, clearly labelled content; not personal data. |
 
-## Data categories and terms
+## 2. Erasure requests (art. 17 GDPR)
 
-| # | Data category | Where stored | Retention | Trigger / disposition |
-| --- | --- | --- | --- | --- |
-| R1 | Pending report, not reviewed (`status = pending`, untouched) | `cameras` | **90 days** from `created_at` | Automatic deletion after 90 days if no review decision was made. |
-| R2 | Pending report, reviewed and approved (`pending → verified`) | `cameras` | Tied to the record lifecycle (R3) | Becomes a public record; follows the verification cycle. |
-| R3 | Verified public record | `cameras` | While accurate and current; re-verification cycle ≤ **12 months** (proposal) | Periodic re-check (MODERATION.md "Maintain"). If not re-verified, status → `needs_review`; if still not re-verified after **90 days**, the record is removed. Stale records are retired rather than presented as current (DATA_MODEL.md "Data quality rules"). |
-| R4 | Rejected report (`status = rejected`) | `cameras` | **30 days** from the rejection decision | Deletion after 30 days (window for internal review of the decision). |
-| R5 | Correction / removal request (`correction_requests`, incl. the optional `contact` field) | `correction_requests` | **2 years** from final resolution | Kept for audit and for the data subject's own follow-up; then deleted. `contact` is used only to answer the request and is never published. |
-| R6 | Moderation audit events (`moderation_events`; `actor` is a pseudonym) | `moderation_events` | **2 years** from the event | Supports internal accountability (MODERATION.md); then deleted. Suspended (legal hold) if litigation or a supervisory-authority request is pending. |
-| R7 | Intake `notes` (free text ≤ 1000 chars) | `cameras.notes` | **2 years** as moderation context | Never published (currently exposed in the public JSON API — boundary bug H3, fix pending in `db/cameras.ts`). After the record leaves the review cycle, notes follow the record's retention. |
-| R8 | Evidence (images, media, supporting material) | Not implemented (ARCHITECTURE.md) | Tied to the record it supports; delete **90 days** after the record is removed or the final decision plus appeal window elapses | Never public; least-privilege access; deletion must be automated. To be refined when evidence storage is designed. |
-| R9 | Application / operational logs | Logging platform | **12 months** max | Logs must not contain personal data by design (M4: never log emails); aggregate only. |
-| R10 | Backups (database) | Backup storage | Max **12 months**; mirror source-data terms where technically feasible | Encrypted; restoration drill exists (DEPLOYMENT.md). |
-| R11 | Exported datasets (CSV/GeoJSON, ODbL) | Already-distributed copies | Cannot be recalled | Declared in the privacy notice; future exports exclude removed records; each export is versioned. |
+1. Receive request via `privacy@…` (contact defined in the privacy notice).
+2. Verify the requester's identity proportionately (see PRIVACY_NOTICE.md § rights).
+3. Assess exceptions: art. 17(3) allows retention where necessary for the public-interest dataset purpose or legal obligations; a minimal, clearly justified retention (e.g. record provenance) may be kept — documented in the correction log.
+4. Execute deletion: record, evidence, linked metadata; note that backups rotate within 30 days (R10).
+5. Respond within 1 month (art. 12(3)); extendable by 2 months with notice; state the reason for any refusal and the right to complain to the supervisory authority.
 
-## Notes
+**Definition of "deletion".** "Deletion" means irreversible deletion from the database and, where technically feasible, from backups; otherwise the data is excluded from all future processing and exports. The erasure response states which of the two applies.
 
-- Individual rights override the schedule: art. 17 erasure and art. 21
-  objection requests are processed on the normal 1-month track (art. 12(3))
-  even if the schedule term has not yet elapsed.
-- "Deletion" means irreversible deletion from the database and, where
-  technically feasible, from backups; otherwise the data is excluded from all
-  future processing and exports.
-- Legal hold: any pending litigation, complaint, or supervisory-authority
-  inquiry suspends the relevant deletions until the matter is closed. The hold
-  and its end date are recorded in the audit log.
-- Implementation required before launch: a scheduled deletion job (worker/cron)
-  covering R1, R4, R5, R6, R9, R10 and the `needs_review` retirement path in
-  R3, plus a deletion audit log.
-- The 90/30-day and 12-month values are proposals grounded in the review
-  report findings (P1) and in the project's own "Maintain / retire stale
-  records" rule; they must be confirmed (or amended) by the maintainers and by
-  external legal review before the schedule is published.
+**Legal hold.** Any pending litigation, complaint, or supervisory-authority inquiry suspends the relevant deletions until the matter is closed. The hold, its scope and its end date are recorded in the audit log (R4/R5).
+
+## 3. Operational enforcement
+
+- Retention rules R1/R2/R3 need automated enforcement: a scheduled job (Cloudflare D1 cron / Workers cron trigger) that flags `pending` > 90 days and `rejected` > 30 days for deletion, and pushes stale `verified` records to `needs_review`. **Follow-up (implementation, assignee: ada):** `db/retention.ts` + cron binding + tests.
+- Audit log entries (R4/R5/R9) are archived, not hard-deleted, until the 2-year mark.
+- The DPO reviews this schedule annually and on any material change of purpose, provider, or jurisdiction.
+
+## 4. Legal rationale
+
+- Storage limitation (art. 5(1)(e)): every category has an explicit, justified retention and a deletion trigger; nothing is kept "just in case".
+- Right to erasure (art. 17): the schedule implements deletion without undue delay and documents exceptions.
+- Accountability (art. 5(2)): retention decisions are recorded in ADR 0004 and this schedule.
+- Italian Codice Privacy (D.Lgs. 196/2003): no additional national retention mandates apply to this dataset; if official-source records are republished, national transparency rules are checked per record (`source: official`).

@@ -1,68 +1,45 @@
-# Processor and sub-processor register
+# Processor / sub-processor register
 
-Status: **DRAFT — pre-launch.** Register under GDPR art. 30(1) (controller's
-register). The register must be kept up to date; any new processor (e.g.
-evidence storage) must be added before it is brought online.
+- **Status:** draft for pre-launch review (ADR 0005)
+- **Owner:** Rosa (DPO / privacy)
+- **Legal basis:** GDPR art. 28 (processors), Cap. V (transfers), art. 30 (records of processing activities)
+- **Review:** annually and on any provider change; additions require DPO approval before onboarding.
 
-## Register entries
+> **Disclaimer:** this document is product guidance / not legal advice. It is a draft for pre-launch review and requires external counsel review before launch.
 
-### P1. Cloudflare, Inc. — hosting, edge compute, database
+---
 
-| Field (art. 30(1)) | Value |
-| --- | --- |
-| Name and contact | Cloudflare, Inc., 101 Townsend St, San Francisco, CA 94107, US — see cloudflare.com/trust-hub/ |
-| Categories of processing | Hosting of the web app (Cloudflare Workers); database (Cloudflare D1); future: object storage (R2), image optimisation |
-| Categories of data subjects | Contributors (report submitters), correction-request submitters, moderators (via application data) |
-| Categories of personal data | Submission data: location (lat/lon), optional address, notes, optional manufacturer/observedOn; correction requests incl. optional contact; moderation context. No identity is required for submissions. |
-| Transfers to third countries | Cloudflare's global network; EU–US DPF certified; **DPA v6.3 (June 2025) incorporating EU SCCs 2021/914** (cloudflare.com/cloudflare-customer-dpa/); D1 data-location to be pinned to the EU for the primary jurisdiction (location hints / jurisdiction constraints — developers.cloudflare.com/d1/configuration/data-location/) |
-| Retention terms | Per RETENTION_SCHEDULE.md (deletion jobs run against D1) |
-| Security measures | TLS in transit, least-privilege access, secrets via platform env (never in source), encrypted backups |
-| Sub-processors | Per the Cloudflare DPA sub-processor annex — **to be pulled and archived with this register before launch** |
+## 1. Register
 
-### P2. OpenAI — moderator authentication ("Sign in with ChatGPT")
+| # | Processor | Service | Data processed | Role | DPA / mechanism | Transfer & residency | Sub-processors | Status |
+|---|-----------|---------|----------------|------|-----------------|----------------------|----------------|--------|
+| PR1 | **Cloudflare, Inc.** | Cloudflare Workers (compute/edge) + D1 (database, binding `DB`) | All application data: pending/verified records, notes, evidence refs, moderation decisions, correction requests. No R2 in use (`hosting.json` `r2: null`). | **Processor** (art. 28) | Cloudflare Data Processing Addendum (**DPA v6.3, June 2025**) incorporating **EU SCCs (2021/914)** (modules 2/3 as applicable) | Transfers EU→US possible via edge; mitigation: D1 configured with EU residency (**`weur` location hint**); encryption in transit (TLS); supplementary-measures assessment documented in § 2; **Cloudflare participates in the EU–US Data Privacy Framework (DPF-certified)** — DPF is an additional transfer ground alongside the SCCs | Per Cloudflare's published sub-processor list (DPA § list, change-notified) — reviewed at contracting | Onboarded (test) / **pre-launch: execute DPA + region pinning** |
+| PR2 | **OpenAI, LLC** | ChatGPT sign-in (`/signin-with-chatgpt`, headers `oai-authenticated-user-*`) | Moderator identity attributes received: email, display name, full name | **Not a processor of OpenSurveillanceDB data** — OpenAI is an independent controller of its own authentication service (its privacy policy governs the sign-in). No OSDB data is sent to OpenAI; we only *receive* identity attributes. | OpenAI's own terms/privacy policy (controller-to-controller) | Identity attributes originate from OpenAI services (US/EU per OpenAI infrastructure); assessed as a transfer *into* our systems, not an export of our data | n/a (provider side) | Onboarded (scaffold, not yet wired — see H1) / **pre-launch: wire auth + verify with OpenAI** |
+| PR3 | **GitHub, Inc.** | Source repository hosting | Source code only; no runtime data, no personal data | Not a processor in practice (no OSDB data processed) | GitHub ToS | n/a | n/a | Informational |
+| PR4 | **OpenStreetMap Foundation / tile.openstreetmap.org** | Map tiles (test only) | None (public map tiles) | No personal data | OSM tile usage policy | n/a | n/a | Test only; production provider TBD (review H5) |
 
-| Field (art. 30(1)) | Value |
-| --- | --- |
-| Name and contact | OpenAI (contact per openai.com/policies/data-processing-addendum/) |
-| Categories of processing | Identity verification of moderators during sign-in; delivers identity headers `oai-authenticated-user-email`, `oai-authenticated-user-full-name` to the application (`app/chatgpt-auth.ts`) |
-| Categories of data subjects | Moderators only |
-| Categories of personal data | Email address, full name (transmitted in request headers) |
-| Transfers to third countries | OpenAI DPA in place (openai.com/policies/data-processing-addendum/); transfer mechanism (DPF/SCCs) **to be confirmed with counsel before the flow is enabled** |
-| Retention terms | Application must **never log or store** these headers; only a pseudonymous moderator ID is stored (finding M4). |
-| Security measures | Header values processed in transit only; sign-in flow to be wired only on authenticated routes with rate limiting (H1/H2) |
-| Sub-processors | Per OpenAI DPA — to be archived with this register |
+## 2. International transfers (Cap. V GDPR) — assessment summary
 
-**Status note:** the auth scaffold is not connected to any page and the
-`/moderation` panel is currently unauthenticated (finding H1). This entry
-applies **only if** the ChatGPT-auth flow is completed. Alternative:
-server-managed credentials for moderators with no third-party identity
-provider.
+### Cloudflare (PR1)
+- **Transfer instrument:** Cloudflare DPA (**v6.3, June 2025**) with **EU Standard Contractual Clauses (2021/914)** — controller-to-processor and processor-to-processor modules as applicable; DPA executed by the controller (placeholder entity) before launch. **EU–US Data Privacy Framework:** Cloudflare is DPF-certified; the DPF is recorded as an additional transfer ground (the SCCs alone are sufficient; DPF strengthens the transfer assessment).
+- **Supplementary measures (TIA summary):** data at rest in D1 pinned to `weur` (Western Europe); TLS for all traffic; Workers edge execution minimises data transfer (dynamic app, not bulk data); no long-term backup export (R2 null → no US-resident backup copies beyond provider rotation); Cloudflare's published sub-processor list and incident-notification commitments accepted in the DPA.
+- **Residual risk:** low for the dataset described (mostly non-personal infrastructure data + pseudonymous contributor metadata). Reassessed annually.
 
-### P3. OpenStreetMap Foundation — map tiles (independent controller, NOT a processor)
+### OpenAI (PR2)
+- The sign-in is initiated by the moderator on OpenAI's service; identity attributes are then delivered to us. Our processing of those attributes is EU-side; we do not transfer them onward. The exposure is limited to the authentication moment; mitigated by: never logging emails, session-only use, reviewer pseudonyms in audit logs (M4).
 
-| Field | Value |
-| --- | --- |
-| Role | Independent controller under its own privacy policy; tiles are fetched by the visitor's browser directly from OSM servers |
-| Data | OSMF processes its own server logs under its own policy; the project does not transmit personal data to OSMF |
-| Action | State this relationship in the privacy notice; no DPA required; production tile provider must comply with the OSM tile usage policy (see OSM_INTEGRATION.md) |
+## 3. Safeguards and commitments
 
-## Measures of protection (art. 32) — summary
+- **No email logging:** application logs and audit logs must never contain `oai-authenticated-user-email` values (M4; enforced in code — follow-up for ada with H1).
+- **Data residency:** D1 `location_hint = "weur"` before any real data load.
+- **Backup retention:** D1 automatic backups (hourly, 24 h) and Time Travel PITR (30 days) are accepted as the technical erasure horizon (RETENTION_SCHEDULE.md R10); no R2 export backup is configured.
+- **Breach notification:** Cloudflare's DPA commits the processor to notifying us per art. 33(2) without undue delay; our procedure is BREACH_PROCEDURE.md. OpenAI's sign-in incidents are governed by OpenAI's own incident commitments — no OSDB data at risk there.
+- **Onboarding rule:** no new processor/sub-processor may be onboarded without a DPA review and DPO sign-off (art. 28(2)).
 
-- Encryption in transit (TLS) on all endpoints.
-- Least-privilege access: pending records, evidence, and audit data accessible
-  only to moderators; public query boundary enforced in code and by tests
-  (ADR 0001).
-- Secrets stored in the hosting platform, never in source or client bundles.
-- Rate limiting and authentication before real public submissions (H2 — to be
-  implemented).
-- Pseudonymous reviewer identifiers; no emails in logs (M4).
-- Audit logging of moderation decisions (2-year retention).
-- Encrypted backups with restoration drill (DEPLOYMENT.md).
+## 4. Open items before launch
 
-## Maintenance
-
-- Review and re-archive the sub-processor annexes of P1/P2 **at least
-  annually** and whenever a DPA version changes.
-- Any new processor (e.g. evidence object storage, monitoring, tile provider)
-  must be added to this register **before** going live and assessed under
-  Chapter V GDPR (LAWFUL_BASIS.md, Category F).
+- [ ] Execute Cloudflare DPA (SCC) with the confirmed controller entity; pin D1 region `weur`.
+- [ ] **Confirm the applicable SCC version at DPA execution:** the Commission has announced a new generation of SCCs (public consultation Q4 2024; adoption announced for 2025) to replace the 2021/914 clauses. The register and the DPA must reference the SCC version in force at signature.
+- [ ] Wire ChatGPT auth to `/moderation` (fixes H1) and verify the identity attributes actually received (name fields may be null).
+- [ ] Confirm whether Cloudflare's sub-processor list changes require an updated review at contract signature.
+- [ ] Choose and assess the production map-tile provider (H5).
