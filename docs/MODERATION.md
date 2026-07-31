@@ -30,7 +30,7 @@ OpenSurveillanceDB may publish a record only when it documents visible public su
 
 ## Appeals and corrections
 
-Before public launch, the project must provide a simple, reachable way to challenge a record, request correction, or report harm. Urgent privacy/safety reports should be temporarily hidden while reviewed. Decisions and rationale should be auditable internally, without exposing reporters or reviewers.
+Before public launch, the project must provide a simple, reachable way to challenge a record, request correction, or report harm. Urgent privacy/safety reports should be temporarily hidden while reviewed. Decisions and rationale should be auditable internally, without exposing reporters or reviewers. Service-level targets for responses, decisions, emergency hides, and appeals are defined in [MODERATION_SLA.md](MODERATION_SLA.md) (draft, pre-launch).
 
 ## Moderator safeguards
 
