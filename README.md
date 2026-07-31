@@ -52,6 +52,8 @@ The documentation is part of the project and is intended to be discussed openly.
 - [Open-source and data licensing](docs/OPEN_SOURCE.md)
 - [OpenStreetMap integration](docs/OSM_INTEGRATION.md)
 - [Deployment and operations](docs/DEPLOYMENT.md)
+- [Local release checklist](docs/RELEASE_CHECKLIST.md)
+- [Changelog](CHANGELOG.md)
 - [Governance](GOVERNANCE.md)
 
 ## Run locally

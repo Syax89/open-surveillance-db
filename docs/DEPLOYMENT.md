@@ -30,6 +30,12 @@ The default local database is seeded with demo pins. Do not load real reports in
 5. Deploy production, monitor health and error rates, and record the release.
 6. Publish a concise changelog and data-export version where applicable.
 
+For the current local environment (LXC 114), a concrete step-by-step checklist
+with exact commands — build verification, changelog, tag, deploy, smoke tests,
+rollback — lives in [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md). The
+Operations manual ([OPERATIONS.md](OPERATIONS.md)) covers monitoring, backups,
+and the Workers rollback plan.
+
 ## Build and verification
 
 The production build is a single command; lint, type-check, and the privacy
