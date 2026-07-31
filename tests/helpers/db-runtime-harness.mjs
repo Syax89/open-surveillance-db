@@ -1,22 +1,29 @@
-// Runtime harness for the database layer (db/cameras.ts, db/moderation.ts).
+// The runtime harness for the database layer (db/cameras.ts, db/moderation.ts).
 //
 // The api-harness in tests/helpers/api-harness.mjs transpiles *route*
 // handlers and stubs every db module. This harness goes one level deeper:
 // it transpiles the real database modules against an injectable
 // `cloudflare:workers` env mock, so the actual SQL (status transitions,
-// event writes, public queries, seeding) runs against a real in-memory
-// SQLite database through the D1 adapter in tests/helpers/d1-sqlite.mjs.
+// event writes, public queries) runs against a real in-memory SQLite
+// database through the D1 adapter in tests/helpers/d1-sqlite.mjs.
+//
+// H3: the schema is no longer created at runtime (getD1() is a pure binding
+// passthrough). applyDrizzleMigrations() replays the real Drizzle migration
+// files (drizzle/0000-*.sql ... 0006-*.sql) on the in-memory database, so
+// tests exercise exactly what `wrangler d1 migrations apply` produces on a
+// fresh local DB — with zero demo rows.
 //
 // Every load builds a fresh temp tree, so module instances never share
 // state across tests.
 
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+const DRIZZLE_DIR = path.join(root, "drizzle");
 
 const DB_MODULES = [
   { source: "db/cameras.ts", output: "db/cameras.mjs" },
@@ -42,6 +49,7 @@ async function buildTree() {
   );
 
   await mkdir(path.join(tree, "db"), { recursive: true });
+  await mkdir(path.join(tree, "app", "lib"), { recursive: true });
   for (const { source, output } of DB_MODULES) {
     const sourcePath = path.join(root, source);
     const compiled = ts.transpileModule(await readFile(sourcePath, "utf8"), {
@@ -76,6 +84,18 @@ export async function loadDbRuntime() {
   const cameras = await import(pathToFileURL(path.join(tree, "db/cameras.mjs")).href);
   const moderation = await import(pathToFileURL(path.join(tree, "db/moderation.mjs")).href);
   return { env: envModule.env, cameras, moderation };
+}
+
+// Replays the real Drizzle migration files (drizzle/0000-*.sql ... 0006-*.sql)
+// on a D1SqliteDatabase, mirroring `wrangler d1 migrations apply` on a fresh
+// local DB: 3 tables + 3 indexes + 19 cameras columns (16 base + 3 freshness), zero demo rows.
+export async function applyDrizzleMigrations(db) {
+  const files = (await readdir(DRIZZLE_DIR))
+    .filter((name) => /^\d{4}_.*\.sql$/.test(name))
+    .sort();
+  for (const file of files) {
+    db.exec(await readFile(path.join(DRIZZLE_DIR, file), "utf8"));
+  }
 }
 
 export async function cleanupDbRuntime() {

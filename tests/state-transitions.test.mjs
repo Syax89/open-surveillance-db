@@ -12,12 +12,14 @@
 //   5. correction-request decisions stay private and record their events;
 //   6. malformed moderation input cannot change any status.
 //
-// The suite is repeatable from an empty database (getD1 seeds the two demo
-// records) and requires no network access.
+// The suite is repeatable from an empty database: the schema is applied by
+// replaying the real Drizzle migrations (applyDrizzleMigrations), exactly
+// like `wrangler d1 migrations apply` on a fresh local DB — no runtime
+// demo seeding (H3) and no network access.
 
 import assert from "node:assert/strict";
 import { after, beforeEach, test } from "node:test";
-import { cleanupDbRuntime, loadDbRuntime } from "./helpers/db-runtime-harness.mjs";
+import { applyDrizzleMigrations, cleanupDbRuntime, loadDbRuntime } from "./helpers/db-runtime-harness.mjs";
 import { D1SqliteDatabase } from "./helpers/d1-sqlite.mjs";
 
 let runtime;
@@ -35,14 +37,13 @@ const REASON = {
 beforeEach(async () => {
   runtime = await loadDbRuntime();
   db = new D1SqliteDatabase();
+  // H3: the schema is delivered by the Drizzle migrations (0000-0005),
+  // exactly like `wrangler d1 migrations apply` on a fresh local DB.
+  // There is no runtime table creation and no demo seeding anymore.
+  await applyDrizzleMigrations(db);
   runtime.env.DB = db;
   cameras = runtime.cameras;
   moderation = runtime.moderation;
-  // The moderation tables (moderation_events, correction_requests) are
-  // created lazily by getModerationD1() on first use. Initialize the schema
-  // once up front so tests can inspect eventCount()/queues even before the
-  // first moderation call — mirrors a warm production DB.
-  await moderation.listPendingModerationItems();
 });
 
 after(async () => cleanupDbRuntime());
@@ -109,17 +110,18 @@ function publicTitles(records) {
 }
 
 // ---------------------------------------------------------------------------
-// Seeding and intake
+// Fresh database and intake
 // ---------------------------------------------------------------------------
 
-test("an empty database seeds two demo records, both publicly visible and without notes", async () => {
+test("a fresh database starts empty: no demo records and empty moderation queues", async () => {
   const records = await cameras.listPublicCameras();
-  assert.equal(records.length, 2);
-  assert.deepEqual(publicTitles(records), ["Illustrative record B", "Illustrative record A"]);
-  for (const record of records) {
-    assert.equal(record.status, "demo");
-    assert.ok(!Object.hasOwn(record, "notes"), "public records must never expose notes");
-  }
+  assert.equal(records.length, 0, "no demo records may be seeded at runtime (H3)");
+
+  const queue = await moderation.listPendingModerationItems();
+  assert.deepEqual(queue.cameraReports, []);
+  assert.deepEqual(queue.reviewCameras, []);
+  assert.deepEqual(queue.correctionRequests, []);
+  assert.deepEqual(queue.recentEvents, []);
 });
 
 test("a submitted camera starts pending and is absent from every public representation", async () => {
@@ -236,12 +238,13 @@ test("moderating a missing camera or a demo record returns null and writes nothi
   const missing = await moderation.moderateCamera(9999, "approve", REASON.verified, null);
   assert.equal(missing, null);
 
-  // Demo records (id 1 and 2 after seeding) are not moderation items.
-  const demoIds = (await cameras.listPublicCameras()).filter((record) => record.status === "demo").map((record) => record.id);
-  for (const id of demoIds) {
-    const decision = await moderation.moderateCamera(id, "approve", REASON.verified, null);
-    assert.equal(decision, null, `demo record #${id} must not be moderateable`);
-  }
+  // H3: demo records are never seeded at runtime. A record can still land in
+  // the reserved 'demo' status via a direct database edit, and it must not
+  // be moderateable (the public query whitelists demo, moderation does not).
+  const report = await submitReport({ title: "Demo-status camera" });
+  await db.prepare("UPDATE cameras SET status = 'demo' WHERE id = ?").bind(report.id).run();
+  const decision = await moderation.moderateCamera(report.id, "approve", REASON.verified, null);
+  assert.equal(decision, null, "demo record must not be moderateable");
 
   assert.equal(await eventCount(), before);
 });
@@ -257,12 +260,19 @@ test("only verified and demo cameras are publicly visible; every other status di
     { status: "needs_review", visible: false },
     { status: "rejected", visible: false },
     { status: "removed", visible: false },
+    { status: "demo", visible: true },
   ];
 
   for (const { status, visible } of visibility) {
     await t.test(`${status} -> ${visible ? "visible" : "hidden"}`, async () => {
       const report = await submitReport({ title: `Visibility ${status}`, latitude: 41.9, longitude: 12.5 });
-      await toStatus(report.id, status);
+      if (status === "demo") {
+        // H3: demo is not a moderation-reachable status; simulate the legacy
+        // reserved status with a direct database edit.
+        await db.prepare("UPDATE cameras SET status = 'demo' WHERE id = ?").bind(report.id).run();
+      } else {
+        await toStatus(report.id, status);
+      }
 
       const publicRecords = await cameras.listPublicCameras();
       assert.equal(

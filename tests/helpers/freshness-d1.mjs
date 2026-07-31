@@ -21,6 +21,7 @@ import os from "node:os";
 import path from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import ts from "typescript";
+import { applyDrizzleMigrations } from "./db-runtime-harness.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -39,6 +40,10 @@ export class FreshnessD1 {
 
   prepare(sql) {
     return new FreshnessStatement(this.database, sql);
+  }
+
+  exec(sql) {
+    this.database.exec(sql);
   }
 
   // Used by getD1()/getModerationD1() for CREATE TABLE/INDEX batches.
@@ -150,12 +155,16 @@ function loadDbModules() {
 
 /**
  * Fresh runtime per test: a brand-new in-memory SQLite database wrapped in the
- * D1 adapter, wired into env.DB. Returns the adapter (for raw SQL in tests)
- * and the real db/* module namespaces.
+ * D1 adapter, wired into env.DB. The schema is delivered by the real Drizzle
+ * migrations (applyDrizzleMigrations), exactly like `wrangler d1 migrations
+ * apply` on a fresh local DB — no runtime table creation, no demo seeding.
+ * Returns the adapter (for raw SQL in tests) and the real db/* module
+ * namespaces.
  */
 export async function freshRuntime() {
   const database = new DatabaseSync(":memory:");
   const d1 = new FreshnessD1(database);
+  await applyDrizzleMigrations(d1);
   globalThis.__OSDB_FRESHNESS_D1__ = d1;
   const modules = await loadDbModules();
   return { database, d1, ...modules };
