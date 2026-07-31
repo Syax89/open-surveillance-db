@@ -280,7 +280,7 @@ test("a removed record cannot be reverted to a public status by any action", asy
   // No transition leads out of `removed` in the current lifecycle.
   for (const action of ["approve", "reject", "hide", "mark-stale", "reverify"]) {
     const attempt = await moderation.moderateCamera(report.id, action, REASON.privacy, null);
-    assert.equal(attempt, null, `action ${action} must not revive a removed record`);
+    assert.equal(attempt.kind, "not_found", `action ${action} must not revive a removed record`);
   }
 
   const records = await cameras.listPublicCameras();
@@ -360,7 +360,7 @@ test("a correction request can be resolved with a reasoned, auditable decision",
 
   // The request is no longer pending: resolving it twice must fail.
   const again = await moderation.moderateCorrection(request.id, "reject", REASON.duplicate, null);
-  assert.equal(again, null);
+  assert.equal(again.kind, "not_found", "a second decision on a reviewed request must not apply");
 });
 
 test("a rejected correction request records its decision and leaves the pending queue", async () => {
@@ -379,9 +379,9 @@ test("a rejected correction request records its decision and leaves the pending 
   assert.equal(queue.correctionRequests.some((item) => item.id === request.id), false);
 });
 
-test("moderating a missing correction request returns null", async () => {
+test("moderating a missing correction request returns a not-found result", async () => {
   const result = await moderation.moderateCorrection(9999, "approve", REASON.verified, null);
-  assert.equal(result, null);
+  assert.equal(result.kind, "not_found");
 });
 
 // ---------------------------------------------------------------------------
@@ -453,12 +453,12 @@ test("compare-and-set guards prevent a second concurrent decision from applying"
     publishManufacturer: false,
     publishObservedOn: false,
   });
-  assert.equal(second, null, "a second approve on the same status must not apply");
+  assert.equal(second.kind, "not_found", "a second approve on the same status must not apply");
 
   const hidden = await moderation.moderateCamera(report.id, "hide", REASON.privacy, null);
   assert.ok(hidden);
   const hiddenAgain = await moderation.moderateCamera(report.id, "hide", REASON.privacy, null);
-  assert.equal(hiddenAgain, null, "a second hide on the same status must not apply");
+  assert.equal(hiddenAgain.kind, "not_found", "a second hide on the same status must not apply");
 
   // Exactly one audit event per applied decision.
   const queue = await moderation.listPendingModerationItems();
@@ -466,7 +466,7 @@ test("compare-and-set guards prevent a second concurrent decision from applying"
   assert.equal(eventsForReport.length, 2);
 });
 
-test("moderating a missing camera returns null", async () => {
+test("moderating a missing camera returns a not-found result", async () => {
   const result = await moderation.moderateCamera(9999, "hide", REASON.privacy, null);
-  assert.equal(result, null);
+  assert.equal(result.kind, "not_found");
 });
