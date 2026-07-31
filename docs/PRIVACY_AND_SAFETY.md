@@ -13,8 +13,8 @@ This project concerns surveillance, so it must hold itself to a high privacy and
 
 - Publish only public-facing, visible infrastructure after review.
 - Generalise locations when a precise point introduces unnecessary risk; **default publication precision is ~4 decimal places (~10 m, zone level), with the exact location kept in the private moderation record only** (decision 2026-07-31).
-- Do not publish images until a reviewable redaction workflow exists.
-- Strip EXIF/geolocation metadata from any accepted image unless the retained data is deliberately necessary and documented.
+- Do not publish images until a reviewable redaction workflow exists. Photo intake (2026-08): uploads are **never public by default** — they land in a private evidence store, EXIF/GPS metadata is stripped at the boundary before storage, and a photo becomes public only after a moderator approves it *and* explicitly confirms that the subject was redacted (fail-closed gate; the API rejects an approval without that confirmation).
+- Strip EXIF/geolocation metadata from any accepted image unless the retained data is deliberately necessary and documented. Enforcement is mandatory at ingestion: magic-byte container sniffing, MIME/size/dimension limits, and metadata stripping happen server-side before bytes are persisted; client-side checks are convenience only.
 
 ## User rights and accountability
 
