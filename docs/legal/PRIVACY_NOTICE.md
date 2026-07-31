@@ -1,124 +1,97 @@
-# Privacy notice (draft)
+# Privacy notice (draft — pre-launch)
 
-Status: **DRAFT — pre-launch.** This document is the draft art. 13 GDPR
-information notice. It must be completed with the final controller identity
-and contact, reviewed by external counsel, and localized (Italian + English)
-before publication. It is product guidance, not legal advice.
+- **Status:** draft for pre-launch review; controller contact details below are placeholders to be finalised at launch.
+- **Legal basis:** GDPR art. 13 (data collected from data subjects) and art. 14 (data not obtained from the data subject, e.g. records sourced from official public sources); D.Lgs. 196/2003 (Codice Privacy, IT) as primary jurisdiction.
+- **Version:** 0.2 (2026-07-31) — this document is a draft deliverable, not a published notice.
+
+> **Disclaimer:** this document is product guidance / not legal advice. It is a draft for pre-launch review and requires external counsel review before launch.
 
 ---
 
 ## 1. Who we are (controller)
 
-OpenSurveillanceDB is an open, non-commercial civic database that documents
-**visible public surveillance infrastructure** (cameras mounted in public
-spaces). It does not provide video feeds, tracking tools, or advice on
-avoiding lawful surveillance.
+- **Controller:** OpenSurveillanceDB Ltd. — *placeholder entity; community governance to be confirmed before launch (see ../GOVERNANCE.md).*
+- **Privacy contact / data-protection contact:** `privacy@…` *(placeholder address)* — for any question, data-subject request, or report. Response time: see § 8.
 
-- Controller: [TO BE CONFIRMED before launch — project maintainers / legal
-  entity, see DEPLOYMENT.md "Preconditions for a public environment"].
-- Data protection contact (DPO / privacy team): [TO BE CONFIRMED —
-  placeholder: privacy@…], one month response time, see section 7.
-- Representative: not applicable while the controller is established in the
-  EU/EEA.
+## 2. What the service does
 
-## 2. What we process, why, and on which legal basis
+OpenSurveillanceDB publishes a public-interest map of **visible, public surveillance infrastructure** (e.g. cameras mounted in public streets, squares, station exteriors), reviewed by trained moderators before publication. It is a civic-transparency project, not a commercial platform: no behavioural advertising, no tracking, no sale of data.
 
-| Processing | Data | Purpose | Legal basis |
-| --- | --- | --- | --- |
-| Publishing records of visible public surveillance infrastructure | Record fields in DATA_MODEL.md (`title`, `kind`, generalised location, `description`, `source`, `updated`, `status`; `manufacturer`/`observedOn` only with an explicit per-field moderator opt-in) | Civic transparency about visible surveillance in shared spaces; public research; accountability | Art. 6(1)(f) GDPR — legitimate interest of civic transparency, assessed in LAWFUL_BASIS.md |
-| Receiving community reports | Report fields (`title`, `kind`, location, optional `address`, `notes`, optional `manufacturer`, optional `observedOn`; no identity required) | Moderation and verification of submissions; abuse prevention | Art. 6(1)(f) GDPR — legitimate interest in operating a moderated public-interest service |
-| Handling correction / removal requests | `correction_requests`: issue type, message, **optional contact** (e.g. email) | Processing rights requests and corrections | Art. 6(1)(c) GDPR (obligations under GDPR arts. 12–22) and 6(1)(f) (managing requests) |
-| Moderation | Moderation audit events with **pseudonymous** reviewer identifier; never emails in logs | Accountability, internal audit of decisions | Art. 6(1)(f) GDPR and art. 32 GDPR (security) |
-| Service operation | Technical logs (aggregate), rate limiting | Security, availability | Art. 6(1)(f) GDPR |
+## 3. What personal data we process
 
-We do **not** use the data for behavioural advertising, profiling, or automated
-decision-making (art. 22 GDPR).
+| Data | Source | Purpose | Legal basis |
+|------|--------|---------|-------------|
+| Report content: location, description, optional `manufacturer` / `observedOn`, private `notes` | Reporter (data subject) | Build the public record; moderation queue | art. 6(1)(f) (see LAWFUL_BASIS.md) |
+| Contributor pseudonymous internal ID + submission timestamp | Reporter | Abuse prevention, provenance | art. 6(1)(f) |
+| Evidence (files/links attached to a report) | Reporter | Verification of the record | art. 6(1)(f); retained private, tied to the record (RETENTION_SCHEDULE.md R6) |
+| Correction / takedown request (contact details the requester provides, e.g. email) | Requester | Exercise of rights, harm reports | art. 6(1)(c) (GDPR arts. 15-22) and 6(1)(f) |
+| Moderator identity (email, display name, full name via ChatGPT sign-in) | OpenAI (identity provider) | Authenticate moderators; separate moderation credentials (../MODERATION.md) | art. 6(1)(f); **never logged or stored by the application** |
+| Moderation audit entries (decision, reason code, timestamp, reviewer **pseudonym**) | The project | Accountability, appeals | art. 6(1)(f); never public (aggregate transparency reports only) |
+| Published records | Moderated reports / official public sources | The public dataset (ODbL 1.0) | art. 6(1)(f) / 6(1)(e) — see LAWFUL_BASIS.md |
 
-## 3. What we do NOT collect or publish
+**Records from official public sources (art. 14(2)(f)):** where a record is republished from an official public source (`source: official`), the data was not obtained from the data subject. The source categories are: public registers and transparency portals of public administrations (e.g. in Italy, D.Lgs. 33/2013 datasets), published public-authority documents, and other publicly accessible official sources. Such records are checked per record under the source's own legal regime (see LAWFUL_BASIS.md § 3.2).
 
-- No video, live streams, credentials, network information, or control
-  interfaces.
-- No private-home cameras or cameras pointing into private interiors.
-- No personal names, faces, vehicle plates, or precise operational details
-  (PRIVACY_AND_SAFETY.md, MODERATION.md).
-- Submissions are stored as `pending` and are **never public** until a
-  moderator approves them (ADR 0001).
+**Voluntary provision (art. 13(2)(e)):** providing data for a report is **voluntary** — it is neither a statutory nor a contractual requirement. The only consequence of not providing it is that the report cannot be processed (or, for optional fields, that the record will carry less detail). There is no obligation to provide data, and no penalty for declining.
 
-## 4. Where data goes (recipients and transfers)
+**Special categories (art. 9 GDPR):** none are intentionally collected. Evidence that incidentally captures identifiable people, plates, or private interiors is redacted or deleted (../MODERATION.md; RETENTION_SCHEDULE.md R6).
 
-- **Cloudflare, Inc.** — hosting (Workers) and database (D1). Processor under
-  the Cloudflare Data Processing Addendum (DPA v6.3, June 2025), which
-  incorporates the EU Standard Contractual Clauses (2021/914); Cloudflare
-  participates in the EU–US Data Privacy Framework. D1 data-location
-  configuration (location hints / jurisdiction constraints) must be set for
-  the EU before production. See PROCESSOR_REGISTER.md.
-- **OpenAI** — authentication of moderators ("Sign in with ChatGPT", scaffold
-  in `app/chatgpt-auth.ts`): OpenAI receives the moderator's email and full
-  name in request headers (`oai-authenticated-user-*`). OpenAI acts under its
-  Data Processing Addendum. These headers are **never logged** by the
-  application. This flow is not yet wired to any page and must either be
-  completed with this privacy review or removed (finding H1).
-- **OpenStreetMap Foundation** — map tiles are fetched by the visitor's
-  browser directly from OSM servers; OSMF is an independent controller under
-  its own privacy policy. The project does not send personal data to OSMF.
-- **Public redistribution** — published records are exported under ODbL 1.0.
-  Copies already downloaded cannot be recalled; removed records are excluded
-  from future exports.
+**Children:** the service is addressed to adults. In Italy, submitting a report requires the age of consent for information-society services (14 years, art. 2-quinquies D.Lgs. 196/2003); other jurisdictions apply their own age thresholds.
 
-## 5. How long we keep data
+## 4. What we do NOT collect or publish (negative scope)
 
-Published in the retention schedule: [RETENTION_SCHEDULE.md](RETENTION_SCHEDULE.md)
-(90 days for unreviewed reports, 30 days for rejected reports, verification
-cycle for published records, 2 years for correction requests and moderation
-audit events, evidence tied to its record).
+- **No video, live streams, credentials, network information, or control interfaces** — the project documents the *existence* of visible surveillance infrastructure, never its output or access.
+- **No private-home cameras** or cameras pointing into private interiors.
+- **No personal names, faces, vehicle plates, or precise operational details** (../PRIVACY_AND_SAFETY.md, ../MODERATION.md).
+- **No behavioural advertising, no tracking, no sale of data**, no analytics libraries.
+- Submissions are stored as `pending` and are **never public** until a moderator approves them (ADR 0001). Rejected content is never published.
 
-## 6. Your rights
+This negative scope strengthens the reasonable expectations of data subjects and is a material input to the art. 6(1)(f) balancing test (LAWFUL_BASIS.md § 3.1).
 
-Under GDPR arts. 15–22 you have the right to:
+## 5. Recipients and transfers
 
-- **Access** (art. 15) — a copy of the personal data we hold about you.
-- **Rectification** (art. 16) — correct inaccurate data, e.g. through the
-  correction/request form.
-- **Erasure** (art. 17) — ask for deletion of your data.
-- **Restriction** (art. 18) — limit processing in the cases listed by the law.
-- **Portability** (art. 20) — where the basis is consent or contract (this
-  project relies on legitimate interest, so portability is limited).
-- **Objection** (art. 21) — object to processing based on legitimate interest;
-  we will stop unless we demonstrate compelling legitimate grounds.
-- **Lodging a complaint** — with the Italian Data Protection Authority
-  (Garante per la protezione dei dati personali, garanteprivacy.it) or the
-  supervisory authority of your residence (art. 77 GDPR).
+- **Cloudflare, Inc.** — hosting and database (Workers + D1). Processor (art. 28) under the Cloudflare Data Processing Addendum (**DPA v6.3, June 2025**) incorporating **EU Standard Contractual Clauses (2021/914)**; Cloudflare is certified under the **EU–US Data Privacy Framework** (additional transfer ground). D1 configured for EU residency (`weur` location hint). See PROCESSOR_REGISTER.md.
+- **OpenAI (ChatGPT sign-in)** — identity provider for moderators. OpenAI is an **independent controller of its own authentication service** (its privacy policy applies at sign-in); no OpenSurveillanceDB data is sent to OpenAI — we only receive the identity attributes listed in § 3. Never published, never logged.
+- **Publication itself:** verified records become part of a public dataset licensed ODbL 1.0 and may be downloaded/exported (JSON/CSV/GeoJSON). This is the purpose of the service, disclosed here. Copies already downloaded cannot be recalled; removed records are excluded from future exports.
+- No other recipients; no behavioural advertising; no analytics libraries.
 
-## 7. How to exercise rights and response times
+## 6. International data transfers (Cap. V GDPR)
 
-- Use the correction/request form on the site, or contact the privacy contact
-  in section 1.
-- We may ask for reasonable identity verification when we have doubts about
-  your identity (art. 12(6)); we will not ask for more information than
-  necessary.
-- We respond **within one month** (art. 12(3)), extendable by two further
-  months with a notification of the delay.
-- Urgent privacy/safety reports: hidden within 24 hours, reviewed promptly
-  (MODERATION_SLA.md).
+- Cloudflare: transfers covered by the Cloudflare DPA incorporating **EU Standard Contractual Clauses (2021/914)**; supplementary measures assessed for US processing (encryption in transit, EU residency for D1). Full assessment in PROCESSOR_REGISTER.md.
+- OpenAI sign-in: identity attributes are exchanged with OpenAI's services; the sign-in flow is governed by OpenAI's terms/privacy policy (see above).
 
-## 8. Security
+## 7. Retention
 
-We apply appropriate technical and organisational measures (art. 32): TLS in
-transit, least-privilege access to moderation data, secrets outside source
-code, rate limiting and authentication before real submissions (to be
-completed — findings H1/H2), pseudonymous reviewer identifiers, and encrypted
-backups.
+See the published retention schedule (RETENTION_SCHEDULE.md): pending reports 90 days; rejected 30 days; verified records subject to a review cycle; correction requests and audit entries 2 years; evidence tied to the record; operational logs ≤ 12 months (aggregate); backups rotated by the provider (up to 30 days point-in-time recovery).
 
-## 9. Changes to this notice
+## 8. Your rights (GDPR arts. 15-22)
 
-The notice is versioned in the repository (`docs/legal/`). Material changes
-are announced in the project changelog before taking effect.
+You may request, free of charge:
+
+- **Access** (art. 15) — confirmation and copy of your data.
+- **Rectification** (art. 16) — correction of inaccurate data.
+- **Erasure** (art. 17) — deletion, subject to the exceptions in art. 17(3) and the retention schedule.
+- **Restriction** (art. 18) and **objection** (art. 21).
+- **Portability** (art. 20) — where technically applicable.
+- No automated decision-making, including profiling, is performed (art. 22).
+
+**How to exercise them:** write to `privacy@…`. To protect data subjects, we may ask you to verify your identity (proportionate to the request, e.g. by confirming details only you could know or providing a copy of an ID for requests about your personal data).
+
+**Timeline:** we respond within **1 month** (art. 12(3)); this may be extended by up to 2 further months for complex requests, with notice. If we refuse, we explain why and remind you of your right to complain.
+
+**Complaints:** you may complain to the competent supervisory authority — in Italy, the *Garante per la protezione dei dati personali* (www.garanteprivacy.it).
+
+## 9. Contact and monitoring
+
+- Privacy contact: `privacy@…` — first response within 48 h, substantive response within 14 days (MODERATION_SLA.md).
+- This notice is reviewed at launch and then at least annually, or on any material change; the version history is kept in the repository.
+
+## 10. Open items before launch
+
+- [ ] **Italian localization of this notice** (primary jurisdiction; GDPR art. 12(1) "clear and plain language") — to be published bilingually (Italian + English) before launch.
+- [ ] Confirm the final controller entity and the monitored mailbox (sections 1 and 9).
+- [ ] Confirm the applicable SCC version at DPA execution (new-generation SCCs announced for adoption in 2025 — see PROCESSOR_REGISTER.md open items).
+- [ ] Per-jurisdiction review (see LAWFUL_BASIS.md § 6) and external counsel review.
 
 ---
 
-### Localization and completion checklist (before launch)
-
-- [ ] Final controller identity and privacy contact (DEPLOYMENT.md precondition).
-- [ ] Italian localization of this notice (primary jurisdiction).
-- [ ] Independent legal review.
-- [ ] Link from the site footer and from the data export notices.
+*Draft note: sections 1 and 9 contain placeholder contact data. The final notice requires confirmation of the controller entity, a monitored mailbox, and per-jurisdiction review (see LAWFUL_BASIS.md § 6) before public launch.*

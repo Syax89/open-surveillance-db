@@ -4,7 +4,7 @@
 
 Report vulnerabilities that could expose contributor identities, unpublished submissions, moderation tools, database credentials, or permit unauthorized changes to records.
 
-Do not include exploit details, tokens, personal data, or live endpoints in a public issue. Before public launch, the project must publish a monitored private disclosure address and a response-time commitment.
+Do not include exploit details, tokens, personal data, or live endpoints in a public issue. Before public launch, the project must publish a monitored private disclosure address and a response-time commitment; breach handling and notification are defined in [docs/legal/BREACH_PROCEDURE.md](docs/legal/BREACH_PROCEDURE.md).
 
 ## Current prototype
 

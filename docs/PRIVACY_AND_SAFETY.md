@@ -18,7 +18,7 @@ This project concerns surveillance, so it must hold itself to a high privacy and
 
 ## User rights and accountability
 
-The public service needs, before launch: a privacy notice, lawful-basis analysis for each operating jurisdiction, retention schedule, correction/removal path, data-access contact, and processor/subprocessor register. Records of moderation decisions must be protected from public exposure while sufficient transparency reporting is published in aggregate.
+The public service needs, before launch: a [privacy notice](legal/PRIVACY_NOTICE.md), [lawful-basis analysis](legal/LAWFUL_BASIS.md) for each operating jurisdiction, [retention schedule](legal/RETENTION_SCHEDULE.md), correction/removal path, data-access contact, and [processor/subprocessor register](legal/PROCESSOR_REGISTER.md). Records of moderation decisions must be protected from public exposure while sufficient transparency reporting is published in aggregate. Breach handling is defined in [BREACH_PROCEDURE.md](legal/BREACH_PROCEDURE.md); all pre-launch drafts are collected in the [LEGAL_DELIVERABLES_INDEX.md](legal/LEGAL_DELIVERABLES_INDEX.md).
 
 ## Abuse prevention
 

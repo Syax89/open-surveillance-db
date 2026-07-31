@@ -1,95 +1,103 @@
-# Personal data breach procedure
+# Personal data breach procedure (GDPR arts. 33-34)
 
-Status: **DRAFT — pre-launch.** Procedure under GDPR arts. 33 and 34 for
-personal data breaches affecting the service. References: GDPR art. 4(12)
-(definition), 33 (notification to the supervisory authority), 34
-(communication to data subjects), 33(5) (breach register), 32 (security).
+- **Status:** draft for pre-launch review
+- **Owner:** Rosa (DPO / privacy contact); containment coordinated with Ada (CTO)
+- **Scope:** any incident that leads to accidental or unlawful destruction, loss, alteration, or unauthorised disclosure of, or access to, personal data held by OpenSurveillanceDB — including pending submissions, evidence, correction requests, and moderator identity attributes.
 
-## 1. Definitions and scope
+> **Disclaimer:** this document is product guidance / not legal advice. It is a draft for pre-launch review and requires external counsel review before launch.
 
-- **Personal data breach**: a breach of security leading to the accidental or
-  unlawful destruction, loss, alteration, unauthorised disclosure of, or
-  access to, personal data transmitted, stored, or otherwise processed.
-- In scope: pending submissions, correction requests (incl. `contact`),
-  moderation audit data, moderator identity data, and any future evidence.
-  Public record data is not personal data but may be involved in an incident.
+---
+
+## 1. Roles
+
+| Role | Person (pre-launch) | Duty |
+|------|--------------------|----|
+| **Privacy contact / first responder** | Rosa (DPO) | Receive reports, run triage, decide notifications, own the breach register |
+| **Technical containment** | Ada (CTO) | Stop the leak, preserve evidence, analyse root cause |
+| **Communication** | Marie (docs) | Internal/external statements under privacy-contact direction |
+| **Escalation** | Angelina (CEO) | High-risk incidents: approval of data-subject notification, external communication |
+| **On-call** | Defined at launch (monitored mailbox + pager rotation) | Guarantee a response outside business hours once the service is public |
 
 ## 2. Detection
 
-Sources: monitoring and error alerts (DEPLOYMENT.md), moderation team reports,
-the security disclosure process (SECURITY.md — private, monitored address
-before launch), hosting-provider notifications (Cloudflare), and internal
-testing.
+Sources of detection:
 
-## 3. Triage — risk assessment (art. 33(1))
+- Cloudflare incident notification (per the Cloudflare DPA, art. 33(2) flow — processor notifies us without undue delay);
+- application/monitoring alerts (5xx spikes, unexpected 403/429 patterns, /moderation access anomalies once auth is wired);
+- reports from users, moderators, or third parties (privacy@ mailbox);
+- scheduled internal checks (logs review, moderation audit log review).
 
-Within the first hours, assess likelihood and severity of risk to the rights
-and freedoms of natural persons, considering:
+Any team member who suspects a breach must report it to the privacy contact **within 1 hour** of suspicion — suspicion is enough; confirmation is the triage step.
 
-- **Confidentiality**: was personal data disclosed to unauthorised parties?
-- **Integrity**: was data altered or destroyed?
-- **Availability**: was data made inaccessible (e.g. D1 outage, ransomware)?
+## 3. Triage and severity assessment
 
-Reference scenarios for this project:
+1. **Confirm** whether personal data is involved and the breach type: confidentiality (unauthorised access/disclosure), integrity (alteration), availability (loss/destruction).
+2. **Assess likelihood × impact** of risk to data subjects:
 
-| Scenario | Likely risk level | Notes |
-| --- | --- | --- |
-| Unauthorised access to `/moderation` (pending records, notes, correction requests visible) | High | Pending submissions contain location and free-text notes; correction requests may contain a contact address. |
-| Public API leaking non-public fields (e.g. `notes` boundary regression — cf. finding H3) | Medium/High | Content not reviewed becomes public; mitigation: boundary tests, immediate fix and removal from exports. |
-| Database exfiltration (D1 credentials, backups) | High | Includes evidence and moderation data if stored. |
-| Logs capturing moderator email/full name (M4 regression) | Medium | Prevented by design; check all logging sinks if suspected. |
-| Loss of availability (protracted outage / data loss) | Low/Medium | Restoration from encrypted backups; deletion obligations of the retention schedule may be affected. |
+| | Low impact | Medium impact | High impact |
+|---|---|---|---|
+| **Likely** | Medium | High | **High** |
+| **Unlikely** | Low | Medium | High |
+| **Remote** | Low | Low | Medium |
 
-## 4. Notification to the supervisory authority (art. 33)
+Impact factors: data category (location data, evidence, identities rank higher), volume, whether data was pseudonymised, whether published, exploitability, mitigations in place (e.g. encryption at rest — D1 data is encrypted at rest by the provider; TLS in transit).
 
-- Where the breach is likely to result in a **risk** to rights and freedoms,
-  notify the Garante per la protezione dei dati personali (Italy) **within
-  72 hours** of becoming aware (art. 33(1)).
-- Content (art. 33(3)): (a) nature of the breach, categories and approximate
-  number of data subjects and records; (b) name and contact of the DPO/privacy
-  contact; (c) likely consequences; (d) measures taken or proposed. Where
-  information is not yet available, it is provided in phases without undue
-  delay (art. 33(4)).
-- If the breach is **not likely** to result in a risk, it is documented
-  internally and not notified (art. 33(1) second sentence); the reasoning is
-  recorded.
+3. **Classify:**
+   - **Low/Medium:** contain, document in the register; notify the Garante only if required by the assessment.
+   - **High:** contain + notify the Garante within 72 h (art. 33) + assess data-subject notification (art. 34).
+   - **Not personal data** (e.g. leak of demo records only): still document; no GDPR notification.
 
-## 5. Communication to data subjects (art. 34)
+## 4. Containment and recovery
 
-- Communicate **without undue delay** where the breach is likely to result in
-  a **high risk** (art. 34(1)), in clear and plain language: nature of the
-  breach, contact of the privacy team, likely consequences, measures taken.
-- Exemptions (art. 34(3)): encryption or other measures making data
-  unintelligible; subsequent measures eliminating the high risk; or where
-  communication would involve disproportionate effort (public communication in
-  that case).
+- Ada (CTO) leads: revoke/rotate credentials, take the affected route offline (e.g. disable the endpoint, apply auth — see H1/H2 mitigations), preserve logs and database state **before** remediation (Time Travel PITR can serve as evidence snapshot and rollback point), stop further exposure.
+- For published-data incidents: hide affected records immediately (MODERATION_SLA.md emergency flow) pending review.
+- Communicate internally on a need-to-know basis; no public statements without the privacy contact.
 
-## 6. Breach register (art. 33(5))
+## 5. Notification
 
-Record every breach — date, facts, effects, remedial action, notification
-decisions and rationale. Proposed retention: 5 years from the last record,
-extended on legal hold (the GDPR does not fix a term; 5 years is a practical
-audit horizon to be confirmed with counsel).
+### 5.1 To the supervisory authority (art. 33 GDPR)
 
-## 7. Roles
+- **When:** within **72 hours** of becoming aware, unless the breach is unlikely to result in a risk to the rights and freedoms of natural persons. If not feasible within 72 h, notify with reasons for the delay.
+- **Authority (IT):** *Garante per la protezione dei dati personali* (www.garanteprivacy.it — breach notification form).
+- **Content (art. 33(3)):** nature of the breach; categories and approximate number of data subjects and records; measures taken/planned; contact point for information; where available, the data categories (not the data itself).
+- The 72-h clock starts when the controller (privacy contact) *becomes aware* — i.e. at confirmation in step 3, not at discovery of suspicion.
 
-- **Privacy/DPO lead (Rosa / legal function)**: risk classification,
-  notification to the authority, communication to data subjects, register.
-- **Technical lead (Ada / CTO)**: containment, fix, forensics, restoration.
-- **Maintainers**: public communication, incident post-mortem.
-- Notification to affected data subjects uses the channels of the privacy
-  notice; where the only contact stored is the correction-request `contact`,
-  it is used solely for this purpose.
+### 5.2 To data subjects (art. 34 GDPR)
 
-## 8. Post-incident
+- **When:** where the breach is likely to result in a **high risk** to rights and freedoms — communicate **without undue delay**, in clear and plain language.
+- **Content (art. 34(2)):** nature of the breach; the privacy contact to obtain more information; likely consequences; measures taken.
+- **Exceptions (art. 34(3)):** (a) data were encrypted/pseudonymised such that they are unintelligible; (b) subsequent measures eliminate the high risk; (c) disproportionate effort — in that case a public communication (e.g. site notice, press release) is required instead.
+- **Internal database leak vs. public dataset:** for the public dataset (mostly non-personal infrastructure data) art. 34 rarely applies; it applies to leaked pending submissions, evidence, or moderator identities.
 
-1. Root-cause analysis and corrective actions (code, tests, access control).
-2. Update this procedure, the PROCESSOR_REGISTER.md (if a processor caused the
-   incident), and the incident runbook.
-3. Assess whether the incident triggers a review of the DPIA (LAWFUL_BASIS.md).
+## 6. Documentation (breach register)
 
-## 9. Contact
+Every breach — including low-risk and near-misses — is recorded:
 
-Privacy contact placeholder (see PRIVACY_NOTICE.md section 1) and the
-SECURITY.md disclosure address — both must be real and monitored **before**
-launch (SECURITY.md).
+| Field | Content |
+|-------|---------|
+| Date/time | When detected, when confirmed, when contained |
+| Description | Facts, data categories, approximate volumes |
+| Cause / root cause | Later analysis |
+| Effects | Actual or potential consequences |
+| Remedial action | Steps taken and by whom |
+| Notification decision | To whom (Garante/data subjects/public), when, content, rationale |
+| Lessons learned | Actions to prevent recurrence |
+
+Retention: **2 years** (aligned with the audit log, RETENTION_SCHEDULE.md R5/R9); the register is not public.
+
+## 7. Post-incident review
+
+- Root-cause analysis with Ada; corrective actions tracked as tasks (this kanban board) with owners and deadlines.
+- Review this procedure and the privacy notice if the incident reveals gaps; report lessons to the advisory circle (../GOVERNANCE.md).
+- Aggregate breach statistics (counts by severity, no incident detail) feed the quarterly transparency report.
+
+## 8. Communication templates (draft)
+
+- **Internal alert:** `[BREACH] <severity> — <summary> — detected <timestamp> — owner <name>`.
+- **Garante notification:** structured per art. 33(3) — see 5.1.
+- **Data-subject notice:** plain-language email/page: what happened, what data, what we are doing, what they can do, contact.
+- **Public statement (only via Marie under privacy-contact direction):** factual, no speculation, no victim blaming, no unverified details.
+
+---
+
+*Pre-launch note: this procedure becomes operational once the privacy mailbox and on-call rotation exist (see PRIVACY_NOTICE.md § 9 and ../GOVERNANCE.md "Before launch").*

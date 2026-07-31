@@ -1,113 +1,90 @@
 # Lawful-basis assessment (outline)
 
-Status: **DRAFT outline — pre-launch.** Framework per processing category under
-GDPR art. 6, with the balancing test for the core activity. The outline must be
-completed per operating jurisdiction before launch; primary jurisdiction for
-this draft is Italy (D.Lgs. 196/2003 "Codice Privacy", as amended by
-D.Lgs. 101/2018).
+- **Status:** draft outline for pre-launch review (ADR 0002)
+- **Owner:** Rosa (DPO / privacy)
+- **Jurisdiction (primary):** European Union — GDPR (EU) 2016/679; Italy — D.Lgs. 196/2003 (Codice Privacy, as amended by D.Lgs. 101/2018)
+- **Documents this supports:** PRIVACY_NOTICE.md, PROCESSOR_REGISTER.md
 
-Method: for each processing category we identify (a) a lawful basis under
-art. 6(1), (b) necessity of the specific data, (c) a documented balancing of
-the controller's interests against the rights and freedoms of data subjects,
-following the three-step legitimate-interest test of Article 29 Working Party
-Opinion 06/2014 (WP217): legitimate interest → necessity → balancing.
+> **Disclaimer:** this document is product guidance / not legal advice. It is a draft for pre-launch review and requires external counsel review before launch.
 
-## Category A — Publishing records of visible public surveillance infrastructure
+---
 
-- Basis: **art. 6(1)(f) GDPR — legitimate interest** of the controller and of
-  the public in civic transparency about visible surveillance infrastructure
-  in shared spaces.
-- Interest: informing the public about where cameras are installed in public
-  areas; enabling scrutiny, research, and accountability; no commercial
-  purpose (README.md: "non-commercial civic database").
-- Necessity: publication is the minimum needed for the purpose; the project
-  publishes only record metadata (DATA_MODEL.md), never feeds, credentials, or
-  operational capability (MODERATION.md exclusions). Per-field publication
-  opt-in for `manufacturer`/`observedOn`; coordinate generalisation where a
-  precise point adds risk (PRIVACY_AND_SAFETY.md).
-- Balancing (impact on data subjects): the records describe **infrastructure,
-  not individuals**. Impacts to weigh: (i) misidentification/accuracy —
-  mitigated by the review lifecycle and the correction/removal path;
-  (ii) location data at building granularity — mitigated by generalisation and
-  the exclusion of private premises; (iii) no sensitive data (art. 9) is
-  collected by design. Weight in favour: public visibility of the
-  infrastructure, civic-transparency purpose, human moderation before
-  publication (MODERATION.md), aggregate transparency reporting instead of
-  exposing reporters/reviewers.
-- Outcome: on the current design, the legitimate interest is compelling and
-  the mitigations are sufficient to keep the processing proportionate.
-  **Reassessment triggers**: any future inclusion of images of people,
-  non-public cameras, or per-address precision requires a new balancing.
+## 1. Preliminary question: is the public dataset personal data at all?
 
-## Category B — Public-interest basis (art. 6(1)(e))
+Published camera records describe **infrastructure** (a camera, its kind, its public location), not natural persons. Under GDPR art. 1 and Recital 14 the Regulation does not cover legal persons, and data about inanimate objects or infrastructure is generally **not personal data** (art. 4(1)) — a camera location does not relate to an identified or identifiable natural person. The GDPR therefore does **not** constrain the publication of the dataset itself in most cases.
 
-- Art. 6(1)(e) (task in the public interest / official authority) is available
-  only where the processing has a statutory basis or is carried out by a
-  public authority. As a private civic project there is currently **no
-  statutory basis** for this specific inventory under Italian law (D.Lgs.
-  196/2003 does not grant private parties a specific basis for building
-  surveillance-infrastructure databases). Therefore **6(1)(f) is the primary
-  basis** for the core activity.
-- Revisit if: the project is operated by or commissioned by a public body, or
-  a specific legal provision is enacted in an operating jurisdiction.
+**The GDPR does apply** to the operational pipeline that supports it, which processes personal data:
 
-## Category C — Community reports (pending submissions)
+1. reports and evidence submitted by contributors (may contain incidental personal data);
+2. contributor pseudonymous IDs and submission metadata;
+3. correction/takedown requests (requester contact details);
+4. moderation records and moderator identities (via ChatGPT sign-in);
+5. correspondence with the privacy contact.
 
-- Basis: art. 6(1)(f) — operating a moderated civic service, preventing abuse
-  and spam.
-- Necessity: `title`/`kind`/position are the minimum for a useful record;
-  `address` optional; `manufacturer`/`observedOn` optional and private until a
-  moderator opts in per field; `notes` free text kept as moderation context,
-  never published (boundary fix H3 pending). No identity is required to
-  submit (pseudonymous contributor reference where possible — DATA_MODEL.md).
-- Balancing: low impact (no identity), high protective measures (pending
-  status, moderation before publication). Outcome: proportionate.
+This assessment covers those operations. Where a record is republished from an official public source (`source: official`), the source's own legal regime (national transparency law) is checked per record.
 
-## Category D — Correction / removal requests
+## 2. Processing inventory (short)
 
-- Basis: art. 6(1)(c) GDPR (compliance with obligations under GDPR arts. 12–22:
-  rectification, erasure, restriction, objection) and, for the contact
-  management, art. 6(1)(f) (processing the request).
-- Necessity: the optional `contact` field (≤ 180 chars) is needed only to
-  answer the requester; it is never published. Retention: 2 years (audit),
-  see RETENTION_SCHEDULE.md.
+| Operation | Personal data involved | Basis | Necessity / safeguards |
+|-----------|----------------------|-------|------------------------|
+| Collect & store reports (pending) | Location, description, optional metadata, notes, pseudonymous ID | 6(1)(f) | Needed to run a community-sourced civic map; pseudonymous IDs; private by default; 90-day retention |
+| Moderate (screen/verify/decide) | Report content, evidence, reviewer pseudonym | 6(1)(f) | Two-person review for sensitive records; audit log pseudonymous; never public |
+| Publish verified records + exports (ODbL) | Generally **not personal data** (infrastructure) | 6(1)(f) / 6(1)(e) | Per-field opt-in for `manufacturer`/`observedOn`; least-specific location; no images until redaction workflow exists |
+| Handle correction/takedown requests | Requester contact data | 6(1)(c) + 6(1)(f) | Needed to comply with arts. 15-22; identity verification proportionate |
+| Security & abuse prevention | IP-level rate limiting (no logs retained), submissions metadata | 6(1)(f) | No behavioural advertising; rate limiting per H2 |
+| Moderator authentication | Email/name via ChatGPT sign-in | 6(1)(f) | Never logged, never stored; session-only (M4) |
 
-## Category E — Moderation and audit logs
+## 3. Lawful bases
 
-- Basis: art. 6(1)(f) + art. 32 GDPR (security, accountability).
-- Minimisation: `actor` is a **pseudonymous reviewer identifier**; emails and
-  full names are never stored or logged (finding M4). Retention 2 years.
+### 3.1 Publication of verified records — art. 6(1)(f) legitimate interest (primary)
 
-## Category F — International transfers (Chapter V GDPR, arts. 44–49)
+- **Legitimate interest:** civic transparency about visible public surveillance infrastructure; public awareness and accountability of public authorities; enabling communities and journalists to assess the extent of surveillance in public space.
+- **Necessity:** the map requires publishing locations of infrastructure that is *already visible to anyone in the street*; no less intrusive means achieves the transparency purpose (generalising locations further would defeat it; the moderation queue and private fields show we do not publish more than needed).
+- **Balancing test (LIA):**
 
-- Cloudflare (Workers/D1): transfer mechanism via the Cloudflare DPA
-  incorporating EU SCCs 2021/914, plus EU–US DPF certification; D1 data
-  location set for the EU (location hints / jurisdiction constraints,
-  developers.cloudflare.com/d1/configuration/data-location/) for the primary
-  jurisdiction.
-- OpenAI (ChatGPT auth, moderators): OpenAI DPA (openai.com/policies/
-  data-processing-addendum); transfer mechanism to be confirmed with counsel
-  (DPF/SCCs) before the auth flow is enabled.
-- Transfer impact assessment (TIA) to be documented for each processor before
-  launch (Schrems II / CJEU C-311/18 framework).
+| Factor | Assessment |
+|--------|-----------|
+| Controller/third-party interest | Strong, public-interest purpose (non-commercial, community-governed) |
+| Impact on data subjects | **Low**: records concern infrastructure, not persons; no images, plates, faces, private interiors; least-specific coordinates; per-field opt-in for `manufacturer`/`observedOn`; no live video, no credentials, no operational detail |
+| Reasonable expectations | A camera on a public street is observable by anyone; its existence is not private information |
+| Safeguards | Human moderation before publication; retention schedule; correction/removal path with SLA; appeals with independent reviewer; no tracking/ads; ODbL licensing |
+| Residual risk | Low, provided the safeguards are implemented (see review findings H1-H4) |
 
-## DPIA
+- **Conclusion:** legitimate interest is balanced for the publication purpose. Review annually and on any material change (art. 6(1)(f) requires a documented, current balancing test).
 
-A Data Protection Impact Assessment (art. 35 GDPR) is **recommended** before
-launch: the service processes location data at scale about a topic of public
-sensitivity. Even though the project does not itself conduct systematic
-surveillance of individuals (the criterion of art. 35(3)(c) concerns the
-controller's own monitoring), the scale and the public-exposure effect justify
-a documented DPIA, which also satisfies the accountability principle (art.
-5(2)).
+### 3.2 Public-interest basis — art. 6(1)(e) (complementary)
 
-## Summary table
+Art. 6(1)(e) applies where processing is necessary for a task carried out in the public interest, and art. 6(3) requires a basis in Union or Member State law. A community project is not automatically vested with an official task; therefore:
 
-| Category | Basis (art. 6) | Necessity | Balancing | DPIA |
-| --- | --- | --- | --- | --- |
-| A. Publication of visible infra records | 6(1)(f) | Yes — record metadata only | Favourable with current mitigations | Recommended |
-| B. Public interest | 6(1)(e) — not applicable (no statutory basis for private project) | n/a | n/a | n/a |
-| C. Community reports | 6(1)(f) | Yes — minimum fields | Favourable | Included in DPIA |
-| D. Correction requests | 6(1)(c) + 6(1)(f) | Yes — contact optional | Favourable | Included |
-| E. Moderation/audit | 6(1)(f) + art. 32 | Yes — pseudonyms | Favourable | Included |
-| F. Transfers | Cap. V (SCC 2021/914 + DPF) | Conditional on DPA | To be completed per processor | Included |
+- 6(1)(e) is **not** the primary basis for community-sourced records;
+- it applies where records are republished from **official public sources** (marked `source: official`) under national transparency rules (in Italy, e.g. D.Lgs. 33/2013 for public-administration transparency, checked per record);
+- for the dataset as a whole, 6(1)(f) is the anchor; 6(1)(e) is documented as a supporting consideration for official-source records.
+
+> **Note on ADR 0002:** this section updates the earlier statement in `docs/decisions/0002-legal-pre-launch-deliverables.md` that art. 6(1)(e) "is not applicable to a private civic project absent a statutory basis". The ADR is amended accordingly: 6(1)(e) remains unavailable as a *primary* basis for community-sourced records, but is documented as the applicable basis for republication of official-source records where national transparency law provides the art. 6(3) statutory anchor.
+
+### 3.3 Other operations
+
+- Correction/takedown requests: **6(1)(c)** (compliance with arts. 15-22 GDPR) plus 6(1)(f) (running a safe service). Consent (6(1)(a)) is not used for core processing; it may be offered separately for optional contact (currently out of scope).
+- No processing relies on 6(1)(b) (no contract with data subjects) or 6(1)(d) (vital interests).
+
+### 3.4 Special categories (art. 9)
+
+Not intentionally collected. Incidental capture in evidence (faces, plates, interiors) is prevented by policy (../MODERATION.md) and enforced by redaction/deletion (RETENTION_SCHEDULE.md R6). If a future feature collects such data, a separate art. 9 assessment is required before implementation.
+
+## 4. Jurisdiction note — Italy (D.Lgs. 196/2003)
+
+- The Codice Privacy applies alongside the GDPR; the norms of adaptation introduced by D.Lgs. 101/2018 (artt. 2-ter ss.) govern public-interest processing and safeguards — relevant for official-source records under 6(1)(e).
+- Age of consent for information-society services: 14 years (art. 2-quinquies D.Lgs. 196/2003).
+- The *Garante per la protezione dei dati personali* is the supervisory authority for complaints (see PRIVACY_NOTICE.md § 8).
+- Other jurisdictions (first 2-3 per ../MODERATION.md M5 playbook) are assessed before accepting records from them; this outline is the template.
+
+## 5. Decision
+
+- **Primary basis for the dataset and its pipeline: art. 6(1)(f)** with the documented LIA in § 3.1; **6(1)(e)** for official-source records; **6(1)(c)** for rights compliance.
+- The LIA is a living document: reviewed at launch, annually, and on any material change of purpose, provider, or scope.
+
+## 6. Open items before launch
+
+- [ ] Final legal review per operating jurisdiction (start: IT, DE per ../MODERATION.md M5).
+- [ ] Confirm controller entity and contacts (PRIVACY_NOTICE.md § 1, 9).
+- [ ] Record the LIA sign-off in the governance log (ADR 0002).
