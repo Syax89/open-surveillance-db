@@ -24,7 +24,7 @@ OpenSurveillanceDB may publish a record only when it documents visible public su
 1. **Receive:** create a private `pending` record; acknowledge without promising publication.
 2. **Screen:** remove spam, personal data, prohibited content, and dangerous details.
 3. **Verify:** assess whether the camera is public, visible, current, and within local policy.
-4. **Minimise:** publish the least specific location and metadata that still serves transparency. Optional manufacturer and observation-date values are reviewed individually; approval of the camera does not publish them.
+4. **Minimise:** publish the least specific location and metadata that still serves transparency. **Published coordinates are rounded to ~4 decimal places (~10 m, zone level) by default; the exact location stays in the private moderation record, visible only to moderators** (decision 2026-07-31). Optional manufacturer and observation-date values are reviewed individually; approval of the camera does not publish them.
 5. **Decide:** approve, request clarification, reject, or escalate; record a reason. When approving a camera, set the publication choice for manufacturer and observation date separately, with both choices defaulting to private.
 6. **Maintain:** re-check periodically and respond to corrections or removal requests.
 

@@ -2,6 +2,7 @@
 
 - **Status:** all documents are **drafts** for pre-launch review; nothing here is a published commitment.
 - **Owner:** Rosa (DPO / privacy)
+- **Decisions applied (2026-07-31, CEO — recorded in ADR 0007, docs task t_0b3d47e2):** data licence **ODbL 1.0** (software stays as in the repository: AGPL-3.0-or-later in LICENSE + package.json — note: the CEO decision cited "MIT already present", which does not match the repository; confirmation requested, see task t_e4bfcfbc); publication precision **~4 decimal places (~10 m)** with exact detail private to moderators; retention **12 months with renewal**; correction/removal contact **`privacy@opensurveillancedb`** (mailbox to be created at launch) + private form.
 - **Location:** canonical folder for pre-launch legal deliverables: `docs/legal/` (per ADR 0002).
 - **Produced from:** review findings P1-P6, M1-M5 in [`REVIEW_POLICY_LEGALE_2026-07-31.md`](REVIEW_POLICY_LEGALE_2026-07-31.md) (committed to the repository with this index; task t_05d84417).
 
@@ -9,7 +10,7 @@
 
 | Document | Covers (findings) | Status | Owner |
 |----------|-------------------|--------|-------|
-| [RETENTION_SCHEDULE.md](RETENTION_SCHEDULE.md) | P1, M3 — retention values (90/30 days, review cycle, 2-year audit, evidence, backups, operational logs), legal hold, deletion definition | Draft | Rosa |
+| [RETENTION_SCHEDULE.md](RETENTION_SCHEDULE.md) | P1, M3 — retention values (90/30 days, **12-month renewal review cycle** — decided 2026-07-31, 2-year audit, evidence, backups, operational logs), legal hold, deletion definition | Draft | Rosa |
 | [PRIVACY_NOTICE.md](PRIVACY_NOTICE.md) | P6, M4 — purposes, bases, rights (arts. 12-22), negative scope, contact, 1-month response, identity verification | Draft | Rosa |
 | [LAWFUL_BASIS.md](LAWFUL_BASIS.md) | P3 — art. 6(1)(f) + LIA balancing test, 6(1)(e) for official sources, IT jurisdiction (D.Lgs. 196/2003) | Draft | Rosa |
 | [PROCESSOR_REGISTER.md](PROCESSOR_REGISTER.md) | P5, M4 — Cloudflare (DPA v6.3 + SCC + EU residency + EU–US DPF), OpenAI auth (not a processor; never log emails), others | Draft | Rosa |
@@ -26,7 +27,8 @@
 
 ## Still open (other pre-launch items from the review, not in this task's scope)
 
-- **Terms of use** — a draft exists (separate drafting task, rosa); it is **not yet in this PR** and will be added in a follow-up PR before launch.
+- **Terms of use** — the v0.1 draft (task t_b047996f) was **not found** in any branch/workspace; re-draft task created (t_49f0041f, rosa); to be added in a follow-up PR before launch.
+- **Software licence confirmation** — the CEO decision note cites "MIT already present", but the repository carries **AGPL-3.0-or-later** (LICENSE, package.json — review finding O1, implemented in PR #8). Confirmation needed: keep AGPL or switch to MIT.
 - **DCO / inbound licensing** (O3) — CONTRIBUTING.md update (docs task, marie).
 - **ODbL notices in CSV/GeoJSON exports** (O2) — implementation (ada).
 - **package.json name/license** (O1) — implementation (ada, with H1-H4 fixes).

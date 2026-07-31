@@ -12,7 +12,7 @@ This project concerns surveillance, so it must hold itself to a high privacy and
 ## Location and media rules
 
 - Publish only public-facing, visible infrastructure after review.
-- Generalise locations when a precise point introduces unnecessary risk.
+- Generalise locations when a precise point introduces unnecessary risk; **default publication precision is ~4 decimal places (~10 m, zone level), with the exact location kept in the private moderation record only** (decision 2026-07-31).
 - Do not publish images until a reviewable redaction workflow exists.
 - Strip EXIF/geolocation metadata from any accepted image unless the retained data is deliberately necessary and documented.
 

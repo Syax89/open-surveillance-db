@@ -1,6 +1,6 @@
 # Privacy notice (draft — pre-launch)
 
-- **Status:** draft for pre-launch review; controller contact details below are placeholders to be finalised at launch.
+- **Status:** draft for pre-launch review; decisions of 2026-07-31 applied (data licence ODbL 1.0, coordinate precision ~4 decimals, 12-month retention renewal, privacy contact `privacy@opensurveillancedb`); controller entity still to be finalised at launch.
 - **Legal basis:** GDPR art. 13 (data collected from data subjects) and art. 14 (data not obtained from the data subject, e.g. records sourced from official public sources); D.Lgs. 196/2003 (Codice Privacy, IT) as primary jurisdiction.
 - **Version:** 0.2 (2026-07-31) — this document is a draft deliverable, not a published notice.
 
@@ -11,7 +11,7 @@
 ## 1. Who we are (controller)
 
 - **Controller:** OpenSurveillanceDB Ltd. — *placeholder entity; community governance to be confirmed before launch (see ../GOVERNANCE.md).*
-- **Privacy contact / data-protection contact:** `privacy@…` *(placeholder address)* — for any question, data-subject request, or report. Response time: see § 8.
+- **Privacy contact / data-protection contact:** `privacy@opensurveillancedb` *(dedicated mailbox — to be created before launch; final domain to be confirmed)* — for any question, data-subject request, or report. Response time: see § 8.
 
 ## 2. What the service does
 
@@ -42,6 +42,7 @@ OpenSurveillanceDB publishes a public-interest map of **visible, public surveill
 - **No video, live streams, credentials, network information, or control interfaces** — the project documents the *existence* of visible surveillance infrastructure, never its output or access.
 - **No private-home cameras** or cameras pointing into private interiors.
 - **No personal names, faces, vehicle plates, or precise operational details** (../PRIVACY_AND_SAFETY.md, ../MODERATION.md).
+- **No coordinates beyond zone-level precision:** published locations are rounded to **~4 decimal places (~10 m)**; the exact location remains in the private moderation record, visible only to moderators (decision 2026-07-31; see ../MODERATION.md).
 - **No behavioural advertising, no tracking, no sale of data**, no analytics libraries.
 - Submissions are stored as `pending` and are **never public** until a moderator approves them (ADR 0001). Rejected content is never published.
 
@@ -61,7 +62,7 @@ This negative scope strengthens the reasonable expectations of data subjects and
 
 ## 7. Retention
 
-See the published retention schedule (RETENTION_SCHEDULE.md): pending reports 90 days; rejected 30 days; verified records subject to a review cycle; correction requests and audit entries 2 years; evidence tied to the record; operational logs ≤ 12 months (aggregate); backups rotated by the provider (up to 30 days point-in-time recovery).
+See the published retention schedule (RETENTION_SCHEDULE.md): pending reports 90 days; rejected 30 days; verified records on a **12-month renewal review cycle** (decision 2026-07-31); correction requests and audit entries 2 years; evidence tied to the record; operational logs ≤ 12 months (aggregate); backups rotated by the provider (up to 30 days point-in-time recovery).
 
 ## 8. Your rights (GDPR arts. 15-22)
 
@@ -74,7 +75,7 @@ You may request, free of charge:
 - **Portability** (art. 20) — where technically applicable.
 - No automated decision-making, including profiling, is performed (art. 22).
 
-**How to exercise them:** write to `privacy@…`. To protect data subjects, we may ask you to verify your identity (proportionate to the request, e.g. by confirming details only you could know or providing a copy of an ID for requests about your personal data).
+**How to exercise them:** write to `privacy@opensurveillancedb`. To protect data subjects, we may ask you to verify your identity (proportionate to the request, e.g. by confirming details only you could know or providing a copy of an ID for requests about your personal data).
 
 **Timeline:** we respond within **1 month** (art. 12(3)); this may be extended by up to 2 further months for complex requests, with notice. If we refuse, we explain why and remind you of your right to complain.
 
@@ -82,16 +83,20 @@ You may request, free of charge:
 
 ## 9. Contact and monitoring
 
-- Privacy contact: `privacy@…` — first response within 48 h, substantive response within 14 days (MODERATION_SLA.md).
+- Privacy contact: `privacy@opensurveillancedb` — first response within 48 h, substantive response within 14 days (MODERATION_SLA.md).
 - This notice is reviewed at launch and then at least annually, or on any material change; the version history is kept in the repository.
 
 ## 10. Open items before launch
 
 - [ ] **Italian localization of this notice** (primary jurisdiction; GDPR art. 12(1) "clear and plain language") — to be published bilingually (Italian + English) before launch.
-- [ ] Confirm the final controller entity and the monitored mailbox (sections 1 and 9).
+- [x] Data licence: **ODbL 1.0** (decision 2026-07-31).
+- [x] Publication precision: coordinates rounded to **~4 decimal places (~10 m)**; exact detail private to moderators (decision 2026-07-31).
+- [x] Retention of verified records: **12 months with renewal** (decision 2026-07-31).
+- [x] Correction/removal contact: `privacy@opensurveillancedb` + private form (decision 2026-07-31; mailbox to be created at launch).
+- [ ] Confirm the final controller entity (sections 1 and 9) — the mailbox decision is made; only the domain and creation remain.
 - [ ] Confirm the applicable SCC version at DPA execution (new-generation SCCs announced for adoption in 2025 — see PROCESSOR_REGISTER.md open items).
 - [ ] Per-jurisdiction review (see LAWFUL_BASIS.md § 6) and external counsel review.
 
 ---
 
-*Draft note: sections 1 and 9 contain placeholder contact data. The final notice requires confirmation of the controller entity, a monitored mailbox, and per-jurisdiction review (see LAWFUL_BASIS.md § 6) before public launch.*
+*Draft note: the 2026-07-31 decisions (ODbL 1.0, coordinate precision, 12-month retention renewal, privacy contact) are applied. The final notice still requires confirmation of the controller entity and per-jurisdiction review (see LAWFUL_BASIS.md § 6) before public launch.*
