@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1785503050568,
+      "tag": "0000_eminent_vision",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1785504372232,
+      "tag": "0001_low_queen_noir",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1785505003985,
+      "tag": "0002_confused_human_torch",
+      "breakpoints": true
+    }
+  ]
+}
