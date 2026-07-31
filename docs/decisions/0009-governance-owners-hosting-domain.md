@@ -1,11 +1,11 @@
-# ADR 0008: Named governance owners, pilot hosting, and future domain
+# ADR 0009: Named governance owners, pilot hosting, and future domain
 
 - **Status:** accepted (CEO decision, 2026-07-31)
 - **Date:** 2026-07-31
 - **Author:** Marie (Technical Writer), recording the CEO decision
 - **Decision owner:** CEO
 - **Related ADRs:** 0005 (processors and data residency), 0006 (pilot
-  boundary), 0007 (data licence, precision, retention, contact)
+  boundary), 0008 (data licence, precision, retention, contact)
 - **Related docs:** GOVERNANCE.md, `docs/EXECUTION_BOARD.md` (Wave A item 4),
   `docs/DEPLOYMENT.md` (§ Local LXC deployment), `docs/OPERATIONS.md`,
   `docs/workstreams/OPS_OPEN.md`, `docs/legal/PRIVACY_NOTICE.md`
@@ -73,7 +73,7 @@ this matter to the project team.
 
 - The Wave A gate now has a named owner for every responsibility; item 4 is
   decided (items 3 and 5 tracked on the execution board — item 3 in
-  ADR 0007).
+  ADR 0008).
 - Governance changes flow through GOVERNANCE.md; merge authority rests with
   Ada; role changes require a new documented decision in this log.
 - **Processor picture changes:** with the pilot self-hosted, Cloudflare is no

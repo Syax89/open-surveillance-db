@@ -24,11 +24,11 @@ a named, reachable owner before it becomes a production dependency.
 
 1. Select one pilot jurisdiction and working languages.
 2. Confirm which public infrastructure is eligible and which places/details are excluded.
-3. Choose the data licence, publication precision, retention approach, and correction/removal contact. — **Decided 2026-07-31: ODbL 1.0 for the database and exports; coordinates rounded to ~4 decimal places (~10 m) by default; 12-month retention with re-verification renewal; `privacy@opensurveillancedb` as the correction/removal contact.** [ADR 0007](decisions/0007-data-licence-precision-retention-contact.md)
+3. Choose the data licence, publication precision, retention approach, and correction/removal contact. — **Decided 2026-07-31: ODbL 1.0 for the database and exports; coordinates rounded to ~4 decimal places (~10 m) by default; 12-month retention with re-verification renewal; `privacy@opensurveillancedb` as the correction/removal contact.** [ADR 0008](decisions/0008-data-licence-precision-retention-contact.md)
 4. Name the initial maintainers, operations owner, data steward, security contact, and moderation contact.
 5. Create a public organisation/repository and an accessible private route for security and privacy reports.
 
-**Gate:** the decisions are documented in `docs/decisions/`; there is no ambiguity about what data may enter the pilot. (Items 1–3 are decided in ADR 0006 and ADR 0007; items 4–5 remain open.)
+**Gate:** the decisions are documented in `docs/decisions/`; there is no ambiguity about what data may enter the pilot. (Items 1–3 are decided in ADR 0006 and ADR 0008; items 4–5 remain open.)
 
 ### Wave B — build the safe public-alpha foundation
 

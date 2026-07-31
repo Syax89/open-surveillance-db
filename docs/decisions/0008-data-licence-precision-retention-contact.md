@@ -1,4 +1,4 @@
-# ADR 0007: Data licence, publication precision, retention, and privacy contact
+# ADR 0008: Data licence, publication precision, retention, and privacy contact
 
 - **Status:** accepted (CEO decision, 2026-07-31)
 - **Date:** 2026-07-31

@@ -81,7 +81,7 @@ non-blocking nearby check. That check draws only from `verified` and fictional
 ## Data quality rules
 
 - Every published record needs provenance, a review decision, and an update date.
-- Prefer a precise coordinate only when its publication is safe; the default published precision is ~4 decimal places (~10 m), rounding (never truncating), and finer values require a documented justification (ADR 0007).
+- Prefer a precise coordinate only when its publication is safe; the default published precision is ~4 decimal places (~10 m), rounding (never truncating), and finer values require a documented justification (ADR 0008).
 - Use controlled categories rather than free-form surveillance capability claims.
 - Treat “brand”, “direction”, “coverage”, and similar fields as potentially sensitive; their public availability requires a jurisdiction-specific rule.
 - Retire or mark stale records rather than presenting old observations as current facts.
