@@ -29,6 +29,10 @@ Last reviewed: 2026-07-31
 - [x] Public in-app guide plus skip link, visible focus treatment, reduced-motion support, and map-directory accessibility guidance.
 - [x] Draft accessibility statement and design decision for a non-sensitive usability-feedback route ([`docs/ACCESSIBILITY_STATEMENT.md`](ACCESSIBILITY_STATEMENT.md), [ADR 0006](decisions/0006-non-sensitive-usability-feedback-route.md)).
 - [x] Clearly labelled illustrative demo data.
+- [x] Lightweight public data dictionary and export versioning policy
+  ([`docs/DATA_DICTIONARY.md`](DATA_DICTIONARY.md),
+  [`docs/EXPORT_VERSIONING.md`](EXPORT_VERSIONING.md)); versioned releases
+  remain future work pending the final data licence.
 - [x] Initial open documentation and project policies.
 
 ## Not yet implemented
