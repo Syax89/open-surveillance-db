@@ -25,6 +25,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 const ROUTES = [
   { source: "app/api/cameras/route.ts", output: "app/api/cameras/route.mjs" },
   { source: "app/api/cameras/nearby/route.ts", output: "app/api/cameras/nearby/route.mjs" },
+  { source: "app/api/cameras/revisions/route.ts", output: "app/api/cameras/revisions/route.mjs" },
   { source: "app/api/moderation/route.ts", output: "app/api/moderation/route.mjs" },
   { source: "app/api/corrections/route.ts", output: "app/api/corrections/route.mjs" },
 ];
@@ -132,6 +133,13 @@ export function buildRouteTree() {
 
 // relativeOutput: e.g. "app/api/cameras/route.mjs"
 export async function loadRoute(relativeOutput) {
+  const tree = await buildRouteTree();
+  return import(pathToFileURL(path.join(tree, relativeOutput)).href);
+}
+
+// relativeOutput: e.g. "app/lib/duplicate-detection.mjs" — the tree already
+// transpiles every pure lib module, so tests can exercise them directly.
+export async function loadLib(relativeOutput) {
   const tree = await buildRouteTree();
   return import(pathToFileURL(path.join(tree, relativeOutput)).href);
 }

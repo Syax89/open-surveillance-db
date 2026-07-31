@@ -388,3 +388,32 @@ async function createModerationEvent(
   if (!result) throw new Error("Moderation event could not be recorded");
   return result;
 }
+
+export type PublicCameraRevision = {
+  id: number;
+  entityId: number;
+  previousStatus: string;
+  newStatus: string;
+  action: string;
+  createdAt: string;
+};
+
+/**
+ * Reviewed public change summary for a camera record: the lifecycle
+ * transitions a moderator applied (approved, marked stale, re-verified,
+ * removed), oldest first. This is the public revision history described in
+ * docs/FUTURE_ROADMAP.md (Horizon 1). It deliberately projects only
+ * non-identifying fields: the private audit columns (actor, note,
+ * reason_code) never leave this boundary, so contributor and moderator
+ * identities and internal notes are never published.
+ */
+export async function listPublicCameraRevisions(cameraId: number): Promise<PublicCameraRevision[]> {
+  const d1 = await getModerationD1();
+  const result = await d1
+    .prepare(
+      "SELECT id, entity_id AS entityId, previous_status AS previousStatus, new_status AS newStatus, action, created_at AS createdAt FROM moderation_events WHERE entity = 'camera' AND entity_id = ? ORDER BY created_at ASC, id ASC",
+    )
+    .bind(cameraId)
+    .all<PublicCameraRevision>();
+  return result.results;
+}
