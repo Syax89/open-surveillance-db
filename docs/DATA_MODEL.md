@@ -7,7 +7,7 @@
 | `id` | Yes | Stable record identifier |
 | `title` | Yes | Plain-language label; no personal names |
 | `kind` | Yes | Camera category, for example fixed dome or traffic monitoring |
-| `latitude`, `longitude` | Yes, rounded where necessary | Location of publicly visible infrastructure |
+| `latitude`, `longitude` | Yes, rounded to ~4 decimal places (~10 m) by default | Location of publicly visible infrastructure |
 | `address` | Usually | General location text, not a private address |
 | `description` | Yes after review | Brief factual context, without sensitive operational detail |
 | `manufacturer` | Only with a field-specific opt-in | Optional maker/brand supplied with a report; stays private unless a moderator explicitly elects to publish this field |
@@ -81,7 +81,7 @@ non-blocking nearby check. That check draws only from `verified` and fictional
 ## Data quality rules
 
 - Every published record needs provenance, a review decision, and an update date.
-- Prefer a precise coordinate only when its publication is safe; otherwise round or generalise it.
+- Prefer a precise coordinate only when its publication is safe; the default published precision is ~4 decimal places (~10 m), rounding (never truncating), and finer values require a documented justification (ADR 0007).
 - Use controlled categories rather than free-form surveillance capability claims.
 - Treat “brand”, “direction”, “coverage”, and similar fields as potentially sensitive; their public availability requires a jurisdiction-specific rule.
 - Retire or mark stale records rather than presenting old observations as current facts.

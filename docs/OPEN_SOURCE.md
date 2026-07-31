@@ -10,7 +10,7 @@ Unless a document says otherwise, project documentation is proposed under [CC BY
 
 ## Database and exports
 
-The public database needs an explicit license before it contains real records. The current proposal is [ODbL 1.0](https://opendatacommons.org/licenses/odbl/), with clear attribution and share-alike notices. This choice must be checked against jurisdictional rules, source terms, and the final data model before public beta.
+The public database needs an explicit license before it contains real records. **Decided 2026-07-31 ([ADR 0007](decisions/0007-data-licence-precision-retention-contact.md)): the database and every export format are licensed under [ODbL 1.0](https://opendatacommons.org/licenses/odbl/), with clear attribution and share-alike notices.** This choice must still be checked against jurisdictional rules, source terms, and the final data model before public beta.
 
 ## OpenStreetMap data
 

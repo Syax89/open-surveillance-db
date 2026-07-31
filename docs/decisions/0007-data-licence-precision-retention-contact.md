@@ -73,11 +73,13 @@ this matter to the project team.
 4. **Correction/removal contact: `privacy@opensurveillancedb`.** This is the
    monitored mailbox for data-subject requests (art. 15–17 GDPR), correction
    and takedown requests for published records, and privacy/security reports
-   that prefer a private route. Response commitments follow MODERATION_SLA.md
-   (first response ≤ 48 h, substantive response ≤ 14 days); correspondence is
-   retained 2 years (RETENTION_SCHEDULE.md, R9). The address replaces the
-   `privacy@…` placeholders in PRIVACY_NOTICE.md, RETENTION_SCHEDULE.md,
-   MODERATION_SLA.md, and BREACH_PROCEDURE.md.
+   that prefer a private route. The existing private correction/removal form
+   in the site (API `corrections`) remains a parallel intake route. Response
+   commitments follow MODERATION_SLA.md (first response ≤ 48 h, substantive
+   response ≤ 14 days); correspondence is retained 2 years
+   (RETENTION_SCHEDULE.md, R9). The address replaces the `privacy@…`
+   placeholders in PRIVACY_NOTICE.md, RETENTION_SCHEDULE.md, MODERATION_SLA.md,
+   and BREACH_PROCEDURE.md.
 
 ## Consequences
 
@@ -88,9 +90,9 @@ this matter to the project team.
 - **Docs (marie):** the placeholders in the legal drafts are replaced with
   `privacy@opensurveillancedb`; `docs/OPEN_SOURCE.md` and `docs/DATA_MODEL.md`
   are updated from "proposal"/"where necessary" to the decided defaults.
-- **Ops (ken):** the mailbox must be provisioned and its operator named before
-  the address is published; the retention cron job required by ADR 0004
-  remains a launch precondition.
+- **Ops (ken):** the mailbox must be provisioned (TLD to be confirmed at
+  launch) and its operator named before the address is published; the
+  retention cron job required by ADR 0004 remains a launch precondition.
 - **Review:** the 12-month cycle stays an initial value and must be revisited
   after the first year of operations with real volumes (ADR 0004).
 - Wave A item 3 is now decided; items 4–5 are tracked on the execution board.
