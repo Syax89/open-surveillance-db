@@ -46,11 +46,27 @@ Last reviewed: 2026-08-01
   (`TILE_PROVIDER_URL`/`TILE_PROVIDER_KEY`), and a documented
   community-vs-commercial-vs-self-hosted decision matrix
   ([`docs/OSM_INTEGRATION.md`](OSM_INTEGRATION.md)).
+- [x] Coarse auth roles (`contributor`/`moderator`/`admin`) enforced on every
+  protected route via `requireRole` (moderation queue, appeals), with the
+  acting reviewer derived server-side from the authenticated user instead of a
+  client-chosen actor id ([ADR 0014](decisions/0014-auth-roles-appeals.md)).
+- [x] Contributor appeal workflow against moderation decisions: file, list,
+  decide (independent senior moderator; escalated appeals resolve at the
+  administrator); an upheld appeal returns the record to the moderation queue
+  for a fresh decision ([ADR 0014](decisions/0014-auth-roles-appeals.md)).
+- [x] Append-only audit log extended to appeals (`appeal_id` link on
+  `moderation_events`); internal workflow events (appeals, recusals,
+  escalations) stay out of the public revision history.
 
 ## Not yet implemented
 
+- [ ] Real authentication and provisioned contributor accounts (contributor
+  registration and login sessions are in place — [ADR 0013](decisions/0013-contributor-accounts-and-sessions.md);
+  the seeded role identities are prototype-only and MFA enforcement plus
+  provisioning onto `users` role identities land with the real auth provider).
 - [ ] Public `/feedback` page for the non-sensitive usability-feedback route (designed in [ADR 0006](decisions/0006-non-sensitive-usability-feedback-route.md); implementation pending).
-- [ ] Audit log, appeal workflow, and production moderation controls (contributor accounts and reviewer roles are in place — [ADR 0013](decisions/0013-contributor-accounts-and-sessions.md), [ADR 0009](decisions/0009-reviewer-roles-moderation-queue.md)).
+- [ ] Production moderation controls (auth-provisioned roles, abuse-response
+  tooling, retrospective review workflow for emergency hides).
 - [ ] Image upload, secure storage, EXIF stripping, and redaction tooling.
 - [ ] Legal/privacy review and public-facing terms.
 - [ ] Public deployment, domain, backup/restore drills, and monitoring — remains a future precondition, see `docs/DEPLOYMENT.md`.

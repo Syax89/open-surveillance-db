@@ -38,6 +38,9 @@ const expectedTables = [
   // STATUS gap #1 (0009): contributor accounts and sessions.
   "contributors",
   "sessions",
+  // Auth roles + appeals (0010): role identities and the appeal trail.
+  "users",
+  "moderation_appeals",
 ];
 // Indexes declared by the migrations.
 const expectedIndexes = [
@@ -50,16 +53,22 @@ const expectedIndexes = [
   "sessions_token_hash_unique",
   "sessions_contributor_idx",
   "sessions_expires_idx",
+  "users_role_idx",
+  "users_email_unique",
+  "moderation_appeals_status_idx",
+  "moderation_appeals_entity_idx",
 ];
 // Tables that are not application schema but legitimately appear in a local
 // D1 database. Anything outside this set is an unexpected schema change.
 const allowedExtraTables = ["_cf_METADATA", "sqlite_sequence", "d1_migrations"];
 
 // Tables that migration 0008 (Wave B Data & Trust) deliberately seeds with
-// the reviewer roles. A fresh DB must contain exactly these rows — no more,
-// no less — so extra demo/seed data still fails the gate.
+// the reviewer roles, and migration 0010 with the demo identity accounts.
+// A fresh DB must contain exactly these rows — no more, no less — so extra
+// demo/seed data still fails the gate.
 const expectedSeedCounts = {
   reviewers: 5,
+  users: 6,
 };
 
 let failures = 0;

@@ -26,13 +26,38 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { after, beforeEach, test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { apiRequest, cleanupRouteTree, loadRoute, responseBody } from "./helpers/api-harness.mjs";
+import { apiRequest as publicRequest, cleanupRouteTree, loadRoute, responseBody } from "./helpers/api-harness.mjs";
 import { callArgs, resetMockState, stub } from "./helpers/mock-state.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const readSource = (relativePath) => readFile(path.join(root, relativePath), "utf8");
 
-beforeEach(() => resetMockState());
+// Route-level authz (ADR 0014): protected routes derive the acting reviewer
+// from the authenticated identity header. This mock-based suite acts as the
+// Demo Record Reviewer (moderator coarse role, reviewer id 2) unless a test
+// overrides the stub.
+const moderatorUser = {
+  id: 2,
+  email: "record@osdb.test",
+  displayName: "Demo Record Reviewer",
+  role: "moderator",
+  active: 1,
+  mfaEnabled: 0,
+  createdAt: "2026-08-01T00:00:00.000Z",
+  updatedAt: "2026-08-01T00:00:00.000Z",
+};
+const moderatorReviewer = { id: 2, displayName: "Demo Record Reviewer", role: "record_reviewer", active: 1 };
+const authRequest = (path, opts = {}) =>
+  publicRequest(path, { ...opts, headers: { "x-osdb-user-email": moderatorUser.email, ...(opts.headers ?? {}) } });
+const stubModeratorAuth = () => {
+  stub("getUserByEmail", async (email) => (email === moderatorUser.email ? moderatorUser : null));
+  stub("getReviewerByUserId", async () => moderatorReviewer);
+};
+
+beforeEach(() => {
+  resetMockState();
+  stubModeratorAuth();
+});
 after(async () => cleanupRouteTree());
 
 const route = () => loadRoute("app/api/moderation/route.mjs");
@@ -118,7 +143,7 @@ test("PATCH approve with outcome passes options to moderateCorrection", async ()
   );
   const { PATCH } = await route();
   const response = await PATCH(
-    apiRequest("/api/moderation", {
+    authRequest("/api/moderation", {
       method: "PATCH",
       body: { entity: "correction", id: 9, action: "approve", reasonCode: validReasonCode, outcome: "marked-stale", actorId },
     }),
@@ -135,7 +160,7 @@ test("PATCH approve with cameraId associates the request to a record", async () 
   stub("moderateCorrection", async () => okResult({ ...correctionItem, cameraId: 7 }));
   const { PATCH } = await route();
   const response = await PATCH(
-    apiRequest("/api/moderation", {
+    authRequest("/api/moderation", {
       method: "PATCH",
       body: { entity: "correction", id: 9, action: "approve", reasonCode: validReasonCode, cameraId: 7, actorId },
     }),
@@ -150,7 +175,7 @@ test("PATCH approve with outcome and cameraId passes both through", async () => 
   );
   const { PATCH } = await route();
   const response = await PATCH(
-    apiRequest("/api/moderation", {
+    authRequest("/api/moderation", {
       method: "PATCH",
       body: { entity: "correction", id: 9, action: "approve", reasonCode: validReasonCode, note: "done", outcome: "removed", cameraId: 7, actorId },
     }),
@@ -167,7 +192,7 @@ test("PATCH reject may also carry a cameraId reassociation", async () => {
   );
   const { PATCH } = await route();
   const response = await PATCH(
-    apiRequest("/api/moderation", {
+    authRequest("/api/moderation", {
       method: "PATCH",
       body: { entity: "correction", id: 9, action: "reject", reasonCode: "duplicate", cameraId: 5, actorId },
     }),
@@ -183,7 +208,7 @@ test("PATCH associate links a pending request to a record without deciding", asy
   stub("moderateCorrection", async () => okResult({ ...correctionItem, cameraId: 7 }, associatedEvent));
   const { PATCH } = await route();
   const response = await PATCH(
-    apiRequest("/api/moderation", {
+    authRequest("/api/moderation", {
       method: "PATCH",
       body: { entity: "correction", id: 9, action: "associate", reasonCode: "insufficient-evidence", cameraId: 7, actorId },
     }),
@@ -205,7 +230,7 @@ test("PATCH supports the full correction action set with cameraId", async (t) =>
     await t.test(action, async () => {
       stub("moderateCorrection", async () => okResult({ ...correctionItem, cameraId: 7 }));
       const response = await PATCH(
-        apiRequest("/api/moderation", {
+        authRequest("/api/moderation", {
           method: "PATCH",
           body: { entity: "correction", id: 9, action, reasonCode: validReasonCode, cameraId: 7, actorId },
         }),
@@ -221,7 +246,7 @@ test("PATCH escalate on a correction requires a note and forwards the action", a
   );
   const { PATCH } = await route();
   const response = await PATCH(
-    apiRequest("/api/moderation", {
+    authRequest("/api/moderation", {
       method: "PATCH",
       body: { entity: "correction", id: 9, action: "escalate", reasonCode: "requires-senior-review", note: "Needs senior moderator", actorId },
     }),
@@ -247,7 +272,7 @@ test("PATCH approve without outcome or cameraId stays backward compatible (no op
   );
   const { PATCH } = await route();
   const response = await PATCH(
-    apiRequest("/api/moderation", {
+    authRequest("/api/moderation", {
       method: "PATCH",
       body: { entity: "correction", id: 9, action: "approve", reasonCode: validReasonCode, note: "fixed", actorId },
     }),
@@ -276,7 +301,7 @@ test("PATCH rejects invalid cameraId values on corrections", async (t) => {
   for (const { name, cameraId } of cases) {
     await t.test(name, async () => {
       const response = await PATCH(
-        apiRequest("/api/moderation", {
+        authRequest("/api/moderation", {
           method: "PATCH",
           body: { entity: "correction", id: 9, action: "associate", reasonCode: validReasonCode, cameraId, actorId },
         }),
@@ -300,7 +325,7 @@ test("PATCH rejects invalid outcome values on corrections", async (t) => {
   for (const { name, outcome } of cases) {
     await t.test(name, async () => {
       const response = await PATCH(
-        apiRequest("/api/moderation", {
+        authRequest("/api/moderation", {
           method: "PATCH",
           body: { entity: "correction", id: 9, action: "approve", reasonCode: validReasonCode, outcome, actorId },
         }),
@@ -316,7 +341,7 @@ test("PATCH rejects outcome on non-approve correction actions", async (t) => {
   for (const action of ["reject", "associate"]) {
     await t.test(action, async () => {
       const response = await PATCH(
-        apiRequest("/api/moderation", {
+        authRequest("/api/moderation", {
           method: "PATCH",
           body: { entity: "correction", id: 9, action, reasonCode: validReasonCode, outcome: "kept", actorId },
         }),
@@ -330,7 +355,7 @@ test("PATCH rejects outcome on non-approve correction actions", async (t) => {
 test("PATCH associate requires a cameraId", async () => {
   const { PATCH } = await route();
   const response = await PATCH(
-    apiRequest("/api/moderation", {
+    authRequest("/api/moderation", {
       method: "PATCH",
       body: { entity: "correction", id: 9, action: "associate", reasonCode: validReasonCode, actorId },
     }),
@@ -348,7 +373,7 @@ test("PATCH rejects correction-only fields on camera decisions", async (t) => {
   for (const { name, ...overrides } of cases) {
     await t.test(name, async () => {
       const response = await PATCH(
-        apiRequest("/api/moderation", {
+        authRequest("/api/moderation", {
           method: "PATCH",
           body: { entity: "camera", id: 5, action: "approve", reasonCode: validReasonCode, actorId, ...overrides },
         }),
@@ -362,7 +387,7 @@ test("PATCH rejects correction-only fields on camera decisions", async (t) => {
 test("PATCH rejects unknown correction actions even with a cameraId", async () => {
   const { PATCH } = await route();
   const response = await PATCH(
-    apiRequest("/api/moderation", {
+    authRequest("/api/moderation", {
       method: "PATCH",
       body: { entity: "correction", id: 9, action: "hide", reasonCode: validReasonCode, cameraId: 5, actorId },
     }),
@@ -379,7 +404,7 @@ test("PATCH returns 404 when the db layer rejects the correction decision", asyn
   stub("moderateCorrection", async () => ({ kind: "not_found" }));
   const { PATCH } = await route();
   const response = await PATCH(
-    apiRequest("/api/moderation", {
+    authRequest("/api/moderation", {
       method: "PATCH",
       body: { entity: "correction", id: 999, action: "approve", reasonCode: validReasonCode, outcome: "kept", cameraId: 5, actorId },
     }),
@@ -394,7 +419,7 @@ test("PATCH returns 500 when the correction write fails", async () => {
   });
   const { PATCH } = await route();
   const response = await PATCH(
-    apiRequest("/api/moderation", {
+    authRequest("/api/moderation", {
       method: "PATCH",
       body: { entity: "correction", id: 9, action: "approve", reasonCode: validReasonCode, outcome: "kept", cameraId: 5, actorId },
     }),
@@ -415,7 +440,7 @@ test("GET /api/moderation exposes the correction outcome in the queue", async ()
   };
   stub("listPendingModerationItems", async () => queue);
   const { GET } = await route();
-  const response = await GET(apiRequest("/api/moderation"));
+  const response = await GET(authRequest("/api/moderation"));
   assert.equal(response.status, 200);
   const body = await responseBody(response);
   assert.equal(body.correctionRequests[0].cameraId, 7);
