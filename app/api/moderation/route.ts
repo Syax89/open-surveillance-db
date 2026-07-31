@@ -95,8 +95,9 @@ export async function GET() {
   try {
     return Response.json(await listPendingModerationItems());
   } catch (error) {
+    console.error("GET /api/moderation failed", error);
     return Response.json(
-      { error: error instanceof Error ? error.message : "Moderation queue unavailable" },
+      { error: "Moderation queue unavailable" },
       { status: 503 },
     );
   }
@@ -131,8 +132,9 @@ export async function PATCH(request: Request) {
 
     return Response.json({ entity: payload.entity, item: item.item, event: item.event });
   } catch (error) {
+    console.error("PATCH /api/moderation failed", error);
     return Response.json(
-      { error: error instanceof Error ? error.message : "Unable to update moderation item" },
+      { error: "Unable to update moderation item" },
       { status: 500 },
     );
   }
