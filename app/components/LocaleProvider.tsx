@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useSyncExternalStore, type ReactNode } from "react";
 
 export type Locale = "en" | "it";
 
@@ -12,13 +12,19 @@ type LocaleContextValue = {
 const LocaleContext = createContext<LocaleContextValue | null>(null);
 const storageKey = "opensurveillancedb-locale";
 
-export function LocaleProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>("en");
+function getStoredLocale(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem(storageKey);
+}
 
-  useEffect(() => {
-    const savedLocale = window.localStorage.getItem(storageKey);
-    if (savedLocale === "en" || savedLocale === "it") setLocaleState(savedLocale);
-  }, []);
+function subscribeToLocaleStorage(onChange: () => void): () => void {
+  window.addEventListener("storage", onChange);
+  return () => window.removeEventListener("storage", onChange);
+}
+
+export function LocaleProvider({ children }: { children: ReactNode }) {
+  const storedLocale = useSyncExternalStore(subscribeToLocaleStorage, getStoredLocale, () => null);
+  const locale: Locale = storedLocale === "en" || storedLocale === "it" ? storedLocale : "en";
 
   useEffect(() => {
     document.documentElement.lang = locale;
@@ -27,8 +33,10 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
   const value = useMemo(() => ({
     locale,
     setLocale(nextLocale: Locale) {
-      setLocaleState(nextLocale);
       window.localStorage.setItem(storageKey, nextLocale);
+      // The `storage` event only fires in other tabs; notify same-tab
+      // subscribers so the locale switches immediately.
+      window.dispatchEvent(new Event("storage"));
     },
   }), [locale]);
 

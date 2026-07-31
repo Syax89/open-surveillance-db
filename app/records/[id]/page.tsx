@@ -74,7 +74,7 @@ export default function RecordPage() {
   useEffect(() => {
     let cancelled = false;
     fetch("/api/cameras")
-      .then((response) => response.ok ? response.json() : Promise.reject(new Error()))
+      .then((response) => response.ok ? response.json() as Promise<{ records: Camera[] }> : Promise.reject(new Error()))
       .then((data: { records: Camera[] }) => { if (!cancelled && data.records.length) setRecords(data.records); })
       .catch(() => undefined)
       .finally(() => !cancelled && setLoading(false));

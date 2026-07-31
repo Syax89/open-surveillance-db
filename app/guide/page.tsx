@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { LocaleToggle, useLocale } from "../components/LocaleProvider";
 
 export default function GuidePage() {
@@ -8,11 +9,11 @@ export default function GuidePage() {
 
   return <main id="main-content" className="record-page">
     <nav className="nav-shell" aria-label={t.navigation}>
-      <a className="brand" href="/" aria-label={t.homeAria}><span className="brand-mark" aria-hidden="true">◉</span><span>OpenSurveillanceDB</span></a>
+      <Link className="brand" href="/" aria-label={t.homeAria}><span className="brand-mark" aria-hidden="true">◉</span><span>OpenSurveillanceDB</span></Link>
       <div className="nav-links">
-        <a href="/#map">{t.map}</a>
-        <a href="/#records">{t.directory}</a>
-        <a className="nav-action" href="/">{t.home}</a>
+        <Link href="/#map">{t.map}</Link>
+        <Link href="/#records">{t.directory}</Link>
+        <Link className="nav-action" href="/">{t.home}</Link>
       </div>
       <LocaleToggle />
     </nav>
@@ -22,8 +23,8 @@ export default function GuidePage() {
       <h1>{t.title}</h1>
       <p className="record-detail-summary">{t.intro}</p>
       <div className="record-detail-actions">
-        <a className="button button-primary" href="/#map">{t.exploreMap} <span aria-hidden="true">↘</span></a>
-        <a className="button detail-outline" href="/#records">{t.browseDirectory}</a>
+        <Link className="button button-primary" href="/#map">{t.exploreMap} <span aria-hidden="true">↘</span></Link>
+        <Link className="button detail-outline" href="/#records">{t.browseDirectory}</Link>
       </div>
     </article>
 
@@ -82,7 +83,7 @@ export default function GuidePage() {
     <footer>
       <div className="brand"><span className="brand-mark" aria-hidden="true">◉</span><span>OpenSurveillanceDB</span></div>
       <p>{t.footer}</p>
-      <div className="footer-links"><a href="/">{t.home}</a><a href="/#map">{t.map}</a><a href="/#records">{t.directory}</a></div>
+      <div className="footer-links"><Link href="/">{t.home}</Link><Link href="/#map">{t.map}</Link><Link href="/#records">{t.directory}</Link></div>
     </footer>
   </main>;
 }

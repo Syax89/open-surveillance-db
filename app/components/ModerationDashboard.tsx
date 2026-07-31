@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { LocaleToggle, useLocale } from "./LocaleProvider";
 
@@ -251,8 +252,8 @@ export function ModerationDashboard() {
 
   return <main id="main-content">
     <nav className="nav-shell" aria-label={t.navigation}>
-      <a className="brand" href="/" aria-label={t.home}><span className="brand-mark" aria-hidden="true">◉</span><span>OpenSurveillanceDB</span></a>
-      <div className="nav-actions"><LocaleToggle /><a className="text-button" href="/">{t.returnPublic} <span aria-hidden="true">→</span></a></div>
+      <Link className="brand" href="/" aria-label={t.home}><span className="brand-mark" aria-hidden="true">◉</span><span>OpenSurveillanceDB</span></Link>
+      <div className="nav-actions"><LocaleToggle /><Link className="text-button" href="/">{t.returnPublic} <span aria-hidden="true">→</span></Link></div>
     </nav>
 
     <section className="moderation-page" aria-labelledby="moderation-title">
