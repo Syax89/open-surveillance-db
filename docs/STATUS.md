@@ -21,6 +21,7 @@ Last reviewed: 2026-07-31
 - [x] Local-only moderation queue for pending reports and correction requests.
 - [x] Required moderation reason, optional reviewer note, and append-only local audit history.
 - [x] Local lifecycle for verified records: mark for review, reverify, or remove.
+- [x] Reviewed public change summary on record pages; it omits contributor identities and internal notes.
 - [x] Automated contract tests for public-data and private-request boundaries.
 - [x] Local playbook for fictional submit → moderate → public-result checks.
 - [x] Local fictional-data check: rejected records remain absent from public outputs and create an audit event.
