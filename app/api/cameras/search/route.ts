@@ -74,7 +74,7 @@ export async function GET(request: Request) {
   }
 
   const key = callerKey(request);
-  const limit = checkRateLimit(key, searchLimits(env));
+  const limit = checkRateLimit("search", key, searchLimits(env));
   if (!limit.allowed) {
     console.warn(`GET /api/cameras/search rate limited for caller ${key}`);
     return Response.json({ error: "Too many searches. Please try again shortly." }, {
