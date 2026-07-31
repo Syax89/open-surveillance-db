@@ -166,7 +166,7 @@ export const en = {
     contribute: "Contribute",
     reportTitle: "Help make public space legible.",
     reportIntro:
-      "Choose a location on the map or enter coordinates, then add only what you can observe from public space. This version has a real local moderation queue but no photo upload yet.",
+      "Choose a location on the map or enter coordinates, then add only what you can observe from public space. Photos are optional, stored privately, and only published after human review with confirmed redaction.",
     beforeSubmitting: "Before submitting",
     beforeSubmittingBody:
       "Do not upload or describe people, licence plates, private homes, security weaknesses or sensitive locations.",
@@ -205,6 +205,17 @@ export const en = {
     observedPlaceholder: "Direction, operator, visible notice, model…",
     reportConsent:
       "I confirm this observation was made from public space and contains no personal data.",
+    photoUploadTitle: "Photo evidence (optional)",
+    photoUploadHelp:
+      "JPEG, PNG or WebP up to 10 MB and 4096 px per side. Faces, licence plates and other personal data must be redacted before uploading; location and camera metadata (EXIF) is stripped automatically on upload.",
+    photoUploadLabel: "Choose photos",
+    photoUploading: "Uploading…",
+    photoUploadError: "The photo could not be uploaded.",
+    photoAdded: "Photo added — it will be reviewed by a moderator before any publication.",
+    photoRemove: "Remove",
+    photoMaxReached: "A report can include up to 5 photos.",
+    photoRedactionReminder:
+      "Redact faces and licence plates before uploading. Photos are never shown publicly without moderator approval and confirmed redaction.",
     sendModeration: "Send to moderation",
     footerLineOne: "An open database of public surveillance cameras.",
     footerLineTwo: "Built for transparency, not tracking.",
@@ -351,7 +362,7 @@ export const en = {
       "This interface is for the local prototype only. It is not linked from the public experience and does not publish any new information by itself.",
     localTool: "Local-only tool.",
     localWarning:
-      "Review text and approximate locations only. Do not add photos, personal data, credentials, live-feed links, or operational security details.",
+      "Review text and approximate locations only. Photos in the queue are private evidence: check redaction before approving, and never add personal data, credentials, live-feed links, or operational security details.",
     loading: "Loading local moderation queue…",
     awaiting: (total: number) => `${total} ${total === 1 ? "item" : "items"} awaiting a local decision`,
     loadError: "The moderation queue could not be loaded.",
@@ -399,6 +410,23 @@ export const en = {
     noCorrectionsText:
       "Private requests remain out of the public directory and data export.",
     privateCorrection: "Private correction",
+    pendingPhotos: "Pending photos",
+    noPhotosTitle: "No photos are waiting.",
+    noPhotosText:
+      "Uploaded photos appear here until a decision is recorded. A photo is never public without approval and confirmed redaction.",
+    photoEvidence: "Photo evidence",
+    photoRedactionConfirm: "I confirm the subject was redacted",
+    photoRedactionHelp:
+      "Approving a photo requires confirming that faces, licence plates and other personal data were redacted before upload. Photos are never public without this confirmation.",
+    photoPreview: "Preview",
+    photoPreviewUnavailable: "Preview unavailable",
+    photoDimensions: "Dimensions",
+    photoSize: "Size",
+    photoStripState: "Metadata stripped",
+    photoRedactionState: "Redaction confirmed",
+    photoApprove: "Approve and publish",
+    photoReject: "Reject",
+    photoNoRedaction: "Redaction not confirmed",
     recentDecisions: "Recent decisions",
     readOnlyHistory: "Read-only local history",
     noDecisionsTitle: "No decisions recorded yet.",

@@ -392,6 +392,72 @@ test("POST /api/cameras maps malformed JSON bodies to 500", async () => {
   assert.ok(body.error, "an error message must be returned");
 });
 
+test("POST /api/cameras links uploaded photo ids to the new report", async () => {
+  stub("createPendingCamera", async (input) => ({ id: 14, ...input }));
+  stub("linkPhotosToCamera", async () => 2);
+  stub("findNearbyPublicCameras", async () => []);
+  const { POST } = await camerasRoute();
+  const response = await POST(
+    apiRequest("/api/cameras", {
+      method: "POST",
+      body: {
+        title: "With photo evidence",
+        kind: "Dome",
+        latitude: 45.0,
+        longitude: 9.0,
+        photoIds: [101, 102],
+      },
+    }),
+  );
+  assert.equal(response.status, 201);
+  const body = await responseBody(response);
+  assert.equal(body.record.id, 14);
+  assert.equal(body.linkedPhotos, 2);
+  assert.deepEqual(callArgs("linkPhotosToCamera")[0], [14, [101, 102]]);
+});
+
+test("POST /api/cameras rejects non-integer photo ids with 400", async () => {
+  stub("createPendingCamera", async (input) => ({ id: 15, ...input }));
+  const { POST } = await camerasRoute();
+  const response = await POST(
+    apiRequest("/api/cameras", {
+      method: "POST",
+      body: {
+        title: "Bad photo ids",
+        kind: "Dome",
+        latitude: 45.0,
+        longitude: 9.0,
+        photoIds: [101, "102"],
+      },
+    }),
+  );
+  assert.equal(response.status, 400);
+  assert.equal(callArgs("linkPhotosToCamera").length, 0, "no linking on invalid ids");
+});
+
+test("POST /api/cameras keeps photo linking best-effort when storage fails", async () => {
+  stub("createPendingCamera", async (input) => ({ id: 16, ...input }));
+  stub("linkPhotosToCamera", async () => {
+    throw new Error("R2 unavailable");
+  });
+  stub("findNearbyPublicCameras", async () => []);
+  const { POST } = await camerasRoute();
+  const response = await POST(
+    apiRequest("/api/cameras", {
+      method: "POST",
+      body: {
+        title: "Linking failure",
+        kind: "Dome",
+        latitude: 45.0,
+        longitude: 9.0,
+        photoIds: [101],
+      },
+    }),
+  );
+  assert.equal(response.status, 201, "a storage hiccup must never fail the report");
+  assert.equal((await responseBody(response)).linkedPhotos, 0);
+});
+
 test("POST /api/cameras rejects non-object JSON bodies", async () => {
   const { POST } = await camerasRoute();
   for (const body of ["42", "[1,2]", '"hello"']) {
