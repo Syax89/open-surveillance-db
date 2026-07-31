@@ -4,6 +4,7 @@
 //   - POST /api/auth/logout       revoke session + clear cookies (CSRF-gated)
 //   - GET  /api/auth/me           current profile or 401
 //   - GET  /api/auth/me/submissions  the contributor's own attributed reports
+//   - DELETE /api/auth/account    erasure with de-attribution (CSRF-gated, R7)
 //   - POST /api/cameras           optional attribution + CSRF when logged in
 //
 // db/auth is mocked (see tests/helpers/mocks/auth.mjs); pure validation
@@ -30,6 +31,7 @@ const loginRoute = () => loadRoute("app/api/auth/login/route.mjs");
 const logoutRoute = () => loadRoute("app/api/auth/logout/route.mjs");
 const meRoute = () => loadRoute("app/api/auth/me/route.mjs");
 const submissionsRoute = () => loadRoute("app/api/auth/me/submissions/route.mjs");
+const accountRoute = () => loadRoute("app/api/auth/account/route.mjs");
 const camerasRoute = () => loadRoute("app/api/cameras/route.mjs");
 
 const contributor = {
@@ -393,6 +395,110 @@ test("me/submissions returns 401 without a session", async () => {
   const { GET } = await submissionsRoute();
   const response = await GET(apiRequest("/api/auth/me/submissions"));
   assert.equal(response.status, 401);
+});
+
+// ---------------------------------------------------------------------------
+// DELETE /api/auth/account — account erasure (RETENTION_SCHEDULE R7)
+// ---------------------------------------------------------------------------
+
+test("account erasure deletes the account, de-attributes reports, and clears cookies", async () => {
+  stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("eraseContributor", async () => ({ deleted: true, deattributedReports: 3 }));
+  const { DELETE } = await accountRoute();
+  const response = await DELETE(
+    sessionRequest("/api/auth/account", "raw-session-token-abc123", {
+      method: "DELETE",
+      headers: { "x-csrf-token": "csrf-token-123" },
+    }),
+  );
+  assert.equal(response.status, 200);
+  assert.deepEqual(await responseBody(response), { ok: true, deattributedReports: 3 });
+  assert.deepEqual(callArgs("eraseContributor")[0], [7]);
+  const cookies = response.headers.getSetCookie();
+  assert.match(cookies.join(" "), /osdb_session=;/);
+  assert.match(cookies.join(" "), /osdb_csrf=;/);
+  assert.match(cookies.join(" "), /Max-Age=0/);
+});
+
+test("account erasure returns 401 without a session and never touches the db", async () => {
+  const { DELETE } = await accountRoute();
+  const response = await DELETE(apiRequest("/api/auth/account", { method: "DELETE" }));
+  assert.equal(response.status, 401);
+  assert.equal(callArgs("eraseContributor").length, 0);
+});
+
+test("account erasure returns 401 for an unknown or expired session token", async () => {
+  stub("findSessionByToken", async () => null);
+  const { DELETE } = await accountRoute();
+  const response = await DELETE(
+    sessionRequest("/api/auth/account", "dead-token", { method: "DELETE" }),
+  );
+  assert.equal(response.status, 401);
+});
+
+test("account erasure with a live session but a wrong CSRF token is rejected", async () => {
+  stub("findSessionByToken", async () => ({ ...session, contributor }));
+  const { DELETE } = await accountRoute();
+  const response = await DELETE(
+    sessionRequest("/api/auth/account", "raw-session-token-abc123", {
+      method: "DELETE",
+      headers: { "x-csrf-token": "wrong-token" },
+    }),
+  );
+  assert.equal(response.status, 403);
+  assert.equal(callArgs("eraseContributor").length, 0);
+});
+
+test("account erasure with a live session but a missing CSRF token is rejected", async () => {
+  stub("findSessionByToken", async () => ({ ...session, contributor }));
+  const { DELETE } = await accountRoute();
+  const response = await DELETE(
+    sessionRequest("/api/auth/account", "raw-session-token-abc123", { method: "DELETE" }),
+  );
+  assert.equal(response.status, 403);
+});
+
+test("account erasure rejects cross-origin requests", async () => {
+  const { DELETE } = await accountRoute();
+  const response = await DELETE(
+    apiRequest("/api/auth/account", {
+      method: "DELETE",
+      headers: { origin: "https://evil.example" },
+    }),
+  );
+  assert.equal(response.status, 403);
+  assert.equal(callArgs("eraseContributor").length, 0);
+});
+
+test("account erasure respects the auth rate-limit bucket", async () => {
+  stub("findSessionByToken", async () => null);
+  const { DELETE } = await accountRoute();
+  for (let index = 0; index < 10; index += 1) {
+    const response = await DELETE(
+      sessionRequest("/api/auth/account", `token-${index}`, { method: "DELETE" }),
+    );
+    assert.notEqual(response.status, 429, `request ${index + 1} must stay allowed`);
+  }
+  const blocked = await DELETE(
+    sessionRequest("/api/auth/account", "token-blocked", { method: "DELETE" }),
+  );
+  assert.equal(blocked.status, 429);
+  assert.ok(Number(blocked.headers.get("retry-after")) > 0);
+});
+
+test("account erasure returns 500 when the database is unavailable", async () => {
+  stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("eraseContributor", async () => {
+    throw new Error("Database binding unavailable");
+  });
+  const { DELETE } = await accountRoute();
+  const response = await DELETE(
+    sessionRequest("/api/auth/account", "raw-session-token-abc123", {
+      method: "DELETE",
+      headers: { "x-csrf-token": "csrf-token-123" },
+    }),
+  );
+  assert.equal(response.status, 500);
 });
 
 // ---------------------------------------------------------------------------

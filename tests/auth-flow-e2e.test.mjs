@@ -19,8 +19,10 @@
 //      moderator, applying the outcome to the record;
 //   6. every legal transition writes exactly one audit event, and the public
 //      revisions endpoint exposes only the non-identifying history;
-//   7. the suite itself records which route+method it exercised and asserts
-//      100% coverage of the API route surface (all 6 route files).
+//   7. erasing a contributor account de-attributes its reports (they stay
+//      public), revokes every session, and hard-deletes the account (R7);
+//   8. the suite itself records which route+method it exercised and asserts
+//      100% coverage of the API route surface (all 7 route files).
 //
 // No personal data is used: all fixtures are fictional. No network: the only
 // geocoder touch is a coordinate search that never calls resolvePlace.
@@ -86,6 +88,7 @@ let searchRoute;
 let revisionsRoute;
 let correctionsRoute;
 let moderationRoute;
+let accountRoute;
 
 beforeEach(async () => {
   env = await e2eEnv();
@@ -100,6 +103,7 @@ beforeEach(async () => {
   revisionsRoute = await load("revisions", "app/api/cameras/revisions/route.mjs");
   correctionsRoute = await load("corrections", "app/api/corrections/route.mjs");
   moderationRoute = await load("moderation", "app/api/moderation/route.mjs");
+  accountRoute = await load("account", "app/api/auth/account/route.mjs");
 });
 
 after(async () => {
@@ -569,10 +573,87 @@ test("E2E: nearby and coordinate search return only published records", async ()
 });
 
 // ---------------------------------------------------------------------------
-// 7) Coverage gate: 100% of the route surface exercised by this suite
+// 7) Account erasure (RETENTION_SCHEDULE R7) end to end
 // ---------------------------------------------------------------------------
 
-test("E2E suite covers 100% of the API route surface (all 6 route files, all methods)", () => {
+test("E2E: erasing a contributor de-attributes their reports, keeps them public, and kills all sessions", async () => {
+  // Build a real contributor + session through the real db/auth module (the
+  // register/login routes are covered separately with mocks in
+  // tests/api-auth.test.mjs; here the goal is the erasure path end to end).
+  const auth = await loadE2EModule("db/auth.mjs");
+  const profile = await auth.createContributor({
+    email: "eraseme@example.org",
+    displayName: "Eraseme",
+    password: "supersecret123",
+  });
+  const { rawToken, csrfToken } = await auth.createSession(profile.id, { ttlDays: 7 });
+  const sessionCookies = `osdb_session=${rawToken}; osdb_csrf=${csrfToken}`;
+  const authHeaders = { cookie: sessionCookies, "x-csrf-token": csrfToken };
+
+  // 1. The contributor submits an attributed report through the real route.
+  const submitted = await camerasRoute.POST(apiRequest("/api/cameras", {
+    method: "POST",
+    headers: authHeaders,
+    body: { ...SUBMIT, title: "Camera to de-attribute" },
+  }));
+  assert.equal(submitted.status, 201);
+  const { record } = await responseBody(submitted);
+  assert.equal(record.contributorId, profile.id, "the report must be attributed on submit");
+
+  // 2. A second session exists too (e.g. another device) — erasure must kill
+  //    every session, not just the one making the request.
+  await auth.createSession(profile.id, { ttlDays: 7 });
+
+  // 3. Moderators publish the report, so it is public before erasure.
+  const approved = await moderateCamera(record.id, "approve", REASON.verified, REVIEWERS.record);
+  assert.equal(approved.status, 200);
+  assert.equal((await publicListing()).length, 1, "the record must be public before erasure");
+
+  // 4. Erasure: the authenticated contributor deletes their account.
+  const erased = await accountRoute.DELETE(apiRequest("/api/auth/account", {
+    method: "DELETE",
+    headers: authHeaders,
+  }));
+  assert.equal(erased.status, 200);
+  const erasedBody = await responseBody(erased);
+  assert.equal(erasedBody.ok, true);
+  assert.equal(erasedBody.deattributedReports, 1, "exactly the one attributed report is de-attributed");
+  assert.match(erased.headers.getSetCookie().join(" "), /Max-Age=0/, "both session cookies must be cleared");
+
+  // 5. The contributor row and every session are gone.
+  assert.equal(await auth.getContributorById(profile.id), null, "the account must be hard-deleted");
+  assert.equal(await auth.findSessionByToken(rawToken), null, "the erasing session must not resolve");
+  const sessionRows = await env.DB.prepare("SELECT COUNT(*) AS n FROM sessions WHERE contributor_id = ?")
+    .bind(profile.id).first();
+  assert.equal(Number(sessionRows.n), 0, "all sessions of the contributor must be revoked");
+
+  // 6. The report itself survives, public, with attribution severed.
+  const rows = await env.DB.prepare(
+    "SELECT contributor_id AS contributorId, status FROM cameras WHERE id = ?",
+  ).bind(record.id).first();
+  assert.equal(rows.contributorId, null, "contributor_id must be NULL after erasure");
+  assert.equal(rows.status, "verified", "the record keeps its published state");
+  const listing = await publicListing();
+  assert.equal(listing.length, 1, "the de-attributed record stays public");
+  assert.equal(listing[0].title, "Camera to de-attribute");
+
+  // 7. The append-only audit trail is untouched: the publish event survives.
+  const events = await auditEvents();
+  assert.equal(events.length, 1);
+  assert.equal(events[0].action, "approve");
+  assert.equal(events[0].entity_id, record.id);
+});
+
+test("E2E: erasure requires a live session — anonymous DELETE is rejected", async () => {
+  const response = await accountRoute.DELETE(apiRequest("/api/auth/account", { method: "DELETE" }));
+  assert.equal(response.status, 401);
+});
+
+// ---------------------------------------------------------------------------
+// 8) Coverage gate: 100% of the route surface exercised by this suite
+// ---------------------------------------------------------------------------
+
+test("E2E suite covers 100% of the API route surface (all 7 route files, all methods)", () => {
   const expected = [
     "cameras:GET",
     "cameras:POST",
@@ -582,6 +663,7 @@ test("E2E suite covers 100% of the API route surface (all 6 route files, all met
     "corrections:POST",
     "moderation:GET",
     "moderation:PATCH",
+    "account:DELETE",
   ];
   const missing = expected.filter((key) => !coverage.has(key));
   assert.deepEqual(missing, [], `missing E2E coverage: ${missing.join(", ")}`);

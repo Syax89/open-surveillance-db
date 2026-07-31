@@ -194,3 +194,88 @@ test("sessions are independent: revoking one never touches another", async () =>
   assert.equal(await auth.findSessionByToken(first.rawToken, NOW), null);
   assert.ok(await auth.findSessionByToken(second.rawToken, NOW));
 });
+
+// ---------------------------------------------------------------------------
+// Account erasure (RETENTION_SCHEDULE R7)
+// ---------------------------------------------------------------------------
+
+test("eraseContributor de-attributes the reports, revokes all sessions, and hard-deletes the account", async () => {
+  const { auth, cameras } = runtime;
+  const profile = await auth.createContributor({ email: "eraseme@example.org", displayName: "Eraseme", password: "supersecret123" });
+  const first = await auth.createSession(profile.id, { ttlDays: 7, now: NOW });
+  const second = await auth.createSession(profile.id, { ttlDays: 7, now: NOW });
+
+  const attributed = await cameras.createPendingCamera({
+    title: "Attributed camera",
+    kind: "Dome",
+    manufacturer: null,
+    observedOn: null,
+    address: "",
+    notes: "",
+    latitude: 44.83,
+    longitude: 11.62,
+    contributorId: profile.id,
+  });
+  // A second report, same contributor.
+  await cameras.createPendingCamera({
+    title: "Another attributed camera",
+    kind: "Bullet",
+    manufacturer: null,
+    observedOn: null,
+    address: "",
+    notes: "",
+    latitude: 44.84,
+    longitude: 11.63,
+    contributorId: profile.id,
+  });
+  // An anonymous report must be untouched.
+  const anonymous = await cameras.createPendingCamera({
+    title: "Anonymous camera",
+    kind: "Bullet",
+    manufacturer: null,
+    observedOn: null,
+    address: "",
+    notes: "",
+    latitude: 44.85,
+    longitude: 11.64,
+  });
+  assert.equal(anonymous.contributorId, null);
+
+  const result = await auth.eraseContributor(profile.id);
+  assert.equal(result.deleted, true);
+  assert.equal(result.deattributedReports, 2, "both attributed reports are counted");
+
+  // Account and sessions are gone.
+  assert.equal(await auth.getContributorById(profile.id), null);
+  assert.equal(await auth.findSessionByToken(first.rawToken, NOW), null);
+  assert.equal(await auth.findSessionByToken(second.rawToken, NOW), null);
+
+  // Reports survive with contributor_id NULL; the anonymous one was never touched.
+  const deattributed = await runtime.env.DB.prepare(
+    "SELECT contributor_id AS contributorId FROM cameras WHERE id = ?",
+  ).bind(attributed.id).first();
+  assert.equal(deattributed.contributorId, null);
+  const other = await runtime.env.DB.prepare(
+    "SELECT contributor_id AS contributorId FROM cameras WHERE id = ?",
+  ).bind(anonymous.id).first();
+  assert.equal(other.contributorId, null);
+  const all = await runtime.env.DB.prepare("SELECT COUNT(*) AS n FROM cameras").first();
+  assert.equal(Number(all.n), 3, "no report row is deleted by erasure");
+});
+
+test("eraseContributor on an unknown id reports deleted: false and de-attributes nothing", async () => {
+  const { auth } = runtime;
+  const result = await auth.eraseContributor(9999);
+  assert.equal(result.deleted, false);
+  assert.equal(result.deattributedReports, 0);
+});
+
+test("eraseContributor is safe to call twice — the second call finds nothing", async () => {
+  const { auth } = runtime;
+  const profile = await auth.createContributor({ email: "twice@example.org", displayName: "Twice", password: "supersecret123" });
+  const first = await auth.eraseContributor(profile.id);
+  assert.equal(first.deleted, true);
+  const second = await auth.eraseContributor(profile.id);
+  assert.equal(second.deleted, false);
+  assert.equal(second.deattributedReports, 0);
+});

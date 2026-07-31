@@ -541,5 +541,17 @@ export const en = {
     anonymous: "Anonymous",
     notAuthenticatedTitle: "Not logged in",
     notAuthenticatedBody: "Log in to see your profile and your attributed reports.",
+    deleteAccountSection: "Delete account",
+    deleteAccountHint:
+      "Deletes your account and removes the link between you and your reports. The reports themselves stay published anonymously (RETENTION_SCHEDULE R7).",
+    deleteAccountConfirm: "Delete account permanently?",
+    deleteAccountConfirmBody:
+      "Your account and all its sessions will be erased. Your reports stay published, no longer attributed to you. This cannot be undone.",
+    deleteAccount: "Delete account",
+    deletingAccount: "Deleting account…",
+    accountDeletedTitle: "Account deleted",
+    accountDeletedBody:
+      "Your account has been erased and you are logged out. Your reports remain published without attribution.",
+    errorDeleteAccount: "Unable to delete the account. Please try again.",
   },
 } as const;

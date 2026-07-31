@@ -371,3 +371,65 @@ export async function listContributorSubmissions(contributorId: number): Promise
     .all<ContributorSubmission>();
   return result.results;
 }
+
+// ---------------------------------------------------------------------------
+// Account erasure (RETENTION_SCHEDULE R7, TERMS §15 pre-launch item)
+// ---------------------------------------------------------------------------
+
+export type ErasureResult = {
+  /** Whether a contributor row with this id existed and was hard-deleted. */
+  deleted: boolean;
+  /** Number of attributed reports that were de-attributed to anonymous. */
+  deattributedReports: number;
+};
+
+/**
+ * Erase a contributor account (GDPR art. 17 erasure path, R7).
+ *
+ * De-attribution is EXPLICIT, not FK-driven: `cameras.contributor_id` has no
+ * ON DELETE action on purpose, so the only way to remove a contributor who
+ * owns reports is this function — which first severs the attribution, then
+ * revokes every session, then hard-deletes the account. The reported data
+ * itself stays published: only the link between the account and its reports
+ * is removed (RETENTION_SCHEDULE R7: "on verified records kept as
+ * provenance … as long as the record is public"; the anonymous report keeps
+ * its public fields, `contributor_id` becomes NULL).
+ *
+ * The three statements run as one atomic batch: a failure in any step rolls
+ * back the whole erasure, so an account is never left half-deleted (e.g.
+ * sessions gone but reports still attributed, or vice versa).
+ *
+ * Returns the number of reports de-attributed (for the erasure response and
+ * the audit trail) and whether the account row existed at all.
+ */
+export async function eraseContributor(contributorId: number): Promise<ErasureResult> {
+  const d1 = await getD1();
+
+  // A contributor that never existed (or was already erased) is a no-op:
+  // nothing to de-attribute, nothing to delete.
+  const existing = await d1
+    .prepare("SELECT COUNT(*) AS n FROM contributors WHERE id = ?")
+    .bind(contributorId)
+    .first<{ n: number }>();
+  if (Number(existing?.n ?? 0) === 0) {
+    return { deleted: false, deattributedReports: 0 };
+  }
+
+  const attributed = await d1
+    .prepare("SELECT COUNT(*) AS n FROM cameras WHERE contributor_id = ?")
+    .bind(contributorId)
+    .first<{ n: number }>();
+  const deattributedReports = Number(attributed?.n ?? 0);
+
+  await d1.batch([
+    d1.prepare("UPDATE cameras SET contributor_id = NULL WHERE contributor_id = ?").bind(contributorId),
+    // Explicit session revocation, mirroring logout: after erasure no
+    // session of this contributor may resolve, in every environment
+    // (real D1 would cascade on contributor delete, but the test harness
+    // does not enforce FKs, so the app layer must be the source of truth).
+    d1.prepare("DELETE FROM sessions WHERE contributor_id = ?").bind(contributorId),
+    d1.prepare("DELETE FROM contributors WHERE id = ?").bind(contributorId),
+  ]);
+
+  return { deleted: true, deattributedReports };
+}

@@ -537,5 +537,17 @@ export const it: Translation<typeof en> = {
     anonymous: "Anonimo",
     notAuthenticatedTitle: "Non hai effettuato l'accesso",
     notAuthenticatedBody: "Accedi per vedere il tuo profilo e le tue segnalazioni attribuite.",
+    deleteAccountSection: "Elimina account",
+    deleteAccountHint:
+      "Elimina il tuo account e rimuove il collegamento tra te e le tue segnalazioni. Le segnalazioni restano pubblicate in forma anonima (RETENTION_SCHEDULE R7).",
+    deleteAccountConfirm: "Eliminare definitivamente l'account?",
+    deleteAccountConfirmBody:
+      "L'account e tutte le sue sessioni verranno cancellati. Le tue segnalazioni restano pubblicate, senza più attribuzione a te. Questa azione non può essere annullata.",
+    deleteAccount: "Elimina account",
+    deletingAccount: "Eliminazione in corso…",
+    accountDeletedTitle: "Account eliminato",
+    accountDeletedBody:
+      "Il tuo account è stato cancellato e hai effettuato l'accesso. Le tue segnalazioni restano pubblicate senza attribuzione.",
+    errorDeleteAccount: "Impossibile eliminare l'account. Riprova.",
   },
 };
