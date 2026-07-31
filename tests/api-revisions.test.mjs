@@ -25,7 +25,7 @@ const publicRecord = {
   longitude: 12.5,
   status: "verified",
   source: "Community report",
-  updated: "Local moderation: re-verified",
+  updated: "2026-07-12T09:00:00.000Z",
   description: "",
   createdAt: "2026-07-01T08:00:00.000Z",
 };

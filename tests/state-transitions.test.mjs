@@ -151,12 +151,12 @@ test("a submitted camera starts pending and is absent from every public represen
 
 test("every legal camera transition updates the status and records an append-only event", async (t) => {
   const cases = [
-    { from: "pending", action: "approve", to: "verified", updated: "Local moderation: approved and verified", reason: REASON.verified },
+    { from: "pending", action: "approve", to: "verified", updated: "ISO", reason: REASON.verified },
     { from: "pending", action: "reject", to: "rejected", updated: "Local moderation: rejected", reason: REASON.duplicate },
     { from: "pending", action: "hide", to: "removed", updated: "Local moderation: hidden from public listing", reason: REASON.sensitive },
     { from: "verified", action: "mark-stale", to: "needs_review", updated: "Local moderation: marked stale and queued for review", reason: REASON.stale },
     { from: "verified", action: "hide", to: "removed", updated: "Local moderation: hidden from public listing", reason: REASON.sensitive },
-    { from: "needs_review", action: "reverify", to: "verified", updated: "Local moderation: re-verified", reason: REASON.verified },
+    { from: "needs_review", action: "reverify", to: "verified", updated: "ISO", reason: REASON.verified },
     { from: "needs_review", action: "hide", to: "removed", updated: "Local moderation: hidden from public listing", reason: REASON.sensitive },
   ];
 
@@ -170,7 +170,15 @@ test("every legal camera transition updates the status and records an append-onl
       assert.ok(decision, `${action} on ${from} must succeed`);
 
       assert.equal(decision.item.status, to);
-      assert.equal(decision.item.updated, updated);
+      if (updated === "ISO") {
+        // Publicly visible transitions must record a comparable ISO verification
+        // timestamp so the directory freshness filter stays meaningful; the
+        // exact instant is not asserted, only the format.
+        assert.match(decision.item.updated, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/, "verified transitions must record an ISO 8601 verification timestamp");
+        assert.ok(Number.isFinite(new Date(decision.item.updated).getTime()), "the ISO timestamp must be parseable");
+      } else {
+        assert.equal(decision.item.updated, updated);
+      }
       assert.equal(await statusOf(report.id), to);
 
       expectEvent(decision.event, {
