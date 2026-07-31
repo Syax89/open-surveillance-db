@@ -67,19 +67,31 @@ export function callerKey(request: Request): string {
   return "unknown";
 }
 
-/** Environment knobs for submission endpoints (POST /api/cameras, POST /api/corrections). */
+/**
+ * Environment knobs for submission endpoints (POST /api/cameras, POST /api/corrections).
+ *
+ * The parameter is `unknown` (cast internally) on purpose: Cloudflare's `Env`
+ * interface has no string index signature, so it is not assignable to
+ * `Record<string, unknown>`, and this module must stay runnable in plain Node
+ * (the boundary tests import its source). Reading an object's properties
+ * through a cast is safe here — the values are only ever `Number()`-coerced or
+ * string-compared, never trusted as types.
+ */
+type EnvLike = { [key: string]: unknown };
+
 export function submissionLimits(
-  env: Record<string, unknown>,
+  env: unknown,
   defaults: RateLimitOptions = { maxRequests: 5, windowSeconds: 60 },
 ): RateLimitOptions {
-  const maxRequests = Number(env.POST_RATE_LIMIT_MAX);
-  const windowSeconds = Number(env.POST_RATE_LIMIT_WINDOW_SECONDS);
+  const config = env as EnvLike;
+  const maxRequests = Number(config.POST_RATE_LIMIT_MAX);
+  const windowSeconds = Number(config.POST_RATE_LIMIT_WINDOW_SECONDS);
   return {
     maxRequests: Number.isFinite(maxRequests) && maxRequests > 0 ? maxRequests : defaults.maxRequests,
     windowSeconds: Number.isFinite(windowSeconds) && windowSeconds > 0 ? windowSeconds : defaults.windowSeconds,
   };
 }
 
-export function submissionsDisabled(env: Record<string, unknown>): boolean {
-  return env.POST_SUBMISSIONS_DISABLED === "true";
+export function submissionsDisabled(env: unknown): boolean {
+  return (env as EnvLike).POST_SUBMISSIONS_DISABLED === "true";
 }
