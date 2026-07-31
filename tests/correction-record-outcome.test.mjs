@@ -378,18 +378,22 @@ test("GET /api/moderation exposes the correction outcome in the queue", async ()
 // AC-3 / AC-4 / AC-5 — static contract on the db and public boundary
 // ---------------------------------------------------------------------------
 
-test("db schema carries the outcome column (runtime CREATE TABLE)", async () => {
-  const corrections = await readSource("db/corrections.ts");
-  const moderation = await readSource("db/moderation.ts");
+test("db schema carries the outcome column (Drizzle migration 0001)", async () => {
+  const migration0001 = await readSource("drizzle/0001_low_queen_noir.sql");
+  const schema = await readSource("db/schema.ts");
+  // H3: the schema is delivered by the Drizzle migrations, not by runtime
+  // bootstrap (getD1() is a pure binding passthrough). Assert the outcome
+  // column on the migration that creates correction_requests and on the
+  // schema declaration.
   assert.match(
-    corrections,
-    /CREATE\s+TABLE[^)]*correction_requests[\s\S]{0,600}\boutcome\s+TEXT/i,
-    "db/corrections.ts must create correction_requests with an outcome column",
+    migration0001,
+    /CREATE\s+TABLE[^)]*`correction_requests`[\s\S]{0,600}`outcome`\s+text/i,
+    "drizzle/0001 must create correction_requests with an outcome column",
   );
   assert.match(
-    moderation,
-    /CREATE\s+TABLE[^)]*correction_requests[\s\S]{0,600}\boutcome\s+TEXT/i,
-    "db/moderation.ts must create correction_requests with an outcome column",
+    schema,
+    /outcome:\s*text\(\s*["']outcome["']\s*\)/,
+    "db/schema.ts must declare the outcome column",
   );
 });
 
