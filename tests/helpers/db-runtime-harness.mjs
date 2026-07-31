@@ -21,6 +21,9 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 const DB_MODULES = [
   { source: "db/cameras.ts", output: "db/cameras.mjs" },
   { source: "db/moderation.ts", output: "db/moderation.mjs" },
+  // db/moderation.ts imports ./freshness (pure, no CF binding); transpile it
+  // into the temp tree so the rewritten import resolves.
+  { source: "db/freshness.ts", output: "db/freshness.mjs" },
   // db/cameras.ts imports ../app/lib/duplicate-detection (pure, no CF binding);
   // transpile it into the temp tree so the rewritten import resolves.
   { source: "app/lib/duplicate-detection.ts", output: "app/lib/duplicate-detection.mjs" },

@@ -1,5 +1,6 @@
 import { getD1, type CameraRecord } from "./cameras";
 import type { CorrectionRequest } from "./corrections";
+import { DEFAULT_REVIEW_INTERVAL_MONTHS, STALE_GRACE_DAYS, addDays, computeReviewDueAt } from "./freshness";
 
 export type ModerationCameraRecord = CameraRecord;
 
@@ -10,6 +11,7 @@ export type ModerationQueue = {
   cameraReports: PendingCameraReport[];
   publishedCameras: ModerationCameraRecord[];
   reviewCameras: ModerationCameraRecord[];
+  staleCameras: ModerationCameraRecord[];
   correctionRequests: PendingCorrectionRequest[];
   recentEvents: ModerationEvent[];
 };
@@ -95,27 +97,41 @@ async function getModerationD1() {
 
 export async function listPendingModerationItems(): Promise<ModerationQueue> {
   const d1 = await getModerationD1();
-  const [cameraReports, publishedCameras, reviewCameras, correctionRequests, recentEvents] =
+  // Lazy freshness sweep: before the queue is read, records whose review
+  // window elapsed are moved to `needs_review` (scheduled expiry) and records
+  // not re-confirmed within the grace period are labelled `stale`. Public
+  // routes never depend on this sweep: listPublicCameras() enforces the same
+  // freshness boundary at read time.
+  await runFreshnessSweep();
+  const cameraColumns =
+    "id, title, kind, manufacturer, observed_on AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, notes, latitude, longitude, status, source, updated, description, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt";
+  const [cameraReports, publishedCameras, reviewCameras, staleCameras, correctionRequests, recentEvents] =
     await Promise.all([
     d1
       .prepare(
-        "SELECT id, title, kind, manufacturer, observed_on AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, notes, latitude, longitude, status, source, updated, description, created_at AS createdAt FROM cameras WHERE status = ? ORDER BY created_at ASC, id ASC",
+        `SELECT ${cameraColumns} FROM cameras WHERE status = ? ORDER BY created_at ASC, id ASC`,
       )
       .bind("pending")
       .all<PendingCameraReport>(),
     d1
       .prepare(
-        "SELECT id, title, kind, manufacturer, observed_on AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, notes, latitude, longitude, status, source, updated, description, created_at AS createdAt FROM cameras WHERE status = ? ORDER BY created_at ASC, id ASC",
+        `SELECT ${cameraColumns} FROM cameras WHERE status = ? ORDER BY created_at ASC, id ASC`,
       )
       .bind("verified")
       .all<CameraRecord>(),
     d1
       .prepare(
-        "SELECT id, title, kind, manufacturer, observed_on AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, notes, latitude, longitude, status, source, updated, description, created_at AS createdAt FROM cameras WHERE status = ? ORDER BY created_at ASC, id ASC",
+        `SELECT ${cameraColumns} FROM cameras WHERE status = ? ORDER BY created_at ASC, id ASC`,
       )
       .bind("needs_review")
       .all<CameraRecord>(),
     // correction_requests rows expose outcome in the queue (null while pending).
+    d1
+      .prepare(
+        `SELECT ${cameraColumns} FROM cameras WHERE status = ? ORDER BY created_at ASC, id ASC`,
+      )
+      .bind("stale")
+      .all<CameraRecord>(),
     d1
       .prepare(
         "SELECT id, camera_id AS cameraId, issue_type AS issueType, message, contact, status, outcome, created_at AS createdAt FROM correction_requests WHERE status = ? ORDER BY created_at ASC, id ASC",
@@ -134,9 +150,64 @@ export async function listPendingModerationItems(): Promise<ModerationQueue> {
     cameraReports: cameraReports.results,
     publishedCameras: publishedCameras.results,
     reviewCameras: reviewCameras.results,
+    staleCameras: staleCameras.results,
     correctionRequests: correctionRequests.results,
     recentEvents: recentEvents.results,
   };
+}
+
+/**
+ * Scheduled-expiry sweep (docs/workstreams/DATA_TRUST.md "Review and expiry
+ * clocks"): a `verified` record whose review window elapsed moves to
+ * `needs_review`; a `needs_review` record still unconfirmed STALE_GRACE_DAYS
+ * days after its scheduled review becomes `stale`. Every transition writes a
+ * moderation event (action `scheduled-expiry` / `expiry-not-reconfirmed`).
+ */
+export async function runFreshnessSweep(nowIso: string = new Date().toISOString()): Promise<{ scheduledExpiry: number; becameStale: number }> {
+  const d1 = await getModerationD1();
+  const staleThreshold = addDays(nowIso, -STALE_GRACE_DAYS);
+
+  const due = await d1
+    .prepare("SELECT id FROM cameras WHERE status = 'verified' AND review_due_at IS NOT NULL AND review_due_at < ?")
+    .bind(nowIso)
+    .all<{ id: number }>();
+  for (const { id } of due.results) {
+    await d1
+      .prepare("UPDATE cameras SET status = 'needs_review', updated = ? WHERE id = ?")
+      .bind("Local moderation: scheduled review due", id)
+      .run();
+    await createModerationEvent(d1, {
+      entity: "camera",
+      entityId: id,
+      previousStatus: "verified",
+      newStatus: "needs_review",
+      action: "scheduled-expiry",
+      reasonCode: "inaccurate-or-outdated",
+      note: "Review window elapsed; re-verification required before the record can be public again.",
+    });
+  }
+
+  const unconfirmed = await d1
+    .prepare("SELECT id FROM cameras WHERE status = 'needs_review' AND review_due_at IS NOT NULL AND review_due_at < ?")
+    .bind(staleThreshold)
+    .all<{ id: number }>();
+  for (const { id } of unconfirmed.results) {
+    await d1
+      .prepare("UPDATE cameras SET status = 'stale', updated = ? WHERE id = ?")
+      .bind("Local moderation: not re-confirmed within the review grace period", id)
+      .run();
+    await createModerationEvent(d1, {
+      entity: "camera",
+      entityId: id,
+      previousStatus: "needs_review",
+      newStatus: "stale",
+      action: "expiry-not-reconfirmed",
+      reasonCode: "inaccurate-or-outdated",
+      note: `No re-verification within ${STALE_GRACE_DAYS} days of the scheduled review.`,
+    });
+  }
+
+  return { scheduledExpiry: due.results.length, becameStale: unconfirmed.results.length };
 }
 
 export async function moderateCamera(
@@ -156,27 +227,56 @@ export async function moderateCamera(
   const transition = getCameraTransition(current.status, action);
   if (!transition) return null;
 
+  const nowIso = new Date().toISOString();
+  // Approval and re-verification both restart the freshness clocks: the record
+  // is considered re-verified as of now, and its next review is due in
+  // DEFAULT_REVIEW_INTERVAL_MONTHS (standard confidence, DATA_TRUST clocks).
+  const refreshClock = action === "approve" || action === "reverify";
+  const selectColumns =
+    "id, title, kind, manufacturer, observed_on AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, notes, latitude, longitude, status, source, updated, description, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt";
   const publishMetadata = current.status === "pending" && action === "approve";
-  const item = publishMetadata
-    ? await d1
-        .prepare(
-          "UPDATE cameras SET status = ?, updated = ?, publish_manufacturer = ?, publish_observed_on = ? WHERE id = ? AND status = ? RETURNING id, title, kind, manufacturer, observed_on AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, notes, latitude, longitude, status, source, updated, description, created_at AS createdAt",
-        )
-        .bind(
-          transition.newStatus,
-          transition.updated,
-          metadataPublication?.publishManufacturer ? 1 : 0,
-          metadataPublication?.publishObservedOn ? 1 : 0,
-          id,
-          current.status,
-        )
-        .first<ModerationCameraRecord>()
-    : await d1
-        .prepare(
-          "UPDATE cameras SET status = ?, updated = ? WHERE id = ? AND status = ? RETURNING id, title, kind, manufacturer, observed_on AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, notes, latitude, longitude, status, source, updated, description, created_at AS createdAt",
-        )
-        .bind(transition.newStatus, transition.updated, id, current.status)
-        .first<ModerationCameraRecord>();
+
+  let item: ModerationCameraRecord | null = null;
+  if (publishMetadata) {
+    item = await d1
+      .prepare(
+        `UPDATE cameras SET status = ?, updated = ?, publish_manufacturer = ?, publish_observed_on = ?, last_verified_at = ?, review_due_at = ?, review_interval_months = ? WHERE id = ? AND status = ? RETURNING ${selectColumns}`,
+      )
+      .bind(
+        transition.newStatus,
+        transition.updated,
+        metadataPublication?.publishManufacturer ? 1 : 0,
+        metadataPublication?.publishObservedOn ? 1 : 0,
+        nowIso,
+        computeReviewDueAt(nowIso, DEFAULT_REVIEW_INTERVAL_MONTHS),
+        DEFAULT_REVIEW_INTERVAL_MONTHS,
+        id,
+        current.status,
+      )
+      .first<ModerationCameraRecord>();
+  } else if (refreshClock) {
+    item = await d1
+      .prepare(
+        `UPDATE cameras SET status = ?, updated = ?, last_verified_at = ?, review_due_at = ?, review_interval_months = ? WHERE id = ? AND status = ? RETURNING ${selectColumns}`,
+      )
+      .bind(
+        transition.newStatus,
+        transition.updated,
+        nowIso,
+        computeReviewDueAt(nowIso, DEFAULT_REVIEW_INTERVAL_MONTHS),
+        DEFAULT_REVIEW_INTERVAL_MONTHS,
+        id,
+        current.status,
+      )
+      .first<ModerationCameraRecord>();
+  } else {
+    item = await d1
+      .prepare(
+        `UPDATE cameras SET status = ?, updated = ? WHERE id = ? AND status = ? RETURNING ${selectColumns}`,
+      )
+      .bind(transition.newStatus, transition.updated, id, current.status)
+      .first<ModerationCameraRecord>();
+  }
   if (!item) return null;
 
   const event = await createModerationEvent(d1, {
@@ -220,6 +320,15 @@ function getCameraTransition(
   }
 
   if (previousStatus === "needs_review") {
+    if (action === "reverify") {
+      return { newStatus: "verified", updated: "Local moderation: re-verified" };
+    }
+    if (action === "hide") {
+      return { newStatus: "removed", updated: "Local moderation: hidden from public listing" };
+    }
+  }
+
+  if (previousStatus === "stale") {
     if (action === "reverify") {
       return { newStatus: "verified", updated: "Local moderation: re-verified" };
     }
