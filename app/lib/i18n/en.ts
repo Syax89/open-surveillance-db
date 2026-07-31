@@ -30,7 +30,7 @@ export const en = {
   },
   status: {
     verified: "Verified",
-    demo: "Prototype record",
+    demo: "Illustrative record",
     pending: "In moderation",
     needs_review: "Needs review",
     removed: "Removed",
@@ -59,6 +59,7 @@ export const en = {
     livePrototype: "Live prototype",
     mapTitle: "Explore documented cameras",
     osmBaseMap: "OpenStreetMap base map",
+    mapCoverageNote: "The map shows documented public records only; an empty area does not prove that no cameras are present.",
     prototypeMode: "Prototype mode.",
     prototypeBanner:
       "The base map is real OpenStreetMap data; the two visible camera pins are clearly labelled illustrative records. Click anywhere on the map to select a position for a report.",
@@ -419,7 +420,7 @@ export const en = {
       reverify: "Reverified",
     },
     statusLabels: {
-      pending: "Pending",
+      pending: "In moderation",
       verified: "Verified",
       needs_review: "Needs review",
       removed: "Removed",
