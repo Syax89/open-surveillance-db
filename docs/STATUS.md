@@ -21,18 +21,25 @@ Last reviewed: 2026-07-31
 - [x] Local-only moderation queue for pending reports and correction requests.
 - [x] Required moderation reason, optional reviewer note, and append-only local audit history.
 - [x] Local lifecycle for verified records: mark for review, reverify, or remove.
+- [x] Reviewed public change summary on record pages; it omits contributor identities and internal notes.
 - [x] Automated contract tests for public-data and private-request boundaries.
 - [x] Local playbook for fictional submit → moderate → public-result checks.
 - [x] Local fictional-data check: rejected records remain absent from public outputs and create an audit event.
 - [x] Local fictional-data lifecycle check: only verified state reaches public outputs.
 - [x] English/Italian interface for public pages, record detail, and local moderation.
 - [x] Public in-app guide plus skip link, visible focus treatment, reduced-motion support, and map-directory accessibility guidance.
+- [x] Draft accessibility statement and design decision for a non-sensitive usability-feedback route ([`docs/ACCESSIBILITY_STATEMENT.md`](ACCESSIBILITY_STATEMENT.md), [ADR 0006](decisions/0006-non-sensitive-usability-feedback-route.md)).
 - [x] Clearly labelled illustrative demo data.
+- [x] Lightweight public data dictionary and export versioning policy
+  ([`docs/DATA_DICTIONARY.md`](DATA_DICTIONARY.md),
+  [`docs/EXPORT_VERSIONING.md`](EXPORT_VERSIONING.md)); versioned releases
+  remain future work pending the final data licence.
 - [x] Initial open documentation and project policies.
 
 ## Not yet implemented
 
 - [ ] Authentication and contributor accounts.
+- [ ] Public `/feedback` page for the non-sensitive usability-feedback route (designed in [ADR 0006](decisions/0006-non-sensitive-usability-feedback-route.md); implementation pending).
 - [ ] Authentication/roles, audit log, appeal workflow, and production moderation controls.
 - [ ] Image upload, secure storage, EXIF stripping, and redaction tooling.
 - [ ] Legal/privacy review and public-facing terms.

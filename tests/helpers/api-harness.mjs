@@ -25,13 +25,14 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 const ROUTES = [
   { source: "app/api/cameras/route.ts", output: "app/api/cameras/route.mjs" },
   { source: "app/api/cameras/nearby/route.ts", output: "app/api/cameras/nearby/route.mjs" },
+  { source: "app/api/cameras/revisions/route.ts", output: "app/api/cameras/revisions/route.mjs" },
   { source: "app/api/moderation/route.ts", output: "app/api/moderation/route.mjs" },
   { source: "app/api/corrections/route.ts", output: "app/api/corrections/route.mjs" },
 ];
 
 // Real db/* modules compiled into the temp tree so runtime tests can
 // exercise the actual public-query and moderation boundaries against an
-// in-memory D1 (see tests/helpers/d1-adapter.mjs). They land in a separate
+// in-memory D1 (see tests/helpers/d1-sqlite.mjs). They land in a separate
 // db-real/ directory so they never collide with the db/* mocks the route
 // handlers import. db/index.ts (drizzle) and db/schema.ts are deliberately
 // excluded: the raw-D1 modules never import them at runtime. The modules
@@ -122,9 +123,9 @@ async function buildTree() {
   }
 
   // Compile the real db/* modules into db-real/. Unlike the routes, their
-  // relative imports are plain "./cameras" (no /db/ segment), so the generic
-  // rewriteSpecifiers pattern does not apply: any relative import without an
-  // explicit .mjs extension gets one.
+  // relative imports are plain "./cameras" or cross-dir "../app/lib/*" (no
+  // /db/ segment), so the generic rewriteSpecifiers pattern does not apply:
+  // any relative import without an explicit .mjs extension gets one.
   await mkdir(path.join(tree, "db-real"), { recursive: true });
   for (const { source, output } of REAL_DB_MODULES) {
     const sourcePath = path.join(root, source);
@@ -139,7 +140,7 @@ async function buildTree() {
 
     const rewritten = compiled
       .replace(/from\s*["']cloudflare:workers["']/g, `from "${workersMockUrl}"`)
-      .replace(/(from\s*["'])(\.\/[^"']+)(["'])/g, (match, prefix, specifier, suffix) =>
+      .replace(/(from\s*["'])(\.\.?\/[^"']+)(["'])/g, (match, prefix, specifier, suffix) =>
         specifier.endsWith(".mjs") ? match : `${prefix}${specifier}.mjs${suffix}`,
       );
 
@@ -183,6 +184,10 @@ export async function loadTreeModule(relativeOutput) {
   const tree = await buildRouteTree();
   return import(pathToFileURL(path.join(tree, relativeOutput)).href);
 }
+
+// Alias used by the merged H1/duplicate-detection suites: the tree already
+// transpiles every pure lib module, so tests can exercise them directly.
+export const loadLib = loadTreeModule;
 
 export async function cleanupRouteTree() {
   if (!builtTreePromise) return;

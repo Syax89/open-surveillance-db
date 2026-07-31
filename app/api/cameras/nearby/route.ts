@@ -1,6 +1,7 @@
 import { findNearbyPublicCameras } from "../../../../db/cameras";
 
 function readNumber(value: string | null) { if (value === null || value.trim() === "") return null; const number = Number(value); return Number.isFinite(number) ? number : null; }
+function readText(value: string | null, maxLength: number) { return typeof value === "string" ? value.trim().slice(0, maxLength) : ""; }
 
 export async function GET(request: Request) {
   const query = new URL(request.url).searchParams;
@@ -13,7 +14,12 @@ export async function GET(request: Request) {
   }
 
   try {
-    const records = await findNearbyPublicCameras(latitude, longitude, radius);
+    // Optional text hints for the pre-submit duplicate check: when supplied,
+    // candidates are ranked by title/address/kind similarity as well as distance.
+    const title = readText(query.get("title"), 90);
+    const address = readText(query.get("address"), 180);
+    const kind = readText(query.get("kind"), 60);
+    const records = await findNearbyPublicCameras(latitude, longitude, radius, { title, address, kind });
     return Response.json({ records });
   } catch (error) {
     console.error("GET /api/cameras/nearby failed", error);

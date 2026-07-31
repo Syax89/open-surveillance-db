@@ -1,5 +1,9 @@
 # Data model and API
 
+> Field-by-field public reference: see the
+> [data dictionary](DATA_DICTIONARY.md). Export releases: see the
+> [export versioning policy](EXPORT_VERSIONING.md).
+
 ## Public camera record
 
 | Field | Public? | Description |

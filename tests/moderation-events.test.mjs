@@ -16,7 +16,7 @@
 import assert from "node:assert/strict";
 import { after, beforeEach, test } from "node:test";
 import { cleanupRouteTree, loadTreeModule } from "./helpers/api-harness.mjs";
-import { D1 } from "./helpers/d1-adapter.mjs";
+import { D1SqliteDatabase as D1 } from "./helpers/d1-sqlite.mjs";
 import { resetMockState } from "./helpers/mock-state.mjs";
 
 beforeEach(() => resetMockState());

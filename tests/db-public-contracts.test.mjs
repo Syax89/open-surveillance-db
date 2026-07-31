@@ -3,7 +3,7 @@
 // Two layers:
 //  1. DB-layer integration: the REAL db/cameras.ts, db/corrections.ts and
 //     db/moderation.ts SQL runs against a fresh in-memory SQLite through the
-//     D1 adapter (tests/helpers/d1-adapter.mjs). These lock the public data
+//     D1 adapter (tests/helpers/d1-sqlite.mjs). These lock the public data
 //     boundary documented in docs/DATA_DICTIONARY.md: only verified/demo
 //     records, notes never selected, manufacturer/observedOn conditional on
 //     their publish flags, seed dataset, nearby distance semantics.
@@ -15,7 +15,7 @@
 import assert from "node:assert/strict";
 import { after, beforeEach, test } from "node:test";
 import { apiRequest, cleanupRouteTree, loadRoute, loadTreeModule, responseBody } from "./helpers/api-harness.mjs";
-import { D1 } from "./helpers/d1-adapter.mjs";
+import { D1SqliteDatabase as D1 } from "./helpers/d1-sqlite.mjs";
 import { resetMockState, stub } from "./helpers/mock-state.mjs";
 
 beforeEach(() => resetMockState());
@@ -226,8 +226,8 @@ test("findNearbyPublicCameras computes distance, filters by radius and sorts asc
   const { env, cameras } = await realDb();
   await resetDb({ env, cameras });
   // 0.0001° latitude ≈ 11 m, 0.001° ≈ 111 m, 0.01° ≈ 1.1 km (WGS84).
-  const near = await insertCamera(env, { title: "Near", latitude: 44.101 });
-  const closer = await insertCamera(env, { title: "Closer", latitude: 44.1001 });
+  await insertCamera(env, { title: "Near", latitude: 44.101 });
+  await insertCamera(env, { title: "Closer", latitude: 44.1001 });
   await insertCamera(env, { title: "Far", latitude: 44.11 });
   await insertCamera(env, { title: "Pending far", latitude: 44.2, status: "pending" });
 

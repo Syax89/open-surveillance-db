@@ -17,7 +17,7 @@
 import assert from "node:assert/strict";
 import { after, beforeEach, test } from "node:test";
 import { apiRequest, cleanupRouteTree, loadRoute, loadTreeModule, responseBody } from "./helpers/api-harness.mjs";
-import { D1 } from "./helpers/d1-adapter.mjs";
+import { D1SqliteDatabase as D1 } from "./helpers/d1-sqlite.mjs";
 import { callArgs, resetMockState, stub } from "./helpers/mock-state.mjs";
 
 beforeEach(() => resetMockState());
@@ -209,6 +209,7 @@ const moderationRoute = () => loadRoute("app/api/moderation/route.mjs");
 
 test("POST /api/cameras never forwards prototype-pollution or unknown keys to the db layer", async () => {
   stub("createPendingCamera", async (input) => ({ id: 9, ...input }));
+  stub("findNearbyPublicCameras", async () => []);
   const { POST } = await camerasRoute();
   const response = await POST(
     apiRequest("/api/cameras", {
@@ -219,6 +220,7 @@ test("POST /api/cameras never forwards prototype-pollution or unknown keys to th
   assert.equal(response.status, 201);
   const body = await responseBody(response);
   assert.equal(body.record.title, "Safe cam");
+  assert.deepEqual(body.possibleDuplicates, [], "duplicate check must complete with clean inputs");
 
   const [args] = callArgs("createPendingCamera");
   assert.deepEqual(Object.keys(args[0]).sort(), [
@@ -233,6 +235,14 @@ test("POST /api/cameras never forwards prototype-pollution or unknown keys to th
   ]);
   assert.equal(Object.hasOwn(args[0], "__proto__"), false, "the __proto__ key must never be forwarded");
   assert.equal(Object.hasOwn(args[0], "extraField"), false);
+
+  const [duplicateArgs] = callArgs("findNearbyPublicCameras");
+  assert.deepEqual(
+    duplicateArgs,
+    [44.1, 12.2, 75, { title: "Safe cam", address: "", kind: "Fixed dome" }],
+    "the pre-submit duplicate check receives only the sanitised, trimmed fields",
+  );
+
   assert.equal(Object.prototype.polluted, undefined, "Object.prototype must be untouched");
   assert.equal(Object.prototype.admin, undefined);
 });
@@ -256,7 +266,7 @@ test("POST /api/corrections ignores unknown and prototype keys", async () => {
 });
 
 test("PATCH /api/moderation ignores privilege-like extra keys in the body", async () => {
-  stub("moderateCamera", async (id, action, reasonCode, note) => ({
+  stub("moderateCamera", async (id) => ({
     item: { id, status: "verified" },
     event: { id: 1 },
   }));
