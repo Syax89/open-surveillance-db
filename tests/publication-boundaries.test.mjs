@@ -447,6 +447,42 @@ test("server errors are logged server-side and return generic client messages", 
   }
 });
 
+test("every map task has a keyboard/text-list equivalent in the public interface", async () => {
+  const page = await readSource("app/page.tsx");
+  const map = await readSource("app/components/SurveillanceMap.tsx");
+
+  // Map task: select a record (pin click). Keyboard path: the directory's
+  // "Show on map" moves selection AND keyboard focus to the map region,
+  // respecting reduced motion.
+  assert.match(page, /function\s+showRecordOnMap\s*\(\s*id:\s*number\s*\)/);
+  assert.match(page, /setSelectedId\s*\(\s*id\s*\)/, "show-on-map must select the record");
+  assert.match(page, /document\.getElementById\(\s*["']map["']\s*\)\?\.scrollIntoView/, "show-on-map must scroll to the map");
+  assert.match(page, /document\.getElementById\(\s*["']map-region["']\s*\)\?\.focus/, "show-on-map must move keyboard focus to the map region");
+  assert.match(page, /prefers-reduced-motion/, "scrolling must respect reduced-motion preference");
+
+  // Map task: browse pins. Text-list path: one directory card per record with
+  // the keyboard select action.
+  assert.match(page, /className=["']record-list["']/, "the directory must render the record list");
+  assert.match(page, /showRecordOnMap\(\s*camera\.id\s*\)/, "every record card must offer the keyboard select path");
+
+  // Map task: pick a report position (map click). Keyboard path: manual coordinates.
+  assert.match(page, /selectManualCoordinates/, "the report form must keep the manual-coordinate fallback");
+
+  // The map region is a labelled, programmatically focusable landmark that
+  // describes the text-list alternative.
+  assert.match(map, /role="region"/);
+  assert.match(map, /aria-label=\{\s*label\s*\}/);
+  assert.match(map, /tabIndex=\{\s*-1\s*\}/, "the map region must accept programmatic focus");
+  assert.match(map, /id="map-region"/);
+  assert.match(map, /href="#records"/, "the map description must link the directory alternative");
+
+  // Map task: map unavailable (blocked script or tile host). The list stays
+  // usable and the failure is visible with a direct link to the directory.
+  assert.match(map, /setMapUnavailable\(\s*true\s*\)/, "a map startup failure must flip to the fallback state");
+  assert.match(map, /map-fallback/, "the fallback state must render a visible text alternative");
+  assert.match(map, /The interactive map is unavailable\./, "the fallback must state plainly that the map is unavailable");
+});
+
 test("package metadata identifies the project, license, and repository", async () => {
   const pkg = JSON.parse(await readSource("package.json"));
   assert.equal(pkg.name, "open-surveillance-db");
