@@ -84,6 +84,9 @@ uses the same public-only nearby-record check.
 **Implementation update (2026-07-31):** a local playbook documents setup,
 synthetic submissions, approve/reject/hide checks, nearby-search validation,
 and a cautious reset approach without providing a destructive reset command.
+A clean local setup, schema migration, synthetic fixture, and non-destructive
+reset process is now documented in
+[DEVELOPMENT_SETUP.md](DEVELOPMENT_SETUP.md) (all commands verified on `main`).
 
 ### Planned work
 

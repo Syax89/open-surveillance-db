@@ -28,6 +28,9 @@ Last reviewed: 2026-07-31
 - [x] English/Italian interface for public pages, record detail, and local moderation.
 - [x] Public in-app guide plus skip link, visible focus treatment, reduced-motion support, and map-directory accessibility guidance.
 - [x] Clearly labelled illustrative demo data.
+- [x] Documented clean local setup, schema migrations, synthetic fixtures, and
+  non-destructive local reset (`docs/DEVELOPMENT_SETUP.md`, commands verified
+  on `main`).
 - [x] Initial open documentation and project policies.
 
 ## Not yet implemented

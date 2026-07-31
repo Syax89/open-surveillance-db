@@ -29,6 +29,10 @@ Open the public prototype at `http://localhost:3000` and the local moderation
 dashboard at `http://localhost:3000/moderation`. Keep the development server
 running while following the checks below.
 
+For the full clean-setup walkthrough — prerequisites, schema migrations,
+synthetic fixtures, and the non-destructive reset procedure — see
+[DEVELOPMENT_SETUP.md](DEVELOPMENT_SETUP.md).
+
 The local database creates two explicitly labelled `demo` records when it is
 empty. They are fictional pins used to show the interface; they are not claims
 about real cameras.
@@ -144,8 +148,9 @@ Treat it as data even in a prototype.
 
 1. Stop the development server before changing any local state.
 2. Identify the project-local runtime state directory created by the local
-   worker tooling (often under `.wrangler/`), and make a dated copy outside the
-   project before changing it.
+   worker tooling (`.wrangler/state/`), and make a dated copy outside the
+   project before changing it. The exact non-destructive move-aside commands
+   are in [DEVELOPMENT_SETUP.md](DEVELOPMENT_SETUP.md#6-reset).
 3. Prefer creating a fresh workspace copy for a clean exercise instead of
    erasing the existing state.
 4. If a maintainer intentionally clears local state, restart the server and
