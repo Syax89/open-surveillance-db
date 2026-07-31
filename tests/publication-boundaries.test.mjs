@@ -16,17 +16,28 @@ async function sourceFiles(directory) {
   return files.flat();
 }
 
-test("the public camera query explicitly excludes pending records", async () => {
+test("the public camera query excludes non-public states via the shared status whitelist", async () => {
   const cameras = await readSource("db/cameras.ts");
+  const shared = await readSource("app/lib/public-status.ts");
   const functionStart = cameras.indexOf("export async function listPublicCameras");
   const functionEnd = cameras.indexOf("export async function createPendingCamera", functionStart);
   const publicQuery = cameras.slice(functionStart, functionEnd);
 
   assert.ok(functionStart >= 0, "listPublicCameras must remain the public read boundary");
   assert.match(
+    shared,
+    /export\s+const\s+PUBLIC_CAMERA_STATUSES\s*=\s*\[\s*['"]verified['"]\s*,\s*['"]demo['"]\s*\]\s*as\s+const/,
+    "the shared whitelist must be the single source of truth for verified and demo",
+  );
+  assert.match(
     publicQuery,
-    /WHERE\s+status\s+IN\s*\(\s*'verified'\s*,\s*'demo'\s*\)/i,
-    "the public query must whitelist only verified and demo statuses",
+    /publicCameraPredicate\(/,
+    "the public query must derive its status whitelist from the shared predicate",
+  );
+  assert.doesNotMatch(
+    publicQuery,
+    /status\s+IN\s*\(\s*['"](?:verified|demo|pending|rejected|removed|needs_review|stale)['"]/,
+    "the whitelist must never be hand-written into the query",
   );
   assert.match(publicQuery, /return\s+result\.results\s*;/, "the public query must return its filtered result set");
   assert.doesNotMatch(publicQuery, /status\s*=\s*'pending'/i, "pending records must not be part of the public query");
@@ -606,8 +617,13 @@ test("the public change summary is served only for currently public records", as
   assert.ok(getStart >= 0, "the revisions route must have a dedicated public-record lookup");
   assert.match(
     getBoundary,
-    /WHERE\s+id\s*=\s*\?\s+AND\s+status\s+IN\s*\(\s*'verified'\s*,\s*'demo'\s*\)/i,
-    "the lookup must resolve only verified and demo records",
+    /WHERE\s+id\s*=\s*\?\s+AND\s+\$\{publicPredicate\}/,
+    "the lookup must resolve only records in the shared public status whitelist",
+  );
+  assert.doesNotMatch(
+    getBoundary,
+    /status\s+IN\s*\(\s*['"](?:verified|demo)['"]/,
+    "the lookup must not hand-write the status whitelist",
   );
   assert.doesNotMatch(getBoundary, /\bnotes\b/, "the lookup must not select the private notes field");
 
