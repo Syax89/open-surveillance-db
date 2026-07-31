@@ -1,5 +1,9 @@
 # Data model and API
 
+> Field-by-field public reference: see the
+> [data dictionary](DATA_DICTIONARY.md). Export releases: see the
+> [export versioning policy](EXPORT_VERSIONING.md).
+
 ## Public camera record
 
 | Field | Public? | Description |
@@ -13,7 +17,7 @@
 | `manufacturer` | Only with a field-specific opt-in | Optional maker/brand supplied with a report; stays private unless a moderator explicitly elects to publish this field |
 | `observedOn` | Only with a field-specific opt-in | Optional ISO calendar date of the observation; stays private unless a moderator explicitly elects to publish this field |
 | `source` | Yes | Provenance type such as survey, official source, or demo |
-| `updated` | Yes | Last public verification date |
+| `updated` | Yes | Last public verification date (ISO 8601); freshness windows match only ISO values — illustrative demo labels are never window-matched |
 | `status` | Yes in controlled form | `verified` or `demo`; `pending` is never public |
 
 ## Fields planned for moderated storage

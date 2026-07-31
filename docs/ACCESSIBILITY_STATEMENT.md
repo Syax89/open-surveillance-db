@@ -1,0 +1,213 @@
+# Accessibility statement
+
+- **Status:** draft — pre-launch, prototype stage
+- **Owner:** Marie (documentation) with review by Ada (technical) and Rosa (privacy/legal)
+- **Standards target:** WCAG 2.2 AA (Web Content Accessibility Guidelines)
+- **Related documents:** [PRODUCT_UX.md](workstreams/PRODUCT_UX.md), [ADR 0006 — non-sensitive usability-feedback route](decisions/0006-non-sensitive-usability-feedback-route.md), [MODERATION_SLA.md](legal/MODERATION_SLA.md)
+
+This statement describes the accessibility of the OpenSurveillanceDB public web
+application. It is written for the current **local prototype** and will be
+updated before any public launch, when the pilot area, languages, and review
+method are decided (see [FUTURE_ROADMAP.md](FUTURE_ROADMAP.md), Horizon 2 and 4).
+
+## Commitment
+
+OpenSurveillanceDB is a public-interest civic database. The project is
+committed to an inclusive web experience: the core journeys — browse, search,
+submit, and correct/remove — must be usable with a keyboard, with assistive
+technology, and on small screens, in the pilot language and in English. The
+product target is **WCAG 2.2 AA** for the public website, with manual testing
+by disabled users before the pilot is widened, as agreed in
+[PRODUCT_UX.md](workstreams/PRODUCT_UX.md#accessibility-mobile-and-internationalisation-requirements).
+
+## Compliance status
+
+**Partially compliant.** The local prototype implements a meaningful
+accessibility baseline, but it has **not yet passed formal automated or manual
+accessibility testing**, and some known limitations remain (listed below).
+This section will be replaced by a measured conformance statement (WCAG 2.2
+A/AA, per success criterion) once the testing gates in Horizon 2 are complete.
+
+### What is already implemented in the prototype
+
+- A skip link and main-content target on every app surface.
+- Visible keyboard focus states and logical focus order.
+- `prefers-reduced-motion` support (animations reduced when requested).
+- A searchable text directory and record-detail pages that work **without map
+  interaction**; map and directory present the same public fields.
+- Report-location selection by map click **or** validated manual coordinates.
+- English/Italian interface with a device-local language preference; the
+  language choice does not affect API data.
+- An in-app bilingual guide at `/guide` explaining data states, workflow, and
+  prototype boundaries.
+- Status information is not conveyed by colour alone (text and icon labels are
+  used), and safe type/order filters are shared by map and directory.
+
+### Known limitations (not yet implemented)
+
+- **Map tasks are not yet fully keyboard-equivalent.** The text-list
+  alternative covers browsing; remaining map interactions are still being
+  brought to keyboard parity (tracked in Horizon 2).
+- **No formal manual testing** with screen readers, 200% zoom, contrast
+  checking, or small-screen devices has been run yet; the automated checks and
+  manual test plan are pending (Horizon 2).
+- **Some user-visible strings are still defined inline** in components while
+  the interface-string externalisation and pilot-language review are in
+  progress (Horizon 2).
+- **The dedicated feedback page (`/feedback`) is not yet implemented.** The
+  non-sensitive usability-feedback route is specified in
+  [ADR 0006](decisions/0006-non-sensitive-usability-feedback-route.md);
+  implementation is tracked as follow-up work. Until it exists, barriers can
+  be reported through the alternative channels listed below.
+
+## Reporting a barrier: the usability-feedback route
+
+The project provides a **non-sensitive usability-feedback route** so that
+anyone can report an interface barrier **without creating an account and
+without providing personal data** (see ADR 0006). When implemented, the route
+will be available at `/feedback` and will ask only for:
+
+1. the type of barrier (navigation/keyboard, screen reader, colour/contrast,
+   zoom/layout, other);
+2. a plain-language description of what happened;
+3. an optional URL of the page where the barrier occurred;
+4. an optional contact address, **only if** the visitor wants a reply (never
+   required, never used for anything else, and deleted once the exchange is
+   closed).
+
+No account, no mandatory email, no analytics, and no behavioural tracking are
+involved. The route is designed to collect no sensitive personal data.
+
+### Alternative channels (current prototype)
+
+Until `/feedback` is implemented, please report accessibility barriers through
+one of these channels:
+
+- open an issue on the project repository (public, non-sensitive content only —
+  do not include personal data, screenshots of people, or private locations);
+- use the [correction/request form](/) on the public page for issues related
+  to a specific record;
+- write to the privacy contact named in the
+  [privacy notice](legal/PRIVACY_NOTICE.md).
+
+### Response commitment
+
+Feedback is handled with the same targets as correction and takedown requests
+([MODERATION_SLA.md](legal/MODERATION_SLA.md)): an acknowledgement within
+**48 hours** and a substantive response within **14 days**, in the language of
+the message when possible.
+
+## Enforcement and contact
+
+- **Accessibility owner:** Marie (documentation), with technical validation by
+  Ada (CTO) and privacy review by Rosa (DPO).
+- **Escalation:** if a reported barrier is not resolved or the response
+  commitment is not met, escalate to the maintainers via
+  [GOVERNANCE.md](../GOVERNANCE.md); for privacy-sensitive concerns use the
+  privacy contact in the [privacy notice](legal/PRIVACY_NOTICE.md).
+
+## Review schedule
+
+This statement is reviewed:
+
+- after every release that changes the interface or the accessibility
+  behaviour;
+- at least quarterly once the service is running, together with the
+  accessibility task-completion measures in
+  [PRODUCT_UX.md](workstreams/PRODUCT_UX.md#non-commercial-success-measures);
+- before any public launch, with the final conformance results and known
+  exceptions recorded here.
+
+---
+
+# Dichiarazione di accessibilità
+
+- **Stato:** bozza — pre-lancio, fase di prototipo locale
+- **Responsabile:** Marie (documentazione) con revisione di Ada (tecnica) e Rosa (privacy/legale)
+- **Standard di riferimento:** WCAG 2.2 AA (Web Content Accessibility Guidelines)
+- **Documenti correlati:** [PRODUCT_UX.md](workstreams/PRODUCT_UX.md), [ADR 0006 — percorso di feedback di usabilità non sensibile](decisions/0006-non-sensitive-usability-feedback-route.md), [MODERATION_SLA.md](legal/MODERATION_SLA.md)
+
+Questa dichiarazione descrive l'accessibilità dell'applicazione web pubblica di
+OpenSurveillanceDB. È redatta per l'attuale **prototipo locale** e sarà
+aggiornata prima di qualsiasi lancio pubblico, quando saranno decisi l'area
+pilota, le lingue e il metodo di verifica (vedi [FUTURE_ROADMAP.md](FUTURE_ROADMAP.md), Orizzonte 2 e 4).
+
+## Impegno
+
+OpenSurveillanceDB è un database civico di interesse pubblico. Il progetto è
+impegnato a offrire un'esperienza web inclusiva: i percorsi principali —
+consultazione, ricerca, segnalazione e correzione/rimozione — devono essere
+utilizzabili con tastiera, con tecnologie assistive e su schermi piccoli, nella
+lingua pilota e in inglese. L'obiettivo di prodotto è la conformità **WCAG 2.2
+AA** per il sito pubblico, con test manuali condotti da utenti con disabilità
+prima di ampliare il pilota, come concordato in
+[PRODUCT_UX.md](workstreams/PRODUCT_UX.md#accessibility-mobile-and-internationalisation-requirements).
+
+## Stato di conformità
+
+**Parzialmente conforme.** Il prototipo locale implementa una base di
+accessibilità significativa, ma **non ha ancora superato test formali
+automatizzati o manuali**, e permangono alcune limitazioni note (elencate
+sotto). Questa sezione sarà sostituita da una dichiarazione di conformità
+misurata (WCAG 2.2 A/AA, per singolo criterio di successo) al termine delle
+verifiche previste nell'Orizzonte 2.
+
+### Cosa è già implementato nel prototipo
+
+- Collegamento "salta al contenuto" (skip link) e destinazione del contenuto principale su ogni schermata.
+- Stati di focus visibili e ordine di focus logico.
+- Supporto a `prefers-reduced-motion` (animazioni ridotte su richiesta).
+- Directory testuale ricercabile e pagine di dettaglio utilizzabili **senza interazione con la mappa**; mappa e directory mostrano gli stessi campi pubblici.
+- Selezione della posizione tramite clic sulla mappa **oppure** coordinate manuali validate.
+- Interfaccia in inglese e italiano con preferenza di lingua salvata solo sul dispositivo; la scelta non influisce sui dati API.
+- Guida in-app bilingue su `/guide` che spiega stati dei dati, flusso di lavoro e confini del prototipo.
+- Lo stato non è comunicato solo con il colore (sono usate etichette testuali e icone) e i filtri sicuri per tipo/ordine sono condivisi tra mappa e directory.
+
+### Limitazioni note (non ancora implementate)
+
+- **I compiti sulla mappa non sono ancora pienamente equivalenti da tastiera.** L'alternativa testuale copre la consultazione; le restanti interazioni sulla mappa sono in corso di allineamento (Orizzonte 2).
+- **Nessun test manuale formale** con screen reader, zoom al 200%, verifica del contrasto o dispositivi a schermo piccolo è stato ancora eseguito; i controlli automatizzati e il piano di test manuale sono previsti (Orizzonte 2).
+- **Alcune stringhe visibili sono ancora definite inline** nei componenti, in attesa dell'esternalizzazione delle stringhe di interfaccia e della revisione della lingua pilota (Orizzonte 2).
+- **La pagina di feedback dedicata (`/feedback`) non è ancora implementata.** Il percorso di feedback di usabilità non sensibile è specificato in [ADR 0006](decisions/0006-non-sensitive-usability-feedback-route.md); l'implementazione è tracciata come lavoro successivo. Finché non esiste, le barriere possono essere segnalate tramite i canali alternativi elencati sotto.
+
+## Segnalare una barriera: il percorso di feedback di usabilità
+
+Il progetto offre un **percorso di feedback di usabilità non sensibile** per
+consentire a chiunque di segnalare una barriera dell'interfaccia **senza creare
+un account e senza fornire dati personali** (vedi ADR 0006). Quando
+implementato, il percorso sarà disponibile su `/feedback` e chiederà solo:
+
+1. il tipo di barriera (navigazione/tastiera, screen reader, colore/contrasto, zoom/layout, altro);
+2. una descrizione in linguaggio semplice di cosa è accaduto;
+3. l'URL facoltativo della pagina in cui si è verificata la barriera;
+4. un contatto facoltativo, **solo se** si desidera una risposta (mai obbligatorio, mai usato per altri scopi, eliminato a chiusura dello scambio).
+
+Nessun account, nessuna email obbligatoria, nessuna analisi e nessun tracciamento comportamentale. Il percorso è progettato per non raccogliere dati personali sensibili.
+
+### Canali alternativi (prototipo attuale)
+
+Finché `/feedback` non è implementato, segnala le barriere di accessibilità tramite uno di questi canali:
+
+- apri un issue sul repository del progetto (contenuti pubblici e non sensibili — non includere dati personali, foto di persone o luoghi privati);
+- usa il [modulo di correzione/richiesta](/) nella pagina pubblica per problemi relativi a una scheda specifica;
+- scrivi al contatto privacy indicato nell'[informativa privacy](legal/PRIVACY_NOTICE.md).
+
+### Impegno di risposta
+
+Il feedback è gestito con gli stessi obiettivi delle richieste di correzione e
+rimozione ([MODERATION_SLA.md](legal/MODERATION_SLA.md)): conferma di ricezione
+entro **48 ore** e risposta sostanziale entro **14 giorni**, nella lingua del
+messaggio quando possibile.
+
+## Applicazione e contatti
+
+- **Responsabile accessibilità:** Marie (documentazione), con validazione tecnica di Ada (CTO) e revisione privacy di Rosa (DPO).
+- **Scalata:** se una barriera segnalata non viene risolta o l'impegno di risposta non viene rispettato, rivolgiti ai maintainer tramite [GOVERNANCE.md](../GOVERNANCE.md); per questioni sensibili dal punto di vista della privacy usa il contatto privacy nell'[informativa privacy](legal/PRIVACY_NOTICE.md).
+
+## Calendario di revisione
+
+Questa dichiarazione viene rivista:
+
+- dopo ogni rilascio che modifica l'interfaccia o il comportamento di accessibilità;
+- almeno trimestralmente a servizio attivo, insieme alle misure di completamento dei compiti di accessibilità in [PRODUCT_UX.md](workstreams/PRODUCT_UX.md#non-commercial-success-measures);
+- prima di qualsiasi lancio pubblico, registrando qui i risultati finali di conformità e le eccezioni note.

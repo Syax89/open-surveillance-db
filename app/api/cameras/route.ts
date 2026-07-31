@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { createPendingCamera, listPublicCameras } from "../../../db/cameras";
+import { createPendingCamera, findNearbyPublicCameras, freshnessWindows, listPublicCameras, type FreshnessWindow, type PublicCameraFilters } from "../../../db/cameras";
 import { isRecord } from "../../lib/guards";
 import { callerKey, checkRateLimit, submissionLimits, submissionsDisabled } from "../../lib/rate-limit";
 
@@ -31,8 +31,17 @@ function toCsv(records: Awaited<ReturnType<typeof listPublicCameras>>) {
 
 export async function GET(request: Request) {
   try {
-    const records = await listPublicCameras();
-    const format = new URL(request.url).searchParams.get("format");
+    const params = new URL(request.url).searchParams;
+    const format = params.get("format");
+    const kind = cleanText(params.get("kind"), 60);
+    const freshness = params.get("freshness");
+    if (freshness !== null && !freshnessWindows.includes(freshness as FreshnessWindow)) {
+      return Response.json({ error: `Unknown freshness window. Use one of: ${freshnessWindows.join(", ")}.` }, { status: 400 });
+    }
+    const filters: PublicCameraFilters = {};
+    if (kind) filters.kind = kind;
+    if (freshness && freshness !== "all") filters.freshness = freshness as FreshnessWindow;
+    const records = await listPublicCameras(filters);
     if (format === "geojson") {
       return Response.json({ type: "FeatureCollection", features: records.map((record) => ({ type: "Feature", geometry: { type: "Point", coordinates: [record.longitude, record.latitude] }, properties: { id: record.id, title: record.title, kind: record.kind, manufacturer: record.manufacturer, observedOn: record.observedOn, status: record.status, source: record.source, updated: record.updated, description: record.description } })) }, { headers: { "Content-Disposition": "attachment; filename=opensurveillancedb-cameras.geojson" } });
     }
@@ -75,7 +84,16 @@ export async function POST(request: Request) {
     const longitude = Number(payload.longitude);
     if (!title || !kind || !Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180 || (payload.observedOn !== undefined && payload.observedOn !== null && !observedOn)) return Response.json({ error: "A title, type, valid position and (when provided) a valid observation date are required." }, { status: 400 });
     const record = await createPendingCamera({ title, kind, address, notes, manufacturer: manufacturer || null, observedOn: observedOn || null, latitude, longitude });
-    return Response.json({ record }, { status: 201 });
+    // Non-blocking pre-submit duplicate detection: warn the submitter about
+    // nearby reviewed records without leaking any non-public data. A failure
+    // here must never fail the report itself.
+    let possibleDuplicates: Awaited<ReturnType<typeof findNearbyPublicCameras>> = [];
+    try {
+      possibleDuplicates = await findNearbyPublicCameras(latitude, longitude, 75, { title, address, kind });
+    } catch (error) {
+      console.error("POST /api/cameras duplicate check failed", error);
+    }
+    return Response.json({ record, possibleDuplicates }, { status: 201 });
   } catch (error) {
     console.error("POST /api/cameras failed", error);
     return Response.json({ error: "Unable to save report" }, { status: 500 });

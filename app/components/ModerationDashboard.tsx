@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { LocaleToggle, useLocale } from "./LocaleProvider";
+import { LocaleToggle, useLocale, useMessages } from "./LocaleProvider";
 
 type CameraInQueue = {
   id: number;
@@ -70,58 +70,9 @@ const reasonOptions: { value: ReasonCode }[] = [
   { value: "other" },
 ];
 
-const copy = {
-  en: {
-    navigation: "Moderation navigation", home: "OpenSurveillanceDB home", returnPublic: "Return to public prototype",
-    localAdministration: "Local administration", title: "Moderation queue",
-    intro: "This interface is for the local prototype only. It is not linked from the public experience and does not publish any new information by itself.",
-    localTool: "Local-only tool.", localWarning: "Review text and approximate locations only. Do not add photos, personal data, credentials, live-feed links, or operational security details.",
-    loading: "Loading local moderation queue…", awaiting: (total: number) => `${total} ${total === 1 ? "item" : "items"} awaiting a local decision`,
-    loadError: "The moderation queue could not be loaded.", saveError: "The moderation decision could not be saved.",
-    cameraReport: "Camera report", correctionRequest: "Correction request", decisionSaved: "saved", reason: "Reason",
-    details: "Decision details", requiredReason: "Required reason", selectReason: "Select a reason", moderatorNote: "Optional moderator note", noteHelp: "Optional. Maximum 500 characters.",
-    approve: "Approve", reject: "Reject", hide: "Hide", markStale: "Mark for review", reverify: "Reverify", saving: "Saving…", decisionFor: "Decision for",
-    reports: "Reports", lifecycle: "Lifecycle", corrections: "Corrections", localAudit: "Local audit",
-    pendingReports: "Pending camera reports", pending: "pending", noPendingTitle: "No camera reports are waiting.", noPendingText: "New local submissions will appear here until a decision is recorded.", pendingReport: "Pending report",
-    publishedRecords: "Published records", verified: "verified", noPublishedTitle: "No verified records are available locally.", noPublishedText: "Approved reports will appear here after their publication status is recorded.", verifiedRecord: "Verified record",
-    recordsNeedReview: "Records needing review", awaitingReview: "awaiting review", noReviewTitle: "No published records need a new review.", noReviewText: "Records marked for review remain out of the public data until they are reverified or hidden.", needsReview: "Needs review",
-    privateCorrections: "Private correction requests", noCorrectionsTitle: "No correction requests are waiting.", noCorrectionsText: "Private requests remain out of the public directory and data export.", privateCorrection: "Private correction",
-    recentDecisions: "Recent decisions", readOnlyHistory: "Read-only local history", noDecisionsTitle: "No decisions recorded yet.", noDecisionsText: "Saved decisions will appear here for local review.", moderation: "Moderation",
-    approximateLocation: "Approximate location", noAddress: "No address supplied", source: "Source", communityReport: "Community report", submitted: "Submitted", submitterNotes: "Submitter notes", lastUpdate: "Last update", recordNotes: "Record notes", manufacturer: "Manufacturer", observedOn: "Observed on", metadataPublication: "Optional metadata publication", metadataPublicationHelp: "Choose which optional metadata may appear in the public record. Leave an option unchecked to keep it private.", publishManufacturer: "Publish manufacturer", publishObservedOn: "Publish observed date", contact: "Contact", noContact: "No contact supplied", status: "Status", request: "Request", timestamp: "Timestamp", item: "Item", unavailable: "Unavailable", actor: "Actor", localModerator: "Local moderator", relatedRecord: "Related record", generalConcern: "General concern", moderatorNoteTitle: "Moderator note",
-    timeUnavailable: "Time unavailable", decisionRecorded: "Decision recorded", unknown: "Unknown", recorded: "Recorded",
-    action: { approve: "Approve", reject: "Reject", hide: "Hide", "mark-stale": "Mark for review", reverify: "Reverify" },
-    actionPast: { approve: "Approved", reject: "Rejected", hide: "Hidden", "mark-stale": "Marked for review", reverify: "Reverified" },
-    statusLabels: { pending: "Pending", verified: "Verified", needs_review: "Needs review", removed: "Removed", rejected: "Rejected", hidden: "Hidden" },
-    reasons: { "verified-public-infrastructure": "Verified public infrastructure", "insufficient-evidence": "Insufficient evidence", duplicate: "Duplicate report", "private-or-sensitive-location": "Private or sensitive location", "inaccurate-or-outdated": "Inaccurate or out of date", "privacy-or-safety-concern": "Privacy or safety concern", other: "Other" },
-  },
-  it: {
-    navigation: "Navigazione moderazione", home: "Home di OpenSurveillanceDB", returnPublic: "Torna al prototipo pubblico",
-    localAdministration: "Amministrazione locale", title: "Coda di moderazione",
-    intro: "Questa interfaccia è riservata al prototipo locale. Non è collegata all'esperienza pubblica e non pubblica autonomamente nuove informazioni.",
-    localTool: "Strumento solo locale.", localWarning: "Valuta solo testo e posizioni approssimative. Non aggiungere foto, dati personali, credenziali, link a feed live o dettagli sulla sicurezza operativa.",
-    loading: "Caricamento della coda di moderazione locale…", awaiting: (total: number) => `${total} ${total === 1 ? "elemento in attesa" : "elementi in attesa"} di una decisione locale`,
-    loadError: "Non è stato possibile caricare la coda di moderazione.", saveError: "Non è stato possibile salvare la decisione di moderazione.",
-    cameraReport: "Segnalazione videocamera", correctionRequest: "Richiesta di correzione", decisionSaved: "salvata", reason: "Motivo",
-    details: "Dettagli della decisione", requiredReason: "Motivo obbligatorio", selectReason: "Seleziona un motivo", moderatorNote: "Nota opzionale del moderatore", noteHelp: "Opzionale. Massimo 500 caratteri.",
-    approve: "Approva", reject: "Rifiuta", hide: "Nascondi", markStale: "Segna per revisione", reverify: "Riverifica", saving: "Salvataggio…", decisionFor: "Decisione per",
-    reports: "Segnalazioni", lifecycle: "Ciclo di vita", corrections: "Correzioni", localAudit: "Registro locale",
-    pendingReports: "Segnalazioni di videocamere in attesa", pending: "in attesa", noPendingTitle: "Non ci sono segnalazioni di videocamere in attesa.", noPendingText: "Le nuove segnalazioni locali appariranno qui fino alla registrazione di una decisione.", pendingReport: "Segnalazione in attesa",
-    publishedRecords: "Record pubblicati", verified: "verificati", noPublishedTitle: "Non sono disponibili record verificati in locale.", noPublishedText: "Le segnalazioni approvate appariranno qui dopo la registrazione dello stato di pubblicazione.", verifiedRecord: "Record verificato",
-    recordsNeedReview: "Record da ricontrollare", awaitingReview: "in attesa di revisione", noReviewTitle: "Nessun record pubblicato richiede una nuova revisione.", noReviewText: "I record segnati per revisione restano fuori dai dati pubblici finché non sono riverificati o nascosti.", needsReview: "Da ricontrollare",
-    privateCorrections: "Richieste private di correzione", noCorrectionsTitle: "Non ci sono richieste di correzione in attesa.", noCorrectionsText: "Le richieste private restano fuori dalla directory pubblica e dall'esportazione dati.", privateCorrection: "Correzione privata",
-    recentDecisions: "Decisioni recenti", readOnlyHistory: "Storico locale in sola lettura", noDecisionsTitle: "Nessuna decisione registrata.", noDecisionsText: "Le decisioni salvate appariranno qui per la revisione locale.", moderation: "Moderazione",
-    approximateLocation: "Posizione approssimativa", noAddress: "Nessun indirizzo indicato", source: "Fonte", communityReport: "Segnalazione della comunità", submitted: "Inviata", submitterNotes: "Note del segnalante", lastUpdate: "Ultimo aggiornamento", recordNotes: "Note del record", manufacturer: "Marca", observedOn: "Osservata il", metadataPublication: "Pubblicazione dei metadati facoltativi", metadataPublicationHelp: "Scegli quali metadati facoltativi possono comparire nel record pubblico. Lascia un'opzione non selezionata per mantenerla privata.", publishManufacturer: "Pubblica la marca", publishObservedOn: "Pubblica la data osservata", contact: "Contatto", noContact: "Nessun contatto indicato", status: "Stato", request: "Richiesta", timestamp: "Data e ora", item: "Elemento", unavailable: "Non disponibile", actor: "Autore", localModerator: "Moderatore locale", relatedRecord: "Record collegato", generalConcern: "Segnalazione generale", moderatorNoteTitle: "Nota del moderatore",
-    timeUnavailable: "Data non disponibile", decisionRecorded: "Decisione registrata", unknown: "Sconosciuto", recorded: "Registrato",
-    action: { approve: "Approva", reject: "Rifiuta", hide: "Nascondi", "mark-stale": "Segna per revisione", reverify: "Riverifica" },
-    actionPast: { approve: "Approvata", reject: "Rifiutata", hide: "Nascosta", "mark-stale": "Segnato per revisione", reverify: "Riverificato" },
-    statusLabels: { pending: "In attesa", verified: "Verificato", needs_review: "Da ricontrollare", removed: "Rimosso", rejected: "Rifiutato", hidden: "Nascosto" },
-    reasons: { "verified-public-infrastructure": "Infrastruttura pubblica verificata", "insufficient-evidence": "Prove insufficienti", duplicate: "Segnalazione duplicata", "private-or-sensitive-location": "Luogo privato o sensibile", "inaccurate-or-outdated": "Informazione inaccurata o obsoleta", "privacy-or-safety-concern": "Problema di privacy o sicurezza", other: "Altro" },
-  },
-} as const;
-
 export function ModerationDashboard() {
   const { locale } = useLocale();
-  const t = copy[locale];
+  const t = useMessages().moderation;
   const [cameras, setCameras] = useState<CameraInQueue[]>([]);
   const [publishedCameras, setPublishedCameras] = useState<CameraInQueue[]>([]);
   const [reviewCameras, setReviewCameras] = useState<CameraInQueue[]>([]);

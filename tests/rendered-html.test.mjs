@@ -97,6 +97,25 @@ test("server-rendered homepage carries the public app metadata", async () => {
   assert.doesNotMatch(html, /Your site is taking shape|Building your site/i);
 });
 
+test("server-rendered homepage provides the map region and its text-list alternative", async () => {
+  const { response, html } = await renderHomepage();
+
+  assert.equal(response.status, 200);
+
+  // The map is a labelled landmark whose description points to the directory
+  // (the text-list equivalent required by PRODUCT_UX.md for every map task).
+  assert.match(html, /id="map-region"[^>]*role="region" aria-label="Interactive OpenStreetMap map"/);
+  assert.match(html, /Go to the accessible directory/);
+
+  // The text-list alternative itself is part of the initial HTML: a searchable
+  // directory with a result count and a per-record "Show on map" keyboard path.
+  assert.match(html, /Browse public records without the map/);
+  assert.match(html, /id="record-search"/);
+  assert.match(html, /id="record-search-count"[^>]*role="status"/);
+  assert.match(html, /Show on map/);
+  assert.match(html, /record-list/);
+});
+
 test("starter preview skeleton stays removed from the template", async () => {
   const [page, layout, packageJson, publicFiles] = await Promise.all([
     readFile(path.join(root, "app", "page.tsx"), "utf8"),

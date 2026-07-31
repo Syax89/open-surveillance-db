@@ -8,7 +8,10 @@ npm run dev
 npm run build
 ```
 
-The default local database is seeded with demo pins. Do not load real reports into a development machine or demo deployment.
+The default local database is seeded with demo pins. Do not load real reports
+into a development machine or demo deployment. For the full clean-setup
+walkthrough — schema migrations, synthetic fixtures, and the non-destructive
+local reset — see [DEVELOPMENT_SETUP.md](DEVELOPMENT_SETUP.md).
 
 ## Preconditions for a public environment
 
@@ -29,6 +32,12 @@ The default local database is seeded with demo pins. Do not load real reports in
 4. Confirm backups and rollback plan.
 5. Deploy production, monitor health and error rates, and record the release.
 6. Publish a concise changelog and data-export version where applicable.
+
+For the current local environment (LXC 114), a concrete step-by-step checklist
+with exact commands — build verification, changelog, tag, deploy, smoke tests,
+rollback — lives in [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md). The
+Operations manual ([OPERATIONS.md](OPERATIONS.md)) covers monitoring, backups,
+and the Workers rollback plan.
 
 ## Build and verification
 
@@ -218,4 +227,4 @@ The moderation endpoints are **fail-closed**: without credentials they return
 
 ## Environment variables
 
-`NEXT_PUBLIC_SITE_URL` may be set to the canonical public URL for metadata generation. It must be absent or point to a non-production value in local development. Any future identity, storage, analytics, or notification settings need an explicit inventory and privacy review.
+`NEXT_PUBLIC_SITE_URL` may be set to the canonical public URL for metadata generation. It must be absent or point to a non-production value in local development. When it is absent, `app/layout.tsx` omits `metadataBase` entirely and serves the favicon through a relative `<link rel="icon" href="/favicon.svg">` in the root layout — this keeps deployments without the variable free of absolute `localhost` metadata URLs (the old `?? "http://localhost:3000"` fallback made browsers request the favicon from `localhost` on staging). Any future identity, storage, analytics, or notification settings need an explicit inventory and privacy review.
