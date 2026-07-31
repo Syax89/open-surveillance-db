@@ -47,12 +47,12 @@ test("the public directory filters are parameterised and whitelisted at the db b
   assert.match(publicQuery, /query\s*\+=\s*["']\s*AND\s+updated\s*>=\s*\?["']/, "the freshness filter must be a bound placeholder, never interpolated");
   assert.match(
     publicQuery,
-    /\\.bind\\(\\.\\.\\.parameters\\)/,
+    /\.bind\(\.\.\.parameters\)/,
     "all filters must be passed through the same parameterised bind call",
   );
   assert.match(
     publicQuery,
-    /updated\\s+GLOB\\s+'\\[0-9\\]\\[0-9\\]\\[0-9\\]\\[0-9\\]-\\*'/,
+    /updated\s+GLOB\s+'\[0-9\]\[0-9\]\[0-9\]\[0-9\]-\*'/,
     "a freshness window must match only ISO verification timestamps (non-ISO labels are never window-matched)",
   );
   assert.doesNotMatch(
