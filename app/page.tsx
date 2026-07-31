@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { SurveillanceMap } from "./components/SurveillanceMap";
 import { LocaleToggle, useLocale, useMessages } from "./components/LocaleProvider";
 import { prototypeRecords, publicRecords, type Camera } from "./lib/records";
