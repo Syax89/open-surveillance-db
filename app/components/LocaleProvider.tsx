@@ -1,8 +1,8 @@
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useSyncExternalStore, type ReactNode } from "react";
-
-export type Locale = "en" | "it";
+import { messages } from "../lib/i18n";
+import type { Locale, MessageBundle } from "../lib/i18n";
 
 type LocaleContextValue = {
   locale: Locale;
@@ -43,8 +43,10 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
     },
   }), [locale]);
 
+  const common = messages[locale].common;
+
   return <LocaleContext.Provider value={value}>
-    <a className="skip-link" href="#main-content">{locale === "it" ? "Vai al contenuto principale" : "Skip to main content"}</a>
+    <a className="skip-link" href="#main-content">{common.skipLink}</a>
     {children}
   </LocaleContext.Provider>;
 }
@@ -55,9 +57,16 @@ export function useLocale() {
   return context;
 }
 
+/** Typed message bundle for the current locale (English pilot, Italian parity). */
+export function useMessages(): MessageBundle {
+  const { locale } = useLocale();
+  return messages[locale];
+}
+
 export function LocaleToggle() {
   const { locale, setLocale } = useLocale();
-  return <div className="locale-toggle" aria-label={locale === "it" ? "Selezione lingua" : "Language selection"}>
+  const common = messages[locale].common;
+  return <div className="locale-toggle" aria-label={common.languageSelection}>
     <button type="button" className={locale === "en" ? "is-active" : ""} aria-pressed={locale === "en"} onClick={() => setLocale("en")}>EN</button>
     <button type="button" className={locale === "it" ? "is-active" : ""} aria-pressed={locale === "it"} onClick={() => setLocale("it")}>IT</button>
   </div>;

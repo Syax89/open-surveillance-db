@@ -26,7 +26,7 @@ Last reviewed: 2026-07-31
 - [x] Local playbook for fictional submit → moderate → public-result checks.
 - [x] Local fictional-data check: rejected records remain absent from public outputs and create an audit event.
 - [x] Local fictional-data lifecycle check: only verified state reaches public outputs.
-- [x] English/Italian interface for public pages, record detail, and local moderation.
+- [x] Externalised English/Italian interface strings (English as pilot language, Italian type-checked for parity) across public pages, record detail, map, and local moderation.
 - [x] Public in-app guide plus skip link, visible focus treatment, reduced-motion support, and map-directory accessibility guidance.
 - [x] Draft accessibility statement and design decision for a non-sensitive usability-feedback route ([`docs/ACCESSIBILITY_STATEMENT.md`](ACCESSIBILITY_STATEMENT.md), [ADR 0006](decisions/0006-non-sensitive-usability-feedback-route.md)).
 - [x] Clearly labelled illustrative demo data.
