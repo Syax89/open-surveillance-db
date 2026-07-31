@@ -241,6 +241,7 @@ or client bundles (the secrets gate in CI rejects hardcoded credentials).
 | `READ_RATE_LIMIT_MAX` / `READ_RATE_LIMIT_WINDOW_SECONDS` | 60 / 60 | Plain reads (`GET /api/cameras`) |
 | `EXPORT_RATE_LIMIT_MAX` / `EXPORT_RATE_LIMIT_WINDOW_SECONDS` | 10 / 60 | Bulk exports (CSV/GeoJSON) |
 | `NEARBY_RATE_LIMIT_MAX` / `NEARBY_RATE_LIMIT_WINDOW_SECONDS` | 30 / 60 | Nearby search |
+| `REVISIONS_RATE_LIMIT_MAX` / `REVISIONS_RATE_LIMIT_WINDOW_SECONDS` | 30 / 60 | Public change history (`GET /api/cameras/revisions`) |
 | `POST_RATE_LIMIT_MAX` / `POST_RATE_LIMIT_WINDOW_SECONDS` | 5 / 60 | Submissions (cameras + corrections) |
 | `MODERATION_RATE_LIMIT_MAX` / `MODERATION_RATE_LIMIT_WINDOW_SECONDS` | 30 / 60 | Moderation API (second layer over edge auth) |
 | `POST_SUBMISSIONS_DISABLED` | `false` | Kill switch: reject new submissions with 503 |

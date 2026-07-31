@@ -532,6 +532,7 @@ test("public POST endpoints are rate-limited per caller and can be disabled", as
 test("every public route family applies its own rate limit with 429 and Retry-After", async () => {
   const cameras = await readSource("app/api/cameras/route.ts");
   const nearby = await readSource("app/api/cameras/nearby/route.ts");
+  const revisions = await readSource("app/api/cameras/revisions/route.ts");
   const corrections = await readSource("app/api/corrections/route.ts");
   const moderation = await readSource("app/api/moderation/route.ts");
 
@@ -543,6 +544,7 @@ test("every public route family applies its own rate limit with 429 and Retry-Af
 
   assert.ok(hasRateLimiter(cameras), "cameras GET+POST must be rate-limited");
   assert.ok(hasRateLimiter(nearby), "nearby search must be rate-limited");
+  assert.ok(hasRateLimiter(revisions), "change-history reads must be rate-limited");
   assert.ok(hasRateLimiter(corrections), "corrections must be rate-limited");
   assert.ok(hasRateLimiter(moderation), "moderation must be rate-limited");
 
@@ -554,6 +556,7 @@ test("every public route family applies its own rate limit with 429 and Retry-Af
     "cameras GET must split reads from bulk exports",
   );
   assert.match(nearby, /limitsFor\(\s*["']nearby["']/, "nearby must use its own bucket");
+  assert.match(revisions, /limitsFor\(\s*["']revisions["']/, "revisions must use its own bucket");
   assert.match(moderation, /limitsFor\(\s*["']moderate["']/, "moderation must use its own bucket");
   assert.match(corrections, /submissionLimits\(env\)/, "corrections must share the submission bucket");
 });
@@ -564,6 +567,7 @@ test("public handlers reject oversized inputs and guard the request URI", async 
     corrections: await readSource("app/api/corrections/route.ts"),
     moderation: await readSource("app/api/moderation/route.ts"),
     nearby: await readSource("app/api/cameras/nearby/route.ts"),
+    revisions: await readSource("app/api/cameras/revisions/route.ts"),
   };
 
   for (const [label, source] of Object.entries(routes)) {
@@ -584,6 +588,7 @@ test("every rate-limited route reports blocks to the hashed abuse-alert layer", 
   const files = [
     "app/api/cameras/route.ts",
     "app/api/cameras/nearby/route.ts",
+    "app/api/cameras/revisions/route.ts",
     "app/api/corrections/route.ts",
     "app/api/moderation/route.ts",
   ];

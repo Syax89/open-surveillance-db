@@ -27,12 +27,13 @@ export type RateLimitOptions = {
  * submission prefix stays `POST_*` for backward compatibility with the limits
  * already deployed for POST /api/cameras and POST /api/corrections.
  */
-export type RouteKind = "read" | "export" | "nearby" | "submit" | "moderate";
+export type RouteKind = "read" | "export" | "nearby" | "revisions" | "submit" | "moderate";
 
 const ROUTE_LIMIT_DEFAULTS: Record<RouteKind, RateLimitOptions> = {
   read: { maxRequests: 60, windowSeconds: 60 },
   export: { maxRequests: 10, windowSeconds: 60 },
   nearby: { maxRequests: 30, windowSeconds: 60 },
+  revisions: { maxRequests: 30, windowSeconds: 60 },
   submit: { maxRequests: 5, windowSeconds: 60 },
   moderate: { maxRequests: 30, windowSeconds: 60 },
 };
@@ -41,6 +42,7 @@ const ROUTE_LIMIT_ENV_PREFIX: Record<RouteKind, string> = {
   read: "READ",
   export: "EXPORT",
   nearby: "NEARBY",
+  revisions: "REVISIONS",
   submit: "POST",
   moderate: "MODERATION",
 };

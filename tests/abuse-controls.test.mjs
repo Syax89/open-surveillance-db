@@ -82,6 +82,7 @@ test("environment overrides tune the per-route limits", () => {
   });
   assert.deepEqual(rateLimit.limitsFor("export", {}), { maxRequests: 10, windowSeconds: 60 });
   assert.deepEqual(rateLimit.limitsFor("nearby", {}), { maxRequests: 30, windowSeconds: 60 });
+  assert.deepEqual(rateLimit.limitsFor("revisions", {}), { maxRequests: 30, windowSeconds: 60 });
   assert.deepEqual(rateLimit.limitsFor("moderate", {}), { maxRequests: 30, windowSeconds: 60 });
   // Invalid or missing overrides fall back to the defaults.
   assert.deepEqual(
