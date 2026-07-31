@@ -195,6 +195,6 @@ test("POST /api/corrections maps database failures to 500", async () => {
 });
 
 test("the corrections route exposes no GET handler", async () => {
-  const module = await route();
-  assert.equal(typeof module.GET, "undefined");
+  const routeModule = await route();
+  assert.equal(typeof routeModule.GET, "undefined");
 });
