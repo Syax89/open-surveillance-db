@@ -93,9 +93,27 @@ test("verification transitions store an ISO timestamp so the public freshness fi
 
 test("the one-time freshness backfill migration is present, idempotent, and guarded", async () => {
   const files = await sourceFiles("drizzle");
-  const migration = files.find((name) => name.endsWith(".sql") && path.basename(name).startsWith("0005_"));
-  assert.ok(migration, "a 0005 migration must backfill pre-existing prose verification timestamps");
+  // H3 follow-up (#37): the backfill is matched by content, not by a hardcoded
+  // 0005_ prefix — it was renumbered to 0007 when registered in the journal.
+  let migration;
+  for (const name of files) {
+    if (!name.endsWith(".sql")) continue;
+    if (/UPDATE\s+cameras\s+SET\s+updated\s*=/i.test(await readSource(name))) {
+      migration = name;
+      break;
+    }
+  }
+  assert.ok(migration, "a backfill migration must rewrite pre-existing prose verification timestamps");
   const sql = await readSource(migration);
+
+  // The migration must be registered in the journal, or wrangler never applies
+  // it and legacy prose labels survive forever (the #33 defect fixed by #37).
+  const journalPath = files.find((name) => name.endsWith("_journal.json"));
+  const journal = JSON.parse(await readSource(journalPath));
+  const registered = journal.entries.some(
+    (entry) => typeof entry.tag === "string" && migration.includes(entry.tag),
+  );
+  assert.ok(registered, "the backfill migration must be registered in drizzle/meta/_journal.json");
 
   assert.match(sql, /UPDATE\s+cameras\s+SET\s+updated\s*=/i, "the migration must rewrite the verification timestamp");
   assert.match(sql, /status\s*=\s*'verified'/i, "only verified public records are backfilled");
