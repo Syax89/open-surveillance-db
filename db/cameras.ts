@@ -57,9 +57,30 @@ export async function getD1() {
   return env.DB;
 }
 
-export async function listPublicCameras(): Promise<PublicCameraRecord[]> {
+export const freshnessWindows = ["7d", "30d", "90d", "all"] as const;
+export type FreshnessWindow = (typeof freshnessWindows)[number];
+export type PublicCameraFilters = { kind?: string; freshness?: FreshnessWindow };
+
+function freshnessCutoff(freshness: Exclude<FreshnessWindow, "all">): string {
+  const days = Number.parseInt(freshness, 10);
+  return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+}
+
+export async function listPublicCameras(options?: PublicCameraFilters): Promise<PublicCameraRecord[]> {
   const d1 = await getD1();
-  const result = await d1.prepare("SELECT id, title, kind, CASE WHEN publish_manufacturer = 1 THEN manufacturer ELSE NULL END AS manufacturer, CASE WHEN publish_observed_on = 1 THEN observed_on ELSE NULL END AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, latitude, longitude, status, source, updated, description, created_at AS createdAt FROM cameras WHERE status IN ('verified', 'demo') ORDER BY id DESC").all<PublicCameraRecord>();
+  const parameters: string[] = [];
+  let query = "SELECT id, title, kind, CASE WHEN publish_manufacturer = 1 THEN manufacturer ELSE NULL END AS manufacturer, CASE WHEN publish_observed_on = 1 THEN observed_on ELSE NULL END AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, latitude, longitude, status, source, updated, description, created_at AS createdAt FROM cameras WHERE status IN ('verified', 'demo')";
+  if (options?.kind) { query += " AND kind = ?"; parameters.push(options.kind); }
+  if (options?.freshness && options.freshness !== "all") {
+    query += " AND updated >= ?";
+    parameters.push(freshnessCutoff(options.freshness));
+    // A freshness window matches only ISO verification timestamps. Non-ISO
+    // labels (illustrative demo placeholders, pre-backfill prose) must never
+    // be presented as freshly verified — the UI applies the same rule.
+    query += " AND updated GLOB '[0-9][0-9][0-9][0-9]-*'";
+  }
+  query += " ORDER BY id DESC";
+  const result = await d1.prepare(query).bind(...parameters).all<PublicCameraRecord>();
   return result.results;
 }
 export type NearbyPublicCameraRecord = PublicCameraRecord & { distanceMeters: number };
