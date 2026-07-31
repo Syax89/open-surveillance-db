@@ -22,13 +22,13 @@ a named, reachable owner before it becomes a production dependency.
 
 **Decision owners:** maintainers, with input from data & trust lead.
 
-1. Select one pilot jurisdiction and working languages.
-2. Confirm which public infrastructure is eligible and which places/details are excluded.
+1. Select one pilot jurisdiction and working languages. — **Decided 2026-07-31: Italy, Comune di Ferrara as launch area; Italian and English.** [ADR 0010](decisions/0010-pilot-jurisdiction-languages-eligibility.md)
+2. Confirm which public infrastructure is eligible and which places/details are excluded. — **Decided 2026-07-31: cameras visible from public space are eligible; private homes, live feeds, sensitive operational details, and security weaknesses are excluded.** [ADR 0010](decisions/0010-pilot-jurisdiction-languages-eligibility.md)
 3. Choose the data licence, publication precision, retention approach, and correction/removal contact.
 4. Name the initial maintainers, operations owner, data steward, security contact, and moderation contact.
 5. Create a public organisation/repository and an accessible private route for security and privacy reports.
 
-**Gate:** the decisions are documented in `docs/decisions/`; there is no ambiguity about what data may enter the pilot.
+**Gate:** the decisions are documented in `docs/decisions/`; there is no ambiguity about what data may enter the pilot. (Items 1–2 are decided in ADR 0010; items 3–5 remain open.)
 
 ### Wave B — build the safe public-alpha foundation
 
@@ -75,6 +75,15 @@ These are the next technical tickets once Wave A has named owners and approved t
 
 ## Progress log
 
+- **2026-07-31 — Pilot boundary decided (Wave A items 1–2):** the CEO approved
+  Italy as pilot jurisdiction with the Comune di Ferrara as launch area, Italian
+  and English as working languages, and a defined eligibility boundary (visible
+  public-space surveillance cameras; private homes, live feeds, sensitive
+  operational details, and security weaknesses excluded). The Italian GDPR
+  review is coherent with the existing legal drafts. Recorded in
+  [ADR 0010](decisions/0010-pilot-jurisdiction-languages-eligibility.md). Items
+  3–5 of Wave A (final data licence, named owners, public organisation and
+  private reporting route) remain open.
 - **2026-07-31 — Product foundation started:** an accessible, searchable
   directory and a public-record detail route now complement the map in the
   local prototype. They consume only the existing public/demo API response;
