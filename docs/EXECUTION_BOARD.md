@@ -28,7 +28,7 @@ a named, reachable owner before it becomes a production dependency.
 4. Name the initial maintainers, operations owner, data steward, security contact, and moderation contact.
 5. Create a public organisation/repository and an accessible private route for security and privacy reports.
 
-**Gate:** the decisions are documented in `docs/decisions/`; there is no ambiguity about what data may enter the pilot. (Items 1–3 are decided in ADR 0006 and ADR 0008; items 4–5 remain open.)
+**Gate:** the decisions are documented in `docs/decisions/`; there is no ambiguity about what data may enter the pilot. (Items 1–3 are decided in ADR 0010 and ADR 0008; items 4–5 remain open.)
 
 ### Wave B — build the safe public-alpha foundation
 

@@ -1,10 +1,10 @@
-# ADR 0009: Named governance owners, pilot hosting, and future domain
+# ADR 0011: Named governance owners, pilot hosting, and future domain
 
 - **Status:** accepted (CEO decision, 2026-07-31)
 - **Date:** 2026-07-31
 - **Author:** Marie (Technical Writer), recording the CEO decision
 - **Decision owner:** CEO
-- **Related ADRs:** 0005 (processors and data residency), 0006 (pilot
+- **Related ADRs:** 0005 (processors and data residency), 0010 (pilot
   boundary), 0008 (data licence, precision, retention, contact)
 - **Related docs:** GOVERNANCE.md, `docs/EXECUTION_BOARD.md` (Wave A item 4),
   `docs/DEPLOYMENT.md` (§ Local LXC deployment), `docs/OPERATIONS.md`,

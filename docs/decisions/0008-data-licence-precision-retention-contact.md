@@ -5,7 +5,7 @@
 - **Author:** Rosa (DPO / privacy), recording the CEO decision
 - **Decision owner:** CEO
 - **Related ADRs:** 0002 (legal pre-launch deliverables), 0004 (retention
-  schedule), 0005 (processors and data residency), 0006 (pilot boundary)
+  schedule), 0005 (processors and data residency), 0010 (pilot boundary)
 - **Related docs:** README, `docs/OPEN_SOURCE.md`, `docs/DATA_MODEL.md`,
   `docs/legal/PRIVACY_NOTICE.md`, `docs/legal/RETENTION_SCHEDULE.md`,
   `docs/legal/REVIEW_POLICY_LEGALE_2026-07-31.md` (findings O1, O2, O4),
