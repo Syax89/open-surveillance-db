@@ -14,7 +14,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
+  ...(process.env.NEXT_PUBLIC_SITE_URL
+    ? { metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL) }
+    : {}),
   title: "OpenSurveillanceDB — Public data about public surveillance",
   description: "An open, community-maintained database of public surveillance cameras.",
   openGraph: {
@@ -28,10 +30,6 @@ export const metadata: Metadata = {
     description: "Public data about public surveillance.",
     images: ["/og.png"],
   },
-  icons: {
-    icon: "/favicon.svg",
-    shortcut: "/favicon.svg",
-  },
 };
 
 export default function RootLayout({
@@ -41,6 +39,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        {/* Relative href on purpose: metadata icons would be resolved against
+            metadataBase (or the localhost fallback), which breaks the favicon
+            on deployments where NEXT_PUBLIC_SITE_URL is unset. */}
+        <link rel="icon" href="/favicon.svg" />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
