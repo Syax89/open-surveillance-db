@@ -12,7 +12,7 @@
 
 ## 1. Who we are
 
-- **Controller / operator:** OpenSurveillanceDB Ltd. — *placeholder entity; community governance to be confirmed before launch (GOVERNANCE.md).*
+- **Controller / operator:** Simone Rondina (syax89) / OpenSurveillanceDB — Italy (CEO decision 2026-07-31, PRIVACY_NOTICE.md § 1; final legal-entity wording to be confirmed at launch).
 - **Contact:** `privacy@opensurveillancedb` *(dedicated mailbox — to be created before launch; final domain to be confirmed)* for any question, correction, appeal, or privacy request. Response times: MODERATION_SLA.md (S2/S3).
 
 ## 2. What these terms cover
@@ -88,7 +88,7 @@ Your use of the Service is governed by the privacy notice (PRIVACY_NOTICE.md), t
 ## 12. Applicable law and jurisdiction
 
 1. These terms are governed by **EU law and, where applicable, Italian law** — in particular the GDPR and D.Lgs. 196/2003 (Codice Privacy, as amended by D.Lgs. 101/2018).
-2. **Disputes:** the courts of the place where the controller is established (Italy) have jurisdiction, **without prejudice** to the right of consumers residing in the EU to bring proceedings in the courts of their own country of residence (Regulation (EU) 1215/2012, Brussels I recast) and to the protection of their mandatory national provisions (Regulation (EC) 593/2008, Rome I). *Final wording to be confirmed once the controller entity is fixed (see § 15).*
+2. **Disputes:** the courts of the place where the controller is established (Italy) have jurisdiction, **without prejudice** to the right of consumers residing in the EU to bring proceedings in the courts of their own country of residence (Regulation (EU) 1215/2012, Brussels I recast) and to the protection of their mandatory national provisions (Regulation (EC) 593/2008, Rome I). *Final wording to be confirmed at launch.*
 3. **Complaints:** you may complain to the competent supervisory authority — in Italy, the *Garante per la protezione dei dati personali* (www.garanteprivacy.it).
 
 ## 13. Changes to these terms
@@ -104,11 +104,11 @@ Your use of the Service is governed by the privacy notice (PRIVACY_NOTICE.md), t
 ## 15. Pre-launch open items
 
 - [x] Privacy contact decided (2026-07-31): `privacy@opensurveillancedb` — mailbox to be created before launch, final domain to be confirmed (PRIVACY_NOTICE.md § 1/8).
-- [ ] Confirm the controller entity (PRIVACY_NOTICE.md § 1/8; GOVERNANCE.md).
+- [x] Controller entity per CEO decision 2026-07-31: **Simone Rondina (syax89) / OpenSurveillanceDB — Italy** (PRIVACY_NOTICE.md § 1; final legal-entity wording to be confirmed at launch).
 - [ ] Final review of the jurisdiction clause for the first operating jurisdictions (LAWFUL_BASIS.md § 6; MODERATION.md M5).
 - [ ] Decide and implement the acceptance mechanics (clickwrap on the submission form vs. general browse terms) — implementation owner: Ada.
 - [ ] **ADR:** record the adoption of these terms and the inbound data-licensing model (submission → ODbL only upon verification) as a proposed ADR (next free number, per GOVERNANCE.md) — the terms embed a licensing and data-publication decision that material changes require documenting.
 
 ---
 
-*Draft note: the 2026-07-31 Wave A decisions (ODbL 1.0 data licence, ~4-decimal coordinate precision, 12-month retention renewal, privacy contact) are applied. Remaining placeholders — controller entity and jurisdiction wording (§§ 1, 12, 15) — must be finalised at launch. This document is a deliverable of the pre-launch legal review (task t_05d84417, action list #2) and is not a published commitment.*
+*Draft note: the 2026-07-31 Wave A decisions (ODbL 1.0 data licence, ~4-decimal coordinate precision, 12-month retention renewal, privacy contact, controller entity) are applied. Remaining placeholder — jurisdiction wording (§ 12) — must be finalised at launch. This document is a deliverable of the pre-launch legal review (task t_05d84417, action list #2) and is not a published commitment.*
