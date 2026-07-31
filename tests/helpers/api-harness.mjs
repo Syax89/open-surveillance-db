@@ -198,6 +198,11 @@ export async function loadTreeModule(relativeOutput) {
 // transpiles every pure lib module, so tests can exercise them directly.
 export const loadLib = loadTreeModule;
 
+// Name-based convenience for the abuse-control suites: loads a transpiled
+// app/lib module (e.g. "rate-limit") from the shared tree.
+export const loadLibModule = (name) => loadTreeModule(path.join("app", "lib", `${name}.mjs`));
+
+
 export async function cleanupRouteTree() {
   if (!builtTreePromise) return;
   const tree = await builtTreePromise;
