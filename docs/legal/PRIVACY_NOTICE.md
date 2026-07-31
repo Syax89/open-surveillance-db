@@ -94,7 +94,7 @@ You may request, free of charge:
 - [x] Retention of verified records: **12 months with renewal** (decision 2026-07-31).
 - [x] Correction/removal contact: `privacy@opensurveillancedb` + private form (decision 2026-07-31; mailbox to be created at launch).
 - [x] Controller entity: **Simone Rondina (syax89) / OpenSurveillanceDB, Italy** (decision 2026-07-31).
-- [ ] Provision the monitored mailbox `privacy@opensurveillancedb` (ops) before the address is published (ADR 0007).
+- [ ] Provision the monitored mailbox `privacy@opensurveillancedb` (ops) before the address is published (ADR 0008).
 - [ ] Confirm the applicable SCC version at DPA execution (new-generation SCCs announced for adoption in 2025 — see PROCESSOR_REGISTER.md open items).
 - [ ] Per-jurisdiction review (see LAWFUL_BASIS.md § 6) and external counsel review.
 

@@ -43,4 +43,4 @@
 - [ ] Wire ChatGPT auth to `/moderation` (fixes H1) and verify the identity attributes actually received (name fields may be null).
 - [ ] Confirm whether Cloudflare's sub-processor list changes require an updated review at contract signature.
 - [ ] Choose and assess the production map-tile provider (H5).
-- [ ] Revise this register and PRIVACY_NOTICE § 5 per ADR 0008: the pilot runtime is self-hosted (LXC 114, Italy) and Cloudflare returns to a future precondition — to be completed before the pilot hosts real data.
+- [ ] Revise this register and PRIVACY_NOTICE § 5 per ADR 0012: the pilot runtime is self-hosted (LXC 114, Italy) and Cloudflare returns to a future precondition — to be completed before the pilot hosts real data.

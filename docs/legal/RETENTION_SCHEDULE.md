@@ -2,7 +2,7 @@
 
 - **Status:** draft for pre-launch review (ADR 0004)
 - **Owner:** Rosa (DPO / privacy)
-- **Decisions applied (2026-07-31, CEO — ADR 0007):** verified records on a **12-month renewal review cycle**; privacy contact `privacy@opensurveillancedb` (mailbox to be created at launch).
+- **Decisions applied (2026-07-31, CEO — ADR 0008):** verified records on a **12-month renewal review cycle**; privacy contact `privacy@opensurveillancedb` (mailbox to be created at launch).
 - **Legal basis:** GDPR art. 5(1)(e) (storage limitation), art. 17 (erasure); D.Lgs. 196/2003 (Codice Privacy, IT) as primary jurisdiction; consistent with `../PRIVACY_AND_SAFETY.md` and `../MODERATION.md`.
 - **Scope:** all data held by OpenSurveillanceDB, including submissions, moderation data, evidence, correction requests and backups.
 
@@ -14,7 +14,7 @@
 |---|---------------|-----------|-----------------|------------------|-------|
 | R1 | `pending` report (non-verified submission) | **90 days** | Submission date; reset on last moderator activity when clarification was requested | Hard delete of the record and its evidence | Covers the moderation queue and the requester's chance to supply clarification. |
 | R2 | `rejected` report | **30 days** | Rejection decision | Hard delete of the record and its evidence | Leaves a short appeal window (see MODERATION_SLA.md); rejected content is never public. |
-| R3 | `verified` record (published) | **12 months with renewal** (re-verification every 12 months — decision 2026-07-31, ADR 0007) | Date of verification / last re-verification | If not re-verified: `needs_review` → after 6 months unverified → `removed` (record and evidence deleted) | Retention is justified by the public-interest dataset purpose; periodic review keeps data accurate (art. 5(1)(d)) and current. |
+| R3 | `verified` record (published) | **12 months with renewal** (re-verification every 12 months — decision 2026-07-31, ADR 0008) | Date of verification / last re-verification | If not re-verified: `needs_review` → after 6 months unverified → `removed` (record and evidence deleted) | Retention is justified by the public-interest dataset purpose; periodic review keeps data accurate (art. 5(1)(d)) and current. |
 | R4 | Correction / takedown request | **2 years** | Resolution date | Archive the entry in the internal audit log, then delete | Accountability trail (art. 5(2)); aligned with the moderation audit log (M3). |
 | R5 | Moderation audit log entry (decision, reason code, timestamp, reviewer pseudonym) | **2 years** | Decision time | Delete | Aligned with R4; contains no personal data of reporters; reviewer identities are pseudonymous and never logged as raw emails. |
 | R6 | Evidence (files / links supporting a record) | **Tied to the record it supports** | Same lifecycle as R1/R2/R3 | Deleted with the record; hard-deleted immediately if the record is rejected/removed | Evidence containing incidental personal data (e.g. faces, plates, interiors) is redacted or deleted on the spot; never published. |
