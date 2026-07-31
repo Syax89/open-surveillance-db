@@ -134,10 +134,11 @@ test("POST /api/photos honours env-tuned limits via the shared env mock", async 
     // Byte cap: measured body larger than 8 bytes → 413.
     const big = await POST(photoRequest(jpegBytes()));
     assert.equal(big.status, 413);
-    // Dimension cap: 64px wide > 32px limit → 400.
+    // Dimension cap: 64px wide > 32px limit → 400. Raise the byte cap so the
+    // full image is read and the SOF dimensions are actually enforced.
+    env.PHOTO_MAX_BYTES = "1000000";
     stub("createPendingPhoto", async () => photoFixture);
-    const small = jpegBytes().slice(0, 8);
-    const dimmed = await POST(photoRequest(small));
+    const dimmed = await POST(photoRequest(jpegBytes()));
     assert.equal(dimmed.status, 400);
     assert.equal(callArgs("createPendingPhoto").length, 0);
   } finally {

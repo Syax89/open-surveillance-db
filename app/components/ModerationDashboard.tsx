@@ -32,6 +32,20 @@ type CorrectionInQueue = {
   createdAt?: string;
 };
 
+type PhotoInQueue = {
+  id: number;
+  cameraId?: number | null;
+  mimeType: string;
+  width: number;
+  height: number;
+  sizeBytes: number;
+  status: string;
+  exifStripped: number;
+  redactionConfirmed: number;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
 type Reviewer = {
   id: number;
   displayName: string;
@@ -78,13 +92,14 @@ type QueuePayload = {
   publishedCameras?: CameraInQueue[];
   reviewCameras?: CameraInQueue[];
   correctionRequests?: CorrectionInQueue[];
+  photoReports?: PhotoInQueue[];
   recentEvents?: ModerationEvent[];
   reviewers?: Reviewer[];
   queueItems?: QueueItem[];
   error?: string;
 };
 
-type QueueEntity = "camera" | "correction";
+type QueueEntity = "camera" | "correction" | "photo";
 type ModerationAction = "approve" | "reject" | "hide" | "mark-stale" | "reverify" | "escalate";
 type ReasonCode = "verified-public-infrastructure" | "insufficient-evidence" | "duplicate" | "private-or-sensitive-location" | "inaccurate-or-outdated" | "privacy-or-safety-concern" | "requires-senior-review" | "other";
 
@@ -106,6 +121,8 @@ export function ModerationDashboard() {
   const [publishedCameras, setPublishedCameras] = useState<CameraInQueue[]>([]);
   const [reviewCameras, setReviewCameras] = useState<CameraInQueue[]>([]);
   const [corrections, setCorrections] = useState<CorrectionInQueue[]>([]);
+  const [photos, setPhotos] = useState<PhotoInQueue[]>([]);
+  const [redactionConfirmed, setRedactionConfirmed] = useState<Record<string, boolean>>({});
   const [recentEvents, setRecentEvents] = useState<ModerationEvent[]>([]);
   const [reviewers, setReviewers] = useState<Reviewer[]>([]);
   const [queueItems, setQueueItems] = useState<QueueItem[]>([]);
@@ -159,6 +176,7 @@ export function ModerationDashboard() {
         setPublishedCameras(Array.isArray(data.publishedCameras) ? data.publishedCameras : []);
         setReviewCameras(Array.isArray(data.reviewCameras) ? data.reviewCameras : []);
         setCorrections(Array.isArray(data.correctionRequests) ? data.correctionRequests : []);
+        setPhotos(Array.isArray(data.photoReports) ? data.photoReports : []);
         setRecentEvents(Array.isArray(data.recentEvents) ? data.recentEvents : []);
         setReviewers(Array.isArray(data.reviewers) ? data.reviewers : []);
         setQueueItems(Array.isArray(data.queueItems) ? data.queueItems : []);
@@ -172,7 +190,7 @@ export function ModerationDashboard() {
 
   useEffect(() => loadQueue(), [loadQueue]);
 
-  const total = cameras.length + corrections.length;
+  const total = cameras.length + corrections.length + photos.length;
   const summary = useMemo(() => t.awaiting(total), [t, total]);
 
   const queueByKey = useMemo(() => new Map(
@@ -209,6 +227,7 @@ export function ModerationDashboard() {
           entity, id, action, reasonCode, actorId: actingAs,
           ...(note ? { note } : {}),
           ...(entity === "camera" && action === "approve" ? { publishManufacturer: metadataChoices.manufacturer, publishObservedOn: metadataChoices.observedOn } : {}),
+          ...(entity === "photo" && action === "approve" ? { redactionConfirmed: redactionConfirmed[key] === true } : {}),
         }),
       });
       const data = await response.json() as { error?: string };
@@ -216,9 +235,10 @@ export function ModerationDashboard() {
 
       // Reload the queue so queue state badges and moved items stay truthful.
       setReasons((items) => { const next = { ...items }; delete next[key]; return next; });
+      setRedactionConfirmed((items) => { const next = { ...items }; delete next[key]; return next; });
       setNotes((items) => { const next = { ...items }; delete next[key]; return next; });
       setMetadataPublication((items) => { const next = { ...items }; delete next[key]; return next; });
-      setMessage(`${entity === "camera" ? t.cameraReport : t.correctionRequest} #${id} ${t.decisionSaved}: ${actionLabel(action)}. ${t.reason}: ${readableReason(reasonCode)}.`);
+      setMessage(`${entity === "camera" ? t.cameraReport : entity === "photo" ? t.photoEvidence : t.correctionRequest} #${id} ${t.decisionSaved}: ${actionLabel(action)}. ${t.reason}: ${readableReason(reasonCode)}.`);
       loadQueue();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : t.saveError);
@@ -250,7 +270,7 @@ export function ModerationDashboard() {
     const busy = processing === key;
     const disabled = busy || !reasons[key] || !actorId;
     return <div className="record-list-actions" aria-label={`${t.decisionFor} ${entity} ${id}`}>
-      {allowedActions.map((action) => <button key={action} type="button" className={action === "approve" || action === "reverify" ? "button button-primary" : action === "hide" || action === "mark-stale" ? "button button-quiet" : "text-button"} disabled={disabled} onClick={() => decide(entity, id, action)}>{busy ? t.saving : actionLabel(action)}</button>)}
+      {allowedActions.map((action) => <button key={action} type="button" className={action === "approve" || action === "reverify" ? "button button-primary" : action === "hide" || action === "mark-stale" ? "button button-quiet" : "text-button"} disabled={disabled || (entity === "photo" && action === "approve" && redactionConfirmed[key] !== true)} onClick={() => decide(entity, id, action)}>{busy ? t.saving : actionLabel(action)}</button>)}
     </div>;
   }
 
@@ -304,6 +324,12 @@ export function ModerationDashboard() {
         <div className="section-heading"><div><p className="eyebrow"><span /> {t.corrections}</p><h2 id="correction-requests-title">{t.privateCorrections}</h2></div><p className="section-note">{corrections.length} {t.pending}</p></div>
         {!loading && corrections.length === 0 && <div className="empty-state"><h3>{t.noCorrectionsTitle}</h3><p>{t.noCorrectionsText}</p></div>}
         <ul className="moderation-list" aria-label={t.privateCorrections}>{corrections.map((correction) => <li key={correction.id}><article className="record-list-card"><div><p className="card-topline"><span className="status-dot pending" /> {t.privateCorrection}</p><h3>{correction.issueType}</h3><p className="record-kind">{correction.cameraId ? `${t.relatedRecord} #${correction.cameraId}` : t.generalConcern}</p></div>{queueBadge("correction", correction.id)}<dl><div><dt>{t.submitted}</dt><dd>{readableDate(correction.createdAt)}</dd></div><div><dt>{t.contact}</dt><dd>{correction.contact || t.noContact}</dd></div><div><dt>{t.status}</dt><dd>{readableStatus(correction.status)}</dd></div></dl><div><h4>{t.request}</h4><p>{correction.message}</p></div>{decisionFields("correction", correction.id, ["approve", "reject", "escalate"])}{decisionActions("correction", correction.id, ["approve", "reject", "escalate"])}</article></li>)}</ul>
+      </section>
+
+      <section className="moderation-section" aria-labelledby="photo-queue-title">
+        <div className="section-heading"><div><p className="eyebrow"><span /> {t.photoEvidence}</p><h2 id="photo-queue-title">{t.pendingPhotos}</h2></div><p className="section-note">{photos.length} {t.pending}</p></div>
+        {!loading && photos.length === 0 && <div className="empty-state"><h3>{t.noPhotosTitle}</h3><p>{t.noPhotosText}</p></div>}
+        <ul className="moderation-list" aria-label={t.pendingPhotos}>{photos.map((photo) => <li key={photo.id}><article className="record-list-card"><div><p className="card-topline"><span className="status-dot pending" /> {t.photoEvidence} #{photo.id}</p><h3>{t.photoEvidence}</h3><p className="record-kind">{photo.mimeType} · {photo.width}×{photo.height} · {(photo.sizeBytes / 1024).toFixed(1)} KB</p></div><dl><div><dt>{t.photoStripState}</dt><dd>{photo.exifStripped === 1 ? t.verified : t.photoNoRedaction}</dd></div><div><dt>{t.photoRedactionState}</dt><dd>{photo.redactionConfirmed === 1 ? t.verified : t.photoNoRedaction}</dd></div><div><dt>{t.relatedRecord}</dt><dd>{photo.cameraId ? `#${photo.cameraId}` : t.unavailable}</dd></div><div><dt>{t.submitted}</dt><dd>{readableDate(photo.createdAt)}</dd></div></dl><div className="photo-preview-frame"><img src={`/api/moderation/photos/${photo.id}`} alt={`${t.photoEvidence} #${photo.id}`} loading="lazy" /></div><div className="photo-moderate-note" role="note">{t.photoRedactionHelp}</div><label className="photo-redaction-check"><input type="checkbox" checked={redactionConfirmed[`photo-${photo.id}`] === true} onChange={(event) => setRedactionConfirmed((items) => ({ ...items, [`photo-${photo.id}`]: event.target.checked }))} /> <span>{t.photoRedactionConfirm}</span></label>{decisionFields("photo", photo.id, ["approve", "reject"])}{decisionActions("photo", photo.id, ["approve", "reject"])}</article></li>)}</ul>
       </section>
 
       <section className="moderation-section" aria-labelledby="moderation-history-title">
