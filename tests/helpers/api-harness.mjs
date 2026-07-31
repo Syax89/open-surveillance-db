@@ -136,6 +136,13 @@ export async function loadRoute(relativeOutput) {
   return import(pathToFileURL(path.join(tree, relativeOutput)).href);
 }
 
+// relativeOutput: e.g. "app/lib/duplicate-detection.mjs" — the tree already
+// transpiles every pure lib module, so tests can exercise them directly.
+export async function loadLib(relativeOutput) {
+  const tree = await buildRouteTree();
+  return import(pathToFileURL(path.join(tree, relativeOutput)).href);
+}
+
 export async function cleanupRouteTree() {
   if (!builtTreePromise) return;
   const tree = await builtTreePromise;

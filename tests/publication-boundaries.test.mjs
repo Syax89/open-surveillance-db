@@ -74,7 +74,11 @@ test("nearby search validates its bounded coordinates and stays behind the publi
     /latitude\s*<\s*-90[\s\S]*latitude\s*>\s*90[\s\S]*longitude\s*<\s*-180[\s\S]*longitude\s*>\s*180[\s\S]*radius\s*<\s*10[\s\S]*radius\s*>\s*500/,
     "nearby search must reject invalid coordinates and radius values outside 10–500 metres",
   );
-  assert.match(route, /findNearbyPublicCameras\(latitude,\s*longitude,\s*radius\)/);
+  assert.match(
+    route,
+    /findNearbyPublicCameras\(\s*latitude,\s*longitude,\s*radius/,
+    "nearby search must pass the bounded coordinates (and optional pre-submit text hints) to the public helper",
+  );
   assert.doesNotMatch(route, /\bgetD1\b|\.prepare\(|\bSELECT\b/i, "the nearby route must not query the database directly");
   assert.match(helper, /const\s+records\s*=\s+await\s+listPublicCameras\(\)/, "nearby search must start with the filtered public list");
   assert.match(helper, /\.filter\(\(record\)\s*=>\s*record\.distanceMeters\s*<=\s*radiusMeters\)/, "nearby search must filter that public list by distance");
