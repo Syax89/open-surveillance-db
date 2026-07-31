@@ -74,25 +74,15 @@ export type MetadataPublicationChoices = {
   publishObservedOn: boolean;
 };
 
-const createCorrectionRequestsTable =
-  "CREATE TABLE IF NOT EXISTS correction_requests (id INTEGER PRIMARY KEY AUTOINCREMENT, camera_id INTEGER, issue_type TEXT NOT NULL, message TEXT NOT NULL, contact TEXT, status TEXT NOT NULL DEFAULT 'pending', created_at TEXT NOT NULL, outcome TEXT)";
-const createCorrectionRequestsStatusIndex =
-  "CREATE INDEX IF NOT EXISTS correction_requests_status_idx ON correction_requests(status)";
-const createModerationEventsTable =
-  "CREATE TABLE IF NOT EXISTS moderation_events (id INTEGER PRIMARY KEY AUTOINCREMENT, entity TEXT NOT NULL, entity_id INTEGER NOT NULL, previous_status TEXT NOT NULL, new_status TEXT NOT NULL, action TEXT NOT NULL, reason_code TEXT NOT NULL, note TEXT, actor TEXT NOT NULL, created_at TEXT NOT NULL)";
-const createModerationEventsCreatedAtIndex =
-  "CREATE INDEX IF NOT EXISTS moderation_events_created_at_idx ON moderation_events(created_at DESC, id DESC)";
 const localModerator = "Local moderator";
 
+/**
+ * The `correction_requests` and `moderation_events` tables and their indexes
+ * are applied by the Drizzle migrations in `drizzle/`; this function performs
+ * no runtime bootstrap.
+ */
 async function getModerationD1() {
-  const d1 = await getD1();
-  await d1.batch([
-    d1.prepare(createCorrectionRequestsTable),
-    d1.prepare(createCorrectionRequestsStatusIndex),
-    d1.prepare(createModerationEventsTable),
-    d1.prepare(createModerationEventsCreatedAtIndex),
-  ]);
-  return d1;
+  return getD1();
 }
 
 export async function listPendingModerationItems(): Promise<ModerationQueue> {
