@@ -1,0 +1,95 @@
+name: Ops Backup D1
+
+# Backup giornaliero del database D1 di produzione (docs/OPERATIONS.md §3).
+# Il dump contiene dati sensibili (contatti delle richieste di correzione,
+# coda di moderazione): viene CIFRATO prima di essere salvato come artifact
+# GitHub privato del run. La passphrase vive SOLO in secrets.BACKUP_PASSPHRASE.
+# Questo workflow non esegue mai deploy e non tocca il worker in produzione.
+
+on:
+  schedule:
+    - cron: "0 2 * * *" # ogni giorno 02:00 UTC
+  workflow_dispatch: {} # esecuzione manuale (drill)
+
+concurrency:
+  group: ops-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    name: Export D1 + verify + encrypt
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Export D1 remoto (schema + dati)
+        id: export
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          stamp=$(date +%F)
+          npx wrangler d1 export opensurveillancedb --remote \
+            --output="d1-backup-${stamp}.sql"
+          echo "stamp=${stamp}" >> "$GITHUB_OUTPUT"
+          echo "file=d1-backup-${stamp}.sql" >> "$GITHUB_OUTPUT"
+          ls -la "d1-backup-${stamp}.sql"
+
+      - name: Verifica struttura (3 tabelle attese)
+        run: |
+          f="${{ steps.export.outputs.file }}"
+          for t in cameras correction_requests moderation_events; do
+            if grep -q "CREATE TABLE ${t} " "$f"; then
+              echo "OK tabella ${t}"
+            else
+              echo "::error::tabella ${t} MANCANTE nel dump ${f}"
+              exit 1
+            fi
+          done
+
+      - name: Baseline conteggi (per il drill di restore)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npx wrangler d1 execute opensurveillancedb --remote \
+            --command="SELECT 'cameras' t, COUNT(*) n FROM cameras UNION ALL SELECT 'correction_requests', COUNT(*) FROM correction_requests UNION ALL SELECT 'moderation_events', COUNT(*) FROM moderation_events;" \
+            --json | tee d1-counts.json
+
+      - name: Cifra il dump (AES-256, passphrase da secret)
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          f="${{ steps.export.outputs.file }}"
+          if [ -z "${BACKUP_PASSPHRASE:-}" ]; then
+            echo "::error::secret BACKUP_PASSPHRASE non configurato: il dump NON verrà cifrato, abort."
+            exit 1
+          fi
+          openssl enc -aes-256-cbc -salt -pbkdf2 \
+            -pass "pass:${BACKUP_PASSPHRASE}" \
+            -in "$f" -out "${f}.enc"
+          sha256sum "${f}.enc" > "${f}.enc.sha256"
+          rm -f "$f" # mai l'artifact in chiaro
+          ls -la "${f}.enc"*
+
+      - name: Upload artifact privato del run (solo cifrato)
+        uses: actions/upload-artifact@v4
+        with:
+          name: d1-backup-${{ steps.export.outputs.stamp }}
+          path: |
+            d1-backup-*.enc
+            d1-backup-*.enc.sha256
+            d1-counts.json
+          retention-days: 30
