@@ -28,16 +28,32 @@ const wranglerBin = path.join(root, "node_modules", "wrangler", "bin", "wrangler
 const dbName = "opensurveillancedb";
 
 // Tables the application schema must expose after a fresh migration.
-const expectedTables = ["cameras", "correction_requests", "moderation_events"];
+const expectedTables = [
+  "cameras",
+  "correction_requests",
+  "moderation_events",
+  // Wave B Data & Trust (0008): reviewer roles and the moderation queue.
+  "reviewers",
+  "moderation_queue",
+];
 // Indexes declared by the migrations.
 const expectedIndexes = [
   "cameras_status_idx",
   "correction_requests_status_idx",
   "moderation_events_created_at_idx",
+  "reviewers_role_idx",
+  "moderation_queue_state_idx",
 ];
 // Tables that are not application schema but legitimately appear in a local
 // D1 database. Anything outside this set is an unexpected schema change.
 const allowedExtraTables = ["_cf_METADATA", "sqlite_sequence", "d1_migrations"];
+
+// Tables that migration 0008 (Wave B Data & Trust) deliberately seeds with
+// the reviewer roles. A fresh DB must contain exactly these rows — no more,
+// no less — so extra demo/seed data still fails the gate.
+const expectedSeedCounts = {
+  reviewers: 5,
+};
 
 let failures = 0;
 
@@ -184,9 +200,11 @@ for (const i of expectedIndexes) {
   }
 }
 
-// 6. A fresh migrated database must be empty (no demo/seed rows).
+// 6. A fresh migrated database must be empty (no demo/seed rows), except for
+//    tables the migrations deliberately seed with a fixed row set.
 console.log("[7/7] checking row counts (fresh DB must be empty)…");
 for (const t of expectedTables) {
+  const seeded = expectedSeedCounts[t];
   let count = -1;
   try {
     const rows = query(`SELECT COUNT(*) AS n FROM ${t};`);
@@ -197,6 +215,12 @@ for (const t of expectedTables) {
   }
   if (count === 0) {
     console.log(`      ✓ ${t}: 0 rows`);
+  } else if (seeded !== undefined) {
+    if (count === seeded) {
+      console.log(`      ✓ ${t}: ${count} rows (migration seed, expected)`);
+    } else {
+      fail(`expected ${t} to have exactly ${seeded} seeded rows, found ${count}`);
+    }
   } else {
     fail(`expected ${t} to be empty on a fresh DB, found ${count} row(s)`);
   }
