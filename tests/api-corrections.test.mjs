@@ -151,9 +151,6 @@ test("POST /api/corrections truncates long fields to their documented limits", a
 
 test("POST /api/corrections rejects non-object JSON bodies", async () => {
   const { POST } = await route();
-  // NOTE: JSON `null` is excluded here on purpose — see the documented-500
-  // test below. Property access on null throws inside the handler and the
-  // catch-all maps it to 500, not 400 (finding OSDB-QA-001).
   for (const body of ["[]", "7", '"x"']) {
     const response = await POST(apiRequest("/api/corrections", { method: "POST", body }));
     assert.equal(response.status, 400, body);
@@ -161,15 +158,10 @@ test("POST /api/corrections rejects non-object JSON bodies", async () => {
   }
 });
 
-test("POST /api/corrections maps a JSON null body to 500 (documented deviation, OSDB-QA-001)", async () => {
-  // FINDING OSDB-QA-001: the handler reads `payload.cameraId` without an
-  // isRecord() guard, so a JSON `null` body throws a TypeError that the
-  // catch-all turns into 500 instead of a client-error 400. The moderation
-  // route guards the same input with 400, so this is inconsistent. If the
-  // route is hardened, flip this assertion to 400.
+test("POST /api/corrections rejects a JSON null body with 400 (OSDB-QA-001)", async () => {
   const { POST } = await route();
   const response = await POST(apiRequest("/api/corrections", { method: "POST", body: "null" }));
-  assert.equal(response.status, 500);
+  assert.equal(response.status, 400);
   assert.equal(callArgs("createCorrectionRequest").length, 0);
 });
 

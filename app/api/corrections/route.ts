@@ -1,5 +1,6 @@
 import { env } from "cloudflare:workers";
 import { createCorrectionRequest } from "../../../db/corrections";
+import { isRecord } from "../../lib/guards";
 import { callerKey, checkRateLimit, submissionLimits, submissionsDisabled } from "../../lib/rate-limit";
 
 function cleanText(value: unknown, maxLength: number) {
@@ -23,7 +24,8 @@ export async function POST(request: Request) {
   }
 
   try {
-    const payload = await request.json() as Record<string, unknown>;
+    const payload: unknown = await request.json();
+    if (!isRecord(payload)) return Response.json({ error: "Choose an issue type and provide a short description." }, { status: 400 });
     const rawCameraId = payload.cameraId;
     const cameraId = rawCameraId === "" || rawCameraId === undefined || rawCameraId === null ? null : Number(rawCameraId);
     const issueType = cleanText(payload.issueType, 50);
