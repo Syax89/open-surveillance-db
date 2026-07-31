@@ -135,26 +135,32 @@ test("the public camera query never selects the private notes field", async () =
   const [record] = await cameras.listPublicCameras();
   assert.equal(record.title, "Sensitive");
   assert.equal("notes" in record, false, "notes must be absent from public records");
-  assert.deepEqual(Object.keys(record).sort(), [
+  // The exact public field set is schema-driven: the freshness columns
+  // (last_verified_at, review_due_at, review_interval_months) are part of
+  // the public surface once the freshness feature is in the schema, and
+  // absent before it (the PR head may predate it even when main has it).
+  const tableInfo = await env.DB.prepare("PRAGMA table_info(cameras)").all();
+  const hasFreshness = tableInfo.results.some((column) => column.name === "last_verified_at");
+  const expectedKeys = [
     "address",
     "createdAt",
     "description",
     "id",
     "kind",
-    "lastVerifiedAt",
+    ...(hasFreshness ? ["lastVerifiedAt"] : []),
     "latitude",
     "longitude",
     "manufacturer",
     "observedOn",
     "publishManufacturer",
     "publishObservedOn",
-    "reviewDueAt",
-    "reviewIntervalMonths",
+    ...(hasFreshness ? ["reviewDueAt", "reviewIntervalMonths"] : []),
     "source",
     "status",
     "title",
     "updated",
-  ]);
+  ];
+  assert.deepEqual(Object.keys(record).sort(), expectedKeys);
 });
 
 test("manufacturer and observedOn are conditional on their publish flags", async () => {

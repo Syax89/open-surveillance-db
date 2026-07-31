@@ -14,6 +14,7 @@
 // Every test gets a fresh temp tree so module instances never share state.
 
 import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -42,10 +43,15 @@ const REAL_DB_MODULES = [
   { source: "db/cameras.ts", output: "db-real/cameras.mjs" },
   { source: "db/corrections.ts", output: "db-real/corrections.mjs" },
   { source: "db/moderation.ts", output: "db-real/moderation.mjs" },
-  // db/moderation.ts imports ./freshness (pure, no CF binding); it must be
-  // compiled into the same tree so the rewritten import resolves.
-  { source: "db/freshness.ts", output: "db-real/freshness.mjs" },
 ];
+// db/moderation.ts imports ./freshness (pure, no CF binding) once the
+// freshness feature is present. CI checks out the PR head, not the merge
+// with main, so the source file may not exist on the branch even when it is
+// on main. Compile it only when present — db/moderation.ts imports it only
+// in that case, so the two stay consistent in every state.
+if (existsSync(path.join(root, "db/freshness.ts"))) {
+  REAL_DB_MODULES.push({ source: "db/freshness.ts", output: "db-real/freshness.mjs" });
+}
 
 let builtTreePromise = null;
 
