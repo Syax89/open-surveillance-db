@@ -16,6 +16,7 @@ export async function GET(request: Request) {
     const records = await findNearbyPublicCameras(latitude, longitude, radius);
     return Response.json({ records });
   } catch (error) {
-    return Response.json({ error: error instanceof Error ? error.message : "Database unavailable" }, { status: 503 });
+    console.error("GET /api/cameras/nearby failed", error);
+    return Response.json({ error: "Database unavailable" }, { status: 503 });
   }
 }
