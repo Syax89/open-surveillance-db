@@ -23,6 +23,7 @@
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "wrangler d1 migrations apply opensurveillancedb --local",
+    "db:smoke": "node scripts/db-migration-smoke.mjs",
     "db:reset": "node scripts/db-reset.mjs",
     "db:seed": "wrangler d1 execute opensurveillancedb --local --file=scripts/demo-cameras.sql --yes"
   },
