@@ -41,6 +41,9 @@ const ROUTES = [
   { source: "app/api/cameras/revisions/route.ts", output: "app/api/cameras/revisions/route.mjs" },
   { source: "app/api/moderation/route.ts", output: "app/api/moderation/route.mjs" },
   { source: "app/api/corrections/route.ts", output: "app/api/corrections/route.mjs" },
+  // Account erasure (R7): exercised end to end with a real session built via
+  // the real db/auth module, so the DELETE handler runs against real SQL.
+  { source: "app/api/auth/account/route.ts", output: "app/api/auth/account/route.mjs" },
 ];
 
 // Real db modules compiled into the tree (NOT mocks): the route handlers will

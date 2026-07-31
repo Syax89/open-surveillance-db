@@ -36,6 +36,7 @@ const ROUTES = [
   { source: "app/api/auth/logout/route.ts", output: "app/api/auth/logout/route.mjs" },
   { source: "app/api/auth/me/route.ts", output: "app/api/auth/me/route.mjs" },
   { source: "app/api/auth/me/submissions/route.ts", output: "app/api/auth/me/submissions/route.mjs" },
+  { source: "app/api/auth/account/route.ts", output: "app/api/auth/account/route.mjs" },
 ];
 
 // Real db/* modules compiled into the temp tree so runtime tests can

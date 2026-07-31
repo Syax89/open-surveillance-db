@@ -46,6 +46,8 @@ export default function AccountPage() {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
   const [loggedOut, setLoggedOut] = useState(false);
+  const [deleted, setDeleted] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(() => {
@@ -100,6 +102,33 @@ export default function AccountPage() {
     }
   }
 
+  async function onDeleteAccount() {
+    if (!window.confirm(`${t.deleteAccountConfirm}\n\n${t.deleteAccountConfirmBody}`)) return;
+    const csrfToken = readCsrfToken();
+    setError(null);
+    setDeleting(true);
+    try {
+      const response = await fetch("/api/auth/account", {
+        method: "DELETE",
+        headers: csrfToken ? { "x-csrf-token": csrfToken } : {},
+      });
+      if (response.ok) {
+        setDeleted(true);
+        setContributor(null);
+        setSubmissions([]);
+        router.refresh();
+      } else if (response.status === 403) {
+        setError(t.errorCrossOrigin);
+      } else {
+        setError(t.errorDeleteAccount);
+      }
+    } catch {
+      setError(t.errorDeleteAccount);
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   const memberSince = contributor
     ? new Date(contributor.createdAt).toLocaleDateString()
     : "";
@@ -122,6 +151,13 @@ export default function AccountPage() {
         <h1>{t.accountTitle}</h1>
 
         {loading ? <p>{t.loading}</p> : null}
+
+        {!loading && deleted ? (
+          <>
+            <h2>{t.accountDeletedTitle}</h2>
+            <p className="record-detail-summary">{t.accountDeletedBody}</p>
+          </>
+        ) : null}
 
         {!loading && loggedOut ? (
           <>
@@ -179,6 +215,19 @@ export default function AccountPage() {
             <button className="button detail-outline" type="button" onClick={() => void onLogout()}>
               {t.logout}
             </button>
+
+            <section aria-labelledby="delete-account-title" className="auth-danger-zone">
+              <h2 id="delete-account-title">{t.deleteAccountSection}</h2>
+              <p className="record-detail-summary">{t.deleteAccountHint}</p>
+              <button
+                className="button detail-outline"
+                type="button"
+                onClick={() => void onDeleteAccount()}
+                disabled={deleting}
+              >
+                {deleting ? t.deletingAccount : t.deleteAccount}
+              </button>
+            </section>
           </>
         ) : null}
 

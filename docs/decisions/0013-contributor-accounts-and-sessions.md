@@ -89,3 +89,33 @@ Two questions had to be answered before writing code:
 - Future work: email verification, password reset, and (if ever needed) an
   option to convert a *named* submission to anonymous — each requires the
   mailer decision first.
+
+## Update (2026-08-01): account erasure with de-attribution (R7)
+
+The GDPR art. 17 erasure path is self-service: `DELETE /api/auth/account`
+(equivalent to `/api/account`, kept inside the auth family). Semantics,
+matching RETENTION_SCHEDULE R7 ("erasure with de-attribution"):
+
+1. **De-attribution is explicit, not FK-driven.** `cameras.contributor_id`
+   deliberately has **no** `ON DELETE` action. Removing a contributor who
+   owns reports therefore can only go through `db/auth.ts`
+   `eraseContributor()`, which in one atomic batch (D1 `batch`):
+   1. sets `contributor_id = NULL` on every report the contributor
+      submitted — the anonymous report stays published, only the link to the
+      account is severed;
+   2. deletes every session of the contributor (all devices logged out);
+   3. hard-deletes the contributor row.
+2. **Why not `ON DELETE SET NULL`.** A schema-level FK action would silently
+   detach attribution on any raw delete and cannot be exercised by the test
+   harness (the in-memory D1 adapter does not enforce foreign keys), so the
+   invariant would live in untested schema magic. Explicit de-attribution in
+   the app layer is portable, observable (the erasure response reports how
+   many reports were de-attributed), and testable end to end; the missing FK
+   action acts as a guardrail that forces every deletion through the
+   audited path.
+3. **Moderation and audit are untouched.** `moderation_events` reference
+   reviewers, not contributors, and are append-only; erasure never rewrites
+   them. The published record keeps its status and its audit history — only
+   `cameras.contributor_id` changes to NULL.
+4. **Security posture** mirrors logout: same-origin gate, the shared auth
+   rate-limit bucket, and CSRF double-submit. Anonymous calls get 401.
