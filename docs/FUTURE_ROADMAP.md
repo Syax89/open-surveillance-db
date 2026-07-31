@@ -43,12 +43,20 @@ re-verification lifecycle work is also implemented locally: a verified record
 can be marked `needs_review`, which removes it from public output until it is
 reverified or removed. A full fictional lifecycle exercise has passed.
 
+**Implementation update (2026-07-31, change summary):** every record detail
+page now shows a reviewed public change summary — approved, marked for
+re-review, re-verified, or removed transitions with their dates — served by
+`GET /api/cameras/revisions?cameraId=N`. The endpoint resolves only for
+currently public records and its projection deliberately omits contributor
+identity, moderator identity, reason codes, and internal notes; boundary tests
+guard the projection statically and at runtime.
+
 ### Planned work
 
 - Detect likely duplicates before a contributor submits a new record.
 - Add explicit record freshness and re-verification state without publishing stale data as current.
 - Add safe category and verification-freshness filters to the public directory.
-- Add a reviewed public change summary that omits contributor identities and internal notes.
+- [x] Add a reviewed public change summary that omits contributor identities and internal notes.
 - Give moderators a local way to associate a correction request with a record outcome.
 - Expand tests around each status transition and its public visibility.
 

@@ -7,8 +7,10 @@ export const {
   listPublicCameras,
   findNearbyPublicCameras,
   createPendingCamera,
+  getPublicCameraById,
 } = makeMock({
   listPublicCameras: "listPublicCameras",
   findNearbyPublicCameras: "findNearbyPublicCameras",
   createPendingCamera: "createPendingCamera",
+  getPublicCameraById: "getPublicCameraById",
 });

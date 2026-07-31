@@ -437,6 +437,7 @@ test("server errors are logged server-side and return generic client messages", 
   const routes = {
     cameras: await readSource("app/api/cameras/route.ts"),
     nearby: await readSource("app/api/cameras/nearby/route.ts"),
+    revisions: await readSource("app/api/cameras/revisions/route.ts"),
     corrections: await readSource("app/api/corrections/route.ts"),
     moderation: await readSource("app/api/moderation/route.ts"),
   };
@@ -493,4 +494,63 @@ test("package metadata identifies the project, license, and repository", async (
   assert.equal(pkg.license, "AGPL-3.0-or-later");
   assert.equal(pkg.repository?.url, "git+https://github.com/Syax89/open-surveillance-db.git");
   assert.equal(pkg.homepage, "https://github.com/Syax89/open-surveillance-db");
+});
+
+test("the public change summary is served only for currently public records", async () => {
+  const route = await readSource("app/api/cameras/revisions/route.ts");
+  const cameras = await readSource("db/cameras.ts");
+  const getStart = cameras.indexOf("export async function getPublicCameraById");
+  const getBoundary = cameras.slice(getStart);
+
+  assert.ok(getStart >= 0, "the revisions route must have a dedicated public-record lookup");
+  assert.match(
+    getBoundary,
+    /WHERE\s+id\s*=\s*\?\s+AND\s+status\s+IN\s*\(\s*'verified'\s*,\s*'demo'\s*\)/i,
+    "the lookup must resolve only verified and demo records",
+  );
+  assert.doesNotMatch(getBoundary, /\bnotes\b/, "the lookup must not select the private notes field");
+
+  assert.match(
+    route,
+    /import\s*\{[^}]*\bgetPublicCameraById\b[^}]*\}\s*from\s*["'][^"']*db\/cameras["']/,
+    "the route must use the dedicated public-record lookup",
+  );
+  assert.match(
+    route,
+    /import\s*\{[^}]*\blistPublicCameraRevisions\b[^}]*\}\s*from\s*["'][^"']*db\/moderation["']/,
+    "the route must use the dedicated public-history boundary",
+  );
+  assert.match(route, /searchParams\.get\(['"]cameraId['"]\)/, "the route must read a cameraId");
+  assert.match(route, /status:\s*400/, "an invalid cameraId must be rejected");
+  assert.match(route, /if\s*\(!record\)/, "a non-public record must be rejected before any history read");
+  assert.match(route, /status:\s*404/, "a non-public record must return 404");
+  assert.match(route, /status:\s*503/, "database failures must fail closed");
+  assert.doesNotMatch(
+    route,
+    /\bgetD1\b|\.prepare\(|\bSELECT\b|\bmoderateCamera\b|\blistPendingModerationItems\b/i,
+    "the public route must not touch the database or the moderation queue directly",
+  );
+});
+
+test("the public change summary omits contributor identity and internal notes", async () => {
+  const moderation = await readSource("db/moderation.ts");
+  const summaryStart = moderation.indexOf("export async function listPublicCameraRevisions");
+  const summary = moderation.slice(summaryStart);
+
+  assert.ok(summaryStart >= 0, "the public-history boundary must be an explicit database function");
+  assert.match(
+    summary,
+    /FROM\s+moderation_events\s+WHERE\s+entity\s*=\s*['"]camera['"]\s+AND\s+entity_id\s*=\s*\?/i,
+    "the summary must select only camera lifecycle events for the requested record",
+  );
+  assert.match(
+    summary,
+    /ORDER\s+BY\s+created_at\s+ASC,\s*id\s+ASC/i,
+    "the summary must be chronological, oldest first",
+  );
+  assert.doesNotMatch(
+    summary,
+    /\bactor\b|\bnote\b|\breason_code\b|\breasonCode\b/,
+    "the public summary must never select the private audit columns (actor, note, reason code)",
+  );
 });
