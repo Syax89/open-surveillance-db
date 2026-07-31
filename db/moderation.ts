@@ -330,7 +330,7 @@ function getCameraTransition(
 
   if (previousStatus === "stale") {
     if (action === "reverify") {
-      return { newStatus: "verified", updated: "Local moderation: re-verified" };
+      return { newStatus: "verified", updated: new Date().toISOString() };
     }
     if (action === "hide") {
       return { newStatus: "removed", updated: "Local moderation: hidden from public listing" };
