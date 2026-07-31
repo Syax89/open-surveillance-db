@@ -25,7 +25,7 @@ CSV, or GeoJSON output. See [DATA_MODEL.md](DATA_MODEL.md) and
 | Output | Endpoint | Shape |
 | --- | --- | --- |
 | JSON | `GET /api/cameras` | `{ "records": [ … ] }` |
-| CSV | `GET /api/cameras?format=csv` | One header row, one record per row, CR/LF-terminated |
+| CSV | `GET /api/cameras?format=csv` | One header row, one record per row, newline-terminated |
 | GeoJSON | `GET /api/cameras?format=geojson` | `FeatureCollection` of `Point` features |
 | Nearby JSON | `GET /api/cameras/nearby?latitude=…&longitude=…&radius=…` | `{ "records": [ … ] }`, same fields plus `distanceMeters` |
 
@@ -54,7 +54,7 @@ some fields entirely (marked `—`).
 | `longitude` | ✓ | ✓ | — (in geometry) | number | WGS84 longitude; same precision rule as latitude. GeoJSON geometry is `[longitude, latitude]`. |
 | `status` | ✓ | ✓ | ✓ | string | `verified` (reviewed, real) or `demo` (fictional, clearly labelled). No other status can be present in a public output. |
 | `source` | ✓ | ✓ | ✓ | string | Provenance label. In the prototype the observed values are `Prototype seed` (illustrative demo records) and `Community report` (submitted and later approved). Future provenance classes are defined in [workstreams/DATA_TRUST.md](workstreams/DATA_TRUST.md). |
-| `updated` | ✓ | ✓ | ✓ | string | Short label of the last review action (e.g. `Local moderation: approved and verified`); seeded demo records carry their creation ISO timestamp. Stored as text; not a machine-readable verification date. |
+| `updated` | ✓ | ✓ | ✓ | string | Short label of the last review action (e.g. `Local moderation: approved and verified`); seeded demo records carry the literal label `Demo data`, fresh submissions `Submitted just now`. Stored as text; not a machine-readable verification date. |
 | `description` | ✓ | ✓ | ✓ | string | Brief factual context written or reviewed by a moderator; no sensitive operational detail. |
 | `createdAt` | ✓ | — | — | string | Submission/creation timestamp (ISO). Not exported in CSV/GeoJSON. |
 
@@ -91,8 +91,8 @@ until a moderator approves the record.
 | --- | --- | --- | --- |
 | `cameraId` | no | integer ≥ 1 | Optional link to a public record. |
 | `issueType` | yes | 50 chars | Short reason label (e.g. inaccurate details, no longer present, privacy concern). |
-| `message` | yes | — | Short description. |
-| `contact` | no | — | Contact for follow-up; stored privately. |
+| `message` | yes | 1500 chars | Short description. |
+| `contact` | no | 180 chars | Contact for follow-up; stored privately. |
 
 The response is `201 { "referenceId": … }`; requests are private and never
 alter a public record automatically.
