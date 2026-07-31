@@ -224,7 +224,7 @@ test("every illegal camera transition is a no-op: status unchanged and no event 
         const before = await eventCount();
         const decision = await moderation.moderateCamera(report.id, action, REASON.duplicate, null);
 
-        assert.equal(decision, null);
+        assert.equal(decision.kind, "not_found");
         assert.equal(await statusOf(report.id), from, "status must stay unchanged");
         assert.equal(await eventCount(), before, "no event may be recorded for an illegal transition");
       });
@@ -236,7 +236,7 @@ test("moderating a missing camera or a demo record returns null and writes nothi
   const before = await eventCount();
 
   const missing = await moderation.moderateCamera(9999, "approve", REASON.verified, null);
-  assert.equal(missing, null);
+  assert.equal(missing.kind, "not_found");
 
   // H3: demo records are never seeded at runtime. A record can still land in
   // the reserved 'demo' status via a direct database edit, and it must not
@@ -244,7 +244,7 @@ test("moderating a missing camera or a demo record returns null and writes nothi
   const report = await submitReport({ title: "Demo-status camera" });
   await db.prepare("UPDATE cameras SET status = 'demo' WHERE id = ?").bind(report.id).run();
   const decision = await moderation.moderateCamera(report.id, "approve", REASON.verified, null);
-  assert.equal(decision, null, "demo record must not be moderateable");
+  assert.equal(decision.kind, "not_found", "demo record must not be moderateable");
 
   assert.equal(await eventCount(), before);
 });
@@ -446,7 +446,7 @@ test("correction decisions record events and never touch public output", async (
   // Re-deciding an already processed correction is a no-op.
   const before = await eventCount();
   const again = await moderation.moderateCorrection(correctionId, "reject", REASON.duplicate, null);
-  assert.equal(again, null);
+  assert.equal(again.kind, "not_found");
   assert.equal(await eventCount(), before);
 
   // A second correction can be rejected -> rejected + event.
@@ -488,7 +488,7 @@ test("malformed actions and identifiers leave every status untouched", async () 
   const before = await eventCount();
   for (const action of malformed) {
     const decision = await moderation.moderateCamera(report.id, action, REASON.verified, null);
-    assert.equal(decision, null, `action ${JSON.stringify(action)} must be rejected`);
+    assert.equal(decision.kind, "not_found", `action ${JSON.stringify(action)} must be rejected`);
   }
   assert.equal(await statusOf(report.id), "verified");
   assert.equal(await eventCount(), before);

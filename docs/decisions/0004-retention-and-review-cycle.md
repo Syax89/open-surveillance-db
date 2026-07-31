@@ -38,4 +38,4 @@ This ADR updates the earlier values proposed in ADR 0002-legal-pre-launch-delive
 - Contributors and requesters get predictable deletion; the schedule is referenced by the privacy notice.
 - The 30-day rejected window and the 14-day substantive-response SLA align with the appeal path (MODERATION_SLA S5).
 - A cron job and tests are required before launch (new implementation work).
-- The 12-month re-verification cycle is an initial proposal; it must be revisited after the first year of operations with real volumes.
+- The 12-month re-verification cycle is **confirmed as the retention decision (2026-07-31, CEO — see ADR 0007)**; it must still be revisited after the first year of operations with real volumes.

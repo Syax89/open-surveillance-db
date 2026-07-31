@@ -1,6 +1,8 @@
 import { env } from "cloudflare:workers";
 import { createCorrectionRequest } from "../../../db/corrections";
+import { recordRateLimitBlock } from "../../lib/abuse-alerts";
 import { isRecord } from "../../lib/guards";
+import { PayloadTooLargeError, readJsonBody, urlTooLong } from "../../lib/input-limits";
 import { callerKey, checkRateLimit, submissionLimits, submissionsDisabled } from "../../lib/rate-limit";
 
 function cleanText(value: unknown, maxLength: number) {
@@ -8,15 +10,26 @@ function cleanText(value: unknown, maxLength: number) {
 }
 
 export async function POST(request: Request) {
+  // Input limits: reject absurdly long URLs before any parsing work.
+  if (urlTooLong(request)) {
+    return Response.json({ error: "Request URI too long." }, { status: 414 });
+  }
+
   if (submissionsDisabled(env)) {
     console.warn("POST /api/corrections rejected: submissions disabled via POST_SUBMISSIONS_DISABLED");
     return Response.json({ error: "Correction requests are temporarily disabled." }, { status: 503 });
   }
 
   const key = callerKey(request);
-  const limit = checkRateLimit(key, submissionLimits(env));
+  const limitOptions = submissionLimits(env);
+  const limit = checkRateLimit("submit", key, limitOptions);
   if (!limit.allowed) {
-    console.warn(`POST /api/corrections rate limited for caller ${key}`);
+    console.warn("POST /api/corrections rate limited");
+    recordRateLimitBlock(env, {
+      route: "/api/corrections",
+      key,
+      windowSeconds: limitOptions.windowSeconds,
+    });
     return Response.json({ error: "Too many requests. Please try again shortly." }, {
       status: 429,
       headers: { "Retry-After": String(limit.retryAfterSeconds) },
@@ -24,7 +37,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const payload: unknown = await request.json();
+    const payload: unknown = await readJsonBody(request, env);
     if (!isRecord(payload)) return Response.json({ error: "Choose an issue type and provide a short description." }, { status: 400 });
     const rawCameraId = payload.cameraId;
     const cameraId = rawCameraId === "" || rawCameraId === undefined || rawCameraId === null ? null : Number(rawCameraId);
@@ -35,6 +48,10 @@ export async function POST(request: Request) {
     const correction = await createCorrectionRequest({ cameraId, issueType, message, contact });
     return Response.json({ referenceId: correction.id }, { status: 201 });
   } catch (error) {
+    if (error instanceof PayloadTooLargeError) {
+      console.warn("POST /api/corrections payload rejected: body over the configured byte cap");
+      return Response.json({ error: error.message }, { status: error.status });
+    }
     console.error("POST /api/corrections failed", error);
     return Response.json({ error: "Unable to save correction request" }, { status: 500 });
   }

@@ -85,6 +85,13 @@ test("server-rendered homepage carries the public app metadata", async () => {
   // A11y live region for the "loading public records" notice.
   assert.match(html, /role="status"/);
 
+  // Browse acceptance (docs/workstreams/PRODUCT_UX.md): map card and the
+  // accessible directory list must both expose the record ID alongside the
+  // same public fields. Server-rendered demo records make this checkable.
+  const recordIdFields = (html.match(/<dt>Record ID<\/dt>/g) ?? []).length;
+  assert.ok(recordIdFields >= 2, `expected the record ID in the map card and each list card, found ${recordIdFields}`);
+  assert.match(html, /<dt>Record ID<\/dt><dd>1<\/dd>/);
+
   // No starter-template preview may leak into the public page.
   assert.doesNotMatch(html, /codex-preview|sites-skeleton|react-loading-skeleton/i);
   assert.doesNotMatch(html, /Your site is taking shape|Building your site/i);

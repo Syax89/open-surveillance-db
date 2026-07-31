@@ -1,9 +1,36 @@
+import { env } from "cloudflare:workers";
 import { findNearbyPublicCameras } from "../../../../db/cameras";
+import { recordRateLimitBlock } from "../../../lib/abuse-alerts";
+import { urlTooLong } from "../../../lib/input-limits";
+import { callerKey, checkRateLimit, limitsFor } from "../../../lib/rate-limit";
 
 function readNumber(value: string | null) { if (value === null || value.trim() === "") return null; const number = Number(value); return Number.isFinite(number) ? number : null; }
 function readText(value: string | null, maxLength: number) { return typeof value === "string" ? value.trim().slice(0, maxLength) : ""; }
 
 export async function GET(request: Request) {
+  // Input limits: reject absurdly long URLs before any query parsing work.
+  if (urlTooLong(request)) {
+    return Response.json({ error: "Request URI too long." }, { status: 414 });
+  }
+
+  // Rate limits: nearby search is public and cheap to hammer, so it gets its
+  // own bucket independent of the plain read and export buckets.
+  const key = callerKey(request);
+  const limitOptions = limitsFor("nearby", env);
+  const limit = checkRateLimit("nearby", key, limitOptions);
+  if (!limit.allowed) {
+    console.warn("GET /api/cameras/nearby rate limited");
+    recordRateLimitBlock(env, {
+      route: "/api/cameras/nearby",
+      key,
+      windowSeconds: limitOptions.windowSeconds,
+    });
+    return Response.json({ error: "Too many requests. Please try again shortly." }, {
+      status: 429,
+      headers: { "Retry-After": String(limit.retryAfterSeconds) },
+    });
+  }
+
   const query = new URL(request.url).searchParams;
   const latitude = readNumber(query.get("latitude"));
   const longitude = readNumber(query.get("longitude"));

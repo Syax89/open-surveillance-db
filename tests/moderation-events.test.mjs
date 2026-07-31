@@ -93,6 +93,11 @@ test("approve records a full audit event and publishes the record", async () => 
     reasonCode: "verified-public-infrastructure",
     note: "Looks legit",
     actor: "Local moderator",
+    reviewerId: null,
+    actorRole: null,
+    recused: 0,
+    escalated: 0,
+    secondReviewerId: null,
     createdAt: decision.event.createdAt,
   });
   assert.match(decision.event.createdAt, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
@@ -164,7 +169,7 @@ test("invalid transitions return null and write no event", async (t) => {
   for (const [action, reasonCode] of invalidActions) {
     await t.test(`pending + ${action} is a no-op`, async () => {
       const result = await moderation.moderateCamera(camera.id, action, reasonCode, null);
-      assert.equal(result, null);
+      assert.equal(result.kind, "not_found");
       const rows = await eventRows(env);
       assert.equal(rows.length, 0, `${action} on a pending record must not write an event`);
     });
@@ -173,7 +178,7 @@ test("invalid transitions return null and write no event", async (t) => {
   const verified = await moderation.moderateCamera(camera.id, "approve", "verified-public-infrastructure", null);
   assert.ok(verified);
   const rejectFromVerified = await moderation.moderateCamera(camera.id, "reject", "insufficient-evidence", null);
-  assert.equal(rejectFromVerified, null, "reject is only legal from pending");
+  assert.equal(rejectFromVerified.kind, "not_found", "reject is only legal from pending");
   const rows = await eventRows(env);
   assert.equal(rows.length, 1, "only the legal approve transition may be recorded");
 });
@@ -182,7 +187,7 @@ test("unknown ids return null and write no event", async () => {
   const { env, cameras, moderation } = await realDb();
   await resetDb({ env, cameras });
   const result = await moderation.moderateCamera(9999, "approve", "verified-public-infrastructure", null);
-  assert.equal(result, null);
+  assert.equal(result.kind, "not_found");
   assert.equal((await eventRows(env)).length, 0);
 });
 
@@ -266,11 +271,16 @@ test("correction moderation records events and keeps decisions private", async (
     reasonCode: "duplicate",
     note: null,
     actor: "Local moderator",
+    reviewerId: null,
+    actorRole: null,
+    recused: 0,
+    escalated: 0,
+    secondReviewerId: null,
     createdAt: approved.event.createdAt,
   });
 
   const rejected = await moderation.moderateCorrection(request.id, "reject", "insufficient-evidence", null);
-  assert.equal(rejected, null, "a non-pending correction cannot be moderated again");
+  assert.equal(rejected.kind, "not_found", "a non-pending correction cannot be moderated again");
   assert.equal((await eventRows(env)).length, 1, "the failed re-moderation writes nothing");
 
   const queue = await moderation.listPendingModerationItems();

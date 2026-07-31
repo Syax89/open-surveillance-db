@@ -24,7 +24,7 @@ Sources of detection:
 
 - Cloudflare incident notification (per the Cloudflare DPA, art. 33(2) flow — processor notifies us without undue delay);
 - application/monitoring alerts (5xx spikes, unexpected 403/429 patterns, /moderation access anomalies once auth is wired);
-- reports from users, moderators, or third parties (privacy@ mailbox);
+- reports from users, moderators, or third parties (`privacy@opensurveillancedb` mailbox);
 - scheduled internal checks (logs review, moderation audit log review).
 
 Any team member who suspects a breach must report it to the privacy contact **within 1 hour** of suspicion — suspicion is enough; confirmation is the triage step.
