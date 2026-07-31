@@ -1,4 +1,4 @@
-# ADR 0008: Public repository, private security/privacy reporting route, and hosting
+# ADR 0012: Public repository, private security/privacy reporting route, and hosting
 
 - **Status:** accepted
 - **Date:** 2026-07-31
@@ -25,10 +25,10 @@ commitment". This ADR records the decision that makes those concrete.
 
 2. **Private reporting route: SECURITY.md + PGP.** SECURITY.md is the
    private security/privacy reporting route:
-   - it publishes the project PGP public key (`Hermes Agent
-     <hermes@simone.local>`, RSA 4096, fingerprint
-     `993C 105F 654E F8AE 0FF5 50B9 423F F41B FF01 7DF5`, key id
-     `423FF41BFF017DF5`) so reporters can encrypt sensitive payloads;
+   - it publishes the project PGP public key (`OpenSurveillanceDB Security
+     <security@opensurveillancedb>`, RSA 4096, fingerprint
+     `04E8 A3EE 7C72 188B D3AF 925D 496C F0BD 4920 D3F7`, key id
+     `496CF0BD4920D3F7`) so reporters can encrypt sensitive payloads;
    - it points reporters to **GitHub Private Vulnerability Reporting**
      (confidential advisories, enabled on the repo) for vulnerability
      reports;
