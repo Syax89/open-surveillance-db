@@ -159,12 +159,17 @@ async function buildTree() {
 }
 
 // Rewrite the transpiled ESM so it resolves inside the temp tree:
-//   - relative db/* and lib/* imports get an explicit .mjs extension,
+//   - every relative import (./x, ../x, ../../x, ...) gets an explicit .mjs
+//     extension unless it already carries one (the tree mirrors sources as
+//     .mjs at every depth: db/*, app/lib/*, and lib-internal sibling imports
+//     like `./public-status` in app/lib/records.ts),
 //   - the bare `cloudflare:workers` specifier is pointed at the mock module.
 function rewriteSpecifiers(code, workersMockUrl) {
-  let rewritten = code
-    .replace(/(from\s*["'])(\.[^"']*\/db\/[^"']+)(["'])/g, "$1$2.mjs$3")
-    .replace(/(from\s*["'])(\.[^"']*\/lib\/[^"']+)(["'])/g, "$1$2.mjs$3");
+  let rewritten = code.replace(
+    /(from\s*["'])(\.\.?\/[^"']+)(["'])/g,
+    (match, prefix, specifier, suffix) =>
+      specifier.endsWith(".mjs") ? match : `${prefix}${specifier}.mjs${suffix}`,
+  );
   if (workersMockUrl) {
     rewritten = rewritten.replace(
       /from\s*["']cloudflare:workers["']/g,

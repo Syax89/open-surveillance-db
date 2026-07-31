@@ -108,7 +108,7 @@ test("a fresh database starts empty: no demo records are seeded at runtime", asy
 test("the public camera query returns only verified and demo records", async () => {
   const { env, cameras } = await realDb();
   await resetDb({ env, cameras });
-  const statuses = ["pending", "needs_review", "rejected", "removed", "verified", "demo"];
+  const statuses = ["pending", "needs_review", "rejected", "removed", "stale", "verified", "demo"];
   for (const status of statuses) {
     await insertCamera(env, { title: `Record ${status}`, status });
   }
@@ -118,7 +118,7 @@ test("the public camera query returns only verified and demo records", async () 
   assert.deepEqual(
     returned.map((record) => record.status).sort(),
     ["demo", "verified"],
-    "pending/needs_review/rejected/removed must never cross the public boundary",
+    "pending/needs_review/rejected/removed/stale must never cross the public boundary",
   );
 });
 
