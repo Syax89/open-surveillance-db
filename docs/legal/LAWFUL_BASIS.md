@@ -29,7 +29,7 @@ This assessment covers those operations. Where a record is republished from an o
 |-----------|----------------------|-------|------------------------|
 | Collect & store reports (pending) | Location, description, optional metadata, notes, pseudonymous ID | 6(1)(f) | Needed to run a community-sourced civic map; pseudonymous IDs; private by default; 90-day retention |
 | Moderate (screen/verify/decide) | Report content, evidence, reviewer pseudonym | 6(1)(f) | Two-person review for sensitive records; audit log pseudonymous; never public |
-| Publish verified records + exports (ODbL) | Generally **not personal data** (infrastructure) | 6(1)(f) / 6(1)(e) | Per-field opt-in for `manufacturer`/`observedOn`; least-specific location; no images until redaction workflow exists |
+| Publish verified records + exports (ODbL) | Generally **not personal data** (infrastructure) | 6(1)(f) / 6(1)(e) | Per-field opt-in for `manufacturer`/`observedOn`; least-specific location (**~4-decimal default**, decision 2026-07-31); no images until redaction workflow exists |
 | Handle correction/takedown requests | Requester contact data | 6(1)(c) + 6(1)(f) | Needed to comply with arts. 15-22; identity verification proportionate |
 | Security & abuse prevention | IP-level rate limiting (no logs retained), submissions metadata | 6(1)(f) | No behavioural advertising; rate limiting per H2 |
 | Moderator authentication | Email/name via ChatGPT sign-in | 6(1)(f) | Never logged, never stored; session-only (M4) |
@@ -45,7 +45,7 @@ This assessment covers those operations. Where a record is republished from an o
 | Factor | Assessment |
 |--------|-----------|
 | Controller/third-party interest | Strong, public-interest purpose (non-commercial, community-governed) |
-| Impact on data subjects | **Low**: records concern infrastructure, not persons; no images, plates, faces, private interiors; least-specific coordinates; per-field opt-in for `manufacturer`/`observedOn`; no live video, no credentials, no operational detail |
+| Impact on data subjects | **Low**: records concern infrastructure, not persons; no images, plates, faces, private interiors; least-specific coordinates (**~4 decimal places by default**, decision 2026-07-31); per-field opt-in for `manufacturer`/`observedOn`; no live video, no credentials, no operational detail |
 | Reasonable expectations | A camera on a public street is observable by anyone; its existence is not private information |
 | Safeguards | Human moderation before publication; retention schedule; correction/removal path with SLA; appeals with independent reviewer; no tracking/ads; ODbL licensing |
 | Residual risk | Low, provided the safeguards are implemented (see review findings H1-H4) |
@@ -86,5 +86,5 @@ Not intentionally collected. Incidental capture in evidence (faces, plates, inte
 ## 6. Open items before launch
 
 - [ ] Final legal review per operating jurisdiction (start: IT, DE per ../MODERATION.md M5).
-- [ ] Confirm controller entity and contacts (PRIVACY_NOTICE.md § 1, 9).
+- [x] Controller entity and privacy contact decided (2026-07-31): **Simone Rondina (syax89) / OpenSurveillanceDB — Italy**; `privacy@opensurveillancedb` (mailbox to be provisioned before launch).
 - [ ] Record the LIA sign-off in the governance log (ADR 0002).

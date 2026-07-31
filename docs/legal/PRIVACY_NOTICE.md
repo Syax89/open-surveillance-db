@@ -1,8 +1,8 @@
 # Privacy notice (draft — pre-launch)
 
-- **Status:** draft for pre-launch review; decisions of 2026-07-31 applied (data licence ODbL 1.0, coordinate precision ~4 decimals, 12-month retention renewal, privacy contact `privacy@opensurveillancedb`); controller entity still to be finalised at launch.
+- **Status:** draft for pre-launch review; decisions of 2026-07-31 applied (controller entity, data licence ODbL 1.0, coordinate precision ~4 decimals, 12-month retention renewal, privacy contact `privacy@opensurveillancedb`); monitored mailbox to be provisioned before launch.
 - **Legal basis:** GDPR art. 13 (data collected from data subjects) and art. 14 (data not obtained from the data subject, e.g. records sourced from official public sources); D.Lgs. 196/2003 (Codice Privacy, IT) as primary jurisdiction.
-- **Version:** 0.2 (2026-07-31) — this document is a draft deliverable, not a published notice.
+- **Version:** 0.3 (2026-07-31) — controller entity added (decision 2026-07-31); this document is a draft deliverable, not a published notice.
 
 > **Disclaimer:** this document is product guidance / not legal advice. It is a draft for pre-launch review and requires external counsel review before launch.
 
@@ -10,7 +10,7 @@
 
 ## 1. Who we are (controller)
 
-- **Controller:** OpenSurveillanceDB Ltd. — *placeholder entity; community governance to be confirmed before launch (see ../GOVERNANCE.md).*
+- **Controller:** Simone Rondina (syax89) / OpenSurveillanceDB — Italy (decision 2026-07-31; governance owners in ../GOVERNANCE.md).
 - **Privacy contact / data-protection contact:** `privacy@opensurveillancedb` *(dedicated mailbox — to be created before launch; final domain to be confirmed)* — for any question, data-subject request, or report. Response time: see § 8.
 
 ## 2. What the service does
@@ -93,10 +93,11 @@ You may request, free of charge:
 - [x] Publication precision: coordinates rounded to **~4 decimal places (~10 m)**; exact detail private to moderators (decision 2026-07-31).
 - [x] Retention of verified records: **12 months with renewal** (decision 2026-07-31).
 - [x] Correction/removal contact: `privacy@opensurveillancedb` + private form (decision 2026-07-31; mailbox to be created at launch).
-- [ ] Confirm the final controller entity (sections 1 and 9) — the mailbox decision is made; only the domain and creation remain.
+- [x] Controller entity: **Simone Rondina (syax89) / OpenSurveillanceDB, Italy** (decision 2026-07-31).
+- [ ] Provision the monitored mailbox `privacy@opensurveillancedb` (ops) before the address is published (ADR 0007).
 - [ ] Confirm the applicable SCC version at DPA execution (new-generation SCCs announced for adoption in 2025 — see PROCESSOR_REGISTER.md open items).
 - [ ] Per-jurisdiction review (see LAWFUL_BASIS.md § 6) and external counsel review.
 
 ---
 
-*Draft note: the 2026-07-31 decisions (ODbL 1.0, coordinate precision, 12-month retention renewal, privacy contact) are applied. The final notice still requires confirmation of the controller entity and per-jurisdiction review (see LAWFUL_BASIS.md § 6) before public launch.*
+*Draft note: the 2026-07-31 decisions (ODbL 1.0, coordinate precision, 12-month retention renewal, privacy contact, controller entity) are applied. The final notice still requires provisioning of the monitored mailbox, per-jurisdiction review (see LAWFUL_BASIS.md § 6), and external counsel review before public launch.*

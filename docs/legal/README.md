@@ -36,7 +36,7 @@ are product/UX deliverables; they are linked here only for discoverability.
 
 ## Open items before launch (not owned by this folder)
 
-- Confirm the controller identity and the public privacy contact (DEPLOYMENT.md
+- Controller identity decided (2026-07-31): **Simone Rondina (syax89) / OpenSurveillanceDB — Italy**; privacy mailbox `privacy@opensurveillancedb` to be provisioned before the address is published (DEPLOYMENT.md
   "Preconditions for a public environment").
 - Translate the privacy notice into Italian before launch (primary
   jurisdiction; GDPR art. 12(1) "clear and plain language") — see

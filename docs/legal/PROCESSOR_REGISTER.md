@@ -21,7 +21,7 @@
 ## 2. International transfers (Cap. V GDPR) — assessment summary
 
 ### Cloudflare (PR1)
-- **Transfer instrument:** Cloudflare DPA (**v6.3, June 2025**) with **EU Standard Contractual Clauses (2021/914)** — controller-to-processor and processor-to-processor modules as applicable; DPA executed by the controller (placeholder entity) before launch. **EU–US Data Privacy Framework:** Cloudflare is DPF-certified; the DPF is recorded as an additional transfer ground (the SCCs alone are sufficient; DPF strengthens the transfer assessment).
+- **Transfer instrument:** Cloudflare DPA (**v6.3, June 2025**) with **EU Standard Contractual Clauses (2021/914)** — controller-to-processor and processor-to-processor modules as applicable; DPA executed by the controller (**Simone Rondina (syax89) / OpenSurveillanceDB**) before launch. **EU–US Data Privacy Framework:** Cloudflare is DPF-certified; the DPF is recorded as an additional transfer ground (the SCCs alone are sufficient; DPF strengthens the transfer assessment).
 - **Supplementary measures (TIA summary):** data at rest in D1 pinned to `weur` (Western Europe); TLS for all traffic; Workers edge execution minimises data transfer (dynamic app, not bulk data); no long-term backup export (R2 null → no US-resident backup copies beyond provider rotation); Cloudflare's published sub-processor list and incident-notification commitments accepted in the DPA.
 - **Residual risk:** low for the dataset described (mostly non-personal infrastructure data + pseudonymous contributor metadata). Reassessed annually.
 
@@ -38,8 +38,9 @@
 
 ## 4. Open items before launch
 
-- [ ] Execute Cloudflare DPA (SCC) with the confirmed controller entity; pin D1 region `weur`.
+- [ ] Execute Cloudflare DPA (SCC) with the controller (**Simone Rondina (syax89) / OpenSurveillanceDB**); pin D1 region `weur`.
 - [ ] **Confirm the applicable SCC version at DPA execution:** the Commission has announced a new generation of SCCs (public consultation Q4 2024; adoption announced for 2025) to replace the 2021/914 clauses. The register and the DPA must reference the SCC version in force at signature.
 - [ ] Wire ChatGPT auth to `/moderation` (fixes H1) and verify the identity attributes actually received (name fields may be null).
 - [ ] Confirm whether Cloudflare's sub-processor list changes require an updated review at contract signature.
 - [ ] Choose and assess the production map-tile provider (H5).
+- [ ] Revise this register and PRIVACY_NOTICE § 5 per ADR 0008: the pilot runtime is self-hosted (LXC 114, Italy) and Cloudflare returns to a future precondition — to be completed before the pilot hosts real data.
