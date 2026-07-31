@@ -37,14 +37,14 @@ Last reviewed: 2026-07-31
 - [ ] Image upload, secure storage, EXIF stripping, and redaction tooling.
 - [ ] Legal/privacy review and public-facing terms.
 - [ ] A production map-tile strategy compliant with provider terms.
-- [ ] Public deployment, domain, backup/restore drills, and monitoring.
+- [ ] Public deployment, domain, backup/restore drills, and monitoring — remains a future precondition, see `docs/DEPLOYMENT.md`.
 - [ ] Android application.
 
 The checked items describe local prototype capability only. They do not mean the service is ready to collect or publish real surveillance-camera data.
 
 ## Local test deployment (LXC 114)
 
-- [x] Always-on test site on Proxmox LXC 114 `osdb-test` → http://192.168.1.201:3000 (LAN only).
+- [x] **Current local environment**: always-on test site on Proxmox LXC 114 `osdb-test` → http://192.168.1.201:3000 (LAN only).
 - [x] systemd unit `osdb-test.service` (`vinext dev` in workerd, `Restart=on-failure`, enabled) and `onboot=1` on the container.
 - [x] Runtime decision documented: `vinext start` cannot run on plain Node (`ERR_UNSUPPORTED_ESM_URL_SCHEME` on `cloudflare:`), see `docs/DEPLOYMENT.md`.
 - [x] Verified: `/` 200, `/api/cameras` 200 (demo-only records, no `notes`), `/api/cameras/nearby` 200, `/guide` 200, `/api/moderation` 503 fail-closed, `/api/corrections` GET 405.
