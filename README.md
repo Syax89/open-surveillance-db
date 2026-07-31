@@ -71,6 +71,10 @@ npm run dev
 
 Open `http://localhost:3000`. The application seeds two explicitly labelled demo pins when the local database is empty.
 
+For a complete walkthrough of a clean local setup — prerequisites, schema
+migrations, synthetic fixtures, and a safe non-destructive reset — read
+[docs/DEVELOPMENT_SETUP.md](docs/DEVELOPMENT_SETUP.md).
+
 For local moderation testing, open `http://localhost:3000/moderation`. This route is intentionally not linked from the public prototype and has no production authentication yet.
 
 For a complete fictional-data workflow—submission, approval/rejection/hiding,

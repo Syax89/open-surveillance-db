@@ -106,6 +106,9 @@ public field across JSON, CSV, and GeoJSON outputs, and an
 [export versioning policy](EXPORT_VERSIONING.md) defines how future dataset
 releases will be versioned, labelled, and cited once the final data licence
 is decided.
+A clean local setup, schema migration, synthetic fixture, and non-destructive
+reset process is now documented in
+[DEVELOPMENT_SETUP.md](DEVELOPMENT_SETUP.md) (all commands verified on `main`).
 
 ### Planned work
 

@@ -8,7 +8,10 @@ npm run dev
 npm run build
 ```
 
-The default local database is seeded with demo pins. Do not load real reports into a development machine or demo deployment.
+The default local database is seeded with demo pins. Do not load real reports
+into a development machine or demo deployment. For the full clean-setup
+walkthrough — schema migrations, synthetic fixtures, and the non-destructive
+local reset — see [DEVELOPMENT_SETUP.md](DEVELOPMENT_SETUP.md).
 
 ## Preconditions for a public environment
 

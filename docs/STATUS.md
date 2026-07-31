@@ -34,6 +34,9 @@ Last reviewed: 2026-07-31
   ([`docs/DATA_DICTIONARY.md`](DATA_DICTIONARY.md),
   [`docs/EXPORT_VERSIONING.md`](EXPORT_VERSIONING.md)); versioned releases
   remain future work pending the final data licence.
+- [x] Documented clean local setup, schema migrations, synthetic fixtures, and
+  non-destructive local reset (`docs/DEVELOPMENT_SETUP.md`, commands verified
+  on `main`).
 - [x] Initial open documentation and project policies.
 
 ## Not yet implemented
