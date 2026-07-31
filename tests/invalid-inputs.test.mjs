@@ -269,8 +269,10 @@ test("POST /api/corrections ignores unknown and prototype keys", async () => {
 
 test("PATCH /api/moderation ignores privilege-like extra keys in the body", async () => {
   stub("moderateCamera", async (id) => ({
+    kind: "ok",
     item: { id, status: "verified" },
     event: { id: 1 },
+    queue: { id: 10 },
   }));
   const { PATCH } = await moderationRoute();
   const response = await PATCH(
@@ -282,6 +284,7 @@ test("PATCH /api/moderation ignores privilege-like extra keys in the body", asyn
         action: "approve",
         reasonCode: "verified-public-infrastructure",
         note: "ok",
+        actorId: 2,
         admin: true,
         role: "root",
         force: true,
@@ -293,7 +296,7 @@ test("PATCH /api/moderation ignores privilege-like extra keys in the body", asyn
   const [args] = callArgs("moderateCamera");
   assert.deepEqual(
     args,
-    [3, "approve", "verified-public-infrastructure", "ok", { publishManufacturer: false, publishObservedOn: false }],
+    [3, "approve", "verified-public-infrastructure", "ok", { publishManufacturer: false, publishObservedOn: false }, { actorId: 2 }],
     "only the documented moderation arguments may reach the db layer",
   );
 });

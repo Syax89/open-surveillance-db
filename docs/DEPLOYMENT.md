@@ -258,4 +258,3 @@ key (never the raw IP) and never request bodies or query strings (see
 `docs/workstreams/OPS_OPEN.md` §Observability). For a public deployment that
 needs global or long-window limits, replace the in-memory limiter with the
 hosting platform's edge rate-limiting product or a KV/DO-backed counter.
->>>>>>> f8d6eed (feat(api,ops): per-route rate limits, input caps, and abuse alerts (Wave B))

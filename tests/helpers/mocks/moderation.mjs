@@ -11,6 +11,7 @@ export const moderationReasonCodes = [
   "private-or-sensitive-location",
   "inaccurate-or-outdated",
   "privacy-or-safety-concern",
+  "requires-senior-review",
   "other",
 ];
 

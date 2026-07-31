@@ -7,8 +7,10 @@ import {
   type CorrectionModerationAction,
   type CorrectionModerationOptions,
   type MetadataPublicationChoices,
+  type ModerationContext,
   type ModerationEntity,
   type ModerationReasonCode,
+  type ModerationResult,
   moderationReasonCodes,
 } from "../../../db/moderation";
 import { recordRateLimitBlock } from "../../lib/abuse-alerts";
@@ -28,7 +30,14 @@ const correctionOutcomeValues = [
 ] as const;
 type CorrectionOutcomeValue = (typeof correctionOutcomeValues)[number];
 
-function parseModerationRequest(value: unknown):
+const queueSensitivities = ["standard", "sensitive", "urgent"] as const;
+type QueueSensitivity = (typeof queueSensitivities)[number];
+
+function isQueueSensitivity(value: unknown): value is QueueSensitivity {
+  return typeof value === "string" && (queueSensitivities as readonly string[]).includes(value);
+}
+
+type ParsedModerationRequest =
   | {
       entity: "camera";
       id: number;
@@ -36,6 +45,7 @@ function parseModerationRequest(value: unknown):
       reasonCode: ModerationReasonCode;
       note: string | null;
       metadataPublication?: MetadataPublicationChoices;
+      context: ModerationContext;
     }
   | {
       entity: "correction";
@@ -44,20 +54,36 @@ function parseModerationRequest(value: unknown):
       reasonCode: ModerationReasonCode;
       note: string | null;
       options?: CorrectionModerationOptions;
+      context: ModerationContext;
     }
-  | null {
+  | null;
+
+function parseModerationRequest(value: unknown): ParsedModerationRequest {
   if (!isRecord(value)) return null;
+
+  // Whitelist of lifecycle actions, kept next to the parser that enforces it.
+  const cameraActions: CameraModerationAction[] = [
+    "approve",
+    "reject",
+    "hide",
+    "mark-stale",
+    "reverify",
+    "escalate",
+  ];
+  const correctionActions: CorrectionModerationAction[] = ["approve", "reject", "associate", "escalate"];
 
   const entity = value.entity as ModerationEntity;
   const id = value.id;
   const action = value.action;
   const reasonCode = value.reasonCode;
   const note = value.note;
+  const actorId = value.actorId;
   const cameraId = value.cameraId;
   const outcome = value.outcome;
   const publishManufacturer = value.publishManufacturer;
   const publishObservedOn = value.publishObservedOn;
   if (typeof id !== "number" || !Number.isInteger(id) || id < 1) return null;
+  if (typeof actorId !== "number" || !Number.isInteger(actorId) || actorId < 1) return null;
   if (
     typeof reasonCode !== "string" ||
     !moderationReasonCodes.includes(reasonCode as ModerationReasonCode)
@@ -71,25 +97,46 @@ function parseModerationRequest(value: unknown):
   ) {
     return null;
   }
+  if (value.sensitivity !== undefined && !isQueueSensitivity(value.sensitivity)) return null;
+  if (value.assigneeId !== undefined) {
+    if (
+      typeof value.assigneeId !== "number" ||
+      !Number.isInteger(value.assigneeId) ||
+      value.assigneeId < 1
+    ) {
+      return null;
+    }
+  }
+  if (value.recused !== undefined && typeof value.recused !== "boolean") return null;
+  if (value.requiresSecondReview !== undefined && typeof value.requiresSecondReview !== "boolean") {
+    return null;
+  }
 
   const parsedReasonCode = reasonCode as ModerationReasonCode;
   const parsedNote = typeof note === "string" && note.trim() ? note.trim() : null;
+  const context = {
+    actorId,
+    ...(value.sensitivity !== undefined ? { sensitivity: value.sensitivity as QueueSensitivity } : {}),
+    ...(value.assigneeId !== undefined ? { assigneeId: value.assigneeId as number } : {}),
+    ...(value.recused !== undefined ? { recused: value.recused as boolean } : {}),
+    ...(value.requiresSecondReview !== undefined
+      ? { requiresSecondReview: value.requiresSecondReview as boolean }
+      : {}),
+  };
+
   if (entity === "camera") {
     if (cameraId !== undefined || outcome !== undefined) return null;
-    if (
-      action === "approve" ||
-      action === "reject" ||
-      action === "hide" ||
-      action === "mark-stale" ||
-      action === "reverify"
-    ) {
-      if (action !== "approve" && (publishManufacturer !== undefined || publishObservedOn !== undefined)) {
+    if (cameraActions.includes(action as CameraModerationAction)) {
+      if (
+        action !== "approve" &&
+        (publishManufacturer !== undefined || publishObservedOn !== undefined)
+      ) {
         return null;
       }
       return {
         entity,
         id,
-        action,
+        action: action as CameraModerationAction,
         reasonCode: parsedReasonCode,
         note: parsedNote,
         ...(action === "approve"
@@ -100,13 +147,14 @@ function parseModerationRequest(value: unknown):
               },
             }
           : {}),
+        context,
       };
     }
     return null;
   }
   if (entity === "correction") {
     if (publishManufacturer !== undefined || publishObservedOn !== undefined) return null;
-    if (action !== "approve" && action !== "reject" && action !== "associate") return null;
+    if (!correctionActions.includes(action as CorrectionModerationAction)) return null;
     if (
       cameraId !== undefined &&
       (typeof cameraId !== "number" || !Number.isInteger(cameraId) || cameraId < 1)
@@ -129,10 +177,11 @@ function parseModerationRequest(value: unknown):
     return {
       entity,
       id,
-      action,
+      action: action as CorrectionModerationAction,
       reasonCode: parsedReasonCode,
       note: parsedNote,
       ...(Object.keys(options).length > 0 ? { options } : {}),
+      context,
     };
   }
   return null;
@@ -163,8 +212,46 @@ function moderationLimit(request: Request) {
   return null;
 }
 
+/** Map the discriminated moderation result to an HTTP response with a stable body. */
+function moderationResponse(
+  entity: ModerationEntity,
+  result: ModerationResult<unknown>,
+): Response {
+  switch (result.kind) {
+    case "ok":
+    case "recused":
+      return Response.json({ entity, ...result });
+    case "second_review_pending":
+      return Response.json({ entity, ...result }, { status: 202 });
+    case "not_found":
+      return Response.json(
+        { error: "Item not found or action is not valid for its current status." },
+        { status: 404 },
+      );
+    case "forbidden":
+      return Response.json(
+        { error: "Your role does not permit this action on this item." },
+        { status: 403 },
+      );
+    case "actor_not_found":
+      return Response.json({ error: "Reviewer not found." }, { status: 404 });
+    case "actor_inactive":
+      return Response.json({ error: "Reviewer is inactive." }, { status: 403 });
+    case "second_review_same_reviewer":
+      return Response.json(
+        { error: "A second reviewer different from the first is required." },
+        { status: 409 },
+      );
+    case "escalation_requires_note":
+      return Response.json(
+        { error: "Escalation requires a note explaining the reason." },
+        { status: 400 },
+      );
+  }
+}
+
 export async function GET(request: Request) {
-  // Input limits: reject absurdly long URLs before any parsing work.
+  // Input limits: reject absurdly long URLs before any query parsing work.
   if (urlTooLong(request)) {
     return Response.json({ error: "Request URI too long." }, { status: 414 });
   }
@@ -198,13 +285,13 @@ export async function PATCH(request: Request) {
       return Response.json(
         {
           error:
-            "Provide a valid entity, positive integer id, permitted action, reasonCode, and optional note of at most 500 characters.",
+            "Provide a valid entity, positive integer id, permitted action, reasonCode, actorId, and optional note of at most 500 characters.",
         },
         { status: 400 },
       );
     }
 
-    const item =
+    const result =
       payload.entity === "camera"
         ? await moderateCamera(
             payload.id,
@@ -212,21 +299,17 @@ export async function PATCH(request: Request) {
             payload.reasonCode,
             payload.note,
             payload.metadataPublication,
+            payload.context,
           )
-        : payload.options
-          ? await moderateCorrection(
-              payload.id,
-              payload.action,
-              payload.reasonCode,
-              payload.note,
-              payload.options,
-            )
-          : await moderateCorrection(payload.id, payload.action, payload.reasonCode, payload.note);
-    if (!item) {
-      return Response.json({ error: "Item not found or action is not valid for its current status." }, { status: 404 });
-    }
-
-    return Response.json({ entity: payload.entity, item: item.item, event: item.event });
+        : await moderateCorrection(
+            payload.id,
+            payload.action,
+            payload.reasonCode,
+            payload.note,
+            payload.options,
+            payload.context,
+          );
+    return moderationResponse(payload.entity, result);
   } catch (error) {
     if (error instanceof PayloadTooLargeError) {
       console.warn("PATCH /api/moderation payload rejected: body over the configured byte cap");
