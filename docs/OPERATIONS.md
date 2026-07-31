@@ -2,7 +2,8 @@
 
 Stato: draft operativo per la messa in produzione.
 Riferimenti: `docs/DEPLOYMENT.md` (precondizioni e release procedure), `docs/STATUS.md`.
-Ultima verifica procedure: 2026-07-31 (Ken, CI/CD).
+Ultima verifica procedure: 2026-08-01 (Ken, CI/CD) — incluso drill operatività
+locale LXC 114 (sezione 8 e appendice).
 
 Questo documento soddisfa la precondizione di operatività di `DEPLOYMENT.md`:
 "Automated backups, restoration drill, monitoring, error alerting, and incident
@@ -317,6 +318,124 @@ Prima del primo deploy di produzione, confermare (barrare quando fatto):
 
 ---
 
+## 8. Operatività del deploy locale (LXC 114, `osdb-test`)
+
+Questa sezione documenta le procedure **testate** per l'ambiente locale
+attualmente attivo: Proxmox container **114** `osdb-test`, IP
+`192.168.1.201:3000`, LAN only. È l'ambiente di riferimento per le verifiche
+di staging (DEPLOYMENT.md §"Local LXC deployment").
+
+### 8.0 Accesso al container: via Proxmox API, non SSH
+
+- La deploy key documentata in DEPLOYMENT.md **non è mai stata iniettata** al
+  `vzcreate` (verificato sul task log del 2026-07-31 17:01) e lo schema API
+  non consente di aggiungere `ssh-public-keys`/`password` post-create.
+- Tutte le operazioni (snapshot, rollback, backup, stop/start) usano il
+  **token API Proxmox**, decifrato a runtime dal vault GPG locale
+  (`~/.hermes/secrets/proxmox-token.gpg`) — mai hardcoded negli script.
+- Prerequisito sulla macchina che esegue gli script: `gpg` con la chiave del
+  vault, `curl`, `python3`.
+
+### 8.1 Health check periodico (monitoraggio)
+
+Script: `ops/health-check.sh`
+
+```bash
+# manuale
+ops/health-check.sh
+# cron (workstation): ogni 5 minuti
+*/5 * * * * /home/simone/workspace/open-surveillance-db/ops/health-check.sh >> /home/simone/logs/osdb-health.log 2>&1
+```
+
+Route verificate (attese → significato):
+
+| Check | URL | Atteso |
+|---|---|---|
+| homepage | `GET /` | `200` |
+| API pubblica | `GET /api/cameras` | `200` |
+| geospatial | `GET /api/cameras/nearby?...` | `200` |
+| guide | `GET /guide` | `200` |
+| moderazione | `GET /api/moderation` | `503` (fail-closed, mai `200` senza credenziali) |
+
+Exit code 0 = tutto OK; exit code 1 = almeno una route fuori soglia. In caso
+di fallimento lo script crea il marker `/tmp/osdb-health-FAIL` (utile per un
+watchdog) e il log in `/home/simone/logs/osdb-health.log` riporta il dettaglio.
+Il job è installato nel crontab della workstation di Ken (vedi sopra).
+
+### 8.2 Backup automatizzato (vzdump → storage NAS)
+
+Script: `ops/backup-lxc114.sh`
+
+```bash
+# manuale
+ops/backup-lxc114.sh
+# cron (workstation): ogni notte alle 02:30
+30 2 * * * /home/simone/workspace/open-surveillance-db/ops/backup-lxc114.sh >> /home/simone/logs/osdb-backup.log 2>&1
+```
+
+Cosa fa (tutto via API Proxmox):
+
+1. Lancia `vzdump` del container 114 in **snapshot mode** (nessun downtime)
+   sullo storage CIFS **NAS** (configurato su pve: `content=images,backup`),
+   compressione `zstd`, `prune-backups=keep-last=7` (ritenzione 7 backup).
+2. Attende il completamento del task (poll fino a 30 min) e controlla
+   `exitstatus=OK`.
+3. Verifica via API storage content che l'archivio
+   `NAS:backup/vzdump-lxc-114-<data>_<ora>.tar.zst` sia elencato e stampa il
+   numero totale di archivi conservati.
+
+Il database D1 dell'app (`.wrangler/state/v3/d1/.../*.sqlite`) vive nella
+rootfs del container e **è incluso** nell'archivio vzdump (verificato: file
+estratto e letto con `PRAGMA integrity_check` ok, tabelle `cameras`,
+`correction_requests`, `moderation_events`).
+
+### 8.3 Procedura di restore (disaster recovery)
+
+Dall'archivio vzdump più recente sul NAS:
+
+```bash
+# 1. individuare l'archivio sul NAS
+smbclient //192.168.1.194/NAS -U Simone -c 'cd dump; ls vzdump-lxc-114-*'
+# 2. estrarre il D1 sqlite (esempio)
+zstd -dc vzdump-lxc-114-<DATA>_<ORA>.tar.zst | tar -xf - -C /tmp \
+  ./opt/open-surveillance-db/.wrangler/state/v3/d1/miniflare-D1DatabaseObject/<hash>.sqlite
+# 3. verificare integrità
+python3 -c "import sqlite3;c=sqlite3.connect('<file>');print(c.execute('PRAGMA integrity_check').fetchone())"
+```
+
+Restore **completo** del container (sostituzione): creare un nuovo container
+dall'archivio con `pct restore` (o via API) oppure rollback allo snapshot
+pre-deploy (sezione 8.4) — che ripristina anche i file non in DB.
+
+### 8.4 Rollback (snapshot del deploy precedente)
+
+Due script complementari:
+
+```bash
+# PRIMA di ogni deploy: crea lo snapshot pre-deploy (rollback base)
+ops/snapshot-pre-deploy.sh                 # nome default pre-deploy-YYYYMMDD-HHMMSS
+# IN CASO DI PROBLEMI: rollback a quello snapshot + riavvio + health check
+ops/rollback-lxc114.sh pre-deploy-20260801-003428
+```
+
+Comportamento verificato del rollback Proxmox:
+
+- L'API rollback ferma il container, ripristina il disco dallo snapshot e
+  **non lo riavvia da solo**: `rollback-lxc114.sh` gestisce stop→rollback→
+  start→wait→health check in sequenza.
+- Dopo il rollback l'health check completo (8.1) deve dare 5/5 OK prima di
+  dichiarare risolto l'incidente (vedi runbook §4.3, step Verify).
+
+### 8.5 Note di sicurezza
+
+- Nessun segreto negli script: il token Proxmox è nel vault GPG locale
+  (`~/.hermes/secrets/proxmox-token.gpg`, chmod 600), decifrato a runtime.
+- Gli archivi vzdump contengono l'intera rootfs del container (incluso il D1
+  con eventuali richieste di correzione): storage NAS privato, accesso
+  ristretto, mai su canali pubblici.
+
+---
+
 ## Appendice: comandi verificati
 
 Tutte le verifiche eseguite il 2026-07-31 da Ken, in locale, su `main`
@@ -336,6 +455,28 @@ Tutte le verifiche eseguite il 2026-07-31 da Ken, in locale, su `main`
 | 10 | cifratura backup | `openssl enc -aes-256-cbc -salt -pbkdf2 ...` + decrypt | roundtrip OK (`cmp` identico), `sha256sum` verificato |
 | 11 | workflow YAML | `python3 -c "yaml.safe_load(...)"` su `ops-monitoring.yml`, `ops-backup.yml` | entrambi validi (`jobs: health-check`, `jobs: backup`) |
 | 12 | advisory | `GHSA-36p8-mvp6-cv38` (CVE-2026-0933, command injection in `wrangler pages deploy`) | **non applicabile**: patch in 4.59.1, repo su 4.118.0 |
+
+### Appendice — drill operatività locale LXC 114 (2026-08-01, Ken)
+
+Tutte le prove eseguite in ambiente reale (workstation Ken → Proxmox
+192.168.1.77 → container 114 → storage NAS 192.168.1.194):
+
+| # | Procedura | Comando / script | Esito reale |
+|---|---|---|---|
+| L1 | health check route | `ops/health-check.sh` | 5/5 OK (`/` 200, `/api/cameras` 200, nearby 200, `/guide` 200, `/api/moderation` 503) |
+| L2 | snapshot pre-deploy | `ops/snapshot-pre-deploy.sh` | snapshot `pre-deploy-20260801-002440` creato (UPID vzsnapshot) |
+| L3 | backup vzdump→NAS | `ops/backup-lxc114.sh` | `vzdump-lxc-114-2026_08_01-00_34_31.tar.zst` 1.02 GB su `NAS:backup/`, task OK in 40s, verificato via storage content API (2 archivi, keep=7) |
+| L4 | contenuto backup | estrazione D1 sqlite da archivio | `PRAGMA integrity_check` = `ok`; tabelle `cameras`(4), `correction_requests`(2), `moderation_events`(0) |
+| L5 | rollback | `ops/rollback-lxc114.sh pre-deploy-20260801-003428` | rollback UPID vzrollback TASK OK; container fermato da Proxmox → riavvio → sito su in 40s → health check 5/5 OK |
+| L6 | dati post-rollback | `GET /api/cameras` | 2 record `demo` serviti (dati preservati) |
+| L7 | cron | `crontab -l` | `*/5 * * * * ops/health-check.sh` e `30 2 * * * ops/backup-lxc114.sh` installati |
+
+Note emerse dal drill (già incorporate in §8):
+
+- Il rollback Proxmox ferma il container e non lo riavvia da solo → lo script
+  fa start esplicito + attesa + health check (§8.4).
+- `ssh-public-keys` e `password` non sono ammessi dal PUT config LXC (schema
+  API: "property is not defined in schema") → accesso via API token, §8.0.
 
 Note per il prossimo drill:
 
