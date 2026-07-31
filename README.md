@@ -66,10 +66,17 @@ Requirements: Node.js 22.13 or newer.
 
 ```bash
 npm install
+npm run db:migrate   # apply the Drizzle schema migrations to a fresh local DB
 npm run dev
 ```
 
-Open `http://localhost:3000`. The application seeds two explicitly labelled demo pins when the local database is empty.
+Open `http://localhost:3000`. The database starts empty — no demo rows are
+inserted at runtime. For the two labelled illustrative pins used in manual
+checks, run the optional, separate demo seed:
+
+```bash
+npm run db:seed
+```
 
 For a complete walkthrough of a clean local setup — prerequisites, schema
 migrations, synthetic fixtures, and a safe non-destructive reset — read

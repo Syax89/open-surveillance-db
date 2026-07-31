@@ -33,9 +33,14 @@ For the full clean-setup walkthrough — prerequisites, schema migrations,
 synthetic fixtures, and the non-destructive reset procedure — see
 [DEVELOPMENT_SETUP.md](DEVELOPMENT_SETUP.md).
 
-The local database creates two explicitly labelled `demo` records when it is
-empty. They are fictional pins used to show the interface; they are not claims
-about real cameras.
+The local database starts **empty**: the schema comes from the Drizzle
+migrations and no demo rows are inserted at runtime. If you want the two
+clearly labelled `demo` pins used to show the interface (they are fictional
+and not claims about real cameras), run the optional, separate seed first:
+
+```bash
+npm run db:seed
+```
 
 ## Create a safe test report
 
@@ -154,7 +159,8 @@ Treat it as data even in a prototype.
 3. Prefer creating a fresh workspace copy for a clean exercise instead of
    erasing the existing state.
 4. If a maintainer intentionally clears local state, restart the server and
-   verify that only the two labelled demo records are recreated.
+   verify the API returns an empty list, or exactly the two labelled demo
+   records after an explicit `npm run db:seed`.
 
 This playbook intentionally provides no destructive reset command. Never use a
 reset procedure against a deployment, shared environment, or any data that may
