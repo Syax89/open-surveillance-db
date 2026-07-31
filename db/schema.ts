@@ -248,3 +248,34 @@ export const moderationEvents = sqliteTable(
   },
   (table) => [index("moderation_events_created_at_idx").on(table.createdAt, table.id)],
 );
+
+/**
+ * Photo evidence attached to a camera report. D1 stores METADATA ONLY; the
+ * image bytes live in object storage (R2 bucket `PHOTOS`) under an opaque
+ * `storage_key` that is never exposed to clients. Photos are never public:
+ * they must be approved by a moderator with confirmed redaction, and the
+ * linked camera must itself be public (`cameras.status` + freshness).
+ * `exif_stripped` records the mandatory intake strip; `redaction_confirmed`
+ * is set by the moderator at approval time.
+ */
+export const photos = sqliteTable(
+  "photos",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    cameraId: integer("camera_id"),
+    storageKey: text("storage_key").notNull(),
+    mimeType: text("mime_type").notNull(),
+    width: integer("width").notNull(),
+    height: integer("height").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    status: text("status").notNull().default("pending"),
+    exifStripped: integer("exif_stripped").notNull().default(1),
+    redactionConfirmed: integer("redaction_confirmed").notNull().default(0),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (table) => [
+    index("photos_status_idx").on(table.status),
+    index("photos_camera_idx").on(table.cameraId),
+  ],
+);

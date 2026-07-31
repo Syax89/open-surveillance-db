@@ -41,6 +41,8 @@ const expectedTables = [
   // Auth roles + appeals (0010): role identities and the appeal trail.
   "users",
   "moderation_appeals",
+  // Photo evidence (0011): metadata only, image bytes live in R2.
+  "photos",
 ];
 // Indexes declared by the migrations.
 const expectedIndexes = [
@@ -57,6 +59,8 @@ const expectedIndexes = [
   "users_email_unique",
   "moderation_appeals_status_idx",
   "moderation_appeals_entity_idx",
+  "photos_status_idx",
+  "photos_camera_idx",
 ];
 // Tables that are not application schema but legitimately appear in a local
 // D1 database. Anything outside this set is an unexpected schema change.

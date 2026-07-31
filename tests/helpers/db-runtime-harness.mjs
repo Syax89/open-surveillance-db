@@ -31,6 +31,9 @@ const DB_MODULES = [
   // db/corrections.ts (private correction/removal intake) imports getD1 from
   // ./cameras, so it runs against the same binding and public boundary.
   { source: "db/corrections.ts", output: "db/corrections.mjs" },
+  // db/photos.ts (photo evidence) imports getD1 from ./cameras and type-only
+  // from ./moderation; db/moderation.ts imports listPendingPhotos from it.
+  { source: "db/photos.ts", output: "db/photos.mjs" },
   // db/moderation.ts imports ./freshness (pure, no CF binding); transpile it
   // into the temp tree so the rewritten import resolves.
   { source: "db/freshness.ts", output: "db/freshness.mjs" },
@@ -101,7 +104,8 @@ export async function loadDbRuntime() {
   const auth = await import(pathToFileURL(path.join(tree, "db/auth.mjs")).href);
   const users = await import(pathToFileURL(path.join(tree, "db/users.mjs")).href);
   const appeals = await import(pathToFileURL(path.join(tree, "db/appeals.mjs")).href);
-  return { env: envModule.env, cameras, corrections, moderation, auth, users, appeals };
+  const photos = await import(pathToFileURL(path.join(tree, "db/photos.mjs")).href);
+  return { env: envModule.env, cameras, corrections, moderation, auth, users, appeals, photos };
 }
 
 // Replays the real Drizzle migration files (drizzle/0000-*.sql ... 0006-*.sql)
