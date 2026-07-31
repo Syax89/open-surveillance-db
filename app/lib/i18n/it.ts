@@ -24,12 +24,12 @@ export const it: Translation<typeof en> = {
       "Puoi comunque cercare, filtrare e aprire ogni record pubblico dall'elenco accessibile sottostante, che funziona senza la mappa.",
   },
   status: {
-    verified: "Verificata",
-    demo: "Record prototipo",
+    verified: "Verificato",
+    demo: "Record illustrativo",
     pending: "In moderazione",
     needs_review: "Da ricontrollare",
-    removed: "Rimossa",
-    rejected: "Rifiutata",
+    removed: "Rimosso",
+    rejected: "Rifiutato",
   },
   home: {
     mainNavigation: "Navigazione principale",
@@ -54,6 +54,7 @@ export const it: Translation<typeof en> = {
     livePrototype: "Prototipo attivo",
     mapTitle: "Esplora le telecamere documentate",
     osmBaseMap: "Mappa di base OpenStreetMap",
+    mapCoverageNote: "La mappa mostra solo record pubblici documentati; un'area vuota non dimostra che non ci siano telecamere.",
     prototypeMode: "Modalità prototipo.",
     prototypeBanner:
       "La mappa di base usa dati reali di OpenStreetMap; i due pin visibili sono record illustrativi chiaramente etichettati. Fai clic in un punto della mappa per selezionare la posizione di una segnalazione.",
@@ -414,7 +415,7 @@ export const it: Translation<typeof en> = {
       reverify: "Riverificato",
     },
     statusLabels: {
-      pending: "In attesa",
+      pending: "In moderazione",
       verified: "Verificato",
       needs_review: "Da ricontrollare",
       removed: "Rimosso",
