@@ -142,8 +142,12 @@ environment" above).
   (`local-lvm:vm-114-disk-0`).
 - Network: `eth0` = 192.168.1.201/24, gateway 192.168.1.1, DNS 192.168.1.192.
 - `onboot=1` (set via Proxmox API so the site comes back after a host reboot).
-- SSH root via the deploy key injected at create time (`--ssh-public-keys`);
-  password root login stays disabled (Debian default).
+- No SSH access: the deploy key was **not** injected at create time (verified
+  from the `vzcreate` task log, 2026-07-31 — no `--ssh-public-keys` was passed)
+  and `ssh-public-keys`/`password` cannot be set post-create (API schema
+  rejects them). All container operations (snapshot, rollback, backup,
+  stop/start) are performed via the Proxmox API token, see
+  `docs/OPERATIONS.md` §8.
 
 ### Application
 
