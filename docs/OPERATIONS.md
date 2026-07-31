@@ -423,6 +423,11 @@ Comportamento verificato del rollback Proxmox:
 - L'API rollback ferma il container, ripristina il disco dallo snapshot e
   **non lo riavvia da solo**: `rollback-lxc114.sh` gestisce stop→rollback→
   start→wait→health check in sequenza.
+- Il task di rollback è asincrono: la POST restituisce un UPID che lo script
+  interroga (`/nodes/pve/tasks/<upid>/status`) fino a `exitstatus=OK` —
+  stesso polling di `backup-lxc114.sh` (§8.2, attesa fino a 30 min). Lo start
+  del container parte **solo a rollback completato**, non dopo un timeout
+  fisso.
 - Dopo il rollback l'health check completo (8.1) deve dare 5/5 OK prima di
   dichiarare risolto l'incidente (vedi runbook §4.3, step Verify).
 

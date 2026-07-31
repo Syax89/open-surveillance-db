@@ -44,16 +44,38 @@ TOKEN=$(gpg -d --batch --quiet "$TOKEN_SRC" 2>/dev/null)
 API="https://$PVE_HOST:8006/api2/json"
 
 echo "$(ts) ROLLBACK vmid=$VMID to snapshot '$SNAP'"
-RESP=$(curl -sk -X POST -H "Authorization: PVEAPIToken=$TOKEN" \
-  "$API/nodes/$PVE_NODE/lxc/$VMID/snapshot/$SNAP/rollback" 2>/dev/null)
-echo "$RESP"
-if ! echo "$RESP" | grep -q '"data"'; then
+UPID=$(curl -sk -X POST -H "Authorization: PVEAPIToken=$TOKEN" \
+  "$API/nodes/$PVE_NODE/lxc/$VMID/snapshot/$SNAP/rollback" 2>/dev/null \
+  | python3 -c "import json,sys;print(json.load(sys.stdin).get('data',''))" 2>/dev/null)
+
+if [ -z "$UPID" ]; then
   echo "$(ts) ERROR: rollback not accepted (snapshot exists?)" >&2
   exit 1
 fi
+echo "$(ts) rollback task upid=$UPID"
 
-# wait for the rollback task to finish (container is stopped by Proxmox)
-sleep 5
+# wait for the rollback task to finish (container is stopped by Proxmox):
+# poll the task status like backup-lxc114.sh instead of a fixed sleep
+t=0
+while [ $t -lt 1800 ]; do
+  st=$(curl -sk -H "Authorization: PVEAPIToken=$TOKEN" \
+    "$API/nodes/$PVE_NODE/tasks/$UPID/status" 2>/dev/null \
+    | python3 -c "import json,sys;d=json.load(sys.stdin).get('data',{});print(d.get('status'), d.get('exitstatus',''))" 2>/dev/null)
+  echo "$st" | grep -q '^running' || break
+  sleep 10
+  t=$((t+10))
+done
+
+case "$st" in
+  "stopped OK")
+    echo "$(ts) rollback finished OK (${t}s)"
+    ;;
+  *)
+    echo "$(ts) ERROR: rollback task ended with status: $st" >&2
+    exit 4
+    ;;
+esac
+
 echo "$(ts) restarting container"
 curl -sk -X POST -H "Authorization: PVEAPIToken=$TOKEN" \
   "$API/nodes/$PVE_NODE/lxc/$VMID/status/start" >/dev/null 2>&1
