@@ -1,4 +1,4 @@
-# ADR 0006: Pilot jurisdiction, working languages, and eligible infrastructure
+# ADR 0010: Pilot jurisdiction, working languages, and eligible infrastructure
 
 - **Status:** accepted (CEO decision, 2026-07-31)
 - **Date:** 2026-07-31

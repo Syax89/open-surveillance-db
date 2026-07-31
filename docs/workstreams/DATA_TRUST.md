@@ -273,7 +273,7 @@ The data workstream recommends **go** only if every item below has a named
 owner and verifiable evidence:
 
 - [x] Pilot geography and eligibility/exclusion rules are approved after local
-  privacy/legal review ([ADR 0006](../decisions/0006-pilot-jurisdiction-languages-eligibility.md),
+  privacy/legal review ([ADR 0010](../decisions/0010-pilot-jurisdiction-languages-eligibility.md),
   CEO decision 2026-07-31; Italian GDPR review coherent with the existing
   `docs/legal/` drafts; the boundary applies to the Comune di Ferrara launch
   area — expansion to further municipalities requires a new documented decision).
