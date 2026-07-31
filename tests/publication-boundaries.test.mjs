@@ -355,7 +355,7 @@ test("moderation writes an auditable event with transition, actor, and note", as
   );
   assert.match(
     moderation,
-    /previousStatus\s*:\s*["']pending["'][\s\S]{0,300}newStatus\s*:\s*status/,
+    /previousStatus\s*:\s*current\.status[\s\S]{0,300}newStatus\s*:\s*status/,
     "the event creation must include both the prior and destination status",
   );
   assert.match(
@@ -435,12 +435,12 @@ test("the moderation route accepts only the explicit lifecycle actions", async (
   assert.ok(parserStart >= 0, "lifecycle commands must be parsed before database writes");
   assert.match(
     parser,
-    /action\s*===\s*["']mark-stale["']/,
+    /cameraActions\s*[=:][\s\S]{0,300}["']mark-stale["']/,
     "the route parser must allow mark-stale for verified cameras",
   );
   assert.match(
     parser,
-    /action\s*===\s*["']reverify["']/,
+    /cameraActions\s*[=:][\s\S]{0,300}["']reverify["']/,
     "the route parser must allow reverify for cameras under review",
   );
 });

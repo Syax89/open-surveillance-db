@@ -392,9 +392,9 @@ test("a stale record can be removed; illegal transitions stay rejected", async (
 
   // Illegal transitions from stale must not apply.
   const badApprove = await moderation.moderateCamera(item.id, "approve", REASON.verified, null);
-  assert.equal(badApprove, null, "approve is not a valid transition from stale");
+  assert.equal(badApprove.kind, "not_found", "approve is not a valid transition from stale");
   const badMarkStale = await moderation.moderateCamera(item.id, "mark-stale", REASON.stale, null);
-  assert.equal(badMarkStale, null, "mark-stale is not a valid transition from stale");
+  assert.equal(badMarkStale.kind, "not_found", "mark-stale is not a valid transition from stale");
 
   const removed = await moderation.moderateCamera(item.id, "hide", REASON.sensitive, "removal decision");
   assert.ok(removed, "hide must succeed from stale");

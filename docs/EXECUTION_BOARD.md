@@ -140,6 +140,20 @@ These are the next technical tickets once Wave A has named owners and approved t
   manual-coordinate fields; and if the lazy Leaflet load or tile host fails,
   the map degrades to a visible panel linking the accessible directory instead
   of an empty box (PR #22, 155/155 tests green).
+- **2026-07-31 — Reviewer roles, moderation queue, decision reasons, and
+  append-only audit events implemented (Wave B, Data & Trust):** every
+  decision now requires a named reviewer (`actorId`) enforced against a
+  role→action matrix mirroring DATA_TRUST.md separation of duties (intake
+  reviewers triage but cannot publish; only record reviewers/senior moderators
+  approve; privacy/safety lead owns hide/escalate; administrator may only
+  escalate). A per-entity `moderation_queue` tracks assignment, sensitivity,
+  second review, and escalation; sensitive/urgent items require a second,
+  different reviewer before publish/reject/reverify; recusal is recorded
+  without touching the record; escalation requires a mandatory note. The audit
+  trail is append-only at the database layer (UPDATE/DELETE triggers raise
+  ABORT) with reviewer id + role captured at write time. Schema ships as
+  migration `0008` (journal-registered, drizzle-kit generate no-op) and is
+  documented in ADR 0009. 362/362 tests green; fresh-DB migration 9/9.
 
 ## Active next plan
 
