@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { LocaleToggle, useLocale } from "../components/LocaleProvider";
+import Link from "next/link";
 
 export default function GuidePage() {
   const { locale } = useLocale();
