@@ -21,6 +21,9 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 const DB_MODULES = [
   { source: "db/cameras.ts", output: "db/cameras.mjs" },
   { source: "db/moderation.ts", output: "db/moderation.mjs" },
+  // db/cameras.ts imports ../app/lib/duplicate-detection (pure, no CF binding);
+  // transpile it into the temp tree so the rewritten import resolves.
+  { source: "app/lib/duplicate-detection.ts", output: "app/lib/duplicate-detection.mjs" },
 ];
 
 let builtTreePromise = null;
@@ -49,10 +52,15 @@ async function buildTree() {
 
     const rewritten = compiled
       .replace(/from\s*["']cloudflare:workers["']/g, `from "${envUrl}"`)
-      .replace(/(from\s*["'])(\.\/[^"']+)(["'])/g, (match, prefix, specifier, suffix) =>
+      // Rewrite both ./ and ../ relative imports to their .mjs counterparts;
+      // db/cameras.ts imports ../app/lib/duplicate-detection, which the
+      // transpiled tree mirrors under app/lib/duplicate-detection.mjs.
+      .replace(/(from\s*["'])(\.\.?\/[^"']+)(["'])/g, (match, prefix, specifier, suffix) =>
         specifier.endsWith(".mjs") ? match : `${prefix}${specifier}.mjs${suffix}`,
       );
 
+    // Modules can live in nested dirs (db/, app/lib/); mirror the layout.
+    await mkdir(path.dirname(path.join(tree, output)), { recursive: true });
     await writeFile(path.join(tree, output), rewritten);
   }
   return tree;
