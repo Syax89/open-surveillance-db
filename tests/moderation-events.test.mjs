@@ -98,6 +98,7 @@ test("approve records a full audit event and publishes the record", async () => 
     recused: 0,
     escalated: 0,
     secondReviewerId: null,
+    appealId: null,
     createdAt: decision.event.createdAt,
   });
   assert.match(decision.event.createdAt, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
@@ -276,6 +277,7 @@ test("correction moderation records events and keeps decisions private", async (
     recused: 0,
     escalated: 0,
     secondReviewerId: null,
+    appealId: null,
     createdAt: approved.event.createdAt,
   });
 

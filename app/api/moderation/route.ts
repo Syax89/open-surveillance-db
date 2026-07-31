@@ -14,9 +14,11 @@ import {
   moderationReasonCodes,
 } from "../../../db/moderation";
 import { recordRateLimitBlock } from "../../lib/abuse-alerts";
+import { requireRole } from "../../lib/authz";
 import { isRecord } from "../../lib/guards";
 import { PayloadTooLargeError, readJsonBody, urlTooLong } from "../../lib/input-limits";
 import { callerKey, checkRateLimit, limitsFor } from "../../lib/rate-limit";
+import { getReviewerByUserId } from "../../../db/users";
 
 // Mirror of the db layer allowlist (db/moderation.ts correctionOutcomes). Kept
 // inline so the route validates without importing a runtime value the test
@@ -256,6 +258,11 @@ export async function GET(request: Request) {
     return Response.json({ error: "Request URI too long." }, { status: 414 });
   }
 
+  // Role gate: the moderation queue is moderator+ only (ADR 0014). The worker
+  // edge gate already authenticates; this route enforces the coarse role.
+  const auth = await requireRole(request, "moderator");
+  if (!auth.ok) return auth.response;
+
   const blocked = moderationLimit(request);
   if (blocked) return blocked;
 
@@ -271,10 +278,18 @@ export async function GET(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  // Input limits: reject absurdly long URLs before any parsing work.
+  // Input limits: reject absurdly long URLs before any query parsing work.
   if (urlTooLong(request)) {
     return Response.json({ error: "Request URI too long." }, { status: 414 });
   }
+
+  // Role gate: decisions are moderator+ only. The acting reviewer is derived
+  // server-side from the authenticated user's linked reviewer profile instead
+  // of trusting a client-supplied actor id (ADR 0013 closes the ADR 0009
+  // trade-off). An admin-role user may act as any reviewer (stepping in for
+  // the demo actor selector); a moderator acts as their own reviewer only.
+  const auth = await requireRole(request, "moderator");
+  if (!auth.ok) return auth.response;
 
   const blocked = moderationLimit(request);
   if (blocked) return blocked;
@@ -285,11 +300,24 @@ export async function PATCH(request: Request) {
       return Response.json(
         {
           error:
-            "Provide a valid entity, positive integer id, permitted action, reasonCode, actorId, and optional note of at most 500 characters.",
+            "Provide a valid entity, positive integer id, permitted action, reasonCode, and optional note of at most 500 characters.",
         },
         { status: 400 },
       );
     }
+
+    let actorId = payload.context.actorId;
+    if (auth.user.role !== "admin") {
+      const reviewer = await getReviewerByUserId(auth.user.id);
+      if (!reviewer) {
+        return Response.json(
+          { error: "Your account has no reviewer profile to act with." },
+          { status: 403 },
+        );
+      }
+      actorId = reviewer.id;
+    }
+    const context = { ...payload.context, actorId };
 
     const result =
       payload.entity === "camera"
@@ -299,7 +327,7 @@ export async function PATCH(request: Request) {
             payload.reasonCode,
             payload.note,
             payload.metadataPublication,
-            payload.context,
+            context,
           )
         : await moderateCorrection(
             payload.id,
@@ -307,7 +335,7 @@ export async function PATCH(request: Request) {
             payload.reasonCode,
             payload.note,
             payload.options,
-            payload.context,
+            context,
           );
     return moderationResponse(payload.entity, result);
   } catch (error) {

@@ -54,6 +54,20 @@ const REVIEWERS = {
   admin: 5, // Demo Administrator — escalate only
 };
 
+// ADR 0014 identity mapping: the moderation route derives the acting reviewer
+// from the authenticated user (x-osdb-user-email header) instead of trusting a
+// client-chosen actor id. Migration 0009 seeds the five demo reviewer accounts
+// (reviewers 1-5). Reviewer ids outside that set (negative tests) use the
+// admin identity so the payload actorId stays authoritative.
+const reviewerEmail = {
+  1: "intake@osdb.test",
+  2: "record@osdb.test",
+  3: "senior@osdb.test",
+  4: "privacy@osdb.test",
+  5: "admin@osdb.test",
+};
+const identityFor = (actorId) => reviewerEmail[actorId] ?? "admin@osdb.test";
+
 const SUBMIT = {
   title: "Corner shop entrance",
   kind: "Fixed dome",
@@ -89,6 +103,8 @@ let revisionsRoute;
 let correctionsRoute;
 let moderationRoute;
 let accountRoute;
+let appealsRoute;
+let appealItemRoute;
 
 beforeEach(async () => {
   env = await e2eEnv();
@@ -104,6 +120,8 @@ beforeEach(async () => {
   correctionsRoute = await load("corrections", "app/api/corrections/route.mjs");
   moderationRoute = await load("moderation", "app/api/moderation/route.mjs");
   accountRoute = await load("account", "app/api/auth/account/route.mjs");
+  appealsRoute = await load("appeals", "app/api/appeals/route.mjs");
+  appealItemRoute = await load("appealItem", "app/api/appeals/[id]/route.mjs");
 });
 
 after(async () => {
@@ -124,8 +142,25 @@ async function submitCamera(overrides = {}) {
 async function moderateCamera(id, action, reasonCode, actorId, extra = {}) {
   return moderationRoute.PATCH(apiRequest("/api/moderation", {
     method: "PATCH",
+    headers: { "x-osdb-user-email": identityFor(actorId) },
     body: { entity: "camera", id, action, reasonCode, actorId, ...extra },
   }));
+}
+
+async function moderateCorrection(body) {
+  return moderationRoute.PATCH(apiRequest("/api/moderation", {
+    method: "PATCH",
+    headers: { "x-osdb-user-email": identityFor(body.actorId) },
+    body,
+  }));
+}
+
+async function moderationQueue() {
+  const response = await moderationRoute.GET(apiRequest("/api/moderation", {
+    headers: { "x-osdb-user-email": identityFor(REVIEWERS.record) },
+  }));
+  assert.equal(response.status, 200);
+  return responseBody(response);
 }
 
 async function publicListing() {
@@ -240,9 +275,7 @@ test("E2E: a submitted camera starts pending and is absent from every public sur
   const records = await publicListing();
   assert.equal(records.length, 0, "pending records must not appear in the public listing");
 
-  const queueResponse = await moderationRoute.GET(apiRequest("/api/moderation"));
-  assert.equal(queueResponse.status, 200);
-  const queue = await responseBody(queueResponse);
+  const queue = await moderationQueue();
   assert.equal(queue.cameraReports.length, 1);
   assert.equal(queue.cameraReports[0].id, record.id);
   assert.equal(queue.cameraReports[0].status, "pending");
@@ -433,23 +466,20 @@ test("E2E: a contested privacy correction is escalated and handled by a senior m
   assert.equal(records[0].status, "verified");
 
   // The moderation queue surfaces the correction request.
-  const queue = await responseBody(await moderationRoute.GET(apiRequest("/api/moderation")));
+  const queue = await moderationQueue();
   assert.equal(queue.correctionRequests.length, 1);
   assert.equal(queue.correctionRequests[0].id, referenceId);
   assert.equal(queue.correctionRequests[0].status, "pending");
 
   // A reviewer escalates the contested correction with a mandatory note.
-  const escalate = await moderationRoute.PATCH(apiRequest("/api/moderation", {
-    method: "PATCH",
-    body: {
-      entity: "correction",
-      id: referenceId,
-      action: "escalate",
-      reasonCode: REASON.privacy,
-      note: "Requester contests the publication decision.",
-      actorId: REVIEWERS.record,
-    },
-  }));
+  const escalate = await moderateCorrection({
+    entity: "correction",
+    id: referenceId,
+    action: "escalate",
+    reasonCode: REASON.privacy,
+    note: "Requester contests the publication decision.",
+    actorId: REVIEWERS.record,
+  });
   assert.equal(escalate.status, 200);
   const escalated = await responseBody(escalate);
   assert.equal(escalated.event.escalated, 1);
@@ -457,32 +487,26 @@ test("E2E: a contested privacy correction is escalated and handled by a senior m
   assert.equal(escalated.queue.escalationReason, "Requester contests the publication decision.");
 
   // A non-resolver cannot touch the escalated item.
-  const blocked = await moderationRoute.PATCH(apiRequest("/api/moderation", {
-    method: "PATCH",
-    body: {
-      entity: "correction",
-      id: referenceId,
-      action: "approve",
-      reasonCode: REASON.privacy,
-      actorId: REVIEWERS.record,
-    },
-  }));
+  const blocked = await moderateCorrection({
+    entity: "correction",
+    id: referenceId,
+    action: "approve",
+    reasonCode: REASON.privacy,
+    actorId: REVIEWERS.record,
+  });
   assert.equal(blocked.status, 403);
 
   // A senior moderator handles the appeal: mark the record stale while it is
   // reassessed (DATA_TRUST SLA) — the record leaves the public listing.
-  const resolve = await moderationRoute.PATCH(apiRequest("/api/moderation", {
-    method: "PATCH",
-    body: {
-      entity: "correction",
-      id: referenceId,
-      action: "approve",
-      reasonCode: REASON.privacy,
-      note: "Appeal upheld — reassessing the record.",
-      outcome: "marked-stale",
-      actorId: REVIEWERS.senior,
-    },
-  }));
+  const resolve = await moderateCorrection({
+    entity: "correction",
+    id: referenceId,
+    action: "approve",
+    reasonCode: REASON.privacy,
+    note: "Appeal upheld — reassessing the record.",
+    outcome: "marked-stale",
+    actorId: REVIEWERS.senior,
+  });
   assert.equal(resolve.status, 200);
   const resolved = await responseBody(resolve);
   assert.equal(resolved.item.status, "reviewed");
@@ -573,6 +597,213 @@ test("E2E: nearby and coordinate search return only published records", async ()
 });
 
 // ---------------------------------------------------------------------------
+
+// 6b) Appeals (ADR 0014): contributor contests a decision, an independent
+//     senior moderator reviews it, every step lands in the audit log.
+// ---------------------------------------------------------------------------
+
+test("E2E: a contributor appeals a rejection; an independent senior moderator upholds it and the record returns to the queue", async () => {
+  const record = await submitCamera();
+  await moderateCamera(record.id, "reject", REASON.insufficient, REVIEWERS.intake);
+
+  // The rejection is a final decision: the contributor contests it.
+  const events = await auditEvents();
+  const decisionEvent = events[0];
+  assert.equal(decisionEvent.action, "reject");
+
+  const fileResponse = await appealsRoute.POST(apiRequest("/api/appeals", {
+    method: "POST",
+    headers: { "x-osdb-user-email": "contributor@osdb.test" },
+    body: {
+      entity: "camera",
+      entityId: record.id,
+      decisionEventId: decisionEvent.id,
+      reason: "The camera is on a public street, not private property.",
+    },
+  }));
+  assert.equal(fileResponse.status, 201);
+  const filed = await responseBody(fileResponse);
+  assert.equal(filed.appeal.status, "pending");
+  assert.equal(filed.appeal.entity, "camera");
+  assert.equal(filed.appeal.decisionEventId, decisionEvent.id);
+  assert.equal(filed.appeal.appellantName, "Demo Contributor");
+  assert.equal(filed.appeal.decisionAction, "reject");
+
+  // The audit trail records the filing, linked to the appeal.
+  const afterFile = await auditEvents();
+  assert.equal(afterFile.length, 2);
+  assert.equal(afterFile[1].action, "appeal-filed");
+  assert.equal(afterFile[1].appeal_id, filed.appeal.id);
+
+  // The reviewer who made the original decision cannot decide the appeal —
+  // and as an intake reviewer they could not decide it at all: independence
+  // is structurally guaranteed because the deciding tier is senior+.
+  const original = await appealItemRoute.PATCH(apiRequest(`/api/appeals/${filed.appeal.id}`, {
+    method: "PATCH",
+    headers: { "x-osdb-user-email": "intake@osdb.test" },
+    body: { decision: "dismiss", note: "No new evidence" },
+  }));
+  assert.equal(original.status, 403);
+
+  // A record reviewer (non-senior) cannot decide an appeal.
+  const recordReviewer = await appealItemRoute.PATCH(apiRequest(`/api/appeals/${filed.appeal.id}`, {
+    method: "PATCH",
+    headers: { "x-osdb-user-email": "record@osdb.test" },
+    body: { decision: "dismiss" },
+  }));
+  assert.equal(recordReviewer.status, 403);
+
+  // The senior moderator upholds: the rejection is reversed.
+  const upheld = await appealItemRoute.PATCH(apiRequest(`/api/appeals/${filed.appeal.id}`, {
+    method: "PATCH",
+    headers: { "x-osdb-user-email": "senior@osdb.test" },
+    body: { decision: "uphold", note: "Evidence supports a public street" },
+  }));
+  assert.equal(upheld.status, 200);
+  const decided = await responseBody(upheld);
+  assert.equal(decided.appeal.status, "upheld");
+  assert.equal(decided.appeal.deciderName, "Demo Senior Moderator");
+
+  const row = await env.DB.prepare("SELECT status FROM cameras WHERE id = ?").bind(record.id).first();
+  assert.equal(row.status, "pending", "an upheld appeal returns the record to the moderation queue");
+
+  // Audit trail: reject → appeal-filed → appeal-uphold, all linked.
+  const finalEvents = await auditEvents();
+  assert.deepEqual(
+    finalEvents.map((event) => [event.action, event.appeal_id]),
+    [
+      ["reject", null],
+      ["appeal-filed", filed.appeal.id],
+      ["appeal-uphold", filed.appeal.id],
+    ],
+  );
+});
+
+test("E2E: appeals validation and role gates hold through the real routes", async () => {
+  const record = await submitCamera();
+  // Approve by the SENIOR moderator: the independence rule must block the
+  // original decider from reviewing their own decision's appeal (409).
+  await moderateCamera(record.id, "approve", REASON.verified, REVIEWERS.senior);
+  const events = await auditEvents();
+  const decisionEvent = events[0];
+
+  // Anonymous callers cannot file an appeal.
+  const anonymous = await appealsRoute.POST(apiRequest("/api/appeals", {
+    method: "POST",
+    body: { entity: "camera", entityId: record.id, decisionEventId: decisionEvent.id, reason: "Contesting" },
+  }));
+  assert.equal(anonymous.status, 401);
+
+  // A contributor cannot operate the moderation queue (coarse role gate).
+  const contributorModerate = await moderationRoute.PATCH(apiRequest("/api/moderation", {
+    method: "PATCH",
+    headers: { "x-osdb-user-email": "contributor@osdb.test" },
+    body: { entity: "camera", id: record.id, action: "approve", reasonCode: REASON.verified, actorId: REVIEWERS.senior },
+  }));
+  assert.equal(contributorModerate.status, 403);
+  assert.match((await responseBody(contributorModerate)).error, /role does not permit/i);
+
+  // A contributor can view nothing; only moderators list appeals.
+  const contributorList = await appealsRoute.GET(apiRequest("/api/appeals", {
+    headers: { "x-osdb-user-email": "contributor@osdb.test" },
+  }));
+  assert.equal(contributorList.status, 403);
+
+  // Unknown decision id → 404; non-final decisions (escalations keep the same
+  // status) cannot be appealed → 400.
+  const missing = await appealsRoute.POST(apiRequest("/api/appeals", {
+    method: "POST",
+    headers: { "x-osdb-user-email": "contributor@osdb.test" },
+    body: { entity: "camera", entityId: record.id, decisionEventId: 999999, reason: "Contesting" },
+  }));
+  assert.equal(missing.status, 404);
+
+  await moderateCamera(record.id, "escalate", "requires-senior-review", REVIEWERS.senior, { note: "Needs senior input" });
+  const escalationEvent = (await auditEvents()).find((event) => event.action === "escalate");
+  const nonFinal = await appealsRoute.POST(apiRequest("/api/appeals", {
+    method: "POST",
+    headers: { "x-osdb-user-email": "contributor@osdb.test" },
+    body: { entity: "camera", entityId: record.id, decisionEventId: escalationEvent.id, reason: "Contesting" },
+  }));
+  assert.equal(nonFinal.status, 400);
+
+  // Duplicate pending appeal against the same decision → 409.
+  await appealsRoute.POST(apiRequest("/api/appeals", {
+    method: "POST",
+    headers: { "x-osdb-user-email": "contributor@osdb.test" },
+    body: { entity: "camera", entityId: record.id, decisionEventId: decisionEvent.id, reason: "First appeal" },
+  }));
+  const duplicate = await appealsRoute.POST(apiRequest("/api/appeals", {
+    method: "POST",
+    headers: { "x-osdb-user-email": "contributor@osdb.test" },
+    body: { entity: "camera", entityId: record.id, decisionEventId: decisionEvent.id, reason: "Second appeal" },
+  }));
+  assert.equal(duplicate.status, 409);
+
+  // The moderator list shows the filed appeal; a contributor cannot decide.
+  const listResponse = await appealsRoute.GET(apiRequest("/api/appeals", {
+    headers: { "x-osdb-user-email": "record@osdb.test" },
+  }));
+  assert.equal(listResponse.status, 200);
+  const { appeals } = await responseBody(listResponse);
+  assert.equal(appeals.length, 1);
+  assert.equal(appeals[0].status, "pending");
+
+  const contributorDecide = await appealItemRoute.PATCH(apiRequest(`/api/appeals/${appeals[0].id}`, {
+    method: "PATCH",
+    headers: { "x-osdb-user-email": "contributor@osdb.test" },
+    body: { decision: "dismiss" },
+  }));
+  assert.equal(contributorDecide.status, 403);
+
+  // The senior moderator who made the original decision is blocked (409):
+  // an appeal is always reviewed by someone independent of the decision.
+  const originalReviewer = await appealItemRoute.PATCH(apiRequest(`/api/appeals/${appeals[0].id}`, {
+    method: "PATCH",
+    headers: { "x-osdb-user-email": "senior@osdb.test" },
+    body: { decision: "dismiss", note: "My original decision stands" },
+  }));
+  assert.equal(originalReviewer.status, 409);
+  assert.match((await responseBody(originalReviewer)).error, /original decision/i);
+
+  // Escalating an appeal requires a note; an escalated appeal may only be
+  // decided by the administrator (here the senior is the original decider,
+  // so the administrator drives the escalation).
+  const noNote = await appealItemRoute.PATCH(apiRequest(`/api/appeals/${appeals[0].id}`, {
+    method: "PATCH",
+    headers: { "x-osdb-user-email": "admin@osdb.test" },
+    body: { decision: "escalate" },
+  }));
+  assert.equal(noNote.status, 400);
+
+  const escalated = await appealItemRoute.PATCH(apiRequest(`/api/appeals/${appeals[0].id}`, {
+    method: "PATCH",
+    headers: { "x-osdb-user-email": "admin@osdb.test" },
+    body: { decision: "escalate", note: "Requires administrator review" },
+  }));
+  assert.equal(escalated.status, 200);
+  assert.equal((await responseBody(escalated)).appeal.status, "escalated");
+
+  const recordReviewerOnEscalated = await appealItemRoute.PATCH(apiRequest(`/api/appeals/${appeals[0].id}`, {
+    method: "PATCH",
+    headers: { "x-osdb-user-email": "record@osdb.test" },
+    body: { decision: "dismiss", note: "Trying anyway" },
+  }));
+  assert.equal(recordReviewerOnEscalated.status, 403);
+
+  const adminResolves = await appealItemRoute.PATCH(apiRequest(`/api/appeals/${appeals[0].id}`, {
+    method: "PATCH",
+    headers: { "x-osdb-user-email": "admin@osdb.test" },
+    body: { decision: "dismiss", note: "Original decision stands" },
+  }));
+  assert.equal(adminResolves.status, 200);
+  assert.equal((await responseBody(adminResolves)).appeal.status, "dismissed");
+
+  // The record stays verified: a dismissed appeal changes nothing public.
+  const row = await env.DB.prepare("SELECT status FROM cameras WHERE id = ?").bind(record.id).first();
+  assert.equal(row.status, "verified");
+});
+
 // 7) Account erasure (RETENTION_SCHEDULE R7) end to end
 // ---------------------------------------------------------------------------
 
@@ -653,7 +884,7 @@ test("E2E: erasure requires a live session — anonymous DELETE is rejected", as
 // 8) Coverage gate: 100% of the route surface exercised by this suite
 // ---------------------------------------------------------------------------
 
-test("E2E suite covers 100% of the API route surface (all 7 route files, all methods)", () => {
+test("E2E suite covers 100% of the API route surface (all 9 route files, all methods)", () => {
   const expected = [
     "cameras:GET",
     "cameras:POST",
@@ -664,6 +895,9 @@ test("E2E suite covers 100% of the API route surface (all 7 route files, all met
     "moderation:GET",
     "moderation:PATCH",
     "account:DELETE",
+    "appeals:POST",
+    "appeals:GET",
+    "appealItem:PATCH",
   ];
   const missing = expected.filter((key) => !coverage.has(key));
   assert.deepEqual(missing, [], `missing E2E coverage: ${missing.join(", ")}`);

@@ -43,6 +43,11 @@ const DB_MODULES = [
   // db/auth.ts (contributor accounts and sessions, ADR 0013) imports getD1
   // from ./cameras; it runs against the same binding and in-memory D1.
   { source: "db/auth.ts", output: "db/auth.mjs" },
+  // Auth roles + appeals (ADR 0014): db/users (identity accounts, coarse
+  // role) and db/appeals (appeal workflow) run against the same env.DB.
+  // db/appeals imports ./moderation + ./users; db/users imports ./cameras.
+  { source: "db/users.ts", output: "db/users.mjs" },
+  { source: "db/appeals.ts", output: "db/appeals.mjs" },
 ];
 
 let builtTreePromise = null;
@@ -94,7 +99,9 @@ export async function loadDbRuntime() {
   const corrections = await import(pathToFileURL(path.join(tree, "db/corrections.mjs")).href);
   const moderation = await import(pathToFileURL(path.join(tree, "db/moderation.mjs")).href);
   const auth = await import(pathToFileURL(path.join(tree, "db/auth.mjs")).href);
-  return { env: envModule.env, cameras, corrections, moderation, auth };
+  const users = await import(pathToFileURL(path.join(tree, "db/users.mjs")).href);
+  const appeals = await import(pathToFileURL(path.join(tree, "db/appeals.mjs")).href);
+  return { env: envModule.env, cameras, corrections, moderation, auth, users, appeals };
 }
 
 // Replays the real Drizzle migration files (drizzle/0000-*.sql ... 0006-*.sql)

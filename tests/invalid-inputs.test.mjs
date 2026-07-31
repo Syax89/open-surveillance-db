@@ -16,13 +16,39 @@
 
 import assert from "node:assert/strict";
 import { after, beforeEach, test } from "node:test";
-import { apiRequest, cleanupRouteTree, loadRoute, loadTreeModule, responseBody } from "./helpers/api-harness.mjs";
+import { apiRequest as publicRequest, cleanupRouteTree, loadRoute, loadTreeModule, responseBody } from "./helpers/api-harness.mjs";
+// Public intakes (cameras POST, corrections POST) must work WITHOUT any
+// identity header; keep the plain request helper for them.
+const apiRequest = publicRequest;
 import { D1SqliteDatabase as D1 } from "./helpers/d1-sqlite.mjs";
 import { applyDrizzleMigrations } from "./helpers/db-runtime-harness.mjs";
 import { callArgs, resetMockState, stub } from "./helpers/mock-state.mjs";
 
 beforeEach(() => resetMockState());
 after(async () => cleanupRouteTree());
+
+// Route-level authz (ADR 0014): the moderation route derives the acting
+// reviewer from the authenticated identity header. This suite acts as the
+// Demo Record Reviewer (moderator coarse role, reviewer id 2) for the
+// protected-route call below; the public cameras/corrections intakes ignore
+// the header.
+const moderatorUser = {
+  id: 2,
+  email: "record@osdb.test",
+  displayName: "Demo Record Reviewer",
+  role: "moderator",
+  active: 1,
+  mfaEnabled: 0,
+  createdAt: "2026-08-01T00:00:00.000Z",
+  updatedAt: "2026-08-01T00:00:00.000Z",
+};
+const moderatorReviewer = { id: 2, displayName: "Demo Record Reviewer", role: "record_reviewer", active: 1 };
+const authRequest = (path, opts = {}) =>
+  publicRequest(path, { ...opts, headers: { "x-osdb-user-email": moderatorUser.email, ...(opts.headers ?? {}) } });
+const stubModeratorAuth = () => {
+  stub("getUserByEmail", async (email) => (email === moderatorUser.email ? moderatorUser : null));
+  stub("getReviewerByUserId", async () => moderatorReviewer);
+};
 
 let treeEnv = null;
 let realCameras = null;
@@ -269,6 +295,7 @@ test("POST /api/corrections ignores unknown and prototype keys", async () => {
 });
 
 test("PATCH /api/moderation ignores privilege-like extra keys in the body", async () => {
+  stubModeratorAuth();
   stub("moderateCamera", async (id) => ({
     kind: "ok",
     item: { id, status: "verified" },
@@ -277,7 +304,7 @@ test("PATCH /api/moderation ignores privilege-like extra keys in the body", asyn
   }));
   const { PATCH } = await moderationRoute();
   const response = await PATCH(
-    apiRequest("/api/moderation", {
+    authRequest("/api/moderation", {
       method: "PATCH",
       body: JSON.stringify({
         entity: "camera",

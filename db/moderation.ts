@@ -146,6 +146,7 @@ export type ModerationEvent = {
   recused: number;
   escalated: number;
   secondReviewerId: number | null;
+  appealId: number | null;
   createdAt: string;
 };
 
@@ -200,7 +201,21 @@ async function getModerationD1() {
   return getD1();
 }
 
-type ModerationD1 = Awaited<ReturnType<typeof getModerationD1>>;
+export type ModerationD1 = Awaited<ReturnType<typeof getModerationD1>>;
+
+/**
+ * Reopens an entity's moderation queue item after an upheld appeal (the old
+ * row is `closed`, so the partial unique index permits a fresh open row).
+ * The reopened item returns to `queued` for a fresh decision by a different
+ * reviewer.
+ */
+export async function reopenQueueForItem(
+  entity: ModerationEntity,
+  entityId: number,
+): Promise<ModerationQueueItem> {
+  const d1 = await getModerationD1();
+  return getOrCreateQueueItem(d1, entity, entityId, {});
+}
 
 const cameraColumns =
   "id, title, kind, manufacturer, observed_on AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, notes, latitude, longitude, status, source, updated, description, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt";
@@ -395,7 +410,7 @@ export async function listPendingModerationItems(): Promise<ModerationQueue> {
         .all<PendingCorrectionRequest>(),
       d1
         .prepare(
-          `SELECT id, entity, entity_id AS entityId, previous_status AS previousStatus, new_status AS newStatus, action, reason_code AS reasonCode, note, actor, reviewer_id AS reviewerId, actor_role AS actorRole, recused, escalated, second_reviewer_id AS secondReviewerId, created_at AS createdAt FROM moderation_events ORDER BY created_at DESC, id DESC LIMIT ?`,
+          `SELECT id, entity, entity_id AS entityId, previous_status AS previousStatus, new_status AS newStatus, action, reason_code AS reasonCode, note, actor, reviewer_id AS reviewerId, actor_role AS actorRole, recused, escalated, second_reviewer_id AS secondReviewerId, appeal_id AS appealId, created_at AS createdAt FROM moderation_events ORDER BY created_at DESC, id DESC LIMIT ?`,
         )
         .bind(50)
         .all<ModerationEvent>(),
@@ -494,21 +509,46 @@ export async function runFreshnessSweep(nowIso: string = new Date().toISOString(
 // Decisions
 // ---------------------------------------------------------------------------
 
+/** Minimal reviewer identity the event recorder needs (id, display name, role). */
+export type ReviewerAttribution = {
+  id: number;
+  displayName: string;
+  role: string;
+};
+
+export type ModerationEventInput = Omit<
+  ModerationEvent,
+  "id" | "actor" | "createdAt" | "reviewerId" | "actorRole" | "recused" | "escalated" | "secondReviewerId" | "appealId"
+> & {
+  reviewer?: Reviewer | ReviewerAttribution | null;
+  recused?: boolean;
+  escalated?: boolean;
+  secondReviewerId?: number | null;
+  appealId?: number | null;
+};
+
+/**
+ * Public recorder for the append-only audit trail. `db/appeals.ts` and other
+ * moderation-adjacent modules reuse it so every moderation action lands in
+ * `moderation_events` through the same immutable path.
+ */
+export async function recordModerationEvent(
+  d1: ModerationD1,
+  event: ModerationEventInput,
+): Promise<ModerationEvent> {
+  return createModerationEvent(d1, event);
+}
+
 async function createModerationEvent(
   d1: ModerationD1,
-  event: Omit<ModerationEvent, "id" | "actor" | "createdAt" | "reviewerId" | "actorRole" | "recused" | "escalated" | "secondReviewerId"> & {
-    reviewer?: Reviewer | null;
-    recused?: boolean;
-    escalated?: boolean;
-    secondReviewerId?: number | null;
-  },
+  event: ModerationEventInput,
 ): Promise<ModerationEvent> {
   const createdAt = new Date().toISOString();
   const result = await d1
     .prepare(
-      `INSERT INTO moderation_events (entity, entity_id, previous_status, new_status, action, reason_code, note, actor, reviewer_id, actor_role, recused, escalated, second_reviewer_id, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-       RETURNING id, entity, entity_id AS entityId, previous_status AS previousStatus, new_status AS newStatus, action, reason_code AS reasonCode, note, actor, reviewer_id AS reviewerId, actor_role AS actorRole, recused, escalated, second_reviewer_id AS secondReviewerId, created_at AS createdAt`,
+      `INSERT INTO moderation_events (entity, entity_id, previous_status, new_status, action, reason_code, note, actor, reviewer_id, actor_role, recused, escalated, second_reviewer_id, appeal_id, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       RETURNING id, entity, entity_id AS entityId, previous_status AS previousStatus, new_status AS newStatus, action, reason_code AS reasonCode, note, actor, reviewer_id AS reviewerId, actor_role AS actorRole, recused, escalated, second_reviewer_id AS secondReviewerId, appeal_id AS appealId, created_at AS createdAt`,
     )
     .bind(
       event.entity,
@@ -524,6 +564,7 @@ async function createModerationEvent(
       event.recused ? 1 : 0,
       event.escalated ? 1 : 0,
       event.secondReviewerId ?? null,
+      event.appealId ?? null,
       createdAt,
     )
     .first<ModerationEvent>();
@@ -1075,13 +1116,34 @@ export type PublicCameraRevision = {
 };
 
 /**
+ * Actions that change the public record lifecycle. Internal workflow events —
+ * recusals, escalations, second-review intents, appeal filings/decisions —
+ * never appear in the public revision history even though they are stored in
+ * the same append-only table.
+ */
+const PUBLIC_LIFECYCLE_ACTIONS = new Set([
+  "approve",
+  "reject",
+  "hide",
+  "mark-stale",
+  "reverify",
+  "scheduled-expiry",
+  "expiry-not-reconfirmed",
+  "marked-stale",
+  "removed",
+  "corrected",
+]);
+
+/**
  * Reviewed public change summary for a camera record: the lifecycle
  * transitions a moderator applied (approved, marked stale, re-verified,
  * removed), oldest first. This is the public revision history described in
  * docs/FUTURE_ROADMAP.md (Horizon 1). It deliberately projects only
  * non-identifying fields: the private audit columns (actor, note,
  * reason_code) never leave this boundary, so contributor and moderator
- * identities and internal notes are never published.
+ * identities and internal notes are never published. Internal workflow
+ * actions (recusals, escalations, appeals) are filtered out even though they
+ * live in the same audit table.
  */
 export async function listPublicCameraRevisions(cameraId: number): Promise<PublicCameraRevision[]> {
   const d1 = await getModerationD1();
@@ -1091,5 +1153,5 @@ export async function listPublicCameraRevisions(cameraId: number): Promise<Publi
     )
     .bind(cameraId)
     .all<PublicCameraRevision>();
-  return result.results;
+  return result.results.filter((event) => PUBLIC_LIFECYCLE_ACTIONS.has(event.action));
 }

@@ -44,6 +44,10 @@ const ROUTES = [
   // Account erasure (R7): exercised end to end with a real session built via
   // the real db/auth module, so the DELETE handler runs against real SQL.
   { source: "app/api/auth/account/route.ts", output: "app/api/auth/account/route.mjs" },
+  // Auth roles + appeals (ADR 0014): contributor files an appeal, moderators
+  // list and decide it. The [id] route lives in its own directory.
+  { source: "app/api/appeals/route.ts", output: "app/api/appeals/route.mjs" },
+  { source: "app/api/appeals/[id]/route.ts", output: "app/api/appeals/[id]/route.mjs" },
 ];
 
 // Real db modules compiled into the tree (NOT mocks): the route handlers will
@@ -57,6 +61,10 @@ const REAL_DB_MODULES = [
   // cameras route now pulls in for optional contributor attribution; it must
   // exist in the tree so the transitive import resolves against the real db.
   { source: "db/auth.ts", output: "db/auth.mjs" },
+  // Auth roles + appeals (ADR 0014): db/users and db/appeals are imported by
+  // the authz lib and the appeals routes; they run against the same env.DB.
+  { source: "db/users.ts", output: "db/users.mjs" },
+  { source: "db/appeals.ts", output: "db/appeals.mjs" },
 ];
 
 let builtTreePromise = null;

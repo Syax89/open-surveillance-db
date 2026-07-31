@@ -7,10 +7,35 @@
 
 import assert from "node:assert/strict";
 import { after, beforeEach, test } from "node:test";
-import { apiRequest, cleanupRouteTree, loadRoute, responseBody } from "./helpers/api-harness.mjs";
+import { apiRequest as publicRequest, cleanupRouteTree, loadRoute, responseBody } from "./helpers/api-harness.mjs";
 import { callArgs, resetMockState, stub } from "./helpers/mock-state.mjs";
 
-beforeEach(() => resetMockState());
+// Route-level authz (ADR 0014): protected routes derive the acting reviewer
+// from the authenticated identity header instead of trusting a client-chosen
+// actor id. These mock-based suites act as the Demo Record Reviewer
+// (moderator coarse role, reviewer id 2) unless a test overrides the stub.
+const moderatorUser = {
+  id: 2,
+  email: "record@osdb.test",
+  displayName: "Demo Record Reviewer",
+  role: "moderator",
+  active: 1,
+  mfaEnabled: 0,
+  createdAt: "2026-08-01T00:00:00.000Z",
+  updatedAt: "2026-08-01T00:00:00.000Z",
+};
+const moderatorReviewer = { id: 2, displayName: "Demo Record Reviewer", role: "record_reviewer", active: 1 };
+const authRequest = (path, opts = {}) =>
+  publicRequest(path, { ...opts, headers: { "x-osdb-user-email": moderatorUser.email, ...(opts.headers ?? {}) } });
+const stubModeratorAuth = () => {
+  stub("getUserByEmail", async (email) => (email === moderatorUser.email ? moderatorUser : null));
+  stub("getReviewerByUserId", async () => moderatorReviewer);
+};
+
+beforeEach(() => {
+  resetMockState();
+  stubModeratorAuth();
+});
 after(async () => cleanupRouteTree());
 
 const route = () => loadRoute("app/api/moderation/route.mjs");
@@ -94,7 +119,7 @@ test("GET /api/moderation returns the full queue shape from the database boundar
   };
   stub("listPendingModerationItems", async () => queue);
   const { GET } = await route();
-  const response = await GET(apiRequest("/api/moderation"));
+  const response = await GET(authRequest("/api/moderation"));
   assert.equal(response.status, 200);
   assert.deepEqual(await responseBody(response), queue);
 });
@@ -104,7 +129,7 @@ test("GET /api/moderation returns 503 when the queue is unavailable", async () =
     throw new Error("Database binding unavailable");
   });
   const { GET } = await route();
-  const response = await GET(apiRequest("/api/moderation"));
+  const response = await GET(authRequest("/api/moderation"));
   assert.equal(response.status, 503);
   assert.equal((await responseBody(response)).error, "Moderation queue unavailable");
 });
@@ -117,7 +142,7 @@ test("PATCH approve on a camera passes explicit publication choices through", as
   stub("moderateCamera", async () => okResult({ ...cameraItem, status: "verified" }));
   const { PATCH } = await route();
   const response = await PATCH(
-    apiRequest("/api/moderation", {
+    authRequest("/api/moderation", {
       method: "PATCH",
       body: {
         entity: "camera",
@@ -151,7 +176,7 @@ test("PATCH approve on a camera defaults omitted publication choices to private"
   stub("moderateCamera", async () => okResult());
   const { PATCH } = await route();
   const response = await PATCH(
-    apiRequest("/api/moderation", {
+    authRequest("/api/moderation", {
       method: "PATCH",
       body: { entity: "camera", id: 5, action: "approve", reasonCode: validReasonCode, actorId },
     }),
@@ -167,7 +192,7 @@ test("PATCH reject on a camera does not carry metadata publication arguments", a
   stub("moderateCamera", async () => okResult({ ...cameraItem, status: "rejected" }));
   const { PATCH } = await route();
   const response = await PATCH(
-    apiRequest("/api/moderation", {
+    authRequest("/api/moderation", {
       method: "PATCH",
       body: { entity: "camera", id: 5, action: "reject", reasonCode: "duplicate", actorId },
     }),
@@ -183,7 +208,7 @@ test("PATCH supports the full camera lifecycle action set", async (t) => {
       // Stub inside the subtest: beforeEach resets state for every subtest.
       stub("moderateCamera", async () => okResult());
       const response = await PATCH(
-        apiRequest("/api/moderation", {
+        authRequest("/api/moderation", {
           method: "PATCH",
           body: { entity: "camera", id: 5, action, reasonCode: validReasonCode, actorId },
         }),
@@ -203,7 +228,7 @@ test("PATCH on a correction routes to moderateCorrection without publication fla
   );
   const { PATCH } = await route();
   const response = await PATCH(
-    apiRequest("/api/moderation", {
+    authRequest("/api/moderation", {
       method: "PATCH",
       body: { entity: "correction", id: 9, action: "approve", reasonCode: validReasonCode, note: "fixed", actorId },
     }),
@@ -223,7 +248,7 @@ test("PATCH forwards queue workflow fields to the db layer", async () => {
   stub("moderateCamera", async () => okResult());
   const { PATCH } = await route();
   const response = await PATCH(
-    apiRequest("/api/moderation", {
+    authRequest("/api/moderation", {
       method: "PATCH",
       body: {
         entity: "camera",
@@ -255,7 +280,7 @@ test("PATCH maps a pending second review to 202 with the item untouched", async 
   }));
   const { PATCH } = await route();
   const response = await PATCH(
-    apiRequest("/api/moderation", {
+    authRequest("/api/moderation", {
       method: "PATCH",
       body: { entity: "camera", id: 5, action: "approve", reasonCode: validReasonCode, actorId },
     }),
@@ -270,7 +295,7 @@ test("PATCH maps a recusal to 200 and never changes the record", async () => {
   stub("moderateCamera", async () => ({ kind: "recused", item: cameraItem, event: eventFixture, queue: queueFixture }));
   const { PATCH } = await route();
   const response = await PATCH(
-    apiRequest("/api/moderation", {
+    authRequest("/api/moderation", {
       method: "PATCH",
       body: { entity: "camera", id: 5, action: "approve", reasonCode: validReasonCode, actorId, recused: true },
     }),
@@ -293,7 +318,7 @@ test("PATCH maps role/state violations to their documented statuses", async (t) 
     await t.test(name, async () => {
       stub("moderateCamera", async () => ({ kind }));
       const response = await PATCH(
-        apiRequest("/api/moderation", {
+        authRequest("/api/moderation", {
           method: "PATCH",
           body: { entity: "camera", id: 5, action: "escalate", reasonCode: validReasonCode, actorId },
         }),
@@ -317,7 +342,7 @@ test("PATCH rejects non-object bodies", async (t) => {
   ];
   for (const { name, body } of cases) {
     await t.test(name, async () => {
-      const response = await PATCH(apiRequest("/api/moderation", { method: "PATCH", body }));
+      const response = await PATCH(authRequest("/api/moderation", { method: "PATCH", body }));
       assert.equal(response.status, 400, name);
       assert.equal(callArgs("moderateCamera").length + callArgs("moderateCorrection").length, 0, name);
     });
@@ -337,7 +362,7 @@ test("PATCH rejects invalid ids", async (t) => {
   for (const { name, id, body } of cases) {
     await t.test(name, async () => {
       const response = await PATCH(
-        apiRequest("/api/moderation", {
+        authRequest("/api/moderation", {
           method: "PATCH",
           body: body ?? { entity: "camera", id, action: "approve", reasonCode: validReasonCode, actorId },
         }),
@@ -362,7 +387,7 @@ test("PATCH rejects invalid actor ids", async (t) => {
   for (const { name, actorId: badActorId, body } of cases) {
     await t.test(name, async () => {
       const response = await PATCH(
-        apiRequest("/api/moderation", {
+        authRequest("/api/moderation", {
           method: "PATCH",
           body: body ?? { entity: "camera", id: 5, action: "approve", reasonCode: validReasonCode, actorId: badActorId },
         }),
@@ -386,7 +411,7 @@ test("PATCH rejects invalid queue workflow fields", async (t) => {
   for (const { name, ...overrides } of cases) {
     await t.test(name, async () => {
       const response = await PATCH(
-        apiRequest("/api/moderation", {
+        authRequest("/api/moderation", {
           method: "PATCH",
           body: { entity: "camera", id: 5, action: "approve", reasonCode: validReasonCode, actorId, ...overrides },
         }),
@@ -408,7 +433,7 @@ test("PATCH rejects invalid entities and actions", async (t) => {
   for (const { name, entity = "camera", action = "approve" } of cases) {
     await t.test(name, async () => {
       const response = await PATCH(
-        apiRequest("/api/moderation", {
+        authRequest("/api/moderation", {
           method: "PATCH",
           body: { entity, id: 5, action, reasonCode: validReasonCode, actorId },
         }),
@@ -429,7 +454,7 @@ test("PATCH rejects missing or unrecognised reason codes", async (t) => {
   ];
   for (const { name, body } of cases) {
     await t.test(name, async () => {
-      const response = await PATCH(apiRequest("/api/moderation", { method: "PATCH", body }));
+      const response = await PATCH(authRequest("/api/moderation", { method: "PATCH", body }));
       assert.equal(response.status, 400, name);
       assert.equal(callArgs("moderateCamera").length + callArgs("moderateCorrection").length, 0, name);
     });
@@ -456,7 +481,7 @@ test("PATCH rejects invalid notes and publication flags", async (t) => {
         actorId,
         ...overrides,
       };
-      const response = await PATCH(apiRequest("/api/moderation", { method: "PATCH", body }));
+      const response = await PATCH(authRequest("/api/moderation", { method: "PATCH", body }));
       assert.equal(response.status, 400, name);
       assert.equal(callArgs("moderateCamera").length + callArgs("moderateCorrection").length, 0, name);
     });
@@ -467,7 +492,7 @@ test("PATCH accepts a note of exactly 500 characters", async () => {
   stub("moderateCamera", async () => okResult());
   const { PATCH } = await route();
   const response = await PATCH(
-    apiRequest("/api/moderation", {
+    authRequest("/api/moderation", {
       method: "PATCH",
       body: { entity: "camera", id: 5, action: "reject", reasonCode: "duplicate", note: "n".repeat(500), actorId },
     }),
@@ -479,7 +504,7 @@ test("PATCH trims and nullifies blank notes", async () => {
   stub("moderateCamera", async () => okResult());
   const { PATCH } = await route();
   const response = await PATCH(
-    apiRequest("/api/moderation", {
+    authRequest("/api/moderation", {
       method: "PATCH",
       body: { entity: "camera", id: 5, action: "reject", reasonCode: "duplicate", note: "   ", actorId },
     }),
@@ -496,7 +521,7 @@ test("PATCH returns 404 when the item is missing or the transition is invalid", 
   stub("moderateCamera", async () => ({ kind: "not_found" }));
   const { PATCH } = await route();
   const response = await PATCH(
-    apiRequest("/api/moderation", {
+    authRequest("/api/moderation", {
       method: "PATCH",
       body: { entity: "camera", id: 999, action: "approve", reasonCode: validReasonCode, actorId },
     }),
@@ -511,7 +536,7 @@ test("PATCH returns 500 when the database write fails", async () => {
   });
   const { PATCH } = await route();
   const response = await PATCH(
-    apiRequest("/api/moderation", {
+    authRequest("/api/moderation", {
       method: "PATCH",
       body: { entity: "camera", id: 5, action: "approve", reasonCode: validReasonCode, actorId },
     }),
@@ -522,6 +547,6 @@ test("PATCH returns 500 when the database write fails", async () => {
 
 test("PATCH maps malformed JSON bodies to 500", async () => {
   const { PATCH } = await route();
-  const response = await PATCH(apiRequest("/api/moderation", { method: "PATCH", body: "{nope" }));
+  const response = await PATCH(authRequest("/api/moderation", { method: "PATCH", body: "{nope" }));
   assert.equal(response.status, 500);
 });

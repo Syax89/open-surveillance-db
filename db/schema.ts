@@ -96,13 +96,42 @@ export const sessions = sqliteTable(
 );
 
 /**
+ * Real identities behind the coarse roles (ADR 0014). `role` is the coarse
+ * authorization tier enforced on every protected route: `contributor` (submit
+ * reports, file appeals), `moderator` (moderation queue, appeal review),
+ * `admin` (everything, plus user/reviewer management). A moderator/admin user
+ * has an optional linked `reviewers` row carrying the granular DATA_TRUST
+ * role; the five "Demo" rows and the demo contributor are the local-prototype
+ * seed from migration 0010 and are replaced by provisioned accounts before
+ * any public-alpha deployment. The public credential store (`contributors`,
+ * ADR 0013) is a separate layer: registration provisions a contributor
+ * account, while provisioning maps it onto a `users` role identity at alpha
+ * (see ADR 0014 integration note).
+ */
+export const users = sqliteTable(
+  "users",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    email: text("email").notNull().unique(),
+    displayName: text("display_name").notNull(),
+    role: text("role").notNull().default("contributor"),
+    active: integer("active").notNull().default(1),
+    mfaEnabled: integer("mfa_enabled").notNull().default(0),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (table) => [index("users_role_idx").on(table.role)],
+);
+
+/**
  * Named local moderators. Roles encode the separation of duties in
  * DATA_TRUST.md: intake reviewers triage but cannot publish, record reviewers
  * and senior moderators approve, the privacy/safety lead owns urgent hides,
  * and the administrator can only escalate (never edit content or approve).
  * Real authentication/MFA is a public-alpha ticket; `mfa_enabled` already
- * records the expectation. The five "Demo" rows are the local-prototype seed
- * from the Wave B migration.
+ * records the expectation. `user_id` links the reviewer profile to the
+ * identity account in `users` (coarse role); the five "Demo" rows are the
+ * local-prototype seed from the Wave B migration.
  */
 export const reviewers = sqliteTable(
   "reviewers",
@@ -112,6 +141,7 @@ export const reviewers = sqliteTable(
     role: text("role").notNull(),
     active: integer("active").notNull().default(1),
     mfaEnabled: integer("mfa_enabled").notNull().default(0),
+    userId: integer("user_id").references(() => users.id),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
@@ -148,9 +178,48 @@ export const moderationQueue = sqliteTable(
 );
 
 /**
+ * Contributor appeals against a moderation decision (DATA_TRUST.md
+ * "Corrections, removals, and appeals"). A contributor contests a recorded
+ * decision; an independent senior moderator (not the original reviewer)
+ * reviews it. Statuses: `pending` → `upheld` | `dismissed` | `escalated`.
+ * Every status change writes an append-only `moderation_events` row with the
+ * `appeal_id` link, so the appeal trail is part of the immutable audit log.
+ *
+ * `decision_event_id` references the appealed decision event. The reverse
+ * link (`moderation_events.appeal_id`) is a plain integer column: the FK is
+ * applied by the migration, and keeping the schema one-directional avoids a
+ * circular table reference that TypeScript cannot resolve.
+ */
+export const moderationAppeals = sqliteTable(
+  "moderation_appeals",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    entity: text("entity").notNull(),
+    entityId: integer("entity_id").notNull(),
+    decisionEventId: integer("decision_event_id")
+      .notNull()
+      .references(() => moderationEvents.id),
+    appellantId: integer("appellant_id")
+      .notNull()
+      .references(() => users.id),
+    reason: text("reason").notNull(),
+    status: text("status").notNull().default("pending"),
+    decidedBy: integer("decided_by").references(() => reviewers.id),
+    decisionNote: text("decision_note"),
+    createdAt: text("created_at").notNull(),
+    decidedAt: text("decided_at"),
+  },
+  (table) => [
+    index("moderation_appeals_status_idx").on(table.status),
+    index("moderation_appeals_entity_idx").on(table.entity, table.entityId),
+  ],
+);
+
+/**
  * Append-only audit trail for moderation decisions. Extended with reviewer
  * attribution (reviewer id + role captured at write time), recusal and
  * escalation flags, and the second reviewer involved in a two-person review.
+ * `appeal_id` links an appeal's audit events back to the appeal row.
  * UPDATE/DELETE are blocked at the database layer (triggers in migration
  * 0008); the API exposes no way to mutate history.
  */
@@ -171,6 +240,10 @@ export const moderationEvents = sqliteTable(
     recused: integer("recused").notNull().default(0),
     escalated: integer("escalated").notNull().default(0),
     secondReviewerId: integer("second_reviewer_id").references(() => reviewers.id),
+    // Plain column: the FK to moderation_appeals is applied by migration 0010.
+    // Keeping it reference-free in the schema avoids a circular table
+    // reference between moderation_appeals and moderation_events.
+    appealId: integer("appeal_id"),
     createdAt: text("created_at").notNull(),
   },
   (table) => [index("moderation_events_created_at_idx").on(table.createdAt, table.id)],
