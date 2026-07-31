@@ -28,6 +28,9 @@ const DRIZZLE_DIR = path.join(root, "drizzle");
 const DB_MODULES = [
   { source: "db/cameras.ts", output: "db/cameras.mjs" },
   { source: "db/moderation.ts", output: "db/moderation.mjs" },
+  // db/corrections.ts (private correction/removal intake) imports getD1 from
+  // ./cameras, so it runs against the same binding and public boundary.
+  { source: "db/corrections.ts", output: "db/corrections.mjs" },
   // db/moderation.ts imports ./freshness (pure, no CF binding); transpile it
   // into the temp tree so the rewritten import resolves.
   { source: "db/freshness.ts", output: "db/freshness.mjs" },
@@ -82,8 +85,9 @@ export async function loadDbRuntime() {
   const tree = await builtTreePromise;
   const envModule = await import(pathToFileURL(path.join(tree, "cloudflare-workers.mjs")).href);
   const cameras = await import(pathToFileURL(path.join(tree, "db/cameras.mjs")).href);
+  const corrections = await import(pathToFileURL(path.join(tree, "db/corrections.mjs")).href);
   const moderation = await import(pathToFileURL(path.join(tree, "db/moderation.mjs")).href);
-  return { env: envModule.env, cameras, moderation };
+  return { env: envModule.env, cameras, corrections, moderation };
 }
 
 // Replays the real Drizzle migration files (drizzle/0000-*.sql ... 0006-*.sql)
