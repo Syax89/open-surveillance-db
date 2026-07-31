@@ -60,6 +60,23 @@ The documentation is part of the project and is intended to be discussed openly.
 - [Changelog](CHANGELOG.md)
 - [Governance](GOVERNANCE.md)
 
+## Roles and contacts
+
+Initial project roles were named on 2026-07-31 as part of the Wave A pilot
+boundary (decision recorded in [GOVERNANCE.md](GOVERNANCE.md)):
+
+| Role | Owner(s) |
+| --- | --- |
+| Maintainers | Simone (syax89) and Ada (CTO). Ada is the sole merge authority: every merge into `main` is performed by Ada. |
+| Operations owner | Ken |
+| Data stewards | Linus and Grace |
+| Security contact | Ken — private reporting route in [SECURITY.md](SECURITY.md) |
+| Moderation contact | Grace |
+
+These are initial nominations for the pilot, not a claim that the full public
+governance structure already exists. Only public professional identities are
+listed, in line with the project's privacy-by-design approach.
+
 ## Run locally
 
 Requirements: Node.js 22.13 or newer.
