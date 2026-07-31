@@ -4,21 +4,22 @@
 // docs/DATA_MODEL.md. Full spec: see task t_f00aa65e workspace QA_SPEC_correction_record_outcome.md.
 //
 // PATCH /api/moderation, entity=correction:
-//   { entity: "correction", id, action: "approve"|"reject"|"associate",
-//     reasonCode, note?, outcome?, cameraId? }
+//   { entity: "correction", id, action: "approve"|"reject"|"associate"|"escalate",
+//     reasonCode, note?, outcome?, cameraId?, actorId }
 //
 //   - outcome  (string, ONLY with "approve"): kept|corrected|marked-stale|removed|escalated
 //   - cameraId (positive integer, optional on ANY correction action): links/re-links the
 //     request to a record, persisted on correction_requests.camera_id
 //   - associate: new action; REQUIRES cameraId; links a pending request to a record without
 //     deciding; db layer writes an audit event with action='associate'
-//   - db call: moderateCorrection(id, action, reasonCode, note, options?) with
-//     options = { outcome?, cameraId? }; NO 5th argument when both are absent
-//     (backward compatible — existing tests assert exactly 4 args).
+//   - db call: moderateCorrection(id, action, reasonCode, note, options?, context?) with
+//     options = { outcome?, cameraId? } (undefined when both are absent) and
+//     context = { actorId, sensitivity?, assigneeId?, recused?, requiresSecondReview? }
 //   - malformed payloads → 400 and no db writes.
 //
-// This suite is RED on main (feature absent: zero "outcome" occurrences in db/ and app/).
-// The implementation must turn it GREEN without touching the other suites.
+// Wave B (Data & Trust): every decision is attributed to a named reviewer
+// (actorId) and the route maps the db-layer discriminated result to a stable
+// HTTP status (see docs/workstreams/DATA_TRUST.md "Queue and decisions").
 
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
@@ -37,6 +38,7 @@ after(async () => cleanupRouteTree());
 const route = () => loadRoute("app/api/moderation/route.mjs");
 
 const validReasonCode = "verified-public-infrastructure";
+const actorId = 2;
 
 const correctionItem = {
   id: 9,
@@ -57,14 +59,40 @@ const correctionEvent = {
   action: "approve",
   reasonCode: validReasonCode,
   note: null,
-  actor: "Local moderator",
+  actor: "Demo Record Reviewer",
+  reviewerId: 2,
+  actorRole: "record_reviewer",
+  recused: 0,
+  escalated: 0,
+  secondReviewerId: null,
   createdAt: "2026-07-31T08:00:00.000Z",
 };
 
-// The db layer receives options = { outcome?, cameraId? }. Implementations may
-// omit an absent key or carry it as undefined — pin the semantics, not the shape.
+const queueFixture = {
+  id: 10,
+  entity: "correction",
+  entityId: 9,
+  state: "closed",
+  assigneeId: 2,
+  sensitivity: "standard",
+  requiresSecondReview: 0,
+  secondReviewerId: null,
+  escalationReason: null,
+  createdAt: "2026-07-31T08:00:00.000Z",
+  updatedAt: "2026-07-31T08:00:00.000Z",
+  assignee: "Demo Record Reviewer",
+  secondReviewer: null,
+};
+
+const okResult = (item, event = correctionEvent, queue = queueFixture) => ({ kind: "ok", item, event, queue });
+
+// The db layer receives options = { outcome?, cameraId? } as the 5th argument
+// and the attribution context (actorId + workflow fields) as the 6th.
+// Implementations may omit an absent options key or carry it as undefined —
+// pin the semantics, not the shape.
 function assertOptions(args, expected) {
-  assert.equal(args.length, 5, "a 5th options argument must be passed");
+  assert.equal(args.length, 6, "options (5th) and context (6th) arguments must be passed");
+  assert.deepEqual(args[5], { actorId }, "the reviewer attribution must be forwarded");
   const options = args[4];
   assert.equal(typeof options, "object");
   const keys = Object.keys(options)
@@ -85,15 +113,14 @@ const expectNoDbWrites = (name) => {
 // ---------------------------------------------------------------------------
 
 test("PATCH approve with outcome passes options to moderateCorrection", async () => {
-  stub("moderateCorrection", async () => ({
-    item: { ...correctionItem, status: "reviewed", outcome: "marked-stale" },
-    event: { ...correctionEvent, newStatus: "reviewed" },
-  }));
+  stub("moderateCorrection", async () =>
+    okResult({ ...correctionItem, status: "reviewed", outcome: "marked-stale" }, { ...correctionEvent, newStatus: "reviewed" }),
+  );
   const { PATCH } = await route();
   const response = await PATCH(
     apiRequest("/api/moderation", {
       method: "PATCH",
-      body: { entity: "correction", id: 9, action: "approve", reasonCode: validReasonCode, outcome: "marked-stale" },
+      body: { entity: "correction", id: 9, action: "approve", reasonCode: validReasonCode, outcome: "marked-stale", actorId },
     }),
   );
   assert.equal(response.status, 200);
@@ -105,12 +132,12 @@ test("PATCH approve with outcome passes options to moderateCorrection", async ()
 });
 
 test("PATCH approve with cameraId associates the request to a record", async () => {
-  stub("moderateCorrection", async () => ({ item: { ...correctionItem, cameraId: 7 }, event: correctionEvent }));
+  stub("moderateCorrection", async () => okResult({ ...correctionItem, cameraId: 7 }));
   const { PATCH } = await route();
   const response = await PATCH(
     apiRequest("/api/moderation", {
       method: "PATCH",
-      body: { entity: "correction", id: 9, action: "approve", reasonCode: validReasonCode, cameraId: 7 },
+      body: { entity: "correction", id: 9, action: "approve", reasonCode: validReasonCode, cameraId: 7, actorId },
     }),
   );
   assert.equal(response.status, 200);
@@ -118,15 +145,14 @@ test("PATCH approve with cameraId associates the request to a record", async () 
 });
 
 test("PATCH approve with outcome and cameraId passes both through", async () => {
-  stub("moderateCorrection", async () => ({
-    item: { ...correctionItem, cameraId: 7, status: "reviewed", outcome: "removed" },
-    event: { ...correctionEvent, newStatus: "reviewed" },
-  }));
+  stub("moderateCorrection", async () =>
+    okResult({ ...correctionItem, cameraId: 7, status: "reviewed", outcome: "removed" }, { ...correctionEvent, newStatus: "reviewed" }),
+  );
   const { PATCH } = await route();
   const response = await PATCH(
     apiRequest("/api/moderation", {
       method: "PATCH",
-      body: { entity: "correction", id: 9, action: "approve", reasonCode: validReasonCode, note: "done", outcome: "removed", cameraId: 7 },
+      body: { entity: "correction", id: 9, action: "approve", reasonCode: validReasonCode, note: "done", outcome: "removed", cameraId: 7, actorId },
     }),
   );
   assert.equal(response.status, 200);
@@ -136,15 +162,14 @@ test("PATCH approve with outcome and cameraId passes both through", async () => 
 });
 
 test("PATCH reject may also carry a cameraId reassociation", async () => {
-  stub("moderateCorrection", async () => ({
-    item: { ...correctionItem, cameraId: 5, status: "rejected" },
-    event: { ...correctionEvent, newStatus: "rejected", action: "reject" },
-  }));
+  stub("moderateCorrection", async () =>
+    okResult({ ...correctionItem, cameraId: 5, status: "rejected" }, { ...correctionEvent, newStatus: "rejected", action: "reject" }),
+  );
   const { PATCH } = await route();
   const response = await PATCH(
     apiRequest("/api/moderation", {
       method: "PATCH",
-      body: { entity: "correction", id: 9, action: "reject", reasonCode: "duplicate", cameraId: 5 },
+      body: { entity: "correction", id: 9, action: "reject", reasonCode: "duplicate", cameraId: 5, actorId },
     }),
   );
   assert.equal(response.status, 200);
@@ -155,12 +180,12 @@ test("PATCH reject may also carry a cameraId reassociation", async () => {
 
 test("PATCH associate links a pending request to a record without deciding", async () => {
   const associatedEvent = { ...correctionEvent, newStatus: "pending", action: "associate" };
-  stub("moderateCorrection", async () => ({ item: { ...correctionItem, cameraId: 7 }, event: associatedEvent }));
+  stub("moderateCorrection", async () => okResult({ ...correctionItem, cameraId: 7 }, associatedEvent));
   const { PATCH } = await route();
   const response = await PATCH(
     apiRequest("/api/moderation", {
       method: "PATCH",
-      body: { entity: "correction", id: 9, action: "associate", reasonCode: "insufficient-evidence", cameraId: 7 },
+      body: { entity: "correction", id: 9, action: "associate", reasonCode: "insufficient-evidence", cameraId: 7, actorId },
     }),
   );
   assert.equal(response.status, 200);
@@ -178,11 +203,11 @@ test("PATCH supports the full correction action set with cameraId", async (t) =>
   const { PATCH } = await route();
   for (const action of ["approve", "reject", "associate"]) {
     await t.test(action, async () => {
-      stub("moderateCorrection", async () => ({ item: { ...correctionItem, cameraId: 7 }, event: correctionEvent }));
+      stub("moderateCorrection", async () => okResult({ ...correctionItem, cameraId: 7 }));
       const response = await PATCH(
         apiRequest("/api/moderation", {
           method: "PATCH",
-          body: { entity: "correction", id: 9, action, reasonCode: validReasonCode, cameraId: 7 },
+          body: { entity: "correction", id: 9, action, reasonCode: validReasonCode, cameraId: 7, actorId },
         }),
       );
       assert.equal(response.status, 200, action);
@@ -190,24 +215,45 @@ test("PATCH supports the full correction action set with cameraId", async (t) =>
   }
 });
 
-// ---------------------------------------------------------------------------
-// AC-6 — backward compatibility: no options → exactly 4 db args
-// ---------------------------------------------------------------------------
-
-test("PATCH approve without outcome or cameraId stays backward compatible (no 5th argument)", async () => {
-  stub("moderateCorrection", async () => ({
-    item: { ...correctionItem, status: "reviewed" },
-    event: { ...correctionEvent, newStatus: "reviewed" },
-  }));
+test("PATCH escalate on a correction requires a note and forwards the action", async () => {
+  stub("moderateCorrection", async () =>
+    okResult(correctionItem, { ...correctionEvent, action: "escalate", escalated: 1 }, { ...queueFixture, state: "escalated" }),
+  );
   const { PATCH } = await route();
   const response = await PATCH(
     apiRequest("/api/moderation", {
       method: "PATCH",
-      body: { entity: "correction", id: 9, action: "approve", reasonCode: validReasonCode, note: "fixed" },
+      body: { entity: "correction", id: 9, action: "escalate", reasonCode: "requires-senior-review", note: "Needs senior moderator", actorId },
     }),
   );
   assert.equal(response.status, 200);
-  assert.deepEqual(callArgs("moderateCorrection")[0], [9, "approve", validReasonCode, "fixed"]);
+  assert.deepEqual(callArgs("moderateCorrection")[0], [
+    9,
+    "escalate",
+    "requires-senior-review",
+    "Needs senior moderator",
+    undefined,
+    { actorId },
+  ]);
+});
+
+// ---------------------------------------------------------------------------
+// AC-6 — backward compatibility: no options → options arg stays undefined
+// ---------------------------------------------------------------------------
+
+test("PATCH approve without outcome or cameraId stays backward compatible (no options object)", async () => {
+  stub("moderateCorrection", async () =>
+    okResult({ ...correctionItem, status: "reviewed" }, { ...correctionEvent, newStatus: "reviewed" }),
+  );
+  const { PATCH } = await route();
+  const response = await PATCH(
+    apiRequest("/api/moderation", {
+      method: "PATCH",
+      body: { entity: "correction", id: 9, action: "approve", reasonCode: validReasonCode, note: "fixed", actorId },
+    }),
+  );
+  assert.equal(response.status, 200);
+  assert.deepEqual(callArgs("moderateCorrection")[0], [9, "approve", validReasonCode, "fixed", undefined, { actorId }]);
 });
 
 // ---------------------------------------------------------------------------
@@ -232,7 +278,7 @@ test("PATCH rejects invalid cameraId values on corrections", async (t) => {
       const response = await PATCH(
         apiRequest("/api/moderation", {
           method: "PATCH",
-          body: { entity: "correction", id: 9, action: "associate", reasonCode: validReasonCode, cameraId },
+          body: { entity: "correction", id: 9, action: "associate", reasonCode: validReasonCode, cameraId, actorId },
         }),
       );
       assert.equal(response.status, 400, name);
@@ -256,7 +302,7 @@ test("PATCH rejects invalid outcome values on corrections", async (t) => {
       const response = await PATCH(
         apiRequest("/api/moderation", {
           method: "PATCH",
-          body: { entity: "correction", id: 9, action: "approve", reasonCode: validReasonCode, outcome },
+          body: { entity: "correction", id: 9, action: "approve", reasonCode: validReasonCode, outcome, actorId },
         }),
       );
       assert.equal(response.status, 400, name);
@@ -272,7 +318,7 @@ test("PATCH rejects outcome on non-approve correction actions", async (t) => {
       const response = await PATCH(
         apiRequest("/api/moderation", {
           method: "PATCH",
-          body: { entity: "correction", id: 9, action, reasonCode: validReasonCode, outcome: "kept" },
+          body: { entity: "correction", id: 9, action, reasonCode: validReasonCode, outcome: "kept", actorId },
         }),
       );
       assert.equal(response.status, 400, action);
@@ -286,7 +332,7 @@ test("PATCH associate requires a cameraId", async () => {
   const response = await PATCH(
     apiRequest("/api/moderation", {
       method: "PATCH",
-      body: { entity: "correction", id: 9, action: "associate", reasonCode: validReasonCode },
+      body: { entity: "correction", id: 9, action: "associate", reasonCode: validReasonCode, actorId },
     }),
   );
   assert.equal(response.status, 400);
@@ -304,7 +350,7 @@ test("PATCH rejects correction-only fields on camera decisions", async (t) => {
       const response = await PATCH(
         apiRequest("/api/moderation", {
           method: "PATCH",
-          body: { entity: "camera", id: 5, action: "approve", reasonCode: validReasonCode, ...overrides },
+          body: { entity: "camera", id: 5, action: "approve", reasonCode: validReasonCode, actorId, ...overrides },
         }),
       );
       assert.equal(response.status, 400, name);
@@ -318,7 +364,7 @@ test("PATCH rejects unknown correction actions even with a cameraId", async () =
   const response = await PATCH(
     apiRequest("/api/moderation", {
       method: "PATCH",
-      body: { entity: "correction", id: 9, action: "hide", reasonCode: validReasonCode, cameraId: 5 },
+      body: { entity: "correction", id: 9, action: "hide", reasonCode: validReasonCode, cameraId: 5, actorId },
     }),
   );
   assert.equal(response.status, 400);
@@ -330,12 +376,12 @@ test("PATCH rejects unknown correction actions even with a cameraId", async () =
 // ---------------------------------------------------------------------------
 
 test("PATCH returns 404 when the db layer rejects the correction decision", async () => {
-  stub("moderateCorrection", async () => null);
+  stub("moderateCorrection", async () => ({ kind: "not_found" }));
   const { PATCH } = await route();
   const response = await PATCH(
     apiRequest("/api/moderation", {
       method: "PATCH",
-      body: { entity: "correction", id: 999, action: "approve", reasonCode: validReasonCode, outcome: "kept", cameraId: 5 },
+      body: { entity: "correction", id: 999, action: "approve", reasonCode: validReasonCode, outcome: "kept", cameraId: 5, actorId },
     }),
   );
   assert.equal(response.status, 404);
@@ -350,7 +396,7 @@ test("PATCH returns 500 when the correction write fails", async () => {
   const response = await PATCH(
     apiRequest("/api/moderation", {
       method: "PATCH",
-      body: { entity: "correction", id: 9, action: "approve", reasonCode: validReasonCode, outcome: "kept", cameraId: 5 },
+      body: { entity: "correction", id: 9, action: "approve", reasonCode: validReasonCode, outcome: "kept", cameraId: 5, actorId },
     }),
   );
   assert.equal(response.status, 500);
@@ -364,6 +410,8 @@ test("GET /api/moderation exposes the correction outcome in the queue", async ()
     reviewCameras: [],
     correctionRequests: [{ ...correctionItem, cameraId: 7, status: "pending", outcome: null }],
     recentEvents: [],
+    reviewers: [],
+    queueItems: [],
   };
   stub("listPendingModerationItems", async () => queue);
   const { GET } = await route();
