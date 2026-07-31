@@ -6,7 +6,8 @@
 //     D1 adapter (tests/helpers/d1-sqlite.mjs). These lock the public data
 //     boundary documented in docs/DATA_DICTIONARY.md: only verified/demo
 //     records, notes never selected, manufacturer/observedOn conditional on
-//     their publish flags, seed dataset, nearby distance semantics.
+//     their publish flags, fresh-DB schema from Drizzle migrations (no
+//     runtime demo seed), nearby distance semantics.
 //  2. Route-layer contract lock-downs that complement tests/api-cameras
 //     (which stubs the db layer): full GeoJSON property set, CSV field set,
 //     no version identifier on live exports (docs/EXPORT_VERSIONING.md:
@@ -16,6 +17,7 @@ import assert from "node:assert/strict";
 import { after, beforeEach, test } from "node:test";
 import { apiRequest, cleanupRouteTree, loadRoute, loadTreeModule, responseBody } from "./helpers/api-harness.mjs";
 import { D1SqliteDatabase as D1 } from "./helpers/d1-sqlite.mjs";
+import { applyDrizzleMigrations } from "./helpers/db-runtime-harness.mjs";
 import { resetMockState, stub } from "./helpers/mock-state.mjs";
 
 beforeEach(() => resetMockState());
@@ -40,13 +42,15 @@ async function realDb() {
   return { env: treeEnv, cameras: realCameras, corrections: realCorrections, moderation: realModeration };
 }
 
-// Fresh in-memory DB with the cameras table created and its seed rows removed.
-// correction_requests / moderation_events start empty by construction on a
-// fresh D1; the cameras auto-seed (a behaviour tested explicitly below) is
-// the only thing that needs wiping.
-async function resetDb({ env, cameras }) {
+// Fresh in-memory DB with the schema applied from the real Drizzle
+// migrations. correction_requests / moderation_events start empty by
+// construction on a fresh D1; the cameras table is wiped so each test
+// controls its own fixture data.
+async function resetDb({ env }) {
   env.DB = new D1();
-  await cameras.getD1();
+  // H3: the schema comes from the real Drizzle migrations (fresh-DB contract);
+  // getD1() is a pure binding passthrough and bootstraps nothing.
+  await applyDrizzleMigrations(env.DB);
   await env.DB.prepare("DELETE FROM cameras").run();
 }
 
@@ -91,23 +95,14 @@ async function insertCamera(env, overrides = {}) {
   ).first();
 }
 
-test("a fresh database seeds exactly two clearly-labelled demo records", async () => {
+test("a fresh database starts empty: no demo records are seeded at runtime", async () => {
   const { env, cameras } = await realDb();
   env.DB = new D1();
+  // H3: the schema comes from the real Drizzle migrations; a fresh DB starts
+  // with zero records — demo records were previously seeded here at runtime.
+  await applyDrizzleMigrations(env.DB);
   const records = await cameras.listPublicCameras();
-
-  assert.equal(records.length, 2);
-  for (const record of records) {
-    assert.equal(record.status, "demo");
-    assert.equal(record.source, "Prototype seed");
-    assert.match(record.description, /not a claim|approximate|never/i);
-    assert.equal(record.notes, undefined, "demo seeds must not expose the notes field");
-  }
-  assert.deepEqual(
-    records.map((record) => record.title),
-    ["Illustrative record B", "Illustrative record A"],
-    "seed records are returned newest (highest id) first",
-  );
+  assert.equal(records.length, 0, "no demo records may be seeded at runtime (H3)");
 });
 
 test("the public camera query returns only verified and demo records", async () => {

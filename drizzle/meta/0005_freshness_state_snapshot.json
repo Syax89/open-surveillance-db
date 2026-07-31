@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "d99c4963-0bcb-4f1a-af70-262021088899",
+  "id": "8e3c5d8d-78f9-45d8-b088-89c962382666",
   "prevId": "d55bd7a6-be03-4d59-919b-90e6683fec7c",
   "tables": {
     "cameras": {
@@ -117,6 +117,28 @@
           "autoincrement": false,
           "default": "''"
         },
+        "last_verified_at": {
+          "name": "last_verified_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "review_due_at": {
+          "name": "review_due_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "review_interval_months": {
+          "name": "review_interval_months",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 12
+        },
         "created_at": {
           "name": "created_at",
           "type": "text",
@@ -125,15 +147,7 @@
           "autoincrement": false
         }
       },
-      "indexes": {
-        "cameras_status_idx": {
-          "name": "cameras_status_idx",
-          "columns": [
-            "status"
-          ],
-          "isUnique": false
-        }
-      },
+      "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
@@ -193,15 +207,7 @@
           "autoincrement": false
         }
       },
-      "indexes": {
-        "correction_requests_status_idx": {
-          "name": "correction_requests_status_idx",
-          "columns": [
-            "status"
-          ],
-          "isUnique": false
-        }
-      },
+      "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
@@ -281,16 +287,7 @@
           "autoincrement": false
         }
       },
-      "indexes": {
-        "moderation_events_created_at_idx": {
-          "name": "moderation_events_created_at_idx",
-          "columns": [
-            "created_at",
-            "id"
-          ],
-          "isUnique": false
-        }
-      },
+      "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},

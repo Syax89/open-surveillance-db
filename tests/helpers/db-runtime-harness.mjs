@@ -9,7 +9,7 @@
 //
 // H3: the schema is no longer created at runtime (getD1() is a pure binding
 // passthrough). applyDrizzleMigrations() replays the real Drizzle migration
-// files (drizzle/0000-*.sql ... 0005-*.sql) on the in-memory database, so
+// files (drizzle/0000-*.sql ... 0006-*.sql) on the in-memory database, so
 // tests exercise exactly what `wrangler d1 migrations apply` produces on a
 // fresh local DB — with zero demo rows.
 //
@@ -86,9 +86,9 @@ export async function loadDbRuntime() {
   return { env: envModule.env, cameras, moderation };
 }
 
-// Replays the real Drizzle migration files (drizzle/0000-*.sql ... 0005-*.sql)
+// Replays the real Drizzle migration files (drizzle/0000-*.sql ... 0006-*.sql)
 // on a D1SqliteDatabase, mirroring `wrangler d1 migrations apply` on a fresh
-// local DB: 3 tables + 3 indexes + 16 cameras columns, zero demo rows.
+// local DB: 3 tables + 3 indexes + 19 cameras columns (16 base + 3 freshness), zero demo rows.
 export async function applyDrizzleMigrations(db) {
   const files = (await readdir(DRIZZLE_DIR))
     .filter((name) => /^\d{4}_.*\.sql$/.test(name))

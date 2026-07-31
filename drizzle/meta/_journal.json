@@ -26,22 +26,29 @@
     {
       "idx": 3,
       "version": "6",
-      "when": 1785510000000,
+      "when": 1785515000000,
       "tag": "0003_camera_evidence_metadata",
       "breakpoints": true
     },
     {
       "idx": 4,
       "version": "6",
-      "when": 1785510100000,
+      "when": 1785515500000,
       "tag": "0004_camera_metadata_publication_consent",
       "breakpoints": true
     },
     {
       "idx": 5,
       "version": "6",
-      "when": 1785519938642,
-      "tag": "0005_flawless_thor_girl",
+      "when": 1785522000000,
+      "tag": "0005_freshness_state",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1785524825613,
+      "tag": "0006_flawless_thor_girl",
       "breakpoints": true
     }
   ]

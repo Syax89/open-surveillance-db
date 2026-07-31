@@ -17,6 +17,7 @@ import assert from "node:assert/strict";
 import { after, beforeEach, test } from "node:test";
 import { cleanupRouteTree, loadTreeModule } from "./helpers/api-harness.mjs";
 import { D1SqliteDatabase as D1 } from "./helpers/d1-sqlite.mjs";
+import { applyDrizzleMigrations } from "./helpers/db-runtime-harness.mjs";
 import { resetMockState } from "./helpers/mock-state.mjs";
 
 beforeEach(() => resetMockState());
@@ -37,9 +38,11 @@ async function realDb() {
   return { env: treeEnv, cameras: realCameras, corrections: realCorrections, moderation: realModeration };
 }
 
-async function resetDb({ env, cameras }) {
+async function resetDb({ env }) {
   env.DB = new D1();
-  await cameras.getD1();
+  // H3: the schema comes from the real Drizzle migrations (fresh-DB contract);
+  // getD1() is a pure binding passthrough and bootstraps nothing.
+  await applyDrizzleMigrations(env.DB);
   await env.DB.prepare("DELETE FROM cameras").run();
 }
 

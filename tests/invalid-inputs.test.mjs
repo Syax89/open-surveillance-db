@@ -18,6 +18,7 @@ import assert from "node:assert/strict";
 import { after, beforeEach, test } from "node:test";
 import { apiRequest, cleanupRouteTree, loadRoute, loadTreeModule, responseBody } from "./helpers/api-harness.mjs";
 import { D1SqliteDatabase as D1 } from "./helpers/d1-sqlite.mjs";
+import { applyDrizzleMigrations } from "./helpers/db-runtime-harness.mjs";
 import { callArgs, resetMockState, stub } from "./helpers/mock-state.mjs";
 
 beforeEach(() => resetMockState());
@@ -36,9 +37,11 @@ async function realDb() {
   return { env: treeEnv, cameras: realCameras, corrections: realCorrections };
 }
 
-async function resetDb({ env, cameras }) {
+async function resetDb({ env }) {
   env.DB = new D1();
-  await cameras.getD1();
+  // H3: the schema comes from the real Drizzle migrations (fresh-DB contract);
+  // getD1() is a pure binding passthrough and bootstraps nothing.
+  await applyDrizzleMigrations(env.DB);
   await env.DB.prepare("DELETE FROM cameras").run();
 }
 
@@ -75,10 +78,9 @@ test("SQL injection payloads are stored as inert text and never executed", async
   assert.equal(record.address, hostileAddress);
   assert.equal(record.notes, hostileNotes);
 
-  // The cameras table auto-seeds two demo rows whenever it is empty (a
-  // behaviour locked by the fresh-DB test in db-public-contracts), so the
-  // hostile record arrives alongside them.
-  assert.equal(await countCameras(env), 3, "no rows deleted by the injection string");
+  // H3: the fresh DB starts empty (migrations only, no runtime demo seed),
+  // so the hostile record is the only row in the cameras table.
+  assert.equal(await countCameras(env), 1, "no rows deleted by the injection string");
   const publicRecords = await cameras.listPublicCameras();
   assert.equal(publicRecords.some((item) => item.id === record.id), false, "pending hostile record stays private");
   await cameras.createPendingCamera({
@@ -91,7 +93,7 @@ test("SQL injection payloads are stored as inert text and never executed", async
     latitude: 44.1,
     longitude: 12.2,
   });
-  assert.equal(await countCameras(env), 4, "the cameras table is fully functional afterwards");
+  assert.equal(await countCameras(env), 2, "the cameras table is fully functional afterwards");
 });
 
 test("hostile unicode and control characters round-trip exactly", async () => {
