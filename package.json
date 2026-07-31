@@ -1,6 +1,16 @@
 {
-  "name": "site-creator-vinext-starter",
+  "name": "open-surveillance-db",
   "version": "0.1.0",
+  "description": "Open, non-commercial civic database of visible public surveillance infrastructure.",
+  "license": "AGPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Syax89/open-surveillance-db.git"
+  },
+  "homepage": "https://github.com/Syax89/open-surveillance-db",
+  "bugs": {
+    "url": "https://github.com/Syax89/open-surveillance-db/issues"
+  },
   "private": true,
   "engines": {
     "node": ">=22.13.0"

@@ -32,7 +32,7 @@ export default function Home() {
   useEffect(() => {
     let cancelled = false;
     fetch("/api/cameras")
-      .then((response) => response.ok ? response.json() : Promise.reject(new Error(t.apiLoadError)))
+      .then((response) => response.ok ? response.json() as Promise<{ records: Camera[] }> : Promise.reject(new Error(t.apiLoadError)))
       .then((data: { records: Camera[] }) => { if (!cancelled && data.records.length) { setRecords(data.records); setSelectedId(data.records[0].id); } })
       .catch(() => { if (!cancelled) setNotice(t.apiUnavailable); })
       .finally(() => !cancelled && setLoading(false));

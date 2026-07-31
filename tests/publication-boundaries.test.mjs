@@ -365,3 +365,92 @@ test("the public interface contains no moderation or admin endpoint link", async
     "public pages must not expose a moderation or admin endpoint through JSX expressions",
   );
 });
+
+
+test("the public JSON output never contains the private notes field", async () => {
+  const cameras = await readSource("db/cameras.ts");
+  const route = await readSource("app/api/cameras/route.ts");
+  const publicStart = cameras.indexOf("export async function listPublicCameras");
+  const publicEnd = cameras.indexOf("export async function createPendingCamera", publicStart);
+  const publicBoundary = cameras.slice(publicStart, publicEnd);
+  const getStart = route.indexOf("export async function GET");
+  const postStart = route.indexOf("export async function POST", getStart);
+  const getHandler = route.slice(getStart, postStart);
+
+  assert.ok(publicStart >= 0, "the public query must remain the public read boundary");
+  assert.doesNotMatch(
+    publicBoundary,
+    /\bnotes\b/,
+    "the public read boundary must not select or reference the private notes field",
+  );
+  assert.doesNotMatch(
+    getHandler,
+    /\bnotes\b/,
+    "the public GET handler must not expose a notes field",
+  );
+  assert.match(
+    cameras,
+    /export\s+type\s+PublicCameraRecord\s*=\s*Omit\s*<CameraRecord,\s*["']notes["']>/,
+    "the public record type must explicitly omit the private notes field",
+  );
+});
+
+test("moderation is gated at the worker edge and fails closed", async () => {
+  const worker = await readSource("worker/index.ts");
+
+  assert.match(worker, /moderationPath\s*=\s*\(/, "the worker must recognise moderation paths");
+  assert.match(worker, /MODERATION_USER/, "the worker must read the moderator username from environment");
+  assert.match(worker, /MODERATION_PASSWORD/, "the worker must read the moderator password from environment");
+  assert.match(worker, /MODERATION_TOKEN/, "the worker must accept a bearer token when configured");
+  assert.match(worker, /status:\s*401/, "unauthenticated moderation requests must be rejected with 401");
+  assert.match(worker, /Unauthorized/, "the 401 response must identify itself as Unauthorized");
+  assert.match(worker, /status:\s*503/, "the gate must fail closed when no credentials are configured");
+});
+
+test("public POST endpoints are rate-limited per caller and can be disabled", async () => {
+  const route = await readSource("app/api/cameras/route.ts");
+  const limiter = await readSource("app/lib/rate-limit.ts");
+  const postStart = route.indexOf("export async function POST");
+  const post = route.slice(postStart);
+
+  assert.ok(postStart >= 0, "camera reports must have an explicit POST handler");
+  assert.match(
+    route,
+    /import\s*\{[^}]*\bcheckRateLimit\b[^}]*\}\s*from\s*["'][^"']*lib\/rate-limit["']/,
+    "the POST handler must use the shared per-caller rate limiter",
+  );
+  assert.match(route, /callerKey\(request\)/, "the rate limiter must be keyed on the caller identity");
+  assert.match(post, /status:\s*429/, "exceeding the limit must return 429");
+  assert.match(post, /Retry-After/, "the 429 response must include a retry window");
+  assert.match(post, /submissionsDisabled\(env\)/, "submissions must be disableable through environment");
+  assert.match(limiter, /new\s+Map<string,\s*number\[\]>/, "the limiter must keep per-key request timestamps");
+  assert.match(limiter, /POST_RATE_LIMIT_MAX/, "the request limit must be configurable through environment");
+  assert.match(limiter, /POST_RATE_LIMIT_WINDOW_SECONDS/, "the window must be configurable through environment");
+  assert.match(limiter, /POST_SUBMISSIONS_DISABLED/, "the disable flag must be read from environment");
+});
+
+test("server errors are logged server-side and return generic client messages", async () => {
+  const routes = {
+    cameras: await readSource("app/api/cameras/route.ts"),
+    nearby: await readSource("app/api/cameras/nearby/route.ts"),
+    corrections: await readSource("app/api/corrections/route.ts"),
+    moderation: await readSource("app/api/moderation/route.ts"),
+  };
+
+  for (const [label, source] of Object.entries(routes)) {
+    assert.doesNotMatch(
+      source,
+      /Response\.json\(\{\s*error:\s*error\s+instanceof\s+Error\s*\?\s*error\.message/,
+      `${label} must not leak raw error messages to the client`,
+    );
+    assert.match(source, /console\.error/, `${label} must log error details server-side`);
+  }
+});
+
+test("package metadata identifies the project, license, and repository", async () => {
+  const pkg = JSON.parse(await readSource("package.json"));
+  assert.equal(pkg.name, "open-surveillance-db");
+  assert.equal(pkg.license, "AGPL-3.0-or-later");
+  assert.equal(pkg.repository?.url, "git+https://github.com/Syax89/open-surveillance-db.git");
+  assert.equal(pkg.homepage, "https://github.com/Syax89/open-surveillance-db");
+});
