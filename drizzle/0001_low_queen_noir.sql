@@ -5,5 +5,6 @@ CREATE TABLE `correction_requests` (
 	`message` text NOT NULL,
 	`contact` text,
 	`status` text DEFAULT 'pending' NOT NULL,
+	`outcome` text,
 	`created_at` text NOT NULL
 );

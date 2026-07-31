@@ -33,6 +33,7 @@ export const correctionRequests = sqliteTable("correction_requests", {
   message: text("message").notNull(),
   contact: text("contact"),
   status: text("status").notNull().default("pending"),
+  outcome: text("outcome"),
   createdAt: text("created_at").notNull(),
 });
 
