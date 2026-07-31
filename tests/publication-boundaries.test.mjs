@@ -74,7 +74,11 @@ test("nearby search validates its bounded coordinates and stays behind the publi
     /latitude\s*<\s*-90[\s\S]*latitude\s*>\s*90[\s\S]*longitude\s*<\s*-180[\s\S]*longitude\s*>\s*180[\s\S]*radius\s*<\s*10[\s\S]*radius\s*>\s*500/,
     "nearby search must reject invalid coordinates and radius values outside 10–500 metres",
   );
-  assert.match(route, /findNearbyPublicCameras\(latitude,\s*longitude,\s*radius\)/);
+  assert.match(
+    route,
+    /findNearbyPublicCameras\(\s*latitude,\s*longitude,\s*radius/,
+    "nearby search must pass the bounded coordinates (and optional pre-submit text hints) to the public helper",
+  );
   assert.doesNotMatch(route, /\bgetD1\b|\.prepare\(|\bSELECT\b/i, "the nearby route must not query the database directly");
   assert.match(helper, /const\s+records\s*=\s+await\s+listPublicCameras\(\)/, "nearby search must start with the filtered public list");
   assert.match(helper, /\.filter\(\(record\)\s*=>\s*record\.distanceMeters\s*<=\s*radiusMeters\)/, "nearby search must filter that public list by distance");
@@ -434,6 +438,7 @@ test("server errors are logged server-side and return generic client messages", 
   const routes = {
     cameras: await readSource("app/api/cameras/route.ts"),
     nearby: await readSource("app/api/cameras/nearby/route.ts"),
+    revisions: await readSource("app/api/cameras/revisions/route.ts"),
     corrections: await readSource("app/api/corrections/route.ts"),
     moderation: await readSource("app/api/moderation/route.ts"),
   };
@@ -448,10 +453,105 @@ test("server errors are logged server-side and return generic client messages", 
   }
 });
 
+test("every map task has a keyboard/text-list equivalent in the public interface", async () => {
+  const page = await readSource("app/page.tsx");
+  const map = await readSource("app/components/SurveillanceMap.tsx");
+
+  // Map task: select a record (pin click). Keyboard path: the directory's
+  // "Show on map" moves selection AND keyboard focus to the map region,
+  // respecting reduced motion.
+  assert.match(page, /function\s+showRecordOnMap\s*\(\s*id:\s*number\s*\)/);
+  assert.match(page, /setSelectedId\s*\(\s*id\s*\)/, "show-on-map must select the record");
+  assert.match(page, /document\.getElementById\(\s*["']map["']\s*\)\?\.scrollIntoView/, "show-on-map must scroll to the map");
+  assert.match(page, /document\.getElementById\(\s*["']map-region["']\s*\)\?\.focus/, "show-on-map must move keyboard focus to the map region");
+  assert.match(page, /prefers-reduced-motion/, "scrolling must respect reduced-motion preference");
+
+  // Map task: browse pins. Text-list path: one directory card per record with
+  // the keyboard select action.
+  assert.match(page, /className=["']record-list["']/, "the directory must render the record list");
+  assert.match(page, /showRecordOnMap\(\s*camera\.id\s*\)/, "every record card must offer the keyboard select path");
+
+  // Map task: pick a report position (map click). Keyboard path: manual coordinates.
+  assert.match(page, /selectManualCoordinates/, "the report form must keep the manual-coordinate fallback");
+
+  // The map region is a labelled, programmatically focusable landmark that
+  // describes the text-list alternative.
+  assert.match(map, /role="region"/);
+  assert.match(map, /aria-label=\{\s*label\s*\}/);
+  assert.match(map, /tabIndex=\{\s*-1\s*\}/, "the map region must accept programmatic focus");
+  assert.match(map, /id="map-region"/);
+  assert.match(map, /href="#records"/, "the map description must link the directory alternative");
+
+  // Map task: map unavailable (blocked script or tile host). The list stays
+  // usable and the failure is visible with a direct link to the directory.
+  assert.match(map, /setMapUnavailable\(\s*true\s*\)/, "a map startup failure must flip to the fallback state");
+  assert.match(map, /map-fallback/, "the fallback state must render a visible text alternative");
+  assert.match(map, /The interactive map is unavailable\./, "the fallback must state plainly that the map is unavailable");
+});
+
 test("package metadata identifies the project, license, and repository", async () => {
   const pkg = JSON.parse(await readSource("package.json"));
   assert.equal(pkg.name, "open-surveillance-db");
   assert.equal(pkg.license, "AGPL-3.0-or-later");
   assert.equal(pkg.repository?.url, "git+https://github.com/Syax89/open-surveillance-db.git");
   assert.equal(pkg.homepage, "https://github.com/Syax89/open-surveillance-db");
+});
+
+test("the public change summary is served only for currently public records", async () => {
+  const route = await readSource("app/api/cameras/revisions/route.ts");
+  const cameras = await readSource("db/cameras.ts");
+  const getStart = cameras.indexOf("export async function getPublicCameraById");
+  const getBoundary = cameras.slice(getStart);
+
+  assert.ok(getStart >= 0, "the revisions route must have a dedicated public-record lookup");
+  assert.match(
+    getBoundary,
+    /WHERE\s+id\s*=\s*\?\s+AND\s+status\s+IN\s*\(\s*'verified'\s*,\s*'demo'\s*\)/i,
+    "the lookup must resolve only verified and demo records",
+  );
+  assert.doesNotMatch(getBoundary, /\bnotes\b/, "the lookup must not select the private notes field");
+
+  assert.match(
+    route,
+    /import\s*\{[^}]*\bgetPublicCameraById\b[^}]*\}\s*from\s*["'][^"']*db\/cameras["']/,
+    "the route must use the dedicated public-record lookup",
+  );
+  assert.match(
+    route,
+    /import\s*\{[^}]*\blistPublicCameraRevisions\b[^}]*\}\s*from\s*["'][^"']*db\/moderation["']/,
+    "the route must use the dedicated public-history boundary",
+  );
+  assert.match(route, /searchParams\.get\(['"]cameraId['"]\)/, "the route must read a cameraId");
+  assert.match(route, /status:\s*400/, "an invalid cameraId must be rejected");
+  assert.match(route, /if\s*\(!record\)/, "a non-public record must be rejected before any history read");
+  assert.match(route, /status:\s*404/, "a non-public record must return 404");
+  assert.match(route, /status:\s*503/, "database failures must fail closed");
+  assert.doesNotMatch(
+    route,
+    /\bgetD1\b|\.prepare\(|\bSELECT\b|\bmoderateCamera\b|\blistPendingModerationItems\b/i,
+    "the public route must not touch the database or the moderation queue directly",
+  );
+});
+
+test("the public change summary omits contributor identity and internal notes", async () => {
+  const moderation = await readSource("db/moderation.ts");
+  const summaryStart = moderation.indexOf("export async function listPublicCameraRevisions");
+  const summary = moderation.slice(summaryStart);
+
+  assert.ok(summaryStart >= 0, "the public-history boundary must be an explicit database function");
+  assert.match(
+    summary,
+    /FROM\s+moderation_events\s+WHERE\s+entity\s*=\s*['"]camera['"]\s+AND\s+entity_id\s*=\s*\?/i,
+    "the summary must select only camera lifecycle events for the requested record",
+  );
+  assert.match(
+    summary,
+    /ORDER\s+BY\s+created_at\s+ASC,\s*id\s+ASC/i,
+    "the summary must be chronological, oldest first",
+  );
+  assert.doesNotMatch(
+    summary,
+    /\bactor\b|\bnote\b|\breason_code\b|\breasonCode\b/,
+    "the public summary must never select the private audit columns (actor, note, reason code)",
+  );
 });

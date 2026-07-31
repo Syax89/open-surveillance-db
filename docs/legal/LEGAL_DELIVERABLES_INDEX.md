@@ -34,6 +34,14 @@
 - **Italian localization of the privacy notice** (art. 12(1)) — see PRIVACY_NOTICE.md open items.
 - **SCC version at DPA execution** — see PROCESSOR_REGISTER.md open items.
 
+## Related documents (not legal deliverables)
+
+For discoverability only: the
+[accessibility statement](../ACCESSIBILITY_STATEMENT.md) and
+[ADR 0006 — non-sensitive usability-feedback route](../decisions/0006-non-sensitive-usability-feedback-route.md)
+are product/UX deliverables owned by the product workstream, not part of the
+pre-launch legal review.
+
 ## Consolidation note
 
 This folder (`docs/legal/`) is the **single canonical location** for pre-launch legal deliverables. Earlier draft copies at the repository root (`docs/PRIVACY_NOTICE.md`, `docs/LAWFUL_BASIS.md`, `docs/PROCESSOR_REGISTER.md`, `docs/RETENTION_SCHEDULE.md`, `docs/BREACH_PROCEDURE.md`, `docs/MODERATION_SLA.md`, and this index) were removed as part of the legal-review consolidation (PR #8); the ADR 0002 and `README.md` in this folder are updated accordingly.

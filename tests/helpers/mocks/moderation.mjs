@@ -18,8 +18,10 @@ export const {
   listPendingModerationItems,
   moderateCamera,
   moderateCorrection,
+  listPublicCameraRevisions,
 } = makeMock({
   listPendingModerationItems: "listPendingModerationItems",
   moderateCamera: "moderateCamera",
   moderateCorrection: "moderateCorrection",
+  listPublicCameraRevisions: "listPublicCameraRevisions",
 });

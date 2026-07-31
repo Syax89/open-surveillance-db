@@ -400,7 +400,7 @@ test("nearby search passes bounded coordinates and radius to the helper", async 
   const response = await GET(apiRequest("/api/cameras/nearby?latitude=41.9&longitude=12.49&radius=75"));
   assert.equal(response.status, 200);
   assert.deepEqual(await responseBody(response), { records: [nearbyFixture] });
-  assert.deepEqual(callArgs("findNearbyPublicCameras")[0], [41.9, 12.49, 75]);
+  assert.deepEqual(callArgs("findNearbyPublicCameras")[0], [41.9, 12.49, 75, { title: "", address: "", kind: "" }]);
 });
 
 test("nearby search defaults the radius to 75 metres", async () => {
@@ -408,7 +408,7 @@ test("nearby search defaults the radius to 75 metres", async () => {
   const { GET } = await nearbyRoute();
   const response = await GET(apiRequest("/api/cameras/nearby?latitude=41.9&longitude=12.49"));
   assert.equal(response.status, 200);
-  assert.deepEqual(callArgs("findNearbyPublicCameras")[0], [41.9, 12.49, 75]);
+  assert.deepEqual(callArgs("findNearbyPublicCameras")[0], [41.9, 12.49, 75, { title: "", address: "", kind: "" }]);
 });
 
 test("nearby search accepts boundary radius values 10 and 500", async () => {
@@ -469,4 +469,69 @@ test("nearby search returns 503 when the database is unavailable", async () => {
   const { GET } = await nearbyRoute();
   const response = await GET(apiRequest("/api/cameras/nearby?latitude=0&longitude=0&radius=50"));
   assert.equal(response.status, 503);
+});
+
+test("nearby search forwards and truncates pre-submit text hints", async () => {
+  stub("findNearbyPublicCameras", async () => []);
+  const { GET } = await nearbyRoute();
+  const response = await GET(
+    apiRequest(`/api/cameras/nearby?latitude=41.9&longitude=12.49&radius=75&title=${"T".repeat(95)}&address=${"A".repeat(200)}&kind=${"K".repeat(70)}`),
+  );
+  assert.equal(response.status, 200);
+  assert.deepEqual(callArgs("findNearbyPublicCameras")[0], [
+    41.9,
+    12.49,
+    75,
+    { title: "T".repeat(90), address: "A".repeat(180), kind: "K".repeat(60) },
+  ]);
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/cameras — non-blocking pre-submit duplicate detection
+// ---------------------------------------------------------------------------
+
+test("POST includes nearby reviewed records as possibleDuplicates without blocking the report", async () => {
+  const duplicateFixture = {
+    ...nearbyFixture,
+    similarity: 0.82,
+    matchStrength: "high",
+  };
+  stub("createPendingCamera", async (input) => ({ id: 14, ...input }));
+  stub("findNearbyPublicCameras", async () => [duplicateFixture]);
+  const { POST } = await camerasRoute();
+  const response = await POST(
+    apiRequest("/api/cameras", {
+      method: "POST",
+      body: { title: "Camera porta nord", kind: "Fixed dome", address: "Via Roma 1", latitude: 41.9004, longitude: 12.4936 },
+    }),
+  );
+  assert.equal(response.status, 201);
+  const body = await responseBody(response);
+  assert.equal(body.record.id, 14);
+  assert.deepEqual(body.possibleDuplicates, [duplicateFixture]);
+  // The duplicate check must reuse the cleaned, validated fields and a 75 m radius.
+  assert.deepEqual(callArgs("findNearbyPublicCameras")[0], [
+    41.9004,
+    12.4936,
+    75,
+    { title: "Camera porta nord", address: "Via Roma 1", kind: "Fixed dome" },
+  ]);
+});
+
+test("POST survives a failing duplicate check with an empty possibleDuplicates list", async () => {
+  stub("createPendingCamera", async (input) => ({ id: 15, ...input }));
+  stub("findNearbyPublicCameras", async () => {
+    throw new Error("Database binding unavailable");
+  });
+  const { POST } = await camerasRoute();
+  const response = await POST(
+    apiRequest("/api/cameras", {
+      method: "POST",
+      body: { title: "X", kind: "Y", latitude: 1, longitude: 1 },
+    }),
+  );
+  assert.equal(response.status, 201);
+  const body = await responseBody(response);
+  assert.equal(body.record.id, 15);
+  assert.deepEqual(body.possibleDuplicates, []);
 });

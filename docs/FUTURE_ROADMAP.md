@@ -43,12 +43,20 @@ re-verification lifecycle work is also implemented locally: a verified record
 can be marked `needs_review`, which removes it from public output until it is
 reverified or removed. A full fictional lifecycle exercise has passed.
 
+**Implementation update (2026-07-31, change summary):** every record detail
+page now shows a reviewed public change summary — approved, marked for
+re-review, re-verified, or removed transitions with their dates — served by
+`GET /api/cameras/revisions?cameraId=N`. The endpoint resolves only for
+currently public records and its projection deliberately omits contributor
+identity, moderator identity, reason codes, and internal notes; boundary tests
+guard the projection statically and at runtime.
+
 ### Planned work
 
 - Detect likely duplicates before a contributor submits a new record.
 - Add explicit record freshness and re-verification state without publishing stale data as current.
 - Add safe category and verification-freshness filters to the public directory.
-- Add a reviewed public change summary that omits contributor identities and internal notes.
+- [x] Add a reviewed public change summary that omits contributor identities and internal notes.
 - Give moderators a local way to associate a correction request with a record outcome.
 - Expand tests around each status transition and its public visibility.
 
@@ -65,7 +73,10 @@ translation review and formal accessibility testing remain required. The site
 also has a bilingual in-app guide, a skip link, visible focus states,
 reduced-motion support, and explicit map-to-directory guidance. A report
 location can be selected by map click or valid manual coordinates; either path
-uses the same public-only nearby-record check.
+uses the same public-only nearby-record check. An accessibility statement
+(draft) and the design decision for a non-sensitive usability-feedback route
+([ADR 0006](decisions/0006-non-sensitive-usability-feedback-route.md)) are now
+recorded; the `/feedback` page itself is pending implementation.
 
 ### Planned work
 
@@ -84,6 +95,11 @@ uses the same public-only nearby-record check.
 **Implementation update (2026-07-31):** a local playbook documents setup,
 synthetic submissions, approve/reject/hide checks, nearby-search validation,
 and a cautious reset approach without providing a destructive reset command.
+A lightweight [data dictionary](DATA_DICTIONARY.md) now documents every
+public field across JSON, CSV, and GeoJSON outputs, and an
+[export versioning policy](EXPORT_VERSIONING.md) defines how future dataset
+releases will be versioned, labelled, and cited once the final data licence
+is decided.
 
 ### Planned work
 
