@@ -57,6 +57,7 @@ const REAL_DB_MODULES = [
   // cameras route now pulls in for optional contributor attribution; it must
   // exist in the tree so the transitive import resolves against the real db.
   { source: "db/auth.ts", output: "db/auth.mjs" },
+  { source: "db/photos.ts", output: "db/photos.mjs" },
 ];
 
 let builtTreePromise = null;

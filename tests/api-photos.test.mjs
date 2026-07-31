@@ -30,10 +30,10 @@ function jpegBytes() {
     for (const array of arrays) { out.set(array, offset); offset += array.length; }
     return out;
   };
-  const app0 = concat(Uint8Array.from([0xff, 0xe0]), Uint8Array.from(be16(16)), ascii("JFIF\0"), Uint8Array.from([1, 1, 0, 0, 1, 0, 1]));
-  const app1Exif = concat(Uint8Array.from([0xff, 0xe1]), Uint8Array.from(be16(16)), ascii("Exif\0\0"), ascii("GPS-GEO"));
+  const app0 = concat(Uint8Array.from([0xff, 0xe0]), Uint8Array.from(be16(16)), ascii("JFIF\0"), Uint8Array.from([1, 1, 0, 0, 1, 0, 1, 0, 0]));
+  const app1Exif = concat(Uint8Array.from([0xff, 0xe1]), Uint8Array.from(be16(2 + 13)), ascii("Exif\0\0"), ascii("GPS-GEO"));
   const sof0 = concat(Uint8Array.from([0xff, 0xc0]), Uint8Array.from(be16(8)), Uint8Array.from([8]), Uint8Array.from(be16(48)), Uint8Array.from(be16(64)), Uint8Array.from([1]));
-  const sos = concat(Uint8Array.from([0xff, 0xda]), Uint8Array.from(be16(6)), Uint8Array.from([1, 0x01, 0x00, 0x3f, 0x00]));
+  const sos = concat(Uint8Array.from([0xff, 0xda]), Uint8Array.from(be16(2 + 5)), Uint8Array.from([1, 0x01, 0x00, 0x3f, 0x00]));
   return concat(Uint8Array.from([0xff, 0xd8]), app0, app1Exif, sof0, sos, Uint8Array.from([0x12, 0x34]), Uint8Array.from([0xff, 0xd9]));
 }
 
@@ -107,8 +107,9 @@ test("POST /api/photos rejects non-image bodies with 415", async () => {
 
 test("POST /api/photos rejects unreadable dimensions with 400", async () => {
   const { POST } = await photosRoute();
-  // JPEG container with no SOF marker → dimensions unreadable.
-  const bytes = Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x04, 0x00, 0x00, 0xff, 0xd9]);
+  // JPEG container with no SOF marker → dimensions unreadable. At least 12
+  // bytes so sniffing succeeds first (otherwise it is a 415, not a 400).
+  const bytes = Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x04, 0x00, 0x00, 0xff, 0xd9, 0x00, 0x00]);
   const response = await POST(photoRequest(bytes));
   assert.equal(response.status, 400);
   assert.equal(callArgs("createPendingPhoto").length, 0);

@@ -54,19 +54,19 @@ function asciiBytes(text) {
 // Minimal JPEG: SOI + APP0(JFIF) + APP1(EXIF) + APP13(IPTC) + COM + SOF0(64x48)
 // + SOS + 2 entropy bytes + EOI. CRC-free, marker-walkable.
 function jpegFixture({ withExif = true, withIptc = true, withComment = true } = {}) {
-  const app0 = concat(u8(0xff, 0xe0), u8(...be16(16)), asciiBytes("JFIF\0"), u8(1, 1, 0, 0, 1, 0, 1));
+  const app0 = concat(u8(0xff, 0xe0), u8(...be16(16)), asciiBytes("JFIF\0"), u8(1, 1, 0, 0, 1, 0, 1, 0, 0));
   const app1Exif = withExif
-    ? concat(u8(0xff, 0xe1), u8(...be16(2 + 14)), asciiBytes("Exif\0\0"), asciiBytes("GEO-GPS-DATA"))
+    ? concat(u8(0xff, 0xe1), u8(...be16(2 + 18)), asciiBytes("Exif\0\0"), asciiBytes("GEO-GPS-DATA"))
     : u8();
   const app13 = withIptc
-    ? concat(u8(0xff, 0xed), u8(...be16(2 + 11)), asciiBytes("Photoshop 3"), u8(0))
+    ? concat(u8(0xff, 0xed), u8(...be16(2 + 12)), asciiBytes("Photoshop 3"), u8(0))
     : u8();
   const com = withComment
-    ? concat(u8(0xff, 0xfe), u8(...be16(2 + 8)), asciiBytes("user comment"))
+    ? concat(u8(0xff, 0xfe), u8(...be16(2 + 12)), asciiBytes("user comment"))
     : u8();
   // SOF0: length 8, precision 8, height 48, width 64, 1 component.
   const sof0 = concat(u8(0xff, 0xc0), u8(...be16(8)), u8(8), u8(...be16(48)), u8(...be16(64)), u8(1));
-  const sos = concat(u8(0xff, 0xda), u8(...be16(6)), u8(1), u8(0x01, 0x00), u8(0x3f, 0x00));
+  const sos = concat(u8(0xff, 0xda), u8(...be16(2 + 5)), u8(1), u8(0x01, 0x00), u8(0x3f, 0x00));
   const scan = u8(0x12, 0x34);
   const eoi = u8(0xff, 0xd9);
   return concat(u8(0xff, 0xd8), app0, app1Exif, app13, com, sof0, sos, scan, eoi);
@@ -84,7 +84,7 @@ function pngFixture({ withExif = true, withText = true } = {}) {
     u8(0, 0, 0, 0), // crc (unchecked by the parser)
   );
   const exif = withExif
-    ? concat(u8(...be32(12)), asciiBytes("eXIf"), asciiBytes("EXIF-GPS!"), u8(0, 0, 0, 0))
+    ? concat(u8(...be32(9)), asciiBytes("eXIf"), asciiBytes("EXIF-GPS!"), u8(0, 0, 0, 0))
     : u8();
   const text = withText
     ? concat(u8(...be32(9)), asciiBytes("tEXt"), asciiBytes("Author=Me"), u8(0, 0, 0, 0))
@@ -101,13 +101,12 @@ function webpFixture({ withExif = true, withXmp = true } = {}) {
     u8(0x00, 0x00, 0x00, 0x00),
     u8(...[63, 0, 0]), // width-1, 24-bit LE
     u8(...[47, 0, 0]), // height-1, 24-bit LE
-    u8(0x00),
   );
   const exif = withExif
     ? concat(asciiBytes("EXIF"), u8(...le32(8)), asciiBytes("GEOGPS!"), u8(0x00))
     : u8();
   const xmp = withXmp
-    ? concat(asciiBytes("XMP "), u8(...le32(8)), asciiBytes("<xmp>foo"), u8(0x00))
+    ? concat(asciiBytes("XMP "), u8(...le32(8)), asciiBytes("<xmp>foo"))
     : u8();
   const body = concat(vp8x, exif, xmp);
   return concat(asciiBytes("RIFF"), u8(...le32(body.length)), asciiBytes("WEBP"), body);

@@ -20,7 +20,7 @@ export type ModerationQueue = {
   queueItems: ModerationQueueItem[];
 };
 
-export type ModerationEntity = "camera" | "correction";
+export type ModerationEntity = "camera" | "correction" | "photo";
 export type CameraModerationAction =
   | "approve"
   | "reject"

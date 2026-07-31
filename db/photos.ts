@@ -46,7 +46,8 @@ const photoColumns =
   "id, camera_id AS cameraId, storage_key AS storageKey, mime_type AS mimeType, width, height, size_bytes AS sizeBytes, status, exif_stripped AS exifStripped, redaction_confirmed AS redactionConfirmed, created_at AS createdAt, updated_at AS updatedAt";
 
 function withoutStorageKey(photo: PhotoRecord): PendingPhotoReport {
-  const { storageKey: _storageKey, ...publicPhoto } = photo;
+  const { storageKey, ...publicPhoto } = photo;
+  void storageKey;
   return publicPhoto;
 }
 
