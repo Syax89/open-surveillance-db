@@ -65,7 +65,10 @@ translation review and formal accessibility testing remain required. The site
 also has a bilingual in-app guide, a skip link, visible focus states,
 reduced-motion support, and explicit map-to-directory guidance. A report
 location can be selected by map click or valid manual coordinates; either path
-uses the same public-only nearby-record check.
+uses the same public-only nearby-record check. An accessibility statement
+(draft) and the design decision for a non-sensitive usability-feedback route
+([ADR 0006](decisions/0006-non-sensitive-usability-feedback-route.md)) are now
+recorded; the `/feedback` page itself is pending implementation.
 
 ### Planned work
 

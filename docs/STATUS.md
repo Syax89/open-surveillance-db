@@ -27,12 +27,14 @@ Last reviewed: 2026-07-31
 - [x] Local fictional-data lifecycle check: only verified state reaches public outputs.
 - [x] English/Italian interface for public pages, record detail, and local moderation.
 - [x] Public in-app guide plus skip link, visible focus treatment, reduced-motion support, and map-directory accessibility guidance.
+- [x] Draft accessibility statement and design decision for a non-sensitive usability-feedback route ([`docs/ACCESSIBILITY_STATEMENT.md`](ACCESSIBILITY_STATEMENT.md), [ADR 0006](decisions/0006-non-sensitive-usability-feedback-route.md)).
 - [x] Clearly labelled illustrative demo data.
 - [x] Initial open documentation and project policies.
 
 ## Not yet implemented
 
 - [ ] Authentication and contributor accounts.
+- [ ] Public `/feedback` page for the non-sensitive usability-feedback route (designed in [ADR 0006](decisions/0006-non-sensitive-usability-feedback-route.md); implementation pending).
 - [ ] Authentication/roles, audit log, appeal workflow, and production moderation controls.
 - [ ] Image upload, secure storage, EXIF stripping, and redaction tooling.
 - [ ] Legal/privacy review and public-facing terms.

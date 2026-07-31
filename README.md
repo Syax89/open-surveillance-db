@@ -31,6 +31,7 @@ An open, non-commercial civic database for documenting **visible public surveill
 - Nearby-record warning and safe type/order filters shared by map and directory.
 - Bilingual interface (English and Italian), with a device-local language preference.
 - In-app bilingual project guide at `/guide`.
+- Draft accessibility statement and design for a non-sensitive usability-feedback route (see `docs/ACCESSIBILITY_STATEMENT.md` and ADR 0006).
 - Cloudflare D1-compatible data layer, with local demo records.
 
 The prototype is deliberately not a public registry yet. It needs a public repository, moderation team, privacy review, terms, and operational safeguards before accepting real-world reports.
@@ -49,6 +50,7 @@ The documentation is part of the project and is intended to be discussed openly.
 - [Data model and API](docs/DATA_MODEL.md)
 - [Moderation policy](docs/MODERATION.md)
 - [Privacy and safety](docs/PRIVACY_AND_SAFETY.md)
+- [Accessibility statement](docs/ACCESSIBILITY_STATEMENT.md)
 - [Open-source and data licensing](docs/OPEN_SOURCE.md)
 - [OpenStreetMap integration](docs/OSM_INTEGRATION.md)
 - [Deployment and operations](docs/DEPLOYMENT.md)
