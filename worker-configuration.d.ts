@@ -4,6 +4,13 @@
 // I tipi sono strutturali e basati su lib.dom: vinext espone i propri tipi
 // con Request/Response DOM standard, quindi non usiamo @cloudflare/workers-types.
 
+// Cloudflare Workers espone la namespace di cache default come `caches.default`,
+// proprietà che lib.dom non modella su CacheStorage: la aggiungiamo per
+// declaration merging (questo file è uno script, quindi l'interfaccia è globale).
+interface CacheStorage {
+  default: Cache;
+}
+
 declare module "cloudflare:workers" {
   export interface D1PreparedStatement {
     bind(...values: unknown[]): D1PreparedStatement;
@@ -31,6 +38,12 @@ declare module "cloudflare:workers" {
         };
       };
     };
+    /** Tile proxy upstream (see docs/OSM_INTEGRATION.md). Optional: defaults
+     * to the canonical community server https://tile.openstreetmap.org. */
+    TILE_PROVIDER_URL?: string;
+    /** Optional API key appended as `?key=` for providers that require one
+     * (e.g. MapTiler, Stadia Maps). Leave unset for the community server. */
+    TILE_PROVIDER_KEY?: string;
   }
 
   export const env: Env;

@@ -1,6 +1,6 @@
 # Project status
 
-Last reviewed: 2026-07-31
+Last reviewed: 2026-08-01
 
 ## Implemented locally
 
@@ -40,6 +40,11 @@ Last reviewed: 2026-07-31
   non-destructive local reset (`docs/DEVELOPMENT_SETUP.md`, commands verified
   on `main`).
 - [x] Initial open documentation and project policies.
+- [x] Compliant map-tile strategy: same-origin tile proxy with identifying
+  User-Agent, forwarded Referer, ≥7-day edge caching, switchable provider
+  (`TILE_PROVIDER_URL`/`TILE_PROVIDER_KEY`), and a documented
+  community-vs-commercial-vs-self-hosted decision matrix
+  ([`docs/OSM_INTEGRATION.md`](OSM_INTEGRATION.md)).
 
 ## Not yet implemented
 
@@ -48,7 +53,6 @@ Last reviewed: 2026-07-31
 - [ ] Authentication/roles, audit log, appeal workflow, and production moderation controls.
 - [ ] Image upload, secure storage, EXIF stripping, and redaction tooling.
 - [ ] Legal/privacy review and public-facing terms.
-- [ ] A production map-tile strategy compliant with provider terms.
 - [ ] Public deployment, domain, backup/restore drills, and monitoring — remains a future precondition, see `docs/DEPLOYMENT.md`.
 - [ ] Android application.
 

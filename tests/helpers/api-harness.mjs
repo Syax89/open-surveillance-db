@@ -30,6 +30,7 @@ const ROUTES = [
   { source: "app/api/cameras/revisions/route.ts", output: "app/api/cameras/revisions/route.mjs" },
   { source: "app/api/moderation/route.ts", output: "app/api/moderation/route.mjs" },
   { source: "app/api/corrections/route.ts", output: "app/api/corrections/route.mjs" },
+  { source: "app/api/tiles/[z]/[x]/[y]/route.ts", output: "app/api/tiles/[z]/[x]/[y]/route.mjs" },
 ];
 
 // Real db/* modules compiled into the temp tree so runtime tests can
