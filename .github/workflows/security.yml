@@ -1,0 +1,67 @@
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 6 * * 1" # ogni lunedì 06:00 UTC
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  secrets-scan:
+    name: Gitleaks (hardcoded secrets)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Gitleaks scan
+        shell: bash
+        run: |
+          GITLEAKS_VERSION=8.24.3
+          curl -sSfL \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            -o /tmp/gitleaks.tar.gz
+          tar -xzf /tmp/gitleaks.tar.gz -C /usr/local/bin gitleaks
+          gitleaks detect --source . --redact --verbose
+
+  dependency-audit:
+    name: npm audit (vulnerable dependencies)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: npm audit (production dependencies — gate)
+        # Gate bloccante sul runtime: tutto ciò che va in produzione.
+        # Le vulnerabilità nelle devDependencies (tooling) NON bloccano qui,
+        # ma vengono riportate dallo step completo qui sotto.
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: npm audit (full report — non-blocking)
+        # Report completo incluso le devDependencies (es. brace-expansion via
+        # eslint-plugin-*, esbuild via drizzle-kit/wrangler: debito noto non
+        # risolvibile senza major upgrade). continue-on-error mantiene il
+        # check visibile senza bloccare il merge.
+        continue-on-error: true
+        run: npm audit --audit-level=high
