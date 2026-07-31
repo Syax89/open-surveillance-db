@@ -227,6 +227,7 @@ test("POST /api/cameras never forwards prototype-pollution or unknown keys to th
   const [args] = callArgs("createPendingCamera");
   assert.deepEqual(Object.keys(args[0]).sort(), [
     "address",
+    "contributorId",
     "kind",
     "latitude",
     "longitude",

@@ -35,6 +35,9 @@ const expectedTables = [
   // Wave B Data & Trust (0008): reviewer roles and the moderation queue.
   "reviewers",
   "moderation_queue",
+  // STATUS gap #1 (0009): contributor accounts and sessions.
+  "contributors",
+  "sessions",
 ];
 // Indexes declared by the migrations.
 const expectedIndexes = [
@@ -43,6 +46,10 @@ const expectedIndexes = [
   "moderation_events_created_at_idx",
   "reviewers_role_idx",
   "moderation_queue_state_idx",
+  "contributors_email_unique",
+  "sessions_token_hash_unique",
+  "sessions_contributor_idx",
+  "sessions_expires_idx",
 ];
 // Tables that are not application schema but legitimately appear in a local
 // D1 database. Anything outside this set is an unexpected schema change.

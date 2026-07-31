@@ -224,6 +224,7 @@ test("POST /api/cameras stores a trimmed, date-validated pending report", async 
       notes: "vista sul parco",
       latitude: 44.1,
       longitude: 12.2,
+      contributorId: null,
     },
   ]);
 });
@@ -247,6 +248,7 @@ test("POST /api/cameras without optional metadata passes nulls and empty strings
     notes: "",
     latitude: 45,
     longitude: 9,
+    contributorId: null,
   });
 });
 

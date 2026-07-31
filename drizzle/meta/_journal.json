@@ -64,6 +64,13 @@
    "when": 1785530234484,
    "tag": "0008_wave_b_reviewer_roles",
    "breakpoints": true
+  },
+  {
+   "idx": 9,
+   "version": "6",
+   "when": 1785536400000,
+   "tag": "0009_contributor_auth",
+   "breakpoints": true
   }
  ]
 }

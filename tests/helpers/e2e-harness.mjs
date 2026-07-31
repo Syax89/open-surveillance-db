@@ -50,6 +50,10 @@ const REAL_DB_MODULES = [
   { source: "db/corrections.ts", output: "db/corrections.mjs" },
   { source: "db/moderation.ts", output: "db/moderation.mjs" },
   { source: "db/freshness.ts", output: "db/freshness.mjs" },
+  // db/auth.ts (ADR 0013) is imported by app/lib/auth-session.ts, which the
+  // cameras route now pulls in for optional contributor attribution; it must
+  // exist in the tree so the transitive import resolves against the real db.
+  { source: "db/auth.ts", output: "db/auth.mjs" },
 ];
 
 let builtTreePromise = null;
