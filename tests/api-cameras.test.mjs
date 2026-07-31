@@ -114,7 +114,7 @@ test("GET /api/cameras returns 503 when the database is unavailable", async () =
   const response = await GET(apiRequest("/api/cameras"));
   assert.equal(response.status, 503);
   const body = await responseBody(response);
-  assert.equal(body.error, "Database binding unavailable");
+  assert.equal(body.error, "Database unavailable");
 });
 
 // ---------------------------------------------------------------------------
@@ -356,7 +356,9 @@ test("POST /api/cameras rejects non-string observedOn values", async (t) => {
   }
 });
 
-test("POST /api/cameras maps database failures to 500 with the underlying message", async () => {
+test("POST /api/cameras maps database failures to 500 with a generic client-safe message", async () => {
+  // The route must not leak the underlying error message to the client
+  // (pre-hosting hardening): the status is 500, the message is generic.
   stub("createPendingCamera", async () => {
     throw new Error("Report could not be stored");
   });
@@ -368,7 +370,7 @@ test("POST /api/cameras maps database failures to 500 with the underlying messag
     }),
   );
   assert.equal(response.status, 500);
-  assert.equal((await responseBody(response)).error, "Report could not be stored");
+  assert.equal((await responseBody(response)).error, "Unable to save report");
 });
 
 test("POST /api/cameras coerces empty-string and null coordinates to 0,0", async () => {

@@ -70,7 +70,7 @@ test("GET /api/moderation returns 503 when the queue is unavailable", async () =
   const { GET } = await route();
   const response = await GET(apiRequest("/api/moderation"));
   assert.equal(response.status, 503);
-  assert.equal((await responseBody(response)).error, "Database binding unavailable");
+  assert.equal((await responseBody(response)).error, "Moderation queue unavailable");
 });
 
 // ---------------------------------------------------------------------------
@@ -337,7 +337,7 @@ test("PATCH returns 500 when the database write fails", async () => {
     }),
   );
   assert.equal(response.status, 500);
-  assert.equal((await responseBody(response)).error, "Moderation event could not be recorded");
+  assert.equal((await responseBody(response)).error, "Unable to update moderation item");
 });
 
 test("PATCH maps malformed JSON bodies to 500", async () => {

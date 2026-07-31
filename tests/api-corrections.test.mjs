@@ -191,7 +191,7 @@ test("POST /api/corrections maps database failures to 500", async () => {
     }),
   );
   assert.equal(response.status, 500);
-  assert.equal((await responseBody(response)).error, "Correction request could not be saved");
+  assert.equal((await responseBody(response)).error, "Unable to save correction request");
 });
 
 test("the corrections route exposes no GET handler", async () => {
