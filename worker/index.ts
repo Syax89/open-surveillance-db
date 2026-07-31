@@ -17,6 +17,11 @@ interface Env {
   MODERATION_USER?: string;
   MODERATION_PASSWORD?: string;
   MODERATION_TOKEN?: string;
+  /** Contributor auth (ADR 0013): session lifetime and cookie policy. */
+  AUTH_SESSION_TTL_DAYS?: string;
+  AUTH_COOKIE_SECURE?: string;
+  AUTH_RATE_LIMIT_MAX?: string;
+  AUTH_RATE_LIMIT_WINDOW_SECONDS?: string;
 }
 
 interface ExecutionContext {

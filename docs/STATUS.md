@@ -31,6 +31,7 @@ Last reviewed: 2026-08-01
 - [x] Locality/address/coordinate public search with truthful empty states: coordinate pairs are parsed locally, other places are resolved through a configurable geocoder, results stay within the reviewed public-record boundary, and zero-result responses describe the searched area without claiming an absence of cameras.
 - [x] Public in-app guide plus skip link, visible focus treatment, reduced-motion support, and map-directory accessibility guidance.
 - [x] Draft accessibility statement and design decision for a non-sensitive usability-feedback route ([`docs/ACCESSIBILITY_STATEMENT.md`](ACCESSIBILITY_STATEMENT.md), [ADR 0006](decisions/0006-non-sensitive-usability-feedback-route.md)).
+- [x] Contributor accounts and sessions: email+password registration/login/logout, PBKDF2-SHA256 password hashing, hashed opaque session tokens, same-origin + per-session CSRF protection, account page with attributed submissions. Anonymous submissions remain possible by design ([ADR 0013](decisions/0013-contributor-accounts-and-sessions.md)).
 - [x] Clearly labelled illustrative demo data.
 - [x] Lightweight public data dictionary and export versioning policy
   ([`docs/DATA_DICTIONARY.md`](DATA_DICTIONARY.md),
@@ -48,9 +49,8 @@ Last reviewed: 2026-08-01
 
 ## Not yet implemented
 
-- [ ] Authentication and contributor accounts.
 - [ ] Public `/feedback` page for the non-sensitive usability-feedback route (designed in [ADR 0006](decisions/0006-non-sensitive-usability-feedback-route.md); implementation pending).
-- [ ] Authentication/roles, audit log, appeal workflow, and production moderation controls.
+- [ ] Audit log, appeal workflow, and production moderation controls (contributor accounts and reviewer roles are in place — [ADR 0013](decisions/0013-contributor-accounts-and-sessions.md), [ADR 0009](decisions/0009-reviewer-roles-moderation-queue.md)).
 - [ ] Image upload, secure storage, EXIF stripping, and redaction tooling.
 - [ ] Legal/privacy review and public-facing terms.
 - [ ] Public deployment, domain, backup/restore drills, and monitoring — remains a future precondition, see `docs/DEPLOYMENT.md`.

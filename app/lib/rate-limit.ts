@@ -27,7 +27,7 @@ export type RateLimitOptions = {
  * submission prefix stays `POST_*` for backward compatibility with the limits
  * already deployed for POST /api/cameras and POST /api/corrections.
  */
-export type RouteKind = "read" | "export" | "nearby" | "revisions" | "submit" | "moderate";
+export type RouteKind = "read" | "export" | "nearby" | "revisions" | "submit" | "moderate" | "auth";
 
 const ROUTE_LIMIT_DEFAULTS: Record<RouteKind, RateLimitOptions> = {
   read: { maxRequests: 60, windowSeconds: 60 },
@@ -36,6 +36,10 @@ const ROUTE_LIMIT_DEFAULTS: Record<RouteKind, RateLimitOptions> = {
   revisions: { maxRequests: 30, windowSeconds: 60 },
   submit: { maxRequests: 5, windowSeconds: 60 },
   moderate: { maxRequests: 30, windowSeconds: 60 },
+  // Auth endpoints (register/login) are credential-guessing surfaces; the
+  // deliberate per-caller bucket keeps brute force slow while staying far
+  // above the rate of legitimate interactive use.
+  auth: { maxRequests: 10, windowSeconds: 60 },
 };
 
 const ROUTE_LIMIT_ENV_PREFIX: Record<RouteKind, string> = {
@@ -45,6 +49,7 @@ const ROUTE_LIMIT_ENV_PREFIX: Record<RouteKind, string> = {
   revisions: "REVISIONS",
   submit: "POST",
   moderate: "MODERATION",
+  auth: "AUTH",
 };
 
 const attemptsByKey = new Map<string, number[]>();

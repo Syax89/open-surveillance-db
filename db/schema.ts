@@ -26,6 +26,9 @@ export const cameras = sqliteTable(
     lastVerifiedAt: text("last_verified_at"),
     reviewDueAt: text("review_due_at"),
     reviewIntervalMonths: integer("review_interval_months").notNull().default(12),
+    // Optional attribution to the logged-in contributor who submitted the
+    // report (ADR 0013). NULL for anonymous submissions, which remain allowed.
+    contributorId: integer("contributor_id").references(() => contributors.id),
     createdAt: text("created_at").notNull(),
   },
   (table) => [index("cameras_status_idx").on(table.status)],
@@ -44,6 +47,52 @@ export const correctionRequests = sqliteTable(
     createdAt: text("created_at").notNull(),
   },
   (table) => [index("correction_requests_status_idx").on(table.status)],
+);
+
+/**
+ * Registered contributors (STATUS gap #1, ADR 0013). `email` is stored
+ * lowercase and unique; `password_hash` is a PBKDF2-SHA256 string
+ * (`pbkdf2$<iterations>$<saltB64>$<hashB64>`). `display_name` is an optional
+ * public handle. Anonymous submissions remain possible by design; an account
+ * is only needed to track and attribute your own reports.
+ */
+export const contributors = sqliteTable(
+  "contributors",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    email: text("email").notNull(),
+    displayName: text("display_name"),
+    passwordHash: text("password_hash").notNull(),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (table) => [uniqueIndex("contributors_email_unique").on(table.email)],
+);
+
+/**
+ * Login sessions (ADR 0013). Only the SHA-256 of the raw session token is
+ * stored, plus a per-session CSRF token echoed through a non-HttpOnly cookie
+ * and verified on state-changing requests. A row is dead after `expires_at`
+ * or once `revoked_at` is set (logout).
+ */
+export const sessions = sqliteTable(
+  "sessions",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    contributorId: integer("contributor_id")
+      .notNull()
+      .references(() => contributors.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull(),
+    csrfToken: text("csrf_token").notNull(),
+    createdAt: text("created_at").notNull(),
+    expiresAt: text("expires_at").notNull(),
+    revokedAt: text("revoked_at"),
+  },
+  (table) => [
+    uniqueIndex("sessions_token_hash_unique").on(table.tokenHash),
+    index("sessions_contributor_idx").on(table.contributorId),
+    index("sessions_expires_idx").on(table.expiresAt),
+  ],
 );
 
 /**

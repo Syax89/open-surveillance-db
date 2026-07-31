@@ -1,5 +1,7 @@
 import { env } from "cloudflare:workers";
 import { createPendingCamera, findNearbyPublicCameras, freshnessWindows, listPublicCameras, type FreshnessWindow, type PublicCameraFilters } from "../../../db/cameras";
+import { resolveOptionalContributor } from "../../lib/auth-session";
+import { csrfVerified, sameOrigin } from "../../lib/csrf";
 import { isRecord } from "../../lib/guards";
 import {
   callerKey,
@@ -115,6 +117,18 @@ export async function POST(request: Request) {
   }
 
   try {
+    // Optional contributor attribution (ADR 0013): anonymous submissions
+    // remain possible, but a request carrying a live session must pass the
+    // same-origin + CSRF checks before its report is attributed. A missing
+    // or dead session simply means the report is anonymous.
+    const auth = await resolveOptionalContributor(request);
+    if (auth && (!sameOrigin(request) || !csrfVerified(request, auth.session.csrfToken))) {
+      return Response.json(
+        { error: "Cross-site request rejected. Refresh the page and try again." },
+        { status: 403 },
+      );
+    }
+
     const payload: unknown = await readJsonBody(request, env);
     if (!isRecord(payload)) return Response.json({ error: "A title, type, valid position and (when provided) a valid observation date are required." }, { status: 400 });
     const title = cleanText(payload.title, 90);
@@ -126,7 +140,7 @@ export async function POST(request: Request) {
     const latitude = Number(payload.latitude);
     const longitude = Number(payload.longitude);
     if (!title || !kind || !Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180 || (payload.observedOn !== undefined && payload.observedOn !== null && !observedOn)) return Response.json({ error: "A title, type, valid position and (when provided) a valid observation date are required." }, { status: 400 });
-    const record = await createPendingCamera({ title, kind, address, notes, manufacturer: manufacturer || null, observedOn: observedOn || null, latitude, longitude });
+    const record = await createPendingCamera({ title, kind, address, notes, manufacturer: manufacturer || null, observedOn: observedOn || null, latitude, longitude, contributorId: auth?.contributor.id ?? null });
     // Non-blocking pre-submit duplicate detection: warn the submitter about
     // nearby reviewed records without leaking any non-public data. A failure
     // here must never fail the report itself.
