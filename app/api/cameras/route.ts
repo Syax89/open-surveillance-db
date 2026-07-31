@@ -1,5 +1,6 @@
 import { env } from "cloudflare:workers";
 import { createPendingCamera, listPublicCameras } from "../../../db/cameras";
+import { isRecord } from "../../lib/guards";
 import { callerKey, checkRateLimit, submissionLimits, submissionsDisabled } from "../../lib/rate-limit";
 
 function cleanText(value: unknown, maxLength: number) {
@@ -62,7 +63,8 @@ export async function POST(request: Request) {
   }
 
   try {
-    const payload = await request.json() as Record<string, unknown>;
+    const payload: unknown = await request.json();
+    if (!isRecord(payload)) return Response.json({ error: "A title, type, valid position and (when provided) a valid observation date are required." }, { status: 400 });
     const title = cleanText(payload.title, 90);
     const kind = cleanText(payload.kind, 60);
     const address = cleanText(payload.address, 180);

@@ -321,8 +321,6 @@ test("POST /api/cameras maps malformed JSON bodies to 500", async () => {
 
 test("POST /api/cameras rejects non-object JSON bodies", async () => {
   const { POST } = await camerasRoute();
-  // NOTE: JSON `null` is excluded here on purpose — see the documented-500
-  // test below (finding OSDB-QA-001).
   for (const body of ["42", "[1,2]", '"hello"']) {
     const response = await POST(apiRequest("/api/cameras", { method: "POST", body }));
     assert.equal(response.status, 400, body);
@@ -330,13 +328,10 @@ test("POST /api/cameras rejects non-object JSON bodies", async () => {
   }
 });
 
-test("POST /api/cameras maps a JSON null body to 500 (documented deviation, OSDB-QA-001)", async () => {
-  // FINDING OSDB-QA-001: same flaw as /api/corrections — `payload.title` on
-  // null throws inside the handler and the catch-all returns 500, while the
-  // moderation route returns 400 for the same input class.
+test("POST /api/cameras rejects a JSON null body with 400 (OSDB-QA-001)", async () => {
   const { POST } = await camerasRoute();
   const response = await POST(apiRequest("/api/cameras", { method: "POST", body: "null" }));
-  assert.equal(response.status, 500);
+  assert.equal(response.status, 400);
   assert.equal(callArgs("createPendingCamera").length, 0);
 });
 
