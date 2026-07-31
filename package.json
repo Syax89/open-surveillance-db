@@ -21,7 +21,10 @@
     "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
     "test": "npm run build && node --test \"tests/*.test.mjs\"",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
-    "db:generate": "drizzle-kit generate"
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "wrangler d1 migrations apply opensurveillancedb --local",
+    "db:reset": "node scripts/db-reset.mjs",
+    "db:seed": "wrangler d1 execute opensurveillancedb --local --file=scripts/demo-cameras.sql --yes"
   },
   "dependencies": {
     "@types/leaflet": "^1.9.21",

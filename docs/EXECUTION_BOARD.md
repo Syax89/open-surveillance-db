@@ -23,13 +23,13 @@ named owners are recorded in [GOVERNANCE.md](../GOVERNANCE.md).
 
 **Decision owners:** maintainers, with input from data & trust lead.
 
-1. Select one pilot jurisdiction and working languages.
-2. Confirm which public infrastructure is eligible and which places/details are excluded.
+1. Select one pilot jurisdiction and working languages. — **Decided 2026-07-31: Italy, Comune di Ferrara as launch area; Italian and English.** [ADR 0010](decisions/0010-pilot-jurisdiction-languages-eligibility.md)
+2. Confirm which public infrastructure is eligible and which places/details are excluded. — **Decided 2026-07-31: cameras visible from public space are eligible; private homes, live feeds, sensitive operational details, and security weaknesses are excluded.** [ADR 0010](decisions/0010-pilot-jurisdiction-languages-eligibility.md)
 3. Choose the data licence, publication precision, retention approach, and correction/removal contact.
 4. Name the initial maintainers, operations owner, data steward, security contact, and moderation contact. — **Decided 2026-07-31: maintainers are Simone (syax89) and Ada (CTO, sole merge authority); operations owner and security contact are Ken; data stewards are Linus and Grace; moderation contact is Grace.** Recorded in [GOVERNANCE.md](../GOVERNANCE.md).
 5. Create a public organisation/repository and an accessible private route for security and privacy reports.
 
-**Gate:** the decisions are documented in `docs/decisions/`; there is no ambiguity about what data may enter the pilot. (Items 1–2 are decided in ADR 0006; item 4 is recorded in [GOVERNANCE.md](../GOVERNANCE.md); items 3 and 5 remain open.)
+**Gate:** the decisions are documented in `docs/decisions/`; there is no ambiguity about what data may enter the pilot. (Items 1–2 are decided in ADR 0010; item 4 is recorded in [GOVERNANCE.md](../GOVERNANCE.md); items 3 and 5 remain open.)
 
 ### Wave B — build the safe public-alpha foundation
 
@@ -76,6 +76,15 @@ These are the next technical tickets once Wave A has named owners and approved t
 
 ## Progress log
 
+- **2026-07-31 — Pilot boundary decided (Wave A items 1–2):** the CEO approved
+  Italy as pilot jurisdiction with the Comune di Ferrara as launch area, Italian
+  and English as working languages, and a defined eligibility boundary (visible
+  public-space surveillance cameras; private homes, live feeds, sensitive
+  operational details, and security weaknesses excluded). The Italian GDPR
+  review is coherent with the existing legal drafts. Recorded in
+  [ADR 0010](decisions/0010-pilot-jurisdiction-languages-eligibility.md). Items
+  3–5 of Wave A (final data licence, named owners, public organisation and
+  private reporting route) remain open.
 - **2026-07-31 — Product foundation started:** an accessible, searchable
   directory and a public-record detail route now complement the map in the
   local prototype. They consume only the existing public/demo API response;
@@ -148,6 +157,20 @@ These are the next technical tickets once Wave A has named owners and approved t
   Linus and Grace; moderation contact is Grace. Recorded in
   [GOVERNANCE.md](../GOVERNANCE.md). Items 3 and 5 of Wave A (final data
   licence, public organisation and private reporting route) remain open.
+- **2026-07-31 — Reviewer roles, moderation queue, decision reasons, and
+  append-only audit events implemented (Wave B, Data & Trust):** every
+  decision now requires a named reviewer (`actorId`) enforced against a
+  role→action matrix mirroring DATA_TRUST.md separation of duties (intake
+  reviewers triage but cannot publish; only record reviewers/senior moderators
+  approve; privacy/safety lead owns hide/escalate; administrator may only
+  escalate). A per-entity `moderation_queue` tracks assignment, sensitivity,
+  second review, and escalation; sensitive/urgent items require a second,
+  different reviewer before publish/reject/reverify; recusal is recorded
+  without touching the record; escalation requires a mandatory note. The audit
+  trail is append-only at the database layer (UPDATE/DELETE triggers raise
+  ABORT) with reviewer id + role captured at write time. Schema ships as
+  migration `0008` (journal-registered, drizzle-kit generate no-op) and is
+  documented in ADR 0009. 362/362 tests green; fresh-DB migration 9/9.
 
 ## Active next plan
 

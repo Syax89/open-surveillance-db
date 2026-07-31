@@ -392,9 +392,9 @@ test("a stale record can be removed; illegal transitions stay rejected", async (
 
   // Illegal transitions from stale must not apply.
   const badApprove = await moderation.moderateCamera(item.id, "approve", REASON.verified, null);
-  assert.equal(badApprove, null, "approve is not a valid transition from stale");
+  assert.equal(badApprove.kind, "not_found", "approve is not a valid transition from stale");
   const badMarkStale = await moderation.moderateCamera(item.id, "mark-stale", REASON.stale, null);
-  assert.equal(badMarkStale, null, "mark-stale is not a valid transition from stale");
+  assert.equal(badMarkStale.kind, "not_found", "mark-stale is not a valid transition from stale");
 
   const removed = await moderation.moderateCamera(item.id, "hide", REASON.sensitive, "removal decision");
   assert.ok(removed, "hide must succeed from stale");
@@ -410,16 +410,30 @@ test("the public camera query enforces the freshness window at read time", async
   const functionStart = cameras.indexOf("export async function listPublicCameras");
   const functionEnd = cameras.indexOf("export async function createPendingCamera", functionStart);
   const publicQuery = cameras.slice(functionStart, functionEnd);
+  const predicateStart = cameras.indexOf("export function publicCameraPredicate");
+  const predicateEnd = cameras.indexOf("export async function listPublicCameras", predicateStart);
+  const predicate = cameras.slice(predicateStart, predicateEnd);
 
+  assert.ok(predicateStart >= 0, "the shared public predicate must exist");
   assert.match(
     publicQuery,
-    /WHERE\s+status\s+IN\s*\(\s*'verified'\s*,\s*'demo'\s*\)/i,
-    "the public query must whitelist only verified and demo statuses",
+    /publicCameraPredicate\(/,
+    "the public query must derive its status whitelist from the shared predicate",
   );
   assert.match(
-    publicQuery,
-    /review_due_at\s+IS\s+NULL\s+OR\s+review_due_at\s+>=\s*\?/i,
-    "the public query must keep verified records only inside their review window",
+    predicate,
+    /status\s+IN\s*\(\s*\$\{placeholders\}\)/,
+    "the predicate must generate the status whitelist from PUBLIC_CAMERA_STATUSES",
+  );
+  assert.match(
+    predicate,
+    /PUBLIC_CAMERA_STATUSES/,
+    "the predicate must be derived from the shared public-status constant",
+  );
+  assert.match(
+    predicate,
+    /review_due_at\s+IS\s+NULL\s+OR\s+review_due_at\s*>=\s*\?/i,
+    "the predicate must keep verified records only inside their review window",
   );
   assert.match(
     publicQuery,

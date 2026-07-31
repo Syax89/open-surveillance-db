@@ -12,6 +12,8 @@
 //   - records not re-confirmed within 90 days of the scheduled review become
 //     stale and must never be silently represented as current.
 
+import { PUBLIC_CAMERA_STATUSES } from "../app/lib/public-status";
+
 export const DEFAULT_REVIEW_INTERVAL_MONTHS = 12;
 export const STALE_GRACE_DAYS = 90;
 
@@ -83,17 +85,20 @@ export function evaluateFreshness(
 
 /**
  * Public-read test: may this record be presented as a currently verified
- * record? Only `verified` records inside their review window and clearly
- * labelled `demo` records pass. Everything else (pending, needs_review,
- * rejected, removed, or verified but past the review date) is not public.
+ * record? The status must be whitelisted in PUBLIC_CAMERA_STATUSES
+ * (app/lib/public-status.ts), and the record must be inside the current
+ * freshness phase. `demo` records are always current (illustrative
+ * placeholders); any other public status must be current at read time, which
+ * for `verified` means inside its review window (or without a schedule, i.e.
+ * not provably stale). Everything else (pending, needs_review, rejected,
+ * removed, stale, ...) is not public.
  */
 export function isPubliclyCurrent(
   record: FreshnessInput,
   nowIso: string = new Date().toISOString(),
 ): boolean {
-  if (record.status === "demo") return true;
-  if (record.status === "verified") {
-    return evaluateFreshness(record, nowIso) === "current";
+  if (!(PUBLIC_CAMERA_STATUSES as readonly string[]).includes(record.status)) {
+    return false;
   }
-  return false;
+  return evaluateFreshness(record, nowIso) === "current";
 }

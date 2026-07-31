@@ -141,6 +141,21 @@ async function buildDbModules() {
     compiledDuplicateDetection.replace(/from\s*["']cloudflare:workers["']/g, `from "${workersUrl}"`),
   );
 
+  // db/cameras.ts and db/freshness.ts import ../app/lib/public-status (pure,
+  // shared public-status whitelist); mirror it too.
+  const compiledPublicStatus = ts.transpileModule(
+    await readFile(path.join(appLibDir, "public-status.ts"), "utf8"),
+    {
+      compilerOptions: {
+        module: ts.ModuleKind.ESNext,
+        target: ts.ScriptTarget.ESNext,
+        moduleResolution: ts.ModuleResolutionKind.Bundler,
+      },
+      fileName: path.join(appLibDir, "public-status.ts"),
+    },
+  ).outputText;
+  await writeFile(path.join(tree, "app", "lib", "public-status.mjs"), compiledPublicStatus);
+
   modules.cameras = await import(pathToFileURL(path.join(tree, "db", "cameras.mjs")).href);
   modules.corrections = await import(pathToFileURL(path.join(tree, "db", "corrections.mjs")).href);
   modules.freshness = await import(pathToFileURL(path.join(tree, "db", "freshness.mjs")).href);

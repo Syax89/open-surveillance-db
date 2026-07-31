@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { isPublicStatus } from "../lib/public-status";
 import { useMessages } from "./LocaleProvider";
 
 export type MapCamera = { id: number; title: string; kind: string; status: string; latitude: number; longitude: number };
@@ -55,7 +56,11 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
     const L = leafletRef.current; const layer = markersRef.current; if (!L || !layer) return;
     layer.clearLayers();
     cameras.forEach((camera) => {
-      const marker = L.marker([camera.latitude, camera.longitude], { icon: L.divIcon({ className: "", html: `<span class="osm-camera-marker ${camera.status} ${camera.id === selectedId ? "selected" : ""}" aria-hidden="true"><i></i></span>`, iconSize: [28, 28], iconAnchor: [14, 14] }), title: camera.title });
+      // Defense in depth: only whitelisted public statuses may style a
+      // marker; a non-public status renders a plain marker (the parent page
+      // already filters through publicRecords(), this is a second gate).
+      const statusClass = isPublicStatus(camera.status) ? camera.status : "";
+      const marker = L.marker([camera.latitude, camera.longitude], { icon: L.divIcon({ className: "", html: `<span class="osm-camera-marker ${statusClass} ${camera.id === selectedId ? "selected" : ""}" aria-hidden="true"><i></i></span>`, iconSize: [28, 28], iconAnchor: [14, 14] }), title: camera.title });
       marker.bindTooltip(`${camera.title}<br/><small>${camera.kind}</small>`, { direction: "top", offset: [0, -12] }); marker.on("click", () => onSelect(camera.id)); marker.addTo(layer);
     });
   }, [cameras, selectedId, onSelect]);
