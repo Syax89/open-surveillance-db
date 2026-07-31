@@ -37,6 +37,9 @@ const DB_MODULES = [
   // db/cameras.ts imports ../app/lib/duplicate-detection (pure, no CF binding);
   // transpile it into the temp tree so the rewritten import resolves.
   { source: "app/lib/duplicate-detection.ts", output: "app/lib/duplicate-detection.mjs" },
+  // db/cameras.ts and db/freshness.ts import ../app/lib/public-status (pure,
+  // shared public-status whitelist); mirror it into the temp tree as well.
+  { source: "app/lib/public-status.ts", output: "app/lib/public-status.mjs" },
 ];
 
 let builtTreePromise = null;
