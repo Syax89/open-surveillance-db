@@ -26,7 +26,7 @@
 1. **Consultation:** browse the map, the record directory, and individual record pages; search and read the public dataset.
 2. **Exports:** download public data via the JSON/CSV/GeoJSON exports and the public API, and reuse it, subject to the ODbL 1.0 licence (§ 7) and to the abuse limits in § 4.
 3. **Reports:** submit observations of visible public surveillance infrastructure for human moderation. Reports are never guaranteed to be published (§ 5).
-4. **Lawful purposes:** the data may be used for research, journalism, civic advocacy, and any purpose consistent with these terms and with the ODbL 1.0 licence. No account is required to browse; contributions use a **pseudonymous internal ID**, never a real-name requirement (PRIVACY_AND_SAFETY.md).
+4. **Lawful purposes:** the data may be used for research, journalism, civic advocacy, and any purpose consistent with these terms and with the ODbL 1.0 licence. No account is required to browse **or to report**: submissions may be anonymous, or attributed to an optional free contributor account (email + pseudonymous display name, ADR 0013). Contributions use a **pseudonymous internal ID**, never a real-name requirement (PRIVACY_AND_SAFETY.md); account data is processed per PRIVACY_NOTICE.md § 3 and RETENTION_SCHEDULE.md R7.
 
 ## 4. What you may not do
 
@@ -44,7 +44,7 @@
 
 ## 5. Reports and publication
 
-1. **No guarantee of publication.** Every report enters the database as `pending` (ADR 0001). Trained human moderators screen, verify, and decide per MODERATION.md. A report may be rejected, hidden, or removed at any time; rejected content is never published and is deleted after 30 days (RETENTION_SCHEDULE.md R2).
+1. **No guarantee of publication.** Every report enters the database as `pending` (ADR 0001). Trained human moderators screen, verify, and decide per MODERATION.md. A report may be rejected, hidden, or removed at any time; rejected content is never published and is scheduled for deletion 30 days after the rejection decision (RETENTION_SCHEDULE.md R2; automated enforcement is a pre-launch implementation item, see § 15).
 2. **What you keep and what you grant.** You retain whatever rights you have in the content you submit. By submitting, you grant the project a non-exclusive, worldwide, royalty-free licence to store and review the report and — **if and only if** the record is verified and published — to publish it and make it available under **ODbL 1.0**, as part of the open database, with attribution to contributors per the ODbL notice. No licence to publish is granted by the mere act of submitting.
 3. **Your warranties.** By submitting you confirm that: the content is accurate to the best of your knowledge; you are entitled to share it; it complies with § 4; and you meet the minimum age for using the Service in your jurisdiction (in Italy, 14 years — art. 2-quinquies D.Lgs. 196/2003).
 4. **Verification may be refused.** `source: official` records republished from official public sources follow their own legal regime, checked per record (LAWFUL_BASIS.md § 3.2); community reports are verified against the MODERATION.md publication standard, not against official registers.
@@ -52,7 +52,7 @@
 ## 6. Moderation, corrections, appeals
 
 1. Moderation follows MODERATION.md and MODERATION_SLA.md: emergency hides within **24 h**, first response within **48 h**, substantive decision within **14 days**, re-review of temporary hides within **30 days**.
-2. Any person affected by a moderation decision may request correction or removal via `privacy@opensurveillancedb` within **30 days** of the decision; appeals are decided by a **different reviewer** than the original decision, with escalation to the advisory circle for disputed cases (MODERATION_SLA.md S5/S6).
+2. Any person affected by a moderation decision may request correction or removal via the in-app correction form (home page, "Report a problem / correction" section) or `privacy@opensurveillancedb` within **30 days** of the decision; appeals are decided by a **different reviewer** than the original decision, with escalation to the advisory circle for disputed cases (MODERATION_SLA.md S5/S6).
 3. Data-subject rights (access, rectification, erasure, restriction, objection, portability) are described in PRIVACY_NOTICE.md § 7 and exercised through the same contact.
 
 ## 7. Licences
@@ -67,7 +67,7 @@
 1. OpenSurveillanceDB is a **civic, community-maintained dataset — not an official record and not a statement of legal fact.** Records may be incomplete, outdated, or inaccurate despite human moderation; publication is deliberately conservative (ADR 0001).
 2. Do not rely on the dataset for safety-critical or official decisions. Verify against official sources (e.g. the relevant public administration) before acting on it. The Service provides information about visible infrastructure only — it is not a directory of every camera, and absence of a record proves nothing.
 3. Records from official sources are marked with their source and verification date; community records carry no such guarantee.
-4. Published coordinates are rounded to **~4 decimal places (~10 m)** — zone-level precision (decision 2026-07-31). The exact location is never published and remains in the private moderation record, visible only to moderators (MODERATION.md, step 4).
+4. Published coordinates are rounded to **~4 decimal places (~10 m)** — zone-level precision (decision 2026-07-31, enforced at the public read boundary). The exact location is never published and remains in the private moderation record, visible only to moderators (MODERATION.md, step 4).
 
 ## 9. Privacy
 
@@ -83,7 +83,7 @@ Your use of the Service is governed by the privacy notice (PRIVACY_NOTICE.md), t
 ## 11. Suspension and removal
 
 1. We may suspend or limit access, or remove content, where necessary to enforce these terms, to protect users or data subjects, or per the moderation policy — aiming to notify the affected person where proportionate and possible.
-2. Contributors may request deletion of their `pending` submissions via `privacy@opensurveillancedb`; verified published records are subject to the **12-month renewal** retention and review cycle (RETENTION_SCHEDULE.md R3) and to the correction path of § 6.
+2. Contributors may request deletion of their `pending` submissions via `privacy@opensurveillancedb`; verified published records are subject to the **12-month renewal** retention and review cycle (RETENTION_SCHEDULE.md R3; automated re-verification sweep is a pre-launch implementation item, see § 15) and to the correction path of § 6.
 
 ## 12. Applicable law and jurisdiction
 
@@ -107,6 +107,9 @@ Your use of the Service is governed by the privacy notice (PRIVACY_NOTICE.md), t
 - [x] Controller entity per CEO decision 2026-07-31: **Simone Rondina (syax89) / OpenSurveillanceDB — Italy** (PRIVACY_NOTICE.md § 1; final legal-entity wording to be confirmed at launch).
 - [ ] Final review of the jurisdiction clause for the first operating jurisdictions (LAWFUL_BASIS.md § 6; MODERATION.md M5).
 - [ ] Decide and implement the acceptance mechanics (clickwrap on the submission form vs. general browse terms) — implementation owner: Ada.
+- [ ] **Retention enforcement (R1/R2/R3):** implement the automated deletion/expiry job (`db/retention.ts` + cron trigger) per RETENTION_SCHEDULE.md § 3 — implementation owner: Ada; the schedule itself is approved and in force as policy, the code enforcement is pending pre-launch.
+- [ ] **Account erasure endpoint (R7):** contributor accounts (ADR 0013, PR #57) have no `/api/auth/account` delete route yet; the `cameras.contributor_id` FK (no ON DELETE clause) blocks hard-deleting a contributor with attributed reports. Implement account deletion with de-attribution of reports (`contributor_id = NULL`) before launch — implementation owner: Ada; tracked in RETENTION_SCHEDULE.md R7.
+- [ ] **Link the legal documents from the UI:** the published site should expose TERMS_OF_USE.md / PRIVACY_NOTICE.md (e.g. footer links) before public launch; currently they live in the repository only.
 - [ ] **ADR:** record the adoption of these terms and the inbound data-licensing model (submission → ODbL only upon verification) as a proposed ADR (next free number, per GOVERNANCE.md) — the terms embed a licensing and data-publication decision that material changes require documenting.
 
 ---

@@ -23,6 +23,8 @@ OpenSurveillanceDB publishes a public-interest map of **visible, public surveill
 |------|--------|---------|-------------|
 | Report content: location, description, optional `manufacturer` / `observedOn`, private `notes` | Reporter (data subject) | Build the public record; moderation queue | art. 6(1)(f) (see LAWFUL_BASIS.md) |
 | Contributor pseudonymous internal ID + submission timestamp | Reporter | Abuse prevention, provenance | art. 6(1)(f) |
+| Contributor account (email, optional display name, password hash) | Contributor (voluntary registration, ADR 0013) | Login, attribution of submissions, abuse prevention | art. 6(1)(f) — minimising: optional, pseudonymous handle, PBKDF2-SHA256 hashed password, never exposed in API responses |
+| Session records (hashed token, CSRF token, timestamps) | The project (login) | Keep the contributor logged in; CSRF protection | art. 6(1)(f); token stored only as SHA-256, expires after **30 days** or on logout (RETENTION_SCHEDULE.md R7) |
 | Evidence (files/links attached to a report) | Reporter | Verification of the record | art. 6(1)(f); retained private, tied to the record (RETENTION_SCHEDULE.md R6) |
 | Correction / takedown request (contact details the requester provides, e.g. email) | Requester | Exercise of rights, harm reports | art. 6(1)(c) (GDPR arts. 15-22) and 6(1)(f) |
 | Moderator identity (email, display name, full name via ChatGPT sign-in) | OpenAI (identity provider) | Authenticate moderators; separate moderation credentials (../MODERATION.md) | art. 6(1)(f); **never logged or stored by the application** |
@@ -42,7 +44,7 @@ OpenSurveillanceDB publishes a public-interest map of **visible, public surveill
 - **No video, live streams, credentials, network information, or control interfaces** — the project documents the *existence* of visible surveillance infrastructure, never its output or access.
 - **No private-home cameras** or cameras pointing into private interiors.
 - **No personal names, faces, vehicle plates, or precise operational details** (../PRIVACY_AND_SAFETY.md, ../MODERATION.md).
-- **No coordinates beyond zone-level precision:** published locations are rounded to **~4 decimal places (~10 m)**; the exact location remains in the private moderation record, visible only to moderators (decision 2026-07-31; see ../MODERATION.md).
+- **No coordinates beyond zone-level precision:** published locations are rounded to **~4 decimal places (~10 m)**; the exact location remains in the private moderation record, visible only to moderators (decision 2026-07-31; enforced at the public read boundary — `db/cameras.ts` `roundPublicCoordinate`; see ../MODERATION.md).
 - **No behavioural advertising, no tracking, no sale of data**, no analytics libraries.
 - Submissions are stored as `pending` and are **never public** until a moderator approves them (ADR 0001). Rejected content is never published.
 
@@ -62,7 +64,7 @@ This negative scope strengthens the reasonable expectations of data subjects and
 
 ## 7. Retention
 
-See the published retention schedule (RETENTION_SCHEDULE.md): pending reports 90 days; rejected 30 days; verified records on a **12-month renewal review cycle** (decision 2026-07-31); correction requests and audit entries 2 years; evidence tied to the record; operational logs ≤ 12 months (aggregate); backups rotated by the provider (up to 30 days point-in-time recovery).
+See the published retention schedule (RETENTION_SCHEDULE.md): pending reports 90 days; rejected 30 days; verified records on a **12-month renewal review cycle** (decision 2026-07-31); correction requests and audit entries 2 years; evidence tied to the record; operational logs ≤ 12 months (aggregate); backups rotated by the provider (up to 30 days point-in-time recovery). Automated enforcement of the deletion/expiry rules (R1/R2/R3) is a pre-launch implementation item (RETENTION_SCHEDULE.md § 3); until then the schedule is applied by the moderation workflow.
 
 ## 8. Your rights (GDPR arts. 15-22)
 
@@ -95,6 +97,7 @@ You may request, free of charge:
 - [x] Correction/removal contact: `privacy@opensurveillancedb` + private form (decision 2026-07-31; mailbox to be created at launch).
 - [x] Controller entity: **Simone Rondina (syax89) / OpenSurveillanceDB, Italy** (decision 2026-07-31).
 - [ ] Provision the monitored mailbox `privacy@opensurveillancedb` (ops) before the address is published (ADR 0008).
+- [ ] **Contributor-account processing disclosure:** the account data rows in § 3 and the session/account retention (R7) must be re-checked when the contributor-auth PR (#57, ADR 0013) lands on `main`, and the account-erasure endpoint is implemented (see TERMS § 15 open item).
 - [ ] Confirm the applicable SCC version at DPA execution (new-generation SCCs announced for adoption in 2025 — see PROCESSOR_REGISTER.md open items).
 - [ ] Per-jurisdiction review (see LAWFUL_BASIS.md § 6) and external counsel review.
 

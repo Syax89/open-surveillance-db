@@ -39,7 +39,16 @@ test("the public camera query excludes non-public states via the shared status w
     /status\s+IN\s*\(\s*['"](?:verified|demo|pending|rejected|removed|needs_review|stale)['"]/,
     "the whitelist must never be hand-written into the query",
   );
-  assert.match(publicQuery, /return\s+result\.results\s*;/, "the public query must return its filtered result set");
+  assert.match(
+    publicQuery,
+    /return\s+result\.results\.map\(/,
+    "the public query must return its filtered result set (rounded at the public boundary)",
+  );
+  assert.match(
+    publicQuery,
+    /roundPublicCoordinate\(record\.latitude\)[\s\S]*roundPublicCoordinate\(record\.longitude\)/,
+    "the public query must round both coordinates to the ~4-decimal zone precision",
+  );
   assert.doesNotMatch(publicQuery, /status\s*=\s*'pending'/i, "pending records must not be part of the public query");
 });
 

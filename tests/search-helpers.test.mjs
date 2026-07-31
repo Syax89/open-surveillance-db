@@ -102,7 +102,7 @@ test("textMatches searches the same public fields the directory exposes", () => 
   assert.ok(search.textMatches(record, "VIA ROMA"));
   assert.ok(search.textMatches(record, "Acme"));
   assert.ok(search.textMatches(record, "lamppost"));
-  assert.ok(search.textMatches(record, "45.4642"), "a shortened coordinate must match its 5-decimal rendering");
+  assert.ok(search.textMatches(record, "45.4642"), "a shortened coordinate must match its 4-decimal rendering");
   assert.ok(!search.textMatches(record, "private-note-text"));
   assert.ok(!search.textMatches(record, ""));
 });

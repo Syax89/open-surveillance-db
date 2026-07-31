@@ -56,8 +56,8 @@ export function textMatches(record: {
 }, query: string): boolean {
   const needle = query.trim().toLocaleLowerCase();
   if (!needle) return false;
-  const latitude = record.latitude.toFixed(5);
-  const longitude = record.longitude.toFixed(5);
+  const latitude = record.latitude.toFixed(4);
+  const longitude = record.longitude.toFixed(4);
   const haystack = [
     record.title,
     record.kind,
