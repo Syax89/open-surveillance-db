@@ -5,11 +5,13 @@ scratch, how the local database gets its schema and data, and how to reset it
 safely. It is written for contributors who want to reproduce the prototype on
 their own machine.
 
-Everything below was verified on 2026-07-31 against `main`
-(`0153eab`), with Node `22.22.3`, npm `10.9.8`, and the wrangler version
-pinned in `package-lock.json` (4.118.x). The local environment never touches
-the Cloudflare remote: every command below operates on the project-local
-state unless it explicitly says `--remote`.
+Everything below was verified on 2026-07-31 against the H3 migration branch
+(`2226dad`, on top of `main` `0153eab`), with Node `22.22.3`, npm `10.9.8`,
+and the wrangler version pinned in `package-lock.json` (4.118.x). The
+journal-mismatch symptoms in [section 7](#7-troubleshooting) were reproduced
+in isolated local state directories, not on a shared database. The local
+environment never touches the Cloudflare remote: every command below operates
+on the project-local state unless it explicitly says `--remote`.
 
 ## 1. Prerequisites
 
@@ -82,7 +84,38 @@ The `wrangler.jsonc` `d1_databases` entry points `migrations_dir` at
 `drizzle`, so wrangler applies them in filename order and records what ran in
 a `d1_migrations` table.
 
+#### Generating a new migration (`db:generate`)
+
+When you change the schema in `db/schema.ts`, regenerate a migration instead
+of editing an applied one. Migrations are append-only: the journal records the
+name of every file that ran, so editing an applied file only desynchronizes
+your local state from everyone else's.
+
+```bash
+# 1. edit db/schema.ts
+npm run db:generate   # drizzle-kit diffs against the latest snapshot
+npm run db:migrate    # apply the new migration to the local database
+```
+
+`npm run db:generate` runs `drizzle-kit generate` (config in
+`drizzle.config.ts`: schema `./db/schema.ts`, output `./drizzle`). Expected
+outcome: one new numbered file `drizzle/00NN_<name>.sql` describing only the
+intended change, plus updates to `drizzle/meta/_journal.json` and the matching
+snapshot. Review the generated SQL before committing: it should contain
+exactly the schema change you made, nothing else. If `db:generate` produces
+nothing or an unexpected diff, the journal/snapshots under `drizzle/meta/`
+are out of sync — see [section 7](#7-troubleshooting).
+
 ## 4. Running migrations on a fresh local database
+
+The four database commands, at a glance:
+
+| Command | Purpose | Expected outcome |
+| --- | --- | --- |
+| `npm run db:generate` | Regenerate a migration after editing `db/schema.ts` | One new `drizzle/00NN_*.sql` (+ `drizzle/meta/` journal/snapshot update) with only your change |
+| `npm run db:migrate` | Apply pending Drizzle migrations to the local D1 database | Full schema on a fresh state (8 files: 3 tables + 3 indexes, 0 rows); no-op when everything is already applied |
+| `npm run db:reset` | Start over non-destructively | `.wrangler/state` moved aside under a timestamped backup, then migrations applied to a fresh empty DB |
+| `npm run db:seed` (optional) | Insert the two labelled demo pins | 2 fictional `demo` records, idempotent — safe to re-run |
 
 On a truly fresh local state (right after `npm ci`), apply the migrations
 first, then start the app:
@@ -95,7 +128,8 @@ npm run dev
 `npm run db:migrate` is a wrapper around
 `wrangler d1 migrations apply opensurveillancedb --local`. Wrangler asks
 "About to apply N migration(s) ... continue?" before executing; confirm with
-Enter. In a non-interactive shell (CI) the confirmation step is skipped.
+Enter. In a non-interactive shell (CI) wrangler auto-confirms (verified output:
+`🤖 Using fallback value in non-interactive context: yes`).
 
 Verified result on a fresh state: all eight migration files apply (`✅`),
 producing the three tables plus the `d1_migrations` bookkeeping table, and
@@ -201,6 +235,11 @@ reset the same day already exists, `mv` silently nests the new state *inside*
 it (`.wrangler/state.bak-2026-07-31-213000/state`) instead of replacing it
 (verified). The unique name keeps every backup sibling, not nested.
 
+If there is no local state at all (a truly fresh clone before the first
+`npm run dev`), the reset script prints
+`No local state found (.wrangler/state missing) — nothing to reset.` and then
+still applies the migrations, so `db:reset` is safe to run at any point.
+
 Verified: after this procedure the API returns an empty list (or exactly the
 two demo records if you re-ran `db:seed`), and no submitted reports or audit
 history survive.
@@ -223,7 +262,11 @@ Alternatives and rules:
 | Symptom | Cause | Fix |
 | --- | --- | --- |
 | `✘ [ERROR] table 'cameras' already exists` when applying migrations | Migrations run against a state dir that already has a schema | Reset first ([section 6](#6-reset)), then apply migrations on the fresh state |
+| `✘ [ERROR] duplicate column name: manufacturer: SQLITE_ERROR` (or another `already exists` error) while applying a migration | The local schema already contains the change, but its journal entry is missing — journal/state desync (state created before migrations existed, an interrupted apply, or a hand-edited `d1_migrations`) | Reset ([section 6](#6-reset)) and re-migrate on the fresh state. Verified reproduction: deleting one journal row makes wrangler try to re-apply the migration and fail exactly like this |
+| `✅ No migrations to apply!` but the schema does not match the current code | The journal (`d1_migrations`) lists migrations that no longer exist on disk; wrangler silently skips ghost entries (verified), so the DB drifts out of sync with the branch — typical after branch history was rewritten and a migration was dropped or renamed | Reset and re-migrate; keep `drizzle/*.sql` and `drizzle/meta/_journal.json` in sync with the branch you are on |
 | `npm run db:migrate` reports everything already applied | The local state was migrated before | Nothing to do, or reset if you want a clean slate ([section 6](#6-reset)) |
+| `no such column: ...` (or missing table) at runtime after switching branches | Stale local DB: `.wrangler/state` was migrated by an older commit, and the current code expects a newer schema | `npm run db:reset`, then `npm run db:migrate` on the new branch |
+| `db:generate` produces nothing or an unexpected diff | `drizzle/meta/_journal.json`/snapshots are out of sync with the SQL files (hand-edited or restored from another branch) | Do not hand-edit the journal; regenerate from a clean checkout of the branch |
 | `Error [ERR_UNSUPPORTED_ESM_URL_SCHEME]: ... Received protocol 'cloudflare:'` | `npm start` (`vinext start`, plain Node) cannot load the Workers-runtime `cloudflare:` module | Use `npm run dev` (`vinext dev`, runs in workerd). See `docs/DEPLOYMENT.md` § Local LXC deployment |
 | `/moderation` and `/api/moderation` return 503 | Fail-closed default: no moderation credentials configured | Set `MODERATION_USER`/`MODERATION_PASSWORD` (Basic auth) or `MODERATION_TOKEN` (bearer) in the environment, then restart |
 | Port 3000 already in use | Another instance is running | Stop it, or start with a different port (`npm run dev -- --port 3001`) |

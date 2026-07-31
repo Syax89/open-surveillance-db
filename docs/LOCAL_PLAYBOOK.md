@@ -22,8 +22,15 @@ Requirements: Node.js 22.13 or newer and a recent npm.
 
 ```bash
 npm install
+npm run db:migrate   # on a fresh checkout: apply the Drizzle schema migrations first
 npm run dev
 ```
+
+On a fresh checkout the local database has no schema until you migrate it:
+`npm run db:migrate` creates the three tables (and the `d1_migrations`
+journal) from `drizzle/`. If you are starting from an empty state, this step
+is required — running `npm run dev` first would start against a database
+without tables.
 
 Open the public prototype at `http://localhost:3000` and the local moderation
 dashboard at `http://localhost:3000/moderation`. Keep the development server

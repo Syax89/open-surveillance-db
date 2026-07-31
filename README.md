@@ -82,6 +82,12 @@ For a complete walkthrough of a clean local setup — prerequisites, schema
 migrations, synthetic fixtures, and a safe non-destructive reset — read
 [docs/DEVELOPMENT_SETUP.md](docs/DEVELOPMENT_SETUP.md).
 
+To start over with a clean local database, run `npm run db:reset`
+(non-destructive: it moves the local state aside under a timestamped backup,
+then re-applies the migrations). After changing the schema in `db/schema.ts`,
+regenerate a migration with `npm run db:generate` before running
+`db:migrate`.
+
 For local moderation testing, open `http://localhost:3000/moderation`. This route is intentionally not linked from the public prototype and has no production authentication yet.
 
 For a complete fictional-data workflow—submission, approval/rejection/hiding,
