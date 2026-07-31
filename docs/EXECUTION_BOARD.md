@@ -133,6 +133,13 @@ These are the next technical tickets once Wave A has named owners and approved t
   date. Local moderators choose each field separately, defaulting to private;
   the public data boundary suppresses raw metadata unless the corresponding
   field-specific choice is enabled.
+- **2026-07-31 — Map-to-directory keyboard equivalent completed:** every map
+  task now has a keyboard/text-list path. Directory "Show on map" selects a
+  record, scrolls, and moves keyboard focus to the labelled map region,
+  honouring reduced-motion preferences; picking a report location keeps the
+  manual-coordinate fields; and if the lazy Leaflet load or tile host fails,
+  the map degrades to a visible panel linking the accessible directory instead
+  of an empty box (PR #22, 155/155 tests green).
 
 ## Active next plan
 
