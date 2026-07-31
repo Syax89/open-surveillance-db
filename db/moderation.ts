@@ -21,7 +21,21 @@ export type CameraModerationAction =
   | "hide"
   | "mark-stale"
   | "reverify";
-export type CorrectionModerationAction = "approve" | "reject";
+export type CorrectionModerationAction = "approve" | "reject" | "associate";
+
+export const correctionOutcomes = [
+  "kept",
+  "corrected",
+  "marked-stale",
+  "removed",
+  "escalated",
+] as const;
+export type CorrectionOutcome = (typeof correctionOutcomes)[number];
+
+export type CorrectionModerationOptions = {
+  outcome?: CorrectionOutcome;
+  cameraId?: number;
+};
 
 export const moderationReasonCodes = [
   "verified-public-infrastructure",
@@ -59,7 +73,7 @@ export type MetadataPublicationChoices = {
 };
 
 const createCorrectionRequestsTable =
-  "CREATE TABLE IF NOT EXISTS correction_requests (id INTEGER PRIMARY KEY AUTOINCREMENT, camera_id INTEGER, issue_type TEXT NOT NULL, message TEXT NOT NULL, contact TEXT, status TEXT NOT NULL DEFAULT 'pending', created_at TEXT NOT NULL)";
+  "CREATE TABLE IF NOT EXISTS correction_requests (id INTEGER PRIMARY KEY AUTOINCREMENT, camera_id INTEGER, issue_type TEXT NOT NULL, message TEXT NOT NULL, contact TEXT, status TEXT NOT NULL DEFAULT 'pending', created_at TEXT NOT NULL, outcome TEXT)";
 const createCorrectionRequestsStatusIndex =
   "CREATE INDEX IF NOT EXISTS correction_requests_status_idx ON correction_requests(status)";
 const createModerationEventsTable =
@@ -101,9 +115,10 @@ export async function listPendingModerationItems(): Promise<ModerationQueue> {
       )
       .bind("needs_review")
       .all<CameraRecord>(),
+    // correction_requests rows expose outcome in the queue (null while pending).
     d1
       .prepare(
-        "SELECT id, camera_id AS cameraId, issue_type AS issueType, message, contact, status, created_at AS createdAt FROM correction_requests WHERE status = ? ORDER BY created_at ASC, id ASC",
+        "SELECT id, camera_id AS cameraId, issue_type AS issueType, message, contact, status, outcome, created_at AS createdAt FROM correction_requests WHERE status = ? ORDER BY created_at ASC, id ASC",
       )
       .bind("pending")
       .all<PendingCorrectionRequest>(),
@@ -221,28 +236,131 @@ export async function moderateCorrection(
   action: CorrectionModerationAction,
   reasonCode: ModerationReasonCode,
   note: string | null,
+  options?: CorrectionModerationOptions,
 ): Promise<ModerationDecision<PendingCorrectionRequest> | null> {
   const d1 = await getModerationD1();
+  const outcome = options?.outcome;
+  const cameraId = options?.cameraId;
+  if (action === "associate" && cameraId === undefined) return null;
   const status = action === "approve" ? "reviewed" : "rejected";
+
+  const sets: string[] = [];
+  const binds: (string | number)[] = [];
+  if (action !== "associate") {
+    sets.push("status = ?");
+    binds.push(status);
+  }
+  if (cameraId !== undefined) {
+    sets.push("camera_id = ?");
+    binds.push(cameraId);
+  }
+  if (action === "approve" && outcome !== undefined) {
+    sets.push("outcome = ?");
+    binds.push(outcome);
+  }
+  binds.push(id);
 
   const item = await d1
     .prepare(
-      "UPDATE correction_requests SET status = ? WHERE id = ? AND status = 'pending' RETURNING id, camera_id AS cameraId, issue_type AS issueType, message, contact, status, created_at AS createdAt",
+      `UPDATE correction_requests SET ${sets.join(", ")} WHERE id = ? AND status = 'pending' RETURNING id, camera_id AS cameraId, issue_type AS issueType, message, contact, status, outcome, created_at AS createdAt`,
     )
-    .bind(status, id)
+    .bind(...binds)
     .first<PendingCorrectionRequest>();
   if (!item) return null;
 
-  const event = await createModerationEvent(d1, {
-    entity: "correction",
-    entityId: id,
-    previousStatus: "pending",
-    newStatus: status,
-    action,
-    reasonCode,
-    note,
-  });
+  const event =
+    action === "associate"
+      ? await createModerationEvent(d1, {
+          entity: "correction",
+          entityId: id,
+          previousStatus: "pending",
+          newStatus: "pending",
+          action: "associate",
+          reasonCode,
+          note,
+        })
+      : await createModerationEvent(d1, {
+          entity: "correction",
+          entityId: id,
+          previousStatus: "pending",
+          newStatus: status,
+          action,
+          reasonCode,
+          note,
+        });
+
+  if (action === "approve" && outcome !== undefined && item.cameraId !== null) {
+    await applyCorrectionOutcome(d1, item.cameraId, outcome, reasonCode, note);
+  }
+
   return { item, event };
+}
+
+async function applyCorrectionOutcome(
+  d1: Awaited<ReturnType<typeof getModerationD1>>,
+  cameraId: number,
+  outcome: CorrectionOutcome,
+  reasonCode: ModerationReasonCode,
+  note: string | null,
+): Promise<void> {
+  const record = await d1
+    .prepare("SELECT status FROM cameras WHERE id = ?")
+    .bind(cameraId)
+    .first<{ status: string }>();
+  if (!record) return;
+
+  if (outcome === "marked-stale") {
+    // A credible correction sends a verified record back to needs_review while
+    // it is reassessed (DATA_TRUST SLA).
+    if (record.status !== "verified") return;
+    await d1
+      .prepare("UPDATE cameras SET status = 'needs_review', updated = ? WHERE id = ? AND status = 'verified'")
+      .bind("Local moderation: correction marked record stale", cameraId)
+      .run();
+    await createModerationEvent(d1, {
+      entity: "camera",
+      entityId: cameraId,
+      previousStatus: "verified",
+      newStatus: "needs_review",
+      action: "marked-stale",
+      reasonCode,
+      note,
+    });
+    return;
+  }
+
+  if (outcome === "removed") {
+    await d1
+      .prepare("UPDATE cameras SET status = 'removed', updated = ? WHERE id = ?")
+      .bind("Local moderation: correction outcome removed the record", cameraId)
+      .run();
+    await createModerationEvent(d1, {
+      entity: "camera",
+      entityId: cameraId,
+      previousStatus: record.status,
+      newStatus: "removed",
+      action: "removed",
+      reasonCode,
+      note,
+    });
+    return;
+  }
+
+  if (outcome === "corrected") {
+    await d1
+      .prepare("UPDATE cameras SET updated = ? WHERE id = ?")
+      .bind("Local moderation: correction applied to record", cameraId)
+      .run();
+    await createModerationEvent(d1, {
+      entity: "camera",
+      entityId: cameraId,
+      previousStatus: record.status,
+      newStatus: record.status,
+      action: "corrected",
+      reasonCode,
+      note,
+    });
+  }
 }
 
 async function createModerationEvent(
