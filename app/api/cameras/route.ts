@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { createPendingCamera, findNearbyPublicCameras, listPublicCameras } from "../../../db/cameras";
+import { createPendingCamera, findNearbyPublicCameras, freshnessWindows, listPublicCameras, type FreshnessWindow, type PublicCameraFilters } from "../../../db/cameras";
 import { isRecord } from "../../lib/guards";
 import { callerKey, checkRateLimit, submissionLimits, submissionsDisabled } from "../../lib/rate-limit";
 
@@ -31,8 +31,17 @@ function toCsv(records: Awaited<ReturnType<typeof listPublicCameras>>) {
 
 export async function GET(request: Request) {
   try {
-    const records = await listPublicCameras();
-    const format = new URL(request.url).searchParams.get("format");
+    const params = new URL(request.url).searchParams;
+    const format = params.get("format");
+    const kind = cleanText(params.get("kind"), 60);
+    const freshness = params.get("freshness");
+    if (freshness !== null && !freshnessWindows.includes(freshness as FreshnessWindow)) {
+      return Response.json({ error: `Unknown freshness window. Use one of: ${freshnessWindows.join(", ")}.` }, { status: 400 });
+    }
+    const filters: PublicCameraFilters = {};
+    if (kind) filters.kind = kind;
+    if (freshness && freshness !== "all") filters.freshness = freshness as FreshnessWindow;
+    const records = await listPublicCameras(filters);
     if (format === "geojson") {
       return Response.json({ type: "FeatureCollection", features: records.map((record) => ({ type: "Feature", geometry: { type: "Point", coordinates: [record.longitude, record.latitude] }, properties: { id: record.id, title: record.title, kind: record.kind, manufacturer: record.manufacturer, observedOn: record.observedOn, status: record.status, source: record.source, updated: record.updated, description: record.description } })) }, { headers: { "Content-Disposition": "attachment; filename=opensurveillancedb-cameras.geojson" } });
     }

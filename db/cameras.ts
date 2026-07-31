@@ -68,12 +68,49 @@ export async function getD1() {
   return env.DB;
 }
 
-export async function listPublicCameras(nowIso: string = new Date().toISOString()): Promise<PublicCameraRecord[]> {
+export const freshnessWindows = ["7d", "30d", "90d", "all"] as const;
+export type FreshnessWindow = (typeof freshnessWindows)[number];
+export type PublicCameraFilters = { kind?: string; freshness?: FreshnessWindow };
+
+function freshnessCutoff(freshness: Exclude<FreshnessWindow, "all">): string {
+  const days = Number.parseInt(freshness, 10);
+  return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+}
+
+export async function listPublicCameras(
+  nowIsoOrFilters?: string | PublicCameraFilters,
+): Promise<PublicCameraRecord[]> {
   const d1 = await getD1();
+  // The first argument is either a review-window boundary (ISO string, as used
+  // by the freshness-reverification suite) or a filter object (directory UI /
+  // public API route). A string selects the boundary at a specific instant;
+  // filter objects always evaluate the boundary "now".
+  const filters =
+    typeof nowIsoOrFilters === "string" ? undefined : nowIsoOrFilters;
+  const nowIso =
+    typeof nowIsoOrFilters === "string"
+      ? nowIsoOrFilters
+      : new Date().toISOString();
+  const parameters: string[] = [];
   // Public freshness boundary: only `demo` records and `verified` records still
   // inside their review window (or without a schedule, i.e. not provably stale)
   // are presented as current. This mirrors isPubliclyCurrent() in db/freshness.ts.
-  const result = await d1.prepare("SELECT id, title, kind, CASE WHEN publish_manufacturer = 1 THEN manufacturer ELSE NULL END AS manufacturer, CASE WHEN publish_observed_on = 1 THEN observed_on ELSE NULL END AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, latitude, longitude, status, source, updated, description, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt FROM cameras WHERE status IN ('verified', 'demo') AND (status = 'demo' OR review_due_at IS NULL OR review_due_at >= ?) ORDER BY id DESC").bind(nowIso).all<PublicCameraRecord>();
+  let query = "SELECT id, title, kind, CASE WHEN publish_manufacturer = 1 THEN manufacturer ELSE NULL END AS manufacturer, CASE WHEN publish_observed_on = 1 THEN observed_on ELSE NULL END AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, latitude, longitude, status, source, updated, description, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt FROM cameras WHERE status IN ('verified', 'demo') AND (status = 'demo' OR review_due_at IS NULL OR review_due_at >= ?)";
+  parameters.push(nowIso);
+  if (filters?.kind) {
+    query += " AND kind = ?";
+    parameters.push(filters.kind);
+  }
+  if (filters?.freshness && filters.freshness !== "all") {
+    query += " AND updated >= ?";
+    parameters.push(freshnessCutoff(filters.freshness));
+    // A freshness window matches only ISO verification timestamps. Non-ISO
+    // labels (illustrative demo placeholders, pre-backfill prose) must never
+    // be presented as freshly verified — the UI applies the same rule.
+    query += " AND updated GLOB '[0-9][0-9][0-9][0-9]-*'";
+  }
+  query += " ORDER BY id DESC";
+  const result = await d1.prepare(query).bind(...parameters).all<PublicCameraRecord>();
   return result.results;
 }
 export type NearbyPublicCameraRecord = PublicCameraRecord & { distanceMeters: number };

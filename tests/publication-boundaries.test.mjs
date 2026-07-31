@@ -32,6 +32,82 @@ test("the public camera query explicitly excludes pending records", async () => 
   assert.doesNotMatch(publicQuery, /status\s*=\s*'pending'/i, "pending records must not be part of the public query");
 });
 
+test("the public directory filters are parameterised and whitelisted at the db boundary", async () => {
+  const cameras = await readSource("db/cameras.ts");
+  const publicStart = cameras.indexOf("export async function listPublicCameras");
+  const publicEnd = cameras.indexOf("export async function createPendingCamera", publicStart);
+  const publicQuery = cameras.slice(publicStart, publicEnd);
+
+  assert.match(
+    cameras,
+    /export\s+const\s+freshnessWindows\s*=\s*\[["']7d["']\s*,\s*["']30d["']\s*,\s*["']90d["']\s*,\s*["']all["']\]/,
+    "freshness windows must be an explicit whitelist of 7d/30d/90d/all",
+  );
+  assert.match(publicQuery, /query\s*\+=\s*["']\s*AND\s+kind\s*=\s*\?["']/, "the category filter must be a bound placeholder, never interpolated");
+  assert.match(publicQuery, /query\s*\+=\s*["']\s*AND\s+updated\s*>=\s*\?["']/, "the freshness filter must be a bound placeholder, never interpolated");
+  assert.match(
+    publicQuery,
+    /\\.bind\\(\\.\\.\\.parameters\\)/,
+    "all filters must be passed through the same parameterised bind call",
+  );
+  assert.match(
+    publicQuery,
+    /updated\\s+GLOB\\s+'\\[0-9\\]\\[0-9\\]\\[0-9\\]\\[0-9\\]-\\*'/,
+    "a freshness window must match only ISO verification timestamps (non-ISO labels are never window-matched)",
+  );
+  assert.doesNotMatch(
+    publicQuery,
+    /AND\s+kind\s*=\s*['"]\s*\+\s*(?:options|kind|filters)/,
+    "the category filter must not concatenate user input into SQL",
+  );
+  assert.doesNotMatch(
+    publicQuery,
+    /AND\s+updated\s*>=\s*['"]\s*\+\s*(?:options|freshness|filters)/,
+    "the freshness filter must not concatenate user input into SQL",
+  );
+});
+
+test("verification transitions store an ISO timestamp so the public freshness filter stays meaningful", async () => {
+  const moderation = await readSource("db/moderation.ts");
+  const transitions = moderation.slice(
+    moderation.indexOf("function getCameraTransition"),
+    moderation.indexOf("export async function moderateCorrection"),
+  );
+
+  assert.match(
+    transitions,
+    /action === "approve"[\s\S]*?newStatus: "verified",\s*updated:\s*new Date\(\)\.toISOString\(\)/,
+    "approve must record the verification moment as a comparable ISO timestamp",
+  );
+  assert.match(
+    transitions,
+    /action === "reverify"[\s\S]*?newStatus: "verified",\s*updated:\s*new Date\(\)\.toISOString\(\)/,
+    "reverify must refresh the verification timestamp, not a human-readable label",
+  );
+  assert.doesNotMatch(
+    transitions,
+    /newStatus: "verified",\s*updated:\s*"Local moderation:/,
+    "verified public records must never carry a prose string in updated (breaks freshness ordering)",
+  );
+});
+
+test("the one-time freshness backfill migration is present, idempotent, and guarded", async () => {
+  const files = await sourceFiles("drizzle");
+  const migration = files.find((name) => name.endsWith(".sql") && path.basename(name).startsWith("0005_"));
+  assert.ok(migration, "a 0005 migration must backfill pre-existing prose verification timestamps");
+  const sql = await readSource(migration);
+
+  assert.match(sql, /UPDATE\s+cameras\s+SET\s+updated\s*=/i, "the migration must rewrite the verification timestamp");
+  assert.match(sql, /status\s*=\s*'verified'/i, "only verified public records are backfilled");
+  assert.match(
+    sql,
+    /updated\s+NOT\s+GLOB\s+'\[0-9\]\[0-9\]\[0-9\]\[0-9\]-/,
+    "only non-ISO values are rewritten, so the migration is idempotent",
+  );
+  assert.match(sql, /moderation_events/, "the backfill must reuse the moderation audit trail for the real verification moment");
+  assert.match(sql, /sqlite_master/, "the backfill must be guarded when the runtime-created audit table does not exist yet");
+});
+
 test("JSON, GeoJSON, and CSV are all derived from the public camera list", async () => {
   const route = await readSource("app/api/cameras/route.ts");
   const getStart = route.indexOf("export async function GET");
@@ -39,7 +115,7 @@ test("JSON, GeoJSON, and CSV are all derived from the public camera list", async
   const getHandler = route.slice(getStart, postStart);
 
   assert.match(route, /import\s*\{[^}]*\blistPublicCameras\b[^}]*\}\s*from\s*["'][^"']*db\/cameras["']/);
-  assert.match(getHandler, /const\s+records\s*=\s+await\s+listPublicCameras\(\)/);
+  assert.match(getHandler, /const\s+records\s*=\s+await\s+listPublicCameras\(filters\)/);
   assert.match(
     getHandler,
     /features\s*:\s*records\.map\(/,

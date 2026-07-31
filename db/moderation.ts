@@ -297,7 +297,7 @@ function getCameraTransition(
 ): { newStatus: string; updated: string } | null {
   if (previousStatus === "pending") {
     if (action === "approve") {
-      return { newStatus: "verified", updated: "Local moderation: approved and verified" };
+      return { newStatus: "verified", updated: new Date().toISOString() };
     }
     if (action === "reject") {
       return { newStatus: "rejected", updated: "Local moderation: rejected" };
@@ -321,7 +321,7 @@ function getCameraTransition(
 
   if (previousStatus === "needs_review") {
     if (action === "reverify") {
-      return { newStatus: "verified", updated: "Local moderation: re-verified" };
+      return { newStatus: "verified", updated: new Date().toISOString() };
     }
     if (action === "hide") {
       return { newStatus: "removed", updated: "Local moderation: hidden from public listing" };

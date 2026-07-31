@@ -21,6 +21,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [kindFilter, setKindFilter] = useState("all");
+  const [freshnessFilter, setFreshnessFilter] = useState("all");
   const [sortOrder, setSortOrder] = useState<"alphabetical" | "position">("alphabetical");
   const [correctionNotice, setCorrectionNotice] = useState("");
   const [nearbyCandidates, setNearbyCandidates] = useState<NearbyCandidate[]>([]);
@@ -43,14 +44,18 @@ export default function Home() {
   const cameraKinds = useMemo(() => Array.from(new Set(records.map((camera) => camera.kind).filter(Boolean))).sort((a, b) => a.localeCompare(b)), [records]);
   const filteredRecords = useMemo(() => {
     const query = search.trim().toLocaleLowerCase();
+    const freshnessCutoff = freshnessFilter === "all" ? null : Date.now() - Number.parseInt(freshnessFilter, 10) * 24 * 60 * 60 * 1000;
     const matchingRecords = records.filter((camera) => {
       const matchesSearch = !query || [camera.title, camera.kind, camera.source, camera.address, camera.manufacturer, camera.description, camera.latitude.toFixed(5), camera.longitude.toFixed(5)].filter(Boolean).some((value) => String(value).toLocaleLowerCase().includes(query));
-      return matchesSearch && (kindFilter === "all" || camera.kind === kindFilter);
+      const matchesKind = kindFilter === "all" || camera.kind === kindFilter;
+      const updatedAt = new Date(camera.updated).getTime();
+      const matchesFreshness = freshnessCutoff === null || (Number.isFinite(updatedAt) && updatedAt >= freshnessCutoff);
+      return matchesSearch && matchesKind && matchesFreshness;
     });
     return matchingRecords.sort((first, second) => sortOrder === "alphabetical"
       ? first.title.localeCompare(second.title)
       : first.latitude - second.latitude || first.longitude - second.longitude || first.title.localeCompare(second.title));
-  }, [kindFilter, records, search, sortOrder]);
+  }, [freshnessFilter, kindFilter, records, search, sortOrder]);
   const selectedCamera = useMemo(() => filteredRecords.find((camera) => camera.id === selectedId) ?? filteredRecords[0], [filteredRecords, selectedId]);
 
   async function selectCoordinates(latitude: number, longitude: number) {
@@ -159,7 +164,7 @@ export default function Home() {
 
     <section className="records-section" id="records" aria-labelledby="records-title">
       <div className="records-heading"><div><p className="eyebrow"><span /> {t.accessibleDirectory}</p><h2 id="records-title">{t.recordsTitle}</h2><p>{t.recordsIntro}</p></div><a className="text-button" href="#map">{t.useMapInstead} <span aria-hidden="true">↑</span></a></div>
-      <div className="directory-controls"><div className="record-search"><label htmlFor="record-search">{t.searchDirectory}</label><input id="record-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t.searchPlaceholder} aria-describedby="record-search-help record-search-count" /><p id="record-search-help">{t.searchHelp}</p></div><div className="record-filter"><label htmlFor="record-kind-filter">{t.cameraType}</label><select id="record-kind-filter" value={kindFilter} onChange={(event) => setKindFilter(event.target.value)}><option value="all">{t.allTypes}</option>{cameraKinds.map((kind) => <option key={kind} value={kind}>{kind}</option>)}</select></div><div className="record-filter"><label htmlFor="record-sort">{t.orderRecords}</label><select id="record-sort" value={sortOrder} onChange={(event) => setSortOrder(event.target.value as "alphabetical" | "position")}><option value="alphabetical">{t.alphabetical}</option><option value="position">{t.positionOrder}</option></select></div></div>
+      <div className="directory-controls"><div className="record-search"><label htmlFor="record-search">{t.searchDirectory}</label><input id="record-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t.searchPlaceholder} aria-describedby="record-search-help record-search-count" /><p id="record-search-help">{t.searchHelp}</p></div><div className="record-filter"><label htmlFor="record-kind-filter">{t.cameraType}</label><select id="record-kind-filter" value={kindFilter} onChange={(event) => setKindFilter(event.target.value)}><option value="all">{t.allTypes}</option>{cameraKinds.map((kind) => <option key={kind} value={kind}>{kind}</option>)}</select></div><div className="record-filter"><label htmlFor="record-freshness-filter">{t.freshnessFilter}</label><select id="record-freshness-filter" value={freshnessFilter} onChange={(event) => setFreshnessFilter(event.target.value)}><option value="all">{t.freshnessAll}</option><option value="7d">{t.freshness7d}</option><option value="30d">{t.freshness30d}</option><option value="90d">{t.freshness90d}</option></select></div><div className="record-filter"><label htmlFor="record-sort">{t.orderRecords}</label><select id="record-sort" value={sortOrder} onChange={(event) => setSortOrder(event.target.value as "alphabetical" | "position")}><option value="alphabetical">{t.alphabetical}</option><option value="position">{t.positionOrder}</option></select></div></div>
       <p className="search-count" id="record-search-count" role="status">{filteredRecords.length === 1 ? t.oneRecordFound : `${filteredRecords.length} ${t.recordsFound}`}</p>
       {filteredRecords.length ? <ul className="record-list">{filteredRecords.map((camera) => <li key={camera.id}><article className="record-list-card"><div><p className="card-topline"><span className={`status-dot ${camera.status}`} /> {statuses[camera.status] ?? camera.status}</p><h3>{camera.title}</h3><p className="record-kind">{camera.kind}</p></div><dl><div><dt>{t.source}</dt><dd>{camera.source}</dd></div><div><dt>{t.lastVerification}</dt><dd>{camera.updated}</dd></div><div><dt>{t.location}</dt><dd>{camera.address || `${camera.latitude.toFixed(5)}, ${camera.longitude.toFixed(5)}`}</dd></div>{camera.manufacturer && <div><dt>{t.manufacturerLabel}</dt><dd>{camera.manufacturer}</dd></div>}{camera.observedOn && <div><dt>{t.observedOnLabel}</dt><dd>{camera.observedOn}</dd></div>}</dl><div className="record-list-actions"><button type="button" className="text-button" onClick={() => showRecordOnMap(camera.id)}>{t.showOnMap} <span aria-hidden="true">→</span></button><a className="text-button" href={`/records/${camera.id}`}>{t.openRecord} <span aria-hidden="true">→</span></a></div></article></li>)}</ul> : <div className="empty-state"><h3>{t.emptyTitle}</h3><p>{t.emptyBody}</p><button type="button" className="text-button" onClick={() => setSearch("")}>{t.clearSearch} <span aria-hidden="true">→</span></button></div>}
     </section>
