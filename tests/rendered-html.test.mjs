@@ -1,91 +1,112 @@
+/**
+ * Rendered-HTML smoke test for OpenSurveillanceDB.
+ *
+ * History / decision (kanban t_7632afa1): the original version of this file
+ * was copied from the vinext starter template and asserted the template's
+ * "loading skeleton" preview — app/_sites-preview/SkeletonPreview.tsx,
+ * react-loading-skeleton and <meta name="codex-preview" content="development">
+ * on the rendered HTML ("Your site is taking shape"). That artifact was
+ * deliberately removed when the real prototype UI replaced the starter: the
+ * app/_sites-preview/ directory never existed in this repository's git
+ * history, package.json never depended on react-loading-skeleton, and
+ * app/page.tsx + app/layout.tsx no longer reference the preview. The old
+ * harness (plain `node --test` importing dist/server/index.js) also cannot
+ * work in this stack: the production bundle imports `cloudflare:workers`,
+ * which only the Cloudflare Workers runtime can resolve.
+ *
+ * The test is rewritten instead of deleted so the coverage class survives:
+ *   1. a real rendered-HTML smoke test of the production artifact, executed
+ *      with Miniflare (the same runtime the app deploys to). It verifies the
+ *      public homepage serves the app's real metadata and that no
+ *      starter-template preview leaks into the served HTML;
+ *   2. a static guard asserting the starter preview artifacts stay removed
+ *      (fail-fast, no build needed).
+ *
+ * Requires `npm run build` first (npm test already builds before running).
+ */
 import assert from "node:assert/strict";
 import { access, readFile, readdir } from "node:fs/promises";
+import path from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
+import { Miniflare } from "miniflare";
 
-const developmentPreviewMeta =
-  /<meta(?=[^>]*\bname=["']codex-preview["'])(?=[^>]*\bcontent=["']development["'])[^>]*>/i;
-const templateRoot = new URL("../", import.meta.url);
-const previewRoot = new URL("../app/_sites-preview/", import.meta.url);
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const serverDir = path.join(root, "dist", "server");
 
-async function render() {
-  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
-  workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
-  const { default: worker } = await import(workerUrl.href);
-
-  return worker.fetch(
-    new Request("http://localhost/", {
-      headers: { accept: "text/html" },
-    }),
-    {
-      ASSETS: {
-        fetch: async () => new Response("Not found", { status: 404 }),
-      },
-    },
-    {
-      waitUntil() {},
-      passThroughOnException() {},
-    },
-  );
+/** Collect every JS module of the built worker, with index.js as the entry. */
+async function workerModules() {
+  const found = [];
+  const walk = async (dir) => {
+    const entries = await readdir(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        await walk(full);
+      } else if (entry.name.endsWith(".js")) {
+        found.push({ type: "ESModule", path: full });
+      }
+    }
+  };
+  await walk(serverDir);
+  const entry = found.find((m) => m.path === path.join(serverDir, "index.js"));
+  assert.ok(entry, "dist/server/index.js is missing — run `npm run build` first");
+  return [entry, ...found.filter((m) => m !== entry)];
 }
 
-test("server-renders the starter loading skeleton", async () => {
-  const response = await render();
+/** Render the homepage exactly like the deployed worker would. */
+async function renderHomepage() {
+  const mf = new Miniflare({
+    modules: await workerModules(),
+    compatibilityDate: "2026-01-01",
+    compatibilityFlags: ["nodejs_compat"],
+  });
+  try {
+    const response = await mf.dispatchFetch("http://localhost/", {
+      headers: { accept: "text/html" },
+    });
+    return { response, html: await response.text() };
+  } finally {
+    await mf.dispose();
+  }
+}
+
+test("server-rendered homepage carries the public app metadata", async () => {
+  const { response, html } = await renderHomepage();
+
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
-  const html = await response.text();
-  assert.match(html, developmentPreviewMeta);
-  assert.match(html, /<title>Your site is taking shape<\/title>/i);
-  assert.match(html, /Building your site/);
-  assert.match(html, /Your site is taking shape/);
-  assert.match(
-    html,
-    /Your first version will appear here automatically when it’s ready\./,
-  );
-  assert.doesNotMatch(html, /Codex/);
-  assert.match(html, /react-loading-skeleton/);
+  // The real app metadata (app/layout.tsx), not the starter's placeholder.
+  assert.match(html, /<title>OpenSurveillanceDB[^<]*Public data about public surveillance<\/title>/i);
+  assert.match(html, /<html[^>]*lang="en"/);
+  assert.match(html, /OpenSurveillanceDB/);
+  assert.match(html, /Public data about public surveillance\./);
+  // A11y live region for the "loading public records" notice.
   assert.match(html, /role="status"/);
+
+  // No starter-template preview may leak into the public page.
+  assert.doesNotMatch(html, /codex-preview|sites-skeleton|react-loading-skeleton/i);
+  assert.doesNotMatch(html, /Your site is taking shape|Building your site/i);
 });
 
-test("keeps the loading skeleton scoped and disposable", async () => {
-  const [preview, css, page, layout, packageJson, files] = await Promise.all([
-    readFile(new URL("SkeletonPreview.tsx", previewRoot), "utf8"),
-    readFile(new URL("preview.css", previewRoot), "utf8"),
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../package.json", import.meta.url), "utf8"),
-    readdir(previewRoot),
+test("starter preview skeleton stays removed from the template", async () => {
+  const [page, layout, packageJson, publicFiles] = await Promise.all([
+    readFile(path.join(root, "app", "page.tsx"), "utf8"),
+    readFile(path.join(root, "app", "layout.tsx"), "utf8"),
+    readFile(path.join(root, "package.json"), "utf8"),
+    readdir(path.join(root, "public")),
   ]);
 
-  assert.deepEqual(files.sort(), ["SkeletonPreview.tsx", "preview.css"]);
-  assert.match(preview, /from "react-loading-skeleton"/);
-  assert.match(preview, /baseColor="#eceae7"/);
-  assert.match(preview, /highlightColor="#f9f8f6"/);
-  assert.match(preview, /duration=\{2\.8\}/);
-  assert.match(preview, /sites-skeleton-search-placeholder/);
-  assert.match(packageJson, /"react-loading-skeleton": "3\.5\.0"/);
+  // The preview source directory and its static copy must not exist.
+  await assert.rejects(access(path.join(root, "app", "_sites-preview")));
+  assert.ok(!publicFiles.includes("_sites-preview"), "public/_sites-preview must not exist");
 
-  const shellIndex = preview.indexOf('className="sites-skeleton-shell"');
-  const statusIndex = preview.indexOf('className="sites-skeleton-status"');
-  assert.ok(shellIndex >= 0 && statusIndex > shellIndex);
-  assert.match(css, /position:\s*fixed/);
-  assert.match(css, /inset:\s*0/);
-  assert.match(css, /opacity:\s*0\.52/);
-  assert.match(css, /prefers-reduced-motion:\s*reduce/);
-  assert.doesNotMatch(css, /#020617|canvas|pets|progress/i);
-  assert.doesNotMatch(
-    preview,
-    /loading-spinner|status-mark|status-progress|canvas|cookie|random/i,
-  );
+  // The template dependency was never adopted.
+  assert.doesNotMatch(packageJson, /react-loading-skeleton/);
 
-  assert.match(page, /export const metadata:\s*Metadata/);
-  assert.match(page, /"codex-preview": "development"/);
-  assert.match(page, /<SkeletonPreview \/>/);
-  assert.match(layout, /title:\s*"Starter Project"/);
-  assert.doesNotMatch(layout, /codex-preview|_sites-preview|themeColor|\bViewport\b/);
-  assert.doesNotMatch(css, /(^|\s)(html|body)\s*\{/m);
-
-  await assert.rejects(
-    access(new URL("public/_sites-preview", templateRoot)),
-  );
+  // The real app must not reference the preview or its meta tag.
+  assert.doesNotMatch(layout, /codex-preview|_sites-preview/i);
+  assert.doesNotMatch(page, /SkeletonPreview|_sites-preview|codex-preview/i);
+  assert.match(layout, /title:\s*"OpenSurveillanceDB/);
 });

@@ -35,8 +35,5 @@ jobs:
       - name: Typecheck (tsc --noEmit)
         run: npx tsc --noEmit
 
-      - name: Test (build + node --test)
+      - name: Test (build + node --test suite)
         run: npm test
-
-      - name: Build (vinext)
-        run: npm run build
