@@ -144,6 +144,11 @@ harm.
 - Use layered controls: CDN/edge protection, per-route limits, quotas for
   authenticated high-volume contributors, schema validation, payload-size caps,
   and abuse monitoring.
+- Implemented in Wave B: per-route sliding-window limiter
+  (`app/lib/rate-limit.ts`), capped JSON body reader and URI guard
+  (`app/lib/input-limits.ts`), and hashed abuse alerts with route surge
+  detection (`app/lib/abuse-alerts.ts`). Environment knobs and defaults are
+  listed in `docs/DEPLOYMENT.md`.
 - Keep pending records, moderator notes, account data, audit detail, and private
   evidence inaccessible from public APIs, search, exports, error messages, and
   logs.

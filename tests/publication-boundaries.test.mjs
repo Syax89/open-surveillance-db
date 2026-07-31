@@ -534,9 +534,100 @@ test("public POST endpoints are rate-limited per caller and can be disabled", as
   assert.match(post, /Retry-After/, "the 429 response must include a retry window");
   assert.match(post, /submissionsDisabled\(env\)/, "submissions must be disableable through environment");
   assert.match(limiter, /new\s+Map<string,\s*number\[\]>/, "the limiter must keep per-key request timestamps");
-  assert.match(limiter, /POST_RATE_LIMIT_MAX/, "the request limit must be configurable through environment");
-  assert.match(limiter, /POST_RATE_LIMIT_WINDOW_SECONDS/, "the window must be configurable through environment");
+  assert.match(limiter, /submit:\s*["']POST["']/, "the submission limit must read the POST_* prefix");
+  assert.match(limiter, /\$\{prefix\}_RATE_LIMIT_MAX/, "the request limit must be configurable through environment");
+  assert.match(limiter, /\$\{prefix\}_RATE_LIMIT_WINDOW_SECONDS/, "the window must be configurable through environment");
   assert.match(limiter, /POST_SUBMISSIONS_DISABLED/, "the disable flag must be read from environment");
+});
+
+test("every public route family applies its own rate limit with 429 and Retry-After", async () => {
+  const cameras = await readSource("app/api/cameras/route.ts");
+  const nearby = await readSource("app/api/cameras/nearby/route.ts");
+  const revisions = await readSource("app/api/cameras/revisions/route.ts");
+  const corrections = await readSource("app/api/corrections/route.ts");
+  const moderation = await readSource("app/api/moderation/route.ts");
+
+  const hasRateLimiter = (source) =>
+    /import\s*\{[^}]*\bcheckRateLimit\b[^}]*\}\s*from\s*["'][^"']*lib\/rate-limit["']/.test(source) &&
+    /callerKey\(request\)/.test(source) &&
+    /status:\s*429/.test(source) &&
+    /Retry-After/.test(source);
+
+  assert.ok(hasRateLimiter(cameras), "cameras GET+POST must be rate-limited");
+  assert.ok(hasRateLimiter(nearby), "nearby search must be rate-limited");
+  assert.ok(hasRateLimiter(revisions), "change-history reads must be rate-limited");
+  assert.ok(hasRateLimiter(corrections), "corrections must be rate-limited");
+  assert.ok(hasRateLimiter(moderation), "moderation must be rate-limited");
+
+  // Each route family maps to its own bucket so a burst on one endpoint
+  // never starves another.
+  assert.match(
+    cameras,
+    /["']export["']\s*:\s*["']read["']/,
+    "cameras GET must split reads from bulk exports",
+  );
+  assert.match(nearby, /limitsFor\(\s*["']nearby["']/, "nearby must use its own bucket");
+  assert.match(revisions, /limitsFor\(\s*["']revisions["']/, "revisions must use its own bucket");
+  assert.match(moderation, /limitsFor\(\s*["']moderate["']/, "moderation must use its own bucket");
+  assert.match(corrections, /submissionLimits\(env\)/, "corrections must share the submission bucket");
+});
+
+test("public handlers reject oversized inputs and guard the request URI", async () => {
+  const routes = {
+    cameras: await readSource("app/api/cameras/route.ts"),
+    corrections: await readSource("app/api/corrections/route.ts"),
+    moderation: await readSource("app/api/moderation/route.ts"),
+    nearby: await readSource("app/api/cameras/nearby/route.ts"),
+    revisions: await readSource("app/api/cameras/revisions/route.ts"),
+  };
+
+  for (const [label, source] of Object.entries(routes)) {
+    assert.match(source, /urlTooLong\(request\)/, `${label} must guard the request URI length`);
+  }
+  for (const [label, source] of Object.entries({ cameras: routes.cameras, corrections: routes.corrections, moderation: routes.moderation })) {
+    assert.match(source, /readJsonBody\(request,\s*env\)/, `${label} must read bodies through the capped reader`);
+    assert.match(source, /PayloadTooLargeError/, `${label} must handle the 413 signal`);
+    assert.match(
+      source,
+      /status:\s*(?:413|error\.status)/,
+      `${label} must answer 413 for oversized bodies`,
+    );
+  }
+});
+
+test("every rate-limited route reports blocks to the hashed abuse-alert layer", async () => {
+  const files = [
+    "app/api/cameras/route.ts",
+    "app/api/cameras/nearby/route.ts",
+    "app/api/cameras/revisions/route.ts",
+    "app/api/corrections/route.ts",
+    "app/api/moderation/route.ts",
+  ];
+  for (const file of files) {
+    const source = await readSource(file);
+    assert.match(
+      source,
+      /recordRateLimitBlock\(env/,
+      `${file} must signal rate-limit blocks to the abuse-alert layer`,
+    );
+    assert.match(
+      source,
+      /from\s*["'][^"']*lib\/abuse-alerts["']/,
+      `${file} must import the abuse-alert module`,
+    );
+  }
+
+  const alerts = await readSource("app/lib/abuse-alerts.ts");
+  assert.match(alerts, /sha256Hex/, "alerts must hash the caller identity");
+  assert.match(alerts, /callerHash/, "the alert payload must expose only a hashed identity");
+  assert.doesNotMatch(
+    alerts,
+    /callerHash\s*:\s*key\b/,
+    "the raw caller key must never be used as the alert identity",
+  );
+  const limits = await readSource("app/lib/input-limits.ts");
+  assert.match(limits, /DEFAULT_MAX_BODY_BYTES/, "the input layer must define a default body cap");
+  assert.match(limits, /MAX_BODY_BYTES/, "the body cap must be configurable through environment");
 });
 
 test("server errors are logged server-side and return generic client messages", async () => {
