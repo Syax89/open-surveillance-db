@@ -13,7 +13,7 @@
 //
 // Every test gets a fresh temp tree so module instances never share state.
 
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -50,6 +50,35 @@ async function buildTree() {
     );
   }
 
+  // The `cloudflare:workers` runtime surface: plain Node cannot resolve the
+  // scheme, so the transpiled routes are pointed at a static mock module.
+  const workersMockUrl = pathToFileURL(path.join(tree, "cloudflare-workers.mjs")).href;
+  await writeFile(
+    path.join(tree, "cloudflare-workers.mjs"),
+    await readFile(path.join(mocksDir, "cloudflare-workers.mjs"), "utf8"),
+  );
+
+  // Mirror app/lib/*.ts (pure helpers, no Workers bindings) so relative
+  // `lib/*` imports resolve inside the temp tree.
+  const libDir = path.join(root, "app", "lib");
+  const libOutputDir = path.join(tree, "app", "lib");
+  await mkdir(libOutputDir, { recursive: true });
+  for (const entry of await readdir(libDir, { withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.endsWith(".ts")) continue;
+    const libCompiled = rewriteSpecifiers(
+      ts.transpileModule(await readFile(path.join(libDir, entry.name), "utf8"), {
+        compilerOptions: {
+          module: ts.ModuleKind.ESNext,
+          target: ts.ScriptTarget.ESNext,
+          moduleResolution: ts.ModuleResolutionKind.Bundler,
+        },
+        fileName: path.join(libDir, entry.name),
+      }).outputText,
+      "",
+    );
+    await writeFile(path.join(libOutputDir, entry.name.replace(/\.ts$/, ".mjs")), libCompiled);
+  }
+
   for (const { source, output } of ROUTES) {
     const sourcePath = path.join(root, source);
     const outputPath = path.join(tree, output);
@@ -63,20 +92,14 @@ async function buildTree() {
       fileName: sourcePath,
     }).outputText;
 
-    // Node ESM needs explicit extensions: rewrite every relative `db/*`
-    // import to `db/*.mjs` so it resolves to the mock modules.
-    const rewritten = compiled.replace(
-      /(from\s*["'])(\.[^"']*\/db\/[^"']+)(["'])/g,
-      "$1$2.mjs$3",
-    );
-    // Sanity check: every relative db import must now carry an explicit .mjs.
-    const dbImports = [...rewritten.matchAll(/(?:from|import)\s*["'](\.[^"']*\/db\/[^"']+)["']/g)];
-    const unresolved = dbImports
+    const rewritten = rewriteSpecifiers(compiled, workersMockUrl);
+    // Sanity check: every relative db/lib import must now carry an explicit .mjs.
+    const unresolvedImports = [...rewritten.matchAll(/(?:from|import)\s*["'](\.[^"']*\/db\/[^"']+|\.[^"']*\/lib\/[^"']+)["']/g)]
       .map((match) => match[1])
       .filter((specifier) => !specifier.endsWith(".mjs"));
-    if (unresolved.length > 0) {
+    if (unresolvedImports.length > 0) {
       throw new Error(
-        `route ${source} still has unresolved db imports: ${unresolved.join(", ")}`,
+        `route ${source} still has unresolved relative imports: ${unresolvedImports.join(", ")}`,
       );
     }
 
@@ -84,6 +107,22 @@ async function buildTree() {
     await writeFile(outputPath, rewritten);
   }
   return tree;
+}
+
+// Rewrite the transpiled ESM so it resolves inside the temp tree:
+//   - relative db/* and lib/* imports get an explicit .mjs extension,
+//   - the bare `cloudflare:workers` specifier is pointed at the mock module.
+function rewriteSpecifiers(code, workersMockUrl) {
+  let rewritten = code
+    .replace(/(from\s*["'])(\.[^"']*\/db\/[^"']+)(["'])/g, "$1$2.mjs$3")
+    .replace(/(from\s*["'])(\.[^"']*\/lib\/[^"']+)(["'])/g, "$1$2.mjs$3");
+  if (workersMockUrl) {
+    rewritten = rewritten.replace(
+      /from\s*["']cloudflare:workers["']/g,
+      `from "${workersMockUrl}"`,
+    );
+  }
+  return rewritten;
 }
 
 export function buildRouteTree() {
