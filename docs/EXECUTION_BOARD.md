@@ -9,12 +9,13 @@ must not be accepted until the public-alpha gate is met.
 | Workstream | Responsible role | Detailed plan | Main dependency |
 | --- | --- | --- | --- |
 | Product, UX, accessibility | Product lead | [PRODUCT_UX.md](workstreams/PRODUCT_UX.md) | Pilot scope and public data boundary |
-| Data, moderation, privacy, safety | Data & trust lead | [DATA_TRUST.md](workstreams/DATA_TRUST.md) | Jurisdictional review and trained reviewers |
-| Operations, infrastructure, open source | Operations lead | [OPS_OPEN.md](workstreams/OPS_OPEN.md) | Named service owners and sustainable budget |
-| Coordination | Maintainers | This board and [development plan](DEVELOPMENT_PLAN.md) | Public decision log |
+| Data, moderation, privacy, safety | Data & trust lead — Linus and Grace (data stewards); Grace (moderation contact) | [DATA_TRUST.md](workstreams/DATA_TRUST.md) | Jurisdictional review and trained reviewers |
+| Operations, infrastructure, open source | Operations lead — Ken (operations owner, security contact) | [OPS_OPEN.md](workstreams/OPS_OPEN.md) | Named service owners and sustainable budget |
+| Coordination | Maintainers — Simone (syax89) and Ada (CTO, sole merge authority) | This board and [development plan](DEVELOPMENT_PLAN.md) | Public decision log |
 
 One person may initially hold several roles, but each responsibility must have
-a named, reachable owner before it becomes a production dependency.
+a named, reachable owner before it becomes a production dependency. The current
+named owners are recorded in [GOVERNANCE.md](../GOVERNANCE.md).
 
 ## Sequence
 
@@ -25,10 +26,10 @@ a named, reachable owner before it becomes a production dependency.
 1. Select one pilot jurisdiction and working languages. — **Decided 2026-07-31: Italy, Comune di Ferrara as launch area; Italian and English.** [ADR 0010](decisions/0010-pilot-jurisdiction-languages-eligibility.md)
 2. Confirm which public infrastructure is eligible and which places/details are excluded. — **Decided 2026-07-31: cameras visible from public space are eligible; private homes, live feeds, sensitive operational details, and security weaknesses are excluded.** [ADR 0010](decisions/0010-pilot-jurisdiction-languages-eligibility.md)
 3. Choose the data licence, publication precision, retention approach, and correction/removal contact.
-4. Name the initial maintainers, operations owner, data steward, security contact, and moderation contact.
+4. Name the initial maintainers, operations owner, data steward, security contact, and moderation contact. — **Decided 2026-07-31: maintainers are Simone (syax89) and Ada (CTO, sole merge authority); operations owner and security contact are Ken; data stewards are Linus and Grace; moderation contact is Grace.** Recorded in [GOVERNANCE.md](../GOVERNANCE.md).
 5. Create a public organisation/repository and an accessible private route for security and privacy reports.
 
-**Gate:** the decisions are documented in `docs/decisions/`; there is no ambiguity about what data may enter the pilot. (Items 1–2 are decided in ADR 0010; items 3–5 remain open.)
+**Gate:** the decisions are documented in `docs/decisions/`; there is no ambiguity about what data may enter the pilot. (Items 1–2 are decided in ADR 0010; item 4 is recorded in [GOVERNANCE.md](../GOVERNANCE.md); items 3 and 5 remain open.)
 
 ### Wave B — build the safe public-alpha foundation
 
@@ -149,6 +150,13 @@ These are the next technical tickets once Wave A has named owners and approved t
   manual-coordinate fields; and if the lazy Leaflet load or tile host fails,
   the map degrades to a visible panel linking the accessible directory instead
   of an empty box (PR #22, 155/155 tests green).
+- **2026-07-31 — Initial owners named (Wave A item 4):** the CEO named the
+  initial maintainers, operations owner, data steward, security contact, and
+  moderation contact: maintainers are Simone (syax89) and Ada (CTO, sole merge
+  authority); operations owner and security contact are Ken; data stewards are
+  Linus and Grace; moderation contact is Grace. Recorded in
+  [GOVERNANCE.md](../GOVERNANCE.md). Items 3 and 5 of Wave A (final data
+  licence, public organisation and private reporting route) remain open.
 - **2026-07-31 — Reviewer roles, moderation queue, decision reasons, and
   append-only audit events implemented (Wave B, Data & Trust):** every
   decision now requires a named reviewer (`actorId`) enforced against a
