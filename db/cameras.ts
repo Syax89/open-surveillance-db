@@ -22,38 +22,13 @@ export type CameraRecord = {
 /** Public read boundary: the private `notes` field must never leave this type. */
 export type PublicCameraRecord = Omit<CameraRecord, "notes">;
 
-const createTable = "CREATE TABLE IF NOT EXISTS cameras (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, kind TEXT NOT NULL, manufacturer TEXT, observed_on TEXT, publish_manufacturer INTEGER NOT NULL DEFAULT 0, publish_observed_on INTEGER NOT NULL DEFAULT 0, address TEXT, notes TEXT NOT NULL DEFAULT '', latitude REAL NOT NULL, longitude REAL NOT NULL, status TEXT NOT NULL DEFAULT 'pending', source TEXT NOT NULL, updated TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL)";
-const createIndex = "CREATE INDEX IF NOT EXISTS cameras_status_idx ON cameras(status)";
-const cameraMetadataColumns = [
-  { name: "manufacturer", statement: "ALTER TABLE cameras ADD COLUMN manufacturer TEXT" },
-  { name: "observed_on", statement: "ALTER TABLE cameras ADD COLUMN observed_on TEXT" },
-  { name: "publish_manufacturer", statement: "ALTER TABLE cameras ADD COLUMN publish_manufacturer INTEGER NOT NULL DEFAULT 0" },
-  { name: "publish_observed_on", statement: "ALTER TABLE cameras ADD COLUMN publish_observed_on INTEGER NOT NULL DEFAULT 0" },
-] as const;
-const seedRecords = [["Illustrative record A", "Fixed dome", 41.9004, 12.4936, "Prototype seed", "Demo data", "This marker demonstrates how a verified public record will be presented. It is not a claim about a real camera."], ["Illustrative record B", "Traffic monitoring", 41.9047, 12.5031, "Prototype seed", "Demo data", "The field of view is deliberately approximate and should never be treated as a record of live activity."]] as const;
-
-async function ensureCameraMetadataColumns(d1: NonNullable<typeof env.DB>) {
-  const columns = await d1.prepare("PRAGMA table_info(cameras)").all<{ name: string }>();
-  const existingColumns = new Set(columns.results.map((column) => column.name));
-  const missingColumns = cameraMetadataColumns.filter((column) => !existingColumns.has(column.name));
-
-  if (missingColumns.length > 0) {
-    await d1.batch(missingColumns.map((column) => d1.prepare(column.statement)));
-  }
-}
-
+/**
+ * The schema (tables, metadata columns, indexes) is applied exclusively by
+ * the Drizzle migrations in `drizzle/` (wrangler d1 migrations apply).
+ * This function performs no runtime bootstrap and seeds no demo data.
+ */
 export async function getD1() {
   if (!env.DB) throw new Error("Database binding unavailable");
-  await env.DB.prepare(createTable).run();
-  await ensureCameraMetadataColumns(env.DB);
-  await env.DB.prepare(createIndex).run();
-
-  const count = await env.DB.prepare("SELECT COUNT(*) AS count FROM cameras").first<{ count: number }>();
-  if (count?.count === 0) {
-    const now = new Date().toISOString();
-    await env.DB.batch(seedRecords.map((record) => env.DB.prepare("INSERT INTO cameras (title, kind, latitude, longitude, status, source, updated, description, created_at) VALUES (?, ?, ?, ?, 'demo', ?, ?, ?, ?)").bind(...record, now)));
-  }
-
   return env.DB;
 }
 

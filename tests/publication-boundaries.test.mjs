@@ -238,16 +238,17 @@ test("moderation decisions require a reason code from an explicit allowlist", as
 
 test("moderation writes an auditable event with transition, actor, and note", async () => {
   const moderation = await readSource("db/moderation.ts");
+  const migration = await readSource("drizzle/0002_confused_human_torch.sql");
 
-  assert.match(
+  assert.doesNotMatch(
     moderation,
     /CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+moderation_events/i,
-    "the moderation database must create a moderation_events table",
+    "the moderation module must not bootstrap tables at runtime; the schema comes from the Drizzle migrations",
   );
   assert.match(
-    moderation,
-    /moderation_events[\s\S]{0,800}\b(?:from_status|previous_status)\b[\s\S]{0,800}\b(?:to_status|new_status)\b[\s\S]{0,800}\bnote\b[\s\S]{0,800}\bactor\b/i,
-    "the event schema must retain status transitions, actor, and note",
+    migration,
+    /CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+`?moderation_events`?\s*\([\s\S]*?\bprevious_status\b[\s\S]*?\bnew_status\b[\s\S]*?\bnote\b[\s\S]*?\bactor\b/i,
+    "the moderation_events migration must define status transitions, actor, and note",
   );
   assert.match(
     moderation,
