@@ -42,6 +42,9 @@ const REAL_DB_MODULES = [
   { source: "db/cameras.ts", output: "db-real/cameras.mjs" },
   { source: "db/corrections.ts", output: "db-real/corrections.mjs" },
   { source: "db/moderation.ts", output: "db-real/moderation.mjs" },
+  // db/moderation.ts imports ./freshness (pure, no CF binding); it must be
+  // compiled into the same tree so the rewritten import resolves.
+  { source: "db/freshness.ts", output: "db-real/freshness.mjs" },
 ];
 
 let builtTreePromise = null;
