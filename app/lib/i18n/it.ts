@@ -59,6 +59,7 @@ export const it: Translation<typeof en> = {
     prototypeBanner:
       "La mappa di base usa dati reali di OpenStreetMap; i due pin visibili sono record illustrativi chiaramente etichettati. Fai clic in un punto della mappa per selezionare la posizione di una segnalazione.",
     mapHint: "Fai clic sulla mappa per scegliere la posizione della segnalazione",
+    recordId: "ID record",
     source: "Fonte",
     freshness: "Aggiornamento",
     location: "Posizione",

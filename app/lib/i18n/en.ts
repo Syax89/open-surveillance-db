@@ -64,6 +64,7 @@ export const en = {
     prototypeBanner:
       "The base map is real OpenStreetMap data; the two visible camera pins are clearly labelled illustrative records. Click anywhere on the map to select a position for a report.",
     mapHint: "Click the map to choose a report position",
+    recordId: "Record ID",
     source: "Source",
     freshness: "Freshness",
     location: "Location",
