@@ -1,27 +1,69 @@
 {
-  "version": "7",
-  "dialect": "sqlite",
-  "entries": [
-    {
-      "idx": 0,
-      "version": "6",
-      "when": 1785503050568,
-      "tag": "0000_eminent_vision",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "6",
-      "when": 1785504372232,
-      "tag": "0001_low_queen_noir",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "6",
-      "when": 1785505003985,
-      "tag": "0002_confused_human_torch",
-      "breakpoints": true
-    }
-  ]
+ "version": "7",
+ "dialect": "sqlite",
+ "entries": [
+  {
+   "idx": 0,
+   "version": "6",
+   "when": 1785503050568,
+   "tag": "0000_eminent_vision",
+   "breakpoints": true
+  },
+  {
+   "idx": 1,
+   "version": "6",
+   "when": 1785504372232,
+   "tag": "0001_low_queen_noir",
+   "breakpoints": true
+  },
+  {
+   "idx": 2,
+   "version": "6",
+   "when": 1785505003985,
+   "tag": "0002_confused_human_torch",
+   "breakpoints": true
+  },
+  {
+   "idx": 3,
+   "version": "6",
+   "when": 1785515000000,
+   "tag": "0003_camera_evidence_metadata",
+   "breakpoints": true
+  },
+  {
+   "idx": 4,
+   "version": "6",
+   "when": 1785515500000,
+   "tag": "0004_camera_metadata_publication_consent",
+   "breakpoints": true
+  },
+  {
+   "idx": 5,
+   "version": "6",
+   "when": 1785522000000,
+   "tag": "0005_freshness_state",
+   "breakpoints": true
+  },
+  {
+   "idx": 6,
+   "version": "6",
+   "when": 1785524825613,
+   "tag": "0006_flawless_thor_girl",
+   "breakpoints": true
+  },
+  {
+   "idx": 7,
+   "version": "6",
+   "when": 1785526529955,
+   "tag": "0007_directory_freshness_backfill",
+   "breakpoints": true
+  },
+  {
+   "idx": 8,
+   "version": "6",
+   "when": 1785530234484,
+   "tag": "0008_wave_b_reviewer_roles",
+   "breakpoints": true
+  }
+ ]
 }

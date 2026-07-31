@@ -9,12 +9,13 @@ must not be accepted until the public-alpha gate is met.
 | Workstream | Responsible role | Detailed plan | Main dependency |
 | --- | --- | --- | --- |
 | Product, UX, accessibility | Product lead | [PRODUCT_UX.md](workstreams/PRODUCT_UX.md) | Pilot scope and public data boundary |
-| Data, moderation, privacy, safety | Data & trust lead | [DATA_TRUST.md](workstreams/DATA_TRUST.md) | Jurisdictional review and trained reviewers |
-| Operations, infrastructure, open source | Operations lead | [OPS_OPEN.md](workstreams/OPS_OPEN.md) | Named service owners and sustainable budget |
-| Coordination | Maintainers | This board and [development plan](DEVELOPMENT_PLAN.md) | Public decision log |
+| Data, moderation, privacy, safety | Data & trust lead — Linus and Grace (data stewards); Grace (moderation contact) | [DATA_TRUST.md](workstreams/DATA_TRUST.md) | Jurisdictional review and trained reviewers |
+| Operations, infrastructure, open source | Operations lead — Ken (operations owner, security contact) | [OPS_OPEN.md](workstreams/OPS_OPEN.md) | Named service owners and sustainable budget |
+| Coordination | Maintainers — Simone (syax89) and Ada (CTO, sole merge authority) | This board and [development plan](DEVELOPMENT_PLAN.md) | Public decision log |
 
 One person may initially hold several roles, but each responsibility must have
-a named, reachable owner before it becomes a production dependency.
+a named, reachable owner before it becomes a production dependency. The current
+named owners are recorded in [GOVERNANCE.md](../GOVERNANCE.md).
 
 ## Sequence
 
@@ -22,13 +23,13 @@ a named, reachable owner before it becomes a production dependency.
 
 **Decision owners:** maintainers, with input from data & trust lead.
 
-1. Select one pilot jurisdiction and working languages.
-2. Confirm which public infrastructure is eligible and which places/details are excluded.
+1. Select one pilot jurisdiction and working languages. — **Decided 2026-07-31: Italy, Comune di Ferrara as launch area; Italian and English.** [ADR 0010](decisions/0010-pilot-jurisdiction-languages-eligibility.md)
+2. Confirm which public infrastructure is eligible and which places/details are excluded. — **Decided 2026-07-31: cameras visible from public space are eligible; private homes, live feeds, sensitive operational details, and security weaknesses are excluded.** [ADR 0010](decisions/0010-pilot-jurisdiction-languages-eligibility.md)
 3. Choose the data licence, publication precision, retention approach, and correction/removal contact. — **Decided 2026-07-31: ODbL 1.0 for the database and exports; coordinates rounded to ~4 decimal places (~10 m) by default; 12-month retention with re-verification renewal; `privacy@opensurveillancedb` as the correction/removal contact.** [ADR 0008](decisions/0008-data-licence-precision-retention-contact.md)
-4. Name the initial maintainers, operations owner, data steward, security contact, and moderation contact.
+4. Name the initial maintainers, operations owner, data steward, security contact, and moderation contact. — **Decided 2026-07-31: maintainers are Simone (syax89) and Ada (CTO, sole merge authority); operations owner and security contact are Ken; data stewards are Linus and Grace; moderation contact is Grace.** Recorded in [GOVERNANCE.md](../GOVERNANCE.md).
 5. Create a public organisation/repository and an accessible private route for security and privacy reports.
 
-**Gate:** the decisions are documented in `docs/decisions/`; there is no ambiguity about what data may enter the pilot. (Items 1–3 are decided in ADR 0010 and ADR 0008; items 4–5 remain open.)
+**Gate:** the decisions are documented in `docs/decisions/`; there is no ambiguity about what data may enter the pilot. (Items 1–4 are decided — ADR 0010 (pilot boundary), ADR 0008 (data licence, precision, retention, contact), GOVERNANCE.md (named owners); item 5 remains open.)
 
 ### Wave B — build the safe public-alpha foundation
 
@@ -75,6 +76,15 @@ These are the next technical tickets once Wave A has named owners and approved t
 
 ## Progress log
 
+- **2026-07-31 — Pilot boundary decided (Wave A items 1–2):** the CEO approved
+  Italy as pilot jurisdiction with the Comune di Ferrara as launch area, Italian
+  and English as working languages, and a defined eligibility boundary (visible
+  public-space surveillance cameras; private homes, live feeds, sensitive
+  operational details, and security weaknesses excluded). The Italian GDPR
+  review is coherent with the existing legal drafts. Recorded in
+  [ADR 0010](decisions/0010-pilot-jurisdiction-languages-eligibility.md). Items
+  3–5 of Wave A (final data licence, named owners, public organisation and
+  private reporting route) remain open.
 - **2026-07-31 — Product foundation started:** an accessible, searchable
   directory and a public-record detail route now complement the map in the
   local prototype. They consume only the existing public/demo API response;
@@ -133,6 +143,34 @@ These are the next technical tickets once Wave A has named owners and approved t
   date. Local moderators choose each field separately, defaulting to private;
   the public data boundary suppresses raw metadata unless the corresponding
   field-specific choice is enabled.
+- **2026-07-31 — Map-to-directory keyboard equivalent completed:** every map
+  task now has a keyboard/text-list path. Directory "Show on map" selects a
+  record, scrolls, and moves keyboard focus to the labelled map region,
+  honouring reduced-motion preferences; picking a report location keeps the
+  manual-coordinate fields; and if the lazy Leaflet load or tile host fails,
+  the map degrades to a visible panel linking the accessible directory instead
+  of an empty box (PR #22, 155/155 tests green).
+- **2026-07-31 — Initial owners named (Wave A item 4):** the CEO named the
+  initial maintainers, operations owner, data steward, security contact, and
+  moderation contact: maintainers are Simone (syax89) and Ada (CTO, sole merge
+  authority); operations owner and security contact are Ken; data stewards are
+  Linus and Grace; moderation contact is Grace. Recorded in
+  [GOVERNANCE.md](../GOVERNANCE.md). Items 3 and 5 of Wave A (final data
+  licence, public organisation and private reporting route) remain open.
+- **2026-07-31 — Reviewer roles, moderation queue, decision reasons, and
+  append-only audit events implemented (Wave B, Data & Trust):** every
+  decision now requires a named reviewer (`actorId`) enforced against a
+  role→action matrix mirroring DATA_TRUST.md separation of duties (intake
+  reviewers triage but cannot publish; only record reviewers/senior moderators
+  approve; privacy/safety lead owns hide/escalate; administrator may only
+  escalate). A per-entity `moderation_queue` tracks assignment, sensitivity,
+  second review, and escalation; sensitive/urgent items require a second,
+  different reviewer before publish/reject/reverify; recusal is recorded
+  without touching the record; escalation requires a mandatory note. The audit
+  trail is append-only at the database layer (UPDATE/DELETE triggers raise
+  ABORT) with reviewer id + role captured at write time. Schema ships as
+  migration `0008` (journal-registered, drizzle-kit generate no-op) and is
+  documented in ADR 0009. 362/362 tests green; fresh-DB migration 9/9.
 
 ## Active next plan
 

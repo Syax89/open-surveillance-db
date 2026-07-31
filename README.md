@@ -31,6 +31,7 @@ An open, non-commercial civic database for documenting **visible public surveill
 - Nearby-record warning and safe type/order filters shared by map and directory.
 - Bilingual interface (English and Italian), with a device-local language preference.
 - In-app bilingual project guide at `/guide`.
+- Draft accessibility statement and design for a non-sensitive usability-feedback route (see `docs/ACCESSIBILITY_STATEMENT.md` and ADR 0006).
 - Cloudflare D1-compatible data layer, with local demo records.
 
 The prototype is deliberately not a public registry yet. It needs a public repository, moderation team, privacy review, terms, and operational safeguards before accepting real-world reports.
@@ -47,11 +48,16 @@ The documentation is part of the project and is intended to be discussed openly.
 - [Local playbook and acceptance checks](docs/LOCAL_PLAYBOOK.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Data model and API](docs/DATA_MODEL.md)
+- [Data dictionary (public fields)](docs/DATA_DICTIONARY.md)
+- [Export versioning policy](docs/EXPORT_VERSIONING.md)
 - [Moderation policy](docs/MODERATION.md)
 - [Privacy and safety](docs/PRIVACY_AND_SAFETY.md)
+- [Accessibility statement](docs/ACCESSIBILITY_STATEMENT.md)
 - [Open-source and data licensing](docs/OPEN_SOURCE.md)
 - [OpenStreetMap integration](docs/OSM_INTEGRATION.md)
 - [Deployment and operations](docs/DEPLOYMENT.md)
+- [Local release checklist](docs/RELEASE_CHECKLIST.md)
+- [Changelog](CHANGELOG.md)
 - [Governance](GOVERNANCE.md)
 
 ## Run locally
@@ -60,10 +66,27 @@ Requirements: Node.js 22.13 or newer.
 
 ```bash
 npm install
+npm run db:migrate   # apply the Drizzle schema migrations to a fresh local DB
 npm run dev
 ```
 
-Open `http://localhost:3000`. The application seeds two explicitly labelled demo pins when the local database is empty.
+Open `http://localhost:3000`. The database starts empty — no demo rows are
+inserted at runtime. For the two labelled illustrative pins used in manual
+checks, run the optional, separate demo seed:
+
+```bash
+npm run db:seed
+```
+
+For a complete walkthrough of a clean local setup — prerequisites, schema
+migrations, synthetic fixtures, and a safe non-destructive reset — read
+[docs/DEVELOPMENT_SETUP.md](docs/DEVELOPMENT_SETUP.md).
+
+To start over with a clean local database, run `npm run db:reset`
+(non-destructive: it moves the local state aside under a timestamped backup,
+then re-applies the migrations). After changing the schema in `db/schema.ts`,
+regenerate a migration with `npm run db:generate` before running
+`db:migrate`.
 
 For local moderation testing, open `http://localhost:3000/moderation`. This route is intentionally not linked from the public prototype and has no production authentication yet.
 

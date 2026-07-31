@@ -8,6 +8,7 @@ Last reviewed: 2026-07-31
 - [x] Interactive map based on OpenStreetMap tiles.
 - [x] Searchable text directory and record-detail pages for public/demo records.
 - [x] Safe directory filters (type and ordering) shared by map and list.
+- [x] Safe category and verification-freshness directory filters: whitelisted freshness windows (`7d`/`30d`/`90d`), parameterised SQL, ISO verification timestamps, and a one-time backfill for pre-existing prose values.
 - [x] Non-blocking local duplicate warning based only on nearby public/demo records.
 - [x] Report position may be selected by map click or validated manual coordinates; both paths use the same public-only duplicate check.
 - [x] Camera-record API and GeoJSON export.
@@ -21,18 +22,28 @@ Last reviewed: 2026-07-31
 - [x] Local-only moderation queue for pending reports and correction requests.
 - [x] Required moderation reason, optional reviewer note, and append-only local audit history.
 - [x] Local lifecycle for verified records: mark for review, reverify, or remove.
+- [x] Reviewed public change summary on record pages; it omits contributor identities and internal notes.
 - [x] Automated contract tests for public-data and private-request boundaries.
 - [x] Local playbook for fictional submit → moderate → public-result checks.
 - [x] Local fictional-data check: rejected records remain absent from public outputs and create an audit event.
 - [x] Local fictional-data lifecycle check: only verified state reaches public outputs.
-- [x] English/Italian interface for public pages, record detail, and local moderation.
+- [x] Externalised English/Italian interface strings (English as pilot language, Italian type-checked for parity) across public pages, record detail, map, and local moderation.
 - [x] Public in-app guide plus skip link, visible focus treatment, reduced-motion support, and map-directory accessibility guidance.
+- [x] Draft accessibility statement and design decision for a non-sensitive usability-feedback route ([`docs/ACCESSIBILITY_STATEMENT.md`](ACCESSIBILITY_STATEMENT.md), [ADR 0006](decisions/0006-non-sensitive-usability-feedback-route.md)).
 - [x] Clearly labelled illustrative demo data.
+- [x] Lightweight public data dictionary and export versioning policy
+  ([`docs/DATA_DICTIONARY.md`](DATA_DICTIONARY.md),
+  [`docs/EXPORT_VERSIONING.md`](EXPORT_VERSIONING.md)); versioned releases
+  remain future work pending the final data licence.
+- [x] Documented clean local setup, schema migrations, synthetic fixtures, and
+  non-destructive local reset (`docs/DEVELOPMENT_SETUP.md`, commands verified
+  on `main`).
 - [x] Initial open documentation and project policies.
 
 ## Not yet implemented
 
 - [ ] Authentication and contributor accounts.
+- [ ] Public `/feedback` page for the non-sensitive usability-feedback route (designed in [ADR 0006](decisions/0006-non-sensitive-usability-feedback-route.md); implementation pending).
 - [ ] Authentication/roles, audit log, appeal workflow, and production moderation controls.
 - [ ] Image upload, secure storage, EXIF stripping, and redaction tooling.
 - [ ] Legal/privacy review and public-facing terms.

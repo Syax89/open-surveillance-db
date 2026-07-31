@@ -8,7 +8,10 @@ npm run dev
 npm run build
 ```
 
-The default local database is seeded with demo pins. Do not load real reports into a development machine or demo deployment.
+The default local database is seeded with demo pins. Do not load real reports
+into a development machine or demo deployment. For the full clean-setup
+walkthrough — schema migrations, synthetic fixtures, and the non-destructive
+local reset — see [DEVELOPMENT_SETUP.md](DEVELOPMENT_SETUP.md).
 
 ## Preconditions for a public environment
 
@@ -29,6 +32,12 @@ The default local database is seeded with demo pins. Do not load real reports in
 4. Confirm backups and rollback plan.
 5. Deploy production, monitor health and error rates, and record the release.
 6. Publish a concise changelog and data-export version where applicable.
+
+For the current local environment (LXC 114), a concrete step-by-step checklist
+with exact commands — build verification, changelog, tag, deploy, smoke tests,
+rollback — lives in [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md). The
+Operations manual ([OPERATIONS.md](OPERATIONS.md)) covers monitoring, backups,
+and the Workers rollback plan.
 
 ## Build and verification
 
@@ -218,4 +227,34 @@ The moderation endpoints are **fail-closed**: without credentials they return
 
 ## Environment variables
 
-`NEXT_PUBLIC_SITE_URL` may be set to the canonical public URL for metadata generation. It must be absent or point to a non-production value in local development. Any future identity, storage, analytics, or notification settings need an explicit inventory and privacy review.
+`NEXT_PUBLIC_SITE_URL` may be set to the canonical public URL for metadata generation. It must be absent or point to a non-production value in local development. When it is absent, `app/layout.tsx` omits `metadataBase` entirely and serves the favicon through a relative `<link rel="icon" href="/favicon.svg">` in the root layout — this keeps deployments without the variable free of absolute `localhost` metadata URLs (the old `?? "http://localhost:3000"` fallback made browsers request the favicon from `localhost` on staging). Any future identity, storage, analytics, or notification settings need an explicit inventory and privacy review.
+
+### Abuse-control environment variables
+
+The per-route rate limits, input caps, and abuse alerts are configured through
+environment variables. All are optional; the defaults below apply when unset.
+Set them in the hosting platform's secret/environment store, never in source
+or client bundles (the secrets gate in CI rejects hardcoded credentials).
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `READ_RATE_LIMIT_MAX` / `READ_RATE_LIMIT_WINDOW_SECONDS` | 60 / 60 | Plain reads (`GET /api/cameras`) |
+| `EXPORT_RATE_LIMIT_MAX` / `EXPORT_RATE_LIMIT_WINDOW_SECONDS` | 10 / 60 | Bulk exports (CSV/GeoJSON) |
+| `NEARBY_RATE_LIMIT_MAX` / `NEARBY_RATE_LIMIT_WINDOW_SECONDS` | 30 / 60 | Nearby search |
+| `REVISIONS_RATE_LIMIT_MAX` / `REVISIONS_RATE_LIMIT_WINDOW_SECONDS` | 30 / 60 | Public change history (`GET /api/cameras/revisions`) |
+| `POST_RATE_LIMIT_MAX` / `POST_RATE_LIMIT_WINDOW_SECONDS` | 5 / 60 | Submissions (cameras + corrections) |
+| `MODERATION_RATE_LIMIT_MAX` / `MODERATION_RATE_LIMIT_WINDOW_SECONDS` | 30 / 60 | Moderation API (second layer over edge auth) |
+| `POST_SUBMISSIONS_DISABLED` | `false` | Kill switch: reject new submissions with 503 |
+| `MAX_BODY_BYTES` | 32768 (32 KiB) | Max JSON request body; larger bodies answer 413 |
+| `ABUSE_ALERT_THRESHOLD` | 10 | Per-caller abuse events per window before an alert fires |
+| `ABUSE_ALERT_SURGE_THRESHOLD` | 50 | Route-wide events per window before a surge alert fires |
+| `ABUSE_ALERT_COOLDOWN_SECONDS` | 300 | Minimum seconds between two alerts for the same key/route |
+| `ABUSE_ALERT_WEBHOOK_URL` | unset | Optional JSON webhook; without it alerts go to the server log |
+
+The limiter is a per-isolate sliding window (60 s default) — see
+`app/lib/rate-limit.ts`. Input caps live in `app/lib/input-limits.ts`; alerts
+in `app/lib/abuse-alerts.ts`. Alerts carry only a SHA-256 hash of the caller
+key (never the raw IP) and never request bodies or query strings (see
+`docs/workstreams/OPS_OPEN.md` §Observability). For a public deployment that
+needs global or long-window limits, replace the in-memory limiter with the
+hosting platform's edge rate-limiting product or a KV/DO-backed counter.

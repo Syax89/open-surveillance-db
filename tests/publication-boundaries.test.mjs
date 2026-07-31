@@ -16,20 +16,125 @@ async function sourceFiles(directory) {
   return files.flat();
 }
 
-test("the public camera query explicitly excludes pending records", async () => {
+test("the public camera query excludes non-public states via the shared status whitelist", async () => {
   const cameras = await readSource("db/cameras.ts");
+  const shared = await readSource("app/lib/public-status.ts");
   const functionStart = cameras.indexOf("export async function listPublicCameras");
   const functionEnd = cameras.indexOf("export async function createPendingCamera", functionStart);
   const publicQuery = cameras.slice(functionStart, functionEnd);
 
   assert.ok(functionStart >= 0, "listPublicCameras must remain the public read boundary");
   assert.match(
+    shared,
+    /export\s+const\s+PUBLIC_CAMERA_STATUSES\s*=\s*\[\s*['"]verified['"]\s*,\s*['"]demo['"]\s*\]\s*as\s+const/,
+    "the shared whitelist must be the single source of truth for verified and demo",
+  );
+  assert.match(
     publicQuery,
-    /WHERE\s+status\s+IN\s*\(\s*'verified'\s*,\s*'demo'\s*\)/i,
-    "the public query must whitelist only verified and demo statuses",
+    /publicCameraPredicate\(/,
+    "the public query must derive its status whitelist from the shared predicate",
+  );
+  assert.doesNotMatch(
+    publicQuery,
+    /status\s+IN\s*\(\s*['"](?:verified|demo|pending|rejected|removed|needs_review|stale)['"]/,
+    "the whitelist must never be hand-written into the query",
   );
   assert.match(publicQuery, /return\s+result\.results\s*;/, "the public query must return its filtered result set");
   assert.doesNotMatch(publicQuery, /status\s*=\s*'pending'/i, "pending records must not be part of the public query");
+});
+
+test("the public directory filters are parameterised and whitelisted at the db boundary", async () => {
+  const cameras = await readSource("db/cameras.ts");
+  const publicStart = cameras.indexOf("export async function listPublicCameras");
+  const publicEnd = cameras.indexOf("export async function createPendingCamera", publicStart);
+  const publicQuery = cameras.slice(publicStart, publicEnd);
+
+  assert.match(
+    cameras,
+    /export\s+const\s+freshnessWindows\s*=\s*\[["']7d["']\s*,\s*["']30d["']\s*,\s*["']90d["']\s*,\s*["']all["']\]/,
+    "freshness windows must be an explicit whitelist of 7d/30d/90d/all",
+  );
+  assert.match(publicQuery, /query\s*\+=\s*["']\s*AND\s+kind\s*=\s*\?["']/, "the category filter must be a bound placeholder, never interpolated");
+  assert.match(publicQuery, /query\s*\+=\s*["']\s*AND\s+updated\s*>=\s*\?["']/, "the freshness filter must be a bound placeholder, never interpolated");
+  assert.match(
+    publicQuery,
+    /\.bind\(\.\.\.parameters\)/,
+    "all filters must be passed through the same parameterised bind call",
+  );
+  assert.match(
+    publicQuery,
+    /updated\s+GLOB\s+'\[0-9\]\[0-9\]\[0-9\]\[0-9\]-\*'/,
+    "a freshness window must match only ISO verification timestamps (non-ISO labels are never window-matched)",
+  );
+  assert.doesNotMatch(
+    publicQuery,
+    /AND\s+kind\s*=\s*['"]\s*\+\s*(?:options|kind|filters)/,
+    "the category filter must not concatenate user input into SQL",
+  );
+  assert.doesNotMatch(
+    publicQuery,
+    /AND\s+updated\s*>=\s*['"]\s*\+\s*(?:options|freshness|filters)/,
+    "the freshness filter must not concatenate user input into SQL",
+  );
+});
+
+test("verification transitions store an ISO timestamp so the public freshness filter stays meaningful", async () => {
+  const moderation = await readSource("db/moderation.ts");
+  const transitions = moderation.slice(
+    moderation.indexOf("function getCameraTransition"),
+    moderation.indexOf("export async function moderateCorrection"),
+  );
+
+  assert.match(
+    transitions,
+    /action === "approve"[\s\S]*?newStatus: "verified",\s*updated:\s*new Date\(\)\.toISOString\(\)/,
+    "approve must record the verification moment as a comparable ISO timestamp",
+  );
+  assert.match(
+    transitions,
+    /action === "reverify"[\s\S]*?newStatus: "verified",\s*updated:\s*new Date\(\)\.toISOString\(\)/,
+    "reverify must refresh the verification timestamp, not a human-readable label",
+  );
+  assert.doesNotMatch(
+    transitions,
+    /newStatus: "verified",\s*updated:\s*"Local moderation:/,
+    "verified public records must never carry a prose string in updated (breaks freshness ordering)",
+  );
+});
+
+test("the one-time freshness backfill migration is present, idempotent, and guarded", async () => {
+  const files = await sourceFiles("drizzle");
+  // H3 follow-up (#37): the backfill is matched by content, not by a hardcoded
+  // 0005_ prefix — it was renumbered to 0007 when registered in the journal.
+  let migration;
+  for (const name of files) {
+    if (!name.endsWith(".sql")) continue;
+    if (/UPDATE\s+cameras\s+SET\s+updated\s*=/i.test(await readSource(name))) {
+      migration = name;
+      break;
+    }
+  }
+  assert.ok(migration, "a backfill migration must rewrite pre-existing prose verification timestamps");
+  const sql = await readSource(migration);
+
+  // The migration must be registered in the journal, or wrangler never applies
+  // it and legacy prose labels survive forever (the #33 defect fixed by #37).
+  const journalPath = files.find((name) => name.endsWith("_journal.json"));
+  const journal = JSON.parse(await readSource(journalPath));
+  const registered = journal.entries.some(
+    (entry) => typeof entry.tag === "string" && migration.includes(entry.tag),
+  );
+  assert.ok(registered, "the backfill migration must be registered in drizzle/meta/_journal.json");
+
+  assert.match(sql, /UPDATE\s+cameras\s+SET\s+updated\s*=/i, "the migration must rewrite the verification timestamp");
+  assert.match(sql, /status\s*=\s*'verified'/i, "only verified public records are backfilled");
+  assert.match(
+    sql,
+    /updated\s+NOT\s+GLOB\s+'\[0-9\]\[0-9\]\[0-9\]\[0-9\]-/,
+    "only non-ISO values are rewritten, so the migration is idempotent",
+  );
+  assert.match(sql, /moderation_events/, "the backfill must reuse the moderation audit trail for the real verification moment");
+  assert.match(sql, /sqlite_master/, "the backfill must be guarded when the runtime-created audit table does not exist yet");
 });
 
 test("JSON, GeoJSON, and CSV are all derived from the public camera list", async () => {
@@ -39,7 +144,7 @@ test("JSON, GeoJSON, and CSV are all derived from the public camera list", async
   const getHandler = route.slice(getStart, postStart);
 
   assert.match(route, /import\s*\{[^}]*\blistPublicCameras\b[^}]*\}\s*from\s*["'][^"']*db\/cameras["']/);
-  assert.match(getHandler, /const\s+records\s*=\s+await\s+listPublicCameras\(\)/);
+  assert.match(getHandler, /const\s+records\s*=\s+await\s+listPublicCameras\(filters\)/);
   assert.match(
     getHandler,
     /features\s*:\s*records\.map\(/,
@@ -74,7 +179,11 @@ test("nearby search validates its bounded coordinates and stays behind the publi
     /latitude\s*<\s*-90[\s\S]*latitude\s*>\s*90[\s\S]*longitude\s*<\s*-180[\s\S]*longitude\s*>\s*180[\s\S]*radius\s*<\s*10[\s\S]*radius\s*>\s*500/,
     "nearby search must reject invalid coordinates and radius values outside 10–500 metres",
   );
-  assert.match(route, /findNearbyPublicCameras\(latitude,\s*longitude,\s*radius\)/);
+  assert.match(
+    route,
+    /findNearbyPublicCameras\(\s*latitude,\s*longitude,\s*radius/,
+    "nearby search must pass the bounded coordinates (and optional pre-submit text hints) to the public helper",
+  );
   assert.doesNotMatch(route, /\bgetD1\b|\.prepare\(|\bSELECT\b/i, "the nearby route must not query the database directly");
   assert.match(helper, /const\s+records\s*=\s+await\s+listPublicCameras\(\)/, "nearby search must start with the filtered public list");
   assert.match(helper, /\.filter\(\(record\)\s*=>\s*record\.distanceMeters\s*<=\s*radiusMeters\)/, "nearby search must filter that public list by distance");
@@ -238,16 +347,17 @@ test("moderation decisions require a reason code from an explicit allowlist", as
 
 test("moderation writes an auditable event with transition, actor, and note", async () => {
   const moderation = await readSource("db/moderation.ts");
+  const migration = await readSource("drizzle/0002_confused_human_torch.sql");
 
-  assert.match(
+  assert.doesNotMatch(
     moderation,
     /CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+moderation_events/i,
-    "the moderation database must create a moderation_events table",
+    "the moderation module must not bootstrap tables at runtime; the schema comes from the Drizzle migrations",
   );
   assert.match(
-    moderation,
-    /moderation_events[\s\S]{0,800}\b(?:from_status|previous_status)\b[\s\S]{0,800}\b(?:to_status|new_status)\b[\s\S]{0,800}\bnote\b[\s\S]{0,800}\bactor\b/i,
-    "the event schema must retain status transitions, actor, and note",
+    migration,
+    /CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+`?moderation_events`?\s*\([\s\S]*?\bprevious_status\b[\s\S]*?\bnew_status\b[\s\S]*?\bnote\b[\s\S]*?\bactor\b/i,
+    "the moderation_events migration must define status transitions, actor, and note",
   );
   assert.match(
     moderation,
@@ -256,7 +366,7 @@ test("moderation writes an auditable event with transition, actor, and note", as
   );
   assert.match(
     moderation,
-    /previousStatus\s*:\s*["']pending["'][\s\S]{0,300}newStatus\s*:\s*status/,
+    /previousStatus\s*:\s*current\.status[\s\S]{0,300}newStatus\s*:\s*status/,
     "the event creation must include both the prior and destination status",
   );
   assert.match(
@@ -336,12 +446,12 @@ test("the moderation route accepts only the explicit lifecycle actions", async (
   assert.ok(parserStart >= 0, "lifecycle commands must be parsed before database writes");
   assert.match(
     parser,
-    /action\s*===\s*["']mark-stale["']/,
+    /cameraActions\s*[=:][\s\S]{0,300}["']mark-stale["']/,
     "the route parser must allow mark-stale for verified cameras",
   );
   assert.match(
     parser,
-    /action\s*===\s*["']reverify["']/,
+    /cameraActions\s*[=:][\s\S]{0,300}["']reverify["']/,
     "the route parser must allow reverify for cameras under review",
   );
 });
@@ -424,15 +534,107 @@ test("public POST endpoints are rate-limited per caller and can be disabled", as
   assert.match(post, /Retry-After/, "the 429 response must include a retry window");
   assert.match(post, /submissionsDisabled\(env\)/, "submissions must be disableable through environment");
   assert.match(limiter, /new\s+Map<string,\s*number\[\]>/, "the limiter must keep per-key request timestamps");
-  assert.match(limiter, /POST_RATE_LIMIT_MAX/, "the request limit must be configurable through environment");
-  assert.match(limiter, /POST_RATE_LIMIT_WINDOW_SECONDS/, "the window must be configurable through environment");
+  assert.match(limiter, /submit:\s*["']POST["']/, "the submission limit must read the POST_* prefix");
+  assert.match(limiter, /\$\{prefix\}_RATE_LIMIT_MAX/, "the request limit must be configurable through environment");
+  assert.match(limiter, /\$\{prefix\}_RATE_LIMIT_WINDOW_SECONDS/, "the window must be configurable through environment");
   assert.match(limiter, /POST_SUBMISSIONS_DISABLED/, "the disable flag must be read from environment");
+});
+
+test("every public route family applies its own rate limit with 429 and Retry-After", async () => {
+  const cameras = await readSource("app/api/cameras/route.ts");
+  const nearby = await readSource("app/api/cameras/nearby/route.ts");
+  const revisions = await readSource("app/api/cameras/revisions/route.ts");
+  const corrections = await readSource("app/api/corrections/route.ts");
+  const moderation = await readSource("app/api/moderation/route.ts");
+
+  const hasRateLimiter = (source) =>
+    /import\s*\{[^}]*\bcheckRateLimit\b[^}]*\}\s*from\s*["'][^"']*lib\/rate-limit["']/.test(source) &&
+    /callerKey\(request\)/.test(source) &&
+    /status:\s*429/.test(source) &&
+    /Retry-After/.test(source);
+
+  assert.ok(hasRateLimiter(cameras), "cameras GET+POST must be rate-limited");
+  assert.ok(hasRateLimiter(nearby), "nearby search must be rate-limited");
+  assert.ok(hasRateLimiter(revisions), "change-history reads must be rate-limited");
+  assert.ok(hasRateLimiter(corrections), "corrections must be rate-limited");
+  assert.ok(hasRateLimiter(moderation), "moderation must be rate-limited");
+
+  // Each route family maps to its own bucket so a burst on one endpoint
+  // never starves another.
+  assert.match(
+    cameras,
+    /["']export["']\s*:\s*["']read["']/,
+    "cameras GET must split reads from bulk exports",
+  );
+  assert.match(nearby, /limitsFor\(\s*["']nearby["']/, "nearby must use its own bucket");
+  assert.match(revisions, /limitsFor\(\s*["']revisions["']/, "revisions must use its own bucket");
+  assert.match(moderation, /limitsFor\(\s*["']moderate["']/, "moderation must use its own bucket");
+  assert.match(corrections, /submissionLimits\(env\)/, "corrections must share the submission bucket");
+});
+
+test("public handlers reject oversized inputs and guard the request URI", async () => {
+  const routes = {
+    cameras: await readSource("app/api/cameras/route.ts"),
+    corrections: await readSource("app/api/corrections/route.ts"),
+    moderation: await readSource("app/api/moderation/route.ts"),
+    nearby: await readSource("app/api/cameras/nearby/route.ts"),
+    revisions: await readSource("app/api/cameras/revisions/route.ts"),
+  };
+
+  for (const [label, source] of Object.entries(routes)) {
+    assert.match(source, /urlTooLong\(request\)/, `${label} must guard the request URI length`);
+  }
+  for (const [label, source] of Object.entries({ cameras: routes.cameras, corrections: routes.corrections, moderation: routes.moderation })) {
+    assert.match(source, /readJsonBody\(request,\s*env\)/, `${label} must read bodies through the capped reader`);
+    assert.match(source, /PayloadTooLargeError/, `${label} must handle the 413 signal`);
+    assert.match(
+      source,
+      /status:\s*(?:413|error\.status)/,
+      `${label} must answer 413 for oversized bodies`,
+    );
+  }
+});
+
+test("every rate-limited route reports blocks to the hashed abuse-alert layer", async () => {
+  const files = [
+    "app/api/cameras/route.ts",
+    "app/api/cameras/nearby/route.ts",
+    "app/api/cameras/revisions/route.ts",
+    "app/api/corrections/route.ts",
+    "app/api/moderation/route.ts",
+  ];
+  for (const file of files) {
+    const source = await readSource(file);
+    assert.match(
+      source,
+      /recordRateLimitBlock\(env/,
+      `${file} must signal rate-limit blocks to the abuse-alert layer`,
+    );
+    assert.match(
+      source,
+      /from\s*["'][^"']*lib\/abuse-alerts["']/,
+      `${file} must import the abuse-alert module`,
+    );
+  }
+
+  const alerts = await readSource("app/lib/abuse-alerts.ts");
+  assert.match(alerts, /sha256Hex/, "alerts must hash the caller identity");
+  assert.match(alerts, /callerHash/, "the alert payload must expose only a hashed identity");
+  assert.doesNotMatch(
+    alerts,
+    /callerHash\s*:\s*key\b/,
+    "the raw caller key must never be used as the alert identity",
+  );
+  const limits = await readSource("app/lib/input-limits.ts");
+  assert.match(limits, /DEFAULT_MAX_BODY_BYTES/, "the input layer must define a default body cap");
+  assert.match(limits, /MAX_BODY_BYTES/, "the body cap must be configurable through environment");
 });
 
 test("server errors are logged server-side and return generic client messages", async () => {
   const routes = {
     cameras: await readSource("app/api/cameras/route.ts"),
     nearby: await readSource("app/api/cameras/nearby/route.ts"),
+    revisions: await readSource("app/api/cameras/revisions/route.ts"),
     corrections: await readSource("app/api/corrections/route.ts"),
     moderation: await readSource("app/api/moderation/route.ts"),
   };
@@ -447,10 +649,116 @@ test("server errors are logged server-side and return generic client messages", 
   }
 });
 
+test("every map task has a keyboard/text-list equivalent in the public interface", async () => {
+  const page = await readSource("app/page.tsx");
+  const map = await readSource("app/components/SurveillanceMap.tsx");
+
+  // Map task: select a record (pin click). Keyboard path: the directory's
+  // "Show on map" moves selection AND keyboard focus to the map region,
+  // respecting reduced motion.
+  assert.match(page, /function\s+showRecordOnMap\s*\(\s*id:\s*number\s*\)/);
+  assert.match(page, /setSelectedId\s*\(\s*id\s*\)/, "show-on-map must select the record");
+  assert.match(page, /document\.getElementById\(\s*["']map["']\s*\)\?\.scrollIntoView/, "show-on-map must scroll to the map");
+  assert.match(page, /document\.getElementById\(\s*["']map-region["']\s*\)\?\.focus/, "show-on-map must move keyboard focus to the map region");
+  assert.match(page, /prefers-reduced-motion/, "scrolling must respect reduced-motion preference");
+
+  // Map task: browse pins. Text-list path: one directory card per record with
+  // the keyboard select action.
+  assert.match(page, /className=["']record-list["']/, "the directory must render the record list");
+  assert.match(page, /showRecordOnMap\(\s*camera\.id\s*\)/, "every record card must offer the keyboard select path");
+
+  // Map task: pick a report position (map click). Keyboard path: manual coordinates.
+  assert.match(page, /selectManualCoordinates/, "the report form must keep the manual-coordinate fallback");
+
+  // The map region is a labelled, programmatically focusable landmark that
+  // describes the text-list alternative.
+  assert.match(map, /role="region"/);
+  assert.match(map, /aria-label=\{\s*label\s*\}/);
+  assert.match(map, /tabIndex=\{\s*-1\s*\}/, "the map region must accept programmatic focus");
+  assert.match(map, /id="map-region"/);
+  assert.match(map, /href="#records"/, "the map description must link the directory alternative");
+
+  // Map task: map unavailable (blocked script or tile host). The list stays
+  // usable and the failure is visible with a direct link to the directory.
+  assert.match(map, /setMapUnavailable\(\s*true\s*\)/, "a map startup failure must flip to the fallback state");
+  assert.match(map, /map-fallback/, "the fallback state must render a visible text alternative");
+  // i18n externalisation moved user-facing wording into the pilot bundle
+  // (ADR 0007); the fallback must still state plainly that the map is
+  // unavailable, and the component must consume it from the bundle.
+  const enBundle = await readSource("app/lib/i18n/en.ts");
+  assert.match(enBundle, /The interactive map is unavailable\./, "the EN pilot bundle must state plainly that the map is unavailable");
+  assert.match(map, /t\.mapFallbackTitle/, "the fallback title must come from the message bundle");
+  assert.match(map, /t\.mapFallbackBody/, "the fallback body must come from the message bundle");
+});
+
 test("package metadata identifies the project, license, and repository", async () => {
   const pkg = JSON.parse(await readSource("package.json"));
   assert.equal(pkg.name, "open-surveillance-db");
   assert.equal(pkg.license, "AGPL-3.0-or-later");
   assert.equal(pkg.repository?.url, "git+https://github.com/Syax89/open-surveillance-db.git");
   assert.equal(pkg.homepage, "https://github.com/Syax89/open-surveillance-db");
+});
+
+test("the public change summary is served only for currently public records", async () => {
+  const route = await readSource("app/api/cameras/revisions/route.ts");
+  const cameras = await readSource("db/cameras.ts");
+  const getStart = cameras.indexOf("export async function getPublicCameraById");
+  const getBoundary = cameras.slice(getStart);
+
+  assert.ok(getStart >= 0, "the revisions route must have a dedicated public-record lookup");
+  assert.match(
+    getBoundary,
+    /WHERE\s+id\s*=\s*\?\s+AND\s+\$\{publicPredicate\}/,
+    "the lookup must resolve only records in the shared public status whitelist",
+  );
+  assert.doesNotMatch(
+    getBoundary,
+    /status\s+IN\s*\(\s*['"](?:verified|demo)['"]/,
+    "the lookup must not hand-write the status whitelist",
+  );
+  assert.doesNotMatch(getBoundary, /\bnotes\b/, "the lookup must not select the private notes field");
+
+  assert.match(
+    route,
+    /import\s*\{[^}]*\bgetPublicCameraById\b[^}]*\}\s*from\s*["'][^"']*db\/cameras["']/,
+    "the route must use the dedicated public-record lookup",
+  );
+  assert.match(
+    route,
+    /import\s*\{[^}]*\blistPublicCameraRevisions\b[^}]*\}\s*from\s*["'][^"']*db\/moderation["']/,
+    "the route must use the dedicated public-history boundary",
+  );
+  assert.match(route, /searchParams\.get\(['"]cameraId['"]\)/, "the route must read a cameraId");
+  assert.match(route, /status:\s*400/, "an invalid cameraId must be rejected");
+  assert.match(route, /if\s*\(!record\)/, "a non-public record must be rejected before any history read");
+  assert.match(route, /status:\s*404/, "a non-public record must return 404");
+  assert.match(route, /status:\s*503/, "database failures must fail closed");
+  assert.doesNotMatch(
+    route,
+    /\bgetD1\b|\.prepare\(|\bSELECT\b|\bmoderateCamera\b|\blistPendingModerationItems\b/i,
+    "the public route must not touch the database or the moderation queue directly",
+  );
+});
+
+test("the public change summary omits contributor identity and internal notes", async () => {
+  const moderation = await readSource("db/moderation.ts");
+  const summaryStart = moderation.indexOf("export async function listPublicCameraRevisions");
+  const summary = moderation.slice(summaryStart);
+
+  assert.ok(summaryStart >= 0, "the public-history boundary must be an explicit database function");
+  assert.match(
+    summary,
+    /FROM\s+moderation_events\s+WHERE\s+entity\s*=\s*['"]camera['"]\s+AND\s+entity_id\s*=\s*\?/i,
+    "the summary must select only camera lifecycle events for the requested record",
+  );
+  assert.match(
+    summary,
+    /ORDER\s+BY\s+created_at\s+ASC,\s*id\s+ASC/i,
+    "the summary must be chronological, oldest first",
+  );
+  assert.doesNotMatch(
+    summary,
+    /\bactor\b|\bnote\b|\breason_code\b|\breasonCode\b/,
+    "the public summary must never select the private audit columns (actor, note, reason code)",
+  );
 });

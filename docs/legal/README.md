@@ -29,9 +29,14 @@ Decision records: `docs/decisions/0002-legal-pre-launch-deliverables.md`,
 `docs/decisions/0004-retention-and-review-cycle.md`,
 `docs/decisions/0005-processors-and-data-residency.md`.
 
+Related documents (outside this folder): the
+[accessibility statement](../ACCESSIBILITY_STATEMENT.md) and
+[ADR 0006 — non-sensitive usability-feedback route](../decisions/0006-non-sensitive-usability-feedback-route.md)
+are product/UX deliverables; they are linked here only for discoverability.
+
 ## Open items before launch (not owned by this folder)
 
-- Confirm the controller identity and the public privacy contact (DEPLOYMENT.md
+- Controller identity decided (2026-07-31): **Simone Rondina (syax89) / OpenSurveillanceDB — Italy**; privacy mailbox `privacy@opensurveillancedb` to be provisioned before the address is published (DEPLOYMENT.md
   "Preconditions for a public environment").
 - Translate the privacy notice into Italian before launch (primary
   jurisdiction; GDPR art. 12(1) "clear and plain language") — see

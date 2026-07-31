@@ -1,5 +1,6 @@
 import { getD1, type CameraRecord } from "./cameras";
 import type { CorrectionRequest } from "./corrections";
+import { DEFAULT_REVIEW_INTERVAL_MONTHS, STALE_GRACE_DAYS, addDays, computeReviewDueAt } from "./freshness";
 
 export type ModerationCameraRecord = CameraRecord;
 
@@ -10,8 +11,11 @@ export type ModerationQueue = {
   cameraReports: PendingCameraReport[];
   publishedCameras: ModerationCameraRecord[];
   reviewCameras: ModerationCameraRecord[];
+  staleCameras: ModerationCameraRecord[];
   correctionRequests: PendingCorrectionRequest[];
   recentEvents: ModerationEvent[];
+  reviewers: Reviewer[];
+  queueItems: ModerationQueueItem[];
 };
 
 export type ModerationEntity = "camera" | "correction";
@@ -20,8 +24,23 @@ export type CameraModerationAction =
   | "reject"
   | "hide"
   | "mark-stale"
-  | "reverify";
-export type CorrectionModerationAction = "approve" | "reject";
+  | "reverify"
+  | "escalate";
+export type CorrectionModerationAction = "approve" | "reject" | "associate" | "escalate";
+
+export const correctionOutcomes = [
+  "kept",
+  "corrected",
+  "marked-stale",
+  "removed",
+  "escalated",
+] as const;
+export type CorrectionOutcome = (typeof correctionOutcomes)[number];
+
+export type CorrectionModerationOptions = {
+  outcome?: CorrectionOutcome;
+  cameraId?: number;
+};
 
 export const moderationReasonCodes = [
   "verified-public-infrastructure",
@@ -30,10 +49,87 @@ export const moderationReasonCodes = [
   "private-or-sensitive-location",
   "inaccurate-or-outdated",
   "privacy-or-safety-concern",
+  "requires-senior-review",
   "other",
 ] as const;
 
 export type ModerationReasonCode = (typeof moderationReasonCodes)[number];
+
+// ---------------------------------------------------------------------------
+// Reviewer roles and separation of duties (docs/workstreams/DATA_TRUST.md
+// "Roles and separation of duties"). No authentication is enforced in the
+// local prototype: the API requires an explicit named actor for every
+// decision and the dashboard makes the choice visible. Real authentication is
+// a separate public-alpha ticket; the schema already supports it (reviewers +
+// MFA flag, demo seed removable by migration).
+// ---------------------------------------------------------------------------
+
+export const reviewerRoles = [
+  "intake_reviewer",
+  "record_reviewer",
+  "senior_moderator",
+  "privacy_safety_lead",
+  "administrator",
+] as const;
+
+export type ReviewerRole = (typeof reviewerRoles)[number];
+
+export type Reviewer = {
+  id: number;
+  displayName: string;
+  role: ReviewerRole;
+  active: number;
+  mfaEnabled: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ModerationContext = {
+  actorId: number;
+  sensitivity?: "standard" | "sensitive" | "urgent";
+  assigneeId?: number;
+  recused?: boolean;
+  requiresSecondReview?: boolean;
+};
+
+export type ModerationResult<T> =
+  | { kind: "ok"; item: T; event: ModerationEvent; queue: ModerationQueueItem }
+  | { kind: "recused"; item: T; event: ModerationEvent; queue: ModerationQueueItem }
+  | {
+      kind: "second_review_pending";
+      item: T;
+      event: ModerationEvent;
+      queue: ModerationQueueItem;
+    }
+  | { kind: "not_found" }
+  | { kind: "forbidden" }
+  | { kind: "actor_not_found" }
+  | { kind: "actor_inactive" }
+  | { kind: "second_review_same_reviewer" }
+  | { kind: "escalation_requires_note" };
+
+/** Legacy decision shape, kept as an alias for callers of the pre-Wave-B API. */
+export type ModerationDecision<T> = { item: T; event: ModerationEvent };
+
+export type QueueState = "queued" | "assigned" | "second_review" | "escalated" | "closed";
+export const queueSensitivities = ["standard", "sensitive", "urgent"] as const;
+export type QueueSensitivity = (typeof queueSensitivities)[number];
+
+export type ModerationQueueItem = {
+  id: number | null;
+  entity: ModerationEntity;
+  entityId: number;
+  state: QueueState;
+  assigneeId: number | null;
+  sensitivity: QueueSensitivity;
+  requiresSecondReview: number;
+  secondReviewerId: number | null;
+  escalationReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+  assignee: string | null;
+  secondReviewer: string | null;
+};
 
 export type ModerationEvent = {
   id: number;
@@ -45,12 +141,12 @@ export type ModerationEvent = {
   reasonCode: ModerationReasonCode;
   note: string | null;
   actor: string;
+  reviewerId: number | null;
+  actorRole: ReviewerRole | null;
+  recused: number;
+  escalated: number;
+  secondReviewerId: number | null;
   createdAt: string;
-};
-
-export type ModerationDecision<T> = {
-  item: T;
-  event: ModerationEvent;
 };
 
 export type MetadataPublicationChoices = {
@@ -58,111 +154,567 @@ export type MetadataPublicationChoices = {
   publishObservedOn: boolean;
 };
 
-const createCorrectionRequestsTable =
-  "CREATE TABLE IF NOT EXISTS correction_requests (id INTEGER PRIMARY KEY AUTOINCREMENT, camera_id INTEGER, issue_type TEXT NOT NULL, message TEXT NOT NULL, contact TEXT, status TEXT NOT NULL DEFAULT 'pending', created_at TEXT NOT NULL)";
-const createCorrectionRequestsStatusIndex =
-  "CREATE INDEX IF NOT EXISTS correction_requests_status_idx ON correction_requests(status)";
-const createModerationEventsTable =
-  "CREATE TABLE IF NOT EXISTS moderation_events (id INTEGER PRIMARY KEY AUTOINCREMENT, entity TEXT NOT NULL, entity_id INTEGER NOT NULL, previous_status TEXT NOT NULL, new_status TEXT NOT NULL, action TEXT NOT NULL, reason_code TEXT NOT NULL, note TEXT, actor TEXT NOT NULL, created_at TEXT NOT NULL)";
-const createModerationEventsCreatedAtIndex =
-  "CREATE INDEX IF NOT EXISTS moderation_events_created_at_idx ON moderation_events(created_at DESC, id DESC)";
+// ---------------------------------------------------------------------------
+// Role → action matrix. `approve` (publishing a normal record) is reserved to
+// record reviewers and senior moderators; intake reviewers may triage
+// (reject/hide) but never publish; the administrator may only escalate.
+// ---------------------------------------------------------------------------
+
+const rolePermissions: Record<ReviewerRole, ReadonlySet<string>> = {
+  intake_reviewer: new Set<string>(["reject", "hide", "escalate"]),
+  record_reviewer: new Set<string>(["approve", "reject", "hide", "mark-stale", "reverify", "escalate"]),
+  senior_moderator: new Set<string>(["approve", "reject", "hide", "mark-stale", "reverify", "escalate"]),
+  privacy_safety_lead: new Set<string>(["hide", "escalate"]),
+  administrator: new Set<string>(["escalate"]),
+};
+
+// Only these roles may approve a camera or a correction request.
+const approvalRoles: ReadonlySet<ReviewerRole> = new Set<ReviewerRole>(["record_reviewer", "senior_moderator"]);
+
+// Only these roles may resolve an escalated item.
+const escalationResolverRoles: ReadonlySet<ReviewerRole> = new Set<ReviewerRole>([
+  "senior_moderator",
+  "privacy_safety_lead",
+]);
+
+// These decisions on a sensitive/flagged item require a second reviewer.
+// Emergency `hide` intentionally stays single-person (DATA_TRUST: emergency
+// hiding does not require two reviewers, but it is reviewed retrospectively).
+const secondReviewActions: ReadonlySet<string> = new Set(["approve", "reject", "reverify"]);
+
+function roleAllowsAction(role: ReviewerRole, action: string): boolean {
+  if (!rolePermissions[role].has(action)) return false;
+  if (action === "approve" && !approvalRoles.has(role)) return false;
+  return true;
+}
+
 const localModerator = "Local moderator";
 
+/**
+ * The schema (reviewers, moderation_queue, moderation_events columns,
+ * append-only triggers) is applied exclusively by the Drizzle migrations in
+ * `drizzle/` (wrangler d1 migrations apply). This function performs no
+ * runtime bootstrap and seeds no demo data at runtime.
+ */
 async function getModerationD1() {
-  const d1 = await getD1();
-  await d1.batch([
-    d1.prepare(createCorrectionRequestsTable),
-    d1.prepare(createCorrectionRequestsStatusIndex),
-    d1.prepare(createModerationEventsTable),
-    d1.prepare(createModerationEventsCreatedAtIndex),
-  ]);
-  return d1;
+  return getD1();
+}
+
+type ModerationD1 = Awaited<ReturnType<typeof getModerationD1>>;
+
+const cameraColumns =
+  "id, title, kind, manufacturer, observed_on AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, notes, latitude, longitude, status, source, updated, description, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt";
+
+const queueSelect = [
+  "q.id",
+  "q.entity",
+  "q.entity_id AS entityId",
+  "q.state",
+  "q.assignee_id AS assigneeId",
+  "q.sensitivity",
+  "q.requires_second_review AS requiresSecondReview",
+  "q.second_reviewer_id AS secondReviewerId",
+  "q.escalation_reason AS escalationReason",
+  "q.created_at AS createdAt",
+  "q.updated_at AS updatedAt",
+  "a.display_name AS assignee",
+  "s.display_name AS secondReviewer",
+].join(", ");
+
+const queueJoin =
+  "FROM moderation_queue q LEFT JOIN reviewers a ON a.id = q.assignee_id LEFT JOIN reviewers s ON s.id = q.second_reviewer_id";
+
+async function loadCamera(d1: ModerationD1, id: number): Promise<ModerationCameraRecord | null> {
+  return d1
+    .prepare(`SELECT ${cameraColumns} FROM cameras WHERE id = ?`)
+    .bind(id)
+    .first<ModerationCameraRecord>();
+}
+
+async function listReviewers(d1: ModerationD1, onlyActive: boolean): Promise<Reviewer[]> {
+  const result = await d1
+    .prepare(
+      `SELECT id, display_name AS displayName, role, active, mfa_enabled AS mfaEnabled, created_at AS createdAt, updated_at AS updatedAt FROM reviewers${
+        onlyActive ? " WHERE active = 1" : ""
+      } ORDER BY role, display_name`,
+    )
+    .all<Reviewer>();
+  return result.results;
+}
+
+async function getReviewerById(d1: ModerationD1, id: number): Promise<Reviewer | null> {
+  return d1
+    .prepare(
+      "SELECT id, display_name AS displayName, role, active, mfa_enabled AS mfaEnabled, created_at AS createdAt, updated_at AS updatedAt FROM reviewers WHERE id = ?",
+    )
+    .bind(id)
+    .first<Reviewer>();
+}
+
+async function findOpenQueueItem(
+  d1: ModerationD1,
+  entity: ModerationEntity,
+  entityId: number,
+): Promise<ModerationQueueItem | null> {
+  return d1
+    .prepare(
+      `SELECT ${queueSelect} ${queueJoin} WHERE q.entity = ? AND q.entity_id = ? AND q.state != 'closed'`,
+    )
+    .bind(entity, entityId)
+    .first<ModerationQueueItem>();
+}
+
+async function getOrCreateQueueItem(
+  d1: ModerationD1,
+  entity: ModerationEntity,
+  entityId: number,
+  options: { sensitivity?: ModerationContext["sensitivity"]; assigneeId?: number; requiresSecondReview?: boolean },
+): Promise<ModerationQueueItem> {
+  const existing = await findOpenQueueItem(d1, entity, entityId);
+  if (existing) return existing;
+
+  const now = new Date().toISOString();
+  const sensitivity = options.sensitivity ?? "standard";
+  const requiresSecondReview =
+    options.requiresSecondReview === true || sensitivity !== "standard" ? 1 : 0;
+  // SQLite RETURNING cannot reference table aliases, so the fresh row is
+  // returned with plain column names; assignee/second reviewer names are
+  // NULL for a new queue item and filled by later read-backs.
+  const created = await d1
+    .prepare(
+      `INSERT INTO moderation_queue (entity, entity_id, state, assignee_id, sensitivity, requires_second_review, second_reviewer_id, escalation_reason, created_at, updated_at)
+       VALUES (?, ?, 'queued', ?, ?, ?, NULL, NULL, ?, ?)
+       RETURNING id, entity, entity_id AS entityId, state, assignee_id AS assigneeId, sensitivity, requires_second_review AS requiresSecondReview, second_reviewer_id AS secondReviewerId, escalation_reason AS escalationReason, created_at AS createdAt, updated_at AS updatedAt, NULL AS assignee, NULL AS secondReviewer`,
+    )
+    .bind(
+      entity,
+      entityId,
+      options.assigneeId ?? null,
+      sensitivity,
+      requiresSecondReview,
+      now,
+      now,
+    )
+    .first<ModerationQueueItem>();
+  if (!created) throw new Error("Moderation queue item could not be created");
+  return created;
+}
+
+async function updateQueueState(
+  d1: ModerationD1,
+  queueId: number,
+  state: QueueState,
+  extra: { secondReviewerId?: number | null; escalationReason?: string | null } = {},
+): Promise<ModerationQueueItem> {
+  const now = new Date().toISOString();
+  const result = await d1
+    .prepare(
+      `UPDATE moderation_queue SET state = ?, updated_at = ?, second_reviewer_id = COALESCE(?, second_reviewer_id), escalation_reason = COALESCE(?, escalation_reason) WHERE id = ?`,
+    )
+    .bind(
+      state,
+      now,
+      extra.secondReviewerId ?? null,
+      extra.escalationReason ?? null,
+      queueId,
+    )
+    .run() as { meta: { changes: number } };
+  if (result.meta.changes === 0) throw new Error("Moderation queue item could not be updated");
+  // SQLite does not allow JOINs inside RETURNING, so the fresh state is read
+  // back with the reviewer display names in a separate statement.
+  const updated = await d1
+    .prepare(`SELECT ${queueSelect} ${queueJoin} WHERE q.id = ?`)
+    .bind(queueId)
+    .first<ModerationQueueItem>();
+  if (!updated) throw new Error("Moderation queue item could not be updated");
+  return updated;
+}
+
+function synthesizedQueueItem(
+  entity: ModerationEntity,
+  entityId: number,
+  createdAt: string,
+): ModerationQueueItem {
+  return {
+    id: null,
+    entity,
+    entityId,
+    state: "queued",
+    assigneeId: null,
+    sensitivity: "standard",
+    requiresSecondReview: 0,
+    secondReviewerId: null,
+    escalationReason: null,
+    createdAt,
+    updatedAt: createdAt,
+    assignee: null,
+    secondReviewer: null,
+  };
 }
 
 export async function listPendingModerationItems(): Promise<ModerationQueue> {
   const d1 = await getModerationD1();
-  const [cameraReports, publishedCameras, reviewCameras, correctionRequests, recentEvents] =
+  // Lazy freshness sweep: before the queue is read, records whose review
+  // window elapsed are moved to `needs_review` (scheduled expiry) and records
+  // not re-confirmed within the grace period are labelled `stale`. Public
+  // routes never depend on this sweep: listPublicCameras() enforces the same
+  // freshness boundary at read time.
+  await runFreshnessSweep();
+  const [cameraReports, publishedCameras, reviewCameras, staleCameras, correctionRequests, recentEvents, reviewers, openQueueItems] =
     await Promise.all([
-    d1
-      .prepare(
-        "SELECT id, title, kind, manufacturer, observed_on AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, notes, latitude, longitude, status, source, updated, description, created_at AS createdAt FROM cameras WHERE status = ? ORDER BY created_at ASC, id ASC",
-      )
-      .bind("pending")
-      .all<PendingCameraReport>(),
-    d1
-      .prepare(
-        "SELECT id, title, kind, manufacturer, observed_on AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, notes, latitude, longitude, status, source, updated, description, created_at AS createdAt FROM cameras WHERE status = ? ORDER BY created_at ASC, id ASC",
-      )
-      .bind("verified")
-      .all<CameraRecord>(),
-    d1
-      .prepare(
-        "SELECT id, title, kind, manufacturer, observed_on AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, notes, latitude, longitude, status, source, updated, description, created_at AS createdAt FROM cameras WHERE status = ? ORDER BY created_at ASC, id ASC",
-      )
-      .bind("needs_review")
-      .all<CameraRecord>(),
-    d1
-      .prepare(
-        "SELECT id, camera_id AS cameraId, issue_type AS issueType, message, contact, status, created_at AS createdAt FROM correction_requests WHERE status = ? ORDER BY created_at ASC, id ASC",
-      )
-      .bind("pending")
-      .all<PendingCorrectionRequest>(),
-    d1
-      .prepare(
-        "SELECT id, entity, entity_id AS entityId, previous_status AS previousStatus, new_status AS newStatus, action, reason_code AS reasonCode, note, actor, created_at AS createdAt FROM moderation_events ORDER BY created_at DESC, id DESC LIMIT ?",
-      )
-      .bind(50)
-      .all<ModerationEvent>(),
+      d1
+        .prepare(
+          `SELECT ${cameraColumns} FROM cameras WHERE status = ? ORDER BY created_at ASC, id ASC`,
+        )
+        .bind("pending")
+        .all<PendingCameraReport>(),
+      d1
+        .prepare(
+          `SELECT ${cameraColumns} FROM cameras WHERE status = ? ORDER BY created_at ASC, id ASC`,
+        )
+        .bind("verified")
+        .all<CameraRecord>(),
+      d1
+        .prepare(
+          `SELECT ${cameraColumns} FROM cameras WHERE status = ? ORDER BY created_at ASC, id ASC`,
+        )
+        .bind("needs_review")
+        .all<CameraRecord>(),
+      d1
+        .prepare(
+          `SELECT ${cameraColumns} FROM cameras WHERE status = ? ORDER BY created_at ASC, id ASC`,
+        )
+        .bind("stale")
+        .all<CameraRecord>(),
+      // correction_requests rows expose outcome in the queue (null while pending).
+      d1
+        .prepare(
+          "SELECT id, camera_id AS cameraId, issue_type AS issueType, message, contact, status, outcome, created_at AS createdAt FROM correction_requests WHERE status = ? ORDER BY created_at ASC, id ASC",
+        )
+        .bind("pending")
+        .all<PendingCorrectionRequest>(),
+      d1
+        .prepare(
+          `SELECT id, entity, entity_id AS entityId, previous_status AS previousStatus, new_status AS newStatus, action, reason_code AS reasonCode, note, actor, reviewer_id AS reviewerId, actor_role AS actorRole, recused, escalated, second_reviewer_id AS secondReviewerId, created_at AS createdAt FROM moderation_events ORDER BY created_at DESC, id DESC LIMIT ?`,
+        )
+        .bind(50)
+        .all<ModerationEvent>(),
+      listReviewers(d1, true),
+      d1
+        .prepare(`SELECT ${queueSelect} ${queueJoin} WHERE q.state != 'closed' ORDER BY q.updated_at DESC`)
+        .all<ModerationQueueItem>(),
     ]);
+
+  const queueByKey = new Map(
+    openQueueItems.results.map((item) => [`${item.entity}:${item.entityId}`, item]),
+  );
+  const queueItems: ModerationQueueItem[] = [
+    ...cameraReports.results.map((camera) =>
+      queueByKey.get(`camera:${camera.id}`) ?? synthesizedQueueItem("camera", camera.id, camera.createdAt),
+    ),
+    ...reviewCameras.results.map((camera) =>
+      queueByKey.get(`camera:${camera.id}`) ?? synthesizedQueueItem("camera", camera.id, camera.createdAt),
+    ),
+    ...staleCameras.results.map((camera) =>
+      queueByKey.get(`camera:${camera.id}`) ?? synthesizedQueueItem("camera", camera.id, camera.createdAt),
+    ),
+    ...correctionRequests.results.map((correction) =>
+      queueByKey.get(`correction:${correction.id}`) ??
+      synthesizedQueueItem("correction", correction.id, correction.createdAt),
+    ),
+  ];
 
   return {
     cameraReports: cameraReports.results,
     publishedCameras: publishedCameras.results,
     reviewCameras: reviewCameras.results,
+    staleCameras: staleCameras.results,
     correctionRequests: correctionRequests.results,
     recentEvents: recentEvents.results,
+    reviewers: reviewers,
+    queueItems,
   };
 }
 
+/**
+ * Scheduled-expiry sweep (docs/workstreams/DATA_TRUST.md "Review and expiry
+ * clocks"): a `verified` record whose review window elapsed moves to
+ * `needs_review`; a `needs_review` record still unconfirmed STALE_GRACE_DAYS
+ * days after its scheduled review becomes `stale`. Every transition writes a
+ * moderation event (action `scheduled-expiry` / `expiry-not-reconfirmed`).
+ */
+export async function runFreshnessSweep(nowIso: string = new Date().toISOString()): Promise<{ scheduledExpiry: number; becameStale: number }> {
+  const d1 = await getModerationD1();
+  const staleThreshold = addDays(nowIso, -STALE_GRACE_DAYS);
+
+  const due = await d1
+    .prepare("SELECT id FROM cameras WHERE status = 'verified' AND review_due_at IS NOT NULL AND review_due_at < ?")
+    .bind(nowIso)
+    .all<{ id: number }>();
+  for (const { id } of due.results) {
+    await d1
+      .prepare("UPDATE cameras SET status = 'needs_review', updated = ? WHERE id = ?")
+      .bind("Local moderation: scheduled review due", id)
+      .run();
+    await createModerationEvent(d1, {
+      entity: "camera",
+      entityId: id,
+      previousStatus: "verified",
+      newStatus: "needs_review",
+      action: "scheduled-expiry",
+      reasonCode: "inaccurate-or-outdated",
+      note: "Review window elapsed; re-verification required before the record can be public again.",
+    });
+  }
+
+  const unconfirmed = await d1
+    .prepare("SELECT id FROM cameras WHERE status = 'needs_review' AND review_due_at IS NOT NULL AND review_due_at < ?")
+    .bind(staleThreshold)
+    .all<{ id: number }>();
+  for (const { id } of unconfirmed.results) {
+    await d1
+      .prepare("UPDATE cameras SET status = 'stale', updated = ? WHERE id = ?")
+      .bind("Local moderation: not re-confirmed within the review grace period", id)
+      .run();
+    await createModerationEvent(d1, {
+      entity: "camera",
+      entityId: id,
+      previousStatus: "needs_review",
+      newStatus: "stale",
+      action: "expiry-not-reconfirmed",
+      reasonCode: "inaccurate-or-outdated",
+      note: `No re-verification within ${STALE_GRACE_DAYS} days of the scheduled review.`,
+    });
+  }
+
+  return { scheduledExpiry: due.results.length, becameStale: unconfirmed.results.length };
+}
+
+// ---------------------------------------------------------------------------
+// Decisions
+// ---------------------------------------------------------------------------
+
+async function createModerationEvent(
+  d1: ModerationD1,
+  event: Omit<ModerationEvent, "id" | "actor" | "createdAt" | "reviewerId" | "actorRole" | "recused" | "escalated" | "secondReviewerId"> & {
+    reviewer?: Reviewer | null;
+    recused?: boolean;
+    escalated?: boolean;
+    secondReviewerId?: number | null;
+  },
+): Promise<ModerationEvent> {
+  const createdAt = new Date().toISOString();
+  const result = await d1
+    .prepare(
+      `INSERT INTO moderation_events (entity, entity_id, previous_status, new_status, action, reason_code, note, actor, reviewer_id, actor_role, recused, escalated, second_reviewer_id, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       RETURNING id, entity, entity_id AS entityId, previous_status AS previousStatus, new_status AS newStatus, action, reason_code AS reasonCode, note, actor, reviewer_id AS reviewerId, actor_role AS actorRole, recused, escalated, second_reviewer_id AS secondReviewerId, created_at AS createdAt`,
+    )
+    .bind(
+      event.entity,
+      event.entityId,
+      event.previousStatus,
+      event.newStatus,
+      event.action,
+      event.reasonCode,
+      event.note,
+      event.reviewer?.displayName ?? localModerator,
+      event.reviewer?.id ?? null,
+      event.reviewer?.role ?? null,
+      event.recused ? 1 : 0,
+      event.escalated ? 1 : 0,
+      event.secondReviewerId ?? null,
+      createdAt,
+    )
+    .first<ModerationEvent>();
+
+  if (!result) throw new Error("Moderation event could not be recorded");
+  return result;
+}
+
+/**
+ * Records a decision and updates the queue/entity state. Returns a
+ * discriminated result; see `ModerationResult`.
+ *
+ * `context` is required on the API path (the route validates `actorId`). When
+ * omitted (legacy direct callers: tests, the freshness sweep) the decision is
+ * recorded with the fixed "Local moderator" actor and no role/queue
+ * enforcement, matching the pre-Wave-B contract. The entity status changes
+ * only when the decision is final: recusals, escalations and first-review
+ * steps of a two-person review never alter `cameras.status`.
+ */
 export async function moderateCamera(
   id: number,
   action: CameraModerationAction,
   reasonCode: ModerationReasonCode,
   note: string | null,
   metadataPublication?: MetadataPublicationChoices,
-): Promise<ModerationDecision<ModerationCameraRecord> | null> {
+  context?: ModerationContext,
+): Promise<ModerationResult<ModerationCameraRecord>> {
   const d1 = await getModerationD1();
+
+  const reviewer = context ? await getReviewerById(d1, context.actorId) : null;
+  if (context && !reviewer) return { kind: "actor_not_found" };
+  if (reviewer && reviewer.active !== 1) return { kind: "actor_inactive" };
+  if (reviewer && !roleAllowsAction(reviewer.role, action)) return { kind: "forbidden" };
+
   const current = await d1
     .prepare("SELECT status FROM cameras WHERE id = ?")
     .bind(id)
     .first<{ status: string }>();
-  if (!current) return null;
+  if (!current) return { kind: "not_found" };
+
+  const queue = context
+    ? await getOrCreateQueueItem(d1, "camera", id, {
+        sensitivity: context.sensitivity,
+        assigneeId: context.assigneeId,
+        requiresSecondReview: context.requiresSecondReview,
+      })
+    : synthesizedQueueItem("camera", id, new Date().toISOString());
+
+  // An escalated item may only be resolved by a senior moderator / privacy
+  // lead (or re-escalated); everyone else is locked out of further actions.
+  if (context && queue.state === "escalated" && action !== "escalate" && !escalationResolverRoles.has(reviewer!.role)) {
+    return { kind: "forbidden" };
+  }
+
+  // Recusal: record the disclosure, never change the record.
+  if (context?.recused === true) {
+    const event = await createModerationEvent(d1, {
+      entity: "camera",
+      entityId: id,
+      previousStatus: current.status,
+      newStatus: current.status,
+      action,
+      reasonCode,
+      note,
+      reviewer,
+      recused: true,
+      escalated: false,
+      secondReviewerId: null,
+    });
+    return { kind: "recused", item: (await loadCamera(d1, id))!, event, queue };
+  }
+
+  // Escalation: route to a senior moderator / privacy lead without changing
+  // the record. The note becomes the escalation reason and is mandatory.
+  if (action === "escalate") {
+    if (!context) return { kind: "forbidden" };
+    if (!note) return { kind: "escalation_requires_note" };
+    const updatedQueue = await updateQueueState(d1, queue.id!, "escalated", {
+      escalationReason: note,
+    });
+    const event = await createModerationEvent(d1, {
+      entity: "camera",
+      entityId: id,
+      previousStatus: current.status,
+      newStatus: current.status,
+      action,
+      reasonCode,
+      note,
+      reviewer,
+      recused: false,
+      escalated: true,
+      secondReviewerId: null,
+    });
+    return { kind: "ok", item: (await loadCamera(d1, id))!, event, queue: updatedQueue };
+  }
 
   const transition = getCameraTransition(current.status, action);
-  if (!transition) return null;
+  if (!transition) return { kind: "not_found" };
 
+  const needsSecondReview =
+    context !== undefined &&
+    secondReviewActions.has(action) &&
+    (queue.requiresSecondReview === 1 || queue.sensitivity !== "standard");
+
+  if (needsSecondReview && queue.state !== "second_review") {
+    // First reviewer acts: record the intent; the status is not final yet.
+    const event = await createModerationEvent(d1, {
+      entity: "camera",
+      entityId: id,
+      previousStatus: current.status,
+      newStatus: current.status,
+      action,
+      reasonCode,
+      note,
+      reviewer,
+      recused: false,
+      escalated: false,
+      secondReviewerId: null,
+    });
+    const updatedQueue = await updateQueueState(d1, queue.id!, "second_review");
+    return {
+      kind: "second_review_pending",
+      item: (await loadCamera(d1, id))!,
+      event,
+      queue: updatedQueue,
+    };
+  }
+
+  let secondReviewerId: number | null = null;
+  if (needsSecondReview) {
+    const first = await d1
+      .prepare(
+        "SELECT reviewer_id AS reviewerId FROM moderation_events WHERE entity = ? AND entity_id = ? AND action = ? AND reviewer_id IS NOT NULL ORDER BY id DESC LIMIT 1",
+      )
+      .bind("camera", id, action)
+      .first<{ reviewerId: number }>();
+    if (first && first.reviewerId === reviewer!.id) {
+      return { kind: "second_review_same_reviewer" };
+    }
+    secondReviewerId = first?.reviewerId ?? null;
+  }
+
+  const nowIso = new Date().toISOString();
+  // Approval and re-verification both restart the freshness clocks: the record
+  // is considered re-verified as of now, and its next review is due in
+  // DEFAULT_REVIEW_INTERVAL_MONTHS (standard confidence, DATA_TRUST clocks).
+  const refreshClock = action === "approve" || action === "reverify";
   const publishMetadata = current.status === "pending" && action === "approve";
-  const item = publishMetadata
-    ? await d1
-        .prepare(
-          "UPDATE cameras SET status = ?, updated = ?, publish_manufacturer = ?, publish_observed_on = ? WHERE id = ? AND status = ? RETURNING id, title, kind, manufacturer, observed_on AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, notes, latitude, longitude, status, source, updated, description, created_at AS createdAt",
-        )
-        .bind(
-          transition.newStatus,
-          transition.updated,
-          metadataPublication?.publishManufacturer ? 1 : 0,
-          metadataPublication?.publishObservedOn ? 1 : 0,
-          id,
-          current.status,
-        )
-        .first<ModerationCameraRecord>()
-    : await d1
-        .prepare(
-          "UPDATE cameras SET status = ?, updated = ? WHERE id = ? AND status = ? RETURNING id, title, kind, manufacturer, observed_on AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, notes, latitude, longitude, status, source, updated, description, created_at AS createdAt",
-        )
-        .bind(transition.newStatus, transition.updated, id, current.status)
-        .first<ModerationCameraRecord>();
-  if (!item) return null;
+
+  let item: ModerationCameraRecord | null = null;
+  if (publishMetadata) {
+    item = await d1
+      .prepare(
+        `UPDATE cameras SET status = ?, updated = ?, publish_manufacturer = ?, publish_observed_on = ?, last_verified_at = ?, review_due_at = ?, review_interval_months = ? WHERE id = ? AND status = ? RETURNING ${cameraColumns}`,
+      )
+      .bind(
+        transition.newStatus,
+        transition.updated,
+        metadataPublication?.publishManufacturer ? 1 : 0,
+        metadataPublication?.publishObservedOn ? 1 : 0,
+        nowIso,
+        computeReviewDueAt(nowIso, DEFAULT_REVIEW_INTERVAL_MONTHS),
+        DEFAULT_REVIEW_INTERVAL_MONTHS,
+        id,
+        current.status,
+      )
+      .first<ModerationCameraRecord>();
+  } else if (refreshClock) {
+    item = await d1
+      .prepare(
+        `UPDATE cameras SET status = ?, updated = ?, last_verified_at = ?, review_due_at = ?, review_interval_months = ? WHERE id = ? AND status = ? RETURNING ${cameraColumns}`,
+      )
+      .bind(
+        transition.newStatus,
+        transition.updated,
+        nowIso,
+        computeReviewDueAt(nowIso, DEFAULT_REVIEW_INTERVAL_MONTHS),
+        DEFAULT_REVIEW_INTERVAL_MONTHS,
+        id,
+        current.status,
+      )
+      .first<ModerationCameraRecord>();
+  } else {
+    item = await d1
+      .prepare(
+        `UPDATE cameras SET status = ?, updated = ? WHERE id = ? AND status = ? RETURNING ${cameraColumns}`,
+      )
+      .bind(transition.newStatus, transition.updated, id, current.status)
+      .first<ModerationCameraRecord>();
+  }
+  if (!item) return { kind: "not_found" };
 
   const event = await createModerationEvent(d1, {
     entity: "camera",
@@ -172,8 +724,17 @@ export async function moderateCamera(
     action,
     reasonCode,
     note,
+    reviewer,
+    recused: false,
+    escalated: false,
+    secondReviewerId,
   });
-  return { item, event };
+  const updatedQueue = context
+    ? await updateQueueState(d1, queue.id!, "closed", {
+        secondReviewerId: secondReviewerId ?? (needsSecondReview ? reviewer!.id : null),
+      })
+    : queue;
+  return { kind: "ok", item, event, queue: updatedQueue };
 }
 
 function getCameraTransition(
@@ -182,7 +743,7 @@ function getCameraTransition(
 ): { newStatus: string; updated: string } | null {
   if (previousStatus === "pending") {
     if (action === "approve") {
-      return { newStatus: "verified", updated: "Local moderation: approved and verified" };
+      return { newStatus: "verified", updated: new Date().toISOString() };
     }
     if (action === "reject") {
       return { newStatus: "rejected", updated: "Local moderation: rejected" };
@@ -206,7 +767,16 @@ function getCameraTransition(
 
   if (previousStatus === "needs_review") {
     if (action === "reverify") {
-      return { newStatus: "verified", updated: "Local moderation: re-verified" };
+      return { newStatus: "verified", updated: new Date().toISOString() };
+    }
+    if (action === "hide") {
+      return { newStatus: "removed", updated: "Local moderation: hidden from public listing" };
+    }
+  }
+
+  if (previousStatus === "stale") {
+    if (action === "reverify") {
+      return { newStatus: "verified", updated: new Date().toISOString() };
     }
     if (action === "hide") {
       return { newStatus: "removed", updated: "Local moderation: hidden from public listing" };
@@ -216,57 +786,310 @@ function getCameraTransition(
   return null;
 }
 
+function getCorrectionTransition(action: CorrectionModerationAction): { newStatus: string } | null {
+  if (action === "approve") return { newStatus: "reviewed" };
+  if (action === "reject") return { newStatus: "rejected" };
+  if (action === "associate") return { newStatus: "pending" };
+  return null;
+}
+
+async function loadCorrection(d1: ModerationD1, id: number): Promise<PendingCorrectionRequest | null> {
+  return d1
+    .prepare(
+      "SELECT id, camera_id AS cameraId, issue_type AS issueType, message, contact, status, outcome, created_at AS createdAt FROM correction_requests WHERE id = ?",
+    )
+    .bind(id)
+    .first<PendingCorrectionRequest>();
+}
+
+/**
+ * Same contract as `moderateCamera`, for correction requests. `options`
+ * carries the correction-specific outcome/association (existing behaviour);
+ * `context` carries the named actor and queue workflow state.
+ */
 export async function moderateCorrection(
   id: number,
   action: CorrectionModerationAction,
   reasonCode: ModerationReasonCode,
   note: string | null,
-): Promise<ModerationDecision<PendingCorrectionRequest> | null> {
+  options?: CorrectionModerationOptions,
+  context?: ModerationContext,
+): Promise<ModerationResult<PendingCorrectionRequest>> {
   const d1 = await getModerationD1();
+  const outcome = options?.outcome;
+  const cameraId = options?.cameraId;
+  if (action === "associate" && cameraId === undefined) return { kind: "not_found" };
+
+  const reviewer = context ? await getReviewerById(d1, context.actorId) : null;
+  if (context && !reviewer) return { kind: "actor_not_found" };
+  if (reviewer && reviewer.active !== 1) return { kind: "actor_inactive" };
+  if (reviewer && !roleAllowsAction(reviewer.role, action)) return { kind: "forbidden" };
+
+  const current = await d1
+    .prepare("SELECT status FROM correction_requests WHERE id = ?")
+    .bind(id)
+    .first<{ status: string }>();
+  if (!current) return { kind: "not_found" };
+
+  const queue = context
+    ? await getOrCreateQueueItem(d1, "correction", id, {
+        sensitivity: context.sensitivity,
+        assigneeId: context.assigneeId,
+        requiresSecondReview: context.requiresSecondReview,
+      })
+    : synthesizedQueueItem("correction", id, new Date().toISOString());
+
+  if (context && queue.state === "escalated" && action !== "escalate" && !escalationResolverRoles.has(reviewer!.role)) {
+    return { kind: "forbidden" };
+  }
+
+  if (context?.recused === true) {
+    const event = await createModerationEvent(d1, {
+      entity: "correction",
+      entityId: id,
+      previousStatus: current.status,
+      newStatus: current.status,
+      action,
+      reasonCode,
+      note,
+      reviewer,
+      recused: true,
+      escalated: false,
+      secondReviewerId: null,
+    });
+    return {
+      kind: "recused",
+      item: (await loadCorrection(d1, id))!,
+      event,
+      queue,
+    };
+  }
+
+  if (action === "escalate") {
+    if (!context) return { kind: "forbidden" };
+    if (!note) return { kind: "escalation_requires_note" };
+    const updatedQueue = await updateQueueState(d1, queue.id!, "escalated", {
+      escalationReason: note,
+    });
+    const event = await createModerationEvent(d1, {
+      entity: "correction",
+      entityId: id,
+      previousStatus: current.status,
+      newStatus: current.status,
+      action,
+      reasonCode,
+      note,
+      reviewer,
+      recused: false,
+      escalated: true,
+      secondReviewerId: null,
+    });
+    return { kind: "ok", item: (await loadCorrection(d1, id))!, event, queue: updatedQueue };
+  }
+
+  const transition = getCorrectionTransition(action);
+  if (!transition) return { kind: "not_found" };
+
+  const needsSecondReview =
+    context !== undefined &&
+    secondReviewActions.has(action) &&
+    (queue.requiresSecondReview === 1 || queue.sensitivity !== "standard");
+
+  if (needsSecondReview && queue.state !== "second_review") {
+    const event = await createModerationEvent(d1, {
+      entity: "correction",
+      entityId: id,
+      previousStatus: current.status,
+      newStatus: current.status,
+      action,
+      reasonCode,
+      note,
+      reviewer,
+      recused: false,
+      escalated: false,
+      secondReviewerId: null,
+    });
+    const updatedQueue = await updateQueueState(d1, queue.id!, "second_review");
+    return {
+      kind: "second_review_pending",
+      item: (await loadCorrection(d1, id))!,
+      event,
+      queue: updatedQueue,
+    };
+  }
+
+  let secondReviewerId: number | null = null;
+  if (needsSecondReview) {
+    const first = await d1
+      .prepare(
+        "SELECT reviewer_id AS reviewerId FROM moderation_events WHERE entity = ? AND entity_id = ? AND action = ? AND reviewer_id IS NOT NULL ORDER BY id DESC LIMIT 1",
+      )
+      .bind("correction", id, action)
+      .first<{ reviewerId: number }>();
+    if (first && first.reviewerId === reviewer!.id) {
+      return { kind: "second_review_same_reviewer" };
+    }
+    secondReviewerId = first?.reviewerId ?? null;
+  }
+
   const status = action === "approve" ? "reviewed" : "rejected";
+  const sets: string[] = [];
+  const binds: (string | number)[] = [];
+  if (action !== "associate") {
+    sets.push("status = ?");
+    binds.push(status);
+  }
+  if (cameraId !== undefined) {
+    sets.push("camera_id = ?");
+    binds.push(cameraId);
+  }
+  if (action === "approve" && outcome !== undefined) {
+    sets.push("outcome = ?");
+    binds.push(outcome);
+  }
+  binds.push(id);
 
   const item = await d1
     .prepare(
-      "UPDATE correction_requests SET status = ? WHERE id = ? AND status = 'pending' RETURNING id, camera_id AS cameraId, issue_type AS issueType, message, contact, status, created_at AS createdAt",
+      `UPDATE correction_requests SET ${sets.join(", ")} WHERE id = ? AND status = 'pending' RETURNING id, camera_id AS cameraId, issue_type AS issueType, message, contact, status, outcome, created_at AS createdAt`,
     )
-    .bind(status, id)
+    .bind(...binds)
     .first<PendingCorrectionRequest>();
-  if (!item) return null;
+  if (!item) return { kind: "not_found" };
 
-  const event = await createModerationEvent(d1, {
-    entity: "correction",
-    entityId: id,
-    previousStatus: "pending",
-    newStatus: status,
-    action,
-    reasonCode,
-    note,
-  });
-  return { item, event };
+  const event =
+    action === "associate"
+      ? await createModerationEvent(d1, {
+          entity: "correction",
+          entityId: id,
+          previousStatus: "pending",
+          newStatus: "pending",
+          action: "associate",
+          reasonCode,
+          note,
+          reviewer,
+          recused: false,
+          escalated: false,
+          secondReviewerId: null,
+        })
+      : await createModerationEvent(d1, {
+          entity: "correction",
+          entityId: id,
+          previousStatus: current.status,
+          newStatus: status,
+          action,
+          reasonCode,
+          note,
+          reviewer,
+          recused: false,
+          escalated: false,
+          secondReviewerId,
+        });
+
+  if (action === "approve" && outcome !== undefined && item.cameraId !== null) {
+    await applyCorrectionOutcome(d1, item.cameraId, outcome, reasonCode, note);
+  }
+
+  const updatedQueue = context
+    ? await updateQueueState(d1, queue.id!, "closed", {
+        secondReviewerId: secondReviewerId ?? (needsSecondReview ? reviewer!.id : null),
+      })
+    : queue;
+  return { kind: "ok", item, event, queue: updatedQueue };
 }
 
-async function createModerationEvent(
-  d1: Awaited<ReturnType<typeof getModerationD1>>,
-  event: Omit<ModerationEvent, "id" | "actor" | "createdAt">,
-): Promise<ModerationEvent> {
-  const createdAt = new Date().toISOString();
+async function applyCorrectionOutcome(
+  d1: ModerationD1,
+  cameraId: number,
+  outcome: CorrectionOutcome,
+  reasonCode: ModerationReasonCode,
+  note: string | null,
+): Promise<void> {
+  const record = await d1
+    .prepare("SELECT status FROM cameras WHERE id = ?")
+    .bind(cameraId)
+    .first<{ status: string }>();
+  if (!record) return;
+
+  if (outcome === "marked-stale") {
+    // A credible correction sends a verified record back to needs_review while
+    // it is reassessed (DATA_TRUST SLA).
+    if (record.status !== "verified") return;
+    await d1
+      .prepare("UPDATE cameras SET status = 'needs_review', updated = ? WHERE id = ? AND status = 'verified'")
+      .bind("Local moderation: correction marked record stale", cameraId)
+      .run();
+    await createModerationEvent(d1, {
+      entity: "camera",
+      entityId: cameraId,
+      previousStatus: "verified",
+      newStatus: "needs_review",
+      action: "marked-stale",
+      reasonCode,
+      note,
+    });
+    return;
+  }
+
+  if (outcome === "removed") {
+    await d1
+      .prepare("UPDATE cameras SET status = 'removed', updated = ? WHERE id = ?")
+      .bind("Local moderation: correction outcome removed the record", cameraId)
+      .run();
+    await createModerationEvent(d1, {
+      entity: "camera",
+      entityId: cameraId,
+      previousStatus: record.status,
+      newStatus: "removed",
+      action: "removed",
+      reasonCode,
+      note,
+    });
+    return;
+  }
+
+  if (outcome === "corrected") {
+    await d1
+      .prepare("UPDATE cameras SET updated = ? WHERE id = ?")
+      .bind("Local moderation: correction applied to record", cameraId)
+      .run();
+    await createModerationEvent(d1, {
+      entity: "camera",
+      entityId: cameraId,
+      previousStatus: record.status,
+      newStatus: record.status,
+      action: "corrected",
+      reasonCode,
+      note,
+    });
+  }
+}
+
+export type PublicCameraRevision = {
+  id: number;
+  entityId: number;
+  previousStatus: string;
+  newStatus: string;
+  action: string;
+  createdAt: string;
+};
+
+/**
+ * Reviewed public change summary for a camera record: the lifecycle
+ * transitions a moderator applied (approved, marked stale, re-verified,
+ * removed), oldest first. This is the public revision history described in
+ * docs/FUTURE_ROADMAP.md (Horizon 1). It deliberately projects only
+ * non-identifying fields: the private audit columns (actor, note,
+ * reason_code) never leave this boundary, so contributor and moderator
+ * identities and internal notes are never published.
+ */
+export async function listPublicCameraRevisions(cameraId: number): Promise<PublicCameraRevision[]> {
+  const d1 = await getModerationD1();
   const result = await d1
     .prepare(
-      "INSERT INTO moderation_events (entity, entity_id, previous_status, new_status, action, reason_code, note, actor, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id, entity, entity_id AS entityId, previous_status AS previousStatus, new_status AS newStatus, action, reason_code AS reasonCode, note, actor, created_at AS createdAt",
+      "SELECT id, entity_id AS entityId, previous_status AS previousStatus, new_status AS newStatus, action, created_at AS createdAt FROM moderation_events WHERE entity = 'camera' AND entity_id = ? ORDER BY created_at ASC, id ASC",
     )
-    .bind(
-      event.entity,
-      event.entityId,
-      event.previousStatus,
-      event.newStatus,
-      event.action,
-      event.reasonCode,
-      event.note,
-      localModerator,
-      createdAt,
-    )
-    .first<ModerationEvent>();
-
-  if (!result) throw new Error("Moderation event could not be recorded");
-  return result;
+    .bind(cameraId)
+    .all<PublicCameraRevision>();
+  return result.results;
 }

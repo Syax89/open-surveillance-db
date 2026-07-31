@@ -11,6 +11,7 @@ export const moderationReasonCodes = [
   "private-or-sensitive-location",
   "inaccurate-or-outdated",
   "privacy-or-safety-concern",
+  "requires-senior-review",
   "other",
 ];
 
@@ -18,8 +19,10 @@ export const {
   listPendingModerationItems,
   moderateCamera,
   moderateCorrection,
+  listPublicCameraRevisions,
 } = makeMock({
   listPendingModerationItems: "listPendingModerationItems",
   moderateCamera: "moderateCamera",
   moderateCorrection: "moderateCorrection",
+  listPublicCameraRevisions: "listPublicCameraRevisions",
 });

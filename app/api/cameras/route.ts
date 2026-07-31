@@ -1,7 +1,20 @@
 import { env } from "cloudflare:workers";
-import { createPendingCamera, listPublicCameras } from "../../../db/cameras";
+import { createPendingCamera, findNearbyPublicCameras, freshnessWindows, listPublicCameras, type FreshnessWindow, type PublicCameraFilters } from "../../../db/cameras";
 import { isRecord } from "../../lib/guards";
-import { callerKey, checkRateLimit, submissionLimits, submissionsDisabled } from "../../lib/rate-limit";
+import {
+  callerKey,
+  checkRateLimit,
+  limitsFor,
+  submissionLimits,
+  submissionsDisabled,
+  type RouteKind,
+} from "../../lib/rate-limit";
+import { recordRateLimitBlock } from "../../lib/abuse-alerts";
+import {
+  PayloadTooLargeError,
+  readJsonBody,
+  urlTooLong,
+} from "../../lib/input-limits";
 
 function cleanText(value: unknown, maxLength: number) {
   return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
@@ -30,9 +43,42 @@ function toCsv(records: Awaited<ReturnType<typeof listPublicCameras>>) {
 }
 
 export async function GET(request: Request) {
+  // Input limits: reject absurdly long URLs before any parsing work.
+  if (urlTooLong(request)) {
+    return Response.json({ error: "Request URI too long." }, { status: 414 });
+  }
+
+  // Rate limits: plain reads share a generous bucket, bulk exports (CSV and
+  // GeoJSON) get a stricter one so anomalous export traffic is throttled.
+  const format = new URL(request.url).searchParams.get("format");
+  const kind: RouteKind = format === "csv" || format === "geojson" ? "export" : "read";
+  const key = callerKey(request);
+  const limitOptions = limitsFor(kind, env);
+  const limit = checkRateLimit(kind, key, limitOptions);
+  if (!limit.allowed) {
+    console.warn(`GET /api/cameras rate limited (${kind} bucket)`);
+    recordRateLimitBlock(env, {
+      route: "/api/cameras",
+      key,
+      windowSeconds: limitOptions.windowSeconds,
+    });
+    return Response.json({ error: "Too many requests. Please try again shortly." }, {
+      status: 429,
+      headers: { "Retry-After": String(limit.retryAfterSeconds) },
+    });
+  }
+
   try {
-    const records = await listPublicCameras();
-    const format = new URL(request.url).searchParams.get("format");
+    const params = new URL(request.url).searchParams;
+    const kindFilter = cleanText(params.get("kind"), 60);
+    const freshness = params.get("freshness");
+    if (freshness !== null && !freshnessWindows.includes(freshness as FreshnessWindow)) {
+      return Response.json({ error: `Unknown freshness window. Use one of: ${freshnessWindows.join(", ")}.` }, { status: 400 });
+    }
+    const filters: PublicCameraFilters = {};
+    if (kindFilter) filters.kind = kindFilter;
+    if (freshness && freshness !== "all") filters.freshness = freshness as FreshnessWindow;
+    const records = await listPublicCameras(filters);
     if (format === "geojson") {
       return Response.json({ type: "FeatureCollection", features: records.map((record) => ({ type: "Feature", geometry: { type: "Point", coordinates: [record.longitude, record.latitude] }, properties: { id: record.id, title: record.title, kind: record.kind, manufacturer: record.manufacturer, observedOn: record.observedOn, status: record.status, source: record.source, updated: record.updated, description: record.description } })) }, { headers: { "Content-Disposition": "attachment; filename=opensurveillancedb-cameras.geojson" } });
     }
@@ -53,9 +99,15 @@ export async function POST(request: Request) {
   }
 
   const key = callerKey(request);
-  const limit = checkRateLimit(key, submissionLimits(env));
+  const limitOptions = submissionLimits(env);
+  const limit = checkRateLimit("submit", key, limitOptions);
   if (!limit.allowed) {
-    console.warn(`POST /api/cameras rate limited for caller ${key}`);
+    console.warn("POST /api/cameras rate limited");
+    recordRateLimitBlock(env, {
+      route: "/api/cameras",
+      key,
+      windowSeconds: limitOptions.windowSeconds,
+    });
     return Response.json({ error: "Too many submissions. Please try again shortly." }, {
       status: 429,
       headers: { "Retry-After": String(limit.retryAfterSeconds) },
@@ -63,7 +115,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const payload: unknown = await request.json();
+    const payload: unknown = await readJsonBody(request, env);
     if (!isRecord(payload)) return Response.json({ error: "A title, type, valid position and (when provided) a valid observation date are required." }, { status: 400 });
     const title = cleanText(payload.title, 90);
     const kind = cleanText(payload.kind, 60);
@@ -75,8 +127,21 @@ export async function POST(request: Request) {
     const longitude = Number(payload.longitude);
     if (!title || !kind || !Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180 || (payload.observedOn !== undefined && payload.observedOn !== null && !observedOn)) return Response.json({ error: "A title, type, valid position and (when provided) a valid observation date are required." }, { status: 400 });
     const record = await createPendingCamera({ title, kind, address, notes, manufacturer: manufacturer || null, observedOn: observedOn || null, latitude, longitude });
-    return Response.json({ record }, { status: 201 });
+    // Non-blocking pre-submit duplicate detection: warn the submitter about
+    // nearby reviewed records without leaking any non-public data. A failure
+    // here must never fail the report itself.
+    let possibleDuplicates: Awaited<ReturnType<typeof findNearbyPublicCameras>> = [];
+    try {
+      possibleDuplicates = await findNearbyPublicCameras(latitude, longitude, 75, { title, address, kind });
+    } catch (error) {
+      console.error("POST /api/cameras duplicate check failed", error);
+    }
+    return Response.json({ record, possibleDuplicates }, { status: 201 });
   } catch (error) {
+    if (error instanceof PayloadTooLargeError) {
+      console.warn("POST /api/cameras payload rejected: body over the configured byte cap");
+      return Response.json({ error: error.message }, { status: error.status });
+    }
     console.error("POST /api/cameras failed", error);
     return Response.json({ error: "Unable to save report" }, { status: 500 });
   }

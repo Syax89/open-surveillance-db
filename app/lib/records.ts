@@ -1,3 +1,4 @@
+import { isPublicStatus } from "./public-status";
 import type { MapCamera } from "../components/SurveillanceMap";
 
 export type Camera = MapCamera & {
@@ -8,6 +9,17 @@ export type Camera = MapCamera & {
   manufacturer?: string | null;
   observedOn?: string | null;
 };
+
+/**
+ * Defense-in-depth client gate: only records whose status is whitelisted in
+ * PUBLIC_CAMERA_STATUSES (verified/demo) may be rendered. The API already
+ * filters server-side; this second gate guarantees a non-public record that
+ * ever reaches the client bundle is dropped before any component can display
+ * it, its location, or its internal status string.
+ */
+export function publicRecords(records: Camera[]): Camera[] {
+  return records.filter((record) => isPublicStatus(record.status));
+}
 
 export const prototypeRecords: Camera[] = [
   {
@@ -35,9 +47,3 @@ export const prototypeRecords: Camera[] = [
     address: "Illustrative location, Rome",
   },
 ];
-
-export const statusLabel: Record<string, string> = {
-  verified: "Verified",
-  demo: "Prototype record",
-  pending: "In moderation",
-};
