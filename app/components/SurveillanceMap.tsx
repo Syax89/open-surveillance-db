@@ -13,8 +13,16 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
   const mapRef = useRef<import("leaflet").Map | null>(null);
   const markersRef = useRef<import("leaflet").LayerGroup | null>(null);
   const leafletRef = useRef<typeof import("leaflet") | null>(null);
-  const onPickRef = useRef(onPick); onPickRef.current = onPick;
-  const focusLocationRef = useRef(focusLocation); focusLocationRef.current = focusLocation;
+  const onPickRef = useRef(onPick);
+  const focusLocationRef = useRef(focusLocation);
+
+  useEffect(() => {
+    onPickRef.current = onPick;
+  }, [onPick]);
+
+  useEffect(() => {
+    focusLocationRef.current = focusLocation;
+  }, [focusLocation]);
 
   useEffect(() => {
     let disposed = false;
@@ -44,14 +52,16 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
     });
   }, [cameras, selectedId, onSelect]);
 
+  const focusLat = focusLocation?.latitude;
+  const focusLng = focusLocation?.longitude;
   useEffect(() => {
-    if (!focusLocation || !mapRef.current) return;
+    if (focusLat === undefined || focusLng === undefined || !mapRef.current) return;
     mapRef.current.setView(
-      [focusLocation.latitude, focusLocation.longitude],
+      [focusLat, focusLng],
       Math.max(mapRef.current.getZoom(), 15),
       { animate: false },
     );
-  }, [focusLocation?.latitude, focusLocation?.longitude]);
+  }, [focusLat, focusLng]);
   const isItalian = locale === "it";
   const label = isItalian ? "Mappa interattiva OpenStreetMap" : "Interactive OpenStreetMap map";
   const description = isItalian

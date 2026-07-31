@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useSyncExternalStore, type ReactNode } from "react";
 
 export type Locale = "en" | "it";
 
@@ -11,24 +11,35 @@ type LocaleContextValue = {
 
 const LocaleContext = createContext<LocaleContextValue | null>(null);
 const storageKey = "opensurveillancedb-locale";
+const localeChangeEvent = "opensurveillancedb-locale-change";
+
+function readStoredLocale(): Locale {
+  if (typeof window === "undefined") return "en";
+  const savedLocale = window.localStorage.getItem(storageKey);
+  return savedLocale === "en" || savedLocale === "it" ? savedLocale : "en";
+}
+
+function subscribeToLocale(callback: () => void) {
+  window.addEventListener("storage", callback);
+  window.addEventListener(localeChangeEvent, callback);
+  return () => {
+    window.removeEventListener("storage", callback);
+    window.removeEventListener(localeChangeEvent, callback);
+  };
+}
 
 export function LocaleProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>("en");
-
-  useEffect(() => {
-    const savedLocale = window.localStorage.getItem(storageKey);
-    if (savedLocale === "en" || savedLocale === "it") setLocaleState(savedLocale);
-  }, []);
+  const locale = useSyncExternalStore(subscribeToLocale, readStoredLocale, () => "en" as Locale);
 
   useEffect(() => {
     document.documentElement.lang = locale;
   }, [locale]);
 
-  const value = useMemo(() => ({
+  const value = useMemo<LocaleContextValue>(() => ({
     locale,
     setLocale(nextLocale: Locale) {
-      setLocaleState(nextLocale);
       window.localStorage.setItem(storageKey, nextLocale);
+      window.dispatchEvent(new Event(localeChangeEvent));
     },
   }), [locale]);
 

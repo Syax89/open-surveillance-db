@@ -1,4 +1,6 @@
+import { env } from "cloudflare:workers";
 import { createPendingCamera, listPublicCameras } from "../../../db/cameras";
+import { callerKey, checkRateLimit, submissionLimits, submissionsDisabled } from "../../lib/rate-limit";
 
 function cleanText(value: unknown, maxLength: number) {
   return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
@@ -38,11 +40,27 @@ export async function GET(request: Request) {
     }
     return Response.json({ records });
   } catch (error) {
-    return Response.json({ error: error instanceof Error ? error.message : "Database unavailable" }, { status: 503 });
+    console.error("GET /api/cameras failed", error);
+    return Response.json({ error: "Database unavailable" }, { status: 503 });
   }
 }
 
 export async function POST(request: Request) {
+  if (submissionsDisabled(env)) {
+    console.warn("POST /api/cameras rejected: submissions disabled via POST_SUBMISSIONS_DISABLED");
+    return Response.json({ error: "Submissions are temporarily disabled." }, { status: 503 });
+  }
+
+  const key = callerKey(request);
+  const limit = checkRateLimit(key, submissionLimits(env));
+  if (!limit.allowed) {
+    console.warn(`POST /api/cameras rate limited for caller ${key}`);
+    return Response.json({ error: "Too many submissions. Please try again shortly." }, {
+      status: 429,
+      headers: { "Retry-After": String(limit.retryAfterSeconds) },
+    });
+  }
+
   try {
     const payload = await request.json() as Record<string, unknown>;
     const title = cleanText(payload.title, 90);
@@ -57,6 +75,7 @@ export async function POST(request: Request) {
     const record = await createPendingCamera({ title, kind, address, notes, manufacturer: manufacturer || null, observedOn: observedOn || null, latitude, longitude });
     return Response.json({ record }, { status: 201 });
   } catch (error) {
-    return Response.json({ error: error instanceof Error ? error.message : "Unable to save report" }, { status: 500 });
+    console.error("POST /api/cameras failed", error);
+    return Response.json({ error: "Unable to save report" }, { status: 500 });
   }
 }

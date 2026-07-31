@@ -1,6 +1,16 @@
 {
-  "name": "site-creator-vinext-starter",
+  "name": "open-surveillance-db",
   "version": "0.1.0",
+  "description": "Open, non-commercial civic database of visible public surveillance infrastructure.",
+  "license": "AGPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Syax89/open-surveillance-db.git"
+  },
+  "homepage": "https://github.com/Syax89/open-surveillance-db",
+  "bugs": {
+    "url": "https://github.com/Syax89/open-surveillance-db/issues"
+  },
   "private": true,
   "engines": {
     "node": ">=22.13.0"
@@ -18,12 +28,12 @@
     "@types/leaflet": "^1.9.21",
     "drizzle-orm": "0.45.2",
     "leaflet": "^1.9.4",
-    "next": "16.2.6",
-    "react": "19.2.6",
-    "react-dom": "19.2.6"
+    "next": "^16.2.12",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "1.37.1",
+    "@cloudflare/vite-plugin": "^1.50.0",
     "@tailwindcss/postcss": "4.2.1",
     "@types/node": "22.19.19",
     "@types/react": "19.2.14",
@@ -31,14 +41,18 @@
     "@vitejs/plugin-react": "6.0.2",
     "@vitejs/plugin-rsc": "0.5.26",
     "drizzle-kit": "0.31.10",
-    "eslint": "9.39.4",
-    "eslint-config-next": "16.2.6",
-    "react-server-dom-webpack": "19.2.6",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.2.12",
+    "react-server-dom-webpack": "^19.2.8",
     "tailwindcss": "4.2.1",
     "typescript": "5.9.3",
     "vinext": "0.0.50",
-    "vite": "8.0.13",
-    "wrangler": "4.92.0"
+    "vite": "^8.2.0",
+    "wrangler": "^4.118.0"
   },
-  "type": "module"
+  "type": "module",
+  "overrides": {
+    "sharp": "^0.35.3",
+    "postcss": "^8.5.18"
+  }
 }
