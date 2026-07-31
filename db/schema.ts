@@ -16,6 +16,13 @@ export const cameras = sqliteTable("cameras", {
   source: text("source").notNull(),
   updated: text("updated").notNull(),
   description: text("description").notNull().default(""),
+  // Freshness state: last_verified_at is the machine-readable ISO date of the
+  // last successful verification; review_due_at is the scheduled recheck date
+  // (last_verified_at + review_interval_months). A verified record is only
+  // published as current while it is inside this review window.
+  lastVerifiedAt: text("last_verified_at"),
+  reviewDueAt: text("review_due_at"),
+  reviewIntervalMonths: integer("review_interval_months").notNull().default(12),
   createdAt: text("created_at").notNull(),
 });
 
