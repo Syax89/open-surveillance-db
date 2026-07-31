@@ -106,11 +106,35 @@ async function buildDbModules() {
     }).outputText;
 
     const rewritten = compiled
-      .replace(/(from\s*["'])(\.\/[^"']+)(["'])/g, "$1$2.mjs$3")
+      // Rewrite ./ and ../ relative imports to their .mjs counterparts
+      // (db/cameras.ts imports ../app/lib/duplicate-detection).
+      .replace(/(from\s*["'])(\.\.?\/[^"']+)(["'])/g, (match, prefix, specifier, suffix) =>
+        specifier.endsWith(".mjs") ? match : `${prefix}${specifier}.mjs${suffix}`,
+      )
       .replace(/from\s*["']cloudflare:workers["']/g, `from "${workersUrl}"`);
 
-    await writeFile(path.join(tree, "db", `${file.replace(/\.ts$/, ".mjs")}`), rewritten);
+    await writeFile(path.join(tree, "db", file.replace(/\.ts$/, ".mjs")), rewritten);
   }
+
+  // db/cameras.ts imports ../app/lib/duplicate-detection (pure, no CF binding);
+  // mirror it into the temp tree so the rewritten import resolves.
+  const appLibDir = path.join(root, "app", "lib");
+  await mkdir(path.join(tree, "app", "lib"), { recursive: true });
+  const compiledDuplicateDetection = ts.transpileModule(
+    await readFile(path.join(appLibDir, "duplicate-detection.ts"), "utf8"),
+    {
+      compilerOptions: {
+        module: ts.ModuleKind.ESNext,
+        target: ts.ScriptTarget.ESNext,
+        moduleResolution: ts.ModuleResolutionKind.Bundler,
+      },
+      fileName: path.join(appLibDir, "duplicate-detection.ts"),
+    },
+  ).outputText;
+  await writeFile(
+    path.join(tree, "app", "lib", "duplicate-detection.mjs"),
+    compiledDuplicateDetection.replace(/from\s*["']cloudflare:workers["']/g, `from "${workersUrl}"`),
+  );
 
   modules.cameras = await import(pathToFileURL(path.join(tree, "db", "cameras.mjs")).href);
   modules.corrections = await import(pathToFileURL(path.join(tree, "db", "corrections.mjs")).href);
