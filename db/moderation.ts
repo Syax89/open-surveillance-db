@@ -1,5 +1,6 @@
 import { getD1, type CameraRecord } from "./cameras";
 import type { CorrectionRequest } from "./corrections";
+import { listPendingPhotos, type PendingPhotoReport } from "./photos";
 import { DEFAULT_REVIEW_INTERVAL_MONTHS, STALE_GRACE_DAYS, addDays, computeReviewDueAt } from "./freshness";
 
 export type ModerationCameraRecord = CameraRecord;
@@ -13,6 +14,7 @@ export type ModerationQueue = {
   reviewCameras: ModerationCameraRecord[];
   staleCameras: ModerationCameraRecord[];
   correctionRequests: PendingCorrectionRequest[];
+  photoReports: PendingPhotoReport[];
   recentEvents: ModerationEvent[];
   reviewers: Reviewer[];
   queueItems: ModerationQueueItem[];
@@ -430,6 +432,7 @@ export async function listPendingModerationItems(): Promise<ModerationQueue> {
     reviewCameras: reviewCameras.results,
     staleCameras: staleCameras.results,
     correctionRequests: correctionRequests.results,
+    photoReports: await listPendingPhotos(),
     recentEvents: recentEvents.results,
     reviewers: reviewers,
     queueItems,

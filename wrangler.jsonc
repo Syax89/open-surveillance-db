@@ -10,6 +10,12 @@
     "binding": "ASSETS"
   },
   "images": { "binding": "IMAGES" },
+  "r2_buckets": [
+    {
+      "binding": "PHOTOS",
+      "bucket_name": "opensurveillancedb-photos"
+    }
+  ],
   "d1_databases": [
     {
       "binding": "DB",

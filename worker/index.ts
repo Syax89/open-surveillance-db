@@ -13,6 +13,8 @@ interface Env {
       };
     };
   };
+  /** Photo evidence object storage (D1 stores metadata only). */
+  PHOTOS: R2Bucket;
   /** Moderation access control. At least one credential must be configured. */
   MODERATION_USER?: string;
   MODERATION_PASSWORD?: string;

@@ -38,6 +38,8 @@ const expectedTables = [
   // STATUS gap #1 (0009): contributor accounts and sessions.
   "contributors",
   "sessions",
+  // Photo evidence (0010): metadata only, image bytes live in R2.
+  "photos",
 ];
 // Indexes declared by the migrations.
 const expectedIndexes = [
@@ -50,6 +52,8 @@ const expectedIndexes = [
   "sessions_token_hash_unique",
   "sessions_contributor_idx",
   "sessions_expires_idx",
+  "photos_status_idx",
+  "photos_camera_idx",
 ];
 // Tables that are not application schema but legitimately appear in a local
 // D1 database. Anything outside this set is an unexpected schema change.

@@ -2,6 +2,7 @@ import { env } from "cloudflare:workers";
 import { createPendingCamera, findNearbyPublicCameras, freshnessWindows, listPublicCameras, type FreshnessWindow, type PublicCameraFilters } from "../../../db/cameras";
 import { resolveOptionalContributor } from "../../lib/auth-session";
 import { csrfVerified, sameOrigin } from "../../lib/csrf";
+import { linkPhotosToCamera } from "../../../db/photos";
 import { isRecord } from "../../lib/guards";
 import {
   callerKey,
@@ -139,8 +140,32 @@ export async function POST(request: Request) {
     const observedOn = cleanObservedOn(payload.observedOn);
     const latitude = Number(payload.latitude);
     const longitude = Number(payload.longitude);
+    // Optional photo evidence: uploaded photos (POST /api/photos) may be
+    // attached to the report at submission time. They stay private: the
+    // photos themselves must be individually moderated before they can be
+    // served, regardless of what happens to this report.
+    const photoIds = Array.isArray(payload.photoIds)
+      ? payload.photoIds.filter(
+          (id): id is number => typeof id === "number" && Number.isInteger(id) && id >= 1,
+        ).slice(0, 5)
+      : [];
+    if (
+      Array.isArray(payload.photoIds) &&
+      payload.photoIds.some((id) => typeof id !== "number" || !Number.isInteger(id) || id < 1)
+    ) {
+      return Response.json({ error: "photoIds must be an array of positive integers." }, { status: 400 });
+    }
     if (!title || !kind || !Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180 || (payload.observedOn !== undefined && payload.observedOn !== null && !observedOn)) return Response.json({ error: "A title, type, valid position and (when provided) a valid observation date are required." }, { status: 400 });
     const record = await createPendingCamera({ title, kind, address, notes, manufacturer: manufacturer || null, observedOn: observedOn || null, latitude, longitude, contributorId: auth?.contributor.id ?? null });
+    // Link photo evidence after the report row exists. Linking is best-effort:
+    // a photo that fails the pending/unlinked guard is simply left orphaned
+    // (it will never be public without moderation).
+    let linkedPhotoCount = 0;
+    try {
+      linkedPhotoCount = await linkPhotosToCamera(record.id, photoIds);
+    } catch (error) {
+      console.error("POST /api/cameras photo linking failed", error);
+    }
     // Non-blocking pre-submit duplicate detection: warn the submitter about
     // nearby reviewed records without leaking any non-public data. A failure
     // here must never fail the report itself.
@@ -150,7 +175,7 @@ export async function POST(request: Request) {
     } catch (error) {
       console.error("POST /api/cameras duplicate check failed", error);
     }
-    return Response.json({ record, possibleDuplicates }, { status: 201 });
+    return Response.json({ record, possibleDuplicates, linkedPhotos: linkedPhotoCount }, { status: 201 });
   } catch (error) {
     if (error instanceof PayloadTooLargeError) {
       console.warn("POST /api/cameras payload rejected: body over the configured byte cap");
