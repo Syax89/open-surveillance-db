@@ -4,12 +4,25 @@ import {
   moderateCorrection,
   type CameraModerationAction,
   type CorrectionModerationAction,
+  type CorrectionModerationOptions,
   type MetadataPublicationChoices,
   type ModerationEntity,
   type ModerationReasonCode,
   moderationReasonCodes,
 } from "../../../db/moderation";
 import { isRecord } from "../../lib/guards";
+
+// Mirror of the db layer allowlist (db/moderation.ts correctionOutcomes). Kept
+// inline so the route validates without importing a runtime value the test
+// harness does not mock.
+const correctionOutcomeValues = [
+  "kept",
+  "corrected",
+  "marked-stale",
+  "removed",
+  "escalated",
+] as const;
+type CorrectionOutcomeValue = (typeof correctionOutcomeValues)[number];
 
 function parseModerationRequest(value: unknown):
   | {
@@ -26,6 +39,7 @@ function parseModerationRequest(value: unknown):
       action: CorrectionModerationAction;
       reasonCode: ModerationReasonCode;
       note: string | null;
+      options?: CorrectionModerationOptions;
     }
   | null {
   if (!isRecord(value)) return null;
@@ -35,6 +49,8 @@ function parseModerationRequest(value: unknown):
   const action = value.action;
   const reasonCode = value.reasonCode;
   const note = value.note;
+  const cameraId = value.cameraId;
+  const outcome = value.outcome;
   const publishManufacturer = value.publishManufacturer;
   const publishObservedOn = value.publishObservedOn;
   if (typeof id !== "number" || !Number.isInteger(id) || id < 1) return null;
@@ -54,36 +70,66 @@ function parseModerationRequest(value: unknown):
 
   const parsedReasonCode = reasonCode as ModerationReasonCode;
   const parsedNote = typeof note === "string" && note.trim() ? note.trim() : null;
-  if (
-    entity === "camera" &&
-    (action === "approve" ||
+  if (entity === "camera") {
+    if (cameraId !== undefined || outcome !== undefined) return null;
+    if (
+      action === "approve" ||
       action === "reject" ||
       action === "hide" ||
       action === "mark-stale" ||
-      action === "reverify")
-  ) {
-    if (action !== "approve" && (publishManufacturer !== undefined || publishObservedOn !== undefined)) {
+      action === "reverify"
+    ) {
+      if (action !== "approve" && (publishManufacturer !== undefined || publishObservedOn !== undefined)) {
+        return null;
+      }
+      return {
+        entity,
+        id,
+        action,
+        reasonCode: parsedReasonCode,
+        note: parsedNote,
+        ...(action === "approve"
+          ? {
+              metadataPublication: {
+                publishManufacturer: publishManufacturer ?? false,
+                publishObservedOn: publishObservedOn ?? false,
+              },
+            }
+          : {}),
+      };
+    }
+    return null;
+  }
+  if (entity === "correction") {
+    if (publishManufacturer !== undefined || publishObservedOn !== undefined) return null;
+    if (action !== "approve" && action !== "reject" && action !== "associate") return null;
+    if (
+      cameraId !== undefined &&
+      (typeof cameraId !== "number" || !Number.isInteger(cameraId) || cameraId < 1)
+    ) {
       return null;
     }
+    if (
+      outcome !== undefined &&
+      (typeof outcome !== "string" ||
+        !correctionOutcomeValues.includes(outcome as CorrectionOutcomeValue))
+    ) {
+      return null;
+    }
+    if (outcome !== undefined && action !== "approve") return null;
+    if (action === "associate" && cameraId === undefined) return null;
+
+    const options: CorrectionModerationOptions = {};
+    if (cameraId !== undefined) options.cameraId = cameraId;
+    if (outcome !== undefined) options.outcome = outcome as CorrectionOutcomeValue;
     return {
       entity,
       id,
       action,
       reasonCode: parsedReasonCode,
       note: parsedNote,
-      ...(action === "approve"
-        ? {
-            metadataPublication: {
-              publishManufacturer: publishManufacturer ?? false,
-              publishObservedOn: publishObservedOn ?? false,
-            },
-          }
-        : {}),
+      ...(Object.keys(options).length > 0 ? { options } : {}),
     };
-  }
-  if (entity === "correction" && (action === "approve" || action === "reject")) {
-    if (publishManufacturer !== undefined || publishObservedOn !== undefined) return null;
-    return { entity, id, action, reasonCode: parsedReasonCode, note: parsedNote };
   }
   return null;
 }
@@ -122,7 +168,15 @@ export async function PATCH(request: Request) {
             payload.note,
             payload.metadataPublication,
           )
-        : await moderateCorrection(payload.id, payload.action, payload.reasonCode, payload.note);
+        : payload.options
+          ? await moderateCorrection(
+              payload.id,
+              payload.action,
+              payload.reasonCode,
+              payload.note,
+              payload.options,
+            )
+          : await moderateCorrection(payload.id, payload.action, payload.reasonCode, payload.note);
     if (!item) {
       return Response.json({ error: "Item not found or action is not valid for its current status." }, { status: 404 });
     }
