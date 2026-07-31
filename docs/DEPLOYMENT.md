@@ -224,4 +224,4 @@ The moderation endpoints are **fail-closed**: without credentials they return
 
 ## Environment variables
 
-`NEXT_PUBLIC_SITE_URL` may be set to the canonical public URL for metadata generation. It must be absent or point to a non-production value in local development. Any future identity, storage, analytics, or notification settings need an explicit inventory and privacy review.
+`NEXT_PUBLIC_SITE_URL` may be set to the canonical public URL for metadata generation. It must be absent or point to a non-production value in local development. When it is absent, `app/layout.tsx` omits `metadataBase` entirely and serves the favicon through a relative `<link rel="icon" href="/favicon.svg">` in the root layout — this keeps deployments without the variable free of absolute `localhost` metadata URLs (the old `?? "http://localhost:3000"` fallback made browsers request the favicon from `localhost` on staging). Any future identity, storage, analytics, or notification settings need an explicit inventory and privacy review.

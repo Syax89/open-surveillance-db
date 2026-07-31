@@ -485,7 +485,13 @@ test("every map task has a keyboard/text-list equivalent in the public interface
   // usable and the failure is visible with a direct link to the directory.
   assert.match(map, /setMapUnavailable\(\s*true\s*\)/, "a map startup failure must flip to the fallback state");
   assert.match(map, /map-fallback/, "the fallback state must render a visible text alternative");
-  assert.match(map, /The interactive map is unavailable\./, "the fallback must state plainly that the map is unavailable");
+  // i18n externalisation moved user-facing wording into the pilot bundle
+  // (ADR 0007); the fallback must still state plainly that the map is
+  // unavailable, and the component must consume it from the bundle.
+  const enBundle = await readSource("app/lib/i18n/en.ts");
+  assert.match(enBundle, /The interactive map is unavailable\./, "the EN pilot bundle must state plainly that the map is unavailable");
+  assert.match(map, /t\.mapFallbackTitle/, "the fallback title must come from the message bundle");
+  assert.match(map, /t\.mapFallbackBody/, "the fallback body must come from the message bundle");
 });
 
 test("package metadata identifies the project, license, and repository", async () => {

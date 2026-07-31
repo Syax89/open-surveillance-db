@@ -1,14 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useLocale } from "./LocaleProvider";
+import { useMessages } from "./LocaleProvider";
 
 export type MapCamera = { id: number; title: string; kind: string; status: string; latitude: number; longitude: number };
 export type MapLocation = { latitude: number; longitude: number };
 type Props = { cameras: MapCamera[]; selectedId: number; onSelect: (id: number) => void; onPick: (latitude: number, longitude: number) => void; focusLocation?: MapLocation | null };
 
 export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLocation }: Props) {
-  const { locale } = useLocale();
   const [mapUnavailable, setMapUnavailable] = useState(false);
   const mapElement = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<import("leaflet").Map | null>(null);
@@ -71,16 +70,12 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
       { animate: false },
     );
   }, [focusLat, focusLng]);
-  const isItalian = locale === "it";
-  const label = isItalian ? "Mappa interattiva OpenStreetMap" : "Interactive OpenStreetMap map";
-  const description = isItalian
-    ? "La mappa mostra gli stessi record pubblici dell'elenco accessibile sottostante. Puoi usare l'elenco per cercare, filtrare e aprire i record senza usare la mappa."
-    : "The map shows the same public records as the accessible directory below. You can use the directory to search, filter, and open records without using the map.";
-  const directoryLink = isItalian ? "Vai all'elenco accessibile" : "Go to the accessible directory";
-  const fallbackTitle = isItalian ? "La mappa interattiva non è disponibile." : "The interactive map is unavailable.";
-  const fallbackBody = isItalian
-    ? "Puoi comunque cercare, filtrare e aprire ogni record pubblico dall'elenco accessibile sottostante, che funziona senza la mappa."
-    : "You can still search, filter, and open every public record from the accessible directory below, which works without the map.";
+  const t = useMessages().map;
+  const label = t.mapLabel;
+  const description = t.mapDescription;
+  const directoryLink = t.mapDirectoryLink;
+  const fallbackTitle = t.mapFallbackTitle;
+  const fallbackBody = t.mapFallbackBody;
 
   return <div className="map-region" id="map-region" role="region" aria-label={label} aria-describedby="map-accessibility-description" tabIndex={-1}>
     <p className="sr-only" id="map-accessibility-description">{description} <a href="#records">{directoryLink}</a>.</p>

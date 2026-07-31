@@ -1,0 +1,439 @@
+/**
+ * English message bundle — PILOT LANGUAGE.
+ *
+ * This file is the single source of truth for user-facing interface strings.
+ * Every key defined here MUST have a matching key in `it.ts`; the
+ * `Translation<typeof en>` type applied to the Italian bundle makes that
+ * parity a compile-time guarantee (missing or extra keys fail `tsc`).
+ *
+ * Convention (docs/decisions/0006-i18n-externalisation-and-pilot-language.md):
+ *  - English is canonical. Add or reword strings here first, then mirror in
+ *    the Italian bundle.
+ *  - Keep bundles dependency-free and serialisable: strings and simple
+ *    formatter functions only.
+ *  - Do not store user-selected locale on the server; the choice lives in
+ *    `localStorage` (see app/components/LocaleProvider.tsx).
+ */
+export const en = {
+  common: {
+    skipLink: "Skip to main content",
+    languageSelection: "Language selection",
+  },
+  map: {
+    mapLabel: "Interactive OpenStreetMap map",
+    mapDescription:
+      "The map shows the same public records as the accessible directory below. You can use the directory to search, filter, and open records without using the map.",
+    mapDirectoryLink: "Go to the accessible directory",
+    mapFallbackTitle: "The interactive map is unavailable.",
+    mapFallbackBody:
+      "You can still search, filter, and open every public record from the accessible directory below, which works without the map.",
+  },
+  status: {
+    verified: "Verified",
+    demo: "Prototype record",
+    pending: "In moderation",
+    needs_review: "Needs review",
+    removed: "Removed",
+    rejected: "Rejected",
+  },
+  home: {
+    mainNavigation: "Main navigation",
+    homeAria: "OpenSurveillanceDB home",
+    menu: "Menu",
+    exploreMap: "Explore map",
+    browseRecords: "Browse records",
+    howItWorks: "How it works",
+    addCamera: "Add a camera",
+    openDatabase: "Open database · community maintained",
+    heroTitle: "Public data about public surveillance.",
+    heroIntro:
+      "OpenSurveillanceDB maps visible surveillance infrastructure in public space. The data is open, sourced and built by people who want to understand the systems around them.",
+    exploreTheMap: "Explore the map",
+    ourPrinciples: "Our principles",
+    prototypeStats: "Prototype database statistics",
+    publicRecords: "public records",
+    accountsRequired: "accounts required",
+    openPrototype: "open prototype",
+    visualLabelFirst: "Mapping public space",
+    visualLabelSecond: "with public knowledge",
+    livePrototype: "Live prototype",
+    mapTitle: "Explore documented cameras",
+    osmBaseMap: "OpenStreetMap base map",
+    prototypeMode: "Prototype mode.",
+    prototypeBanner:
+      "The base map is real OpenStreetMap data; the two visible camera pins are clearly labelled illustrative records. Click anywhere on the map to select a position for a report.",
+    mapHint: "Click the map to choose a report position",
+    source: "Source",
+    freshness: "Freshness",
+    location: "Location",
+    reportIssue: "Report an issue",
+    loadingRecords: "Loading the public record API…",
+    downloadGeoJson: "Download GeoJSON",
+    downloadCsv: "Download CSV",
+    readDataPolicy: "Read the data policy",
+    accessibleDirectory: "Accessible directory",
+    recordsTitle: "Browse public records without the map",
+    recordsIntro:
+      "Search covers the same reviewed records shown on the map. A result is never evidence that an area has no surveillance.",
+    useMapInstead: "Use the map instead",
+    searchDirectory: "Search the public directory",
+    searchPlaceholder: "Type, source, place or coordinate",
+    searchHelp:
+      "Only reviewed public records and labelled prototype records appear here.",
+    cameraType: "Camera type",
+    allTypes: "All types",
+    orderRecords: "Order records",
+    alphabetical: "Alphabetical",
+    positionOrder: "Position (south to north)",
+    oneRecordFound: "1 public record found",
+    recordsFound: "public records found",
+    lastVerification: "Last verification",
+    showOnMap: "Show on map",
+    openRecord: "Open record",
+    emptyTitle: "No published record matches that search.",
+    emptyBody:
+      "This does not mean that there are no cameras in the area. You can clear the search, explore the map, or submit a private observation for moderation.",
+    clearSearch: "Clear search",
+    accountability: "Accountability",
+    correctionTitle: "Correct a record or raise a concern.",
+    correctionIntro:
+      "Corrections are private. They do not change the map automatically and are never included in the public data export.",
+    urgentConcern: "Urgent privacy or safety concern?",
+    urgentConcernBody:
+      "Describe only the minimum needed to identify the problem. Do not include personal data, live-feed links, credentials, or images.",
+    relatedRecord: "Related public record",
+    noSpecificRecord: "No specific record / general concern",
+    needsReview: "What needs review?",
+    selectOne: "Select one",
+    inaccurate: "Inaccurate information",
+    outdated: "Outdated record",
+    privacySafety: "Privacy or safety concern",
+    duplicate: "Duplicate record",
+    other: "Other",
+    briefDescription: "Brief description",
+    correctionPlaceholder:
+      "Explain the issue without including personal data or operational details.",
+    contactEmail: "Contact email (optional)",
+    contactPlaceholder: "Only if you want a reply",
+    correctionConsent:
+      "I understand that this request is private, reviewed by humans, and may not result in an automatic change.",
+    sendPrivateRequest: "Send private request",
+    civicCommons: "A civic data commons",
+    principlesTitle: "Visibility without surveillance.",
+    principlesIntro:
+      "We document public infrastructure, never camera feeds. Each published record has a source, a status and a way to be corrected.",
+    openDefault: "Open by default",
+    openDefaultBody:
+      "Downloadable data with visible provenance for journalism, research and civic use.",
+    privacyFirst: "Privacy first",
+    privacyFirstBody:
+      "Faces, licence plates and personal information must be removed before publication.",
+    moderatedReports: "Moderated reports",
+    moderatedReportsBody:
+      "New records wait for human review. A report is not made public just because it was submitted.",
+    contribute: "Contribute",
+    reportTitle: "Help make public space legible.",
+    reportIntro:
+      "Choose a location on the map or enter coordinates, then add only what you can observe from public space. This version has a real local moderation queue but no photo upload yet.",
+    beforeSubmitting: "Before submitting",
+    beforeSubmittingBody:
+      "Do not upload or describe people, licence plates, private homes, security weaknesses or sensitive locations.",
+    selectedPoint: "Selected point",
+    manualCoordinatesTitle: "Or enter coordinates",
+    manualCoordinatesHelp:
+      "Use decimal degrees. Latitude must be between -90 and 90; longitude between -180 and 180. A comma is accepted as the decimal separator.",
+    latitude: "Latitude",
+    longitude: "Longitude",
+    useCoordinates: "Use these coordinates",
+    checkingNearby: "Checking reviewed records within 75 metres…",
+    possibleDuplicate: "Possible duplicate nearby",
+    duplicateBody:
+      "These reviewed records are within 75 metres. You can still submit a new report; it will be reviewed separately.",
+    metresAway: "m away",
+    matchVeryClose: "very close match",
+    matchLikely: "likely match",
+    duplicateGuidance:
+      "If this is the same camera, use the correction form instead of creating a duplicate.",
+    nearbyUnavailable:
+      "We could not check nearby records. You can still submit this report for moderation.",
+    recordTitle: "Record title",
+    recordTitlePlaceholder: "e.g. Public security camera",
+    fixedDome: "Fixed dome",
+    bullet: "Bullet",
+    trafficReader: "Traffic / licence plate reader",
+    otherUnknown: "Other / unknown",
+    manufacturer: "Manufacturer (optional)",
+    manufacturerPlaceholder: "e.g. manufacturer name",
+    manufacturerLabel: "Manufacturer",
+    observedOn: "Date observed (optional)",
+    observedOnLabel: "Observed on",
+    approximateAddress: "Approximate address",
+    addressPlaceholder: "Street and city (optional)",
+    whatObserved: "What did you observe?",
+    observedPlaceholder: "Direction, operator, visible notice, model…",
+    reportConsent:
+      "I confirm this observation was made from public space and contains no personal data.",
+    sendModeration: "Send to moderation",
+    footerLineOne: "An open database of public surveillance cameras.",
+    footerLineTwo: "Built for transparency, not tracking.",
+    openData: "Open data",
+    backToTop: "Back to top",
+    apiLoadError: "Unable to load records",
+    apiUnavailable:
+      "The public API is not available yet, so the prototype is showing illustrative records.",
+    positionSelected: "Position selected",
+    nearbyCheckError: "Unable to check nearby records",
+    choosePosition:
+      "Choose the approximate camera position on the map or enter valid coordinates before submitting.",
+    invalidCoordinates:
+      "Enter a valid latitude (-90 to 90) and longitude (-180 to 180).",
+    defaultReportTitle: "Public camera report",
+    unknown: "Unknown",
+    submitReportError: "Unable to submit report",
+    reportSaved:
+      "Report saved. It is now marked ‘In moderation’ and is not shown publicly until reviewed.",
+    reportSavedWithNearby:
+      "Reviewed records were found close to this position — a moderator will check whether this is a duplicate before publication.",
+    moderationUnavailable:
+      "The moderation queue is unavailable. Please try again after restarting the local prototype.",
+    saveRequestError: "Unable to save request",
+    correctionSaved: "Private correction request saved with reference",
+    correctionPrivate: "It is not displayed in the public directory.",
+    correctionUnavailable: "The correction queue is unavailable. Please try again later.",
+  },
+  guide: {
+    navigation: "Guide navigation",
+    homeAria: "OpenSurveillanceDB home",
+    map: "Map",
+    directory: "Directory",
+    home: "Home",
+    eyebrow: "Project guide",
+    title: "A public database, built with care.",
+    intro:
+      "This guide explains what OpenSurveillanceDB documents, how a report becomes public data, and the limits of this local prototype.",
+    exploreMap: "Explore the map",
+    browseDirectory: "Browse directory",
+    missionEyebrow: "Purpose and boundaries",
+    missionTitle: "Visibility without operational surveillance.",
+    missionBody:
+      "OpenSurveillanceDB helps people understand visible surveillance infrastructure in public space. It is a civic record of public-facing equipment, not a tool for watching, tracking, or bypassing it.",
+    missionOneTitle: "What we document",
+    missionOneBody:
+      "Visible camera infrastructure, approximate location, type, source and a review status.",
+    missionTwoTitle: "What we do not collect",
+    missionTwoBody:
+      "Camera feeds, credentials, private-home details, operational weaknesses, faces, licence plates or other personal data.",
+    missionThreeTitle: "What the map cannot prove",
+    missionThreeBody:
+      "An absent record does not show that an area is free of surveillance. It only shows that no reviewed record is currently published.",
+    cycleEyebrow: "A reviewed process",
+    cycleTitle: "From observation to public record.",
+    cycleBody:
+      "Reports are deliberately separated from published records. The public map and exports are not an automatic mirror of submissions.",
+    cycleRuleTitle: "The default is not publication.",
+    cycleRuleBody:
+      "A report becomes public only after a human review finds it suitable, sufficiently documented and safe to publish.",
+    cycleStepsLabel: "Publication cycle",
+    submitLabel: "Submit",
+    submitTitle: "An observation is submitted",
+    submitBody:
+      "A contributor chooses an approximate public-space location and adds a short description. The report begins as private pending data.",
+    moderateLabel: "Moderate",
+    moderateTitle: "A person reviews it",
+    moderateBody:
+      "Review checks relevance, duplication, accuracy and whether the report contains material that should not be made public.",
+    publishLabel: "Publish",
+    publishTitle: "Only reviewed data appears",
+    publishBody:
+      "Approved records are marked verified and can appear in the map, directory and GeoJSON export. Other reports remain out of public outputs.",
+    statusEyebrow: "Reading the records",
+    statusTitle: "Each status says what the record can support.",
+    statusIntro:
+      "A status describes the current review state, not a guarantee that a camera is active, complete or permanently accurate.",
+    verifiedTitle: "Reviewed and publishable",
+    verifiedBody:
+      "A moderator has approved this record for public display. It can appear in the map, directory and GeoJSON download.",
+    reviewTitle: "Temporarily withheld",
+    reviewBody:
+      "Something needs checking: the record may be old, unclear, duplicated or the subject of a correction. It is not a public record while under review.",
+    pendingTitle: "Awaiting a decision",
+    pendingBody:
+      "A submission has been saved for local review but is not visible in public data, the map, the directory or exports.",
+    dataEyebrow: "Open data and map base",
+    dataTitle: "Open where it is safe to be open.",
+    dataBody:
+      "Published records are available as GeoJSON and CSV for reuse and inspection. The public dataset contains only records that passed review; submissions and corrections are excluded.",
+    downloadGeoJson: "Download public GeoJSON",
+    downloadCsv: "Download public CSV",
+    geoJsonTitle: "A reusable public export",
+    geoJsonBody:
+      "GeoJSON is a common geographic data format. It is intended for civic analysis, research and compatible mapping tools—not for finding camera feeds or sensitive operational information.",
+    osmTitle: "OpenStreetMap provides the base map",
+    osmBody:
+      "The map background is provided by OpenStreetMap contributors. It is separate from this project’s camera records and always needs visible attribution and responsible use.",
+    localLabel: "Local prototype",
+    localTitle: "This version is not a public service",
+    localBody:
+      "It runs locally for product development. Its illustrative records, queues and decisions are test material; no claim should be made about real surveillance infrastructure from this prototype.",
+    footer: "Built for transparency, not tracking.",
+  },
+  record: {
+    navigation: "Record navigation",
+    backToDirectory: "← Back to directory",
+    loading: "Loading the public record…",
+    publicRecord: "Public record",
+    recordId: "Record ID",
+    source: "Source",
+    lastVerification: "Last verification",
+    generalLocation: "General location",
+    manufacturer: "Manufacturer",
+    observedOn: "Observed on",
+    viewOnMap: "View on map",
+    reportIssue: "Report an issue",
+    recordNote:
+      "This page contains only reviewed public records or clearly labelled prototype data. It does not provide live feeds or operational camera details.",
+    unavailable: "Record unavailable",
+    notFound: "We could not find that public record.",
+    notFoundDetail:
+      "It may have been removed, is not public, or the link is incorrect.",
+    browseDirectory: "Browse the directory",
+    statusFallback: "Status",
+    changeHistory: "Change history",
+    changeHistoryNote:
+      "This history lists reviewed changes only. It never includes contributor identities or internal notes.",
+    changeHistoryFallback: "Record updated",
+    changeHistoryLabels: {
+      approve: "Approved and published",
+      "mark-stale": "Marked for re-review",
+      reverify: "Re-verified",
+      hide: "Removed from public listing",
+    },
+  },
+  moderation: {
+    navigation: "Moderation navigation",
+    home: "OpenSurveillanceDB home",
+    returnPublic: "Return to public prototype",
+    localAdministration: "Local administration",
+    title: "Moderation queue",
+    intro:
+      "This interface is for the local prototype only. It is not linked from the public experience and does not publish any new information by itself.",
+    localTool: "Local-only tool.",
+    localWarning:
+      "Review text and approximate locations only. Do not add photos, personal data, credentials, live-feed links, or operational security details.",
+    loading: "Loading local moderation queue…",
+    awaiting: (total: number) => `${total} ${total === 1 ? "item" : "items"} awaiting a local decision`,
+    loadError: "The moderation queue could not be loaded.",
+    saveError: "The moderation decision could not be saved.",
+    cameraReport: "Camera report",
+    correctionRequest: "Correction request",
+    decisionSaved: "saved",
+    reason: "Reason",
+    details: "Decision details",
+    requiredReason: "Required reason",
+    selectReason: "Select a reason",
+    moderatorNote: "Optional moderator note",
+    noteHelp: "Optional. Maximum 500 characters.",
+    approve: "Approve",
+    reject: "Reject",
+    hide: "Hide",
+    markStale: "Mark for review",
+    reverify: "Reverify",
+    saving: "Saving…",
+    decisionFor: "Decision for",
+    reports: "Reports",
+    lifecycle: "Lifecycle",
+    corrections: "Corrections",
+    localAudit: "Local audit",
+    pendingReports: "Pending camera reports",
+    pending: "pending",
+    noPendingTitle: "No camera reports are waiting.",
+    noPendingText:
+      "New local submissions will appear here until a decision is recorded.",
+    pendingReport: "Pending report",
+    publishedRecords: "Published records",
+    verified: "verified",
+    noPublishedTitle: "No verified records are available locally.",
+    noPublishedText:
+      "Approved reports will appear here after their publication status is recorded.",
+    verifiedRecord: "Verified record",
+    recordsNeedReview: "Records needing review",
+    awaitingReview: "awaiting review",
+    noReviewTitle: "No published records need a new review.",
+    noReviewText:
+      "Records marked for review remain out of the public data until they are reverified or hidden.",
+    needsReview: "Needs review",
+    privateCorrections: "Private correction requests",
+    noCorrectionsTitle: "No correction requests are waiting.",
+    noCorrectionsText:
+      "Private requests remain out of the public directory and data export.",
+    privateCorrection: "Private correction",
+    recentDecisions: "Recent decisions",
+    readOnlyHistory: "Read-only local history",
+    noDecisionsTitle: "No decisions recorded yet.",
+    noDecisionsText:
+      "Saved decisions will appear here for local review.",
+    moderation: "Moderation",
+    approximateLocation: "Approximate location",
+    noAddress: "No address supplied",
+    source: "Source",
+    communityReport: "Community report",
+    submitted: "Submitted",
+    submitterNotes: "Submitter notes",
+    lastUpdate: "Last update",
+    recordNotes: "Record notes",
+    manufacturer: "Manufacturer",
+    observedOn: "Observed on",
+    metadataPublication: "Optional metadata publication",
+    metadataPublicationHelp:
+      "Choose which optional metadata may appear in the public record. Leave an option unchecked to keep it private.",
+    publishManufacturer: "Publish manufacturer",
+    publishObservedOn: "Publish observed date",
+    contact: "Contact",
+    noContact: "No contact supplied",
+    status: "Status",
+    request: "Request",
+    timestamp: "Timestamp",
+    item: "Item",
+    unavailable: "Unavailable",
+    actor: "Actor",
+    localModerator: "Local moderator",
+    relatedRecord: "Related record",
+    generalConcern: "General concern",
+    moderatorNoteTitle: "Moderator note",
+    timeUnavailable: "Time unavailable",
+    decisionRecorded: "Decision recorded",
+    unknown: "Unknown",
+    recorded: "Recorded",
+    action: {
+      approve: "Approve",
+      reject: "Reject",
+      hide: "Hide",
+      "mark-stale": "Mark for review",
+      reverify: "Reverify",
+    },
+    actionPast: {
+      approve: "Approved",
+      reject: "Rejected",
+      hide: "Hidden",
+      "mark-stale": "Marked for review",
+      reverify: "Reverified",
+    },
+    statusLabels: {
+      pending: "Pending",
+      verified: "Verified",
+      needs_review: "Needs review",
+      removed: "Removed",
+      rejected: "Rejected",
+      hidden: "Hidden",
+    },
+    reasons: {
+      "verified-public-infrastructure": "Verified public infrastructure",
+      "insufficient-evidence": "Insufficient evidence",
+      duplicate: "Duplicate report",
+      "private-or-sensitive-location": "Private or sensitive location",
+      "inaccurate-or-outdated": "Inaccurate or out of date",
+      "privacy-or-safety-concern": "Privacy or safety concern",
+      other: "Other",
+    },
+  },
+} as const;
