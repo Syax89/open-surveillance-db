@@ -190,6 +190,53 @@ test("nearby search validates its bounded coordinates and stays behind the publi
   assert.doesNotMatch(helper, /\bgetD1\b|\.prepare\(|\bSELECT\b/i, "the nearby helper must not bypass the public-list boundary");
 });
 
+test("locality search stays behind the public-list boundary and is rate-limited", async () => {
+  const route = await readSource("app/api/cameras/search/route.ts");
+  const cameras = await readSource("db/cameras.ts");
+  const limiter = await readSource("app/lib/rate-limit.ts");
+  const search = await readSource("app/lib/search.ts");
+  const helperStart = cameras.indexOf("export async function searchPublicCamerasNear");
+  const helperEnd = cameras.indexOf("export async function createPendingCamera", helperStart);
+  const helper = cameras.slice(helperStart, helperEnd);
+
+  assert.ok(helperStart >= 0, "the search route must have a dedicated public-data area helper");
+  assert.match(
+    route,
+    /import\s*\{[^}]*\bsearchPublicCamerasNear\b[^}]*\}\s*from\s*["'][^"']*db\/cameras["']/,
+    "the search route must use the dedicated public-data helper",
+  );
+  assert.match(
+    route,
+    /import\s*\{[^}]*\bresolvePlace\b[^}]*\}\s*from\s*["'][^"']*db\/geocode["']/,
+    "free-text place queries must go through the geocoder module",
+  );
+  assert.match(helper, /const\s+records\s*=\s+await\s+listPublicCameras\(\)/, "area search must start with the filtered public list");
+  assert.match(helper, /\.filter\(\(record\)\s*=>\s*record\.distanceMeters\s*<=\s*radiusMeters\)/, "area search must filter that public list by distance");
+  assert.doesNotMatch(helper, /\bsimilarity\b|\bmatchStrength\b|\bslice\(0,\s*8\)/, "area search must not leak duplicate-detection internals or cap results");
+  assert.doesNotMatch(route, /\bgetD1\b|\.prepare\(|\bSELECT\b/i, "the search route must not query the database directly");
+  assert.doesNotMatch(route, /createPendingCamera|moderateCamera/, "the search route must never write");
+  assert.doesNotMatch(route, /\bnotes\b/, "the search route must not reference the private notes field");
+  assert.doesNotMatch(route, /console\.(?:log|info)\b/, "the search route must not log user queries");
+  assert.match(route, /Cache-Control["']?\s*:\s*["']no-store["']/, "search responses must not be cached at the edge");
+
+  assert.match(
+    route,
+    /import\s*\{[^}]*\bcheckRateLimit\b[^}]*\}\s*from\s*["'][^"']*lib\/rate-limit["']/,
+    "the search route must use the shared per-caller rate limiter",
+  );
+  assert.match(route, /callerKey\(request\)/, "the rate limiter must be keyed on the caller identity");
+  assert.match(route, /status:\s*429/, "exceeding the limit must return 429");
+  assert.match(route, /Retry-After/, "the 429 response must include a retry window");
+  assert.match(limiter, /SEARCH_RATE_LIMIT_MAX/, "the search request limit must be configurable through environment");
+  assert.match(limiter, /SEARCH_RATE_LIMIT_WINDOW_SECONDS/, "the search window must be configurable through environment");
+
+  assert.match(route, /status:\s*404/, "an unresolvable place must return a truthful not-found response");
+  assert.match(route, /status:\s*503/, "a geocoder or database failure must return a truthful unavailable response");
+  assert.match(route, /searchPublicCamerasNear\(area\.latitude,\s*area\.longitude,\s*area\.radiusMeters\)/);
+  assert.match(search, /export\s+function\s+parseCoordinateQuery/, "raw coordinate queries must be parsed locally");
+  assert.match(search, /export\s+function\s+radiusForBoundingBox/, "place searches must scale their radius with the resolved place");
+});
+
 test("manual report coordinates are bounded and reuse the public-only selection flow", async () => {
   const page = await readSource("app/page.tsx");
   const handlerStart = page.indexOf("async function selectManualCoordinates");

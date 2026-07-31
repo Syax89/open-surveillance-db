@@ -28,6 +28,7 @@ Last reviewed: 2026-07-31
 - [x] Local fictional-data check: rejected records remain absent from public outputs and create an audit event.
 - [x] Local fictional-data lifecycle check: only verified state reaches public outputs.
 - [x] Externalised English/Italian interface strings (English as pilot language, Italian type-checked for parity) across public pages, record detail, map, and local moderation.
+- [x] Locality/address/coordinate public search with truthful empty states: coordinate pairs are parsed locally, other places are resolved through a configurable geocoder, results stay within the reviewed public-record boundary, and zero-result responses describe the searched area without claiming an absence of cameras.
 - [x] Public in-app guide plus skip link, visible focus treatment, reduced-motion support, and map-directory accessibility guidance.
 - [x] Draft accessibility statement and design decision for a non-sensitive usability-feedback route ([`docs/ACCESSIBILITY_STATEMENT.md`](ACCESSIBILITY_STATEMENT.md), [ADR 0006](decisions/0006-non-sensitive-usability-feedback-route.md)).
 - [x] Clearly labelled illustrative demo data.

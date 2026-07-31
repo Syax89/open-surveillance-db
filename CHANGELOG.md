@@ -32,6 +32,11 @@ changes accumulate under `[Unreleased]`.
 - Runtime API contract tests for cameras, corrections, and moderation, plus
   publication-boundary tests proving non-public states stay out of every
   public representation.
+- Locality/address/coordinate public search (`GET /api/cameras/search`):
+  raw coordinate pairs are parsed locally, free-text places are resolved
+  through a configurable geocoder (Nominatim by default), and every response
+  describes the searched area — a zero-result state never claims an area has
+  no surveillance. Per-caller rate limit and no edge caching.
 - Rate limiting for submission endpoints and fail-closed moderation access
   control (ADR 0003).
 - Pre-launch legal deliverables: privacy notice, lawful basis, processor
