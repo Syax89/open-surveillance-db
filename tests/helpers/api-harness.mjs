@@ -29,6 +29,20 @@ const ROUTES = [
   { source: "app/api/corrections/route.ts", output: "app/api/corrections/route.mjs" },
 ];
 
+// Real db/* modules compiled into the temp tree so runtime tests can
+// exercise the actual public-query and moderation boundaries against an
+// in-memory D1 (see tests/helpers/d1-adapter.mjs). They land in a separate
+// db-real/ directory so they never collide with the db/* mocks the route
+// handlers import. db/index.ts (drizzle) and db/schema.ts are deliberately
+// excluded: the raw-D1 modules never import them at runtime. The modules
+// import the same cloudflare:workers mock as the routes, so tests inject
+// env.DB (a D1 adapter instance) and run the real SQL.
+const REAL_DB_MODULES = [
+  { source: "db/cameras.ts", output: "db-real/cameras.mjs" },
+  { source: "db/corrections.ts", output: "db-real/corrections.mjs" },
+  { source: "db/moderation.ts", output: "db-real/moderation.mjs" },
+];
+
 let builtTreePromise = null;
 
 async function buildTree() {
@@ -106,6 +120,31 @@ async function buildTree() {
     await mkdir(path.dirname(outputPath), { recursive: true });
     await writeFile(outputPath, rewritten);
   }
+
+  // Compile the real db/* modules into db-real/. Unlike the routes, their
+  // relative imports are plain "./cameras" (no /db/ segment), so the generic
+  // rewriteSpecifiers pattern does not apply: any relative import without an
+  // explicit .mjs extension gets one.
+  await mkdir(path.join(tree, "db-real"), { recursive: true });
+  for (const { source, output } of REAL_DB_MODULES) {
+    const sourcePath = path.join(root, source);
+    const compiled = ts.transpileModule(await readFile(sourcePath, "utf8"), {
+      compilerOptions: {
+        module: ts.ModuleKind.ESNext,
+        target: ts.ScriptTarget.ESNext,
+        moduleResolution: ts.ModuleResolutionKind.Bundler,
+      },
+      fileName: sourcePath,
+    }).outputText;
+
+    const rewritten = compiled
+      .replace(/from\s*["']cloudflare:workers["']/g, `from "${workersMockUrl}"`)
+      .replace(/(from\s*["'])(\.\/[^"']+)(["'])/g, (match, prefix, specifier, suffix) =>
+        specifier.endsWith(".mjs") ? match : `${prefix}${specifier}.mjs${suffix}`,
+      );
+
+    await writeFile(path.join(tree, output), rewritten);
+  }
   return tree;
 }
 
@@ -132,6 +171,15 @@ export function buildRouteTree() {
 
 // relativeOutput: e.g. "app/api/cameras/route.mjs"
 export async function loadRoute(relativeOutput) {
+  const tree = await buildRouteTree();
+  return import(pathToFileURL(path.join(tree, relativeOutput)).href);
+}
+
+// Load any other module compiled into the same temp tree — e.g. the real
+// app/lib/rate-limit.mjs implementation or the cloudflare-workers mock whose
+// `env` object the routes read live. The cached tree is shared, so the module
+// instance is the same one the route handlers imported.
+export async function loadTreeModule(relativeOutput) {
   const tree = await buildRouteTree();
   return import(pathToFileURL(path.join(tree, relativeOutput)).href);
 }
