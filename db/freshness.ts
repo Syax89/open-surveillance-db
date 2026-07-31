@@ -37,9 +37,9 @@ export function addMonths(iso: string, months: number): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) throw new Error(`Invalid ISO date: ${iso}`);
   const day = date.getUTCDate();
-  const target = new Date(
-    Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + months, 1),
-  );
+  const totalMonths = date.getUTCFullYear() * 12 + date.getUTCMonth() + months;
+  const target = new Date(date.getTime());
+  target.setUTCFullYear(Math.floor(totalMonths / 12), totalMonths % 12, 1);
   const lastDayOfTargetMonth = new Date(
     Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0),
   ).getUTCDate();
@@ -67,6 +67,7 @@ export function evaluateFreshness(
   nowIso: string = new Date().toISOString(),
 ): FreshnessPhase {
   if (record.status === "demo") return "current";
+  if (record.status === "stale") return "stale";
   if (record.status === "verified" || record.status === "needs_review") {
     if (!record.reviewDueAt) {
       // Legacy record without a schedule: not provably stale, and for
