@@ -285,7 +285,7 @@ test("PATCH approve on a photo requires redaction confirmation and forwards it",
   }));
   const { PATCH } = await route();
   const response = await PATCH(
-    apiRequest("/api/moderation", {
+    authRequest("/api/moderation", {
       method: "PATCH",
       body: { entity: "photo", id: 21, action: "approve", reasonCode: "verified-public-infrastructure", redactionConfirmed: true, actorId },
     }),
@@ -301,7 +301,7 @@ test("PATCH approve on a photo requires redaction confirmation and forwards it",
 test("PATCH approve on a photo without redaction confirmation is rejected before the db layer", async () => {
   const { PATCH } = await route();
   const response = await PATCH(
-    apiRequest("/api/moderation", {
+    authRequest("/api/moderation", {
       method: "PATCH",
       body: { entity: "photo", id: 21, action: "approve", reasonCode: "verified-public-infrastructure", actorId },
     }),
@@ -316,7 +316,7 @@ test("PATCH approve on a photo maps a redaction_required result to 400", async (
   stub("moderatePhoto", async () => ({ kind: "redaction_required" }));
   const { PATCH } = await route();
   const response = await PATCH(
-    apiRequest("/api/moderation", {
+    authRequest("/api/moderation", {
       method: "PATCH",
       body: { entity: "photo", id: 21, action: "approve", reasonCode: "verified-public-infrastructure", redactionConfirmed: true, actorId },
     }),
@@ -333,7 +333,7 @@ test("PATCH reject on a photo forwards redactionConfirmed false and leaves it pe
   }));
   const { PATCH } = await route();
   const response = await PATCH(
-    apiRequest("/api/moderation", {
+    authRequest("/api/moderation", {
       method: "PATCH",
       body: { entity: "photo", id: 21, action: "reject", reasonCode: "privacy-or-safety-concern", redactionConfirmed: false, actorId },
     }),
