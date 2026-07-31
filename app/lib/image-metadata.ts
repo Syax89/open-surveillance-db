@@ -222,7 +222,12 @@ function stripJpegMetadata(bytes: Uint8Array): Uint8Array | null {
     if (bytes[offset] !== 0xff) return null;
     const marker = bytes[offset + 1];
     // SOS: entropy-coded data follows; copy everything to the end verbatim.
+    // A well-formed JPEG must still end with EOI (FF D9); without it the
+    // container is truncated and we refuse to store it (fail closed).
     if (marker === 0xda) {
+      if (bytes.length < 2 || bytes[bytes.length - 2] !== 0xff || bytes[bytes.length - 1] !== 0xd9) {
+        return null;
+      }
       output.push(...bytes.slice(offset));
       return Uint8Array.from(output);
     }
@@ -252,8 +257,20 @@ function stripJpegMetadata(bytes: Uint8Array): Uint8Array | null {
 }
 
 function stripPngMetadata(bytes: Uint8Array): Uint8Array | null {
+  // Compare the 8-byte PNG signature directly: sniffImageType requires at
+  // least 12 bytes, but the signature alone is exactly 8.
   const signature = bytes.slice(0, 8);
-  if (signature.length !== 8 || sniffImageType(signature) !== "png") return null;
+  const isPng =
+    signature.length === 8 &&
+    signature[0] === 0x89 &&
+    signature[1] === 0x50 &&
+    signature[2] === 0x4e &&
+    signature[3] === 0x47 &&
+    signature[4] === 0x0d &&
+    signature[5] === 0x0a &&
+    signature[6] === 0x1a &&
+    signature[7] === 0x0a;
+  if (!isPng) return null;
   const output: number[] = [...signature];
   let offset = 8;
   const dropped = new Set(["eXIf", "tEXt", "iTXt", "zTXt"]);
@@ -273,7 +290,9 @@ function stripPngMetadata(bytes: Uint8Array): Uint8Array | null {
 
 function stripWebpMetadata(bytes: Uint8Array): Uint8Array | null {
   if (bytes.length < 12 || sniffImageType(bytes) !== "webp") return null;
-  const output: number[] = [...bytes.slice(0, 8)]; // RIFF + placeholder size
+  // Keep the full RIFF header (RIFF + size + WEBP fourcc), then rewrite the
+  // chunk size once the dropped chunks are known.
+  const output: number[] = [...bytes.slice(0, 12)];
   let offset = 12;
   const dropped = new Set(["EXIF", "XMP "]);
   while (offset + 8 <= bytes.length) {

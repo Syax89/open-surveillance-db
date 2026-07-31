@@ -100,7 +100,7 @@ async function buildDbModules() {
   const dbDir = path.join(root, "db");
   await mkdir(path.join(tree, "db"), { recursive: true });
   const modules = {};
-  for (const file of ["cameras.ts", "corrections.ts", "freshness.ts", "moderation.ts"]) {
+  for (const file of ["cameras.ts", "corrections.ts", "freshness.ts", "moderation.ts", "photos.ts"]) {
     const compiled = ts.transpileModule(await readFile(path.join(dbDir, file), "utf8"), {
       compilerOptions: {
         module: ts.ModuleKind.ESNext,

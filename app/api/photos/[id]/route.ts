@@ -1,4 +1,4 @@
-import { readPublicPhotoBytes } from "../../../db/photos";
+import { readPublicPhotoBytes } from "../../../../db/photos";
 
 /**
  * GET /api/photos/[id] — serve one approved photo.
@@ -25,12 +25,15 @@ export async function GET(request: Request) {
     return Response.json({ error: "Photo not found." }, { status: 404 });
   }
 
-  return new Response(photo.bytes, {
-    headers: {
-      "Content-Type": photo.mimeType,
-      "Cache-Control": "public, max-age=3600, immutable",
-      "X-Content-Type-Options": "nosniff",
-      "Content-Security-Policy": "default-src 'none'; sandbox",
+  return new Response(
+    photo.bytes.buffer.slice(photo.bytes.byteOffset, photo.bytes.byteOffset + photo.bytes.byteLength) as ArrayBuffer,
+    {
+      headers: {
+        "Content-Type": photo.mimeType,
+        "Cache-Control": "public, max-age=3600, immutable",
+        "X-Content-Type-Options": "nosniff",
+        "Content-Security-Policy": "default-src 'none'; sandbox",
+      },
     },
-  });
+  );
 }
