@@ -84,6 +84,11 @@ uses the same public-only nearby-record check.
 **Implementation update (2026-07-31):** a local playbook documents setup,
 synthetic submissions, approve/reject/hide checks, nearby-search validation,
 and a cautious reset approach without providing a destructive reset command.
+A lightweight [data dictionary](DATA_DICTIONARY.md) now documents every
+public field across JSON, CSV, and GeoJSON outputs, and an
+[export versioning policy](EXPORT_VERSIONING.md) defines how future dataset
+releases will be versioned, labelled, and cited once the final data licence
+is decided.
 
 ### Planned work
 

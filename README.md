@@ -47,6 +47,8 @@ The documentation is part of the project and is intended to be discussed openly.
 - [Local playbook and acceptance checks](docs/LOCAL_PLAYBOOK.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Data model and API](docs/DATA_MODEL.md)
+- [Data dictionary (public fields)](docs/DATA_DICTIONARY.md)
+- [Export versioning policy](docs/EXPORT_VERSIONING.md)
 - [Moderation policy](docs/MODERATION.md)
 - [Privacy and safety](docs/PRIVACY_AND_SAFETY.md)
 - [Open-source and data licensing](docs/OPEN_SOURCE.md)

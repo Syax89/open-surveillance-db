@@ -28,6 +28,10 @@ Last reviewed: 2026-07-31
 - [x] English/Italian interface for public pages, record detail, and local moderation.
 - [x] Public in-app guide plus skip link, visible focus treatment, reduced-motion support, and map-directory accessibility guidance.
 - [x] Clearly labelled illustrative demo data.
+- [x] Lightweight public data dictionary and export versioning policy
+  ([`docs/DATA_DICTIONARY.md`](DATA_DICTIONARY.md),
+  [`docs/EXPORT_VERSIONING.md`](EXPORT_VERSIONING.md)); versioned releases
+  remain future work pending the final data licence.
 - [x] Initial open documentation and project policies.
 
 ## Not yet implemented
