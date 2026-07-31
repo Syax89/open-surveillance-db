@@ -2,15 +2,26 @@
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { SurveillanceMap } from "./components/SurveillanceMap";
-import { LocaleToggle, useMessages } from "./components/LocaleProvider";
+import { LocaleToggle, useLocale, useMessages } from "./components/LocaleProvider";
 import { prototypeRecords, type Camera } from "./lib/records";
+import { formatDistance, textMatches } from "./lib/search";
 
 type NearbyCandidate = { id: number; title: string; kind: string; distanceMeters: number; similarity: number; matchStrength: "high" | "medium" | "low" };
+
+type PlaceSearchArea = { kind: "coordinates" | "place"; displayName?: string; latitude: number; longitude: number; radiusMeters: number; radiusLabel: string };
+
+type PlaceSearchResult = {
+  status: "loading" | "success" | "empty" | "not-found" | "error";
+  message?: string;
+  area?: PlaceSearchArea;
+  records?: Array<Camera & { distanceMeters: number }>;
+};
 
 export default function Home() {
   const bundle = useMessages();
   const t = bundle.home;
   const statuses: Record<string, string> = bundle.status;
+  const { locale } = useLocale();
   const [records, setRecords] = useState<Camera[]>(prototypeRecords);
   const [selectedId, setSelectedId] = useState(1);
   const [notice, setNotice] = useState("");
@@ -29,6 +40,8 @@ export default function Home() {
   const [nearbyLoading, setNearbyLoading] = useState(false);
   const [nearbyError, setNearbyError] = useState("");
   const nearbyRequest = useRef<AbortController | null>(null);
+  const [placeQuery, setPlaceQuery] = useState("");
+  const [placeResult, setPlaceResult] = useState<PlaceSearchResult | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -46,7 +59,7 @@ export default function Home() {
   const filteredRecords = useMemo(() => {
     const query = search.trim().toLocaleLowerCase();
     const matchingRecords = records.filter((camera) => {
-      const matchesSearch = !query || [camera.title, camera.kind, camera.source, camera.address, camera.manufacturer, camera.description, camera.latitude.toFixed(5), camera.longitude.toFixed(5)].filter(Boolean).some((value) => String(value).toLocaleLowerCase().includes(query));
+      const matchesSearch = !query || textMatches(camera, query);
       const matchesKind = kindFilter === "all" || camera.kind === kindFilter;
       const updatedAt = new Date(camera.updated).getTime();
       const matchesFreshness = freshnessCutoff === null || (Number.isFinite(updatedAt) && updatedAt >= freshnessCutoff);
@@ -92,6 +105,40 @@ export default function Home() {
       return;
     }
     await selectCoordinates(latitude, longitude);
+  }
+
+  // Locality/address/coordinate search: resolve the place server-side
+  // (coordinates are parsed locally, other text is geocoded), then render the
+  // searched area, the result count, and a truthful zero-result state.
+  async function searchByPlace(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const query = placeQuery.trim();
+    if (!query) {
+      setPlaceResult({ status: "error", message: t.placeSearchEmptyQuery });
+      return;
+    }
+    setPlaceResult({ status: "loading" });
+    try {
+      const params = new URLSearchParams({ q: query, lang: locale });
+      const response = await fetch(`/api/cameras/search?${params}`);
+      if (response.status === 404) {
+        setPlaceResult({ status: "not-found", message: t.placeNotFoundTitle });
+        return;
+      }
+      if (response.status === 429) {
+        setPlaceResult({ status: "error", message: t.placeSearchRateLimited });
+        return;
+      }
+      if (!response.ok) {
+        setPlaceResult({ status: "error", message: t.placeSearchUnavailable });
+        return;
+      }
+      const data = await response.json() as { area: PlaceSearchArea; records: Array<Camera & { distanceMeters: number }> };
+      setPlaceResult({ status: data.records.length ? "success" : "empty", area: data.area, records: data.records });
+      if (data.records.length) setCoordinates({ latitude: data.area.latitude, longitude: data.area.longitude });
+    } catch {
+      setPlaceResult({ status: "error", message: t.placeSearchUnavailable });
+    }
   }
 
   // Keyboard/text-list path for the map's "select a record" task: choose the
@@ -164,6 +211,7 @@ export default function Home() {
 
     <section className="records-section" id="records" aria-labelledby="records-title">
       <div className="records-heading"><div><p className="eyebrow"><span /> {t.accessibleDirectory}</p><h2 id="records-title">{t.recordsTitle}</h2><p>{t.recordsIntro}</p></div><a className="text-button" href="#map">{t.useMapInstead} <span aria-hidden="true">↑</span></a></div>
+      <div className="place-search"><h3>{t.placeSearchTitle}</h3><p>{t.placeSearchHelp}</p><form className="place-search-form" role="search" onSubmit={searchByPlace}><label htmlFor="place-search">{t.placeSearchLabel}</label><div className="place-search-row"><input id="place-search" type="search" value={placeQuery} onChange={(event) => setPlaceQuery(event.target.value)} maxLength={200} placeholder={t.placeSearchPlaceholder} autoComplete="off" /><button className="button" type="submit">{t.placeSearchSubmit}</button>{placeResult && placeResult.status !== "loading" ? <button type="button" className="text-button" onClick={() => { setPlaceResult(null); setPlaceQuery(""); }}>{t.placeClearResults} <span aria-hidden="true">→</span></button> : null}</div></form><div aria-live="polite">{placeResult?.status === "loading" && <p className="loading-note" role="status">{t.placeSearchLoading}</p>}{placeResult?.status === "error" && <p className="nearby-error" role="alert">{placeResult.message}</p>}{placeResult?.status === "not-found" && <div className="empty-state"><h3>{t.placeNotFoundTitle}</h3><p>{t.placeNotFoundBody}</p></div>}{(placeResult?.status === "success" || placeResult?.status === "empty") && placeResult.area && <div className="place-results"><p className="search-count" role="status">{t.placeAreaLabel(placeResult.area)}</p>{placeResult.status === "success" && placeResult.records && <><p className="search-count">{t.placeResultsFound(placeResult.records.length)}</p><ul className="record-list">{placeResult.records.map((camera) => <li key={camera.id}><article className="record-list-card"><div><p className="card-topline"><span className={`status-dot ${camera.status}`} /> {statuses[camera.status] ?? camera.status}</p><h3>{camera.title}</h3><p className="record-kind">{camera.kind}</p></div><dl><div><dt>{t.distance}</dt><dd>{formatDistance(camera.distanceMeters)}</dd></div><div><dt>{t.location}</dt><dd>{camera.address || `${camera.latitude.toFixed(5)}, ${camera.longitude.toFixed(5)}`}</dd></div><div><dt>{t.lastVerification}</dt><dd>{camera.updated}</dd></div></dl><div className="record-list-actions"><button type="button" className="text-button" onClick={() => showRecordOnMap(camera.id)}>{t.showOnMap} <span aria-hidden="true">→</span></button><a className="text-button" href={`/records/${camera.id}`}>{t.openRecord} <span aria-hidden="true">→</span></a></div></article></li>)}</ul></>}{placeResult.status === "empty" && <div className="empty-state"><h3>{t.placeEmptyTitle}</h3><p>{t.placeEmptyBody}</p><div className="record-list-actions"><a className="text-button" href="#report">{t.placeEmptySubmit} <span aria-hidden="true">→</span></a><a className="text-button" href="/guide">{t.placeEmptyCoverage} <span aria-hidden="true">→</span></a></div></div>}</div>}</div></div>
       <div className="directory-controls"><div className="record-search"><label htmlFor="record-search">{t.searchDirectory}</label><input id="record-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t.searchPlaceholder} aria-describedby="record-search-help record-search-count" /><p id="record-search-help">{t.searchHelp}</p></div><div className="record-filter"><label htmlFor="record-kind-filter">{t.cameraType}</label><select id="record-kind-filter" value={kindFilter} onChange={(event) => setKindFilter(event.target.value)}><option value="all">{t.allTypes}</option>{cameraKinds.map((kind) => <option key={kind} value={kind}>{kind}</option>)}</select></div><div className="record-filter"><label htmlFor="record-freshness-filter">{t.freshnessFilter}</label><select id="record-freshness-filter" value={freshnessFilter} onChange={(event) => { const value = event.target.value; setFreshnessFilter(value); setFreshnessCutoff(value === "all" ? null : Date.now() - Number.parseInt(value, 10) * 24 * 60 * 60 * 1000); }}><option value="all">{t.freshnessAll}</option><option value="7d">{t.freshness7d}</option><option value="30d">{t.freshness30d}</option><option value="90d">{t.freshness90d}</option></select></div><div className="record-filter"><label htmlFor="record-sort">{t.orderRecords}</label><select id="record-sort" value={sortOrder} onChange={(event) => setSortOrder(event.target.value as "alphabetical" | "position")}><option value="alphabetical">{t.alphabetical}</option><option value="position">{t.positionOrder}</option></select></div></div>
       <p className="search-count" id="record-search-count" role="status">{filteredRecords.length === 1 ? t.oneRecordFound : `${filteredRecords.length} ${t.recordsFound}`}</p>
       {filteredRecords.length ? <ul className="record-list">{filteredRecords.map((camera) => <li key={camera.id}><article className="record-list-card"><div><p className="card-topline"><span className={`status-dot ${camera.status}`} /> {statuses[camera.status] ?? camera.status}</p><h3>{camera.title}</h3><p className="record-kind">{camera.kind}</p></div><dl><div><dt>{t.source}</dt><dd>{camera.source}</dd></div><div><dt>{t.lastVerification}</dt><dd>{camera.updated}</dd></div><div><dt>{t.location}</dt><dd>{camera.address || `${camera.latitude.toFixed(5)}, ${camera.longitude.toFixed(5)}`}</dd></div>{camera.manufacturer && <div><dt>{t.manufacturerLabel}</dt><dd>{camera.manufacturer}</dd></div>}{camera.observedOn && <div><dt>{t.observedOnLabel}</dt><dd>{camera.observedOn}</dd></div>}</dl><div className="record-list-actions"><button type="button" className="text-button" onClick={() => showRecordOnMap(camera.id)}>{t.showOnMap} <span aria-hidden="true">→</span></button><a className="text-button" href={`/records/${camera.id}`}>{t.openRecord} <span aria-hidden="true">→</span></a></div></article></li>)}</ul> : <div className="empty-state"><h3>{t.emptyTitle}</h3><p>{t.emptyBody}</p><button type="button" className="text-button" onClick={() => setSearch("")}>{t.clearSearch} <span aria-hidden="true">→</span></button></div>}

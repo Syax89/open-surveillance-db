@@ -100,6 +100,31 @@ export const en = {
     emptyBody:
       "This does not mean that there are no cameras in the area. You can clear the search, explore the map, or submit a private observation for moderation.",
     clearSearch: "Clear search",
+    distance: "Distance",
+    placeSearchTitle: "Search by place",
+    placeSearchLabel: "Locality, address, or coordinates",
+    placeSearchPlaceholder: "e.g. Town centre, Via Roma, or 45.46420, 9.19000",
+    placeSearchHelp:
+      "Finds reviewed public records near the place you enter. A result is never proof that an area has no surveillance.",
+    placeSearchSubmit: "Search",
+    placeSearchLoading: "Searching reviewed public records near that place…",
+    placeSearchUnavailable: "Search is temporarily unavailable. Please try again shortly.",
+    placeSearchRateLimited: "Too many searches. Please wait a moment and try again.",
+    placeSearchEmptyQuery: "Enter a locality, address, or coordinates to search.",
+    placeClearResults: "Clear results",
+    placeAreaLabel: (area: { kind: string; displayName?: string; radiusLabel: string; latitude: number; longitude: number }) =>
+      area.kind === "place"
+        ? `Search area: near ${area.displayName} (within ${area.radiusLabel})`
+        : `Search area: within ${area.radiusLabel} of ${area.latitude.toFixed(5)}, ${area.longitude.toFixed(5)}`,
+    placeResultsFound: (count: number) =>
+      `${count} ${count === 1 ? "reviewed public record" : "reviewed public records"} found near this place`,
+    placeNotFoundTitle: "We could not find that place.",
+    placeNotFoundBody: "Check the spelling, or enter coordinates (latitude, longitude) instead.",
+    placeEmptyTitle: "No published record was found in this area.",
+    placeEmptyBody:
+      "This means only that no reviewed record in this database falls inside the search area. It is not evidence that no cameras exist there.",
+    placeEmptySubmit: "Submit a private observation",
+    placeEmptyCoverage: "About data coverage limits",
     accountability: "Accountability",
     correctionTitle: "Correct a record or raise a concern.",
     correctionIntro:

@@ -95,3 +95,22 @@ export function submissionLimits(
 export function submissionsDisabled(env: unknown): boolean {
   return (env as EnvLike).POST_SUBMISSIONS_DISABLED === "true";
 }
+
+/**
+ * Environment knobs for the public search route (GET /api/cameras/search).
+ * The default is deliberately modest: every locality query may hit the
+ * external geocoder, whose community usage policy is far stricter than our
+ * own D1 reads, so the limit protects the geocoder as much as the API.
+ */
+export function searchLimits(
+  env: unknown,
+  defaults: RateLimitOptions = { maxRequests: 15, windowSeconds: 60 },
+): RateLimitOptions {
+  const config = env as EnvLike;
+  const maxRequests = Number(config.SEARCH_RATE_LIMIT_MAX);
+  const windowSeconds = Number(config.SEARCH_RATE_LIMIT_WINDOW_SECONDS);
+  return {
+    maxRequests: Number.isFinite(maxRequests) && maxRequests > 0 ? maxRequests : defaults.maxRequests,
+    windowSeconds: Number.isFinite(windowSeconds) && windowSeconds > 0 ? windowSeconds : defaults.windowSeconds,
+  };
+}

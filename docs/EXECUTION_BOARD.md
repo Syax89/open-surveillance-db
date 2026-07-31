@@ -75,6 +75,13 @@ These are the next technical tickets once Wave A has named owners and approved t
 
 ## Progress log
 
+- **2026-07-31 — Pilot search started:** locality/address/coordinate search
+  (`GET /api/cameras/search`) with truthful empty states: coordinate queries
+  are parsed locally, free-text places resolve through a configurable
+  geocoder, and every response returns the searched area and radius.
+  Zero results are never presented as proof of no surveillance. The route is
+  per-caller rate-limited (default 15/min, env-configurable) and excluded
+  from edge caching.
 - **2026-07-31 — Product foundation started:** an accessible, searchable
   directory and a public-record detail route now complement the map in the
   local prototype. They consume only the existing public/demo API response;

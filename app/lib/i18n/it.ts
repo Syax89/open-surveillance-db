@@ -95,6 +95,31 @@ export const it: Translation<typeof en> = {
     emptyBody:
       "Questo non significa che nell’area non ci siano telecamere. Puoi cancellare la ricerca, esplorare la mappa o inviare un’osservazione privata per la moderazione.",
     clearSearch: "Cancella ricerca",
+    distance: "Distanza",
+    placeSearchTitle: "Cerca per luogo",
+    placeSearchLabel: "Località, indirizzo o coordinate",
+    placeSearchPlaceholder: "es. Centro città, Via Roma, o 45.46420, 9.19000",
+    placeSearchHelp:
+      "Trova record pubblici revisionati vicino al luogo inserito. Un risultato non è mai la prova che un’area non abbia sorveglianza.",
+    placeSearchSubmit: "Cerca",
+    placeSearchLoading: "Ricerca dei record pubblici revisionati vicino a questo luogo…",
+    placeSearchUnavailable: "La ricerca è temporaneamente non disponibile. Riprova tra poco.",
+    placeSearchRateLimited: "Troppe ricerche. Attendi un momento e riprova.",
+    placeSearchEmptyQuery: "Inserisci una località, un indirizzo o delle coordinate per cercare.",
+    placeClearResults: "Cancella i risultati",
+    placeAreaLabel: (area: { kind: string; displayName?: string; radiusLabel: string; latitude: number; longitude: number }) =>
+      area.kind === "place"
+        ? `Area di ricerca: vicino a ${area.displayName} (entro ${area.radiusLabel})`
+        : `Area di ricerca: entro ${area.radiusLabel} da ${area.latitude.toFixed(5)}, ${area.longitude.toFixed(5)}`,
+    placeResultsFound: (count: number) =>
+      `${count} ${count === 1 ? "record pubblico revisionato" : "record pubblici revisionati"} trovati vicino a questo luogo`,
+    placeNotFoundTitle: "Non siamo riusciti a trovare questo luogo.",
+    placeNotFoundBody: "Controlla l’ortografia oppure inserisci le coordinate (latitudine, longitudine).",
+    placeEmptyTitle: "In questa area non è stato trovato alcun record pubblicato.",
+    placeEmptyBody:
+      "Questo significa solo che nessun record revisionato di questo database rientra nell’area di ricerca. Non è la prova che lì non ci siano telecamere.",
+    placeEmptySubmit: "Invia un’osservazione privata",
+    placeEmptyCoverage: "I limiti della copertura dati",
     accountability: "Responsabilità",
     correctionTitle: "Correggi un record o segnala una criticità.",
     correctionIntro:
