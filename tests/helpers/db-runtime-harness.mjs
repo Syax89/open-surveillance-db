@@ -28,8 +28,8 @@ const DRIZZLE_DIR = path.join(root, "drizzle");
 const DB_MODULES = [
   { source: "db/cameras.ts", output: "db/cameras.mjs" },
   { source: "db/moderation.ts", output: "db/moderation.mjs" },
-  // db/cameras.ts imports ../app/lib/duplicate-detection (H1 pre-submit
-  // duplicate check); transpile it into the temp tree so the import resolves.
+  // db/cameras.ts imports ../app/lib/duplicate-detection (pure, no CF binding);
+  // transpile it into the temp tree so the rewritten import resolves.
   { source: "app/lib/duplicate-detection.ts", output: "app/lib/duplicate-detection.mjs" },
 ];
 
@@ -45,8 +45,6 @@ async function buildTree() {
     '// Injectable cloudflare:workers env mock for DB-layer integration tests.\nexport const env = {};\n',
   );
 
-  await mkdir(path.join(tree, "db"), { recursive: true });
-  await mkdir(path.join(tree, "app", "lib"), { recursive: true });
   for (const { source, output } of DB_MODULES) {
     const sourcePath = path.join(root, source);
     const compiled = ts.transpileModule(await readFile(sourcePath, "utf8"), {
@@ -60,10 +58,15 @@ async function buildTree() {
 
     const rewritten = compiled
       .replace(/from\s*["']cloudflare:workers["']/g, `from "${envUrl}"`)
+      // Rewrite both ./ and ../ relative imports to their .mjs counterparts;
+      // db/cameras.ts imports ../app/lib/duplicate-detection, which the
+      // transpiled tree mirrors under app/lib/duplicate-detection.mjs.
       .replace(/(from\s*["'])(\.\.?\/[^"']+)(["'])/g, (match, prefix, specifier, suffix) =>
         specifier.endsWith(".mjs") ? match : `${prefix}${specifier}.mjs${suffix}`,
       );
 
+    // Modules can live in nested dirs (db/, app/lib/); mirror the layout.
+    await mkdir(path.dirname(path.join(tree, output)), { recursive: true });
     await writeFile(path.join(tree, output), rewritten);
   }
   return tree;
