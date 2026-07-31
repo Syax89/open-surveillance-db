@@ -73,14 +73,18 @@ translation review and formal accessibility testing remain required. The site
 also has a bilingual in-app guide, a skip link, visible focus states,
 reduced-motion support, and explicit map-to-directory guidance. A report
 location can be selected by map click or valid manual coordinates; either path
-uses the same public-only nearby-record check. An accessibility statement
-(draft) and the design decision for a non-sensitive usability-feedback route
-([ADR 0006](decisions/0006-non-sensitive-usability-feedback-route.md)) are now
-recorded; the `/feedback` page itself is pending implementation.
+ uses the same public-only nearby-record check. Every map task now has a
+ keyboard/text-list equivalent (PR #22): selecting a record from the directory
+ moves selection and keyboard focus to the labelled map region honouring
+ reduced-motion preferences, and if the map script or tile host fails the map
+ degrades to a visible panel linking the accessible directory instead of an
+ empty box. An accessibility statement
+ (draft) and the design decision for a non-sensitive usability-feedback route
+ ([ADR 0006](decisions/0006-non-sensitive-usability-feedback-route.md)) are now
+ recorded; the `/feedback` page itself is pending implementation.
 
 ### Planned work
 
-- Finish the keyboard and text-list equivalent for every map task.
 - Run manual screen-reader, zoom, contrast, and small-screen checks.
 - Externalise interface strings and introduce English plus the pilot-area language.
 - Make zero-result, coverage, status, and consent language precise and consistent.
