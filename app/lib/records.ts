@@ -35,9 +35,3 @@ export const prototypeRecords: Camera[] = [
     address: "Illustrative location, Rome",
   },
 ];
-
-export const statusLabel: Record<string, string> = {
-  verified: "Verified",
-  demo: "Prototype record",
-  pending: "In moderation",
-};

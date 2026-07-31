@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { LocaleToggle, useLocale } from "./LocaleProvider";
+import { statusLabel } from "../lib/status";
 
 type CameraInQueue = {
   id: number;
@@ -91,7 +92,6 @@ const copy = {
     timeUnavailable: "Time unavailable", decisionRecorded: "Decision recorded", unknown: "Unknown", recorded: "Recorded",
     action: { approve: "Approve", reject: "Reject", hide: "Hide", "mark-stale": "Mark for review", reverify: "Reverify" },
     actionPast: { approve: "Approved", reject: "Rejected", hide: "Hidden", "mark-stale": "Marked for review", reverify: "Reverified" },
-    statusLabels: { pending: "Pending", verified: "Verified", needs_review: "Needs review", removed: "Removed", rejected: "Rejected", hidden: "Hidden" },
     reasons: { "verified-public-infrastructure": "Verified public infrastructure", "insufficient-evidence": "Insufficient evidence", duplicate: "Duplicate report", "private-or-sensitive-location": "Private or sensitive location", "inaccurate-or-outdated": "Inaccurate or out of date", "privacy-or-safety-concern": "Privacy or safety concern", other: "Other" },
   },
   it: {
@@ -114,7 +114,6 @@ const copy = {
     timeUnavailable: "Data non disponibile", decisionRecorded: "Decisione registrata", unknown: "Sconosciuto", recorded: "Registrato",
     action: { approve: "Approva", reject: "Rifiuta", hide: "Nascondi", "mark-stale": "Segna per revisione", reverify: "Riverifica" },
     actionPast: { approve: "Approvata", reject: "Rifiutata", hide: "Nascosta", "mark-stale": "Segnato per revisione", reverify: "Riverificato" },
-    statusLabels: { pending: "In attesa", verified: "Verificato", needs_review: "Da ricontrollare", removed: "Rimosso", rejected: "Rifiutato", hidden: "Nascosto" },
     reasons: { "verified-public-infrastructure": "Infrastruttura pubblica verificata", "insufficient-evidence": "Prove insufficienti", duplicate: "Segnalazione duplicata", "private-or-sensitive-location": "Luogo privato o sensibile", "inaccurate-or-outdated": "Informazione inaccurata o obsoleta", "privacy-or-safety-concern": "Problema di privacy o sicurezza", other: "Altro" },
   },
 } as const;
@@ -144,7 +143,7 @@ export function ModerationDashboard() {
   function actionLabel(action: ModerationAction) { return t.action[action]; }
   function readableAction(action?: string) { return action && action in t.actionPast ? t.actionPast[action as ModerationAction] : action ?? t.decisionRecorded; }
   function readableReason(reasonCode?: string) { return reasonCode && reasonCode in t.reasons ? t.reasons[reasonCode as ReasonCode] : reasonCode ?? t.timeUnavailable; }
-  function readableStatus(status?: string) { return status && status in t.statusLabels ? t.statusLabels[status as keyof typeof t.statusLabels] : status ?? t.recorded; }
+  function readableStatus(status?: string) { return status ? statusLabel(locale, status) : t.recorded; }
 
   function cameraMetadata(camera: CameraInQueue) {
     if (!camera.manufacturer && !camera.observedOn) return null;
