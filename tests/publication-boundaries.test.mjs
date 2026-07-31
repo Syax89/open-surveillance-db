@@ -738,6 +738,49 @@ test("every map task has a keyboard/text-list equivalent in the public interface
   assert.match(map, /t\.mapFallbackBody/, "the fallback body must come from the message bundle");
 });
 
+test("the map loads tiles through the compliant same-origin tile proxy", async () => {
+  const map = await readSource("app/components/SurveillanceMap.tsx");
+  const route = await readSource("app/api/tiles/[z]/[x]/[y]/route.ts");
+
+  // The client bundle must never hotlink a tile server directly: every tile
+  // request goes through our own proxy, which identifies the app with a
+  // stable User-Agent and caches server-side (docs/OSM_INTEGRATION.md).
+  assert.doesNotMatch(
+    map,
+    /tile\.openstreetmap\.org/,
+    "the client must not fetch OSM tiles directly",
+  );
+  assert.match(
+    map,
+    /\/api\/tiles\/\{z\}\/\{x\}\/\{y\}\.png/,
+    "the map must use the same-origin tile proxy",
+  );
+
+  // OSMF tile usage policy: visible licence attribution plus the
+  // recommended "report a map issue" link.
+  assert.match(
+    map,
+    /openstreetmap\.org\/copyright/,
+    "the map must keep visible OSM attribution",
+  );
+  assert.match(
+    map,
+    /openstreetmap\.org\/fixthemap/,
+    "the map must offer the report-a-map-issue link",
+  );
+
+  // The proxy caps the zoom level and bounds x/y per slippy-map limits so
+  // the endpoint cannot be used to scrape arbitrary paths or drive bulk
+  // downloads (policy §4).
+  assert.match(route, /MAX_ZOOM\s*=\s*19/, "the proxy must cap the zoom level");
+  assert.match(route, /2 \*\* z/, "the proxy must bound x/y per slippy-map limits");
+  assert.match(
+    route,
+    /TILE_PROVIDER_URL/,
+    "the upstream provider must be switchable via environment, not hard-coded",
+  );
+});
+
 test("package metadata identifies the project, license, and repository", async () => {
   const pkg = JSON.parse(await readSource("package.json"));
   assert.equal(pkg.name, "open-surveillance-db");

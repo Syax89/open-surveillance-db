@@ -38,7 +38,16 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
         leafletRef.current = L;
         const map = L.map(mapElement.current, { zoomControl: false, scrollWheelZoom: true }).setView([41.9028, 12.4964], 13);
         L.control.zoom({ position: "bottomright" }).addTo(map);
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>' }).addTo(map);
+        // Tiles are served through the same-origin tile proxy
+        // (/api/tiles/{z}/{x}/{y}.png, see docs/OSM_INTEGRATION.md): the
+        // client never hotlinks a tile server directly, the upstream request
+        // carries an identifying User-Agent and the end user's Referer, and
+        // responses are cached server-side. The upstream provider is switched
+        // with the TILE_PROVIDER_URL environment variable, no rebuild needed.
+        L.tileLayer("/api/tiles/{z}/{x}/{y}.png", {
+          maxZoom: 19,
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a> &middot; <a href="https://www.openstreetmap.org/fixthemap">Fix the map</a>',
+        }).addTo(map);
         markersRef.current = L.layerGroup().addTo(map);
         map.on("click", (event) => onPickRef.current(event.latlng.lat, event.latlng.lng)); mapRef.current = map;
         const initialFocus = focusLocationRef.current;

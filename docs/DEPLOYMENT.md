@@ -22,7 +22,11 @@ local reset — see [DEVELOPMENT_SETUP.md](DEVELOPMENT_SETUP.md).
 - Automated backups, restoration drill, monitoring, error alerting, and incident runbook.
 - Abuse controls: rate limiting, authentication where needed, moderation roles, and audit logs.
 - Privacy notice, terms, correction/removal form, and retention schedule published.
-- Approved map tile provider or self-hosted map infrastructure.
+- Approved map tile provider or self-hosted map infrastructure. The
+  same-origin tile proxy is in place and compliant by default
+  (`/api/tiles/{z}/{x}/{y}.png` → `TILE_PROVIDER_URL`); before launch, choose
+  the provider tier and set the variable (see
+  [OSM_INTEGRATION.md](OSM_INTEGRATION.md)).
 
 ## Release procedure
 
