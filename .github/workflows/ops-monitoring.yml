@@ -1,0 +1,80 @@
+name: Ops Monitoring
+
+# Health check periodico dell'ambiente di produzione (docs/OPERATIONS.md §2).
+# Su failure apre una issue GitHub: canale di alerting primario.
+# Nessun segreto in questo file; l'URL di produzione arriva da una
+# repository variable (PROD_URL), non hardcoded.
+
+on:
+  schedule:
+    - cron: "0 7 * * *" # ogni giorno 07:00 UTC
+  workflow_dispatch: {} # esecuzione manuale (dry run)
+
+concurrency:
+  group: ops-monitoring
+  cancel-in-progress: false
+
+jobs:
+  health-check:
+    name: Health check produzione
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Health check (homepage + API pubblica)
+        id: health
+        shell: bash
+        env:
+          PROD_URL: ${{ vars.PROD_URL }}
+        run: |
+          set -u
+          if [ -z "${PROD_URL:-}" ]; then
+            echo "::error::PROD_URL non configurata (repository variable). Impossibile eseguire il check."
+            exit 2
+          fi
+          fail=0
+          for path in "/" "/api/cameras"; do
+            code=$(curl -sS -o /tmp/hc_body -w '%{http_code}' --max-time 20 "https://${PROD_URL}${path}" || echo 000)
+            echo "GET ${path} -> ${code}"
+            if [ "$code" != "200" ]; then
+              echo "::error::health check FAILED su ${path} (HTTP ${code})"
+              fail=1
+            fi
+          done
+          # Fail-closed: la moderazione NON deve mai rispondere 200 senza auth
+          code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "https://${PROD_URL}/api/moderation" || echo 000)
+          echo "GET /api/moderation -> ${code}"
+          if [ "$code" = "200" ]; then
+            echo "::error::gate moderazione APERTO senza credenziali (fail-closed violato)"
+            fail=1
+          fi
+          echo "status=$fail" >> "$GITHUB_OUTPUT"
+          exit "$fail"
+
+      - name: Apri issue su failure
+        if: failure() && github.event_name == 'schedule'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner, repo: context.repo.repo,
+              state: 'open', labels: ['ops']
+            });
+            const open = issues.find(i => i.title.includes('ops: health check FAILED'));
+            if (open) {
+              console.log('Issue già aperta:', open.number);
+              return;
+            }
+            await github.rest.issues.create({
+              owner: context.repo.owner, repo: context.repo.repo,
+              title: 'ops: health check FAILED (' + new Date().toISOString() + ')',
+              labels: ['ops'],
+              body: [
+                'Il workflow Ops Monitoring ha rilevato un failure su produzione.',
+                'Dettagli: https://github.com/' + context.repo.owner + '/' + context.repo.repo + '/actions/runs/' + context.runId,
+                'Runbook: docs/OPERATIONS.md §4 (incident runbook).'
+              ].join('\n')
+            });
