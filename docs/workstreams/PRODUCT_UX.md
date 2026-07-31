@@ -100,7 +100,7 @@ The first public alpha is a deliberately narrow pilot in one reviewed jurisdicti
 | Record change summary | Public record pages show meaningful reviewed updates and last verification, not internal identities or notes. |
 | Guided duplicate warning | Submitters are shown nearby published records and can choose correction rather than creating a duplicate. |
 | Plain-language data dictionary | Category names, status meanings, source types, and location precision are explained in context. |
-| Usability feedback route | Visitors can report an interface barrier without being forced to create an account. |
+| Usability feedback route | Visitors can report an interface barrier without being forced to create an account; design recorded in [ADR 0006](../decisions/0006-non-sensitive-usability-feedback-route.md). |
 | Additional locale framework | Translations can be added without hard-coded strings or layout breakage. |
 
 ### Could have after policies and moderation capacity permit
@@ -140,6 +140,7 @@ Public alpha may proceed only when the following can be demonstrated in a test e
 - Support keyboard operation in a logical order; use a visible skip link and never trap focus in panels or dialogs.
 - Meet colour contrast requirements and pair status colours with text/icon labels. Respect reduced-motion and user contrast preferences.
 - Do not encode critical instructions only in images, map position, colour, or a gesture.
+- Publish an [accessibility statement](../ACCESSIBILITY_STATEMENT.md) and a non-sensitive barrier-reporting route ([ADR 0006](../decisions/0006-non-sensitive-usability-feedback-route.md)); reported barriers receive a time-bound response (see the statement's response commitment).
 
 ### Mobile
 
@@ -196,7 +197,7 @@ Before public alpha, maintainers must publicly record decisions on:
 2. Which record fields are safe to show at what geographic precision.
 3. The account, rate-limit, acknowledgement, and withdrawal model for submissions.
 4. The correction/removal service-level target and urgent escalation contact.
-5. The accessibility test method, participants, and known exceptions.
+5. The accessibility test method, participants, and known exceptions (draft position in the [accessibility statement](../ACCESSIBILITY_STATEMENT.md)).
 6. The privacy-preserving metrics configuration and retention period.
 
 Material decisions belong in `docs/decisions/` and must be linked from the development plan before the affected feature is opened to the public.
