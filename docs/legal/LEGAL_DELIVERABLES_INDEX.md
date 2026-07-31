@@ -18,6 +18,7 @@
 | [MODERATION_SLA.md](MODERATION_SLA.md) | M1, M2, M3 — 24 h emergency hide, 48 h first response, 14-day decision, 30-day hide review, independent appeals | Draft | Rosa |
 | [decisions/0004-retention-and-review-cycle.md](../decisions/0004-retention-and-review-cycle.md) | ADR — retention values + enforcement | Proposed | Rosa |
 | [decisions/0005-processors-and-data-residency.md](../decisions/0005-processors-and-data-residency.md) | ADR — processor choice, SCC, EU residency, OpenAI role | Proposed | Rosa |
+| [REVIEW_TERMS_CODE_COHERENCE_2026-08-01.md](REVIEW_TERMS_CODE_COHERENCE_2026-08-01.md) | STATUS gap #4 — final coherence check: TERMS_OF_USE v0.2 / PRIVACY_NOTICE v0.3 vs. implemented practices (auth, upload, retention, correction) | Delivered (PR) | Rosa |
 
 ## How they map to the policy documents
 
@@ -27,7 +28,7 @@
 
 ## Still open (other pre-launch items from the review, not in this task's scope)
 
-- **Terms of use** — the v0.1 draft (task t_b047996f) was **not found** in any branch/workspace; re-draft task created (t_49f0041f, rosa); to be added in a follow-up PR before launch.
+- **Terms of use** — **delivered**: `../TERMS_OF_USE.md` v0.2 exists in the repository (PR #49, re-drafted by task t_49f0041f); final coherence review in this folder's REVIEW_TERMS_CODE_COHERENCE_2026-08-01.md (STATUS gap #4). Remaining: acceptance mechanics, jurisdiction wording, UI links — tracked in TERMS § 15.
 - **Software licence confirmation** — the CEO decision note cites "MIT already present", but the repository carries **AGPL-3.0-or-later** (LICENSE, package.json — review finding O1, implemented in PR #8). Confirmation needed: keep AGPL or switch to MIT.
 - **DCO / inbound licensing** (O3) — CONTRIBUTING.md update (docs task, marie).
 - **ODbL notices in CSV/GeoJSON exports** (O2) — implementation (ada).

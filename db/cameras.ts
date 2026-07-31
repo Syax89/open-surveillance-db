@@ -32,6 +32,18 @@ export type CameraRecord = {
 export type PublicCameraRecord = Omit<CameraRecord, "notes">;
 
 /**
+ * Zone-level coordinate precision for the public boundary (decision 2026-07-31,
+ * ADR 0008; TERMS_OF_USE.md § 8.4): published coordinates are rounded to
+ * ~4 decimal places (~10 m). The exact location is stored in the database and
+ * remains visible only to moderators (db/moderation.ts reads the raw columns).
+ * Every public read path (directory list, by-id lookup, exports, search) must
+ * pass through this rounding so the ~10 m promise holds on every surface.
+ */
+export function roundPublicCoordinate(value: number): number {
+  return Math.round(value * 10_000) / 10_000;
+}
+
+/**
  * The schema (tables, metadata columns, indexes) is applied exclusively by
  * the Drizzle migrations in `drizzle/` (wrangler d1 migrations apply).
  * This function performs no runtime bootstrap and seeds no demo data.
@@ -106,7 +118,7 @@ export async function listPublicCameras(
   }
   query += " ORDER BY id DESC";
   const result = await d1.prepare(query).bind(...parameters).all<PublicCameraRecord>();
-  return result.results;
+  return result.results.map((record) => ({ ...record, latitude: roundPublicCoordinate(record.latitude), longitude: roundPublicCoordinate(record.longitude) }));
 }
 export type NearbyPublicCameraRecord = PublicCameraRecord & { distanceMeters: number };
 function distanceInMeters(fromLatitude: number, fromLongitude: number, toLatitude: number, toLongitude: number) { const earthRadiusMeters = 6_371_000; const toRadians = (degrees: number) => degrees * Math.PI / 180; const latitudeDelta = toRadians(toLatitude - fromLatitude); const longitudeDelta = toRadians(toLongitude - fromLongitude); const latitudeStart = toRadians(fromLatitude); const latitudeEnd = toRadians(toLatitude); const haversine = Math.sin(latitudeDelta / 2) ** 2 + Math.cos(latitudeStart) * Math.cos(latitudeEnd) * Math.sin(longitudeDelta / 2) ** 2; return 2 * earthRadiusMeters * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine)); }
@@ -140,5 +152,6 @@ export async function getPublicCameraById(id: number, nowIso: string = new Date(
     )
     .bind(id, ...parameters)
     .first<PublicCameraRecord>();
-  return result ?? null;
+  if (!result) return null;
+  return { ...result, latitude: roundPublicCoordinate(result.latitude), longitude: roundPublicCoordinate(result.longitude) };
 }

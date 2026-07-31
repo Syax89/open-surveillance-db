@@ -440,7 +440,16 @@ test("the public camera query enforces the freshness window at read time", async
     /last_verified_at\s+AS\s+lastVerifiedAt/,
     "the public query must expose the last verified date for labelling",
   );
-  assert.match(publicQuery, /return\s+result\.results\s*;/, "the public query must return its filtered result set");
+  assert.match(
+    publicQuery,
+    /return\s+result\.results\.map\(/,
+    "the public query must return its filtered result set (rounded at the public boundary)",
+  );
+  assert.match(
+    publicQuery,
+    /roundPublicCoordinate\(record\.latitude\)[\s\S]*roundPublicCoordinate\(record\.longitude\)/,
+    "the public query must round both coordinates to the ~4-decimal zone precision",
+  );
 });
 
 test("approval and re-verification both write the freshness clocks", async () => {
