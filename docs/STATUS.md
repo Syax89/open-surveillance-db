@@ -8,6 +8,7 @@ Last reviewed: 2026-07-31
 - [x] Interactive map based on OpenStreetMap tiles.
 - [x] Searchable text directory and record-detail pages for public/demo records.
 - [x] Safe directory filters (type and ordering) shared by map and list.
+- [x] Safe category and verification-freshness directory filters: whitelisted freshness windows (`7d`/`30d`/`90d`), parameterised SQL, ISO verification timestamps, and a one-time backfill for pre-existing prose values.
 - [x] Non-blocking local duplicate warning based only on nearby public/demo records.
 - [x] Report position may be selected by map click or validated manual coordinates; both paths use the same public-only duplicate check.
 - [x] Camera-record API and GeoJSON export.

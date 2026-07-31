@@ -71,7 +71,12 @@ test("approve records a full audit event and publishes the record", async () => 
     publishObservedOn: false,
   });
   assert.equal(decision.item.status, "verified");
-  assert.equal(decision.item.updated, "Local moderation: approved and verified");
+  assert.match(
+    decision.item.updated,
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/,
+    "approval must record an ISO 8601 verification timestamp",
+  );
+  assert.ok(Number.isFinite(new Date(decision.item.updated).getTime()), "the ISO timestamp must be parseable");
   assert.equal(decision.item.publishManufacturer, 1);
   assert.equal(decision.item.publishObservedOn, 0);
 
@@ -129,7 +134,12 @@ test("verified records can be marked stale and re-verified, each step recorded",
 
   const reverified = await moderation.moderateCamera(camera.id, "reverify", "verified-public-infrastructure", null);
   assert.equal(reverified.item.status, "verified");
-  assert.equal(reverified.item.updated, "Local moderation: re-verified");
+  assert.match(
+    reverified.item.updated,
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/,
+    "re-verification must refresh the ISO 8601 verification timestamp",
+  );
+  assert.ok(Number.isFinite(new Date(reverified.item.updated).getTime()), "the ISO timestamp must be parseable");
 
   const rows = await eventRows(env);
   assert.deepEqual(rows.map((row) => ({ action: row.action, previous_status: row.previous_status, new_status: row.new_status })), [

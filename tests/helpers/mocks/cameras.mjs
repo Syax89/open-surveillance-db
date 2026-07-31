@@ -3,6 +3,8 @@
 
 import { makeMock } from "../mock-state.mjs";
 
+export const freshnessWindows = ["7d", "30d", "90d", "all"];
+
 export const {
   listPublicCameras,
   findNearbyPublicCameras,

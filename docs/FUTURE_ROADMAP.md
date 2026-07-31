@@ -51,6 +51,15 @@ currently public records and its projection deliberately omits contributor
 identity, moderator identity, reason codes, and internal notes; boundary tests
 guard the projection statically and at runtime.
 
+**Implementation update (2026-07-31, safe directory filters):** the public
+directory now filters by camera category and verification freshness
+(`GET /api/cameras?kind=...&freshness=7d|30d|90d`, shared by JSON, GeoJSON, and
+CSV). The category filter is a bounded, parameterised equality match; the
+freshness windows are an explicit whitelist; verification transitions record
+ISO timestamps, with a one-time backfill from the moderation audit trail for
+pre-existing prose values; and non-ISO labels (illustrative demo placeholders)
+are never matched by a freshness window, in the UI or the API.
+
 ### Planned work
 
 - Detect likely duplicates before a contributor submits a new record.

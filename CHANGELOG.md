@@ -40,6 +40,12 @@ changes accumulate under `[Unreleased]`.
 - Operations manual with environment matrix, monitoring, backup, and rollback
   workflows (docs/OPERATIONS.md), and the local test deployment procedure on
   Proxmox LXC 114 (docs/DEPLOYMENT.md).
+- Safe category and verification-freshness filters in the public directory:
+  `GET /api/cameras` accepts a bounded `kind` and a whitelisted `freshness`
+  window (`7d`/`30d`/`90d`) shared by JSON, GeoJSON, and CSV. Verification
+  transitions now record ISO timestamps and a one-time migration backfills
+  pre-existing prose values from the moderation audit trail, so a freshness
+  window can never present stale or illustrative data as freshly verified.
 
 ### Changed
 

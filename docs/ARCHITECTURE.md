@@ -10,7 +10,7 @@ flowchart LR
   Browser --> OSM[OpenStreetMap raster tiles]
 ```
 
-The front end is a React/Vinext application. Leaflet renders a map using OpenStreetMap tiles in local development. The `/api/cameras` endpoint exposes only `verified` and `demo` records; submissions are created with `pending` status. The database layer is designed for Cloudflare D1 and uses Drizzle for schema migrations.
+The front end is a React/Vinext application. Leaflet renders a map using OpenStreetMap tiles in local development. The `/api/cameras` endpoint exposes only `verified` and `demo` records; submissions are created with `pending` status. `GET /api/cameras` accepts optional `kind` (bounded, parameterised equality) and `freshness` (whitelisted `7d`/`30d`/`90d` windows) filters shared by the JSON, GeoJSON, and CSV outputs; a freshness window matches only ISO verification timestamps, so illustrative demo labels and pre-backfill prose can never be presented as freshly verified. The database layer is designed for Cloudflare D1 and uses Drizzle for schema migrations.
 
 ## Required production shape
 
