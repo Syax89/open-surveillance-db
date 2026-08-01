@@ -99,3 +99,13 @@ test("empty id lists are a no-op without touching the database", async () => {
   const linked = await photos.linkPhotosToCamera(42, [], null);
   assert.equal(linked, 0);
 });
+
+test("nonexistent photo ids are a silent best-effort no-op", async () => {
+  // A photo id that does not exist (or was already linked elsewhere) simply
+  // does not match the UPDATE: the caller gets a lower count, never a throw
+  // or an existence oracle (403/404). This is the "id inesistente" edge
+  // from the t_0de37378 audit — POST /api/cameras must still answer 201
+  // with linkedPhotos: 0.
+  const linked = await photos.linkPhotosToCamera(42, [999_999, 999_998], null);
+  assert.equal(linked, 0);
+});

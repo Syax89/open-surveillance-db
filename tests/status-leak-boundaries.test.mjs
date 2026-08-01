@@ -304,14 +304,19 @@ test("client: publicRecords drops non-whitelisted records before rendering", asy
 
 test("the homepage filters through publicRecords and labels via the safe helper", async () => {
   const page = await readSource("app/page.tsx");
+  // The home UI lives in app/components/home since the t_6104f386 refactor:
+  // the page keeps the data flow, the components keep the labels.
+  const mapPanel = await readSource("app/components/home/MapPanel.tsx");
+  const directory = await readSource("app/components/home/PublicDirectory.tsx");
+  const homeUi = mapPanel + directory;
   assert.match(page, /publicRecords\(/, "the homepage must filter records through the client whitelist");
   assert.match(page, /setRecords\(publicRecords\(/, "API data must be filtered before entering state");
   assert.doesNotMatch(
-    page,
+    homeUi,
     /\?\?\s*(?:camera|selectedCamera)\.status/,
     "the homepage must never fall back to rendering a raw status value",
   );
-  assert.match(page, /publicStatusLabel\(statuses,\s*(?:camera|selectedCamera)\.status,\s*t\.unknown\)/, "status labels must come from the safe helper");
+  assert.match(homeUi, /publicStatusLabel\(statuses,\s*(?:camera|selectedCamera)\.status,\s*t\.unknown\)/, "status labels must come from the safe helper");
 });
 
 test("the record page labels via the safe helper and never appends a raw status", async () => {
