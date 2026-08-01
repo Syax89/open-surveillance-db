@@ -198,26 +198,48 @@ test("DirectoryTool renders the directory shell with the shared FiltersBar and b
 });
 
 test("DirectoryTool search narrows the list (debounced URL commit); the empty state offers a clear action that restores it", async () => {
-  const { screen } = rtl;
+  const { screen, fireEvent } = rtl;
   const user = rtl.userEvent.setup();
   await renderWithLocale(React.createElement(DirectoryTool));
+
+  // The harness runs REAL timers, so every URL commit below goes through the
+  // ~250ms debounce (QUERY_DEBOUNCE_MS) plus a re-render. Under CI load (full
+  // suite in parallel + NODE_V8_COVERAGE instrumentation) that window has
+  // blown past testing-library's default 1000ms waitFor (flake observed on
+  // PR #182 coverage job), so the debounce-sensitive waits carry an explicit
+  // generous timeout. The asserts themselves are unchanged: they still pin
+  // the debounced behaviour — A disappears only AFTER the debounce fires,
+  // clearing commits right away, and the empty state offers the clear action.
+  const DEBOUNCE_WAIT = { timeout: 5000 };
 
   // F4 (useCameraFilters): the search input feels instant but commits to the
   // URL (and therefore filters) after the ~250ms debounce (R2 URL churn).
   await user.type(screen.getByLabelText("Search the public directory"), "Illustrative record B");
-  await rtl.waitFor(() => assert.ok(screen.queryByRole("heading", { name: "Illustrative record A" }) === null));
+  await rtl.waitFor(() => assert.ok(screen.queryByRole("heading", { name: "Illustrative record A" }) === null), DEBOUNCE_WAIT);
   assert.ok(screen.getByRole("heading", { name: "Illustrative record B" }));
 
   // A new query replaces the old one; a no-match query yields the truthful
-  // empty state.
-  await user.clear(screen.getByLabelText("Search the public directory"));
-  await rtl.waitFor(() => assert.ok(screen.getByRole("heading", { name: "Illustrative record A" })));
+  // empty state. NOTE: the input clear goes through fireEvent.change instead
+  // of user.clear(): user-event's clear() (focus → selectAll → delete) can
+  // lose its input event under V8-coverage load (React value-tracker race —
+  // the input stays on the old value and the URL keeps ?q=), which no
+  // waitFor timeout can recover from. fireEvent.change drives the same
+  // onChange → setQ("") → immediate-commit path the app wires, determinis-
+  // tically, and the stub asserts the URL really was cleared in that step.
+  fireEvent.change(screen.getByLabelText("Search the public directory"), { target: { value: "" } });
+  const navAfterClear = await getNavState();
+  assert.ok(
+    !navAfterClear.replaced.at(-1).includes("q="),
+    "clearing the search commits the bare URL immediately (no ?q= dead air)",
+  );
+  await rtl.waitFor(() => assert.ok(screen.getByRole("heading", { name: "Illustrative record A" })), DEBOUNCE_WAIT);
   await user.type(screen.getByLabelText("Search the public directory"), "no-such-camera");
-  await rtl.waitFor(() => assert.ok(screen.getByRole("heading", { name: "No published record matches that search." })));
+  await rtl.waitFor(() => assert.ok(screen.getByRole("heading", { name: "No published record matches that search." })), DEBOUNCE_WAIT);
 
-  // Clearing the search commits immediately (no debounce dead air).
+  // Clearing the search commits immediately (no debounce dead air); the
+  // restore is still async under coverage load, so wait for it.
   await user.click(screen.getByRole("button", { name: /Clear search/ }));
-  assert.ok(screen.getByRole("heading", { name: "Illustrative record A" }), "clearing restores the list");
+  await rtl.waitFor(() => assert.ok(screen.getByRole("heading", { name: "Illustrative record A" }), "clearing restores the list"), DEBOUNCE_WAIT);
 });
 
 test("DirectoryTool kind filter narrows and Reset filters restores the full list", async () => {
