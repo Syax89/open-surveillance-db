@@ -20,7 +20,7 @@ export function InfoPage({ page }: { page: keyof LegalContent }) {
   const content: LegalPageContent = legalMessages[locale][page];
 
   return (
-    <main id="main-content" className="legal-page">
+    <main id="main-content" className="info-page">
       <nav className="nav-shell" aria-label={t.navigation}>
         <Link className="brand" href="/" aria-label={t.homeAria}>
           <span className="brand-mark" aria-hidden="true">◉</span>
@@ -35,12 +35,14 @@ export function InfoPage({ page }: { page: keyof LegalContent }) {
         <LocaleToggle />
       </nav>
 
-      <article className="legal-article">
+      <article className="record-detail">
         <p className="eyebrow"><span /> {content.eyebrow}</p>
         <h1>{content.title}</h1>
-        <p className="legal-intro">{content.intro}</p>
+        <p className="record-detail-summary">{content.intro}</p>
         <p className="legal-updated">{content.updated}</p>
+      </article>
 
+      <div className="legal-body">
         {content.sections.map((section, sectionIndex) => (
           <section
             className="legal-section"
@@ -53,7 +55,7 @@ export function InfoPage({ page }: { page: keyof LegalContent }) {
             ))}
           </section>
         ))}
-      </article>
+      </div>
 
       <footer>
         <div className="brand">
