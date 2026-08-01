@@ -37,14 +37,15 @@ for future page changes and for the QA pass over the routes.
 - **C-ADR done** — ADR 0018 (verifications, trust levels, two-track editing,
   two identity layers) recorded before any code; the routes below are listed
   here **before** implementation per the route rule.
-- **C1, C2, C4 done** — backend schema/verifications (C1, PR #174),
-  profile API with `deriveLevel` (C2, PR #176), corrections whitelist + dedupe
-  (C4, PR #175). The verification toggle and the profile/level contracts are
-  live on `main`; the routes below that are marked "planned" still wait for
-  the frontend phases.
-- **C3, C5, C6 pending** — backend edit flow, frontend profile/verification
-  widget, frontend edit page — routes land with their phases; until then the
-  routes below are **planned, not implemented**.
+- **C1, C2, C3, C4 done** — backend schema/verifications (C1, PR #174),
+  profile API with `deriveLevel` (C2, PR #176), two-track contribution
+  editing with moderated edit requests (C3, PR #177), corrections whitelist +
+  dedupe (C4, PR #175). The verification toggle, the profile/level contracts
+  and the edit-flow backend are live on `main`; the routes below that are
+  marked "planned" still wait for the frontend phases.
+- **C5, C6 pending** — frontend profile/verification widget, frontend edit
+  page — routes land with their phases; until then the routes below are
+  **planned, not implemented**.
 
 ## Principles
 
@@ -271,7 +272,7 @@ proposed).
 - **Nav/footer:** never linked from public navigation (account surface).
 - **Auth:** auth-gated (contributor session, ADR 0013); anonymous → 401.
 
-### `/records/[id]/edit` — Edit contribution (planned, community C3/C6)
+### `/records/[id]/edit` — Edit contribution (planned, community C6)
 
 - **Purpose:** private, dedicated edit page for the record **owner** —
   replaces inline editing for contribution fields (design #815 C7).
