@@ -164,6 +164,29 @@ const INFO_ROUTES = {
     en: ["A public database, built with care."],
     noEn: ["A public database, built with care."],
   },
+  // Route tool separate (F1 route group (tools), t_03c0fa15): /mappa e
+  // /directory sono pagine pubbliche, /segnala e /correggi form privati
+  // (noindex) — tutte servono contenuto EN/IT dal cookie come le pagine info.
+  "/mappa": {
+    it: ["Mappa interattiva", "Esplora le telecamere documentate", "Prototipo attivo"],
+    en: ["Interactive map", "Explore documented cameras", "Live prototype"],
+    noEn: ["Interactive map", "Explore documented cameras"],
+  },
+  "/directory": {
+    it: ["Elenco pubblico", "Sfoglia i record pubblici senza usare la mappa"],
+    en: ["Public directory", "Browse public records without the map"],
+    noEn: ["Public directory", "Search, filter and order"],
+  },
+  "/segnala": {
+    it: ["Segnala una telecamera", "Rendi leggibile lo spazio pubblico"],
+    en: ["Report a camera", "Help make public space legible"],
+    noEn: ["Report a camera", "Help make public space legible"],
+  },
+  "/correggi": {
+    it: ["Correggi un record", "Le correzioni sono private"],
+    en: ["Correct a record", "Corrections are private"],
+    noEn: ["Correct a record", "Corrections are private"],
+  },
 };
 
 // ---------------------------------------------------------------------------

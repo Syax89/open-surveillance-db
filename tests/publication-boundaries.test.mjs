@@ -260,14 +260,17 @@ test("locality search stays behind the public-list boundary and is rate-limited"
 });
 
 test("manual report coordinates are bounded and reuse the public-only selection flow", async () => {
-  // The report flow (hook + form) moved to its own component in the
-  // t_6104f386 refactor; the guards below apply to that component.
+  // The report flow split in F1 (t_03c0fa15, QA t_14b1949c): the hook
+  // (coordinate bounds + selection flow) now lives in app/lib/useReportFlow.ts,
+  // the form JSX (labelled coordinate inputs) in ReportForm.tsx. The guards
+  // below apply to each file at its boundary.
   const page = await readSource("app/components/home/ReportForm.tsx");
-  const handlerStart = page.indexOf("async function selectManualCoordinates");
-  const submitStart = page.indexOf("async function submitReport", handlerStart);
-  const handler = page.slice(handlerStart, submitStart);
+  const hook = await readSource("app/lib/useReportFlow.ts");
+  const handlerStart = hook.indexOf("async function selectManualCoordinates");
+  const submitStart = hook.indexOf("async function submitReport", handlerStart);
+  const handler = hook.slice(handlerStart, submitStart);
 
-  assert.ok(handlerStart >= 0, "the report form must offer a manual-coordinate fallback");
+  assert.ok(handlerStart >= 0, "the report flow must offer a manual-coordinate fallback");
   assert.match(page, /id=["']manual-latitude["']/, "the fallback must provide a labelled latitude input");
   assert.match(page, /id=["']manual-longitude["']/, "the fallback must provide a labelled longitude input");
   assert.match(page, /inputMode=["']decimal["']/, "coordinate inputs should use a decimal-friendly keyboard");
@@ -755,7 +758,12 @@ test("every map task has a keyboard/text-list equivalent in the public interface
   assert.match(map, /aria-label=\{\s*label\s*\}/);
   assert.match(map, /tabIndex=\{\s*-1\s*\}/, "the map region must accept programmatic focus");
   assert.match(map, /id="map-region"/);
-  assert.match(map, /href="#records"/, "the map description must link the directory alternative");
+  // The sr-only directory link is parameterised (F1 route group (tools)):
+  // the home default is the #records anchor, /mappa points to /directory.
+  // The default must stay the home anchor so the home map keeps linking the
+  // text-list alternative on the same page.
+  assert.match(map, /directoryHref\s*=\s*"#records"/, "the default directory link must stay the home #records anchor");
+  assert.match(map, /href=\{directoryHref\}/, "the directory link must be parameterised (home anchor vs /directory)");
 
   // Map task: map unavailable (blocked script or tile host). The list stays
   // usable and the failure is visible with a direct link to the directory.

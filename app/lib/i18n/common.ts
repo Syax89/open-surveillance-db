@@ -16,6 +16,17 @@ export const en = {
   metaTitle: "OpenSurveillanceDB — Public data about public surveillance",
   metaDescription:
     "An open, community-maintained database of public surveillance cameras.",
+  // Tool-route shared nav (F1 route group (tools)): every tool page links
+  // the other public tools plus the home — no dead ends between the four
+  // tools (docs/FRONTEND_DESIGN.md §2.5).
+  toolNavigation: "Tool navigation",
+  toolHomeAria: "OpenSurveillanceDB home",
+  toolMap: "Map",
+  toolDirectory: "Directory",
+  toolReport: "Report",
+  toolCorrection: "Correct",
+  toolGuide: "Guide",
+  toolHome: "Home",
 } as const;
 
 export const it: Translation<typeof en> = {
@@ -27,4 +38,15 @@ export const it: Translation<typeof en> = {
   metaTitle: "OpenSurveillanceDB — Dati pubblici sulla sorveglianza pubblica",
   metaDescription:
     "Un database aperto e mantenuto dalla comunità delle telecamere di sorveglianza pubblica.",
+  // Navigazione condivisa delle route tool (F1 route group (tools)): ogni
+  // pagina tool collega gli altri tool pubblici più la home — nessun vicolo
+  // cieco tra i quattro tool (docs/FRONTEND_DESIGN.md §2.5).
+  toolNavigation: "Navigazione strumenti",
+  toolHomeAria: "Pagina iniziale di OpenSurveillanceDB",
+  toolMap: "Mappa",
+  toolDirectory: "Elenco",
+  toolReport: "Segnala",
+  toolCorrection: "Correggi",
+  toolGuide: "Guida",
+  toolHome: "Home",
 };

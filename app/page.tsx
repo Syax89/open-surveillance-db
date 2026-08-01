@@ -10,7 +10,8 @@ import { Hero } from "./components/home/Hero";
 import { MapPanel } from "./components/home/MapPanel";
 import { PublicDirectory } from "./components/home/PublicDirectory";
 import { CorrectionForm } from "./components/home/CorrectionForm";
-import { ReportForm, useReportFlow } from "./components/home/ReportForm";
+import { ReportForm } from "./components/home/ReportForm";
+import { useReportFlow } from "./lib/useReportFlow";
 
 export default function Home() {
   const t = useMessages().home;

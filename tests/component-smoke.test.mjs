@@ -15,12 +15,10 @@
  * ModerationDashboard.tsx resta un orchestratore sottile e importa i
  * componenti estratti da app/components/moderation/.
  *
- * Deviazione registrata (baseline pinnata, NON silenziosa):
- *   app/components/home/ReportForm.tsx = 162 righe (> target ~150).
- *   Motivo: hook useReportFlow (~131 righe di logica) co-locato con il
- *   componente JSX nello stesso file. Il test fallisce se il file cresce
- *   oltre la baseline registrata (162) e lo segnala come deviazione nel
- *   report QA (raccomandazione: split dell'hook in useReportFlow.ts).
+ * La deviazione di ReportForm registrata in passato (hook useReportFlow
+ * co-locato, 162 righe) è stata risolta in F1 (t_03c0fa15): l'hook è stato
+ * estratto in app/lib/useReportFlow.ts (QA t_14b1949c), il componente
+ * resta solo JSX e rientra nel target ~150. Nessuna deviazione attiva.
  *
  * Stile: come rendered-html.test.mjs — guardie statiche su sorgente +
  * render reale via Miniflare. Non importa i componenti direttamente
@@ -70,17 +68,11 @@ const MODERATION_COMPONENTS = [
  * Deviazioni note dal target ~150, con baseline pinnata: il file NON deve
  * crescere oltre il numero di righe registrato al momento del pin. Qualsiasi
  * nuovo file oltre il target NON registrato qui fa fallire il test.
+ *
+ * (Nessuna deviazione attiva da F1 — ReportForm è tornato sotto target dopo
+ * l'estrazione di useReportFlow in app/lib/useReportFlow.ts.)
  */
-const KNOWN_DEVIATIONS = new Map([
-  [
-    "app/components/home/ReportForm.tsx",
-    {
-      baselineLines: 162,
-      reason:
-        "hook useReportFlow (~131 righe di logica) co-locato con il componente JSX; obiettivo ~150 mancato di 12 — raccomandato split in useReportFlow.ts dedicato (QA t_14b1949c)",
-    },
-  ],
-]);
+const KNOWN_DEVIATIONS = new Map([]);
 
 /** Componente condiviso atteso dal refactor di Linus. */
 const INFO_PAGE_COMPONENT = { name: "InfoPage", file: "app/components/InfoPage.tsx" };

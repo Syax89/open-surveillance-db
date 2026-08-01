@@ -50,11 +50,25 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 
 // Client pages and components the harness must be able to load. Pages are
 // the default exports; components keep their named exports.
+//
+// F1 route group (tools) (t_03c0fa15): the four tool bodies and the shared
+// tool chrome are "use client" components. They live under app/components/
+// (so the recursive walk already transpiles them); they are listed here as
+// the explicit isolation contract — the interaction tests load them by
+// these exact paths.
 const PAGES = [
   { source: "app/login/page.tsx", relative: "app/login/page.mjs" },
   { source: "app/register/page.tsx", relative: "app/register/page.mjs" },
   { source: "app/account/page.tsx", relative: "app/account/page.mjs" },
   { source: "app/records/[id]/page.tsx", relative: "app/records/[id]/page.mjs" },
+  // F1 route group (tools): tool bodies + shared chrome.
+  { source: "app/components/ToolLayout.tsx", relative: "app/components/ToolLayout.mjs" },
+  { source: "app/components/FiltersBar.tsx", relative: "app/components/FiltersBar.mjs" },
+  { source: "app/components/EmptyState.tsx", relative: "app/components/EmptyState.mjs" },
+  { source: "app/components/tools/MappaTool.tsx", relative: "app/components/tools/MappaTool.mjs" },
+  { source: "app/components/tools/DirectoryTool.tsx", relative: "app/components/tools/DirectoryTool.mjs" },
+  { source: "app/components/tools/SegnalaTool.tsx", relative: "app/components/tools/SegnalaTool.mjs" },
+  { source: "app/components/tools/CorreggiTool.tsx", relative: "app/components/tools/CorreggiTool.mjs" },
 ];
 
 const transpile = (sourcePath) =>
@@ -101,13 +115,21 @@ export default function Link({ href, children, ...rest }) {
 `);
   // The navigation mock keeps a mutable state so tests can set the params
   // for /records/[id] and assert router.push calls after a form submit.
+  // `search` is the URL shell (F1 tool routes /mappa ?type=&freshness=,
+  // /correggi ?record=ID): tests pass a query string via __setNavState
+  // ({ search: "type=dome&freshness=7d" }) and the components read it via
+  // useSearchParams, exactly like Next's useSearchParams on a real route.
   await writeFile(path.join(nodeModules, "next", "navigation.mjs"),
-    `const state = { params: { id: "1" }, pushed: [] };
-export const __setNavState = (patch) => { Object.assign(state, patch); };
+    `const state = { params: { id: "1" }, search: "", pushed: [] };
+export const __setNavState = (patch) => {
+  if (patch.search !== undefined) Object.assign(state, { search: patch.search });
+  if (patch.params !== undefined) Object.assign(state, { params: patch.params });
+  if (patch.pushed !== undefined) Object.assign(state, { pushed: patch.pushed });
+};
 export const __getNavState = () => state;
 export const useParams = () => state.params;
 export const useRouter = () => ({ push: (p) => { state.pushed.push(p); }, refresh: () => {} });
-export const useSearchParams = () => new URLSearchParams();
+export const useSearchParams = () => new URLSearchParams(state.search);
 export const usePathname = () => "/";
 `);
 

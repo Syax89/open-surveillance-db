@@ -13,6 +13,9 @@
  */
 import { en as commonEn, it as commonIt } from "./common";
 import { en as mapEn, it as mapIt } from "./map";
+import { en as directoryEn, it as directoryIt } from "./directory";
+import { en as reportEn, it as reportIt } from "./report";
+import { en as correctionEn, it as correctionIt } from "./correction";
 import { en as statusEn, it as statusIt } from "./status";
 import { en as homeEn, it as homeIt } from "./home";
 import { en as guideEn, it as guideIt } from "./guide";
@@ -30,6 +33,9 @@ import type { Locale, Translation } from "./types";
 export const en = {
   common: commonEn,
   map: mapEn,
+  directory: directoryEn,
+  report: reportEn,
+  correction: correctionEn,
   status: statusEn,
   home: homeEn,
   guide: guideEn,
@@ -47,6 +53,9 @@ export const en = {
 export const it: Translation<typeof en> = {
   common: commonIt,
   map: mapIt,
+  directory: directoryIt,
+  report: reportIt,
+  correction: correctionIt,
   status: statusIt,
   home: homeIt,
   guide: guideIt,
