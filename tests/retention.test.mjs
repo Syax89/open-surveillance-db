@@ -75,12 +75,14 @@ async function insertPhoto({ cameraId = null, status = "pending", createdAt, sto
 }
 
 async function insertRejectEvent(cameraId, createdAt) {
-  await runtime.env.DB.prepare(
+  const row = await runtime.env.DB.prepare(
     `INSERT INTO moderation_events (entity, entity_id, previous_status, new_status, action, reason_code, note, actor, created_at)
-     VALUES ('camera', ?, 'pending', 'rejected', 'reject', 'privacy-or-safety-concern', 'test', 'Test Reviewer', ?)`,
+     VALUES ('camera', ?, 'pending', 'rejected', 'reject', 'privacy-or-safety-concern', 'test', 'Test Reviewer', ?)
+     RETURNING id`,
   )
     .bind(cameraId, createdAt)
-    .run();
+    .first();
+  return row.id;
 }
 
 async function insertPhotoRejectEvent(photoId, createdAt) {
@@ -92,12 +94,49 @@ async function insertPhotoRejectEvent(photoId, createdAt) {
     .run();
 }
 
-async function insertCorrection({ createdAt, outcome = "resolved" }) {
-  await runtime.env.DB.prepare(
-    `INSERT INTO correction_requests (camera_id, issue_type, message, contact, status, outcome, created_at)
-     VALUES (NULL, 'takedown', 'test', NULL, 'closed', ?, ?)`,
+// A resolved correction request: terminal status ('reviewed' by default) with
+// the resolution timestamp the app now writes (moderateCorrection sets
+// resolved_at on the approve/reject transition). Open requests pass
+// status='pending' and resolvedAt=null.
+async function insertCorrection({ createdAt, resolvedAt = null, status = "reviewed", outcome = "kept" }) {
+  const row = await runtime.env.DB.prepare(
+    `INSERT INTO correction_requests (camera_id, issue_type, message, contact, status, outcome, resolved_at, created_at)
+     VALUES (NULL, 'takedown', 'test', NULL, ?, ?, ?, ?)
+     RETURNING id`,
   )
-    .bind(outcome, createdAt)
+    .bind(status, outcome, resolvedAt, createdAt)
+    .first();
+  return row.id;
+}
+
+// An appeal against the camera's moderation decision. status mirrors the app:
+// pending → upheld | dismissed | escalated. Only 'pending'/'escalated' (not
+// finally decided) must block the R1/R2 purge. The appellant FK is satisfied
+// with a throwaway users row (FK enforcement is ON in the D1 adapter).
+async function insertAppeal({ entity = "camera", entityId, decisionEventId, status = "pending" }) {
+  const user = await runtime.env.DB.prepare(
+    "INSERT INTO users (email, display_name, role, active, mfa_enabled, created_at, updated_at) VALUES (?, 'Appellant', 'contributor', 1, 0, ?, ?) RETURNING id",
+  )
+    .bind(`appellant-${Math.random()}@example.com`, NOW, NOW)
+    .first();
+  await runtime.env.DB.prepare(
+    `INSERT INTO moderation_appeals (entity, entity_id, decision_event_id, appellant_id, reason, status, created_at)
+     VALUES (?, ?, ?, ?, 'test appeal', ?, ?)`,
+  )
+    .bind(entity, entityId, decisionEventId, user.id, status, NOW)
+    .run();
+}
+
+// A legal-hold audit event for a camera (RETENTION_SCHEDULE.md §2 convention,
+// documented at HOLD_EXCLUSION_SQL in db/retention.ts): 'legal-hold' raises
+// the hold, 'legal-hold-release' lifts it. A hold never changes the record
+// status, so previous_status/new_status mirror the current one.
+async function insertHoldEvent(cameraId, action, createdAt, status = "rejected") {
+  await runtime.env.DB.prepare(
+    `INSERT INTO moderation_events (entity, entity_id, previous_status, new_status, action, reason_code, note, actor, created_at)
+     VALUES ('camera', ?, ?, ?, ?, 'other', 'test hold', 'Ops', ?)`,
+  )
+    .bind(cameraId, status, status, action, createdAt)
     .run();
 }
 
@@ -281,15 +320,139 @@ test("R3: the tombstone event records the REAL previous_status, never 'removed'"
 // R4 — resolved correction requests
 // ---------------------------------------------------------------------------
 
-test("R4: resolved correction requests older than 2 years are purged", async () => {
-  await insertCorrection({ createdAt: daysBefore(800) });
-  await insertCorrection({ createdAt: daysBefore(100) });
-  await insertCorrection({ createdAt: daysBefore(800), outcome: null }); // still open: never purged
+test("R4: resolved correction requests are purged 2 years after the RESOLUTION date", async () => {
+  // Resolution 800 days ago → past the 2-year floor → purged.
+  await insertCorrection({ createdAt: daysBefore(900), resolvedAt: daysBefore(800) });
+  // Created 900 days ago but resolved only 100 days ago → still inside the
+  // floor → must survive (regression: a created_at anchor purged it EARLY).
+  await insertCorrection({ createdAt: daysBefore(900), resolvedAt: daysBefore(100) });
+  // Open request: never resolved → never purged.
+  await insertCorrection({ createdAt: daysBefore(900), status: "pending", resolvedAt: null, outcome: null });
 
   const summary = await runtime.retention.runRetentionSweep(NOW);
 
-  assert.equal(summary.correctionsPurged, 1, "only resolved requests past 2 years");
-  assert.equal(await count("correction_requests"), 2, "the recent and the open request survive");
+  assert.equal(summary.correctionsPurged, 1, "only the request past its resolution+2y floor");
+  assert.equal(await count("correction_requests"), 2, "the recently resolved and the open request survive");
+});
+
+test("R4: rejected corrections (outcome NULL) are purged too — resolution+2y", async () => {
+  // The pre-fix predicate (`outcome IS NOT NULL`) never matched rejected
+  // requests (only approve sets outcome), so they accumulated forever.
+  await insertCorrection({ createdAt: daysBefore(900), resolvedAt: daysBefore(800), status: "rejected", outcome: null });
+  await insertCorrection({ createdAt: daysBefore(900), resolvedAt: daysBefore(100), status: "rejected", outcome: null });
+
+  const summary = await runtime.retention.runRetentionSweep(NOW);
+
+  assert.equal(summary.correctionsPurged, 1, "a rejected request is resolved: covered by the 2-year floor");
+  assert.equal(await count("correction_requests"), 1, "the recently rejected request survives");
+});
+
+test("R4: legacy rows without resolved_at fall back to created_at (documented derogation)", async () => {
+  // Rows resolved before migration 0018 have resolved_at = NULL (backfill
+  // covers only rows with a decision event; the fixture simulates the rest).
+  await insertCorrection({ createdAt: daysBefore(800), resolvedAt: null });
+  await insertCorrection({ createdAt: daysBefore(100), resolvedAt: null });
+
+  const summary = await runtime.retention.runRetentionSweep(NOW);
+
+  assert.equal(summary.correctionsPurged, 1, "legacy fallback mirrors the R2/R6 pattern");
+  assert.equal(await count("correction_requests"), 1);
+});
+
+test("R4: the purge ARCHIVES an audit event in the same batch as the delete", async () => {
+  const id = await insertCorrection({ createdAt: daysBefore(900), resolvedAt: daysBefore(800) });
+
+  const summary = await runtime.retention.runRetentionSweep(NOW);
+
+  assert.equal(summary.correctionsPurged, 1);
+  const event = await runtime.env.DB.prepare(
+    "SELECT entity, entity_id AS entityId, previous_status AS previousStatus, new_status AS newStatus, action, actor FROM moderation_events WHERE entity = 'correction' AND action = 'archive'",
+  )
+    .first();
+  assert.ok(event, "an archive event must be written before the delete (art. 5(2))");
+  assert.equal(event.entityId, id);
+  assert.equal(event.previousStatus, "reviewed");
+  assert.equal(event.newStatus, "archived");
+  assert.equal(event.actor, "Retention sweep");
+  assert.equal(await count("correction_requests", "id = ?", id), 0, "the row is deleted after archiving");
+});
+
+// ---------------------------------------------------------------------------
+// Appeals / legal hold — R1/R2 purge exclusions (P1, consolidated review)
+// ---------------------------------------------------------------------------
+
+test("R2: a rejected camera with a PENDING appeal survives the purge (P1)", async () => {
+  // MODERATION_SLA S5: an appeal can still be open at decision+30d (filed at
+  // +29d, decided up to +14d later); purging would destroy record + evidence
+  // irreversibly while the appeal is pending.
+  const appealed = await insertCamera({ title: "Appealed", status: "rejected", createdAt: daysBefore(200) });
+  const eventId = await insertRejectEvent(appealed, daysBefore(40));
+  await insertAppeal({ entityId: appealed, decisionEventId: eventId, status: "pending" });
+  const normal = await insertCamera({ title: "No appeal", status: "rejected", createdAt: daysBefore(200) });
+  await insertRejectEvent(normal, daysBefore(40));
+
+  const summary = await runtime.retention.runRetentionSweep(NOW);
+
+  assert.equal(summary.rejectedPurged, 1, "only the record without an open appeal");
+  assert.equal(await count("cameras", "id = ?", appealed), 1, "the appealed record must survive");
+  assert.equal(await count("cameras", "id = ?", normal), 0);
+});
+
+test("R2: an ESCALATED appeal still blocks the purge (not finally decided)", async () => {
+  const escalated = await insertCamera({ title: "Appeal escalated", status: "rejected", createdAt: daysBefore(200) });
+  const eventId = await insertRejectEvent(escalated, daysBefore(40));
+  await insertAppeal({ entityId: escalated, decisionEventId: eventId, status: "escalated" });
+
+  const summary = await runtime.retention.runRetentionSweep(NOW);
+
+  assert.equal(summary.rejectedPurged, 0);
+  assert.equal(await count("cameras", "id = ?", escalated), 1);
+});
+
+test("R2: a finally DECIDED appeal (dismissed) does not block the purge", async () => {
+  const decided = await insertCamera({ title: "Appeal dismissed", status: "rejected", createdAt: daysBefore(200) });
+  const eventId = await insertRejectEvent(decided, daysBefore(40));
+  await insertAppeal({ entityId: decided, decisionEventId: eventId, status: "dismissed" });
+
+  const summary = await runtime.retention.runRetentionSweep(NOW);
+
+  assert.equal(summary.rejectedPurged, 1);
+  assert.equal(await count("cameras", "id = ?", decided), 0);
+});
+
+test("R2: a camera under ACTIVE legal hold survives the purge (RETENTION_SCHEDULE §2)", async () => {
+  const held = await insertCamera({ title: "Legal hold", status: "rejected", createdAt: daysBefore(200) });
+  await insertRejectEvent(held, daysBefore(40));
+  await insertHoldEvent(held, "legal-hold", daysBefore(20));
+
+  const summary = await runtime.retention.runRetentionSweep(NOW);
+
+  assert.equal(summary.rejectedPurged, 0, "the hold suspends the deletion");
+  assert.equal(await count("cameras", "id = ?", held), 1);
+});
+
+test("R2: a RELEASED legal hold no longer blocks the purge", async () => {
+  const released = await insertCamera({ title: "Hold released", status: "rejected", createdAt: daysBefore(200) });
+  await insertRejectEvent(released, daysBefore(40));
+  await insertHoldEvent(released, "legal-hold", daysBefore(60));
+  await insertHoldEvent(released, "legal-hold-release", daysBefore(10));
+
+  const summary = await runtime.retention.runRetentionSweep(NOW);
+
+  assert.equal(summary.rejectedPurged, 1, "the matter is closed: the 30-day clock resumes");
+  assert.equal(await count("cameras", "id = ?", released), 0);
+});
+
+test("R1: a pending camera under legal hold survives the pending purge", async () => {
+  const held = await insertCamera({ title: "Pending held", status: "pending", createdAt: daysBefore(100) });
+  await insertHoldEvent(held, "legal-hold", daysBefore(50), "pending");
+  const normal = await insertCamera({ title: "Pending normal", status: "pending", createdAt: daysBefore(100) });
+
+  const summary = await runtime.retention.runRetentionSweep(NOW);
+
+  assert.equal(summary.pendingPurged, 1);
+  assert.equal(await count("cameras", "id = ?", held), 1, "held record survives");
+  assert.equal(await count("cameras", "id = ?", normal), 0);
 });
 
 // ---------------------------------------------------------------------------

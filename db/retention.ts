@@ -11,7 +11,8 @@
  *                                       `removed` after 6 months unverified
  *                                       (the review clocks themselves live in
  *                                       db/freshness.ts + runFreshnessSweep)
- *   R4  resolved correction requests  → delete after 2 years (created_at)
+ *   R4  resolved correction requests  → archived in the audit log, then
+ *                                       deleted after 2 years (RESOLUTION date)
  *   R6  photo evidence                → deleted with its record; orphan
  *                                       pending photos after 90 days; rejected
  *                                       photos after 30 days (R13: anchored on
@@ -35,6 +36,16 @@
  *  - `cameras.updated` holds a human note, not a timestamp — so the R2
  *    "rejection decision date" is anchored on the moderation event
  *    (action='reject'), with `created_at` as fallback for legacy rows.
+ *    The R4 "resolution date" is `correction_requests.resolved_at` (set by
+ *    moderateCorrection on the approve/reject transition, backfilled by
+ *    migration 0018), with `created_at` as documented fallback for legacy
+ *    rows; R4 also ARCHIVES the request (an append-only audit event) in the
+ *    same batch as the delete, per RETENTION_SCHEDULE.md R4 art. 5(2).
+ *  - R1/R2 hard-deletes skip records with an OPEN APPEAL (moderation_appeals
+ *    status pending/escalated — MODERATION_SLA §4/S5) or an ACTIVE LEGAL HOLD
+ *    (audit event action='legal-hold' with no later 'legal-hold-release' —
+ *    RETENTION_SCHEDULE.md §2). The hold convention is documented at
+ *    HOLD_EXCLUSION_SQL below.
  *  - Destructive D1 work is done in `d1.batch(...)` transactions so a record,
  *    its queue items and its evidence are removed atomically; R2 (PHOTOS
  *    bucket) objects are deleted AFTER the D1 batch succeeds, best effort, so
@@ -135,6 +146,43 @@ function daysAgo(nowIso: string, days: number): string {
 }
 
 type D1 = Awaited<ReturnType<typeof getD1>>;
+
+/**
+ * SQL fragment appended to the R1/R2 camera SELECTs (whose FROM alias is `c`):
+ * skip records with an open appeal or an active legal hold, so a hard delete
+ * can never destroy data that the law still protects.
+ *
+ *  - Open appeal: a `moderation_appeals` row for the camera still `pending`
+ *    or `escalated` (not finally decided). MODERATION_SLA §4/S5: an appeal can
+ *    be filed up to 30 days after the decision and decided up to 14 days
+ *    later, so an appeal can still be open when the R2 sweep fires at
+ *    decision+30 days; purging then would destroy the record and its evidence
+ *    irreversibly before the appeal is decided.
+ *  - Active legal hold: an audit event `action='legal-hold'` for the camera
+ *    with no later `action='legal-hold-release'` event. RETENTION_SCHEDULE.md
+ *    §2: "Any pending litigation, complaint, or supervisory-authority inquiry
+ *    suspends the relevant deletions until the matter is closed. The hold, its
+ *    scope and its end date are recorded in the audit log." The audit trail is
+ *    the only hold registry in the schema; a hold is raised (and later
+ *    released) by ops writing those events on the append-only log.
+ */
+const HOLD_EXCLUSION_SQL = `
+  AND NOT EXISTS (
+    SELECT 1 FROM moderation_appeals a
+    WHERE a.entity = 'camera' AND a.entity_id = c.id
+      AND a.status IN ('pending', 'escalated')
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM moderation_events lh
+    WHERE lh.entity = 'camera' AND lh.entity_id = c.id
+      AND lh.action = 'legal-hold'
+      AND NOT EXISTS (
+        SELECT 1 FROM moderation_events lhr
+        WHERE lhr.entity = 'camera' AND lhr.entity_id = c.id
+          AND lhr.action = 'legal-hold-release'
+          AND lhr.created_at >= lh.created_at
+      )
+  )`;
 
 /**
  * Delete the R2 objects for a set of storage keys, best effort: a bucket
@@ -280,9 +328,15 @@ export async function runRetentionSweep(
   }
 
   // --- R1: pending reports not verified within 90 days → hard delete + evidence.
+  // Records under an open appeal or an active legal hold are exempt
+  // (HOLD_EXCLUSION_SQL): a hard delete is irreversible, so the law-first rule
+  // is to skip and retry on a later run.
   const pendingCutoff = daysAgo(now, policy.pendingDays);
   const pending = await d1
-    .prepare("SELECT id FROM cameras WHERE status = 'pending' AND created_at < ?")
+    .prepare(
+      `SELECT c.id FROM cameras c
+       WHERE c.status = 'pending' AND c.created_at < ?${HOLD_EXCLUSION_SQL}`,
+    )
     .bind(pendingCutoff)
     .all<{ id: number }>();
   for (const { id } of pending.results) {
@@ -300,7 +354,10 @@ export async function runRetentionSweep(
 
   // --- R2: rejected reports expire 30 days after the rejection decision.
   // The decision date is the latest moderation event with action='reject';
-  // legacy rows without an event fall back to created_at.
+  // legacy rows without an event fall back to created_at. Records under an
+  // open appeal (filed up to decision+30d, decided up to +14d later per
+  // MODERATION_SLA S5) or an active legal hold are exempt: the purge must not
+  // destroy record + evidence while the appeal/hold is still open.
   const rejectedCutoff = daysAgo(now, policy.rejectedDays);
   const rejected = await d1
     .prepare(
@@ -313,7 +370,7 @@ export async function runRetentionSweep(
         GROUP BY entity_id
       ) e ON e.entity_id = c.id
       WHERE c.status = 'rejected'
-        AND COALESCE(e.decided_at, c.created_at) < ?`,
+        AND COALESCE(e.decided_at, c.created_at) < ?${HOLD_EXCLUSION_SQL}`,
     )
     .bind(rejectedCutoff)
     .all<{ id: number }>();
@@ -330,16 +387,53 @@ export async function runRetentionSweep(
     }
   }
 
-  // --- R4: resolved correction requests older than 2 years → delete.
-  // `outcome IS NOT NULL` marks a resolved request (the queue lists only
-  // pending ones). created_at is the only stored timestamp; using it is
-  // conservative (never earlier than the legal 2-year floor).
+  // --- R4: resolved correction requests are archived, then deleted, 2 years
+  // after the RESOLUTION date (RETENTION_SCHEDULE.md R4: "2 years, Resolution
+  // date" + "archive the entry in the internal audit log, then delete").
+  // The anchor is resolved_at (set by moderateCorrection on the approve/reject
+  // transition, backfilled by migration 0018 from the decision event); rows
+  // without it fall back to created_at, the documented derogation for legacy
+  // requests resolved before the column existed (same fallback pattern as the
+  // R2/R6 legacy rows). A created_at anchor would purge BEFORE the legal floor
+  // — created_at always precedes the resolution date. Only terminal states are
+  // swept ('reviewed', 'rejected'): escalated requests stay 'pending' (not yet
+  // resolved) and open requests are never touched.
   const correctionCutoff = daysAgo(now, policy.correctionDays);
   const corrections = await d1
-    .prepare("DELETE FROM correction_requests WHERE outcome IS NOT NULL AND created_at < ?")
+    .prepare(
+      `SELECT id, status, resolved_at AS resolvedAt
+       FROM correction_requests
+       WHERE status IN ('reviewed', 'rejected')
+         AND COALESCE(resolved_at, created_at) < ?`,
+    )
     .bind(correctionCutoff)
-    .run() as { meta: { changes: number } };
-  summary.correctionsPurged = corrections.meta.changes;
+    .all<{ id: number; status: string; resolvedAt: string | null }>();
+  for (const correction of corrections.results) {
+    try {
+      // Archive step (art. 5(2)): write an append-only audit event in the SAME
+      // batch as the delete, so the purge cannot leave a gap in the trail.
+      // The decision event (approve/reject) carries the resolution itself;
+      // this event records the purge and its trigger, keeping the 2-year
+      // accountability trail complete after the row is gone.
+      await d1.batch([
+        d1
+          .prepare(
+            "INSERT INTO moderation_events (entity, entity_id, previous_status, new_status, action, reason_code, note, actor, reviewer_id, actor_role, recused, escalated, second_reviewer_id, appeal_id, created_at) VALUES ('correction', ?, ?, 'archived', 'archive', 'other', ?, 'Retention sweep', NULL, NULL, 0, 0, NULL, NULL, ?)",
+          )
+          .bind(
+            correction.id,
+            correction.status,
+            `Correction request ${correction.id} purged under R4 (2-year retention from resolution date ${correction.resolvedAt ?? "unknown (legacy row)"}); archived before delete per RETENTION_SCHEDULE.md R4.`,
+            now,
+          ),
+        d1.prepare("DELETE FROM correction_requests WHERE id = ?").bind(correction.id),
+      ]);
+      summary.correctionsPurged += 1;
+    } catch (error) {
+      summary.failures += 1;
+      console.error(`Retention: R4 archive+delete failed for correction ${correction.id}`, error);
+    }
+  }
 
   // --- R6: orphan pending photos (never linked to a record) and rejected
   // photos (evidence a moderator refused) are removed from D1 and R2.
