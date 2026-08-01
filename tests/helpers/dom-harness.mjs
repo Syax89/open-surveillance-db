@@ -128,6 +128,14 @@ export default function Link({ href, children, ...rest }) {
   //     shell for /mappa /correggi ?record=ID (useSearchParams reads it);
   //   __setNavState({ pathname: "/mappa" })                → feeds
   //     usePathname for the ToolLayout per-page nav sets (t_2ca69725).
+  //
+  // F4 URL-state contract (t_522638a5): push/replace model Next's router —
+  // after a navigation the URL changes, so the stub updates the URL and
+  // useSearchParams reflects it on the next render (deep-link / back-forward
+  // behaviour in jsdom). `replaced` stays an array of hrefs (legacy contract,
+  // client-legacy-anchor); the full call shape { href, opts } lands in
+  // `replaceCalls` so tests can assert router.replace(href, { scroll: false })
+  // on filter edits (R2 URL churn).
   await writeFile(path.join(nodeModules, "next", "navigation.mjs"),
     `const parseUrl = (href) => {
   if (typeof href !== "string" || href.length === 0) return { pathname: "/", search: "" };
@@ -142,6 +150,7 @@ const state = {
   params: { id: "1" },
   pushed: [],
   replaced: [],
+  replaceCalls: [],
   url: { pathname: "/", search: "" },
   history: [{ pathname: "/", search: "" }],
   historyIndex: 0,
@@ -199,8 +208,9 @@ export const useRouter = () => ({
     state.historyIndex += 1;
     applyUrl(state.history[state.historyIndex]);
   },
-  replace: (p) => {
+  replace: (p, opts) => {
     state.replaced.push(p);
+    state.replaceCalls.push({ href: p, opts });
     state.history[state.historyIndex] = parseUrl(p);
     applyUrl(state.history[state.historyIndex]);
   },

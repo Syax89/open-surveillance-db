@@ -743,10 +743,12 @@ test("every map task has a keyboard/text-list equivalent in the public interface
   const reportForm = await readSource("app/components/home/ReportForm.tsx");
 
   // Map task: select a record (pin click). Keyboard path: the directory's
-  // "Show on map" pushes /mappa?focus=ID (URL carries the selection; F4
-  // wires the focus handling on /mappa — D3-qualified shell).
+  // "Show on map" pushes /mappa carrying the ACTIVE filters + ?focus=ID
+  // (F4, mapHrefWithFocus: the URL carries the selection AND the filter
+  // context — shareable deep link; the F4 URL contract asserts the exact
+  // href, e.g. /mappa?type=Bullet&focus=2).
   assert.match(directoryTool, /function\s+showRecordOnMap\s*\(\s*id:\s*number\s*\)/);
-  assert.match(directoryTool, /router\.push\(`\/mappa\?focus=\$\{id\}`\)/, "show-on-map must navigate to the map with the record preselected");
+  assert.match(directoryTool, /router\.push\(mapHrefWithFocus\(filters, id\)\)/, "show-on-map must navigate to the map with the record preselected");
 
   // The directory is the map's text equivalent: it renders the record list
   // with the keyboard select action on every card.

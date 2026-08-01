@@ -168,12 +168,14 @@ test("every directory record has a real 'Show on map' button (keyboard path for 
 
 test("the 'Show on map' action navigates to /mappa with the record preselected (URL focus path)", async () => {
   // F2 home hub: showRecordOnMap moved to /directory (DirectoryTool). The
-  // keyboard path for the map-selection task is now a router push to
-  // /mappa?focus=ID — the URL carries the selection (shareable, F4 wires the
-  // focus handling on /mappa). No client-side scroll/focus choreography on
-  // the directory anymore; the focus contract belongs to the URL (D3).
+  // keyboard path for the map-selection task is a router push to /mappa
+  // carrying the ACTIVE filters plus ?focus=ID (F4, useCameraFilters:
+  // mapHrefWithFocus) — the URL carries the selection AND the filter context
+  // (shareable, deep-link; the F4 URL contract asserts the exact href). No
+  // client-side scroll/focus choreography on the directory anymore; the
+  // focus contract belongs to the URL (D3).
   const source = await readFile(path.join(root, "app", "components", "tools", "DirectoryTool.tsx"), "utf8");
-  assert.match(source, /router\.push\(`\/mappa\?focus=\$\{id\}`\)/, "the keyboard path must push /mappa?focus=ID");
+  assert.match(source, /router\.push\(mapHrefWithFocus\(filters, id\)\)/, "the keyboard path must push /mappa with the active filters and ?focus=ID");
 });
 
 test("no positive tabindex anywhere on the homepage (standard tab order preserved)", async () => {
