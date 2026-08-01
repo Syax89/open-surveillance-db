@@ -928,6 +928,21 @@ test("E2E: appeals validation and role gates hold through the real routes", asyn
   assert.equal(row.status, "verified");
 });
 
+test("E2E: appeals route maps a syntactically invalid JSON body to 400 (not 500)", async () => {
+  const appealsBefore = await env.DB.prepare("SELECT COUNT(*) AS n FROM moderation_appeals").first();
+  const malformed = await appealsRoute.POST(
+    apiRequest("/api/appeals", {
+      method: "POST",
+      headers: { "x-osdb-user-email": "contributor@osdb.test" },
+      body: '{"entity": "camera", broken',
+    }),
+  );
+  assert.equal(malformed.status, 400);
+  assert.equal((await responseBody(malformed)).error, "Request body is not valid JSON.");
+  const appealsAfter = await env.DB.prepare("SELECT COUNT(*) AS n FROM moderation_appeals").first();
+  assert.equal(Number(appealsAfter.n), Number(appealsBefore.n), "no appeal row written for malformed JSON");
+});
+
 // 7) Account erasure (RETENTION_SCHEDULE R7) end to end
 // ---------------------------------------------------------------------------
 
