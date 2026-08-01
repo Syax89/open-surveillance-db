@@ -1,28 +1,45 @@
 # Site map and information architecture
 
-Last reviewed: 2026-08-01 (post-implementation state)
+Last reviewed: 2026-08-01 (post-implementation state, F1 route split)
 
-> **Design & refactor vision:** the plan to refactor the home-page tool sections into
-> separate routes (`/mappa`, `/directory`, `/segnala`, `/correggi`) is in
-> [`docs/FRONTEND_DESIGN.md`](FRONTEND_DESIGN.md) (design vision) and
-> [`docs/FRONTEND_PLAN.md`](FRONTEND_PLAN.md) (consolidated roadmap with phases, API
-> requirements, legal/security/i18n requirements and acceptance criteria). This document
-> describes the implemented state; those documents describe the target state.
+> **Design & refactor vision:** the refactor that promotes the home-page tool
+> sections to separate routes (`/mappa`, `/directory`, `/segnala`, `/correggi`)
+> is specified in [`docs/FRONTEND_DESIGN.md`](FRONTEND_DESIGN.md) (design
+> vision) and [`docs/FRONTEND_PLAN.md`](FRONTEND_PLAN.md) (consolidated
+> roadmap with phases, API requirements, legal/security/i18n requirements and
+> acceptance criteria). This document describes the implemented state; those
+> documents describe the target state and the phase plan.
 
 This document defines the information architecture of the public website:
 the complete site map, the global navigation (page nav-shell and footer), and
 the shared layout pattern that every informational page follows. It reflects
 the **implemented** state of the site (all routes live since PRs #65, #67,
 #68, #70, #71, #73, #76; QA in PR #72; informational pages converted to
-Server Components in PR #120, with SSR locale resolution in PR #132). It is
-the reference for future page changes and for the QA pass over the routes.
+Server Components in PR #120, with SSR locale resolution in PR #132; the four
+public tool routes split in F1, t_03c0fa15 / PR #158). It is the reference
+for future page changes and for the QA pass over the routes.
+
+**Phase status (frontend refactor, roadmap `docs/FRONTEND_PLAN.md`):**
+
+- **F1 done** — the four tool routes exist as dedicated pages
+  (`/mappa`, `/directory`, `/segnala`, `/correggi`, route group
+  `app/(tools)/` with shared `ToolLayout`).
+- **F2 pending** (t_52dcb95e) — home becomes a hub: static map teaser + four
+  tool cards. Until F2 merges, `/` keeps its anchor sections (`#map`,
+  `#records`, `#report`) as a temporary fallback.
+- **F3 pending** (t_2ca69725) — navigation link sets (home header/footer,
+  per-page refinement) and client-side `LegacyAnchorRedirect` for the old
+  anchors. Until F3 merges, anchor links (`/#map`, `/#records`) remain valid
+  and the footer does not yet list the tool routes.
 
 ## Principles
 
-1. **The home page is a tool, not a document.** `/` keeps the interactive
-   surface (map, directory, report, correction) and the short hero. Long-form
-   content (mission, rules, policies, FAQ) lives on dedicated pages linked
-   from the header and footer.
+1. **The home page is a hub, not the tool.** Since F1 (t_03c0fa15) the four
+   interactive tools live on their own routes (`/mappa`, `/directory`,
+   `/segnala`, `/correggi`) with a shared tool layout; `/` keeps the hero and
+   orienting content and links the tools (F2 completes the hub: static map
+   teaser + four tool cards). Long-form content (mission, rules, policies,
+   FAQ) lives on dedicated pages linked from the header and footer.
 2. **One page, one job.** Every route has a single purpose and a single
    `h1`. No page mixes two topics (e.g. rules and contacts never share a
    route).
@@ -54,6 +71,12 @@ the reference for future page changes and for the QA pass over the routes.
 - Public informational routes use **short Italian slugs** (`/manifesto`,
   `/regole`, `/faq`…), matching the project's bilingual identity and the
   canonical names used in the footer.
+- Public tool routes follow the same kebab-case convention with one
+  documented exception: `/mappa`, `/segnala`, `/correggi` are Italian
+  (coherent with the informational slugs), while **`/directory` keeps the
+  English slug** — precedent: `/guide` (already live, never renamed).
+  Decided in `docs/FRONTEND_PLAN.md` §1.3 (CTO t_f24c3227) and listed here
+  **before** implementation, per the rule below.
 - **Existing routes are never renamed.** `/guide` (already live) keeps its
   English slug; `/moderation` keeps its role as the **private moderator
   dashboard** (protected by `requireRole`). The public informational page
@@ -76,10 +99,11 @@ or `legal` bundle — legal content is a separate typed layer
 | Chrome (skip link, locale toggle, SEO metadata) | every route | `common.ts` |
 | Global footer | every route | `footer.ts` |
 | Record-status vocabulary | map, directory, record detail | `status.ts` |
-| Map | `/` map panel (future `/mappa`) | `map.ts` |
-| Home / directory | `/` hero + directory (future `/directory`) | `home.ts` |
-| Report | `/` report form (future `/segnala`) | `home.ts` (future `report.ts`) |
-| Correction | `/` correction form (future `/correggi`) | `home.ts` (future `correction.ts`) |
+| Map | `/mappa` | `map.ts` |
+| Directory | `/directory` | `directory.ts` |
+| Report | `/segnala` | `report.ts` |
+| Correction | `/correggi` | `correction.ts` |
+| Home (hub) | `/` hero + orienting content | `home.ts` |
 | Record detail | `/records/[id]` | `record.ts` |
 | Auth | `/login`, `/register`, `/account` | `auth.ts` |
 | Moderation (private dashboard) | `/moderation` | `moderation.ts` |
@@ -95,7 +119,11 @@ or `legal` bundle — legal content is a separate typed layer
 
 | Route          | Page                  | Purpose                                             | In home nav | In footer | Status |
 |----------------|-----------------------|-----------------------------------------------------|:---:|:---:|--------|
-| `/`            | Home                  | Map + directory + report + correction (the tool)    | ✓ (brand) | ✓ (brand) | implemented (prototype) |
+| `/`            | Home (hub)            | Hero + orienting content; links the four tools (hub cards in F2; anchor sections as temporary fallback) | ✓ (brand) | ✓ (brand) | implemented (prototype) |
+| `/mappa`       | Map                   | Interactive map (Leaflet), record panel, filters, export, text fallback | — (F3) | — (F3) | implemented (F1, t_03c0fa15) |
+| `/directory`   | Directory             | Searchable text directory with filters, sort, count, pagination | — (F3) | — (F3) | implemented (F1, t_03c0fa15) |
+| `/segnala`     | Report a camera       | Guided private submission form (`noindex`)          | — (F3) | — (F3) | implemented (F1, t_03c0fa15) |
+| `/correggi`    | Correct / remove      | Correction/removal request form (`noindex`, `?record=ID` prefill) | — (F3) | — (F3) | implemented (F1, t_03c0fa15) |
 | `/guide`       | Guide                 | How to use the site (map, directory, exports)       | ✓ | ✓ | implemented (pre-existing) |
 | `/manifesto`   | Manifesto             | Mission, principles, non-goals, what we publish     | ✓ | ✓ | implemented (PR #65) |
 | `/regole`      | Rules                 | Participation and content rules for contributors    | ✓ | ✓ | implemented (PR #67) |
@@ -107,11 +135,15 @@ or `legal` bundle — legal content is a separate typed layer
 | `/faq`         | FAQ                   | Frequent questions                                  | — | ✓ | implemented (PR #68) |
 | `/contatti`    | Contacts              | Who we are, owners, correction/removal contact      | — | ✓ | implemented (PR #68) |
 
-"Home nav" means the page is linked from the home page's `nav-shell` (the
-only page with the full link set: Map & data, Directory, Guide, Rules,
-Manifesto, Add a camera). Informational pages render their own compact
-`nav-shell` with a context-appropriate subset of links; see "Page
-navigation" below.
+"Home nav" means the page is linked from the home page's `nav-shell`. The
+home keeps the full link set (Map, Directory, Guide, Rules, Manifesto, CTA
+Report); since F1 it still targets the **anchor sections** (`/#map`,
+`/#records`, `/#report`) — the direct route-URL links land with F3
+(t_2ca69725). The four tool pages link each other through the shared
+`ToolLayout` nav (Map, Directory, Report, Correction, Guide, Home), so there
+are never dead ends between the tools (per-page link refinement is F3).
+Informational pages render their own compact `nav-shell` with a
+context-appropriate subset of links; see "Page navigation" below.
 
 Routes **not** linked in nav/footer (private or functional): `/moderation`
 (moderator dashboard), `/account`, `/login`, `/register`, `/records/[id]`
@@ -120,16 +152,73 @@ Routes **not** linked in nav/footer (private or functional): `/moderation`
 
 ## Page-by-page specification
 
-### `/` — Home (implemented)
+### `/` — Home (implemented; hub completion in F2)
 
-- **Purpose:** the interactive tool. Entry point for map exploration,
-  directory browsing, submitting a report, and filing a correction.
-- **Content:** hero, map section, directory section, correction section,
-  principles section (kept short; the full manifesto lives at `/manifesto`).
-- **Nav/footer:** brand in the page `nav-shell` and in the footer; the map
-  section links the exports (GeoJSON/CSV) and `/guide`.
-- **Notes:** anchor targets (`#map`, `#records`, `#report`, `#top`) remain
-  valid for the nav links (`/#map` etc.).
+- **Purpose:** the orienting entry point. Short hero + links to the four
+  tool pages; the full tool surfaces live on their own routes since F1.
+- **Content:** hero, principles section (kept short; the full manifesto
+  lives at `/manifesto`). Until F2 merges, the map/directory/report/correction
+  sections stay on the page as anchor targets (`#map`, `#records`, `#report`,
+  `#top`); F2 replaces them with a static map teaser + four tool cards.
+- **Nav/footer:** brand in the page `nav-shell` and in the footer; the home
+  links the tools at their route URLs.
+
+### `/mappa` — Map (implemented, F1 t_03c0fa15)
+
+- **Purpose:** the interactive map tool. Full-viewport Leaflet map, record
+  panel, filters (type + freshness, applied client-side until the
+  server-side filter gate, `docs/FRONTEND_PLAN.md` §3.3), exports, textual
+  fallback.
+- **Content:** `app/(tools)/mappa/page.tsx` (thin server shell) +
+  `MappaTool` (`app/components/tools/MappaTool.tsx`, `"use client"`),
+  wrapped in a `Suspense` boundary (Next 16 `useSearchParams` requirement).
+  Bundle: `map.ts`.
+- **Layout:** route group `app/(tools)/layout.tsx` → `ToolLayout`
+  (`app/components/ToolLayout.tsx`): shared nav (Map, Directory, Report,
+  Correction, Guide, Home) + `main#main-content`.
+- **Nav/footer:** in tool nav (`ToolLayout`); home-nav and footer links land
+  with F3 (t_2ca69725).
+
+### `/directory` — Directory (implemented, F1 t_03c0fa15)
+
+- **Purpose:** the searchable text directory, the keyboard/AT-equivalent of
+  the map. Search, low-risk filters (type, freshness), sort, result count,
+  truthful empty state, server-side pagination.
+- **Content:** `app/(tools)/directory/page.tsx` + `DirectoryTool`
+  (`app/components/tools/DirectoryTool.tsx`, `"use client"`), reusing
+  `FiltersBar`, `EmptyState`, `RecordCard`. Bundle: `directory.ts`.
+- **SEO:** the only tool page with real SEO value (`docs/FRONTEND_PLAN.md`
+  §1.3) — indexable, own metadata.
+- **Nav/footer:** in tool nav (`ToolLayout`); home-nav and footer links land
+  with F3 (t_2ca69725).
+
+### `/segnala` — Report a camera (implemented, F1 t_03c0fa15)
+
+- **Purpose:** guided private submission of a possible record. Eligibility
+  check, minimum fields, coordinates, photo with redaction note, consent,
+  non-public reference ID.
+- **Content:** `app/(tools)/segnala/page.tsx` + `SegnalaTool`
+  (`app/components/tools/SegnalaTool.tsx`, `"use client"`), reusing
+  `ReportForm` + `useReportFlow`. Bundle: `report.ts`.
+- **SEO/privacy:** `robots: noindex, nofollow` (form page; submissions are
+  private until moderated).
+- **Nav/footer:** in tool nav (`ToolLayout`); never in footer (form surface);
+  home-nav link lands with F2/F3.
+
+### `/correggi` — Correct / remove (implemented, F1 t_03c0fa15)
+
+- **Purpose:** correction/removal request: select a record, choose an issue
+  type (inaccurate / outdated / privacy / duplicate / other), minimal
+  supporting context, reference ID. `?record=ID` pre-fills the related
+  record.
+- **Content:** `app/(tools)/correggi/page.tsx` + `CorreggiTool`
+  (`app/components/tools/CorreggiTool.tsx`, `"use client"`), wrapped in a
+  `Suspense` boundary (`useSearchParams`), reusing `CorrectionForm`. Bundle:
+  `correction.ts`.
+- **SEO/privacy:** `robots: noindex, nofollow` (form page; corrections are
+  private requests).
+- **Nav/footer:** in tool nav (`ToolLayout`); never in footer (form surface);
+  home-nav link lands with F2/F3.
 
 ### `/guide` — Guide (implemented, pre-existing)
 
@@ -137,7 +226,12 @@ Routes **not** linked in nav/footer (private or functional): `/moderation`
   lifecycle and statuses.
 - **Content:** `app/guide/page.tsx`, rendered with the shared
   `nav-shell` + `record-detail` layout; the global footer comes from the
-  root layout (not repeated in the page).
+  root layout (not repeated in the page). Since F1 the map and directory are
+  separate routes: the guide's copy (bundle `guide.ts`) describes them as
+  **pages** (`/mappa`, `/directory`), not home sections; the physical nav
+  links/CTAs switch from anchors to the route URLs with F3 (t_2ca69725).
+  The guide bundle remains the **only** user guide (no duplicate
+  `docs/USER_GUIDE.md` is maintained).
 - **Nav/footer:** in home nav and footer.
 
 ### `/manifesto` — Manifesto (implemented, PR #65)
@@ -232,7 +326,8 @@ fits its context. This is the implemented pattern; keep it consistent:
 
 | Page(s)     | `nav-links` (in order)                                        |
 |-------------|---------------------------------------------------------------|
-| `/`         | Map & data (`/#map`), Directory (`/#records`), Guide, Rules, Manifesto, CTA Add a camera (`/#report`) |
+| `/`         | Map & data (`/#map`), Directory (`/#records`), Guide, Rules, Manifesto, CTA Report (`/#report`) — anchor targets until F3 replaces them with `/mappa` `/directory` `/segnala` |
+| `/mappa`, `/directory`, `/segnala`, `/correggi` | shared `ToolLayout`: Map, Directory, Report, Correction, Guide, Home (CTA) — no dead ends between the four tools (F1; per-page refinement in F3) |
 | `/guide`    | Map, Directory, FAQ, Contacts, Manifesto, Home                 |
 | `/manifesto`, `/regole` | Map, Directory, Guide, Home (CTA)              |
 | `/moderazione` | Map, Directory, Home (CTA)                                  |
@@ -246,8 +341,9 @@ fits its context. This is the implemented pattern; keep it consistent:
   pages.
 - Labels come from each page's bundle (`bundle.<page>.navigation` etc.), not
   from a shared nav bundle.
-- Anchor links (`/#map`, `/#records`) navigate to the home page and its
-  section; they work from any route.
+- Anchor links (`/#map`, `/#records`) still navigate to the home page and its
+  section; they work from any route and remain valid until F3 replaces them
+  with direct tool-route links + `LegacyAnchorRedirect` (t_2ca69725).
 
 ### Footer (shared, global)
 
@@ -267,6 +363,8 @@ institutional links and the legal bar:
   (`bundle.footer`).
 - The moderation queue (`/moderation`) is deliberately **not** linked in the
   footer (publication-boundaries suite).
+- The four public tool routes are **not yet** in the footer: the tool links
+  land with F3 (t_2ca69725), per `docs/FRONTEND_PLAN.md` §1.3.
 - De-dup note: pages must **not** render their own footer — the global one
   is enough (PR #76 removed the per-page duplicates).
 
@@ -412,8 +510,12 @@ export default async function PrivacyPage() {
 
 | Bundle    | Where                                                     | Purpose |
 |-----------|-----------------------------------------------------------|---------|
-| `common`, `map`, `status` | `app/lib/i18n/common.ts`, `map.ts`, `status.ts` | shared UI chrome (skip link, map labels, record statuses) |
-| `home`    | `app/lib/i18n/home.ts` | home page (hero, map, directory, correction, principles) |
+| `common`, `status` | `app/lib/i18n/common.ts`, `status.ts` | shared UI chrome (skip link, record statuses) |
+| `home`    | `app/lib/i18n/home.ts` | home page (hero, principles; tool sections removed in F1) |
+| `map`     | `app/lib/i18n/map.ts` | `/mappa` interactive map + fallback |
+| `directory` | `app/lib/i18n/directory.ts` | `/directory` text directory |
+| `report`  | `app/lib/i18n/report.ts` | `/segnala` report form |
+| `correction` | `app/lib/i18n/correction.ts` | `/correggi` correction form |
 | `guide`   | `app/lib/i18n/guide.ts` | guide page |
 | `manifesto` | `app/lib/i18n/manifesto.ts` | manifesto page |
 | `moderazione` | `app/lib/i18n/moderazione.ts` | how-moderation-works page |
@@ -440,6 +542,10 @@ Notes:
 
 | Page          | Primary sources                                          |
 |---------------|----------------------------------------------------------|
+| `/mappa`      | `docs/FRONTEND_DESIGN.md` (map tool), `docs/OSM_INTEGRATION.md` (tiles/attribution), data layer `app/lib/use-public-cameras.ts` |
+| `/directory`  | `docs/FRONTEND_DESIGN.md` (directory tool), `docs/DATA_MODEL.md` (fields shown), `docs/MODERATION.md` (status meanings) |
+| `/segnala`    | README "Before submitting", `docs/MODERATION.md` (publication standard), `docs/legal/PRIVACY_NOTICE.md` (consent/privacy copy), `docs/FRONTEND_PLAN.md` §7.2 |
+| `/correggi`   | `docs/MODERATION.md` (appeals and corrections), `docs/legal/PRIVACY_NOTICE.md` (correction/removal contact), `docs/FRONTEND_PLAN.md` §7.2 |
 | `/manifesto`  | home `principles` section, `README.md` (Principles, non-goals) |
 | `/regole`     | `docs/MODERATION.md` (Publication standard, Eligible examples, Exclusions), README "Before submitting" |
 | `/moderazione`| `docs/MODERATION.md` (Review flow, Appeals and corrections, Moderator safeguards), ADR 0014 |
@@ -471,5 +577,10 @@ with PR #72 (tests: `tests/navigation-pages.test.mjs`,
 - Header nav: pages keep their compact per-page `nav-shell`; if more pages
   are added, revisit the home link set (do not grow it without an explicit
   decision).
+- Tool nav: the shared `ToolLayout` nav is uniform across the four tools
+  (F1); per-page refinement and the footer tool links land in F3
+  (t_2ca69725).
 - `/guide` slug kept for compatibility; a future alias `/guida` is possible.
 - `/feedback` route (ADR 0006) remains proposed, not implemented.
+- The `/` hub cards and static map teaser are F2 (t_52dcb95e); until then
+  the anchor sections remain as the temporary fallback.

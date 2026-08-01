@@ -94,12 +94,36 @@ short version:
 | Concept | Bundle | Notes |
 |---------|--------|-------|
 | Chrome + footer + status vocabulary | `common.ts`, `footer.ts`, `status.ts` | shared across routes |
-| Map / directory / report / correction | `map.ts`, `home.ts` | `home.ts` owns the directory, report and correction forms until the `/mappa` `/directory` `/segnala` `/correggi` split (FRONTEND_PLAN F1/F2) introduces `directory.ts`, `report.ts`, `correction.ts` |
+| Map | `map.ts` | `/mappa` (F1 route split) |
+| Directory | `directory.ts` | `/directory` (F1 route split) |
+| Report | `report.ts` | `/segnala` (F1 route split) |
+| Correction | `correction.ts` | `/correggi` (F1 route split) |
+| Home (hub) | `home.ts` | `/` hero + orienting content (tool sections moved to their own bundles in F1) |
 | Record detail | `record.ts` | |
 | Auth | `auth.ts` | |
 | Moderation dashboard | `moderation.ts` | private, local-only |
 | Informational pages | `guide.ts`, `manifesto.ts`, `faq.ts`, `contact.ts`, `rules.ts`, `moderazione.ts` | one per page |
 | Legal pages | `app/lib/legal/` | typed content layer, NOT i18n bundles |
+
+## Parity is structural, not semantic
+
+`Translation<typeof en>` guarantees that the Italian bundle has the **same
+keys and shape** as the English pilot — it cannot guarantee that the Italian
+copy **means the same thing**. Real examples found during the frontend
+review (fixed in F-i18n, PR #156):
+
+- `auth.loggedOutTitle`: EN "You are logged out" → IT was "Hai effettuato
+  l'accesso" (logged **in**);
+- `auth.accountDeletedBody`: same inverted meaning;
+- `auth.createOne`: "Create one" → IT "Crealo" (colloquial register; fixed
+  to "Crea un account").
+
+**Structural parity is a build gate; semantic parity is a human review
+gate.** Every translation change is a reviewed policy change
+(`docs/workstreams/PRODUCT_UX.md`, "Internationalisation"), and the
+per-domain files are small enough that a native speaker can review a full
+EN/IT pair in one diff. The i18n QA suite re-checks key parity and
+untranslated-English leftovers at test time.
 
 ## Microcopy standards
 

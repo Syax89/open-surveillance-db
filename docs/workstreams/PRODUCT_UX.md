@@ -37,42 +37,86 @@ The first public alpha is a deliberately narrow pilot in one reviewed jurisdicti
 
 ## Target user journeys
 
+The four core journeys map to the public tool routes introduced by the
+frontend refactor (F1, `docs/FRONTEND_PLAN.md` §1.2): **Browse** → `/mappa`
++ `/directory`; **Search** → `/directory` (and `/mappa` filters); **Submit**
+→ `/segnala`; **Correct** → `/correggi`. The home page is the hub that links
+the four tools; the map and the directory are separate pages, each with its
+own URL, so a journey can be deep-linked and bookmarked.
+
 ### 1. Browse
 
-1. A visitor opens the site and sees a short purpose statement, pilot-area notice, privacy/safety boundary, and a choice between **Map** and **List**.
-2. The map loads reviewed public records in the current area. A text alternative lists the same records without requiring map interaction.
-3. The visitor selects a marker or list item and opens a record summary: type, general location, source type, verification date, status, and record ID.
-4. The visitor can open the full public record, download the reviewed dataset, or use **Report an issue with this record**.
+1. A visitor opens the site and sees a short purpose statement, pilot-area
+   notice, privacy/safety boundary, and a choice between **Map**
+   (`/mappa`) and **Directory** (`/directory`).
+2. The map (`/mappa`) loads reviewed public records in the current area. A
+   text alternative — the directory (`/directory`) — lists the same records
+   without requiring map interaction.
+3. The visitor selects a marker or list item and opens a record summary:
+   type, general location, source type, verification date, status, and
+   record ID.
+4. The visitor can open the full public record, download the reviewed
+   dataset, or use **Report an issue with this record** (`/correggi`).
 
-**Success condition:** a visitor can find and understand a record without using a mouse, colour cues, or a map gesture.
+**Success condition:** a visitor can find and understand a record without
+using a mouse, colour cues, or a map gesture.
 
 ### 2. Search
 
-1. The visitor enters a locality, neighbourhood, public address, or coordinate in a labelled search field.
-2. The interface returns matching reviewed records and indicates the search area. It does not imply exhaustive coverage.
-3. Filters allow only low-risk, explained categories (for example, camera type and verification freshness), with a visible reset action.
-4. A zero-result state says that no **published record** was found and offers a route to submit a private observation or learn about coverage limits.
+1. The visitor enters a locality, neighbourhood, public address, or
+   coordinate in a labelled search field on `/directory` (or filters the
+   map on `/mappa`).
+2. The interface returns matching reviewed records and indicates the search
+   area. It does not imply exhaustive coverage.
+3. Filters allow only low-risk, explained categories (for example, camera
+   type and verification freshness), with a visible reset action.
+4. A zero-result state says that no **published record** was found and
+   offers a route to submit a private observation (`/segnala`) or learn
+   about coverage limits.
 
-**Success condition:** search is usable without precise geographic knowledge and zero results are not misrepresented as proof that no camera exists.
+**Success condition:** search is usable without precise geographic knowledge
+and zero results are not misrepresented as proof that no camera exists.
 
 ### 3. Submit a possible record
 
-1. The contributor reads a short eligibility check: visible public infrastructure only; no private homes, people, plates, live feeds, credentials, or sensitive-site details.
-2. The contributor selects a location by search, entering coordinates, or choosing a point on the map. The form explains that the published location may be generalised.
-3. The contributor supplies only the minimum structured information: observation type, general location, source/observation date, and optional factual note. Brand is optional and subject to review; direction or coverage is not requested in alpha.
-4. Before submit, a review screen repeats the privacy warning, license/contribution statement, and the fact that the report is private and may be rejected or edited.
-5. The service validates fields, creates a non-public reference ID, and shows an acknowledgement with no public link. It gives a way to add clarification or withdraw the report where the identity model permits.
+1. The contributor reads a short eligibility check on `/segnala`: visible
+   public infrastructure only; no private homes, people, plates, live
+   feeds, credentials, or sensitive-site details.
+2. The contributor selects a location by search, entering coordinates, or
+   choosing a point on the map. The form explains that the published
+   location may be generalised.
+3. The contributor supplies only the minimum structured information:
+   observation type, general location, source/observation date, and optional
+   factual note. Brand is optional and subject to review; direction or
+   coverage is not requested in alpha.
+4. Before submit, a review screen repeats the privacy warning,
+   license/contribution statement, and the fact that the report is private
+   and may be rejected or edited.
+5. The service validates fields, creates a non-public reference ID, and
+   shows an acknowledgement with no public link. It gives a way to add
+   clarification or withdraw the report where the identity model permits.
 
-**Success condition:** no newly submitted record appears in public map, public API, search, or export before a human approval decision.
+**Success condition:** no newly submitted record appears in public map,
+public API, search, or export before a human approval decision.
 
 ### 4. Correct, challenge, or request removal
 
-1. Each public record has a prominent **Report an issue** link; the page also offers a general contact route for people who cannot locate a record.
-2. The requester chooses an issue type: inaccurate, outdated, privacy/safety concern, duplicate, or other; they can provide minimal supporting context.
-3. For credible urgent privacy or safety concerns, the interface confirms that the record can be temporarily hidden while reviewed; it never promises an automatic outcome.
-4. The requester receives a private reference ID and an explanation of the review/appeal path. Public pages show a neutral status such as “under review” only when it is safe to do so.
+1. Each public record has a prominent **Report an issue** link to
+   `/correggi`; the site also offers a general contact route (`/contatti`)
+   for people who cannot locate a record.
+2. The requester chooses an issue type on `/correggi`: inaccurate,
+   outdated, privacy/safety concern, duplicate, or other; they can provide
+   minimal supporting context. A `?record=ID` parameter pre-fills the
+   related record.
+3. For credible urgent privacy or safety concerns, the interface confirms
+   that the record can be temporarily hidden while reviewed; it never
+   promises an automatic outcome.
+4. The requester receives a private reference ID and an explanation of the
+   review/appeal path. Public pages show a neutral status such as “under
+   review” only when it is safe to do so.
 
-**Success condition:** a correction can be started without an account, and its details do not become public or leak through API/export/logs.
+**Success condition:** a correction can be started without an account, and
+its details do not become public or leak through API/export/logs.
 
 ## Prioritised backlog
 
@@ -85,7 +129,7 @@ The first public alpha is a deliberately narrow pilot in one reviewed jurisdicti
 | Clear status, provenance, and freshness labels | Users can distinguish verified, pending (never public), and demo data, and see source type and date. |
 | Guided private submission | Eligibility, minimisation, validation, acknowledgement, and an explicit pre-publication review state are present. |
 | Correction/takedown entry point | Every public record and site footer link to a low-friction, private issue flow. |
-| Empty, error, loading, and offline states | The interface does not silently fail or overstate data coverage. |
+| Empty, error, loading, and offline states | The interface does not silently fail or overstate data coverage. The standard state set is `{loading, empty, not-found, error, offline}`, each with title + body + recovery action (see `docs/REFACTOR_I18N.md`, "Microcopy standards"). |
 | Mobile responsive interaction | Core browse, search, submit, and correction tasks work at 320 CSS px width and without hover. |
 | Accessibility baseline | Semantic structure, focus management, keyboard map alternative, contrast, labels, and screen-reader announcements are verified. |
 | Pilot-language and English copy | All safety-critical and consent/review messages are translated and reviewed by a human speaker. |
@@ -157,6 +201,19 @@ Public alpha may proceed only when the following can be demonstrated in a test e
 - Use locale-aware formatting for dates and numbers while keeping coordinates unambiguous and copyable.
 - Avoid culture-specific assumptions about address order, camera terminology, legal roles, or the availability of formal postal addresses.
 - Treat translation of privacy, safety, consent, and moderation text as a reviewed policy change, not a mechanical task.
+- **Semantic parity, not just structural parity.** Type-checked EN/IT key
+  parity (`Translation<typeof en>`) guarantees the *shape* of a bundle, not
+  that the Italian copy says the same thing. Real regressions were found in
+  `auth.ts` (`loggedOutTitle`, `accountDeletedBody` translated as "logged
+  in" instead of "logged out"; `createOne` as "Crealo") — a **human review
+  of every Italian string** is required before the redesign ships
+  (`docs/FRONTEND_PLAN.md` §5.1).
+- **Conceptual mapping, not one file per route.** The user-facing domains
+  (home, directory, report, moderation, auth, info, legal) map to the
+  per-domain bundles in `app/lib/i18n/`; the table lives in
+  `docs/SITEMAP.md` ("i18n message bundles") and `docs/REFACTOR_I18N.md`.
+  No monolithic `info`/`legal` bundle is created; legal content stays in the
+  typed `app/lib/legal/` layer.
 
 ## Non-commercial success measures
 
