@@ -6,7 +6,7 @@
 - **Decision owner:** Angelina (CEO) — review requested; see the kanban
   handoff (t_9d67605d). This ADR records the CTO decision and the CEO can
   veto or adjust it on review.
-- **PR:** #<to-fill>
+- **PR:** #132
 - **Updates:** ADR 0007-i18n-externalisation-and-pilot-language (decision
   point 4, "Locale stays client-side", is superseded for the server side).
 - **Related ADRs:** 0007 (i18n externalisation and pilot language)
