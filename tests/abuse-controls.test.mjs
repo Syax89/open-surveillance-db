@@ -6,14 +6,16 @@
 // transpiled into the shared harness tree and imported directly.
 
 import assert from "node:assert/strict";
-import { after, beforeEach, test } from "node:test";
-import { apiRequest, cleanupRouteTree, loadLibModule } from "./helpers/api-harness.mjs";
+import { after, afterEach, beforeEach, test } from "node:test";
+import { apiRequest, cleanupRouteTree, loadLibModule, loadRoute, loadTreeModule } from "./helpers/api-harness.mjs";
+import { callArgs, resetMockState, stub } from "./helpers/mock-state.mjs";
 
 after(async () => cleanupRouteTree());
 
 let rateLimit;
 let abuseAlerts;
 let inputLimits;
+let originalFetch;
 
 beforeEach(async () => {
   if (!rateLimit) {
@@ -25,6 +27,12 @@ beforeEach(async () => {
   }
   rateLimit.resetRateLimitState();
   abuseAlerts.resetAbuseAlertState();
+  resetMockState();
+  originalFetch = globalThis.fetch;
+});
+
+afterEach(() => {
+  globalThis.fetch = originalFetch;
 });
 
 // Run fn with console.error captured so fire-and-forget alert delivery can be
@@ -84,6 +92,12 @@ test("environment overrides tune the per-route limits", () => {
   assert.deepEqual(rateLimit.limitsFor("nearby", {}), { maxRequests: 30, windowSeconds: 60 });
   assert.deepEqual(rateLimit.limitsFor("revisions", {}), { maxRequests: 30, windowSeconds: 60 });
   assert.deepEqual(rateLimit.limitsFor("moderate", {}), { maxRequests: 30, windowSeconds: 60 });
+  // The tile proxy gets its own conservative default and env knobs.
+  assert.deepEqual(rateLimit.limitsFor("tiles", {}), { maxRequests: 60, windowSeconds: 60 });
+  assert.deepEqual(
+    rateLimit.limitsFor("tiles", { TILES_RATE_LIMIT_MAX: "120", TILES_RATE_LIMIT_WINDOW_SECONDS: "30" }),
+    { maxRequests: 120, windowSeconds: 30 },
+  );
   // Invalid or missing overrides fall back to the defaults.
   assert.deepEqual(
     rateLimit.limitsFor("read", { READ_RATE_LIMIT_MAX: "-3", READ_RATE_LIMIT_WINDOW_SECONDS: "0" }),
@@ -216,4 +230,78 @@ test("abuse-alert state is observable and resettable", async () => {
   assert.equal(state.trackedRoutes, 1);
   abuseAlerts.resetAbuseAlertState();
   assert.equal(abuseAlerts.getAbuseAlertState().trackedCallers, 0);
+});
+
+// ---------------------------------------------------------------------------
+// Route-level 429 enforcement (Wave B follow-up: public binary routes)
+// ---------------------------------------------------------------------------
+// GET /api/photos/[id] and GET /api/tiles/* previously had no rate limit at
+// all; both are public routes whose cost is dominated by egress/upstream
+// bytes. These tests run the real handlers through the shared harness and
+// assert the sliding window produces a 429 with Retry-After past the cap.
+
+const envMock = async () => (await loadTreeModule("cloudflare-workers.mjs")).env;
+const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+test("GET /api/photos/[id] answers 429 past the read threshold and blocks before storage", async () => {
+  const env = await envMock();
+  env.READ_RATE_LIMIT_MAX = "2";
+  try {
+    stub("readPublicPhotoBytes", async () => ({ bytes: new Uint8Array([0xff, 0xd8, 0xff]), mimeType: "image/jpeg" }));
+    const { GET } = await loadRoute("app/api/photos/[id]/route.mjs");
+
+    const first = await GET(apiRequest("/api/photos/11"));
+    assert.equal(first.status, 200);
+    const second = await GET(apiRequest("/api/photos/11"));
+    assert.equal(second.status, 200);
+
+    const blocked = await GET(apiRequest("/api/photos/11"));
+    assert.equal(blocked.status, 429);
+    assert.ok(Number(blocked.headers.get("retry-after")) >= 1);
+    assert.equal(await blocked.json().then((body) => body.error), "Too many requests. Please try again shortly.");
+
+    // The blocked call must never reach the storage boundary.
+    assert.equal(callArgs("readPublicPhotoBytes").length, 2, "the third request is throttled before touching storage");
+
+    // A different caller is unaffected by the same bucket.
+    const other = await GET(
+      new Request("https://osdb.test/api/photos/11", { headers: { "cf-connecting-ip": "203.0.113.99" } }),
+    );
+    assert.equal(other.status, 200);
+  } finally {
+    delete env.READ_RATE_LIMIT_MAX;
+  }
+});
+
+test("GET /api/tiles/* answers 429 past the tiles threshold, independently of the read bucket", async () => {
+  const env = await envMock();
+  env.TILES_RATE_LIMIT_MAX = "2";
+  let upstreamCalls = 0;
+  globalThis.fetch = async () => {
+    upstreamCalls += 1;
+    return new Response(png, { status: 200, headers: { "Content-Type": "image/png" } });
+  };
+  try {
+    const { GET } = await loadRoute("app/api/tiles/[z]/[x]/[y]/route.mjs");
+    const request = (headers = {}) =>
+      GET(apiRequest("/api/tiles/13/4250/2900", { headers }), {
+        params: Promise.resolve({ z: "13", x: "4250", y: "2900" }),
+      });
+
+    assert.equal((await request()).status, 200);
+    assert.equal((await request()).status, 200);
+    const blocked = await request();
+    assert.equal(blocked.status, 429);
+    assert.ok(Number(blocked.headers.get("retry-after")) >= 1);
+    assert.equal(blocked.headers.get("cache-control"), "no-store");
+    assert.equal(upstreamCalls, 2, "the throttled request never reaches the upstream");
+
+    // The tile bucket is independent: the same caller still has fresh read
+    // budget (photos route shares the read bucket, not the tiles one).
+    const { GET: photoGet } = await loadRoute("app/api/photos/[id]/route.mjs");
+    stub("readPublicPhotoBytes", async () => ({ bytes: png, mimeType: "image/png" }));
+    assert.equal((await photoGet(apiRequest("/api/photos/11"))).status, 200);
+  } finally {
+    delete env.TILES_RATE_LIMIT_MAX;
+  }
 });

@@ -1,6 +1,6 @@
 # Data dictionary
 
-Status: current for the local prototype (2026-07-31). This document describes
+Status: current for main (2026-08-01). This document describes
 every public field exposed by the prototype so that a contributor can
 understand the public dataset from documentation alone (Horizon 3 exit gate in
 [FUTURE_ROADMAP.md](FUTURE_ROADMAP.md)). It is a *lightweight* companion to the
@@ -28,11 +28,47 @@ CSV, or GeoJSON output. See [DATA_MODEL.md](DATA_MODEL.md) and
 | CSV | `GET /api/cameras?format=csv` | One header row, one record per row, newline-terminated |
 | GeoJSON | `GET /api/cameras?format=geojson` | `FeatureCollection` of `Point` features |
 | Nearby JSON | `GET /api/cameras/nearby?latitude=…&longitude=…&radius=…` | `{ "records": [ … ] }`, same fields plus `distanceMeters` |
+| Search JSON | `GET /api/cameras/search?q=…&lang=…` | `{ "query", "area": { "kind", "displayName"?, "latitude", "longitude", "radiusMeters", "radiusLabel" }, "count", "records" }` |
+| Revisions JSON | `GET /api/cameras/revisions?cameraId=N` | `{ "recordId", "revisions": [ { "id", "entityId", "previousStatus", "newStatus", "action", "createdAt" } ] }` |
+| Photos JSON | `GET /api/photos?cameraId=N` | `{ "photos": [ { "id", "mimeType", "width", "height" } ] }` |
+| Photo bytes | `GET /api/photos/[id]` | Raw image bytes (JPEG/PNG/WebP), not a JSON envelope |
 
-All four outputs derive from the same filtered public-record list
-(`status IN ('verified','demo')`), so a record appears in all of them or in
-none of them. CSV cells are escaped to reduce spreadsheet formula-injection
-risk (values beginning with `=`, `+`, `-`, or `@` are prefixed with `'`).
+The JSON, CSV, GeoJSON, and nearby outputs derive from the same filtered
+public-record list (`status IN ('verified','demo')`), so a record appears in
+all of them or in none of them. CSV cells are escaped to reduce spreadsheet
+formula-injection risk (values beginning with `=`, `+`, `-`, or `@` are
+prefixed with `'`).
+
+The search output is a spatial projection of the same list: the query is
+resolved to a point plus a radius and every reviewed public record near that
+area is returned. A raw coordinate pair (`41.9004, 12.4936`) is parsed
+locally and searched at a fixed radius without touching the external
+geocoder; any other text is resolved through the geocoder (`db/geocode.ts`,
+Nominatim), whose bounding box decides the radius. The response carries the
+resolved area explicitly and never claims coverage: an empty `records` array
+means only that no published record falls inside the area. Failure modes are
+truthful — `404` when the place cannot be resolved, `503` when the geocoder
+or database is unavailable, `429` on the search rate limit, `400` for a
+missing or over-long query — and the response is never cached
+(`Cache-Control: no-store`).
+
+The revisions output is a public change summary for a single record and
+carries no moderator identity: only the lifecycle actions
+(`approve`, `reject`, `hide`, `mark-stale`, `reverify`,
+`scheduled-expiry`, `expiry-not-reconfirmed`, `marked-stale`) with their
+timestamps are listed. It is served **only** for records that are currently
+public — a `404` answers for any other record so pending/rejected/removed
+records cannot be probed and their private history never leaks. It has its
+own rate-limit bucket.
+
+Photo outputs fail closed. `GET /api/photos?cameraId=N` lists only approved
+photos (`status = 'approved'` and `redaction_confirmed = 1`) of a currently
+public camera and answers `404` when the camera is not public, so a pending
+or rejected record never leaks its evidence. `GET /api/photos/[id]` returns
+bytes only under the same conditions; every other case answers an
+indistinguishable `404` (no existence leak), the storage key never appears,
+and the image is served with `Cache-Control: public, max-age=3600,
+immutable`.
 
 ## Public record fields
 
@@ -54,7 +90,7 @@ some fields entirely (marked `—`).
 | `longitude` | ✓ | ✓ | — (in geometry) | number | WGS84 longitude; same precision rule as latitude. GeoJSON geometry is `[longitude, latitude]`. |
 | `status` | ✓ | ✓ | ✓ | string | `verified` (reviewed, real) or `demo` (fictional, clearly labelled). No other status can be present in a public output. |
 | `source` | ✓ | ✓ | ✓ | string | Provenance label. In the prototype the observed values are `Prototype seed` (illustrative demo records) and `Community report` (submitted and later approved). Future provenance classes are defined in [workstreams/DATA_TRUST.md](workstreams/DATA_TRUST.md). |
-| `updated` | ✓ | ✓ | ✓ | string | Short label of the last review action (e.g. `Local moderation: approved and verified`); seeded demo records carry the literal label `Demo data`, fresh submissions `Submitted just now`. Stored as text; not a machine-readable verification date. |
+| `updated` | ✓ | ✓ | ✓ | string | Last public verification date (ISO 8601). Freshness windows (`7d`/`30d`/`90d`) match only ISO values, so non-ISO labels are never window-matched: seeded demo records carry the literal label `Demo data`, and a fresh submission `Submitted just now` until it is verified. Migration `0007_directory_freshness_backfill` converted the pre-existing prose labels of verified records into comparable ISO timestamps. |
 | `description` | ✓ | ✓ | ✓ | string | Brief factual context written or reviewed by a moderator; no sensitive operational detail. |
 | `createdAt` | ✓ | — | — | string | Submission/creation timestamp (ISO). Not exported in CSV/GeoJSON. |
 
@@ -97,6 +133,17 @@ until a moderator approves the record.
 The response is `201 { "referenceId": … }`; requests are private and never
 alter a public record automatically.
 
+### Photo intake input (`POST /api/photos`)
+
+Uploads one image as the raw request body (JPEG/PNG/WebP only, size and
+dimension limits are env-tunable). The route sniffs the container from magic
+bytes (never trusts the caller's `Content-Type`), strips EXIF/XMP/IPTC
+metadata — mandatory, fail closed — and stores sanitised bytes in R2
+(`PHOTOS`) with metadata-only in D1. The response (`201`) is photo metadata
+only: never the storage key, never the bytes back. The photo stays private
+until a moderator approves it and confirms redaction; only then can it
+appear in the public photo outputs above.
+
 ## Fields that are never public
 
 The following exist in storage or private responses and must never appear in
@@ -110,6 +157,18 @@ any public output:
   ([workstreams/DATA_TRUST.md](workstreams/DATA_TRUST.md)).
 - Pending reports in any state other than `verified`/`demo` (`pending`,
   `needs_review`, `rejected`, `removed`).
+- `photos.*` — photos that are not approved (`pending`, `rejected`, or
+  `redaction_confirmed = 0`) and their R2 storage keys. The public photo
+  endpoints fail closed with an indistinguishable `404`, never revealing the
+  existence of a non-approved photo.
+- `appeals.*` — appeals against moderation decisions and their reasons; only
+  moderators can list them, and no appeal content is ever serialised in a
+  public response.
+- `moderation_queue.*` — the internal moderation queue: assignees,
+  sensitivity flags, escalation reasons, and reviewer notes.
+- `sessions.*` and auth tokens — contributor sessions, session tokens, and
+  CSRF tokens are never serialised in any response outside the authenticated
+  session flow itself.
 
 ## Related policies
 

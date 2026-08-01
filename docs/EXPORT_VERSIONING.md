@@ -30,7 +30,9 @@ A "versioned export" is a **snapshot** of the reviewed public dataset
 per the release notes) published as a release artifact, together with its
 metadata. Live API/CSV/GeoJSON endpoints remain out of scope: they are
 convenience views of the current database and are never a substitute for a
-release.
+release. Live exports do carry the ODbL 1.0 attribution notice required by
+[TERMS_OF_USE.md § 7.1](TERMS_OF_USE.md) (© OpenSurveillanceDB contributors —
+ODbL 1.0; attribution and share-alike required for derivative databases).
 
 ## Versioning scheme
 

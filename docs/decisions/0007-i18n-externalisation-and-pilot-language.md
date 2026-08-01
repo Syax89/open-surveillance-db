@@ -60,3 +60,35 @@ interface strings with English plus the pilot-area language.
 - Trade-off: namespaces repeat a few common words (e.g. `exploreMap`) instead
   of sharing a global key set — acceptable for now, keeps each page's bundle
   self-contained and reviewable; revisit only if a third language lands.
+
+## Update (2026-08-01): per-domain bundle files (PR #80, open)
+
+On `main` the bundles are still **monolithic**: `en.ts` (~929 lines) and
+`it.ts` (~925 lines) each contain every namespace as a top-level key, exactly
+as described in the Decision above. A refactor is in flight on branch
+`refactor/i18n-domain-bundles` (PR #80) that splits the monolith into
+**per-domain files** — one file per domain, each exporting both languages:
+
+- `app/lib/i18n/common.ts` (shared chrome: skip link, language selection)
+- `app/lib/i18n/map.ts`, `status.ts` (map labels, record statuses)
+- `app/lib/i18n/home.ts`, `guide.ts`, `manifesto.ts`, `moderazione.ts`,
+  `faq.ts`, `contact.ts`, `rules.ts`, `record.ts` (public pages)
+- `app/lib/i18n/moderation.ts`, `auth.ts`, `footer.ts` (moderation
+  dashboard, auth flows, global footer)
+
+Structural invariants of the refactor:
+
+- Every domain file exports `en` (canonical key set) and `it` typed as
+  `Translation<typeof en>` — the parity guarantee of point 2 is unchanged.
+- `app/lib/i18n/types.ts` is untouched (`Translation<T>` is unchanged).
+- `app/lib/i18n/index.ts` assembles the per-domain files into the public
+  `messages` shape; `useMessages()` consumption is unchanged.
+- Adding a language (point 6) still means adding `xx.ts` + extending
+  `Locale` + registering in `index.ts`; after the refactor the new-language
+  files mirror the per-domain layout (`<domain>.xx.ts` pairs).
+
+**To update after PR #80 merges:** the file-structure wording in points 1
+(`en.ts` as "the single canonical message bundle") and 6 (adding a language)
+of the Decision, and the `en.ts`/`it.ts` wording in Consequences, become
+historical; rewrite them to describe the per-domain layout above. Until the
+merge, this ADR describes `main` as it is.

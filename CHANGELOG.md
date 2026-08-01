@@ -51,6 +51,68 @@ changes accumulate under `[Unreleased]`.
   transitions now record ISO timestamps and a one-time migration backfills
   pre-existing prose values from the moderation audit trail, so a freshness
   window can never present stale or illustrative data as freshly verified.
+- Fresh-database migration smoke test job in CI: the full migration chain
+  must apply cleanly to an empty database before the pipeline passes
+  ([#47](https://github.com/Syax89/open-surveillance-db/pull/47)).
+- Contributor accounts and sessions: email+password registration, login and
+  logout, PBKDF2-SHA256 password hashing, hashed opaque session tokens,
+  same-origin and per-session CSRF protection, and an account page listing
+  attributed submissions. Anonymous submissions remain possible by design
+  ([#57](https://github.com/Syax89/open-surveillance-db/pull/57),
+  [ADR 0013](docs/decisions/0013-contributor-accounts-and-sessions.md)).
+- Contributor account erasure with de-attribution (GDPR art. 17): deleting an
+  account detaches its submissions from the contributor identity
+  ([#61](https://github.com/Syax89/open-surveillance-db/pull/61)).
+- Coarse auth roles (`contributor`/`moderator`/`admin`) enforced on every
+  protected route via `requireRole`, with the acting reviewer derived
+  server-side from the authenticated user, plus a contributor appeal workflow
+  against moderation decisions — file, list, and decide, with escalated
+  appeals resolving at the administrator ([#62](https://github.com/Syax89/open-surveillance-db/pull/62),
+  [ADR 0014](docs/decisions/0014-auth-roles-appeals.md)).
+- Append-only audit log extended to appeals (`appeal_id` link on
+  `moderation_events`); internal workflow events (appeals, recusals,
+  escalations) stay out of the public revision history
+  ([#62](https://github.com/Syax89/open-surveillance-db/pull/62)).
+- Compliant map-tile strategy: same-origin tile proxy with identifying
+  User-Agent, forwarded Referer, ≥7-day edge caching, switchable provider
+  (`TILE_PROVIDER_URL`/`TILE_PROVIDER_KEY`), and a documented
+  community-vs-commercial-vs-self-hosted decision matrix
+  ([#55](https://github.com/Syax89/open-surveillance-db/pull/55),
+  [docs/OSM_INTEGRATION.md](docs/OSM_INTEGRATION.md)).
+- Local operations for the LXC 114 test deployment:
+  `ops/health-check.sh` (5-route health probe, fail-closed moderation check),
+  `ops/backup-lxc114.sh` (vzdump snapshot to NAS, zstd, keep-last 7, D1
+  included and integrity-checked), `ops/snapshot-pre-deploy.sh`, and
+  `ops/rollback-lxc114.sh` (rollback + explicit restart + health check),
+  with the live drill recorded in `docs/OPERATIONS.md`
+  ([#58](https://github.com/Syax89/open-surveillance-db/pull/58),
+  [#60](https://github.com/Syax89/open-surveillance-db/pull/60)).
+- Public information-site restructure: bilingual `/manifesto`, `/regole`,
+  `/privacy`, `/termini`, `/licenze`, `/faq`, `/contatti`, and `/moderazione`
+  pages wired into a global site footer with institutional links, ODbL and
+  OSM attribution, plus a full sitemap and navigation pattern
+  ([#65](https://github.com/Syax89/open-surveillance-db/pull/65),
+  [#67](https://github.com/Syax89/open-surveillance-db/pull/67),
+  [#68](https://github.com/Syax89/open-surveillance-db/pull/68),
+  [#70](https://github.com/Syax89/open-surveillance-db/pull/70),
+  [#71](https://github.com/Syax89/open-surveillance-db/pull/71),
+  [#73](https://github.com/Syax89/open-surveillance-db/pull/73),
+  [#66](https://github.com/Syax89/open-surveillance-db/pull/66)).
+- Image upload for camera records with secure storage: `/api/photos` intake
+  with size/MIME/dimension caps, magic-byte container verification, mandatory
+  EXIF/XMP/IPTC stripping (fail-closed), sanitised bytes in R2 with metadata
+  only in D1, and a moderation/redaction gate — approved photos are served
+  only for public cameras; pending or rejected evidence never leaks
+  ([#64](https://github.com/Syax89/open-surveillance-db/pull/64)).
+- Legal/privacy boundary review applied at the public boundary: coordinate
+  precision enforced at ~4 decimal places, retention schedule, and terms and
+  privacy notice aligned with the contributor-account flow
+  ([#59](https://github.com/Syax89/open-surveillance-db/pull/59),
+  [ADR 0008](docs/decisions/0008-data-licence-precision-retention-contact.md));
+  governance owners and hosting/domain decisions documented
+  ([#48](https://github.com/Syax89/open-surveillance-db/pull/48),
+  [ADR 0011](docs/decisions/0011-governance-owners-hosting-domain.md),
+  [#52](https://github.com/Syax89/open-surveillance-db/pull/52)).
 
 ### Changed
 
@@ -71,6 +133,10 @@ changes accumulate under `[Unreleased]`.
   `null` body instead of a `500`.
 - `rendered-html` test suite repaired and included in the full CI run.
 - `package.json` license field set (pre-hosting hardening).
+- Info pages render exactly one footer: per-page `<footer>` blocks removed so
+  every page keeps the global site footer only, and the `/regole` "never"
+  heading renders its correct title instead of the body string
+  ([#76](https://github.com/Syax89/open-surveillance-db/pull/76)).
 
 ### Security
 

@@ -56,6 +56,9 @@ npm test          # build + API contract and publication-boundary tests
 - [ ] `npm run build` produces `dist/client` and `dist/server`.
 - [ ] `npm test` passes (runtime API tests + publication-boundary tests).
 
+QA evidence from the latest E2E and navigation-test rounds is archived under
+[`docs/qa/`](qa/) (`QA_REPORT_auth-flow-e2e.md`, `QA_REPORT_navigation-pages.md`).
+
 ### 3. Review what changed
 
 ```bash
@@ -88,7 +91,7 @@ git push origin v0.1.0            # CI builds from the tag
 - [ ] Tag exists on `origin` (`git ls-remote --tags origin`).
 - [ ] CI pipeline on the tag is green.
 
-> Per [docs/OPERATIONS.md](OPERATIONS.md#51-identificare-le-versioni), every
+> Per [docs/OPERATIONS.md](OPERATIONS.md#51-identifying-versions), every
 > release correlates to a `v*` tag. Record the tag/commit next to the deployed
 > version so a rollback can identify it later.
 
@@ -136,7 +139,7 @@ curl -sS http://192.168.1.201:3000/api/cameras | grep -c '"notes"'              
 
 - [ ] Note the deployed commit/tag and (for Workers releases) the
       `wrangler` version-id in the changelog or the release issue, per
-      [docs/OPERATIONS.md](OPERATIONS.md#51-identificare-le-versioni).
+      [docs/OPERATIONS.md](OPERATIONS.md#51-identifying-versions).
 - [ ] Update `docs/STATUS.md` if the release changes implemented capability.
 
 ## Rollback (local environment)
@@ -157,4 +160,4 @@ systemctl restart osdb-test.service
 - [ ] Service is `active (running)` and smoke tests (step 7) pass again.
 
 For the Cloudflare Workers deployment the rollback procedure is the
-`wrangler rollback` plan in [docs/OPERATIONS.md](OPERATIONS.md#5-rollback-plan-versione-precedente-dei-workers).
+`wrangler rollback` plan in [docs/OPERATIONS.md](OPERATIONS.md#5-rollback-plan-previous-workers-versions).

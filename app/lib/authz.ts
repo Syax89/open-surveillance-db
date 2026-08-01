@@ -5,7 +5,8 @@
  *
  *   1. Real ChatGPT-plugin headers (`oai-authenticated-user-email`) when the
  *      app runs inside the ChatGPT plugin platform — the public-alpha path
- *      documented in `app/chatgpt-auth.ts`.
+ *      (the old `app/chatgpt-auth.ts` scaffold was removed; the header
+ *      contract below is what remains).
  *   2. A prototype header `x-osdb-user-email` that the worker edge injects
  *      after the Basic-auth gate succeeds (worker/index.ts), so the local
  *      dashboard and API automation carry a server-set identity instead of a
