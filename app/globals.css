@@ -417,3 +417,38 @@ footer>p { margin:0; color:#586870; font-size:13px; line-height:1.5; }
    palette so contrast matches the rest of the site. */
 .manifesto-list { display:grid; gap:10px; margin:14px 0 0; padding:0 0 0 18px; color:#435963; font-size:13px; line-height:1.5; }
 .manifesto-list li::marker { color:#3e9477; }
+
+/* Community verification widget (C5, ADR 0018 §2): the record-detail toggle
+   and the profile trust-level badge. Tokens: reuses the existing status
+   palette (--status-verified green family, --status-community amber) — no
+   new tokens (COMMUNITY_PLAN §6.3). The toggle target is at least 44×44px
+   (WCAG 2.5.8); the interaction is deliberately quiet (no animation, C9). */
+.confirm-widget-wrap { margin:26px 0 4px; padding:0 0 26px; border-bottom:1px solid var(--line); }
+.confirm-button { display:inline-flex; align-items:center; gap:10px; min-width:44px; min-height:44px; padding:10px 16px; border:1px solid #b9c9c0; border-radius:9px; background:#fffef9; color:#0b705c; font-size:14px; font-weight:800; cursor:pointer; }
+.confirm-button:hover { background:#f1f7f1; border-color:#3e9477; }
+.confirm-button:focus-visible { outline:3px solid #0b705c; outline-offset:2px; }
+.confirm-button[aria-pressed="true"] { background:#eef4ea; border-color:#43a979; }
+.confirm-button:disabled { cursor:not-allowed; opacity:.55; transform:none; }
+.confirm-star { width:20px; height:20px; flex:none; color:#43a979; }
+.confirm-count { white-space:nowrap; }
+.confirm-help { margin:10px 0 0; color:#5c6c75; font-size:13px; line-height:1.5; }
+/* Profile trust-level badge (Vera C1): .card-topline label + dot, progress
+   line is TEXT ONLY — never a bar. */
+.level-badge { margin:0 0 30px; }
+.level-badge .card-topline { margin:0 0 6px; }
+.level-badge .status-dot { background:#43a979; }
+.level-progress { margin:0; color:#52656d; font-size:13px; line-height:1.5; }
+/* Profile contributions list (C5): local filter chips, polite total
+   counter, pagination with aria-current on the current page indicator. */
+.contributions-filters { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 16px; }
+.filter-chip { padding:8px 14px; border:1px solid var(--line); border-radius:999px; background:#fffef9; color:#435963; font-size:13px; font-weight:700; cursor:pointer; min-height:36px; }
+.filter-chip:hover { border-color:#3e9477; color:#0b705c; }
+.filter-chip.active { background:#0b705c; border-color:#0b705c; color:#fff; }
+.filter-chip:focus-visible { outline:3px solid #0b705c; outline-offset:2px; }
+.contributions-total { margin:0 0 12px; color:#52656d; font-size:13px; font-weight:700; }
+.contributions-list li { flex-wrap:wrap; }
+.contributions-kind { color:#435963; }
+.contributions-edit { margin-left:auto; font-size:13px; }
+.contributions-pagination { display:flex; align-items:center; gap:14px; margin:16px 0 4px; }
+.contributions-pagination .button { padding:9px 14px; font-size:13px; }
+.page-indicator { color:#52656d; font-size:13px; font-weight:700; }

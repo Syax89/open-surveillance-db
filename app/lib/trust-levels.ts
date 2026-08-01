@@ -71,3 +71,19 @@ export function trustLevelMeta(verifiedCount: number): TrustLevelMeta {
     nextThreshold: next ? next.threshold : null,
   };
 }
+
+/**
+ * The three PUBLIC badge keys (COMMUNITY_PLAN §3.1 — frozen mapping, also
+ * pinned by the C-i18n tests): internal L0–L4 map to 3 UI badges
+ * (New / Trusted / Experienced contributor). The badge is public; the
+ * numeric level and weight are NOT exposed anywhere in the UI.
+ */
+export const BADGE_KEYS = ["new", "trusted", "experienced"] as const;
+export type BadgeKey = (typeof BADGE_KEYS)[number];
+
+export function badgeKeyForLevel(level: number): BadgeKey {
+  const safe = Number.isFinite(level) ? Math.trunc(level) : 0;
+  if (safe <= 0) return "new";
+  if (safe <= 2) return "trusted";
+  return "experienced";
+}

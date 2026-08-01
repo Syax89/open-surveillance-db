@@ -90,6 +90,19 @@ export const en = {
   errorLoadContributions: "Could not load your contributions.",
   errorLoadTrustLevel: "Could not load your trust level.",
   gateL1Help: "You can verify records after your first contribution is published.",
+  // Profile list pagination (F0 canonical contract) + per-filter empty
+  // state: the list is the contributor's own, filters are local to the
+  // page (never shareable URLs, COMMUNITY_PLAN §2.3).
+  noContributionsFiltered: "No contributions match this filter.",
+  previousPage: "Previous page",
+  nextPage: "Next page",
+  pageOf: (page: number, totalPages: number) => `Page ${page} of ${totalPages}`,
+  contributionsNavigation: "Contributions navigation",
+  contributionStatusFilter: "Filter contributions by status",
+  // Anonymous verification gate (C5): the record detail shows the toggle
+  // but disables it with this explanatory copy — the server answers 401
+  // without a session, so the button never pretends to work.
+  loginToVerify: "Log in to verify this record",
 
   // --- Contribution editing (C6) ---
   edit: "Edit",
@@ -207,6 +220,19 @@ export const it: Translation<typeof en> = {
   errorLoadContributions: "Non è stato possibile caricare i tuoi contributi.",
   errorLoadTrustLevel: "Non è stato possibile caricare il tuo livello di fiducia.",
   gateL1Help: "Puoi verificare i record dopo la pubblicazione del tuo primo contributo.",
+  // Paginazione della lista profilo (contratto canonico F0) + empty state
+  // per filtro: la lista è del contributor, i filtri sono locali alla
+  // pagina (mai URL condivisibili, COMMUNITY_PLAN §2.3).
+  noContributionsFiltered: "Nessun contributo corrisponde a questo filtro.",
+  previousPage: "Pagina precedente",
+  nextPage: "Pagina successiva",
+  pageOf: (page: number, totalPages: number) => `Pagina ${page} di ${totalPages}`,
+  contributionsNavigation: "Navigazione contributi",
+  contributionStatusFilter: "Filtra i contributi per stato",
+  // Gate anonimo delle verifiche (C5): il dettaglio record mostra il toggle
+  // ma lo disabilita con questo copy esplicativo — il server risponde 401
+  // senza sessione, quindi il bottone non finge mai di funzionare.
+  loginToVerify: "Accedi per verificare questo record",
 
   // --- Modifica dei contributi (C6) ---
   edit: "Modifica",

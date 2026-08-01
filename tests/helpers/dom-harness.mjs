@@ -62,6 +62,12 @@ const PAGES = [
   { source: "app/account/page.tsx", relative: "app/account/page.mjs" },
   { source: "app/records/[id]/page.tsx", relative: "app/records/[id]/page.mjs" },
   { source: "app/records/[id]/edit/page.tsx", relative: "app/records/[id]/edit/page.mjs" },
+  // C5 community components: the verification toggle and the trust-level
+  // badge are loaded by the client interaction tests (client-verify-toggle,
+  // client-account) — listed here as the explicit isolation contract like
+  // the other hand-picked components below.
+  { source: "app/components/StarConfirmButton.tsx", relative: "app/components/StarConfirmButton.mjs" },
+  { source: "app/components/LevelBadge.tsx", relative: "app/components/LevelBadge.mjs" },
   // F1 route group (tools): tool bodies + shared chrome.
   { source: "app/components/ToolLayout.tsx", relative: "app/components/ToolLayout.mjs" },
   { source: "app/components/LegacyAnchorRedirect.tsx", relative: "app/components/LegacyAnchorRedirect.mjs" },

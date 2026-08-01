@@ -164,6 +164,23 @@ const INFO_ROUTES = {
     en: ["A public database, built with care."],
     noEn: ["A public database, built with care."],
   },
+  // Private auth surface (C5): /account SSRs the client shell in the cookie
+  // language — the h1 and the loading note are the parity markers (the
+  // data-driven profile renders client-side only, never in SSR).
+  "/account": {
+    it: ["Il tuo account", "Caricamento…"],
+    en: ["Your account", "Loading…"],
+    noEn: ["Your account", "Loading…", "Not logged in"],
+  },
+  // Record detail (C5): the verification widget is client-rendered; the SSR
+  // shell carries the localized loading note and the back link. The back
+  // label contains an apostrophe, which React SSRs HTML-escaped as
+  // &#x27; — the marker matches the emitted form (verified against output).
+  "/records/1": {
+    it: ["Caricamento del record pubblico…", "Torna all&#x27;elenco"],
+    en: ["Loading the public record…", "← Back to directory"],
+    noEn: ["Loading the public record…", "← Back to directory", "Record navigation"],
+  },
   // Home hub (F2 route group home, t_52dcb95e): l'hub è ora una pagina
   // SSR-pura di orientamento con hero, MapTeaser statico e 4 card tool.
   // I marker verificano la parità EN/IT delle nuove stringhe dell'hub
