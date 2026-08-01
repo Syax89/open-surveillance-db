@@ -43,7 +43,7 @@ function parseAppealRequest(value: unknown): {
 
 function appealLimit(request: Request) {
   const key = callerKey(request);
-  const limitOptions = limitsFor("moderate", env);
+  const limitOptions = limitsFor("appeal", env);
   const limit = checkRateLimit("appeal", key, limitOptions);
   if (!limit.allowed) {
     console.warn("/api/appeals rate limited");

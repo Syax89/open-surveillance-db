@@ -154,8 +154,12 @@ harm.
   (`GET /api/tiles/*`, dedicated bucket, default 60/min, env
   `TILES_RATE_LIMIT_MAX`/`TILES_RATE_LIMIT_WINDOW_SECONDS`) so bulk scraping
   cannot drive unbounded R2 egress or violate the OSMF community tile usage
-  policy. Appeal decisions (`PATCH /api/appeals/[id]`) share the moderation
-  bucket (default 30/min) as a second layer over the edge gate.
+  policy. Appeal filing and review (`POST/GET /api/appeals`) have their own
+  bucket (default 20/min, env
+  `APPEAL_RATE_LIMIT_MAX`/`APPEAL_RATE_LIMIT_WINDOW_SECONDS`) so the appeals
+  workload is tunable independently of moderation; appeal decisions
+  (`PATCH /api/appeals/[id]`) share the moderation bucket (default 30/min) as
+  a second layer over the edge gate.
 - The in-memory limiter is per-isolate: on a public multi-isolate deployment
   the per-caller counts are not global, so the effective ceiling scales with
   the number of isolates. Before public alpha, evaluate Cloudflare's

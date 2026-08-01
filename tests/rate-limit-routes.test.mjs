@@ -7,7 +7,7 @@
 //
 //   POST /api/photos             submit bucket    (POST_RATE_LIMIT_*)
 //   POST /api/cameras            submit bucket    (POST_RATE_LIMIT_*)
-//   POST /api/appeals            appeal bucket    (MODERATION_RATE_LIMIT_*)
+//   POST /api/appeals            appeal bucket    (APPEAL_RATE_LIMIT_*)
 //   PATCH /api/moderation        moderate bucket  (MODERATION_RATE_LIMIT_*)
 //   GET  /api/cameras/nearby     nearby bucket    (NEARBY_RATE_LIMIT_*)
 //   GET  /api/cameras/revisions  revisions bucket (REVISIONS_RATE_LIMIT_*)
@@ -64,6 +64,8 @@ const DEFAULT_ENV = {
   REVISIONS_RATE_LIMIT_WINDOW_SECONDS: "60",
   MODERATION_RATE_LIMIT_MAX: "1000000",
   MODERATION_RATE_LIMIT_WINDOW_SECONDS: "60",
+  APPEAL_RATE_LIMIT_MAX: "1000000",
+  APPEAL_RATE_LIMIT_WINDOW_SECONDS: "60",
   POST_SUBMISSIONS_DISABLED: "false",
   SEARCH_RATE_LIMIT_MAX: "1000000",
   SEARCH_RATE_LIMIT_WINDOW_SECONDS: "60",
@@ -275,8 +277,8 @@ test("POST /api/cameras rate-limits the submit family with 429 + Retry-After", a
 });
 
 test("POST /api/appeals rate-limits the appeal family with 429 + Retry-After", async () => {
-  env.MODERATION_RATE_LIMIT_MAX = "1";
-  env.MODERATION_RATE_LIMIT_WINDOW_SECONDS = "60";
+  env.APPEAL_RATE_LIMIT_MAX = "1";
+  env.APPEAL_RATE_LIMIT_WINDOW_SECONDS = "60";
   stubAuth(CONTRIBUTOR);
   stub("fileAppeal", async (input) => ({
     kind: "ok",
@@ -376,7 +378,7 @@ test("calls under the threshold are not rate-limited on any route family", async
     },
     {
       name: "POST /api/appeals",
-      knob: "MODERATION_RATE_LIMIT_MAX",
+      knob: "APPEAL_RATE_LIMIT_MAX",
       setup: () => {
         stubAuth(CONTRIBUTOR);
         stub("fileAppeal", async (input) => ({ kind: "ok", appeal: { id: 9, ...input }, event: { id: 1 } }));

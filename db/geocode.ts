@@ -34,7 +34,37 @@ const defaultGeocoderBaseUrl = "https://nominatim.openstreetmap.org";
 const requestTimeoutMs = 5_000;
 /** Negative results are cached too, so a typo does not hammer the endpoint. */
 const cacheTtlMs = 60 * 60 * 1_000;
+/**
+ * Hard cap on cached entries (per isolate). Every unique locality/address
+ * query (text + language + geocoder base URL) creates an entry that lives up
+ * to an hour, so on a long-lived worker with varied search traffic an
+ * unbounded map would grow without limit. When the cap is reached the oldest
+ * entries are evicted first (Map preserves insertion order); expired entries
+ * are dropped opportunistically when the map is at the cap.
+ */
+const maxCacheEntries = 1_000;
 const cache = new Map<string, { expiresAt: number; value: ResolvedPlace | null }>();
+
+/**
+ * Store an entry without letting the cache exceed `maxCacheEntries`. Only a
+ * new key grows the map, so overwriting an existing (e.g. expired) key never
+ * triggers eviction; at the cap, expired entries are pruned first and the
+ * oldest live entries are evicted to make room.
+ */
+function setCachedEntry(key: string, entry: { expiresAt: number; value: ResolvedPlace | null }): void {
+  if (!cache.has(key) && cache.size >= maxCacheEntries) {
+    const now = Date.now();
+    for (const [candidateKey, candidate] of cache) {
+      if (candidate.expiresAt <= now) cache.delete(candidateKey);
+    }
+    while (cache.size >= maxCacheEntries) {
+      const oldestKey = cache.keys().next().value;
+      if (oldestKey === undefined) break;
+      cache.delete(oldestKey);
+    }
+  }
+  cache.set(key, entry);
+}
 
 type EnvLike = { [key: string]: unknown };
 
@@ -81,7 +111,7 @@ export async function resolvePlace(
     }>;
     const first = results[0];
     if (!first) {
-      cache.set(cacheKey, { expiresAt: Date.now() + cacheTtlMs, value: null });
+      setCachedEntry(cacheKey, { expiresAt: Date.now() + cacheTtlMs, value: null });
       return null;
     }
 
@@ -99,9 +129,18 @@ export async function resolvePlace(
     if (!Number.isFinite(place.latitude) || !Number.isFinite(place.longitude)) {
       throw new Error("Geocoder returned unusable coordinates");
     }
-    cache.set(cacheKey, { expiresAt: Date.now() + cacheTtlMs, value: place });
+    setCachedEntry(cacheKey, { expiresAt: Date.now() + cacheTtlMs, value: place });
     return place;
   } finally {
     clearTimeout(timer);
   }
+}
+
+/** Test/observability hooks: clear the cache between runs and expose its size. */
+export function resetGeocodeCache(): void {
+  cache.clear();
+}
+
+export function geocodeCacheSize(): number {
+  return cache.size;
 }
