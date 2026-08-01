@@ -39,6 +39,7 @@ export const it: Translation<typeof en> = {
     browseRecords: "Sfoglia i record",
     howItWorks: "Come funziona",
     rules: "Regole",
+    manifesto: "Manifesto",
     addCamera: "Aggiungi una telecamera",
     openDatabase: "Database aperto · mantenuto dalla comunità",
     heroTitle: "Dati pubblici sulla sorveglianza pubblica.",
@@ -235,6 +236,7 @@ export const it: Translation<typeof en> = {
     map: "Mappa",
     directory: "Elenco",
     home: "Home",
+    manifesto: "Manifesto",
     eyebrow: "Guida al progetto",
     title: "Un database pubblico, costruito con attenzione.",
     intro:
@@ -304,6 +306,87 @@ export const it: Translation<typeof en> = {
     localBody:
       "Funziona localmente per lo sviluppo del prodotto. Record illustrativi, code e decisioni sono materiale di test: da questo prototipo non si deve dedurre nulla su infrastrutture di sorveglianza reali.",
     footer: "Creato per la trasparenza, non per il tracciamento.",
+  },
+  manifesto: {
+    navigation: "Navigazione del manifesto",
+    homeAria: "Pagina iniziale di OpenSurveillanceDB",
+    map: "Mappa",
+    directory: "Elenco",
+    guide: "Come funziona",
+    manifesto: "Manifesto",
+    home: "Home",
+    eyebrow: "Manifesto del progetto",
+    title: "Un manifesto per uno spazio pubblico leggibile.",
+    intro:
+      "OpenSurveillanceDB è un database civico aperto e non commerciale dell’infrastruttura di sorveglianza pubblica visibile. Questa pagina dichiara a cosa serve il progetto, i principi che lo governano, cosa scegliamo deliberatamente di non fare e cosa viene — e non viene — pubblicato.",
+    exploreMap: "Esplora la mappa",
+    browseDirectory: "Sfoglia l’elenco",
+    readGuide: "Leggi la guida",
+    missionEyebrow: "Missione",
+    missionTitle: "Aiutare le persone a comprendere i sistemi che le circondano.",
+    missionBody:
+      "Il progetto mappa l’infrastruttura di telecamere visibile negli spazi condivisi, così che le persone possano capire cosa è installato attorno a loro. Documenta solo apparecchiature rivolte al pubblico. Non è uno strumento per osservare, tracciare o aggirare la sorveglianza legittima.",
+    missionOneTitle: "Cosa documentiamo",
+    missionOneBody:
+      "Infrastrutture di telecamere visibili, posizione approssimativa, tipo, fonte e stato di revisione.",
+    missionTwoTitle: "Cosa non raccogliamo",
+    missionTwoBody:
+      "Feed delle telecamere, credenziali, dettagli di abitazioni private, debolezze operative, volti, targhe o altri dati personali.",
+    missionThreeTitle: "Cosa i dati non possono dimostrare",
+    missionThreeBody:
+      "L’assenza di un record non dimostra che un’area sia libera da sorveglianza. Indica solo che non è pubblicato alcun record revisionato.",
+    principlesEyebrow: "Principi",
+    principlesTitle: "Gratuito, aperto e sicuro per progettazione.",
+    principlesIntro:
+      "Cinque impegni guidano ogni decisione del progetto, dal modello dati alla coda di moderazione.",
+    principleOneTitle: "Gratuito da usare",
+    principleOneBody:
+      "Niente pubblicità, profilazione o funzioni a pagamento. Il database e il software sono beni comuni.",
+    principleTwoTitle: "Open source",
+    principleTwoBody:
+      "Il software può essere ispezionato, riusato e migliorato dalla comunità.",
+    principleThreeTitle: "Dati aperti con provenienza",
+    principleThreeBody:
+      "Licenza e provenienza sono registrate per ogni record pubblicato, così giornalismo, ricerca e uso civico possono farvi affidamento.",
+    principleFourTitle: "Privacy e sicurezza by design",
+    principleFourBody:
+      "Niente telecamere di abitazioni private, dettagli operativi sensibili o link a feed live. Volti e targhe vengono rimossi prima della pubblicazione.",
+    principleFiveTitle: "Prima la moderazione umana",
+    principleFiveBody:
+      "Gli invii della comunità diventano pubblici solo dopo una revisione umana che li ritenga pertinenti, sufficientemente documentati e sicuri da pubblicare.",
+    nonGoalsEyebrow: "Non-obiettivi",
+    nonGoalsTitle: "Cosa scegliamo deliberatamente di non fare.",
+    nonGoalsBody:
+      "I confini sono importanti quanto la missione. OpenSurveillanceDB non diventerà mai nessuna delle seguenti cose:",
+    nonGoalFeedsTitle: "Niente feed delle telecamere",
+    nonGoalFeedsBody:
+      "Documentiamo apparecchiature, non filmati. Nessun feed live o registrato viene mai collegato o mostrato.",
+    nonGoalTrackingTitle: "Niente strumenti di tracciamento",
+    nonGoalTrackingBody:
+      "I dati non possono essere usati per osservare, seguire o profilare le persone nello spazio pubblico.",
+    nonGoalBypassTitle: "Niente consigli per eludere",
+    nonGoalBypassBody:
+      "Il progetto non aiuta nessuno a evitare la sorveglianza legittima e non pubblica debolezze operative.",
+    nonGoalPrivateTitle: "Niente proprietà privata",
+    nonGoalPrivateBody:
+      "Le telecamere che sorvegliano abitazioni private e i dettagli della vita privata sono fuori ambito.",
+    publishEyebrow: "Cosa pubblichiamo",
+    publishTitle: "Aperti dove è sicuro esserlo.",
+    publishBody:
+      "Solo l’infrastruttura revisionata e rivolta al pubblico entra negli output pubblici. Ogni record pubblicato è un fatto su apparecchiature visibili, non su una persona.",
+    publishedTitle: "Pubblicato",
+    publishedItemOne: "Infrastruttura di telecamere visibile e sua posizione approssimativa",
+    publishedItemTwo: "Tipo, fonte e stato di revisione per ogni record",
+    publishedItemThree:
+      "Esportazioni GeoJSON e CSV dei record revisionati, con licenza e provenienza",
+    neverPublishedTitle: "Mai pubblicato",
+    neverPublishedItemOne: "Feed delle telecamere, credenziali o link a filmati live",
+    neverPublishedItemTwo: "Volti, targhe o qualsiasi dato personale",
+    neverPublishedItemThree:
+      "Dettagli di abitazioni private, luoghi sensibili o debolezze operative",
+    neverPublishedItemFour:
+      "Segnalazioni e correzioni prima — o senza — revisione umana",
+    footerNote: "Creato per la trasparenza, non per il tracciamento.",
   },
   moderazione: {
     navigation: "Navigazione moderazione",
