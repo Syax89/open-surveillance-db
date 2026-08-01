@@ -42,6 +42,17 @@ before(async () => {
 
 afterEach(() => rtl?.cleanup());
 
+// The Server Components refactor (PR #120) moved the nav-shell labels into a
+// required `navLabels` prop — the pages now pass the localized i18n labels.
+// The DOM tests must mirror that contract: fictional labels only.
+const fakeNavLabels = {
+  mainNavigation: "Main navigation",
+  homeAria: "OpenSurveillanceDB home",
+  exploreMap: "Explore the map",
+  browseRecords: "Browse records",
+  howItWorks: "How it works",
+};
+
 // Fictitious legal content: no real names, no real URLs beyond example.test.
 const fakeLegalContent = {
   eyebrow: "Fixture page",
@@ -170,7 +181,7 @@ test("footer: locale toggle switches the landmark label and link texts (EN -> IT
 });
 
 test("legal: renders title, intro and sections wired to headings via aria-labelledby", async () => {
-  const view = await renderWithLocale(React.createElement(LegalPage, { content: fakeLegalContent }));
+  const view = await renderWithLocale(React.createElement(LegalPage, { content: fakeLegalContent, navLabels: fakeNavLabels }));
   const { container } = view;
 
   assert.equal(container.querySelector("h1").textContent, "Fixture Information Page");
@@ -186,7 +197,7 @@ test("legal: renders title, intro and sections wired to headings via aria-labell
 });
 
 test("legal: inline markup renders links, strong, em, notes and tables", async () => {
-  const view = await renderWithLocale(React.createElement(LegalPage, { content: fakeLegalContent }));
+  const view = await renderWithLocale(React.createElement(LegalPage, { content: fakeLegalContent, navLabels: fakeNavLabels }));
   const { container } = view;
 
   const p = container.querySelector("section p");
@@ -211,7 +222,7 @@ test("legal: inline markup renders links, strong, em, notes and tables", async (
 });
 
 test("legal: nav shell links resolve, LocaleToggle present, no broken hrefs", async () => {
-  const view = await renderWithLocale(React.createElement(LegalPage, { content: fakeLegalContent }));
+  const view = await renderWithLocale(React.createElement(LegalPage, { content: fakeLegalContent, navLabels: fakeNavLabels }));
   const { container } = view;
 
   const nav = container.querySelector("nav.nav-shell");
