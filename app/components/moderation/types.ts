@@ -28,8 +28,25 @@ export type CorrectionInQueue = {
   message: string;
   contact?: string | null;
   status: string;
+  outcome?: string | null;
   createdAt?: string;
 };
+
+/**
+ * Record-outcome allowlist for correction approvals (H1, t_69891619).
+ * Mirrors the backend `correctionOutcomes` in db/moderation.ts so the UI
+ * never proposes a value the API would reject. `kept` is the "verified /
+ * record unchanged" outcome; the three headline outcomes of the H1
+ * requirement (verified / corrected / removed) come first in the selector.
+ */
+export const correctionOutcomeOptions = [
+  { value: "kept" },
+  { value: "corrected" },
+  { value: "removed" },
+  { value: "marked-stale" },
+  { value: "escalated" },
+] as const;
+export type CorrectionOutcomeValue = (typeof correctionOutcomeOptions)[number]["value"];
 
 /**
  * A pending community edit request (ADR 0018 §4, C3). `proposed*` are the
@@ -129,7 +146,7 @@ export type QueuePayload = {
 };
 
 export type QueueEntity = "camera" | "correction" | "photo" | "camera_edit";
-export type ModerationAction = "approve" | "reject" | "hide" | "mark-stale" | "reverify" | "escalate";
+export type ModerationAction = "approve" | "reject" | "hide" | "mark-stale" | "reverify" | "escalate" | "associate";
 export type ReasonCode = "verified-public-infrastructure" | "insufficient-evidence" | "duplicate" | "private-or-sensitive-location" | "inaccurate-or-outdated" | "privacy-or-safety-concern" | "requires-senior-review" | "other";
 
 export const reasonOptions: { value: ReasonCode }[] = [
@@ -154,6 +171,13 @@ export type DecisionFormApi = {
   setReason: (key: string, value: string) => void;
   note: (key: string) => string;
   setNote: (key: string, value: string) => void;
+  // Correction-only fields (H1, t_69891619): the record outcome chosen on
+  // approve and the record id the request is linked to (associate requires
+  // it; approve/reject may re-link).
+  outcome: (key: string) => string;
+  setOutcome: (key: string, value: string) => void;
+  cameraId: (key: string) => string;
+  setCameraId: (key: string, value: string) => void;
   metadataChoices: (key: string) => { manufacturer: boolean; observedOn: boolean };
   setMetadataChoice: (key: string, field: "manufacturer" | "observedOn", value: boolean) => void;
   redactionConfirmed: (key: string) => boolean;

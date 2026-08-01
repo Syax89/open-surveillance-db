@@ -24,6 +24,10 @@ export function useModerationQueue() {
   const [actorId, setActorId] = useState("");
   const [reasons, setReasons] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState<Record<string, string>>({});
+  // Correction-only decision fields (H1, t_69891619): the record outcome
+  // chosen for approve and the record id the request is linked to.
+  const [outcomes, setOutcomes] = useState<Record<string, string>>({});
+  const [cameraIds, setCameraIds] = useState<Record<string, string>>({});
   const [metadataPublication, setMetadataPublication] = useState<Record<string, { manufacturer: boolean; observedOn: boolean }>>({});
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState<string | null>(null);
@@ -40,6 +44,7 @@ export function useModerationQueue() {
   function readableAction(action?: string) { return action && action in t.actionPast ? t.actionPast[action as ModerationAction] : action ?? t.decisionRecorded; }
   function readableReason(reasonCode?: string) { return reasonCode && reasonCode in t.reasons ? t.reasons[reasonCode as ReasonCode] : reasonCode ?? t.timeUnavailable; }
   function readableStatus(status?: string) { return status && status in t.statusLabels ? t.statusLabels[status as keyof typeof t.statusLabels] : status ?? t.recorded; }
+  function readableOutcome(outcome?: string) { return outcome && outcome in t.outcomeLabels ? t.outcomeLabels[outcome as keyof typeof t.outcomeLabels] : outcome ?? t.unavailable; }
 
   const loadQueue = useCallback(() => {
     const controller = new AbortController();
@@ -90,6 +95,17 @@ export function useModerationQueue() {
     if (!reasonCode) return;
     if (!Number.isInteger(actingAs) || actingAs < 1) { setError(t.actorRequired); return; }
 
+    // Correction association contract (H1, t_69891619): approve must name a
+    // record outcome, associate must name a record id. The server enforces
+    // the same rules (400 otherwise); checking here gives immediate feedback
+    // without a round-trip.
+    const outcome = outcomes[key];
+    const rawCameraId = cameraIds[key] ?? "";
+    const parsedCameraId = rawCameraId.trim() === "" ? null : Number.parseInt(rawCameraId, 10);
+    if (entity === "correction" && action === "approve" && !outcome) { setError(t.approveRequiresOutcome); return; }
+    if (entity === "correction" && action === "associate" && (parsedCameraId === null || !Number.isInteger(parsedCameraId) || parsedCameraId < 1)) { setError(t.associateRequiresCameraId); return; }
+    if (entity === "correction" && parsedCameraId !== null && (!Number.isInteger(parsedCameraId) || parsedCameraId < 1)) { setError(t.invalidRecordId); return; }
+
     setProcessing(key);
     setMessage("");
     setError("");
@@ -99,6 +115,8 @@ export function useModerationQueue() {
         body: JSON.stringify({
           entity, id, action, reasonCode, actorId: actingAs,
           ...(note ? { note } : {}),
+          ...(entity === "correction" && action === "approve" && outcome ? { outcome } : {}),
+          ...(entity === "correction" && parsedCameraId !== null ? { cameraId: parsedCameraId } : {}),
           ...(entity === "camera" && action === "approve" ? { publishManufacturer: metadataChoices.manufacturer, publishObservedOn: metadataChoices.observedOn } : {}),
           ...(entity === "photo" && action === "approve" ? { redactionConfirmed: redactionConfirmed[key] === true } : {}),
         }),
@@ -110,6 +128,8 @@ export function useModerationQueue() {
       setReasons((items) => { const next = { ...items }; delete next[key]; return next; });
       setRedactionConfirmed((items) => { const next = { ...items }; delete next[key]; return next; });
       setNotes((items) => { const next = { ...items }; delete next[key]; return next; });
+      setOutcomes((items) => { const next = { ...items }; delete next[key]; return next; });
+      setCameraIds((items) => { const next = { ...items }; delete next[key]; return next; });
       setMetadataPublication((items) => { const next = { ...items }; delete next[key]; return next; });
       setMessage(`${entity === "camera" ? t.cameraReport : entity === "photo" ? t.photoEvidence : entity === "camera_edit" ? t.editRequest : t.correctionRequest} #${id} ${t.decisionSaved}: ${actionLabel(action)}. ${t.reason}: ${readableReason(reasonCode)}.`);
       loadQueue();
@@ -123,6 +143,10 @@ export function useModerationQueue() {
     setReason: (key, value) => setReasons((items) => ({ ...items, [key]: value })),
     note: (key) => notes[key] ?? "",
     setNote: (key, value) => setNotes((items) => ({ ...items, [key]: value.slice(0, 500) })),
+    outcome: (key) => outcomes[key] ?? "",
+    setOutcome: (key, value) => setOutcomes((items) => ({ ...items, [key]: value })),
+    cameraId: (key) => cameraIds[key] ?? "",
+    setCameraId: (key, value) => setCameraIds((items) => ({ ...items, [key]: value })),
     metadataChoices: (key) => metadataPublication[key] ?? { manufacturer: false, observedOn: false },
     setMetadataChoice: (key, field, value) => setMetadataPublication((items) => ({ ...items, [key]: { ...(metadataPublication[key] ?? { manufacturer: false, observedOn: false }), [field]: value } })),
     redactionConfirmed: (key) => redactionConfirmed[key] === true,
@@ -136,7 +160,7 @@ export function useModerationQueue() {
     loading, message, error, summary,
     cameras, publishedCameras, reviewCameras, corrections, editRequests, photos, recentEvents, reviewers,
     actorId, setActorId,
-    queueBadge, readableDate, readableAction, readableReason, readableStatus,
+    queueBadge, readableDate, readableAction, readableReason, readableStatus, readableOutcome,
     decisionApi,
   };
 }

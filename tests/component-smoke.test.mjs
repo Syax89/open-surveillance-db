@@ -97,8 +97,16 @@ const MODERATION_COMPONENTS = [
  *
  * (Nessuna deviazione attiva da F1 — ReportForm è tornato sotto target dopo
  * l'estrazione di useReportFlow in app/lib/useReportFlow.ts.)
+ *
+ * Deviazione H1 (t_69891619): useModerationQueue cresce di ~19 righe per lo
+ * stato di associazione correzione→esito record (campi outcome + record id,
+ * validazione client, cleanup, getter/setter per DecisionFormApi). Stato e
+ * accessor appartengono all'hook decisionale condiviso; l'estrazione in un
+ * file separato non ridurrebbe la superficie. Baseline pinnata a 166 righe.
  */
-const KNOWN_DEVIATIONS = new Map([]);
+const KNOWN_DEVIATIONS = new Map([
+  ["app/components/moderation/useModerationQueue.tsx", { baselineLines: 166, reason: "H1 t_69891619: campi associazione correzione→esito record (outcome + record id, validazione, cleanup)" }],
+]);
 
 /** Componente condiviso atteso dal refactor di Linus. */
 const INFO_PAGE_COMPONENT = { name: "InfoPage", file: "app/components/InfoPage.tsx" };

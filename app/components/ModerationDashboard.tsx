@@ -10,6 +10,7 @@ import Link from "next/link";
 import { LocaleToggle, useMessages } from "./LocaleProvider";
 import { SiteHeader } from "./SiteHeader";
 import { CameraQueueItem } from "./moderation/CameraQueueItem";
+import { CorrectionHistorySection } from "./moderation/CorrectionHistorySection";
 import { CorrectionQueueItem } from "./moderation/CorrectionQueueItem";
 import { EditQueueItem } from "./moderation/EditQueueItem";
 import { HistorySection } from "./moderation/HistorySection";
@@ -77,7 +78,15 @@ export function ModerationDashboard() {
         listLabel={t.privateCorrections} loading={q.loading} items={q.corrections}
         emptyTitle={t.noCorrectionsTitle} emptyText={t.noCorrectionsText}
         itemKey={(correction) => correction.id}
-        renderItem={(correction) => <CorrectionQueueItem correction={correction} queueBadge={q.queueBadge("correction", correction.id)} api={q.decisionApi} readableDate={q.readableDate} readableStatus={q.readableStatus} />}
+        renderItem={(correction) => <CorrectionQueueItem correction={correction} queueBadge={q.queueBadge("correction", correction.id)} api={q.decisionApi} readableDate={q.readableDate} readableStatus={q.readableStatus} readableOutcome={q.readableOutcome} />}
+      />
+
+      <CorrectionHistorySection
+        readableDate={q.readableDate}
+        readableAction={q.readableAction}
+        readableReason={q.readableReason}
+        readableStatus={q.readableStatus}
+        readableOutcome={q.readableOutcome}
       />
 
       <QueueSection
