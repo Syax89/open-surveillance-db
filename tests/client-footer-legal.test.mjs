@@ -42,17 +42,6 @@ before(async () => {
 
 afterEach(() => rtl?.cleanup());
 
-// The Server Components refactor (PR #120) moved the nav-shell labels into a
-// required `navLabels` prop — the pages now pass the localized i18n labels.
-// The DOM tests must mirror that contract: fictional labels only.
-const fakeNavLabels = {
-  mainNavigation: "Main navigation",
-  homeAria: "OpenSurveillanceDB home",
-  exploreMap: "Explore the map",
-  browseRecords: "Browse records",
-  howItWorks: "How it works",
-};
-
 // Fictitious legal content: no real names, no real URLs beyond example.test.
 const fakeLegalContent = {
   eyebrow: "Fixture page",
