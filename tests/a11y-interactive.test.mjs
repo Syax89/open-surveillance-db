@@ -22,9 +22,9 @@
  *      shared-layout source tests in rendered-html.test.mjs).
  *   3. Auth/account forms: every control has an accessible name (wrapping
  *      <label> or for/id pair), server-side errors are announced through a
- *      live region (role="alert"). aria-invalid is NOT yet wired — tracked
- *      as finding QA-2026-08-01-2, pinned below so the gap stays visible
- *      while the suite stays green.
+ *      live region (role="alert"). aria-invalid is wired to the per-field
+ *      client validation since F-QA t_7b716c97 (finding QA-2026-08-01-2
+ *      CLOSED): the interaction test below pins the new behaviour.
  *   4. Locale toggle: the SSR root carries lang="en" and the toggle exposes
  *      aria-label + aria-pressed; the provider updates
  *      document.documentElement.lang on switch so screen readers re-read
@@ -45,6 +45,15 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { Miniflare } from "miniflare";
+import {
+  React,
+  installFetchMock,
+  jsonResponse,
+  loadDomPage,
+  renderWithLocale,
+  setupDom,
+  wrapWithLocale,
+} from "./helpers/dom-harness.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const serverDir = path.join(root, "dist", "server");
@@ -336,23 +345,53 @@ test("account actions are native buttons with no tabindex manipulation", async (
   assert.doesNotMatch(account, /tabIndex/);
 });
 
-test("aria-invalid is not yet wired on auth inputs — known gap, tracked (QA-2026-08-01-2)", async () => {
-  // The audit asked for aria-invalid on failing auth fields. The current
-  // implementation relies on native required/minLength validation (browser
-  // :invalid styling) and announces server errors via role="alert", but does
-  // not mark the specific field with aria-invalid. Pinned so a future fix
-  // must update this assertion deliberately; the gap is recorded in
-  // QA_REPORT_a11y-interactive.md (finding QA-2026-08-01-2).
-  for (const route of ["/login", "/register"]) {
-    const { html } = await renderRoute(route);
-    assert.equal((html.match(/aria-invalid/g) ?? []).length, 0, `${route} SSR must not yet set aria-invalid`);
-  }
-  const [login, register] = await Promise.all([
-    readFile(path.join(root, "app", "login", "page.tsx"), "utf8"),
-    readFile(path.join(root, "app", "register", "page.tsx"), "utf8"),
-  ]);
-  assert.doesNotMatch(login, /aria-invalid/);
-  assert.doesNotMatch(register, /aria-invalid/);
+test("aria-invalid marks the failing auth field on submit and clears as the user types (QA-2026-08-01-2 closed)", async () => {
+  // The audit finding is CLOSED (F-QA t_7b716c97): login/register now wire
+  // aria-invalid to the per-field client validation, so assistive
+  // technology knows exactly which field failed. This test pins the new
+  // behaviour at interaction level (SSR never renders the attribute — it
+  // only appears after a failed submit).
+  const rtl = await setupDom();
+  const user = rtl.userEvent.setup();
+  let fetchCalled = false;
+  installFetchMock(() => {
+    fetchCalled = true;
+    return jsonResponse({ error: "invalid credentials" }, { status: 401 });
+  });
+
+  const LoginPage = await loadDomPage("app/login/page.mjs");
+  rtl.render(await wrapWithLocale(React.createElement(LoginPage)));
+  const emailInput = rtl.screen.getByLabelText("Email");
+  const passwordInput = rtl.screen.getByLabelText(/^Password/);
+  assert.equal(emailInput.getAttribute("aria-invalid"), null, "SSR/initial render must not mark fields invalid");
+  assert.equal(passwordInput.getAttribute("aria-invalid"), null);
+
+  // Empty submit: both fields are marked, no request is fired.
+  await user.click(rtl.screen.getByRole("button", { name: /log in/i }));
+  assert.equal(emailInput.getAttribute("aria-invalid"), "true", "empty email must be invalid");
+  assert.equal(passwordInput.getAttribute("aria-invalid"), "true", "short password must be invalid");
+  assert.equal(fetchCalled, false, "client-side field errors must not fire the network request");
+
+  // Fixing the email clears only its own flag; the password stays invalid.
+  await user.type(emailInput, "contributor@example.test");
+  assert.equal(emailInput.getAttribute("aria-invalid"), null, "fixing the email must clear its flag");
+  assert.equal(passwordInput.getAttribute("aria-invalid"), "true", "the still-short password keeps its flag");
+
+  rtl.cleanup();
+
+  // Register mirrors the contract, including the optional displayName
+  // (only marked when present but below the 2-char minimum).
+  const RegisterPage = await loadDomPage("app/register/page.mjs");
+  rtl.render(await wrapWithLocale(React.createElement(RegisterPage)));
+  const regEmail = rtl.screen.getByLabelText("Email");
+  const regName = rtl.screen.getByLabelText(/display name|nickname/i);
+  const regPassword = rtl.screen.getByLabelText(/^Password/);
+  await user.type(regName, "x");
+  await user.click(rtl.screen.getByRole("button", { name: /create|register/i }));
+  assert.equal(regEmail.getAttribute("aria-invalid"), "true");
+  assert.equal(regName.getAttribute("aria-invalid"), "true", "a 1-char display name must be invalid");
+  assert.equal(regPassword.getAttribute("aria-invalid"), "true");
+  rtl.cleanup();
 });
 
 // ---------------------------------------------------------------------------
@@ -414,15 +453,63 @@ test("every <img> in the public HTML carries alt text", async () => {
   assert.match(photoItem, /<img[^>]*alt=\{`\$\{t\.photoEvidence\}/, "photo previews must carry alt text");
 });
 
-test("aria-current for the active page is not yet implemented — known gap, tracked (QA-2026-08-01-3)", async () => {
-  // The audit asked for aria-current="page" on the active nav/footer entry.
-  // No nav link currently marks the current page. Pinned so a future fix
-  // must update this assertion deliberately; the gap is recorded in
-  // QA_REPORT_a11y-interactive.md (finding QA-2026-08-01-3).
-  for (const route of ["/", "/login", "/register", "/guide", "/moderazione"]) {
+test("aria-current marks the active page in the footer and the header brand (QA-2026-08-01-3 closed)", async () => {
+  // The audit finding is CLOSED (F-QA t_7b716c97): the footer marks its own
+  // link with aria-current="page" on every institutional route, the header
+  // brand marks the home, and the home's in-page nav marks the active
+  // section (separate client test below).
+  const FOOTER_LINKS = ["/manifesto", "/regole", "/guide", "/privacy", "/termini", "/licenze", "/faq", "/contatti"];
+  for (const route of FOOTER_LINKS) {
     const { html } = await renderRoute(route);
-    assert.equal((html.match(/aria-current/g) ?? []).length, 0, `${route} must not yet use aria-current`);
+    const footer = html.slice(html.indexOf("footer-links"));
+    const linkTag = footer.match(new RegExp(`<a[^>]*href="${route}"[^>]*>`));
+    assert.ok(linkTag, `${route}: the footer must link to itself`);
+    assert.match(linkTag[0], /aria-current="page"/, `${route}: the footer's own link must be marked current`);
+    const current = (footer.match(/aria-current="page"/g) ?? []).length;
+    assert.equal(current, 1, `${route}: exactly one footer link must be current (found ${current})`);
   }
+  // Pages outside the footer link set (auth, record, moderation info) mark
+  // NO footer link as current — none of them is in the footer navigation.
+  for (const route of ["/login", "/register", "/account", "/records/1", "/moderazione", "/moderation"]) {
+    const { html } = await renderRoute(route);
+    const footer = html.slice(html.indexOf("footer-links"));
+    assert.equal((footer.match(/aria-current="page"/g) ?? []).length, 0, `${route}: no footer link may be current`);
+  }
+  // The home marks the header brand (in-page anchor to #top) and the footer
+  // brand as current; other pages leave the brand unmarked.
+  const home = await renderRoute("/");
+  assert.match(home.html, /<a class="brand"[^>]*href="#top"[^>]*aria-current="page"/, "home header brand must be current");
+  assert.match(home.html, /<footer class="site-footer"[\s\S]*?<a class="brand"[^>]*href="\/"[^>]*aria-current="page"/, "home footer brand must be current");
+  for (const route of ["/guide", "/login"]) {
+    const { html } = await renderRoute(route);
+    assert.doesNotMatch(html, /<a class="brand"[^>]*aria-current="page"/, `${route}: brand must not be marked current`);
+  }
+});
+
+test("home nav: the clicked in-page section anchor carries aria-current=true", async () => {
+  // Same-page navigation pattern (QA-2026-08-01-3): on the single-page
+  // home the anchor for the section the user is viewing gets
+  // aria-current="true" (the value ARIA defines for same-page references).
+  const rtl = await setupDom();
+  const user = rtl.userEvent.setup();
+  installFetchMock((input) => {
+    if (String(input).startsWith("/api/cameras")) {
+      return jsonResponse({
+        records: [
+          { id: 1, title: "Illustrative record A", kind: "Fixed dome", status: "demo", latitude: 41.9004, longitude: 12.4936, source: "Prototype seed", updated: "Demo data", description: "Fixture." },
+        ],
+        total: 1,
+      });
+    }
+    return jsonResponse({ error: "not found" }, { status: 404 });
+  });
+  const Home = await loadDomPage("app/page.mjs");
+  rtl.render(await wrapWithLocale(React.createElement(Home)));
+  const recordsLink = rtl.screen.getByRole("link", { name: /browse records/i });
+  assert.equal(recordsLink.getAttribute("aria-current"), null, "no section is current before interaction");
+  await user.click(recordsLink);
+  assert.equal(recordsLink.getAttribute("aria-current"), "true", "the clicked section anchor must become current");
+  rtl.cleanup();
 });
 
 // ---------------------------------------------------------------------------

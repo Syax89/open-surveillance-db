@@ -15,11 +15,33 @@ export default function RegisterPage() {
   const [displayName, setDisplayName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // Per-field client validation state (finding QA-2026-08-01-2, closed in
+  // F-QA t_7b716c97): aria-invalid marks the exact failing field. Server
+  // errors keep the role="alert" announcement without blaming one field.
+  const [fieldErrors, setFieldErrors] = useState<{
+    email?: boolean;
+    displayName?: boolean;
+    password?: boolean;
+  }>({});
+
+  function clientValidation() {
+    const emailInvalid = !email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+    const displayNameInvalid = displayName.trim().length > 0 && displayName.trim().length < 2;
+    const passwordInvalid = password.length < 10;
+    const errors = {
+      email: emailInvalid || undefined,
+      displayName: displayNameInvalid || undefined,
+      password: passwordInvalid || undefined,
+    };
+    setFieldErrors(errors);
+    return !emailInvalid && !displayNameInvalid && !passwordInvalid;
+  }
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
-    setSubmitting(true);
     setError(null);
+    if (!clientValidation()) return;
+    setSubmitting(true);
     try {
       const response = await fetch("/api/auth/register", {
         method: "POST",
@@ -59,7 +81,7 @@ export default function RegisterPage() {
         <h1>{t.registerTitle}</h1>
         <p className="record-detail-summary">{t.anonymousNote}</p>
 
-        <form className="auth-form" onSubmit={onSubmit}>
+        <form className="auth-form" onSubmit={onSubmit} noValidate>
           <label className="auth-field">
             <span>{t.email}</span>
             <input
@@ -67,8 +89,12 @@ export default function RegisterPage() {
               name="email"
               autoComplete="email"
               required
+              aria-invalid={fieldErrors.email || undefined}
               value={email}
-              onChange={(event) => setEmail(event.target.value)}
+              onChange={(event) => {
+                setEmail(event.target.value);
+                if (fieldErrors.email) setFieldErrors((f) => ({ ...f, email: undefined }));
+              }}
             />
           </label>
           <label className="auth-field">
@@ -79,8 +105,12 @@ export default function RegisterPage() {
               autoComplete="nickname"
               minLength={2}
               maxLength={60}
+              aria-invalid={fieldErrors.displayName || undefined}
               value={displayName}
-              onChange={(event) => setDisplayName(event.target.value)}
+              onChange={(event) => {
+                setDisplayName(event.target.value);
+                if (fieldErrors.displayName) setFieldErrors((f) => ({ ...f, displayName: undefined }));
+              }}
             />
           </label>
           <label className="auth-field">
@@ -91,8 +121,12 @@ export default function RegisterPage() {
               autoComplete="new-password"
               required
               minLength={10}
+              aria-invalid={fieldErrors.password || undefined}
               value={password}
-              onChange={(event) => setPassword(event.target.value)}
+              onChange={(event) => {
+                setPassword(event.target.value);
+                if (fieldErrors.password) setFieldErrors((f) => ({ ...f, password: undefined }));
+              }}
             />
             <small>{t.passwordHint}</small>
           </label>
