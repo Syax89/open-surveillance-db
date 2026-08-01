@@ -12,6 +12,11 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // QA test harness temp trees (tests/.render-tmp-*, tests/.dbg-tmp-*):
+    // generated at runtime by tests/pages-render.test.mjs; must never be
+    // linted even if a crashed run leaves one behind.
+    "tests/.render-tmp-*/**",
+    "tests/.dbg-tmp-*/**",
   ]),
 ]);
 
