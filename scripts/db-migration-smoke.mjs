@@ -62,6 +62,8 @@ const expectedIndexes = [
   "moderation_appeals_entity_idx",
   "photos_status_idx",
   "photos_camera_idx",
+  // Pending-photo quota (0013): only 'pending' rows are indexed.
+  "photos_pending_submitter_idx",
 ];
 // Tables that are not application schema but legitimately appear in a local
 // D1 database. Anything outside this set is an unexpected schema change.
