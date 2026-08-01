@@ -117,7 +117,8 @@ changes accumulate under `[Unreleased]`.
   trust levels, verifications (never "stars"), contributor profile,
   contribution editing, abuse reporting and destructive confirmations — EN
   pilot + IT type-checked parity, registered in `index.ts` (COMMUNITY_PLAN
-  §6, ADR 0007).
+  §6, ADR 0007)
+  ([#172](https://github.com/Syax89/open-surveillance-db/pull/172)).
 
 ### Changed
 
@@ -163,7 +164,8 @@ changes accumulate under `[Unreleased]`.
 - Italian interface bundles use "contributor" instead of "contributore"
   (`auth.ts` register title and `moderazione.ts` credentials copy), fixing
   the pre-existing EN/IT terminology drift flagged by the community copy
-  review (COMMUNITY_PLAN §6.1).
+  review (COMMUNITY_PLAN §6.1)
+  ([#172](https://github.com/Syax89/open-surveillance-db/pull/172)).
 
 ### Security
 
