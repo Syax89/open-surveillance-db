@@ -59,6 +59,30 @@ button { cursor:pointer; }
 .signal-two { right:65%;top:63%; }
 .signal-three { right:10%;top:74%; }
 .visual-label { position:absolute; right:50px; bottom:55px; border-left:2px solid var(--mint); padding-left:14px; color:#d4eee5; font-size:13px; line-height:1.45; font-weight:700; }
+/* Home hub (F2, t_52dcb95e): static MapTeaser + four tool cards. No Leaflet
+   on the hub — the teaser visual is a decorative CSS grid with static pins
+   (aria-hidden), the cards are plain links to the tool routes. */
+.map-teaser { width:min(1180px, calc(100% - 48px)); margin:0 auto; padding:96px 0 40px; display:grid; grid-template-columns:1fr 1.05fr; gap:64px; align-items:center; }
+.map-teaser-copy .eyebrow { color:#5f7078; }
+.map-teaser-copy h2 { margin:0; font-size:clamp(30px,3.6vw,48px); letter-spacing:-.06em; line-height:1.04; }
+.map-teaser-copy p:not(.eyebrow) { max-width:480px; margin:22px 0 28px; color:#5e707a; font-size:16px; line-height:1.6; }
+.map-teaser-visual { position:relative; min-height:300px; overflow:hidden; border-radius:18px; background:linear-gradient(135deg,#0a2a43,#061c30); }
+.teaser-grid { position:absolute; inset:-18%; opacity:.55; background-image:linear-gradient(rgba(161,222,208,.12) 1px, transparent 1px),linear-gradient(90deg, rgba(161,222,208,.12) 1px, transparent 1px); background-size:36px 36px; transform:rotate(-20deg) scale(1.15); }
+.teaser-pin { position:absolute; width:13px; height:13px; border-radius:50%; background:var(--amber); box-shadow:0 0 0 5px rgba(248,184,78,.16),0 0 18px rgba(248,184,78,.75); }
+.teaser-pin-one { left:22%; top:30%; }
+.teaser-pin-two { left:56%; top:24%; }
+.teaser-pin-three { left:38%; top:62%; }
+.teaser-pin-four { left:70%; top:56%; }
+.teaser-pin-five { left:12%; top:70%; }
+.tool-cards { width:min(1180px, calc(100% - 48px)); margin:0 auto; padding:44px 0 0; }
+.tool-cards-heading .eyebrow { margin-bottom:0; color:#5f7078; }
+.tool-cards-grid { margin-top:26px; display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.tool-card { display:flex; flex-direction:column; gap:7px; padding:24px 24px 26px; border:1px solid var(--line); border-radius:12px; background:#fffef9; transition:transform .2s ease, border-color .2s ease; }
+.tool-card:hover { transform:translateY(-2px); border-color:#9db8aa; }
+.tool-card:focus-visible { outline:3px solid #0b705c; outline-offset:2px; }
+.tool-card-icon { display:grid; place-items:center; width:38px; height:38px; border-radius:10px; background:#e5ebe3; color:#106049; font-size:18px; line-height:1; }
+.tool-card-title { font-size:18px; font-weight:800; letter-spacing:-.03em; color:var(--ink); }
+.tool-card-body { margin:0; color:#5e707a; font-size:13px; line-height:1.5; }
 .map-section, .principles, .report-section, footer { width:min(1180px, calc(100% - 48px)); margin-left:auto; margin-right:auto; }
 .map-section { padding:112px 0 102px; }
 .section-heading { display:flex; align-items:end; justify-content:space-between; margin-bottom:30px; gap:24px; }
@@ -253,6 +277,9 @@ footer>p { margin:0; color:#586870; font-size:13px; line-height:1.5; }
   .hero-intro { font-size:16px }
   .hero-stats { margin-top:48px;gap:18px }
   .hero-visual { min-height:260px }
+  .map-teaser { grid-template-columns:1fr; gap:30px; padding:64px 0 24px }
+  .map-teaser-visual { min-height:210px }
+  .tool-cards-grid { grid-template-columns:1fr }
   .visual-label { right:26px;bottom:28px }
   .map-section { padding:70px 0 }
   .records-section { padding-bottom:65px }

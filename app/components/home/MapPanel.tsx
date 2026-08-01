@@ -18,18 +18,19 @@ type Props = {
   loading: boolean;
   /** Page-level status notice, displayed under the map. */
   notice: string;
-  /** Where the "Report an issue" card action points (home anchor vs /correggi). */
+  /** Where the "Report an issue" card action points (default: /correggi tool route). */
   issueHref?: string;
-  /** Where the sr-only "accessible directory" alternative points (home anchor vs /directory). */
+  /** Where the sr-only "accessible directory" alternative points (default: /directory tool route). */
   directoryHref?: string;
 };
 
 /**
  * Map tool section: interactive map, selected-record card, loading
- * notice and data-export actions. Reused by the home page (anchor
- * fallback, F2 simplifies) and by /mappa (F1 route group (tools)).
+ * notice and data-export actions. Used by /mappa (F1 route group (tools));
+ * the home hub (F2) renders only the static MapTeaser and never mounts
+ * this component (no Leaflet on the hub).
  */
-export function MapPanel({ filteredRecords, selectedId, onSelect, onPick, coordinates, selectedCamera, loading, notice, issueHref = "#correction", directoryHref = "#records" }: Props) {
+export function MapPanel({ filteredRecords, selectedId, onSelect, onPick, coordinates, selectedCamera, loading, notice, issueHref = "/correggi", directoryHref = "/directory" }: Props) {
   const t = useMessages().map;
   const statuses = useMessages().status;
   return (

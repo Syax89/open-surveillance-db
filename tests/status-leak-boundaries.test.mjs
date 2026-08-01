@@ -302,22 +302,30 @@ test("client: publicRecords drops non-whitelisted records before rendering", asy
 // 4. Static UI guards: the public pages never render a raw status fallback
 // ---------------------------------------------------------------------------
 
-test("the homepage filters through publicRecords and labels via the safe helper", async () => {
-  const page = await readSource("app/page.tsx");
-  // The home UI lives in app/components/home since the t_6104f386 refactor:
-  // the page keeps the data flow, the components keep the labels.
+test("the public tool surfaces filter through publicRecords and label via the safe helper", async () => {
+  // F2 home hub (t_52dcb95e): the home is an SSR-pure orienteering page —
+  // it renders NO records at all (no map, no directory, no forms). The
+  // record-rendering surfaces live on the tool routes (F1 route group
+  // (tools)): /mappa (MappaTool → MapPanel), /directory (DirectoryTool →
+  // PublicDirectory) and /correggi (CorreggiTool → CorrectionForm). The
+  // client whitelist + safe-label guards apply to those components.
+  const mappaTool = await readSource("app/components/tools/MappaTool.tsx");
+  const directoryTool = await readSource("app/components/tools/DirectoryTool.tsx");
+  const correggiTool = await readSource("app/components/tools/CorreggiTool.tsx");
   const mapPanel = await readSource("app/components/home/MapPanel.tsx");
   const directory = await readSource("app/components/home/PublicDirectory.tsx");
-  const homeUi = mapPanel + directory;
+  const toolUi = mapPanel + directory;
   const hook = await readSource("app/lib/use-public-cameras.ts");
-  assert.match(page, /publicRecords\(/, "the homepage must filter its demo seed through the client whitelist");
+  for (const tool of [mappaTool, directoryTool, correggiTool]) {
+    assert.match(tool, /publicRecords\(/, "every tool surface must filter its demo seed through the client whitelist");
+  }
   assert.match(hook, /publicRecords\(data\.records\)/, "API data must be filtered before entering state (shared hook)");
   assert.doesNotMatch(
-    homeUi,
+    toolUi,
     /\?\?\s*(?:camera|selectedCamera)\.status/,
-    "the homepage must never fall back to rendering a raw status value",
+    "the tool surfaces must never fall back to rendering a raw status value",
   );
-  assert.match(homeUi, /publicStatusLabel\(statuses,\s*(?:camera|selectedCamera)\.status,\s*t\.unknown\)/, "status labels must come from the safe helper");
+  assert.match(toolUi, /publicStatusLabel\(statuses,\s*(?:camera|selectedCamera)\.status,\s*t\.unknown\)/, "status labels must come from the safe helper");
 });
 
 test("the record page labels via the safe helper and never appends a raw status", async () => {
