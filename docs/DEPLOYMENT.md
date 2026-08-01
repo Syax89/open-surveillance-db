@@ -115,13 +115,64 @@ Notes:
 
 ## Cloudflare Workers deployment
 
-Production target is Cloudflare Workers (see `wrangler.jsonc`). Set the real
-D1 database id first — the committed file keeps a placeholder:
+Production target is Cloudflare Workers (see `wrangler.jsonc`). **Deploys run
+through CI only** (`.github/workflows/deploy.yml`, `workflow_dispatch` with a
+`dry-run`/`deploy` mode — see OPERATIONS.md §7): never run `wrangler deploy`
+manually against production. The workflow applies D1 migrations first, then
+uploads the Worker, and it refuses to run while `wrangler.jsonc` keeps the
+placeholder D1 `database_id`.
+
+One-time setup before the first `deploy`:
 
 ```bash
-npx wrangler d1 migrations apply DB      # apply Drizzle migrations
-npx wrangler deploy                      # build + upload Worker + static assets
-npx wrangler tail                        # live logs after deploy
+# D1 database: create it and copy the database_id into wrangler.jsonc
+npx wrangler d1 create opensurveillancedb
+
+# R2 bucket backing the PHOTOS binding (must exist in the account)
+npx wrangler r2 bucket create opensurveillancedb-photos
+
+# Worker secrets (persist across deploys; never in source)
+npx wrangler secret put MODERATION_USER
+npx wrangler secret put MODERATION_PASSWORD
+npx wrangler secret put MODERATION_TOKEN   # optional bearer alternative
+```
+
+### Cloudflare bindings (`wrangler.jsonc`)
+
+The Worker `Env` is wired entirely through `wrangler.jsonc` bindings — none
+of these are configured in the platform's secret store. The committed file
+declares:
+
+| Binding | Type | Resource | Used by |
+| --- | --- | --- | --- |
+| `ASSETS` | Static assets | `dist/client` (production build output) | Serves the client bundle; image optimizer fetches assets through it (`worker/index.ts` `/_vinext/image`) |
+| `DB` | D1 database | `opensurveillancedb` | All relational data (`db/*`) |
+| `PHOTOS` | R2 bucket | `opensurveillancedb-photos` | Photo evidence bytes: `db/photos.ts` stores EXIF-stripped images under `photos/<uuid>.<ext>` and reads them back for moderation preview / public serving. D1 stores metadata only — the bucket is the object store |
+| `IMAGES` | Cloudflare Images | (managed service, no resource to create) | On-the-fly image optimization (`worker/index.ts` `/_vinext/image`): resize/format/quality transforms via `env.IMAGES.input(...)` |
+
+Create the R2 bucket before the first deploy (the binding in
+`wrangler.jsonc` is declarative; the bucket must exist in the account):
+
+```bash
+npx wrangler r2 bucket create opensurveillancedb-photos
+```
+
+The `IMAGES` binding targets the Cloudflare Images managed service and needs
+no explicit resource creation.
+
+GitHub repository secrets used by the workflow:
+`CLOUDFLARE_API_TOKEN` (permissions "Workers Scripts - Edit" + "D1 - Edit")
+and `CLOUDFLARE_ACCOUNT_ID` (the `PROD_URL` variable is only used by the
+`ops-monitoring.yml` health-check workflow, not by deploys). The job
+targets the `production` GitHub Environment (add required reviewers for a
+human gate on deploys).
+
+Manual smoke commands after a deploy (read-only):
+
+```bash
+npx wrangler tail                        # live logs
+npx wrangler versions list               # version ids for rollback correlation
+npx wrangler rollback [version-id]       # instant rollback, does not touch D1
 ```
 
 The OpenAI-hosting metadata scaffold (`.openai/hosting.json` and the `sites()`
@@ -261,6 +312,8 @@ or client bundles (the secrets gate in CI rejects hardcoded credentials).
 | `MODERATION_RATE_LIMIT_MAX` / `MODERATION_RATE_LIMIT_WINDOW_SECONDS` | 30 / 60 | Moderation API (second layer over edge auth), including appeal decisions |
 | `TILES_RATE_LIMIT_MAX` / `TILES_RATE_LIMIT_WINDOW_SECONDS` | 60 / 60 | Tile proxy (`GET /api/tiles/*`) — protects the OSMF upstream from per-caller scraping |
 | `POST_SUBMISSIONS_DISABLED` | `false` | Kill switch: reject new submissions with 503 |
+| `PHOTOS_MAX_PENDING_PER_CALLER` | 20 | Pending-photo count cap per caller bucket (authenticated: `contributor:<id>`; anonymous: `anon:<sha256(caller key)>`). `POST /api/photos` answers 429 when a caller is at the cap — a state quota distinct from the HTTP rate limit, bounding how much R2 storage and how many moderation-queue items one caller can accumulate while the queue catches up. Only `status = 'pending'` photos count; approved/rejected photos leave the cap as soon as a moderator decides them |
+| `PHOTOS_MAX_PENDING_BYTES` | 209715200 (200 MiB) | Pending R2 bytes cap per caller bucket, same semantics — bounds the storage volume even when the count is not the binding constraint |
 | `MAX_BODY_BYTES` | 32768 (32 KiB) | Max JSON request body; larger bodies answer 413 |
 | `ABUSE_ALERT_THRESHOLD` | 10 | Per-caller abuse events per window before an alert fires |
 | `ABUSE_ALERT_SURGE_THRESHOLD` | 50 | Route-wide events per window before a surge alert fires |
@@ -276,3 +329,30 @@ needs global or long-window limits, replace the in-memory limiter with
 Cloudflare's rate-limiting product (see `docs/workstreams/OPS_OPEN.md`
 §Security for the per-isolate caveat and the buckets to migrate first) or a
 KV/DO-backed counter.
+
+### Media, tiles, and auth environment variables
+
+The media/tile variables configure the photo upload pipeline and the
+same-origin tile proxy; the moderation/auth variables gate the moderation
+surface and contributor sessions. All are optional; the defaults below apply
+when unset. Set them in the hosting platform's secret/environment store
+(`wrangler secret put` on Workers), never in source or client bundles.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `TILE_PROVIDER_URL` | `https://tile.openstreetmap.org` | Upstream tile base URL for `/api/tiles/{z}/{x}/{y}.png` (no trailing slash; a trailing `/` is tolerated). See [OSM_INTEGRATION.md](OSM_INTEGRATION.md) for the provider decision matrix |
+| `TILE_PROVIDER_KEY` | unset | API key appended as `?key=…` for tile providers that require one (MapTiler, Stadia Maps, …). Never commit it; set it as a Worker secret |
+| `MODERATION_USER` / `MODERATION_PASSWORD` | unset | HTTP Basic auth pair that unlocks `/moderation` and `/api/moderation*` at the worker edge. Both must be set together |
+| `MODERATION_TOKEN` | unset | Alternative bearer token for the same gate (API automation). At least one credential method (Basic pair or bearer) must be configured |
+| `AUTH_SESSION_TTL_DAYS` | `30` | Contributor session lifetime in days (ADR 0013); TTL is computed as `days × 86400` seconds |
+| `AUTH_COOKIE_SECURE` | unset (`false`) | Set to `true` in production so the session cookie carries the `Secure` attribute (HTTPS precondition; must stay unset on the plain-HTTP LAN prototype) |
+| `AUTH_RATE_LIMIT_MAX` / `AUTH_RATE_LIMIT_WINDOW_SECONDS` | `10` / `60` | Per-key rate limit on `/api/auth/login` and `/api/auth/register` |
+
+The moderation gate **fails closed**: if neither the Basic pair nor the
+bearer token is configured, every `/moderation` and `/api/moderation*`
+request is denied with `503 Moderation is unavailable.` — see
+`worker/index.ts` and [ADR 0003](decisions/0003-moderation-access-control.md).
+The photo pipeline needs no additional variables beyond the `PHOTOS` R2
+bucket binding and the `IMAGES` binding declared in `wrangler.jsonc` (see
+"Cloudflare bindings" above): image size/dimension caps are tuned via the
+abuse-control variables in the previous table.

@@ -20,7 +20,12 @@ home" workstream and for the QA pass over the new routes.
 3. **Bilingual by construction.** Every page uses the existing
    `LocaleProvider` pattern: a `en` (pilot) and `it` bundle, type-checked
    for parity by `Translation<typeof en>` (`app/lib/i18n/types.ts`). No
-   hard-coded user-facing strings.
+   hard-coded user-facing strings. The locale preference is persisted in the
+   `opensurveillancedb-locale` cookie and read server-side (root layout +
+   informational pages) so SSR renders the user's language with correct
+   `<html lang>` and localized metadata (ADR 0015). Content URLs stay
+   language-neutral; deep-links to a specific language use the redirect stub
+   `GET /api/locale?lang=it&next=/guide` (sets the cookie, then 302).
 4. **Privacy and safety by design.** Informational pages describe *what the
    project does and how moderation works*; they never expose pending/private
    data, contributor identities, internal notes, or operational details.

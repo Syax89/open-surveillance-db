@@ -509,6 +509,33 @@ test("POST /api/cameras keeps photo linking best-effort when storage fails", asy
   assert.equal((await responseBody(response)).linkedPhotos, 0);
 });
 
+test("POST /api/cameras accepts nonexistent photo ids best-effort with linkedPhotos 0", async () => {
+  // Photo id linking with ids that do not exist (audit t_0de37378 #6): the
+  // link is best-effort and silent — the report is still created (201), the
+  // db layer returns 0 for unmatched ids (no existence oracle, no throw).
+  stub("createPendingCamera", async (input) => ({ id: 17, ...input }));
+  stub("linkPhotosToCamera", async () => 0);
+  stub("findNearbyPublicCameras", async () => []);
+  const { POST } = await camerasRoute();
+  const response = await POST(
+    apiRequest("/api/cameras", {
+      method: "POST",
+      body: {
+        title: "Nonexistent photo ids",
+        kind: "Dome",
+        latitude: 45.0,
+        longitude: 9.0,
+        photoIds: [999_999, 999_998],
+      },
+    }),
+  );
+  assert.equal(response.status, 201);
+  const body = await responseBody(response);
+  assert.equal(body.record.id, 17);
+  assert.equal(body.linkedPhotos, 0, "unmatched photo ids must not fail the report");
+  assert.deepEqual(callArgs("linkPhotosToCamera")[0], [17, [999999, 999998], null]);
+});
+
 test("POST /api/cameras rejects non-object JSON bodies", async () => {
   const { POST } = await camerasRoute();
   for (const body of ["42", "[1,2]", '"hello"']) {

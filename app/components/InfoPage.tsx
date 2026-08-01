@@ -1,5 +1,3 @@
-"use client";
-
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { LocaleToggle } from "./LocaleProvider";
@@ -7,6 +5,11 @@ import { LocaleToggle } from "./LocaleProvider";
 /**
  * Shared layout for the public informational pages
  * (/manifesto, /regole, /guide, /faq, /contatti, /moderazione).
+ *
+ * Server Component (no "use client"): the pages render statically on the
+ * server with per-route metadata (SSR/SEO, task t_c36fe96c). The only client
+ * island is <LocaleToggle />, which re-renders the route via router.refresh()
+ * when the user switches language.
  *
  * Encapsulates the structure those pages previously duplicated: the
  * navigation shell (nav-shell with brand + page nav links + locale

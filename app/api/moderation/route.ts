@@ -263,6 +263,11 @@ function moderationResponse(
         { error: "Item not found or action is not valid for its current status." },
         { status: 404 },
       );
+    case "camera_not_found":
+      return Response.json(
+        { error: "Camera not found. The correction cannot be linked to a non-existent record." },
+        { status: 404 },
+      );
     case "forbidden":
       return Response.json(
         { error: "Your role does not permit this action on this item." },

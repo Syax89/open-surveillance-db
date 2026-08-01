@@ -36,6 +36,12 @@ export const {
   verifyPassword,
   randomBase64Url,
   sha256Hex,
+  // Per-email login lockout (ADR 0016): pure helpers run for real, db-touching
+  // functions are stubbed per test like the rest of db/auth.
+  loginLockoutKey,
+  getLoginLockout,
+  recordFailedLogin,
+  clearLoginAttempts,
 } = makeMock({
   createContributor: "createContributor",
   findContributorByEmail: "findContributorByEmail",
@@ -50,4 +56,8 @@ export const {
   verifyPassword: "verifyPassword",
   randomBase64Url: "randomBase64Url",
   sha256Hex: "sha256Hex",
+  loginLockoutKey: "loginLockoutKey",
+  getLoginLockout: "getLoginLockout",
+  recordFailedLogin: "recordFailedLogin",
+  clearLoginAttempts: "clearLoginAttempts",
 });

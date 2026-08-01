@@ -55,7 +55,7 @@ async function workerModules() {
 }
 
 /** Render a route exactly like the deployed worker would. */
-async function renderRoute(route = "/") {
+async function renderRoute(route = "/", { headers = {} } = {}) {
   const mf = new Miniflare({
     modules: await workerModules(),
     compatibilityDate: "2026-01-01",
@@ -63,7 +63,7 @@ async function renderRoute(route = "/") {
   });
   try {
     const response = await mf.dispatchFetch(`http://localhost${route}`, {
-      headers: { accept: "text/html" },
+      headers: { accept: "text/html", ...headers },
     });
     return { response, html: await response.text() };
   } finally {
@@ -100,6 +100,34 @@ test("server-rendered homepage carries the public app metadata", async () => {
   // No starter-template preview may leak into the public page.
   assert.doesNotMatch(html, /codex-preview|sites-skeleton|react-loading-skeleton/i);
   assert.doesNotMatch(html, /Your site is taking shape|Building your site/i);
+});
+
+test("server-rendered homepage honours the persisted locale cookie (SSR lang + metadata)", async () => {
+  // A returning Italian user carries the preference cookie (ADR 0015): the
+  // first paint must already be Italian — correct <html lang> and localized
+  // root-layout fallback metadata — with no EN->IT flash.
+  const { response, html } = await renderRoute("/", {
+    headers: { cookie: "opensurveillancedb-locale=it" },
+  });
+
+  assert.equal(response.status, 200);
+  assert.match(html, /<html[^>]*lang="it"/);
+  assert.match(html, /<title>OpenSurveillanceDB[^<]*Dati pubblici sulla sorveglianza pubblica<\/title>/i);
+  assert.match(html, /Un database aperto e mantenuto dalla/);
+});
+
+test("server-rendered informational pages honour the locale cookie (html lang + per-route metadata)", async () => {
+  const { response, html } = await renderRoute("/guide", {
+    headers: { cookie: "opensurveillancedb-locale=it" },
+  });
+
+  assert.equal(response.status, 200);
+  assert.match(html, /<html[^>]*lang="it"/);
+  // guide.generateMetadata picks the Italian bundle for title/description.
+  assert.match(html, /<title>[^<]*Un database pubblico, costruito con attenzione\.<\/title>/);
+  // The h1 comes from the same server-side bundle, so content and metadata
+  // agree on the language.
+  assert.match(html, /<h1[^>]*>Un database pubblico, costruito con attenzione\.<\/h1>/);
 });
 
 test("server-rendered homepage provides the map region and its text-list alternative", async () => {
@@ -359,11 +387,12 @@ test("moderation info page carries the shared layout without a duplicate footer"
 });
 
 test("starter preview skeleton stays removed from the template", async () => {
-  const [page, layout, packageJson, publicFiles] = await Promise.all([
+  const [page, layout, packageJson, publicFiles, enBundle] = await Promise.all([
     readFile(path.join(root, "app", "page.tsx"), "utf8"),
     readFile(path.join(root, "app", "layout.tsx"), "utf8"),
     readFile(path.join(root, "package.json"), "utf8"),
     readdir(path.join(root, "public")),
+    readFile(path.join(root, "app", "lib", "i18n", "en.ts"), "utf8"),
   ]);
 
   // The preview source directory and its static copy must not exist.
@@ -376,7 +405,13 @@ test("starter preview skeleton stays removed from the template", async () => {
   // The real app must not reference the preview or its meta tag.
   assert.doesNotMatch(layout, /codex-preview|_sites-preview/i);
   assert.doesNotMatch(page, /SkeletonPreview|_sites-preview|codex-preview/i);
-  assert.match(layout, /title:\s*"OpenSurveillanceDB/);
+
+  // The real app metadata is defined server-side and localized (ADR 0015):
+  // the root layout renders it via generateMetadata from the i18n bundle,
+  // whose pilot bundle carries the canonical <title> wording.
+  assert.match(layout, /generateMetadata/);
+  assert.match(layout, /getServerMessages/);
+  assert.match(enBundle, /metaTitle:\s*"OpenSurveillanceDB/);
 });
 
 test("FAQ page serves bilingual FAQ content", async () => {
