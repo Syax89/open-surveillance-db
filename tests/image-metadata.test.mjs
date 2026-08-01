@@ -52,8 +52,10 @@ function asciiBytes(text) {
 }
 
 // Minimal JPEG: SOI + APP0(JFIF) + APP1(EXIF) + APP13(IPTC) + COM + SOF0(64x48)
-// + SOS + 2 entropy bytes + EOI. CRC-free, marker-walkable.
-function jpegFixture({ withExif = true, withIptc = true, withComment = true } = {}) {
+// + SOS + entropy bytes + EOI. CRC-free, marker-walkable. `scanBytes` grows
+// the entropy-coded payload to simulate a real photo (>128 KB forces the old
+// `push(...slice)` spread to overflow the call stack).
+function jpegFixture({ withExif = true, withIptc = true, withComment = true, scanBytes = 2 } = {}) {
   const app0 = concat(u8(0xff, 0xe0), u8(...be16(16)), asciiBytes("JFIF\0"), u8(1, 1, 0, 0, 1, 0, 1, 0, 0));
   const app1Exif = withExif
     ? concat(u8(0xff, 0xe1), u8(...be16(2 + 18)), asciiBytes("Exif\0\0"), asciiBytes("GEO-GPS-DATA"))
@@ -67,13 +69,15 @@ function jpegFixture({ withExif = true, withIptc = true, withComment = true } = 
   // SOF0: length 8, precision 8, height 48, width 64, 1 component.
   const sof0 = concat(u8(0xff, 0xc0), u8(...be16(8)), u8(8), u8(...be16(48)), u8(...be16(64)), u8(1));
   const sos = concat(u8(0xff, 0xda), u8(...be16(2 + 5)), u8(1), u8(0x01, 0x00), u8(0x3f, 0x00));
-  const scan = u8(0x12, 0x34);
+  const scan = new Uint8Array(scanBytes);
+  scan.fill(0x5a);
   const eoi = u8(0xff, 0xd9);
   return concat(u8(0xff, 0xd8), app0, app1Exif, app13, com, sof0, sos, scan, eoi);
 }
 
 // Minimal PNG: signature + IHDR(64x48) + eXIf chunk + tEXt chunk + IEND.
-function pngFixture({ withExif = true, withText = true } = {}) {
+// `idatBytes` adds a large IDAT chunk (the bulk of a real PNG payload).
+function pngFixture({ withExif = true, withText = true, idatBytes = 0 } = {}) {
   const signature = u8(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a);
   const ihdr = concat(
     u8(...be32(13)),
@@ -89,12 +93,16 @@ function pngFixture({ withExif = true, withText = true } = {}) {
   const text = withText
     ? concat(u8(...be32(9)), asciiBytes("tEXt"), asciiBytes("Author=Me"), u8(0, 0, 0, 0))
     : u8();
+  const idat = idatBytes > 0
+    ? concat(u8(...be32(idatBytes)), asciiBytes("IDAT"), new Uint8Array(idatBytes).fill(0x1a), u8(0, 0, 0, 0))
+    : u8();
   const iend = concat(u8(...be32(0)), asciiBytes("IEND"), u8(0, 0, 0, 0));
-  return concat(signature, ihdr, exif, text, iend);
+  return concat(signature, ihdr, exif, text, idat, iend);
 }
 
 // Minimal WebP: RIFF/WEBP + VP8X(64x48) + EXIF chunk + XMP chunk.
-function webpFixture({ withExif = true, withXmp = true } = {}) {
+// `vp8Bytes` adds a large VP8 chunk (the bulk of a real WebP payload).
+function webpFixture({ withExif = true, withXmp = true, vp8Bytes = 0 } = {}) {
   const vp8x = concat(
     asciiBytes("VP8X"),
     u8(...le32(10)),
@@ -108,7 +116,10 @@ function webpFixture({ withExif = true, withXmp = true } = {}) {
   const xmp = withXmp
     ? concat(asciiBytes("XMP "), u8(...le32(8)), asciiBytes("<xmp>foo"))
     : u8();
-  const body = concat(vp8x, exif, xmp);
+  const vp8 = vp8Bytes > 0
+    ? concat(asciiBytes("VP8 "), u8(...le32(vp8Bytes)), new Uint8Array(vp8Bytes).fill(0x2f))
+    : u8();
+  const body = concat(vp8x, exif, xmp, vp8);
   return concat(asciiBytes("RIFF"), u8(...le32(body.length)), asciiBytes("WEBP"), body);
 }
 
@@ -213,6 +224,49 @@ test("returns null on truncated containers (fail closed, never store unstripped)
   assert.equal(lib.stripImageMetadata(png.slice(0, png.length - 1), "png"), null);
   const webp = webpFixture();
   assert.equal(lib.stripImageMetadata(webp.slice(0, webp.length - 1), "webp"), null);
+});
+
+test("strips metadata from multi-megabyte payloads without overflowing the call stack", () => {
+  // Regression (Ada review, PR #64): `output.push(...bytes.slice(...))`
+  // threw `RangeError: Maximum call stack size exceeded` on payloads above
+  // ~128 KB, so no real phone photo (2-5 MB) could ever be accepted. The
+  // strip pipeline must copy chunks with a preallocated Uint8Array + .set().
+  const payloadBytes = 2 * 1024 * 1024; // 2 MiB, well past the old failure point
+
+  const jpeg = jpegFixture({ scanBytes: payloadBytes });
+  assert.ok(jpeg.length > 1024 * 1024, "JPEG fixture must exceed 1 MB");
+  const jpegStripped = lib.stripImageMetadata(jpeg, "jpeg");
+  assert.ok(jpegStripped, "large JPEG must strip successfully");
+  assert.equal(containsAscii(jpegStripped, "Exif"), false);
+  assert.equal(containsAscii(jpegStripped, "Photoshop"), false);
+  assert.equal(containsAscii(jpegStripped, "JFIF"), true);
+  assert.deepEqual(lib.readImageDimensions(jpegStripped, "jpeg"), { width: 64, height: 48 });
+  assert.ok(
+    jpegStripped.length > 1024 * 1024,
+    "large JPEG must keep its pixel payload (expected >1 MB, got " + jpegStripped.length + ")",
+  );
+
+  const png = pngFixture({ idatBytes: payloadBytes });
+  assert.ok(png.length > 1024 * 1024, "PNG fixture must exceed 1 MB");
+  const pngStripped = lib.stripImageMetadata(png, "png");
+  assert.ok(pngStripped, "large PNG must strip successfully");
+  assert.equal(containsAscii(pngStripped, "eXIf"), false);
+  assert.equal(containsAscii(pngStripped, "Author=Me"), false);
+  assert.equal(containsAscii(pngStripped, "IDAT"), true);
+  assert.deepEqual(lib.readImageDimensions(pngStripped, "png"), { width: 64, height: 48 });
+  assert.ok(pngStripped.length > 1024 * 1024, "large PNG must keep its IDAT payload");
+
+  const webp = webpFixture({ vp8Bytes: payloadBytes });
+  assert.ok(webp.length > 1024 * 1024, "WebP fixture must exceed 1 MB");
+  const webpStripped = lib.stripImageMetadata(webp, "webp");
+  assert.ok(webpStripped, "large WebP must strip successfully");
+  assert.equal(containsAscii(webpStripped, "EXIF"), false);
+  assert.equal(containsAscii(webpStripped, "<xmp>"), false);
+  assert.equal(containsAscii(webpStripped, "VP8 "), true);
+  assert.deepEqual(lib.readImageDimensions(webpStripped, "webp"), { width: 64, height: 48 });
+  const riffSize = (webpStripped[4] | (webpStripped[5] << 8) | (webpStripped[6] << 16) | (webpStripped[7] << 24)) >>> 0;
+  assert.equal(riffSize, webpStripped.length - 8);
+  assert.ok(webpStripped.length > 1024 * 1024, "large WebP must keep its VP8 payload");
 });
 
 // ---------------------------------------------------------------------------

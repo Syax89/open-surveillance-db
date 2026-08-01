@@ -30,7 +30,7 @@ export const PHOTO_MIME_TYPES: Record<ImageType, string> = {
 
 /** Default upload caps; each can be overridden via env (see photoLimits). */
 export const DEFAULT_MAX_PHOTO_BYTES = 10 * 1024 * 1024; // 10 MiB
-export const DEFAULT_MAX_PHOTO_DIMENSION = 8_000; // px per side
+export const DEFAULT_MAX_PHOTO_DIMENSION = 4_096; // px per side (matches UI copy and PR contract)
 
 type EnvLike = { [key: string]: unknown };
 
@@ -216,7 +216,14 @@ export function stripImageMetadata(bytes: Uint8Array, type: ImageType): Uint8Arr
 
 function stripJpegMetadata(bytes: Uint8Array): Uint8Array | null {
   if (bytes.length < 4 || bytes[0] !== 0xff || bytes[1] !== 0xd8) return null;
-  const output: number[] = [0xff, 0xd8];
+  // Preallocate the input size as an upper bound: stripping only removes
+  // segments, so the output is never larger than the input. Chunks are
+  // copied with `.set()` — never spread: the post-SOS entropy data of a
+  // real photo (1-10 MB) would overflow the call stack as `push(...slice)`.
+  const output = new Uint8Array(bytes.length);
+  let written = 0;
+  output[written++] = 0xff;
+  output[written++] = 0xd8;
   let offset = 2;
   while (offset + 4 <= bytes.length) {
     if (bytes[offset] !== 0xff) return null;
@@ -228,27 +235,32 @@ function stripJpegMetadata(bytes: Uint8Array): Uint8Array | null {
       if (bytes.length < 2 || bytes[bytes.length - 2] !== 0xff || bytes[bytes.length - 1] !== 0xd9) {
         return null;
       }
-      output.push(...bytes.slice(offset));
-      return Uint8Array.from(output);
+      output.set(bytes.subarray(offset), written);
+      written += bytes.length - offset;
+      return output.slice(0, written);
     }
     if (marker === 0xd9) {
-      output.push(0xff, 0xd9);
-      return Uint8Array.from(output);
+      output[written++] = 0xff;
+      output[written++] = 0xd9;
+      return output.slice(0, written);
     }
     const length = readUint16BE(bytes, offset + 2);
     if (length < 2 || offset + 2 + length > bytes.length) return null;
     // Standalone markers (RST0-7, TEM) carry no length field.
     const standalone = (marker >= 0xd0 && marker <= 0xd7) || marker === 0x01;
     if (standalone) {
-      output.push(0xff, marker);
+      output[written++] = 0xff;
+      output[written++] = marker;
       offset += 2;
       continue;
     }
     // Drop privacy-bearing segments: APP1 (EXIF/XMP), APP13 (IPTC/PS), COM.
     const drop = marker === 0xe1 || marker === 0xed || marker === 0xfe;
     if (!drop) {
-      output.push(0xff, marker);
-      output.push(...bytes.slice(offset + 2, offset + 2 + length));
+      output[written++] = 0xff;
+      output[written++] = marker;
+      output.set(bytes.subarray(offset + 2, offset + 2 + length), written);
+      written += length;
     }
     offset += 2 + length;
   }
@@ -271,7 +283,12 @@ function stripPngMetadata(bytes: Uint8Array): Uint8Array | null {
     signature[6] === 0x1a &&
     signature[7] === 0x0a;
   if (!isPng) return null;
-  const output: number[] = [...signature];
+  // Preallocated output sized to the input (upper bound): kept chunks are
+  // copied with `.set()`, never spread (a real photo's IDAT is megabytes).
+  const output = new Uint8Array(bytes.length);
+  let written = 0;
+  output.set(signature, written);
+  written += signature.length;
   let offset = 8;
   const dropped = new Set(["eXIf", "tEXt", "iTXt", "zTXt"]);
   while (offset + 8 <= bytes.length) {
@@ -280,19 +297,24 @@ function stripPngMetadata(bytes: Uint8Array): Uint8Array | null {
     const total = 12 + length;
     if (offset + total > bytes.length) return null;
     if (!dropped.has(type)) {
-      output.push(...bytes.slice(offset, offset + total));
+      output.set(bytes.subarray(offset, offset + total), written);
+      written += total;
     }
     offset += total;
   }
   if (offset !== bytes.length) return null;
-  return Uint8Array.from(output);
+  return output.slice(0, written);
 }
 
 function stripWebpMetadata(bytes: Uint8Array): Uint8Array | null {
   if (bytes.length < 12 || sniffImageType(bytes) !== "webp") return null;
   // Keep the full RIFF header (RIFF + size + WEBP fourcc), then rewrite the
-  // chunk size once the dropped chunks are known.
-  const output: number[] = [...bytes.slice(0, 12)];
+  // chunk size once the dropped chunks are known. Preallocated output sized
+  // to the input (upper bound); kept chunks copied with `.set()`, never
+  // spread (a real photo's VP8/VP8L payload is megabytes).
+  const output = new Uint8Array(bytes.length);
+  output.set(bytes.subarray(0, 12), 0);
+  let written = 12;
   let offset = 12;
   const dropped = new Set(["EXIF", "XMP "]);
   while (offset + 8 <= bytes.length) {
@@ -301,16 +323,17 @@ function stripWebpMetadata(bytes: Uint8Array): Uint8Array | null {
     const total = 8 + size + (size % 2);
     if (offset + total > bytes.length) return null;
     if (!dropped.has(fourcc)) {
-      output.push(...bytes.slice(offset, offset + total));
+      output.set(bytes.subarray(offset, offset + total), written);
+      written += total;
     }
     offset += total;
   }
   if (offset !== bytes.length) return null;
   // Rewrite the RIFF chunk size (bytes 4..8, little-endian, excludes RIFF+size).
-  const riffSize = output.length - 8;
+  const riffSize = written - 8;
   output[4] = riffSize & 0xff;
   output[5] = (riffSize >> 8) & 0xff;
   output[6] = (riffSize >> 16) & 0xff;
   output[7] = (riffSize >> 24) & 0xff;
-  return Uint8Array.from(output);
+  return output.slice(0, written);
 }
