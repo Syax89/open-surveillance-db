@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { searchPublicCamerasNear } from "../../../../db/cameras";
+import { searchPublicCamerasNearPage, SEARCH_PAGE_DEFAULT_LIMIT, SEARCH_PAGE_MAX_LIMIT } from "../../../../db/cameras";
 import { resolvePlace } from "../../../../db/geocode";
 import { callerKey, checkRateLimit, searchLimits } from "../../../lib/rate-limit";
 import {
@@ -27,7 +27,10 @@ import {
  *     radius, so "near a street" stays small while "near a city" scales up.
  *
  * The response carries the resolved area explicitly so clients can show a
- * text description of what was searched and a truthful zero-result state.
+ * text description of what was searched and a truthful zero-result state,
+ * and uses the same pagination contract as the directory list
+ * ({ records, total, nextOffset }, FRONTEND_PLAN § 3.2.3) so the frontend
+ * reuses one pagination helper.
  */
 
 type SearchArea = {
@@ -38,9 +41,17 @@ type SearchArea = {
   radiusMeters: number;
 };
 
-async function searchArea(query: string, area: SearchArea) {
+function readPageNumber(value: string | null, fallback: number, max: number): number | null {
+  if (value === null || value.trim() === "") return fallback;
+  if (!/^\d+$/.test(value.trim())) return null;
+  const parsed = Number(value.trim());
+  if (!Number.isSafeInteger(parsed)) return null;
+  return Math.min(parsed, max);
+}
+
+async function searchArea(query: string, area: SearchArea, limit: number, offset: number) {
   try {
-    const records = await searchPublicCamerasNear(area.latitude, area.longitude, area.radiusMeters);
+    const page = await searchPublicCamerasNearPage(area.latitude, area.longitude, area.radiusMeters, { limit, offset });
     return Response.json({
       query,
       area: {
@@ -51,8 +62,10 @@ async function searchArea(query: string, area: SearchArea) {
         radiusMeters: area.radiusMeters,
         radiusLabel: formatDistance(area.radiusMeters),
       },
-      count: records.length,
-      records,
+      count: page.total,
+      records: page.records,
+      total: page.total,
+      nextOffset: page.nextOffset,
     }, {
       // Queries are user input; do not let edge caches store them.
       headers: { "Cache-Control": "no-store" },
@@ -73,13 +86,22 @@ export async function GET(request: Request) {
     return Response.json({ error: "That search is too long. Try a shorter locality, address, or coordinates." }, { status: 400 });
   }
 
+  // Pagination (FRONTEND_PLAN § 3.2.3): same limit/offset contract as the
+  // list, default 25, hard cap 100. Invalid values answer 400 before any
+  // geocoder or database work.
+  const limit = readPageNumber(url.searchParams.get("limit"), SEARCH_PAGE_DEFAULT_LIMIT, SEARCH_PAGE_MAX_LIMIT);
+  const offset = readPageNumber(url.searchParams.get("offset"), 0, Number.MAX_SAFE_INTEGER);
+  if (limit === null || offset === null || limit < 1) {
+    return Response.json({ error: `limit must be an integer between 1 and ${SEARCH_PAGE_MAX_LIMIT} and offset a non-negative integer.` }, { status: 400 });
+  }
+
   const key = callerKey(request);
-  const limit = checkRateLimit("search", key, searchLimits(env));
-  if (!limit.allowed) {
+  const rateLimit = checkRateLimit("search", key, searchLimits(env));
+  if (!rateLimit.allowed) {
     console.warn(`GET /api/cameras/search rate limited for caller ${key}`);
     return Response.json({ error: "Too many searches. Please try again shortly." }, {
       status: 429,
-      headers: { "Retry-After": String(limit.retryAfterSeconds) },
+      headers: { "Retry-After": String(rateLimit.retryAfterSeconds) },
     });
   }
 
@@ -90,7 +112,7 @@ export async function GET(request: Request) {
       latitude: coordinates.latitude,
       longitude: coordinates.longitude,
       radiusMeters: coordinateRadiusMeters,
-    });
+    }, limit, offset);
   }
 
   const language = url.searchParams.get("lang") === "it" ? "it" : "en";
@@ -114,5 +136,5 @@ export async function GET(request: Request) {
     latitude: place.latitude,
     longitude: place.longitude,
     radiusMeters: radiusForBoundingBox(place.boundingBox),
-  });
+  }, limit, offset);
 }

@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { createPendingCamera, findNearbyPublicCameras, freshnessWindows, listPublicCameras, listPublicCamerasPage, PUBLIC_CAMERAS_PAGE_DEFAULT_LIMIT, PUBLIC_CAMERAS_PAGE_MAX_LIMIT, type FreshnessWindow, type PublicCameraFilters } from "../../../db/cameras";
+import { createPendingCamera, findNearbyPublicCameras, freshnessWindows, getPublicCameraFacets, listPublicCameras, listPublicCamerasInBbox, listPublicCamerasPage, PUBLIC_CAMERAS_PAGE_DEFAULT_LIMIT, PUBLIC_CAMERAS_PAGE_MAX_LIMIT, type FreshnessWindow, type PublicCameraFilters } from "../../../db/cameras";
 import { resolveOptionalContributor } from "../../lib/auth-session";
 import { csrfVerified, sameOrigin } from "../../lib/csrf";
 import { DATA_LICENSE_ID, DATA_LICENSE_NOTICE } from "../../lib/data-license";
@@ -98,6 +98,28 @@ export async function GET(request: Request) {
     const filters: PublicCameraFilters = {};
     if (kindFilter) filters.kind = kindFilter;
     if (freshness && freshness !== "all") filters.freshness = freshness as FreshnessWindow;
+
+    // Map marker layer (FRONTEND_PLAN § 3.3): `bbox=west,south,east,north`
+    // returns every public point inside the box as GeoJSON. Bounded 5-minute
+    // edge cache (same policy as the JSON list): moderation decisions change
+    // the marker set, so the map must never serve a stale point for long.
+    const bboxParam = params.get("bbox");
+    if (bboxParam !== null) {
+      if (format !== "geojson") {
+        return Response.json({ error: "The bbox parameter requires format=geojson." }, { status: 400 });
+      }
+      const parts = bboxParam.split(",").map((part) => Number(part.trim()));
+      if (parts.length !== 4 || parts.some((value) => !Number.isFinite(value))) {
+        return Response.json({ error: "bbox must be four numbers: west,south,east,north." }, { status: 400 });
+      }
+      const [west, south, east, north] = parts;
+      if (west < -180 || east > 180 || south < -90 || north > 90 || west >= east || south >= north) {
+        return Response.json({ error: "bbox must be a valid geographic rectangle: west<east and south<north within world bounds." }, { status: 400 });
+      }
+      const records = await listPublicCamerasInBbox({ west, south, east, north });
+      return Response.json({ type: "FeatureCollection", license: DATA_LICENSE_ID, attribution: DATA_LICENSE_NOTICE, features: records.map((record) => ({ type: "Feature", geometry: { type: "Point", coordinates: [record.longitude, record.latitude] }, properties: { id: record.id, title: record.title, kind: record.kind, manufacturer: record.manufacturer, observedOn: record.observedOn, status: record.status, source: record.source, updated: record.updated, description: record.description } })) }, { headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" } });
+    }
+
     if (format === "geojson") {
       // Exports are complete snapshots (rate-limited in the "export" bucket):
       // they fetch the FULL public list, never a page.
@@ -108,11 +130,11 @@ export async function GET(request: Request) {
       // cache is acceptable (the dataset changes through moderation, not live
       // feeds), and revalidation happens after the window. Deliberately NOT
       // `immutable` — the export URL's content does change when moderators act.
-      return Response.json({ type: "FeatureCollection", license: DATA_LICENSE_ID, attribution: DATA_LICENSE_NOTICE, features: records.map((record) => ({ type: "Feature", geometry: { type: "Point", coordinates: [record.longitude, record.latitude] }, properties: { id: record.id, title: record.title, kind: record.kind, manufacturer: record.manufacturer, observedOn: record.observedOn, status: record.status, source: record.source, updated: record.updated, description: record.description } })) }, { headers: { "Content-Disposition": "attachment; filename=opensurveillancedb-cameras.geojson", "Cache-Control": "public, max-age=3600" } });
+      return Response.json({ type: "FeatureCollection", license: DATA_LICENSE_ID, attribution: DATA_LICENSE_NOTICE, features: records.map((record) => ({ type: "Feature", geometry: { type: "Point", coordinates: [record.longitude, record.latitude] }, properties: { id: record.id, title: record.title, kind: record.kind, manufacturer: record.manufacturer, observedOn: record.observedOn, status: record.status, source: record.source, updated: record.updated, description: record.description } })) }, { headers: { "Content-Disposition": "attachment; filename=opensurveillancedb-cameras.geojson", "Cache-Control": "public, s-maxage=3600" } });
     }
     if (format === "csv") {
       const records = await listPublicCameras(filters);
-      return new Response(toCsv(records), { headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": "attachment; filename=opensurveillancedb-cameras.csv", "Cache-Control": "public, max-age=3600" } });
+      return new Response(toCsv(records), { headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": "attachment; filename=opensurveillancedb-cameras.csv", "Cache-Control": "public, s-maxage=3600" } });
     }
     // Pagination applies to the default JSON list only — CSV/GeoJSON exports
     // stay complete snapshots (rate-limited in the "export" bucket). limit is
@@ -123,11 +145,16 @@ export async function GET(request: Request) {
     if (limit === null || offset === null || limit < 1) {
       return Response.json({ error: `limit must be an integer between 1 and ${PUBLIC_CAMERAS_PAGE_MAX_LIMIT} and offset a non-negative integer.` }, { status: 400 });
     }
-    const page = await listPublicCamerasPage(filters, { limit, offset });
-    // JSON list: moderation-derived data that changes as decisions land —
-    // never cache it at the edge or in browsers (audit t_2ee58c08, gap #2),
-    // matching the no-store policy already set by /api/cameras/search.
-    return Response.json({ records: page.records, total: page.total, nextOffset: page.nextOffset }, { headers: { "Cache-Control": "no-store" } });
+    const [page, facets] = await Promise.all([
+      listPublicCamerasPage(filters, { limit, offset }),
+      getPublicCameraFacets(),
+    ]);
+    // JSON list + inline facets (FRONTEND_PLAN § 3.2.2, single round-trip).
+    // The dataset changes through moderation decisions, never live feeds: a
+    // bounded 5-minute edge/browser cache with stale-while-revalidate keeps
+    // the directory responsive while still converging after any moderation
+    // action. search/nearby stay no-store (user input / duplicate warnings).
+    return Response.json({ records: page.records, total: page.total, nextOffset: page.nextOffset, facets }, { headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" } });
   } catch (error) {
     console.error("GET /api/cameras failed", error);
     return Response.json({ error: "Database unavailable" }, { status: 503 });

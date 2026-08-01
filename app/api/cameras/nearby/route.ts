@@ -1,12 +1,27 @@
 import { env } from "cloudflare:workers";
-import { findNearbyPublicCameras } from "../../../../db/cameras";
+import { findNearbyPublicCamerasPage, NEARBY_PAGE_DEFAULT_LIMIT, NEARBY_PAGE_MAX_LIMIT } from "../../../../db/cameras";
 import { recordRateLimitBlock } from "../../../lib/abuse-alerts";
 import { urlTooLong } from "../../../lib/input-limits";
 import { callerKey, checkRateLimit, limitsFor } from "../../../lib/rate-limit";
 
 function readNumber(value: string | null) { if (value === null || value.trim() === "") return null; const number = Number(value); return Number.isFinite(number) ? number : null; }
-function readText(value: string | null, maxLength: number) { return typeof value === "string" ? value.trim().slice(0, maxLength) : ""; }
+function readPageNumber(value: string | null, fallback: number, max: number): number | null {
+  if (value === null || value.trim() === "") return fallback;
+  if (!/^\d+$/.test(value.trim())) return null;
+  const parsed = Number(value.trim());
+  if (!Number.isSafeInteger(parsed)) return null;
+  return Math.min(parsed, max);
+}
 
+/**
+ * GET /api/cameras/nearby — paginated proximity search (FRONTEND_PLAN
+ * § 3.2.3). Returns public records around a coordinate, ordered by distance,
+ * with the same pagination contract as the directory list
+ * ({ records, total, nextOffset }), default page 50 (hard cap 100). The
+ * pre-submit duplicate warning on the report form calls this with limit=8 to
+ * keep its warning compact; the server-side duplicate check (POST
+ * /api/cameras) keeps using findNearbyPublicCameras directly.
+ */
 export async function GET(request: Request) {
   // Input limits: reject absurdly long URLs before any query parsing work.
   if (urlTooLong(request)) {
@@ -17,8 +32,8 @@ export async function GET(request: Request) {
   // own bucket independent of the plain read and export buckets.
   const key = callerKey(request);
   const limitOptions = limitsFor("nearby", env);
-  const limit = checkRateLimit("nearby", key, limitOptions);
-  if (!limit.allowed) {
+  const rateLimit = checkRateLimit("nearby", key, limitOptions);
+  if (!rateLimit.allowed) {
     console.warn("GET /api/cameras/nearby rate limited");
     recordRateLimitBlock(env, {
       route: "/api/cameras/nearby",
@@ -27,7 +42,7 @@ export async function GET(request: Request) {
     });
     return Response.json({ error: "Too many requests. Please try again shortly." }, {
       status: 429,
-      headers: { "Retry-After": String(limit.retryAfterSeconds) },
+      headers: { "Retry-After": String(rateLimit.retryAfterSeconds) },
     });
   }
 
@@ -35,22 +50,22 @@ export async function GET(request: Request) {
   const latitude = readNumber(query.get("latitude"));
   const longitude = readNumber(query.get("longitude"));
   const radius = query.has("radius") ? readNumber(query.get("radius")) : 75;
+  const limit = readPageNumber(query.get("limit"), NEARBY_PAGE_DEFAULT_LIMIT, NEARBY_PAGE_MAX_LIMIT);
+  const offset = readPageNumber(query.get("offset"), 0, Number.MAX_SAFE_INTEGER);
 
   if (latitude === null || longitude === null || radius === null || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180 || radius < 10 || radius > 500) {
     return Response.json({ error: "Valid latitude, longitude and a radius between 10 and 500 metres are required." }, { status: 400 });
   }
+  if (limit === null || offset === null || limit < 1) {
+    return Response.json({ error: `limit must be an integer between 1 and ${NEARBY_PAGE_MAX_LIMIT} and offset a non-negative integer.` }, { status: 400 });
+  }
 
   try {
-    // Optional text hints for the pre-submit duplicate check: when supplied,
-    // candidates are ranked by title/address/kind similarity as well as distance.
-    const title = readText(query.get("title"), 90);
-    const address = readText(query.get("address"), 180);
-    const kind = readText(query.get("kind"), 60);
-    const records = await findNearbyPublicCameras(latitude, longitude, radius, { title, address, kind });
-    // Moderation-derived duplicates list (audit t_2ee58c08, gap #2): the
-    // pre-submit warning must never be served stale from a cache after a
-    // moderation decision, so the response is never stored.
-    return Response.json({ records }, { headers: { "Cache-Control": "no-store" } });
+    const page = await findNearbyPublicCamerasPage(latitude, longitude, radius, { limit, offset });
+    // Nearby results derive from moderation state (a decision can withdraw a
+    // point), and the query embeds the caller's location: the response is
+    // never stored at the edge or in browsers.
+    return Response.json({ records: page.records, total: page.total, nextOffset: page.nextOffset }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     console.error("GET /api/cameras/nearby failed", error);
     return Response.json({ error: "Database unavailable" }, { status: 503 });

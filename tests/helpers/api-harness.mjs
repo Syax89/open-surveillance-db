@@ -25,6 +25,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 
 const ROUTES = [
   { source: "app/api/cameras/route.ts", output: "app/api/cameras/route.mjs" },
+  { source: "app/api/cameras/[id]/route.ts", output: "app/api/cameras/[id]/route.mjs" },
   { source: "app/api/cameras/nearby/route.ts", output: "app/api/cameras/nearby/route.mjs" },
   { source: "app/api/cameras/search/route.ts", output: "app/api/cameras/search/route.mjs" },
   { source: "app/api/cameras/revisions/route.ts", output: "app/api/cameras/revisions/route.mjs" },
