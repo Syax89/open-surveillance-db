@@ -1,11 +1,21 @@
-"use client";
-
+import type { Metadata } from "next";
 import { InfoPage } from "../components/InfoPage";
-import { useMessages } from "../components/LocaleProvider";
+import { getServerMessages } from "../lib/server-i18n";
 import Link from "next/link";
 
-export default function ManifestoPage() {
-  const bundle = useMessages();
+export async function generateMetadata(): Promise<Metadata> {
+  const bundle = await getServerMessages();
+  const t = bundle.manifesto;
+  return {
+    title: t.title,
+    description: t.intro,
+    openGraph: { title: t.title, description: t.intro, images: ["/og.png"] },
+    twitter: { card: "summary_large_image", title: t.title, description: t.intro, images: ["/og.png"] },
+  };
+}
+
+export default async function ManifestoPage() {
+  const bundle = await getServerMessages();
   const t = bundle.manifesto;
 
   return (
