@@ -43,7 +43,7 @@ let RecordPage;
 before(async () => {
   rtl = await setupDom();
   StarConfirmButton = (await loadDomModule("app/components/StarConfirmButton.mjs")).StarConfirmButton;
-  RecordPage = await loadDomPage("app/records/[id]/page.mjs");
+  RecordPage = await loadDomPage("app/records/[id]/RecordPageBody.mjs");
 });
 
 afterEach(() => {

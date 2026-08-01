@@ -35,9 +35,9 @@ const PAGES = [
   { route: "/guide", source: "app/guide/page.tsx", relative: "app/guide/page.mjs" },
   { route: "/login", source: "app/login/page.tsx", relative: "app/login/page.mjs" },
   { route: "/register", source: "app/register/page.tsx", relative: "app/register/page.mjs" },
-  { route: "/account", source: "app/account/page.tsx", relative: "app/account/page.mjs" },
+  { route: "/account", source: "app/account/AccountPageBody.tsx", relative: "app/account/AccountPageBody.mjs" },
   { route: "/moderation", source: "app/moderation/page.tsx", relative: "app/moderation/page.mjs" },
-  { route: "/records/[id]", source: "app/records/[id]/page.tsx", relative: "app/records/[id]/page.mjs" },
+  { route: "/records/[id]", source: "app/records/[id]/RecordPageBody.tsx", relative: "app/records/[id]/RecordPageBody.mjs" },
   { route: "/records/[id]/edit", source: "app/records/[id]/edit/page.tsx", relative: "app/records/[id]/edit/page.mjs" },
 ];
 

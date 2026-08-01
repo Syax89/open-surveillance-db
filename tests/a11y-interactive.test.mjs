@@ -336,7 +336,7 @@ test("auth errors are announced through a live region (role=alert)", async () =>
   const [login, register, account] = await Promise.all([
     readFile(path.join(root, "app", "login", "page.tsx"), "utf8"),
     readFile(path.join(root, "app", "register", "page.tsx"), "utf8"),
-    readFile(path.join(root, "app", "account", "page.tsx"), "utf8"),
+    readFile(path.join(root, "app", "account", "AccountPageBody.tsx"), "utf8"),
   ]);
   // role="alert" is an implicit assertive live region: the message is read
   // out as soon as it renders after a failed submit.
@@ -347,7 +347,7 @@ test("auth errors are announced through a live region (role=alert)", async () =>
 
 test("account actions are native buttons; tabIndex only as programmatic focus targets, never on buttons", async () => {
   const [account, confirmDialog] = await Promise.all([
-    readFile(path.join(root, "app", "account", "page.tsx"), "utf8"),
+    readFile(path.join(root, "app", "account", "AccountPageBody.tsx"), "utf8"),
     readFile(path.join(root, "app", "components", "ConfirmDialog.tsx"), "utf8"),
   ]);
   assert.match(account, /type="button"/, "logout/delete must be native buttons");
@@ -407,7 +407,7 @@ test("the trust-level badge is never colour-only: label + dot, progress is a tex
 });
 
 test("profile contributions: local filters use aria-pressed, the counter is role=status, pagination carries aria-current (C5)", async () => {
-  const account = await readFile(path.join(root, "app", "account", "page.tsx"), "utf8");
+  const account = await readFile(path.join(root, "app", "account", "AccountPageBody.tsx"), "utf8");
   // Local status filters (never in the URL — private page).
   assert.match(account, /aria-pressed=\{filter === key\}/, "filter chips must expose aria-pressed");
   assert.match(account, /role="group"\s+aria-label=\{community\.contributionStatusFilter\}/, "the filter group must be labelled");

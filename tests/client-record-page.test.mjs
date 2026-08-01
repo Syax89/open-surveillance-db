@@ -39,7 +39,7 @@ let __resetPublicCamerasCache;
 
 before(async () => {
   rtl = await setupDom();
-  RecordPage = await loadDomPage("app/records/[id]/page.mjs");
+  RecordPage = await loadDomPage("app/records/[id]/RecordPageBody.mjs");
   const mapMod = await loadDomModule("app/components/SurveillanceMap.mjs");
   SurveillanceMap = mapMod.SurveillanceMap;
   // The usePublicCameras module keeps a module-level cache across tests in
