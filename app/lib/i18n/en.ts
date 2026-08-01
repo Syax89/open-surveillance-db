@@ -11,13 +11,21 @@
  *    the Italian bundle.
  *  - Keep bundles dependency-free and serialisable: strings and simple
  *    formatter functions only.
- *  - Do not store user-selected locale on the server; the choice lives in
- *    `localStorage` (see app/components/LocaleProvider.tsx).
+ *  - The locale preference is persisted in the `opensurveillancedb-locale`
+ *    cookie (server-side, SSR/SEO) and mirrored in `localStorage` (multi-tab
+ *    sync) — see app/components/LocaleProvider.tsx and ADR 0015. It is a
+ *    pure interface preference, never personal data.
  */
 export const en = {
   common: {
     skipLink: "Skip to main content",
     languageSelection: "Language selection",
+    // Root-layout metadata (SSR/SEO): the fallback <title>/<description>
+    // for every route without its own generateMetadata (home, records, auth
+    // pages). Localized via the locale cookie — see ADR 0015.
+    metaTitle: "OpenSurveillanceDB — Public data about public surveillance",
+    metaDescription:
+      "An open, community-maintained database of public surveillance cameras.",
   },
   map: {
     mapLabel: "Interactive OpenStreetMap map",
