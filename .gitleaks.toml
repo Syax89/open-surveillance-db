@@ -1,0 +1,25 @@
+# Gitleaks configuration — OpenSurveillanceDB
+#
+# Policy: hardcoded secrets are a hard CI gate (security.yml → Gitleaks).
+# This file extends the default rule set and allowlists ONLY the
+# test-fixture placeholder convention used across tests/:
+#
+#   MODERATION_TOKEN: "tok-<alnum>"   (e.g. "tok-0123456789abcdef")
+#
+# These values are low-meaning test inputs with a recognizable `tok-`
+# prefix — they are never real credentials. The allowlist is a regex on
+# the SECRET VALUE ONLY (not a path-wide carve-out), so a real secret
+# accidentally committed to a test file is still flagged.
+#
+# If a future fixture needs a different shape, extend the regex here —
+# do not add a blanket `paths = ["tests/"]` allowlist, that would hide
+# genuine leaks inside test files.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Test-fixture placeholder tokens (tok-* convention) — not real secrets"
+regexes = [
+    '''^tok-[a-z0-9]{3,32}$''',
+]
