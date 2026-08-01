@@ -14,7 +14,8 @@
  *   R4  resolved correction requests  → delete after 2 years (created_at)
  *   R6  photo evidence                → deleted with its record; orphan
  *                                       pending photos after 90 days; rejected
- *                                       photos immediately
+ *                                       photos after 30 days (R13: anchored on
+ *                                       the photo reject event)
  *   R7  sessions                      → delete expired / revoked rows
  *
  * Deliberately NOT purged here:
@@ -333,9 +334,24 @@ export async function runRetentionSweep(
     .prepare("SELECT id, storage_key AS storageKey FROM photos WHERE camera_id IS NULL AND status = 'pending' AND created_at < ?")
     .bind(daysAgo(now, policy.orphanPhotoDays))
     .all<{ id: number; storageKey: string }>();
+  // R13: rejected photos expire 30 days after the rejection decision, not at
+  // the next sweep — the decision date is the latest moderation event with
+  // entity='photo' AND action='reject'; legacy rows without an event fall
+  // back to created_at. Same anchor pattern as the camera R2 sweep above.
   const rejectedPhotos = await d1
-    .prepare("SELECT id, storage_key AS storageKey FROM photos WHERE status = 'rejected'")
-    .bind()
+    .prepare(
+      `SELECT p.id, p.storage_key AS storageKey
+       FROM photos p
+       LEFT JOIN (
+         SELECT entity_id, MAX(created_at) AS decided_at
+         FROM moderation_events
+         WHERE entity = 'photo' AND action = 'reject'
+         GROUP BY entity_id
+       ) e ON e.entity_id = p.id
+       WHERE p.status = 'rejected'
+         AND COALESCE(e.decided_at, p.created_at) < ?`,
+    )
+    .bind(daysAgo(now, policy.rejectedDays))
     .all<{ id: number; storageKey: string }>();
   const orphanAndRejected = [...orphanPhotos.results, ...rejectedPhotos.results];
   if (orphanAndRejected.length > 0) {

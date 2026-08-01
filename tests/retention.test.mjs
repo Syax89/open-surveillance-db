@@ -64,13 +64,14 @@ async function insertCamera({ title, status, createdAt, reviewDueAt = null }) {
   return row.id;
 }
 
-async function insertPhoto({ cameraId = null, status = "pending", createdAt, storageKey }) {
-  await runtime.env.DB.prepare(
+async function insertPhoto({ cameraId = null, status = "pending", createdAt, storageKey, redactionConfirmed = 0 }) {
+  const { meta } = await runtime.env.DB.prepare(
     `INSERT INTO photos (camera_id, contributor_id, storage_key, mime_type, width, height, size_bytes, status, exif_stripped, redaction_confirmed, created_at, updated_at)
-     VALUES (?, NULL, ?, 'image/jpeg', 100, 100, 1000, ?, 1, 0, ?, ?)`,
+     VALUES (?, NULL, ?, 'image/jpeg', 100, 100, 1000, ?, 1, ?, ?, ?)`,
   )
-    .bind(cameraId, storageKey, status, createdAt, createdAt)
+    .bind(cameraId, storageKey, status, redactionConfirmed, createdAt, createdAt)
     .run();
+  return meta.lastRowId;
 }
 
 async function insertRejectEvent(cameraId, createdAt) {
@@ -79,6 +80,15 @@ async function insertRejectEvent(cameraId, createdAt) {
      VALUES ('camera', ?, 'pending', 'rejected', 'reject', 'privacy-or-safety-concern', 'test', 'Test Reviewer', ?)`,
   )
     .bind(cameraId, createdAt)
+    .run();
+}
+
+async function insertPhotoRejectEvent(photoId, createdAt) {
+  await runtime.env.DB.prepare(
+    `INSERT INTO moderation_events (entity, entity_id, previous_status, new_status, action, reason_code, note, actor, created_at)
+     VALUES ('photo', ?, 'pending', 'rejected', 'reject', 'privacy-or-safety-concern', 'test', 'Test Reviewer', ?)`,
+  )
+    .bind(photoId, createdAt)
     .run();
 }
 
@@ -260,17 +270,37 @@ test("R4: resolved correction requests older than 2 years are purged", async () 
 // R6 — photos
 // ---------------------------------------------------------------------------
 
-test("R6: orphan pending photos expire and rejected photos are removed at once", async () => {
+test("R6: orphan pending photos expire after 90 days; rejected photos after 30 days (R13)", async () => {
   await insertPhoto({ cameraId: null, status: "pending", createdAt: daysBefore(100), storageKey: "orphan.jpg" });
   await insertPhoto({ cameraId: null, status: "pending", createdAt: daysBefore(10), storageKey: "young-orphan.jpg" });
-  await insertPhoto({ cameraId: null, status: "rejected", createdAt: daysBefore(2), storageKey: "rejected.jpg" });
+
+  // R13: the rejection decision date (entity='photo' AND action='reject')
+  // anchors the 30-day clock — NOT the upload date and NOT the next sweep.
+  const oldRejectedId = await insertPhoto({ cameraId: null, status: "rejected", createdAt: daysBefore(60), storageKey: "old-rejected.jpg" });
+  await insertPhotoRejectEvent(oldRejectedId, daysBefore(40));
+  const recentRejectedId = await insertPhoto({ cameraId: null, status: "rejected", createdAt: daysBefore(60), storageKey: "recent-rejected.jpg" });
+  await insertPhotoRejectEvent(recentRejectedId, daysBefore(5));
 
   const { r2, deletedKeys } = makeR2Spy();
   const summary = await runtime.retention.runRetentionSweep(NOW, { r2 });
 
-  assert.equal(summary.photosDeleted, 2, "orphan past 90 days + rejected photo");
-  assert.deepEqual(deletedKeys.sort(), ["orphan.jpg", "rejected.jpg"].sort());
+  assert.equal(summary.photosDeleted, 2, "orphan past 90 days + rejection past 30 days");
+  assert.deepEqual(deletedKeys.sort(), ["orphan.jpg", "old-rejected.jpg"].sort());
   assert.equal(await count("photos", "storage_key = 'young-orphan.jpg'"), 1, "a pending orphan inside the window survives");
+  assert.equal(await count("photos", "storage_key = 'recent-rejected.jpg'"), 1, "a rejection inside the 30-day window survives");
+});
+
+test("R6: legacy rejected photos without a moderation event fall back to created_at", async () => {
+  // Rows rejected before the event trail existed (or whose event was pruned)
+  // anchor the 30-day clock on created_at, mirroring the camera R2 fallback.
+  await insertPhoto({ cameraId: null, status: "rejected", createdAt: daysBefore(40), storageKey: "legacy-old.jpg" });
+  await insertPhoto({ cameraId: null, status: "rejected", createdAt: daysBefore(10), storageKey: "legacy-fresh.jpg" });
+
+  const summary = await runtime.retention.runRetentionSweep(NOW);
+
+  assert.equal(summary.photosDeleted, 1, "only the legacy rejection past 30 days may be purged");
+  assert.equal(await count("photos", "storage_key = 'legacy-old.jpg'"), 0);
+  assert.equal(await count("photos", "storage_key = 'legacy-fresh.jpg'"), 1);
 });
 
 test("R6 regression: more than 100 rejected photos are deleted in bounded chunks", async () => {
@@ -278,7 +308,7 @@ test("R6 regression: more than 100 rejected photos are deleted in bounded chunks
   // with 150 ids used to throw `too many SQL variables` and leave orphaned
   // rows. The sweep must chunk the deletion (BLOCKER 2).
   for (let i = 0; i < 150; i += 1) {
-    await insertPhoto({ cameraId: null, status: "rejected", createdAt: daysBefore(1), storageKey: `rejected-${i}.jpg` });
+    await insertPhoto({ cameraId: null, status: "rejected", createdAt: daysBefore(40), storageKey: `rejected-${i}.jpg` });
   }
 
   const { r2, deletedKeys } = makeR2Spy();
@@ -287,6 +317,49 @@ test("R6 regression: more than 100 rejected photos are deleted in bounded chunks
   assert.equal(summary.photosDeleted, 150);
   assert.equal(await count("photos", "status = 'rejected'"), 0, "every rejected photo must be gone");
   assert.equal(deletedKeys.length, 150, "every R2 object must be requested for deletion");
+});
+
+test("R6: the sweep is idempotent — a second run deletes nothing new", async () => {
+  await insertPhoto({ cameraId: null, status: "pending", createdAt: daysBefore(100), storageKey: "orphan.jpg" });
+  const rejectedId = await insertPhoto({ cameraId: null, status: "rejected", createdAt: daysBefore(60), storageKey: "rejected.jpg" });
+  await insertPhotoRejectEvent(rejectedId, daysBefore(40));
+
+  const { r2, deletedKeys } = makeR2Spy();
+  const first = await runtime.retention.runRetentionSweep(NOW, { r2 });
+  const second = await runtime.retention.runRetentionSweep(NOW, { r2 });
+
+  assert.equal(first.photosDeleted, 2);
+  assert.equal(second.photosDeleted, 0, "nothing is left for a second pass");
+  assert.equal(await count("photos"), 0, "all eligible rows are gone after the first run");
+  assert.equal(deletedKeys.length, 2, "no R2 object is deleted twice");
+});
+
+test("R6: approved + redacted photos on a verified camera are never touched", async () => {
+  // R13: approved evidence on a verified camera follows the 12-month record
+  // cycle (R3) and is deleted WITH the record — never by the photo sweep.
+  const verified = await insertCamera({ title: "Verified camera", status: "verified", createdAt: daysBefore(200) });
+  await insertPhoto({
+    cameraId: verified,
+    status: "approved",
+    createdAt: daysBefore(100),
+    storageKey: "approved.jpg",
+    redactionConfirmed: 1,
+  });
+  await insertPhoto({
+    cameraId: verified,
+    status: "approved",
+    createdAt: daysBefore(5),
+    storageKey: "approved-fresh.jpg",
+    redactionConfirmed: 1,
+  });
+
+  const { r2, deletedKeys } = makeR2Spy();
+  const summary = await runtime.retention.runRetentionSweep(NOW, { r2 });
+
+  assert.equal(summary.photosDeleted, 0, "approved evidence must not be swept while its record is verified");
+  assert.equal(deletedKeys.length, 0, "no R2 object may be deleted for approved evidence");
+  assert.equal(await count("photos", "storage_key = 'approved.jpg'"), 1);
+  assert.equal(await count("photos", "storage_key = 'approved-fresh.jpg'"), 1);
 });
 
 // ---------------------------------------------------------------------------
