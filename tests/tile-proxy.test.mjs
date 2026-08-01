@@ -55,6 +55,8 @@ afterEach(async () => {
   const { env } = await loadTreeModule("cloudflare-workers.mjs");
   delete env.TILE_PROVIDER_URL;
   delete env.TILE_PROVIDER_KEY;
+  delete env.TILE_UPSTREAM_TIMEOUT_MS;
+  delete env.TILE_MAX_BYTES;
 });
 
 after(async () => cleanupRouteTree());
@@ -215,4 +217,74 @@ test("switches provider via TILE_PROVIDER_URL and appends TILE_PROVIDER_KEY", as
     capturedUrl,
     "https://api.maptiler.com/maps/streets-v2/13/4250/2900.png?key=sekret",
   );
+});
+
+test("returns 502, no-store and no cache when the upstream exceeds the fetch timeout", async () => {
+  const cacheState = fakeCache();
+  // Simulate a hung upstream: the response never arrives on its own, but the
+  // request honours the AbortSignal the route passes, exactly like a real
+  // fetch. TILE_UPSTREAM_TIMEOUT_MS is lowered to 50 ms so the test runs in
+  // ~50 ms instead of the production default of 5 s. The ref'd safety timer
+  // keeps the event loop alive (Node's AbortSignal.timeout timer is unref'd)
+  // and fails loudly if the route ever stops passing a signal.
+  let rejectReason = null;
+  stubFetch(async (_url, init) => {
+    await new Promise((_, reject) => {
+      const safety = setTimeout(() => {
+        const err = new Error("tile upstream stub: AbortSignal never fired");
+        rejectReason = err;
+        reject(err);
+      }, 5_000);
+      init.signal.addEventListener("abort", () => {
+        clearTimeout(safety);
+        rejectReason = new DOMException("The operation was aborted.", "AbortError");
+        reject(rejectReason);
+      });
+    });
+  });
+
+  const response = await getTile({ z: "13", x: "4250", y: "2900" }, {
+    envOverrides: { TILE_UPSTREAM_TIMEOUT_MS: "50" },
+  });
+  assert.equal(rejectReason?.name, "AbortError", "route must abort the hung upstream fetch");
+  assert.equal(response.status, 502);
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.equal(cacheState.putCalls.length, 0);
+});
+
+test("returns 502 and never caches when the upstream body exceeds the 2 MiB cap", async () => {
+  const cacheState = fakeCache();
+  let cancelled = false;
+  const chunk = new Uint8Array(1024 * 1024); // 1 MiB per chunk
+  stubFetch(async () => {
+    const body = new ReadableStream({
+      // Never closes: a misbehaving provider keeps pushing chunks. A route
+      // that kept draining would never return — answering 502 at all proves
+      // the read stopped at the cap.
+      pull(controller) {
+        controller.enqueue(chunk);
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    return new Response(body, { status: 200, headers: { "Content-Type": "image/png" } });
+  });
+
+  const response = await getTile({ z: "13", x: "4250", y: "2900" });
+  assert.equal(response.status, 502);
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.equal(cacheState.putCalls.length, 0);
+  assert.equal(cancelled, true, "over-cap stream must be cancelled, never drained");
+});
+
+test("accepts and caches a tile body within the cap", async () => {
+  const cacheState = fakeCache();
+  const big = new Uint8Array(1024 * 1024); // 1 MiB < 2 MiB cap
+  stubFetch(async () => new Response(big, { status: 200, headers: { "Content-Type": "image/png" } }));
+
+  const response = await getTile({ z: "13", x: "4250", y: "2900" });
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("content-type"), "image/png");
+  assert.equal(cacheState.putCalls.length, 1);
 });

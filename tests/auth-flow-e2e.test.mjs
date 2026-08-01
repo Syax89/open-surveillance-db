@@ -103,6 +103,8 @@ let revisionsRoute;
 let correctionsRoute;
 let moderationRoute;
 let accountRoute;
+let registerRoute;
+let loginRoute;
 let appealsRoute;
 let appealItemRoute;
 
@@ -110,6 +112,12 @@ beforeEach(async () => {
   env = await e2eEnv();
   env.DB = new D1SqliteDatabase();
   await applyDrizzleMigrations(env.DB);
+  // Lockout knobs are per-test: wipe leftovers so a previous test's small
+  // thresholds never bleed into the next one.
+  delete env.AUTH_LOCKOUT_MAX_ATTEMPTS;
+  delete env.AUTH_LOCKOUT_WINDOW_SECONDS;
+  delete env.AUTH_LOCKOUT_DURATION_SECONDS;
+  delete env.AUTH_LOCKOUT_MAX_DURATION_SECONDS;
   // The route modules are cached in the shared tree; reload the recorder each
   // test so coverage stays cumulative while handlers stay stateless.
   const load = async (name, path) => recorder(name, await loadE2ERoute(path));
@@ -120,6 +128,8 @@ beforeEach(async () => {
   correctionsRoute = await load("corrections", "app/api/corrections/route.mjs");
   moderationRoute = await load("moderation", "app/api/moderation/route.mjs");
   accountRoute = await load("account", "app/api/auth/account/route.mjs");
+  registerRoute = await load("register", "app/api/auth/register/route.mjs");
+  loginRoute = await load("login", "app/api/auth/login/route.mjs");
   appealsRoute = await load("appeals", "app/api/appeals/route.mjs");
   appealItemRoute = await load("appealItem", "app/api/appeals/[id]/route.mjs");
 });
@@ -261,6 +271,120 @@ test("auth gate: public routes are not gated — no login needed to read or subm
   const response = await worker.fetch(new Request("https://osdb.test/api/cameras"), {}, ctx);
   assert.equal(response.status, 200);
   assert.equal(await response.text(), "handler-called");
+});
+
+test("auth gate: identity headers are stripped at the edge — a direct client cannot spoof a role", async () => {
+  const { default: worker } = await loadE2EModule("worker.mjs");
+  const stub = await loadE2EModule("vinext-router-stub.mjs");
+  const ctx = { waitUntil() {}, passThroughOnException() {} };
+  const envWithCreds = {
+    MODERATION_USER: "moderator",
+    MODERATION_PASSWORD: "s3cret",
+    MODERATION_IDENTITY_EMAIL: "admin@osdb.test",
+  };
+
+  // 1. A direct client spoofs the prototype identity header on a gated path
+  //    without any credentials: rejected at the edge (401), handler never
+  //    reached.
+  stub.resetLastRequest();
+  const spoofed = await worker.fetch(
+    new Request("https://osdb.test/api/appeals", {
+      headers: { "x-osdb-user-email": "admin@osdb.test" },
+    }),
+    envWithCreds,
+    ctx,
+  );
+  assert.equal(spoofed.status, 401, "spoofed identity without a gate must be rejected");
+  assert.equal(stub.lastRequest, null, "the handler must not be reached for an unauthenticated gated path");
+
+  // 2. Even behind a valid gate, a client-supplied identity is replaced by
+  //    the server-chosen one (MODERATION_IDENTITY_EMAIL) — never honoured.
+  stub.resetLastRequest();
+  const ok = await worker.fetch(
+    new Request("https://osdb.test/api/appeals", {
+      headers: {
+        Authorization: `Basic ${Buffer.from("moderator:s3cret").toString("base64")}`,
+        "x-osdb-user-email": "senior@osdb.test", // spoof attempt behind the gate
+      },
+    }),
+    envWithCreds,
+    ctx,
+  );
+  assert.equal(ok.status, 200);
+  assert.equal(await ok.text(), "handler-called");
+  assert.equal(
+    stub.lastRequest.headers.get("x-osdb-user-email"),
+    "admin@osdb.test",
+    "the edge must inject the configured identity, not the client's",
+  );
+
+  // 3. The ChatGPT-platform headers are stripped on every path unless the
+  //    deployment explicitly trusts the platform gateway (public route here
+  //    so the request reaches the handler).
+  stub.resetLastRequest();
+  await worker.fetch(
+    new Request("https://osdb.test/api/cameras", {
+      headers: { "oai-authenticated-user-email": "contributor@osdb.test" },
+    }),
+    envWithCreds,
+    ctx,
+  );
+  assert.equal(
+    stub.lastRequest.headers.get("oai-authenticated-user-email"),
+    null,
+    "platform headers must be stripped by default (no TRUST_PLATFORM_HEADERS)",
+  );
+
+  // 4. TRUST_PLATFORM_HEADERS=true (real ChatGPT-plugin deployment) lets the
+  //    platform-supplied identity through; the prototype header never is.
+  stub.resetLastRequest();
+  const trusted = await worker.fetch(
+    new Request("https://osdb.test/api/appeals", {
+      headers: {
+        Authorization: `Basic ${Buffer.from("moderator:s3cret").toString("base64")}`,
+        "oai-authenticated-user-email": "contributor@osdb.test",
+        "x-osdb-user-email": "senior@osdb.test",
+      },
+    }),
+    { ...envWithCreds, TRUST_PLATFORM_HEADERS: "true" },
+    ctx,
+  );
+  assert.equal(trusted.status, 200);
+  assert.equal(stub.lastRequest.headers.get("oai-authenticated-user-email"), "contributor@osdb.test");
+  assert.equal(
+    stub.lastRequest.headers.get("x-osdb-user-email"),
+    "admin@osdb.test",
+    "x-osdb-user-email is edge-injected only; a client value never survives",
+  );
+});
+
+test("auth gate: appeals are gated at the edge and fail closed without credentials", async () => {
+  const { default: worker } = await loadE2EModule("worker.mjs");
+  const ctx = { waitUntil() {}, passThroughOnException() {} };
+
+  // Fail-closed default: no moderation credentials configured → 503.
+  const noCreds = await worker.fetch(new Request("https://osdb.test/api/appeals"), {}, ctx);
+  assert.equal(noCreds.status, 503);
+  const noCredsItem = await worker.fetch(new Request("https://osdb.test/api/appeals/1"), {}, ctx);
+  assert.equal(noCredsItem.status, 503);
+
+  // Configured but unauthenticated → 401 with the moderation challenge.
+  const envWithCreds = { MODERATION_USER: "moderator", MODERATION_PASSWORD: "s3cret" };
+  const unauth = await worker.fetch(new Request("https://osdb.test/api/appeals"), envWithCreds, ctx);
+  assert.equal(unauth.status, 401);
+  assert.match(unauth.headers.get("www-authenticate"), /Basic realm="moderation"/);
+
+  // Correct Basic credentials pass through — the appeals surface is now
+  // behind the same transport gate as the moderation queue.
+  const authed = await worker.fetch(
+    new Request("https://osdb.test/api/appeals", {
+      headers: { Authorization: `Basic ${Buffer.from("moderator:s3cret").toString("base64")}` },
+    }),
+    envWithCreds,
+    ctx,
+  );
+  assert.equal(authed.status, 200);
+  assert.equal(await authed.text(), "handler-called");
 });
 
 // ---------------------------------------------------------------------------
@@ -804,6 +928,21 @@ test("E2E: appeals validation and role gates hold through the real routes", asyn
   assert.equal(row.status, "verified");
 });
 
+test("E2E: appeals route maps a syntactically invalid JSON body to 400 (not 500)", async () => {
+  const appealsBefore = await env.DB.prepare("SELECT COUNT(*) AS n FROM moderation_appeals").first();
+  const malformed = await appealsRoute.POST(
+    apiRequest("/api/appeals", {
+      method: "POST",
+      headers: { "x-osdb-user-email": "contributor@osdb.test" },
+      body: '{"entity": "camera", broken',
+    }),
+  );
+  assert.equal(malformed.status, 400);
+  assert.equal((await responseBody(malformed)).error, "Request body is not valid JSON.");
+  const appealsAfter = await env.DB.prepare("SELECT COUNT(*) AS n FROM moderation_appeals").first();
+  assert.equal(Number(appealsAfter.n), Number(appealsBefore.n), "no appeal row written for malformed JSON");
+});
+
 // 7) Account erasure (RETENTION_SCHEDULE R7) end to end
 // ---------------------------------------------------------------------------
 
@@ -881,10 +1020,109 @@ test("E2E: erasure requires a live session — anonymous DELETE is rejected", as
 });
 
 // ---------------------------------------------------------------------------
+// 7b) Per-email login lockout (ADR 0016) — real routes, real db/auth SQL
+// ---------------------------------------------------------------------------
+
+const AUTH_EMAIL = "lockout-e2e@example.org";
+const AUTH_PASSWORD = "correct-horse-battery";
+
+async function registerContributor() {
+  const response = await registerRoute.POST(apiRequest("/api/auth/register", {
+    method: "POST",
+    body: { email: AUTH_EMAIL, password: AUTH_PASSWORD, displayName: "Lockout E2E" },
+  }));
+  assert.equal(response.status, 201, "register must create the account");
+  return response;
+}
+
+function loginAttempt(ip, password) {
+  return loginRoute.POST(apiRequest("/api/auth/login", {
+    method: "POST",
+    headers: { "cf-connecting-ip": ip },
+    body: { email: AUTH_EMAIL, password },
+  }));
+}
+
+test("E2E: N failed logins from different IPs lock the account (429 + Retry-After)", async () => {
+  env.AUTH_LOCKOUT_MAX_ATTEMPTS = "3";
+  env.AUTH_LOCKOUT_DURATION_SECONDS = "900";
+  await registerContributor();
+
+  // Two failed attempts from different IPs stay generic 401 (per-IP buckets
+  // are separate, so the rate limiter must not interfere).
+  assert.equal((await loginAttempt("10.0.0.1", "wrong-password-1")).status, 401);
+  assert.equal((await loginAttempt("10.0.0.2", "wrong-password-2")).status, 401);
+
+  // The third failure — from yet another IP — trips the per-email lockout.
+  const tripped = await loginAttempt("10.0.0.3", "wrong-password-3");
+  assert.equal(tripped.status, 429);
+  assert.ok(Number(tripped.headers.get("retry-after")) > 0, "429 must carry Retry-After");
+
+  // Even the correct password answers 429 while the account is locked.
+  const correct = await loginAttempt("10.0.0.4", AUTH_PASSWORD);
+  assert.equal(correct.status, 429);
+
+  // And no raw email ever lands in the counter table.
+  const rows = await env.DB.prepare("SELECT * FROM login_attempts").all();
+  assert.equal(rows.results.length, 1);
+  assert.ok(!JSON.stringify(rows.results).includes(AUTH_EMAIL), "no PII in the lockout table");
+});
+
+test("E2E: a successful login resets the per-email counter", async () => {
+  env.AUTH_LOCKOUT_MAX_ATTEMPTS = "3";
+  await registerContributor();
+
+  assert.equal((await loginAttempt("10.0.0.1", "wrong-password-1")).status, 401);
+  assert.equal((await loginAttempt("10.0.0.2", "wrong-password-2")).status, 401);
+  // Correct login mid-run resets the counter...
+  assert.equal((await loginAttempt("10.0.0.3", AUTH_PASSWORD)).status, 200);
+  // ...so two more failures stay 401 (without the reset, the 2nd would be 429).
+  assert.equal((await loginAttempt("10.0.0.4", "wrong-password-3")).status, 401);
+  assert.equal((await loginAttempt("10.0.0.5", "wrong-password-4")).status, 401);
+  assert.equal((await loginAttempt("10.0.0.6", AUTH_PASSWORD)).status, 200);
+});
+
+test("E2E: the lockout expires after the duration and the account logs in again", async () => {
+  env.AUTH_LOCKOUT_MAX_ATTEMPTS = "3";
+  env.AUTH_LOCKOUT_DURATION_SECONDS = "1";
+  await registerContributor();
+
+  assert.equal((await loginAttempt("10.0.0.1", "wrong-password-1")).status, 401);
+  assert.equal((await loginAttempt("10.0.0.2", "wrong-password-2")).status, 401);
+  assert.equal((await loginAttempt("10.0.0.3", "wrong-password-3")).status, 429);
+
+  // Wait for the 1-second lock to expire, then the correct password works.
+  await new Promise((resolve) => setTimeout(resolve, 1200));
+  assert.equal((await loginAttempt("10.0.0.4", AUTH_PASSWORD)).status, 200);
+});
+
+test("E2E: lockout log lines never contain the raw email (PII-free)", async () => {
+  env.AUTH_LOCKOUT_MAX_ATTEMPTS = "2";
+  await registerContributor();
+
+  const warnings = [];
+  const originalWarn = console.warn;
+  console.warn = (...args) => warnings.push(args.join(" "));
+  try {
+    await loginAttempt("10.0.0.1", "wrong-password-1");
+    await loginAttempt("10.0.0.2", "wrong-password-2");
+  } finally {
+    console.warn = originalWarn;
+  }
+
+  const lockoutLines = warnings.filter((line) => line.includes("lockout"));
+  assert.ok(lockoutLines.length >= 1, "a lockout must be logged");
+  for (const line of lockoutLines) {
+    assert.ok(!line.includes(AUTH_EMAIL), `log line must not contain the email: ${line}`);
+    assert.ok(!line.includes("lockout-e2e"), "no email-shaped value in the log either");
+  }
+});
+
+// ---------------------------------------------------------------------------
 // 8) Coverage gate: 100% of the route surface exercised by this suite
 // ---------------------------------------------------------------------------
 
-test("E2E suite covers 100% of the API route surface (all 9 route files, all methods)", () => {
+test("E2E suite covers 100% of the API route surface (all 11 route files, all methods)", () => {
   const expected = [
     "cameras:GET",
     "cameras:POST",
@@ -895,6 +1133,8 @@ test("E2E suite covers 100% of the API route surface (all 9 route files, all met
     "moderation:GET",
     "moderation:PATCH",
     "account:DELETE",
+    "register:POST",
+    "login:POST",
     "appeals:POST",
     "appeals:GET",
     "appealItem:PATCH",

@@ -26,11 +26,11 @@
 
 import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
+import { coverageTreeCleanupEnabled, coverageTreeRoot } from "./coverage-tree.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -44,6 +44,11 @@ const ROUTES = [
   // Account erasure (R7): exercised end to end with a real session built via
   // the real db/auth module, so the DELETE handler runs against real SQL.
   { source: "app/api/auth/account/route.ts", output: "app/api/auth/account/route.mjs" },
+  // Contributor auth (ADR 0013 + 0015): register/login run the real db/auth
+  // SQL against the in-memory D1, so the per-email lockout (429, Retry-After,
+  // reset on success, expiry) is exercised end to end.
+  { source: "app/api/auth/register/route.ts", output: "app/api/auth/register/route.mjs" },
+  { source: "app/api/auth/login/route.ts", output: "app/api/auth/login/route.mjs" },
   // Auth roles + appeals (ADR 0014): contributor files an appeal, moderators
   // list and decide it. The [id] route lives in its own directory.
   { source: "app/api/appeals/route.ts", output: "app/api/appeals/route.mjs" },
@@ -100,7 +105,7 @@ function rewriteSpecifiers(code, workersMockUrl) {
 }
 
 async function buildTree() {
-  const tree = await mkdtemp(path.join(os.tmpdir(), "osdb-e2e-"));
+  const tree = await mkdtemp(path.join(coverageTreeRoot(), "osdb-e2e-"));
 
   // 1. Injectable env mock: routes and real db modules share this instance.
   const workersMockUrl = pathToFileURL(path.join(tree, "cloudflare-workers.mjs")).href;
@@ -167,7 +172,12 @@ async function buildTree() {
     const routerStubUrl = pathToFileURL(path.join(tree, "vinext-router-stub.mjs")).href;
     await writeFile(
       path.join(tree, "vinext-router-stub.mjs"),
-      'export default { fetch: async () => new Response("handler-called") };\n',
+      "// Edge identity-gate tests read the request the router received to\n" +
+        "// assert that spoofed identity headers were stripped and the\n" +
+        "// server-chosen identity was injected (ADR 0014).\n" +
+        "export let lastRequest = null;\n" +
+        "export function resetLastRequest() { lastRequest = null; }\n" +
+        "export default { fetch: async (request) => { lastRequest = request; return new Response(\"handler-called\"); } };\n",
     );
     const compiled = transpile(path.join(root, "worker", "index.ts"));
     const rewritten = compiled
@@ -208,6 +218,8 @@ export async function e2eEnv() {
 export async function cleanupE2ETree() {
   if (!builtTreePromise) return;
   const tree = await builtTreePromise;
-  await rm(tree, { recursive: true, force: true });
+  if (coverageTreeCleanupEnabled()) {
+    await rm(tree, { recursive: true, force: true });
+  }
   builtTreePromise = null;
 }

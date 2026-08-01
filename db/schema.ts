@@ -42,7 +42,10 @@ export const correctionRequests = sqliteTable(
   "correction_requests",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
-    cameraId: integer("camera_id"),
+    // FK to cameras (migration 0015). Historical corrections must survive
+    // the removal of a camera record: SET NULL keeps the request auditable
+    // while unlinking it from the deleted record.
+    cameraId: integer("camera_id").references(() => cameras.id, { onDelete: "set null" }),
     issueType: text("issue_type").notNull(),
     message: text("message").notNull(),
     contact: text("contact"),
@@ -97,6 +100,28 @@ export const sessions = sqliteTable(
     index("sessions_contributor_idx").on(table.contributorId),
     index("sessions_expires_idx").on(table.expiresAt),
   ],
+);
+
+/**
+ * Per-email login lockout counters (P2 security, ADR 0016). One row per
+ * normalised email, keyed by the SHA-256 of the normalised email
+ * (`email_key`) so the table stores no PII. `failed_count` counts failed
+ * logins inside the current window (`window_start`); reaching the threshold
+ * sets `locked_until` and every login for that email answers 429 with
+ * Retry-After until it passes. `lockout_level` counts consecutive lockouts
+ * so the duration backs off exponentially (capped in code). All queries go
+ * through db/auth.ts; this definition exists so the drizzle model stays the
+ * single schema reference.
+ */
+export const loginAttempts = sqliteTable(
+  "login_attempts",
+  {
+    emailKey: text("email_key").primaryKey(),
+    failedCount: integer("failed_count").notNull().default(0),
+    windowStart: text("window_start").notNull(),
+    lockedUntil: text("locked_until"),
+    lockoutLevel: integer("lockout_level").notNull().default(0),
+  },
 );
 
 /**

@@ -34,6 +34,7 @@ export type RouteKind =
   | "revisions"
   | "submit"
   | "moderate"
+  | "appeal"
   | "auth"
   | "tiles";
 
@@ -44,6 +45,11 @@ const ROUTE_LIMIT_DEFAULTS: Record<RouteKind, RateLimitOptions> = {
   revisions: { maxRequests: 30, windowSeconds: 60 },
   submit: { maxRequests: 5, windowSeconds: 60 },
   moderate: { maxRequests: 30, windowSeconds: 60 },
+  // Appeals are moderation-adjacent but a distinct caller population
+  // (contributors contesting decisions, moderators reviewing them), so the
+  // bucket gets its own conservative default and its own env knobs instead
+  // of silently inheriting the moderation limits.
+  appeal: { maxRequests: 20, windowSeconds: 60 },
   // Auth endpoints (register/login) are credential-guessing surfaces; the
   // deliberate per-caller bucket keeps brute force slow while staying far
   // above the rate of legitimate interactive use.
@@ -62,6 +68,7 @@ const ROUTE_LIMIT_ENV_PREFIX: Record<RouteKind, string> = {
   revisions: "REVISIONS",
   submit: "POST",
   moderate: "MODERATION",
+  appeal: "APPEAL",
   auth: "AUTH",
   tiles: "TILES",
 };

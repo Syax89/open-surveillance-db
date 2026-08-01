@@ -251,7 +251,9 @@ test("locality search stays behind the public-list boundary and is rate-limited"
 });
 
 test("manual report coordinates are bounded and reuse the public-only selection flow", async () => {
-  const page = await readSource("app/page.tsx");
+  // The report flow (hook + form) moved to its own component in the
+  // t_6104f386 refactor; the guards below apply to that component.
+  const page = await readSource("app/components/home/ReportForm.tsx");
   const handlerStart = page.indexOf("async function selectManualCoordinates");
   const submitStart = page.indexOf("async function submitReport", handlerStart);
   const handler = page.slice(handlerStart, submitStart);
@@ -646,11 +648,14 @@ test("public handlers reject oversized inputs and guard the request URI", async 
   }
   for (const [label, source] of Object.entries({ cameras: routes.cameras, corrections: routes.corrections, moderation: routes.moderation })) {
     assert.match(source, /readJsonBody\(request,\s*env\)/, `${label} must read bodies through the capped reader`);
-    assert.match(source, /PayloadTooLargeError/, `${label} must handle the 413 signal`);
+    // The routes answer the whole transport-level body-error family
+    // (BodyReadError base: 413 oversized + 400 malformed JSON) with the
+    // error's own status instead of a blanket 500.
+    assert.match(source, /BodyReadError/, `${label} must handle the transport-level body errors`);
     assert.match(
       source,
       /status:\s*(?:413|error\.status)/,
-      `${label} must answer 413 for oversized bodies`,
+      `${label} must answer the body error's status (413 / 400)`,
     );
   }
 });
@@ -712,6 +717,10 @@ test("server errors are logged server-side and return generic client messages", 
 test("every map task has a keyboard/text-list equivalent in the public interface", async () => {
   const page = await readSource("app/page.tsx");
   const map = await readSource("app/components/SurveillanceMap.tsx");
+  // The directory and the report form moved to their own components in the
+  // t_6104f386 refactor; the keyboard/text-list guards below apply there.
+  const directory = await readSource("app/components/home/PublicDirectory.tsx");
+  const reportForm = await readSource("app/components/home/ReportForm.tsx");
 
   // Map task: select a record (pin click). Keyboard path: the directory's
   // "Show on map" moves selection AND keyboard focus to the map region,
@@ -724,11 +733,11 @@ test("every map task has a keyboard/text-list equivalent in the public interface
 
   // Map task: browse pins. Text-list path: one directory card per record with
   // the keyboard select action.
-  assert.match(page, /className=["']record-list["']/, "the directory must render the record list");
-  assert.match(page, /showRecordOnMap\(\s*camera\.id\s*\)/, "every record card must offer the keyboard select path");
+  assert.match(directory, /className=["']record-list["']/, "the directory must render the record list");
+  assert.match(directory, /showRecordOnMap\(\s*camera\.id\s*\)/, "every record card must offer the keyboard select path");
 
   // Map task: pick a report position (map click). Keyboard path: manual coordinates.
-  assert.match(page, /selectManualCoordinates/, "the report form must keep the manual-coordinate fallback");
+  assert.match(reportForm, /selectManualCoordinates/, "the report form must keep the manual-coordinate fallback");
 
   // The map region is a labelled, programmatically focusable landmark that
   // describes the text-list alternative.

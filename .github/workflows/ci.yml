@@ -38,6 +38,35 @@ jobs:
       - name: Test (build + node --test suite)
         run: npm test
 
+  coverage:
+    name: Coverage (soglia righe)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Build + full suite con coverage, poi soglia minima sulle righe (solo
+      # codice di produzione, esclusi test/helper/mock/fixture): sotto
+      # COVERAGE_LINES (default 75) il job fallisce. Baseline in docs/QA_COVERAGE.md.
+      - name: Coverage run
+        run: npm run coverage
+
+      - name: Coverage threshold (righe)
+        run: npm run coverage:docs
+        env:
+          COVERAGE_LINES: 75
+
   db-migration-smoke:
     name: Fresh-DB migration smoke
     runs-on: ubuntu-latest
