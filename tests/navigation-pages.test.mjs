@@ -536,30 +536,39 @@ test("worker gate admits a correct Bearer token (token-only config)", async () =
   assert.notEqual(correct.response.status, 503);
 });
 
-test("worker edge does not yet add global security headers on main (tripwire for t_6148aa6f)", async () => {
-  // On main the edge worker serves pages without global security headers —
-  // that is the open feat/security-headers PR (task t_6148aa6f), which adds
-  // X-Content-Type-Options, X-Frame-Options, Referrer-Policy,
-  // Permissions-Policy and CSP to every worker response. Until it lands, the
-  // only security headers in the product come from individual routes (e.g.
-  // the photo handlers). This assertion is a deliberate tripwire: it goes
-  // red the moment that PR merges, and the update is to flip it into a
-  // presence check for the full header set.
+test("worker edge adds the full global security header set on every page (t_6148aa6f landed)", async () => {
+  // t_6148aa6f (feat(security), PR #83) has landed: the edge worker now wraps
+  // every response with X-Content-Type-Options, X-Frame-Options,
+  // Referrer-Policy, Permissions-Policy and CSP. This test was born as a
+  // tripwire asserting absence; now that the feature is on main it is a
+  // presence + value check for the full header set on public pages.
   for (const route of ["/", "/login"]) {
     const { response } = await renderRoute(route);
     assert.equal(response.status, 200, `${route} must render before header check`);
+    assert.equal(response.headers.get("x-content-type-options"), "nosniff", `${route}: X-Content-Type-Options must be nosniff`);
+    assert.equal(response.headers.get("x-frame-options"), "DENY", `${route}: X-Frame-Options must be DENY`);
     assert.equal(
-      response.headers.get("x-content-type-options"),
-      null,
-      `${route}: X-Content-Type-Options absent on main — when t_6148aa6f lands, assert 'nosniff' here`,
+      response.headers.get("referrer-policy"),
+      "strict-origin-when-cross-origin",
+      `${route}: Referrer-Policy must be strict-origin-when-cross-origin`,
     );
+    assert.match(
+      response.headers.get("permissions-policy"),
+      /camera=\(\)/,
+      `${route}: Permissions-Policy must block camera`,
+    );
+    const csp = response.headers.get("content-security-policy");
+    assert.ok(csp, `${route}: CSP must be present`);
+    assert.match(csp, /frame-ancestors 'none'/, `${route}: CSP must keep clickjacking protection`);
+    assert.match(csp, /object-src 'none'/, `${route}: CSP must block plugin objects`);
+    assert.match(csp, /default-src 'self'/, `${route}: CSP must default to same-origin`);
   }
 });
 
 test("security headers, when present, are never weakened (forward-compatible value check)", async () => {
-  // Green both before and after t_6148aa6f: on main nothing is present
-  // (trivially green); once the edge headers land, this becomes a real
-  // value check on every public route.
+  // The global edge headers (t_6148aa6f, PR #83) are on main; this stays a
+  // value check on every public route — if a route ever overrides a header
+  // with a weaker value, this goes red.
   for (const route of PUBLIC_ROUTES) {
     const { response } = await renderRoute(route);
     const xcto = response.headers.get("x-content-type-options");

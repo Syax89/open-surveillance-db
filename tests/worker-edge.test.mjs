@@ -163,10 +163,10 @@ test("forwards unknown-route 404 responses from the handler unchanged", async ()
 });
 
 test("preserves security headers set by the app handler (pass-through, never stripped)", async () => {
-  // On main the worker does not add global security headers (that is the
-  // open feat/security-headers PR, task t_6148aa6f). What the worker MUST do
-  // today is leave handler-set headers untouched — e.g. the photo routes
-  // ship X-Content-Type-Options: nosniff + CSP sandbox on binary bodies.
+  // The worker wraps every response with the global security headers
+  // (t_6148aa6f, PR #83), but must never overwrite handler-set headers —
+  // e.g. the photo routes ship X-Content-Type-Options: nosniff + CSP
+  // sandbox on binary bodies, which are stricter and must survive.
   const { worker, app } = await loadWorker();
   const handler = app.default;
   const originalFetch = handler.fetch;
