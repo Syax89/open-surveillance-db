@@ -45,6 +45,7 @@ The documentation is part of the project and is intended to be discussed openly.
 - [Next local sprint: reliable moderation loop](docs/NEXT_SPRINT.md)
 - [Future roadmap](docs/FUTURE_ROADMAP.md)
 - [Current status](docs/STATUS.md)
+- [Site map and information architecture](docs/SITEMAP.md)
 - [Local playbook and acceptance checks](docs/LOCAL_PLAYBOOK.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Data model and API](docs/DATA_MODEL.md)
