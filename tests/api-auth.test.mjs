@@ -191,6 +191,20 @@ test("register rejects cross-origin requests", async () => {
   assert.equal(callArgs("createContributor").length, 0);
 });
 
+test("register maps a syntactically invalid JSON body to 400 (not 500)", async () => {
+  const { POST } = await registerRoute();
+  const response = await POST(
+    apiRequest("/api/auth/register", { method: "POST", body: '{"email": "ada@example.org", broken' }),
+  );
+  assert.equal(response.status, 400);
+  assert.equal((await responseBody(response)).error, "Request body is not valid JSON.");
+  assert.equal(
+    callArgs("findContributorByEmail").length + callArgs("createContributor").length,
+    0,
+    "no auth db call for malformed JSON",
+  );
+});
+
 test("register respects the auth rate-limit bucket", async () => {
   const { POST } = await registerRoute();
   for (let index = 0; index < 10; index += 1) {
@@ -377,6 +391,16 @@ test("login rejects cross-origin requests", async () => {
   );
   assert.equal(response.status, 403);
   assert.equal(callArgs("authenticateContributor").length, 0);
+});
+
+test("login maps a syntactically invalid JSON body to 400 (not 500)", async () => {
+  const { POST } = await loginRoute();
+  const response = await POST(
+    apiRequest("/api/auth/login", { method: "POST", body: '{"email": "ada@example.org", broken' }),
+  );
+  assert.equal(response.status, 400);
+  assert.equal((await responseBody(response)).error, "Request body is not valid JSON.");
+  assert.equal(callArgs("authenticateContributor").length, 0, "no credential check for malformed JSON");
 });
 
 // ---------------------------------------------------------------------------

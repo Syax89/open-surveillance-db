@@ -17,11 +17,11 @@
 // state across tests.
 
 import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import ts from "typescript";
-
+import { coverageTreeCleanupEnabled, coverageTreeRoot } from "./coverage-tree.mjs";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const DRIZZLE_DIR = path.join(root, "drizzle");
 
@@ -56,7 +56,7 @@ const DB_MODULES = [
 let builtTreePromise = null;
 
 async function buildTree() {
-  const tree = await mkdtemp(path.join(os.tmpdir(), "osdb-db-runtime-"));
+  const tree = await mkdtemp(path.join(coverageTreeRoot(), "osdb-db-runtime-"));
 
   // Injectable env mock: tests set env.DB to a D1SqliteDatabase instance.
   const envUrl = pathToFileURL(path.join(tree, "cloudflare-workers.mjs")).href;
@@ -123,6 +123,8 @@ export async function applyDrizzleMigrations(db) {
 export async function cleanupDbRuntime() {
   if (!builtTreePromise) return;
   const tree = await builtTreePromise;
-  await rm(tree, { recursive: true, force: true });
+  if (coverageTreeCleanupEnabled()) {
+    await rm(tree, { recursive: true, force: true });
+  }
   builtTreePromise = null;
 }

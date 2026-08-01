@@ -17,11 +17,11 @@
 
 import { DatabaseSync } from "node:sqlite";
 import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import ts from "typescript";
 import { applyDrizzleMigrations } from "./db-runtime-harness.mjs";
+import { coverageTreeRoot } from "./coverage-tree.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -83,7 +83,7 @@ class FreshnessStatement {
 let modulesPromise = null;
 
 async function buildDbModules() {
-  const tree = await mkdtemp(path.join(os.tmpdir(), "osdb-freshness-"));
+  const tree = await mkdtemp(path.join(coverageTreeRoot(), "osdb-freshness-"));
   const workersUrl = pathToFileURL(path.join(tree, "cloudflare-workers.mjs")).href;
 
   await writeFile(

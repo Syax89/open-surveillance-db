@@ -268,7 +268,8 @@ Alternatives and rules:
 | `no such column: ...` (or missing table) at runtime after switching branches | Stale local DB: `.wrangler/state` was migrated by an older commit, and the current code expects a newer schema | `npm run db:reset`, then `npm run db:migrate` on the new branch |
 | `db:generate` produces nothing or an unexpected diff | `drizzle/meta/_journal.json`/snapshots are out of sync with the SQL files (hand-edited or restored from another branch) | Do not hand-edit the journal; regenerate from a clean checkout of the branch |
 | `Error [ERR_UNSUPPORTED_ESM_URL_SCHEME]: ... Received protocol 'cloudflare:'` | `npm start` (`vinext start`, plain Node) cannot load the Workers-runtime `cloudflare:` module | Use `npm run dev` (`vinext dev`, runs in workerd). See `docs/DEPLOYMENT.md` § Local LXC deployment |
-| `/moderation` and `/api/moderation` return 503 | Fail-closed default: no moderation credentials configured | Set `MODERATION_USER`/`MODERATION_PASSWORD` (Basic auth) or `MODERATION_TOKEN` (bearer) in the environment, then restart |
+| `/moderation`, `/api/moderation`, `/api/appeals` return 503 | Fail-closed default: no moderation credentials configured | Set `MODERATION_USER`/`MODERATION_PASSWORD` (Basic auth) or `MODERATION_TOKEN` (bearer) in the environment, then restart |
+| Moderation/appeals API returns `401 Authentication required` after a successful Basic login | The gate passed but no server-side identity was injected | Set `MODERATION_IDENTITY_EMAIL` (e.g. `admin@osdb.test` for the prototype) — the worker only injects identity from that setting (ADR 0014) |
 | Port 3000 already in use | Another instance is running | Stop it, or start with a different port (`npm run dev -- --port 3001`) |
 
 ## 8. Related documentation

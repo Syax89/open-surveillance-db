@@ -673,8 +673,9 @@ test("PATCH returns 500 when the database write fails", async () => {
   assert.equal((await responseBody(response)).error, "Unable to update moderation item");
 });
 
-test("PATCH maps malformed JSON bodies to 500", async () => {
+test("PATCH maps malformed JSON bodies to 400", async () => {
   const { PATCH } = await route();
   const response = await PATCH(authRequest("/api/moderation", { method: "PATCH", body: "{nope" }));
-  assert.equal(response.status, 500);
+  assert.equal(response.status, 400);
+  assert.equal(callArgs("moderateCamera").length, 0, "no db write for malformed JSON");
 });
