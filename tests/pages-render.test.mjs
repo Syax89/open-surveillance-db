@@ -28,6 +28,10 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 const PAGES = [
   { route: "/", source: "app/page.tsx", relative: "app/page.mjs" },
+  { route: "/mappa", source: "app/(tools)/mappa/page.tsx", relative: "app/(tools)/mappa/page.mjs", layout: "tools" },
+  { route: "/directory", source: "app/(tools)/directory/page.tsx", relative: "app/(tools)/directory/page.mjs", layout: "tools" },
+  { route: "/segnala", source: "app/(tools)/segnala/page.tsx", relative: "app/(tools)/segnala/page.mjs", layout: "tools" },
+  { route: "/correggi", source: "app/(tools)/correggi/page.tsx", relative: "app/(tools)/correggi/page.mjs", layout: "tools" },
   { route: "/guide", source: "app/guide/page.tsx", relative: "app/guide/page.mjs" },
   { route: "/login", source: "app/login/page.tsx", relative: "app/login/page.mjs" },
   { route: "/register", source: "app/register/page.tsx", relative: "app/register/page.mjs" },
@@ -41,6 +45,8 @@ const PAGES = [
 const KNOWN_ROUTES = new Set([
   "/", "/guide", "/login", "/register", "/account", "/moderation",
   "/manifesto", "/regole", "/faq", "/contatti", "/privacy", "/termini", "/licenze", "/accessibility",
+  // Route tool separate (F1 route group (tools), t_03c0fa15).
+  "/mappa", "/directory", "/segnala", "/correggi",
   "/api/cameras", "/api/cameras?format=geojson", "/api/cameras?format=csv",
   "/api/cameras/nearby", "/api/cameras/search", "/api/cameras/revisions",
   "/api/tiles", "/api/auth/me", "/api/auth/me/submissions", "/api/auth/logout",
@@ -57,8 +63,10 @@ const LEAK_PATTERNS = [
 
 // Pagine pubbliche su cui i pattern di leak hanno senso. /guide documenta gli
 // stati intenzionalmente (esente); /moderation è una pagina interna gated
-// (mostra "Pending camera reports" per design).
-const LEAK_CHECK_ROUTES = new Set(["/", "/login", "/register", "/account", "/records/[id]"]);
+// (mostra "Pending camera reports" per design). Le route tool separate (F1)
+// mostrano solo dati pubblici / form: /segnala e /correggi sono form privati
+// (noindex), /mappa e /directory la stessa directory pubblica della home.
+const LEAK_CHECK_ROUTES = new Set(["/", "/mappa", "/directory", "/segnala", "/correggi", "/login", "/register", "/account", "/records/[id]"]);
 
 const transpile = (sourcePath) =>
   ts.transpileModule(readFileSync(sourcePath, "utf8"), {
@@ -184,6 +192,11 @@ async function loadLocaleProvider(tree) {
   return mod.LocaleProvider;
 }
 
+async function loadToolLayout(tree) {
+  const mod = await import(pathToFileURL(path.join(tree, "app/components/ToolLayout.mjs")).href);
+  return mod.ToolLayout;
+}
+
 function extractHeadings(html) {
   const out = [];
   const re = /<h([1-6])[^>]*>(.*?)<\/h\1>/gs;
@@ -234,7 +247,13 @@ for (const page of PAGES) {
       const element = Page.constructor.name === "AsyncFunction"
         ? await Page()
         : React.createElement(Page);
-      html = renderToString(React.createElement(LocaleProvider, null, element));
+      // Le route tool separate (F1) vivono nel route group (tools): il
+      // layout condiviso ToolLayout è ciò che emette main#main-content e la
+      // nav shell — il render test lo applica come farebbe Next.
+      const wrapped = page.layout === "tools"
+        ? React.createElement(await loadToolLayout(tree), null, element)
+        : element;
+      html = renderToString(React.createElement(LocaleProvider, null, wrapped));
     } catch (err) {
       assert.fail(`render di ${page.route} ha lanciato: ${err.message}`);
     }

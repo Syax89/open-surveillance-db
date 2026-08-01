@@ -6,7 +6,15 @@ import { useMessages } from "./LocaleProvider";
 
 export type MapCamera = { id: number; title: string; kind: string; status: string; latitude: number; longitude: number };
 export type MapLocation = { latitude: number; longitude: number };
-type Props = { cameras: MapCamera[]; selectedId: number; onSelect: (id: number) => void; onPick: (latitude: number, longitude: number) => void; focusLocation?: MapLocation | null };
+type Props = {
+  cameras: MapCamera[];
+  selectedId: number;
+  onSelect: (id: number) => void;
+  onPick: (latitude: number, longitude: number) => void;
+  focusLocation?: MapLocation | null;
+  /** Where the sr-only "accessible directory" link points: home anchor (#records) or /directory. */
+  directoryHref?: string;
+};
 
 type LeafletModule = typeof import("leaflet");
 type MarkerEntry = { marker: import("leaflet").Marker; camera: MapCamera };
@@ -24,7 +32,7 @@ function buildMarkerIcon(L: LeafletModule, camera: MapCamera, isSelected: boolea
   });
 }
 
-export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLocation }: Props) {
+export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLocation, directoryHref = "#records" }: Props) {
   const [mapUnavailable, setMapUnavailable] = useState(false);
   const [offline, setOffline] = useState(false);
   const mapElement = useRef<HTMLDivElement | null>(null);
@@ -158,10 +166,10 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
   const offlineAction = t.offlineAction;
 
   return <div className="map-region" id="map-region" role="region" aria-label={label} aria-describedby="map-accessibility-description" tabIndex={-1}>
-    <p className="sr-only" id="map-accessibility-description">{description} <a href="#records">{directoryLink}</a>.</p>
+    <p className="sr-only" id="map-accessibility-description">{description} <a href={directoryHref}>{directoryLink}</a>.</p>
     {offline && <div className="offline-state" role="status"><b>{offlineTitle}.</b> {offlineBody} <button type="button" className="text-button" onClick={() => window.location.reload()}>{offlineAction} <span aria-hidden="true">→</span></button></div>}
     {mapUnavailable
-      ? <div className="map-fallback" role="note"><p className="map-fallback-title">{fallbackTitle}</p><p>{fallbackBody}</p><p><a className="text-button" href="#records">{directoryLink} <span aria-hidden="true">→</span></a></p></div>
+      ? <div className="map-fallback" role="note"><p className="map-fallback-title">{fallbackTitle}</p><p>{fallbackBody}</p><p><a className="text-button" href={directoryHref}>{directoryLink} <span aria-hidden="true">→</span></a></p></div>
       : <div ref={mapElement} className="live-map" />}
   </div>;
 }

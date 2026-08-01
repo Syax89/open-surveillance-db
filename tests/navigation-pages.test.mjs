@@ -75,7 +75,13 @@ async function renderRoute(route, { env = {}, headers = {} } = {}) {
 }
 
 /** Public HTML routes that must always render (no credentials needed). */
-const PUBLIC_ROUTES = ["/", "/guide", "/login", "/register", "/account", "/accessibility"];
+const PUBLIC_ROUTES = [
+  "/", "/guide", "/login", "/register", "/account", "/accessibility",
+  // Route tool separate (F1 route group (tools), t_03c0fa15): /mappa e
+  // /directory sono pubbliche, /segnala e /correggi form privati (noindex)
+  // — tutti devono renderizzare 200 senza credenziali.
+  "/mappa", "/directory", "/segnala", "/correggi",
+];
 
 /**
  * Routes linked from the global footer (added in #71) that are carried by
@@ -384,7 +390,7 @@ function bundleKeys(bundle) {
 }
 
 const I18N_DOMAINS = [
-  "common", "map", "status", "home", "guide", "manifesto", "moderazione",
+  "common", "map", "directory", "report", "correction", "status", "home", "guide", "manifesto", "moderazione",
   "faq", "contact", "rules", "record", "moderation", "auth", "footer",
 ];
 

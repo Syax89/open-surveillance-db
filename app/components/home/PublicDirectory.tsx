@@ -6,6 +6,8 @@ import { publicStatusLabel } from "../../lib/public-status";
 import { formatDistance } from "../../lib/search";
 import type { Camera } from "../../lib/records";
 import { RecordCard } from "../RecordCard";
+import { FiltersBar } from "../FiltersBar";
+import { EmptyState } from "../EmptyState";
 
 type PlaceSearchArea = { kind: "coordinates" | "place"; displayName?: string; latitude: number; longitude: number; radiusMeters: number; radiusLabel: string };
 
@@ -35,15 +37,21 @@ type Props = {
   showRecordOnMap: (id: number) => void;
   /** Place-search hit: focus the map / report position on the area. */
   setCoordinates: (coordinates: { latitude: number; longitude: number } | null) => void;
+  /** "Use the map instead" target: home anchor (#map) or /mappa route. */
+  mapHref?: string;
+  /** "Submit a private observation" target: home anchor (#report) or /segnala route. */
+  reportHref?: string;
 };
 
 /**
- * Home records section: place search, directory controls (search, kind,
- * freshness, sort) and the accessible record list. Every record card is the
- * shared RecordCard component (audit t_c6da60f0, P2).
+ * Public directory section (F1 route group (tools)): place search, the
+ * shared FiltersBar (search, kind, freshness, sort, reset, counter) and the
+ * accessible record list. Every record card is the shared RecordCard
+ * component. Reads the `directory` i18n bundle; reused by the home page
+ * (anchor fallback) and by /directory.
  */
-export function PublicDirectory({ filteredRecords, cameraKinds, search, setSearch, kindFilter, setKindFilter, freshnessFilter, setFreshnessFilter, setFreshnessCutoff, sortOrder, setSortOrder, showRecordOnMap, setCoordinates }: Props) {
-  const t = useMessages().home;
+export function PublicDirectory({ filteredRecords, cameraKinds, search, setSearch, kindFilter, setKindFilter, freshnessFilter, setFreshnessFilter, setFreshnessCutoff, sortOrder, setSortOrder, showRecordOnMap, setCoordinates, mapHref = "#map", reportHref = "#report" }: Props) {
+  const t = useMessages().directory;
   const statuses = useMessages().status;
   const { locale } = useLocale();
   const [placeQuery, setPlaceQuery] = useState("");
@@ -106,14 +114,21 @@ export function PublicDirectory({ filteredRecords, cameraKinds, search, setSearc
     }
   }
 
+  function resetFilters() {
+    setSearch("");
+    setKindFilter("all");
+    setFreshnessFilter("all");
+    setFreshnessCutoff(null);
+    setSortOrder("alphabetical");
+  }
+
   return (
     <section className="records-section" id="records" aria-labelledby="records-title">
       {offline && <div className="offline-state" role="status"><b>{t.offlineTitle}.</b> {t.offlineBody} <button type="button" className="text-button" onClick={() => window.location.reload()}>{t.offlineAction} <span aria-hidden="true">→</span></button></div>}
-      <div className="records-heading"><div><p className="eyebrow"><span /> {t.accessibleDirectory}</p><h2 id="records-title">{t.recordsTitle}</h2><p>{t.recordsIntro}</p></div><a className="text-button" href="#map">{t.useMapInstead} <span aria-hidden="true">↑</span></a></div>
-      <div className="place-search"><h3>{t.placeSearchTitle}</h3><p>{t.placeSearchHelp}</p><form className="place-search-form" role="search" onSubmit={searchByPlace}><label htmlFor="place-search">{t.placeSearchLabel}</label><div className="place-search-row"><input id="place-search" type="search" value={placeQuery} onChange={(event) => setPlaceQuery(event.target.value)} maxLength={200} placeholder={t.placeSearchPlaceholder} autoComplete="off" /><button className="button" type="submit">{t.placeSearchSubmit}</button>{placeResult && placeResult.status !== "loading" ? <button type="button" className="text-button" onClick={() => { setPlaceResult(null); setPlaceQuery(""); }}>{t.placeClearResults} <span aria-hidden="true">→</span></button> : null}</div></form><div aria-live="polite">{placeResult?.status === "loading" && <p className="loading-note" role="status">{t.placeSearchLoading}</p>}{placeResult?.status === "error" && <p className="nearby-error" role="alert">{placeResult.message}</p>}{placeResult?.status === "not-found" && <div className="empty-state"><h3>{t.placeNotFoundTitle}</h3><p>{t.placeNotFoundBody}</p></div>}{(placeResult?.status === "success" || placeResult?.status === "empty") && placeResult.area && <div className="place-results"><p className="search-count" role="status">{t.placeAreaLabel(placeResult.area)}</p>{placeResult.status === "success" && placeResult.records && <><p className="search-count">{t.placeResultsFound(placeResult.records.length)}</p><ul className="record-list">{placeResult.records.map((camera) => <li key={camera.id}><RecordCard camera={camera} statusLabel={publicStatusLabel(statuses, camera.status, t.unknown)} facts={[{ label: t.distance, value: formatDistance(camera.distanceMeters) }, { label: t.location, value: camera.address || `${camera.latitude.toFixed(4)}, ${camera.longitude.toFixed(4)}` }, { label: t.lastVerification, value: camera.updated }]} actions={cardActions(camera)} /></li>)}</ul></>}{placeResult.status === "empty" && <div className="empty-state"><h3>{t.placeEmptyTitle}</h3><p>{t.placeEmptyBody}</p><div className="record-list-actions"><a className="text-button" href="#report">{t.placeEmptySubmit} <span aria-hidden="true">→</span></a><a className="text-button" href="/guide">{t.placeEmptyCoverage} <span aria-hidden="true">→</span></a></div></div>}</div>}</div></div>
-      <div className="directory-controls"><div className="record-search"><label htmlFor="record-search">{t.searchDirectory}</label><input id="record-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t.searchPlaceholder} aria-describedby="record-search-help record-search-count" /><p id="record-search-help">{t.searchHelp}</p></div><div className="record-filter"><label htmlFor="record-kind-filter">{t.cameraType}</label><select id="record-kind-filter" value={kindFilter} onChange={(event) => setKindFilter(event.target.value)}><option value="all">{t.allTypes}</option>{cameraKinds.map((kind) => <option key={kind} value={kind}>{kind}</option>)}</select></div><div className="record-filter"><label htmlFor="record-freshness-filter">{t.freshnessFilter}</label><select id="record-freshness-filter" value={freshnessFilter} onChange={(event) => { const value = event.target.value; setFreshnessFilter(value); setFreshnessCutoff(value === "all" ? null : Date.now() - Number.parseInt(value, 10) * 24 * 60 * 60 * 1000); }}><option value="all">{t.freshnessAll}</option><option value="7d">{t.freshness7d}</option><option value="30d">{t.freshness30d}</option><option value="90d">{t.freshness90d}</option></select></div><div className="record-filter"><label htmlFor="record-sort">{t.orderRecords}</label><select id="record-sort" value={sortOrder} onChange={(event) => setSortOrder(event.target.value as "alphabetical" | "position")}><option value="alphabetical">{t.alphabetical}</option><option value="position">{t.positionOrder}</option></select></div></div>
-      <p className="search-count" id="record-search-count" role="status">{filteredRecords.length === 1 ? t.oneRecordFound : `${filteredRecords.length} ${t.recordsFound}`}</p>
-      {filteredRecords.length ? <ul className="record-list">{filteredRecords.map((camera) => <li key={camera.id}><RecordCard camera={camera} statusLabel={publicStatusLabel(statuses, camera.status, t.unknown)} facts={[{ label: t.recordId, value: camera.id }, { label: t.source, value: camera.source }, { label: t.lastVerification, value: camera.updated }, { label: t.location, value: camera.address || `${camera.latitude.toFixed(4)}, ${camera.longitude.toFixed(4)}` }, ...(camera.manufacturer ? [{ label: t.manufacturerLabel, value: camera.manufacturer }] : []), ...(camera.observedOn ? [{ label: t.observedOnLabel, value: camera.observedOn }] : [])]} actions={cardActions(camera)} /></li>)}</ul> : <div className="empty-state"><h3>{t.emptyTitle}</h3><p>{t.emptyBody}</p><button type="button" className="text-button" onClick={() => setSearch("")}>{t.clearSearch} <span aria-hidden="true">→</span></button></div>}
+      <div className="records-heading"><div><p className="eyebrow"><span /> {t.accessibleDirectory}</p><h2 id="records-title">{t.recordsTitle}</h2><p>{t.recordsIntro}</p></div><a className="text-button" href={mapHref}>{t.useMapInstead} <span aria-hidden="true">↑</span></a></div>
+      <div className="place-search"><h3>{t.placeSearchTitle}</h3><p>{t.placeSearchHelp}</p><form className="place-search-form" role="search" onSubmit={searchByPlace}><label htmlFor="place-search">{t.placeSearchLabel}</label><div className="place-search-row"><input id="place-search" type="search" value={placeQuery} onChange={(event) => setPlaceQuery(event.target.value)} maxLength={200} placeholder={t.placeSearchPlaceholder} autoComplete="off" /><button className="button" type="submit">{t.placeSearchSubmit}</button>{placeResult && placeResult.status !== "loading" ? <button type="button" className="text-button" onClick={() => { setPlaceResult(null); setPlaceQuery(""); }}>{t.placeClearResults} <span aria-hidden="true">→</span></button> : null}</div></form><div aria-live="polite">{placeResult?.status === "loading" && <p className="loading-note" role="status">{t.placeSearchLoading}</p>}{placeResult?.status === "error" && <p className="nearby-error" role="alert">{placeResult.message}</p>}{placeResult?.status === "not-found" && <EmptyState title={t.placeNotFoundTitle} body={t.placeNotFoundBody} />}{(placeResult?.status === "success" || placeResult?.status === "empty") && placeResult.area && <div className="place-results"><p className="search-count" role="status">{t.placeAreaLabel(placeResult.area)}</p>{placeResult.status === "success" && placeResult.records && <><p className="search-count">{t.placeResultsFound(placeResult.records.length)}</p><ul className="record-list">{placeResult.records.map((camera) => <li key={camera.id}><RecordCard camera={camera} statusLabel={publicStatusLabel(statuses, camera.status, t.unknown)} facts={[{ label: t.distance, value: formatDistance(camera.distanceMeters) }, { label: t.location, value: camera.address || `${camera.latitude.toFixed(4)}, ${camera.longitude.toFixed(4)}` }, { label: t.lastVerification, value: camera.updated }]} actions={cardActions(camera)} /></li>)}</ul></>}{placeResult.status === "empty" && <EmptyState title={t.placeEmptyTitle} body={t.placeEmptyBody} action={<p className="place-empty-actions"><a className="text-button" href={reportHref}>{t.placeEmptySubmit} <span aria-hidden="true">→</span></a><a className="text-button" href="/guide">{t.placeEmptyCoverage} <span aria-hidden="true">→</span></a></p>} />}</div>}</div></div>
+      <FiltersBar variant="inline" cameraKinds={cameraKinds} search={search} setSearch={setSearch} kindFilter={kindFilter} setKindFilter={setKindFilter} freshnessFilter={freshnessFilter} setFreshnessFilter={setFreshnessFilter} setFreshnessCutoff={setFreshnessCutoff} sortOrder={sortOrder} setSortOrder={setSortOrder} resultCount={filteredRecords.length} onReset={resetFilters} />
+      {filteredRecords.length ? <ul className="record-list">{filteredRecords.map((camera) => <li key={camera.id}><RecordCard camera={camera} statusLabel={publicStatusLabel(statuses, camera.status, t.unknown)} facts={[{ label: t.recordId, value: camera.id }, { label: t.source, value: camera.source }, { label: t.lastVerification, value: camera.updated }, { label: t.location, value: camera.address || `${camera.latitude.toFixed(4)}, ${camera.longitude.toFixed(4)}` }, ...(camera.manufacturer ? [{ label: t.manufacturerLabel, value: camera.manufacturer }] : []), ...(camera.observedOn ? [{ label: t.observedOnLabel, value: camera.observedOn }] : [])]} actions={cardActions(camera)} /></li>)}</ul> : <EmptyState title={t.emptyTitle} body={t.emptyBody} action={<button type="button" className="text-button" onClick={() => setSearch("")}>{t.clearSearch} <span aria-hidden="true">→</span></button>} />}
     </section>
 
   );

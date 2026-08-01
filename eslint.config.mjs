@@ -17,6 +17,12 @@ const eslintConfig = defineConfig([
     // linted even if a crashed run leaves one behind.
     "tests/.render-tmp-*/**",
     "tests/.dbg-tmp-*/**",
+    // DOM harness transpile tree (tests/helpers/dom-harness.mjs): esbuild
+    // output written to tests/.dom-tmp-*/ at runtime by the jsdom tests
+    // (client-*.test.mjs). The transpiled code trips the React purity/refs
+    // rules that the handwritten sources satisfy, so it must never be
+    // linted even if a crashed run leaves the tree behind.
+    "tests/.dom-tmp-*/**",
   ]),
 ]);
 
