@@ -99,6 +99,16 @@ test("journey browse→filtri: search narrows the directory and the live count f
   const DirectoryTool = await loadDirectoryTool();
   const { container } = await renderWithLocale(React.createElement(DirectoryTool));
 
+  // The harness runs REAL timers, so the search narrows only after the
+  // ~250ms debounce (QUERY_DEBOUNCE_MS) commits the URL plus a re-render.
+  // Under CI load (full suite in parallel + NODE_V8_COVERAGE) that window
+  // has blown past testing-library's default 1000ms waitFor — same latent
+  // flake fixed in client-tools (t_08bfe97d / PR #183) — so the three
+  // debounce-sensitive waits carry an explicit generous timeout. The asserts
+  // are unchanged and stay honest: the narrowing, the live counter and the
+  // empty state all still only appear once the debounce/commit has run.
+  const DEBOUNCE_WAIT = { timeout: 5000 };
+
   const searchInput = container.querySelector("#record-search");
   assert.ok(searchInput, "the directory search input must render");
   const cards = () => container.querySelectorAll("ul.record-list li").length;
@@ -110,17 +120,17 @@ test("journey browse→filtri: search narrows the directory and the live count f
   // the narrowing applies once the debounce writes the URL — wait for it
   // (same pattern as client-tools' debounced-search test, t_522638a5).
   await rtl.userEvent.type(searchInput, "corner");
-  await rtl.waitFor(() => assert.equal(cards(), 1, "search 'corner' must leave one record"));
+  await rtl.waitFor(() => assert.equal(cards(), 1, "search 'corner' must leave one record"), DEBOUNCE_WAIT);
   assert.match(container.querySelector("ul.record-list")?.textContent ?? "", /Corner shop entrance/);
 
   // The live counter announces the filtered result (role=status region).
   const counter = container.querySelector("#record-search-count");
   assert.ok(counter, "the result counter must be a status/aria-live region");
-  await rtl.waitFor(() => assert.match(counter?.textContent ?? "", /1/));
+  await rtl.waitFor(() => assert.match(counter?.textContent ?? "", /1/), DEBOUNCE_WAIT);
 
   // Empty state is truthful and offers a way back.
   await rtl.userEvent.selectOptions(container.querySelector("#record-kind-filter"), "Bullet");
-  await rtl.waitFor(() => assert.equal(cards(), 0, "no record matches corner+Bullet"));
+  await rtl.waitFor(() => assert.equal(cards(), 0, "no record matches corner+Bullet"), DEBOUNCE_WAIT);
   const emptyState = container.querySelector(".empty-state");
   assert.ok(emptyState, "the zero-result state must render (never a silent blank)");
   assert.match(emptyState?.textContent ?? "", /clear search|reset/i);
