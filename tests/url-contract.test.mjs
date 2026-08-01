@@ -38,7 +38,8 @@ import { loadDomModule, setUrlState, getUrlState, goBack, goForward } from "./he
 // exists and exposes parseFilterParams/stringifyFilterParams).
 // ---------------------------------------------------------------------------
 
-const FILTER_KEYS = ["type", "freshness", "lat", "lng", "z", "query"];
+// The filter keys the URL owns. The oracle implements each one explicitly
+// below (a key list would let a typo silently drop a key from the contract).
 const FRESHNESS_VALUES = new Set(["all", "7d", "30d", "90d", "365d"]);
 const TYPE_FALLBACK = "all";
 const FRESHNESS_FALLBACK = "all";

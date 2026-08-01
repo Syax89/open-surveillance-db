@@ -72,7 +72,6 @@ let env;
 let camerasRoute;
 let moderationRoute;
 let registerRoute;
-let loginRoute;
 let meRoute;
 let submissionsRoute;
 let logoutRoute;
@@ -86,7 +85,9 @@ beforeEach(async () => {
   camerasRoute = await load("cameras", "app/api/cameras/route.mjs");
   moderationRoute = await load("moderation", "app/api/moderation/route.mjs");
   registerRoute = await load("register", "app/api/auth/register/route.mjs");
-  loginRoute = await load("login", "app/api/auth/login/route.mjs");
+  // loginRoute is deliberately not exercised here: ADR 0013 makes register
+  // create the session immediately, so the login→account journey runs
+  // through register (login is covered by api-auth.test.mjs).
   meRoute = await load("me", "app/api/auth/me/route.mjs");
   submissionsRoute = await load("submissions", "app/api/auth/me/submissions/route.mjs");
   logoutRoute = await load("logout", "app/api/auth/logout/route.mjs");
@@ -134,10 +135,14 @@ async function ssr(route) {
 // Journey 2: segnala → submit → coda moderazione
 // ---------------------------------------------------------------------------
 
-test("journey segnala: the report form renders on the SSR home (no JS needed to see it)", async () => {
-  const { response, html } = await ssr("/");
+test("journey segnala: the report form renders on the SSR /segnala tool (no JS needed to see it)", async () => {
+  // F2 moved the report form off the home hub into the /segnala tool route
+  // (F1 route group). The home hub links it (browse-filter-record asserts
+  // href="/segnala"); here we assert the form itself SSRs on its route.
+  const { response, html } = await ssr("/segnala");
   assert.equal(response.status, 200);
-  assert.match(html, /<form class="report-form"/, "the report form must be part of the home SSR");
+  assert.match(html, /id="report-tool-title"/, "the segnala tool heading must SSR");
+  assert.match(html, /<form class="report-form"/, "the report form must be part of the /segnala SSR");
   assert.match(html, /id="report"/, "the segnala section anchor must exist");
 });
 

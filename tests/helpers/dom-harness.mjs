@@ -414,14 +414,21 @@ export async function setupDom({ url = "https://osdb.test/" } = {}) {
     // Copy the jsdom window surface onto the Node global scope so react-dom
     // and the transpiled components see a real DOM. Some Node globals
     // (navigator, etc.) are getter-only, so those are redefined explicitly.
+    //
+    // AbortController/AbortSignal are deliberately NOT copied: jsdom ships
+    // its own instances, and undici (used by Miniflare in the SSR/e2e halves
+    // of the same test file) rejects a cross-realm signal with
+    // "Expected signal to be an instance of AbortSignal". The Node native
+    // AbortController is API-identical and satisfies both jsdom components
+    // and undici — keep the native one on the global scope (F-QA t_7b716c97).
     const keys = [
       "window", "document", "navigator", "HTMLElement", "HTMLAnchorElement",
       "HTMLButtonElement", "HTMLInputElement", "HTMLFormElement", "HTMLSelectElement",
       "HTMLTextAreaElement", "HTMLDivElement", "HTMLUListElement", "HTMLLIElement",
       "HTMLHeadingElement", "HTMLParagraphElement", "HTMLSpanElement", "HTMLImageElement",
       "HTMLTableElement", "HTMLTimeElement", "Node", "Element", "Event", "MouseEvent",
-      "KeyboardEvent", "FocusEvent", "CustomEvent", "AbortController", "AbortSignal",
-      "FormData", "File", "Blob", "URL", "URLSearchParams", "TextEncoder", "TextDecoder",
+      "KeyboardEvent", "FocusEvent", "CustomEvent", "FormData", "File", "Blob",
+      "URL", "URLSearchParams", "TextEncoder", "TextDecoder",
       "getComputedStyle", "requestAnimationFrame", "cancelAnimationFrame",
       "localStorage", "sessionStorage", "MutationObserver", "DOMParser", "CSS", "Comment",
     ];

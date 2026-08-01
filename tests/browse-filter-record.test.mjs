@@ -131,15 +131,20 @@ test("journey browse→filtri: kind filter and sort order drive the directory", 
   const DirectoryTool = await loadDirectoryTool();
   const { container } = await renderWithLocale(React.createElement(DirectoryTool));
 
-  await rtl.userEvent.selectOptions(container.querySelector("#record-kind-filter"), "Bullet");
-  assert.equal(container.querySelectorAll("ul.record-list li").length, 1, "kind filter must keep only Bullet records");
-  assert.match(container.querySelector("ul.record-list")?.textContent ?? "", /Main square pillar/);
-
-  // Position sort orders by latitude (41.9004 Corner before 41.9047 Main).
+  // Position sort orders by latitude (41.9004 Corner before 41.9047 Main)
+  // over the WHOLE filtered set — assert it with both records visible first,
+  // then narrow with the kind filter (a kind-filtered set can be 1 record,
+  // so sort must be verified on the full set to prove ordering).
   await rtl.userEvent.selectOptions(container.querySelector("#record-sort"), "position");
   const titles = [...container.querySelectorAll("ul.record-list li")].map((li) => li.textContent ?? "");
   assert.equal(titles.length, 2);
   assert.ok(titles[0].includes("Corner shop entrance"), `position sort must lead with the lower latitude, got: ${titles[0]}`);
+
+  // Kind filter narrows the same sorted list to the Bullet record only.
+  await rtl.userEvent.selectOptions(container.querySelector("#record-kind-filter"), "Bullet");
+  const remaining = [...container.querySelectorAll("ul.record-list li")].map((li) => li.textContent ?? "");
+  assert.equal(remaining.length, 1, "kind filter must keep only Bullet records");
+  assert.match(remaining[0] ?? "", /Main square pillar/);
 });
 
 test("journey browse→record: the directory card links to a resolvable record detail", async () => {
