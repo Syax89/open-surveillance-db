@@ -83,7 +83,6 @@ function sessionRequest(pathAndQuery, rawToken, { headers = {}, ...rest } = {}) 
 // ---------------------------------------------------------------------------
 
 test("register creates a contributor, opens a session, and sets both cookies", async () => {
-  stub("findContributorByEmail", async () => null);
   stub("createContributor", async () => contributor);
   stub("createSession", async () => newSession);
   const { POST } = await registerRoute();
@@ -118,21 +117,10 @@ test("register creates a contributor, opens a session, and sets both cookies", a
   assert.match(csrfCookie, /SameSite=Strict/);
 });
 
-test("register answers 409 when the email is already registered", async () => {
-  stub("findContributorByEmail", async () => contributor);
-  const { POST } = await registerRoute();
-  const response = await POST(
-    apiRequest("/api/auth/register", {
-      method: "POST",
-      body: { email: "ada@example.org", password: "supersecret123" },
-    }),
-  );
-  assert.equal(response.status, 409);
-  assert.equal(callArgs("createContributor").length, 0);
-});
-
-test("register maps a unique-index race to 409 without leaking internals", async () => {
-  stub("findContributorByEmail", async () => null);
+test("register answers 409 via the unique index, never pre-checking email existence", async () => {
+  // Anti-enumeration contract: no fast-path SELECT on the email. The 409
+  // comes only from the unique-index constraint on insert, so an existing
+  // email costs the same PBKDF2 hashing as a new one (no timing oracle).
   stub("createContributor", async () => {
     throw new Error("UNIQUE constraint failed: contributors.email");
   });
@@ -144,7 +132,24 @@ test("register maps a unique-index race to 409 without leaking internals", async
     }),
   );
   assert.equal(response.status, 409);
-  assert.equal((await responseBody(response)).error, "An account with this email already exists.");
+  assert.equal(callArgs("findContributorByEmail").length, 0, "no pre-check query");
+});
+
+test("register maps a unique-index race to 409 with the generic, non-distinct body", async () => {
+  stub("createContributor", async () => {
+    throw new Error("UNIQUE constraint failed: contributors.email");
+  });
+  const { POST } = await registerRoute();
+  const response = await POST(
+    apiRequest("/api/auth/register", {
+      method: "POST",
+      body: { email: "ada@example.org", password: "supersecret123" },
+    }),
+  );
+  assert.equal(response.status, 409);
+  // Body must be identical to the 400 validation body so responses do not
+  // reveal whether the email is already registered.
+  assert.equal((await responseBody(response)).error, "Unable to register with this email.");
 });
 
 test("register rejects invalid payloads with 400 and never touches the db", async (t) => {
@@ -165,6 +170,9 @@ test("register rejects invalid payloads with 400 and never touches the db", asyn
     await t.test(name, async () => {
       const response = await POST(apiRequest("/api/auth/register", { method: "POST", body }));
       assert.equal(response.status, 400, name);
+      // 400 body identical to the 409 body: a caller cannot tell "invalid
+      // input" apart from "email already registered".
+      assert.equal((await responseBody(response)).error, "Unable to register with this email.", name);
       assert.equal(callArgs("findContributorByEmail").length + callArgs("createContributor").length, 0, name);
     });
   }
@@ -204,8 +212,8 @@ test("register respects the auth rate-limit bucket", async () => {
   assert.ok(Number(blocked.headers.get("retry-after")) > 0);
 });
 
-test("register returns 503 when the database is unavailable", async () => {
-  stub("findContributorByEmail", async () => {
+test("register returns 500 when the database is unavailable", async () => {
+  stub("createContributor", async () => {
     throw new Error("Database binding unavailable");
   });
   const { POST } = await registerRoute();

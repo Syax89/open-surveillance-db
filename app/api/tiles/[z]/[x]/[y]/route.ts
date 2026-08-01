@@ -1,4 +1,6 @@
 import { env } from "cloudflare:workers";
+import { recordRateLimitBlock } from "../../../../../lib/abuse-alerts";
+import { callerKey, checkRateLimit, limitsFor } from "../../../../../lib/rate-limit";
 
 /**
  * Same-origin tile proxy (compliant with the OSMF tile usage policy).
@@ -83,6 +85,32 @@ export async function GET(request: Request, context: { params: Promise<TileParam
     return new Response("Invalid tile coordinates", {
       status: 400,
       headers: { "Cache-Control": "no-store" },
+    });
+  }
+
+  // Per-caller tile bucket (default 60/min, TILES_RATE_LIMIT_* knobs).
+  // Metering happens before the edge-cache lookup so a caller cannot use
+  // cache hits to dodge the throttle: bulk scraping of fresh coordinates
+  // would otherwise hammer the upstream (OSMF community tile service)
+  // well past its usage policy. Interactive map panning stays far below
+  // the default; the same caller on the same tiles is absorbed by the
+  // edge cache below.
+  const key = callerKey(request);
+  const limitOptions = limitsFor("tiles", env);
+  const limit = checkRateLimit("tiles", key, limitOptions);
+  if (!limit.allowed) {
+    console.warn("GET /api/tiles/[z]/[x]/[y] rate limited");
+    recordRateLimitBlock(env, {
+      route: "/api/tiles/[z]/[x]/[y]",
+      key,
+      windowSeconds: limitOptions.windowSeconds,
+    });
+    return new Response("Too many tile requests. Please try again shortly.", {
+      status: 429,
+      headers: {
+        "Retry-After": String(limit.retryAfterSeconds),
+        "Cache-Control": "no-store",
+      },
     });
   }
 

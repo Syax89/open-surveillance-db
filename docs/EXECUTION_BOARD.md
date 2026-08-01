@@ -181,10 +181,14 @@ These are the next technical tickets once Wave A has named owners and approved t
 
 ## Active next plan
 
-The next planned cycle is [reliable local moderation](NEXT_SPRINT.md): reasoned
-decisions, append-only local audit events, history, and full fictional-data
-workflow tests. It intentionally precedes accounts, media, public hosting, and
-Android work.
+The reliable-local-moderation sprint is **complete** (2026-08-01): reasoned
+decisions, append-only audit events, history, and fictional-data workflow
+tests all shipped on `main`, together with most of its original deferrals
+(accounts, roles, appeals, photo pipeline). The sprint plan and its outcome are
+archived in [NEXT_SPRINT.md](NEXT_SPRINT.md); current capability is tracked in
+[STATUS.md](STATUS.md).
+
+The board sequence continues with [Wave C — verify the pilot](#wave-c--verify-the-pilot).
 
 The longer sequence from local prototype to a potential public alpha and Android
 companion is maintained in the [future roadmap](FUTURE_ROADMAP.md). Its gates

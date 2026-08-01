@@ -27,7 +27,15 @@ export type RateLimitOptions = {
  * submission prefix stays `POST_*` for backward compatibility with the limits
  * already deployed for POST /api/cameras and POST /api/corrections.
  */
-export type RouteKind = "read" | "export" | "nearby" | "revisions" | "submit" | "moderate" | "auth";
+export type RouteKind =
+  | "read"
+  | "export"
+  | "nearby"
+  | "revisions"
+  | "submit"
+  | "moderate"
+  | "auth"
+  | "tiles";
 
 const ROUTE_LIMIT_DEFAULTS: Record<RouteKind, RateLimitOptions> = {
   read: { maxRequests: 60, windowSeconds: 60 },
@@ -40,6 +48,11 @@ const ROUTE_LIMIT_DEFAULTS: Record<RouteKind, RateLimitOptions> = {
   // deliberate per-caller bucket keeps brute force slow while staying far
   // above the rate of legitimate interactive use.
   auth: { maxRequests: 10, windowSeconds: 60 },
+  // Tile proxy: every request that reaches the map edge is metered so a
+  // single caller cannot scrape the upstream (the OSMF community tile
+  // service) beyond community usage. 60/min is far above what interactive
+  // map panning produces per client, and the edge cache absorbs repeats.
+  tiles: { maxRequests: 60, windowSeconds: 60 },
 };
 
 const ROUTE_LIMIT_ENV_PREFIX: Record<RouteKind, string> = {
@@ -50,6 +63,7 @@ const ROUTE_LIMIT_ENV_PREFIX: Record<RouteKind, string> = {
   submit: "POST",
   moderate: "MODERATION",
   auth: "AUTH",
+  tiles: "TILES",
 };
 
 const attemptsByKey = new Map<string, number[]>();
