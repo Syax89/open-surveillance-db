@@ -71,6 +71,23 @@ async function renderHomepage() {
   }
 }
 
+/** Render any route exactly like the deployed worker would. */
+async function renderRoute(route) {
+  const mf = new Miniflare({
+    modules: await workerModules(),
+    compatibilityDate: "2026-01-01",
+    compatibilityFlags: ["nodejs_compat"],
+  });
+  try {
+    const response = await mf.dispatchFetch(`http://localhost${route}`, {
+      headers: { accept: "text/html" },
+    });
+    return { response, html: await response.text() };
+  } finally {
+    await mf.dispose();
+  }
+}
+
 test("server-rendered homepage carries the public app metadata", async () => {
   const { response, html } = await renderHomepage();
 
@@ -154,6 +171,58 @@ test("global footer exposes every institutional page, the ODbL data licence and 
   // one contentinfo landmark.
   const footerCount = (html.match(/<footer\b/g) ?? []).length;
   assert.equal(footerCount, 1, `expected a single footer landmark, found ${footerCount}`);
+});
+
+test("moderation info page explains review flow, appeals and safeguards", async () => {
+  const { response, html } = await renderRoute("/moderazione");
+
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
+
+  // The public "How moderation works" page covers the three required
+  // sections (SITEMAP: review flow, appeals and corrections, safeguards).
+  assert.match(html, /How moderation works/);
+  assert.match(html, /The review flow/);
+  assert.match(html, /Appeals and corrections/);
+  assert.match(html, /Moderator safeguards/);
+
+  // Review flow steps from docs/MODERATION.md (receive → maintain).
+  assert.match(html, />Receive</);
+  assert.match(html, />Screen</);
+  assert.match(html, />Verify</);
+  assert.match(html, />Minimise</);
+  assert.match(html, />Decide</);
+  assert.match(html, />Maintain</);
+
+  // Coordinate minimisation promise from the 2026-07-31 decision.
+  assert.match(html, /rounded to about 4 decimal places/);
+
+  // Appeal outcomes from ADR 0014: upheld / dismissed / escalated.
+  assert.match(html, />Upheld</);
+  assert.match(html, />Dismissed</);
+  assert.match(html, />Escalated</);
+
+  // This is the PUBLIC page: it must not link the private moderation
+  // dashboard or any moderation/admin endpoint (publication-boundaries).
+  assert.doesNotMatch(html, /href="\/moderation"/);
+  assert.doesNotMatch(html, /href="\/api\/moderation/);
+});
+
+test("moderation info page carries the shared layout without a duplicate footer", async () => {
+  const { response, html } = await renderRoute("/moderazione");
+
+  assert.equal(response.status, 200);
+
+  // The global footer is rendered once by the root layout; the page itself
+  // must not add its own footer (SITEMAP: "footer mai copiato per pagina").
+  const footerCount = (html.match(/<footer\b/g) ?? []).length;
+  assert.equal(footerCount, 1, `expected a single footer landmark, found ${footerCount}`);
+  assert.match(html, /<footer class="site-footer" aria-label="Site footer">/);
+
+  // The page starts with the skip link and uses the shared nav shell.
+  assert.match(html, /Skip to main content/);
+  assert.match(html, /<nav class="nav-shell"/);
+  assert.match(html, /id="main-content"/);
 });
 
 test("starter preview skeleton stays removed from the template", async () => {
