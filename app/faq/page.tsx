@@ -61,10 +61,5 @@ export default function FaqPage() {
       </div>
     </section>
 
-    <footer>
-      <div className="brand"><span className="brand-mark" aria-hidden="true">◉</span><span>OpenSurveillanceDB</span></div>
-      <p>{t.footer}</p>
-      <div className="footer-links"><Link href="/">{t.home}</Link><Link href="/#map">{t.map}</Link><Link href="/#records">{t.directory}</Link><Link href="/contatti">{t.contactLabel}</Link></div>
-    </footer>
   </main>;
 }

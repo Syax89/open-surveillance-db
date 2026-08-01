@@ -44,8 +44,8 @@ export default function RulesPage() {
 
     <section className="report-section" aria-labelledby="never-title">
       <div>
-        <p className="eyebrow"><span /> {t.neverTitle}</p>
-        <h2 id="never-title">{t.neverBody}</h2>
+        <h2 id="never-title">{t.neverTitle}</h2>
+        <p>{t.neverBody}</p>
         <div className="report-rule"><b>{t.beforeSubmittingTitle}</b><br />{t.beforeSubmittingBody}</div>
       </div>
       <div className="report-form" aria-label={t.neverTitle}>
@@ -97,10 +97,5 @@ export default function RulesPage() {
       </div>
     </section>
 
-    <footer>
-      <div className="brand"><span className="brand-mark" aria-hidden="true">◉</span><span>OpenSurveillanceDB</span></div>
-      <p>{t.footer}</p>
-      <div className="footer-links"><Link href="/">{t.home}</Link><Link href="/#map">{t.map}</Link><Link href="/#records">{t.directory}</Link><Link href="/guide">{t.guide}</Link></div>
-    </footer>
   </main>;
 }
