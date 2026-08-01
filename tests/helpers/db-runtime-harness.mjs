@@ -9,7 +9,7 @@
 //
 // H3: the schema is no longer created at runtime (getD1() is a pure binding
 // passthrough). applyDrizzleMigrations() replays the real Drizzle migration
-// files (drizzle/0000-*.sql ... 0014-*.sql) on the in-memory database, so
+// files (drizzle/0000-*.sql ... 0017-*.sql) on the in-memory database, so
 // tests exercise exactly what `wrangler d1 migrations apply` produces on a
 // fresh local DB — including migration 0017, which removes the demo
 // identities seeded by 0008/0010. Suites that need the demo reviewers/users
@@ -111,9 +111,9 @@ export async function loadDbRuntime() {
   return { env: envModule.env, cameras, corrections, moderation, auth, users, appeals, photos };
 }
 
-// Replays the real Drizzle migration files (drizzle/0000-*.sql ... 0014-*.sql)
+// Replays the real Drizzle migration files (drizzle/0000-*.sql ... 0017-*.sql)
 // on a D1SqliteDatabase, mirroring `wrangler d1 migrations apply` on a fresh
-// local DB: full application schema, zero demo rows (0014 removes the seed).
+// local DB: full application schema, zero demo rows (0017 removes the seed).
 export async function applyDrizzleMigrations(db) {
   const files = (await readdir(DRIZZLE_DIR))
     .filter((name) => /^\d{4}_.*\.sql$/.test(name))

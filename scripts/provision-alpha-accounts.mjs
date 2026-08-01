@@ -1,7 +1,7 @@
 // Provision real moderator/admin accounts before opening the DB to the
 // public (public-alpha prerequisite, ADR 0009 / ADR 0014).
 //
-// Migration 0015 removes the local-prototype demo identities ("Demo *"
+// Migration 0017 removes the local-prototype demo identities ("Demo *"
 // reviewers + @osdb.test demo users) from every fresh database. This script
 // is the documented replacement path: it reads real accounts from the
 // PROVISION_ACCOUNTS environment variable and inserts them idempotently into

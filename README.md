@@ -138,7 +138,7 @@ npm run db:seed
 For local moderation testing, open `http://localhost:3000/moderation`. This
 route is intentionally not linked from the public prototype and has no
 production authentication yet. The local DB ships with demo identities
-(`Demo *` reviewers) only until migration `0015` is applied — the last
+(`Demo *` reviewers) only until migration `0017` is applied — the last
 migration removes them from every fresh database. Local suites that need the
 demo identities seed them explicitly in their test setup; for a real
 alpha/prod deployment, provision real moderator/admin accounts instead (see
@@ -164,7 +164,7 @@ the `MODERATION_USER`/`MODERATION_PASSWORD` (Basic auth) or `MODERATION_TOKEN`
 (bearer) environment variables and fails closed: with none configured, the
 dashboard and `/api/moderation` return `503`. Protected routes additionally
 enforce coarse roles via `requireRole` (see ADR 0003 and ADR 0014). The local
-DB no longer ships demo identities (`Demo *` reviewers): migration `0015`
+DB no longer ships demo identities (`Demo *` reviewers): migration `0017`
 removes them from every fresh database. Local suites that need the demo
 identities seed them explicitly in their test setup; for a real alpha/prod
 deployment, provision real moderator/admin accounts instead (see
