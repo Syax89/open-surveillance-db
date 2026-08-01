@@ -244,18 +244,25 @@ test("homepage and guide link to /manifesto from the nav and the footer", async 
   assert.match(pages[1].html, /<a href="\/manifesto">Manifesto<\/a>/);
 });
 
-test("manifesto page reuses the shared info-page styles (approved contrast palette)", async () => {
-  const [page, css] = await Promise.all([
+test("info pages reuse the shared layout styles (approved contrast palette)", async () => {
+  const [infoPage, manifestoPage, css] = await Promise.all([
+    readFile(path.join(root, "app", "components", "InfoPage.tsx"), "utf8"),
     readFile(path.join(root, "app", "manifesto", "page.tsx"), "utf8"),
     readFile(path.join(root, "app", "globals.css"), "utf8"),
   ]);
 
-  // The page reuses the same layout classes as the guide page and the home
-  // page — no new colour decisions, so the already-reviewed contrast palette
-  // applies unchanged. The only new rule is the manifesto list, which reuses
-  // the correction-form card colours (#435963 on #fbfbf7, WCAG AA).
-  for (const cls of ["record-page", "nav-shell", "principles", "records-section", "correction-section", "record-detail"]) {
-    assert.match(page, new RegExp(`className="[^"]*${cls}`), `expected className to reuse ${cls}`);
+  // The shared InfoPage component carries the navigation shell and intro
+  // article classes used by every informational page, while the manifesto
+  // page keeps its own section shells. No new colour decisions, so the
+  // already-reviewed contrast palette applies unchanged. The only new rule
+  // is the manifesto list, which reuses the correction-form card colours
+  // (#435963 on #fbfbf7, WCAG AA).
+  assert.match(manifestoPage, /InfoPage/, "manifesto page must use the shared InfoPage layout");
+  for (const cls of ["record-page", "nav-shell", "record-detail"]) {
+    assert.match(infoPage, new RegExp(`className="[^"]*${cls}`), `expected shared layout to reuse ${cls}`);
+  }
+  for (const cls of ["principles", "records-section", "correction-section"]) {
+    assert.match(manifestoPage, new RegExp(`className="[^"]*${cls}`), `expected manifesto page to reuse ${cls}`);
   }
   assert.match(css, /\.manifesto-list\s*\{/);
 
