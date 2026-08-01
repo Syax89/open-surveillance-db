@@ -225,7 +225,7 @@ test("back/forward preserves state: the URL re-derives the filters on every navi
   // Back: the browser restores the previous URL → the hook re-derives from
   // it (no local state to desync), and the shared walk refetches the full
   // list (the filtered walk never seeded the module cache).
-  setNavState({ search: "" });
+  await setNavState({ search: "" });
   view.rerender(await wrapWithLocale(React.createElement(DirectoryTool)));
   await rtl.waitFor(() => assert.ok(screen.getByRole("heading", { name: "Dome camera 1" })));
   assert.ok(screen.getByRole("heading", { name: "Bullet camera 2" }));

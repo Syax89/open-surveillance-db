@@ -311,6 +311,20 @@ export function usePublicCameras({ seed = [], onRecords, onError, filters }: Use
   useEffect(() => { onRecordsRef.current = onRecords; });
   useEffect(() => { onErrorRef.current = onError; });
 
+  // Latest-value ref for the filters object. The walk effect below keys on
+  // the SEMANTIC filter values (filterKey/serverActive) and must never
+  // re-run for the `filters` OBJECT identity: the tool call sites build
+  // `serverFiltersFrom(filters)` inline, so a NEW object arrives on every
+  // parent render (PR #165 review blocker t_6e9c812d: with server filters
+  // active the walk looped forever — fetch → setRecords → re-render → new
+  // filters object → effect re-runs → abort + new walk → fetch → LOOP ∞).
+  // Reading the current filters through a ref keeps the effect closure
+  // fresh without putting the unstable object in the dependency array.
+  const filtersRef = useRef<ServerCameraFilters>(filters ?? {});
+  useEffect(() => {
+    filtersRef.current = filters ?? {};
+  });
+
   // All state transitions happen in async continuations of the shared fetch,
   // so a consumer that mounts after the cache was populated settles in the
   // same microtask without a visible loading flash.
@@ -320,7 +334,7 @@ export function usePublicCameras({ seed = [], onRecords, onError, filters }: Use
     // change); the shared walk keeps its module-level dedupe/abort contract.
     const controller = new AbortController();
     const run = serverActive
-      ? walkFilteredPages(filters, controller.signal).then((page) => ({ records: page.records, total: page.total }))
+      ? walkFilteredPages(filtersRef.current, controller.signal).then((page) => ({ records: page.records, total: page.total }))
       : ensureAll().then((fetched) => ({ records: fetched, total: cachedTotal ?? fetched.length }));
     run
       .then((fetched) => {
@@ -350,7 +364,15 @@ export function usePublicCameras({ seed = [], onRecords, onError, filters }: Use
       if (serverActive) controller.abort();
       else releaseAll();
     };
-  }, [attempt, filterKey, serverActive, filters]);
+    // The effect re-runs ONLY on the semantic filter values (filterKey
+    // encodes kind+freshness; serverActive is derived from them) and on
+    // reload — never on the `filters` object identity, which is unstable
+    // (call sites build serverFiltersFrom(filters) inline). The current
+    // filters are read through filtersRef so the closure is always fresh.
+    // (PR #165 review blocker t_6e9c812d: filters in the deps looped the
+    // filtered walk forever — every setRecords re-rendered the tool, which
+    // rebuilt the filters object and restarted the effect.)
+  }, [attempt, filterKey, serverActive]);
 
   return {
     records,
