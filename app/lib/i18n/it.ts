@@ -38,6 +38,7 @@ export const it: Translation<typeof en> = {
     exploreMap: "Esplora la mappa",
     browseRecords: "Sfoglia i record",
     howItWorks: "Come funziona",
+    rules: "Regole",
     manifesto: "Manifesto",
     addCamera: "Aggiungi una telecamera",
     openDatabase: "Database aperto · mantenuto dalla comunità",
@@ -527,6 +528,100 @@ export const it: Translation<typeof en> = {
       "Per payload che contengono dati personali o dettagli operativi, crittografali con la chiave PGP del progetto (impronta 04E8 A3EE 7C72 188B D3AF 925D 496C F0BD 4920 D3F7) e includi il testo cifrato nell'advisory. Impegno di risposta: prima risposta entro 48 ore, risposta sostanziale entro 14 giorni, rimozione d'emergenza entro 24 ore.",
     securityRouteNote:
       "Le segnalazioni di sicurezza e le richieste relative alla privacy viaggiano su canali separati: advisory privati per le vulnerabilità, modulo di correzione e contatto privacy per le richieste dell'interessato.",
+
+  rules: {
+    navigation: "Navigazione delle regole",
+    homeAria: "Pagina iniziale di OpenSurveillanceDB",
+    map: "Mappa",
+    directory: "Elenco",
+    guide: "Guida",
+    home: "Home",
+    eyebrow: "Regole di partecipazione",
+    title: "Cosa pubblichiamo e come puoi aiutare.",
+    intro:
+      "Queste regole spiegano cosa documenta OpenSurveillanceDB, cosa possono segnalare i contributori, come funziona la moderazione, come correggere un record e come riutilizzare i dati.",
+    reportEyebrow: "Cosa puoi segnalare",
+    reportTitle: "Spazio pubblico, osservato dallo spazio pubblico.",
+    reportBody:
+      "Si può documentare solo l’infrastruttura di sorveglianza visibile negli spazi condivisi. Un record è pubblicabile quando ha un chiaro scopo di trasparenza civica e non contiene dati personali non necessari.",
+    eligibleOneTitle: "Infrastruttura su strada pubblica",
+    eligibleOneBody:
+      "Una telecamera visibilmente montata in una strada, piazza, esterno di stazione o esterno di edificio pubblico.",
+    eligibleTwoTitle: "Telecamere del traffico documentate pubblicamente",
+    eligibleTwoBody:
+      "Una telecamera di monitoraggio del traffico documentata pubblicamente, quando pubblicare il record è lecito e sicuro.",
+    eligibleThreeTitle: "Fonti pubbliche ufficiali",
+    eligibleThreeBody:
+      "Un record proveniente da una fonte pubblica ufficiale, marcato con la sua fonte e la data di verifica.",
+    neverTitle: "Da non segnalare mai",
+    neverBody:
+      "Le segnalazioni che contengono uno dei seguenti elementi vengono filtrate e non vengono mai pubblicate.",
+    neverOneTitle: "Abitazioni private",
+    neverOneBody:
+      "Telecamere residenziali o private, inclusi videocitofoni e telecamere rivolte verso un’abitazione privata.",
+    neverTwoTitle: "Persone e dati personali",
+    neverTwoBody:
+      "Persone identificabili, targhe di veicoli o interni privati.",
+    neverThreeTitle: "Feed live e accessi",
+    neverThreeBody:
+      "Video in diretta, URL di streaming, credenziali, informazioni di rete o interfacce di controllo.",
+    neverFourTitle: "Dettagli sensibili",
+    neverFourBody:
+      "Dettagli sul campo visivo o sulle capacità operative che potrebbero creare un rischio per la sicurezza, o località sensibili la cui pubblicazione potrebbe aumentare il rischio.",
+    beforeSubmittingTitle: "Prima di inviare",
+    beforeSubmittingBody:
+      "Non caricare né descrivere persone, targhe, abitazioni private, debolezze di sicurezza o località sensibili. Gli invii restano privati finché un moderatore non li esamina; non vengono pubblicati automaticamente.",
+    moderationEyebrow: "Moderazione",
+    moderationTitle: "Ogni record viene esaminato da una persona.",
+    moderationBody:
+      "Le segnalazioni sono intenzionalmente separate dai record pubblicati. Mappa ed esportazioni non sono una copia automatica degli invii.",
+    flowLabel: "Flusso di revisione",
+    flowOneTitle: "Ricezione",
+    flowOneBody:
+      "Viene creato un record privato in attesa e l’invio è riconosciuto senza promettere la pubblicazione.",
+    flowTwoTitle: "Filtro",
+    flowTwoBody:
+      "Spam, dati personali, contenuti vietati e dettagli pericolosi vengono rimossi.",
+    flowThreeTitle: "Verifica",
+    flowThreeBody:
+      "Un moderatore valuta se la telecamera è pubblica, visibile, attuale e conforme alla policy locale.",
+    flowFourTitle: "Minimizzazione",
+    flowFourBody:
+      "Viene pubblicata la posizione e la quantità minima di metadati necessaria alla trasparenza. Le coordinate esatte restano nel record privato di moderazione; quelle pubblicate sono arrotondate a circa 10 metri.",
+    flowFiveTitle: "Decisione",
+    flowFiveBody:
+      "Approvare, chiedere chiarimenti, respingere o inoltrare — registrando sempre una motivazione.",
+    flowSixTitle: "Manutenzione",
+    flowSixBody:
+      "I record vengono ricontrollati periodicamente e rispondono a correzioni o richieste di rimozione.",
+    correctionEyebrow: "Correzioni e ricorsi",
+    correctionTitle: "Un modo semplice per contestare un record.",
+    correctionBody:
+      "Chiunque può richiedere una correzione, contestare un record o segnalare un danno. Le richieste sono private, esaminate da persone e non modificano mai la mappa automaticamente.",
+    correctionOneTitle: "Richiedi una correzione",
+    correctionOneBody:
+      "I record inaccurati, obsoleti o duplicati possono essere segnalati per la revisione.",
+    correctionTwoTitle: "Segnala un problema di privacy o sicurezza",
+    correctionTwoBody:
+      "Le segnalazioni urgenti vengono temporaneamente nascoste dagli output pubblici durante la revisione.",
+    correctionThreeTitle: "Nessun dato personale richiesto",
+    correctionThreeBody:
+      "Descrivi solo il minimo necessario a identificare il problema. Non includere dati personali, link a feed live, credenziali o immagini.",
+    dataEyebrow: "Riuso dei dati",
+    dataTitle: "Aperti dove è sicuro esserlo.",
+    dataBody:
+      "I record pubblicati sono disponibili in GeoJSON e CSV per riuso e verifica. Il dataset pubblico contiene solo record che hanno superato la revisione; segnalazioni e correzioni sono escluse.",
+    downloadGeoJson: "Scarica il GeoJSON pubblico",
+    downloadCsv: "Scarica il CSV pubblico",
+    reuseOneTitle: "Licenza e provenienza",
+    reuseOneBody:
+      "Ogni record pubblicato conserva la sua fonte e la data di verifica, e i dati sono concessi in licenza per il riuso aperto.",
+    reuseTwoTitle: "Nessun dettaglio operativo",
+    reuseTwoBody:
+      "Le esportazioni sono pensate per analisi civica, ricerca e strumenti cartografici compatibili — non per trovare feed di telecamere o informazioni operative sensibili.",
+    reuseThreeTitle: "Attribuzione a OpenStreetMap",
+    reuseThreeBody:
+      "Lo sfondo della mappa proviene dai contributori di OpenStreetMap ed è separato dai record sulle telecamere del progetto.",
     footer: "Creato per la trasparenza, non per il tracciamento.",
   },
   record: {
