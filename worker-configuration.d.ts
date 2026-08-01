@@ -28,6 +28,19 @@ declare module "cloudflare:workers" {
     fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>;
   }
 
+  export interface R2Object {
+    arrayBuffer(): Promise<ArrayBuffer>;
+    httpMetadata?: { contentType?: string };
+  }
+
+  export interface R2Bucket {
+    put(key: string, value: ArrayBuffer | Uint8Array | string | ReadableStream, options?: {
+      httpMetadata?: { contentType?: string };
+    }): Promise<unknown>;
+    get(key: string): Promise<R2Object | null>;
+    delete(key: string): Promise<void>;
+  }
+
   export interface Env {
     ASSETS: Fetcher;
     DB: D1Database;
@@ -44,7 +57,7 @@ declare module "cloudflare:workers" {
     /** Optional API key appended as `?key=` for providers that require one
      * (e.g. MapTiler, Stadia Maps). Leave unset for the community server. */
     TILE_PROVIDER_KEY?: string;
+    PHOTOS: R2Bucket;
   }
-
   export const env: Env;
 }

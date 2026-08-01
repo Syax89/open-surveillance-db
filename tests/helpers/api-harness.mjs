@@ -29,6 +29,7 @@ const ROUTES = [
   { source: "app/api/cameras/search/route.ts", output: "app/api/cameras/search/route.mjs" },
   { source: "app/api/cameras/revisions/route.ts", output: "app/api/cameras/revisions/route.mjs" },
   { source: "app/api/moderation/route.ts", output: "app/api/moderation/route.mjs" },
+  { source: "app/api/moderation/photos/[id]/route.ts", output: "app/api/moderation/photos/[id]/route.mjs" },
   { source: "app/api/corrections/route.ts", output: "app/api/corrections/route.mjs" },
   { source: "app/api/tiles/[z]/[x]/[y]/route.ts", output: "app/api/tiles/[z]/[x]/[y]/route.mjs" },
   { source: "app/api/auth/register/route.ts", output: "app/api/auth/register/route.mjs" },
@@ -37,6 +38,8 @@ const ROUTES = [
   { source: "app/api/auth/me/route.ts", output: "app/api/auth/me/route.mjs" },
   { source: "app/api/auth/me/submissions/route.ts", output: "app/api/auth/me/submissions/route.mjs" },
   { source: "app/api/auth/account/route.ts", output: "app/api/auth/account/route.mjs" },
+  { source: "app/api/photos/route.ts", output: "app/api/photos/route.mjs" },
+  { source: "app/api/photos/[id]/route.ts", output: "app/api/photos/[id]/route.mjs" },
 ];
 
 // Real db/* modules compiled into the temp tree so runtime tests can
@@ -51,6 +54,7 @@ const REAL_DB_MODULES = [
   { source: "db/cameras.ts", output: "db-real/cameras.mjs" },
   { source: "db/corrections.ts", output: "db-real/corrections.mjs" },
   { source: "db/moderation.ts", output: "db-real/moderation.mjs" },
+  { source: "db/photos.ts", output: "db-real/photos.mjs" },
 ];
 // db/moderation.ts imports ./freshness (pure, no CF binding) once the
 // freshness feature is present. CI checks out the PR head, not the merge
@@ -74,7 +78,7 @@ async function buildTree() {
   const mocksDir = path.join(root, "tests", "helpers", "mocks");
   const mockStateUrl = pathToFileURL(path.join(root, "tests", "helpers", "mock-state.mjs")).href;
   await mkdir(path.join(tree, "db"), { recursive: true });
-  for (const mockName of ["cameras", "corrections", "geocode", "moderation", "auth", "users"]) {
+  for (const mockName of ["cameras", "corrections", "geocode", "moderation", "auth", "users", "photos"]) {
     const source = await readFile(path.join(mocksDir, `${mockName}.mjs`), "utf8");
     await writeFile(
       path.join(tree, "db", `${mockName}.mjs`),

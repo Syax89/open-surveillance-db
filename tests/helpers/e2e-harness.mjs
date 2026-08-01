@@ -65,6 +65,7 @@ const REAL_DB_MODULES = [
   // the authz lib and the appeals routes; they run against the same env.DB.
   { source: "db/users.ts", output: "db/users.mjs" },
   { source: "db/appeals.ts", output: "db/appeals.mjs" },
+  { source: "db/photos.ts", output: "db/photos.mjs" },
 ];
 
 let builtTreePromise = null;

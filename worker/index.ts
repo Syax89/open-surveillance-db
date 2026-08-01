@@ -1,7 +1,7 @@
 /** Cloudflare Worker entry point for OpenSurveillanceDB. */
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
-import type { D1Database, Fetcher } from "cloudflare:workers";
+import type { D1Database, Fetcher, R2Bucket } from "cloudflare:workers";
 
 interface Env {
   ASSETS: Fetcher;
@@ -13,6 +13,8 @@ interface Env {
       };
     };
   };
+  /** Photo evidence object storage (D1 stores metadata only). */
+  PHOTOS: R2Bucket;
   /** Moderation access control. At least one credential must be configured. */
   MODERATION_USER?: string;
   MODERATION_PASSWORD?: string;

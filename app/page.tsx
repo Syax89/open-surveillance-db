@@ -43,6 +43,9 @@ export default function Home() {
   const nearbyRequest = useRef<AbortController | null>(null);
   const [placeQuery, setPlaceQuery] = useState("");
   const [placeResult, setPlaceResult] = useState<PlaceSearchResult | null>(null);
+  const [photos, setPhotos] = useState<Array<{ id: number; mimeType: string; width: number; height: number; name: string }>>([]);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -153,6 +156,44 @@ export default function Home() {
     document.getElementById("map-region")?.focus({ preventScroll: true });
   }
 
+  // Upload one photo to the private evidence store (POST /api/photos).
+  // The server strips EXIF/GPS and enforces MIME, size and dimension limits;
+  // the client-side checks below are convenience only, not a security gate.
+  async function uploadPhoto(file: File) {
+    if (photos.length >= 5) { setNotice(t.photoMaxReached); return; }
+    setPhotoUploading(true);
+    setNotice("");
+    try {
+      const response = await fetch("/api/photos", {
+        method: "POST",
+        headers: { "Content-Type": file.type || "application/octet-stream" },
+        body: file,
+      });
+      const data = await response.json() as { photo?: { id: number; mimeType: string; width: number; height: number }; error?: string };
+      if (!response.ok) throw new Error(data.error || t.photoUploadError);
+      if (!data.photo) throw new Error(t.photoUploadError);
+      setPhotos((items) => [...items, { id: data.photo!.id, mimeType: data.photo!.mimeType, width: data.photo!.width, height: data.photo!.height, name: file.name }]);
+      setNotice(t.photoAdded);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : t.photoUploadError);
+    } finally {
+      setPhotoUploading(false);
+      if (photoInputRef.current) photoInputRef.current.value = "";
+    }
+  }
+
+  function onPhotoSelected(event: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? []);
+    for (const file of files) {
+      if (photos.length >= 5) { setNotice(t.photoMaxReached); break; }
+      void uploadPhoto(file);
+    }
+  }
+
+  function removePhoto(id: number) {
+    setPhotos((items) => items.filter((photo) => photo.id !== id));
+  }
+
   async function submitReport(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -168,13 +209,14 @@ export default function Home() {
       longitude: coordinates.longitude,
       ...(manufacturer ? { manufacturer } : {}),
       ...(observedOn ? { observedOn } : {}),
+      ...(photos.length > 0 ? { photoIds: photos.map((photo) => photo.id) } : {}),
     };
     try {
       const response = await fetch("/api/cameras", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const data = await response.json() as { possibleDuplicates?: NearbyCandidate[] };
       if (!response.ok) throw new Error(t.submitReportError);
       const duplicates = Array.isArray(data.possibleDuplicates) ? data.possibleDuplicates : [];
-      event.currentTarget.reset(); setCoordinates(null); setManualLatitude(""); setManualLongitude("");
+      event.currentTarget.reset(); setCoordinates(null); setManualLatitude(""); setManualLongitude(""); setPhotos([]);
       setNotice(duplicates.length > 0 ? `${t.reportSaved} ${t.reportSavedWithNearby}` : t.reportSaved);
     } catch { setNotice(t.moderationUnavailable); }
   }
@@ -221,7 +263,7 @@ export default function Home() {
     <section className="correction-section" id="correction" aria-labelledby="correction-title"><div><p className="eyebrow"><span /> {t.accountability}</p><h2 id="correction-title">{t.correctionTitle}</h2><p>{t.correctionIntro}</p><div className="report-rule"><b>{t.urgentConcern}</b><br />{t.urgentConcernBody}</div></div><form className="correction-form" onSubmit={submitCorrection}><label>{t.relatedRecord}<select name="cameraId" defaultValue=""><option value="">{t.noSpecificRecord}</option>{records.map((camera) => <option key={camera.id} value={camera.id}>{camera.id} — {camera.title}</option>)}</select></label><label>{t.needsReview}<select required name="issueType" defaultValue=""><option value="" disabled>{t.selectOne}</option><option value="inaccurate">{t.inaccurate}</option><option value="outdated">{t.outdated}</option><option value="privacy-safety">{t.privacySafety}</option><option value="duplicate">{t.duplicate}</option><option value="other">{t.other}</option></select></label><label>{t.briefDescription}<textarea required name="message" maxLength={1500} rows={4} placeholder={t.correctionPlaceholder} /></label><label>{t.contactEmail}<input type="email" name="contact" maxLength={180} placeholder={t.contactPlaceholder} /></label><label className="check-label"><input type="checkbox" required /> <span>{t.correctionConsent}</span></label><button className="button button-primary" type="submit">{t.sendPrivateRequest} <span aria-hidden="true">→</span></button>{correctionNotice && <p className="notice" role="status">{correctionNotice}</p>}</form></section>
 
     <section className="principles" id="how-it-works"><div className="principles-intro"><p className="eyebrow"><span /> {t.civicCommons}</p><h2>{t.principlesTitle}</h2><p>{t.principlesIntro}</p></div><div className="principles-grid"><article><span>01</span><h3>{t.openDefault}</h3><p>{t.openDefaultBody}</p></article><article><span>02</span><h3>{t.privacyFirst}</h3><p>{t.privacyFirstBody}</p></article><article><span>03</span><h3>{t.moderatedReports}</h3><p>{t.moderatedReportsBody}</p></article></div></section>
-    <section className="report-section" id="report"><div><p className="eyebrow"><span /> {t.contribute}</p><h2>{t.reportTitle}</h2><p>{t.reportIntro}</p><div className="report-rule"><b>{t.beforeSubmitting}</b><br />{t.beforeSubmittingBody}</div>{coordinates && <div className="coordinate-readout">{t.selectedPoint}<br /><b>{coordinates.latitude.toFixed(5)}, {coordinates.longitude.toFixed(5)}</b></div>}{nearbyLoading && <p className="nearby-check" role="status">{t.checkingNearby}</p>}{nearbyCandidates.length > 0 && <aside className="duplicate-alert" role="alert" aria-live="assertive"><b>{t.possibleDuplicate}</b><p>{t.duplicateBody}</p><ul>{nearbyCandidates.map((candidate) => <li key={candidate.id}><a href={`/records/${candidate.id}`}>{candidate.title}</a> · {candidate.kind} · {Math.round(candidate.distanceMeters)} {t.metresAway}{candidate.matchStrength === "high" && <span className="duplicate-strength"> · {t.matchVeryClose}</span>}{candidate.matchStrength === "medium" && <span className="duplicate-strength"> · {t.matchLikely}</span>}</li>)}</ul><p className="duplicate-guidance"><a className="text-button" href="#correction">{t.duplicateGuidance} <span aria-hidden="true">→</span></a></p></aside>}{nearbyError && <p className="nearby-check nearby-error" role="status">{t.nearbyUnavailable}</p>}</div><form className="report-form" onSubmit={submitReport}><fieldset className="coordinate-entry"><legend>{t.manualCoordinatesTitle}</legend><p id="manual-coordinates-help">{t.manualCoordinatesHelp}</p><div className="coordinate-fields"><label htmlFor="manual-latitude">{t.latitude}<input id="manual-latitude" type="text" inputMode="decimal" autoComplete="off" value={manualLatitude} onChange={(event) => setManualLatitude(event.target.value)} aria-describedby="manual-coordinates-help" placeholder="45.46420" /></label><label htmlFor="manual-longitude">{t.longitude}<input id="manual-longitude" type="text" inputMode="decimal" autoComplete="off" value={manualLongitude} onChange={(event) => setManualLongitude(event.target.value)} aria-describedby="manual-coordinates-help" placeholder="9.19000" /></label></div><button className="button coordinate-button" type="button" onClick={selectManualCoordinates}>{t.useCoordinates}</button></fieldset><label>{t.recordTitle}<input required name="title" maxLength={90} placeholder={t.recordTitlePlaceholder} /></label><label>{t.cameraType}<select required name="kind" defaultValue=""><option value="" disabled>{t.selectOne}</option><option>{t.fixedDome}</option><option>{t.bullet}</option><option>PTZ</option><option>{t.trafficReader}</option><option>{t.otherUnknown}</option></select></label><div className="report-metadata-fields"><label>{t.manufacturer}<input name="manufacturer" maxLength={80} placeholder={t.manufacturerPlaceholder} /></label><label>{t.observedOn}<input name="observedOn" type="date" /></label></div><label>{t.approximateAddress}<input name="address" maxLength={180} placeholder={t.addressPlaceholder} /></label><label>{t.whatObserved}<textarea name="notes" maxLength={1000} rows={3} placeholder={t.observedPlaceholder} /></label><label className="check-label"><input type="checkbox" required /> <span>{t.reportConsent}</span></label><button className="button button-primary" type="submit">{t.sendModeration} <span aria-hidden="true">→</span></button></form></section>
-
+    <section className="report-section" id="report"><div><p className="eyebrow"><span /> {t.contribute}</p><h2>{t.reportTitle}</h2><p>{t.reportIntro}</p><div className="report-rule"><b>{t.beforeSubmitting}</b><br />{t.beforeSubmittingBody}</div>{coordinates && <div className="coordinate-readout">{t.selectedPoint}<br /><b>{coordinates.latitude.toFixed(5)}, {coordinates.longitude.toFixed(5)}</b></div>}{nearbyLoading && <p className="nearby-check" role="status">{t.checkingNearby}</p>}{nearbyCandidates.length > 0 && <aside className="duplicate-alert" role="alert" aria-live="assertive"><b>{t.possibleDuplicate}</b><p>{t.duplicateBody}</p><ul>{nearbyCandidates.map((candidate) => <li key={candidate.id}><a href={`/records/${candidate.id}`}>{candidate.title}</a> · {candidate.kind} · {Math.round(candidate.distanceMeters)} {t.metresAway}{candidate.matchStrength === "high" && <span className="duplicate-strength"> · {t.matchVeryClose}</span>}{candidate.matchStrength === "medium" && <span className="duplicate-strength"> · {t.matchLikely}</span>}</li>)}</ul><p className="duplicate-guidance"><a className="text-button" href="#correction">{t.duplicateGuidance} <span aria-hidden="true">→</span></a></p></aside>}{nearbyError && <p className="nearby-check nearby-error" role="status">{t.nearbyUnavailable}</p>}</div><form className="report-form" onSubmit={submitReport}><fieldset className="coordinate-entry"><legend>{t.manualCoordinatesTitle}</legend><p id="manual-coordinates-help">{t.manualCoordinatesHelp}</p><div className="coordinate-fields"><label htmlFor="manual-latitude">{t.latitude}<input id="manual-latitude" type="text" inputMode="decimal" autoComplete="off" value={manualLatitude} onChange={(event) => setManualLatitude(event.target.value)} aria-describedby="manual-coordinates-help" placeholder="45.46420" /></label><label htmlFor="manual-longitude">{t.longitude}<input id="manual-longitude" type="text" inputMode="decimal" autoComplete="off" value={manualLongitude} onChange={(event) => setManualLongitude(event.target.value)} aria-describedby="manual-coordinates-help" placeholder="9.19000" /></label></div><button className="button coordinate-button" type="button" onClick={selectManualCoordinates}>{t.useCoordinates}</button></fieldset><label>{t.recordTitle}<input required name="title" maxLength={90} placeholder={t.recordTitlePlaceholder} /></label><label>{t.cameraType}<select required name="kind" defaultValue=""><option value="" disabled>{t.selectOne}</option><option>{t.fixedDome}</option><option>{t.bullet}</option><option>PTZ</option><option>{t.trafficReader}</option><option>{t.otherUnknown}</option></select></label><div className="report-metadata-fields"><label>{t.manufacturer}<input name="manufacturer" maxLength={80} placeholder={t.manufacturerPlaceholder} /></label><label>{t.observedOn}<input name="observedOn" type="date" /></label></div><label>{t.approximateAddress}<input name="address" maxLength={180} placeholder={t.addressPlaceholder} /></label><label>{t.whatObserved}<textarea name="notes" maxLength={1000} rows={3} placeholder={t.observedPlaceholder} /></label><fieldset className="photo-upload" aria-labelledby="photo-upload-title"><legend id="photo-upload-title">{t.photoUploadTitle}</legend><p className="search-count" id="photo-upload-help">{t.photoUploadHelp}</p><div className="photo-upload-row"><label className="button button-quiet photo-choose" htmlFor="photo-input">{t.photoUploadLabel} <span aria-hidden="true">↗</span><input id="photo-input" ref={photoInputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={onPhotoSelected} disabled={photoUploading} /></label>{photoUploading && <span className="loading-note" role="status">{t.photoUploading}</span>}{photos.length > 0 && <span className="search-count">{photos.length}/5</span>}</div>{photos.length > 0 && <ul className="photo-list" aria-label={t.photoUploadTitle}>{photos.map((photo) => <li key={photo.id}><span className="photo-file-name">{photo.name}</span><span className="search-count">{photo.width}×{photo.height} · {photo.mimeType}</span><button type="button" className="text-button" onClick={() => removePhoto(photo.id)}>{t.photoRemove} <span aria-hidden="true">→</span></button></li>)}</ul>}<p className="search-count" role="note">{t.photoRedactionReminder}</p></fieldset><label className="check-label"><input type="checkbox" required /> <span>{t.reportConsent}</span></label><button className="button button-primary" type="submit">{t.sendModeration} <span aria-hidden="true">→</span></button></form></section>
+ (feat(photos): moderation queue card with preview, EXIF/redaction state and redaction-gated approval)
   </main>;
 }

@@ -13,6 +13,11 @@ import {
   type ModerationResult,
   moderationReasonCodes,
 } from "../../../db/moderation";
+import {
+  moderatePhoto,
+  type PhotoModerationAction,
+  type PhotoModerationResult,
+} from "../../../db/photos";
 import { recordRateLimitBlock } from "../../lib/abuse-alerts";
 import { requireRole } from "../../lib/authz";
 import { isRecord } from "../../lib/guards";
@@ -58,6 +63,15 @@ type ParsedModerationRequest =
       options?: CorrectionModerationOptions;
       context: ModerationContext;
     }
+  | {
+      entity: "photo";
+      id: number;
+      action: PhotoModerationAction;
+      reasonCode: ModerationReasonCode;
+      note: string | null;
+      redactionConfirmed: boolean;
+      context: ModerationContext;
+    }
   | null;
 
 function parseModerationRequest(value: unknown): ParsedModerationRequest {
@@ -73,6 +87,7 @@ function parseModerationRequest(value: unknown): ParsedModerationRequest {
     "escalate",
   ];
   const correctionActions: CorrectionModerationAction[] = ["approve", "reject", "associate", "escalate"];
+  const photoActions: PhotoModerationAction[] = ["approve", "reject"];
 
   const entity = value.entity as ModerationEntity;
   const id = value.id;
@@ -82,6 +97,7 @@ function parseModerationRequest(value: unknown): ParsedModerationRequest {
   const actorId = value.actorId;
   const cameraId = value.cameraId;
   const outcome = value.outcome;
+  const redactionConfirmed = value.redactionConfirmed;
   const publishManufacturer = value.publishManufacturer;
   const publishObservedOn = value.publishObservedOn;
   if (typeof id !== "number" || !Number.isInteger(id) || id < 1) return null;
@@ -113,6 +129,7 @@ function parseModerationRequest(value: unknown): ParsedModerationRequest {
   if (value.requiresSecondReview !== undefined && typeof value.requiresSecondReview !== "boolean") {
     return null;
   }
+  if (redactionConfirmed !== undefined && typeof redactionConfirmed !== "boolean") return null;
 
   const parsedReasonCode = reasonCode as ModerationReasonCode;
   const parsedNote = typeof note === "string" && note.trim() ? note.trim() : null;
@@ -186,6 +203,22 @@ function parseModerationRequest(value: unknown): ParsedModerationRequest {
       context,
     };
   }
+  if (entity === "photo") {
+    if (publishManufacturer !== undefined || publishObservedOn !== undefined) return null;
+    if (cameraId !== undefined || outcome !== undefined) return null;
+    if (!photoActions.includes(action as PhotoModerationAction)) return null;
+    // Approval is impossible without explicit redaction confirmation.
+    if (action === "approve" && redactionConfirmed !== true) return null;
+    return {
+      entity,
+      id,
+      action: action as PhotoModerationAction,
+      reasonCode: parsedReasonCode,
+      note: parsedNote,
+      redactionConfirmed: redactionConfirmed ?? false,
+      context,
+    };
+  }
   return null;
 }
 
@@ -216,8 +249,8 @@ function moderationLimit(request: Request) {
 
 /** Map the discriminated moderation result to an HTTP response with a stable body. */
 function moderationResponse(
-  entity: ModerationEntity,
-  result: ModerationResult<unknown>,
+  entity: ModerationEntity | "photo",
+  result: ModerationResult<unknown> | PhotoModerationResult,
 ): Response {
   switch (result.kind) {
     case "ok":
@@ -247,6 +280,11 @@ function moderationResponse(
     case "escalation_requires_note":
       return Response.json(
         { error: "Escalation requires a note explaining the reason." },
+        { status: 400 },
+      );
+    case "redaction_required":
+      return Response.json(
+        { error: "Approving a photo requires confirming that the subject was redacted." },
         { status: 400 },
       );
   }
@@ -319,24 +357,35 @@ export async function PATCH(request: Request) {
     }
     const context = { ...payload.context, actorId };
 
-    const result =
-      payload.entity === "camera"
-        ? await moderateCamera(
-            payload.id,
-            payload.action,
-            payload.reasonCode,
-            payload.note,
-            payload.metadataPublication,
-            context,
-          )
-        : await moderateCorrection(
-            payload.id,
-            payload.action,
-            payload.reasonCode,
-            payload.note,
-            payload.options,
-            context,
-          );
+    let result: ModerationResult<unknown> | PhotoModerationResult;
+    if (payload.entity === "camera") {
+      result = await moderateCamera(
+        payload.id,
+        payload.action,
+        payload.reasonCode,
+        payload.note,
+        payload.metadataPublication,
+        context,
+      );
+    } else if (payload.entity === "correction") {
+      result = await moderateCorrection(
+        payload.id,
+        payload.action,
+        payload.reasonCode,
+        payload.note,
+        payload.options,
+        context,
+      );
+    } else {
+      result = await moderatePhoto(
+        payload.id,
+        payload.action,
+        payload.redactionConfirmed,
+        payload.reasonCode,
+        payload.note,
+        context.actorId,
+      );
+    }
     return moderationResponse(payload.entity, result);
   } catch (error) {
     if (error instanceof PayloadTooLargeError) {

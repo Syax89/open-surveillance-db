@@ -163,7 +163,7 @@ export const it: Translation<typeof en> = {
     contribute: "Contribuisci",
     reportTitle: "Rendi leggibile lo spazio pubblico.",
     reportIntro:
-      "Scegli una posizione sulla mappa o inserisci le coordinate, poi aggiungi solo ciò che puoi osservare dallo spazio pubblico. Questa versione ha una coda di moderazione locale reale, ma non supporta ancora il caricamento di foto.",
+      "Scegli una posizione sulla mappa o inserisci le coordinate, poi aggiungi solo ciò che puoi osservare dallo spazio pubblico. Le foto sono facoltative, restano private e vengono pubblicate solo dopo revisione umana con redazione confermata.",
     beforeSubmitting: "Prima di inviare",
     beforeSubmittingBody:
       "Non caricare né descrivere persone, targhe, abitazioni private, debolezze di sicurezza o luoghi sensibili.",
@@ -202,6 +202,17 @@ export const it: Translation<typeof en> = {
     observedPlaceholder: "Direzione, gestore, avviso visibile, modello…",
     reportConsent:
       "Confermo che l’osservazione è stata fatta dallo spazio pubblico e non contiene dati personali.",
+    photoUploadTitle: "Prova fotografica (facoltativa)",
+    photoUploadHelp:
+      "JPEG, PNG o WebP fino a 10 MB e 4096 px per lato. Volti, targhe e altri dati personali devono essere oscurati prima del caricamento; i metadati di posizione e della fotocamera (EXIF) vengono rimossi automaticamente all’upload.",
+    photoUploadLabel: "Scegli le foto",
+    photoUploading: "Caricamento…",
+    photoUploadError: "La foto non può essere caricata.",
+    photoAdded: "Foto aggiunta — verrà esaminata da un moderatore prima di qualsiasi pubblicazione.",
+    photoRemove: "Rimuovi",
+    photoMaxReached: "Una segnalazione può includere fino a 5 foto.",
+    photoRedactionReminder:
+      "Oscura volti e targhe prima del caricamento. Le foto non vengono mai mostrate pubblicamente senza approvazione del moderatore e redazione confermata.",
     sendModeration: "Invia alla moderazione",
     footerLineOne: "Un database aperto delle telecamere di sorveglianza pubblica.",
     footerLineTwo: "Creato per la trasparenza, non per il tracciamento.",
@@ -668,7 +679,7 @@ export const it: Translation<typeof en> = {
       "Questa interfaccia è riservata al prototipo locale. Non è collegata all'esperienza pubblica e non pubblica autonomamente nuove informazioni.",
     localTool: "Strumento solo locale.",
     localWarning:
-      "Valuta solo testo e posizioni approssimative. Non aggiungere foto, dati personali, credenziali, link a feed live o dettagli sulla sicurezza operativa.",
+      "Valuta solo testo e posizioni approssimative. Le foto in coda sono prove private: verifica la redazione prima di approvare e non aggiungere mai dati personali, credenziali, link a feed live o dettagli sulla sicurezza operativa.",
     loading: "Caricamento della coda di moderazione locale…",
     awaiting: (total: number) => `${total} ${total === 1 ? "elemento in attesa" : "elementi in attesa"} di una decisione locale`,
     loadError: "Non è stato possibile caricare la coda di moderazione.",
@@ -716,6 +727,23 @@ export const it: Translation<typeof en> = {
     noCorrectionsText:
       "Le richieste private restano fuori dalla directory pubblica e dall'esportazione dati.",
     privateCorrection: "Correzione privata",
+    pendingPhotos: "Foto in attesa",
+    noPhotosTitle: "Nessuna foto in attesa.",
+    noPhotosText:
+      "Le foto caricate appaiono qui fino a quando non viene registrata una decisione. Una foto non è mai pubblica senza approvazione e redazione confermata.",
+    photoEvidence: "Prova fotografica",
+    photoRedactionConfirm: "Confermo che il soggetto è stato oscurato",
+    photoRedactionHelp:
+      "Approvare una foto richiede di confermare che volti, targhe e altri dati personali siano stati oscurati prima del caricamento. Le foto non sono mai pubbliche senza questa conferma.",
+    photoPreview: "Anteprima",
+    photoPreviewUnavailable: "Anteprima non disponibile",
+    photoDimensions: "Dimensioni",
+    photoSize: "Peso",
+    photoStripState: "Metadati rimossi",
+    photoRedactionState: "Redazione confermata",
+    photoApprove: "Approva e pubblica",
+    photoReject: "Rifiuta",
+    photoNoRedaction: "Redazione non confermata",
     recentDecisions: "Decisioni recenti",
     readOnlyHistory: "Storico locale in sola lettura",
     noDecisionsTitle: "Nessuna decisione registrata.",
