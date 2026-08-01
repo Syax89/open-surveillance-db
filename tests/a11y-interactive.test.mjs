@@ -1,0 +1,412 @@
+/**
+ * Interactive-accessibility QA suite (kanban t_444f7598).
+ *
+ * Extends the static a11y coverage from navigation-pages.test.mjs (single
+ * <h1>, heading ladder, skip link, focus-visible, contrast) and
+ * rendered-html.test.mjs (map region + directory equivalent) with the
+ * interactive contracts the audit (t_0de37378) found untested:
+ *
+ *   1. Map keyboard path: every map action has a keyboard/text equivalent —
+ *      the map region is a labelled landmark that is programmatically
+ *      focusable (tabindex="-1") but NOT in the tab order, its sr-only
+ *      description links to the accessible directory, and every directory
+ *      record carries a real "Show on map" <button> that moves focus back
+ *      to the region (honouring prefers-reduced-motion). No positive
+ *      tabindex anywhere, so the tab order stays the document order.
+ *   2. ModerationDashboard: native focusable controls only (no tabIndex →
+ *      no involuntary focus trap), labelled action groups, label-for pairs
+ *      on every decision control, aria-describedby on the note field,
+ *      status/alert live regions, alt text on photo previews. The queue
+ *      itself is client-fetched, so the rendered contracts are asserted on
+ *      the SSR shell AND on the component source (same pattern as the
+ *      shared-layout source tests in rendered-html.test.mjs).
+ *   3. Auth/account forms: every control has an accessible name (wrapping
+ *      <label> or for/id pair), server-side errors are announced through a
+ *      live region (role="alert"). aria-invalid is NOT yet wired — tracked
+ *      as finding QA-2026-08-01-2, pinned below so the gap stays visible
+ *      while the suite stays green.
+ *   4. Locale toggle: the SSR root carries lang="en" and the toggle exposes
+ *      aria-label + aria-pressed; the provider updates
+ *      document.documentElement.lang on switch so screen readers re-read
+ *      the page in the new language.
+ *   5. Footer/nav: labelled landmarks, every footer link has visible text
+ *      (no unlabeled links), every <img> carries alt. aria-current for the
+ *      active page is NOT yet implemented — tracked as finding
+ *      QA-2026-08-01-3, pinned below.
+ *   6. Fixture hygiene: all fixtures here are fictional (demo records,
+ *      local-only moderator credentials); nothing personal may appear in
+ *      the rendered public HTML.
+ *
+ * Requires `npm run build` first (npm test already builds before running).
+ */
+import assert from "node:assert/strict";
+import { readFile, readdir } from "node:fs/promises";
+import path from "node:path";
+import test from "node:test";
+import { fileURLToPath } from "node:url";
+import { Miniflare } from "miniflare";
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const serverDir = path.join(root, "dist", "server");
+
+/** Collect every JS module of the built worker, with index.js as the entry. */
+async function workerModules() {
+  const found = [];
+  const walk = async (dir) => {
+    const entries = await readdir(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        await walk(full);
+      } else if (entry.name.endsWith(".js")) {
+        found.push({ type: "ESModule", path: full });
+      }
+    }
+  };
+  await walk(serverDir);
+  const entry = found.find((m) => m.path === path.join(serverDir, "index.js"));
+  assert.ok(entry, "dist/server/index.js is missing — run `npm run build` first");
+  return [entry, ...found.filter((m) => m !== entry)];
+}
+
+/** Render a route exactly like the deployed worker would. */
+async function renderRoute(route, { env = {}, headers = {} } = {}) {
+  const mf = new Miniflare({
+    modules: await workerModules(),
+    compatibilityDate: "2026-01-01",
+    compatibilityFlags: ["nodejs_compat"],
+    bindings: env,
+  });
+  try {
+    const response = await mf.dispatchFetch(`http://localhost${route}`, {
+      headers: { accept: "text/html", ...headers },
+    });
+    return { response, html: await response.text() };
+  } finally {
+    await mf.dispose();
+  }
+}
+
+const MODERATION_CREDENTIALS = {
+  env: { MODERATION_USER: "moderator", MODERATION_PASSWORD: "s3cret" },
+  headers: { authorization: `Basic ${Buffer.from("moderator:s3cret").toString("base64")}` },
+};
+
+// ---------------------------------------------------------------------------
+// 1. Map keyboard path
+// ---------------------------------------------------------------------------
+
+test("the map region is a labelled, programmatically-focusable landmark (not in the tab order)", async () => {
+  const { html } = await renderRoute("/");
+  assert.match(
+    html,
+    /<div class="map-region" id="map-region" role="region" aria-label="[^"]+" aria-describedby="map-accessibility-description" tabindex="-1">/,
+    "map region must be a labelled region whose description is linked via aria-describedby",
+  );
+  // tabindex="-1" keeps the region out of the tab order while allowing the
+  // directory's "Show on map" button to move focus onto it — no trap, no
+  // tab-order disruption.
+  assert.match(html, /id="map-accessibility-description"/, "the sr-only description must exist");
+});
+
+test("the map's sr-only description links to the accessible directory (text equivalent)", async () => {
+  const { html } = await renderRoute("/");
+  const description = html.match(/<p class="sr-only" id="map-accessibility-description">[\s\S]*?<\/p>/);
+  assert.ok(description, "sr-only map description must be rendered");
+  assert.match(description[0], /<a href="#records">/, "the description must link to the directory");
+  assert.match(description[0], /Go to the accessible directory/, "the directory link must be labelled");
+});
+
+test("every directory record has a real 'Show on map' button (keyboard path for map selection)", async () => {
+  const { html } = await renderRoute("/");
+  const recordsSection = html.slice(html.indexOf('id="records"'), html.indexOf('id="correction"'));
+  assert.ok(recordsSection.length > 0, "the directory section must render");
+  const recordCards = (recordsSection.match(/class="record-list-card"/g) ?? []).length;
+  const showOnMapButtons = (recordsSection.match(/<button[^>]*type="button"[^>]*>Show on map[\s\S]*?<\/button>/g) ?? []).length;
+  assert.ok(recordCards >= 1, "the directory must render at least one demo record");
+  assert.equal(
+    showOnMapButtons,
+    recordCards,
+    `every record card must have a 'Show on map' button (cards=${recordCards}, buttons=${showOnMapButtons})`,
+  );
+});
+
+test("the 'Show on map' handler moves keyboard focus to the map region and honours reduced motion", async () => {
+  const page = await readFile(path.join(root, "app", "page.tsx"), "utf8");
+  assert.match(page, /prefers-reduced-motion:\s*reduce/, "the handler must read the reduced-motion preference");
+  assert.match(
+    page,
+    /getElementById\("map-region"\)\?\.focus\(/,
+    "the keyboard path must move focus to the map region",
+  );
+  assert.match(page, /scrollIntoView\(\{ behavior: reduceMotion/, "smooth scrolling must be disabled under reduced motion");
+});
+
+test("no positive tabindex anywhere on the homepage (standard tab order preserved)", async () => {
+  const { html } = await renderRoute("/");
+  const tabindexes = [...html.matchAll(/tabindex="([^"]+)"/g)].map((m) => m[1]);
+  // The only allowed tabindex is -1 on the map region (programmatic focus).
+  assert.deepEqual(tabindexes, ["-1"], `only map-region may carry tabindex="-1", found ${tabindexes.join(", ")}`);
+});
+
+test("the skip link is the first focusable element on the page (before the nav shell)", async () => {
+  const { html } = await renderRoute("/");
+  const skipPos = html.indexOf("skip-link");
+  const navPos = html.indexOf("nav-shell");
+  assert.ok(skipPos >= 0 && navPos >= 0, "skip link and nav must render");
+  assert.ok(skipPos < navPos, "the skip link must precede the navigation in the tab order");
+  assert.match(html, /<a class="skip-link" href="#main-content">/);
+});
+
+test("manual coordinates (keyboard path for map location picking) have labelled, described inputs", async () => {
+  const { html } = await renderRoute("/");
+  assert.match(html, /<label for="manual-latitude">Latitude<input id="manual-latitude"[^>]*aria-describedby="manual-coordinates-help"/);
+  assert.match(html, /<label for="manual-longitude">Longitude<input id="manual-longitude"[^>]*aria-describedby="manual-coordinates-help"/);
+  assert.match(html, /id="manual-coordinates-help"/, "the shared help text must exist");
+});
+
+test("place search exposes role=search with a labelled input", async () => {
+  const { html } = await renderRoute("/");
+  assert.match(html, /<form class="place-search-form" role="search">/);
+  assert.match(html, /<label for="place-search">[\s\S]*?<\/label>/);
+  assert.match(html, /<input id="place-search"[^>]*type="search"/);
+});
+
+// ---------------------------------------------------------------------------
+// 2. ModerationDashboard
+// ---------------------------------------------------------------------------
+
+test("the moderation shell (credentials) renders the labelled nav, h1 and a polite loading region", async () => {
+  const { response, html } = await renderRoute("/moderation", MODERATION_CREDENTIALS);
+  assert.equal(response.status, 200);
+  assert.match(html, /<nav class="nav-shell" aria-label="Moderation navigation">/);
+  assert.match(html, /<h1 id="moderation-title">Moderation queue<\/h1>/);
+  assert.match(html, /<p class="loading-note" aria-live="polite">/, "queue loading must be announced");
+});
+
+test("the moderation dashboard uses no tabIndex at all (no involuntary focus trap)", async () => {
+  const component = await readFile(path.join(root, "app", "components", "ModerationDashboard.tsx"), "utf8");
+  assert.doesNotMatch(component, /tabIndex/, "no element may be added to or removed from the tab order");
+  // Rendered shell: same guarantee.
+  const { html } = await renderRoute("/moderation", MODERATION_CREDENTIALS);
+  assert.doesNotMatch(html, /tabindex=/);
+});
+
+test("moderation decision controls are labelled and described (label-for, aria-describedby)", async () => {
+  const component = await readFile(path.join(root, "app", "components", "ModerationDashboard.tsx"), "utf8");
+  // Reason select + moderator note textarea: label-for pairs with stable ids.
+  // (The select carries onChange arrow functions, so its props contain `>` —
+  // match the id first, then the `required` flag on the same line.)
+  assert.match(component, /<label htmlFor=\{reasonId\}>/, "reason select must have a label-for");
+  assert.match(component, /<select id=\{reasonId\}/, "reason select must carry its stable id");
+  assert.match(component, /<select id=\{reasonId\}[\s\S]*?required/, "reason select must be required");
+  assert.match(component, /<label htmlFor=\{noteId\}>/, "note textarea must have a label-for");
+  assert.match(component, /<textarea id=\{noteId\}[\s\S]*?aria-describedby=\{`\$\{noteId\}-help`\}/, "note must be described by its help text");
+  // Actor selector (rendered in the SSR shell already).
+  const { html } = await renderRoute("/moderation", MODERATION_CREDENTIALS);
+  assert.match(html, /<label for="actor-select">[\s\S]*?<select id="actor-select"[\s\S]*?required/);
+});
+
+test("moderation action groups are labelled and queues are labelled lists", async () => {
+  const component = await readFile(path.join(root, "app", "components", "ModerationDashboard.tsx"), "utf8");
+  assert.match(
+    component,
+    /record-list-actions" aria-label=\{`\$\{t\.decisionFor\} \$\{entity\} \$\{id}`\}/,
+    "every action group must carry an aria-label",
+  );
+  for (const listLabel of ["t.pendingReports", "t.publishedRecords", "t.recordsNeedReview", "t.privateCorrections", "t.pendingPhotos", "t.recentDecisions"]) {
+    assert.ok(
+      component.includes(`<ul className="moderation-list" aria-label={${listLabel}}>`),
+      `queue list must be labelled: ${listLabel}`,
+    );
+  }
+});
+
+test("moderation status/error feedback uses live regions and photo previews carry alt text", async () => {
+  const component = await readFile(path.join(root, "app", "components", "ModerationDashboard.tsx"), "utf8");
+  assert.match(component, /role="status"/, "success notices must be announced (polite)");
+  assert.match(component, /role="alert"/, "errors must be announced (assertive)");
+  assert.match(component, /<img[^>]*alt=/, "photo previews must have alt text");
+});
+
+// ---------------------------------------------------------------------------
+// 3. Auth/account forms
+// ---------------------------------------------------------------------------
+
+/** Every control in a rendered form must have an accessible name: either a
+ *  label-for/id pair, or a wrapping <label> with text content. */
+function assertControlsLabeled(html, where) {
+  const controls = [...html.matchAll(/<(input|select|textarea)\b[^>]*>/g)];
+  assert.ok(controls.length >= 1, `${where} must contain form controls`);
+  for (const match of controls) {
+    const tag = match[0];
+    const forAttr = /for="([^"]+)"/.exec(tag);
+    if (forAttr) {
+      // Explicit label-for: the matching id must exist and its label must
+      // have visible text.
+      assert.ok(html.includes(`id="${forAttr[1]}"`) || html.includes(`id=${forAttr[1]}`), `${where}: ${tag} has no element with id ${forAttr[1]}`);
+      const labelMatch = html.match(new RegExp(`<label[^>]*for="${forAttr[1]}"[^>]*>([\\s\\S]*?)</label>`));
+      assert.ok(labelMatch, `${where}: no label[for="${forAttr[1]}"]`);
+      assert.match(labelMatch[1], /[A-Za-z]/, `${where}: label[for="${forAttr[1]}"] must have text`);
+    } else {
+      // Implicit association: the control must be wrapped by a <label> that
+      // opened after the previous </label> and has text content.
+      const before = html.slice(0, match.index);
+      const lastOpen = before.lastIndexOf("<label");
+      const lastClose = before.lastIndexOf("</label>");
+      assert.ok(lastOpen > lastClose, `${where}: control ${tag.slice(0, 60)}… must be wrapped by a <label>`);
+      const closeAt = html.indexOf("</label>", lastOpen);
+      const content = html.slice(lastOpen, closeAt);
+      assert.match(content, /[A-Za-z]/, `${where}: the wrapping label must have text content`);
+    }
+  }
+}
+
+test("every login form control has an accessible name (wrapping label)", async () => {
+  const { html } = await renderRoute("/login");
+  const form = html.match(/<form class="auth-form"[\s\S]*?<\/form>/);
+  assert.ok(form, "login form must render");
+  assertControlsLabeled(form[0], "login");
+});
+
+test("every register form control has an accessible name (wrapping label)", async () => {
+  const { html } = await renderRoute("/register");
+  const form = html.match(/<form class="auth-form"[\s\S]*?<\/form>/);
+  assert.ok(form, "register form must render");
+  assertControlsLabeled(form[0], "register");
+});
+
+test("auth errors are announced through a live region (role=alert)", async () => {
+  const [login, register, account] = await Promise.all([
+    readFile(path.join(root, "app", "login", "page.tsx"), "utf8"),
+    readFile(path.join(root, "app", "register", "page.tsx"), "utf8"),
+    readFile(path.join(root, "app", "account", "page.tsx"), "utf8"),
+  ]);
+  // role="alert" is an implicit assertive live region: the message is read
+  // out as soon as it renders after a failed submit.
+  assert.match(login, /role="alert"/, "login must announce errors");
+  assert.match(register, /role="alert"/, "register must announce errors");
+  assert.match(account, /role="alert"/, "account must announce errors");
+});
+
+test("account actions are native buttons with no tabindex manipulation", async () => {
+  const account = await readFile(path.join(root, "app", "account", "page.tsx"), "utf8");
+  assert.match(account, /type="button"/, "logout/delete must be native buttons");
+  assert.doesNotMatch(account, /tabIndex/);
+});
+
+test("aria-invalid is not yet wired on auth inputs — known gap, tracked (QA-2026-08-01-2)", async () => {
+  // The audit asked for aria-invalid on failing auth fields. The current
+  // implementation relies on native required/minLength validation (browser
+  // :invalid styling) and announces server errors via role="alert", but does
+  // not mark the specific field with aria-invalid. Pinned so a future fix
+  // must update this assertion deliberately; the gap is recorded in
+  // QA_REPORT_a11y-interactive.md (finding QA-2026-08-01-2).
+  for (const route of ["/login", "/register"]) {
+    const { html } = await renderRoute(route);
+    assert.equal((html.match(/aria-invalid/g) ?? []).length, 0, `${route} SSR must not yet set aria-invalid`);
+  }
+  const [login, register] = await Promise.all([
+    readFile(path.join(root, "app", "login", "page.tsx"), "utf8"),
+    readFile(path.join(root, "app", "register", "page.tsx"), "utf8"),
+  ]);
+  assert.doesNotMatch(login, /aria-invalid/);
+  assert.doesNotMatch(register, /aria-invalid/);
+});
+
+// ---------------------------------------------------------------------------
+// 4. Locale toggle
+// ---------------------------------------------------------------------------
+
+test("the SSR root declares lang and the toggle exposes aria-label + aria-pressed", async () => {
+  for (const route of ["/", "/login", "/register"]) {
+    const { html } = await renderRoute(route);
+    assert.match(html, /<html[^>]*lang="en"/, `${route} must declare a lang attribute`);
+    assert.match(
+      html,
+      /<div class="locale-toggle" aria-label="Language selection"><button[^>]*aria-pressed="true">EN<\/button><button[^>]*aria-pressed="false">IT<\/button><\/div>/,
+      `${route} must render the toggle with aria-pressed states`,
+    );
+  }
+});
+
+test("switching locale updates document.documentElement.lang (screen-reader readable)", async () => {
+  const provider = await readFile(path.join(root, "app", "components", "LocaleProvider.tsx"), "utf8");
+  assert.match(
+    provider,
+    /document\.documentElement\.lang = locale/,
+    "the provider must keep the root lang in sync with the selected locale",
+  );
+  assert.match(provider, /useEffect\(\(\) => \{\s*document\.documentElement\.lang = locale;\s*\}, \[locale\]\)/, "the sync must run on every locale change");
+  assert.match(provider, /aria-pressed=\{locale === "en"\}/, "the EN button must reflect its pressed state");
+  assert.match(provider, /aria-pressed=\{locale === "it"\}/, "the IT button must reflect its pressed state");
+});
+
+// ---------------------------------------------------------------------------
+// 5. Footer / nav
+// ---------------------------------------------------------------------------
+
+test("every footer link has visible text and the landmarks are labelled", async () => {
+  for (const route of ["/", "/guide", "/login"]) {
+    const { html } = await renderRoute(route);
+    assert.match(html, /<footer class="site-footer" aria-label="Site footer">/, `${route} must have the contentinfo landmark`);
+    assert.match(html, /<nav class="footer-links" aria-label="Institutional pages">/, `${route} must have the labelled footer nav`);
+    const footer = html.slice(html.indexOf("site-footer"));
+    const links = [...footer.matchAll(/<a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g)];
+    assert.ok(links.length >= 8, `${route} footer must expose every institutional link`);
+    for (const [, href, text] of links) {
+      assert.match(text, /[A-Za-z]/, `${route}: footer link ${href} must have visible text`);
+    }
+  }
+});
+
+test("every <img> in the public HTML carries alt text", async () => {
+  for (const route of ["/", "/login", "/register", "/guide"]) {
+    const { html } = await renderRoute(route);
+    const images = [...html.matchAll(/<img\b[^>]*>/g)];
+    for (const image of images) {
+      assert.match(image[0], /\salt=/, `${route}: ${image[0].slice(0, 80)}… must have alt text`);
+    }
+  }
+  // Moderation photo previews (client-rendered) are checked in the source.
+  const dashboard = await readFile(path.join(root, "app", "components", "ModerationDashboard.tsx"), "utf8");
+  assert.match(dashboard, /<img[^>]*alt=\{`\$\{t\.photoEvidence\}/, "photo previews must carry alt text");
+});
+
+test("aria-current for the active page is not yet implemented — known gap, tracked (QA-2026-08-01-3)", async () => {
+  // The audit asked for aria-current="page" on the active nav/footer entry.
+  // No nav link currently marks the current page. Pinned so a future fix
+  // must update this assertion deliberately; the gap is recorded in
+  // QA_REPORT_a11y-interactive.md (finding QA-2026-08-01-3).
+  for (const route of ["/", "/login", "/register", "/guide", "/moderazione"]) {
+    const { html } = await renderRoute(route);
+    assert.equal((html.match(/aria-current/g) ?? []).length, 0, `${route} must not yet use aria-current`);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// 6. Fixture hygiene (no personal data)
+// ---------------------------------------------------------------------------
+
+test("the QA fixtures never leak into public HTML (fictional data only)", async () => {
+  // The moderation credentials and the demo identities are fictional
+  // fixtures; none of them may appear on any public page.
+  const forbidden = [
+    "s3cret",                 // local-only moderator password
+    "Basic ",                 // authorization header must never be rendered
+    "record@osdb.test",       // test moderator identity
+    "Demo Record Reviewer",   // internal reviewer display name
+  ];
+  for (const route of ["/", "/login", "/register", "/guide", "/records/1"]) {
+    const { html } = await renderRoute(route);
+    for (const marker of forbidden) {
+      assert.doesNotMatch(html, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), `${route} must not contain ${marker}`);
+    }
+    assert.doesNotMatch(html, /<dd>[^<]*@[^<]*<\/dd>/, `${route} must not render an email address cell`);
+  }
+  // The moderation page itself must not echo the Basic auth header or the
+  // plaintext password into its own HTML.
+  const { html } = await renderRoute("/moderation", MODERATION_CREDENTIALS);
+  assert.doesNotMatch(html, /s3cret/);
+  assert.doesNotMatch(html, /Basic /);
+});
