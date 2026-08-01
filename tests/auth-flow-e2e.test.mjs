@@ -30,7 +30,11 @@
 import assert from "node:assert/strict";
 import { after, beforeEach, test } from "node:test";
 import { apiRequest, responseBody } from "./helpers/api-harness.mjs";
-import { applyDrizzleMigrations, cleanupDbRuntime } from "./helpers/db-runtime-harness.mjs";
+import {
+  applyDrizzleMigrations,
+  cleanupDbRuntime,
+  seedDemoIdentities,
+} from "./helpers/db-runtime-harness.mjs";
 import { D1SqliteDatabase } from "./helpers/d1-sqlite.mjs";
 import { cleanupE2ETree, e2eEnv, loadE2EModule, loadE2ERoute } from "./helpers/e2e-harness.mjs";
 
@@ -118,6 +122,11 @@ beforeEach(async () => {
   delete env.AUTH_LOCKOUT_WINDOW_SECONDS;
   delete env.AUTH_LOCKOUT_DURATION_SECONDS;
   delete env.AUTH_LOCKOUT_MAX_DURATION_SECONDS;
+  // Migration 0017 removes the demo seed (fresh DB = zero demo rows, exactly
+  // like alpha/prod). This suite exercises the authenticated moderation,
+  // appeals and auth flows, so it provisions the demo identities itself —
+  // the same shape a deploy provisions real accounts before opening the DB.
+  await seedDemoIdentities(env.DB);
   // The route modules are cached in the shared tree; reload the recorder each
   // test so coverage stays cumulative while handlers stay stateless.
   const load = async (name, path) => recorder(name, await loadE2ERoute(path));

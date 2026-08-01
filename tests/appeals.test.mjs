@@ -9,7 +9,7 @@
 
 import assert from "node:assert/strict";
 import { after, beforeEach, test } from "node:test";
-import { applyDrizzleMigrations, cleanupDbRuntime, loadDbRuntime } from "./helpers/db-runtime-harness.mjs";
+import { applyDrizzleMigrations, cleanupDbRuntime, loadDbRuntime, seedDemoIdentities } from "./helpers/db-runtime-harness.mjs";
 import { D1SqliteDatabase as D1 } from "./helpers/d1-sqlite.mjs";
 
 let env;
@@ -28,6 +28,10 @@ beforeEach(async () => {
   ({ env, cameras, moderation, users, appeals } = await loadDbRuntime());
   env.DB = new D1();
   await applyDrizzleMigrations(env.DB);
+  // Migration 0015 removes the demo seed; this suite pins the appeal flow on
+  // the real demo identities (contributor id 6, reviewers 1/2/3/5), so it
+  // provisions them explicitly like a deploy would before opening the DB.
+  await seedDemoIdentities(env.DB);
 });
 
 after(async () => cleanupDbRuntime());
