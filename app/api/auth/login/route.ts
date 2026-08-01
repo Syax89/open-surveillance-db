@@ -1,12 +1,21 @@
 import { env } from "cloudflare:workers";
 import {
   authenticateContributor,
+  clearLoginAttempts,
   createSession,
+  getLoginLockout,
   isValidEmail,
+  loginLockoutKey,
   normalizeEmail,
+  recordFailedLogin,
 } from "../../../../db/auth";
 import { sessionCookieHeaders } from "../../../lib/auth-session";
-import { authLimit, cookieHeaderInit, isValidPassword } from "../../../lib/auth-route-helpers";
+import {
+  authLimit,
+  cookieHeaderInit,
+  isValidPassword,
+  loginLockoutPolicy,
+} from "../../../lib/auth-route-helpers";
 import { sameOrigin } from "../../../lib/csrf";
 import { isRecord } from "../../../lib/guards";
 import { PayloadTooLargeError, readJsonBody, urlTooLong } from "../../../lib/input-limits";
@@ -17,6 +26,15 @@ import { PayloadTooLargeError, readJsonBody, urlTooLong } from "../../../lib/inp
  * Unknown email and wrong password both answer the same generic 401 so the
  * response never reveals which part was wrong. Success sets the same cookie
  * pair as registration (`osdb_session` + `osdb_csrf`).
+ *
+ * Brute-force defence is layered (ADR 0015): the per-IP `auth` bucket
+ * (authLimit) throttles a single caller, and a per-email lockout — keyed by
+ * the SHA-256 of the normalised email, never the address — stops distributed
+ * guessing against one account. A locked account answers 429 with
+ * Retry-After before any hashing work; the attempt that crosses the
+ * threshold trips the lock; a successful login clears the counter. The
+ * lockout applies identically to unknown emails, so it cannot be used to
+ * enumerate accounts.
  */
 export async function POST(request: Request) {
   if (urlTooLong(request)) {
@@ -42,10 +60,36 @@ export async function POST(request: Request) {
       return Response.json({ error: "Invalid credentials." }, { status: 401 });
     }
 
+    // Per-email lockout gate. The key is a hash of the normalised email, so
+    // no PII ever appears in the counter table or in the log line below.
+    const policy = loginLockoutPolicy(env);
+    const emailKey = await loginLockoutKey(email);
+    const lockout = await getLoginLockout(emailKey, policy);
+    if (lockout.locked) {
+      console.warn(`POST /api/auth/login rejected: account locked (emailKey ${emailKey})`);
+      return Response.json(
+        { error: "Too many failed login attempts. Please try again later." },
+        { status: 429, headers: { "Retry-After": String(lockout.retryAfterSeconds) } },
+      );
+    }
+
     const contributor = await authenticateContributor(email, password);
     if (!contributor) {
+      // Same generic 401 as before — the lockout only trips after the
+      // threshold, and only this attempt's result tells us which branch.
+      const after = await recordFailedLogin(emailKey, policy);
+      if (after.locked) {
+        console.warn(`POST /api/auth/login rejected: lockout triggered (emailKey ${emailKey})`);
+        return Response.json(
+          { error: "Too many failed login attempts. Please try again later." },
+          { status: 429, headers: { "Retry-After": String(after.retryAfterSeconds) } },
+        );
+      }
       return Response.json({ error: "Invalid credentials." }, { status: 401 });
     }
+
+    // A successful login resets the per-email counter.
+    await clearLoginAttempts(emailKey);
 
     const { rawToken, csrfToken } = await createSession(contributor.id);
     return Response.json(

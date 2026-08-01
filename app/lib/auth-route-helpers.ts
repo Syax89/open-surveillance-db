@@ -8,10 +8,48 @@
 
 import { recordRateLimitBlock } from "./abuse-alerts";
 import { callerKey, checkRateLimit, limitsFor } from "./rate-limit";
+import type { LoginLockoutPolicy } from "../../db/auth";
 
 export const MIN_PASSWORD_LENGTH = 10;
 export const MAX_PASSWORD_LENGTH = 200;
 export const MAX_DISPLAY_NAME_LENGTH = 60;
+
+/**
+ * Default per-email lockout policy (ADR 0015): 5 failed logins inside a
+ * 15-minute window lock the account for 15 minutes; consecutive lockouts
+ * double the duration up to a 2-hour cap. The counting window re-anchors at
+ * the moment the lockout trips, so an attacker who resumes right after the
+ * lock expires escalates the backoff instead of starting over.
+ */
+export const LOGIN_LOCKOUT_DEFAULTS: LoginLockoutPolicy = {
+  maxAttempts: 5,
+  windowSeconds: 15 * 60,
+  durationSeconds: 15 * 60,
+  maxDurationSeconds: 2 * 60 * 60,
+};
+
+/**
+ * Resolve the per-email lockout policy, honouring env overrides. The
+ * parameter is `unknown` (cast internally) for the same reason as
+ * `limitsFor` in rate-limit.ts: Cloudflare's `Env` has no string index
+ * signature, and this module must stay runnable in plain Node.
+ */
+export function loginLockoutPolicy(env: unknown): LoginLockoutPolicy {
+  const config = env as { [key: string]: unknown };
+  const read = (key: string, fallback: number): number => {
+    const value = Number(config[key]);
+    return Number.isFinite(value) && value > 0 ? value : fallback;
+  };
+  return {
+    maxAttempts: read("AUTH_LOCKOUT_MAX_ATTEMPTS", LOGIN_LOCKOUT_DEFAULTS.maxAttempts),
+    windowSeconds: read("AUTH_LOCKOUT_WINDOW_SECONDS", LOGIN_LOCKOUT_DEFAULTS.windowSeconds),
+    durationSeconds: read("AUTH_LOCKOUT_DURATION_SECONDS", LOGIN_LOCKOUT_DEFAULTS.durationSeconds),
+    maxDurationSeconds: read(
+      "AUTH_LOCKOUT_MAX_DURATION_SECONDS",
+      LOGIN_LOCKOUT_DEFAULTS.maxDurationSeconds,
+    ),
+  };
+}
 
 /**
  * Rate limit the auth endpoints. Register and login are credential-guessing

@@ -279,3 +279,148 @@ test("eraseContributor is safe to call twice — the second call finds nothing",
   assert.equal(second.deleted, false);
   assert.equal(second.deattributedReports, 0);
 });
+
+// ---------------------------------------------------------------------------
+// Per-email login lockout (P2 security, ADR 0015)
+// ---------------------------------------------------------------------------
+
+// Small, deterministic policy: 3 failures inside a 60s window lock the email
+// for 60s, doubling per consecutive lockout up to 120s.
+const LOCKOUT_POLICY = {
+  maxAttempts: 3,
+  windowSeconds: 60,
+  durationSeconds: 60,
+  maxDurationSeconds: 120,
+};
+
+test("loginLockoutKey is a stable hash of the normalised email — never the address", async () => {
+  const { auth } = runtime;
+  const key = await auth.loginLockoutKey("  Ada@Example.ORG ");
+  assert.equal(key, await auth.loginLockoutKey("ada@example.org"), "the key normalises the email");
+  assert.match(key, /^[0-9a-f]{64}$/, "the key is a SHA-256 hex digest");
+  assert.ok(!key.includes("ada"), "the raw email must not appear in the key");
+  assert.notEqual(key, await auth.loginLockoutKey("ada@other.example"));
+});
+
+test("recordFailedLogin trips the lockout at the threshold; getLoginLockout reports Retry-After", async () => {
+  const { auth } = runtime;
+  const emailKey = await auth.loginLockoutKey("ada@example.org");
+
+  assert.deepEqual(await auth.recordFailedLogin(emailKey, LOCKOUT_POLICY, NOW), {
+    locked: false,
+    retryAfterSeconds: 0,
+  });
+  assert.deepEqual(await auth.recordFailedLogin(emailKey, LOCKOUT_POLICY, NOW), {
+    locked: false,
+    retryAfterSeconds: 0,
+  });
+  const tripped = await auth.recordFailedLogin(emailKey, LOCKOUT_POLICY, NOW);
+  assert.deepEqual(tripped, { locked: true, retryAfterSeconds: 60 }, "the 3rd failure locks for 60s");
+
+  const locked = await auth.getLoginLockout(emailKey, LOCKOUT_POLICY, NOW);
+  assert.deepEqual(locked, { locked: true, retryAfterSeconds: 60 });
+  const later = await auth.getLoginLockout(emailKey, LOCKOUT_POLICY, "2026-08-01T00:00:30.000Z");
+  assert.equal(later.locked, true);
+  assert.ok(later.retryAfterSeconds <= 31, "Retry-After shrinks as the lock runs down");
+});
+
+test("a successful login clears the counter", async () => {
+  const { auth } = runtime;
+  const emailKey = await auth.loginLockoutKey("ada@example.org");
+  await auth.recordFailedLogin(emailKey, LOCKOUT_POLICY, NOW);
+  await auth.recordFailedLogin(emailKey, LOCKOUT_POLICY, NOW);
+
+  await auth.clearLoginAttempts(emailKey);
+  assert.deepEqual(await auth.getLoginLockout(emailKey, LOCKOUT_POLICY, NOW), {
+    locked: false,
+    retryAfterSeconds: 0,
+  });
+
+  // The counter restarts from zero: two more failures do NOT lock.
+  await auth.recordFailedLogin(emailKey, LOCKOUT_POLICY, NOW);
+  const state = await auth.recordFailedLogin(emailKey, LOCKOUT_POLICY, NOW);
+  assert.deepEqual(state, { locked: false, retryAfterSeconds: 0 });
+});
+
+test("the lockout expires after the duration", async () => {
+  const { auth } = runtime;
+  const emailKey = await auth.loginLockoutKey("ada@example.org");
+  for (let index = 0; index < 3; index += 1) {
+    await auth.recordFailedLogin(emailKey, LOCKOUT_POLICY, NOW);
+  }
+  assert.equal((await auth.getLoginLockout(emailKey, LOCKOUT_POLICY, NOW)).locked, true);
+
+  const afterExpiry = new Date(Date.parse(NOW) + 60_000).toISOString();
+  assert.deepEqual(await auth.getLoginLockout(emailKey, LOCKOUT_POLICY, afterExpiry), {
+    locked: false,
+    retryAfterSeconds: 0,
+  });
+});
+
+test("attempts from different callers count against the same email", async () => {
+  const { auth } = runtime;
+  const emailKey = await auth.loginLockoutKey("ada@example.org");
+  // The counter is keyed by the email hash only — there is no IP component,
+  // so every caller hitting the same account shares one counter.
+  await auth.recordFailedLogin(emailKey, LOCKOUT_POLICY, NOW);
+  await auth.recordFailedLogin(emailKey, LOCKOUT_POLICY, NOW);
+  const tripped = await auth.recordFailedLogin(emailKey, LOCKOUT_POLICY, NOW);
+  assert.equal(tripped.locked, true, "the 3rd attempt from a different caller trips the shared counter");
+
+  // A different email keeps an independent counter.
+  const otherKey = await auth.loginLockoutKey("bob@example.org");
+  assert.deepEqual(await auth.getLoginLockout(otherKey, LOCKOUT_POLICY, NOW), {
+    locked: false,
+    retryAfterSeconds: 0,
+  });
+});
+
+test("a stale counting window starts a fresh counter", async () => {
+  const { auth } = runtime;
+  const emailKey = await auth.loginLockoutKey("ada@example.org");
+  await auth.recordFailedLogin(emailKey, LOCKOUT_POLICY, "2026-08-01T00:00:00.000Z");
+  await auth.recordFailedLogin(emailKey, LOCKOUT_POLICY, "2026-08-01T00:00:10.000Z");
+  // 70s later the 60s window has rolled over: the counter restarts at 1.
+  const state = await auth.recordFailedLogin(emailKey, LOCKOUT_POLICY, "2026-08-01T00:01:10.000Z");
+  assert.deepEqual(state, { locked: false, retryAfterSeconds: 0 });
+  assert.deepEqual(await auth.getLoginLockout(emailKey, LOCKOUT_POLICY, "2026-08-01T00:01:10.000Z"), {
+    locked: false,
+    retryAfterSeconds: 0,
+  });
+});
+
+test("consecutive lockouts back off exponentially up to the cap", async () => {
+  const { auth } = runtime;
+  const emailKey = await auth.loginLockoutKey("ada@example.org");
+
+  // First lockout: 3 failures → locked for the base 60s.
+  for (let index = 0; index < 3; index += 1) {
+    await auth.recordFailedLogin(emailKey, LOCKOUT_POLICY, "2026-08-01T00:00:00.000Z");
+  }
+  assert.equal((await auth.getLoginLockout(emailKey, LOCKOUT_POLICY, "2026-08-01T00:00:00.000Z")).locked, true);
+
+  // Lock expires at 00:01:00; the attacker resumes inside the post-lock
+  // window (00:01:05): the counter is still at the threshold, so ONE more
+  // failure re-locks immediately — for double the duration (120s).
+  const second = await auth.recordFailedLogin(emailKey, LOCKOUT_POLICY, "2026-08-01T00:01:05.000Z");
+  assert.equal(second.locked, true);
+  assert.equal(second.retryAfterSeconds, 120);
+
+  // Third consecutive lockout: 240s would be next, but the cap (120s) holds.
+  const third = await auth.recordFailedLogin(emailKey, LOCKOUT_POLICY, "2026-08-01T00:03:10.000Z");
+  assert.equal(third.locked, true);
+  assert.equal(third.retryAfterSeconds, 120);
+});
+
+test("the lockout table stores only the email hash — never PII", async () => {
+  const { auth } = runtime;
+  const emailKey = await auth.loginLockoutKey("ada@example.org");
+  await auth.recordFailedLogin(emailKey, LOCKOUT_POLICY, NOW);
+
+  const rows = await runtime.env.DB.prepare("SELECT * FROM login_attempts").all();
+  assert.equal(rows.results.length, 1);
+  const [attempt] = rows.results;
+  assert.equal(attempt.email_key, emailKey);
+  assert.ok(!JSON.stringify(attempt).includes("ada@example.org"), "no raw email in the row");
+  assert.ok(!JSON.stringify(attempt).includes("@"), "no email-shaped value at all");
+});
