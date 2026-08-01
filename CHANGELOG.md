@@ -193,7 +193,8 @@ changes accumulate under `[Unreleased]`.
   decision trail — rendered in a dedicated dashboard section. Contact
   details, internal notes and reviewer attribution never leave the
   gated moderation API: the public record page keeps exposing only the
-  filtered public revision projection (AC-5).
+  filtered public revision projection (AC-5)
+  ([#187](https://github.com/Syax89/open-surveillance-db/pull/187)).
 
 ### Changed
 
