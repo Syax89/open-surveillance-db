@@ -20,6 +20,7 @@ import {
 } from "../../../db/photos";
 import { recordRateLimitBlock } from "../../lib/abuse-alerts";
 import { requireRole } from "../../lib/authz";
+import { cameraPurgeTags, purgeCacheTags } from "../../lib/cache-purge";
 import { isRecord } from "../../lib/guards";
 import { BodyReadError, readJsonBody, urlTooLong } from "../../lib/input-limits";
 import { callerKey, checkRateLimit, limitsFor } from "../../lib/rate-limit";
@@ -391,6 +392,33 @@ export async function PATCH(request: Request) {
         context.actorId,
       );
     }
+
+    // Edge-cache invalidation (follow-up F0, t_ae600b90): a camera decision
+    // changes the public set or the record itself, and the list/bbox/export
+    // responses are cached with `s-maxage=300, stale-while-revalidate=600`
+    // (the record detail is per-id, the collections are shared). Purge the
+    // affected tags through the Cloudflare Cache Purge API so a takedown
+    // (e.g. privacy/safety removal) stops being served immediately instead
+    // of lingering for the revalidation window. Fail-open by design: when
+    // CACHE_PURGE_TOKEN/ZONE_ID are absent (local prototype, tests) this is
+    // a documented no-op, and an API failure never fails the decision.
+    if (result.kind === "ok") {
+      if (payload.entity === "camera") {
+        await purgeCacheTags(cameraPurgeTags(payload.id), env);
+      } else if (payload.entity === "correction") {
+        // A correction decision can change the linked camera (approve with
+        // outcome corrected/removed/marked-stale) — purge that record too.
+        const cameraId = (result as { item?: { cameraId?: number | null } }).item?.cameraId;
+        if (cameraId !== null && cameraId !== undefined) {
+          await purgeCacheTags(cameraPurgeTags(cameraId), env);
+        }
+      }
+      // Photo decisions do not invalidate camera tags: the photo bytes are
+      // served with a 1 h immutable cache on /api/photos/[id] and approved
+      // photos are not embedded in the camera list payloads. Photo-tag
+      // purge is intentionally out of scope here (write path F2/F3).
+    }
+
     return moderationResponse(payload.entity, result);
   } catch (error) {
     if (error instanceof BodyReadError) {

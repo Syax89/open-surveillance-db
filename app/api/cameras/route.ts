@@ -14,6 +14,7 @@ import {
   type RouteKind,
 } from "../../lib/rate-limit";
 import { recordRateLimitBlock } from "../../lib/abuse-alerts";
+import { CACHE_TAGS } from "../../lib/cache-purge";
 import {
   BodyReadError,
   readJsonBody,
@@ -108,16 +109,23 @@ export async function GET(request: Request) {
       if (format !== "geojson") {
         return Response.json({ error: "The bbox parameter requires format=geojson." }, { status: 400 });
       }
-      const parts = bboxParam.split(",").map((part) => Number(part.trim()));
-      if (parts.length !== 4 || parts.some((value) => !Number.isFinite(value))) {
+      // Strict decimal segments (follow-up F0, t_ae600b90): `Number("")` is 0,
+      // so a trailing comma like "12.4,41.8,12.6," would silently parse the
+      // empty segment as 0. A regex per segment rejects empty values and
+      // non-decimal syntax ("1e3", "0x10") before any arithmetic.
+      const segments = bboxParam.split(",").map((part) => part.trim());
+      if (
+        segments.length !== 4 ||
+        segments.some((part) => !/^-?\d+(\.\d+)?$/.test(part))
+      ) {
         return Response.json({ error: "bbox must be four numbers: west,south,east,north." }, { status: 400 });
       }
-      const [west, south, east, north] = parts;
+      const [west, south, east, north] = segments.map((part) => Number(part));
       if (west < -180 || east > 180 || south < -90 || north > 90 || west >= east || south >= north) {
         return Response.json({ error: "bbox must be a valid geographic rectangle: west<east and south<north within world bounds." }, { status: 400 });
       }
       const records = await listPublicCamerasInBbox({ west, south, east, north });
-      return Response.json({ type: "FeatureCollection", license: DATA_LICENSE_ID, attribution: DATA_LICENSE_NOTICE, features: records.map((record) => ({ type: "Feature", geometry: { type: "Point", coordinates: [record.longitude, record.latitude] }, properties: { id: record.id, title: record.title, kind: record.kind, manufacturer: record.manufacturer, observedOn: record.observedOn, status: record.status, source: record.source, updated: record.updated, description: record.description } })) }, { headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" } });
+      return Response.json({ type: "FeatureCollection", license: DATA_LICENSE_ID, attribution: DATA_LICENSE_NOTICE, features: records.map((record) => ({ type: "Feature", geometry: { type: "Point", coordinates: [record.longitude, record.latitude] }, properties: { id: record.id, title: record.title, kind: record.kind, manufacturer: record.manufacturer, observedOn: record.observedOn, status: record.status, source: record.source, updated: record.updated, description: record.description } })) }, { headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600", "Cache-Tag": CACHE_TAGS.bbox } });
     }
 
     if (format === "geojson") {
@@ -130,11 +138,11 @@ export async function GET(request: Request) {
       // cache is acceptable (the dataset changes through moderation, not live
       // feeds), and revalidation happens after the window. Deliberately NOT
       // `immutable` — the export URL's content does change when moderators act.
-      return Response.json({ type: "FeatureCollection", license: DATA_LICENSE_ID, attribution: DATA_LICENSE_NOTICE, features: records.map((record) => ({ type: "Feature", geometry: { type: "Point", coordinates: [record.longitude, record.latitude] }, properties: { id: record.id, title: record.title, kind: record.kind, manufacturer: record.manufacturer, observedOn: record.observedOn, status: record.status, source: record.source, updated: record.updated, description: record.description } })) }, { headers: { "Content-Disposition": "attachment; filename=opensurveillancedb-cameras.geojson", "Cache-Control": "public, s-maxage=3600" } });
+      return Response.json({ type: "FeatureCollection", license: DATA_LICENSE_ID, attribution: DATA_LICENSE_NOTICE, features: records.map((record) => ({ type: "Feature", geometry: { type: "Point", coordinates: [record.longitude, record.latitude] }, properties: { id: record.id, title: record.title, kind: record.kind, manufacturer: record.manufacturer, observedOn: record.observedOn, status: record.status, source: record.source, updated: record.updated, description: record.description } })) }, { headers: { "Content-Disposition": "attachment; filename=opensurveillancedb-cameras.geojson", "Cache-Control": "public, s-maxage=3600", "Cache-Tag": CACHE_TAGS.export } });
     }
     if (format === "csv") {
       const records = await listPublicCameras(filters);
-      return new Response(toCsv(records), { headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": "attachment; filename=opensurveillancedb-cameras.csv", "Cache-Control": "public, s-maxage=3600" } });
+      return new Response(toCsv(records), { headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": "attachment; filename=opensurveillancedb-cameras.csv", "Cache-Control": "public, s-maxage=3600", "Cache-Tag": CACHE_TAGS.export } });
     }
     // Pagination applies to the default JSON list only — CSV/GeoJSON exports
     // stay complete snapshots (rate-limited in the "export" bucket). limit is
@@ -154,7 +162,7 @@ export async function GET(request: Request) {
     // bounded 5-minute edge/browser cache with stale-while-revalidate keeps
     // the directory responsive while still converging after any moderation
     // action. search/nearby stay no-store (user input / duplicate warnings).
-    return Response.json({ records: page.records, total: page.total, nextOffset: page.nextOffset, facets }, { headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" } });
+    return Response.json({ records: page.records, total: page.total, nextOffset: page.nextOffset, facets }, { headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600", "Cache-Tag": CACHE_TAGS.list } });
   } catch (error) {
     console.error("GET /api/cameras failed", error);
     return Response.json({ error: "Database unavailable" }, { status: 503 });

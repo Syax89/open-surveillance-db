@@ -7,7 +7,7 @@
 
 import assert from "node:assert/strict";
 import { after, beforeEach, test } from "node:test";
-import { apiRequest as publicRequest, cleanupRouteTree, loadRoute, responseBody } from "./helpers/api-harness.mjs";
+import { apiRequest as publicRequest, cleanupRouteTree, loadRoute, loadTreeModule, responseBody } from "./helpers/api-harness.mjs";
 import { callArgs, resetMockState, stub } from "./helpers/mock-state.mjs";
 
 // Route-level authz (ADR 0014): protected routes derive the acting reviewer
@@ -678,4 +678,121 @@ test("PATCH maps malformed JSON bodies to 400", async () => {
   const response = await PATCH(authRequest("/api/moderation", { method: "PATCH", body: "{nope" }));
   assert.equal(response.status, 400);
   assert.equal(callArgs("moderateCamera").length, 0, "no db write for malformed JSON");
+});
+
+// ---------------------------------------------------------------------------
+// PATCH /api/moderation — edge-cache purge (follow-up F0, t_ae600b90)
+// ---------------------------------------------------------------------------
+
+const originalFetch = globalThis.fetch;
+const capturedPurgeRequests = [];
+function stubPurgeFetch() {
+  capturedPurgeRequests.length = 0;
+  globalThis.fetch = async (input, init) => {
+    capturedPurgeRequests.push({ url: String(input), init });
+    return new Response(JSON.stringify({ success: true }), { status: 200 });
+  };
+}
+
+test("PATCH on a camera decision purges the record and shared camera tags via the Cache Purge API", async () => {
+  stub("moderateCamera", async () => okResult());
+  const env = (await loadTreeModule("cloudflare-workers.mjs")).env;
+  env.CACHE_PURGE_TOKEN = "test-token";
+  env.CACHE_PURGE_ZONE_ID = "test-zone";
+  stubPurgeFetch();
+  try {
+    const { PATCH } = await route();
+    const response = await PATCH(
+      authRequest("/api/moderation", {
+        method: "PATCH",
+        body: { entity: "camera", id: 5, action: "approve", reasonCode: validReasonCode, actorId },
+      }),
+    );
+    assert.equal(response.status, 200);
+    assert.equal(capturedPurgeRequests.length, 1, "one purge call for a camera decision");
+    const call = capturedPurgeRequests[0];
+    assert.equal(call.url, "https://api.cloudflare.com/client/v4/zones/test-zone/purge_cache");
+    assert.equal(call.init.method, "POST");
+    assert.equal(call.init.headers.Authorization, "Bearer test-token");
+    assert.deepEqual(JSON.parse(call.init.body), {
+      tags: ["cameras-list", "cameras-bbox", "cameras-export", "camera-5"],
+    });
+  } finally {
+    delete env.CACHE_PURGE_TOKEN;
+    delete env.CACHE_PURGE_ZONE_ID;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("PATCH on a correction decision purges the linked camera when present", async () => {
+  stub("moderateCorrection", async () => okResult({ ...cameraItem, cameraId: 42 }));
+  const env = (await loadTreeModule("cloudflare-workers.mjs")).env;
+  env.CACHE_PURGE_TOKEN = "test-token";
+  env.CACHE_PURGE_ZONE_ID = "test-zone";
+  stubPurgeFetch();
+  try {
+    const { PATCH } = await route();
+    const response = await PATCH(
+      authRequest("/api/moderation", {
+        method: "PATCH",
+        body: { entity: "correction", id: 9, action: "approve", reasonCode: validReasonCode, outcome: "corrected", cameraId: 42, actorId },
+      }),
+    );
+    assert.equal(response.status, 200);
+    assert.equal(capturedPurgeRequests.length, 1);
+    assert.deepEqual(JSON.parse(capturedPurgeRequests[0].init.body).tags, [
+      "cameras-list",
+      "cameras-bbox",
+      "cameras-export",
+      "camera-42",
+    ]);
+  } finally {
+    delete env.CACHE_PURGE_TOKEN;
+    delete env.CACHE_PURGE_ZONE_ID;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("PATCH does not call the purge API when cache-purge credentials are absent", async () => {
+  stub("moderateCamera", async () => okResult());
+  const env = (await loadTreeModule("cloudflare-workers.mjs")).env;
+  delete env.CACHE_PURGE_TOKEN;
+  delete env.CACHE_PURGE_ZONE_ID;
+  stubPurgeFetch();
+  try {
+    const { PATCH } = await route();
+    const response = await PATCH(
+      authRequest("/api/moderation", {
+        method: "PATCH",
+        body: { entity: "camera", id: 5, action: "reject", reasonCode: "duplicate", actorId },
+      }),
+    );
+    assert.equal(response.status, 200);
+    assert.equal(capturedPurgeRequests.length, 0, "no purge call without credentials (documented no-op)");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("PATCH does not purge when the decision did not succeed", async () => {
+  stub("moderateCamera", async () => ({ kind: "second_review_pending" }));
+  const env = (await loadTreeModule("cloudflare-workers.mjs")).env;
+  env.CACHE_PURGE_TOKEN = "test-token";
+  env.CACHE_PURGE_ZONE_ID = "test-zone";
+  stubPurgeFetch();
+  try {
+    const { PATCH } = await route();
+    const response = await PATCH(
+      authRequest("/api/moderation", {
+        method: "PATCH",
+        body: { entity: "camera", id: 5, action: "approve", reasonCode: validReasonCode, actorId },
+      }),
+    );
+    assert.equal(response.status, 202);
+    assert.equal(capturedPurgeRequests.length, 0, "a pending second review did not change the public set");
+  } finally {
+    delete env.CACHE_PURGE_TOKEN;
+    delete env.CACHE_PURGE_ZONE_ID;
+    globalThis.fetch = originalFetch;
+  }
 });

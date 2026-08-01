@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 import { getPublicCameraById } from "../../../../db/cameras";
 import { recordRateLimitBlock } from "../../../lib/abuse-alerts";
+import { CACHE_TAGS } from "../../../lib/cache-purge";
 import { callerKey, checkRateLimit, limitsFor } from "../../../lib/rate-limit";
 
 /**
@@ -20,10 +21,17 @@ import { callerKey, checkRateLimit, limitsFor } from "../../../lib/rate-limit";
  */
 export async function GET(request: Request) {
   const idParam = new URL(request.url).pathname.split("/").pop() ?? "";
-  const id = Number(idParam);
-  if (!Number.isInteger(id) || id < 1) {
+  // Strict decimal check (follow-up F0, t_ae600b90): `Number("1e3")` and
+  // `Number("0x10")` are both finite integers, so a plain Number() cast
+  // would accept scientific/hex syntax. The public ids are plain decimal
+  // strings — ^\d+$ is the exact grammar (the query stays parameterised
+  // either way; this is a tighter contract, not a security boundary). The
+  // positivity check is kept alongside: ids are 1-based, and "0" passes
+  // ^\d+$ but must still answer 404.
+  if (!/^\d+$/.test(idParam) || Number(idParam) < 1) {
     return Response.json({ error: "Camera not found." }, { status: 404 });
   }
+  const id = Number(idParam);
 
   // Public read route: metered per caller in the read-family bucket, same as
   // the directory list and the photo bytes. Malformed ids above answered 404
@@ -53,8 +61,10 @@ export async function GET(request: Request) {
     return Response.json({ record }, {
       // Same bounded edge cache as the list: the record changes through
       // moderation decisions, never live feeds, and revalidation converges
-      // after any decision within the window.
-      headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" },
+      // after any decision within the window. The Cache-Tag lets the
+      // moderation write path purge this exact representation immediately
+      // (see app/lib/cache-purge.ts).
+      headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600", "Cache-Tag": CACHE_TAGS.record(id) },
     });
   } catch (error) {
     console.error("GET /api/cameras/[id] failed", error);

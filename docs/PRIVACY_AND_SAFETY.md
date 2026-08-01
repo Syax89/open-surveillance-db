@@ -47,6 +47,34 @@ Remaining pre-launch items on the rights side: provisioning the monitored privac
 - Maintain emergency hide/remove controls for credible safety reports.
 - Never expose unpublished reports through search, API, exports, logs, or analytics.
 
+## Edge caching and moderation
+
+Public read responses carry a **bounded edge cache**: the camera list, bbox
+map layer and record detail use `public, s-maxage=300,
+stale-while-revalidate=600`; full CSV/GeoJSON exports use `s-maxage=3600`;
+approved photo bytes use `public, max-age=3600, immutable`. These windows
+keep the directory responsive without serving live feeds, but they mean a
+moderation decision (e.g. a privacy/safety removal) could otherwise leave a
+taken-down record served from the edge for up to the revalidation window.
+
+To close that gap, every cacheable public response carries a **Cache-Tag**
+(`cameras-list`, `cameras-bbox`, `cameras-export`, `camera-<id>`,
+`photo-<id>`), and the moderation write path (`PATCH /api/moderation`)
+purges the affected tags through the **Cloudflare Cache Purge API** after a
+successful camera or correction decision (fail-open: an API failure never
+fails the decision, and without `CACHE_PURGE_TOKEN`/`CACHE_PURGE_ZONE_ID`
+configured the purge is a documented no-op and the bounded cache window
+remains the guarantee).
+
+**Trade-off (documented).** With purge credentials configured, a takedown is
+served until the purge completes (typically < 1 s) plus any in-flight
+stale-while-revalidate response already handed to a client; without
+credentials, the worst case is the revalidation window (up to ~15 min for
+list/bbox/record, 1 h for exports). This is a deliberate operational choice:
+the cache exists to keep the public directory responsive under load, and the
+purge hook exists so privacy decisions can override it. Photo-bytes purge is
+deferred to the F2/F3 photo write path (the tag is already emitted).
+
 ## Accessibility and inclusion
 
 The map must have an accessible list/search alternative, keyboard operation, non-colour-only status indicators, readable language, and translations. Community reporting must not be the only basis for determining whether a group is subject to surveillance.

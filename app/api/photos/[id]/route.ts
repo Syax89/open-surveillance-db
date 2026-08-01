@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 import { readPublicPhotoBytes } from "../../../../db/photos";
 import { recordRateLimitBlock } from "../../../lib/abuse-alerts";
+import { CACHE_TAGS } from "../../../lib/cache-purge";
 import { callerKey, checkRateLimit, limitsFor } from "../../../lib/rate-limit";
 
 /**
@@ -53,7 +54,11 @@ export async function GET(request: Request) {
     {
       headers: {
         "Content-Type": photo.mimeType,
+        // 1 h immutable cache (photo bytes never change). The Cache-Tag lets
+        // the future photo write path purge a taken-down photo immediately
+        // (see app/lib/cache-purge.ts — photo purge lands with F2/F3).
         "Cache-Control": "public, max-age=3600, immutable",
+        "Cache-Tag": CACHE_TAGS.photo(id),
         "X-Content-Type-Options": "nosniff",
         "Content-Security-Policy": "default-src 'none'; sandbox",
       },

@@ -54,6 +54,7 @@ test("GET /api/cameras returns the public list as JSON by default", async () => 
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type"), /application\/json/);
   assert.equal(response.headers.get("cache-control"), "public, s-maxage=300, stale-while-revalidate=600", "the directory list is cached for a bounded window and revalidated after moderation decisions");
+  assert.equal(response.headers.get("cache-tag"), "cameras-list", "the list carries the shared list cache-tag for moderation purge");
   assert.deepEqual(await responseBody(response), { records: [cameraFixture], total: 1, nextOffset: null, facets: emptyFacets });
   assert.deepEqual(callArgs("listPublicCamerasPage")[0], [{}, { limit: 500, offset: 0 }], "the default page is the first 500 records");
   assert.equal(callArgs("getPublicCameraFacets").length, 1, "the facets are computed inline for the filter UI");
@@ -70,6 +71,7 @@ test("GET /api/cameras?format=geojson emits lon/lat FeatureCollection with expor
     /filename=opensurveillancedb-cameras\.geojson/,
   );
   assert.equal(response.headers.get("cache-control"), "public, s-maxage=3600", "export snapshots may be cached for a bounded window");
+  assert.equal(response.headers.get("cache-tag"), "cameras-export", "exports carry the shared export cache-tag for moderation purge");
   const body = await responseBody(response);
   assert.equal(body.type, "FeatureCollection");
   // ODbL 1.0 attribution (TERMS § 7.1): the FeatureCollection must carry the
@@ -109,6 +111,7 @@ test("GET /api/cameras?format=csv escapes quotes and neutralises spreadsheet for
   assert.match(response.headers.get("content-type"), /text\/csv; charset=utf-8/);
   assert.match(response.headers.get("content-disposition"), /filename=opensurveillancedb-cameras\.csv/);
   assert.equal(response.headers.get("cache-control"), "public, s-maxage=3600", "export snapshots may be cached for a bounded window");
+  assert.equal(response.headers.get("cache-tag"), "cameras-export", "exports carry the shared export cache-tag for moderation purge");
   const csv = await responseBody(response);
   assert.match(csv, /^id,title,kind,manufacturer,observed_on,status,source,updated,description,address,latitude,longitude\n/);
   assert.match(
@@ -849,6 +852,7 @@ test("GET /api/cameras/[id] returns the public record wrapped in { record }", as
 
   assert.equal(response.status, 200);
   assert.equal(response.headers.get("cache-control"), "public, s-maxage=300, stale-while-revalidate=600", "the record detail is cached for a bounded window like the list");
+  assert.equal(response.headers.get("cache-tag"), "camera-1", "the record detail carries its per-id cache-tag for moderation purge");
   assert.deepEqual(await responseBody(response), { record: cameraFixture });
   assert.deepEqual(callArgs("getPublicCameraById")[0], [1]);
 });
@@ -865,7 +869,20 @@ test("GET /api/cameras/[id] fails closed with 404 for non-public or missing reco
 
 test("GET /api/cameras/[id] rejects non-numeric and non-positive ids with 404", async (t) => {
   const { GET } = await cameraIdRoute();
-  for (const path of ["/api/cameras/abc", "/api/cameras/-3", "/api/cameras/1.5", "/api/cameras/0", "/api/cameras/"]) {
+  const paths = [
+    "/api/cameras/abc",
+    "/api/cameras/-3",
+    "/api/cameras/1.5",
+    "/api/cameras/0",
+    "/api/cameras/",
+    // Follow-up F0 (t_ae600b90): scientific/hex syntax parses to finite
+    // integers via Number(), but the public ids are plain decimal strings.
+    "/api/cameras/1e3",
+    "/api/cameras/0x10",
+    "/api/cameras/1_000",
+    "/api/cameras/1e",
+  ];
+  for (const path of paths) {
     await t.test(path, async () => {
       const response = await GET(apiRequest(path));
       assert.equal(response.status, 404, path);
@@ -912,6 +929,7 @@ test("GET /api/cameras?format=geojson&bbox= returns only the points inside the b
 
   assert.equal(response.status, 200);
   assert.equal(response.headers.get("cache-control"), "public, s-maxage=300, stale-while-revalidate=600", "the map marker layer is cached like the list, never longer");
+  assert.equal(response.headers.get("cache-tag"), "cameras-bbox", "the bbox layer carries the shared bbox cache-tag for moderation purge");
   assert.equal(response.headers.get("content-disposition"), null, "a bbox GeoJSON is a live map layer, not a download attachment");
   const body = await responseBody(response);
   assert.equal(body.type, "FeatureCollection");
@@ -929,6 +947,17 @@ test("GET /api/cameras bbox validation rejects malformed and inverted rectangles
     "12.4,42.0,12.6,41.8",
     "-181,0,10,10",
     "0,-91,10,10",
+    // Follow-up F0 (t_ae600b90): empty segments must be rejected — a bare
+    // `Number("")` is 0, so a trailing/middle comma would silently parse as
+    // a real coordinate instead of answering 400.
+    "12.4,41.8,12.6,",
+    "12.4,,12.6,42.0",
+    ",41.8,12.6,42.0",
+    "12.4,41.8,12.6, ",
+    // Non-decimal numeric syntax is rejected too ("1e3"/"0x10" parse to
+    // finite numbers via Number(), but they are not plain decimal segments).
+    "1e3,41.8,12.6,42.0",
+    "0x10,41.8,12.6,42.0",
   ];
   for (const bbox of cases) {
     await t.test(bbox, async () => {
