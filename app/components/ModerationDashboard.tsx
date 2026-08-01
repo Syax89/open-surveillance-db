@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { LocaleToggle, useLocale, useMessages } from "./LocaleProvider";
+import { SiteHeader } from "./SiteHeader";
 
 type CameraInQueue = {
   id: number;
@@ -275,10 +276,9 @@ export function ModerationDashboard() {
   }
 
   return <main id="main-content">
-    <nav className="nav-shell" aria-label={t.navigation}>
-      <Link className="brand" href="/" aria-label={t.home}><span className="brand-mark" aria-hidden="true">◉</span><span>OpenSurveillanceDB</span></Link>
+    <SiteHeader navLabel={t.navigation} homeLabel={t.home} toggle="none">
       <div className="nav-actions"><LocaleToggle /><Link className="text-button" href="/">{t.returnPublic} <span aria-hidden="true">→</span></Link></div>
-    </nav>
+    </SiteHeader>
 
     <section className="moderation-page" aria-labelledby="moderation-title">
       <p className="eyebrow"><span /> {t.localAdministration}</p>

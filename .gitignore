@@ -51,3 +51,4 @@ tsconfig.tsbuildinfo
 
 # dom harness transpile tree (tests/.dom-tmp-*)
 tests/.dom-tmp-*
+tests/ssr-snap15.tmp.mjs
