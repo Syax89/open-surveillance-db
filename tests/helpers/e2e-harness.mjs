@@ -167,7 +167,12 @@ async function buildTree() {
     const routerStubUrl = pathToFileURL(path.join(tree, "vinext-router-stub.mjs")).href;
     await writeFile(
       path.join(tree, "vinext-router-stub.mjs"),
-      'export default { fetch: async () => new Response("handler-called") };\n',
+      "// Edge identity-gate tests read the request the router received to\n" +
+        "// assert that spoofed identity headers were stripped and the\n" +
+        "// server-chosen identity was injected (ADR 0014).\n" +
+        "export let lastRequest = null;\n" +
+        "export function resetLastRequest() { lastRequest = null; }\n" +
+        "export default { fetch: async (request) => { lastRequest = request; return new Response(\"handler-called\"); } };\n",
     );
     const compiled = transpile(path.join(root, "worker", "index.ts"));
     const rewritten = compiled
