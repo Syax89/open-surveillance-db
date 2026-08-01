@@ -211,7 +211,7 @@ logout).
 
 Coarse role identity (ADR 0014): `email` (unique), `displayName`, `role`
 (`contributor` | `moderator` | `admin`), `active`, `mfaEnabled`, timestamps.
-Gates every protected route via `requireRole`. The five "Demo" rows are
+Gates every protected route via `requireRole`. The six "Demo" rows are
 local-prototype seed (migration `0010`) and are replaced by provisioned
 accounts before public alpha. Bridged to `contributors` by email at
 provisioning time (see ADR 0014 integration note).
