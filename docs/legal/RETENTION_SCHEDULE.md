@@ -1,7 +1,7 @@
 # Retention schedule (operational)
 
 - **Status:** draft for pre-launch review (ADR 0004)
-- **Owner:** Rosa (DPO / privacy)
+- **Owner:** Rosa (Legal & Privacy Officer / privacy contact)
 - **Decisions applied (2026-07-31, CEO — ADR 0008):** verified records on a **12-month renewal review cycle**; privacy contact `privacy@opensurveillancedb` (mailbox to be created at launch).
 - **Photo evidence retention (2026-08-01, DPO — audit gap G6):** photo uploads follow their own lifecycle (R13) aligned to the record rules — pending/orphan 90 days, rejected 30 days, approved photos follow the 12-month record cycle; deletion always includes the R2 `PHOTOS` object bytes, not just the D1 row.
 - **Legal basis:** GDPR art. 5(1)(e) (storage limitation), art. 17 (erasure); D.Lgs. 196/2003 (Codice Privacy, IT) as primary jurisdiction; consistent with `../PRIVACY_AND_SAFETY.md` and `../MODERATION.md`.
@@ -44,7 +44,7 @@
 - Retention rules R1/R2/R3 need automated enforcement: a scheduled job (Cloudflare D1 cron / Workers cron trigger) that flags `pending` > 90 days and `rejected` > 30 days for deletion, and pushes stale `verified` records to `needs_review`. **Follow-up (implementation):** `db/retention.ts` + cron binding + tests (tracked in t_e54a5c3b; photo sweep tracked in t_d89ed37d).
 - Photo evidence (R13) is swept by the same job: `pending` photos orphaned for > 90 days, `pending` photos linked to a camera rejected/removed for > 30 days, and `rejected` photos older than 30 days are hard-deleted — D1 row **and** R2 object (`PHOTOS.delete(storageKey)`) — atomically with any record deletion.
 - Audit log entries (R4/R5/R9) are archived, not hard-deleted, until the 2-year mark.
-- The DPO reviews this schedule annually and on any material change of purpose, provider, or jurisdiction.
+- The privacy/legal owner (data-protection contact) reviews this schedule annually and on any material change of purpose, provider, or jurisdiction.
 
 ## 4. Legal rationale
 
