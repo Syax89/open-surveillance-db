@@ -159,7 +159,16 @@ test("JSON, GeoJSON, and CSV are all derived from the public camera list", async
     /features\s*:\s*records\.map\(/,
     "GeoJSON must map the same filtered records returned by listPublicCameras",
   );
-  assert.match(getHandler, /return\s+Response\.json\(\{\s*records\s*\}\)/);
+  assert.match(
+    getHandler,
+    /listPublicCamerasPage\(filters,\s*\{\s*limit,\s*offset\s*\}\)/,
+    "the default JSON list must page through the dedicated paginated helper",
+  );
+  assert.match(
+    getHandler,
+    /return\s+Response\.json\(\{\s*records:\s*page\.records,\s*total:\s*page\.total,\s*nextOffset:\s*page\.nextOffset\s*\}/,
+    "the default JSON list must return the paginated shape (records, total, nextOffset)",
+  );
   assert.match(route, /function\s+toCsv\s*\(records/, "CSV must have an explicit serializer");
   assert.match(getHandler, /format\s*===\s*["']csv["']/, "the public route must recognise the CSV format");
   assert.match(getHandler, /new\s+Response\(toCsv\(records\)/, "CSV must serialize the same filtered record list");

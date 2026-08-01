@@ -206,7 +206,10 @@ export async function GET(request: Request) {
     const camera = await getPublicCameraById(cameraId);
     if (!camera) return Response.json({ error: "Record not found." }, { status: 404 });
     const photos = await listApprovedPhotosForCamera(cameraId);
-    return Response.json({ photos });
+    // Approved-photo list (audit t_2ee58c08, gap #2): the set changes as
+    // photos pass moderation, so the list itself is never cached (the photo
+    // bytes served by /api/photos/[id] are immutable and cached separately).
+    return Response.json({ photos }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     console.error("GET /api/photos failed", error);
     return Response.json({ error: "Unable to list photos" }, { status: 503 });

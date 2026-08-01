@@ -52,7 +52,9 @@ export async function GET(request: Request) {
     }
 
     const revisions = await listPublicCameraRevisions(cameraId);
-    return Response.json({ recordId: record.id, revisions });
+    // Public change history (audit t_2ee58c08, gap #2): the summary must
+    // reflect the latest moderation decisions, so it is never cached.
+    return Response.json({ recordId: record.id, revisions }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     console.error("GET /api/cameras/revisions failed", error);
     return Response.json({ error: "Change history unavailable" }, { status: 503 });

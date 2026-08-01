@@ -458,7 +458,7 @@ test("route families keep independent rate-limit windows", async () => {
   assertBlocked(submitBlocked, "the submit family must be exhausted for this caller");
 
   // The plain read family is untouched by the submit burst.
-  stub("listPublicCameras", async () => []);
+  stub("listPublicCamerasPage", async () => ({ records: [], total: 0, nextOffset: null }));
   const camerasRoute = await routes.cameras();
   const read = await camerasRoute.GET(apiRequest("/api/cameras", { headers: identityHeaders(caller) }));
   assert.equal(read.status, 200, "the read bucket must not be affected by the submit bucket");

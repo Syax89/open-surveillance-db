@@ -199,6 +199,78 @@ test("the public camera list orders by id descending", async () => {
   );
 });
 
+test("listPublicCamerasPage returns exactly limit records, the true total and a null nextOffset on the last page", async () => {
+  const { env, cameras } = await realDb();
+  await resetDb({ env, cameras });
+  const created = [];
+  for (let index = 0; index < 7; index += 1) {
+    created.push(await insertCamera(env, { title: `Page ${index}` }));
+  }
+
+  const first = await cameras.listPublicCamerasPage(undefined, { limit: 3, offset: 0 });
+  assert.equal(first.records.length, 3, "a page never exceeds its limit");
+  assert.equal(first.total, 7, "total counts every matching record, not just the page");
+  assert.equal(first.nextOffset, 3, "a non-final page advertises the next offset");
+  // Same id DESC ordering as the full list (stable offsets between requests).
+  assert.deepEqual(first.records.map((record) => record.id), [created[6].id, created[5].id, created[4].id]);
+
+  const middle = await cameras.listPublicCamerasPage(undefined, { limit: 3, offset: 3 });
+  assert.deepEqual(middle.records.map((record) => record.id), [created[3].id, created[2].id, created[1].id]);
+  assert.equal(middle.total, 7);
+
+  const last = await cameras.listPublicCamerasPage(undefined, { limit: 3, offset: 6 });
+  assert.deepEqual(last.records.map((record) => record.id), [created[0].id]);
+  assert.equal(last.nextOffset, null, "the final page stops the walk");
+});
+
+test("listPublicCamerasPage pages are disjoint and cover the whole public set (zero records out of page)", async () => {
+  const { env, cameras } = await realDb();
+  await resetDb({ env, cameras });
+  const created = [];
+  for (let index = 0; index < 10; index += 1) {
+    created.push(await insertCamera(env, { title: `Cover ${index}` }));
+  }
+
+  const pageOne = await cameras.listPublicCamerasPage(undefined, { limit: 4, offset: 0 });
+  const pageTwo = await cameras.listPublicCamerasPage(undefined, { limit: 4, offset: 4 });
+  const pageThree = await cameras.listPublicCamerasPage(undefined, { limit: 4, offset: 8 });
+
+  const seen = [...pageOne.records, ...pageTwo.records, ...pageThree.records].map((record) => record.id);
+  assert.equal(new Set(seen).size, seen.length, "no record may appear on more than one page");
+  assert.deepEqual(seen.sort((a, b) => a - b), created.map((record) => record.id).sort((a, b) => a - b), "every public record appears on exactly one page");
+  // Zero records out of page: walking nextOffset must terminate on the true total.
+  const walked = [];
+  let offset = 0;
+  for (;;) {
+    const page = await cameras.listPublicCamerasPage(undefined, { limit: 4, offset });
+    walked.push(...page.records);
+    if (page.nextOffset === null) break;
+    offset = page.nextOffset;
+  }
+  assert.deepEqual(walked.map((record) => record.id).sort((a, b) => a - b), created.map((record) => record.id).sort((a, b) => a - b));
+});
+
+test("listPublicCamerasPage applies the same public boundary, filters and coordinate rounding as the full list", async () => {
+  const { env, cameras } = await realDb();
+  await resetDb({ env, cameras });
+  await insertCamera(env, { title: "Hidden pending", status: "pending", kind: "PTZ" });
+  await insertCamera(env, { title: "Verified dome", status: "verified", kind: "Fixed dome", latitude: 44.12346, longitude: 12.34568 });
+  await insertCamera(env, { title: "Verified ptz", status: "verified", kind: "PTZ" });
+
+  const all = await cameras.listPublicCamerasPage(undefined, { limit: 10, offset: 0 });
+  assert.equal(all.total, 2, "pending records never enter the paginated total");
+  assert.equal(all.records.some((record) => record.title === "Hidden pending"), false);
+
+  const byKind = await cameras.listPublicCamerasPage({ kind: "PTZ" }, { limit: 10, offset: 0 });
+  assert.equal(byKind.total, 1);
+  assert.deepEqual(byKind.records.map((record) => record.title), ["Verified ptz"]);
+
+  const rounded = all.records.find((record) => record.title === "Verified dome");
+  assert.equal(rounded.latitude, 44.1235, "coordinates are rounded to ~4 decimals like the full list");
+  assert.equal(rounded.longitude, 12.3457);
+  assert.equal("notes" in rounded, false, "the private notes field never crosses the boundary");
+});
+
 test("createPendingCamera stores a private pending record with publication flags off", async () => {
   const { env, cameras } = await realDb();
   await resetDb({ env, cameras });
@@ -360,6 +432,7 @@ const cameraFixture = {
 };
 
 test("live exports carry no version identifier (versioned releases are a proposal)", async () => {
+  stub("listPublicCamerasPage", async () => ({ records: [cameraFixture], total: 1, nextOffset: null }));
   stub("listPublicCameras", async () => [cameraFixture]);
   const { GET } = await loadRoute("app/api/cameras/route.mjs");
   const response = await GET(apiRequest("/api/cameras"));
@@ -408,7 +481,7 @@ test("CSV omits createdAt and the publish flags and is newline-terminated", asyn
 });
 
 test("unknown format values including uppercase variants fall back to JSON", async () => {
-  stub("listPublicCameras", async () => [cameraFixture]);
+  stub("listPublicCamerasPage", async () => ({ records: [cameraFixture], total: 1, nextOffset: null }));
   const { GET } = await loadRoute("app/api/cameras/route.mjs");
   for (const format of ["CSV", "GeoJSON", "xml", ""]) {
     const query = format ? `?format=${format}` : "";
