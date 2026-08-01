@@ -246,7 +246,14 @@ export const moderationEvents = sqliteTable(
     appealId: integer("appeal_id"),
     createdAt: text("created_at").notNull(),
   },
-  (table) => [index("moderation_events_created_at_idx").on(table.createdAt, table.id)],
+  (table) => [
+    index("moderation_events_created_at_idx").on(table.createdAt, table.id),
+    // Audit-trail lookup index: listPublicCameraRevisions and the
+    // second-reviewer lookups in moderateCamera/moderateCorrection filter on
+    // (entity, entity_id); without it every read is a full scan of the
+    // append-only audit trail. Migration 0012.
+    index("moderation_events_entity_idx").on(table.entity, table.entityId),
+  ],
 );
 
 /**
