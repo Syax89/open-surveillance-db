@@ -69,8 +69,8 @@ open have since been implemented:
   route (confidential advisory, visible only to maintainers) and a response-time
   commitment: first response within 48 h, substantive response within 14 days,
   emergency hide of affected content within 24 h. The same route is published on
-  the public `/contatti` page; a machine-readable RFC 9116 `security.txt` is in
-  review (PR #79).
+  the public `/contatti` page; a machine-readable RFC 9116 `security.txt` is
+  live at `public/.well-known/security.txt` (PR #79 merged).
 - **Publication of governance and reporting contacts on a public surface** — the
   bilingual `/contatti` page publishes the named roles, the data controller, the
   correction e-mail, and the security advisory route.
