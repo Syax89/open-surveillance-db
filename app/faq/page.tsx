@@ -57,6 +57,26 @@ export default async function FaqPage() {
           <summary>{t.qPrivacy}</summary>
           <p>{t.aPrivacy}</p>
         </details>
+        <details className="faq-item">
+          <summary>{t.qAccount}</summary>
+          <p>{t.aAccount}</p>
+        </details>
+        <details className="faq-item">
+          <summary>{t.qVerifications}</summary>
+          <p>{t.aVerifications}</p>
+        </details>
+        <details className="faq-item">
+          <summary>{t.qEdit}</summary>
+          <p>{t.aEdit}</p>
+        </details>
+        <details className="faq-item">
+          <summary>{t.qLevels}</summary>
+          <p>{t.aLevels}</p>
+        </details>
+        <details className="faq-item">
+          <summary>{t.qDeleteAccount}</summary>
+          <p>{t.aDeleteAccount}</p>
+        </details>
       </section>
 
       <section className="correction-section" aria-labelledby="faq-more-title">

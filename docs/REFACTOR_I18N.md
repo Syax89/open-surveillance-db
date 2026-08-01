@@ -105,7 +105,7 @@ short version:
 | Auth | `auth.ts` | |
 | Community (trust levels, verifications, profile, editing) | `community.ts` | `/account` community section, `/records/[id]` verification widget, `/records/[id]/edit` (COMMUNITY_PLAN §6) |
 | Moderation dashboard | `moderation.ts` | private, local-only |
-| Informational pages | `guide.ts`, `manifesto.ts`, `faq.ts`, `contact.ts`, `rules.ts`, `moderazione.ts` | one per page |
+| Informational pages | `guide.ts`, `manifesto.ts`, `faq.ts`, `contact.ts`, `rules.ts`, `moderazione.ts` | one per page; `guide.ts` and `faq.ts` were extended (C-docs) with community sections (account, editing, verifications, trust levels) that reuse the frozen `community.ts` vocabulary — never new jargon |
 | Legal pages | `app/lib/legal/` | typed content layer, NOT i18n bundles |
 
 ## Parity is structural, not semantic

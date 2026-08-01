@@ -154,6 +154,22 @@ changes accumulate under `[Unreleased]`.
   (L0=0/L1=1/L2=5/L3=20/L4=50, solo `status='verified'` conta) e `level` nel
   meta di `/api/auth/me` e della lista contributi; `me/submissions` deprecato
   (backward-compat).
+- Community documentation (C-docs, COMMUNITY_PLAN §6.4): `/guide` extended
+  with four community sections (account — why and how, email+password today,
+  re-aligned with the final login choice; editing your contribution — owner
+  only, re-moderation, not immediately public; verifications — what they
+  confirm, one per user, kept fair, never attributed publicly; trust levels —
+  thresholds 1/5/20/50, recognition not competition) and `/faq` with five new
+  Q&A (account, verifications, editing, contributor levels, verifications on
+  account erasure), both EN/IT type-checked via the existing bundle parity;
+  `docs/workstreams/PRODUCT_UX.md` gains the "Verify and manage your own
+  contributions" journey; `docs/DATA_DICTIONARY.md` documents
+  `confirmationCount`, the verification toggle contract, the
+  `me/contributions` contract and the derived trust level
+  (thresholds + meta, never denormalised, no public attribution);
+  `docs/REFACTOR_I18N.md` and `docs/SITEMAP.md` updated (C phase status,
+  guide/FAQ specs). No new `docs/USER_GUIDE.md` — `/guide` stays the only
+  user guide (SITEMAP rule).
 
 ### Changed
 

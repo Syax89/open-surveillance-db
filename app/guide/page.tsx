@@ -81,6 +81,51 @@ export default async function GuidePage() {
         </div>
       </section>
 
+      <section className="records-section" aria-labelledby="account-title">
+        <div className="records-heading">
+          <div><p className="eyebrow"><span /> {t.accountEyebrow}</p><h2 id="account-title">{t.accountTitle}</h2><p>{t.accountBody}</p></div>
+        </div>
+        <div className="record-list">
+          <article className="record-list-card"><div><p className="card-topline">01 · {t.accountWhyTitle}</p><h3>{t.accountWhyTitle}</h3><p className="record-kind">{t.accountWhyBody}</p></div></article>
+          <article className="record-list-card"><div><p className="card-topline">02 · {t.accountHowTitle}</p><h3>{t.accountHowTitle}</h3><p className="record-kind">{t.accountHowBody}</p></div></article>
+          <article className="record-list-card"><div><p className="card-topline">03 · {t.accountAnonymousTitle}</p><h3>{t.accountAnonymousTitle}</h3><p className="record-kind">{t.accountAnonymousBody}</p></div></article>
+        </div>
+      </section>
+
+      <section className="records-section" aria-labelledby="edit-title">
+        <div className="records-heading">
+          <div><p className="eyebrow"><span /> {t.editEyebrow}</p><h2 id="edit-title">{t.editTitle}</h2><p>{t.editBody}</p></div>
+        </div>
+        <div className="record-list">
+          <article className="record-list-card"><div><p className="card-topline">01 · {t.editOwnerTitle}</p><h3>{t.editOwnerTitle}</h3><p className="record-kind">{t.editOwnerBody}</p></div></article>
+          <article className="record-list-card"><div><p className="card-topline">02 · {t.editRemoderationTitle}</p><h3>{t.editRemoderationTitle}</h3><p className="record-kind">{t.editRemoderationBody}</p></div></article>
+          <article className="record-list-card"><div><p className="card-topline">03 · {t.editNotImmediateTitle}</p><h3>{t.editNotImmediateTitle}</h3><p className="record-kind">{t.editNotImmediateBody}</p></div></article>
+        </div>
+      </section>
+
+      <section className="records-section" aria-labelledby="verify-title">
+        <div className="records-heading">
+          <div><p className="eyebrow"><span /> {t.verifyEyebrow}</p><h2 id="verify-title">{t.verifyTitle}</h2><p>{t.verifyBody}</p></div>
+        </div>
+        <div className="record-list">
+          <article className="record-list-card"><div><p className="card-topline">01 · {t.verifyWhatTitle}</p><h3>{t.verifyWhatTitle}</h3><p className="record-kind">{t.verifyWhatBody}</p></div></article>
+          <article className="record-list-card"><div><p className="card-topline">02 · {t.verifyOneTitle}</p><h3>{t.verifyOneTitle}</h3><p className="record-kind">{t.verifyOneBody}</p></div></article>
+          <article className="record-list-card"><div><p className="card-topline">03 · {t.verifyFairTitle}</p><h3>{t.verifyFairTitle}</h3><p className="record-kind">{t.verifyFairBody}</p></div></article>
+          <article className="record-list-card"><div><p className="card-topline">04 · {t.verifyPrivateTitle}</p><h3>{t.verifyPrivateTitle}</h3><p className="record-kind">{t.verifyPrivateBody}</p></div></article>
+        </div>
+      </section>
+
+      <section className="records-section" aria-labelledby="level-title">
+        <div className="records-heading">
+          <div><p className="eyebrow"><span /> {t.levelEyebrow}</p><h2 id="level-title">{t.levelTitle}</h2><p>{t.levelBody}</p></div>
+        </div>
+        <div className="record-list">
+          <article className="record-list-card"><div><p className="card-topline">01 · {t.levelThresholdsTitle}</p><h3>{t.levelThresholdsTitle}</h3><p className="record-kind">{t.levelThresholdsBody}</p></div></article>
+          <article className="record-list-card"><div><p className="card-topline">02 · {t.levelBadgeTitle}</p><h3>{t.levelBadgeTitle}</h3><p className="record-kind">{t.levelBadgeBody}</p></div></article>
+          <article className="record-list-card"><div><p className="card-topline">03 · {t.levelRecognitionTitle}</p><h3>{t.levelRecognitionTitle}</h3><p className="record-kind">{t.levelRecognitionBody}</p></div></article>
+        </div>
+      </section>
+
       <section className="correction-section" aria-labelledby="open-data-title">
         <div>
           <p className="eyebrow"><span /> {t.dataEyebrow}</p>
