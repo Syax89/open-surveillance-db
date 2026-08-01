@@ -17,7 +17,7 @@ export const en = {
   eyebrow: "Project guide",
   title: "A public database, built with care.",
   intro:
-    "This guide explains what OpenSurveillanceDB documents, how a report becomes public data, and the limits of this local prototype.",
+    "This guide explains what OpenSurveillanceDB documents, how to use the map and directory pages, how a report becomes public data, and the limits of this local prototype.",
   exploreMap: "Explore the map",
   browseDirectory: "Browse directory",
   missionEyebrow: "Purpose and boundaries",
@@ -36,7 +36,7 @@ export const en = {
   cycleEyebrow: "A reviewed process",
   cycleTitle: "From observation to public record.",
   cycleBody:
-    "Reports are deliberately separated from published records. The public map and exports are not an automatic mirror of submissions.",
+    "Reports are deliberately separated from published records. The public map, directory and exports are not an automatic mirror of submissions.",
   cycleRuleTitle: "The default is not publication.",
   cycleRuleBody:
     "A report becomes public only after a human review finds it suitable, sufficiently documented and safe to publish.",
@@ -95,7 +95,7 @@ export const it: Translation<typeof en> = {
   eyebrow: "Guida al progetto",
   title: "Un database pubblico, costruito con attenzione.",
   intro:
-    "Questa guida spiega cosa documenta OpenSurveillanceDB, come una segnalazione diventa un dato pubblico e quali sono i limiti di questo prototipo locale.",
+    "Questa guida spiega cosa documenta OpenSurveillanceDB, come usare le pagine della mappa e dell'elenco, come una segnalazione diventa un dato pubblico e quali sono i limiti di questo prototipo locale.",
   exploreMap: "Esplora la mappa",
   browseDirectory: "Sfoglia l’elenco",
   missionEyebrow: "Scopo e limiti",
@@ -114,7 +114,7 @@ export const it: Translation<typeof en> = {
   cycleEyebrow: "Un processo revisionato",
   cycleTitle: "Dall’osservazione al record pubblico.",
   cycleBody:
-    "Le segnalazioni sono intenzionalmente separate dai record pubblicati. Mappa ed esportazioni non sono una copia automatica degli invii.",
+    "Le segnalazioni sono intenzionalmente separate dai record pubblicati. Mappa, elenco ed esportazioni non sono una copia automatica degli invii.",
   cycleRuleTitle: "La regola predefinita è non pubblicare.",
   cycleRuleBody:
     "Una segnalazione diventa pubblica solo dopo una revisione umana che la ritenga pertinente, sufficientemente documentata e sicura da pubblicare.",
