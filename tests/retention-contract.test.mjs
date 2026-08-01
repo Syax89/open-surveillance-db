@@ -147,8 +147,8 @@ test("the worker exposes a scheduled handler wired to the retention sweep", asyn
   );
   assert.match(
     worker,
-    /loadRetentionPolicy\(env\)/,
-    "the scheduled handler must resolve the RETENTION_DAYS env override",
+    /DEFAULT_RETENTION_POLICY/,
+    "the scheduled handler must use the fixed legal policy (no env override for retention windows)",
   );
   assert.match(
     worker,

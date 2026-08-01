@@ -2,7 +2,7 @@
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
 import type { D1Database, Fetcher, R2Bucket } from "cloudflare:workers";
-import { loadRetentionPolicy, runRetentionSweep, type RetentionSummary } from "../db/retention";
+import { DEFAULT_RETENTION_POLICY, runRetentionSweep, type RetentionSummary } from "../db/retention";
 
 interface Env {
   ASSETS: Fetcher;
@@ -42,8 +42,6 @@ interface Env {
   AUTH_COOKIE_SECURE?: string;
   AUTH_RATE_LIMIT_MAX?: string;
   AUTH_RATE_LIMIT_WINDOW_SECONDS?: string;
-  /** Retention master window in days (default 365, ADR 0008). See db/retention.ts. */
-  RETENTION_DAYS?: string;
 }
 
 interface ExecutionContext {
@@ -269,7 +267,7 @@ const worker = {
    * caught and logged so the worker stays healthy (the next run retries).
    */
   async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
-    const policy = loadRetentionPolicy(env);
+    const policy = DEFAULT_RETENTION_POLICY;
     ctx.waitUntil(
       runRetentionSweep(new Date().toISOString(), { policy, r2: env.PHOTOS })
         .then((summary: RetentionSummary) => {

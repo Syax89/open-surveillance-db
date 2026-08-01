@@ -78,7 +78,23 @@ async function buildWorkerTree() {
   await writeFile(path.join(mocksDir, "app-router-entry.mjs"), appRouterMock);
   await writeFile(path.join(mocksDir, "image-optimization.mjs"), imageOptimizationMock);
 
+  // The worker imports ../db/retention (scheduled retention sweep). These
+  // gate tests exercise routing/authz, not the sweep, so a minimal mock keeps
+  // the tree self-contained (the real sweep has its own suites:
+  // tests/retention.test.mjs + tests/retention-contract.test.mjs).
+  const dbDir = path.join(tree, "db");
+  await mkdir(dbDir, { recursive: true });
+  await writeFile(
+    path.join(dbDir, "retention.mjs"),
+    "export const DEFAULT_RETENTION_POLICY = { pendingDays: 90, rejectedDays: 30, unverifiedRemovalMonths: 6, correctionDays: 730, orphanPhotoDays: 90 };\n" +
+      "export async function runRetentionSweep() { return {}; }\n",
+  );
+
   const rewritten = compiled
+    .replace(
+      /from\s*["']\.\.\/db\/retention["']/g,
+      `from "${pathToFileURL(path.join(dbDir, "retention.mjs")).href}"`,
+    )
     .replace(
       /from\s*["']vinext\/server\/image-optimization["']/g,
       `from "${pathToFileURL(path.join(mocksDir, "image-optimization.mjs")).href}"`,

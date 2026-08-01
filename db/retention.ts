@@ -26,9 +26,12 @@
  *                                       separate decision; out of scope.
  *
  * Design notes:
- *  - `RETENTION_DAYS` is the master policy knob (default 365, env-overridable
- *    in the worker via `env.RETENTION_DAYS`); the per-category windows are
- *    fixed legal values and are NOT scaled by it.
+ *  - The windows are FIXED legal values (RETENTION_SCHEDULE.md, ADR 0008):
+ *    there is deliberately NO env knob to override them — an env override
+ *    could silently extend a legally defined retention window. The "master
+ *    12-month" clock of ADR 0008 p.3 is the freshness review interval
+ *    (DEFAULT_REVIEW_INTERVAL_MONTHS in db/freshness.ts), not a retention
+ *    constant here.
  *  - `cameras.updated` holds a human note, not a timestamp — so the R2
  *    "rejection decision date" is anchored on the moderation event
  *    (action='reject'), with `created_at` as fallback for legacy rows.
@@ -37,25 +40,27 @@
  *    bucket) objects are deleted AFTER the D1 batch succeeds, best effort, so
  *    a bucket failure never orphanes the D1 rows (the objects stay reachable
  *    through the rows and the next run retries them).
+ *  - Every per-record loop is isolated: a single record/chunk that fails is
+ *    counted in `summary.failures` and skipped, so one bad row can never
+ *    abort the whole sweep and block it forever (re-failing every day).
  *  - `now` is injectable for deterministic tests; `r2` (the PHOTOS bucket) is
  *    injectable so tests can assert object deletion without a binding.
  */
 
 import { getD1 } from "./cameras";
 import { runFreshnessSweep } from "./moderation";
+import { addMonths } from "./freshness";
 
 // ---------------------------------------------------------------------------
 // Policy constants (RETENTION_SCHEDULE.md / ADR 0004)
 // ---------------------------------------------------------------------------
 
-/** Master 12-month retention window (ADR 0008 p.3). Env override: RETENTION_DAYS. */
-export const RETENTION_DAYS = 365;
 /** R1: non-verified `pending` reports expire after 90 days from submission. */
 export const PENDING_RETENTION_DAYS = 90;
 /** R2: `rejected` reports expire after 30 days from the rejection decision. */
 export const REJECTED_RETENTION_DAYS = 30;
-/** R3: a record not re-verified within 6 months of its review date is removed. */
-export const UNVERIFIED_REMOVAL_DAYS = 180;
+/** R3: a record not re-verified within 6 CALENDAR MONTHS of its review date is removed. */
+export const UNVERIFIED_REMOVAL_MONTHS = 6;
 /** R4: resolved correction/takedown requests are kept 2 years. */
 export const CORRECTION_RETENTION_DAYS = 730;
 /** R6: pending photo never linked to a record expires with the pending window. */
@@ -69,38 +74,20 @@ export const ORPHAN_PHOTO_RETENTION_DAYS = PENDING_RETENTION_DAYS;
 export const D1_MAX_BOUND_PARAMS = 100;
 
 export type RetentionPolicy = {
-  retentionDays: number;
   pendingDays: number;
   rejectedDays: number;
-  unverifiedRemovalDays: number;
+  unverifiedRemovalMonths: number;
   correctionDays: number;
   orphanPhotoDays: number;
 };
 
 export const DEFAULT_RETENTION_POLICY: RetentionPolicy = {
-  retentionDays: RETENTION_DAYS,
   pendingDays: PENDING_RETENTION_DAYS,
   rejectedDays: REJECTED_RETENTION_DAYS,
-  unverifiedRemovalDays: UNVERIFIED_REMOVAL_DAYS,
+  unverifiedRemovalMonths: UNVERIFIED_REMOVAL_MONTHS,
   correctionDays: CORRECTION_RETENTION_DAYS,
   orphanPhotoDays: ORPHAN_PHOTO_RETENTION_DAYS,
 };
-
-/** Parse a positive integer env value, falling back when absent/invalid. */
-export function parsePositiveInt(value: string | undefined, fallback: number): number {
-  if (value === undefined || value === "") return fallback;
-  const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed < 1) return fallback;
-  return parsed;
-}
-
-/** Resolve the effective policy, honouring the RETENTION_DAYS env override. */
-export function loadRetentionPolicy(
-  env?: { RETENTION_DAYS?: string },
-): RetentionPolicy {
-  const retentionDays = parsePositiveInt(env?.RETENTION_DAYS, RETENTION_DAYS);
-  return { ...DEFAULT_RETENTION_POLICY, retentionDays };
-}
 
 /** Minimal R2 surface the sweep needs (the real PHOTOS bucket satisfies it). */
 export type RetentionR2 = {
@@ -129,8 +116,12 @@ export type RetentionSummary = {
   photosDeleted: number;
   /** R6: PHOTOS bucket objects deleted (best effort). */
   r2ObjectsDeleted: number;
+  /** R6: PHOTOS bucket objects the sweep FAILED to delete (orphaned after D1 rows were removed). */
+  r2ObjectsFailed: number;
   /** R7: expired/revoked session rows removed. */
   sessionsPurged: number;
+  /** Records/chunks whose D1 or R2 step threw; the sweep skipped them and continued. */
+  failures: number;
   /** Audit rows are append-only by design; never touched. */
   moderationEventsRetained: 0;
 };
@@ -196,7 +187,7 @@ async function purgeCameraRecord(
   r2: RetentionR2 | undefined,
   cameraId: number,
   nowIso: string,
-): Promise<{ photoRows: number; r2Deleted: number }> {
+): Promise<{ photoRows: number; r2Deleted: number; r2Failed: number }> {
   const photos = await selectPhotosForCamera(d1, cameraId);
   await d1.batch([
     ...(photos.length > 0
@@ -205,8 +196,8 @@ async function purgeCameraRecord(
     d1.prepare("UPDATE moderation_queue SET state = 'closed', updated_at = ? WHERE entity = 'camera' AND entity_id = ? AND state != 'closed'").bind(nowIso, cameraId),
     d1.prepare("DELETE FROM cameras WHERE id = ?").bind(cameraId),
   ]);
-  const { deleted } = await deleteR2Objects(r2, photos.map((photo) => photo.storageKey));
-  return { photoRows: photos.length, r2Deleted: deleted };
+  const { deleted, failed } = await deleteR2Objects(r2, photos.map((photo) => photo.storageKey));
+  return { photoRows: photos.length, r2Deleted: deleted, r2Failed: failed };
 }
 
 // ---------------------------------------------------------------------------
@@ -237,7 +228,9 @@ export async function runRetentionSweep(
     correctionsPurged: 0,
     photosDeleted: 0,
     r2ObjectsDeleted: 0,
+    r2ObjectsFailed: 0,
     sessionsPurged: 0,
+    failures: 0,
     moderationEventsRetained: 0,
   };
 
@@ -250,7 +243,9 @@ export async function runRetentionSweep(
   // The 6-month clock starts at review_due_at; `stale` is only reached 90 days
   // past it, so `removed` strictly follows `stale`. Evidence is deleted with
   // the record (R6); the row stays as a `removed` tombstone (never public).
-  const unverifiedCutoff = daysAgo(now, policy.unverifiedRemovalDays);
+  // The window is CALENDAR months (addMonths), matching the freshness clocks
+  // and the legal wording "6 months unverified" (review t_eed5f080).
+  const unverifiedCutoff = addMonths(now, -policy.unverifiedRemovalMonths);
   const unverified = await d1
     .prepare(
       "SELECT id, status FROM cameras WHERE status IN ('needs_review', 'stale') AND review_due_at IS NOT NULL AND review_due_at < ?",
@@ -258,24 +253,30 @@ export async function runRetentionSweep(
     .bind(unverifiedCutoff)
     .all<{ id: number; status: string }>();
   for (const { id, status } of unverified.results) {
-    const photos = await selectPhotosForCamera(d1, id);
-    await d1.batch([
-      ...(photos.length > 0
-        ? [d1.prepare("DELETE FROM photos WHERE camera_id = ?").bind(id)]
-        : []),
-      d1
-        .prepare("UPDATE cameras SET status = 'removed', updated = ? WHERE id = ?")
-        .bind("Retention: unverified past the 6-month removal window", id),
-      d1
-        .prepare(
-          "INSERT INTO moderation_events (entity, entity_id, previous_status, new_status, action, reason_code, note, actor, reviewer_id, actor_role, recused, escalated, second_reviewer_id, appeal_id, created_at) VALUES ('camera', ?, ?, 'removed', 'removed', 'inaccurate-or-outdated', ?, 'Retention sweep', NULL, NULL, 0, 0, NULL, NULL, ?)",
-        )
-        .bind(id, status, `Removed after ${policy.unverifiedRemovalDays} days unverified (R3).`, now),
-    ]);
-    const { deleted } = await deleteR2Objects(r2, photos.map((photo) => photo.storageKey));
-    summary.photosDeleted += photos.length;
-    summary.r2ObjectsDeleted += deleted;
-    summary.unverifiedRemoved += 1;
+    try {
+      const photos = await selectPhotosForCamera(d1, id);
+      await d1.batch([
+        ...(photos.length > 0
+          ? [d1.prepare("DELETE FROM photos WHERE camera_id = ?").bind(id)]
+          : []),
+        d1
+          .prepare("UPDATE cameras SET status = 'removed', updated = ? WHERE id = ?")
+          .bind("Retention: unverified past the 6-month removal window", id),
+        d1
+          .prepare(
+            "INSERT INTO moderation_events (entity, entity_id, previous_status, new_status, action, reason_code, note, actor, reviewer_id, actor_role, recused, escalated, second_reviewer_id, appeal_id, created_at) VALUES ('camera', ?, ?, 'removed', 'removed', 'inaccurate-or-outdated', ?, 'Retention sweep', NULL, NULL, 0, 0, NULL, NULL, ?)",
+          )
+          .bind(id, status, `Removed after ${policy.unverifiedRemovalMonths} months unverified (R3).`, now),
+      ]);
+      const { deleted, failed } = await deleteR2Objects(r2, photos.map((photo) => photo.storageKey));
+      summary.photosDeleted += photos.length;
+      summary.r2ObjectsDeleted += deleted;
+      summary.r2ObjectsFailed += failed;
+      summary.unverifiedRemoved += 1;
+    } catch (error) {
+      summary.failures += 1;
+      console.error(`Retention: R3 removal failed for camera ${id}`, error);
+    }
   }
 
   // --- R1: pending reports not verified within 90 days → hard delete + evidence.
@@ -285,10 +286,16 @@ export async function runRetentionSweep(
     .bind(pendingCutoff)
     .all<{ id: number }>();
   for (const { id } of pending.results) {
-    const { photoRows, r2Deleted } = await purgeCameraRecord(d1, r2, id, now);
-    summary.photosDeleted += photoRows;
-    summary.r2ObjectsDeleted += r2Deleted;
-    summary.pendingPurged += 1;
+    try {
+      const { photoRows, r2Deleted, r2Failed } = await purgeCameraRecord(d1, r2, id, now);
+      summary.photosDeleted += photoRows;
+      summary.r2ObjectsDeleted += r2Deleted;
+      summary.r2ObjectsFailed += r2Failed;
+      summary.pendingPurged += 1;
+    } catch (error) {
+      summary.failures += 1;
+      console.error(`Retention: R1 purge failed for camera ${id}`, error);
+    }
   }
 
   // --- R2: rejected reports expire 30 days after the rejection decision.
@@ -298,23 +305,29 @@ export async function runRetentionSweep(
   const rejected = await d1
     .prepare(
       `SELECT c.id
-       FROM cameras c
-       LEFT JOIN (
-         SELECT entity_id, MAX(created_at) AS decided_at
-         FROM moderation_events
-         WHERE entity = 'camera' AND action = 'reject'
-         GROUP BY entity_id
-       ) e ON e.entity_id = c.id
-       WHERE c.status = 'rejected'
-         AND COALESCE(e.decided_at, c.created_at) < ?`,
+      FROM cameras c
+      LEFT JOIN (
+        SELECT entity_id, MAX(created_at) AS decided_at
+        FROM moderation_events
+        WHERE entity = 'camera' AND action = 'reject'
+        GROUP BY entity_id
+      ) e ON e.entity_id = c.id
+      WHERE c.status = 'rejected'
+        AND COALESCE(e.decided_at, c.created_at) < ?`,
     )
     .bind(rejectedCutoff)
     .all<{ id: number }>();
   for (const { id } of rejected.results) {
-    const { photoRows, r2Deleted } = await purgeCameraRecord(d1, r2, id, now);
-    summary.photosDeleted += photoRows;
-    summary.r2ObjectsDeleted += r2Deleted;
-    summary.rejectedPurged += 1;
+    try {
+      const { photoRows, r2Deleted, r2Failed } = await purgeCameraRecord(d1, r2, id, now);
+      summary.photosDeleted += photoRows;
+      summary.r2ObjectsDeleted += r2Deleted;
+      summary.r2ObjectsFailed += r2Failed;
+      summary.rejectedPurged += 1;
+    } catch (error) {
+      summary.failures += 1;
+      console.error(`Retention: R2 purge failed for camera ${id}`, error);
+    }
   }
 
   // --- R4: resolved correction requests older than 2 years → delete.
@@ -330,6 +343,12 @@ export async function runRetentionSweep(
 
   // --- R6: orphan pending photos (never linked to a record) and rejected
   // photos (evidence a moderator refused) are removed from D1 and R2.
+  // NOTE (asymmetry, pinned by tests): the orphan query REQUIRES
+  // camera_id IS NULL — a pending photo linked to a record follows the record
+  // lifecycle (R1/R2/R3) and is never swept alone. The rejected query has NO
+  // camera_id filter: a rejected photo is removed 30 days after the reject
+  // decision even if it is still linked to a live record, because rejected
+  // evidence is never public and must not outlive its appeal window (R13).
   const orphanPhotos = await d1
     .prepare("SELECT id, storage_key AS storageKey FROM photos WHERE camera_id IS NULL AND status = 'pending' AND created_at < ?")
     .bind(daysAgo(now, policy.orphanPhotoDays))
@@ -341,15 +360,15 @@ export async function runRetentionSweep(
   const rejectedPhotos = await d1
     .prepare(
       `SELECT p.id, p.storage_key AS storageKey
-       FROM photos p
-       LEFT JOIN (
-         SELECT entity_id, MAX(created_at) AS decided_at
-         FROM moderation_events
-         WHERE entity = 'photo' AND action = 'reject'
-         GROUP BY entity_id
-       ) e ON e.entity_id = p.id
-       WHERE p.status = 'rejected'
-         AND COALESCE(e.decided_at, p.created_at) < ?`,
+      FROM photos p
+      LEFT JOIN (
+        SELECT entity_id, MAX(created_at) AS decided_at
+        FROM moderation_events
+        WHERE entity = 'photo' AND action = 'reject'
+        GROUP BY entity_id
+      ) e ON e.entity_id = p.id
+      WHERE p.status = 'rejected'
+        AND COALESCE(e.decided_at, p.created_at) < ?`,
     )
     .bind(daysAgo(now, policy.rejectedDays))
     .all<{ id: number; storageKey: string }>();
@@ -358,22 +377,33 @@ export async function runRetentionSweep(
     // D1 caps bound parameters at 100 per query, so a single
     // `DELETE ... WHERE id IN (?, ...)` breaks once more than 100 photos
     // are pending removal (rejected evidence can pile up between runs).
-    // Delete in chunks of at most 100 ids. The D1 rows go FIRST: if any
-    // chunk fails, the R2 objects are still reachable through the rows and
-    // the next run retries cleanly — deleting objects before the rows would
-    // orphan the bucket objects on a partial failure.
+    // Delete in chunks of at most 100 ids, and delete each chunk's R2
+    // objects IMMEDIATELY after its D1 rows: if a later chunk fails, the
+    // rows of the earlier chunks are already gone, so their R2 objects must
+    // be gone too or they would be orphaned forever (the pre-fix code ran
+    // deleteR2Objects only after the whole loop, leaking the objects of
+    // every chunk deleted before the failing one). The failed chunk keeps
+    // its D1 rows, so its objects stay reachable and the next run retries.
     const ids = orphanAndRejected.map((photo) => photo.id);
     for (let offset = 0; offset < ids.length; offset += D1_MAX_BOUND_PARAMS) {
-      const chunk = ids.slice(offset, offset + D1_MAX_BOUND_PARAMS);
-      const placeholders = chunk.map(() => "?").join(", ");
-      await d1
-        .prepare(`DELETE FROM photos WHERE id IN (${placeholders})`)
-        .bind(...chunk)
-        .run();
+      const chunk = orphanAndRejected.slice(offset, offset + D1_MAX_BOUND_PARAMS);
+      const chunkIds = chunk.map((photo) => photo.id);
+      const placeholders = chunkIds.map(() => "?").join(", ");
+      try {
+        await d1
+          .prepare(`DELETE FROM photos WHERE id IN (${placeholders})`)
+          .bind(...chunkIds)
+          .run();
+      } catch (error) {
+        summary.failures += 1;
+        console.error(`Retention: R6 chunk delete failed for ${chunkIds.length} photos`, error);
+        continue;
+      }
+      const { deleted, failed } = await deleteR2Objects(r2, chunk.map((photo) => photo.storageKey));
+      summary.photosDeleted += chunk.length;
+      summary.r2ObjectsDeleted += deleted;
+      summary.r2ObjectsFailed += failed;
     }
-    const { deleted } = await deleteR2Objects(r2, orphanAndRejected.map((photo) => photo.storageKey));
-    summary.photosDeleted += orphanAndRejected.length;
-    summary.r2ObjectsDeleted += deleted;
   }
 
   // --- R7: dead session rows (expired or revoked) are pure garbage collection.

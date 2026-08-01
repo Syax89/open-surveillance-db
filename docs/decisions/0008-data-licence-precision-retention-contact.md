@@ -134,11 +134,13 @@ Mechanics chosen:
   triggers — so a 2-year archival path needs an archive table plus a
   migration and a separate decision; it is tracked separately and out of
   scope of the daily sweep.
-- **The policy is testable and env-overridable.** `db/retention.ts` exports
-  `RETENTION_DAYS` (default 365, the master window per point 3 above) and the
+- **The policy is testable and fixed.** `db/retention.ts` exports the
   per-rule constants (`PENDING_RETENTION_DAYS` 90, `REJECTED_RETENTION_DAYS`
-  30, `UNVERIFIED_REMOVAL_DAYS` 180, `CORRECTION_RETENTION_DAYS` 730,
-  `ORPHAN_PHOTO_RETENTION_DAYS` 90). The worker reads `RETENTION_DAYS` from
-  the environment; `runRetentionSweep(now, { policy, r2 })` accepts an
-  injected policy and R2 bucket so tests can time-travel and assert object
-  deletion without a live binding.
+  30, `UNVERIFIED_REMOVAL_MONTHS` 6, `CORRECTION_RETENTION_DAYS` 730,
+  `ORPHAN_PHOTO_RETENTION_DAYS` 90). The windows are deliberately NOT
+  env-overridable (a knob that silently extends a legal retention window
+  would defeat the schedule); the 12-month master clock is the freshness
+  review interval (`DEFAULT_REVIEW_INTERVAL_MONTHS` in db/freshness.ts).
+  `runRetentionSweep(now, { policy, r2 })` accepts an injected policy and R2
+  bucket so tests can time-travel and assert object deletion without a live
+  binding.

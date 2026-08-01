@@ -133,6 +133,32 @@ function makeR2Spy() {
   return { r2, deletedKeys };
 }
 
+// A D1 wrapper that makes the Nth .run() of statements whose SQL contains
+// `sqlSubstring` throw — simulates a transient D1 failure to prove the sweep
+// isolates per record / per chunk (a failure must not abort the whole run).
+function makeFailOnNthRun(db, sqlSubstring, nthRun) {
+  let runCount = 0;
+  return {
+    prepare(sql) {
+      const statement = db.prepare(sql);
+      if (!sql.includes(sqlSubstring)) return statement;
+      const originalRun = statement.run.bind(statement);
+      statement.run = () => {
+        runCount += 1;
+        if (runCount === nthRun) throw new Error(`simulated D1 failure on: ${sql}`);
+        return originalRun();
+      };
+      return statement;
+    },
+    batch(statements) {
+      return db.batch(statements);
+    },
+    exec(sql) {
+      return db.exec(sql);
+    },
+  };
+}
+
 // ---------------------------------------------------------------------------
 // R1 — pending reports
 // ---------------------------------------------------------------------------
@@ -362,6 +388,116 @@ test("R6: approved + redacted photos on a verified camera are never touched", as
   assert.equal(await count("photos", "storage_key = 'approved-fresh.jpg'"), 1);
 });
 
+test("R6 regression: a chunk DELETE failure deletes R2 per-chunk, leaking nothing (review t_eed5f080 #1)", async () => {
+  // Pre-fix the sweep deleted ALL D1 chunks first and only then the R2
+  // objects; a failure on chunk N leaked the objects of chunks 1..N-1 whose
+  // rows were already gone. Now each chunk's R2 objects are deleted right
+  // after its own D1 rows, so an early failure cannot orphan earlier chunks.
+  for (let i = 0; i < 150; i += 1) {
+    await insertPhoto({ cameraId: null, status: "rejected", createdAt: daysBefore(40), storageKey: `chunk-${i}.jpg` });
+  }
+  // Fail the SECOND `DELETE ... WHERE id IN (...)` (the 100-row chunk is the
+  // first call; the 50-row tail is the second).
+  const failingDb = makeFailOnNthRun(runtime.env.DB, "DELETE FROM photos WHERE id IN", 2);
+  runtime.env.DB = failingDb;
+
+  const { r2, deletedKeys } = makeR2Spy();
+  const summary = await runtime.retention.runRetentionSweep(NOW, { r2 });
+
+  assert.equal(summary.failures, 1, "the failed chunk must be counted, not fatal");
+  assert.equal(summary.photosDeleted, 100, "chunk 1 rows are gone, chunk 2 rows survive");
+  assert.equal(await count("photos", "status = 'rejected'"), 50, "the failed chunk keeps its D1 rows for the next run");
+  assert.equal(deletedKeys.length, 100, "exactly chunk 1's objects are deleted — nothing leaks, nothing is orphaned");
+  assert.equal(summary.r2ObjectsDeleted, 100);
+  assert.equal(summary.r2ObjectsFailed, 0);
+  // Chunk 1's keys are the first 100 inserted (id order), chunk 2's the last 50.
+  assert.deepEqual(
+    [...deletedKeys].sort(),
+    Array.from({ length: 100 }, (_, i) => `chunk-${i}.jpg`).sort(),
+    "only the rows actually deleted from D1 have their R2 objects removed",
+  );
+});
+
+test("R6: a failed chunk retries cleanly on the next run (rows + objects stay consistent)", async () => {
+  for (let i = 0; i < 150; i += 1) {
+    await insertPhoto({ cameraId: null, status: "rejected", createdAt: daysBefore(40), storageKey: `retry-${i}.jpg` });
+  }
+  const failingDb = makeFailOnNthRun(runtime.env.DB, "DELETE FROM photos WHERE id IN", 2);
+  runtime.env.DB = failingDb;
+
+  const first = await runtime.retention.runRetentionSweep(NOW, { r2: undefined });
+  assert.equal(first.failures, 1);
+
+  // Second run: the 50 surviving rows are now the only candidates; no failure.
+  runtime.env.DB = failingDb; // still the same wrapper (fail only on the 2nd IN-delete)
+  const second = await runtime.retention.runRetentionSweep(NOW, { r2: undefined });
+  assert.equal(second.failures, 0);
+  assert.equal(await count("photos"), 0, "the retry clears the leftover chunk");
+});
+
+test("R2/R3: a failing record is isolated — the sweep continues and counts it (review t_eed5f080 #2)", async () => {
+  // Two expired rejected cameras; the FIRST purge (DELETE FROM cameras) fails.
+  const a = await insertCamera({ title: "Rejected A", status: "rejected", createdAt: daysBefore(200) });
+  const b = await insertCamera({ title: "Rejected B", status: "rejected", createdAt: daysBefore(200) });
+  await insertRejectEvent(a, daysBefore(40));
+  await insertRejectEvent(b, daysBefore(40));
+
+  const failingDb = makeFailOnNthRun(runtime.env.DB, "DELETE FROM cameras WHERE id = ?", 1);
+  runtime.env.DB = failingDb;
+
+  const summary = await runtime.retention.runRetentionSweep(NOW);
+
+  assert.equal(summary.failures, 1, "the failing record is counted, not fatal");
+  assert.equal(summary.rejectedPurged, 1, "the other record is still purged");
+  assert.equal(await count("cameras", "id = ?", a), 1, "the failing record survives for retry");
+  assert.equal(await count("cameras", "id = ?", b), 0);
+});
+
+test("R6: failed R2 object deletions are reported in r2ObjectsFailed (review t_eed5f080 #5)", async () => {
+  await insertPhoto({ cameraId: null, status: "pending", createdAt: daysBefore(100), storageKey: "orphan-ok.jpg" });
+  await insertPhoto({ cameraId: null, status: "pending", createdAt: daysBefore(100), storageKey: "orphan-fail.jpg" });
+
+  const r2 = {
+    delete: async (key) => {
+      if (key === "orphan-fail.jpg") throw new Error("bucket unavailable");
+    },
+  };
+  const summary = await runtime.retention.runRetentionSweep(NOW, { r2 });
+
+  assert.equal(summary.photosDeleted, 2, "D1 rows are removed regardless of bucket failures");
+  assert.equal(summary.r2ObjectsDeleted, 1);
+  assert.equal(summary.r2ObjectsFailed, 1, "the failed object deletion is surfaced in the summary");
+});
+
+test("R6: rejected photos are swept even when linked to a live camera; pending linked photos are not (review t_eed5f080 #8)", async () => {
+  // The orphan query requires camera_id IS NULL, but the rejected query has
+  // NO camera_id filter: rejected evidence is never public and expires 30
+  // days after the reject decision even if the record is still alive.
+  const verified = await insertCamera({ title: "Verified", status: "verified", createdAt: daysBefore(200) });
+  const rejectedLinked = await insertPhoto({
+    cameraId: verified,
+    status: "rejected",
+    createdAt: daysBefore(60),
+    storageKey: "rejected-linked.jpg",
+  });
+  await insertPhotoRejectEvent(rejectedLinked, daysBefore(40));
+  await insertPhoto({
+    cameraId: verified,
+    status: "pending",
+    createdAt: daysBefore(100),
+    storageKey: "pending-linked.jpg",
+  });
+
+  const { r2, deletedKeys } = makeR2Spy();
+  const summary = await runtime.retention.runRetentionSweep(NOW, { r2 });
+
+  assert.equal(summary.photosDeleted, 1, "only the rejected linked photo is swept");
+  assert.deepEqual(deletedKeys, ["rejected-linked.jpg"]);
+  assert.equal(await count("photos", "storage_key = 'pending-linked.jpg'"), 1, "pending linked evidence follows the record lifecycle");
+  assert.equal(await count("photos", "storage_key = 'rejected-linked.jpg'"), 0);
+  assert.equal(await count("cameras", "id = ?", verified), 1, "the verified record itself is untouched");
+});
+
 // ---------------------------------------------------------------------------
 // R7 — sessions
 // ---------------------------------------------------------------------------
@@ -414,9 +550,15 @@ test("R6 deletion chunks against the D1 100-bound-parameter cap", async () => {
     /offset\s*<\s*ids\.length;\s*offset\s*\+=\s*D1_MAX_BOUND_PARAMS/,
     "the deletion must iterate in chunks of at most 100 ids",
   );
+  // Per-chunk (review t_eed5f080 #1): each chunk's R2 objects are deleted
+  // right after ITS OWN D1 rows, so a later chunk failure can no longer
+  // orphan the objects of already-deleted chunks. The actual deleteR2Objects
+  // CALL must still come after the DELETE inside the loop body.
+  const deleteCall = r6.indexOf("await deleteR2Objects(r2, chunk.map");
+  assert.ok(deleteCall > 0, "the R2 deletion must be the per-chunk call in the loop");
   assert.ok(
-    r6.indexOf("DELETE FROM photos WHERE id IN") < r6.indexOf("deleteR2Objects"),
-    "D1 rows must be deleted BEFORE the R2 objects (no orphaned rows on failure)",
+    r6.indexOf("DELETE FROM photos WHERE id IN") < deleteCall,
+    "each chunk's D1 rows must be deleted BEFORE that chunk's R2 objects (no orphaned objects on failure)",
   );
 });
 
