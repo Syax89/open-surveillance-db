@@ -459,12 +459,22 @@ test("logout with a live session but a missing CSRF token is rejected", async ()
 // GET /api/auth/me + GET /api/auth/me/submissions
 // ---------------------------------------------------------------------------
 
-test("me returns the profile for a live session", async () => {
+test("me returns the profile and the caller's trust level for a live session", async () => {
   stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("countVerifiedCameras", async () => 7);
   const { GET } = await meRoute();
   const response = await GET(sessionRequest("/api/auth/me", "raw-session-token-abc123"));
   assert.equal(response.status, 200);
-  assert.deepEqual((await responseBody(response)).contributor, contributor);
+  const body = await responseBody(response);
+  assert.deepEqual(body.contributor, contributor);
+  // C2: level is derived on the fly from the verified count (7 -> L2, next 20).
+  assert.deepEqual(body.level, {
+    level: 2,
+    verifiedCount: 7,
+    threshold: 5,
+    nextThreshold: 20,
+  });
+  assert.deepEqual(callArgs("countVerifiedCameras")[0], [7]);
 });
 
 test("me returns 401 without a session", async () => {

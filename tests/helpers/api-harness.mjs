@@ -39,6 +39,7 @@ const ROUTES = [
   { source: "app/api/auth/logout/route.ts", output: "app/api/auth/logout/route.mjs" },
   { source: "app/api/auth/me/route.ts", output: "app/api/auth/me/route.mjs" },
   { source: "app/api/auth/me/submissions/route.ts", output: "app/api/auth/me/submissions/route.mjs" },
+  { source: "app/api/auth/me/contributions/route.ts", output: "app/api/auth/me/contributions/route.mjs" },
   { source: "app/api/auth/account/route.ts", output: "app/api/auth/account/route.mjs" },
   { source: "app/api/photos/route.ts", output: "app/api/photos/route.mjs" },
   { source: "app/api/photos/[id]/route.ts", output: "app/api/photos/[id]/route.mjs" },

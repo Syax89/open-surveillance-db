@@ -149,8 +149,9 @@ enforces same-origin + CSRF when a session is present.
 | `POST` | `/api/auth/register` | public | Contributor account (email + password, PBKDF2-SHA256, ADR 0013). Sets `osdb_session` (HttpOnly) + `osdb_csrf` cookies |
 | `POST` | `/api/auth/login` | public | Verify credentials and open a session (same cookie pair). Unknown email and wrong password both answer `401` |
 | `POST` | `/api/auth/logout` | session | Revoke the current session and clear cookies; idempotent |
-| `GET` | `/api/auth/me` | session | Current contributor profile (never the password hash); `401` anonymous |
-| `GET` | `/api/auth/me/submissions` | session | The contributor's own attributed reports (id, title, status, created_at); `401` anonymous |
+| `GET` | `/api/auth/me` | session | Current contributor profile (never the password hash) + the caller's own trust `level` (derived from the verified contribution count, C2); `401` anonymous | 
+| `GET` | `/api/auth/me/submissions` | session | The contributor's own attributed reports (id, title, status, created_at); `401` anonymous. **Deprecated (C2)** — superseded by `/api/auth/me/contributions`, kept for backward compatibility | 
+| `GET` | `/api/auth/me/contributions` | session | The contributor's own attributed contributions (camera reports, corrections, photo uploads), paginated (F0: `page`/`pageSize` default 25, max 100, `pagination` object) with optional `type`/`status` whitelist filters and the caller's trust `level` in the meta; `Cache-Control: no-store`; `401` anonymous, `400` cross-account/unknown filter, `503` db unavailable | 
 | `DELETE` | `/api/auth/account` | session | Account erasure (GDPR art. 17, RETENTION_SCHEDULE R7): de-attributes every attributed report, revokes all sessions, hard-deletes the contributor row; returns the count of de-attributed reports |
 | `POST` | `/api/appeals` | contributor+ | File an appeal against a *final* moderation decision (`entity`, `entityId`, `decisionEventId`, `reason` ≤ 1500 chars). One pending appeal per decision (`409`); every step writes an audit event |
 | `GET` | `/api/appeals` | moderator+ | List filed appeals (appellant display name, contested decision, status) |

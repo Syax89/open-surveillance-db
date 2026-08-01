@@ -93,6 +93,10 @@ const expectedIndexes = [
   "correction_requests_contributor_idx",
   // Community trust levels (0023): index-only level COUNT.
   "cameras_contributor_status_idx",
+  // Community profile contributions list (0025): "my contributions" branches
+  // for cameras and photos ORDER BY created_at DESC on contributor_id.
+  "cameras_contributor_created_idx",
+  "photos_contributor_created_idx",
 ];
 // Tables that are not application schema but legitimately appear in a local
 // D1 database. Anything outside this set is an unexpected schema change.

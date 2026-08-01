@@ -52,6 +52,11 @@ export const cameras = sqliteTable(
     // here so drizzle-kit generate never re-emits it (convention 0012/0014:
     // hand-written migration + schema declaration together).
     index("cameras_contributor_status_idx").on(table.contributorId, table.status),
+    // Community profile contributions list (migration 0025, C2): the "my
+    // reports" branch of listContributorContributions filters on
+    // contributor_id and orders by created_at DESC; the leading-contributor
+    // composite turns that into an index scan instead of a full table scan.
+    index("cameras_contributor_created_idx").on(table.contributorId, sql`created_at DESC`),
   ],
 );
 
@@ -380,6 +385,12 @@ export const photos = sqliteTable(
     index("photos_pending_submitter_idx")
       .on(table.submitterKey)
       .where(sql`${table.status} = 'pending'`),
+    // Community profile contributions list (migration 0025, C2): the "my
+    // photos" branch of listContributorContributions filters on
+    // contributor_id and orders by created_at DESC; photos previously had no
+    // contributor-leading index at all, so this turns a full scan into an
+    // index scan.
+    index("photos_contributor_created_idx").on(table.contributorId, sql`created_at DESC`),
   ],
 );
 

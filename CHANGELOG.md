@@ -147,6 +147,13 @@ changes accumulate under `[Unreleased]`.
   duplicato o target già rimosso), attribuzione opzionale al contributor
   (`contributor_id`, sessione + CSRF quando presente), anonimo sempre
   possibile e rate-limitato per IP (bucket `submit` 5/60s).
+- Community profile contributions (C2, ADR 0018): migrazione D1 0025
+  (index `(contributor_id, created_at DESC)` su cameras e photos),
+  `GET /api/auth/me/contributions` paginato (contratto F0, filtri whitelist,
+  `Cache-Control: no-store`, solo dati propri), `deriveLevel` puro
+  (L0=0/L1=1/L2=5/L3=20/L4=50, solo `status='verified'` conta) e `level` nel
+  meta di `/api/auth/me` e della lista contributi; `me/submissions` deprecato
+  (backward-compat).
 
 ### Changed
 
