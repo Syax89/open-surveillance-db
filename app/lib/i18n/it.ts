@@ -667,6 +667,10 @@ export const it: Translation<typeof en> = {
     notFoundDetail:
       "Potrebbe essere stato rimosso, non essere pubblico oppure il collegamento non è corretto.",
     browseDirectory: "Sfoglia l'elenco",
+    loadError: "Non è stato possibile caricare il record pubblico.",
+    loadErrorDetail:
+      "Il servizio dei record non è raggiungibile in questo momento. Controlla la connessione e riprova.",
+    retryLoad: "Riprova",
     statusFallback: "Stato",
     changeHistory: "Cronologia delle modifiche",
     changeHistoryNote:

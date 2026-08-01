@@ -92,6 +92,13 @@ test("environment overrides tune the per-route limits", () => {
   assert.deepEqual(rateLimit.limitsFor("nearby", {}), { maxRequests: 30, windowSeconds: 60 });
   assert.deepEqual(rateLimit.limitsFor("revisions", {}), { maxRequests: 30, windowSeconds: 60 });
   assert.deepEqual(rateLimit.limitsFor("moderate", {}), { maxRequests: 30, windowSeconds: 60 });
+  // Appeals get their own conservative default and env knobs, independent of
+  // the moderation bucket (filing/review is a distinct caller population).
+  assert.deepEqual(rateLimit.limitsFor("appeal", {}), { maxRequests: 20, windowSeconds: 60 });
+  assert.deepEqual(
+    rateLimit.limitsFor("appeal", { APPEAL_RATE_LIMIT_MAX: "7", APPEAL_RATE_LIMIT_WINDOW_SECONDS: "30" }),
+    { maxRequests: 7, windowSeconds: 30 },
+  );
   // The tile proxy gets its own conservative default and env knobs.
   assert.deepEqual(rateLimit.limitsFor("tiles", {}), { maxRequests: 60, windowSeconds: 60 });
   assert.deepEqual(

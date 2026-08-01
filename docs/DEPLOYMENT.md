@@ -325,7 +325,8 @@ or client bundles (the secrets gate in CI rejects hardcoded credentials).
 | `NEARBY_RATE_LIMIT_MAX` / `NEARBY_RATE_LIMIT_WINDOW_SECONDS` | 30 / 60 | Nearby search |
 | `REVISIONS_RATE_LIMIT_MAX` / `REVISIONS_RATE_LIMIT_WINDOW_SECONDS` | 30 / 60 | Public change history (`GET /api/cameras/revisions`) |
 | `POST_RATE_LIMIT_MAX` / `POST_RATE_LIMIT_WINDOW_SECONDS` | 5 / 60 | Submissions (cameras + corrections) |
-| `MODERATION_RATE_LIMIT_MAX` / `MODERATION_RATE_LIMIT_WINDOW_SECONDS` | 30 / 60 | Moderation API (second layer over edge auth), including appeal decisions |
+| `MODERATION_RATE_LIMIT_MAX` / `MODERATION_RATE_LIMIT_WINDOW_SECONDS` | 30 / 60 | Moderation API (second layer over edge auth), including appeal decisions (`PATCH /api/appeals/[id]`) |
+| `APPEAL_RATE_LIMIT_MAX` / `APPEAL_RATE_LIMIT_WINDOW_SECONDS` | 20 / 60 | Appeal filing and review (`POST/GET /api/appeals`) — a distinct bucket from moderation so contributors contesting decisions and moderators reviewing them never starve the moderation queue |
 | `TILES_RATE_LIMIT_MAX` / `TILES_RATE_LIMIT_WINDOW_SECONDS` | 60 / 60 | Tile proxy (`GET /api/tiles/*`) — protects the OSMF upstream from per-caller scraping |
 | `POST_SUBMISSIONS_DISABLED` | `false` | Kill switch: reject new submissions with 503 |
 | `PHOTOS_MAX_PENDING_PER_CALLER` | 20 | Pending-photo count cap per caller bucket (authenticated: `contributor:<id>`; anonymous: `anon:<sha256(caller key)>`). `POST /api/photos` answers 429 when a caller is at the cap — a state quota distinct from the HTTP rate limit, bounding how much R2 storage and how many moderation-queue items one caller can accumulate while the queue catches up. Only `status = 'pending'` photos count; approved/rejected photos leave the cap as soon as a moderator decides them |
