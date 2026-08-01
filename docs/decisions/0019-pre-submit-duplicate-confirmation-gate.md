@@ -1,6 +1,6 @@
 # ADR 0019: Pre-submit duplicate confirmation gate
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-08-02
 - **Author:** Linus (Backend/API)
 - **Related ADRs:** 0001 (public data boundary), 0008 (data licence,
