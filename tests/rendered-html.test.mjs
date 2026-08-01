@@ -311,22 +311,26 @@ test("homepage and guide link to /manifesto from the nav and the footer", async 
 });
 
 test("info pages reuse the shared layout styles (approved contrast palette)", async () => {
-  const [infoPage, manifestoPage, css] = await Promise.all([
+  const [infoPage, siteHeader, manifestoPage, css] = await Promise.all([
     readFile(path.join(root, "app", "components", "InfoPage.tsx"), "utf8"),
+    readFile(path.join(root, "app", "components", "SiteHeader.tsx"), "utf8"),
     readFile(path.join(root, "app", "manifesto", "page.tsx"), "utf8"),
     readFile(path.join(root, "app", "globals.css"), "utf8"),
   ]);
 
-  // The shared InfoPage component carries the navigation shell and intro
-  // article classes used by every informational page, while the manifesto
+  // The shared InfoPage component carries the intro article classes used by
+  // every informational page, and the navigation shell now lives in the
+  // shared SiteHeader (brand + nav-shell + LocaleToggle), while the manifesto
   // page keeps its own section shells. No new colour decisions, so the
   // already-reviewed contrast palette applies unchanged. The only new rule
   // is the manifesto list, which reuses the correction-form card colours
   // (#435963 on #fbfbf7, WCAG AA).
   assert.match(manifestoPage, /InfoPage/, "manifesto page must use the shared InfoPage layout");
-  for (const cls of ["record-page", "nav-shell", "record-detail"]) {
+  for (const cls of ["record-page", "record-detail"]) {
     assert.match(infoPage, new RegExp(`className="[^"]*${cls}`), `expected shared layout to reuse ${cls}`);
   }
+  assert.match(siteHeader, /className="nav-shell"/, "expected shared SiteHeader to carry the nav-shell");
+  assert.match(siteHeader, /LocaleToggle/, "expected shared SiteHeader to render the LocaleToggle");
   for (const cls of ["principles", "records-section", "correction-section"]) {
     assert.match(manifestoPage, new RegExp(`className="[^"]*${cls}`), `expected manifesto page to reuse ${cls}`);
   }
