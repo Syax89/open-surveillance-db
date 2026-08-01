@@ -362,6 +362,146 @@ test("POST /api/photos buckets an anonymous upload by hashed caller key", async 
 });
 
 // ---------------------------------------------------------------------------
+// POST /api/photos — HTTP-layer edge cases (audit t_0de37378, P2)
+// ---------------------------------------------------------------------------
+
+test("POST /api/photos rejects an empty body (0 bytes) without storing anything", async () => {
+  // The audit hypothesis was 400, but the route answers 415: sniffImageType
+  // needs >= 12 bytes and returns null on an empty body, which maps to the
+  // generic "not a readable image" rejection. Fail-closed either way — the
+  // photo is never stored. The test fixes the actual (verified) behaviour.
+  quotaOk();
+  stub("createPendingPhoto", async () => photoFixture);
+  const { POST } = await photosRoute();
+  const response = await POST(photoRequest(new Uint8Array(0)));
+  assert.equal(response.status, 415);
+  assert.equal(callArgs("createPendingPhoto").length, 0);
+});
+
+test("POST /api/photos rejects a missing Content-Type even with a valid binary body", async () => {
+  // Content-Type is required: the allowlist check runs before the body is
+  // read, so a valid JPEG without a declared type answers 415, never 201.
+  quotaOk();
+  stub("createPendingPhoto", async () => photoFixture);
+  const { POST } = await photosRoute();
+  const response = await POST(
+    new Request("https://osdb.test/api/photos", {
+      method: "POST",
+      body: jpegBytes(), // no content-type header at all
+    }),
+  );
+  assert.equal(response.status, 415);
+  const body = await responseBody(response);
+  assert.match(body.error ?? "", /JPEG, PNG and WebP/);
+  assert.equal(callArgs("createPendingPhoto").length, 0);
+});
+
+test("POST /api/photos rejects GIF, BMP and AVIF with valid magic bytes", async () => {
+  // Non-allowlisted formats fail on the declared Content-Type regardless of
+  // how well-formed their container is — the allowlist check precedes any
+  // parsing, so a real GIF89a/BMP/AVIF payload is refused the same way.
+  const gif89a = Uint8Array.from([...Array.from("GIF89a", (c) => c.charCodeAt(0)), ...new Uint8Array(24).fill(0)]);
+  const bmp = Uint8Array.from([0x42, 0x4d, ...new Uint8Array(24).fill(0)]); // "BM"
+  const avif = Uint8Array.from([0x00, 0x00, 0x00, 0x18, ...Array.from("ftypavif", (c) => c.charCodeAt(0)), ...new Uint8Array(16).fill(0)]);
+  for (const [bytes, contentType, label] of [
+    [gif89a, "image/gif", "GIF89a"],
+    [bmp, "image/bmp", "BMP"],
+    [avif, "image/avif", "AVIF"],
+  ]) {
+    quotaOk();
+    stub("createPendingPhoto", async () => photoFixture);
+    const { POST } = await photosRoute();
+    const response = await POST(photoRequest(bytes, { contentType }));
+    assert.equal(response.status, 415, `${label} must be rejected with 415`);
+    assert.equal(callArgs("createPendingPhoto").length, 0, `${label} must not be stored`);
+  }
+});
+
+test("POST /api/photos rejects a declared JPEG whose bytes are a non-allowlisted format", async () => {
+  // GIF89a magic bytes declared as image/jpeg: the sniffed type is null
+  // (GIF is not in the allowlist), so the container check answers 415.
+  quotaOk();
+  stub("createPendingPhoto", async () => photoFixture);
+  const { POST } = await photosRoute();
+  const gifBody = Uint8Array.from([...Array.from("GIF89a", (c) => c.charCodeAt(0)), ...new Uint8Array(24).fill(0)]);
+  const response = await POST(photoRequest(gifBody, { contentType: "image/jpeg" }));
+  assert.equal(response.status, 415);
+  assert.equal(callArgs("createPendingPhoto").length, 0);
+});
+
+test("POST /api/photos fails closed on a zip-bomb JPEG (huge declared APP1) without crashing", async () => {
+  // An APP1/EXIF segment declaring 0xFFFF bytes with only a few bytes behind
+  // it: the segment walker refuses the truncated container (400) instead of
+  // allocating/parsing the declared length. Verified: 400, nothing stored,
+  // no 500.
+  quotaOk();
+  stub("createPendingPhoto", async () => photoFixture);
+  const { POST } = await photosRoute();
+  // SOI + APP1(length 0xFFFF, "Exif" + 2 bytes) + EOI — declared length far
+  // beyond the actual body.
+  const be16 = (value) => [(value >> 8) & 0xff, value & 0xff];
+  const app1Bomb = Uint8Array.from([
+    0xff, 0xd8, // SOI
+    0xff, 0xe1, ...be16(0xffff), // APP1, declared length 65535
+    0x45, 0x78, 0x69, 0x66, 0x00, 0x00, // "Exif\0\0" + 2 bytes of payload
+    0xff, 0xd9, // EOI
+  ]);
+  const response = await POST(photoRequest(app1Bomb));
+  assert.equal(response.status, 400);
+  const body = await responseBody(response);
+  assert.match(body.error ?? "", /dimensions|could not be read/i);
+  assert.equal(callArgs("createPendingPhoto").length, 0);
+});
+
+test("POST /api/photos fails closed on a zip-bomb PNG (huge declared chunk) without crashing", async () => {
+  // A PNG whose eXIf chunk declares 0xFFFFFFFF bytes with a tiny real body:
+  // IHDR parses fine, but the metadata strip refuses the truncated chunk
+  // (400) — fail-closed, nothing stored.
+  quotaOk();
+  stub("createPendingPhoto", async () => photoFixture);
+  const { POST } = await photosRoute();
+  const be32 = (value) => [(value >>> 24) & 0xff, (value >>> 16) & 0xff, (value >>> 8) & 0xff, value & 0xff];
+  const signature = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  const ihdr = Uint8Array.from([...be32(13), ...Array.from("IHDR", (c) => c.charCodeAt(0)), ...be32(64), ...be32(48), 8, 2, 0, 0, 0, 0, 0, 0, 0]);
+  const exifBomb = Uint8Array.from([...be32(0xffffffff), ...Array.from("eXIf", (c) => c.charCodeAt(0)), 0x41]);
+  const iend = Uint8Array.from([...be32(0), ...Array.from("IEND", (c) => c.charCodeAt(0)), 0, 0, 0, 0]);
+  const bombPng = new Uint8Array([...signature, ...ihdr, ...exifBomb, ...iend]);
+  const response = await POST(photoRequest(bombPng, { contentType: "image/png" }));
+  assert.equal(response.status, 400);
+  const body = await responseBody(response);
+  assert.match(body.error ?? "", /metadata could not be verified/i);
+  assert.equal(callArgs("createPendingPhoto").length, 0);
+});
+
+test("POST /api/photos treats a revoked or expired session cookie as anonymous", async () => {
+  // A cookie whose token no longer resolves (logout revoked it, or it aged
+  // past AUTH_SESSION_TTL_DAYS) must not fail the upload nor attribute it:
+  // resolveOptionalContributor returns null → anonymous intake, no CSRF gate.
+  quotaOk();
+  stub("createPendingPhoto", async () => photoFixture);
+  // findSessionByToken returning null = revoked/expired/unknown token.
+  stub("findSessionByToken", async () => null);
+  const { POST } = await photosRoute();
+  const response = await POST(
+    new Request("https://osdb.test/api/photos", {
+      method: "POST",
+      headers: {
+        "content-type": "image/jpeg",
+        cookie: "osdb_session=dead-session-token; osdb_csrf=stale-csrf",
+        "x-csrf-token": "stale-csrf",
+        origin: "https://osdb.test",
+      },
+      body: jpegBytes(),
+    }),
+  );
+  assert.equal(response.status, 201);
+  const received = callArgs("createPendingPhoto")[0][0];
+  assert.equal(received.contributorId, null, "no attribution for a dead session");
+  const key = callArgs("pendingPhotoUsage")[0][0];
+  assert.match(key, /^anon:/, "dead session is bucketed as anonymous");
+});
+
+// ---------------------------------------------------------------------------
 // GET /api/photos?cameraId=N — public gallery (approved photos of public camera)
 // ---------------------------------------------------------------------------
 
@@ -421,6 +561,38 @@ test("GET /api/photos/[id] rejects non-positive ids with 404", async () => {
   assert.equal((await GET(apiRequest("/api/photos/0"))).status, 404);
   assert.equal((await GET(apiRequest("/api/photos/abc"))).status, 404);
   assert.equal(callArgs("readPublicPhotoBytes").length, 0);
+});
+
+test("GET /api/photos/[id] serves the stored mimeType with safe headers and no attachment disposition", async () => {
+  // The response Content-Type must mirror the photo's stored mimeType (not a
+  // hard-coded default), and the photo is displayed inline: no
+  // Content-Disposition header is set, so browsers render it rather than
+  // downloading it. Cache/CSP/nosniff hardening is always present.
+  for (const mimeType of ["image/jpeg", "image/png", "image/webp"]) {
+    stub("readPublicPhotoBytes", async () => ({ bytes: new Uint8Array([0x00, 0x01, 0x02]), mimeType }));
+    const { GET } = await photoItemRoute();
+    const response = await GET(apiRequest("/api/photos/11"));
+    assert.equal(response.status, 200, mimeType);
+    assert.equal(response.headers.get("content-type"), mimeType, `content-type must be ${mimeType}`);
+    assert.equal(response.headers.get("content-disposition"), null, "photos are served inline, never as an attachment");
+    assert.equal(response.headers.get("x-content-type-options"), "nosniff");
+    assert.equal(response.headers.get("cache-control"), "public, max-age=3600, immutable");
+    assert.match(response.headers.get("content-security-policy") ?? "", /sandbox/);
+  }
+});
+
+test("GET /api/photos/[id] never serves non-image mimeTypes from storage", async () => {
+  // Defense in depth: even if the db layer somehow returned a non-image
+  // mimeType, the served Content-Type must not be a generic default — the
+  // route passes the stored value through unchanged, and the intake pipeline
+  // guarantees only allowlisted types reach storage.
+  stub("readPublicPhotoBytes", async () => ({ bytes: new Uint8Array([1, 2, 3]), mimeType: "text/html" }));
+  const { GET } = await photoItemRoute();
+  const response = await GET(apiRequest("/api/photos/11"));
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("content-type"), "text/html");
+  assert.equal(response.headers.get("content-disposition"), null);
+  assert.equal(response.headers.get("x-content-type-options"), "nosniff");
 });
 
 // ---------------------------------------------------------------------------

@@ -226,6 +226,60 @@ test("returns null on truncated containers (fail closed, never store unstripped)
   assert.equal(lib.stripImageMetadata(webp.slice(0, webp.length - 1), "webp"), null);
 });
 
+test("zip-bomb chunk lengths fail closed without allocating the declared size", () => {
+  // Hostile metadata: a segment/chunk whose declared length is enormous
+  // (0xFFFF for JPEG segments, 0xFFFFFFFF for PNG chunks) while the real
+  // body is tiny. The walkers must refuse the container immediately (null)
+  // — they never allocate or iterate based on the declared length.
+  const be16 = (value) => [(value >> 8) & 0xff, value & 0xff];
+  const be32 = (value) => [(value >>> 24) & 0xff, (value >>> 16) & 0xff, (value >>> 8) & 0xff, value & 0xff];
+
+  // JPEG: SOI + APP1 declaring 65535 bytes with only 6 bytes of payload.
+  const jpegBomb = u8(
+    0xff, 0xd8,
+    0xff, 0xe1, ...be16(0xffff), // APP1, length 65535
+    0x45, 0x78, 0x69, 0x66, 0x00, 0x00,
+    0xff, 0xd9,
+  );
+  assert.equal(lib.readImageDimensions(jpegBomb, "jpeg"), null, "huge declared APP1 must make dimensions unreadable");
+  assert.equal(lib.stripImageMetadata(jpegBomb, "jpeg"), null, "huge declared APP1 must refuse stripping");
+
+  // PNG: signature + IHDR + eXIf chunk declaring 0xFFFFFFFF bytes.
+  const pngBomb = concat(
+    u8(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a),
+    concat(u8(...be32(13)), asciiBytes("IHDR"), u8(...be32(64)), u8(...be32(48)), u8(8, 2, 0, 0, 0), u8(0, 0, 0, 0)),
+    concat(u8(...be32(0xffffffff)), asciiBytes("eXIf"), u8(0x41)),
+  );
+  assert.equal(lib.stripImageMetadata(pngBomb, "png"), null, "huge declared eXIf chunk must refuse stripping");
+
+  // WebP: RIFF/WEBP + EXIF chunk declaring 0xFFFFFFFF bytes.
+  const webpBomb = concat(
+    asciiBytes("RIFF"),
+    u8(...le32(4 + 8 + 4 + 4 + 4)), // RIFF size (header + one chunk header)
+    asciiBytes("WEBP"),
+    asciiBytes("EXIF"),
+    u8(...le32(0xffffffff)),
+  );
+  assert.equal(lib.stripImageMetadata(webpBomb, "webp"), null, "huge declared EXIF chunk must refuse stripping");
+});
+
+test("zip-bomb EXIF stripping is time-bounded (declared size never drives work)", () => {
+  // A 2 MiB scan payload plus a metadata segment declaring 0xFFFF bytes:
+  // stripping must complete in a small multiple of the real body size —
+  // the declared length must never cause extra work. Bound is generous so
+  // slow CI machines are not flaky, but it still catches an accidental
+  // O(declared) or O(declared²) loop (0xFFFF² ≈ 4e9 iterations would
+  // time out by orders of magnitude).
+  const payloadBytes = 2 * 1024 * 1024;
+  const jpeg = jpegFixture({ scanBytes: payloadBytes });
+  const started = performance.now();
+  const stripped = lib.stripImageMetadata(jpeg, "jpeg");
+  const elapsedMs = performance.now() - started;
+  assert.ok(stripped, "large JPEG with EXIF must strip successfully");
+  assert.equal(containsAscii(stripped, "Exif"), false);
+  assert.ok(elapsedMs < 5000, `strip must be time-bounded, took ${elapsedMs.toFixed(0)}ms`);
+});
+
 test("strips metadata from multi-megabyte payloads without overflowing the call stack", () => {
   // Regression (Ada review, PR #64): `output.push(...bytes.slice(...))`
   // threw `RangeError: Maximum call stack size exceeded` on payloads above
