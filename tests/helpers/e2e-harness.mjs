@@ -26,11 +26,11 @@
 
 import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
+import { coverageTreeCleanupEnabled, coverageTreeRoot } from "./coverage-tree.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -100,7 +100,7 @@ function rewriteSpecifiers(code, workersMockUrl) {
 }
 
 async function buildTree() {
-  const tree = await mkdtemp(path.join(os.tmpdir(), "osdb-e2e-"));
+  const tree = await mkdtemp(path.join(coverageTreeRoot(), "osdb-e2e-"));
 
   // 1. Injectable env mock: routes and real db modules share this instance.
   const workersMockUrl = pathToFileURL(path.join(tree, "cloudflare-workers.mjs")).href;
@@ -208,6 +208,8 @@ export async function e2eEnv() {
 export async function cleanupE2ETree() {
   if (!builtTreePromise) return;
   const tree = await builtTreePromise;
-  await rm(tree, { recursive: true, force: true });
+  if (coverageTreeCleanupEnabled()) {
+    await rm(tree, { recursive: true, force: true });
+  }
   builtTreePromise = null;
 }

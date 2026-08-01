@@ -54,6 +54,7 @@ The documentation is part of the project and is intended to be discussed openly.
 - [Moderation policy](docs/MODERATION.md)
 - [Privacy and safety](docs/PRIVACY_AND_SAFETY.md)
 - [Accessibility statement](docs/ACCESSIBILITY_STATEMENT.md)
+- [QA coverage report e soglia CI](docs/QA_COVERAGE.md)
 - [Open-source and data licensing](docs/OPEN_SOURCE.md)
 - [OpenStreetMap integration](docs/OSM_INTEGRATION.md)
 - [Deployment and operations](docs/DEPLOYMENT.md)
