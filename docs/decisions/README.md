@@ -29,6 +29,7 @@ reviews or lost in chat threads.
 | [0015](0015-locale-persistence-cookie-ssr.md) | Locale persistence — cookie + SSR, deep-link route | accepted | 2026-08-01 |
 | [0016](0016-account-lockout-after-failed-logins.md) | Per-email account lockout after failed logins | accepted | 2026-08-01 |
 | [0017](0017-no-dpo-appointed-art37.md) | No DPO appointed — documented exclusion under GDPR art. 37(1) | accepted (legal recommendation) | 2026-08-01 |
+| [0018](0018-community-verifications-trust-levels-editing.md) | Community verifications, trust levels and contribution editing | accepted | 2026-08-01 |
 
 Status values follow the headers in each ADR: `proposed` (draft, pending
 review) and `accepted` (decision recorded; `CEO decision` marks decisions made

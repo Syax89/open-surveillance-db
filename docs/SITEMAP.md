@@ -32,6 +32,16 @@ for future page changes and for the QA pass over the routes.
   anchors. Until F3 merges, anchor links (`/#map`, `/#records`) remain valid
   and the footer does not yet list the tool routes.
 
+**Phase status (community system, roadmap `docs/COMMUNITY_PLAN.md`):**
+
+- **C-ADR done** — ADR 0018 (verifications, trust levels, two-track editing,
+  two identity layers) recorded before any code; the routes below are listed
+  here **before** implementation per the route rule.
+- **C1–C6 pending** (backend schema/verifications, profile API, edit flow,
+  corrections whitelist, frontend profile/verification widget, frontend edit
+  page) — routes land with their phases; until then the routes below are
+  **planned, not implemented**.
+
 ## Principles
 
 1. **The home page is a hub, not the tool.** Since F1 (t_03c0fa15) the four
@@ -105,7 +115,10 @@ or `legal` bundle — legal content is a separate typed layer
 | Correction | `/correggi` | `correction.ts` |
 | Home (hub) | `/` hero + orienting content | `home.ts` |
 | Record detail | `/records/[id]` | `record.ts` |
-| Auth | `/login`, `/register`, `/account` | `auth.ts` |
+| Verification widget | `/records/[id]` (aggregate count + personal toggle) | `community.ts` (shared vocabulary: levels, verifications) |
+| Auth | `/login`, `/register`, `/account`, `/account/contributions` | `auth.ts` |
+| Contribution editing | `/records/[id]/edit` | `record.ts` (form) + `community.ts` (moderation notice, statuses) |
+| Community (levels, verifications) | `/account`, `/account/contributions`, `/records/[id]`, `/records/[id]/edit`, `/guide` | `community.ts` (new per-domain bundle, EN pilot + IT) |
 | Moderation (private dashboard) | `/moderation` | `moderation.ts` |
 | Info — guide | `/guide` | `guide.ts` |
 | Info — manifesto | `/manifesto` | `manifesto.ts` |
@@ -146,9 +159,11 @@ Informational pages render their own compact `nav-shell` with a
 context-appropriate subset of links; see "Page navigation" below.
 
 Routes **not** linked in nav/footer (private or functional): `/moderation`
-(moderator dashboard), `/account`, `/login`, `/register`, `/records/[id]`
-(linked contextually from map/directory), `/api/*`, and the future
-`/feedback` (ADR 0006, still proposed).
+(moderator dashboard), `/account`, `/account/contributions` (planned,
+community C-phase), `/records/[id]/edit` (planned, community C-phase),
+`/login`, `/register`, `/records/[id]` (linked contextually from
+map/directory), `/api/*`, and the future `/feedback` (ADR 0006, still
+proposed).
 
 ## Page-by-page specification
 
@@ -219,6 +234,54 @@ Routes **not** linked in nav/footer (private or functional): `/moderation`
   private requests).
 - **Nav/footer:** in tool nav (`ToolLayout`); never in footer (form surface);
   home-nav link lands with F2/F3.
+
+### `/records/[id]` — Record detail (implemented; verification widget in C5)
+
+- **Purpose:** the public record page — location, kind, status, notes,
+  freshness, and (community C-phase) the verification widget.
+- **Content:** existing record-detail page; **planned addition (C5, ADR
+  0018):** verification widget "confirm this record exists" with the
+  personal toggle (`aria-pressed`, `aria-live=polite`, target ≥ 44px,
+  `prefers-reduced-motion`) and the **aggregate `confirmationCount`**.
+  Public DOM shows aggregate counts only — never per-profile attribution
+  (ADR 0018 decision 2). Bundles: `record.ts` + `community.ts`.
+- **Privacy:** page stays indexable; the count is public aggregate data
+  (`s-maxage=300, stale-while-revalidate=600`), the personal toggle state is
+  `no-store` and only meaningful for a logged-in contributor.
+- **Nav/footer:** linked contextually from map/directory (unchanged).
+
+### `/account/contributions` — My contributions (planned, community C2/C5)
+
+- **Purpose:** private, paginated list of the signed-in contributor's
+  contributions (cameras, corrections, photos) with **local** state filters
+  (no URL state — private page, not shareable), badge level and a textual
+  progress line ("X verified contributions to the next level", no bar).
+- **Content:** extension of the `/account` profile (ADR 0018 decision 1/3/4):
+  contributions list (canonical `page`/`pageSize` contract, `role="status"`
+  counter), link "Modifica" for the owner only, truthful empty state.
+  Bundle: `auth.ts` (profile chrome) + `community.ts` (levels/verifications
+  vocabulary).
+- **SEO/privacy:** `robots: noindex` (private account surface). Route is
+  **kebab-case** per the route rule and listed here **before** code
+  (COMMUNITY_PLAN §6.4).
+- **Nav/footer:** never linked from public navigation (account surface).
+- **Auth:** auth-gated (contributor session, ADR 0013); anonymous → 401.
+
+### `/records/[id]/edit` — Edit contribution (planned, community C3/C6)
+
+- **Purpose:** private, dedicated edit page for the record **owner** —
+  replaces inline editing for contribution fields (design #815 C7).
+- **Content:** form pattern `ReportForm` with editable whitelist (title,
+  kind, address, notes, manufacturer, observedOn, description — ADR 0018
+  decision 4), the notice "changes enter moderation" for published states,
+  and the edit-request status when one is pending. Bundle: `record.ts`
+  (form) + `community.ts` (moderation notice, statuses).
+- **SEO/privacy:** auth-gated (contributor session); owner-only; never
+  linked from public navigation; page itself is not indexed for anonymous
+  crawlers (private surface).
+- **Behaviour:** `pending` → direct PATCH (owner-check); `verified` /
+  `needs_review` / `stale` → edit-request re-moderated (entity
+  `camera_edit`, 202 + `editRequest`); `removed` / `rejected` → 409 blocked.
 
 ### `/guide` — Guide (implemented, pre-existing)
 
@@ -522,9 +585,10 @@ export default async function PrivacyPage() {
 | `faq`     | `app/lib/i18n/faq.ts` | FAQ page |
 | `contact` | `app/lib/i18n/contact.ts` | contacts page |
 | `rules`   | `app/lib/i18n/rules.ts` | rules page |
-| `record`  | `app/lib/i18n/record.ts` | record detail page |
+| `record`  | `app/lib/i18n/record.ts` | record detail page (+ edit form, C6) |
 | `moderation` | `app/lib/i18n/moderation.ts` | private moderator dashboard |
-| `auth`    | `app/lib/i18n/auth.ts` | login/register/account |
+| `auth`    | `app/lib/i18n/auth.ts` | login/register/account (+ contributions list, C5) |
+| `community` | `app/lib/i18n/community.ts` | shared community vocabulary — levels, verifications, edit notices (new, C-i18n; used by `/account`, `/records/[id]`, `/records/[id]/edit`, `/guide`) |
 | `footer`  | `app/lib/i18n/footer.ts` | global footer labels |
 | `legal`   | `app/lib/legal/en.ts` / `it.ts` | structured legal content (`privacy`, `terms`, `licenses`, `accessibility`) rendered by `LegalPage` |
 
@@ -554,6 +618,9 @@ Notes:
 | `/licenze`    | `docs/OPEN_SOURCE.md`, `LICENSE`                         |
 | `/faq`        | README, `docs/MODERATION.md`, `docs/PRIVACY_AND_SAFETY.md` |
 | `/contatti`   | `GOVERNANCE.md` (owners/roles), `docs/legal/PRIVACY_NOTICE.md` (correction/removal contact), `SECURITY.md` (security route only) |
+| `/records/[id]` (verification widget, C5) | `docs/COMMUNITY_PLAN.md` §4 (verification model), ADR 0018, `docs/MODERATION.md` (status meanings) |
+| `/account/contributions` (planned) | `docs/COMMUNITY_PLAN.md` §2.3 (profile API), ADR 0018, `docs/DATA_MODEL.md` |
+| `/records/[id]/edit` (planned) | `docs/COMMUNITY_PLAN.md` §2.2 (two-track editing), ADR 0018, `docs/MODERATION.md` (edit moderation) |
 
 ## QA verification (completed, PR #72)
 
@@ -582,5 +649,10 @@ with PR #72 (tests: `tests/navigation-pages.test.mjs`,
   (t_2ca69725).
 - `/guide` slug kept for compatibility; a future alias `/guida` is possible.
 - `/feedback` route (ADR 0006) remains proposed, not implemented.
+- Community routes (`/account/contributions`, `/records/[id]/edit`,
+  verification widget on `/records/[id]`) are **listed here before code**
+  (ADR 0018, COMMUNITY_PLAN §6.4/§7) and land with phases C1–C6; until then
+  they are planned, not implemented. The route rule ("list new routes here
+  before implementation") is satisfied by this entry.
 - The `/` hub cards and static map teaser are F2 (t_52dcb95e); until then
   the anchor sections remain as the temporary fallback.
