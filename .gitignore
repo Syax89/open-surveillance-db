@@ -52,3 +52,6 @@ tsconfig.tsbuildinfo
 # dom harness transpile tree (tests/.dom-tmp-*)
 tests/.dom-tmp-*
 tests/ssr-snap15.tmp.mjs
+
+# lighthouse CI local runs (kanban t_2d2bf33f)
+/.lighthouseci/

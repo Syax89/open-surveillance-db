@@ -42,6 +42,12 @@ A/AA, per success criterion) once the testing gates in Horizon 2 are complete.
   prototype boundaries.
 - Status information is not conveyed by colour alone (text and icon labels are
   used), and safe type/order filters are shared by map and directory.
+- **Automated accessibility gates run in CI on every PR:** axe-core over every
+  SSR route (jsdom) plus a Lighthouse CI gate in real Chromium enforcing the
+  layout-dependent WCAG 2.2 AA rules jsdom cannot evaluate — color-contrast,
+  target-size (2.5.8), link-in-text-block, scrollable-region-focusable — with
+  a minimum accessibility score of **0.95** on all public routes
+  (`.github/workflows/lighthouse.yml`, local check: `npx lhci autorun`).
 
 ### Known limitations (not yet implemented)
 
@@ -162,6 +168,7 @@ verifiche previste nell'Orizzonte 2.
 - Interfaccia in inglese e italiano con preferenza di lingua salvata solo sul dispositivo; la scelta non influisce sui dati API.
 - Guida in-app bilingue su `/guide` che spiega stati dei dati, flusso di lavoro e confini del prototipo.
 - Lo stato non è comunicato solo con il colore (sono usate etichette testuali e icone) e i filtri sicuri per tipo/ordine sono condivisi tra mappa e directory.
+- **Gate di accessibilità automatizzati in CI su ogni PR:** axe-core su ogni rotta SSR (jsdom) più un gate Lighthouse CI in Chromium reale che applica le regole di layout WCAG 2.2 AA che jsdom non può valutare — color-contrast, target-size (2.5.8), link-in-text-block, scrollable-region-focusable — con punteggio di accessibilità minimo **0.95** su tutte le rotte pubbliche (`.github/workflows/lighthouse.yml`, verifica locale: `npx lhci autorun`).
 
 ### Limitazioni note (non ancora implementate)
 
