@@ -273,3 +273,24 @@ test("cleanup tree temporanea", async () => {
   }
   assert.ok(true);
 });
+
+test("global CSP (worker edge) is compatible with the SSR markup these pages emit", async () => {
+  // Coerenza tra il render test e la Content-Security-Policy globale
+  // (worker/index.ts, kanban t_6148aa6f): il markup SSR di vinext/Next
+  // contiene script inline RSC (self.__VINEXT_RSC_*) e uno style inline
+  // <style data-vinext-fonts> — la CSP deve permetterli, altrimenti il
+  // browser blocca la pagina pur essendo il render corretto. Guardia
+  // statica: se la CSP cambia, questo test forza a rivalutarla insieme.
+  const workerSource = readFileSync(path.join(root, "worker", "index.ts"), "utf8");
+  const cspMatch = workerSource.match(/Content-Security-Policy[^\n]*\n((?:.*\n)*?)\s*\]/);
+  assert.ok(cspMatch, "CSP definita nel worker edge");
+  const csp = cspMatch[1];
+  // Inline scripts RSC + dynamic import same-origin (nessun eval).
+  assert.match(csp, /script-src 'self' 'unsafe-inline'/, "CSP deve permettere gli inline script RSC");
+  // <style data-vinext-fonts> inline.
+  assert.match(csp, /style-src 'self' 'unsafe-inline'/, "CSP deve permettere lo style inline fonts");
+  // Le tile sono servite same-origin (proxy /api/tiles, docs/OSM_INTEGRATION.md).
+  assert.match(csp, /img-src 'self'/, "CSP deve permettere risorse img same-origin");
+  // Il sito non è iframabile (clickjacking) — coerente con X-Frame-Options: DENY.
+  assert.match(csp, /frame-ancestors 'none'/, "CSP frame-ancestors 'none'");
+});
