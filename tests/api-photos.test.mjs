@@ -578,6 +578,7 @@ test("GET /api/photos/[id] serves the stored mimeType with safe headers and no a
     assert.equal(response.headers.get("content-disposition"), null, "photos are served inline, never as an attachment");
     assert.equal(response.headers.get("x-content-type-options"), "nosniff");
     assert.equal(response.headers.get("cache-control"), "public, max-age=3600, immutable");
+    assert.equal(response.headers.get("cache-tag"), "photo-11", "approved photo bytes carry their per-photo cache-tag for the future moderation purge");
     assert.match(response.headers.get("content-security-policy") ?? "", /sandbox/);
   }
 });

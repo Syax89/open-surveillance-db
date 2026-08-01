@@ -42,6 +42,16 @@ interface Env {
   AUTH_COOKIE_SECURE?: string;
   AUTH_RATE_LIMIT_MAX?: string;
   AUTH_RATE_LIMIT_WINDOW_SECONDS?: string;
+  /**
+   * Edge-cache purge (follow-up F0, t_ae600b90): when set, the moderation
+   * write path purges the affected cache tags through the Cloudflare Cache
+   * Purge API so a privacy takedown stops being served immediately. Both
+   * values are required; absent credentials make the purge a documented
+   * no-op (the bounded s-maxage/stale-while-revalidate window still
+   * converges). See app/lib/cache-purge.ts and PRIVACY_AND_SAFETY.md.
+   */
+  CACHE_PURGE_TOKEN?: string;
+  CACHE_PURGE_ZONE_ID?: string;
 }
 
 interface ExecutionContext {
