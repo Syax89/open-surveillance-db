@@ -42,7 +42,7 @@ The documentation is part of the project and is intended to be discussed openly.
 
 - [Development plan](docs/DEVELOPMENT_PLAN.md)
 - [Execution board and workstream ownership](docs/EXECUTION_BOARD.md)
-- [Next local sprint: reliable moderation loop](docs/NEXT_SPRINT.md)
+- [Sprint archive: reliable moderation loop (completed)](docs/NEXT_SPRINT.md)
 - [Future roadmap](docs/FUTURE_ROADMAP.md)
 - [Current status](docs/STATUS.md)
 - [Site map and information architecture](docs/SITEMAP.md)
