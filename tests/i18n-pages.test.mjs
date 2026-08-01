@@ -18,16 +18,21 @@
  *      server switch, and LegalPage renders both languages without crashing
  *      (jsdom harness, same as client-locale-toggle.test.mjs).
  *
- * Known SSR limitations are PINNED, not hidden, with a comment pointing at
- * the finding id (same pattern as the loading-note contrast exception in
- * navigation-pages.test.mjs):
- *   - the root layout hardcodes <html lang="en"> (app/layout.tsx) so SSR
- *     never emits lang="it", even for Italian content (finding
- *     QA-2026-08-01-3; the client LocaleProvider fixes the attribute after
- *     hydration — pinned in client-locale-toggle.test.mjs);
- *   - the global SiteFooter is a client component whose SSR snapshot is
- *     always English, so the server-rendered HTML of Italian pages carries
- *     the English footer labels until hydration (finding QA-2026-08-01-1).
+ * Known SSR limitations were PINNED by the original QA suite (PR #131) with a
+ * comment pointing at the finding id, so a fix would have to update them
+ * deliberately (same pattern as the loading-note contrast exception in
+ * navigation-pages.test.mjs). The fix (PR for t_b73f4946) landed and the
+ * assertions below are FLIPPED from the pinned behaviour to the fixed one:
+ *   - the root layout reads the server locale (getServerLocale, ADR 0015) and
+ *     renders <html lang={locale}> on first paint, so SSR emits lang="it" for
+ *     Italian content (finding QA-2026-08-01-3; the client LocaleProvider
+ *     effect still keeps the attribute in sync on client-side switches);
+ *   - LocaleProvider seeds its useSyncExternalStore server snapshot with the
+ *     layout's server locale, so the global SiteFooter (a client component)
+ *     SSRs the cookie language instead of always English — Italian pages
+ *     carry the Italian footer labels from first paint (finding
+ *     QA-2026-08-01-1); after hydration the client snapshot (localStorage)
+ *     takes over exactly as before.
  *
  * Fixtures: only interface strings and the public legal content are
  * asserted — no personal data (privacy & safety by design).
@@ -83,9 +88,11 @@ async function renderPath(requestPath, locale) {
   }
 }
 
-/** Drop the global site-footer landmark (client island, EN in SSR — pinned
- *  separately below) so the "no English residue" checks target the
- *  server-rendered page content. */
+/** Drop the global site-footer landmark so the "no English residue" checks
+ *  target the server-rendered page content (nav + article). The footer itself
+ *  is asserted separately below — it now SSRs the cookie locale (flip of
+ *  QA-2026-08-01-1), but keeping the content contract focused on the page
+ *  body avoids coupling the two suites. */
 function stripFooter(html) {
   return html.replace(/<footer[\s\S]*?<\/footer>/, "");
 }
@@ -178,8 +185,8 @@ test("informative pages serve their Italian content when the locale cookie is it
 test("Italian renderings contain no English residual markers in the page content", async () => {
   for (const [requestPath, markers] of Object.entries(INFO_ROUTES)) {
     const { html } = await renderPath(requestPath, "it");
-    // The footer is a client island that always SSRs English (pinned in its
-    // own test below); the no-English contract applies to the page content.
+    // The footer is asserted separately below (it now SSRs the cookie
+    // locale); the no-English contract applies to the page content.
     const content = stripFooter(html);
 
     for (const marker of markers.noEn) {
@@ -215,45 +222,55 @@ test("every informative route renders EN and IT without crashing and flips its t
 });
 
 // ---------------------------------------------------------------------------
-// 4. Known SSR limitations, pinned (findings QA-2026-08-01-1 / -3)
+// 4. Former SSR limitations, now fixed (findings QA-2026-08-01-1 / -3)
+//
+// The original QA suite pinned both defects (contrast-exception pattern). The
+// fix (t_b73f4946) flipped these assertions deliberately: the root layout
+// propagates the cookie locale to <html lang> and seeds LocaleProvider's SSR
+// snapshot, so first paint matches the user's language everywhere.
 // ---------------------------------------------------------------------------
 
-test("SSR <html lang> follows the persisted locale on every informative route (ADR 0015; pinned limitation QA-2026-08-01-3 now fixed)", async () => {
-  // The SSR-lang limitation pinned at QA-2026-08-01-3 was fixed by the
-  // i18n SSR change (ADR 0015 / #132): app/layout.tsx now reads the locale
-  // cookie through getServerLocale() and renders <html lang={locale}>, so
-  // the first paint of an Italian page is already announced as Italian (no
-  // EN->IT flash, screen readers pronounce the correct language). The
-  // client LocaleProvider still keeps document.documentElement.lang in sync
-  // after hydration (client-locale-toggle.test.mjs). This assertion was
-  // flipped deliberately: it now pins the fixed behaviour and fails only if
-  // the root layout regresses to a hardcoded English lang.
+test("SSR <html lang> matches the cookie locale: it on Italian pages, en by default (flipped fix, QA-2026-08-01-3)", async () => {
+  // FLIPPED from the pinned behaviour (lang="en" always): the root layout
+  // reads the server locale (getServerLocale, ADR 0015) and renders
+  // <html lang={locale}>, so SSR emits lang="it" for Italian content —
+  // screen readers announce the right language at first paint, before any
+  // client JavaScript runs. Without a cookie the pilot language (en, ADR
+  // 0007) is served, which is also what crawlers see.
   for (const [requestPath] of Object.entries(INFO_ROUTES)) {
     const { html } = await renderPath(requestPath, "it");
     assert.match(html, /<html[^>]*lang="it"/, `${requestPath} (it) SSR must declare lang="it"`);
   }
+  // Default without a cookie stays English (pilot language).
+  const { html } = await renderPath("/privacy");
+  assert.match(html, /<html[^>]*lang="en"/, "/privacy (no cookie) SSR must declare lang=\"en\"");
 });
 
-test("SSR footer renders English labels even on Italian pages (pinned defect, QA-2026-08-01-1)", async () => {
-  // SiteFooter is a "use client" component reading the LocaleProvider
-  // context, whose SSR snapshot is always "en" (it cannot read the cookie).
-  // The cookie-based server i18n therefore does NOT reach the global footer:
-  // the server-rendered HTML of Italian pages mixes Italian content with an
-  // English footer (links + tagline). After hydration the footer switches to
-  // the stored locale for users with a preference; without JS, or before
-  // hydration, the page is mixed-language. This pins the current behaviour;
-  // a fix (reading the locale cookie in the root layout / footer SSR) must
-  // flip these assertions to the Italian labels.
+test("SSR footer renders Italian labels on Italian pages (flipped fix, QA-2026-08-01-1)", async () => {
+  // FLIPPED from the pinned defect (EN footer in IT SSR): the root layout
+  // passes its server locale (getServerLocale, ADR 0015) into LocaleProvider,
+  // which uses it as the useSyncExternalStore SSR snapshot. The global
+  // SiteFooter (a "use client" component reading the context) therefore SSRs
+  // the cookie language: Italian pages carry the Italian footer labels (links
+  // + tagline) from first paint — no mixed-language HTML for crawlers/no-JS,
+  // no EN->IT flash. After hydration the client snapshot (localStorage) takes
+  // over exactly as before. Labels asserted here are the real it.ts bundle
+  // values ("Privacy" and "FAQ" are identical in both languages, so the
+  // discriminators are the labels that actually differ).
   const { html } = await renderPath("/privacy", "it");
   const footer = extractFooter(html);
 
-  for (const marker of ["Rules", "Guide", "Privacy", "Terms of use", "Licenses", "FAQ", "Contact"]) {
-    assert.ok(footer.includes(marker), `SSR footer on Italian /privacy still contains "${marker}"`);
+  for (const marker of ["Regole", "Guida", "Licenze", "Contatti"]) {
+    assert.ok(footer.includes(marker), `SSR footer on Italian /privacy should contain "${marker}"`);
   }
-  assert.match(footer, /built for transparency, not tracking\./);
-  // And the Italian footer labels are NOT present in the SSR HTML.
-  for (const marker of ["Regole", "Termini di utilizzo", "Licenze", "Creato per la trasparenza"]) {
-    assert.ok(!footer.includes(marker), `SSR footer on Italian /privacy must not contain "${marker}"`);
+  // React SSR encodes the apostrophe in "Termini d'uso" as &#x27; in the raw
+  // HTML, so match the entity-tolerant form instead of the plain string.
+  assert.match(footer, /Termini d(&#x27;|')uso/, "SSR footer on Italian /privacy should contain \"Termini d'uso\"");
+  assert.match(footer, /creato per la trasparenza, non per il tracciamento\./);
+  assert.match(footer, /Piè di pagina del sito/, "Italian footer must keep the localized landmark aria-label");
+  // And the English footer labels are NOT present in the SSR HTML.
+  for (const marker of ["Rules", "Guide", "Terms of use", "Licenses", "Contact", "built for transparency, not tracking."]) {
+    assert.ok(!footer.includes(marker), `SSR footer on Italian /privacy must not contain English "${marker}"`);
   }
 });
 
