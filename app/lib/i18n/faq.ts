@@ -27,10 +27,10 @@ export const en = {
     "The map shows only reviewed public records, and published coordinates are intentionally rounded to about 4 decimal places (roughly 10 metres). A status describes the current review state, not a guarantee that a camera is active. An empty area does not prove that no cameras are present — it only shows that no reviewed record is currently published there.",
   qCorrect: "How do I correct an error?",
   aCorrect:
-    "Use the private correction form on the home page (“Correct a record or raise a concern”) or write to privacy@opensurveillancedb. Correction requests are private: they do not change the map automatically and are never included in the public export. First response within 48 hours; substantive response within 14 days.",
+    "Use the private correction form on the home page (“Correct a record or raise a concern”) or write to privacy@opensurveillancedb.org. Correction requests are private: they do not change the map automatically and are never included in the public export. First response within 48 hours; substantive response within 14 days.",
   qPrivacy: "What about privacy?",
   aPrivacy:
-    "Reports are private while pending; published records contain no faces, licence plates or personal data. The data controller is Simone Rondina (syax89) / OpenSurveillanceDB, Italy. Data-subject rights (access, rectification, erasure, objection) can be exercised via privacy@opensurveillancedb.",
+    "Reports are private while pending; published records contain no faces, licence plates or personal data. The data controller is Simone Rondina (syax89) / OpenSurveillanceDB, Italy. Data-subject rights (access, rectification, erasure, objection) can be exercised via privacy@opensurveillancedb.org.",
   qAccount: "Do I need an account?",
   aAccount:
     "No. Browsing, reporting a camera and sending a correction all work without an account. An account is optional and adds attribution: you can follow your own reports, edit your contributions, verify records you have seen and build a trust level from your verified contributions.",
@@ -74,10 +74,10 @@ export const it: Translation<typeof en> = {
     "La mappa mostra solo record pubblici revisionati e le coordinate pubblicate sono volutamente arrotondate a circa 4 decimali (circa 10 metri). Uno stato descrive la situazione di revisione corrente, non la garanzia che una telecamera sia attiva. Un'area vuota non dimostra che non ci siano telecamere: mostra solo che in quel punto non c'è attualmente alcun record revisionato pubblicato.",
   qCorrect: "Come si corregge un errore?",
   aCorrect:
-    "Usa il modulo privato di correzione nella home page (“Correggi un record o segnala un problema”) oppure scrivi a privacy@opensurveillancedb. Le richieste di correzione sono private: non modificano la mappa automaticamente e non finiscono mai nell'esportazione pubblica. Prima risposta entro 48 ore; risposta sostanziale entro 14 giorni.",
+    "Usa il modulo privato di correzione nella home page (“Correggi un record o segnala un problema”) oppure scrivi a privacy@opensurveillancedb.org. Le richieste di correzione sono private: non modificano la mappa automaticamente e non finiscono mai nell'esportazione pubblica. Prima risposta entro 48 ore; risposta sostanziale entro 14 giorni.",
   qPrivacy: "E per quanto riguarda la privacy?",
   aPrivacy:
-    "Le segnalazioni sono private finché sono in attesa; i record pubblicati non contengono volti, targhe o dati personali. Il titolare del trattamento è Simone Rondina (syax89) / OpenSurveillanceDB, Italia. I diritti dell'interessato (accesso, rettifica, cancellazione, opposizione) si esercitano scrivendo a privacy@opensurveillancedb.",
+    "Le segnalazioni sono private finché sono in attesa; i record pubblicati non contengono volti, targhe o dati personali. Il titolare del trattamento è Simone Rondina (syax89) / OpenSurveillanceDB, Italia. I diritti dell'interessato (accesso, rettifica, cancellazione, opposizione) si esercitano scrivendo a privacy@opensurveillancedb.org.",
   qAccount: "Serve un account?",
   aAccount:
     "No. Consultare, segnalare una telecamera e inviare una correzione funzionano anche senza account. L'account è facoltativo e aggiunge l'attribuzione: puoi seguire le tue segnalazioni, modificare i tuoi contributi, verificare i record che hai visto e costruire un livello di fiducia con i tuoi contributi verificati.",

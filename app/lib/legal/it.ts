@@ -35,7 +35,7 @@ export const itLegal: LegalContent = {
           },
           {
             type: "paragraph",
-            text: "**Contatto privacy:** [privacy@opensurveillancedb](mailto:privacy@opensurveillancedb) — casella dedicata, da creare prima del lancio — per ogni domanda, richiesta dell'interessato o segnalazione. Prima risposta entro 48 ore, risposta sostanziale entro 14 giorni.",
+            text: "**Contatto privacy:** [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org) — casella dedicata — per ogni domanda, richiesta dell'interessato o segnalazione. Prima risposta entro 48 ore, risposta sostanziale entro 14 giorni.",
           },
         ],
       },
@@ -210,7 +210,7 @@ export const itLegal: LegalContent = {
           },
           {
             type: "paragraph",
-            text: "**Come esercitarli:** scrivi a [privacy@opensurveillancedb](mailto:privacy@opensurveillancedb). Per tutelare gli interessati, potremmo chiederti di verificare la tua identità, in modo proporzionato alla richiesta.",
+            text: "**Come esercitarli:** scrivi a [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org). Per tutelare gli interessati, potremmo chiederti di verificare la tua identità, in modo proporzionato alla richiesta.",
           },
           {
             type: "paragraph",
@@ -227,7 +227,7 @@ export const itLegal: LegalContent = {
         blocks: [
           {
             type: "paragraph",
-            text: "Contatto privacy: [privacy@opensurveillancedb](mailto:privacy@opensurveillancedb) — prima risposta entro 48 ore, risposta sostanziale entro 14 giorni.",
+            text: "Contatto privacy: [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org) — prima risposta entro 48 ore, risposta sostanziale entro 14 giorni.",
           },
           {
             type: "paragraph",
@@ -288,7 +288,7 @@ export const itLegal: LegalContent = {
           },
           {
             type: "paragraph",
-            text: "**Contatto:** [privacy@opensurveillancedb](mailto:privacy@opensurveillancedb) — casella dedicata, da creare prima del lancio — per ogni domanda, correzione, ricorso o richiesta relativa alla privacy. Tempi di risposta: prima risposta entro 48 ore, decisione sostanziale entro 14 giorni.",
+            text: "**Contatto:** [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org) — casella dedicata — per ogni domanda, correzione, ricorso o richiesta relativa alla privacy. Tempi di risposta: prima risposta entro 48 ore, decisione sostanziale entro 14 giorni.",
           },
         ],
       },
@@ -378,7 +378,7 @@ export const itLegal: LegalContent = {
             ordered: true,
             items: [
               "La moderazione segue la policy e i livelli di servizio pubblicati: nascondimenti d'emergenza entro **24 ore**, prima risposta entro **48 ore**, decisione sostanziale entro **14 giorni**, riesame dei nascondimenti temporanei entro **30 giorni**.",
-              "Chiunque sia interessato da una decisione di moderazione può richiederne la correzione o la rimozione tramite il modulo di correzione nell'app (home page, sezione \"Segnala un problema / correzione\") o [privacy@opensurveillancedb](mailto:privacy@opensurveillancedb) entro **30 giorni** dalla decisione. I ricorsi sono decisi da un **revisore diverso** da quello della decisione originaria, con escalation per i casi contestati.",
+              "Chiunque sia interessato da una decisione di moderazione può richiederne la correzione o la rimozione tramite il modulo di correzione nell'app (home page, sezione \"Segnala un problema / correzione\") o [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org) entro **30 giorni** dalla decisione. I ricorsi sono decisi da un **revisore diverso** da quello della decisione originaria, con escalation per i casi contestati.",
               "I diritti dell'interessato (accesso, rettifica, cancellazione, limitazione, opposizione, portabilità) sono descritti nell'[informativa sulla privacy](/privacy) e si esercitano tramite lo stesso contatto.",
             ],
           },
@@ -419,7 +419,7 @@ export const itLegal: LegalContent = {
         blocks: [
           {
             type: "paragraph",
-            text: "Il tuo uso del Servizio è disciplinato dall'[informativa sulla privacy](/privacy). Punti chiave: niente tracciamento, niente pubblicità comportamentale; le segnalazioni sono private finché pending; i tuoi diritti GDPR si esercitano tramite [privacy@opensurveillancedb](mailto:privacy@opensurveillancedb) nei termini di legge (art. 12(3) GDPR).",
+            text: "Il tuo uso del Servizio è disciplinato dall'[informativa sulla privacy](/privacy). Punti chiave: niente tracciamento, niente pubblicità comportamentale; le segnalazioni sono private finché pending; i tuoi diritti GDPR si esercitano tramite [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org) nei termini di legge (art. 12(3) GDPR).",
           },
         ],
       },
@@ -446,7 +446,7 @@ export const itLegal: LegalContent = {
             ordered: true,
             items: [
               "Possiamo sospendere o limitare l'accesso, o rimuovere contenuti, quando necessario per far rispettare questi termini, per proteggere utenti o interessati, o secondo la policy di moderazione — con l'obiettivo di informare la persona interessata dove proporzionato e possibile.",
-              "I contributori possono richiedere la cancellazione delle proprie segnalazioni pending tramite [privacy@opensurveillancedb](mailto:privacy@opensurveillancedb); i record verificati e pubblicati sono soggetti al ciclo di conservazione e revisione con **rinnovo a 12 mesi** e al percorso di correzione della sezione 6.",
+              "I contributori possono richiedere la cancellazione delle proprie segnalazioni pending tramite [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org); i record verificati e pubblicati sono soggetti al ciclo di conservazione e revisione con **rinnovo a 12 mesi** e al percorso di correzione della sezione 6.",
             ],
           },
         ],
@@ -484,7 +484,7 @@ export const itLegal: LegalContent = {
           {
             type: "list",
             items: [
-              "**Privacy, correzioni, ricorsi, diritti:** [privacy@opensurveillancedb](mailto:privacy@opensurveillancedb) (casella dedicata — da creare prima del lancio).",
+              "**Privacy, correzioni, ricorsi, diritti:** [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org) (casella dedicata).",
               "Le emergenze di moderazione o abuso usano lo stesso canale (nascondimento entro 24 ore).",
             ],
           },
@@ -636,7 +636,7 @@ export const itLegal: LegalContent = {
             items: [
               "apri una segnalazione sul repository del progetto (contenuto pubblico e non sensibile — non includere dati personali, foto di persone o luoghi privati);",
               "usa il [modulo di correzione](/) nella pagina pubblica per problemi relativi a un record specifico;",
-              "scrivi al contatto privacy indicato nell'[informativa sulla privacy](/privacy): [privacy@opensurveillancedb](mailto:privacy@opensurveillancedb).",
+              "scrivi al contatto privacy indicato nell'[informativa sulla privacy](/privacy): [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org).",
             ],
           },
           {

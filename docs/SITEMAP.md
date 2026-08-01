@@ -385,7 +385,7 @@ proposed).
   security disclosure route.
 - **Content:** from `GOVERNANCE.md` (owners and roles), the correction /
   removal contact from `docs/legal/PRIVACY_NOTICE.md`
-  (privacy@opensurveillancedb), and the security reporting route from
+  (privacy@opensurveillancedb.org), and the security reporting route from
   `SECURITY.md` — the page links the GitHub security-advisories form and
   does not include sensitive data in the body. Bundle: `contact`.
 - **Nav/footer:** footer only.

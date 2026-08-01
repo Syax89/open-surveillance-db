@@ -104,5 +104,5 @@ Not intentionally collected. Incidental capture in evidence (faces, plates, inte
 ## 6. Open items before launch
 
 - [ ] Final legal review per operating jurisdiction (start: IT, DE per ../MODERATION.md M5).
-- [x] Controller entity and privacy contact decided (2026-07-31): **Simone Rondina (syax89) / OpenSurveillanceDB — Italy**; `privacy@opensurveillancedb` (mailbox to be provisioned before launch).
+- [x] Controller entity and privacy contact decided (2026-07-31): **Simone Rondina (syax89) / OpenSurveillanceDB — Italy**; `privacy@opensurveillancedb.org` (mailbox active 2026-08-01).
 - [ ] Record the LIA sign-off in the governance log (ADR 0002).

@@ -2,7 +2,7 @@
 
 - **Status:** all documents are **drafts** for pre-launch review; nothing here is a published commitment.
 - **Owner:** Rosa (Legal & Privacy Officer / privacy contact)
-- **Decisions applied (2026-07-31, CEO — recorded in ADR 0008, docs task t_0b3d47e2):** controller entity **Simone Rondina (syax89) / OpenSurveillanceDB (Italy)**; data licence **ODbL 1.0** (software stays as in the repository: AGPL-3.0-or-later in LICENSE + package.json — note: the CEO decision cited "MIT already present", which does not match the repository; confirmation requested, see task t_e4bfcfbc); publication precision **~4 decimal places (~10 m)** with exact detail private to moderators; retention **12 months with renewal**; correction/removal contact **`privacy@opensurveillancedb`** (mailbox to be created at launch) + private form.
+- **Decisions applied (2026-07-31, CEO — recorded in ADR 0008, docs task t_0b3d47e2):** controller entity **Simone Rondina (syax89) / OpenSurveillanceDB (Italy)**; data licence **ODbL 1.0** (software stays as in the repository: AGPL-3.0-or-later in LICENSE + package.json — note: the CEO decision cited "MIT already present", which does not match the repository; confirmation requested, see task t_e4bfcfbc); publication precision **~4 decimal places (~10 m)** with exact detail private to moderators; retention **12 months with renewal**; correction/removal contact **`privacy@opensurveillancedb.org`** (dedicated, monitored mailbox) + private form.
 - **Location:** canonical folder for pre-launch legal deliverables: `docs/legal/` (per ADR 0002).
 - **Produced from:** review findings P1-P6, M1-M5 in [`REVIEW_POLICY_LEGALE_2026-07-31.md`](REVIEW_POLICY_LEGALE_2026-07-31.md) (committed to the repository with this index; task t_05d84417).
 
@@ -26,7 +26,7 @@
 
 - PRIVACY_AND_SAFETY.md "User rights and accountability" (privacy notice, lawful-basis analysis, retention schedule, correction/removal path, data-access contact, processor register) → all satisfied by drafts above.
 - MODERATION.md "Appeals and corrections" + "Moderator safeguards" → MODERATION_SLA.md.
-- SECURITY.md "monitored private disclosure address and a response-time commitment" → BREACH_PROCEDURE.md § 2/5 (mailbox to be created at launch).
+- SECURITY.md "monitored private disclosure address and a response-time commitment" → BREACH_PROCEDURE.md § 2/5 (mailbox active).
 
 ## Still open (other pre-launch items from the review, not in this task's scope)
 

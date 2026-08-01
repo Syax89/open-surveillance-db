@@ -2,7 +2,7 @@
 
 - **Status:** draft for pre-launch review (ADR 0004)
 - **Owner:** Rosa (Legal & Privacy Officer / privacy contact)
-- **Decisions applied (2026-07-31, CEO — ADR 0008):** verified records on a **12-month renewal review cycle**; privacy contact `privacy@opensurveillancedb` (mailbox to be created at launch).
+- **Decisions applied (2026-07-31, CEO — ADR 0008):** verified records on a **12-month renewal review cycle**; privacy contact `privacy@opensurveillancedb.org` (dedicated, monitored mailbox).
 - **Photo evidence retention (2026-08-01, DPO — audit gap G6):** photo uploads follow their own lifecycle (R13) aligned to the record rules — pending/orphan 90 days, rejected 30 days, approved photos follow the 12-month record cycle; deletion always includes the R2 `PHOTOS` object bytes, not just the D1 row.
 - **Community data retention (2026-08-01, DPO — community system, COMMUNITY_PLAN.md § 5.3):** new rule **R14** for profile/trust level/verifications/edit-history — profile data follows the account (active → erasure), verifications given and revision authorship are de-identified at erasure, audit entries keep the 2-year rule (R5).
 - **Legal basis:** GDPR art. 5(1)(e) (storage limitation), art. 17 (erasure); D.Lgs. 196/2003 (Codice Privacy, IT) as primary jurisdiction; consistent with `../PRIVACY_AND_SAFETY.md` and `../MODERATION.md`.
@@ -22,7 +22,7 @@
 | R6 | Evidence (files / links supporting a record) | **Tied to the record it supports** | Same lifecycle as R1/R2/R3 | Deleted with the record; hard-deleted immediately if the record is rejected/removed | Evidence containing incidental personal data (e.g. faces, plates, interiors) is redacted or deleted on the spot; never published. Photo evidence follows its own lifecycle — see R13. |
 | R7 | Contributor metadata (pseudonymous internal ID, submission timestamp; **account** — email, optional display name, password hash; session records) | **Account data:** while the account is active; sessions **30 days** after issue or immediately on logout/revocation (ADR 0013, `AUTH_SESSION_TTL_DAYS`); pending-submission attribution 90 days as pending, then tied to the record; verified-record provenance kept as long as the record is public | Account deletion request (art. 17) / session expiry | Delete account and sessions (cascade); attributed reports are de-attributed (convert to anonymous, `contributor_id = NULL`) or reviewed with the requester | Email is collected **only** for login/attribution; passwords are PBKDF2-SHA256 hashed, sessions stored as SHA-256 only — a DB leak cannot replay live sessions. Account erasure is **self-service and implemented**: `DELETE /api/auth/account` (PR #61, GDPR art. 17) hard-deletes the contributor row, revokes all sessions, and de-attributes attributed reports atomically (`contributor_id = NULL` via `eraseContributor` in `db/auth.ts`); the response reports the number of de-attributed reports. The FK `cameras.contributor_id` therefore never blocks erasure. See TERMS § 15 / PRIVACY_NOTICE § 7. |
 | R8 | Moderator identity (ChatGPT sign-in: email, display name, full name) | **Not stored** | — | — | Used for authentication only; emails are never logged in application logs (M4); audit logs carry a reviewer pseudonym only. |
-| R9 | Correspondence with the privacy contact (`privacy@opensurveillancedb` — mailbox to be created at launch) | **2 years** | Last message date | Delete | Applies to data-subject requests and breach communication. |
+| R9 | Correspondence with the privacy contact (`privacy@opensurveillancedb.org` — dedicated, monitored mailbox) | **2 years** | Last message date | Delete | Applies to data-subject requests and breach communication. |
 | R10 | Backups (Cloudflare D1: hourly automatic backups, Time Travel PITR) | **Provider-managed: 24 h hourly snapshots, 30 days point-in-time recovery** | Continuous | Automatic rotation by the provider | An erasure under art. 17 becomes fully effective at the next backup rotation; the remaining window (max 30 days) is disclosed in the erasure response. R2 is used for **photo bytes only** (`PHOTOS` bucket, R13) — not for backups; no long-term export backups exist. |
 | R11 | Application / operational logs | **≤ 12 months** | Log entry creation | Delete; aggregate-only | Logs must not contain personal data by design (M4: never log emails); used for security, availability and abuse prevention; retained in aggregate only. |
 | R12 | `demo` records | As long as the prototype needs them | — | Purged before public launch | Fictional, clearly labelled content; not personal data. |
@@ -31,7 +31,7 @@
 
 ## 2. Erasure requests (art. 17 GDPR)
 
-1. Receive request via `privacy@opensurveillancedb` (contact defined in the privacy notice).
+1. Receive request via `privacy@opensurveillancedb.org` (contact defined in the privacy notice).
 2. Verify the requester's identity proportionately (see PRIVACY_NOTICE.md § rights).
 3. Assess exceptions: art. 17(3) allows retention where necessary for the public-interest dataset purpose or legal obligations; a minimal, clearly justified retention (e.g. record provenance) may be kept — documented in the correction log.
 4. Execute deletion: record, evidence (including photo metadata and the R2 image bytes, R13), linked metadata; note that backups rotate within 30 days (R10).

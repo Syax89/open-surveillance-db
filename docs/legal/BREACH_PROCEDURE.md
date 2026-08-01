@@ -24,7 +24,7 @@ Sources of detection:
 
 - Cloudflare incident notification (per the Cloudflare DPA, art. 33(2) flow — processor notifies us without undue delay);
 - application/monitoring alerts (5xx spikes, unexpected 403/429 patterns, /moderation access anomalies once auth is wired);
-- reports from users, moderators, or third parties (`privacy@opensurveillancedb` mailbox);
+- reports from users, moderators, or third parties (`privacy@opensurveillancedb.org` mailbox);
 - scheduled internal checks (logs review, moderation audit log review).
 
 Any team member who suspects a breach must report it to the privacy contact **within 1 hour** of suspicion — suspicion is enough; confirmation is the triage step.
@@ -100,4 +100,4 @@ Retention: **2 years** (aligned with the audit log, RETENTION_SCHEDULE.md R5/R9)
 
 ---
 
-*Pre-launch note: this procedure becomes operational once the privacy mailbox and on-call rotation exist (see PRIVACY_NOTICE.md § 9 and ../GOVERNANCE.md "Before launch").*
+*Pre-launch note: this procedure becomes operational once the on-call rotation exists (the monitored mailbox is active; see PRIVACY_NOTICE.md § 9 and ../GOVERNANCE.md "Before launch").*

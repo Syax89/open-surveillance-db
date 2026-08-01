@@ -32,7 +32,7 @@ export const enLegal: LegalContent = {
           },
           {
             type: "paragraph",
-            text: "**Privacy contact:** [privacy@opensurveillancedb](mailto:privacy@opensurveillancedb) — a dedicated mailbox, to be created before launch — for any question, data-subject request or report. First response within 48 hours, substantive response within 14 days.",
+            text: "**Privacy contact:** [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org) — a dedicated mailbox — for any question, data-subject request or report. First response within 48 hours, substantive response within 14 days.",
           },
         ],
       },
@@ -207,7 +207,7 @@ export const enLegal: LegalContent = {
           },
           {
             type: "paragraph",
-            text: "**How to exercise them:** write to [privacy@opensurveillancedb](mailto:privacy@opensurveillancedb). To protect data subjects, we may ask you to verify your identity, proportionately to the request.",
+            text: "**How to exercise them:** write to [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org). To protect data subjects, we may ask you to verify your identity, proportionately to the request.",
           },
           {
             type: "paragraph",
@@ -224,7 +224,7 @@ export const enLegal: LegalContent = {
         blocks: [
           {
             type: "paragraph",
-            text: "Privacy contact: [privacy@opensurveillancedb](mailto:privacy@opensurveillancedb) — first response within 48 hours, substantive response within 14 days.",
+            text: "Privacy contact: [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org) — first response within 48 hours, substantive response within 14 days.",
           },
           {
             type: "paragraph",
@@ -285,7 +285,7 @@ export const enLegal: LegalContent = {
           },
           {
             type: "paragraph",
-            text: "**Contact:** [privacy@opensurveillancedb](mailto:privacy@opensurveillancedb) — a dedicated mailbox, to be created before launch — for any question, correction, appeal or privacy request. Response times: first response within 48 hours, substantive decision within 14 days.",
+            text: "**Contact:** [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org) — a dedicated mailbox — for any question, correction, appeal or privacy request. Response times: first response within 48 hours, substantive decision within 14 days.",
           },
         ],
       },
@@ -375,7 +375,7 @@ export const enLegal: LegalContent = {
             ordered: true,
             items: [
               "Moderation follows the published policy and service levels: emergency hides within **24 hours**, first response within **48 hours**, substantive decision within **14 days**, re-review of temporary hides within **30 days**.",
-              "Any person affected by a moderation decision may request correction or removal via the in-app correction form (home page, \"Report a problem / correction\" section) or [privacy@opensurveillancedb](mailto:privacy@opensurveillancedb) within **30 days** of the decision. Appeals are decided by a **different reviewer** than the original decision, with escalation for disputed cases.",
+              "Any person affected by a moderation decision may request correction or removal via the in-app correction form (home page, \"Report a problem / correction\" section) or [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org) within **30 days** of the decision. Appeals are decided by a **different reviewer** than the original decision, with escalation for disputed cases.",
               "Data-subject rights (access, rectification, erasure, restriction, objection, portability) are described in the [privacy notice](/privacy) and exercised through the same contact.",
             ],
           },
@@ -416,7 +416,7 @@ export const enLegal: LegalContent = {
         blocks: [
           {
             type: "paragraph",
-            text: "Your use of the Service is governed by the [privacy notice](/privacy). Key points: no tracking, no behavioural advertising; reports are private while pending; your GDPR rights are exercisable via [privacy@opensurveillancedb](mailto:privacy@opensurveillancedb) within the statutory timelines (Art. 12(3) GDPR).",
+            text: "Your use of the Service is governed by the [privacy notice](/privacy). Key points: no tracking, no behavioural advertising; reports are private while pending; your GDPR rights are exercisable via [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org) within the statutory timelines (Art. 12(3) GDPR).",
           },
         ],
       },
@@ -443,7 +443,7 @@ export const enLegal: LegalContent = {
             ordered: true,
             items: [
               "We may suspend or limit access, or remove content, where necessary to enforce these terms, to protect users or data subjects, or per the moderation policy — aiming to notify the affected person where proportionate and possible.",
-              "Contributors may request deletion of their pending submissions via [privacy@opensurveillancedb](mailto:privacy@opensurveillancedb); verified published records are subject to the **12-month renewal** retention and review cycle and to the correction path of section 6.",
+              "Contributors may request deletion of their pending submissions via [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org); verified published records are subject to the **12-month renewal** retention and review cycle and to the correction path of section 6.",
             ],
           },
         ],
@@ -481,7 +481,7 @@ export const enLegal: LegalContent = {
           {
             type: "list",
             items: [
-              "**Privacy, corrections, appeals, rights:** [privacy@opensurveillancedb](mailto:privacy@opensurveillancedb) (dedicated mailbox — to be created before launch).",
+              "**Privacy, corrections, appeals, rights:** [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org) (dedicated mailbox).",
               "Moderation and abuse emergencies use the same channel (hide within 24 hours).",
             ],
           },
@@ -633,7 +633,7 @@ export const enLegal: LegalContent = {
             items: [
               "open an issue on the project repository (public, non-sensitive content only — do not include personal data, photos of people, or private locations);",
               "use the [correction form](/) on the public page for issues related to a specific record;",
-              "write to the privacy contact named in the [privacy notice](/privacy): [privacy@opensurveillancedb](mailto:privacy@opensurveillancedb).",
+              "write to the privacy contact named in the [privacy notice](/privacy): [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org).",
             ],
           },
           {

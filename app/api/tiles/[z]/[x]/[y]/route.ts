@@ -47,7 +47,7 @@ const UPSTREAM_TIMEOUT_MS_DEFAULT = 5_000;
 // Oversized bodies are rejected with 502 and never cached.
 const TILE_MAX_BYTES_DEFAULT = 2 * 1024 * 1024;
 const TILE_USER_AGENT =
-  "OpenSurveillanceDB/0.1 (+https://github.com/Syax89/open-surveillance-db; contact: privacy@opensurveillancedb)";
+  "OpenSurveillanceDB/0.1 (+https://github.com/Syax89/open-surveillance-db; contact: privacy@opensurveillancedb.org)";
 const TILE_ACCEPT = "image/avif,image/webp,image/png,image/*;q=0.8,*/*;q=0.5";
 
 type TileParams = { z: string; x: string; y: string };

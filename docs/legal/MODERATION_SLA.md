@@ -28,7 +28,7 @@
 
 ## 3. Emergency flow (S1)
 
-1. Report received via the privacy/safety channel (`privacy@opensurveillancedb` — mailbox to be created at launch) or moderation queue.
+1. Report received via the privacy/safety channel (`privacy@opensurveillancedb.org` — dedicated, monitored mailbox) or moderation queue.
 2. On-duty reviewer hides the content immediately (even before full review — hide first, ask later).
 3. Privacy contact notified; severity assessed per BREACH_PROCEDURE.md if personal data is involved.
 4. Full review within 30 days (S4): restore, modify (minimise), or remove; requester informed.

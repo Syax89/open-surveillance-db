@@ -53,7 +53,7 @@ PR #64 ha reso **attivo** l'upload di foto (`POST /api/photos`), ma i documenti 
 
 - **Retention enforcement automatico (R1/R2/R3/R6):** `db/retention.ts` + cron — owner Ada, TERMS § 15.
 - Account erasure endpoint (R7) — owner Ada, TERMS § 15.
-- Provisioning mailbox `privacy@opensurveillancedb`, giurisdizione, SCC version, counsel esterno — PRIVACY_NOTICE § 10.
+- Mailbox privacy attiva (`privacy@opensurveillancedb.org`); giurisdizione, SCC version, counsel esterno — PRIVACY_NOTICE § 10.
 
 ---
 
