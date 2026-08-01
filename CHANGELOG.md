@@ -63,6 +63,21 @@ changes accumulate under `[Unreleased]`.
 - Contributor account erasure with de-attribution (GDPR art. 17): deleting an
   account detaches its submissions from the contributor identity
   ([#61](https://github.com/Syax89/open-surveillance-db/pull/61)).
+- Community system decision record: ADR 0018 formalises the two identity
+  layers (contributors vs users/reviewers), the `camera_confirmations`
+  verification model (UNIQUE per record+contributor, toggle PUT/DELETE,
+  daily quota as D1 state), derived trust levels (pure `deriveLevel`,
+  thresholds 0/1/5/20/50, verified-only, never denormalised, no leaderboard),
+  two-track contribution editing (pending = owner PATCH; published =
+  re-moderated `camera_edit` edit-request; removed/rejected = 409), the
+  six-layer anti-gaming model, and the extended art. 17 erasure
+  ([#168](https://github.com/Syax89/open-surveillance-db/pull/168),
+  [docs/decisions/0018-community-verifications-trust-levels-editing.md](docs/decisions/0018-community-verifications-trust-levels-editing.md)).
+- Site map updated **before** the community code: private routes
+  `/account/contributions` (kebab-case, `noindex`) and `/records/[id]/edit`
+  (auth-gated, owner-only), the verification widget on `/records/[id]`
+  (aggregate public count only), and the new `community.ts` i18n bundle
+  mapping (auth/record/community) ([docs/SITEMAP.md](docs/SITEMAP.md)).
 - Coarse auth roles (`contributor`/`moderator`/`admin`) enforced on every
   protected route via `requireRole`, with the acting reviewer derived
   server-side from the authenticated user, plus a contributor appeal workflow

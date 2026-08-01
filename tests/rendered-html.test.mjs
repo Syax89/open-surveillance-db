@@ -87,8 +87,12 @@ test("server-rendered homepage carries the public app metadata", async () => {
   assert.match(html, /<html[^>]*lang="en"/);
   assert.match(html, /OpenSurveillanceDB/);
   assert.match(html, /Public data about public surveillance\./);
-  // A11y live region for the hero record-count stat (progressive enhancement).
-  assert.match(html, /role="status"/);
+  // A11y live region for the hero record-count stat (progressive enhancement):
+  // an sr-only role="status" region mounts client-side when the public count
+  // resolves. On SSR the stat is a plain <dt> placeholder — axe forbids
+  // role="status" on <dt> (aria-allowed-role) and it breaks the <dl> model
+  // (see app/components/home/Hero.tsx, t_2d2bf33f).
+  assert.doesNotMatch(html, /<dt[^>]*role="status"/, "SSR stat placeholder must be a plain <dt>");
 
   // F2 home hub: the home is an orienteering page. It renders the static
   // MapTeaser (CTA → /mappa) and the four tool cards (FRONTEND_DESIGN §2.4),
