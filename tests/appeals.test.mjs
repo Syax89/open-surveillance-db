@@ -32,6 +32,10 @@ beforeEach(async () => {
   // the real demo identities (contributor id 6, reviewers 1/2/3/5), so it
   // provisions them explicitly like a deploy would before opening the DB.
   await seedDemoIdentities(env.DB);
+  // The shared env mock is reused across tests: reset the per-appellant
+  // appeal threshold knobs so a test that lowers them cannot leak.
+  delete env.APPEAL_APPELLANT_RATE_LIMIT_MAX;
+  delete env.APPEAL_APPELLANT_RATE_LIMIT_WINDOW_SECONDS;
 });
 
 after(async () => cleanupDbRuntime());
@@ -141,6 +145,122 @@ test("only one pending appeal per decision; unknown appellant is rejected", asyn
     reason: "Who am I?",
   });
   assert.equal(stranger.kind, "appellant_not_found");
+});
+
+test("fileAppeal on another contributor's attributed submission stays allowed (documented relevance rule, P3 appeal-ownership)", async () => {
+  // ADR 0013 attribution: the camera was submitted by contributor id 77
+  // (contributors table, seeded directly with an explicit id — the migration
+  // has no seed rows).
+  await env.DB.prepare(
+    "INSERT INTO contributors (id, email, display_name, password_hash, created_at, updated_at) VALUES (77, ?, ?, ?, ?, ?)",
+  ).bind(
+    "other@osdb.test",
+    "Other Contributor",
+    "x".repeat(64),
+    new Date().toISOString(),
+    new Date().toISOString(),
+  ).run();
+
+  const record = await cameras.createPendingCamera({
+    title: "Attributed to another contributor",
+    kind: "Fixed dome",
+    manufacturer: "Acme",
+    observedOn: "2026-07-01",
+    address: "Via Roma 2",
+    notes: "private",
+    latitude: 41.9006,
+    longitude: 12.4938,
+    contributorId: 77,
+  });
+  await moderation.moderateCamera(record.id, "reject", "insufficient-evidence", null, undefined, {
+    actorId: INTAKE.id,
+  });
+  const decision = (await auditEvents())[0];
+
+  // Standing cannot be verified for attributed submissions without a product
+  // decision (option 1 of the audit: hard 403 + "not my submission" reason
+  // code, pending Ada/PM). Under the documented rule (option 2) the appeal is
+  // filed and moderation evaluates the stated relevance; the per-appellant
+  // threshold and the route's minimum reason length bound abuse.
+  const result = await appeals.fileAppeal({
+    entity: "camera",
+    entityId: record.id,
+    decisionEventId: decision.id,
+    appellantId: CONTRIBUTOR_USER_ID,
+    reason: "I recorded this camera myself and can confirm it is on a public street.",
+  });
+  assert.equal(result.kind, "ok");
+  assert.equal(result.appeal.appellantId, CONTRIBUTOR_USER_ID);
+});
+
+test("fileAppeal enforces the per-appellant threshold; failed attempts do not count", async () => {
+  env.APPEAL_APPELLANT_RATE_LIMIT_MAX = "2";
+
+  // Three final decisions on three different records.
+  const decisionIds = [];
+  for (let i = 0; i < 3; i += 1) {
+    const record = await submitPending();
+    await moderation.moderateCamera(record.id, "reject", "insufficient-evidence", null, undefined, {
+      actorId: INTAKE.id,
+    });
+    decisionIds.push((await auditEvents()).find((event) => event.entity_id === record.id).id);
+  }
+
+  const first = await appeals.fileAppeal({
+    entity: "camera",
+    entityId: 1,
+    decisionEventId: decisionIds[0],
+    appellantId: CONTRIBUTOR_USER_ID,
+    reason: "First appeal with a substantive reason",
+  });
+  assert.equal(first.kind, "ok");
+
+  // A failed attempt (unknown decision) must not consume the budget.
+  const failed = await appeals.fileAppeal({
+    entity: "camera",
+    entityId: 2,
+    decisionEventId: 999999,
+    appellantId: CONTRIBUTOR_USER_ID,
+    reason: "Attempt that fails before the threshold check",
+  });
+  assert.equal(failed.kind, "decision_not_found");
+
+  const second = await appeals.fileAppeal({
+    entity: "camera",
+    entityId: 2,
+    decisionEventId: decisionIds[1],
+    appellantId: CONTRIBUTOR_USER_ID,
+    reason: "Second appeal with a substantive reason",
+  });
+  assert.equal(second.kind, "ok");
+
+  // Budget exhausted (2 filed inside the window): the third is refused.
+  const third = await appeals.fileAppeal({
+    entity: "camera",
+    entityId: 3,
+    decisionEventId: decisionIds[2],
+    appellantId: CONTRIBUTOR_USER_ID,
+    reason: "Third appeal that must hit the per-appellant threshold",
+  });
+  assert.equal(third.kind, "appeal_limit_exceeded");
+
+  // A different appellant is not affected by the same threshold.
+  await env.DB.prepare(
+    "INSERT INTO users (email, display_name, role, active, mfa_enabled, created_at, updated_at) VALUES (?, ?, 'contributor', 1, 0, ?, ?)",
+  ).bind(
+    "second-contributor@osdb.test",
+    "Second Contributor",
+    new Date().toISOString(),
+    new Date().toISOString(),
+  ).run();
+  const otherAppellant = await appeals.fileAppeal({
+    entity: "camera",
+    entityId: 3,
+    decisionEventId: decisionIds[2],
+    appellantId: 7,
+    reason: "A different contributor files within their own budget",
+  });
+  assert.equal(otherAppellant.kind, "ok");
 });
 
 test("decideAppeal enforces the independence and seniority rules", async () => {

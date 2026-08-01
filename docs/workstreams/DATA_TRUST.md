@@ -244,6 +244,34 @@ automatically removing accurate, in-scope public-interest records. Conversely,
 the project should favour temporary caution where a credible harm report cannot
 be resolved quickly.
 
+### Appeal standing and abuse control
+
+Appeals are a channel for people affected by a decision, not a general
+dispute queue (audit t_2ee58c08, P3):
+
+- An appeal must state **why the appellant is affected**: they submitted the
+  contested report, or they have direct, specific knowledge relevant to the
+  record (for example, a field observation of the same camera). The submission
+  form requires a reason of at least 20 characters and the senior moderator
+  evaluates the stated relevance when deciding; appeals without a substantive
+  reason are rejected at submission, and out-of-context appeals are dismissed.
+- **Anonymous submissions have no attribution**, so standing cannot be checked
+  against them: any contributor may appeal a decision on an anonymous
+  submission, on the assumption that they may be the anonymous reporter. This
+  is deliberate — it keeps the correction channel open to people who reported
+  without an account.
+- A **per-appellant threshold** (default 5 appeals per 24 hours, tunable via
+  `APPEAL_APPELLANT_RATE_LIMIT_MAX` / `APPEAL_APPELLANT_RATE_LIMIT_WINDOW_SECONDS`)
+  bounds sustained filing by one account, on top of the per-IP HTTP bucket.
+  Only appeals that actually land on the queue count; failed attempts (unknown
+  decisions, duplicates) do not. This prevents a single account from flooding
+  the senior-moderator queue with appeals on decisions it has no standing to
+  contest.
+- If the product later adopts hard ownership checks for attributed submissions
+  (rejecting appeals by a non-attributed contributor with a dedicated
+  "not my submission" flow), this rule is superseded for attributed records
+  only; anonymous submissions remain appealable by anyone.
+
 ## Threat and abuse checklist
 
 The following controls are alpha prerequisites or explicit blockers.
@@ -253,7 +281,7 @@ The following controls are alpha prerequisites or explicit blockers.
 | Doxxing or reports about private homes | Automated and human scope screening; private-address detection; reject/remove policy; emergency hide |
 | Exposure of people, plates, or private interiors | Text minimisation; media disabled until redaction workflow is tested; restricted evidence access |
 | Stalking, targeting, or tactical misuse | No live feeds, coverage cones, device/network data, or sensitive-site records; safe location precision rules |
-| Spam, brigading, or coordinated false submissions | Rate limits, abuse detection, duplicate linking, pseudonymous contributor controls, human publication gate |
+| Spam, brigading, or coordinated false submissions | Rate limits (per-IP and per-appellant for appeals), abuse detection, duplicate linking, pseudonymous contributor controls, human publication gate |
 | Reviewer harassment or coercion | Pseudonymous public attribution, role separation, private escalation channel, access logging |
 | Malicious files or links | Quarantine, malware scan, strict content types, no direct rendering of originals, safe link handling |
 | Data scraping or re-identification | Publish only minimised data; documented API limits; no unpublished endpoints; monitor anomalous access |

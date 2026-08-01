@@ -127,6 +127,10 @@ beforeEach(async () => {
   // appeals and auth flows, so it provisions the demo identities itself —
   // the same shape a deploy provisions real accounts before opening the DB.
   await seedDemoIdentities(env.DB);
+  // The shared env mock is reused across tests: reset the per-appellant
+  // appeal threshold knobs so a test that lowers them cannot leak.
+  delete env.APPEAL_APPELLANT_RATE_LIMIT_MAX;
+  delete env.APPEAL_APPELLANT_RATE_LIMIT_WINDOW_SECONDS;
   // The route modules are cached in the shared tree; reload the recorder each
   // test so coverage stays cumulative while handlers stay stateless.
   const load = async (name, path) => recorder(name, await loadE2ERoute(path));
@@ -847,7 +851,7 @@ test("E2E: appeals validation and role gates hold through the real routes", asyn
   const missing = await appealsRoute.POST(apiRequest("/api/appeals", {
     method: "POST",
     headers: { "x-osdb-user-email": "contributor@osdb.test" },
-    body: { entity: "camera", entityId: record.id, decisionEventId: 999999, reason: "Contesting" },
+    body: { entity: "camera", entityId: record.id, decisionEventId: 999999, reason: "Contesting: I observed this camera directly" },
   }));
   assert.equal(missing.status, 404);
 
@@ -856,7 +860,7 @@ test("E2E: appeals validation and role gates hold through the real routes", asyn
   const nonFinal = await appealsRoute.POST(apiRequest("/api/appeals", {
     method: "POST",
     headers: { "x-osdb-user-email": "contributor@osdb.test" },
-    body: { entity: "camera", entityId: record.id, decisionEventId: escalationEvent.id, reason: "Contesting" },
+    body: { entity: "camera", entityId: record.id, decisionEventId: escalationEvent.id, reason: "Contesting: the escalation ignores my evidence" },
   }));
   assert.equal(nonFinal.status, 400);
 
@@ -864,12 +868,12 @@ test("E2E: appeals validation and role gates hold through the real routes", asyn
   await appealsRoute.POST(apiRequest("/api/appeals", {
     method: "POST",
     headers: { "x-osdb-user-email": "contributor@osdb.test" },
-    body: { entity: "camera", entityId: record.id, decisionEventId: decisionEvent.id, reason: "First appeal" },
+    body: { entity: "camera", entityId: record.id, decisionEventId: decisionEvent.id, reason: "First appeal: the camera is on public property" },
   }));
   const duplicate = await appealsRoute.POST(apiRequest("/api/appeals", {
     method: "POST",
     headers: { "x-osdb-user-email": "contributor@osdb.test" },
-    body: { entity: "camera", entityId: record.id, decisionEventId: decisionEvent.id, reason: "Second appeal" },
+    body: { entity: "camera", entityId: record.id, decisionEventId: decisionEvent.id, reason: "Second appeal: new evidence supports the location" },
   }));
   assert.equal(duplicate.status, 409);
 
@@ -950,6 +954,53 @@ test("E2E: appeals route maps a syntactically invalid JSON body to 400 (not 500)
   assert.equal((await responseBody(malformed)).error, "Request body is not valid JSON.");
   const appealsAfter = await env.DB.prepare("SELECT COUNT(*) AS n FROM moderation_appeals").first();
   assert.equal(Number(appealsAfter.n), Number(appealsBefore.n), "no appeal row written for malformed JSON");
+});
+
+test("E2E: an appeal reason below the relevance floor is rejected with 400", async () => {
+  const record = await submitCamera();
+  await moderateCamera(record.id, "reject", REASON.insufficient, REVIEWERS.intake);
+  const decisionEvent = (await auditEvents())[0];
+
+  // A short placeholder carries no stated relevance for the senior moderator
+  // to evaluate (P3 appeal-ownership, documented rule).
+  const short = await appealsRoute.POST(apiRequest("/api/appeals", {
+    method: "POST",
+    headers: { "x-osdb-user-email": "contributor@osdb.test" },
+    body: { entity: "camera", entityId: record.id, decisionEventId: decisionEvent.id, reason: "Contesting" },
+  }));
+  assert.equal(short.status, 400);
+  assert.match((await responseBody(short)).error, /explaining why you are affected/);
+});
+
+test("E2E: the per-appellant appeal threshold answers 429 through the route", async () => {
+  env.APPEAL_APPELLANT_RATE_LIMIT_MAX = "2";
+  try {
+    const records = [];
+    const decisionIds = [];
+    for (let i = 0; i < 3; i += 1) {
+      const record = await submitCamera();
+      await moderateCamera(record.id, "reject", REASON.insufficient, REVIEWERS.intake);
+      records.push(record);
+      decisionIds.push((await auditEvents()).find((event) => event.entity_id === record.id).id);
+    }
+    const file = (entityId, decisionEventId, reason) =>
+      appealsRoute.POST(apiRequest("/api/appeals", {
+        method: "POST",
+        headers: { "x-osdb-user-email": "contributor@osdb.test" },
+        body: { entity: "camera", entityId, decisionEventId, reason },
+      }));
+
+    const first = await file(records[0].id, decisionIds[0], "First appeal: I observed this camera directly");
+    assert.equal(first.status, 201);
+    const second = await file(records[1].id, decisionIds[1], "Second appeal: my evidence shows a public street");
+    assert.equal(second.status, 201);
+    const third = await file(records[2].id, decisionIds[2], "Third appeal: this decision needs a fresh review");
+    assert.equal(third.status, 429);
+    assert.match((await responseBody(third)).error, /Too many appeals from this account/);
+    assert.equal(third.headers.get("Retry-After"), "86400", "Retry-After mirrors the default 24h window");
+  } finally {
+    delete env.APPEAL_APPELLANT_RATE_LIMIT_MAX;
+  }
 });
 
 // 7) Account erasure (RETENTION_SCHEDULE R7) end to end
