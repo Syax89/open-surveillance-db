@@ -19,6 +19,7 @@
     "dev": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext dev",
     "build": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext build",
     "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
+    "preview:serve": "node scripts/serve-preview.mjs",
     "test": "npm run build && node --test \"tests/*.test.mjs\"",
     "coverage": "bash -c 'set -euo pipefail; npm run build; rm -rf .coverage && mkdir -p .coverage; OSDB_COVERAGE_TREE=1 NODE_V8_COVERAGE=.coverage/raw node --test --experimental-test-coverage --test-coverage-include=\".coverage/trees/osdb-routes-*/app/**\" --test-coverage-include=\".coverage/trees/osdb-routes-*/db-real/**\" --test-coverage-include=\".coverage/trees/osdb-e2e-*/app/**\" --test-coverage-include=\".coverage/trees/osdb-e2e-*/db/**\" --test-coverage-include=\".coverage/trees/osdb-e2e-*/worker.mjs\" --test-coverage-include=\".coverage/trees/osdb-db-runtime-*/**\" --test-coverage-include=\".coverage/trees/osdb-freshness-*/**\" --test-coverage-exclude=\".coverage/trees/**/cloudflare-workers.mjs\" --test-coverage-exclude=\".coverage/trees/**/geocode.mjs\" --test-coverage-exclude=\".coverage/trees/**/vinext-*-stub.mjs\" --test-coverage-exclude=\"**/node_modules/**\" \"tests/*.test.mjs\" 2>&1 | tee .coverage/coverage.txt'",
     "coverage:docs": "bash -c 'npx c8 report --temp-directory=.coverage/raw --report-dir=.coverage/report --reporter=json --reporter=text-summary > .coverage/c8-summary.txt && node scripts/coverage-docs.mjs --check'",
@@ -39,6 +40,7 @@
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.50.0",
+    "@lhci/cli": "^0.15.1",
     "@tailwindcss/postcss": "4.2.1",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.2",
@@ -49,6 +51,7 @@
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "6.0.2",
     "@vitejs/plugin-rsc": "0.5.26",
+    "axe-core": "^4.10.0",
     "c8": "^10.1.3",
     "drizzle-kit": "0.31.10",
     "eslint": "^9.39.5",

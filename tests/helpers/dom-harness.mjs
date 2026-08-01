@@ -116,51 +116,110 @@ export default function Link({ href, children, ...rest }) {
 `);
   // The navigation mock keeps a mutable state so tests can set the params
   // for /records/[id] and assert router.push calls after a form submit.
-  // `search` is the URL shell (F1 tool routes /mappa ?type=&freshness=,
-  // /correggi ?record=ID): tests pass a query string via __setNavState
-  // ({ search: "type=dome&freshness=7d" }) and the components read it via
-  // useSearchParams, exactly like Next's useSearchParams on a real route.
-  // `pathname` feeds usePathname (F3 ToolLayout per-page nav sets); the
-  // router stub records push and replace (LegacyAnchorRedirect uses
-  // replace, t_2ca69725).
+  //
+  // URL-state model (F-QA t_7b716c97, prereq F4): besides `params`, the mock
+  // carries a real URL state — pathname + search — plus a browser-style
+  // history stack, so tests can simulate deep links (initial URL from the
+  // address bar), router.push/replace navigation, and back/forward. The
+  // URL-contract suite (tests/url-contract.test.mjs) drives these helpers.
+  //
+  // Legacy aliases (F1/F3 suites keep using them unchanged):
+  //   __setNavState({ search: "type=dome&freshness=7d" })  → seeds the URL
+  //     shell for /mappa /correggi ?record=ID (useSearchParams reads it);
+  //   __setNavState({ pathname: "/mappa" })                → feeds
+  //     usePathname for the ToolLayout per-page nav sets (t_2ca69725).
   //
   // F4 URL-state contract (t_522638a5): push/replace model Next's router —
-  // after a navigation the URL changes, so the stub extracts the query from
-  // the href into `state.search` and useSearchParams reflects it on the
-  // next render (deep-link / back-forward behaviour in jsdom). `replaced`
-  // stays an array of hrefs (legacy contract, client-legacy-anchor); the
-  // full call shape { href, opts } lands in `replaceCalls` so tests can
-  // assert router.replace(href, { scroll: false }) on filter edits.
+  // after a navigation the URL changes, so the stub updates the URL and
+  // useSearchParams reflects it on the next render (deep-link / back-forward
+  // behaviour in jsdom). `replaced` stays an array of hrefs (legacy contract,
+  // client-legacy-anchor); the full call shape { href, opts } lands in
+  // `replaceCalls` so tests can assert router.replace(href, { scroll: false })
+  // on filter edits (R2 URL churn).
   await writeFile(path.join(nodeModules, "next", "navigation.mjs"),
-    `const state = { params: { id: "1" }, search: "", pathname: "/", pushed: [], replaced: [], replaceCalls: [] };
+    `const parseUrl = (href) => {
+  if (typeof href !== "string" || href.length === 0) return { pathname: "/", search: "" };
+  const qIndex = href.indexOf("?");
+  return qIndex === -1
+    ? { pathname: href, search: "" }
+    : { pathname: href.slice(0, qIndex) || "/", search: href.slice(qIndex) };
+};
+const normalizeSearch = (s) => (s.length > 0 && s[0] !== "?" ? "?" + s : s);
+const cloneUrl = (u) => ({ pathname: u.pathname, search: u.search });
+const state = {
+  params: { id: "1" },
+  pushed: [],
+  replaced: [],
+  replaceCalls: [],
+  url: { pathname: "/", search: "" },
+  history: [{ pathname: "/", search: "" }],
+  historyIndex: 0,
+};
+const applyUrl = (next) => { state.url = cloneUrl(next); };
 export const __setNavState = (patch) => {
-  if (patch.search !== undefined) Object.assign(state, { search: patch.search });
-  if (patch.params !== undefined) Object.assign(state, { params: patch.params });
-  if (patch.pushed !== undefined) Object.assign(state, { pushed: patch.pushed });
-  if (patch.replaced !== undefined) Object.assign(state, { replaced: patch.replaced });
-  if (patch.replaceCalls !== undefined) Object.assign(state, { replaceCalls: patch.replaceCalls });
-  if (patch.pathname !== undefined) Object.assign(state, { pathname: patch.pathname });
+  if (patch.url !== undefined) {
+    // A URL in the patch simulates a fresh deep link: it replaces both the
+    // current URL and the whole history (there is no "back" from a deep
+    // link in a fresh tab).
+    const next = typeof patch.url === "string" ? parseUrl(patch.url) : cloneUrl(patch.url);
+    applyUrl(next);
+    state.history = [cloneUrl(next)];
+    state.historyIndex = 0;
+    const rest = { ...patch };
+    delete rest.url;
+    Object.assign(state, rest);
+    return;
+  }
+  // Legacy aliases: seed the URL shell / pathname directly (F1/F3 suites).
+  const rest = { ...patch };
+  if (patch.search !== undefined) {
+    const next = { pathname: state.url.pathname, search: normalizeSearch(String(patch.search)) };
+    applyUrl(next);
+    delete rest.search;
+  }
+  if (patch.pathname !== undefined) {
+    const next = { pathname: String(patch.pathname), search: state.url.search };
+    applyUrl(next);
+    delete rest.pathname;
+  }
+  Object.assign(state, rest);
 };
 export const __getNavState = () => state;
-export const useParams = () => state.params;
-// Next's router navigation rewrites the URL: extract the query from the
-// href so useSearchParams reflects it (back/forward + deep-link contract).
-const applyNavigation = (href) => {
-  if (typeof href !== "string") return;
-  const queryIndex = href.indexOf("?");
-  state.search = queryIndex === -1 ? "" : href.slice(queryIndex + 1);
+export const __goBack = () => {
+  if (state.historyIndex > 0) {
+    state.historyIndex -= 1;
+    applyUrl(state.history[state.historyIndex]);
+  }
+  return state.url;
 };
+export const __goForward = () => {
+  if (state.historyIndex < state.history.length - 1) {
+    state.historyIndex += 1;
+    applyUrl(state.history[state.historyIndex]);
+  }
+  return state.url;
+};
+export const useParams = () => state.params;
 export const useRouter = () => ({
-  push: (p) => { state.pushed.push(p); applyNavigation(p); },
+  push: (p) => {
+    state.pushed.push(p);
+    state.history = state.history.slice(0, state.historyIndex + 1);
+    state.history.push(parseUrl(p));
+    state.historyIndex += 1;
+    applyUrl(state.history[state.historyIndex]);
+  },
   replace: (p, opts) => {
     state.replaced.push(p);
     state.replaceCalls.push({ href: p, opts });
-    applyNavigation(p);
+    state.history[state.historyIndex] = parseUrl(p);
+    applyUrl(state.history[state.historyIndex]);
   },
   refresh: () => {},
+  back: __goBack,
+  forward: __goForward,
 });
-export const useSearchParams = () => new URLSearchParams(state.search);
-export const usePathname = () => state.pathname;
+export const useSearchParams = () => new URLSearchParams(state.url.search);
+export const usePathname = () => state.url.pathname;
 `);
 
   // --- leaflet stub: records every marker + its divIcon html --------------
@@ -308,6 +367,32 @@ export async function getNavState() {
   return mod.__getNavState();
 }
 
+// URL-state helpers (F-QA t_7b716c97, prereq F4): drive the navigation stub
+// like a browser address bar — set a deep-link URL, navigate via the router,
+// and walk the history with back/forward. Used by the URL-contract suite and
+// by any interaction test that needs a specific initial URL (e.g. the F4
+// useCameraFilters tests will deep-link into /directory?type=...).
+export async function setUrlState(url) {
+  const mod = await loadDomModule("node_modules/next/navigation.mjs");
+  mod.__setNavState({ url });
+  return mod.__getNavState();
+}
+
+export async function getUrlState() {
+  const mod = await loadDomModule("node_modules/next/navigation.mjs");
+  return mod.__getNavState().url;
+}
+
+export async function goBack() {
+  const mod = await loadDomModule("node_modules/next/navigation.mjs");
+  return mod.__goBack();
+}
+
+export async function goForward() {
+  const mod = await loadDomModule("node_modules/next/navigation.mjs");
+  return mod.__goForward();
+}
+
 // Access to the leaflet recording stub.
 export async function leafletMarkers() {
   const mod = await loadDomModule("node_modules/leaflet/index.mjs");
@@ -339,14 +424,21 @@ export async function setupDom({ url = "https://osdb.test/" } = {}) {
     // Copy the jsdom window surface onto the Node global scope so react-dom
     // and the transpiled components see a real DOM. Some Node globals
     // (navigator, etc.) are getter-only, so those are redefined explicitly.
+    //
+    // AbortController/AbortSignal are deliberately NOT copied: jsdom ships
+    // its own instances, and undici (used by Miniflare in the SSR/e2e halves
+    // of the same test file) rejects a cross-realm signal with
+    // "Expected signal to be an instance of AbortSignal". The Node native
+    // AbortController is API-identical and satisfies both jsdom components
+    // and undici — keep the native one on the global scope (F-QA t_7b716c97).
     const keys = [
       "window", "document", "navigator", "HTMLElement", "HTMLAnchorElement",
       "HTMLButtonElement", "HTMLInputElement", "HTMLFormElement", "HTMLSelectElement",
       "HTMLTextAreaElement", "HTMLDivElement", "HTMLUListElement", "HTMLLIElement",
       "HTMLHeadingElement", "HTMLParagraphElement", "HTMLSpanElement", "HTMLImageElement",
       "HTMLTableElement", "HTMLTimeElement", "Node", "Element", "Event", "MouseEvent",
-      "KeyboardEvent", "FocusEvent", "CustomEvent", "AbortController", "AbortSignal",
-      "FormData", "File", "Blob", "URL", "URLSearchParams", "TextEncoder", "TextDecoder",
+      "KeyboardEvent", "FocusEvent", "CustomEvent", "FormData", "File", "Blob",
+      "URL", "URLSearchParams", "TextEncoder", "TextDecoder",
       "getComputedStyle", "requestAnimationFrame", "cancelAnimationFrame",
       "localStorage", "sessionStorage", "MutationObserver", "DOMParser", "CSS", "Comment",
     ];

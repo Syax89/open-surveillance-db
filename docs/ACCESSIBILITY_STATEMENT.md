@@ -23,10 +23,13 @@ by disabled users before the pilot is widened, as agreed in
 ## Compliance status
 
 **Partially compliant.** The local prototype implements a meaningful
-accessibility baseline, but it has **not yet passed formal automated or manual
-accessibility testing**, and some known limitations remain (listed below).
-This section will be replaced by a measured conformance statement (WCAG 2.2
-A/AA, per success criterion) once the testing gates in Horizon 2 are complete.
+accessibility baseline, and **automated checks now run in CI**: the F-QA
+gate audits the SSR HTML of every public route with axe-core (WCAG 2.1/2.2
+A/AA tags) and enforces 0 critical/serious violations. **Formal manual
+testing is still pending** (screen readers, zoom, small screens), and some
+known limitations remain (listed below). This section will be replaced by a
+measured conformance statement (WCAG 2.2 A/AA, per success criterion) once
+the manual testing gates in Horizon 2 are complete.
 
 ### What is already implemented in the prototype
 
@@ -42,6 +45,12 @@ A/AA, per success criterion) once the testing gates in Horizon 2 are complete.
   prototype boundaries.
 - Status information is not conveyed by colour alone (text and icon labels are
   used), and safe type/order filters are shared by map and directory.
+- **Automated accessibility gates run in CI on every PR:** axe-core over every
+  SSR route (jsdom) plus a Lighthouse CI gate in real Chromium enforcing the
+  layout-dependent WCAG 2.2 AA rules jsdom cannot evaluate — color-contrast,
+  target-size (2.5.8), link-in-text-block, scrollable-region-focusable — with
+  a minimum accessibility score of **0.95** on all public routes
+  (`.github/workflows/lighthouse.yml`, local check: `npx lhci autorun`).
 
 ### Known limitations (not yet implemented)
 
@@ -49,8 +58,11 @@ A/AA, per success criterion) once the testing gates in Horizon 2 are complete.
   alternative covers browsing; remaining map interactions are still being
   brought to keyboard parity (tracked in Horizon 2).
 - **No formal manual testing** with screen readers, 200% zoom, contrast
-  checking, or small-screen devices has been run yet; the automated checks and
-  manual test plan are pending (Horizon 2).
+  checking, or small-screen devices has been run yet; the manual test plan
+  is pending (Horizon 2). Automated checks are in place (axe-core on every
+  route, CI, 0 critical/serious violations); contrast and target-size need
+  a real rendering engine, so they stay covered by the manual plan and the
+  Lighthouse CI proposal (ops).
 - **Some user-visible strings are still defined inline** in components while
   the interface-string externalisation and pilot-language review are in
   progress (Horizon 2).
@@ -146,11 +158,14 @@ prima di ampliare il pilota, come concordato in
 ## Stato di conformità
 
 **Parzialmente conforme.** Il prototipo locale implementa una base di
-accessibilità significativa, ma **non ha ancora superato test formali
-automatizzati o manuali**, e permangono alcune limitazioni note (elencate
-sotto). Questa sezione sarà sostituita da una dichiarazione di conformità
-misurata (WCAG 2.2 A/AA, per singolo criterio di successo) al termine delle
-verifiche previste nell'Orizzonte 2.
+accessibilità significativa, e **i controlli automatizzati ora girano in CI**:
+il gate F-QA verifica l'HTML SSR di ogni route pubblica con axe-core (tag
+WCAG 2.1/2.2 A/AA) e impone 0 violazioni critiche/serie. **Il test manuale
+formale è ancora previsto** (screen reader, zoom, schermi piccoli), e
+permangono alcune limitazioni note (elencate sotto). Questa sezione sarà
+sostituita da una dichiarazione di conformità misurata (WCAG 2.2 A/AA, per
+singolo criterio di successo) al termine dei test manuali previsti
+nell'Orizzonte 2.
 
 ### Cosa è già implementato nel prototipo
 
@@ -162,11 +177,12 @@ verifiche previste nell'Orizzonte 2.
 - Interfaccia in inglese e italiano con preferenza di lingua salvata solo sul dispositivo; la scelta non influisce sui dati API.
 - Guida in-app bilingue su `/guide` che spiega stati dei dati, flusso di lavoro e confini del prototipo.
 - Lo stato non è comunicato solo con il colore (sono usate etichette testuali e icone) e i filtri sicuri per tipo/ordine sono condivisi tra mappa e directory.
+- **Gate di accessibilità automatizzati in CI su ogni PR:** axe-core su ogni rotta SSR (jsdom) più un gate Lighthouse CI in Chromium reale che applica le regole di layout WCAG 2.2 AA che jsdom non può valutare — color-contrast, target-size (2.5.8), link-in-text-block, scrollable-region-focusable — con punteggio di accessibilità minimo **0.95** su tutte le rotte pubbliche (`.github/workflows/lighthouse.yml`, verifica locale: `npx lhci autorun`).
 
 ### Limitazioni note (non ancora implementate)
 
 - **I compiti sulla mappa non sono ancora pienamente equivalenti da tastiera.** L'alternativa testuale copre la consultazione; le restanti interazioni sulla mappa sono in corso di allineamento (Orizzonte 2).
-- **Nessun test manuale formale** con screen reader, zoom al 200%, verifica del contrasto o dispositivi a schermo piccolo è stato ancora eseguito; i controlli automatizzati e il piano di test manuale sono previsti (Orizzonte 2).
+- **Nessun test manuale formale** con screen reader, zoom al 200%, verifica del contrasto o dispositivi a schermo piccolo è stato ancora eseguito; il piano di test manuale è previsto (Orizzonte 2). I controlli automatizzati sono in atto (axe-core su ogni route, CI, 0 violazioni critiche/serie); contrasto e target-size richiedono un vero motore di rendering, quindi restano coperti dal piano manuale e dalla proposta Lighthouse CI (ops).
 - **Alcune stringhe visibili sono ancora definite inline** nei componenti, in attesa dell'esternalizzazione delle stringhe di interfaccia e della revisione della lingua pilota (Orizzonte 2).
 - **La pagina di feedback dedicata (`/feedback`) non è ancora implementata.** Il percorso di feedback di usabilità non sensibile è specificato in [ADR 0006](decisions/0006-non-sensitive-usability-feedback-route.md); l'implementazione è tracciata come lavoro successivo. Finché non esiste, le barriere possono essere segnalate tramite i canali alternativi elencati sotto.
 

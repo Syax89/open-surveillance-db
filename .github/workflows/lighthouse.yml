@@ -1,0 +1,55 @@
+name: Lighthouse a11y gate
+
+# BLOCKING accessibility gate (QA proposal F-QA item 6, kanban t_2d2bf33f).
+# Runs Lighthouse (real Chromium) against a preview build of the public
+# routes and FAILS the check run when the accessibility category score drops
+# below 0.95 — a PR cannot merge with a red lighthouse job.
+#
+# Covers the layout-dependent axe rules that the jsdom-based SSR suite cannot
+# evaluate (color-contrast, target-size WCAG 2.5.8, link-in-text-block,
+# scrollable-region-focusable) — see lighthouserc.cjs and
+# docs/ACCESSIBILITY_STATEMENT.md.
+#
+# Local equivalent for QA: `npm run build && npx lhci autorun`
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: lighthouse-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lighthouse-a11y:
+    name: Lighthouse accessibility >= 0.95
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build production bundle (dist/)
+        run: npm run build
+
+      - name: Lighthouse CI (collect + assert + upload)
+        uses: treosh/lighthouse-ci-action@v12
+        with:
+          configPath: ./lighthouserc.cjs
+          uploadArtifacts: true
+          # Report on temporary public storage (results are also kept as a
+          # workflow artifact for the PR). No secrets involved.
+          temporaryPublicStorage: true

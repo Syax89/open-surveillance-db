@@ -22,17 +22,19 @@
  *      shared-layout source tests in rendered-html.test.mjs).
  *   3. Auth/account forms: every control has an accessible name (wrapping
  *      <label> or for/id pair), server-side errors are announced through a
- *      live region (role="alert"). aria-invalid is NOT yet wired — tracked
- *      as finding QA-2026-08-01-2, pinned below so the gap stays visible
- *      while the suite stays green.
+ *      live region (role="alert"). aria-invalid is wired to the per-field
+ *      client validation since F-QA t_7b716c97 (finding QA-2026-08-01-2
+ *      CLOSED): the interaction test below pins the new behaviour.
  *   4. Locale toggle: the SSR root carries lang="en" and the toggle exposes
  *      aria-label + aria-pressed; the provider updates
  *      document.documentElement.lang on switch so screen readers re-read
  *      the page in the new language.
  *   5. Footer/nav: labelled landmarks, every footer link has visible text
  *      (no unlabeled links), every <img> carries alt. aria-current for the
- *      active page is NOT yet implemented — tracked as finding
- *      QA-2026-08-01-3, pinned below.
+ *      active page IS implemented since F-QA t_7b716c97 (finding
+ *      QA-2026-08-01-3 CLOSED): the footer marks its own link, the header
+ *      brand marks the home, and the ToolLayout per-page nav marks the
+ *      current tool route — pinned below.
  *   6. Fixture hygiene: all fixtures here are fictional (demo records,
  *      local-only moderator credentials); nothing personal may appear in
  *      the rendered public HTML.
@@ -45,6 +47,17 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { Miniflare } from "miniflare";
+import {
+  React,
+  installFetchMock,
+  jsonResponse,
+  loadDomModule,
+  loadDomPage,
+  renderWithLocale,
+  setNavState,
+  setupDom,
+  wrapWithLocale,
+} from "./helpers/dom-harness.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const serverDir = path.join(root, "dist", "server");
@@ -338,23 +351,53 @@ test("account actions are native buttons with no tabindex manipulation", async (
   assert.doesNotMatch(account, /tabIndex/);
 });
 
-test("aria-invalid is not yet wired on auth inputs — known gap, tracked (QA-2026-08-01-2)", async () => {
-  // The audit asked for aria-invalid on failing auth fields. The current
-  // implementation relies on native required/minLength validation (browser
-  // :invalid styling) and announces server errors via role="alert", but does
-  // not mark the specific field with aria-invalid. Pinned so a future fix
-  // must update this assertion deliberately; the gap is recorded in
-  // QA_REPORT_a11y-interactive.md (finding QA-2026-08-01-2).
-  for (const route of ["/login", "/register"]) {
-    const { html } = await renderRoute(route);
-    assert.equal((html.match(/aria-invalid/g) ?? []).length, 0, `${route} SSR must not yet set aria-invalid`);
-  }
-  const [login, register] = await Promise.all([
-    readFile(path.join(root, "app", "login", "page.tsx"), "utf8"),
-    readFile(path.join(root, "app", "register", "page.tsx"), "utf8"),
-  ]);
-  assert.doesNotMatch(login, /aria-invalid/);
-  assert.doesNotMatch(register, /aria-invalid/);
+test("aria-invalid marks the failing auth field on submit and clears as the user types (QA-2026-08-01-2 closed)", async () => {
+  // The audit finding is CLOSED (F-QA t_7b716c97): login/register now wire
+  // aria-invalid to the per-field client validation, so assistive
+  // technology knows exactly which field failed. This test pins the new
+  // behaviour at interaction level (SSR never renders the attribute — it
+  // only appears after a failed submit).
+  const rtl = await setupDom();
+  const user = rtl.userEvent.setup();
+  let fetchCalled = false;
+  installFetchMock(() => {
+    fetchCalled = true;
+    return jsonResponse({ error: "invalid credentials" }, { status: 401 });
+  });
+
+  const LoginPage = await loadDomPage("app/login/page.mjs");
+  rtl.render(await wrapWithLocale(React.createElement(LoginPage)));
+  const emailInput = rtl.screen.getByLabelText("Email");
+  const passwordInput = rtl.screen.getByLabelText(/^Password/);
+  assert.equal(emailInput.getAttribute("aria-invalid"), null, "SSR/initial render must not mark fields invalid");
+  assert.equal(passwordInput.getAttribute("aria-invalid"), null);
+
+  // Empty submit: both fields are marked, no request is fired.
+  await user.click(rtl.screen.getByRole("button", { name: /log in/i }));
+  assert.equal(emailInput.getAttribute("aria-invalid"), "true", "empty email must be invalid");
+  assert.equal(passwordInput.getAttribute("aria-invalid"), "true", "short password must be invalid");
+  assert.equal(fetchCalled, false, "client-side field errors must not fire the network request");
+
+  // Fixing the email clears only its own flag; the password stays invalid.
+  await user.type(emailInput, "contributor@example.test");
+  assert.equal(emailInput.getAttribute("aria-invalid"), null, "fixing the email must clear its flag");
+  assert.equal(passwordInput.getAttribute("aria-invalid"), "true", "the still-short password keeps its flag");
+
+  rtl.cleanup();
+
+  // Register mirrors the contract, including the optional displayName
+  // (only marked when present but below the 2-char minimum).
+  const RegisterPage = await loadDomPage("app/register/page.mjs");
+  rtl.render(await wrapWithLocale(React.createElement(RegisterPage)));
+  const regEmail = rtl.screen.getByLabelText("Email");
+  const regName = rtl.screen.getByLabelText(/display name|nickname/i);
+  const regPassword = rtl.screen.getByLabelText(/^Password/);
+  await user.type(regName, "x");
+  await user.click(rtl.screen.getByRole("button", { name: /create|register/i }));
+  assert.equal(regEmail.getAttribute("aria-invalid"), "true");
+  assert.equal(regName.getAttribute("aria-invalid"), "true", "a 1-char display name must be invalid");
+  assert.equal(regPassword.getAttribute("aria-invalid"), "true");
+  rtl.cleanup();
 });
 
 // ---------------------------------------------------------------------------
@@ -416,15 +459,85 @@ test("every <img> in the public HTML carries alt text", async () => {
   assert.match(photoItem, /<img[^>]*alt=\{`\$\{t\.photoEvidence\}/, "photo previews must carry alt text");
 });
 
-test("aria-current for the active page is not yet implemented — known gap, tracked (QA-2026-08-01-3)", async () => {
-  // The audit asked for aria-current="page" on the active nav/footer entry.
-  // No nav link currently marks the current page. Pinned so a future fix
-  // must update this assertion deliberately; the gap is recorded in
-  // QA_REPORT_a11y-interactive.md (finding QA-2026-08-01-3).
-  for (const route of ["/", "/login", "/register", "/guide", "/moderazione"]) {
+test("aria-current marks the active page in the footer and the header brand (QA-2026-08-01-3 closed)", async () => {
+  // The audit finding is CLOSED (F-QA t_7b716c97): the footer marks its own
+  // link with aria-current="page" on every route in its link set (13 links,
+  // exactly one current per route) and the header brand marks the home. The
+  // ToolLayout per-page nav NEVER self-links (hand-off pattern,
+  // FRONTEND_DESIGN §2.5), so the current page is exposed by the footer and
+  // by each page's h1 — pinned by the client test below.
+  const FOOTER_LINKS = ["/mappa", "/directory", "/segnala", "/correggi", "/manifesto", "/regole", "/guide", "/privacy", "/termini", "/licenze", "/accessibility", "/faq", "/contatti"];
+  for (const route of FOOTER_LINKS) {
     const { html } = await renderRoute(route);
-    assert.equal((html.match(/aria-current/g) ?? []).length, 0, `${route} must not yet use aria-current`);
+    const footer = html.slice(html.indexOf("footer-links"));
+    const linkTag = footer.match(new RegExp(`<a[^>]*href="${route}"[^>]*>`));
+    assert.ok(linkTag, `${route}: the footer must link to itself`);
+    assert.match(linkTag[0], /aria-current="page"/, `${route}: the footer's own link must be marked current`);
+    const current = (footer.match(/aria-current="page"/g) ?? []).length;
+    assert.equal(current, 1, `${route}: exactly one footer link must be current (found ${current})`);
   }
+  // Pages outside the footer link set (auth, record, moderation info) mark
+  // NO footer link as current — none of them is in the footer navigation.
+  for (const route of ["/login", "/register", "/account", "/records/1", "/moderazione", "/moderation"]) {
+    const { html } = await renderRoute(route);
+    const footer = html.slice(html.indexOf("footer-links"));
+    assert.equal((footer.match(/aria-current="page"/g) ?? []).length, 0, `${route}: no footer link may be current`);
+  }
+  // The home marks the header brand (in-page anchor to #top) and the footer
+  // brand as current; other pages (including the tool routes, whose header
+  // brand is a next/link to /) leave the brand unmarked. Lookaheads keep the
+  // assertions order-independent (React/Next may emit href before class).
+  const home = await renderRoute("/");
+  assert.match(home.html, /<a(?=[^>]*class="brand")(?=[^>]*href="#top")(?=[^>]*aria-current="page")[^>]*>/, "home header brand must be current");
+  assert.match(home.html, /<footer class="site-footer"[\s\S]*?<a(?=[^>]*class="brand")(?=[^>]*href="\/")(?=[^>]*aria-current="page")[^>]*>/, "home footer brand must be current");
+  for (const route of ["/guide", "/login", "/mappa"]) {
+    const { html } = await renderRoute(route);
+    assert.doesNotMatch(html, /<a[^>]*class="brand"[^>]*aria-current="page"/, `${route}: brand must not be marked current`);
+  }
+});
+
+test("tool nav: the per-page set never self-links — the current page is marked by the footer (QA-2026-08-01-3)", async () => {
+  // Per-page navigation pattern (F3 t_2ca69725, FRONTEND_DESIGN §2.5): the
+  // tool nav set links the OTHER tools + contextual pages + home — the
+  // current page is never linked to itself (pinned by
+  // client-tools.test.mjs). There is therefore NO self-link in the per-page
+  // nav to mark with aria-current; the current page is exposed to assistive
+  // technology by the site footer (full 13-link nav, marks its own link
+  // aria-current="page" — asserted in the test above) and by each page's
+  // own h1. This test pins that contract so a future change cannot add a
+  // dead-end self-link or silently drop the footer marking.
+  const rtl = await setupDom();
+  await setNavState({ pathname: "/mappa" });
+  const mod = await loadDomModule("app/components/ToolLayout.mjs");
+  const ToolLayout = mod.ToolLayout;
+  const { container, rerender } = await renderWithLocale(React.createElement(ToolLayout, null, React.createElement("div", null, "body")));
+
+  const links = () => [...container.querySelectorAll(".nav-links a")];
+  const currentOf = () => links().filter((a) => a.getAttribute("aria-current") === "page");
+  assert.equal(links().length >= 4, true, "the per-page nav set must render");
+  assert.equal(currentOf().length, 0, "the per-page nav must not self-link (hand-off pattern): no aria-current on /mappa");
+  assert.ok(
+    !links().some((a) => a.getAttribute("href") === "/mappa"),
+    "the /mappa nav set must not contain a link to itself",
+  );
+
+  // Same contract on /directory: no self-link, footer marks the page.
+  // NOTE: testing-library's rerender() replaces the tree with the BARE
+  // element — it would drop the LocaleProvider wrapper and crash with
+  // "useLocale must be used within LocaleProvider". Re-wrap explicitly.
+  await setNavState({ pathname: "/directory" });
+  rerender(await wrapWithLocale(React.createElement(ToolLayout, null, React.createElement("div", null, "body"))));
+  const directoryLinks = [...container.querySelectorAll(".nav-links a")];
+  assert.equal(
+    directoryLinks.filter((a) => a.getAttribute("aria-current") === "page").length,
+    0,
+    "no self-link on /directory either",
+  );
+  assert.ok(
+    !directoryLinks.some((a) => a.getAttribute("href") === "/directory"),
+    "the /directory nav set must not contain a link to itself",
+  );
+  rtl.cleanup();
 });
 
 // ---------------------------------------------------------------------------
