@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useMessages } from "./LocaleProvider";
 
 /**
@@ -32,29 +33,36 @@ import { useMessages } from "./LocaleProvider";
  */
 export function SiteFooter() {
   const t = useMessages().footer;
+  // Mark the current page in the institutional navigation (finding
+  // QA-2026-08-01-3, closed in F-QA t_7b716c97): WCAG 2.4.2 / ARIA require
+  // the active page to be exposed to assistive technology. The brand link
+  // is the "home" entry, so it is marked on the root path.
+  const pathname = usePathname();
+  const isActive = (href: string) => pathname === href;
+  const pageCurrent = (href: string) => (isActive(href) ? "page" : undefined);
   return (
     <footer className="site-footer" aria-label={t.landmarkLabel}>
       <div className="footer-brand">
-        <Link className="brand" href="/" aria-label={t.homeAria}>
+        <Link className="brand" href="/" aria-label={t.homeAria} aria-current={pageCurrent("/")}>
           <span className="brand-mark" aria-hidden="true">◉</span>
           <span>OpenSurveillanceDB</span>
         </Link>
         <p>{t.tagline}</p>
       </div>
       <nav className="footer-links" aria-label={t.navigation}>
-        <Link href="/mappa">{t.toolMap}</Link>
-        <Link href="/directory">{t.toolDirectory}</Link>
-        <Link href="/segnala">{t.toolReport}</Link>
-        <Link href="/correggi">{t.toolCorrection}</Link>
-        <Link href="/manifesto">{t.manifesto}</Link>
-        <Link href="/regole">{t.rules}</Link>
-        <Link href="/guide">{t.guide}</Link>
-        <Link href="/privacy">{t.privacy}</Link>
-        <Link href="/termini">{t.terms}</Link>
-        <Link href="/licenze">{t.licenses}</Link>
-        <Link href="/accessibility">{t.accessibility}</Link>
-        <Link href="/faq">{t.faq}</Link>
-        <Link href="/contatti">{t.contact}</Link>
+        <Link href="/mappa" aria-current={pageCurrent("/mappa")}>{t.toolMap}</Link>
+        <Link href="/directory" aria-current={pageCurrent("/directory")}>{t.toolDirectory}</Link>
+        <Link href="/segnala" aria-current={pageCurrent("/segnala")}>{t.toolReport}</Link>
+        <Link href="/correggi" aria-current={pageCurrent("/correggi")}>{t.toolCorrection}</Link>
+        <Link href="/manifesto" aria-current={pageCurrent("/manifesto")}>{t.manifesto}</Link>
+        <Link href="/regole" aria-current={pageCurrent("/regole")}>{t.rules}</Link>
+        <Link href="/guide" aria-current={pageCurrent("/guide")}>{t.guide}</Link>
+        <Link href="/privacy" aria-current={pageCurrent("/privacy")}>{t.privacy}</Link>
+        <Link href="/termini" aria-current={pageCurrent("/termini")}>{t.terms}</Link>
+        <Link href="/licenze" aria-current={pageCurrent("/licenze")}>{t.licenses}</Link>
+        <Link href="/accessibility" aria-current={pageCurrent("/accessibility")}>{t.accessibility}</Link>
+        <Link href="/faq" aria-current={pageCurrent("/faq")}>{t.faq}</Link>
+        <Link href="/contatti" aria-current={pageCurrent("/contatti")}>{t.contact}</Link>
       </nav>
       <p className="footer-legal">
         <a href="https://opendatacommons.org/licenses/odbl/1-0/" rel="license">{t.dataLicense}</a>

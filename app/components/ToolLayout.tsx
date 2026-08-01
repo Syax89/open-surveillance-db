@@ -83,6 +83,14 @@ export function ToolLayout({ children }: { children: ReactNode }) {
       <SiteHeader navLabel={t.toolNavigation} homeLabel={t.toolHomeAria}>
         <div className="nav-links">
           {nav.map(({ href, label }) => (
+            // The per-page set NEVER links the current page to itself
+            // (hand-off pattern, FRONTEND_DESIGN §2.5 — pinned by
+            // client-tools.test.mjs), so there is no self-link here to mark
+            // with aria-current. The current page is exposed to assistive
+            // technology by the SITE footer (full 13-link nav, marks its own
+            // link aria-current="page") and by the page's own h1 — see
+            // a11y-interactive "aria-current marks the active page"
+            // (QA-2026-08-01-3, closed in F-QA t_7b716c97).
             <Link key={href} href={href} className={href === "/" ? "nav-action" : undefined}>
               {t[label]}
             </Link>

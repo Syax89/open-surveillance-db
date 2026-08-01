@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { LocaleToggle, useMessages } from "./LocaleProvider";
 
@@ -69,6 +70,23 @@ export function SiteHeader({
   children,
 }: SiteHeaderProps) {
   const t = useMessages().home;
+  // The brand link represents the home page: mark it with aria-current on
+  // the root path (finding QA-2026-08-01-3, closed in F-QA t_7b716c97).
+  // The homepage itself renders the brand as an in-page anchor to "#top",
+  // which is the same page — also current.
+  const pathname = usePathname();
+  const brandIsCurrent = brandAs === "anchor" || pathname === "/";
+  const brandProps: {
+    className: string;
+    href: string;
+    "aria-label"?: string;
+    "aria-current"?: "page";
+  } = {
+    className: "brand",
+    href: brandHref,
+    ...(homeLabel ? { "aria-label": homeLabel } : {}),
+    ...(brandIsCurrent ? { "aria-current": "page" as const } : {}),
+  };
   const brandChildren = (
     <>
       <span className="brand-mark" aria-hidden="true">◉</span>
@@ -78,11 +96,11 @@ export function SiteHeader({
   return (
     <nav className="nav-shell" aria-label={navLabel}>
       {brandAs === "anchor" ? (
-        <a className="brand" href={brandHref} {...(homeLabel ? { "aria-label": homeLabel } : {})}>
+        <a {...brandProps}>
           {brandChildren}
         </a>
       ) : (
-        <Link className="brand" href={brandHref} {...(homeLabel ? { "aria-label": homeLabel } : {})}>
+        <Link {...brandProps}>
           {brandChildren}
         </Link>
       )}

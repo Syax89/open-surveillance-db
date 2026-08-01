@@ -52,6 +52,13 @@ const ROUTES = [
   // reset on success, expiry) is exercised end to end.
   { source: "app/api/auth/register/route.ts", output: "app/api/auth/register/route.mjs" },
   { source: "app/api/auth/login/route.ts", output: "app/api/auth/login/route.mjs" },
+  // Contributor session (ADR 0013): me resolves the current contributor,
+  // me/submissions lists ONLY the contributor's own attributed reports,
+  // logout revokes the session. Loaded by the login→account journey
+  // (tests/e2e-journeys.test.mjs, F-QA t_7b716c97).
+  { source: "app/api/auth/me/route.ts", output: "app/api/auth/me/route.mjs" },
+  { source: "app/api/auth/me/submissions/route.ts", output: "app/api/auth/me/submissions/route.mjs" },
+  { source: "app/api/auth/logout/route.ts", output: "app/api/auth/logout/route.mjs" },
   // Auth roles + appeals (ADR 0014): contributor files an appeal, moderators
   // list and decide it. The [id] route lives in its own directory.
   { source: "app/api/appeals/route.ts", output: "app/api/appeals/route.mjs" },
