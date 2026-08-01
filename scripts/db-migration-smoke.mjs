@@ -47,6 +47,7 @@ const expectedTables = [
 // Indexes declared by the migrations.
 const expectedIndexes = [
   "cameras_status_idx",
+  "cameras_coordinates_idx",
   "correction_requests_status_idx",
   "moderation_events_created_at_idx",
   "moderation_events_entity_idx",

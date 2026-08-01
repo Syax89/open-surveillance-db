@@ -31,7 +31,11 @@ export const cameras = sqliteTable(
     contributorId: integer("contributor_id").references(() => contributors.id),
     createdAt: text("created_at").notNull(),
   },
-  (table) => [index("cameras_status_idx").on(table.status)],
+  (table) => [
+    index("cameras_status_idx").on(table.status),
+    // Coordinate lookup for the proximity searches (bbox pre-filter, 0013).
+    index("cameras_coordinates_idx").on(table.latitude, table.longitude),
+  ],
 );
 
 export const correctionRequests = sqliteTable(

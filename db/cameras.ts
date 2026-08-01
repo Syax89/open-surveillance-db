@@ -122,8 +122,60 @@ export async function listPublicCameras(
 }
 export type NearbyPublicCameraRecord = PublicCameraRecord & { distanceMeters: number };
 function distanceInMeters(fromLatitude: number, fromLongitude: number, toLatitude: number, toLongitude: number) { const earthRadiusMeters = 6_371_000; const toRadians = (degrees: number) => degrees * Math.PI / 180; const latitudeDelta = toRadians(toLatitude - fromLatitude); const longitudeDelta = toRadians(toLongitude - fromLongitude); const latitudeStart = toRadians(fromLatitude); const latitudeEnd = toRadians(toLatitude); const haversine = Math.sin(latitudeDelta / 2) ** 2 + Math.cos(latitudeStart) * Math.cos(latitudeEnd) * Math.sin(longitudeDelta / 2) ** 2; return 2 * earthRadiusMeters * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine)); }
+/**
+ * Bounding-box pre-filter for the proximity searches.
+ *
+ * `findNearbyPublicCameras` and `searchPublicCamerasNear` used to load the
+ * whole public dataset (`listPublicCameras()`, no LIMIT, no geographic
+ * filter) and run haversine in JS over every record — O(N) per request.
+ * This variant narrows the candidate set to an approximate lat/lon box
+ * around the query point (~1° latitude ≈ 111 km), so the exact haversine
+ * pass runs only over the box. D1 has no spatial index: the box is a
+ * selective filter, not a true index, but it drops the candidate set from
+ * O(N) to O(box) (audit gap t_2ee58c08).
+ *
+ * The returned records carry the exact same public shape as
+ * `listPublicCameras` (same public predicate, same publish-flag CASEs,
+ * same coordinate rounding) so both callers keep their existing contracts.
+ */
+export async function listPublicCamerasNear(
+  latitude: number,
+  longitude: number,
+  radiusMeters: number,
+  nowIso: string = new Date().toISOString(),
+): Promise<PublicCameraRecord[]> {
+  const d1 = await getD1();
+  const { sql: publicPredicate, parameters: predicateParameters } = publicCameraPredicate(nowIso);
+  // ~1° of latitude ≈ 111,320 m; longitude degrees shrink with cos(latitude).
+  // Clamp cos to a small floor so a polar query degrades to a wider (still
+  // correct) box instead of dividing by zero. The box may extend past the
+  // ±180° antimeridian; BETWEEN then covers the intersection with the stored
+  // range, which is the correct conservative pre-filter.
+  //
+  // The box is widened by a fixed padding because the public boundary rounds
+  // coordinates to ~4 decimals (~10 m, ADR 0008): a record whose RAW
+  // coordinates sit just outside the radius can round to a point inside it,
+  // and the old full-scan path (which measured distance on the rounded
+  // values) would have returned it. Padding the box by more than the maximum
+  // rounding displacement (~8 m diagonal) guarantees the exact haversine
+  // pass below still sees every record the old path would have seen — the
+  // box only ever removes records that are provably outside the radius.
+  const ROUNDING_PADDING_METERS = 15;
+  const latitudeDelta = (radiusMeters + ROUNDING_PADDING_METERS) / 111_320;
+  const longitudeDelta = (radiusMeters + ROUNDING_PADDING_METERS) / (111_320 * Math.max(Math.cos((latitude * Math.PI) / 180), 0.01));
+  const parameters = [
+    ...predicateParameters,
+    latitude - latitudeDelta,
+    latitude + latitudeDelta,
+    longitude - longitudeDelta,
+    longitude + longitudeDelta,
+  ];
+  const query = `SELECT id, title, kind, CASE WHEN publish_manufacturer = 1 THEN manufacturer ELSE NULL END AS manufacturer, CASE WHEN publish_observed_on = 1 THEN observed_on ELSE NULL END AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, latitude, longitude, status, source, updated, description, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt FROM cameras WHERE ${publicPredicate} AND latitude BETWEEN ? AND ? AND longitude BETWEEN ? AND ? ORDER BY id DESC`;
+  const result = await d1.prepare(query).bind(...parameters).all<PublicCameraRecord>();
+  return result.results.map((record) => ({ ...record, latitude: roundPublicCoordinate(record.latitude), longitude: roundPublicCoordinate(record.longitude) }));
+}
 export type DuplicateCandidateRecord = NearbyPublicCameraRecord & { similarity: number; matchStrength: MatchStrength };
-export async function findNearbyPublicCameras(latitude: number, longitude: number, radiusMeters: number, duplicateInput?: { title?: string; address?: string; kind?: string }): Promise<DuplicateCandidateRecord[]> { const records = await listPublicCameras(); const submittedText = [duplicateInput?.title, duplicateInput?.address, duplicateInput?.kind].filter(Boolean).join(" "); const hasTextSignal = submittedText.trim().length > 0; return records.map((record) => { const distanceMeters = distanceInMeters(latitude, longitude, record.latitude, record.longitude); const similarity = hasTextSignal ? textSimilarity(submittedText, [record.title, record.address ?? "", record.kind].join(" ")) : 0; return { ...record, distanceMeters, similarity, matchStrength: classifyDuplicateMatch(distanceMeters, similarity, hasTextSignal) }; }).filter((record) => record.distanceMeters <= radiusMeters).sort((first, second) => first.distanceMeters - second.distanceMeters || second.similarity - first.similarity).slice(0, 8); }
+export async function findNearbyPublicCameras(latitude: number, longitude: number, radiusMeters: number, duplicateInput?: { title?: string; address?: string; kind?: string }): Promise<DuplicateCandidateRecord[]> { const records = await listPublicCamerasNear(latitude, longitude, radiusMeters); const submittedText = [duplicateInput?.title, duplicateInput?.address, duplicateInput?.kind].filter(Boolean).join(" "); const hasTextSignal = submittedText.trim().length > 0; return records.map((record) => { const distanceMeters = distanceInMeters(latitude, longitude, record.latitude, record.longitude); const similarity = hasTextSignal ? textSimilarity(submittedText, [record.title, record.address ?? "", record.kind].join(" ")) : 0; return { ...record, distanceMeters, similarity, matchStrength: classifyDuplicateMatch(distanceMeters, similarity, hasTextSignal) }; }).filter((record) => record.distanceMeters <= radiusMeters).sort((first, second) => first.distanceMeters - second.distanceMeters || second.similarity - first.similarity).slice(0, 8); }
 /**
  * Area search for the locality/address/coordinate route (GET /api/cameras/search).
  *
@@ -135,7 +187,7 @@ export async function findNearbyPublicCameras(latitude: number, longitude: numbe
  * a capped list as the complete picture.
  */
 export async function searchPublicCamerasNear(latitude: number, longitude: number, radiusMeters: number): Promise<NearbyPublicCameraRecord[]> {
-  const records = await listPublicCameras();
+  const records = await listPublicCamerasNear(latitude, longitude, radiusMeters);
   return records.map((record) => ({ ...record, distanceMeters: distanceInMeters(latitude, longitude, record.latitude, record.longitude) }))
     .filter((record) => record.distanceMeters <= radiusMeters)
     .sort((first, second) => first.distanceMeters - second.distanceMeters);
