@@ -478,3 +478,105 @@ test("the account page never exposes a real email before login", async () => {
   assert.match(html, /<h1[^>]*>Your account<\/h1>/);
   assert.doesNotMatch(html, /<dd>[^<]*@[^<]*<\/dd>/, "no email must be rendered when logged out");
 });
+
+// ---------------------------------------------------------------------------
+// 5. Worker edge (built artifact, kanban t_ee01cf79)
+// ---------------------------------------------------------------------------
+// The built worker (dist/server/index.js) is the deployed entry point: it
+// routes requests, gates the moderation subtree with Basic/Bearer auth
+// (fail-closed) and forwards everything else to the vinext app handler.
+// These tests pin the edge behaviour on the real artifact, complementing the
+// isolated unit suite in tests/worker-edge.test.mjs.
+
+const GATE_UNAVAILABLE_BODY = { error: "Moderation is unavailable." };
+const MODERATION_PATHS = ["/moderation", "/api/moderation", "/api/moderation/photos/1"];
+
+test("worker gate fails closed on every moderation path without credentials", async () => {
+  for (const route of MODERATION_PATHS) {
+    const { response, html } = await renderRoute(route);
+    assert.equal(response.status, 503, `${route} must be 503 without credentials`);
+    assert.equal(response.headers.get("cache-control"), "no-store");
+    assert.deepEqual(JSON.parse(html), GATE_UNAVAILABLE_BODY, `${route} must carry the gate JSON body`);
+  }
+});
+
+test("worker gate rejects a wrong Basic credential with 401 + WWW-Authenticate", async () => {
+  const env = { MODERATION_USER: "moderator", MODERATION_PASSWORD: "s3cret" };
+  const wrong = `Basic ${Buffer.from("moderator:wrong").toString("base64")}`;
+  const { response, html } = await renderRoute("/api/moderation", { env, headers: { authorization: wrong } });
+  assert.equal(response.status, 401);
+  assert.equal(response.headers.get("www-authenticate"), 'Basic realm="moderation", charset="UTF-8"');
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.equal(html, "Unauthorized");
+});
+
+test("worker gate admits a correct Basic credential and forwards to the app handler", async () => {
+  const env = { MODERATION_USER: "moderator", MODERATION_PASSWORD: "s3cret" };
+  const correct = `Basic ${Buffer.from("moderator:s3cret").toString("base64")}`;
+  for (const route of ["/api/moderation", "/api/moderation/photos/1"]) {
+    const { response } = await renderRoute(route, { env, headers: { authorization: correct } });
+    // The gate passed: the response is the app handler's, never the gate's
+    // (a gate denial would carry WWW-Authenticate and the plain "Unauthorized"
+    // body, or the 503 unavailable JSON). On this DB-less test host the app
+    // answers 401 (its own session auth) or 500 (missing DB binding) — the
+    // exact status is app-level and not part of the worker contract.
+    assert.equal(response.headers.get("www-authenticate"), null, `${route} must not be a gate denial`);
+    assert.notEqual(response.status, 503, `${route} must not hit the fail-closed gate`);
+  }
+});
+
+test("worker gate admits a correct Bearer token (token-only config)", async () => {
+  const env = { MODERATION_TOKEN: "tok-123" };
+  const wrong = await renderRoute("/api/moderation", { env, headers: { authorization: "Bearer tok-124" } });
+  assert.equal(wrong.response.status, 401, "a wrong token must be rejected");
+  assert.equal(wrong.response.headers.get("www-authenticate"), 'Basic realm="moderation", charset="UTF-8"');
+
+  const correct = await renderRoute("/api/moderation", { env, headers: { authorization: "Bearer tok-123" } });
+  assert.equal(correct.response.headers.get("www-authenticate"), null, "a correct token must pass the gate");
+  assert.notEqual(correct.response.status, 503);
+});
+
+test("worker edge adds the full global security header set on every page (t_6148aa6f landed)", async () => {
+  // t_6148aa6f (feat(security), PR #83) has landed: the edge worker now wraps
+  // every response with X-Content-Type-Options, X-Frame-Options,
+  // Referrer-Policy, Permissions-Policy and CSP. This test was born as a
+  // tripwire asserting absence; now that the feature is on main it is a
+  // presence + value check for the full header set on public pages.
+  for (const route of ["/", "/login"]) {
+    const { response } = await renderRoute(route);
+    assert.equal(response.status, 200, `${route} must render before header check`);
+    assert.equal(response.headers.get("x-content-type-options"), "nosniff", `${route}: X-Content-Type-Options must be nosniff`);
+    assert.equal(response.headers.get("x-frame-options"), "DENY", `${route}: X-Frame-Options must be DENY`);
+    assert.equal(
+      response.headers.get("referrer-policy"),
+      "strict-origin-when-cross-origin",
+      `${route}: Referrer-Policy must be strict-origin-when-cross-origin`,
+    );
+    assert.match(
+      response.headers.get("permissions-policy"),
+      /camera=\(\)/,
+      `${route}: Permissions-Policy must block camera`,
+    );
+    const csp = response.headers.get("content-security-policy");
+    assert.ok(csp, `${route}: CSP must be present`);
+    assert.match(csp, /frame-ancestors 'none'/, `${route}: CSP must keep clickjacking protection`);
+    assert.match(csp, /object-src 'none'/, `${route}: CSP must block plugin objects`);
+    assert.match(csp, /default-src 'self'/, `${route}: CSP must default to same-origin`);
+  }
+});
+
+test("security headers, when present, are never weakened (forward-compatible value check)", async () => {
+  // The global edge headers (t_6148aa6f, PR #83) are on main; this stays a
+  // value check on every public route — if a route ever overrides a header
+  // with a weaker value, this goes red.
+  for (const route of PUBLIC_ROUTES) {
+    const { response } = await renderRoute(route);
+    const xcto = response.headers.get("x-content-type-options");
+    const csp = response.headers.get("content-security-policy");
+    if (xcto !== null) assert.equal(xcto, "nosniff", `${route} must not weaken X-Content-Type-Options`);
+    if (csp !== null) {
+      assert.match(csp, /frame-ancestors 'none'/, `${route} CSP must keep clickjacking protection`);
+      assert.match(csp, /object-src 'none'/, `${route} CSP must block plugin objects`);
+    }
+  }
+});
