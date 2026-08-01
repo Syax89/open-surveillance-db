@@ -2,6 +2,13 @@
 
 Last reviewed: 2026-08-01 (post-implementation state)
 
+> **Design & refactor vision:** the plan to refactor the home-page tool sections into
+> separate routes (`/mappa`, `/directory`, `/segnala`, `/correggi`) is in
+> [`docs/FRONTEND_DESIGN.md`](FRONTEND_DESIGN.md) (design vision) and
+> [`docs/FRONTEND_PLAN.md`](FRONTEND_PLAN.md) (consolidated roadmap with phases, API
+> requirements, legal/security/i18n requirements and acceptance criteria). This document
+> describes the implemented state; those documents describe the target state.
+
 This document defines the information architecture of the public website:
 the complete site map, the global navigation (page nav-shell and footer), and
 the shared layout pattern that every informational page follows. It reflects
