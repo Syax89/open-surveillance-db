@@ -32,7 +32,16 @@ jobs:
             "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
             -o /tmp/gitleaks.tar.gz
           tar -xzf /tmp/gitleaks.tar.gz -C /usr/local/bin gitleaks
-          gitleaks detect --source . --redact --verbose
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            # Su PR: scansiona SOLO i commit della PR (base..head), non l'intero
+            # storico git. Lo scan completo (fetch-depth: 0) include branch non
+            # ancora mergeati con token di test → falsi positivi su ogni PR.
+            echo "Scan PR commits: ${GITHUB_BASE_SHA}..${GITHUB_HEAD_SHA}"
+            gitleaks detect --source . --redact --log-opts="${GITHUB_BASE_SHA}..${GITHUB_HEAD_SHA}"
+          else
+            # Push su main / schedule: scan completo dello storico.
+            gitleaks detect --source . --redact
+          fi
 
   dependency-audit:
     name: npm audit (vulnerable dependencies)
