@@ -68,6 +68,11 @@ const expectedIndexes = [
   "photos_camera_idx",
   // Pending-photo quota (0013): only 'pending' rows are indexed.
   "photos_pending_submitter_idx",
+  // F0 backend prereq (0019): composite public-directory indexes serving the
+  // kind filter, the status+recency navigation and the freshness windows.
+  "cameras_status_kind_idx",
+  "cameras_status_updated_idx",
+  "cameras_status_last_verified_idx",
 ];
 // Tables that are not application schema but legitimately appear in a local
 // D1 database. Anything outside this set is an unexpected schema change.

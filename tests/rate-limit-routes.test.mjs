@@ -318,7 +318,7 @@ test("PATCH /api/moderation rate-limits the moderate family with 429 + Retry-Aft
 test("GET /api/cameras/nearby rate-limits the nearby family with 429 + Retry-After", async () => {
   env.NEARBY_RATE_LIMIT_MAX = "1";
   env.NEARBY_RATE_LIMIT_WINDOW_SECONDS = "60";
-  stub("findNearbyPublicCameras", async () => []);
+  stub("findNearbyPublicCamerasPage", async () => ({ records: [], total: 0, nextOffset: null }));
   const { GET } = await routes.nearby();
   const caller = "203.0.113.105";
 
@@ -328,7 +328,7 @@ test("GET /api/cameras/nearby rate-limits the nearby family with 429 + Retry-Aft
   const blocked = await GET(build.nearby(caller));
   assertBlocked(blocked);
   await assertErrorBody(blocked, /too many requests/i);
-  assert.equal(callArgs("findNearbyPublicCameras").length, 1, "the blocked request must not reach the db layer");
+  assert.equal(callArgs("findNearbyPublicCamerasPage").length, 1, "the blocked request must not reach the db layer");
 });
 
 test("GET /api/cameras/revisions rate-limits the revisions family with 429 + Retry-After", async () => {
@@ -402,7 +402,7 @@ test("calls under the threshold are not rate-limited on any route family", async
     {
       name: "GET /api/cameras/nearby",
       knob: "NEARBY_RATE_LIMIT_MAX",
-      setup: () => stub("findNearbyPublicCameras", async () => []),
+      setup: () => stub("findNearbyPublicCamerasPage", async () => ({ records: [], total: 0, nextOffset: null })),
       handler: async () => (await routes.nearby()).GET,
       request: () => build.nearby("203.0.113.115"),
       expected: 200,
@@ -459,19 +459,20 @@ test("route families keep independent rate-limit windows", async () => {
 
   // The plain read family is untouched by the submit burst.
   stub("listPublicCamerasPage", async () => ({ records: [], total: 0, nextOffset: null }));
+  stub("getPublicCameraFacets", async () => ({ kinds: [], freshness: { "7d": 0, "30d": 0, "90d": 0, all: 0 } }));
   const camerasRoute = await routes.cameras();
   const read = await camerasRoute.GET(apiRequest("/api/cameras", { headers: identityHeaders(caller) }));
   assert.equal(read.status, 200, "the read bucket must not be affected by the submit bucket");
 
   // The search family is untouched too (the task's canonical example: a
   // photos burst must not starve search).
-  stub("searchPublicCamerasNear", async () => []);
+  stub("searchPublicCamerasNearPage", async () => ({ records: [], total: 0, nextOffset: null }));
   const searchRoute = await loadRoute("app/api/cameras/search/route.mjs");
   const search = await searchRoute.GET(build.search(caller));
   assert.equal(search.status, 200, "the search bucket must not be affected by the submit bucket");
 
   // Nearby and revisions are untouched as well.
-  stub("findNearbyPublicCameras", async () => []);
+  stub("findNearbyPublicCamerasPage", async () => ({ records: [], total: 0, nextOffset: null }));
   const nearbyRoute = await routes.nearby();
   const nearby = await nearbyRoute.GET(build.nearby(caller));
   assert.equal(nearby.status, 200, "the nearby bucket must not be affected by the submit bucket");

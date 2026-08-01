@@ -64,16 +64,16 @@ test("the public directory filters are parameterised and whitelisted at the db b
     "freshness windows must be an explicit whitelist of 7d/30d/90d/all",
   );
   assert.match(publicQuery, /query\s*\+=\s*["']\s*AND\s+kind\s*=\s*\?["']/, "the category filter must be a bound placeholder, never interpolated");
-  assert.match(publicQuery, /query\s*\+=\s*["']\s*AND\s+updated\s*>=\s*\?["']/, "the freshness filter must be a bound placeholder, never interpolated");
+  assert.match(publicQuery, /query\s*\+=\s*["']\s*AND\s+last_verified_at\s*>=\s*\?["']/, "the freshness filter must be a bound placeholder, never interpolated");
   assert.match(
     publicQuery,
     /\.bind\(\.\.\.parameters\)/,
     "all filters must be passed through the same parameterised bind call",
   );
-  assert.match(
+  assert.doesNotMatch(
     publicQuery,
-    /updated\s+GLOB\s+'\[0-9\]\[0-9\]\[0-9\]\[0-9\]-\*'/,
-    "a freshness window must match only ISO verification timestamps (non-ISO labels are never window-matched)",
+    /updated\s+GLOB/,
+    "the freshness window must no longer use a GLOB anti-label filter (migration 0019 normalised non-ISO values so the composite index stays usable)",
   );
   assert.doesNotMatch(
     publicQuery,
@@ -115,10 +115,14 @@ test("the one-time freshness backfill migration is present, idempotent, and guar
   const files = await sourceFiles("drizzle");
   // H3 follow-up (#37): the backfill is matched by content, not by a hardcoded
   // 0005_ prefix — it was renumbered to 0007 when registered in the journal.
+  // Migration 0019 also rewrites `updated` (normalisation of any remaining
+  // non-ISO label), so the backfill is distinguished by its moderation-trail
+  // recovery, which only 0007 performs.
   let migration;
   for (const name of files) {
     if (!name.endsWith(".sql")) continue;
-    if (/UPDATE\s+cameras\s+SET\s+updated\s*=/i.test(await readSource(name))) {
+    const sql = await readSource(name);
+    if (/UPDATE\s+cameras\s+SET\s+updated\s*=/i.test(sql) && /moderation_events/.test(sql)) {
       migration = name;
       break;
     }
@@ -166,8 +170,8 @@ test("JSON, GeoJSON, and CSV are all derived from the public camera list", async
   );
   assert.match(
     getHandler,
-    /return\s+Response\.json\(\{\s*records:\s*page\.records,\s*total:\s*page\.total,\s*nextOffset:\s*page\.nextOffset\s*\}/,
-    "the default JSON list must return the paginated shape (records, total, nextOffset)",
+    /return\s+Response\.json\(\{\s*records:\s*page\.records,\s*total:\s*page\.total,\s*nextOffset:\s*page\.nextOffset,\s*facets\s*\}/,
+    "the default JSON list must return the paginated shape (records, total, nextOffset) plus the inline facets",
   );
   assert.match(route, /function\s+toCsv\s*\(records/, "CSV must have an explicit serializer");
   assert.match(getHandler, /format\s*===\s*["']csv["']/, "the public route must recognise the CSV format");
@@ -179,15 +183,15 @@ test("JSON, GeoJSON, and CSV are all derived from the public camera list", async
 test("nearby search validates its bounded coordinates and stays behind the public-list boundary", async () => {
   const route = await readSource("app/api/cameras/nearby/route.ts");
   const cameras = await readSource("db/cameras.ts");
-  const helperStart = cameras.indexOf("export async function findNearbyPublicCameras");
+  const helperStart = cameras.indexOf("export async function searchPublicCamerasNear");
   const helperEnd = cameras.indexOf("export async function createPendingCamera", helperStart);
   const helper = cameras.slice(helperStart, helperEnd);
 
   assert.ok(helperStart >= 0, "nearby search must have an explicit public-data helper");
   assert.match(
     route,
-    /import\s*\{[^}]*\bfindNearbyPublicCameras\b[^}]*\}\s*from\s*["'][^"']*db\/cameras["']/,
-    "the nearby route must use the dedicated public-data helper",
+    /import\s*\{[^}]*\bfindNearbyPublicCamerasPage\b[^}]*\}\s*from\s*["'][^"']*db\/cameras["']/,
+    "the nearby route must use the paginated public-data helper",
   );
   assert.match(route, /query\.get\(["']latitude["']\)/, "nearby search must read a latitude");
   assert.match(route, /query\.get\(["']longitude["']\)/, "nearby search must read a longitude");
@@ -199,8 +203,8 @@ test("nearby search validates its bounded coordinates and stays behind the publi
   );
   assert.match(
     route,
-    /findNearbyPublicCameras\(\s*latitude,\s*longitude,\s*radius/,
-    "nearby search must pass the bounded coordinates (and optional pre-submit text hints) to the public helper",
+    /findNearbyPublicCamerasPage\(\s*latitude,\s*longitude,\s*radius,\s*\{\s*limit,\s*offset\s*\}\)/,
+    "nearby search must pass the bounded coordinates and pagination to the public helper",
   );
   assert.doesNotMatch(route, /\bgetD1\b|\.prepare\(|\bSELECT\b/i, "the nearby route must not query the database directly");
   assert.match(
@@ -224,8 +228,8 @@ test("locality search stays behind the public-list boundary and is rate-limited"
   assert.ok(helperStart >= 0, "the search route must have a dedicated public-data area helper");
   assert.match(
     route,
-    /import\s*\{[^}]*\bsearchPublicCamerasNear\b[^}]*\}\s*from\s*["'][^"']*db\/cameras["']/,
-    "the search route must use the dedicated public-data helper",
+    /import\s*\{[^}]*\bsearchPublicCamerasNearPage\b[^}]*\}\s*from\s*["'][^"']*db\/cameras["']/,
+    "the search route must use the paginated public-data helper",
   );
   assert.match(
     route,
@@ -254,7 +258,7 @@ test("locality search stays behind the public-list boundary and is rate-limited"
 
   assert.match(route, /status:\s*404/, "an unresolvable place must return a truthful not-found response");
   assert.match(route, /status:\s*503/, "a geocoder or database failure must return a truthful unavailable response");
-  assert.match(route, /searchPublicCamerasNear\(area\.latitude,\s*area\.longitude,\s*area\.radiusMeters\)/);
+  assert.match(route, /searchPublicCamerasNearPage\(area\.latitude,\s*area\.longitude,\s*area\.radiusMeters,\s*\{\s*limit,\s*offset\s*\}\)/);
   assert.match(search, /export\s+function\s+parseCoordinateQuery/, "raw coordinate queries must be parsed locally");
   assert.match(search, /export\s+function\s+radiusForBoundingBox/, "place searches must scale their radius with the resolved place");
 });

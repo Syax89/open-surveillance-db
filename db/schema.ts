@@ -35,6 +35,17 @@ export const cameras = sqliteTable(
     index("cameras_status_idx").on(table.status),
     // Coordinate lookup for the proximity searches (bbox pre-filter, 0013).
     index("cameras_coordinates_idx").on(table.latitude, table.longitude),
+    // Composite public-directory indexes (migration 0019, FRONTEND_PLAN
+    // § 3.2.5): the directory filters always lead with the public status
+    // whitelist, so (status, kind) turns the kind filter into an index seek
+    // and (status, updated DESC) covers the status+recency navigation. The
+    // freshness windows are anchored on last_verified_at (domain decision
+    // § 3.2.6), so (status, last_verified_at DESC) serves those range scans.
+    // Declared here so drizzle-kit generate never re-emits them (convention
+    // 0012/0014: hand-written migration + schema declaration together).
+    index("cameras_status_kind_idx").on(table.status, table.kind),
+    index("cameras_status_updated_idx").on(table.status, sql`updated DESC`),
+    index("cameras_status_last_verified_idx").on(table.status, sql`last_verified_at DESC`),
   ],
 );
 

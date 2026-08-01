@@ -7,11 +7,21 @@ import { after, beforeEach, test } from "node:test";
 import { apiRequest, cleanupRouteTree, loadRoute, responseBody } from "./helpers/api-harness.mjs";
 import { callArgs, resetMockState, stub } from "./helpers/mock-state.mjs";
 
-beforeEach(() => resetMockState());
+beforeEach(() => {
+  resetMockState();
+  // The JSON list now computes facets inline; every list test gets the empty
+  // facet shape unless it overrides the stub.
+  stub("getPublicCameraFacets", defaultFacets);
+});
 after(async () => cleanupRouteTree());
 
 const camerasRoute = () => loadRoute("app/api/cameras/route.mjs");
 const nearbyRoute = () => loadRoute("app/api/cameras/nearby/route.mjs");
+
+// Facets contract (FRONTEND_PLAN § 3.2.2): the JSON list carries the facets
+// inline so the filter UI gets kinds/freshness in one round-trip.
+const emptyFacets = { kinds: [], freshness: { "7d": 0, "30d": 0, "90d": 0, all: 0 } };
+const defaultFacets = async () => emptyFacets;
 
 const cameraFixture = {
   id: 1,
@@ -43,9 +53,10 @@ test("GET /api/cameras returns the public list as JSON by default", async () => 
 
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type"), /application\/json/);
-  assert.equal(response.headers.get("cache-control"), "no-store", "moderation-derived JSON must never be cached");
-  assert.deepEqual(await responseBody(response), { records: [cameraFixture], total: 1, nextOffset: null });
+  assert.equal(response.headers.get("cache-control"), "public, s-maxage=300, stale-while-revalidate=600", "the directory list is cached for a bounded window and revalidated after moderation decisions");
+  assert.deepEqual(await responseBody(response), { records: [cameraFixture], total: 1, nextOffset: null, facets: emptyFacets });
   assert.deepEqual(callArgs("listPublicCamerasPage")[0], [{}, { limit: 500, offset: 0 }], "the default page is the first 500 records");
+  assert.equal(callArgs("getPublicCameraFacets").length, 1, "the facets are computed inline for the filter UI");
 });
 
 test("GET /api/cameras?format=geojson emits lon/lat FeatureCollection with export headers", async () => {
@@ -58,7 +69,7 @@ test("GET /api/cameras?format=geojson emits lon/lat FeatureCollection with expor
     response.headers.get("content-disposition"),
     /filename=opensurveillancedb-cameras\.geojson/,
   );
-  assert.equal(response.headers.get("cache-control"), "public, max-age=3600", "export snapshots may be cached for a bounded window");
+  assert.equal(response.headers.get("cache-control"), "public, s-maxage=3600", "export snapshots may be cached for a bounded window");
   const body = await responseBody(response);
   assert.equal(body.type, "FeatureCollection");
   // ODbL 1.0 attribution (TERMS § 7.1): the FeatureCollection must carry the
@@ -97,7 +108,7 @@ test("GET /api/cameras?format=csv escapes quotes and neutralises spreadsheet for
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type"), /text\/csv; charset=utf-8/);
   assert.match(response.headers.get("content-disposition"), /filename=opensurveillancedb-cameras\.csv/);
-  assert.equal(response.headers.get("cache-control"), "public, max-age=3600", "export snapshots may be cached for a bounded window");
+  assert.equal(response.headers.get("cache-control"), "public, s-maxage=3600", "export snapshots may be cached for a bounded window");
   const csv = await responseBody(response);
   assert.match(csv, /^id,title,kind,manufacturer,observed_on,status,source,updated,description,address,latitude,longitude\n/);
   assert.match(
@@ -119,7 +130,7 @@ test("GET /api/cameras ignores unknown format values and returns JSON", async ()
   const { GET } = await camerasRoute();
   const response = await GET(apiRequest("/api/cameras?format=xml"));
   assert.equal(response.status, 200);
-  assert.deepEqual(await responseBody(response), { records: [cameraFixture], total: 1, nextOffset: null });
+  assert.deepEqual(await responseBody(response), { records: [cameraFixture], total: 1, nextOffset: null, facets: emptyFacets });
 });
 
 test("GET /api/cameras?kind= filters the public list by an exact, parameterised category", async () => {
@@ -128,7 +139,7 @@ test("GET /api/cameras?kind= filters the public list by an exact, parameterised 
   const response = await GET(apiRequest("/api/cameras?kind=Fixed%20dome"));
 
   assert.equal(response.status, 200);
-  assert.deepEqual(await responseBody(response), { records: [cameraFixture], total: 1, nextOffset: null });
+  assert.deepEqual(await responseBody(response), { records: [cameraFixture], total: 1, nextOffset: null, facets: emptyFacets });
   assert.deepEqual(callArgs("listPublicCamerasPage")[0], [{ kind: "Fixed dome" }, { limit: 500, offset: 0 }]);
 });
 
@@ -673,26 +684,39 @@ test("POST /api/cameras coerces empty-string and null coordinates to 0,0", async
 
 const nearbyFixture = { ...cameraFixture, distanceMeters: 42 };
 
-test("nearby search passes bounded coordinates and radius to the helper", async () => {
-  stub("findNearbyPublicCameras", async () => [nearbyFixture]);
+test("nearby search passes bounded coordinates and pagination to the helper", async () => {
+  stub("findNearbyPublicCamerasPage", async () => ({ records: [nearbyFixture], total: 1, nextOffset: null }));
   const { GET } = await nearbyRoute();
   const response = await GET(apiRequest("/api/cameras/nearby?latitude=41.9&longitude=12.49&radius=75"));
   assert.equal(response.status, 200);
-  assert.deepEqual(await responseBody(response), { records: [nearbyFixture] });
-  assert.deepEqual(callArgs("findNearbyPublicCameras")[0], [41.9, 12.49, 75, { title: "", address: "", kind: "" }]);
+  assert.deepEqual(await responseBody(response), { records: [nearbyFixture], total: 1, nextOffset: null });
+  assert.deepEqual(callArgs("findNearbyPublicCamerasPage")[0], [41.9, 12.49, 75, { limit: 50, offset: 0 }], "the default nearby page is 50 records (FRONTEND_PLAN § 3.2.3)");
 });
 
 test("nearby search defaults the radius to 75 metres", async () => {
-  stub("findNearbyPublicCameras", async () => []);
+  stub("findNearbyPublicCamerasPage", async () => ({ records: [], total: 0, nextOffset: null }));
   const { GET } = await nearbyRoute();
   const response = await GET(apiRequest("/api/cameras/nearby?latitude=41.9&longitude=12.49"));
   assert.equal(response.status, 200);
   assert.equal(response.headers.get("cache-control"), "no-store", "duplicate-warning data must never be cached");
-  assert.deepEqual(callArgs("findNearbyPublicCameras")[0], [41.9, 12.49, 75, { title: "", address: "", kind: "" }]);
+  assert.deepEqual(callArgs("findNearbyPublicCamerasPage")[0], [41.9, 12.49, 75, { limit: 50, offset: 0 }]);
+});
+
+test("nearby search forwards explicit limit/offset and clamps an over-max limit", async () => {
+  stub("findNearbyPublicCamerasPage", async () => ({ records: [], total: 0, nextOffset: null }));
+  const { GET } = await nearbyRoute();
+
+  const explicit = await GET(apiRequest("/api/cameras/nearby?latitude=0&longitude=0&radius=50&limit=8&offset=16"));
+  assert.equal(explicit.status, 200);
+  assert.deepEqual(callArgs("findNearbyPublicCamerasPage")[0], [0, 0, 50, { limit: 8, offset: 16 }], "the pre-submit form requests a compact page");
+
+  const clamped = await GET(apiRequest("/api/cameras/nearby?latitude=0&longitude=0&limit=999999"));
+  assert.equal(clamped.status, 200);
+  assert.deepEqual(callArgs("findNearbyPublicCamerasPage")[1], [0, 0, 75, { limit: 100, offset: 0 }], "an over-max limit is clamped to 100");
 });
 
 test("nearby search accepts boundary radius values 10 and 500", async () => {
-  stub("findNearbyPublicCameras", async () => []);
+  stub("findNearbyPublicCamerasPage", async () => ({ records: [], total: 0, nextOffset: null }));
   const { GET } = await nearbyRoute();
   for (const radius of [10, 500]) {
     const response = await GET(
@@ -717,7 +741,7 @@ test("nearby search rejects missing or invalid coordinates", async (t) => {
     await t.test(name, async () => {
       const response = await GET(apiRequest(`/api/cameras/nearby?${query}`));
       assert.equal(response.status, 400, name);
-      assert.equal(callArgs("findNearbyPublicCameras").length, 0, name);
+      assert.equal(callArgs("findNearbyPublicCamerasPage").length, 0, name);
     });
   }
 });
@@ -737,33 +761,29 @@ test("nearby search rejects radius outside 10–500 metres", async (t) => {
         apiRequest(`/api/cameras/nearby?latitude=0&longitude=0&radius=${radius}`),
       );
       assert.equal(response.status, 400, name);
-      assert.equal(callArgs("findNearbyPublicCameras").length, 0, name);
+      assert.equal(callArgs("findNearbyPublicCamerasPage").length, 0, name);
+    });
+  }
+});
+
+test("nearby search rejects invalid limit and offset values with 400", async (t) => {
+  const { GET } = await nearbyRoute();
+  for (const query of ["limit=abc", "limit=-5", "limit=1.5", "limit=0", "offset=abc", "offset=-3"]) {
+    await t.test(query, async () => {
+      const response = await GET(apiRequest(`/api/cameras/nearby?latitude=0&longitude=0&${query}`));
+      assert.equal(response.status, 400, query);
+      assert.equal(callArgs("findNearbyPublicCamerasPage").length, 0, "no query must run for invalid pagination");
     });
   }
 });
 
 test("nearby search returns 503 when the database is unavailable", async () => {
-  stub("findNearbyPublicCameras", async () => {
+  stub("findNearbyPublicCamerasPage", async () => {
     throw new Error("Database binding unavailable");
   });
   const { GET } = await nearbyRoute();
   const response = await GET(apiRequest("/api/cameras/nearby?latitude=0&longitude=0&radius=50"));
   assert.equal(response.status, 503);
-});
-
-test("nearby search forwards and truncates pre-submit text hints", async () => {
-  stub("findNearbyPublicCameras", async () => []);
-  const { GET } = await nearbyRoute();
-  const response = await GET(
-    apiRequest(`/api/cameras/nearby?latitude=41.9&longitude=12.49&radius=75&title=${"T".repeat(95)}&address=${"A".repeat(200)}&kind=${"K".repeat(70)}`),
-  );
-  assert.equal(response.status, 200);
-  assert.deepEqual(callArgs("findNearbyPublicCameras")[0], [
-    41.9,
-    12.49,
-    75,
-    { title: "T".repeat(90), address: "A".repeat(180), kind: "K".repeat(60) },
-  ]);
 });
 
 // ---------------------------------------------------------------------------
@@ -814,4 +834,115 @@ test("POST survives a failing duplicate check with an empty possibleDuplicates l
   const body = await responseBody(response);
   assert.equal(body.record.id, 15);
   assert.deepEqual(body.possibleDuplicates, []);
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/cameras/[id] — record detail
+// ---------------------------------------------------------------------------
+
+const cameraIdRoute = () => loadRoute("app/api/cameras/[id]/route.mjs");
+
+test("GET /api/cameras/[id] returns the public record wrapped in { record }", async () => {
+  stub("getPublicCameraById", async () => cameraFixture);
+  const { GET } = await cameraIdRoute();
+  const response = await GET(apiRequest("/api/cameras/1"));
+
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("cache-control"), "public, s-maxage=300, stale-while-revalidate=600", "the record detail is cached for a bounded window like the list");
+  assert.deepEqual(await responseBody(response), { record: cameraFixture });
+  assert.deepEqual(callArgs("getPublicCameraById")[0], [1]);
+});
+
+test("GET /api/cameras/[id] fails closed with 404 for non-public or missing records", async () => {
+  stub("getPublicCameraById", async () => null);
+  const { GET } = await cameraIdRoute();
+  const response = await GET(apiRequest("/api/cameras/999"));
+  assert.equal(response.status, 404);
+  const body = await responseBody(response);
+  assert.equal(body.error, "Camera not found.");
+  assert.deepEqual(callArgs("getPublicCameraById")[0], [999]);
+});
+
+test("GET /api/cameras/[id] rejects non-numeric and non-positive ids with 404", async (t) => {
+  const { GET } = await cameraIdRoute();
+  for (const path of ["/api/cameras/abc", "/api/cameras/-3", "/api/cameras/1.5", "/api/cameras/0", "/api/cameras/"]) {
+    await t.test(path, async () => {
+      const response = await GET(apiRequest(path));
+      assert.equal(response.status, 404, path);
+      assert.equal(callArgs("getPublicCameraById").length, 0, "no lookup must run for a malformed id");
+    });
+  }
+});
+
+test("GET /api/cameras/[id] returns 503 when the database is unavailable", async () => {
+  stub("getPublicCameraById", async () => {
+    throw new Error("Database binding unavailable");
+  });
+  const { GET } = await cameraIdRoute();
+  const response = await GET(apiRequest("/api/cameras/1"));
+  assert.equal(response.status, 503);
+  assert.equal((await responseBody(response)).error, "Database unavailable");
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/cameras — facets and bounding-box GeoJSON
+// ---------------------------------------------------------------------------
+
+test("GET /api/cameras includes kind and freshness facets computed on the public boundary", async () => {
+  stub("listPublicCamerasPage", async () => ({ records: [cameraFixture], total: 512, nextOffset: 25 }));
+  stub("getPublicCameraFacets", async () => ({
+    kinds: [{ kind: "Fixed dome", count: 210 }, { kind: "PTZ", count: 44 }],
+    freshness: { "7d": 12, "30d": 64, "90d": 130, all: 512 },
+  }));
+  const { GET } = await camerasRoute();
+  const response = await GET(apiRequest("/api/cameras"));
+  assert.equal(response.status, 200);
+  const body = await responseBody(response);
+  assert.deepEqual(body.facets, {
+    kinds: [{ kind: "Fixed dome", count: 210 }, { kind: "PTZ", count: 44 }],
+    freshness: { "7d": 12, "30d": 64, "90d": 130, all: 512 },
+  });
+  assert.equal(body.total, 512);
+});
+
+test("GET /api/cameras?format=geojson&bbox= returns only the points inside the box with a 5-minute cache", async () => {
+  stub("listPublicCamerasInBbox", async () => [cameraFixture]);
+  const { GET } = await camerasRoute();
+  const response = await GET(apiRequest("/api/cameras?format=geojson&bbox=12.4,41.8,12.6,42.0"));
+
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("cache-control"), "public, s-maxage=300, stale-while-revalidate=600", "the map marker layer is cached like the list, never longer");
+  assert.equal(response.headers.get("content-disposition"), null, "a bbox GeoJSON is a live map layer, not a download attachment");
+  const body = await responseBody(response);
+  assert.equal(body.type, "FeatureCollection");
+  assert.equal(body.features.length, 1);
+  assert.deepEqual(callArgs("listPublicCamerasInBbox")[0], [{ west: 12.4, south: 41.8, east: 12.6, north: 42.0 }]);
+});
+
+test("GET /api/cameras bbox validation rejects malformed and inverted rectangles", async (t) => {
+  const { GET } = await camerasRoute();
+  const cases = [
+    "12.4,41.8,12.6",
+    "12.4,41.8,12.6,42.0,99",
+    "abc,41.8,12.6,42.0",
+    "12.6,41.8,12.4,42.0",
+    "12.4,42.0,12.6,41.8",
+    "-181,0,10,10",
+    "0,-91,10,10",
+  ];
+  for (const bbox of cases) {
+    await t.test(bbox, async () => {
+      const response = await GET(apiRequest(`/api/cameras?format=geojson&bbox=${encodeURIComponent(bbox)}`));
+      assert.equal(response.status, 400, bbox);
+      assert.equal(callArgs("listPublicCamerasInBbox").length, 0, "no query must run for an invalid bbox");
+    });
+  }
+});
+
+test("GET /api/cameras bbox requires format=geojson", async () => {
+  const { GET } = await camerasRoute();
+  const response = await GET(apiRequest("/api/cameras?bbox=12.4,41.8,12.6,42.0"));
+  assert.equal(response.status, 400);
+  const body = await responseBody(response);
+  assert.match(body.error, /format=geojson/);
 });

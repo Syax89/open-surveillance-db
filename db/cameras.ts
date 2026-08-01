@@ -57,24 +57,27 @@ export const freshnessWindows = ["7d", "30d", "90d", "all"] as const;
 export type FreshnessWindow = (typeof freshnessWindows)[number];
 export type PublicCameraFilters = { kind?: string; freshness?: FreshnessWindow };
 
+// Domain decision (F0, FRONTEND_PLAN § 3.2.6): the public freshness windows
+// answer "when was this last verified on the ground?", so they are anchored
+// on `last_verified_at`, not on `updated` (which also moves on non-verifying
+// moderation edits such as a title fix). The moderation write path already
+// sets last_verified_at on approve/reverify, and migration 0019 backfills it
+// for legacy verified rows from their recovered verification timestamp.
 function freshnessCutoff(freshness: Exclude<FreshnessWindow, "all">): string {
   const days = Number.parseInt(freshness, 10);
   return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 }
-
-/**
- * The shared public-read predicate, derived from PUBLIC_CAMERA_STATUSES
- * (app/lib/public-status.ts) — never hand-written into a query:
- *
- *   status IN (?, ?) AND (status = 'demo' OR review_due_at IS NULL OR review_due_at >= ?)
- *
- * The IN whitelist is generated from the single constant, and the freshness
- * carve-out keeps `demo` illustrative records public without a schedule while
- * every other public status must still be current at read time. Both public
- * queries (directory list and by-id lookup) share this predicate so a status
- * change takes effect on every surface at once.
- */
 export function publicCameraPredicate(nowIso: string): { sql: string; parameters: string[] } {
+  // The shared public-read predicate, derived from PUBLIC_CAMERA_STATUSES
+  // (app/lib/public-status.ts) — never hand-written into a query:
+  //
+  //   status IN (?, ?) AND (status = 'demo' OR review_due_at IS NULL OR review_due_at >= ?)
+  //
+  // The IN whitelist is generated from the single constant, and the freshness
+  // carve-out keeps `demo` illustrative records public without a schedule while
+  // every other public status must still be current at read time. Every public
+  // query (directory list, by-id lookup, facets, bbox) shares this predicate so
+  // a status change takes effect on every surface at once.
   const placeholders = PUBLIC_CAMERA_STATUSES.map(() => "?").join(", ");
   return {
     sql: `status IN (${placeholders}) AND (status = 'demo' OR review_due_at IS NULL OR review_due_at >= ?)`,
@@ -109,12 +112,14 @@ export async function listPublicCameras(
     parameters.push(filters.kind);
   }
   if (filters?.freshness && filters.freshness !== "all") {
-    query += " AND updated >= ?";
+    query += " AND last_verified_at >= ?";
     parameters.push(freshnessCutoff(filters.freshness));
-    // A freshness window matches only ISO verification timestamps. Non-ISO
-    // labels (illustrative demo placeholders, pre-backfill prose) must never
-    // be presented as freshly verified — the UI applies the same rule.
-    query += " AND updated GLOB '[0-9][0-9][0-9][0-9]-*'";
+    // No GLOB anti-label filter here: migration 0019 normalised every
+    // non-ISO `updated` value to a real timestamp, and the freshness window
+    // itself is anchored on `last_verified_at` (domain decision, § 3.2.6), so
+    // the comparison is always meaningful and the composite
+    // (status, last_verified_at) index is usable — a GLOB would defeat the
+    // index seek.
   }
   query += " ORDER BY id DESC";
   const result = await d1.prepare(query).bind(...parameters).all<PublicCameraRecord>();
@@ -166,9 +171,12 @@ export async function listPublicCamerasPage(
     parameters.push(filters.kind);
   }
   if (filters?.freshness && filters.freshness !== "all") {
-    query += " AND updated >= ?";
+    query += " AND last_verified_at >= ?";
     parameters.push(freshnessCutoff(filters.freshness));
-    query += " AND updated GLOB '[0-9][0-9][0-9][0-9]-*'";
+    // Same normalisation + last_verified_at anchor note as listPublicCameras:
+    // migration 0019 made every `updated` value ISO, the freshness window is
+    // anchored on last_verified_at, so no GLOB is needed and the composite
+    // index stays usable.
   }
   const countResult = await d1.prepare(`SELECT COUNT(*) AS total ${query}`).bind(...parameters).first<{ total: number }>();
   const total = countResult?.total ?? 0;
@@ -272,4 +280,112 @@ export async function getPublicCameraById(id: number, nowIso: string = new Date(
     .first<PublicCameraRecord>();
   if (!result) return null;
   return { ...result, latitude: roundPublicCoordinate(result.latitude), longitude: roundPublicCoordinate(result.longitude) };
+}
+
+export type PublicCameraFacets = {
+  kinds: { kind: string; count: number }[];
+  freshness: { "7d": number; "30d": number; "90d": number; all: number };
+};
+
+/**
+ * Facets for the directory/map filters (FRONTEND_PLAN § 3.2.2): the distinct
+ * public `kind` values with their counts and the freshness-window counts.
+ *
+ * The facets describe the FULL public dataset (shared predicate, no kind or
+ * freshness filter applied): the filter UI must keep offering every kind even
+ * while one is active, so the counts are computed on the same boundary the
+ * list itself uses, never on a filtered subset. The freshness windows use the
+ * same last_verified_at anchor as the list filter (domain decision § 3.2.6);
+ * `all` is the total public count. Both aggregate queries are served by the
+ * composite indexes declared in schema.ts (status, kind) and
+ * (status, last_verified_at DESC) and created by migration 0019.
+ */
+export async function getPublicCameraFacets(nowIso: string = new Date().toISOString()): Promise<PublicCameraFacets> {
+  const d1 = await getD1();
+  const { sql: publicPredicate, parameters: predicateParameters } = publicCameraPredicate(nowIso);
+  const kinds = await d1
+    .prepare(`SELECT kind, COUNT(*) AS count FROM cameras WHERE ${publicPredicate} GROUP BY kind ORDER BY count DESC, kind ASC`)
+    .bind(...predicateParameters)
+    .all<{ kind: string; count: number }>();
+  const freshness = await d1
+    .prepare(
+      `SELECT COUNT(*) AS allCount, SUM(CASE WHEN last_verified_at >= ? THEN 1 ELSE 0 END) AS d7, SUM(CASE WHEN last_verified_at >= ? THEN 1 ELSE 0 END) AS d30, SUM(CASE WHEN last_verified_at >= ? THEN 1 ELSE 0 END) AS d90 FROM cameras WHERE ${publicPredicate}`,
+    )
+    .bind(freshnessCutoff("7d"), freshnessCutoff("30d"), freshnessCutoff("90d"), ...predicateParameters)
+    .first<{ allCount: number; d7: number; d30: number; d90: number }>();
+  return {
+    kinds: kinds.results,
+    freshness: {
+      "7d": freshness?.d7 ?? 0,
+      "30d": freshness?.d30 ?? 0,
+      "90d": freshness?.d90 ?? 0,
+      all: freshness?.allCount ?? 0,
+    },
+  };
+}
+
+/**
+ * Bounding-box variant of the public list for the map marker layer
+ * (FRONTEND_PLAN § 3.3: the map needs all points in the visible box, not a
+ * page). Same shared predicate, publish-flag CASEs and ~10 m rounding as
+ * every other public surface. `bbox` is [west, south, east, north] in
+ * decimal degrees; the coordinates composite index serves the BETWEEN.
+ */
+export async function listPublicCamerasInBbox(
+  bbox: { west: number; south: number; east: number; north: number },
+  nowIso: string = new Date().toISOString(),
+): Promise<PublicCameraRecord[]> {
+  const d1 = await getD1();
+  const { sql: publicPredicate, parameters: predicateParameters } = publicCameraPredicate(nowIso);
+  const parameters = [...predicateParameters, bbox.south, bbox.north, bbox.west, bbox.east];
+  const query = `SELECT id, title, kind, CASE WHEN publish_manufacturer = 1 THEN manufacturer ELSE NULL END AS manufacturer, CASE WHEN publish_observed_on = 1 THEN observed_on ELSE NULL END AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, latitude, longitude, status, source, updated, description, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt FROM cameras WHERE ${publicPredicate} AND latitude BETWEEN ? AND ? AND longitude BETWEEN ? AND ? ORDER BY id DESC`;
+  const result = await d1.prepare(query).bind(...parameters).all<PublicCameraRecord>();
+  return result.results.map((record) => ({ ...record, latitude: roundPublicCoordinate(record.latitude), longitude: roundPublicCoordinate(record.longitude) }));
+}
+
+/** Default and hard-max page size for search/nearby (FRONTEND_PLAN § 3.2.3). */
+export const SEARCH_PAGE_DEFAULT_LIMIT = 25;
+export const SEARCH_PAGE_MAX_LIMIT = 100;
+export const NEARBY_PAGE_DEFAULT_LIMIT = 50;
+export const NEARBY_PAGE_MAX_LIMIT = 100;
+
+/**
+ * Paginated variant of searchPublicCamerasNear for GET /api/cameras/search:
+ * same exact distance ordering, same shape as the list pagination
+ * ({ records, total, nextOffset }) so the frontend reuses one pagination
+ * contract (FRONTEND_PLAN § 3.2.3).
+ */
+export async function searchPublicCamerasNearPage(
+  latitude: number,
+  longitude: number,
+  radiusMeters: number,
+  options: { limit: number; offset: number } = { limit: SEARCH_PAGE_DEFAULT_LIMIT, offset: 0 },
+): Promise<{ records: NearbyPublicCameraRecord[]; total: number; nextOffset: number | null }> {
+  const limit = Math.min(Math.max(Math.trunc(options.limit) || SEARCH_PAGE_DEFAULT_LIMIT, 1), SEARCH_PAGE_MAX_LIMIT);
+  const offset = Math.max(Math.trunc(options.offset) || 0, 0);
+  const records = await searchPublicCamerasNear(latitude, longitude, radiusMeters);
+  const total = records.length;
+  const page = records.slice(offset, offset + limit);
+  const nextOffset = offset + page.length < total ? offset + page.length : null;
+  return { records: page, total, nextOffset };
+}
+
+/**
+ * Paginated variant of searchPublicCamerasNear for GET /api/cameras/nearby
+ * (FRONTEND_PLAN § 3.2.3): same distance ordering, same pagination shape,
+ * larger default page (50).
+ */
+export async function findNearbyPublicCamerasPage(
+  latitude: number,
+  longitude: number,
+  radiusMeters: number,
+  options: { limit: number; offset: number } = { limit: NEARBY_PAGE_DEFAULT_LIMIT, offset: 0 },
+): Promise<{ records: NearbyPublicCameraRecord[]; total: number; nextOffset: number | null }> {
+  const limit = Math.min(Math.max(Math.trunc(options.limit) || NEARBY_PAGE_DEFAULT_LIMIT, 1), NEARBY_PAGE_MAX_LIMIT);
+  const offset = Math.max(Math.trunc(options.offset) || 0, 0);
+  const records = await searchPublicCamerasNear(latitude, longitude, radiusMeters);
+  const total = records.length;
+  const page = records.slice(offset, offset + limit);
+  const nextOffset = offset + page.length < total ? offset + page.length : null;
+  return { records: page, total, nextOffset };
 }

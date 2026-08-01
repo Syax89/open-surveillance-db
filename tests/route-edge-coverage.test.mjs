@@ -55,7 +55,7 @@ test("nearby answers 414 for absurdly long URIs before any work", async () => {
   const { GET } = await nearbyRoute();
   const response = await GET(apiRequest(`/api/cameras/nearby?${"a".repeat(5000)}`));
   assert.equal(response.status, 414);
-  assert.equal(callArgs("findNearbyPublicCameras").length, 0);
+  assert.equal(callArgs("findNearbyPublicCamerasPage").length, 0);
 });
 
 test("nearby answers 429 past its own bucket, independently of the read bucket", async () => {
@@ -63,16 +63,16 @@ test("nearby answers 429 past its own bucket, independently of the read bucket",
   const previous = envModule.env.NEARBY_RATE_LIMIT_MAX;
   envModule.env.NEARBY_RATE_LIMIT_MAX = "1";
   try {
-    stub("findNearbyPublicCameras", async () => []);
+    stub("findNearbyPublicCamerasPage", async () => ({ records: [], total: 0, nextOffset: null }));
     const { GET } = await nearbyRoute();
     const allowed = await GET(apiRequest("/api/cameras/nearby?latitude=0&longitude=0&radius=50"));
     assert.equal(allowed.status, 200, "the first call fits the 1/min cap");
-    assert.equal(callArgs("findNearbyPublicCameras").length, 1);
+    assert.equal(callArgs("findNearbyPublicCamerasPage").length, 1);
 
     const blocked = await GET(apiRequest("/api/cameras/nearby?latitude=0&longitude=0&radius=50"));
     assert.equal(blocked.status, 429);
     assert.ok(Number(blocked.headers.get("retry-after")) >= 1);
-    assert.equal(callArgs("findNearbyPublicCameras").length, 1, "the throttled call never reaches the db layer");
+    assert.equal(callArgs("findNearbyPublicCamerasPage").length, 1, "the throttled call never reaches the db layer");
   } finally {
     envModule.env.NEARBY_RATE_LIMIT_MAX = previous;
   }

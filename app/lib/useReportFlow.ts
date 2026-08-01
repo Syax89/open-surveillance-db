@@ -45,7 +45,7 @@ export function useReportFlow({ setNotice }: { setNotice: (notice: string) => vo
     setNearbyError("");
     setNearbyLoading(true);
     try {
-      const params = new URLSearchParams({ latitude: String(latitude), longitude: String(longitude), radius: "75" });
+      const params = new URLSearchParams({ latitude: String(latitude), longitude: String(longitude), radius: "75", limit: "8" });
       const response = await fetch(`/api/cameras/nearby?${params}`, { signal: controller.signal });
       if (!response.ok) throw new Error(t.nearbyCheckError);
       const data = await response.json() as { records?: NearbyCandidate[] };

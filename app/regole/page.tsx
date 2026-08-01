@@ -99,6 +99,7 @@ export default async function RulesPage() {
           <p className="eyebrow"><span /> {t.dataEyebrow}</p>
           <h2 id="data-title">{t.dataTitle}</h2>
           <p>{t.dataBody}</p>
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- download API, non navigazione: <Link> non gestisce la query di export */}
           <div className="data-actions"><a href="/api/cameras?format=geojson">{t.downloadGeoJson} <span aria-hidden="true">→</span></a><span>·</span><a href="/api/cameras?format=csv">{t.downloadCsv} <span aria-hidden="true">→</span></a></div>
         </div>
         <div className="correction-form">
