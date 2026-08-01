@@ -18,6 +18,9 @@ export const en = {
   common: {
     skipLink: "Skip to main content",
     languageSelection: "Language selection",
+    privacy: "Privacy",
+    terms: "Terms of use",
+    licences: "Licences",
   },
   map: {
     mapLabel: "Interactive OpenStreetMap map",

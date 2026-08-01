@@ -13,6 +13,9 @@ export const it: Translation<typeof en> = {
   common: {
     skipLink: "Vai al contenuto principale",
     languageSelection: "Selezione lingua",
+    privacy: "Privacy",
+    terms: "Termini di utilizzo",
+    licences: "Licenze",
   },
   map: {
     mapLabel: "Mappa interattiva OpenStreetMap",
