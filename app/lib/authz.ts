@@ -1,20 +1,28 @@
 /**
  * Route-level authorization (STATUS gap #2, ADR 0014).
  *
- * The prototype has two identity paths:
+ * The prototype has two identity paths, and BOTH are trusted only because
+ * the worker edge (worker/index.ts) is the single identity authority:
  *
  *   1. Real ChatGPT-plugin headers (`oai-authenticated-user-email`) when the
  *      app runs inside the ChatGPT plugin platform — the public-alpha path
  *      (the old `app/chatgpt-auth.ts` scaffold was removed; the header
- *      contract below is what remains).
- *   2. A prototype header `x-osdb-user-email` that the worker edge injects
- *      after the Basic-auth gate succeeds (worker/index.ts), so the local
- *      dashboard and API automation carry a server-set identity instead of a
- *      client-chosen one.
+ *      contract below is what remains). The edge strips these headers from
+ *      every request unless `TRUST_PLATFORM_HEADERS=true` (a deployment
+ *      where the platform gateway, not arbitrary clients, sits in front of
+ *      the worker).
+ *   2. The prototype header `x-osdb-user-email`, which the worker edge
+ *      STRIPS from every incoming request and re-injects ONLY after the
+ *      Basic/bearer moderation gate succeeds, from the server-side
+ *      `MODERATION_IDENTITY_EMAIL` setting (worker/index.ts). A client can
+ *      never set it directly.
  *
  * `requireRole` resolves the caller against the `users` table (coarse role),
  * rejects unknown/inactive callers with 401, and callers below the required
  * tier with 403. Every protected route calls it before doing any work.
+ * Security note: these headers are edge-set-only; any code path that would
+ * accept them from an un-gated client reintroduces the authz-spoofing
+ * vulnerability closed by ADR 0014.
  */
 
 import { getUserByEmail, type UserRecord, type UserRole, roleAtLeast } from "../../db/users";
