@@ -207,11 +207,11 @@ test("POST answers 414 when the URI is too long", async () => {
   assert.equal(callArgs("fileAppeal").length, 0);
 });
 
-test("POST answers 429 past the moderation bucket and records the block", async () => {
+test("POST answers 429 past the appeal bucket and records the block", async () => {
   stubIdentity(contributorUser);
   const envModule = await loadTreeModule("cloudflare-workers.mjs");
-  const previous = envModule.env.MODERATION_RATE_LIMIT_MAX;
-  envModule.env.MODERATION_RATE_LIMIT_MAX = "1";
+  const previous = envModule.env.APPEAL_RATE_LIMIT_MAX;
+  envModule.env.APPEAL_RATE_LIMIT_MAX = "1";
   try {
     stub("fileAppeal", async () => ({ kind: "ok", appeal: appealFixture, event: eventFixture }));
     const { POST } = await appealsRoute();
@@ -224,7 +224,7 @@ test("POST answers 429 past the moderation bucket and records the block", async 
     assert.ok(Number(blocked.headers.get("retry-after")) >= 1);
     assert.equal(callArgs("fileAppeal").length, 1, "the throttled call never reaches the db layer");
   } finally {
-    envModule.env.MODERATION_RATE_LIMIT_MAX = previous;
+    envModule.env.APPEAL_RATE_LIMIT_MAX = previous;
   }
 });
 
