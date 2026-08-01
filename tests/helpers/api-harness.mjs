@@ -54,6 +54,7 @@ const ROUTES = [
 const REAL_DB_MODULES = [
   { source: "db/cameras.ts", output: "db-real/cameras.mjs" },
   { source: "db/corrections.ts", output: "db-real/corrections.mjs" },
+  { source: "db/geocode.ts", output: "db-real/geocode.mjs" },
   { source: "db/moderation.ts", output: "db-real/moderation.mjs" },
   { source: "db/photos.ts", output: "db-real/photos.mjs" },
 ];
