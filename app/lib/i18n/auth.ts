@@ -1,0 +1,118 @@
+/**
+ * auth — interface strings.
+ *
+ * English is the pilot language: `en` defines the canonical key set for
+ * this domain, `it` is type-checked against it via `Translation<typeof en>`
+ * (see `./types.ts`), so a missing or extra key fails `tsc --noEmit`.
+ */
+import type { Translation } from "./types";
+
+export const en = {
+  navigation: "Main navigation",
+  homeAria: "OpenSurveillanceDB home",
+  accountAria: "Your account",
+  backHome: "Back to the map",
+  loginTitle: "Log in",
+  registerTitle: "Create a contributor account",
+  accountTitle: "Your account",
+  email: "Email",
+  password: "Password",
+  displayName: "Display name (optional)",
+  login: "Log in",
+  register: "Create account",
+  logout: "Log out",
+  noAccount: "No account yet?",
+  haveAccount: "Already have an account?",
+  createOne: "Create one",
+  signIn: "Log in instead",
+  passwordHint: "At least 10 characters.",
+  anonymousNote:
+    "You do not need an account to report a camera. An account lets you track your own reports.",
+  privacyNotice: "Privacy notice",
+  termsOfUse: "Terms of use",
+  profileSection: "Profile",
+  memberSince: "Member since",
+  emailLabel: "Email",
+  displayNameLabel: "Display name",
+  submissionsSection: "Your reports",
+  noSubmissions: "You have not submitted any attributed reports yet.",
+  submissionStatus: "Status",
+  submissionCreated: "Submitted",
+  loggedOutTitle: "You are logged out",
+  loggedOutBody: "Your session has ended. You can close this window or log in again.",
+  errorInvalidCredentials: "Invalid credentials.",
+  errorEmailTaken: "An account with this email already exists.",
+  errorGeneric: "Something went wrong. Please try again.",
+  errorCrossOrigin: "Cross-site request rejected.",
+  loading: "Loading…",
+  anonymous: "Anonymous",
+  notAuthenticatedTitle: "Not logged in",
+  notAuthenticatedBody: "Log in to see your profile and your attributed reports.",
+  deleteAccountSection: "Delete account",
+  deleteAccountHint:
+    "Deletes your account and removes the link between you and your reports. The reports themselves stay published anonymously (RETENTION_SCHEDULE R7).",
+  deleteAccountConfirm: "Delete account permanently?",
+  deleteAccountConfirmBody:
+    "Your account and all its sessions will be erased. Your reports stay published, no longer attributed to you. This cannot be undone.",
+  deleteAccount: "Delete account",
+  deletingAccount: "Deleting account…",
+  accountDeletedTitle: "Account deleted",
+  accountDeletedBody:
+    "Your account has been erased and you are logged out. Your reports remain published without attribution.",
+  errorDeleteAccount: "Unable to delete the account. Please try again.",
+} as const;
+
+export const it: Translation<typeof en> = {
+  navigation: "Navigazione principale",
+  homeAria: "Pagina iniziale di OpenSurveillanceDB",
+  accountAria: "Il tuo account",
+  backHome: "Torna alla mappa",
+  loginTitle: "Accedi",
+  registerTitle: "Crea un account da contributore",
+  accountTitle: "Il tuo account",
+  email: "Email",
+  password: "Password",
+  displayName: "Nome visualizzato (facoltativo)",
+  login: "Accedi",
+  register: "Crea account",
+  logout: "Esci",
+  noAccount: "Non hai ancora un account?",
+  haveAccount: "Hai già un account?",
+  createOne: "Crealo",
+  signIn: "Accedi invece",
+  passwordHint: "Almeno 10 caratteri.",
+  anonymousNote:
+    "Non serve un account per segnalare una telecamera. Un account ti permette di tenere traccia delle tue segnalazioni.",
+  privacyNotice: "Informativa privacy",
+  termsOfUse: "Termini d’uso",
+  profileSection: "Profilo",
+  memberSince: "Iscritto dal",
+  emailLabel: "Email",
+  displayNameLabel: "Nome visualizzato",
+  submissionsSection: "Le tue segnalazioni",
+  noSubmissions: "Non hai ancora inviato segnalazioni attribuite.",
+  submissionStatus: "Stato",
+  submissionCreated: "Inviata",
+  loggedOutTitle: "Hai effettuato l'accesso",
+  loggedOutBody: "La sessione è terminata. Puoi chiudere questa finestra o accedere di nuovo.",
+  errorInvalidCredentials: "Credenziali non valide.",
+  errorEmailTaken: "Esiste già un account con questa email.",
+  errorGeneric: "Qualcosa è andato storto. Riprova.",
+  errorCrossOrigin: "Richiesta cross-site rifiutata.",
+  loading: "Caricamento…",
+  anonymous: "Anonimo",
+  notAuthenticatedTitle: "Non hai effettuato l'accesso",
+  notAuthenticatedBody: "Accedi per vedere il tuo profilo e le tue segnalazioni attribuite.",
+  deleteAccountSection: "Elimina account",
+  deleteAccountHint:
+    "Elimina il tuo account e rimuove il collegamento tra te e le tue segnalazioni. Le segnalazioni restano pubblicate in forma anonima (RETENTION_SCHEDULE R7).",
+  deleteAccountConfirm: "Eliminare definitivamente l'account?",
+  deleteAccountConfirmBody:
+    "L'account e tutte le sue sessioni verranno cancellati. Le tue segnalazioni restano pubblicate, senza più attribuzione a te. Questa azione non può essere annullata.",
+  deleteAccount: "Elimina account",
+  deletingAccount: "Eliminazione in corso…",
+  accountDeletedTitle: "Account eliminato",
+  accountDeletedBody:
+    "Il tuo account è stato cancellato e hai effettuato l'accesso. Le tue segnalazioni restano pubblicate senza attribuzione.",
+  errorDeleteAccount: "Impossibile eliminare l'account. Riprova.",
+};
