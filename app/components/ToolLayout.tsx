@@ -83,7 +83,11 @@ export function ToolLayout({ children }: { children: ReactNode }) {
       <SiteHeader navLabel={t.toolNavigation} homeLabel={t.toolHomeAria}>
         <div className="nav-links">
           {nav.map(({ href, label }) => (
-            <Link key={href} href={href} className={href === "/" ? "nav-action" : undefined}>
+            // The link for the page the visitor is on carries
+            // aria-current="page" (finding QA-2026-08-01-3, closed in F-QA
+            // t_7b716c97): the per-page nav set changes with the route, so
+            // the current page must be exposed to assistive technology.
+            <Link key={href} href={href} className={href === "/" ? "nav-action" : undefined} aria-current={href === pathname ? "page" : undefined}>
               {t[label]}
             </Link>
           ))}

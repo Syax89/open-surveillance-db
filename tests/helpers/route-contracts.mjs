@@ -14,7 +14,10 @@
 // For existing routes the mapping records what already covers them; the
 // "note" column explains intent. Fixtures remain fictional — no personal
 // data anywhere in this registry or the tests that consume it.
-
+//
+// Dynamic routes: "/records/[id]" is resolved to a fictional demo id
+// (/records/1) by the SSR/axe suites before dispatching — the registry
+// keeps the Next.js route pattern as the source of truth.
 export function registeredRoutes() {
   return [
     {
@@ -23,11 +26,59 @@ export function registeredRoutes() {
       source: "app/page.tsx",
       artifacts: {
         ssr: "pages-render.test.mjs",
-        interaction: "client-public-cameras-layer.test.mjs",
-        i18n: "client-locale-toggle.test.mjs",
+        interaction: "home-hub.test.mjs",
+        i18n: "i18n-pages.test.mjs",
         a11y: "axe-audit.test.mjs",
       },
-      note: "F2 hub: SSR puro, card tool, usePublicCount; filtri UI journey in e2e-journeys",
+      note: "F2 hub SSR-pure: interaction = usePublicCount + nav (home-hub); journey in e2e-journeys",
+    },
+    {
+      route: "/mappa",
+      name: "map tool",
+      source: "app/(tools)/mappa/page.tsx",
+      artifacts: {
+        ssr: "pages-render.test.mjs",
+        interaction: "client-tools.test.mjs",
+        i18n: "i18n-pages.test.mjs",
+        a11y: "axe-audit.test.mjs",
+      },
+      note: "F1 tool; F4 possiede il contratto URL dei filtri (url-contract gate)",
+    },
+    {
+      route: "/directory",
+      name: "directory tool",
+      source: "app/(tools)/directory/page.tsx",
+      artifacts: {
+        ssr: "pages-render.test.mjs",
+        interaction: "client-tools.test.mjs",
+        i18n: "i18n-pages.test.mjs",
+        a11y: "axe-audit.test.mjs",
+      },
+      note: "F1 tool; journey browse→filtri→record in browse-filter-record",
+    },
+    {
+      route: "/segnala",
+      name: "report tool",
+      source: "app/(tools)/segnala/page.tsx",
+      artifacts: {
+        ssr: "pages-render.test.mjs",
+        interaction: "client-tools.test.mjs",
+        i18n: "i18n-pages.test.mjs",
+        a11y: "axe-audit.test.mjs",
+      },
+      note: "F1 tool; journey segnala→submit→coda moderazione in e2e-journeys",
+    },
+    {
+      route: "/correggi",
+      name: "correction tool",
+      source: "app/(tools)/correggi/page.tsx",
+      artifacts: {
+        ssr: "pages-render.test.mjs",
+        interaction: "client-tools.test.mjs",
+        i18n: "i18n-pages.test.mjs",
+        a11y: "axe-audit.test.mjs",
+      },
+      note: "F1 tool",
     },
     {
       route: "/guide",
@@ -87,7 +138,7 @@ export function registeredRoutes() {
         i18n: "client-locale-toggle.test.mjs",
         a11y: "axe-audit.test.mjs",
       },
-      note: "F0: fetch via GET /api/cameras/[id] quando atterrato",
+      note: "route dinamica: audit e SSR usano l'id demo fittizio /records/1",
     },
     {
       route: "/moderation",
@@ -197,6 +248,18 @@ export function registeredRoutes() {
         a11y: "axe-audit.test.mjs",
       },
       note: "statica",
+    },
+    {
+      route: "/accessibility",
+      name: "accessibility statement page",
+      source: "app/accessibility/page.tsx",
+      artifacts: {
+        ssr: "pages-render.test.mjs",
+        interaction: "client-locale-toggle.test.mjs",
+        i18n: "i18n-pages.test.mjs",
+        a11y: "axe-audit.test.mjs",
+      },
+      note: "F-legal G2: pagina pubblica della dichiarazione",
     },
   ];
 }

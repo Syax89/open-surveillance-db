@@ -1,18 +1,23 @@
 /**
  * E2E journey 1: browse → filtri → record (F-QA t_7b716c97, item 5).
  *
- * The roadmap's first required journey: a visitor lands on the home,
- * browses the directory, narrows it with the filter controls (search text,
+ * The roadmap's first required journey: a visitor lands on the home hub,
+ * reaches the directory, narrows it with the filter controls (search text,
  * kind, freshness, sort) and opens a record.
  *
  * Two layers, both real:
- *   - client: the REAL Home page runs in the dom-harness (jsdom +
- *     @testing-library + user-event) against a deterministic fetch mock.
- *     The filter interaction (typing, selecting, live count, empty state)
- *     was previously UNTESTED — no existing suite drives these controls.
- *   - SSR: the built worker (Miniflare) serves the home with the directory
- *     and the record detail resolves, so the whole journey works without
- *     client JS too (progressive enhancement).
+ *   - client: the REAL DirectoryTool (/directory) runs in the dom-harness
+ *     (jsdom + @testing-library + user-event) against a deterministic
+ *     fetch mock. The filter interaction on the tool route — typing,
+ *     selecting, live count, empty state, record links — is exercised end
+ *     to end on the real component tree (FiltersBar + EmptyState +
+ *     RecordCard via PublicDirectory).
+ *   - SSR: the built worker (Miniflare) serves the home hub with the tool
+ *     cards and the record detail resolves, so the whole journey works
+ *     without client JS too (progressive enhancement). The /directory SSR
+ *     shell and the /records/[id] loading shell render server-side; the
+ *     interactive halves live in client-tools.test.mjs / client-record-page
+ *     (the F1/F3 suites already own those contracts).
  *
  * Fixtures are fictional demo records — no personal data.
  *
@@ -28,7 +33,7 @@ import {
   React,
   installFetchMock,
   jsonResponse,
-  loadDomPage,
+  loadDomModule,
   renderWithLocale,
   setUrlState,
   setupDom,
@@ -68,87 +73,80 @@ const TWO_RECORDS = [
   },
 ];
 
+function installDirectoryFetch() {
+  installFetchMock((input) => {
+    if (String(input).startsWith("/api/cameras")) {
+      return jsonResponse({ records: TWO_RECORDS, total: TWO_RECORDS.length, nextOffset: null });
+    }
+    return jsonResponse({ error: "not found" }, { status: 404 });
+  });
+}
+
+async function loadDirectoryTool() {
+  const mod = await loadDomModule("app/components/tools/DirectoryTool.mjs");
+  return mod.DirectoryTool;
+}
+
 // ---------------------------------------------------------------------------
-// Client layer — filter interaction (previously untested)
+// Client layer — filter interaction on the /directory tool route
 // ---------------------------------------------------------------------------
 
 test("journey browse→filtri: search narrows the directory and the live count follows", async () => {
-  const { userEvent } = await setupDom();
-  await setUrlState("/");
-  installFetchMock((input) => {
-    if (String(input).startsWith("/api/cameras")) {
-      return jsonResponse({ records: TWO_RECORDS, total: TWO_RECORDS.length });
-    }
-    return jsonResponse({ error: "not found" }, { status: 404 });
-  });
+  const rtl = await setupDom();
+  await setUrlState("/directory");
+  installDirectoryFetch();
 
-  const Home = await loadDomPage("app/page.mjs");
-  const { container } = await renderWithLocale(React.createElement(Home));
+  const DirectoryTool = await loadDirectoryTool();
+  const { container } = await renderWithLocale(React.createElement(DirectoryTool));
 
   const searchInput = container.querySelector("#record-search");
   assert.ok(searchInput, "the directory search input must render");
-  const cards = () => container.querySelectorAll(".record-list > li, ul.record-list li").length;
+  const cards = () => container.querySelectorAll("ul.record-list li").length;
 
-  // Both records visible before filtering.
-  const allCards = container.querySelectorAll("ul.record-list li").length;
-  assert.equal(allCards, 2, "the directory must show both fictional records");
+  assert.equal(cards(), 2, "the directory must show both fictional records");
 
   // Search narrows to the matching record.
-  await userEvent.type(searchInput, "corner");
-  assert.equal(container.querySelectorAll("ul.record-list li").length, 1, "search 'corner' must leave one record");
+  await rtl.userEvent.type(searchInput, "corner");
+  assert.equal(cards(), 1, "search 'corner' must leave one record");
   assert.match(container.querySelector("ul.record-list")?.textContent ?? "", /Corner shop entrance/);
 
-  // The live counter announces the filtered result (aria-live region).
+  // The live counter announces the filtered result (role=status region).
   const counter = container.querySelector("#record-search-count");
-  assert.ok(counter, "the result counter must be an aria-live region");
+  assert.ok(counter, "the result counter must be a status/aria-live region");
   assert.match(counter?.textContent ?? "", /1/);
 
   // Empty state is truthful and offers a way back.
-  await userEvent.selectOptions(container.querySelector("#record-kind-filter"), "Bullet");
-  assert.equal(container.querySelectorAll("ul.record-list li").length, 0, "no record matches corner+Bullet");
+  await rtl.userEvent.selectOptions(container.querySelector("#record-kind-filter"), "Bullet");
+  assert.equal(cards(), 0, "no record matches corner+Bullet");
   const emptyState = container.querySelector(".empty-state");
   assert.ok(emptyState, "the zero-result state must render (never a silent blank)");
-  assert.match(emptyState?.textContent ?? "", /Clear search|clear search/i);
+  assert.match(emptyState?.textContent ?? "", /clear search|reset/i);
 });
 
 test("journey browse→filtri: kind filter and sort order drive the directory", async () => {
-  const { userEvent } = await setupDom();
-  await setUrlState("/");
-  installFetchMock((input) => {
-    if (String(input).startsWith("/api/cameras")) {
-      return jsonResponse({ records: TWO_RECORDS, total: TWO_RECORDS.length });
-    }
-    return jsonResponse({ error: "not found" }, { status: 404 });
-  });
+  const rtl = await setupDom();
+  await setUrlState("/directory");
+  installDirectoryFetch();
 
-  const Home = await loadDomPage("app/page.mjs");
-  const { container } = await renderWithLocale(React.createElement(Home));
+  const DirectoryTool = await loadDirectoryTool();
+  const { container } = await renderWithLocale(React.createElement(DirectoryTool));
 
-  await userEvent.selectOptions(container.querySelector("#record-kind-filter"), "Bullet");
+  await rtl.userEvent.selectOptions(container.querySelector("#record-kind-filter"), "Bullet");
   assert.equal(container.querySelectorAll("ul.record-list li").length, 1, "kind filter must keep only Bullet records");
   assert.match(container.querySelector("ul.record-list")?.textContent ?? "", /Main square pillar/);
 
-  // Sort by position reorders (alphabetical default: Corner < Main).
-  await userEvent.selectOptions(container.querySelector("#record-sort"), "position");
-  const firstTitle = container.querySelector("ul.record-list li .record-title, ul.record-list li")?.textContent ?? "";
-  // After position sort with the Bullet filter the single card is unchanged;
-  // clear the filter to see both, then assert position ordering by latitude.
-  await userEvent.selectOptions(container.querySelector("#record-kind-filter"), "all");
+  // Position sort orders by latitude (41.9004 Corner before 41.9047 Main).
+  await rtl.userEvent.selectOptions(container.querySelector("#record-sort"), "position");
   const titles = [...container.querySelectorAll("ul.record-list li")].map((li) => li.textContent ?? "");
   assert.equal(titles.length, 2);
-  // position sort: latitude 41.9004 (Corner) before 41.9047 (Main).
   assert.ok(titles[0].includes("Corner shop entrance"), `position sort must lead with the lower latitude, got: ${titles[0]}`);
 });
 
 test("journey browse→record: the directory card links to a resolvable record detail", async () => {
-  await setUrlState("/");
-  installFetchMock((input) => {
-    if (String(input).startsWith("/api/cameras")) {
-      return jsonResponse({ records: TWO_RECORDS, total: TWO_RECORDS.length });
-    }
-    return jsonResponse({ error: "not found" }, { status: 404 });
-  });
-  const { container } = await renderWithLocale(React.createElement(await loadDomPage("app/page.mjs")));
+  await setUrlState("/directory");
+  installDirectoryFetch();
+  const DirectoryTool = await loadDirectoryTool();
+  const { container } = await renderWithLocale(React.createElement(DirectoryTool));
 
   const openLinks = [...container.querySelectorAll("a.text-button")].filter((a) =>
     /\/records\/\d+/.test(a.getAttribute("href") ?? ""),
@@ -198,11 +196,18 @@ async function ssr(route) {
   }
 }
 
-test("journey SSR: the home serves the directory with record links and the detail resolves", async () => {
+test("journey SSR: the home hub links the directory tool and the record detail resolves", async () => {
   const home = await ssr("/");
   assert.equal(home.response.status, 200);
-  assert.match(home.html, /id="records"/, "the directory section must SSR");
-  assert.match(home.html, /href="\/records\/1"/, "the directory must link to record details");
+  assert.match(home.html, /href="\/directory"/, "the hub must link the directory tool");
+  assert.match(home.html, /href="\/segnala"/, "the hub must link the report tool");
+
+  // The /directory route SSRs its shell (heading + FiltersBar) so the page
+  // paints server-side; the interactive filter halves are client-tools'.
+  const directory = await ssr("/directory");
+  assert.equal(directory.response.status, 200, "the directory tool must render server-side");
+  assert.match(directory.html, /id="directory-tool-title"/, "the directory tool heading must SSR");
+  assert.match(directory.html, /id="record-search"/, "the FiltersBar must be part of the SSR shell");
 
   // The record detail is a client-fetched page: SSR renders the accessible
   // loading shell (aria-live region) so the browser paints the page and the

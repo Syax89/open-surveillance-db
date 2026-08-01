@@ -420,7 +420,7 @@ export async function setupDom({ url = "https://osdb.test/" } = {}) {
       "HTMLTextAreaElement", "HTMLDivElement", "HTMLUListElement", "HTMLLIElement",
       "HTMLHeadingElement", "HTMLParagraphElement", "HTMLSpanElement", "HTMLImageElement",
       "HTMLTableElement", "HTMLTimeElement", "Node", "Element", "Event", "MouseEvent",
-      "KeyboardEvent", "FocusEvent", "CustomEvent",
+      "KeyboardEvent", "FocusEvent", "CustomEvent", "AbortController", "AbortSignal",
       "FormData", "File", "Blob", "URL", "URLSearchParams", "TextEncoder", "TextDecoder",
       "getComputedStyle", "requestAnimationFrame", "cancelAnimationFrame",
       "localStorage", "sessionStorage", "MutationObserver", "DOMParser", "CSS", "Comment",

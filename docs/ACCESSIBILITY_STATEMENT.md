@@ -23,10 +23,13 @@ by disabled users before the pilot is widened, as agreed in
 ## Compliance status
 
 **Partially compliant.** The local prototype implements a meaningful
-accessibility baseline, but it has **not yet passed formal automated or manual
-accessibility testing**, and some known limitations remain (listed below).
-This section will be replaced by a measured conformance statement (WCAG 2.2
-A/AA, per success criterion) once the testing gates in Horizon 2 are complete.
+accessibility baseline, and **automated checks now run in CI**: the F-QA
+gate audits the SSR HTML of every public route with axe-core (WCAG 2.1/2.2
+A/AA tags) and enforces 0 critical/serious violations. **Formal manual
+testing is still pending** (screen readers, zoom, small screens), and some
+known limitations remain (listed below). This section will be replaced by a
+measured conformance statement (WCAG 2.2 A/AA, per success criterion) once
+the manual testing gates in Horizon 2 are complete.
 
 ### What is already implemented in the prototype
 
@@ -49,8 +52,11 @@ A/AA, per success criterion) once the testing gates in Horizon 2 are complete.
   alternative covers browsing; remaining map interactions are still being
   brought to keyboard parity (tracked in Horizon 2).
 - **No formal manual testing** with screen readers, 200% zoom, contrast
-  checking, or small-screen devices has been run yet; the automated checks and
-  manual test plan are pending (Horizon 2).
+  checking, or small-screen devices has been run yet; the manual test plan
+  is pending (Horizon 2). Automated checks are in place (axe-core on every
+  route, CI, 0 critical/serious violations); contrast and target-size need
+  a real rendering engine, so they stay covered by the manual plan and the
+  Lighthouse CI proposal (ops).
 - **Some user-visible strings are still defined inline** in components while
   the interface-string externalisation and pilot-language review are in
   progress (Horizon 2).
@@ -146,11 +152,14 @@ prima di ampliare il pilota, come concordato in
 ## Stato di conformità
 
 **Parzialmente conforme.** Il prototipo locale implementa una base di
-accessibilità significativa, ma **non ha ancora superato test formali
-automatizzati o manuali**, e permangono alcune limitazioni note (elencate
-sotto). Questa sezione sarà sostituita da una dichiarazione di conformità
-misurata (WCAG 2.2 A/AA, per singolo criterio di successo) al termine delle
-verifiche previste nell'Orizzonte 2.
+accessibilità significativa, e **i controlli automatizzati ora girano in CI**:
+il gate F-QA verifica l'HTML SSR di ogni route pubblica con axe-core (tag
+WCAG 2.1/2.2 A/AA) e impone 0 violazioni critiche/serie. **Il test manuale
+formale è ancora previsto** (screen reader, zoom, schermi piccoli), e
+permangono alcune limitazioni note (elencate sotto). Questa sezione sarà
+sostituita da una dichiarazione di conformità misurata (WCAG 2.2 A/AA, per
+singolo criterio di successo) al termine dei test manuali previsti
+nell'Orizzonte 2.
 
 ### Cosa è già implementato nel prototipo
 
@@ -166,7 +175,7 @@ verifiche previste nell'Orizzonte 2.
 ### Limitazioni note (non ancora implementate)
 
 - **I compiti sulla mappa non sono ancora pienamente equivalenti da tastiera.** L'alternativa testuale copre la consultazione; le restanti interazioni sulla mappa sono in corso di allineamento (Orizzonte 2).
-- **Nessun test manuale formale** con screen reader, zoom al 200%, verifica del contrasto o dispositivi a schermo piccolo è stato ancora eseguito; i controlli automatizzati e il piano di test manuale sono previsti (Orizzonte 2).
+- **Nessun test manuale formale** con screen reader, zoom al 200%, verifica del contrasto o dispositivi a schermo piccolo è stato ancora eseguito; il piano di test manuale è previsto (Orizzonte 2). I controlli automatizzati sono in atto (axe-core su ogni route, CI, 0 violazioni critiche/serie); contrasto e target-size richiedono un vero motore di rendering, quindi restano coperti dal piano manuale e dalla proposta Lighthouse CI (ops).
 - **Alcune stringhe visibili sono ancora definite inline** nei componenti, in attesa dell'esternalizzazione delle stringhe di interfaccia e della revisione della lingua pilota (Orizzonte 2).
 - **La pagina di feedback dedicata (`/feedback`) non è ancora implementata.** Il percorso di feedback di usabilità non sensibile è specificato in [ADR 0006](decisions/0006-non-sensitive-usability-feedback-route.md); l'implementazione è tracciata come lavoro successivo. Finché non esiste, le barriere possono essere segnalate tramite i canali alternativi elencati sotto.
 

@@ -180,7 +180,11 @@ test("journey segnala: submit → moderation queue → approve → public listin
 
   const detail = await ssr(`/records/${record.id}`);
   assert.equal(detail.response.status, 200, "the public record detail must render");
-  assert.match(detail.html, new RegExp(record.title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "the record detail must show the title");
+  // The record detail is a client-fetched page (F0 [id] API): SSR renders
+  // the accessible loading shell with an aria-live region; the record title
+  // itself is asserted at client level (client-record-page.test.mjs).
+  assert.match(detail.html, /class="record-detail"[^>]*aria-live="polite"/, "the detail shell must be an aria-live region");
+  assert.match(detail.html, /loading-note/, "the SSR shell must announce the loading state");
 });
 
 // ---------------------------------------------------------------------------

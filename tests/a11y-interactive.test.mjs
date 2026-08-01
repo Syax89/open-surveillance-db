@@ -31,8 +31,10 @@
  *      the page in the new language.
  *   5. Footer/nav: labelled landmarks, every footer link has visible text
  *      (no unlabeled links), every <img> carries alt. aria-current for the
- *      active page is NOT yet implemented — tracked as finding
- *      QA-2026-08-01-3, pinned below.
+ *      active page IS implemented since F-QA t_7b716c97 (finding
+ *      QA-2026-08-01-3 CLOSED): the footer marks its own link, the header
+ *      brand marks the home, and the ToolLayout per-page nav marks the
+ *      current tool route — pinned below.
  *   6. Fixture hygiene: all fixtures here are fictional (demo records,
  *      local-only moderator credentials); nothing personal may appear in
  *      the rendered public HTML.
@@ -49,8 +51,10 @@ import {
   React,
   installFetchMock,
   jsonResponse,
+  loadDomModule,
   loadDomPage,
   renderWithLocale,
+  setNavState,
   setupDom,
   wrapWithLocale,
 } from "./helpers/dom-harness.mjs";
@@ -455,10 +459,10 @@ test("every <img> in the public HTML carries alt text", async () => {
 
 test("aria-current marks the active page in the footer and the header brand (QA-2026-08-01-3 closed)", async () => {
   // The audit finding is CLOSED (F-QA t_7b716c97): the footer marks its own
-  // link with aria-current="page" on every institutional route, the header
-  // brand marks the home, and the home's in-page nav marks the active
-  // section (separate client test below).
-  const FOOTER_LINKS = ["/manifesto", "/regole", "/guide", "/privacy", "/termini", "/licenze", "/faq", "/contatti"];
+  // link with aria-current="page" on every route in its link set, the
+  // header brand marks the home, and the ToolLayout per-page nav marks the
+  // current tool route (separate client test below).
+  const FOOTER_LINKS = ["/mappa", "/directory", "/segnala", "/correggi", "/manifesto", "/regole", "/guide", "/privacy", "/termini", "/licenze", "/accessibility", "/faq", "/contatti"];
   for (const route of FOOTER_LINKS) {
     const { html } = await renderRoute(route);
     const footer = html.slice(html.indexOf("footer-links"));
@@ -476,39 +480,42 @@ test("aria-current marks the active page in the footer and the header brand (QA-
     assert.equal((footer.match(/aria-current="page"/g) ?? []).length, 0, `${route}: no footer link may be current`);
   }
   // The home marks the header brand (in-page anchor to #top) and the footer
-  // brand as current; other pages leave the brand unmarked.
+  // brand as current; other pages (including the tool routes, whose header
+  // brand is a next/link to /) leave the brand unmarked.
   const home = await renderRoute("/");
   assert.match(home.html, /<a class="brand"[^>]*href="#top"[^>]*aria-current="page"/, "home header brand must be current");
   assert.match(home.html, /<footer class="site-footer"[\s\S]*?<a class="brand"[^>]*href="\/"[^>]*aria-current="page"/, "home footer brand must be current");
-  for (const route of ["/guide", "/login"]) {
+  for (const route of ["/guide", "/login", "/mappa"]) {
     const { html } = await renderRoute(route);
     assert.doesNotMatch(html, /<a class="brand"[^>]*aria-current="page"/, `${route}: brand must not be marked current`);
   }
 });
 
-test("home nav: the clicked in-page section anchor carries aria-current=true", async () => {
-  // Same-page navigation pattern (QA-2026-08-01-3): on the single-page
-  // home the anchor for the section the user is viewing gets
-  // aria-current="true" (the value ARIA defines for same-page references).
+test("tool nav: the per-page link for the current route carries aria-current=page (QA-2026-08-01-3)", async () => {
+  // Per-page navigation pattern (F3 t_2ca69725, closed in F-QA): the
+  // ToolLayout nav set changes with usePathname(), so the link for the page
+  // the visitor is on must carry aria-current="page" — the value ARIA
+  // defines for the current page of a navigation set.
   const rtl = await setupDom();
-  const user = rtl.userEvent.setup();
-  installFetchMock((input) => {
-    if (String(input).startsWith("/api/cameras")) {
-      return jsonResponse({
-        records: [
-          { id: 1, title: "Illustrative record A", kind: "Fixed dome", status: "demo", latitude: 41.9004, longitude: 12.4936, source: "Prototype seed", updated: "Demo data", description: "Fixture." },
-        ],
-        total: 1,
-      });
-    }
-    return jsonResponse({ error: "not found" }, { status: 404 });
-  });
-  const Home = await loadDomPage("app/page.mjs");
-  rtl.render(await wrapWithLocale(React.createElement(Home)));
-  const recordsLink = rtl.screen.getByRole("link", { name: /browse records/i });
-  assert.equal(recordsLink.getAttribute("aria-current"), null, "no section is current before interaction");
-  await user.click(recordsLink);
-  assert.equal(recordsLink.getAttribute("aria-current"), "true", "the clicked section anchor must become current");
+  await setNavState({ pathname: "/mappa" });
+  const mod = await loadDomModule("app/components/ToolLayout.mjs");
+  const ToolLayout = mod.ToolLayout;
+  const { container, rerender } = await renderWithLocale(React.createElement(ToolLayout, null, React.createElement("div", null, "body")));
+
+  const links = () => [...container.querySelectorAll(".nav-links a")];
+  const currentOf = () => links().filter((a) => a.getAttribute("aria-current") === "page");
+  assert.equal(links().length >= 4, true, "the per-page nav set must render");
+  assert.equal(currentOf().length, 1, "exactly one nav link must be current on /mappa");
+  assert.equal(currentOf()[0].getAttribute("href"), "/mappa", "the /mappa link must be marked current");
+  const directoryLink = links().find((a) => a.getAttribute("href") === "/directory");
+  assert.equal(directoryLink?.getAttribute("aria-current"), null, "other tools must not be current");
+
+  // Moving to /directory re-marks the nav (the set itself changes).
+  await setNavState({ pathname: "/directory" });
+  rerender(React.createElement(ToolLayout, null, React.createElement("div", null, "body")));
+  const currentDirectory = [...container.querySelectorAll(".nav-links a")].filter((a) => a.getAttribute("aria-current") === "page");
+  assert.equal(currentDirectory.length, 1);
+  assert.equal(currentDirectory[0].getAttribute("href"), "/directory");
   rtl.cleanup();
 });
 

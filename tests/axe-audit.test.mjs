@@ -72,10 +72,14 @@ async function renderRoute(route, { env = {}, headers = {} } = {}) {
 }
 
 // Every SSR-able route in the route-contracts registry plus the gated
-// moderation shell (which needs credentials). /records/:id uses a fictional
-// demo id (fixture hygiene — no real personal data anywhere).
+// moderation shell (which needs credentials). /records/[id] is dynamic:
+// the audit resolves it to a fictional demo id (/records/1) — fixture
+// hygiene, no real personal data anywhere.
 const AUDIT_ROUTES = [
-  ...registeredRoutes().map((r) => ({ route: r.route, ...(r.auth ? MODERATION_CREDENTIALS : {}) })),
+  ...registeredRoutes().map((r) => ({
+    route: r.route.replace("[id]", "1"),
+    ...(r.auth ? MODERATION_CREDENTIALS : {}),
+  })),
 ];
 
 for (const { route, env, headers } of AUDIT_ROUTES) {
