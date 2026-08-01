@@ -104,6 +104,7 @@ export type ModerationResult<T> =
       queue: ModerationQueueItem;
     }
   | { kind: "not_found" }
+  | { kind: "camera_not_found" }
   | { kind: "forbidden" }
   | { kind: "actor_not_found" }
   | { kind: "actor_inactive" }
@@ -874,6 +875,19 @@ export async function moderateCorrection(
     .bind(id)
     .first<{ status: string }>();
   if (!current) return { kind: "not_found" };
+
+  // The route validates cameraId as a positive integer, but existence must
+  // be checked here: otherwise an UPDATE could link the correction to a
+  // non-existent camera (orphan data) and an approve outcome on it would
+  // silently apply to nothing. Escalate never persists camera_id, so it is
+  // exempt (the parser allows the field on any action for uniformity).
+  if (cameraId !== undefined && action !== "escalate") {
+    const camera = await d1
+      .prepare("SELECT id FROM cameras WHERE id = ?")
+      .bind(cameraId)
+      .first<{ id: number }>();
+    if (!camera) return { kind: "camera_not_found" };
+  }
 
   const queue = context
     ? await getOrCreateQueueItem(d1, "correction", id, {
