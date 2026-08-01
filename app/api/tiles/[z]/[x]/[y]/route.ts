@@ -15,6 +15,10 @@ import { callerKey, checkRateLimit, limitsFor } from "../../../../../lib/rate-li
  *     CDN, do not strip or blank the Referer");
  *   - server-side caching honouring upstream cache headers, or a 7-day
  *     minimum TTL when the upstream sends none (policy §3.2/§5);
+ *   - a bounded upstream fetch: AbortSignal.timeout (TILE_UPSTREAM_TIMEOUT_MS,
+ *     default 5 s) so a slow/hung provider answers 502 instead of pinning the
+ *     request, and a hard body cap (TILE_MAX_BYTES, default 2 MiB) so an
+ *     oversized response is rejected without ever being cached;
  *   - strict zoom/x/y validation so the endpoint cannot be used to scrape
  *     arbitrary paths or drive bulk downloads (policy §4).
  *
@@ -34,11 +38,72 @@ const MAX_ZOOM = 19;
 // them, cache each tile for at least 7 days." Applied when the upstream
 // response carries no Cache-Control.
 const MIN_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60;
+// A slow or hung upstream must not pin the request until the platform
+// timeout: abort after TILE_UPSTREAM_TIMEOUT_MS (default 5s) and answer 502.
+// Same pattern as db/geocode.ts (requestTimeoutMs).
+const UPSTREAM_TIMEOUT_MS_DEFAULT = 5_000;
+// Cap on the accepted upstream body: standard raster tiles are well under
+// 1 MiB, so anything past 2 MiB is an anomaly (or a compromised provider).
+// Oversized bodies are rejected with 502 and never cached.
+const TILE_MAX_BYTES_DEFAULT = 2 * 1024 * 1024;
 const TILE_USER_AGENT =
   "OpenSurveillanceDB/0.1 (+https://github.com/Syax89/open-surveillance-db; contact: privacy@opensurveillancedb)";
 const TILE_ACCEPT = "image/avif,image/webp,image/png,image/*;q=0.8,*/*;q=0.5";
 
 type TileParams = { z: string; x: string; y: string };
+
+// The `Env` interface has no string index signature, so knobs are read
+// through a cast — same EnvLike pattern as lib/rate-limit.ts limitsFor().
+type EnvLike = { [key: string]: unknown };
+
+/** Effective upstream fetch timeout, honouring the TILE_UPSTREAM_TIMEOUT_MS knob. */
+function upstreamTimeoutMs(envValue: unknown = env): number {
+  const value = Number((envValue as EnvLike).TILE_UPSTREAM_TIMEOUT_MS);
+  return Number.isFinite(value) && value > 0 ? value : UPSTREAM_TIMEOUT_MS_DEFAULT;
+}
+
+/** Effective upstream body cap, honouring the TILE_MAX_BYTES knob. */
+function tileMaxBytes(envValue: unknown = env): number {
+  const value = Number((envValue as EnvLike).TILE_MAX_BYTES);
+  return Number.isFinite(value) && value > 0 ? value : TILE_MAX_BYTES_DEFAULT;
+}
+
+/** Thrown when the upstream tile body exceeds the configured cap. */
+class TileTooLargeError extends Error {}
+
+/**
+ * Read an upstream response body up to `maxBytes`, streaming with a running
+ * counter (same shape as readCappedBody in app/api/photos/route.ts). When the
+ * cap is exceeded the stream is cancelled immediately — the connection is not
+ * drained — and TileTooLargeError is thrown so the route answers 502 without
+ * caching. Returns the full body as a single Uint8Array when within the cap.
+ */
+async function readCappedUpstreamBody(
+  body: ReadableStream<Uint8Array> | null,
+  maxBytes: number,
+): Promise<Uint8Array<ArrayBuffer>> {
+  if (!body) return new Uint8Array(0);
+  const reader = body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel().catch(() => {});
+      throw new TileTooLargeError(`tile response exceeds ${maxBytes} bytes`);
+    }
+    chunks.push(value);
+  }
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return out;
+}
 
 /**
  * Validate and normalise slippy-map tile coordinates. Returns null for any
@@ -141,7 +206,14 @@ export async function GET(request: Request, context: { params: Promise<TileParam
     });
     const referer = request.headers.get("Referer");
     if (referer) headers.set("Referer", referer);
-    upstream = await fetch(upstreamUrl(tile.z, tile.x, tile.y), { headers });
+    // Abort a slow or hung upstream after TILE_UPSTREAM_TIMEOUT_MS (default
+    // 5s) so the worker never pins a request until the platform timeout;
+    // same pattern as db/geocode.ts. The signal also cuts off a trickling
+    // response body mid-stream.
+    upstream = await fetch(upstreamUrl(tile.z, tile.x, tile.y), {
+      headers,
+      signal: AbortSignal.timeout(upstreamTimeoutMs()),
+    });
   } catch (error) {
     console.error("tile upstream fetch failed", error);
     return new Response("Tile upstream unavailable", {
@@ -167,7 +239,19 @@ export async function GET(request: Request, context: { params: Promise<TileParam
   }
   responseHeaders.set("X-Tile-Cache", "miss");
 
-  const body = await upstream.arrayBuffer();
+  // Read the upstream body with a hard cap (default 2 MiB): a compromised or
+  // broken provider must not be able to push an unbounded body through the
+  // worker. Over-cap responses answer 502 and are never cached.
+  let body: Uint8Array<ArrayBuffer>;
+  try {
+    body = await readCappedUpstreamBody(upstream.body, tileMaxBytes());
+  } catch (error) {
+    console.error("tile upstream body rejected", error);
+    return new Response("Tile upstream unavailable", {
+      status: 502,
+      headers: { "Cache-Control": "no-store" },
+    });
+  }
   const response = new Response(body, { status: 200, headers: responseHeaders });
 
   if (cache) {
