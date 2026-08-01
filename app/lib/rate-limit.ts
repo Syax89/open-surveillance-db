@@ -36,7 +36,8 @@ export type RouteKind =
   | "moderate"
   | "appeal"
   | "auth"
-  | "tiles";
+  | "tiles"
+  | "confirm";
 
 const ROUTE_LIMIT_DEFAULTS: Record<RouteKind, RateLimitOptions> = {
   read: { maxRequests: 60, windowSeconds: 60 },
@@ -59,6 +60,11 @@ const ROUTE_LIMIT_DEFAULTS: Record<RouteKind, RateLimitOptions> = {
   // service) beyond community usage. 60/min is far above what interactive
   // map panning produces per client, and the edge cache absorbs repeats.
   tiles: { maxRequests: 60, windowSeconds: 60 },
+  // Community verifications (ADR 0018 §2.6, C1): the toggle PUT/DELETE and
+  // the personal GET share one bucket, independent of the read bucket the
+  // public record payload uses. The state quota (daily cap) is a D1 COUNT
+  // inside the toggle; this bucket only bounds the request rate per caller.
+  confirm: { maxRequests: 30, windowSeconds: 60 },
 };
 
 const ROUTE_LIMIT_ENV_PREFIX: Record<RouteKind, string> = {
@@ -71,6 +77,7 @@ const ROUTE_LIMIT_ENV_PREFIX: Record<RouteKind, string> = {
   appeal: "APPEAL",
   auth: "AUTH",
   tiles: "TILES",
+  confirm: "CONFIRM",
 };
 
 const attemptsByKey = new Map<string, number[]>();
