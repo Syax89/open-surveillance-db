@@ -86,27 +86,95 @@ function requireModerationAuth(request: Request, env: Env): Response | null {
   });
 }
 
+/**
+ * Global security headers (audit t_a07443bd, P2 gap).
+ *
+ * Applied by the worker edge to EVERY response — pages, API JSON, errors,
+ * image optimization, the moderation gate. Individual handlers may set
+ * stricter values (e.g. the photo routes ship `Content-Security-Policy:
+ * default-src 'none'; sandbox` on binary image bodies): the middleware only
+ * ADDS headers that are not already present, so a more restrictive policy
+ * set by an app route is never weakened.
+ *
+ * CSP notes (calibrated for the vinext/Next RSC runtime):
+ * - `script-src 'unsafe-inline'` is required: the server-rendered HTML
+ *   embeds RSC bootstrap inline scripts (`self.__VINEXT_RSC_*`) plus a
+ *   same-origin dynamic `import()`. No CDNs, no `unsafe-eval`.
+ * - `style-src 'unsafe-inline'` is required for the inline
+ *   `<style data-vinext-fonts>` font preloads emitted by vinext.
+ * - `img-src 'self' data: blob:` — tiles are served same-origin through the
+ *   /api/tiles proxy (docs/OSM_INTEGRATION.md); Leaflet div-icons use HTML.
+ * - `frame-ancestors 'none'` + `X-Frame-Options: DENY`: the site must not
+ *   be iframable (clickjacking). Kept as headers even though modern
+ *   browsers prefer the CSP directive, for legacy coverage.
+ * - `default-src 'self'` + `object-src 'none'` + `form-action 'self'` +
+ *   `base-uri 'self'`: baseline that blocks most reflected/XSS payloads at
+ *   the header level.
+ *
+ * HSTS is deliberately NOT set here: the site is currently served over
+ * plain HTTP (local LXC 114). `Strict-Transport-Security` should be enabled
+ * at the Cloudflare zone level (or via a CF header rule) once the public
+ * domain is active — see task t_6148aa6f.
+ */
+const SECURITY_HEADERS: ReadonlyArray<readonly [string, string]> = [
+  ["X-Content-Type-Options", "nosniff"],
+  ["X-Frame-Options", "DENY"],
+  ["Referrer-Policy", "strict-origin-when-cross-origin"],
+  ["Permissions-Policy", "camera=(), microphone=(), geolocation=()"],
+  [
+    "Content-Security-Policy",
+    "default-src 'self'; " +
+      "script-src 'self' 'unsafe-inline'; " +
+      "style-src 'self' 'unsafe-inline'; " +
+      "img-src 'self' data: blob:; " +
+      "font-src 'self'; " +
+      "connect-src 'self'; " +
+      "media-src 'self'; " +
+      "object-src 'none'; " +
+      "frame-ancestors 'none'; " +
+      "base-uri 'self'; " +
+      "form-action 'self'; " +
+      "worker-src 'self' blob:",
+  ],
+];
+
+/** Return a copy of `response` carrying the global security headers. */
+function withSecurityHeaders(response: Response): Response {
+  const headers = new Headers(response.headers);
+  for (const [name, value] of SECURITY_HEADERS) {
+    // Never overwrite an existing header: app routes may set stricter
+    // values (photo CSP sandbox) that must survive the middleware.
+    if (!headers.has(name)) headers.set(name, value);
+  }
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
     if (moderationPath(url.pathname)) {
       const gate = requireModerationAuth(request, env);
-      if (gate) return gate;
+      if (gate) return withSecurityHeaders(gate);
     }
 
     if (url.pathname === "/_vinext/image") {
       const allowedWidths = [...DEFAULT_DEVICE_SIZES, ...DEFAULT_IMAGE_SIZES];
-      return handleImageOptimization(request, {
+      const optimized = await handleImageOptimization(request, {
         fetchAsset: (path) => env.ASSETS.fetch(new Request(new URL(path, request.url))),
         transformImage: async (body, { width, format, quality }) => {
           const result = await env.IMAGES.input(body).transform(width > 0 ? { width } : {}).output({ format, quality });
           return result.response();
         },
       }, allowedWidths);
+      return withSecurityHeaders(optimized);
     }
 
-    return handler.fetch(request, env, ctx);
+    return withSecurityHeaders(await handler.fetch(request, env, ctx));
   },
 };
 
