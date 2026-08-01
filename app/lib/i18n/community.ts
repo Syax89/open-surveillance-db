@@ -105,6 +105,19 @@ export const en = {
   errorEditNotOwner: "You can only edit your own contributions.",
   errorEditConflict: "An edit request for this record is already under review.",
   errorEditRateLimit: "Too many attempts. Please try again in a minute.",
+  editRequestPending: "An edit request for this record is already under review.",
+  editSaved: "Changes saved.",
+  editSubmitted: "Your edit request has been submitted for review.",
+  editNoChanges: "No changes were made.",
+  errorEditRace:
+    "This record changed since you loaded it. Refresh the page and try again.",
+  errorEditNotFound: "This record is not available for editing.",
+  errorEditGeneric: "Could not save your changes. Please try again.",
+  editBackToRecord: "Back to the record",
+  editLoginTitle: "Log in to edit your contribution",
+  editLoginBody:
+    "You need to be logged in to edit a contribution you submitted.",
+  editLoginAction: "Log in",
 
   // --- Destructive confirmations ---
   removeVerificationConfirmTitle: "Remove your verification from this record?",
@@ -209,6 +222,19 @@ export const it: Translation<typeof en> = {
   errorEditNotOwner: "Puoi modificare solo i tuoi contributi.",
   errorEditConflict: "Una richiesta di modifica per questo record è già in revisione.",
   errorEditRateLimit: "Troppi tentativi. Riprova tra un minuto.",
+  editRequestPending: "Una richiesta di modifica per questo record è già in revisione.",
+  editSaved: "Modifiche salvate.",
+  editSubmitted: "La tua richiesta di modifica è stata inviata per la revisione.",
+  editNoChanges: "Nessuna modifica apportata.",
+  errorEditRace:
+    "Il record è cambiato da quando l'hai caricato. Ricarica la pagina e riprova.",
+  errorEditNotFound: "Questo record non è disponibile per la modifica.",
+  errorEditGeneric: "Non è stato possibile salvare le modifiche. Riprova.",
+  editBackToRecord: "Torna al record",
+  editLoginTitle: "Accedi per modificare il tuo contributo",
+  editLoginBody:
+    "Devi avere un account per modificare un contributo che hai inviato.",
+  editLoginAction: "Accedi",
 
   // --- Conferme distruttive ---
   removeVerificationConfirmTitle: "Rimuovere la tua verifica da questo record?",

@@ -38,6 +38,7 @@ const PAGES = [
   { route: "/account", source: "app/account/page.tsx", relative: "app/account/page.mjs" },
   { route: "/moderation", source: "app/moderation/page.tsx", relative: "app/moderation/page.mjs" },
   { route: "/records/[id]", source: "app/records/[id]/page.tsx", relative: "app/records/[id]/page.mjs" },
+  { route: "/records/[id]/edit", source: "app/records/[id]/edit/page.tsx", relative: "app/records/[id]/edit/page.mjs" },
 ];
 
 // Le route del repo (pagine + API) note al momento del test: usate per

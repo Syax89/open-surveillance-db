@@ -45,6 +45,34 @@ export const en = {
     reverify: "Re-verified",
     hide: "Removed from public listing",
   },
+  // Contribution edit form (/records/[id]/edit, C6). The page keeps its own
+  // field labels here (record.ts is the form bundle per SITEMAP) instead of
+  // mixing the report bundle: same per-page isolation rule as statusFilters.
+  editTitle: "Record title",
+  editTitlePlaceholder: "e.g. Public security camera",
+  editKind: "Camera type",
+  editKindSelect: "Select one",
+  editKindOptions: {
+    fixedDome: "Fixed dome",
+    bullet: "Bullet",
+    ptz: "PTZ",
+    trafficReader: "Traffic / licence plate reader",
+    otherUnknown: "Other / unknown",
+  },
+  editManufacturer: "Manufacturer (optional)",
+  editManufacturerPlaceholder: "e.g. manufacturer name",
+  editObservedOn: "Date observed (optional)",
+  editAddress: "Approximate address (optional)",
+  editAddressPlaceholder: "Street and city",
+  editNotes: "What did you observe?",
+  editNotesPlaceholder: "Direction, operator, visible notice, model…",
+  editDescription: "Description (optional)",
+  editDescriptionPlaceholder: "Additional context about the record…",
+  editBlockedRemovedTitle: "This record can no longer be edited",
+  editTitleRequired: "The record title is required.",
+  editFieldTooLong: (limit: number) =>
+    `This field must be at most ${limit} characters.`,
+  editObservedOnInvalid: "Enter a valid date (YYYY-MM-DD).",
 } as const;
 
 export const it: Translation<typeof en> = {
@@ -85,4 +113,33 @@ export const it: Translation<typeof en> = {
     reverify: "Riverificato",
     hide: "Rimosso dall'elenco pubblico",
   },
+  // Form di modifica del contributo (/records/[id]/edit, C6). La pagina
+  // tiene qui le proprie label di campo (record.ts è il bundle del form
+  // secondo SITEMAP) invece di mescolare il bundle report: stessa regola di
+  // isolamento per pagina di statusFilters.
+  editTitle: "Titolo del record",
+  editTitlePlaceholder: "es. Telecamera di videosorveglianza pubblica",
+  editKind: "Tipo di telecamera",
+  editKindSelect: "Seleziona una voce",
+  editKindOptions: {
+    fixedDome: "Dome fissa",
+    bullet: "Bullet",
+    ptz: "PTZ",
+    trafficReader: "Lettore traffico / targhe",
+    otherUnknown: "Altro / sconosciuto",
+  },
+  editManufacturer: "Produttore (facoltativo)",
+  editManufacturerPlaceholder: "es. nome del produttore",
+  editObservedOn: "Data osservata (facoltativo)",
+  editAddress: "Indirizzo approssimativo (facoltativo)",
+  editAddressPlaceholder: "Via e città",
+  editNotes: "Cosa hai osservato?",
+  editNotesPlaceholder: "Direzione, gestore, cartello visibile, modello…",
+  editDescription: "Descrizione (facoltativo)",
+  editDescriptionPlaceholder: "Contesto aggiuntivo sul record…",
+  editBlockedRemovedTitle: "Questo record non può più essere modificato",
+  editTitleRequired: "Il titolo del record è obbligatorio.",
+  editFieldTooLong: (limit: number) =>
+    `Questo campo deve avere al massimo ${limit} caratteri.`,
+  editObservedOnInvalid: "Inserisci una data valida (AAAA-MM-GG).",
 };

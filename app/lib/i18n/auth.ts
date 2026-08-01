@@ -60,10 +60,20 @@ export const en = {
     "Your account and all its sessions will be erased. Your reports stay published, no longer attributed to you. This cannot be undone.",
   deleteAccount: "Delete account",
   deletingAccount: "Deleting account…",
+  deleteAccountCancel: "Cancel",
   accountDeletedTitle: "Account deleted",
   accountDeletedBody:
     "Your account has been erased and you are logged out. Your reports remain published without attribution.",
   errorDeleteAccount: "Unable to delete the account. Please try again.",
+  // Display name inline edit (C6/C8 — the only inline-editable profile field).
+  displayNameEdit: "Edit display name",
+  displayNameSave: "Save",
+  displayNameCancel: "Cancel",
+  displayNameHelp: "Between 2 and 60 characters.",
+  displayNameSaved: "Display name saved.",
+  errorDisplayName: "The display name must be between 2 and 60 characters.",
+  errorDisplayNameRateLimit: "Too many attempts. Please try again in a minute.",
+  errorDisplayNameGeneric: "Could not save the display name. Please try again.",
 } as const;
 
 export const it: Translation<typeof en> = {
@@ -119,8 +129,19 @@ export const it: Translation<typeof en> = {
     "L'account e tutte le sue sessioni verranno cancellati. Le tue segnalazioni restano pubblicate, senza più attribuzione a te. Questa azione non può essere annullata.",
   deleteAccount: "Elimina account",
   deletingAccount: "Eliminazione in corso…",
+  deleteAccountCancel: "Annulla",
   accountDeletedTitle: "Account eliminato",
   accountDeletedBody:
     "Il tuo account è stato cancellato e hai effettuato il logout. Le tue segnalazioni restano pubblicate senza attribuzione.",
   errorDeleteAccount: "Impossibile eliminare l'account. Riprova.",
+  // Modifica inline del nome visualizzato (C6/C8 — l'unico campo profilo
+  // modificabile inline).
+  displayNameEdit: "Modifica nome visualizzato",
+  displayNameSave: "Salva",
+  displayNameCancel: "Annulla",
+  displayNameHelp: "Tra 2 e 60 caratteri.",
+  displayNameSaved: "Nome visualizzato salvato.",
+  errorDisplayName: "Il nome visualizzato deve essere tra 2 e 60 caratteri.",
+  errorDisplayNameRateLimit: "Troppi tentativi. Riprova tra un minuto.",
+  errorDisplayNameGeneric: "Non è stato possibile salvare il nome visualizzato. Riprova.",
 };

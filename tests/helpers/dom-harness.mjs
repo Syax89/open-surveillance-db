@@ -61,6 +61,7 @@ const PAGES = [
   { source: "app/register/page.tsx", relative: "app/register/page.mjs" },
   { source: "app/account/page.tsx", relative: "app/account/page.mjs" },
   { source: "app/records/[id]/page.tsx", relative: "app/records/[id]/page.mjs" },
+  { source: "app/records/[id]/edit/page.tsx", relative: "app/records/[id]/edit/page.mjs" },
   // F1 route group (tools): tool bodies + shared chrome.
   { source: "app/components/ToolLayout.tsx", relative: "app/components/ToolLayout.mjs" },
   { source: "app/components/LegacyAnchorRedirect.tsx", relative: "app/components/LegacyAnchorRedirect.mjs" },

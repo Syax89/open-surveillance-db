@@ -363,6 +363,23 @@ footer>p { margin:0; color:#586870; font-size:13px; line-height:1.5; }
 .auth-danger-zone .button { border-color:#d49a8c; color:#8a3b2c; background:#fff; }
 .auth-danger-zone .button:hover { background:#fdf0ec; border-color:#c0745f; }
 .auth-danger-zone .button:disabled { opacity:.55; cursor:progress; }
+
+/* Inline display name edit (C6/C8 profile field). */
+.display-name-form { display:grid; gap:10px; }
+.display-name-form .auth-field { gap:6px; }
+.display-name-actions { display:flex; gap:10px; flex-wrap:wrap; }
+.display-name-saved { color:#0b705c; font-weight:800; }
+.display-name-edit { margin-left:10px; }
+
+/* Accessible destructive confirmation dialog (C6 — replaces window.confirm). */
+.confirm-dialog-backdrop { position:fixed; inset:0; z-index:50; display:flex; align-items:center; justify-content:center; padding:20px; background:rgba(14,42,53,.55); }
+.confirm-dialog { max-width:440px; width:100%; padding:24px 26px 26px; border:1px solid #e6b8ad; border-radius:12px; background:#fffef9; box-shadow:0 18px 50px rgba(14,42,53,.28); }
+.confirm-dialog h2 { margin:0 0 10px; color:#8a3b2c; font-size:18px; }
+.confirm-dialog p { margin:0 0 20px; color:#5d4a44; font-size:14px; line-height:1.55; }
+.confirm-dialog-actions { display:flex; gap:12px; justify-content:flex-end; flex-wrap:wrap; }
+.button-danger { background:#8a3b2c; color:#fff; }
+.button-danger:hover { background:#a04432; }
+.button-danger:disabled { opacity:.55; cursor:progress; }
 @media (max-width:700px) {
   .record-detail-list { grid-template-columns:1fr; }
 }

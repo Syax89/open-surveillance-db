@@ -43,9 +43,8 @@ for future page changes and for the QA pass over the routes.
   dedupe (C4, PR #175). The verification toggle, the profile/level contracts
   and the edit-flow backend are live on `main`; the routes below that are
   marked "planned" still wait for the frontend phases.
-- **C5, C6 pending** — frontend profile/verification widget, frontend edit
-  page — routes land with their phases; until then the routes below are
-  **planned, not implemented**.
+- **C6 done** — frontend edit page `/records/[id]/edit` + owner edit links
+  (C6); **C5 pending** — frontend profile/verification widget.
 
 ## Principles
 
@@ -272,7 +271,7 @@ proposed).
 - **Nav/footer:** never linked from public navigation (account surface).
 - **Auth:** auth-gated (contributor session, ADR 0013); anonymous → 401.
 
-### `/records/[id]/edit` — Edit contribution (planned, community C6)
+### `/records/[id]/edit` — Edit contribution (implemented, community C6)
 
 - **Purpose:** private, dedicated edit page for the record **owner** —
   replaces inline editing for contribution fields (design #815 C7).
@@ -282,11 +281,13 @@ proposed).
   and the edit-request status when one is pending. Bundle: `record.ts`
   (form) + `community.ts` (moderation notice, statuses).
 - **SEO/privacy:** auth-gated (contributor session); owner-only; never
-  linked from public navigation; page itself is not indexed for anonymous
-  crawlers (private surface).
+  linked from public navigation; `robots.txt` disallows `/records/*/edit`
+  (private surface).
 - **Behaviour:** `pending` → direct PATCH (owner-check); `verified` /
   `needs_review` / `stale` → edit-request re-moderated (entity
   `camera_edit`, 202 + `editRequest`); `removed` / `rejected` → 409 blocked.
+  Owner pre-fill comes from the owner-only `GET /api/cameras/[id]/edit`
+  (200 `{ record, editRequest }`, no-store), never from the public GET.
 
 ### `/guide` — Guide (implemented, pre-existing; community sections C-docs)
 
