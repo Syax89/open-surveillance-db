@@ -125,7 +125,15 @@ export const control = { zoom: () => ({ addTo: () => {} }) };
 export const tileLayer = () => ({ addTo: () => {} });
 export const layerGroup = () => ({ addTo: () => ({ clearLayers: () => { markers.length = 0; }, addLayer: (m) => markers.push(m) }) });
 export function marker(latlng, opts) {
-  const m = { latlng, opts, bindTooltip: () => m, on: () => m, addTo: (layer) => { layer.addLayer(m); return m; } };
+  const m = {
+    latlng, opts,
+    bindTooltip: () => m, on: () => m,
+    addTo: (layer) => { layer.addLayer(m); return m; },
+    // Real Leaflet API: setIcon replaces the marker icon in place. The
+    // recorded opts.icon must follow so tests asserting marker html read
+    // the CURRENT icon (e.g. the selected-marker status class).
+    setIcon: (icon) => { m.opts = { ...m.opts, icon }; return m; },
+  };
   return m;
 }
 export const divIcon = (opts) => opts;
