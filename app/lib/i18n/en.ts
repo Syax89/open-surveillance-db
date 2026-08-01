@@ -43,6 +43,7 @@ export const en = {
     exploreMap: "Explore map",
     browseRecords: "Browse records",
     howItWorks: "How it works",
+    rules: "Rules",
     addCamera: "Add a camera",
     openDatabase: "Open database · community maintained",
     heroTitle: "Public data about public surveillance.",
@@ -369,6 +370,101 @@ export const en = {
     notDashboardTitle: "This page is not the moderation queue",
     notDashboardBody:
       "The moderation dashboard is a private tool, protected by access control and never linked from the public site. This page only explains how the process works.",
+  },
+  rules: {
+    navigation: "Rules navigation",
+    homeAria: "OpenSurveillanceDB home",
+    map: "Map",
+    directory: "Directory",
+    guide: "Guide",
+    home: "Home",
+    eyebrow: "Participation rules",
+    title: "What we publish, and how you can help.",
+    intro:
+      "These rules explain what OpenSurveillanceDB documents, what contributors may report, how moderation works, how to correct a record, and how the data can be reused.",
+    reportEyebrow: "What you can report",
+    reportTitle: "Public space, observed from public space.",
+    reportBody:
+      "Only visible surveillance infrastructure in shared spaces can be documented. A record is publishable when it has a clear civic-transparency purpose and contains no unnecessary personal data.",
+    eligibleOneTitle: "Public street infrastructure",
+    eligibleOneBody:
+      "A camera visibly mounted in a public street, square, station exterior, or public building exterior.",
+    eligibleTwoTitle: "Publicly documented traffic cameras",
+    eligibleTwoBody:
+      "A traffic-monitoring camera that is publicly documented, where publishing the record is lawful and safe.",
+    eligibleThreeTitle: "Official public sources",
+    eligibleThreeBody:
+      "A record from an official public source, marked with its source and verification date.",
+    neverTitle: "Never report",
+    neverBody:
+      "Reports containing any of the following are screened out and are never published.",
+    neverOneTitle: "Private homes",
+    neverOneBody:
+      "Residential or private cameras, including doorbells and cameras facing a private home.",
+    neverTwoTitle: "People and personal data",
+    neverTwoBody:
+      "Identifiable people, vehicle licence plates, or private interiors.",
+    neverThreeTitle: "Live feeds and access",
+    neverThreeBody:
+      "Live video, stream URLs, credentials, network information, or control interfaces.",
+    neverFourTitle: "Sensitive details",
+    neverFourBody:
+      "Detailed field-of-view or operational capability that could create a safety risk, or sensitive locations where publication could increase risk.",
+    beforeSubmittingTitle: "Before submitting",
+    beforeSubmittingBody:
+      "Do not upload or describe people, licence plates, private homes, security weaknesses or sensitive locations. Submissions are private until a moderator reviews them; they are not published automatically.",
+    moderationEyebrow: "Moderation",
+    moderationTitle: "Every record is reviewed by a person.",
+    moderationBody:
+      "Reports are deliberately separated from published records. The public map and exports are not an automatic mirror of submissions.",
+    flowLabel: "Review flow",
+    flowOneTitle: "Receive",
+    flowOneBody:
+      "A private pending record is created and acknowledged without promising publication.",
+    flowTwoTitle: "Screen",
+    flowTwoBody:
+      "Spam, personal data, prohibited content and dangerous details are removed.",
+    flowThreeTitle: "Verify",
+    flowThreeBody:
+      "A moderator assesses whether the camera is public, visible, current and within local policy.",
+    flowFourTitle: "Minimise",
+    flowFourBody:
+      "The least specific location and metadata that still serves transparency are published. Exact coordinates stay in the private moderation record; published coordinates are rounded to about 10 metres.",
+    flowFiveTitle: "Decide",
+    flowFiveBody:
+      "Approve, request clarification, reject, or escalate — always recording a reason.",
+    flowSixTitle: "Maintain",
+    flowSixBody:
+      "Records are re-checked periodically and respond to corrections or removal requests.",
+    correctionEyebrow: "Corrections and appeals",
+    correctionTitle: "A simple way to challenge a record.",
+    correctionBody:
+      "Anyone can request a correction, challenge a record, or report harm. Requests are private, reviewed by humans, and never change the map automatically.",
+    correctionOneTitle: "Request a correction",
+    correctionOneBody:
+      "Inaccurate, outdated or duplicate records can be flagged for review.",
+    correctionTwoTitle: "Report a privacy or safety concern",
+    correctionTwoBody:
+      "Urgent reports are temporarily hidden from the public outputs while they are reviewed.",
+    correctionThreeTitle: "No personal data needed",
+    correctionThreeBody:
+      "Describe only the minimum needed to identify the problem. Do not include personal data, live-feed links, credentials, or images.",
+    dataEyebrow: "Data reuse",
+    dataTitle: "Open where it is safe to be open.",
+    dataBody:
+      "Published records are available as GeoJSON and CSV for reuse and inspection. The public dataset contains only records that passed review; submissions and corrections are excluded.",
+    downloadGeoJson: "Download public GeoJSON",
+    downloadCsv: "Download public CSV",
+    reuseOneTitle: "Licensing and provenance",
+    reuseOneBody:
+      "Every published record keeps its source and verification date, and the data is licensed for open reuse.",
+    reuseTwoTitle: "No operational detail",
+    reuseTwoBody:
+      "Exports are intended for civic analysis, research and compatible mapping tools — not for finding camera feeds or sensitive operational information.",
+    reuseThreeTitle: "Attribution to OpenStreetMap",
+    reuseThreeBody:
+      "The map background is provided by OpenStreetMap contributors and is separate from this project's camera records.",
+    footer: "Built for transparency, not tracking.",
   },
   record: {
     navigation: "Record navigation",
