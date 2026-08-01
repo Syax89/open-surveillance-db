@@ -435,3 +435,75 @@ test("contact page serves owners, privacy and security routes", async () => {
   assert.match(html, /<footer class="site-footer" aria-label="Site footer">/);
   assert.match(html, /href="\/contatti"/);
 });
+
+// ---------------------------------------------------------------------------
+// Global security headers (kanban t_6148aa6f, P2 gap from audit t_a07443bd).
+// The worker edge (worker/index.ts) applies them to EVERY response; these
+// tests exercise the real deployed worker through Miniflare.
+// ---------------------------------------------------------------------------
+
+/**
+ * Assert the full global security-header set on a response, plus the CSP
+ * baseline directives that must always be present.
+ */
+function assertSecurityHeaders(response, route) {
+  assert.equal(response.headers.get("x-content-type-options"), "nosniff", `${route}: nosniff`);
+  assert.equal(response.headers.get("x-frame-options"), "DENY", `${route}: frame deny`);
+  assert.equal(response.headers.get("referrer-policy"), "strict-origin-when-cross-origin", `${route}: referrer policy`);
+  assert.match(response.headers.get("permissions-policy") ?? "", /camera=\(\)/, `${route}: camera denied`);
+  assert.match(response.headers.get("permissions-policy") ?? "", /microphone=\(\)/, `${route}: microphone denied`);
+  assert.match(response.headers.get("permissions-policy") ?? "", /geolocation=\(\)/, `${route}: geolocation denied`);
+
+  const csp = response.headers.get("content-security-policy") ?? "";
+  assert.match(csp, /default-src 'self'/, `${route}: CSP default-src`);
+  assert.match(csp, /object-src 'none'/, `${route}: CSP object-src`);
+  assert.match(csp, /frame-ancestors 'none'/, `${route}: CSP frame-ancestors`);
+  assert.match(csp, /base-uri 'self'/, `${route}: CSP base-uri`);
+  assert.match(csp, /form-action 'self'/, `${route}: CSP form-action`);
+}
+
+test("security headers reach HTML pages, API errors, 404s and the moderation gate", async () => {
+  // Every response class the worker can produce, without a DB binding:
+  // SSR HTML (200), JSON 404 (non-integer photo id — no DB hit), plain
+  // 404, the moderation gate (503 fail-closed, no credentials), and the
+  // image optimizer (400 malformed request).
+  const probes = [
+    { route: "/", expect: 200 },
+    { route: "/manifesto", expect: 200 },
+    { route: "/faq", expect: 200 },
+    { route: "/api/photos/abc", expect: 404 },
+    { route: "/nonexistent-xyz", expect: 404 },
+    { route: "/moderation", expect: 503 },
+    { route: "/_vinext/image?url=/x.png&w=100", expect: 400 },
+  ];
+
+  for (const { route, expect } of probes) {
+    const { response } = await renderRoute(route);
+    assert.equal(response.status, expect, `${route} status`);
+    assertSecurityHeaders(response, route);
+  }
+});
+
+test("security headers do not overwrite a stricter app-level CSP (photo routes)", async () => {
+  // Static guard: the worker middleware must only ADD headers. The photo
+  // routes set `Content-Security-Policy: default-src 'none'; sandbox` on
+  // binary bodies; if the edge ever overwrote it the sandbox would be
+  // silently weakened. (Binary photo bytes need a D1/R2 binding, so the
+  // merge rule is asserted on the source contract instead.)
+  const workerSource = await readFile(path.join(root, "worker", "index.ts"), "utf8");
+  assert.match(workerSource, /if \(!headers\.has\(name\)\)/, "edge must only add missing headers");
+});
+
+test("worker edge source carries the global security headers (static guard)", async () => {
+  const workerSource = await readFile(path.join(root, "worker", "index.ts"), "utf8");
+  for (const [name, value] of [
+    ["X-Content-Type-Options", "nosniff"],
+    ["X-Frame-Options", "DENY"],
+    ["Referrer-Policy", "strict-origin-when-cross-origin"],
+    ["Permissions-Policy", "camera=()"],
+    ["Content-Security-Policy", "default-src 'self'"],
+  ]) {
+    assert.ok(workerSource.includes(name), `worker/index.ts must define ${name}`);
+    assert.ok(workerSource.includes(value), `worker/index.ts must define ${value}`);
+  }
+});
