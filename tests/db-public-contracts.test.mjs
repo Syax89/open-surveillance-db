@@ -252,6 +252,39 @@ test("findNearbyPublicCameras computes distance, filters by radius and sorts asc
   assert.deepEqual(within100.map((record) => record.title), ["Closer"], "the ~111 m point is outside a 100 m radius");
 });
 
+test("findNearbyPublicCameras computes distance on raw coordinates but projects rounded ones", async () => {
+  const { env, cameras } = await realDb();
+  await resetDb({ env, cameras });
+  // 0.00014° latitude ≈ 15.6 m (WGS84): stored with full raw precision so
+  // rounding to 4 decimals (~10 m, ADR 0008) would change the computed
+  // distance (44.1001 ≈ 11.1 m). The duplicate check must measure against
+  // the exact stored position, then round only in the public projection.
+  await insertCamera(env, { title: "Raw precise", latitude: 44.10014, longitude: 12.2 });
+
+  const nearby = await cameras.findNearbyPublicCameras(44.1, 12.2, 200);
+  assert.equal(nearby.length, 1);
+  const record = nearby[0];
+  // Distance from the true raw position (~15.6 m), not the rounded one (~11.1 m).
+  assert.ok(record.distanceMeters > 14 && record.distanceMeters < 17, `raw distance expected ~15.6 m, got ${record.distanceMeters}`);
+  // Public projection still rounds: the exact position never leaves the module.
+  assert.equal(record.latitude, 44.1001, "response latitude must be rounded to ~10 m (ADR 0008)");
+  assert.equal(record.longitude, 12.2);
+});
+
+test("findNearbyPublicCameras keeps a raw-inside candidate that would round outside the radius", async () => {
+  const { env, cameras } = await realDb();
+  await resetDb({ env, cameras });
+  // 0.00065° ≈ 72.3 m: inside the 75 m radius on raw coordinates, but its
+  // rounded position (44.1007 ≈ 77.8 m) would fall OUTSIDE the radius. The
+  // duplicate check must filter on the true distance so a real nearby record
+  // is never missed at the boundary (false negative).
+  await insertCamera(env, { title: "Boundary raw", latitude: 44.10065, longitude: 12.2 });
+
+  const within75 = await cameras.findNearbyPublicCameras(44.1, 12.2, 75);
+  assert.deepEqual(within75.map((record) => record.title), ["Boundary raw"], "raw distance 72.3 m must stay inside the 75 m radius");
+  assert.ok(within75[0].distanceMeters < 75, `raw distance must be < 75 m, got ${within75[0].distanceMeters}`);
+});
+
 test("createCorrectionRequest stores a pending private request", async () => {
   const { env, cameras, corrections } = await realDb();
   await resetDb({ env, cameras });
