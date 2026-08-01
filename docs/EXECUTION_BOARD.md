@@ -72,8 +72,8 @@ Status reflects the local prototype as of 2026-08-01; every `Done` row is eviden
 | P0 | Add route-level rate limits, input limits, and abuse alerts | Operations | Hosting choice | Done — per-route limits, input caps, abuse alerts (PR #43) |
 | P0 | Configure staging, secrets, backups, restore rehearsal, and monitoring | Operations | Hosting choice | In progress — local LXC 114 covered (ops/ scripts); Cloudflare staging deferred (CEO local-first decision) |
 | P1 | Create separate private evidence/media pipeline with scanning, EXIF removal, and redaction | Data & trust | Approved retention and review policy | Done (local prototype) — intake caps, magic-byte verification, EXIF/XMP/IPTC strip, R2 storage, moderation/redaction gate (PR #64) |
-| P1 | Internationalise safety-critical UI strings | Product | Pilot language decision | Done — bilingual EN/IT surfaces; per-domain bundle refactor in PR #80 |
-| P1 | Publish versioned data exports, data dictionary, and changelog | Data & trust + Operations | Final data licence | In progress — CSV export done; ODbL export notice (PR #81) and changelog (PR #86) open |
+| P1 | Internationalise safety-critical UI strings | Product | Pilot language decision | Done — bilingual EN/IT surfaces (PRs #68, #72, #78, #88); per-domain bundle refactor in flight (PR #80) |
+| P1 | Publish versioned data exports, data dictionary, and changelog | Data & trust + Operations | Final data licence | In progress — CSV export done; changelog done (PR #86); ODbL export notice open (PR #81) |
 | P1 | Add privacy-preserving aggregate service metrics and transparency reporting | Operations + Product | Privacy review | Open |
 
 ## Progress log
