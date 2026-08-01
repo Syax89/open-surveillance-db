@@ -116,7 +116,10 @@ const MODERATION_CREDENTIALS = {
 // ---------------------------------------------------------------------------
 
 test("the map region is a labelled, programmatically-focusable landmark (not in the tab order)", async () => {
-  const { html } = await renderRoute("/");
+  // F2 home hub: the interactive map moved to /mappa (the hub renders only
+  // the static MapTeaser). The map-task keyboard contract is verified on the
+  // route that actually owns the map.
+  const { html } = await renderRoute("/mappa");
   assert.match(
     html,
     /<div class="map-region" id="map-region" role="region" aria-label="[^"]+" aria-describedby="map-accessibility-description" tabindex="-1">/,
@@ -129,17 +132,17 @@ test("the map region is a labelled, programmatically-focusable landmark (not in 
 });
 
 test("the map's sr-only description links to the accessible directory (text equivalent)", async () => {
-  const { html } = await renderRoute("/");
+  const { html } = await renderRoute("/mappa");
   const description = html.match(/<p class="sr-only" id="map-accessibility-description">[\s\S]*?<\/p>/);
   assert.ok(description, "sr-only map description must be rendered");
-  assert.match(description[0], /<a href="#records">/, "the description must link to the directory");
+  assert.match(description[0], /<a href="\/directory">/, "the description must link to the directory route");
   assert.match(description[0], /Go to the accessible directory/, "the directory link must be labelled");
 });
 
 test("every directory record has a real 'Show on map' button (keyboard path for map selection)", async () => {
-  const { html } = await renderRoute("/");
-  const recordsSection = html.slice(html.indexOf('id="records"'), html.indexOf('id="correction"'));
-  assert.ok(recordsSection.length > 0, "the directory section must render");
+  const { html } = await renderRoute("/directory");
+  const recordsSection = html.slice(html.indexOf('id="records"'));
+  assert.ok(recordsSection.length > 0, "the directory tool must render");
   const recordCards = (recordsSection.match(/class="record-list-card"/g) ?? []).length;
   const showOnMapButtons = (recordsSection.match(/<button[^>]*type="button"[^>]*>Show on map[\s\S]*?<\/button>/g) ?? []).length;
   assert.ok(recordCards >= 1, "the directory must render at least one demo record");
@@ -150,22 +153,23 @@ test("every directory record has a real 'Show on map' button (keyboard path for 
   );
 });
 
-test("the 'Show on map' handler moves keyboard focus to the map region and honours reduced motion", async () => {
-  const page = await readFile(path.join(root, "app", "page.tsx"), "utf8");
-  assert.match(page, /prefers-reduced-motion:\s*reduce/, "the handler must read the reduced-motion preference");
-  assert.match(
-    page,
-    /getElementById\("map-region"\)\?\.focus\(/,
-    "the keyboard path must move focus to the map region",
-  );
-  assert.match(page, /scrollIntoView\(\{ behavior: reduceMotion/, "smooth scrolling must be disabled under reduced motion");
+test("the 'Show on map' action navigates to /mappa with the record preselected (URL focus path)", async () => {
+  // F2 home hub: showRecordOnMap moved to /directory (DirectoryTool). The
+  // keyboard path for the map-selection task is now a router push to
+  // /mappa?focus=ID — the URL carries the selection (shareable, F4 wires the
+  // focus handling on /mappa). No client-side scroll/focus choreography on
+  // the directory anymore; the focus contract belongs to the URL (D3).
+  const source = await readFile(path.join(root, "app", "components", "tools", "DirectoryTool.tsx"), "utf8");
+  assert.match(source, /router\.push\(`\/mappa\?focus=\$\{id\}`\)/, "the keyboard path must push /mappa?focus=ID");
 });
 
 test("no positive tabindex anywhere on the homepage (standard tab order preserved)", async () => {
   const { html } = await renderRoute("/");
   const tabindexes = [...html.matchAll(/tabindex="([^"]+)"/g)].map((m) => m[1]);
-  // The only allowed tabindex is -1 on the map region (programmatic focus).
-  assert.deepEqual(tabindexes, ["-1"], `only map-region may carry tabindex="-1", found ${tabindexes.join(", ")}`);
+  // The home hub has no interactive map and no focus-choreography element:
+  // NO tabindex at all is allowed (the map-region tabindex="-1" lives on
+  // /mappa now, asserted in the map test above).
+  assert.deepEqual(tabindexes, [], `the home hub must not carry any tabindex, found ${tabindexes.join(", ")}`);
 });
 
 test("the skip link is the first focusable element on the page (before the nav shell)", async () => {
@@ -178,14 +182,17 @@ test("the skip link is the first focusable element on the page (before the nav s
 });
 
 test("manual coordinates (keyboard path for map location picking) have labelled, described inputs", async () => {
-  const { html } = await renderRoute("/");
+  // F2 home hub: the report form moved to /segnala (the keyboard path for
+  // map location picking lives with the form).
+  const { html } = await renderRoute("/segnala");
   assert.match(html, /<label for="manual-latitude">Latitude<input id="manual-latitude"[^>]*aria-describedby="manual-coordinates-help"/);
   assert.match(html, /<label for="manual-longitude">Longitude<input id="manual-longitude"[^>]*aria-describedby="manual-coordinates-help"/);
   assert.match(html, /id="manual-coordinates-help"/, "the shared help text must exist");
 });
 
 test("place search exposes role=search with a labelled input", async () => {
-  const { html } = await renderRoute("/");
+  // F2 home hub: the searchable directory moved to /directory.
+  const { html } = await renderRoute("/directory");
   assert.match(html, /<form class="place-search-form" role="search">/);
   assert.match(html, /<label for="place-search">[\s\S]*?<\/label>/);
   assert.match(html, /<input id="place-search"[^>]*type="search"/);

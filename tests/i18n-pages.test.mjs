@@ -164,6 +164,15 @@ const INFO_ROUTES = {
     en: ["A public database, built with care."],
     noEn: ["A public database, built with care."],
   },
+  // Home hub (F2 route group home, t_52dcb95e): l'hub è ora una pagina
+  // SSR-pura di orientamento con hero, MapTeaser statico e 4 card tool.
+  // I marker verificano la parità EN/IT delle nuove stringhe dell'hub
+  // (CTA hero, teaser, card tool, link manifesto).
+  "/": {
+    it: ["Dati pubblici sulla sorveglianza pubblica.", "Esplora la mappa interattiva", "Apri la mappa", "Cosa puoi fare", "Segnala una telecamera", "Correggi un record", "Leggi il manifesto"],
+    en: ["Public data about public surveillance.", "Explore the interactive map", "Open the map", "What you can do", "Report a camera", "Correct a record", "Read the manifesto"],
+    noEn: ["Explore the interactive map", "Open the map", "What you can do", "Report a camera", "Correct a record", "Read the manifesto"],
+  },
   // Route tool separate (F1 route group (tools), t_03c0fa15): /mappa e
   // /directory sono pagine pubbliche, /segnala e /correggi form privati
   // (noindex) — tutte servono contenuto EN/IT dal cookie come le pagine info.

@@ -732,42 +732,41 @@ test("server errors are logged server-side and return generic client messages", 
 });
 
 test("every map task has a keyboard/text-list equivalent in the public interface", async () => {
-  const page = await readSource("app/page.tsx");
+  // F2 home hub (t_52dcb95e): the home is an orienteering page — the map,
+  // directory, report and correction tools live on their own routes (F1
+  // route group (tools)). The keyboard/text-list guards below therefore
+  // apply to the tool routes that own each task.
+  const directoryTool = await readSource("app/components/tools/DirectoryTool.tsx");
+  const mappaTool = await readSource("app/components/tools/MappaTool.tsx");
   const map = await readSource("app/components/SurveillanceMap.tsx");
-  // The directory and the report form moved to their own components in the
-  // t_6104f386 refactor; the keyboard/text-list guards below apply there.
   const directory = await readSource("app/components/home/PublicDirectory.tsx");
   const reportForm = await readSource("app/components/home/ReportForm.tsx");
 
   // Map task: select a record (pin click). Keyboard path: the directory's
-  // "Show on map" moves selection AND keyboard focus to the map region,
-  // respecting reduced motion.
-  assert.match(page, /function\s+showRecordOnMap\s*\(\s*id:\s*number\s*\)/);
-  assert.match(page, /setSelectedId\s*\(\s*id\s*\)/, "show-on-map must select the record");
-  assert.match(page, /document\.getElementById\(\s*["']map["']\s*\)\?\.scrollIntoView/, "show-on-map must scroll to the map");
-  assert.match(page, /document\.getElementById\(\s*["']map-region["']\s*\)\?\.focus/, "show-on-map must move keyboard focus to the map region");
-  assert.match(page, /prefers-reduced-motion/, "scrolling must respect reduced-motion preference");
+  // "Show on map" pushes /mappa?focus=ID (URL carries the selection; F4
+  // wires the focus handling on /mappa — D3-qualified shell).
+  assert.match(directoryTool, /function\s+showRecordOnMap\s*\(\s*id:\s*number\s*\)/);
+  assert.match(directoryTool, /router\.push\(`\/mappa\?focus=\$\{id\}`\)/, "show-on-map must navigate to the map with the record preselected");
 
-  // Map task: browse pins. Text-list path: one directory card per record with
-  // the keyboard select action.
+  // The directory is the map's text equivalent: it renders the record list
+  // with the keyboard select action on every card.
   assert.match(directory, /className=["']record-list["']/, "the directory must render the record list");
   assert.match(directory, /showRecordOnMap\(\s*camera\.id\s*\)/, "every record card must offer the keyboard select path");
 
-  // Map task: pick a report position (map click). Keyboard path: manual coordinates.
+  // Map task: pick a report position (map click). Keyboard path: manual
+  // coordinates on /segnala.
   assert.match(reportForm, /selectManualCoordinates/, "the report form must keep the manual-coordinate fallback");
 
   // The map region is a labelled, programmatically focusable landmark that
-  // describes the text-list alternative.
+  // describes the text-list alternative. On /mappa the alternative link is
+  // the /directory route (parameterised — the home default no longer exists
+  // because the hub has no map; MappaTool passes /directory explicitly).
   assert.match(map, /role="region"/);
   assert.match(map, /aria-label=\{\s*label\s*\}/);
   assert.match(map, /tabIndex=\{\s*-1\s*\}/, "the map region must accept programmatic focus");
   assert.match(map, /id="map-region"/);
-  // The sr-only directory link is parameterised (F1 route group (tools)):
-  // the home default is the #records anchor, /mappa points to /directory.
-  // The default must stay the home anchor so the home map keeps linking the
-  // text-list alternative on the same page.
-  assert.match(map, /directoryHref\s*=\s*"#records"/, "the default directory link must stay the home #records anchor");
-  assert.match(map, /href=\{directoryHref\}/, "the directory link must be parameterised (home anchor vs /directory)");
+  assert.match(mappaTool, /directoryHref="\/directory"/, "/mappa must link the directory route as the text alternative");
+  assert.match(map, /href=\{directoryHref\}/, "the directory link must be parameterised (route vs anchor)");
 
   // Map task: map unavailable (blocked script or tile host). The list stays
   // usable and the failure is visible with a direct link to the directory.

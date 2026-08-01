@@ -87,15 +87,25 @@ test("server-rendered homepage carries the public app metadata", async () => {
   assert.match(html, /<html[^>]*lang="en"/);
   assert.match(html, /OpenSurveillanceDB/);
   assert.match(html, /Public data about public surveillance\./);
-  // A11y live region for the "loading public records" notice.
+  // A11y live region for the hero record-count stat (progressive enhancement).
   assert.match(html, /role="status"/);
 
-  // Browse acceptance (docs/workstreams/PRODUCT_UX.md): map card and the
-  // accessible directory list must both expose the record ID alongside the
-  // same public fields. Server-rendered demo records make this checkable.
-  const recordIdFields = (html.match(/<dt>Record ID<\/dt>/g) ?? []).length;
-  assert.ok(recordIdFields >= 2, `expected the record ID in the map card and each list card, found ${recordIdFields}`);
-  assert.match(html, /<dt>Record ID<\/dt><dd>1<\/dd>/);
+  // F2 home hub: the home is an orienteering page. It renders the static
+  // MapTeaser (CTA → /mappa) and the four tool cards (FRONTEND_DESIGN §2.4),
+  // and must NOT embed the interactive map or the directory (they live on
+  // /mappa and /directory — the SSR render of those routes is asserted in
+  // the map/directory test below and in i18n-pages.test.mjs).
+  assert.match(html, /class="map-teaser"/, "the hub must render the static map teaser");
+  assert.match(html, /href="\/mappa"[^>]*>Open the map/, "the teaser CTA must point at /mappa");
+  const toolCards = (html.match(/class="tool-card"/g) ?? []).length;
+  assert.equal(toolCards, 4, `expected the four tool cards, found ${toolCards}`);
+  for (const href of ["/mappa", "/directory", "/segnala", "/correggi"]) {
+    assert.ok(html.includes(`href="${href}"`), `expected a tool-card link to ${href}`);
+  }
+  // The hub must not render the old all-in-one sections (no map instance,
+  // no searchable directory, no forms on the home).
+  assert.doesNotMatch(html, /id="map-region"/, "no interactive map on the hub");
+  assert.doesNotMatch(html, /id="record-search"/, "no directory search on the hub");
 
   // No starter-template preview may leak into the public page.
   assert.doesNotMatch(html, /codex-preview|sites-skeleton|react-loading-skeleton/i);
@@ -130,23 +140,34 @@ test("server-rendered informational pages honour the locale cookie (html lang + 
   assert.match(html, /<h1[^>]*>Un database pubblico, costruito con attenzione\.<\/h1>/);
 });
 
-test("server-rendered homepage provides the map region and its text-list alternative", async () => {
-  const { response, html } = await renderHomepage();
-
-  assert.equal(response.status, 200);
+test("server-rendered /mappa provides the map region and /directory the text-list alternative", async () => {
+  // F2 home hub: the interactive map and the accessible directory moved to
+  // their own routes (F1 route group (tools)). The home hub renders only the
+  // static MapTeaser (asserted above); the map task contract (labelled
+  // landmark + text-list equivalent) is now verified on the tool routes.
+  const map = await renderRoute("/mappa");
+  assert.equal(map.response.status, 200);
 
   // The map is a labelled landmark whose description points to the directory
   // (the text-list equivalent required by PRODUCT_UX.md for every map task).
-  assert.match(html, /id="map-region"[^>]*role="region" aria-label="Interactive OpenStreetMap map"/);
-  assert.match(html, /Go to the accessible directory/);
+  assert.match(map.html, /id="map-region"[^>]*role="region" aria-label="Interactive OpenStreetMap map"/);
+  assert.match(map.html, /Go to the accessible directory/);
 
-  // The text-list alternative itself is part of the initial HTML: a searchable
-  // directory with a result count and a per-record "Show on map" keyboard path.
-  assert.match(html, /Browse public records without the map/);
-  assert.match(html, /id="record-search"/);
-  assert.match(html, /id="record-search-count"[^>]*role="status"/);
-  assert.match(html, /Show on map/);
-  assert.match(html, /record-list/);
+  // The text-list alternative itself is server-rendered on /directory: a
+  // searchable directory with a result count and a per-record "Show on map"
+  // keyboard path.
+  const directory = await renderRoute("/directory");
+  assert.equal(directory.response.status, 200);
+  assert.match(directory.html, /Browse public records without the map/);
+  assert.match(directory.html, /id="record-search"/);
+  assert.match(directory.html, /id="record-search-count"[^>]*role="status"/);
+  assert.match(directory.html, /Show on map/);
+  assert.match(directory.html, /record-list/);
+  // The directory is the map's text equivalent: every SSR'd record card
+  // exposes the public record ID (Browse acceptance, PRODUCT_UX.md).
+  const recordIdFields = (directory.html.match(/<dt>Record ID<\/dt>/g) ?? []).length;
+  assert.ok(recordIdFields >= 2, `expected the record ID in each list card, found ${recordIdFields}`);
+  assert.match(directory.html, /<dt>Record ID<\/dt><dd>1<\/dd>/);
 });
 
 test("global footer exposes every institutional page, the ODbL data licence and OSM attribution", async () => {
@@ -197,40 +218,51 @@ test("global footer exposes every institutional page, the ODbL data licence and 
   assert.equal(footerCount, 1, `expected a single footer landmark, found ${footerCount}`);
 });
 
-test("homepage collection points link to the privacy notice and terms (GDPR art. 13 short notice)", async () => {
-  const { response, html } = await renderHomepage();
-
-  assert.equal(response.status, 200);
+test("collection points link to the privacy notice and terms (GDPR art. 13 short notice)", async () => {
+  // F2 home hub: the report and correction forms moved to their own routes
+  // (/segnala, /correggi). The art. 13(1) GDPR collection-point contract is
+  // asserted on the routes that actually collect the data.
+  const report = await renderRoute("/segnala");
+  assert.equal(report.response.status, 200);
 
   // Report form: the consent checkbox must be followed by explicit links to
   // /privacy and /termini at the point of collection (footer alone is not
   // enough — art. 13(1) GDPR requires the short notice at collection time).
   // React SSR inserts <!-- --> markers between text and elements.
-  assert.match(html, /I confirm this observation was made from public space and contains no personal data\.[\s\S]{0,80}<a href="\/privacy">Privacy notice<\/a>\s*·\s*<a href="\/termini">Terms of use<\/a>/);
-
-  // Correction form: same requirement for the private correction request.
-  assert.match(html, /I understand that this request is private[\s\S]{0,200}href="\/privacy"/);
-  assert.match(html, /I understand that this request is private[\s\S]{0,200}href="\/termini"/);
+  assert.match(report.html, /I confirm this observation was made from public space and contains no personal data\.[\s\S]{0,80}<a href="\/privacy">Privacy notice<\/a>\s*·\s*<a href="\/termini">Terms of use<\/a>/);
 
   // Photo upload: the help line mentions EXIF stripping and points to the
   // privacy notice.
-  assert.match(html, /EXIF metadata is stripped on upload[\s\S]{0,120}href="\/privacy"/);
+  assert.match(report.html, /EXIF metadata is stripped on upload[\s\S]{0,120}href="\/privacy"/);
 
-  // Count check: footer (1) + report form (1) + correction form (1) + photo
-  // help (1) = 4 explicit /privacy links on the homepage.
-  const privacyLinks = (html.match(/href="\/privacy"/g) ?? []).length;
-  const termsLinks = (html.match(/href="\/termini"/g) ?? []).length;
-  assert.ok(privacyLinks >= 4, `expected >= 4 /privacy links on the homepage, found ${privacyLinks}`);
-  assert.ok(termsLinks >= 3, `expected >= 3 /termini links on the homepage, found ${termsLinks}`);
+  const correction = await renderRoute("/correggi");
+  assert.equal(correction.response.status, 200);
+
+  // Correction form: same requirement for the private correction request.
+  assert.match(correction.html, /I understand that this request is private[\s\S]{0,200}href="\/privacy"/);
+  assert.match(correction.html, /I understand that this request is private[\s\S]{0,200}href="\/termini"/);
+
+  // Count check: footer (1) + report form (1) + photo help (1) = 3 explicit
+  // /privacy links on /segnala; footer (1) + correction form (1) = 2 on
+  // /correggi (terms: footer + form in both).
+  const reportPrivacy = (report.html.match(/href="\/privacy"/g) ?? []).length;
+  const reportTerms = (report.html.match(/href="\/termini"/g) ?? []).length;
+  const correctionPrivacy = (correction.html.match(/href="\/privacy"/g) ?? []).length;
+  const correctionTerms = (correction.html.match(/href="\/termini"/g) ?? []).length;
+  assert.ok(reportPrivacy >= 3, `expected >= 3 /privacy links on /segnala, found ${reportPrivacy}`);
+  assert.ok(reportTerms >= 2, `expected >= 2 /termini links on /segnala, found ${reportTerms}`);
+  assert.ok(correctionPrivacy >= 2, `expected >= 2 /privacy links on /correggi, found ${correctionPrivacy}`);
+  assert.ok(correctionTerms >= 2, `expected >= 2 /termini links on /correggi, found ${correctionTerms}`);
 });
 
-test("homepage SSR without photos never renders the photo-redaction confirmation (G3 negative)", async () => {
+test("/segnala SSR without photos never renders the photo-redaction confirmation (G3 negative)", async () => {
   // G3 (legal): the redaction confirmation checkbox is CONDITIONAL on
-  // photos.length > 0. The server-rendered homepage has no photos attached,
-  // so the checkbox and its attestation text must not appear — a report
-  // without photos must never be blocked by it. The positive case (checkbox
-  // present with photos) is covered by tests/client-report-legal.test.mjs.
-  const { response, html } = await renderHomepage();
+  // photos.length > 0. The server-rendered /segnala (the report form's own
+  // route since F1) has no photos attached, so the checkbox and its
+  // attestation text must not appear — a report without photos must never be
+  // blocked by it. The positive case (checkbox present with photos) is
+  // covered by tests/client-report-legal.test.mjs.
+  const { response, html } = await renderRoute("/segnala");
 
   assert.equal(response.status, 200);
   assert.doesNotMatch(html, /I confirm that I have redacted/);

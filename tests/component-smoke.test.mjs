@@ -20,6 +20,14 @@
  * estratto in app/lib/useReportFlow.ts (QA t_14b1949c), il componente
  * resta solo JSX e rientra nel target ~150. Nessuna deviazione attiva.
  *
+ * F2 home hub (t_52dcb95e): la home è ora un hub di orientamento SSR-puro.
+ * Importa il NUOVO set di componenti hub (Hero, MapTeaser, ToolCards,
+ * HomeNav); i componenti tool della vecchia home (PublicDirectory,
+ * ReportForm, CorrectionForm, MapPanel) vivono ora sulle route tool
+ * (app/components/tools/*) e restano nel repo — il contratto di esistenza
+ * e dimensione si applica a entrambi i set, ma solo il set hub è importato
+ * da app/page.tsx.
+ *
  * Stile: come rendered-html.test.mjs — guardie statiche su sorgente +
  * render reale via Miniflare. Non importa i componenti direttamente
  * (il bundle di produzione risolve cloudflare:workers solo nel runtime
@@ -46,6 +54,24 @@ const HOME_COMPONENTS = [
   { name: "ReportForm", file: "app/components/home/ReportForm.tsx" },
   { name: "CorrectionForm", file: "app/components/home/CorrectionForm.tsx" },
   { name: "MapPanel", file: "app/components/home/MapPanel.tsx" },
+  // F2 home hub (t_52dcb95e): componenti nuovi dell'hub SSR-puro.
+  { name: "MapTeaser", file: "app/components/home/MapTeaser.tsx" },
+  { name: "ToolCards", file: "app/components/home/ToolCards.tsx" },
+  { name: "HomeNav", file: "app/components/home/HomeNav.tsx" },
+];
+
+/**
+ * Componenti che app/page.tsx DEVE importare (F2 home hub): l'hub è un
+ * orienteering page che non ospita più i tool (mappa/directory/form vivono
+ * sulle route tool e leggono i propri bundle). PublicDirectory/ReportForm/
+ * CorrectionForm/MapPanel restano nel repo ma NON sono più importati dalla
+ * home — il contratto di import riflette il nuovo hub.
+ */
+const HOME_IMPORTS = [
+  { name: "Hero", base: "Hero" },
+  { name: "MapTeaser", base: "MapTeaser" },
+  { name: "ToolCards", base: "ToolCards" },
+  { name: "HomeNav", base: "HomeNav" },
 ];
 
 /**
@@ -132,12 +158,20 @@ test("refactor: la home non e' piu' un monolite (page orchestrator sottile)", as
 
 test("refactor: la home importa i componenti estratti (non li definisce inline)", async () => {
   const source = await readFile(path.join(root, "app", "page.tsx"), "utf8");
-  for (const { name, file } of HOME_COMPONENTS) {
-    const base = path.basename(file, ".tsx");
+  for (const { name, base } of HOME_IMPORTS) {
     assert.match(
       source,
       new RegExp(`from\\s+["'].*${base}["']`),
       `atteso import di ${name} in app/page.tsx`,
+    );
+  }
+  // I componenti tool della vecchia home NON devono tornare nell'hub: la
+  // home è un orienteering page, i tool vivono sulle loro route (F2).
+  for (const base of ["PublicDirectory", "ReportForm", "CorrectionForm", "MapPanel"]) {
+    assert.doesNotMatch(
+      source,
+      new RegExp(`from\\s+["'].*${base}["']`),
+      `l'hub non deve reimportare ${base} (vive sulle route tool)`,
     );
   }
 });
