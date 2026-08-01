@@ -105,19 +105,22 @@ test("journey browse→filtri: search narrows the directory and the live count f
 
   assert.equal(cards(), 2, "the directory must show both fictional records");
 
-  // Search narrows to the matching record.
+  // Search narrows to the matching record. F4 (useCameraFilters) debounces
+  // the ?q= URL commit (~250ms, R2 URL churn): the input feels instant but
+  // the narrowing applies once the debounce writes the URL — wait for it
+  // (same pattern as client-tools' debounced-search test, t_522638a5).
   await rtl.userEvent.type(searchInput, "corner");
-  assert.equal(cards(), 1, "search 'corner' must leave one record");
+  await rtl.waitFor(() => assert.equal(cards(), 1, "search 'corner' must leave one record"));
   assert.match(container.querySelector("ul.record-list")?.textContent ?? "", /Corner shop entrance/);
 
   // The live counter announces the filtered result (role=status region).
   const counter = container.querySelector("#record-search-count");
   assert.ok(counter, "the result counter must be a status/aria-live region");
-  assert.match(counter?.textContent ?? "", /1/);
+  await rtl.waitFor(() => assert.match(counter?.textContent ?? "", /1/));
 
   // Empty state is truthful and offers a way back.
   await rtl.userEvent.selectOptions(container.querySelector("#record-kind-filter"), "Bullet");
-  assert.equal(cards(), 0, "no record matches corner+Bullet");
+  await rtl.waitFor(() => assert.equal(cards(), 0, "no record matches corner+Bullet"));
   const emptyState = container.querySelector(".empty-state");
   assert.ok(emptyState, "the zero-result state must render (never a silent blank)");
   assert.match(emptyState?.textContent ?? "", /clear search|reset/i);
