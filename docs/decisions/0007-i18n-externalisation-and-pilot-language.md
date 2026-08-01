@@ -41,6 +41,13 @@ interface strings with English plus the pilot-area language.
    default so the server-rendered page, metadata and API responses are
    language-neutral (consistent with ADR 0001: interface strings never affect
    public data).
+
+   > **Superseded by ADR 0015 (2026-08-01) for the server side.** The
+   > preference is now mirrored to the `opensurveillancedb-locale` cookie and
+   > read server-side by the root layout and the informational pages, so SSR
+   > renders the user's language (html lang + localized metadata) with no
+   > EN→IT flash. `localStorage` remains for multi-tab sync. Interface
+   > strings still never affect public data (ADR 0001 unchanged).
 5. **Shared vocabulary is centralised.** Status labels live once in the
    `status` namespace and are reused by home, guide and record detail;
    moderation keeps its own `statusLabels` where the vocabulary differs
