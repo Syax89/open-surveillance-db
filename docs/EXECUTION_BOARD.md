@@ -27,9 +27,9 @@ named owners are recorded in [GOVERNANCE.md](../GOVERNANCE.md).
 2. Confirm which public infrastructure is eligible and which places/details are excluded. — **Decided 2026-07-31: cameras visible from public space are eligible; private homes, live feeds, sensitive operational details, and security weaknesses are excluded.** [ADR 0010](decisions/0010-pilot-jurisdiction-languages-eligibility.md)
 3. Choose the data licence, publication precision, retention approach, and correction/removal contact. — **Decided 2026-07-31: ODbL 1.0 for the database and exports; coordinates rounded to ~4 decimal places (~10 m) by default; 12-month retention with re-verification renewal; `privacy@opensurveillancedb` as the correction/removal contact.** [ADR 0008](decisions/0008-data-licence-precision-retention-contact.md)
 4. Name the initial maintainers, operations owner, data steward, security contact, and moderation contact. — **Decided 2026-07-31: maintainers are Simone (syax89) and Ada (CTO, sole merge authority); operations owner and security contact are Ken; data stewards are Linus and Grace; moderation contact is Grace.** Recorded in [GOVERNANCE.md](../GOVERNANCE.md).
-5. Create a public organisation/repository and an accessible private route for security and privacy reports.
+5. Create a public organisation/repository and an accessible private route for security and privacy reports. — **Decided 2026-07-31: the repository `Syax89/open-surveillance-db` is public with CI as its merge gate; SECURITY.md is the private reporting route (GitHub Private Vulnerability Reporting plus a project PGP key) with a 48-hour first-response commitment; near-term hosting is local-first.** [ADR 0012](decisions/0012-public-repo-security-disclosure-and-hosting.md). RFC 9116 `security.txt` discovery on the deployed site is drafted (PR #79) and merges with the public deployment.
 
-**Gate:** the decisions are documented in `docs/decisions/`; there is no ambiguity about what data may enter the pilot. (Items 1–4 are decided — ADR 0010 (pilot boundary), ADR 0008 (data licence, precision, retention, contact), GOVERNANCE.md (named owners); item 5 remains open.)
+**Gate:** the decisions are documented in `docs/decisions/`; there is no ambiguity about what data may enter the pilot. (Items 1–5 are decided — ADR 0010 (pilot boundary), ADR 0008 (data licence, precision, retention, contact), GOVERNANCE.md (named owners), ADR 0012 (public repository and the private reporting route via SECURITY.md). What remains is deployment, not policy: `security.txt` discovery (RFC 9116, PR #79) and real operator identity provisioning land with the public deployment.)
 
 ### Wave B — build the safe public-alpha foundation
 
@@ -59,20 +59,22 @@ Open only the selected pilot area, with a deliberately small contributor group a
 
 These are the next technical tickets once Wave A has named owners and approved the pilot policy.
 
-| Priority | Ticket | Owner | Depends on |
-| --- | --- | --- | --- |
-| P0 | Replace demo seeding in deployed environments with controlled migrations | Operations | Environment policy |
-| P0 | Prevent every non-public status from UI/API/GeoJSON, with automated tests | Data & trust | Target status model |
-| P0 | Add an accessible public list and record-detail view | Product | Public-field decision |
-| P0 | Add locality/address/coordinate search and truthful empty states | Product | Pilot dataset boundary |
-| P0 | Create private correction/removal and urgent-hide intake | Data & trust | Contact and retention policy |
-| P0 | Implement reviewer roles, queue, decision reasons, and audit events | Data & trust | Named moderators and role policy |
-| P0 | Add route-level rate limits, input limits, and abuse alerts | Operations | Hosting choice |
-| P0 | Configure staging, secrets, backups, restore rehearsal, and monitoring | Operations | Hosting choice |
-| P1 | Create separate private evidence/media pipeline with scanning, EXIF removal, and redaction | Data & trust | Approved retention and review policy |
-| P1 | Internationalise safety-critical UI strings | Product | Pilot language decision |
-| P1 | Publish versioned data exports, data dictionary, and changelog | Data & trust + Operations | Final data licence |
-| P1 | Add privacy-preserving aggregate service metrics and transparency reporting | Operations + Product | Privacy review |
+Status reflects the local prototype as of 2026-08-01; every `Done` row is evidenced in the Progress log below.
+
+| Priority | Ticket | Owner | Depends on | Status |
+| --- | --- | --- | --- | --- |
+| P0 | Replace demo seeding in deployed environments with controlled migrations | Operations | Environment policy | Open — migrations are journal-managed, but local deploys still seed demo records |
+| P0 | Prevent every non-public status from UI/API/GeoJSON, with automated tests | Data & trust | Target status model | Done (local prototype) — boundary contract tests guard public-list, GeoJSON, corrections, navigation, and status leaks |
+| P0 | Add an accessible public list and record-detail view | Product | Public-field decision | Done (local prototype) — directory and record-detail route complement the map |
+| P0 | Add locality/address/coordinate search and truthful empty states | Product | Pilot dataset boundary | Done (local prototype) — `GET /api/cameras/search` |
+| P0 | Create private correction/removal and urgent-hide intake | Data & trust | Contact and retention policy | Done (local prototype) — `correction_requests` intake plus moderation hide |
+| P0 | Implement reviewer roles, queue, decision reasons, and audit events | Data & trust | Named moderators and role policy | Done — ADR 0009/0014; append-only audit and appeals included |
+| P0 | Add route-level rate limits, input limits, and abuse alerts | Operations | Hosting choice | Done — per-route limits, input caps, abuse alerts (PR #43) |
+| P0 | Configure staging, secrets, backups, restore rehearsal, and monitoring | Operations | Hosting choice | In progress — local LXC 114 covered (ops/ scripts); Cloudflare staging deferred (CEO local-first decision) |
+| P1 | Create separate private evidence/media pipeline with scanning, EXIF removal, and redaction | Data & trust | Approved retention and review policy | Done (local prototype) — intake caps, magic-byte verification, EXIF/XMP/IPTC strip, R2 storage, moderation/redaction gate (PR #64) |
+| P1 | Internationalise safety-critical UI strings | Product | Pilot language decision | Done — bilingual EN/IT surfaces (PRs #68, #72, #78, #88); per-domain bundle refactor in flight (PR #80) |
+| P1 | Publish versioned data exports, data dictionary, and changelog | Data & trust + Operations | Final data licence | In progress — CSV export done; changelog done (PR #86); ODbL export notice open (PR #81) |
+| P1 | Add privacy-preserving aggregate service metrics and transparency reporting | Operations + Product | Privacy review | Open |
 
 ## Progress log
 
@@ -164,6 +166,7 @@ These are the next technical tickets once Wave A has named owners and approved t
   Linus and Grace; moderation contact is Grace. Recorded in
   [GOVERNANCE.md](../GOVERNANCE.md). Items 3 and 5 of Wave A (final data
   licence, public organisation and private reporting route) remain open.
+- **2026-07-31 — Route-level rate limits, input caps, and abuse alerts added (Wave B, Operations):** every route family now has its own per-caller sliding-window limit (reads 60/min, exports 10/min, nearby and revisions 30/min, submissions 5/min, moderation 30/min, auth 10/min, search 15/min — all env-configurable via `${PREFIX}_RATE_LIMIT_MAX`/`_WINDOW_SECONDS`). Oversized payloads are capped, and repeated blocks or surges emit structured abuse alerts in which the caller is identified only by a SHA-256 hash, never the raw IP (PR #43).
 - **2026-07-31 — Reviewer roles, moderation queue, decision reasons, and
   append-only audit events implemented (Wave B, Data & Trust):** every
   decision now requires a named reviewer (`actorId`) enforced against a
@@ -178,6 +181,11 @@ These are the next technical tickets once Wave A has named owners and approved t
   ABORT) with reviewer id + role captured at write time. Schema ships as
   migration `0008` (journal-registered, drizzle-kit generate no-op) and is
   documented in ADR 0009. 362/362 tests green; fresh-DB migration 9/9.
+- **2026-08-01 — Contributor accounts, sessions, and self-service erasure implemented (Wave B, Data & Trust):** registration uses email+password with salted PBKDF2-SHA256 at 210,000 iterations (OWASP 2023); sessions are opaque random tokens stored only as their SHA-256 (30-day TTL, `HttpOnly; SameSite=Strict`), with CSRF double-submit on every state-changing request and a per-caller auth rate limit (10/min). Anonymous reporting remains possible by design: a live session attributes the report to the contributor, its absence leaves the report anonymous (`contributor_id` NULL). GDPR art. 17 erasure (`DELETE /api/auth/account`) de-attributes every report in one atomic batch, revokes all sessions, and hard-deletes the account; the audit trail is never rewritten. Documented in [ADR 0013](decisions/0013-contributor-accounts-and-sessions.md) (PRs #57, #61).
+- **2026-08-01 — Coarse auth roles, route-level authorization, and contributor appeals implemented (Wave B, Data & Trust):** a `users` identity table (`contributor`/`moderator`/`admin`) gates every protected route through a single `requireRole` chokepoint (401 unknown or inactive, 403 below tier); the moderation PATCH no longer trusts a client-supplied `actorId` — reviewer identity is derived server-side from the caller. A contributor can appeal a final decision (`pending → upheld | dismissed | escalated`), one pending appeal per decision; escalated appeals resolve only at the administrator, an upheld appeal returns the record to the moderation queue for a fresh decision by a different reviewer, and the original decider is blocked. Every appeal transition appends to the immutable audit trail and is filtered out of public revisions. Documented in [ADR 0014](decisions/0014-auth-roles-appeals.md) (PRs #56, #62; migration 0010).
+- **2026-08-01 — Private evidence/media pipeline implemented (Wave B, Data & Trust):** `/api/photos` intake applies size/MIME/dimension caps and magic-byte container verification, strips EXIF/XMP/IPTC metadata fail-closed, stores sanitised bytes in R2 with metadata only in D1, and publishes a photo only after moderation/redaction approval for a public camera — pending or rejected evidence never leaks (PR #64, STATUS gap #3).
+- **2026-08-01 — Public information-site restructure completed (Wave C item 5):** bilingual pages `/manifesto`, `/regole`, `/faq`, `/contatti`, `/privacy`, `/termini`, `/licenze`, and `/moderazione` are wired into a single global site footer with institutional links and ODbL/OSM attribution; GDPR art. 13/14 short-notice links now appear in the report, correction, and register forms; a full navigation QA pass (link resolution, accessibility, EN/IT coverage, leak and render checks) and a footer de-duplication fix keep the restructure consistent. Site structure is documented in [SITEMAP.md](SITEMAP.md). (PRs #65, #67, #68, #70, #71, #72, #73, #75, #76, #88.)
+- **2026-08-01 — Local LXC 114 operations added (Wave B, Operations):** `ops/` now provides `health-check.sh` (LAN reachability and endpoint checks, run every 5 minutes), `backup-lxc114.sh` (vzdump snapshot to the NAS, 7 kept, nightly 02:30), `snapshot-pre-deploy.sh`, and `rollback-lxc114.sh` (polls the Proxmox task UPID, stops → restores → restarts the container). A live drill on 2026-08-01 backed up the container (1.02 GB in ~40 s), rolled back a pre-deploy snapshot, and brought the site back with the health check 5/5. Documented in [OPERATIONS.md](OPERATIONS.md) §8 and its appendix. (PRs #58, #60.)
 
 ## Active next plan
 
@@ -189,6 +197,15 @@ archived in [NEXT_SPRINT.md](NEXT_SPRINT.md); current capability is tracked in
 [STATUS.md](STATUS.md).
 
 The board sequence continues with [Wave C — verify the pilot](#wave-c--verify-the-pilot).
+
+As of 2026-08-01 that cycle is complete on the local prototype — reasoned,
+append-only audited decisions with reviewer roles and appeals (ADR 0009/0014) —
+and the two items it deliberately deferred (contributor accounts and erasure,
+ADR 0013; evidence/media pipeline, PR #64) have landed too. The next cycle
+therefore starts beyond accounts and media; see [NEXT_SPRINT.md](NEXT_SPRINT.md)
+and [STATUS.md](STATUS.md) for the current local-capability list. Public
+hosting, provisioning real operator identities with MFA, versioned exports, and
+Android work remain future gates.
 
 The longer sequence from local prototype to a potential public alpha and Android
 companion is maintained in the [future roadmap](FUTURE_ROADMAP.md). Its gates
