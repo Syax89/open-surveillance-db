@@ -366,6 +366,60 @@ test("account actions are native buttons; tabIndex only as programmatic focus ta
   assert.match(confirmDialog, /aria-labelledby/, "the alertdialog must be labelled");
 });
 
+test("the verification toggle is a native button with aria-pressed, a live region and no tabIndex (C5/C9)", async () => {
+  const toggle = await readFile(path.join(root, "app", "components", "StarConfirmButton.tsx"), "utf8");
+  // Native button, no focus-order manipulation.
+  assert.match(toggle, /<button\s+type="button"/, "the toggle must be a native button");
+  assert.doesNotMatch(toggle, /tabIndex/);
+  // aria-pressed mirrors the personal state.
+  assert.match(toggle, /aria-pressed=\{confirmed\}/, "aria-pressed must mirror the confirmed state");
+  // Polite live region on the counter.
+  assert.match(toggle, /aria-live="polite"/, "the count must be a polite live region");
+  // Busy flag while a toggle is in flight (double-submit guard).
+  assert.match(toggle, /aria-busy=\{busy\}/, "the toggle must expose aria-busy while pending");
+  // Disabled is driven by the gate state, never by a click handler hack.
+  assert.match(toggle, /disabled=\{disabled \|\| busy\}/, "the toggle must disable on gate/busy");
+  // The star is decorative.
+  assert.match(toggle, /aria-hidden="true"/, "the SVG star must be decorative");
+  // Accessible name is localized (flips between the two frozen strings).
+  assert.match(toggle, /const label = confirmed \? t\.removeVerification : t\.confirmExists/, "the accessible name must flip with the state");
+});
+
+test("the verification toggle target is at least 44x44px (WCAG 2.5.8) and interaction is quiet (C9)", async () => {
+  const css = await readFile(path.join(root, "app", "globals.css"), "utf8");
+  assert.match(css, /\.confirm-button\s*\{[^}]*min-width:44px/, "the toggle must have a 44px min width");
+  assert.match(css, /\.confirm-button\s*\{[^}]*min-height:44px/, "the toggle must have a 44px min height");
+  // No count-up / toast / burst / sound animations in the widget CSS.
+  assert.doesNotMatch(css, /\.confirm-button\s*\{[^}]*animation/i, "the toggle must not animate (C9: no count-up/burst)");
+});
+
+test("the trust-level badge is never colour-only: label + dot, progress is a text line (C1)", async () => {
+  const badge = await readFile(path.join(root, "app", "components", "LevelBadge.tsx"), "utf8");
+  // Badge text (the frozen label) is always rendered — never colour alone.
+  assert.match(badge, /badgeLabels\[badgeKey\]/, "the badge must render the localized label text");
+  // The dot is decorative (aria-hidden), the label is the accessible name.
+  assert.match(badge, /aria-hidden="true"/, "the status dot must be decorative");
+  // Progress is a TEXT line, never a bar.
+  assert.match(badge, /progressToNextLevel/, "the progress line must be textual");
+  assert.doesNotMatch(badge, /<div[^>]*role="progressbar"/, "no progress bar may be rendered");
+  // Mapping comes from the frozen trust-levels module, not a local guess.
+  assert.match(badge, /badgeKeyForLevel/, "the badge key must come from trust-levels.ts");
+});
+
+test("profile contributions: local filters use aria-pressed, the counter is role=status, pagination carries aria-current (C5)", async () => {
+  const account = await readFile(path.join(root, "app", "account", "page.tsx"), "utf8");
+  // Local status filters (never in the URL — private page).
+  assert.match(account, /aria-pressed=\{filter === key\}/, "filter chips must expose aria-pressed");
+  assert.match(account, /role="group"\s+aria-label=\{community\.contributionStatusFilter\}/, "the filter group must be labelled");
+  // Polite total counter.
+  assert.match(account, /role="status"/, "the contribution total must be announced politely");
+  // Pagination marks the current page.
+  assert.match(account, /aria-current="page"/, "the current page indicator must carry aria-current");
+  // Owner-only edit links: the href points at the dedicated edit route.
+  assert.match(account, /href=\{`\/records\/\$\{contribution\.id\}\/edit`\}/, "the edit link must target /records/[id]/edit");
+  assert.match(account, /isEditable\(contribution\)/, "the edit link must be gated by editability");
+});
+
 test("aria-invalid marks the failing auth field on submit and clears as the user types (QA-2026-08-01-2 closed)", async () => {
   // The audit finding is CLOSED (F-QA t_7b716c97): login/register now wire
   // aria-invalid to the per-field client validation, so assistive

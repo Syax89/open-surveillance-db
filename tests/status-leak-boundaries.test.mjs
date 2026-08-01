@@ -347,17 +347,17 @@ test("the account page labels submission statuses from i18n with a neutral fallb
   );
   assert.doesNotMatch(
     page,
-    /statuses\[submission\.status[^\]]*\]\s*\?\?\s*submission\.status/,
+    /statuses\[contribution\.status[^\]]*\]\s*\?\?\s*contribution\.status/,
     "the account page must never fall back to a raw internal status value",
   );
   assert.match(
     page,
-    /statuses\[submission\.status[^\]]*\]\s*\?\?\s*t\.submissionStatus/,
+    /statuses\[contribution\.status[^\]]*\]\s*\?\?\s*(?:community\.statusFilters\[[^\]]*\]\s*\?\?\s*)?t\.submissionStatus/,
     "unknown statuses must fall back to the neutral localized label",
   );
   assert.match(
     page,
-    /status-dot\s+\$\{submission\.status\}/,
+    /status-dot\s+\$\{contribution\.status\}/,
     "the status dot class must derive from the submission status (repo convention)",
   );
 });

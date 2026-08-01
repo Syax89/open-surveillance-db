@@ -6,6 +6,32 @@ import { useRouter } from "next/navigation";
 import { useMessages } from "../components/LocaleProvider";
 import { SiteHeader } from "../components/SiteHeader";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { LevelBadge } from "../components/LevelBadge";
+import type { TrustLevelMeta } from "../lib/trust-levels";
+
+/**
+ * /account — extended contributor profile (COMMUNITY_PLAN §2.3, C5 + C6).
+ *
+ * On top of the pre-existing auth surface (profile, logout, erasure) this
+ * page now renders:
+ *   - the trust-level badge (LevelBadge: .card-topline label + dot, one of
+ *     the three frozen badge keys, never numeric points) and the textual
+ *     progress line — never a bar (design C1);
+ *   - the contributor's own paginated contributions list from
+ *     GET /api/auth/me/contributions (canonical F0 contract), with LOCAL
+ *     status filters (useState — the private profile is never shareable,
+ *     so the filter state deliberately stays out of the URL), a
+ *     role="status" total counter, honest empty states, and an "Edit" link
+ *     for the owner only (every row here IS the owner's; the link appears
+ *     on editable camera contributions, pointing at /records/[id]/edit);
+ *   - display name inline edit (C6/C8) and an accessible destructive
+ *     confirmation for erasure (ConfirmDialog alertdialog — C6 replaced
+ *     window.confirm).
+ *
+ * The old /api/auth/me/submissions endpoint stays server-side for backward
+ * compatibility (deprecated); the UI now reads the paginated contributions
+ * endpoint.
+ */
 
 type Contributor = {
   id: number;
@@ -15,12 +41,46 @@ type Contributor = {
   updatedAt: string;
 };
 
-type Submission = {
+type Contribution = {
+  type: "camera" | "correction" | "photo";
   id: number;
-  title: string;
+  title: string | null;
+  issueType: string | null;
+  cameraId: number | null;
   status: string;
   createdAt: string;
 };
+
+type ContributionsPage = {
+  contributions: Contribution[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+    hasMore: boolean;
+  };
+};
+
+const PAGE_SIZE = 25;
+
+/** Local filter keys — deliberately NOT in the URL (private page, C6/C5). */
+const STATUS_FILTERS = ["all", "pending", "verified", "needs_review", "removed"] as const;
+type StatusFilter = (typeof STATUS_FILTERS)[number];
+
+/**
+ * A camera contribution is editable by its owner when its status is not
+ * terminal: pending → direct PATCH, verified/needs_review/stale → moderated
+ * edit request (COMMUNITY_PLAN §2.2). removed/rejected are never editable
+ * (409 server-side); corrections and photos have no edit page.
+ */
+function isEditable(contribution: Contribution): boolean {
+  return (
+    contribution.type === "camera"
+    && contribution.status !== "removed"
+    && contribution.status !== "rejected"
+  );
+}
 
 /** Read the script-readable CSRF cookie so mutations can echo it back. */
 function readCsrfToken(): string | null {
@@ -37,8 +97,14 @@ export default function AccountPage() {
   const statuses = bundle.status;
   const router = useRouter();
   const [contributor, setContributor] = useState<Contributor | null>(null);
-  const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [level, setLevel] = useState<TrustLevelMeta | null>(null);
+  const [contributions, setContributions] = useState<Contribution[]>([]);
+  const [pagination, setPagination] = useState<{ page: number; totalPages: number; hasMore: boolean; total: number } | null>(null);
+  const [filter, setFilter] = useState<StatusFilter>("all");
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [contributionsLoading, setContributionsLoading] = useState(false);
+  const [contributionsError, setContributionsError] = useState(false);
   const [loggedOut, setLoggedOut] = useState(false);
   const [deleted, setDeleted] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -58,25 +124,18 @@ export default function AccountPage() {
   // window.confirm — C6 deliverable 4: focus management + alertdialog).
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  const load = useCallback(() => {
+  const loadProfile = useCallback(() => {
     const controller = new AbortController();
-    Promise.all([
-      fetch("/api/auth/me", { signal: controller.signal }),
-      fetch("/api/auth/me/submissions", { signal: controller.signal }),
-    ])
-      .then(async ([profileResponse, submissionsResponse]) => {
-        if (profileResponse.status === 401) {
+    fetch("/api/auth/me", { signal: controller.signal })
+      .then(async (response) => {
+        if (response.status === 401) {
           setContributor(null);
-          setSubmissions([]);
           return;
         }
-        if (!profileResponse.ok) throw new Error(t.errorGeneric);
-        const profile = await profileResponse.json();
-        setContributor(profile.contributor);
-        if (submissionsResponse.ok) {
-          const body = await submissionsResponse.json();
-          setSubmissions(body.submissions);
-        }
+        if (!response.ok) throw new Error(t.errorGeneric);
+        const body = await response.json();
+        setContributor(body.contributor);
+        setLevel(body.level ?? null);
       })
       .catch((reason: unknown) => {
         if (reason instanceof Error && reason.name !== "AbortError") setError(t.errorGeneric);
@@ -85,7 +144,51 @@ export default function AccountPage() {
     return () => controller.abort();
   }, [t.errorGeneric]);
 
-  useEffect(() => load(), [load]);
+  // Contributions list: local filter + pagination state, refetched whenever
+  // the filter or the page changes. Cache-Control: no-store on the API;
+  // the page never shares this URL (filters are local state, §2.3).
+  // All setState calls happen in promise continuations — nothing runs
+  // synchronously in the effect body (react-hooks/set-state-in-effect),
+  // same pattern as VerificationWidget.
+  const loadContributions = useCallback((nextFilter: StatusFilter, nextPage: number) => {
+    const controller = new AbortController();
+    const query = new URLSearchParams({ page: String(nextPage), pageSize: String(PAGE_SIZE) });
+    if (nextFilter !== "all") query.set("status", nextFilter);
+    Promise.resolve()
+      .then(() => { setContributionsLoading(true); setContributionsError(false); })
+      .then(() => fetch(`/api/auth/me/contributions?${query.toString()}`, { signal: controller.signal }))
+      .then(async (response) => {
+        if (response.status === 401) {
+          setContributor(null);
+          return;
+        }
+        if (!response.ok) throw new Error(t.errorGeneric);
+        const body = (await response.json()) as ContributionsPage;
+        setContributions(body.contributions);
+        setPagination({
+          page: body.pagination.page,
+          totalPages: body.pagination.totalPages,
+          hasMore: body.pagination.hasMore,
+          total: body.pagination.total,
+        });
+        // The list response also carries the level in its meta; using the
+        // freshest value keeps the badge in sync after a moderation change.
+        setLevel((body as { level?: TrustLevelMeta }).level ?? null);
+      })
+      .catch((reason: unknown) => {
+        if (reason instanceof Error && reason.name !== "AbortError") setContributionsError(true);
+      })
+      .finally(() => setContributionsLoading(false));
+    return () => controller.abort();
+  }, [t.errorGeneric]);
+
+  useEffect(() => loadProfile(), [loadProfile]);
+
+  useEffect(() => {
+    if (contributor === null) return;
+    const cancel = loadContributions(filter, page);
+    return cancel;
+  }, [contributor, filter, page, loadContributions]);
 
   // Move focus into the name input when inline editing opens.
   useEffect(() => {
@@ -96,6 +199,15 @@ export default function AccountPage() {
   useEffect(() => {
     if (nameError) nameErrorRef.current?.focus();
   }, [nameError]);
+
+  function selectFilter(next: StatusFilter) {
+    setFilter(next);
+    setPage(1);
+  }
+
+  function goToPage(next: number) {
+    if (pagination && next >= 1 && next <= pagination.totalPages) setPage(next);
+  }
 
   async function onLogout() {
     const csrfToken = readCsrfToken();
@@ -108,7 +220,6 @@ export default function AccountPage() {
       if (response.ok) {
         setLoggedOut(true);
         setContributor(null);
-        setSubmissions([]);
         router.refresh();
       } else if (response.status === 403) {
         setError(t.errorCrossOrigin);
@@ -185,7 +296,6 @@ export default function AccountPage() {
         setConfirmDelete(false);
         setDeleted(true);
         setContributor(null);
-        setSubmissions([]);
         router.refresh();
       } else if (response.status === 403) {
         setConfirmDelete(false);
@@ -298,24 +408,110 @@ export default function AccountPage() {
                 <dt>{t.memberSince}</dt>
                 <dd>{memberSince}</dd>
               </dl>
+              {level ? (
+                <LevelBadge
+                  level={level.level}
+                  verifiedCount={level.verifiedCount}
+                  nextThreshold={level.nextThreshold}
+                />
+              ) : null}
             </section>
 
-            <section aria-labelledby="submissions-title">
-              <h2 id="submissions-title">{t.submissionsSection}</h2>
-              {submissions.length === 0 ? (
-                <p>{t.noSubmissions}</p>
-              ) : (
-                <ul className="auth-submissions">
-                  {submissions.map((submission) => (
-                    <li key={submission.id}>
-                      <Link href={`/records/${submission.id}`}>{submission.title}</Link>
-                      <Link className="text-button" href={`/records/${submission.id}/edit`}>{community.edit}</Link>
-                      <span className={`status-dot ${submission.status}`} aria-hidden="true" />
-                      <span>{statuses[submission.status as keyof typeof statuses] ?? t.submissionStatus}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
+            <section aria-labelledby="contributions-title">
+              <h2 id="contributions-title">{community.yourContributions}</h2>
+
+              {/* Local status filters (never in the URL — private page). */}
+              <div
+                className="contributions-filters"
+                role="group"
+                aria-label={community.contributionStatusFilter}
+              >
+                {STATUS_FILTERS.map((key) => (
+                  <button
+                    key={key}
+                    type="button"
+                    className={`filter-chip${filter === key ? " active" : ""}`}
+                    aria-pressed={filter === key}
+                    onClick={() => selectFilter(key)}
+                  >
+                    {community.statusFilters[key]}
+                  </button>
+                ))}
+              </div>
+
+              {contributionsError ? (
+                <p className="auth-error" role="alert">{community.errorLoadContributions}</p>
+              ) : null}
+
+              {!contributionsError && pagination !== null && pagination.total === 0 ? (
+                <>
+                  <h3>{community.noContributionsYet}</h3>
+                  <p className="record-detail-summary">
+                    {filter === "all" ? community.noContributionsBody : community.noContributionsFiltered}
+                  </p>
+                </>
+              ) : null}
+
+              {!contributionsError && pagination !== null && pagination.total > 0 ? (
+                <>
+                  {/* Polite total counter: announced on load and after a
+                      filter/page change without stealing focus. */}
+                  <p className="contributions-total" role="status">
+                    {community.contributionCount(pagination.total)}
+                  </p>
+                  <ul className="auth-submissions contributions-list" aria-label={community.yourContributions}>
+                    {contributions.map((contribution) => {
+                      const statusLabel = statuses[contribution.status as keyof typeof statuses]
+                        ?? community.statusFilters[contribution.status as keyof typeof community.statusFilters]
+                        ?? t.submissionStatus;
+                      return (
+                        <li key={`${contribution.type}-${contribution.id}`}>
+                          {contribution.type === "camera" && contribution.title ? (
+                            <Link href={`/records/${contribution.id}`}>{contribution.title}</Link>
+                          ) : (
+                            <span className="contributions-kind">{community.contribution}</span>
+                          )}
+                          <span className={`status-dot ${contribution.status}`} aria-hidden="true" />
+                          <span>{statusLabel}</span>
+                          {isEditable(contribution) ? (
+                            <Link className="text-button contributions-edit" href={`/records/${contribution.id}/edit`}>
+                              {community.editContribution}
+                            </Link>
+                          ) : null}
+                        </li>
+                      );
+                    })}
+                  </ul>
+
+                  {/* Pagination (F0): previous/next with aria-current on the
+                      current page indicator. */}
+                  <nav className="contributions-pagination" aria-label={community.contributionsNavigation}>
+                    <button
+                      type="button"
+                      className="button detail-outline"
+                      disabled={page <= 1 || contributionsLoading}
+                      onClick={() => goToPage(page - 1)}
+                    >
+                      {community.previousPage}
+                    </button>
+                    <span className="page-indicator" aria-current="page">
+                      {community.pageOf(page, pagination.totalPages)}
+                    </span>
+                    <button
+                      type="button"
+                      className="button detail-outline"
+                      disabled={!pagination.hasMore || contributionsLoading}
+                      onClick={() => goToPage(page + 1)}
+                    >
+                      {community.nextPage}
+                    </button>
+                  </nav>
+                </>
+              ) : null}
+
+              {contributionsLoading && !contributionsError && pagination === null ? (
+                <p>{t.loading}</p>
+              ) : null}
             </section>
 
             {error ? <p className="auth-error" role="alert">{error}</p> : null}
