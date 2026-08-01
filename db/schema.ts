@@ -271,6 +271,10 @@ export const photos = sqliteTable(
     id: integer("id").primaryKey({ autoIncrement: true }),
     cameraId: integer("camera_id"),
     contributorId: integer("contributor_id"),
+    // Internal pending-quota bucket (migration 0013): `contributor:<id>` for
+    // authenticated uploads, `anon:<sha256(caller key)>` for anonymous ones.
+    // Never exposed through the public projection; only 'pending' rows count.
+    submitterKey: text("submitter_key"),
     storageKey: text("storage_key").notNull(),
     mimeType: text("mime_type").notNull(),
     width: integer("width").notNull(),
@@ -285,5 +289,9 @@ export const photos = sqliteTable(
   (table) => [
     index("photos_status_idx").on(table.status),
     index("photos_camera_idx").on(table.cameraId),
+    // Pending-quota lookups always filter on (submitter_key, status='pending').
+    index("photos_pending_submitter_idx")
+      .on(table.submitterKey)
+      .where(sql`${table.status} = 'pending'`),
   ],
 );
