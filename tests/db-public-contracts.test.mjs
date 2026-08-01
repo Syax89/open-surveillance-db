@@ -397,11 +397,11 @@ test("createCorrectionRequest stores a pending private request", async () => {
     message: "The kind label is wrong",
     contact: "someone@example.invalid",
   });
-  assert.equal(request.status, "pending");
-  assert.equal(request.cameraId, camera.id);
-  assert.equal(request.issueType, "inaccurate details");
-  assert.equal(request.message, "The kind label is wrong");
-  assert.equal(request.contact, "someone@example.invalid");
+  assert.equal(request.correction.status, "pending");
+  assert.equal(request.correction.cameraId, camera.id);
+  assert.equal(request.correction.issueType, "inaccurate details");
+  assert.equal(request.correction.message, "The kind label is wrong");
+  assert.equal(request.correction.contact, "someone@example.invalid");
 
   const anonymous = await corrections.createCorrectionRequest({
     cameraId: null,
@@ -409,8 +409,8 @@ test("createCorrectionRequest stores a pending private request", async () => {
     message: "Removed last month",
     contact: "",
   });
-  assert.equal(anonymous.contact, null, "empty contact is stored as null");
-  assert.equal(anonymous.cameraId, null);
+  assert.equal(anonymous.correction.contact, null, "empty contact is stored as null");
+  assert.equal(anonymous.correction.cameraId, null);
 });
 
 test("moderation approval with publication choices makes metadata public", async () => {

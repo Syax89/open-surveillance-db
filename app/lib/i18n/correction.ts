@@ -26,10 +26,13 @@ export const en = {
   noSpecificRecord: "No specific record / general concern",
   needsReview: "What needs review?",
   selectOne: "Select one",
+  // C4: the select maps 1:1 to the backend issue_type whitelist
+  // (inaccurate|missing|removal|abuse|other) — see db/corrections.ts
+  // CORRECTION_ISSUE_TYPES. Free text is never accepted for removal/abuse.
   inaccurate: "Inaccurate information",
-  outdated: "Outdated record",
-  privacySafety: "Privacy or safety concern",
-  duplicate: "Duplicate record",
+  missing: "No longer present",
+  removal: "Removal request",
+  abuse: "Abuse report",
   other: "Other",
   briefDescription: "Brief description",
   correctionPlaceholder:
@@ -74,9 +77,9 @@ export const it: Translation<typeof en> = {
   needsReview: "Cosa deve essere rivisto?",
   selectOne: "Seleziona un'opzione",
   inaccurate: "Informazione inesatta",
-  outdated: "Record non aggiornato",
-  privacySafety: "Problema di privacy o sicurezza",
-  duplicate: "Record duplicato",
+  missing: "Non più presente",
+  removal: "Richiesta di rimozione",
+  abuse: "Segnalazione di abuso",
   other: "Altro",
   briefDescription: "Breve descrizione",
   correctionPlaceholder:

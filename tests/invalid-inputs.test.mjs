@@ -223,8 +223,8 @@ test("numeric-string cameraId is coerced to an integer by SQLite affinity", asyn
     message: "Wrong kind",
     contact: "",
   });
-  assert.equal(request.cameraId, camera.id, "string id must be stored as the integer it represents");
-  assert.equal(typeof request.cameraId, "number");
+  assert.equal(request.correction.cameraId, camera.id, "string id must be stored as the integer it represents");
+  assert.equal(typeof request.correction.cameraId, "number");
 });
 
 // ---------------------------------------------------------------------------
@@ -277,19 +277,19 @@ test("POST /api/cameras never forwards prototype-pollution or unknown keys to th
 });
 
 test("POST /api/corrections ignores unknown and prototype keys", async () => {
-  stub("createCorrectionRequest", async (input) => ({ id: 4, ...input }));
+  stub("createCorrectionRequest", async (input) => ({ kind: "created", correction: { id: 4, ...input } }));
   const { POST } = await correctionsRoute();
   const response = await POST(
     apiRequest("/api/corrections", {
       method: "POST",
-      body: '{"issueType":"privacy concern","message":"Shows my house","__proto__":{"bypass":1},"admin":true,"cameraId":1}',
+      body: '{"issueType":"abuse","message":"Shows my house","__proto__":{"bypass":1},"admin":true,"cameraId":1}',
     }),
   );
   assert.equal(response.status, 201);
   assert.deepEqual(await responseBody(response), { referenceId: 4 });
 
   const [args] = callArgs("createCorrectionRequest");
-  assert.deepEqual(Object.keys(args[0]).sort(), ["cameraId", "contact", "issueType", "message"]);
+  assert.deepEqual(Object.keys(args[0]).sort(), ["cameraId", "contact", "contributorId", "issueType", "message"]);
   assert.equal(args[0].cameraId, 1);
   assert.equal(Object.prototype.bypass, undefined);
 });
