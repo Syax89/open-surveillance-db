@@ -61,6 +61,32 @@ The build emits a static client bundle (`dist/client`) served by the Worker's
 `ASSETS` binding and a server bundle (`dist/server`) run by the `vinext start`
 production server or by Cloudflare Workers (`wrangler deploy`).
 
+### Build-time network usage (offline-safe)
+
+The production build makes **no network requests**. Two hygiene decisions keep
+it that way:
+
+- **No `next.config`.** The repo has no `next.config.ts` (the template stub was
+  removed). `vinext` loads `next.config.{ts,mjs,js,cjs}` only if present, and
+  reads a small set of options from it (`output`, `redirects`, `rewrites`,
+  `headers`, `images.dangerouslyAllowSVG`, `experimental`, …); with no file it
+  falls back to documented defaults. If a future feature needs one of those
+  options (e.g. SVG optimization in the image proxy, see `worker/index.ts`),
+  add the file back — there is no other Next.js config surface.
+- **No remote fonts.** The app does not use `next/font/google` (Geist/Geist_Mono
+  were removed: the `--font-geist-*` variables they defined were never
+  referenced by any stylesheet — `body` uses `Arial, Helvetica, sans-serif`).
+  `next/font/google` would make the build fetch CSS + `.woff2` from
+  `fonts.googleapis.com` / `fonts.gstatic.com` at build time (cached under
+  `.vinext/fonts/`, which is gitignored), and fall back to runtime CDN `<link>`
+  tags when offline — a hard network dependency for a build that must work in
+  air-gapped CI and must not leak visitor requests to third parties. If custom
+  fonts are ever needed, self-host them (e.g. `@fontsource-variable/*` or
+  committed `.woff2` via `next/font/local`); do not reintroduce Google Fonts.
+
+CI runs `npm ci` (resolves everything from the lockfile) and `npm run build`;
+neither touches the network.
+
 ## Container deployment
 
 The project ships no image; the container is a thin wrapper around the
