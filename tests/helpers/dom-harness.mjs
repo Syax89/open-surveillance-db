@@ -22,6 +22,16 @@
 //   5. it installs a jsdom window as the global DOM and exposes the
 //      @testing-library/react API bound to it.
 //
+// ISOLATION CONTRACT (QA t_5084202a): the transpile tree is created with
+// mkdtemp INSIDE this process (one dir per test FILE — node --test runs each
+// file in its own process) and removed ONLY by this file's own `after()` hook
+// below. No test file may ever share, reuse, glob-delete or pre-seed
+// tests/.dom-tmp-*: a shared build dir is exactly the race that the t_5084202a
+// investigation disproved but must stay impossible. If a future refactor makes
+// a component prop required (like navLabels in PR #120), the DOM test that
+// renders it fails DETERMINISTICALLY with a contract-guard message — not with
+// an intermittent TypeError on an undefined prop.
+//
 // Tests use ONLY fictitious fixtures (example.test addresses, made-up
 // titles) — never real personal data.
 

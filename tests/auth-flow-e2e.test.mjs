@@ -282,6 +282,120 @@ test("auth gate: public routes are not gated — no login needed to read or subm
   assert.equal(await response.text(), "handler-called");
 });
 
+test("auth gate: identity headers are stripped at the edge — a direct client cannot spoof a role", async () => {
+  const { default: worker } = await loadE2EModule("worker.mjs");
+  const stub = await loadE2EModule("vinext-router-stub.mjs");
+  const ctx = { waitUntil() {}, passThroughOnException() {} };
+  const envWithCreds = {
+    MODERATION_USER: "moderator",
+    MODERATION_PASSWORD: "s3cret",
+    MODERATION_IDENTITY_EMAIL: "admin@osdb.test",
+  };
+
+  // 1. A direct client spoofs the prototype identity header on a gated path
+  //    without any credentials: rejected at the edge (401), handler never
+  //    reached.
+  stub.resetLastRequest();
+  const spoofed = await worker.fetch(
+    new Request("https://osdb.test/api/appeals", {
+      headers: { "x-osdb-user-email": "admin@osdb.test" },
+    }),
+    envWithCreds,
+    ctx,
+  );
+  assert.equal(spoofed.status, 401, "spoofed identity without a gate must be rejected");
+  assert.equal(stub.lastRequest, null, "the handler must not be reached for an unauthenticated gated path");
+
+  // 2. Even behind a valid gate, a client-supplied identity is replaced by
+  //    the server-chosen one (MODERATION_IDENTITY_EMAIL) — never honoured.
+  stub.resetLastRequest();
+  const ok = await worker.fetch(
+    new Request("https://osdb.test/api/appeals", {
+      headers: {
+        Authorization: `Basic ${Buffer.from("moderator:s3cret").toString("base64")}`,
+        "x-osdb-user-email": "senior@osdb.test", // spoof attempt behind the gate
+      },
+    }),
+    envWithCreds,
+    ctx,
+  );
+  assert.equal(ok.status, 200);
+  assert.equal(await ok.text(), "handler-called");
+  assert.equal(
+    stub.lastRequest.headers.get("x-osdb-user-email"),
+    "admin@osdb.test",
+    "the edge must inject the configured identity, not the client's",
+  );
+
+  // 3. The ChatGPT-platform headers are stripped on every path unless the
+  //    deployment explicitly trusts the platform gateway (public route here
+  //    so the request reaches the handler).
+  stub.resetLastRequest();
+  await worker.fetch(
+    new Request("https://osdb.test/api/cameras", {
+      headers: { "oai-authenticated-user-email": "contributor@osdb.test" },
+    }),
+    envWithCreds,
+    ctx,
+  );
+  assert.equal(
+    stub.lastRequest.headers.get("oai-authenticated-user-email"),
+    null,
+    "platform headers must be stripped by default (no TRUST_PLATFORM_HEADERS)",
+  );
+
+  // 4. TRUST_PLATFORM_HEADERS=true (real ChatGPT-plugin deployment) lets the
+  //    platform-supplied identity through; the prototype header never is.
+  stub.resetLastRequest();
+  const trusted = await worker.fetch(
+    new Request("https://osdb.test/api/appeals", {
+      headers: {
+        Authorization: `Basic ${Buffer.from("moderator:s3cret").toString("base64")}`,
+        "oai-authenticated-user-email": "contributor@osdb.test",
+        "x-osdb-user-email": "senior@osdb.test",
+      },
+    }),
+    { ...envWithCreds, TRUST_PLATFORM_HEADERS: "true" },
+    ctx,
+  );
+  assert.equal(trusted.status, 200);
+  assert.equal(stub.lastRequest.headers.get("oai-authenticated-user-email"), "contributor@osdb.test");
+  assert.equal(
+    stub.lastRequest.headers.get("x-osdb-user-email"),
+    "admin@osdb.test",
+    "x-osdb-user-email is edge-injected only; a client value never survives",
+  );
+});
+
+test("auth gate: appeals are gated at the edge and fail closed without credentials", async () => {
+  const { default: worker } = await loadE2EModule("worker.mjs");
+  const ctx = { waitUntil() {}, passThroughOnException() {} };
+
+  // Fail-closed default: no moderation credentials configured → 503.
+  const noCreds = await worker.fetch(new Request("https://osdb.test/api/appeals"), {}, ctx);
+  assert.equal(noCreds.status, 503);
+  const noCredsItem = await worker.fetch(new Request("https://osdb.test/api/appeals/1"), {}, ctx);
+  assert.equal(noCredsItem.status, 503);
+
+  // Configured but unauthenticated → 401 with the moderation challenge.
+  const envWithCreds = { MODERATION_USER: "moderator", MODERATION_PASSWORD: "s3cret" };
+  const unauth = await worker.fetch(new Request("https://osdb.test/api/appeals"), envWithCreds, ctx);
+  assert.equal(unauth.status, 401);
+  assert.match(unauth.headers.get("www-authenticate"), /Basic realm="moderation"/);
+
+  // Correct Basic credentials pass through — the appeals surface is now
+  // behind the same transport gate as the moderation queue.
+  const authed = await worker.fetch(
+    new Request("https://osdb.test/api/appeals", {
+      headers: { Authorization: `Basic ${Buffer.from("moderator:s3cret").toString("base64")}` },
+    }),
+    envWithCreds,
+    ctx,
+  );
+  assert.equal(authed.status, 200);
+  assert.equal(await authed.text(), "handler-called");
+});
+
 // ---------------------------------------------------------------------------
 // 2) Submit → pending → absent from public
 // ---------------------------------------------------------------------------

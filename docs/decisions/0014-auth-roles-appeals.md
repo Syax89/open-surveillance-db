@@ -113,6 +113,37 @@ against the new `users` table exactly like `app/chatgpt-auth.ts` documents.
   stripped or replaced at the edge in any deployment where the caller is not
   the authenticated platform itself.
 
+## Edge identity gate (2026-08-01)
+
+The worker edge (`worker/index.ts`) is the single identity authority. It
+closes the spoofing gap where `resolveAuthUser`/`requireRole` trusted
+client-supplied identity headers on `/api/appeals` (and, in principle, any
+future role-protected route) without a gate:
+
+1. **Strip on every path.** `x-osdb-user-email` is removed from every
+   incoming request; the ChatGPT-platform headers (`oai-authenticated-user-email`
+   and the `oai-authenticated-user-full-name*` variants) are removed too,
+   unless the deployment sets `TRUST_PLATFORM_HEADERS=true` — only valid in a
+   real ChatGPT-plugin deployment where the platform gateway, not arbitrary
+   clients, sits in front of the worker.
+2. **Gate before identity.** The moderation Basic/Bearer gate is extended to
+   the appeals surface (`/api/appeals`, `/api/appeals/*`) — the only other
+   role-protected API. A direct client can no longer reach it with a spoofed
+   header: without a valid credential the request is rejected (401), and
+   without configured credentials the gate fails closed (503).
+3. **Inject server-side.** After a successful gate the worker sets
+   `x-osdb-user-email` from `MODERATION_IDENTITY_EMAIL` (the `users.email`
+   the credential maps to; `admin@osdb.test` for the local prototype).
+   Fail-closed: unset means no identity, so the route layer rejects the
+   request (401) — a misconfigured host can never accidentally grant a role.
+4. `app/lib/authz.ts` keeps resolving identity from the same headers, which
+   are now guaranteed edge-set; its header comment documents the trust model.
+
+A direct client that sends `x-osdb-user-email` / `oai-authenticated-user-email`
+never reaches a role-protected route with those values intact: no gate → 401,
+gate but spoofed value → value replaced by `MODERATION_IDENTITY_EMAIL`.
+Enforced at runtime in `tests/auth-flow-e2e.test.mjs` (edge spoofing suite).
+
 ## Integration with ADR 0013 (contributor accounts)
 
 `users` (coarse role identity, this ADR) and `contributors` (public

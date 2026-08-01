@@ -319,15 +319,31 @@ curl -sS http://192.168.1.201:3000/api/cameras                              # 20
 curl -sS "http://192.168.1.201:3000/api/cameras/nearby?latitude=41.9004&longitude=12.4936&radius=50"  # 200
 curl -sS -o /dev/null -w '%{http_code}\n' http://192.168.1.201:3000/guide    # 200
 curl -sS http://192.168.1.201:3000/api/moderation                            # 503 fail-closed (no creds)
+curl -sS http://192.168.1.201:3000/api/appeals                              # 503 fail-closed (no creds)
 ```
 
 Public API responses must expose only `demo`/`verified` records and never the
 private `notes` field (enforced by the publication-boundary tests in CI).
 
-The moderation endpoints are **fail-closed**: without credentials they return
-`503 Moderation is unavailable.`. To enable the local moderation queue, add
-`MODERATION_USER` / `MODERATION_PASSWORD` (Basic auth) or
+The moderation and appeals endpoints are **fail-closed**: without credentials
+they return `503 Moderation is unavailable.`. To enable the local moderation
+queue, add `MODERATION_USER` / `MODERATION_PASSWORD` (Basic auth) or
 `MODERATION_TOKEN` (bearer) to the unit's `Environment=` lines and restart.
+
+### Identity and access-control environment variables
+
+The worker edge is the single identity authority (ADR 0014): it strips
+client-supplied identity headers from every request and re-injects the
+server-chosen identity only after the moderation gate succeeds. All of these
+are optional; the fail-closed defaults below apply when unset. Set them in
+the hosting platform's secret/environment store, never in source.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `MODERATION_USER` / `MODERATION_PASSWORD` | unset | Basic auth for the moderation gate (fails closed: 503 without any credential) |
+| `MODERATION_TOKEN` | unset | Bearer token alternative for the same gate (API automation) |
+| `MODERATION_IDENTITY_EMAIL` | unset | `users.email` injected as `x-osdb-user-email` after the gate succeeds. Local prototype: `admin@osdb.test`. Unset = gate passes with NO identity → protected routes reject with 401 (fail closed) |
+| `TRUST_PLATFORM_HEADERS` | `false` | `true` only in a real ChatGPT-plugin deployment, where the platform gateway (not arbitrary clients) sits in front of the worker: passes `oai-authenticated-user-email` through instead of stripping it. Never set for direct-Internet or LAN deployments |
 
 ## Environment variables
 
@@ -347,7 +363,8 @@ or client bundles (the secrets gate in CI rejects hardcoded credentials).
 | `NEARBY_RATE_LIMIT_MAX` / `NEARBY_RATE_LIMIT_WINDOW_SECONDS` | 30 / 60 | Nearby search |
 | `REVISIONS_RATE_LIMIT_MAX` / `REVISIONS_RATE_LIMIT_WINDOW_SECONDS` | 30 / 60 | Public change history (`GET /api/cameras/revisions`) |
 | `POST_RATE_LIMIT_MAX` / `POST_RATE_LIMIT_WINDOW_SECONDS` | 5 / 60 | Submissions (cameras + corrections) |
-| `MODERATION_RATE_LIMIT_MAX` / `MODERATION_RATE_LIMIT_WINDOW_SECONDS` | 30 / 60 | Moderation API (second layer over edge auth), including appeal decisions |
+| `MODERATION_RATE_LIMIT_MAX` / `MODERATION_RATE_LIMIT_WINDOW_SECONDS` | 30 / 60 | Moderation API (second layer over edge auth), including appeal decisions (`PATCH /api/appeals/[id]`) |
+| `APPEAL_RATE_LIMIT_MAX` / `APPEAL_RATE_LIMIT_WINDOW_SECONDS` | 20 / 60 | Appeal filing and review (`POST/GET /api/appeals`) — a distinct bucket from moderation so contributors contesting decisions and moderators reviewing them never starve the moderation queue |
 | `TILES_RATE_LIMIT_MAX` / `TILES_RATE_LIMIT_WINDOW_SECONDS` | 60 / 60 | Tile proxy (`GET /api/tiles/*`) — protects the OSMF upstream from per-caller scraping |
 | `POST_SUBMISSIONS_DISABLED` | `false` | Kill switch: reject new submissions with 503 |
 | `PHOTOS_MAX_PENDING_PER_CALLER` | 20 | Pending-photo count cap per caller bucket (authenticated: `contributor:<id>`; anonymous: `anon:<sha256(caller key)>`). `POST /api/photos` answers 429 when a caller is at the cap — a state quota distinct from the HTTP rate limit, bounding how much R2 storage and how many moderation-queue items one caller can accumulate while the queue catches up. Only `status = 'pending'` photos count; approved/rejected photos leave the cap as soon as a moderator decides them |
