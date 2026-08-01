@@ -43,6 +43,7 @@ test("GET returns the public change summary for a verified record", async () => 
   const { GET } = await route();
   const response = await GET(apiRequest("/api/cameras/revisions?cameraId=3"));
   assert.equal(response.status, 200);
+  assert.equal(response.headers.get("cache-control"), "no-store", "change history must never be cached");
   const body = await responseBody(response);
   assert.equal(body.recordId, 3);
   assert.deepEqual(body.revisions, revisionsFixture);

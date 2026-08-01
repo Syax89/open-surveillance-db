@@ -89,12 +89,19 @@ export async function GET(request: Request) {
     if (format === "geojson") {
       // Top-level licence metadata (RFC 7946 foreign members): ODbL 1.0
       // attribution required when the database is shared (TERMS § 7.1).
-      return Response.json({ type: "FeatureCollection", license: DATA_LICENSE_ID, attribution: DATA_LICENSE_NOTICE, features: records.map((record) => ({ type: "Feature", geometry: { type: "Point", coordinates: [record.longitude, record.latitude] }, properties: { id: record.id, title: record.title, kind: record.kind, manufacturer: record.manufacturer, observedOn: record.observedOn, status: record.status, source: record.source, updated: record.updated, description: record.description } })) }, { headers: { "Content-Disposition": "attachment; filename=opensurveillancedb-cameras.geojson" } });
+      // Exports are complete snapshots for download: a bounded 1 h edge/browser
+      // cache is acceptable (the dataset changes through moderation, not live
+      // feeds), and revalidation happens after the window. Deliberately NOT
+      // `immutable` — the export URL's content does change when moderators act.
+      return Response.json({ type: "FeatureCollection", license: DATA_LICENSE_ID, attribution: DATA_LICENSE_NOTICE, features: records.map((record) => ({ type: "Feature", geometry: { type: "Point", coordinates: [record.longitude, record.latitude] }, properties: { id: record.id, title: record.title, kind: record.kind, manufacturer: record.manufacturer, observedOn: record.observedOn, status: record.status, source: record.source, updated: record.updated, description: record.description } })) }, { headers: { "Content-Disposition": "attachment; filename=opensurveillancedb-cameras.geojson", "Cache-Control": "public, max-age=3600" } });
     }
     if (format === "csv") {
-      return new Response(toCsv(records), { headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": "attachment; filename=opensurveillancedb-cameras.csv" } });
+      return new Response(toCsv(records), { headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": "attachment; filename=opensurveillancedb-cameras.csv", "Cache-Control": "public, max-age=3600" } });
     }
-    return Response.json({ records });
+    // JSON list: moderation-derived data that changes as decisions land —
+    // never cache it at the edge or in browsers (audit t_2ee58c08, gap #2),
+    // matching the no-store policy already set by /api/cameras/search.
+    return Response.json({ records }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     console.error("GET /api/cameras failed", error);
     return Response.json({ error: "Database unavailable" }, { status: 503 });

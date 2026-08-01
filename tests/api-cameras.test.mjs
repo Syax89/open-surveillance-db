@@ -43,6 +43,7 @@ test("GET /api/cameras returns the public list as JSON by default", async () => 
 
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type"), /application\/json/);
+  assert.equal(response.headers.get("cache-control"), "no-store", "moderation-derived JSON must never be cached");
   assert.deepEqual(await responseBody(response), { records: [cameraFixture] });
 });
 
@@ -56,6 +57,7 @@ test("GET /api/cameras?format=geojson emits lon/lat FeatureCollection with expor
     response.headers.get("content-disposition"),
     /filename=opensurveillancedb-cameras\.geojson/,
   );
+  assert.equal(response.headers.get("cache-control"), "public, max-age=3600", "export snapshots may be cached for a bounded window");
   const body = await responseBody(response);
   assert.equal(body.type, "FeatureCollection");
   // ODbL 1.0 attribution (TERMS § 7.1): the FeatureCollection must carry the
@@ -94,6 +96,7 @@ test("GET /api/cameras?format=csv escapes quotes and neutralises spreadsheet for
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type"), /text\/csv; charset=utf-8/);
   assert.match(response.headers.get("content-disposition"), /filename=opensurveillancedb-cameras\.csv/);
+  assert.equal(response.headers.get("cache-control"), "public, max-age=3600", "export snapshots may be cached for a bounded window");
   const csv = await responseBody(response);
   assert.match(csv, /^id,title,kind,manufacturer,observed_on,status,source,updated,description,address,latitude,longitude\n/);
   assert.match(
@@ -625,6 +628,7 @@ test("nearby search defaults the radius to 75 metres", async () => {
   const { GET } = await nearbyRoute();
   const response = await GET(apiRequest("/api/cameras/nearby?latitude=41.9&longitude=12.49"));
   assert.equal(response.status, 200);
+  assert.equal(response.headers.get("cache-control"), "no-store", "duplicate-warning data must never be cached");
   assert.deepEqual(callArgs("findNearbyPublicCameras")[0], [41.9, 12.49, 75, { title: "", address: "", kind: "" }]);
 });
 
