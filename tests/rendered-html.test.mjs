@@ -391,12 +391,12 @@ test("moderation info page carries the shared layout without a duplicate footer"
 });
 
 test("starter preview skeleton stays removed from the template", async () => {
-  const [page, layout, packageJson, publicFiles, enBundle] = await Promise.all([
+  const [page, layout, packageJson, publicFiles, commonBundle] = await Promise.all([
     readFile(path.join(root, "app", "page.tsx"), "utf8"),
     readFile(path.join(root, "app", "layout.tsx"), "utf8"),
     readFile(path.join(root, "package.json"), "utf8"),
     readdir(path.join(root, "public")),
-    readFile(path.join(root, "app", "lib", "i18n", "en.ts"), "utf8"),
+    readFile(path.join(root, "app", "lib", "i18n", "common.ts"), "utf8"),
   ]);
 
   // The preview source directory and its static copy must not exist.
@@ -412,10 +412,10 @@ test("starter preview skeleton stays removed from the template", async () => {
 
   // The real app metadata is defined server-side and localized (ADR 0015):
   // the root layout renders it via generateMetadata from the i18n bundle,
-  // whose pilot bundle carries the canonical <title> wording.
+  // whose pilot `common` domain carries the canonical <title> wording.
   assert.match(layout, /generateMetadata/);
   assert.match(layout, /getServerMessages/);
-  assert.match(enBundle, /metaTitle:\s*"OpenSurveillanceDB/);
+  assert.match(commonBundle, /metaTitle:\s*"OpenSurveillanceDB/);
 });
 
 test("FAQ page serves bilingual FAQ content", async () => {

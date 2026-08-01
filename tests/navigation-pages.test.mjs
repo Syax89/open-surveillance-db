@@ -382,28 +382,41 @@ function bundleKeys(bundle) {
   return keys;
 }
 
+const I18N_DOMAINS = [
+  "common", "map", "status", "home", "guide", "manifesto", "moderazione",
+  "faq", "contact", "rules", "record", "moderation", "auth", "footer",
+];
+
 test("EN and IT bundles expose the exact same key set", async () => {
-  const [enModule, itModule] = await Promise.all([
-    transpileAndImport(path.join(root, "app", "lib", "i18n", "en.ts")),
-    transpileAndImport(path.join(root, "app", "lib", "i18n", "it.ts")),
-  ]);
-  const enKeys = bundleKeys(enModule.en);
-  const itKeys = bundleKeys(itModule.it);
-  const missing = enKeys.filter((key) => !itKeys.includes(key));
-  const extra = itKeys.filter((key) => !enKeys.includes(key));
+  // Each per-domain file carries its own `en` (pilot) and `it` (parity)
+  // export; the assembled `messages` shape is built in `index.ts`. Checking
+  // every domain file locally gives the same whole-bundle guarantee with
+  // failures pinpointed to the domain that drifted.
+  const missing = [];
+  const extra = [];
+  for (const domain of I18N_DOMAINS) {
+    const mod = await transpileAndImport(path.join(root, "app", "lib", "i18n", `${domain}.ts`));
+    const enKeys = bundleKeys(mod.en);
+    const itKeys = bundleKeys(mod.it);
+    for (const key of enKeys) if (!itKeys.includes(key)) missing.push(`${domain}.${key}`);
+    for (const key of itKeys) if (!enKeys.includes(key)) extra.push(`${domain}.${key}`);
+  }
   assert.deepEqual(missing, [], `keys missing from Italian bundle: ${missing.join(", ")}`);
   assert.deepEqual(extra, [], `keys present only in Italian bundle: ${extra.join(", ")}`);
 });
 
 test("no untranslated English sentence is left in the Italian bundle", async () => {
-  const [en, it] = await Promise.all([
-    readFile(path.join(root, "app", "lib", "i18n", "en.ts"), "utf8"),
-    readFile(path.join(root, "app", "lib", "i18n", "it.ts"), "utf8"),
-  ]);
-  // Pull every string literal from each bundle.
+  // Every domain file starts with the `en` export followed by the `it`
+  // export; split on that boundary to compare literals per language.
   const literals = (src) => [...src.matchAll(/:\s*"((?:[^"\\]|\\.)*)"/g)].map((m) => m[1]);
-  const enLiterals = new Set(literals(en));
-  const itLiterals = literals(it);
+  const enLiterals = new Set();
+  const itLiterals = [];
+  for (const domain of I18N_DOMAINS) {
+    const src = await readFile(path.join(root, "app", "lib", "i18n", `${domain}.ts`), "utf8");
+    const [enPart, itPart] = src.split("export const it: Translation<typeof en> = {");
+    for (const literal of literals(enPart)) enLiterals.add(literal);
+    itLiterals.push(...literals(itPart));
+  }
   // Technical loanwords / status keys / proper nouns that legitimately stay
   // identical in Italian.
   const allowlist = new Set([
