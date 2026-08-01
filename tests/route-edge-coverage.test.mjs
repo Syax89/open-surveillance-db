@@ -129,6 +129,12 @@ test("login answers 429 past the auth bucket (brute-force backstop)", async () =
   envModule.env.AUTH_RATE_LIMIT_MAX = "1";
   try {
     stub("authenticateContributor", async () => null); // wrong password path
+    // Per-email lockout gate (ADR 0016): never locked, failure recorded but
+    // under the threshold — so the 401 below is the generic wrong-credentials
+    // answer and the 429 that follows comes from the auth rate-limit bucket.
+    stub("loginLockoutKey", async (email) => `lockout:${email}`);
+    stub("getLoginLockout", async () => ({ locked: false, retryAfterSeconds: 0 }));
+    stub("recordFailedLogin", async () => ({ locked: false, retryAfterSeconds: 0 }));
     const { POST } = await loginRoute();
     const allowed = await POST(apiRequest("/api/auth/login", {
       method: "POST",
@@ -175,6 +181,8 @@ test("login answers 413 when the body exceeds the byte cap", async () => {
 });
 
 test("login answers 500 when the db layer fails unexpectedly", async () => {
+  stub("loginLockoutKey", async (email) => `lockout:${email}`);
+  stub("getLoginLockout", async () => ({ locked: false, retryAfterSeconds: 0 }));
   stub("authenticateContributor", async () => {
     throw new Error("D1 binding unavailable");
   });
