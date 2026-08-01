@@ -459,9 +459,11 @@ test("every <img> in the public HTML carries alt text", async () => {
 
 test("aria-current marks the active page in the footer and the header brand (QA-2026-08-01-3 closed)", async () => {
   // The audit finding is CLOSED (F-QA t_7b716c97): the footer marks its own
-  // link with aria-current="page" on every route in its link set, the
-  // header brand marks the home, and the ToolLayout per-page nav marks the
-  // current tool route (separate client test below).
+  // link with aria-current="page" on every route in its link set (13 links,
+  // exactly one current per route) and the header brand marks the home. The
+  // ToolLayout per-page nav NEVER self-links (hand-off pattern,
+  // FRONTEND_DESIGN §2.5), so the current page is exposed by the footer and
+  // by each page's h1 — pinned by the client test below.
   const FOOTER_LINKS = ["/mappa", "/directory", "/segnala", "/correggi", "/manifesto", "/regole", "/guide", "/privacy", "/termini", "/licenze", "/accessibility", "/faq", "/contatti"];
   for (const route of FOOTER_LINKS) {
     const { html } = await renderRoute(route);
@@ -481,21 +483,27 @@ test("aria-current marks the active page in the footer and the header brand (QA-
   }
   // The home marks the header brand (in-page anchor to #top) and the footer
   // brand as current; other pages (including the tool routes, whose header
-  // brand is a next/link to /) leave the brand unmarked.
+  // brand is a next/link to /) leave the brand unmarked. Lookaheads keep the
+  // assertions order-independent (React/Next may emit href before class).
   const home = await renderRoute("/");
-  assert.match(home.html, /<a class="brand"[^>]*href="#top"[^>]*aria-current="page"/, "home header brand must be current");
-  assert.match(home.html, /<footer class="site-footer"[\s\S]*?<a class="brand"[^>]*href="\/"[^>]*aria-current="page"/, "home footer brand must be current");
+  assert.match(home.html, /<a(?=[^>]*class="brand")(?=[^>]*href="#top")(?=[^>]*aria-current="page")[^>]*>/, "home header brand must be current");
+  assert.match(home.html, /<footer class="site-footer"[\s\S]*?<a(?=[^>]*class="brand")(?=[^>]*href="\/")(?=[^>]*aria-current="page")[^>]*>/, "home footer brand must be current");
   for (const route of ["/guide", "/login", "/mappa"]) {
     const { html } = await renderRoute(route);
-    assert.doesNotMatch(html, /<a class="brand"[^>]*aria-current="page"/, `${route}: brand must not be marked current`);
+    assert.doesNotMatch(html, /<a[^>]*class="brand"[^>]*aria-current="page"/, `${route}: brand must not be marked current`);
   }
 });
 
-test("tool nav: the per-page link for the current route carries aria-current=page (QA-2026-08-01-3)", async () => {
-  // Per-page navigation pattern (F3 t_2ca69725, closed in F-QA): the
-  // ToolLayout nav set changes with usePathname(), so the link for the page
-  // the visitor is on must carry aria-current="page" — the value ARIA
-  // defines for the current page of a navigation set.
+test("tool nav: the per-page set never self-links — the current page is marked by the footer (QA-2026-08-01-3)", async () => {
+  // Per-page navigation pattern (F3 t_2ca69725, FRONTEND_DESIGN §2.5): the
+  // tool nav set links the OTHER tools + contextual pages + home — the
+  // current page is never linked to itself (pinned by
+  // client-tools.test.mjs). There is therefore NO self-link in the per-page
+  // nav to mark with aria-current; the current page is exposed to assistive
+  // technology by the site footer (full 13-link nav, marks its own link
+  // aria-current="page" — asserted in the test above) and by each page's
+  // own h1. This test pins that contract so a future change cannot add a
+  // dead-end self-link or silently drop the footer marking.
   const rtl = await setupDom();
   await setNavState({ pathname: "/mappa" });
   const mod = await loadDomModule("app/components/ToolLayout.mjs");
@@ -505,17 +513,28 @@ test("tool nav: the per-page link for the current route carries aria-current=pag
   const links = () => [...container.querySelectorAll(".nav-links a")];
   const currentOf = () => links().filter((a) => a.getAttribute("aria-current") === "page");
   assert.equal(links().length >= 4, true, "the per-page nav set must render");
-  assert.equal(currentOf().length, 1, "exactly one nav link must be current on /mappa");
-  assert.equal(currentOf()[0].getAttribute("href"), "/mappa", "the /mappa link must be marked current");
-  const directoryLink = links().find((a) => a.getAttribute("href") === "/directory");
-  assert.equal(directoryLink?.getAttribute("aria-current"), null, "other tools must not be current");
+  assert.equal(currentOf().length, 0, "the per-page nav must not self-link (hand-off pattern): no aria-current on /mappa");
+  assert.ok(
+    !links().some((a) => a.getAttribute("href") === "/mappa"),
+    "the /mappa nav set must not contain a link to itself",
+  );
 
-  // Moving to /directory re-marks the nav (the set itself changes).
+  // Same contract on /directory: no self-link, footer marks the page.
+  // NOTE: testing-library's rerender() replaces the tree with the BARE
+  // element — it would drop the LocaleProvider wrapper and crash with
+  // "useLocale must be used within LocaleProvider". Re-wrap explicitly.
   await setNavState({ pathname: "/directory" });
-  rerender(React.createElement(ToolLayout, null, React.createElement("div", null, "body")));
-  const currentDirectory = [...container.querySelectorAll(".nav-links a")].filter((a) => a.getAttribute("aria-current") === "page");
-  assert.equal(currentDirectory.length, 1);
-  assert.equal(currentDirectory[0].getAttribute("href"), "/directory");
+  rerender(await wrapWithLocale(React.createElement(ToolLayout, null, React.createElement("div", null, "body"))));
+  const directoryLinks = [...container.querySelectorAll(".nav-links a")];
+  assert.equal(
+    directoryLinks.filter((a) => a.getAttribute("aria-current") === "page").length,
+    0,
+    "no self-link on /directory either",
+  );
+  assert.ok(
+    !directoryLinks.some((a) => a.getAttribute("href") === "/directory"),
+    "the /directory nav set must not contain a link to itself",
+  );
   rtl.cleanup();
 });
 

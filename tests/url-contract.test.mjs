@@ -40,7 +40,9 @@ import { loadDomModule, setUrlState, getUrlState, goBack, goForward } from "./he
 
 // The filter keys the URL owns. The oracle implements each one explicitly
 // below (a key list would let a typo silently drop a key from the contract).
-const FRESHNESS_VALUES = new Set(["all", "7d", "30d", "90d", "365d"]);
+// The whitelist mirrors db/cameras.ts freshnessWindows (["7d","30d","90d",
+// "all"]) — the same values the F0 server filters accept.
+const FRESHNESS_VALUES = new Set(["all", "7d", "30d", "90d"]);
 const TYPE_FALLBACK = "all";
 const FRESHNESS_FALLBACK = "all";
 
@@ -197,7 +199,7 @@ test("harness: replace updates the current history entry without growing it", as
 test("F4 GATE: useCameraFilters satisfies the URL contract (skipped until F4 lands)", async (t) => {
   let mod;
   try {
-    mod = await loadDomModule("app/components/useCameraFilters.mjs");
+    mod = await loadDomModule("app/lib/use-camera-filters.mjs");
   } catch {
     mod = null;
   }
@@ -205,14 +207,28 @@ test("F4 GATE: useCameraFilters satisfies the URL contract (skipped until F4 lan
     t.skip("F4 non ancora atterrato (t_522638a5): il contratto URL si attiva con la PR di F4. La suite resta verde per F0-F3.");
     return;
   }
-  const { parseFilterParams: parse, stringifyFilterParams: stringify } = mod;
-  assert.equal(typeof parse, "function", "useCameraFilters must export parseFilterParams");
-  assert.equal(typeof stringify, "function", "useCameraFilters must export stringifyFilterParams");
-  // The real implementation must satisfy the same invariants as the oracle.
-  const state = parse(new URLSearchParams("type=Fixed+dome&freshness=30d&query=via+roma"));
+  const { parseCameraFilters: parse, stringifyCameraFilters: stringify } = mod;
+  assert.equal(typeof parse, "function", "use-camera-filters must export parseCameraFilters");
+  assert.equal(typeof stringify, "function", "use-camera-filters must export stringifyCameraFilters");
+  // The real implementation must satisfy the same invariants as the oracle:
+  // round-trip lossless, encoding survives, invalid values fall back — never
+  // throw, never 500 (URL contract, parere QA t_8bc7f4e2 punto 1).
+  const state = parse(new URLSearchParams("type=Fixed+dome&freshness=30d&q=via+roma"));
   assert.deepEqual(parse(new URLSearchParams(stringify(state).replace(/^\?/, ""))), state, "round-trip lossless");
-  const invalid = parse(new URLSearchParams("freshness=banana&type=" + "x".repeat(500)));
+  const encoded = parse(new URLSearchParams("type=Telecamera+%C3%A0+angolo+stretto&q=via+Roma%2C+1"));
+  assert.equal(encoded.type, "Telecamera à angolo stretto");
+  // URLSearchParams serializes spaces as '+' and non-ASCII as %-escapes:
+  // the invariant is that the UTF-8 char survives the round-trip, not that
+  // the wire form matches encodeURIComponent (which would use %20).
+  assert.ok(stringify(encoded).includes("%C3%A0"), "non-ASCII must be %-encoded on the wire");
+  const invalid = parse(new URLSearchParams("freshness=banana&type=" + "x".repeat(500) + "&q=" + "y".repeat(500)));
   assert.equal(invalid.freshness, "all", "invalid freshness falls back");
-  assert.ok(invalid.type.length <= 40, "type is bounded");
+  assert.ok(invalid.type.length <= 60, "type is bounded");
+  assert.ok(invalid.q.length <= 200, "q is bounded (input max)");
   assert.doesNotThrow(() => stringify(invalid));
+  // Duplicate keys: URLSearchParams keeps the first value — the lenient
+  // parse must not throw and must pick a whitelisted freshness.
+  const dup = parse(new URLSearchParams("freshness=all&freshness=7d&focus=abc"));
+  assert.equal(dup.freshness, "all");
+  assert.equal(dup.focus, null, "non-numeric focus must fall back to null");
 });

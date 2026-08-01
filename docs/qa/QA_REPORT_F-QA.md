@@ -24,7 +24,7 @@ Oracolo eseguibile di parse/stringify dei filtri (type/freshness/lat/lng/z/query
 
 ### 1.3 Gap noti chiusi
 - **QA-2026-08-01-2 (aria-invalid sui form)** — CLOSED: login/register ora hanno validazione client per-campo con `aria-invalid` sul campo sbagliato, `noValidate` sul form (niente doppia UI nativa), errore server resta su `role="alert"` senza accusare un campo specifico. Test di interazione che pina il comportamento (submit vuoto → entrambi i campi marcati, nessun fetch; fix del campo → si sblocca solo lui; displayName da 1 char invalido).
-- **QA-2026-08-01-3 (aria-current sulla nav attiva)** — CLOSED: footer marca con `aria-current="page"` il link della route corrente (13 link, esattamente uno per route); brand header/footer marcato sulla home; ToolLayout marca il link della tool corrente nella nav per-pagina (F3). Test SSR + test di interazione del ToolLayout (pathname /mappa → /mappa current; /directory → /directory current).
+- **QA-2026-08-01-3 (aria-current sulla nav attiva)** — CLOSED: il footer globale (root layout, presente su ogni route) marca con `aria-current="page"` il link della route corrente (13 link, esattamente uno per route); brand header/footer marcato sulla home. La nav per-pagina del ToolLayout (F3) **non si auto-linka mai** (pattern hand-off, FRONTEND_DESIGN §2.5 — pin `client-tools`): la pagina corrente non ha quindi un self-link da marcare nella tool nav, ed è esposta all'assistive technology dal footer e dall'h1 di pagina. Test SSR (footer per route) + test di interazione ToolLayout (nessun self-link su /mappa e /directory).
 
 ### 1.4 Criteri di accettazione per fase — `tests/qa-phase-gate.test.mjs` + `tests/helpers/route-contracts.mjs`
 - Registry unico delle route (20): per ognuna i 4 artifact obbligatori (a) SSR smoke, (b) interaction test, (c) i18n parity, (d) a11y contract.
@@ -56,12 +56,12 @@ Nessun workflow Lighthouse esiste in .github/workflows/ → **proposta come task
 | tests/a11y-interactive.test.mjs | gap aria chiusi: test nuovi, pinned obsolete rimosse |
 | app/components/SiteFooter.tsx | aria-current su ogni link del footer |
 | app/components/SiteHeader.tsx | aria-current sul brand (home) |
-| app/components/ToolLayout.tsx | aria-current sulla tool corrente |
+| app/components/ToolLayout.tsx | commento contratto: nav per-pagina mai self-link (niente aria-current dead) |
 | app/login/page.tsx, app/register/page.tsx | aria-invalid per-campo + noValidate |
 | package.json | devDependency axe-core |
 | docs/ACCESSIBILITY_STATEMENT.md | gap "automated checks pending" chiuso (EN+IT) |
 
 ## 3. Note per il reviewer
 - Il test `axe-audit` richiede `npm run build` (npm test lo esegue già).
-- F4 (t_522638a5) deve: (1) NON cancellare tests/url-contract.test.mjs (è il gate di accettazione), (2) esportare parseFilterParams/stringifyFilterParams dal proprio modulo per attivare il gate.
+- F4 (t_522638a5) deve: (1) NON cancellare tests/url-contract.test.mjs (è il gate di accettazione), (2) il gate si attiva sul modulo reale `app/lib/use-camera-filters.mjs` con gli export `parseCameraFilters`/`stringifyCameraFilters` (contratto verificato contro la PR #165: round-trip, encoding, fallback invalidi, bound q≤200/type≤60, focus non-numerico → null).
 - Le route F1-F3 sono già nel registry con i loro artifact esistenti (home-hub, client-tools, pages-render, i18n-pages): nessun test di fase rotto.
