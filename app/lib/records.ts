@@ -9,6 +9,14 @@ export type Camera = MapCamera & {
   manufacturer?: string | null;
   observedOn?: string | null;
   /**
+   * Community-verification aggregate count (ADR 0018 §2.3, C1). Public and
+   * aggregate only — never attribution to any profile. Present on real API
+   * records (GET /api/cameras fills it via confirmationCountsFor); absent
+   * on the demo seed, which renders the widget without a counter until the
+   * record detail loads the live value.
+   */
+  confirmationCount?: number;
+  /**
    * Machine-readable last verification date (F0, FRONTEND_PLAN § 3.2.6):
    * the server freshness windows are anchored on this field. Present on
    * real API records; absent on the demo seed (which keeps `updated` as
