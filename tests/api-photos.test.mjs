@@ -20,6 +20,20 @@ const photosRoute = () => loadRoute("app/api/photos/route.mjs");
 const photoItemRoute = () => loadRoute("app/api/photos/[id]/route.mjs");
 const moderationPhotoRoute = () => loadRoute("app/api/moderation/photos/[id]/route.mjs");
 
+// Default pending-photo quota state for tests that are not about the quota:
+// zero pending photos, zero pending bytes — the upload is always allowed by
+// the state quota and the test exercises whatever behaviour it stubbed.
+function quotaOk() {
+  return stub("pendingPhotoUsage", async () => ({ count: 0, sizeBytes: 0 }));
+}
+
+// SHA-256 hex of a string, matching app/lib/abuse-alerts.ts sha256Hex — used
+// to assert the anonymous quota bucket key is the hashed caller key.
+async function sha256HexOf(value) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
 // Synthetic EXIF-carrying JPEG bytes (see image-metadata.test.mjs fixtures).
 function jpegBytes() {
   const be16 = (value) => [(value >> 8) & 0xff, value & 0xff];
@@ -64,6 +78,7 @@ const photoFixture = {
 // ---------------------------------------------------------------------------
 
 test("POST /api/photos stores a sanitised photo and returns metadata only", async () => {
+  quotaOk();
   stub("createPendingPhoto", async () => photoFixture);
   const bytes = jpegBytes();
   const { POST } = await photosRoute();
@@ -87,6 +102,7 @@ test("POST /api/photos stores a sanitised photo and returns metadata only", asyn
 });
 
 test("POST /api/photos attributes an authenticated upload to its contributor", async () => {
+  quotaOk();
   stub("findSessionByToken", async () => ({
     tokenHash: "x",
     csrfToken: "csrf-token-123",
@@ -131,6 +147,7 @@ test("POST /api/photos rejects an authenticated upload without a valid CSRF toke
 });
 
 test("POST /api/photos rejects non-allowlisted MIME types with 415", async () => {
+  quotaOk();
   const { POST } = await photosRoute();
   const response = await POST(photoRequest(jpegBytes(), { contentType: "image/gif" }));
   assert.equal(response.status, 415);
@@ -138,6 +155,7 @@ test("POST /api/photos rejects non-allowlisted MIME types with 415", async () =>
 });
 
 test("POST /api/photos rejects a declared type that does not match the file bytes", async () => {
+  quotaOk();
   const { POST } = await photosRoute();
   const response = await POST(photoRequest(jpegBytes(), { contentType: "image/png" }));
   assert.equal(response.status, 415);
@@ -145,6 +163,7 @@ test("POST /api/photos rejects a declared type that does not match the file byte
 });
 
 test("POST /api/photos rejects non-image bodies with 415", async () => {
+  quotaOk();
   const { POST } = await photosRoute();
   const response = await POST(photoRequest(new Uint8Array([1, 2, 3, 4, 5]), { contentType: "image/jpeg" }));
   assert.equal(response.status, 415);
@@ -152,6 +171,7 @@ test("POST /api/photos rejects non-image bodies with 415", async () => {
 });
 
 test("POST /api/photos rejects unreadable dimensions with 400", async () => {
+  quotaOk();
   const { POST } = await photosRoute();
   // JPEG container with no SOF marker → dimensions unreadable. At least 12
   // bytes so sniffing succeeds first (otherwise it is a 415, not a 400).
@@ -162,6 +182,7 @@ test("POST /api/photos rejects unreadable dimensions with 400", async () => {
 });
 
 test("POST /api/photos rejects oversized bodies with 413", async () => {
+  quotaOk();
   const { POST } = await photosRoute();
   // Declared content-length over the default 10 MiB cap → 413 pre-read.
   const response = await POST(
@@ -172,6 +193,7 @@ test("POST /api/photos rejects oversized bodies with 413", async () => {
 });
 
 test("POST /api/photos honours env-tuned limits via the shared env mock", async () => {
+  quotaOk();
   const env = (await loadTreeModule("cloudflare-workers.mjs")).env;
   env.PHOTO_MAX_BYTES = "8";
   env.PHOTO_MAX_DIMENSION = "32";
@@ -207,6 +229,7 @@ test("POST /api/photos returns 503 when submissions are disabled", async () => {
 });
 
 test("POST /api/photos fails closed when metadata stripping cannot be verified", async () => {
+  quotaOk();
   const env = (await loadTreeModule("cloudflare-workers.mjs")).env;
   env.PHOTO_MAX_BYTES = "1000000";
   try {
@@ -220,6 +243,122 @@ test("POST /api/photos fails closed when metadata stripping cannot be verified",
   } finally {
     delete env.PHOTO_MAX_BYTES;
   }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/photos — pending-photo quota (audit t_2ee58c08, P2)
+// ---------------------------------------------------------------------------
+
+test("POST /api/photos answers 429 when the caller is at the pending-photo count cap", async () => {
+  // 20 pending photos = default cap → the 21st upload is rejected before the
+  // body is read and nothing is stored.
+  stub("pendingPhotoUsage", async () => ({ count: 20, sizeBytes: 0 }));
+  stub("createPendingPhoto", async () => photoFixture);
+  const { POST } = await photosRoute();
+  const response = await POST(photoRequest(jpegBytes()));
+
+  assert.equal(response.status, 429);
+  const body = await responseBody(response);
+  assert.match(body.error ?? "", /quota exceeded/i);
+  assert.equal(callArgs("createPendingPhoto").length, 0, "over-quota upload must not reach storage");
+});
+
+test("POST /api/photos answers 429 when pending bytes exceed the byte quota", async () => {
+  // Just under the count cap, but the pending bytes (200 MiB − 1 byte) plus the
+  // new photo push past the default 200 MiB byte quota → rejected before storage.
+  const byteCap = 200 * 1024 * 1024;
+  stub("pendingPhotoUsage", async () => ({ count: 5, sizeBytes: byteCap - 1 }));
+  stub("createPendingPhoto", async () => photoFixture);
+  const { POST } = await photosRoute();
+  const response = await POST(photoRequest(jpegBytes()));
+
+  assert.equal(response.status, 429);
+  assert.equal(callArgs("createPendingPhoto").length, 0, "over-quota upload must not reach storage");
+});
+
+test("POST /api/photos allows uploads under the pending-photo quota unchanged", async () => {
+  // At 19 pending photos (one below the default cap of 20) a new upload is
+  // accepted and stored exactly as before the quota existed.
+  stub("pendingPhotoUsage", async () => ({ count: 19, sizeBytes: 1024 }));
+  stub("createPendingPhoto", async () => photoFixture);
+  const { POST } = await photosRoute();
+  const response = await POST(photoRequest(jpegBytes()));
+
+  assert.equal(response.status, 201);
+  assert.equal(callArgs("createPendingPhoto").length, 1);
+  const received = callArgs("createPendingPhoto")[0][0];
+  assert.equal(received.submitterKey, `anon:${await sha256HexOf("unknown")}`);
+  // The storage layer must still receive the sanitised bytes and attribution.
+  assert.ok(received.bytes instanceof Uint8Array);
+  assert.equal(received.mimeType, "image/jpeg");
+});
+
+test("POST /api/photos honours env-tuned pending-photo quota knobs", async () => {
+  const env = (await loadTreeModule("cloudflare-workers.mjs")).env;
+  env.PHOTOS_MAX_PENDING_PER_CALLER = "2";
+  env.PHOTOS_MAX_PENDING_BYTES = "1000";
+  try {
+    // Count cap at 2: two pending photos → third upload rejected with 429.
+    stub("pendingPhotoUsage", async () => ({ count: 2, sizeBytes: 100 }));
+    stub("createPendingPhoto", async () => photoFixture);
+    let { POST } = await photosRoute();
+    assert.equal((await POST(photoRequest(jpegBytes()))).status, 429);
+    assert.equal(callArgs("createPendingPhoto").length, 0);
+
+    // Byte cap at 1000: 999 pending bytes + a photo over 1 byte → 429.
+    stub("pendingPhotoUsage", async () => ({ count: 0, sizeBytes: 999 }));
+    const response = await POST(photoRequest(jpegBytes()));
+    assert.equal(response.status, 429);
+    assert.equal(callArgs("createPendingPhoto").length, 0);
+
+    // Under both caps: upload accepted.
+    stub("pendingPhotoUsage", async () => ({ count: 1, sizeBytes: 100 }));
+    const ok = await POST(photoRequest(jpegBytes()));
+    assert.equal(ok.status, 201);
+    assert.equal(callArgs("createPendingPhoto").length, 1);
+  } finally {
+    delete env.PHOTOS_MAX_PENDING_PER_CALLER;
+    delete env.PHOTOS_MAX_PENDING_BYTES;
+  }
+});
+
+test("POST /api/photos buckets an authenticated upload by contributor id", async () => {
+  quotaOk();
+  stub("findSessionByToken", async () => ({
+    tokenHash: "x",
+    csrfToken: "csrf-token-123",
+    contributor: { id: 7, email: "linus@osdb.test", displayName: "Linus" },
+  }));
+  stub("createPendingPhoto", async () => photoFixture);
+  const { POST } = await photosRoute();
+  const response = await POST(
+    new Request("https://osdb.test/api/photos", {
+      method: "POST",
+      headers: {
+        "content-type": "image/jpeg",
+        cookie: "osdb_session=raw-session-token-abc123; osdb_csrf=csrf-token-123",
+        "x-csrf-token": "csrf-token-123",
+      },
+      body: jpegBytes(),
+    }),
+  );
+  assert.equal(response.status, 201);
+  assert.equal(callArgs("pendingPhotoUsage")[0][0], "contributor:7");
+  assert.equal(callArgs("createPendingPhoto")[0][0].submitterKey, "contributor:7");
+});
+
+test("POST /api/photos buckets an anonymous upload by hashed caller key", async () => {
+  quotaOk();
+  stub("createPendingPhoto", async () => photoFixture);
+  const { POST } = await photosRoute();
+  // With no cf-connecting-ip header the rate-limit callerKey falls back to
+  // "unknown"; the quota key is the SHA-256 of that value, never the raw key.
+  const response = await POST(photoRequest(jpegBytes()));
+  assert.equal(response.status, 201);
+  const key = callArgs("pendingPhotoUsage")[0][0];
+  assert.match(key, /^anon:[0-9a-f]{64}$/);
+  assert.equal(key, `anon:${await sha256HexOf("unknown")}`);
+  assert.equal(callArgs("createPendingPhoto")[0][0].submitterKey, key);
 });
 
 // ---------------------------------------------------------------------------

@@ -254,6 +254,8 @@ or client bundles (the secrets gate in CI rejects hardcoded credentials).
 | `MODERATION_RATE_LIMIT_MAX` / `MODERATION_RATE_LIMIT_WINDOW_SECONDS` | 30 / 60 | Moderation API (second layer over edge auth), including appeal decisions |
 | `TILES_RATE_LIMIT_MAX` / `TILES_RATE_LIMIT_WINDOW_SECONDS` | 60 / 60 | Tile proxy (`GET /api/tiles/*`) — protects the OSMF upstream from per-caller scraping |
 | `POST_SUBMISSIONS_DISABLED` | `false` | Kill switch: reject new submissions with 503 |
+| `PHOTOS_MAX_PENDING_PER_CALLER` | 20 | Pending-photo count cap per caller bucket (authenticated: `contributor:<id>`; anonymous: `anon:<sha256(caller key)>`). `POST /api/photos` answers 429 when a caller is at the cap — a state quota distinct from the HTTP rate limit, bounding how much R2 storage and how many moderation-queue items one caller can accumulate while the queue catches up. Only `status = 'pending'` photos count; approved/rejected photos leave the cap as soon as a moderator decides them |
+| `PHOTOS_MAX_PENDING_BYTES` | 209715200 (200 MiB) | Pending R2 bytes cap per caller bucket, same semantics — bounds the storage volume even when the count is not the binding constraint |
 | `MAX_BODY_BYTES` | 32768 (32 KiB) | Max JSON request body; larger bodies answer 413 |
 | `ABUSE_ALERT_THRESHOLD` | 10 | Per-caller abuse events per window before an alert fires |
 | `ABUSE_ALERT_SURGE_THRESHOLD` | 50 | Route-wide events per window before a surge alert fires |
