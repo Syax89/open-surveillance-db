@@ -121,7 +121,7 @@ export const it: Translation<typeof en> = {
   safeguardEscalationTitle: "Un percorso di escalation chiaro",
   safeguardEscalationBody: "Le questioni legali e di privacy hanno un percorso definito verso revisori senior e amministratori.",
   safeguardCredentialsTitle: "Credenziali separate",
-  safeguardCredentialsBody: "Le credenziali di moderazione sono separate dagli account contributore generali, così la coda è raggiungibile solo dai moderatori formati.",
+  safeguardCredentialsBody: "Le credenziali di moderazione sono separate dagli account contributor generali, così la coda è raggiungibile solo dai moderatori formati.",
   safeguardTrainingTitle: "Formazione e consapevolezza dei bias",
   safeguardTrainingBody: "I moderatori applicano criteri coerenti e ricevono formazione sulla consapevolezza dei bias.",
   safeguardAuditTitle: "Revisione e audit regolari",

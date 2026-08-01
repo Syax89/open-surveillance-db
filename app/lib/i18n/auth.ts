@@ -72,7 +72,7 @@ export const it: Translation<typeof en> = {
   accountAria: "Il tuo account",
   backHome: "Torna alla mappa",
   loginTitle: "Accedi",
-  registerTitle: "Crea un account da contributore",
+  registerTitle: "Crea un account da contributor",
   accountTitle: "Il tuo account",
   email: "Email",
   password: "Password",

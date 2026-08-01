@@ -410,7 +410,7 @@ function bundleKeys(bundle) {
 
 const I18N_DOMAINS = [
   "common", "map", "directory", "report", "correction", "status", "home", "guide", "manifesto", "moderazione",
-  "faq", "contact", "rules", "record", "moderation", "auth", "footer",
+  "faq", "contact", "rules", "record", "moderation", "auth", "community", "footer",
 ];
 
 test("EN and IT bundles expose the exact same key set", async () => {
