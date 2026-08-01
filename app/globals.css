@@ -121,3 +121,20 @@ footer { padding:30px 0 44px; display:grid; grid-template-columns:1fr 1fr 1fr; a
 .auth-danger-zone .button:hover { background:#fdf0ec; border-color:#c0745f; }
 .auth-danger-zone .button:disabled { opacity:.55; cursor:progress; }
 @media (max-width:700px){ .record-detail-list { grid-template-columns:1fr; } }
+
+/* Public legal / information pages (privacy, terms, licences). */
+.legal-article { width:min(100% - 48px, 780px); margin:48px auto 80px; }
+.legal-article h1 { font-size:clamp(34px,5vw,54px); line-height:1.05; letter-spacing:-.02em; color:#203841; margin:14px 0 18px; }
+.legal-intro { font-size:17px; line-height:1.6; color:#435963; margin:0 0 18px; }
+.legal-updated { margin:0 0 6px; color:#63717b; font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; }
+.legal-section { margin:44px 0 0; padding-top:28px; border-top:1px solid #d8ddd6; }
+.legal-section h2 { font-size:clamp(21px,3vw,26px); line-height:1.2; letter-spacing:-.01em; color:#203841; margin:0 0 14px; }
+.legal-section p { margin:0 0 14px; color:#2f4751; font-size:15px; line-height:1.65; }
+.legal-list { margin:0 0 14px; padding-left:20px; display:grid; gap:8px; color:#2f4751; font-size:15px; line-height:1.6; }
+.legal-note { margin:26px 0 0; padding:16px 18px; border:1px solid #e0c477; border-left:3px solid #c99127; border-radius:8px; background:#fff7df; color:#684f28; font-size:13.5px; line-height:1.55; }
+.legal-table-wrap { overflow-x:auto; margin:18px 0 20px; border:1px solid #d8ddd6; border-radius:9px; }
+.legal-table { width:100%; border-collapse:collapse; font-size:13px; line-height:1.5; }
+.legal-table th { text-align:left; padding:10px 12px; background:#f2f6f2; color:#435963; font-size:11px; text-transform:uppercase; letter-spacing:.07em; border-bottom:1px solid #d8ddd6; }
+.legal-table td { padding:10px 12px; color:#2f4751; border-bottom:1px solid #eef2ee; vertical-align:top; }
+.legal-table tr:last-child td { border-bottom:0; }
+@media (max-width:700px){ .legal-article { width:min(100% - 32px, 780px); margin:32px auto 64px; } }

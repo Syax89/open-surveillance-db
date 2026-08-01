@@ -554,4 +554,16 @@ export const en = {
       "Your account has been erased and you are logged out. Your reports remain published without attribution.",
     errorDeleteAccount: "Unable to delete the account. Please try again.",
   },
+  legal: {
+    navigation: "Site navigation",
+    homeAria: "OpenSurveillanceDB home",
+    map: "Map",
+    directory: "Directory",
+    guide: "How it works",
+    home: "Home",
+    footerTagline: "Open, community-maintained data about public surveillance.",
+    privacy: "Privacy",
+    terms: "Terms of use",
+    licenses: "Licences",
+  },
 } as const;

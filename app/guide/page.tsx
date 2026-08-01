@@ -84,7 +84,7 @@ export default function GuidePage() {
     <footer>
       <div className="brand"><span className="brand-mark" aria-hidden="true">◉</span><span>OpenSurveillanceDB</span></div>
       <p>{t.footer}</p>
-      <div className="footer-links"><Link href="/">{t.home}</Link><Link href="/#map">{t.map}</Link><Link href="/#records">{t.directory}</Link></div>
+      <div className="footer-links"><Link href="/">{t.home}</Link><Link href="/#map">{t.map}</Link><Link href="/#records">{t.directory}</Link><Link href="/privacy">{bundle.legal.privacy}</Link><Link href="/termini">{bundle.legal.terms}</Link><Link href="/licenze">{bundle.legal.licenses}</Link></div>
     </footer>
   </main>;
 }

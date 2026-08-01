@@ -54,21 +54,26 @@ async function workerModules() {
   return [entry, ...found.filter((m) => m !== entry)];
 }
 
-/** Render the homepage exactly like the deployed worker would. */
-async function renderHomepage() {
+/** Render a public page exactly like the deployed worker would. */
+async function renderPage(pathname) {
   const mf = new Miniflare({
     modules: await workerModules(),
     compatibilityDate: "2026-01-01",
     compatibilityFlags: ["nodejs_compat"],
   });
   try {
-    const response = await mf.dispatchFetch("http://localhost/", {
+    const response = await mf.dispatchFetch(`http://localhost${pathname}`, {
       headers: { accept: "text/html" },
     });
     return { response, html: await response.text() };
   } finally {
     await mf.dispose();
   }
+}
+
+/** Render the homepage exactly like the deployed worker would. */
+async function renderHomepage() {
+  return renderPage("/");
 }
 
 test("server-rendered homepage carries the public app metadata", async () => {
@@ -114,6 +119,31 @@ test("server-rendered homepage provides the map region and its text-list alterna
   assert.match(html, /id="record-search-count"[^>]*role="status"/);
   assert.match(html, /Show on map/);
   assert.match(html, /record-list/);
+});
+
+test("server-rendered legal pages carry their public content and footer links", async () => {
+  const pages = [
+    { path: "/privacy", title: "Privacy notice" },
+    { path: "/termini", title: "Terms of use" },
+    { path: "/licenze", title: "Open source and data licensing" },
+  ];
+  for (const { path, title } of pages) {
+    const { response, html } = await renderPage(path);
+    assert.equal(response.status, 200, `${path} should serve HTTP 200`);
+    assert.match(html, /id="main-content"/);
+    assert.match(html, new RegExp(`<h1>${title}</h1>`), `${path} should render its <h1>`);
+    // The shared footer exposes all three legal pages from every info page.
+    assert.match(html, /href="\/privacy"/);
+    assert.match(html, /href="\/termini"/);
+    assert.match(html, /href="\/licenze"/);
+  }
+});
+
+test("homepage footer links the public legal pages", async () => {
+  const { html } = await renderHomepage();
+  assert.match(html, /href="\/privacy"/);
+  assert.match(html, /href="\/termini"/);
+  assert.match(html, /href="\/licenze"/);
 });
 
 test("starter preview skeleton stays removed from the template", async () => {

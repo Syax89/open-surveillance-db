@@ -550,4 +550,16 @@ export const it: Translation<typeof en> = {
       "Il tuo account è stato cancellato e hai effettuato l'accesso. Le tue segnalazioni restano pubblicate senza attribuzione.",
     errorDeleteAccount: "Impossibile eliminare l'account. Riprova.",
   },
+  legal: {
+    navigation: "Navigazione del sito",
+    homeAria: "Home di OpenSurveillanceDB",
+    map: "Mappa",
+    directory: "Elenco",
+    guide: "Come funziona",
+    home: "Home",
+    footerTagline: "Dati aperti, mantenuti dalla comunità, sulla sorveglianza pubblica.",
+    privacy: "Privacy",
+    terms: "Termini di utilizzo",
+    licenses: "Licenze",
+  },
 };
