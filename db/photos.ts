@@ -181,6 +181,14 @@ export async function listApprovedPhotosForCamera(cameraId: number): Promise<
  * NULL`) stay linkable by anyone — they carry no attribution, and the
  * photo remains private and moderated regardless. An anonymous submitter
  * (contributorId null) can only link anonymous photos.
+ *
+ * Rejection is silent and best-effort by design: the WHERE clause makes a
+ * cross-owner (or non-pending/already-linked) photo simply not match, so
+ * it is left orphaned and the caller sees a lower count — never a 403/404.
+ * A hard error here would fail the whole report submission over a single
+ * foreign photo id (hostile UX) and would turn the endpoint into a photo
+ * id existence oracle (403 vs 404 distinguishes "exists but not yours").
+ * The photo can never become public without moderation regardless.
  */
 export async function linkPhotosToCamera(
   cameraId: number,

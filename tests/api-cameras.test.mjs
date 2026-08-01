@@ -417,6 +417,43 @@ test("POST /api/cameras links uploaded photo ids to the new report", async () =>
   assert.deepEqual(callArgs("linkPhotosToCamera")[0], [14, [101, 102], null]);
 });
 
+test("POST /api/cameras passes the authenticated submitter's contributor id into photo linking", async () => {
+  // Ownership guard wiring (PR #64, Ada review): a photo attributed to a
+  // contributor at upload may only be linked by that same contributor. The
+  // route must forward the resolved contributor id so linkPhotosToCamera can
+  // enforce it — a session-carrying submitter with valid CSRF gets their id
+  // threaded through; the anonymous path keeps null (covered above).
+  stub("findSessionByToken", async () => ({
+    tokenHash: "x",
+    csrfToken: "csrf-token-123",
+    contributor: { id: 7, email: "linus@osdb.test", displayName: "Linus" },
+  }));
+  stub("createPendingCamera", async (input) => ({ id: 14, ...input }));
+  stub("linkPhotosToCamera", async () => 2);
+  stub("findNearbyPublicCameras", async () => []);
+  const { POST } = await camerasRoute();
+  const response = await POST(
+    new Request("https://osdb.test/api/cameras", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        origin: "https://osdb.test",
+        cookie: "osdb_session=raw-session-token-abc123; osdb_csrf=csrf-token-123",
+        "x-csrf-token": "csrf-token-123",
+      },
+      body: JSON.stringify({
+        title: "With photo evidence",
+        kind: "Dome",
+        latitude: 45.0,
+        longitude: 9.0,
+        photoIds: [101, 102],
+      }),
+    }),
+  );
+  assert.equal(response.status, 201);
+  assert.deepEqual(callArgs("linkPhotosToCamera")[0], [14, [101, 102], 7]);
+});
+
 test("POST /api/cameras rejects non-integer photo ids with 400", async () => {
   stub("createPendingCamera", async (input) => ({ id: 15, ...input }));
   const { POST } = await camerasRoute();
