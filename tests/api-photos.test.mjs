@@ -515,6 +515,7 @@ test("GET /api/photos?cameraId= lists approved photos only for a public camera",
   const { GET } = await photosRoute();
   const response = await GET(apiRequest("/api/photos?cameraId=5"));
   assert.equal(response.status, 200);
+  assert.equal(response.headers.get("cache-control"), "no-store", "the approved-photo list must never be cached");
   assert.deepEqual(await responseBody(response), { photos: approved });
   assert.deepEqual(callArgs("listApprovedPhotosForCamera")[0], [5]);
 });

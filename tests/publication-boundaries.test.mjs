@@ -159,7 +159,16 @@ test("JSON, GeoJSON, and CSV are all derived from the public camera list", async
     /features\s*:\s*records\.map\(/,
     "GeoJSON must map the same filtered records returned by listPublicCameras",
   );
-  assert.match(getHandler, /return\s+Response\.json\(\{\s*records\s*\}\)/);
+  assert.match(
+    getHandler,
+    /listPublicCamerasPage\(filters,\s*\{\s*limit,\s*offset\s*\}\)/,
+    "the default JSON list must page through the dedicated paginated helper",
+  );
+  assert.match(
+    getHandler,
+    /return\s+Response\.json\(\{\s*records:\s*page\.records,\s*total:\s*page\.total,\s*nextOffset:\s*page\.nextOffset\s*\}/,
+    "the default JSON list must return the paginated shape (records, total, nextOffset)",
+  );
   assert.match(route, /function\s+toCsv\s*\(records/, "CSV must have an explicit serializer");
   assert.match(getHandler, /format\s*===\s*["']csv["']/, "the public route must recognise the CSV format");
   assert.match(getHandler, /new\s+Response\(toCsv\(records\)/, "CSV must serialize the same filtered record list");
@@ -522,6 +531,7 @@ test("the public interface contains no moderation or admin endpoint link", async
   const clientFiles = (await sourceFiles("app"))
     .filter((file) => !file.startsWith(`app${path.sep}api${path.sep}`))
     .filter((file) => !file.startsWith(`app${path.sep}moderation${path.sep}`))
+    .filter((file) => !file.startsWith(`app${path.sep}components${path.sep}moderation${path.sep}`))
     .filter((file) => !file.includes(`${path.sep}ModerationDashboard.`))
     .filter((file) => /\.(?:ts|tsx|js|jsx)$/.test(file));
   const publicSource = (await Promise.all(clientFiles.map(readSource))).join("\n");
@@ -754,8 +764,8 @@ test("every map task has a keyboard/text-list equivalent in the public interface
   // i18n externalisation moved user-facing wording into the pilot bundle
   // (ADR 0007); the fallback must still state plainly that the map is
   // unavailable, and the component must consume it from the bundle.
-  const enBundle = await readSource("app/lib/i18n/en.ts");
-  assert.match(enBundle, /The interactive map is unavailable\./, "the EN pilot bundle must state plainly that the map is unavailable");
+  const enMapBundle = await readSource("app/lib/i18n/map.ts");
+  assert.match(enMapBundle, /The interactive map is unavailable\./, "the EN pilot bundle must state plainly that the map is unavailable");
   assert.match(map, /t\.mapFallbackTitle/, "the fallback title must come from the message bundle");
   assert.match(map, /t\.mapFallbackBody/, "the fallback body must come from the message bundle");
 });

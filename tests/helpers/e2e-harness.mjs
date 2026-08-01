@@ -22,7 +22,10 @@
 //
 // Tests apply the real Drizzle migrations on a fresh D1SqliteDatabase per
 // test and assign it to env.DB, exactly like `wrangler d1 migrations apply`
-// on a fresh local DB. No demo data, no network, no mocks of the db layer.
+// on a fresh local DB — including migration 0017, which removes the demo
+// seed. Suites that need the demo reviewers/users seed them explicitly via
+// seedDemoIdentities() (see auth-flow-e2e, appeals). No network, no mocks of
+// the db layer.
 
 import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";

@@ -48,8 +48,22 @@ function subscribeToLocale(callback: () => void) {
   };
 }
 
-export function LocaleProvider({ children }: { children: ReactNode }) {
-  const locale = useSyncExternalStore(subscribeToLocale, readStoredLocale, () => "en" as Locale);
+export function LocaleProvider({
+  children,
+  serverLocale = "en",
+}: {
+  children: ReactNode;
+  /**
+   * Locale resolved server-side from the `opensurveillancedb-locale` cookie
+   * (app/lib/server-i18n.ts, root layout). Used as the SSR snapshot of
+   * useSyncExternalStore so client islands (SiteFooter, skip link, toggle
+   * state) render the right language on first paint — fixing the EN footer
+   * inside Italian SSR HTML (QA-2026-08-01-1). After hydration the client
+   * snapshot (localStorage) takes over, exactly like before.
+   */
+  serverLocale?: Locale;
+}) {
+  const locale = useSyncExternalStore(subscribeToLocale, readStoredLocale, () => serverLocale);
 
   useEffect(() => {
     document.documentElement.lang = locale;

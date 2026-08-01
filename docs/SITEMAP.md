@@ -344,16 +344,15 @@ export default async function PrivacyPage() {
    per page.
 2. **One `h1` per page**, placed in the `article.record-detail` hero
    (existing class). Sections use `h2`; sub-parts `h3`. No skipped levels.
-3. **Bilingual:** page strings live in the page's bundle inside
-   `app/lib/i18n/en.ts` (pilot) mirrored in `it.ts`; parity is enforced by
-   the `Translation<typeof en>` type. Pages read their bundle server-side
-   via `getServerMessages()` (`app/lib/server-i18n.ts`) — never import the
+3. **Bilingual:** add one per-domain file in `app/lib/i18n/` (e.g.
+   `home.ts`) exporting the page's `en` pilot object and its `it`
+   counterpart; parity is enforced by the `Translation<typeof en>` type
+   inside each domain file. Pages read their bundle server-side via
+   `getServerMessages()` (`app/lib/server-i18n.ts`) — never import the
    client hook `useMessages()` in a page. Legal pages use the
-   `app/lib/legal/` layer with the same en/it parity rule. (A refactor
-   splitting the i18n monolith into per-domain files —
-   `app/lib/i18n/home.ts`, `guide.ts`, `auth.ts`, … — is in progress in
-   PR #80; when it merges, update this rule and the i18n section below to
-   the per-domain layout.)
+   `app/lib/legal/` layer with the same en/it parity rule. Add
+   `nav`/`footer` keys in the relevant domain (see
+   `docs/REFACTOR_I18N.md`).
 4. **Content sources** are the docs referenced in the page-by-page spec;
    pages summarise/adapt them, they do not duplicate the raw markdown
    wholesale.
@@ -366,27 +365,26 @@ export default async function PrivacyPage() {
 
 | Bundle    | Where                                                     | Purpose |
 |-----------|-----------------------------------------------------------|---------|
-| `common`, `map`, `status` | `app/lib/i18n/en.ts` / `it.ts` | shared UI chrome (skip link, map labels, record statuses) |
-| `home`    | `app/lib/i18n/en.ts` / `it.ts` | home page (hero, map, directory, correction, principles) |
-| `guide`   | 〃                          | guide page |
-| `manifesto` | 〃                        | manifesto page |
-| `moderazione` | 〃                      | how-moderation-works page |
-| `faq`     | 〃                           | FAQ page |
-| `contact` | 〃                           | contacts page |
-| `rules`   | 〃                           | rules page |
-| `record`  | 〃                           | record detail page |
-| `moderation` | 〃                       | private moderator dashboard |
-| `auth`    | 〃                           | login/register/account |
-| `footer`  | 〃                           | global footer labels |
+| `common`, `map`, `status` | `app/lib/i18n/common.ts`, `map.ts`, `status.ts` | shared UI chrome (skip link, map labels, record statuses) |
+| `home`    | `app/lib/i18n/home.ts` | home page (hero, map, directory, correction, principles) |
+| `guide`   | `app/lib/i18n/guide.ts` | guide page |
+| `manifesto` | `app/lib/i18n/manifesto.ts` | manifesto page |
+| `moderazione` | `app/lib/i18n/moderazione.ts` | how-moderation-works page |
+| `faq`     | `app/lib/i18n/faq.ts` | FAQ page |
+| `contact` | `app/lib/i18n/contact.ts` | contacts page |
+| `rules`   | `app/lib/i18n/rules.ts` | rules page |
+| `record`  | `app/lib/i18n/record.ts` | record detail page |
+| `moderation` | `app/lib/i18n/moderation.ts` | private moderator dashboard |
+| `auth`    | `app/lib/i18n/auth.ts` | login/register/account |
+| `footer`  | `app/lib/i18n/footer.ts` | global footer labels |
 | `legal`   | `app/lib/legal/en.ts` / `it.ts` | structured legal content (`privacy`, `terms`, `licenses`) rendered by `LegalPage` |
 
 Notes:
 
-- The main i18n files are still **monolithic** `en.ts` / `it.ts` (top-level
-  bundle per page). PR #80 splits them into per-domain files
-  (`app/lib/i18n/home.ts`, `guide.ts`, `auth.ts`, …) — after that PR
-  merges, update this table to the per-domain paths and drop the "monolith"
-  wording. Until then, this table describes `main` as it is.
+- Each per-domain file pairs the page's `en` pilot object with its `it`
+  counterpart, type-checked by `Translation<typeof en>` inside the same
+  file; `app/lib/i18n/index.ts` assembles the full `messages` shape (see
+  `docs/REFACTOR_I18N.md`).
 - The legal layer is **separate** from the main bundle: `app/lib/legal/`
   has its own `en.ts` / `it.ts` / `types.ts` / `index.ts` and its own
   `LegalContent` type (inline markup support).
@@ -423,9 +421,6 @@ with PR #72 (tests: `tests/navigation-pages.test.mjs`,
 
 ## Open items
 
-- **i18n refactor (PR #80):** the per-domain bundle split
-  (`app/lib/i18n/<domain>.ts`) is open; after it merges, update the "i18n
-  bundles" section and rule 3 of the layout pattern in this document.
 - Header nav: pages keep their compact per-page `nav-shell`; if more pages
   are added, revisit the home link set (do not grow it without an explicit
   decision).

@@ -11,6 +11,10 @@
  *      importa i componenti estratti (non li definisce inline);
  *   4. le pagine informative usano il layout condiviso InfoPage.
  *
+ * Il refactor moderation (t_c7460073, Ada) segue lo stesso contratto:
+ * ModerationDashboard.tsx resta un orchestratore sottile e importa i
+ * componenti estratti da app/components/moderation/.
+ *
  * Deviazione registrata (baseline pinnata, NON silenziosa):
  *   app/components/home/ReportForm.tsx = 162 righe (> target ~150).
  *   Motivo: hook useReportFlow (~131 righe di logica) co-locato con il
@@ -44,6 +48,22 @@ const HOME_COMPONENTS = [
   { name: "ReportForm", file: "app/components/home/ReportForm.tsx" },
   { name: "CorrectionForm", file: "app/components/home/CorrectionForm.tsx" },
   { name: "MapPanel", file: "app/components/home/MapPanel.tsx" },
+];
+
+/**
+ * Componenti attesi dal refactor moderation di Ada (t_c7460073):
+ * ModerationDashboard.tsx -> app/components/moderation/*. L'hook
+ * useModerationQueue possiede stato/fetch/decide (pattern del refactor
+ * home); le sezioni e le card sono presentazionali e ricevono l'API.
+ */
+const MODERATION_COMPONENTS = [
+  { name: "QueueSection", file: "app/components/moderation/QueueSection.tsx" },
+  { name: "DecisionForm", file: "app/components/moderation/DecisionForm.tsx" },
+  { name: "CameraQueueItem", file: "app/components/moderation/CameraQueueItem.tsx" },
+  { name: "CorrectionQueueItem", file: "app/components/moderation/CorrectionQueueItem.tsx" },
+  { name: "PhotoQueueItem", file: "app/components/moderation/PhotoQueueItem.tsx" },
+  { name: "HistorySection", file: "app/components/moderation/HistorySection.tsx" },
+  { name: "useModerationQueue", file: "app/components/moderation/useModerationQueue.tsx" },
 ];
 
 /**
@@ -138,6 +158,66 @@ test("refactor: le pagine informative usano il layout condiviso InfoPage", async
       source,
       /from\s+["']\.\.\/components\/InfoPage["']/,
       `atteso import di InfoPage in app/${page}/page.tsx`,
+    );
+  }
+});
+
+test("refactor moderation: i componenti estratti esistono nei path previsti (t_c7460073)", async () => {
+  for (const { name, file } of MODERATION_COMPONENTS) {
+    const full = path.join(root, file);
+    await assert.doesNotReject(access(full), `atteso ${file} (componente ${name})`);
+  }
+});
+
+test("refactor moderation: nessun componente supera il target ~150 (o la baseline registrata)", async () => {
+  for (const { name, file } of MODERATION_COMPONENTS) {
+    const source = await readFile(path.join(root, file), "utf8");
+    const lines = countLines(source);
+    const deviation = KNOWN_DEVIATIONS.get(file);
+    if (deviation) {
+      assert.ok(
+        lines <= deviation.baselineLines,
+        `${name} (${file}): ${lines} righe > baseline registrata ${deviation.baselineLines} — la deviazione e' cresciuta (${deviation.reason})`,
+      );
+      console.log(`   [deviazione registrata] ${file}: ${lines} righe (> target ${MAX_COMPONENT_LINES}) — ${deviation.reason}`);
+    } else {
+      assert.ok(
+        lines <= MAX_COMPONENT_LINES,
+        `${name} (${file}): ${lines} righe > ${MAX_COMPONENT_LINES} (obiettivo refactor) — registrare in KNOWN_DEVIATIONS solo con baseline + motivo`,
+      );
+    }
+  }
+});
+
+test("refactor moderation: la dashboard non e' piu' un monolite (orchestratore sottile)", async () => {
+  const source = await readFile(path.join(root, "app", "components", "ModerationDashboard.tsx"), "utf8");
+  const lines = countLines(source);
+  assert.ok(
+    lines <= MAX_COMPONENT_LINES,
+    `ModerationDashboard.tsx: ${lines} righe > ${MAX_COMPONENT_LINES} (deve restare un orchestratore sottile)`,
+  );
+});
+
+test("refactor moderation: la dashboard importa i componenti estratti (non li definisce inline)", async () => {
+  const source = await readFile(path.join(root, "app", "components", "ModerationDashboard.tsx"), "utf8");
+  // Componenti composti direttamente dalla dashboard.
+  for (const { name, file } of MODERATION_COMPONENTS.filter((c) => c.name !== "DecisionForm")) {
+    const base = path.basename(file, path.extname(file));
+    assert.match(
+      source,
+      new RegExp(`from\\s+["'].*${base}["']`),
+      `atteso import di ${name} in ModerationDashboard.tsx`,
+    );
+  }
+});
+
+test("refactor moderation: DecisionForm e' importato dalle card che lo usano", async () => {
+  for (const file of ["app/components/moderation/CameraQueueItem.tsx", "app/components/moderation/CorrectionQueueItem.tsx", "app/components/moderation/PhotoQueueItem.tsx"]) {
+    const source = await readFile(path.join(root, file), "utf8");
+    assert.match(
+      source,
+      /from\s+["'].*DecisionForm["']/,
+      `atteso import di DecisionForm in ${file}`,
     );
   }
 });

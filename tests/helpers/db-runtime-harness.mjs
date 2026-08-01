@@ -9,9 +9,12 @@
 //
 // H3: the schema is no longer created at runtime (getD1() is a pure binding
 // passthrough). applyDrizzleMigrations() replays the real Drizzle migration
-// files (drizzle/0000-*.sql ... 0006-*.sql) on the in-memory database, so
+// files (drizzle/0000-*.sql ... 0017-*.sql) on the in-memory database, so
 // tests exercise exactly what `wrangler d1 migrations apply` produces on a
-// fresh local DB — with zero demo rows.
+// fresh local DB — including migration 0017, which removes the demo
+// identities seeded by 0008/0010. Suites that need the demo reviewers/users
+// (auth-flow-e2e, appeals) seed them explicitly with seedDemoIdentities()
+// after applying the migrations, mirroring the pre-alpha provisioning step.
 //
 // Every load builds a fresh temp tree, so module instances never share
 // state across tests.
@@ -43,6 +46,9 @@ const DB_MODULES = [
   // db/cameras.ts and db/freshness.ts import ../app/lib/public-status (pure,
   // shared public-status whitelist); mirror it into the temp tree as well.
   { source: "app/lib/public-status.ts", output: "app/lib/public-status.mjs" },
+  // db/appeals.ts imports ../app/lib/rate-limit (pure, no CF binding) for the
+  // per-appellant appeal threshold knobs; mirror it into the temp tree too.
+  { source: "app/lib/rate-limit.ts", output: "app/lib/rate-limit.mjs" },
   // db/auth.ts (contributor accounts and sessions, ADR 0013) imports getD1
   // from ./cameras; it runs against the same binding and in-memory D1.
   { source: "db/auth.ts", output: "db/auth.mjs" },
@@ -108,9 +114,9 @@ export async function loadDbRuntime() {
   return { env: envModule.env, cameras, corrections, moderation, auth, users, appeals, photos };
 }
 
-// Replays the real Drizzle migration files (drizzle/0000-*.sql ... 0006-*.sql)
+// Replays the real Drizzle migration files (drizzle/0000-*.sql ... 0017-*.sql)
 // on a D1SqliteDatabase, mirroring `wrangler d1 migrations apply` on a fresh
-// local DB: 3 tables + 3 indexes + 19 cameras columns (16 base + 3 freshness), zero demo rows.
+// local DB: full application schema, zero demo rows (0017 removes the seed).
 export async function applyDrizzleMigrations(db) {
   const files = (await readdir(DRIZZLE_DIR))
     .filter((name) => /^\d{4}_.*\.sql$/.test(name))
@@ -118,6 +124,42 @@ export async function applyDrizzleMigrations(db) {
   for (const file of files) {
     db.exec(await readFile(path.join(DRIZZLE_DIR, file), "utf8"));
   }
+}
+
+// Seeds the demo identities that migrations 0008/0010 used to insert and
+// migration 0017 now removes. Suites that exercise moderation/appeals/auth
+// against the real schema (auth-flow-e2e, appeals) call this after
+// applyDrizzleMigrations() to reproduce the pre-alpha demo fixture, exactly
+// like a deploy provisioning real accounts before opening the DB.
+//
+// NOTE: ids are inserted explicitly so the suites' hardcoded reviewer/user
+// ids (1-5 reviewers, 1-6 users) keep matching, exactly as the original
+// migration seed produced them.
+export async function seedDemoIdentities(db) {
+  db.exec(`
+    INSERT INTO users (id, email, display_name, role, active, mfa_enabled, created_at, updated_at) VALUES
+      (1, 'intake@osdb.test', 'Demo Intake Reviewer', 'moderator', 1, 0, '2026-08-01T00:00:00.000Z', '2026-08-01T00:00:00.000Z'),
+      (2, 'record@osdb.test', 'Demo Record Reviewer', 'moderator', 1, 0, '2026-08-01T00:00:00.000Z', '2026-08-01T00:00:00.000Z'),
+      (3, 'senior@osdb.test', 'Demo Senior Moderator', 'moderator', 1, 0, '2026-08-01T00:00:00.000Z', '2026-08-01T00:00:00.000Z'),
+      (4, 'privacy@osdb.test', 'Demo Privacy Lead', 'moderator', 1, 0, '2026-08-01T00:00:00.000Z', '2026-08-01T00:00:00.000Z'),
+      (5, 'admin@osdb.test', 'Demo Administrator', 'admin', 1, 0, '2026-08-01T00:00:00.000Z', '2026-08-01T00:00:00.000Z'),
+      (6, 'contributor@osdb.test', 'Demo Contributor', 'contributor', 1, 0, '2026-08-01T00:00:00.000Z', '2026-08-01T00:00:00.000Z');
+  `);
+  db.exec(`
+    INSERT INTO reviewers (id, display_name, role, active, mfa_enabled, created_at, updated_at) VALUES
+      (1, 'Demo Intake Reviewer', 'intake_reviewer', 1, 0, '2026-07-31T00:00:00.000Z', '2026-07-31T00:00:00.000Z'),
+      (2, 'Demo Record Reviewer', 'record_reviewer', 1, 0, '2026-07-31T00:00:00.000Z', '2026-07-31T00:00:00.000Z'),
+      (3, 'Demo Senior Moderator', 'senior_moderator', 1, 0, '2026-07-31T00:00:00.000Z', '2026-07-31T00:00:00.000Z'),
+      (4, 'Demo Privacy Lead', 'privacy_safety_lead', 1, 0, '2026-07-31T00:00:00.000Z', '2026-07-31T00:00:00.000Z'),
+      (5, 'Demo Administrator', 'administrator', 1, 0, '2026-07-31T00:00:00.000Z', '2026-07-31T00:00:00.000Z');
+  `);
+  db.exec(`
+    UPDATE reviewers SET user_id = (SELECT id FROM users WHERE email = 'intake@osdb.test') WHERE display_name = 'Demo Intake Reviewer';
+    UPDATE reviewers SET user_id = (SELECT id FROM users WHERE email = 'record@osdb.test') WHERE display_name = 'Demo Record Reviewer';
+    UPDATE reviewers SET user_id = (SELECT id FROM users WHERE email = 'senior@osdb.test') WHERE display_name = 'Demo Senior Moderator';
+    UPDATE reviewers SET user_id = (SELECT id FROM users WHERE email = 'privacy@osdb.test') WHERE display_name = 'Demo Privacy Lead';
+    UPDATE reviewers SET user_id = (SELECT id FROM users WHERE email = 'admin@osdb.test') WHERE display_name = 'Demo Administrator';
+  `);
 }
 
 export async function cleanupDbRuntime() {

@@ -24,14 +24,18 @@ interface strings with English plus the pilot-area language.
 
 ## Decision
 
-1. **English is the pilot language.** `app/lib/i18n/en.ts` is the single
-   canonical message bundle: it defines the key set, the namespaces and the
-   exact English wording for every user-facing string.
-2. **All other languages are type-checked against English.** Each bundle is
-   declared as `Translation<typeof en>` (`app/lib/i18n/types.ts`), a mapped
-   type that recurses through nested dictionaries (status maps, reason codes,
-   action labels) and preserves function signatures (plural formatters such
-   as `awaiting`). A missing or extra key fails `npx tsc --noEmit`, so CI
+1. **English is the pilot language.** Each per-domain file under
+   `app/lib/i18n/` (e.g. `home.ts`, `auth.ts`, `moderation.ts`) exports an
+   `en` object that is the canonical key set and exact English wording for
+   its namespace; `index.ts` assembles the top-level `messages` shape from
+   the domains. EN defines the key set, the namespaces and the wording for
+   every user-facing string.
+2. **All other languages are type-checked against English.** Each domain
+   file pairs its `en` pilot object with an `it` counterpart declared as
+   `Translation<typeof en>` (`app/lib/i18n/types.ts`), a mapped type that
+   recurses through nested dictionaries (status maps, reason codes, action
+   labels) and preserves function signatures (plural formatters such as
+   `awaiting`). A missing or extra key fails `npx tsc --noEmit`, so CI
    enforces parity at compile time — no runtime fallback machinery needed.
 3. **Dependency-free.** No i18n runtime library is introduced; the bundles
    are plain serialisable data + simple formatters, keeping the Worker bundle
@@ -52,9 +56,10 @@ interface strings with English plus the pilot-area language.
    `status` namespace and are reused by home, guide and record detail;
    moderation keeps its own `statusLabels` where the vocabulary differs
    (`hidden`, per-queue wording).
-6. **Adding a language** means: add `xx.ts` with `Translation<typeof en>`,
-   extend `Locale` in `types.ts`, and register the bundle in `index.ts`.
-   The compiler then lists every key the new language must translate.
+6. **Adding a language** means: for each domain file, add the new
+   language's counterpart object typed as `Translation<typeof en>` (the
+   compiler lists every key the new language must translate), extend
+   `Locale` in `types.ts`, and register the assembled bundle in `index.ts`.
 
 ## Consequences
 
@@ -62,8 +67,10 @@ interface strings with English plus the pilot-area language.
   (verified by review; API/DB error payloads remain server-side and are not
   localised — they are internal and fail closed).
 - CI (tsc --noEmit) is the translation completeness gate.
-- Wording reviews happen in one place per language; a future pilot-area
-  language (e.g. IT for the pilot jurisdiction) already ships as `it.ts`.
+- Wording reviews happen in one place per domain (EN pilot + IT parity
+  side by side); a future pilot-area language (e.g. IT for the pilot
+  jurisdiction) already ships as the `it` counterparts across the domain
+  files. See `docs/REFACTOR_I18N.md` for the per-domain layout.
 - Trade-off: namespaces repeat a few common words (e.g. `exploreMap`) instead
   of sharing a global key set — acceptable for now, keeps each page's bundle
   self-contained and reviewable; revisit only if a third language lands.

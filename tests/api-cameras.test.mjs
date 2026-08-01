@@ -37,13 +37,15 @@ const cameraFixture = {
 // ---------------------------------------------------------------------------
 
 test("GET /api/cameras returns the public list as JSON by default", async () => {
-  stub("listPublicCameras", async () => [cameraFixture]);
+  stub("listPublicCamerasPage", async () => ({ records: [cameraFixture], total: 1, nextOffset: null }));
   const { GET } = await camerasRoute();
   const response = await GET(apiRequest("/api/cameras"));
 
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type"), /application\/json/);
-  assert.deepEqual(await responseBody(response), { records: [cameraFixture] });
+  assert.equal(response.headers.get("cache-control"), "no-store", "moderation-derived JSON must never be cached");
+  assert.deepEqual(await responseBody(response), { records: [cameraFixture], total: 1, nextOffset: null });
+  assert.deepEqual(callArgs("listPublicCamerasPage")[0], [{}, { limit: 500, offset: 0 }], "the default page is the first 500 records");
 });
 
 test("GET /api/cameras?format=geojson emits lon/lat FeatureCollection with export headers", async () => {
@@ -56,6 +58,7 @@ test("GET /api/cameras?format=geojson emits lon/lat FeatureCollection with expor
     response.headers.get("content-disposition"),
     /filename=opensurveillancedb-cameras\.geojson/,
   );
+  assert.equal(response.headers.get("cache-control"), "public, max-age=3600", "export snapshots may be cached for a bounded window");
   const body = await responseBody(response);
   assert.equal(body.type, "FeatureCollection");
   // ODbL 1.0 attribution (TERMS § 7.1): the FeatureCollection must carry the
@@ -94,6 +97,7 @@ test("GET /api/cameras?format=csv escapes quotes and neutralises spreadsheet for
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type"), /text\/csv; charset=utf-8/);
   assert.match(response.headers.get("content-disposition"), /filename=opensurveillancedb-cameras\.csv/);
+  assert.equal(response.headers.get("cache-control"), "public, max-age=3600", "export snapshots may be cached for a bounded window");
   const csv = await responseBody(response);
   assert.match(csv, /^id,title,kind,manufacturer,observed_on,status,source,updated,description,address,latitude,longitude\n/);
   assert.match(
@@ -111,59 +115,59 @@ test("GET /api/cameras?format=csv escapes quotes and neutralises spreadsheet for
 });
 
 test("GET /api/cameras ignores unknown format values and returns JSON", async () => {
-  stub("listPublicCameras", async () => [cameraFixture]);
+  stub("listPublicCamerasPage", async () => ({ records: [cameraFixture], total: 1, nextOffset: null }));
   const { GET } = await camerasRoute();
   const response = await GET(apiRequest("/api/cameras?format=xml"));
   assert.equal(response.status, 200);
-  assert.deepEqual(await responseBody(response), { records: [cameraFixture] });
+  assert.deepEqual(await responseBody(response), { records: [cameraFixture], total: 1, nextOffset: null });
 });
 
 test("GET /api/cameras?kind= filters the public list by an exact, parameterised category", async () => {
-  stub("listPublicCameras", async () => [cameraFixture]);
+  stub("listPublicCamerasPage", async () => ({ records: [cameraFixture], total: 1, nextOffset: null }));
   const { GET } = await camerasRoute();
   const response = await GET(apiRequest("/api/cameras?kind=Fixed%20dome"));
 
   assert.equal(response.status, 200);
-  assert.deepEqual(await responseBody(response), { records: [cameraFixture] });
-  assert.deepEqual(callArgs("listPublicCameras")[0], [{ kind: "Fixed dome" }]);
+  assert.deepEqual(await responseBody(response), { records: [cameraFixture], total: 1, nextOffset: null });
+  assert.deepEqual(callArgs("listPublicCamerasPage")[0], [{ kind: "Fixed dome" }, { limit: 500, offset: 0 }]);
 });
 
 test("GET /api/cameras trims and bounds the kind filter and ignores blank values", async () => {
-  stub("listPublicCameras", async () => [cameraFixture]);
+  stub("listPublicCamerasPage", async () => ({ records: [cameraFixture], total: 1, nextOffset: null }));
   const { GET } = await camerasRoute();
 
   const trimmed = await GET(apiRequest("/api/cameras?kind=%20%20PTZ%20%20"));
   assert.equal(trimmed.status, 200);
-  assert.deepEqual(callArgs("listPublicCameras")[0], [{ kind: "PTZ" }]);
+  assert.deepEqual(callArgs("listPublicCamerasPage")[0], [{ kind: "PTZ" }, { limit: 500, offset: 0 }]);
 
   await GET(apiRequest("/api/cameras?kind=%20%20"));
-  assert.deepEqual(callArgs("listPublicCameras")[1], [{}], "a blank kind must not filter");
+  assert.deepEqual(callArgs("listPublicCamerasPage")[1], [{}, { limit: 500, offset: 0 }], "a blank kind must not filter");
 
   await GET(apiRequest(`/api/cameras?kind=${"K".repeat(80)}`));
-  assert.deepEqual(callArgs("listPublicCameras")[2], [{ kind: "K".repeat(60) }], "the kind filter must be capped at the schema limit");
+  assert.deepEqual(callArgs("listPublicCamerasPage")[2], [{ kind: "K".repeat(60) }, { limit: 500, offset: 0 }], "the kind filter must be capped at the schema limit");
 });
 
 test("GET /api/cameras?freshness= applies a whitelisted verification-freshness window", async () => {
-  stub("listPublicCameras", async () => [cameraFixture]);
+  stub("listPublicCamerasPage", async () => ({ records: [cameraFixture], total: 1, nextOffset: null }));
   const { GET } = await camerasRoute();
 
   const response = await GET(apiRequest("/api/cameras?freshness=7d"));
   assert.equal(response.status, 200);
-  assert.deepEqual(callArgs("listPublicCameras")[0], [{ freshness: "7d" }]);
+  assert.deepEqual(callArgs("listPublicCamerasPage")[0], [{ freshness: "7d" }, { limit: 500, offset: 0 }]);
 
   await GET(apiRequest("/api/cameras?freshness=30d&kind=Dome"));
-  assert.deepEqual(callArgs("listPublicCameras")[1], [{ kind: "Dome", freshness: "30d" }]);
+  assert.deepEqual(callArgs("listPublicCamerasPage")[1], [{ kind: "Dome", freshness: "30d" }, { limit: 500, offset: 0 }]);
 });
 
 test("GET /api/cameras treats freshness=all and an absent freshness as no filter", async () => {
-  stub("listPublicCameras", async () => [cameraFixture]);
+  stub("listPublicCamerasPage", async () => ({ records: [cameraFixture], total: 1, nextOffset: null }));
   const { GET } = await camerasRoute();
 
   await GET(apiRequest("/api/cameras?freshness=all"));
-  assert.deepEqual(callArgs("listPublicCameras")[0], [{}]);
+  assert.deepEqual(callArgs("listPublicCamerasPage")[0], [{}, { limit: 500, offset: 0 }]);
 
   await GET(apiRequest("/api/cameras"));
-  assert.deepEqual(callArgs("listPublicCameras")[1], [{}]);
+  assert.deepEqual(callArgs("listPublicCamerasPage")[1], [{}, { limit: 500, offset: 0 }]);
 });
 
 test("GET /api/cameras rejects freshness values outside the whitelist with 400", async (t) => {
@@ -174,7 +178,7 @@ test("GET /api/cameras rejects freshness values outside the whitelist with 400",
       assert.equal(response.status, 400, freshness);
       const body = await responseBody(response);
       assert.match(body.error, /Unknown freshness window/, freshness);
-      assert.equal(callArgs("listPublicCameras").length, 0, "no query must run for an invalid window");
+      assert.equal(callArgs("listPublicCamerasPage").length, 0, "no query must run for an invalid window");
     });
   }
 });
@@ -189,8 +193,66 @@ test("GET /api/cameras export formats honour the same safe filters", async () =>
   assert.deepEqual(callArgs("listPublicCameras")[0], [{ kind: "Fixed dome", freshness: "90d" }]);
 });
 
+test("GET /api/cameras forwards limit and offset to the paginated query and reports total/nextOffset", async () => {
+  stub("listPublicCamerasPage", async () => ({ records: [cameraFixture], total: 1_327, nextOffset: 525 }));
+  const { GET } = await camerasRoute();
+  const response = await GET(apiRequest("/api/cameras?limit=25&offset=500"));
+
+  assert.equal(response.status, 200);
+  const body = await responseBody(response);
+  assert.deepEqual(body.records, [cameraFixture]);
+  assert.equal(body.total, 1327);
+  assert.equal(body.nextOffset, 525, "nextOffset is surfaced verbatim so clients can fetch the next page");
+  assert.deepEqual(callArgs("listPublicCamerasPage")[0], [{}, { limit: 25, offset: 500 }]);
+});
+
+test("GET /api/cameras clamps limit above the max and accepts a zero offset", async () => {
+  stub("listPublicCamerasPage", async () => ({ records: [], total: 0, nextOffset: null }));
+  const { GET } = await camerasRoute();
+
+  await GET(apiRequest("/api/cameras?limit=999999"));
+  assert.deepEqual(callArgs("listPublicCamerasPage")[0], [{}, { limit: 500, offset: 0 }], "an over-max limit is clamped to the maximum page");
+
+  await GET(apiRequest("/api/cameras?limit=500&offset=0"));
+  assert.deepEqual(callArgs("listPublicCamerasPage")[1], [{}, { limit: 500, offset: 0 }], "offset 0 is valid");
+
+  await GET(apiRequest("/api/cameras?limit="));
+  assert.deepEqual(callArgs("listPublicCamerasPage")[2], [{}, { limit: 500, offset: 0 }], "a blank limit falls back to the default page size, like an absent one");
+});
+
+test("GET /api/cameras rejects invalid limit and offset values with 400", async (t) => {
+  const { GET } = await camerasRoute();
+  const cases = [
+    { name: "limit text", query: "limit=abc" },
+    { name: "limit negative", query: "limit=-5" },
+    { name: "limit decimal", query: "limit=1.5" },
+    { name: "limit zero", query: "limit=0" },
+    { name: "offset text", query: "offset=abc" },
+    { name: "offset negative", query: "offset=-3" },
+    { name: "offset decimal", query: "offset=2.5" },
+  ];
+  for (const { name, query } of cases) {
+    await t.test(name, async () => {
+      const response = await GET(apiRequest(`/api/cameras?${query}`));
+      assert.equal(response.status, 400, name);
+      assert.equal(callArgs("listPublicCamerasPage").length, 0, "no query must run for invalid pagination");
+    });
+  }
+});
+
+test("GET /api/cameras export formats ignore pagination parameters entirely", async () => {
+  stub("listPublicCameras", async () => [cameraFixture]);
+  const { GET } = await camerasRoute();
+  // Exports are complete snapshots: pagination params are not validated and
+  // the full list is returned even with an absurd limit.
+  const response = await GET(apiRequest("/api/cameras?format=csv&limit=abc&offset=-1"));
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-disposition"), /filename=opensurveillancedb-cameras\.csv/);
+  assert.equal(callArgs("listPublicCamerasPage").length, 0, "the paginated query must never run for exports");
+});
+
 test("GET /api/cameras returns 503 when the database is unavailable", async () => {
-  stub("listPublicCameras", async () => {
+  stub("listPublicCamerasPage", async () => {
     throw new Error("Database binding unavailable");
   });
   const { GET } = await camerasRoute();
@@ -625,6 +687,7 @@ test("nearby search defaults the radius to 75 metres", async () => {
   const { GET } = await nearbyRoute();
   const response = await GET(apiRequest("/api/cameras/nearby?latitude=41.9&longitude=12.49"));
   assert.equal(response.status, 200);
+  assert.equal(response.headers.get("cache-control"), "no-store", "duplicate-warning data must never be cached");
   assert.deepEqual(callArgs("findNearbyPublicCameras")[0], [41.9, 12.49, 75, { title: "", address: "", kind: "" }]);
 });
 

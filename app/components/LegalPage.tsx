@@ -1,17 +1,17 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { LocaleToggle } from "./LocaleProvider";
 import type { LegalPageContent, LegalBlock } from "../lib/legal";
+import { SiteHeader } from "./SiteHeader";
 
 /**
  * Shared layout for the public legal / information pages
  * (/privacy, /termini, /licenze).
  *
  * Server Component (no "use client"): pages render statically with per-route
- * metadata (SSR/SEO, task t_c36fe96c). The only client island is
- * <LocaleToggle />. The nav labels come from the page as props (the page is
- * a Server Component and cannot call useMessages()); content is passed as
- * data by the same page.
+ * metadata (SSR/SEO, task t_c36fe96c). The only client island is the
+ * navigation shell <SiteHeader />, which renders the <LocaleToggle />. The
+ * nav labels come from the page as props (the page is a Server Component and
+ * cannot call useMessages()); content is passed as data by the same page.
  *
  * Renders the same navigation shell, reading column and footer used by
  * the rest of the site (see app/guide/page.tsx), with a common
@@ -108,18 +108,13 @@ export interface LegalNavLabels {
 export function LegalPage({ content, navLabels }: { content: LegalPageContent; navLabels: LegalNavLabels }) {
   return (
     <main id="main-content" className="record-page">
-      <nav className="nav-shell" aria-label={navLabels.mainNavigation}>
-        <Link className="brand" href="/" aria-label={navLabels.homeAria}>
-          <span className="brand-mark" aria-hidden="true">◉</span>
-          <span>OpenSurveillanceDB</span>
-        </Link>
+      <SiteHeader navLabel={navLabels.mainNavigation} homeLabel={navLabels.homeAria}>
         <div className="nav-links">
           <Link href="/#map">{navLabels.exploreMap}</Link>
           <Link href="/#records">{navLabels.browseRecords}</Link>
           <Link href="/guide">{navLabels.howItWorks}</Link>
         </div>
-        <LocaleToggle />
-      </nav>
+      </SiteHeader>
 
       <article className="record-detail">
         <p className="eyebrow"><span /> {content.eyebrow}</p>

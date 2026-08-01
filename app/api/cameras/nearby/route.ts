@@ -47,7 +47,10 @@ export async function GET(request: Request) {
     const address = readText(query.get("address"), 180);
     const kind = readText(query.get("kind"), 60);
     const records = await findNearbyPublicCameras(latitude, longitude, radius, { title, address, kind });
-    return Response.json({ records });
+    // Moderation-derived duplicates list (audit t_2ee58c08, gap #2): the
+    // pre-submit warning must never be served stale from a cache after a
+    // moderation decision, so the response is never stored.
+    return Response.json({ records }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     console.error("GET /api/cameras/nearby failed", error);
     return Response.json({ error: "Database unavailable" }, { status: 503 });

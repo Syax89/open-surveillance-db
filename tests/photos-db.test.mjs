@@ -23,7 +23,7 @@
 
 import assert from "node:assert/strict";
 import { after, beforeEach, test } from "node:test";
-import { applyDrizzleMigrations, cleanupDbRuntime, loadDbRuntime } from "./helpers/db-runtime-harness.mjs";
+import { applyDrizzleMigrations, cleanupDbRuntime, loadDbRuntime, seedDemoIdentities } from "./helpers/db-runtime-harness.mjs";
 import { D1SqliteDatabase } from "./helpers/d1-sqlite.mjs";
 
 let runtime;
@@ -35,6 +35,11 @@ beforeEach(async () => {
   runtime = await loadDbRuntime();
   db = new D1SqliteDatabase();
   await applyDrizzleMigrations(db);
+  // Migration 0017 removes the demo seed (fresh DB = zero demo rows, exactly
+  // like alpha/prod). This suite exercises moderatePhoto with the demo
+  // reviewer identities (reviewer id 2), so it provisions them explicitly —
+  // the same shape a deploy provisions real accounts before opening the DB.
+  await seedDemoIdentities(db);
   runtime.env.DB = db;
   // Minimal in-memory R2 mock: put stores bytes, get returns a BodyInit-like
   // object (arrayBuffer) or null. Keyed by storage key.

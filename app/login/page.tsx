@@ -3,7 +3,8 @@
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { LocaleToggle, useMessages } from "../components/LocaleProvider";
+import { useMessages } from "../components/LocaleProvider";
+import { SiteHeader } from "../components/SiteHeader";
 
 export default function LoginPage() {
   const bundle = useMessages();
@@ -41,16 +42,11 @@ export default function LoginPage() {
 
   return (
     <main id="main-content" className="record-page">
-      <nav className="nav-shell" aria-label={t.navigation}>
-        <Link className="brand" href="/" aria-label={t.homeAria}>
-          <span className="brand-mark" aria-hidden="true">◉</span>
-          <span>OpenSurveillanceDB</span>
-        </Link>
+      <SiteHeader navLabel={t.navigation} homeLabel={t.homeAria}>
         <div className="nav-links">
           <Link className="nav-action" href="/">{t.backHome}</Link>
         </div>
-        <LocaleToggle />
-      </nav>
+      </SiteHeader>
 
       <article className="record-detail auth-card">
         <p className="eyebrow"><span /> {t.loginTitle}</p>

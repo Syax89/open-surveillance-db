@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { LocaleToggle, useMessages } from "./components/LocaleProvider";
+import { useMessages } from "./components/LocaleProvider";
+import { SiteHeader } from "./components/SiteHeader";
 import { prototypeRecords, publicRecords } from "./lib/records";
 import { usePublicCameras } from "./lib/use-public-cameras";
 import { textMatches } from "./lib/search";
@@ -71,11 +72,9 @@ export default function Home() {
   }
 
   return <main id="main-content">
-    <nav className="nav-shell" aria-label={t.mainNavigation}>
-      <a className="brand" href="#top" aria-label={t.homeAria}><span className="brand-mark" aria-hidden="true">◉</span><span>OpenSurveillanceDB</span></a>
-      <button className="menu-button" type="button" aria-expanded={menuOpen} aria-controls="main-links" onClick={() => setMenuOpen((current) => !current)}>{t.menu}</button>
-      <div className={`nav-links ${menuOpen ? "is-open" : ""}`} id="main-links"><a href="#map">{t.exploreMap}</a><a href="#records">{t.browseRecords}</a><a href="/guide">{t.howItWorks}</a><a href="/regole">{t.rules}</a><a href="/manifesto">{t.manifesto}</a><a className="nav-action" href="#report">{t.addCamera}</a></div><LocaleToggle />
-    </nav>
+    <SiteHeader navLabel={t.mainNavigation} homeLabel={t.homeAria} brandHref="#top" brandAs="anchor" menu menuOpen={menuOpen} onMenuToggle={() => setMenuOpen((current) => !current)}>
+      <div className={`nav-links ${menuOpen ? "is-open" : ""}`} id="main-links"><a href="#map">{t.exploreMap}</a><a href="#records">{t.browseRecords}</a><a href="/guide">{t.howItWorks}</a><a href="/regole">{t.rules}</a><a href="/manifesto">{t.manifesto}</a><a className="nav-action" href="#report">{t.addCamera}</a></div>
+    </SiteHeader>
 
     <Hero recordsCount={total ?? records.length} />
 

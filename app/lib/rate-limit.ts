@@ -185,6 +185,38 @@ export function searchLimits(
   };
 }
 
+/**
+ * Per-appellant appeal threshold (audit t_2ee58c08, P3 — appeal ownership):
+ * bounds how many appeals one contributor account can file within a window,
+ * so a single identity cannot flood the senior-moderator queue with appeals
+ * on decisions it has no standing to contest (DATA_TRUST.md "Corrections,
+ * removals, and appeals").
+ *
+ * This is a *state* quota (a D1 COUNT over `moderation_appeals`), distinct
+ * from the per-IP HTTP bucket on POST /api/appeals: the IP bucket stops a
+ * burst from one caller, this caps sustained filing by one identity even
+ * when the caller's IP changes. The check runs inside `fileAppeal`, so no
+ * route can bypass it.
+ *
+ *   - APPEAL_APPELLANT_RATE_LIMIT_MAX (default 5): max filed appeals per
+ *     appellant inside the window. Failed attempts (unknown/non-final
+ *     decisions, duplicates) do not count — only appeals that actually land
+ *     on the moderation queue.
+ *   - APPEAL_APPELLANT_RATE_LIMIT_WINDOW_SECONDS (default 86400 = 24h).
+ */
+export function appealAppellantLimits(
+  env: unknown,
+  defaults: RateLimitOptions = { maxRequests: 5, windowSeconds: 86400 },
+): RateLimitOptions {
+  const config = env as EnvLike;
+  const maxRequests = Number(config.APPEAL_APPELLANT_RATE_LIMIT_MAX);
+  const windowSeconds = Number(config.APPEAL_APPELLANT_RATE_LIMIT_WINDOW_SECONDS);
+  return {
+    maxRequests: Number.isFinite(maxRequests) && maxRequests > 0 ? maxRequests : defaults.maxRequests,
+    windowSeconds: Number.isFinite(windowSeconds) && windowSeconds > 0 ? windowSeconds : defaults.windowSeconds,
+  };
+}
+
 /** Test/observability hook: clear all in-memory counters between runs. */
 export function resetRateLimitState(): void {
   attemptsByKey.clear();

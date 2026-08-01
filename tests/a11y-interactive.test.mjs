@@ -49,6 +49,25 @@ import { Miniflare } from "miniflare";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const serverDir = path.join(root, "dist", "server");
 
+/**
+ * Aggregate source of the moderation UI: the dashboard orchestrator plus
+ * every component under components/moderation/ (the split from the
+ * ModerationDashboard monolith, kanban t_c7460073). Used by source-level
+ * a11y contracts that used to read the single dashboard file.
+ */
+async function readModerationSource() {
+  const dashboard = await readFile(path.join(root, "app", "components", "ModerationDashboard.tsx"), "utf8");
+  const modDir = path.join(root, "app", "components", "moderation");
+  const entries = await readdir(modDir, { withFileTypes: true });
+  const parts = [dashboard];
+  for (const entry of entries) {
+    if (entry.isFile() && /\.[jt]sx?$/.test(entry.name)) {
+      parts.push(await readFile(path.join(modDir, entry.name), "utf8"));
+    }
+  }
+  return parts.join("\n");
+}
+
 /** Collect every JS module of the built worker, with index.js as the entry. */
 async function workerModules() {
   const found = [];
@@ -185,15 +204,18 @@ test("the moderation shell (credentials) renders the labelled nav, h1 and a poli
 });
 
 test("the moderation dashboard uses no tabIndex at all (no involuntary focus trap)", async () => {
-  const component = await readFile(path.join(root, "app", "components", "ModerationDashboard.tsx"), "utf8");
-  assert.doesNotMatch(component, /tabIndex/, "no element may be added to or removed from the tab order");
+  // The monolith was split into components/moderation/* (kanban t_c7460073);
+  // the no-tabIndex contract holds across the dashboard and every extracted
+  // component, so aggregate the sources before asserting.
+  const source = await readModerationSource();
+  assert.doesNotMatch(source, /tabIndex/, "no element may be added to or removed from the tab order");
   // Rendered shell: same guarantee.
   const { html } = await renderRoute("/moderation", MODERATION_CREDENTIALS);
   assert.doesNotMatch(html, /tabindex=/);
 });
 
 test("moderation decision controls are labelled and described (label-for, aria-describedby)", async () => {
-  const component = await readFile(path.join(root, "app", "components", "ModerationDashboard.tsx"), "utf8");
+  const component = await readFile(path.join(root, "app", "components", "moderation", "DecisionForm.tsx"), "utf8");
   // Reason select + moderator note textarea: label-for pairs with stable ids.
   // (The select carries onChange arrow functions, so its props contain `>` —
   // match the id first, then the `required` flag on the same line.)
@@ -208,25 +230,37 @@ test("moderation decision controls are labelled and described (label-for, aria-d
 });
 
 test("moderation action groups are labelled and queues are labelled lists", async () => {
-  const component = await readFile(path.join(root, "app", "components", "ModerationDashboard.tsx"), "utf8");
+  const form = await readFile(path.join(root, "app", "components", "moderation", "DecisionForm.tsx"), "utf8");
   assert.match(
-    component,
+    form,
     /record-list-actions" aria-label=\{`\$\{t\.decisionFor\} \$\{entity\} \$\{id}`\}/,
     "every action group must carry an aria-label",
   );
-  for (const listLabel of ["t.pendingReports", "t.publishedRecords", "t.recordsNeedReview", "t.privateCorrections", "t.pendingPhotos", "t.recentDecisions"]) {
+  // The six labelled list shells live in the generic QueueSection (listLabel
+  // prop) and the dashboard passes each section's label explicitly.
+  const section = await readFile(path.join(root, "app", "components", "moderation", "QueueSection.tsx"), "utf8");
+  assert.match(
+    section,
+    /<ul className="moderation-list" aria-label=\{listLabel\}>/,
+    "queue list shell must be labelled via listLabel",
+  );
+  const dashboard = await readFile(path.join(root, "app", "components", "ModerationDashboard.tsx"), "utf8");
+  for (const listLabel of ["t.pendingReports", "t.publishedRecords", "t.recordsNeedReview", "t.privateCorrections", "t.pendingPhotos"]) {
     assert.ok(
-      component.includes(`<ul className="moderation-list" aria-label={${listLabel}}>`),
-      `queue list must be labelled: ${listLabel}`,
+      dashboard.includes(`listLabel={${listLabel}}`),
+      `queue section must pass its label: ${listLabel}`,
     );
   }
+  const history = await readFile(path.join(root, "app", "components", "moderation", "HistorySection.tsx"), "utf8");
+  assert.match(history, /aria-label=\{t\.recentDecisions\}/, "history list must be labelled");
 });
 
 test("moderation status/error feedback uses live regions and photo previews carry alt text", async () => {
-  const component = await readFile(path.join(root, "app", "components", "ModerationDashboard.tsx"), "utf8");
-  assert.match(component, /role="status"/, "success notices must be announced (polite)");
-  assert.match(component, /role="alert"/, "errors must be announced (assertive)");
-  assert.match(component, /<img[^>]*alt=/, "photo previews must have alt text");
+  const dashboard = await readFile(path.join(root, "app", "components", "ModerationDashboard.tsx"), "utf8");
+  assert.match(dashboard, /role="status"/, "success notices must be announced (polite)");
+  assert.match(dashboard, /role="alert"/, "errors must be announced (assertive)");
+  const photoItem = await readFile(path.join(root, "app", "components", "moderation", "PhotoQueueItem.tsx"), "utf8");
+  assert.match(photoItem, /<img[^>]*alt=/, "photo previews must have alt text");
 });
 
 // ---------------------------------------------------------------------------
@@ -369,8 +403,8 @@ test("every <img> in the public HTML carries alt text", async () => {
     }
   }
   // Moderation photo previews (client-rendered) are checked in the source.
-  const dashboard = await readFile(path.join(root, "app", "components", "ModerationDashboard.tsx"), "utf8");
-  assert.match(dashboard, /<img[^>]*alt=\{`\$\{t\.photoEvidence\}/, "photo previews must carry alt text");
+  const photoItem = await readFile(path.join(root, "app", "components", "moderation", "PhotoQueueItem.tsx"), "utf8");
+  assert.match(photoItem, /<img[^>]*alt=\{`\$\{t\.photoEvidence\}/, "photo previews must carry alt text");
 });
 
 test("aria-current for the active page is not yet implemented — known gap, tracked (QA-2026-08-01-3)", async () => {
