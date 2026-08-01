@@ -244,6 +244,7 @@ async function waitForAlert(messages, timeoutMs = 1_000) {
 test("POST /api/photos rate-limits the submit family with 429 + Retry-After", async () => {
   env.POST_RATE_LIMIT_MAX = "1";
   env.POST_RATE_LIMIT_WINDOW_SECONDS = "60";
+  stub("pendingPhotoUsage", async () => ({ count: 0, bytes: 0 })); // photo quota (#123), route contract on main
   const { POST } = await routes.photos();
   const caller = "203.0.113.101";
 
@@ -354,6 +355,9 @@ test("calls under the threshold are not rate-limited on any route family", async
     {
       name: "POST /api/photos",
       knob: "POST_RATE_LIMIT_MAX",
+      setup: () => {
+        stub("pendingPhotoUsage", async () => ({ count: 0, bytes: 0 }));
+      },
       handler: async () => (await routes.photos()).POST,
       request: () => build.photos("203.0.113.111"),
       expected: 415,
@@ -444,6 +448,7 @@ test("route families keep independent rate-limit windows", async () => {
   // Exhaust the submit family through POST /api/photos.
   env.POST_RATE_LIMIT_MAX = "1";
   env.POST_RATE_LIMIT_WINDOW_SECONDS = "60";
+  stub("pendingPhotoUsage", async () => ({ count: 0, bytes: 0 })); // photo quota (#123), route contract on main
   const photosRoute = await routes.photos();
   const first = await photosRoute.POST(build.photos(caller));
   assert.notEqual(first.status, 429, "the first submit must pass");
@@ -497,6 +502,7 @@ test("route families keep independent rate-limit windows", async () => {
 test("the caller key prefers the edge IP over X-Forwarded-For at the route layer", async () => {
   env.POST_RATE_LIMIT_MAX = "1";
   env.POST_RATE_LIMIT_WINDOW_SECONDS = "60";
+  stub("pendingPhotoUsage", async () => ({ count: 0, bytes: 0 })); // photo quota (#123), route contract on main
   const { POST } = await routes.photos();
 
   // Same edge IP with a different forwarded hop stays blocked: the edge IP
@@ -513,6 +519,7 @@ test("the caller key prefers the edge IP over X-Forwarded-For at the route layer
 test("the caller key falls back to the first X-Forwarded-For hop without an edge IP", async () => {
   env.POST_RATE_LIMIT_MAX = "1";
   env.POST_RATE_LIMIT_WINDOW_SECONDS = "60";
+  stub("pendingPhotoUsage", async () => ({ count: 0, bytes: 0 })); // photo quota (#123), route contract on main
   const { POST } = await routes.photos();
 
   const first = await POST(build.photos(undefined, "203.0.113.9, 10.0.0.1"));
@@ -526,6 +533,7 @@ test("the caller key falls back to the first X-Forwarded-For hop without an edge
 test("a request with no identity header degrades to the unknown key without crashing", async () => {
   env.POST_RATE_LIMIT_MAX = "1";
   env.POST_RATE_LIMIT_WINDOW_SECONDS = "60";
+  stub("pendingPhotoUsage", async () => ({ count: 0, bytes: 0 })); // photo quota (#123), route contract on main
   const { POST } = await routes.photos();
 
   const first = await POST(build.photos());
@@ -547,6 +555,7 @@ test("a 429 is a clean 429 and the hashed abuse alert fires once per cooldown", 
   env.ABUSE_ALERT_SURGE_THRESHOLD = "1000"; // silence the aggregate surge alert
   env.ABUSE_ALERT_COOLDOWN_SECONDS = "300";
   const caller = "203.0.113.210";
+  stub("pendingPhotoUsage", async () => ({ count: 0, bytes: 0 })); // photo quota (#123), route contract on main
   const { POST } = await routes.photos();
 
   const messages = [];
