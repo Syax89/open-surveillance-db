@@ -27,10 +27,10 @@
     "db:migrate": "wrangler d1 migrations apply opensurveillancedb --local",
     "db:smoke": "node scripts/db-migration-smoke.mjs",
     "db:reset": "node scripts/db-reset.mjs",
+    "db:provision": "node scripts/provision-alpha-accounts.mjs",
     "db:seed": "wrangler d1 execute opensurveillancedb --local --file=scripts/demo-cameras.sql --yes"
   },
   "dependencies": {
-    "@types/leaflet": "^1.9.21",
     "drizzle-orm": "0.45.2",
     "leaflet": "^1.9.4",
     "next": "^16.2.12",
@@ -43,6 +43,7 @@
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
+    "@types/leaflet": "^1.9.21",
     "@types/node": "22.19.19",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",

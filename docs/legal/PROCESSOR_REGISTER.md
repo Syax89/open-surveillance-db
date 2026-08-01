@@ -1,9 +1,9 @@
 # Processor / sub-processor register
 
 - **Status:** draft for pre-launch review (ADR 0005)
-- **Owner:** Rosa (DPO / privacy)
+- **Owner:** Rosa (Legal & Privacy Officer / privacy contact)
 - **Legal basis:** GDPR art. 28 (processors), Cap. V (transfers), art. 30 (records of processing activities)
-- **Review:** annually and on any provider change; additions require DPO approval before onboarding.
+- **Review:** annually and on any provider change; additions require the privacy/legal owner's approval before onboarding.
 
 > **Disclaimer:** this document is product guidance / not legal advice. It is a draft for pre-launch review and requires external counsel review before launch.
 
@@ -35,7 +35,7 @@
 - **Photo storage hygiene:** R2 (`PHOTOS`) stores only EXIF/XMP/IPTC-stripped bytes; metadata lives in D1; photo objects follow the record's lifecycle (RETENTION_SCHEDULE.md R6) and deletion of a record must delete the R2 objects too (retention job — owner ada, see RETENTION_SCHEDULE.md § 3 open item).
 - **Backup retention:** D1 automatic backups (hourly, 24 h) and Time Travel PITR (30 days) are accepted as the technical erasure horizon (RETENTION_SCHEDULE.md R10); **no R2 export backup of D1 is configured** — R2 is used only for active photo objects, not as a backup target (this is unchanged from before; the wording is clarified because R2 itself is now in use for photos).
 - **Breach notification:** Cloudflare's DPA commits the processor to notifying us per art. 33(2) without undue delay; our procedure is BREACH_PROCEDURE.md. OpenAI's sign-in incidents are governed by OpenAI's own incident commitments — no OSDB data at risk there.
-- **Onboarding rule:** no new processor/sub-processor may be onboarded without a DPA review and DPO sign-off (art. 28(2)).
+- **Onboarding rule:** no new processor/sub-processor may be onboarded without a DPA review and privacy/legal owner sign-off (art. 28(2)).
 
 ## 4. Open items before launch
 

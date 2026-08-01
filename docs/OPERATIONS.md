@@ -125,6 +125,16 @@ BACKUP_PASSPHRASE      passphrase for AES-256 encryption of dumps
 PROD_URL (variable)    production hostname (e.g. opensurveillancedb.example)
 ```
 
+> **Secrets status (2026-08-01, ken)**: `BACKUP_PASSPHRASE` configured (local
+> GPG vault `~/.hermes/secrets/osdb-backup-passphrase.gpg`, 384-bit entropy,
+> `openssl rand -base64 48`). `CLOUDFLARE_API_TOKEN` and
+> `CLOUDFLARE_ACCOUNT_ID` are NOT configured and NOT needed while the
+> deployment is local (LXC 114, section 8): the remote D1 backup becomes
+> operational only after the public Cloudflare deployment (ADR 0012,
+> DEPLOYMENT.md). `ops-backup.yml` has a fail-fast guard that stops the run
+> with a clear error until those two secrets exist — never export to a
+> non-existent account. Pre-launch checklist: section 6.
+
 Decrypting a backup for a restore drill:
 
 ```bash
@@ -308,8 +318,10 @@ Before the first production deploy, confirm (tick when done):
 
 - [ ] `wrangler.jsonc`: real production D1 `database_id`.
 - [ ] Migrations applied to the remote D1 (`wrangler d1 migrations apply ... --remote`).
-- [ ] GitHub secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`,
-      `BACKUP_PASSPHRASE`; repository variable `PROD_URL`.
+- [ ] GitHub secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
+      (public deploy phase only — not needed for the local LXC 114
+      environment, section 8), `BACKUP_PASSPHRASE` (configured); repository
+      variable `PROD_URL`.
 - [ ] Cloudflare secrets: `MODERATION_USER`/`MODERATION_PASSWORD` or
       `MODERATION_TOKEN` (without these moderation responds 503 — fail-closed).
 - [ ] `deploy.yml` workflow tested in **dry-run** at least once.

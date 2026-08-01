@@ -32,17 +32,20 @@
 import assert from "node:assert/strict";
 import { after, beforeEach, test } from "node:test";
 import { apiRequest, responseBody } from "./helpers/api-harness.mjs";
-import { applyDrizzleMigrations, cleanupDbRuntime } from "./helpers/db-runtime-harness.mjs";
+import { applyDrizzleMigrations, cleanupDbRuntime, seedDemoIdentities } from "./helpers/db-runtime-harness.mjs";
 import { D1SqliteDatabase } from "./helpers/d1-sqlite.mjs";
 import { cleanupE2ETree, e2eEnv, loadE2ERoute } from "./helpers/e2e-harness.mjs";
 
 // ---------------------------------------------------------------------------
 // Fixtures: every POST/PATCH route that reads a JSON body via readJsonBody.
 // The identity header is only set where the route requires it; public intakes
-// (cameras, corrections) and auth endpoints must work without one.
+// (cameras, corrections) and auth endpoints must work without one. Since
+// migration 0017 removed the demo seed, suites needing demo reviewers/users
+// re-seed them explicitly with seedDemoIdentities() (same pattern as
+// auth-flow-e2e and appeals).
 // ---------------------------------------------------------------------------
 
-const MODERATOR = { "x-osdb-user-email": "record@osdb.test" }; // seeded by migration 0010
+const MODERATOR = { "x-osdb-user-email": "record@osdb.test" }; // seeded by seedDemoIdentities()
 const CONTRIBUTOR = { "x-osdb-user-email": "contributor@osdb.test" };
 
 const ROUTES = [
@@ -113,6 +116,9 @@ beforeEach(async () => {
   env = await e2eEnv();
   env.DB = new D1SqliteDatabase();
   await applyDrizzleMigrations(env.DB);
+  // Migration 0017 removed the demo seed; re-seed the demo identities the
+  // protected routes (moderation, appeals) authenticate against.
+  await seedDemoIdentities(env.DB);
   // Lockout knobs are per-test: wipe leftovers so a previous test's small
   // thresholds never bleed into the next one (same pattern as the E2E suite).
   delete env.AUTH_LOCKOUT_MAX_ATTEMPTS;

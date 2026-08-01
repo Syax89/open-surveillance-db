@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { LocaleToggle, useMessages } from "../components/LocaleProvider";
+import { useMessages } from "../components/LocaleProvider";
+import { SiteHeader } from "../components/SiteHeader";
 
 type Contributor = {
   id: number;
@@ -27,15 +28,6 @@ function readCsrfToken(): string | null {
     .find((part) => part.startsWith("osdb_csrf="));
   return match ? decodeURIComponent(match.slice("osdb_csrf=".length)) : null;
 }
-
-const statusLabels: Record<string, string> = {
-  pending: "pending",
-  verified: "verified",
-  needs_review: "needs_review",
-  rejected: "rejected",
-  removed: "removed",
-  hidden: "hidden",
-};
 
 export default function AccountPage() {
   const bundle = useMessages();
@@ -135,16 +127,11 @@ export default function AccountPage() {
 
   return (
     <main id="main-content" className="record-page">
-      <nav className="nav-shell" aria-label={t.navigation}>
-        <Link className="brand" href="/" aria-label={t.homeAria}>
-          <span className="brand-mark" aria-hidden="true">◉</span>
-          <span>OpenSurveillanceDB</span>
-        </Link>
+      <SiteHeader navLabel={t.navigation} homeLabel={t.homeAria}>
         <div className="nav-links">
           <Link className="nav-action" href="/">{t.backHome}</Link>
         </div>
-        <LocaleToggle />
-      </nav>
+      </SiteHeader>
 
       <article className="record-detail auth-card">
         <p className="eyebrow"><span /> {t.accountTitle}</p>
@@ -203,8 +190,8 @@ export default function AccountPage() {
                   {submissions.map((submission) => (
                     <li key={submission.id}>
                       <Link href={`/records/${submission.id}`}>{submission.title}</Link>
-                      <span className={`status-dot ${statusLabels[submission.status] ?? ""}`} aria-hidden="true" />
-                      <span>{statuses[submission.status as keyof typeof statuses] ?? submission.status}</span>
+                      <span className={`status-dot ${submission.status}`} aria-hidden="true" />
+                      <span>{statuses[submission.status as keyof typeof statuses] ?? t.submissionStatus}</span>
                     </li>
                   ))}
                 </ul>

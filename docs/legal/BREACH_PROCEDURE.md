@@ -1,7 +1,7 @@
 # Personal data breach procedure (GDPR arts. 33-34)
 
 - **Status:** draft for pre-launch review
-- **Owner:** Rosa (DPO / privacy contact); containment coordinated with Ada (CTO)
+- **Owner:** Rosa (Legal & Privacy Officer / privacy contact); containment coordinated with Ada (CTO)
 - **Scope:** any incident that leads to accidental or unlawful destruction, loss, alteration, or unauthorised disclosure of, or access to, personal data held by OpenSurveillanceDB — including pending submissions, evidence, correction requests, and moderator identity attributes.
 
 > **Disclaimer:** this document is product guidance / not legal advice. It is a draft for pre-launch review and requires external counsel review before launch.
@@ -12,7 +12,7 @@
 
 | Role | Person (pre-launch) | Duty |
 |------|--------------------|----|
-| **Privacy contact / first responder** | Rosa (DPO) | Receive reports, run triage, decide notifications, own the breach register |
+| **Privacy contact / first responder** | Rosa (Legal & Privacy Officer) | Receive reports, run triage, decide notifications, own the breach register |
 | **Technical containment** | Ada (CTO) | Stop the leak, preserve evidence, analyse root cause |
 | **Communication** | Marie (docs) | Internal/external statements under privacy-contact direction |
 | **Escalation** | Angelina (CEO) | High-risk incidents: approval of data-subject notification, external communication |

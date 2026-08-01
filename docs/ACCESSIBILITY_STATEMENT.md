@@ -100,7 +100,7 @@ the message when possible.
 ## Enforcement and contact
 
 - **Accessibility owner:** Marie (documentation), with technical validation by
-  Ada (CTO) and privacy review by Rosa (DPO).
+  Ada (CTO) and privacy review by Rosa (Legal & Privacy Officer).
 - **Escalation:** if a reported barrier is not resolved or the response
   commitment is not met, escalate to the maintainers via
   [GOVERNANCE.md](../GOVERNANCE.md); for privacy-sensitive concerns use the
@@ -201,7 +201,7 @@ messaggio quando possibile.
 
 ## Applicazione e contatti
 
-- **Responsabile accessibilità:** Marie (documentazione), con validazione tecnica di Ada (CTO) e revisione privacy di Rosa (DPO).
+- **Responsabile accessibilità:** Marie (documentazione), con validazione tecnica di Ada (CTO) e revisione privacy di Rosa (Legal & Privacy Officer).
 - **Scalata:** se una barriera segnalata non viene risolta o l'impegno di risposta non viene rispettato, rivolgiti ai maintainer tramite [GOVERNANCE.md](../GOVERNANCE.md); per questioni sensibili dal punto di vista della privacy usa il contatto privacy nell'[informativa privacy](legal/PRIVACY_NOTICE.md).
 
 ## Calendario di revisione

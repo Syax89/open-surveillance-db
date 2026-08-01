@@ -1,7 +1,7 @@
 # Legal pre-launch deliverables
 
 Status: **DRAFT — pre-launch**. These documents are project drafts produced by the
-DPO/legal function to satisfy the requirements already declared by the project
+privacy/legal function (no DPO appointed — see ADR 0017: GDPR art. 37(1) not applicable) to satisfy the requirements already declared by the project
 policies. They are **not legal advice** and must receive an independent review
 by qualified counsel before any public launch (see PRIVACY_AND_SAFETY.md:
 "local legal review is required before any public launch").
@@ -24,10 +24,12 @@ deliverables (ADR 0002); the full index with finding coverage is in
 | [PROCESSOR_REGISTER.md](PROCESSOR_REGISTER.md) | Draft | Art. 30 register: Cloudflare, OpenAI auth, OSM; DPA version, SCC, EU–US DPF | P5, M4 |
 | [BREACH_PROCEDURE.md](BREACH_PROCEDURE.md) | Draft | Art. 33/34 notification procedure, scenario table | P2 |
 | [MODERATION_SLA.md](MODERATION_SLA.md) | Draft proposal | Response targets, appeals, audit log, moderator privacy | M1–M4 |
+| [DPO_EXCLUSION.md](DPO_EXCLUSION.md) | Draft | GDPR art. 37 assessment: no mandatory DPO (art. 37(1) N/A), voluntary DPO declined (art. 37(4)), accountability (arts. 5(2), 24), review triggers | P6, gap 7 |
 
 Decision records: `docs/decisions/0002-legal-pre-launch-deliverables.md`,
 `docs/decisions/0004-retention-and-review-cycle.md`,
-`docs/decisions/0005-processors-and-data-residency.md`.
+`docs/decisions/0005-processors-and-data-residency.md`,
+`docs/decisions/0017-no-dpo-appointed-art37.md`.
 
 Related documents (outside this folder): the
 [accessibility statement](../ACCESSIBILITY_STATEMENT.md) and
