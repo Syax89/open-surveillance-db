@@ -1,0 +1,25 @@
+# OpenSurveillanceDB — Security Contact (RFC 9116)
+#
+# Full policy: SECURITY.md (private vulnerability reporting, PGP key,
+# response SLAs, breach procedure).
+# https://github.com/Syax89/open-surveillance-db/blob/main/SECURITY.md
+
+# Preferred route: GitHub Private Vulnerability Reporting (confidential
+# advisory, visible only to maintainers). Do NOT open public issues for
+# vulnerabilities. Reports containing personal data must be PGP-encrypted
+# (see Encryption below).
+Contact: https://github.com/Syax89/open-surveillance-db/security/advisories/new
+
+# Project PGP key (RSA 4096) — full block in SECURITY.md.
+# Fingerprint: 04E8 A3EE 7C72 188B D3AF 925D 496C F0BD 4920 D3F7
+Encryption: https://github.com/Syax89/open-surveillance-db/blob/main/SECURITY.md
+
+# This file expires 12 months after publication (RFC 9116 §2.5.5).
+# Renewal is part of the periodic security review.
+Expires: 2027-08-01T00:00:00.000Z
+
+# Full security and vulnerability-handling policy.
+Policy: https://github.com/Syax89/open-surveillance-db/blob/main/SECURITY.md
+
+# Preferred languages: Italian (project language) and English.
+Preferred-Languages: it, en
