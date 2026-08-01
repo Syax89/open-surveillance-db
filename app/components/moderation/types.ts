@@ -31,6 +31,35 @@ export type CorrectionInQueue = {
   createdAt?: string;
 };
 
+/**
+ * A pending community edit request (ADR 0018 §4, C3). `proposed*` are the
+ * per-column diff the contributor sent (null = column unchanged); `current*`
+ * are the camera's stored values, so the review UI diffs old/new in one row.
+ */
+export type EditRequestInQueue = {
+  id: number;
+  cameraId?: number | null;
+  contributorId?: number | null;
+  status: string;
+  createdAt?: string;
+  updatedAt?: string;
+  proposedTitle?: string | null;
+  proposedKind?: string | null;
+  proposedAddress?: string | null;
+  proposedNotes?: string | null;
+  proposedManufacturer?: string | null;
+  proposedObservedOn?: string | null;
+  proposedDescription?: string | null;
+  currentTitle?: string | null;
+  currentKind?: string | null;
+  currentAddress?: string | null;
+  currentNotes?: string | null;
+  currentManufacturer?: string | null;
+  currentObservedOn?: string | null;
+  currentDescription?: string | null;
+  cameraStatus?: string | null;
+};
+
 export type PhotoInQueue = {
   id: number;
   cameraId?: number | null;
@@ -91,6 +120,7 @@ export type QueuePayload = {
   publishedCameras?: CameraInQueue[];
   reviewCameras?: CameraInQueue[];
   correctionRequests?: CorrectionInQueue[];
+  cameraEditRequests?: EditRequestInQueue[];
   photoReports?: PhotoInQueue[];
   recentEvents?: ModerationEvent[];
   reviewers?: Reviewer[];
@@ -98,7 +128,7 @@ export type QueuePayload = {
   error?: string;
 };
 
-export type QueueEntity = "camera" | "correction" | "photo";
+export type QueueEntity = "camera" | "correction" | "photo" | "camera_edit";
 export type ModerationAction = "approve" | "reject" | "hide" | "mark-stale" | "reverify" | "escalate";
 export type ReasonCode = "verified-public-infrastructure" | "insufficient-evidence" | "duplicate" | "private-or-sensitive-location" | "inaccurate-or-outdated" | "privacy-or-safety-concern" | "requires-senior-review" | "other";
 

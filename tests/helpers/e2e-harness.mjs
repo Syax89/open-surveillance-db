@@ -39,6 +39,9 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 
 const ROUTES = [
   { source: "app/api/cameras/route.ts", output: "app/api/cameras/route.mjs" },
+  // The two-track community edit PATCH (ADR 0018 §4) — loaded by the
+  // register→submit→approve→edit journey (tests/e2e-journeys.test.mjs).
+  { source: "app/api/cameras/[id]/route.ts", output: "app/api/cameras/[id]/route.mjs" },
   { source: "app/api/cameras/nearby/route.ts", output: "app/api/cameras/nearby/route.mjs" },
   { source: "app/api/cameras/search/route.ts", output: "app/api/cameras/search/route.mjs" },
   { source: "app/api/cameras/revisions/route.ts", output: "app/api/cameras/revisions/route.mjs" },
@@ -87,6 +90,9 @@ const REAL_DB_MODULES = [
   // db/cameras.ts imports ./confirmations at runtime (the public payload
   // carries confirmationCount), so the real db layer must resolve it.
   { source: "db/confirmations.ts", output: "db/confirmations.mjs" },
+  // db/camera-edits.ts (community editing, ADR 0018 §4) is imported by the
+  // PATCH /api/cameras/[id] route; it must run the real two-track SQL.
+  { source: "db/camera-edits.ts", output: "db/camera-edits.mjs" },
 ];
 
 let builtTreePromise = null;

@@ -2,7 +2,9 @@ import { env } from "cloudflare:workers";
 import {
   listPendingModerationItems,
   moderateCamera,
+  moderateCameraEdit,
   moderateCorrection,
+  type CameraEditModerationAction,
   type CameraModerationAction,
   type CorrectionModerationAction,
   type CorrectionModerationOptions,
@@ -56,6 +58,14 @@ type ParsedModerationRequest =
       context: ModerationContext;
     }
   | {
+      entity: "camera_edit";
+      id: number;
+      action: CameraEditModerationAction;
+      reasonCode: ModerationReasonCode;
+      note: string | null;
+      context: ModerationContext;
+    }
+  | {
       entity: "correction";
       id: number;
       action: CorrectionModerationAction;
@@ -89,6 +99,10 @@ function parseModerationRequest(value: unknown): ParsedModerationRequest {
   ];
   const correctionActions: CorrectionModerationAction[] = ["approve", "reject", "associate", "escalate"];
   const photoActions: PhotoModerationAction[] = ["approve", "reject"];
+  // Community edit requests: the reviewer may only apply or discard the
+  // contributor's diff (ADR 0018 §4). No other camera/correction action is
+  // valid on a camera_edit entity.
+  const cameraEditActions: CameraEditModerationAction[] = ["approve", "reject"];
 
   const entity = value.entity as ModerationEntity;
   const id = value.id;
@@ -171,6 +185,28 @@ function parseModerationRequest(value: unknown): ParsedModerationRequest {
       };
     }
     return null;
+  }
+  if (entity === "camera_edit") {
+    // Edit-request decisions carry no camera/outcome/publication metadata:
+    // the diff lives in the request row; the reviewer only applies or
+    // discards it. Any extra field is rejected.
+    if (
+      cameraId !== undefined ||
+      outcome !== undefined ||
+      publishManufacturer !== undefined ||
+      publishObservedOn !== undefined
+    ) {
+      return null;
+    }
+    if (!cameraEditActions.includes(action as CameraEditModerationAction)) return null;
+    return {
+      entity,
+      id,
+      action: action as CameraEditModerationAction,
+      reasonCode: parsedReasonCode,
+      note: parsedNote,
+      context,
+    };
   }
   if (entity === "correction") {
     if (publishManufacturer !== undefined || publishObservedOn !== undefined) return null;
@@ -373,6 +409,14 @@ export async function PATCH(request: Request) {
         payload.metadataPublication,
         context,
       );
+    } else if (payload.entity === "camera_edit") {
+      result = await moderateCameraEdit(
+        payload.id,
+        payload.action,
+        payload.reasonCode,
+        payload.note,
+        context,
+      );
     } else if (payload.entity === "correction") {
       result = await moderateCorrection(
         payload.id,
@@ -405,6 +449,14 @@ export async function PATCH(request: Request) {
     if (result.kind === "ok") {
       if (payload.entity === "camera") {
         await purgeCacheTags(cameraPurgeTags(payload.id), env);
+      } else if (payload.entity === "camera_edit") {
+        // An approved community edit changes the public record: purge the
+        // target camera's tags (the diff only applies on approve). The
+        // rejected path never touches `cameras`.
+        const cameraId = (result as { item?: { cameraId?: number | null } }).item?.cameraId;
+        if (cameraId !== null && cameraId !== undefined) {
+          await purgeCacheTags(cameraPurgeTags(cameraId), env);
+        }
       } else if (payload.entity === "correction") {
         // A correction decision can change the linked camera (approve with
         // outcome corrected/removed/marked-stale) — purge that record too.

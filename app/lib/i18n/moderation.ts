@@ -63,8 +63,31 @@ export const en = {
   privateCorrections: "Private correction requests",
   noCorrectionsTitle: "No correction requests are waiting.",
   noCorrectionsText:
-    "Private requests remain out of the public directory and data export.",
+    "Private requests stay out of the public directory and the data export.",
   privateCorrection: "Private correction",
+  editing: "Editing",
+  editRequests: "Community edit requests",
+  noEditRequestsTitle: "No community edit requests are waiting.",
+  noEditRequestsText:
+    "Proposed changes to published records appear here until a moderator applies or discards them.",
+  editRequest: "Edit request",
+  editDiffTitle: "Proposed changes",
+  editDiffHelp:
+    "Only the fields the contributor changed are listed. Apply the diff to publish the changes, or reject it to keep the record as it is.",
+  editDiffEmpty: "This request proposes no field changes.",
+  editDiffCleared: "Cleared",
+  current: "Current",
+  proposed: "Proposed",
+  notSet: "Not set",
+  fieldLabels: {
+    title: "Title",
+    kind: "Type",
+    address: "Address",
+    notes: "Notes",
+    manufacturer: "Manufacturer",
+    observedOn: "Observed on",
+    description: "Description",
+  },
   pendingPhotos: "Pending photos",
   noPhotosTitle: "No photos are waiting.",
   noPhotosText:
@@ -165,6 +188,8 @@ export const en = {
     removed: "Removed after correction",
     corrected: "Corrected",
     associate: "Correction linked to record",
+    edit_applied: "Edit applied",
+    edit_rejected: "Edit rejected",
   },
   statusLabels: {
     pending: "In moderation",
@@ -173,6 +198,7 @@ export const en = {
     removed: "Removed",
     rejected: "Rejected",
     hidden: "Hidden",
+    approved: "Approved",
   },
   reasons: {
     "verified-public-infrastructure": "Verified public infrastructure",
@@ -244,6 +270,29 @@ export const it: Translation<typeof en> = {
   noCorrectionsText:
     "Le richieste private restano fuori dalla directory pubblica e dall'esportazione dati.",
   privateCorrection: "Correzione privata",
+  editing: "Modifica",
+  editRequests: "Richieste di modifica della comunità",
+  noEditRequestsTitle: "Non ci sono richieste di modifica in attesa.",
+  noEditRequestsText:
+    "Le modifiche proposte ai record pubblicati appaiono qui finché un moderatore non le applica o le scarta.",
+  editRequest: "Richiesta di modifica",
+  editDiffTitle: "Modifiche proposte",
+  editDiffHelp:
+    "Sono elencati solo i campi modificati dal segnalante. Applica il diff per pubblicare le modifiche, oppure rifiutalo per mantenere il record invariato.",
+  editDiffEmpty: "Questa richiesta non propone alcuna modifica.",
+  editDiffCleared: "Svuotato",
+  current: "Attuale",
+  proposed: "Proposto",
+  notSet: "Non impostato",
+  fieldLabels: {
+    title: "Titolo",
+    kind: "Tipo",
+    address: "Indirizzo",
+    notes: "Note",
+    manufacturer: "Marca",
+    observedOn: "Osservata il",
+    description: "Descrizione",
+  },
   pendingPhotos: "Foto in attesa",
   noPhotosTitle: "Nessuna foto in attesa.",
   noPhotosText:
@@ -345,6 +394,8 @@ export const it: Translation<typeof en> = {
     removed: "Rimosso dopo correzione",
     corrected: "Corretto",
     associate: "Correzione collegata al record",
+    edit_applied: "Modifica applicata",
+    edit_rejected: "Modifica rifiutata",
   },
   statusLabels: {
     pending: "In moderazione",
@@ -353,6 +404,7 @@ export const it: Translation<typeof en> = {
     removed: "Rimosso",
     rejected: "Rifiutato",
     hidden: "Nascosto",
+    approved: "Approvata",
   },
   reasons: {
     "verified-public-infrastructure": "Infrastruttura pubblica verificata",

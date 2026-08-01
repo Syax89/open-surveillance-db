@@ -8,19 +8,55 @@ export type ModerationCameraRecord = CameraRecord;
 export type PendingCameraReport = ModerationCameraRecord;
 export type PendingCorrectionRequest = CorrectionRequest;
 
+/**
+ * A pending community edit request for the moderation queue (ADR 0018 §4,
+ * C3). The proposed-* columns are the per-column diff the contributor sent
+ * (NULL = column unchanged); the current-* columns are the camera's stored
+ * values at queue-read time so the reviewer can diff old/new in one payload.
+ * `cameraStatus`/`current*` are NULL when the target camera was removed
+ * (camera_edit_requests.camera_id is ON DELETE SET NULL).
+ */
+export type PendingEditRequest = {
+  id: number;
+  cameraId: number | null;
+  contributorId: number | null;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  proposedTitle: string | null;
+  proposedKind: string | null;
+  proposedAddress: string | null;
+  proposedNotes: string | null;
+  proposedManufacturer: string | null;
+  proposedObservedOn: string | null;
+  proposedDescription: string | null;
+  currentTitle: string | null;
+  currentKind: string | null;
+  currentAddress: string | null;
+  currentNotes: string | null;
+  currentManufacturer: string | null;
+  currentObservedOn: string | null;
+  currentDescription: string | null;
+  cameraStatus: string | null;
+};
+
 export type ModerationQueue = {
   cameraReports: PendingCameraReport[];
   publishedCameras: ModerationCameraRecord[];
   reviewCameras: ModerationCameraRecord[];
   staleCameras: ModerationCameraRecord[];
   correctionRequests: PendingCorrectionRequest[];
+  // Community edit requests awaiting a moderator decision (ADR 0018 §4, C3).
+  // Each row is a per-column diff against the editable whitelist; the
+  // moderator applies or discards it via moderateCameraEdit.
+  cameraEditRequests: PendingEditRequest[];
   photoReports: PendingPhotoReport[];
   recentEvents: ModerationEvent[];
   reviewers: Reviewer[];
   queueItems: ModerationQueueItem[];
 };
 
-export type ModerationEntity = "camera" | "correction" | "photo";
+export type ModerationEntity = "camera" | "correction" | "photo" | "camera_edit";
 export type CameraModerationAction =
   | "approve"
   | "reject"
@@ -378,7 +414,7 @@ export async function listPendingModerationItems(): Promise<ModerationQueue> {
   // routes never depend on this sweep: listPublicCameras() enforces the same
   // freshness boundary at read time.
   await runFreshnessSweep();
-  const [cameraReports, publishedCameras, reviewCameras, staleCameras, correctionRequests, recentEvents, reviewers, openQueueItems] =
+  const [cameraReports, publishedCameras, reviewCameras, staleCameras, correctionRequests, cameraEditRequests, recentEvents, reviewers, openQueueItems] =
     await Promise.all([
       d1
         .prepare(
@@ -411,6 +447,26 @@ export async function listPendingModerationItems(): Promise<ModerationQueue> {
         )
         .bind("pending")
         .all<PendingCorrectionRequest>(),
+      // Community edit requests (entity camera_edit): pending diff rows with
+      // the camera's current values joined in, so the review UI diffs
+      // old/new without a second round-trip per row. One query, no N+1.
+      d1
+        .prepare(
+          `SELECT er.id, er.camera_id AS cameraId, er.contributor_id AS contributorId, er.status,
+                  er.proposed_title AS proposedTitle, er.proposed_kind AS proposedKind,
+                  er.proposed_address AS proposedAddress, er.proposed_notes AS proposedNotes,
+                  er.proposed_manufacturer AS proposedManufacturer, er.proposed_observed_on AS proposedObservedOn,
+                  er.proposed_description AS proposedDescription,
+                  er.created_at AS createdAt, er.updated_at AS updatedAt,
+                  c.title AS currentTitle, c.kind AS currentKind, c.address AS currentAddress,
+                  c.notes AS currentNotes, c.manufacturer AS currentManufacturer,
+                  c.observed_on AS currentObservedOn, c.description AS currentDescription,
+                  c.status AS cameraStatus
+           FROM camera_edit_requests er LEFT JOIN cameras c ON c.id = er.camera_id
+           WHERE er.status = 'pending'
+           ORDER BY er.created_at ASC, er.id ASC`,
+        )
+        .all<PendingEditRequest>(),
       d1
         .prepare(
           `SELECT id, entity, entity_id AS entityId, previous_status AS previousStatus, new_status AS newStatus, action, reason_code AS reasonCode, note, actor, reviewer_id AS reviewerId, actor_role AS actorRole, recused, escalated, second_reviewer_id AS secondReviewerId, appeal_id AS appealId, created_at AS createdAt FROM moderation_events ORDER BY created_at DESC, id DESC LIMIT ?`,
@@ -440,6 +496,10 @@ export async function listPendingModerationItems(): Promise<ModerationQueue> {
       queueByKey.get(`correction:${correction.id}`) ??
       synthesizedQueueItem("correction", correction.id, correction.createdAt),
     ),
+    ...cameraEditRequests.results.map((editRequest) =>
+      queueByKey.get(`camera_edit:${editRequest.id}`) ??
+      synthesizedQueueItem("camera_edit", editRequest.id, editRequest.createdAt),
+    ),
   ];
 
   return {
@@ -448,6 +508,7 @@ export async function listPendingModerationItems(): Promise<ModerationQueue> {
     reviewCameras: reviewCameras.results,
     staleCameras: staleCameras.results,
     correctionRequests: correctionRequests.results,
+    cameraEditRequests: cameraEditRequests.results,
     photoReports: await listPendingPhotos(),
     recentEvents: recentEvents.results,
     reviewers: reviewers,
@@ -525,6 +586,10 @@ export type ModerationEventInput = Omit<
   "id" | "actor" | "createdAt" | "reviewerId" | "actorRole" | "recused" | "escalated" | "secondReviewerId" | "appealId"
 > & {
   reviewer?: Reviewer | ReviewerAttribution | null;
+  /** Free-text actor override for events recorded outside the reviewer
+   * workflow (e.g. a contributor's own pending-record edit). Defaults to the
+   * reviewer display name, then the fixed "Local moderator" actor. */
+  actor?: string;
   recused?: boolean;
   escalated?: boolean;
   secondReviewerId?: number | null;
@@ -562,7 +627,7 @@ async function createModerationEvent(
       event.action,
       event.reasonCode,
       event.note,
-      event.reviewer?.displayName ?? localModerator,
+      event.actor ?? event.reviewer?.displayName ?? localModerator,
       event.reviewer?.id ?? null,
       event.reviewer?.role ?? null,
       event.recused ? 1 : 0,
@@ -1062,6 +1127,234 @@ export async function moderateCorrection(
     : queue;
   return { kind: "ok", item, event, queue: updatedQueue };
 }
+
+export type CameraEditModerationAction = "approve" | "reject";
+
+/**
+ * Community edit-request decision (ADR 0018 §4, C3). `approve` applies the
+ * per-column diff to `cameras` and records `edit_applied`; `reject` discards
+ * the diff and records `edit_rejected`. Both close the entity's
+ * `moderation_queue` row (entity `camera_edit`, entity_id = the edit-request
+ * id) and mark the request terminal. Idempotent: re-approving an approved
+ * request (or re-rejecting a rejected one) answers `ok` with the previously
+ * recorded event and never re-applies the diff; a cross transition answers
+ * `not_found`. The camera's freshness clocks and status are never touched —
+ * only the whitelist columns change.
+ */
+export async function moderateCameraEdit(
+  id: number,
+  action: CameraEditModerationAction,
+  reasonCode: ModerationReasonCode,
+  note: string | null,
+  context?: ModerationContext,
+): Promise<ModerationResult<CameraEditDecisionItem>> {
+  const d1 = await getModerationD1();
+  if (action !== "approve" && action !== "reject") return { kind: "forbidden" };
+
+  const reviewer = context ? await getReviewerById(d1, context.actorId) : null;
+  if (context && !reviewer) return { kind: "actor_not_found" };
+  if (reviewer && reviewer.active !== 1) return { kind: "actor_inactive" };
+  if (reviewer && !roleAllowsAction(reviewer.role, action)) return { kind: "forbidden" };
+
+  const current = await d1
+    .prepare(
+      "SELECT id, camera_id AS cameraId, contributor_id AS contributorId, status, created_at AS createdAt, updated_at AS updatedAt FROM camera_edit_requests WHERE id = ?",
+    )
+    .bind(id)
+    .first<{ id: number; cameraId: number | null; contributorId: number | null; status: string; createdAt: string; updatedAt: string }>();
+  if (!current) return { kind: "not_found" };
+
+  const queue = context
+    ? await getOrCreateQueueItem(d1, "camera_edit", id, {
+        sensitivity: context.sensitivity,
+        assigneeId: context.assigneeId,
+        requiresSecondReview: context.requiresSecondReview,
+      })
+    : synthesizedQueueItem("camera_edit", id, current.createdAt);
+
+  if (context && queue.state === "escalated" && !escalationResolverRoles.has(reviewer!.role)) {
+    return { kind: "forbidden" };
+  }
+
+  // Recusal: record the disclosure, never touch the request or the camera.
+  if (context?.recused === true) {
+    const event = await createModerationEvent(d1, {
+      entity: "camera_edit",
+      entityId: id,
+      previousStatus: current.status,
+      newStatus: current.status,
+      action,
+      reasonCode,
+      note,
+      reviewer,
+      recused: true,
+      escalated: false,
+      secondReviewerId: null,
+    });
+    return { kind: "recused", item: (await loadEditRequestItem(d1, id))!, event, queue };
+  }
+
+  // Idempotence: a terminal request re-decided the same way answers ok with
+  // the original event — no double apply, no duplicate audit row. A terminal
+  // request decided the OTHER way is an invalid transition.
+  if (current.status !== "pending") {
+    if (current.status === "approved" && action === "approve") {
+      const event = await loadLastEditEvent(d1, id, "edit_applied");
+      if (event) return { kind: "ok", item: (await loadEditRequestItem(d1, id))!, event, queue };
+    }
+    if (current.status === "rejected" && action === "reject") {
+      const event = await loadLastEditEvent(d1, id, "edit_rejected");
+      if (event) return { kind: "ok", item: (await loadEditRequestItem(d1, id))!, event, queue };
+    }
+    return { kind: "not_found" };
+  }
+
+  const needsSecondReview =
+    context !== undefined &&
+    secondReviewActions.has(action) &&
+    (queue.requiresSecondReview === 1 || queue.sensitivity !== "standard");
+
+  if (needsSecondReview && queue.state !== "second_review") {
+    const event = await createModerationEvent(d1, {
+      entity: "camera_edit",
+      entityId: id,
+      previousStatus: current.status,
+      newStatus: current.status,
+      action,
+      reasonCode,
+      note,
+      reviewer,
+      recused: false,
+      escalated: false,
+      secondReviewerId: null,
+    });
+    const updatedQueue = await updateQueueState(d1, queue.id!, "second_review");
+    return {
+      kind: "second_review_pending",
+      item: (await loadEditRequestItem(d1, id))!,
+      event,
+      queue: updatedQueue,
+    };
+  }
+
+  let secondReviewerId: number | null = null;
+  if (needsSecondReview) {
+    const first = await d1
+      .prepare(
+        "SELECT reviewer_id AS reviewerId FROM moderation_events WHERE entity = ? AND entity_id = ? AND action = ? AND reviewer_id IS NOT NULL ORDER BY id DESC LIMIT 1",
+      )
+      .bind("camera_edit", id, action)
+      .first<{ reviewerId: number }>();
+    if (first && first.reviewerId === reviewer!.id) {
+      return { kind: "second_review_same_reviewer" };
+    }
+    secondReviewerId = first?.reviewerId ?? null;
+  }
+
+  const nowIso = new Date().toISOString();
+  const newStatus = action === "approve" ? "approved" : "rejected";
+  const eventAction = action === "approve" ? "edit_applied" : "edit_rejected";
+
+  if (action === "approve") {
+    // The target must still be published-editable at decision time: a camera
+    // removed (or re-edited past the queue) while the request sat in the
+    // queue must not receive a stale diff. Verify before applying.
+    if (current.cameraId === null) return { kind: "not_found" };
+    const camera = await d1
+      .prepare("SELECT status FROM cameras WHERE id = ?")
+      .bind(current.cameraId)
+      .first<{ status: string }>();
+    if (!camera || !PUBLISHED_EDITABLE_CAMERA_STATUSES.has(camera.status)) {
+      return { kind: "not_found" };
+    }
+    // COALESCE(proposed, current): a NULL proposed column means "unchanged"
+    // and keeps the stored value. Only the whitelist columns are touched —
+    // status, contributor_id, source, publish_*, freshness clocks stay put.
+    await d1
+      .prepare(
+        `UPDATE cameras SET
+           title = COALESCE((SELECT proposed_title FROM camera_edit_requests WHERE id = ?), title),
+           kind = COALESCE((SELECT proposed_kind FROM camera_edit_requests WHERE id = ?), kind),
+           address = COALESCE((SELECT proposed_address FROM camera_edit_requests WHERE id = ?), address),
+           notes = COALESCE((SELECT proposed_notes FROM camera_edit_requests WHERE id = ?), notes),
+           manufacturer = COALESCE((SELECT proposed_manufacturer FROM camera_edit_requests WHERE id = ?), manufacturer),
+           observed_on = COALESCE((SELECT proposed_observed_on FROM camera_edit_requests WHERE id = ?), observed_on),
+           description = COALESCE((SELECT proposed_description FROM camera_edit_requests WHERE id = ?), description),
+           updated = ?
+         WHERE id = ?`,
+      )
+      .bind(id, id, id, id, id, id, id, "Local moderation: community edit applied", current.cameraId)
+      .run();
+  }
+
+  const event = await createModerationEvent(d1, {
+    entity: "camera_edit",
+    entityId: id,
+    previousStatus: "pending",
+    newStatus,
+    action: eventAction,
+    reasonCode,
+    note,
+    reviewer,
+    recused: false,
+    escalated: false,
+    secondReviewerId,
+  });
+
+  await d1
+    .prepare(
+      "UPDATE camera_edit_requests SET status = ?, decided_by = ?, decision_note = ?, decided_at = ?, updated_at = ? WHERE id = ? AND status = 'pending'",
+    )
+    .bind(newStatus, reviewer?.id ?? null, note, nowIso, nowIso, id)
+    .run();
+
+  const updatedQueue = context
+    ? await updateQueueState(d1, queue.id!, "closed", {
+        secondReviewerId: secondReviewerId ?? (needsSecondReview ? reviewer!.id : null),
+      })
+    : queue;
+
+  return { kind: "ok", item: (await loadEditRequestItem(d1, id))!, event, queue: updatedQueue };
+}
+
+/** Camera statuses a pending edit-request diff may be applied to. */
+const PUBLISHED_EDITABLE_CAMERA_STATUSES = new Set(["verified", "needs_review", "stale"]);
+
+async function loadEditRequestItem(
+  d1: ModerationD1,
+  id: number,
+): Promise<CameraEditDecisionItem | null> {
+  return d1
+    .prepare(
+      "SELECT id, camera_id AS cameraId, contributor_id AS contributorId, status, decided_by AS decidedBy, decision_note AS decisionNote, decided_at AS decidedAt, created_at AS createdAt FROM camera_edit_requests WHERE id = ?",
+    )
+    .bind(id)
+    .first<CameraEditDecisionItem>();
+}
+
+async function loadLastEditEvent(
+  d1: ModerationD1,
+  id: number,
+  action: string,
+): Promise<ModerationEvent | null> {
+  return d1
+    .prepare(
+      `SELECT id, entity, entity_id AS entityId, previous_status AS previousStatus, new_status AS newStatus, action, reason_code AS reasonCode, note, actor, reviewer_id AS reviewerId, actor_role AS actorRole, recused, escalated, second_reviewer_id AS secondReviewerId, appeal_id AS appealId, created_at AS createdAt FROM moderation_events WHERE entity = 'camera_edit' AND entity_id = ? AND action = ? ORDER BY id DESC LIMIT 1`,
+    )
+    .bind(id, action)
+    .first<ModerationEvent>();
+}
+
+export type CameraEditDecisionItem = {
+  id: number;
+  cameraId: number | null;
+  contributorId: number | null;
+  status: string;
+  decidedBy: number | null;
+  decisionNote: string | null;
+  decidedAt: string | null;
+  createdAt: string;
+};
 
 async function applyCorrectionOutcome(
   d1: ModerationD1,
