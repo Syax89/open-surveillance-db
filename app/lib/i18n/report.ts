@@ -38,6 +38,15 @@ export const en = {
   matchLikely: "likely match",
   duplicateGuidance:
     "If this is the same camera, use the correction form instead of creating a duplicate.",
+  // Horizon 1 duplicate gate (ADR 0019): a high-strength match must be
+  // acknowledged before the report can be stored.
+  duplicateConfirmNotice:
+    "A very close match was found nearby. Confirm that this is a distinct camera to submit, or use the correction form for the existing record.",
+  duplicateConfirmTitle: "A very close match already exists nearby",
+  duplicateConfirmBody:
+    "A reviewed record at almost the same spot was found. If this is the same camera, use the correction form. If it is a different camera, confirm below to submit it for moderation.",
+  duplicateConfirmLabel:
+    "I confirm this is a distinct camera and I still want to submit it.",
   nearbyUnavailable:
     "We could not check nearby records. You can still submit this report for moderation.",
   recordTitle: "Record title",
@@ -127,6 +136,15 @@ export const it: Translation<typeof en> = {
   matchLikely: "corrispondenza probabile",
   duplicateGuidance:
     "Se è la stessa telecamera, usa il modulo di correzione invece di creare un duplicato.",
+  // Gate duplicati Horizon 1 (ADR 0019): una corrispondenza molto vicina
+  // deve essere confermata prima che la segnalazione venga salvata.
+  duplicateConfirmNotice:
+    "Trovata una corrispondenza molto vicina. Conferma che si tratta di una telecamera diversa per inviare, oppure usa il modulo di correzione per il record esistente.",
+  duplicateConfirmTitle: "Una corrispondenza molto vicina esiste già nelle vicinanze",
+  duplicateConfirmBody:
+    "È stato trovato un record revisionato quasi nello stesso punto. Se è la stessa telecamera, usa il modulo di correzione. Se è una telecamera diversa, conferma qui sotto per inviarla in moderazione.",
+  duplicateConfirmLabel:
+    "Confermo che è una telecamera diversa e voglio comunque inviarla.",
   nearbyUnavailable:
     "Non è stato possibile verificare i record vicini. Puoi comunque inviare la segnalazione per la moderazione.",
   recordTitle: "Titolo del record",

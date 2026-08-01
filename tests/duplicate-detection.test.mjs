@@ -101,3 +101,27 @@ test("classifyDuplicateMatch extends the text upgrade to 200 m, then falls back 
   assert.equal(classifyDuplicateMatch(201, 0.8, true), "low");
   assert.equal(classifyDuplicateMatch(300, 0, false), "low");
 });
+
+// ---------------------------------------------------------------------------
+// requiresDuplicateConfirmation (Horizon 1 gate, ADR 0019)
+// ---------------------------------------------------------------------------
+
+test("requiresDuplicateConfirmation is false for an empty or low-strength candidate list", async () => {
+  const { requiresDuplicateConfirmation } = await lib();
+  assert.equal(requiresDuplicateConfirmation([]), false);
+  assert.equal(requiresDuplicateConfirmation([{ matchStrength: "low" }]), false);
+  assert.equal(requiresDuplicateConfirmation([{ matchStrength: "medium" }, { matchStrength: "low" }]), false);
+});
+
+test("requiresDuplicateConfirmation is true when any candidate is high-strength", async () => {
+  const { requiresDuplicateConfirmation } = await lib();
+  assert.equal(requiresDuplicateConfirmation([{ matchStrength: "high" }]), true);
+  assert.equal(requiresDuplicateConfirmation([{ matchStrength: "medium" }, { matchStrength: "high" }]), true);
+  assert.equal(requiresDuplicateConfirmation([{ matchStrength: "low" }, { matchStrength: "medium" }, { matchStrength: "high" }]), true);
+});
+
+test("the confirmation threshold constant names exactly the high strength", async () => {
+  const { DUPLICATE_CONFIRMATION_STRENGTHS, requiresDuplicateConfirmation } = await lib();
+  assert.deepEqual([...DUPLICATE_CONFIRMATION_STRENGTHS], ["high"]);
+  assert.equal(requiresDuplicateConfirmation([{ matchStrength: "medium" }]), false, "medium stays informational, never a gate");
+});

@@ -170,6 +170,16 @@ changes accumulate under `[Unreleased]`.
   `docs/REFACTOR_I18N.md` and `docs/SITEMAP.md` updated (C phase status,
   guide/FAQ specs). No new `docs/USER_GUIDE.md` — `/guide` stays the only
   user guide (SITEMAP rule).
+- Pre-submit duplicate confirmation gate (H1, FUTURE_ROADMAP, ADR 0019): the
+  duplicate check now runs BEFORE storage, and a `high`-strength match
+  (same spot ≤ 25 m, or ≤ 75 m with matching text) refuses the report with
+  `409` + `possibleDuplicates` unless the payload carries
+  `duplicateConfirmed: true` (strict boolean — `"true"`, `1` and any other
+  value fail closed). Medium/low candidates stay informational. The check
+  reads only reviewed public records, fails open on outage, and the /segnala
+  form surfaces the authoritative candidate list with a mandatory
+  confirmation checkbox that disables submit until acknowledged; the hook
+  also refuses implicit form submissions (Enter) while the gate is open.
 
 ### Changed
 

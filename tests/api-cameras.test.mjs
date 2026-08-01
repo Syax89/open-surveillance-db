@@ -790,14 +790,16 @@ test("nearby search returns 503 when the database is unavailable", async () => {
 });
 
 // ---------------------------------------------------------------------------
-// POST /api/cameras — non-blocking pre-submit duplicate detection
+// POST /api/cameras — Horizon 1 duplicate gate (ADR 0019)
 // ---------------------------------------------------------------------------
 
 test("POST includes nearby reviewed records as possibleDuplicates without blocking the report", async () => {
+  // Medium/low candidates stay informational: only a high-strength match
+  // forces the confirmation gate, so a medium candidate must not block.
   const duplicateFixture = {
     ...nearbyFixture,
-    similarity: 0.82,
-    matchStrength: "high",
+    similarity: 0.4,
+    matchStrength: "medium",
   };
   stub("createPendingCamera", async (input) => ({ id: 14, ...input }));
   stub("findNearbyPublicCameras", async () => [duplicateFixture]);
@@ -819,6 +821,73 @@ test("POST includes nearby reviewed records as possibleDuplicates without blocki
     75,
     { title: "Camera porta nord", address: "Via Roma 1", kind: "Fixed dome" },
   ]);
+});
+
+test("POST rejects a high-strength duplicate with 409 and does NOT store the record", async () => {
+  const duplicateFixture = {
+    ...nearbyFixture,
+    similarity: 0.82,
+    matchStrength: "high",
+  };
+  stub("createPendingCamera", async (input) => ({ id: 14, ...input }));
+  stub("findNearbyPublicCameras", async () => [duplicateFixture]);
+  const { POST } = await camerasRoute();
+  const response = await POST(
+    apiRequest("/api/cameras", {
+      method: "POST",
+      body: { title: "Camera porta nord", kind: "Fixed dome", address: "Via Roma 1", latitude: 41.9004, longitude: 12.4936 },
+    }),
+  );
+  assert.equal(response.status, 409, "a likely duplicate must be refused before storage");
+  const body = await responseBody(response);
+  assert.ok(body.error, "the 409 must explain the gate");
+  assert.deepEqual(body.possibleDuplicates, [duplicateFixture], "the 409 must carry the candidate list so the client can surface it");
+  assert.equal(callArgs("createPendingCamera").length, 0, "no db write for an unconfirmed duplicate");
+  assert.equal(callArgs("linkPhotosToCamera").length, 0, "no photo linking for an unconfirmed duplicate");
+});
+
+test("POST stores the report once the submitter explicitly confirms the duplicate is distinct", async () => {
+  const duplicateFixture = {
+    ...nearbyFixture,
+    similarity: 0.82,
+    matchStrength: "high",
+  };
+  stub("createPendingCamera", async (input) => ({ id: 14, ...input }));
+  stub("findNearbyPublicCameras", async () => [duplicateFixture]);
+  const { POST } = await camerasRoute();
+  const response = await POST(
+    apiRequest("/api/cameras", {
+      method: "POST",
+      body: { title: "Camera porta nord", kind: "Fixed dome", address: "Via Roma 1", latitude: 41.9004, longitude: 12.4936, duplicateConfirmed: true },
+    }),
+  );
+  assert.equal(response.status, 201, "an explicit confirmation must let the report through");
+  const body = await responseBody(response);
+  assert.equal(body.record.id, 14);
+  // The candidates stay in the response for transparency: the moderator can
+  // still compare the confirmed report against the nearby record.
+  assert.deepEqual(body.possibleDuplicates, [duplicateFixture]);
+});
+
+test("POST treats a non-boolean duplicateConfirmed as absent (fail-closed)", async () => {
+  const duplicateFixture = {
+    ...nearbyFixture,
+    similarity: 0.82,
+    matchStrength: "high",
+  };
+  stub("createPendingCamera", async (input) => ({ id: 14, ...input }));
+  stub("findNearbyPublicCameras", async () => [duplicateFixture]);
+  const { POST } = await camerasRoute();
+  for (const bogus of ["true", 1, "yes"]) {
+    const response = await POST(
+      apiRequest("/api/cameras", {
+        method: "POST",
+        body: { title: "Camera porta nord", kind: "Fixed dome", latitude: 41.9004, longitude: 12.4936, duplicateConfirmed: bogus },
+      }),
+    );
+    assert.equal(response.status, 409, `duplicateConfirmed=${JSON.stringify(bogus)} must fail closed`);
+  }
+  assert.equal(callArgs("createPendingCamera").length, 0, "no db write for any non-boolean confirmation");
 });
 
 test("POST survives a failing duplicate check with an empty possibleDuplicates list", async () => {

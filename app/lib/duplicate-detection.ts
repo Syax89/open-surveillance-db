@@ -67,3 +67,16 @@ export function classifyDuplicateMatch(distanceMeters: number, similarity: numbe
   if (distanceMeters <= 75) return hasTextSignal && similarity >= 0.6 ? "high" : "medium";
   return hasTextSignal && similarity >= 0.6 && distanceMeters <= 200 ? "medium" : "low";
 }
+
+/**
+ * Strengths that force an explicit submitter confirmation before the report
+ * is stored (Horizon 1 gate, ADR 0019). Only "high" — essentially the same
+ * spot (<= 25 m) or <= 75 m with matching text — is treated as a likely
+ * duplicate; medium/low stay informational warnings.
+ */
+export const DUPLICATE_CONFIRMATION_STRENGTHS: readonly MatchStrength[] = ["high"];
+
+/** True when any candidate is strong enough to require explicit confirmation. */
+export function requiresDuplicateConfirmation(candidates: readonly { matchStrength: MatchStrength }[]): boolean {
+  return candidates.some((candidate) => DUPLICATE_CONFIRMATION_STRENGTHS.includes(candidate.matchStrength));
+}

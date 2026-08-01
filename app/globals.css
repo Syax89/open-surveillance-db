@@ -317,6 +317,8 @@ footer>p { margin:0; color:#586870; font-size:13px; line-height:1.5; }
 .duplicate-alert p { margin:5px 0 0 !important; color:inherit !important; font-size:13px !important; line-height:1.48 !important; }
 .duplicate-alert ul { display:grid; gap:5px; margin:10px 0 0; padding-left:18px; }
 .duplicate-alert a { color:#725107; font-weight:800; text-decoration:underline; text-underline-offset:2px; }
+.duplicate-alert .check-label { display:grid; grid-template-columns:17px 1fr; align-items:start; gap:9px; margin-top:12px; font-size:12px; line-height:1.4; font-weight:400; }
+.duplicate-alert .check-label input { width:15px; height:15px; margin-top:1px; }
 .duplicate-strength { font-weight:700; }
 .duplicate-guidance { margin-top:10px; }
 .duplicate-guidance .text-button { font-size:13px; }

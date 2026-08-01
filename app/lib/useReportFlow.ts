@@ -26,6 +26,13 @@ export function useReportFlow({ setNotice }: { setNotice: (notice: string) => vo
   const [nearbyCandidates, setNearbyCandidates] = useState<NearbyCandidate[]>([]);
   const [nearbyLoading, setNearbyLoading] = useState(false);
   const [nearbyError, setNearbyError] = useState("");
+  // Horizon 1 duplicate gate (ADR 0019): when the server answers 409 with a
+  // high-strength candidate, the contributor must explicitly confirm this is
+  // a distinct camera before the report is stored. The checkbox state lives
+  // here (not in the form DOM) so the submit payload and the disabled button
+  // share one source of truth.
+  const [duplicateConfirmationRequired, setDuplicateConfirmationRequired] = useState(false);
+  const [duplicateConfirmed, setDuplicateConfirmed] = useState(false);
   const nearbyRequest = useRef<AbortController | null>(null);
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
   const [photoUploading, setPhotoUploading] = useState(false);
@@ -43,6 +50,8 @@ export function useReportFlow({ setNotice }: { setNotice: (notice: string) => vo
     setNotice(`${t.positionSelected}: ${latitude.toFixed(5)}, ${longitude.toFixed(5)}.`);
     setNearbyCandidates([]);
     setNearbyError("");
+    setDuplicateConfirmationRequired(false);
+    setDuplicateConfirmed(false);
     setNearbyLoading(true);
     try {
       const params = new URLSearchParams({ latitude: String(latitude), longitude: String(longitude), radius: "75", limit: "8" });
@@ -113,6 +122,11 @@ export function useReportFlow({ setNotice }: { setNotice: (notice: string) => vo
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
     if (!coordinates) { setNotice(t.choosePosition); return; }
+    // Belt-and-braces client guard: Enter in a text field submits the form
+    // even when the submit button is disabled, so the hook refuses to fire
+    // the POST until the duplicate confirmation is checked. The server gate
+    // (409) remains the real enforcement.
+    if (duplicateConfirmationRequired && !duplicateConfirmed) { setNotice(t.duplicateConfirmNotice); return; }
     const manufacturer = String(form.get("manufacturer") || "").trim();
     const observedOn = String(form.get("observedOn") || "").trim();
     const payload = {
@@ -125,16 +139,31 @@ export function useReportFlow({ setNotice }: { setNotice: (notice: string) => vo
       ...(manufacturer ? { manufacturer } : {}),
       ...(observedOn ? { observedOn } : {}),
       ...(photos.length > 0 ? { photoIds: photos.map((photo) => photo.id) } : {}),
+      ...(duplicateConfirmed ? { duplicateConfirmed: true } : {}),
     };
     try {
       const response = await fetch("/api/cameras", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-      const data = await response.json() as { possibleDuplicates?: NearbyCandidate[] };
+      const data = await response.json() as { possibleDuplicates?: NearbyCandidate[]; error?: string };
+      // Horizon 1 gate: a 409 with candidates means the server refused to
+      // store the report until the contributor confirms it is a distinct
+      // camera. Surface the authoritative (text-aware) candidate list in the
+      // duplicate alert and require the confirmation checkbox before the
+      // next submit. The form is NOT reset — the contributor keeps their
+      // input and only adds the acknowledgement.
+      if (response.status === 409 && Array.isArray(data.possibleDuplicates) && data.possibleDuplicates.length > 0) {
+        setNearbyCandidates(data.possibleDuplicates);
+        setDuplicateConfirmationRequired(true);
+        setDuplicateConfirmed(false);
+        setNotice(t.duplicateConfirmNotice);
+        return;
+      }
       if (!response.ok) throw new Error(t.submitReportError);
       const duplicates = Array.isArray(data.possibleDuplicates) ? data.possibleDuplicates : [];
       formElement.reset(); setCoordinates(null); setManualLatitude(""); setManualLongitude(""); setPhotos([]);
+      setDuplicateConfirmationRequired(false); setDuplicateConfirmed(false);
       setNotice(duplicates.length > 0 ? `${t.reportSaved} ${t.reportSavedWithNearby}` : t.reportSaved);
     } catch { setNotice(t.moderationUnavailable); }
   }
 
-  return { coordinates, setCoordinates, manualLatitude, setManualLatitude, manualLongitude, setManualLongitude, nearbyCandidates, nearbyLoading, nearbyError, selectCoordinates, selectManualCoordinates, photos, photoUploading, photoInputRef, onPhotoSelected, removePhoto, submitReport };
+  return { coordinates, setCoordinates, manualLatitude, setManualLatitude, manualLongitude, setManualLongitude, nearbyCandidates, nearbyLoading, nearbyError, selectCoordinates, selectManualCoordinates, photos, photoUploading, photoInputRef, onPhotoSelected, removePhoto, submitReport, duplicateConfirmationRequired, duplicateConfirmed, setDuplicateConfirmed };
 }
