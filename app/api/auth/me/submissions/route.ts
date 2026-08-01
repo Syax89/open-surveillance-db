@@ -8,6 +8,12 @@ import { urlTooLong } from "../../../../lib/input-limits";
  * GET /api/auth/me/submissions — the authenticated contributor's own
  * attributed reports (id, title, status, created_at). 401 when anonymous.
  * Anonymous submissions are never attributable and therefore never listed.
+ *
+ * DEPRECATED (COMMUNITY_PLAN §2.3, C2): kept for backward compatibility but
+ * superseded by GET /api/auth/me/contributions, which adds pagination
+ * (F0 contract), correction/photo contribution kinds, a status filter and
+ * the caller's trust level in the meta. New clients should call
+ * /api/auth/me/contributions instead.
  */
 export async function GET(request: Request) {
   if (urlTooLong(request)) {

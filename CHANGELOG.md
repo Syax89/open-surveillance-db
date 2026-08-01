@@ -141,6 +141,13 @@ changes accumulate under `[Unreleased]`.
   payload pubblici (GROUP BY IN, no N+1), anti-gaming 6 strati (quota D1
   20/40, per-record 5, IP-hash burst, decay su `last_verified_at`), erasure
   estesa art. 17 (ADR 0018, C1).
+- Community profile contributions (C2, ADR 0018): migrazione D1 0024
+  (index `(contributor_id, created_at DESC)` su cameras e photos),
+  `GET /api/auth/me/contributions` paginato (contratto F0, filtri whitelist,
+  `Cache-Control: no-store`, solo dati propri), `deriveLevel` puro
+  (L0=0/L1=1/L2=5/L3=20/L4=50, solo `status='verified'` conta) e `level` nel
+  meta di `/api/auth/me` e della lista contributi; `me/submissions` deprecato
+  (backward-compat).
 
 ### Changed
 
