@@ -1,7 +1,7 @@
 # Retention schedule (operational)
 
 - **Status:** draft for pre-launch review (ADR 0004)
-- **Owner:** Rosa (DPO / privacy)
+- **Owner:** Rosa (Legal & Privacy Officer / privacy contact)
 - **Decisions applied (2026-07-31, CEO — ADR 0008):** verified records on a **12-month renewal review cycle**; privacy contact `privacy@opensurveillancedb` (mailbox to be created at launch).
 - **Legal basis:** GDPR art. 5(1)(e) (storage limitation), art. 17 (erasure); D.Lgs. 196/2003 (Codice Privacy, IT) as primary jurisdiction; consistent with `../PRIVACY_AND_SAFETY.md` and `../MODERATION.md`.
 - **Scope:** all data held by OpenSurveillanceDB, including submissions, moderation data, evidence, correction requests and backups.
@@ -41,7 +41,7 @@
 
 - Retention rules R1/R2/R3 need automated enforcement: a scheduled job (Cloudflare D1 cron / Workers cron trigger) that flags `pending` > 90 days and `rejected` > 30 days for deletion, and pushes stale `verified` records to `needs_review`. **Follow-up (implementation, assignee: ada):** `db/retention.ts` + cron binding + tests.
 - Audit log entries (R4/R5/R9) are archived, not hard-deleted, until the 2-year mark.
-- The DPO reviews this schedule annually and on any material change of purpose, provider, or jurisdiction.
+- The privacy/legal owner (data-protection contact) reviews this schedule annually and on any material change of purpose, provider, or jurisdiction.
 
 ## 4. Legal rationale
 

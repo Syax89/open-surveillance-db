@@ -1,7 +1,7 @@
 # Terms of use (draft — pre-launch)
 
 - **Status:** draft for pre-launch review — **not in force**. No public service is live yet; these terms are the proposed contract for the public launch. Nothing here is a binding offer or commitment.
-- **Owner:** Rosa (DPO / privacy)
+- **Owner:** Rosa (Legal & Privacy Officer / privacy contact)
 - **Version:** 0.3 (2026-08-01 — photo evidence upload documented: TERMS § 4.1/§ 5.5 now describe the active `POST /api/photos` flow — EXIF/XMP/IPTC stripping fail-closed, R2/D1 storage, moderation + redaction gate, retention R6; see `docs/legal/REVIEW_PHOTO_UPLOAD_TERMS_ALIGNMENT_2026-08-01.md`).
 - **Decisions applied (2026-07-31, CEO — Wave A):** privacy contact `privacy@opensurveillancedb` (dedicated mailbox, to be created at launch); published coordinates rounded to **~4 decimal places (~10 m)** (zone-level precision; exact location private to moderators); verified records on a **12-month renewal** retention cycle (RETENTION_SCHEDULE.md R3).
 - **Scope:** the OpenSurveillanceDB web application, public API, data exports and related services ("the Service").

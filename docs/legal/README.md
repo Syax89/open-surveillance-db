@@ -1,7 +1,7 @@
 # Legal pre-launch deliverables
 
 Status: **DRAFT — pre-launch**. These documents are project drafts produced by the
-DPO/legal function to satisfy the requirements already declared by the project
+privacy/legal function (no DPO appointed — see ADR 0015: GDPR art. 37(1) not applicable) to satisfy the requirements already declared by the project
 policies. They are **not legal advice** and must receive an independent review
 by qualified counsel before any public launch (see PRIVACY_AND_SAFETY.md:
 "local legal review is required before any public launch").

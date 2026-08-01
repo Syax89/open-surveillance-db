@@ -12,6 +12,7 @@
 
 - **Controller:** Simone Rondina (syax89) / OpenSurveillanceDB — Italy (decision 2026-07-31; governance owners in ../GOVERNANCE.md).
 - **Privacy contact / data-protection contact:** `privacy@opensurveillancedb` *(dedicated mailbox — to be created before launch; final domain to be confirmed)* — for any question, data-subject request, or report. Response time: see § 8.
+- **Data protection officer (art. 37 GDPR):** none appointed — the obligation does not apply to this project (no public authority, no large-scale systematic monitoring of data subjects, no large-scale special-category processing; documented in ADR 0015). The privacy contact above serves as the data-protection contact.
 
 ## 2. What the service does
 
