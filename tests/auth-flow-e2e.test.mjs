@@ -711,7 +711,11 @@ test("E2E: full lifecycle writes one append-only audit event per legal transitio
 test("E2E: nearby and coordinate search return only published records", async () => {
   const published = await submitCamera({ title: "Published camera" });
   await moderateCamera(published.id, "approve", REASON.verified, REVIEWERS.record);
-  await submitCamera({ title: "Pending camera" });
+  // Same coordinates as the published record → the Horizon 1 gate (ADR 0019)
+  // answers 409 unless the submitter confirms the camera is distinct. The
+  // explicit confirmation is exactly the flow a real contributor follows;
+  // the point of this test is the public boundary, not the gate itself.
+  await submitCamera({ title: "Pending camera", duplicateConfirmed: true });
 
   const nearby = await responseBody(
     await nearbyRoute.GET(apiRequest(`/api/cameras/nearby?latitude=${SUBMIT.latitude}&longitude=${SUBMIT.longitude}&radius=100`)),

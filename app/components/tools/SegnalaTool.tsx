@@ -27,6 +27,9 @@ export function SegnalaTool() {
         nearbyCandidates={report.nearbyCandidates}
         nearbyLoading={report.nearbyLoading}
         nearbyError={report.nearbyError}
+        duplicateConfirmationRequired={report.duplicateConfirmationRequired}
+        duplicateConfirmed={report.duplicateConfirmed}
+        setDuplicateConfirmed={report.setDuplicateConfirmed}
         photos={report.photos}
         photoUploading={report.photoUploading}
         photoInputRef={report.photoInputRef}

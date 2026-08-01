@@ -60,9 +60,21 @@ ISO timestamps, with a one-time backfill from the moderation audit trail for
 pre-existing prose values; and non-ISO labels (illustrative demo placeholders)
 are never matched by a freshness window, in the UI or the API.
 
+**Implementation update (2026-08-02, duplicate gate):** the pre-submit
+duplicate warning is now a server-enforced confirmation gate (ADR 0019). A
+report whose position and text match a reviewed public record with
+`high` strength (same spot ≤ 25 m, or ≤ 75 m with matching text) is refused
+with `409` and `possibleDuplicates` **before** any row is stored, unless the
+submitter explicitly confirms it is a distinct camera (`duplicateConfirmed:
+true`). Medium/low candidates remain informational. The /segnala form shows
+the authoritative candidate list and a mandatory confirmation checkbox when
+the gate trips; the check itself fails open, so an unavailable duplicate
+check degrades to the old non-blocking warning instead of silencing
+submissions.
+
 ### Planned work
 
-- Detect likely duplicates before a contributor submits a new record.
+- [x] Detect likely duplicates before a contributor submits a new record.
 - Add explicit record freshness and re-verification state without publishing stale data as current.
 - Add safe category and verification-freshness filters to the public directory.
 - [x] Add a reviewed public change summary that omits contributor identities and internal notes.

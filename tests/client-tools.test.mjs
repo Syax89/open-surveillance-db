@@ -335,6 +335,101 @@ test("SegnalaTool manual coordinates + full submit reach the moderation API", as
   assert.match(screen.getByRole("status").textContent, /Report saved/, "saved confirmation after a 2xx");
 });
 
+test("SegnalaTool requires an explicit duplicate confirmation after a 409 gate", async () => {
+  const { screen } = rtl;
+  const user = rtl.userEvent.setup();
+  const postedBodies = [];
+  installFetchMock(async (input, init) => {
+    const url = String(input);
+    if (url.startsWith("/api/cameras/nearby")) return jsonResponse({ records: [] });
+    if (url === "/api/cameras" && init?.method === "POST") {
+      if (init.body) postedBodies.push(JSON.parse(String(init.body)));
+      // First submit: the server gate refuses with a high-strength candidate.
+      if (postedBodies.length === 1) {
+        return jsonResponse(
+          {
+            error: "A very similar public record already exists nearby.",
+            possibleDuplicates: [
+              { id: 7, title: "Camera porta nord", kind: "Fixed dome", distanceMeters: 12, similarity: 0.82, matchStrength: "high" },
+            ],
+          },
+          { status: 409 },
+        );
+      }
+      return jsonResponse({});
+    }
+    return jsonResponse({ records: [], total: 0, nextOffset: null });
+  });
+  await renderWithLocale(React.createElement(SegnalaTool));
+
+  // Fill the report like the plain-submit test.
+  await user.type(screen.getByLabelText("Latitude"), "45.46420");
+  await user.type(screen.getByLabelText("Longitude"), "9.19000");
+  await user.click(screen.getByRole("button", { name: /Use these coordinates/ }));
+  await user.type(screen.getByLabelText("Record title"), "Fixture public camera");
+  await user.selectOptions(screen.getByLabelText("Camera type"), "Fixed dome");
+  await user.click(screen.getByRole("checkbox"));
+  await user.click(screen.getByRole("button", { name: /Send to moderation/ }));
+
+  // The 409 surfaces the authoritative candidate list and the confirmation
+  // checkbox; the submit button is disabled until the checkbox is checked.
+  assert.match(screen.getByRole("alert").textContent, /Camera porta nord/, "the 409 candidate must be listed in the duplicate alert");
+  const confirmCheckbox = screen.getByRole("checkbox", { name: /I confirm this is a distinct camera/ });
+  assert.ok(confirmCheckbox, "the confirmation checkbox must appear after a 409 gate");
+  assert.equal(screen.getByRole("button", { name: /Send to moderation/ }).disabled, true, "submit stays disabled until confirmed");
+  assert.equal(postedBodies[0].duplicateConfirmed, undefined, "the first POST must NOT carry the confirmation flag");
+
+  // Acknowledge and resubmit: the second POST carries duplicateConfirmed: true.
+  await user.click(confirmCheckbox);
+  assert.equal(screen.getByRole("button", { name: /Send to moderation/ }).disabled, false, "submit re-enables once confirmed");
+  await user.click(screen.getByRole("button", { name: /Send to moderation/ }));
+  assert.equal(postedBodies[1].duplicateConfirmed, true, "the confirmed resubmit must carry duplicateConfirmed: true");
+  assert.match(screen.getByRole("status").textContent, /Report saved/, "the confirmed report lands the saved confirmation");
+});
+
+test("SegnalaTool refuses to resubmit an unconfirmed duplicate via implicit form submission", async () => {
+  const { screen } = rtl;
+  const user = rtl.userEvent.setup();
+  let postCount = 0;
+  installFetchMock(async (input, init) => {
+    const url = String(input);
+    if (url.startsWith("/api/cameras/nearby")) return jsonResponse({ records: [] });
+    if (url === "/api/cameras" && init?.method === "POST") {
+      postCount += 1;
+      if (postCount === 1) {
+        return jsonResponse(
+          {
+            error: "A very similar public record already exists nearby.",
+            possibleDuplicates: [
+              { id: 7, title: "Camera porta nord", kind: "Fixed dome", distanceMeters: 12, similarity: 0.82, matchStrength: "high" },
+            ],
+          },
+          { status: 409 },
+        );
+      }
+      return jsonResponse({});
+    }
+    return jsonResponse({ records: [], total: 0, nextOffset: null });
+  });
+  await renderWithLocale(React.createElement(SegnalaTool));
+
+  await user.type(screen.getByLabelText("Latitude"), "45.46420");
+  await user.type(screen.getByLabelText("Longitude"), "9.19000");
+  await user.click(screen.getByRole("button", { name: /Use these coordinates/ }));
+  await user.type(screen.getByLabelText("Record title"), "Fixture public camera");
+  await user.selectOptions(screen.getByLabelText("Camera type"), "Fixed dome");
+  await user.click(screen.getByRole("checkbox"));
+  await user.click(screen.getByRole("button", { name: /Send to moderation/ }));
+  assert.equal(postCount, 1, "the gate rejects the first POST");
+
+  // Enter in the title field submits the form even with a disabled button;
+  // the hook must refuse to fire another POST until the checkbox is checked.
+  await user.type(screen.getByLabelText("Record title"), " x");
+  await user.keyboard("{Enter}");
+  assert.equal(postCount, 1, "no second POST without the explicit confirmation");
+  assert.match(screen.getByRole("status").textContent, /Confirm that this is a distinct camera/, "the notice explains the gate");
+});
+
 // ---------------------------------------------------------------------------
 // /correggi — CorreggiTool
 // ---------------------------------------------------------------------------

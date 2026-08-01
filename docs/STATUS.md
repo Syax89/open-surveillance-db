@@ -10,6 +10,7 @@ Last reviewed: 2026-08-01
 - [x] Safe directory filters (type and ordering) shared by map and list.
 - [x] Safe category and verification-freshness directory filters: whitelisted freshness windows (`7d`/`30d`/`90d`), parameterised SQL, ISO verification timestamps, and a one-time backfill for pre-existing prose values.
 - [x] Non-blocking local duplicate warning based only on nearby public/demo records.
+- [x] Server-enforced duplicate gate (ADR 0019): a `high`-strength candidate refuses the report with `409` until the submitter explicitly confirms it is a distinct camera (`duplicateConfirmed: true`); the check runs before storage, fails open, and the /segnala form surfaces the candidates + confirmation checkbox.
 - [x] Report position may be selected by map click or validated manual coordinates; both paths use the same public-only duplicate check.
 - [x] Camera-record API and GeoJSON export.
 - [x] CSV export derived from the same public-record boundary as JSON and GeoJSON.

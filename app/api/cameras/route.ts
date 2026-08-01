@@ -1,5 +1,6 @@
 import { env } from "cloudflare:workers";
 import { createPendingCamera, findNearbyPublicCameras, freshnessWindows, getPublicCameraFacets, listPublicCameras, listPublicCamerasInBbox, listPublicCamerasPage, PUBLIC_CAMERAS_PAGE_DEFAULT_LIMIT, PUBLIC_CAMERAS_PAGE_MAX_LIMIT, type FreshnessWindow, type PublicCameraFilters } from "../../../db/cameras";
+import { requiresDuplicateConfirmation } from "../../lib/duplicate-detection";
 import { resolveOptionalContributor } from "../../lib/auth-session";
 import { csrfVerified, sameOrigin } from "../../lib/csrf";
 import { DATA_LICENSE_ID, DATA_LICENSE_NOTICE } from "../../lib/data-license";
@@ -230,6 +231,35 @@ export async function POST(request: Request) {
       return Response.json({ error: "photoIds must be an array of positive integers." }, { status: 400 });
     }
     if (!title || !kind || !Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180 || (payload.observedOn !== undefined && payload.observedOn !== null && !observedOn)) return Response.json({ error: "A title, type, valid position and (when provided) a valid observation date are required." }, { status: 400 });
+    // Horizon 1 duplicate gate (ADR 0019): detect likely duplicates BEFORE the
+    // record is stored. The check runs on reviewed public records only (the
+    // same public boundary as every read route — it can never reveal pending
+    // reports). A failure of the check itself must never block a legitimate
+    // report: the catch below fails OPEN exactly like the previous
+    // post-insert warning did, so a broken duplicate check degrades to the
+    // old non-blocking behaviour instead of silencing submissions.
+    let possibleDuplicates: Awaited<ReturnType<typeof findNearbyPublicCameras>> = [];
+    try {
+      possibleDuplicates = await findNearbyPublicCameras(latitude, longitude, 75, { title, address, kind });
+    } catch (error) {
+      console.error("POST /api/cameras duplicate check failed", error);
+    }
+    // A high-strength candidate (essentially the same spot, or <= 75 m with
+    // matching text) forces an explicit acknowledgement. Without it the
+    // report is rejected with 409 and NOT stored — no record row, no photo
+    // linking — so a contributor who skips the UI confirmation can never
+    // silently file a near-duplicate. The flag is strictly boolean true:
+    // anything else ("true", 1) fails closed. This is a confirmation gate,
+    // not a hard block: a human can always proceed after acknowledging.
+    if (requiresDuplicateConfirmation(possibleDuplicates) && payload.duplicateConfirmed !== true) {
+      return Response.json(
+        {
+          error: "A very similar public record already exists nearby. Confirm that this is a distinct camera before submitting (duplicateConfirmed: true), or use the correction form for the existing record.",
+          possibleDuplicates,
+        },
+        { status: 409 },
+      );
+    }
     const record = await createPendingCamera({ title, kind, address, notes, manufacturer: manufacturer || null, observedOn: observedOn || null, latitude, longitude, contributorId: auth?.contributor.id ?? null });
     // Link photo evidence after the report row exists. Linking is best-effort:
     // a photo that fails the pending/unlinked guard is simply left orphaned
@@ -241,15 +271,6 @@ export async function POST(request: Request) {
       linkedPhotoCount = await linkPhotosToCamera(record.id, photoIds, auth?.contributor.id ?? null);
     } catch (error) {
       console.error("POST /api/cameras photo linking failed", error);
-    }
-    // Non-blocking pre-submit duplicate detection: warn the submitter about
-    // nearby reviewed records without leaking any non-public data. A failure
-    // here must never fail the report itself.
-    let possibleDuplicates: Awaited<ReturnType<typeof findNearbyPublicCameras>> = [];
-    try {
-      possibleDuplicates = await findNearbyPublicCameras(latitude, longitude, 75, { title, address, kind });
-    } catch (error) {
-      console.error("POST /api/cameras duplicate check failed", error);
     }
     return Response.json({ record, possibleDuplicates, linkedPhotos: linkedPhotoCount }, { status: 201 });
   } catch (error) {

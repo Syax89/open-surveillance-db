@@ -137,6 +137,14 @@ observation date are rejected with `400`. The response (`201`) echoes the
 stored private record, which the submitter may inspect; none of it is public
 until a moderator approves the record.
 
+When a reviewed public record at essentially the same spot (or ≤ 75 m with
+matching text) is found **before** storage, the route answers `409` with
+`{ error, possibleDuplicates }` and stores nothing (ADR 0019). The submitter
+must explicitly acknowledge the candidate is a distinct camera via
+`duplicateConfirmed: true`; the report is then stored and the candidates are
+returned in the `201` for moderation context. Medium/low candidates never
+block and appear in `possibleDuplicates` either way.
+
 | Field | Required | Limit | Notes |
 | --- | --- | --- | --- |
 | `title` | yes | 90 chars | |
@@ -147,6 +155,7 @@ until a moderator approves the record.
 | `manufacturer` | no | 80 chars | Stored privately; publication needs the moderator opt-in. |
 | `observedOn` | no | 10 chars | Must be a real calendar date in `YYYY-MM-DD` form. |
 | `notes` | no | 1000 chars | **Never public.** Internal intake notes; excluded from every public output by the public query boundary. |
+| `duplicateConfirmed` | no | boolean | Strictly `true` to acknowledge a `high`-strength candidate (ADR 0019). Anything else (`"true"`, `1`, absent) fails closed with `409`. |
 
 ### Correction request input (`POST /api/corrections`)
 
