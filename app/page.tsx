@@ -23,10 +23,13 @@ export default function Home() {
   const [sortOrder, setSortOrder] = useState<"alphabetical" | "position">("alphabetical");
 
   // Shared public-cameras data layer (audit t_c6da60f0): fetch + abort +
-  // module cache + explicit loading/error states. The prototype records are
-  // the explicit demo seed rendered while loading or when the API is
-  // unreachable (the notice below says so); the API payload replaces them.
-  const { records, loading } = usePublicCameras({
+  // module cache + explicit loading/error states. The layer walks the
+  // paginated /api/cameras (limit 500/page, nextOffset) so the map renders
+  // ALL public records; `total` is the server total, never a first-page
+  // count. The prototype records are the explicit demo seed rendered while
+  // loading or when the API is unreachable (the notice below says so); the
+  // API payload replaces them.
+  const { records, total, loading } = usePublicCameras({
     seed: publicRecords(prototypeRecords),
     onRecords: (next) => setSelectedId(next[0].id),
     onError: () => setNotice(t.apiUnavailable),
@@ -74,7 +77,7 @@ export default function Home() {
       <div className={`nav-links ${menuOpen ? "is-open" : ""}`} id="main-links"><a href="#map">{t.exploreMap}</a><a href="#records">{t.browseRecords}</a><a href="/guide">{t.howItWorks}</a><a href="/regole">{t.rules}</a><a href="/manifesto">{t.manifesto}</a><a className="nav-action" href="#report">{t.addCamera}</a></div><LocaleToggle />
     </nav>
 
-    <Hero recordsCount={records.length} />
+    <Hero recordsCount={total ?? records.length} />
 
     <MapPanel
       filteredRecords={filteredRecords}
