@@ -191,10 +191,11 @@ test("the hub SSR markup carries hero, static MapTeaser and the four tool cards"
   assert.match(html, /class="map-teaser"/, "static map teaser present");
   assert.match(html, /href="\/mappa"[^>]*>Open the map/, "teaser CTA → /mappa");
   // The hero stat renders the neutral SSR placeholder (no invented number).
-  // role="status" sits on the <span> INSIDE the <dt>: axe-core 4.10 flags a
-  // dt/dd with role="status" (definition-list/dlitem), so the live region
-  // must not replace the semantic list item (F-QA t_7b716c97 axe audit).
-  assert.match(html, /<dt><span role="status">—<\/span><\/dt>/, "SSR stat must be the neutral placeholder");
+  // role="status" lives on a separate sr-only live region (mounted only when
+  // the count resolves), NOT on the <dt> — axe forbids role="status" on
+  // <dt> (aria-allowed-role) and it breaks the <dl> model (definition-list).
+  assert.match(html, /<dt>—<\/dt>/, "SSR stat must be the neutral placeholder");
+  assert.doesNotMatch(html, /<dt role="status">/, "the live region must not be on the dt");
   // Four tool cards.
   const cards = [...html.matchAll(/class="tool-card"/g)];
   assert.equal(cards.length, 4, "expected exactly four tool cards");
