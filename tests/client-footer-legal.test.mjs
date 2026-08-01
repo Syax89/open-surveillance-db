@@ -77,6 +77,15 @@ const fakeLegalContent = {
 // et al.). These QA tests predate the Server-Components refactor (PR #120)
 // that introduced navLabels; this fictitious fixture mirrors the contract so
 // the tests exercise the same prop shape as production.
+//
+// QA t_5084202a — root cause of the "flaky" CI red runs: PR #120 made
+// navLabels a REQUIRED prop; the tests from PR #94 still rendered LegalPage
+// with only `content`, crashing with `Cannot read properties of undefined
+// (reading 'mainNavigation')` at LegalPage.mjs:56:149. That failure was
+// DETERMINISTIC on the pre-fix SHA (reproduced locally), not a .dom-tmp race:
+// dom-harness builds each test file in its own mkdtemp dir and removes only
+// its own tree in `after()`. The fix landed in PR #123; the contract test
+// below turns any future signature change into a clear, immediate failure.
 const fakeNavLabels = {
   mainNavigation: "Fixture navigation",
   homeAria: "Fixture home",
@@ -84,6 +93,27 @@ const fakeNavLabels = {
   browseRecords: "Fixture records",
   howItWorks: "Fixture guide",
 };
+
+// Contract guard: if a future refactor adds/renames a navLabels key, the
+// render below fails with a descriptive message instead of a cryptic
+// TypeError on an undefined prop (the t_5084202a failure mode).
+test("legal: nav shell renders every fixture nav label (contract guard)", async () => {
+  const view = await renderWithLocale(React.createElement(LegalPage, { content: fakeLegalContent, navLabels: fakeNavLabels }));
+  const { container } = view;
+
+  const nav = container.querySelector("nav.nav-shell");
+  assert.ok(nav, "nav shell must render");
+  assert.equal(nav.getAttribute("aria-label"), fakeNavLabels.mainNavigation, "nav aria-label must come from navLabels.mainNavigation");
+
+  const brand = container.querySelector("nav .brand");
+  assert.ok(brand, "brand link must render");
+  assert.equal(brand.getAttribute("aria-label"), fakeNavLabels.homeAria, "brand aria-label must come from navLabels.homeAria");
+
+  const linkTexts = [...container.querySelectorAll(".nav-links a")].map((a) => a.textContent.trim());
+  for (const key of ["exploreMap", "browseRecords", "howItWorks"]) {
+    assert.ok(linkTexts.includes(fakeNavLabels[key]), `nav link text must include navLabels.${key} ("${fakeNavLabels[key]}")`);
+  }
+});
 
 function collectLinks(container) {
   return [...container.querySelectorAll("a")].map((a) => ({
