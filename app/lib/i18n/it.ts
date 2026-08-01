@@ -202,9 +202,13 @@ export const it: Translation<typeof en> = {
     observedPlaceholder: "Direzione, gestore, avviso visibile, modello…",
     reportConsent:
       "Confermo che l’osservazione è stata fatta dallo spazio pubblico e non contiene dati personali.",
+    privacyNotice: "Informativa privacy",
+    termsOfUse: "Termini d’uso",
     photoUploadTitle: "Prova fotografica (facoltativa)",
     photoUploadHelp:
       "JPEG, PNG o WebP fino a 10 MB e 4096 px per lato. Volti, targhe e altri dati personali devono essere oscurati prima del caricamento; i metadati di posizione e della fotocamera (EXIF) vengono rimossi automaticamente all’upload.",
+    photoExifPrivacyNote: "I metadati EXIF vengono rimossi all’upload — vedi l’",
+    photoExifPrivacyLink: "informativa privacy",
     photoUploadLabel: "Scegli le foto",
     photoUploading: "Caricamento…",
     photoUploadError: "La foto non può essere caricata.",
@@ -869,6 +873,8 @@ export const it: Translation<typeof en> = {
     passwordHint: "Almeno 10 caratteri.",
     anonymousNote:
       "Non serve un account per segnalare una telecamera. Un account ti permette di tenere traccia delle tue segnalazioni.",
+    privacyNotice: "Informativa privacy",
+    termsOfUse: "Termini d’uso",
     profileSection: "Profilo",
     memberSince: "Iscritto dal",
     emailLabel: "Email",

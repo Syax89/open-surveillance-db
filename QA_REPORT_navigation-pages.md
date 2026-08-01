@@ -111,3 +111,39 @@ Baseline su main: 543 test. Dopo questa PR: **569 test** (+26).
 - PR **mergeable**: suite completa verde in locale (568/568), lint/tsc/db:smoke puliti.
 - Review finale in carico ad Ada (CTO) come da flusso del progetto.
 - Follow-up consigliato (separato, non bloccante): fix contrasto `.loading-note`.
+
+## 7. Aggiornamento — notifica breve art. 13/14 GDPR nei form (kanban t_4436bd21)
+
+Il gap 5 dell'audit legale (t_1de55bfb) richiedeva che l'informativa privacy fosse
+richiamata esplicitamente **al punto di raccolta**, non solo nel footer globale.
+
+### Modifiche
+- **Form di segnalazione** (`app/page.tsx`, `#report`): accanto alla checkbox
+  `reportConsent` ora compaiono i link **Informativa privacy → /privacy** e
+  **Termini d'uso → /termini** (stringhe i18n `privacyNotice` / `termsOfUse`,
+  EN+IT).
+- **Form di correzione** (`#correction`): stessi link accanto a `correctionConsent`.
+- **Upload foto**: la riga help ora termina con la nota
+  "I metadati EXIF vengono rimossi all'upload — vedi l'informativa privacy"
+  (link a `/privacy`, stringhe `photoExifPrivacyNote` / `photoExifPrivacyLink`,
+  EN+IT).
+- **Registrazione account** (`app/register/page.tsx`): paragrafo
+  `.auth-legal-links` con i link a `/privacy` e `/termini` subito sotto il
+  pulsante submit (bundle `auth`, EN+IT).
+- **CSS**: regole per `.auth-legal-links`, `.check-label a` e `#photo-upload-help a`
+  (colore tema `#0a705d`/`#0b705c`, sottolineatura, stesso stile degli altri link).
+
+### Test aggiunti (tests/rendered-html.test.mjs, +2)
+- `homepage collection points link to the privacy notice and terms (GDPR art. 13 short notice)`:
+  verifica i link nel report form e nel correction form accanto al consenso,
+  la nota EXIF con link a `/privacy` nella riga help foto, e il conteggio minimo
+  dei link (`/privacy` ≥ 4, `/termini` ≥ 3 sulla home).
+- `register page links to the privacy notice and terms next to the submit button`:
+  verifica `.auth-legal-links` dentro il form auth, subito dopo il submit.
+
+### Esito
+- EN/IT parity preservata (stesso set di chiavi in `en.ts`/`it.ts`, type-checked).
+- Nessun contenuto legale nuovo: solo richiami alle pagine esistenti `/privacy`
+  e `/termini` (testi già approvati, Rosa disponibile per review).
+- **Esito QA: ✅ PASS** — nessuna regressione, i link risolvono a route reali
+  (già coperte dal crawl `navigation-pages` e dai test `legal-pages`).
