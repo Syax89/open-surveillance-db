@@ -310,11 +310,70 @@ Prima del primo deploy di produzione, confermare (barrare quando fatto):
       `BACKUP_PASSPHRASE`; repository variable `PROD_URL`.
 - [ ] Secrets Cloudflare: `MODERATION_USER`/`MODERATION_PASSWORD` o
       `MODERATION_TOKEN` (senza questi la moderazione risponde 503 — fail-closed).
+- [ ] Workflow `deploy.yml` provato in **dry-run** almeno una volta.
 - [ ] Workflow `ops-monitoring.yml` schedulato e passato almeno una volta (dry run manuale).
 - [ ] Workflow `ops-backup.yml` schedulato; primo backup eseguito e dump verificato (3 tabelle + conteggi).
 - [ ] Drill di restore eseguito (Pattern A) con esito registrato.
 - [ ] Tag `v*` presente e correlato a un deployment; `wrangler rollback` provato in staging.
 - [ ] Incident runbook condiviso con il team (questo file).
+
+---
+
+## 7. Deploy Cloudflare via CI (workflow `deploy.yml`)
+
+Il deploy del Worker + migrazioni D1 di produzione passa dal workflow
+`.github/workflows/deploy.yml` — mai comandi manuali `wrangler deploy` da
+macchine locali. Il workflow è **manuale** (`workflow_dispatch`) finché non è
+presa la decisione sul deploy pubblico (DEPLOYMENT.md "Preconditions for a
+public environment"); a decisione presa, si aggiunge il trigger automatico su
+tag `v*` (modifica documentata in testa al file).
+
+### 7.1 Modalità
+
+| Mode | Cosa fa | Effetto remoto |
+|---|---|---|
+| `dry-run` (default) | `wrangler d1 migrations apply --remote --dry-run` (migrazioni pendenti, nessuna applicata) + `wrangler deploy --dry-run` (bundle locale) | nessuno |
+| `deploy` | `wrangler d1 migrations apply --remote` + `wrangler deploy` + registra il version id (`wrangler versions list`) | D1 migrato + worker aggiornato |
+
+Il job gira su `environment: production` (GitHub Environments): una volta
+aggiunti i required reviewers, ogni deploy richiede approvazione umana.
+
+### 7.2 Pre-requisiti (one-time, prima del primo `deploy`)
+
+```bash
+# 1. Secrets GitHub (mai hardcoded nei workflow)
+gh secret set CLOUDFLARE_API_TOKEN   # permessi "Workers Scripts - Edit" + "D1 - Edit"
+gh secret set CLOUDFLARE_ACCOUNT_ID
+gh variable set PROD_URL             # hostname di produzione (es. osdb.example.org)
+
+# 2. D1 di produzione: creare il database e copiare il database_id in
+#    wrangler.jsonc (il workflow blocca il deploy finché c'è il placeholder)
+npx wrangler d1 create opensurveillancedb   # output: database_id
+
+# 3. Bucket R2 (il binding PHOTOS è dichiarativo: il bucket deve esistere)
+npx wrangler r2 bucket create opensurveillancedb-photos
+
+# 4. Secrets del worker (persistono tra i deploy; mai nel codice)
+npx wrangler secret put MODERATION_USER
+npx wrangler secret put MODERATION_PASSWORD
+npx wrangler secret put MODERATION_TOKEN      # opzionale, alternativa bearer
+```
+
+Verifica preliminare rapida da CI senza toccare produzione: modalità
+`dry-run` del workflow (migrazioni pendenti + bundle).
+
+### 7.3 Rollback
+
+Il worker è versionato: il rollback è **istantaneo e non tocca D1**
+(`npx wrangler rollback [version-id]` — vedi §5). Se l'incidente riguarda
+i dati, il rollback del worker non basta: serve il ripristino D1 (§3.4).
+
+### 7.4 Regole
+
+- Mai `wrangler deploy` manuale in produzione da macchine locali: solo CI.
+- Mai credenziali moderation nel codice o nei workflow: solo secrets CF.
+- Un deploy che fallisce a metà (es. migrazione andata male) → rollback
+  worker (§5.2) + fix migrazione; non tentare un secondo deploy alla cieca.
 
 ---
 
