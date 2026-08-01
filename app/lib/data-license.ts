@@ -11,5 +11,4 @@ export const DATA_LICENSE_ID = "ODbL-1.0";
 
 export const DATA_LICENSE_URL = "https://opendatacommons.org/licenses/odbl/1.0/";
 
-export const DATA_LICENSE_NOTICE =
-  "© OpenSurveillanceDB contributors — ODbL 1.0 (https://opendatacommons.org/licenses/odbl/1.0/); attribution e share-alike richiesti per database derivati";
+export const DATA_LICENSE_NOTICE = `© OpenSurveillanceDB contributors — ODbL 1.0 (${DATA_LICENSE_URL}); attribution e share-alike richiesti per database derivati`;
