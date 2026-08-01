@@ -20,6 +20,7 @@
 
 import assert from "node:assert/strict";
 import { after, beforeEach, test } from "node:test";
+import { loadLibModule } from "./helpers/api-harness.mjs";
 import { applyDrizzleMigrations, cleanupDbRuntime, loadDbRuntime } from "./helpers/db-runtime-harness.mjs";
 import { D1SqliteDatabase } from "./helpers/d1-sqlite.mjs";
 
@@ -414,4 +415,38 @@ test("eraseContributor deletes verifications and de-attributes community data", 
   // The other contributor is untouched.
   const untouched = await db.prepare("SELECT COUNT(*) AS n FROM contributors WHERE id = ?").bind(other).first();
   assert.equal(Number(untouched.n), 1);
+});
+
+// ---------------------------------------------------------------------------
+// Confidence score guard (ADR 0018 §6.2 / COMMUNITY_PLAN §8.3, C-QA)
+// ---------------------------------------------------------------------------
+// The weighted confidence score is v2, OUT of alpha: no confidence column
+// exists anywhere in the schema, so no aggregation can divide by zero. This
+// guard pins that structural absence — if a future v2 PR adds the column
+// without the explicit division-by-zero test, this test fails and the merge
+// is blocked (COMMUNITY_PLAN §8.3: "division-by-zero (0 conferme + 0
+// rimozioni → NaN) test esplicito").
+test("confidence score is out of alpha: no confidence column exists in any table (division-by-zero impossible)", async () => {
+  const tables = await db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all();
+  const confidenceColumns = [];
+  for (const { name } of tables.results) {
+    const columns = await db.prepare(`PRAGMA table_info(${name})`).all();
+    for (const column of columns.results) {
+      if (column.name.toLowerCase().includes("confidence")) {
+        confidenceColumns.push(`${name}.${column.name}`);
+      }
+    }
+  }
+  assert.deepEqual(
+    confidenceColumns,
+    [],
+    `confidence_score is v2 (out of alpha): no table may carry a confidence column — found ${confidenceColumns.join(", ")}`,
+  );
+
+  // The derived level is fail-closed on a corrupt count: NaN/Infinity never
+  // grant a level up (L4, api-contributions.test.mjs) — the closest numeric
+  // aggregate in alpha, and the pattern a confidence denominator must follow.
+  const { deriveLevel } = await loadLibModule("trust-levels");
+  assert.equal(deriveLevel(NaN), 0, "NaN count must clamp to L0, never divide-by-zero into a level");
+  assert.equal(deriveLevel(Infinity), 0, "Infinity count must clamp to L0");
 });
