@@ -72,6 +72,14 @@ const fakeLegalContent = {
   ],
 };
 
+const fakeLegalNavLabels = {
+  mainNavigation: "Main navigation",
+  homeAria: "OpenSurveillanceDB home",
+  exploreMap: "Explore map",
+  browseRecords: "Browse records",
+  howItWorks: "How it works",
+};
+
 function collectLinks(container) {
   return [...container.querySelectorAll("a")].map((a) => ({
     href: a.getAttribute("href"),
@@ -170,7 +178,7 @@ test("footer: locale toggle switches the landmark label and link texts (EN -> IT
 });
 
 test("legal: renders title, intro and sections wired to headings via aria-labelledby", async () => {
-  const view = await renderWithLocale(React.createElement(LegalPage, { content: fakeLegalContent }));
+  const view = await renderWithLocale(React.createElement(LegalPage, { content: fakeLegalContent, navLabels: fakeLegalNavLabels }));
   const { container } = view;
 
   assert.equal(container.querySelector("h1").textContent, "Fixture Information Page");
@@ -186,7 +194,7 @@ test("legal: renders title, intro and sections wired to headings via aria-labell
 });
 
 test("legal: inline markup renders links, strong, em, notes and tables", async () => {
-  const view = await renderWithLocale(React.createElement(LegalPage, { content: fakeLegalContent }));
+  const view = await renderWithLocale(React.createElement(LegalPage, { content: fakeLegalContent, navLabels: fakeLegalNavLabels }));
   const { container } = view;
 
   const p = container.querySelector("section p");
@@ -211,7 +219,7 @@ test("legal: inline markup renders links, strong, em, notes and tables", async (
 });
 
 test("legal: nav shell links resolve, LocaleToggle present, no broken hrefs", async () => {
-  const view = await renderWithLocale(React.createElement(LegalPage, { content: fakeLegalContent }));
+  const view = await renderWithLocale(React.createElement(LegalPage, { content: fakeLegalContent, navLabels: fakeLegalNavLabels }));
   const { container } = view;
 
   const nav = container.querySelector("nav.nav-shell");
