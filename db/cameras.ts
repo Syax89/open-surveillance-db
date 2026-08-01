@@ -120,6 +120,66 @@ export async function listPublicCameras(
   const result = await d1.prepare(query).bind(...parameters).all<PublicCameraRecord>();
   return result.results.map((record) => ({ ...record, latitude: roundPublicCoordinate(record.latitude), longitude: roundPublicCoordinate(record.longitude) }));
 }
+
+/** Default and hard-max page size for the public JSON list (audit t_2ee58c08, gap #1). */
+export const PUBLIC_CAMERAS_PAGE_DEFAULT_LIMIT = 500;
+export const PUBLIC_CAMERAS_PAGE_MAX_LIMIT = 500;
+
+export type PublicCameraListPage = {
+  records: PublicCameraRecord[];
+  /** Total number of records matching the filters, independent of the page. */
+  total: number;
+  /** Offset of the next page, or null when the current page is the last one. */
+  nextOffset: number | null;
+};
+
+/**
+ * Paginated variant of listPublicCameras for the default JSON directory.
+ *
+ * The default JSON payload must stay bounded as the dataset grows, while the
+ * CSV/GeoJSON exports remain complete snapshots (they keep calling
+ * listPublicCameras). The page shares the same public predicate, the same
+ * publish-flag CASEs and the same ~10 m coordinate rounding as the full
+ * list, and ORDER BY id DESC keeps offsets stable between requests. `limit`
+ * is clamped to [1, PUBLIC_CAMERAS_PAGE_MAX_LIMIT] and `offset` to >= 0 at
+ * the db boundary, so a caller can never request an unbounded page.
+ */
+export async function listPublicCamerasPage(
+  nowIsoOrFilters?: string | PublicCameraFilters,
+  options: { limit: number; offset: number } = { limit: PUBLIC_CAMERAS_PAGE_DEFAULT_LIMIT, offset: 0 },
+): Promise<PublicCameraListPage> {
+  const d1 = await getD1();
+  // Same dual first argument as listPublicCameras: an ISO boundary string
+  // (freshness-reverification suite) or a filter object (directory route).
+  const filters = typeof nowIsoOrFilters === "string" ? undefined : nowIsoOrFilters;
+  const nowIso = typeof nowIsoOrFilters === "string" ? nowIsoOrFilters : new Date().toISOString();
+  // Defensive clamp: the route already validates, but the db boundary never
+  // trusts its caller with an unbounded page size.
+  const limit = Math.min(Math.max(Math.trunc(options.limit) || PUBLIC_CAMERAS_PAGE_DEFAULT_LIMIT, 1), PUBLIC_CAMERAS_PAGE_MAX_LIMIT);
+  const offset = Math.max(Math.trunc(options.offset) || 0, 0);
+  const parameters: string[] = [];
+  const { sql: publicPredicate, parameters: predicateParameters } = publicCameraPredicate(nowIso);
+  parameters.push(...predicateParameters);
+  let query = `FROM cameras WHERE ${publicPredicate}`;
+  if (filters?.kind) {
+    query += " AND kind = ?";
+    parameters.push(filters.kind);
+  }
+  if (filters?.freshness && filters.freshness !== "all") {
+    query += " AND updated >= ?";
+    parameters.push(freshnessCutoff(filters.freshness));
+    query += " AND updated GLOB '[0-9][0-9][0-9][0-9]-*'";
+  }
+  const countResult = await d1.prepare(`SELECT COUNT(*) AS total ${query}`).bind(...parameters).first<{ total: number }>();
+  const total = countResult?.total ?? 0;
+  const result = await d1
+    .prepare(`SELECT id, title, kind, CASE WHEN publish_manufacturer = 1 THEN manufacturer ELSE NULL END AS manufacturer, CASE WHEN publish_observed_on = 1 THEN observed_on ELSE NULL END AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, latitude, longitude, status, source, updated, description, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt ${query} ORDER BY id DESC LIMIT ? OFFSET ?`)
+    .bind(...parameters, limit, offset)
+    .all<PublicCameraRecord>();
+  const records = result.results.map((record) => ({ ...record, latitude: roundPublicCoordinate(record.latitude), longitude: roundPublicCoordinate(record.longitude) }));
+  const nextOffset = offset + records.length < total ? offset + records.length : null;
+  return { records, total, nextOffset };
+}
 export type NearbyPublicCameraRecord = PublicCameraRecord & { distanceMeters: number };
 function distanceInMeters(fromLatitude: number, fromLongitude: number, toLatitude: number, toLongitude: number) { const earthRadiusMeters = 6_371_000; const toRadians = (degrees: number) => degrees * Math.PI / 180; const latitudeDelta = toRadians(toLatitude - fromLatitude); const longitudeDelta = toRadians(toLongitude - fromLongitude); const latitudeStart = toRadians(fromLatitude); const latitudeEnd = toRadians(toLatitude); const haversine = Math.sin(latitudeDelta / 2) ** 2 + Math.cos(latitudeStart) * Math.cos(latitudeEnd) * Math.sin(longitudeDelta / 2) ** 2; return 2 * earthRadiusMeters * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine)); }
 /**

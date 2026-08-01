@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { createPendingCamera, findNearbyPublicCameras, freshnessWindows, listPublicCameras, type FreshnessWindow, type PublicCameraFilters } from "../../../db/cameras";
+import { createPendingCamera, findNearbyPublicCameras, freshnessWindows, listPublicCameras, listPublicCamerasPage, PUBLIC_CAMERAS_PAGE_DEFAULT_LIMIT, PUBLIC_CAMERAS_PAGE_MAX_LIMIT, type FreshnessWindow, type PublicCameraFilters } from "../../../db/cameras";
 import { resolveOptionalContributor } from "../../lib/auth-session";
 import { csrfVerified, sameOrigin } from "../../lib/csrf";
 import { DATA_LICENSE_ID, DATA_LICENSE_NOTICE } from "../../lib/data-license";
@@ -22,6 +22,19 @@ import {
 
 function cleanText(value: unknown, maxLength: number) {
   return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
+}
+
+// Pagination for the default JSON list (audit t_2ee58c08, gap #1): `limit`
+// and `offset` are optional non-negative integers. A blank value falls back
+// to `fallback`; anything else that is not a plain decimal integer is
+// rejected (null), and an over-max limit is clamped to `max` — a client
+// asking for 100000 records gets the maximum page, not an error.
+function readPageNumber(value: string | null, fallback: number, max?: number): number | null {
+  if (value === null || value.trim() === "") return fallback;
+  if (!/^\d+$/.test(value.trim())) return null;
+  const parsed = Number(value.trim());
+  if (!Number.isSafeInteger(parsed)) return null;
+  return max === undefined ? parsed : Math.min(parsed, max);
 }
 
 function isValidCalendarDate(value: string) {
@@ -85,8 +98,10 @@ export async function GET(request: Request) {
     const filters: PublicCameraFilters = {};
     if (kindFilter) filters.kind = kindFilter;
     if (freshness && freshness !== "all") filters.freshness = freshness as FreshnessWindow;
-    const records = await listPublicCameras(filters);
     if (format === "geojson") {
+      // Exports are complete snapshots (rate-limited in the "export" bucket):
+      // they fetch the FULL public list, never a page.
+      const records = await listPublicCameras(filters);
       // Top-level licence metadata (RFC 7946 foreign members): ODbL 1.0
       // attribution required when the database is shared (TERMS § 7.1).
       // Exports are complete snapshots for download: a bounded 1 h edge/browser
@@ -96,12 +111,23 @@ export async function GET(request: Request) {
       return Response.json({ type: "FeatureCollection", license: DATA_LICENSE_ID, attribution: DATA_LICENSE_NOTICE, features: records.map((record) => ({ type: "Feature", geometry: { type: "Point", coordinates: [record.longitude, record.latitude] }, properties: { id: record.id, title: record.title, kind: record.kind, manufacturer: record.manufacturer, observedOn: record.observedOn, status: record.status, source: record.source, updated: record.updated, description: record.description } })) }, { headers: { "Content-Disposition": "attachment; filename=opensurveillancedb-cameras.geojson", "Cache-Control": "public, max-age=3600" } });
     }
     if (format === "csv") {
+      const records = await listPublicCameras(filters);
       return new Response(toCsv(records), { headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": "attachment; filename=opensurveillancedb-cameras.csv", "Cache-Control": "public, max-age=3600" } });
     }
+    // Pagination applies to the default JSON list only — CSV/GeoJSON exports
+    // stay complete snapshots (rate-limited in the "export" bucket). limit is
+    // optional (default PUBLIC_CAMERAS_PAGE_DEFAULT_LIMIT, clamped to the
+    // max); offset is optional and starts at 0. Invalid values answer 400.
+    const limit = readPageNumber(params.get("limit"), PUBLIC_CAMERAS_PAGE_DEFAULT_LIMIT, PUBLIC_CAMERAS_PAGE_MAX_LIMIT);
+    const offset = readPageNumber(params.get("offset"), 0);
+    if (limit === null || offset === null || limit < 1) {
+      return Response.json({ error: `limit must be an integer between 1 and ${PUBLIC_CAMERAS_PAGE_MAX_LIMIT} and offset a non-negative integer.` }, { status: 400 });
+    }
+    const page = await listPublicCamerasPage(filters, { limit, offset });
     // JSON list: moderation-derived data that changes as decisions land —
     // never cache it at the edge or in browsers (audit t_2ee58c08, gap #2),
     // matching the no-store policy already set by /api/cameras/search.
-    return Response.json({ records }, { headers: { "Cache-Control": "no-store" } });
+    return Response.json({ records: page.records, total: page.total, nextOffset: page.nextOffset }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     console.error("GET /api/cameras failed", error);
     return Response.json({ error: "Database unavailable" }, { status: 503 });

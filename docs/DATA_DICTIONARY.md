@@ -24,14 +24,35 @@ CSV, or GeoJSON output. See [DATA_MODEL.md](DATA_MODEL.md) and
 
 | Output | Endpoint | Shape |
 | --- | --- | --- |
-| JSON | `GET /api/cameras` | `{ "records": [ … ] }` |
-| CSV | `GET /api/cameras?format=csv` | One header row, one record per row, newline-terminated |
-| GeoJSON | `GET /api/cameras?format=geojson` | `FeatureCollection` of `Point` features |
+| JSON | `GET /api/cameras` | `{ "records": [ … ], "total": N, "nextOffset": N \| null }` (paginated, see below) |
+| CSV | `GET /api/cameras?format=csv` | One header row, one record per row, newline-terminated (complete snapshot) |
+| GeoJSON | `GET /api/cameras?format=geojson` | `FeatureCollection` of `Point` features (complete snapshot) |
 | Nearby JSON | `GET /api/cameras/nearby?latitude=…&longitude=…&radius=…` | `{ "records": [ … ] }`, same fields plus `distanceMeters` |
 | Search JSON | `GET /api/cameras/search?q=…&lang=…` | `{ "query", "area": { "kind", "displayName"?, "latitude", "longitude", "radiusMeters", "radiusLabel" }, "count", "records" }` |
 | Revisions JSON | `GET /api/cameras/revisions?cameraId=N` | `{ "recordId", "revisions": [ { "id", "entityId", "previousStatus", "newStatus", "action", "createdAt" } ] }` |
 | Photos JSON | `GET /api/photos?cameraId=N` | `{ "photos": [ { "id", "mimeType", "width", "height" } ] }` |
 | Photo bytes | `GET /api/photos/[id]` | Raw image bytes (JPEG/PNG/WebP), not a JSON envelope |
+
+The default JSON list is paginated so the payload stays bounded as the
+dataset grows: `limit` (default 500, hard max 500) and `offset` (default 0)
+are optional non-negative integers. `total` is the number of records
+matching the filters independent of the page, and `nextOffset` is the
+offset of the next page (or `null` on the last page) so a client can walk
+the whole list without guessing. Records are ordered `id DESC`, keeping
+offsets stable between requests. Invalid values (`limit=0`, negatives,
+decimals, non-numeric text) answer `400`; a blank `limit` falls back to the
+default. CSV and GeoJSON exports deliberately ignore pagination: they are
+complete snapshots for download, rate-limited in their own bucket.
+
+Cache policy: the JSON list, nearby, revisions, and photo-list responses
+answer `Cache-Control: no-store` — they derive from moderation decisions
+that can change at any time, so a browser or proxy must never serve a stale
+copy after a decision lands. The CSV/GeoJSON exports answer
+`Cache-Control: public, max-age=3600`: a bounded 1 h staleness is
+acceptable for a download snapshot, and the URL's content does change when
+moderators act, so it is deliberately not `immutable`. Photo bytes keep
+their longer `public, max-age=3600, immutable` policy because their storage
+key already version-binds the content.
 
 The JSON, CSV, GeoJSON, and nearby outputs derive from the same filtered
 public-record list (`status IN ('verified','demo')`), so a record appears in
