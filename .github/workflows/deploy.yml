@@ -1,0 +1,126 @@
+name: Deploy Cloudflare
+
+# Deploy del Worker + migrazioni D1 di produzione (docs/OPERATIONS.md §7).
+#
+# Trigger: SOLO manuale (workflow_dispatch) finché non è presa la decisione
+# sul deploy pubblico (DEPLOYMENT.md "Preconditions for a public
+# environment"). Quando la precondizione è decisa, sbloccare il trigger
+# automatico su tag v* aggiungendo:
+#
+#   push:
+#     tags: ["v*"]
+#
+# (decisione tag-only vs push su main: da confermare con Ada).
+#
+# Modalità:
+#   dry-run (default) — verifica migrazioni pendenti e bundle del worker
+#                       SENZA toccare l'ambiente remoto.
+#   deploy            — applica le migrazioni D1 remote e carica il worker.
+#
+# Sicurezza:
+#   - Nessun segreto nel file: le credenziali Cloudflare arrivano dai
+#     secrets GitHub, quelle di moderazione sono secrets del worker CF
+#     (`wrangler secret put`), mai hardcoded.
+#   - Fail-fast: se `database_id` è ancora il placeholder o i secrets CF
+#     mancano, il job termina subito con errore chiaro.
+#   - `environment: production` (GitHub Environments): aggiungere required
+#     reviewers per il gate umano sul deploy.
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "dry-run (default) | deploy"
+        required: true
+        default: dry-run
+        type: choice
+        options:
+          - dry-run
+          - deploy
+
+concurrency:
+  group: deploy-cloudflare
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy Worker + D1 (production)
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check Cloudflare secrets (fail-fast)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -z "${CLOUDFLARE_API_TOKEN}" ] || [ -z "${CLOUDFLARE_ACCOUNT_ID}" ]; then
+            echo "::error::Secrets GitHub mancanti: CLOUDFLARE_API_TOKEN e CLOUDFLARE_ACCOUNT_ID devono essere configurati (gh secret set)."
+            exit 1
+          fi
+          echo "Secrets Cloudflare: OK"
+
+      - name: Check D1 database_id (fail-fast, mai deploy su DB placeholder)
+        run: |
+          if grep -q '00000000-0000-4000-8000-000000000000' wrangler.jsonc; then
+            echo "::error::wrangler.jsonc ha ancora il database_id placeholder. Prima del primo deploy:"
+            echo "  npx wrangler d1 create opensurveillancedb   # output: database_id"
+            echo "  poi sostituire il placeholder in wrangler.jsonc e committare."
+            exit 1
+          fi
+          echo "database_id: OK"
+
+      - name: Build (dist/client per ASSETS + bundle server)
+        run: npm run build
+
+      - name: Dry run D1 migrations (nessuna modifica remota)
+        if: ${{ github.event.inputs.mode == 'dry-run' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          echo "Migrazioni pendenti (--dry-run, nessuna applicata):"
+          npx wrangler d1 migrations apply opensurveillancedb --remote --dry-run
+
+      - name: Dry run deploy (bundle locale, nessun upload)
+        if: ${{ github.event.inputs.mode == 'dry-run' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npx wrangler deploy --dry-run --outdir=.wrangler/dry-run
+          echo "Dry run completato: nessuna modifica remota."
+
+      - name: Apply D1 migrations (remoto, produzione)
+        if: ${{ github.event.inputs.mode == 'deploy' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npx wrangler d1 migrations apply opensurveillancedb --remote
+
+      - name: Deploy Worker + static assets
+        if: ${{ github.event.inputs.mode == 'deploy' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npx wrangler deploy
+          echo "Registrazione version id (correlazione rollback, OPERATIONS.md §5.1):"
+          npx wrangler versions list | head -8

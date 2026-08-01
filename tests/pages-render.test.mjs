@@ -93,6 +93,7 @@ async function buildRenderTree() {
     exports: {
       "./link": "./link.mjs", "./link.js": "./link.mjs",
       "./navigation": "./navigation.mjs", "./navigation.js": "./navigation.mjs",
+      "./headers": "./headers.mjs", "./headers.js": "./headers.mjs",
       ".": "./link.mjs",
     },
   }));
@@ -107,6 +108,13 @@ export default function Link({ href, children, ...rest }) {
 export const useRouter = () => ({ push: () => {}, refresh: () => {} });
 export const useSearchParams = () => new URLSearchParams();
 export const usePathname = () => "/";
+`);
+  // Mock di next/headers: nessun cookie impostato -> le pagine Server
+  // Component (server-i18n) risolvono il locale pilota "en", identico al
+  // primo render SSR pre-conversione (ADR 0007).
+  await writeFile(path.join(nodeModules, "next", "headers.mjs"),
+    `export const cookies = async () => ({ get: () => undefined, getAll: () => [], has: () => false });
+export const headers = async () => new Headers();
 `);
 
   // Traspila ricorsivamente app/lib e app/components mantenendo la struttura
@@ -220,7 +228,13 @@ for (const page of PAGES) {
     const LocaleProvider = await loadLocaleProvider(tree);
     let html;
     try {
-      html = renderToString(React.createElement(LocaleProvider, null, React.createElement(Page)));
+      // Le pagine informative sono Server Components (async): si risolvono
+      // chiamando la funzione (l'elemento risultante contiene già il bundle
+      // i18n del locale pilota). Le pagine client restano funzioni sync.
+      const element = Page.constructor.name === "AsyncFunction"
+        ? await Page()
+        : React.createElement(Page);
+      html = renderToString(React.createElement(LocaleProvider, null, element));
     } catch (err) {
       assert.fail(`render di ${page.route} ha lanciato: ${err.message}`);
     }
@@ -272,4 +286,25 @@ test("cleanup tree temporanea", async () => {
     treePromise = null;
   }
   assert.ok(true);
+});
+
+test("global CSP (worker edge) is compatible with the SSR markup these pages emit", async () => {
+  // Coerenza tra il render test e la Content-Security-Policy globale
+  // (worker/index.ts, kanban t_6148aa6f): il markup SSR di vinext/Next
+  // contiene script inline RSC (self.__VINEXT_RSC_*) e uno style inline
+  // <style data-vinext-fonts> — la CSP deve permetterli, altrimenti il
+  // browser blocca la pagina pur essendo il render corretto. Guardia
+  // statica: se la CSP cambia, questo test forza a rivalutarla insieme.
+  const workerSource = readFileSync(path.join(root, "worker", "index.ts"), "utf8");
+  const cspMatch = workerSource.match(/Content-Security-Policy[^\n]*\n((?:.*\n)*?)\s*\]/);
+  assert.ok(cspMatch, "CSP definita nel worker edge");
+  const csp = cspMatch[1];
+  // Inline scripts RSC + dynamic import same-origin (nessun eval).
+  assert.match(csp, /script-src 'self' 'unsafe-inline'/, "CSP deve permettere gli inline script RSC");
+  // <style data-vinext-fonts> inline.
+  assert.match(csp, /style-src 'self' 'unsafe-inline'/, "CSP deve permettere lo style inline fonts");
+  // Le tile sono servite same-origin (proxy /api/tiles, docs/OSM_INTEGRATION.md).
+  assert.match(csp, /img-src 'self'/, "CSP deve permettere risorse img same-origin");
+  // Il sito non è iframabile (clickjacking) — coerente con X-Frame-Options: DENY.
+  assert.match(csp, /frame-ancestors 'none'/, "CSP frame-ancestors 'none'");
 });

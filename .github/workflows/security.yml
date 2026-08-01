@@ -26,13 +26,27 @@ jobs:
 
       - name: Gitleaks scan
         shell: bash
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           GITLEAKS_VERSION=8.24.3
           curl -sSfL \
             "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
             -o /tmp/gitleaks.tar.gz
           tar -xzf /tmp/gitleaks.tar.gz -C /usr/local/bin gitleaks
-          gitleaks detect --source . --redact --verbose
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            # Su PR: scansiona SOLO i commit della PR (base..head), non l'intero
+            # storico git. Lo scan completo (fetch-depth: 0) include branch non
+            # ancora mergeati con token di test → falsi positivi su ogni PR.
+            # SHA passati via env (hex-only, mai input utente) — vedi
+            # https://github.blog/security/vulnerability-research/how-to-catch-github-actions-workflow-injections-before-attackers-do/
+            echo "Scan PR commits: ${PR_BASE_SHA}..${PR_HEAD_SHA}"
+            gitleaks detect --source . --redact --log-opts="${PR_BASE_SHA}..${PR_HEAD_SHA}"
+          else
+            # Push su main / schedule: scan completo dello storico.
+            gitleaks detect --source . --redact
+          fi
 
   dependency-audit:
     name: npm audit (vulnerable dependencies)

@@ -2,6 +2,7 @@ import { env } from "cloudflare:workers";
 import { createPendingCamera, findNearbyPublicCameras, freshnessWindows, listPublicCameras, type FreshnessWindow, type PublicCameraFilters } from "../../../db/cameras";
 import { resolveOptionalContributor } from "../../lib/auth-session";
 import { csrfVerified, sameOrigin } from "../../lib/csrf";
+import { DATA_LICENSE_ID, DATA_LICENSE_NOTICE } from "../../lib/data-license";
 import { linkPhotosToCamera } from "../../../db/photos";
 import { isRecord } from "../../lib/guards";
 import {
@@ -42,7 +43,10 @@ function csvCell(value: string | number | null) {
 function toCsv(records: Awaited<ReturnType<typeof listPublicCameras>>) {
   const header = ["id", "title", "kind", "manufacturer", "observed_on", "status", "source", "updated", "description", "address", "latitude", "longitude"];
   const rows = records.map((record) => [record.id, record.title, record.kind, record.manufacturer, record.observedOn, record.status, record.source, record.updated, record.description, record.address, record.latitude, record.longitude].map(csvCell).join(","));
-  return `${header.join(",")}\n${rows.join("\n")}\n`;
+  // ODbL 1.0 attribution (TERMS_OF_USE § 7.1): the licence requires the
+  // notice when the database is shared, so every export carries it. The
+  // footer comment keeps the header line parseable by spreadsheet tools.
+  return `${header.join(",")}\n${rows.join("\n")}\n# ${DATA_LICENSE_NOTICE}\n`;
 }
 
 export async function GET(request: Request) {
@@ -83,7 +87,9 @@ export async function GET(request: Request) {
     if (freshness && freshness !== "all") filters.freshness = freshness as FreshnessWindow;
     const records = await listPublicCameras(filters);
     if (format === "geojson") {
-      return Response.json({ type: "FeatureCollection", features: records.map((record) => ({ type: "Feature", geometry: { type: "Point", coordinates: [record.longitude, record.latitude] }, properties: { id: record.id, title: record.title, kind: record.kind, manufacturer: record.manufacturer, observedOn: record.observedOn, status: record.status, source: record.source, updated: record.updated, description: record.description } })) }, { headers: { "Content-Disposition": "attachment; filename=opensurveillancedb-cameras.geojson" } });
+      // Top-level licence metadata (RFC 7946 foreign members): ODbL 1.0
+      // attribution required when the database is shared (TERMS § 7.1).
+      return Response.json({ type: "FeatureCollection", license: DATA_LICENSE_ID, attribution: DATA_LICENSE_NOTICE, features: records.map((record) => ({ type: "Feature", geometry: { type: "Point", coordinates: [record.longitude, record.latitude] }, properties: { id: record.id, title: record.title, kind: record.kind, manufacturer: record.manufacturer, observedOn: record.observedOn, status: record.status, source: record.source, updated: record.updated, description: record.description } })) }, { headers: { "Content-Disposition": "attachment; filename=opensurveillancedb-cameras.geojson" } });
     }
     if (format === "csv") {
       return new Response(toCsv(records), { headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": "attachment; filename=opensurveillancedb-cameras.csv" } });

@@ -13,6 +13,9 @@ Last reviewed: 2026-08-01
 - [x] Report position may be selected by map click or validated manual coordinates; both paths use the same public-only duplicate check.
 - [x] Camera-record API and GeoJSON export.
 - [x] CSV export derived from the same public-record boundary as JSON and GeoJSON.
+- [x] CSV and GeoJSON exports carry the ODbL 1.0 attribution notice
+  (© OpenSurveillanceDB contributors — ODbL 1.0; attribution and share-alike
+  required for derivative databases), matching TERMS_OF_USE § 7.1.
 - [x] D1-compatible schema and migration.
 - [x] Submission path that creates non-public `pending` records.
 - [x] Optional manufacturer and observation-date report metadata, normalised
@@ -77,6 +80,11 @@ Last reviewed: 2026-08-01
   that polls the Proxmox task status (`ops/health-check.sh`,
   `ops/backup-lxc114.sh`, `ops/snapshot-pre-deploy.sh`,
   `ops/rollback-lxc114.sh`).
+- [x] QA evidence archived under [`docs/qa/`](qa/):
+  [`QA_REPORT_auth-flow-e2e.md`](qa/QA_REPORT_auth-flow-e2e.md) (authenticated
+  submit → moderate → publish flow, 457 tests) and
+  [`QA_REPORT_navigation-pages.md`](qa/QA_REPORT_navigation-pages.md)
+  (navigation, accessibility, EN/IT parity, and GDPR notice links, 569 tests).
 
 ## Not yet implemented
 
