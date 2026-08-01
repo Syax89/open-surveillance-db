@@ -126,7 +126,7 @@ npm run dev
 ```
 
 `npm run db:migrate` is a wrapper around
-`wrangler d1 migrations apply opensurveillancedb --local`. Wrangler asks
+`wrangler d1 migrations apply osdb-production --local`. Wrangler asks
 "About to apply N migration(s) ... continue?" before executing; confirm with
 Enter. In a non-interactive shell (CI) wrangler auto-confirms (verified output:
 `🤖 Using fallback value in non-interactive context: yes`).
@@ -152,7 +152,7 @@ the actual SQLite files are under
 For the remote Cloudflare D1 database the same command targets the remote:
 
 ```bash
-npx wrangler d1 migrations apply opensurveillancedb --remote
+npx wrangler d1 migrations apply osdb-production --remote
 ```
 
 (Requires Cloudflare credentials and a real `database_id`; see

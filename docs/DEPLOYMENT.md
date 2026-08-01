@@ -190,7 +190,7 @@ One-time setup before the first `deploy`:
 
 ```bash
 # D1 database: create it and copy the database_id into wrangler.jsonc
-npx wrangler d1 create opensurveillancedb
+npx wrangler d1 create osdb-production
 
 # R2 bucket backing the PHOTOS binding (must exist in the account)
 npx wrangler r2 bucket create opensurveillancedb-photos
@@ -210,7 +210,7 @@ declares:
 | Binding | Type | Resource | Used by |
 | --- | --- | --- | --- |
 | `ASSETS` | Static assets | `dist/client` (production build output) | Serves the client bundle; image optimizer fetches assets through it (`worker/index.ts` `/_vinext/image`) |
-| `DB` | D1 database | `opensurveillancedb` | All relational data (`db/*`) |
+| `DB` | D1 database | `osdb-production` | All relational data (`db/*`) |
 | `PHOTOS` | R2 bucket | `opensurveillancedb-photos` | Photo evidence bytes: `db/photos.ts` stores EXIF-stripped images under `photos/<uuid>.<ext>` and reads them back for moderation preview / public serving. D1 stores metadata only — the bucket is the object store |
 | `IMAGES` | Cloudflare Images | (managed service, no resource to create) | On-the-fly image optimization (`worker/index.ts` `/_vinext/image`): resize/format/quality transforms via `env.IMAGES.input(...)` |
 
