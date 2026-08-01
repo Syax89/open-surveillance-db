@@ -24,7 +24,7 @@ PR #64 ha reso **attivo** lo storage R2 delle foto (bytes EXIF-stripped in R2, m
 | Flusso | `POST /api/photos` → allowlist JPEG/PNG/WebP → limiti ≤10 MB/4096 px → `stripImageMetadata` fail-closed (EXIF/XMP/IPTC) → bytes sanitizzati in R2, **metadata only in D1** (`db/photos.ts`); `storage_key` mai esposto |
 | Confine pubblico | Foto mai pubbliche finché moderatore approva con `redaction_confirmed = 1` + camera pubblica (`getPublicPhoto`), altrimenti 404 |
 | Retention | Foto legate al record (RETENTION_SCHEDULE.md R6); la cancellazione del record deve includere gli oggetti R2 (job di retention — owner ada, cfr. § 3 di RETENTION_SCHEDULE) |
-| File obsoleti | `.openai/hosting.json` contiene `"r2": null` — residuo pre-PR #64; **non** è più la fonte di verità (lo è `wrangler.jsonc`) |
+| File obsoleti | `.openai/hosting.json` **non esiste più nel repo**: era scaffold template leftover ed è stato rimosso (DEPLOYMENT.md); la frase `"r2": null` sopravvive solo come citazione testuale in vecchi doc (riga PR1 pre-PR #64, RETENTION_SCHEDULE.md R10, ADR 0005). Fonte di verità: `wrangler.jsonc` `r2_buckets` |
 | Regione bucket | **NON dichiarata** in `wrangler.jsonc`: la giurisdizione/location R2 si imposta a creazione del bucket (CLI/dashboard), non nel binding. Default Cloudflare R2 = distribuzione multi-region senza garanzia di residenza EU; la **jurisdictional restriction EU** è immutabile una volta impostata |
 
 ## 3. Modifiche incluse nel PR
