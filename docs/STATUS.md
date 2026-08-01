@@ -32,6 +32,7 @@ Last reviewed: 2026-08-01
 - [x] Public in-app guide plus skip link, visible focus treatment, reduced-motion support, and map-directory accessibility guidance.
 - [x] Draft accessibility statement and design decision for a non-sensitive usability-feedback route ([`docs/ACCESSIBILITY_STATEMENT.md`](ACCESSIBILITY_STATEMENT.md), [ADR 0006](decisions/0006-non-sensitive-usability-feedback-route.md)).
 - [x] Contributor accounts and sessions: email+password registration/login/logout, PBKDF2-SHA256 password hashing, hashed opaque session tokens, same-origin + per-session CSRF protection, account page with attributed submissions. Anonymous submissions remain possible by design ([ADR 0013](decisions/0013-contributor-accounts-and-sessions.md)).
+- [x] Contributor account erasure with de-attribution (GDPR art. 17): deleting an account detaches its submissions from the contributor identity.
 - [x] Clearly labelled illustrative demo data.
 - [x] Lightweight public data dictionary and export versioning policy
   ([`docs/DATA_DICTIONARY.md`](DATA_DICTIONARY.md),
@@ -57,19 +58,42 @@ Last reviewed: 2026-08-01
 - [x] Append-only audit log extended to appeals (`appeal_id` link on
   `moderation_events`); internal workflow events (appeals, recusals,
   escalations) stay out of the public revision history.
+- [x] Image upload for camera records with secure storage: `/api/photos`
+  intake with size/MIME/dimension caps, magic-byte container verification,
+  mandatory EXIF/XMP/IPTC stripping (fail-closed), sanitised bytes in R2 with
+  metadata only in D1, and a moderation/redaction gate — approved photos are
+  served only for public cameras; pending or rejected evidence never leaks.
+- [x] Legal/privacy review of the public boundary and public-facing terms:
+  coordinate precision at ~4 decimal places, retention schedule, and terms
+  and privacy notice aligned with the contributor-account flow, plus
+  bilingual `/privacy`, `/termini`, `/licenze` pages linked from the global
+  footer.
+- [x] Public information-site restructure: bilingual pages `/manifesto`,
+  `/regole`, `/privacy`, `/termini`, `/licenze`, `/faq`, `/contatti` (and
+  `/moderazione`), wired into a global site footer with institutional links,
+  ODbL and OSM attribution.
+- [x] Local monitoring, backup, and rollback for the LXC 114 test deployment:
+  health check, scheduled backups, pre-deploy snapshot, and a rollback script
+  that polls the Proxmox task status (`ops/health-check.sh`,
+  `ops/backup-lxc114.sh`, `ops/snapshot-pre-deploy.sh`,
+  `ops/rollback-lxc114.sh`).
 
 ## Not yet implemented
 
-- [ ] Real authentication and provisioned contributor accounts (contributor
-  registration and login sessions are in place — [ADR 0013](decisions/0013-contributor-accounts-and-sessions.md);
-  the seeded role identities are prototype-only and MFA enforcement plus
-  provisioning onto `users` role identities land with the real auth provider).
+- [ ] MFA enforcement and provisioning of operator identities onto the
+  `users` role table — contributor accounts and sessions are in place
+  ([ADR 0013](decisions/0013-contributor-accounts-and-sessions.md)); the
+  seeded demo identities remain prototype-only and `mfa_enabled` lands with
+  the real auth provider.
 - [ ] Public `/feedback` page for the non-sensitive usability-feedback route (designed in [ADR 0006](decisions/0006-non-sensitive-usability-feedback-route.md); implementation pending).
-- [ ] Production moderation controls (auth-provisioned roles, abuse-response
-  tooling, retrospective review workflow for emergency hides).
-- [ ] Image upload, secure storage, EXIF stripping, and redaction tooling.
-- [ ] Legal/privacy review and public-facing terms.
-- [ ] Public deployment, domain, backup/restore drills, and monitoring — remains a future precondition, see `docs/DEPLOYMENT.md`.
+- [ ] Production moderation controls at public launch: abuse-response runbook,
+  retrospective review workflow for emergency hides, and
+  [MODERATION_SLA](legal/MODERATION_SLA.md) targets in force (roles, appeals,
+  and the audit log are in place — [ADR 0014](decisions/0014-auth-roles-appeals.md)).
+- [ ] Public deployment with a public domain — production monitoring,
+  backup/restore drills, and error alerting remain a future precondition, see
+  `docs/DEPLOYMENT.md` (the local LXC 114 deployment already has
+  monitoring/backup/rollback in place).
 - [ ] Android application.
 
 The checked items describe local prototype capability only. They do not mean the service is ready to collect or publish real surveillance-camera data.
@@ -80,4 +104,5 @@ The checked items describe local prototype capability only. They do not mean the
 - [x] systemd unit `osdb-test.service` (`vinext dev` in workerd, `Restart=on-failure`, enabled) and `onboot=1` on the container.
 - [x] Runtime decision documented: `vinext start` cannot run on plain Node (`ERR_UNSUPPORTED_ESM_URL_SCHEME` on `cloudflare:`), see `docs/DEPLOYMENT.md`.
 - [x] Verified: `/` 200, `/api/cameras` 200 (demo-only records, no `notes`), `/api/cameras/nearby` 200, `/guide` 200, `/api/moderation` 503 fail-closed, `/api/corrections` GET 405.
+- [x] Ops scripts for the local environment: `ops/health-check.sh`, `ops/backup-lxc114.sh`, `ops/snapshot-pre-deploy.sh`, `ops/rollback-lxc114.sh`.
 - [ ] Cloudflare Workers + D1 staging deployment (blocked by CEO decision: local-first for now).
