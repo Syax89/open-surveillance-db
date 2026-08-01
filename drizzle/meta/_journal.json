@@ -99,6 +99,13 @@
    "when": 1785610000000,
    "tag": "0013_pending_photo_quota",
    "breakpoints": true
+  },
+  {
+   "idx": 14,
+   "version": "6",
+   "when": 1785609000000,
+   "tag": "0014_cameras_coordinates_idx",
+   "breakpoints": true
   }
- ]
+]
 }

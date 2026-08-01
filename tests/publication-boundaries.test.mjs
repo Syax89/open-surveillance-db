@@ -194,7 +194,11 @@ test("nearby search validates its bounded coordinates and stays behind the publi
     "nearby search must pass the bounded coordinates (and optional pre-submit text hints) to the public helper",
   );
   assert.doesNotMatch(route, /\bgetD1\b|\.prepare\(|\bSELECT\b/i, "the nearby route must not query the database directly");
-  assert.match(helper, /const\s+records\s*=\s+await\s+listPublicCameras\(\)/, "nearby search must start with the filtered public list");
+  assert.match(
+    helper,
+    /const\s+records\s*=\s+await\s+listPublicCamerasNear\(\s*latitude,\s*longitude,\s*radiusMeters\s*\)/,
+    "nearby search must start with the bounding-box pre-filtered public list",
+  );
   assert.match(helper, /\.filter\(\(record\)\s*=>\s*record\.distanceMeters\s*<=\s*radiusMeters\)/, "nearby search must filter that public list by distance");
   assert.doesNotMatch(helper, /\bgetD1\b|\.prepare\(|\bSELECT\b/i, "the nearby helper must not bypass the public-list boundary");
 });
@@ -219,7 +223,7 @@ test("locality search stays behind the public-list boundary and is rate-limited"
     /import\s*\{[^}]*\bresolvePlace\b[^}]*\}\s*from\s*["'][^"']*db\/geocode["']/,
     "free-text place queries must go through the geocoder module",
   );
-  assert.match(helper, /const\s+records\s*=\s+await\s+listPublicCameras\(\)/, "area search must start with the filtered public list");
+  assert.match(helper, /const\s+records\s*=\s+await\s+listPublicCamerasNear\(\s*latitude,\s*longitude,\s*radiusMeters\s*\)/, "area search must start with the bounding-box pre-filtered public list");
   assert.match(helper, /\.filter\(\(record\)\s*=>\s*record\.distanceMeters\s*<=\s*radiusMeters\)/, "area search must filter that public list by distance");
   assert.doesNotMatch(helper, /\bsimilarity\b|\bmatchStrength\b|\bslice\(0,\s*8\)/, "area search must not leak duplicate-detection internals or cap results");
   assert.doesNotMatch(route, /\bgetD1\b|\.prepare\(|\bSELECT\b/i, "the search route must not query the database directly");
