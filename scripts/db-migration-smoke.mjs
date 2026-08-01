@@ -11,7 +11,7 @@
 // persist directory (.wrangler/smoke-state) that is wiped before every run,
 // so it never touches a developer's real .wrangler/state. It uses the same
 // wrangler command as `npm run db:migrate` (wrangler d1 migrations apply
-// opensurveillancedb --local), so a broken `db:migrate` fails here too.
+// osdb-production --local), so a broken `db:migrate` fails here too.
 //
 // Usage: node scripts/db-migration-smoke.mjs
 // Exit code 0 = schema OK, 1 = any check failed.
@@ -25,7 +25,10 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const migrationsDir = path.join(root, "drizzle");
 const persistDir = path.join(root, ".wrangler", "smoke-state");
 const wranglerBin = path.join(root, "node_modules", "wrangler", "bin", "wrangler.js");
-const dbName = "opensurveillancedb";
+// Must match the `database_name` of the D1 entry in wrangler.jsonc (the
+// production D1 is osdb-production; a mismatch makes wrangler fall back to
+// the default `migrations` dir and the smoke test fails).
+const dbName = "osdb-production";
 
 // Tables the application schema must expose after a fresh migration.
 const expectedTables = [
