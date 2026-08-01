@@ -2,7 +2,6 @@ import { env } from "cloudflare:workers";
 import {
   createContributor,
   createSession,
-  findContributorByEmail,
   isValidEmail,
   normalizeEmail,
   type PublicContributor,
@@ -46,8 +45,10 @@ export async function POST(request: Request) {
   try {
     const payload: unknown = await readJsonBody(request, env);
     if (!isRecord(payload)) {
+      // Generic body shared with the 409 below: register is a public
+      // endpoint and must not reveal why it failed (account enumeration).
       return Response.json(
-        { error: "Provide a valid email and a password of at least 10 characters." },
+        { error: "Unable to register with this email." },
         { status: 400 },
       );
     }
@@ -56,25 +57,26 @@ export async function POST(request: Request) {
     const displayName = parseDisplayName(payload.displayName);
     if (!isValidEmail(email) || !isValidPassword(payload.password) || displayName === undefined) {
       return Response.json(
-        { error: "Provide a valid email, a password of at least 10 characters, and an optional display name of at most 60 characters." },
+        { error: "Unable to register with this email." },
         { status: 400 },
       );
     }
 
-    // Fast path: an existing account answers 409 before any hashing work.
-    const existing = await findContributorByEmail(email);
-    if (existing) {
-      return Response.json({ error: "An account with this email already exists." }, { status: 409 });
-    }
-
+    // No pre-check for an existing email: the unique email index is the
+    // single source of truth. A pre-check SELECT would be both a redundant
+    // query and a timing oracle (existing email answered in ~ms vs ~100ms of
+    // PBKDF2 hashing for a new one), which would let a caller enumerate
+    // accounts by response time. The constraint error below maps to the same
+    // generic 409.
     let contributor: PublicContributor;
     try {
       contributor = await createContributor({ email, displayName, password: payload.password });
     } catch (error) {
       // The unique email index is the last line of defence against a
-      // register race; map the constraint error to the same 409.
+      // register race; map the constraint error to the same generic 409
+      // (body identical to the 400 above so responses stay indistinguishable).
       if (error instanceof Error && error.message.includes("UNIQUE constraint failed")) {
-        return Response.json({ error: "An account with this email already exists." }, { status: 409 });
+        return Response.json({ error: "Unable to register with this email." }, { status: 409 });
       }
       throw error;
     }

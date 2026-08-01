@@ -189,10 +189,14 @@ Status reflects the local prototype as of 2026-08-01; every `Done` row is eviden
 
 ## Active next plan
 
-The next planned cycle is [reliable local moderation](NEXT_SPRINT.md): reasoned
-decisions, append-only local audit events, history, and full fictional-data
-workflow tests. It intentionally precedes accounts, media, public hosting, and
-Android work.
+The reliable-local-moderation sprint is **complete** (2026-08-01): reasoned
+decisions, append-only audit events, history, and fictional-data workflow
+tests all shipped on `main`, together with most of its original deferrals
+(accounts, roles, appeals, photo pipeline). The sprint plan and its outcome are
+archived in [NEXT_SPRINT.md](NEXT_SPRINT.md); current capability is tracked in
+[STATUS.md](STATUS.md).
+
+The board sequence continues with [Wave C — verify the pilot](#wave-c--verify-the-pilot).
 
 As of 2026-08-01 that cycle is complete on the local prototype — reasoned,
 append-only audited decisions with reviewer roles and appeals (ADR 0009/0014) —

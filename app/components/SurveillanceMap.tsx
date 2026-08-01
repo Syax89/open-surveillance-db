@@ -8,14 +8,33 @@ export type MapCamera = { id: number; title: string; kind: string; status: strin
 export type MapLocation = { latitude: number; longitude: number };
 type Props = { cameras: MapCamera[]; selectedId: number; onSelect: (id: number) => void; onPick: (latitude: number, longitude: number) => void; focusLocation?: MapLocation | null };
 
+type LeafletModule = typeof import("leaflet");
+type MarkerEntry = { marker: import("leaflet").Marker; camera: MapCamera };
+
+function buildMarkerIcon(L: LeafletModule, camera: MapCamera, isSelected: boolean) {
+  // Defense in depth: only whitelisted public statuses may style a
+  // marker; a non-public status renders a plain marker (the parent page
+  // already filters through publicRecords(), this is a second gate).
+  const statusClass = isPublicStatus(camera.status) ? camera.status : "";
+  return L.divIcon({
+    className: "",
+    html: `<span class="osm-camera-marker ${statusClass} ${isSelected ? "selected" : ""}" aria-hidden="true"><i></i></span>`,
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+  });
+}
+
 export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLocation }: Props) {
   const [mapUnavailable, setMapUnavailable] = useState(false);
   const mapElement = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<import("leaflet").Map | null>(null);
   const markersRef = useRef<import("leaflet").LayerGroup | null>(null);
-  const leafletRef = useRef<typeof import("leaflet") | null>(null);
+  const markersByIdRef = useRef<Map<number, MarkerEntry> | null>(null);
+  const leafletRef = useRef<LeafletModule | null>(null);
   const onPickRef = useRef(onPick);
   const focusLocationRef = useRef(focusLocation);
+  const selectedIdRef = useRef(selectedId);
+  const prevSelectedIdRef = useRef(selectedId);
 
   useEffect(() => {
     onPickRef.current = onPick;
@@ -24,6 +43,10 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
   useEffect(() => {
     focusLocationRef.current = focusLocation;
   }, [focusLocation]);
+
+  useEffect(() => {
+    selectedIdRef.current = selectedId;
+  }, [selectedId]);
 
   useEffect(() => {
     let disposed = false;
@@ -58,21 +81,44 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
       }
     }
     createMap();
-    return () => { disposed = true; mapRef.current?.remove(); mapRef.current = null; markersRef.current = null; };
+    return () => { disposed = true; mapRef.current?.remove(); mapRef.current = null; markersRef.current = null; markersByIdRef.current = null; };
   }, []);
 
+  // Marker population depends only on the camera list and the click
+  // handler — NOT on the selection. Rebuilding every marker on each
+  // selection change would recreate N Leaflet DOM nodes per click; the
+  // selection is applied by the dedicated effect below.
   useEffect(() => {
     const L = leafletRef.current; const layer = markersRef.current; if (!L || !layer) return;
     layer.clearLayers();
+    const byId = new Map<number, MarkerEntry>();
     cameras.forEach((camera) => {
-      // Defense in depth: only whitelisted public statuses may style a
-      // marker; a non-public status renders a plain marker (the parent page
-      // already filters through publicRecords(), this is a second gate).
-      const statusClass = isPublicStatus(camera.status) ? camera.status : "";
-      const marker = L.marker([camera.latitude, camera.longitude], { icon: L.divIcon({ className: "", html: `<span class="osm-camera-marker ${statusClass} ${camera.id === selectedId ? "selected" : ""}" aria-hidden="true"><i></i></span>`, iconSize: [28, 28], iconAnchor: [14, 14] }), title: camera.title });
+      const marker = L.marker([camera.latitude, camera.longitude], { icon: buildMarkerIcon(L, camera, false), title: camera.title });
       marker.bindTooltip(`${camera.title}<br/><small>${camera.kind}</small>`, { direction: "top", offset: [0, -12] }); marker.on("click", () => onSelect(camera.id)); marker.addTo(layer);
+      byId.set(camera.id, { marker, camera });
     });
-  }, [cameras, selectedId, onSelect]);
+    markersByIdRef.current = byId;
+    // Freshly built markers start unselected; re-apply the current
+    // selection here so a rebuild (filter/directory change) keeps the
+    // same selected marker even when selectedId itself did not change.
+    const current = selectedIdRef.current;
+    const entry = byId.get(current);
+    if (entry) entry.marker.setIcon(buildMarkerIcon(L, entry.camera, true));
+    prevSelectedIdRef.current = current;
+  }, [cameras, onSelect]);
+
+  // Selection: swap the `selected` class only on the previously and the
+  // newly selected marker (two setIcon calls, no layer rebuild).
+  useEffect(() => {
+    const L = leafletRef.current; const byId = markersByIdRef.current; if (!L || !byId) return;
+    const prev = prevSelectedIdRef.current;
+    if (prev === selectedId) return;
+    const prevEntry = byId.get(prev);
+    if (prevEntry) prevEntry.marker.setIcon(buildMarkerIcon(L, prevEntry.camera, false));
+    const nextEntry = byId.get(selectedId);
+    if (nextEntry) nextEntry.marker.setIcon(buildMarkerIcon(L, nextEntry.camera, true));
+    prevSelectedIdRef.current = selectedId;
+  }, [selectedId]);
 
   const focusLat = focusLocation?.latitude;
   const focusLng = focusLocation?.longitude;

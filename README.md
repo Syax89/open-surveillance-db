@@ -2,7 +2,7 @@
 
 An open, non-commercial civic database for documenting **visible public surveillance infrastructure**. The project helps people understand where cameras are installed in shared spaces; it does not provide video feeds, tracking tools, or advice on avoiding lawful surveillance.
 
-> Current state: local working prototype. The map uses OpenStreetMap and shows only clearly labelled illustrative records until a public moderation process exists.
+> Current state: local working prototype. The map uses OpenStreetMap and shows only clearly labelled illustrative records; contributor accounts, moderation, roles, and appeals run locally, but the service is not yet a public registry.
 
 ## Principles
 
@@ -18,6 +18,13 @@ An open, non-commercial civic database for documenting **visible public surveill
 - Searchable, map-equivalent public record directory and individual record pages.
 - Public API endpoint for reviewed records and GeoJSON export.
 - CSV and GeoJSON exports derived from the same reviewed public record list.
+- Locality/address/coordinate public search (`/api/cameras/search`) with truthful
+  empty states: coordinate pairs are parsed locally, other places are resolved
+  through a configurable geocoder, and a zero-result response describes the
+  searched area instead of claiming an absence of surveillance.
+- Data licensing decided: the public dataset and every export format (JSON,
+  CSV, GeoJSON) are under ODbL 1.0, and published coordinates are rounded to
+  ~4 decimal places by default (ADR 0008).
 - Submission form that stores new reports as `pending` for moderation.
 - Optional manufacturer and observation-date metadata at report intake. These
   fields remain private while a report is `pending`. Approving the camera does
@@ -26,15 +33,42 @@ An open, non-commercial civic database for documenting **visible public surveill
 - Report-location selection by map click or valid manual coordinates, using the
   same non-blocking nearby-record check in either case.
 - Private correction/request-for-review form that creates a non-public moderation request.
-- Local-only moderation dashboard at `/moderation` for reviewing pending reports and requests.
+- Contributor accounts: email+password registration, login/logout, and an
+  account page listing the contributor's own submissions, with PBKDF2-SHA256
+  password hashing, hashed opaque session cookies, and CSRF protection.
+  Anonymous submissions remain possible by design (ADR 0013).
+- Self-service account erasure with de-attribution (GDPR art. 17): deleting an
+  account detaches its submissions from the identity without unpublishing them
+  (ADR 0013).
+- Moderation dashboard at `/moderation` for reviewing pending reports and
+  requests, gated by `MODERATION_USER`/`MODERATION_PASSWORD` (Basic auth) or
+  `MODERATION_TOKEN` (bearer) environment credentials — fail-closed, returning
+  `503` when none are configured (ADR 0003).
+- Coarse authorization roles (`contributor`/`moderator`/`admin`) enforced on
+  every protected route via `requireRole`, with the acting reviewer derived
+  server-side from the authenticated user (ADR 0014).
+- Appeal workflow against moderation decisions: an independent senior moderator
+  (or the administrator, for escalations) reviews a contested decision; an
+  upheld appeal returns the record to the moderation queue for a fresh decision
+  (ADR 0014).
 - Local record lifecycle: verified → needs review → reverified or removed, with audit history.
+- Image upload for camera records with secure storage: size/MIME/dimension
+  caps, magic-byte verification, mandatory EXIF/XMP/IPTC stripping (fail-closed),
+  R2 storage with metadata kept only in D1, and a moderation/redaction gate
+  before a photo can be served for a public camera (PR #64).
 - Nearby-record warning and safe type/order filters shared by map and directory.
 - Bilingual interface (English and Italian), with a device-local language preference.
 - In-app bilingual project guide at `/guide`.
+- Public information-site pages — `/manifesto`, `/regole`, `/privacy`,
+  `/termini`, `/licenze`, `/faq`, `/contatti`, `/moderazione` — linked from a
+  global site footer with ODbL and OSM attribution.
 - Draft accessibility statement and design for a non-sensitive usability-feedback route (see `docs/ACCESSIBILITY_STATEMENT.md` and ADR 0006).
 - Cloudflare D1-compatible data layer, with local demo records.
 
-The prototype is deliberately not a public registry yet. It needs a public repository, moderation team, privacy review, terms, and operational safeguards before accepting real-world reports.
+The prototype is deliberately not a public registry yet. The code and draft
+policies are public, but accepting real-world reports still requires a public
+launch: independent legal review of the draft terms and privacy documents, real
+moderation staffing, and operational safeguards.
 
 ## Read the project plan
 
@@ -42,22 +76,27 @@ The documentation is part of the project and is intended to be discussed openly.
 
 - [Development plan](docs/DEVELOPMENT_PLAN.md)
 - [Execution board and workstream ownership](docs/EXECUTION_BOARD.md)
-- [Next local sprint: reliable moderation loop](docs/NEXT_SPRINT.md)
+- [Sprint archive: reliable moderation loop (completed)](docs/NEXT_SPRINT.md)
 - [Future roadmap](docs/FUTURE_ROADMAP.md)
 - [Current status](docs/STATUS.md)
 - [Site map and information architecture](docs/SITEMAP.md)
+- [Clean local setup and schema migrations](docs/DEVELOPMENT_SETUP.md)
 - [Local playbook and acceptance checks](docs/LOCAL_PLAYBOOK.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Data model and API](docs/DATA_MODEL.md)
 - [Data dictionary (public fields)](docs/DATA_DICTIONARY.md)
 - [Export versioning policy](docs/EXPORT_VERSIONING.md)
 - [Moderation policy](docs/MODERATION.md)
+- [Terms of use](docs/TERMS_OF_USE.md)
+- [Pre-launch legal deliverables](docs/legal/README.md)
 - [Privacy and safety](docs/PRIVACY_AND_SAFETY.md)
 - [Accessibility statement](docs/ACCESSIBILITY_STATEMENT.md)
 - [Open-source and data licensing](docs/OPEN_SOURCE.md)
 - [OpenStreetMap integration](docs/OSM_INTEGRATION.md)
 - [Deployment and operations](docs/DEPLOYMENT.md)
+- [Operations manual](docs/OPERATIONS.md)
 - [Local release checklist](docs/RELEASE_CHECKLIST.md)
+- [Decision records (ADR 0001–0014)](docs/decisions/)
 - [Changelog](CHANGELOG.md)
 - [Governance](GOVERNANCE.md)
 
@@ -106,7 +145,12 @@ then re-applies the migrations). After changing the schema in `db/schema.ts`,
 regenerate a migration with `npm run db:generate` before running
 `db:migrate`.
 
-For local moderation testing, open `http://localhost:3000/moderation`. This route is intentionally not linked from the public prototype and has no production authentication yet.
+For local moderation testing, open `http://localhost:3000/moderation`. This
+route is intentionally not linked from the public prototype. Access is gated by
+the `MODERATION_USER`/`MODERATION_PASSWORD` (Basic auth) or `MODERATION_TOKEN`
+(bearer) environment variables and fails closed: with none configured, the
+dashboard and `/api/moderation` return `503`. Protected routes additionally
+enforce coarse roles via `requireRole` (see ADR 0003 and ADR 0014).
 
 For a complete fictional-data workflow—submission, approval/rejection/hiding,
 public-boundary checks, and a cautious reset approach—read the [local
@@ -120,7 +164,7 @@ npm run build
 
 ## License
 
-The application source code is offered under [GNU Affero General Public License v3.0 or later](LICENSE) (`AGPL-3.0-or-later`). Documentation is proposed under CC BY-SA 4.0; published database licensing is described in [Open source and data licensing](docs/OPEN_SOURCE.md) and must be confirmed before launch.
+The application source code is offered under [GNU Affero General Public License v3.0 or later](LICENSE) (`AGPL-3.0-or-later`). Documentation is proposed under CC BY-SA 4.0; the public database and every export format are licensed under ODbL 1.0 (ADR 0008) — see [Open source and data licensing](docs/OPEN_SOURCE.md).
 
 ## Contributing
 

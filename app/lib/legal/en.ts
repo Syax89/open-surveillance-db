@@ -21,7 +21,7 @@ export const enLegal: LegalContent = {
     intro:
       "How OpenSurveillanceDB processes personal data, what we publish, what we never collect, and how you can exercise your rights under the GDPR.",
     versionNote:
-      "Version 0.3 — 31 July 2026. Draft for pre-launch review; the repository copy (docs/legal/PRIVACY_NOTICE.md) remains canonical.",
+      "Version 0.4 — 1 August 2026. Draft for pre-launch review; the repository copy (docs/legal/PRIVACY_NOTICE.md) remains canonical.",
     sections: [
       {
         heading: "1. Who we are (controller)",
@@ -82,10 +82,10 @@ export const enLegal: LegalContent = {
                 "Art. 6(1)(f) GDPR; token stored only as SHA-256, expires after 30 days or on logout",
               ],
               [
-                "Evidence (files/links attached to a report)",
+                "Photo evidence (JPEG/PNG/WebP uploads, up to 10 MB / 4096 px)",
                 "Reporter",
                 "Verification of the record",
-                "Art. 6(1)(f) GDPR; retained private, tied to the record",
+                "Art. 6(1)(f) GDPR; EXIF/XMP/IPTC stripped at the boundary (fail-closed), bytes in R2 with metadata only in D1, retained private and tied to the record; never public until a moderator approves with redaction confirmed",
               ],
               [
                 "Correction / takedown request (contact details the requester provides, e.g. email)",
@@ -142,6 +142,7 @@ export const enLegal: LegalContent = {
               "**No personal names, faces, vehicle plates or precise operational details.**",
               "**No coordinates beyond zone-level precision:** published locations are rounded to **~4 decimal places (~10 m)**; the exact location remains in the private moderation record, visible only to moderators.",
               "**No behavioural advertising, no tracking, no sale of data**, no analytics libraries.",
+              "**No published photo without moderation and confirmed redaction:** uploaded photos (JPEG/PNG/WebP, ≤10 MB / 4096 px) are stripped of EXIF/XMP/IPTC metadata at the boundary (fail-closed — a container that cannot be walked safely is rejected, never stored unstripped), stored with sanitised bytes in R2 and metadata only in D1, and are **never public** until a moderator approves them with `redaction_confirmed = 1`. The storage key is never exposed.",
               "Submissions are stored as pending and are **never public** until a moderator approves them. Rejected content is never published.",
             ],
           },
@@ -240,7 +241,7 @@ export const enLegal: LegalContent = {
     intro:
       "These terms govern the use of OpenSurveillanceDB, the open, community-maintained database of visible public surveillance infrastructure. They apply to the web application, the public API, the data exports and related services (\"the Service\").",
     versionNote:
-      "Version 0.2 — 31 July 2026. Draft for pre-launch review; the repository copy (docs/TERMS_OF_USE.md) remains canonical.",
+      "Version 0.3 — 1 August 2026. Draft for pre-launch review; the repository copy (docs/TERMS_OF_USE.md) remains canonical.",
     sections: [
       {
         heading: "1. Who we are",
@@ -298,7 +299,7 @@ export const enLegal: LegalContent = {
               "live video, stream URLs, credentials, network information, or control interfaces;",
               "detailed field-of-view or operational capability that could create a safety risk;",
               "sensitive facilities or locations where publication could materially increase risk;",
-              "images containing identifiable people, vehicle plates, or private interiors unless safely redacted and necessary (note: evidence uploads are not enabled yet);",
+              "images containing identifiable people, vehicle plates, or private interiors unless you have safely redacted them **before uploading** and they are necessary — photo evidence uploads are **active** (section 5): images are stripped of EXIF/XMP/IPTC metadata at the boundary (fail-closed) and are never published until a moderator approves them with confirmed redaction;",
               "unverifiable allegations about people or organisations;",
               "content you are not entitled to share.",
             ],
@@ -328,6 +329,7 @@ export const enLegal: LegalContent = {
               "**What you keep and what you grant.** You retain whatever rights you have in the content you submit. By submitting, you grant the project a non-exclusive, worldwide, royalty-free licence to store and review the report and — **if and only if** the record is verified and published — to publish it and make it available under **ODbL 1.0**, as part of the open database, with attribution to contributors per the ODbL notice. No licence to publish is granted by the mere act of submitting.",
               "**Your warranties.** By submitting you confirm that: the content is accurate to the best of your knowledge; you are entitled to share it; it complies with section 4; and you meet the minimum age for using the Service in your jurisdiction (in Italy, 14 years).",
               "**Verification may be refused.** Records republished from official public sources follow their own legal regime, checked per record; community reports are verified against the moderation publication standard, not against official registers.",
+              "**Photo evidence.** Reports may include photos (JPEG, PNG or WebP, up to **10 MB and 4096 px per side**). On upload, the service **strips EXIF/XMP/IPTC metadata at the boundary** (fail-closed: if the container cannot be walked safely the upload is rejected — never stored unstripped), verifies the container from magic bytes (never trusting the declared Content-Type), stores the sanitised bytes in object storage (**R2**) with metadata only in the database (**D1**), and keeps every photo **private (pending) and never public** until a moderator approves it with `redaction_confirmed = 1` — the moderator must confirm the subject was redacted. Photos follow the record's retention (deleted with the record; hard-deleted immediately if the record is rejected or removed). The storage key is never exposed; clients interact with photos by id only.",
             ],
           },
         ],
@@ -508,7 +510,7 @@ export const enLegal: LegalContent = {
         blocks: [
           {
             type: "paragraph",
-            text: "Contributors must submit only material they are entitled to share. They grant the project the rights needed to publish accepted code, documentation and data under the relevant project licence. Evidence uploads require a separate, explicit contribution and privacy flow before they are enabled.",
+            text: "Contributors must submit only material they are entitled to share. They grant the project the rights needed to publish accepted code, documentation and data under the relevant project licence. Photo evidence uploads are **active** (2026-08): images are stripped of EXIF/XMP/IPTC metadata at the boundary (fail-closed), stored privately (bytes in R2, metadata in D1), and never published until a moderator approves them with confirmed redaction (see TERMS section 5).",
           },
         ],
       },
