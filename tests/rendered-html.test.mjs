@@ -116,6 +116,46 @@ test("server-rendered homepage provides the map region and its text-list alterna
   assert.match(html, /record-list/);
 });
 
+test("global footer exposes every institutional page, the ODbL data licence and OSM attribution", async () => {
+  const { response, html } = await renderHomepage();
+
+  assert.equal(response.status, 200);
+
+  // The footer is a labelled contentinfo landmark (rendered once by the root
+  // layout) containing a distinct labelled navigation landmark.
+  assert.match(html, /<footer class="site-footer" aria-label="Site footer">/);
+  assert.match(html, /<nav class="footer-links" aria-label="Institutional pages">/);
+
+  // Every public institutional route is linked from the footer. The local
+  // moderation queue (/moderation) is intentionally absent: it is a local-only
+  // tool that must not be exposed from the public interface (see the
+  // publication-boundaries suite).
+  const institutionalLinks = [
+    "/manifesto",
+    "/regole",
+    "/guide",
+    "/privacy",
+    "/termini",
+    "/licenze",
+    "/faq",
+    "/contatti",
+  ];
+  for (const href of institutionalLinks) {
+    assert.ok(html.includes(`href="${href}"`), `expected footer link to ${href}`);
+  }
+
+  // Data attribution required by the legal and OSM decisions (ADR 0008,
+  // docs/OSM_INTEGRATION.md).
+  assert.match(html, /opendatacommons\.org\/licenses\/odbl\/1-0\//);
+  assert.match(html, /www\.openstreetmap\.org\/copyright/);
+  assert.match(html, /OpenStreetMap contributors/);
+
+  // No per-page duplicate footer remains: the homepage must contain exactly
+  // one contentinfo landmark.
+  const footerCount = (html.match(/<footer\b/g) ?? []).length;
+  assert.equal(footerCount, 1, `expected a single footer landmark, found ${footerCount}`);
+});
+
 test("starter preview skeleton stays removed from the template", async () => {
   const [page, layout, packageJson, publicFiles] = await Promise.all([
     readFile(path.join(root, "app", "page.tsx"), "utf8"),
