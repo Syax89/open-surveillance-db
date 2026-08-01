@@ -1,5 +1,43 @@
 # Deployment and operations plan
 
+## Provisioning real accounts (pre-alpha)
+
+The migrations seed **demo identities** for the local prototype (`Demo *`
+reviewers in `drizzle/0008_wave_b_reviewer_roles.sql`, six `@osdb.test` demo
+users in `drizzle/0010_auth_roles_appeals.sql`). They are removed by the
+**last** migration, `drizzle/0017_remove_demo_seed.sql`, which runs on every
+fresh database — so a fresh DB has **zero demo identities** (verified by
+`npm run db:smoke`). Demo accounts must never be the moderation/admin
+identities of a public environment.
+
+Before opening the DB to the public, provision the real moderator/admin
+accounts with the dedicated script (idempotent — safe to re-run, also usable
+in CI/deploy):
+
+```bash
+PROVISION_ACCOUNTS='[
+  {"email":"ada@example.org","displayName":"Ada","role":"admin","reviewerRole":"administrator"},
+  {"email":"linus@example.org","displayName":"Linus","role":"moderator","reviewerRole":"record_reviewer"},
+  {"email":"grace@example.org","displayName":"Grace","role":"moderator","reviewerRole":"intake_reviewer"}
+]' npm run db:provision            # local D1 (default)
+PROVISION_ACCOUNTS='[...]' npm run db:provision -- --remote   # alpha/prod D1
+```
+
+- `role` must be `contributor | moderator | admin` (coarse route gate, ADR 0014).
+- `reviewerRole` is optional and only meaningful for `moderator`/`admin`;
+  it creates the linked granular DATA_TRUST profile
+  (`intake_reviewer | record_reviewer | senior_moderator | privacy_safety_lead | administrator`).
+- Accounts are upserted on the unique email (and reviewer display name), so
+  re-running never duplicates rows.
+- The script only manages role identities — real authentication (passwords /
+  OIDC) is a separate public-alpha ticket and out of scope here, exactly like
+  the demo identities they replace.
+
+Coordinated with the deploy workflow ticket (Cloudflare deploy + real D1
+database id): the deploy pipeline runs `db:provision --remote` with the
+`PROVISION_ACCOUNTS` value supplied as a GitHub secret after `db:smoke`
+passes, and before the worker is exposed.
+
 ## Local development
 
 ```bash

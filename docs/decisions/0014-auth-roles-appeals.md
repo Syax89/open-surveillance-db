@@ -12,6 +12,12 @@
   `contributors` + `sessions` is a separate layer: registration provisions
   credentials, provisioning maps a contributor onto a `users` role identity —
   see the integration note in Consequences).
+- **Implementation note (2026-08-01):** the demo-identity removal required by
+  decision 1 is implemented by migration `drizzle/0017_remove_demo_seed.sql`
+  (the last migration — a fresh DB has zero demo identities, asserted by
+  `npm run db:smoke`), and real accounts are provisioned with
+  `scripts/provision-alpha-accounts.mjs` (`PROVISION_ACCOUNTS` env) before a
+  public environment opens; see docs/DEPLOYMENT.md §Provisioning real accounts.
 
 ## Context
 

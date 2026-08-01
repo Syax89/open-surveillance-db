@@ -7,6 +7,12 @@
   append-only audit replace the single generic "Local moderator" actor in the
   local prototype); ADR 0004-retention-and-review-cycle (queue workflow state is
   tracked per entity without changing the public status lifecycle).
+- **Implementation note (2026-08-01):** the demo-seed removal required by
+  decision 1 is implemented by migration `drizzle/0017_remove_demo_seed.sql`
+  (the last migration — a fresh DB has zero demo identities, asserted by
+  `npm run db:smoke`), and real accounts are provisioned with
+  `scripts/provision-alpha-accounts.mjs` (`PROVISION_ACCOUNTS` env) before a
+  public environment opens; see docs/DEPLOYMENT.md §Provisioning real accounts.
 
 ## Context
 

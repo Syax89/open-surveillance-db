@@ -75,11 +75,11 @@ const allowedExtraTables = ["_cf_METADATA", "sqlite_sequence", "d1_migrations"];
 
 // Tables that migration 0008 (Wave B Data & Trust) deliberately seeds with
 // the reviewer roles, and migration 0010 with the demo identity accounts.
-// A fresh DB must contain exactly these rows — no more, no less — so extra
-// demo/seed data still fails the gate.
+// Migration 0017 (LAST) removes every demo seed, so a fresh DB must contain
+// ZERO rows in both tables — no demo identities survive into alpha/prod.
 const expectedSeedCounts = {
-  reviewers: 5,
-  users: 6,
+  reviewers: 0,
+  users: 0,
 };
 
 let failures = 0;
@@ -124,9 +124,9 @@ console.log("└─────────────────────�
 if (existsSync(persistDir)) {
   rmSync(persistDir, { recursive: true, force: true });
 }
-console.log(`[1/7] fresh persist dir: ${path.relative(root, persistDir)}`);
+console.log(`[1/8] fresh persist dir: ${path.relative(root, persistDir)}`);
 
-console.log("[2/7] applying migrations (wrangler d1 migrations apply --local)…");
+console.log("[2/8] applying migrations (wrangler d1 migrations apply --local)…");
 try {
   runWrangler(["d1", "migrations", "apply", dbName, "--local", "--persist-to", persistDir]);
 } catch (err) {
@@ -137,7 +137,7 @@ try {
 console.log("      migrations applied successfully");
 
 // 2. Migration journal must exist and match the files in drizzle/.
-console.log("[3/7] checking migration journal (d1_migrations)…");
+console.log("[3/8] checking migration journal (d1_migrations)…");
 let journalRows;
 try {
   journalRows = query("SELECT name FROM d1_migrations;");
@@ -165,7 +165,7 @@ if (appliedNames.join("\n") !== filesSorted.join("\n")) {
 //    what catches a migration dropped or renamed in the migrations dir: the
 //    DB journal only reflects what was applied, so a missing file is invisible
 //    to it — but drizzle/meta/_journal.json still lists the expected set.
-console.log("[4/7] checking drizzle meta journal…");
+console.log("[4/8] checking drizzle meta journal…");
 let metaTags = [];
 const metaJournalPath = path.join(migrationsDir, "meta", "_journal.json");
 try {
@@ -186,7 +186,7 @@ if (metaSorted.join("\n") !== filesNoExt.join("\n")) {
 }
 
 // 4. Expected application tables must exist.
-console.log("[5/7] checking application tables…");
+console.log("[5/8] checking application tables…");
 let tableRows;
 try {
   tableRows = query("SELECT name FROM sqlite_master WHERE type = 'table';");
@@ -210,7 +210,7 @@ if (unexpected.length > 0) {
 }
 
 // 5. Expected indexes must exist.
-console.log("[6/7] checking indexes…");
+console.log("[6/8] checking indexes…");
 let indexRows;
 try {
   indexRows = query("SELECT name FROM sqlite_master WHERE type = 'index' AND name NOT LIKE 'sqlite_%';");
@@ -229,7 +229,7 @@ for (const i of expectedIndexes) {
 
 // 6. A fresh migrated database must be empty (no demo/seed rows), except for
 //    tables the migrations deliberately seed with a fixed row set.
-console.log("[7/7] checking row counts (fresh DB must be empty)…");
+console.log("[7/8] checking row counts (fresh DB must be empty)…");
 for (const t of expectedTables) {
   const seeded = expectedSeedCounts[t];
   let count = -1;
@@ -250,6 +250,39 @@ for (const t of expectedTables) {
     }
   } else {
     fail(`expected ${t} to be empty on a fresh DB, found ${count} row(s)`);
+  }
+}
+
+// 7. Zero demo identities: migration 0017 (LAST) must have removed every
+//    "Demo *" reviewer and every @osdb.test demo user seeded by 0008/0010.
+//    This is the security gate that keeps demo moderation/admin accounts out
+//    of a fresh alpha/prod database.
+console.log("[8/8] checking zero demo identities (0017 removal)…");
+const demoChecks = [
+  {
+    label: "demo reviewers (display_name LIKE 'Demo %')",
+    sql: "SELECT COUNT(*) AS n FROM reviewers WHERE display_name LIKE 'Demo %'",
+  },
+  {
+    label: "demo users (email LIKE '%@osdb.test')",
+    sql: "SELECT COUNT(*) AS n FROM users WHERE email LIKE '%@osdb.test'",
+  },
+  {
+    label: "demo-linked reviewer profiles (user_id -> demo user)",
+    sql: "SELECT COUNT(*) AS n FROM reviewers r JOIN users u ON u.id = r.user_id WHERE u.email LIKE '%@osdb.test'",
+  },
+];
+for (const check of demoChecks) {
+  try {
+    const rows = query(check.sql);
+    const n = Number(rows[0]?.n ?? -1);
+    if (n === 0) {
+      console.log(`      ✓ ${check.label}: 0 rows`);
+    } else {
+      fail(`${check.label}: found ${n} row(s) on a fresh DB — demo seed was not removed`);
+    }
+  } catch (err) {
+    fail(`could not run demo check (${check.label}): ${err.message}`);
   }
 }
 
