@@ -10,6 +10,9 @@
     "binding": "ASSETS"
   },
   "images": { "binding": "IMAGES" },
+  "triggers": {
+    "crons": ["0 3 * * *"]
+  },
   "r2_buckets": [
     {
       "binding": "PHOTOS",

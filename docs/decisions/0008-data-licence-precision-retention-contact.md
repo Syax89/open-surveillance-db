@@ -96,3 +96,49 @@ this matter to the project team.
 - **Review:** the 12-month cycle stays an initial value and must be revisited
   after the first year of operations with real volumes (ADR 0004).
 - Wave A item 3 is now decided; items 4–5 are tracked on the execution board.
+
+## Implementation note (2026-08-01): retention sweep mechanics
+
+The automated enforcement called for by ADR 0004 §3 is implemented in
+`db/retention.ts`, wired to a Cloudflare Worker cron trigger
+(`wrangler.jsonc` → `triggers.crons`, **daily at 03:00 UTC**) and invoked by
+the `scheduled` handler in `worker/index.ts`. The sweep enforces the
+RETENTION_SCHEDULE rules as follows:
+
+| Rule | Data | Window | Action |
+|------|------|--------|--------|
+| R1 | `pending` reports | 90 days from `created_at` | hard delete record + evidence + close open queue item |
+| R2 | `rejected` reports | 30 days from the rejection decision | hard delete record + evidence + close open queue item |
+| R3 | `verified` records | review window (`review_due_at`) | freshness sweep (`db/moderation.ts`) → `needs_review`, then `stale`; after 6 months unverified → status `removed`, evidence deleted, audit event written |
+| R4 | resolved correction requests | 2 years from `created_at` | delete |
+| R6 | photo evidence | tied to the record | deleted with the record; orphan `pending` photos after 90 days; `rejected` photos at the next run |
+| R7 | sessions | `expires_at` / `revoked_at` | delete expired or revoked rows |
+
+Mechanics chosen:
+
+- **Published records past retention are flagged, not anonymised.** A record
+  whose re-verification window elapsed moves to `needs_review` (withdrawn from
+  every public surface by the existing freshness boundary) and only becomes
+  `removed` after 6 months unverified. The row is kept as a `removed`
+  tombstone with its evidence deleted — removal is irreversible for the
+  evidence, and the tombstone preserves the moderation audit trail (art.
+  5(2)). This follows ADR 0004 R3 and ADR 0008 point 3 verbatim; no
+  anonymisation is needed because the public boundary already withholds
+  non-current records.
+- **The rejection decision date** (R2) is the latest `moderation_events` row
+  with `action = 'reject'` for the record, falling back to `created_at` for
+  legacy rows without an event. `cameras.updated` is a human note, not a
+  timestamp, and must not be used as a retention anchor.
+- **`moderation_events` are never purged by this job** (R5). The table is
+  append-only by design — migration 0008 installs `BEFORE UPDATE/DELETE`
+  triggers — so a 2-year archival path needs an archive table plus a
+  migration and a separate decision; it is tracked separately and out of
+  scope of the daily sweep.
+- **The policy is testable and env-overridable.** `db/retention.ts` exports
+  `RETENTION_DAYS` (default 365, the master window per point 3 above) and the
+  per-rule constants (`PENDING_RETENTION_DAYS` 90, `REJECTED_RETENTION_DAYS`
+  30, `UNVERIFIED_REMOVAL_DAYS` 180, `CORRECTION_RETENTION_DAYS` 730,
+  `ORPHAN_PHOTO_RETENTION_DAYS` 90). The worker reads `RETENTION_DAYS` from
+  the environment; `runRetentionSweep(now, { policy, r2 })` accepts an
+  injected policy and R2 bucket so tests can time-travel and assert object
+  deletion without a live binding.
