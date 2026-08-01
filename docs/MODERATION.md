@@ -74,6 +74,28 @@ Before approving, the moderator verifies that the image:
 
 Photo moderation decisions are appealable under [MODERATION_SLA.md](legal/MODERATION_SLA.md) (S5): within 30 days of the decision, decided by a different reviewer than the original one. The appeal window is aligned with the rejected-photo retention window (R13/R2).
 
+## Edit moderation
+
+Contributor edits to published records are moderated before they become public (COMMUNITY_PLAN.md § 2.2; ADR 0018). The moderation queue entry entity is **`camera_edit`**, backed by `camera_edit_requests` + a `moderation_queue` row; every decision writes an append-only `moderation_events` entry.
+
+### Two-track flow
+
+- **Edits to `pending` records (never public):** direct PATCH by the record owner with ownership check, CSRF + same-origin + rate-limit (bucket `edit`); anonymous/non-owner requests answer **404 fail-closed** (no-existence-oracle pattern). No moderation queue entry.
+- **Edits to `verified` / `needs_review` / `stale` records (public history):** the PATCH **never mutates `cameras` in place**. It creates a `camera_edit_requests` row (explicit per-column diff) + a `moderation_queue` row (entity `camera_edit`). One open edit-request per camera at a time (partial unique, pattern `moderation_queue_open_unique`).
+- **`removed` / `rejected` (terminal) records:** edits blocked, no queue entry (**409**).
+
+### Standard applied to edits
+
+- Editable fields are the POST `/api/cameras` whitelist: `title`, `kind`, `address`, `notes`, `manufacturer`, `observedOn`, `description`. **Never editable:** `status`, `contributor_id`, `source`, `publish_manufacturer`/`publish_observed_on` (moderator decisions), `last_verified_at`/`review_due_at` (freshness clock). Proposed coordinates are rounded (~10 m) + sensitivity-reviewed.
+- An edit must be accurate to the best of the contributor's knowledge, limited to what the record actually supports, and must not introduce prohibited content (TERMS_OF_USE.md § 4).
+- **Approve** applies the diff and writes `moderation_events` action `edit_applied`; **reject** writes `edit_rejected`. A no-op edit (same content) returns 200 "no changes" and writes no event (anti-farming, ADR 0018).
+- Moderators/admins who are **not the record owner** act only through the moderation endpoints (403 on the edit API); they never bypass the queue.
+
+### Emergency hide and appeals
+
+- An edit that turns out harmful (safety risk, personal data, prohibited content) is handled through the existing emergency flow ([MODERATION_SLA.md](legal/MODERATION_SLA.md) S1: temporary hide within **24 h**) and the removal path of TERMS_OF_USE.md § 11; the revert keeps the audit trail in the revision history (RETENTION_SCHEDULE.md R14).
+- Decisions on edits — rejection, revert, or hide of a submitted edit, and published edits later found inaccurate — are appealable under the same path as other moderation decisions ([ADR 0014](decisions/0014-auth-roles-appeals.md), MODERATION_SLA.md S5/S6): within **30 days**, decided by a **different reviewer** than the original decision, with escalation to the advisory circle for disputed cases. The edit queue follows the same SLA as the submission queue.
+
 ## Appeals and corrections
 
 A contributor who disagrees with a recorded moderation decision can challenge it through the implemented appeal workflow ([ADR 0014](decisions/0014-auth-roles-appeals.md), routes `/api/appeals`): file, list, decide. Any authenticated user with at least the `contributor` role may file an appeal (`POST /api/appeals`); moderators and admins list and decide them (`GET /api/appeals`, `PATCH /api/appeals/:id`).
