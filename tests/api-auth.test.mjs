@@ -231,7 +231,10 @@ test("register returns 500 when the database is unavailable", async () => {
 // ---------------------------------------------------------------------------
 
 test("login authenticates, opens a session, and sets both cookies", async () => {
+  stub("loginLockoutKey", async (email) => `lockout:${email}`);
+  stub("getLoginLockout", async () => ({ locked: false, retryAfterSeconds: 0 }));
   stub("authenticateContributor", async () => contributor);
+  stub("clearLoginAttempts", async () => {});
   stub("createSession", async () => newSession);
   const { POST } = await loginRoute();
   const response = await POST(
@@ -244,6 +247,8 @@ test("login authenticates, opens a session, and sets both cookies", async () => 
   const body = await responseBody(response);
   assert.deepEqual(body.contributor, contributor);
   assert.deepEqual(callArgs("authenticateContributor")[0], ["ada@example.org", "supersecret123"]);
+  assert.deepEqual(callArgs("loginLockoutKey")[0], ["ada@example.org"], "the key derives from the normalised email");
+  assert.deepEqual(callArgs("clearLoginAttempts")[0], ["lockout:ada@example.org"], "a successful login clears the per-email counter");
   assert.deepEqual(cookieNames(response).sort(), ["osdb_csrf", "osdb_session"]);
 });
 
@@ -255,7 +260,10 @@ test("login answers the same generic 401 for unknown email and wrong password", 
   ];
   for (const { name, impl } of cases) {
     await t.test(name, async () => {
+      stub("loginLockoutKey", async (email) => `lockout:${email}`);
+      stub("getLoginLockout", async () => ({ locked: false, retryAfterSeconds: 0 }));
       stub("authenticateContributor", impl);
+      stub("recordFailedLogin", async () => ({ locked: false, retryAfterSeconds: 0 }));
       const response = await POST(
         apiRequest("/api/auth/login", {
           method: "POST",
@@ -265,8 +273,81 @@ test("login answers the same generic 401 for unknown email and wrong password", 
       assert.equal(response.status, 401);
       assert.equal((await responseBody(response)).error, "Invalid credentials.");
       assert.equal(callArgs("createSession").length, 0);
+      assert.deepEqual(callArgs("recordFailedLogin")[0][0], "lockout:ada@example.org", "the failure is recorded under the email key");
     });
   }
+});
+
+test("login records the failed attempt under the email-derived hash key — never the address", async () => {
+  stub("loginLockoutKey", async (email) => `sha256:${email}`);
+  stub("getLoginLockout", async () => ({ locked: false, retryAfterSeconds: 0 }));
+  stub("authenticateContributor", async () => null);
+  stub("recordFailedLogin", async () => ({ locked: false, retryAfterSeconds: 0 }));
+  const { POST } = await loginRoute();
+  const response = await POST(
+    apiRequest("/api/auth/login", {
+      method: "POST",
+      body: { email: "Ada@Example.ORG", password: "wrong-password-123" },
+    }),
+  );
+  assert.equal(response.status, 401);
+  const [key, policy] = callArgs("recordFailedLogin")[0];
+  assert.equal(key, "sha256:ada@example.org");
+  assert.equal(policy.maxAttempts, 5, "the default policy applies when no env knobs are set");
+  assert.equal(policy.windowSeconds, 900);
+});
+
+test("login answers 429 with Retry-After while the account is locked, before any auth work", async () => {
+  stub("loginLockoutKey", async (email) => `lockout:${email}`);
+  stub("getLoginLockout", async () => ({ locked: true, retryAfterSeconds: 42 }));
+  const { POST } = await loginRoute();
+  const response = await POST(
+    apiRequest("/api/auth/login", {
+      method: "POST",
+      body: { email: "ada@example.org", password: "supersecret123" },
+    }),
+  );
+  assert.equal(response.status, 429);
+  assert.equal(response.headers.get("retry-after"), "42");
+  assert.equal(callArgs("authenticateContributor").length, 0, "no credential work happens while locked");
+  assert.equal(callArgs("recordFailedLogin").length, 0, "a blocked attempt is not counted again");
+});
+
+test("login answers 429 when the failed attempt trips the lockout", async () => {
+  stub("loginLockoutKey", async (email) => `lockout:${email}`);
+  stub("getLoginLockout", async () => ({ locked: false, retryAfterSeconds: 0 }));
+  stub("authenticateContributor", async () => null);
+  stub("recordFailedLogin", async () => ({ locked: true, retryAfterSeconds: 900 }));
+  const { POST } = await loginRoute();
+  const response = await POST(
+    apiRequest("/api/auth/login", {
+      method: "POST",
+      body: { email: "ada@example.org", password: "wrong-password-123" },
+    }),
+  );
+  assert.equal(response.status, 429);
+  assert.equal(response.headers.get("retry-after"), "900");
+  assert.equal(callArgs("createSession").length, 0);
+});
+
+test("failed logins from different client IPs share the same email key", async () => {
+  stub("loginLockoutKey", async (email) => `lockout:${email}`);
+  stub("getLoginLockout", async () => ({ locked: false, retryAfterSeconds: 0 }));
+  stub("authenticateContributor", async () => null);
+  stub("recordFailedLogin", async () => ({ locked: false, retryAfterSeconds: 0 }));
+  const { POST } = await loginRoute();
+  for (const ip of ["10.0.0.1", "10.0.0.2", "10.0.0.3"]) {
+    const response = await POST(
+      apiRequest("/api/auth/login", {
+        method: "POST",
+        headers: { "cf-connecting-ip": ip },
+        body: { email: "ada@example.org", password: "wrong-password-123" },
+      }),
+    );
+    assert.equal(response.status, 401, `attempt from ${ip} must stay allowed (per-IP bucket) but fail auth`);
+  }
+  const keys = callArgs("recordFailedLogin").map(([key]) => key);
+  assert.deepEqual(keys, ["lockout:ada@example.org", "lockout:ada@example.org", "lockout:ada@example.org"], "every IP counts against the same email key");
 });
 
 test("login rejects malformed credentials with 401 (not 400) to avoid probing", async (t) => {
