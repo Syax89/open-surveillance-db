@@ -66,6 +66,10 @@ const REAL_DB_MODULES = [
   // db/cameras.ts imports ./confirmations at runtime (the public payload
   // carries confirmationCount), so the real db layer must resolve it.
   { source: "db/confirmations.ts", output: "db-real/confirmations.mjs" },
+  // db/camera-edits.ts (community editing, ADR 0018 §4) imports getD1 from
+  // ./cameras and recordModerationEvent from ./moderation — both already in
+  // this tree — so the real two-track logic runs against the same binding.
+  { source: "db/camera-edits.ts", output: "db-real/camera-edits.mjs" },
 ];
 // db/moderation.ts imports ./freshness (pure, no CF binding) once the
 // freshness feature is present. CI checks out the PR head, not the merge
@@ -89,7 +93,7 @@ async function buildTree() {
   const mocksDir = path.join(root, "tests", "helpers", "mocks");
   const mockStateUrl = pathToFileURL(path.join(root, "tests", "helpers", "mock-state.mjs")).href;
   await mkdir(path.join(tree, "db"), { recursive: true });
-  for (const mockName of ["cameras", "corrections", "geocode", "moderation", "auth", "users", "photos", "appeals", "confirmations"]) {
+  for (const mockName of ["cameras", "camera-edits", "corrections", "geocode", "moderation", "auth", "users", "photos", "appeals", "confirmations"]) {
     const source = await readFile(path.join(mocksDir, `${mockName}.mjs`), "utf8");
     await writeFile(
       path.join(tree, "db", `${mockName}.mjs`),

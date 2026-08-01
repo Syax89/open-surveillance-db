@@ -5,7 +5,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocale, useMessages } from "../LocaleProvider";
-import type { CameraInQueue, CorrectionInQueue, DecisionFormApi, ModerationAction, ModerationEvent, PhotoInQueue, QueueEntity, QueueItem, QueuePayload, ReasonCode, Reviewer } from "./types";
+import type { CameraInQueue, CorrectionInQueue, DecisionFormApi, EditRequestInQueue, ModerationAction, ModerationEvent, PhotoInQueue, QueueEntity, QueueItem, QueuePayload, ReasonCode, Reviewer } from "./types";
 
 export function useModerationQueue() {
   const { locale } = useLocale();
@@ -15,6 +15,7 @@ export function useModerationQueue() {
   const [publishedCameras, setPublishedCameras] = useState<CameraInQueue[]>([]);
   const [reviewCameras, setReviewCameras] = useState<CameraInQueue[]>([]);
   const [corrections, setCorrections] = useState<CorrectionInQueue[]>([]);
+  const [editRequests, setEditRequests] = useState<EditRequestInQueue[]>([]);
   const [photos, setPhotos] = useState<PhotoInQueue[]>([]);
   const [redactionConfirmed, setRedactionConfirmed] = useState<Record<string, boolean>>({});
   const [recentEvents, setRecentEvents] = useState<ModerationEvent[]>([]);
@@ -50,6 +51,7 @@ export function useModerationQueue() {
         setPublishedCameras(Array.isArray(data.publishedCameras) ? data.publishedCameras : []);
         setReviewCameras(Array.isArray(data.reviewCameras) ? data.reviewCameras : []);
         setCorrections(Array.isArray(data.correctionRequests) ? data.correctionRequests : []);
+        setEditRequests(Array.isArray(data.cameraEditRequests) ? data.cameraEditRequests : []);
         setPhotos(Array.isArray(data.photoReports) ? data.photoReports : []);
         setRecentEvents(Array.isArray(data.recentEvents) ? data.recentEvents : []);
         setReviewers(Array.isArray(data.reviewers) ? data.reviewers : []);
@@ -64,7 +66,7 @@ export function useModerationQueue() {
 
   useEffect(() => loadQueue(), [loadQueue]);
 
-  const total = cameras.length + corrections.length + photos.length;
+  const total = cameras.length + corrections.length + editRequests.length + photos.length;
   const summary = useMemo(() => t.awaiting(total), [t, total]);
 
   const queueByKey = useMemo(() => new Map(
@@ -109,7 +111,7 @@ export function useModerationQueue() {
       setRedactionConfirmed((items) => { const next = { ...items }; delete next[key]; return next; });
       setNotes((items) => { const next = { ...items }; delete next[key]; return next; });
       setMetadataPublication((items) => { const next = { ...items }; delete next[key]; return next; });
-      setMessage(`${entity === "camera" ? t.cameraReport : entity === "photo" ? t.photoEvidence : t.correctionRequest} #${id} ${t.decisionSaved}: ${actionLabel(action)}. ${t.reason}: ${readableReason(reasonCode)}.`);
+      setMessage(`${entity === "camera" ? t.cameraReport : entity === "photo" ? t.photoEvidence : entity === "camera_edit" ? t.editRequest : t.correctionRequest} #${id} ${t.decisionSaved}: ${actionLabel(action)}. ${t.reason}: ${readableReason(reasonCode)}.`);
       loadQueue();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : t.saveError);
@@ -132,7 +134,7 @@ export function useModerationQueue() {
 
   return {
     loading, message, error, summary,
-    cameras, publishedCameras, reviewCameras, corrections, photos, recentEvents, reviewers,
+    cameras, publishedCameras, reviewCameras, corrections, editRequests, photos, recentEvents, reviewers,
     actorId, setActorId,
     queueBadge, readableDate, readableAction, readableReason, readableStatus,
     decisionApi,

@@ -66,6 +66,10 @@ const DB_MODULES = [
   // from ./cameras and the shared public whitelist; db/cameras.ts imports
   // confirmationCountsFor from it, so the pair runs against the same binding.
   { source: "db/confirmations.ts", output: "db/confirmations.mjs" },
+  // db/camera-edits.ts (community editing, ADR 0018 §4) imports getD1 from
+  // ./cameras and recordModerationEvent from ./moderation — both already in
+  // this tree — so the real two-track logic runs against the same binding.
+  { source: "db/camera-edits.ts", output: "db/camera-edits.mjs" },
 ];
 
 let builtTreePromise = null;
@@ -122,7 +126,8 @@ export async function loadDbRuntime() {
   const photos = await import(pathToFileURL(path.join(tree, "db/photos.mjs")).href);
   const retention = await import(pathToFileURL(path.join(tree, "db/retention.mjs")).href);
   const confirmations = await import(pathToFileURL(path.join(tree, "db/confirmations.mjs")).href);
-  return { env: envModule.env, cameras, corrections, moderation, auth, users, appeals, photos, retention, confirmations };
+  const cameraEdits = await import(pathToFileURL(path.join(tree, "db/camera-edits.mjs")).href);
+  return { env: envModule.env, cameras, corrections, moderation, auth, users, appeals, photos, retention, confirmations, cameraEdits };
 }
 
 // Replays the real Drizzle migration files (drizzle/0000-*.sql ... 0017-*.sql)

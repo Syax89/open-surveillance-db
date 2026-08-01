@@ -11,6 +11,7 @@ import { LocaleToggle, useMessages } from "./LocaleProvider";
 import { SiteHeader } from "./SiteHeader";
 import { CameraQueueItem } from "./moderation/CameraQueueItem";
 import { CorrectionQueueItem } from "./moderation/CorrectionQueueItem";
+import { EditQueueItem } from "./moderation/EditQueueItem";
 import { HistorySection } from "./moderation/HistorySection";
 import { PhotoQueueItem } from "./moderation/PhotoQueueItem";
 import { QueueSection } from "./moderation/QueueSection";
@@ -77,6 +78,14 @@ export function ModerationDashboard() {
         emptyTitle={t.noCorrectionsTitle} emptyText={t.noCorrectionsText}
         itemKey={(correction) => correction.id}
         renderItem={(correction) => <CorrectionQueueItem correction={correction} queueBadge={q.queueBadge("correction", correction.id)} api={q.decisionApi} readableDate={q.readableDate} readableStatus={q.readableStatus} />}
+      />
+
+      <QueueSection
+        id="edit-requests-title" eyebrow={t.editing} title={t.editRequests} note={`${q.editRequests.length} ${t.pending}`}
+        listLabel={t.editRequests} loading={q.loading} items={q.editRequests}
+        emptyTitle={t.noEditRequestsTitle} emptyText={t.noEditRequestsText}
+        itemKey={(editRequest) => editRequest.id}
+        renderItem={(editRequest) => <EditQueueItem editRequest={editRequest} queueBadge={q.queueBadge("camera_edit", editRequest.id)} api={q.decisionApi} readableDate={q.readableDate} />}
       />
 
       <QueueSection

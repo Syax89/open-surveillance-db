@@ -70,7 +70,7 @@ const queueFixture = {
 
 const emptyQueue = {
   cameraReports: [], publishedCameras: [], reviewCameras: [], correctionRequests: [],
-  photoReports: [], recentEvents: [], reviewers: [], queueItems: [],
+  cameraEditRequests: [], photoReports: [], recentEvents: [], reviewers: [], queueItems: [],
 };
 
 test("moderation: renders the queue rows and accessible per-row action labels", async () => {
@@ -225,4 +225,87 @@ test("moderation: hide action available on a pending camera row", async () => {
     reasonCode: "private-or-sensitive-location",
     actorId: 2,
   });
+});
+
+test("moderation: camera_edit rows render the old/new diff and decide through camera_edit entity", async () => {
+  const { screen, waitFor } = rtl;
+  const user = rtl.userEvent.setup();
+  const patchRequests = [];
+  const editFixture = {
+    ...queueFixture,
+    cameraEditRequests: [
+      {
+        id: 12,
+        cameraId: 7,
+        contributorId: 9,
+        status: "pending",
+        createdAt: "2026-08-01T10:00:00.000Z",
+        proposedTitle: "Corrected shop name",
+        proposedKind: null,
+        proposedManufacturer: "Acme Cameras",
+        proposedAddress: null,
+        proposedNotes: null,
+        proposedObservedOn: null,
+        proposedDescription: "Renamed after a signage update",
+        currentTitle: "Fixture pending camera",
+        currentKind: "Fixed dome",
+        currentManufacturer: null,
+        currentAddress: null,
+        currentNotes: null,
+        currentObservedOn: null,
+        currentDescription: "",
+        cameraStatus: "verified",
+      },
+    ],
+    queueItems: [
+      ...queueFixture.queueItems,
+      { id: 9, entity: "camera_edit", entityId: 12, state: "queued", sensitivity: "standard" },
+    ],
+  };
+  installFetchMock((input, init) => {
+    if (input === "/api/moderation" && init?.method === "PATCH") {
+      patchRequests.push({ input, init });
+      return jsonResponse({}, { status: 200 });
+    }
+    if (input === "/api/moderation") return jsonResponse(editFixture);
+    return jsonResponse({ error: "unexpected route" }, { status: 404 });
+  });
+
+  await renderWithLocale(React.createElement(ModerationDashboard));
+  await waitFor(() => assert.ok(screen.queryByText("Edit request")));
+
+  // The diff card shows the record link, the proposed values and the
+  // old/new labels — only changed columns appear (unchanged stay hidden).
+  assert.ok(screen.getByText(/Edit request #12/));
+  assert.ok(screen.getByText(/Proposed: Corrected shop name/));
+  assert.ok(screen.getByText(/Proposed: Renamed after a signage update/));
+  assert.ok(screen.getByText(/Current: Fixture pending camera/));
+  assert.ok(screen.getByText(/Proposed: Corrected shop name/));
+  assert.ok(screen.getByText(/Proposed: Acme Cameras/));
+  // Unchanged columns (kind, address, notes, observedOn) are not listed.
+  assert.equal(screen.queryByText(/Proposed: Fixed dome/), null);
+
+  // The camera_edit row has its own accessible decision group and the
+  // approve/reject buttons are gated like every other row.
+  const editActions = screen.getByLabelText("Decision for camera_edit 12");
+  assert.ok(editActions);
+  const approve = editActions.querySelector('button[type="button"]');
+  assert.equal(approve.disabled, true, "approve stays disabled until reason + reviewer");
+
+  // Deciding dispatches entity camera_edit (approve applies the diff).
+  await user.selectOptions(screen.getByRole("combobox", { name: /^Acting reviewer/ }), "2");
+  await user.selectOptions(screen.getByLabelText("Required reason", { selector: "#camera_edit-12-reason" }), "verified-public-infrastructure");
+  assert.equal(approve.disabled, false);
+  await user.click(approve);
+
+  await waitFor(() => assert.equal(patchRequests.length, 1));
+  const body = JSON.parse(patchRequests[0].init.body);
+  assert.deepEqual(body, {
+    entity: "camera_edit",
+    id: 12,
+    action: "approve",
+    reasonCode: "verified-public-infrastructure",
+    actorId: 2,
+  });
+  await waitFor(() => assert.ok(screen.queryByText(/Edit request #12 Decision saved: Approve/)));
 });
