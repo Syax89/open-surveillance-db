@@ -44,7 +44,7 @@ for future page changes and for the QA pass over the routes.
   and the edit-flow backend are live on `main`; the routes below that are
   marked "planned" still wait for the frontend phases.
 - **C6 done** — frontend edit page `/records/[id]/edit` + owner edit links
-  (C6); **C5 pending** — frontend profile/verification widget.
+  (C6, PR #180); **C5 pending** — frontend profile/verification widget.
 
 ## Principles
 
