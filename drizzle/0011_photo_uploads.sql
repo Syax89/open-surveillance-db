@@ -13,6 +13,7 @@
 CREATE TABLE `photos` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`camera_id` integer,
+	`contributor_id` integer,
 	`storage_key` text NOT NULL,
 	`mime_type` text NOT NULL,
 	`width` integer NOT NULL,

@@ -413,7 +413,8 @@ test("POST /api/cameras links uploaded photo ids to the new report", async () =>
   const body = await responseBody(response);
   assert.equal(body.record.id, 14);
   assert.equal(body.linkedPhotos, 2);
-  assert.deepEqual(callArgs("linkPhotosToCamera")[0], [14, [101, 102]]);
+  // Anonymous submitter → contributorId null; anonymous photos stay linkable.
+  assert.deepEqual(callArgs("linkPhotosToCamera")[0], [14, [101, 102], null]);
 });
 
 test("POST /api/cameras rejects non-integer photo ids with 400", async () => {

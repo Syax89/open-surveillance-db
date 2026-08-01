@@ -82,6 +82,52 @@ test("POST /api/photos stores a sanitised photo and returns metadata only", asyn
   assert.equal(received.mimeType, "image/jpeg");
   assert.equal(received.width, 64);
   assert.equal(received.height, 48);
+  // No session cookie → anonymous upload, no contributor attribution.
+  assert.equal(received.contributorId, null);
+});
+
+test("POST /api/photos attributes an authenticated upload to its contributor", async () => {
+  stub("findSessionByToken", async () => ({
+    tokenHash: "x",
+    csrfToken: "csrf-token-123",
+    contributor: { id: 7, email: "linus@osdb.test", displayName: "Linus" },
+  }));
+  stub("createPendingPhoto", async () => photoFixture);
+  const { POST } = await photosRoute();
+  const response = await POST(
+    new Request("https://osdb.test/api/photos", {
+      method: "POST",
+      headers: {
+        "content-type": "image/jpeg",
+        cookie: "osdb_session=raw-session-token-abc123; osdb_csrf=csrf-token-123",
+        "x-csrf-token": "csrf-token-123",
+      },
+      body: jpegBytes(),
+    }),
+  );
+  assert.equal(response.status, 201);
+  assert.equal(callArgs("createPendingPhoto")[0][0].contributorId, 7);
+});
+
+test("POST /api/photos rejects an authenticated upload without a valid CSRF token", async () => {
+  stub("findSessionByToken", async () => ({
+    tokenHash: "x",
+    csrfToken: "csrf-token-123",
+    contributor: { id: 7, email: "linus@osdb.test", displayName: "Linus" },
+  }));
+  const { POST } = await photosRoute();
+  const response = await POST(
+    new Request("https://osdb.test/api/photos", {
+      method: "POST",
+      headers: {
+        "content-type": "image/jpeg",
+        cookie: "osdb_session=raw-session-token-abc123; osdb_csrf=csrf-token-123",
+      },
+      body: jpegBytes(),
+    }),
+  );
+  assert.equal(response.status, 403);
+  assert.equal(callArgs("createPendingPhoto").length, 0);
 });
 
 test("POST /api/photos rejects non-allowlisted MIME types with 415", async () => {

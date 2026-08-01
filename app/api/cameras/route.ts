@@ -159,10 +159,12 @@ export async function POST(request: Request) {
     const record = await createPendingCamera({ title, kind, address, notes, manufacturer: manufacturer || null, observedOn: observedOn || null, latitude, longitude, contributorId: auth?.contributor.id ?? null });
     // Link photo evidence after the report row exists. Linking is best-effort:
     // a photo that fails the pending/unlinked guard is simply left orphaned
-    // (it will never be public without moderation).
+    // (it will never be public without moderation). Photos attributed to a
+    // contributor (uploaded while signed in) can only be linked by that same
+    // contributor — the ownership guard lives in linkPhotosToCamera.
     let linkedPhotoCount = 0;
     try {
-      linkedPhotoCount = await linkPhotosToCamera(record.id, photoIds);
+      linkedPhotoCount = await linkPhotosToCamera(record.id, photoIds, auth?.contributor.id ?? null);
     } catch (error) {
       console.error("POST /api/cameras photo linking failed", error);
     }

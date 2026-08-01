@@ -263,6 +263,7 @@ export const photos = sqliteTable(
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
     cameraId: integer("camera_id"),
+    contributorId: integer("contributor_id"),
     storageKey: text("storage_key").notNull(),
     mimeType: text("mime_type").notNull(),
     width: integer("width").notNull(),

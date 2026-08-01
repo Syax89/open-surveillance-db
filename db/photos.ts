@@ -20,6 +20,7 @@ import type { ModerationEvent } from "./moderation";
 export type PhotoRecord = {
   id: number;
   cameraId: number | null;
+  contributorId: number | null;
   storageKey: string;
   mimeType: string;
   width: number;
@@ -43,7 +44,7 @@ export type PhotoModerationResult =
   | { kind: "redaction_required" };
 
 const photoColumns =
-  "id, camera_id AS cameraId, storage_key AS storageKey, mime_type AS mimeType, width, height, size_bytes AS sizeBytes, status, exif_stripped AS exifStripped, redaction_confirmed AS redactionConfirmed, created_at AS createdAt, updated_at AS updatedAt";
+  "id, camera_id AS cameraId, contributor_id AS contributorId, storage_key AS storageKey, mime_type AS mimeType, width, height, size_bytes AS sizeBytes, status, exif_stripped AS exifStripped, redaction_confirmed AS redactionConfirmed, created_at AS createdAt, updated_at AS updatedAt";
 
 function withoutStorageKey(photo: PhotoRecord): PendingPhotoReport {
   const { storageKey, ...publicPhoto } = photo;
@@ -76,6 +77,7 @@ export async function createPendingPhoto(input: {
   mimeType: string;
   width: number;
   height: number;
+  contributorId?: number | null;
 }): Promise<PendingPhotoReport> {
   if (!env.PHOTOS) throw new Error("Photo storage binding unavailable");
   const d1 = await getD1();
@@ -87,11 +89,12 @@ export async function createPendingPhoto(input: {
   const now = new Date().toISOString();
   const result = await d1
     .prepare(
-      `INSERT INTO photos (camera_id, storage_key, mime_type, width, height, size_bytes, status, exif_stripped, redaction_confirmed, created_at, updated_at)
-       VALUES (NULL, ?, ?, ?, ?, ?, 'pending', 1, 0, ?, ?)
+      `INSERT INTO photos (camera_id, contributor_id, storage_key, mime_type, width, height, size_bytes, status, exif_stripped, redaction_confirmed, created_at, updated_at)
+       VALUES (NULL, ?, ?, ?, ?, ?, ?, 'pending', 1, 0, ?, ?)
        RETURNING ${photoColumns}`,
     )
     .bind(
+      input.contributorId ?? null,
       storageKey,
       input.mimeType,
       input.width,
@@ -169,10 +172,20 @@ export async function listApprovedPhotosForCamera(cameraId: number): Promise<
   return result.results;
 }
 
-/** Link uploaded photos to a camera report at submission time. */
+/**
+ * Link uploaded photos to a camera report at submission time.
+ *
+ * Ownership guard (Ada review, PR #64): photos carry the contributor id
+ * recorded at upload; a photo attributed to a contributor may only be
+ * linked by that same contributor. Anonymous photos (`contributor_id IS
+ * NULL`) stay linkable by anyone — they carry no attribution, and the
+ * photo remains private and moderated regardless. An anonymous submitter
+ * (contributorId null) can only link anonymous photos.
+ */
 export async function linkPhotosToCamera(
   cameraId: number,
   photoIds: number[],
+  contributorId?: number | null,
 ): Promise<number> {
   if (photoIds.length === 0) return 0;
   const d1 = await getD1();
@@ -181,9 +194,10 @@ export async function linkPhotosToCamera(
   const result = await d1
     .prepare(
       `UPDATE photos SET camera_id = ?, updated_at = ?
-       WHERE id IN (${placeholders}) AND status = 'pending' AND camera_id IS NULL`,
+       WHERE id IN (${placeholders}) AND status = 'pending' AND camera_id IS NULL
+         AND (contributor_id IS NULL OR contributor_id = ?)`,
     )
-    .bind(cameraId, now, ...photoIds)
+    .bind(cameraId, now, ...photoIds, contributorId ?? null)
     .run() as { meta: { changes: number } };
   return result.meta.changes;
 }

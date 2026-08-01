@@ -15,6 +15,8 @@ import {
 import { PayloadTooLargeError, urlTooLong } from "../../lib/input-limits";
 import { recordRateLimitBlock } from "../../lib/abuse-alerts";
 import { callerKey, checkRateLimit, submissionLimits, submissionsDisabled } from "../../lib/rate-limit";
+import { csrfVerified, sameOrigin } from "../../lib/csrf";
+import { resolveOptionalContributor } from "../../lib/auth-session";
 
 /**
  * Photo intake (STATUS gap #3).
@@ -100,6 +102,15 @@ export async function POST(request: Request) {
   const declaredType = (request.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
 
   try {
+    // Optional contributor attribution (ADR 0013): uploads may be anonymous,
+    // but a request carrying a live session must pass the same-origin + CSRF
+    // checks before its photo is attributed (used by the link-time ownership
+    // guard in linkPhotosToCamera).
+    const auth = await resolveOptionalContributor(request);
+    if (auth && (!sameOrigin(request) || !csrfVerified(request, auth.session.csrfToken))) {
+      return photoError("Cross-site request rejected. Refresh the page and try again.", 403);
+    }
+
     // MIME allowlist: reject anything that is not a supported image type
     // before spending a byte on the body.
     if (!allowedMimeTypes.has(declaredType)) {
@@ -138,6 +149,7 @@ export async function POST(request: Request) {
       mimeType: PHOTO_MIME_TYPES[sniffed],
       width: dimensions.width,
       height: dimensions.height,
+      contributorId: auth?.contributor.id ?? null,
     });
     return Response.json({ photo }, { status: 201 });
   } catch (error) {
