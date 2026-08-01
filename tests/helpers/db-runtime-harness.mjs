@@ -43,6 +43,9 @@ const DB_MODULES = [
   // db/cameras.ts and db/freshness.ts import ../app/lib/public-status (pure,
   // shared public-status whitelist); mirror it into the temp tree as well.
   { source: "app/lib/public-status.ts", output: "app/lib/public-status.mjs" },
+  // db/appeals.ts imports ../app/lib/rate-limit (pure, no CF binding) for the
+  // per-appellant appeal threshold knobs; mirror it into the temp tree too.
+  { source: "app/lib/rate-limit.ts", output: "app/lib/rate-limit.mjs" },
   // db/auth.ts (contributor accounts and sessions, ADR 0013) imports getD1
   // from ./cameras; it runs against the same binding and in-memory D1.
   { source: "db/auth.ts", output: "db/auth.mjs" },

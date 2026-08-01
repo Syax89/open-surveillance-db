@@ -113,6 +113,17 @@ test("environment overrides tune the per-route limits", () => {
   assert.equal(rateLimit.submissionLimits({ POST_RATE_LIMIT_MAX: "4" }).maxRequests, 4);
   assert.equal(rateLimit.submissionsDisabled({ POST_SUBMISSIONS_DISABLED: "true" }), true);
   assert.equal(rateLimit.submissionsDisabled({}), false);
+  // The per-appellant appeal threshold (P3 appeal-ownership) defaults to
+  // 5 appeals / 24h and honours its own env knobs.
+  assert.deepEqual(rateLimit.appealAppellantLimits({}), { maxRequests: 5, windowSeconds: 86400 });
+  assert.deepEqual(
+    rateLimit.appealAppellantLimits({ APPEAL_APPELLANT_RATE_LIMIT_MAX: "2", APPEAL_APPELLANT_RATE_LIMIT_WINDOW_SECONDS: "3600" }),
+    { maxRequests: 2, windowSeconds: 3600 },
+  );
+  assert.deepEqual(
+    rateLimit.appealAppellantLimits({ APPEAL_APPELLANT_RATE_LIMIT_MAX: "-1", APPEAL_APPELLANT_RATE_LIMIT_WINDOW_SECONDS: "0" }),
+    { maxRequests: 5, windowSeconds: 86400 },
+  );
 });
 
 test("the caller key prefers the edge IP over forwarded hops", () => {

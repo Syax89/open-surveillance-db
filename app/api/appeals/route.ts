@@ -9,9 +9,20 @@ import { requireRole } from "../../lib/authz";
 import { isRecord } from "../../lib/guards";
 import { BodyReadError, readJsonBody, urlTooLong } from "../../lib/input-limits";
 import { recordRateLimitBlock } from "../../lib/abuse-alerts";
-import { callerKey, checkRateLimit, limitsFor } from "../../lib/rate-limit";
+import {
+  appealAppellantLimits,
+  callerKey,
+  checkRateLimit,
+  limitsFor,
+} from "../../lib/rate-limit";
 
 const appealReasonMaxLength = 1500;
+// Standing floor (P3 appeal-ownership audit): an appeal must state why the
+// appellant is affected (their submission, or direct knowledge of the
+// record). Short placeholders ("No", "Contesting") carry no relevance for
+// the senior moderator to evaluate, so they are rejected at the boundary.
+// DATA_TRUST.md "Corrections, removals, and appeals".
+const appealReasonMinLength = 20;
 
 function parseEntity(value: unknown): "camera" | "correction" | null {
   return value === "camera" || value === "correction" ? value : null;
@@ -37,7 +48,13 @@ function parseAppealRequest(value: unknown): {
   ) {
     return null;
   }
-  if (!reason || reason.length > appealReasonMaxLength) return null;
+  if (
+    !reason ||
+    reason.length < appealReasonMinLength ||
+    reason.length > appealReasonMaxLength
+  ) {
+    return null;
+  }
   return { entity, entityId, decisionEventId, reason };
 }
 
@@ -66,6 +83,12 @@ function appealLimit(request: Request) {
  * authenticated user with at least the `contributor` role; the appeal is
  * attributed to their user account and every step writes an append-only
  * audit event.
+ *
+ * Standing and abuse control: the reason must state why the appellant is
+ * affected (their submission or direct knowledge of the record); anonymous
+ * submissions have no attribution, so any contributor may appeal a decision
+ * on one. The per-IP bucket bounds bursts; fileAppeal enforces a
+ * per-appellant threshold on the queue (429 when exceeded).
  */
 export async function POST(request: Request) {
   if (urlTooLong(request)) {
@@ -83,7 +106,7 @@ export async function POST(request: Request) {
     if (!payload) {
       return Response.json(
         {
-          error: `Provide a valid entity, positive integer entityId, the decisionEventId being contested, and a reason of at most ${appealReasonMaxLength} characters.`,
+          error: `Provide a valid entity, positive integer entityId, the decisionEventId being contested, and a reason of ${appealReasonMinLength}-${appealReasonMaxLength} characters explaining why you are affected (your submission or direct knowledge of the record).`,
         },
         { status: 400 },
       );
@@ -114,6 +137,18 @@ export async function POST(request: Request) {
           { error: "This decision already has a pending appeal." },
           { status: 409 },
         );
+      case "appeal_limit_exceeded": {
+        const limit = appealAppellantLimits(env);
+        return Response.json(
+          {
+            error: `Too many appeals from this account in the last ${limit.windowSeconds} seconds. Please try again later.`,
+          },
+          {
+            status: 429,
+            headers: { "Retry-After": String(limit.windowSeconds) },
+          },
+        );
+      }
     }
   } catch (error) {
     if (error instanceof BodyReadError) {
