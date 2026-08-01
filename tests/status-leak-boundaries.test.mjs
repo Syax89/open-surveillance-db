@@ -309,8 +309,9 @@ test("the homepage filters through publicRecords and labels via the safe helper"
   const mapPanel = await readSource("app/components/home/MapPanel.tsx");
   const directory = await readSource("app/components/home/PublicDirectory.tsx");
   const homeUi = mapPanel + directory;
-  assert.match(page, /publicRecords\(/, "the homepage must filter records through the client whitelist");
-  assert.match(page, /setRecords\(publicRecords\(/, "API data must be filtered before entering state");
+  const hook = await readSource("app/lib/use-public-cameras.ts");
+  assert.match(page, /publicRecords\(/, "the homepage must filter its demo seed through the client whitelist");
+  assert.match(hook, /publicRecords\(data\.records\)/, "API data must be filtered before entering state (shared hook)");
   assert.doesNotMatch(
     homeUi,
     /\?\?\s*(?:camera|selectedCamera)\.status/,
@@ -321,10 +322,36 @@ test("the homepage filters through publicRecords and labels via the safe helper"
 
 test("the record page labels via the safe helper and never appends a raw status", async () => {
   const page = await readSource("app/records/[id]/page.tsx");
-  assert.match(page, /publicRecords\(/, "the record page must filter records through the client whitelist");
+  const hook = await readSource("app/lib/use-public-cameras.ts");
+  assert.match(page, /usePublicCameras\(/, "the record page must load records through the shared filtered hook");
+  assert.match(hook, /publicRecords\(/, "the shared hook must filter records through the client whitelist");
   assert.match(page, /publicStatusLabel\(statuses,\s*record\.status,\s*t\.statusFallback\)/, "record status must come from the safe helper");
   assert.doesNotMatch(page, /\$\{t\.statusFallback\}[^}]*record\.status/, "the record page must not append the raw status to the fallback");
   assert.doesNotMatch(page, /statuses\[record\.status\]\s*\?\?\s*record\.status/, "the record page must not render a raw status value");
+});
+
+test("the account page labels submission statuses from i18n with a neutral fallback", async () => {
+  const page = await readSource("app/account/page.tsx");
+  assert.doesNotMatch(
+    page,
+    /statusLabels\s*[:=]/,
+    "the hardcoded statusLabels record must not come back (bundle.status is the single source)",
+  );
+  assert.doesNotMatch(
+    page,
+    /statuses\[submission\.status[^\]]*\]\s*\?\?\s*submission\.status/,
+    "the account page must never fall back to a raw internal status value",
+  );
+  assert.match(
+    page,
+    /statuses\[submission\.status[^\]]*\]\s*\?\?\s*t\.submissionStatus/,
+    "unknown statuses must fall back to the neutral localized label",
+  );
+  assert.match(
+    page,
+    /status-dot\s+\$\{submission\.status\}/,
+    "the status dot class must derive from the submission status (repo convention)",
+  );
 });
 
 test("the map marker applies a status class only for whitelisted statuses", async () => {

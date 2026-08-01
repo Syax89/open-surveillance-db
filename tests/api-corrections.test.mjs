@@ -165,10 +165,11 @@ test("POST /api/corrections rejects a JSON null body with 400 (OSDB-QA-001)", as
   assert.equal(callArgs("createCorrectionRequest").length, 0);
 });
 
-test("POST /api/corrections maps malformed JSON to 500", async () => {
+test("POST /api/corrections maps malformed JSON to 400", async () => {
   const { POST } = await route();
   const response = await POST(apiRequest("/api/corrections", { method: "POST", body: "{oops" }));
-  assert.equal(response.status, 500);
+  assert.equal(response.status, 400);
+  assert.equal(callArgs("createCorrectionRequest").length, 0, "no db write for malformed JSON");
 });
 
 test("POST /api/corrections maps database failures to 500", async () => {

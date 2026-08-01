@@ -1,7 +1,7 @@
 # Lawful-basis assessment (outline)
 
 - **Status:** draft outline for pre-launch review (ADR 0002)
-- **Owner:** Rosa (DPO / privacy)
+- **Owner:** Rosa (Legal & Privacy Officer / privacy contact)
 - **Jurisdiction (primary):** European Union — GDPR (EU) 2016/679; Italy — D.Lgs. 196/2003 (Codice Privacy, as amended by D.Lgs. 101/2018)
 - **Documents this supports:** PRIVACY_NOTICE.md, PROCESSOR_REGISTER.md
 

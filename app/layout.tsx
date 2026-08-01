@@ -1,19 +1,8 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import { LocaleProvider } from "./components/LocaleProvider";
 import { SiteFooter } from "./components/SiteFooter";
 import { getServerLocale, getServerMessages } from "./lib/server-i18n";
 import "./globals.css";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 /**
  * Root metadata, localized from the locale cookie (ADR 0015).
@@ -66,9 +55,7 @@ export default async function RootLayout({
             on deployments where NEXT_PUBLIC_SITE_URL is unset. */}
         <link rel="icon" href="/favicon.svg" />
       </head>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+      <body className="antialiased">
         <LocaleProvider>
           {children}
           <SiteFooter />

@@ -1,7 +1,7 @@
 # Pre-launch legal deliverables — index
 
 - **Status:** all documents are **drafts** for pre-launch review; nothing here is a published commitment.
-- **Owner:** Rosa (DPO / privacy)
+- **Owner:** Rosa (Legal & Privacy Officer / privacy contact)
 - **Decisions applied (2026-07-31, CEO — recorded in ADR 0008, docs task t_0b3d47e2):** controller entity **Simone Rondina (syax89) / OpenSurveillanceDB (Italy)**; data licence **ODbL 1.0** (software stays as in the repository: AGPL-3.0-or-later in LICENSE + package.json — note: the CEO decision cited "MIT already present", which does not match the repository; confirmation requested, see task t_e4bfcfbc); publication precision **~4 decimal places (~10 m)** with exact detail private to moderators; retention **12 months with renewal**; correction/removal contact **`privacy@opensurveillancedb`** (mailbox to be created at launch) + private form.
 - **Location:** canonical folder for pre-launch legal deliverables: `docs/legal/` (per ADR 0002).
 - **Produced from:** review findings P1-P6, M1-M5 in [`REVIEW_POLICY_LEGALE_2026-07-31.md`](REVIEW_POLICY_LEGALE_2026-07-31.md) (committed to the repository with this index; task t_05d84417).
@@ -16,6 +16,7 @@
 | [PROCESSOR_REGISTER.md](PROCESSOR_REGISTER.md) | P5, M4 — Cloudflare (DPA v6.3 + SCC + EU residency + EU–US DPF; **Workers + D1 + R2 photo storage**), OpenAI auth (not a processor; never log emails), others | Draft | Rosa |
 | [BREACH_PROCEDURE.md](BREACH_PROCEDURE.md) | P2 — arts. 33/34, roles, triage, 72-h notification, data-subject notification, register | Draft | Rosa |
 | [MODERATION_SLA.md](MODERATION_SLA.md) | M1, M2, M3 — 24 h emergency hide, 48 h first response, 14-day decision, 30-day hide review, independent appeals | Draft | Rosa |
+| [DPO_EXCLUSION.md](DPO_EXCLUSION.md) | Gap 7, P6 — GDPR art. 37 assessment: art. 37(1) N/A (no public authority, no large-scale monitoring, no special-category processing), voluntary DPO declined (art. 37(4)), accountability via functional privacy/legal role (arts. 5(2), 24), review triggers | Draft | Rosa |
 | [decisions/0004-retention-and-review-cycle.md](../decisions/0004-retention-and-review-cycle.md) | ADR — retention values + enforcement | Proposed | Rosa |
 | [decisions/0005-processors-and-data-residency.md](../decisions/0005-processors-and-data-residency.md) | ADR — processor choice, SCC, EU residency, OpenAI role | Proposed | Rosa |
 | [REVIEW_TERMS_CODE_COHERENCE_2026-08-01.md](REVIEW_TERMS_CODE_COHERENCE_2026-08-01.md) | STATUS gap #4 — final coherence check: TERMS_OF_USE v0.2 / PRIVACY_NOTICE v0.3 vs. implemented practices (auth, upload, retention, correction) | Delivered (PR) | Rosa |

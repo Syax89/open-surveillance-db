@@ -674,6 +674,10 @@ export const en = {
     notFoundDetail:
       "It may have been removed, is not public, or the link is incorrect.",
     browseDirectory: "Browse the directory",
+    loadError: "Could not load the public record.",
+    loadErrorDetail:
+      "The record service is unreachable right now. Check your connection and try again.",
+    retryLoad: "Try again",
     statusFallback: "Status",
     changeHistory: "Change history",
     changeHistoryNote:

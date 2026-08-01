@@ -19,6 +19,23 @@ interface Env {
   MODERATION_USER?: string;
   MODERATION_PASSWORD?: string;
   MODERATION_TOKEN?: string;
+  /**
+   * Edge-set identity (ADR 0014): after the moderation gate succeeds, the
+   * worker injects this `users.email` as `x-osdb-user-email`. The local
+   * prototype sets it to the demo admin account (admin@osdb.test); a real
+   * deployment maps each gate credential to its own account. Fail-closed:
+   * when unset, gated requests pass through with NO identity, so the route
+   * layer rejects them (401).
+   */
+  MODERATION_IDENTITY_EMAIL?: string;
+  /**
+   * Pass through the ChatGPT-platform identity headers (`oai-*`) instead of
+   * stripping them. Only set in a real ChatGPT-plugin deployment, where the
+   * platform gateway (not arbitrary clients) sits in front of this worker.
+   * Default (unset/false): strip — the prototype and direct-Internet deploys
+   * must never trust a client-chosen identity (ADR 0014).
+   */
+  TRUST_PLATFORM_HEADERS?: string;
   /** Contributor auth (ADR 0013): session lifetime and cookie policy. */
   AUTH_SESSION_TTL_DAYS?: string;
   AUTH_COOKIE_SECURE?: string;
@@ -33,8 +50,9 @@ interface ExecutionContext {
 
 // Image security config. SVG sources with .svg extension auto-skip the
 // optimization endpoint on the client side (served directly, no proxy).
-// To route SVGs through the optimizer (with security headers), set
-// dangerouslyAllowSVG: true in next.config.js and uncomment below:
+// To route SVGs through the optimizer (with security headers), create a
+// next.config.ts with `images: { dangerouslyAllowSVG: true }` (vinext
+// reads that option at build time) and uncomment below:
 // const imageConfig: ImageConfig = { dangerouslyAllowSVG: true };
 
 // Moderation access control (see docs/decisions/0002-moderation-access-control.md):
@@ -45,6 +63,24 @@ interface ExecutionContext {
 // host can never expose the moderation queue by accident.
 const moderationPath = (pathname: string) =>
   pathname === "/moderation" || pathname === "/api/moderation" || pathname.startsWith("/api/moderation/");
+
+// Identity-gated paths (ADR 0014): the appeals API carries moderator-grade
+// write access and is protected by the same edge gate as the moderation
+// queue, so a direct client can never reach it without a real credential.
+const identityPath = (pathname: string) =>
+  pathname === "/api/appeals" || pathname.startsWith("/api/appeals/");
+
+const gatedPath = (pathname: string) => moderationPath(pathname) || identityPath(pathname);
+
+// Identity headers (ADR 0014). The prototype header `x-osdb-user-email` and
+// the ChatGPT-plugin headers (`oai-*`) are trusted ONLY when set by this
+// edge after a real gate — never when supplied by the caller. The worker is
+// the single identity authority: it strips client-supplied values on every
+// path and re-injects the server-chosen identity where a gate succeeded.
+const PROTOTYPE_IDENTITY_HEADER = "x-osdb-user-email";
+const PLATFORM_IDENTITY_HEADER = "oai-authenticated-user-email";
+const PLATFORM_FULL_NAME_HEADER = "oai-authenticated-user-full-name";
+const PLATFORM_FULL_NAME_ENCODING_HEADER = "oai-authenticated-user-full-name-encoding";
 
 function safeEqual(expected: string, actual: string) {
   if (expected.length !== actual.length) return false;
@@ -153,19 +189,58 @@ function withSecurityHeaders(response: Response): Response {
   });
 }
 
+/**
+ * Remove every client-supplied identity header from the request (ADR 0014).
+ * The caller can never choose their own role: `x-osdb-user-email` is always
+ * dropped, and the ChatGPT-platform headers (`oai-*`) are dropped too unless
+ * the deployment explicitly trusts the platform gateway
+ * (`TRUST_PLATFORM_HEADERS=true`, ChatGPT-plugin public-alpha only).
+ */
+function stripIdentityHeaders(request: Request, env: Env): Request {
+  const headers = new Headers(request.headers);
+  headers.delete(PROTOTYPE_IDENTITY_HEADER);
+  const trustPlatform =
+    env.TRUST_PLATFORM_HEADERS === "1" || env.TRUST_PLATFORM_HEADERS === "true";
+  if (!trustPlatform) {
+    headers.delete(PLATFORM_IDENTITY_HEADER);
+    headers.delete(PLATFORM_FULL_NAME_HEADER);
+    headers.delete(PLATFORM_FULL_NAME_ENCODING_HEADER);
+  }
+  return new Request(request, { headers });
+}
+
+/**
+ * After the moderation gate succeeds, set the server-chosen identity
+ * (`MODERATION_IDENTITY_EMAIL`) as `x-osdb-user-email`. Fail-closed: without
+ * a configured identity the request passes through anonymous and the route
+ * layer rejects it (401), so a misconfigured host can never accidentally
+ * grant a role.
+ */
+function injectIdentityAfterGate(request: Request, env: Env): Request {
+  if (!env.MODERATION_IDENTITY_EMAIL) return request;
+  const headers = new Headers(request.headers);
+  headers.set(PROTOTYPE_IDENTITY_HEADER, env.MODERATION_IDENTITY_EMAIL);
+  return new Request(request, { headers });
+}
+
 const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
-    if (moderationPath(url.pathname)) {
-      const gate = requireModerationAuth(request, env);
+    // 1. Identity sanitisation runs on EVERY path before any gate: the edge
+    //    is the single identity authority and never trusts the caller.
+    let gated = stripIdentityHeaders(request, env);
+
+    if (gatedPath(url.pathname)) {
+      const gate = requireModerationAuth(gated, env);
       if (gate) return withSecurityHeaders(gate);
+      gated = injectIdentityAfterGate(gated, env);
     }
 
     if (url.pathname === "/_vinext/image") {
       const allowedWidths = [...DEFAULT_DEVICE_SIZES, ...DEFAULT_IMAGE_SIZES];
-      const optimized = await handleImageOptimization(request, {
-        fetchAsset: (path) => env.ASSETS.fetch(new Request(new URL(path, request.url))),
+      const optimized = await handleImageOptimization(gated, {
+        fetchAsset: (path) => env.ASSETS.fetch(new Request(new URL(path, gated.url))),
         transformImage: async (body, { width, format, quality }) => {
           const result = await env.IMAGES.input(body).transform(width > 0 ? { width } : {}).output({ format, quality });
           return result.response();
@@ -174,7 +249,7 @@ const worker = {
       return withSecurityHeaders(optimized);
     }
 
-    return withSecurityHeaders(await handler.fetch(request, env, ctx));
+    return withSecurityHeaders(await handler.fetch(gated, env, ctx));
   },
 };
 

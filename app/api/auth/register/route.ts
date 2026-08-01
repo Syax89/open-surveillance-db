@@ -15,7 +15,7 @@ import {
 } from "../../../lib/auth-route-helpers";
 import { sameOrigin } from "../../../lib/csrf";
 import { isRecord } from "../../../lib/guards";
-import { PayloadTooLargeError, readJsonBody, urlTooLong } from "../../../lib/input-limits";
+import { BodyReadError, readJsonBody, urlTooLong } from "../../../lib/input-limits";
 
 /**
  * POST /api/auth/register — create a contributor account and open a session.
@@ -87,8 +87,8 @@ export async function POST(request: Request) {
       { status: 201, headers: cookieHeaderInit(sessionCookieHeaders(rawToken, csrfToken, env)) },
     );
   } catch (error) {
-    if (error instanceof PayloadTooLargeError) {
-      console.warn("POST /api/auth/register payload rejected: body over the configured byte cap");
+    if (error instanceof BodyReadError) {
+      console.warn("POST /api/auth/register payload rejected: body too large or not valid JSON");
       return Response.json({ error: error.message }, { status: error.status });
     }
     console.error("POST /api/auth/register failed", error);

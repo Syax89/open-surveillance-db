@@ -29,15 +29,6 @@ function readCsrfToken(): string | null {
   return match ? decodeURIComponent(match.slice("osdb_csrf=".length)) : null;
 }
 
-const statusLabels: Record<string, string> = {
-  pending: "pending",
-  verified: "verified",
-  needs_review: "needs_review",
-  rejected: "rejected",
-  removed: "removed",
-  hidden: "hidden",
-};
-
 export default function AccountPage() {
   const bundle = useMessages();
   const t = bundle.auth;
@@ -199,8 +190,8 @@ export default function AccountPage() {
                   {submissions.map((submission) => (
                     <li key={submission.id}>
                       <Link href={`/records/${submission.id}`}>{submission.title}</Link>
-                      <span className={`status-dot ${statusLabels[submission.status] ?? ""}`} aria-hidden="true" />
-                      <span>{statuses[submission.status as keyof typeof statuses] ?? submission.status}</span>
+                      <span className={`status-dot ${submission.status}`} aria-hidden="true" />
+                      <span>{statuses[submission.status as keyof typeof statuses] ?? t.submissionStatus}</span>
                     </li>
                   ))}
                 </ul>
