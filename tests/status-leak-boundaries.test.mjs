@@ -330,6 +330,30 @@ test("the record page labels via the safe helper and never appends a raw status"
   assert.doesNotMatch(page, /statuses\[record\.status\]\s*\?\?\s*record\.status/, "the record page must not render a raw status value");
 });
 
+test("the account page labels submission statuses from i18n with a neutral fallback", async () => {
+  const page = await readSource("app/account/page.tsx");
+  assert.doesNotMatch(
+    page,
+    /statusLabels\s*[:=]/,
+    "the hardcoded statusLabels record must not come back (bundle.status is the single source)",
+  );
+  assert.doesNotMatch(
+    page,
+    /statuses\[submission\.status[^\]]*\]\s*\?\?\s*submission\.status/,
+    "the account page must never fall back to a raw internal status value",
+  );
+  assert.match(
+    page,
+    /statuses\[submission\.status[^\]]*\]\s*\?\?\s*t\.submissionStatus/,
+    "unknown statuses must fall back to the neutral localized label",
+  );
+  assert.match(
+    page,
+    /status-dot\s+\$\{submission\.status\}/,
+    "the status dot class must derive from the submission status (repo convention)",
+  );
+});
+
 test("the map marker applies a status class only for whitelisted statuses", async () => {
   const map = await readSource("app/components/SurveillanceMap.tsx");
   assert.match(map, /import\s*\{[^}]*\bisPublicStatus\b[^}]*\}\s*from\s*["'][^"']*lib\/public-status["']/);
