@@ -58,6 +58,11 @@ test("GET /api/cameras?format=geojson emits lon/lat FeatureCollection with expor
   );
   const body = await responseBody(response);
   assert.equal(body.type, "FeatureCollection");
+  // ODbL 1.0 attribution (TERMS § 7.1): the FeatureCollection must carry the
+  // licence id and the attribution notice as top-level members.
+  assert.equal(body.license, "ODbL-1.0");
+  assert.match(body.attribution, /© OpenSurveillanceDB contributors — ODbL 1\.0/);
+  assert.match(body.attribution, /opendatacommons\.org\/licenses\/odbl\/1\.0\//);
   assert.equal(body.features.length, 1);
   const feature = body.features[0];
   assert.equal(feature.type, "Feature");
@@ -95,6 +100,13 @@ test("GET /api/cameras?format=csv escapes quotes and neutralises spreadsheet for
     csv,
     /"1","'=SUM\(A1:A2\)","Fixed dome","'-leading","2026-01-01","verified","Community report","2026-01-01T00:00:00\.000Z","He said ""hi"", ok","","41\.9004","12\.4936"\n/,
     "formula injection must be neutralised with a leading apostrophe, quotes doubled, nulls empty",
+  );
+  // ODbL 1.0 attribution (TERMS § 7.1): the CSV export must end with the
+  // licence notice as a comment line, keeping the header row parseable.
+  assert.match(
+    csv,
+    /# © OpenSurveillanceDB contributors — ODbL 1\.0 \(https:\/\/opendatacommons\.org\/licenses\/odbl\/1\.0\/\); attribution e share-alike richiesti per database derivati\n$/,
+    "the CSV export must carry the ODbL notice footer",
   );
 });
 
