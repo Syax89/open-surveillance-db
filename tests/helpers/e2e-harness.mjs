@@ -74,6 +74,9 @@ const REAL_DB_MODULES = [
   { source: "db/users.ts", output: "db/users.mjs" },
   { source: "db/appeals.ts", output: "db/appeals.mjs" },
   { source: "db/photos.ts", output: "db/photos.mjs" },
+  // db/retention.ts (ADR 0008 scheduled sweep) is imported by the worker
+  // edge gate; compile it into the tree so the worker module resolves.
+  { source: "db/retention.ts", output: "db/retention.mjs" },
 ];
 
 let builtTreePromise = null;
@@ -184,6 +187,11 @@ async function buildTree() {
     );
     const compiled = transpile(path.join(root, "worker", "index.ts"));
     const rewritten = compiled
+      // The worker sits at tree root (worker.mjs), so its ../db/retention
+      // import (db/retention.ts → db/retention.mjs inside the tree) must be
+      // rebased to the in-tree path; the vinext and workers imports are
+      // stubbed as before.
+      .replace(/from\s*["']\.\.\/db\/retention["']/g, `from "${pathToFileURL(path.join(tree, "db", "retention.mjs")).href}"`)
       .replace(/from\s*["']vinext\/server\/image-optimization["']/g, `from "${imageStubUrl}"`)
       .replace(/from\s*["']vinext\/server\/app-router-entry["']/g, `from "${routerStubUrl}"`)
       .replace(/from\s*["']cloudflare:workers["']/g, `from "${workersMockUrl}"`);

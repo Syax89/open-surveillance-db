@@ -51,6 +51,14 @@ export const correctionRequests = sqliteTable(
     contact: text("contact"),
     status: text("status").notNull().default("pending"),
     outcome: text("outcome"),
+    // Resolution timestamp (migration 0018): set when a moderator reaches a
+    // terminal state (approve -> reviewed, reject -> rejected). R4 anchors
+    // the 2-year retention floor on this date ("Resolution date",
+    // RETENTION_SCHEDULE.md R4), NOT on created_at — created_at would purge
+    // resolved requests before the legal floor. NULL while the request is
+    // still pending; legacy rows resolved before the column existed are
+    // backfilled by migration 0018 from their moderation decision event.
+    resolvedAt: text("resolved_at"),
     createdAt: text("created_at").notNull(),
   },
   (table) => [index("correction_requests_status_idx").on(table.status)],
@@ -282,6 +290,14 @@ export const moderationEvents = sqliteTable(
     // (entity, entity_id); without it every read is a full scan of the
     // append-only audit trail. Migration 0012.
     index("moderation_events_entity_idx").on(table.entity, table.entityId),
+    // Retention-sweep decision-date index (migration 0018): runRetentionSweep
+    // resolves the R2/R6/R4 "decision date" with
+    //   WHERE entity = ? AND action = ? GROUP BY entity_id
+    // over the append-only trail; (entity, action, entity_id) turns that
+    // filter into an index seek and covers the GROUP BY key without a sort.
+    // Declared here so drizzle-kit generate never re-emits it (convention
+    // 0012/0014: hand-written migration + schema declaration together).
+    index("moderation_events_entity_action_idx").on(table.entity, table.action, table.entityId),
   ],
 );
 

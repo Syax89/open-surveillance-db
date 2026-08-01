@@ -2,6 +2,7 @@
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
 import type { D1Database, Fetcher, R2Bucket } from "cloudflare:workers";
+import { DEFAULT_RETENTION_POLICY, runRetentionSweep, type RetentionSummary } from "../db/retention";
 
 interface Env {
   ASSETS: Fetcher;
@@ -46,6 +47,12 @@ interface Env {
 interface ExecutionContext {
   waitUntil(promise: Promise<unknown>): void;
   passThroughOnException(): void;
+}
+
+/** Cloudflare ScheduledController surface used by the cron handler. */
+interface ScheduledController {
+  readonly cron: string;
+  readonly scheduledTime: Date;
 }
 
 // Image security config. SVG sources with .svg extension auto-skip the
@@ -250,6 +257,26 @@ const worker = {
     }
 
     return withSecurityHeaders(await handler.fetch(gated, env, ctx));
+  },
+
+  /**
+   * Scheduled retention sweep (ADR 0004 §3, ADR 0008 p.3 — cron binding in
+   * wrangler.jsonc, daily at 03:00 UTC). Runs the retention job from
+   * db/retention.ts against the D1 + PHOTOS bindings. The sweep must never
+   * break the request path: it runs inside waitUntil and any failure is
+   * caught and logged so the worker stays healthy (the next run retries).
+   */
+  async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    const policy = DEFAULT_RETENTION_POLICY;
+    ctx.waitUntil(
+      runRetentionSweep(new Date().toISOString(), { policy, r2: env.PHOTOS })
+        .then((summary: RetentionSummary) => {
+          console.log(`Retention sweep ok (${controller.cron}):`, JSON.stringify(summary));
+        })
+        .catch((error) => {
+          console.error("Retention sweep failed:", error);
+        }),
+    );
   },
 };
 

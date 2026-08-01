@@ -861,6 +861,7 @@ export async function moderateCorrection(
   context?: ModerationContext,
 ): Promise<ModerationResult<PendingCorrectionRequest>> {
   const d1 = await getModerationD1();
+  const now = new Date().toISOString();
   const outcome = options?.outcome;
   const cameraId = options?.cameraId;
   if (action === "associate" && cameraId === undefined) return { kind: "not_found" };
@@ -996,6 +997,12 @@ export async function moderateCorrection(
   if (action !== "associate") {
     sets.push("status = ?");
     binds.push(status);
+    // R4 anchor (migration 0018): the 2-year retention floor for a resolved
+    // request starts at the resolution date, not created_at — see
+    // RETENTION_SCHEDULE.md R4. Set it on the same transition that leaves the
+    // pending state, so the audit log (decision event) and the column agree.
+    sets.push("resolved_at = ?");
+    binds.push(now);
   }
   if (cameraId !== undefined) {
     sets.push("camera_id = ?");

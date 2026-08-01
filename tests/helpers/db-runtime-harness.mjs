@@ -57,6 +57,11 @@ const DB_MODULES = [
   // db/appeals imports ./moderation + ./users; db/users imports ./cameras.
   { source: "db/users.ts", output: "db/users.mjs" },
   { source: "db/appeals.ts", output: "db/appeals.mjs" },
+  // db/retention.ts (scheduled retention sweep, ADR 0004/0008) imports
+  // getD1 from ./cameras and runFreshnessSweep from ./moderation — both
+  // already in this tree — and exercises destructive R1-R7 work against the
+  // same binding.
+  { source: "db/retention.ts", output: "db/retention.mjs" },
 ];
 
 let builtTreePromise = null;
@@ -111,7 +116,8 @@ export async function loadDbRuntime() {
   const users = await import(pathToFileURL(path.join(tree, "db/users.mjs")).href);
   const appeals = await import(pathToFileURL(path.join(tree, "db/appeals.mjs")).href);
   const photos = await import(pathToFileURL(path.join(tree, "db/photos.mjs")).href);
-  return { env: envModule.env, cameras, corrections, moderation, auth, users, appeals, photos };
+  const retention = await import(pathToFileURL(path.join(tree, "db/retention.mjs")).href);
+  return { env: envModule.env, cameras, corrections, moderation, auth, users, appeals, photos, retention };
 }
 
 // Replays the real Drizzle migration files (drizzle/0000-*.sql ... 0017-*.sql)
