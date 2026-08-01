@@ -24,11 +24,11 @@
     "coverage:docs": "bash -c 'npx c8 report --temp-directory=.coverage/raw --report-dir=.coverage/report --reporter=json --reporter=text-summary > .coverage/c8-summary.txt && node scripts/coverage-docs.mjs --check'",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next --ignore-pattern .coverage --ignore-pattern .worktrees",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "wrangler d1 migrations apply opensurveillancedb --local",
+    "db:migrate": "wrangler d1 migrations apply osdb-production --local",
     "db:smoke": "node scripts/db-migration-smoke.mjs",
     "db:reset": "node scripts/db-reset.mjs",
     "db:provision": "node scripts/provision-alpha-accounts.mjs",
-    "db:seed": "wrangler d1 execute opensurveillancedb --local --file=scripts/demo-cameras.sql --yes"
+    "db:seed": "wrangler d1 execute osdb-production --local --file=scripts/demo-cameras.sql --yes"
   },
   "dependencies": {
     "drizzle-orm": "0.45.2",

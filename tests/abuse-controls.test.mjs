@@ -49,8 +49,11 @@ async function captureErrors(fn) {
   return messages;
 }
 
-// Give the fire-and-forget alert delivery a chance to complete.
-const flushAlerts = () => new Promise((resolve) => setTimeout(resolve, 20));
+// Give the fire-and-forget alert delivery a chance to complete. Deterministic:
+// awaits every in-flight delivery instead of an arbitrary sleep, so alert-count
+// assertions cannot race with SHA-256 hashing + console.error on a loaded CI
+// runner.
+const flushAlerts = () => abuseAlerts.flushAbuseAlertDeliveries();
 
 // ---------------------------------------------------------------------------
 // rate-limit.ts

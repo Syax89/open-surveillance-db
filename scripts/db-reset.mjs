@@ -44,7 +44,7 @@ if (!existsSync(stateDir)) {
 }
 
 console.log("Applying Drizzle migrations to a fresh local database…");
-runWrangler(["d1", "migrations", "apply", "opensurveillancedb", "--local"]);
+runWrangler(["d1", "migrations", "apply", "osdb-production", "--local"]);
 
 console.log("\nReset complete. The local database is empty.");
 console.log("Optional: run `npm run db:seed` to add the two labelled demo pins.");

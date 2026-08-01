@@ -41,6 +41,12 @@ const surgeCounters = new Map<string, number[]>();
 const lastAlertAt = new Map<string, number>();
 const lastSurgeAt = new Map<string, number>();
 
+// In-flight fire-and-forget deliveries. Kept so tests can flush deterministically
+// instead of sleeping on an arbitrary timeout (the delivery is async: SHA-256
+// hashing + console.error/webhook, which can exceed a fixed sleep on a loaded CI
+// runner and make alert-count assertions flaky).
+const pendingDeliveries = new Set<Promise<void>>();
+
 const MAX_TRACKED_KEYS = 10_000;
 
 function envNumber(env: unknown, key: string, fallback: number): number {
@@ -107,32 +113,32 @@ export function recordAbuseEvent(env: unknown, input: AbuseEventInput): void {
 
   if (recent.length >= threshold && now - (lastAlertAt.get(counterKey) ?? 0) > cooldownMs) {
     lastAlertAt.set(counterKey, now);
-    void deliverAbuseAlert(env, input.key, {
-      source: "open-surveillance-db",
-      event: input.event,
-      route: input.route,
-      count: recent.length,
-      windowSeconds: input.windowSeconds,
-      detail: input.detail ?? `${recent.length} ${eventLabel} event(s) from one caller in ${input.windowSeconds}s`,
-      at: new Date(now).toISOString(),
-    }).catch((error) => {
-      console.error("[abuse-alert] delivery failed", error);
-    });
+    trackDelivery(
+      deliverAbuseAlert(env, input.key, {
+        source: "open-surveillance-db",
+        event: input.event,
+        route: input.route,
+        count: recent.length,
+        windowSeconds: input.windowSeconds,
+        detail: input.detail ?? `${recent.length} ${eventLabel} event(s) from one caller in ${input.windowSeconds}s`,
+        at: new Date(now).toISOString(),
+      }),
+    );
   }
 
   if (surge.length >= surgeThreshold && now - (lastSurgeAt.get(input.route) ?? 0) > cooldownMs) {
     lastSurgeAt.set(input.route, now);
-    void deliverAbuseAlert(env, "aggregate", {
-      source: "open-surveillance-db",
-      event: input.event,
-      route: input.route,
-      count: surge.length,
-      windowSeconds: input.windowSeconds,
-      detail: `${surge.length} ${eventLabel} event(s) on ${input.route} in ${input.windowSeconds}s across all callers`,
-      at: new Date(now).toISOString(),
-    }).catch((error) => {
-      console.error("[abuse-alert] delivery failed", error);
-    });
+    trackDelivery(
+      deliverAbuseAlert(env, "aggregate", {
+        source: "open-surveillance-db",
+        event: input.event,
+        route: input.route,
+        count: surge.length,
+        windowSeconds: input.windowSeconds,
+        detail: `${surge.length} ${eventLabel} event(s) on ${input.route} in ${input.windowSeconds}s across all callers`,
+        at: new Date(now).toISOString(),
+      }),
+    );
   }
 }
 
@@ -142,6 +148,27 @@ export function recordRateLimitBlock(
   input: Omit<AbuseEventInput, "event">,
 ): void {
   recordAbuseEvent(env, { ...input, event: "rate_limited" });
+}
+
+/**
+ * Track a fire-and-forget delivery so `flushAbuseAlertDeliveries` can await it.
+ * Delivery errors are logged and swallowed (the alert path must never fail the
+ * request), exactly as before.
+ */
+function trackDelivery(delivery: Promise<void>): void {
+  pendingDeliveries.add(delivery);
+  delivery
+    .catch((error) => {
+      console.error("[abuse-alert] delivery failed", error);
+    })
+    .finally(() => pendingDeliveries.delete(delivery));
+}
+
+/** Test/observability hook: resolve once every in-flight delivery settled. */
+export async function flushAbuseAlertDeliveries(): Promise<void> {
+  while (pendingDeliveries.size > 0) {
+    await Promise.allSettled([...pendingDeliveries]);
+  }
 }
 
 /**

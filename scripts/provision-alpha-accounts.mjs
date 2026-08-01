@@ -36,7 +36,7 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const wranglerBin = path.join(root, "node_modules", "wrangler", "bin", "wrangler.js");
-const dbName = "opensurveillancedb";
+const dbName = "osdb-production";
 
 const USER_ROLES = new Set(["contributor", "moderator", "admin"]);
 // Granular DATA_TRUST reviewer roles (mirror of db/moderation.ts reviewerRoles).
