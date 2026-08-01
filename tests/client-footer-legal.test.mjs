@@ -153,11 +153,11 @@ test("footer: contentinfo landmark with localized aria-label and labelled nav", 
   assert.equal(nav.getAttribute("aria-label"), "Institutional pages");
 
   const links = collectLinks(footer);
-  // brand + 8 institutional links + 2 external licence/attribution links
-  assert.equal(links.length, 11);
+  // brand + 9 institutional links + 2 external licence/attribution links
+  assert.equal(links.length, 12);
   const internal = links.filter((l) => l.href.startsWith("/"));
-  assert.equal(internal.length, 9);
-  for (const expected of ["/manifesto", "/regole", "/guide", "/privacy", "/termini", "/licenze", "/faq", "/contatti"]) {
+  assert.equal(internal.length, 10);
+  for (const expected of ["/manifesto", "/regole", "/guide", "/privacy", "/termini", "/licenze", "/accessibility", "/faq", "/contatti"]) {
     assert.ok(
       internal.some((l) => l.href === expected),
       `expected internal link ${expected} in footer`,

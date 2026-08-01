@@ -40,7 +40,7 @@ const PAGES = [
 // verificare che ogni href relativo in nav/footer punti a qualcosa di reale.
 const KNOWN_ROUTES = new Set([
   "/", "/guide", "/login", "/register", "/account", "/moderation",
-  "/manifesto", "/regole", "/faq", "/contatti", "/privacy", "/termini", "/licenze",
+  "/manifesto", "/regole", "/faq", "/contatti", "/privacy", "/termini", "/licenze", "/accessibility",
   "/api/cameras", "/api/cameras?format=geojson", "/api/cameras?format=csv",
   "/api/cameras/nearby", "/api/cameras/search", "/api/cameras/revisions",
   "/api/tiles", "/api/auth/me", "/api/auth/me/submissions", "/api/auth/logout",
@@ -257,7 +257,7 @@ for (const page of PAGES) {
     // Link: ogni href relativo/assoluto interno deve puntare a una route nota
     // o essere un'ancora / un file statico servito da /.
     for (const href of extractHrefs(html)) {
-      if (href.startsWith("http") || href.startsWith("#") || href === "/favicon.svg" || href === "/og.png") continue;
+      if (href.startsWith("http") || href.startsWith("mailto:") || href.startsWith("#") || href === "/favicon.svg" || href === "/og.png") continue;
       if (href.startsWith("/records/")) continue; // route dinamica parametrica
       const pathOnly = href.split("?")[0];
       const withQuery = href.split("#")[0];

@@ -170,6 +170,7 @@ test("global footer exposes every institutional page, the ODbL data licence and 
     "/privacy",
     "/termini",
     "/licenze",
+    "/accessibility",
     "/faq",
     "/contatti",
   ];
@@ -214,6 +215,19 @@ test("homepage collection points link to the privacy notice and terms (GDPR art.
   const termsLinks = (html.match(/href="\/termini"/g) ?? []).length;
   assert.ok(privacyLinks >= 4, `expected >= 4 /privacy links on the homepage, found ${privacyLinks}`);
   assert.ok(termsLinks >= 3, `expected >= 3 /termini links on the homepage, found ${termsLinks}`);
+});
+
+test("homepage SSR without photos never renders the photo-redaction confirmation (G3 negative)", async () => {
+  // G3 (legal): the redaction confirmation checkbox is CONDITIONAL on
+  // photos.length > 0. The server-rendered homepage has no photos attached,
+  // so the checkbox and its attestation text must not appear — a report
+  // without photos must never be blocked by it. The positive case (checkbox
+  // present with photos) is covered by tests/client-report-legal.test.mjs.
+  const { response, html } = await renderHomepage();
+
+  assert.equal(response.status, 200);
+  assert.doesNotMatch(html, /I confirm that I have redacted/);
+  assert.doesNotMatch(html, /check-redaction/);
 });
 
 test("register page links to the privacy notice and terms next to the submit button", async () => {

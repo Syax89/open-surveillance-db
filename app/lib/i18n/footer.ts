@@ -20,6 +20,7 @@ export const en = {
   licenses: "Licenses",
   faq: "FAQ",
   contact: "Contact",
+  accessibility: "Accessibility statement",
   dataLicense: "Database and exports licensed under ODbL 1.0",
   osmAttribution: "Map data © OpenStreetMap contributors",
 } as const;
@@ -37,6 +38,7 @@ export const it: Translation<typeof en> = {
   licenses: "Licenze",
   faq: "FAQ",
   contact: "Contatti",
+  accessibility: "Dichiarazione di accessibilità",
   dataLicense: "Database ed esportazioni concessi in licenza ODbL 1.0",
   osmAttribution: "Dati cartografici © OpenStreetMap contributors",
 };

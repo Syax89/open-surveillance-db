@@ -116,6 +116,10 @@ button { cursor:pointer; }
 .report-form textarea { resize:vertical; }
 .report-form .check-label { grid-template-columns:17px 1fr; align-items:start; gap:9px; font-size:12px; line-height:1.4; font-weight:400; }
 .check-label input { width:15px; height:15px; margin-top:1px; }
+.legal-microcopy { margin:2px 0 0; color:#5c6c75; font-size:12px; line-height:1.5; }
+.legal-microcopy a { color:#0a705d; font-weight:700; text-decoration:underline; text-underline-offset:3px; }
+.check-redaction { display:grid; margin-top:14px; }
+.check-redaction input { width:15px; height:15px; margin-top:1px; }
 .coordinate-readout { margin-top:18px; padding:13px 15px; border-radius:7px; background:#e3eee4; color:#4c6660; font-size:12px; line-height:1.5; }
 .coordinate-readout b { color:#194d40; }
 .coordinate-entry { display:grid; gap:12px; margin:0; padding:16px; border:1px solid #cbd8ce; border-radius:8px; background:#f1f6f0; }

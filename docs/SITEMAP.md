@@ -74,6 +74,7 @@ the reference for future page changes and for the QA pass over the routes.
 | `/privacy`     | Privacy               | Public privacy notice                               | — | ✓ | implemented (PR #70) |
 | `/termini`     | Terms of use          | Public terms of use                                 | — | ✓ | implemented (PR #70) |
 | `/licenze`     | Licences              | Data and software licences, OSM attribution         | — | ✓ | implemented (PR #70) |
+| `/accessibility` | Accessibility statement | WCAG 2.2 AA commitment, compliance status, barrier reporting | — | ✓ | implemented (F-legal t_2bef9ebb) |
 | `/faq`         | FAQ                   | Frequent questions                                  | — | ✓ | implemented (PR #68) |
 | `/contatti`    | Contacts              | Who we are, owners, correction/removal contact      | — | ✓ | implemented (PR #68) |
 
@@ -164,6 +165,16 @@ Routes **not** linked in nav/footer (private or functional): `/moderation`
   notice.
 - **Nav/footer:** footer only.
 
+### `/accessibility` — Accessibility statement (implemented, F-legal t_2bef9ebb)
+
+- **Purpose:** the public accessibility statement: commitment (WCAG 2.2 AA),
+  compliance status, what is already implemented, known limitations, and how
+  to report a barrier (D.Lgs. 106/2018 good practice).
+- **Content:** `legalMessages[locale].accessibility` from `app/lib/legal/en.ts`
+  / `it.ts` (structured sections rendered by `LegalPage`), adapted from
+  `docs/ACCESSIBILITY_STATEMENT.md` — the repository copy stays canonical.
+- **Nav/footer:** footer only.
+
 ### `/faq` — FAQ (implemented, PR #68)
 
 - **Purpose:** frequent questions: how to report, map accuracy, how to
@@ -198,7 +209,7 @@ fits its context. This is the implemented pattern; keep it consistent:
 | `/moderazione` | Map, Directory, Home (CTA)                                  |
 | `/faq`      | Map, Directory, Contacts, Home (CTA)                          |
 | `/contatti` | Map, Directory, FAQ, Home (CTA)                               |
-| `/privacy`, `/termini`, `/licenze` | Map, Directory, Guide (via `LegalPage`)  |
+| `/privacy`, `/termini`, `/licenze`, `/accessibility` | Map, Directory, Guide (via `LegalPage`)  |
 
 - Mobile: the `menu-button` collapse is implemented on the home page; the
   informational pages currently render the `nav-links` inline (they wrap at
@@ -220,7 +231,7 @@ institutional links and the legal bar:
 | Section    | Content                                                       |
 |------------|---------------------------------------------------------------|
 | Brand      | OpenSurveillanceDB + tagline                                  |
-| Nav        | Manifesto, Rules, Guide, Privacy, Terms of use, Licences, FAQ, Contact |
+| Nav        | Manifesto, Rules, Guide, Privacy, Terms of use, Licences, Accessibility, FAQ, Contact |
 | Legal bar  | Data licence **ODbL 1.0** notice + **© OpenStreetMap contributors** attribution |
 
 - Footer labels are bilingual (EN/IT) via the shared `footer` bundle
@@ -384,7 +395,7 @@ export default async function PrivacyPage() {
 | `moderation` | `app/lib/i18n/moderation.ts` | private moderator dashboard |
 | `auth`    | `app/lib/i18n/auth.ts` | login/register/account |
 | `footer`  | `app/lib/i18n/footer.ts` | global footer labels |
-| `legal`   | `app/lib/legal/en.ts` / `it.ts` | structured legal content (`privacy`, `terms`, `licenses`) rendered by `LegalPage` |
+| `legal`   | `app/lib/legal/en.ts` / `it.ts` | structured legal content (`privacy`, `terms`, `licenses`, `accessibility`) rendered by `LegalPage` |
 
 Notes:
 

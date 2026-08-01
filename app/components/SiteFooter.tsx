@@ -45,6 +45,7 @@ export function SiteFooter() {
         <Link href="/privacy">{t.privacy}</Link>
         <Link href="/termini">{t.terms}</Link>
         <Link href="/licenze">{t.licenses}</Link>
+        <Link href="/accessibility">{t.accessibility}</Link>
         <Link href="/faq">{t.faq}</Link>
         <Link href="/contatti">{t.contact}</Link>
       </nav>

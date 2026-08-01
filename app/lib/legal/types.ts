@@ -36,4 +36,5 @@ export type LegalContent = {
   privacy: LegalPageContent;
   terms: LegalPageContent;
   licenses: LegalPageContent;
+  accessibility: LegalPageContent;
 };

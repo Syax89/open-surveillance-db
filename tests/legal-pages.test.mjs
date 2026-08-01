@@ -56,9 +56,10 @@ async function renderPath(requestPath) {
 
 test("public legal pages are served with their English content", async () => {
   const cases = [
-    { path: "/privacy", markers: ["Privacy notice", "Controller", "Art. 6(1)(f) GDPR", "privacy@opensurveillancedb"] },
+    { path: "/privacy", markers: ["Privacy notice", "Controller", "Art. 6(1)(f) GDPR", "privacy@opensurveillancedb", "Cookies", "opensurveillancedb-locale", "art. 122 D.Lgs. 196/2003"] },
     { path: "/termini", markers: ["Terms of use", "Controller / operator", "ODbL 1.0", "privacy@opensurveillancedb"] },
     { path: "/licenze", markers: ["Licences", "AGPL-3.0-or-later", "ODbL 1.0", "CC BY-SA 4.0"] },
+    { path: "/accessibility", markers: ["Accessibility statement", "WCAG 2.2 AA", "Partially compliant", "privacy@opensurveillancedb"] },
   ];
 
   for (const { path: requestPath, markers } of cases) {
@@ -78,11 +79,12 @@ test("public legal pages are served with their English content", async () => {
     assert.match(html, /class="record-detail-note"/);
 
     // The global site footer (SiteFooter in the root layout) links the
-    // three public legal pages on every route.
+    // public legal pages on every route.
     assert.match(html, /class="site-footer"/);
     assert.match(html, /href="\/privacy"/);
     assert.match(html, /href="\/termini"/);
     assert.match(html, /href="\/licenze"/);
+    assert.match(html, /href="\/accessibility"/);
   }
 });
 
@@ -91,10 +93,11 @@ test("global site footer links to the public legal pages", async () => {
 
   assert.equal(response.status, 200);
   // The global footer (root layout) must be part of the server-rendered
-  // homepage and link the three public legal pages.
+  // homepage and link the public legal pages.
   assert.match(html, /class="site-footer"/);
   assert.match(html, /class="footer-links"/);
   assert.match(html, /href="\/privacy"/);
   assert.match(html, /href="\/termini"/);
   assert.match(html, /href="\/licenze"/);
+  assert.match(html, /href="\/accessibility"/);
 });

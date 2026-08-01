@@ -75,7 +75,7 @@ async function renderRoute(route, { env = {}, headers = {} } = {}) {
 }
 
 /** Public HTML routes that must always render (no credentials needed). */
-const PUBLIC_ROUTES = ["/", "/guide", "/login", "/register", "/account"];
+const PUBLIC_ROUTES = ["/", "/guide", "/login", "/register", "/account", "/accessibility"];
 
 /**
  * Routes linked from the global footer (added in #71) that are carried by
@@ -163,6 +163,7 @@ test("every nav/footer link target resolves to a real page (no 404)", async (t) 
     for (const href of hrefs) {
       if (href.startsWith("#")) continue; // in-page anchors
       if (href.startsWith("http")) continue; // external (OSM attribution)
+      if (href.startsWith("mailto:")) continue; // contact links (privacy@)
       const target = href.split("?")[0].split("#")[0];
       if (ASSET_HREF.test(target) || ASSET_EXT.test(target)) continue; // static assets
       if (seen.has(target)) continue;
