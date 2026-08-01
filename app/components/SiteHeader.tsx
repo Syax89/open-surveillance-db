@@ -76,11 +76,16 @@ export function SiteHeader({
   // which is the same page — also current.
   const pathname = usePathname();
   const brandIsCurrent = brandAs === "anchor" || pathname === "/";
-  const brandProps = {
+  const brandProps: {
+    className: string;
+    href: string;
+    "aria-label"?: string;
+    "aria-current"?: "page";
+  } = {
     className: "brand",
     href: brandHref,
     ...(homeLabel ? { "aria-label": homeLabel } : {}),
-    ...(brandIsCurrent ? { "aria-current": "page" } : {}),
+    ...(brandIsCurrent ? { "aria-current": "page" as const } : {}),
   };
   const brandChildren = (
     <>
