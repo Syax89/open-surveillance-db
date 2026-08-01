@@ -71,7 +71,8 @@ changes accumulate under `[Unreleased]`.
   two-track contribution editing (pending = owner PATCH; published =
   re-moderated `camera_edit` edit-request; removed/rejected = 409), the
   six-layer anti-gaming model, and the extended art. 17 erasure
-  ([docs/decisions/0018-community-verifications-trust-levels-editing.md](docs/decisions/0018-community-verifications-trust-levels-editing.md)).
+  ([#168](https://github.com/Syax89/open-surveillance-db/pull/168),
+  [docs/decisions/0018-community-verifications-trust-levels-editing.md](docs/decisions/0018-community-verifications-trust-levels-editing.md)).
 - Site map updated **before** the community code: private routes
   `/account/contributions` (kebab-case, `noindex`) and `/records/[id]/edit`
   (auth-gated, owner-only), the verification widget on `/records/[id]`
