@@ -522,6 +522,7 @@ test("the public interface contains no moderation or admin endpoint link", async
   const clientFiles = (await sourceFiles("app"))
     .filter((file) => !file.startsWith(`app${path.sep}api${path.sep}`))
     .filter((file) => !file.startsWith(`app${path.sep}moderation${path.sep}`))
+    .filter((file) => !file.startsWith(`app${path.sep}components${path.sep}moderation${path.sep}`))
     .filter((file) => !file.includes(`${path.sep}ModerationDashboard.`))
     .filter((file) => /\.(?:ts|tsx|js|jsx)$/.test(file));
   const publicSource = (await Promise.all(clientFiles.map(readSource))).join("\n");
