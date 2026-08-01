@@ -72,13 +72,26 @@ the gate trips; the check itself fails open, so an unavailable duplicate
 check degrades to the old non-blocking warning instead of silencing
 submissions.
 
+**Implementation update (2026-08-02, correction → record outcome):** a
+correction request can now be associated with a record outcome entirely from
+the local moderation dashboard. Approve on a correction requires a record
+outcome (verified/kept, corrected, removed, marked for review, escalated) and
+the new "Link to record" decision attaches a still-pending request to a record
+without deciding it. A private per-record correction history
+(`GET /api/moderation/corrections?cameraId=N`, moderator-only, no-store) shows
+every request linked to a record — pending and resolved — with outcome,
+resolution date and the append-only decision trail. Contact details, internal
+notes and reviewer attribution stay inside the gated moderation API; the
+public record page keeps exposing only the filtered public revision
+projection.
+
 ### Planned work
 
 - [x] Detect likely duplicates before a contributor submits a new record.
 - Add explicit record freshness and re-verification state without publishing stale data as current.
 - Add safe category and verification-freshness filters to the public directory.
 - [x] Add a reviewed public change summary that omits contributor identities and internal notes.
-- Give moderators a local way to associate a correction request with a record outcome.
+- [x] Give moderators a local way to associate a correction request with a record outcome.
 - Expand tests around each status transition and its public visibility.
 
 **Exit gate:** a fictional duplicate, correction, stale record, and re-verification can each be handled without leaking internal data.

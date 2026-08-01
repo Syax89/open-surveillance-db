@@ -198,12 +198,20 @@ export type MetadataPublicationChoices = {
 // Role → action matrix. `approve` (publishing a normal record) is reserved to
 // record reviewers and senior moderators; intake reviewers may triage
 // (reject/hide) but never publish; the administrator may only escalate.
+//
+// `associate` (H1 correction → record outcome, t_69891619) links a still
+// pending correction request to a record without deciding it. It is granted
+// to the same record-facing roles that may `approve` — pointing a request at
+// a specific record steers the eventual outcome, so it stays out of the
+// intake reviewer's triage-only set (ADR 0009: intake may triage but never
+// publish). The parser has always whitelisted `associate` for corrections;
+// this matrix entry is what actually gates it server-side.
 // ---------------------------------------------------------------------------
 
 const rolePermissions: Record<ReviewerRole, ReadonlySet<string>> = {
   intake_reviewer: new Set<string>(["reject", "hide", "escalate"]),
-  record_reviewer: new Set<string>(["approve", "reject", "hide", "mark-stale", "reverify", "escalate"]),
-  senior_moderator: new Set<string>(["approve", "reject", "hide", "mark-stale", "reverify", "escalate"]),
+  record_reviewer: new Set<string>(["approve", "reject", "hide", "mark-stale", "reverify", "associate", "escalate"]),
+  senior_moderator: new Set<string>(["approve", "reject", "hide", "mark-stale", "reverify", "associate", "escalate"]),
   privacy_safety_lead: new Set<string>(["hide", "escalate"]),
   administrator: new Set<string>(["escalate"]),
 };
@@ -1421,6 +1429,98 @@ async function applyCorrectionOutcome(
       note,
     });
   }
+}
+
+/**
+ * One correction request in a record's private request history (H1,
+ * t_69891619). Unlike the queue row (`PendingCorrectionRequest`) it carries
+ * the resolution timestamp and the append-only decision trail for that
+ * request, so a moderator can see the full life of every request on a
+ * record without leaving the local dashboard.
+ */
+export type CorrectionHistoryRequest = {
+  id: number;
+  cameraId: number | null;
+  issueType: string;
+  message: string;
+  contact: string | null;
+  status: string;
+  outcome: string | null;
+  createdAt: string;
+  resolvedAt: string | null;
+  events: ModerationEvent[];
+};
+
+export type CorrectionHistory = {
+  camera: { id: number; title: string; status: string } | null;
+  requests: CorrectionHistoryRequest[];
+};
+
+/**
+ * Private per-record correction history for the local moderation dashboard
+ * (docs/FUTURE_ROADMAP.md Horizon 1 — "a local way to associate a
+ * correction request with a record outcome").
+ *
+ * Returns every request linked to the record — pending and resolved — with
+ * the request's own decision events (approve/reject/associate/escalate from
+ * the append-only trail), oldest event first. The events are fetched in one
+ * batched query (no N+1) and grouped in memory.
+ *
+ * Privacy boundary: this is a moderator-only read. It never leaves the
+ * moderation API (the worker edge gate covers `/api/moderation/*`), so
+ * contact details, internal notes and reviewer attribution stay local. The
+ * public record page continues to expose only the filtered
+ * `listPublicCameraRevisions` projection.
+ *
+ * A removed record still exists as a `cameras` row (`status = 'removed'`),
+ * so its history stays visible to moderators; a record deleted from the
+ * table (corrections then carry `camera_id = NULL` via the FK's SET NULL)
+ * answers `camera: null`.
+ */
+export async function listCorrectionHistoryForCamera(
+  cameraId: number,
+): Promise<CorrectionHistory> {
+  const d1 = await getModerationD1();
+  const camera = await d1
+    .prepare("SELECT id, title, status FROM cameras WHERE id = ?")
+    .bind(cameraId)
+    .first<{ id: number; title: string; status: string }>();
+  if (!camera) return { camera: null, requests: [] };
+
+  // Newest first; capped so the events IN (...) clause stays well under the
+  // SQLite variable limit even before chunking.
+  const requests = await d1
+    .prepare(
+      "SELECT id, camera_id AS cameraId, issue_type AS issueType, message, contact, status, outcome, created_at AS createdAt, resolved_at AS resolvedAt FROM correction_requests WHERE camera_id = ? ORDER BY created_at DESC, id DESC LIMIT 200",
+    )
+    .bind(cameraId)
+    .all<Omit<CorrectionHistoryRequest, "events">>();
+
+  const ids = requests.results.map((request) => request.id);
+  const eventsByRequest = new Map<number, ModerationEvent[]>();
+  for (let offset = 0; offset < ids.length; offset += 100) {
+    const chunk = ids.slice(offset, offset + 100);
+    const placeholders = chunk.map(() => "?").join(", ");
+    const events = await d1
+      .prepare(
+        `SELECT id, entity, entity_id AS entityId, previous_status AS previousStatus, new_status AS newStatus, action, reason_code AS reasonCode, note, actor, reviewer_id AS reviewerId, actor_role AS actorRole, recused, escalated, second_reviewer_id AS secondReviewerId, appeal_id AS appealId, created_at AS createdAt FROM moderation_events WHERE entity = 'correction' AND entity_id IN (${placeholders}) ORDER BY created_at ASC, id ASC`,
+      )
+      .bind(...chunk)
+      .all<ModerationEvent>();
+    for (const event of events.results) {
+      const list = eventsByRequest.get(event.entityId);
+      if (list) list.push(event);
+      else eventsByRequest.set(event.entityId, [event]);
+    }
+  }
+
+  return {
+    camera,
+    requests: requests.results.map((request) => ({
+      ...request,
+      events: eventsByRequest.get(request.id) ?? [],
+    })),
+  };
 }
 
 export type PublicCameraRevision = {

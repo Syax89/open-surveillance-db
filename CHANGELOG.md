@@ -180,6 +180,21 @@ changes accumulate under `[Unreleased]`.
   form surfaces the authoritative candidate list with a mandatory
   confirmation checkbox that disables submit until acknowledged; the hook
   also refuses implicit form submissions (Enter) while the gate is open.
+- Moderator H1 (correction request → record outcome, t_69891619): the
+  correction rows in the local dashboard now carry the record-outcome
+  select (required on approve: verified/kept, corrected, removed, marked
+  for review, escalated), the record-id field (required on the new
+  "Link to record" action, optional on approve/reject) and the
+  `associate` action that links a pending request to a record without
+  deciding; `GET /api/moderation/corrections?cameraId=N`
+  (moderator-only: worker edge gate + coarse role, `Cache-Control:
+  no-store`) serves the private per-record correction history — pending
+  and resolved requests with outcome, resolvedAt and the append-only
+  decision trail — rendered in a dedicated dashboard section. Contact
+  details, internal notes and reviewer attribution never leave the
+  gated moderation API: the public record page keeps exposing only the
+  filtered public revision projection (AC-5)
+  ([#187](https://github.com/Syax89/open-surveillance-db/pull/187)).
 
 ### Changed
 
