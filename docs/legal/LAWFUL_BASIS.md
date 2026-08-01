@@ -52,6 +52,24 @@ This assessment covers those operations. Where a record is republished from an o
 
 - **Conclusion:** legitimate interest is balanced for the publication purpose. Review annually and on any material change (art. 6(1)(f) requires a documented, current balancing test).
 
+#### 3.1.1 Community system — profile, trust levels, verifications, edit history (art. 6(1)(f))
+
+The community system (COMMUNITY_PLAN.md § 5) adds processing of contributor personal data: the contributor profile (display name, trust level, verifications received, list of contributions), verifications given to other records, and edit-history authorship. All are personal data (art. 4(1) — tied to `contributors.id`; pseudonymisation does not exclude identifiability, art. 4(5), Recital 26). The basis is **art. 6(1)(f)** — **never consent** (art. 6(1)(a)): the community features are a core function of the service, and the imbalance between controller and data subject makes consent an inappropriate basis.
+
+- **Legitimate interest:** contributor recognition and community verification of dataset quality — the civic-transparency purpose of § 3.1 extended to the people who build the dataset; verifications are a quality signal for consumers of the public data.
+- **Necessity:** trust levels are **derived from data already collected** (verified contributions) — no new collection, no behavioural metrics; verifications are minimal by design (one per user per record, no free text); edit authorship is required for accountability (art. 5(2)) and accuracy (art. 16).
+- **Balancing test (LIA):**
+
+| Factor | Assessment |
+|--------|-----------|
+| Controller/third-party interest | Strong: recognition incentivises contributors and verifications improve dataset quality; non-commercial, community-governed |
+| Impact on data subjects | **Low, conditional:** the public profile is **strictly opt-in, private by default** (COMMUNITY_PLAN.md § 5.2, binding); only the chosen display name is ever public — never real name or email; **no public leaderboard/ranking** (trust levels/verifications are informative, non-ordinal indicators, not profiling under art. 4(4)/22); no export of profiles; erasure (art. 17) covers profile, verifications and edit authorship (R14) |
+| Reasonable expectations | A contributor who opts in to a public profile, with a documented notice (PRIVACY_NOTICE.md § 3/§ 5), can expect the chosen display name and derived indicators to be visible; anonymous contributors are fully supported (no account needed to report) |
+| Safeguards | Opt-in public profile with private default; pseudonymous display name only; no ranking/leaderboard; edit queue moderated before publication (MODERATION.md "Edit moderation"); append-only revision history; erasure extended to profile/verifications/authorship, tested before the community schema PR merges (COMMUNITY_PLAN.md § 5.2); one verification per user per record (anti-gaming); art. 22 note: trust levels are derived with transparent, non-discriminatory, documented criteria — not automated decision-making with legal or similarly significant effects |
+| Residual risk | Low, provided the safeguards are implemented; identification risk for contributors who document surveillance is mitigated by the private-by-default profile and the pseudonymous display name |
+
+- **Conclusion:** legitimate interest is balanced for the community-system purposes, on the condition that the binding safeguards of COMMUNITY_PLAN.md § 5.2 (opt-in public profile, private default, no public ranking) are implemented before go-live. Review together with § 3.1 on any material change.
+
 ### 3.2 Public-interest basis — art. 6(1)(e) (complementary)
 
 Art. 6(1)(e) applies where processing is necessary for a task carried out in the public interest, and art. 6(3) requires a basis in Union or Member State law. A community project is not automatically vested with an official task; therefore:
