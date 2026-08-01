@@ -1,21 +1,28 @@
-// Wave B (Data & Trust) — route-level contract for the private
+// Wave B (Data & Trust) + C4 — route-level contract for the private
 // correction/removal intake (POST /api/corrections).
 //
 // These tests exercise the real route handler with the mocked db boundary
-// (see helpers/api-harness.mjs): validation, trimming, HTTP status codes,
-// rate limiting and the submissions-disabled gate. Together with
-// tests/intake-urgent-hide-workflow.test.mjs (real database layer) they pin
-// the documented intake contract from docs/workstreams/DATA_TRUST.md:
+// (see helpers/api-harness.mjs): whitelist validation (A1/A2), trimming,
+// HTTP status codes, dedupe mapping (A5), rate limiting (A4) and the
+// submissions-disabled gate. Together with tests/intake-urgent-hide-workflow
+// and tests/corrections-dedupe.test.mjs (real database layer) they pin the
+// documented intake contract:
 //
-//   - every published record has a low-friction, account-free issue path
-//     whose documented categories are all accepted;
-//   - the intake acknowledges with a case reference and never echoes
+//   - C4 BREAKING CHANGE: `issueType` is a whitelist
+//     (inaccurate|missing|removal|abuse|other) — the historical free-text
+//     categories are rejected with 400, and removal/abuse NEVER accept free
+//     text, even when the message body contains the word (A2);
+//   - every whitelisted category is accepted and stored trimmed, and the
+//     intake acknowledges with a case reference and never echoes
 //     requester-supplied content back;
 //   - removal-style requests may arrive without a precise record id;
-//   - the endpoint fails closed (503) when submissions are disabled and
-//     rate-limits abusive callers (429 + Retry-After);
-//   - hostile input (script tags, CRLF, control characters) is bounded and
-//     cannot crash the handler or inject headers.
+//   - anonymous reports stay possible (reporter privacy, A4) and are
+//     rate-limited per IP (429 + Retry-After);
+//   - duplicate open reports and re-reports on an already-removed target map
+//     to 409 (A5; the DB-level enforcement lives in corrections-dedupe);
+//   - the endpoint fails closed (503) when submissions are disabled;
+//   - hostile input (script tags, CRLF, control characters, oversized
+//     bodies) is bounded and cannot crash the handler (A7).
 //
 // All fixtures are fictional; no personal data is used.
 
@@ -49,26 +56,34 @@ async function correctionsEnv() {
 
 const route = () => loadRoute("app/api/corrections/route.mjs");
 
-// The documented issue categories from the "Report an issue" path
-// (docs/workstreams/DATA_TRUST.md — Corrections, removals, and appeals).
-const DOCUMENTED_CATEGORIES = [
+// The C4 whitelist (COMMUNITY_PLAN §2.4, A1). MUST match db/corrections.ts
+// CORRECTION_ISSUE_TYPES — the route rejects anything outside this list.
+const WHITELIST = ["inaccurate", "missing", "removal", "abuse", "other"];
+
+// Historical free-text categories (pre-C4). Their rejection is the breaking
+// change this suite pins: they were accepted before, now they answer 400.
+const LEGACY_FREE_TEXT_CATEGORIES = [
   "Inaccurate location/details",
   "No longer present",
   "Private/non-public",
   "Privacy concern",
   "Safety concern",
   "Rights/ownership concern",
-  "Other",
+  "Wrong location",
+  "outdated",
+  "privacy-safety",
+  "duplicate",
+  "privacy-concern",
 ];
 
 function intakePost(body, headers = {}) {
   return apiRequest("/api/corrections", { method: "POST", body, headers });
 }
 
-test("the intake accepts every documented correction category, trimmed", async () => {
+test("A1: the intake accepts every whitelisted issue type, stored trimmed", async () => {
   const { POST } = await route();
-  for (const [index, issueType] of DOCUMENTED_CATEGORIES.entries()) {
-    stub("createCorrectionRequest", async (input) => ({ id: 100 + index, ...input }));
+  for (const [index, issueType] of WHITELIST.entries()) {
+    stub("createCorrectionRequest", async (input) => ({ kind: "created", correction: { id: 100 + index, ...input } }));
     const response = await POST(
       intakePost(
         {
@@ -86,14 +101,71 @@ test("the intake accepts every documented correction category, trimmed", async (
   }
 });
 
+test("A1/A2: any issue type outside the whitelist answers 400 — including every legacy free-text category", async () => {
+  const { POST } = await route();
+  const cases = [
+    ...LEGACY_FREE_TEXT_CATEGORIES.map((issueType) => ({ name: `legacy free text "${issueType}"`, issueType })),
+    { name: "random string", issueType: "please fix this camera" },
+    { name: "empty", issueType: "  " },
+    { name: "numeric", issueType: "123" },
+  ];
+  for (const [index, { name, issueType }] of cases.entries()) {
+    stub("createCorrectionRequest", async (input) => ({ kind: "created", correction: { id: 500 + index, ...input } }));
+    const response = await POST(
+      intakePost(
+        { cameraId: 42, issueType, message: "Please investigate." },
+        { "cf-connecting-ip": `203.0.113.${100 + index}` },
+      ),
+    );
+    assert.equal(response.status, 400, name);
+    assert.equal(
+      callArgs("createCorrectionRequest").length,
+      0,
+      `${name}: no request may be stored for an out-of-whitelist issue type`,
+    );
+  }
+});
+
+test("A2: free text is never accepted for removal/abuse, even when the message contains the word", async () => {
+  const { POST } = await route();
+  const cases = [
+    { issueType: "Please remove this camera", message: "It violates my privacy, please remove it now." },
+    { issueType: "abuse report", message: "This is an abuse of surveillance powers." },
+    { issueType: "I want to report removal", message: "removal" },
+    { issueType: "remove", message: "removal abuse" },
+  ];
+  for (const [index, body] of cases.entries()) {
+    stub("createCorrectionRequest", async (input) => ({ kind: "created", correction: { id: 600 + index, ...input } }));
+    const response = await POST(
+      intakePost(body, { "cf-connecting-ip": `203.0.113.${140 + index}` }),
+    );
+    assert.equal(response.status, 400, JSON.stringify(body));
+    assert.equal(callArgs("createCorrectionRequest").length, 0, "free-text removal/abuse must never be stored");
+  }
+});
+
+test("A1/A2: the whitelisted removal and abuse types are accepted and routed to the same private intake", async () => {
+  const { POST } = await route();
+  for (const issueType of ["removal", "abuse"]) {
+    stub("createCorrectionRequest", async (input) => ({ kind: "created", correction: { id: 700, ...input } }));
+    const response = await POST(
+      intakePost(
+        { cameraId: 42, issueType, message: "A camera on Via Roma faces a private courtyard." },
+        { "cf-connecting-ip": "203.0.113.150" },
+      ),
+    );
+    assert.equal(response.status, 201, issueType);
+  }
+});
+
 test("the intake response never echoes requester-supplied content", async () => {
-  stub("createCorrectionRequest", async (input) => ({ id: 77, ...input }));
+  stub("createCorrectionRequest", async (input) => ({ kind: "created", correction: { id: 77, ...input } }));
   const { POST } = await route();
   const response = await POST(
     intakePost(
       {
         cameraId: 42,
-        issueType: "Privacy concern",
+        issueType: "removal",
         message: "This camera faces a private window.",
         contact: "requester@example.test",
       },
@@ -111,12 +183,12 @@ test("the intake response never echoes requester-supplied content", async () => 
 test("removal-style requests are accepted without a precise camera id", async () => {
   const { POST } = await route();
   const cases = [
-    { name: "no longer present", issueType: "No longer present", cameraId: undefined },
-    { name: "private/non-public", issueType: "Private/non-public", cameraId: null },
-    { name: "privacy concern", issueType: "Privacy concern", cameraId: "" },
+    { name: "removal without id", issueType: "removal", cameraId: undefined },
+    { name: "abuse with null id", issueType: "abuse", cameraId: null },
+    { name: "missing with empty id", issueType: "missing", cameraId: "" },
   ];
   for (const [index, { name, issueType, cameraId }] of cases.entries()) {
-    stub("createCorrectionRequest", async (input) => ({ id: 200 + index, ...input }));
+    stub("createCorrectionRequest", async (input) => ({ kind: "created", correction: { id: 200 + index, ...input } }));
     const body = { issueType, message: "Please investigate." };
     if (cameraId !== undefined) body.cameraId = cameraId;
     const response = await POST(
@@ -127,13 +199,52 @@ test("removal-style requests are accepted without a precise camera id", async ()
   }
 });
 
-test("the intake fails closed with 503 when submissions are disabled", async () => {
+test("A4: anonymous reports are allowed and stored without attribution", async () => {
+  stub("createCorrectionRequest", async (input) => ({ kind: "created", correction: { id: 800, ...input } }));
+  const { POST } = await route();
+  const response = await POST(
+    intakePost(
+      { cameraId: 42, issueType: "inaccurate", message: "Coordinates look off.", contact: null },
+      { "cf-connecting-ip": "203.0.113.160" },
+    ),
+  );
+  assert.equal(response.status, 201, "anonymous reporters must stay able to file a request");
+  assert.equal(callArgs("createCorrectionRequest").at(-1)[0].contributorId, null);
+});
+
+test("A5 (route mapping): an open duplicate report answers 409", async () => {
+  stub("createCorrectionRequest", async () => ({ kind: "duplicate_open" }));
+  const { POST } = await route();
+  const response = await POST(
+    intakePost(
+      { cameraId: 42, issueType: "inaccurate", message: "Again.", contact: null },
+      { "cf-connecting-ip": "203.0.113.170" },
+    ),
+  );
+  assert.equal(response.status, 409);
+  assert.match((await responseBody(response)).error, /already under review/);
+});
+
+test("A5 (route mapping): a repeat report on an already-removed record answers 409", async () => {
+  stub("createCorrectionRequest", async () => ({ kind: "already_removed" }));
+  const { POST } = await route();
+  const response = await POST(
+    intakePost(
+      { cameraId: 42, issueType: "removal", message: "Still there?", contact: null },
+      { "cf-connecting-ip": "203.0.113.171" },
+    ),
+  );
+  assert.equal(response.status, 409);
+  assert.match((await responseBody(response)).error, /already been removed/);
+});
+
+test("A4: the intake fails closed with 503 when submissions are disabled", async () => {
   const env = await correctionsEnv();
   env.POST_SUBMISSIONS_DISABLED = "true";
   const { POST } = await route();
   const response = await POST(
     intakePost(
-      { issueType: "Other", message: "Hello", contact: null },
+      { issueType: "other", message: "Hello", contact: null },
       { "cf-connecting-ip": "203.0.113.40" },
     ),
   );
@@ -142,7 +253,7 @@ test("the intake fails closed with 503 when submissions are disabled", async () 
   assert.equal(callArgs("createCorrectionRequest").length, 0, "no request may be stored while disabled");
 });
 
-test("the intake rate-limits abusive callers with 429 and a Retry-After window", async () => {
+test("A4: the intake rate-limits abusive callers with 429 and a Retry-After window", async () => {
   const env = await correctionsEnv();
   env.POST_RATE_LIMIT_MAX = "1";
   env.POST_RATE_LIMIT_WINDOW_SECONDS = "60";
@@ -150,7 +261,7 @@ test("the intake rate-limits abusive callers with 429 and a Retry-After window",
   const request = () =>
     POST(
       intakePost(
-        { issueType: "Other", message: "Hello", contact: null },
+        { issueType: "other", message: "Hello", contact: null },
         { "cf-connecting-ip": "203.0.113.50" },
       ),
     );
@@ -158,7 +269,7 @@ test("the intake rate-limits abusive callers with 429 and a Retry-After window",
   // The first request must reach the database layer, so the db boundary is
   // stubbed like in the other intake tests; the second is rate-limited
   // before any db call happens.
-  stub("createCorrectionRequest", async (input) => ({ id: 400, ...input }));
+  stub("createCorrectionRequest", async (input) => ({ kind: "created", correction: { id: 400, ...input } }));
   const first = await request();
   assert.equal(first.status, 201, "the first request within the window must pass");
   const second = await request();
@@ -174,7 +285,7 @@ test("the intake rate-limits abusive callers with 429 and a Retry-After window",
   );
 });
 
-test("hostile input is bounded and cannot crash the intake or inject headers", async (t) => {
+test("A7: hostile input is bounded and cannot crash the intake or inject headers", async (t) => {
   const { POST } = await route();
   const cases = [
     { name: "script tag in message", message: "<script>alert(1)</script>", contact: null },
@@ -184,10 +295,10 @@ test("hostile input is bounded and cannot crash the intake or inject headers", a
   ];
   for (const [index, { name, message, contact }] of cases.entries()) {
     await t.test(name, async () => {
-      stub("createCorrectionRequest", async (input) => ({ id: 300 + index, ...input }));
+      stub("createCorrectionRequest", async (input) => ({ kind: "created", correction: { id: 300 + index, ...input } }));
       const response = await POST(
         intakePost(
-          { cameraId: 42, issueType: "Other", message, contact },
+          { cameraId: 42, issueType: "other", message, contact },
           { "cf-connecting-ip": `203.0.113.${60 + index}` },
         ),
       );
@@ -204,6 +315,20 @@ test("hostile input is bounded and cannot crash the intake or inject headers", a
       assert.ok(stored.contact === null || stored.contact.length <= 180, "contact must stay within the documented bound");
     });
   }
+});
+
+test("A7: an oversized body answers 413 before any database write", async () => {
+  const env = await correctionsEnv();
+  env.MAX_BODY_BYTES = "1024";
+  const { POST } = await route();
+  const response = await POST(
+    intakePost(
+      { cameraId: 42, issueType: "other", message: "M".repeat(4096), contact: null },
+      { "cf-connecting-ip": "203.0.113.61" },
+    ),
+  );
+  assert.equal(response.status, 413);
+  assert.equal(callArgs("createCorrectionRequest").length, 0, "an oversized payload must never reach the db layer");
 });
 
 test("the intake contract is write-only: no GET handler exposes stored requests", async () => {

@@ -141,9 +141,21 @@ changes accumulate under `[Unreleased]`.
   payload pubblici (GROUP BY IN, no N+1), anti-gaming 6 strati (quota D1
   20/40, per-record 5, IP-hash burst, decay su `last_verified_at`), erasure
   estesa art. 17 (ADR 0018, C1).
+- Report intake C4 (COMMUNITY_PLAN §2.4): `issue_type` whitelist
+  (`inaccurate|missing|removal|abuse|other`), dedupe one-open-report per
+  (submitter, target) con indici unici parziali (migrazione 0024, 409 su
+  duplicato o target già rimosso), attribuzione opzionale al contributor
+  (`contributor_id`, sessione + CSRF quando presente), anonimo sempre
+  possibile e rate-limitato per IP (bucket `submit` 5/60s).
 
 ### Changed
 
+- **BREAKING** `POST /api/corrections` (C4, COMMUNITY_PLAN §2.4): `issueType`
+  è ora una whitelist (`inaccurate|missing|removal|abuse|other`) — le
+  categorie free-text storiche ("Inaccurate location/details", "Privacy
+  concern", ...) rispondono 400; `removal`/`abuse` non accettano MAI
+  free-text, anche se il messaggio contiene la parola. I client esistenti
+  devono usare i valori whitelist.
 - Production build audited; TypeScript and lint issues fixed as part of the
   build pipeline (docs/DEPLOYMENT.md added).
 - Local deployment documentation aligned with the actual runtime: `vinext dev`

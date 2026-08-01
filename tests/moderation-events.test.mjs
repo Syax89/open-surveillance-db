@@ -260,12 +260,12 @@ test("correction moderation records events and keeps decisions private", async (
     contact: "",
   });
 
-  const approved = await moderation.moderateCorrection(request.id, "approve", "duplicate", null);
+  const approved = await moderation.moderateCorrection(request.correction.id, "approve", "duplicate", null);
   assert.equal(approved.item.status, "reviewed");
   assert.deepEqual(approved.event, {
     id: 1,
     entity: "correction",
-    entityId: request.id,
+    entityId: request.correction.id,
     previousStatus: "pending",
     newStatus: "reviewed",
     action: "approve",
@@ -281,7 +281,7 @@ test("correction moderation records events and keeps decisions private", async (
     createdAt: approved.event.createdAt,
   });
 
-  const rejected = await moderation.moderateCorrection(request.id, "reject", "insufficient-evidence", null);
+  const rejected = await moderation.moderateCorrection(request.correction.id, "reject", "insufficient-evidence", null);
   assert.equal(rejected.kind, "not_found", "a non-pending correction cannot be moderated again");
   assert.equal((await eventRows(env)).length, 1, "the failed re-moderation writes nothing");
 

@@ -103,23 +103,23 @@ test("a correction request is stored privately and only surfaces in the moderati
     contact: "reporter@example.test",
   });
 
-  assert.ok(request.id > 0, "the intake must return a private reference id");
-  assert.equal(request.status, "pending");
-  assert.equal(request.cameraId, report.id);
-  assert.equal(request.issueType, "No longer present");
-  assert.equal(request.message, "The camera has been removed from the pole.");
-  assert.equal(request.contact, "reporter@example.test");
+  assert.ok(request.correction.id > 0, "the intake must return a private reference id");
+  assert.equal(request.correction.status, "pending");
+  assert.equal(request.correction.cameraId, report.id);
+  assert.equal(request.correction.issueType, "No longer present");
+  assert.equal(request.correction.message, "The camera has been removed from the pole.");
+  assert.equal(request.correction.contact, "reporter@example.test");
 
   const queue = await moderation.listPendingModerationItems();
-  const listed = queue.correctionRequests.find((item) => item.id === request.id);
+  const listed = queue.correctionRequests.find((item) => item.id === request.correction.id);
   assert.ok(listed, "pending correction requests must be visible to the moderation queue");
   assert.equal(listed.status, "pending");
 
   // The request is not a camera: no public representation can contain it.
   const records = await cameras.listPublicCameras();
   for (const record of records) {
-    assert.notEqual(record.title, request.message);
-    assert.notEqual(record.title, request.issueType);
+    assert.notEqual(record.title, request.correction.message);
+    assert.notEqual(record.title, request.correction.issueType);
   }
 });
 
@@ -130,12 +130,12 @@ test("a removal-style intake accepts a request without an identifiable cameraId"
     message: "A camera on Via Roma appears to face a private courtyard.",
     contact: null,
   });
-  assert.ok(request.id > 0);
-  assert.equal(request.cameraId, null);
-  assert.equal(request.status, "pending");
+  assert.ok(request.correction.id > 0);
+  assert.equal(request.correction.cameraId, null);
+  assert.equal(request.correction.status, "pending");
 
   const queue = await moderation.listPendingModerationItems();
-  assert.ok(queue.correctionRequests.some((item) => item.id === request.id));
+  assert.ok(queue.correctionRequests.some((item) => item.id === request.correction.id));
 });
 
 test("creating a correction request never alters the referenced camera", async () => {
@@ -175,7 +175,7 @@ test("a verified camera disappears from the public list after an urgent hide", a
     message: "This camera appears to face a private window.",
     contact: null,
   });
-  assert.ok(request.id > 0, "the request must return a private reference id");
+  assert.ok(request.correction.id > 0, "the request must return a private reference id");
 
   // The intake reviewer applies the urgent temporary hide — a single actor,
   // no two-reviewer requirement for the emergency action.
@@ -306,7 +306,7 @@ test("a privacy/safety request is resolved with a removed outcome against the hi
   const hidden = await moderation.moderateCamera(report.id, "hide", REASON.privacy, null);
   assert.equal(hidden.item.status, "removed");
 
-  const resolved = await moderation.moderateCorrection(request.id, "approve", REASON.privacy, "Record removed after review", {
+  const resolved = await moderation.moderateCorrection(request.correction.id, "approve", REASON.privacy, "Record removed after review", {
     cameraId: report.id,
     outcome: "removed",
   });
@@ -320,7 +320,7 @@ test("a privacy/safety request is resolved with a removed outcome against the hi
 
   // The resolved request leaves the pending queue and stays private.
   const queue = await moderation.listPendingModerationItems();
-  assert.equal(queue.correctionRequests.some((item) => item.id === request.id), false);
+  assert.equal(queue.correctionRequests.some((item) => item.id === request.correction.id), false);
   assert.equal((await cameras.listPublicCameras()).some((r) => r.id === report.id), false);
 });
 
@@ -332,7 +332,7 @@ test("a cameraId-less removal request can be resolved with a removed outcome", a
     contact: null,
   });
 
-  const resolved = await moderation.moderateCorrection(request.id, "approve", REASON.sensitive, "Out of scope", {
+  const resolved = await moderation.moderateCorrection(request.correction.id, "approve", REASON.sensitive, "Out of scope", {
     outcome: "removed",
   });
   assert.ok(resolved);
@@ -340,7 +340,7 @@ test("a cameraId-less removal request can be resolved with a removed outcome", a
   assert.equal(resolved.item.outcome, "removed");
 
   const queue = await moderation.listPendingModerationItems();
-  assert.equal(queue.correctionRequests.some((item) => item.id === request.id), false);
+  assert.equal(queue.correctionRequests.some((item) => item.id === request.correction.id), false);
 });
 
 test("a correction request can be resolved with a reasoned, auditable decision", async () => {
@@ -352,14 +352,14 @@ test("a correction request can be resolved with a reasoned, auditable decision",
     contact: null,
   });
 
-  const approved = await moderation.moderateCorrection(request.id, "approve", REASON.verified, "Location generalised");
+  const approved = await moderation.moderateCorrection(request.correction.id, "approve", REASON.verified, "Location generalised");
   assert.equal(approved.item.status, "reviewed");
   assert.equal(approved.event.entity, "correction");
   assert.equal(approved.event.previousStatus, "pending");
   assert.equal(approved.event.newStatus, "reviewed");
 
   // The request is no longer pending: resolving it twice must fail.
-  const again = await moderation.moderateCorrection(request.id, "reject", REASON.duplicate, null);
+  const again = await moderation.moderateCorrection(request.correction.id, "reject", REASON.duplicate, null);
   assert.equal(again.kind, "not_found", "a second decision on a reviewed request must not apply");
 });
 
@@ -371,12 +371,12 @@ test("a rejected correction request records its decision and leaves the pending 
     contact: null,
   });
 
-  const rejected = await moderation.moderateCorrection(request.id, "reject", REASON.duplicate, "Already reported");
+  const rejected = await moderation.moderateCorrection(request.correction.id, "reject", REASON.duplicate, "Already reported");
   assert.equal(rejected.item.status, "rejected");
   assert.equal(rejected.event.reasonCode, REASON.duplicate);
 
   const queue = await moderation.listPendingModerationItems();
-  assert.equal(queue.correctionRequests.some((item) => item.id === request.id), false);
+  assert.equal(queue.correctionRequests.some((item) => item.id === request.correction.id), false);
 });
 
 test("moderating a missing correction request returns a not-found result", async () => {
@@ -422,7 +422,7 @@ test("the moderation queue separates pending, published, and review buckets", as
   assert.ok(queue.cameraReports.some((item) => item.id === pendingReport.id));
   assert.equal(queue.publishedCameras.some((item) => item.id === publishedReport.id), false);
   assert.ok(queue.reviewCameras.some((item) => item.id === publishedReport.id));
-  assert.ok(queue.correctionRequests.some((item) => item.id === request.id));
+  assert.ok(queue.correctionRequests.some((item) => item.id === request.correction.id));
   assert.ok(Array.isArray(queue.recentEvents) && queue.recentEvents.length >= 2);
 });
 
