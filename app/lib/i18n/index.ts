@@ -17,3 +17,13 @@ export const messages = { en, it } as const;
 
 export type MessageBundle = Translation<typeof en>;
 export type { Locale, Translation };
+
+/**
+ * Cookie name used to persist the interface locale server-side.
+ *
+ * The client toggle writes the same value to `localStorage` (multi-tab sync,
+ * see LocaleProvider) and to this cookie; server components read the cookie
+ * to render the correct bundle and <html lang> (SSR/SEO, task t_c36fe96c).
+ * The cookie is a pure preference, never a tracker: no personal data.
+ */
+export const LOCALE_COOKIE = "opensurveillancedb-locale";
