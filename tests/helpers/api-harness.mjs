@@ -40,6 +40,7 @@ const ROUTES = [
   { source: "app/api/auth/account/route.ts", output: "app/api/auth/account/route.mjs" },
   { source: "app/api/photos/route.ts", output: "app/api/photos/route.mjs" },
   { source: "app/api/photos/[id]/route.ts", output: "app/api/photos/[id]/route.mjs" },
+  { source: "app/api/appeals/route.ts", output: "app/api/appeals/route.mjs" },
 ];
 
 // Real db/* modules compiled into the temp tree so runtime tests can
@@ -78,7 +79,7 @@ async function buildTree() {
   const mocksDir = path.join(root, "tests", "helpers", "mocks");
   const mockStateUrl = pathToFileURL(path.join(root, "tests", "helpers", "mock-state.mjs")).href;
   await mkdir(path.join(tree, "db"), { recursive: true });
-  for (const mockName of ["cameras", "corrections", "geocode", "moderation", "auth", "users", "photos"]) {
+  for (const mockName of ["cameras", "corrections", "geocode", "moderation", "auth", "users", "photos", "appeals"]) {
     const source = await readFile(path.join(mocksDir, `${mockName}.mjs`), "utf8");
     await writeFile(
       path.join(tree, "db", `${mockName}.mjs`),
