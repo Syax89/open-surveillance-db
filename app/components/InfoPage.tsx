@@ -1,6 +1,5 @@
-import Link from "next/link";
 import type { ReactNode } from "react";
-import { LocaleToggle } from "./LocaleProvider";
+import { SiteHeader } from "./SiteHeader";
 
 /**
  * Shared layout for the public informational pages
@@ -8,12 +7,12 @@ import { LocaleToggle } from "./LocaleProvider";
  *
  * Server Component (no "use client"): the pages render statically on the
  * server with per-route metadata (SSR/SEO, task t_c36fe96c). The only client
- * island is <LocaleToggle />, which re-renders the route via router.refresh()
- * when the user switches language.
+ * islands are <SiteHeader /> (which renders the LocaleToggle) and the
+ * toggle's router.refresh() when the user switches language.
  *
  * Encapsulates the structure those pages previously duplicated: the
- * navigation shell (nav-shell with brand + page nav links + locale
- * toggle), the intro article (eyebrow / title / summary / CTA action
+ * navigation shell (via the shared SiteHeader — brand + page nav links +
+ * locale toggle), the intro article (eyebrow / title / summary / CTA action
  * row) and the content sections, which each page supplies as children.
  *
  * Renders exactly the markup the per-page copies produced, so adopting
@@ -54,14 +53,9 @@ export function InfoPage({
 }: InfoPageProps) {
   return (
     <main id="main-content" className="record-page">
-      <nav className="nav-shell" aria-label={navLabel}>
-        <Link className="brand" href="/" aria-label={homeLabel}>
-          <span className="brand-mark" aria-hidden="true">◉</span>
-          <span>OpenSurveillanceDB</span>
-        </Link>
+      <SiteHeader navLabel={navLabel} homeLabel={homeLabel}>
         <div className="nav-links">{navLinks}</div>
-        <LocaleToggle />
-      </nav>
+      </SiteHeader>
 
       <article className="record-detail">
         <p className="eyebrow"><span /> {eyebrow}</p>
