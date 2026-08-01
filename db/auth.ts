@@ -551,10 +551,15 @@ export type ErasureResult = {
   deleted: boolean;
   /** Number of attributed reports that were de-attributed to anonymous. */
   deattributedReports: number;
+  /** Number of community verifications given/received that were hard-deleted. */
+  deletedConfirmations: number;
+  /** Number of correction reports de-attributed to anonymous (SET NULL). */
+  deattributedCorrections: number;
 };
 
 /**
- * Erase a contributor account (GDPR art. 17 erasure path, R7).
+ * Erase a contributor account (GDPR art. 17 erasure path, R7; community data
+ * ADR 0018 §6.2).
  *
  * De-attribution is EXPLICIT, not FK-driven: `cameras.contributor_id` has no
  * ON DELETE action on purpose, so the only way to remove a contributor who
@@ -565,11 +570,21 @@ export type ErasureResult = {
  * provenance … as long as the record is public"; the anonymous report keeps
  * its public fields, `contributor_id` becomes NULL).
  *
- * The three statements run as one atomic batch: a failure in any step rolls
- * back the whole erasure, so an account is never left half-deleted (e.g.
- * sessions gone but reports still attributed, or vice versa).
+ * Community data (ADR 0018 §6.2): verifications *given* to other records are
+ * hard-deleted — they were the contributor's own data, art. 17 — and the
+ * verification count on every record drops back. Verifications *received*
+ * by the erased account disappear with it. `camera_edit_requests` and
+ * `correction_requests` are de-attributed with SET NULL, never deleted: the
+ * requests (audit trail) survive, unlinked. `cameras` are never touched
+ * beyond the existing de-attribution (the ADR 0013 pattern).
  *
- * Returns the number of reports de-attributed (for the erasure response and
+ * The statements run as one atomic batch: a failure in any step rolls back
+ * the whole erasure, so an account is never left half-deleted (e.g. sessions
+ * gone but reports still attributed, or verifications deleted but the
+ * contributor row surviving).
+ *
+ * Returns the number of reports de-attributed, community verifications
+ * deleted and correction reports de-attributed (for the erasure response and
  * the audit trail) and whether the account row existed at all.
  */
 export async function eraseContributor(contributorId: number): Promise<ErasureResult> {
@@ -582,7 +597,7 @@ export async function eraseContributor(contributorId: number): Promise<ErasureRe
     .bind(contributorId)
     .first<{ n: number }>();
   if (Number(existing?.n ?? 0) === 0) {
-    return { deleted: false, deattributedReports: 0 };
+    return { deleted: false, deattributedReports: 0, deletedConfirmations: 0, deattributedCorrections: 0 };
   }
 
   const attributed = await d1
@@ -590,8 +605,26 @@ export async function eraseContributor(contributorId: number): Promise<ErasureRe
     .bind(contributorId)
     .first<{ n: number }>();
   const deattributedReports = Number(attributed?.n ?? 0);
+  const confirmations = await d1
+    .prepare("SELECT COUNT(*) AS n FROM camera_confirmations WHERE contributor_id = ?")
+    .bind(contributorId)
+    .first<{ n: number }>();
+  const deletedConfirmations = Number(confirmations?.n ?? 0);
+  const corrections = await d1
+    .prepare("SELECT COUNT(*) AS n FROM correction_requests WHERE contributor_id = ?")
+    .bind(contributorId)
+    .first<{ n: number }>();
+  const deattributedCorrections = Number(corrections?.n ?? 0);
 
   await d1.batch([
+    // Community verifications are the contributor's own data (art. 17): the
+    // rows are hard-deleted. The count drops back on every public record.
+    d1.prepare("DELETE FROM camera_confirmations WHERE contributor_id = ?").bind(contributorId),
+    // Contribution-edit requests: SET NULL, never delete — the edit request
+    // (and its moderation trail) survives, unlinked (audit, ADR 0018 §6.2).
+    d1.prepare("UPDATE camera_edit_requests SET contributor_id = NULL WHERE contributor_id = ?").bind(contributorId),
+    // Correction reports: SET NULL, never delete (same rule as cameras).
+    d1.prepare("UPDATE correction_requests SET contributor_id = NULL WHERE contributor_id = ?").bind(contributorId),
     d1.prepare("UPDATE cameras SET contributor_id = NULL WHERE contributor_id = ?").bind(contributorId),
     // Explicit session revocation, mirroring logout: after erasure no
     // session of this contributor may resolve, in every environment
@@ -601,5 +634,5 @@ export async function eraseContributor(contributorId: number): Promise<ErasureRe
     d1.prepare("DELETE FROM contributors WHERE id = ?").bind(contributorId),
   ]);
 
-  return { deleted: true, deattributedReports };
+  return { deleted: true, deattributedReports, deletedConfirmations, deattributedCorrections };
 }

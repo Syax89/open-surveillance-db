@@ -49,6 +49,11 @@ const expectedTables = [
   // Per-email login lockout (0016, ADR 0016): brute-force counter keyed by
   // the SHA-256 of the normalised email — never the address itself.
   "login_attempts",
+  // Community verifications + edit requests (0020/0021, ADR 0018): the
+  // toggle table (one confirmation per record+contributor) and the two-track
+  // PATCH edit-request table.
+  "camera_confirmations",
+  "camera_edit_requests",
 ];
 // Indexes declared by the migrations.
 const expectedIndexes = [
@@ -76,6 +81,18 @@ const expectedIndexes = [
   "cameras_status_kind_idx",
   "cameras_status_updated_idx",
   "cameras_status_last_verified_idx",
+  // Community verifications (0020): UNIQUE (camera, contributor) + the
+  // (contributor_id, created_at) quota-count index.
+  "camera_confirmations_camera_contributor_unique",
+  "camera_confirmations_contributor_created_idx",
+  // Contribution editing (0021): one open edit-request per camera + the
+  // per-contributor "my edits" index.
+  "camera_edit_requests_open_unique",
+  "camera_edit_requests_contributor_idx",
+  // Community corrections (0022): per-contributor "my corrections" index.
+  "correction_requests_contributor_idx",
+  // Community trust levels (0023): index-only level COUNT.
+  "cameras_contributor_status_idx",
 ];
 // Tables that are not application schema but legitimately appear in a local
 // D1 database. Anything outside this set is an unexpected schema change.

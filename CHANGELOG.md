@@ -134,6 +134,13 @@ changes accumulate under `[Unreleased]`.
   pilot + IT type-checked parity, registered in `index.ts` (COMMUNITY_PLAN
   §6, ADR 0007)
   ([#172](https://github.com/Syax89/open-surveillance-db/pull/172)).
+- Backend community verifications (C1, ADR 0018): migrazioni D1 0020-0023
+  (`camera_confirmations`, `camera_edit_requests`,
+  `correction_requests.contributor_id`, index livelli), API conferme
+  PUT/DELETE/GET `/api/cameras/[id]/confirmation`, `confirmationCount` nei
+  payload pubblici (GROUP BY IN, no N+1), anti-gaming 6 strati (quota D1
+  20/40, per-record 5, IP-hash burst, decay su `last_verified_at`), erasure
+  estesa art. 17 (ADR 0018, C1).
 
 ### Changed
 

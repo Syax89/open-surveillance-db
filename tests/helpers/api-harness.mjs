@@ -26,6 +26,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 const ROUTES = [
   { source: "app/api/cameras/route.ts", output: "app/api/cameras/route.mjs" },
   { source: "app/api/cameras/[id]/route.ts", output: "app/api/cameras/[id]/route.mjs" },
+  { source: "app/api/cameras/[id]/confirmation/route.ts", output: "app/api/cameras/[id]/confirmation/route.mjs" },
   { source: "app/api/cameras/nearby/route.ts", output: "app/api/cameras/nearby/route.mjs" },
   { source: "app/api/cameras/search/route.ts", output: "app/api/cameras/search/route.mjs" },
   { source: "app/api/cameras/revisions/route.ts", output: "app/api/cameras/revisions/route.mjs" },
@@ -61,6 +62,9 @@ const REAL_DB_MODULES = [
   { source: "db/geocode.ts", output: "db-real/geocode.mjs" },
   { source: "db/moderation.ts", output: "db-real/moderation.mjs" },
   { source: "db/photos.ts", output: "db-real/photos.mjs" },
+  // db/cameras.ts imports ./confirmations at runtime (the public payload
+  // carries confirmationCount), so the real db layer must resolve it.
+  { source: "db/confirmations.ts", output: "db-real/confirmations.mjs" },
 ];
 // db/moderation.ts imports ./freshness (pure, no CF binding) once the
 // freshness feature is present. CI checks out the PR head, not the merge
@@ -84,7 +88,7 @@ async function buildTree() {
   const mocksDir = path.join(root, "tests", "helpers", "mocks");
   const mockStateUrl = pathToFileURL(path.join(root, "tests", "helpers", "mock-state.mjs")).href;
   await mkdir(path.join(tree, "db"), { recursive: true });
-  for (const mockName of ["cameras", "corrections", "geocode", "moderation", "auth", "users", "photos", "appeals"]) {
+  for (const mockName of ["cameras", "corrections", "geocode", "moderation", "auth", "users", "photos", "appeals", "confirmations"]) {
     const source = await readFile(path.join(mocksDir, `${mockName}.mjs`), "utf8");
     await writeFile(
       path.join(tree, "db", `${mockName}.mjs`),

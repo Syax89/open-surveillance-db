@@ -46,6 +46,12 @@ export const cameras = sqliteTable(
     index("cameras_status_kind_idx").on(table.status, table.kind),
     index("cameras_status_updated_idx").on(table.status, sql`updated DESC`),
     index("cameras_status_last_verified_idx").on(table.status, sql`last_verified_at DESC`),
+    // Community trust levels (ADR 0018 §3, migration 0023): the level COUNT
+    // is `WHERE contributor_id = ? AND status = 'verified'`, so
+    // (contributor_id, status) turns it into an index-only seek. Declared
+    // here so drizzle-kit generate never re-emits it (convention 0012/0014:
+    // hand-written migration + schema declaration together).
+    index("cameras_contributor_status_idx").on(table.contributorId, table.status),
   ],
 );
 
@@ -71,8 +77,19 @@ export const correctionRequests = sqliteTable(
     // backfilled by migration 0018 from their moderation decision event.
     resolvedAt: text("resolved_at"),
     createdAt: text("created_at").notNull(),
+    // Optional attribution to the contributor who filed the report (ADR 0018
+    // §6.1, migration 0022): NULL = anonymous, which stays possible (reporter
+    // privacy). NEVER ON DELETE CASCADE — de-attribution is explicit in
+    // eraseContributor, exactly like cameras.contributor_id.
+    contributorId: integer("contributor_id").references(() => contributors.id),
   },
-  (table) => [index("correction_requests_status_idx").on(table.status)],
+  (table) => [
+    index("correction_requests_status_idx").on(table.status),
+    // "My corrections" profile list (migration 0022). Declared here so
+    // drizzle-kit generate never re-emits it (convention 0012/0014:
+    // hand-written migration + schema declaration together).
+    index("correction_requests_contributor_idx").on(table.contributorId),
+  ],
 );
 
 /**
@@ -349,5 +366,77 @@ export const photos = sqliteTable(
     index("photos_pending_submitter_idx")
       .on(table.submitterKey)
       .where(sql`${table.status} = 'pending'`),
+  ],
+);
+
+/**
+ * Community verifications (ADR 0018 §2, migration 0020). Toggle semantics,
+ * one confirmation type per (record, contributor): the UNIQUE
+ * (camera_id, contributor_id) index is the structural anti-gaming layer —
+ * one active verification per pair, enforced at the database level (a
+ * concurrent double-PUT yields exactly one row, the second answers 409).
+ * `created_at` drives the daily-quota COUNT (per contributor) and the
+ * per-record cap; `(contributor_id, created_at)` serves both. The decay rule
+ * (`created_at >= cameras.last_verified_at`) is applied in the count query,
+ * not here. ON DELETE CASCADE is mirrored by an explicit delete in
+ * eraseContributor because the test harness does not enforce foreign keys.
+ * Declared here so drizzle-kit generate never re-emits it (convention
+ * 0012/0014: hand-written migration + schema declaration together).
+ */
+export const cameraConfirmations = sqliteTable(
+  "camera_confirmations",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    cameraId: integer("camera_id")
+      .notNull()
+      .references(() => cameras.id, { onDelete: "cascade" }),
+    contributorId: integer("contributor_id")
+      .notNull()
+      .references(() => contributors.id, { onDelete: "cascade" }),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("camera_confirmations_camera_contributor_unique").on(table.cameraId, table.contributorId),
+    index("camera_confirmations_contributor_created_idx").on(table.contributorId, table.createdAt),
+  ],
+);
+
+/**
+ * Community contribution editing (ADR 0018 §4, migration 0021). Published-
+ * record edits never mutate `cameras` directly: they insert a row here with
+ * the explicit per-column diff against the editable whitelist plus a
+ * `moderation_queue` row (entity `camera_edit`). The partial unique index
+ * `(camera_id) WHERE status = 'pending'` mirrors
+ * `moderation_queue_open_unique`: one open edit-request per camera. The
+ * proposed-* columns are the editable whitelist; status transitions
+ * pending -> approved | rejected with the reviewer decision fields.
+ * Declared here so drizzle-kit generate never re-emits it (convention
+ * 0012/0014: hand-written migration + schema declaration together).
+ */
+export const cameraEditRequests = sqliteTable(
+  "camera_edit_requests",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    cameraId: integer("camera_id").references(() => cameras.id, { onDelete: "set null" }),
+    contributorId: integer("contributor_id").references(() => contributors.id),
+    proposedTitle: text("proposed_title"),
+    proposedKind: text("proposed_kind"),
+    proposedAddress: text("proposed_address"),
+    proposedNotes: text("proposed_notes"),
+    proposedManufacturer: text("proposed_manufacturer"),
+    proposedObservedOn: text("proposed_observed_on"),
+    proposedDescription: text("proposed_description"),
+    status: text("status").notNull().default("pending"),
+    decidedBy: integer("decided_by").references(() => reviewers.id),
+    decisionNote: text("decision_note"),
+    decidedAt: text("decided_at"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("camera_edit_requests_open_unique")
+      .on(table.cameraId)
+      .where(sql`status = 'pending'`),
+    index("camera_edit_requests_contributor_idx").on(table.contributorId),
   ],
 );

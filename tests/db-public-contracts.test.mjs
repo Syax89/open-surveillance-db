@@ -213,6 +213,9 @@ test("listPublicCamerasPage returns exactly limit records, the true total and a 
   assert.equal(first.nextOffset, 3, "a non-final page advertises the next offset");
   // Same id DESC ordering as the full list (stable offsets between requests).
   assert.deepEqual(first.records.map((record) => record.id), [created[6].id, created[5].id, created[4].id]);
+  // Community-verification aggregate (ADR 0018 §2.3): every page record
+  // carries the decayed confirmationCount, filled by one GROUP BY IN query.
+  assert.equal(typeof first.records[0].confirmationCount, "number");
 
   const middle = await cameras.listPublicCamerasPage(undefined, { limit: 3, offset: 3 });
   assert.deepEqual(middle.records.map((record) => record.id), [created[3].id, created[2].id, created[1].id]);
@@ -269,6 +272,32 @@ test("listPublicCamerasPage applies the same public boundary, filters and coordi
   assert.equal(rounded.latitude, 44.1235, "coordinates are rounded to ~4 decimals like the full list");
   assert.equal(rounded.longitude, 12.3457);
   assert.equal("notes" in rounded, false, "the private notes field never crosses the boundary");
+});
+
+test("getPublicCameraById carries the decayed community-verification count", async () => {
+  const { env, cameras } = await realDb();
+  await resetDb({ env, cameras });
+  await env.DB.prepare(
+    "INSERT INTO contributors (id, email, display_name, password_hash, created_at, updated_at) VALUES (?, ?, NULL, ?, ?, ?)",
+  )
+    .bind(7, "confirm@example.org", "pbkdf2$test$fixture", "2026-08-01T00:00:00.000Z", "2026-08-01T00:00:00.000Z")
+    .run();
+  const live = await insertCamera(env, { title: "Live cam" });
+  const decayed = await insertCamera(env, { title: "Decayed cam" });
+  // One confirmation inside the review window (counts) and one before it (decayed).
+  await env.DB.prepare("INSERT INTO camera_confirmations (camera_id, contributor_id, created_at) VALUES (?, ?, ?)")
+    .bind(live.id, 7, "2026-08-15T00:00:00.000Z")
+    .run();
+  await env.DB.prepare("UPDATE cameras SET last_verified_at = '2026-08-10T00:00:00.000Z' WHERE id = ?").bind(live.id).run();
+  await env.DB.prepare("INSERT INTO camera_confirmations (camera_id, contributor_id, created_at) VALUES (?, ?, ?)")
+    .bind(decayed.id, 7, "2026-08-01T00:00:00.000Z")
+    .run();
+  await env.DB.prepare("UPDATE cameras SET last_verified_at = '2026-08-10T00:00:00.000Z' WHERE id = ?").bind(decayed.id).run();
+
+  const liveRecord = await cameras.getPublicCameraById(live.id);
+  assert.equal(liveRecord.confirmationCount, 1, "the in-window confirmation counts");
+  const decayedRecord = await cameras.getPublicCameraById(decayed.id);
+  assert.equal(decayedRecord.confirmationCount, 0, "the decayed confirmation does not count");
 });
 
 test("createPendingCamera stores a private pending record with publication flags off", async () => {

@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 import { classifyDuplicateMatch, textSimilarity, type MatchStrength } from "../app/lib/duplicate-detection";
 import { PUBLIC_CAMERA_STATUSES } from "../app/lib/public-status";
+import { confirmationCountsFor } from "./confirmations";
 
 export type CameraRecord = {
   id: number;
@@ -29,7 +30,15 @@ export type CameraRecord = {
 };
 
 /** Public read boundary: the private `notes` field must never leave this type. */
-export type PublicCameraRecord = Omit<CameraRecord, "notes">;
+export type PublicCameraRecord = Omit<CameraRecord, "notes"> & {
+  /**
+   * Decayed community-verification count (ADR 0018 §2.3). Aggregate only —
+   * never attribution to any profile. Set by getPublicCameraById and the
+   * paginated list (one GROUP BY IN query, no N+1); the full-list / nearby /
+   * bbox surfaces keep their historical shape and do not populate it.
+   */
+  confirmationCount: number;
+};
 
 /**
  * Zone-level coordinate precision for the public boundary (decision 2026-07-31,
@@ -184,7 +193,14 @@ export async function listPublicCamerasPage(
     .prepare(`SELECT id, title, kind, CASE WHEN publish_manufacturer = 1 THEN manufacturer ELSE NULL END AS manufacturer, CASE WHEN publish_observed_on = 1 THEN observed_on ELSE NULL END AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, latitude, longitude, status, source, updated, description, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt ${query} ORDER BY id DESC LIMIT ? OFFSET ?`)
     .bind(...parameters, limit, offset)
     .all<PublicCameraRecord>();
-  const records = result.results.map((record) => ({ ...record, latitude: roundPublicCoordinate(record.latitude), longitude: roundPublicCoordinate(record.longitude) }));
+  const records = result.results.map((record) => ({ ...record, latitude: roundPublicCoordinate(record.latitude), longitude: roundPublicCoordinate(record.longitude), confirmationCount: 0 }));
+  // Community-verification counts (ADR 0018 §2.3): one GROUP BY IN query for
+  // the whole page — never an N+1 per record. The counts are decayed (only
+  // confirmations at/after last_verified_at count).
+  if (records.length > 0) {
+    const counts = await confirmationCountsFor(records.map((record) => record.id));
+    for (const record of records) record.confirmationCount = counts.get(record.id) ?? 0;
+  }
   const nextOffset = offset + records.length < total ? offset + records.length : null;
   return { records, total, nextOffset };
 }
@@ -279,7 +295,9 @@ export async function getPublicCameraById(id: number, nowIso: string = new Date(
     .bind(id, ...parameters)
     .first<PublicCameraRecord>();
   if (!result) return null;
-  return { ...result, latitude: roundPublicCoordinate(result.latitude), longitude: roundPublicCoordinate(result.longitude) };
+  // Decayed community-verification count (ADR 0018 §2.3), aggregate only.
+  const confirmationCount = await confirmationCountsFor([id]).then((map) => map.get(id) ?? 0);
+  return { ...result, latitude: roundPublicCoordinate(result.latitude), longitude: roundPublicCoordinate(result.longitude), confirmationCount };
 }
 
 export type PublicCameraFacets = {

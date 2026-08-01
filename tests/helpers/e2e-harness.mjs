@@ -84,6 +84,9 @@ const REAL_DB_MODULES = [
   // db/retention.ts (ADR 0008 scheduled sweep) is imported by the worker
   // edge gate; compile it into the tree so the worker module resolves.
   { source: "db/retention.ts", output: "db/retention.mjs" },
+  // db/cameras.ts imports ./confirmations at runtime (the public payload
+  // carries confirmationCount), so the real db layer must resolve it.
+  { source: "db/confirmations.ts", output: "db/confirmations.mjs" },
 ];
 
 let builtTreePromise = null;
