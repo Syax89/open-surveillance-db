@@ -1,7 +1,7 @@
 # Moderation service-level agreements (SLA)
 
 - **Status:** draft for pre-launch review
-- **Owner:** Rosa (DPO / privacy) with the moderation team
+- **Owner:** Rosa (Legal & Privacy Officer / privacy contact) with the moderation team
 - **Implements:** ../MODERATION.md ("Appeals and corrections" + "Moderator safeguards"); review findings M1, M2, M3.
 - **Alignment:** response times are compatible with GDPR art. 12(3) (1-month substantive response).
 
@@ -62,4 +62,4 @@ Retention: 2 years (RETENTION_SCHEDULE.md R5). The log is internal — never exp
 ## 7. Exceptions
 
 - SLA targets may be missed only when a legal/technical blocker is documented (e.g. mailbox outage) or when the privacy contact signs off a temporary pause (e.g. during a breach response).
-- No SLA suspension without DPO approval.
+- No SLA suspension without the privacy/legal owner's approval.

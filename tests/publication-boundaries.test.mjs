@@ -648,11 +648,14 @@ test("public handlers reject oversized inputs and guard the request URI", async 
   }
   for (const [label, source] of Object.entries({ cameras: routes.cameras, corrections: routes.corrections, moderation: routes.moderation })) {
     assert.match(source, /readJsonBody\(request,\s*env\)/, `${label} must read bodies through the capped reader`);
-    assert.match(source, /PayloadTooLargeError/, `${label} must handle the 413 signal`);
+    // The routes answer the whole transport-level body-error family
+    // (BodyReadError base: 413 oversized + 400 malformed JSON) with the
+    // error's own status instead of a blanket 500.
+    assert.match(source, /BodyReadError/, `${label} must handle the transport-level body errors`);
     assert.match(
       source,
       /status:\s*(?:413|error\.status)/,
-      `${label} must answer 413 for oversized bodies`,
+      `${label} must answer the body error's status (413 / 400)`,
     );
   }
 });

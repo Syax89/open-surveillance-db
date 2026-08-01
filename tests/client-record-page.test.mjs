@@ -8,11 +8,14 @@
  *      source, revision history);
  *   3. not-found: an id absent from the public payload renders the "could
  *      not find" state with a browse-directory link;
- *   4. fetch error: the page degrades to the local prototype records
- *      (defense-in-depth) instead of crashing.
+ *   4. fetch error: the page renders the honest error state with a retry
+ *      (a dead API is never reported as "not found" — audit t_c6da60f0);
+ *   5. empty public payload: an API that answers with no records renders the
+ *      not-found state, not an error;
+ *   6. retry: reloading after a failed fetch recovers and renders the record.
  *
  * SurveillanceMap status-leak gate:
- *   5. markers only receive the CSS status class for whitelisted public
+ *   7. markers only receive the CSS status class for whitelisted public
  *      statuses (verified/demo); pending/rejected markers render with an
  *      empty status class (reuses the isPublicStatus whitelist).
  *
@@ -28,15 +31,24 @@ import {
 let rtl;
 let RecordPage;
 let SurveillanceMap;
+let __resetPublicCamerasCache;
 
 before(async () => {
   rtl = await setupDom();
   RecordPage = await loadDomPage("app/records/[id]/page.mjs");
   const mapMod = await loadDomModule("app/components/SurveillanceMap.mjs");
   SurveillanceMap = mapMod.SurveillanceMap;
+  // The usePublicCameras module keeps a module-level cache across tests in
+  // this process; each test installs its own fetch mock, so the cache must
+  // be dropped between tests (same instance the page module imports).
+  const camerasMod = await loadDomModule("app/lib/use-public-cameras.mjs");
+  __resetPublicCamerasCache = camerasMod.__resetPublicCamerasCache;
 });
 
-afterEach(() => rtl?.cleanup());
+afterEach(() => {
+  rtl?.cleanup();
+  __resetPublicCamerasCache();
+});
 
 const publicRecordFixture = {
   id: 7,
@@ -86,7 +98,7 @@ test("record page: loading state is announced while fetches are pending", async 
 });
 
 test("record page: found record renders public fields and revision history", async () => {
-  const { screen, waitFor } = rtl;
+  const { screen } = rtl;
   installFetchMock(recordHandler());
   await setNavState({ params: { id: "7" } });
 
@@ -122,15 +134,52 @@ test("record page: unknown id renders the not-found state", async () => {
   assert.equal(browse.getAttribute("href"), "/#records");
 });
 
-test("record page: fetch failure degrades to local prototype data instead of crashing", async () => {
+test("record page: fetch failure renders the honest error state, never a fake 'not found'", async () => {
   const { screen } = rtl;
   installFetchMock(recordHandler({ fail: true }));
   await setNavState({ params: { id: "7" } });
 
   await renderWithLocale(React.createElement(RecordPage));
-  // No crash; the local prototype records (ids 1 and 2, demo status) remain
-  // the fallback dataset, so id 7 is absent -> not-found, not a blank page.
+  // A dead API must be surfaced as an error with a retry, not reported as
+  // "record not found" — the swallowed-error defect from audit t_c6da60f0.
+  await screen.findByText("Could not load the public record.");
+  assert.ok(screen.getByText(
+    "The record service is unreachable right now. Check your connection and try again.",
+  ));
+  assert.ok(screen.getByRole("button", { name: "Try again" }));
+});
+
+test("record page: an empty public payload renders the not-found state, not an error", async () => {
+  const { screen } = rtl;
+  installFetchMock(recordHandler({ records: [] }));
+  await setNavState({ params: { id: "7" } });
+
+  await renderWithLocale(React.createElement(RecordPage));
+  // The API answered 200 but published nothing: "not public / removed" is
+  // the honest reading, not an unreachable-service error.
   await screen.findByText("We could not find that public record.");
+});
+
+test("record page: retry after a failed load refetches and renders the record", async () => {
+  const { screen } = rtl;
+  let cameraCalls = 0;
+  installFetchMock((input) => {
+    if (input === "/api/cameras") {
+      cameraCalls += 1;
+      return cameraCalls === 1
+        ? Promise.reject(new TypeError("Failed to fetch"))
+        : jsonResponse({ records: [publicRecordFixture] });
+    }
+    if (input === "/api/cameras/revisions?cameraId=7") return jsonResponse(revisions);
+    return jsonResponse({ error: "unexpected route" }, { status: 404 });
+  });
+  await setNavState({ params: { id: "7" } });
+
+  await renderWithLocale(React.createElement(RecordPage));
+  await screen.findByText("Could not load the public record.");
+  const user = rtl.userEvent.setup();
+  await user.click(screen.getByRole("button", { name: "Try again" }));
+  await screen.findByText("Fixture Public Camera");
 });
 
 test("map: markers only carry the CSS status class for whitelisted public statuses", async () => {

@@ -22,6 +22,7 @@ Initial owners were named by the CEO on 2026-07-31 as part of the Wave A pilot b
 | Data stewards | Linus and Grace |
 | Security contact | Ken — private reporting route in [SECURITY.md](SECURITY.md) |
 | Moderation contact | Grace |
+| Privacy / legal contact (data-protection contact) | Rosa (Legal & Privacy Officer) |
 
 These are initial nominations for the pilot, not a claim that the full public governance structure already exists.
 

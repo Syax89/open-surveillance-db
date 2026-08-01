@@ -15,7 +15,7 @@ import {
 } from "../../lib/rate-limit";
 import { recordRateLimitBlock } from "../../lib/abuse-alerts";
 import {
-  PayloadTooLargeError,
+  BodyReadError,
   readJsonBody,
   urlTooLong,
 } from "../../lib/input-limits";
@@ -185,8 +185,8 @@ export async function POST(request: Request) {
     }
     return Response.json({ record, possibleDuplicates, linkedPhotos: linkedPhotoCount }, { status: 201 });
   } catch (error) {
-    if (error instanceof PayloadTooLargeError) {
-      console.warn("POST /api/cameras payload rejected: body over the configured byte cap");
+    if (error instanceof BodyReadError) {
+      console.warn("POST /api/cameras payload rejected: body too large or not valid JSON");
       return Response.json({ error: error.message }, { status: error.status });
     }
     console.error("POST /api/cameras failed", error);
