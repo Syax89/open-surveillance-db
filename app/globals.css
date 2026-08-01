@@ -159,3 +159,8 @@ footer { padding:30px 0 44px; display:grid; grid-template-columns:1fr 1fr 1fr; a
 .faq-item summary:focus-visible { outline:3px solid #0b705c; outline-offset:-3px; }
 .faq-item p { margin:0; padding:0 22px 22px 60px; color:#52656d; font-size:14px; line-height:1.55; }
 @media (max-width:700px){ .faq-item p { padding-left:22px; } }
+/* Manifesto page (app/manifesto/page.tsx): compact list inside the
+   "Published / Never published" cards. Reuses the correction-form card
+   palette so contrast matches the rest of the site. */
+.manifesto-list { display:grid; gap:10px; margin:14px 0 0; padding:0 0 0 18px; color:#435963; font-size:13px; line-height:1.5; }
+.manifesto-list li::marker { color:#3e9477; }

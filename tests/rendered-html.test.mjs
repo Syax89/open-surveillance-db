@@ -161,6 +161,77 @@ test("global footer exposes every institutional page, the ODbL data licence and 
   assert.equal(footerCount, 1, `expected a single footer landmark, found ${footerCount}`);
 });
 
+test("server-rendered /manifesto is accessible and carries the mission, principles, non-goals and publish boundaries", async () => {
+  const { response, html } = await renderRoute("/manifesto");
+
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
+
+  // Main landmark, one h1 with the manifesto title.
+  assert.match(html, /<main[^>]*id="main-content"/);
+  assert.match(html, /<h1>A manifesto for legible public space\.<\/h1>/);
+  assert.equal((html.match(/<h1>/g) ?? []).length, 1);
+
+  // The four content blocks are labelled landmarks (a11y navigation).
+  assert.match(html, /aria-labelledby="mission-title"/);
+  assert.match(html, /aria-labelledby="principles-title"/);
+  assert.match(html, /aria-labelledby="non-goals-title"/);
+  assert.match(html, /aria-labelledby="publish-title"/);
+  assert.match(html, /<h2[^>]*id="mission-title">Help people understand the systems around them\.<\/h2>/);
+  assert.match(html, /<h2[^>]*id="non-goals-title">What we deliberately do not do\.<\/h2>/);
+
+  // Mission, the five principles, and the four non-goals all render.
+  assert.match(html, /What we document/);
+  assert.match(html, /Free to use/);
+  assert.match(html, /Open source/);
+  assert.match(html, /Open data with provenance/);
+  assert.match(html, /Privacy and safety by design/);
+  assert.match(html, /Human moderation first/);
+  assert.match(html, /No camera feeds/);
+  assert.match(html, /No tracking tools/);
+  assert.match(html, /No evasion advice/);
+  assert.match(html, /No private property/);
+
+  // Publish boundary: what is published and what is never published.
+  assert.match(html, /<h2[^>]*id="publish-title">Open where it is safe to be open\.<\/h2>/);
+  assert.match(html, /<ul class="manifesto-list">/);
+  assert.match(html, /Never published/);
+  assert.match(html, /Submissions and corrections before — or without — human review/);
+
+  // Shared info-page layout + footer.
+  assert.match(html, /class="record-page"/);
+  assert.match(html, /class="nav-shell"/);
+  assert.match(html, /Built for transparency, not tracking\./);
+});
+
+test("homepage and guide link to /manifesto from the nav and the footer", async () => {
+  const pages = await Promise.all([renderRoute("/"), renderRoute("/guide")]);
+
+  for (const { response, html } of pages) {
+    assert.equal(response.status, 200);
+    assert.match(html, /href="\/manifesto"/);
+  }
+  assert.match(pages[0].html, /<a href="\/manifesto">Manifesto<\/a>/);
+  assert.match(pages[1].html, /<a href="\/manifesto">Manifesto<\/a>/);
+});
+
+test("manifesto page reuses the shared info-page styles (approved contrast palette)", async () => {
+  const [page, css] = await Promise.all([
+    readFile(path.join(root, "app", "manifesto", "page.tsx"), "utf8"),
+    readFile(path.join(root, "app", "globals.css"), "utf8"),
+  ]);
+
+  // The page reuses the same layout classes as the guide page and the home
+  // page — no new colour decisions, so the already-reviewed contrast palette
+  // applies unchanged. The only new rule is the manifesto list, which reuses
+  // the correction-form card colours (#435963 on #fbfbf7, WCAG AA).
+  for (const cls of ["record-page", "nav-shell", "principles", "records-section", "correction-section", "record-detail"]) {
+    assert.match(page, new RegExp(`className="[^"]*${cls}`), `expected className to reuse ${cls}`);
+  }
+  assert.match(css, /\.manifesto-list\s*\{/);
+
+});
+
 test("moderation info page explains review flow, appeals and safeguards", async () => {
   const { response, html } = await renderRoute("/moderazione");
 
