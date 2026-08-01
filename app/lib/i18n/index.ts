@@ -27,6 +27,7 @@ import { en as rulesEn, it as rulesIt } from "./rules";
 import { en as recordEn, it as recordIt } from "./record";
 import { en as moderationEn, it as moderationIt } from "./moderation";
 import { en as authEn, it as authIt } from "./auth";
+import { en as communityEn, it as communityIt } from "./community";
 import { en as footerEn, it as footerIt } from "./footer";
 import type { Locale, Translation } from "./types";
 
@@ -47,6 +48,7 @@ export const en = {
   record: recordEn,
   moderation: moderationEn,
   auth: authEn,
+  community: communityEn,
   footer: footerEn,
 } as const;
 
@@ -67,6 +69,7 @@ export const it: Translation<typeof en> = {
   record: recordIt,
   moderation: moderationIt,
   auth: authIt,
+  community: communityIt,
   footer: footerIt,
 };
 

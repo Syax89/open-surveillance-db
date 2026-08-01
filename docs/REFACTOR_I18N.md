@@ -34,6 +34,7 @@ app/lib/i18n/
   record.ts       # /records/[id] — record detail
   moderation.ts   # local moderation dashboard (queue, audit, photos)
   auth.ts         # login / register / account pages
+  community.ts    # community system: trust levels, verifications, profile, editing
   footer.ts       # global site footer
 ```
 
@@ -58,7 +59,8 @@ changes** were needed.
   `npx tsc --noEmit` — CI enforces parity at compile time.
 - Verified after the split: all 14 domains, 722 message leaves per
   language, identical key sets at every nesting level; 0 missing, 0 extra,
-  0 value drift between the old and new files.
+  0 value drift between the old and new files. (The community system later
+  added a 15th domain, `community.ts` — C-i18n, COMMUNITY_PLAN §6.)
 - `tests/navigation-pages.test.mjs` re-checks per-domain key parity and
   untranslated-English leftovers at test time.
 
@@ -101,6 +103,7 @@ short version:
 | Home (hub) | `home.ts` | `/` hero + orienting content (tool sections moved to their own bundles in F1) |
 | Record detail | `record.ts` | |
 | Auth | `auth.ts` | |
+| Community (trust levels, verifications, profile, editing) | `community.ts` | `/account` community section, `/records/[id]` verification widget, `/records/[id]/edit` (COMMUNITY_PLAN §6) |
 | Moderation dashboard | `moderation.ts` | private, local-only |
 | Informational pages | `guide.ts`, `manifesto.ts`, `faq.ts`, `contact.ts`, `rules.ts`, `moderazione.ts` | one per page |
 | Legal pages | `app/lib/legal/` | typed content layer, NOT i18n bundles |

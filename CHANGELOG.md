@@ -128,6 +128,12 @@ changes accumulate under `[Unreleased]`.
   ([#48](https://github.com/Syax89/open-surveillance-db/pull/48),
   [ADR 0011](docs/decisions/0011-governance-owners-hosting-domain.md),
   [#52](https://github.com/Syax89/open-surveillance-db/pull/52)).
+- Community i18n bundle (`app/lib/i18n/community.ts`): frozen vocabulary for
+  trust levels, verifications (never "stars"), contributor profile,
+  contribution editing, abuse reporting and destructive confirmations — EN
+  pilot + IT type-checked parity, registered in `index.ts` (COMMUNITY_PLAN
+  §6, ADR 0007)
+  ([#172](https://github.com/Syax89/open-surveillance-db/pull/172)).
 
 ### Changed
 
@@ -170,6 +176,11 @@ changes accumulate under `[Unreleased]`.
   every page keeps the global site footer only, and the `/regole` "never"
   heading renders its correct title instead of the body string
   ([#76](https://github.com/Syax89/open-surveillance-db/pull/76)).
+- Italian interface bundles use "contributor" instead of "contributore"
+  (`auth.ts` register title and `moderazione.ts` credentials copy), fixing
+  the pre-existing EN/IT terminology drift flagged by the community copy
+  review (COMMUNITY_PLAN §6.1)
+  ([#172](https://github.com/Syax89/open-surveillance-db/pull/172)).
 
 ### Security
 

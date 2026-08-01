@@ -1,0 +1,221 @@
+/**
+ * community — community-system interface strings.
+ *
+ * English is the pilot language: `en` defines the canonical key set for
+ * this domain, `it` is type-checked against it via `Translation<typeof en>`
+ * (see `./types.ts`), so a missing or extra key fails `tsc --noEmit`.
+ *
+ * Vocabulary frozen by the copy review (kanban comment #814, Eva) and
+ * consolidated in docs/COMMUNITY_PLAN.md §6: trust levels / livelli di
+ * fiducia, verifications / verifiche (NEVER "stars"), badges
+ * New/Trusted/Experienced contributor, abuse reporting, contribution
+ * editing and destructive confirmations. Zero gamification jargon.
+ */
+import type { Translation } from "./types";
+
+export const en = {
+  // --- Trust levels (frozen: NEVER "tiers", "rank", "XP", "points") ---
+  trustLevels: "Trust levels",
+  trustLevel: "Trust level",
+  yourTrustLevel: "Your trust level",
+  levelReached: "You reached a new trust level.",
+  seeYourTrustLevel: "See your trust level",
+  badgeLabels: {
+    new: "New contributor",
+    trusted: "Trusted contributor",
+    experienced: "Experienced contributor",
+  },
+  levelDescriptions: {
+    new: "You are a new contributor. Your reports are reviewed by moderators before publication, like everyone else's.",
+    trusted:
+      "You are a trusted contributor. Your consistent, verified contributions mean your reports may be prioritised in the moderation queue.",
+    experienced:
+      "You are an experienced contributor. Your track record of accurate, verified contributions is recognised by the community.",
+  },
+  progressToNextLevel: (count: number) =>
+    `${count} verified ${count === 1 ? "contribution" : "contributions"} to reach the next trust level`,
+
+  // --- Verifications (frozen: NEVER "stars", "badges", "upvotes") ---
+  verifications: "Verifications",
+  verification: "Verification",
+  addVerification: "Add a verification",
+  verificationCount: (total: number) =>
+    `${total} ${total === 1 ? "verification" : "verifications"}`,
+  verifiedByCommunity: "Verified by the community",
+  recordHasVerifications: (total: number) =>
+    `This record has ${total} ${total === 1 ? "verification" : "verifications"}`,
+  confirmExists: "Confirm this record exists",
+  verifyHelp:
+    "You are adding a verification to this record. This means you have personally confirmed the camera is present at the documented location.",
+  verificationAdded: "Verification added",
+  removeOwnVerificationTitle: "Remove your verification?",
+  removeOwnVerificationBody:
+    "Your verification will be removed from this record. Other verifications, if any, remain.",
+  removeVerification: "Remove verification",
+  verificationRemoved: "Verification removed",
+  reportVerificationAbuse: "Report verification as abuse",
+  reportAbuseHelp:
+    "Use this only if the verification appears false, automated, or submitted in bad faith.",
+  abuseReportSent: "Abuse report sent",
+  abuseReportThanks: "Thank you. A moderator will review this verification.",
+  noVerificationsYet: "No verifications yet",
+  notVerifiedByCommunity:
+    "This record has not been independently verified by the community yet.",
+  errorAddVerification: "Could not add your verification. Please try again.",
+  errorRemoveVerification: "Could not remove your verification. Please try again.",
+  errorSelfVerify: "You cannot verify your own record.",
+  errorAlreadyVerified: "You have already verified this record.",
+
+  // --- Contributor profile / contributions list (C5) ---
+  contributions: "Contributions",
+  contribution: "Contribution",
+  yourContributions: "Your contributions",
+  contributionCount: (total: number) =>
+    `${total} ${total === 1 ? "contribution" : "contributions"}`,
+  noContributionsYet: "No contributions yet",
+  noContributionsBody: "You have not contributed any records yet.",
+  noVerificationsBody:
+    "You have not added any verifications yet. Visit a record you can confirm to add your first.",
+  contributorProfile: "Contributor profile",
+  // Contribution status filters: mirror the shared record-status vocabulary
+  // (status.ts) deliberately — the profile list keeps its own labels so a
+  // page never mixes bundles (same pattern as moderation.ts statusLabels).
+  statusFilters: {
+    all: "All",
+    pending: "In moderation",
+    verified: "Verified",
+    needs_review: "Needs review",
+    removed: "Removed",
+  },
+  errorLoadContributions: "Could not load your contributions.",
+  errorLoadTrustLevel: "Could not load your trust level.",
+  gateL1Help: "You can verify records after your first contribution is published.",
+
+  // --- Contribution editing (C6) ---
+  edit: "Edit",
+  editContribution: "Edit contribution",
+  editYourContribution: "Edit your contribution",
+  editReviewNotice:
+    "Your changes will be reviewed by a moderator before they replace the current record.",
+  saveChanges: "Save changes",
+  saveSubmitForReview: "Save and submit for review",
+  cancel: "Cancel",
+  editBlockedRemoved:
+    "This contribution cannot be edited: the record was removed or rejected.",
+  errorEditNotOwner: "You can only edit your own contributions.",
+  errorEditConflict: "An edit request for this record is already under review.",
+  errorEditRateLimit: "Too many attempts. Please try again in a minute.",
+
+  // --- Destructive confirmations ---
+  removeVerificationConfirmTitle: "Remove your verification from this record?",
+  cannotBeUndone: "This cannot be undone.",
+  remove: "Remove",
+  deleteContributionTitle: "Delete this contribution?",
+  deleteContributionBody:
+    "The record will be removed from the public directory and sent to moderation. This cannot be undone.",
+  deleteContribution: "Delete contribution",
+} as const;
+
+export const it: Translation<typeof en> = {
+  // --- Livelli di fiducia (congelato: MAI "tiers", "rank", "XP", "punti") ---
+  trustLevels: "Livelli di fiducia",
+  trustLevel: "Livello di fiducia",
+  yourTrustLevel: "Il tuo livello di fiducia",
+  levelReached: "Hai raggiunto un nuovo livello di fiducia.",
+  seeYourTrustLevel: "Vedi il tuo livello di fiducia",
+  badgeLabels: {
+    new: "Nuovo contributor",
+    trusted: "Contributor fidato",
+    experienced: "Contributor esperto",
+  },
+  levelDescriptions: {
+    new: "Sei un nuovo contributor. Le tue segnalazioni sono esaminate dai moderatori prima della pubblicazione, come quelle di tutti.",
+    trusted:
+      "Sei un contributor fidato. I tuoi contributi costanti e verificati fanno sì che le tue segnalazioni possano essere prioritarizzate nella coda di moderazione.",
+    experienced:
+      "Sei un contributor esperto. Il tuo storico di contributi accurati e verificati è riconosciuto dalla community.",
+  },
+  progressToNextLevel: (count: number) =>
+    `${count} contribut${count === 1 ? "o" : "i"} verificat${count === 1 ? "o" : "i"} per raggiungere il prossimo livello di fiducia`,
+
+  // --- Verifiche (congelato: MAI "stars", "badges", "upvotes") ---
+  verifications: "Verifiche",
+  verification: "Verifica",
+  addVerification: "Aggiungi una verifica",
+  verificationCount: (total: number) =>
+    `${total} ${total === 1 ? "verifica" : "verifiche"}`,
+  verifiedByCommunity: "Verificato dalla community",
+  recordHasVerifications: (total: number) =>
+    `Questo record ha ${total} ${total === 1 ? "verifica" : "verifiche"}`,
+  confirmExists: "Conferma che questo record esiste",
+  verifyHelp:
+    "Stai aggiungendo una verifica a questo record. Significa che hai confermato personalmente la presenza della telecamera nella posizione documentata.",
+  verificationAdded: "Verifica aggiunta",
+  removeOwnVerificationTitle: "Rimuovere la tua verifica?",
+  removeOwnVerificationBody:
+    "La tua verifica verrà rimossa da questo record. Le altre eventuali verifiche restano.",
+  removeVerification: "Rimuovi verifica",
+  verificationRemoved: "Verifica rimossa",
+  reportVerificationAbuse: "Segnala la verifica come abuso",
+  reportAbuseHelp:
+    "Usalo solo se la verifica appare falsa, automatizzata o inviata in malafede.",
+  abuseReportSent: "Segnalazione di abuso inviata",
+  abuseReportThanks: "Grazie. Un moderatore esaminerà questa verifica.",
+  noVerificationsYet: "Nessuna verifica",
+  notVerifiedByCommunity:
+    "Questo record non è ancora stato verificato indipendentemente dalla community.",
+  errorAddVerification: "Non è stato possibile aggiungere la verifica. Riprova.",
+  errorRemoveVerification: "Non è stato possibile rimuovere la verifica. Riprova.",
+  errorSelfVerify: "Non puoi verificare un tuo record.",
+  errorAlreadyVerified: "Hai già verificato questo record.",
+
+  // --- Profilo del contributor / elenco contributi (C5) ---
+  contributions: "Contributi",
+  contribution: "Contributo",
+  yourContributions: "I tuoi contributi",
+  contributionCount: (total: number) =>
+    `${total} ${total === 1 ? "contributo" : "contributi"}`,
+  noContributionsYet: "Nessun contributo",
+  noContributionsBody: "Non hai ancora contribuito a nessun record.",
+  noVerificationsBody:
+    "Non hai ancora aggiunto verifiche. Visita un record che puoi confermare per aggiungere la prima.",
+  contributorProfile: "Profilo del contributor",
+  // Filtri di stato dei contributi: rispecchiano deliberatamente il
+  // vocabolario condiviso degli stati record (status.ts) — la lista del
+  // profilo tiene le proprie label così una pagina non mescola bundle
+  // (stesso pattern di moderation.ts statusLabels).
+  statusFilters: {
+    all: "Tutti",
+    pending: "In moderazione",
+    verified: "Verificato",
+    needs_review: "Da ricontrollare",
+    removed: "Rimosso",
+  },
+  errorLoadContributions: "Non è stato possibile caricare i tuoi contributi.",
+  errorLoadTrustLevel: "Non è stato possibile caricare il tuo livello di fiducia.",
+  gateL1Help: "Puoi verificare i record dopo la pubblicazione del tuo primo contributo.",
+
+  // --- Modifica dei contributi (C6) ---
+  edit: "Modifica",
+  editContribution: "Modifica contributo",
+  editYourContribution: "Modifica il tuo contributo",
+  editReviewNotice:
+    "Le tue modifiche saranno esaminate da un moderatore prima di sostituire il record attuale.",
+  saveChanges: "Salva modifiche",
+  saveSubmitForReview: "Salva e invia per revisione",
+  cancel: "Annulla",
+  editBlockedRemoved:
+    "Questo contributo non può essere modificato: il record è stato rimosso o rifiutato.",
+  errorEditNotOwner: "Puoi modificare solo i tuoi contributi.",
+  errorEditConflict: "Una richiesta di modifica per questo record è già in revisione.",
+  errorEditRateLimit: "Troppi tentativi. Riprova tra un minuto.",
+
+  // --- Conferme distruttive ---
+  removeVerificationConfirmTitle: "Rimuovere la tua verifica da questo record?",
+  cannotBeUndone: "Questa azione non può essere annullata.",
+  remove: "Rimuovi",
+  deleteContributionTitle: "Eliminare questo contributo?",
+  deleteContributionBody:
+    "Il record verrà rimosso dall'elenco pubblico e inviato in moderazione. Questa azione non può essere annullata.",
+  deleteContribution: "Elimina contributo",
+};
