@@ -55,7 +55,10 @@ export default async function RootLayout({
   // Server-rendered <html lang> from the persisted preference: the first
   // paint already matches the user's language (no EN->IT flash) and the
   // attribute is correct before any client JavaScript runs. The client
-  // LocaleProvider effect keeps it in sync on client-side switches.
+  // LocaleProvider effect keeps it in sync on client-side switches. The same
+  // server locale seeds LocaleProvider's SSR snapshot, so client islands
+  // rendered by the server (SiteFooter, skip link, toggle active state) also
+  // match the cookie locale instead of always being English (QA-2026-08-01-1).
   const locale = await getServerLocale();
 
   return (
@@ -69,7 +72,7 @@ export default async function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <LocaleProvider>
+        <LocaleProvider serverLocale={locale}>
           {children}
           <SiteFooter />
         </LocaleProvider>
