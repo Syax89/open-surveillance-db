@@ -161,6 +161,44 @@ test("global footer exposes every institutional page, the ODbL data licence and 
   assert.equal(footerCount, 1, `expected a single footer landmark, found ${footerCount}`);
 });
 
+test("homepage collection points link to the privacy notice and terms (GDPR art. 13 short notice)", async () => {
+  const { response, html } = await renderHomepage();
+
+  assert.equal(response.status, 200);
+
+  // Report form: the consent checkbox must be followed by explicit links to
+  // /privacy and /termini at the point of collection (footer alone is not
+  // enough — art. 13(1) GDPR requires the short notice at collection time).
+  // React SSR inserts <!-- --> markers between text and elements.
+  assert.match(html, /I confirm this observation was made from public space and contains no personal data\.[\s\S]{0,80}<a href="\/privacy">Privacy notice<\/a>\s*·\s*<a href="\/termini">Terms of use<\/a>/);
+
+  // Correction form: same requirement for the private correction request.
+  assert.match(html, /I understand that this request is private[\s\S]{0,200}href="\/privacy"/);
+  assert.match(html, /I understand that this request is private[\s\S]{0,200}href="\/termini"/);
+
+  // Photo upload: the help line mentions EXIF stripping and points to the
+  // privacy notice.
+  assert.match(html, /EXIF metadata is stripped on upload[\s\S]{0,120}href="\/privacy"/);
+
+  // Count check: footer (1) + report form (1) + correction form (1) + photo
+  // help (1) = 4 explicit /privacy links on the homepage.
+  const privacyLinks = (html.match(/href="\/privacy"/g) ?? []).length;
+  const termsLinks = (html.match(/href="\/termini"/g) ?? []).length;
+  assert.ok(privacyLinks >= 4, `expected >= 4 /privacy links on the homepage, found ${privacyLinks}`);
+  assert.ok(termsLinks >= 3, `expected >= 3 /termini links on the homepage, found ${termsLinks}`);
+});
+
+test("register page links to the privacy notice and terms next to the submit button", async () => {
+  const { response, html } = await renderRoute("/register");
+
+  assert.equal(response.status, 200);
+  assert.match(html, /<p class="auth-legal-links">/);
+  assert.match(html, /href="\/privacy">Privacy notice<\/a>/);
+  assert.match(html, /href="\/termini">Terms of use<\/a>/);
+  // The links sit inside the auth form, right after the submit button.
+  assert.match(html, /Create account<\/button>[\s\S]{0,200}href="\/privacy"/);
+});
+
 test("server-rendered /manifesto is accessible and carries the mission, principles, non-goals and publish boundaries", async () => {
   const { response, html } = await renderRoute("/manifesto");
 
