@@ -586,7 +586,7 @@ test("E2E: a contested privacy correction is escalated and handled by a senior m
     method: "POST",
     body: {
       cameraId: record.id,
-      issueType: "privacy-concern",
+      issueType: "removal",
       message: "This entrance is a private residential courtyard, not public infrastructure.",
       contact: "",
     },

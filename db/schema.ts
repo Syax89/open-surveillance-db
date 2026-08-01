@@ -52,7 +52,7 @@ export const cameras = sqliteTable(
     // here so drizzle-kit generate never re-emits it (convention 0012/0014:
     // hand-written migration + schema declaration together).
     index("cameras_contributor_status_idx").on(table.contributorId, table.status),
-    // Community profile contributions list (migration 0024, C2): the "my
+    // Community profile contributions list (migration 0025, C2): the "my
     // reports" branch of listContributorContributions filters on
     // contributor_id and orders by created_at DESC; the leading-contributor
     // composite turns that into an index scan instead of a full table scan.
@@ -90,6 +90,20 @@ export const correctionRequests = sqliteTable(
   },
   (table) => [
     index("correction_requests_status_idx").on(table.status),
+    // C4 dedupe (COMMUNITY_PLAN §2.4, A5): one open (pending) report per
+    // (submitter, target), race-safe at the DB level. The logged-in variant
+    // keys on (camera_id, contributor_id); the anonymous variant keys on
+    // camera_id alone because NULLs are distinct in a plain UNIQUE index —
+    // the predicate disambiguates. Anonymity is preserved: no IP or other
+    // identifier is stored, only the absence of a contributor.
+    // Declared here so drizzle-kit generate never re-emits them (convention
+    // 0012/0014: hand-written migration + schema declaration together).
+    uniqueIndex("correction_requests_open_contributor_unique")
+      .on(table.cameraId, table.contributorId)
+      .where(sql`status = 'pending' AND contributor_id IS NOT NULL`),
+    uniqueIndex("correction_requests_open_anon_unique")
+      .on(table.cameraId)
+      .where(sql`status = 'pending' AND contributor_id IS NULL`),
     // "My corrections" profile list (migration 0022). Declared here so
     // drizzle-kit generate never re-emits it (convention 0012/0014:
     // hand-written migration + schema declaration together).
@@ -371,7 +385,7 @@ export const photos = sqliteTable(
     index("photos_pending_submitter_idx")
       .on(table.submitterKey)
       .where(sql`${table.status} = 'pending'`),
-    // Community profile contributions list (migration 0024, C2): the "my
+    // Community profile contributions list (migration 0025, C2): the "my
     // photos" branch of listContributorContributions filters on
     // contributor_id and orders by created_at DESC; photos previously had no
     // contributor-leading index at all, so this turns a full scan into an

@@ -596,7 +596,7 @@ export type ContributionsPage = {
  * boundary, so a caller can never request an unbounded page. The ORDER BY
  * (created_at DESC, id DESC) matches the old submissions ordering and is
  * served by the (contributor_id, created_at DESC) index added in migration
- * 0024 for cameras and photos; correction_requests already carries a
+ * 0025 for cameras and photos; correction_requests already carries a
  * (contributor_id) index from migration 0022.
  */
 export async function listContributorContributions(

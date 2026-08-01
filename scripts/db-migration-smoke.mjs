@@ -93,7 +93,7 @@ const expectedIndexes = [
   "correction_requests_contributor_idx",
   // Community trust levels (0023): index-only level COUNT.
   "cameras_contributor_status_idx",
-  // Community profile contributions list (0024): "my contributions" branches
+  // Community profile contributions list (0025): "my contributions" branches
   // for cameras and photos ORDER BY created_at DESC on contributor_id.
   "cameras_contributor_created_idx",
   "photos_contributor_created_idx",
