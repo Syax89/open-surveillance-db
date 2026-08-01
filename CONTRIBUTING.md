@@ -29,4 +29,4 @@ The public submission workflow is not live. When it is, reports must comply with
 
 ## Decisions and disagreements
 
-Open a discussion for material design choices. Decisions should be recorded in `docs/decisions/` with context, alternatives, and consequences. The governance document explains how unresolved questions are handled.
+Open a discussion for material design choices. Decisions should be recorded in [`docs/decisions/`](docs/decisions/README.md) with context, alternatives, and consequences — use the [ADR template](docs/decisions/_template.md). The governance document explains how unresolved questions are handled.

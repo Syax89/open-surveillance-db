@@ -197,7 +197,7 @@ are decision checkpoints, not calendar promises.
 ## How to work openly
 
 - Open an issue or discussion for each ticket, linking to its workstream and acceptance evidence.
-- Keep policy and architectural choices in `docs/decisions/`; do not bury them in code reviews.
+- Keep policy and architectural choices in [`docs/decisions/`](decisions/README.md) (ADR log); do not bury them in code reviews.
 - Use synthetic, clearly labelled data in issues, tests, previews, and demos.
 - Do not open a real submission endpoint until its moderation and privacy dependencies are complete.
 - Update [STATUS.md](STATUS.md) after each completed release gate, not simply when a feature is coded.

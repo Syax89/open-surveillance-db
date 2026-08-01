@@ -28,7 +28,7 @@ These are initial nominations for the pilot, not a claim that the full public go
 ## Decision making
 
 1. Proposals are discussed publicly where safe to do so.
-2. Maintainers seek consensus and record material decisions in `docs/decisions/`.
+2. Maintainers seek consensus and record material decisions in [`docs/decisions/`](docs/decisions/README.md) (ADR log with index and template).
 3. Privacy, security, and safety objections pause a decision until they are addressed.
 4. A change to mission, licensing, data publication, or governance needs a documented public proposal and a reasonable comment period.
 
