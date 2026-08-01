@@ -248,7 +248,7 @@ export async function authenticateContributor(
 }
 
 // ---------------------------------------------------------------------------
-// Per-email login lockout (P2 security, ADR 0015)
+// Per-email login lockout (P2 security, ADR 0016)
 // ---------------------------------------------------------------------------
 //
 // The per-IP `auth` rate-limit bucket (app/lib/rate-limit.ts) throttles a
@@ -261,7 +261,7 @@ export async function authenticateContributor(
 // Lockout poisoning (a third party deliberately failing N times against a
 // known email to lock its owner out) is accepted and bounded: the lock is
 // short and self-expiring, consecutive lockouts back off exponentially to a
-// cap, and a successful login clears the row. See ADR 0015.
+// cap, and a successful login clears the row. See ADR 0016.
 
 export type LoginLockoutPolicy = {
   /** Failed logins allowed inside one window before the lockout trips. */

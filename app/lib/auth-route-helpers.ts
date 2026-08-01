@@ -15,7 +15,7 @@ export const MAX_PASSWORD_LENGTH = 200;
 export const MAX_DISPLAY_NAME_LENGTH = 60;
 
 /**
- * Default per-email lockout policy (ADR 0015): 5 failed logins inside a
+ * Default per-email lockout policy (ADR 0016): 5 failed logins inside a
  * 15-minute window lock the account for 15 minutes; consecutive lockouts
  * double the duration up to a 2-hour cap. The counting window re-anchors at
  * the moment the lockout trips, so an attacker who resumes right after the

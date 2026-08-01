@@ -3,7 +3,7 @@
 -- the journal convention; applied by `wrangler d1 migrations apply` and
 -- replayed by the db-runtime test harness.
 --
--- Privacy/safety model (docs/PRIVACY_AND_SAFETY.md, ADR 0015):
+-- Privacy/safety model (docs/PRIVACY_AND_SAFETY.md, ADR 0016):
 --   - one row per normalised email, keyed by the SHA-256 of the normalised
 --     email (`email_key`), so the table stores NO PII: a DB leak cannot map
 --     a row back to an address without the original;

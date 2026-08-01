@@ -891,7 +891,7 @@ test("E2E: erasure requires a live session — anonymous DELETE is rejected", as
 });
 
 // ---------------------------------------------------------------------------
-// 7b) Per-email login lockout (ADR 0015) — real routes, real db/auth SQL
+// 7b) Per-email login lockout (ADR 0016) — real routes, real db/auth SQL
 // ---------------------------------------------------------------------------
 
 const AUTH_EMAIL = "lockout-e2e@example.org";

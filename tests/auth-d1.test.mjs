@@ -281,7 +281,7 @@ test("eraseContributor is safe to call twice — the second call finds nothing",
 });
 
 // ---------------------------------------------------------------------------
-// Per-email login lockout (P2 security, ADR 0015)
+// Per-email login lockout (P2 security, ADR 0016)
 // ---------------------------------------------------------------------------
 
 // Small, deterministic policy: 3 failures inside a 60s window lock the email

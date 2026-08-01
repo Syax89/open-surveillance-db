@@ -1,4 +1,4 @@
-# ADR 0015: Per-email account lockout after failed logins
+# ADR 0016: Per-email account lockout after failed logins
 
 - **Status:** accepted
 - **Date:** 2026-08-01
@@ -33,7 +33,7 @@ Two questions had to be answered:
 
 ## Decision
 
-1. **New `login_attempts` table (migration 0012), keyed by `email_key` = the
+1. **New `login_attempts` table (migration 0016), keyed by `email_key` = the
    SHA-256 of the normalised email.** The raw address never appears in the
    table nor in any log line — a DB leak cannot map a row back to an address
    without the original. Columns: `failed_count`, `window_start`,

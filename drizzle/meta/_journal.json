@@ -89,13 +89,6 @@
   {
    "idx": 12,
    "version": "6",
-   "when": 1785604200000,
-   "tag": "0012_login_lockout",
-   "breakpoints": true
-  },
-  {
-   "idx": 13,
-   "version": "6",
    "when": 1785650000000,
    "tag": "0012_moderation_events_entity_idx",
    "breakpoints": true
@@ -113,6 +106,20 @@
    "when": 1785609000000,
    "tag": "0014_cameras_coordinates_idx",
    "breakpoints": true
+  },
+  {
+   "idx": 15,
+   "version": "6",
+   "when": 1785651000000,
+   "tag": "0015_correction_camera_fk",
+   "breakpoints": true
+  },
+  {
+   "idx": 16,
+   "version": "6",
+   "when": 1785604200000,
+   "tag": "0016_login_lockout",
+   "breakpoints": true
   }
-]
+ ]
 }

@@ -36,7 +36,7 @@ export const {
   verifyPassword,
   randomBase64Url,
   sha256Hex,
-  // Per-email login lockout (ADR 0015): pure helpers run for real, db-touching
+  // Per-email login lockout (ADR 0016): pure helpers run for real, db-touching
   // functions are stubbed per test like the rest of db/auth.
   loginLockoutKey,
   getLoginLockout,

@@ -43,7 +43,7 @@ const expectedTables = [
   "moderation_appeals",
   // Photo evidence (0011): metadata only, image bytes live in R2.
   "photos",
-  // Per-email login lockout (0012, ADR 0015): brute-force counter keyed by
+  // Per-email login lockout (0016, ADR 0016): brute-force counter keyed by
   // the SHA-256 of the normalised email — never the address itself.
   "login_attempts",
 ];

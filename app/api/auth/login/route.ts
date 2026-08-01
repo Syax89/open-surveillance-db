@@ -27,7 +27,7 @@ import { PayloadTooLargeError, readJsonBody, urlTooLong } from "../../../lib/inp
  * response never reveals which part was wrong. Success sets the same cookie
  * pair as registration (`osdb_session` + `osdb_csrf`).
  *
- * Brute-force defence is layered (ADR 0015): the per-IP `auth` bucket
+ * Brute-force defence is layered (ADR 0016): the per-IP `auth` bucket
  * (authLimit) throttles a single caller, and a per-email lockout — keyed by
  * the SHA-256 of the normalised email, never the address — stops distributed
  * guessing against one account. A locked account answers 429 with

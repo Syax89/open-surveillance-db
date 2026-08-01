@@ -100,7 +100,7 @@ export const sessions = sqliteTable(
 );
 
 /**
- * Per-email login lockout counters (P2 security, ADR 0015). One row per
+ * Per-email login lockout counters (P2 security, ADR 0016). One row per
  * normalised email, keyed by the SHA-256 of the normalised email
  * (`email_key`) so the table stores no PII. `failed_count` counts failed
  * logins inside the current window (`window_start`); reaching the threshold
