@@ -96,9 +96,11 @@ export function useModerationQueue() {
     if (!Number.isInteger(actingAs) || actingAs < 1) { setError(t.actorRequired); return; }
 
     // Correction association contract (H1, t_69891619): approve must name a
-    // record outcome, associate must name a record id. The server enforces
-    // the same rules (400 otherwise); checking here gives immediate feedback
-    // without a round-trip.
+    // record outcome and associate must name a record id. The outcome gate is
+    // client-side only — the server accepts approve without an outcome (200,
+    // backward-compat) — while associate requires cameraId server-side too
+    // (400 otherwise). Checking here gives immediate feedback without a
+    // round-trip.
     const outcome = outcomes[key];
     const rawCameraId = cameraIds[key] ?? "";
     const parsedCameraId = rawCameraId.trim() === "" ? null : Number.parseInt(rawCameraId, 10);

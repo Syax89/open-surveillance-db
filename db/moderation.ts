@@ -198,12 +198,20 @@ export type MetadataPublicationChoices = {
 // Role → action matrix. `approve` (publishing a normal record) is reserved to
 // record reviewers and senior moderators; intake reviewers may triage
 // (reject/hide) but never publish; the administrator may only escalate.
+//
+// `associate` (H1 correction → record outcome, t_69891619) links a still
+// pending correction request to a record without deciding it. It is granted
+// to the same record-facing roles that may `approve` — pointing a request at
+// a specific record steers the eventual outcome, so it stays out of the
+// intake reviewer's triage-only set (ADR 0009: intake may triage but never
+// publish). The parser has always whitelisted `associate` for corrections;
+// this matrix entry is what actually gates it server-side.
 // ---------------------------------------------------------------------------
 
 const rolePermissions: Record<ReviewerRole, ReadonlySet<string>> = {
   intake_reviewer: new Set<string>(["reject", "hide", "escalate"]),
-  record_reviewer: new Set<string>(["approve", "reject", "hide", "mark-stale", "reverify", "escalate"]),
-  senior_moderator: new Set<string>(["approve", "reject", "hide", "mark-stale", "reverify", "escalate"]),
+  record_reviewer: new Set<string>(["approve", "reject", "hide", "mark-stale", "reverify", "associate", "escalate"]),
+  senior_moderator: new Set<string>(["approve", "reject", "hide", "mark-stale", "reverify", "associate", "escalate"]),
   privacy_safety_lead: new Set<string>(["hide", "escalate"]),
   administrator: new Set<string>(["escalate"]),
 };

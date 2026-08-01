@@ -102,10 +102,10 @@ const MODERATION_COMPONENTS = [
  * stato di associazione correzione→esito record (campi outcome + record id,
  * validazione client, cleanup, getter/setter per DecisionFormApi). Stato e
  * accessor appartengono all'hook decisionale condiviso; l'estrazione in un
- * file separato non ridurrebbe la superficie. Baseline pinnata a 166 righe.
+ * file separato non ridurrebbe la superficie. Baseline pinnata a 168 righe.
  */
 const KNOWN_DEVIATIONS = new Map([
-  ["app/components/moderation/useModerationQueue.tsx", { baselineLines: 166, reason: "H1 t_69891619: campi associazione correzione→esito record (outcome + record id, validazione, cleanup)" }],
+  ["app/components/moderation/useModerationQueue.tsx", { baselineLines: 168, reason: "H1 t_69891619: campi associazione correzione→esito record (outcome + record id, validazione, cleanup) + commento contratto server/client aggiornato (fix PR #187)" }],
 ]);
 
 /** Componente condiviso atteso dal refactor di Linus. */
