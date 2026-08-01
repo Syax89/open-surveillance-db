@@ -74,6 +74,9 @@ export const en = {
   emptyBody:
     "This does not mean that there are no cameras in the area. You can clear the search, explore the map, or submit a private observation for moderation.",
   clearSearch: "Clear search",
+  offlineTitle: "You are offline",
+  offlineBody: "Showing the last loaded records.",
+  offlineAction: "Try again",
   distance: "Distance",
   placeSearchTitle: "Search by place",
   placeSearchLabel: "Locality, address, or coordinates",
@@ -82,8 +85,8 @@ export const en = {
     "Finds reviewed public records near the place you enter. A result is never proof that an area has no surveillance.",
   placeSearchSubmit: "Search",
   placeSearchLoading: "Searching reviewed public records near that place…",
-  placeSearchUnavailable: "Search is temporarily unavailable. Please try again shortly.",
-  placeSearchRateLimited: "Too many searches. Please wait a moment and try again.",
+  placeSearchUnavailable: "The search service is unreachable right now. Check your connection and try again.",
+  placeSearchRateLimited: "Too many searches. Please try again in a minute.",
   placeSearchEmptyQuery: "Enter a locality, address, or coordinates to search.",
   placeClearResults: "Clear results",
   placeAreaLabel: (area: { kind: string; displayName?: string; radiusLabel: string; latitude: number; longitude: number }) =>
@@ -298,6 +301,9 @@ export const it: Translation<typeof en> = {
   emptyBody:
     "Questo non significa che nell’area non ci siano telecamere. Puoi cancellare la ricerca, esplorare la mappa o inviare un’osservazione privata per la moderazione.",
   clearSearch: "Cancella ricerca",
+  offlineTitle: "Sei offline",
+  offlineBody: "Mostriamo gli ultimi record caricati.",
+  offlineAction: "Riprova",
   distance: "Distanza",
   placeSearchTitle: "Cerca per luogo",
   placeSearchLabel: "Località, indirizzo o coordinate",
@@ -306,8 +312,8 @@ export const it: Translation<typeof en> = {
     "Trova record pubblici revisionati vicino al luogo inserito. Un risultato non è mai la prova che un’area non abbia sorveglianza.",
   placeSearchSubmit: "Cerca",
   placeSearchLoading: "Ricerca dei record pubblici revisionati vicino a questo luogo…",
-  placeSearchUnavailable: "La ricerca è temporaneamente non disponibile. Riprova tra poco.",
-  placeSearchRateLimited: "Troppe ricerche. Attendi un momento e riprova.",
+  placeSearchUnavailable: "Il servizio di ricerca non è raggiungibile in questo momento. Controlla la connessione e riprova.",
+  placeSearchRateLimited: "Troppe ricerche. Riprova tra un minuto.",
   placeSearchEmptyQuery: "Inserisci una località, un indirizzo o delle coordinate per cercare.",
   placeClearResults: "Cancella i risultati",
   placeAreaLabel: (area: { kind: string; displayName?: string; radiusLabel: string; latitude: number; longitude: number }) =>

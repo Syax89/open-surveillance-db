@@ -27,6 +27,9 @@ export const en = {
   notFoundDetail:
     "It may have been removed, is not public, or the link is incorrect.",
   browseDirectory: "Browse the directory",
+  offlineTitle: "You are offline",
+  offlineBody: "Showing the last loaded records.",
+  offlineAction: "Try again",
   loadError: "Could not load the public record.",
   loadErrorDetail:
     "The record service is unreachable right now. Check your connection and try again.",
@@ -64,6 +67,9 @@ export const it: Translation<typeof en> = {
   notFoundDetail:
     "Potrebbe essere stato rimosso, non essere pubblico oppure il collegamento non è corretto.",
   browseDirectory: "Sfoglia l'elenco",
+  offlineTitle: "Sei offline",
+  offlineBody: "Mostriamo gli ultimi record caricati.",
+  offlineAction: "Riprova",
   loadError: "Non è stato possibile caricare il record pubblico.",
   loadErrorDetail:
     "Il servizio dei record non è raggiungibile in questo momento. Controlla la connessione e riprova.",

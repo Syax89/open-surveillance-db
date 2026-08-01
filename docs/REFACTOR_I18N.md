@@ -81,3 +81,82 @@ changes** were needed.
 - Keeping `en`/`it` co-located avoids the old cross-file jump when
   translating and makes a translation PR readable in a single diff.
 - The `messages` assembly point stays a single, tiny, auditable file.
+
+## Conceptual mapping (route → bundle)
+
+The bundles mirror the **concepts**, not one file per route: surfaces that
+share copy share a bundle. There is deliberately **no** monolithic `info`
+or `legal` bundle — legal content is a separate typed layer
+(`app/lib/legal/`), and each informational page owns its bundle. See
+`docs/SITEMAP.md` (section "i18n message bundles") for the full table; the
+short version:
+
+| Concept | Bundle | Notes |
+|---------|--------|-------|
+| Chrome + footer + status vocabulary | `common.ts`, `footer.ts`, `status.ts` | shared across routes |
+| Map / directory / report / correction | `map.ts`, `home.ts` | `home.ts` owns the directory, report and correction forms until the `/mappa` `/directory` `/segnala` `/correggi` split (FRONTEND_PLAN F1/F2) introduces `directory.ts`, `report.ts`, `correction.ts` |
+| Record detail | `record.ts` | |
+| Auth | `auth.ts` | |
+| Moderation dashboard | `moderation.ts` | private, local-only |
+| Informational pages | `guide.ts`, `manifesto.ts`, `faq.ts`, `contact.ts`, `rules.ts`, `moderazione.ts` | one per page |
+| Legal pages | `app/lib/legal/` | typed content layer, NOT i18n bundles |
+
+## Microcopy standards
+
+All interactive surfaces follow the same state and error vocabulary, so a
+user sees consistent wording (and screen-reader announcements) across the
+map, directory, record detail and moderation dashboard.
+
+### State set: `{loading, empty, not-found, error, offline}`
+
+Each state is **title + body + recovery action** where an action makes
+sense. Implemented examples:
+
+| State | Keys | Example |
+|-------|------|---------|
+| `loading` | `loading` (+ `role="status"`) | `record.loading` |
+| `empty` | `emptyTitle` + `emptyBody` + action | `home.emptyTitle/emptyBody/clearSearch` |
+| `not-found` | `notFound` + `notFoundDetail` + action | `record.notFound/notFoundDetail/browseDirectory` |
+| `error` | `loadError` + `loadErrorDetail` + action | `record.loadError/loadErrorDetail/retryLoad` |
+| `offline` | `offlineTitle` + `offlineBody` + `offlineAction` | `map`/`home`/`record` — "You are offline / Sei offline" + "Showing the last loaded records. / Mostriamo gli ultimi record caricati." + "Try again / Riprova" |
+
+The offline state is wired with `navigator.onLine` listeners
+(`online`/`offline` events) and rendered as `role="status"`; it is
+SSR-safe (never in first paint, because `navigator` is undefined on the
+server). The map and directory keep showing the already-loaded records —
+the notice explains that nothing refreshes until the connection returns.
+
+### Uniform API error pattern
+
+Reachability failures use one canonical pattern (copy lives in
+`record.loadErrorDetail` and is mirrored where the same failure can
+happen):
+
+- EN: "The record service is unreachable right now. Check your connection
+  and try again."
+- IT: "Il servizio dei record non è raggiungibile in questo momento.
+  Controlla la connessione e riprova."
+
+Rate limiting gets its own explicit retry window:
+- EN: "Too many searches. Please try again in a minute."
+- IT: "Troppe ricerche. Riprova tra un minuto."
+
+### Moderation decision confirmation
+
+A saved decision announces **"Decision saved / Decisione salvata"** plus a
+summary of what was decided (entity, action, reason), rendered in
+`role="status"` so screen readers announce it:
+"Camera report #7 Decision saved: Approve. Reason: Verified public
+infrastructure." (key `moderation.decisionSaved`).
+
+### aria-live contract for async outcomes
+
+Every async outcome (place search, photo upload, report/correction
+submission, moderation decision) is announced:
+
+- `role="status"` (polite) for non-urgent results — search results,
+  saved notices, loading notes, offline banners;
+- `role="alert"` (assertive) only for urgent/blocking conditions —
+  duplicate warnings, failed decisions/errors;
+- live regions are placed in the DOM **before** the content they announce
+  so a screen reader reaches them in reading order.

@@ -62,6 +62,35 @@ the reference for future page changes and for the QA pass over the routes.
 - New routes must be **kebab-case, lowercase**, and listed in this document
   before implementation.
 
+## i18n message bundles (conceptual mapping)
+
+Interface strings live in **per-domain bundles** under `app/lib/i18n/`
+(PR #80; see [`docs/REFACTOR_I18N.md`](REFACTOR_I18N.md)). The mapping from
+concept to bundle is conceptual, not one-bundle-per-route: surfaces that
+share copy share a bundle. There is deliberately **no** monolithic `info`
+or `legal` bundle — legal content is a separate typed layer
+(`app/lib/legal/`), and the informational pages each own their bundle.
+
+| Concept | Surface / route | Bundle |
+|---------|-----------------|--------|
+| Chrome (skip link, locale toggle, SEO metadata) | every route | `common.ts` |
+| Global footer | every route | `footer.ts` |
+| Record-status vocabulary | map, directory, record detail | `status.ts` |
+| Map | `/` map panel (future `/mappa`) | `map.ts` |
+| Home / directory | `/` hero + directory (future `/directory`) | `home.ts` |
+| Report | `/` report form (future `/segnala`) | `home.ts` (future `report.ts`) |
+| Correction | `/` correction form (future `/correggi`) | `home.ts` (future `correction.ts`) |
+| Record detail | `/records/[id]` | `record.ts` |
+| Auth | `/login`, `/register`, `/account` | `auth.ts` |
+| Moderation (private dashboard) | `/moderation` | `moderation.ts` |
+| Info — guide | `/guide` | `guide.ts` |
+| Info — manifesto | `/manifesto` | `manifesto.ts` |
+| Info — FAQ | `/faq` | `faq.ts` |
+| Info — contacts | `/contatti` | `contact.ts` |
+| Info — rules | `/regole` | `rules.ts` |
+| Info — how moderation works | `/moderazione` | `moderazione.ts` |
+| Legal (privacy, terms, licences) | `/privacy`, `/termini`, `/licenze` | `app/lib/legal/` (typed layer, not i18n bundles) |
+
 ## Site map
 
 | Route          | Page                  | Purpose                                             | In home nav | In footer | Status |
@@ -118,7 +147,7 @@ Routes **not** linked in nav/footer (private or functional): `/moderation`
 - **Content:** from the home "principles" section and `README.md` (mission,
   principles, non-goals: no video feeds, no tracking tools, no advice on
   avoiding lawful surveillance; private-home cameras excluded). Bundle:
-  `manifesto` (`app/lib/i18n/en.ts`).
+  `manifesto` (`app/lib/i18n/manifesto.ts`).
 - **Nav/footer:** home nav + footer.
 
 ### `/regole` — Rules (implemented, PR #67)

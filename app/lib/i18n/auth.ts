@@ -54,7 +54,7 @@ export const en = {
   notAuthenticatedBody: "Log in to see your profile and your attributed reports.",
   deleteAccountSection: "Delete account",
   deleteAccountHint:
-    "Deletes your account and removes the link between you and your reports. The reports themselves stay published anonymously (RETENTION_SCHEDULE R7).",
+    "Deletes your account and removes the link between you and your reports. The reports themselves stay published anonymously.",
   deleteAccountConfirm: "Delete account permanently?",
   deleteAccountConfirmBody:
     "Your account and all its sessions will be erased. Your reports stay published, no longer attributed to you. This cannot be undone.",
@@ -82,7 +82,7 @@ export const it: Translation<typeof en> = {
   logout: "Esci",
   noAccount: "Non hai ancora un account?",
   haveAccount: "Hai già un account?",
-  createOne: "Crealo",
+  createOne: "Crea un account",
   signIn: "Accedi invece",
   passwordHint: "Almeno 10 caratteri.",
   anonymousNote:
@@ -101,7 +101,7 @@ export const it: Translation<typeof en> = {
   noSubmissions: "Non hai ancora inviato segnalazioni attribuite.",
   submissionStatus: "Stato",
   submissionCreated: "Inviata",
-  loggedOutTitle: "Hai effettuato l'accesso",
+  loggedOutTitle: "Hai effettuato il logout",
   loggedOutBody: "La sessione è terminata. Puoi chiudere questa finestra o accedere di nuovo.",
   errorInvalidCredentials: "Credenziali non valide.",
   errorEmailTaken: "Esiste già un account con questa email.",
@@ -113,7 +113,7 @@ export const it: Translation<typeof en> = {
   notAuthenticatedBody: "Accedi per vedere il tuo profilo e le tue segnalazioni attribuite.",
   deleteAccountSection: "Elimina account",
   deleteAccountHint:
-    "Elimina il tuo account e rimuove il collegamento tra te e le tue segnalazioni. Le segnalazioni restano pubblicate in forma anonima (RETENTION_SCHEDULE R7).",
+    "Elimina il tuo account e rimuove il collegamento tra te e le tue segnalazioni. Le segnalazioni restano pubblicate in forma anonima.",
   deleteAccountConfirm: "Eliminare definitivamente l'account?",
   deleteAccountConfirmBody:
     "L'account e tutte le sue sessioni verranno cancellati. Le tue segnalazioni restano pubblicate, senza più attribuzione a te. Questa azione non può essere annullata.",
@@ -121,6 +121,6 @@ export const it: Translation<typeof en> = {
   deletingAccount: "Eliminazione in corso…",
   accountDeletedTitle: "Account eliminato",
   accountDeletedBody:
-    "Il tuo account è stato cancellato e hai effettuato l'accesso. Le tue segnalazioni restano pubblicate senza attribuzione.",
+    "Il tuo account è stato cancellato e hai effettuato il logout. Le tue segnalazioni restano pubblicate senza attribuzione.",
   errorDeleteAccount: "Impossibile eliminare l'account. Riprova.",
 };

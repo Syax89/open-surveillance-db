@@ -142,9 +142,9 @@ test("moderation: approve dispatches PATCH with entity, id, action, reason and a
   });
 
   // Feedback message appears in role=status.
-  await waitFor(() => assert.ok(screen.queryByText(/Camera report #7 saved: Approve/)));
+  await waitFor(() => assert.ok(screen.queryByText(/Camera report #7 Decision saved: Approve/)));
   const status = screen.getByRole("status");
-  assert.match(status.textContent, /Camera report #7 saved: Approve\. Reason: Verified public infrastructure\./);
+  assert.match(status.textContent, /Camera report #7 Decision saved: Approve\. Reason: Verified public infrastructure\./);
 });
 
 test("moderation: a failed decision surfaces the server error in role=alert", async () => {
