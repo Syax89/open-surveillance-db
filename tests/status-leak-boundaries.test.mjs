@@ -323,7 +323,7 @@ test("the homepage filters through publicRecords and labels via the safe helper"
 test("the record page labels via the safe helper and never appends a raw status", async () => {
   const page = await readSource("app/records/[id]/page.tsx");
   const hook = await readSource("app/lib/use-public-cameras.ts");
-  assert.match(page, /usePublicCameras\(/, "the record page must load records through the shared filtered hook");
+  assert.match(page, /usePublicCamera(?:s)?\(/, "the record page must load records through the shared filtered hook");
   assert.match(hook, /publicRecords\(/, "the shared hook must filter records through the client whitelist");
   assert.match(page, /publicStatusLabel\(statuses,\s*record\.status,\s*t\.statusFallback\)/, "record status must come from the safe helper");
   assert.doesNotMatch(page, /\$\{t\.statusFallback\}[^}]*record\.status/, "the record page must not append the raw status to the fallback");

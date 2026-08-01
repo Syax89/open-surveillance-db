@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { LocaleToggle, useLocale, useMessages } from "../../components/LocaleProvider";
 import { SiteHeader } from "../../components/SiteHeader";
-import { usePublicCameras } from "../../lib/use-public-cameras";
+import { usePublicCamera } from "../../lib/use-public-cameras";
 import { publicStatusLabel } from "../../lib/public-status";
 
 type Revision = {
@@ -24,10 +24,12 @@ export default function RecordPage() {
   const statuses: Record<string, string> = bundle.status;
   const recordId = Number(params.id);
 
-  // Shared public-cameras data layer (audit t_c6da60f0): the page no longer
-  // fetches the whole directory on its own, and a dead API is surfaced as an
-  // honest error state instead of a misleading "not found".
-  const { records, loading: camerasLoading, error: camerasError, reload } = usePublicCameras();
+  // Shared public-cameras data layer (audit t_c6da60f0, pagination
+  // t_cc94f340): a targeted walk resolves this single id without fetching
+  // the whole directory (early exit on the id DESC list, module cache shared
+  // with the home page), and a dead API is surfaced as an honest error state
+  // instead of a misleading "not found".
+  const { record, loading: camerasLoading, error: camerasError, reload } = usePublicCamera(recordId);
   const [revisions, setRevisions] = useState<Revision[]>([]);
   // Set when the latest revisions fetch settles. While it does not match the
   // requested record id, the detail keeps showing the loading note — no stale
@@ -44,7 +46,8 @@ export default function RecordPage() {
     return () => { cancelled = true; };
   }, [recordId]);
 
-  const record = useMemo(() => records.find((item) => item.id === recordId), [recordId, records]);
+  // `record` comes from the shared layer (targeted paginated walk); null
+  // while loading and when the id is definitively not public.
   // Safe label: whitelisted public statuses only; anything else falls back to
   // the neutral "Status" string, never the raw internal status value.
   const recordStatus = record ? publicStatusLabel(statuses, record.status, t.statusFallback) : "";
