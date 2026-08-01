@@ -15,11 +15,11 @@
 
 import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
+import { coverageTreeCleanupEnabled, coverageTreeRoot } from "./coverage-tree.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -68,7 +68,7 @@ if (existsSync(path.join(root, "db/freshness.ts"))) {
 let builtTreePromise = null;
 
 async function buildTree() {
-  const tree = await mkdtemp(path.join(os.tmpdir(), "osdb-routes-"));
+  const tree = await mkdtemp(path.join(coverageTreeRoot(), "osdb-routes-"));
 
   // Mirror the mocked db modules at the same relative depth the routes
   // expect (tmp/db/cameras.mjs etc.). The mock modules import the shared
@@ -223,7 +223,9 @@ export const loadLibModule = (name) => loadTreeModule(path.join("app", "lib", `$
 export async function cleanupRouteTree() {
   if (!builtTreePromise) return;
   const tree = await builtTreePromise;
-  await rm(tree, { recursive: true, force: true });
+  if (coverageTreeCleanupEnabled()) {
+    await rm(tree, { recursive: true, force: true });
+  }
   builtTreePromise = null;
 }
 

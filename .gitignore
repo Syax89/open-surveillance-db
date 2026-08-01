@@ -12,6 +12,10 @@
 
 # testing
 /coverage
+/.coverage/
+
+# kanban git worktrees (per-task, mai da committare)
+/.worktrees/
 
 # next.js
 /.next/
