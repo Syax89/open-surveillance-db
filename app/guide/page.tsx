@@ -14,6 +14,7 @@ export default function GuidePage() {
       <div className="nav-links">
         <Link href="/#map">{t.map}</Link>
         <Link href="/#records">{t.directory}</Link>
+        <Link href="/manifesto">{t.manifesto}</Link>
         <Link className="nav-action" href="/">{t.home}</Link>
       </div>
       <LocaleToggle />
@@ -80,5 +81,6 @@ export default function GuidePage() {
         <div><p className="card-topline">{t.localLabel}</p><h3>{t.localTitle}</h3><p>{t.localBody}</p></div>
       </div>
     </section>
+
   </main>;
 }

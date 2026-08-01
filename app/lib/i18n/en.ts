@@ -43,6 +43,7 @@ export const en = {
     exploreMap: "Explore map",
     browseRecords: "Browse records",
     howItWorks: "How it works",
+    manifesto: "Manifesto",
     addCamera: "Add a camera",
     openDatabase: "Open database · community maintained",
     heroTitle: "Public data about public surveillance.",
@@ -239,6 +240,7 @@ export const en = {
     map: "Map",
     directory: "Directory",
     home: "Home",
+    manifesto: "Manifesto",
     eyebrow: "Project guide",
     title: "A public database, built with care.",
     intro:
@@ -308,6 +310,87 @@ export const en = {
     localBody:
       "It runs locally for product development. Its illustrative records, queues and decisions are test material; no claim should be made about real surveillance infrastructure from this prototype.",
     footer: "Built for transparency, not tracking.",
+  },
+  manifesto: {
+    navigation: "Manifesto navigation",
+    homeAria: "OpenSurveillanceDB home",
+    map: "Map",
+    directory: "Directory",
+    guide: "How it works",
+    manifesto: "Manifesto",
+    home: "Home",
+    eyebrow: "Project manifesto",
+    title: "A manifesto for legible public space.",
+    intro:
+      "OpenSurveillanceDB is an open, non-commercial civic database of visible public surveillance infrastructure. This page states what the project is for, the principles that govern it, what we deliberately do not do, and what is — and is not — published.",
+    exploreMap: "Explore the map",
+    browseDirectory: "Browse the directory",
+    readGuide: "Read the guide",
+    missionEyebrow: "Mission",
+    missionTitle: "Help people understand the systems around them.",
+    missionBody:
+      "The project maps visible camera infrastructure in shared spaces so people can understand what is installed around them. It documents public-facing equipment only. It is not a tool for watching, tracking, or bypassing lawful surveillance.",
+    missionOneTitle: "What we document",
+    missionOneBody:
+      "Visible camera infrastructure, approximate location, type, source and a review status.",
+    missionTwoTitle: "What we do not collect",
+    missionTwoBody:
+      "Camera feeds, credentials, private-home details, operational weaknesses, faces, licence plates or other personal data.",
+    missionThreeTitle: "What the data cannot prove",
+    missionThreeBody:
+      "An absent record does not show that an area is free of surveillance. It only shows that no reviewed record is currently published.",
+    principlesEyebrow: "Principles",
+    principlesTitle: "Free, open, and safe by design.",
+    principlesIntro:
+      "Five commitments shape every decision in this project, from the data model to the moderation queue.",
+    principleOneTitle: "Free to use",
+    principleOneBody:
+      "No ads, no profiling, no paid features. The database and the software are public goods.",
+    principleTwoTitle: "Open source",
+    principleTwoBody:
+      "The software can be inspected, reused and improved by the community.",
+    principleThreeTitle: "Open data with provenance",
+    principleThreeBody:
+      "Licensing and provenance are recorded for every published record, so journalism, research and civic use can rely on them.",
+    principleFourTitle: "Privacy and safety by design",
+    principleFourBody:
+      "No private-home cameras, no sensitive operational details, no live-feed links. Faces and licence plates are removed before publication.",
+    principleFiveTitle: "Human moderation first",
+    principleFiveBody:
+      "Community submissions become public only after a human review finds them suitable, sufficiently documented and safe to publish.",
+    nonGoalsEyebrow: "Non-goals",
+    nonGoalsTitle: "What we deliberately do not do.",
+    nonGoalsBody:
+      "The boundaries are as important as the mission. OpenSurveillanceDB will never become any of the following:",
+    nonGoalFeedsTitle: "No camera feeds",
+    nonGoalFeedsBody:
+      "We document equipment, not footage. No live or recorded feed is ever linked or displayed.",
+    nonGoalTrackingTitle: "No tracking tools",
+    nonGoalTrackingBody:
+      "The data cannot be used to watch, follow or profile people in public space.",
+    nonGoalBypassTitle: "No evasion advice",
+    nonGoalBypassBody:
+      "The project does not help anyone avoid lawful surveillance and does not publish operational weaknesses.",
+    nonGoalPrivateTitle: "No private property",
+    nonGoalPrivateBody:
+      "Cameras that surveil private homes, and details of private life, are out of scope.",
+    publishEyebrow: "What we publish",
+    publishTitle: "Open where it is safe to be open.",
+    publishBody:
+      "Only reviewed, public-facing infrastructure enters the public outputs. Every published record is a fact about visible equipment, not about a person.",
+    publishedTitle: "Published",
+    publishedItemOne: "Visible camera infrastructure and its approximate location",
+    publishedItemTwo: "Type, source and review status for every record",
+    publishedItemThree:
+      "GeoJSON and CSV exports of reviewed records, with licensing and provenance",
+    neverPublishedTitle: "Never published",
+    neverPublishedItemOne: "Camera feeds, credentials or links to live footage",
+    neverPublishedItemTwo: "Faces, licence plates or any personal data",
+    neverPublishedItemThree:
+      "Private-home details, sensitive locations or operational weaknesses",
+    neverPublishedItemFour:
+      "Submissions and corrections before — or without — human review",
+    footerNote: "Built for transparency, not tracking.",
   },
   moderazione: {
     navigation: "Moderation navigation",
