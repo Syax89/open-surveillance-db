@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import { DirectoryTool } from "../../components/tools/DirectoryTool";
 import { getServerMessages } from "../../lib/server-i18n";
@@ -14,10 +15,20 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 /**
- * /directory — public directory tool (F1 route group (tools), t_03c0fa15).
- * The only tool page with real SEO value (docs/FRONTEND_PLAN.md §1.3), so it
- * stays indexable with its own metadata.
+ * /directory — public directory tool (F1 route group (tools), t_03c0fa15;
+ * F4 t_522638a5). The only tool page with real SEO value
+ * (docs/FRONTEND_PLAN.md §1.3), so it stays indexable with its own metadata.
+ *
+ * F4 wires useCameraFilters (useSearchParams) into DirectoryTool, which
+ * requires a Suspense boundary in Next 16 during static/build rendering —
+ * same pattern as /mappa and /correggi. The fallback is the SSR loading
+ * note; the tool body renders synchronously, so the boundary never flashes
+ * in practice.
  */
 export default function DirectoryPage() {
-  return <DirectoryTool />;
+  return (
+    <Suspense fallback={<p className="loading-note">Loading the directory…</p>}>
+      <DirectoryTool />
+    </Suspense>
+  );
 }

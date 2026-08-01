@@ -121,22 +121,42 @@ export default function Link({ href, children, ...rest }) {
   // ({ search: "type=dome&freshness=7d" }) and the components read it via
   // useSearchParams, exactly like Next's useSearchParams on a real route.
   // `pathname` feeds usePathname (F3 ToolLayout per-page nav sets); the
-  // router stub records both push and replace (LegacyAnchorRedirect uses
+  // router stub records push and replace (LegacyAnchorRedirect uses
   // replace, t_2ca69725).
+  //
+  // F4 URL-state contract (t_522638a5): push/replace model Next's router —
+  // after a navigation the URL changes, so the stub extracts the query from
+  // the href into `state.search` and useSearchParams reflects it on the
+  // next render (deep-link / back-forward behaviour in jsdom). `replaced`
+  // stays an array of hrefs (legacy contract, client-legacy-anchor); the
+  // full call shape { href, opts } lands in `replaceCalls` so tests can
+  // assert router.replace(href, { scroll: false }) on filter edits.
   await writeFile(path.join(nodeModules, "next", "navigation.mjs"),
-    `const state = { params: { id: "1" }, search: "", pathname: "/", pushed: [], replaced: [] };
+    `const state = { params: { id: "1" }, search: "", pathname: "/", pushed: [], replaced: [], replaceCalls: [] };
 export const __setNavState = (patch) => {
   if (patch.search !== undefined) Object.assign(state, { search: patch.search });
   if (patch.params !== undefined) Object.assign(state, { params: patch.params });
   if (patch.pushed !== undefined) Object.assign(state, { pushed: patch.pushed });
   if (patch.replaced !== undefined) Object.assign(state, { replaced: patch.replaced });
+  if (patch.replaceCalls !== undefined) Object.assign(state, { replaceCalls: patch.replaceCalls });
   if (patch.pathname !== undefined) Object.assign(state, { pathname: patch.pathname });
 };
 export const __getNavState = () => state;
 export const useParams = () => state.params;
+// Next's router navigation rewrites the URL: extract the query from the
+// href so useSearchParams reflects it (back/forward + deep-link contract).
+const applyNavigation = (href) => {
+  if (typeof href !== "string") return;
+  const queryIndex = href.indexOf("?");
+  state.search = queryIndex === -1 ? "" : href.slice(queryIndex + 1);
+};
 export const useRouter = () => ({
-  push: (p) => { state.pushed.push(p); },
-  replace: (p) => { state.replaced.push(p); },
+  push: (p) => { state.pushed.push(p); applyNavigation(p); },
+  replace: (p, opts) => {
+    state.replaced.push(p);
+    state.replaceCalls.push({ href: p, opts });
+    applyNavigation(p);
+  },
   refresh: () => {},
 });
 export const useSearchParams = () => new URLSearchParams(state.search);

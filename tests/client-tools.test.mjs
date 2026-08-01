@@ -11,12 +11,11 @@
  *                 (F3 t_2ca69725, FRONTEND_DESIGN §2.5): every tool page
  *                 links the other tools + contextual pages + home, with a
  *                 full cross-tool fallback on unknown paths;
- *   MappaTool   — FiltersBar (panel variant) renders, client-side filters
- *                 (search / kind / freshness) narrow the records, the empty
- *                 state is truthful with a clear action, the URL shell seeds
- *                 the initial filter state (?type= ?freshness=, F4 owns the
- *                 full read/write contract), and the card actions point at
- *                 the tool routes (/correggi, /directory);
+ *   MappaTool   — FiltersBar (panel variant) renders, the URL filters
+ *                 (F4 useCameraFilters) narrow the records, the empty state
+ *                 is truthful with a clear action, deep links apply the
+ *                 seeded filters fully, and the card actions point at the
+ *                 tool routes (/correggi, /directory);
  *   DirectoryTool — shared FiltersBar (inline variant), search/kind filters,
  *                 reset, truthful empty state, "Show on map" pushes
  *                 /mappa?focus=ID through the navigation stub;
@@ -68,7 +67,7 @@ afterEach(() => {
   __resetPublicCamerasCache();
   // Reset the navigation stub: URL shell empty, pathname back to the
   // fallback, router.push/replace logs cleared.
-  setNavState({ pushed: [], replaced: [], search: "", pathname: "/" });
+  setNavState({ pushed: [], replaced: [], replaceCalls: [], search: "", pathname: "/" });
 });
 
 // ---------------------------------------------------------------------------
@@ -168,18 +167,17 @@ test("MappaTool freshness filter on the demo seed yields the truthful empty stat
   assert.ok(screen.getByRole("heading", { name: "Illustrative record A" }), "clearing restores the records");
 });
 
-test("MappaTool URL shell seeds the initial filter state (?type= seeds kind, ?freshness= seeds the select)", async () => {
+test("MappaTool deep link applies the seeded URL filters fully (type + freshness, demo seed → truthful empty state)", async () => {
   setNavState({ search: "type=Traffic monitoring&freshness=7d" });
   const { screen } = rtl;
   await renderWithLocale(React.createElement(MappaTool));
 
-  // ?type= seeds the kind filter: only the Traffic monitoring record remains.
-  assert.ok(screen.getByRole("heading", { name: "Illustrative record B" }));
-  assert.ok(screen.queryByRole("heading", { name: "Illustrative record A" }) === null);
-
-  // ?freshness= seeds the shell select (the full read/write URL contract,
-  // including applying the seeded cutoff, is F4/useCameraFilters).
-  assert.equal(screen.getByLabelText("Record freshness").value, "7d");
+  // F4 (useCameraFilters): the URL is no longer just a shell — the deep link
+  // seeds kind AND applies the derived freshness cutoff. The demo seed has
+  // no finite freshness date ("Demo data"), so the truthful empty state
+  // shows instead of a half-applied shell, and the select reflects the URL.
+  assert.equal(screen.getByLabelText("Record freshness").value, "7d", "?freshness= seeds the select");
+  assert.ok(screen.getByRole("heading", { name: "No published record matches those filters." }), "deep link fully applies the seeded filters");
 });
 
 // ---------------------------------------------------------------------------
@@ -199,18 +197,25 @@ test("DirectoryTool renders the directory shell with the shared FiltersBar and b
   assert.equal(useMap.getAttribute("href"), "/mappa", "the directory links the map tool route");
 });
 
-test("DirectoryTool search narrows the list; the empty state offers a clear action that restores it", async () => {
+test("DirectoryTool search narrows the list (debounced URL commit); the empty state offers a clear action that restores it", async () => {
   const { screen } = rtl;
   const user = rtl.userEvent.setup();
   await renderWithLocale(React.createElement(DirectoryTool));
 
+  // F4 (useCameraFilters): the search input feels instant but commits to the
+  // URL (and therefore filters) after the ~250ms debounce (R2 URL churn).
   await user.type(screen.getByLabelText("Search the public directory"), "Illustrative record B");
-  assert.ok(screen.queryByRole("heading", { name: "Illustrative record A" }) === null);
+  await rtl.waitFor(() => assert.ok(screen.queryByRole("heading", { name: "Illustrative record A" }) === null));
   assert.ok(screen.getByRole("heading", { name: "Illustrative record B" }));
 
+  // A new query replaces the old one; a no-match query yields the truthful
+  // empty state.
+  await user.clear(screen.getByLabelText("Search the public directory"));
+  await rtl.waitFor(() => assert.ok(screen.getByRole("heading", { name: "Illustrative record A" })));
   await user.type(screen.getByLabelText("Search the public directory"), "no-such-camera");
-  assert.ok(screen.getByRole("heading", { name: "No published record matches that search." }), "truthful empty state");
+  await rtl.waitFor(() => assert.ok(screen.getByRole("heading", { name: "No published record matches that search." })));
 
+  // Clearing the search commits immediately (no debounce dead air).
   await user.click(screen.getByRole("button", { name: /Clear search/ }));
   assert.ok(screen.getByRole("heading", { name: "Illustrative record A" }), "clearing restores the list");
 });

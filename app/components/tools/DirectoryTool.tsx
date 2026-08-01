@@ -1,52 +1,45 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useMessages } from "../LocaleProvider";
 import { publicRecords, prototypeRecords } from "../../lib/records";
 import { usePublicCameras } from "../../lib/use-public-cameras";
-import { textMatches } from "../../lib/search";
+import {
+  applyCameraFilters,
+  cameraKindsOf,
+  mapHrefWithFocus,
+  serverFiltersFrom,
+  useCameraFilters,
+} from "../../lib/use-camera-filters";
 import { PublicDirectory } from "../home/PublicDirectory";
 
 /**
- * /directory tool body (F1 route group (tools), D3-qualified shell): the
- * extracted PublicDirectory (FiltersBar + EmptyState + RecordCard) with
- * client-side filters — the same pattern as the home page, promoted to its
- * own route. Server-side pagination arrives with F0/F4 (API filters).
+ * /directory tool body (F4, t_522638a5): the filters live in the URL
+ * (?q= ?type= ?freshness= ?sort= — useCameraFilters) and kind/freshness are
+ * forwarded to the API (F0 server-side filters); the client memo only gates
+ * the demo seed fallback and the client-only dimensions (q, sort, plan
+ * §3.3). Deep links, shareable URLs and back/forward all re-derive the same
+ * state from the URL — no local filter state to desync (D4, one pattern
+ * with /mappa).
  */
 export function DirectoryTool() {
   const t = useMessages().directory;
   const router = useRouter();
-  const [search, setSearch] = useState("");
-  const [kindFilter, setKindFilter] = useState("all");
-  const [freshnessFilter, setFreshnessFilter] = useState("all");
-  const [freshnessCutoff, setFreshnessCutoff] = useState<number | null>(null);
-  const [sortOrder, setSortOrder] = useState<"alphabetical" | "position">("alphabetical");
-
+  const { filters, qInput, setQ, setType, setFreshness, setSort, reset } = useCameraFilters();
   const { records } = usePublicCameras({
     seed: publicRecords(prototypeRecords),
+    filters: serverFiltersFrom(filters),
   });
 
-  const cameraKinds = useMemo(() => Array.from(new Set(records.map((camera) => camera.kind).filter(Boolean))).sort((a, b) => a.localeCompare(b)), [records]);
+  const filteredRecords = useMemo(() => applyCameraFilters(records, filters), [records, filters]);
+  const cameraKinds = useMemo(() => cameraKindsOf(records), [records]);
 
-  const filteredRecords = useMemo(() => {
-    const query = search.trim().toLocaleLowerCase();
-    const matchingRecords = records.filter((camera) => {
-      const matchesSearch = !query || textMatches(camera, query);
-      const matchesKind = kindFilter === "all" || camera.kind === kindFilter;
-      const updatedAt = new Date(camera.updated).getTime();
-      const matchesFreshness = freshnessCutoff === null || (Number.isFinite(updatedAt) && updatedAt >= freshnessCutoff);
-      return matchesSearch && matchesKind && matchesFreshness;
-    });
-    return matchingRecords.sort((first, second) => sortOrder === "alphabetical"
-      ? first.title.localeCompare(second.title)
-      : first.latitude - second.latitude || first.longitude - second.longitude || first.title.localeCompare(second.title));
-  }, [freshnessCutoff, kindFilter, records, search, sortOrder]);
-
-  // Keyboard path on /directory: "Show on map" opens /mappa with the record
-  // preselected via ?focus=ID (F4 wires the focus handling on /mappa).
+  // Navigation (push, not replace — R2): the map opens with the SAME
+  // filters and the record preselected via ?focus=ID. /mappa reads focus
+  // from the URL (focus management, FRONTEND_DESIGN §6.2).
   function showRecordOnMap(id: number) {
-    router.push(`/mappa?focus=${id}`);
+    router.push(mapHrefWithFocus(filters, id));
   }
 
   return (
@@ -55,17 +48,17 @@ export function DirectoryTool() {
       <PublicDirectory
         filteredRecords={filteredRecords}
         cameraKinds={cameraKinds}
-        search={search}
-        setSearch={setSearch}
-        kindFilter={kindFilter}
-        setKindFilter={setKindFilter}
-        freshnessFilter={freshnessFilter}
-        setFreshnessFilter={setFreshnessFilter}
-        setFreshnessCutoff={setFreshnessCutoff}
-        sortOrder={sortOrder}
-        setSortOrder={setSortOrder}
+        search={qInput}
+        setSearch={setQ}
+        kindFilter={filters.type}
+        setKindFilter={setType}
+        freshnessFilter={filters.freshness}
+        setFreshnessFilter={setFreshness}
+        sortOrder={filters.sort}
+        setSortOrder={setSort}
         showRecordOnMap={showRecordOnMap}
         setCoordinates={() => {}}
+        onResetFilters={reset}
         mapHref="/mappa"
         reportHref="/segnala"
       />

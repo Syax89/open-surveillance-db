@@ -8,6 +8,13 @@ export type Camera = MapCamera & {
   address?: string | null;
   manufacturer?: string | null;
   observedOn?: string | null;
+  /**
+   * Machine-readable last verification date (F0, FRONTEND_PLAN § 3.2.6):
+   * the server freshness windows are anchored on this field. Present on
+   * real API records; absent on the demo seed (which keeps `updated` as
+   * the fallback anchor in the client freshness gate).
+   */
+  lastVerifiedAt?: string | null;
 };
 
 /**
