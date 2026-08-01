@@ -454,6 +454,88 @@ export const en = {
     notDashboardBody:
       "The moderation dashboard is a private tool, protected by access control and never linked from the public site. This page only explains how the process works.",
   },
+
+  faq: {
+    navigation: "FAQ navigation",
+    homeAria: "OpenSurveillanceDB home",
+    map: "Map",
+    directory: "Directory",
+    home: "Home",
+    faqLabel: "FAQ",
+    contactLabel: "Contacts",
+    eyebrow: "Frequently asked questions",
+    title: "Questions people ask about the database.",
+    intro:
+      "Short answers about reporting, map accuracy, corrections and privacy. For anything not covered here, use the correction form or the contact page.",
+    qReport: "How do I report a camera?",
+    aReport:
+      "Choose an approximate location on the map (or enter coordinates), then add only what you can observe from public space: type, direction, visible notice, manufacturer. Do not include people, licence plates, private homes, credentials or live-feed links. The report starts as private pending data and becomes public only after a human review approves it.",
+    qAccuracy: "How accurate is the map?",
+    aAccuracy:
+      "The map shows only reviewed public records, and published coordinates are intentionally rounded to about 4 decimal places (roughly 10 metres). A status describes the current review state, not a guarantee that a camera is active. An empty area does not prove that no cameras are present — it only shows that no reviewed record is currently published there.",
+    qCorrect: "How do I correct an error?",
+    aCorrect:
+      "Use the private correction form on the home page (“Correct a record or raise a concern”) or write to privacy@opensurveillancedb. Correction requests are private: they do not change the map automatically and are never included in the public export. First response within 48 hours; substantive response within 14 days.",
+    qPrivacy: "What about privacy?",
+    aPrivacy:
+      "Reports are private while pending; published records contain no faces, licence plates or personal data. The data controller is Simone Rondina (syax89) / OpenSurveillanceDB, Italy. Data-subject rights (access, rectification, erasure, objection) can be exercised via privacy@opensurveillancedb.",
+    moreTitle: "Still have questions?",
+    moreBody:
+      "For corrections, removals and privacy requests use the correction form on the home page or the contact page.",
+    contactCta: "Open the contact page",
+    correctionCta: "Go to the correction form",
+    footer: "Built for transparency, not tracking.",
+  },
+
+  contact: {
+    navigation: "Contacts navigation",
+    homeAria: "OpenSurveillanceDB home",
+    map: "Map",
+    directory: "Directory",
+    home: "Home",
+    faqLabel: "FAQ",
+    contactLabel: "Contacts",
+    eyebrow: "Contacts and accountability",
+    title: "Who runs this, and how to reach us.",
+    intro:
+      "OpenSurveillanceDB is an open, non-commercial civic database of visible public surveillance infrastructure. It documents public-facing equipment; it never provides feeds, tracking tools or advice on avoiding lawful surveillance.",
+    whoTitle: "Who we are",
+    whoBody:
+      "A small pilot team of named volunteers maintains the project. These are initial nominations for the pilot, not a claim that a full public governance structure already exists.",
+    rolesTitle: "Roles and owners",
+    rolesIntro: "Initial roles were named on 2026-07-31 (Wave A pilot boundary, GOVERNANCE.md):",
+    roleMaintainers: "Maintainers",
+    roleMaintainersBody: "Simone (syax89) and Ada (CTO). Ada is the sole merge authority.",
+    roleOps: "Operations owner",
+    roleOpsBody: "Ken — hosting, deployments, backups.",
+    roleData: "Data stewards",
+    roleDataBody: "Linus and Grace — data model, quality and retention.",
+    roleSecurity: "Security contact",
+    roleSecurityBody: "Ken — private reporting route in SECURITY.md.",
+    roleModeration: "Moderation contact",
+    roleModerationBody: "Grace.",
+    controllerTitle: "Data controller",
+    controllerBody:
+      "Simone Rondina (syax89) / OpenSurveillanceDB — Italy (decision of 2026-07-31; final legal-entity wording to be confirmed at launch).",
+    correctionTitle: "Corrections and removal",
+    correctionBody:
+      "Use the private correction form on the home page, or write to the privacy contact. Requests are private, reviewed by a human, and never published. Response targets: first response within 48 hours, substantive response within 14 days, emergency content hide within 24 hours (MODERATION_SLA).",
+    correctionForm: "Open the correction form",
+    correctionEmail: "privacy@opensurveillancedb",
+    correctionEmailNote:
+      "Dedicated mailbox — to be created before launch; final domain to be confirmed.",
+    securityTitle: "Reporting a security vulnerability",
+    securityBody:
+      "Use the GitHub Private Vulnerability Reporting flow, which creates a confidential advisory only the maintainers can see. Do not open a public issue for a vulnerability.",
+    securityAdvisory: "Open the private advisory form",
+    securityPgpTitle: "Encrypting sensitive payloads",
+    securityPgpBody:
+      "For payloads that contain personal data or operational details, encrypt them with the project PGP key (fingerprint 04E8 A3EE 7C72 188B D3AF 925D 496C F0BD 4920 D3F7) and include the ciphertext in the advisory. Response commitment: first response within 48 hours, substantive response within 14 days, emergency hide within 24 hours.",
+    securityRouteNote:
+      "Security reports and privacy requests travel on separate channels: private advisories for vulnerabilities, the correction form and privacy contact for data-subject requests.",
+    footer: "Built for transparency, not tracking.",
+  },
+
   rules: {
     navigation: "Rules navigation",
     homeAria: "OpenSurveillanceDB home",

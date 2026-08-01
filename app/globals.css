@@ -149,6 +149,16 @@ footer { padding:30px 0 44px; display:grid; grid-template-columns:1fr 1fr 1fr; a
 .legal-table caption { padding:12px 14px; text-align:left; font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; color:#63717b; border-bottom:1px solid var(--line); }
 .legal-table th { padding:10px 12px; text-align:left; background:#eef1ea; color:#3d555d; font-size:11px; text-transform:uppercase; letter-spacing:.07em; }
 .legal-table td { padding:10px 12px; border-top:1px solid #e2e6de; color:#4b5f68; line-height:1.5; vertical-align:top; }
+/* FAQ (kanban t_dd306f21): accessible native disclosure widgets. */
+.faq-section { width:min(760px, calc(100% - 48px)); margin:0 auto; padding:0 0 100px; display:grid; gap:12px; }
+.faq-item { border:1px solid var(--line); border-radius:12px; background:#fffef9; overflow:hidden; }
+.faq-item summary { display:flex; align-items:center; gap:14px; padding:19px 22px; cursor:pointer; font-size:17px; font-weight:800; letter-spacing:-.02em; list-style:none; }
+.faq-item summary::-webkit-details-marker { display:none; }
+.faq-item summary::before { content:"+"; flex:none; display:grid; place-items:center; width:24px; height:24px; border-radius:50%; background:#e3eee4; color:#106049; font-size:16px; font-weight:800; }
+.faq-item[open] summary::before { content:"–"; }
+.faq-item summary:focus-visible { outline:3px solid #0b705c; outline-offset:-3px; }
+.faq-item p { margin:0; padding:0 22px 22px 60px; color:#52656d; font-size:14px; line-height:1.55; }
+@media (max-width:700px){ .faq-item p { padding-left:22px; } }
 /* Manifesto page (app/manifesto/page.tsx): compact list inside the
    "Published / Never published" cards. Reuses the correction-form card
    palette so contrast matches the rest of the site. */

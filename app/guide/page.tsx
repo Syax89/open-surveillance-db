@@ -14,6 +14,8 @@ export default function GuidePage() {
       <div className="nav-links">
         <Link href="/#map">{t.map}</Link>
         <Link href="/#records">{t.directory}</Link>
+        <Link href="/faq">{bundle.faq.faqLabel}</Link>
+        <Link href="/contatti">{bundle.contact.contactLabel}</Link>
         <Link href="/manifesto">{t.manifesto}</Link>
         <Link className="nav-action" href="/">{t.home}</Link>
       </div>
