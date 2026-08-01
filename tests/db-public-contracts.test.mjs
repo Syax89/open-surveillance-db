@@ -434,6 +434,7 @@ const cameraFixture = {
 test("live exports carry no version identifier (versioned releases are a proposal)", async () => {
   stub("listPublicCamerasPage", async () => ({ records: [cameraFixture], total: 1, nextOffset: null }));
   stub("listPublicCameras", async () => [cameraFixture]);
+  stub("getPublicCameraFacets", async () => ({ kinds: [], freshness: { "7d": 0, "30d": 0, "90d": 0, all: 0 } }));
   const { GET } = await loadRoute("app/api/cameras/route.mjs");
   const response = await GET(apiRequest("/api/cameras"));
   assert.equal(response.status, 200);
@@ -482,6 +483,7 @@ test("CSV omits createdAt and the publish flags and is newline-terminated", asyn
 
 test("unknown format values including uppercase variants fall back to JSON", async () => {
   stub("listPublicCamerasPage", async () => ({ records: [cameraFixture], total: 1, nextOffset: null }));
+  stub("getPublicCameraFacets", async () => ({ kinds: [], freshness: { "7d": 0, "30d": 0, "90d": 0, all: 0 } }));
   const { GET } = await loadRoute("app/api/cameras/route.mjs");
   for (const format of ["CSV", "GeoJSON", "xml", ""]) {
     const query = format ? `?format=${format}` : "";
