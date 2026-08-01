@@ -174,7 +174,11 @@ test("record detail: anonymous caller sees the disabled toggle with the login co
   // The widget renders only here (record detail); anonymous → disabled.
   const button = await screen.findByRole("button", { name: "Confirm this record exists" });
   assert.equal(button.disabled, true);
-  assert.ok(screen.getByText("Log in to verify this record"));
+  // The gate copy settles only AFTER the personal-state fetch resolves
+  // (checking → anonymous): findByRole resolves as soon as the button is in
+  // the DOM, so wait for the copy instead of reading it synchronously —
+  // under the coverage runner the fetch may not have settled yet.
+  await screen.findByText("Log in to verify this record");
   // The aggregate count still shows (public data, no session needed).
   assert.ok(screen.getByText("3 verifications"));
 });
@@ -188,7 +192,8 @@ test("record detail: L0 contributor sees the disabled toggle with the gate copy"
   await screen.findByText("Fixture Public Camera");
   const button = await screen.findByRole("button", { name: "Confirm this record exists" });
   assert.equal(button.disabled, true);
-  assert.ok(screen.getByText("You can verify records after your first contribution is published."));
+  // Same gate-settling race as the anonymous test: wait for the copy.
+  await screen.findByText("You can verify records after your first contribution is published.");
 });
 
 test("record detail: L1+ toggle PUTs with the CSRF token, updates the count and flips aria-pressed", async () => {
