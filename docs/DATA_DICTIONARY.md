@@ -44,10 +44,15 @@ decimals, non-numeric text) answer `400`; a blank `limit` falls back to the
 default. CSV and GeoJSON exports deliberately ignore pagination: they are
 complete snapshots for download, rate-limited in their own bucket.
 
-Cache policy: the JSON list, nearby, revisions, and photo-list responses
-answer `Cache-Control: no-store` — they derive from moderation decisions
-that can change at any time, so a browser or proxy must never serve a stale
-copy after a decision lands. The CSV/GeoJSON exports answer
+Cache policy: the JSON list, the single-record route and the bbox/GeoJSON
+marker layer answer `Cache-Control: public, s-maxage=300,
+stale-while-revalidate=600` — the dataset changes through moderation
+decisions, never live feeds, so a bounded 5-minute edge/browser cache keeps
+the directory and map responsive while still converging after any decision
+(and the moderation write path purges the exact `Cache-Tag` immediately).
+The nearby, search, revisions, and photo-list responses answer
+`Cache-Control: no-store` — they derive from moderation decisions or user
+input that must never be served stale. The CSV/GeoJSON exports answer
 `Cache-Control: public, max-age=3600`: a bounded 1 h staleness is
 acceptable for a download snapshot, and the URL's content does change when
 moderators act, so it is deliberately not `immutable`. Photo bytes keep
@@ -114,6 +119,7 @@ some fields entirely (marked `—`).
 | `updated` | ✓ | ✓ | ✓ | string | Last public verification date (ISO 8601). Freshness windows (`7d`/`30d`/`90d`) match only ISO values, so non-ISO labels are never window-matched: seeded demo records carry the literal label `Demo data`, and a fresh submission `Submitted just now` until it is verified. Migration `0007_directory_freshness_backfill` converted the pre-existing prose labels of verified records into comparable ISO timestamps. |
 | `description` | ✓ | ✓ | ✓ | string | Brief factual context written or reviewed by a moderator; no sensitive operational detail. |
 | `createdAt` | ✓ | — | — | string | Submission/creation timestamp (ISO). Not exported in CSV/GeoJSON. |
+| `confirmationCount` | ✓ | — | — | integer | Aggregate community-verification count (ADR 0018 §2.3, C1): how many distinct contributors currently confirm the camera exists at the documented location. **Never per-profile attribution** — the public DOM carries only the aggregate. Only in the JSON list and single-record payloads (the map marker/bbox layer and the CSV/GeoJSON exports omit it). Counts are *decayed*: only verifications at/after `lastVerifiedAt` count, and re-verifying a record "renews" its verifications. |
 
 ### Nearby response extra field
 
@@ -165,6 +171,95 @@ only: never the storage key, never the bytes back. The photo stays private
 until a moderator approves it and confirms redaction; only then can it
 appear in the public photo outputs above.
 
+## Community verifications, trust levels and contribution profile (C1/C2)
+
+The community layer (ADR 0018, COMMUNITY_PLAN §2–§4) adds two private,
+authenticated surfaces on top of the public dataset, plus the aggregate
+`confirmationCount` on public record payloads described above. All
+community endpoints are personal data: they answer `Cache-Control: no-store`
+and are gated by the contributor session (ADR 0013) with same-origin + CSRF
+on mutations.
+
+### Verification toggle — `PUT/DELETE/GET /api/cameras/[id]/confirmation`
+
+A verification is a personal confirmation that the camera exists at the
+documented location. It is **not** a vote or a rating: one verification per
+account per record (UNIQUE `(camera_id, contributor_id)` at the database
+level), a level gate (≥ 1 published contribution), a self-verification ban,
+daily per-account and per-record quotas, and an IP-hash burst bucket are the
+anti-gaming layers (COMMUNITY_PLAN §4.2).
+
+| Method | Behaviour | Responses |
+| --- | --- | --- |
+| `PUT` | Toggle ON (empty body) → `{ "confirmed": true, "count": N }` | `401` anonymous · `403` CSRF or level gate or self-verify · `404` record not public · `409` already verified · `429` quota |
+| `DELETE` | Toggle OFF → `{ "confirmed": false, "count": N }` | `404` no verification to remove · `401`/`403` as above |
+| `GET` | Personal state → `{ "confirmed": bool }` (anonymous → `false`) | `404` invalid id · `429` rate limit |
+
+The public aggregate lives on the record payload as `confirmationCount`
+(JSON list + single-record route, `s-maxage=300, stale-while-revalidate=600`);
+the personal toggle state is always `no-store`.
+
+### Contribution profile — `GET /api/auth/me/contributions`
+
+The authenticated contributor's own attributed contributions (camera
+reports, corrections, photo uploads), paginated with the canonical F0
+contract and the caller's own trust level in the meta. Only own data is ever
+served: a `contributorId` query parameter targeting another account answers
+`400` and is never resolved (no cross-account path, no existence oracle).
+
+| Query | Values | Notes |
+| --- | --- | --- |
+| `type` | `camera` \| `correction` \| `photo` | Optional whitelist; unknown value → `400` |
+| `status` | `pending` \| `verified` \| `needs_review` \| `removed` | Optional whitelist; unknown value → `400` |
+| `page` | positive integer, default `1` | 1-based |
+| `pageSize` | integer 1–100, default `25` | clamped at the db boundary too |
+
+Response:
+
+```json
+{
+  "contributions": [
+    { "type": "camera|correction|photo", "id": 7, "title": "…" | null,
+      "issueType": "…" | null, "cameraId": 3 | null,
+      "status": "verified", "createdAt": "2026-08-01T…Z" }
+  ],
+  "pagination": { "page": 1, "pageSize": 25, "total": 3, "totalPages": 1, "hasMore": false },
+  "level": { "level": 2, "verifiedCount": 7, "threshold": 5, "nextThreshold": 20 }
+}
+```
+
+Errors: `401` anonymous · `400` unknown filter or invalid pagination or
+cross-account `contributorId` · `503` database unavailable. The superseded
+`GET /api/auth/me/submissions` stays for backward compatibility and is
+deprecated. `GET /api/auth/me` also carries the caller's own `level` so the
+account page renders the badge and progress line in one call.
+
+### Trust level — `level` (derived, never denormalised)
+
+The level is a pure function `deriveLevel(verifiedCount)` of the
+contributor's **verified** contribution count — `status = 'verified'`
+records only; pending, rejected and removed never count. Thresholds live in
+one constant (`app/lib/trust-levels.ts`, `TRUST_LEVELS`):
+
+| Level | Threshold (verified contributions) |
+| --- | --- |
+| L0 | 0 |
+| L1 | 1 |
+| L2 | 5 |
+| L3 | 20 |
+| L4 | 50 |
+
+The meta shape is machine-readable: `{ level, verifiedCount, threshold,
+nextThreshold }` with `nextThreshold: null` at the top level (L4). There is
+**no** `contributors.contributor_level` column — the level is always
+recomputed from a COUNT over the `(contributor_id, status)` index, so it can
+never go stale when a moderation decision flips a record's status, and
+account erasure recalculates it by de-attributing records. No endpoint
+exposes anyone else's or a global level, and no leaderboard/ranking exists
+(COMMUNITY_PLAN §3.1, §5.2). Display labels ("New contributor", "Trusted
+contributor", "Experienced contributor") are a frontend/i18n concern
+(`community.ts` bundle), never a backend constant.
+
 ## Fields that are never public
 
 The following exist in storage or private responses and must never appear in
@@ -190,6 +285,15 @@ any public output:
 - `sessions.*` and auth tokens — contributor sessions, session tokens, and
   CSRF tokens are never serialised in any response outside the authenticated
   session flow itself.
+- `camera_confirmations.*` — who verified a record is never public: the
+  public payloads expose only the aggregate `confirmationCount`, never a
+  per-profile link (ADR 0018 decision 2). The personal toggle state
+  (`GET /api/cameras/[id]/confirmation`) is `no-store` and only meaningful
+  for the signed-in caller.
+- Trust levels of other contributors (or global levels) — `level` is served
+  only to the caller for their own profile; no endpoint exposes anyone
+  else's level and no leaderboard/ranking exists (COMMUNITY_PLAN §3.1,
+  §5.2).
 
 ## Related policies
 

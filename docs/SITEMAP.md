@@ -37,9 +37,14 @@ for future page changes and for the QA pass over the routes.
 - **C-ADR done** — ADR 0018 (verifications, trust levels, two-track editing,
   two identity layers) recorded before any code; the routes below are listed
   here **before** implementation per the route rule.
-- **C1–C6 pending** (backend schema/verifications, profile API, edit flow,
-  corrections whitelist, frontend profile/verification widget, frontend edit
-  page) — routes land with their phases; until then the routes below are
+- **C1, C2, C3, C4 done** — backend schema/verifications (C1, PR #174),
+  profile API with `deriveLevel` (C2, PR #176), two-track contribution
+  editing with moderated edit requests (C3, PR #177), corrections whitelist +
+  dedupe (C4, PR #175). The verification toggle, the profile/level contracts
+  and the edit-flow backend are live on `main`; the routes below that are
+  marked "planned" still wait for the frontend phases.
+- **C5, C6 pending** — frontend profile/verification widget, frontend edit
+  page — routes land with their phases; until then the routes below are
   **planned, not implemented**.
 
 ## Principles
@@ -267,7 +272,7 @@ proposed).
 - **Nav/footer:** never linked from public navigation (account surface).
 - **Auth:** auth-gated (contributor session, ADR 0013); anonymous → 401.
 
-### `/records/[id]/edit` — Edit contribution (planned, community C3/C6)
+### `/records/[id]/edit` — Edit contribution (planned, community C6)
 
 - **Purpose:** private, dedicated edit page for the record **owner** —
   replaces inline editing for contribution fields (design #815 C7).
@@ -283,18 +288,21 @@ proposed).
   `needs_review` / `stale` → edit-request re-moderated (entity
   `camera_edit`, 202 + `editRequest`); `removed` / `rejected` → 409 blocked.
 
-### `/guide` — Guide (implemented, pre-existing)
+### `/guide` — Guide (implemented, pre-existing; community sections C-docs)
 
 - **Purpose:** how to use the site: map, directory, filters, exports, record
-  lifecycle and statuses.
+  lifecycle and statuses; since C-docs also the community layer: accounts,
+  editing your own contribution (re-moderation), verifications and trust
+  levels.
 - **Content:** `app/guide/page.tsx`, rendered with the shared
   `nav-shell` + `record-detail` layout; the global footer comes from the
   root layout (not repeated in the page). Since F1 the map and directory are
   separate routes: the guide's copy (bundle `guide.ts`) describes them as
   **pages** (`/mappa`, `/directory`), not home sections; the physical nav
   links/CTAs switch from anchors to the route URLs with F3 (t_2ca69725).
-  The guide bundle remains the **only** user guide (no duplicate
-  `docs/USER_GUIDE.md` is maintained).
+  The community sections reuse the frozen `community.ts` vocabulary (trust
+  levels, verifications) — the guide bundle remains the **only** user guide
+  (no duplicate `docs/USER_GUIDE.md` is maintained).
 - **Nav/footer:** in home nav and footer.
 
 ### `/manifesto` — Manifesto (implemented, PR #65)
@@ -361,10 +369,12 @@ proposed).
   `docs/ACCESSIBILITY_STATEMENT.md` — the repository copy stays canonical.
 - **Nav/footer:** footer only.
 
-### `/faq` — FAQ (implemented, PR #68)
+### `/faq` — FAQ (implemented, PR #68; community Q&A C-docs)
 
 - **Purpose:** frequent questions: how to report, map accuracy, how to
-  correct an error, privacy.
+  correct an error, privacy; since C-docs also accounts, verifications,
+  editing a contribution, contributor levels and account-erasure effects on
+  community data.
 - **Content:** curated Q&A from README/guide/moderation docs. Bundle: `faq`.
 - **Nav/footer:** footer only.
 

@@ -31,6 +31,21 @@ export const en = {
   qPrivacy: "What about privacy?",
   aPrivacy:
     "Reports are private while pending; published records contain no faces, licence plates or personal data. The data controller is Simone Rondina (syax89) / OpenSurveillanceDB, Italy. Data-subject rights (access, rectification, erasure, objection) can be exercised via privacy@opensurveillancedb.",
+  qAccount: "Do I need an account?",
+  aAccount:
+    "No. Browsing, reporting a camera and sending a correction all work without an account. An account is optional and adds attribution: you can follow your own reports, edit your contributions, verify records you have seen and build a trust level from your verified contributions.",
+  qVerifications: "What are verifications?",
+  aVerifications:
+    "A verification is a personal confirmation that a camera exists at the documented location. Each account can add one verification per record, so the count reflects distinct people. Public pages show only the total number of verifications — who verified a record is never shown.",
+  qEdit: "Can I edit my contribution?",
+  aEdit:
+    "Only the contributor who submitted a record can edit it. A report still in moderation can be corrected directly by its owner. Once a record is published, an edit goes back into moderation and appears in public data only after a human review approves it.",
+  qLevels: "What are contributor levels?",
+  aLevels:
+    "Trust levels recognise accurate contributions: only verified records count, with thresholds at 1, 5, 20 and 50 verified contributions. Levels are recognition, not a competition — no public ranking or leaderboard exists.",
+  qDeleteAccount: "What happens to my verifications if I delete my account?",
+  aDeleteAccount:
+    "Account erasure removes the link between you and the community data: verifications you received are deleted, verifications you gave are de-identified (they stay on the record without pointing to you), and your published reports remain published without attribution to you.",
   moreTitle: "Still have questions?",
   moreBody:
     "For corrections, removals and privacy requests use the correction form on the home page or the contact page.",
@@ -63,6 +78,21 @@ export const it: Translation<typeof en> = {
   qPrivacy: "E per quanto riguarda la privacy?",
   aPrivacy:
     "Le segnalazioni sono private finché sono in attesa; i record pubblicati non contengono volti, targhe o dati personali. Il titolare del trattamento è Simone Rondina (syax89) / OpenSurveillanceDB, Italia. I diritti dell'interessato (accesso, rettifica, cancellazione, opposizione) si esercitano scrivendo a privacy@opensurveillancedb.",
+  qAccount: "Serve un account?",
+  aAccount:
+    "No. Consultare, segnalare una telecamera e inviare una correzione funzionano anche senza account. L'account è facoltativo e aggiunge l'attribuzione: puoi seguire le tue segnalazioni, modificare i tuoi contributi, verificare i record che hai visto e costruire un livello di fiducia con i tuoi contributi verificati.",
+  qVerifications: "Cosa sono le verifiche?",
+  aVerifications:
+    "Una verifica è una conferma personale che una telecamera esista nella posizione documentata. Ogni account può aggiungere una verifica per record, quindi il conteggio riflette persone distinte. Le pagine pubbliche mostrano solo il numero totale di verifiche: chi ha verificato un record non viene mai mostrato.",
+  qEdit: "Posso modificare il mio contributo?",
+  aEdit:
+    "Solo chi ha inviato un record può modificarlo. Una segnalazione ancora in moderazione può essere corretta direttamente dal suo autore. Quando un record è pubblicato, una modifica torna in moderazione e compare nei dati pubblici solo dopo l'approvazione di una revisione umana.",
+  qLevels: "Cosa sono i livelli di contributor?",
+  aLevels:
+    "I livelli di fiducia riconoscono i contributi accurati: contano solo i record verificati, con soglie a 1, 5, 20 e 50 contributi verificati. I livelli sono riconoscimento, non competizione: non esiste alcuna classifica pubblica.",
+  qDeleteAccount: "Cosa succede alle mie verifiche se elimino l'account?",
+  aDeleteAccount:
+    "La cancellazione dell'account rimuove il collegamento tra te e i dati community: le verifiche che hai ricevuto vengono eliminate, quelle che hai dato vengono de-identificate (restano sul record senza puntare a te) e i tuoi record pubblicati restano pubblicati senza attribuzione a te.",
   moreTitle: "Hai ancora domande?",
   moreBody:
     "Per correzioni, rimozioni e richieste relative alla privacy usa il modulo di correzione nella home page o la pagina dei contatti.",

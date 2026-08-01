@@ -30,7 +30,7 @@ The first public alpha is a deliberately narrow pilot in one reviewed jurisdicti
 | User | Need | Product response |
 | --- | --- | --- |
 | Resident or visitor | Understand what reviewed public records exist near a place | Map and accessible results list, source and verification information, clear data limitations |
-| Community contributor | Share a possible visible public camera responsibly | Guided private submission, safety checks, acknowledgement, no immediate publication |
+| Community contributor | Share a possible visible public camera responsibly; follow up on their own contributions | Guided private submission, safety checks, acknowledgement, no immediate publication; signed-in: private `/account` profile with trust level and own contributions, verification of records, owner editing with re-moderation |
 | Person affected by a record | Correct an error or report potential harm | Fast correction/removal path, reference ID, expected response route |
 | Moderator | Make consistent decisions without exposing reporter data | This workstream supplies user-facing status and reason language; the moderator workspace is specified elsewhere |
 | Researcher or civic group | Reuse reviewed data transparently | Documented export, license/provenance context, and a clear distinction from OSM data |
@@ -42,7 +42,10 @@ frontend refactor (F1, `docs/FRONTEND_PLAN.md` §1.2): **Browse** → `/mappa`
 + `/directory`; **Search** → `/directory` (and `/mappa` filters); **Submit**
 → `/segnala`; **Correct** → `/correggi`. The home page is the hub that links
 the four tools; the map and the directory are separate pages, each with its
-own URL, so a journey can be deep-linked and bookmarked.
+own URL, so a journey can be deep-linked and bookmarked. A fifth journey —
+**Verify and manage your own contributions** — covers the community layer
+(contributor accounts, trust levels, verifications, contribution editing,
+COMMUNITY_PLAN §2–§4) on the private `/account` and `/records/[id]` surfaces.
 
 ### 1. Browse
 
@@ -117,6 +120,52 @@ public API, search, or export before a human approval decision.
 
 **Success condition:** a correction can be started without an account, and
 its details do not become public or leak through API/export/logs.
+
+### 5. Verify and manage your own contributions
+
+The community layer (COMMUNITY_PLAN §2–§4, ADR 0018) gives a signed-in
+contributor a private view of their own attributed work and a lightweight
+way to confirm records from personal observation. It is **recognition, not
+competition**: no leaderboard, no public ranking, no gamified metrics
+(§"Non-commercial success measures" below).
+
+1. A contributor who already has an account (ADR 0013, email + password)
+   signs in and lands on `/account`, their private profile: profile fields,
+   their own trust level badge with a textual progress line, and the list of
+   their contributions (camera reports, corrections, photo uploads) with
+   **local** state filters (no URL state — the page is private and not
+   shareable). Anonymous visitors get the logged-out state, never someone
+   else's data.
+2. From `/account` the contributor opens their contributions at
+   `/account/contributions` (kebab-case, `noindex`): a paginated list of
+   their own attributed records with status, type and date, filtered locally
+   by status. Empty states are truthful ("No contributions yet") and never
+   imply coverage.
+3. On a public record (`/records/[id]`) the contributor can add a
+   **verification** — a personal confirmation that the camera exists at the
+   documented location — with the aggregate count shown publicly. One
+   verification per account per record; the level gate (≥ 1 verified
+   contribution) is explained in plain language when the toggle is disabled;
+   self-verification is blocked. Public pages show only the aggregate count —
+   never who verified.
+4. To fix an error in their own contribution the owner opens
+   `/records/[id]/edit`: a report still in moderation can be corrected
+   directly; a published record goes through **re-moderation** — the edit
+   replaces the public record only after a human review approves it, and the
+   page says so ("Your changes will be reviewed by a moderator before they
+   replace the current record").
+5. The contributor can remove their own verification at any time (destructive
+   confirmation), report a verification as abuse, and — if they leave — erase
+   their account from `/account`: verifications they received are deleted,
+   verifications they gave are de-identified, and their published reports
+   remain published without attribution (GDPR art. 17, RETENTION_SCHEDULE
+   R14).
+
+**Success condition:** a contributor can see every own contribution and its
+state, verify and un-verify records, edit their own contribution with a
+clear re-moderation notice, and erase the account with the community data
+deleted or de-identified — all without any public ranking or attribution of
+verifications to a profile.
 
 ## Prioritised backlog
 
