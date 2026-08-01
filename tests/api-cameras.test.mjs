@@ -393,15 +393,16 @@ test("POST /api/cameras normalises an ISO datetime observedOn to its date part",
   assert.equal(callArgs("createPendingCamera")[0][0].observedOn, "2026-07-01");
 });
 
-test("POST /api/cameras maps malformed JSON bodies to 500", async () => {
+test("POST /api/cameras maps malformed JSON bodies to 400", async () => {
   stub("createPendingCamera", async (input) => ({ id: 12, ...input }));
   const { POST } = await camerasRoute();
   const response = await POST(
     apiRequest("/api/cameras", { method: "POST", body: '{"title": broken' }),
   );
-  assert.equal(response.status, 500);
+  assert.equal(response.status, 400);
   const body = await responseBody(response);
   assert.ok(body.error, "an error message must be returned");
+  assert.equal(callArgs("createPendingCamera").length, 0, "no db write for malformed JSON");
 });
 
 test("POST /api/cameras links uploaded photo ids to the new report", async () => {

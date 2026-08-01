@@ -21,7 +21,7 @@ import {
 import { recordRateLimitBlock } from "../../lib/abuse-alerts";
 import { requireRole } from "../../lib/authz";
 import { isRecord } from "../../lib/guards";
-import { PayloadTooLargeError, readJsonBody, urlTooLong } from "../../lib/input-limits";
+import { BodyReadError, readJsonBody, urlTooLong } from "../../lib/input-limits";
 import { callerKey, checkRateLimit, limitsFor } from "../../lib/rate-limit";
 import { getReviewerByUserId } from "../../../db/users";
 
@@ -388,8 +388,8 @@ export async function PATCH(request: Request) {
     }
     return moderationResponse(payload.entity, result);
   } catch (error) {
-    if (error instanceof PayloadTooLargeError) {
-      console.warn("PATCH /api/moderation payload rejected: body over the configured byte cap");
+    if (error instanceof BodyReadError) {
+      console.warn("PATCH /api/moderation payload rejected: body too large or not valid JSON");
       return Response.json({ error: error.message }, { status: error.status });
     }
     console.error("PATCH /api/moderation failed", error);
