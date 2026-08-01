@@ -42,7 +42,10 @@ export const correctionRequests = sqliteTable(
   "correction_requests",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
-    cameraId: integer("camera_id"),
+    // FK to cameras (migration 0015). Historical corrections must survive
+    // the removal of a camera record: SET NULL keeps the request auditable
+    // while unlinking it from the deleted record.
+    cameraId: integer("camera_id").references(() => cameras.id, { onDelete: "set null" }),
     issueType: text("issue_type").notNull(),
     message: text("message").notNull(),
     contact: text("contact"),
