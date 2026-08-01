@@ -26,6 +26,7 @@ function buildMarkerIcon(L: LeafletModule, camera: MapCamera, isSelected: boolea
 
 export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLocation }: Props) {
   const [mapUnavailable, setMapUnavailable] = useState(false);
+  const [offline, setOffline] = useState(false);
   const mapElement = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<import("leaflet").Map | null>(null);
   const markersRef = useRef<import("leaflet").LayerGroup | null>(null);
@@ -47,6 +48,22 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
   useEffect(() => {
     selectedIdRef.current = selectedId;
   }, [selectedId]);
+
+  // Offline state: the tiles cannot load and the records are the last ones
+  // the browser received. The map stays visible (the markers are already on
+  // the page); a status notice explains why nothing refreshes. SSR-safe:
+  // navigator is undefined on the server, so first paint never shows it.
+  useEffect(() => {
+    if (typeof navigator === "undefined" || typeof window === "undefined") return;
+    const update = () => setOffline(!navigator.onLine);
+    update();
+    window.addEventListener("online", update);
+    window.addEventListener("offline", update);
+    return () => {
+      window.removeEventListener("online", update);
+      window.removeEventListener("offline", update);
+    };
+  }, []);
 
   useEffect(() => {
     let disposed = false;
@@ -136,9 +153,13 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
   const directoryLink = t.mapDirectoryLink;
   const fallbackTitle = t.mapFallbackTitle;
   const fallbackBody = t.mapFallbackBody;
+  const offlineTitle = t.offlineTitle;
+  const offlineBody = t.offlineBody;
+  const offlineAction = t.offlineAction;
 
   return <div className="map-region" id="map-region" role="region" aria-label={label} aria-describedby="map-accessibility-description" tabIndex={-1}>
     <p className="sr-only" id="map-accessibility-description">{description} <a href="#records">{directoryLink}</a>.</p>
+    {offline && <div className="offline-state" role="status"><b>{offlineTitle}.</b> {offlineBody} <button type="button" className="text-button" onClick={() => window.location.reload()}>{offlineAction} <span aria-hidden="true">→</span></button></div>}
     {mapUnavailable
       ? <div className="map-fallback" role="note"><p className="map-fallback-title">{fallbackTitle}</p><p>{fallbackBody}</p><p><a className="text-button" href="#records">{directoryLink} <span aria-hidden="true">→</span></a></p></div>
       : <div ref={mapElement} className="live-map" />}

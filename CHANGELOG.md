@@ -122,6 +122,24 @@ changes accumulate under `[Unreleased]`.
   under `workerd` via a systemd unit, with `vinext start` (plain Node)
   documented as incompatible (`ERR_UNSUPPORTED_ESM_URL_SCHEME` on
   `cloudflare:`).
+- Italian interface strings fixed where they said the opposite of the
+  English pilot: the logged-out title and the account-deleted body now say
+  "logout" instead of "accesso", and the "create an account" link reads
+  "Crea un account" instead of "Crealo" (F-i18n, FRONTEND_PLAN §5.1).
+- Internal jargon removed from user-facing strings: `RETENTION_SCHEDULE R7`
+  (auth), `GOVERNANCE.md`, "Wave A pilot boundary" and `MODERATION_SLA`
+  (contacts) replaced with plain-language wording (F-i18n).
+- Offline state added to the map, directory and record detail: when the
+  connection drops, a status notice explains that the last loaded records
+  are still shown and offers a retry (F-i18n).
+- Microcopy standardized: uniform API-reachability error pattern
+  ("non raggiungibile in questo momento / controlla la connessione /
+  riprova"), explicit rate-limit retry window ("Riprova tra un minuto"),
+  and moderation decisions confirm with "Decisione salvata" plus a summary
+  of entity, action and reason (F-i18n).
+- i18n mapping documented: per-domain bundles kept, with a conceptual
+  route→bundle table in `docs/SITEMAP.md` and `docs/REFACTOR_I18N.md`
+  (no monolithic info/legal bundles; legal stays in `app/lib/legal/`).
 
 ### Fixed
 
