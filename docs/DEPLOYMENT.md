@@ -246,12 +246,13 @@ or client bundles (the secrets gate in CI rejects hardcoded credentials).
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `READ_RATE_LIMIT_MAX` / `READ_RATE_LIMIT_WINDOW_SECONDS` | 60 / 60 | Plain reads (`GET /api/cameras`) |
+| `READ_RATE_LIMIT_MAX` / `READ_RATE_LIMIT_WINDOW_SECONDS` | 60 / 60 | Plain reads (`GET /api/cameras`, photo bytes `GET /api/photos/[id]`) |
 | `EXPORT_RATE_LIMIT_MAX` / `EXPORT_RATE_LIMIT_WINDOW_SECONDS` | 10 / 60 | Bulk exports (CSV/GeoJSON) |
 | `NEARBY_RATE_LIMIT_MAX` / `NEARBY_RATE_LIMIT_WINDOW_SECONDS` | 30 / 60 | Nearby search |
 | `REVISIONS_RATE_LIMIT_MAX` / `REVISIONS_RATE_LIMIT_WINDOW_SECONDS` | 30 / 60 | Public change history (`GET /api/cameras/revisions`) |
 | `POST_RATE_LIMIT_MAX` / `POST_RATE_LIMIT_WINDOW_SECONDS` | 5 / 60 | Submissions (cameras + corrections) |
-| `MODERATION_RATE_LIMIT_MAX` / `MODERATION_RATE_LIMIT_WINDOW_SECONDS` | 30 / 60 | Moderation API (second layer over edge auth) |
+| `MODERATION_RATE_LIMIT_MAX` / `MODERATION_RATE_LIMIT_WINDOW_SECONDS` | 30 / 60 | Moderation API (second layer over edge auth), including appeal decisions |
+| `TILES_RATE_LIMIT_MAX` / `TILES_RATE_LIMIT_WINDOW_SECONDS` | 60 / 60 | Tile proxy (`GET /api/tiles/*`) — protects the OSMF upstream from per-caller scraping |
 | `POST_SUBMISSIONS_DISABLED` | `false` | Kill switch: reject new submissions with 503 |
 | `MAX_BODY_BYTES` | 32768 (32 KiB) | Max JSON request body; larger bodies answer 413 |
 | `ABUSE_ALERT_THRESHOLD` | 10 | Per-caller abuse events per window before an alert fires |
@@ -264,5 +265,7 @@ The limiter is a per-isolate sliding window (60 s default) — see
 in `app/lib/abuse-alerts.ts`. Alerts carry only a SHA-256 hash of the caller
 key (never the raw IP) and never request bodies or query strings (see
 `docs/workstreams/OPS_OPEN.md` §Observability). For a public deployment that
-needs global or long-window limits, replace the in-memory limiter with the
-hosting platform's edge rate-limiting product or a KV/DO-backed counter.
+needs global or long-window limits, replace the in-memory limiter with
+Cloudflare's rate-limiting product (see `docs/workstreams/OPS_OPEN.md`
+§Security for the per-isolate caveat and the buckets to migrate first) or a
+KV/DO-backed counter.

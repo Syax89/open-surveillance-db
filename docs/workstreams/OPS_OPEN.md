@@ -149,6 +149,21 @@ harm.
   (`app/lib/input-limits.ts`), and hashed abuse alerts with route surge
   detection (`app/lib/abuse-alerts.ts`). Environment knobs and defaults are
   listed in `docs/DEPLOYMENT.md`.
+- Public binary routes are metered per caller: photo bytes
+  (`GET /api/photos/[id]`, read bucket, default 60/min) and the tile proxy
+  (`GET /api/tiles/*`, dedicated bucket, default 60/min, env
+  `TILES_RATE_LIMIT_MAX`/`TILES_RATE_LIMIT_WINDOW_SECONDS`) so bulk scraping
+  cannot drive unbounded R2 egress or violate the OSMF community tile usage
+  policy. Appeal decisions (`PATCH /api/appeals/[id]`) share the moderation
+  bucket (default 30/min) as a second layer over the edge gate.
+- The in-memory limiter is per-isolate: on a public multi-isolate deployment
+  the per-caller counts are not global, so the effective ceiling scales with
+  the number of isolates. Before public alpha, evaluate Cloudflare's
+  rate-limiting product (or a KV/DO-backed counter) for the critical
+  buckets — auth, submissions, and tiles — where a determined caller could
+  otherwise spread a burst across isolates. The per-isolate limiter remains
+  the correct first layer everywhere and the only one needed for the local
+  and staging single-isolate deployments.
 - Keep pending records, moderator notes, account data, audit detail, and private
   evidence inaccessible from public APIs, search, exports, error messages, and
   logs.
