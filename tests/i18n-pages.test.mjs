@@ -218,18 +218,19 @@ test("every informative route renders EN and IT without crashing and flips its t
 // 4. Known SSR limitations, pinned (findings QA-2026-08-01-1 / -3)
 // ---------------------------------------------------------------------------
 
-test("SSR <html lang> stays \"en\" even on Italian pages (pinned SSR limitation, QA-2026-08-01-3)", async () => {
-  // app/layout.tsx hardcodes <html lang="en">: server components pick the
-  // bundle from the cookie (server-i18n.ts) but never propagate the locale
-  // to the document element. The client LocaleProvider fixes
-  // document.documentElement.lang in an effect after hydration (pinned in
-  // client-locale-toggle.test.mjs). Until the layout reads the server
-  // locale, the first paint of an Italian page is announced as English —
-  // e.g. screen readers may mispronounce Italian text. This assertion pins
-  // the current behaviour so a fix must update it deliberately.
+test("SSR <html lang> follows the persisted locale on every informative route (ADR 0015; pinned limitation QA-2026-08-01-3 now fixed)", async () => {
+  // The SSR-lang limitation pinned at QA-2026-08-01-3 was fixed by the
+  // i18n SSR change (ADR 0015 / #132): app/layout.tsx now reads the locale
+  // cookie through getServerLocale() and renders <html lang={locale}>, so
+  // the first paint of an Italian page is already announced as Italian (no
+  // EN->IT flash, screen readers pronounce the correct language). The
+  // client LocaleProvider still keeps document.documentElement.lang in sync
+  // after hydration (client-locale-toggle.test.mjs). This assertion was
+  // flipped deliberately: it now pins the fixed behaviour and fails only if
+  // the root layout regresses to a hardcoded English lang.
   for (const [requestPath] of Object.entries(INFO_ROUTES)) {
     const { html } = await renderPath(requestPath, "it");
-    assert.match(html, /<html[^>]*lang="en"/, `${requestPath} (it) SSR still declares lang="en"`);
+    assert.match(html, /<html[^>]*lang="it"/, `${requestPath} (it) SSR must declare lang="it"`);
   }
 });
 

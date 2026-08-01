@@ -44,6 +44,11 @@ const ROUTES = [
   // Account erasure (R7): exercised end to end with a real session built via
   // the real db/auth module, so the DELETE handler runs against real SQL.
   { source: "app/api/auth/account/route.ts", output: "app/api/auth/account/route.mjs" },
+  // Contributor auth (ADR 0013 + 0015): register/login run the real db/auth
+  // SQL against the in-memory D1, so the per-email lockout (429, Retry-After,
+  // reset on success, expiry) is exercised end to end.
+  { source: "app/api/auth/register/route.ts", output: "app/api/auth/register/route.mjs" },
+  { source: "app/api/auth/login/route.ts", output: "app/api/auth/login/route.mjs" },
   // Auth roles + appeals (ADR 0014): contributor files an appeal, moderators
   // list and decide it. The [id] route lives in its own directory.
   { source: "app/api/appeals/route.ts", output: "app/api/appeals/route.mjs" },
