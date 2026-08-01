@@ -5,7 +5,7 @@
 - **Owner:** Rosa (Legal & Privacy Officer / privacy contact)
 - **Decision owner:** CEO (validation recorded on board task t_06c4dc33)
 - **Legal basis assessed:** GDPR art. 37(1)(a)/(b)/(c) and art. 37(4)
-- **Cross-references:** ADR 0015 (`docs/decisions/0015-no-dpo-appointed-art37.md`), PRIVACY_NOTICE.md § 1, GOVERNANCE.md (privacy / legal contact), LAWFUL_BASIS.md § 1, PROCESSOR_REGISTER.md, RETENTION_SCHEDULE.md, BREACH_PROCEDURE.md
+- **Cross-references:** ADR 0017 (`docs/decisions/0017-no-dpo-appointed-art37.md`), PRIVACY_NOTICE.md § 1, GOVERNANCE.md (privacy / legal contact), LAWFUL_BASIS.md § 1, PROCESSOR_REGISTER.md, RETENTION_SCHEDULE.md, BREACH_PROCEDURE.md
 
 > **Disclaimer:** this document is product guidance / not legal advice. It is a draft for pre-launch review and requires external counsel review before launch.
 
@@ -21,7 +21,7 @@ officer was ever formally appointed** anywhere in the repository, and the
 governance records did not list a privacy/legal owner at all (closed in
 parallel by ADR 0011 / GOVERNANCE.md).
 
-This document records the full GDPR art. 37 assessment that the ADR 0015
+This document records the full GDPR art. 37 assessment that the ADR 0017
 decision summarises: why the mandatory-DPO obligation does not apply
 (art. 37(1)(a)/(b)/(c)), why a **voluntary DPO under art. 37(4)** was
 considered and deliberately not appointed at this stage, and how
@@ -121,11 +121,11 @@ The project discharges arts. 5(2) and 24 as follows:
   (BREACH_PROCEDURE.md, arts. 33–34), lawful basis and balancing
   (LAWFUL_BASIS.md), moderation and redaction (MODERATION.md,
   MODERATION_SLA.md).
-- **Decision record:** this assessment, ADR 0015, and the CEO validation
+- **Decision record:** this assessment, ADR 0017, and the CEO validation
   (task t_06c4dc33) are the accountability record for the art. 37 decision
   itself — the reason it is documented rather than omitted.
 - **Art. 13(1)(b) disclosure:** PRIVACY_NOTICE § 1 discloses "no DPO
-  appointed — the obligation does not apply" with a pointer to ADR 0015,
+  appointed — the obligation does not apply" with a pointer to ADR 0017,
   satisfying the "where applicable" disclosure without inventing a role.
 
 ## 5. Review triggers — when this decision is revisited

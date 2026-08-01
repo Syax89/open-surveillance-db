@@ -1,7 +1,7 @@
 # Legal pre-launch deliverables
 
 Status: **DRAFT — pre-launch**. These documents are project drafts produced by the
-privacy/legal function (no DPO appointed — see ADR 0015: GDPR art. 37(1) not applicable) to satisfy the requirements already declared by the project
+privacy/legal function (no DPO appointed — see ADR 0017: GDPR art. 37(1) not applicable) to satisfy the requirements already declared by the project
 policies. They are **not legal advice** and must receive an independent review
 by qualified counsel before any public launch (see PRIVACY_AND_SAFETY.md:
 "local legal review is required before any public launch").
@@ -29,7 +29,7 @@ deliverables (ADR 0002); the full index with finding coverage is in
 Decision records: `docs/decisions/0002-legal-pre-launch-deliverables.md`,
 `docs/decisions/0004-retention-and-review-cycle.md`,
 `docs/decisions/0005-processors-and-data-residency.md`,
-`docs/decisions/0015-no-dpo-appointed-art37.md`.
+`docs/decisions/0017-no-dpo-appointed-art37.md`.
 
 Related documents (outside this folder): the
 [accessibility statement](../ACCESSIBILITY_STATEMENT.md) and

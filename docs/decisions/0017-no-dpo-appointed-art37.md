@@ -1,4 +1,4 @@
-# ADR 0015: No DPO appointed — documented exclusion under GDPR art. 37(1)
+# ADR 0017: No DPO appointed — documented exclusion under GDPR art. 37(1)
 
 - **Status:** accepted (legal recommendation, 2026-08-01); CEO validation tracked
   on board task t_06c4dc33 — if the CEO opts for a voluntary DPO, this ADR and the

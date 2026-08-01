@@ -27,7 +27,8 @@ reviews or lost in chat threads.
 | [0013](0013-contributor-accounts-and-sessions.md) | Contributor accounts and sessions | accepted | 2026-08-01 |
 | [0014](0014-auth-roles-appeals.md) | Coarse auth roles, route-level authorization, and contributor appeals | accepted | 2026-08-01 |
 | [0015](0015-locale-persistence-cookie-ssr.md) | Locale persistence — cookie + SSR, deep-link route | accepted | 2026-08-01 |
-| [0015](0015-no-dpo-appointed-art37.md) | No DPO appointed — documented exclusion under GDPR art. 37(1) | accepted (legal recommendation) | 2026-08-01 |
+| [0016](0016-account-lockout-after-failed-logins.md) | Per-email account lockout after failed logins | accepted | 2026-08-01 |
+| [0017](0017-no-dpo-appointed-art37.md) | No DPO appointed — documented exclusion under GDPR art. 37(1) | accepted (legal recommendation) | 2026-08-01 |
 
 Status values follow the headers in each ADR: `proposed` (draft, pending
 review) and `accepted` (decision recorded; `CEO decision` marks decisions made
