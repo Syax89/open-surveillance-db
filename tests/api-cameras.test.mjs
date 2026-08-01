@@ -393,15 +393,16 @@ test("POST /api/cameras normalises an ISO datetime observedOn to its date part",
   assert.equal(callArgs("createPendingCamera")[0][0].observedOn, "2026-07-01");
 });
 
-test("POST /api/cameras maps malformed JSON bodies to 500", async () => {
+test("POST /api/cameras maps malformed JSON bodies to 400", async () => {
   stub("createPendingCamera", async (input) => ({ id: 12, ...input }));
   const { POST } = await camerasRoute();
   const response = await POST(
     apiRequest("/api/cameras", { method: "POST", body: '{"title": broken' }),
   );
-  assert.equal(response.status, 500);
+  assert.equal(response.status, 400);
   const body = await responseBody(response);
   assert.ok(body.error, "an error message must be returned");
+  assert.equal(callArgs("createPendingCamera").length, 0, "no db write for malformed JSON");
 });
 
 test("POST /api/cameras links uploaded photo ids to the new report", async () => {
@@ -506,6 +507,33 @@ test("POST /api/cameras keeps photo linking best-effort when storage fails", asy
   );
   assert.equal(response.status, 201, "a storage hiccup must never fail the report");
   assert.equal((await responseBody(response)).linkedPhotos, 0);
+});
+
+test("POST /api/cameras accepts nonexistent photo ids best-effort with linkedPhotos 0", async () => {
+  // Photo id linking with ids that do not exist (audit t_0de37378 #6): the
+  // link is best-effort and silent — the report is still created (201), the
+  // db layer returns 0 for unmatched ids (no existence oracle, no throw).
+  stub("createPendingCamera", async (input) => ({ id: 17, ...input }));
+  stub("linkPhotosToCamera", async () => 0);
+  stub("findNearbyPublicCameras", async () => []);
+  const { POST } = await camerasRoute();
+  const response = await POST(
+    apiRequest("/api/cameras", {
+      method: "POST",
+      body: {
+        title: "Nonexistent photo ids",
+        kind: "Dome",
+        latitude: 45.0,
+        longitude: 9.0,
+        photoIds: [999_999, 999_998],
+      },
+    }),
+  );
+  assert.equal(response.status, 201);
+  const body = await responseBody(response);
+  assert.equal(body.record.id, 17);
+  assert.equal(body.linkedPhotos, 0, "unmatched photo ids must not fail the report");
+  assert.deepEqual(callArgs("linkPhotosToCamera")[0], [17, [999999, 999998], null]);
 });
 
 test("POST /api/cameras rejects non-object JSON bodies", async () => {

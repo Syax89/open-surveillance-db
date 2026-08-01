@@ -13,6 +13,7 @@ export const {
   moderatePhoto,
   readPhotoBytes,
   readPublicPhotoBytes,
+  pendingPhotoUsage,
 } = makeMock({
   createPendingPhoto: "createPendingPhoto",
   listPendingPhotos: "listPendingPhotos",
@@ -23,4 +24,5 @@ export const {
   moderatePhoto: "moderatePhoto",
   readPhotoBytes: "readPhotoBytes",
   readPublicPhotoBytes: "readPublicPhotoBytes",
+  pendingPhotoUsage: "pendingPhotoUsage",
 });

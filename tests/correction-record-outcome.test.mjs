@@ -413,6 +413,32 @@ test("PATCH returns 404 when the db layer rejects the correction decision", asyn
   assert.match((await responseBody(response)).error, /Item not found/);
 });
 
+test("PATCH associate to a non-existent camera returns 404", async () => {
+  stub("moderateCorrection", async () => ({ kind: "camera_not_found" }));
+  const { PATCH } = await route();
+  const response = await PATCH(
+    authRequest("/api/moderation", {
+      method: "PATCH",
+      body: { entity: "correction", id: 9, action: "associate", reasonCode: validReasonCode, cameraId: 4242, actorId },
+    }),
+  );
+  assert.equal(response.status, 404);
+  assert.match((await responseBody(response)).error, /Camera not found/);
+});
+
+test("PATCH approve with outcome on a non-existent camera returns 404", async () => {
+  stub("moderateCorrection", async () => ({ kind: "camera_not_found" }));
+  const { PATCH } = await route();
+  const response = await PATCH(
+    authRequest("/api/moderation", {
+      method: "PATCH",
+      body: { entity: "correction", id: 9, action: "approve", reasonCode: validReasonCode, outcome: "removed", cameraId: 4242, actorId },
+    }),
+  );
+  assert.equal(response.status, 404);
+  assert.match((await responseBody(response)).error, /Camera not found/);
+});
+
 test("PATCH returns 500 when the correction write fails", async () => {
   stub("moderateCorrection", async () => {
     throw new Error("Moderation event could not be recorded");
@@ -475,6 +501,35 @@ test("db layer declares the correction outcome allowlist", async () => {
   for (const value of ["kept", "corrected", "marked-stale", "removed", "escalated"]) {
     assert.match(moderation, new RegExp(`["'\`]${value}["'\`]`), `outcome allowlist must include ${value}`);
   }
+});
+
+test("db schema enforces the correction camera FK (migration 0015 + schema.ts)", async () => {
+  const migration0015 = await readSource("drizzle/0015_correction_camera_fk.sql");
+  const schema = await readSource("db/schema.ts");
+  // SQLite cannot add a REFERENCES clause to an existing column, so the
+  // migration must recreate correction_requests with the constraint and
+  // preserve the historical rows (SET NULL keeps corrections after a
+  // camera record is removed).
+  assert.match(
+    migration0015,
+    /REFERENCES\s*`cameras`\s*\(`id`\)[^;]*ON\s+DELETE\s+set\s+null/i,
+    "migration 0015 must declare the FK with ON DELETE SET NULL",
+  );
+  assert.match(
+    migration0015,
+    /CREATE\s+TABLE\s+`new_correction_requests`/i,
+    "migration 0015 must recreate correction_requests to add the FK",
+  );
+  assert.match(
+    migration0015,
+    /INSERT\s+INTO\s+`new_correction_requests`[\s\S]*SELECT[\s\S]*FROM\s+`correction_requests`/i,
+    "migration 0015 must preserve existing correction rows",
+  );
+  assert.match(
+    schema,
+    /cameraId:\s*integer\(\s*["']camera_id["']\s*\)\s*\.references\(\s*\(\)\s*=>\s*cameras\.id,\s*\{\s*onDelete:\s*["']set null["']\s*\}\)/,
+    "db/schema.ts must declare the FK with ON DELETE SET NULL",
+  );
 });
 
 test("AC-3: approve outcomes move or update the linked camera record", async () => {

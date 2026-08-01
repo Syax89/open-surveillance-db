@@ -632,6 +632,32 @@ test("PATCH returns 404 when the item is missing or the transition is invalid", 
   assert.match((await responseBody(response)).error, /Item not found/);
 });
 
+test("PATCH returns 404 when a correction associate targets a non-existent camera", async () => {
+  stub("moderateCorrection", async () => ({ kind: "camera_not_found" }));
+  const { PATCH } = await route();
+  const response = await PATCH(
+    authRequest("/api/moderation", {
+      method: "PATCH",
+      body: { entity: "correction", id: 9, action: "associate", reasonCode: validReasonCode, cameraId: 4242, actorId },
+    }),
+  );
+  assert.equal(response.status, 404);
+  assert.match((await responseBody(response)).error, /Camera not found/);
+});
+
+test("PATCH returns 404 when an approve outcome targets a non-existent camera", async () => {
+  stub("moderateCorrection", async () => ({ kind: "camera_not_found" }));
+  const { PATCH } = await route();
+  const response = await PATCH(
+    authRequest("/api/moderation", {
+      method: "PATCH",
+      body: { entity: "correction", id: 9, action: "approve", reasonCode: validReasonCode, outcome: "removed", cameraId: 4242, actorId },
+    }),
+  );
+  assert.equal(response.status, 404);
+  assert.match((await responseBody(response)).error, /Camera not found/);
+});
+
 test("PATCH returns 500 when the database write fails", async () => {
   stub("moderateCamera", async () => {
     throw new Error("Moderation event could not be recorded");
@@ -647,8 +673,9 @@ test("PATCH returns 500 when the database write fails", async () => {
   assert.equal((await responseBody(response)).error, "Unable to update moderation item");
 });
 
-test("PATCH maps malformed JSON bodies to 500", async () => {
+test("PATCH maps malformed JSON bodies to 400", async () => {
   const { PATCH } = await route();
   const response = await PATCH(authRequest("/api/moderation", { method: "PATCH", body: "{nope" }));
-  assert.equal(response.status, 500);
+  assert.equal(response.status, 400);
+  assert.equal(callArgs("moderateCamera").length, 0, "no db write for malformed JSON");
 });

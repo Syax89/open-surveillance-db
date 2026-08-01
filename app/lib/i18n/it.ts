@@ -13,6 +13,12 @@ export const it: Translation<typeof en> = {
   common: {
     skipLink: "Vai al contenuto principale",
     languageSelection: "Selezione lingua",
+    // Metadata del layout di root (SSR/SEO): <title>/<description> di
+    // fallback per le route senza generateMetadata propria (home, records,
+    // pagine di autenticazione). Localizzati via cookie di locale — ADR 0015.
+    metaTitle: "OpenSurveillanceDB — Dati pubblici sulla sorveglianza pubblica",
+    metaDescription:
+      "Un database aperto e mantenuto dalla comunità delle telecamere di sorveglianza pubblica.",
   },
   map: {
     mapLabel: "Mappa interattiva OpenStreetMap",

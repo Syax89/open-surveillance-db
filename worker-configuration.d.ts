@@ -57,6 +57,12 @@ declare module "cloudflare:workers" {
     /** Optional API key appended as `?key=` for providers that require one
      * (e.g. MapTiler, Stadia Maps). Leave unset for the community server. */
     TILE_PROVIDER_KEY?: string;
+    /** Upstream fetch timeout in ms (default 5000). A slow or hung provider
+     * answers 502 instead of pinning the request until the platform timeout. */
+    TILE_UPSTREAM_TIMEOUT_MS?: string;
+    /** Max accepted upstream tile body in bytes (default 2 MiB). Bodies over
+     * the cap answer 502 and are never cached. */
+    TILE_MAX_BYTES?: string;
     PHOTOS: R2Bucket;
   }
   export const env: Env;

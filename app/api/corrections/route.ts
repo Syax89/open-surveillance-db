@@ -2,7 +2,7 @@ import { env } from "cloudflare:workers";
 import { createCorrectionRequest } from "../../../db/corrections";
 import { recordRateLimitBlock } from "../../lib/abuse-alerts";
 import { isRecord } from "../../lib/guards";
-import { PayloadTooLargeError, readJsonBody, urlTooLong } from "../../lib/input-limits";
+import { BodyReadError, readJsonBody, urlTooLong } from "../../lib/input-limits";
 import { callerKey, checkRateLimit, submissionLimits, submissionsDisabled } from "../../lib/rate-limit";
 
 function cleanText(value: unknown, maxLength: number) {
@@ -48,8 +48,8 @@ export async function POST(request: Request) {
     const correction = await createCorrectionRequest({ cameraId, issueType, message, contact });
     return Response.json({ referenceId: correction.id }, { status: 201 });
   } catch (error) {
-    if (error instanceof PayloadTooLargeError) {
-      console.warn("POST /api/corrections payload rejected: body over the configured byte cap");
+    if (error instanceof BodyReadError) {
+      console.warn("POST /api/corrections payload rejected: body too large or not valid JSON");
       return Response.json({ error: error.message }, { status: error.status });
     }
     console.error("POST /api/corrections failed", error);

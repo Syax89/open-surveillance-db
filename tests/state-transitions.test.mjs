@@ -477,6 +477,124 @@ test("correction decisions record events and never touch public output", async (
 });
 
 // ---------------------------------------------------------------------------
+// Correction ↔ camera integrity: no orphan links (audit t_2ee58c08 gap)
+// ---------------------------------------------------------------------------
+
+test("associate to a non-existent camera is rejected without an orphan UPDATE", async () => {
+  const report = await submitReport();
+  await moderation.moderateCamera(report.id, "approve", REASON.verified, null);
+
+  const insert = await db
+    .prepare(
+      "INSERT INTO correction_requests (camera_id, issue_type, message, contact, status, created_at) VALUES (?, 'wrong-location', 'Linked to a real camera', NULL, 'pending', ?)",
+    )
+    .bind(report.id, "2026-07-31T09:00:00.000Z")
+    .run();
+  const correctionId = Number(insert.meta.lastRowId);
+  const eventsBefore = await eventCount();
+
+  const result = await moderation.moderateCorrection(correctionId, "associate", REASON.verified, null, {
+    cameraId: 4242,
+  });
+  assert.equal(result.kind, "camera_not_found");
+
+  // No orphan UPDATE: the correction keeps its original camera link and stays pending.
+  const row = await db
+    .prepare("SELECT camera_id AS cameraId, status FROM correction_requests WHERE id = ?")
+    .bind(correctionId)
+    .first();
+  assert.equal(row.cameraId, report.id, "the original camera link must be preserved");
+  assert.equal(row.status, "pending", "the correction must not be decided");
+  assert.equal(await eventCount(), eventsBefore, "no moderation event may be recorded");
+});
+
+test("approve with outcome on a non-existent camera is rejected without side effects", async () => {
+  const report = await submitReport();
+  await moderation.moderateCamera(report.id, "approve", REASON.verified, null);
+
+  const insert = await db
+    .prepare(
+      "INSERT INTO correction_requests (camera_id, issue_type, message, contact, status, created_at) VALUES (?, 'inaccurate', 'Wrong date', NULL, 'pending', ?)",
+    )
+    .bind(report.id, "2026-07-31T09:05:00.000Z")
+    .run();
+  const correctionId = Number(insert.meta.lastRowId);
+  const eventsBefore = await eventCount();
+
+  const result = await moderation.moderateCorrection(correctionId, "approve", REASON.verified, null, {
+    outcome: "removed",
+    cameraId: 4242,
+  });
+  assert.equal(result.kind, "camera_not_found");
+
+  const row = await db
+    .prepare("SELECT camera_id AS cameraId, status FROM correction_requests WHERE id = ?")
+    .bind(correctionId)
+    .first();
+  assert.equal(row.status, "pending", "approve on a ghost camera must not mark the request reviewed");
+  assert.equal(row.cameraId, report.id, "the camera link must be preserved");
+  const camera = await db.prepare("SELECT status FROM cameras WHERE id = ?").bind(report.id).first();
+  assert.equal(camera.status, "verified", "the linked camera must be untouched");
+  assert.equal(await eventCount(), eventsBefore, "no moderation event may be recorded");
+});
+
+test("approve with outcome on an existing camera still applies the outcome", async () => {
+  const report = await submitReport();
+  await moderation.moderateCamera(report.id, "approve", REASON.verified, null);
+
+  const insert = await db
+    .prepare(
+      "INSERT INTO correction_requests (camera_id, issue_type, message, contact, status, created_at) VALUES (?, 'inaccurate', 'Wrong date', NULL, 'pending', ?)",
+    )
+    .bind(report.id, "2026-07-31T09:05:00.000Z")
+    .run();
+  const correctionId = Number(insert.meta.lastRowId);
+
+  const result = await moderation.moderateCorrection(correctionId, "approve", REASON.verified, null, {
+    outcome: "removed",
+    cameraId: report.id,
+  });
+  assert.equal(result.kind, "ok");
+  const camera = await db.prepare("SELECT status FROM cameras WHERE id = ?").bind(report.id).first();
+  assert.equal(camera.status, "removed", "the outcome must apply to the existing camera");
+});
+
+test("FK constraint rejects correction links to non-existent cameras (migration 0012)", async () => {
+  db.exec("PRAGMA foreign_keys = ON");
+  // D1SqliteStatement.run is synchronous (mirrors the D1 surface), so the
+  // constraint violation is a synchronous throw from the statement.
+  assert.throws(
+    () =>
+      db
+        .prepare(
+          "INSERT INTO correction_requests (camera_id, issue_type, message, contact, status, created_at) VALUES (?, 'wrong-location', 'orphan', NULL, 'pending', ?)",
+        )
+        .bind(4242, "2026-07-31T09:00:00.000Z")
+        .run(),
+    /FOREIGN KEY/i,
+    "an INSERT with a non-existent camera_id must violate the FK added by migration 0012",
+  );
+});
+
+test("deleting a camera unlinks its corrections (ON DELETE SET NULL)", async () => {
+  db.exec("PRAGMA foreign_keys = ON");
+  const report = await submitReport();
+  const insert = await db
+    .prepare(
+      "INSERT INTO correction_requests (camera_id, issue_type, message, contact, status, created_at) VALUES (?, 'wrong-location', 'linked', NULL, 'pending', ?)",
+    )
+    .bind(report.id, "2026-07-31T09:00:00.000Z")
+    .run();
+  const correctionId = Number(insert.meta.lastRowId);
+  await db.prepare("DELETE FROM cameras WHERE id = ?").bind(report.id).run();
+  const row = await db
+    .prepare("SELECT camera_id AS cameraId FROM correction_requests WHERE id = ?")
+    .bind(correctionId)
+    .first();
+  assert.equal(row.cameraId, null, "the correction must survive the camera deletion with camera_id NULL");
+});
+
+// ---------------------------------------------------------------------------
 // Malformed moderation input cannot change any status (DB layer)
 // ---------------------------------------------------------------------------
 

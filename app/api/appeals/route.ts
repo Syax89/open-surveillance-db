@@ -7,7 +7,7 @@ import {
 } from "../../../db/appeals";
 import { requireRole } from "../../lib/authz";
 import { isRecord } from "../../lib/guards";
-import { PayloadTooLargeError, readJsonBody, urlTooLong } from "../../lib/input-limits";
+import { BodyReadError, readJsonBody, urlTooLong } from "../../lib/input-limits";
 import { recordRateLimitBlock } from "../../lib/abuse-alerts";
 import { callerKey, checkRateLimit, limitsFor } from "../../lib/rate-limit";
 
@@ -43,7 +43,7 @@ function parseAppealRequest(value: unknown): {
 
 function appealLimit(request: Request) {
   const key = callerKey(request);
-  const limitOptions = limitsFor("moderate", env);
+  const limitOptions = limitsFor("appeal", env);
   const limit = checkRateLimit("appeal", key, limitOptions);
   if (!limit.allowed) {
     console.warn("/api/appeals rate limited");
@@ -116,8 +116,8 @@ export async function POST(request: Request) {
         );
     }
   } catch (error) {
-    if (error instanceof PayloadTooLargeError) {
-      console.warn("POST /api/appeals payload rejected: body over the configured byte cap");
+    if (error instanceof BodyReadError) {
+      console.warn("POST /api/appeals payload rejected: body too large or not valid JSON");
       return Response.json({ error: error.message }, { status: error.status });
     }
     console.error("POST /api/appeals failed", error);

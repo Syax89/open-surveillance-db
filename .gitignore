@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+/.npm-cache
 /.pnp
 .pnp.*
 .yarn/*
@@ -12,6 +13,10 @@
 
 # testing
 /coverage
+/.coverage/
+
+# kanban git worktrees (per-task, mai da committare)
+/.worktrees/
 
 # next.js
 /.next/
@@ -43,3 +48,6 @@ tsconfig.tsbuildinfo
 /.wrangler/
 /outputs/
 /work/
+
+# dom harness transpile tree (tests/.dom-tmp-*)
+tests/.dom-tmp-*

@@ -20,6 +20,10 @@
     {
       "binding": "DB",
       "database_name": "opensurveillancedb",
+      // TODO(pre-launch): sostituire con il database_id reale del D1 di
+      // produzione (output di `npx wrangler d1 create opensurveillancedb`
+      // oppure dashboard CF → D1). Il workflow deploy.yml blocca il deploy
+      // finché qui c'è il placeholder.
       "database_id": "00000000-0000-4000-8000-000000000000",
       "migrations_dir": "drizzle"
     }

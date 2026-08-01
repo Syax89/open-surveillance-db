@@ -31,14 +31,21 @@ export const cameras = sqliteTable(
     contributorId: integer("contributor_id").references(() => contributors.id),
     createdAt: text("created_at").notNull(),
   },
-  (table) => [index("cameras_status_idx").on(table.status)],
+  (table) => [
+    index("cameras_status_idx").on(table.status),
+    // Coordinate lookup for the proximity searches (bbox pre-filter, 0013).
+    index("cameras_coordinates_idx").on(table.latitude, table.longitude),
+  ],
 );
 
 export const correctionRequests = sqliteTable(
   "correction_requests",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
-    cameraId: integer("camera_id"),
+    // FK to cameras (migration 0015). Historical corrections must survive
+    // the removal of a camera record: SET NULL keeps the request auditable
+    // while unlinking it from the deleted record.
+    cameraId: integer("camera_id").references(() => cameras.id, { onDelete: "set null" }),
     issueType: text("issue_type").notNull(),
     message: text("message").notNull(),
     contact: text("contact"),
@@ -93,6 +100,28 @@ export const sessions = sqliteTable(
     index("sessions_contributor_idx").on(table.contributorId),
     index("sessions_expires_idx").on(table.expiresAt),
   ],
+);
+
+/**
+ * Per-email login lockout counters (P2 security, ADR 0016). One row per
+ * normalised email, keyed by the SHA-256 of the normalised email
+ * (`email_key`) so the table stores no PII. `failed_count` counts failed
+ * logins inside the current window (`window_start`); reaching the threshold
+ * sets `locked_until` and every login for that email answers 429 with
+ * Retry-After until it passes. `lockout_level` counts consecutive lockouts
+ * so the duration backs off exponentially (capped in code). All queries go
+ * through db/auth.ts; this definition exists so the drizzle model stays the
+ * single schema reference.
+ */
+export const loginAttempts = sqliteTable(
+  "login_attempts",
+  {
+    emailKey: text("email_key").primaryKey(),
+    failedCount: integer("failed_count").notNull().default(0),
+    windowStart: text("window_start").notNull(),
+    lockedUntil: text("locked_until"),
+    lockoutLevel: integer("lockout_level").notNull().default(0),
+  },
 );
 
 /**
@@ -271,6 +300,10 @@ export const photos = sqliteTable(
     id: integer("id").primaryKey({ autoIncrement: true }),
     cameraId: integer("camera_id"),
     contributorId: integer("contributor_id"),
+    // Internal pending-quota bucket (migration 0013): `contributor:<id>` for
+    // authenticated uploads, `anon:<sha256(caller key)>` for anonymous ones.
+    // Never exposed through the public projection; only 'pending' rows count.
+    submitterKey: text("submitter_key"),
     storageKey: text("storage_key").notNull(),
     mimeType: text("mime_type").notNull(),
     width: integer("width").notNull(),
@@ -285,5 +318,9 @@ export const photos = sqliteTable(
   (table) => [
     index("photos_status_idx").on(table.status),
     index("photos_camera_idx").on(table.cameraId),
+    // Pending-quota lookups always filter on (submitter_key, status='pending').
+    index("photos_pending_submitter_idx")
+      .on(table.submitterKey)
+      .where(sql`${table.status} = 'pending'`),
   ],
 );
