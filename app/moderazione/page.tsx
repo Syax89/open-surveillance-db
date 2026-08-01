@@ -1,8 +1,18 @@
-"use client";
-
+import type { Metadata } from "next";
 import { InfoPage } from "../components/InfoPage";
-import { useMessages } from "../components/LocaleProvider";
+import { getServerMessages } from "../lib/server-i18n";
 import Link from "next/link";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const bundle = await getServerMessages();
+  const t = bundle.moderazione;
+  return {
+    title: t.title,
+    description: t.intro,
+    openGraph: { title: t.title, description: t.intro, images: ["/og.png"] },
+    twitter: { card: "summary_large_image", title: t.title, description: t.intro, images: ["/og.png"] },
+  };
+}
 
 /**
  * Public "How moderation works" page (/moderazione).
@@ -13,12 +23,15 @@ import Link from "next/link";
  * /moderation (gated at the worker edge) and is deliberately not linked
  * anywhere in the public experience (publication-boundaries suite).
  *
+ * Server Component (SSR/SEO): static content rendered on the server with
+ * per-route metadata; only the LocaleToggle is a client island.
+ *
  * Layout follows the shared informational-page pattern (nav-shell +
  * record-page), and the global footer is rendered by the root layout —
  * it is NOT repeated here (SITEMAP: "footer mai copiato per pagina").
  */
-export default function ModerazionePage() {
-  const bundle = useMessages();
+export default async function ModerazionePage() {
+  const bundle = await getServerMessages();
   const t = bundle.moderazione;
 
   return (
