@@ -345,10 +345,25 @@ test("auth errors are announced through a live region (role=alert)", async () =>
   assert.match(account, /role="alert"/, "account must announce errors");
 });
 
-test("account actions are native buttons with no tabindex manipulation", async () => {
-  const account = await readFile(path.join(root, "app", "account", "page.tsx"), "utf8");
+test("account actions are native buttons; tabIndex only as programmatic focus targets, never on buttons", async () => {
+  const [account, confirmDialog] = await Promise.all([
+    readFile(path.join(root, "app", "account", "page.tsx"), "utf8"),
+    readFile(path.join(root, "app", "components", "ConfirmDialog.tsx"), "utf8"),
+  ]);
   assert.match(account, /type="button"/, "logout/delete must be native buttons");
-  assert.doesNotMatch(account, /tabIndex/);
+  // No tabIndex on buttons (no keyboard-trap manipulation); the only
+  // allowed tabIndex is -1 on messages that receive programmatic focus for
+  // announcement (C6 focus management — role=alert/status error focus).
+  assert.doesNotMatch(account, /<button[^>]*tabIndex/, "buttons must never carry tabIndex");
+  assert.doesNotMatch(account, /tabIndex=\{[1-9]/, "only -1 programmatic focus targets are allowed");
+  assert.match(account, /role="alert"/, "account errors are announced");
+  // The destructive erasure confirm lives in the shared ConfirmDialog
+  // component (replaces window.confirm — C6 deliverable 4): the page must
+  // render it and the component must expose an accessible alertdialog.
+  assert.match(account, /<ConfirmDialog/, "account must render the accessible confirm dialog");
+  assert.match(confirmDialog, /role="alertdialog"/, "destructive erasure confirm is an accessible alertdialog");
+  assert.match(confirmDialog, /aria-modal/, "the alertdialog must be modal");
+  assert.match(confirmDialog, /aria-labelledby/, "the alertdialog must be labelled");
 });
 
 test("aria-invalid marks the failing auth field on submit and clears as the user types (QA-2026-08-01-2 closed)", async () => {

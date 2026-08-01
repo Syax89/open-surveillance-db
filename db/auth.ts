@@ -225,6 +225,27 @@ export async function getContributorById(id: number): Promise<PublicContributor 
 }
 
 /**
+ * Update the contributor's own display name (profile field, C6/C8 — the only
+ * inline-editable profile field; editing is reserved to the profile, never to
+ * contribution records). Returns the refreshed public profile, or null when
+ * the account no longer exists (erased between the session read and this
+ * update). `now` is injectable for deterministic tests.
+ */
+export async function updateContributorDisplayName(
+  id: number,
+  displayName: string | null,
+  now: string = new Date().toISOString(),
+): Promise<PublicContributor | null> {
+  const d1 = await getD1();
+  return d1
+    .prepare(
+      `UPDATE contributors SET display_name = ?, updated_at = ? WHERE id = ? RETURNING ${publicContributorColumns}`,
+    )
+    .bind(displayName, now, id)
+    .first<PublicContributor>();
+}
+
+/**
  * Verify an email/password pair against the stored PBKDF2 hash. Returns the
  * public profile on success, null on unknown email or wrong password — the
  * route maps both to the same generic 401 so responses do not reveal which

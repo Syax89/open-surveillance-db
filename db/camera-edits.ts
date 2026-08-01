@@ -140,6 +140,81 @@ export type ApplyCameraEditResult =
 export const PUBLISHED_EDITABLE_STATUSES = ["verified", "needs_review", "stale"] as const;
 export const TERMINAL_EDITABLE_STATUSES = ["removed", "rejected"] as const;
 
+/**
+ * Owner view of a camera plus its open edit-request, when one exists (C6).
+ *
+ * The public GET /api/cameras/[id] is deliberately attribution-free (it
+ * never exposes `contributor_id` nor `notes`) and answers 404 for pending
+ * records, so the /records/[id]/edit page cannot pre-fill its form from it.
+ * This is the owner-only read that complements the C3 PATCH:
+ *
+ *   - owner, any status  -> `ok` with the full row (notes included) and the
+ *     open edit-request (`editRequest`) or null. The page renders the form
+ *     for pending/published states and the blocked notice for removed /
+ *     rejected; the request state is shown before any submit, so a second
+ *     concurrent PATCH (409 edit_request_exists) is prevented client-side.
+ *   - pending / removed / rejected and not the owner -> `not_found` (404
+ *     fail-closed, no-existence-oracle: these records are not public).
+ *   - published and not the owner -> `not_owner` (403, the record exists
+ *     publicly but editing is owner-only, same rule as the PATCH).
+ */
+export type CameraEditViewResult =
+  | { kind: "ok"; record: OwnerCameraRecord; editRequest: EditRequestSummary | null }
+  | { kind: "not_found" }
+  | { kind: "not_owner" };
+
+export async function getCameraEditView(
+  cameraId: number,
+  contributorId: number,
+): Promise<CameraEditViewResult> {
+  const d1 = await getD1();
+  const camera = await loadCameraForEdit(d1, cameraId);
+  if (!camera) return { kind: "not_found" };
+
+  const isOwner = camera.contributorId === contributorId;
+  if (!isOwner) {
+    // Published records are public (403, ownership rule); anything else is
+    // indistinguishable from a missing id (404 fail-closed).
+    if ((PUBLISHED_EDITABLE_STATUSES as readonly string[]).includes(camera.status)) {
+      return { kind: "not_owner" };
+    }
+    return { kind: "not_found" };
+  }
+
+  const openRequest = await d1
+    .prepare(
+      "SELECT id, camera_id AS cameraId, status, created_at AS createdAt FROM camera_edit_requests WHERE camera_id = ? AND status = 'pending' ORDER BY id DESC LIMIT 1",
+    )
+    .bind(cameraId)
+    .first<EditRequestSummary>();
+  return {
+    kind: "ok",
+    record: {
+      id: camera.id,
+      title: camera.title,
+      kind: camera.kind,
+      manufacturer: camera.manufacturer,
+      observedOn: camera.observedOn,
+      publishManufacturer: camera.publishManufacturer,
+      publishObservedOn: camera.publishObservedOn,
+      address: camera.address,
+      notes: camera.notes,
+      latitude: camera.latitude,
+      longitude: camera.longitude,
+      status: camera.status,
+      source: camera.source,
+      updated: camera.updated,
+      description: camera.description,
+      lastVerifiedAt: camera.lastVerifiedAt,
+      reviewDueAt: camera.reviewDueAt,
+      reviewIntervalMonths: camera.reviewIntervalMonths,
+      contributorId: camera.contributorId,
+      createdAt: camera.createdAt,
+    },
+    editRequest: openRequest ?? null,
+  };
+}
+
 function isCalendarDate(value: string): boolean {
   const date = new Date(`${value}T00:00:00.000Z`);
   return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;

@@ -10,6 +10,9 @@
 #   - /appelli        reserved route for the appeals flow (not public today;
 #                     defensive rule in case a page is added later).
 #   - /account        contributor account area, authenticated — never index.
+#   - /records/*/edit private contribution-edit page, owner-only, auth-gated —
+#                     never index (only the public /records/[id] stays
+#                     indexable).
 #   - /register       account creation — never index (also reduces spam noise).
 #   - /login          authentication — never index.
 #
@@ -21,6 +24,7 @@ Disallow: /api/
 Disallow: /moderation
 Disallow: /appelli
 Disallow: /account
+Disallow: /records/*/edit
 Disallow: /register
 Disallow: /login
 

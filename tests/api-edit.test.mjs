@@ -172,6 +172,106 @@ test("E1 guard order: cross-origin rejected before any db work", async () => {
   assert.equal(callArgs("applyCameraEdit").length, 0);
 });
 
+// ---------------------------------------------------------------------------
+// C6 — GET /api/cameras/[id]/edit (owner-only view for /records/[id]/edit)
+// ---------------------------------------------------------------------------
+
+const editViewRoute = () => loadRoute("app/api/cameras/[id]/edit/route.mjs");
+
+const editRequestFixture = {
+  id: 12,
+  cameraId: 5,
+  status: "pending",
+  createdAt: "2026-08-01T12:00:00.000Z",
+};
+
+test("C6 GET edit view: anonymous answers 401 before any db work", async () => {
+  const { GET } = await editViewRoute();
+  const response = await GET(apiRequest("/api/cameras/5/edit"));
+  assert.equal(response.status, 401);
+  assert.equal((await responseBody(response)).error, "Not authenticated.");
+  assert.equal(callArgs("getCameraEditView").length, 0);
+});
+
+test("C6 GET edit view: owner answers 200 { record, editRequest } with no-store", async () => {
+  liveSession();
+  stub("getCameraEditView", async () => ({ kind: "ok", record: ownerView, editRequest: editRequestFixture }));
+  const { GET } = await editViewRoute();
+  const response = await GET(sessionRequest("/api/cameras/5/edit"));
+  assert.equal(response.status, 200);
+  assert.deepEqual(await responseBody(response), { record: ownerView, editRequest: editRequestFixture });
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  const [id, contributorId] = callArgs("getCameraEditView")[0];
+  assert.equal(id, 5);
+  assert.equal(contributorId, 7);
+});
+
+test("C6 GET edit view: owner with no open edit-request answers 200 with editRequest null", async () => {
+  liveSession();
+  stub("getCameraEditView", async () => ({ kind: "ok", record: ownerView, editRequest: null }));
+  const { GET } = await editViewRoute();
+  const response = await GET(sessionRequest("/api/cameras/5/edit"));
+  assert.equal(response.status, 200);
+  const body = await responseBody(response);
+  assert.equal(body.editRequest, null);
+  assert.equal(body.record.id, 5);
+});
+
+test("C6 GET edit view: non-owner on a published record answers 403", async () => {
+  liveSession();
+  stub("getCameraEditView", async () => ({ kind: "not_owner" }));
+  const { GET } = await editViewRoute();
+  const response = await GET(sessionRequest("/api/cameras/5/edit"));
+  assert.equal(response.status, 403);
+  assert.equal((await responseBody(response)).error, "You can only edit your own reports.");
+});
+
+test("C6 GET edit view: missing/pending-not-owned records answer 404 fail-closed", async () => {
+  liveSession();
+  stub("getCameraEditView", async () => ({ kind: "not_found" }));
+  const { GET } = await editViewRoute();
+  const response = await GET(sessionRequest("/api/cameras/9/edit"));
+  assert.equal(response.status, 404);
+  assert.equal((await responseBody(response)).error, "Camera not found.");
+});
+
+test("C6 GET edit view: malformed id answers 404 and never reaches the db layer", async () => {
+  liveSession();
+  const { GET } = await editViewRoute();
+  for (const path of ["/api/cameras/abc/edit", "/api/cameras/0/edit", "/api/cameras/-1/edit"]) {
+    const response = await GET(sessionRequest(path));
+    assert.equal(response.status, 404, `${path} must answer 404`);
+    assert.equal((await responseBody(response)).error, "Camera not found.");
+  }
+  assert.equal(callArgs("getCameraEditView").length, 0);
+});
+
+test("C6 GET edit view: answers 503 when the db layer is unavailable", async () => {
+  liveSession();
+  stub("getCameraEditView", async () => {
+    throw new Error("boom");
+  });
+  const { GET } = await editViewRoute();
+  const response = await GET(sessionRequest("/api/cameras/5/edit"));
+  assert.equal(response.status, 503);
+  assert.equal((await responseBody(response)).error, "Database unavailable");
+});
+
+test("C6 GET edit view: the shared read bucket rate-limits the view (429)", async () => {
+  liveSession();
+  env.READ_RATE_LIMIT_MAX = "2";
+  env.READ_RATE_LIMIT_WINDOW_SECONDS = "60";
+  stub("getCameraEditView", async () => ({ kind: "ok", record: ownerView, editRequest: null }));
+  const { GET } = await editViewRoute();
+  for (let i = 0; i < 2; i++) {
+    const response = await GET(sessionRequest("/api/cameras/5/edit"));
+    assert.equal(response.status, 200, `request ${i + 1} must pass`);
+  }
+  const third = await GET(sessionRequest("/api/cameras/5/edit"));
+  assert.equal(third.status, 429);
+  assert.equal((await responseBody(third)).error, "Too many requests. Please try again shortly.");
+});
+
 test("E2 owner pending edit answers 200 with the owner view, no-store", async () => {
   liveSession();
   stub("applyCameraEdit", async () => ({ kind: "direct_applied", record: ownerView }));

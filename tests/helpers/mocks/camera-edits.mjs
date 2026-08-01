@@ -111,6 +111,8 @@ export function parseEditableEditFields(value) {
 
 export const {
   applyCameraEdit,
+  getCameraEditView,
 } = makeMock({
   applyCameraEdit: "applyCameraEdit",
+  getCameraEditView: "getCameraEditView",
 });

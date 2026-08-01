@@ -141,6 +141,18 @@ export function registeredRoutes() {
       note: "route dinamica: audit e SSR usano l'id demo fittizio /records/1",
     },
     {
+      route: "/records/[id]/edit",
+      name: "record edit",
+      source: "app/records/[id]/edit/page.tsx",
+      artifacts: {
+        ssr: "pages-render.test.mjs",
+        interaction: "client-edit-form.test.mjs",
+        i18n: "client-locale-toggle.test.mjs",
+        a11y: "axe-audit.test.mjs",
+      },
+      note: "C6: privata auth-gated owner-only; la pagina SSR parte dal gate loading (client)",
+    },
+    {
       route: "/moderation",
       name: "moderation",
       source: "app/moderation/page.tsx",
