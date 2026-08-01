@@ -528,6 +528,8 @@ export const it: Translation<typeof en> = {
       "Per payload che contengono dati personali o dettagli operativi, crittografali con la chiave PGP del progetto (impronta 04E8 A3EE 7C72 188B D3AF 925D 496C F0BD 4920 D3F7) e includi il testo cifrato nell'advisory. Impegno di risposta: prima risposta entro 48 ore, risposta sostanziale entro 14 giorni, rimozione d'emergenza entro 24 ore.",
     securityRouteNote:
       "Le segnalazioni di sicurezza e le richieste relative alla privacy viaggiano su canali separati: advisory privati per le vulnerabilità, modulo di correzione e contatto privacy per le richieste dell'interessato.",
+    footer: "Built for transparency, not tracking.",
+  },
 
   rules: {
     navigation: "Navigazione delle regole",

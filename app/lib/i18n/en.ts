@@ -533,6 +533,8 @@ export const en = {
       "For payloads that contain personal data or operational details, encrypt them with the project PGP key (fingerprint 04E8 A3EE 7C72 188B D3AF 925D 496C F0BD 4920 D3F7) and include the ciphertext in the advisory. Response commitment: first response within 48 hours, substantive response within 14 days, emergency hide within 24 hours.",
     securityRouteNote:
       "Security reports and privacy requests travel on separate channels: private advisories for vulnerabilities, the correction form and privacy contact for data-subject requests.",
+    footer: "Built for transparency, not tracking.",
+  },
 
   rules: {
     navigation: "Rules navigation",
