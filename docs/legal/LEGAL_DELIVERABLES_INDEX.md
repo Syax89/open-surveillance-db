@@ -16,6 +16,7 @@
 | [PROCESSOR_REGISTER.md](PROCESSOR_REGISTER.md) | P5, M4 — Cloudflare (DPA v6.3 + SCC + EU residency + EU–US DPF; **Workers + D1 + R2 photo storage**), OpenAI auth (not a processor; never log emails), others | Draft | Rosa |
 | [BREACH_PROCEDURE.md](BREACH_PROCEDURE.md) | P2 — arts. 33/34, roles, triage, 72-h notification, data-subject notification, register | Draft | Rosa |
 | [MODERATION_SLA.md](MODERATION_SLA.md) | M1, M2, M3 — 24 h emergency hide, 48 h first response, 14-day decision, 30-day hide review, independent appeals | Draft | Rosa |
+| [DPO_EXCLUSION.md](DPO_EXCLUSION.md) | Gap 7, P6 — GDPR art. 37 assessment: art. 37(1) N/A (no public authority, no large-scale monitoring, no special-category processing), voluntary DPO declined (art. 37(4)), accountability via functional privacy/legal role (arts. 5(2), 24), review triggers | Draft | Rosa |
 | [decisions/0004-retention-and-review-cycle.md](../decisions/0004-retention-and-review-cycle.md) | ADR — retention values + enforcement | Proposed | Rosa |
 | [decisions/0005-processors-and-data-residency.md](../decisions/0005-processors-and-data-residency.md) | ADR — processor choice, SCC, EU residency, OpenAI role | Proposed | Rosa |
 | [REVIEW_TERMS_CODE_COHERENCE_2026-08-01.md](REVIEW_TERMS_CODE_COHERENCE_2026-08-01.md) | STATUS gap #4 — final coherence check: TERMS_OF_USE v0.2 / PRIVACY_NOTICE v0.3 vs. implemented practices (auth, upload, retention, correction) | Delivered (PR) | Rosa |

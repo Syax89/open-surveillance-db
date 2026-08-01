@@ -26,6 +26,8 @@ reviews or lost in chat threads.
 | [0012](0012-public-repo-security-disclosure-and-hosting.md) | Public repository, private security/privacy reporting route, and hosting | accepted | 2026-07-31 |
 | [0013](0013-contributor-accounts-and-sessions.md) | Contributor accounts and sessions | accepted | 2026-08-01 |
 | [0014](0014-auth-roles-appeals.md) | Coarse auth roles, route-level authorization, and contributor appeals | accepted | 2026-08-01 |
+| [0015](0015-locale-persistence-cookie-ssr.md) | Locale persistence — cookie + SSR, deep-link route | accepted | 2026-08-01 |
+| [0015](0015-no-dpo-appointed-art37.md) | No DPO appointed — documented exclusion under GDPR art. 37(1) | accepted (legal recommendation) | 2026-08-01 |
 
 Status values follow the headers in each ADR: `proposed` (draft, pending
 review) and `accepted` (decision recorded; `CEO decision` marks decisions made
