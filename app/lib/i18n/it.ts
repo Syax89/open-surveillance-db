@@ -365,6 +365,87 @@ export const it: Translation<typeof en> = {
     notDashboardBody:
       "La dashboard di moderazione è uno strumento privato, protetto dal controllo degli accessi e mai linkato dal sito pubblico. Questa pagina spiega solo come funziona il processo.",
   },
+
+  faq: {
+    navigation: "Navigazione FAQ",
+    homeAria: "Pagina iniziale di OpenSurveillanceDB",
+    map: "Mappa",
+    directory: "Elenco",
+    home: "Home",
+    faqLabel: "FAQ",
+    contactLabel: "Contatti",
+    eyebrow: "Domande frequenti",
+    title: "Le domande che le persone fanno sul database.",
+    intro:
+      "Risposte brevi su segnalazioni, precisione della mappa, correzioni e privacy. Per tutto ciò che non è trattato qui, usa il modulo di correzione o la pagina dei contatti.",
+    qReport: "Come si segnala una telecamera?",
+    aReport:
+      "Scegli una posizione approssimativa sulla mappa (o inserisci le coordinate), poi aggiungi solo ciò che puoi osservare dallo spazio pubblico: tipo, direzione, avviso visibile, produttore. Non includere persone, targhe, abitazioni private, credenziali o link a feed in diretta. La segnalazione nasce come dato privato in attesa e diventa pubblica solo dopo l'approvazione di una revisione umana.",
+    qAccuracy: "Quanto è precisa la mappa?",
+    aAccuracy:
+      "La mappa mostra solo record pubblici revisionati e le coordinate pubblicate sono volutamente arrotondate a circa 4 decimali (circa 10 metri). Uno stato descrive la situazione di revisione corrente, non la garanzia che una telecamera sia attiva. Un'area vuota non dimostra che non ci siano telecamere: mostra solo che in quel punto non c'è attualmente alcun record revisionato pubblicato.",
+    qCorrect: "Come si corregge un errore?",
+    aCorrect:
+      "Usa il modulo privato di correzione nella home page (“Correggi un record o segnala un problema”) oppure scrivi a privacy@opensurveillancedb. Le richieste di correzione sono private: non modificano la mappa automaticamente e non finiscono mai nell'esportazione pubblica. Prima risposta entro 48 ore; risposta sostanziale entro 14 giorni.",
+    qPrivacy: "E per quanto riguarda la privacy?",
+    aPrivacy:
+      "Le segnalazioni sono private finché sono in attesa; i record pubblicati non contengono volti, targhe o dati personali. Il titolare del trattamento è Simone Rondina (syax89) / OpenSurveillanceDB, Italia. I diritti dell'interessato (accesso, rettifica, cancellazione, opposizione) si esercitano scrivendo a privacy@opensurveillancedb.",
+    moreTitle: "Hai ancora domande?",
+    moreBody:
+      "Per correzioni, rimozioni e richieste relative alla privacy usa il modulo di correzione nella home page o la pagina dei contatti.",
+    contactCta: "Apri la pagina dei contatti",
+    correctionCta: "Vai al modulo di correzione",
+    footer: "Creato per la trasparenza, non per il tracciamento.",
+  },
+
+  contact: {
+    navigation: "Navigazione contatti",
+    homeAria: "Pagina iniziale di OpenSurveillanceDB",
+    map: "Mappa",
+    directory: "Elenco",
+    home: "Home",
+    faqLabel: "FAQ",
+    contactLabel: "Contatti",
+    eyebrow: "Contatti e responsabilità",
+    title: "Chi gestisce il progetto e come contattarci.",
+    intro:
+      "OpenSurveillanceDB è un database civico aperto e non commerciale delle infrastrutture di sorveglianza pubblica visibili. Documenta apparecchiature rivolte allo spazio pubblico; non fornisce feed, strumenti di tracciamento né consigli per eludere la sorveglianza legittima.",
+    whoTitle: "Chi siamo",
+    whoBody:
+      "Un piccolo team pilota di volontari nominati mantiene il progetto. Sono nomine iniziali per il pilota, non la rivendicazione di una struttura di governance pubblica già completa.",
+    rolesTitle: "Ruoli e responsabili",
+    rolesIntro: "I ruoli iniziali sono stati nominati il 2026-07-31 (confine pilota Wave A, GOVERNANCE.md):",
+    roleMaintainers: "Manutentori",
+    roleMaintainersBody: "Simone (syax89) e Ada (CTO). Ada è l'unica autorità di merge.",
+    roleOps: "Responsabile operativo",
+    roleOpsBody: "Ken — hosting, deployment, backup.",
+    roleData: "Data steward",
+    roleDataBody: "Linus e Grace — modello dati, qualità e conservazione.",
+    roleSecurity: "Contatto sicurezza",
+    roleSecurityBody: "Ken — canale di segnalazione privato in SECURITY.md.",
+    roleModeration: "Contatto moderazione",
+    roleModerationBody: "Grace.",
+    controllerTitle: "Titolare del trattamento",
+    controllerBody:
+      "Simone Rondina (syax89) / OpenSurveillanceDB — Italia (decisione del 2026-07-31; formulazione definitiva dell'entità giuridica da confermare al lancio).",
+    correctionTitle: "Correzioni e rimozioni",
+    correctionBody:
+      "Usa il modulo privato di correzione nella home page oppure scrivi al contatto privacy. Le richieste sono private, esaminate da una persona e mai pubblicate. Obiettivi di risposta: prima risposta entro 48 ore, risposta sostanziale entro 14 giorni, rimozione d'emergenza dei contenuti entro 24 ore (MODERATION_SLA).",
+    correctionForm: "Apri il modulo di correzione",
+    correctionEmail: "privacy@opensurveillancedb",
+    correctionEmailNote:
+      "Casella dedicata — da creare prima del lancio; dominio finale da confermare.",
+    securityTitle: "Segnalare una vulnerabilità di sicurezza",
+    securityBody:
+      "Usa il flusso GitHub Private Vulnerability Reporting, che crea un advisory confidenziale visibile solo ai manutentori. Non aprire un issue pubblico per una vulnerabilità.",
+    securityAdvisory: "Apri il modulo per l'advisory privato",
+    securityPgpTitle: "Crittografia dei dati sensibili",
+    securityPgpBody:
+      "Per payload che contengono dati personali o dettagli operativi, crittografali con la chiave PGP del progetto (impronta 04E8 A3EE 7C72 188B D3AF 925D 496C F0BD 4920 D3F7) e includi il testo cifrato nell'advisory. Impegno di risposta: prima risposta entro 48 ore, risposta sostanziale entro 14 giorni, rimozione d'emergenza entro 24 ore.",
+    securityRouteNote:
+      "Le segnalazioni di sicurezza e le richieste relative alla privacy viaggiano su canali separati: advisory privati per le vulnerabilità, modulo di correzione e contatto privacy per le richieste dell'interessato.",
+    footer: "Creato per la trasparenza, non per il tracciamento.",
+  },
   record: {
     navigation: "Navigazione del record",
     backToDirectory: "← Torna all'elenco",

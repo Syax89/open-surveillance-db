@@ -54,25 +54,8 @@ async function workerModules() {
   return [entry, ...found.filter((m) => m !== entry)];
 }
 
-/** Render the homepage exactly like the deployed worker would. */
-async function renderHomepage() {
-  const mf = new Miniflare({
-    modules: await workerModules(),
-    compatibilityDate: "2026-01-01",
-    compatibilityFlags: ["nodejs_compat"],
-  });
-  try {
-    const response = await mf.dispatchFetch("http://localhost/", {
-      headers: { accept: "text/html" },
-    });
-    return { response, html: await response.text() };
-  } finally {
-    await mf.dispose();
-  }
-}
-
-/** Render any route exactly like the deployed worker would. */
-async function renderRoute(route) {
+/** Render a route exactly like the deployed worker would. */
+async function renderRoute(route = "/") {
   const mf = new Miniflare({
     modules: await workerModules(),
     compatibilityDate: "2026-01-01",
@@ -86,6 +69,11 @@ async function renderRoute(route) {
   } finally {
     await mf.dispose();
   }
+}
+
+/** Render the homepage exactly like the deployed worker would. */
+async function renderHomepage() {
+  return renderRoute("/");
 }
 
 test("server-rendered homepage carries the public app metadata", async () => {
@@ -244,4 +232,47 @@ test("starter preview skeleton stays removed from the template", async () => {
   assert.doesNotMatch(layout, /codex-preview|_sites-preview/i);
   assert.doesNotMatch(page, /SkeletonPreview|_sites-preview|codex-preview/i);
   assert.match(layout, /title:\s*"OpenSurveillanceDB/);
+});
+
+test("FAQ page serves bilingual FAQ content", async () => {
+  const { response, html } = await renderRoute("/faq");
+
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
+
+  // The four FAQ topics required by the task: reporting, map accuracy,
+  // corrections and privacy.
+  assert.match(html, /How do I report a camera\?/);
+  assert.match(html, /How accurate is the map\?/);
+  assert.match(html, /How do I correct an error\?/);
+  assert.match(html, /What about privacy\?/);
+
+  // FAQ items use accessible native disclosure widgets (details/summary).
+  assert.match(html, /<details class="faq-item"/);
+  assert.match(html, /<summary>/);
+
+  // The page links to the correction form and the contact page.
+  assert.match(html, /href="\/#correction"/);
+  assert.match(html, /href="\/contatti"/);
+});
+
+test("contact page serves owners, privacy and security routes", async () => {
+  const { response, html } = await renderRoute("/contatti");
+
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
+
+  // Who we are + named owners (GOVERNANCE.md / README "Roles and contacts").
+  assert.match(html, /Who we are/);
+  assert.match(html, /Simone \(syax89\) and Ada \(CTO\)/);
+
+  // Correction / removal contact (privacy contact + in-app form).
+  assert.match(html, /Corrections and removal/);
+  assert.match(html, /privacy@opensurveillancedb/);
+  assert.match(html, /href="\/#correction"/);
+
+  // Security route per SECURITY.md: private GitHub advisory, no public issue.
+  assert.match(html, /Reporting a security vulnerability/);
+  assert.match(html, /security\/advisories\/new/);
+  assert.match(html, /Do not open a public issue for a vulnerability/);
 });
