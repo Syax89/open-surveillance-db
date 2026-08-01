@@ -2,7 +2,7 @@
 
 - **Status:** draft for pre-launch review; decisions of 2026-07-31 applied (controller entity, data licence ODbL 1.0, coordinate precision ~4 decimals, 12-month retention renewal, privacy contact `privacy@opensurveillancedb`); monitored mailbox to be provisioned before launch.
 - **Legal basis:** GDPR art. 13 (data collected from data subjects) and art. 14 (data not obtained from the data subject, e.g. records sourced from official public sources); D.Lgs. 196/2003 (Codice Privacy, IT) as primary jurisdiction.
-- **Version:** 0.4 (2026-08-01) — photo evidence row (§ 3) and negative scope (§ 4) aligned with the active upload flow (PR #64): EXIF/XMP/IPTC stripping fail-closed, R2/D1 storage, moderation + redaction gate, retention R6; this document is a draft deliverable, not a published notice.
+- **Version:** 0.7 (2026-08-01) — recipients (§ 5) and international transfers (§ 6) updated: Cloudflare **R2** photo storage added (PR #64), aligned with PROCESSOR_REGISTER.md PR1; R2 bucket region/jurisdiction to be confirmed with the CTO (see § 10). Photo evidence row (§ 3) and negative scope (§ 4) aligned with the active upload flow (PR #64): EXIF/XMP/IPTC stripping fail-closed, R2/D1 storage, moderation + redaction gate, retention R6; retention § 7 aligned with the photo evidence lifecycle (RETENTION_SCHEDULE.md R13): pending/orphan 90 days, rejected 30 days, approved photos follow the 12-month record cycle; deletion includes the R2 image bytes. This document is a draft deliverable, not a published notice.
 
 > **Disclaimer:** this document is product guidance / not legal advice. It is a draft for pre-launch review and requires external counsel review before launch.
 
@@ -53,19 +53,19 @@ This negative scope strengthens the reasonable expectations of data subjects and
 
 ## 5. Recipients and transfers
 
-- **Cloudflare, Inc.** — hosting and database (Workers + D1). Processor (art. 28) under the Cloudflare Data Processing Addendum (**DPA v6.3, June 2025**) incorporating **EU Standard Contractual Clauses (2021/914)**; Cloudflare is certified under the **EU–US Data Privacy Framework** (additional transfer ground). D1 configured for EU residency (`weur` location hint). See PROCESSOR_REGISTER.md.
+- **Cloudflare, Inc.** — hosting, database and object storage (Workers + D1 + **R2** for photo evidence). Processor (art. 28) under the Cloudflare Data Processing Addendum (**DPA v6.3, June 2025**) incorporating **EU Standard Contractual Clauses (2021/914)**; Cloudflare is certified under the **EU–US Data Privacy Framework** (additional transfer ground). D1 configured for EU residency (`weur` location hint). **R2** (`PHOTOS` bucket) stores only **EXIF/XMP/IPTC-stripped photo bytes** (metadata stays in D1); its region/jurisdiction is not declared in the repo config — to be confirmed with the CTO and pinned to the EU if photo evidence is treated as personal data (see PROCESSOR_REGISTER.md § 4 open item). See PROCESSOR_REGISTER.md.
 - **OpenAI (ChatGPT sign-in)** — identity provider for moderators. OpenAI is an **independent controller of its own authentication service** (its privacy policy applies at sign-in); no OpenSurveillanceDB data is sent to OpenAI — we only receive the identity attributes listed in § 3. Never published, never logged.
 - **Publication itself:** verified records become part of a public dataset licensed ODbL 1.0 and may be downloaded/exported (JSON/CSV/GeoJSON). This is the purpose of the service, disclosed here. Copies already downloaded cannot be recalled; removed records are excluded from future exports.
 - No other recipients; no behavioural advertising; no analytics libraries.
 
 ## 6. International data transfers (Cap. V GDPR)
 
-- Cloudflare: transfers covered by the Cloudflare DPA incorporating **EU Standard Contractual Clauses (2021/914)**; supplementary measures assessed for US processing (encryption in transit, EU residency for D1). Full assessment in PROCESSOR_REGISTER.md.
+- Cloudflare: transfers covered by the Cloudflare DPA incorporating **EU Standard Contractual Clauses (2021/914)**; supplementary measures assessed for US processing (encryption in transit, EU residency for D1; **R2 photo storage — region/jurisdiction to be confirmed with the CTO, EU pinning recommended and tracked in PROCESSOR_REGISTER.md § 4 open items**). Full assessment in PROCESSOR_REGISTER.md.
 - OpenAI sign-in: identity attributes are exchanged with OpenAI's services; the sign-in flow is governed by OpenAI's terms/privacy policy (see above).
 
 ## 7. Retention
 
-See the published retention schedule (RETENTION_SCHEDULE.md): pending reports 90 days; rejected 30 days; verified records on a **12-month renewal review cycle** (decision 2026-07-31); correction requests and audit entries 2 years; evidence tied to the record; operational logs ≤ 12 months (aggregate); backups rotated by the provider (up to 30 days point-in-time recovery). Automated enforcement of the deletion/expiry rules (R1/R2/R3) is a pre-launch implementation item (RETENTION_SCHEDULE.md § 3); until then the schedule is applied by the moderation workflow.
+See the published retention schedule (RETENTION_SCHEDULE.md): pending reports 90 days; rejected 30 days; verified records on a **12-month renewal review cycle** (decision 2026-07-31); correction requests and audit entries 2 years; evidence tied to the record; operational logs ≤ 12 months (aggregate); backups rotated by the provider (up to 30 days point-in-time recovery). **Photo evidence follows its own lifecycle (RETENTION_SCHEDULE.md R13):** uploads never linked to a report are deleted after **90 days**; moderator-rejected photos after **30 days**; approved photos on verified records follow the **12-month** record cycle. Deletion of photo evidence always includes the stored image bytes in R2, not only the database row. Automated enforcement of the deletion/expiry rules (R1/R2/R3/R13) is a pre-launch implementation item (RETENTION_SCHEDULE.md § 3); until then the schedule is applied by the moderation workflow.
 
 ## 8. Your rights (GDPR arts. 15-22)
 
@@ -97,10 +97,12 @@ You may request, free of charge:
 - [x] Retention of verified records: **12 months with renewal** (decision 2026-07-31).
 - [x] Correction/removal contact: `privacy@opensurveillancedb` + private form (decision 2026-07-31; mailbox to be created at launch).
 - [x] Controller entity: **Simone Rondina (syax89) / OpenSurveillanceDB, Italy** (decision 2026-07-31).
+- [x] **Photo evidence retention defined (R13):** pending/orphan uploads 90 days, rejected photos 30 days, approved photos follow the 12-month record cycle; deletion includes the R2 image bytes (RETENTION_SCHEDULE.md R13). Enforcement tracked in the retention sweep (`db/retention.ts`).
 - [ ] Provision the monitored mailbox `privacy@opensurveillancedb` (ops) before the address is published (ADR 0008).
 - [x] **Contributor-account processing disclosure:** re-checked after PR #57 and PR #61 landed on `main` — the account data rows in § 3 and the session/account retention (R7) match the implementation, and the account-erasure endpoint is implemented (`DELETE /api/auth/account`, de-attribution `contributor_id = NULL`, session revocation; UI entry point: the account page `/account` — see TERMS § 15).
 - [x] **Photo evidence disclosure aligned with the active upload flow (PR #64):** § 3 (photo evidence row) and § 4 (negative scope) now describe EXIF/XMP/IPTC stripping at the boundary (fail-closed), R2 bytes + D1 metadata, the moderation/redaction gate (`redaction_confirmed = 1`), and retention R6. Coherence check: `docs/legal/REVIEW_PHOTO_UPLOAD_TERMS_ALIGNMENT_2026-08-01.md`.
 - [ ] Confirm the applicable SCC version at DPA execution (new-generation SCCs announced for adoption in 2025 — see PROCESSOR_REGISTER.md open items).
+- [ ] **Confirm the R2 photo bucket region/jurisdiction with the CTO (ada)** — bucket `opensurveillancedb-photos`; pin an EU jurisdictional restriction if photo evidence is treated as personal data (set at bucket creation, immutable; see PROCESSOR_REGISTER.md § 4). Update § 5/§ 6 and the register once confirmed.
 - [ ] Per-jurisdiction review (see LAWFUL_BASIS.md § 6) and external counsel review.
 
 ---

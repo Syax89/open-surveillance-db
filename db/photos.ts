@@ -71,6 +71,11 @@ async function readObjectBytes(storageKey: string): Promise<Uint8Array | null> {
  * `bytes` MUST already be stripped (the route enforces this with
  * stripImageMetadata) — this function is the storage boundary, not the
  * sanitisation boundary.
+ *
+ * `submitterKey` is the pending-quota bucket (migration 0013):
+ * `contributor:<id>` for authenticated uploads, `anon:<sha256(caller key)>`
+ * for anonymous ones. It is internal bookkeeping and is never part of the
+ * returned projection.
  */
 export async function createPendingPhoto(input: {
   bytes: Uint8Array;
@@ -78,6 +83,7 @@ export async function createPendingPhoto(input: {
   width: number;
   height: number;
   contributorId?: number | null;
+  submitterKey?: string | null;
 }): Promise<PendingPhotoReport> {
   if (!env.PHOTOS) throw new Error("Photo storage binding unavailable");
   const d1 = await getD1();
@@ -89,12 +95,13 @@ export async function createPendingPhoto(input: {
   const now = new Date().toISOString();
   const result = await d1
     .prepare(
-      `INSERT INTO photos (camera_id, contributor_id, storage_key, mime_type, width, height, size_bytes, status, exif_stripped, redaction_confirmed, created_at, updated_at)
-       VALUES (NULL, ?, ?, ?, ?, ?, ?, 'pending', 1, 0, ?, ?)
+      `INSERT INTO photos (camera_id, contributor_id, submitter_key, storage_key, mime_type, width, height, size_bytes, status, exif_stripped, redaction_confirmed, created_at, updated_at)
+       VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, 'pending', 1, 0, ?, ?)
        RETURNING ${photoColumns}`,
     )
     .bind(
       input.contributorId ?? null,
+      input.submitterKey ?? null,
       storageKey,
       input.mimeType,
       input.width,
@@ -106,6 +113,29 @@ export async function createPendingPhoto(input: {
     .first<PhotoRecord>();
   if (!result) throw new Error("Photo could not be stored");
   return withoutStorageKey(result);
+}
+
+/**
+ * Pending-photo usage for a caller's quota bucket (audit t_2ee58c08, P2).
+ *
+ * Counts photos and sums their stored bytes for `submitterKey` where
+ * `status = 'pending'` — approved and rejected photos leave the cap as soon
+ * as a moderator decides them. The partial index `photos_pending_submitter_idx`
+ * keeps this query cheap: only pending rows are indexed.
+ */
+export async function pendingPhotoUsage(submitterKey: string): Promise<{
+  count: number;
+  sizeBytes: number;
+}> {
+  const d1 = await getD1();
+  const row = await d1
+    .prepare(
+      `SELECT COUNT(*) AS count, COALESCE(SUM(size_bytes), 0) AS sizeBytes
+       FROM photos WHERE submitter_key = ? AND status = 'pending'`,
+    )
+    .bind(submitterKey)
+    .first<{ count: number; sizeBytes: number }>();
+  return row ?? { count: 0, sizeBytes: 0 };
 }
 
 /** Moderation queue view: pending photos (metadata only, no storage key). */

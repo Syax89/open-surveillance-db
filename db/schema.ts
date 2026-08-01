@@ -31,14 +31,21 @@ export const cameras = sqliteTable(
     contributorId: integer("contributor_id").references(() => contributors.id),
     createdAt: text("created_at").notNull(),
   },
-  (table) => [index("cameras_status_idx").on(table.status)],
+  (table) => [
+    index("cameras_status_idx").on(table.status),
+    // Coordinate lookup for the proximity searches (bbox pre-filter, 0013).
+    index("cameras_coordinates_idx").on(table.latitude, table.longitude),
+  ],
 );
 
 export const correctionRequests = sqliteTable(
   "correction_requests",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
-    cameraId: integer("camera_id"),
+    // FK to cameras (migration 0015). Historical corrections must survive
+    // the removal of a camera record: SET NULL keeps the request auditable
+    // while unlinking it from the deleted record.
+    cameraId: integer("camera_id").references(() => cameras.id, { onDelete: "set null" }),
     issueType: text("issue_type").notNull(),
     message: text("message").notNull(),
     contact: text("contact"),
@@ -271,6 +278,10 @@ export const photos = sqliteTable(
     id: integer("id").primaryKey({ autoIncrement: true }),
     cameraId: integer("camera_id"),
     contributorId: integer("contributor_id"),
+    // Internal pending-quota bucket (migration 0013): `contributor:<id>` for
+    // authenticated uploads, `anon:<sha256(caller key)>` for anonymous ones.
+    // Never exposed through the public projection; only 'pending' rows count.
+    submitterKey: text("submitter_key"),
     storageKey: text("storage_key").notNull(),
     mimeType: text("mime_type").notNull(),
     width: integer("width").notNull(),
@@ -285,5 +296,9 @@ export const photos = sqliteTable(
   (table) => [
     index("photos_status_idx").on(table.status),
     index("photos_camera_idx").on(table.cameraId),
+    // Pending-quota lookups always filter on (submitter_key, status='pending').
+    index("photos_pending_submitter_idx")
+      .on(table.submitterKey)
+      .where(sql`${table.status} = 'pending'`),
   ],
 );

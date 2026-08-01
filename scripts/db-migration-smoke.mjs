@@ -47,6 +47,7 @@ const expectedTables = [
 // Indexes declared by the migrations.
 const expectedIndexes = [
   "cameras_status_idx",
+  "cameras_coordinates_idx",
   "correction_requests_status_idx",
   "moderation_events_created_at_idx",
   "moderation_events_entity_idx",
@@ -62,6 +63,8 @@ const expectedIndexes = [
   "moderation_appeals_entity_idx",
   "photos_status_idx",
   "photos_camera_idx",
+  // Pending-photo quota (0013): only 'pending' rows are indexed.
+  "photos_pending_submitter_idx",
 ];
 // Tables that are not application schema but legitimately appear in a local
 // D1 database. Anything outside this set is an unexpected schema change.

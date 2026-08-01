@@ -2,6 +2,7 @@ import { env } from "cloudflare:workers";
 import {
   createPendingPhoto,
   listApprovedPhotosForCamera,
+  pendingPhotoUsage,
 } from "../../../db/photos";
 import { getPublicCameraById } from "../../../db/cameras";
 import {
@@ -17,6 +18,7 @@ import { recordRateLimitBlock } from "../../lib/abuse-alerts";
 import { callerKey, checkRateLimit, submissionLimits, submissionsDisabled } from "../../lib/rate-limit";
 import { csrfVerified, sameOrigin } from "../../lib/csrf";
 import { resolveOptionalContributor } from "../../lib/auth-session";
+import { pendingPhotoQuota, submitterKeyFor } from "../../lib/photo-quota";
 
 /**
  * Photo intake (STATUS gap #3).
@@ -24,10 +26,13 @@ import { resolveOptionalContributor } from "../../lib/auth-session";
  * POST /api/photos — upload one image as the raw request body. The route:
  *   1. enforces size, MIME and dimension limits (env-tunable, see
  *      app/lib/image-metadata.ts photoLimits);
- *   2. verifies the container from magic bytes, never trusting the caller's
+ *   2. enforces a per-caller pending-photo quota before storage (count and
+ *      bytes, env-tunable, see app/lib/photo-quota.ts) so a caller cannot
+ *      accumulate unbounded R2 storage or flood the moderation queue;
+ *   3. verifies the container from magic bytes, never trusting the caller's
  *      Content-Type;
- *   3. strips EXIF/XMP/IPTC metadata — mandatory, fail closed;
- *   4. stores the sanitised bytes in R2 (`PHOTOS`) and metadata-only in D1.
+ *   4. strips EXIF/XMP/IPTC metadata — mandatory, fail closed;
+ *   5. stores the sanitised bytes in R2 (`PHOTOS`) and metadata-only in D1.
  * Returns photo metadata (never the storage key, never the bytes back).
  *
  * GET /api/photos?cameraId=N — approved photos of a public camera (record
@@ -111,6 +116,22 @@ export async function POST(request: Request) {
       return photoError("Cross-site request rejected. Refresh the page and try again.", 403);
     }
 
+    // Pending-photo quota (audit t_2ee58c08, P2): a caller may accumulate at
+    // most PHOTOS_MAX_PENDING_PER_CALLER pending photos (and
+    // PHOTOS_MAX_PENDING_BYTES pending R2 bytes) before the moderation queue
+    // catches up. The count is checked HERE — before the body is even read —
+    // so an over-quota caller is rejected without spending a byte on parsing;
+    // the byte quota is enforced after stripping, still before any R2 store.
+    // The state quota is separate from the "submit" rate limit: the limiter
+    // bounds the request rate, this bounds accumulated pending storage.
+    const submitterKey = await submitterKeyFor(auth, request);
+    const quota = pendingPhotoQuota(env);
+    const pendingUsage = await pendingPhotoUsage(submitterKey);
+    if (pendingUsage.count >= quota.maxPendingCount) {
+      console.warn("POST /api/photos rejected: pending-photo count quota exceeded", { submitterKey });
+      return photoError("Pending photo quota exceeded. Existing uploads must be reviewed before you can add more.", 429);
+    }
+
     // MIME allowlist: reject anything that is not a supported image type
     // before spending a byte on the body.
     if (!allowedMimeTypes.has(declaredType)) {
@@ -144,12 +165,21 @@ export async function POST(request: Request) {
       return photoError("The image metadata could not be verified; the upload was rejected.", 400);
     }
 
+    // Byte quota: the sanitised size is now known, so the pending R2 volume
+    // can be checked exactly. Still before any storage — an over-quota caller
+    // costs us parsing but never R2 writes.
+    if (pendingUsage.sizeBytes + stripped.length > quota.maxPendingBytes) {
+      console.warn("POST /api/photos rejected: pending-photo byte quota exceeded", { submitterKey });
+      return photoError("Pending photo storage quota exceeded. Existing uploads must be reviewed before you can add more.", 429);
+    }
+
     const photo = await createPendingPhoto({
       bytes: stripped,
       mimeType: PHOTO_MIME_TYPES[sniffed],
       width: dimensions.width,
       height: dimensions.height,
       contributorId: auth?.contributor.id ?? null,
+      submitterKey,
     });
     return Response.json({ photo }, { status: 201 });
   } catch (error) {

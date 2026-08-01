@@ -83,6 +83,19 @@ const fakeLegalContent = {
   ],
 };
 
+// LegalPage takes the nav-shell labels as a separate required prop — the real
+// pages pass the `home` bundle resolved from server-i18n (app/privacy/page.tsx
+// et al.). These QA tests predate the Server-Components refactor (PR #120)
+// that introduced navLabels; this fictitious fixture mirrors the contract so
+// the tests exercise the same prop shape as production.
+const fakeNavLabels = {
+  mainNavigation: "Fixture navigation",
+  homeAria: "Fixture home",
+  exploreMap: "Fixture map",
+  browseRecords: "Fixture records",
+  howItWorks: "Fixture guide",
+};
+
 function collectLinks(container) {
   return [...container.querySelectorAll("a")].map((a) => ({
     href: a.getAttribute("href"),
