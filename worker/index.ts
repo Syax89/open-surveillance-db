@@ -33,8 +33,9 @@ interface ExecutionContext {
 
 // Image security config. SVG sources with .svg extension auto-skip the
 // optimization endpoint on the client side (served directly, no proxy).
-// To route SVGs through the optimizer (with security headers), set
-// dangerouslyAllowSVG: true in next.config.js and uncomment below:
+// To route SVGs through the optimizer (with security headers), create a
+// next.config.ts with `images: { dangerouslyAllowSVG: true }` (vinext
+// reads that option at build time) and uncomment below:
 // const imageConfig: ImageConfig = { dangerouslyAllowSVG: true };
 
 // Moderation access control (see docs/decisions/0002-moderation-access-control.md):
