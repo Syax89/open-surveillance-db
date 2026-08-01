@@ -418,6 +418,7 @@ test("no untranslated English sentence is left in the Italian bundle", async () 
     "privacy-or-safety-concern", "requires-senior-review", "other",
     "Local audit", "Read-only local history", "Local administration",
     "Moderation queue", "Public record", "Approved", "Rejected", "Hidden",
+    "privacy@opensurveillancedb",
   ]);
   const leftovers = itLiterals.filter(
     (literal) => literal.length > 12 && enLiterals.has(literal) && !allowlist.has(literal),

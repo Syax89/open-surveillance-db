@@ -40,6 +40,7 @@ const PAGES = [
 // verificare che ogni href relativo in nav/footer punti a qualcosa di reale.
 const KNOWN_ROUTES = new Set([
   "/", "/guide", "/login", "/register", "/account", "/moderation",
+  "/manifesto", "/regole", "/faq", "/contatti",
   "/api/cameras", "/api/cameras?format=geojson", "/api/cameras?format=csv",
   "/api/cameras/nearby", "/api/cameras/search", "/api/cameras/revisions",
   "/api/tiles", "/api/auth/me", "/api/auth/me/submissions", "/api/auth/logout",
