@@ -138,8 +138,9 @@ npx wrangler secret put MODERATION_TOKEN   # optional bearer alternative
 ```
 
 GitHub repository secrets used by the workflow:
-`CLOUDFLARE_API_TOKEN` (permissions "Workers Scripts - Edit" + "D1 - Edit"),
-`CLOUDFLARE_ACCOUNT_ID`, plus the `PROD_URL` repository variable. The job
+`CLOUDFLARE_API_TOKEN` (permissions "Workers Scripts - Edit" + "D1 - Edit")
+and `CLOUDFLARE_ACCOUNT_ID` (the `PROD_URL` variable is only used by the
+`ops-monitoring.yml` health-check workflow, not by deploys). The job
 targets the `production` GitHub Environment (add required reviewers for a
 human gate on deploys).
 
