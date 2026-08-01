@@ -63,6 +63,7 @@ const PAGES = [
   { source: "app/records/[id]/page.tsx", relative: "app/records/[id]/page.mjs" },
   // F1 route group (tools): tool bodies + shared chrome.
   { source: "app/components/ToolLayout.tsx", relative: "app/components/ToolLayout.mjs" },
+  { source: "app/components/LegacyAnchorRedirect.tsx", relative: "app/components/LegacyAnchorRedirect.mjs" },
   { source: "app/components/FiltersBar.tsx", relative: "app/components/FiltersBar.mjs" },
   { source: "app/components/EmptyState.tsx", relative: "app/components/EmptyState.mjs" },
   { source: "app/components/tools/MappaTool.tsx", relative: "app/components/tools/MappaTool.mjs" },
@@ -119,18 +120,27 @@ export default function Link({ href, children, ...rest }) {
   // /correggi ?record=ID): tests pass a query string via __setNavState
   // ({ search: "type=dome&freshness=7d" }) and the components read it via
   // useSearchParams, exactly like Next's useSearchParams on a real route.
+  // `pathname` feeds usePathname (F3 ToolLayout per-page nav sets); the
+  // router stub records both push and replace (LegacyAnchorRedirect uses
+  // replace, t_2ca69725).
   await writeFile(path.join(nodeModules, "next", "navigation.mjs"),
-    `const state = { params: { id: "1" }, search: "", pushed: [] };
+    `const state = { params: { id: "1" }, search: "", pathname: "/", pushed: [], replaced: [] };
 export const __setNavState = (patch) => {
   if (patch.search !== undefined) Object.assign(state, { search: patch.search });
   if (patch.params !== undefined) Object.assign(state, { params: patch.params });
   if (patch.pushed !== undefined) Object.assign(state, { pushed: patch.pushed });
+  if (patch.replaced !== undefined) Object.assign(state, { replaced: patch.replaced });
+  if (patch.pathname !== undefined) Object.assign(state, { pathname: patch.pathname });
 };
 export const __getNavState = () => state;
 export const useParams = () => state.params;
-export const useRouter = () => ({ push: (p) => { state.pushed.push(p); }, refresh: () => {} });
+export const useRouter = () => ({
+  push: (p) => { state.pushed.push(p); },
+  replace: (p) => { state.replaced.push(p); },
+  refresh: () => {},
+});
 export const useSearchParams = () => new URLSearchParams(state.search);
-export const usePathname = () => "/";
+export const usePathname = () => state.pathname;
 `);
 
   // --- leaflet stub: records every marker + its divIcon html --------------

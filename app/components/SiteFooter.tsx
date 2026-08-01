@@ -7,10 +7,13 @@ import { useMessages } from "./LocaleProvider";
  * Global site footer (landmark: contentinfo).
  *
  * Rendered once in the root layout so every page — public, guide, record,
- * moderation and auth — shares the same institutional navigation and the
- * required data attribution:
- *  - links to the public institutional pages (manifesto, rules, guide,
- *    privacy, terms, licenses, FAQ, contact);
+ * moderation and auth — shares the same navigation and the required data
+ * attribution:
+ *  - links to the four public tool routes (map, directory, report,
+ *    correction) first, then the institutional pages (manifesto, rules,
+ *    guide, privacy, terms, licenses, FAQ, contact, accessibility
+ *    statement): the tools are never dead ends and every public surface is
+ *    reachable from every page (F3 t_2ca69725, FRONTEND_DESIGN §2.5);
  *  - the ODbL 1.0 data licence notice for the database and exports
  *    (ADR 0008, docs/OPEN_SOURCE.md);
  *  - the OpenStreetMap attribution required for the map base layer
@@ -39,6 +42,10 @@ export function SiteFooter() {
         <p>{t.tagline}</p>
       </div>
       <nav className="footer-links" aria-label={t.navigation}>
+        <Link href="/mappa">{t.toolMap}</Link>
+        <Link href="/directory">{t.toolDirectory}</Link>
+        <Link href="/segnala">{t.toolReport}</Link>
+        <Link href="/correggi">{t.toolCorrection}</Link>
         <Link href="/manifesto">{t.manifesto}</Link>
         <Link href="/regole">{t.rules}</Link>
         <Link href="/guide">{t.guide}</Link>

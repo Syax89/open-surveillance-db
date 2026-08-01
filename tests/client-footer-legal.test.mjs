@@ -150,14 +150,22 @@ test("footer: contentinfo landmark with localized aria-label and labelled nav", 
 
   const nav = footer.querySelector("nav.footer-links");
   assert.ok(nav, "footer navigation <nav> must render");
-  assert.equal(nav.getAttribute("aria-label"), "Institutional pages");
+  // F3 t_2ca69725: the footer nav carries the four public tool routes +
+  // the institutional pages, so the label is "site navigation".
+  assert.equal(nav.getAttribute("aria-label"), "Site navigation");
 
   const links = collectLinks(footer);
-  // brand + 9 institutional links + 2 external licence/attribution links
-  assert.equal(links.length, 12);
+  // brand + 4 tool links + 9 institutional links + 2 external
+  // licence/attribution links
+  assert.equal(links.length, 16);
   const internal = links.filter((l) => l.href.startsWith("/"));
-  assert.equal(internal.length, 10);
-  for (const expected of ["/manifesto", "/regole", "/guide", "/privacy", "/termini", "/licenze", "/accessibility", "/faq", "/contatti"]) {
+  assert.equal(internal.length, 14);
+  for (const expected of [
+    // Public tool routes (F3 t_2ca69725, FRONTEND_DESIGN §2.5).
+    "/mappa", "/directory", "/segnala", "/correggi",
+    // Institutional pages.
+    "/manifesto", "/regole", "/guide", "/privacy", "/termini", "/licenze", "/accessibility", "/faq", "/contatti",
+  ]) {
     assert.ok(
       internal.some((l) => l.href === expected),
       `expected internal link ${expected} in footer`,

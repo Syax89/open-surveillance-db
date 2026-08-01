@@ -155,15 +155,22 @@ test("global footer exposes every institutional page, the ODbL data licence and 
   assert.equal(response.status, 200);
 
   // The footer is a labelled contentinfo landmark (rendered once by the root
-  // layout) containing a distinct labelled navigation landmark.
+  // layout) containing a distinct labelled navigation landmark. F3
+  // (t_2ca69725) added the four public tool routes to the footer nav, so the
+  // label is "site navigation".
   assert.match(html, /<footer class="site-footer" aria-label="Site footer">/);
-  assert.match(html, /<nav class="footer-links" aria-label="Institutional pages">/);
+  assert.match(html, /<nav class="footer-links" aria-label="Site navigation">/);
 
-  // Every public institutional route is linked from the footer. The local
-  // moderation queue (/moderation) is intentionally absent: it is a local-only
-  // tool that must not be exposed from the public interface (see the
-  // publication-boundaries suite).
-  const institutionalLinks = [
+  // Every public route is linked from the footer: the four tool routes (F3,
+  // FRONTEND_DESIGN §2.5 — the tools are never dead ends) plus every
+  // institutional page. The local moderation queue (/moderation) is
+  // intentionally absent: it is a local-only tool that must not be exposed
+  // from the public interface (see the publication-boundaries suite).
+  const publicLinks = [
+    "/mappa",
+    "/directory",
+    "/segnala",
+    "/correggi",
     "/manifesto",
     "/regole",
     "/guide",
@@ -174,7 +181,7 @@ test("global footer exposes every institutional page, the ODbL data licence and 
     "/faq",
     "/contatti",
   ];
-  for (const href of institutionalLinks) {
+  for (const href of publicLinks) {
     assert.ok(html.includes(`href="${href}"`), `expected footer link to ${href}`);
   }
 

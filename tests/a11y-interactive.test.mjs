@@ -384,7 +384,7 @@ test("every footer link has visible text and the landmarks are labelled", async 
   for (const route of ["/", "/guide", "/login"]) {
     const { html } = await renderRoute(route);
     assert.match(html, /<footer class="site-footer" aria-label="Site footer">/, `${route} must have the contentinfo landmark`);
-    assert.match(html, /<nav class="footer-links" aria-label="Institutional pages">/, `${route} must have the labelled footer nav`);
+    assert.match(html, /<nav class="footer-links" aria-label="Site navigation">/, `${route} must have the labelled footer nav`);
     const footer = html.slice(html.indexOf("site-footer"));
     const links = [...footer.matchAll(/<a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g)];
     assert.ok(links.length >= 8, `${route} footer must expose every institutional link`);
