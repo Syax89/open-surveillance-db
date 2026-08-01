@@ -40,7 +40,15 @@ Oracolo eseguibile di parse/stringify dei filtri (type/freshness/lat/lng/z/query
 ### 1.6 Lighthouse CI (item 6)
 Nessun workflow Lighthouse esiste in .github/workflows/ → **proposta come task a Ken** (t_2d2bf33f): gate bloccante accessibility >= 0.95, copertura delle regole layout-dipendenti escluse da jsdom.
 
-## 2. File toccati
+## 2. Verifiche eseguite (reali)
+
+- `npm run test`: **1125 test, 1124 PASS, 0 FAIL, 1 SKIP** (F4 gate, atteso fino al merge F4)
+- `npm run lint`: 0 errori (1 warning pre-esistente su main, non toccato)
+- `npx tsc --noEmit`: pulito (fix typecheck aria-current brand, commit 1f157c8)
+- **CI su PR #167: 5/5 SUCCESS** (Lint · Typecheck · Test · Build, Gitleaks, Coverage, npm audit, Fresh-DB migration smoke)
+- Base: github/main `da7fe38` (F0-F3 + #163/#164) — rebasato
+
+## 3. File toccati
 
 | File | Motivo |
 |---|---|
@@ -61,7 +69,7 @@ Nessun workflow Lighthouse esiste in .github/workflows/ → **proposta come task
 | package.json | devDependency axe-core |
 | docs/ACCESSIBILITY_STATEMENT.md | gap "automated checks pending" chiuso (EN+IT) |
 
-## 3. Note per il reviewer
+## 4. Note per il reviewer
 - Il test `axe-audit` richiede `npm run build` (npm test lo esegue già).
 - F4 (t_522638a5) deve: (1) NON cancellare tests/url-contract.test.mjs (è il gate di accettazione), (2) il gate si attiva sul modulo reale `app/lib/use-camera-filters.mjs` con gli export `parseCameraFilters`/`stringifyCameraFilters` (contratto verificato contro la PR #165: round-trip, encoding, fallback invalidi, bound q≤200/type≤60, focus non-numerico → null).
 - Le route F1-F3 sono già nel registry con i loro artifact esistenti (home-hub, client-tools, pages-render, i18n-pages): nessun test di fase rotto.
