@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { LocaleToggle, useMessages } from "./components/LocaleProvider";
-import { prototypeRecords, publicRecords, type Camera } from "./lib/records";
+import { prototypeRecords, publicRecords } from "./lib/records";
+import { usePublicCameras } from "./lib/use-public-cameras";
 import { textMatches } from "./lib/search";
 import { Hero } from "./components/home/Hero";
 import { MapPanel } from "./components/home/MapPanel";
@@ -12,32 +13,30 @@ import { ReportForm, useReportFlow } from "./components/home/ReportForm";
 
 export default function Home() {
   const t = useMessages().home;
-  const [records, setRecords] = useState<Camera[]>(publicRecords(prototypeRecords));
   const [selectedId, setSelectedId] = useState(1);
   const [notice, setNotice] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [kindFilter, setKindFilter] = useState("all");
   const [freshnessFilter, setFreshnessFilter] = useState("all");
   const [freshnessCutoff, setFreshnessCutoff] = useState<number | null>(null);
   const [sortOrder, setSortOrder] = useState<"alphabetical" | "position">("alphabetical");
 
+  // Shared public-cameras data layer (audit t_c6da60f0): fetch + abort +
+  // module cache + explicit loading/error states. The prototype records are
+  // the explicit demo seed rendered while loading or when the API is
+  // unreachable (the notice below says so); the API payload replaces them.
+  const { records, loading } = usePublicCameras({
+    seed: publicRecords(prototypeRecords),
+    onRecords: (next) => setSelectedId(next[0].id),
+    onError: () => setNotice(t.apiUnavailable),
+  });
+
   // Report flow (position + nearby-duplicate check + photo upload + submit):
   // the hook owns the flow's internal state; the page injects the notice
   // setter (the notice is displayed in the map section) and distributes the
   // flow to the map (pick a position) and the report form (display + submit).
   const report = useReportFlow({ setNotice });
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/cameras")
-      .then((response) => response.ok ? response.json() as Promise<{ records: Camera[] }> : Promise.reject(new Error(t.apiLoadError)))
-      .then((data: { records: Camera[] }) => { if (!cancelled && data.records.length) { setRecords(publicRecords(data.records)); setSelectedId(data.records[0].id); } })
-      .catch(() => { if (!cancelled) setNotice(t.apiUnavailable); })
-      .finally(() => !cancelled && setLoading(false));
-    return () => { cancelled = true; };
-  }, [t.apiLoadError, t.apiUnavailable]);
 
   const cameraKinds = useMemo(() => Array.from(new Set(records.map((camera) => camera.kind).filter(Boolean))).sort((a, b) => a.localeCompare(b)), [records]);
 
