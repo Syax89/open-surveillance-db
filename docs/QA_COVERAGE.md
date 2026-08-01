@@ -1,16 +1,16 @@
 # QA Coverage Report
 
-Baseline generata il **2026-08-01** su commit `53f7df8` con
-`npm run coverage && npm run coverage:docs`. Suite: 903/903 test PASS, 0 fail.
+Baseline generata il **2026-08-01** su commit `2f2bd54` con
+`npm run coverage && npm run coverage:docs`. Suite: 906/906 test PASS, 0 fail.
 
 ## Riepilogo (solo codice di produzione, esclusi test/helper/mock/fixture)
 
 | Metrica | Coperto | Totale | % |
 |---|---|---|---|
-| Righe | 5092 | 5362 | **94.96%** |
-| Branch | 1332 | 1438 | 92.63% |
-| Funzioni | 228 | 233 | 97.85% |
-| Statement | 5092 | 5362 | 94.96% |
+| Righe | 5374 | 5665 | **94.86%** |
+| Branch | 1356 | 1463 | 92.69% |
+| Funzioni | 233 | 241 | 96.68% |
+| Statement | 5374 | 5665 | 94.86% |
 
 ## Soglia minima CI
 
@@ -28,8 +28,8 @@ sotto soglia il job fallisce.
 - `app/lib/image-metadata.ts` — righe 89.82% (300/334), branch 92.31%, funzioni 100.00%
 - `app/api/cameras/route.ts` — righe 90.75% (157/173), branch 98.82%, funzioni 100.00%
 - `db/cameras.ts` — righe 91.36% (148/162), branch 96.97%, funzioni 91.67%
+- `worker/index.ts` — righe 91.39% (191/209), branch 97.56%, funzioni 76.92%
 - `app/api/cameras/search/route.ts` — righe 92.21% (71/77), branch 95.83%, funzioni 100.00%
-- `app/api/auth/me/route.ts` — righe 92.86% (26/28), branch 71.43%, funzioni 100.00%
 
 ## Dettaglio per file
 
@@ -43,11 +43,12 @@ sotto soglia il job fallisce.
 | `app/lib/image-metadata.ts` | 89.82 | 92.31 | 100.00 | 300/334 |
 | `app/api/cameras/route.ts` | 90.75 | 98.82 | 100.00 | 157/173 |
 | `db/cameras.ts` | 91.36 | 96.97 | 91.67 | 148/162 |
+| `worker/index.ts` | 91.39 | 97.56 | 76.92 | 191/209 |
 | `app/api/cameras/search/route.ts` | 92.21 | 95.83 | 100.00 | 71/77 |
 | `app/api/auth/me/route.ts` | 92.86 | 71.43 | 100.00 | 26/28 |
 | `app/api/moderation/photos/[id]/route.ts` | 93.75 | 60.00 | 100.00 | 30/32 |
 | `app/api/photos/route.ts` | 94.74 | 92.86 | 100.00 | 180/190 |
-| `worker/index.ts` | 94.79 | 97.56 | 83.33 | 182/192 |
+| `db/retention.ts` | 95.45 | 96.00 | 71.43 | 273/286 |
 | `app/api/auth/account/route.ts` | 96.23 | 90.91 | 100.00 | 51/53 |
 | `app/api/corrections/route.ts` | 96.43 | 95.83 | 100.00 | 54/56 |
 | `db/geocode.ts` | 96.67 | 72.73 | 100.00 | 116/120 |
