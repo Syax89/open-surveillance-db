@@ -18,9 +18,6 @@ export const en = {
   common: {
     skipLink: "Skip to main content",
     languageSelection: "Language selection",
-    privacy: "Privacy",
-    terms: "Terms of use",
-    licences: "Licences",
   },
   map: {
     mapLabel: "Interactive OpenStreetMap map",
@@ -556,5 +553,21 @@ export const en = {
     accountDeletedBody:
       "Your account has been erased and you are logged out. Your reports remain published without attribution.",
     errorDeleteAccount: "Unable to delete the account. Please try again.",
+  },
+  footer: {
+    landmarkLabel: "Site footer",
+    navigation: "Institutional pages",
+    homeAria: "OpenSurveillanceDB home",
+    tagline: "An open database of public surveillance cameras, built for transparency, not tracking.",
+    manifesto: "Manifesto",
+    rules: "Rules",
+    guide: "Guide",
+    privacy: "Privacy",
+    terms: "Terms of use",
+    licenses: "Licenses",
+    faq: "FAQ",
+    contact: "Contact",
+    dataLicense: "Database and exports licensed under ODbL 1.0",
+    osmAttribution: "Map data © OpenStreetMap contributors",
   },
 } as const;

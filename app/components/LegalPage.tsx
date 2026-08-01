@@ -95,7 +95,6 @@ function renderBlock(block: LegalBlock, keyPrefix: string): ReactNode {
 
 export function LegalPage({ content }: { content: LegalPageContent }) {
   const bundle = useMessages();
-  const t = bundle.common;
   const home = bundle.home;
 
   return (
@@ -130,21 +129,9 @@ export function LegalPage({ content }: { content: LegalPageContent }) {
             )}
           </section>
         ))}
-      </article>
 
-      <footer>
-        <div className="brand">
-          <span className="brand-mark" aria-hidden="true">◉</span>
-          <span>OpenSurveillanceDB</span>
-        </div>
-        <p>{content.versionNote}</p>
-        <div className="footer-links">
-          <Link href="/privacy">{t.privacy}</Link>
-          <Link href="/termini">{t.terms}</Link>
-          <Link href="/licenze">{t.licences}</Link>
-          <Link href="/guide">{home.howItWorks}</Link>
-        </div>
-      </footer>
+        <p className="record-detail-note">{content.versionNote}</p>
+      </article>
     </main>
   );
 }

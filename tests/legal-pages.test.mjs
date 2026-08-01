@@ -71,21 +71,28 @@ test("public legal pages are served with their English content", async () => {
       assert.ok(html.includes(marker), `${requestPath} should contain "${marker}"`);
     }
 
-    // Shared info-page layout: navigation shell, main landmark, footer links.
+    // Shared info-page layout: navigation shell, main landmark, version note.
     assert.match(html, /class="nav-shell"/);
     assert.match(html, /id="main-content"/);
     assert.match(html, /class="legal-section"/);
+    assert.match(html, /class="record-detail-note"/);
+
+    // The global site footer (SiteFooter in the root layout) links the
+    // three public legal pages on every route.
+    assert.match(html, /class="site-footer"/);
     assert.match(html, /href="\/privacy"/);
     assert.match(html, /href="\/termini"/);
     assert.match(html, /href="\/licenze"/);
   }
 });
 
-test("homepage footer links to the public legal pages", async () => {
+test("global site footer links to the public legal pages", async () => {
   const { response, html } = await renderPath("/");
 
   assert.equal(response.status, 200);
-  // The footer cross-links must be part of the server-rendered homepage.
+  // The global footer (root layout) must be part of the server-rendered
+  // homepage and link the three public legal pages.
+  assert.match(html, /class="site-footer"/);
   assert.match(html, /class="footer-links"/);
   assert.match(html, /href="\/privacy"/);
   assert.match(html, /href="\/termini"/);

@@ -13,9 +13,6 @@ export const it: Translation<typeof en> = {
   common: {
     skipLink: "Vai al contenuto principale",
     languageSelection: "Selezione lingua",
-    privacy: "Privacy",
-    terms: "Termini di utilizzo",
-    licences: "Licenze",
   },
   map: {
     mapLabel: "Mappa interattiva OpenStreetMap",
@@ -552,5 +549,21 @@ export const it: Translation<typeof en> = {
     accountDeletedBody:
       "Il tuo account è stato cancellato e hai effettuato l'accesso. Le tue segnalazioni restano pubblicate senza attribuzione.",
     errorDeleteAccount: "Impossibile eliminare l'account. Riprova.",
+  },
+  footer: {
+    landmarkLabel: "Piè di pagina del sito",
+    navigation: "Pagine istituzionali",
+    homeAria: "Pagina iniziale di OpenSurveillanceDB",
+    tagline: "Un database aperto delle telecamere di sorveglianza pubblica, creato per la trasparenza, non per il tracciamento.",
+    manifesto: "Manifesto",
+    rules: "Regole",
+    guide: "Guida",
+    privacy: "Privacy",
+    terms: "Termini d'uso",
+    licenses: "Licenze",
+    faq: "FAQ",
+    contact: "Contatti",
+    dataLicense: "Database ed esportazioni concessi in licenza ODbL 1.0",
+    osmAttribution: "Dati cartografici © OpenStreetMap contributors",
   },
 };
