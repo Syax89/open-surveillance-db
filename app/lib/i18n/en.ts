@@ -207,9 +207,13 @@ export const en = {
     observedPlaceholder: "Direction, operator, visible notice, model…",
     reportConsent:
       "I confirm this observation was made from public space and contains no personal data.",
+    privacyNotice: "Privacy notice",
+    termsOfUse: "Terms of use",
     photoUploadTitle: "Photo evidence (optional)",
     photoUploadHelp:
       "JPEG, PNG or WebP up to 10 MB and 4096 px per side. Faces, licence plates and other personal data must be redacted before uploading; location and camera metadata (EXIF) is stripped automatically on upload.",
+    photoExifPrivacyNote: "EXIF metadata is stripped on upload — see the",
+    photoExifPrivacyLink: "privacy notice",
     photoUploadLabel: "Choose photos",
     photoUploading: "Uploading…",
     photoUploadError: "The photo could not be uploaded.",
@@ -873,6 +877,8 @@ export const en = {
     passwordHint: "At least 10 characters.",
     anonymousNote:
       "You do not need an account to report a camera. An account lets you track your own reports.",
+    privacyNotice: "Privacy notice",
+    termsOfUse: "Terms of use",
     profileSection: "Profile",
     memberSince: "Member since",
     emailLabel: "Email",

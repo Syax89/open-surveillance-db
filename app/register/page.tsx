@@ -104,6 +104,11 @@ export default function RegisterPage() {
           <button className="button button-primary" type="submit" disabled={submitting}>
             {submitting ? t.loading : t.register}
           </button>
+          <p className="auth-legal-links">
+            <Link href="/privacy">{t.privacyNotice}</Link>
+            <span aria-hidden="true"> · </span>
+            <Link href="/termini">{t.termsOfUse}</Link>
+          </p>
         </form>
 
         <p className="auth-switch">
