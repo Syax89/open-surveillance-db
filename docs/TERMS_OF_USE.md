@@ -109,7 +109,7 @@ Your use of the Service is governed by the privacy notice (PRIVACY_NOTICE.md), t
 - [ ] Decide and implement the acceptance mechanics (clickwrap on the submission form vs. general browse terms) — implementation owner: Ada.
 - [ ] **Retention enforcement (R1/R2/R3):** implement the automated deletion/expiry job (`db/retention.ts` + cron trigger) per RETENTION_SCHEDULE.md § 3 — implementation owner: Ada; the schedule itself is approved and in force as policy, the code enforcement is pending pre-launch.
 - [ ] **Account erasure endpoint (R7):** contributor accounts (ADR 0013, PR #57) have no `/api/auth/account` delete route yet; the `cameras.contributor_id` FK (no ON DELETE clause) blocks hard-deleting a contributor with attributed reports. Implement account deletion with de-attribution of reports (`contributor_id = NULL`) before launch — implementation owner: Ada; tracked in RETENTION_SCHEDULE.md R7.
-- [ ] **Link the legal documents from the UI:** the published site should expose TERMS_OF_USE.md / PRIVACY_NOTICE.md (e.g. footer links) before public launch; currently they live in the repository only.
+- [x] **Link the legal documents from the UI:** the published site exposes TERMS_OF_USE.md / PRIVACY_NOTICE.md / OPEN_SOURCE.md as the public pages `/termini`, `/privacy` and `/licenze` (footer links on every page; layout and content sources in `docs/SITEMAP.md`). The repository copies remain canonical.
 - [ ] **ADR:** record the adoption of these terms and the inbound data-licensing model (submission → ODbL only upon verification) as a proposed ADR (next free number, per GOVERNANCE.md) — the terms embed a licensing and data-publication decision that material changes require documenting.
 
 ---

@@ -90,7 +90,7 @@ You may request, free of charge:
 
 ## 10. Open items before launch
 
-- [ ] **Italian localization of this notice** (primary jurisdiction; GDPR art. 12(1) "clear and plain language") — to be published bilingually (Italian + English) before launch.
+- [x] **Italian localization of this notice** (primary jurisdiction; GDPR art. 12(1) "clear and plain language") — published bilingually (Italian + English) as the public page `/privacy` (web adaptation of this notice; the repository copy remains canonical — see `docs/SITEMAP.md`).
 - [x] Data licence: **ODbL 1.0** (decision 2026-07-31).
 - [x] Publication precision: coordinates rounded to **~4 decimal places (~10 m)**; exact detail private to moderators (decision 2026-07-31).
 - [x] Retention of verified records: **12 months with renewal** (decision 2026-07-31).
