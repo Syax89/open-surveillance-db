@@ -59,8 +59,8 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 const PAGES = [
   { source: "app/login/page.tsx", relative: "app/login/page.mjs" },
   { source: "app/register/page.tsx", relative: "app/register/page.mjs" },
-  { source: "app/account/page.tsx", relative: "app/account/page.mjs" },
-  { source: "app/records/[id]/page.tsx", relative: "app/records/[id]/page.mjs" },
+  { source: "app/account/AccountPageBody.tsx", relative: "app/account/AccountPageBody.mjs" },
+  { source: "app/records/[id]/RecordPageBody.tsx", relative: "app/records/[id]/RecordPageBody.mjs" },
   { source: "app/records/[id]/edit/page.tsx", relative: "app/records/[id]/edit/page.mjs" },
   // C5 community components: the verification toggle and the trust-level
   // badge are loaded by the client interaction tests (client-verify-toggle,

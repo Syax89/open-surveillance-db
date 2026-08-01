@@ -233,6 +233,11 @@ changes accumulate under `[Unreleased]`.
   the pre-existing EN/IT terminology drift flagged by the community copy
   review (COMMUNITY_PLAN §6.1)
   ([#172](https://github.com/Syax89/open-surveillance-db/pull/172)).
+- WCAG 2.2 AA fixes from the manual H2 a11y pass (t_793479ed): `/mappa`
+  reflows below 640px (`.section-note` `white-space:normal`, 1.4.10), the
+  sr-only map link shows a visible focus badge when tabbed (2.4.7), and
+  `/records/[id]` + `/account` render per-page `<title>` metadata (2.4.2)
+  via server shells that wrap the client bodies.
 
 ### Security
 

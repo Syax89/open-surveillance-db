@@ -38,7 +38,7 @@ let AccountPage;
 
 before(async () => {
   rtl = await setupDom();
-  AccountPage = await loadDomPage("app/account/page.mjs");
+  AccountPage = await loadDomPage("app/account/AccountPageBody.mjs");
 });
 
 afterEach(() => rtl?.cleanup());

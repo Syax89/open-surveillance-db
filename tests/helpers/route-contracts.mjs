@@ -119,7 +119,7 @@ export function registeredRoutes() {
     {
       route: "/account",
       name: "account",
-      source: "app/account/page.tsx",
+      source: "app/account/AccountPageBody.tsx",
       artifacts: {
         ssr: "pages-render.test.mjs",
         interaction: "client-account.test.mjs",
@@ -131,7 +131,7 @@ export function registeredRoutes() {
     {
       route: "/records/[id]",
       name: "record detail",
-      source: "app/records/[id]/page.tsx",
+      source: "app/records/[id]/RecordPageBody.tsx",
       artifacts: {
         ssr: "pages-render.test.mjs",
         interaction: "client-record-page.test.mjs",

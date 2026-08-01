@@ -329,7 +329,7 @@ test("the public tool surfaces filter through publicRecords and label via the sa
 });
 
 test("the record page labels via the safe helper and never appends a raw status", async () => {
-  const page = await readSource("app/records/[id]/page.tsx");
+  const page = await readSource("app/records/[id]/RecordPageBody.tsx");
   const hook = await readSource("app/lib/use-public-cameras.ts");
   assert.match(page, /usePublicCamera(?:s)?\(/, "the record page must load records through the shared filtered hook");
   assert.match(hook, /publicRecords\(/, "the shared hook must filter records through the client whitelist");
@@ -339,7 +339,7 @@ test("the record page labels via the safe helper and never appends a raw status"
 });
 
 test("the account page labels submission statuses from i18n with a neutral fallback", async () => {
-  const page = await readSource("app/account/page.tsx");
+  const page = await readSource("app/account/AccountPageBody.tsx");
   assert.doesNotMatch(
     page,
     /statusLabels\s*[:=]/,
