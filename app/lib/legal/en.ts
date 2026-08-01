@@ -21,7 +21,7 @@ export const enLegal: LegalContent = {
     intro:
       "How OpenSurveillanceDB processes personal data, what we publish, what we never collect, and how you can exercise your rights under the GDPR.",
     versionNote:
-      "Version 0.4 — 1 August 2026. Draft for pre-launch review; the repository copy (docs/legal/PRIVACY_NOTICE.md) remains canonical.",
+      "Version 0.5 — 1 August 2026. Draft for pre-launch review; § 10 (cookies) added with the functional-language cookie documentation (art. 122 D.Lgs. 196/2003). The repository copy (docs/legal/PRIVACY_NOTICE.md) remains canonical.",
     sections: [
       {
         heading: "1. Who we are (controller)",
@@ -229,6 +229,39 @@ export const enLegal: LegalContent = {
           {
             type: "paragraph",
             text: "This notice is reviewed at launch and then at least annually, or on any material change; the version history is kept in the repository.",
+          },
+        ],
+      },
+      {
+        heading: "10. Cookies",
+        blocks: [
+          {
+            type: "paragraph",
+            text: "OpenSurveillanceDB uses a single functional cookie:",
+          },
+          {
+            type: "paragraph",
+            text: "**opensurveillancedb-locale** — remembers the language you selected on this device/browser (Italian or English). It is set **only when you change the language**; it is never used to track you.",
+          },
+          {
+            type: "list",
+            items: [
+              "**Type:** functional — strictly necessary to provide the language preference you explicitly requested",
+              "**Purpose:** persist your interface language",
+              "**Duration:** 1 year (`max-age=31536000`)",
+              "**Content:** none of your data — a plain language code (`it` / `en`)",
+              "**Properties:** `SameSite=Lax`, `path=/`, not readable cross-site (no tracking or session surface)",
+              "**Legal basis:** art. 122 D.Lgs. 196/2003 (transposing art. 5(3) of Directive 2002/58/EC as amended by 2009/136/EC) — consent is **not** required for cookies strictly necessary to provide a service explicitly requested by the user, so no consent banner is shown.",
+              "**Managing it:** you can delete it at any time from your browser settings; without it the interface defaults to the pilot language (English) on this device.",
+            ],
+          },
+          {
+            type: "paragraph",
+            text: "The same preference is mirrored in your browser's `localStorage` for multi-tab synchronisation. `localStorage` is a browser storage technology, not a cookie, and is never transmitted to our servers.",
+          },
+          {
+            type: "note",
+            text: "**Commitment:** if the redesign or any future feature introduces cookies that are not strictly necessary (analytics, advertising, profiling), we will ask for your explicit consent through a banner **before** installing them, in accordance with art. 122 D.Lgs. 196/2003.",
           },
         ],
       },
@@ -511,6 +544,110 @@ export const enLegal: LegalContent = {
           {
             type: "paragraph",
             text: "Contributors must submit only material they are entitled to share. They grant the project the rights needed to publish accepted code, documentation and data under the relevant project licence. Photo evidence uploads are **active** (2026-08): images are stripped of EXIF/XMP/IPTC metadata at the boundary (fail-closed), stored privately (bytes in R2, metadata in D1), and never published until a moderator approves them with confirmed redaction (see TERMS section 5).",
+          },
+        ],
+      },
+    ],
+  },
+
+  accessibility: {
+    eyebrow: "Information · Accessibility",
+    title: "Accessibility statement",
+    intro:
+      "OpenSurveillanceDB is a public-interest civic database. This statement describes our accessibility commitment, our current compliance status, and how you can report a barrier.",
+    versionNote:
+      "Version 0.1 — 1 August 2026. Draft — pre-launch, prototype stage. The repository copy (docs/ACCESSIBILITY_STATEMENT.md) remains canonical.",
+    sections: [
+      {
+        heading: "1. Commitment",
+        blocks: [
+          {
+            type: "paragraph",
+            text: "The core journeys — browse, search, submit, and correct/remove — must be usable with a keyboard, with assistive technology, and on small screens, in the pilot language and in English. The product target is **WCAG 2.2 AA** for the public website, with manual testing by disabled users before the pilot is widened.",
+          },
+        ],
+      },
+      {
+        heading: "2. Compliance status",
+        blocks: [
+          {
+            type: "paragraph",
+            text: "**Partially compliant.** The current prototype implements a meaningful accessibility baseline, but it has **not yet passed formal automated or manual accessibility testing**, and some known limitations remain (listed below). This section will be replaced by a measured conformance statement (WCAG 2.2 A/AA, per success criterion) once the testing gates are complete.",
+          },
+        ],
+      },
+      {
+        heading: "3. What is already implemented",
+        blocks: [
+          {
+            type: "list",
+            items: [
+              "A skip link and main-content target on every page.",
+              "Visible keyboard focus states and a logical focus order.",
+              "Support for `prefers-reduced-motion` (animations reduced when requested).",
+              "A searchable text directory and record-detail pages that work **without map interaction**; map and directory present the same public fields.",
+              "Report-location selection by map click **or** validated manual coordinates.",
+              "An English/Italian interface with a device-local language preference; the language choice does not affect API data.",
+              "A bilingual in-app guide at [/guide](/guide) explaining data states, workflow and prototype boundaries.",
+              "Status information is never conveyed by colour alone (text and icon labels are used).",
+            ],
+          },
+        ],
+      },
+      {
+        heading: "4. Known limitations",
+        blocks: [
+          {
+            type: "list",
+            items: [
+              "**Map tasks are not yet fully keyboard-equivalent.** The text-list alternative covers browsing; the remaining map interactions are still being brought to keyboard parity.",
+              "**No formal manual testing** with screen readers, 200% zoom, contrast checking, or small-screen devices has been run yet; the automated checks and manual test plan are pending.",
+              "**Some user-visible strings are still defined inline** in components while the interface-string externalisation and pilot-language review are in progress.",
+              "**The dedicated feedback page (/feedback) is not yet implemented.** Until it exists, barriers can be reported through the alternative channels below.",
+            ],
+          },
+        ],
+      },
+      {
+        heading: "5. Reporting a barrier",
+        blocks: [
+          {
+            type: "paragraph",
+            text: "The project provides a **non-sensitive usability-feedback route** so that anyone can report an interface barrier **without creating an account and without providing personal data**. When implemented, the route will be available at `/feedback` and will ask only for:",
+          },
+          {
+            type: "list",
+            items: [
+              "the type of barrier (navigation/keyboard, screen reader, colour/contrast, zoom/layout, other);",
+              "a plain-language description of what happened;",
+              "an optional URL of the page where the barrier occurred;",
+              "an optional contact address, **only if** you want a reply (never required, never used for anything else, and deleted once the exchange is closed).",
+            ],
+          },
+          {
+            type: "paragraph",
+            text: "Until `/feedback` is implemented, please report accessibility barriers through one of these channels:",
+          },
+          {
+            type: "list",
+            items: [
+              "open an issue on the project repository (public, non-sensitive content only — do not include personal data, photos of people, or private locations);",
+              "use the [correction form](/) on the public page for issues related to a specific record;",
+              "write to the privacy contact named in the [privacy notice](/privacy): [privacy@opensurveillancedb](mailto:privacy@opensurveillancedb).",
+            ],
+          },
+          {
+            type: "paragraph",
+            text: "**Response commitment:** feedback is handled with the same targets as correction and takedown requests — an acknowledgement within **48 hours** and a substantive response within **14 days**, in the language of the message when possible.",
+          },
+        ],
+      },
+      {
+        heading: "6. Review schedule",
+        blocks: [
+          {
+            type: "paragraph",
+            text: "This statement is reviewed after every release that changes the interface or the accessibility behaviour; at least quarterly once the service is running; and before any public launch, with the final conformance results and known exceptions recorded here.",
           },
         ],
       },

@@ -129,6 +129,11 @@ const INFO_ROUTES = {
     en: ["Licences", "AGPL-3.0-or-later"],
     noEn: ["Licences", "Terms of use", "Privacy notice"],
   },
+  "/accessibility": {
+    it: ["Dichiarazione di accessibilità", "Impegno", "Stato di conformità", "Limitazioni note", "Segnalare una barriera", "privacy@opensurveillancedb"],
+    en: ["Accessibility statement", "Partially compliant", "privacy@opensurveillancedb"],
+    noEn: ["Accessibility statement", "Compliance status", "Known limitations", "Reporting a barrier"],
+  },
   "/faq": {
     it: ["Domande frequenti", "Come si segnala una telecamera?", "Quanto è precisa la mappa?", "Come si corregge un errore?", "E per quanto riguarda la privacy?"],
     en: ["How do I report a camera?", "How accurate is the map?", "How do I correct an error?", "What about privacy?"],

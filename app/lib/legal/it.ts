@@ -24,7 +24,7 @@ export const itLegal: LegalContent = {
     intro:
       "Come OpenSurveillanceDB tratta i dati personali, cosa pubblichiamo, cosa non raccogliamo mai e come puoi esercitare i tuoi diritti ai sensi del GDPR.",
     versionNote:
-      "Versione 0.4 — 1 agosto 2026. Bozza per la revisione pre-lancio; la copia repository (docs/legal/PRIVACY_NOTICE.md) resta la versione canonica.",
+      "Versione 0.5 — 1 agosto 2026. Bozza per la revisione pre-lancio; aggiunto il § 10 (cookie) con la documentazione del cookie funzionale di lingua (art. 122 D.Lgs. 196/2003). La copia repository (docs/legal/PRIVACY_NOTICE.md) resta la versione canonica.",
     sections: [
       {
         heading: "1. Chi siamo (titolare del trattamento)",
@@ -232,6 +232,39 @@ export const itLegal: LegalContent = {
           {
             type: "paragraph",
             text: "Questa informativa è rivista al lancio e successivamente almeno ogni anno, o in occasione di modifiche sostanziali; la cronologia delle versioni è conservata nel repository.",
+          },
+        ],
+      },
+      {
+        heading: "10. Cookie",
+        blocks: [
+          {
+            type: "paragraph",
+            text: "OpenSurveillanceDB utilizza un solo cookie funzionale:",
+          },
+          {
+            type: "paragraph",
+            text: "**opensurveillancedb-locale** — ricorda la lingua che hai scelto su questo dispositivo/browser (italiano o inglese). Viene impostato **solo quando cambi lingua**; non viene mai utilizzato per tracciarti.",
+          },
+          {
+            type: "list",
+            items: [
+              "**Tipo:** funzionale — strettamente necessario a fornire la preferenza di lingua che hai esplicitamente richiesto",
+              "**Finalità:** memorizzare la lingua dell'interfaccia",
+              "**Durata:** 1 anno (`max-age=31536000`)",
+              "**Contenuto:** nessun tuo dato — solo il codice lingua (`it` / `en`)",
+              "**Proprietà:** `SameSite=Lax`, `path=/`, non leggibile cross-site (nessuna superficie di tracciamento o sessione)",
+              "**Base giuridica:** art. 122 D.Lgs. 196/2003 (recepimento dell'art. 5(3) della Direttiva 2002/58/CE, come modificata dalla 2009/136/CE) — il consenso **non** è richiesto per i cookie strettamente necessari a fornire un servizio esplicitamente richiesto dall'utente; nessun banner di consenso è pertanto mostrato.",
+              "**Gestione:** puoi eliminarlo in qualsiasi momento dalle impostazioni del browser; senza di esso l'interfaccia torna alla lingua predefinita (inglese) su questo dispositivo.",
+            ],
+          },
+          {
+            type: "paragraph",
+            text: "La stessa preferenza è replicata nel `localStorage` del browser per la sincronizzazione tra schede. Il `localStorage` è una tecnologia di archiviazione del browser, non un cookie, e non viene mai trasmesso ai nostri server.",
+          },
+          {
+            type: "note",
+            text: "**Impegno:** se il redesign o una futura funzionalità introducesse cookie non strettamente necessari (analytics, pubblicità, profilazione), richiederemo il tuo consenso esplicito tramite banner **prima** di installarli, ai sensi dell'art. 122 D.Lgs. 196/2003.",
           },
         ],
       },
@@ -514,6 +547,110 @@ export const itLegal: LegalContent = {
           {
             type: "paragraph",
             text: "I contributori devono inviare solo materiale che hanno il diritto di condividere. Concedono al progetto i diritti necessari a pubblicare codice, documentazione e dati accettati con la licenza di progetto pertinente. Il caricamento di prove fotografiche è **attivo** (agosto 2026): le immagini vengono private dei metadati EXIF/XMP/IPTC al confine (fail-closed), conservate privatamente (byte in R2, metadati in D1), e mai pubblicate finché un moderatore non le approva con redazione confermata (vedi sezione 5 dei Termini).",
+          },
+        ],
+      },
+    ],
+  },
+
+  accessibility: {
+    eyebrow: "Informazioni · Accessibilità",
+    title: "Dichiarazione di accessibilità",
+    intro:
+      "OpenSurveillanceDB è un database civico di interesse pubblico. Questa dichiarazione descrive il nostro impegno per l'accessibilità, lo stato attuale di conformità e come segnalare una barriera.",
+    versionNote:
+      "Versione 0.1 — 1 agosto 2026. Bozza — fase pre-lancio, prototipo. La copia repository (docs/ACCESSIBILITY_STATEMENT.md) resta la versione canonica.",
+    sections: [
+      {
+        heading: "1. Impegno",
+        blocks: [
+          {
+            type: "paragraph",
+            text: "I percorsi principali — sfogliare, cercare, segnalare e correggere/rimuovere — devono essere utilizzabili con la tastiera, con le tecnologie assistive e su schermi piccoli, nella lingua pilota e in inglese. L'obiettivo di prodotto è la conformità **WCAG 2.2 AA** per il sito pubblico, con test manuali da parte di persone con disabilità prima di ampliare il pilot.",
+          },
+        ],
+      },
+      {
+        heading: "2. Stato di conformità",
+        blocks: [
+          {
+            type: "paragraph",
+            text: "**Parzialmente conforme.** Il prototipo attuale implementa una base di accessibilità significativa, ma **non ha ancora superato test di accessibilità formali, automatici o manuali**, e permangono alcune limitazioni note (elencate sotto). Questa sezione sarà sostituita da una dichiarazione di conformità misurata (WCAG 2.2 A/AA, per criterio di successo) al completamento delle verifiche.",
+          },
+        ],
+      },
+      {
+        heading: "3. Cosa è già implementato",
+        blocks: [
+          {
+            type: "list",
+            items: [
+              "Un link salta-contenuto e un target main-content su ogni pagina.",
+              "Stati di focus da tastiera visibili e un ordine di focus logico.",
+              "Supporto di `prefers-reduced-motion` (animazioni ridotte su richiesta).",
+              "Una directory testuale ricercabile e pagine di dettaglio dei record che funzionano **senza interazione con la mappa**; mappa e directory presentano gli stessi campi pubblici.",
+              "Selezione della posizione della segnalazione tramite clic sulla mappa **o** coordinate manuali validate.",
+              "Un'interfaccia in inglese/italiano con preferenza di lingua locale al dispositivo; la scelta della lingua non influisce sui dati API.",
+              "Una guida in-app bilingue su [/guide](/guide) che spiega gli stati dei dati, il flusso di lavoro e i confini del prototipo.",
+              "Lo stato delle informazioni non è mai comunicato solo con il colore (vengono usati testo ed etichette con icone).",
+            ],
+          },
+        ],
+      },
+      {
+        heading: "4. Limitazioni note",
+        blocks: [
+          {
+            type: "list",
+            items: [
+              "**Le attività sulla mappa non sono ancora del tutto equivalenti da tastiera.** L'alternativa a elenco testuale copre la navigazione; le interazioni di mappa rimanenti sono in fase di allineamento alla parità da tastiera.",
+              "**Nessun test manuale formale** con screen reader, zoom al 200%, verifica del contrasto o dispositivi a schermo piccolo è stato ancora eseguito; i controlli automatici e il piano di test manuale sono in programma.",
+              "**Alcune stringhe visibili all'utente sono ancora definite inline** nei componenti, mentre è in corso l'esternalizzazione delle stringhe dell'interfaccia e la revisione della lingua pilota.",
+              "**La pagina dedicata di feedback (/feedback) non è ancora implementata.** Finché non esiste, le barriere possono essere segnalate tramite i canali alternativi sotto.",
+            ],
+          },
+        ],
+      },
+      {
+        heading: "5. Segnalare una barriera",
+        blocks: [
+          {
+            type: "paragraph",
+            text: "Il progetto prevede un **percorso di feedback non sensibile all'usabilità**, così che chiunque possa segnalare una barriera dell'interfaccia **senza creare un account e senza fornire dati personali**. Quando sarà implementato, il percorso sarà disponibile su `/feedback` e chiederà solo:",
+          },
+          {
+            type: "list",
+            items: [
+              "il tipo di barriera (navigazione/tastiera, screen reader, colore/contrasto, zoom/layout, altro);",
+              "una descrizione in parole semplici di cosa è successo;",
+              "un URL facoltativo della pagina in cui si è verificata la barriera;",
+              "un recapito facoltativo, **solo se** desideri una risposta (mai obbligatorio, mai usato per altro, ed eliminato a conclusione dello scambio).",
+            ],
+          },
+          {
+            type: "paragraph",
+            text: "Finché `/feedback` non è implementato, segnala le barriere di accessibilità tramite uno di questi canali:",
+          },
+          {
+            type: "list",
+            items: [
+              "apri una segnalazione sul repository del progetto (contenuto pubblico e non sensibile — non includere dati personali, foto di persone o luoghi privati);",
+              "usa il [modulo di correzione](/) nella pagina pubblica per problemi relativi a un record specifico;",
+              "scrivi al contatto privacy indicato nell'[informativa sulla privacy](/privacy): [privacy@opensurveillancedb](mailto:privacy@opensurveillancedb).",
+            ],
+          },
+          {
+            type: "paragraph",
+            text: "**Impegno di risposta:** il feedback è gestito con gli stessi obiettivi delle richieste di correzione e rimozione — un riscontro entro **48 ore** e una risposta sostanziale entro **14 giorni**, nella lingua del messaggio quando possibile.",
+          },
+        ],
+      },
+      {
+        heading: "6. Calendario di revisione",
+        blocks: [
+          {
+            type: "paragraph",
+            text: "Questa dichiarazione viene rivista dopo ogni rilascio che modifica l'interfaccia o il comportamento di accessibilità; almeno ogni tre mesi una volta che il servizio è operativo; e prima di ogni lancio pubblico, registrando qui i risultati finali di conformità e le eccezioni note.",
           },
         ],
       },
