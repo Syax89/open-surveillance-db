@@ -18,7 +18,9 @@ export const en = {
     "An open, community-maintained database of public surveillance cameras.",
   // Tool-route shared nav (F1 route group (tools)): every tool page links
   // the other public tools plus the home — no dead ends between the four
-  // tools (docs/FRONTEND_DESIGN.md §2.5).
+  // tools (docs/FRONTEND_DESIGN.md §2.5). The per-page link SET is chosen by
+  // ToolLayout (F3 t_2ca69725); the labels live here so both the tool chrome
+  // and (via footer.ts's own copies) the global footer stay in sync.
   toolNavigation: "Tool navigation",
   toolHomeAria: "OpenSurveillanceDB home",
   toolMap: "Map",
@@ -26,6 +28,8 @@ export const en = {
   toolReport: "Report",
   toolCorrection: "Correct",
   toolGuide: "Guide",
+  toolRules: "Rules",
+  toolContact: "Contact",
   toolHome: "Home",
 } as const;
 
@@ -40,7 +44,10 @@ export const it: Translation<typeof en> = {
     "Un database aperto e mantenuto dalla comunità delle telecamere di sorveglianza pubblica.",
   // Navigazione condivisa delle route tool (F1 route group (tools)): ogni
   // pagina tool collega gli altri tool pubblici più la home — nessun vicolo
-  // cieco tra i quattro tool (docs/FRONTEND_DESIGN.md §2.5).
+  // cieco tra i quattro tool (docs/FRONTEND_DESIGN.md §2.5). Il set di link
+  // per pagina è scelto da ToolLayout (F3 t_2ca69725); le label vivono qui
+  // così sia la chrome tool sia (via le copie in footer.ts) il footer globale
+  // restano allineati.
   toolNavigation: "Navigazione strumenti",
   toolHomeAria: "Pagina iniziale di OpenSurveillanceDB",
   toolMap: "Mappa",
@@ -48,5 +55,7 @@ export const it: Translation<typeof en> = {
   toolReport: "Segnala",
   toolCorrection: "Correggi",
   toolGuide: "Guida",
+  toolRules: "Regole",
+  toolContact: "Contatti",
   toolHome: "Home",
 };

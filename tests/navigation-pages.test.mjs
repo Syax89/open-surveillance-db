@@ -143,6 +143,25 @@ test("unknown routes return 404 (not a soft-render)", async () => {
   }
 });
 
+test("legacy anchor URLs are served 200 HTML — the fragment never reaches the worker", async () => {
+  // F3 t_2ca69725: the old tool anchors (#map #records #report #correction)
+  // are fragments, which the HTTP client never sends to the server — a 302
+  // server-side redirect cannot work (CTO correction to Vera's D8,
+  // t_f24c3227). The server must keep serving the page 200 (the client-side
+  // LegacyAnchorRedirect performs the actual redirect on mount) and must
+  // never emit a 3xx for these URLs.
+  for (const anchor of ["#map", "#records", "#report", "#correction"]) {
+    const { response, html } = await renderRoute(`/${anchor}`);
+    assert.equal(
+      response.status,
+      200,
+      `/${anchor} must be served 200 (no server-side redirect for a fragment)`,
+    );
+    assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
+    assert.ok(html.length > 0, `/${anchor} must serve the full page shell`);
+  }
+});
+
 test("moderation gate fails closed without credentials", async () => {
   const { response, html } = await renderRoute("/moderation");
   assert.equal(response.status, 503);

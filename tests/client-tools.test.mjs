@@ -7,8 +7,10 @@
  * a11y contract (publication-boundaries.test.mjs) live in their own suites.
  * THIS suite is the jsdom interaction layer for the four tool bodies:
  *
- *   ToolLayout  — the shared route-group chrome links all four tools plus
- *                 home (no dead ends between the tools, FRONTEND_DESIGN §2.5);
+ *   ToolLayout  — the shared route-group chrome links the per-page nav sets
+ *                 (F3 t_2ca69725, FRONTEND_DESIGN §2.5): every tool page
+ *                 links the other tools + contextual pages + home, with a
+ *                 full cross-tool fallback on unknown paths;
  *   MappaTool   — FiltersBar (panel variant) renders, client-side filters
  *                 (search / kind / freshness) narrow the records, the empty
  *                 state is truthful with a clear action, the URL shell seeds
@@ -64,29 +66,56 @@ before(async () => {
 afterEach(() => {
   rtl?.cleanup();
   __resetPublicCamerasCache();
-  // Reset the navigation stub: URL shell empty, router.push log cleared.
-  setNavState({ pushed: [], search: "" });
+  // Reset the navigation stub: URL shell empty, pathname back to the
+  // fallback, router.push/replace logs cleared.
+  setNavState({ pushed: [], replaced: [], search: "", pathname: "/" });
 });
 
 // ---------------------------------------------------------------------------
-// ToolLayout — shared route-group chrome
+// ToolLayout — per-page nav sets (F3 t_2ca69725, FRONTEND_DESIGN §2.5)
 // ---------------------------------------------------------------------------
 
-test("ToolLayout renders the nav shell linking the four tools plus home", async () => {
+test("ToolLayout renders the per-page nav sets from FRONTEND_DESIGN §2.5 (no dead ends)", async () => {
+  // The nav shell links the OTHER tools + contextual pages + the home CTA;
+  // the current page is never linked to itself. The route-group layout picks
+  // the set from usePathname() (the layout cannot know the route statically).
+  const cases = {
+    "/mappa": ["/directory", "/segnala", "/guide", "/"],
+    "/directory": ["/mappa", "/segnala", "/guide", "/"],
+    "/segnala": ["/directory", "/mappa", "/guide", "/regole", "/"],
+    "/correggi": ["/directory", "/mappa", "/contatti", "/"],
+  };
+  for (const [pathname, expected] of Object.entries(cases)) {
+    setNavState({ pathname });
+    const { screen } = rtl;
+    await renderWithLocale(
+      React.createElement(ToolLayout, null, React.createElement("p", null, "tool body")),
+    );
+
+    const main = screen.getByRole("main");
+    assert.equal(main.id, "main-content", "the tool layout must keep the main-content landmark");
+
+    const links = Array.from(main.querySelectorAll(".nav-links a")).map((a) => a.getAttribute("href"));
+    assert.deepEqual(links, expected, `nav set on ${pathname} must match FRONTEND_DESIGN §2.5`);
+    // The children (the tool body) must render inside the layout.
+    assert.ok(main.textContent.includes("tool body"));
+
+    rtl.cleanup();
+  }
+});
+
+test("ToolLayout falls back to the full cross-tool set on unknown paths (defensive)", async () => {
+  setNavState({ pathname: "/some-future-route" });
   const { screen } = rtl;
   await renderWithLocale(
     React.createElement(ToolLayout, null, React.createElement("p", null, "tool body")),
   );
 
   const main = screen.getByRole("main");
-  assert.equal(main.id, "main-content", "the tool layout must keep the main-content landmark");
-
-  const links = Array.from(main.querySelectorAll("a")).map((a) => a.getAttribute("href"));
+  const links = Array.from(main.querySelectorAll(".nav-links a")).map((a) => a.getAttribute("href"));
   for (const href of ["/mappa", "/directory", "/segnala", "/correggi", "/guide", "/"]) {
-    assert.ok(links.includes(href), `tool nav must link ${href} (no dead ends between tools)`);
+    assert.ok(links.includes(href), `fallback nav must link ${href} (no dead ends between tools)`);
   }
-  // The children (the tool body) must render inside the layout.
-  assert.ok(main.textContent.includes("tool body"));
 });
 
 // ---------------------------------------------------------------------------

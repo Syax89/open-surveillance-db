@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { LocaleProvider } from "./components/LocaleProvider";
+import { LegacyAnchorRedirect } from "./components/LegacyAnchorRedirect";
 import { SiteFooter } from "./components/SiteFooter";
 import { getServerLocale, getServerMessages } from "./lib/server-i18n";
 import "./globals.css";
@@ -60,6 +61,12 @@ export default async function RootLayout({
       </head>
       <body className="antialiased">
         <LocaleProvider serverLocale={locale}>
+          {/* F3 t_2ca69725: legacy tool anchors (#map #records #report
+              #correction) redirect client-side to the tool routes. Mounted
+              in the root layout so the redirect works from any page the
+              bookmark lands on; SSR renders nothing (progressive
+              enhancement, CTO t_f24c3227). */}
+          <LegacyAnchorRedirect />
           {children}
           <SiteFooter />
         </LocaleProvider>

@@ -9,9 +9,18 @@ import type { Translation } from "./types";
 
 export const en = {
   landmarkLabel: "Site footer",
-  navigation: "Institutional pages",
+  // The footer nav carries the four public tool routes first, then the
+  // institutional pages (F3 t_2ca69725, docs/FRONTEND_DESIGN.md §2.5): the
+  // tools are never dead ends and every public surface is reachable from
+  // every page. The label is therefore "site navigation", not
+  // "institutional pages".
+  navigation: "Site navigation",
   homeAria: "OpenSurveillanceDB home",
   tagline: "An open database of public surveillance cameras, built for transparency, not tracking.",
+  toolMap: "Map",
+  toolDirectory: "Directory",
+  toolReport: "Report",
+  toolCorrection: "Correct",
   manifesto: "Manifesto",
   rules: "Rules",
   guide: "Guide",
@@ -27,9 +36,18 @@ export const en = {
 
 export const it: Translation<typeof en> = {
   landmarkLabel: "Piè di pagina del sito",
-  navigation: "Pagine istituzionali",
+  // Il nav del footer porta prima le quattro route tool pubbliche, poi le
+  // pagine istituzionali (F3 t_2ca69725, docs/FRONTEND_DESIGN.md §2.5): i
+  // tool non sono mai vicoli ciechi e ogni superficie pubblica è raggiungibile
+  // da ogni pagina. L'etichetta è quindi "navigazione del sito", non
+  // "pagine istituzionali".
+  navigation: "Navigazione del sito",
   homeAria: "Pagina iniziale di OpenSurveillanceDB",
   tagline: "Un database aperto delle telecamere di sorveglianza pubblica, creato per la trasparenza, non per il tracciamento.",
+  toolMap: "Mappa",
+  toolDirectory: "Elenco",
+  toolReport: "Segnala",
+  toolCorrection: "Correggi",
   manifesto: "Manifesto",
   rules: "Regole",
   guide: "Guida",
