@@ -37,7 +37,8 @@ export type RouteKind =
   | "appeal"
   | "auth"
   | "tiles"
-  | "confirm";
+  | "confirm"
+  | "edit";
 
 const ROUTE_LIMIT_DEFAULTS: Record<RouteKind, RateLimitOptions> = {
   read: { maxRequests: 60, windowSeconds: 60 },
@@ -65,6 +66,12 @@ const ROUTE_LIMIT_DEFAULTS: Record<RouteKind, RateLimitOptions> = {
   // public record payload uses. The state quota (daily cap) is a D1 COUNT
   // inside the toggle; this bucket only bounds the request rate per caller.
   confirm: { maxRequests: 30, windowSeconds: 60 },
+  // Community contribution editing (ADR 0018 §4, C3): the two-track PATCH
+  // /api/cameras/[id]. Deliberately independent from the confirm bucket so a
+  // verification burst never starves legitimate edits; 5/min is far above
+  // interactive form use (a record edit is a deliberate, slow action) while
+  // still throttling edit-farming attempts.
+  edit: { maxRequests: 5, windowSeconds: 60 },
 };
 
 const ROUTE_LIMIT_ENV_PREFIX: Record<RouteKind, string> = {
@@ -78,6 +85,7 @@ const ROUTE_LIMIT_ENV_PREFIX: Record<RouteKind, string> = {
   auth: "AUTH",
   tiles: "TILES",
   confirm: "CONFIRM",
+  edit: "EDIT",
 };
 
 const attemptsByKey = new Map<string, number[]>();

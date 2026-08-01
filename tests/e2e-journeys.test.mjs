@@ -70,6 +70,7 @@ const CONTRIBUTOR = {
 
 let env;
 let camerasRoute;
+let cameraEditRoute;
 let moderationRoute;
 let registerRoute;
 let meRoute;
@@ -83,6 +84,7 @@ beforeEach(async () => {
   await seedDemoIdentities(env.DB);
   const load = async (name, routePath) => (await loadE2ERoute(routePath));
   camerasRoute = await load("cameras", "app/api/cameras/route.mjs");
+  cameraEditRoute = await load("cameraEdit", "app/api/cameras/[id]/route.mjs");
   moderationRoute = await load("moderation", "app/api/moderation/route.mjs");
   registerRoute = await load("register", "app/api/auth/register/route.mjs");
   // loginRoute is deliberately not exercised here: ADR 0013 makes register
@@ -240,4 +242,116 @@ test("journey account: register builds a session, me resolves the contributor, s
   assert.equal(loggedOut.status, 200);
   const afterLogout = await meRoute.GET(apiRequest("/api/auth/me", { headers: { cookie: registerCookies } }));
   assert.equal(afterLogout.status, 401, "the revoked session must not resolve after logout");
+});
+
+// ---------------------------------------------------------------------------
+// Journey 4: community editing a due binari (ADR 0018 §4, C3)
+// register → submit → approve → edit pending → edit altrui 403 → edit
+// verified → re-moderation.
+// ---------------------------------------------------------------------------
+
+async function registerContributor(overrides = {}) {
+  const email = `edit-journey-${crypto.randomUUID()}@example.org`;
+  const response = await registerRoute.POST(apiRequest("/api/auth/register", {
+    method: "POST",
+    body: { email, displayName: "Edit Journey Tester", password: "supersecret123", ...overrides },
+  }));
+  assert.equal(response.status, 201, "register must return 201");
+  const cookies = response.headers.getSetCookie().join("; ");
+  const csrfToken = /osdb_csrf=([^;]+)/.exec(cookies)?.[1];
+  assert.ok(csrfToken, "register must issue a CSRF cookie");
+  return { cookies, csrfToken };
+}
+
+const editPatch = (pathAndQuery, body, auth) =>
+  apiRequest(pathAndQuery, {
+    method: "PATCH",
+    headers: { cookie: auth.cookies, "x-csrf-token": auth.csrfToken },
+    body,
+  });
+
+test("journey edit: pending edits direct, verified goes to re-moderation, foreign edits 403", async () => {
+  // 1. register → two contributors (owner + outsider).
+  const owner = await registerContributor();
+  const outsider = await registerContributor();
+  const me = await meRoute.GET(apiRequest("/api/auth/me", { headers: { cookie: owner.cookies } }));
+  const { contributor } = await responseBody(me);
+
+  // 2. submit → pending record attributed to the owner.
+  const submitted = await camerasRoute.POST(apiRequest("/api/cameras", {
+    method: "POST",
+    headers: { cookie: owner.cookies, "x-csrf-token": owner.csrfToken },
+    body: { ...SUBMIT, title: "Old corner shop title" },
+  }));
+  assert.equal(submitted.status, 201);
+  const { record } = await responseBody(submitted);
+  assert.equal(record.status, "pending");
+  assert.equal(record.contributorId, contributor.id);
+
+  // 3. edit pending: the owner PATCHes the pending record directly (binario
+  //    diretto) and gets the owner view back, no moderation round-trip.
+  const pendingEdit = await cameraEditRoute.PATCH(editPatch(`/api/cameras/${record.id}`, {
+    title: "Renamed before publish",
+    expectedUpdated: record.updated,
+  }, owner));
+  assert.equal(pendingEdit.status, 200);
+  const pendingView = await responseBody(pendingEdit);
+  assert.equal(pendingView.changed, true);
+  assert.equal(pendingView.record.title, "Renamed before publish");
+  assert.equal(pendingView.record.status, "pending", "status is never editable");
+
+  // 4. approve → verified (a moderator publishes it).
+  const approved = await moderationRoute.PATCH(apiRequest("/api/moderation", {
+    method: "PATCH",
+    headers: { "x-osdb-user-email": identityFor(REVIEWERS.record) },
+    body: { entity: "camera", id: record.id, action: "approve", reasonCode: "verified-public-infrastructure", actorId: REVIEWERS.record },
+  }));
+  assert.equal(approved.status, 200, "approve must succeed");
+  const listing = await camerasRoute.GET(apiRequest("/api/cameras"));
+  assert.ok((await responseBody(listing)).records.some((item) => item.id === record.id && item.status === "verified"));
+
+  // 5. edit altrui: the outsider cannot edit the verified record → 403
+  //    (moderators and non-owners act only through the moderation endpoints).
+  const foreign = await cameraEditRoute.PATCH(editPatch(`/api/cameras/${record.id}`, {
+    title: "Hijacked title",
+  }, outsider));
+  assert.equal(foreign.status, 403);
+
+  // 6. edit verified: the owner's PATCH never touches `cameras` — it creates
+  //    an edit request (binario moderazione) and answers 202.
+  const verifiedEdit = await cameraEditRoute.PATCH(editPatch(`/api/cameras/${record.id}`, {
+    title: "Community corrected title",
+  }, owner));
+  assert.equal(verifiedEdit.status, 202);
+  const { editRequest } = await responseBody(verifiedEdit);
+  assert.equal(editRequest.cameraId, record.id);
+  assert.equal(editRequest.status, "pending");
+
+  // The record is unchanged until a human decides.
+  const publicRecord = await cameraEditRoute.GET(apiRequest(`/api/cameras/${record.id}`));
+  const { record: stillOld } = await responseBody(publicRecord);
+  assert.equal(stillOld.title, "Renamed before publish", "the public record must not change until approve");
+
+  // The edit request is visible in the moderation queue (entity camera_edit).
+  const queueResponse = await moderationRoute.GET(apiRequest("/api/moderation", {
+    headers: { "x-osdb-user-email": identityFor(REVIEWERS.record) },
+  }));
+  const queue = await responseBody(queueResponse);
+  const queuedEdit = queue.cameraEditRequests?.find((item) => item.id === editRequest.id);
+  assert.ok(queuedEdit, "the edit request must appear in the moderation queue");
+  assert.equal(queuedEdit.proposedTitle, "Community corrected title");
+  assert.equal(queuedEdit.currentTitle, "Renamed before publish", "the queue carries old+new for the diff UI");
+
+  // 7. re-moderation: a moderator approves the diff → the record changes.
+  const decided = await moderationRoute.PATCH(apiRequest("/api/moderation", {
+    method: "PATCH",
+    headers: { "x-osdb-user-email": identityFor(REVIEWERS.record) },
+    body: { entity: "camera_edit", id: editRequest.id, action: "approve", reasonCode: "verified-public-infrastructure", actorId: REVIEWERS.record },
+  }));
+  assert.equal(decided.status, 200, "camera_edit approve must succeed");
+
+  const afterDecision = await cameraEditRoute.GET(apiRequest(`/api/cameras/${record.id}`));
+  const { record: corrected } = await responseBody(afterDecision);
+  assert.equal(corrected.title, "Community corrected title", "approve applies the diff to the public record");
+  assert.equal(corrected.status, "verified", "status and freshness clocks are never touched");
 });
