@@ -11,15 +11,16 @@
 //      (expires_at NOT NULL + index) and the read-time expiry rejection
 //      in db/auth.ts. These are the pieces that DO exist and are tested
 //      at runtime elsewhere (freshness-reverification, auth-d1).
-//   3. KNOWN GAP (not implemented, tracked for ada/linus) — the worker
-//      exposes only a fetch handler, wrangler.jsonc has no cron triggers,
-//      and db/retention.ts does not exist. R1/R2 hard-deletes and
-//      expired-session cleanup are therefore NOT automated yet. These
-//      assertions pin the CURRENT state: when the purge job lands, this
-//      contract test must be updated in the same change.
+//   3. AUTOMATED PURGE CONTRACT (implemented in PR #87) — the worker
+//      exposes a `scheduled` handler, wrangler.jsonc declares the daily
+//      cron trigger, and db/retention.ts runs the R1-R7 sweep. These
+//      positive assertions pin the automation that replaced the old
+//      KNOWN GAP (worker was fetch-only, no triggers, no retention.ts).
+//      Runtime behaviour of the sweep itself is covered by
+//      tests/retention.test.mjs; this file pins the wiring contract.
 
 import assert from "node:assert/strict";
-import { access, readFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -127,43 +128,56 @@ test("sessions schema pins expires_at NOT NULL with an index, and auth rejects e
 });
 
 // ---------------------------------------------------------------------------
-// 3. Known functional gap (documented, NOT implemented — tracked for ada)
+// 3. Automated purge contract (PR #87 — replaced the KNOWN GAP)
 // ---------------------------------------------------------------------------
 
-test("KNOWN GAP: worker has no scheduled handler and no cron triggers — purge is not automated", async () => {
+test("the worker exposes a scheduled handler wired to the retention sweep", async () => {
   const worker = await readSource("worker/index.ts");
+  const retention = await readSource("db/retention.ts");
+
+  assert.match(
+    worker,
+    /async scheduled\(/,
+    "the worker must expose a scheduled handler so the cron trigger runs the sweep",
+  );
+  assert.match(
+    worker,
+    /runRetentionSweep/,
+    "the scheduled handler must invoke the retention sweep",
+  );
+  assert.match(
+    worker,
+    /loadRetentionPolicy\(env\)/,
+    "the scheduled handler must resolve the RETENTION_DAYS env override",
+  );
+  assert.match(
+    worker,
+    /waitUntil\(/,
+    "the sweep must run inside waitUntil so it never blocks the request path",
+  );
+  assert.match(
+    retention,
+    /export async function runRetentionSweep/,
+    "db/retention.ts must export the sweep entry point",
+  );
+});
+
+test("wrangler.jsonc declares the daily cron trigger and the PHOTOS bucket binding", async () => {
   const wrangler = await readSource("wrangler.jsonc");
 
-  // Current state: the worker is a pure request handler. There is no
-  // `scheduled` entry, so R1/R2 hard-deletes, R3 stale removal and
-  // expired-session cleanup are NOT run on a timer today.
-  //
-  // WHEN THE PURGE JOB LANDS (tracked: ada/linus): update this test in the
-  // same change — replace the negative assertions with contract assertions
-  // on the new scheduled handler and its cron binding.
-  assert.doesNotMatch(
-    worker,
-    /\bscheduled\b/,
-    "KNOWN GAP: worker/index.ts must expose only fetch today; when the scheduled purge handler is added, update this contract test",
-  );
-  assert.doesNotMatch(
+  assert.match(
     wrangler,
-    /"cron"\s*:/,
-    "KNOWN GAP: wrangler.jsonc must have no cron triggers today; when the cron binding is added, update this contract test",
+    /"crons":\s*\["0 3 \* \* \*"\]/,
+    "the retention sweep must run daily at 03:00 UTC",
   );
-  assert.doesNotMatch(
+  assert.match(
     wrangler,
-    /"triggers"\s*:/,
-    "KNOWN GAP: wrangler.jsonc must have no triggers block today; when the cron binding is added, update this contract test",
+    /"r2_buckets"/,
+    "the worker must bind the PHOTOS R2 bucket so evidence objects are purged",
   );
-
-  // db/retention.ts is the file ADR 0004 reserves for the automated purge
-  // ("to be implemented by ada (`db/retention.ts` + tests)"). It does not
-  // exist yet — assert absence explicitly so its creation is a visible
-  // contract change, not a silent one.
-  await assert.rejects(
-    access(path.join(root, "db/retention.ts")),
-    (error) => error.code === "ENOENT",
-    "KNOWN GAP: db/retention.ts must not exist yet (ADR 0004 assigns it to ada); when implemented, update this contract test",
+  assert.match(
+    wrangler,
+    /"binding":\s*"PHOTOS"/,
+    "the PHOTOS binding name must match worker/index.ts Env.PHOTOS",
   );
 });

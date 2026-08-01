@@ -31,8 +31,11 @@
  *  - `cameras.updated` holds a human note, not a timestamp — so the R2
  *    "rejection decision date" is anchored on the moderation event
  *    (action='reject'), with `created_at` as fallback for legacy rows.
- *  - All destructive work is done in `d1.batch(...)` transactions so a record,
- *    its queue items and its evidence are removed atomically.
+ *  - Destructive D1 work is done in `d1.batch(...)` transactions so a record,
+ *    its queue items and its evidence are removed atomically; R2 (PHOTOS
+ *    bucket) objects are deleted AFTER the D1 batch succeeds, best effort, so
+ *    a bucket failure never orphanes the D1 rows (the objects stay reachable
+ *    through the rows and the next run retries them).
  *  - `now` is injectable for deterministic tests; `r2` (the PHOTOS bucket) is
  *    injectable so tests can assert object deletion without a binding.
  */
@@ -56,6 +59,13 @@ export const UNVERIFIED_REMOVAL_DAYS = 180;
 export const CORRECTION_RETENTION_DAYS = 730;
 /** R6: pending photo never linked to a record expires with the pending window. */
 export const ORPHAN_PHOTO_RETENTION_DAYS = PENDING_RETENTION_DAYS;
+
+/**
+ * Cloudflare D1 caps bound parameters at 100 per query. Any `WHERE ... IN (?)`
+ * built from user-collected ids must be chunked to this size (see the R6
+ * photo deletion below).
+ */
+export const D1_MAX_BOUND_PARAMS = 100;
 
 export type RetentionPolicy = {
   retentionDays: number;
@@ -159,24 +169,21 @@ async function deleteR2Objects(
   return { deleted, failed };
 }
 
-/** Delete every photo of a record: R2 objects then D1 rows. Returns rows deleted. */
-async function deletePhotosForCamera(
+/**
+ * Select the storage keys of every photo of a record. The DELETE of the D1
+ * rows happens inside the caller's `d1.batch(...)` so a record, its queue
+ * items and its evidence are removed atomically (a failure rolls back all
+ * three); the R2 objects are deleted AFTER the batch succeeds, best effort.
+ */
+async function selectPhotosForCamera(
   d1: D1,
-  r2: RetentionR2 | undefined,
   cameraId: number,
-): Promise<{ rows: number; r2Deleted: number }> {
+): Promise<{ id: number; storageKey: string }[]> {
   const photos = await d1
     .prepare("SELECT id, storage_key AS storageKey FROM photos WHERE camera_id = ?")
     .bind(cameraId)
     .all<{ id: number; storageKey: string }>();
-  if (photos.results.length === 0) return { rows: 0, r2Deleted: 0 };
-
-  const { deleted } = await deleteR2Objects(r2, photos.results.map((photo) => photo.storageKey));
-  await d1
-    .prepare("DELETE FROM photos WHERE camera_id = ?")
-    .bind(cameraId)
-    .run();
-  return { rows: photos.results.length, r2Deleted: deleted };
+  return photos.results;
 }
 
 /**
@@ -189,12 +196,16 @@ async function purgeCameraRecord(
   cameraId: number,
   nowIso: string,
 ): Promise<{ photoRows: number; r2Deleted: number }> {
-  const { rows, r2Deleted } = await deletePhotosForCamera(d1, r2, cameraId);
+  const photos = await selectPhotosForCamera(d1, cameraId);
   await d1.batch([
+    ...(photos.length > 0
+      ? [d1.prepare("DELETE FROM photos WHERE camera_id = ?").bind(cameraId)]
+      : []),
     d1.prepare("UPDATE moderation_queue SET state = 'closed', updated_at = ? WHERE entity = 'camera' AND entity_id = ? AND state != 'closed'").bind(nowIso, cameraId),
     d1.prepare("DELETE FROM cameras WHERE id = ?").bind(cameraId),
   ]);
-  return { photoRows: rows, r2Deleted };
+  const { deleted } = await deleteR2Objects(r2, photos.map((photo) => photo.storageKey));
+  return { photoRows: photos.length, r2Deleted: deleted };
 }
 
 // ---------------------------------------------------------------------------
@@ -241,15 +252,16 @@ export async function runRetentionSweep(
   const unverifiedCutoff = daysAgo(now, policy.unverifiedRemovalDays);
   const unverified = await d1
     .prepare(
-      "SELECT id FROM cameras WHERE status IN ('needs_review', 'stale') AND review_due_at IS NOT NULL AND review_due_at < ?",
+      "SELECT id, status FROM cameras WHERE status IN ('needs_review', 'stale') AND review_due_at IS NOT NULL AND review_due_at < ?",
     )
     .bind(unverifiedCutoff)
-    .all<{ id: number }>();
-  for (const { id } of unverified.results) {
-    const { rows, r2Deleted } = await deletePhotosForCamera(d1, r2, id);
-    summary.photosDeleted += rows;
-    summary.r2ObjectsDeleted += r2Deleted;
+    .all<{ id: number; status: string }>();
+  for (const { id, status } of unverified.results) {
+    const photos = await selectPhotosForCamera(d1, id);
     await d1.batch([
+      ...(photos.length > 0
+        ? [d1.prepare("DELETE FROM photos WHERE camera_id = ?").bind(id)]
+        : []),
       d1
         .prepare("UPDATE cameras SET status = 'removed', updated = ? WHERE id = ?")
         .bind("Retention: unverified past the 6-month removal window", id),
@@ -257,8 +269,11 @@ export async function runRetentionSweep(
         .prepare(
           "INSERT INTO moderation_events (entity, entity_id, previous_status, new_status, action, reason_code, note, actor, reviewer_id, actor_role, recused, escalated, second_reviewer_id, appeal_id, created_at) VALUES ('camera', ?, ?, 'removed', 'removed', 'inaccurate-or-outdated', ?, 'Retention sweep', NULL, NULL, 0, 0, NULL, NULL, ?)",
         )
-        .bind(id, "removed", `Removed after ${policy.unverifiedRemovalDays} days unverified (R3).`, now),
+        .bind(id, status, `Removed after ${policy.unverifiedRemovalDays} days unverified (R3).`, now),
     ]);
+    const { deleted } = await deleteR2Objects(r2, photos.map((photo) => photo.storageKey));
+    summary.photosDeleted += photos.length;
+    summary.r2ObjectsDeleted += deleted;
     summary.unverifiedRemoved += 1;
   }
 
@@ -324,13 +339,23 @@ export async function runRetentionSweep(
     .all<{ id: number; storageKey: string }>();
   const orphanAndRejected = [...orphanPhotos.results, ...rejectedPhotos.results];
   if (orphanAndRejected.length > 0) {
-    const { deleted } = await deleteR2Objects(r2, orphanAndRejected.map((photo) => photo.storageKey));
+    // D1 caps bound parameters at 100 per query, so a single
+    // `DELETE ... WHERE id IN (?, ...)` breaks once more than 100 photos
+    // are pending removal (rejected evidence can pile up between runs).
+    // Delete in chunks of at most 100 ids. The D1 rows go FIRST: if any
+    // chunk fails, the R2 objects are still reachable through the rows and
+    // the next run retries cleanly — deleting objects before the rows would
+    // orphan the bucket objects on a partial failure.
     const ids = orphanAndRejected.map((photo) => photo.id);
-    const placeholders = ids.map(() => "?").join(", ");
-    await d1
-      .prepare(`DELETE FROM photos WHERE id IN (${placeholders})`)
-      .bind(...ids)
-      .run();
+    for (let offset = 0; offset < ids.length; offset += D1_MAX_BOUND_PARAMS) {
+      const chunk = ids.slice(offset, offset + D1_MAX_BOUND_PARAMS);
+      const placeholders = chunk.map(() => "?").join(", ");
+      await d1
+        .prepare(`DELETE FROM photos WHERE id IN (${placeholders})`)
+        .bind(...chunk)
+        .run();
+    }
+    const { deleted } = await deleteR2Objects(r2, orphanAndRejected.map((photo) => photo.storageKey));
     summary.photosDeleted += orphanAndRejected.length;
     summary.r2ObjectsDeleted += deleted;
   }
