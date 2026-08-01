@@ -18,7 +18,7 @@ runbook". Every procedure listed here has been executed at least once locally
 |---|---|---|---|
 | development | local (`wrangler dev`) | local | demo data, no real data |
 | staging | Workers (preview/`--env staging`) | staging D1 | synthetic data only (DEPLOYMENT.md §release constraint) |
-| production | Workers (`open-surveillance-db`) | D1 `opensurveillancedb` (remote) | only environment with real data |
+| production | Workers (`open-surveillance-db`) | D1 `osdb-production` (remote) | only environment with real data |
 
 Cross-cutting rules:
 
@@ -85,7 +85,7 @@ daily cron; opens a GitHub issue if a check fails — section 2.3).
 
 ```bash
 # Production: full export (schema + data) of the remote D1
-npx wrangler d1 export opensurveillancedb --remote --output=d1-backup-$(date +%F).sql
+npx wrangler d1 export osdb-production --remote --output=d1-backup-$(date +%F).sql
 ```
 
 Notes:
@@ -152,7 +152,7 @@ Repo prerequisites: `wrangler.jsonc` must contain the real production D1
 In the backup run, after the export, a count verification is executed:
 
 ```bash
-npx wrangler d1 execute opensurveillancedb --remote \
+npx wrangler d1 execute osdb-production --remote \
   --command="SELECT 'cameras' t, COUNT(*) n FROM cameras UNION ALL \
              SELECT 'correction_requests', COUNT(*) FROM correction_requests \
              UNION ALL SELECT 'moderation_events', COUNT(*) FROM moderation_events;"
@@ -171,9 +171,9 @@ schema change. Two patterns, depending on the state of the destination DB:
 ```bash
 # 1. Destination DB: empty (new D1 database, or reset)
 # 2. Ingest the dump (schema + data):
-npx wrangler d1 execute opensurveillancedb --remote --file=d1-backup-<DATE>.sql
+npx wrangler d1 execute osdb-production --remote --file=d1-backup-<DATE>.sql
 # 3. Verify structure: the 3 tables must exist
-npx wrangler d1 execute opensurveillancedb --remote \
+npx wrangler d1 execute osdb-production --remote \
   --command="SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name;"
 # 4. Verify data: the counts must match those in the report of the backup day
 #    (section 3.3)
@@ -186,9 +186,9 @@ A full dump on a DB that already has the tables fails with
 
 ```bash
 # 1. Export the data-only backup (from the backup or export --no-schema)
-npx wrangler d1 export opensurveillancedb --remote --no-schema --output=d1-data-$(date +%F).sql
+npx wrangler d1 export osdb-production --remote --no-schema --output=d1-data-$(date +%F).sql
 # 2. Reload the data on the existing DB
-npx wrangler d1 execute opensurveillancedb --remote --file=d1-data-<DATE>.sql
+npx wrangler d1 execute osdb-production --remote --file=d1-data-<DATE>.sql
 # 3. Verify counts as in Pattern A
 ```
 
@@ -362,7 +362,7 @@ gh variable set PROD_URL             # production hostname (e.g. osdb.example.or
 
 # 2. Production D1: create the database and copy the database_id into
 #    wrangler.jsonc (the workflow blocks the deploy while the placeholder is there)
-npx wrangler d1 create opensurveillancedb   # output: database_id
+npx wrangler d1 create osdb-production   # output: database_id
 
 # 3. R2 bucket (the PHOTOS binding is declarative: the bucket must exist)
 npx wrangler r2 bucket create opensurveillancedb-photos
@@ -523,7 +523,7 @@ All verifications executed on 2026-07-31 by Ken, locally, on `main`
 | 1 | build | `npm run build` | `Build complete. Run vinext start...` |
 | 2 | health check | `npx wrangler dev` + curl | `GET / 200 OK`, `GET /api/cameras 200 OK` |
 | 3 | moderation fail-closed | curl `/moderation` without credentials | `503 Service Unavailable` ("Moderation access control is not configured; denying") |
-| 4 | local D1 export | `wrangler d1 export opensurveillancedb --local --output=...` | `Done!` — SQL with `CREATE TABLE` + `INSERT` |
+| 4 | local D1 export | `wrangler d1 export osdb-production --local --output=...` | `Done!` — SQL with `CREATE TABLE` + `INSERT` |
 | 5 | partial dump pitfall | export from a DB without migrations | dump with **only** `cameras` (lesson: apply migrations first, verify the 3 tables) |
 | 6 | migrations | `wrangler d1 migrations apply ... --local` | 5 migrations `✅` (0000→0004) |
 | 7 | Pattern A restore | `wrangler d1 execute ... --file=dump.sql` on a pristine DB | tables recreated; `sqlite_master` query OK |
