@@ -49,6 +49,7 @@ const expectedIndexes = [
   "cameras_status_idx",
   "correction_requests_status_idx",
   "moderation_events_created_at_idx",
+  "moderation_events_entity_idx",
   "reviewers_role_idx",
   "moderation_queue_state_idx",
   "contributors_email_unique",
