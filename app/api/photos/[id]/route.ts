@@ -1,4 +1,7 @@
+import { env } from "cloudflare:workers";
 import { readPublicPhotoBytes } from "../../../../db/photos";
+import { recordRateLimitBlock } from "../../../lib/abuse-alerts";
+import { callerKey, checkRateLimit, limitsFor } from "../../../lib/rate-limit";
 
 /**
  * GET /api/photos/[id] — serve one approved photo.
@@ -17,6 +20,26 @@ export async function GET(request: Request) {
   const id = Number(idParam);
   if (!Number.isInteger(id) || id < 1) {
     return Response.json({ error: "Photo not found." }, { status: 404 });
+  }
+
+  // Public binary route: every hit costs R2 egress, so the read-family
+  // bucket metered per caller (default 60/min, READ_RATE_LIMIT_* knobs)
+  // protects bandwidth from bulk scraping. Malformed ids above already
+  // answered 404 without touching storage and are not counted.
+  const key = callerKey(request);
+  const limitOptions = limitsFor("read", env);
+  const limit = checkRateLimit("read", key, limitOptions);
+  if (!limit.allowed) {
+    console.warn("GET /api/photos/[id] rate limited");
+    recordRateLimitBlock(env, {
+      route: "/api/photos/[id]",
+      key,
+      windowSeconds: limitOptions.windowSeconds,
+    });
+    return Response.json({ error: "Too many requests. Please try again shortly." }, {
+      status: 429,
+      headers: { "Retry-After": String(limit.retryAfterSeconds) },
+    });
   }
 
   const photo = await readPublicPhotoBytes(id);
