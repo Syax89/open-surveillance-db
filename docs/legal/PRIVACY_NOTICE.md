@@ -2,7 +2,7 @@
 
 - **Status:** draft for pre-launch review; decisions of 2026-07-31 applied (controller entity, data licence ODbL 1.0, coordinate precision ~4 decimals, 12-month retention renewal, privacy contact `privacy@opensurveillancedb`); monitored mailbox to be provisioned before launch.
 - **Legal basis:** GDPR art. 13 (data collected from data subjects) and art. 14 (data not obtained from the data subject, e.g. records sourced from official public sources); D.Lgs. 196/2003 (Codice Privacy, IT) as primary jurisdiction.
-- **Version:** 0.3 (2026-07-31) — controller entity added (decision 2026-07-31); this document is a draft deliverable, not a published notice.
+- **Version:** 0.4 (2026-08-01) — photo evidence row (§ 3) and negative scope (§ 4) aligned with the active upload flow (PR #64): EXIF/XMP/IPTC stripping fail-closed, R2/D1 storage, moderation + redaction gate, retention R6; this document is a draft deliverable, not a published notice.
 
 > **Disclaimer:** this document is product guidance / not legal advice. It is a draft for pre-launch review and requires external counsel review before launch.
 
@@ -25,7 +25,7 @@ OpenSurveillanceDB publishes a public-interest map of **visible, public surveill
 | Contributor pseudonymous internal ID + submission timestamp | Reporter | Abuse prevention, provenance | art. 6(1)(f) |
 | Contributor account (email, optional display name, password hash) | Contributor (voluntary registration, ADR 0013) | Login, attribution of submissions, abuse prevention | art. 6(1)(f) — minimising: optional, pseudonymous handle, PBKDF2-SHA256 hashed password, never exposed in API responses |
 | Session records (hashed token, CSRF token, timestamps) | The project (login) | Keep the contributor logged in; CSRF protection | art. 6(1)(f); token stored only as SHA-256, expires after **30 days** or on logout (RETENTION_SCHEDULE.md R7) |
-| Evidence (files/links attached to a report) | Reporter | Verification of the record | art. 6(1)(f); retained private, tied to the record (RETENTION_SCHEDULE.md R6) |
+| Photo evidence (JPEG/PNG/WebP uploads, ≤10 MB / 4096 px) | Reporter | Verification of the record | art. 6(1)(f); EXIF/XMP/IPTC stripped at the boundary (fail-closed), bytes in R2 with metadata only in D1, retained private and tied to the record (RETENTION_SCHEDULE.md R6); never public until a moderator approves with `redaction_confirmed = 1` |
 | Correction / takedown request (contact details the requester provides, e.g. email) | Requester | Exercise of rights, harm reports | art. 6(1)(c) (GDPR arts. 15-22) and 6(1)(f) |
 | Moderator identity (email, display name, full name via ChatGPT sign-in) | OpenAI (identity provider) | Authenticate moderators; separate moderation credentials (../MODERATION.md) | art. 6(1)(f); **never logged or stored by the application** |
 | Moderation audit entries (decision, reason code, timestamp, reviewer **pseudonym**) | The project | Accountability, appeals | art. 6(1)(f); never public (aggregate transparency reports only) |
@@ -46,6 +46,7 @@ OpenSurveillanceDB publishes a public-interest map of **visible, public surveill
 - **No personal names, faces, vehicle plates, or precise operational details** (../PRIVACY_AND_SAFETY.md, ../MODERATION.md).
 - **No coordinates beyond zone-level precision:** published locations are rounded to **~4 decimal places (~10 m)**; the exact location remains in the private moderation record, visible only to moderators (decision 2026-07-31; enforced at the public read boundary — `db/cameras.ts` `roundPublicCoordinate`; see ../MODERATION.md).
 - **No behavioural advertising, no tracking, no sale of data**, no analytics libraries.
+- **No published photo without moderation and confirmed redaction:** uploaded photos (JPEG/PNG/WebP, ≤10 MB / 4096 px) are stripped of EXIF/XMP/IPTC metadata at the boundary (fail-closed — a container that cannot be walked safely is rejected, never stored unstripped), stored with sanitised bytes in R2 and metadata only in D1, and are **never public** until a moderator approves them with `redaction_confirmed = 1` (../PRIVACY_AND_SAFETY.md; ../MODERATION.md). The storage key is never exposed.
 - Submissions are stored as `pending` and are **never public** until a moderator approves them (ADR 0001). Rejected content is never published.
 
 This negative scope strengthens the reasonable expectations of data subjects and is a material input to the art. 6(1)(f) balancing test (LAWFUL_BASIS.md § 3.1).
@@ -98,6 +99,7 @@ You may request, free of charge:
 - [x] Controller entity: **Simone Rondina (syax89) / OpenSurveillanceDB, Italy** (decision 2026-07-31).
 - [ ] Provision the monitored mailbox `privacy@opensurveillancedb` (ops) before the address is published (ADR 0008).
 - [ ] **Contributor-account processing disclosure:** the account data rows in § 3 and the session/account retention (R7) must be re-checked when the contributor-auth PR (#57, ADR 0013) lands on `main`, and the account-erasure endpoint is implemented (see TERMS § 15 open item).
+- [x] **Photo evidence disclosure aligned with the active upload flow (PR #64):** § 3 (photo evidence row) and § 4 (negative scope) now describe EXIF/XMP/IPTC stripping at the boundary (fail-closed), R2 bytes + D1 metadata, the moderation/redaction gate (`redaction_confirmed = 1`), and retention R6. Coherence check: `docs/legal/REVIEW_PHOTO_UPLOAD_TERMS_ALIGNMENT_2026-08-01.md`.
 - [ ] Confirm the applicable SCC version at DPA execution (new-generation SCCs announced for adoption in 2025 — see PROCESSOR_REGISTER.md open items).
 - [ ] Per-jurisdiction review (see LAWFUL_BASIS.md § 6) and external counsel review.
 
