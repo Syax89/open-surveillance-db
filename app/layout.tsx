@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { LocaleProvider } from "./components/LocaleProvider";
+import { SiteFooter } from "./components/SiteFooter";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -48,7 +49,10 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <LocaleProvider>{children}</LocaleProvider>
+        <LocaleProvider>
+          {children}
+          <SiteFooter />
+        </LocaleProvider>
       </body>
     </html>
   );
