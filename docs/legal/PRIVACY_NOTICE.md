@@ -98,7 +98,7 @@ You may request, free of charge:
 - [x] Correction/removal contact: `privacy@opensurveillancedb` + private form (decision 2026-07-31; mailbox to be created at launch).
 - [x] Controller entity: **Simone Rondina (syax89) / OpenSurveillanceDB, Italy** (decision 2026-07-31).
 - [ ] Provision the monitored mailbox `privacy@opensurveillancedb` (ops) before the address is published (ADR 0008).
-- [ ] **Contributor-account processing disclosure:** the account data rows in § 3 and the session/account retention (R7) must be re-checked when the contributor-auth PR (#57, ADR 0013) lands on `main`, and the account-erasure endpoint is implemented (see TERMS § 15 open item).
+- [x] **Contributor-account processing disclosure:** re-checked after PR #57 and PR #61 landed on `main` — the account data rows in § 3 and the session/account retention (R7) match the implementation, and the account-erasure endpoint is implemented (`DELETE /api/auth/account`, de-attribution `contributor_id = NULL`, session revocation; UI entry point: the account page `/account` — see TERMS § 15).
 - [x] **Photo evidence disclosure aligned with the active upload flow (PR #64):** § 3 (photo evidence row) and § 4 (negative scope) now describe EXIF/XMP/IPTC stripping at the boundary (fail-closed), R2 bytes + D1 metadata, the moderation/redaction gate (`redaction_confirmed = 1`), and retention R6. Coherence check: `docs/legal/REVIEW_PHOTO_UPLOAD_TERMS_ALIGNMENT_2026-08-01.md`.
 - [ ] Confirm the applicable SCC version at DPA execution (new-generation SCCs announced for adoption in 2025 — see PROCESSOR_REGISTER.md open items).
 - [ ] Per-jurisdiction review (see LAWFUL_BASIS.md § 6) and external counsel review.

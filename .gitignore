@@ -47,3 +47,6 @@ tsconfig.tsbuildinfo
 /.wrangler/
 /outputs/
 /work/
+
+# dom harness transpile tree (tests/.dom-tmp-*)
+tests/.dom-tmp-*

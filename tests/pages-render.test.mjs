@@ -93,6 +93,7 @@ async function buildRenderTree() {
     exports: {
       "./link": "./link.mjs", "./link.js": "./link.mjs",
       "./navigation": "./navigation.mjs", "./navigation.js": "./navigation.mjs",
+      "./headers": "./headers.mjs", "./headers.js": "./headers.mjs",
       ".": "./link.mjs",
     },
   }));
@@ -107,6 +108,13 @@ export default function Link({ href, children, ...rest }) {
 export const useRouter = () => ({ push: () => {}, refresh: () => {} });
 export const useSearchParams = () => new URLSearchParams();
 export const usePathname = () => "/";
+`);
+  // Mock di next/headers: nessun cookie impostato -> le pagine Server
+  // Component (server-i18n) risolvono il locale pilota "en", identico al
+  // primo render SSR pre-conversione (ADR 0007).
+  await writeFile(path.join(nodeModules, "next", "headers.mjs"),
+    `export const cookies = async () => ({ get: () => undefined, getAll: () => [], has: () => false });
+export const headers = async () => new Headers();
 `);
 
   // Traspila ricorsivamente app/lib e app/components mantenendo la struttura
@@ -220,7 +228,13 @@ for (const page of PAGES) {
     const LocaleProvider = await loadLocaleProvider(tree);
     let html;
     try {
-      html = renderToString(React.createElement(LocaleProvider, null, React.createElement(Page)));
+      // Le pagine informative sono Server Components (async): si risolvono
+      // chiamando la funzione (l'elemento risultante contiene già il bundle
+      // i18n del locale pilota). Le pagine client restano funzioni sync.
+      const element = Page.constructor.name === "AsyncFunction"
+        ? await Page()
+        : React.createElement(Page);
+      html = renderToString(React.createElement(LocaleProvider, null, element));
     } catch (err) {
       assert.fail(`render di ${page.route} ha lanciato: ${err.message}`);
     }

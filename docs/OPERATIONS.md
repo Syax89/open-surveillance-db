@@ -1,50 +1,50 @@
 # Operations manual — OpenSurveillanceDB
 
-Stato: draft operativo per la messa in produzione.
-Riferimenti: `docs/DEPLOYMENT.md` (precondizioni e release procedure), `docs/STATUS.md`.
-Ultima verifica procedure: 2026-08-01 (Ken, CI/CD) — incluso drill operatività
-locale LXC 114 (sezione 8 e appendice).
+Status: operational draft for production rollout.
+References: `docs/DEPLOYMENT.md` (preconditions and release procedures), `docs/STATUS.md`.
+Last procedure verification: 2026-08-01 (Ken, CI/CD) — including the local
+LXC 114 operations drill (section 8 and appendix).
 
-Questo documento soddisfa la precondizione di operatività di `DEPLOYMENT.md`:
+This document satisfies the operability precondition of `DEPLOYMENT.md`:
 "Automated backups, restoration drill, monitoring, error alerting, and incident
-runbook". Ogni procedura elencata qui è stata eseguita almeno una volta in
-locale (comandi e output reali nella sezione [Appendice](#appendice-comandi-verificati)).
+runbook". Every procedure listed here has been executed at least once locally
+(real commands and output in the [Appendix](#appendix-verified-commands)).
 
 ---
 
-## 1. Panoramica
+## 1. Overview
 
-| Ambiente | Worker | D1 | Note |
+| Environment | Worker | D1 | Notes |
 |---|---|---|---|
-| sviluppo | locale (`wrangler dev`) | locale | dati demo, nessun dato reale |
-| staging | Workers (preview/`--env staging`) | D1 staging | solo dati sintetici (vincolo DEPLOYMENT.md §release) |
-| produzione | Workers (`open-surveillance-db`) | D1 `opensurveillancedb` (remote) | unico ambiente con dati reali |
+| development | local (`wrangler dev`) | local | demo data, no real data |
+| staging | Workers (preview/`--env staging`) | staging D1 | synthetic data only (DEPLOYMENT.md §release constraint) |
+| production | Workers (`open-surveillance-db`) | D1 `opensurveillancedb` (remote) | only environment with real data |
 
-Regole trasversali:
+Cross-cutting rules:
 
-- Nessun segreto in sorgente, workflow o log. Credenziali solo via Cloudflare
+- No secrets in source, workflows, or logs. Credentials only via Cloudflare
   secrets / GitHub Actions secrets (`${{ secrets.* }}`).
-- I dump D1 contengono dati di contatto delle richieste di correzione
-  (`correction_requests.contact`) e la coda di moderazione: sono dati sensibili
-  e vanno trattati come tali (sezione [4.2](#42-protezione-dei-backup)).
-- L'endpoint di moderazione è fail-closed: senza credenziali configurate
-  risponde `503`, mai `200` (verificato, vedi Appendice).
+- D1 dumps contain the contact data of correction requests
+  (`correction_requests.contact`) and the moderation queue: they are sensitive
+  data and must be treated as such (section [3.5](#35-backup-protection)).
+- The moderation endpoint is fail-closed: without configured credentials it
+  responds `503`, never `200` (verified, see Appendix).
 
 ---
 
-## 2. Monitoring: health check, error rate, alerting
+## 2. Monitoring: health checks, error rate, alerting
 
-### 2.1 Health check periodico
+### 2.1 Periodic health check
 
-Endpoint da monitorare in produzione:
+Endpoints to monitor in production:
 
-| Check | URL | Atteso | Significato |
+| Check | URL | Expected | Meaning |
 |---|---|---|---|
-| homepage | `GET /` | `200`, `<title>` atteso | worker + asset bundle serviti |
-| API pubblica | `GET /api/cameras` | `200` + JSON `{"records":[...]}` | D1 raggiungibile, query pubblica ok |
-| moderazione | `GET /api/moderation` | `401`/`503` (MAI `200` senza auth) | gate fail-closed attivo |
+| homepage | `GET /` | `200`, expected `<title>` | worker + asset bundle served |
+| public API | `GET /api/cameras` | `200` + JSON `{"records":[...]}` | D1 reachable, public query OK |
+| moderation | `GET /api/moderation` | `401`/`503` (NEVER `200` without auth) | fail-closed gate active |
 
-Procedura manuale (identica a quella usata nel drill locale):
+Manual procedure (identical to the one used in the local drill):
 
 ```bash
 curl -sS -o /dev/null -w 'home        %{http_code} in %{time_total}s\n' https://<PROD_URL>/
@@ -52,92 +52,94 @@ curl -sS -o /dev/null -w 'api/cameras %{http_code} in %{time_total}s\n' https://
 curl -sS -o /dev/null -w 'moderation  %{http_code}\n' https://<PROD_URL>/api/moderation
 ```
 
-Automatizzato dal workflow `.github/workflows/ops-monitoring.yml` (schedulato,
-cron giornaliero; crea una GitHub issue se un check fallisce — sezione 2.3).
+Automated by the `.github/workflows/ops-monitoring.yml` workflow (scheduled,
+daily cron; opens a GitHub issue if a check fails — section 2.3).
 
-### 2.2 Error rate e logs
+### 2.2 Error rate and logs
 
-- **Log in tempo reale**: `npx wrangler tail` (filtrabile per `--format json`).
-  Uso tipico: debug incidenti e verifica errori `5xx`.
-- **Error rate (storico)**: dashboard Cloudflare → Workers → `open-surveillance-db`
-  → Analytics (request volume, errori per status, p95 latency). Soglie
-  operative consigliate: error rate > 1% o p95 > 5s su 10 min → alert.
-- **Retention logs**: attivare Workers Logpush verso R2 o altro storage privato
-  quando il volume lo giustifica (default Cloudflare: retention limitata).
+- **Real-time logs**: `npx wrangler tail` (filterable with `--format json`).
+  Typical use: incident debugging and `5xx` error checks.
+- **Error rate (historical)**: Cloudflare dashboard → Workers →
+  `open-surveillance-db` → Analytics (request volume, errors per status, p95
+  latency). Recommended operational thresholds: error rate > 1% or p95 > 5s
+  over 10 min → alert.
+- **Log retention**: enable Workers Logpush to R2 or other private storage
+  when volume justifies it (Cloudflare default: limited retention).
 
 ### 2.3 Alerting
 
-1. **Workflow health check** (`.github/workflows/ops-monitoring.yml`): se un
-   check non risponde con lo status atteso, apre una issue
-   `ops: health check FAILED` con l'output del check. La notifica GitHub
-   (email/app) è il canale primario.
-2. **Cloudflare Health Checks** (opzionale, consigliato): sul dominio
-   di produzione, health check `GET /` con soglia 2 failure su 3 tentativi
-   e notifica email/webhook.
-3. **Escalation incidente**: vedi runbook, sezione 4.
+1. **Health check workflow** (`.github/workflows/ops-monitoring.yml`): if a
+   check does not respond with the expected status, it opens an issue
+   `ops: health check FAILED` with the check output. The GitHub notification
+   (email/app) is the primary channel.
+2. **Cloudflare Health Checks** (optional, recommended): on the production
+   domain, `GET /` health check with a 2-failure-out-of-3 threshold and
+   email/webhook notification.
+3. **Incident escalation**: see runbook, section 4.
 
 ---
 
-## 3. Backup D1 automatizzato
+## 3. Automated D1 backup
 
-### 3.1 Comando di export (verificato, wrangler 4.118.0)
+### 3.1 Export command (verified, wrangler 4.118.0)
 
 ```bash
-# Produzione: export completo (schema + dati) del D1 remoto
+# Production: full export (schema + data) of the remote D1
 npx wrangler d1 export opensurveillancedb --remote --output=d1-backup-$(date +%F).sql
 ```
 
-Note:
+Notes:
 
-- Il dump include schema e contenuto di tutte le tabelle presenti nel DB
-  remoto (`cameras`, `correction_requests`, `moderation_events`).
-  **Verificare sempre che il dump contenga le 3 tabelle** prima di archiviarlo
-  (pitfall: un DB senza migrazioni applicate produce dump parziali — vedi
-  Appendice, drill #1).
-- Per il solo schema: `--no-data`; per i soli dati: `--no-schema` (usato nel
-  restore su DB esistente, sezione 3.4).
-- `--remote` è obbligatorio per toccare produzione; senza flag wrangler
-  agisce sul DB locale.
+- The dump includes schema and content of all tables in the remote DB
+  (`cameras`, `correction_requests`, `moderation_events`).
+  **Always verify the dump contains the 3 tables** before archiving it
+  (pitfall: a DB without applied migrations produces partial dumps — see
+  Appendix, drill #1).
+- Schema only: `--no-data`; data only: `--no-schema` (used for restore on an
+  existing DB, section 3.4).
+- `--remote` is mandatory to touch production; without the flag wrangler acts
+  on the local DB.
 
-### 3.2 Automazione su schedule
+### 3.2 Scheduled automation
 
 Workflow `.github/workflows/ops-backup.yml`:
 
-- trigger: `schedule` cron `0 2 * * *` (02:00 UTC, giornaliero) + `workflow_dispatch`;
-- esegue `wrangler d1 export ... --remote` con credenziali da
-  `secrets.CLOUDFLARE_API_TOKEN` e `secrets.CLOUDFLARE_ACCOUNT_ID`;
-- verifica che il dump contenga le 3 tabelle attese (`cameras`,
-  `correction_requests`, `moderation_events`) e registra i conteggi baseline;
-- **cifra il dump (AES-256-CBC, passphrase da `secrets.BACKUP_PASSPHRASE`)**
-  e salva solo il file `.enc` come artifact GitHub privato del run
-  (retention 30 giorni). Il file in chiaro viene cancellato nello stesso job:
-  il repo è pubblico, l'artifact non deve mai contenere dump in chiaro;
-- **non** esegue deploy: il backup non tocca mai il worker in produzione.
+- trigger: `schedule` cron `0 2 * * *` (02:00 UTC, daily) + `workflow_dispatch`;
+- runs `wrangler d1 export ... --remote` with credentials from
+  `secrets.CLOUDFLARE_API_TOKEN` and `secrets.CLOUDFLARE_ACCOUNT_ID`;
+- verifies the dump contains the expected 3 tables (`cameras`,
+  `correction_requests`, `moderation_events`) and records the baseline counts;
+- **encrypts the dump (AES-256-CBC, passphrase from
+  `secrets.BACKUP_PASSPHRASE`)** and saves only the `.enc` file as a private
+  GitHub artifact of the run (30-day retention). The plaintext file is deleted
+  in the same job: the repo is public, artifacts must never contain plaintext
+  dumps;
+- **does not** run a deploy: the backup never touches the production worker.
 
-Pre-requisiti GitHub (impostare una volta, mai hardcoded nei workflow):
+GitHub prerequisites (set once, never hardcoded in workflows):
 
 ```text
-CLOUDFLARE_API_TOKEN   token con permesso "D1 - Edit" sull'account
-CLOUDFLARE_ACCOUNT_ID  account id Cloudflare
-BACKUP_PASSPHRASE      passphrase per la cifratura AES-256 dei dump
-PROD_URL (variable)    hostname di produzione (es. opensurveillancedb.example)
+CLOUDFLARE_API_TOKEN   token with "D1 - Edit" permission on the account
+CLOUDFLARE_ACCOUNT_ID  Cloudflare account id
+BACKUP_PASSPHRASE      passphrase for AES-256 encryption of dumps
+PROD_URL (variable)    production hostname (e.g. opensurveillancedb.example)
 ```
 
-Decifratura di un backup per il drill di restore:
+Decrypting a backup for a restore drill:
 
 ```bash
 openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:$BACKUP_PASSPHRASE" \
-  -in d1-backup-<DATA>.sql.enc -out d1-backup-<DATA>.sql
-sha256sum -c d1-backup-<DATA>.sql.enc.sha256   # integrità prima del restore
+  -in d1-backup-<DATE>.sql.enc -out d1-backup-<DATE>.sql
+sha256sum -c d1-backup-<DATE>.sql.enc.sha256   # integrity check before restore
 ```
 
-Pre-requisiti repo: `wrangler.jsonc` deve avere il `database_id` reale del D1
-di produzione (il file committato contiene il placeholder
-`00000000-0000-4000-8000-000000000000`, vedi DEPLOYMENT.md).
+Repo prerequisites: `wrangler.jsonc` must contain the real production D1
+`database_id` (the committed file contains the placeholder
+`00000000-0000-4000-8000-000000000000`, see DEPLOYMENT.md).
 
-### 3.3 Verifica di integrità post-backup
+### 3.3 Post-backup integrity verification
 
-Nel run di backup, dopo l'export, viene eseguita una verifica di conteggio:
+In the backup run, after the export, a count verification is executed:
 
 ```bash
 npx wrangler d1 execute opensurveillancedb --remote \
@@ -146,56 +148,56 @@ npx wrangler d1 execute opensurveillancedb --remote \
              UNION ALL SELECT 'moderation_events', COUNT(*) FROM moderation_events;"
 ```
 
-I conteggi del giorno vengono registrati nel report del run: servono come
-baseline per il drill di restore (sezione 3.4, step 4).
+The day's counts are recorded in the run report: they serve as the baseline
+for the restore drill (section 3.4, step 4).
 
-### 3.4 Drill di restore (procedura verificata in locale)
+### 3.4 Restore drill (procedure verified locally)
 
-Il drill va eseguito almeno trimestralmente e comunque prima di ogni
-modifica di schema. Due pattern, a seconda dello stato del DB di destinazione:
+The drill must be executed at least quarterly and in any case before every
+schema change. Two patterns, depending on the state of the destination DB:
 
-**Pattern A — ripristino completo su D1 vergine (disaster recovery).**
+**Pattern A — full restore on a pristine D1 (disaster recovery).**
 
 ```bash
-# 1. DB di destinazione: vuoto (nuovo database D1, o reset)
-# 2. Ingerire il dump (schema + dati):
-npx wrangler d1 execute opensurveillancedb --remote --file=d1-backup-<DATA>.sql
-# 3. Verificare struttura: le 3 tabelle devono esistere
+# 1. Destination DB: empty (new D1 database, or reset)
+# 2. Ingest the dump (schema + data):
+npx wrangler d1 execute opensurveillancedb --remote --file=d1-backup-<DATE>.sql
+# 3. Verify structure: the 3 tables must exist
 npx wrangler d1 execute opensurveillancedb --remote \
   --command="SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name;"
-# 4. Verificare i dati: i conteggi devono combaciare con quelli del report
-#    del giorno del backup (sezione 3.3)
+# 4. Verify data: the counts must match those in the report of the backup day
+#    (section 3.3)
 ```
 
-**Pattern B — reimport su D1 già esistente (rollback dati, niente reset).**
+**Pattern B — re-import on an existing D1 (data rollback, no reset).**
 
-Il dump completo su un DB che ha già le tabelle fallisce con
-`table already exists` (verificato). Per ricaricare i soli dati:
+A full dump on a DB that already has the tables fails with
+`table already exists` (verified). To reload data only:
 
 ```bash
-# 1. Esportare il backup dati-only (dal backup o export --no-schema)
+# 1. Export the data-only backup (from the backup or export --no-schema)
 npx wrangler d1 export opensurveillancedb --remote --no-schema --output=d1-data-$(date +%F).sql
-# 2. Ricaricare i dati sul DB esistente
-npx wrangler d1 execute opensurveillancedb --remote --file=d1-data-<DATA>.sql
-# 3. Verificare conteggi come nel Pattern A
+# 2. Reload the data on the existing DB
+npx wrangler d1 execute opensurveillancedb --remote --file=d1-data-<DATE>.sql
+# 3. Verify counts as in Pattern A
 ```
 
-**Criteri di successo del drill**: (a) le 3 tabelle esistono; (b) i conteggi
-combaciano con la baseline; (c) un campione di record pubblici torna visibile
-via `GET /api/cameras`. Esito del drill registrato in un commento
-sull'issue/run che lo ha schedulato.
+**Drill success criteria**: (a) the 3 tables exist; (b) the counts match the
+baseline; (c) a sample of public records is visible again via
+`GET /api/cameras`. Drill outcome recorded in a comment on the issue/run that
+scheduled it.
 
-### 3.5 Protezione dei backup
+### 3.5 Backup protection
 
-- I dump contengono dati di contatto e moderazione: **mai** pubblicare
-  backup, mai caricarli su storage pubblico, mai includerli in commit.
-- Il workflow di backup salva solo artifact **cifrati** (AES-256-CBC,
-  passphrase in `secrets.BACKUP_PASSPHRASE`): un artifact del repo pubblico
-  senza cifratura equivarrebbe a una fuga di dati.
-- Artifact GitHub con retention finita (30 giorni) è il minimo accettabile;
-  per retention lunga usare R2 privato o storage aziendale (sempre cifrato).
-- Backup remoti ulteriori (NAS/oggetto) devono usare canale cifrato e
-  accesso ristretto.
+- Dumps contain contact and moderation data: **never** publish backups, never
+  upload them to public storage, never include them in commits.
+- The backup workflow saves only **encrypted** artifacts (AES-256-CBC,
+  passphrase in `secrets.BACKUP_PASSPHRASE`): an unencrypted artifact on the
+  public repo would amount to a data leak.
+- GitHub artifacts with finite retention (30 days) are the acceptable minimum;
+  for long retention use private R2 or company storage (always encrypted).
+- Additional remote backups (NAS/object) must use an encrypted channel and
+  restricted access.
 
 ---
 
@@ -203,290 +205,349 @@ sull'issue/run che lo ha schedulato.
 
 ### 4.1 Severity
 
-| Sev | Esempio | Target response |
+| Sev | Example | Target response |
 |---|---|---|
-| S1 | dati personali esposti pubblicamente; DB perso/corrotto; sito down prolungato | < 30 min |
-| S2 | error rate > 1% sostenuto; feature pubblica degradata; moderazione inaccessibile | < 2 h |
-| S3 | degradazione parziale, nessun impatto su dati pubblici | < 1 giorno lavorativo |
+| S1 | personal data publicly exposed; DB lost/corrupted; prolonged site outage | < 30 min |
+| S2 | sustained error rate > 1%; degraded public feature; moderation inaccessible | < 2 h |
+| S3 | partial degradation, no impact on public data | < 1 working day |
 
-### 4.2 Ruoli e escalation
+### 4.2 Roles and escalation
 
-| Ruolo | Persona | Compito |
+| Role | Person | Task |
 |---|---|---|
-| On-call / primo risponditore | Ken (CI/CD) | verifica alert, triage iniziale |
-| Tech lead / decisioni | Ada (CTO) | autorizza rollback, restore, comunicazione |
-| QA | Grace | verifica post-mitigazione su staging |
-| Mantainer / comunicazione | Ada | annuncio pubblico se serve |
+| On-call / first responder | Ken (CI/CD) | verify alert, initial triage |
+| Tech lead / decisions | Ada (CTO) | authorises rollback, restore, communication |
+| QA | Grace | post-mitigation verification on staging |
+| Maintainer / communication | Ada | public announcement if needed |
 
-Escalation: Ken → Ada → (S1) coinvolgimento immediato di entrambe le figure.
+Escalation: Ken → Ada → (S1) immediate involvement of both roles.
 
-### 4.3 Fasi
+### 4.3 Phases
 
-1. **Detect**: alert del workflow health check, `wrangler tail`, o segnalazione.
-2. **Triage (15 min)**: confermare l'incidente (`curl` manuale), classificarne
-   la severità, aprire issue `incident: <titolo>` con tag severity.
-3. **Mitigate**: applicare la contromisura più rapida e reversibile —
-   rollback del worker (sezione 5) e/o ripristino dati (sezione 3.4).
-   Registrare nel ticket i comandi eseguiti e gli orari.
-4. **Verify**: health check completo (2.1) + verifica conteggi D1 (3.3) +
-   smoke test QA su staging.
-5. **Resolve & postmortem**: chiudere l'incidente solo a dati pubblici
-   verificati. Entro 3 giorni lavorativi: postmortem con timeline, causa
-   radice, azioni correttive (issue dedicate, ciascuna con assignee).
+1. **Detect**: health check workflow alert, `wrangler tail`, or a report.
+2. **Triage (15 min)**: confirm the incident (manual `curl`), classify its
+   severity, open an `incident: <title>` issue with a severity tag.
+3. **Mitigate**: apply the fastest reversible countermeasure — worker rollback
+   (section 5) and/or data restore (section 3.4). Record the commands executed
+   and the times in the ticket.
+4. **Verify**: full health check (2.1) + D1 count verification (3.3) + QA
+   smoke test on staging.
+5. **Resolve & postmortem**: close the incident only with verified public
+   data. Within 3 working days: postmortem with timeline, root cause, and
+   corrective actions (dedicated issues, each with an assignee).
 
-### 4.4 Comunicazione
+### 4.4 Communication
 
-- Interna: issue GitHub + menzione al canale del team. Mai dettagli di dati
-  personali nei ticket pubblici (il repo è pubblico): riferirsi agli
-  incidenti per ID, non per contenuto.
-- Pubblica (solo S1 con esposizione dati): nota su `docs/legal/BREACH_PROCEDURE.md`
-  e contatto del Garante secondo la procedura legale vigente.
+- Internal: GitHub issue + mention on the team channel. Never personal-data
+  details in public tickets (the repo is public): refer to incidents by ID,
+  not by content.
+- Public (only S1 with data exposure): note on `docs/legal/BREACH_PROCEDURE.md`
+  and contact the supervisory authority per the applicable legal procedure.
 
 ---
 
-## 5. Rollback plan (versione precedente dei Workers)
+## 5. Rollback plan (previous Workers versions)
 
-### 5.1 Identificare le versioni
+### 5.1 Identifying versions
 
 ```bash
-npx wrangler versions list          # ultime 10 versioni del worker
+npx wrangler versions list          # last 10 worker versions
 npx wrangler versions view <version-id>
 ```
 
-Ogni release è correlata a un tag git `v*` (procedura release del repo:
-tag + push, la CI costruisce). Correlazione version-id ↔ commit: annotare
-sempre il version-id nel changelog/issue della release, oppure ricavarlo
-dalla dashboard Cloudflare → Workers → Deployments (mostra id e data).
+Every release correlates to a git tag `v*` (repo release procedure: tag +
+push, CI builds). version-id ↔ commit correlation: always record the
+version-id in the release changelog/issue, or derive it from the Cloudflare
+dashboard → Workers → Deployments (shows id and date).
 
-### 5.2 Rollback (due livelli)
+### 5.2 Rollback (two levels)
 
-**Livello 1 — rollback all'ultima versione buona (raccomandato, immediato):**
-
-```bash
-npx wrangler rollback                # torna all'ultimo deployment precedente
-```
-
-**Livello 2 — rollback a una versione specifica:**
+**Level 1 — rollback to the last known good version (recommended, immediate):**
 
 ```bash
-npx wrangler rollback <version-id> -m "rollback per <motivo> (issue #N)"
+npx wrangler rollback                # returns to the previous deployment
 ```
 
-Regole:
+**Level 2 — rollback to a specific version:**
 
-- Il rollback del worker è **istantaneo e non tocca D1**: i dati restano
-  invariati. Se l'incidente riguarda i dati (corruzione, migrazione errata),
-  il rollback del worker non basta: serve il ripristino D1 (3.4).
-- Dopo il rollback: health check (2.1), smoke test QA, e registrare il
-  version-id di origine e di destinazione nell'issue dell'incidente.
-- La versione rollbackata resta in `versions list`: non è persa.
+```bash
+npx wrangler rollback <version-id> -m "rollback for <reason> (issue #N)"
+```
 
-### 5.3 Matrice decisionale rollback vs hotfix
+Rules:
 
-| Situazione | Azione |
+- Worker rollback is **instantaneous and does not touch D1**: data stays
+  unchanged. If the incident involves data (corruption, bad migration), worker
+  rollback is not enough: D1 restore is required (3.4).
+- After rollback: health check (2.1), QA smoke test, and record the source and
+  destination version-ids in the incident issue.
+- The rolled-back version stays in `versions list`: it is not lost.
+
+### 5.3 Rollback vs hotfix decision matrix
+
+| Situation | Action |
 |---|---|
-| regressione UI/API dopo deploy, dati ok | rollback worker (5.2) |
-| migrazione D1 andata male, dati intatti | rollback worker + fix migrazione, restore dati-only (Pattern B) |
-| dati corrotti/persi | restore completo su D1 vergine (Pattern A) + verifica |
-| bug di sicurezza urgente nel codice | rollback immediato + hotfix su branch + release urgente |
+| UI/API regression after deploy, data OK | worker rollback (5.2) |
+| failed D1 migration, data intact | worker rollback + migration fix, data-only restore (Pattern B) |
+| corrupted/lost data | full restore on pristine D1 (Pattern A) + verification |
+| urgent security bug in code | immediate rollback + hotfix on branch + urgent release |
 
-### 5.4 Pre-condizioni affinché il rollback sia possibile
+### 5.4 Preconditions for rollback to be possible
 
-- `CLOUDFLARE_API_TOKEN` con permesso "Workers Scripts - Edit" (stesso
-  secret usato dal backup).
-- Il worker deve essere deployato con versioning attivo (default su
-  Workers moderni); in caso contrario fare almeno `wrangler deploy` della
-  versione precedente dal tag git (`git checkout vX.Y.Z && npx wrangler deploy`).
+- `CLOUDFLARE_API_TOKEN` with "Workers Scripts - Edit" permission (same
+  secret used by the backup).
+- The worker must be deployed with versioning enabled (default on modern
+  Workers); otherwise at least run `wrangler deploy` of the previous version
+  from the git tag (`git checkout vX.Y.Z && npx wrangler deploy`).
 
 ---
 
-## 6. Checklist pre-produzione (collegamento a DEPLOYMENT.md)
+## 6. Pre-production checklist (link to DEPLOYMENT.md)
 
-Prima del primo deploy di produzione, confermare (barrare quando fatto):
+Before the first production deploy, confirm (tick when done):
 
-- [ ] `wrangler.jsonc`: `database_id` reale del D1 di produzione.
-- [ ] Migrazioni applicate al D1 remoto (`wrangler d1 migrations apply ... --remote`).
-- [ ] Secrets GitHub: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`,
+- [ ] `wrangler.jsonc`: real production D1 `database_id`.
+- [ ] Migrations applied to the remote D1 (`wrangler d1 migrations apply ... --remote`).
+- [ ] GitHub secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`,
       `BACKUP_PASSPHRASE`; repository variable `PROD_URL`.
-- [ ] Secrets Cloudflare: `MODERATION_USER`/`MODERATION_PASSWORD` o
-      `MODERATION_TOKEN` (senza questi la moderazione risponde 503 — fail-closed).
-- [ ] Workflow `ops-monitoring.yml` schedulato e passato almeno una volta (dry run manuale).
-- [ ] Workflow `ops-backup.yml` schedulato; primo backup eseguito e dump verificato (3 tabelle + conteggi).
-- [ ] Drill di restore eseguito (Pattern A) con esito registrato.
-- [ ] Tag `v*` presente e correlato a un deployment; `wrangler rollback` provato in staging.
-- [ ] Incident runbook condiviso con il team (questo file).
+- [ ] Cloudflare secrets: `MODERATION_USER`/`MODERATION_PASSWORD` or
+      `MODERATION_TOKEN` (without these moderation responds 503 — fail-closed).
+- [ ] `deploy.yml` workflow tested in **dry-run** at least once.
+- [ ] `ops-monitoring.yml` workflow scheduled and passed at least once (manual dry run).
+- [ ] `ops-backup.yml` workflow scheduled; first backup executed and dump verified (3 tables + counts).
+- [ ] Restore drill executed (Pattern A) with recorded outcome.
+- [ ] `v*` tag present and correlated to a deployment; `wrangler rollback` tested in staging.
+- [ ] Incident runbook shared with the team (this file).
 
 ---
 
-## 8. Operatività del deploy locale (LXC 114, `osdb-test`)
+## 7. Deploy Cloudflare via CI (workflow `deploy.yml`)
 
-Questa sezione documenta le procedure **testate** per l'ambiente locale
-attualmente attivo: Proxmox container **114** `osdb-test`, IP
-`192.168.1.201:3000`, LAN only. È l'ambiente di riferimento per le verifiche
-di staging (DEPLOYMENT.md §"Local LXC deployment").
+The Worker deploy + production D1 migrations go through the
+`.github/workflows/deploy.yml` workflow — never manual `wrangler deploy`
+commands from local machines. The workflow is **manual** (`workflow_dispatch`)
+until the public deploy decision is made (DEPLOYMENT.md "Preconditions for a
+public environment"); once decided, the automatic trigger on tag `v*` is added
+(documentation at the top of the file).
 
-### 8.0 Accesso al container: via Proxmox API, non SSH
+### 7.1 Modes
 
-- La deploy key documentata in DEPLOYMENT.md **non è mai stata iniettata** al
-  `vzcreate` (verificato sul task log del 2026-07-31 17:01) e lo schema API
-  non consente di aggiungere `ssh-public-keys`/`password` post-create.
-- Tutte le operazioni (snapshot, rollback, backup, stop/start) usano il
-  **token API Proxmox**, decifrato a runtime dal vault GPG locale
-  (`~/.hermes/secrets/proxmox-token.gpg`) — mai hardcoded negli script.
-- Prerequisito sulla macchina che esegue gli script: `gpg` con la chiave del
-  vault, `curl`, `python3`.
+| Mode | What it does | Remote effect |
+|---|---|---|
+| `dry-run` (default) | `wrangler d1 migrations apply --remote --dry-run` (pending migrations, none applied) + `wrangler deploy --dry-run` (local bundle) | none |
+| `deploy` | `wrangler d1 migrations apply --remote` + `wrangler deploy` + records the version id (`wrangler versions list`) | D1 migrated + worker updated |
 
-### 8.1 Health check periodico (monitoraggio)
+The job runs on `environment: production` (GitHub Environments): once
+required reviewers are added, every deploy requires human approval.
+
+### 7.2 Prerequisites (one-time, before the first `deploy`)
+
+```bash
+# 1. GitHub secrets (never hardcoded in workflows)
+gh secret set CLOUDFLARE_API_TOKEN   # permissions "Workers Scripts - Edit" + "D1 - Edit"
+gh secret set CLOUDFLARE_ACCOUNT_ID
+gh variable set PROD_URL             # production hostname (e.g. osdb.example.org)
+
+# 2. Production D1: create the database and copy the database_id into
+#    wrangler.jsonc (the workflow blocks the deploy while the placeholder is there)
+npx wrangler d1 create opensurveillancedb   # output: database_id
+
+# 3. R2 bucket (the PHOTOS binding is declarative: the bucket must exist)
+npx wrangler r2 bucket create opensurveillancedb-photos
+
+# 4. Worker secrets (persist across deploys; never in code)
+npx wrangler secret put MODERATION_USER
+npx wrangler secret put MODERATION_PASSWORD
+npx wrangler secret put MODERATION_TOKEN      # optional, bearer alternative
+```
+
+Quick pre-flight verification from CI without touching production: the
+workflow's `dry-run` mode (pending migrations + bundle).
+
+### 7.3 Rollback
+
+The worker is versioned: rollback is **instantaneous and does not touch D1**
+(`npx wrangler rollback [version-id]` — see §5). If the incident involves
+data, worker rollback is not enough: D1 restore is required (§3.4).
+
+### 7.4 Rules
+
+- Never run manual `wrangler deploy` to production from local machines: CI only.
+- Never put moderation credentials in code or workflows: Cloudflare secrets only.
+- A deploy that fails halfway (e.g. a bad migration) → worker rollback (§5.2)
+  + migration fix; do not attempt a blind second deploy.
+
+---
+
+## 8. Local deployment operations (LXC 114, `osdb-test`)
+
+This section documents the **tested** procedures for the currently active
+local environment: Proxmox container **114** `osdb-test`, IP
+`192.168.1.201:3000`, LAN only. It is the reference environment for staging
+verifications (DEPLOYMENT.md §"Local LXC deployment").
+
+### 8.0 Container access: via Proxmox API, not SSH
+
+- The deploy key documented in DEPLOYMENT.md **was never injected** at
+  `vzcreate` (verified on the 2026-07-31 17:01 task log) and the API schema
+  does not allow adding `ssh-public-keys`/`password` post-create.
+- All operations (snapshot, rollback, backup, stop/start) use the **Proxmox
+  API token**, decrypted at runtime from the local GPG vault
+  (`~/.hermes/secrets/proxmox-token.gpg`) — never hardcoded in scripts.
+- Prerequisite on the machine running the scripts: `gpg` with the vault key,
+  `curl`, `python3`.
+
+### 8.1 Periodic health check (monitoring)
 
 Script: `ops/health-check.sh`
 
 ```bash
-# manuale
+# manual
 ops/health-check.sh
-# cron (workstation): ogni 5 minuti
+# cron (workstation): every 5 minutes
 */5 * * * * /home/simone/workspace/open-surveillance-db/ops/health-check.sh >> /home/simone/logs/osdb-health.log 2>&1
 ```
 
-Route verificate (attese → significato):
+Verified routes (expected → meaning):
 
-| Check | URL | Atteso |
+| Check | URL | Expected |
 |---|---|---|
 | homepage | `GET /` | `200` |
-| API pubblica | `GET /api/cameras` | `200` |
+| public API | `GET /api/cameras` | `200` |
 | geospatial | `GET /api/cameras/nearby?...` | `200` |
 | guide | `GET /guide` | `200` |
-| moderazione | `GET /api/moderation` | `503` (fail-closed, mai `200` senza credenziali) |
+| moderation | `GET /api/moderation` | `503` (fail-closed, never `200` without credentials) |
 
-Exit code 0 = tutto OK; exit code 1 = almeno una route fuori soglia. In caso
-di fallimento lo script crea il marker `/tmp/osdb-health-FAIL` (utile per un
-watchdog) e il log in `/home/simone/logs/osdb-health.log` riporta il dettaglio.
-Il job è installato nel crontab della workstation di Ken (vedi sopra).
+Exit code 0 = all OK; exit code 1 = at least one route out of threshold. On
+failure the script creates the `/tmp/osdb-health-FAIL` marker (useful for a
+watchdog) and the log in `/home/simone/logs/osdb-health.log` reports the
+detail. The job is installed in Ken's workstation crontab (see above).
 
-### 8.2 Backup automatizzato (vzdump → storage NAS)
+### 8.2 Automated backup (vzdump → NAS storage)
 
 Script: `ops/backup-lxc114.sh`
 
 ```bash
-# manuale
+# manual
 ops/backup-lxc114.sh
-# cron (workstation): ogni notte alle 02:30
+# cron (workstation): every night at 02:30
 30 2 * * * /home/simone/workspace/open-surveillance-db/ops/backup-lxc114.sh >> /home/simone/logs/osdb-backup.log 2>&1
 ```
 
-Cosa fa (tutto via API Proxmox):
+What it does (all via Proxmox API):
 
-1. Lancia `vzdump` del container 114 in **snapshot mode** (nessun downtime)
-   sullo storage CIFS **NAS** (configurato su pve: `content=images,backup`),
-   compressione `zstd`, `prune-backups=keep-last=7` (ritenzione 7 backup).
-2. Attende il completamento del task (poll fino a 30 min) e controlla
+1. Runs `vzdump` of container 114 in **snapshot mode** (no downtime) on the
+   CIFS **NAS** storage (configured on pve: `content=images,backup`), `zstd`
+   compression, `prune-backups=keep-last=7` (7-backup retention).
+2. Waits for task completion (poll up to 30 min) and checks
    `exitstatus=OK`.
-3. Verifica via API storage content che l'archivio
-   `NAS:backup/vzdump-lxc-114-<data>_<ora>.tar.zst` sia elencato e stampa il
-   numero totale di archivi conservati.
+3. Verifies via the storage content API that the archive
+   `NAS:backup/vzdump-lxc-114-<date>_<time>.tar.zst` is listed and prints the
+   total number of retained archives.
 
-Il database D1 dell'app (`.wrangler/state/v3/d1/.../*.sqlite`) vive nella
-rootfs del container e **è incluso** nell'archivio vzdump (verificato: file
-estratto e letto con `PRAGMA integrity_check` ok, tabelle `cameras`,
+The app's D1 database (`.wrangler/state/v3/d1/.../*.sqlite`) lives in the
+container rootfs and **is included** in the vzdump archive (verified: file
+extracted and read with `PRAGMA integrity_check` OK, tables `cameras`,
 `correction_requests`, `moderation_events`).
 
-### 8.3 Procedura di restore (disaster recovery)
+### 8.3 Restore procedure (disaster recovery)
 
-Dall'archivio vzdump più recente sul NAS:
+From the most recent vzdump archive on the NAS:
 
 ```bash
-# 1. individuare l'archivio sul NAS
+# 1. find the archive on the NAS
 smbclient //192.168.1.194/NAS -U Simone -c 'cd dump; ls vzdump-lxc-114-*'
-# 2. estrarre il D1 sqlite (esempio)
-zstd -dc vzdump-lxc-114-<DATA>_<ORA>.tar.zst | tar -xf - -C /tmp \
+# 2. extract the D1 sqlite (example)
+zstd -dc vzdump-lxc-114-<DATE>_<TIME>.tar.zst | tar -xf - -C /tmp \
   ./opt/open-surveillance-db/.wrangler/state/v3/d1/miniflare-D1DatabaseObject/<hash>.sqlite
-# 3. verificare integrità
+# 3. verify integrity
 python3 -c "import sqlite3;c=sqlite3.connect('<file>');print(c.execute('PRAGMA integrity_check').fetchone())"
 ```
 
-Restore **completo** del container (sostituzione): creare un nuovo container
-dall'archivio con `pct restore` (o via API) oppure rollback allo snapshot
-pre-deploy (sezione 8.4) — che ripristina anche i file non in DB.
+**Full** container restore (replacement): create a new container from the
+archive with `pct restore` (or via API) or roll back to the pre-deploy
+snapshot (section 8.4) — which also restores the non-DB files.
 
-### 8.4 Rollback (snapshot del deploy precedente)
+### 8.4 Rollback (pre-deploy snapshot)
 
-Due script complementari:
+Two complementary scripts:
 
 ```bash
-# PRIMA di ogni deploy: crea lo snapshot pre-deploy (rollback base)
-ops/snapshot-pre-deploy.sh                 # nome default pre-deploy-YYYYMMDD-HHMMSS
-# IN CASO DI PROBLEMI: rollback a quello snapshot + riavvio + health check
+# BEFORE every deploy: create the pre-deploy snapshot (rollback base)
+ops/snapshot-pre-deploy.sh                 # default name pre-deploy-YYYYMMDD-HHMMSS
+# ON PROBLEMS: rollback to that snapshot + restart + health check
 ops/rollback-lxc114.sh pre-deploy-20260801-003428
 ```
 
-Comportamento verificato del rollback Proxmox:
+Verified Proxmox rollback behaviour:
 
-- L'API rollback ferma il container, ripristina il disco dallo snapshot e
-  **non lo riavvia da solo**: `rollback-lxc114.sh` gestisce stop→rollback→
-  start→wait→health check in sequenza.
-- Il task di rollback è asincrono: la POST restituisce un UPID che lo script
-  interroga (`/nodes/pve/tasks/<upid>/status`) fino a `exitstatus=OK` —
-  stesso polling di `backup-lxc114.sh` (§8.2, attesa fino a 30 min). Lo start
-  del container parte **solo a rollback completato**, non dopo un timeout
-  fisso.
-- Dopo il rollback l'health check completo (8.1) deve dare 5/5 OK prima di
-  dichiarare risolto l'incidente (vedi runbook §4.3, step Verify).
+- The rollback API stops the container, restores the disk from the snapshot
+  and **does not restart it on its own**: `rollback-lxc114.sh` handles
+  stop→rollback→start→wait→health check in sequence.
+- The rollback task is asynchronous: the POST returns an UPID that the script
+  polls (`/nodes/pve/tasks/<upid>/status`) until `exitstatus=OK` — same
+  polling as `backup-lxc114.sh` (§8.2, wait up to 30 min). The container start
+  happens **only after the rollback completes**, not after a fixed timeout.
+- After rollback the full health check (8.1) must be 5/5 OK before declaring
+  the incident resolved (see runbook §4.3, Verify step).
 
-### 8.5 Note di sicurezza
+### 8.5 Security notes
 
-- Nessun segreto negli script: il token Proxmox è nel vault GPG locale
-  (`~/.hermes/secrets/proxmox-token.gpg`, chmod 600), decifrato a runtime.
-- Gli archivi vzdump contengono l'intera rootfs del container (incluso il D1
-  con eventuali richieste di correzione): storage NAS privato, accesso
-  ristretto, mai su canali pubblici.
+- No secrets in scripts: the Proxmox token is in the local GPG vault
+  (`~/.hermes/secrets/proxmox-token.gpg`, chmod 600), decrypted at runtime.
+- The vzdump archives contain the entire container rootfs (including D1 with
+  possible correction requests): private NAS storage, restricted access,
+  never on public channels.
 
 ---
 
-## Appendice: comandi verificati
+## Appendix: verified commands
 
-Tutte le verifiche eseguite il 2026-07-31 da Ken, in locale, su `main`
-(commit 09f847d), Node 22, wrangler 4.118.0 (npm ci riproducibile).
+All verifications executed on 2026-07-31 by Ken, locally, on `main`
+(commit 09f847d), Node 22, wrangler 4.118.0 (reproducible `npm ci`).
 
-| # | Procedura | Comando | Esito reale |
+| # | Procedure | Command | Real outcome |
 |---|---|---|---|
 | 1 | build | `npm run build` | `Build complete. Run vinext start...` |
 | 2 | health check | `npx wrangler dev` + curl | `GET / 200 OK`, `GET /api/cameras 200 OK` |
-| 3 | fail-closed moderazione | curl `/moderation` senza credenziali | `503 Service Unavailable` ("Moderation access control is not configured; denying") |
-| 4 | export D1 locale | `wrangler d1 export opensurveillancedb --local --output=...` | `Done!` — SQL con `CREATE TABLE` + `INSERT` |
-| 5 | pitfall dump parziale | export da DB senza migrazioni | dump con **solo** `cameras` (lezione: applicare migrazioni prima, verificare 3 tabelle) |
-| 6 | migrazioni | `wrangler d1 migrations apply ... --local` | 5 migrazioni `✅` (0000→0004) |
-| 7 | restore Pattern A | `wrangler d1 execute ... --file=dump.sql` su DB vergine | tabelle ricreate; query `sqlite_master` ok |
-| 8 | restore su DB esistente | dump completo su DB già migrato | `✘ table cameras already exists` (⇒ Pattern B con `--no-schema`) |
-| 9 | rollback | `wrangler rollback --help`, `wrangler versions --help` | sintassi verificata: `rollback [version-id]`, `versions list/view/upload/deploy` |
-| 10 | cifratura backup | `openssl enc -aes-256-cbc -salt -pbkdf2 ...` + decrypt | roundtrip OK (`cmp` identico), `sha256sum` verificato |
-| 11 | workflow YAML | `python3 -c "yaml.safe_load(...)"` su `ops-monitoring.yml`, `ops-backup.yml` | entrambi validi (`jobs: health-check`, `jobs: backup`) |
-| 12 | advisory | `GHSA-36p8-mvp6-cv38` (CVE-2026-0933, command injection in `wrangler pages deploy`) | **non applicabile**: patch in 4.59.1, repo su 4.118.0 |
+| 3 | moderation fail-closed | curl `/moderation` without credentials | `503 Service Unavailable` ("Moderation access control is not configured; denying") |
+| 4 | local D1 export | `wrangler d1 export opensurveillancedb --local --output=...` | `Done!` — SQL with `CREATE TABLE` + `INSERT` |
+| 5 | partial dump pitfall | export from a DB without migrations | dump with **only** `cameras` (lesson: apply migrations first, verify the 3 tables) |
+| 6 | migrations | `wrangler d1 migrations apply ... --local` | 5 migrations `✅` (0000→0004) |
+| 7 | Pattern A restore | `wrangler d1 execute ... --file=dump.sql` on a pristine DB | tables recreated; `sqlite_master` query OK |
+| 8 | restore on existing DB | full dump on an already-migrated DB | `✘ table cameras already exists` (⇒ Pattern B with `--no-schema`) |
+| 9 | rollback | `wrangler rollback --help`, `wrangler versions --help` | syntax verified: `rollback [version-id]`, `versions list/view/upload/deploy` |
+| 10 | backup encryption | `openssl enc -aes-256-cbc -salt -pbkdf2 ...` + decrypt | roundtrip OK (`cmp` identical), `sha256sum` verified |
+| 11 | workflow YAML | `python3 -c "yaml.safe_load(...)"` on `ops-monitoring.yml`, `ops-backup.yml` | both valid (`jobs: health-check`, `jobs: backup`) |
+| 12 | advisory | `GHSA-36p8-mvp6-cv38` (CVE-2026-0933, command injection in `wrangler pages deploy`) | **not applicable**: patched in 4.59.1, repo on 4.118.0 |
 
-### Appendice — drill operatività locale LXC 114 (2026-08-01, Ken)
+### Appendix — local LXC 114 operations drill (2026-08-01, Ken)
 
-Tutte le prove eseguite in ambiente reale (workstation Ken → Proxmox
-192.168.1.77 → container 114 → storage NAS 192.168.1.194):
+All drills executed in the real environment (Ken's workstation → Proxmox
+192.168.1.77 → container 114 → NAS storage 192.168.1.194):
 
-| # | Procedura | Comando / script | Esito reale |
+| # | Procedure | Command / script | Real outcome |
 |---|---|---|---|
-| L1 | health check route | `ops/health-check.sh` | 5/5 OK (`/` 200, `/api/cameras` 200, nearby 200, `/guide` 200, `/api/moderation` 503) |
-| L2 | snapshot pre-deploy | `ops/snapshot-pre-deploy.sh` | snapshot `pre-deploy-20260801-002440` creato (UPID vzsnapshot) |
-| L3 | backup vzdump→NAS | `ops/backup-lxc114.sh` | `vzdump-lxc-114-2026_08_01-00_34_31.tar.zst` 1.02 GB su `NAS:backup/`, task OK in 40s, verificato via storage content API (2 archivi, keep=7) |
-| L4 | contenuto backup | estrazione D1 sqlite da archivio | `PRAGMA integrity_check` = `ok`; tabelle `cameras`(4), `correction_requests`(2), `moderation_events`(0) |
-| L5 | rollback | `ops/rollback-lxc114.sh pre-deploy-20260801-003428` | rollback UPID vzrollback TASK OK; container fermato da Proxmox → riavvio → sito su in 40s → health check 5/5 OK |
-| L6 | dati post-rollback | `GET /api/cameras` | 2 record `demo` serviti (dati preservati) |
-| L7 | cron | `crontab -l` | `*/5 * * * * ops/health-check.sh` e `30 2 * * * ops/backup-lxc114.sh` installati |
+| L1 | health check routes | `ops/health-check.sh` | 5/5 OK (`/` 200, `/api/cameras` 200, nearby 200, `/guide` 200, `/api/moderation` 503) |
+| L2 | pre-deploy snapshot | `ops/snapshot-pre-deploy.sh` | snapshot `pre-deploy-20260801-002440` created (UPID vzsnapshot) |
+| L3 | vzdump→NAS backup | `ops/backup-lxc114.sh` | `vzdump-lxc-114-2026_08_01-00_34_31.tar.zst` 1.02 GB on `NAS:backup/`, task OK in 40s, verified via storage content API (2 archives, keep=7) |
+| L4 | backup content | D1 sqlite extraction from archive | `PRAGMA integrity_check` = `ok`; tables `cameras`(4), `correction_requests`(2), `moderation_events`(0) |
+| L5 | rollback | `ops/rollback-lxc114.sh pre-deploy-20260801-003428` | rollback UPID vzrollback TASK OK; container stopped by Proxmox → restart → site up in 40s → health check 5/5 OK |
+| L6 | post-rollback data | `GET /api/cameras` | 2 `demo` records served (data preserved) |
+| L7 | cron | `crontab -l` | `*/5 * * * * ops/health-check.sh` and `30 2 * * * ops/backup-lxc114.sh` installed |
 
-Note emerse dal drill (già incorporate in §8):
+Notes from the drill (already incorporated in §8):
 
-- Il rollback Proxmox ferma il container e non lo riavvia da solo → lo script
-  fa start esplicito + attesa + health check (§8.4).
-- `ssh-public-keys` e `password` non sono ammessi dal PUT config LXC (schema
-  API: "property is not defined in schema") → accesso via API token, §8.0.
+- Proxmox rollback stops the container and does not restart it on its own →
+  the script does an explicit start + wait + health check (§8.4).
+- `ssh-public-keys` and `password` are not allowed by the LXC config PUT
+  (API schema: "property is not defined in schema") → access via API token,
+  §8.0.
 
-Note per il prossimo drill:
+Notes for the next drill:
 
-- `wrangler d1 export` non supporta `--persist-to` (solo `execute`): il drill
-  locale usa il DB predefinito di `wrangler dev` in `.wrangler/state`.
-- Il security scanner dell'ambiente di sviluppo blocca `rm -rf` su cartelle
-  temporanee e `npx wrangler@<range>` (advisory): usare la versione del
-  lockfile (`node_modules/.bin/wrangler` dopo `npm ci`).
+- `wrangler d1 export` does not support `--persist-to` (only `execute`): the
+  local drill uses the default DB of `wrangler dev` in `.wrangler/state`.
+- The development environment's security scanner blocks `rm -rf` on temporary
+  folders and `npx wrangler@<range>` (advisory): use the lockfile version
+  (`node_modules/.bin/wrangler` after `npm ci`).

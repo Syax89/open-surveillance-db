@@ -1,14 +1,24 @@
-"use client";
-
+import type { Metadata } from "next";
 import { InfoPage } from "../components/InfoPage";
-import { useMessages } from "../components/LocaleProvider";
+import { getServerMessages } from "../lib/server-i18n";
 import Link from "next/link";
 
 const SECURITY_ADVISORY_URL =
   "https://github.com/Syax89/open-surveillance-db/security/advisories/new";
 
-export default function ContactPage() {
-  const bundle = useMessages();
+export async function generateMetadata(): Promise<Metadata> {
+  const bundle = await getServerMessages();
+  const t = bundle.contact;
+  return {
+    title: t.title,
+    description: t.intro,
+    openGraph: { title: t.title, description: t.intro, images: ["/og.png"] },
+    twitter: { card: "summary_large_image", title: t.title, description: t.intro, images: ["/og.png"] },
+  };
+}
+
+export default async function ContactPage() {
+  const bundle = await getServerMessages();
   const t = bundle.contact;
 
   return (
