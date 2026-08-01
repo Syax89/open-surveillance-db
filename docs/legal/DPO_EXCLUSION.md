@@ -113,8 +113,8 @@ The project discharges arts. 5(2) and 24 as follows:
 - **Functional role:** the privacy/legal function operates as the
   **privacy contact / data-protection contact**: Rosa (Legal & Privacy
   Officer), named in GOVERNANCE.md and reachable at
-  `privacy@opensurveillancedb` (PRIVACY_NOTICE § 1; dedicated mailbox to be
-  provisioned before launch).
+  `privacy@opensurveillancedb.org` (PRIVACY_NOTICE § 1; dedicated, monitored
+  mailbox).
 - **Documented procedures:** rights of data subjects (arts. 12–22,
   PRIVACY_NOTICE § 8), retention and deletion (PRIVACY_NOTICE § 7,
   RETENTION_SCHEDULE.md), processors and transfers (PROCESSOR_REGISTER.md), breach notification

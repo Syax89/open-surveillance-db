@@ -1,8 +1,8 @@
 # Privacy notice (draft — pre-launch)
 
-- **Status:** draft for pre-launch review; decisions of 2026-07-31 applied (controller entity, data licence ODbL 1.0, coordinate precision ~4 decimals, 12-month retention renewal, privacy contact `privacy@opensurveillancedb`); monitored mailbox to be provisioned before launch.
+- **Status:** draft for pre-launch review; decisions of 2026-07-31 applied (controller entity, data licence ODbL 1.0, coordinate precision ~4 decimals, 12-month retention renewal, privacy contact `privacy@opensurveillancedb.org`); monitored mailbox active.
 - **Legal basis:** GDPR art. 13 (data collected from data subjects) and art. 14 (data not obtained from the data subject, e.g. records sourced from official public sources); D.Lgs. 196/2003 (Codice Privacy, IT) as primary jurisdiction.
-- **Version:** 0.8 (2026-08-01) — community-profile processing disclosed, per the community-system legal opinion (COMMUNITY_PLAN.md § 5): § 3 new rows (community profile, verifications given/received, edit history) on legal basis art. 6(1)(f) — **never consent** (core feature, imbalance art. 6(1)(a)); § 4 clarifies trust levels/verifications are **not** profiling and there is **no public leaderboard/ranking**; § 5 extends the public-as-recipient disclosure to the **opt-in public profile** (default private); § 7 references the new retention rule **R14** (RETENTION_SCHEDULE.md); § 8 makes arts. 16/17/21 explicit for profile/contributions; § 10 open item. Prior version 0.7 (2026-08-01): recipients (§ 5) and international transfers (§ 6) updated: Cloudflare **R2** photo storage added (PR #64), aligned with PROCESSOR_REGISTER.md PR1; R2 bucket region/jurisdiction to be confirmed with the CTO (see § 10). Photo evidence row (§ 3) and negative scope (§ 4) aligned with the active upload flow (PR #64): EXIF/XMP/IPTC stripping fail-closed, R2/D1 storage, moderation + redaction gate, retention R6; retention § 7 aligned with the photo evidence lifecycle (RETENTION_SCHEDULE.md R13): pending/orphan 90 days, rejected 30 days, approved photos follow the 12-month record cycle; deletion includes the R2 image bytes. This document is a draft deliverable, not a published notice.
+- **Version:** 0.9 (2026-08-01) — privacy contact updated: monitored mailbox active at `privacy@opensurveillancedb.org` (ADR 0008 resolved; § 1 and § 10 updated — "to be created/provisioned" notes removed). Prior version 0.8 (2026-08-01): community-profile processing disclosed, per the community-system legal opinion (COMMUNITY_PLAN.md § 5): § 3 new rows (community profile, verifications given/received, edit history) on legal basis art. 6(1)(f) — **never consent** (core feature, imbalance art. 6(1)(a)); § 4 clarifies trust levels/verifications are **not** profiling and there is **no public leaderboard/ranking**; § 5 extends the public-as-recipient disclosure to the **opt-in public profile** (default private); § 7 references the new retention rule **R14** (RETENTION_SCHEDULE.md); § 8 makes arts. 16/17/21 explicit for profile/contributions; § 10 open item. Prior version 0.7 (2026-08-01): recipients (§ 5) and international transfers (§ 6) updated: Cloudflare **R2** photo storage added (PR #64), aligned with PROCESSOR_REGISTER.md PR1; R2 bucket region/jurisdiction to be confirmed with the CTO (see § 10). Photo evidence row (§ 3) and negative scope (§ 4) aligned with the active upload flow (PR #64): EXIF/XMP/IPTC stripping fail-closed, R2/D1 storage, moderation + redaction gate, retention R6; retention § 7 aligned with the photo evidence lifecycle (RETENTION_SCHEDULE.md R13): pending/orphan 90 days, rejected 30 days, approved photos follow the 12-month record cycle; deletion includes the R2 image bytes. This document is a draft deliverable, not a published notice.
 
 > **Disclaimer:** this document is product guidance / not legal advice. It is a draft for pre-launch review and requires external counsel review before launch.
 
@@ -11,7 +11,7 @@
 ## 1. Who we are (controller)
 
 - **Controller:** Simone Rondina (syax89) / OpenSurveillanceDB — Italy (decision 2026-07-31; governance owners in ../GOVERNANCE.md).
-- **Privacy contact / data-protection contact:** `privacy@opensurveillancedb` *(dedicated mailbox — to be created before launch; final domain to be confirmed)* — for any question, data-subject request, or report. Response time: see § 8.
+- **Privacy contact / data-protection contact:** `privacy@opensurveillancedb.org` *(dedicated, monitored mailbox)* — for any question, data-subject request, or report. Response time: see § 8.
 - **Data protection officer (art. 37 GDPR):** none appointed — the obligation does not apply to this project (no public authority, no large-scale systematic monitoring of data subjects, no large-scale special-category processing; documented in ADR 0017). The privacy contact above serves as the data-protection contact.
 
 ## 2. What the service does
@@ -84,7 +84,7 @@ You may request, free of charge:
 - **Portability** (art. 20) — where technically applicable.
 - No automated decision-making, including profiling, is performed (art. 22). Trust levels are derived automatically from verified contributions, but they are informative indicators with transparent, non-discriminatory criteria — they do not produce legal or similarly significant effects (see § 4; COMMUNITY_PLAN.md § 5.1).
 
-**How to exercise them:** write to `privacy@opensurveillancedb`. To protect data subjects, we may ask you to verify your identity (proportionate to the request, e.g. by confirming details only you could know or providing a copy of an ID for requests about your personal data).
+**How to exercise them:** write to `privacy@opensurveillancedb.org`. To protect data subjects, we may ask you to verify your identity (proportionate to the request, e.g. by confirming details only you could know or providing a copy of an ID for requests about your personal data).
 
 **Timeline:** we respond within **1 month** (art. 12(3)); this may be extended by up to 2 further months for complex requests, with notice. If we refuse, we explain why and remind you of your right to complain.
 
@@ -92,7 +92,7 @@ You may request, free of charge:
 
 ## 9. Contact and monitoring
 
-- Privacy contact: `privacy@opensurveillancedb` — first response within 48 h, substantive response within 14 days (MODERATION_SLA.md).
+- Privacy contact: `privacy@opensurveillancedb.org` — first response within 48 h, substantive response within 14 days (MODERATION_SLA.md).
 - This notice is reviewed at launch and then at least annually, or on any material change; the version history is kept in the repository.
 
 ## 10. Open items before launch
@@ -101,10 +101,10 @@ You may request, free of charge:
 - [x] Data licence: **ODbL 1.0** (decision 2026-07-31).
 - [x] Publication precision: coordinates rounded to **~4 decimal places (~10 m)**; exact detail private to moderators (decision 2026-07-31).
 - [x] Retention of verified records: **12 months with renewal** (decision 2026-07-31).
-- [x] Correction/removal contact: `privacy@opensurveillancedb` + private form (decision 2026-07-31; mailbox to be created at launch).
+- [x] Correction/removal contact: `privacy@opensurveillancedb.org` + private form (decision 2026-07-31; mailbox active 2026-08-01).
 - [x] Controller entity: **Simone Rondina (syax89) / OpenSurveillanceDB, Italy** (decision 2026-07-31).
 - [x] **Photo evidence retention defined (R13):** pending/orphan uploads 90 days, rejected photos 30 days, approved photos follow the 12-month record cycle; deletion includes the R2 image bytes (RETENTION_SCHEDULE.md R13). Enforcement tracked in the retention sweep (`db/retention.ts`).
-- [ ] Provision the monitored mailbox `privacy@opensurveillancedb` (ops) before the address is published (ADR 0008).
+- [x] Provision the monitored mailbox `privacy@opensurveillancedb.org` (ops) — active since 2026-08-01 (ADR 0008).
 - [x] **Contributor-account processing disclosure:** re-checked after PR #57 and PR #61 landed on `main` — the account data rows in § 3 and the session/account retention (R7) match the implementation, and the account-erasure endpoint is implemented (`DELETE /api/auth/account`, de-attribution `contributor_id = NULL`, session revocation; UI entry point: the account page `/account` — see TERMS § 15).
 - [x] **Photo evidence disclosure aligned with the active upload flow (PR #64):** § 3 (photo evidence row) and § 4 (negative scope) now describe EXIF/XMP/IPTC stripping at the boundary (fail-closed), R2 bytes + D1 metadata, the moderation/redaction gate (`redaction_confirmed = 1`), and retention R6. Coherence check: `docs/legal/REVIEW_PHOTO_UPLOAD_TERMS_ALIGNMENT_2026-08-01.md`.
 - [ ] Confirm the applicable SCC version at DPA execution (new-generation SCCs announced for adoption in 2025 — see PROCESSOR_REGISTER.md open items).
@@ -114,4 +114,4 @@ You may request, free of charge:
 
 ---
 
-*Draft note: the 2026-07-31 decisions (ODbL 1.0, coordinate precision, 12-month retention renewal, privacy contact, controller entity) are applied. The final notice still requires provisioning of the monitored mailbox, per-jurisdiction review (see LAWFUL_BASIS.md § 6), and external counsel review before public launch.*
+*Draft note: the 2026-07-31 decisions (ODbL 1.0, coordinate precision, 12-month retention renewal, privacy contact, controller entity) are applied. The final notice still requires per-jurisdiction review (see LAWFUL_BASIS.md § 6) and external counsel review before public launch.*

@@ -100,11 +100,11 @@ test("report form carries the art. 13 mini-notice next to the consent checkbox",
   const notice = container.querySelector("#report-art13-note");
   assert.ok(notice, "art. 13 mini-notice must render next to the report checkbox");
   assert.match(notice.textContent, /legitimate interest \(art\. 6\(1\)\(f\) GDPR\)/);
-  assert.match(notice.textContent, /privacy@opensurveillancedb/);
+  assert.match(notice.textContent, /privacy@opensurveillancedb.org/);
 
   const privacyLink = notice.querySelector("a[href='/privacy']");
   assert.ok(privacyLink, "mini-notice must link the full privacy notice");
-  const mailto = notice.querySelector("a[href='mailto:privacy@opensurveillancedb']");
+  const mailto = notice.querySelector("a[href='mailto:privacy@opensurveillancedb.org']");
   assert.ok(mailto, "mini-notice must expose the rights contact as a mailto link");
 });
 
@@ -115,7 +115,7 @@ test("correction form carries the art. 13 mini-notice (6(1)(c) + 6(1)(f) variant
   const notice = container.querySelector("#correction-art13-note");
   assert.ok(notice, "art. 13 mini-notice must render next to the correction checkbox");
   assert.match(notice.textContent, /legal obligation \(art\. 6\(1\)\(c\) GDPR — arts\. 15-22\)/);
-  assert.ok(notice.querySelector("a[href='mailto:privacy@opensurveillancedb']"), "correction mini-notice must carry the mailto contact");
+  assert.ok(notice.querySelector("a[href='mailto:privacy@opensurveillancedb.org']"), "correction mini-notice must carry the mailto contact");
 
   const consent = container.querySelector(".correction-form input[type='checkbox']");
   assert.equal(consent.getAttribute("aria-describedby"), "correction-art13-note", "correction checkbox must reference the mini-notice");
@@ -129,7 +129,7 @@ test("register page carries the art. 13 mini-notice (6(1)(f) variant)", async ()
   assert.ok(notice, "art. 13 mini-notice must render on the register page");
   assert.match(notice.textContent, /to provide contributor accounts/);
   assert.ok(notice.querySelector("a[href='/privacy']"), "register mini-notice must link the privacy notice");
-  assert.ok(notice.querySelector("a[href='mailto:privacy@opensurveillancedb']"), "register mini-notice must carry the mailto contact");
+  assert.ok(notice.querySelector("a[href='mailto:privacy@opensurveillancedb.org']"), "register mini-notice must carry the mailto contact");
 });
 
 test("locale toggle flips the redaction confirmation label EN <-> IT", async () => {

@@ -44,7 +44,7 @@ export const en = {
   correctionArt13:
     "The request data and your contact details are processed by the controller Simone Rondina / OpenSurveillanceDB to handle your request, on the basis of legal obligation (art. 6(1)(c) GDPR — arts. 15-22) and legitimate interest (art. 6(1)(f)). Full notice:",
   correctionArt13Rights: "You can exercise your GDPR rights by writing to",
-  privacyContact: "privacy@opensurveillancedb",
+  privacyContact: "privacy@opensurveillancedb.org",
   sendPrivateRequest: "Send private request",
   privacyNotice: "Privacy notice",
   termsOfUse: "Terms of use",
@@ -91,7 +91,7 @@ export const it: Translation<typeof en> = {
   correctionArt13:
     "I dati della richiesta e i tuoi recapiti sono trattati dal titolare Simone Rondina / OpenSurveillanceDB per gestire la tua richiesta, su base di obbligo legale (art. 6(1)(c) GDPR — artt. 15-22) e di interesse legittimo (art. 6(1)(f)). Informativa completa:",
   correctionArt13Rights: "Puoi esercitare i tuoi diritti GDPR scrivendo a",
-  privacyContact: "privacy@opensurveillancedb",
+  privacyContact: "privacy@opensurveillancedb.org",
   sendPrivateRequest: "Invia richiesta privata",
   privacyNotice: "Informativa privacy",
   termsOfUse: "Termini d'uso",

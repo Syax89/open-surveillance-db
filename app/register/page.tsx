@@ -139,7 +139,7 @@ export default function RegisterPage() {
             <span aria-hidden="true"> · </span>
             <Link href="/termini">{t.termsOfUse}</Link>
           </p>
-          <p className="legal-microcopy" id="register-art13-note">{t.registerArt13} <Link href="/privacy">{t.privacyNotice}</Link>. {t.registerArt13Rights} <a href="mailto:privacy@opensurveillancedb">{t.privacyContact}</a>.</p>
+          <p className="legal-microcopy" id="register-art13-note">{t.registerArt13} <Link href="/privacy">{t.privacyNotice}</Link>. {t.registerArt13Rights} <a href="mailto:privacy@opensurveillancedb.org">{t.privacyContact}</a>.</p>
         </form>
 
         <p className="auth-switch">

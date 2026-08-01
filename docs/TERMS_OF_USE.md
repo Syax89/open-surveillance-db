@@ -2,8 +2,8 @@
 
 - **Status:** draft for pre-launch review — **not in force**. No public service is live yet; these terms are the proposed contract for the public launch. Nothing here is a binding offer or commitment.
 - **Owner:** Rosa (Legal & Privacy Officer / privacy contact)
-- **Version:** 0.4 (2026-08-01 — community system documented, per COMMUNITY_PLAN.md § 5.3 and the legal opinion t_9e11b89b: § 2 scope extended to contributor community features; § 3.4 public profile **opt-in, default private**, no leaderboards/rankings; § 5 new sub-section on **editing contributions** (attribution, moderation, revert); § 5.3 warranties extended to edits; § 6 moderation/edit + appeal; § 8 disclaimer covers "community-edited" records; § 11 removal of incorrect edits. Prior version 0.3 (2026-08-01): photo evidence upload documented — TERMS § 4.1/§ 5.5 describe the active `POST /api/photos` flow — EXIF/XMP/IPTC stripping fail-closed, R2/D1 storage, moderation + redaction gate, retention R6; see `docs/legal/REVIEW_PHOTO_UPLOAD_TERMS_ALIGNMENT_2026-08-01.md`).
-- **Decisions applied (2026-07-31, CEO — Wave A):** privacy contact `privacy@opensurveillancedb` (dedicated mailbox, to be created at launch); published coordinates rounded to **~4 decimal places (~10 m)** (zone-level precision; exact location private to moderators); verified records on a **12-month renewal** retention cycle (RETENTION_SCHEDULE.md R3).
+- **Version:** 0.5 (2026-08-01 — privacy contact updated: monitored mailbox active at `privacy@opensurveillancedb.org`; "to be created/provisioned" notes removed from § 1. Prior version 0.4 (2026-08-01 — community system documented, per COMMUNITY_PLAN.md § 5.3 and the legal opinion t_9e11b89b: § 2 scope extended to contributor community features; § 3.4 public profile **opt-in, default private**, no leaderboards/rankings; § 5 new sub-section on **editing contributions** (attribution, moderation, revert); § 5.3 warranties extended to edits; § 6 moderation/edit + appeal; § 8 disclaimer covers "community-edited" records; § 11 removal of incorrect edits. Prior version 0.3 (2026-08-01): photo evidence upload documented — TERMS § 4.1/§ 5.5 describe the active `POST /api/photos` flow — EXIF/XMP/IPTC stripping fail-closed, R2/D1 storage, moderation + redaction gate, retention R6; see `docs/legal/REVIEW_PHOTO_UPLOAD_TERMS_ALIGNMENT_2026-08-01.md`).
+- **Decisions applied (2026-07-31, CEO — Wave A):** privacy contact `privacy@opensurveillancedb.org` (dedicated, monitored mailbox); published coordinates rounded to **~4 decimal places (~10 m)** (zone-level precision; exact location private to moderators); verified records on a **12-month renewal** retention cycle (RETENTION_SCHEDULE.md R3).
 - **Scope:** the OpenSurveillanceDB web application, public API, data exports and related services ("the Service").
 - **Legal framework:** Regulation (EU) 2016/679 (GDPR); D.Lgs. 196/2003 (Codice Privacy, IT, as amended by D.Lgs. 101/2018); mandatory consumer-protection provisions of the user's country of residence continue to apply where the user is a consumer.
 - **Related documents:** [PRIVACY_AND_SAFETY.md](PRIVACY_AND_SAFETY.md), [MODERATION.md](MODERATION.md), [OPEN_SOURCE.md](OPEN_SOURCE.md), [GOVERNANCE.md](../GOVERNANCE.md), ADR 0001; legal deliverables drafted pre-launch: PRIVACY_NOTICE.md, LAWFUL_BASIS.md, RETENTION_SCHEDULE.md, MODERATION_SLA.md, BREACH_PROCEDURE.md.
@@ -13,7 +13,7 @@
 ## 1. Who we are
 
 - **Controller / operator:** Simone Rondina (syax89) / OpenSurveillanceDB — Italy (CEO decision 2026-07-31, PRIVACY_NOTICE.md § 1; final legal-entity wording to be confirmed at launch).
-- **Contact:** `privacy@opensurveillancedb` *(dedicated mailbox — to be created before launch; final domain to be confirmed)* for any question, correction, appeal, or privacy request. Response times: MODERATION_SLA.md (S2/S3).
+- **Contact:** `privacy@opensurveillancedb.org` *(dedicated, monitored mailbox)* for any question, correction, appeal, or privacy request. Response times: MODERATION_SLA.md (S2/S3).
 
 ## 2. What these terms cover
 
@@ -59,7 +59,7 @@
 ## 6. Moderation, corrections, appeals
 
 1. Moderation follows MODERATION.md and MODERATION_SLA.md: emergency hides within **24 h**, first response within **48 h**, substantive decision within **14 days**, re-review of temporary hides within **30 days**. The edit-moderation queue (entity `camera_edit`) follows the same rules and SLA as the submission queue (MODERATION.md "Edit moderation").
-2. Any person affected by a moderation decision may request correction or removal via the in-app correction form (home page, "Report a problem / correction" section) or `privacy@opensurveillancedb` within **30 days** of the decision; appeals are decided by a **different reviewer** than the original decision, with escalation to the advisory circle for disputed cases (MODERATION_SLA.md S5/S6). **The same appeal path covers decisions on edits** — including rejection, revert, or hide of a submitted edit — and decisions on published edits later found inaccurate (MODERATION.md "Edit moderation"; ADR 0014).
+2. Any person affected by a moderation decision may request correction or removal via the in-app correction form (home page, "Report a problem / correction" section) or `privacy@opensurveillancedb.org` within **30 days** of the decision; appeals are decided by a **different reviewer** than the original decision, with escalation to the advisory circle for disputed cases (MODERATION_SLA.md S5/S6). **The same appeal path covers decisions on edits** — including rejection, revert, or hide of a submitted edit — and decisions on published edits later found inaccurate (MODERATION.md "Edit moderation"; ADR 0014).
 3. Data-subject rights (access, rectification, erasure, restriction, objection, portability) are described in PRIVACY_NOTICE.md § 7 and exercised through the same contact.
 
 ## 7. Licences
@@ -78,7 +78,7 @@
 
 ## 9. Privacy
 
-Your use of the Service is governed by the privacy notice (PRIVACY_NOTICE.md), the lawful-basis assessment (LAWFUL_BASIS.md), the retention schedule (RETENTION_SCHEDULE.md), and the breach procedure (BREACH_PROCEDURE.md). Key points: no tracking, no behavioural advertising; reports are private while pending; your GDPR rights are exercisable via `privacy@opensurveillancedb` within the statutory timelines (art. 12(3) GDPR).
+Your use of the Service is governed by the privacy notice (PRIVACY_NOTICE.md), the lawful-basis assessment (LAWFUL_BASIS.md), the retention schedule (RETENTION_SCHEDULE.md), and the breach procedure (BREACH_PROCEDURE.md). Key points: no tracking, no behavioural advertising; reports are private while pending; your GDPR rights are exercisable via `privacy@opensurveillancedb.org` within the statutory timelines (art. 12(3) GDPR).
 
 ## 10. Availability and limitation of liability
 
@@ -90,7 +90,7 @@ Your use of the Service is governed by the privacy notice (PRIVACY_NOTICE.md), t
 ## 11. Suspension and removal
 
 1. We may suspend or limit access, or remove content, where necessary to enforce these terms, to protect users or data subjects, or per the moderation policy — aiming to notify the affected person where proportionate and possible.
-2. Contributors may request deletion of their `pending` submissions via `privacy@opensurveillancedb`; verified published records are subject to the **12-month renewal** retention and review cycle (RETENTION_SCHEDULE.md R3; automated re-verification sweep is a pre-launch implementation item, see § 15) and to the correction path of § 6.
+2. Contributors may request deletion of their `pending` submissions via `privacy@opensurveillancedb.org`; verified published records are subject to the **12-month renewal** retention and review cycle (RETENTION_SCHEDULE.md R3; automated re-verification sweep is a pre-launch implementation item, see § 15) and to the correction path of § 6.
 3. **Removal of incorrect edits.** A published edit that is inaccurate, prohibited (§ 4), or no longer supported by the record may be **reverted or removed** through the moderation queue or the correction path (§ 6), without waiting for the 12-month cycle: the revert keeps the audit trail in the revision history (PRIVACY_NOTICE.md § 3, R14) and the record returns to the last accurate state. Where the edit introduced personal data, the erasure path of PRIVACY_NOTICE.md § 8 applies in addition (art. 16/17 GDPR).
 
 ## 12. Applicable law and jurisdiction
@@ -106,12 +106,12 @@ Your use of the Service is governed by the privacy notice (PRIVACY_NOTICE.md), t
 
 ## 14. Contact
 
-- **Privacy, corrections, appeals, rights:** `privacy@opensurveillancedb` *(dedicated mailbox — to be created before launch; final domain to be confirmed)*.
+- **Privacy, corrections, appeals, rights:** `privacy@opensurveillancedb.org` *(dedicated, monitored mailbox)*.
 - Moderation/abuse emergencies use the same channel (MODERATION_SLA.md S1: hide within 24 h).
 
 ## 15. Pre-launch open items
 
-- [x] Privacy contact decided (2026-07-31): `privacy@opensurveillancedb` — mailbox to be created before launch, final domain to be confirmed (PRIVACY_NOTICE.md § 1/8).
+- [x] Privacy contact decided (2026-07-31) and mailbox active (2026-08-01): `privacy@opensurveillancedb.org` (PRIVACY_NOTICE.md § 1/8).
 - [x] Controller entity per CEO decision 2026-07-31: **Simone Rondina (syax89) / OpenSurveillanceDB — Italy** (PRIVACY_NOTICE.md § 1; final legal-entity wording to be confirmed at launch).
 - [ ] Final review of the jurisdiction clause for the first operating jurisdictions (LAWFUL_BASIS.md § 6; MODERATION.md M5).
 - [ ] Decide and implement the acceptance mechanics (clickwrap on the submission form vs. general browse terms) — implementation owner: Ada.

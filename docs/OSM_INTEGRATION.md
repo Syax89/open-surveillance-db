@@ -14,7 +14,7 @@ map-tile strategy compliant with provider terms").
 | --- | --- | --- |
 | Correct tile URL (`https://tile.openstreetmap.org/{z}/{x}/{y}.png`, no subdomains) | ❌ used deprecated `{s}.tile.openstreetmap.org` | ✅ canonical URL (default upstream of the proxy) |
 | Visible licence attribution linked to the copyright notice | ✅ | ✅ (kept, now with "Fix the map" link) |
-| Stable, contactable User-Agent identifying the app | ❌ browser default UA, no app identity | ✅ `OpenSurveillanceDB/0.1 (+https://github.com/Syax89/open-surveillance-db; contact: privacy@opensurveillancedb)` on every upstream request |
+| Stable, contactable User-Agent identifying the app | ❌ browser default UA, no app identity | ✅ `OpenSurveillanceDB/0.1 (+https://github.com/Syax89/open-surveillance-db; contact: privacy@opensurveillancedb.org)` on every upstream request |
 | Referer present and accurate end-to-end | ⚠️ browser-only, dependent on site Referrer-Policy | ✅ requests are same-origin; the proxy forwards the Referer verbatim (never stripped, policy §3.4) |
 | Server-side caching (≥ 7-day TTL or upstream cache headers) | ❌ browser cache only | ✅ Cloudflare Cache API + `Cache-Control: public, max-age=604800` fallback |
 | No bulk download / prefetch / offline features | ✅ none present | ✅ unchanged (validated, zoom-capped endpoint) |
@@ -180,7 +180,7 @@ tiers below are ordered by operational commitment.
 - [x] Map shows the "Fix the map" link (`https://www.openstreetmap.org/fixthemap`).
 - [x] Upstream requests carry the identifying User-Agent
   `OpenSurveillanceDB/0.1 (+https://github.com/Syax89/open-surveillance-db;
-  contact: privacy@opensurveillancedb)`.
+  contact: privacy@opensurveillancedb.org)`.
 - [x] Client Referer is forwarded upstream, never stripped or blanked.
 - [x] Server-side caching via Cloudflare Cache API; ≥ 7-day
   `Cache-Control` fallback; upstream cache headers honoured.
@@ -188,9 +188,9 @@ tiers below are ordered by operational commitment.
   coordinate-validated endpoint.
 - [x] Provider switchable via `TILE_PROVIDER_URL` / `TILE_PROVIDER_KEY`
   without a software update.
-- [ ] Publish a public contact address on the site before launch (policy
-  "should"): `privacy@opensurveillancedb` is decided for launch
-  (TERMS_OF_USE.md) — wire it into the map/about page when the mailbox exists.
+- [x] Public contact address published on legal/contact pages (policy
+  "should"): `privacy@opensurveillancedb.org` decided and mailbox active
+  (TERMS_OF_USE.md); map/about wiring tracked in FRONTEND_PLAN.md.
 - [ ] Add Cloudflare rate limiting for `/api/tiles/*` before public launch
   as an abuse control (protects both our origin and the upstream).
 

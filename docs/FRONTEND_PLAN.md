@@ -260,9 +260,9 @@ cancellazione (art. 15-22, ≤2 click, 1 mese dichiarato).
 
 **Raccomandati:**
 - **Mini-informativa art. 13** di 2-3 righe accanto alle checkbox di report/correzioni/register
-  (titolare, base 6(1)(f), link /privacy, diritti 15-22, contatto privacy@).
-- **Bloccante pre-lancio**: creare mailbox `privacy@opensurveillancedb` (ADR 0008) prima del
-  go-live pubblico.
+  (titolare, base 6(1)(f), link /privacy, diritti 15-22, contatto privacy@opensurveillancedb.org).
+- [x] **Mailbox privacy attiva**: `privacy@opensurveillancedb.org` (ADR 0008) —
+  bloccante pre-lancio risolto.
 
 ---
 
@@ -379,7 +379,7 @@ F4 dopo F0+F1 → F-legal dopo F-legal-copy → F-QA trasversale dalla F1 in poi
 
 - **Legal**: sezione cookie in /privacy (G1), accessibility statement linkato nel footer (G2),
   conferma redazione foto condizionale (G3), mini-informativa art. 13 nei form. Bloccante
-  pre-lancio: mailbox privacy@.
+  pre-lancio risolto: mailbox privacy@opensurveillancedb.org attiva.
 - **i18n**: parità EN/IT type-checked su ogni nuovo bundle; bug traduzione IT (loggedOutTitle,
   accountDeletedBody, createOne) chiusi; zero gergo interno; stato offline presente.
 - **Performance**: `/directory` non carica Leaflet; hub carica meno JS di oggi; bundle IT

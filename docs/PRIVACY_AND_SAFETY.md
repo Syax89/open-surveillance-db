@@ -32,12 +32,12 @@ The public service needs, before launch: a [privacy notice](legal/PRIVACY_NOTICE
 
 The correction/removal, erasure, and appeal paths are implemented and exercised as follows:
 
-- **Rectification and removal (GDPR art. 16).** Anyone — with or without an account — can request a correction or removal through the in-app form (`POST /api/corrections`; issue types: inaccurate, outdated, privacy/safety, duplicate, other) or `privacy@opensurveillancedb`. Requests are retained for 2 years as an audit trail (RETENTION_SCHEDULE R4).
+- **Rectification and removal (GDPR art. 16).** Anyone — with or without an account — can request a correction or removal through the in-app form (`POST /api/corrections`; issue types: inaccurate, outdated, privacy/safety, duplicate, other) or `privacy@opensurveillancedb.org`. Requests are retained for 2 years as an audit trail (RETENTION_SCHEDULE R4).
 - **Erasure (GDPR art. 17).** Contributors have a self-service path from the account page (see "Contributor accounts and privacy" above); anyone else exercises the right through the privacy contact. The retention schedule documents the exceptions (art. 17(3)) and the backup window (R10).
 - **Appeals (ADR 0014).** Any authenticated contributor may contest a final moderation decision (`POST /api/appeals`). Appeals are decided by an independent senior moderator (the original decider is excluded), can be escalated to the administrator, and an upheld appeal returns the record to the moderation queue for a fresh review by a different reviewer. Appeal activity is internal workflow: it joins the append-only audit trail but is never published.
 - **Accountability.** Moderation decisions and appeals are recorded in an append-only audit log with reviewer pseudonyms (never raw emails) and are published only as aggregate transparency reporting.
 
-Remaining pre-launch items on the rights side: provisioning the monitored privacy mailbox and external counsel review of the notice and terms (LEGAL_DELIVERABLES_INDEX.md).
+Remaining pre-launch items on the rights side: external counsel review of the notice and terms (LEGAL_DELIVERABLES_INDEX.md).
 
 ## Abuse prevention
 

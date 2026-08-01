@@ -70,7 +70,7 @@ this matter to the project team.
    legal hold suspends deletion — both already defined in
    `docs/legal/RETENTION_SCHEDULE.md` § 2.
 
-4. **Correction/removal contact: `privacy@opensurveillancedb`.** This is the
+4. **Correction/removal contact: `privacy@opensurveillancedb.org`.** This is the
    monitored mailbox for data-subject requests (art. 15–17 GDPR), correction
    and takedown requests for published records, and privacy/security reports
    that prefer a private route. The existing private correction/removal form
@@ -88,7 +88,7 @@ this matter to the project team.
   requirements; coordinate rounding to 4 decimals becomes the default in the
   intake/publication pipeline.
 - **Docs (marie):** the placeholders in the legal drafts are replaced with
-  `privacy@opensurveillancedb`; `docs/OPEN_SOURCE.md` and `docs/DATA_MODEL.md`
+  `privacy@opensurveillancedb.org`; `docs/OPEN_SOURCE.md` and `docs/DATA_MODEL.md`
   are updated from "proposal"/"where necessary" to the decided defaults.
 - **Ops (ken):** the mailbox must be provisioned (TLD to be confirmed at
   launch) and its operator named before the address is published; the

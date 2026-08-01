@@ -33,7 +33,7 @@ export const en = {
   registerArt13:
     "Your account data (email, optional display name) is processed by the controller Simone Rondina / OpenSurveillanceDB on the basis of legitimate interest (art. 6(1)(f) GDPR) to provide contributor accounts. Full notice:",
   registerArt13Rights: "You can exercise your GDPR rights (arts. 15-22) by writing to",
-  privacyContact: "privacy@opensurveillancedb",
+  privacyContact: "privacy@opensurveillancedb.org",
   profileSection: "Profile",
   memberSince: "Member since",
   emailLabel: "Email",
@@ -102,7 +102,7 @@ export const it: Translation<typeof en> = {
   registerArt13:
     "I dati del tuo account (email, eventuale nome visualizzato) sono trattati dal titolare Simone Rondina / OpenSurveillanceDB su base di interesse legittimo (art. 6(1)(f) GDPR) per fornire gli account dei contributori. Informativa completa:",
   registerArt13Rights: "Puoi esercitare i diritti previsti dagli artt. 15-22 GDPR scrivendo a",
-  privacyContact: "privacy@opensurveillancedb",
+  privacyContact: "privacy@opensurveillancedb.org",
   profileSection: "Profilo",
   memberSince: "Iscritto dal",
   emailLabel: "Email",

@@ -41,9 +41,9 @@ export const en = {
   correctionBody:
     "Use the private correction form on the home page, or write to the privacy contact. Requests are private, reviewed by a human, and never published. Response targets: first response within 48 hours, substantive response within 14 days, emergency content hide within 24 hours.",
   correctionForm: "Open the correction form",
-  correctionEmail: "privacy@opensurveillancedb",
+  correctionEmail: "privacy@opensurveillancedb.org",
   correctionEmailNote:
-    "Dedicated mailbox — to be created before launch; final domain to be confirmed.",
+    "Dedicated, monitored mailbox.",
   securityTitle: "Reporting a security vulnerability",
   securityBody:
     "Use the GitHub Private Vulnerability Reporting flow, which creates a confidential advisory only the maintainers can see. Do not open a public issue for a vulnerability.",
@@ -90,9 +90,9 @@ export const it: Translation<typeof en> = {
   correctionBody:
     "Usa il modulo privato di correzione nella home page oppure scrivi al contatto privacy. Le richieste sono private, esaminate da una persona e mai pubblicate. Obiettivi di risposta: prima risposta entro 48 ore, risposta sostanziale entro 14 giorni, rimozione d'emergenza dei contenuti entro 24 ore.",
   correctionForm: "Apri il modulo di correzione",
-  correctionEmail: "privacy@opensurveillancedb",
+  correctionEmail: "privacy@opensurveillancedb.org",
   correctionEmailNote:
-    "Casella dedicata — da creare prima del lancio; dominio finale da confermare.",
+    "Casella dedicata e monitorata.",
   securityTitle: "Segnalare una vulnerabilità di sicurezza",
   securityBody:
     "Usa il flusso GitHub Private Vulnerability Reporting, che crea un advisory confidenziale visibile solo ai manutentori. Non aprire un issue pubblico per una vulnerabilità.",

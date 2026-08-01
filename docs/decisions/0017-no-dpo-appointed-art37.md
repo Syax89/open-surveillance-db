@@ -57,7 +57,7 @@ art. 24 GDPR).
 
 - The privacy/legal function continues to operate as the **privacy contact /
   data-protection contact**: Rosa (Legal & Privacy Officer), reachable at
-  `privacy@opensurveillancedb` (PRIVACY_NOTICE § 1), with the rights,
+  `privacy@opensurveillancedb.org` (PRIVACY_NOTICE § 1), with the rights,
   retention, breach, and processor procedures documented in `docs/legal/`.
 - All "DPO" references in **live** documents are replaced with the functional
   role ("privacy/legal owner", "privacy contact", or "Legal & Privacy

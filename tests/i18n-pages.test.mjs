@@ -111,16 +111,16 @@ function extractFooter(html) {
  *   noEn   — English strings that MUST NOT appear in the Italian page
  *            content (footer stripped). Technical identifiers shared by both
  *            languages (GDPR, ODbL 1.0, AGPL-3.0-or-later, CC BY-SA 4.0,
- *            privacy@opensurveillancedb) are deliberately NOT used here.
+ *            privacy@opensurveillancedb.org) are deliberately NOT used here.
  */
 const INFO_ROUTES = {
   "/privacy": {
-    it: ["Informativa sulla privacy", "Titolare del trattamento", "Art. 6(1)(f) GDPR", "privacy@opensurveillancedb"],
+    it: ["Informativa sulla privacy", "Titolare del trattamento", "Art. 6(1)(f) GDPR", "privacy@opensurveillancedb.org"],
     en: ["Privacy notice", "Controller"],
     noEn: ["Privacy notice", "Controller", "Terms of use", "Licences"],
   },
   "/termini": {
-    it: ["Termini di utilizzo", "Titolare / gestore", "ODbL 1.0", "privacy@opensurveillancedb"],
+    it: ["Termini di utilizzo", "Titolare / gestore", "ODbL 1.0", "privacy@opensurveillancedb.org"],
     en: ["Terms of use", "Controller / operator", "Licences"],
     noEn: ["Terms of use", "Privacy notice", "Licences"],
   },
@@ -130,8 +130,8 @@ const INFO_ROUTES = {
     noEn: ["Licences", "Terms of use", "Privacy notice"],
   },
   "/accessibility": {
-    it: ["Dichiarazione di accessibilità", "Impegno", "Stato di conformità", "Limitazioni note", "Segnalare una barriera", "privacy@opensurveillancedb"],
-    en: ["Accessibility statement", "Partially compliant", "privacy@opensurveillancedb"],
+    it: ["Dichiarazione di accessibilità", "Impegno", "Stato di conformità", "Limitazioni note", "Segnalare una barriera", "privacy@opensurveillancedb.org"],
+    en: ["Accessibility statement", "Partially compliant", "privacy@opensurveillancedb.org"],
     noEn: ["Accessibility statement", "Compliance status", "Known limitations", "Reporting a barrier"],
   },
   "/faq": {

@@ -64,7 +64,7 @@ export const en = {
   reportArt13:
     "The data you enter (location, notes, any photos) is processed by the controller Simone Rondina / OpenSurveillanceDB on the basis of legitimate interest (art. 6(1)(f) GDPR) to document public surveillance infrastructure. Full notice:",
   reportArt13Rights: "You can exercise your GDPR rights (arts. 15-22) by writing to",
-  privacyContact: "privacy@opensurveillancedb",
+  privacyContact: "privacy@opensurveillancedb.org",
   photoUploadTitle: "Photo evidence (optional)",
   photoUploadHelp:
     "JPEG, PNG or WebP up to 10 MB and 4096 px per side. Faces, licence plates and other personal data must be redacted before uploading; location and camera metadata (EXIF) is stripped automatically on upload.",
@@ -152,7 +152,7 @@ export const it: Translation<typeof en> = {
   reportArt13:
     "I dati che inserisci (posizione, note, eventuali foto) sono trattati dal titolare Simone Rondina / OpenSurveillanceDB su base di interesse legittimo (art. 6(1)(f) GDPR) per documentare infrastrutture di sorveglianza pubbliche. Informativa completa:",
   reportArt13Rights: "Puoi esercitare i diritti previsti dagli artt. 15-22 GDPR scrivendo a",
-  privacyContact: "privacy@opensurveillancedb",
+  privacyContact: "privacy@opensurveillancedb.org",
   photoUploadTitle: "Prova fotografica (facoltativa)",
   photoUploadHelp:
     "JPEG, PNG o WebP fino a 10 MB e 4096 px per lato. Volti, targhe e altri dati personali devono essere oscurati prima del caricamento; i metadati di posizione e della fotocamera (EXIF) vengono rimossi automaticamente all'upload.",

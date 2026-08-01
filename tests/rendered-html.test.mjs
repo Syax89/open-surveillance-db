@@ -516,7 +516,7 @@ test("contact page serves owners, privacy and security routes", async () => {
 
   // Correction / removal contact (privacy contact + in-app form).
   assert.match(html, /Corrections and removal/);
-  assert.match(html, /privacy@opensurveillancedb/);
+  assert.match(html, /privacy@opensurveillancedb.org/);
   assert.match(html, /href="\/#correction"/);
 
   // Security route per SECURITY.md: private GitHub advisory, no public issue.
