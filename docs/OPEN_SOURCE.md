@@ -18,4 +18,4 @@ OpenStreetMap data is available under the [Open Database License](https://www.op
 
 ## Contributor promise
 
-Contributors must submit only material they are entitled to share. They grant the project the rights needed to publish accepted code, documentation, and data under the relevant project license. Evidence uploads require a separate, explicit contribution and privacy flow before they are enabled.
+Contributors must submit only material they are entitled to share. They grant the project the rights needed to publish accepted code, documentation, and data under the relevant project license. Photo evidence uploads are **active** (2026-08): images are stripped of EXIF/XMP/IPTC metadata at the boundary (fail-closed), stored privately (bytes in R2, metadata in D1), and never published until a moderator approves them with confirmed redaction (see [PRIVACY_AND_SAFETY.md](PRIVACY_AND_SAFETY.md) and [TERMS_OF_USE.md](TERMS_OF_USE.md) § 5.5).

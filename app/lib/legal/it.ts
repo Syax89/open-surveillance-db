@@ -24,7 +24,7 @@ export const itLegal: LegalContent = {
     intro:
       "Come OpenSurveillanceDB tratta i dati personali, cosa pubblichiamo, cosa non raccogliamo mai e come puoi esercitare i tuoi diritti ai sensi del GDPR.",
     versionNote:
-      "Versione 0.3 — 31 luglio 2026. Bozza per la revisione pre-lancio; la copia repository (docs/legal/PRIVACY_NOTICE.md) resta la versione canonica.",
+      "Versione 0.4 — 1 agosto 2026. Bozza per la revisione pre-lancio; la copia repository (docs/legal/PRIVACY_NOTICE.md) resta la versione canonica.",
     sections: [
       {
         heading: "1. Chi siamo (titolare del trattamento)",
@@ -85,10 +85,10 @@ export const itLegal: LegalContent = {
                 "Art. 6(1)(f) GDPR; token memorizzato solo come SHA-256, scade dopo 30 giorni o alla disconnessione",
               ],
               [
-                "Prove (file/link allegati a una segnalazione)",
+                "Prove fotografiche (upload JPEG/PNG/WebP, fino a 10 MB / 4096 px)",
                 "Segnalante",
                 "Verifica del record",
-                "Art. 6(1)(f) GDPR; conservate privatamente, legate al record",
+                "Art. 6(1)(f) GDPR; EXIF/XMP/IPTC rimossi al confine (fail-closed), byte in R2 con metadati solo in D1, conservate privatamente e legate al record; mai pubbliche finché un moderatore approva con redazione confermata",
               ],
               [
                 "Richiesta di correzione / rimozione (dati di contatto forniti dal richiedente, es. email)",
@@ -145,6 +145,7 @@ export const itLegal: LegalContent = {
               "**Niente nomi, volti, targhe o dettagli operativi precisi.**",
               "**Niente coordinate oltre la precisione di zona:** le posizioni pubblicate sono arrotondate a **~4 decimali (~10 m)**; la posizione esatta resta nel record privato di moderazione, visibile solo ai moderatori.",
               "**Niente pubblicità comportamentale, niente tracciamento, nessuna vendita di dati**, nessuna libreria di analisi.",
+              "**Nessuna foto pubblicata senza moderazione e redazione confermata:** le foto caricate (JPEG/PNG/WebP, ≤10 MB / 4096 px) vengono private dei metadati EXIF/XMP/IPTC al confine (fail-closed — un contenitore che non può essere percorso in sicurezza viene rifiutato, mai memorizzato senza stripping), conservate con byte sanitizzati in R2 e metadati solo in D1, e **non sono mai pubbliche** finché un moderatore non le approva con `redaction_confirmed = 1`. La chiave di storage non viene mai esposta.",
               "Le segnalazioni sono conservate come pending e **non sono mai pubbliche** finché un moderatore non le approva. Il contenuto rifiutato non viene mai pubblicato.",
             ],
           },
@@ -243,7 +244,7 @@ export const itLegal: LegalContent = {
     intro:
       "Questi termini disciplinano l'uso di OpenSurveillanceDB, il database aperto e gestito dalla comunità delle infrastrutture di sorveglianza pubbliche e visibili. Si applicano all'applicazione web, all'API pubblica, alle esportazioni dei dati e ai servizi correlati (\"il Servizio\").",
     versionNote:
-      "Versione 0.2 — 31 luglio 2026. Bozza per la revisione pre-lancio; la copia repository (docs/TERMS_OF_USE.md) resta la versione canonica.",
+      "Versione 0.3 — 1 agosto 2026. Bozza per la revisione pre-lancio; la copia repository (docs/TERMS_OF_USE.md) resta la versione canonica.",
     sections: [
       {
         heading: "1. Chi siamo",
@@ -301,7 +302,7 @@ export const itLegal: LegalContent = {
               "video in diretta, URL di streaming, credenziali, informazioni di rete o interfacce di controllo;",
               "dettagli sul campo visivo o sulle capacità operative che potrebbero creare un rischio per la sicurezza;",
               "impianti o luoghi sensibili la cui pubblicazione potrebbe aumentare materialmente il rischio;",
-              "immagini contenenti persone identificabili, targhe o interni privati, salvo che siano oscurate in modo sicuro e necessarie (nota: il caricamento di prove non è ancora attivo);",
+              "immagini contenenti persone identificabili, targhe o interni privati, salvo che tu le abbia oscurate in modo sicuro **prima del caricamento** e che siano necessarie — il caricamento di prove fotografiche è **attivo** (sezione 5): le immagini vengono private dei metadati EXIF/XMP/IPTC al confine (fail-closed) e non vengono mai pubblicate finché un moderatore non le approva con redazione confermata;",
               "accuse non verificabili su persone o organizzazioni;",
               "contenuti che non hai il diritto di condividere.",
             ],
@@ -331,6 +332,7 @@ export const itLegal: LegalContent = {
               "**Cosa conservi e cosa concedi.** Conservi tutti i diritti che hai sul contenuto che invii. Con l'invio concedi al progetto una licenza non esclusiva, mondiale, esente da royalty per conservare ed esaminare la segnalazione e — **solo se** il record viene verificato e pubblicato — per pubblicarla e renderla disponibile con licenza **ODbL 1.0**, come parte del database aperto, con attribuzione ai contributori secondo l'avviso ODbL. Il semplice atto di inviare non concede alcuna licenza di pubblicazione.",
               "**Le tue dichiarazioni.** Inviando confermi che: il contenuto è accurato al meglio delle tue conoscenze; hai il diritto di condividerlo; è conforme alla sezione 4; e hai l'età minima per usare il Servizio nella tua giurisdizione (in Italia, 14 anni).",
               "**La verifica può essere rifiutata.** I record ripubblicati da fonti pubbliche ufficiali seguono il proprio regime giuridico, verificato caso per caso; le segnalazioni della comunità sono verificate secondo lo standard di pubblicazione della moderazione, non contro registri ufficiali.",
+              "**Prove fotografiche.** Le segnalazioni possono includere foto (JPEG, PNG o WebP, fino a **10 MB e 4096 px per lato**). Al caricamento, il servizio **rimuove i metadati EXIF/XMP/IPTC al confine** (fail-closed: se il contenitore non può essere percorso in sicurezza il caricamento viene rifiutato — mai memorizzato senza stripping), verifica il contenitore dai magic bytes (senza mai fidarsi del Content-Type dichiarato), conserva i byte sanitizzati nell'object storage (**R2**) con metadati solo nel database (**D1**), e tiene ogni foto **privata (`pending`) e mai pubblica** finché un moderatore non la approva con `redaction_confirmed = 1` — il moderatore deve confermare che il soggetto è stato oscurato. Le foto seguono la conservazione del record (cancellate col record; hard-delete immediato se il record viene rifiutato o rimosso). `storage_key` non viene mai esposto; i client interagiscono con le foto solo tramite id.",
             ],
           },
         ],
@@ -511,7 +513,7 @@ export const itLegal: LegalContent = {
         blocks: [
           {
             type: "paragraph",
-            text: "I contributori devono inviare solo materiale che hanno il diritto di condividere. Concedono al progetto i diritti necessari a pubblicare codice, documentazione e dati accettati con la licenza di progetto pertinente. Il caricamento di prove richiede un flusso separato ed esplicito di contribuzione e privacy prima di essere attivato.",
+            text: "I contributori devono inviare solo materiale che hanno il diritto di condividere. Concedono al progetto i diritti necessari a pubblicare codice, documentazione e dati accettati con la licenza di progetto pertinente. Il caricamento di prove fotografiche è **attivo** (agosto 2026): le immagini vengono private dei metadati EXIF/XMP/IPTC al confine (fail-closed), conservate privatamente (byte in R2, metadati in D1), e mai pubblicate finché un moderatore non le approva con redazione confermata (vedi sezione 5 dei Termini).",
           },
         ],
       },
