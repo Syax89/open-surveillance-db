@@ -77,6 +77,11 @@ Last reviewed: 2026-08-01
   that polls the Proxmox task status (`ops/health-check.sh`,
   `ops/backup-lxc114.sh`, `ops/snapshot-pre-deploy.sh`,
   `ops/rollback-lxc114.sh`).
+- [x] QA evidence archived under [`docs/qa/`](qa/):
+  [`QA_REPORT_auth-flow-e2e.md`](qa/QA_REPORT_auth-flow-e2e.md) (authenticated
+  submit → moderate → publish flow, 457 tests) and
+  [`QA_REPORT_navigation-pages.md`](qa/QA_REPORT_navigation-pages.md)
+  (navigation, accessibility, EN/IT parity, and GDPR notice links, 569 tests).
 
 ## Not yet implemented
 
