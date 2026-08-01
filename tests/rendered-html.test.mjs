@@ -198,15 +198,44 @@ test("server-rendered /manifesto is accessible and carries the mission, principl
   assert.match(html, /Never published/);
   assert.match(html, /Submissions and corrections before — or without — human review/);
 
-  // Shared info-page layout + footer.
+  // Shared info-page layout. The only footer on the page is the global
+  // SiteFooter rendered by the root layout (SITEMAP: "footer mai copiato
+  // per pagina"); its tagline is the institutional one.
   assert.match(html, /class="record-page"/);
   assert.match(html, /class="nav-shell"/);
-  assert.match(html, /Built for transparency, not tracking\./);
+  assert.match(html, /An open database of public surveillance cameras, built for transparency, not tracking\./);
+  const footerCount = (html.match(/<footer\b/g) ?? []).length;
+  assert.equal(footerCount, 1, `expected a single footer landmark, found ${footerCount}`);
+  assert.match(html, /<footer class="site-footer" aria-label="Site footer">/);
+});
+
+test("rules page carries the shared layout, the fixed never-report heading and a single footer", async () => {
+  const { response, html } = await renderRoute("/regole");
+
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
+
+  // Shared info-page layout markers.
+  assert.match(html, /class="record-page"/);
+  assert.match(html, /class="nav-shell"/);
+  assert.match(html, /<h1>What we publish, and how you can help\.<\/h1>/);
+
+  // a11y fix from review #67: the "never report" heading carries the title,
+  // and the body text renders as a paragraph (title/body were swapped).
+  assert.match(html, /<h2[^>]*id="never-title">Never report<\/h2>/);
+  assert.match(html, /<p>Reports containing any of the following are screened out and are never published\.<\/p>/);
+  assert.doesNotMatch(html, /<h2[^>]*id="never-title">Reports containing/);
+
+  // Single footer: only the global SiteFooter from the root layout
+  // (SITEMAP: "footer mai copiato per pagina"), which links /regole.
+  const footerCount = (html.match(/<footer\b/g) ?? []).length;
+  assert.equal(footerCount, 1, `expected a single footer landmark, found ${footerCount}`);
+  assert.match(html, /<footer class="site-footer" aria-label="Site footer">/);
+  assert.match(html, /href="\/regole"/);
 });
 
 test("homepage and guide link to /manifesto from the nav and the footer", async () => {
   const pages = await Promise.all([renderRoute("/"), renderRoute("/guide")]);
-
   for (const { response, html } of pages) {
     assert.equal(response.status, 200);
     assert.match(html, /href="\/manifesto"/);
@@ -325,6 +354,13 @@ test("FAQ page serves bilingual FAQ content", async () => {
   // The page links to the correction form and the contact page.
   assert.match(html, /href="\/#correction"/);
   assert.match(html, /href="\/contatti"/);
+
+  // Single footer: only the global SiteFooter from the root layout
+  // (SITEMAP: "footer mai copiato per pagina"), which links /faq.
+  const footerCount = (html.match(/<footer\b/g) ?? []).length;
+  assert.equal(footerCount, 1, `expected a single footer landmark, found ${footerCount}`);
+  assert.match(html, /<footer class="site-footer" aria-label="Site footer">/);
+  assert.match(html, /href="\/faq"/);
 });
 
 test("contact page serves owners, privacy and security routes", async () => {
@@ -346,4 +382,11 @@ test("contact page serves owners, privacy and security routes", async () => {
   assert.match(html, /Reporting a security vulnerability/);
   assert.match(html, /security\/advisories\/new/);
   assert.match(html, /Do not open a public issue for a vulnerability/);
+
+  // Single footer: only the global SiteFooter from the root layout
+  // (SITEMAP: "footer mai copiato per pagina"), which links /contatti.
+  const footerCount = (html.match(/<footer\b/g) ?? []).length;
+  assert.equal(footerCount, 1, `expected a single footer landmark, found ${footerCount}`);
+  assert.match(html, /<footer class="site-footer" aria-label="Site footer">/);
+  assert.match(html, /href="\/contatti"/);
 });

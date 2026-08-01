@@ -82,10 +82,5 @@ export default function ManifestoPage() {
       </div>
     </section>
 
-    <footer>
-      <div className="brand"><span className="brand-mark" aria-hidden="true">◉</span><span>OpenSurveillanceDB</span></div>
-      <p>{t.footerNote}</p>
-      <div className="footer-links"><Link href="/">{t.home}</Link><Link href="/#map">{t.map}</Link><Link href="/#records">{t.directory}</Link><Link href="/guide">{t.guide}</Link></div>
-    </footer>
   </main>;
 }
