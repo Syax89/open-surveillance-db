@@ -43,6 +43,7 @@ export const en = {
   emptyBody:
     "This does not mean that there are no cameras in the area. You can clear the search, explore the map, or submit a private observation for moderation.",
   clearSearch: "Clear search",
+  submitObservation: "Submit a private observation",
   resetFilters: "Reset filters",
   offlineTitle: "You are offline",
   offlineBody: "Showing the last loaded records.",
@@ -116,6 +117,7 @@ export const it: Translation<typeof en> = {
   emptyBody:
     "Questo non significa che nell'area non ci siano telecamere. Puoi cancellare la ricerca, esplorare la mappa o inviare un'osservazione privata per la moderazione.",
   clearSearch: "Cancella ricerca",
+  submitObservation: "Invia un'osservazione privata",
   resetFilters: "Azzera i filtri",
   offlineTitle: "Sei offline",
   offlineBody: "Mostriamo gli ultimi record caricati.",
