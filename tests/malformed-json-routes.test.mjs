@@ -8,8 +8,8 @@
 //
 //   1. the SAME malformed bodies are sent to every POST/PATCH route that
 //      reads JSON — cameras, corrections, moderation, appeals, appeals/[id],
-//      auth/login, auth/register — and must answer 400 with the clear
-//      "Request body is not valid JSON." message;
+//      auth/login, auth/register, auth/me (PATCH) — and must answer 400
+//      with the clear "Request body is not valid JSON." message;
 //   2. the neighbouring errors stay distinct: a body over MAX_BODY_BYTES is
 //      still 413 "Request body too large." and a VALID body that fails
 //      schema validation keeps its own 400/401 message (never the
@@ -115,6 +115,13 @@ const ROUTES = [
     method: "POST",
     path: "/api/auth/register",
     headers: {},
+  },
+  {
+    label: "PATCH /api/auth/me",
+    file: "app/api/auth/me/route.mjs",
+    method: "PATCH",
+    path: "/api/auth/me",
+    headers: () => sessionHeaders,
   },
 ];
 
