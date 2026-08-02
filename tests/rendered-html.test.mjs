@@ -603,3 +603,75 @@ test("worker edge source carries the global security headers (static guard)", as
     assert.ok(workerSource.includes(value), `worker/index.ts must define ${value}`);
   }
 });
+
+test("custom 404 page renders for unknown routes and malformed record ids (EN default)", async () => {
+  // t_7eed4601: app/not-found.tsx is the custom 404 (design system, EN/IT,
+  // homepage link). Next.js renders it for routes that do not exist AND for
+  // notFound() calls — /records/abc (malformed id) is rejected by the
+  // server shell of /records/[id] and must answer a real 404 with the
+  // custom page, not a 200 with a client-side "not found" state.
+  for (const route of ["/path-inesistente", "/records/abc"]) {
+    const { response, html } = await renderRoute(route);
+    assert.equal(response.status, 404, `${route} must answer 404`);
+
+    // The custom page, not the default Next.js 404.
+    assert.match(html, /<h1[^>]*>Page not found<\/h1>/, `${route} renders the custom h1`);
+    // Design-system shell: record-detail article + header + footer + CTA home.
+    assert.match(html, /class="record-page"/, `${route} uses the record-page shell`);
+    assert.match(html, /class="record-detail"/, `${route} uses the record-detail card`);
+    assert.match(html, /class="eyebrow"/, `${route} shows the status eyebrow`);
+    assert.match(html, /404/, `${route} shows the 404 status`);
+    // Link back to the homepage (task requirement).
+    assert.match(html, /href="\/"[^>]*>Back to the homepage/, `${route} links home`);
+    // The nav and footer remain usable — no dead end.
+    assert.match(html, /class="nav-shell"/, `${route} keeps the site header`);
+    assert.match(html, /class="site-footer"/, `${route} keeps the site footer`);
+    // The locale toggle is present (persisted language still switchable).
+    assert.match(html, /locale-toggle/, `${route} keeps the locale toggle`);
+    // Privacy by design: the 404 copy must not echo the requested path.
+    // (The route name still appears in the vinext client-router bootstrap
+    // script __VINEXT_RSC_NAV__, present on every page — it is framework
+    // plumbing, not page content. The contract is scoped to the rendered
+    // page body: article, h1, summary, CTA.)
+    const article = html.match(/<article class="record-detail">([\s\S]*?)<\/article>/)?.[1] ?? "";
+    assert.doesNotMatch(article, /path-inesistente|records\/abc/, `${route} page body never echoes the requested path`);
+  }
+});
+
+test("custom 404 page honours the persisted locale cookie (SSR IT copy)", async () => {
+  const { response, html } = await renderRoute("/path-inesistente", {
+    headers: { cookie: "opensurveillancedb-locale=it" },
+  });
+
+  assert.equal(response.status, 404);
+  assert.match(html, /<html[^>]*lang="it"/);
+  assert.match(html, /<h1[^>]*>Pagina non trovata<\/h1>/);
+  assert.match(html, /href="\/"[^>]*>Torna alla home/);
+});
+
+test("custom 404 page renders inside the root layout with a single h1 (a11y contract)", async () => {
+  // The 404 must not break the structural contracts the other pages pin
+  // (pages-render/axe): exactly one h1, main#main-content, single footer.
+  const { response, html } = await renderRoute("/path-inesistente");
+  assert.equal(response.status, 404);
+
+  const h1Count = (html.match(/<h1\b/g) ?? []).length;
+  assert.equal(h1Count, 1, `expected exactly one h1 on the 404 page, found ${h1Count}`);
+  assert.match(html, /<main[^>]*id="main-content"/, "404 keeps the skip-link target");
+  const footerCount = (html.match(/<footer\b/g) ?? []).length;
+  assert.equal(footerCount, 1, `expected a single footer landmark, found ${footerCount}`);
+});
+
+test("root error boundary reuses the custom error shell for server errors (500)", async () => {
+  // t_7eed4601: app/error.tsx is the root error boundary for unhandled
+  // server errors (HTTP 500). A real 500 cannot be forced through the
+  // built worker without injecting a throwing route, so the contract is
+  // pinned statically: it must be a client component (error boundary
+  // requirement) that renders the SAME ErrorPage shell as the 404, wired
+  // to reset(). The 404 SSR contract above already proves the shell works.
+  const errorSource = await readFile(path.join(root, "app", "error.tsx"), "utf8");
+  assert.match(errorSource, /"use client"/, "error.tsx must be a client component");
+  assert.match(errorSource, /from "\.\/components\/ErrorPage"/, "error.tsx must reuse the ErrorPage shell");
+  assert.match(errorSource, /statusCode=\{500\}/, "error.tsx must render the 500 copy");
+  assert.match(errorSource, /onRetry=\{reset\}/, "error.tsx must wire reset() to the retry action");
+});

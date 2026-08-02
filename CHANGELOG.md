@@ -14,6 +14,15 @@ changes accumulate under `[Unreleased]`.
 
 ### Added
 
+- Custom 404 page (`app/not-found.tsx`, t_7eed4601): non-existent routes and
+  `notFound()` calls (including the malformed-record guard on
+  `/records/[id]`) render a design-system error page with bilingual EN/IT
+  copy from the persisted locale cookie, a link back to the homepage and
+  the working site header/footer/locale toggle — no dead end, no path or
+  error echoed (privacy by design). The root error boundary
+  (`app/error.tsx`) reuses the same shell for unhandled server errors (500)
+  with a "Try again" reset action.
+
 - Initial prototype: OpenStreetMap-based map, searchable public directory and
   record-detail pages, public camera API with GeoJSON export, CSV export
   derived from the same public-record boundary, Cloudflare D1-compatible

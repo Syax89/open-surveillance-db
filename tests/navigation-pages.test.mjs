@@ -116,8 +116,15 @@ const MISSING_ROUTES = ["/does-not-exist", "/guide/extra"];
  * a loading note; the h1 and the record/not-found states appear after the
  * client fetch. That is a documented observation, not a 404 regression — see
  * the dedicated test below.
+ *
+ * t_7eed4601 (custom 404): a MALFORMED id (/records/not-a-number) is now a
+ * hard 404 — the server shell of /records/[id] calls notFound() before the
+ * client body mounts, so the custom 404 page renders instead of the loading
+ * shell. The 200-shell contract below covers only well-formed numeric ids
+ * (existing or not); the malformed case is asserted in the 404 suite
+ * (tests/rendered-html.test.mjs).
  */
-const RECORD_ROUTES = ["/records/1", "/records/999999", "/records/not-a-number"];
+const RECORD_ROUTES = ["/records/1", "/records/999999"];
 
 // Static asset URLs that the ASSETS fetcher serves (not app routes); the
 // link-resolution crawl must skip them.
