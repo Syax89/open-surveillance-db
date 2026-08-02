@@ -54,6 +54,15 @@ export interface SiteHeaderProps {
    * "none" suppresses it (record/moderation render it inside their actions).
    */
   toggle?: "after" | "none";
+  /**
+   * Optional element rendered at the very end of the nav shell, to the RIGHT
+   * of the LocaleToggle — the "top-right corner" slot (t_65b778c5). The
+   * public pages pass <AuthNavLinks /> here so login/register/account stay
+   * visible even on mobile, where .nav-links collapses into the menu.
+   * Defaults to nothing, so record/moderation/account shells (which render
+   * their own actions) keep the exact baseline markup.
+   */
+  trailing?: ReactNode;
   /** Per-area links/actions rendered between the brand and the locale toggle. */
   children: ReactNode;
 }
@@ -67,6 +76,7 @@ export function SiteHeader({
   menuOpen = false,
   onMenuToggle,
   toggle = "after",
+  trailing,
   children,
 }: SiteHeaderProps) {
   const t = useMessages().home;
@@ -109,6 +119,7 @@ export function SiteHeader({
       ) : null}
       {children}
       {toggle === "after" ? <LocaleToggle /> : null}
+      {trailing}
     </nav>
   );
 }

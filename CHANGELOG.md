@@ -14,6 +14,22 @@ changes accumulate under `[Unreleased]`.
 
 ### Added
 
+- Header auth entry point (`app/components/AuthNavLinks.tsx`, t_65b778c5, CEO
+  request 2026-08-02): the shared public header now carries login/register/
+  account links in the top-right corner, to the right of the EN/IT
+  LocaleToggle (new optional `trailing` slot on `SiteHeader`, used by
+  `PublicNav` on every public page). Anonymous visitors get "Log in"
+  (/login) and "Create account" (/register); signed-in contributors get the
+  account link (/account) with their display name. Session state is read
+  client-side from the existing GET /api/auth/me endpoint (server half:
+  app/lib/auth-session.ts) and the initial/failed states render nothing —
+  the SSR HTML stays session-free and errors never claim "anonymous" or
+  "signed in" (privacy by design, fail-closed). Labels come from the
+  existing auth bundle (EN login:21/register:22, IT login:90/register:91);
+  aria-current marks the current auth route (WCAG 2.2 AA). The six shared
+  public nav links and all other header variants (record/moderation/
+  account) keep the exact baseline markup.
+
 - Custom 404 page (`app/not-found.tsx`, t_7eed4601): non-existent routes and
   `notFound()` calls (including the malformed-record guard on
   `/records/[id]`) render a design-system error page with bilingual EN/IT

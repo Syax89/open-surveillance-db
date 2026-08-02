@@ -27,6 +27,13 @@ button { cursor:pointer; }
 .brand { display:inline-flex; align-items:center; gap:10px; font-weight:800; letter-spacing:-.04em; font-size:19px; }
 .brand-mark { display:grid; place-items:center; width:29px; height:29px; border-radius:50%; background:var(--ink); color:var(--mint); font-size:20px; line-height:1; }
 .nav-links { display:flex; align-items:center; gap:28px; font-size:14px; font-weight:700; }
+/* Auth entry point in the top-right corner (t_65b778c5): login/register
+   (anonymous) or the account link (signed in). Rendered AFTER the
+   LocaleToggle via SiteHeader's `trailing` slot; always visible — also on
+   mobile, where .nav-links collapses into the hamburger menu. */
+.auth-nav-links { display:inline-flex; align-items:center; gap:10px; font-size:14px; font-weight:700; }
+.auth-nav-links a:not(.nav-action) { color:#405462; }
+.auth-nav-links a:not(.nav-action):hover { color:#16715e; }
 .locale-toggle { display:inline-flex; overflow:hidden; border:1px solid #b7c2bd; border-radius:7px; background:#fffef9; }
 .locale-toggle button { min-width:34px; padding:7px 8px; border:0; background:transparent; color:#62737b; font-size:11px; font-weight:800; letter-spacing:.06em; }
 .locale-toggle button+button { border-left:1px solid #d8ddd6; }
