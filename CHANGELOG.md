@@ -273,6 +273,11 @@ changes accumulate under `[Unreleased]`.
   arguments: dry-run, dryRun"): the dry-run step now uses the read-only
   `wrangler d1 migrations list osdb-production --remote`, so the first
   manual dry-run trigger completes instead of failing.
+- `/mappa` marker pane no longer stays empty (0 markers) when the public
+  API is unreachable or empty: the marker-population effect now re-runs
+  once the lazy leaflet import resolves (`mapReady` flag), instead of
+  early-returning at mount and never being re-triggered by a stable
+  `cameras` prop (t_eb2e33a3 regression after the #202 redesign).
 
 ### Security
 
