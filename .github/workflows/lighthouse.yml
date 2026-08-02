@@ -7,7 +7,8 @@ name: Lighthouse a11y gate
 #
 # Reliability fix (kanban t_2f6e49a0, 2026-08-02): the URL list in
 # lighthouserc.cjs is now ONE representative route per distinct layout
-# template (~10 instead of 19) — runtime dropped from 16-22 min to ~8-10 min,
+# template (~11 instead of 19; /privacy was added for the LegalPage
+# template, t_52c7e214) — runtime dropped from 16-22 min to ~8-10 min,
 # ending the 20-min-timeout race and the runner-pool saturation that left
 # runs "in_progress" for 40+ min. The Lighthouse CI step also has its own
 # fail-fast timeout (15 min): a genuinely hung Lighthouse (server/Chrome)

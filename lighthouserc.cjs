@@ -10,18 +10,23 @@
  *
  * Coverage model (reliability fix t_2f6e49a0, 2026-08-02): the list below is
  * ONE representative route per DISTINCT layout template, not every URL —
- * Lighthouse audits the layout-dependent rules, and the app has 4 shared
- * templates: InfoPage (guide/faq/contatti/privacy/termini/licenze/manifesto/
- * regole/moderazione/accessibility all render the same component, so /guide
- * represents them all), the tools shell ((tools)/layout.tsx: mappa,
- * directory, segnala, correggi — kept individually, each has a distinct
- * layout), the auth pages (login/register/account — the most layout-
- * sensitive: forms, focus traps, target-size on buttons) and the record
- * detail (/records/[id]). Content-level axe rules (alt text, aria, heading
- * structure, …) still run on EVERY public route via the jsdom SSR suite, so
- * no route loses automated coverage. 19 URLs made the job take 16-22 min
- * against a 20 min timeout and saturated the runner pool (queues of 40+ min,
- * runs appearing "in_progress" forever) — see kanban t_2f6e49a0.
+ * Lighthouse audits the layout-dependent rules, and the app has 5 shared
+ * templates: TWO static content templates — InfoPage (guide/faq/contatti/
+ * manifesto/regole/moderazione) and LegalPage (privacy/termini/licenze/
+ * accessibility: a distinct component rendering a <table> with caption/th
+ * scope, role="note" blocks, aria-labelledby sections and a version note) —
+ * plus the tools shell ((tools)/layout.tsx: mappa, directory, segnala,
+ * correggi — kept individually, each has a distinct layout), the auth pages
+ * (login/register/account — the most layout-sensitive: forms, focus traps,
+ * target-size on buttons) and the record detail (/records/[id]). /guide
+ * represents InfoPage; /privacy represents LegalPage, which carries its own
+ * colour tokens on .legal-table/.legal-note that only a real-rendering
+ * contrast audit can catch (jsdom cannot evaluate color-contrast). Content-
+ * level axe rules (alt text, aria, heading structure, …) still run on EVERY
+ * public route via the jsdom SSR suite, so no route loses automated
+ * coverage. 19 URLs made the job take 16-22 min against a 20 min timeout and
+ * saturated the runner pool (queues of 40+ min, runs appearing "in_progress"
+ * forever) — see kanban t_2f6e49a0.
  *
  * Local QA run (after `npm run build`):
  *   npx lhci autorun
@@ -40,11 +45,15 @@ module.exports = {
       // scripts/serve-preview.mjs. Public routes only — no fixtures, no
       // credentials, no personal data.
       startServerCommand: "npm run preview:serve",
-      // Every public route (QA review P1-2): the 8 originals plus the auth
-      // pages (PR #215 — the most layout-sensitive: forms, focus traps,
-      // target-size on buttons) and the legal/static pages, so a visual or
-      // a11y regression on any of them fails the gate. Auth routes SSR as
-      // public (no credentials needed), matching the SSR axe harness.
+      // One representative per distinct layout template (11 URLs): home, the
+      // 4 tools routes (mappa/directory/segnala/correggi — each a distinct
+      // layout), record detail (/records/[id]), the 3 auth pages (PR #215 —
+      // the most layout-sensitive: forms, focus traps, target-size on
+      // buttons), /guide (InfoPage) and /privacy (LegalPage — its own colour
+      // tokens on .legal-table/.legal-note need real-rendering contrast
+      // checks, t_52c7e214). Auth routes SSR as public (no credentials
+      // needed), matching the SSR axe harness. A visual or a11y regression
+      // on any represented layout fails the gate.
       url: [
         "http://localhost:3000/",
         "http://localhost:3000/mappa",
@@ -56,6 +65,7 @@ module.exports = {
         "http://localhost:3000/register",
         "http://localhost:3000/account",
         "http://localhost:3000/guide",
+        "http://localhost:3000/privacy",
       ],
       numberOfRuns: 1,
       settings: {
