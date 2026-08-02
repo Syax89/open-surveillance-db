@@ -34,7 +34,7 @@ import { after, beforeEach, test } from "node:test";
 import { apiRequest, responseBody } from "./helpers/api-harness.mjs";
 import { applyDrizzleMigrations, cleanupDbRuntime, seedDemoIdentities } from "./helpers/db-runtime-harness.mjs";
 import { D1SqliteDatabase } from "./helpers/d1-sqlite.mjs";
-import { cleanupE2ETree, e2eEnv, loadE2ERoute } from "./helpers/e2e-harness.mjs";
+import { cleanupE2ETree, e2eEnv, loadE2EModule, loadE2ERoute } from "./helpers/e2e-harness.mjs";
 
 // ---------------------------------------------------------------------------
 // Fixtures: every POST/PATCH route that reads a JSON body via readJsonBody.
@@ -46,7 +46,25 @@ import { cleanupE2ETree, e2eEnv, loadE2ERoute } from "./helpers/e2e-harness.mjs"
 // ---------------------------------------------------------------------------
 
 const MODERATOR = { "x-osdb-user-email": "record@osdb.test" }; // seeded by seedDemoIdentities()
-const CONTRIBUTOR = { "x-osdb-user-email": "contributor@osdb.test" };
+
+// POST /api/appeals authenticates with the ADR 0013 session cookie (CEO
+// decision 2026-08-02, audit finding 3.1) — the `x-osdb-user-email`
+// prototype header is no longer accepted. The live session is created per
+// test in beforeEach against the fresh env.DB; headers resolve lazily.
+let sessionHeaders = null;
+async function contributorSessionHeaders() {
+  const auth = await loadE2EModule("db/auth.mjs");
+  const profile = await auth.createContributor({
+    email: "contributor@osdb.test",
+    displayName: "Demo Contributor",
+    password: "supersecret123",
+  });
+  const { rawToken, csrfToken } = await auth.createSession(profile.id, { ttlDays: 7 });
+  return {
+    cookie: `osdb_session=${rawToken}; osdb_csrf=${csrfToken}`,
+    "x-csrf-token": csrfToken,
+  };
+}
 
 const ROUTES = [
   {
@@ -75,7 +93,7 @@ const ROUTES = [
     file: "app/api/appeals/route.mjs",
     method: "POST",
     path: "/api/appeals",
-    headers: CONTRIBUTOR,
+    headers: () => sessionHeaders,
   },
   {
     label: "PATCH /api/appeals/[id]",
@@ -131,6 +149,9 @@ beforeEach(async () => {
   env.POST_RATE_LIMIT_MAX = "100000";
   env.AUTH_RATE_LIMIT_MAX = "100000";
   env.MODERATION_RATE_LIMIT_MAX = "100000";
+  // POST /api/appeals needs a live contributor session (CEO decision
+  // 2026-08-02); create it against this test's fresh DB.
+  sessionHeaders = await contributorSessionHeaders();
 });
 
 after(async () => {
@@ -154,7 +175,8 @@ async function dbSnapshot() {
 }
 
 function routeRequest(route, body) {
-  return apiRequest(route.path, { method: route.method, headers: route.headers, body });
+  const headers = typeof route.headers === "function" ? route.headers() : route.headers;
+  return apiRequest(route.path, { method: route.method, headers, body });
 }
 
 // ---------------------------------------------------------------------------

@@ -197,6 +197,27 @@ async function auditEvents() {
   return rows.results;
 }
 
+/**
+ * Create a live contributor session for the demo contributor identity
+ * (contributor@osdb.test). The appeals filing route authenticates with the
+ * ADR 0013 session cookie (CEO decision 2026-08-02, audit finding 3.1) —
+ * not the `x-osdb-user-email` prototype header, which the worker edge strips
+ * and which is no longer accepted by POST /api/appeals.
+ */
+async function contributorSessionHeaders() {
+  const auth = await loadE2EModule("db/auth.mjs");
+  const profile = await auth.createContributor({
+    email: "contributor@osdb.test",
+    displayName: "Demo Contributor",
+    password: "supersecret123",
+  });
+  const { rawToken, csrfToken } = await auth.createSession(profile.id, { ttlDays: 7 });
+  return {
+    cookie: `osdb_session=${rawToken}; osdb_csrf=${csrfToken}`,
+    "x-csrf-token": csrfToken,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // 1) Auth gate (the prototype's only login: moderation Basic/Bearer at the
 //    worker edge). Exercised at runtime against the transpiled worker.
@@ -371,24 +392,33 @@ test("auth gate: identity headers are stripped at the edge — a direct client c
   );
 });
 
-test("auth gate: appeals are gated at the edge and fail closed without credentials", async () => {
+test("auth gate: appeals are split — moderator surfaces gated, contributor filing not (audit finding 3.1)", async () => {
   const { default: worker } = await loadE2EModule("worker.mjs");
   const ctx = { waitUntil() {}, passThroughOnException() {} };
 
-  // Fail-closed default: no moderation credentials configured → 503.
+  // Fail-closed default: no moderation credentials configured → the
+  // moderator-facing appeals surfaces (GET list, PATCH decide) return 503…
   const noCreds = await worker.fetch(new Request("https://osdb.test/api/appeals"), {}, ctx);
   assert.equal(noCreds.status, 503);
   const noCredsItem = await worker.fetch(new Request("https://osdb.test/api/appeals/1"), {}, ctx);
   assert.equal(noCredsItem.status, 503);
 
-  // Configured but unauthenticated → 401 with the moderation challenge.
+  // …but POST /api/appeals (contributor filing, session auth at the route
+  // layer) must pass through even with zero moderation credentials.
+  const filePass = await worker.fetch(new Request("https://osdb.test/api/appeals", { method: "POST" }), {}, ctx);
+  assert.notEqual(filePass.status, 503, "POST /api/appeals must not be caught by the moderation gate");
+  assert.equal(filePass.status, 200);
+  assert.equal(await filePass.text(), "handler-called");
+
+  // Configured but unauthenticated → 401 with the moderation challenge on
+  // the moderator surfaces.
   const envWithCreds = { MODERATION_USER: "moderator", MODERATION_PASSWORD: "s3cret" };
   const unauth = await worker.fetch(new Request("https://osdb.test/api/appeals"), envWithCreds, ctx);
   assert.equal(unauth.status, 401);
   assert.match(unauth.headers.get("www-authenticate"), /Basic realm="moderation"/);
 
-  // Correct Basic credentials pass through — the appeals surface is now
-  // behind the same transport gate as the moderation queue.
+  // Correct Basic credentials pass through — the moderator appeals surface
+  // stays behind the same transport gate as the moderation queue.
   const authed = await worker.fetch(
     new Request("https://osdb.test/api/appeals", {
       headers: { Authorization: `Basic ${Buffer.from("moderator:s3cret").toString("base64")}` },
@@ -752,9 +782,10 @@ test("E2E: a contributor appeals a rejection; an independent senior moderator up
   const decisionEvent = events[0];
   assert.equal(decisionEvent.action, "reject");
 
+  const contributorHeaders = await contributorSessionHeaders();
   const fileResponse = await appealsRoute.POST(apiRequest("/api/appeals", {
     method: "POST",
-    headers: { "x-osdb-user-email": "contributor@osdb.test" },
+    headers: contributorHeaders,
     body: {
       entity: "camera",
       entityId: record.id,
@@ -852,9 +883,10 @@ test("E2E: appeals validation and role gates hold through the real routes", asyn
 
   // Unknown decision id → 404; non-final decisions (escalations keep the same
   // status) cannot be appealed → 400.
+  const contributorHeaders = await contributorSessionHeaders();
   const missing = await appealsRoute.POST(apiRequest("/api/appeals", {
     method: "POST",
-    headers: { "x-osdb-user-email": "contributor@osdb.test" },
+    headers: contributorHeaders,
     body: { entity: "camera", entityId: record.id, decisionEventId: 999999, reason: "Contesting: I observed this camera directly" },
   }));
   assert.equal(missing.status, 404);
@@ -863,7 +895,7 @@ test("E2E: appeals validation and role gates hold through the real routes", asyn
   const escalationEvent = (await auditEvents()).find((event) => event.action === "escalate");
   const nonFinal = await appealsRoute.POST(apiRequest("/api/appeals", {
     method: "POST",
-    headers: { "x-osdb-user-email": "contributor@osdb.test" },
+    headers: contributorHeaders,
     body: { entity: "camera", entityId: record.id, decisionEventId: escalationEvent.id, reason: "Contesting: the escalation ignores my evidence" },
   }));
   assert.equal(nonFinal.status, 400);
@@ -871,12 +903,12 @@ test("E2E: appeals validation and role gates hold through the real routes", asyn
   // Duplicate pending appeal against the same decision → 409.
   await appealsRoute.POST(apiRequest("/api/appeals", {
     method: "POST",
-    headers: { "x-osdb-user-email": "contributor@osdb.test" },
+    headers: contributorHeaders,
     body: { entity: "camera", entityId: record.id, decisionEventId: decisionEvent.id, reason: "First appeal: the camera is on public property" },
   }));
   const duplicate = await appealsRoute.POST(apiRequest("/api/appeals", {
     method: "POST",
-    headers: { "x-osdb-user-email": "contributor@osdb.test" },
+    headers: contributorHeaders,
     body: { entity: "camera", entityId: record.id, decisionEventId: decisionEvent.id, reason: "Second appeal: new evidence supports the location" },
   }));
   assert.equal(duplicate.status, 409);
@@ -946,11 +978,12 @@ test("E2E: appeals validation and role gates hold through the real routes", asyn
 });
 
 test("E2E: appeals route maps a syntactically invalid JSON body to 400 (not 500)", async () => {
+  const contributorHeaders = await contributorSessionHeaders();
   const appealsBefore = await env.DB.prepare("SELECT COUNT(*) AS n FROM moderation_appeals").first();
   const malformed = await appealsRoute.POST(
     apiRequest("/api/appeals", {
       method: "POST",
-      headers: { "x-osdb-user-email": "contributor@osdb.test" },
+      headers: contributorHeaders,
       body: '{"entity": "camera", broken',
     }),
   );
@@ -967,9 +1000,10 @@ test("E2E: an appeal reason below the relevance floor is rejected with 400", asy
 
   // A short placeholder carries no stated relevance for the senior moderator
   // to evaluate (P3 appeal-ownership, documented rule).
+  const contributorHeaders = await contributorSessionHeaders();
   const short = await appealsRoute.POST(apiRequest("/api/appeals", {
     method: "POST",
-    headers: { "x-osdb-user-email": "contributor@osdb.test" },
+    headers: contributorHeaders,
     body: { entity: "camera", entityId: record.id, decisionEventId: decisionEvent.id, reason: "Contesting" },
   }));
   assert.equal(short.status, 400);
@@ -987,10 +1021,11 @@ test("E2E: the per-appellant appeal threshold answers 429 through the route", as
       records.push(record);
       decisionIds.push((await auditEvents()).find((event) => event.entity_id === record.id).id);
     }
+    const contributorHeaders = await contributorSessionHeaders();
     const file = (entityId, decisionEventId, reason) =>
       appealsRoute.POST(apiRequest("/api/appeals", {
         method: "POST",
-        headers: { "x-osdb-user-email": "contributor@osdb.test" },
+        headers: contributorHeaders,
         body: { entity: "camera", entityId, decisionEventId, reason },
       }));
 

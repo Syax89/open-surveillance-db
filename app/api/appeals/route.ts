@@ -6,6 +6,9 @@ import {
   appealStatuses,
 } from "../../../db/appeals";
 import { requireRole } from "../../lib/authz";
+import { getUserByEmail, roleAtLeast } from "../../../db/users";
+import { resolveOptionalContributor } from "../../lib/auth-session";
+import { csrfVerified, sameOrigin } from "../../lib/csrf";
 import { isRecord } from "../../lib/guards";
 import { BodyReadError, readJsonBody, urlTooLong } from "../../lib/input-limits";
 import { recordRateLimitBlock } from "../../lib/abuse-alerts";
@@ -80,9 +83,16 @@ function appealLimit(request: Request) {
 /**
  * POST /api/appeals — a contributor contests a recorded moderation decision
  * (DATA_TRUST.md "Corrections, removals, and appeals"). The caller must be an
- * authenticated user with at least the `contributor` role; the appeal is
- * attributed to their user account and every step writes an append-only
- * audit event.
+ * authenticated contributor with a live session (ADR 0013); the appeal is
+ * attributed to their `users` identity (ADR 0014) and every step writes an
+ * append-only audit event.
+ *
+ * Auth model (CEO decision 2026-08-02, audit finding 3.1): the worker edge
+ * no longer gates POST /api/appeals with moderation credentials — the filing
+ * route authenticates with the contributor session instead. The moderator
+ * surfaces (GET list, PATCH decide) remain behind the edge moderation gate.
+ * Identity headers are stripped at the edge on every path, so this route
+ * resolves the caller from the `osdb_session` cookie only.
  *
  * Standing and abuse control: the reason must state why the appellant is
  * affected (their submission or direct knowledge of the record); anonymous
@@ -95,8 +105,41 @@ export async function POST(request: Request) {
     return Response.json({ error: "Request URI too long." }, { status: 414 });
   }
 
-  const auth = await requireRole(request, "contributor");
-  if (!auth.ok) return auth.response;
+  // Session auth (ADR 0013): the contributor must hold a live session. The
+  // cookie is HttpOnly + SameSite=Strict, and the state-changing request
+  // must also pass the same-origin + double-submit CSRF checks, matching
+  // every other authenticated write route (cameras, corrections, photos).
+  const session = await resolveOptionalContributor(request);
+  if (!session) {
+    return Response.json(
+      { error: "Authentication required. Log in to file an appeal." },
+      { status: 401, headers: { "Cache-Control": "no-store" } },
+    );
+  }
+  if (!sameOrigin(request) || !csrfVerified(request, session.session.csrfToken)) {
+    return Response.json(
+      { error: "Cross-site request rejected. Refresh the page and try again." },
+      { status: 403 },
+    );
+  }
+
+  // Role gate (ADR 0014): the contributor session resolves a `contributors`
+  // row; the appeal is attributed to the matching `users` identity (bridged
+  // by email at provisioning time). No users row (or an inactive one) means
+  // no role identity → 401; a role below contributor → 403.
+  const user = await getUserByEmail(session.contributor.email);
+  if (!user || user.active !== 1) {
+    return Response.json(
+      { error: "Authentication required. Log in to file an appeal." },
+      { status: 401, headers: { "Cache-Control": "no-store" } },
+    );
+  }
+  if (!roleAtLeast(user.role, "contributor")) {
+    return Response.json(
+      { error: "Your role does not permit this action." },
+      { status: 403, headers: { "Cache-Control": "no-store" } },
+    );
+  }
 
   const blocked = appealLimit(request);
   if (blocked) return blocked;
@@ -116,7 +159,7 @@ export async function POST(request: Request) {
       entity: payload.entity,
       entityId: payload.entityId,
       decisionEventId: payload.decisionEventId,
-      appellantId: auth.user.id,
+      appellantId: user.id,
       reason: payload.reason,
     });
 

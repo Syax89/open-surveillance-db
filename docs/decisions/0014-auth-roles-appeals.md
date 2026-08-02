@@ -18,6 +18,15 @@
   `npm run db:smoke`), and real accounts are provisioned with
   `scripts/provision-alpha-accounts.mjs` (`PROVISION_ACCOUNTS` env) before a
   public environment opens; see docs/DEPLOYMENT.md §Provisioning real accounts.
+- **Amendment (2026-08-02, CEO decision — audit finding 3.1 HIGH):** the
+  edge gate no longer covers `POST /api/appeals`. Gating the filing route
+  with moderation credentials made appeals unreachable for contributors
+  (401/503 before the route-level role check could ever run), so filing now
+  authenticates with the ADR 0013 contributor session at the route layer
+  (`app/api/appeals/route.ts`: session cookie + same-origin/double-submit
+  CSRF, then the `users` role bridge). The moderator-facing surfaces
+  (`GET /api/appeals`, `PATCH /api/appeals/:id`) stay behind the edge gate.
+  See the amended §Edge identity gate below.
 
 ## Context
 
@@ -127,10 +136,15 @@ future role-protected route) without a gate:
    real ChatGPT-plugin deployment where the platform gateway, not arbitrary
    clients, sits in front of the worker.
 2. **Gate before identity.** The moderation Basic/Bearer gate is extended to
-   the appeals surface (`/api/appeals`, `/api/appeals/*`) — the only other
-   role-protected API. A direct client can no longer reach it with a spoofed
+   the moderator-facing appeals routes (`GET /api/appeals`,
+   `PATCH /api/appeals/:id`) — the only other role-protected API beside the
+   moderation queue. A direct client can no longer reach them with a spoofed
    header: without a valid credential the request is rejected (401), and
    without configured credentials the gate fails closed (503).
+   `POST /api/appeals` (filing) is **not** gated here — amended by CEO
+   decision 2026-08-02 (audit finding 3.1): filing is a contributor action
+   authenticated by the ADR 0013 session at the route layer, and gating it
+   with moderation credentials made appeals unreachable for contributors.
 3. **Inject server-side.** After a successful gate the worker sets
    `x-osdb-user-email` from `MODERATION_IDENTITY_EMAIL` (the `users.email`
    the credential maps to; `admin@osdb.test` for the local prototype).
