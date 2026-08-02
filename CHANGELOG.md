@@ -14,6 +14,23 @@ changes accumulate under `[Unreleased]`.
 
 ### Added
 
+- **Docs/GDPR — AUTH MULTI-METODO Fase F (t_c9fc674b, ADR 0020):** new
+  [ADR 0020](docs/decisions/0020-multi-method-authentication.md)
+  (multi-method authentication — email+password with verification, passkeys/
+  WebAuthn, OIDC via GitHub/Google as opt-in disclosed method; amends ADR 0013)
+  plus the aligned documentation: AUTH_OPTIONS.md gains §10 mapping the adopted
+  decision to the research options; COMMUNITY_PLAN.md §1.3/§1.5 amended (OIDC
+  no longer blanket-excluded, passkeys promoted to Fase C, mailer gap closed);
+  PRIVACY_AND_SAFETY.md contributor-account section updated (verification,
+  passkey vendor note, OIDC tracking disclosure, erasure extended);
+  PRIVACY_NOTICE.md v0.10 with new §3.1 "How you authenticate" and §3/§4/§5/§6/
+  §7/§10 updates; TERMS_OF_USE.md v0.6 with §3.7 authentication-methods
+  clauses and §15 open item; PROCESSOR_REGISTER.md PR1 extended to Cloudflare
+  Email Routing (zero new processors) plus conditional PR5/PR6 (GitHub/Google
+  OIDC — dormant until the DPA + EU–US DPF activation gate);
+  RETENTION_SCHEDULE.md new rule R15 (verification tokens 24 h; passkeys/
+  recovery codes until erasure); decisions/README.md index updated.
+
 - Header auth entry point (`app/components/AuthNavLinks.tsx`, t_65b778c5,
   CEO request 2026-08-02; mobile placement t_94b3726d): the shared public
   header now carries login/register/account links as the last item of the
