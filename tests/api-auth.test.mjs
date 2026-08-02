@@ -117,7 +117,7 @@ test("register creates a contributor, mints a verification token, opens a sessio
   const [sessionArgs] = callArgs("createSession");
   assert.deepEqual(sessionArgs, [7, { ttlSeconds: 2592000 }]);
 
-  // With no SEND_EMAIL binding the mailer falls back to a dev link, which
+  // With no EMAIL binding the mailer falls back to a dev link, which
   // register echoes so local flows can complete verification. The response
   // still marks the session read-only: the contributor's emailVerifiedAt is
   // NULL (the fixture above) and the write gate (Fase E1) enforces it.

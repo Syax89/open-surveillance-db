@@ -6,7 +6,7 @@
 //
 //   1. register → 201 + read-only session: the contributor has
 //      email_verified_at NULL (me shows it), a verification token row exists
-//      (hash-only), and — with no SEND_EMAIL binding — the dev link is echoed;
+//      (hash-only), and — with no EMAIL binding — the dev link is echoed;
 //   2. GET /api/auth/verify-email consumes the token once: 200, the account
 //      flips to verified (me reflects it), and reusing the link answers 410;
 //   3. POST /api/auth/verify-email/resend mints a fresh token (the OLD link

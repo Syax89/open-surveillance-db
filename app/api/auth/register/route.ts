@@ -115,7 +115,7 @@ export async function POST(request: Request) {
       ttlSeconds: sessionTtlSeconds(env),
     });
     const verification: Record<string, unknown> = { sent: mail.delivered };
-    // Dev/test fallback only: with no SEND_EMAIL binding the mailer returns
+    // Dev/test fallback only: with no EMAIL binding the mailer returns
     // the action link so local flows can complete verification; production
     // (binding present) never exposes the token in an API response.
     if (!mail.delivered && mail.devLink) verification.devLink = mail.devLink;
