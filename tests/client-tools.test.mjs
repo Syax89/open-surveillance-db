@@ -43,6 +43,7 @@ import {
 let rtl;
 let ToolLayout;
 let MappaTool;
+let SurveillanceMap;
 let DirectoryTool;
 let SegnalaTool;
 let CorreggiTool;
@@ -52,6 +53,7 @@ before(async () => {
   rtl = await setupDom();
   ToolLayout = (await loadDomModule("app/components/ToolLayout.mjs")).ToolLayout;
   MappaTool = (await loadDomModule("app/components/tools/MappaTool.mjs")).MappaTool;
+  SurveillanceMap = (await loadDomModule("app/components/SurveillanceMap.mjs")).SurveillanceMap;
   DirectoryTool = (await loadDomModule("app/components/tools/DirectoryTool.mjs")).DirectoryTool;
   SegnalaTool = (await loadDomModule("app/components/tools/SegnalaTool.mjs")).SegnalaTool;
   CorreggiTool = (await loadDomModule("app/components/tools/CorreggiTool.mjs")).CorreggiTool;
@@ -248,6 +250,43 @@ test("MappaTool list row click selects the marker and opens its popup (marker �
   assert.match(liveByTitle["Illustrative record B"].opts.icon.html, /osm-camera-marker demo selected/);
   assert.doesNotMatch(liveByTitle["Illustrative record A"].opts.icon.html, /selected/);
   installEmptyMock();
+});
+
+test("SurveillanceMap populates the marker pane from a stable cameras prop once the map is ready (t_eb2e33a3)", async () => {
+  // Regression t_eb2e33a3: with a STABLE `cameras` array (prototype seed,
+  // unreachable API — the CEO reproduction on the LXC browser) the
+  // marker-population effect early-returns at mount because the lazy
+  // leaflet import has not resolved yet (leafletRef.current === null), and
+  // with `cameras` never changing identity no later render re-triggers it
+  // → .leaflet-marker-pane stays empty (0 children) while the sidebar
+  // lists the same points.
+  //
+  // This is a component-level test ON PURPOSE: through MappaTool the race
+  // is masked in the harness because the navigation stub rebuilds
+  // `URLSearchParams` on every render, which changes `filters` →
+  // `filteredRecords` → `cameras` identity after every parent re-render —
+  // the buggy code would get re-triggered by that noise. The real
+  // `useSearchParams` is stable across renders, so the component test with
+  // fixed props is the faithful reproduction.
+  await resetLeafletMarkers();
+  const { waitFor } = rtl;
+  const cameras = [
+    { id: 1, title: "Illustrative record A", kind: "Fixed dome", status: "demo", latitude: 41.9004, longitude: 12.4936 },
+    { id: 2, title: "Illustrative record B", kind: "Traffic monitoring", status: "demo", latitude: 41.9047, longitude: 12.5031 },
+  ];
+  await renderWithLocale(React.createElement(SurveillanceMap, {
+    cameras,
+    selectedId: 1,
+    onSelect: () => {},
+    onPick: () => {},
+  }));
+
+  // The marker pane must be populated once the lazy leaflet import
+  // resolves — the mapReady flag is the ONLY trigger when cameras is
+  // stable, so without the fix this waitFor times out (0 markers).
+  await waitFor(async () => assert.equal((await leafletMarkers()).length, 2, "marker pane is populated from the stable cameras prop"), { timeout: 2000 });
+  const titles = (await leafletMarkers()).map((marker) => marker.opts.title).sort();
+  assert.deepEqual(titles, ["Illustrative record A", "Illustrative record B"]);
 });
 
 test("MappaTool zoom/pan updates the list to the points in the new viewport (debounced)", async () => {
