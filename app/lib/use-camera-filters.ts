@@ -233,6 +233,21 @@ export function useCameraFilters(): UseCameraFiltersResult {
   // debounce timer, so the SSR smoke (whose useRouter stub has no replace)
   // never touches it. Owned params are rewritten; params the hook does not
   // own (e.g. future ?lat=&lng=&z= viewport state) survive the edit.
+  //
+  // t_b1e192e1: the write is HARDENED against the vinext RSC navigation
+  // error. On the deployed environment router.replace on /mappa throws
+  // ('Cannot read properties of undefined (reading "digest")' — an
+  // unserializable redirect error) and vinext's navigation controller then
+  // forces `window.location.href = currentHref` — a full reload that
+  // unmounts the tool and kills GeocodeSearch's pending geocode debounce
+  // (0 /api/geocode requests). Two layers of protection:
+  //   1. no-op guard: if the write would produce the URL we are already on,
+  //      skip it (R2 URL churn — the guard the CEO asked to verify);
+  //   2. try/catch: a throwing router.replace falls back to a SILENT
+  //      history.replaceState (no RSC round-trip, no navigation error, no
+  //      reload) so the ?q= still commits and the tree stays up.
+  // The revision bump below re-renders either way (the hook's documented
+  // render trigger for stubbed/navigation-less environments).
   const applyFilters = useCallback((next: CameraFilters) => {
     const params = new URLSearchParams(searchParamsRef.current);
     for (const key of ["q", "type", "freshness", "sort", "focus"]) params.delete(key);
@@ -243,7 +258,20 @@ export function useCameraFilters(): UseCameraFiltersResult {
     if (next.sort !== "alphabetical") params.set("sort", next.sort);
     if (next.focus !== null) params.set("focus", String(next.focus));
     const query = params.toString();
-    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    const href = query ? `${pathname}?${query}` : pathname;
+    const currentSearch = searchParamsRef.current;
+    const currentHref = currentSearch ? `${pathname}?${currentSearch}` : pathname;
+    if (href === currentHref) {
+      setRevision((value) => value + 1);
+      return;
+    }
+    try {
+      router.replace(href, { scroll: false });
+    } catch {
+      // Silent commit: the URL is the single source of truth — a failed
+      // client-side navigation must never take the tree down.
+      window.history.replaceState(null, "", href);
+    }
     setRevision((value) => value + 1);
   }, [pathname, router]);
 

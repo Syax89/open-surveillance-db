@@ -34,6 +34,46 @@ const GEOCODE_DEBOUNCE_MS = 300;
 /** Suggestion cap — must match the proxy's MAX_LIMIT (5). */
 const GEOCODE_LIMIT = 5;
 const GEOCODE_LISTBOX_ID = "geocode-listbox";
+/** The search input id (the registry key for the pending query). */
+const GEOCODE_INPUT_ID = "map-list-search";
+
+/**
+ * Module-level pending-query registry (t_b1e192e1). The geocode debounce
+ * MUST survive a remount of GeocodeSearch: on the deployed environment a
+ * vinext RSC navigation error (router.replace in use-camera-filters
+ * applyFilters → "Cannot read properties of undefined (reading 'digest')")
+ * invalidates/remounts the tool tree, and the old unmount cleanup
+ * (clearTimeout + abort) cancelled the 300ms debounce BEFORE the
+ * /api/geocode fetch could start — 0 requests in the network log. Keeping
+ * the timer + AbortController at module level, keyed by input id, means a
+ * remount during the debounce window no longer cancels the user's query:
+ * the timer fires and the fetch goes out regardless of the component's
+ * lifecycle. The map has exactly one search input, so the registry holds
+ * one entry; the key future-proofs multiple instances.
+ */
+type PendingGeocode = { timer: ReturnType<typeof setTimeout> | null; controller: AbortController | null };
+const pendingGeocodeByInput = new Map<string, PendingGeocode>();
+
+function pendingGeocodeFor(inputId: string): PendingGeocode {
+  let entry = pendingGeocodeByInput.get(inputId);
+  if (!entry) {
+    entry = { timer: null, controller: null };
+    pendingGeocodeByInput.set(inputId, entry);
+  }
+  return entry;
+}
+
+/** Test hook: cancel a pending debounce/request (module state survives
+ * unmount by design, so a leftover timer must not leak into the next
+ * test's fetch mock). */
+export function __resetGeocodePending(inputId = GEOCODE_INPUT_ID): void {
+  const entry = pendingGeocodeByInput.get(inputId);
+  if (!entry) return;
+  if (entry.timer !== null) clearTimeout(entry.timer);
+  entry.timer = null;
+  entry.controller?.abort();
+  entry.controller = null;
+}
 
 /**
  * The /mappa sidebar search, dual-function (t_b9666d09): it filters the
@@ -68,9 +108,16 @@ export function GeocodeSearch({ search, onSearchChange, onPlaceSelect }: Props) 
   const [activeIndex, setActiveIndex] = useState(-1);
   const [lastQuery, setLastQuery] = useState("");
   const lastLocalEditRef = useRef(false);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
   const searchWrapRef = useRef<HTMLDivElement | null>(null);
+  // t_b1e192e1: the debounce timer + AbortController live at MODULE level
+  // (pendingGeocodeByInput), NOT in component refs — a remount during the
+  // debounce window (vinext RSC navigation error → tree invalidation) must
+  // not cancel the pending query. There is deliberately NO unmount cleanup
+  // for them: clearing on unmount is exactly the bug that killed the
+  // /api/geocode fetch before it could start. The entry is obtained inside
+  // the callbacks via pendingGeocodeFor() (a plain function, not a hook
+  // argument) so the module-level mutation never trips the
+  // react-hooks/immutability rule.
 
   const closeDropdown = useCallback(() => {
     setOpen(false);
@@ -104,14 +151,15 @@ export function GeocodeSearch({ search, onSearchChange, onPlaceSelect }: Props) 
     };
   }, [open, closeDropdown]);
 
-  // Cancel the debounce timer and any in-flight geocode request on unmount.
-  useEffect(() => () => {
-    if (debounceRef.current !== null) clearTimeout(debounceRef.current);
-    abortRef.current?.abort();
-  }, []);
+  // t_b1e192e1: NO unmount cleanup for the debounce timer / AbortController.
+  // They live at module level (pendingGeocodeByInput) on purpose: a remount
+  // during the 300ms window (vinext RSC navigation error → tree
+  // invalidation) must not cancel the pending query — the /api/geocode
+  // fetch has to fire even if this instance unmounted first.
 
   const runGeocode = useCallback((query: string) => {
-    abortRef.current?.abort();
+    const pending = pendingGeocodeFor(GEOCODE_INPUT_ID);
+    pending.controller?.abort();
     const trimmed = query.trim();
     if (!trimmed) {
       setResults([]);
@@ -121,7 +169,7 @@ export function GeocodeSearch({ search, onSearchChange, onPlaceSelect }: Props) 
       return;
     }
     const controller = new AbortController();
-    abortRef.current = controller;
+    pending.controller = controller;
     const params = new URLSearchParams({ q: trimmed, limit: String(GEOCODE_LIMIT), lang: locale });
     fetch(`/api/geocode?${params.toString()}`, { signal: controller.signal })
       .then(async (response) => {
@@ -148,9 +196,10 @@ export function GeocodeSearch({ search, onSearchChange, onPlaceSelect }: Props) 
   }, [locale]);
 
   const scheduleGeocode = useCallback((value: string) => {
-    if (debounceRef.current !== null) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      debounceRef.current = null;
+    const pending = pendingGeocodeFor(GEOCODE_INPUT_ID);
+    if (pending.timer !== null) clearTimeout(pending.timer);
+    pending.timer = setTimeout(() => {
+      pending.timer = null;
       setLastQuery(value.trim());
       runGeocode(value);
     }, GEOCODE_DEBOUNCE_MS);
@@ -163,11 +212,12 @@ export function GeocodeSearch({ search, onSearchChange, onPlaceSelect }: Props) 
     onSearchChange(value);
     // (b) geocode suggestions, debounced, only while there is text.
     if (value.trim() === "") {
-      if (debounceRef.current !== null) {
-        clearTimeout(debounceRef.current);
-        debounceRef.current = null;
+      const pending = pendingGeocodeFor(GEOCODE_INPUT_ID);
+      if (pending.timer !== null) {
+        clearTimeout(pending.timer);
+        pending.timer = null;
       }
-      abortRef.current?.abort();
+      pending.controller?.abort();
       setResults([]);
       setStatus("idle");
       setOpen(false);
@@ -221,7 +271,7 @@ export function GeocodeSearch({ search, onSearchChange, onPlaceSelect }: Props) 
     <div className="map-list-search" ref={searchWrapRef}>
       <label htmlFor="map-list-search">{t.listSearchLabel}</label>
       <input
-        id="map-list-search"
+        id={GEOCODE_INPUT_ID}
         type="search"
         role="combobox"
         aria-autocomplete="list"
