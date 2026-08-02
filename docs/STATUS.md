@@ -86,6 +86,41 @@ Last reviewed: 2026-08-01
   submit → moderate → publish flow, 457 tests) and
   [`QA_REPORT_navigation-pages.md`](qa/QA_REPORT_navigation-pages.md)
   (navigation, accessibility, EN/IT parity, and GDPR notice links, 569 tests).
+- [x] Community verification system ([ADR 0018](decisions/0018-community-verifications-trust-levels-editing.md)):
+  sighting confirmations on record pages are a toggle (one confirmation type
+  per record and contributor), aggregated as `confirmationCount` and guarded
+  by six anti-gaming layers — unique `(camera_id, contributor_id)` index,
+  account-linking via session identity (never raw IP), daily per-account caps
+  (20 verifications/day, 40 for trusted accounts), burst limits, rate limiting
+  on the confirmation endpoints, and decay of confirmations older than the
+  review window.
+- [x] Contributor trust levels ([ADR 0018](decisions/0018-community-verifications-trust-levels-editing.md),
+  [`COMMUNITY_PLAN.md`](COMMUNITY_PLAN.md)): the level is always derived from
+  the contributor's count of `verified` records via `deriveLevel`
+  (thresholds 0/1/5/20/50), never denormalised, with machine-readable level
+  metadata (`level`, `verifiedCount`, `threshold`, `nextThreshold`) served by
+  `GET /api/auth/me/contributions`; the public UI shows only the three badge
+  labels (New/Trusted/Experienced contributor), never the numeric level.
+- [x] Two-track record editing ([ADR 0018](decisions/0018-community-verifications-trust-levels-editing.md)):
+  `PATCH /api/cameras/[id]` — an owner-edited `pending` record is updated
+  directly (fail-closed 404 for anonymous/non-owner callers), while edits to
+  published records (`verified`/`needs_review`/`stale`) go through moderated
+  `camera_edit_requests` with an editorial lifecycle and no interim exposure;
+  a dedicated `/records/[id]/edit` page surfaces the edit flow and the request
+  state.
+- [x] Correction intake hardening ([ADR 0018](decisions/0018-community-verifications-trust-levels-editing.md)):
+  `issue_type` is validated against an explicit whitelist at the route, and
+  per-submitter dedupe blocks spam-of-reports — one open report per
+  (submitter, camera) answers `409` with `duplicate_open`, with partial unique
+  indexes making concurrent duplicates yield exactly one row.
+- [x] Paginated contribution history: `GET /api/auth/me/contributions`
+  (pagination, correction/photo contribution kinds, status filter, level
+  metadata) and an extended `/account` page with the trust badge, progress
+  line, local status filters, and the paginated contribution list, plus the
+  verification widget (`StarConfirmButton`) on record pages.
+- [x] Extended community guide and FAQ (`/guide`, `/faq`): bilingual
+  sections covering verification, trust levels, editing, and reporting,
+  aligned with the community plan and ADR 0018.
 
 ## Not yet implemented
 

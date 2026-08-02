@@ -88,11 +88,11 @@ projection.
 ### Planned work
 
 - [x] Detect likely duplicates before a contributor submits a new record.
-- Add explicit record freshness and re-verification state without publishing stale data as current.
-- Add safe category and verification-freshness filters to the public directory.
+- [x] Add explicit record freshness and re-verification state without publishing stale data as current. Done: freshness columns on `cameras` (whitelisted `7d`/`30d`/`90d` windows, ISO verification timestamps, one-time backfill) plus the `needs_review`/reverify/remove lifecycle.
+- [x] Add safe category and verification-freshness filters to the public directory. Done: `GET /api/cameras?kind=...&freshness=7d|30d|90d`, shared by JSON, GeoJSON, and CSV.
 - [x] Add a reviewed public change summary that omits contributor identities and internal notes.
-- [x] Give moderators a local way to associate a correction request with a record outcome.
-- Expand tests around each status transition and its public visibility.
+- [x] Give moderators a local way to associate a correction request with a record outcome. Done (2026-08-02, PR #187): approve-on-correction requires a record outcome and the "Link to record" decision attaches a pending request without deciding it; see the implementation update above.
+- [x] Expand tests around each status transition and its public visibility. Done: state-transitions, publication-boundaries, intake-urgent-hide-workflow, and related transition suites.
 
 **Exit gate:** a fictional duplicate, correction, stale record, and re-verification can each be handled without leaking internal data.
 
