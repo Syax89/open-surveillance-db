@@ -51,9 +51,11 @@ the manual testing gates in Horizon 2 are complete.
   target-size (2.5.8), link-in-text-block, scrollable-region-focusable — with
   a minimum accessibility score of **0.95**. Lighthouse audits one
   representative route per distinct layout template (all auth pages, the map,
-  catalog, report/correct forms, record detail and the shared InfoPage
-  template for the legal/static pages), so every layout in the app is covered
-  by real-rendering checks while content-level axe rules still run on every
+  catalog, report/correct forms, record detail and the two static templates —
+  InfoPage via `/guide`, LegalPage via `/privacy`, the latter covering the
+  legal/static pages with their own colour tokens on `.legal-table`/
+  `.legal-note`), so every layout in the app is covered by real-rendering
+  checks while content-level axe rules still run on every
   route (`.github/workflows/lighthouse.yml`, local check: `npx lhci autorun`).
 
 ### Known limitations (not yet implemented)
@@ -181,7 +183,7 @@ nell'Orizzonte 2.
 - Interfaccia in inglese e italiano con preferenza di lingua salvata solo sul dispositivo; la scelta non influisce sui dati API.
 - Guida in-app bilingue su `/guide` che spiega stati dei dati, flusso di lavoro e confini del prototipo.
 - Lo stato non è comunicato solo con il colore (sono usate etichette testuali e icone) e i filtri sicuri per tipo/ordine sono condivisi tra mappa e directory.
-- **Gate di accessibilità automatizzati in CI su ogni PR:** axe-core su ogni rotta SSR (jsdom) più un gate Lighthouse CI in Chromium reale che applica le regole di layout WCAG 2.2 AA che jsdom non può valutare — color-contrast, target-size (2.5.8), link-in-text-block, scrollable-region-focusable — con punteggio di accessibilità minimo **0.95**. Lighthouse controlla una rotta rappresentativa per ogni template di layout distinto (tutte le pagine auth, mappa, catalogo, form segnala/correggi, dettaglio record e il template InfoPage condiviso dalle pagine legali/statiche), quindi ogni layout dell'app è coperto dal rendering reale, mentre le regole di contenuto axe-core restano attive su ogni rotta (`.github/workflows/lighthouse.yml`, verifica locale: `npx lhci autorun`).
+- **Gate di accessibilità automatizzati in CI su ogni PR:** axe-core su ogni rotta SSR (jsdom) più un gate Lighthouse CI in Chromium reale che applica le regole di layout WCAG 2.2 AA che jsdom non può valutare — color-contrast, target-size (2.5.8), link-in-text-block, scrollable-region-focusable — con punteggio di accessibilità minimo **0.95**. Lighthouse controlla una rotta rappresentativa per ogni template di layout distinto (tutte le pagine auth, mappa, catalogo, form segnala/correggi, dettaglio record e i due template statici — InfoPage via `/guide`, LegalPage via `/privacy`, quest'ultimo che copre le pagine legali/statiche con i propri token colore su `.legal-table`/`.legal-note`), quindi ogni layout dell'app è coperto dal rendering reale, mentre le regole di contenuto axe-core restano attive su ogni rotta (`.github/workflows/lighthouse.yml`, verifica locale: `npx lhci autorun`).
 
 ### Limitazioni note (non ancora implementate)
 
