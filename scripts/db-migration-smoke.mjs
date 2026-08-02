@@ -74,6 +74,9 @@ const expectedIndexes = [
   "sessions_expires_idx",
   "users_role_idx",
   "users_email_unique",
+  // Explicit contributor→users identity link (0026, audit t_5ca60ab2, P2):
+  // the only attribution path from a contributor session to a role identity.
+  "users_contributor_id_unique",
   "moderation_appeals_status_idx",
   "moderation_appeals_entity_idx",
   "photos_status_idx",

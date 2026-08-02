@@ -127,8 +127,9 @@ const stubAuth = (user) =>
   stub("getUserByEmail", async (email) => (email === user.email ? user : null));
 
 // Session auth (CEO decision 2026-08-02): POST /api/appeals resolves the
-// caller from the ADR 0013 session cookie, then bridges to the users row by
-// email for the role gate.
+// caller from the ADR 0013 session cookie, then attributes the appeal to the
+// `users` role identity via the EXPLICIT contributor_id link (audit
+// t_5ca60ab2, P2 — the email bridge is gone, it was spoofable).
 const CONTRIBUTOR_PUBLIC = {
   id: 7,
   email: CONTRIBUTOR.email,
@@ -148,6 +149,11 @@ const stubContributorSession = () => {
     contributor: CONTRIBUTOR_PUBLIC,
   }));
   stubAuth(CONTRIBUTOR);
+  // The route resolves the role identity through the contributor_id link,
+  // never by email equality.
+  stub("getUserByContributorId", async (contributorId) =>
+    contributorId === 7 ? CONTRIBUTOR : null,
+  );
 };
 
 // ---------------------------------------------------------------------------

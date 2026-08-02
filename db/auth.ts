@@ -451,17 +451,22 @@ export type NewSession = {
 /**
  * Create a session for a contributor. Returns the raw token (cookie value)
  * alongside the stored row: only the SHA-256 of the token ever reaches the
- * database. `ttlDays` defaults to 30; `now` is injectable for deterministic
- * tests.
+ * database. `ttlSeconds` is the single source of truth for session lifetime
+ * (callers pass `sessionTtlSeconds(env)` from app/lib/auth-session.ts so the
+ * DB `expires_at` always matches the cookie Max-Age — audit t_5ca60ab2, P2).
+ * `ttlDays` remains supported as a convenience and for deterministic tests;
+ * when both are given, `ttlSeconds` wins. Defaults to 30 days. `now` is
+ * injectable for deterministic tests.
  */
 export async function createSession(
   contributorId: number,
-  options: { ttlDays?: number; now?: string } = {},
+  options: { ttlDays?: number; ttlSeconds?: number; now?: string } = {},
 ): Promise<NewSession> {
   const d1 = await getD1();
   const now = options.now ?? new Date().toISOString();
-  const ttlDays = options.ttlDays ?? 30;
-  const expiresAt = new Date(Date.parse(now) + ttlDays * 24 * 60 * 60 * 1000).toISOString();
+  const ttlSeconds =
+    options.ttlSeconds ?? (options.ttlDays ?? 30) * 24 * 60 * 60;
+  const expiresAt = new Date(Date.parse(now) + ttlSeconds * 1000).toISOString();
   const rawToken = randomBase64Url(TOKEN_BYTES);
   const csrfToken = randomBase64Url(TOKEN_BYTES);
   const tokenHash = await sha256Hex(rawToken);
@@ -787,6 +792,11 @@ export async function eraseContributor(contributorId: number): Promise<ErasureRe
     // Correction reports: SET NULL, never delete (same rule as cameras).
     d1.prepare("UPDATE correction_requests SET contributor_id = NULL WHERE contributor_id = ?").bind(contributorId),
     d1.prepare("UPDATE cameras SET contributor_id = NULL WHERE contributor_id = ?").bind(contributorId),
+    // Role-identity link (audit t_5ca60ab2, P2): sever the explicit
+    // users.contributor_id mapping so the users row (an independently
+    // provisioned role identity) survives, but can no longer attribute
+    // appeals to the erased contributor.
+    d1.prepare("UPDATE users SET contributor_id = NULL WHERE contributor_id = ?").bind(contributorId),
     // Explicit session revocation, mirroring logout: after erasure no
     // session of this contributor may resolve, in every environment
     // (real D1 would cascade on contributor delete, but the test harness

@@ -51,6 +51,22 @@ export async function getUserByEmail(email: string): Promise<UserRecord | null> 
     .first<UserRecord>();
 }
 
+/**
+ * Resolve the users identity linked to a contributor account via the
+ * explicit `users.contributor_id` mapping (audit t_5ca60ab2, P2). This is
+ * the ONLY acceptable bridge from a contributor session to a role identity:
+ * email equality between `contributors` and `users` is never trusted, because
+ * a contributor could register with an email matching any users row and
+ * inherit that identity's role (spoofable attribution).
+ */
+export async function getUserByContributorId(contributorId: number): Promise<UserRecord | null> {
+  const d1 = await getD1();
+  return d1
+    .prepare(`SELECT ${userColumns} FROM users WHERE contributor_id = ?`)
+    .bind(contributorId)
+    .first<UserRecord>();
+}
+
 export async function getUserById(id: number): Promise<UserRecord | null> {
   const d1 = await getD1();
   return d1

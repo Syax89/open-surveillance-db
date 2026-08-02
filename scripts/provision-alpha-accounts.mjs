@@ -11,7 +11,7 @@
 //
 // Usage:
 //   PROVISION_ACCOUNTS='[
-//     {"email":"ada@example.org","displayName":"Ada","role":"admin","reviewerRole":"administrator"},
+//     {"email":"ada@example.org","displayName":"Ada","role":"admin","reviewerRole":"administrator","contributorId":1},
 //     {"email":"linus@example.org","displayName":"Linus","role":"moderator","reviewerRole":"record_reviewer"}
 //   ]' node scripts/provision-alpha-accounts.mjs [--remote]
 //
@@ -20,6 +20,12 @@
 //   --persist-to <dir>  apply against an isolated local state directory
 //             (same flag as the smoke test — used for CI/verification runs
 //             that must not touch a developer's real .wrangler/state)
+//
+// `contributorId` is optional: when given, it writes the EXPLICIT
+// contributor→users link (users.contributor_id, audit t_5ca60ab2, P2) so the
+// registered contributor account is attributed to this role identity — the
+// only bridge the appeals route accepts. Leave it unset until the account
+// has registered and the id is known; re-running the script updates it.
 //
 // The script is idempotent: re-running it updates display_name/role/active
 // instead of duplicating rows, so it is safe to run in CI or at every deploy
@@ -89,7 +95,7 @@ const persistTo = persistFlagIndex >= 0 ? process.argv[persistFlagIndex + 1] : u
 const now = new Date().toISOString();
 const statements = [];
 for (const account of accounts) {
-  const { email, displayName, role, reviewerRole } = account ?? {};
+  const { email, displayName, role, reviewerRole, contributorId } = account ?? {};
   if (typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     fail(`invalid email: ${JSON.stringify(email)}`);
   }
@@ -102,19 +108,30 @@ for (const account of accounts) {
   if (reviewerRole !== undefined && !REVIEWER_ROLES.has(reviewerRole)) {
     fail(`invalid reviewerRole "${reviewerRole}" for ${email} — must be one of ${[...REVIEWER_ROLES].join(", ")}`);
   }
+  if (
+    contributorId !== undefined &&
+    (!Number.isInteger(contributorId) || contributorId < 1)
+  ) {
+    fail(`invalid contributorId ${JSON.stringify(contributorId)} for ${email} — must be a positive integer (the registered contributors.id)`);
+  }
 
   const emailEsc = sqlEscape(email);
   const nameEsc = sqlEscape(displayName.trim());
   const roleEsc = sqlEscape(role);
+  const contributorIdSql = contributorId === undefined ? "NULL" : String(contributorId);
 
   // users row: upsert on the unique email — re-running updates, never dupes.
+  // The explicit contributor_id link (audit t_5ca60ab2, P2) is written when
+  // contributorId is provided; the appeals route resolves identities ONLY
+  // through this link, never by email equality.
   statements.push(`
-INSERT INTO users (email, display_name, role, active, mfa_enabled, created_at, updated_at)
-VALUES ('${emailEsc}', '${nameEsc}', '${roleEsc}', 1, 0, '${now}', '${now}')
+INSERT INTO users (email, display_name, role, active, mfa_enabled, contributor_id, created_at, updated_at)
+VALUES ('${emailEsc}', '${nameEsc}', '${roleEsc}', 1, 0, ${contributorIdSql}, '${now}', '${now}')
 ON CONFLICT (email) DO UPDATE SET
   display_name = excluded.display_name,
   role = excluded.role,
   active = 1,
+  contributor_id = excluded.contributor_id,
   updated_at = excluded.updated_at;
 `);
 
