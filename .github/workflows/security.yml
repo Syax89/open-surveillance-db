@@ -29,6 +29,8 @@ jobs:
         env:
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+          PUSH_AFTER_SHA: ${{ github.event.after }}
         run: |
           GITLEAKS_VERSION=8.24.3
           curl -sSfL \
@@ -43,9 +45,28 @@ jobs:
             # https://github.blog/security/vulnerability-research/how-to-catch-github-actions-workflow-injections-before-attackers-do/
             echo "Scan PR commits: ${PR_BASE_SHA}..${PR_HEAD_SHA}"
             gitleaks detect --source . --redact --log-opts="${PR_BASE_SHA}..${PR_HEAD_SHA}"
+          elif [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            # Su push a main: scansiona SOLO i commit introdotti dal push
+            # (before..after), non l'intero storico. Lo scan completo include
+            # branch WIP non ancora mergeati (es. token di test in fixture) →
+            # falsi positivi su OGNI push a main, anche innocuo (regressione
+            # 43db967 / 9d5d177: gate rosso per un token mai mergiato).
+            if [ "${PUSH_BEFORE_SHA}" = "0000000000000000000000000000000000000000" ]; then
+              # Primo push assoluto (before non esiste): fallback allo scan
+              # dello storico raggiungibile da main.
+              echo "Push iniziale (before all-zero): scan storico raggiungibile da main"
+              gitleaks detect --source . --redact --log-opts=main
+            else
+              echo "Scan push commits: ${PUSH_BEFORE_SHA}..${PUSH_AFTER_SHA}"
+              gitleaks detect --source . --redact --log-opts="${PUSH_BEFORE_SHA}..${PUSH_AFTER_SHA}"
+            fi
           else
-            # Push su main / schedule: scan completo dello storico.
-            gitleaks detect --source . --redact
+            # Schedule (settimanale): sweep completo dello storico raggiungibile
+            # da main. I branch WIP non mergiati restano fuori (i loro secret
+            # emergono sulla PR via base..head), quindi il job non si rompe su
+            # token di test presenti su branch in lavorazione.
+            echo "Scan schedule: storico raggiungibile da main"
+            gitleaks detect --source . --redact --log-opts=main
           fi
 
   dependency-audit:
