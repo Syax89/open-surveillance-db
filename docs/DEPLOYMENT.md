@@ -227,7 +227,12 @@ no explicit resource creation.
 GitHub repository secrets used by the workflow:
 `CLOUDFLARE_API_TOKEN` (permissions "Workers Scripts - Edit" + "D1 - Edit")
 and `CLOUDFLARE_ACCOUNT_ID` (the `PROD_URL` variable is only used by the
-`ops-monitoring.yml` health-check workflow, not by deploys). The job
+`ops-monitoring.yml` health-check workflow, not by deploys). `PROD_URL`
+(hostname only, no scheme — the workflow prepends `https://`) is set to
+`open-surveillance-db.simone-rondina.workers.dev` (workers.dev subdomain
+`simone-rondina`; no custom domain/route registered yet). Update it with
+`gh variable set PROD_URL <host>` whenever the public URL changes (see
+docs/OPERATIONS.md §3.2 and issue #203). The job
 targets the `production` GitHub Environment (add required reviewers for a
 human gate on deploys).
 
