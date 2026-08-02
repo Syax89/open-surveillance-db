@@ -35,7 +35,8 @@
 import assert from "node:assert/strict";
 import test, { afterEach, before } from "node:test";
 import {
-  setupDom, loadDomModule, installFetchMock, jsonResponse,
+  setupDom, loadDomModule, installFetchMock, jsonResponse, fakeCamerasPayload,
+  leafletMarkers, resetLeafletMarkers,
   renderWithLocale, setNavState, getNavState, React,
 } from "./helpers/dom-harness.mjs";
 
@@ -121,34 +122,40 @@ test("ToolLayout falls back to the full cross-tool set on unknown paths (defensi
 // /mappa — MappaTool
 // ---------------------------------------------------------------------------
 
-test("MappaTool renders the map tool shell with the shared FiltersBar and the record card", async () => {
+test("MappaTool renders the map tool shell with the shared FiltersBar and the viewport-synced record list", async () => {
   const { screen } = rtl;
   await renderWithLocale(React.createElement(MappaTool));
 
   assert.ok(screen.getByRole("heading", { name: "Interactive map" }), "map pageTitle heading");
-  assert.ok(screen.getByLabelText("Search the public directory"), "shared FiltersBar search (panel variant)");
+  // The search moved into the sidebar column (t_702c10af): the FiltersBar
+  // row keeps kind/freshness/sort/reset, the search lives at the top of the
+  // left column — exactly ONE search control on the page.
+  assert.ok(screen.getByLabelText("Filter the points in the current view"), "sidebar search at the top of the left column");
+  assert.ok(screen.queryByLabelText("Search the public directory") === null, "no duplicated FiltersBar search on /mappa");
   assert.ok(screen.getByLabelText("Camera type"), "shared FiltersBar kind filter");
 
-  // Record card for the selected record (prototype seed, record A first).
-  assert.ok(screen.getByRole("heading", { name: "Illustrative record A" }), "record card shows the selected record");
+  // The sidebar lists the points inside the current viewport (prototype
+  // seed: both records are in the initial view) as buttons, with the
+  // aria-live count announcing the visible points.
+  assert.ok(screen.getByRole("button", { name: /Illustrative record A/ }), "list row for record A");
+  assert.ok(screen.getByRole("button", { name: /Illustrative record B/ }), "list row for record B");
+  assert.ok(screen.getByText("Showing all 2 points in the current view"), "aria-live count announces the visible points");
 
   // Map-task alternative links point at the tool routes, not the home anchors.
-  const reportIssue = screen.getByRole("link", { name: /Report an issue/ });
-  assert.equal(reportIssue.getAttribute("href"), "/correggi");
   const directoryLink = screen.getByRole("link", { name: "Go to the accessible directory" });
   assert.equal(directoryLink.getAttribute("href"), "/directory");
 });
 
-test("MappaTool kind filter narrows the markers and the record card", async () => {
+test("MappaTool kind filter narrows the sidebar list and the markers", async () => {
   const { screen } = rtl;
   const user = rtl.userEvent.setup();
   await renderWithLocale(React.createElement(MappaTool));
 
   await user.selectOptions(screen.getByLabelText("Camera type"), "Fixed dome");
 
-  assert.ok(screen.getByRole("heading", { name: "Illustrative record A" }));
-  assert.ok(screen.queryByRole("heading", { name: "Illustrative record B" }) === null);
-  assert.match(screen.getByRole("status").textContent, /1 public record found/);
+  assert.ok(screen.getByRole("button", { name: /Illustrative record A/ }));
+  assert.ok(screen.queryByRole("button", { name: /Illustrative record B/ }) === null);
+  assert.match(screen.getByText(/1 public record found/).textContent, /1 public record found/);
 });
 
 test("MappaTool freshness filter on the demo seed yields the truthful empty state with a clear action", async () => {
@@ -164,7 +171,7 @@ test("MappaTool freshness filter on the demo seed yields the truthful empty stat
   assert.ok(screen.getByRole("button", { name: /Clear filters/ }), "empty state offers a clear action");
 
   await user.click(screen.getByRole("button", { name: /Clear filters/ }));
-  assert.ok(screen.getByRole("heading", { name: "Illustrative record A" }), "clearing restores the records");
+  assert.ok(screen.getByRole("button", { name: /Illustrative record A/ }), "clearing restores the records to the list");
 });
 
 test("MappaTool deep link applies the seeded URL filters fully (type + freshness, demo seed → truthful empty state)", async () => {
@@ -178,6 +185,108 @@ test("MappaTool deep link applies the seeded URL filters fully (type + freshness
   // shows instead of a half-applied shell, and the select reflects the URL.
   assert.equal(screen.getByLabelText("Record freshness").value, "7d", "?freshness= seeds the select");
   assert.ok(screen.getByRole("heading", { name: "No published record matches those filters." }), "deep link fully applies the seeded filters");
+});
+
+// Marker/popup contract (t_702c10af): the API mock returns the two seed
+// records so usePublicCameras swaps the seed for a NEW array — the marker
+// effect then runs with leaflet ready (same re-render path as production).
+const POPUP_RECORDS = [
+  { id: 1, title: "Illustrative record A", kind: "Fixed dome", status: "demo", latitude: 41.9004, longitude: 12.4936, source: "Prototype seed", updated: "Demo data", description: "This marker demonstrates how a verified public record will be presented. It is not a claim about a real camera.", address: "Illustrative location, Rome" },
+  { id: 2, title: "Illustrative record B", kind: "Traffic monitoring", status: "demo", latitude: 41.9047, longitude: 12.5031, source: "Prototype seed", updated: "Demo data", description: "The field of view is deliberately approximate and should never be treated as a record of live activity.", address: "Illustrative location, Rome" },
+];
+const installRecordsMock = () => installFetchMock(() => jsonResponse(fakeCamerasPayload(POPUP_RECORDS)));
+const installEmptyMock = () => installFetchMock(() => jsonResponse({ records: [], total: 0, nextOffset: null }));
+
+test("MappaTool marker popup carries record info and the correction/detail links", async () => {
+  installRecordsMock();
+  await resetLeafletMarkers();
+  const { waitFor } = rtl;
+  await renderWithLocale(React.createElement(MappaTool));
+
+  await waitFor(async () => assert.equal((await leafletMarkers()).length, 2));
+  const popupByTitle = Object.fromEntries((await leafletMarkers()).map((marker) => [marker.opts.title, marker.popupHtml]));
+
+  assert.match(popupByTitle["Illustrative record A"], /<h3>Illustrative record A<\/h3>/, "popup title");
+  assert.match(popupByTitle["Illustrative record A"], /Record ID/, "popup record-id label");
+  assert.match(popupByTitle["Illustrative record A"], /<dd>1<\/dd>/, "popup record id");
+  assert.match(popupByTitle["Illustrative record A"], /41\.9004, 12\.4936/, "popup coordinates");
+  assert.match(popupByTitle["Illustrative record A"], /Illustrative record/, "popup status label comes from the public safe helper");
+  assert.match(popupByTitle["Illustrative record A"], /href="\/records\/1"/, "popup detail link");
+  assert.match(popupByTitle["Illustrative record A"], /href="\/correggi\?record=1"/, "popup correction link pre-selects the record");
+  assert.match(popupByTitle["Illustrative record B"], /href="\/correggi\?record=2"/);
+  // Record fields are escaped: hostile markup in a title stays inert.
+  assert.doesNotMatch(popupByTitle["Illustrative record A"], /<script>/);
+  installEmptyMock();
+});
+
+test("MappaTool list row click selects the marker and opens its popup (marker ↔ list sync)", async () => {
+  installRecordsMock();
+  await resetLeafletMarkers();
+  const { screen, waitFor } = rtl;
+  const user = rtl.userEvent.setup();
+  await renderWithLocale(React.createElement(MappaTool));
+
+  await waitFor(async () => assert.equal((await leafletMarkers()).length, 2));
+  const markers = await leafletMarkers();
+  const byTitle = Object.fromEntries(markers.map((marker) => [marker.opts.title, marker]));
+
+  // Record A is the default selection: its row carries aria-current and its
+  // marker carries the selected icon class.
+  assert.equal(screen.getByRole("button", { name: /Illustrative record A/ }).getAttribute("aria-current"), "true");
+  assert.match(byTitle["Illustrative record A"].opts.icon.html, /osm-camera-marker demo selected/);
+
+  // Clicking row B: the marker icon swaps, the popup opens, aria-current
+  // moves to the new row (the reverse direction is the same onSelect path
+  // the marker click uses). Markers are re-read AFTER the click — a render
+  // may rebuild the marker layer, so the assertions must target the live
+  // markers on the map, exactly like the browser would.
+  await user.click(screen.getByRole("button", { name: /Illustrative record B/ }));
+  const liveByTitle = Object.fromEntries((await leafletMarkers()).map((marker) => [marker.opts.title, marker]));
+  assert.equal(screen.getByRole("button", { name: /Illustrative record B/ }).getAttribute("aria-current"), "true");
+  assert.equal(screen.getByRole("button", { name: /Illustrative record A/ }).getAttribute("aria-current"), null);
+  assert.equal(liveByTitle["Illustrative record B"].popupOpened, true, "row click opens the marker popup");
+  assert.match(liveByTitle["Illustrative record B"].opts.icon.html, /osm-camera-marker demo selected/);
+  assert.doesNotMatch(liveByTitle["Illustrative record A"].opts.icon.html, /selected/);
+  installEmptyMock();
+});
+
+test("MappaTool zoom/pan updates the list to the points in the new viewport (debounced)", async () => {
+  installRecordsMock();
+  await resetLeafletMarkers();
+  const { screen, waitFor } = rtl;
+  const leaflet = await loadDomModule("node_modules/leaflet/index.mjs");
+  await renderWithLocale(React.createElement(MappaTool));
+
+  // The map (and its moveend handler) exists after the lazy leaflet import
+  // resolves; the viewport starts whole-world so both rows are listed.
+  await waitFor(() => assert.ok(leaflet.__maps.length > 0));
+  const map = leaflet.__maps.at(-1);
+  assert.ok(screen.getByText("Showing all 2 points in the current view"));
+  assert.ok(screen.getByRole("button", { name: /Illustrative record A/ }));
+
+  // Zoom in: a narrow viewport excludes every record — the list empties
+  // truthfully (the map itself keeps all markers) and the aria-live count
+  // announces the change after the 200ms debounce.
+  leaflet.__setBounds({
+    getSouth: () => 41.91, getNorth: () => 41.92,
+    getWest: () => 12.5, getEast: () => 12.51,
+    contains: () => false,
+  });
+  for (const handler of map.handlers["moveend zoomend"] ?? []) handler();
+  await waitFor(() => assert.ok(screen.getByText("No points in the current view")));
+  assert.ok(screen.queryByRole("button", { name: /Illustrative record A/ }) === null);
+  assert.ok(screen.getByText(/No documented points in the current view/), "truthful in-view empty note");
+
+  // Zoom out again: the wide viewport restores both rows.
+  leaflet.__setBounds({
+    getSouth: () => -90, getNorth: () => 90,
+    getWest: () => -180, getEast: () => 180,
+    contains: () => true,
+  });
+  for (const handler of map.handlers["moveend zoomend"] ?? []) handler();
+  await waitFor(() => assert.ok(screen.getByText("Showing all 2 points in the current view")));
+  assert.ok(screen.getByRole("button", { name: /Illustrative record B/ }));
+  installEmptyMock();
 });
 
 // ---------------------------------------------------------------------------

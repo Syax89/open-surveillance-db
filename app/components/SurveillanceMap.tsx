@@ -1,10 +1,22 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { isPublicStatus } from "../lib/public-status";
+import { BOUNDS_DEBOUNCE_MS, escapeHtml } from "../lib/map-viewport";
+import type { ViewportBounds } from "../lib/map-viewport";
 import { useMessages } from "./LocaleProvider";
 
-export type MapCamera = { id: number; title: string; kind: string; status: string; latitude: number; longitude: number };
+export type MapCamera = {
+  id: number;
+  title: string;
+  kind: string;
+  status: string;
+  latitude: number;
+  longitude: number;
+  /** Optional popup fields (present on real API records and the seed). */
+  address?: string | null;
+  description?: string;
+};
 export type MapLocation = { latitude: number; longitude: number };
 type Props = {
   cameras: MapCamera[];
@@ -14,6 +26,19 @@ type Props = {
   focusLocation?: MapLocation | null;
   /** Where the sr-only "accessible directory" link points: home anchor (#records) or /directory. */
   directoryHref?: string;
+  /**
+   * Viewport→list sync (t_702c10af): called with the current bounds after
+   * moveend/zoomend (debounced) and once after the map is created, so the
+   * sidebar list always matches what the map frames. Debouncing is owned
+   * here — a pan/zoom burst commits a single list update.
+   */
+  onBoundsChange?: (bounds: ViewportBounds) => void;
+  /**
+   * Popup content for a marker (t_702c10af). The parent page builds it with
+   * the localized labels and the public-status label helper; the default is
+   * a minimal escaped title+kind so the component stays usable standalone.
+   */
+  popupHtmlFor?: (camera: MapCamera) => string;
 };
 
 type LeafletModule = typeof import("leaflet");
@@ -32,7 +57,11 @@ function buildMarkerIcon(L: LeafletModule, camera: MapCamera, isSelected: boolea
   });
 }
 
-export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLocation, directoryHref = "#records" }: Props) {
+function defaultPopupHtml(camera: MapCamera): string {
+  return `<div class="osm-popup"><h3>${escapeHtml(camera.title)}</h3><p class="osm-popup-kind">${escapeHtml(camera.kind)}</p></div>`;
+}
+
+export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLocation, directoryHref = "#records", onBoundsChange, popupHtmlFor }: Props) {
   const [mapUnavailable, setMapUnavailable] = useState(false);
   const [offline, setOffline] = useState(false);
   const mapElement = useRef<HTMLDivElement | null>(null);
@@ -44,6 +73,9 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
   const focusLocationRef = useRef(focusLocation);
   const selectedIdRef = useRef(selectedId);
   const prevSelectedIdRef = useRef(selectedId);
+  const onBoundsChangeRef = useRef(onBoundsChange);
+  const popupHtmlForRef = useRef(popupHtmlFor);
+  const boundsTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     onPickRef.current = onPick;
@@ -56,6 +88,14 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
   useEffect(() => {
     selectedIdRef.current = selectedId;
   }, [selectedId]);
+
+  useEffect(() => {
+    onBoundsChangeRef.current = onBoundsChange;
+  }, [onBoundsChange]);
+
+  useEffect(() => {
+    popupHtmlForRef.current = popupHtmlFor;
+  }, [popupHtmlFor]);
 
   // Offline state: the tiles cannot load and the records are the last ones
   // the browser received. The map stays visible (the markers are already on
@@ -71,6 +111,16 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
       window.removeEventListener("online", update);
       window.removeEventListener("offline", update);
     };
+  }, []);
+
+  // Viewport→list sync: read the current bounds and hand them to the parent
+  // (the sidebar list). Called debounced on moveend/zoomend and once after
+  // the map is created so the list starts in sync with the initial view.
+  const emitBounds = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const bounds = map.getBounds();
+    onBoundsChangeRef.current?.({ south: bounds.getSouth(), north: bounds.getNorth(), west: bounds.getWest(), east: bounds.getEast() });
   }, []);
 
   useEffect(() => {
@@ -97,17 +147,34 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
           attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a> &middot; <a href="https://www.openstreetmap.org/fixthemap">Fix the map</a>',
         }).addTo(map);
         markersRef.current = L.layerGroup().addTo(map);
-        map.on("click", (event) => onPickRef.current(event.latlng.lat, event.latlng.lng)); mapRef.current = map;
+        map.on("click", (event) => onPickRef.current(event.latlng.lat, event.latlng.lng));
+        mapRef.current = map;
+        // moveend fires after every pan/zoom settles; zoomend is redundant
+        // with it in Leaflet but cheap to listen to as a belt-and-braces
+        // trigger. The list refresh is debounced so a drag never spams it.
+        map.on("moveend zoomend", () => {
+          if (boundsTimerRef.current !== null) window.clearTimeout(boundsTimerRef.current);
+          boundsTimerRef.current = window.setTimeout(emitBounds, BOUNDS_DEBOUNCE_MS);
+        });
         const initialFocus = focusLocationRef.current;
         if (initialFocus) map.setView([initialFocus.latitude, initialFocus.longitude], 15, { animate: false });
         window.setTimeout(() => map.invalidateSize(), 100);
+        // Initial viewport: the sidebar list must match the first frame.
+        emitBounds();
       } catch {
         if (!disposed) setMapUnavailable(true);
       }
     }
     createMap();
-    return () => { disposed = true; mapRef.current?.remove(); mapRef.current = null; markersRef.current = null; markersByIdRef.current = null; };
-  }, []);
+    return () => {
+      disposed = true;
+      if (boundsTimerRef.current !== null) {
+        window.clearTimeout(boundsTimerRef.current);
+        boundsTimerRef.current = null;
+      }
+      mapRef.current?.remove(); mapRef.current = null; markersRef.current = null; markersByIdRef.current = null;
+    };
+  }, [emitBounds]);
 
   // Marker population depends only on the camera list and the click
   // handler — NOT on the selection. Rebuilding every marker on each
@@ -119,21 +186,44 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
     const byId = new Map<number, MarkerEntry>();
     cameras.forEach((camera) => {
       const marker = L.marker([camera.latitude, camera.longitude], { icon: buildMarkerIcon(L, camera, false), title: camera.title });
-      marker.bindTooltip(`${camera.title}<br/><small>${camera.kind}</small>`, { direction: "top", offset: [0, -12] }); marker.on("click", () => onSelect(camera.id)); marker.addTo(layer);
+      marker.bindTooltip(`${camera.title}<br/><small>${camera.kind}</small>`, { direction: "top", offset: [0, -12] });
+      // Popup opens on marker click (Leaflet default) and carries the
+      // record info + correction/detail links built by the parent page.
+      marker.bindPopup(popupHtmlForRef.current ? popupHtmlForRef.current(camera) : defaultPopupHtml(camera), {
+        maxWidth: 300,
+        minWidth: 220,
+        className: "osm-camera-popup",
+      });
+      marker.on("click", () => onSelect(camera.id));
+      marker.addTo(layer);
       byId.set(camera.id, { marker, camera });
     });
     markersByIdRef.current = byId;
     // Freshly built markers start unselected; re-apply the current
-    // selection here so a rebuild (filter/directory change) keeps the
+    // selection icon here so a rebuild (filter/directory change) keeps the
     // same selected marker even when selectedId itself did not change.
+    // A URL focus deep link (?focus=ID) also opens the popup once the
+    // marker exists, so the record's balloon is visible after the pan.
+    // NOTE: prevSelectedIdRef is deliberately NOT updated here — it tracks
+    // "the last id the selection effect processed". A rebuild may run in
+    // the same commit as a selection change (the parent passes a fresh
+    // array identity); resetting the ref here would make the selection
+    // effect early-return and swallow the pan+popup. Icons stay correct in
+    // both cases: the rebuild applies the current selection, the selection
+    // effect re-applies it idempotently when it actually fires.
     const current = selectedIdRef.current;
     const entry = byId.get(current);
-    if (entry) entry.marker.setIcon(buildMarkerIcon(L, entry.camera, true));
-    prevSelectedIdRef.current = current;
+    if (entry) {
+      entry.marker.setIcon(buildMarkerIcon(L, entry.camera, true));
+      if (focusLocationRef.current) entry.marker.openPopup();
+    }
   }, [cameras, onSelect]);
 
   // Selection: swap the `selected` class only on the previously and the
-  // newly selected marker (two setIcon calls, no layer rebuild).
+  // newly selected marker (two setIcon calls, no layer rebuild). When the
+  // selection comes from the sidebar list (or a deep link) the marker is
+  // panned into view and its popup opens — the reverse direction of the
+  // marker click, which already selects + opens the popup natively.
   useEffect(() => {
     const L = leafletRef.current; const byId = markersByIdRef.current; if (!L || !byId) return;
     const prev = prevSelectedIdRef.current;
@@ -141,7 +231,15 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
     const prevEntry = byId.get(prev);
     if (prevEntry) prevEntry.marker.setIcon(buildMarkerIcon(L, prevEntry.camera, false));
     const nextEntry = byId.get(selectedId);
-    if (nextEntry) nextEntry.marker.setIcon(buildMarkerIcon(L, nextEntry.camera, true));
+    if (nextEntry) {
+      nextEntry.marker.setIcon(buildMarkerIcon(L, nextEntry.camera, true));
+      const map = mapRef.current;
+      if (map) {
+        const latlng = nextEntry.marker.getLatLng();
+        if (!map.getBounds().contains(latlng)) map.panTo(latlng);
+        nextEntry.marker.openPopup();
+      }
+    }
     prevSelectedIdRef.current = selectedId;
   }, [selectedId]);
 

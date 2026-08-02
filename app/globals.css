@@ -461,3 +461,50 @@ footer>p { margin:0; color:#586870; font-size:13px; line-height:1.5; }
 .contributions-pagination { display:flex; align-items:center; gap:14px; margin:16px 0 4px; }
 .contributions-pagination .button { padding:9px 14px; font-size:13px; }
 .page-indicator { color:#52656d; font-size:13px; font-weight:700; }
+
+/* ---- /mappa redesign (t_702c10af): sidebar list + near-fullscreen map ----
+   The tool keeps the heading + FiltersBar row; the workspace below splits
+   into a 340px scrollable sidebar (search + viewport-synced list) and an OSM
+   map that fills the remaining viewport height ("quasi a tutto schermo"). */
+.map-layout { width:min(1440px, calc(100% - 32px)); padding:56px 0 72px; }
+.map-layout .live-map-workspace.map-split { grid-template-columns:340px 1fr; height:calc(100vh - 320px); min-height:560px; }
+.map-layout .map-panel .live-map { height:100%; min-height:560px; }
+.map-layout .map-panel .map-fallback { height:100%; min-height:560px; }
+.map-sidebar { display:flex; flex-direction:column; min-height:0; border-right:1px solid var(--line); background:#fffef9; }
+.map-list-search { padding:16px 16px 12px; border-bottom:1px solid var(--line); }
+.map-list-search label { display:block; margin-bottom:6px; color:#63717b; font-size:10px; text-transform:uppercase; letter-spacing:.1em; font-weight:800; }
+.map-list-search input { width:100%; padding:9px 11px; border:1px solid #cfd8d2; border-radius:8px; background:#fff; color:#2f4751; font-size:13px; }
+.map-list-header { display:flex; align-items:baseline; justify-content:space-between; gap:10px; padding:12px 16px 8px; }
+.map-list-header h3 { margin:0; font-size:13px; letter-spacing:-.02em; color:#174e58; }
+.map-list-count { margin:0; color:#6f7e84; font-size:11px; }
+.map-list-scroll { flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; }
+.map-record-list { list-style:none; margin:0; padding:0 8px 12px; }
+.map-record-list li { margin:0; }
+.map-record { display:block; width:100%; padding:11px 12px; border:0; border-left:3px solid transparent; border-radius:8px; background:transparent; text-align:left; cursor:pointer; color:inherit; font:inherit; }
+.map-record:hover { background:#eef3ea; }
+.map-record:focus-visible { outline:3px solid #0b705c; outline-offset:1px; }
+.map-record.selected { border-left-color:#1a7c60; background:#e4efe6; }
+.map-record-title { display:block; color:#174e58; font-size:14px; font-weight:800; letter-spacing:-.02em; }
+.map-record-meta { display:block; margin-top:3px; color:#60737d; font-size:12px; line-height:1.35; }
+.map-list-empty { margin:0; padding:18px 16px; color:#60737d; font-size:13px; line-height:1.5; }
+/* Marker popup (t_702c10af): record info + correction/detail links. */
+.osm-popup h3 { margin:0 0 4px; font-size:15px; letter-spacing:-.02em; color:#174e58; }
+.osm-popup-kind { margin:0 0 6px; color:#60737d; font-size:12px; }
+.osm-popup-status { margin:0 0 10px; color:#2f4751; font-size:12px; font-weight:700; }
+.osm-popup-status .status-dot { margin-right:5px; }
+.osm-popup dl { margin:0 0 8px; display:grid; gap:4px; }
+.osm-popup dt { color:#63717b; font-size:10px; text-transform:uppercase; letter-spacing:.08em; font-weight:800; }
+.osm-popup dd { margin:0; color:#2f4751; font-size:12px; }
+.osm-popup-address, .osm-popup-description { margin:6px 0 0; color:#435963; font-size:12px; line-height:1.45; }
+.osm-popup-actions { display:flex; gap:14px; margin:10px 0 0; }
+.osm-popup-actions a { color:#0a705d; font-weight:800; font-size:12px; }
+/* Mobile-first (t_702c10af): below 768px the sidebar becomes a panel ABOVE
+   the map (search + list, internally scrollable) instead of a side column. */
+@media (max-width:768px) {
+  .map-layout { width:min(100% - 32px,1180px); padding:40px 0 56px; }
+  .map-layout .live-map-workspace.map-split { grid-template-columns:1fr; grid-template-rows:auto 1fr; height:auto; min-height:0; }
+  .map-sidebar { border-right:0; border-bottom:1px solid var(--line); max-height:38vh; }
+  .map-list-scroll { max-height:30vh; }
+  .map-layout .map-panel .live-map { height:55vh; min-height:380px; }
+  .map-layout .map-panel .map-fallback { height:55vh; min-height:380px; }
+}

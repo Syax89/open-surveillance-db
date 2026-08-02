@@ -237,16 +237,34 @@ export const usePathname = () => state.url.pathname;
   }));
   await writeFile(path.join(nodeModules, "leaflet", "index.mjs"),
     `const markers = [];
+const maps = [];
 export const __markers = markers;
-export const __resetMarkers = () => { markers.length = 0; };
+export const __maps = maps;
+export const __resetMarkers = () => { markers.length = 0; maps.length = 0; };
+// Whole-world viewport by default (t_702c10af): the stub map reports
+// bounds that contain every record, so the viewport→list sync keeps the
+// full list. Tests can shrink the viewport with __setBounds() and fire the
+// map's moveend handler to exercise the debounced list narrowing.
+let currentBounds = {
+  getSouth: () => -90,
+  getNorth: () => 90,
+  getWest: () => -180,
+  getEast: () => 180,
+  contains: () => true,
+};
+export const __setBounds = (b) => { currentBounds = b; };
 export function map(el, opts) {
   const m = {
     setView: () => m, // chainable, like the real Leaflet map API
-    on: () => {},
+    on: (event, handler) => { (m.handlers[event] ??= []).push(handler); return m; },
     remove: () => {},
     invalidateSize: () => {},
     getZoom: () => 13,
+    getBounds: () => currentBounds,
+    panTo: () => m,
+    handlers: {},
   };
+  maps.push(m);
   return m;
 }
 export const control = { zoom: () => ({ addTo: () => {} }) };
@@ -255,7 +273,14 @@ export const layerGroup = () => ({ addTo: () => ({ clearLayers: () => { markers.
 export function marker(latlng, opts) {
   const m = {
     latlng, opts,
-    bindTooltip: () => m, on: () => m,
+    bindTooltip: () => m, on: (event, handler) => { (m.handlers[event] ??= []).push(handler); return m; },
+    // Popup contract (t_702c10af): the bound HTML is recorded on the
+    // marker so tests can assert the popup content (links, fields), and
+    // openPopup() records that the balloon was requested.
+    bindPopup: (html) => { m.popupHtml = html; return m; },
+    openPopup: () => { m.popupOpened = true; return m; },
+    getLatLng: () => latlng,
+    handlers: {},
     addTo: (layer) => { layer.addLayer(m); return m; },
     // Real Leaflet API: setIcon replaces the marker icon in place. The
     // recorded opts.icon must follow so tests asserting marker html read

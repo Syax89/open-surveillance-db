@@ -93,8 +93,15 @@ const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
  * buggy code, so a loop fails this hard).
  */
 async function assertFetchCountIsFlat(screen, calls) {
-  // Wait for the walk to settle: the server record is rendered.
-  await rtl.waitFor(() => assert.ok(screen.getByRole("heading", { name: "Fixture public camera" })));
+  // Wait for the walk to settle: the server record is rendered. /mappa
+  // (t_702c10af) renders records as sidebar list buttons instead of the old
+  // record card, /directory keeps the card heading — accept either shape so
+  // the shared regression assertion works for both tools.
+  await rtl.waitFor(() => {
+    const asHeading = screen.queryAllByRole("heading", { name: "Fixture public camera" });
+    const asButton = screen.queryAllByRole("button", { name: /Fixture public camera/ });
+    assert.ok(asHeading.length > 0 || asButton.length > 0, "the server record is rendered");
+  });
   // Let the state flush (setRecords → re-render) before the first sample.
   await pause(50);
   const settled = calls.length;
