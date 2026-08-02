@@ -36,6 +36,7 @@ const ROUTES = [
   { source: "app/api/moderation/photos/[id]/route.ts", output: "app/api/moderation/photos/[id]/route.mjs" },
   { source: "app/api/corrections/route.ts", output: "app/api/corrections/route.mjs" },
   { source: "app/api/tiles/[z]/[x]/[y]/route.ts", output: "app/api/tiles/[z]/[x]/[y]/route.mjs" },
+  { source: "app/api/geocode/route.ts", output: "app/api/geocode/route.mjs" },
   { source: "app/api/auth/register/route.ts", output: "app/api/auth/register/route.mjs" },
   { source: "app/api/auth/login/route.ts", output: "app/api/auth/login/route.mjs" },
   { source: "app/api/auth/logout/route.ts", output: "app/api/auth/logout/route.mjs" },

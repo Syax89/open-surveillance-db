@@ -4,10 +4,17 @@
  * The search route resolves free-text locality and address queries to a point
  * plus bounding box through a Nominatim (OpenStreetMap) endpoint, then the
  * route searches reviewed public records near that area. This module is the
- * only place the route touches an external geocoder, so deployments can point
- * `GEOCODER_BASE_URL` at an approved instance (self-hosted or community
- * policy-compliant) without touching route logic. It lives in `db/` because
- * the route harness mocks every `db/*` module: tests never make network calls.
+ * only place the locality-search route touches an external geocoder, so
+ * deployments can point `GEOCODER_BASE_URL` at an approved instance
+ * (self-hosted or community policy-compliant) without touching route logic.
+ * It lives in `db/` because the route harness mocks every `db/*` module:
+ * tests never make network calls.
+ *
+ * NOTE: this module resolves ONE place (first result). The /mappa sidebar
+ * autocomplete is a SEPARATE surface — the same-origin proxy
+ * `GET /api/geocode` (app/api/geocode/route.ts, docs/OSM_INTEGRATION.md §8)
+ * returns up to 5 suggestions and owns its own rate limit + edge caching.
+ * Both share the `GEOCODER_BASE_URL` knob and the identifying User-Agent.
  *
  * Safety notes:
  *  - Results are cached per isolate with a short TTL to keep external load

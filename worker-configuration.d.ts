@@ -63,6 +63,17 @@ declare module "cloudflare:workers" {
     /** Max accepted upstream tile body in bytes (default 2 MiB). Bodies over
      * the cap answer 502 and are never cached. */
     TILE_MAX_BYTES?: string;
+    /** Geocode upstream base URL (shared by db/geocode.ts and the /api/geocode
+     * proxy, see docs/OSM_INTEGRATION.md §8). Optional: defaults to the
+     * community Nominatim server https://nominatim.openstreetmap.org. */
+    GEOCODER_BASE_URL?: string;
+    /** Per-caller geocode autocomplete rate limit (default 30/60s). */
+    GEOCODE_RATE_LIMIT_MAX?: string;
+    GEOCODE_RATE_LIMIT_WINDOW_SECONDS?: string;
+    /** Upstream fetch timeout in ms for the geocode proxy (default 5000). */
+    GEOCODE_UPSTREAM_TIMEOUT_MS?: string;
+    /** Max accepted upstream geocode body in bytes (default 512 KiB). */
+    GEOCODE_MAX_BYTES?: string;
     PHOTOS: R2Bucket;
   }
   export const env: Env;

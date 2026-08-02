@@ -240,22 +240,32 @@ export const usePathname = () => state.url.pathname;
 const maps = [];
 export const __markers = markers;
 export const __maps = maps;
-export const __resetMarkers = () => { markers.length = 0; maps.length = 0; };
 // Whole-world viewport by default (t_702c10af): the stub map reports
 // bounds that contain every record, so the viewport→list sync keeps the
 // full list. Tests can shrink the viewport with __setBounds() and fire the
 // map's moveend handler to exercise the debounced list narrowing.
-let currentBounds = {
+// __resetMarkers ALSO restores these bounds (t_b9666d09): the geocode
+// autocomplete tests shrink the viewport to assert the pan landing, and a
+// stale narrow viewport leaking into the NEXT test would silently filter
+// the list (a record outside the leftover bounds disappears) — every test
+// must start from the whole-world viewport.
+const wholeWorldBounds = {
   getSouth: () => -90,
   getNorth: () => 90,
   getWest: () => -180,
   getEast: () => 180,
   contains: () => true,
 };
+let currentBounds = wholeWorldBounds;
 export const __setBounds = (b) => { currentBounds = b; };
+export const __resetMarkers = () => { markers.length = 0; maps.length = 0; currentBounds = wholeWorldBounds; };
 export function map(el, opts) {
   const m = {
-    setView: () => m, // chainable, like the real Leaflet map API
+    // setView records every call (t_b9666d09 geocode pan assertions):
+    // m.views accumulates { center, zoom } so tests can assert the map
+    // really moved to the selected place.
+    views: [],
+    setView: (center, zoom, opts) => { m.views.push({ center, zoom, opts }); return m; }, // chainable, like the real Leaflet map API
     on: (event, handler) => { (m.handlers[event] ??= []).push(handler); return m; },
     remove: () => {},
     invalidateSize: () => {},

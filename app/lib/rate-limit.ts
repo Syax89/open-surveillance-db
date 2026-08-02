@@ -37,6 +37,7 @@ export type RouteKind =
   | "appeal"
   | "auth"
   | "tiles"
+  | "geocode"
   | "confirm"
   | "edit";
 
@@ -61,6 +62,15 @@ const ROUTE_LIMIT_DEFAULTS: Record<RouteKind, RateLimitOptions> = {
   // service) beyond community usage. 60/min is far above what interactive
   // map panning produces per client, and the edge cache absorbs repeats.
   tiles: { maxRequests: 60, windowSeconds: 60 },
+  // Geocode autocomplete proxy (GET /api/geocode): every debounced
+  // keystroke in the /mappa sidebar may hit the external Nominatim
+  // geocoder, whose community usage policy is far stricter than our own
+  // reads. The default is deliberately below one request per second on
+  // average per caller (the Nominatim hard ceiling), and the proxy's
+  // server-side cache absorbs repeat queries, so interactive typing stays
+  // comfortably inside the policy while a scraper cannot hammer the
+  // upstream through the dropdown.
+  geocode: { maxRequests: 30, windowSeconds: 60 },
   // Community verifications (ADR 0018 §2.6, C1): the toggle PUT/DELETE and
   // the personal GET share one bucket, independent of the read bucket the
   // public record payload uses. The state quota (daily cap) is a D1 COUNT
@@ -84,6 +94,7 @@ const ROUTE_LIMIT_ENV_PREFIX: Record<RouteKind, string> = {
   appeal: "APPEAL",
   auth: "AUTH",
   tiles: "TILES",
+  geocode: "GEOCODE",
   confirm: "CONFIRM",
   edit: "EDIT",
 };
@@ -179,6 +190,28 @@ export function submissionLimits(env: unknown): RateLimitOptions {
 
 export function submissionsDisabled(env: unknown): boolean {
   return (env as EnvLike).POST_SUBMISSIONS_DISABLED === "true";
+}
+
+/**
+ * Environment knobs for the geocode autocomplete proxy (GET /api/geocode).
+ * The default is deliberately modest: every debounced keystroke in the
+ * /mappa sidebar may hit the external Nominatim geocoder, whose community
+ * usage policy is far stricter than our own reads (and caps the rate at
+ * ~1 request/second per client). The server-side cache absorbs repeat
+ * queries, so 30/min per caller stays far above interactive typing while
+ * still throttling any scrape attempt through the dropdown.
+ */
+export function geocodeLimits(
+  env: unknown,
+  defaults: RateLimitOptions = { maxRequests: 30, windowSeconds: 60 },
+): RateLimitOptions {
+  const config = env as EnvLike;
+  const maxRequests = Number(config.GEOCODE_RATE_LIMIT_MAX);
+  const windowSeconds = Number(config.GEOCODE_RATE_LIMIT_WINDOW_SECONDS);
+  return {
+    maxRequests: Number.isFinite(maxRequests) && maxRequests > 0 ? maxRequests : defaults.maxRequests,
+    windowSeconds: Number.isFinite(windowSeconds) && windowSeconds > 0 ? windowSeconds : defaults.windowSeconds,
+  };
 }
 
 /**

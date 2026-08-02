@@ -1,13 +1,15 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SurveillanceMap } from "../SurveillanceMap";
 import type { MapCamera } from "../SurveillanceMap";
-import { publicStatusLabel } from "../../lib/public-status";
-import { escapeHtml } from "../../lib/map-viewport";
 import type { ViewportBounds } from "../../lib/map-viewport";
 import type { Camera } from "../../lib/records";
 import { useMessages } from "../LocaleProvider";
+import { popupHtmlFor } from "../../lib/map-popup";
+import { GeocodeSearch } from "./GeocodeSearch";
+import type { GeocodeSuggestion } from "./GeocodeSearch";
+import { MapRecordList } from "./MapRecordList";
 
 type Props = {
   /** Records after the directory filters are applied (map markers). */
@@ -33,6 +35,16 @@ type Props = {
   setSearch: (value: string) => void;
   /** Viewport→list sync: the map reports its current bounds (debounced). */
   onBoundsChange: (bounds: ViewportBounds) => void;
+  /**
+   * The map's current bounds (MappaTool state). Used to tell when a
+   * geocode-selection pan has actually landed: the "focus first point"
+   * effect consumes the pending flag only after the bounds object CHANGES
+   * following the selection — a mere identity churn of the records arrays
+   * (filter re-render) must not consume it early.
+   */
+  viewportBounds: ViewportBounds | null;
+  /** Clear every filter — the in-list "Clear filters" action (t_b9666d09). */
+  onReset?: () => void;
 };
 
 /**
@@ -49,76 +61,84 @@ type Props = {
  * framed by the map) and a near-fullscreen OSM map. The list is the
  * keyboard/text equivalent of the map: every row selects the marker (pan +
  * popup), and clicking a marker highlights its row (aria-current).
+ *
+ * The sidebar search is DUAL-FUNCTION (t_b9666d09): GeocodeSearch filters
+ * the viewport points by title/address/type (as before) AND, while typing,
+ * suggests places through the same-origin Nominatim geocoder (/api/geocode)
+ * in an ARIA combobox below the field. Selecting a suggestion pans the map
+ * to the place (map.setView at ≥ zoom 15, via placeFocus feeding
+ * SurveillanceMap's focusLocation effect), the list then follows the new
+ * viewport bounds, and the first point in view is selected when one exists.
+ * The map and the sidebar are ALWAYS rendered — a filter that matches
+ * nothing never replaces the map with an empty state (the truthful "no
+ * record matches" note lives inside the list).
  */
-export function MapPanel({ filteredRecords, visibleRecords, selectedId, onSelect, onPick, coordinates, loading, notice, issueHref = "/correggi", directoryHref = "/directory", search, setSearch, onBoundsChange }: Props) {
+export function MapPanel({ filteredRecords, visibleRecords, selectedId, onSelect, onPick, coordinates, loading, notice, issueHref = "/correggi", directoryHref = "/directory", search, setSearch, onBoundsChange, viewportBounds, onReset }: Props) {
   const t = useMessages().map;
   const statuses = useMessages().status;
 
+  // Pan target chosen from the dropdown: overrides the ?focus= coordinates
+  // while set (both feed SurveillanceMap's focusLocation effect, which does
+  // setView([lat,lng], max(zoom, 15))).
+  const [placeFocus, setPlaceFocus] = useState<{ latitude: number; longitude: number } | null>(null);
+  // Set when a suggestion is selected; consumed by the viewportBounds
+  // effect once the pan's bounds land, selecting the first point in view.
+  const placeFocusRef = useRef<{ latitude: number; longitude: number } | null>(null);
+  const viewportAtSelectionRef = useRef<ViewportBounds | null>(null);
+
   // Popup content (t_702c10af): title, kind, status label, id, coordinates,
-  // address/description and the correction + detail links. Record fields are
-  // HTML-escaped — the popup is assembled client-side and must stay inert;
-  // the status label comes from the public safe helper (never a raw value).
-  const popupHtmlFor = useCallback((camera: MapCamera) => {
-    const coords = `${camera.latitude.toFixed(4)}, ${camera.longitude.toFixed(4)}`;
-    const address = camera.address ? `<p class="osm-popup-address">${escapeHtml(camera.address)}</p>` : "";
-    const description = camera.description ? `<p class="osm-popup-description">${escapeHtml(camera.description)}</p>` : "";
-    return [
-      `<div class="osm-popup">`,
-      `<h3>${escapeHtml(camera.title)}</h3>`,
-      `<p class="osm-popup-kind">${escapeHtml(camera.kind)}</p>`,
-      `<p class="osm-popup-status"><span class="status-dot ${camera.status}" aria-hidden="true"></span> ${publicStatusLabel(statuses, camera.status, t.unknown)}</p>`,
-      `<dl>`,
-      `<div><dt>${t.recordId}</dt><dd>${camera.id}</dd></div>`,
-      `<div><dt>${t.location}</dt><dd>${coords}</dd></div>`,
-      `</dl>`,
-      address,
-      description,
-      `<p class="osm-popup-actions">`,
-      `<a href="/records/${camera.id}">${t.popupDetail} <span aria-hidden="true">→</span></a>`,
-      `<a href="${issueHref}?record=${camera.id}">${t.reportIssue} <span aria-hidden="true">→</span></a>`,
-      `</p>`,
-      `</div>`,
-    ].join("");
-  }, [statuses, t, issueHref]);
+  // address/description and the correction + detail links — built by the
+  // shared lib/map-popup helper (escaped + safe status labels, t_b9666d09).
+  const popupHtmlForCamera = useCallback(
+    (camera: MapCamera) => popupHtmlFor(camera, statuses, t, issueHref),
+    [statuses, t, issueHref],
+  );
+
+  // Geocode selection (GeocodeSearch → onPlaceSelect): remember the viewport
+  // at selection time — the "focus first point" effect below waits until the
+  // map emits NEW bounds (the pan landed) before consuming the pending
+  // selection, so a filter re-render churn of the records arrays must not
+  // consume it early. The local point filter (?q=) is cleared so the list
+  // can follow the new viewport unfiltered — searching "Ferrara" must show
+  // the cameras near Ferrara, not only the ones whose address contains it.
+  const handlePlaceSelect = useCallback((result: GeocodeSuggestion) => {
+    setPlaceFocus({ latitude: result.lat, longitude: result.lng });
+    placeFocusRef.current = { latitude: result.lat, longitude: result.lng };
+    viewportAtSelectionRef.current = viewportBounds;
+    setSearch("");
+  }, [viewportBounds, setSearch]);
+
+  // Focus the first point in the new viewport after a geocode selection
+  // ("focus sul primo punto se presente"). The pending flag is consumed
+  // only when the map emitted NEW bounds since the selection (the pan
+  // landed and the visible list refreshed): before that, visibleRecords is
+  // still the OLD viewport and selecting from it would focus the wrong
+  // point. If the new viewport has no points the pending flag is consumed
+  // so a later manual pan does not surprise the user by auto-selecting.
+  useEffect(() => {
+    if (placeFocusRef.current === null) return;
+    // Not landed yet: the bounds are still the ones captured at selection
+    // (or never emitted). A records-array identity churn (filter
+    // re-render) re-runs this effect but must NOT consume the pending
+    // selection — the guard below is a bounds-object comparison.
+    if (viewportAtSelectionRef.current !== null && viewportAtSelectionRef.current === viewportBounds) return;
+    placeFocusRef.current = null;
+    viewportAtSelectionRef.current = null;
+    if (visibleRecords.length > 0 && !visibleRecords.some((camera) => camera.id === selectedId)) {
+      onSelect(visibleRecords[0].id);
+    }
+  }, [viewportBounds, visibleRecords, selectedId, onSelect]);
+
+  const focusLocation = useMemo(() => placeFocus ?? coordinates, [placeFocus, coordinates]);
 
   return (
     <>
       <div className="live-map-workspace map-split">
         <aside className="map-sidebar" aria-labelledby="map-list-title">
-          <div className="map-list-search">
-            <label htmlFor="map-list-search">{t.listSearchLabel}</label>
-            <input id="map-list-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t.listSearchPlaceholder} aria-describedby="map-list-help" />
-            <p id="map-list-help" className="sr-only">{t.listSearchHelp}</p>
-          </div>
-          <div className="map-list-header">
-            <h2 id="map-list-title">{t.listTitle}</h2>
-            <p className="map-list-count" role="status">{t.listCount(visibleRecords.length, filteredRecords.length)}</p>
-          </div>
-          <p id="map-list-sync-help" className="sr-only">{t.listMapSyncHelp}</p>
-          <div className="map-list-scroll">
-            {visibleRecords.length === 0
-              ? <p className="map-list-empty">{t.listEmptyInView}</p>
-              : <ul className="map-record-list" aria-describedby="map-list-sync-help">
-                  {visibleRecords.map((camera) => {
-                    const selected = camera.id === selectedId;
-                    return (
-                      <li key={camera.id}>
-                        <button
-                          type="button"
-                          className={`map-record${selected ? " selected" : ""}`}
-                          aria-current={selected ? "true" : undefined}
-                          onClick={() => onSelect(camera.id)}
-                        >
-                          <span className="map-record-title">{camera.title}</span>
-                          <span className="map-record-meta">{camera.kind}{camera.address ? ` · ${camera.address}` : ""}</span>
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>}
-          </div>
+          <GeocodeSearch search={search} onSearchChange={setSearch} onPlaceSelect={handlePlaceSelect} />
+          <MapRecordList filteredRecords={filteredRecords} visibleRecords={visibleRecords} selectedId={selectedId} onSelect={onSelect} onReset={onReset} labels={t} />
         </aside>
-        <div className="map-panel"><SurveillanceMap cameras={filteredRecords} selectedId={selectedId} focusLocation={coordinates} onSelect={onSelect} onPick={onPick} directoryHref={directoryHref} onBoundsChange={onBoundsChange} popupHtmlFor={popupHtmlFor} /><div className="map-hint">{t.mapHint}</div></div>
+        <div className="map-panel"><SurveillanceMap cameras={filteredRecords} selectedId={selectedId} focusLocation={focusLocation} onSelect={onSelect} onPick={onPick} directoryHref={directoryHref} onBoundsChange={onBoundsChange} popupHtmlFor={popupHtmlForCamera} /><div className="map-hint">{t.mapHint}</div></div>
       </div>
       {loading && <p className="loading-note">{t.loadingRecords}</p>}{notice && <p className="notice" role="status">{notice}</p>}
       <div className="data-actions"><a href="/api/cameras?format=geojson" download="opensurveillancedb-cameras.geojson">{t.downloadGeoJson}</a><span>·</span><a href="/api/cameras?format=csv" download="opensurveillancedb-cameras.csv">{t.downloadCsv}</a><span>·</span><a href="/guide">{t.readDataPolicy}</a></div>

@@ -1,16 +1,16 @@
 # QA Coverage Report
 
-Baseline generata il **2026-08-02** su commit `62653cf` con
-`npm run coverage && npm run coverage:docs`. Suite: 1384/1384 test PASS, 0 fail.
+Baseline generata il **2026-08-02** su commit `7a3bd62` con
+`npm run coverage && npm run coverage:docs`. Suite: 1436/1436 test PASS, 0 fail.
 
 ## Riepilogo (solo codice di produzione, esclusi test/helper/mock/fixture)
 
 | Metrica | Coperto | Totale | % |
 |---|---|---|---|
-| Righe | 7737 | 8290 | **93.33%** |
-| Branch | 1758 | 1924 | 91.37% |
-| Funzioni | 290 | 302 | 96.03% |
-| Statement | 7737 | 8290 | 93.33% |
+| Righe | 8144 | 8705 | **93.56%** |
+| Branch | 1862 | 2036 | 91.45% |
+| Funzioni | 301 | 313 | 96.17% |
+| Statement | 8144 | 8705 | 93.56% |
 
 ## Soglia minima CI
 
@@ -47,7 +47,7 @@ sotto soglia il job fallisce.
 | `app/lib/image-metadata.ts` | 89.82 | 92.31 | 100.00 | 300/334 |
 | `app/lib/trust-levels.ts` | 89.86 | 100.00 | 66.67 | 62/69 |
 | `app/lib/abuse-alerts.ts` | 90.74 | 96.67 | 100.00 | 147/162 |
-| `worker/index.ts` | 91.43 | 97.56 | 76.92 | 192/210 |
+| `worker/index.ts` | 91.63 | 97.67 | 76.92 | 197/215 |
 | `db/cameras.ts` | 91.82 | 85.19 | 94.12 | 292/318 |
 | `app/api/moderation/photos/[id]/route.ts` | 93.75 | 60.00 | 100.00 | 30/32 |
 | `app/api/cameras/route.ts` | 93.77 | 97.48 | 100.00 | 241/257 |
@@ -58,17 +58,18 @@ sotto soglia il job fallisce.
 | `app/lib/confirm-ip-burst.ts` | 95.83 | 94.44 | 100.00 | 69/72 |
 | `app/api/auth/account/route.ts` | 96.23 | 90.91 | 100.00 | 51/53 |
 | `db/confirmations.ts` | 96.39 | 84.62 | 90.00 | 160/166 |
-| `db/geocode.ts` | 96.67 | 72.73 | 100.00 | 116/120 |
+| `db/geocode.ts` | 96.85 | 72.73 | 100.00 | 123/127 |
 | `db/appeals.ts` | 97.22 | 80.39 | 100.00 | 210/216 |
 | `app/api/auth/register/route.ts` | 97.26 | 95.83 | 100.00 | 71/73 |
 | `app/api/auth/login/route.ts` | 97.40 | 95.65 | 100.00 | 75/77 |
 | `app/api/tiles/[z]/[x]/[y]/route.ts` | 97.61 | 92.31 | 100.00 | 245/251 |
 | `app/api/moderation/route.ts` | 97.77 | 90.97 | 100.00 | 351/359 |
+| `app/api/appeals/route.ts` | 97.78 | 93.10 | 100.00 | 176/180 |
 | `db/retention.ts` | 97.84 | 92.31 | 100.00 | 407/416 |
-| `app/lib/rate-limit.ts` | 98.24 | 100.00 | 100.00 | 167/170 |
+| `app/api/geocode/route.ts` | 97.96 | 91.21 | 100.00 | 288/294 |
 | `app/api/auth/me/contributions/route.ts` | 98.32 | 93.75 | 100.00 | 117/119 |
+| `app/lib/rate-limit.ts` | 98.48 | 100.00 | 100.00 | 195/198 |
 | `db/auth.ts` | 98.55 | 91.89 | 96.55 | 542/550 |
-| `app/api/appeals/route.ts` | 98.68 | 92.16 | 100.00 | 149/151 |
 | `app/api/appeals/[id]/route.ts` | 100.00 | 97.67 | 100.00 | 121/121 |
 | `app/api/cameras/nearby/route.ts` | 100.00 | 100.00 | 100.00 | 72/72 |
 | `app/api/cameras/revisions/route.ts` | 100.00 | 94.12 | 100.00 | 58/58 |
@@ -82,6 +83,7 @@ sotto soglia il job fallisce.
 | `app/lib/duplicate-detection.ts` | 100.00 | 96.97 | 100.00 | 75/75 |
 | `app/lib/guards.ts` | 100.00 | 100.00 | 100.00 | 3/3 |
 | `app/lib/input-limits.ts` | 100.00 | 93.75 | 100.00 | 76/76 |
+| `app/lib/map-viewport.ts` | 100.00 | 100.00 | 100.00 | 52/52 |
 | `app/lib/photo-quota.ts` | 100.00 | 100.00 | 100.00 | 63/63 |
 | `app/lib/public-status.ts` | 100.00 | 100.00 | 100.00 | 24/24 |
 | `app/lib/records.ts` | 100.00 | 100.00 | 100.00 | 37/37 |
