@@ -271,6 +271,25 @@ changes accumulate under `[Unreleased]`.
 
 ### Fixed
 
+- P1-1 `confirmationCountsFor()` D1 bound-parameter cap (t_b2d59dfc): a
+  public camera page with more than 100 records used to build a single
+  `IN (?, ...)` over every id, blowing past D1's 100-bound-parameter limit
+  and turning `GET /api/cameras` (default limit 500) into a 503. The counts
+  query now iterates in chunks of at most 100 ids and merges the GROUP BY
+  results into one Map — same pattern as the correction-history events in
+  `db/moderation.ts`. The in-memory D1 test harness
+  (`tests/helpers/d1-sqlite.mjs`) now enforces the same 100-param cap, so a
+  >100-record regression test fails on the unfixed code instead of passing
+  on node:sqlite's higher SQLITE_MAX_VARIABLE_NUMBER.
+- `verifyPassword` now derives at the iteration count embedded in the stored
+  hash instead of the current `PBKDF2_ITERATIONS` constant (t_fe668331, P1-2
+  security review): bumping the constant (e.g. 210k → 600k, AUTH_OPTIONS §8)
+  no longer invalidates every existing password and locks out all
+  contributors — each hash re-derives at its own stored count (ADR 0013),
+  with a constant fallback for legacy 3-part hashes that predate the embedded
+  count. New bump-safety tests in `tests/auth-d1.test.mjs` cover hashes at
+  different iteration counts and the legacy fallback.
+
 - `/mappa` autocomplete UX (t_3c4b188e): typing a place no longer triggers
   the search immediately — the geocode suggestion dropdown (250ms debounce)
   now appears BEFORE the points list re-filters (400ms `?q=` debounce), and
@@ -314,6 +333,13 @@ changes accumulate under `[Unreleased]`.
   once the lazy leaflet import resolves (`mapReady` flag), instead of
   early-returning at mount and never being re-triggered by a stable
   `cameras` prop (t_eb2e33a3 regression after the #202 redesign).
+- Photo uploads no longer leak orphaned R2 objects when the D1 metadata
+  INSERT fails (t_00e63031, P1-3): `createPendingPhoto` now deletes the
+  just-stored R2 object best-effort before rethrowing, so a failed upload
+  cannot leave bytes in the `PHOTOS` bucket with no D1 row (which the
+  retention sweep — D1-only — could never collect). The storage key is a
+  fresh UUID per attempt, so retries are idempotent: a failed attempt
+  leaves no object behind and the retry stores exactly one.
 
 ### Security
 

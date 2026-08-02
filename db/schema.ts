@@ -201,10 +201,23 @@ export const users = sqliteTable(
     role: text("role").notNull().default("contributor"),
     active: integer("active").notNull().default(1),
     mfaEnabled: integer("mfa_enabled").notNull().default(0),
+    // Explicit contributor→users identity link (audit t_5ca60ab2, P2): the
+    // only attribution path from a contributor session to a `users` role
+    // identity. Email equality is never used to bridge the two stores — a
+    // contributor could register with an email matching any users row and
+    // inherit that identity's role (spoofable attribution). Provisioning
+    // (ops) sets this link. Like cameras.contributor_id there is NO ON
+    // DELETE action: severance is explicit, inside eraseContributor (SET
+    // NULL before the contributor row is deleted), so a role identity is
+    // unlinked but never deleted by account erasure.
+    contributorId: integer("contributor_id").references(() => contributors.id),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
-  (table) => [index("users_role_idx").on(table.role)],
+  (table) => [
+    index("users_role_idx").on(table.role),
+    uniqueIndex("users_contributor_id_unique").on(table.contributorId),
+  ],
 );
 
 /**

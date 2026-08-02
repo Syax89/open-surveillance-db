@@ -168,6 +168,22 @@ harm.
   otherwise spread a burst across isolates. The per-isolate limiter remains
   the correct first layer everywhere and the only one needed for the local
   and staging single-isolate deployments.
+- Caller identity is only as trustworthy as the edge that sets it. The
+  per-caller buckets key on `cf-connecting-ip` when present (set by
+  Cloudflare, unspoofable at the worker) and fall back to the first
+  `x-forwarded-for` hop (`app/lib/rate-limit.ts` `callerKey`; the anonymous
+  pending-photo quota bucket derives from the same key via
+  `app/lib/photo-quota.ts`). On any deployment NOT fronted by Cloudflare a
+  client can set arbitrary `x-forwarded-for` values and rotate its key,
+  making the per-caller limits and the anonymous photo quota best-effort
+  rather than a security boundary. The public API must therefore sit behind
+  Cloudflare (or an equivalent trusted edge that overwrites the forwarded
+  chain); non-CF deployments (local prototype, LAN, staging behind a plain
+  proxy) must terminate at a trusted reverse proxy that strips or
+  overwrites client-supplied `x-forwarded-for`, or treat the buckets as
+  development conveniences only (see LOCAL_PLAYBOOK.md). This is a
+  documented deployment constraint, not a fallback to rely on in
+  production.
 - Keep pending records, moderator notes, account data, audit detail, and private
   evidence inaccessible from public APIs, search, exports, error messages, and
   logs.

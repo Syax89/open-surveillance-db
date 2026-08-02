@@ -2,7 +2,7 @@ import { env } from "cloudflare:workers";
 import { resolveOptionalContributor } from "../../../lib/auth-session";
 import { authLimit, parseDisplayName } from "../../../lib/auth-route-helpers";
 import { csrfVerified, sameOrigin } from "../../../lib/csrf";
-import { urlTooLong } from "../../../lib/input-limits";
+import { BodyReadError, readJsonBody, urlTooLong } from "../../../lib/input-limits";
 import { trustLevelMeta } from "../../../lib/trust-levels";
 import { countVerifiedCameras, updateContributorDisplayName } from "../../../../db/auth";
 
@@ -29,7 +29,9 @@ export async function GET(request: Request) {
   try {
     const resolved = await resolveOptionalContributor(request);
     if (!resolved) {
-      return Response.json({ error: "Not authenticated." }, { status: 401 });
+      // Personal-data-shaped response (the anonymous profile): the account
+      // page must never edge-cache it, mirroring the 200 path.
+      return Response.json({ error: "Not authenticated." }, { status: 401, headers: NO_STORE_HEADERS });
     }
     const verifiedCount = await countVerifiedCameras(resolved.contributor.id);
     return Response.json(
@@ -61,7 +63,10 @@ const NO_STORE_HEADERS = { "Cache-Control": "no-store" };
  * registration). Any other key answers 400 with no partial effects. Guard
  * order mirrors the other auth mutations: urlTooLong -> sameOrigin -> auth
  * rate-limit -> session (401) -> CSRF (403) -> body validation (400). The
- * response is the refreshed public profile, always no-store (personal data).
+ * body read goes through the shared readJsonBody contract: malformed JSON
+ * answers 400 "Request body is not valid JSON." and an oversized body 413
+ * "Request body too large." (same pin as the malformed-json-routes suite).
+ * The response is the refreshed public profile, always no-store (personal data).
  */
 export async function PATCH(request: Request) {
   if (urlTooLong(request)) {
@@ -86,9 +91,13 @@ export async function PATCH(request: Request) {
 
     let payload: unknown;
     try {
-      payload = await request.json();
-    } catch {
-      return Response.json({ error: "A JSON object with the displayName field is required." }, { status: 400, headers: NO_STORE_HEADERS });
+      payload = await readJsonBody(request, env);
+    } catch (error) {
+      if (error instanceof BodyReadError) {
+        console.warn("PATCH /api/auth/me payload rejected: body too large or not valid JSON");
+        return Response.json({ error: error.message }, { status: error.status, headers: NO_STORE_HEADERS });
+      }
+      throw error;
     }
     if (typeof payload !== "object" || payload === null || Array.isArray(payload)) {
       return Response.json({ error: "A JSON object with the displayName field is required." }, { status: 400, headers: NO_STORE_HEADERS });

@@ -6,7 +6,7 @@ import {
   normalizeEmail,
   type PublicContributor,
 } from "../../../../db/auth";
-import { sessionCookieHeaders } from "../../../lib/auth-session";
+import { sessionCookieHeaders, sessionTtlSeconds } from "../../../lib/auth-session";
 import {
   authLimit,
   cookieHeaderInit,
@@ -81,7 +81,13 @@ export async function POST(request: Request) {
       throw error;
     }
 
-    const { rawToken, csrfToken } = await createSession(contributor.id);
+    const { rawToken, csrfToken } = await createSession(contributor.id, {
+      // The DB expires_at must match the cookie Max-Age exactly: both derive
+      // from the same sessionTtlSeconds(env) (audit t_5ca60ab2, P2 — a
+      // divergent TTL would let a token stay valid server-side after the
+      // cookie is gone, or expire sessions the client still holds).
+      ttlSeconds: sessionTtlSeconds(env),
+    });
     return Response.json(
       { contributor },
       { status: 201, headers: cookieHeaderInit(sessionCookieHeaders(rawToken, csrfToken, env)) },

@@ -15,7 +15,7 @@ import {
 } from "../../lib/image-metadata";
 import { PayloadTooLargeError, urlTooLong } from "../../lib/input-limits";
 import { recordRateLimitBlock } from "../../lib/abuse-alerts";
-import { callerKey, checkRateLimit, submissionLimits, submissionsDisabled } from "../../lib/rate-limit";
+import { callerKey, checkRateLimit, limitsFor, submissionLimits, submissionsDisabled } from "../../lib/rate-limit";
 import { csrfVerified, sameOrigin } from "../../lib/csrf";
 import { resolveOptionalContributor } from "../../lib/auth-session";
 import { pendingPhotoQuota, submitterKeyFor } from "../../lib/photo-quota";
@@ -195,6 +195,27 @@ export async function POST(request: Request) {
 export async function GET(request: Request) {
   if (urlTooLong(request)) {
     return Response.json({ error: "Request URI too long." }, { status: 414 });
+  }
+
+  // Public list route: every hit reads D1 and returns the gallery payload,
+  // so the read-family bucket metered per caller (default 60/min,
+  // READ_RATE_LIMIT_* knobs) bounds bulk scraping, mirroring the byte route
+  // GET /api/photos/[id] (audit t_5ca60ab2, P2 — the list was previously
+  // unthrottled).
+  const key = callerKey(request);
+  const limitOptions = limitsFor("read", env);
+  const limit = checkRateLimit("read", key, limitOptions);
+  if (!limit.allowed) {
+    console.warn("GET /api/photos rate limited");
+    recordRateLimitBlock(env, {
+      route: "/api/photos",
+      key,
+      windowSeconds: limitOptions.windowSeconds,
+    });
+    return Response.json({ error: "Too many requests. Please try again shortly." }, {
+      status: 429,
+      headers: { "Retry-After": String(limit.retryAfterSeconds) },
+    });
   }
 
   try {

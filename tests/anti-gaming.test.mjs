@@ -350,6 +350,21 @@ test("confirmationCountsFor aggregates in one GROUP BY with decay", async () => 
   assert.equal(await confirmations.recordConfirmationCount(camC), 0, "a fully decayed record reads as 0");
 });
 
+test("confirmationCountsFor chunks >100 ids against the D1 bound-parameter cap", async () => {
+  const contributorId = await insertContributor();
+  const cameraIds = [];
+  for (let i = 0; i < 150; i += 1) {
+    const id = await insertCamera();
+    await insertConfirmation(id, contributorId, "2026-08-01T00:00:00.000Z");
+    cameraIds.push(id);
+  }
+  const counts = await confirmations.confirmationCountsFor(cameraIds);
+  assert.equal(counts.size, 150, "all 150 cameras must have a count");
+  for (const id of cameraIds) {
+    assert.equal(counts.get(id), 1, `camera ${id} must have exactly 1 confirmation`);
+  }
+});
+
 test("removeConfirmation decrements the decayed count and answers not_found when missing", async () => {
   const verifier = await makeVerifiedContributor();
   const cameraId = await insertCamera();
