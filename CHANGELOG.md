@@ -253,6 +253,11 @@ changes accumulate under `[Unreleased]`.
   sr-only map link shows a visible focus badge when tabbed (2.4.7), and
   `/records/[id]` + `/account` render per-page `<title>` metadata (2.4.2)
   via server shells that wrap the client bodies.
+- Deploy workflow dry-run no longer uses the non-existent `--dry-run` flag
+  on `wrangler d1 migrations apply` (wrangler 4.x exits 1 with "Unknown
+  arguments: dry-run, dryRun"): the dry-run step now uses the read-only
+  `wrangler d1 migrations list osdb-production --remote`, so the first
+  manual dry-run trigger completes instead of failing.
 
 ### Security
 
