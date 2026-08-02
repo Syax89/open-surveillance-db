@@ -154,12 +154,12 @@ test("a submitted camera starts pending and is absent from every public represen
 test("every legal camera transition updates the status and records an append-only event", async (t) => {
   const cases = [
     { from: "pending", action: "approve", to: "verified", updated: "ISO", reason: REASON.verified },
-    { from: "pending", action: "reject", to: "rejected", updated: "Local moderation: rejected", reason: REASON.duplicate },
-    { from: "pending", action: "hide", to: "removed", updated: "Local moderation: hidden from public listing", reason: REASON.sensitive },
-    { from: "verified", action: "mark-stale", to: "needs_review", updated: "Local moderation: marked stale and queued for review", reason: REASON.stale },
-    { from: "verified", action: "hide", to: "removed", updated: "Local moderation: hidden from public listing", reason: REASON.sensitive },
+    { from: "pending", action: "reject", to: "rejected", updated: "ISO", reason: REASON.duplicate },
+    { from: "pending", action: "hide", to: "removed", updated: "ISO", reason: REASON.sensitive },
+    { from: "verified", action: "mark-stale", to: "needs_review", updated: "ISO", reason: REASON.stale },
+    { from: "verified", action: "hide", to: "removed", updated: "ISO", reason: REASON.sensitive },
     { from: "needs_review", action: "reverify", to: "verified", updated: "ISO", reason: REASON.verified },
-    { from: "needs_review", action: "hide", to: "removed", updated: "Local moderation: hidden from public listing", reason: REASON.sensitive },
+    { from: "needs_review", action: "hide", to: "removed", updated: "ISO", reason: REASON.sensitive },
   ];
 
   for (const { from, action, to, updated, reason } of cases) {

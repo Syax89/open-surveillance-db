@@ -386,7 +386,7 @@ export async function applyCameraEdit(input: {
       binds.push(storageValue(field, diff[field]));
     }
     sets.push("updated = ?");
-    binds.push("Community edit");
+    binds.push(input.now);
 
     const precondition = input.expectedUpdated !== undefined ? " AND updated = ?" : "";
     // Bind order follows the SQL: the WHERE columns (id, status,

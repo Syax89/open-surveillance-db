@@ -96,12 +96,12 @@ test("verification transitions store an ISO timestamp so the public freshness fi
 
   assert.match(
     transitions,
-    /action === "approve"[\s\S]*?newStatus: "verified",\s*updated:\s*new Date\(\)\.toISOString\(\)/,
+    /action === "approve"[\s\S]*?newStatus: "verified",\s*updated:\s*nowIso/,
     "approve must record the verification moment as a comparable ISO timestamp",
   );
   assert.match(
     transitions,
-    /action === "reverify"[\s\S]*?newStatus: "verified",\s*updated:\s*new Date\(\)\.toISOString\(\)/,
+    /action === "reverify"[\s\S]*?newStatus: "verified",\s*updated:\s*nowIso/,
     "reverify must refresh the verification timestamp, not a human-readable label",
   );
   assert.doesNotMatch(

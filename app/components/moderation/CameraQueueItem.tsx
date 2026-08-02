@@ -45,7 +45,7 @@ export function CameraQueueItem({ camera, variant, queueBadge, api, readableDate
       <dl>
         <div><dt>{t.approximateLocation}</dt><dd>{camera.address || t.noAddress}<br />{camera.latitude.toFixed(5)}, {camera.longitude.toFixed(5)}</dd></div>
         <div><dt>{t.source}</dt><dd>{camera.source || t.communityReport}</dd></div>
-        <div><dt>{config.lastUpdate ? t.lastUpdate : t.submitted}</dt><dd>{config.lastUpdate ? camera.updated || readableDate(camera.createdAt) : readableDate(camera.createdAt)}</dd></div>
+        <div><dt>{config.lastUpdate ? t.lastUpdate : t.submitted}</dt><dd>{config.lastUpdate ? (camera.updated ? readableDate(camera.updated) : readableDate(camera.createdAt)) : readableDate(camera.createdAt)}</dd></div>
       </dl>
       {metadataAvailable && <dl className="camera-metadata">
         {camera.manufacturer && <div><dt>{t.manufacturer}</dt><dd>{camera.manufacturer}</dd></div>}

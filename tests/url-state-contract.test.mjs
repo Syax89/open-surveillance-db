@@ -194,6 +194,45 @@ test("applyCameraFilters: combined filters + sort, freshness anchored on lastVer
     "position order sorts south→north by latitude");
 });
 
+test("applyCameraFilters P1-2: a real record with a non-parseable updated is KEPT under a freshness window (never silently dropped)", () => {
+  const now = Date.parse("2026-08-01T00:00:00Z");
+  // Legacy row: written before the ISO-only contract, `updated` carries the
+  // old prose label and there is no lastVerifiedAt. The client gate must not
+  // compute NaN and drop a verified record — it has no freshness signal, so
+  // it stays visible (the descriptive text lives in the moderation note).
+  const records = [
+    makeCamera(1, { title: "Legacy verified", status: "verified", lastVerifiedAt: null, updated: "Local moderation: rejected" }),
+    makeCamera(2, { title: "Modern verified", status: "verified", lastVerifiedAt: "2026-07-30T00:00:00.000Z" }),
+  ];
+  const filtered = applyCameraFilters(records, {
+    q: "", type: "all", freshness: "7d", sort: "alphabetical", focus: null,
+  }, now);
+  assert.deepEqual(filtered.map((camera) => camera.title), ["Legacy verified", "Modern verified"],
+    "a non-parseable updated must not drop a real record; a fresh lastVerifiedAt anchors as usual");
+});
+
+test("applyCameraFilters P1-2: demo pins keep the truthful empty-note contract (excluded when they have no freshness date)", () => {
+  const now = Date.parse("2026-08-01T00:00:00Z");
+  // Prototype seed records carry the literal "Demo data" label by design:
+  // they are illustrative and must never masquerade as "recently verified"
+  // under a freshness window (t_b9666d09). The P1-2 keep-if-no-signal rule
+  // applies to REAL records only.
+  const records = [
+    makeCamera(1, { title: "Illustrative record A", status: "demo", lastVerifiedAt: null, updated: "Demo data" }),
+    makeCamera(2, { title: "Verified real", status: "verified", lastVerifiedAt: "2026-07-30T00:00:00.000Z" }),
+  ];
+  const filtered = applyCameraFilters(records, {
+    q: "", type: "all", freshness: "7d", sort: "alphabetical", focus: null,
+  }, now);
+  assert.deepEqual(filtered.map((camera) => camera.title), ["Verified real"],
+    "demo pins without a freshness date are excluded; real records are never dropped");
+  const unfiltered = applyCameraFilters(records, {
+    q: "", type: "all", freshness: "all", sort: "alphabetical", focus: null,
+  }, now);
+  assert.deepEqual(unfiltered.map((camera) => camera.title), ["Illustrative record A", "Verified real"],
+    "with freshness=all the demo pins render as usual");
+});
+
 // ---------------------------------------------------------------------------
 // 2. deep link / back-forward / invalid URL (DOM)
 // ---------------------------------------------------------------------------
