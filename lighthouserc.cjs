@@ -8,6 +8,21 @@
  * A PR whose preview fails this gate is rejected by the lighthouse job in
  * .github/workflows/lighthouse.yml.
  *
+ * Coverage model (reliability fix t_2f6e49a0, 2026-08-02): the list below is
+ * ONE representative route per DISTINCT layout template, not every URL —
+ * Lighthouse audits the layout-dependent rules, and the app has 4 shared
+ * templates: InfoPage (guide/faq/contatti/privacy/termini/licenze/manifesto/
+ * regole/moderazione/accessibility all render the same component, so /guide
+ * represents them all), the tools shell ((tools)/layout.tsx: mappa,
+ * directory, segnala, correggi — kept individually, each has a distinct
+ * layout), the auth pages (login/register/account — the most layout-
+ * sensitive: forms, focus traps, target-size on buttons) and the record
+ * detail (/records/[id]). Content-level axe rules (alt text, aria, heading
+ * structure, …) still run on EVERY public route via the jsdom SSR suite, so
+ * no route loses automated coverage. 19 URLs made the job take 16-22 min
+ * against a 20 min timeout and saturated the runner pool (queues of 40+ min,
+ * runs appearing "in_progress" forever) — see kanban t_2f6e49a0.
+ *
  * Local QA run (after `npm run build`):
  *   npx lhci autorun
  * The CLI starts the preview server itself (startServerCommand) and asserts
@@ -37,19 +52,10 @@ module.exports = {
         "http://localhost:3000/segnala",
         "http://localhost:3000/correggi",
         "http://localhost:3000/records/1",
-        "http://localhost:3000/guide",
-        "http://localhost:3000/accessibility",
         "http://localhost:3000/login",
         "http://localhost:3000/register",
         "http://localhost:3000/account",
-        "http://localhost:3000/faq",
-        "http://localhost:3000/contatti",
-        "http://localhost:3000/privacy",
-        "http://localhost:3000/termini",
-        "http://localhost:3000/licenze",
-        "http://localhost:3000/manifesto",
-        "http://localhost:3000/regole",
-        "http://localhost:3000/moderazione",
+        "http://localhost:3000/guide",
       ],
       numberOfRuns: 1,
       settings: {

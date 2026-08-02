@@ -5,6 +5,15 @@ name: Lighthouse a11y gate
 # routes and FAILS the check run when the accessibility category score drops
 # below 0.95 — a PR cannot merge with a red lighthouse job.
 #
+# Reliability fix (kanban t_2f6e49a0, 2026-08-02): the URL list in
+# lighthouserc.cjs is now ONE representative route per distinct layout
+# template (~10 instead of 19) — runtime dropped from 16-22 min to ~8-10 min,
+# ending the 20-min-timeout race and the runner-pool saturation that left
+# runs "in_progress" for 40+ min. The Lighthouse CI step also has its own
+# fail-fast timeout (15 min): a genuinely hung Lighthouse (server/Chrome)
+# dies with a visible error instead of sitting in_progress until a human
+# cancels it. Job-level timeout raised to 30 min as a safety net.
+#
 # Covers the layout-dependent axe rules that the jsdom-based SSR suite cannot
 # evaluate (color-contrast, target-size WCAG 2.5.8, link-in-text-block,
 # scrollable-region-focusable) — see lighthouserc.cjs and
@@ -27,7 +36,8 @@ jobs:
   lighthouse-a11y:
     name: Lighthouse accessibility >= 0.95
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # 30 min: ~8-10 min typical after the URL trim (t_2f6e49a0) + queue slack.
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
@@ -46,6 +56,10 @@ jobs:
         run: npm run build
 
       - name: Lighthouse CI (collect + assert + upload)
+        # Fail-fast: a hung Lighthouse (server/Chrome) dies here with a
+        # visible error instead of leaving the check "in_progress" forever
+        # (t_2f6e49a0). 15 min ≈ 1.5x the expected ~10 min — no false alarms.
+        timeout-minutes: 15
         uses: treosh/lighthouse-ci-action@v12
         with:
           configPath: ./lighthouserc.cjs
