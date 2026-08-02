@@ -119,3 +119,25 @@ matching RETENTION_SCHEDULE R7 ("erasure with de-attribution"):
    `cameras.contributor_id` changes to NULL.
 4. **Security posture** mirrors logout: same-origin gate, the shared auth
    rate-limit bucket, and CSRF double-submit. Anonymous calls get 401.
+
+## Update (2026-08-02): multi-method authentication (ADR 0020)
+
+[ADR 0020](0020-multi-method-authentication.md) extends this decision from a
+single email+password method to **three methods**, all producing the same
+`contributors.id`:
+
+1. **email + password, now with email verification and password reset** — the
+   "no email verification / no password reset yet" deferrals in decision 5 are
+   resolved by the Cloudflare Email Routing mailer (`opensurveillancedb.org`);
+2. **passkeys (WebAuthn)** as an optional parallel method (D1 `passkeys`
+   table, 10 hashed recovery codes at enrollment, email+password fallback);
+3. **OIDC via GitHub or Google** as an opt-in, disclosed method — subject id +
+   verified flag only, **no email imported**, activation gated on DPA +
+   EU–US DPF (PROCESSOR_REGISTER PR5/PR6, currently conditional).
+
+The session/CSRF/PBKDF2 baseline and the anonymous-submissions rule
+(decision 4) are unchanged. **Email verification is now required for write
+access** (unverified sessions are read-only — ADR 0020 decision 2). Erasure
+(decision 2 above / R7) extends to the new auth data: verification tokens,
+passkeys and recovery codes are hard-deleted, `external_sub` is cleared
+(RETENTION_SCHEDULE R15).

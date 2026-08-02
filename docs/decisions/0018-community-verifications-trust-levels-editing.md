@@ -258,3 +258,16 @@ Two facts shape everything below:
   alpha; no confidence column in the schema now.
 - **Profile as new `/profile` page**: rejected — `/account` is extended
   (design #815), keeping one account surface.
+
+## Update (2026-08-02): email verification now exists (ADR 0020)
+
+The "no mailer exists, ADR 0013" notes above (level gate § 2.2.5 and
+alternatives) are superseded in one respect: the **mailer now exists**
+(Cloudflare Email Routing, AUTH MULTI-METODO Fase A2) and **email
+verification is required for write access** (read-only sessions until
+verified — [ADR 0020](0020-multi-method-authentication.md) decision 2).
+
+The **level gate for confirmations is unchanged**: L1 still means "at least
+one verified contribution" (COMMUNITY_PLAN.md § 3.2), never email
+verification — the two gates are separate. Write access (submissions, edits,
+verifications) is the one gated on email verification.
