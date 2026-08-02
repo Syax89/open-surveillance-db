@@ -31,6 +31,7 @@ reviews or lost in chat threads.
 | [0017](0017-no-dpo-appointed-art37.md) | No DPO appointed — documented exclusion under GDPR art. 37(1) | accepted (legal recommendation) | 2026-08-01 |
 | [0018](0018-community-verifications-trust-levels-editing.md) | Community verifications, trust levels and contribution editing | accepted | 2026-08-01 |
 | [0019](0019-pre-submit-duplicate-confirmation-gate.md) | Pre-submit duplicate confirmation gate | accepted | 2026-08-02 |
+| [0020](0020-multi-method-authentication.md) | Multi-method authentication (email+password with verification, passkeys, OIDC) | accepted | 2026-08-02 |
 
 Status values follow the headers in each ADR: `proposed` (draft, pending
 review) and `accepted` (decision recorded; `CEO decision` marks decisions made
