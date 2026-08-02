@@ -639,7 +639,7 @@ export async function getContributorVerification(
 // ---------------------------------------------------------------------------
 //
 // Both flows that prove mailbox control share the `email_verification_tokens`
-// table (migration 0027 + purpose column 0030): 'verify' links emailed at
+// table (migration 0027 + purpose column 0031): 'verify' links emailed at
 // registration, 'reset' links emailed by the reset-request handler. The
 // security model is inherited from 0027:
 //   - only the SHA-256 of the raw token is stored (a DB leak cannot replay);
