@@ -70,6 +70,12 @@ const DB_MODULES = [
   // ./cameras and recordModerationEvent from ./moderation — both already in
   // this tree — so the real two-track logic runs against the same binding.
   { source: "db/camera-edits.ts", output: "db/camera-edits.mjs" },
+  // db/passkeys.ts (WebAuthn ceremonies + recovery codes, multi-method auth
+  // Fase C, t_36989e06) imports getD1 from ./cameras and the crypto helpers
+  // randomBase64Url/sha256Hex from ./auth — both already in this tree — so
+  // the real challenge/passkey/recovery-code SQL runs against the same
+  // in-memory D1 (passkey-d1.test.mjs).
+  { source: "db/passkeys.ts", output: "db/passkeys.mjs" },
 ];
 
 let builtTreePromise = null;
@@ -127,7 +133,8 @@ export async function loadDbRuntime() {
   const retention = await import(pathToFileURL(path.join(tree, "db/retention.mjs")).href);
   const confirmations = await import(pathToFileURL(path.join(tree, "db/confirmations.mjs")).href);
   const cameraEdits = await import(pathToFileURL(path.join(tree, "db/camera-edits.mjs")).href);
-  return { env: envModule.env, cameras, corrections, moderation, auth, users, appeals, photos, retention, confirmations, cameraEdits };
+  const passkeys = await import(pathToFileURL(path.join(tree, "db/passkeys.mjs")).href);
+  return { env: envModule.env, cameras, corrections, moderation, auth, users, appeals, photos, retention, confirmations, cameraEdits, passkeys };
 }
 
 // Replays the real Drizzle migration files (drizzle/0000-*.sql ... 0017-*.sql)
