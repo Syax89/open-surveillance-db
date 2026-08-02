@@ -186,9 +186,9 @@ console.log("└─────────────────────�
 if (existsSync(persistDir)) {
   rmSync(persistDir, { recursive: true, force: true });
 }
-console.log(`[1/8] fresh persist dir: ${path.relative(root, persistDir)}`);
+console.log(`[1/10] fresh persist dir: ${path.relative(root, persistDir)}`);
 
-console.log("[2/8] applying migrations (wrangler d1 migrations apply --local)…");
+console.log("[2/10] applying migrations (wrangler d1 migrations apply --local)…");
 try {
   runWrangler(["d1", "migrations", "apply", dbName, "--local", "--persist-to", persistDir]);
 } catch (err) {
@@ -199,7 +199,7 @@ try {
 console.log("      migrations applied successfully");
 
 // 2. Migration journal must exist and match the files in drizzle/.
-console.log("[3/8] checking migration journal (d1_migrations)…");
+console.log("[3/10] checking migration journal (d1_migrations)…");
 let journalRows;
 try {
   journalRows = query("SELECT name FROM d1_migrations;");
@@ -227,7 +227,7 @@ if (appliedNames.join("\n") !== filesSorted.join("\n")) {
 //    what catches a migration dropped or renamed in the migrations dir: the
 //    DB journal only reflects what was applied, so a missing file is invisible
 //    to it — but drizzle/meta/_journal.json still lists the expected set.
-console.log("[4/8] checking drizzle meta journal…");
+console.log("[4/10] checking drizzle meta journal…");
 let metaTags = [];
 const metaJournalPath = path.join(migrationsDir, "meta", "_journal.json");
 try {
@@ -254,7 +254,7 @@ if (metaSorted.join("\n") !== filesNoExt.join("\n")) {
 //     giant 0026). drizzle-kit 0.31 has no --dry-run, so we run the real
 //     generate against a throwaway COPY of drizzle/ and assert zero new .sql
 //     files appeared — the developer tree is never touched.
-console.log("[5/9] checking drizzle-kit generate is a no-op…");
+console.log("[5/10] checking drizzle-kit generate is a no-op…");
 const genScratch = path.join(root, ".wrangler", "smoke-generate");
 const genOut = path.join(genScratch, "drizzle");
 const genConfig = path.join(genScratch, "drizzle.config.ts");
@@ -307,7 +307,7 @@ if (genScratchReady) {
 }
 
 // 4. Expected application tables must exist.
-console.log("[6/9] checking application tables…");
+console.log("[6/10] checking application tables…");
 let tableRows;
 try {
   tableRows = query("SELECT name FROM sqlite_master WHERE type = 'table';");
@@ -332,7 +332,7 @@ if (unexpected.length > 0) {
 
 // 4b. Multi-method auth columns on `contributors` (0027): the ALTER TABLE
 // part of the migration must have landed — the tables alone don't prove it.
-console.log("[5b/8] checking contributors auth columns…");
+console.log("[7/10] checking contributors auth columns…");
 let contributorColumns;
 try {
   const colRows = query("PRAGMA table_info(contributors);");
@@ -350,7 +350,7 @@ for (const col of ["email_verified_at", "auth_provider", "external_sub"]) {
 }
 
 // 5. Expected indexes must exist.
-console.log("[6/8] checking indexes…");
+console.log("[8/10] checking indexes…");
 let indexRows;
 try {
   indexRows = query("SELECT name FROM sqlite_master WHERE type = 'index' AND name NOT LIKE 'sqlite_%';");
@@ -369,7 +369,7 @@ for (const i of expectedIndexes) {
 
 // 6. A fresh migrated database must be empty (no demo/seed rows), except for
 //    tables the migrations deliberately seed with a fixed row set.
-console.log("[8/9] checking row counts (fresh DB must be empty)…");
+console.log("[9/10] checking row counts (fresh DB must be empty)…");
 for (const t of expectedTables) {
   const seeded = expectedSeedCounts[t];
   let count = -1;
@@ -397,7 +397,7 @@ for (const t of expectedTables) {
 //    "Demo *" reviewer and every @osdb.test demo user seeded by 0008/0010.
 //    This is the security gate that keeps demo moderation/admin accounts out
 //    of a fresh alpha/prod database.
-console.log("[9/9] checking zero demo identities (0017 removal)…");
+console.log("[10/10] checking zero demo identities (0017 removal)…");
 const demoChecks = [
   {
     label: "demo reviewers (display_name LIKE 'Demo %')",
