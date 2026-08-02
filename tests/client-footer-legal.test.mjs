@@ -72,11 +72,18 @@ const fakeLegalContent = {
   ],
 };
 
-// LegalPage takes the nav-shell labels as a separate required prop — the real
-// pages pass the `home` bundle resolved from server-i18n (app/privacy/page.tsx
-// et al.). These QA tests predate the Server-Components refactor (PR #120)
-// that introduced navLabels; this fictitious fixture mirrors the contract so
-// the tests exercise the same prop shape as production.
+// LegalPage takes the nav-shell landmark labels as a separate required prop —
+// the real pages pass the `home` bundle resolved from server-i18n
+// (app/privacy/page.tsx et al.). These QA tests predate the
+// Server-Components refactor (PR #120) that introduced navLabels; this
+// fictitious fixture mirrors the contract so the tests exercise the same
+// prop shape as production.
+//
+// Since t_a72a3106 the nav LINK SET no longer comes from navLabels: LegalPage
+// renders the shared public nav (PublicNavLinks — the same six home links as
+// every other public page, with the current page marked aria-current). The
+// navLabels prop now carries ONLY the landmark labels (mainNavigation /
+// homeAria); the link texts come from the home bundle.
 //
 // QA t_5084202a — root cause of the "flaky" CI red runs: PR #120 made
 // navLabels a REQUIRED prop; the tests from PR #94 still rendered LegalPage
@@ -89,15 +96,18 @@ const fakeLegalContent = {
 const fakeNavLabels = {
   mainNavigation: "Fixture navigation",
   homeAria: "Fixture home",
-  exploreMap: "Fixture map",
-  browseRecords: "Fixture records",
-  howItWorks: "Fixture guide",
 };
+
+// The shared public nav (PublicNavLinks, t_a72a3106) renders the same six
+// home links on every public page, in this order, with the current page
+// marked aria-current="page".
+const PUBLIC_NAV_HREFS = ["/mappa", "/directory", "/guide", "/regole", "/manifesto", "/segnala"];
 
 // Contract guard: if a future refactor adds/renames a navLabels key, the
 // render below fails with a descriptive message instead of a cryptic
-// TypeError on an undefined prop (the t_5084202a failure mode).
-test("legal: nav shell renders every fixture nav label (contract guard)", async () => {
+// TypeError on an undefined prop (the t_5084202a failure mode). The nav
+// link set itself is pinned to the shared public nav (t_a72a3106).
+test("legal: nav shell renders the landmark labels and the shared public nav (contract guard)", async () => {
   const view = await renderWithLocale(React.createElement(LegalPage, { content: fakeLegalContent, navLabels: fakeNavLabels }));
   const { container } = view;
 
@@ -109,9 +119,14 @@ test("legal: nav shell renders every fixture nav label (contract guard)", async 
   assert.ok(brand, "brand link must render");
   assert.equal(brand.getAttribute("aria-label"), fakeNavLabels.homeAria, "brand aria-label must come from navLabels.homeAria");
 
-  const linkTexts = [...container.querySelectorAll(".nav-links a")].map((a) => a.textContent.trim());
-  for (const key of ["exploreMap", "browseRecords", "howItWorks"]) {
-    assert.ok(linkTexts.includes(fakeNavLabels[key]), `nav link text must include navLabels.${key} ("${fakeNavLabels[key]}")`);
+  // The nav link set is the shared public set — no longer per-page copies.
+  const linkHrefs = [...container.querySelectorAll(".nav-links a")].map((a) => a.getAttribute("href"));
+  assert.deepEqual(linkHrefs, PUBLIC_NAV_HREFS, "legal pages must render the shared six-link public nav");
+  for (const href of PUBLIC_NAV_HREFS) {
+    assert.ok(
+      linkHrefs.includes(href),
+      `the shared public nav must link ${href}`,
+    );
   }
 });
 
@@ -274,8 +289,10 @@ test("legal: nav shell links resolve, LocaleToggle present, no broken hrefs", as
   assert.equal(view.getByRole("button", { name: "EN" }).getAttribute("aria-pressed"), "true");
 
   const links = collectLinks(container);
-  assert.ok(links.length >= 5, "nav + inline markup links must render");
-  for (const expected of ["/", "/#map", "/#records", "/guide", "https://example.test/legal"]) {
+  assert.ok(links.length >= 8, "brand + six shared nav links + inline markup links must render");
+  // Shared public nav (t_a72a3106): the SAME six home links on every public
+  // page — the old per-page legal set (/#map, /#records, /guide) is gone.
+  for (const expected of ["/", "/mappa", "/directory", "/guide", "/regole", "/manifesto", "/segnala", "https://example.test/legal"]) {
     assert.ok(links.some((l) => l.href === expected), `expected link ${expected}`);
   }
   assertNoBrokenHrefs(links);

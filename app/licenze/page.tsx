@@ -22,9 +22,6 @@ export default async function LicencesPage() {
     navLabels={{
       mainNavigation: home.mainNavigation,
       homeAria: home.homeAria,
-      exploreMap: home.exploreMap,
-      browseRecords: home.browseRecords,
-      howItWorks: home.howItWorks,
     }}
   />;
 }

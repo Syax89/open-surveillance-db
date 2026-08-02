@@ -74,20 +74,24 @@ afterEach(() => {
 });
 
 // ---------------------------------------------------------------------------
-// ToolLayout — per-page nav sets (F3 t_2ca69725, FRONTEND_DESIGN §2.5)
+// ToolLayout — shared public nav (t_a72a3106)
 // ---------------------------------------------------------------------------
 
-test("ToolLayout renders the per-page nav sets from FRONTEND_DESIGN §2.5 (no dead ends)", async () => {
-  // The nav shell links the OTHER tools + contextual pages + the home CTA;
-  // the current page is never linked to itself. The route-group layout picks
-  // the set from usePathname() (the layout cannot know the route statically).
+test("ToolLayout renders the shared public nav (six home links) with the current page marked aria-current", async () => {
+  // The nav shell links the SAME six links of the home hub on every tool
+  // page (PublicNavLinks, t_a72a3106): Explore map /mappa, Browse records
+  // /directory, How it works /guide, Rules /regole, Manifesto /manifesto,
+  // Add a camera /segnala — with aria-current="page" on the current route.
+  // This replaced the previous per-page compact sets (4 links,
+  // FRONTEND_DESIGN §2.5 hand-off pattern, CEO check 2026-08-02).
   const cases = {
-    "/mappa": ["/directory", "/segnala", "/guide", "/"],
-    "/directory": ["/mappa", "/segnala", "/guide", "/"],
-    "/segnala": ["/directory", "/mappa", "/guide", "/regole", "/"],
-    "/correggi": ["/directory", "/mappa", "/contatti", "/"],
+    "/mappa": "/mappa",
+    "/directory": "/directory",
+    "/segnala": "/segnala",
+    "/correggi": null, // /correggi is not in the public nav (home has no
+                       // correction link either) — no link is current.
   };
-  for (const [pathname, expected] of Object.entries(cases)) {
+  for (const [pathname, currentHref] of Object.entries(cases)) {
     setNavState({ pathname });
     const { screen } = rtl;
     await renderWithLocale(
@@ -97,8 +101,19 @@ test("ToolLayout renders the per-page nav sets from FRONTEND_DESIGN §2.5 (no de
     const main = screen.getByRole("main");
     assert.equal(main.id, "main-content", "the tool layout must keep the main-content landmark");
 
-    const links = Array.from(main.querySelectorAll(".nav-links a")).map((a) => a.getAttribute("href"));
-    assert.deepEqual(links, expected, `nav set on ${pathname} must match FRONTEND_DESIGN §2.5`);
+    const links = Array.from(main.querySelectorAll(".nav-links a"));
+    const hrefs = links.map((a) => a.getAttribute("href"));
+    assert.deepEqual(
+      hrefs,
+      ["/mappa", "/directory", "/guide", "/regole", "/manifesto", "/segnala"],
+      `nav on ${pathname} must be the shared six-link public set`,
+    );
+    const current = links.filter((a) => a.getAttribute("aria-current") === "page").map((a) => a.getAttribute("href"));
+    assert.deepEqual(
+      current,
+      currentHref ? [currentHref] : [],
+      `aria-current must mark exactly ${currentHref ?? "no link"} on ${pathname}`,
+    );
     // The children (the tool body) must render inside the layout.
     assert.ok(main.textContent.includes("tool body"));
 
@@ -106,7 +121,10 @@ test("ToolLayout renders the per-page nav sets from FRONTEND_DESIGN §2.5 (no de
   }
 });
 
-test("ToolLayout falls back to the full cross-tool set on unknown paths (defensive)", async () => {
+test("ToolLayout renders the shared public nav on unknown paths too (no per-page fallback needed)", async () => {
+  // With the shared set there is no per-page fallback: every route renders
+  // the same six links (previously an unknown path fell back to the full
+  // cross-tool set — now that set IS the nav).
   setNavState({ pathname: "/some-future-route" });
   const { screen } = rtl;
   await renderWithLocale(
@@ -115,9 +133,11 @@ test("ToolLayout falls back to the full cross-tool set on unknown paths (defensi
 
   const main = screen.getByRole("main");
   const links = Array.from(main.querySelectorAll(".nav-links a")).map((a) => a.getAttribute("href"));
-  for (const href of ["/mappa", "/directory", "/segnala", "/correggi", "/guide", "/"]) {
-    assert.ok(links.includes(href), `fallback nav must link ${href} (no dead ends between tools)`);
-  }
+  assert.deepEqual(
+    links,
+    ["/mappa", "/directory", "/guide", "/regole", "/manifesto", "/segnala"],
+    "the shared public nav must render on unknown paths (no dead ends between tools)",
+  );
 });
 
 // ---------------------------------------------------------------------------

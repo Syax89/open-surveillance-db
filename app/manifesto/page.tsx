@@ -22,14 +22,6 @@ export default async function ManifestoPage() {
     <InfoPage
       navLabel={t.navigation}
       homeLabel={t.homeAria}
-      navLinks={
-        <>
-          <Link href="/#map">{t.map}</Link>
-          <Link href="/#records">{t.directory}</Link>
-          <Link href="/guide">{t.guide}</Link>
-          <Link className="nav-action" href="/">{t.home}</Link>
-        </>
-      }
       eyebrow={t.eyebrow}
       title={t.title}
       intro={t.intro}
