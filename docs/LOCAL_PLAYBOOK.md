@@ -13,7 +13,7 @@ The local loop has one important boundary:
 fictional report → pending moderation → local decision → public result only when approved
 ```
 
-`pending`, rejected, hidden, and correction-request records must never appear
+`pending`, rejected, `removed`, and correction-request records must never appear
 on the public map, directory, `/api/cameras`, CSV/GeoJSON exports, or nearby search.
 
 ## Start the prototype
@@ -27,7 +27,7 @@ npm run dev
 ```
 
 On a fresh checkout the local database has no schema until you migrate it:
-`npm run db:migrate` creates the three tables (and the `d1_migrations`
+`npm run db:migrate` creates the 13 schema tables (plus the `d1_migrations`
 journal) from `drizzle/`. If you are starting from an empty state, this step
 is required — running `npm run dev` first would start against a database
 without tables.
@@ -87,7 +87,7 @@ choose one of the following actions.
 | --- | --- | --- |
 | Approve | `verified` | The record appears in the public API, directory, map, CSV/GeoJSON, and relevant nearby results. Manufacturer and observation date remain private unless their individual publication choices are enabled. |
 | Reject | `rejected` | The record remains absent from all public outputs. |
-| Hide | `hidden` | The record remains absent from all public outputs. |
+| Hide | `removed` | The record remains absent from all public outputs. |
 
 Every decision should remove the item from the pending queue and add an entry
 to **Recent decisions**. The event should show the old and new status, action,
@@ -125,7 +125,7 @@ Use a separate fictional report for each action so results are unambiguous.
 2. Refresh every public view listed above.
 3. Confirm its title is absent from the map, directory, JSON, GeoJSON, and
    nearby results.
-4. Confirm its audit event says `pending → hidden`.
+4. Confirm its audit event says `pending → removed`.
 
 ### Review and reverify a published record
 

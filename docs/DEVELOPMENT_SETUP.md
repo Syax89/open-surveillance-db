@@ -5,8 +5,8 @@ scratch, how the local database gets its schema and data, and how to reset it
 safely. It is written for contributors who want to reproduce the prototype on
 their own machine.
 
-Everything below was verified on 2026-07-31 against the H3 migration branch
-(`2226dad`, on top of `main` `0153eab`), with Node `22.22.3`, npm `10.9.8`,
+Everything below was verified on 2026-08-02 against `main`
+(`d59acca`), with Node `22.22.3`, npm `10.9.8`,
 and the wrangler version pinned in `package-lock.json` (4.118.x). The
 journal-mismatch symptoms in [section 7](#7-troubleshooting) were reproduced
 in isolated local state directories, not on a shared database. The local
@@ -27,7 +27,7 @@ From a fresh clone:
 git clone https://github.com/Syax89/open-surveillance-db.git
 cd open-surveillance-db
 npm ci          # reproducible install from package-lock.json (Node >= 22.13)
-npm run db:migrate   # apply the Drizzle schema migrations (0000-0007)
+npm run db:migrate   # apply the Drizzle schema migrations (0000–0025)
 npm run dev     # vinext dev: Vite + workerd, serves on http://localhost:3000
 ```
 
@@ -78,7 +78,25 @@ startup.
 | `0004_camera_metadata_publication_consent.sql` | `cameras.publish_manufacturer`, `cameras.publish_observed_on` |
 | `0005_freshness_state.sql` | freshness columns and backfill |
 | `0006_flawless_thor_girl.sql` | `cameras.review_interval_months` |
-| `0007_*.sql` | H1 freshness backfill re-registration |
+| `0007_directory_freshness_backfill.sql` | one-time backfill: ISO `updated` timestamps for directory freshness filters |
+| `0008_wave_b_reviewer_roles.sql` | reviewer roles, moderation queue, attributable audit events |
+| `0009_contributor_auth.sql` | contributor accounts and sessions (ADR 0013) |
+| `0010_auth_roles_appeals.sql` | auth roles, immutable audit trail, contributor appeals (ADR 0014) |
+| `0011_photo_uploads.sql` | photo evidence metadata (image bytes in R2) |
+| `0012_moderation_events_entity_idx.sql` | audit-trail lookup index |
+| `0013_pending_photo_quota.sql` | per-caller pending-photo quota |
+| `0014_cameras_coordinates_idx.sql` | coordinate lookup index for proximity searches |
+| `0015_correction_camera_fk.sql` | `correction_requests.camera_id` → `cameras.id` FK |
+| `0016_login_lockout.sql` | per-email login lockout |
+| `0017_remove_demo_seed.sql` | remove demo identities before any public-alpha deployment (ADR 0009/0014) |
+| `0018_moderation_events_entity_action_idx.sql` | retention sweep query index + R4 resolution-date anchor |
+| `0019_cameras_composite_indexes.sql` | normalise `updated` + composite `(status, updated DESC)` indexes |
+| `0020_camera_confirmations.sql` | `camera_confirmations` table (C1, ADR 0018) |
+| `0021_camera_edit_requests.sql` | `camera_edit_requests` table (C1, ADR 0018) |
+| `0022_correction_contributor.sql` | `correction_requests.contributor_id` (C1, ADR 0018) |
+| `0023_cameras_contributor_status_idx.sql` | `(contributor_id, status)` index for trust levels (C1) |
+| `0024_correction_dedupe_indexes.sql` | one-open-correction-per-(submitter, target) dedupe indexes (C4) |
+| `0025_contributor_created_idx.sql` | `(contributor_id, created_at DESC)` indexes for the profile list (C2) |
 
 The `wrangler.jsonc` `d1_databases` entry points `migrations_dir` at
 `drizzle`, so wrangler applies them in filename order and records what ran in
@@ -113,7 +131,7 @@ The four database commands, at a glance:
 | Command | Purpose | Expected outcome |
 | --- | --- | --- |
 | `npm run db:generate` | Regenerate a migration after editing `db/schema.ts` | One new `drizzle/00NN_*.sql` (+ `drizzle/meta/` journal/snapshot update) with only your change |
-| `npm run db:migrate` | Apply pending Drizzle migrations to the local D1 database | Full schema on a fresh state (8 files: 3 tables + 3 indexes, 0 rows); no-op when everything is already applied |
+| `npm run db:migrate` | Apply pending Drizzle migrations to the local D1 database | Full schema on a fresh state (26 files: 13 tables, 0 rows); no-op when everything is already applied |
 | `npm run db:reset` | Start over non-destructively | `.wrangler/state` moved aside under a timestamped backup, then migrations applied to a fresh empty DB |
 | `npm run db:seed` (optional) | Insert the two labelled demo pins | 2 fictional `demo` records, idempotent — safe to re-run |
 
@@ -131,8 +149,8 @@ npm run dev
 Enter. In a non-interactive shell (CI) wrangler auto-confirms (verified output:
 `🤖 Using fallback value in non-interactive context: yes`).
 
-Verified result on a fresh state: all eight migration files apply (`✅`),
-producing the three tables plus the `d1_migrations` bookkeeping table, and
+Verified result on a fresh state: all 26 migration files apply (`✅`),
+producing the 13 tables plus the `d1_migrations` bookkeeping table, and
 **zero demo rows**. There is no "seed on empty table" path anywhere in the
 runtime — see [section 5](#5-synthetic-fixtures).
 
@@ -196,7 +214,7 @@ the seed.
 `tests/helpers/` contains the test harness:
 
 - `db-runtime-harness.mjs` — transpiles the real DB modules and replays the
-  real migration files (`drizzle/0000-*.sql` … `0007-*.sql`) onto an
+  real migration files (`drizzle/0000-*.sql` … `0025-*.sql`) onto an
   in-memory D1 adapter, so the test suite exercises exactly what
   `npm run db:migrate` produces locally;
 - `mock-state.mjs` — shared mutable state for the mocked `db` modules;
