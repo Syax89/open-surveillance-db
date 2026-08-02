@@ -73,7 +73,21 @@ function constantTimeEqual(first: string, second: string): boolean {
   return difference === 0;
 }
 
-async function derivePasswordKey(password: string, salt: Uint8Array<ArrayBuffer>): Promise<Uint8Array<ArrayBuffer>> {
+/**
+ * Derive the PBKDF2-SHA256 key for a password/salt pair at the given
+ * iteration count.
+ *
+ * The count is honoured as-is — hashing always passes the current
+ * PBKDF2_ITERATIONS constant, while verification passes the count embedded
+ * in the stored hash (ADR 0013). Raising the constant therefore never
+ * invalidates existing hashes: each one re-derives at its own stored count
+ * until a rehash-on-login upgrades it (AUTH_OPTIONS §8).
+ */
+async function derivePasswordKey(
+  password: string,
+  salt: Uint8Array<ArrayBuffer>,
+  iterations: number,
+): Promise<Uint8Array<ArrayBuffer>> {
   const keyMaterial = await crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(password),
@@ -86,7 +100,7 @@ async function derivePasswordKey(password: string, salt: Uint8Array<ArrayBuffer>
       name: "PBKDF2",
       hash: PBKDF2_HASH,
       salt,
-      iterations: PBKDF2_ITERATIONS,
+      iterations,
     },
     keyMaterial,
     PBKDF2_KEY_LENGTH * 8,
@@ -96,19 +110,40 @@ async function derivePasswordKey(password: string, salt: Uint8Array<ArrayBuffer>
 
 export async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(SALT_BYTES);
-  const derived = await derivePasswordKey(password, salt);
+  const derived = await derivePasswordKey(password, salt, PBKDF2_ITERATIONS);
   return `pbkdf2$${PBKDF2_ITERATIONS}$${bytesToBase64Url(salt)}$${bytesToBase64Url(derived)}`;
 }
 
 export async function verifyPassword(password: string, stored: string): Promise<boolean> {
   const parts = stored.split("$");
-  if (parts.length !== 4 || parts[0] !== "pbkdf2") return false;
-  const iterations = Number(parts[1]);
-  if (!Number.isInteger(iterations) || iterations < 1) return false;
-  const salt = base64UrlToBytes(parts[2]);
-  const expected = parts[3];
+  if (parts[0] !== "pbkdf2") return false;
+
+  let iterations: number;
+  let salt: Uint8Array<ArrayBuffer>;
+  let expected: string;
+
+  if (parts.length === 4) {
+    // Current format (ADR 0013): `pbkdf2$<iterations>$<saltB64>$<hashB64>`.
+    // The embedded count drives the derivation, so a bump of
+    // PBKDF2_ITERATIONS verifies old hashes at their own (lower) count
+    // instead of locking every contributor out.
+    const parsed = Number(parts[1]);
+    if (!Number.isInteger(parsed) || parsed < 1) return false;
+    iterations = parsed;
+    salt = base64UrlToBytes(parts[2]);
+    expected = parts[3];
+  } else if (parts.length === 3) {
+    // Legacy hashes predate the embedded iteration count
+    // (`pbkdf2$<saltB64>$<hashB64>`): fall back to the current constant.
+    iterations = PBKDF2_ITERATIONS;
+    salt = base64UrlToBytes(parts[1]);
+    expected = parts[2];
+  } else {
+    return false;
+  }
+
   try {
-    const derived = await derivePasswordKey(password, salt);
+    const derived = await derivePasswordKey(password, salt, iterations);
     return constantTimeEqual(bytesToBase64Url(derived), expected);
   } catch {
     return false;

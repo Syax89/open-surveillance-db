@@ -271,6 +271,15 @@ changes accumulate under `[Unreleased]`.
 
 ### Fixed
 
+- `verifyPassword` now derives at the iteration count embedded in the stored
+  hash instead of the current `PBKDF2_ITERATIONS` constant (t_fe668331, P1-2
+  security review): bumping the constant (e.g. 210k → 600k, AUTH_OPTIONS §8)
+  no longer invalidates every existing password and locks out all
+  contributors — each hash re-derives at its own stored count (ADR 0013),
+  with a constant fallback for legacy 3-part hashes that predate the embedded
+  count. New bump-safety tests in `tests/auth-d1.test.mjs` cover hashes at
+  different iteration counts and the legacy fallback.
+
 - `/mappa` autocomplete UX (t_3c4b188e): typing a place no longer triggers
   the search immediately — the geocode suggestion dropdown (250ms debounce)
   now appears BEFORE the points list re-filters (400ms `?q=` debounce), and
