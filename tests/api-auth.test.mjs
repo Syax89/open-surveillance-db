@@ -814,7 +814,7 @@ test("verify-email answers 400 for malformed or unknown tokens (generic, anti-en
   // Unknown hash: the db answers invalid and the route maps it to the SAME
   // generic 400 body — a caller cannot tell a live token from a dead one.
   stub("consumeVerificationToken", async () => ({ kind: "invalid" }));
-  const unknown = await GET(apiRequest("/api/auth/verify-email?token=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"));
+  const unknown = await GET(apiRequest("/api/auth/verify-email?token=tok-unknown00000000000000000000"));
   assert.equal(unknown.status, 400);
   assert.equal((await responseBody(unknown)).error, "Invalid or expired verification link.");
 });
@@ -822,12 +822,12 @@ test("verify-email answers 400 for malformed or unknown tokens (generic, anti-en
 test("verify-email answers 410 Gone for used and expired tokens", async () => {
   const { GET } = await verifyEmailRoute();
   stub("consumeVerificationToken", async () => ({ kind: "used" }));
-  const used = await GET(apiRequest("/api/auth/verify-email?token=BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"));
+  const used = await GET(apiRequest("/api/auth/verify-email?token=tok-used000000000000000000000000"));
   assert.equal(used.status, 410);
   assert.match((await responseBody(used)).error, /already been used or has expired/);
 
   stub("consumeVerificationToken", async () => ({ kind: "expired" }));
-  const expired = await GET(apiRequest("/api/auth/verify-email?token=CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC"));
+  const expired = await GET(apiRequest("/api/auth/verify-email?token=tok-expired0000000000000000000000"));
   assert.equal(expired.status, 410);
   assert.match((await responseBody(expired)).error, /already been used or has expired/);
 });
@@ -836,7 +836,7 @@ test("verify-email treats an erased account like an unknown token (400)", async 
   stub("consumeVerificationToken", async () => ({ kind: "verified", contributorId: 7 }));
   stub("markContributorEmailVerified", async () => null);
   const { GET } = await verifyEmailRoute();
-  const response = await GET(apiRequest("/api/auth/verify-email?token=DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD"));
+  const response = await GET(apiRequest("/api/auth/verify-email?token=tok-erased00000000000000000000000"));
   assert.equal(response.status, 400);
   assert.equal((await responseBody(response)).error, "Invalid or expired verification link.");
 });
