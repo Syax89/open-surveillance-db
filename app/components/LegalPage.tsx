@@ -1,17 +1,20 @@
-import Link from "next/link";
 import type { ReactNode } from "react";
 import type { LegalPageContent, LegalBlock } from "../lib/legal";
-import { SiteHeader } from "./SiteHeader";
+import { PublicNav } from "./PublicNav";
 
 /**
  * Shared layout for the public legal / information pages
- * (/privacy, /termini, /licenze).
+ * (/privacy, /termini, /licenze, /accessibility).
  *
  * Server Component (no "use client"): pages render statically with per-route
- * metadata (SSR/SEO, task t_c36fe96c). The only client island is the
- * navigation shell <SiteHeader />, which renders the <LocaleToggle />. The
- * nav labels come from the page as props (the page is a Server Component and
- * cannot call useMessages()); content is passed as data by the same page.
+ * metadata (SSR/SEO, task t_c36fe96c). The only client island is the shared
+ * public header <PublicNav /> (brand + six public nav links + mobile menu +
+ * LocaleToggle). The nav landmark labels come from the page as props (the
+ * page is a Server Component and cannot call useMessages()); the nav LINK
+ * SET is the shared public set (PublicNavLinks via PublicNav, t_a72a3106) —
+ * the same six links of the home hub on EVERY public page, with the current
+ * page marked aria-current (CEO check 2026-08-02). Content is passed as
+ * data by the same page.
  *
  * Renders the same navigation shell, reading column and footer used by
  * the rest of the site (see app/guide/page.tsx), with a common
@@ -100,21 +103,12 @@ function renderBlock(block: LegalBlock, keyPrefix: string): ReactNode {
 export interface LegalNavLabels {
   mainNavigation: string;
   homeAria: string;
-  exploreMap: string;
-  browseRecords: string;
-  howItWorks: string;
 }
 
 export function LegalPage({ content, navLabels }: { content: LegalPageContent; navLabels: LegalNavLabels }) {
   return (
     <main id="main-content" className="record-page">
-      <SiteHeader navLabel={navLabels.mainNavigation} homeLabel={navLabels.homeAria}>
-        <div className="nav-links">
-          <Link href="/#map">{navLabels.exploreMap}</Link>
-          <Link href="/#records">{navLabels.browseRecords}</Link>
-          <Link href="/guide">{navLabels.howItWorks}</Link>
-        </div>
-      </SiteHeader>
+      <PublicNav navLabel={navLabels.mainNavigation} homeLabel={navLabels.homeAria} />
 
       <article className="record-detail">
         <p className="eyebrow"><span /> {content.eyebrow}</p>

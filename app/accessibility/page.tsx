@@ -22,9 +22,6 @@ export default async function AccessibilityPage() {
     navLabels={{
       mainNavigation: home.mainNavigation,
       homeAria: home.homeAria,
-      exploreMap: home.exploreMap,
-      browseRecords: home.browseRecords,
-      howItWorks: home.howItWorks,
     }}
   />;
 }

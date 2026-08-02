@@ -157,13 +157,13 @@ or `legal` bundle — legal content is a separate typed layer
 | `/faq`         | FAQ                   | Frequent questions                                  | — | ✓ | implemented (PR #68) |
 | `/contatti`    | Contacts              | Who we are, owners, correction/removal contact      | — | ✓ | implemented (PR #68) |
 
-"Home nav" means the page is linked from the home page's `nav-shell`. The
-home keeps the full link set (Map, Directory, Guide, Rules, Manifesto, CTA
-Report) at the **route URLs** (`/mappa`, `/directory`, `/segnala` — F3,
-t_2ca69725). The four tool pages link each other through the shared
-`ToolLayout` nav (Map, Directory, Report, Correction, Guide, Home), so there
-are never dead ends between the tools. Informational pages render their own
-compact `nav-shell` with a context-appropriate subset of links; see "Page
+"Home nav" means the page is linked from the home page's `nav-shell`. Since
+t_a72a3106 every public page (home, tools, info/legal) renders the SAME
+header `nav-shell` — `PublicNav` with the six home links at the **route
+URLs** (`/mappa`, `/directory`, `/guide`, `/regole`, `/manifesto`,
+`/segnala` CTA — F3, t_2ca69725), with the current page marked
+`aria-current="page"`. The old per-page sets (tools 4 links vs home 6,
+FRONTEND_DESIGN §2.5 hand-off pattern) were removed; see "Page
 navigation" below.
 
 Routes **not** linked in nav/footer (private or functional): `/moderation`
@@ -200,8 +200,8 @@ proposed).
   wrapped in a `Suspense` boundary (Next 16 `useSearchParams` requirement).
   Bundle: `map.ts`.
 - **Layout:** route group `app/(tools)/layout.tsx` → `ToolLayout`
-  (`app/components/ToolLayout.tsx`): shared nav (Map, Directory, Report,
-  Correction, Guide, Home) + `main#main-content`.
+  (`app/components/ToolLayout.tsx`): the shared `PublicNav` header (six home
+  links, t_a72a3106) + `main#main-content`.
 - **Nav/footer:** in tool nav (`ToolLayout`); also linked from the home nav
   and the global footer (F3, t_2ca69725).
 
@@ -404,29 +404,27 @@ proposed).
 
 ## Global navigation
 
-### Page navigation (`nav-shell`, per page)
+### Page navigation (`nav-shell`, shared)
 
-There is **no shared header component**: every page renders its own
-`nav-shell` (brand + `nav-links` + `LocaleToggle`) with the link set that
-fits its context. This is the implemented pattern; keep it consistent:
+Since t_a72a3106 there IS a shared public header: every public page
+(home, tools, info/legal) renders the SAME `PublicNav` header — brand +
+the six home links + mobile menu + `LocaleToggle` — with the current page
+marked `aria-current="page"` (active state). The compact per-page sets
+(previously 4 links on the tools vs 6 on the home, FRONTEND_DESIGN §2.5
+hand-off pattern) were removed after the CEO check 2026-08-02. Keep the
+six-link set stable:
 
 | Page(s)     | `nav-links` (in order)                                        |
 |-------------|---------------------------------------------------------------|
-| `/`         | Map (`/mappa`), Directory (`/directory`), Guide, Rules, Manifesto, CTA Report (`/segnala`) — `HomeNav`, route URLs since F3 |
-| `/mappa`, `/directory`, `/segnala`, `/correggi` | shared `ToolLayout`: Map, Directory, Report, Correction, Guide, Home (CTA) — no dead ends between the four tools (F1; per-page refinement in F3, t_2ca69725) |
-| `/guide`    | Map, Directory, FAQ, Contacts, Manifesto, Home                 |
-| `/manifesto`, `/regole` | Map, Directory, Guide, Home (CTA)              |
-| `/moderazione` | Map, Directory, Home (CTA)                                  |
-| `/faq`      | Map, Directory, Contacts, Home (CTA)                          |
-| `/contatti` | Map, Directory, FAQ, Home (CTA)                               |
-| `/privacy`, `/termini`, `/licenze`, `/accessibility` | Map, Directory, Guide (via `LegalPage`)  |
+| every public page (`/`, `/mappa`, `/directory`, `/segnala`, `/correggi`, `/guide`, `/manifesto`, `/regole`, `/faq`, `/contatti`, `/moderazione`, `/privacy`, `/termini`, `/licenze`, `/accessibility`) | Explore map (`/mappa`), Browse records (`/directory`), How it works (`/guide`), Rules (`/regole`), Manifesto (`/manifesto`), CTA Add a camera (`/segnala`) — `PublicNav` + `PublicNavLinks`, current page marked `aria-current="page"` |
 
-- Mobile: the `menu-button` collapse is implemented on the home page; the
-  informational pages currently render the `nav-links` inline (they wrap at
-  ≤700px per the shared CSS) — keep this behaviour consistent when adding
-  pages.
-- Labels come from each page's bundle (`bundle.<page>.navigation` etc.), not
-  from a shared nav bundle.
+- Mobile: the `menu-button` collapse is implemented in the shared `PublicNav`
+  header (t_a72a3106) on EVERY public page — the home was the only page with
+  the mobile menu before; now all pages share the same collapsible header.
+- Labels: the six link labels come from the home bundle (`bundle.home`:
+  exploreMap, browseRecords, howItWorks, rules, manifesto, addCamera) via
+  `PublicNavLinks`; the `<nav>` landmark aria-label stays per-page
+  (`bundle.<page>.navigation` etc.), passed to `PublicNav` as `navLabel`.
 - Legacy anchor links (`/#map`, `/#records`, `/#report`, `/#correction`)
   still work from any route: `LegacyAnchorRedirect` (F3, t_2ca69725)
   client-side redirects them to the matching tool route, preserving the
@@ -565,8 +563,9 @@ export default async function PrivacyPage() {
 }
 ```
 
-- `LegalPage` renders the `nav-shell` (Map, Directory, Guide), the
-  `record-detail` hero (eyebrow, `h1`, intro) and the content sections.
+- `LegalPage` renders the shared `PublicNav` header (six home links,
+  t_a72a3106), the `record-detail` hero (eyebrow, `h1`, intro) and the
+  content sections.
 - Content blocks live in `app/lib/legal/en.ts` / `it.ts`
   (`LegalContent` type in `app/lib/legal/types.ts`), with inline markup
   support: `**bold**`, `*italic*`, `[label](url)`.
@@ -669,12 +668,13 @@ with PR #72 (tests: `tests/navigation-pages.test.mjs`,
 
 ## Open items
 
-- Header nav: pages keep their compact per-page `nav-shell`; if more pages
-  are added, revisit the home link set (do not grow it without an explicit
-  decision).
-- Tool nav: the shared `ToolLayout` nav is uniform across the four tools
-  (F1) and the footer tool links are live (F3, t_2ca69725). If the tool
-  count grows, revisit whether the uniform nav set still fits.
+- Header nav: pages share the SAME six-link public header (`PublicNav`,
+  t_a72a3106) — no per-page sets. If more pages are added, do not grow the
+  six-link set without an explicit decision.
+- Tool nav: the shared `ToolLayout` header is the same public header as the
+  home (F1 + t_a72a3106) and the footer tool links are live (F3,
+  t_2ca69725). If the tool count grows, revisit whether the six-link set
+  still fits.
 - `/guide` slug kept for compatibility; a future alias `/guida` is possible.
 - `/feedback` route (ADR 0006) remains proposed, not implemented.
 - Community frontend (C5/C6) is implemented: `/account` profile with

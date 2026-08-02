@@ -565,16 +565,14 @@ test("aria-current marks the active page in the footer and the header brand (QA-
   }
 });
 
-test("tool nav: the per-page set never self-links — the current page is marked by the footer (QA-2026-08-01-3)", async () => {
-  // Per-page navigation pattern (F3 t_2ca69725, FRONTEND_DESIGN §2.5): the
-  // tool nav set links the OTHER tools + contextual pages + home — the
-  // current page is never linked to itself (pinned by
-  // client-tools.test.mjs). There is therefore NO self-link in the per-page
-  // nav to mark with aria-current; the current page is exposed to assistive
-  // technology by the site footer (full 13-link nav, marks its own link
-  // aria-current="page" — asserted in the test above) and by each page's
-  // own h1. This test pins that contract so a future change cannot add a
-  // dead-end self-link or silently drop the footer marking.
+test("tool nav: the shared public nav marks the current page with aria-current (t_a72a3106)", async () => {
+  // The shared public nav (PublicNavLinks, t_a72a3106) replaced the old
+  // per-page sets (F3 t_2ca69725, FRONTEND_DESIGN §2.5 hand-off pattern).
+  // Every tool page now renders the SAME six home links and marks the
+  // current route with aria-current="page" (active state, CEO check
+  // 2026-08-02) — in addition to the footer marking (asserted in the test
+  // above). This test pins the new contract so a future change cannot drop
+  // the header active state or reintroduce the inconsistent 4-link sets.
   const rtl = await setupDom();
   await setNavState({ pathname: "/mappa" });
   const mod = await loadDomModule("app/components/ToolLayout.mjs");
@@ -582,29 +580,20 @@ test("tool nav: the per-page set never self-links — the current page is marked
   const { container, rerender } = await renderWithLocale(React.createElement(ToolLayout, null, React.createElement("div", null, "body")));
 
   const links = () => [...container.querySelectorAll(".nav-links a")];
-  const currentOf = () => links().filter((a) => a.getAttribute("aria-current") === "page");
-  assert.equal(links().length >= 4, true, "the per-page nav set must render");
-  assert.equal(currentOf().length, 0, "the per-page nav must not self-link (hand-off pattern): no aria-current on /mappa");
-  assert.ok(
-    !links().some((a) => a.getAttribute("href") === "/mappa"),
-    "the /mappa nav set must not contain a link to itself",
-  );
+  const currentHrefs = () => links().filter((a) => a.getAttribute("aria-current") === "page").map((a) => a.getAttribute("href"));
+  assert.equal(links().length, 6, "the shared public nav must render the six home links");
+  assert.deepEqual(currentHrefs(), ["/mappa"], "the current page /mappa must be marked aria-current in the header nav");
 
-  // Same contract on /directory: no self-link, footer marks the page.
+  // Same contract on /directory: the header marks the current page.
   // NOTE: testing-library's rerender() replaces the tree with the BARE
   // element — it would drop the LocaleProvider wrapper and crash with
   // "useLocale must be used within LocaleProvider". Re-wrap explicitly.
   await setNavState({ pathname: "/directory" });
   rerender(await wrapWithLocale(React.createElement(ToolLayout, null, React.createElement("div", null, "body"))));
-  const directoryLinks = [...container.querySelectorAll(".nav-links a")];
-  assert.equal(
-    directoryLinks.filter((a) => a.getAttribute("aria-current") === "page").length,
-    0,
-    "no self-link on /directory either",
-  );
-  assert.ok(
-    !directoryLinks.some((a) => a.getAttribute("href") === "/directory"),
-    "the /directory nav set must not contain a link to itself",
+  assert.deepEqual(
+    currentHrefs(),
+    ["/directory"],
+    "the current page /directory must be marked aria-current in the header nav",
   );
   rtl.cleanup();
 });

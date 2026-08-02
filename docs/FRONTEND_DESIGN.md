@@ -203,28 +203,23 @@ directory con filtri, il form di segnalazione, il form di correzione.
 
 ### 2.5 Navigazione globale
 
-#### Header (per pagina)
+#### Header (condiviso)
 
-Mantenere il pattern `SiteHeader` esistente: ogni pagina inietta i propri
-link di contesto. La **home hub** ha il link set completo; le **pagine tool**
-hanno un set ridotto orientato al cross-link tra tool.
+Dal task t_a72a3106 (CEO check 2026-08-02) tutte le pagine pubbliche
+condividono lo STESSO header `PublicNav`: brand + i sei link della home
+(Esplora la mappa `/mappa`, Sfoglia i record `/directory`, Come funziona
+`/guide`, Regole `/regole`, Manifesto `/manifesto`, Aggiungi una telecamera
+`/segnala` — CTA) + menu mobile + LocaleToggle, con la pagina corrente
+marcata `aria-current="page"`. Il pattern precedente (set per-pagina
+ridotti: le tool avevano 4 link contro i 6 della home) è stato rimosso.
 
 | Pagina | Nav links (in ordine) |
 |--------|----------------------|
-| `/` | Mappa (`/mappa`), Directory (`/directory`), Segnala (`/segnala`), Guide, Regole, Manifesto |
-| `/mappa` | Directory, Segnala, Guide, Home |
-| `/directory` | Mappa, Segnala, Guide, Home |
-| `/segnala` | Directory, Mappa, Guide, Regole, Home |
-| `/correggi` | Directory, Mappa, Contatti, Home |
-| `/guide`, `/manifesto`, `/regole` | Mappa, Directory, Guide/Manifesto, Home (CTA) |
-| `/moderazione`, `/faq`, `/contatti` | Mappa, Directory, Home (CTA) |
-| `/privacy`, `/termini`, `/licenze` | Mappa, Directory, Guide (via LegalPage) |
-| `/records/[id]` | Directory (back), Correggi (azione), Home |
-| `/moderation` (privato) | Home (ritorno), LocaleToggle |
-| `/account`, `/login`, `/register` | Home |
+| tutte le pagine pubbliche (`/`, `/mappa`, `/directory`, `/segnala`, `/correggi`, `/guide`, `/manifesto`, `/regole`, `/faq`, `/contatti`, `/moderazione`, `/privacy`, `/termini`, `/licenze`, `/accessibility`) | Mappa (`/mappa`), Directory (`/directory`), Guide, Regole, Manifesto, Segnala CTA (`/segnala`) — `PublicNav` + `PublicNavLinks`, pagina corrente con `aria-current="page"` |
 
-**Regola:** il set di link header di ogni pagina tool include sempre almeno gli
-altri tool pubblici + la home. Niente vicoli ciechi tra i 4 tool.
+**Regola:** il set è unico e stabile; non reintrodurre set per-pagina. Le
+pagine funzionali (auth, record detail, moderation) mantengono il loro
+header contestuale (`nav-record-actions` / `nav-actions`).
 
 #### Footer (globale, conservato)
 

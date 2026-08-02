@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { SiteHeader } from "./SiteHeader";
+import { PublicNav } from "./PublicNav";
 
 /**
  * Shared layout for the public informational pages
@@ -7,28 +7,24 @@ import { SiteHeader } from "./SiteHeader";
  *
  * Server Component (no "use client"): the pages render statically on the
  * server with per-route metadata (SSR/SEO, task t_c36fe96c). The only client
- * islands are <SiteHeader /> (which renders the LocaleToggle) and the
- * toggle's router.refresh() when the user switches language.
+ * islands are <PublicNav /> (shared header: brand + six public nav links +
+ * mobile menu + locale toggle) and the toggle's router.refresh() when the
+ * user switches language.
  *
- * Encapsulates the structure those pages previously duplicated: the
- * navigation shell (via the shared SiteHeader — brand + page nav links +
- * locale toggle), the intro article (eyebrow / title / summary / CTA action
- * row) and the content sections, which each page supplies as children.
+ * Encapsulates the structure those pages previously duplicated: the shared
+ * public header (PublicNav, t_a72a3106 — the same six links of the home hub
+ * on EVERY public page, with the current page marked aria-current), the
+ * intro article (eyebrow / title / summary / CTA action row) and the content
+ * sections, which each page supplies as children.
  *
- * Renders exactly the markup the per-page copies produced, so adopting
- * it is behaviour-neutral by construction (see tests/rendered-html.test.mjs
- * for the structural contracts that stay pinned).
- *
- * Nav links and CTA buttons differ per page, so both are injected as
- * props; every page's copy lives in its own i18n bundle untouched.
+ * CTA buttons differ per page, so they are injected as props; every page's
+ * copy lives in its own i18n bundle untouched.
  */
 export interface InfoPageProps {
   /** aria-label for the navigation shell (page bundle, e.g. t.navigation). */
   navLabel: string;
   /** aria-label for the brand link to the homepage (e.g. t.homeAria). */
   homeLabel: string;
-  /** Links rendered inside .nav-links — each page provides its own set. */
-  navLinks: ReactNode;
   /** Eyebrow text above the page title (e.g. t.eyebrow). */
   eyebrow: ReactNode;
   /** Page title (h1). */
@@ -44,7 +40,6 @@ export interface InfoPageProps {
 export function InfoPage({
   navLabel,
   homeLabel,
-  navLinks,
   eyebrow,
   title,
   intro,
@@ -53,9 +48,7 @@ export function InfoPage({
 }: InfoPageProps) {
   return (
     <main id="main-content" className="record-page">
-      <SiteHeader navLabel={navLabel} homeLabel={homeLabel}>
-        <div className="nav-links">{navLinks}</div>
-      </SiteHeader>
+      <PublicNav navLabel={navLabel} homeLabel={homeLabel} />
 
       <article className="record-detail">
         <p className="eyebrow"><span /> {eyebrow}</p>

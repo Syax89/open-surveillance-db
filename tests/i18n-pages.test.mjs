@@ -398,9 +398,6 @@ describe("client-side: locale toggle cookie + LegalPage rendering", () => {
           navLabels: {
             mainNavigation: homeLabels[locale].mainNavigation,
             homeAria: homeLabels[locale].homeAria,
-            exploreMap: homeLabels[locale].exploreMap,
-            browseRecords: homeLabels[locale].browseRecords,
-            howItWorks: homeLabels[locale].howItWorks,
           },
         }),
       );

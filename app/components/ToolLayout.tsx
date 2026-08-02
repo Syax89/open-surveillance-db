@@ -1,102 +1,29 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
-import { SiteHeader } from "./SiteHeader";
+import { PublicNav } from "./PublicNav";
 import { useMessages } from "./LocaleProvider";
 
 /**
  * Shared layout for the public tool routes (F1 route group (tools)):
  * /mappa /directory /segnala /correggi.
  *
- * Renders the navigation shell (brand + per-page nav links + locale toggle,
- * via the shared SiteHeader) and the main content region.
+ * Renders the shared public header (PublicNav, t_a72a3106 — the same six
+ * links of the home hub on EVERY public page, with the current page marked
+ * aria-current="page") and the main content region.
  *
- * The nav link SET is per-page (F3 t_2ca69725, docs/FRONTEND_DESIGN.md §2.5):
- * every tool page links the other public tools it hands off to, the
- * contextual pages and the home CTA — never a dead end between the four
- * tools. The route-group layout cannot know the current route, so the set is
- * derived from usePathname(); an unknown path falls back to the full
- * cross-tool set (defensive: the SSR harness and future routes still get a
- * complete navigation).
+ * This replaced the previous per-page compact nav sets (4 links,
+ * FRONTEND_DESIGN §2.5 hand-off pattern) that made the tool header look
+ * inconsistent with the home (CEO check 2026-08-02).
  *
  * The route-group layout (app/(tools)/layout.tsx) renders this component
  * around every tool page; the pages themselves render only their tool body.
  */
-type ToolNavKey =
-  | "toolMap"
-  | "toolDirectory"
-  | "toolReport"
-  | "toolCorrection"
-  | "toolGuide"
-  | "toolRules"
-  | "toolContact"
-  | "toolHome";
-
-type ToolNavLink = { href: string; label: ToolNavKey };
-
-const TOOL_NAV_SETS: Record<string, ToolNavLink[]> = {
-  "/mappa": [
-    { href: "/directory", label: "toolDirectory" },
-    { href: "/segnala", label: "toolReport" },
-    { href: "/guide", label: "toolGuide" },
-    { href: "/", label: "toolHome" },
-  ],
-  "/directory": [
-    { href: "/mappa", label: "toolMap" },
-    { href: "/segnala", label: "toolReport" },
-    { href: "/guide", label: "toolGuide" },
-    { href: "/", label: "toolHome" },
-  ],
-  "/segnala": [
-    { href: "/directory", label: "toolDirectory" },
-    { href: "/mappa", label: "toolMap" },
-    { href: "/guide", label: "toolGuide" },
-    { href: "/regole", label: "toolRules" },
-    { href: "/", label: "toolHome" },
-  ],
-  "/correggi": [
-    { href: "/directory", label: "toolDirectory" },
-    { href: "/mappa", label: "toolMap" },
-    { href: "/contatti", label: "toolContact" },
-    { href: "/", label: "toolHome" },
-  ],
-};
-
-/** Fallback for any route outside the four tools: the full cross-tool set. */
-const FALLBACK_NAV: ToolNavLink[] = [
-  { href: "/mappa", label: "toolMap" },
-  { href: "/directory", label: "toolDirectory" },
-  { href: "/segnala", label: "toolReport" },
-  { href: "/correggi", label: "toolCorrection" },
-  { href: "/guide", label: "toolGuide" },
-  { href: "/", label: "toolHome" },
-];
-
 export function ToolLayout({ children }: { children: ReactNode }) {
   const t = useMessages().common;
-  const pathname = usePathname();
-  const nav = TOOL_NAV_SETS[pathname] ?? FALLBACK_NAV;
   return (
     <main id="main-content" className="tool-layout">
-      <SiteHeader navLabel={t.toolNavigation} homeLabel={t.toolHomeAria}>
-        <div className="nav-links">
-          {nav.map(({ href, label }) => (
-            // The per-page set NEVER links the current page to itself
-            // (hand-off pattern, FRONTEND_DESIGN §2.5 — pinned by
-            // client-tools.test.mjs), so there is no self-link here to mark
-            // with aria-current. The current page is exposed to assistive
-            // technology by the SITE footer (full 13-link nav, marks its own
-            // link aria-current="page") and by the page's own h1 — see
-            // a11y-interactive "aria-current marks the active page"
-            // (QA-2026-08-01-3, closed in F-QA t_7b716c97).
-            <Link key={href} href={href} className={href === "/" ? "nav-action" : undefined}>
-              {t[label]}
-            </Link>
-          ))}
-        </div>
-      </SiteHeader>
+      <PublicNav navLabel={t.toolNavigation} homeLabel={t.toolHomeAria} />
       {children}
     </main>
   );

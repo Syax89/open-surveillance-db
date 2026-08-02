@@ -1,8 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
-import { SiteHeader } from "../SiteHeader";
+import { PublicNav } from "../PublicNav";
 import { useMessages } from "../LocaleProvider";
 
 /**
@@ -12,22 +10,11 @@ import { useMessages } from "../LocaleProvider";
  * JS, no client data dependency), so the only interactive chrome — the
  * mobile menu toggle — lives in this small client island, exactly like the
  * other client islands the server pages already embed (SiteFooter,
- * LocaleToggle). The nav set is the complete public set (docs/
- * FRONTEND_DESIGN.md §2.5): the four tools plus guide, rules, manifesto.
+ * LocaleToggle). The nav is the shared public header (PublicNav,
+ * t_a72a3106): the six home links on EVERY public page, with the current
+ * page marked aria-current. The home keeps its in-page "#top" brand anchor.
  */
 export function HomeNav() {
   const t = useMessages().home;
-  const [menuOpen, setMenuOpen] = useState(false);
-  return (
-    <SiteHeader navLabel={t.mainNavigation} homeLabel={t.homeAria} brandHref="#top" brandAs="anchor" menu menuOpen={menuOpen} onMenuToggle={() => setMenuOpen((current) => !current)}>
-      <div className={`nav-links ${menuOpen ? "is-open" : ""}`} id="main-links">
-        <Link href="/mappa">{t.exploreMap}</Link>
-        <Link href="/directory">{t.browseRecords}</Link>
-        <Link href="/guide">{t.howItWorks}</Link>
-        <Link href="/regole">{t.rules}</Link>
-        <Link href="/manifesto">{t.manifesto}</Link>
-        <Link className="nav-action" href="/segnala">{t.addCamera}</Link>
-      </div>
-    </SiteHeader>
-  );
+  return <PublicNav navLabel={t.mainNavigation} homeLabel={t.homeAria} brandHref="#top" brandAs="anchor" />;
 }

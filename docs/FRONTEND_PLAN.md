@@ -62,8 +62,10 @@ Correzioni tecniche CTO alla visione di Vera (vincolanti):
 
 ### 1.3 Navigazione
 
-- **Header per-pagina** (pattern `SiteHeader` esistente): la home ha il link set completo; ogni
-  pagina tool ha set ridotto orientato al cross-link tra tool (mai vicoli ciechi tra i 4 tool).
+- **Header condiviso** (`PublicNav`, t_a72a3106): tutte le pagine pubbliche
+  (home, tool, info, legal) hanno lo STESSO header — i sei link della home
+  con la pagina corrente marcata `aria-current="page"`. Il set per-pagina
+  ridotto delle tool (4 link) è stato rimosso (CEO check 2026-08-02).
 - **Footer globale** (root layout): aggiungere i link ai 4 tool pubblici accanto ai link
   istituzionali. Da aggiungere anche il link all'accessibility statement (G2 Legal).
 - **Route group**: `app/(tools)/{mappa,directory,segnala,correggi}/page.tsx` +
