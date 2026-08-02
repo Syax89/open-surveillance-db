@@ -143,7 +143,10 @@ test("PATCH /api/auth/me maps syntactically invalid JSON to 400 (not 500)", asyn
   const { PATCH } = await meRoute();
   const response = await PATCH(authedPatch("/api/auth/me", '{"displayName": "New", broken'));
   assert.equal(response.status, 400);
-  assert.equal((await responseBody(response)).error, "A JSON object with the displayName field is required.");
+  // The body is read through the shared readJsonBody contract (PR #124 /
+  // #221): malformed JSON answers the transport-level message BEFORE the
+  // handler's own shape validation, exactly like every other JSON route.
+  assert.equal((await responseBody(response)).error, "Request body is not valid JSON.");
   assert.equal(callArgs("updateContributorDisplayName").length, 0);
 });
 
