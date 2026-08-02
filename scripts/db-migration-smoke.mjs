@@ -64,6 +64,9 @@ const expectedTables = [
   "email_verification_tokens",
   "passkeys",
   "recovery_codes",
+  // WebAuthn ceremony challenges — Fase C (0028): only the SHA-256 of the
+  // base64url challenge is stored, 10-minute TTL, single-use (`used_at`).
+  "webauthn_challenges",
 ];
 // Indexes declared by the migrations.
 const expectedIndexes = [
@@ -121,6 +124,12 @@ const expectedIndexes = [
   "passkeys_contributor_idx",
   "recovery_codes_code_hash_unique",
   "recovery_codes_contributor_idx",
+  // WebAuthn ceremony challenges (0028): challenge hash is globally unique
+  // (point lookup on consume); the (expires_at) index serves the expiry
+  // sweep and (contributor_id) the per-account erasure cascade.
+  "webauthn_challenges_challenge_hash_unique",
+  "webauthn_challenges_expires_idx",
+  "webauthn_challenges_contributor_idx",
 ];
 // Tables that are not application schema but legitimately appear in a local
 // D1 database. Anything outside this set is an unexpected schema change.
