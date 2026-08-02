@@ -481,6 +481,11 @@ test("me returns 401 without a session", async () => {
   const { GET } = await meRoute();
   const response = await GET(apiRequest("/api/auth/me"));
   assert.equal(response.status, 401);
+  assert.equal(
+    response.headers.get("cache-control"),
+    "no-store",
+    "the anonymous profile is personal-data-shaped too and must never be edge-cached (P3-3)",
+  );
   assert.equal(callArgs("findSessionByToken").length, 0, "no cookie must not touch the database");
 });
 
@@ -489,6 +494,11 @@ test("me returns 401 for an unknown or expired session token", async () => {
   const { GET } = await meRoute();
   const response = await GET(sessionRequest("/api/auth/me", "dead-token"));
   assert.equal(response.status, 401);
+  assert.equal(
+    response.headers.get("cache-control"),
+    "no-store",
+    "the anonymous profile is personal-data-shaped too and must never be edge-cached (P3-3)",
+  );
 });
 
 test("me returns 503 when the session lookup fails", async () => {
