@@ -1,6 +1,6 @@
 # Architecture
 
-Last reviewed: 2026-08-01
+Last reviewed: 2026-08-02
 
 ## Current prototype
 
@@ -17,6 +17,7 @@ flowchart LR
   API --> Appeals[Appeals /api/appeals]
   API --> Photos[(Photo storage: R2 PHOTOS + D1 metadata)]
   Photos --> Queue
+  Community[Community: verifications and contribution edits /api/cameras/*] --> API
 ```
 
 The front end is a React/Vinext application. Leaflet renders a map whose
@@ -51,6 +52,22 @@ bytes are returned exclusively for approved photos with confirmed redaction
 linked to a currently public camera, everything else answers 404 with no
 existence leak. The database layer is designed for Cloudflare D1 and uses
 Drizzle for schema migrations.
+
+The community system (ADR 0018) runs on the same prototype: contributors can
+verify a public record (`PUT /api/cameras/[id]/confirmation`, with a
+structural anti-gaming layer — one active verification per (record,
+contributor), plus daily and per-record quotas), see their own verification
+state (`GET`, `DELETE` for the toggle), and edit records on two tracks
+(`PATCH /api/cameras/[id]`): pending records get a direct owner-only update,
+while published records never mutate `cameras` directly — the PATCH inserts
+a `camera_edit_requests` diff row plus a `moderation_queue` row (entity
+`camera_edit`) that a moderator applies or discards later. Trust levels
+(L0–L4) are derived server-side from the contributor's verified-contribution
+count and returned by the profile endpoints. Submissions additionally pass
+the pre-submit duplicate gate (ADR 0019): `POST /api/cameras` runs the
+nearby-duplicate check before storage and answers `409 Conflict` with
+`possibleDuplicates` when a `high`-strength candidate exists, unless the
+payload carries `duplicateConfirmed: true`.
 
 ## Required production shape
 
