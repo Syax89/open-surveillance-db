@@ -193,10 +193,12 @@ const INFO_ROUTES = {
   // Route tool separate (F1 route group (tools), t_03c0fa15): /mappa e
   // /directory sono pagine pubbliche, /segnala e /correggi form privati
   // (noindex) — tutte servono contenuto EN/IT dal cookie come le pagine info.
+  // /mappa (t_966254a1) ha UN solo header: il vecchio "Explore documented
+  // cameras" (heading di sezione duplicato) è stato rimosso.
   "/mappa": {
-    it: ["Mappa interattiva", "Esplora le telecamere documentate", "Prototipo attivo"],
-    en: ["Interactive map", "Explore documented cameras", "Live prototype"],
-    noEn: ["Interactive map", "Explore documented cameras"],
+    it: ["Mappa interattiva", "Prototipo attivo"],
+    en: ["Interactive map", "Live prototype"],
+    noEn: ["Interactive map"],
   },
   "/directory": {
     it: ["Elenco pubblico", "Sfoglia i record pubblici senza usare la mappa"],

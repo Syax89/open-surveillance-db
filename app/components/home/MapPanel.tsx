@@ -36,10 +36,14 @@ type Props = {
 };
 
 /**
- * Map tool section: viewport-synced sidebar list + interactive map, with
- * loading notice and data-export actions. Used by /mappa (F1 route group
- * (tools), redesign t_702c10af); the home hub (F2) renders only the static
- * MapTeaser and never mounts this component (no Leaflet on the hub).
+ * Map tool workspace (F1 route group (tools), redesign t_702c10af;
+ * integrated layout t_966254a1): the viewport-synced sidebar list + the
+ * interactive map split, with loading notice and data-export footer. The
+ * tool page (MappaTool) owns the single header, the compact prototype
+ * banner and the FiltersBar row — this component renders ONLY the split
+ * workspace, so /mappa has exactly one header and the map gets the full
+ * remaining height. Used by /mappa; the home hub (F2) renders only the
+ * static MapTeaser and never mounts this component (no Leaflet on the hub).
  *
  * Layout: a scrollable left column (search + list of the points currently
  * framed by the map) and a near-fullscreen OSM map. The list is the
@@ -78,9 +82,7 @@ export function MapPanel({ filteredRecords, visibleRecords, selectedId, onSelect
   }, [statuses, t, issueHref]);
 
   return (
-    <section className="map-section map-layout" id="map" aria-labelledby="map-title">
-      <div className="section-heading"><div><p className="eyebrow"><span /> {t.livePrototype}</p><h2 id="map-title">{t.mapTitle}</h2></div><p className="section-note">{t.osmBaseMap} · {t.mapCoverageNote}</p></div>
-      <div className="prototype-banner"><b>{t.prototypeMode}</b> {t.prototypeBanner}</div>
+    <>
       <div className="live-map-workspace map-split">
         <aside className="map-sidebar" aria-labelledby="map-list-title">
           <div className="map-list-search">
@@ -89,7 +91,7 @@ export function MapPanel({ filteredRecords, visibleRecords, selectedId, onSelect
             <p id="map-list-help" className="sr-only">{t.listSearchHelp}</p>
           </div>
           <div className="map-list-header">
-            <h3 id="map-list-title">{t.listTitle}</h3>
+            <h2 id="map-list-title">{t.listTitle}</h2>
             <p className="map-list-count" role="status">{t.listCount(visibleRecords.length, filteredRecords.length)}</p>
           </div>
           <p id="map-list-sync-help" className="sr-only">{t.listMapSyncHelp}</p>
@@ -120,7 +122,6 @@ export function MapPanel({ filteredRecords, visibleRecords, selectedId, onSelect
       </div>
       {loading && <p className="loading-note">{t.loadingRecords}</p>}{notice && <p className="notice" role="status">{notice}</p>}
       <div className="data-actions"><a href="/api/cameras?format=geojson" download="opensurveillancedb-cameras.geojson">{t.downloadGeoJson}</a><span>·</span><a href="/api/cameras?format=csv" download="opensurveillancedb-cameras.csv">{t.downloadCsv}</a><span>·</span><a href="/guide">{t.readDataPolicy}</a></div>
-    </section>
-
+    </>
   );
 }
