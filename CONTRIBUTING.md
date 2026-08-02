@@ -23,6 +23,35 @@ npm run build
 - Use fictional or clearly labelled demo data in the repository.
 - For database changes, generate and review the Drizzle migration.
 
+## Pull requests and review
+
+Every change (code or docs) goes through a branch + PR and is reviewed before
+merge. Fill the [PR template](.github/PULL_REQUEST_TEMPLATE.md) — it is also
+the review checklist used by the CTO.
+
+PRs that touch UI, UX, or frontend components must additionally pass the
+**Design compliance** section of the template. The binding source of truth is
+[`docs/FRONTEND_DESIGN.md`](docs/FRONTEND_DESIGN.md): tokens, type scale,
+spacing, component specs, and the Dos & Don'ts. In short:
+
+- Every `className` must be defined in `app/globals.css` — no undefined or
+  no-op classes; no inline styles for layout.
+- Use the design tokens (`var(--focus)`, `--status-*`, palette); never
+  hardcode a colour that already has a token.
+- Status is never conveyed by colour alone (WCAG 1.4.1): status dot always
+  paired with a text label.
+- Text contrast ≥ 4.5:1 (AA); secondary greys from the §3.1 table.
+- Touch targets ≥ 44px where practical; visible `:focus-visible` with
+  `var(--focus)`.
+- `PublicNav` (6 links) on every public page; mobile map uses the panel
+  above the map (≤768px), never a bottom-sheet.
+- Design-system changes (tokens, scale, patterns, new components) must be
+  documented in `docs/FRONTEND_DESIGN.md` in the same PR, before merge.
+
+Accessibility is a release gate, not a lint step: verify keyboard
+navigation, focus order, and contrast in a real browser before opening the
+PR.
+
 ## Proposing a camera record
 
 The public submission workflow is not live. When it is, reports must comply with the moderation policy. Never submit private residential cameras, inside views of sensitive facilities, live-stream URLs, account details, or information that could facilitate harm.
