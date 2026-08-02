@@ -5,6 +5,14 @@ name: Ops Monitoring
 # Nessun segreto in questo file; l'URL di produzione arriva da una
 # repository variable (PROD_URL), non hardcoded.
 
+# GITHUB_TOKEN: scope minimo = checkout (contents: read) + apertura issue
+# (issues: write). Senza questo blocco il token default e' read-only e lo
+# step "Apri issue su failure" fallisce con 403 "Resource not accessible
+# by integration" (bug P1, audit DevSecOps t_a49c6790).
+permissions:
+  contents: read
+  issues: write
+
 on:
   schedule:
     - cron: "0 7 * * *" # ogni giorno 07:00 UTC
@@ -55,7 +63,10 @@ jobs:
           exit "$fail"
 
       - name: Apri issue su failure
-        if: failure() && github.event_name == 'schedule'
+        # schedule = alerting quotidiano; workflow_dispatch incluso per la
+        # verifica manuale (fix t_c9b427e8): il run manuale DEVE aprire
+        # l'issue anche quando fallisce al guard PROD_URL.
+        if: failure()
         uses: actions/github-script@v7
         with:
           script: |
