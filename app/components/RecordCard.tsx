@@ -23,6 +23,11 @@ type RecordCardProps = {
  * Callers pass the whitelisted status label (publicStatusLabel) and their own
  * fact rows, so the component stays free of bundle/status coupling while the
  * rendered output is byte-identical to the markup it replaces.
+ *
+ * t_127492f1: the /directory catalog renders the SAME markup inside
+ * `.directory-tool .record-list`; the flat-row styling comes from that list
+ * context (one column, hairline rows — see globals.css), so the card class
+ * and the a11y selectors that count `class="record-list-card"` stay intact.
  */
 export function RecordCard({ camera, statusLabel, facts, actions }: RecordCardProps) {
   return (

@@ -204,14 +204,19 @@ const INFO_ROUTES = {
     noEn: ["Interactive map"],
   },
   "/directory": {
-    it: ["Elenco pubblico", "Sfoglia i record pubblici senza usare la mappa"],
-    en: ["Public directory", "Browse public records without the map"],
+    // F5 (P1-5): the tool page has ONE page header (.tool-heading h1 + pageIntro).
+    // The duplicated records-heading (eyebrow + h2 + intro) is removed when the
+    // directory is embedded in the tool page — the markers pin the remaining copy.
+    it: ["Elenco pubblico", "Cerca, filtra e ordina"],
+    en: ["Public directory", "Search, filter and order"],
     noEn: ["Public directory", "Search, filter and order"],
   },
   "/segnala": {
-    it: ["Segnala una telecamera", "Rendi leggibile lo spazio pubblico"],
-    en: ["Report a camera", "Help make public space legible"],
-    noEn: ["Report a camera", "Help make public space legible"],
+    // F5 (P1-5): same — one page header; the ReportForm eyebrow + h2 + intro is
+    // removed when embedded, the report-rule ("Before submitting") stays.
+    it: ["Segnala una telecamera", "Prima di inviare"],
+    en: ["Report a camera", "Before submitting"],
+    noEn: ["Report a camera", "Before submitting"],
   },
   "/correggi": {
     it: ["Correggi un record", "Le correzioni sono private"],

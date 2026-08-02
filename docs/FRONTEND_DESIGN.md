@@ -89,8 +89,46 @@ visibile via `.tool-section.map-tool`). Regole:
 ```
 
 Eccezione documentata: `/mappa` NON ha header visibile (t_11e38eab) — l'h1
-resta `sr-only` per la gerarchia documentale e `aria-labelledby` della sezione.
-La pagina parte direttamente con la mappa.
+resta `sr-only` per la gerarchia documentale e `aria-labelledby` della
+sezione. La pagina parte direttamente con la mappa.
+
+**Un solo header di pagina per tool page (F5, P1-5):** `/directory`, `/segnala`
+e `/correggi` rendono `.tool-heading` (eyebrow + h1 + intro) come UNICO header;
+i componenti di sezione incorporati (`PublicDirectory`, `ReportForm`,
+`CorrectionForm`) ricevono `showHeading={false}` e NON ripetono il blocco
+eyebrow+h2+intro. Le sezioni mantengono i contenuti funzionali non-duplicati:
+link "Use the map instead" (directory), report-rule "Before submitting"
+(segnala) e "Urgent concern" (correggi). Gerarchia heading: h1 tool →
+h2 sezione (es. place-search) → h3 card.
+
+**Directory catalog mode (t_127492f1 — redesign /directory):** la tool page
+usa `PublicDirectory variant="catalog"` con un layout a tre fasce, nell'ordine
+"filtri → count/export → lista" richiesto dalla CEO:
+
+1. `.directory-tool-heading` = `.tool-heading` con il link "Use the map
+   instead" allineato a destra (modifier: il layout flex vale SOLO per
+   /directory, /segnala e /correggi restano invariati).
+2. `FiltersBar variant="bare"` — la stessa griglia controlli (search + type +
+   freshness + sort + reset, ids storici `record-*`) SENZA il counter.
+3. `.directory-meta` — count (`role=status`, id `record-search-count`),
+   trigger del pannello luogo (`aria-expanded`/`aria-controls`) e export
+   CSV/GeoJSON (`.data-actions`, filtri server kind+freshness).
+4. `.place-search` come pannello collassabile (`.place-search-closed` =
+   `display:none` finché il trigger non lo apre — mai l'attributo `hidden`,
+   vietato dal contratto pages-render): un solo input di ricerca visibile
+   alla volta — la ricerca per luogo è una *modalità*, non una feature
+   sorella (principio già stabilito da /mappa con `hideSearch`).
+5. `h2.sr-only` "Directory results" (chiave `resultsRegion`) prima della
+   lista: mantiene la scala h1 → h2 → h3.
+6. `.directory-tool .record-list` a UNA colonna con righe piatte ~80px
+   (hairline, 3 colonne titolo/fatti/azioni — stile contestuale, la classe
+   `record-list-card` di `RecordCard` resta byte-identica per le suite
+   a11y), ~3× densità delle card 270px. Un solo flusso di risultati: una
+   ricerca luogo attiva sostituisce la lista (banner `.place-banner` con
+   area + count + clear, fact Distanza).
+
+La home resta su `variant="hub"` (output byte-identico: records-heading +
+blocco place-search + FiltersBar inline + count + griglia 2 colonne).
 
 ### 2.3 Eccezioni header
 
@@ -220,24 +258,26 @@ Convenzioni d'uso:
 - spaziature piccole (tra label e campo, tra dot e testo): `--space-1`/`--space-2` (4/8px);
 - touch target: padding ≥ `--space-3` su altezze da 44px.
 
-### 3.4 Radius (scala — ✅ implementato in F3, t_27bfa729)
+### 3.4 Radius (scala — ✅ implementato in F3, t_27bfa729; outlier consolidati in F5, t_97442785)
 
-Token `--radius-*` in `:root` da F3, consolidati dai valori esistenti (gli
-outlier 7/9/10/14/18px restano letterali finché non entrano in scala):
+Token `--radius-*` in `:root` da F3, consolidati dai valori esistenti. Gli
+outlier fuori scala (7/9/10/14/18px) sono stati migrati al token più vicino
+in F5 (P1-5/2-6, `globals.css` — unica eccezione: il reset `border-radius:0`
+del workspace dentro la map-card, intenzionale):
 
 ```
 --radius-xs: 4px    /* notice, offline-state, legal-note */
 --radius-sm: 6px    /* input di form (report/correction), map-hint */
---radius-md: 8px    /* map-list-search input, coordinate-entry, metadata-publication */
---radius-lg: 12px   /* tool-card, report-form card, faq-item, confirm-dialog */
---radius-xl: 16px   /* record-detail */
+--radius-md: 8px    /* skip-link, locale-toggle, search input, duplicate-alert, geocode-option (da 7px) */
+--radius-lg: 12px   /* tool-card, button, nav-action, record-list-card, empty-state (da 9/10px) */
+--radius-xl: 16px   /* record-detail, live-map-workspace, map-card, map-teaser (da 14/18px) */
 --radius-2xl: 22px  /* hero */
 --radius-full: 999px/* pill: section-note, filter-chip */
 --radius-round: 50% /* status-dot, brand-mark */
 ```
 
-Consolidamento binding: i valori fuori scala (7, 9, 10, 14, 18px) migrano al
-token più vicino nel refactor CSS (7→`--radius-md`, 9/10→`--radius-lg`,
+Consolidamento binding (eseguito in F5): i valori fuori scala (7, 9, 10,
+14, 18px) migrano al token più vicino (7→`--radius-md`, 9/10→`--radius-lg`,
 14→`--radius-xl`, 18→`--radius-xl` a seconda del contesto).
 
 ### 3.5 Ombre (scale — 🔒 binding, da implementare)
@@ -300,8 +340,10 @@ prima/dopo identici al pixel su tutte le route pubbliche, Lighthouse a11y
 --radius-round:50% (dot, brand-mark, marker, faq summary ::before)
 ```
 
-I valori fuori scala esistenti (7px, 9px, 10px, 14px, 18px, 99px) restano
-letterali finché non entrano in scala — nessun arrotondamento.
+I valori fuori scala esistenti (7px, 9px, 10px, 14px, 18px, 99px) sono stati
+consolidati sui token in F5 (t_97442785) — nessun letterale fuori scala
+resta in `globals.css` (unica eccezione: il reset `border-radius:0` della
+map-card).
 
 **Type scale** — valori esistenti (F2 §3.3) come token:
 
@@ -405,13 +447,14 @@ Legenda: **[spec]** = sezione dedicata sotto · **[patt.]** = pattern condiviso
 | `lib/map-popup.ts` | `/mappa` | **builder HTML marker popup** (bindPopup) | **[spec] 6.2.2** |
 
 **Directory e tool**
-| `DirectoryTool` | `/directory` | tool-heading + PublicDirectory | [spec] 2.2 |
+| `DirectoryTool` | `/directory` | tool-heading (con link mappa) + PublicDirectory catalog | [spec] 2.2 |
+| `DirectoryCatalog` | `/directory` | **layout catalog**: FiltersBar bare + meta row + pannello luogo + righe | **[spec] 2.2** |
 | `SegnalaTool` | `/segnala` | tool-heading + ReportForm | [spec] 2.2 |
 | `CorreggiTool` | `/correggi` | tool-heading + CorrectionForm | [spec] 2.2 |
-| `PublicDirectory` | `/directory` | search + filtri + lista + place-search | [patt.] |
+| `PublicDirectory` | `/directory`, home | catalog (delega a DirectoryCatalog) / hub (sezione home) | [patt.] |
 | `ReportForm` | `/segnala` | form guidato + coordinate + foto | [patt.] |
 | `CorrectionForm` | `/correggi` | form correzione + duplicate alert | [patt.] |
-| `FiltersBar` | `/mappa`, `/directory` | filtri condivisi D4, varianti `inline`/`panel` | **[spec] 6.3.3** |
+| `FiltersBar` | `/mappa`, `/directory`, home | filtri condivisi D4, varianti `inline`/`panel`/`bare` | **[spec] 6.3.3** |
 | `RecordCard` | directory, search, moderation | card record condivisa | [patt.] |
 | `EmptyState` | directory, mappa, moderation | empty state truthfull (heading h2\|h3) | [patt.] |
 
@@ -537,8 +580,15 @@ Shell condivisa da `not-found.tsx` (404) ed `error.tsx` (500) (t_7eed4601).
 
 - **Anatomia:** `main#main-content.record-page` → `SiteHeader` ridotto
   (1 link `nav-action` "Torna alla home" + LocaleToggle) → `article.record-detail`
-  (card `--shadow-card`, radius 3xl) → copia localizzata → CTA home
+  (card `--shadow-card`, radius `--radius-xl`) → copia localizzata → CTA home
   (`.button`) + (500) bottone retry `onRetry={reset}`.
+- **Document title (F5, P3-3 — WCAG 2.4.2):** ogni pagina di errore ha un
+  `<title>` proprio, non quello della home ereditato dal root layout:
+  "Page not found — OpenSurveillanceDB" (404, `generateMetadata` in
+  `not-found.tsx`, SSR) e "Something went wrong — OpenSurveillanceDB" (500,
+  `document.title` in `ErrorPage` — `error.tsx` è un boundary client e non
+  può esportare metadata). Chiavi `errors.notFoundMetaTitle` /
+  `errors.serverErrorMetaTitle`.
 - **Privacy by design:** la pagina **non riporta mai** il path richiesto né il
   messaggio d'errore (ADR 0002, fail-closed come il gate moderation).
 - **i18n:** client component voluto (error boundary) — copia da
@@ -598,6 +648,15 @@ Stesso componente su `/mappa` e `/directory` (D4, stato URL identico):
 | Ordinamento | `<select>` (alpha/position) | `?sort=` |
 | Reset | `<button>` | rimuove i params |
 
+**Varianti (t_127492f1):** `inline` (home: riga controlli + counter),
+`panel` (/mappa: bordo superiore della map-card, `hideSearch`), `bare`
+(/directory catalog: la stessa griglia controlli SENZA il counter — il
+counter vive nella `.directory-meta` renderizzata da `PublicDirectory`
+catalog, accanto a export e trigger luogo). Le varianti condividono ids
+(`record-search`, `record-kind-filter`, `record-freshness-filter`,
+`record-sort`, `record-search-count`), label e stato URL — solo la resa
+del counter cambia.
+
 Feedback immediato (contatore `role="status"`, niente bottone "applica"),
 reset sempre visibile, empty state truthfull, solo filtri a basso rischio
 (tipo/freshness/sort — mai stato, produttore, dati sensibili).
@@ -608,6 +667,13 @@ reset sempre visibile, empty state truthfull, solo filtri a basso rischio
 padding 24px, bordo `--line`, radius `--radius-lg`, bg `#fffef9`;
 `.card-topline` + h3 + dl fatti (3 colonne) + azioni. Su ≤700px: dl 2
 colonne; azioni in colonna.
+
+**Righe contestuali (t_127492f1):** in `.directory-tool .record-list` la
+stessa `RecordCard` diventa riga piatta (hairline inferiore, niente
+min-height/radius/bg, 3 colonne `titolo | fatti | azioni`, titolo 17px) —
+lo stile arriva dal contesto della lista, la classe dell'articolo resta
+byte-identica (`class="record-list-card"`, conteggiata dalle suite a11y).
+Home e moderation restano card (griglie fuori da `.directory-tool`).
 
 #### 6.3.5 Form ✅
 
@@ -715,6 +781,7 @@ VoiceOver, zoom 200% a 320px, contrasto per stato.
 | Hero | 1 colonna, padding ridotto | 1 colonna | 2 colonne |
 | **Mappa** | **pannello sidebar sopra la mappa** (≤768px, 38vh) | sidebar + mappa | sidebar 340px + mappa |
 | Directory controls | 1 colonna (≤700) | 2 colonne (≤980) | 3 colonne |
+| Directory catalog (t_127492f1) | controlli 1 col; righe 1 col; meta in colonna (≤700) | controlli 2 col; righe 1 col | righe piatte full-width |
 | Record grid | 1 colonna | 1 colonna | 2 colonne |
 | Form | 1 colonna | 2 colonne | 2 colonne |
 | Footer | 1 colonna (≤700) | 2 colonne (≤980) | 3 colonne |
@@ -832,7 +899,7 @@ risultati; form coordinate a 1 colonna (≤480px).
 | D12 | Mappa mobile: pannello sopra la mappa (≤768px), non bottom-sheet | ✅ (v2 corregge la v1) |
 | D13 | Container mappa `min(1440px, calc(100% - 32px))`; breakpoint 480/768 | ✅ |
 | D14 | Error pages custom 404/500 con header ridotto (eccezione 6-link) | ✅ |
-| D15 | Token layer esplicito: spacing 4px, radius, shadow, type scale | 🔒 da implementare in CSS |
+| D15 | Token layer esplicito: spacing 4px, radius, shadow, type scale | ⚠ radius ✅ (F5, outlier consolidati); spacing/type ✅ (F3); shadow 🔒 |
 | D16 | Pesi tipografici 800/700 applicati per selettore (F4) | ✅ |
 | D17 | Body 16px/1.5 esplicito in CSS (F4) | ✅ |
 | D18 | Contrasti secondari ≥4.5:1 (6 coppie allineate in F4) | ✅ |

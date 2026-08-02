@@ -205,14 +205,19 @@ proposed).
 - **Nav/footer:** in tool nav (`ToolLayout`); also linked from the home nav
   and the global footer (F3, t_2ca69725).
 
-### `/directory` — Directory (implemented, F1 t_03c0fa15)
+### `/directory` — Directory (implemented, F1 t_03c0fa15; catalog t_127492f1)
 
 - **Purpose:** the searchable text directory, the keyboard/AT-equivalent of
   the map. Search, low-risk filters (type, freshness), sort, result count,
   truthful empty state, server-side pagination.
 - **Content:** `app/(tools)/directory/page.tsx` + `DirectoryTool`
   (`app/components/tools/DirectoryTool.tsx`, `"use client"`), reusing
-  `FiltersBar`, `EmptyState`, `RecordCard`. Bundle: `directory.ts`.
+  `FiltersBar` (`bare`), `EmptyState`, `RecordCard` (righe contestuali in
+  `.directory-tool .record-list`). Since
+  t_127492f1 the page is a **flat catalog**: tool heading (with "Use the map
+  instead" action) → controls row → results meta row (count + CSV/GeoJSON
+  export of the filtered set + collapsible place-search panel) → one-column
+  flat rows. Bundle: `directory.ts`.
 - **SEO:** the only tool page with real SEO value (`docs/FRONTEND_PLAN.md`
   §1.3) — indexable, own metadata.
 - **Nav/footer:** in tool nav (`ToolLayout`); also linked from the home nav
