@@ -52,6 +52,11 @@ const DB_MODULES = [
   // db/auth.ts (contributor accounts and sessions, ADR 0013) imports getD1
   // from ./cameras; it runs against the same binding and in-memory D1.
   { source: "db/auth.ts", output: "db/auth.mjs" },
+  // db/mailer.ts (transactional mailer, AUTH MULTI-METODO Fase A2) imports
+  // getD1 from ./cameras and the pure templates from app/lib/email-templates;
+  // the 3/h re-send rate limit runs real SQL against the same in-memory D1.
+  { source: "db/mailer.ts", output: "db/mailer.mjs" },
+  { source: "app/lib/email-templates.ts", output: "app/lib/email-templates.mjs" },
   // Auth roles + appeals (ADR 0014): db/users (identity accounts, coarse
   // role) and db/appeals (appeal workflow) run against the same env.DB.
   // db/appeals imports ./moderation + ./users; db/users imports ./cameras.
@@ -134,7 +139,9 @@ export async function loadDbRuntime() {
   const confirmations = await import(pathToFileURL(path.join(tree, "db/confirmations.mjs")).href);
   const cameraEdits = await import(pathToFileURL(path.join(tree, "db/camera-edits.mjs")).href);
   const passkeys = await import(pathToFileURL(path.join(tree, "db/passkeys.mjs")).href);
-  return { env: envModule.env, cameras, corrections, moderation, auth, users, appeals, photos, retention, confirmations, cameraEdits, passkeys };
+  const mailer = await import(pathToFileURL(path.join(tree, "db/mailer.mjs")).href);
+  const emailTemplates = await import(pathToFileURL(path.join(tree, "app/lib/email-templates.mjs")).href);
+  return { env: envModule.env, cameras, corrections, moderation, auth, users, appeals, photos, retention, confirmations, cameraEdits, passkeys, mailer, emailTemplates };
 }
 
 // Replays the real Drizzle migration files (drizzle/0000-*.sql ... 0017-*.sql)

@@ -14,6 +14,22 @@ changes accumulate under `[Unreleased]`.
 
 ### Added
 
+- **Auth — mailer Cloudflare (Fase A2, t_4c398006, ADR 0020 decision 2):**
+  transactional email infrastructure for account verification and password
+  reset, with zero new third parties (Cloudflare Email Service on
+  `opensurveillancedb.org`, covered by the existing Cloudflare DPA — PR1).
+  New `EMAIL` send binding in `wrangler.jsonc` restricted to
+  `noreply@opensurveillancedb.org`; bilingual EN/IT (ADR 0007) HTML + plain
+  templates in `app/lib/email-templates.ts` with a **zero-tracking
+  contract** (no pixels/remote assets/links beyond the action URL, asserted
+  in `tests/mailer.test.mjs`); `db/mailer.ts` send layer with fail-closed
+  `VERIFY_BASE_URL` (missing → 503, never a broken link) and a durable
+  **3 emails/h per contributor** re-send limit enforced in D1 via the new
+  `email_send_log` table (migration 0029 — stores only contributor_id,
+  kind and sent_at: no content, no recipient address, no IP). The routes
+  that consume the mailer land in Fase B; this PR ships the mailer itself
+  plus schema, harness, docs (DEPLOYMENT.md) and 16 tests.
+
 - **Docs/GDPR — AUTH MULTI-METODO Fase F (t_c9fc674b, ADR 0020):** new
   [ADR 0020](docs/decisions/0020-multi-method-authentication.md)
   (multi-method authentication — email+password with verification, passkeys/
