@@ -17,7 +17,7 @@ import { PayloadTooLargeError, urlTooLong } from "../../lib/input-limits";
 import { recordRateLimitBlock } from "../../lib/abuse-alerts";
 import { callerKey, checkRateLimit, limitsFor, submissionLimits, submissionsDisabled } from "../../lib/rate-limit";
 import { csrfVerified, sameOrigin } from "../../lib/csrf";
-import { resolveOptionalContributor } from "../../lib/auth-session";
+import { requireVerifiedContributor } from "../../lib/write-gate";
 import { pendingPhotoQuota, submitterKeyFor } from "../../lib/photo-quota";
 
 /**
@@ -107,12 +107,15 @@ export async function POST(request: Request) {
   const declaredType = (request.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
 
   try {
-    // Optional contributor attribution (ADR 0013): uploads may be anonymous,
-    // but a request carrying a live session must pass the same-origin + CSRF
-    // checks before its photo is attributed (used by the link-time ownership
-    // guard in linkPhotosToCamera).
-    const auth = await resolveOptionalContributor(request);
-    if (auth && (!sameOrigin(request) || !csrfVerified(request, auth.session.csrfToken))) {
+    // Write gate (multi-method auth Fase E1): an upload requires a VERIFIED
+    // contributor. Anonymous (401) and unverified (403) share one single
+    // response body (anti-enumeration); a session created before email
+    // verification is read-only and cannot write. Every upload is therefore
+    // attributed, and the same-origin + CSRF checks always apply (used by
+    // the link-time ownership guard in linkPhotosToCamera).
+    const gate = await requireVerifiedContributor(request);
+    if (!gate.ok) return gate.response;
+    if (!sameOrigin(request) || !csrfVerified(request, gate.session.csrfToken)) {
       return photoError("Cross-site request rejected. Refresh the page and try again.", 403);
     }
 
@@ -124,7 +127,7 @@ export async function POST(request: Request) {
     // the byte quota is enforced after stripping, still before any R2 store.
     // The state quota is separate from the "submit" rate limit: the limiter
     // bounds the request rate, this bounds accumulated pending storage.
-    const submitterKey = await submitterKeyFor(auth, request);
+    const submitterKey = await submitterKeyFor(gate, request);
     const quota = pendingPhotoQuota(env);
     const pendingUsage = await pendingPhotoUsage(submitterKey);
     if (pendingUsage.count >= quota.maxPendingCount) {
@@ -178,7 +181,7 @@ export async function POST(request: Request) {
       mimeType: PHOTO_MIME_TYPES[sniffed],
       width: dimensions.width,
       height: dimensions.height,
-      contributorId: auth?.contributor.id ?? null,
+      contributorId: gate.contributor.id,
       submitterKey,
     });
     return Response.json({ photo }, { status: 201 });

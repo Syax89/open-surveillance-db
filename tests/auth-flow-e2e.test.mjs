@@ -112,9 +112,19 @@ let loginRoute;
 let appealsRoute;
 let appealItemRoute;
 
+// Verified contributor session for the camera intakes (write gate, Fase E1).
+// Created lazily on first submitCamera() call per test; reset in beforeEach
+// because env.DB is fresh every test (a stale session row no longer exists).
+// Uses a dedicated email so it never collides with the appeals fixture
+// (contributor@osdb.test) inside the same test.
+let submitHeaders = null;
+
 beforeEach(async () => {
   env = await e2eEnv();
   env.DB = new D1SqliteDatabase();
+  // The verified submitter session is per-test: env.DB is fresh, so a cached
+  // session from the previous test no longer exists in the database.
+  submitHeaders = null;
   await applyDrizzleMigrations(env.DB);
   // Lockout knobs are per-test: wipe leftovers so a previous test's small
   // thresholds never bleed into the next one.
@@ -155,11 +165,39 @@ after(async () => {
 async function submitCamera(overrides = {}) {
   const response = await camerasRoute.POST(apiRequest("/api/cameras", {
     method: "POST",
+    headers: await ensureSubmitHeaders(),
     body: { ...SUBMIT, ...overrides },
   }));
   assert.equal(response.status, 201, "submission must return 201");
   const body = await responseBody(response);
   return body.record;
+}
+
+/**
+ * Verified contributor session for the write gate (Fase E1): camera intake
+ * is no longer anonymous — every report requires a session whose account is
+ * email-verified. Created lazily per test (env.DB is fresh in beforeEach).
+ */
+async function submitterSessionHeaders() {
+  const auth = await loadE2EModule("db/auth.mjs");
+  const profile = await auth.createContributor({
+    email: "submitter@osdb.test",
+    displayName: "Demo Submitter",
+    password: "supersecret123",
+  });
+  await env.DB.prepare("UPDATE contributors SET email_verified_at = ? WHERE id = ?")
+    .bind(new Date().toISOString(), profile.id)
+    .run();
+  const { rawToken, csrfToken } = await auth.createSession(profile.id, { ttlDays: 7 });
+  return {
+    cookie: `osdb_session=${rawToken}; osdb_csrf=${csrfToken}`,
+    "x-csrf-token": csrfToken,
+  };
+}
+
+async function ensureSubmitHeaders() {
+  if (!submitHeaders) submitHeaders = await submitterSessionHeaders();
+  return submitHeaders;
 }
 
 async function moderateCamera(id, action, reasonCode, actorId, extra = {}) {
@@ -619,9 +657,11 @@ test("E2E: a contested privacy correction is escalated and handled by a senior m
   const record = await submitCamera();
   await moderateCamera(record.id, "approve", REASON.verified, REVIEWERS.record);
 
-  // Requester contests it (private correction intake, no account needed).
+  // Requester contests it (private correction intake — write gate Fase E1:
+  // a verified contributor session is required, same as every intake).
   const correctionResponse = await correctionsRoute.POST(apiRequest("/api/corrections", {
     method: "POST",
+    headers: await ensureSubmitHeaders(),
     body: {
       cameraId: record.id,
       issueType: "removal",
@@ -1063,6 +1103,11 @@ test("E2E: erasing a contributor de-attributes their reports, keeps them public,
     displayName: "Eraseme",
     password: "supersecret123",
   });
+  // Write gate (Fase E1): this contributor must be able to submit — mark the
+  // account email-verified (the column the gate reads, migration 0027).
+  await env.DB.prepare("UPDATE contributors SET email_verified_at = ? WHERE id = ?")
+    .bind(new Date().toISOString(), profile.id)
+    .run();
   const { rawToken, csrfToken } = await auth.createSession(profile.id, { ttlDays: 7 });
   const sessionCookies = `osdb_session=${rawToken}; osdb_csrf=${csrfToken}`;
   const authHeaders = { cookie: sessionCookies, "x-csrf-token": csrfToken };

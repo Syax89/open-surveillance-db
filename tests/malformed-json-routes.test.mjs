@@ -59,6 +59,13 @@ async function contributorSessionHeaders() {
     displayName: "Demo Contributor",
     password: "supersecret123",
   });
+  // Write gate (Fase E1): a session only grants write access once the
+  // account is email-verified. This suite targets body handling, not the
+  // gate, so the fixture contributor is marked verified (same column the
+  // gate reads — migration 0027).
+  await env.DB.prepare("UPDATE contributors SET email_verified_at = ? WHERE id = ?")
+    .bind(new Date().toISOString(), profile.id)
+    .run();
   // The appeals route attributes the session to the `users` role identity via
   // the EXPLICIT users.contributor_id link (audit t_5ca60ab2, P2 — the email
   // bridge is gone). Link the fresh contributor to the demo "Demo Contributor"
@@ -79,14 +86,18 @@ const ROUTES = [
     file: "app/api/cameras/route.mjs",
     method: "POST",
     path: "/api/cameras",
-    headers: {},
+    // Write gate (Fase E1): camera intake requires a VERIFIED contributor
+    // session — resolved lazily like appeals (session created in beforeEach).
+    headers: () => sessionHeaders,
   },
   {
     label: "POST /api/corrections",
     file: "app/api/corrections/route.mjs",
     method: "POST",
     path: "/api/corrections",
-    headers: {},
+    // Write gate (Fase E1): corrections intake requires a VERIFIED
+    // contributor session, same as cameras.
+    headers: () => sessionHeaders,
   },
   {
     label: "PATCH /api/moderation",

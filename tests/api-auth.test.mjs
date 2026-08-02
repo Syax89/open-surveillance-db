@@ -438,6 +438,7 @@ test("login maps a syntactically invalid JSON body to 400 (not 500)", async () =
 
 test("logout revokes the session and clears both cookies", async () => {
   stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
   stub("revokeSession", async () => true);
   const { POST } = await logoutRoute();
   const response = await POST(
@@ -464,6 +465,7 @@ test("logout without a session is idempotent and clears cookies anyway", async (
 
 test("logout with a live session but a wrong CSRF token is rejected", async () => {
   stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
   const { POST } = await logoutRoute();
   const response = await POST(
     sessionRequest("/api/auth/logout", "raw-session-token-abc123", {
@@ -477,6 +479,7 @@ test("logout with a live session but a wrong CSRF token is rejected", async () =
 
 test("logout with a live session but a missing CSRF token is rejected", async () => {
   stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
   const { POST } = await logoutRoute();
   const response = await POST(
     sessionRequest("/api/auth/logout", "raw-session-token-abc123", { method: "POST" }),
@@ -490,6 +493,7 @@ test("logout with a live session but a missing CSRF token is rejected", async ()
 
 test("me returns the profile and the caller's trust level for a live session", async () => {
   stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
   stub("countVerifiedCameras", async () => 7);
   const { GET } = await meRoute();
   const response = await GET(sessionRequest("/api/auth/me", "raw-session-token-abc123"));
@@ -541,6 +545,7 @@ test("me returns 503 when the session lookup fails", async () => {
 
 test("me/submissions lists only the contributor's attributed reports", async () => {
   stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
   const submissions = [
     { id: 11, title: "Station camera", status: "pending", createdAt: "2026-08-01T09:00:00.000Z" },
     { id: 9, title: "Market square", status: "verified", createdAt: "2026-07-30T09:00:00.000Z" },
@@ -565,6 +570,7 @@ test("me/submissions returns 401 without a session", async () => {
 
 test("account erasure deletes the account, de-attributes reports, and clears cookies", async () => {
   stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
   stub("eraseContributor", async () => ({ deleted: true, deattributedReports: 3 }));
   const { DELETE } = await accountRoute();
   const response = await DELETE(
@@ -600,6 +606,7 @@ test("account erasure returns 401 for an unknown or expired session token", asyn
 
 test("account erasure with a live session but a wrong CSRF token is rejected", async () => {
   stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
   const { DELETE } = await accountRoute();
   const response = await DELETE(
     sessionRequest("/api/auth/account", "raw-session-token-abc123", {
@@ -613,6 +620,7 @@ test("account erasure with a live session but a wrong CSRF token is rejected", a
 
 test("account erasure with a live session but a missing CSRF token is rejected", async () => {
   stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
   const { DELETE } = await accountRoute();
   const response = await DELETE(
     sessionRequest("/api/auth/account", "raw-session-token-abc123", { method: "DELETE" }),
@@ -650,6 +658,7 @@ test("account erasure respects the auth rate-limit bucket", async () => {
 
 test("account erasure returns 500 when the database is unavailable", async () => {
   stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
   stub("eraseContributor", async () => {
     throw new Error("Database binding unavailable");
   });
@@ -693,16 +702,19 @@ const validCameraBody = {
   longitude: 11.62,
 };
 
-test("anonymous camera submissions stay possible and are not attributed", async () => {
+test("anonymous camera submissions are refused by the write gate (401, no-store)", async () => {
   stub("createPendingCamera", async () => cameraFixture);
   const { POST } = await camerasRoute();
   const response = await POST(apiRequest("/api/cameras", { method: "POST", body: validCameraBody }));
-  assert.equal(response.status, 201);
-  assert.deepEqual(callArgs("createPendingCamera")[0][0].contributorId, null);
+  assert.equal(response.status, 401);
+  assert.equal((await responseBody(response)).error, "Authentication required.");
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.equal(callArgs("createPendingCamera").length, 0, "the gate must fail before any db write");
 });
 
 test("authenticated camera submissions carry the contributor id", async () => {
   stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
   stub("createPendingCamera", async () => cameraFixture);
   const { POST } = await camerasRoute();
   const response = await POST(
@@ -718,6 +730,7 @@ test("authenticated camera submissions carry the contributor id", async () => {
 
 test("authenticated camera submissions without a valid CSRF token are rejected", async () => {
   stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
   const { POST } = await camerasRoute();
   const response = await POST(
     sessionRequest("/api/cameras", "raw-session-token-abc123", {
@@ -729,13 +742,15 @@ test("authenticated camera submissions without a valid CSRF token are rejected",
   assert.equal(callArgs("createPendingCamera").length, 0);
 });
 
-test("a dead session cookie falls back to the anonymous submission path", async () => {
+test("a dead session cookie is refused by the write gate (401, no-store, no db write)", async () => {
   stub("findSessionByToken", async () => null);
   stub("createPendingCamera", async () => cameraFixture);
   const { POST } = await camerasRoute();
   const response = await POST(
     sessionRequest("/api/cameras", "dead-token", { method: "POST", body: validCameraBody }),
   );
-  assert.equal(response.status, 201);
-  assert.deepEqual(callArgs("createPendingCamera")[0][0].contributorId, null);
+  assert.equal(response.status, 401);
+  assert.equal((await responseBody(response)).error, "Authentication required.");
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.equal(callArgs("createPendingCamera").length, 0, "the gate must fail before any db write");
 });

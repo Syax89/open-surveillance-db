@@ -4,7 +4,7 @@ import {
   createCorrectionRequest,
 } from "../../../db/corrections";
 import { recordRateLimitBlock } from "../../lib/abuse-alerts";
-import { resolveOptionalContributor } from "../../lib/auth-session";
+import { requireVerifiedContributor } from "../../lib/write-gate";
 import { csrfVerified, sameOrigin } from "../../lib/csrf";
 import { isRecord } from "../../lib/guards";
 import { BodyReadError, readJsonBody, urlTooLong } from "../../lib/input-limits";
@@ -23,12 +23,13 @@ function cleanText(value: unknown, maxLength: number) {
  * it answers 400 — free text is NEVER accepted for `removal`/`abuse`, even
  * when the message body contains the word (A2).
  *
- * Anonymous reports stay possible (reporter privacy, A4): the per-IP
- * `submit` rate bucket (default 5/60s) bounds bursts and the dedupe (A5)
- * lives in db/corrections.ts. A live session is optional; when present the
- * report is attributed to the contributor (nullable contributor_id column,
- * migration 0022) and — because the request then carries cookies — the
- * same-origin + CSRF double-submit guards apply (photos route pattern).
+ * Write gate (multi-method auth Fase E1): the reporter must be a VERIFIED
+ * contributor — anonymous reports are refused with 401 and unverified
+ * accounts with 403 (single uniform response body, anti-enumeration; see
+ * app/lib/write-gate.ts). The per-IP `submit` rate bucket (default 5/60s)
+ * bounds bursts and the dedupe (A5) lives in db/corrections.ts. Because
+ * every request now carries cookies, the same-origin + CSRF double-submit
+ * guards always apply (photos route pattern).
  */
 export async function POST(request: Request) {
   // Input limits: reject absurdly long URLs before any parsing work.
@@ -57,18 +58,15 @@ export async function POST(request: Request) {
     });
   }
 
-  // Optional session: attributes the report to the contributor (null =
-  // anonymous). When a session is present the request carries cookies, so
-  // the state change must pass same-origin + CSRF (photos route pattern);
-  // anonymous callers have nothing to CSRF and stay open.
-  let auth: Awaited<ReturnType<typeof resolveOptionalContributor>> = null;
-  try {
-    auth = await resolveOptionalContributor(request);
-  } catch (error) {
-    console.error("POST /api/corrections session lookup failed", error);
-    return Response.json({ error: "Unable to save correction request" }, { status: 500 });
-  }
-  if (auth && (!sameOrigin(request) || !csrfVerified(request, auth.session.csrfToken))) {
+  // Write gate (multi-method auth Fase E1): a correction/removal request
+  // requires a VERIFIED contributor. Anonymous (401) and unverified (403)
+  // share one single response body (anti-enumeration); a session created
+  // before email verification is read-only and cannot write. Every request
+  // now carries cookies, so the state change must pass same-origin + CSRF
+  // (photos route pattern).
+  const gate = await requireVerifiedContributor(request);
+  if (!gate.ok) return gate.response;
+  if (!sameOrigin(request) || !csrfVerified(request, gate.session.csrfToken)) {
     return Response.json({ error: "Cross-origin request rejected." }, { status: 403 });
   }
 
@@ -92,7 +90,7 @@ export async function POST(request: Request) {
       issueType,
       message,
       contact,
-      contributorId: auth?.contributor.id ?? null,
+      contributorId: gate.contributor.id,
     });
     if (result.kind === "duplicate_open") {
       return Response.json({ error: "A report for this record is already under review." }, { status: 409 });

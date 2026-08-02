@@ -585,6 +585,43 @@ export async function revokeSession(rawToken: string, now: string = new Date().t
 }
 
 // ---------------------------------------------------------------------------
+// Write gate (multi-method auth Fase E1): contributor verification state
+// ---------------------------------------------------------------------------
+
+/**
+ * The verification state the write gate checks (migration 0027,
+ * multi-method auth Fase A). `email_verified_at` is the SINGLE source of
+ * truth for "can this account write?": NULL means the account is not yet
+ * verified and every state-changing write is refused, no matter how the
+ * account was created (password, passkey or OIDC — Fase C/D set the same
+ * column once the external identity is accepted).
+ */
+export type ContributorVerification = {
+  id: number;
+  emailVerifiedAt: string | null;
+  /** Registration method: 'password' | 'passkey' | 'github' | 'google'. */
+  authProvider: string;
+};
+
+/**
+ * Read a contributor's verification state for the write gate
+ * (app/lib/write-gate.ts). Returns null when the account no longer exists
+ * (erased between the session read and this check) — the caller treats
+ * that exactly like an anonymous request.
+ */
+export async function getContributorVerification(
+  contributorId: number,
+): Promise<ContributorVerification | null> {
+  const d1 = await getD1();
+  return d1
+    .prepare(
+      "SELECT id, email_verified_at AS emailVerifiedAt, auth_provider AS authProvider FROM contributors WHERE id = ?",
+    )
+    .bind(contributorId)
+    .first<ContributorVerification>();
+}
+
+// ---------------------------------------------------------------------------
 // Contributor's own submissions
 // ---------------------------------------------------------------------------
 

@@ -37,7 +37,7 @@ import {
   seedDemoIdentities,
 } from "./helpers/db-runtime-harness.mjs";
 import { D1SqliteDatabase } from "./helpers/d1-sqlite.mjs";
-import { cleanupE2ETree, e2eEnv, loadE2ERoute } from "./helpers/e2e-harness.mjs";
+import { cleanupE2ETree, e2eEnv, loadE2EModule, loadE2ERoute } from "./helpers/e2e-harness.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const serverDir = path.join(root, "dist", "server");
@@ -65,6 +65,43 @@ const CONTRIBUTOR = {
 };
 
 // ---------------------------------------------------------------------------
+// Verified-session fixture (write gate, Fase E1)
+// ---------------------------------------------------------------------------
+// Camera/correction intakes require a session whose account is
+// email-verified. These journeys target the full flow (submit → moderation →
+// publish), not the gate, so the submitter is provisioned verified. The
+// session is created lazily per test because env.DB is fresh in beforeEach.
+let submitHeaders = null;
+async function submitterSessionHeaders() {
+  const auth = await loadE2EModule("db/auth.mjs");
+  const profile = await auth.createContributor({
+    email: "journey-submitter@example.org",
+    displayName: "Journey Submitter",
+    password: "supersecret123",
+  });
+  await env.DB.prepare("UPDATE contributors SET email_verified_at = ? WHERE id = ?")
+    .bind(new Date().toISOString(), profile.id)
+    .run();
+  const { rawToken, csrfToken } = await auth.createSession(profile.id, { ttlDays: 7 });
+  return {
+    cookie: `osdb_session=${rawToken}; osdb_csrf=${csrfToken}`,
+    "x-csrf-token": csrfToken,
+  };
+}
+async function ensureSubmitHeaders() {
+  if (!submitHeaders) submitHeaders = await submitterSessionHeaders();
+  return submitHeaders;
+}
+// Mark a freshly registered contributor email-verified (the write gate
+// refuses writes until the account is verified; the verify-email endpoint
+// is Fase B, so journeys simulate the verified state directly).
+async function markVerifiedByEmail(email) {
+  await env.DB.prepare("UPDATE contributors SET email_verified_at = ? WHERE email = ?")
+    .bind(new Date().toISOString(), email)
+    .run();
+}
+
+// ---------------------------------------------------------------------------
 // Harness wiring (same as auth-flow-e2e)
 // ---------------------------------------------------------------------------
 
@@ -80,6 +117,9 @@ let logoutRoute;
 beforeEach(async () => {
   env = await e2eEnv();
   env.DB = new D1SqliteDatabase();
+  // The verified submitter session is per-test: env.DB is fresh, so a cached
+  // session from the previous test no longer exists in the database.
+  submitHeaders = null;
   await applyDrizzleMigrations(env.DB);
   await seedDemoIdentities(env.DB);
   const load = async (name, routePath) => (await loadE2ERoute(routePath));
@@ -149,9 +189,11 @@ test("journey segnala: the report form renders on the SSR /segnala tool (no JS n
 });
 
 test("journey segnala: submit → moderation queue → approve → public listing → record detail", async () => {
-  // 1. The contributor submits the report through the real route.
+  // 1. The contributor submits the report through the real route (write gate
+  //    Fase E1: a verified contributor session is required).
   const submitted = await camerasRoute.POST(apiRequest("/api/cameras", {
     method: "POST",
+    headers: await ensureSubmitHeaders(),
     body: SUBMIT,
   }));
   assert.equal(submitted.status, 201, "submission must return 201");
@@ -214,6 +256,14 @@ test("journey account: register builds a session, me resolves the contributor, s
   const { contributor } = await responseBody(me);
   assert.equal(contributor.email, CONTRIBUTOR.email, "me must return the registered contributor");
 
+  // 2b. Verify the account email (write gate Fase E1): a fresh register is
+  //     read-only — the session only gains write access once the account is
+  //     verified. The verify-email endpoint is Fase B; the journey simulates
+  //     the verified state directly on the column the gate reads.
+  await env.DB.prepare("UPDATE contributors SET email_verified_at = ? WHERE id = ?")
+    .bind(new Date().toISOString(), contributor.id)
+    .run();
+
   // 3. Submissions are empty before any report.
   const empty = await submissionsRoute.GET(apiRequest("/api/auth/me/submissions", { headers: { cookie: registerCookies } }));
   assert.equal(empty.status, 200);
@@ -260,7 +310,7 @@ async function registerContributor(overrides = {}) {
   const cookies = response.headers.getSetCookie().join("; ");
   const csrfToken = /osdb_csrf=([^;]+)/.exec(cookies)?.[1];
   assert.ok(csrfToken, "register must issue a CSRF cookie");
-  return { cookies, csrfToken };
+  return { cookies, csrfToken, email };
 }
 
 const editPatch = (pathAndQuery, body, auth) =>
@@ -274,6 +324,10 @@ test("journey edit: pending edits direct, verified goes to re-moderation, foreig
   // 1. register → two contributors (owner + outsider).
   const owner = await registerContributor();
   const outsider = await registerContributor();
+  // Write gate (Fase E1): a fresh register is read-only — verify the owner's
+  // account so the submit below passes the gate (verify-email is Fase B; the
+  // journey simulates the verified state on the column the gate reads).
+  await markVerifiedByEmail(owner.email);
   const me = await meRoute.GET(apiRequest("/api/auth/me", { headers: { cookie: owner.cookies } }));
   const { contributor } = await responseBody(me);
 

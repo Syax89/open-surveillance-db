@@ -9,7 +9,15 @@ import { after, beforeEach, test } from "node:test";
 import { apiRequest, cleanupRouteTree, loadRoute, responseBody } from "./helpers/api-harness.mjs";
 import { callArgs, resetMockState, stub } from "./helpers/mock-state.mjs";
 
-beforeEach(() => resetMockState());
+beforeEach(() => {
+  resetMockState();
+  // Write gate (Fase E1): a VERIFIED session by default — the intake
+  // validation tests below focus on the payload; the gate itself has its
+  // own dedicated suite (tests/write-gate.test.mjs). Tests that exercise
+  // the gate (anonymous / unverified / CSRF) override these stubs.
+  stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
+});
 after(async () => cleanupRouteTree());
 
 const route = () => loadRoute("app/api/corrections/route.mjs");
@@ -43,17 +51,18 @@ function sessionPost(body, headers = {}) {
 }
 
 test("POST /api/corrections stores a trimmed whitelisted request and returns its reference id", async () => {
+  // Write gate (Fase E1): the intake requires a VERIFIED contributor — a
+  // verified session is part of the fixture from now on.
+  stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
   stub("createCorrectionRequest", async (input) => ({ kind: "created", correction: { id: 31, ...input } }));
   const { POST } = await route();
   const response = await POST(
-    apiRequest("/api/corrections", {
-      method: "POST",
-      body: {
-        cameraId: 42,
-        issueType: "  inaccurate  ",
-        message: "  The camera is actually on the other corner.  ",
-        contact: "  reporter@example.test  ",
-      },
+    sessionPost({
+      cameraId: 42,
+      issueType: "  inaccurate  ",
+      message: "  The camera is actually on the other corner.  ",
+      contact: "  reporter@example.test  ",
     }),
   );
 
@@ -63,11 +72,12 @@ test("POST /api/corrections stores a trimmed whitelisted request and returns its
   assert.equal(args.issueType, "inaccurate");
   assert.equal(args.message, "The camera is actually on the other corner.");
   assert.equal(args.contact, "reporter@example.test");
-  assert.equal(args.contributorId, null, "an anonymous caller is stored without attribution");
+  assert.equal(args.contributorId, 11, "a verified caller is attributed");
 });
 
 test("POST /api/corrections attributes the report to the session contributor", async () => {
   stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
   stub("createCorrectionRequest", async (input) => ({ kind: "created", correction: { id: 36, ...input } }));
   const { POST } = await route();
   const response = await POST(
@@ -81,6 +91,7 @@ test("POST /api/corrections rejects a live session with a missing or wrong CSRF 
   const { POST } = await route();
   await t.test("missing csrf header", async () => {
     stub("findSessionByToken", async () => ({ ...session, contributor }));
+    stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
     const response = await POST(
       apiRequest("/api/corrections", {
         method: "POST",
@@ -93,6 +104,7 @@ test("POST /api/corrections rejects a live session with a missing or wrong CSRF 
   });
   await t.test("wrong csrf token", async () => {
     stub("findSessionByToken", async () => ({ ...session, contributor }));
+    stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
     const response = await POST(
       sessionPost(
         { cameraId: 42, issueType: "removal", message: "Faces a private window." },
@@ -115,7 +127,7 @@ test("POST /api/corrections accepts an omitted cameraId and stores null", async 
     await t.test(name, async () => {
       // Stub inside the subtest: beforeEach resets state for every subtest.
       stub("createCorrectionRequest", async (input) => ({ kind: "created", correction: { id: 32, ...input } }));
-      const response = await POST(apiRequest("/api/corrections", { method: "POST", body }));
+      const response = await POST(sessionPost(body));
       assert.equal(response.status, 201, name);
       assert.equal(callArgs("createCorrectionRequest").at(-1)[0].cameraId, null, name);
     });
@@ -126,10 +138,7 @@ test("POST /api/corrections accepts a numeric-string cameraId", async () => {
   stub("createCorrectionRequest", async (input) => ({ kind: "created", correction: { id: 33, ...input } }));
   const { POST } = await route();
   const response = await POST(
-    apiRequest("/api/corrections", {
-      method: "POST",
-      body: { cameraId: "42", issueType: TYPE, message: "Y" },
-    }),
+    sessionPost({ cameraId: "42", issueType: TYPE, message: "Y" }),
   );
   assert.equal(response.status, 201);
   assert.equal(callArgs("createCorrectionRequest")[0][0].cameraId, 42);
@@ -148,10 +157,7 @@ test("POST /api/corrections rejects invalid cameraId values", async (t) => {
   for (const { name, cameraId } of cases) {
     await t.test(name, async () => {
       const response = await POST(
-        apiRequest("/api/corrections", {
-          method: "POST",
-          body: { cameraId, issueType: TYPE, message: "Y" },
-        }),
+        sessionPost({ cameraId, issueType: TYPE, message: "Y" }),
       );
       assert.equal(response.status, 400, name);
       assert.equal(callArgs("createCorrectionRequest").length, 0, name);
@@ -166,10 +172,7 @@ test("POST /api/corrections coerces truthy non-numeric cameraIds to numbers", as
   const { POST } = await route();
   for (const [cameraId, expected] of [[true, 1], [[5], 5]]) {
     const response = await POST(
-      apiRequest("/api/corrections", {
-        method: "POST",
-        body: { cameraId, issueType: TYPE, message: "Y" },
-      }),
+      sessionPost({ cameraId, issueType: TYPE, message: "Y" }),
     );
     assert.equal(response.status, 201, `cameraId=${JSON.stringify(cameraId)}`);
     assert.equal(
@@ -191,7 +194,7 @@ test("POST /api/corrections rejects missing or blank issue type and message", as
   ];
   for (const { name, body } of cases) {
     await t.test(name, async () => {
-      const response = await POST(apiRequest("/api/corrections", { method: "POST", body }));
+      const response = await POST(sessionPost(body));
       assert.equal(response.status, 400, name);
       assert.equal(callArgs("createCorrectionRequest").length, 0, name);
     });
@@ -202,14 +205,11 @@ test("A7: long free-text fields are truncated to their documented limits", async
   stub("createCorrectionRequest", async (input) => ({ kind: "created", correction: { id: 34, ...input } }));
   const { POST } = await route();
   const response = await POST(
-    apiRequest("/api/corrections", {
-      method: "POST",
-      body: {
+    sessionPost({
         issueType: TYPE,
         message: "M".repeat(3000),
         contact: "C".repeat(300),
-      },
-    }),
+      }),
   );
   assert.equal(response.status, 201);
   const input = callArgs("createCorrectionRequest")[0][0];
@@ -220,10 +220,7 @@ test("A7: long free-text fields are truncated to their documented limits", async
 test("A1: a long issue type is not truncated — it is outside the whitelist and answers 400", async () => {
   const { POST } = await route();
   const response = await POST(
-    apiRequest("/api/corrections", {
-      method: "POST",
-      body: { issueType: "I".repeat(100), message: "Y" },
-    }),
+    sessionPost({ issueType: "I".repeat(100), message: "Y" }),
   );
   assert.equal(response.status, 400);
   assert.equal(callArgs("createCorrectionRequest").length, 0);
@@ -232,7 +229,7 @@ test("A1: a long issue type is not truncated — it is outside the whitelist and
 test("POST /api/corrections rejects non-object JSON bodies", async () => {
   const { POST } = await route();
   for (const body of ["[]", "7", '"x"']) {
-    const response = await POST(apiRequest("/api/corrections", { method: "POST", body }));
+    const response = await POST(sessionPost(body));
     assert.equal(response.status, 400, body);
     assert.equal(callArgs("createCorrectionRequest").length, 0, body);
   }
@@ -240,14 +237,14 @@ test("POST /api/corrections rejects non-object JSON bodies", async () => {
 
 test("POST /api/corrections rejects a JSON null body with 400 (OSDB-QA-001)", async () => {
   const { POST } = await route();
-  const response = await POST(apiRequest("/api/corrections", { method: "POST", body: "null" }));
+  const response = await POST(sessionPost("null"));
   assert.equal(response.status, 400);
   assert.equal(callArgs("createCorrectionRequest").length, 0);
 });
 
 test("POST /api/corrections maps malformed JSON to 400", async () => {
   const { POST } = await route();
-  const response = await POST(apiRequest("/api/corrections", { method: "POST", body: "{oops" }));
+  const response = await POST(sessionPost("{oops"));
   assert.equal(response.status, 400);
   assert.equal(callArgs("createCorrectionRequest").length, 0, "no db write for malformed JSON");
 });
@@ -258,10 +255,7 @@ test("POST /api/corrections maps database failures to 500", async () => {
   });
   const { POST } = await route();
   const response = await POST(
-    apiRequest("/api/corrections", {
-      method: "POST",
-      body: { issueType: TYPE, message: "Y" },
-    }),
+    sessionPost({ issueType: TYPE, message: "Y" }),
   );
   assert.equal(response.status, 500);
   assert.equal((await responseBody(response)).error, "Unable to save correction request");
