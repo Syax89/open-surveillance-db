@@ -6,6 +6,7 @@ import {
 } from "../../../../../db/confirmations";
 import { recordRateLimitBlock } from "../../../../lib/abuse-alerts";
 import { resolveOptionalContributor } from "../../../../lib/auth-session";
+import { requireVerifiedContributor } from "../../../../lib/write-gate";
 import { checkConfirmIpBurst, confirmIpBurstLimits } from "../../../../lib/confirm-ip-burst";
 import { csrfVerified, sameOrigin } from "../../../../lib/csrf";
 import { urlTooLong } from "../../../../lib/input-limits";
@@ -72,17 +73,23 @@ async function guardMutation(
     });
   }
 
-  let resolved;
+  let gate;
   try {
-    resolved = await resolveOptionalContributor(request);
+    // Write gate (multi-method auth Fase E1): the toggle requires a VERIFIED
+    // contributor — anonymous (401) and unverified (403) share one single
+    // response body (anti-enumeration, no-store). Raising the bar here is
+    // part of the anti-gaming layer: an unverified account cannot mass-confirm
+    // records, so a freshly registered (unverified) contributor cannot
+    // influence public verification counts. (Decision point flagged for Ada
+    // in the E1 PR: the email-verified requirement stacks on top of the
+    // existing level gate — ≥1 verified contribution — in db/confirmations.ts.)
+    gate = await requireVerifiedContributor(request);
   } catch (error) {
     console.error("PUT/DELETE /api/cameras/[id]/confirmation session lookup failed", error);
     return Response.json({ error: "Database unavailable" }, { status: 503, headers: NO_STORE_HEADERS });
   }
-  if (!resolved) {
-    return Response.json({ error: "Not authenticated." }, { status: 401, headers: NO_STORE_HEADERS });
-  }
-  if (!csrfVerified(request, resolved.session.csrfToken)) {
+  if (!gate.ok) return gate.response;
+  if (!csrfVerified(request, gate.session.csrfToken)) {
     return Response.json({ error: "Invalid CSRF token. Refresh the page and try again." }, { status: 403, headers: NO_STORE_HEADERS });
   }
 
@@ -106,7 +113,7 @@ async function guardMutation(
   if (id === null) {
     return Response.json({ error: "Camera not found." }, { status: 404, headers: NO_STORE_HEADERS });
   }
-  return { id, contributorId: resolved.contributor.id };
+  return { id, contributorId: gate.contributor.id };
 }
 
 export async function PUT(request: Request) {

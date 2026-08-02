@@ -17,15 +17,48 @@
 import assert from "node:assert/strict";
 import { after, beforeEach, test } from "node:test";
 import { apiRequest as publicRequest, cleanupRouteTree, loadRoute, loadTreeModule, responseBody } from "./helpers/api-harness.mjs";
-// Public intakes (cameras POST, corrections POST) must work WITHOUT any
-// identity header; keep the plain request helper for them.
-const apiRequest = publicRequest;
+// Camera/correction intakes now require a VERIFIED session (write gate,
+// Fase E1): the plain request helper stays for the moderation/identity
+// tests below, the verified-session helper for the public intakes.
 import { D1SqliteDatabase as D1 } from "./helpers/d1-sqlite.mjs";
 import { applyDrizzleMigrations } from "./helpers/db-runtime-harness.mjs";
 import { callArgs, resetMockState, stub } from "./helpers/mock-state.mjs";
 
 beforeEach(() => resetMockState());
 after(async () => cleanupRouteTree());
+
+// Verified contributor session (write gate Fase E1): every public intake
+// POST needs it. The gate itself has its own suite (tests/write-gate.test.mjs);
+// here it is just the fixture that lets the hostile-input tests reach the
+// body parsing they target.
+const session = {
+  id: 7,
+  tokenHash: "hash",
+  csrfToken: "csrf-token-123",
+  createdAt: "2026-08-01T00:00:00.000Z",
+  expiresAt: "2026-09-01T00:00:00.000Z",
+  revokedAt: null,
+};
+const contributor = {
+  id: 7,
+  email: "linus@osdb.test",
+  displayName: "Linus",
+  createdAt: "2026-07-01T00:00:00.000Z",
+  updatedAt: "2026-07-01T00:00:00.000Z",
+};
+const verifiedRequest = (path, opts = {}) =>
+  publicRequest(path, {
+    ...opts,
+    headers: {
+      cookie: "osdb_session=raw-session-token-abc123; osdb_csrf=csrf-token-123",
+      "x-csrf-token": "csrf-token-123",
+      ...(opts.headers ?? {}),
+    },
+  });
+const stubVerifiedSession = () => {
+  stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
+};
 
 // Route-level authz (ADR 0014): the moderation route derives the acting
 // reviewer from the authenticated identity header. This suite acts as the
@@ -236,11 +269,12 @@ const correctionsRoute = () => loadRoute("app/api/corrections/route.mjs");
 const moderationRoute = () => loadRoute("app/api/moderation/route.mjs");
 
 test("POST /api/cameras never forwards prototype-pollution or unknown keys to the db layer", async () => {
+  stubVerifiedSession();
   stub("createPendingCamera", async (input) => ({ id: 9, ...input }));
   stub("findNearbyPublicCameras", async () => []);
   const { POST } = await camerasRoute();
   const response = await POST(
-    apiRequest("/api/cameras", {
+    verifiedRequest("/api/cameras", {
       method: "POST",
       body: '{"title":"Safe cam","kind":"Fixed dome","latitude":44.1,"longitude":12.2,"__proto__":{"admin":true},"constructor":{"prototype":{"polluted":true}},"extraField":"ignored"}',
     }),
@@ -277,10 +311,11 @@ test("POST /api/cameras never forwards prototype-pollution or unknown keys to th
 });
 
 test("POST /api/corrections ignores unknown and prototype keys", async () => {
+  stubVerifiedSession();
   stub("createCorrectionRequest", async (input) => ({ kind: "created", correction: { id: 4, ...input } }));
   const { POST } = await correctionsRoute();
   const response = await POST(
-    apiRequest("/api/corrections", {
+    verifiedRequest("/api/corrections", {
       method: "POST",
       body: '{"issueType":"abuse","message":"Shows my house","__proto__":{"bypass":1},"admin":true,"cameraId":1}',
     }),

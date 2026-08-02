@@ -114,6 +114,7 @@ test("P1: contributions answers 401 without a session", async () => {
 
 test("P2: contributions rejects an unknown type filter with 400", async () => {
   stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
   const { GET } = await contributionsRoute();
   const response = await GET(sessionRequest("/api/auth/me/contributions?type=video"));
   assert.equal(response.status, 400);
@@ -123,6 +124,7 @@ test("P2: contributions rejects an unknown type filter with 400", async () => {
 
 test("P3: contributions rejects an unknown status filter with 400", async () => {
   stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
   const { GET } = await contributionsRoute();
   const response = await GET(sessionRequest("/api/auth/me/contributions?status=published"));
   assert.equal(response.status, 400);
@@ -132,6 +134,7 @@ test("P3: contributions rejects an unknown status filter with 400", async () => 
 
 test("P4: contributions rejects invalid page/pageSize with 400", async () => {
   stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
   const { GET } = await contributionsRoute();
   for (const query of ["?page=0", "?page=abc", "?pageSize=0", "?pageSize=1.5"]) {
     const response = await GET(sessionRequest(`/api/auth/me/contributions${query}`));
@@ -143,6 +146,7 @@ test("P4: contributions rejects invalid page/pageSize with 400", async () => {
 
 test("P5: contributions refuses a cross-account contributorId with 400 (only own data)", async () => {
   stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
   const { GET } = await contributionsRoute();
   const response = await GET(sessionRequest("/api/auth/me/contributions?contributorId=99"));
   assert.equal(response.status, 400);
@@ -152,6 +156,7 @@ test("P5: contributions refuses a cross-account contributorId with 400 (only own
 
 test("P6: contributions returns the pagination object, no-store and the caller's level in the meta", async () => {
   stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
   stub("listContributorContributions", async () => ({
     contributions: [cameraContribution, correctionContribution, photoContribution],
     total: 7,
@@ -172,6 +177,7 @@ test("P6: contributions returns the pagination object, no-store and the caller's
 
 test("P6b: pagination math across pages (hasMore, totalPages, offset)", async () => {
   stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
   stub("listContributorContributions", async () => ({ contributions: [cameraContribution], total: 7 }));
   stub("countVerifiedCameras", async () => 7);
   const { GET } = await contributionsRoute();
@@ -187,6 +193,7 @@ test("P6b: pagination math across pages (hasMore, totalPages, offset)", async ()
 
 test("P7: type/status filters are forwarded to the db layer after whitelist validation", async () => {
   stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
   stub("listContributorContributions", async () => ({ contributions: [], total: 0 }));
   stub("countVerifiedCameras", async () => 0);
   const { GET } = await contributionsRoute();
@@ -201,6 +208,7 @@ test("P7: type/status filters are forwarded to the db layer after whitelist vali
 
 test("P7b: absent filters mean all types and all statuses", async () => {
   stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
   stub("listContributorContributions", async () => ({ contributions: [], total: 0 }));
   stub("countVerifiedCameras", async () => 0);
   const { GET } = await contributionsRoute();
@@ -213,6 +221,7 @@ test("P7b: absent filters mean all types and all statuses", async () => {
 
 test("P8: contributions answers 503 when the database is unavailable", async () => {
   stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
   stub("listContributorContributions", async () => {
     throw new Error("Database binding unavailable");
   });
@@ -223,6 +232,7 @@ test("P8: contributions answers 503 when the database is unavailable", async () 
 
 test("P8b: pageSize is capped at 100 by the route (F0 contract)", async () => {
   stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
   stub("listContributorContributions", async () => ({ contributions: [], total: 0 }));
   stub("countVerifiedCameras", async () => 0);
   const { GET } = await contributionsRoute();
@@ -297,6 +307,7 @@ test("L6: the public cameras list never exposes a level (no global/other level l
 
 test("L7: the old submissions endpoint stays (backward compat) and carries no level", async () => {
   stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
   stub("listContributorSubmissions", async () => [
     { id: 11, title: "Station camera", status: "pending", createdAt: "2026-08-01T09:00:00.000Z" },
   ]);
@@ -310,6 +321,7 @@ test("L7: the old submissions endpoint stays (backward compat) and carries no le
 
 test("L8: /api/auth/me exposes only the caller's own derived level", async () => {
   stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
   stub("countVerifiedCameras", async () => 20);
   const { GET } = await meRoute();
   const response = await GET(sessionRequest("/api/auth/me"));

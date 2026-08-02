@@ -60,6 +60,7 @@ export const {
   getLoginLockout,
   recordFailedLogin,
   clearLoginAttempts,
+  getContributorVerification,
 } = makeMock({
   createContributor: "createContributor",
   findContributorByEmail: "findContributorByEmail",
@@ -81,4 +82,5 @@ export const {
   getLoginLockout: "getLoginLockout",
   recordFailedLogin: "recordFailedLogin",
   clearLoginAttempts: "clearLoginAttempts",
+  getContributorVerification: "getContributorVerification",
 });

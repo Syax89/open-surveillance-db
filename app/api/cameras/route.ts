@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 import { createPendingCamera, findNearbyPublicCameras, freshnessWindows, getPublicCameraFacets, listPublicCameras, listPublicCamerasInBbox, listPublicCamerasPage, PUBLIC_CAMERAS_PAGE_DEFAULT_LIMIT, PUBLIC_CAMERAS_PAGE_MAX_LIMIT, type FreshnessWindow, type PublicCameraFilters } from "../../../db/cameras";
 import { requiresDuplicateConfirmation } from "../../lib/duplicate-detection";
-import { resolveOptionalContributor } from "../../lib/auth-session";
+import { requireVerifiedContributor } from "../../lib/write-gate";
 import { csrfVerified, sameOrigin } from "../../lib/csrf";
 import { DATA_LICENSE_ID, DATA_LICENSE_NOTICE } from "../../lib/data-license";
 import { linkPhotosToCamera } from "../../../db/photos";
@@ -193,12 +193,14 @@ export async function POST(request: Request) {
   }
 
   try {
-    // Optional contributor attribution (ADR 0013): anonymous submissions
-    // remain possible, but a request carrying a live session must pass the
-    // same-origin + CSRF checks before its report is attributed. A missing
-    // or dead session simply means the report is anonymous.
-    const auth = await resolveOptionalContributor(request);
-    if (auth && (!sameOrigin(request) || !csrfVerified(request, auth.session.csrfToken))) {
+    // Write gate (multi-method auth Fase E1): every report now requires a
+    // VERIFIED contributor. Anonymous (401) and unverified (403) share one
+    // single response body (anti-enumeration); a session created before
+    // email verification is read-only and cannot write. Attribution is no
+    // longer optional: every stored report carries the verified contributor.
+    const gate = await requireVerifiedContributor(request);
+    if (!gate.ok) return gate.response;
+    if (!sameOrigin(request) || !csrfVerified(request, gate.session.csrfToken)) {
       return Response.json(
         { error: "Cross-site request rejected. Refresh the page and try again." },
         { status: 403 },
@@ -260,7 +262,7 @@ export async function POST(request: Request) {
         { status: 409 },
       );
     }
-    const record = await createPendingCamera({ title, kind, address, notes, manufacturer: manufacturer || null, observedOn: observedOn || null, latitude, longitude, contributorId: auth?.contributor.id ?? null });
+    const record = await createPendingCamera({ title, kind, address, notes, manufacturer: manufacturer || null, observedOn: observedOn || null, latitude, longitude, contributorId: gate.contributor.id });
     // Link photo evidence after the report row exists. Linking is best-effort:
     // a photo that fails the pending/unlinked guard is simply left orphaned
     // (it will never be public without moderation). Photos attributed to a
@@ -268,7 +270,7 @@ export async function POST(request: Request) {
     // contributor — the ownership guard lives in linkPhotosToCamera.
     let linkedPhotoCount = 0;
     try {
-      linkedPhotoCount = await linkPhotosToCamera(record.id, photoIds, auth?.contributor.id ?? null);
+      linkedPhotoCount = await linkPhotosToCamera(record.id, photoIds, gate.contributor.id);
     } catch (error) {
       console.error("POST /api/cameras photo linking failed", error);
     }

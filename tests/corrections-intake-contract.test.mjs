@@ -16,8 +16,9 @@
 //     intake acknowledges with a case reference and never echoes
 //     requester-supplied content back;
 //   - removal-style requests may arrive without a precise record id;
-//   - anonymous reports stay possible (reporter privacy, A4) and are
-//     rate-limited per IP (429 + Retry-After);
+//   - write gate (Fase E1): anonymous reports are refused with 401 and
+//     unverified accounts with 403 (single uniform body); every stored
+//     request is attributed to the verified contributor;
 //   - duplicate open reports and re-reports on an already-removed target map
 //     to 409 (A5; the DB-level enforcement lives in corrections-dedupe);
 //   - the endpoint fails closed (503) when submissions are disabled;
@@ -39,7 +40,15 @@ import {
 } from "./helpers/api-harness.mjs";
 import { callArgs, resetMockState, stub } from "./helpers/mock-state.mjs";
 
-beforeEach(() => resetMockState());
+beforeEach(() => {
+  resetMockState();
+  // Write gate (Fase E1): a VERIFIED session by default — the contract
+  // tests below focus on the intake payload; the gate itself has its own
+  // dedicated suite (tests/write-gate.test.mjs). Tests that exercise the
+  // gate (anonymous / unverified) override these stubs.
+  stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
+});
 afterEach(async () => {
   // Restore the shared env mock mutated by the fail-closed / rate-limit tests.
   const env = await correctionsEnv();
@@ -55,6 +64,24 @@ async function correctionsEnv() {
 }
 
 const route = () => loadRoute("app/api/corrections/route.mjs");
+
+// Live session fixture (ADR 0013 double-submit CSRF). The write gate resolves
+// it through resolveOptionalContributor -> findSessionByToken (stubbed).
+const session = {
+  id: 7,
+  tokenHash: "hash",
+  csrfToken: "csrf-token-123",
+  createdAt: "2026-08-01T00:00:00.000Z",
+  expiresAt: "2026-09-01T00:00:00.000Z",
+  revokedAt: null,
+};
+const contributor = {
+  id: 7,
+  email: "linus@osdb.test",
+  displayName: "Linus",
+  createdAt: "2026-07-01T00:00:00.000Z",
+  updatedAt: "2026-07-01T00:00:00.000Z",
+};
 
 // The C4 whitelist (COMMUNITY_PLAN §2.4, A1). MUST match db/corrections.ts
 // CORRECTION_ISSUE_TYPES — the route rejects anything outside this list.
@@ -77,7 +104,17 @@ const LEGACY_FREE_TEXT_CATEGORIES = [
 ];
 
 function intakePost(body, headers = {}) {
-  return apiRequest("/api/corrections", { method: "POST", body, headers });
+  // Verified-session request by default (write gate Fase E1): cookie pair +
+  // CSRF header, plus any per-test override (e.g. cf-connecting-ip).
+  return apiRequest("/api/corrections", {
+    method: "POST",
+    body,
+    headers: {
+      cookie: "osdb_session=raw-session-token-abc123; osdb_csrf=csrf-token-123",
+      "x-csrf-token": "csrf-token-123",
+      ...headers,
+    },
+  });
 }
 
 test("A1: the intake accepts every whitelisted issue type, stored trimmed", async () => {
@@ -199,17 +236,39 @@ test("removal-style requests are accepted without a precise camera id", async ()
   }
 });
 
-test("A4: anonymous reports are allowed and stored without attribution", async () => {
+test("E1 write gate: anonymous reports are refused with 401, nothing is stored", async () => {
+  // No session at all — the write gate answers 401 before the payload is
+  // read (Fase E1: anonymous intake no longer exists).
+  stub("findSessionByToken", async () => null);
   stub("createCorrectionRequest", async (input) => ({ kind: "created", correction: { id: 800, ...input } }));
   const { POST } = await route();
   const response = await POST(
     intakePost(
       { cameraId: 42, issueType: "inaccurate", message: "Coordinates look off.", contact: null },
-      { "cf-connecting-ip": "203.0.113.160" },
+      { "cf-connecting-ip": "203.0.113.160", cookie: "", "x-csrf-token": "" },
     ),
   );
-  assert.equal(response.status, 201, "anonymous reporters must stay able to file a request");
-  assert.equal(callArgs("createCorrectionRequest").at(-1)[0].contributorId, null);
+  assert.equal(response.status, 401, "anonymous reporters are refused by the write gate");
+  assert.equal((await responseBody(response)).error, "Authentication required.");
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.equal(callArgs("createCorrectionRequest").length, 0, "no anonymous request may be stored");
+});
+
+test("E1 write gate: an unverified session is refused with 403, nothing is stored", async () => {
+  // Live session, but the account has no email_verified_at (Fase B/C/D set
+  // it on verification) — the gate answers 403 with the same uniform body.
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: null, authProvider: "password" }));
+  stub("createCorrectionRequest", async (input) => ({ kind: "created", correction: { id: 801, ...input } }));
+  const { POST } = await route();
+  const response = await POST(
+    intakePost(
+      { cameraId: 42, issueType: "inaccurate", message: "Coordinates look off.", contact: null },
+      { "cf-connecting-ip": "203.0.113.161" },
+    ),
+  );
+  assert.equal(response.status, 403, "an unverified account cannot write");
+  assert.equal((await responseBody(response)).error, "Authentication required.");
+  assert.equal(callArgs("createCorrectionRequest").length, 0, "nothing may be stored by an unverified account");
 });
 
 test("A5 (route mapping): an open duplicate report answers 409", async () => {

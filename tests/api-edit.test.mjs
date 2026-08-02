@@ -121,6 +121,7 @@ const authedPatch = (pathAndQuery, body, { headers = {}, ...rest } = {}) =>
 
 function liveSession() {
   stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
 }
 
 // ---------------------------------------------------------------------------
