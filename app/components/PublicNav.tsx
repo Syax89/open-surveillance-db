@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { SiteHeader } from "./SiteHeader";
 import { PublicNavLinks } from "./PublicNavLinks";
+import { AuthNavLinks } from "./AuthNavLinks";
 
 /**
  * PublicNav — the ONE shared header for every public page (t_a72a3106).
@@ -19,6 +20,14 @@ import { PublicNavLinks } from "./PublicNavLinks";
  * aria-current="page") + locale toggle. The home keeps its in-page brand
  * anchor (brandAs="anchor", brandHref="#top"); every other page uses the
  * default brand link to "/".
+ *
+ * Since t_65b778c5 the header also carries the auth entry point
+ * (AuthNavLinks, CEO request 2026-08-02) in the top-right corner, to the
+ * RIGHT of the LocaleToggle (SiteHeader `trailing` slot): "Log in" /
+ * "Create account" for anonymous visitors, the account link for signed-in
+ * contributors. It renders nothing until GET /api/auth/me resolves, so the
+ * SSR HTML stays session-free (privacy by design) and the mobile collapsed
+ * menu never hides it.
  *
  * Consumers:
  *  - HomeNav (home)      → PublicNav brandHref="#top" brandAs="anchor"
@@ -40,7 +49,7 @@ export interface PublicNavProps {
 export function PublicNav({ navLabel, homeLabel, brandHref = "/", brandAs = "link" }: PublicNavProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   return (
-    <SiteHeader navLabel={navLabel} homeLabel={homeLabel} brandHref={brandHref} brandAs={brandAs} menu menuOpen={menuOpen} onMenuToggle={() => setMenuOpen((current) => !current)}>
+    <SiteHeader navLabel={navLabel} homeLabel={homeLabel} brandHref={brandHref} brandAs={brandAs} menu menuOpen={menuOpen} onMenuToggle={() => setMenuOpen((current) => !current)} trailing={<AuthNavLinks />}>
       <div className={`nav-links ${menuOpen ? "is-open" : ""}`} id="main-links">
         <PublicNavLinks />
       </div>
