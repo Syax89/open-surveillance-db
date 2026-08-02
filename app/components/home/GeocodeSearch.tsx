@@ -29,8 +29,12 @@ type Props = {
   onPlaceSelect: (result: GeocodeSuggestion) => void;
 };
 
-/** Debounce for the geocode autocomplete (spec: 250–300 ms). */
-const GEOCODE_DEBOUNCE_MS = 300;
+/**
+ * Debounce for the geocode autocomplete (t_3c4b188e: 250ms — must stay
+ * SHORTER than the ?q= commit debounce QUERY_DEBOUNCE_MS, 400ms, so the
+ * suggestion dropdown renders BEFORE the points list re-filters).
+ */
+const GEOCODE_DEBOUNCE_MS = 250;
 /** Suggestion cap — must match the proxy's MAX_LIMIT (5). */
 const GEOCODE_LIMIT = 5;
 const GEOCODE_LISTBOX_ID = "geocode-listbox";
@@ -38,18 +42,22 @@ const GEOCODE_LISTBOX_ID = "geocode-listbox";
 const GEOCODE_INPUT_ID = "map-list-search";
 
 /**
- * Module-level pending-query registry (t_b1e192e1). The geocode debounce
- * MUST survive a remount of GeocodeSearch: on the deployed environment a
- * vinext RSC navigation error (router.replace in use-camera-filters
- * applyFilters → "Cannot read properties of undefined (reading 'digest')")
- * invalidates/remounts the tool tree, and the old unmount cleanup
- * (clearTimeout + abort) cancelled the 300ms debounce BEFORE the
- * /api/geocode fetch could start — 0 requests in the network log. Keeping
- * the timer + AbortController at module level, keyed by input id, means a
- * remount during the debounce window no longer cancels the user's query:
- * the timer fires and the fetch goes out regardless of the component's
- * lifecycle. The map has exactly one search input, so the registry holds
- * one entry; the key future-proofs multiple instances.
+ * Module-level pending-query registry (t_b1e192e1, hardened by t_3c4b188e).
+ * The geocode debounce MUST survive a remount of GeocodeSearch: on the
+ * deployed environment a vinext RSC navigation error (router.replace in
+ * use-camera-filters applyFilters → "Cannot read properties of undefined
+ * (reading 'digest')") invalidates/remounts the tool tree, and an unmount
+ * cleanup (clearTimeout + abort) would cancel the debounce BEFORE the
+ * /api/geocode fetch could start — 0 requests in the network log. Since
+ * t_3c4b188e the keyboard ?q= commit never calls router.replace at all
+ * (pure history.replaceState), so the remount source is gone for the typing
+ * flow; the registry stays as defence-in-depth for any OTHER remount source
+ * (e.g. a future explicit-select RSC error). Keeping the timer +
+ * AbortController at module level, keyed by input id, means a remount
+ * during the debounce window never cancels the user's query: the timer
+ * fires and the fetch goes out regardless of the component's lifecycle.
+ * The map has exactly one search input, so the registry holds one entry;
+ * the key future-proofs multiple instances.
  */
 type PendingGeocode = { timer: ReturnType<typeof setTimeout> | null; controller: AbortController | null };
 const pendingGeocodeByInput = new Map<string, PendingGeocode>();
@@ -153,7 +161,7 @@ export function GeocodeSearch({ search, onSearchChange, onPlaceSelect }: Props) 
 
   // t_b1e192e1: NO unmount cleanup for the debounce timer / AbortController.
   // They live at module level (pendingGeocodeByInput) on purpose: a remount
-  // during the 300ms window (vinext RSC navigation error → tree
+  // during the 250ms window (vinext RSC navigation error → tree
   // invalidation) must not cancel the pending query — the /api/geocode
   // fetch has to fire even if this instance unmounted first.
 
