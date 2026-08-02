@@ -482,10 +482,12 @@ footer>p { margin:0; color:#586870; font-size:var(--text-md); line-height:1.5; }
 .duplicate-guidance .text-button { font-size:var(--text-md); }
 @media (max-width:980px) {
   .directory-controls { grid-template-columns:1fr 1fr }
+  .map-card .filters-panel { grid-template-columns:1fr 1fr }
   .record-search { grid-column:1/-1 }
 }
 @media (max-width:700px) {
   .directory-controls { grid-template-columns:1fr }
+  .map-card .filters-panel { grid-template-columns:1fr }
   .record-search { grid-column:auto }
 }
 @media (max-width:480px) {
@@ -624,25 +626,41 @@ footer>p { margin:0; color:#586870; font-size:var(--text-md); line-height:1.5; }
 .page-indicator { color:#52656d; font-size:var(--text-md); font-weight:700; }
 
 /* ---- /mappa integrated layout (t_702c10af sidebar+fullscreen map;
-   t_966254a1: ONE tool header, compact banner + FiltersBar attached to the
-   map card, sidebar list + full map as a single workspace) ----
-   The tool heading (h1 + intro) is the only page header. Below it: a slim
-   prototype banner, then ONE card that owns the whole workspace — the
-   FiltersBar row is the card's top edge (same width, paper background, no
-   gap, so the filters read as part of the map), the split below is the
-   340px scrollable sidebar + the OSM map filling the remaining viewport
-   height ("quasi a tutto schermo"), and the export footer closes the card. */
+   t_966254a1: ONE tool header, FiltersBar attached to the map card,
+   sidebar list + full map as a single workspace; CEO feedback 2026-08-02:
+   prototype banner and export footer removed — the card starts with the
+   filters, the download row lives on /directory) ----
+   The tool heading (h1 + intro) is the only page header. Below it ONE card
+   owns the whole workspace — the FiltersBar row is the card's top edge
+   (same width, paper background, no gap, so the filters read as part of
+   the map), the split below is the 340px scrollable sidebar + the OSM map
+   filling the remaining viewport height ("quasi a tutto schermo"). */
 .map-layout { width:min(1440px, calc(100% - 32px)); margin:0 auto; padding:6px 0 72px; }
-.map-layout .prototype-banner { margin:0 0 16px; padding:8px 14px; border:1px solid #d3ded0; border-left:3px solid #43a979; border-radius:var(--radius-md); background:#eef4ea; color:#42605a; font-size:var(--text-sm); line-height:1.5; }
 .map-card { border:1px solid var(--line); border-radius:var(--radius-xl); overflow:hidden; background:#f9faf7; box-shadow:0 20px 45px rgba(25,46,52,.08); }
 .map-card .filters-panel { padding:14px 18px 12px; border-bottom:1px solid var(--line); background:#fffef9; }
-.map-card .search-count { margin:10px 2px 0; }
+/* FIX /mappa (CEO feedback 2026-08-02): the panel FiltersBar row is its own
+   4-column grid on DESKTOP — kind / freshness / sort / reset on ONE line, the
+   reset button right-aligned in the last (auto) column instead of wrapping
+   alone to a second row (it used to inherit the 3-column .directory-controls
+   template and land misaligned under the kind filter). The rule is scoped to
+   (min-width:981px) because the ≤980px/≤700px overrides below must win on
+   smaller viewports: with equal specificity, a base rule declared AFTER the
+   media queries would otherwise crush the filters to 4 narrow columns on
+   mobile (kind-filter select ~30px wide — Lighthouse target-size WCAG 2.5.8
+   failure, t_9e8642a0). */
+@media (min-width:981px) {
+  .map-card .filters-panel { grid-template-columns:minmax(0,1fr) minmax(175px,.34fr) minmax(190px,.38fr) auto; }
+}
+/* FIX /mappa (CEO feedback 2026-08-02): the result counter sat 2px from the
+   card's left edge while the filters above it are inset 18px — give it the
+   same 18px inset so it aligns with the filters grid (and with the
+   .loading-note / .notice insets below). */
+.map-card .search-count { margin:10px 18px 0; }
 .map-card .live-map-workspace { border:0; border-radius:0; box-shadow:none; }
 .map-card .map-split { grid-template-columns:340px 1fr; height:calc(100vh - 300px); min-height:540px; }
 .map-card .map-panel .live-map { height:100%; min-height:540px; }
 .map-card .map-panel .map-fallback { height:100%; min-height:540px; }
 .map-card .loading-note, .map-card .notice { margin-left:18px; margin-right:18px; }
-.map-card .data-actions { margin:16px 18px 18px; }
 .map-sidebar { display:flex; flex-direction:column; min-height:0; border-right:1px solid var(--line); background:#fffef9; }
 .map-list-search { padding:16px 16px 12px; border-bottom:1px solid var(--line); }
 .map-list-search label { display:block; margin-bottom:6px; color:#63717b; font-size:var(--text-2xs); text-transform:uppercase; letter-spacing:.1em; font-weight:800; }
@@ -658,7 +676,7 @@ footer>p { margin:0; color:#586870; font-size:var(--text-md); line-height:1.5; }
 .map-record:focus-visible { outline:3px solid var(--focus); outline-offset:1px; }
 .map-record.selected { border-left-color:#1a7c60; background:#e4efe6; }
 .map-record-title { display:block; color:#174e58; font-size:var(--text-base); font-weight:800; letter-spacing:-.02em; }
-.map-record-meta { display:block; margin-top:3px; color:#5c6c75; font-size:var(--text-sm); line-height:1.35; }
+.map-record-meta { display:block; margin-top:3px; color:#546d78; font-size:var(--text-sm); line-height:1.35; }
 .map-list-empty { margin:0; padding:18px 16px; color:#60737d; font-size:var(--text-md); line-height:1.5; }
 /* Geocode autocomplete dropdown (t_b9666d09): the ARIA listbox under the
    sidebar search field. The dropdown overlays the list below the search
