@@ -46,6 +46,19 @@ changes accumulate under `[Unreleased]`.
   OIDC — dormant until the DPA + EU–US DPF activation gate);
   RETENTION_SCHEDULE.md new rule R15 (verification tokens 24 h; passkeys/
   recovery codes until erasure); decisions/README.md index updated.
+- External OIDC login (Fase D, t_87f24b2d, ADR 0020): opt-in GitHub +
+  Google sign-in with PKCE (S256), OIDC discovery for Google, account
+  linking `(auth_provider, external_sub)` → contributor, and a manual
+  merge flow when the provider's verified email conflicts with an existing
+  password account (single-use merge token, lockout-protected password
+  proof — no silent takeover). Privacy by design: the provider email is
+  compared in memory and NEVER stored (placeholder
+  `oidc.<provider>.<sub>@invalid`, RFC 2606; only sub + verified flag are
+  kept). Migration 0030 (`oidc_states`, `oidc_merge_requests`), routes
+  GET /api/auth/oidc/[provider]/start, GET .../callback,
+  POST /api/auth/oidc/merge, `ops/oidc-secrets.sh` (client ID/secret in
+  the GPG vault), and runtime tests (route-level
+  `tests/oidc-flow.test.mjs`, DB boundary `tests/oidc-d1.test.mjs`).
 
 - Header auth entry point (`app/components/AuthNavLinks.tsx`, t_65b778c5,
   CEO request 2026-08-02; mobile placement t_94b3726d): the shared public

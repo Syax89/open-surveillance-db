@@ -255,6 +255,70 @@ export const webauthnChallenges = sqliteTable(
 );
 
 /**
+ * OIDC authorization state (migration 0030, Fase D). One row per in-flight
+ * PKCE redirect to an external provider (GitHub/Google). `state_hash` is the
+ * SHA-256 of the raw `state` nonce (never stored in clear, same rule as
+ * `sessions.token_hash`); `code_verifier` MUST stay recoverable to exchange
+ * the authorization code, so it is stored in clear but single-use and
+ * short-lived (10-minute expiry, swept on `expires_at`). Declared here so
+ * drizzle-kit generate never re-emits it (convention 0012/0014).
+ */
+export const oidcStates = sqliteTable(
+  "oidc_states",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    stateHash: text("state_hash").notNull(),
+    provider: text("provider").notNull(),
+    codeVerifier: text("code_verifier").notNull(),
+    redirectTo: text("redirect_to").notNull().default("/account"),
+    createdAt: text("created_at").notNull(),
+    expiresAt: text("expires_at").notNull(),
+    usedAt: text("used_at"),
+  },
+  (table) => [
+    uniqueIndex("oidc_states_state_hash_unique").on(table.stateHash),
+    index("oidc_states_expires_idx").on(table.expiresAt),
+  ],
+);
+
+/**
+ * Pending manual merges (migration 0030, Fase D): when an OIDC provider's
+ * verified email matches an existing password account, the callback refuses
+ * to auto-link (that would be an account-takeover vector) and issues a
+ * single-use merge token instead. The user proves ownership of the existing
+ * account with its password, then `auth_provider`/`external_sub` are written
+ * onto that contributor. The provider email is never persisted (only
+ * compared in memory at callback time) — `contributor_id` references the
+ * existing account directly. Declared here so drizzle-kit generate never
+ * re-emits it (convention 0012/0014).
+ */
+export const oidcMergeRequests = sqliteTable(
+  "oidc_merge_requests",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    tokenHash: text("token_hash").notNull(),
+    provider: text("provider").notNull(),
+    externalSub: text("external_sub").notNull(),
+    contributorId: integer("contributor_id")
+      .notNull()
+      .references(() => contributors.id, { onDelete: "cascade" }),
+    // Provider assertion about the conflicting email, captured at callback
+    // time (the email itself is never stored — Fase D constraint). When the
+    // user proves the password, linkExternalIdentity() uses this flag to set
+    // email_verified_at on the existing account if it is not verified yet.
+    emailVerified: integer("email_verified").notNull().default(0),
+    createdAt: text("created_at").notNull(),
+    expiresAt: text("expires_at").notNull(),
+    usedAt: text("used_at"),
+  },
+  (table) => [
+    uniqueIndex("oidc_merge_requests_token_hash_unique").on(table.tokenHash),
+    index("oidc_merge_requests_contributor_idx").on(table.contributorId),
+    index("oidc_merge_requests_expires_idx").on(table.expiresAt),
+  ],
+);
+
+/**
  * Login sessions (ADR 0013). Only the SHA-256 of the raw session token is
  * stored, plus a per-session CSRF token echoed through a non-HttpOnly cookie
  * and verified on state-changing requests. A row is dead after `expires_at`

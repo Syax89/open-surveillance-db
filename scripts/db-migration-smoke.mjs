@@ -72,6 +72,11 @@ const expectedTables = [
   // verification/password-reset emails (ADR 0020). No content, no recipient
   // address, no IP — see the migration header comment.
   "email_send_log",
+  // OIDC external login — Fase D (0030): PKCE/state rows for in-flight
+  // provider redirects and pending manual-merge tokens (email conflict →
+  // prove the existing account with its password before linking).
+  "oidc_states",
+  "oidc_merge_requests",
 ];
 // Indexes declared by the migrations.
 const expectedIndexes = [
@@ -139,6 +144,14 @@ const expectedIndexes = [
   // `WHERE contributor_id = ? AND sent_at >= ?` range scan.
   "email_send_log_contributor_idx",
   "email_send_log_sent_at_idx",
+  // OIDC external login — Fase D (0030): state hash is globally unique
+  // (point lookup on callback); the (expires_at) indexes serve the expiry
+  // sweeps; merge requests are scoped per contributor for erasure cascade.
+  "oidc_states_state_hash_unique",
+  "oidc_states_expires_idx",
+  "oidc_merge_requests_token_hash_unique",
+  "oidc_merge_requests_contributor_idx",
+  "oidc_merge_requests_expires_idx",
 ];
 // Tables that are not application schema but legitimately appear in a local
 // D1 database. Anything outside this set is an unexpected schema change.

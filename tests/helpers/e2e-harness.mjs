@@ -87,6 +87,11 @@ const REAL_DB_MODULES = [
   // db/retention.ts (ADR 0008 scheduled sweep) is imported by the worker
   // edge gate; compile it into the tree so the worker module resolves.
   { source: "db/retention.ts", output: "db/retention.mjs" },
+  // db/oidc.ts (Fase D OIDC expiry sweep) is imported by the worker edge
+  // gate alongside the retention sweep; compile it into the tree so the
+  // worker module resolves (it imports ./cameras and ./auth, both already
+  // in the tree).
+  { source: "db/oidc.ts", output: "db/oidc.mjs" },
   // db/cameras.ts imports ./confirmations at runtime (the public payload
   // carries confirmationCount), so the real db layer must resolve it.
   { source: "db/confirmations.ts", output: "db/confirmations.mjs" },
@@ -204,10 +209,11 @@ async function buildTree() {
     const compiled = transpile(path.join(root, "worker", "index.ts"));
     const rewritten = compiled
       // The worker sits at tree root (worker.mjs), so its ../db/retention
-      // import (db/retention.ts → db/retention.mjs inside the tree) must be
+      // and ../db/oidc imports (db/*.ts → db/*.mjs inside the tree) must be
       // rebased to the in-tree path; the vinext and workers imports are
       // stubbed as before.
       .replace(/from\s*["']\.\.\/db\/retention["']/g, `from "${pathToFileURL(path.join(tree, "db", "retention.mjs")).href}"`)
+      .replace(/from\s*["']\.\.\/db\/oidc["']/g, `from "${pathToFileURL(path.join(tree, "db", "oidc.mjs")).href}"`)
       .replace(/from\s*["']vinext\/server\/image-optimization["']/g, `from "${imageStubUrl}"`)
       .replace(/from\s*["']vinext\/server\/app-router-entry["']/g, `from "${routerStubUrl}"`)
       .replace(/from\s*["']cloudflare:workers["']/g, `from "${workersMockUrl}"`);
