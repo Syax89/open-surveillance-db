@@ -392,7 +392,7 @@ or client bundles (the secrets gate in CI rejects hardcoded credentials).
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `READ_RATE_LIMIT_MAX` / `READ_RATE_LIMIT_WINDOW_SECONDS` | 60 / 60 | Plain reads (`GET /api/cameras`, photo bytes `GET /api/photos/[id]`) |
+| `READ_RATE_LIMIT_MAX` / `READ_RATE_LIMIT_WINDOW_SECONDS` | 60 / 60 | Plain reads (`GET /api/cameras`, photo bytes `GET /api/photos/[id]`, photo list `GET /api/photos`) |
 | `EXPORT_RATE_LIMIT_MAX` / `EXPORT_RATE_LIMIT_WINDOW_SECONDS` | 10 / 60 | Bulk exports (CSV/GeoJSON) |
 | `NEARBY_RATE_LIMIT_MAX` / `NEARBY_RATE_LIMIT_WINDOW_SECONDS` | 30 / 60 | Nearby search |
 | `REVISIONS_RATE_LIMIT_MAX` / `REVISIONS_RATE_LIMIT_WINDOW_SECONDS` | 30 / 60 | Public change history (`GET /api/cameras/revisions`) |
@@ -433,7 +433,7 @@ when unset. Set them in the hosting platform's secret/environment store
 | `TILE_PROVIDER_KEY` | unset | API key appended as `?key=…` for tile providers that require one (MapTiler, Stadia Maps, …). Never commit it; set it as a Worker secret |
 | `MODERATION_USER` / `MODERATION_PASSWORD` | unset | HTTP Basic auth pair that unlocks `/moderation` and `/api/moderation*` at the worker edge. Both must be set together |
 | `MODERATION_TOKEN` | unset | Alternative bearer token for the same gate (API automation). At least one credential method (Basic pair or bearer) must be configured |
-| `AUTH_SESSION_TTL_DAYS` | `30` | Contributor session lifetime in days (ADR 0013); TTL is computed as `days × 86400` seconds |
+| `AUTH_SESSION_TTL_DAYS` | `30` | Contributor session lifetime in days (ADR 0013); TTL is computed as `days × 86400` seconds. The SAME value drives the DB `expires_at` and the cookie `Max-Age`, so the two can never diverge (audit t_5ca60ab2, P2) |
 | `AUTH_COOKIE_SECURE` | unset (`false`) | Set to `true` in production so the session cookie carries the `Secure` attribute (HTTPS precondition; must stay unset on the plain-HTTP LAN prototype) |
 | `AUTH_RATE_LIMIT_MAX` / `AUTH_RATE_LIMIT_WINDOW_SECONDS` | `10` / `60` | Per-key rate limit on `/api/auth/login` and `/api/auth/register` |
 

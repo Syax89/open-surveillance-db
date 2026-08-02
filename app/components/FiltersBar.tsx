@@ -61,7 +61,11 @@ export function FiltersBar({
   const t = useMessages().directory;
   return (
     <>
-      <div className={`directory-controls filters-${variant}`}>
+      {/* F4 (P3): `filters-inline` era una classe no-op (mai definita nel
+          CSS — il layout è tutto di `.directory-controls`); la variante
+          `panel` mantiene `filters-panel`, usata da `.map-card .filters-panel`
+          (audit F1 §6). */}
+      <div className={`directory-controls${variant === "panel" ? " filters-panel" : ""}`}>
         {!hideSearch && (
           <div className="record-search">
             <label htmlFor="record-search">{t.searchDirectory}</label>

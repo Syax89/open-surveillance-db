@@ -35,7 +35,11 @@ const NOW = "2026-08-01T00:00:00.000Z";
 test("hashPassword produces a self-describing PBKDF2 string and verifies", async () => {
   const { auth } = runtime;
   const hash = await auth.hashPassword("correct horse battery staple");
-  assert.match(hash, /^pbkdf2\$210000\$[A-Za-z0-9_-]+\$[A-Za-z0-9_-]+$/);
+  assert.match(
+    hash,
+    new RegExp(`^pbkdf2\\$${auth.PBKDF2_ITERATIONS}\\$[A-Za-z0-9_-]+\\$[A-Za-z0-9_-]+$`),
+    "the hash embeds the current iteration count (ADR 0013)",
+  );
   assert.equal(await auth.verifyPassword("correct horse battery staple", hash), true);
   assert.equal(await auth.verifyPassword("wrong password", hash), false);
   // Each hash carries a fresh salt.
@@ -45,9 +49,79 @@ test("hashPassword produces a self-describing PBKDF2 string and verifies", async
 
 test("verifyPassword rejects malformed stored hashes", async () => {
   const { auth } = runtime;
-  for (const bad of ["", "plaintext", "pbkdf2$210000$salt", "argon2$1$a$b", "pbkdf2$abc$salt$hash"]) {
+  for (const bad of ["", "plaintext", "pbkdf2$210000$salt$hash$extra", "argon2$1$a$b", "pbkdf2$abc$salt$hash"]) {
     assert.equal(await auth.verifyPassword("anything", bad), false, bad);
   }
+});
+
+// ---------------------------------------------------------------------------
+// Iteration-count embedding (ADR 0013) — bump safety
+// ---------------------------------------------------------------------------
+
+function base64UrlEncode(bytes) {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
+}
+
+/** Build a `pbkdf2$<iterations>$<saltB64>$<hashB64>` hash at an explicit count. */
+async function pbkdf2HashAt(password, iterations) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(password),
+    { name: "PBKDF2" },
+    false,
+    ["deriveBits"],
+  );
+  const derived = await crypto.subtle.deriveBits(
+    { name: "PBKDF2", hash: "SHA-256", salt, iterations },
+    keyMaterial,
+    256,
+  );
+  return `pbkdf2$${iterations}$${base64UrlEncode(salt)}$${base64UrlEncode(new Uint8Array(derived))}`;
+}
+
+test("verifyPassword honours the stored iteration count — a constant bump never locks out existing hashes", async () => {
+  const { auth } = runtime;
+  const password = "correct horse battery staple";
+
+  // Simulate the OWASP bump scenario (AUTH_OPTIONS §8): a hash stored at a
+  // count different from the current code constant. It must verify using its
+  // OWN embedded count — the pre-fix code derived at PBKDF2_ITERATIONS and
+  // would have returned false here, invalidating every existing password.
+  const otherCount = auth.PBKDF2_ITERATIONS + 42_000;
+  const olderHash = await pbkdf2HashAt(password, otherCount);
+  assert.match(olderHash, new RegExp(`^pbkdf2\\$${otherCount}\\$`), "fixture embeds the older count");
+  assert.equal(await auth.verifyPassword(password, olderHash), true, "old-count hash verifies");
+  assert.equal(await auth.verifyPassword("wrong password", olderHash), false);
+
+  // A hash at the current constant still verifies, and the two hashes differ
+  // (different salts) while both accepting the same password.
+  const currentHash = await auth.hashPassword(password);
+  assert.equal(await auth.verifyPassword(password, currentHash), true);
+  assert.notEqual(olderHash, currentHash);
+});
+
+test("verifyPassword falls back to the constant for legacy 3-part hashes", async () => {
+  const { auth } = runtime;
+  const password = "correct horse battery staple";
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(password),
+    { name: "PBKDF2" },
+    false,
+    ["deriveBits"],
+  );
+  const derived = await crypto.subtle.deriveBits(
+    { name: "PBKDF2", hash: "SHA-256", salt, iterations: auth.PBKDF2_ITERATIONS },
+    keyMaterial,
+    256,
+  );
+  const legacy = `pbkdf2$${base64UrlEncode(salt)}$${base64UrlEncode(new Uint8Array(derived))}`;
+  assert.equal(await auth.verifyPassword(password, legacy), true, "legacy hash verifies at the constant");
+  assert.equal(await auth.verifyPassword("wrong password", legacy), false);
 });
 
 // ---------------------------------------------------------------------------

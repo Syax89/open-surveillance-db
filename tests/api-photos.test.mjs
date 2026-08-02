@@ -10,7 +10,7 @@
 
 import assert from "node:assert/strict";
 import { after, beforeEach, test } from "node:test";
-import { apiRequest, cleanupRouteTree, loadRoute, loadTreeModule, responseBody } from "./helpers/api-harness.mjs";
+import { apiRequest, cleanupRouteTree, loadLibModule, loadRoute, loadTreeModule, responseBody } from "./helpers/api-harness.mjs";
 import { callArgs, resetMockState, stub } from "./helpers/mock-state.mjs";
 
 beforeEach(() => resetMockState());
@@ -533,6 +533,36 @@ test("GET /api/photos?cameraId= rejects a missing or invalid camera id", async (
   assert.equal((await GET(apiRequest("/api/photos"))).status, 400);
   assert.equal((await GET(apiRequest("/api/photos?cameraId=abc"))).status, 400);
   assert.equal((await GET(apiRequest("/api/photos?cameraId=0"))).status, 400);
+});
+
+test("GET /api/photos answers 429 past the read bucket and records the block (audit t_5ca60ab2, P2)", async () => {
+  // The list route was previously unthrottled; it now shares the read-family
+  // bucket with GET /api/photos/[id] (READ_RATE_LIMIT_* knobs, default
+  // 60/min). A scraper cannot lean on the JSON list to bypass the byte route.
+  const rateLimit = await loadLibModule("rate-limit");
+  // Earlier GET tests in this file already consumed the shared in-memory
+  // "read" bucket (same caller key): start from a clean slate so the
+  // 1/min cap is exercised exactly.
+  rateLimit.resetRateLimitState();
+  const envModule = await loadTreeModule("cloudflare-workers.mjs");
+  const previous = envModule.env.READ_RATE_LIMIT_MAX;
+  envModule.env.READ_RATE_LIMIT_MAX = "1";
+  try {
+    stub("getPublicCameraById", async () => ({ id: 5, status: "verified" }));
+    stub("listApprovedPhotosForCamera", async () => []);
+    const { GET } = await photosRoute();
+    const allowed = await GET(apiRequest("/api/photos?cameraId=5"));
+    assert.equal(allowed.status, 200, "the first call fits the 1/min cap");
+    assert.equal(callArgs("listApprovedPhotosForCamera").length, 1);
+
+    const blocked = await GET(apiRequest("/api/photos?cameraId=5"));
+    assert.equal(blocked.status, 429);
+    assert.ok(Number(blocked.headers.get("retry-after")) >= 1);
+    assert.equal(callArgs("listApprovedPhotosForCamera").length, 1, "the throttled call never reaches the db layer");
+  } finally {
+    envModule.env.READ_RATE_LIMIT_MAX = previous;
+    rateLimit.resetRateLimitState();
+  }
 });
 
 // ---------------------------------------------------------------------------

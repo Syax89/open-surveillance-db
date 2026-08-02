@@ -6,14 +6,19 @@ import { usePathname } from "next/navigation";
 import { useMessages } from "./LocaleProvider";
 
 /**
- * AuthNavLinks — login/register/account links in the TOP-RIGHT of the
- * shared public header (CEO request 2026-08-02, kanban t_65b778c5).
+ * AuthNavLinks — login/register/account links of the shared public header
+ * (CEO request 2026-08-02, kanban t_65b778c5; mobile placement fix
+ * t_94b3726d).
  *
  * The public nav (PublicNavLinks, t_a72a3106) keeps its six content links;
- * this component renders the auth entry point as a SEPARATE element on the
- * right of the LocaleToggle (SiteHeader `trailing` prop), so it is always
- * visible — also on mobile, where .nav-links collapses into the hamburger
- * menu.
+ * this component renders the auth entry point as the LAST item of the
+ * .nav-links container (PublicNav renders it right after PublicNavLinks).
+ * On mobile (<768px) .nav-links is the hamburger dropdown, so the auth
+ * links travel inside the menu (CEO live feedback 2026-08-02: they used to
+ * sit in a separate top-right element and wrapped the header at 320/390px);
+ * on desktop (≥768px) the container is the inline nav row and the links
+ * stay visible in the header, pushed to the right end next to the
+ * LocaleToggle.
  *
  * Session state (server half: app/lib/auth-session.ts): the header cannot
  * call resolveOptionalContributor() (it needs the raw Request), so it reads

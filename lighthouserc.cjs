@@ -25,6 +25,11 @@ module.exports = {
       // scripts/serve-preview.mjs. Public routes only — no fixtures, no
       // credentials, no personal data.
       startServerCommand: "npm run preview:serve",
+      // Every public route (QA review P1-2): the 8 originals plus the auth
+      // pages (PR #215 — the most layout-sensitive: forms, focus traps,
+      // target-size on buttons) and the legal/static pages, so a visual or
+      // a11y regression on any of them fails the gate. Auth routes SSR as
+      // public (no credentials needed), matching the SSR axe harness.
       url: [
         "http://localhost:3000/",
         "http://localhost:3000/mappa",
@@ -34,6 +39,17 @@ module.exports = {
         "http://localhost:3000/records/1",
         "http://localhost:3000/guide",
         "http://localhost:3000/accessibility",
+        "http://localhost:3000/login",
+        "http://localhost:3000/register",
+        "http://localhost:3000/account",
+        "http://localhost:3000/faq",
+        "http://localhost:3000/contatti",
+        "http://localhost:3000/privacy",
+        "http://localhost:3000/termini",
+        "http://localhost:3000/licenze",
+        "http://localhost:3000/manifesto",
+        "http://localhost:3000/regole",
+        "http://localhost:3000/moderazione",
       ],
       numberOfRuns: 1,
       settings: {

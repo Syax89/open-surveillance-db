@@ -1,6 +1,6 @@
 # Project status
 
-Last reviewed: 2026-08-01
+Last reviewed: 2026-08-02
 
 ## Implemented locally
 
@@ -121,6 +121,26 @@ Last reviewed: 2026-08-01
 - [x] Extended community guide and FAQ (`/guide`, `/faq`): bilingual
   sections covering verification, trust levels, editing, and reporting,
   aligned with the community plan and ADR 0018.
+- [x] Shared public header (`PublicNav`) with the same six home links on
+  every public page (PR #207), plus the header auth entry point in the
+  top-right corner — anonymous visitors get "Log in" / "Create account",
+  signed-in contributors the account link with their display name; session
+  state is read client-side and the SSR HTML stays session-free (PR #215).
+- [x] Custom bilingual 404/500 pages (`app/not-found.tsx`, `app/error.tsx`):
+  design-system error shell with locale cookie, home link, and no path or
+  error echoed (privacy by design, PR #208).
+- [x] Design token layer F3: spacing/radius/type-scale CSS custom properties
+  in `globals.css` as the single source for the design system (PR #214).
+- [x] `/mappa` redesign: viewport-synced sidebar list, marker popups, sidebar
+  search (PR #202), integrated single-header layout (PR #205), click on the
+  map opens the report picker with a link to `/segnala?lat=&lng=` (PR #206),
+  and the visible tool header was replaced by an sr-only h1 (PR #210).
+- [x] Geocoding autocomplete on `/mappa` (Nominatim proxy, PR #211) with two
+  follow-up fixes making the dropdown visible and stable while typing
+  (PRs #212, #213); the map always renders, even when the camera list is
+  stable (PR #204).
+- [x] Accessibility pass H2: `/mappa` reflow, sr-only focus badge, and
+  per-page titles (PR #189).
 
 ## Not yet implemented
 

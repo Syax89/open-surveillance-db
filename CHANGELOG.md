@@ -14,21 +14,24 @@ changes accumulate under `[Unreleased]`.
 
 ### Added
 
-- Header auth entry point (`app/components/AuthNavLinks.tsx`, t_65b778c5, CEO
-  request 2026-08-02): the shared public header now carries login/register/
-  account links in the top-right corner, to the right of the EN/IT
-  LocaleToggle (new optional `trailing` slot on `SiteHeader`, used by
-  `PublicNav` on every public page). Anonymous visitors get "Log in"
-  (/login) and "Create account" (/register); signed-in contributors get the
-  account link (/account) with their display name. Session state is read
-  client-side from the existing GET /api/auth/me endpoint (server half:
-  app/lib/auth-session.ts) and the initial/failed states render nothing —
-  the SSR HTML stays session-free and errors never claim "anonymous" or
-  "signed in" (privacy by design, fail-closed). Labels come from the
-  existing auth bundle (EN login:21/register:22, IT login:90/register:91);
-  aria-current marks the current auth route (WCAG 2.2 AA). The six shared
-  public nav links and all other header variants (record/moderation/
-  account) keep the exact baseline markup.
+- Header auth entry point (`app/components/AuthNavLinks.tsx`, t_65b778c5,
+  CEO request 2026-08-02; mobile placement t_94b3726d): the shared public
+  header now carries login/register/account links as the last item of the
+  `.nav-links` container, right after the six public nav links. On desktop
+  (≥768px) they stay visible in the header, pushed to the right end next
+  to the EN/IT LocaleToggle; on mobile (<768px) they travel INSIDE the
+  hamburger dropdown (separated by a hairline), so the top bar (brand +
+  menu button + LocaleToggle) never wraps at 320/390px. Anonymous visitors
+  get "Log in" (/login) and "Create account" (/register); signed-in
+  contributors get the account link (/account) with their display name.
+  Session state is read client-side from the existing GET /api/auth/me
+  endpoint (server half: app/lib/auth-session.ts) and the initial/failed
+  states render nothing — the SSR HTML stays session-free and errors never
+  claim "anonymous" or "signed in" (privacy by design, fail-closed).
+  Labels come from the existing auth bundle (EN login:21/register:22, IT
+  login:90/register:91); aria-current marks the current auth route (WCAG
+  2.2 AA). The six shared public nav links and all other header variants
+  (record/moderation/account) keep the exact baseline markup.
 
 - Custom 404 page (`app/not-found.tsx`, t_7eed4601): non-existent routes and
   `notFound()` calls (including the malformed-record guard on
@@ -238,6 +241,21 @@ changes accumulate under `[Unreleased]`.
 
 ### Changed
 
+- Header mobile menu boundary moved from 700px to 768px and the auth entry
+  point moved INSIDE the menu (t_94b3726d, CEO live feedback 2026-08-02):
+  `AuthNavLinks` is now the last item of `.nav-links` instead of a separate
+  top-right `trailing` slot (the slot was removed from `SiteHeader`). Below
+  768px the six links + auth collapse into the hamburger dropdown (scoped
+  with `:has(.menu-button)` so the login/register/account/error shells keep
+  their inline "back home" row); at ≤480px the header compacts (brand 13px,
+  mark 24px, 12px margins, 6px gaps) so brand + menu button + LocaleToggle
+  fit one line at 320px. The 701-767px range, where the full row previously
+  overflowed, now uses the mobile menu too. On desktop the inline row wraps
+  (flex-wrap) instead of overflowing the document in the 768-980px tablet
+  range — the "inline, wrap" behaviour §9.1 of the design doc already
+  promised. Tests:
+  tests/header-mobile-menu-contract.test.mjs (new CSS viewport contract),
+  tests/client-auth-nav-links.test.mjs (in-menu placement + aria-current).
 - **BREAKING** `POST /api/corrections` (C4, COMMUNITY_PLAN §2.4): `issueType`
   è ora una whitelist (`inaccurate|missing|removal|abuse|other`) — le
   categorie free-text storiche ("Inaccurate location/details", "Privacy
@@ -270,6 +288,25 @@ changes accumulate under `[Unreleased]`.
   (no monolithic info/legal bundles; legal stays in `app/lib/legal/`).
 
 ### Fixed
+
+- P1-1 `confirmationCountsFor()` D1 bound-parameter cap (t_b2d59dfc): a
+  public camera page with more than 100 records used to build a single
+  `IN (?, ...)` over every id, blowing past D1's 100-bound-parameter limit
+  and turning `GET /api/cameras` (default limit 500) into a 503. The counts
+  query now iterates in chunks of at most 100 ids and merges the GROUP BY
+  results into one Map — same pattern as the correction-history events in
+  `db/moderation.ts`. The in-memory D1 test harness
+  (`tests/helpers/d1-sqlite.mjs`) now enforces the same 100-param cap, so a
+  >100-record regression test fails on the unfixed code instead of passing
+  on node:sqlite's higher SQLITE_MAX_VARIABLE_NUMBER.
+- `verifyPassword` now derives at the iteration count embedded in the stored
+  hash instead of the current `PBKDF2_ITERATIONS` constant (t_fe668331, P1-2
+  security review): bumping the constant (e.g. 210k → 600k, AUTH_OPTIONS §8)
+  no longer invalidates every existing password and locks out all
+  contributors — each hash re-derives at its own stored count (ADR 0013),
+  with a constant fallback for legacy 3-part hashes that predate the embedded
+  count. New bump-safety tests in `tests/auth-d1.test.mjs` cover hashes at
+  different iteration counts and the legacy fallback.
 
 - `/mappa` autocomplete UX (t_3c4b188e): typing a place no longer triggers
   the search immediately — the geocode suggestion dropdown (250ms debounce)
@@ -314,6 +351,13 @@ changes accumulate under `[Unreleased]`.
   once the lazy leaflet import resolves (`mapReady` flag), instead of
   early-returning at mount and never being re-triggered by a stable
   `cameras` prop (t_eb2e33a3 regression after the #202 redesign).
+- Photo uploads no longer leak orphaned R2 objects when the D1 metadata
+  INSERT fails (t_00e63031, P1-3): `createPendingPhoto` now deletes the
+  just-stored R2 object best-effort before rethrowing, so a failed upload
+  cannot leave bytes in the `PHOTOS` bucket with no D1 row (which the
+  retention sweep — D1-only — could never collect). The storage key is a
+  fresh UUID per attempt, so retries are idempotent: a failed attempt
+  leaves no object behind and the retry stores exactly one.
 
 ### Security
 

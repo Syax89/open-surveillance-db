@@ -389,6 +389,94 @@ test("findNearbyPublicCameras keeps a raw-inside candidate that would round outs
   assert.ok(within75[0].distanceMeters < 75, `raw distance must be < 75 m, got ${within75[0].distanceMeters}`);
 });
 
+test("findPublicCamerasNearPage pages by distance in SQL with the historical ordering and totals", async () => {
+  const { env, cameras } = await realDb();
+  await resetDb({ env, cameras });
+  // Same fixture family as findNearbyPublicCameras: ~11 m, ~111 m, ~1.1 km,
+  // plus a pending record that must never surface and a demo record that must.
+  await insertCamera(env, { title: "Near", latitude: 44.101 });
+  await insertCamera(env, { title: "Closer", latitude: 44.1001 });
+  await insertCamera(env, { title: "Far", latitude: 44.11 });
+  await insertCamera(env, { title: "Pending far", latitude: 44.2, status: "pending" });
+  await insertCamera(env, { title: "Demo near", latitude: 44.1002, status: "demo" });
+
+  // Page 1 with limit 2: the two closest, in distance order.
+  const page1 = await cameras.findPublicCamerasNearPage(44.1, 12.2, 200, { limit: 2, offset: 0 }, 25, 100);
+  assert.deepEqual(page1.records.map((record) => record.title), ["Closer", "Demo near"], "page 1 must be the two closest in ascending distance");
+  assert.equal(page1.total, 3, "total must count every reviewed public record inside the radius");
+  assert.equal(page1.nextOffset, 2, "nextOffset must point at the next page");
+
+  // Page 2 with limit 2: the remaining record; nextOffset must be null.
+  const page2 = await cameras.findPublicCamerasNearPage(44.1, 12.2, 200, { limit: 2, offset: 2 }, 25, 100);
+  assert.deepEqual(page2.records.map((record) => record.title), ["Near"], "page 2 must carry the last in-range record");
+  assert.equal(page2.total, 3);
+  assert.equal(page2.nextOffset, null, "the last page must not advertise a next offset");
+
+  // Every returned record is inside the radius and rounded to ~10 m (ADR 0008).
+  for (const record of [...page1.records, ...page2.records]) {
+    assert.ok(record.distanceMeters > 0 && record.distanceMeters <= 200, `distance ${record.distanceMeters} must be within the radius`);
+    assert.equal(record.latitude, Math.round(record.latitude * 10000) / 10000, "public coordinates must be rounded (ADR 0008)");
+    assert.equal(record.longitude, Math.round(record.longitude * 10000) / 10000);
+    assert.equal("notes" in record, false, "notes must never leave the module");
+  }
+});
+
+test("findPublicCamerasNearPage matches the historical in-memory pagination exactly", async () => {
+  const { env, cameras } = await realDb();
+  await resetDb({ env, cameras });
+  // Denser fixture: 30 cameras, 30 × ~11.1 m ≈ 334 m of latitude spread. A
+  // 400 m radius keeps every record in range so the 3 × 10 page boundaries
+  // exercise real LIMIT/OFFSET slices (with 200 m only ~17 records would be
+  // in range and the middle page would already be the last one).
+  for (let i = 1; i <= 30; i++) {
+    await insertCamera(env, { title: `Cam ${String(i).padStart(2, "0")}`, latitude: 44.1 + i * 0.0001, longitude: 12.2 });
+  }
+
+  // The historical path: load the whole set, filter by radius, sort, then slice.
+  const historical = await cameras.searchPublicCamerasNear(44.1, 12.2, 400);
+  const byDistance = historical.map((record) => record.title);
+
+  // The SQL page must reproduce the same ordering, totals and slice boundaries.
+  const pageA = await cameras.findPublicCamerasNearPage(44.1, 12.2, 400, { limit: 10, offset: 0 }, 25, 100);
+  assert.deepEqual(pageA.records.map((record) => record.title), byDistance.slice(0, 10), "page 1 must equal the historical first 10");
+  assert.equal(pageA.total, byDistance.length, "total must equal the historical in-range count");
+  assert.equal(pageA.nextOffset, 10);
+
+  const pageB = await cameras.findPublicCamerasNearPage(44.1, 12.2, 400, { limit: 10, offset: 10 }, 25, 100);
+  assert.deepEqual(pageB.records.map((record) => record.title), byDistance.slice(10, 20), "page 2 must equal the historical slice");
+  assert.equal(pageB.total, byDistance.length);
+  assert.equal(pageB.nextOffset, 20);
+
+  const pageC = await cameras.findPublicCamerasNearPage(44.1, 12.2, 400, { limit: 10, offset: 20 }, 25, 100);
+  assert.deepEqual(pageC.records.map((record) => record.title), byDistance.slice(20), "page 3 must carry the tail");
+  assert.equal(pageC.nextOffset, null, "the final page must not advertise a next offset");
+
+  // A radius that excludes everything: truthful empty page, total 0.
+  const empty = await cameras.findPublicCamerasNearPage(44.1, 12.2, 5, { limit: 10, offset: 0 }, 25, 100);
+  assert.deepEqual(empty.records, []);
+  assert.equal(empty.total, 0);
+  assert.equal(empty.nextOffset, null);
+});
+
+test("findPublicCamerasNearPage clamps limit and offset at the db boundary", async () => {
+  const { env, cameras } = await realDb();
+  await resetDb({ env, cameras });
+  await insertCamera(env, { title: "Only", latitude: 44.1001 });
+
+  // defaultLimit is applied when the caller passes no usable limit.
+  const defaulted = await cameras.findPublicCamerasNearPage(44.1, 12.2, 200, { limit: 0, offset: 0 }, 7, 100);
+  assert.equal(defaulted.records.length, 1, "the default limit must kick in for a zero limit");
+  assert.equal(defaulted.total, 1);
+
+  // Negative offsets clamp to 0; an absurd offset returns an empty page.
+  const negative = await cameras.findPublicCamerasNearPage(44.1, 12.2, 200, { limit: 5, offset: -3 }, 7, 100);
+  assert.deepEqual(negative.records.map((record) => record.title), ["Only"], "negative offset must clamp to 0");
+  const beyond = await cameras.findPublicCamerasNearPage(44.1, 12.2, 200, { limit: 5, offset: 500 }, 7, 100);
+  assert.deepEqual(beyond.records, []);
+  assert.equal(beyond.total, 1, "total must stay truthful even beyond the last page");
+  assert.equal(beyond.nextOffset, null);
+});
+
 test("createCorrectionRequest stores a pending private request", async () => {
   const { env, cameras, corrections } = await realDb();
   await resetDb({ env, cameras });

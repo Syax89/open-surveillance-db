@@ -100,9 +100,11 @@ export function MappaTool() {
       <div className="map-layout">
         {/* Compact prototype banner (t_966254a1): a slim one-liner between
             the map card — only when the map is
-            actually rendered (never over the truthful empty state). */}
+            actually rendered (never over the truthful empty state).
+            F4 (P3): `prototype-banner-compact` era una no-op — lo stile
+            compatto arriva da `.map-layout .prototype-banner` (audit F1 §6). */}
         {filteredRecords.length > 0 && (
-          <div className="prototype-banner prototype-banner-compact" role="note"><b>{t.prototypeMode}</b> {t.prototypeBanner}</div>
+          <div className="prototype-banner" role="note"><b>{t.prototypeMode}</b> {t.prototypeBanner}</div>
         )}
         {/* The whole workspace is ONE card: filters attached to the top
             edge (same width, same background, no gap), then the split
