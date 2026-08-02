@@ -81,13 +81,19 @@ interface ScheduledController {
 const moderationPath = (pathname: string) =>
   pathname === "/moderation" || pathname === "/api/moderation" || pathname.startsWith("/api/moderation/");
 
-// Identity-gated paths (ADR 0014): the appeals API carries moderator-grade
-// write access and is protected by the same edge gate as the moderation
-// queue, so a direct client can never reach it without a real credential.
-const identityPath = (pathname: string) =>
-  pathname === "/api/appeals" || pathname.startsWith("/api/appeals/");
+// Identity-gated paths (ADR 0014, amended by CEO decision 2026-08-02):
+// the moderator-facing appeals surface (GET list, PATCH decide) carries
+// moderator-grade access and stays behind the same edge gate as the
+// moderation queue. POST /api/appeals (filing) is a contributor action that
+// authenticates with the contributor session at the route layer (ADR 0013),
+// so it must NOT be gated here — gating it made appeals unreachable for the
+// very contributors they exist for (audit finding 3.1, HIGH).
+const identityPath = (method: string, pathname: string) =>
+  (pathname === "/api/appeals" || pathname.startsWith("/api/appeals/")) &&
+  !(method === "POST" && pathname === "/api/appeals");
 
-const gatedPath = (pathname: string) => moderationPath(pathname) || identityPath(pathname);
+const gatedPath = (method: string, pathname: string) =>
+  moderationPath(pathname) || identityPath(method, pathname);
 
 // Identity headers (ADR 0014). The prototype header `x-osdb-user-email` and
 // the ChatGPT-plugin headers (`oai-*`) are trusted ONLY when set by this
@@ -248,7 +254,7 @@ const worker = {
     //    is the single identity authority and never trusts the caller.
     let gated = stripIdentityHeaders(request, env);
 
-    if (gatedPath(url.pathname)) {
+    if (gatedPath(request.method, url.pathname)) {
       const gate = requireModerationAuth(gated, env);
       if (gate) return withSecurityHeaders(gate);
       gated = injectIdentityAfterGate(gated, env);

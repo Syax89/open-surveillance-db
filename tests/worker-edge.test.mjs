@@ -32,7 +32,7 @@ const appRouterMock = `
 export const __calls = [];
 export default {
   async fetch(request, env, ctx) {
-    __calls.push({ url: String(request.url), method: request.method, envKeys: Object.keys(env ?? {}) });
+    __calls.push({ url: String(request.url), method: request.method, envKeys: Object.keys(env ?? {}), headers: Object.fromEntries(request.headers.entries()) });
     const url = new URL(request.url);
     if (url.pathname.startsWith("/definitely-unknown")) {
       return new Response("Not Found", { status: 404, headers: { "content-type": "text/plain" } });
@@ -317,6 +317,97 @@ test("the moderation path predicate covers the API subtree, not lookalikes", asy
     assert.notEqual(response.status, 401, `${pathname} is not a moderation path`);
   }
   assert.equal(app.__calls.length, ungated.length, "only the ungated paths reach the handler");
+});
+
+// ---------------------------------------------------------------------------
+// Appeals surface (audit finding 3.1, CEO decision 2026-08-02)
+// ---------------------------------------------------------------------------
+//
+// The moderator-facing appeals routes (GET list, PATCH decide) stay behind
+// the moderation gate. POST /api/appeals — filing an appeal — is a
+// contributor action authenticated by the session at the route layer, so the
+// edge must NOT gate it with moderation credentials; gating it made appeals
+// unreachable for contributors (401/503 before requireRole).
+
+test("POST /api/appeals is not gated: filing reaches the handler without moderation credentials", async () => {
+  const { worker, app } = await loadWorker();
+  // No credentials configured at all: a gated path would fail closed with
+  // 503 — the filing route must pass straight through to the app handler.
+  const response = await worker.fetch(
+    request("/api/appeals", { method: "POST" }),
+    testEnv(),
+    ctx(),
+  );
+  assert.notEqual(response.status, 503, "POST /api/appeals must not fail closed on missing moderation creds");
+  assert.notEqual(response.status, 401, "POST /api/appeals must not require moderation credentials");
+  assert.equal(response.status, 200);
+  assert.equal(await response.text(), "handler-ok");
+  assert.equal(app.__calls.length, 1);
+  assert.equal(app.__calls[0].url, "https://osdb.test/api/appeals");
+  assert.equal(app.__calls[0].method, "POST");
+});
+
+test("POST /api/appeals strips client-supplied identity headers like every other path", async () => {
+  const { worker, app } = await loadWorker();
+  const response = await worker.fetch(
+    request("/api/appeals", {
+      method: "POST",
+      headers: { "x-osdb-user-email": "contributor@osdb.test", "oai-authenticated-user-email": "contributor@osdb.test" },
+    }),
+    testEnv(),
+    ctx(),
+  );
+  assert.equal(response.status, 200);
+  assert.equal(app.__calls.length, 1);
+  // The worker strips identity headers on every path; the route layer must
+  // resolve the caller from the session cookie, never from a client header.
+  assert.equal(app.__calls[0].headers["x-osdb-user-email"], undefined, "x-osdb-user-email must never reach the handler from a client");
+  assert.equal(app.__calls[0].headers["oai-authenticated-user-email"], undefined, "platform identity headers are stripped too (no TRUST_PLATFORM_HEADERS)");
+});
+
+test("GET /api/appeals stays gated: 503 without credentials, 401 without auth, 200 with credentials", async () => {
+  const { worker, app } = await loadWorker();
+
+  const noCreds = await worker.fetch(request("/api/appeals"), testEnv(), ctx());
+  assert.equal(noCreds.status, 503, "the moderator list must fail closed without moderation credentials");
+
+  const env = testEnv({ MODERATION_USER: "moderator", MODERATION_PASSWORD: "s3cret" });
+  const unauth = await worker.fetch(request("/api/appeals"), env, ctx());
+  assert.equal(unauth.status, 401);
+  assert.equal(app.__calls.length, 0);
+
+  const authed = await worker.fetch(
+    request("/api/appeals", { headers: { authorization: basic("moderator", "s3cret") } }),
+    env,
+    ctx(),
+  );
+  assert.equal(authed.status, 200);
+  assert.equal(await authed.text(), "handler-ok");
+  assert.equal(app.__calls.length, 1);
+});
+
+test("PATCH /api/appeals/[id] stays gated behind the moderation gate", async () => {
+  const { worker, app } = await loadWorker();
+  const noCreds = await worker.fetch(request("/api/appeals/1", { method: "PATCH" }), testEnv(), ctx());
+  assert.equal(noCreds.status, 503, "the decide route must fail closed without moderation credentials");
+
+  const env = testEnv({ MODERATION_TOKEN: "tok-123" });
+  const denied = await worker.fetch(
+    request("/api/appeals/1", { method: "PATCH", headers: { authorization: bearer("wrong") } }),
+    env,
+    ctx(),
+  );
+  assert.equal(denied.status, 401);
+  assert.equal(app.__calls.length, 0);
+
+  const admitted = await worker.fetch(
+    request("/api/appeals/1", { method: "PATCH", headers: { authorization: bearer("tok-123") } }),
+    env,
+    ctx(),
+  );
+  assert.equal(admitted.status, 200);
+  assert.equal(app.__calls.length, 1);
+  assert.equal(app.__calls[0].method, "PATCH");
 });
 
 // ---------------------------------------------------------------------------
