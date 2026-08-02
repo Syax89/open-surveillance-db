@@ -3,6 +3,7 @@ import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } fr
 import handler from "vinext/server/app-router-entry";
 import type { D1Database, Fetcher, R2Bucket, SendEmail } from "cloudflare:workers";
 import { DEFAULT_RETENTION_POLICY, runRetentionSweep, type RetentionSummary } from "../db/retention";
+import { sweepOidcExpired } from "../db/oidc";
 
 interface Env {
   ASSETS: Fetcher;
@@ -293,9 +294,10 @@ const worker = {
   /**
    * Scheduled retention sweep (ADR 0004 §3, ADR 0008 p.3 — cron binding in
    * wrangler.jsonc, daily at 03:00 UTC). Runs the retention job from
-   * db/retention.ts against the D1 + PHOTOS bindings. The sweep must never
-   * break the request path: it runs inside waitUntil and any failure is
-   * caught and logged so the worker stays healthy (the next run retries).
+   * db/retention.ts and the OIDC expiry sweep from db/oidc.ts against the D1
+   * + PHOTOS bindings. Both sweeps must never break the request path: they
+   * run inside waitUntil and any failure is caught and logged so the worker
+   * stays healthy (the next run retries).
    */
   async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
     const policy = DEFAULT_RETENTION_POLICY;
@@ -306,6 +308,18 @@ const worker = {
         })
         .catch((error) => {
           console.error("Retention sweep failed:", error);
+        }),
+    );
+    // OIDC rows are single-use and short-lived by design; the expiry sweep
+    // (db/oidc.ts) removes lapsed oidc_states / oidc_merge_requests rows so
+    // every abandoned /start does not leak a row forever on D1.
+    ctx.waitUntil(
+      sweepOidcExpired()
+        .then((result) => {
+          console.log(`OIDC expiry sweep ok (${controller.cron}):`, JSON.stringify(result));
+        })
+        .catch((error) => {
+          console.error("OIDC expiry sweep failed:", error);
         }),
     );
   },

@@ -352,6 +352,44 @@ test("callback: unverified email conflict does NOT trigger a merge (no match att
   assert.equal(callArgs("createOidcMergeRequest").length, 0);
 });
 
+test("callback: private-email GitHub account falls back to /user/emails primary (N1)", async () => {
+  env.OIDC_GITHUB_CLIENT_ID = "gh-client";
+  env.OIDC_GITHUB_CLIENT_SECRET = "gh-secret";
+  stub("consumeOidcState", async () => ({ codeVerifier: "verifier-xyz", redirectTo: "/account" }));
+  stub("findContributorByExternalIdentity", async () => null);
+  stub("findContributorByEmail", async () => ({ id: 42, email: "private-owner@example.org" }));
+  stub("createOidcMergeRequest", async () => ({ rawToken: "merge-token-abc" }));
+  // /user returns NO email (private address — the GitHub default); only
+  // /user/emails (user:email scope) carries the verified primary address.
+  const calls = stubProviderFetch({
+    ...githubRoutes(
+      { ...GITHUB_USER, email: null },
+      [
+        { email: "private-owner@example.org", verified: true, primary: true },
+        { email: "noreply@github.com", verified: true, primary: false },
+      ],
+    ),
+  });
+
+  const { GET } = await callbackRoute();
+  const response = await GET(
+    apiRequest("/api/auth/oidc/github/callback?code=the-code&state=raw-state"),
+  );
+
+  assert.equal(response.status, 302);
+  assert.equal(
+    response.headers.get("location"),
+    "https://osdb.test/login?merge=merge-token-abc",
+  );
+  // The primary email from /user/emails is used for the conflict match even
+  // though /user did not expose it, so private-email accounts can merge.
+  assert.deepEqual(callArgs("findContributorByEmail")[0], ["private-owner@example.org"]);
+  assert.deepEqual(callArgs("createOidcMergeRequest")[0], [
+    { provider: "github", externalSub: "98765", contributorId: 42, emailVerified: true },
+  ]);
+  assert.ok(calls.some((href) => href.includes("api.github.com/user/emails")));
+});
+
 test("callback: new external account is created WITHOUT storing the provider email", async () => {
   env.OIDC_GITHUB_CLIENT_ID = "gh-client";
   env.OIDC_GITHUB_CLIENT_SECRET = "gh-secret";

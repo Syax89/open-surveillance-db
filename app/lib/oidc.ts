@@ -250,36 +250,48 @@ export async function fetchOidcIdentity(
     const id = payload.id;
     const sub = typeof id === "number" || typeof id === "string" ? String(id) : "";
     if (!sub) throw new Error("GitHub userinfo is missing the user id");
+    // /user only carries a PUBLIC email; private addresses (the GitHub
+    // default) come from the /user/emails endpoint, which the user:email
+    // scope authorizes. The verified flag is only asserted there, so the
+    // endpoint is always probed (best-effort: failure means "cannot assert
+    // email", never a hard error).
     const email =
       typeof payload.email === "string" && payload.email.length > 0 ? payload.email : null;
     const displayName = parseName(payload.name) ?? parseName(payload.login);
-    // GitHub's /user email is only present with user:email scope and may be
-    // the private relay; the verified flag comes from the email address
-    // endpoint, so fetch it when we have an access token (best-effort:
-    // failure means "cannot assert verification", never a hard error).
     let emailVerified = false;
-    if (email) {
-      try {
-        const emailsResponse = await globalThis.fetch("https://api.github.com/user/emails", {
-          headers: {
-            Accept: "application/json",
-            Authorization: `Bearer ${accessToken}`,
-            "X-GitHub-Api-Version": "2022-11-28",
-          },
-        });
-        if (emailsResponse.ok) {
-          const emails = (await emailsResponse.json()) as Array<{
-            email?: string;
-            verified?: boolean;
-          }>;
+    let identityEmail = email;
+    try {
+      const emailsResponse = await globalThis.fetch("https://api.github.com/user/emails", {
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${accessToken}`,
+          "X-GitHub-Api-Version": "2022-11-28",
+        },
+      });
+      if (emailsResponse.ok) {
+        const emails = (await emailsResponse.json()) as Array<{
+          email?: string;
+          verified?: boolean;
+          primary?: boolean;
+        }>;
+        if (email) {
           const match = emails.find((entry) => entry.email === email);
           emailVerified = Boolean(match?.verified);
+        } else {
+          // Private-email account: fall back to the user's primary address
+          // (the address they chose for account recovery), which is the
+          // correct merge key when it collides with an existing account.
+          const primary = emails.find((entry) => entry.primary) ?? emails[0];
+          if (primary?.email) {
+            identityEmail = primary.email;
+            emailVerified = Boolean(primary.verified);
+          }
         }
-      } catch {
-        // Verification is a best-effort assertion; leave it false.
       }
+    } catch {
+      // Verification is a best-effort assertion; leave it false.
     }
-    return { sub, email, emailVerified, displayName };
+    return { sub, email: identityEmail, emailVerified, displayName };
   }
 
   // Google userinfo: sub (string), email, email_verified (boolean/string),
