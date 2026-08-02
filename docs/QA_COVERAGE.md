@@ -1,7 +1,7 @@
 # QA Coverage Report
 
-Baseline generata il **2026-08-02** su commit `7a3bd62` con
-`npm run coverage && npm run coverage:docs`. Suite: 1436/1436 test PASS, 0 fail.
+Baseline generata il **2026-08-02** su commit `d83c466` con
+`npm run coverage && npm run coverage:docs`. Suite: 1443/1443 test PASS, 0 fail.
 
 ## Riepilogo (solo codice di produzione, esclusi test/helper/mock/fixture)
 

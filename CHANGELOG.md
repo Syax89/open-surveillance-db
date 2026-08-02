@@ -271,6 +271,17 @@ changes accumulate under `[Unreleased]`.
 
 ### Fixed
 
+- `/mappa` autocomplete UX (t_3c4b188e): typing a place no longer triggers
+  the search immediately — the geocode suggestion dropdown (250ms debounce)
+  now appears BEFORE the points list re-filters (400ms `?q=` debounce), and
+  the keyboard `?q=` commit writes the URL with a PURE
+  `window.history.replaceState` instead of `router.replace`, so the deployed
+  vinext RSC navigation error ("Cannot read properties of undefined
+  (reading 'digest')" — an ASYNC throw that #212's try/catch could not
+  catch) can no longer fire: no full reload, no remount, the dropdown stays
+  open and stable while typing. A committed-filters mirror keeps /mappa and
+  /directory filtering from the URL (deep links and back/forward still
+  re-derive state).
 - Public API no longer exposes the private `notes` field for `verified`/`demo`
   records (pre-hosting hardening).
 - Moderation endpoints are fail-closed: without credentials they return

@@ -398,18 +398,28 @@ const FERRARA_SUGGESTIONS = {
   ],
 };
 
-test("MappaTool geocode autocomplete suggests places in a combobox; keyboard selection pans the map and clears the local filter", async () => {
+test("MappaTool geocode autocomplete suggests places in a combobox; keyboard selection pans the map and clears the local filter", async (t) => {
   installGeocodeMock(FERRARA_SUGGESTIONS);
   await resetLeafletMarkers();
   const { screen, waitFor } = rtl;
   const user = rtl.userEvent.setup();
   await renderWithLocale(React.createElement(MappaTool));
 
+  // t_3c4b188e: ?q= writes (typing AND the selection clear) commit via the
+  // pure history.replaceState path — spy on it to assert the committed URL.
+  const historyReplaceCalls = [];
+  const originalReplaceState = window.history.replaceState.bind(window.history);
+  window.history.replaceState = (data, unused, url) => {
+    historyReplaceCalls.push(String(url));
+    originalReplaceState(data, unused, url);
+  };
+  t.after(() => { window.history.replaceState = originalReplaceState; });
+
   const input = screen.getByRole("combobox", { name: /Filter the points in the current view or search a place/ });
   assert.equal(input.getAttribute("aria-expanded"), "false", "the combobox starts collapsed");
 
   // Typing a query that does not match any local point opens the geocode
-  // dropdown after the ~300ms debounce (the map itself stays rendered).
+  // dropdown after the ~250ms debounce (the map itself stays rendered).
   await user.type(input, "Ferrara");
   const listbox = await waitFor(() => screen.getByRole("listbox", { name: "Place suggestions" }), { timeout: 5000 });
   assert.equal(input.getAttribute("aria-expanded"), "true", "typing expands the combobox");
@@ -421,6 +431,12 @@ test("MappaTool geocode autocomplete suggests places in a combobox; keyboard sel
   assert.match(options[0].textContent, /Ferrara, Emilia-Romagna, Italia/);
   assert.match(options[1].textContent, /Via del Duomo/);
 
+  // t_3c4b188e: the 400ms ?q= commit fires AFTER the dropdown opened — it
+  // must NOT close it (pure history.replaceState, no remount). Waiting for
+  // the commit here also gives the selection clear something real to clear.
+  await waitFor(() => assert.ok(historyReplaceCalls.some((href) => href.includes("q=Ferrara")), "the typed q committed via history.replaceState"), { timeout: 5000 });
+  assert.equal(input.getAttribute("aria-expanded"), "true", "the dropdown stays open after the ?q= commit");
+
   // Keyboard: ArrowDown highlights the first option (aria-activedescendant
   // follows), Enter selects it — the combobox pattern.
   await user.keyboard("{ArrowDown}");
@@ -430,11 +446,14 @@ test("MappaTool geocode autocomplete suggests places in a combobox; keyboard sel
 
   // Selection: the dropdown closes, the input keeps the chosen display
   // name, and the LOCAL point filter (?q=) is cleared so the list can
-  // follow the new viewport unfiltered.
+  // follow the new viewport unfiltered. t_3c4b188e: the clear is a pure
+  // history.replaceState — router.replace was never involved.
   assert.equal(input.getAttribute("aria-expanded"), "false", "selection closes the dropdown");
   assert.equal(input.value, "Ferrara, Emilia-Romagna, Italia", "the input keeps the chosen place name");
   const nav = await getNavState();
-  assert.ok(!nav.replaced.at(-1).includes("q="), "selecting a place clears the local point filter");
+  assert.equal(nav.replaced.length, 0, "selecting a place never called router.replace (pure-history ?q= writes)");
+  assert.ok(historyReplaceCalls.length >= 2, "the ?q= commit + selection clear both went through history.replaceState");
+  assert.ok(!historyReplaceCalls.at(-1).includes("q="), "selecting a place clears the local point filter");
 
   // The map panned to the place: setView([lat,lng], zoom ≥ 15).
   const leaflet = await loadDomModule("node_modules/leaflet/index.mjs");
@@ -552,13 +571,23 @@ test("DirectoryTool renders the directory shell with the shared FiltersBar and b
   assert.equal(useMap.getAttribute("href"), "/mappa", "the directory links the map tool route");
 });
 
-test("DirectoryTool search narrows the list (debounced URL commit); the empty state offers a clear action that restores it", async () => {
+test("DirectoryTool search narrows the list (debounced URL commit); the empty state offers a clear action that restores it", async (t) => {
   const { screen, fireEvent } = rtl;
   const user = rtl.userEvent.setup();
   await renderWithLocale(React.createElement(DirectoryTool));
 
+  // t_3c4b188e: ?q= writes (typing AND clearing) commit via the pure
+  // history.replaceState path — spy on it to assert the committed URL.
+  const historyReplaceCalls = [];
+  const originalReplaceState = window.history.replaceState.bind(window.history);
+  window.history.replaceState = (data, unused, url) => {
+    historyReplaceCalls.push(String(url));
+    originalReplaceState(data, unused, url);
+  };
+  t.after(() => { window.history.replaceState = originalReplaceState; });
+
   // The harness runs REAL timers, so every URL commit below goes through the
-  // ~250ms debounce (QUERY_DEBOUNCE_MS) plus a re-render. Under CI load (full
+  // ~400ms debounce (QUERY_DEBOUNCE_MS) plus a re-render. Under CI load (full
   // suite in parallel + NODE_V8_COVERAGE instrumentation) that window has
   // blown past testing-library's default 1000ms waitFor (flake observed on
   // PR #182 coverage job), so the debounce-sensitive waits carry an explicit
@@ -568,7 +597,7 @@ test("DirectoryTool search narrows the list (debounced URL commit); the empty st
   const DEBOUNCE_WAIT = { timeout: 5000 };
 
   // F4 (useCameraFilters): the search input feels instant but commits to the
-  // URL (and therefore filters) after the ~250ms debounce (R2 URL churn).
+  // URL (and therefore filters) after the ~400ms debounce (R2 URL churn; t_3c4b188e: pure history.replaceState).
   await user.type(screen.getByLabelText("Search the public directory"), "Illustrative record B");
   await rtl.waitFor(() => assert.ok(screen.queryByRole("heading", { name: "Illustrative record A" }) === null), DEBOUNCE_WAIT);
   assert.ok(screen.getByRole("heading", { name: "Illustrative record B" }));
@@ -582,9 +611,9 @@ test("DirectoryTool search narrows the list (debounced URL commit); the empty st
   // onChange → setQ("") → immediate-commit path the app wires, determinis-
   // tically, and the stub asserts the URL really was cleared in that step.
   fireEvent.change(screen.getByLabelText("Search the public directory"), { target: { value: "" } });
-  const navAfterClear = await getNavState();
+  assert.ok(historyReplaceCalls.length >= 2, "typing + clearing committed twice via history.replaceState");
   assert.ok(
-    !navAfterClear.replaced.at(-1).includes("q="),
+    !historyReplaceCalls.at(-1).includes("q="),
     "clearing the search commits the bare URL immediately (no ?q= dead air)",
   );
   await rtl.waitFor(() => assert.ok(screen.getByRole("heading", { name: "Illustrative record A" })), DEBOUNCE_WAIT);
