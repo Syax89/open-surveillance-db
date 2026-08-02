@@ -59,6 +59,13 @@ async function contributorSessionHeaders() {
     displayName: "Demo Contributor",
     password: "supersecret123",
   });
+  // The appeals route attributes the session to the `users` role identity via
+  // the EXPLICIT users.contributor_id link (audit t_5ca60ab2, P2 — the email
+  // bridge is gone). Link the fresh contributor to the demo "Demo Contributor"
+  // users row (id 6) exactly as a deploy provisions real accounts.
+  await env.DB.prepare("UPDATE users SET contributor_id = ? WHERE id = ?")
+    .bind(profile.id, 6)
+    .run();
   const { rawToken, csrfToken } = await auth.createSession(profile.id, { ttlDays: 7 });
   return {
     cookie: `osdb_session=${rawToken}; osdb_csrf=${csrfToken}`,

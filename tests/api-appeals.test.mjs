@@ -61,7 +61,9 @@ const stubIdentity = (user) => stub("getUserByEmail", async (email) => (email ==
 
 // Session auth (CEO decision 2026-08-02): POST /api/appeals authenticates
 // with the ADR 0013 session cookie, so the route resolves the contributor
-// session first, then bridges to the `users` row by email for the role gate.
+// session first, then attributes the appeal to the `users` role identity via
+// the EXPLICIT contributor_id link (audit t_5ca60ab2, P2 — never by email
+// equality, which is spoofable).
 const contributorPublic = {
   id: 7,
   email: "contributor@osdb.test",
@@ -89,7 +91,16 @@ const sessionRequest = (pathAndQuery, { headers = {}, ...rest } = {}) =>
   });
 const stubContributorSession = (user = contributorUser) => {
   stub("findSessionByToken", async () => ({ ...contributorSession, contributor: contributorPublic }));
-  stub("getUserByEmail", async (email) => (email === user.email ? user : null));
+  // The route attributes the session via users.contributor_id. The email
+  // bridge (getUserByEmail) must never be called on this path: stub it to
+  // throw so an accidental regression fails loudly instead of silently
+  // passing through an email match.
+  stub("getUserByEmail", async () => {
+    throw new Error("getUserByEmail must not be called on the POST /api/appeals path");
+  });
+  stub("getUserByContributorId", async (contributorId) =>
+    contributorId === contributorSession.contributorId ? user : null,
+  );
 };
 
 const appealFixture = {
@@ -172,13 +183,36 @@ test("POST rejects inactive accounts with 401", async () => {
   assert.equal(callArgs("fileAppeal").length, 0);
 });
 
-test("POST rejects a session whose contributor has no matching users row", async () => {
+test("POST rejects a session whose contributor has no linked users row", async () => {
   stub("findSessionByToken", async () => ({ ...contributorSession, contributor: contributorPublic }));
-  stub("getUserByEmail", async () => null);
+  stub("getUserByContributorId", async () => null);
   const { POST } = await appealsRoute();
   const response = await POST(sessionRequest("/api/appeals", { method: "POST", body: validPayload }));
-  assert.equal(response.status, 401, "no users row means no role identity to attribute the appeal to");
+  assert.equal(response.status, 401, "no linked users row means no role identity to attribute the appeal to");
   assert.equal(callArgs("fileAppeal").length, 0);
+});
+
+test("POST rejects the email-bridge spoof: an unlinked contributor whose email matches a moderator's users row gets 401, never the moderator role", async () => {
+  // Regression for audit t_5ca60ab2, P2. The old code resolved the users row
+  // by email equality (getUserByEmail(session.contributor.email)); a
+  // contributor registering with the email of an existing moderator users
+  // row would then pass the role gate with the moderator's identity. The
+  // explicit contributor_id link must be the only bridge.
+  stub("findSessionByToken", async () => ({ ...contributorSession, contributor: contributorPublic }));
+  stub("getUserByContributorId", async () => null);
+  // The users table DOES contain a moderator with the same email — the
+  // legacy bridge would have resolved it and granted the moderator role.
+  stub("getUserByEmail", async (email) =>
+    email === contributorPublic.email ? { ...moderatorUser } : null,
+  );
+  const { POST } = await appealsRoute();
+  const response = await POST(sessionRequest("/api/appeals", { method: "POST", body: validPayload }));
+  assert.equal(response.status, 401, "attribution follows the contributor_id link, not the email");
+  assert.equal(callArgs("fileAppeal").length, 0);
+  assert.ok(
+    callArgs("getUserByContributorId").length > 0,
+    "the route must resolve the identity by contributor id",
+  );
 });
 
 test("POST rejects a session with a wrong or missing CSRF token", async () => {

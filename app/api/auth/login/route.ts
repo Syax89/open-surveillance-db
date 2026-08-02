@@ -9,7 +9,7 @@ import {
   normalizeEmail,
   recordFailedLogin,
 } from "../../../../db/auth";
-import { sessionCookieHeaders } from "../../../lib/auth-session";
+import { sessionCookieHeaders, sessionTtlSeconds } from "../../../lib/auth-session";
 import {
   authLimit,
   cookieHeaderInit,
@@ -91,7 +91,12 @@ export async function POST(request: Request) {
     // A successful login resets the per-email counter.
     await clearLoginAttempts(emailKey);
 
-    const { rawToken, csrfToken } = await createSession(contributor.id);
+    const { rawToken, csrfToken } = await createSession(contributor.id, {
+      // Same TTL source as the cookie (sessionTtlSeconds(env)): the DB
+      // expires_at and the cookie Max-Age must never diverge (audit
+      // t_5ca60ab2, P2).
+      ttlSeconds: sessionTtlSeconds(env),
+    });
     return Response.json(
       { contributor },
       { headers: cookieHeaderInit(sessionCookieHeaders(rawToken, csrfToken, env)) },
