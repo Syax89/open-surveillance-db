@@ -75,6 +75,8 @@ Every option below is scored on:
 
 **Verdict: not recommended** for this project. The tracking surface and the GDPR/transfer baggage directly contradict ADR 0013 and `PRIVACY_AND_SAFETY.md` ("no third-party identity providers").
 
+**Implementation status (2026-08-02, Fase D — t_87f24b2d, ADR 0020):** implemented as an *opt-in, fail-closed* exception. GitHub and Google are supported with PKCE (S256), OIDC discovery (Google) / pinned endpoints (GitHub), account linking via `(auth_provider, external_sub)`, and a manual merge when the provider's verified email matches an existing account (no silent takeover). Privacy rule: the provider email is compared in memory and never stored — only `sub` + verified flag (placeholder `oidc.<provider>.<sub>@invalid`, RFC 2606). A provider is active only when its client ID/secret exists in the worker env; missing credentials answer 503. Secrets live in the GPG vault (`ops/oidc-secrets.sh`), never in the repo. The /login page declares the tracking + DPF transfer risks (Fase E2).
+
 ### 4b. Self-hosted IdP (Authentik, Keycloak, Hanko)
 
 - **Security — high**, comparable to the current stack plus centralised policy (MFA, SSO, session policies).

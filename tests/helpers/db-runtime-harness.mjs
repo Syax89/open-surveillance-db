@@ -81,6 +81,10 @@ const DB_MODULES = [
   // the real challenge/passkey/recovery-code SQL runs against the same
   // in-memory D1 (passkey-d1.test.mjs).
   { source: "db/passkeys.ts", output: "db/passkeys.mjs" },
+  // db/oidc.ts (external OIDC login, Fase D — migration 0030) imports getD1
+  // from ./cameras and the token primitives from ./auth, both already in
+  // this tree, so the real PKCE/merge SQL runs against the same binding.
+  { source: "db/oidc.ts", output: "db/oidc.mjs" },
 ];
 
 let builtTreePromise = null;
@@ -141,7 +145,8 @@ export async function loadDbRuntime() {
   const passkeys = await import(pathToFileURL(path.join(tree, "db/passkeys.mjs")).href);
   const mailer = await import(pathToFileURL(path.join(tree, "db/mailer.mjs")).href);
   const emailTemplates = await import(pathToFileURL(path.join(tree, "app/lib/email-templates.mjs")).href);
-  return { env: envModule.env, cameras, corrections, moderation, auth, users, appeals, photos, retention, confirmations, cameraEdits, passkeys, mailer, emailTemplates };
+  const oidc = await import(pathToFileURL(path.join(tree, "db/oidc.mjs")).href);
+  return { env: envModule.env, cameras, corrections, moderation, auth, users, appeals, photos, retention, confirmations, cameraEdits, passkeys, mailer, emailTemplates, oidc };
 }
 
 // Replays the real Drizzle migration files (drizzle/0000-*.sql ... 0017-*.sql)

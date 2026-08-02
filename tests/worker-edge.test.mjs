@@ -78,22 +78,40 @@ async function buildWorkerTree() {
   await writeFile(path.join(mocksDir, "app-router-entry.mjs"), appRouterMock);
   await writeFile(path.join(mocksDir, "image-optimization.mjs"), imageOptimizationMock);
 
-  // The worker imports ../db/retention (scheduled retention sweep). These
-  // gate tests exercise routing/authz, not the sweep, so a minimal mock keeps
-  // the tree self-contained (the real sweep has its own suites:
-  // tests/retention.test.mjs + tests/retention-contract.test.mjs).
+  // The worker imports ../db/retention (scheduled retention sweep) and
+  // ../db/oidc (OIDC expiry sweep). These gate tests exercise routing/authz
+  // and the cron dispatch, not the sweep SQL, so minimal mocks keep the tree
+  // self-contained (the real sweeps have their own suites:
+  // tests/retention.test.mjs + tests/retention-contract.test.mjs and
+  // tests/oidc-d1.test.mjs). Each mock records its invocations so tests can
+  // assert the cron wires both sweeps.
   const dbDir = path.join(tree, "db");
   await mkdir(dbDir, { recursive: true });
   await writeFile(
     path.join(dbDir, "retention.mjs"),
-    "export const DEFAULT_RETENTION_POLICY = { pendingDays: 90, rejectedDays: 30, unverifiedRemovalMonths: 6, correctionDays: 730, orphanPhotoDays: 90 };\n" +
-      "export async function runRetentionSweep() { return {}; }\n",
+    "export const __calls = [];\n" +
+      "export const DEFAULT_RETENTION_POLICY = { pendingDays: 90, rejectedDays: 30, unverifiedRemovalMonths: 6, correctionDays: 730, orphanPhotoDays: 90 };\n" +
+      "export async function runRetentionSweep(...args) { __calls.push(args); return {}; }\n",
+  );
+  await writeFile(
+    path.join(dbDir, "oidc.mjs"),
+    "export const __calls = [];\n" +
+      "export const __state = { throw: false };\n" +
+      "export async function sweepOidcExpired(...args) {\n" +
+      "  __calls.push(args);\n" +
+      "  if (__state.throw) throw new Error(\"boom\");\n" +
+      "  return { states: 0, mergeRequests: 0 };\n" +
+      "}\n",
   );
 
   const rewritten = compiled
     .replace(
       /from\s*["']\.\.\/db\/retention["']/g,
       `from "${pathToFileURL(path.join(dbDir, "retention.mjs")).href}"`,
+    )
+    .replace(
+      /from\s*["']\.\.\/db\/oidc["']/g,
+      `from "${pathToFileURL(path.join(dbDir, "oidc.mjs")).href}"`,
     )
     .replace(
       /from\s*["']vinext\/server\/image-optimization["']/g,
@@ -125,7 +143,9 @@ async function loadWorker() {
   const workerModule = await import(pathToFileURL(path.join(tree, "worker.mjs")).href);
   const image = await import(pathToFileURL(path.join(tree, "mocks", "image-optimization.mjs")).href);
   const app = await import(pathToFileURL(path.join(tree, "mocks", "app-router-entry.mjs")).href);
-  return { worker: workerModule.default, image, app };
+  const retention = await import(pathToFileURL(path.join(tree, "db", "retention.mjs")).href);
+  const oidc = await import(pathToFileURL(path.join(tree, "db", "oidc.mjs")).href);
+  return { worker: workerModule.default, image, app, retention, oidc };
 }
 
 /** Minimal Env shaped by the worker's Env interface. */
@@ -147,9 +167,11 @@ function request(pathAndQuery, { method = "GET", headers = {} } = {}) {
 }
 
 beforeEach(async () => {
-  const { image, app } = await loadWorker();
+  const { image, app, retention, oidc } = await loadWorker();
   image.__calls.length = 0;
   app.__calls.length = 0;
+  retention.__calls.length = 0;
+  oidc.__calls.length = 0;
 });
 
 // ---------------------------------------------------------------------------
@@ -430,6 +452,48 @@ test("/_vinext/image is routed to the image optimizer with the configured widths
   assert.equal(image.__calls[0].hasFetchAsset, true);
   assert.equal(image.__calls[0].hasTransformImage, true);
   assert.deepEqual(image.__calls[0].allowedWidths, [640, 750, 1080, 1200, 1920]);
+});
+
+// ---------------------------------------------------------------------------
+// Scheduled cron: retention sweep + OIDC expiry sweep (B1 review fix, PR #235)
+// ---------------------------------------------------------------------------
+
+test("scheduled() runs both the retention sweep and the OIDC expiry sweep", async () => {
+  const { worker, retention, oidc } = await loadWorker();
+  const waitUntilCalls = [];
+  const ctxObj = {
+    waitUntil(promise) {
+      waitUntilCalls.push(promise);
+    },
+    passThroughOnException() {},
+  };
+  await worker.scheduled({ cron: "0 3 * * *" }, testEnv(), ctxObj);
+  await Promise.all(waitUntilCalls);
+
+  assert.equal(retention.__calls.length, 1, "retention sweep must run from the cron");
+  assert.equal(oidc.__calls.length, 1, "OIDC expiry sweep must run from the cron (B1)");
+  // The OIDC sweep takes the default `now` (expired rows are removed by
+  // expires_at <= now, so the wall clock is the correct boundary).
+  assert.deepEqual(oidc.__calls[0], []);
+});
+
+test("scheduled() keeps working when the OIDC expiry sweep throws (sweeps are isolated)", async () => {
+  const { worker, retention, oidc } = await loadWorker();
+  oidc.__state.throw = true;
+  const waitUntilCalls = [];
+  const ctxObj = {
+    waitUntil(promise) {
+      waitUntilCalls.push(promise);
+    },
+    passThroughOnException() {},
+  };
+  await worker.scheduled({ cron: "0 3 * * *" }, testEnv(), ctxObj);
+  // Both promises settle; the OIDC one rejects but its catch inside the
+  // worker must swallow it so the cron never throws unhandled, and the
+  // retention sweep must still have run.
+  await Promise.allSettled(waitUntilCalls);
+  assert.equal(retention.__calls.length, 1, "retention sweep must run even if the OIDC sweep fails");
+  assert.equal(oidc.__calls.length, 1, "the OIDC sweep is wired and was attempted");
 });
 
 // Small helper: a no-op ExecutionContext shaped like the Worker API.
