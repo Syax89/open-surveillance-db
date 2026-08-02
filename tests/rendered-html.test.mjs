@@ -661,3 +661,17 @@ test("custom 404 page renders inside the root layout with a single h1 (a11y cont
   const footerCount = (html.match(/<footer\b/g) ?? []).length;
   assert.equal(footerCount, 1, `expected a single footer landmark, found ${footerCount}`);
 });
+
+test("root error boundary reuses the custom error shell for server errors (500)", async () => {
+  // t_7eed4601: app/error.tsx is the root error boundary for unhandled
+  // server errors (HTTP 500). A real 500 cannot be forced through the
+  // built worker without injecting a throwing route, so the contract is
+  // pinned statically: it must be a client component (error boundary
+  // requirement) that renders the SAME ErrorPage shell as the 404, wired
+  // to reset(). The 404 SSR contract above already proves the shell works.
+  const errorSource = await readFile(path.join(root, "app", "error.tsx"), "utf8");
+  assert.match(errorSource, /"use client"/, "error.tsx must be a client component");
+  assert.match(errorSource, /from "\.\/components\/ErrorPage"/, "error.tsx must reuse the ErrorPage shell");
+  assert.match(errorSource, /statusCode=\{500\}/, "error.tsx must render the 500 copy");
+  assert.match(errorSource, /onRetry=\{reset\}/, "error.tsx must wire reset() to the retry action");
+});
