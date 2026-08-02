@@ -9,6 +9,13 @@ type Props = {
   records: Camera[];
   /** ?record=ID prefill: the related record is preselected and announced. */
   defaultRecordId?: number | null;
+  /**
+   * P1-5 (F5): /correggi owns the page header via .tool-heading (h1). When
+   * embedded in the tool page the form must not repeat eyebrow + h2 +
+   * intro (FRONTEND_DESIGN §2.2 — one page header per tool page). The
+   * report-rule ("Urgent concern") stays: it is guidance, not a heading.
+   */
+  showHeading?: boolean;
 };
 
 /**
@@ -18,7 +25,7 @@ type Props = {
  * `correction` i18n bundle. `?record=ID` (from the record detail page)
  * pre-selects the related record and announces it via an aria-live region.
  */
-export function CorrectionForm({ records, defaultRecordId = null }: Props) {
+export function CorrectionForm({ records, defaultRecordId = null, showHeading = true }: Props) {
   const t = useMessages().correction;
   const [correctionNotice, setCorrectionNotice] = useState("");
   const preselected = defaultRecordId ? records.find((camera) => camera.id === defaultRecordId) : undefined;
@@ -41,7 +48,7 @@ export function CorrectionForm({ records, defaultRecordId = null }: Props) {
   }
 
   return (
-    <section className="correction-section" id="correction" aria-labelledby="correction-title"><div><p className="eyebrow"><span /> {t.accountability}</p><h2 id="correction-title">{t.correctionTitle}</h2><p>{t.correctionIntro}</p><div className="report-rule"><b>{t.urgentConcern}</b><br />{t.urgentConcernBody}</div></div><form className="correction-form" onSubmit={submitCorrection}>{preselected && <p className="notice" role="status">{t.recordPreselected(preselected.id, preselected.title)}</p>}<label>{t.relatedRecord}<select name="cameraId" defaultValue={preselected ? String(preselected.id) : ""}><option value="">{t.noSpecificRecord}</option>{records.map((camera) => <option key={camera.id} value={camera.id}>{camera.id} — {camera.title}</option>)}</select></label><label>{t.needsReview}<select required name="issueType" defaultValue=""><option value="" disabled>{t.selectOne}</option><option value="inaccurate">{t.inaccurate}</option><option value="missing">{t.missing}</option><option value="removal">{t.removal}</option><option value="abuse">{t.abuse}</option><option value="other">{t.other}</option></select></label><label>{t.briefDescription}<textarea required name="message" maxLength={1500} rows={4} placeholder={t.correctionPlaceholder} /></label><label>{t.contactEmail}<input type="email" name="contact" maxLength={180} placeholder={t.contactPlaceholder} /></label><label className="check-label"><input type="checkbox" required aria-describedby="correction-art13-note" /> <span>{t.correctionConsent} <a href="/privacy">{t.privacyNotice}</a> · <a href="/termini">{t.termsOfUse}</a></span></label><p className="legal-microcopy" id="correction-art13-note">{t.correctionArt13} <a href="/privacy">{t.privacyNotice}</a>. {t.correctionArt13Rights} <a href="mailto:privacy@opensurveillancedb.org">{t.privacyContact}</a>.</p><button className="button button-primary" type="submit">{t.sendPrivateRequest} <span aria-hidden="true">→</span></button>{correctionNotice && <p className="notice" role="status">{correctionNotice}</p>}</form></section>
+    <section className="correction-section" id="correction" aria-labelledby={showHeading ? "correction-title" : undefined} aria-label={showHeading ? undefined : t.accountability}><div>{showHeading && <><p className="eyebrow"><span /> {t.accountability}</p><h2 id="correction-title">{t.correctionTitle}</h2><p>{t.correctionIntro}</p></>}<div className="report-rule"><b>{t.urgentConcern}</b><br />{t.urgentConcernBody}</div></div><form className="correction-form" onSubmit={submitCorrection}>{preselected && <p className="notice" role="status">{t.recordPreselected(preselected.id, preselected.title)}</p>}<label>{t.relatedRecord}<select name="cameraId" defaultValue={preselected ? String(preselected.id) : ""}><option value="">{t.noSpecificRecord}</option>{records.map((camera) => <option key={camera.id} value={camera.id}>{camera.id} — {camera.title}</option>)}</select></label><label>{t.needsReview}<select required name="issueType" defaultValue=""><option value="" disabled>{t.selectOne}</option><option value="inaccurate">{t.inaccurate}</option><option value="missing">{t.missing}</option><option value="removal">{t.removal}</option><option value="abuse">{t.abuse}</option><option value="other">{t.other}</option></select></label><label>{t.briefDescription}<textarea required name="message" maxLength={1500} rows={4} placeholder={t.correctionPlaceholder} /></label><label>{t.contactEmail}<input type="email" name="contact" maxLength={180} placeholder={t.contactPlaceholder} /></label><label className="check-label"><input type="checkbox" required aria-describedby="correction-art13-note" /> <span>{t.correctionConsent} <a href="/privacy">{t.privacyNotice}</a> · <a href="/termini">{t.termsOfUse}</a></span></label><p className="legal-microcopy" id="correction-art13-note">{t.correctionArt13} <a href="/privacy">{t.privacyNotice}</a>. {t.correctionArt13Rights} <a href="mailto:privacy@opensurveillancedb.org">{t.privacyContact}</a>.</p><button className="button button-primary" type="submit">{t.sendPrivateRequest} <span aria-hidden="true">→</span></button>{correctionNotice && <p className="notice" role="status">{correctionNotice}</p>}</form></section>
 
   );
 }
