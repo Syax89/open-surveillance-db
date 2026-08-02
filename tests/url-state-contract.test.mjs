@@ -12,9 +12,11 @@
  *   3. deep-link populates AND applies the filters (demo seed + API data);
  *   4. back/forward preserves state: the URL re-derives the filters on
  *      every navigation (the stub's push/replace model Next's router);
- *   5. ?q= debounce (~250ms): no URL write while typing, ONE replace after,
- *      clearing commits immediately, scroll:false on every filter edit,
- *      replace for filters / push only for navigation (R2 URL churn);
+ *   5. ?q= debounce (~400ms): no URL write while typing, ONE
+ *      history.replaceState commit after (never router.replace — t_3c4b188e
+ *      removes the vinext RSC navigation failure mode), clearing commits
+ *      immediately, replace({ scroll: false }) for explicit select edits /
+ *      push only for navigation (R2 URL churn);
  *   6. server-side filters (F0): kind/freshness forwarded to the API on
  *      EVERY page of the pagination walk (combined filters + pagination);
  *   7. aria-live result counter announces the stabilized result;
@@ -43,7 +45,6 @@ let parseCameraFilters;
 let stringifyCameraFilters;
 let freshnessCutoffFor;
 let applyCameraFilters;
-let QUERY_DEBOUNCE_MS;
 let DirectoryTool;
 let MappaTool;
 let usePublicCameras;
@@ -56,7 +57,6 @@ before(async () => {
   stringifyCameraFilters = filtersMod.stringifyCameraFilters;
   freshnessCutoffFor = filtersMod.freshnessCutoffFor;
   applyCameraFilters = filtersMod.applyCameraFilters;
-  QUERY_DEBOUNCE_MS = filtersMod.QUERY_DEBOUNCE_MS;
   DirectoryTool = (await loadDomModule("app/components/tools/DirectoryTool.mjs")).DirectoryTool;
   MappaTool = (await loadDomModule("app/components/tools/MappaTool.mjs")).MappaTool;
   const camerasMod = await loadDomModule("app/lib/use-public-cameras.mjs");
@@ -246,24 +246,40 @@ test("invalid query values render with safe fallbacks — the page never 500s", 
 // 3. write contract: debounce, replace-vs-push, scroll:false (R2)
 // ---------------------------------------------------------------------------
 
-test("?q= is debounced: no URL write while typing, ONE replace after the debounce", async () => {
-  const { screen } = rtl;
+test("?q= is debounced: no URL write while typing, ONE history.replaceState commit after the debounce (never router.replace) — and the mirror drives the list", async () => {
+  const { screen, waitFor } = rtl;
   const user = rtl.userEvent.setup();
   installApiMock();
   await renderWithLocale(React.createElement(DirectoryTool));
+  await waitFor(() => assert.ok(screen.getByRole("heading", { name: "Dome camera 1" })));
 
-  await user.type(screen.getByLabelText("Search the public directory"), "a");
-  const during = await getNavState();
-  assert.equal(during.replaced.length, 0, "no URL write inside the debounce window");
-  assert.equal(during.pushed.length, 0, "a filter edit must never push");
+  const historyReplaceCalls = [];
+  const originalReplaceState = window.history.replaceState.bind(window.history);
+  window.history.replaceState = (data, unused, url) => {
+    historyReplaceCalls.push(String(url));
+    originalReplaceState(data, unused, url);
+  };
+  try {
+    await user.type(screen.getByLabelText("Search the public directory"), "Bullet");
+    const during = await getNavState();
+    assert.equal(during.replaced.length, 0, "no router.replace inside the debounce window");
+    assert.equal(during.pushed.length, 0, "a filter edit must never push");
 
-  await new Promise((resolve) => setTimeout(resolve, QUERY_DEBOUNCE_MS + 100));
-  const after = await getNavState();
-  assert.equal(after.replaced.length, 1, "exactly one committed write after the debounce");
-  assert.equal(after.replaceCalls.length, 1);
-  assert.deepEqual(after.replaceCalls[0].opts, { scroll: false }, "filter edits use replace({ scroll: false })");
-  assert.match(after.replaced[0], /q=a/);
-  assert.equal(after.pushed.length, 0);
+    // t_3c4b188e: the ?q= commit is a PURE history.replaceState — no RSC
+    // navigation, so the vinext digest error / remount cannot fire. The
+    // committed mirror drives the filtering: the list narrows after the
+    // debounce even though the router was never involved.
+    await waitFor(() => assert.ok(screen.queryByRole("heading", { name: "Dome camera 1" }) === null), { timeout: 5000 });
+    assert.ok(screen.getByRole("heading", { name: "Bullet camera 2" }), "the mirror re-filtered the list to the matching record");
+
+    const after = await getNavState();
+    assert.equal(after.replaced.length, 0, "the keyboard ?q= commit never calls router.replace");
+    assert.equal(historyReplaceCalls.length, 1, "exactly one committed history.replaceState after the debounce");
+    assert.match(historyReplaceCalls[0], /q=Bullet/);
+    assert.equal(after.pushed.length, 0);
+  } finally {
+    window.history.replaceState = originalReplaceState;
+  }
 });
 
 test("every select filter edit is a replace({ scroll: false }), never a push", async () => {
@@ -298,18 +314,32 @@ test("clearing the search commits immediately (no debounce dead air) and reset c
   installApiMock();
   await renderWithLocale(React.createElement(DirectoryTool));
 
-  await user.type(screen.getByLabelText("Search the public directory"), "camera");
-  await rtl.waitFor(async () => assert.ok((await getNavState()).replaced.length >= 1));
+  const historyReplaceCalls = [];
+  const originalReplaceState = window.history.replaceState.bind(window.history);
+  window.history.replaceState = (data, unused, url) => {
+    historyReplaceCalls.push(String(url));
+    originalReplaceState(data, unused, url);
+  };
+  try {
+    await user.type(screen.getByLabelText("Search the public directory"), "camera");
+    await rtl.waitFor(() => assert.ok(historyReplaceCalls.length >= 1), { timeout: 5000 });
 
-  await user.clear(screen.getByLabelText("Search the public directory"));
-  const nav = await getNavState();
-  assert.ok(nav.replaced.length >= 2, "clearing writes the URL immediately (no debounce wait)");
-  assert.equal(new URLSearchParams(nav.replaced.at(-1).split("?")[1] ?? "").get("q"), null, "cleared q is dropped from the URL");
+    await user.clear(screen.getByLabelText("Search the public directory"));
+    // Clearing commits immediately (no debounce wait), through the same
+    // pure-history path — the committed URL must drop q.
+    assert.ok(historyReplaceCalls.length >= 2, "clearing writes the URL immediately (no debounce wait)");
+    assert.equal(new URLSearchParams(historyReplaceCalls.at(-1).split("?")[1] ?? "").get("q"), null, "cleared q is dropped from the URL");
 
-  await user.click(screen.getByRole("button", { name: /Reset filters/ }));
-  const reset = await getNavState();
-  const lastHref = reset.replaced.at(-1);
-  assert.ok(!lastHref.includes("?"), "reset removes every filter dimension (bare pathname)");
+    await user.click(screen.getByRole("button", { name: /Reset filters/ }));
+    // Reset is an EXPLICIT action → router.replace (the R2 churn guard may
+    // skip it: the clear already committed the bare URL). Either way the
+    // URL ends with no filter dimension.
+    const nav = await getNavState();
+    const lastWrite = historyReplaceCalls.at(-1) ?? nav.replaced.at(-1);
+    assert.ok(!String(lastWrite).includes("?"), "reset removes every filter dimension (bare pathname)");
+  } finally {
+    window.history.replaceState = originalReplaceState;
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -416,23 +446,27 @@ test("noindex contract: /segnala and /correggi stay noindex (F1, guardia F4)", (
 });
 
 // ---------------------------------------------------------------------------
-// 7. geocode autocomplete resilience (t_b1e192e1)
+// 7. geocode autocomplete resilience (t_b1e192e1 + t_3c4b188e)
 // ---------------------------------------------------------------------------
 //
-// The deployed environment logs a vinext RSC navigation error on every
+// The deployed environment logged a vinext RSC navigation error on every
 // /mappa keystroke ("Cannot read properties of undefined (reading
 // 'digest')" from router.replace in applyFilters); vinext's navigation
-// controller reacts with a full reload / tree invalidation that unmounts
-// GeocodeSearch, and its unmount cleanup used to cancel the 300ms debounce
-// BEFORE the /api/geocode fetch could start — 0 requests in the network
-// log. Two app-side defences (no vinext patch):
+// controller reacted with a full reload / tree invalidation that unmounts
+// GeocodeSearch and closed the suggestion dropdown right after it opened.
+// t_3c4b188e removes the ROOT CAUSE: the keyboard ?q= commit never calls
+// router.replace — applyFilters writes the URL with a PURE
+// window.history.replaceState (no RSC navigation → no digest error → no
+// remount). Two defences remain valuable:
 //
 //   1. GeocodeSearch keeps the debounce timer + AbortController at MODULE
-//      level (keyed by input id): a remount during the debounce window no
-//      longer cancels the pending query — the fetch fires anyway.
-//   2. use-camera-filters.applyFilters wraps router.replace in try/catch
-//      and falls back to a silent history.replaceState, so a throwing
-//      navigation commits the ?q= without an RSC round-trip or reload.
+//      level (keyed by input id): a remount from ANY other source during
+//      the debounce window no longer cancels the pending query — the fetch
+//      fires anyway.
+//   2. the explicit-write path (selects/reset) keeps the hardened
+//      router.replace (no-op guard + try/catch → silent history.replaceState
+//      fallback), so a throwing navigation commits without an RSC
+//      round-trip or reload.
 //
 // Both are regression-tested below against the harness's simulated
 // environment (throwing router + forced remount).
@@ -462,7 +496,7 @@ test("t_b1e192e1: typing in GeocodeSearch fires /api/geocode even under a forced
   const view = await renderWithLocale(React.createElement(MappaTool));
 
   const input = screen.getByRole("combobox", { name: /Filter the points in the current view or search a place/ });
-  // A single keystroke schedules the 300ms debounce...
+  // A single keystroke schedules the 250ms debounce...
   await user.type(input, "B");
   // ...and the tree is invalidated immediately (the vinext RSC navigation
   // failure mode): a key change forces React to unmount MappaTool and mount
@@ -474,7 +508,7 @@ test("t_b1e192e1: typing in GeocodeSearch fires /api/geocode even under a forced
   assert.equal(geocodeCalls[0], "B", "the debounced query reaches the proxy");
 });
 
-test("t_b1e192e1: a throwing router.replace (vinext RSC navigation error) is neutralized — ?q= commits via history.replaceState and /api/geocode still fires", async () => {
+test("t_3c4b188e: typing under a hostile router (failReplace) — the ?q= still commits via pure history.replaceState and /api/geocode fires", async () => {
   const geocodeCalls = [];
   installMappaMock(geocodeCalls);
   const { screen, waitFor } = rtl;
@@ -497,17 +531,17 @@ test("t_b1e192e1: a throwing router.replace (vinext RSC navigation error) is neu
     const input = screen.getByRole("combobox", { name: /Filter the points in the current view or search a place/ });
     await user.type(input, "Ferrara");
 
-    // applyFilters' hardened write catches the throw and commits the URL
-    // silently via history.replaceState (no RSC round-trip, no reload), and
-    // the geocode autocomplete still fires — the CEO's exact symptom was
-    // 0 /api/geocode requests. The geocode debounce (300ms) outlives the q
-    // debounce (250ms), so waiting for the fetch proves the q write already
-    // ran its course (threw, was caught) without tearing the tree down.
+    // t_3c4b188e: the ?q= commit never calls router.replace at all — the
+    // pure history.replaceState path is the ONLY URL write while typing, so
+    // the deployed vinext RSC navigation error cannot fire even with a
+    // hostile router (failReplace). The geocode autocomplete fires at 250ms,
+    // BEFORE the 400ms ?q= commit — the CEO's exact symptom was the
+    // dropdown never having time to appear.
     await waitFor(() => assert.ok(geocodeCalls.length >= 1, "the /api/geocode fetch still fires (the tree was not torn down)"), { timeout: 5000 });
+    await waitFor(() => assert.ok(historyReplaceCalls.some((href) => href.includes("q=Ferrara")), "the ?q= commits via the pure history.replaceState path"), { timeout: 5000 });
     const nav = await getNavState();
-    assert.equal(nav.replaced.length, 0, "the throwing router.replace never records a navigation");
+    assert.equal(nav.replaced.length, 0, "router.replace was never attempted for the keyboard ?q= write");
     assert.ok(geocodeCalls.some((q) => q === "Ferrara"), "the typed query reaches the proxy");
-    assert.ok(historyReplaceCalls.some((href) => href.includes("q=Ferrara")), "the ?q= commits via the silent history.replaceState fallback");
     assert.equal(input.value, "Ferrara", "the input keeps the typed text");
   } finally {
     window.history.replaceState = originalReplaceState;

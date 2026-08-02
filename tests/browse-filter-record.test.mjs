@@ -100,7 +100,7 @@ test("journey browse→filtri: search narrows the directory and the live count f
   const { container } = await renderWithLocale(React.createElement(DirectoryTool));
 
   // The harness runs REAL timers, so the search narrows only after the
-  // ~250ms debounce (QUERY_DEBOUNCE_MS) commits the URL plus a re-render.
+  // ~400ms debounce (QUERY_DEBOUNCE_MS) commits the URL plus a re-render.
   // Under CI load (full suite in parallel + NODE_V8_COVERAGE) that window
   // has blown past testing-library's default 1000ms waitFor — same latent
   // flake fixed in client-tools (t_08bfe97d / PR #183) — so the three
@@ -116,7 +116,7 @@ test("journey browse→filtri: search narrows the directory and the live count f
   assert.equal(cards(), 2, "the directory must show both fictional records");
 
   // Search narrows to the matching record. F4 (useCameraFilters) debounces
-  // the ?q= URL commit (~250ms, R2 URL churn): the input feels instant but
+  // the ?q= URL commit (~400ms, R2 URL churn — pure history.replaceState, t_3c4b188e): the input feels instant but
   // the narrowing applies once the debounce writes the URL — wait for it
   // (same pattern as client-tools' debounced-search test, t_522638a5).
   await rtl.userEvent.type(searchInput, "corner");

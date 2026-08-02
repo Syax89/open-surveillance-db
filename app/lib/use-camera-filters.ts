@@ -13,9 +13,23 @@
  * next render; there is no other state to synchronise.
  *
  * Debounce: typing in ?q= updates the input instantly but commits the URL
- * (and therefore the filtering) ~250ms after the last keystroke, so history
- * and the aria-live counter are not spammed (R2). Clearing the search
- * commits immediately (no dead air).
+ * (and therefore the filtering) ~400ms after the last keystroke, so history
+ * and the aria-live counter are not spammed (R2). The ?q= debounce is
+ * deliberately LONGER than the geocode autocomplete debounce (250ms in
+ * GeocodeSearch, t_3c4b188e): the place-suggestion dropdown appears BEFORE
+ * the points list re-filters, so typing never hides the dropdown behind a
+ * list update. Clearing the search commits immediately (no dead air).
+ *
+ * t_3c4b188e: the keyboard ?q= commit NEVER calls router.replace — it
+ * writes the URL with a PURE window.history.replaceState. The deployed
+ * vinext RSC navigation error ("Cannot read properties of undefined
+ * (reading 'digest')") is thrown ASYNCHRONOUSLY by the navigation
+ * controller, so #212's try/catch could not catch it; vinext then forces a
+ * full reload that remounts the tool and closes the geocode dropdown. Not
+ * calling router.replace for ?q= removes the failure mode entirely (see
+ * applyFilters). A committed-filters mirror (see useCameraFilters) keeps
+ * the app filtering correctly because useSearchParams never observes a
+ * bare replaceState.
  *
  * freshnessCutoff is DERIVED from the freshness window at filter time — the
  * plan's "derived from the window, not separate state" — so a stale
@@ -35,7 +49,7 @@
  * leaves current-page ordering client-side.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { Camera } from "./records";
 import { textMatches } from "./search";
@@ -48,8 +62,14 @@ export type FreshnessWindow = (typeof FRESHNESS_WINDOWS)[number];
 export const SORT_ORDERS = ["alphabetical", "position"] as const;
 export type SortOrder = (typeof SORT_ORDERS)[number];
 
-/** Debounce for ?q= commits (R2 URL churn: history + AT announcements). */
-export const QUERY_DEBOUNCE_MS = 250;
+/**
+ * Debounce for ?q= commits (R2 URL churn: history + AT announcements).
+ * t_3c4b188e: must stay LONGER than the geocode autocomplete debounce
+ * (GEOCODE_DEBOUNCE_MS, 250ms) so the suggestion dropdown renders BEFORE
+ * the points list re-filters; 400ms keeps typing snappy without spamming
+ * the URL.
+ */
+export const QUERY_DEBOUNCE_MS = 400;
 /** Max length of ?q= (same limit as the place-search input). */
 export const MAX_QUERY_LENGTH = 200;
 
@@ -182,20 +202,31 @@ export type UseCameraFiltersResult = {
 
 /**
  * URL state for the shared filter pattern (/mappa and /directory — D4).
- * Reads the five dimensions from useSearchParams; every write goes through
- * router.replace(href, { scroll: false }). Because the URL is the only
- * source of truth, deep links and back/forward just work: the next render
- * re-parses the params. A local revision bump re-renders after each write
- * even in environments where router.replace is stubbed without a real
- * navigation (dom-harness); values still come from useSearchParams, so it
- * is a render trigger, not a state mirror.
+ * Reads the five dimensions from useSearchParams into a COMMITTED mirror
+ * (t_3c4b188e); the URL stays the shareable source of truth, so deep links
+ * and back/forward just work — every EXTERNAL URL change re-derives the
+ * mirror. Writes go through applyFilters: explicit changes (selects, reset)
+ * use router.replace(href, { scroll: false }); keyboard ?q= commits use a
+ * PURE window.history.replaceState so no RSC navigation (and therefore no
+ * vinext digest error / remount) can ever fire while the user is typing.
+ * A local revision bump re-renders after each write even in environments
+ * where router.replace is stubbed without a real navigation (dom-harness).
  */
 export function useCameraFilters(): UseCameraFiltersResult {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
-  const filters = useMemo(() => parseCameraFilters(searchParams), [searchParams]);
-  const [qInput, setQInput] = useState(filters.q);
+  // The COMMITTED mirror (t_3c4b188e): the filters the app actually filters
+  // on. The URL stays the shareable source of truth (deep links, back/
+  // forward), but keyboard-driven ?q= writes now commit via a PURE
+  // window.history.replaceState (see applyFilters) — which Next's router
+  // never observes — so the mirror is the only place the committed values
+  // are guaranteed to live between a replaceState write and the next
+  // EXTERNAL URL change. It is initialized from the URL, updated by every
+  // write, and re-derived from the URL whenever an external change (deep
+  // link, back/forward) shows up through useSearchParams.
+  const [committed, setCommitted] = useState<CameraFilters>(() => parseCameraFilters(searchParams));
+  const [qInput, setQInput] = useState(() => parseCameraFilters(searchParams).q);
   const [revision, setRevision] = useState(0);
 
   // Latest-value refs so the debounce timer and the write callback never act
@@ -206,74 +237,129 @@ export function useCameraFilters(): UseCameraFiltersResult {
   // always refreshed the refs by the time they are read.
   const filtersRef = useRef<CameraFilters>({ q: "", type: "all", freshness: "all", sort: "alphabetical", focus: null });
   useEffect(() => {
-    filtersRef.current = filters;
+    filtersRef.current = committed;
   });
   const searchParamsRef = useRef<string>("");
   useEffect(() => {
     searchParamsRef.current = searchParams.toString();
   });
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // t_3c4b188e: the router-visible URL (useSearchParams) as last seen. A
+  // PURE history.replaceState ?q= write is NEVER observed by Next's router,
+  // so useSearchParams keeps returning the PREVIOUS URL until the next
+  // router navigation — the mirror is AHEAD of the router-visible URL by
+  // design. The external-sync effect below therefore compares the current
+  // searchParams against THIS ref (not against the mirror): an unchanged
+  // router-visible URL means "no external change — keep the mirror" (this
+  // covers both the no-op renders and the replaceState-write renders).
+  const routerVisibleSearchRef = useRef(searchParams.toString());
 
-  // External URL change (deep link, back/forward, reset): keep the input in
-  // sync with the committed q — but never clobber text the user is actively
-  // typing (the debounce timer has not fired yet, so current !== filters.q).
-  // The setState is guarded (identity write → no re-render), so this is the
-  // documented "adjusting state when a prop changes" pattern — not a loop.
+  // External URL change (deep link, back/forward, reset): re-derive the
+  // committed filters from the URL. A router self-write makes useSearchParams
+  // advance to exactly the URL we just committed (the serialized comparison
+  // sees no difference → keep the mirror); a genuine external change differs
+  // and re-syncs. A pure history.replaceState write leaves useSearchParams
+  // untouched (current === routerVisibleSearchRef) → the mirror is kept,
+  // which is exactly the point of the t_3c4b188e fix.
+  useEffect(() => {
+    const current = searchParams.toString();
+    if (current === routerVisibleSearchRef.current) return;
+    routerVisibleSearchRef.current = current;
+    const fromUrl = parseCameraFilters(searchParams);
+    if (stringifyCameraFilters(fromUrl) === stringifyCameraFilters(committed)) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- external URL sync (deep link / back-forward): the committed mirror re-derives from the URL — the documented "adjusting state when a prop changes" pattern; the serialized-filters guard makes it a one-shot sync, not a loop.
+    setCommitted(fromUrl);
+  }, [searchParams, committed]);
+
+  // External URL change: keep the input in sync with the committed q — but
+  // never clobber text the user is actively typing (the debounce timer has
+  // not fired yet, so qInput !== committed.q). The setState is guarded
+  // (identity write → no re-render), so this is the documented "adjusting
+  // state when a prop changes" pattern — not a loop.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- guarded sync of the URL-controlled input (see comment above): identity-guarded setState keeps the input in sync with the committed URL q (deep link / back-forward); the guard means this is the documented "adjusting state when a prop changes" pattern, not a loop.
-    setQInput((current) => (current === filters.q ? current : filters.q));
-  }, [filters.q]);
+    setQInput((current) => (current === committed.q ? current : committed.q));
+  }, [committed.q]);
 
   // Clear a pending debounce on unmount.
   useEffect(() => () => {
     if (debounceRef.current !== null) clearTimeout(debounceRef.current);
   }, []);
 
-  // Write the URL. Never called during render: only from the setters and the
-  // debounce timer, so the SSR smoke (whose useRouter stub has no replace)
-  // never touches it. Owned params are rewritten; params the hook does not
-  // own (e.g. future ?lat=&lng=&z= viewport state) survive the edit.
-  //
-  // t_b1e192e1: the write is HARDENED against the vinext RSC navigation
-  // error. On the deployed environment router.replace on /mappa throws
-  // ('Cannot read properties of undefined (reading "digest")' — an
-  // unserializable redirect error) and vinext's navigation controller then
-  // forces `window.location.href = currentHref` — a full reload that
-  // unmounts the tool and kills GeocodeSearch's pending geocode debounce
-  // (0 /api/geocode requests). Two layers of protection:
-  //   1. no-op guard: if the write would produce the URL we are already on,
-  //      skip it (R2 URL churn — the guard the CEO asked to verify);
-  //   2. try/catch: a throwing router.replace falls back to a SILENT
-  //      history.replaceState (no RSC round-trip, no navigation error, no
-  //      reload) so the ?q= still commits and the tree stays up.
-  // The revision bump below re-renders either way (the hook's documented
-  // render trigger for stubbed/navigation-less environments).
-  const applyFilters = useCallback((next: CameraFilters) => {
+  // Build the target href for a filter state: the owned params are
+  // serialized from `filters` (the committed mirror), while params the hook
+  // does NOT own (e.g. future ?lat=&lng=&z= viewport state) survive from
+  // the current URL. The mirror is the base for owned params on purpose:
+  // after a pure history.replaceState ?q= write the router-visible URL lags
+  // the mirror, and re-serializing the mirror is what keeps a later select
+  // or reset write from silently dropping the typed q.
+  const hrefFor = useCallback((filters: CameraFilters) => {
     const params = new URLSearchParams(searchParamsRef.current);
     for (const key of ["q", "type", "freshness", "sort", "focus"]) params.delete(key);
-    const q = next.q.trim();
+    const q = filters.q.trim();
     if (q) params.set("q", q);
-    if (next.type && next.type !== "all") params.set("type", next.type);
-    if (next.freshness !== "all") params.set("freshness", next.freshness);
-    if (next.sort !== "alphabetical") params.set("sort", next.sort);
-    if (next.focus !== null) params.set("focus", String(next.focus));
+    if (filters.type && filters.type !== "all") params.set("type", filters.type);
+    if (filters.freshness !== "all") params.set("freshness", filters.freshness);
+    if (filters.sort !== "alphabetical") params.set("sort", filters.sort);
+    if (filters.focus !== null) params.set("focus", String(filters.focus));
     const query = params.toString();
-    const href = query ? `${pathname}?${query}` : pathname;
-    const currentSearch = searchParamsRef.current;
-    const currentHref = currentSearch ? `${pathname}?${currentSearch}` : pathname;
+    return query ? `${pathname}?${query}` : pathname;
+  }, [pathname]);
+
+  // Write the URL. Never called during render: only from the setters and the
+  // debounce timer, so the SSR smoke (whose useRouter stub has no replace)
+  // never touches it. Two commit paths (t_3c4b188e):
+  //
+  //   via="history" — KEYBOARD-driven ?q= writes (setQ, including the
+  //   immediate clear). A PURE window.history.replaceState: it updates the
+  //   address bar and the committed mirror, and NEVER triggers a Next RSC
+  //   navigation. This is the actual fix for the persistent vinext error:
+  //   #212's try/catch could not catch it because the deployed error
+  //   ('Cannot read properties of undefined (reading "digest")') is thrown
+  //   ASYNCHRONOUSLY by the navigation controller, after router.replace has
+  //   already returned; vinext then forces window.location.href =
+  //   currentHref (a full reload), which remounts the tool and closes
+  //   GeocodeSearch's dropdown right after it opens. Not calling
+  //   router.replace for ?q= removes the failure mode entirely.
+  //
+  //   via="router" — EXPLICIT writes (kind/freshness/sort selects, reset):
+  //   router.replace(href, { scroll: false }) as before, hardened by the
+  //   t_b1e192e1 no-op guard + try/catch → silent history.replaceState
+  //   fallback for a synchronously-throwing navigation. These are rare,
+  //   non-typing actions, so an async-error reload would not disrupt the
+  //   autocomplete UX; if vinext's error later proves to hit them too,
+  //   they can move to the same history path (one argument).
+  //
+  // The revision bump below re-renders either way (the hook's documented
+  // render trigger for stubbed/navigation-less environments).
+  const applyFilters = useCallback((next: CameraFilters, via: "router" | "history" = "router") => {
+    const href = hrefFor(next);
+    const currentHref = hrefFor(filtersRef.current);
     if (href === currentHref) {
+      // No-op guard (R2 URL churn — the guard the CEO asked to verify): the
+      // write would produce the URL we are already on; the mirror is still
+      // updated so the committed state always reflects `next`.
+      setCommitted(next);
       setRevision((value) => value + 1);
       return;
     }
-    try {
-      router.replace(href, { scroll: false });
-    } catch {
-      // Silent commit: the URL is the single source of truth — a failed
-      // client-side navigation must never take the tree down.
+    if (via === "history") {
+      // Pure History API: no RSC navigation → no vinext digest error → no
+      // reload → no remount → the geocode dropdown stays open and stable
+      // while the points list re-filters underneath it.
       window.history.replaceState(null, "", href);
+    } else {
+      try {
+        router.replace(href, { scroll: false });
+      } catch {
+        // Silent commit: the URL is the single source of truth — a failed
+        // client-side navigation must never take the tree down.
+        window.history.replaceState(null, "", href);
+      }
     }
+    setCommitted(next);
     setRevision((value) => value + 1);
-  }, [pathname, router]);
+  }, [hrefFor, router]);
 
   function setQ(value: string) {
     setQInput(value);
@@ -285,14 +371,15 @@ export function useCameraFilters(): UseCameraFiltersResult {
     // No-op when the committed value is unchanged (backspace to the same
     // text must not churn the URL).
     if (trimmed === filtersRef.current.q.trim()) return;
-    // Clearing the search commits immediately (no dead air on reset-like UX).
+    // Clearing the search commits immediately (no dead air on reset-like UX)
+    // — same pure-history path as the debounced commit.
     if (trimmed === "") {
-      applyFilters({ ...filtersRef.current, q: "" });
+      applyFilters({ ...filtersRef.current, q: "" }, "history");
       return;
     }
     debounceRef.current = setTimeout(() => {
       debounceRef.current = null;
-      applyFilters({ ...filtersRef.current, q: trimmed });
+      applyFilters({ ...filtersRef.current, q: trimmed }, "history");
     }, QUERY_DEBOUNCE_MS);
   }
 
@@ -323,5 +410,5 @@ export function useCameraFilters(): UseCameraFiltersResult {
   // renderer re-runs after every URL write (see the hook docs).
   void revision;
 
-  return { filters, qInput, setQ, setType, setFreshness, setSort, reset };
+  return { filters: committed, qInput, setQ, setType, setFreshness, setSort, reset };
 }

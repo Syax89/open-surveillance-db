@@ -550,7 +550,7 @@ export async function setupDom({ url = "https://osdb.test/" } = {}) {
 
   // t_b1e192e1: GeocodeSearch keeps its debounce timer + AbortController at
   // MODULE level on purpose (a remount must not cancel the pending geocode
-  // query). That module state survives rtl.cleanup(), so a leftover 300ms
+  // query). That module state survives rtl.cleanup(), so a leftover 250ms
   // timer from one test must not fire into the NEXT test's fetch mock —
   // reset it after every test, in every file that uses the harness.
   globalThis.afterEach(async () => {
