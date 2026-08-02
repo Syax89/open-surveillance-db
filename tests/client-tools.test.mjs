@@ -148,11 +148,13 @@ test("MappaTool renders the map tool shell with the shared FiltersBar and the vi
   const { screen } = rtl;
   await renderWithLocale(React.createElement(MappaTool));
 
-  assert.ok(screen.getByRole("heading", { name: "Interactive map" }), "map pageTitle heading");
-  // Integrated layout (t_966254a1): ONE tool header — the h1 is the only
-  // page heading, the duplicated section heading ("Explore documented
-  // cameras") is gone, the compact prototype banner sits above the map card
-  // and the FiltersBar is attached to the card top edge.
+  assert.ok(screen.getByRole("heading", { name: "Interactive map" }), "map pageTitle heading (sr-only h1 kept for a11y)");
+  // Integrated layout (t_966254a1) + heading cleanup (t_11e38eab): no
+  // visible tool header — the page starts directly with the map. The h1 is
+  // sr-only (still the accessible page heading), the duplicated section
+  // heading ("Explore documented cameras") is gone, the compact prototype
+  // banner sits above the map card and the FiltersBar is attached to the
+  // card top edge. The visible eyebrow ("Live prototype") is also gone.
   assert.ok(screen.queryByRole("heading", { name: "Explore documented cameras" }) === null, "no duplicated section heading on /mappa");
   assert.ok(screen.getByText("Prototype mode.").closest(".prototype-banner-compact"), "the prototype banner is the compact variant");
   assert.ok(screen.getByLabelText("Camera type").closest(".map-card"), "the FiltersBar row is attached to the map card");

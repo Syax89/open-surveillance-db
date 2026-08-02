@@ -18,8 +18,10 @@ import { EmptyState } from "../EmptyState";
 
 /**
  * /mappa tool body (F4, t_522638a5; viewport redesign t_702c10af; integrated
- * layout t_966254a1). ONE tool header (eyebrow + h1 + intro) owns the page;
- * below it a single map card hosts the compact prototype banner, the
+ * layout t_966254a1; heading cleanup t_11e38eab). No visible tool header:
+ * the page starts directly with the compact prototype banner and the single
+ * map card. The h1 stays in the DOM as sr-only (a11y — document hierarchy
+ * and the section's aria-labelledby keep working). The map card hosts the
  * FiltersBar row (kind/freshness/sort/reset — attached to the card top,
  * width-aligned with the map) and the viewport-synced sidebar list + full
  * map. The filters live in the URL (?q= ?type= ?freshness= ?sort= ?focus= —
@@ -85,10 +87,13 @@ export function MappaTool() {
 
   return (
     <section className="tool-section map-tool" aria-labelledby="map-tool-title">
-      <div className="tool-heading"><p className="eyebrow"><span /> {t.livePrototype}</p><h1 id="map-tool-title">{t.pageTitle}</h1><p>{t.pageIntro}</p></div>
+      {/* No visible tool header (t_11e38eab): the page starts directly with
+          the map. The h1 stays sr-only so the document hierarchy and the
+          section's aria-labelledby survive. */}
+      <h1 id="map-tool-title" className="sr-only">{t.pageTitle}</h1>
       <div className="map-layout">
         {/* Compact prototype banner (t_966254a1): a slim one-liner between
-            the single tool header and the map card — only when the map is
+            the map card — only when the map is
             actually rendered (never over the truthful empty state). */}
         {filteredRecords.length > 0 && (
           <div className="prototype-banner prototype-banner-compact" role="note"><b>{t.prototypeMode}</b> {t.prototypeBanner}</div>

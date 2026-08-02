@@ -19,11 +19,12 @@ export const en = {
   pageTitle: "Interactive map",
   pageIntro:
     "Explore documented public cameras on the map. Use the filters to narrow the view; every marker opens its public record. An empty area never proves that no cameras are present.",
-  // Map tool chrome (t_966254a1): the tool has ONE header (pageTitle) —
-  // the old "Explore documented cameras" section heading and its coverage
-  // note were removed with the duplicated header; pageIntro already covers
-  // the "an empty area never proves absence" truthfulness contract.
-  livePrototype: "Live prototype",
+  // Map tool chrome (t_966254a1, t_11e38eab): no visible tool header — the
+  // page starts directly with the map card. The h1 (pageTitle) stays in the
+  // DOM as sr-only for a11y; the old "Explore documented cameras" section
+  // heading, its coverage note and the "Live prototype" eyebrow were removed
+  // with the duplicated header; pageIntro still covers the "an empty area
+  // never proves absence" truthfulness contract (SSR metadata + a11y intro).
   prototypeMode: "Prototype mode.",
   prototypeBanner:
     "The base map is real OpenStreetMap data; the two visible camera pins are clearly labelled illustrative records. Click anywhere on the map to select a position for a report.",
@@ -87,12 +88,13 @@ export const it: Translation<typeof en> = {
   pageTitle: "Mappa interattiva",
   pageIntro:
     "Esplora le telecamere pubbliche documentate sulla mappa. Usa i filtri per restringere la vista; ogni segnaposto apre il record pubblico. Un'area vuota non dimostra mai l'assenza di telecamere.",
-  // Chrome del tool mappa (t_966254a1): il tool ha UN solo header (pageTitle)
-  // — il vecchio heading di sezione "Esplora le telecamere documentate" e la
-  // sua nota di copertura sono stati rimossi con l'header duplicato;
-  // pageIntro copre già il contratto di veridicità "un'area vuota non
-  // dimostra l'assenza di telecamere".
-  livePrototype: "Prototipo attivo",
+  // Chrome del tool mappa (t_966254a1, t_11e38eab): nessun header visibile —
+  // la pagina parte direttamente con la card della mappa. L'h1 (pageTitle)
+  // resta nel DOM come sr-only per a11y; il vecchio heading di sezione
+  // "Esplora le telecamere documentate", la sua nota di copertura e l'eyebrow
+  // "Prototipo attivo" sono stati rimossi con l'header duplicato; pageIntro
+  // copre ancora il contratto di veridicità "un'area vuota non dimostra
+  // l'assenza di telecamere" (metadata SSR + intro a11y).
   prototypeMode: "Modalità prototipo.",
   prototypeBanner:
     "La mappa di base usa dati reali di OpenStreetMap; i due pin visibili sono record illustrativi chiaramente etichettati. Fai clic in un punto della mappa per selezionare la posizione di una segnalazione.",

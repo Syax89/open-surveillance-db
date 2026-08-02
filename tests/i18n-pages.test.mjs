@@ -193,11 +193,14 @@ const INFO_ROUTES = {
   // Route tool separate (F1 route group (tools), t_03c0fa15): /mappa e
   // /directory sono pagine pubbliche, /segnala e /correggi form privati
   // (noindex) — tutte servono contenuto EN/IT dal cookie come le pagine info.
-  // /mappa (t_966254a1) ha UN solo header: il vecchio "Explore documented
-  // cameras" (heading di sezione duplicato) è stato rimosso.
+  // /mappa (t_966254a1, t_11e38eab): nessun header visibile — il tool-heading
+  // (eyebrow "Live prototype" + intro) è stato rimosso, la pagina parte
+  // direttamente con la card della mappa. L'h1 (pageTitle) resta nel DOM come
+  // sr-only per a11y, quindi "Interactive map"/"Mappa interattiva" restano
+  // presenti; "Live prototype"/"Prototipo attivo" sono spariti col blocco.
   "/mappa": {
-    it: ["Mappa interattiva", "Prototipo attivo"],
-    en: ["Interactive map", "Live prototype"],
+    it: ["Mappa interattiva"],
+    en: ["Interactive map"],
     noEn: ["Interactive map"],
   },
   "/directory": {
