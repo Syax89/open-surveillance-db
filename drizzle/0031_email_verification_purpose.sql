@@ -1,0 +1,30 @@
+-- Email verification tokens — Fase B (verification + password reset).
+-- Hand-written migration following the journal convention; applied by
+-- `wrangler d1 migrations apply` and replayed by the db-runtime test harness.
+-- Declared in db/schema.ts so drizzle-kit generate never re-emits it
+-- (convention 0012/0014; the snapshot is generated, the SQL is hand-written).
+--
+-- Design (docs/AUTH_OPTIONS.md, Fase B of the multi-method auth plan):
+--   The `email_verification_tokens` table created by 0027 serves BOTH flows
+--   that prove mailbox control, distinguished by a `purpose` column:
+--     * 'verify' — the link emailed at registration (Fase B): consuming it
+--       sets `contributors.email_verified_at`, which flips the account from
+--       read-only to write-capable (the write gate in Fase E1 reads that
+--       column on every state-changing write).
+--     * 'reset'  — the password-reset link (Fase B): consuming it rotates
+--       the PBKDF2 hash, revokes every live session and (because proving
+--       mailbox control is what reset does) also verifies the address.
+--   Both purposes keep the 0027 security model: SHA-256 hash only, 24h TTL
+--   (`expires_at`), single-use (`used_at`), one row per token. Each purpose
+--   gets its own 3/h send limit in code (COUNT over created_at within the
+--   window), so a reset burst can never exhaust the verification budget or
+--   vice versa.
+--
+--   DEFAULT 'verify' keeps every row written before this migration (none in
+--   production — 0027 shipped with zero rows) and every insert that omits
+--   the column valid; the code always sets it explicitly.
+--
+-- No seed rows: a fresh database must contain zero tokens (the migration
+-- smoke test enforces this).
+
+ALTER TABLE `email_verification_tokens` ADD `purpose` text DEFAULT 'verify' NOT NULL;

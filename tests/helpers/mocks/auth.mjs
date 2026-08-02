@@ -61,6 +61,15 @@ export const {
   recordFailedLogin,
   clearLoginAttempts,
   getContributorVerification,
+  // Email verification + password reset (multi-method auth Fase B): stubbed
+  // like the rest of the db layer; the constants run for real so routes and
+  // tests share the same budget/TTL numbers.
+  createVerificationToken,
+  consumeVerificationToken,
+  countVerificationTokensSentSince,
+  markContributorEmailVerified,
+  resetContributorPassword,
+  revokeAllContributorSessions,
 } = makeMock({
   createContributor: "createContributor",
   findContributorByEmail: "findContributorByEmail",
@@ -83,4 +92,14 @@ export const {
   recordFailedLogin: "recordFailedLogin",
   clearLoginAttempts: "clearLoginAttempts",
   getContributorVerification: "getContributorVerification",
+  createVerificationToken: "createVerificationToken",
+  consumeVerificationToken: "consumeVerificationToken",
+  countVerificationTokensSentSince: "countVerificationTokensSentSince",
+  markContributorEmailVerified: "markContributorEmailVerified",
+  resetContributorPassword: "resetContributorPassword",
+  revokeAllContributorSessions: "revokeAllContributorSessions",
 });
+
+export const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
+export const VERIFICATION_SEND_LIMIT = 3;
+export const VERIFICATION_SEND_WINDOW_MS = 60 * 60 * 1000;

@@ -62,6 +62,14 @@ const ROUTES = [
   { source: "app/api/auth/me/route.ts", output: "app/api/auth/me/route.mjs" },
   { source: "app/api/auth/me/submissions/route.ts", output: "app/api/auth/me/submissions/route.mjs" },
   { source: "app/api/auth/logout/route.ts", output: "app/api/auth/logout/route.mjs" },
+  // Email verification + password reset (multi-method auth Fase B): real
+  // SQL against the in-memory D1 — register→verify flips email_verified_at,
+  // resend honours the 3/h budget, reset rotates the hash and revokes
+  // sessions (tests/auth-verify-e2e.test.mjs).
+  { source: "app/api/auth/verify-email/route.ts", output: "app/api/auth/verify-email/route.mjs" },
+  { source: "app/api/auth/verify-email/resend/route.ts", output: "app/api/auth/verify-email/resend/route.mjs" },
+  { source: "app/api/auth/reset-password/request/route.ts", output: "app/api/auth/reset-password/request/route.mjs" },
+  { source: "app/api/auth/reset-password/confirm/route.ts", output: "app/api/auth/reset-password/confirm/route.mjs" },
   // Auth roles + appeals (ADR 0014): contributor files an appeal, moderators
   // list and decide it. The [id] route lives in its own directory.
   { source: "app/api/appeals/route.ts", output: "app/api/appeals/route.mjs" },

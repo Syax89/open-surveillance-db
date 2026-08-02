@@ -144,13 +144,19 @@ export const contributors = sqliteTable(
 );
 
 /**
- * Email verification tokens (migration 0027, Fase B). Only the SHA-256 of
- * the raw token is stored — a database leak cannot replay it (same rule as
- * `sessions.token_hash`, ADR 0013). A token is dead after `expires_at`
- * (24h) or once `used_at` is set (single-use; consume is an atomic
- * conditional UPDATE in Fase B). The `expires_at` index serves the expiry
- * sweep. Declared here so drizzle-kit generate never re-emits it
+ * Email verification tokens (migration 0027, Fase B; purpose column 0028).
+ * Only the SHA-256 of the raw token is stored — a database leak cannot
+ * replay it (same rule as `sessions.token_hash`, ADR 0013). A token is dead
+ * after `expires_at` (24h) or once `used_at` is set (single-use; consume is
+ * an atomic conditional UPDATE in Fase B). The `expires_at` index serves the
+ * expiry sweep. Declared here so drizzle-kit generate never re-emits it
  * (convention 0012/0014).
+ *
+ * `purpose` (migration 0028) separates the two flows sharing this table:
+ * 'verify' — email verification at registration (Fase B); 'reset' — the
+ * password-reset link (Fase B). Each purpose gets its own 3/h send limit
+ * and its own consume semantics (a reset link never re-verifies the email
+ * address by itself; the reset-confirm handler does).
  */
 export const emailVerificationTokens = sqliteTable(
   "email_verification_tokens",
@@ -160,6 +166,7 @@ export const emailVerificationTokens = sqliteTable(
       .notNull()
       .references(() => contributors.id, { onDelete: "cascade" }),
     tokenHash: text("token_hash").notNull(),
+    purpose: text("purpose").notNull().default("verify"),
     createdAt: text("created_at").notNull(),
     expiresAt: text("expires_at").notNull(),
     usedAt: text("used_at"),

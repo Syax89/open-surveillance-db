@@ -550,3 +550,156 @@ test("the lockout table stores only the email hash — never PII", async () => {
   assert.ok(!JSON.stringify(attempt).includes("ada@example.org"), "no raw email in the row");
   assert.ok(!JSON.stringify(attempt).includes("@"), "no email-shaped value at all");
 });
+
+// ---------------------------------------------------------------------------
+// Email verification + password reset tokens (multi-method auth Fase B)
+// ---------------------------------------------------------------------------
+
+async function makeContributor(auth, email = "verify@example.org") {
+  return auth.createContributor({ email, displayName: "Verifier", password: "supersecret123" });
+}
+
+test("createVerificationToken stores only the SHA-256 hash, 24h TTL, with the purpose", async () => {
+  const { auth } = runtime;
+  const contributor = await makeContributor(auth);
+  const { rawToken, expiresAt } = await auth.createVerificationToken(contributor.id, "verify", NOW);
+
+  assert.equal(typeof rawToken, "string");
+  assert.ok(rawToken.length >= 32, "raw token is high-entropy");
+  assert.equal(expiresAt, "2026-08-02T00:00:00.000Z", "TTL is exactly 24h");
+
+  const rows = await runtime.env.DB.prepare("SELECT * FROM email_verification_tokens").all();
+  assert.equal(rows.results.length, 1);
+  const [row] = rows.results;
+  assert.equal(row.token_hash, await auth.sha256Hex(rawToken), "only the hash is stored");
+  assert.notEqual(row.token_hash, rawToken);
+  assert.equal(row.purpose, "verify");
+  assert.equal(row.used_at, null);
+  assert.equal(row.expires_at, expiresAt);
+  assert.equal(row.contributor_id, contributor.id);
+});
+
+test("consumeVerificationToken burns a live token once, then answers used", async () => {
+  const { auth } = runtime;
+  const contributor = await makeContributor(auth);
+  const { rawToken } = await auth.createVerificationToken(contributor.id, "verify", NOW);
+
+  assert.deepEqual(await auth.consumeVerificationToken(rawToken, "verify", NOW), {
+    kind: "verified",
+    contributorId: contributor.id,
+  });
+  const [row] = (await runtime.env.DB.prepare("SELECT used_at AS usedAt FROM email_verification_tokens").all()).results;
+  assert.equal(row.usedAt, NOW, "the row is burned with the consume timestamp");
+  assert.deepEqual(await auth.consumeVerificationToken(rawToken, "verify", NOW), { kind: "used" });
+});
+
+test("a token is single-use even under a race: two consumers, one winner", async () => {
+  const { auth } = runtime;
+  const contributor = await makeContributor(auth);
+  const { rawToken } = await auth.createVerificationToken(contributor.id, "verify", NOW);
+
+  const results = await Promise.all([
+    auth.consumeVerificationToken(rawToken, "verify", NOW),
+    auth.consumeVerificationToken(rawToken, "verify", NOW),
+  ]);
+  const winners = results.filter((result) => result.kind === "verified").length;
+  assert.equal(winners, 1, "exactly one concurrent consumer wins");
+  assert.equal(results.filter((result) => result.kind === "used").length, 1);
+});
+
+test("consumeVerificationToken rejects the wrong purpose and expired tokens", async () => {
+  const { auth } = runtime;
+  const contributor = await makeContributor(auth);
+  const { rawToken } = await auth.createVerificationToken(contributor.id, "verify", NOW);
+
+  assert.deepEqual(await auth.consumeVerificationToken(rawToken, "reset", NOW), { kind: "invalid" },
+    "a verify token cannot reset a password");
+  const afterTtl = new Date(Date.parse(NOW) + 25 * 60 * 60 * 1000).toISOString();
+  assert.deepEqual(await auth.consumeVerificationToken(rawToken, "verify", afterTtl), { kind: "expired" });
+  // Unknown hashes answer invalid — never "used", so probing cannot enumerate.
+  assert.deepEqual(await auth.consumeVerificationToken("nonexistent-token", "verify", NOW), { kind: "invalid" });
+});
+
+test("creating a new token revokes older UNUSED tokens of the same purpose only", async () => {
+  const { auth } = runtime;
+  const contributor = await makeContributor(auth);
+  const first = await auth.createVerificationToken(contributor.id, "verify", NOW);
+  const reset = await auth.createVerificationToken(contributor.id, "reset", NOW);
+  const second = await auth.createVerificationToken(contributor.id, "verify", NOW);
+
+  // The first verify token is revoked by the re-send; the reset token (other
+  // purpose) survives; the newest verify token stays live.
+  assert.deepEqual(await auth.consumeVerificationToken(first.rawToken, "verify", NOW), { kind: "used" });
+  assert.deepEqual(await auth.consumeVerificationToken(second.rawToken, "verify", NOW), {
+    kind: "verified",
+    contributorId: contributor.id,
+  });
+  assert.deepEqual(await auth.consumeVerificationToken(reset.rawToken, "reset", NOW), {
+    kind: "verified",
+    contributorId: contributor.id,
+  });
+});
+
+test("countVerificationTokensSentSince counts only the window and the purpose", async () => {
+  const { auth } = runtime;
+  const contributor = await makeContributor(auth);
+  await auth.createVerificationToken(contributor.id, "verify", "2026-08-01T00:00:00.000Z"); // inside window
+  await auth.createVerificationToken(contributor.id, "verify", "2026-08-01T00:30:00.000Z"); // inside window
+  await auth.createVerificationToken(contributor.id, "verify", "2026-07-31T23:00:00.000Z"); // outside window
+  await auth.createVerificationToken(contributor.id, "reset", "2026-08-01T00:00:00.000Z"); // other purpose
+
+  const since = "2026-08-01T00:00:00.000Z";
+  assert.equal(await auth.countVerificationTokensSentSince(contributor.id, "verify", since), 2);
+  assert.equal(await auth.countVerificationTokensSentSince(contributor.id, "reset", since), 1);
+  assert.equal(await auth.countVerificationTokensSentSince(999, "verify", since), 0);
+});
+
+test("markContributorEmailVerified is idempotent — the first timestamp wins", async () => {
+  const { auth } = runtime;
+  const contributor = await makeContributor(auth);
+  assert.equal(contributor.emailVerifiedAt, null, "fresh accounts are unverified");
+
+  const verified = await auth.markContributorEmailVerified(contributor.id, "2026-08-01T00:05:00.000Z");
+  assert.equal(verified.emailVerifiedAt, "2026-08-01T00:05:00.000Z");
+  const reVerified = await auth.markContributorEmailVerified(contributor.id, "2026-08-01T00:10:00.000Z");
+  assert.equal(reVerified.emailVerifiedAt, "2026-08-01T00:05:00.000Z", "COALESCE keeps the original timestamp");
+  assert.equal(await auth.markContributorEmailVerified(999), null, "unknown account -> null");
+});
+
+test("resetContributorPassword rotates the hash; the old password stops working", async () => {
+  const { auth } = runtime;
+  const contributor = await makeContributor(auth, "reset-me@example.org");
+  const before = await auth.findContributorByEmail("reset-me@example.org");
+  assert.equal(await auth.verifyPassword("supersecret123", before.passwordHash), true);
+
+  await auth.resetContributorPassword(contributor.id, "rotated-password-1", NOW);
+  const after = await auth.findContributorByEmail("reset-me@example.org");
+  assert.notEqual(after.passwordHash, before.passwordHash);
+  assert.equal(await auth.verifyPassword("supersecret123", after.passwordHash), false);
+  assert.equal(await auth.verifyPassword("rotated-password-1", after.passwordHash), true);
+});
+
+test("revokeAllContributorSessions kills every live session of a contributor", async () => {
+  const { auth } = runtime;
+  const contributor = await makeContributor(auth);
+  const first = await auth.createSession(contributor.id, { ttlDays: 30, now: NOW });
+  const second = await auth.createSession(contributor.id, { ttlDays: 30, now: NOW });
+
+  assert.equal(await auth.revokeAllContributorSessions(contributor.id, NOW), 2);
+  assert.equal(await auth.findSessionByToken(first.rawToken, NOW), null);
+  assert.equal(await auth.findSessionByToken(second.rawToken, NOW), null);
+  // Idempotent: nothing left to revoke.
+  assert.equal(await auth.revokeAllContributorSessions(contributor.id, NOW), 0);
+});
+
+test("the purpose column defaults to 'verify' for legacy-shaped inserts", async () => {
+  const { auth } = runtime;
+  const contributor = await makeContributor(auth);
+  // A raw insert that omits purpose must land as 'verify' (migration 0028
+  // default), keeping every pre-0028 writer valid.
+  await runtime.env.DB.prepare(
+    "INSERT INTO email_verification_tokens (contributor_id, token_hash, created_at, expires_at) VALUES (?, ?, ?, ?)",
+  ).bind(contributor.id, "legacy-hash", NOW, "2026-08-02T00:00:00.000Z").run();
+  const [row] = (await runtime.env.DB.prepare("SELECT purpose FROM email_verification_tokens WHERE token_hash = 'legacy-hash'").all()).results;
+  assert.equal(row.purpose, "verify");
+});

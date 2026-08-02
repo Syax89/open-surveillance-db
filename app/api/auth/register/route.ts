@@ -2,6 +2,7 @@ import { env } from "cloudflare:workers";
 import {
   createContributor,
   createSession,
+  createVerificationToken,
   isValidEmail,
   normalizeEmail,
   type PublicContributor,
@@ -16,16 +17,30 @@ import {
 import { sameOrigin } from "../../../lib/csrf";
 import { isRecord } from "../../../lib/guards";
 import { BodyReadError, readJsonBody, urlTooLong } from "../../../lib/input-limits";
+import { sendVerificationEmail } from "../../../lib/mailer";
 
 /**
- * POST /api/auth/register — create a contributor account and open a session.
+ * POST /api/auth/register — create a contributor account and open a
+ * READ-ONLY session (multi-method auth Fase B).
  *
- * Email + password was chosen over magic links for the local prototype
- * (ADR 0013): it needs no email transport, hashes with PBKDF2-SHA256, and
- * works entirely in-process. A successful registration sets two cookies:
- *   - `osdb_session`   (HttpOnly, SameSite=Strict): the raw session token;
- *   - `osdb_csrf`      (SameSite=Strict, script-readable): the per-session
- *     CSRF token the client echoes via the `X-CSRF-Token` header.
+ * Registration now proves mailbox control before the account can write:
+ *   1. the contributor is created with `email_verified_at = NULL`;
+ *   2. a single-use, 24h verification token is minted (hash-only in D1) and
+ *      emailed via the Cloudflare `send_email` binding (dev/test fallback:
+ *      the link is logged and echoed as `verification.devLink`);
+ *   3. a session is opened exactly as before — but it is READ-ONLY until
+ *      `email_verified_at` is set: the write gate (Fase E1) refuses every
+ *      state-changing write for unverified accounts (403). GET /api/auth/me
+ *      exposes `contributor.emailVerifiedAt` so the client can show the
+ *      "verify your email" state.
+ *
+ * Mail is best-effort and NEVER fails registration: a mail outage still
+ * returns 201 (the user can re-send from the session via
+ * POST /api/auth/verify-email/resend). `verification.devLink` is present
+ * ONLY in the no-binding fallback — a real deployment never echoes the token.
+ *
+ * The email+password contract from ADR 0013 is unchanged (PBKDF2 hashing,
+ * no magic links, cookies `osdb_session` + `osdb_csrf`).
  */
 export async function POST(request: Request) {
   // Input limits: reject absurdly long URLs before any parsing work.
@@ -81,16 +96,32 @@ export async function POST(request: Request) {
       throw error;
     }
 
-    const { rawToken, csrfToken } = await createSession(contributor.id, {
+    // Verification link (Fase B): mint + mail. The raw token lives only in
+    // the email (hash-only in D1); the mailer swallows send failures so a
+    // mail outage never breaks registration.
+    const now = new Date().toISOString();
+    const { rawToken } = await createVerificationToken(contributor.id, "verify", now);
+    const mail = await sendVerificationEmail(env, {
+      to: contributor.email,
+      rawToken,
+      requestOrigin: new URL(request.url).origin,
+    });
+
+    const { rawToken: sessionRawToken, csrfToken } = await createSession(contributor.id, {
       // The DB expires_at must match the cookie Max-Age exactly: both derive
       // from the same sessionTtlSeconds(env) (audit t_5ca60ab2, P2 — a
       // divergent TTL would let a token stay valid server-side after the
       // cookie is gone, or expire sessions the client still holds).
       ttlSeconds: sessionTtlSeconds(env),
     });
+    const verification: Record<string, unknown> = { sent: mail.delivered };
+    // Dev/test fallback only: with no SEND_EMAIL binding the mailer returns
+    // the action link so local flows can complete verification; production
+    // (binding present) never exposes the token in an API response.
+    if (!mail.delivered && mail.devLink) verification.devLink = mail.devLink;
     return Response.json(
-      { contributor },
-      { status: 201, headers: cookieHeaderInit(sessionCookieHeaders(rawToken, csrfToken, env)) },
+      { contributor, verification },
+      { status: 201, headers: cookieHeaderInit(sessionCookieHeaders(sessionRawToken, csrfToken, env)) },
     );
   } catch (error) {
     if (error instanceof BodyReadError) {

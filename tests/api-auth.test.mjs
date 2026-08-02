@@ -33,6 +33,11 @@ const meRoute = () => loadRoute("app/api/auth/me/route.mjs");
 const submissionsRoute = () => loadRoute("app/api/auth/me/submissions/route.mjs");
 const accountRoute = () => loadRoute("app/api/auth/account/route.mjs");
 const camerasRoute = () => loadRoute("app/api/cameras/route.mjs");
+// Email verification + password reset (multi-method auth Fase B).
+const verifyEmailRoute = () => loadRoute("app/api/auth/verify-email/route.mjs");
+const resendRoute = () => loadRoute("app/api/auth/verify-email/resend/route.mjs");
+const resetRequestRoute = () => loadRoute("app/api/auth/reset-password/request/route.mjs");
+const resetConfirmRoute = () => loadRoute("app/api/auth/reset-password/confirm/route.mjs");
 
 const contributor = {
   id: 7,
@@ -82,8 +87,9 @@ function sessionRequest(pathAndQuery, rawToken, { headers = {}, ...rest } = {}) 
 // POST /api/auth/register
 // ---------------------------------------------------------------------------
 
-test("register creates a contributor, opens a session, and sets both cookies", async () => {
+test("register creates a contributor, mints a verification token, opens a session, and sets both cookies", async () => {
   stub("createContributor", async () => contributor);
+  stub("createVerificationToken", async () => ({ rawToken: "verify-token-abc", expiresAt: "2026-08-02T08:00:00.000Z" }));
   stub("createSession", async () => newSession);
   const { POST } = await registerRoute();
   const response = await POST(
@@ -99,11 +105,24 @@ test("register creates a contributor, opens a session, and sets both cookies", a
   // The db layer received the normalised email and trimmed display name.
   const [createArgs] = callArgs("createContributor");
   assert.deepEqual(createArgs, [{ email: "ada@example.org", displayName: "Ada", password: "supersecret123" }]);
+  // Fase B: a verification token is minted for the new account (purpose
+  // 'verify') so the emailed link can prove mailbox control.
+  const [tokenArgs] = callArgs("createVerificationToken");
+  assert.equal(tokenArgs[0], contributor.id);
+  assert.equal(tokenArgs[1], "verify");
+  assert.ok(typeof tokenArgs[2] === "string" && tokenArgs[2].length > 0, "token created_at is an ISO timestamp");
   // The DB TTL follows the same env knob as the cookie (sessionTtlSeconds):
   // default 30 days = 2592000 s, so expires_at and Max-Age can never diverge
   // (audit t_5ca60ab2, P2).
   const [sessionArgs] = callArgs("createSession");
   assert.deepEqual(sessionArgs, [7, { ttlSeconds: 2592000 }]);
+
+  // With no SEND_EMAIL binding the mailer falls back to a dev link, which
+  // register echoes so local flows can complete verification. The response
+  // still marks the session read-only: the contributor's emailVerifiedAt is
+  // NULL (the fixture above) and the write gate (Fase E1) enforces it.
+  assert.deepEqual(body.verification.sent, false);
+  assert.match(body.verification.devLink, /^https:\/\/osdb\.test\/api\/auth\/verify-email\?token=verify-token-abc$/);
 
   // Cookie pair: HttpOnly session cookie + script-readable CSRF cookie.
   assert.deepEqual(cookieNames(response).sort(), ["osdb_csrf", "osdb_session"]);
@@ -129,6 +148,7 @@ test("register propagates AUTH_SESSION_TTL_DAYS to BOTH the DB session and the c
   envModule.env.AUTH_SESSION_TTL_DAYS = "7";
   try {
     stub("createContributor", async () => contributor);
+    stub("createVerificationToken", async () => ({ rawToken: "verify-token-abc", expiresAt: "2026-08-02T08:00:00.000Z" }));
     stub("createSession", async () => newSession);
     const { POST } = await registerRoute();
     const response = await POST(
@@ -235,6 +255,9 @@ test("register maps a syntactically invalid JSON body to 400 (not 500)", async (
 });
 
 test("register respects the auth rate-limit bucket", async () => {
+  stub("createContributor", async () => contributor);
+  stub("createVerificationToken", async () => ({ rawToken: "verify-token-abc", expiresAt: "2026-08-02T08:00:00.000Z" }));
+  stub("createSession", async () => newSession);
   const { POST } = await registerRoute();
   for (let index = 0; index < 10; index += 1) {
     const response = await POST(
@@ -243,7 +266,7 @@ test("register respects the auth rate-limit bucket", async () => {
         body: { email: "ada@example.org", password: "supersecret123" },
       }),
     );
-    assert.notEqual(response.status, 429, `request ${index + 1} must stay allowed`);
+    assert.equal(response.status, 201, `request ${index + 1} must stay allowed`);
   }
   const blocked = await POST(
     apiRequest("/api/auth/register", {
@@ -753,4 +776,267 @@ test("a dead session cookie is refused by the write gate (401, no-store, no db w
   assert.equal((await responseBody(response)).error, "Authentication required.");
   assert.equal(response.headers.get("cache-control"), "no-store");
   assert.equal(callArgs("createPendingCamera").length, 0, "the gate must fail before any db write");
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/auth/verify-email (multi-method auth Fase B)
+// ---------------------------------------------------------------------------
+
+const verifiedContributor = {
+  ...contributor,
+  emailVerifiedAt: "2026-08-01T08:30:00.000Z",
+};
+
+test("verify-email consumes a live token and flips the account to verified", async () => {
+  stub("consumeVerificationToken", async () => ({ kind: "verified", contributorId: 7 }));
+  stub("markContributorEmailVerified", async () => verifiedContributor);
+  const { GET } = await verifyEmailRoute();
+  const response = await GET(apiRequest("/api/auth/verify-email?token=tok-abcdefghijklmnopqrstuvwxyz"));
+  assert.equal(response.status, 200);
+  const body = await responseBody(response);
+  assert.equal(body.verified, true);
+  assert.deepEqual(body.contributor, verifiedContributor);
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  // The db layer consumed with the exact purpose 'verify'.
+  assert.deepEqual(callArgs("consumeVerificationToken")[0], ["tok-abcdefghijklmnopqrstuvwxyz", "verify"]);
+});
+
+test("verify-email answers 400 for malformed or unknown tokens (generic, anti-enumeration)", async () => {
+  const { GET } = await verifyEmailRoute();
+  // Malformed (too short / illegal characters): rejected before any db call.
+  for (const token of ["short", "has spaces!", "tok!en@chars", ""]) {
+    const response = await GET(apiRequest(`/api/auth/verify-email?token=${encodeURIComponent(token)}`));
+    assert.equal(response.status, 400, token);
+    assert.equal((await responseBody(response)).error, "Invalid or expired verification link.", token);
+  }
+  assert.equal(callArgs("consumeVerificationToken").length, 0, "malformed tokens never touch the db");
+
+  // Unknown hash: the db answers invalid and the route maps it to the SAME
+  // generic 400 body — a caller cannot tell a live token from a dead one.
+  stub("consumeVerificationToken", async () => ({ kind: "invalid" }));
+  const unknown = await GET(apiRequest("/api/auth/verify-email?token=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"));
+  assert.equal(unknown.status, 400);
+  assert.equal((await responseBody(unknown)).error, "Invalid or expired verification link.");
+});
+
+test("verify-email answers 410 Gone for used and expired tokens", async () => {
+  const { GET } = await verifyEmailRoute();
+  stub("consumeVerificationToken", async () => ({ kind: "used" }));
+  const used = await GET(apiRequest("/api/auth/verify-email?token=BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"));
+  assert.equal(used.status, 410);
+  assert.match((await responseBody(used)).error, /already been used or has expired/);
+
+  stub("consumeVerificationToken", async () => ({ kind: "expired" }));
+  const expired = await GET(apiRequest("/api/auth/verify-email?token=CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC"));
+  assert.equal(expired.status, 410);
+  assert.match((await responseBody(expired)).error, /already been used or has expired/);
+});
+
+test("verify-email treats an erased account like an unknown token (400)", async () => {
+  stub("consumeVerificationToken", async () => ({ kind: "verified", contributorId: 7 }));
+  stub("markContributorEmailVerified", async () => null);
+  const { GET } = await verifyEmailRoute();
+  const response = await GET(apiRequest("/api/auth/verify-email?token=DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD"));
+  assert.equal(response.status, 400);
+  assert.equal((await responseBody(response)).error, "Invalid or expired verification link.");
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/auth/verify-email/resend (multi-method auth Fase B)
+// ---------------------------------------------------------------------------
+
+test("resend requires a live session (401 anonymous)", async () => {
+  stub("findSessionByToken", async () => null);
+  const { POST } = await resendRoute();
+  const response = await POST(apiRequest("/api/auth/verify-email/resend", { method: "POST" }));
+  assert.equal(response.status, 401);
+  assert.equal(callArgs("createVerificationToken").length, 0);
+});
+
+test("resend on an already-verified account is a no-op success", async () => {
+  stub("findSessionByToken", async () => ({ ...session, contributor: verifiedContributor }));
+  const { POST } = await resendRoute();
+  const response = await POST(
+    sessionRequest("/api/auth/verify-email/resend", "raw-session-token-abc123", { method: "POST" }),
+  );
+  assert.equal(response.status, 200);
+  assert.deepEqual((await responseBody(response)).verified, true);
+  assert.equal(callArgs("createVerificationToken").length, 0, "no new token for a verified account");
+});
+
+test("resend mints a fresh verify token and returns the dev link when mail falls back", async () => {
+  stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("countVerificationTokensSentSince", async () => 0);
+  stub("createVerificationToken", async () => ({ rawToken: "resend-token-456", expiresAt: "2026-08-02T09:00:00.000Z" }));
+  const { POST } = await resendRoute();
+  const response = await POST(
+    sessionRequest("/api/auth/verify-email/resend", "raw-session-token-abc123", { method: "POST" }),
+  );
+  assert.equal(response.status, 200);
+  const body = await responseBody(response);
+  assert.deepEqual(body.sent, true);
+  assert.match(body.devLink, /^https:\/\/osdb\.test\/api\/auth\/verify-email\?token=resend-token-456$/);
+  // The new token is minted for the caller's own account, purpose 'verify'.
+  const [tokenArgs] = callArgs("createVerificationToken");
+  assert.deepEqual(tokenArgs.slice(0, 2), [7, "verify"]);
+});
+
+test("resend honours the 3/h budget: the 4th email answers 429 with Retry-After", async () => {
+  stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("countVerificationTokensSentSince", async () => 3);
+  const { POST } = await resendRoute();
+  const response = await POST(
+    sessionRequest("/api/auth/verify-email/resend", "raw-session-token-abc123", { method: "POST" }),
+  );
+  assert.equal(response.status, 429);
+  assert.ok(Number(response.headers.get("retry-after")) > 0);
+  assert.equal(callArgs("createVerificationToken").length, 0, "no token minted past the budget");
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/auth/reset-password/request (multi-method auth Fase B)
+// ---------------------------------------------------------------------------
+
+test("reset request answers 200 {sent:true} for an UNKNOWN email (anti-enumeration)", async () => {
+  stub("findContributorByEmail", async () => null);
+  const { POST } = await resetRequestRoute();
+  const response = await POST(
+    apiRequest("/api/auth/reset-password/request", {
+      method: "POST",
+      body: { email: "nobody@example.org" },
+    }),
+  );
+  assert.equal(response.status, 200);
+  assert.deepEqual((await responseBody(response)), { sent: true });
+  assert.equal(callArgs("createVerificationToken").length, 0, "no token for unknown accounts");
+});
+
+test("reset request mints a reset token for a known email and never echoes it", async () => {
+  stub("findContributorByEmail", async () => contributor);
+  stub("countVerificationTokensSentSince", async () => 0);
+  stub("createVerificationToken", async () => ({ rawToken: "reset-token-789", expiresAt: "2026-08-02T10:00:00.000Z" }));
+  const { POST } = await resetRequestRoute();
+  const response = await POST(
+    apiRequest("/api/auth/reset-password/request", {
+      method: "POST",
+      body: { email: "Ada@Example.ORG" },
+    }),
+  );
+  assert.equal(response.status, 200);
+  const body = await responseBody(response);
+  // Anti-enumeration: the success body is identical to the unknown-email one,
+  // and the token NEVER appears in the response (it goes only in the mail).
+  assert.deepEqual(body, { sent: true });
+  assert.deepEqual(callArgs("createVerificationToken")[0].slice(0, 2), [7, "reset"]);
+});
+
+test("reset request respects the 3/h reset budget with 429 + Retry-After", async () => {
+  stub("findContributorByEmail", async () => contributor);
+  stub("countVerificationTokensSentSince", async () => 3);
+  const { POST } = await resetRequestRoute();
+  const response = await POST(
+    apiRequest("/api/auth/reset-password/request", {
+      method: "POST",
+      body: { email: "ada@example.org" },
+    }),
+  );
+  assert.equal(response.status, 429);
+  assert.ok(Number(response.headers.get("retry-after")) > 0);
+  assert.equal(callArgs("createVerificationToken").length, 0);
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/auth/reset-password/confirm (multi-method auth Fase B)
+// ---------------------------------------------------------------------------
+
+test("reset confirm rotates the password, revokes sessions, and verifies the email", async () => {
+  stub("consumeVerificationToken", async () => ({ kind: "verified", contributorId: 7 }));
+  stub("resetContributorPassword", async () => {});
+  stub("revokeAllContributorSessions", async () => 1);
+  stub("markContributorEmailVerified", async () => verifiedContributor);
+  const { POST } = await resetConfirmRoute();
+  const response = await POST(
+    apiRequest("/api/auth/reset-password/confirm", {
+      method: "POST",
+      body: { token: "EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE", password: "brand-new-password1" },
+    }),
+  );
+  assert.equal(response.status, 200);
+  const body = await responseBody(response);
+  assert.equal(body.ok, true);
+  assert.deepEqual(body.contributor, verifiedContributor);
+  // Consumed with purpose 'reset'; hash rotated; every live session revoked;
+  // address verified (COALESCE keeps the original timestamp).
+  assert.deepEqual(callArgs("consumeVerificationToken")[0][1], "reset");
+  assert.equal(callArgs("resetContributorPassword")[0][0], 7);
+  assert.equal(callArgs("resetContributorPassword")[0][1], "brand-new-password1");
+  assert.equal(callArgs("revokeAllContributorSessions")[0][0], 7);
+  assert.equal(callArgs("markContributorEmailVerified")[0][0], 7);
+});
+
+test("reset confirm answers 400 for malformed input and unknown tokens", async () => {
+  const { POST } = await resetConfirmRoute();
+  // Malformed token / weak password: rejected before any db call.
+  const malformed = await POST(
+    apiRequest("/api/auth/reset-password/confirm", {
+      method: "POST",
+      body: { token: "short", password: "brand-new-password1" },
+    }),
+  );
+  assert.equal(malformed.status, 400);
+  const weak = await POST(
+    apiRequest("/api/auth/reset-password/confirm", {
+      method: "POST",
+      body: { token: "EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE", password: "short" },
+    }),
+  );
+  assert.equal(weak.status, 400);
+  assert.equal(callArgs("consumeVerificationToken").length, 0);
+
+  stub("consumeVerificationToken", async () => ({ kind: "invalid" }));
+  const unknown = await POST(
+    apiRequest("/api/auth/reset-password/confirm", {
+      method: "POST",
+      body: { token: "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", password: "brand-new-password1" },
+    }),
+  );
+  assert.equal(unknown.status, 400);
+  assert.equal((await responseBody(unknown)).error, "Invalid or expired reset link.");
+});
+
+test("reset confirm answers 410 Gone for used and expired reset tokens", async () => {
+  const { POST } = await resetConfirmRoute();
+  stub("consumeVerificationToken", async () => ({ kind: "used" }));
+  const used = await POST(
+    apiRequest("/api/auth/reset-password/confirm", {
+      method: "POST",
+      body: { token: "GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG", password: "brand-new-password1" },
+    }),
+  );
+  assert.equal(used.status, 410);
+  assert.equal(callArgs("resetContributorPassword").length, 0, "no hash rotation on a dead token");
+
+  stub("consumeVerificationToken", async () => ({ kind: "expired" }));
+  const expired = await POST(
+    apiRequest("/api/auth/reset-password/confirm", {
+      method: "POST",
+      body: { token: "HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH", password: "brand-new-password1" },
+    }),
+  );
+  assert.equal(expired.status, 410);
+});
+
+test("reset confirm treats an erased account like an unknown token (400)", async () => {
+  stub("consumeVerificationToken", async () => ({ kind: "verified", contributorId: 7 }));
+  stub("resetContributorPassword", async () => {});
+  stub("revokeAllContributorSessions", async () => 1);
+  stub("markContributorEmailVerified", async () => null);
+  const { POST } = await resetConfirmRoute();
+  const response = await POST(
+    apiRequest("/api/auth/reset-password/confirm", {
+      method: "POST",
+      body: { token: "IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII", password: "brand-new-password1" },
+    }),
+  );
+  assert.equal(response.status, 400);
 });

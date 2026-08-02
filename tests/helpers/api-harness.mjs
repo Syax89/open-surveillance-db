@@ -40,6 +40,15 @@ const ROUTES = [
   { source: "app/api/auth/register/route.ts", output: "app/api/auth/register/route.mjs" },
   { source: "app/api/auth/login/route.ts", output: "app/api/auth/login/route.mjs" },
   { source: "app/api/auth/logout/route.ts", output: "app/api/auth/logout/route.mjs" },
+  // Email verification + password reset (multi-method auth Fase B): the
+  // verify-email GET consumes the emailed single-use token; the resend POST
+  // (session-gated, 3/h budget) mints a fresh one; reset-password/request is
+  // the public anti-enumeration entry; reset-password/confirm rotates the
+  // hash and revokes sessions.
+  { source: "app/api/auth/verify-email/route.ts", output: "app/api/auth/verify-email/route.mjs" },
+  { source: "app/api/auth/verify-email/resend/route.ts", output: "app/api/auth/verify-email/resend/route.mjs" },
+  { source: "app/api/auth/reset-password/request/route.ts", output: "app/api/auth/reset-password/request/route.mjs" },
+  { source: "app/api/auth/reset-password/confirm/route.ts", output: "app/api/auth/reset-password/confirm/route.mjs" },
   { source: "app/api/auth/me/route.ts", output: "app/api/auth/me/route.mjs" },
   { source: "app/api/auth/me/submissions/route.ts", output: "app/api/auth/me/submissions/route.mjs" },
   { source: "app/api/auth/me/contributions/route.ts", output: "app/api/auth/me/contributions/route.mjs" },
