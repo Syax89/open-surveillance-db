@@ -58,6 +58,12 @@ const expectedTables = [
   // PATCH edit-request table.
   "camera_confirmations",
   "camera_edit_requests",
+  // Multi-method auth — Fase A (0027): email verification tokens (hashed,
+  // 24h TTL, single-use), WebAuthn passkeys (public keys only) and the
+  // one-time recovery codes issued at passkey enrollment (hashed).
+  "email_verification_tokens",
+  "passkeys",
+  "recovery_codes",
 ];
 // Indexes declared by the migrations.
 const expectedIndexes = [
@@ -104,6 +110,17 @@ const expectedIndexes = [
   // for cameras and photos ORDER BY created_at DESC on contributor_id.
   "cameras_contributor_created_idx",
   "photos_contributor_created_idx",
+  // Multi-method auth — Fase A (0027): token hash is globally unique and the
+  // (contributor_id) / (expires_at) indexes serve the per-account lookups and
+  // the expiry sweep; passkey credential_id is globally unique per relying
+  // party; recovery code hash is globally unique (point lookup on consume).
+  "email_verification_tokens_token_hash_unique",
+  "email_verification_tokens_contributor_idx",
+  "email_verification_tokens_expires_idx",
+  "passkeys_credential_id_unique",
+  "passkeys_contributor_idx",
+  "recovery_codes_code_hash_unique",
+  "recovery_codes_contributor_idx",
 ];
 // Tables that are not application schema but legitimately appear in a local
 // D1 database. Anything outside this set is an unexpected schema change.
@@ -304,8 +321,27 @@ if (unexpected.length > 0) {
   fail(`unexpected tables in schema: ${unexpected.join(", ")}`);
 }
 
+// 4b. Multi-method auth columns on `contributors` (0027): the ALTER TABLE
+// part of the migration must have landed — the tables alone don't prove it.
+console.log("[5b/8] checking contributors auth columns…");
+let contributorColumns;
+try {
+  const colRows = query("PRAGMA table_info(contributors);");
+  contributorColumns = namesOf(colRows);
+} catch (err) {
+  fail(`could not read contributors columns: ${err.message}`);
+  contributorColumns = [];
+}
+for (const col of ["email_verified_at", "auth_provider", "external_sub"]) {
+  if (contributorColumns.includes(col)) {
+    console.log(`      ✓ contributors.${col}`);
+  } else {
+    fail(`expected contributors.${col} is missing after fresh migration`);
+  }
+}
+
 // 5. Expected indexes must exist.
-console.log("[7/9] checking indexes…");
+console.log("[6/8] checking indexes…");
 let indexRows;
 try {
   indexRows = query("SELECT name FROM sqlite_master WHERE type = 'index' AND name NOT LIKE 'sqlite_%';");
