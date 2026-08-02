@@ -67,7 +67,7 @@ before(async () => {
 afterEach(() => {
   rtl?.cleanup();
   __resetPublicCamerasCache();
-  setNavState({ pushed: [], replaced: [], replaceCalls: [], search: "", pathname: "/" });
+  setNavState({ pushed: [], replaced: [], replaceCalls: [], failReplace: false, search: "", pathname: "/" });
 });
 
 // ---------------------------------------------------------------------------
@@ -413,4 +413,103 @@ test("noindex contract: /segnala and /correggi stay noindex (F1, guardia F4)", (
   // /directory is the only tool page with real SEO value: it must NOT noindex.
   const directorySource = readFileSync(path.join(root, "app/(tools)/directory/page.tsx"), "utf8");
   assert.ok(!/index:\s*false/.test(directorySource), "/directory stays indexable");
+});
+
+// ---------------------------------------------------------------------------
+// 7. geocode autocomplete resilience (t_b1e192e1)
+// ---------------------------------------------------------------------------
+//
+// The deployed environment logs a vinext RSC navigation error on every
+// /mappa keystroke ("Cannot read properties of undefined (reading
+// 'digest')" from router.replace in applyFilters); vinext's navigation
+// controller reacts with a full reload / tree invalidation that unmounts
+// GeocodeSearch, and its unmount cleanup used to cancel the 300ms debounce
+// BEFORE the /api/geocode fetch could start — 0 requests in the network
+// log. Two app-side defences (no vinext patch):
+//
+//   1. GeocodeSearch keeps the debounce timer + AbortController at MODULE
+//      level (keyed by input id): a remount during the debounce window no
+//      longer cancels the pending query — the fetch fires anyway.
+//   2. use-camera-filters.applyFilters wraps router.replace in try/catch
+//      and falls back to a silent history.replaceState, so a throwing
+//      navigation commits the ?q= without an RSC round-trip or reload.
+//
+// Both are regression-tested below against the harness's simulated
+// environment (throwing router + forced remount).
+
+/** Combined mock: /api/cameras (records) + /api/geocode (recorded calls). */
+function installMappaMock(geocodeCalls = []) {
+  installFetchMock((input) => {
+    const url = new URL(String(input), "https://osdb.test");
+    if (url.pathname === "/api/geocode") {
+      geocodeCalls.push(url.searchParams.get("q") ?? "");
+      return jsonResponse({ results: [] });
+    }
+    if (url.pathname !== "/api/cameras") return jsonResponse({ records: [], total: 0, nextOffset: null });
+    return jsonResponse({ records: apiCameras, total: apiCameras.length, nextOffset: null });
+  });
+  return geocodeCalls;
+}
+
+test("t_b1e192e1: typing in GeocodeSearch fires /api/geocode even under a forced remount inside the debounce window", async () => {
+  const geocodeCalls = [];
+  installMappaMock(geocodeCalls);
+  const { screen, waitFor } = rtl;
+  const user = rtl.userEvent.setup();
+  // Deterministic start (t_b9666d09): the whole-world viewport.
+  const leaflet = await loadDomModule("node_modules/leaflet/index.mjs");
+  leaflet.__resetMarkers();
+  const view = await renderWithLocale(React.createElement(MappaTool));
+
+  const input = screen.getByRole("combobox", { name: /Filter the points in the current view or search a place/ });
+  // A single keystroke schedules the 300ms debounce...
+  await user.type(input, "B");
+  // ...and the tree is invalidated immediately (the vinext RSC navigation
+  // failure mode): a key change forces React to unmount MappaTool and mount
+  // a fresh instance before the timer can fire. The module-level timer must
+  // survive the unmount and still emit the fetch.
+  view.rerender(await wrapWithLocale(React.createElement(MappaTool, { key: "remounted" })));
+
+  await waitFor(() => assert.ok(geocodeCalls.length >= 1, "the /api/geocode fetch fires despite the remount"), { timeout: 5000 });
+  assert.equal(geocodeCalls[0], "B", "the debounced query reaches the proxy");
+});
+
+test("t_b1e192e1: a throwing router.replace (vinext RSC navigation error) is neutralized — ?q= commits via history.replaceState and /api/geocode still fires", async () => {
+  const geocodeCalls = [];
+  installMappaMock(geocodeCalls);
+  const { screen, waitFor } = rtl;
+  const user = rtl.userEvent.setup();
+  const leaflet = await loadDomModule("node_modules/leaflet/index.mjs");
+  leaflet.__resetMarkers();
+
+  // Spy on the silent-commit fallback (jsdom implements the History API).
+  const historyReplaceCalls = [];
+  const originalReplaceState = window.history.replaceState.bind(window.history);
+  window.history.replaceState = (data, unused, url) => {
+    historyReplaceCalls.push(String(url));
+    originalReplaceState(data, unused, url);
+  };
+  try {
+    // Simulate the deployed vinext: the RSC navigation throws on replace.
+    await setNavState({ failReplace: true, pathname: "/mappa" });
+
+    await renderWithLocale(React.createElement(MappaTool));
+    const input = screen.getByRole("combobox", { name: /Filter the points in the current view or search a place/ });
+    await user.type(input, "Ferrara");
+
+    // applyFilters' hardened write catches the throw and commits the URL
+    // silently via history.replaceState (no RSC round-trip, no reload), and
+    // the geocode autocomplete still fires — the CEO's exact symptom was
+    // 0 /api/geocode requests. The geocode debounce (300ms) outlives the q
+    // debounce (250ms), so waiting for the fetch proves the q write already
+    // ran its course (threw, was caught) without tearing the tree down.
+    await waitFor(() => assert.ok(geocodeCalls.length >= 1, "the /api/geocode fetch still fires (the tree was not torn down)"), { timeout: 5000 });
+    const nav = await getNavState();
+    assert.equal(nav.replaced.length, 0, "the throwing router.replace never records a navigation");
+    assert.ok(geocodeCalls.some((q) => q === "Ferrara"), "the typed query reaches the proxy");
+    assert.ok(historyReplaceCalls.some((href) => href.includes("q=Ferrara")), "the ?q= commits via the silent history.replaceState fallback");
+    assert.equal(input.value, "Ferrara", "the input keeps the typed text");
+  } finally {
+    window.history.replaceState = originalReplaceState;
+  }
 });

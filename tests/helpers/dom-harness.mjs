@@ -158,6 +158,11 @@ const state = {
   pushed: [],
   replaced: [],
   replaceCalls: [],
+  // t_b1e192e1: when true, router.replace throws a TypeError mimicking the
+  // vinext RSC navigation error ("Cannot read properties of undefined
+  // (reading 'digest')") — tests use it to prove applyFilters' hardened
+  // write survives a throwing navigation.
+  failReplace: false,
   url: { pathname: "/", search: "" },
   history: [{ pathname: "/", search: "" }],
   historyIndex: 0,
@@ -216,6 +221,12 @@ export const useRouter = () => ({
     applyUrl(state.history[state.historyIndex]);
   },
   replace: (p, opts) => {
+    if (state.failReplace) {
+      // t_b1e192e1: simulate the vinext RSC navigation error — a throwing
+      // router.replace must be neutralized by applyFilters' try/catch, not
+      // crash the test.
+      throw new TypeError("Cannot read properties of undefined (reading 'digest')");
+    }
     state.replaced.push(p);
     state.replaceCalls.push({ href: p, opts });
     state.history[state.historyIndex] = parseUrl(p);
@@ -536,6 +547,20 @@ export async function setupDom({ url = "https://osdb.test/" } = {}) {
 
   // @testing-library/react auto-cleanup hooks into a global afterEach.
   globalThis.afterEach = globalThis.afterEach || (await import("node:test")).afterEach;
+
+  // t_b1e192e1: GeocodeSearch keeps its debounce timer + AbortController at
+  // MODULE level on purpose (a remount must not cancel the pending geocode
+  // query). That module state survives rtl.cleanup(), so a leftover 300ms
+  // timer from one test must not fire into the NEXT test's fetch mock —
+  // reset it after every test, in every file that uses the harness.
+  globalThis.afterEach(async () => {
+    try {
+      const mod = await loadDomModule("app/components/home/GeocodeSearch.mjs");
+      mod.__resetGeocodePending?.();
+    } catch {
+      // GeocodeSearch was never loaded in this file — nothing to reset.
+    }
+  });
 
   const RTL = await import("@testing-library/react");
   // user-event is imported lazily HERE (after jsdom globals are installed):
