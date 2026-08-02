@@ -6,6 +6,9 @@
 //   - a migration dropped/renamed on disk         -> journal mismatch fails
 //   - an unexpected table in the schema           -> assertion fails
 //   - demo rows sneaking into a fresh DB          -> assertion fails
+//   - snapshot drift (schema.ts ahead of the last
+//     drizzle/meta snapshot)                      -> `db:generate` would emit
+//     a spurious migration, so the no-op check fails
 //
 // The script is LOCAL-ONLY and side-effect free: it runs against an isolated
 // persist directory (.wrangler/smoke-state) that is wiped before every run,
@@ -17,7 +20,7 @@
 // Exit code 0 = schema OK, 1 = any check failed.
 
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -25,6 +28,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const migrationsDir = path.join(root, "drizzle");
 const persistDir = path.join(root, ".wrangler", "smoke-state");
 const wranglerBin = path.join(root, "node_modules", "wrangler", "bin", "wrangler.js");
+const drizzleKitBin = path.join(root, "node_modules", "drizzle-kit", "bin.cjs");
 // Must match the `database_name` of the D1 entry in wrangler.jsonc (the
 // production D1 is osdb-production; a mismatch makes wrangler fall back to
 // the default `migrations` dir and the smoke test fails).
@@ -214,8 +218,67 @@ if (metaSorted.join("\n") !== filesNoExt.join("\n")) {
   console.log(`      meta journal OK: ${metaTags.length} migrations registered`);
 }
 
+// 4b. The "no-op guarantee": `npm run db:generate` must not emit any new
+//     migration. Drizzle diffs schema.ts against the LAST snapshot in
+//     drizzle/meta/; when snapshots are missing or stale it silently emits a
+//     spurious migration (the audit's 0011-0025 gap would have produced a
+//     giant 0026). drizzle-kit 0.31 has no --dry-run, so we run the real
+//     generate against a throwaway COPY of drizzle/ and assert zero new .sql
+//     files appeared — the developer tree is never touched.
+console.log("[5/9] checking drizzle-kit generate is a no-op…");
+const genScratch = path.join(root, ".wrangler", "smoke-generate");
+const genOut = path.join(genScratch, "drizzle");
+const genConfig = path.join(genScratch, "drizzle.config.ts");
+let genSqlBefore = [];
+let genScratchReady = true;
+try {
+  rmSync(genScratch, { recursive: true, force: true });
+  mkdirSync(genOut, { recursive: true });
+  cpSync(migrationsDir, genOut, { recursive: true });
+  writeFileSync(
+    genConfig,
+    [
+      'import { defineConfig } from "drizzle-kit";',
+      "",
+      "export default defineConfig({",
+      `  out: ${JSON.stringify(path.relative(root, genOut))},`,
+      '  schema: "./db/schema.ts",',
+      '  dialect: "sqlite",',
+      "});",
+      "",
+    ].join("\n"),
+  );
+  genSqlBefore = readdirSync(genOut).filter((f) => f.endsWith(".sql")).sort();
+} catch (err) {
+  genScratchReady = false;
+  fail(`could not prepare generate scratch copy: ${err.message}`);
+}
+if (genScratchReady) {
+  try {
+    execFileSync(process.execPath, [drizzleKitBin, "generate", "--config", genConfig], {
+      cwd: root,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "inherit"],
+    });
+  } catch (err) {
+    fail(`drizzle-kit generate failed on the scratch copy: ${err.stderr || err.message}`);
+  }
+  const genSqlAfter = readdirSync(genOut).filter((f) => f.endsWith(".sql")).sort();
+  rmSync(genScratch, { recursive: true, force: true });
+  const spurious = genSqlAfter.filter((f) => !genSqlBefore.includes(f));
+  if (spurious.length > 0) {
+    fail(
+      `drizzle-kit generate emitted ${spurious.length} spurious migration(s): ` +
+        `${spurious.join(", ")} — schema.ts and the last snapshot have drifted; ` +
+        "run `npm run db:generate` and commit the result",
+    );
+  } else {
+    console.log("      ✓ generate no-op: 0 new migrations (schema.ts == last snapshot)");
+  }
+}
+
 // 4. Expected application tables must exist.
-console.log("[5/8] checking application tables…");
+console.log("[6/9] checking application tables…");
 let tableRows;
 try {
   tableRows = query("SELECT name FROM sqlite_master WHERE type = 'table';");
@@ -239,7 +302,7 @@ if (unexpected.length > 0) {
 }
 
 // 5. Expected indexes must exist.
-console.log("[6/8] checking indexes…");
+console.log("[7/9] checking indexes…");
 let indexRows;
 try {
   indexRows = query("SELECT name FROM sqlite_master WHERE type = 'index' AND name NOT LIKE 'sqlite_%';");
@@ -258,7 +321,7 @@ for (const i of expectedIndexes) {
 
 // 6. A fresh migrated database must be empty (no demo/seed rows), except for
 //    tables the migrations deliberately seed with a fixed row set.
-console.log("[7/8] checking row counts (fresh DB must be empty)…");
+console.log("[8/9] checking row counts (fresh DB must be empty)…");
 for (const t of expectedTables) {
   const seeded = expectedSeedCounts[t];
   let count = -1;
@@ -286,7 +349,7 @@ for (const t of expectedTables) {
 //    "Demo *" reviewer and every @osdb.test demo user seeded by 0008/0010.
 //    This is the security gate that keeps demo moderation/admin accounts out
 //    of a fresh alpha/prod database.
-console.log("[8/8] checking zero demo identities (0017 removal)…");
+console.log("[9/9] checking zero demo identities (0017 removal)…");
 const demoChecks = [
   {
     label: "demo reviewers (display_name LIKE 'Demo %')",
