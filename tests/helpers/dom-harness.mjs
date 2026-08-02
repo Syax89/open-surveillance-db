@@ -263,6 +263,11 @@ export function map(el, opts) {
     getBounds: () => currentBounds,
     panTo: () => m,
     handlers: {},
+    // Map-click picker (t_6abb96ac): map.openPopup records the popup
+    // content + position so tests can assert the report-picker popup
+    // (coordinates + /segnala deep link) that a map click opens.
+    openPopup: (html, latlng, opts) => { m.popupHtml = html; m.popupLatLng = latlng; m.popupOpts = opts; return m; },
+    closePopup: () => { m.popupHtml = null; m.popupLatLng = null; return m; },
   };
   maps.push(m);
   return m;
@@ -429,6 +434,11 @@ export async function goForward() {
 export async function leafletMarkers() {
   const mod = await loadDomModule("node_modules/leaflet/index.mjs");
   return mod.__markers;
+}
+
+export async function leafletMaps() {
+  const mod = await loadDomModule("node_modules/leaflet/index.mjs");
+  return mod.__maps;
 }
 
 export async function resetLeafletMarkers() {
