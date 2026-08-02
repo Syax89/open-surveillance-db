@@ -122,7 +122,11 @@ GitHub prerequisites (set once, never hardcoded in workflows):
 CLOUDFLARE_API_TOKEN   token with "D1 - Edit" permission on the account
 CLOUDFLARE_ACCOUNT_ID  Cloudflare account id
 BACKUP_PASSPHRASE      passphrase for AES-256 encryption of dumps
-PROD_URL (variable)    production hostname (e.g. opensurveillancedb.example)
+PROD_URL (variable)    production hostname (currently
+                       open-surveillance-db.simone-rondina.workers.dev —
+                       workers.dev subdomain `simone-rondina`, no custom
+                       domain yet; set via `gh variable set PROD_URL <host>`,
+                       issue #203)
 ```
 
 > **Secrets status (2026-08-01, ken)**: `BACKUP_PASSPHRASE` configured (local
