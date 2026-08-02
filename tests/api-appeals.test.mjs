@@ -49,26 +49,48 @@ const moderatorUser = {
   createdAt: "2026-08-01T00:00:00.000Z",
   updatedAt: "2026-08-01T00:00:00.000Z",
 };
-const adminUser = {
-  id: 5,
-  email: "admin@osdb.test",
-  displayName: "Demo Administrator",
-  role: "admin",
-  active: 1,
-  mfaEnabled: 0,
-  createdAt: "2026-08-01T00:00:00.000Z",
-  updatedAt: "2026-08-01T00:00:00.000Z",
-};
 const seniorReviewer = { id: 3, displayName: "Demo Senior Moderator", role: "senior_moderator", active: 1 };
 
 const as = (user) => (path, opts = {}) =>
   apiRequest(path, { ...opts, headers: { "x-osdb-user-email": user.email, ...(opts.headers ?? {}) } });
 const asContributor = as(contributorUser);
 const asModerator = as(moderatorUser);
-const asAdmin = as(adminUser);
 const anonymous = (path, opts = {}) => apiRequest(path, opts);
 
 const stubIdentity = (user) => stub("getUserByEmail", async (email) => (email === user.email ? user : null));
+
+// Session auth (CEO decision 2026-08-02): POST /api/appeals authenticates
+// with the ADR 0013 session cookie, so the route resolves the contributor
+// session first, then bridges to the `users` row by email for the role gate.
+const contributorPublic = {
+  id: 7,
+  email: "contributor@osdb.test",
+  displayName: "Demo Contributor",
+  createdAt: "2026-08-01T00:00:00.000Z",
+  updatedAt: "2026-08-01T00:00:00.000Z",
+};
+const contributorSession = {
+  id: 1,
+  contributorId: 7,
+  tokenHash: "hash-of-raw-token",
+  csrfToken: "csrf-token-123",
+  createdAt: "2026-08-01T00:00:00.000Z",
+  expiresAt: "2026-08-31T00:00:00.000Z",
+  revokedAt: null,
+};
+const sessionRequest = (pathAndQuery, { headers = {}, ...rest } = {}) =>
+  apiRequest(pathAndQuery, {
+    ...rest,
+    headers: {
+      cookie: "osdb_session=raw-token-abc123; osdb_csrf=csrf-token-123",
+      "x-csrf-token": "csrf-token-123",
+      ...headers,
+    },
+  });
+const stubContributorSession = (user = contributorUser) => {
+  stub("findSessionByToken", async () => ({ ...contributorSession, contributor: contributorPublic }));
+  stub("getUserByEmail", async (email) => (email === user.email ? user : null));
+};
 
 const appealFixture = {
   id: 1,
@@ -115,10 +137,10 @@ const validPayload = {
 // ---------------------------------------------------------------------------
 
 test("POST files an appeal and returns 201 with the appeal and audit event", async () => {
-  stubIdentity(contributorUser);
+  stubContributorSession();
   stub("fileAppeal", async () => ({ kind: "ok", appeal: appealFixture, event: eventFixture }));
   const { POST } = await appealsRoute();
-  const response = await POST(asContributor("/api/appeals", { method: "POST", body: validPayload }));
+  const response = await POST(sessionRequest("/api/appeals", { method: "POST", body: validPayload }));
 
   assert.equal(response.status, 201);
   const body = await responseBody(response);
@@ -143,15 +165,40 @@ test("POST rejects anonymous callers with 401", async () => {
 });
 
 test("POST rejects inactive accounts with 401", async () => {
-  stubIdentity({ ...contributorUser, active: 0 });
+  stubContributorSession({ ...contributorUser, active: 0 });
   const { POST } = await appealsRoute();
-  const response = await POST(asContributor("/api/appeals", { method: "POST", body: validPayload }));
+  const response = await POST(sessionRequest("/api/appeals", { method: "POST", body: validPayload }));
   assert.equal(response.status, 401, "an inactive identity is treated as unauthenticated");
   assert.equal(callArgs("fileAppeal").length, 0);
 });
 
+test("POST rejects a session whose contributor has no matching users row", async () => {
+  stub("findSessionByToken", async () => ({ ...contributorSession, contributor: contributorPublic }));
+  stub("getUserByEmail", async () => null);
+  const { POST } = await appealsRoute();
+  const response = await POST(sessionRequest("/api/appeals", { method: "POST", body: validPayload }));
+  assert.equal(response.status, 401, "no users row means no role identity to attribute the appeal to");
+  assert.equal(callArgs("fileAppeal").length, 0);
+});
+
+test("POST rejects a session with a wrong or missing CSRF token", async () => {
+  stubContributorSession();
+  const { POST } = await appealsRoute();
+  for (const headers of [{ "x-csrf-token": "wrong-token" }, {}]) {
+    const response = await POST(
+      apiRequest("/api/appeals", {
+        method: "POST",
+        headers: { cookie: "osdb_session=raw-token-abc123; osdb_csrf=csrf-token-123", ...headers },
+        body: validPayload,
+      }),
+    );
+    assert.equal(response.status, 403, `headers=${JSON.stringify(headers)}`);
+    assert.equal(callArgs("fileAppeal").length, 0);
+  }
+});
+
 test("POST rejects malformed payloads with 400 and never touches the db layer", async () => {
-  stubIdentity(contributorUser);
+  stubContributorSession();
   const { POST } = await appealsRoute();
   const cases = [
     { name: "entity missing", body: { ...validPayload, entity: undefined } },
@@ -167,14 +214,14 @@ test("POST rejects malformed payloads with 400 and never touches the db layer", 
     { name: "payload not an object", body: [1, 2, 3] },
   ];
   for (const { name, body } of cases) {
-    const response = await POST(asContributor("/api/appeals", { method: "POST", body }));
+    const response = await POST(sessionRequest("/api/appeals", { method: "POST", body }));
     assert.equal(response.status, 400, name);
     assert.equal(callArgs("fileAppeal").length, 0, name);
   }
 });
 
 test("POST maps the db-layer failure results to stable status codes", async () => {
-  stubIdentity(contributorUser);
+  stubContributorSession();
   const { POST } = await appealsRoute();
   const cases = [
     { result: { kind: "decision_not_found" }, status: 404 },
@@ -184,42 +231,42 @@ test("POST maps the db-layer failure results to stable status codes", async () =
   ];
   for (const { result, status } of cases) {
     stub("fileAppeal", async () => result);
-    const response = await POST(asContributor("/api/appeals", { method: "POST", body: validPayload }));
+    const response = await POST(sessionRequest("/api/appeals", { method: "POST", body: validPayload }));
     assert.equal(response.status, status, result.kind);
     assert.match((await responseBody(response)).error, /.+/);
   }
 });
 
 test("POST answers 413 when the body exceeds the byte cap", async () => {
-  stubIdentity(contributorUser);
+  stubContributorSession();
   const { POST } = await appealsRoute();
   const oversized = { ...validPayload, reason: "x".repeat(40_000) };
-  const response = await POST(asContributor("/api/appeals", { method: "POST", body: oversized }));
+  const response = await POST(sessionRequest("/api/appeals", { method: "POST", body: oversized }));
   assert.equal(response.status, 413);
   assert.equal(callArgs("fileAppeal").length, 0);
 });
 
 test("POST answers 414 when the URI is too long", async () => {
-  stubIdentity(contributorUser);
+  stubContributorSession();
   const { POST } = await appealsRoute();
-  const response = await POST(asContributor(`/api/appeals?${"a".repeat(5000)}`, { method: "POST", body: validPayload }));
+  const response = await POST(sessionRequest(`/api/appeals?${"a".repeat(5000)}`, { method: "POST", body: validPayload }));
   assert.equal(response.status, 414);
   assert.equal(callArgs("fileAppeal").length, 0);
 });
 
 test("POST answers 429 past the appeal bucket and records the block", async () => {
-  stubIdentity(contributorUser);
+  stubContributorSession();
   const envModule = await loadTreeModule("cloudflare-workers.mjs");
   const previous = envModule.env.APPEAL_RATE_LIMIT_MAX;
   envModule.env.APPEAL_RATE_LIMIT_MAX = "1";
   try {
     stub("fileAppeal", async () => ({ kind: "ok", appeal: appealFixture, event: eventFixture }));
     const { POST } = await appealsRoute();
-    const allowed = await POST(asContributor("/api/appeals", { method: "POST", body: validPayload }));
+    const allowed = await POST(sessionRequest("/api/appeals", { method: "POST", body: validPayload }));
     assert.equal(allowed.status, 201, "the first call fits the 1/min cap");
     assert.equal(callArgs("fileAppeal").length, 1);
 
-    const blocked = await POST(asContributor("/api/appeals", { method: "POST", body: validPayload }));
+    const blocked = await POST(sessionRequest("/api/appeals", { method: "POST", body: validPayload }));
     assert.equal(blocked.status, 429);
     assert.ok(Number(blocked.headers.get("retry-after")) >= 1);
     assert.equal(callArgs("fileAppeal").length, 1, "the throttled call never reaches the db layer");
@@ -229,12 +276,12 @@ test("POST answers 429 past the appeal bucket and records the block", async () =
 });
 
 test("POST answers 500 when the db layer throws unexpectedly", async () => {
-  stubIdentity(contributorUser);
+  stubContributorSession();
   stub("fileAppeal", async () => {
     throw new Error("D1 binding unavailable");
   });
   const { POST } = await appealsRoute();
-  const response = await POST(asContributor("/api/appeals", { method: "POST", body: validPayload }));
+  const response = await POST(sessionRequest("/api/appeals", { method: "POST", body: validPayload }));
   assert.equal(response.status, 500);
   assert.equal((await responseBody(response)).error, "Unable to record the appeal");
 });

@@ -20,7 +20,7 @@
 - **Backend di qualità alta** (linus): boundary pubblico stretto su tutte le superfici, validazione quasi totale, audit trail append-only, 1384/1384 test verdi, coverage 94% baseline.
 
 ### Cosa NON è vero (dichiarato ma non funzionante) — i gap più gravi
-1. **POST /api/appeals irraggiungibile in produzione** (HIGH, linus): l'edge gate-a `/api/appeals` con credenziali moderation, ma la rotta richiede solo ruolo contributor → **i contributori non possono MAI presentare appello**. Feature dichiarata (ADR 0014/README/STATUS) non usabile. I test passano perché bypassano l'edge.
+1. ~~**POST /api/appeals irraggiungibile in produzione** (HIGH, linus)~~ → **RISOLTO** (CEO decision 2026-08-02, opzione a): l'edge gate-a `/api/appeals` con credenziali moderation, ma la rotta richiede solo ruolo contributor → i contributori non potevano presentare appello. `POST /api/appeals` è stato spostato fuori da `identityPath`: ora autentica con la sessione ADR 0013 al route layer (cookie + CSRF, bridge `users` per il ruolo), mentre `GET`/`PATCH` restano dietro il gate moderation. Test edge-worker aggiunti.
 2. **La pipeline di deploy non è MAI stata eseguita** (P1, ken): deploy.yml ha **0 run in assoluto** e la modalità dry-run è **rotta** (`--dry-run` non esiste su `wrangler d1 migrations apply`, exit 1). Il primo trigger fallirebbe.
 3. **Cloudflare è il target di deploy attivo ma i prerequisiti legali non esistono** (P0, rosa): PROCESSOR_REGISTER marca Cloudflare "futuro" mentre `wrangler.jsonc` ha il database_id REALE `osdb-production` e il deploy è pronto. **DPA Cloudflare + SCC + pin region R2 = P0 assoluto prima di caricare dati reali.**
 4. **Main SENZA branch protection** (P1/P2, ken): push diretto bypassa CI; `cancel-in-progress` può nascondere commit rotti.
@@ -61,7 +61,7 @@ Tutti i 7 audit convergono: **il codice è avanti, la documentazione è stale**.
 
 | # | Severità | Finding |
 |---|---|---|
-| 1 | **HIGH** | **POST /api/appeals irraggiungibile**: edge gate-a `/api/appeals` (identityPath → credenziali moderation), ma la rotta richiede solo ruolo contributor → i contributori non possono MAI appellare (401/503 prima di requireRole). Test bypassano l'edge; `worker-edge.test.mjs` non copre `/api/appeals`. **Decisione richiesta**: (a) togliere POST da identityPath con auth a sessione, o (b) dichiarare appelli moderator-only. |
+| 1 | ~~**HIGH**~~ **RISOLTO** | **POST /api/appeals irraggiungibile**: edge gate-a `/api/appeals` (identityPath → credenziali moderation), ma la rotta richiede solo ruolo contributor → i contributori non possono MAI appellare (401/503 prima di requireRole). **Risolto** con decisione CEO (opzione a): `POST /api/appeals` fuori da identityPath, auth a sessione ADR 0013 al route layer; `GET`/`PATCH` restano dietro il gate moderation; test edge-worker aggiunti (PR t_df331399). |
 | 2 | MEDIUM | **Admin può impersonare qualunque reviewer** nell'audit trail (actorId client fidato per admin, moderation/route.ts 389-399): integrità dell'audit append-only compromessa. Da rimuovere in produzione. |
 | 3 | MEDIUM | Rate-limit **per-isolate in-memory**: bypassabile su deploy multi-isolate (sostituire con CF Rate Limiting prima del lancio). |
 | 4 | MEDIUM | **callerKey spoofabile** (fallback x-forwarded-for fuori da CF): rate-limit, burst conferme, quota foto anonime aggirabili su deployment non-CF. |
@@ -189,7 +189,7 @@ Tutti i 7 audit convergono: **il codice è avanti, la documentazione è stale**.
 1. **Legal**: DPA Cloudflare + conferma SCC + pin region R2 EU (G1-G2 rosa). *Nessun dato reale in osdb-production prima.*
 2. **Ops**: fix deploy.yml dry-run (`d1 migrations list --remote`) + fix ops-monitoring (permissions issues:write + PROD_URL) (ken).
 3. **Ops**: abilitare **branch protection su main** con required checks (CI, Security, Lighthouse) (ken).
-4. **Backend decisione CEO**: POST /api/appeals — spostarlo fuori da identityPath con auth a sessione, o dichiararlo moderator-only (linus HIGH).
+4. ~~**Backend decisione CEO**: POST /api/appeals — spostarlo fuori da identityPath con auth a sessione, o dichiararlo moderator-only (linus HIGH)~~ → **RISOLTO** (t_df331399): opzione a implementata — POST /api/appeals fuori da identityPath, auth a sessione ADR 0013, gate moderation solo su GET/PATCH.
 5. **Drizzle**: rigenerare snapshot 0011–0025 + check "generate no-op" in db-migration-smoke (ada HIGH).
 6. **Deploy reale**: aggiungere step `db:provision --remote` + secret PROVISION_ACCOUNTS + configurare i secret CF sul worker + applicare le 11 migrazioni pendenti (ken).
 

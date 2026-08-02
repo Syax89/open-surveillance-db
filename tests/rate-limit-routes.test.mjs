@@ -126,6 +126,30 @@ const REVIEWER = { id: 2, displayName: "Demo Record Reviewer", role: "record_rev
 const stubAuth = (user) =>
   stub("getUserByEmail", async (email) => (email === user.email ? user : null));
 
+// Session auth (CEO decision 2026-08-02): POST /api/appeals resolves the
+// caller from the ADR 0013 session cookie, then bridges to the users row by
+// email for the role gate.
+const CONTRIBUTOR_PUBLIC = {
+  id: 7,
+  email: CONTRIBUTOR.email,
+  displayName: CONTRIBUTOR.displayName,
+  createdAt: "2026-08-01T00:00:00.000Z",
+  updatedAt: "2026-08-01T00:00:00.000Z",
+};
+const stubContributorSession = () => {
+  stub("findSessionByToken", async () => ({
+    id: 1,
+    contributorId: 7,
+    tokenHash: "hash",
+    csrfToken: "csrf-token-123",
+    createdAt: "2026-08-01T00:00:00.000Z",
+    expiresAt: "2026-08-31T00:00:00.000Z",
+    revokedAt: null,
+    contributor: CONTRIBUTOR_PUBLIC,
+  }));
+  stubAuth(CONTRIBUTOR);
+};
+
 // ---------------------------------------------------------------------------
 // Request builders per route. `ip` becomes cf-connecting-ip (the edge IP the
 // callerKey prefers); pass xff to exercise the forwarded-hop fallback.
@@ -159,7 +183,7 @@ const build = {
         decisionEventId: 7,
         reason: "The decision relies on stale data.",
       },
-      headers: { "x-osdb-user-email": CONTRIBUTOR.email, ...identityHeaders(ip) },
+      headers: { cookie: "osdb_session=raw-token-abc123; osdb_csrf=csrf-token-123", "x-csrf-token": "csrf-token-123", ...identityHeaders(ip) },
     }),
   moderation: (ip) =>
     apiRequest("/api/moderation", {
@@ -279,7 +303,9 @@ test("POST /api/cameras rate-limits the submit family with 429 + Retry-After", a
 test("POST /api/appeals rate-limits the appeal family with 429 + Retry-After", async () => {
   env.APPEAL_RATE_LIMIT_MAX = "1";
   env.APPEAL_RATE_LIMIT_WINDOW_SECONDS = "60";
-  stubAuth(CONTRIBUTOR);
+  // Session auth (CEO decision 2026-08-02): the filing route resolves the
+  // contributor from the session cookie, then bridges to the users row.
+  stubContributorSession();
   stub("fileAppeal", async (input) => ({
     kind: "ok",
     appeal: { id: 9, status: "pending", ...input },
@@ -380,7 +406,7 @@ test("calls under the threshold are not rate-limited on any route family", async
       name: "POST /api/appeals",
       knob: "APPEAL_RATE_LIMIT_MAX",
       setup: () => {
-        stubAuth(CONTRIBUTOR);
+        stubContributorSession();
         stub("fileAppeal", async (input) => ({ kind: "ok", appeal: { id: 9, ...input }, event: { id: 1 } }));
       },
       handler: async () => (await routes.appeals()).POST,

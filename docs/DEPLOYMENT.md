@@ -351,10 +351,13 @@ curl -sS http://192.168.1.201:3000/api/appeals                              # 50
 Public API responses must expose only `demo`/`verified` records and never the
 private `notes` field (enforced by the publication-boundary tests in CI).
 
-The moderation and appeals endpoints are **fail-closed**: without credentials
-they return `503 Moderation is unavailable.`. To enable the local moderation
-queue, add `MODERATION_USER` / `MODERATION_PASSWORD` (Basic auth) or
-`MODERATION_TOKEN` (bearer) to the unit's `Environment=` lines and restart.
+The moderation and moderator-facing appeals endpoints are **fail-closed**:
+without credentials they return `503 Moderation is unavailable.`. To enable
+the local moderation queue, add `MODERATION_USER` / `MODERATION_PASSWORD`
+(Basic auth) or `MODERATION_TOKEN` (bearer) to the unit's `Environment=`
+lines and restart. Filing an appeal (`POST /api/appeals`) is exempt from the
+edge gate by design (CEO decision 2026-08-02, ADR 0014 amendment): it
+authenticates with a contributor session at the route layer instead.
 
 ### Identity and access-control environment variables
 
