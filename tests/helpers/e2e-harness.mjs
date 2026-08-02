@@ -27,7 +27,7 @@
 // seedDemoIdentities() (see auth-flow-e2e, appeals). No network, no mocks of
 // the db layer.
 
-import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -70,6 +70,19 @@ const ROUTES = [
   { source: "app/api/auth/verify-email/resend/route.ts", output: "app/api/auth/verify-email/resend/route.mjs" },
   { source: "app/api/auth/reset-password/request/route.ts", output: "app/api/auth/reset-password/request/route.mjs" },
   { source: "app/api/auth/reset-password/confirm/route.ts", output: "app/api/auth/reset-password/confirm/route.mjs" },
+  // Passkey fallback + full ceremony + OIDC (multi-method auth Fase C/D):
+  // recovery redeems a single-use code into a session, the passkey
+  // begin/complete pair runs a REAL WebAuthn ceremony (fixtures from
+  // tests/helpers/webauthn-fixtures.mjs), the OIDC start/callback pair
+  // performs PKCE + account linking — all three end in real writes in
+  // tests/qa-multiauth-write-gate-e2e.test.mjs (Fase G).
+  { source: "app/api/auth/recovery/route.ts", output: "app/api/auth/recovery/route.mjs" },
+  { source: "app/api/auth/passkey/register/begin/route.ts", output: "app/api/auth/passkey/register/begin/route.mjs" },
+  { source: "app/api/auth/passkey/register/complete/route.ts", output: "app/api/auth/passkey/register/complete/route.mjs" },
+  { source: "app/api/auth/passkey/login/begin/route.ts", output: "app/api/auth/passkey/login/begin/route.mjs" },
+  { source: "app/api/auth/passkey/login/complete/route.ts", output: "app/api/auth/passkey/login/complete/route.mjs" },
+  { source: "app/api/auth/oidc/[provider]/start/route.ts", output: "app/api/auth/oidc/[provider]/start/route.mjs" },
+  { source: "app/api/auth/oidc/[provider]/callback/route.ts", output: "app/api/auth/oidc/[provider]/callback/route.mjs" },
   // Auth roles + appeals (ADR 0014): contributor files an appeal, moderators
   // list and decide it. The [id] route lives in its own directory.
   { source: "app/api/appeals/route.ts", output: "app/api/appeals/route.mjs" },
@@ -87,6 +100,9 @@ const REAL_DB_MODULES = [
   // cameras route now pulls in for optional contributor attribution; it must
   // exist in the tree so the transitive import resolves against the real db.
   { source: "db/auth.ts", output: "db/auth.mjs" },
+  // db/passkeys.ts (Fase C) is imported by the recovery route (single-use
+  // code redemption); compile it so the real SQL runs in the tree.
+  { source: "db/passkeys.ts", output: "db/passkeys.mjs" },
   // Auth roles + appeals (ADR 0014): db/users and db/appeals are imported by
   // the authz lib and the appeals routes; they run against the same env.DB.
   { source: "db/users.ts", output: "db/users.mjs" },
@@ -175,6 +191,14 @@ async function buildTree() {
     path.join(tree, "db", "geocode.mjs"),
     geocodeMock.replaceAll('from "../mock-state.mjs"', `from "${mockStateUrl}"`),
   );
+
+  // 5. Bare package imports: the passkey routes (t_36989e06) import
+  //    @simplewebauthn/server directly. The tree lives under the system
+  //    tmpdir where no node_modules exists, so bare specifiers cannot
+  //    resolve — symlink the repo's node_modules into the tree (Node
+  //    resolves symlinks to their real location, so the modules load from
+  //    the repo checkout; same pattern as api-harness).
+  await symlink(path.join(root, "node_modules"), path.join(tree, "node_modules"), "dir");
 
   // 5. Routes: real handlers, db/lib imports resolve inside the tree.
   for (const { source, output } of ROUTES) {
