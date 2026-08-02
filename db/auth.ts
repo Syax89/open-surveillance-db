@@ -73,7 +73,21 @@ function constantTimeEqual(first: string, second: string): boolean {
   return difference === 0;
 }
 
-async function derivePasswordKey(password: string, salt: Uint8Array<ArrayBuffer>): Promise<Uint8Array<ArrayBuffer>> {
+/**
+ * Derive the PBKDF2-SHA256 key for a password/salt pair at the given
+ * iteration count.
+ *
+ * The count is honoured as-is — hashing always passes the current
+ * PBKDF2_ITERATIONS constant, while verification passes the count embedded
+ * in the stored hash (ADR 0013). Raising the constant therefore never
+ * invalidates existing hashes: each one re-derives at its own stored count
+ * until a rehash-on-login upgrades it (AUTH_OPTIONS §8).
+ */
+async function derivePasswordKey(
+  password: string,
+  salt: Uint8Array<ArrayBuffer>,
+  iterations: number,
+): Promise<Uint8Array<ArrayBuffer>> {
   const keyMaterial = await crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(password),
@@ -86,7 +100,7 @@ async function derivePasswordKey(password: string, salt: Uint8Array<ArrayBuffer>
       name: "PBKDF2",
       hash: PBKDF2_HASH,
       salt,
-      iterations: PBKDF2_ITERATIONS,
+      iterations,
     },
     keyMaterial,
     PBKDF2_KEY_LENGTH * 8,
@@ -96,19 +110,40 @@ async function derivePasswordKey(password: string, salt: Uint8Array<ArrayBuffer>
 
 export async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(SALT_BYTES);
-  const derived = await derivePasswordKey(password, salt);
+  const derived = await derivePasswordKey(password, salt, PBKDF2_ITERATIONS);
   return `pbkdf2$${PBKDF2_ITERATIONS}$${bytesToBase64Url(salt)}$${bytesToBase64Url(derived)}`;
 }
 
 export async function verifyPassword(password: string, stored: string): Promise<boolean> {
   const parts = stored.split("$");
-  if (parts.length !== 4 || parts[0] !== "pbkdf2") return false;
-  const iterations = Number(parts[1]);
-  if (!Number.isInteger(iterations) || iterations < 1) return false;
-  const salt = base64UrlToBytes(parts[2]);
-  const expected = parts[3];
+  if (parts[0] !== "pbkdf2") return false;
+
+  let iterations: number;
+  let salt: Uint8Array<ArrayBuffer>;
+  let expected: string;
+
+  if (parts.length === 4) {
+    // Current format (ADR 0013): `pbkdf2$<iterations>$<saltB64>$<hashB64>`.
+    // The embedded count drives the derivation, so a bump of
+    // PBKDF2_ITERATIONS verifies old hashes at their own (lower) count
+    // instead of locking every contributor out.
+    const parsed = Number(parts[1]);
+    if (!Number.isInteger(parsed) || parsed < 1) return false;
+    iterations = parsed;
+    salt = base64UrlToBytes(parts[2]);
+    expected = parts[3];
+  } else if (parts.length === 3) {
+    // Legacy hashes predate the embedded iteration count
+    // (`pbkdf2$<saltB64>$<hashB64>`): fall back to the current constant.
+    iterations = PBKDF2_ITERATIONS;
+    salt = base64UrlToBytes(parts[1]);
+    expected = parts[2];
+  } else {
+    return false;
+  }
+
   try {
-    const derived = await derivePasswordKey(password, salt);
+    const derived = await derivePasswordKey(password, salt, iterations);
     return constantTimeEqual(bytesToBase64Url(derived), expected);
   } catch {
     return false;
@@ -451,17 +486,22 @@ export type NewSession = {
 /**
  * Create a session for a contributor. Returns the raw token (cookie value)
  * alongside the stored row: only the SHA-256 of the token ever reaches the
- * database. `ttlDays` defaults to 30; `now` is injectable for deterministic
- * tests.
+ * database. `ttlSeconds` is the single source of truth for session lifetime
+ * (callers pass `sessionTtlSeconds(env)` from app/lib/auth-session.ts so the
+ * DB `expires_at` always matches the cookie Max-Age — audit t_5ca60ab2, P2).
+ * `ttlDays` remains supported as a convenience and for deterministic tests;
+ * when both are given, `ttlSeconds` wins. Defaults to 30 days. `now` is
+ * injectable for deterministic tests.
  */
 export async function createSession(
   contributorId: number,
-  options: { ttlDays?: number; now?: string } = {},
+  options: { ttlDays?: number; ttlSeconds?: number; now?: string } = {},
 ): Promise<NewSession> {
   const d1 = await getD1();
   const now = options.now ?? new Date().toISOString();
-  const ttlDays = options.ttlDays ?? 30;
-  const expiresAt = new Date(Date.parse(now) + ttlDays * 24 * 60 * 60 * 1000).toISOString();
+  const ttlSeconds =
+    options.ttlSeconds ?? (options.ttlDays ?? 30) * 24 * 60 * 60;
+  const expiresAt = new Date(Date.parse(now) + ttlSeconds * 1000).toISOString();
   const rawToken = randomBase64Url(TOKEN_BYTES);
   const csrfToken = randomBase64Url(TOKEN_BYTES);
   const tokenHash = await sha256Hex(rawToken);
@@ -787,6 +827,11 @@ export async function eraseContributor(contributorId: number): Promise<ErasureRe
     // Correction reports: SET NULL, never delete (same rule as cameras).
     d1.prepare("UPDATE correction_requests SET contributor_id = NULL WHERE contributor_id = ?").bind(contributorId),
     d1.prepare("UPDATE cameras SET contributor_id = NULL WHERE contributor_id = ?").bind(contributorId),
+    // Role-identity link (audit t_5ca60ab2, P2): sever the explicit
+    // users.contributor_id mapping so the users row (an independently
+    // provisioned role identity) survives, but can no longer attribute
+    // appeals to the erased contributor.
+    d1.prepare("UPDATE users SET contributor_id = NULL WHERE contributor_id = ?").bind(contributorId),
     // Explicit session revocation, mirroring logout: after erasure no
     // session of this contributor may resolve, in every environment
     // (real D1 would cascade on contributor delete, but the test harness

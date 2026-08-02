@@ -23,6 +23,7 @@ export function roleAtLeast(role, minimum) {
 
 export const {
   getUserByEmail,
+  getUserByContributorId,
   getUserById,
   listUsers,
   setUserActive,
@@ -30,6 +31,7 @@ export const {
   getReviewerByUserId,
 } = makeMock({
   getUserByEmail: "getUserByEmail",
+  getUserByContributorId: "getUserByContributorId",
   getUserById: "getUserById",
   listUsers: "listUsers",
   setUserActive: "setUserActive",

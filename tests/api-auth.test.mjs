@@ -13,7 +13,7 @@
 
 import assert from "node:assert/strict";
 import { after, beforeEach, test } from "node:test";
-import { apiRequest, cleanupRouteTree, loadLibModule, loadRoute, responseBody } from "./helpers/api-harness.mjs";
+import { apiRequest, cleanupRouteTree, loadLibModule, loadRoute, loadTreeModule, responseBody } from "./helpers/api-harness.mjs";
 import { callArgs, resetMockState, stub } from "./helpers/mock-state.mjs";
 
 let rateLimit;
@@ -99,8 +99,11 @@ test("register creates a contributor, opens a session, and sets both cookies", a
   // The db layer received the normalised email and trimmed display name.
   const [createArgs] = callArgs("createContributor");
   assert.deepEqual(createArgs, [{ email: "ada@example.org", displayName: "Ada", password: "supersecret123" }]);
+  // The DB TTL follows the same env knob as the cookie (sessionTtlSeconds):
+  // default 30 days = 2592000 s, so expires_at and Max-Age can never diverge
+  // (audit t_5ca60ab2, P2).
   const [sessionArgs] = callArgs("createSession");
-  assert.deepEqual(sessionArgs, [7]);
+  assert.deepEqual(sessionArgs, [7, { ttlSeconds: 2592000 }]);
 
   // Cookie pair: HttpOnly session cookie + script-readable CSRF cookie.
   assert.deepEqual(cookieNames(response).sort(), ["osdb_csrf", "osdb_session"]);
@@ -115,6 +118,32 @@ test("register creates a contributor, opens a session, and sets both cookies", a
   assert.match(csrfCookie, /osdb_csrf=csrf-token-123/);
   assert.doesNotMatch(csrfCookie, /HttpOnly/);
   assert.match(csrfCookie, /SameSite=Strict/);
+});
+
+test("register propagates AUTH_SESSION_TTL_DAYS to BOTH the DB session and the cookie Max-Age (no TTL divergence)", async () => {
+  // Audit t_5ca60ab2, P2: the DB expires_at and the cookie Max-Age must
+  // derive from the same sessionTtlSeconds(env). With the knob at 7 days the
+  // db layer receives ttlSeconds 604800 and the cookie carries Max-Age=604800.
+  const envModule = await loadTreeModule("cloudflare-workers.mjs");
+  const previous = envModule.env.AUTH_SESSION_TTL_DAYS;
+  envModule.env.AUTH_SESSION_TTL_DAYS = "7";
+  try {
+    stub("createContributor", async () => contributor);
+    stub("createSession", async () => newSession);
+    const { POST } = await registerRoute();
+    const response = await POST(
+      apiRequest("/api/auth/register", {
+        method: "POST",
+        body: { email: "ada@example.org", password: "supersecret123", displayName: "Ada" },
+      }),
+    );
+    assert.equal(response.status, 201);
+    assert.deepEqual(callArgs("createSession")[0], [7, { ttlSeconds: 604800 }]);
+    const sessionCookie = findCookie(response, "osdb_session");
+    assert.match(sessionCookie, /Max-Age=604800/, "cookie Max-Age matches the DB TTL");
+  } finally {
+    envModule.env.AUTH_SESSION_TTL_DAYS = previous;
+  }
 });
 
 test("register answers 409 via the unique index, never pre-checking email existence", async () => {
@@ -481,6 +510,11 @@ test("me returns 401 without a session", async () => {
   const { GET } = await meRoute();
   const response = await GET(apiRequest("/api/auth/me"));
   assert.equal(response.status, 401);
+  assert.equal(
+    response.headers.get("cache-control"),
+    "no-store",
+    "the anonymous profile is personal-data-shaped too and must never be edge-cached (P3-3)",
+  );
   assert.equal(callArgs("findSessionByToken").length, 0, "no cookie must not touch the database");
 });
 
@@ -489,6 +523,11 @@ test("me returns 401 for an unknown or expired session token", async () => {
   const { GET } = await meRoute();
   const response = await GET(sessionRequest("/api/auth/me", "dead-token"));
   assert.equal(response.status, 401);
+  assert.equal(
+    response.headers.get("cache-control"),
+    "no-store",
+    "the anonymous profile is personal-data-shaped too and must never be edge-cached (P3-3)",
+  );
 });
 
 test("me returns 503 when the session lookup fails", async () => {

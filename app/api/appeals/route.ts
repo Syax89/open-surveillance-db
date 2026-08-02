@@ -6,7 +6,7 @@ import {
   appealStatuses,
 } from "../../../db/appeals";
 import { requireRole } from "../../lib/authz";
-import { getUserByEmail, roleAtLeast } from "../../../db/users";
+import { getUserByContributorId, roleAtLeast } from "../../../db/users";
 import { resolveOptionalContributor } from "../../lib/auth-session";
 import { csrfVerified, sameOrigin } from "../../lib/csrf";
 import { isRecord } from "../../lib/guards";
@@ -124,10 +124,14 @@ export async function POST(request: Request) {
   }
 
   // Role gate (ADR 0014): the contributor session resolves a `contributors`
-  // row; the appeal is attributed to the matching `users` identity (bridged
-  // by email at provisioning time). No users row (or an inactive one) means
-  // no role identity → 401; a role below contributor → 403.
-  const user = await getUserByEmail(session.contributor.email);
+  // row; the appeal is attributed to the matching `users` identity via the
+  // EXPLICIT `users.contributor_id` link provisioned by ops (audit
+  // t_5ca60ab2, P2). Email equality is never used to bridge the two stores —
+  // it is spoofable: registering a contributor with an email matching any
+  // users row (e.g. a moderator's) would otherwise inherit that identity's
+  // role. No linked users row (or an inactive one) means no role identity →
+  // 401; a role below contributor → 403.
+  const user = await getUserByContributorId(session.contributor.id);
   if (!user || user.active !== 1) {
     return Response.json(
       { error: "Authentication required. Log in to file an appeal." },

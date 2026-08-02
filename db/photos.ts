@@ -93,26 +93,44 @@ export async function createPendingPhoto(input: {
     httpMetadata: { contentType: input.mimeType },
   });
   const now = new Date().toISOString();
-  const result = await d1
-    .prepare(
-      `INSERT INTO photos (camera_id, contributor_id, submitter_key, storage_key, mime_type, width, height, size_bytes, status, exif_stripped, redaction_confirmed, created_at, updated_at)
-       VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, 'pending', 1, 0, ?, ?)
-       RETURNING ${photoColumns}`,
-    )
-    .bind(
-      input.contributorId ?? null,
-      input.submitterKey ?? null,
-      storageKey,
-      input.mimeType,
-      input.width,
-      input.height,
-      input.bytes.length,
-      now,
-      now,
-    )
-    .first<PhotoRecord>();
-  if (!result) throw new Error("Photo could not be stored");
-  return withoutStorageKey(result);
+  try {
+    const result = await d1
+      .prepare(
+        `INSERT INTO photos (camera_id, contributor_id, submitter_key, storage_key, mime_type, width, height, size_bytes, status, exif_stripped, redaction_confirmed, created_at, updated_at)
+         VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, 'pending', 1, 0, ?, ?)
+         RETURNING ${photoColumns}`,
+      )
+      .bind(
+        input.contributorId ?? null,
+        input.submitterKey ?? null,
+        storageKey,
+        input.mimeType,
+        input.width,
+        input.height,
+        input.bytes.length,
+        now,
+        now,
+      )
+      .first<PhotoRecord>();
+    if (!result) throw new Error("Photo could not be stored");
+    return withoutStorageKey(result);
+  } catch (error) {
+    // P1-3 (t_00e63031): the R2 object was already stored above; if the D1
+    // INSERT fails now, the object would be orphaned — no D1 row exists, so
+    // the retention sweep (which only sees D1 rows) can never reach it and
+    // the bytes would leak forever. Delete it best-effort, then rethrow so
+    // the upload still fails. The key is a fresh UUID per attempt, so a
+    // client retry starts from a clean state (idempotent retries).
+    try {
+      await env.PHOTOS.delete(storageKey);
+    } catch (cleanupError) {
+      console.error("createPendingPhoto: failed to clean up orphaned R2 object", {
+        storageKey,
+        cleanupError,
+      });
+    }
+    throw error;
+  }
 }
 
 /**

@@ -281,6 +281,14 @@ changes accumulate under `[Unreleased]`.
   (`tests/helpers/d1-sqlite.mjs`) now enforces the same 100-param cap, so a
   >100-record regression test fails on the unfixed code instead of passing
   on node:sqlite's higher SQLITE_MAX_VARIABLE_NUMBER.
+- `verifyPassword` now derives at the iteration count embedded in the stored
+  hash instead of the current `PBKDF2_ITERATIONS` constant (t_fe668331, P1-2
+  security review): bumping the constant (e.g. 210k → 600k, AUTH_OPTIONS §8)
+  no longer invalidates every existing password and locks out all
+  contributors — each hash re-derives at its own stored count (ADR 0013),
+  with a constant fallback for legacy 3-part hashes that predate the embedded
+  count. New bump-safety tests in `tests/auth-d1.test.mjs` cover hashes at
+  different iteration counts and the legacy fallback.
 
 - `/mappa` autocomplete UX (t_3c4b188e): typing a place no longer triggers
   the search immediately — the geocode suggestion dropdown (250ms debounce)
@@ -325,6 +333,13 @@ changes accumulate under `[Unreleased]`.
   once the lazy leaflet import resolves (`mapReady` flag), instead of
   early-returning at mount and never being re-triggered by a stable
   `cameras` prop (t_eb2e33a3 regression after the #202 redesign).
+- Photo uploads no longer leak orphaned R2 objects when the D1 metadata
+  INSERT fails (t_00e63031, P1-3): `createPendingPhoto` now deletes the
+  just-stored R2 object best-effort before rethrowing, so a failed upload
+  cannot leave bytes in the `PHOTOS` bucket with no D1 row (which the
+  retention sweep — D1-only — could never collect). The storage key is a
+  fresh UUID per attempt, so retries are idempotent: a failed attempt
+  leaves no object behind and the retry stores exactly one.
 
 ### Security
 
