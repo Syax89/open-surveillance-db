@@ -309,7 +309,7 @@ export async function runRetentionSweep(
           : []),
         d1
           .prepare("UPDATE cameras SET status = 'removed', updated = ? WHERE id = ?")
-          .bind("Retention: unverified past the 6-month removal window", id),
+          .bind(now, id),
         d1
           .prepare(
             "INSERT INTO moderation_events (entity, entity_id, previous_status, new_status, action, reason_code, note, actor, reviewer_id, actor_role, recused, escalated, second_reviewer_id, appeal_id, created_at) VALUES ('camera', ?, ?, 'removed', 'removed', 'inaccurate-or-outdated', ?, 'Retention sweep', NULL, NULL, 0, 0, NULL, NULL, ?)",

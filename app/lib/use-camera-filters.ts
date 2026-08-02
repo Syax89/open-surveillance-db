@@ -43,10 +43,10 @@
  * server-side filters): with a reachable API the heavy lifting happens in
  * SQL, and the memo re-applies the same predicates as a last-mile gate that
  * also keeps the demo seed fallback coherent. The freshness anchors agree:
- * the memo uses lastVerifiedAt ?? updated, the same field the server
- * freshness windows are anchored on (F0 domain decision). q and sort stay
- * client-side on purpose: the list API has no text filter yet and plan §3.3
- * leaves current-page ordering client-side.
+ * the memo uses lastVerifiedAt ?? (parseable updated), the same field the
+ * server freshness windows are anchored on (F0 domain decision). q and sort
+ * stay client-side on purpose: the list API has no text filter yet and plan
+ * §3.3 leaves current-page ordering client-side.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -101,6 +101,17 @@ export function freshnessCutoffFor(window: FreshnessWindow, now = Date.now()): n
 }
 
 /**
+ * True when a stored timestamp string actually parses as a date (P1-2).
+ * `cameras.updated` is now always ISO, but the client gate must never drop a
+ * verified record because a legacy value (old "Local moderation: ..." label,
+ * demo seed "Demo data") is not parseable — records without a freshness
+ * signal are kept (except demo-status pins, see applyCameraFilters).
+ */
+export function isParseableDate(value: string): boolean {
+  return Number.isFinite(new Date(value).getTime());
+}
+
+/**
  * Lenient URL parse (URL contract, QA t_8bc7f4e2 punto 1): invalid values
  * fall back to the safe default and NEVER throw — a malformed ?freshness=99d
  * or ?focus=abc renders the page with defaults, never a 500. Unknown params
@@ -151,10 +162,12 @@ export function serverFiltersFrom(filters: CameraFilters): ServerCameraFilters {
 /**
  * The filtering + sorting memo (moved here from the tool pages): q (client,
  * no API text filter yet), type + freshness (last-mile gate over the
- * server-filtered or seeded records — anchors on lastVerifiedAt ?? updated,
- * the server's freshness anchor), sort (client, plan §3.3). Pure and
- * side-effect free so the URL contract is unit-testable; `now` is injectable
- * so freshness-window tests are deterministic.
+ * server-filtered or seeded records — anchors on lastVerifiedAt ?? parseable
+ * updated, the server's freshness anchor; a real record with no parseable
+ * anchor is kept, never silently dropped, P1-2; demo-status pins keep the
+ * truthful empty-note contract and are excluded), sort (client, plan §3.3).
+ * Pure and side-effect free so the URL contract is unit-testable; `now` is
+ * injectable so freshness-window tests are deterministic.
  */
 export function applyCameraFilters(records: Camera[], filters: CameraFilters, now = Date.now()): Camera[] {
   const query = filters.q.trim().toLocaleLowerCase();
@@ -163,8 +176,20 @@ export function applyCameraFilters(records: Camera[], filters: CameraFilters, no
     if (query && !textMatches(camera, query)) return false;
     if (filters.type !== "all" && camera.kind !== filters.type) return false;
     if (cutoff !== null) {
-      const anchor = new Date(camera.lastVerifiedAt ?? camera.updated).getTime();
-      if (!Number.isFinite(anchor) || anchor < cutoff) return false;
+      // Freshness anchor (P1-2): prefer lastVerifiedAt; fall back to `updated`
+      // ONLY when it parses as a date. Legacy prose values (e.g. old
+      // "Local moderation: ..." labels) are never written anymore, but a real
+      // record whose anchor is not parseable must NOT be silently dropped — it
+      // has no freshness signal, so it is kept. The demo seed instead keeps
+      // its "Demo data" label and is excluded by status: illustrative pins
+      // must never masquerade as "recently verified" under a freshness window
+      // (t_b9666d09, truthful in-list empty note).
+      const rawAnchor = camera.lastVerifiedAt ?? (isParseableDate(camera.updated) ? camera.updated : undefined);
+      if (rawAnchor === undefined) {
+        if (camera.status === "demo") return false;
+        return true;
+      }
+      if (new Date(rawAnchor).getTime() < cutoff) return false;
     }
     return true;
   });
@@ -369,12 +394,21 @@ export function useCameraFilters(): UseCameraFiltersResult {
     }
     const trimmed = value.trim();
     // No-op when the committed value is unchanged (backspace to the same
-    // text must not churn the URL).
-    if (trimmed === filtersRef.current.q.trim()) return;
+    // text must not churn the URL). Compare against the RENDER-SCOPE
+    // `committed`, never filtersRef.current: the ref is refreshed in a
+    // passive effect that can lag the committed mirror by one flush cycle
+    // (V8-coverage load in CI), so an immediate clear after the debounced
+    // commit used to be misread as "unchanged" and swallowed — the empty
+    // note stayed on screen and the clear never reached applyFilters. The
+    // event handler always closes over the LATEST render's committed, so
+    // this comparison is both fresher and deterministic.
+    if (trimmed === committed.q.trim()) return;
     // Clearing the search commits immediately (no dead air on reset-like UX)
-    // — same pure-history path as the debounced commit.
+    // — same pure-history path as the debounced commit. Spread from the
+    // render-scope committed: filtersRef.current may still lag it, and a
+    // stale spread would resurrect the cleared q in the URL write.
     if (trimmed === "") {
-      applyFilters({ ...filtersRef.current, q: "" }, "history");
+      applyFilters({ ...committed, q: "" }, "history");
       return;
     }
     debounceRef.current = setTimeout(() => {

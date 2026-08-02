@@ -613,7 +613,9 @@ test("E1 real SQL: owner pending edit updates the record and records an edit_app
   assert.equal(result.kind, "direct_applied");
   assert.equal(result.record.title, "New title");
   assert.equal(result.record.notes, "Updated note");
-  assert.equal(result.record.updated, "Community edit");
+  // P1-2: an applied edit writes the injected clock into `updated`, never a
+  // prose label ("Community edit" was a non-ISO value that broke ordering).
+  assert.equal(result.record.updated, NOW);
 
   const row = await db.prepare("SELECT title, notes FROM cameras WHERE id = ?").bind(cameraId).first();
   assert.equal(row.title, "New title");

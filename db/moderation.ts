@@ -542,7 +542,7 @@ export async function runFreshnessSweep(nowIso: string = new Date().toISOString(
   for (const { id } of due.results) {
     await d1
       .prepare("UPDATE cameras SET status = 'needs_review', updated = ? WHERE id = ?")
-      .bind("Local moderation: scheduled review due", id)
+      .bind(nowIso, id)
       .run();
     await createModerationEvent(d1, {
       entity: "camera",
@@ -562,7 +562,7 @@ export async function runFreshnessSweep(nowIso: string = new Date().toISOString(
   for (const { id } of unconfirmed.results) {
     await d1
       .prepare("UPDATE cameras SET status = 'stale', updated = ? WHERE id = ?")
-      .bind("Local moderation: not re-confirmed within the review grace period", id)
+      .bind(nowIso, id)
       .run();
     await createModerationEvent(d1, {
       entity: "camera",
@@ -859,15 +859,20 @@ function getCameraTransition(
   previousStatus: string,
   action: CameraModerationAction,
 ): { newStatus: string; updated: string } | null {
+  // Every transition writes a comparable ISO timestamp into `updated` (never
+  // a human-readable label): the directory ordering and freshness windows
+  // depend on parseable values, and the descriptive text lives in the
+  // moderation event note, not in `updated` (P1-2).
+  const nowIso = new Date().toISOString();
   if (previousStatus === "pending") {
     if (action === "approve") {
-      return { newStatus: "verified", updated: new Date().toISOString() };
+      return { newStatus: "verified", updated: nowIso };
     }
     if (action === "reject") {
-      return { newStatus: "rejected", updated: "Local moderation: rejected" };
+      return { newStatus: "rejected", updated: nowIso };
     }
     if (action === "hide") {
-      return { newStatus: "removed", updated: "Local moderation: hidden from public listing" };
+      return { newStatus: "removed", updated: nowIso };
     }
   }
 
@@ -875,29 +880,29 @@ function getCameraTransition(
     if (action === "mark-stale") {
       return {
         newStatus: "needs_review",
-        updated: "Local moderation: marked stale and queued for review",
+        updated: nowIso,
       };
     }
     if (action === "hide") {
-      return { newStatus: "removed", updated: "Local moderation: hidden from public listing" };
+      return { newStatus: "removed", updated: nowIso };
     }
   }
 
   if (previousStatus === "needs_review") {
     if (action === "reverify") {
-      return { newStatus: "verified", updated: new Date().toISOString() };
+      return { newStatus: "verified", updated: nowIso };
     }
     if (action === "hide") {
-      return { newStatus: "removed", updated: "Local moderation: hidden from public listing" };
+      return { newStatus: "removed", updated: nowIso };
     }
   }
 
   if (previousStatus === "stale") {
     if (action === "reverify") {
-      return { newStatus: "verified", updated: new Date().toISOString() };
+      return { newStatus: "verified", updated: nowIso };
     }
     if (action === "hide") {
-      return { newStatus: "removed", updated: "Local moderation: hidden from public listing" };
+      return { newStatus: "removed", updated: nowIso };
     }
   }
 
@@ -1291,7 +1296,7 @@ export async function moderateCameraEdit(
            updated = ?
          WHERE id = ?`,
       )
-      .bind(id, id, id, id, id, id, id, "Local moderation: community edit applied", current.cameraId)
+      .bind(id, id, id, id, id, id, id, nowIso, current.cameraId)
       .run();
   }
 
@@ -1377,13 +1382,18 @@ async function applyCorrectionOutcome(
     .first<{ status: string }>();
   if (!record) return;
 
+  // Same P1-2 contract as the camera transitions: `updated` always carries a
+  // comparable ISO timestamp (the descriptive outcome text stays in the
+  // moderation event note), so directory ordering and freshness stay intact.
+  const nowIso = new Date().toISOString();
+
   if (outcome === "marked-stale") {
     // A credible correction sends a verified record back to needs_review while
     // it is reassessed (DATA_TRUST SLA).
     if (record.status !== "verified") return;
     await d1
       .prepare("UPDATE cameras SET status = 'needs_review', updated = ? WHERE id = ? AND status = 'verified'")
-      .bind("Local moderation: correction marked record stale", cameraId)
+      .bind(nowIso, cameraId)
       .run();
     await createModerationEvent(d1, {
       entity: "camera",
@@ -1400,7 +1410,7 @@ async function applyCorrectionOutcome(
   if (outcome === "removed") {
     await d1
       .prepare("UPDATE cameras SET status = 'removed', updated = ? WHERE id = ?")
-      .bind("Local moderation: correction outcome removed the record", cameraId)
+      .bind(nowIso, cameraId)
       .run();
     await createModerationEvent(d1, {
       entity: "camera",
@@ -1417,7 +1427,7 @@ async function applyCorrectionOutcome(
   if (outcome === "corrected") {
     await d1
       .prepare("UPDATE cameras SET updated = ? WHERE id = ?")
-      .bind("Local moderation: correction applied to record", cameraId)
+      .bind(nowIso, cameraId)
       .run();
     await createModerationEvent(d1, {
       entity: "camera",

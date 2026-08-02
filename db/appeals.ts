@@ -274,7 +274,7 @@ export async function decideAppeal(input: {
     if (appeal.entity === "camera") {
       await d1
         .prepare("UPDATE cameras SET status = 'pending', updated = ? WHERE id = ?")
-        .bind("Local moderation: appeal upheld, returned for fresh review", appeal.entityId)
+        .bind(now, appeal.entityId)
         .run();
     } else {
       await d1

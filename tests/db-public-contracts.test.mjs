@@ -316,7 +316,10 @@ test("createPendingCamera stores a private pending record with publication flags
 
   assert.equal(record.status, "pending");
   assert.equal(record.source, "Community report");
-  assert.equal(record.updated, "Submitted just now");
+  // P1-2: a fresh submission writes a comparable ISO timestamp into `updated`
+  // (the old "Submitted just now" prose label broke ordering and freshness).
+  assert.match(record.updated, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/, "a fresh submission records an ISO timestamp in updated");
+  assert.ok(Number.isFinite(new Date(record.updated).getTime()), "the submission timestamp must be parseable");
   assert.equal(record.publishManufacturer, 0);
   assert.equal(record.publishObservedOn, 0);
   assert.equal(record.address, null, "empty address is stored as null");
@@ -543,7 +546,7 @@ const cameraFixture = {
   longitude: 12.4936,
   status: "verified",
   source: "Community report",
-  updated: "Local moderation: approved and verified",
+  updated: "2026-01-15T09:30:00.000Z",
   description: "Corner traffic lights",
   createdAt: "2026-01-01T00:00:00.000Z",
 };
@@ -579,7 +582,7 @@ test("GeoJSON properties carry exactly the documented field set", async () => {
     observedOn: "2026-01-01",
     status: "verified",
     source: "Community report",
-    updated: "Local moderation: approved and verified",
+    updated: "2026-01-15T09:30:00.000Z",
     description: "Corner traffic lights",
   });
   assert.deepEqual(body.features[0].geometry, { type: "Point", coordinates: [12.4936, 41.9004] });

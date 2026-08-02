@@ -139,7 +139,10 @@ test("verified records can be marked stale and re-verified, each step recorded",
   await moderation.moderateCamera(camera.id, "approve", "verified-public-infrastructure", null);
   const stale = await moderation.moderateCamera(camera.id, "mark-stale", "inaccurate-or-outdated", "Seems gone");
   assert.equal(stale.item.status, "needs_review");
-  assert.equal(stale.item.updated, "Local moderation: marked stale and queued for review");
+  // P1-2: a non-verified transition still writes a comparable ISO timestamp
+  // into `updated` (never a prose label), so ordering and freshness stay intact.
+  assert.match(stale.item.updated, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/, "mark-stale must record an ISO 8601 timestamp, not a prose label");
+  assert.ok(Number.isFinite(new Date(stale.item.updated).getTime()), "the ISO timestamp must be parseable");
 
   const reverified = await moderation.moderateCamera(camera.id, "reverify", "verified-public-infrastructure", null);
   assert.equal(reverified.item.status, "verified");
