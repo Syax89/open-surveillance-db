@@ -394,12 +394,21 @@ export function useCameraFilters(): UseCameraFiltersResult {
     }
     const trimmed = value.trim();
     // No-op when the committed value is unchanged (backspace to the same
-    // text must not churn the URL).
-    if (trimmed === filtersRef.current.q.trim()) return;
+    // text must not churn the URL). Compare against the RENDER-SCOPE
+    // `committed`, never filtersRef.current: the ref is refreshed in a
+    // passive effect that can lag the committed mirror by one flush cycle
+    // (V8-coverage load in CI), so an immediate clear after the debounced
+    // commit used to be misread as "unchanged" and swallowed — the empty
+    // note stayed on screen and the clear never reached applyFilters. The
+    // event handler always closes over the LATEST render's committed, so
+    // this comparison is both fresher and deterministic.
+    if (trimmed === committed.q.trim()) return;
     // Clearing the search commits immediately (no dead air on reset-like UX)
-    // — same pure-history path as the debounced commit.
+    // — same pure-history path as the debounced commit. Spread from the
+    // render-scope committed: filtersRef.current may still lag it, and a
+    // stale spread would resurrect the cleared q in the URL write.
     if (trimmed === "") {
-      applyFilters({ ...filtersRef.current, q: "" }, "history");
+      applyFilters({ ...committed, q: "" }, "history");
       return;
     }
     debounceRef.current = setTimeout(() => {
