@@ -51,6 +51,23 @@ An open, non-commercial civic database for documenting **visible public surveill
   (or the administrator, for escalations) reviews a contested decision; an
   upheld appeal returns the record to the moderation queue for a fresh decision
   (ADR 0014).
+- Community verifications: signed-in contributors can confirm a public camera
+  or withdraw their confirmation via `PUT`/`DELETE` on
+  `/api/cameras/[id]/confirmation`, and every public record payload carries
+  the aggregated `confirmationCount` (ADR 0018).
+- Community trust levels derived from the contributor's verified
+  contributions, with thresholds at 0/1/5/20/50 verified records (`L0`–`L4`),
+  exposed machine-readable through the profile endpoints (`/api/auth/me`,
+  `/api/auth/me/contributions`) (ADR 0018).
+- Two-track contribution editing: `PATCH /api/cameras/[id]` updates a
+  `pending` record directly, while edits to reviewed records become a
+  moderator-approved edit request — with a private, owner-only edit page at
+  `/records/[id]/edit` (ADR 0018).
+- A paginated list of the contributor's own contributions, trust level, and
+  pending edits on the `/account` page.
+- Pre-submit duplicate gate: `POST /api/cameras` rejects a likely duplicate
+  with `409` unless the contributor explicitly sends `duplicateConfirmed:
+  true` (ADR 0019).
 - Local record lifecycle: verified → needs review → reverified or removed, with audit history.
 - Image upload for camera records with secure storage: size/MIME/dimension
   caps, magic-byte verification, mandatory EXIF/XMP/IPTC stripping (fail-closed),
@@ -96,7 +113,7 @@ The documentation is part of the project and is intended to be discussed openly.
 - [Deployment and operations](docs/DEPLOYMENT.md)
 - [Operations manual](docs/OPERATIONS.md)
 - [Local release checklist](docs/RELEASE_CHECKLIST.md)
-- [Decision records (ADR 0001–0014)](docs/decisions/)
+- [Decision records (ADR 0001–0019)](docs/decisions/)
 - [Changelog](CHANGELOG.md)
 - [Governance](GOVERNANCE.md)
 
@@ -133,19 +150,6 @@ checks, run the optional, separate demo seed:
 
 ```bash
 npm run db:seed
-```
-
-For local moderation testing, open `http://localhost:3000/moderation`. This
-route is intentionally not linked from the public prototype and has no
-production authentication yet. The local DB ships with demo identities
-(`Demo *` reviewers) only until migration `0017` is applied — the last
-migration removes them from every fresh database. Local suites that need the
-demo identities seed them explicitly in their test setup; for a real
-alpha/prod deployment, provision real moderator/admin accounts instead (see
-[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) §Provisioning real accounts):
-
-```bash
-PROVISION_ACCOUNTS='[{"email":"ada@example.org","displayName":"Ada","role":"admin","reviewerRole":"administrator"}]' npm run db:provision
 ```
 
 For a complete walkthrough of a clean local setup — prerequisites, schema
