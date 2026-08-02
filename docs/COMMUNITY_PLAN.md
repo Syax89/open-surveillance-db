@@ -1,7 +1,7 @@
 # Community system plan — piano consolidato (login, profilo contributi, livelli, verifiche)
 
-Last reviewed: 2026-08-01
-Status: **roadmap da approvare** (consolidamento dei pareri di Ricerca/Data/CTO/QA/Legal/Copy/Docs/Backend/Design)
+Last reviewed: 2026-08-02
+Status: **roadmap da approvare** (consolidamento dei pareri di Ricerca/Data/CTO/QA/Legal/Copy/Docs/Backend/Design) — § 1 aggiornato alla decisione multi-method auth ([ADR 0020](decisions/0020-multi-method-authentication.md), 2026-08-02)
 
 Questo documento è il **piano unico** del community system: login sicuro, profilo dei
 contributi, trust levels e verifiche (stelline) sui record. Consolida:
@@ -49,29 +49,61 @@ backoff, GDPR data-minimising senza identity provider terzi. Gap noti: **nessun 
 
 ### 1.3 Decisione consolidata
 
+> **Aggiornato 2026-08-02 (ADR 0020, progetto AUTH MULTI-METODO fasi A–G).** La
+> decisione sotto è la *prima* consolidazione (pareri 2026-08-01). Con il multi-method
+> auth il CEO ha deciso tre metodi con disclosure dei rischi invece di esclusioni:
+> i punti 1–3 sono rivisti in § 1.5. In sintesi: **passkey passano da "dopo" a Fase C**;
+> **OIDC terze parti passano da "esclusi" a metodo opzionale con disclosure (Fase D)**;
+> il vincolo "non esiste mailer" (punto 3) è risolto da **Cloudflare Email Routing**
+> (Fase A2) — zero nuovi processor, zero DPA.
+
 1. **Tattico, subito: harden le sessioni + TOTP opt-in.** Chiudono i due gap reali di oggi
    ("no 2FA", "sessioni con solo TTL assoluto") senza nuovi terzi, senza costi, dentro
    Workers+D1. Interventi (§7 di AUTH_OPTIONS.md): `Secure` fail-closed in produzione, idle
    timeout 14 giorni, rotazione token su privilege change, PBKDF2 → 600k con rehash on-login,
    prefisso `__Host-`, logout-all-devices, password change+reset (col futuro mailer).
+   *(Nota 2026-08-02: lo hardening sessioni resta baseline; **TOTP è deferito** — le passkey
+   coprono la stessa storia di secondo fattore con phishing-resistance strutturale, ADR 0020.)*
 2. **Strategico, dopo: passkey/WebAuthn come metodo aggiuntivo parallelo** (email+password
    resta fallback). Unica opzione strutturalmente phishing-resistant; open standard, costo
    zero, gira su Workers (SimpleWebAuthn + KV challenge store + tabella D1 `passkeys`).
    Rollout: enrollment post-login + Conditional UI; mai sostituire la password subito
-   (adoption ~36%).
+   (adoption ~36%). *(Nota 2026-08-02: **adottato come Fase C** — enrollment → 10 recovery
+   codes hashed, anti-replay counter, fallback email/PW obbligatorio.)*
 3. **Esclusi esplicitamente**: OIDC terze parti (tracking + trasferimento dati → contraddice
    ADR 0013 e PRIVACY_AND_SAFETY), IdP self-hosted (nuova superficie operativa per una sola
    app), magic link come login (richiede il mailer che non esiste e aggiunge un processor
    senza risolvere il phishing — il suo vero valore, password reset + email verification,
-   arriverà col mailer).
+   arriverà col mailer). *(Nota 2026-08-02: **superato per l'OIDC** — GitHub/Google diventano
+   metodo opzionale con disclosure (Fase D); restano esclusi IdP self-hosted e magic-link come
+   login. Vedi § 1.5.)*
 
 ### 1.4 Impatto sul community system
 
 Il community system **non dipende** dalla scelta login: poggia su `contributors.id` + sessioni
 esistenti (ADR 0013). Requisito per il futuro: **qualsiasi login scelto deve produrre un
-`contributors.id`** (colonna `auth_provider`/`external_id` nullable in migrazione futura), mai
+`contributors.id`** (colonne `auth_provider` + `external_sub` + `email_verified_at` nullable
+nella migrazione multi-auth, ADR 0020/Fase A), mai
 un terzo layer. L'hardening sessioni è ortogonale e può procedere in parallelo; se atterra
 nella stessa finestra, `auth-flow-e2e.test.mjs` va esteso nella stessa PR.
+
+### 1.5 Decisione multi-method auth (2026-08-02, ADR 0020)
+
+Il progetto **AUTH MULTI-METODO** (fasi A–G, kanban) implementa la scelta multi-method
+registrata in [ADR 0020](decisions/0020-multi-method-authentication.md). Rispetto a § 1.2/1.3:
+
+| Metodo | Fase | Note |
+|---|---|---|
+| **email+password con verifica** | A (schema), A2 (mailer Cloudflare Email Routing `opensurveillancedb.org`), B (register→token→email→sessione read-only finché non verificato; verify-email 200/400/410; re-send rate-limited; password reset) | Verifica email **obbligatoria per write access**: `resolveVerifiedContributor()` → 401 anonimo / 403 non verificato (Fase E1). Token SHA-256 single-use 24h; 3 email/h per contributor. |
+| **passkey/WebAuthn** | C | `@simplewebauthn/server` (MIT), challenge store con expiry, tabella D1 `passkeys` (credential_id UNIQUE, public_key, counter) + anti-replay; enrollment → 10 recovery codes (hash); fallback email/PW obbligatorio. |
+| **OIDC GitHub/Google** | D | **Opt-in per account**, PKCE + discovery, account linking `auth_provider`+`external_sub` → contributor; conflitto email → merge manuale; **nessuna email importata dal provider** (solo sub + verified flag); client id/secret in GPG. Rischi dichiarati in UI (matrice rischi, Fase E2), privacy notice e terms: tracking provider (vede login e IP) + trasferimento US (EU–US DPF). |
+| UX trasparenza | E2 | `/login` con 3 metodi + matrice rischi esplicita per metodo (phishing-resistance, tracking, dipendenza da device). |
+
+**Impatto su questo piano:** le conferme/stelline restano ancorate ai livelli (§ 3.1: L1 = ≥1
+contributo verificato); il *write gate* per le segnalazioni usa invece la **verifica email**
+(E1, ADR 0020 § 2) — i due gate sono separati (vedi note a § 3.2 e § 8.3). L'erasure (R7) si
+estende ai nuovi dati di autenticazione: token, passkey e recovery codes hard-deleted, `external_sub`
+pulito (RETENTION_SCHEDULE R15; PRIVACY_NOTICE § 10).
 
 ---
 
@@ -173,7 +205,10 @@ L3–L4→Experienced. I test i18n/a11y dei badge si scrivono su questo mapping.
 - **L0**: può segnalare e navigare; conferme registrate ma peso 0 (non alimentano lo score);
   toggle UI disabilitato con copy esplicativo.
 - **L1+**: conferme con peso pieno; "può confermare" (gate anti-gaming: **≥1 contributo
-  verificato = L1, MAI email verification** — non esiste mailer, ADR 0013).
+  verificato = L1 — la verifica email NON è il gate delle conferme**; nota 2026-08-02: il
+  mailer ora esiste (Fase A2) e la verifica email è requisito del *write access* per le
+  segnalazioni (Fase E1, ADR 0020 § 2), ma il gate L1 delle conferme resta ancorato ai
+  contributi verificati).
 - **L2+**: peso 1.5; segnalazioni abuso con priorità.
 - **L3+**: peso 2.0; abuso bypassa soglie di rimozione più basse.
 - **L4**: peso 3.0. **Community verification path (L4) NON in alpha** — flag per ADR separata
@@ -296,6 +331,16 @@ non discriminatori; se un domani condizionasse diritti legali → valutazione 13
 | `docs/legal/LAWFUL_BASIS.md` | LIA §3.1 aggiornato (interesse: riconoscimento/verifica comunitaria; impatto basso se opt-in e pseudonimo; salvaguardie) |
 | Mini-informativa register | Riga "il tuo profilo e le tue conferme possono essere pubblici" |
 | `docs/decisions/0018-…` | **Nuovo ADR** (conferme + livelli + editing + doppia identità contributors/users) prima del codice |
+
+**Estensione 2026-08-02 (AUTH MULTI-METODO, ADR 0020):**
+
+| Documento | Azione |
+|---|---|
+| `docs/decisions/0020-multi-method-authentication.md` | **Nuovo ADR 0020** (multi-method auth: email+verifica, passkey, OIDC GitHub/Google opzionale) — aggiorna ADR 0013; AUTH_OPTIONS/COMMUNITY_PLAN/PRIVACY_AND_SAFETY allineati |
+| `docs/legal/PRIVACY_NOTICE.md` → **v0.10** | Nuova sezione **§ 3.1 "How you authenticate"** (3 metodi; passkey vendor note; OIDC tracking disclosure); righe § 3 (token verifica, passkey, recovery codes, attributi OIDC — mai email); § 5 GitHub/Google condizionali + Cloudflare Email Routing; § 6 trasferimenti (OIDC US/DPF, sync passkey); § 7 R15; § 10 gate attivazione OIDC |
+| `docs/TERMS_OF_USE.md` → **v0.6** | **§ 3.7 metodi di autenticazione**: verifica email obbligatoria per write access (sessione read-only finché non verificata); passkey vendor note; OIDC opt-in + tracking disclosure; § 15 open item gate OIDC |
+| `docs/legal/PROCESSOR_REGISTER.md` | PR1 esteso a **Cloudflare Email Routing** (zero nuovi terzi: stessa DPA); **PR5/PR6 GitHub/Google condizionali** (dormienti finché OIDC non attivato: DPA + EU–US DPF; nessuna email importata) |
+| `docs/legal/RETENTION_SCHEDULE.md` | **R15 — dati autenticazione**: token verifica 24 h single-use; passkey/recovery codes finché account attivo, hard-delete all'erasure |
 
 ---
 
@@ -423,7 +468,8 @@ Fonte: Grace (t_45ff2bfd) + pattern FRONTEND_PLAN §7.
 
 - Utente X modifica contributo di Y → 403 anche con id manipolato; X moderatore → 403 (tranne
   se owner).
-- Stelline da account nuovi → gate L1 (≥1 contributo verificato); MAI email verification.
+- Stelline da account nuovi → gate L1 (≥1 contributo verificato). La verifica email è un
+  requisito di *write access* separato (Fase E1, ADR 0020 § 2), non del gate conferme.
 - Editing verified → re-moderation; una riga open per entità (`moderation_queue_open_unique`);
   approve idempotente.
 - Confidence score: division-by-zero (0 conferme + 0 rimozioni → NaN) test esplicito.
@@ -461,4 +507,7 @@ Fonte: Grace (t_45ff2bfd) + pattern FRONTEND_PLAN §7.
    funzionale ma la feature community è visibile solo a backend completo.
 3. **AUTH_OPTIONS sequencing**: harden sessioni + TOTP (tattico) prima di passkey
    (strategico); il community system non ne dipende, ma la guida "come registrarsi" va
-   riallineata alla scelta finale.
+   riallineata alla scelta finale. → **Risolto 2026-08-02 (ADR 0020):** multi-method con
+   verifica email (Fase A2/B) + passkey (Fase C) + OIDC GitHub/Google opzionale (Fase D);
+   TOTP deferito; la guida "come registrarsi" si allinea alla pagina `/login` a 3 metodi
+   (Fase E2).

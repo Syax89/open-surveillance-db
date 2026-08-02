@@ -1,10 +1,14 @@
 # AUTH_OPTIONS.md — Authentication options for contributor accounts
 
-- **Status:** research / decision support — nothing in this document is implemented yet
+- **Status:** research deliverable (2026-08-01) — **recommendations superseded by
+  [ADR 0020](decisions/0020-multi-method-authentication.md)** (multi-method auth,
+  accepted 2026-08-02). Kept as the background analysis; the research itself remains
+  valid, the *decisions* are recorded in ADR 0020. Nothing in this document is
+  implementation status.
 - **Date:** 2026-08-01
 - **Author:** Ken (Security / DevOps)
 - **Scope:** optional secure login upgrades for the existing contributor-account system (ADR 0013)
-- **Related:** `docs/PRIVACY_AND_SAFETY.md`, `docs/SECURITY.md`, ADR 0013 (contributor accounts and sessions), ADR 0016 (account lockout), ADR 0014 (auth roles and appeals)
+- **Related:** `docs/PRIVACY_AND_SAFETY.md`, `docs/SECURITY.md`, ADR 0013 (contributor accounts and sessions), ADR 0016 (account lockout), ADR 0014 (auth roles and appeals), **ADR 0020 (multi-method authentication — the decision this research fed into)**
 
 ## 1. What exists today (baseline)
 
@@ -146,4 +150,30 @@ Against the OWASP Session Management Cheat Sheet, the current implementation is 
 
 ---
 
-*Cost and adoption figures (FIDO Alliance Passkey Index, Hanko pricing, OWASP cheat sheets) are as of 2026-08 and may drift; re-verify before a final ADR. This document is a research deliverable, not a decision — a follow-up ADR should record the chosen option and its consequences.*
+## 10. Decision (2026-08-02) — multi-method auth adopted (ADR 0020)
+
+This research document was the input to a decision that **partially reverses
+the recommendations in § 9**. The AUTH MULTI-METODO roadmap (phases A–G) was
+approved and the decision is recorded in
+[ADR 0020](decisions/0020-multi-method-authentication.md) (accepted
+2026-08-02). How the options map to the adopted decision:
+
+| Option (this doc) | Verdict here | Adopted decision (ADR 0020) |
+|---|---|---|
+| § 3 Passkeys / WebAuthn | recommended, strategic | **Adopted as method 2** (optional, parallel). Enrollment → 10 hashed recovery codes; email+password stays the mandatory fallback (~36 % adoption). Fase C. |
+| § 4a OIDC third-party (GitHub/Google) | **not recommended** | **Adopted as method 3 — opt-in only**, with the risks this document identified turned into disclosures instead of exclusions: provider tracking surface and EU–US DPF transfer are declared in the login UI risk matrix, privacy notice § 3.1/§ 5/§ 6 and terms; processors PR5/PR6 stay **conditional** until a DPA + DPF activation gate passes. No email is imported from the provider (subject id + verified flag only). Fase D. |
+| § 4b OIDC self-hosted | overkill | Still rejected — unchanged. |
+| § 5 Magic link / email OTP | not a login path | Still rejected **as a login path** — but its companion value is adopted: **email verification and password reset** now run on Cloudflare Email Routing (`opensurveillancedb.org`), which adds **zero new processors** (Cloudflare is already PR1). Fase A2/B. |
+| § 6 TOTP 2FA | recommended tactical | **Deferred** — passkeys cover the same local-second-factor story with structural phishing resistance; TOTP can be layered later without a new ADR. |
+| § 7 Session hardening | recommended tactical | Baseline, unchanged and partly already landed (PBKDF2 embedded iterations, P1-2). |
+
+Consequences for this document's stated gaps: **email verification and
+password reset now exist** (gap 1 closed by the mailer), the phishing-resistant
+method is now available (gap 5), and the "no third-party identity providers"
+posture is amended to "no third-party identity provider *by default* — OIDC is
+an opt-in, disclosed method" (gap 5/GDPR row in § 8: the tracking surface is
+declared, not hidden).
+
+---
+
+*Cost and adoption figures (FIDO Alliance Passkey Index, Hanko pricing, OWASP cheat sheets) are as of 2026-08 and may drift; re-verify before relying on them. This document is the research deliverable behind ADR 0020 — the decision and its consequences are recorded there, not here.*
