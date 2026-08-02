@@ -22,4 +22,12 @@ export const env = {
   POST_SUBMISSIONS_DISABLED: "false",
   SEARCH_RATE_LIMIT_MAX: "1000000",
   SEARCH_RATE_LIMIT_WINDOW_SECONDS: "60",
+  // WebAuthn relying-party identity (multi-method auth Fase C, t_36989e06):
+  // the routes read WEBAUTHN_* via webauthnRpConfig(). The test origin
+  // matches apiRequest()'s https://osdb.test; rpID localhost keeps the
+  // ceremony verification deterministic (verification itself is stubbed at
+  // route level, covered for real in the WebAuthn conformance story).
+  WEBAUTHN_RP_ID: "localhost",
+  WEBAUTHN_RP_NAME: "OpenSurveillanceDB",
+  WEBAUTHN_ORIGIN: "https://osdb.test",
 };

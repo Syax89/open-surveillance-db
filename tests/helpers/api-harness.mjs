@@ -13,7 +13,7 @@
 //
 // Every test gets a fresh temp tree so module instances never share state.
 
-import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -44,6 +44,15 @@ const ROUTES = [
   { source: "app/api/auth/me/submissions/route.ts", output: "app/api/auth/me/submissions/route.mjs" },
   { source: "app/api/auth/me/contributions/route.ts", output: "app/api/auth/me/contributions/route.mjs" },
   { source: "app/api/auth/account/route.ts", output: "app/api/auth/account/route.mjs" },
+  // Multi-method auth Fase C (t_36989e06): passkey ceremonies, recovery
+  // codes and passkey management. The [id]-less credentials route exports
+  // GET (list) + DELETE (remove).
+  { source: "app/api/auth/passkey/register/begin/route.ts", output: "app/api/auth/passkey/register/begin/route.mjs" },
+  { source: "app/api/auth/passkey/register/complete/route.ts", output: "app/api/auth/passkey/register/complete/route.mjs" },
+  { source: "app/api/auth/passkey/login/begin/route.ts", output: "app/api/auth/passkey/login/begin/route.mjs" },
+  { source: "app/api/auth/passkey/login/complete/route.ts", output: "app/api/auth/passkey/login/complete/route.mjs" },
+  { source: "app/api/auth/passkey/credentials/route.ts", output: "app/api/auth/passkey/credentials/route.mjs" },
+  { source: "app/api/auth/recovery/route.ts", output: "app/api/auth/recovery/route.mjs" },
   { source: "app/api/photos/route.ts", output: "app/api/photos/route.mjs" },
   { source: "app/api/photos/[id]/route.ts", output: "app/api/photos/[id]/route.mjs" },
   // Contributor appeals (ADR 0014): POST/GET on the collection, PATCH on the
@@ -88,6 +97,13 @@ let builtTreePromise = null;
 async function buildTree() {
   const tree = await mkdtemp(path.join(coverageTreeRoot(), "osdb-routes-"));
 
+  // The passkey routes (t_36989e06) are the first to import a bare package
+  // (@simplewebauthn/server) from a handler. The tree lives under the system
+  // tmpdir where no node_modules exists, so bare specifiers cannot resolve —
+  // symlink the repo's node_modules into the tree (Node resolves symlinks to
+  // the real path, so package-internal imports keep working too).
+  await symlink(path.join(root, "node_modules"), path.join(tree, "node_modules"), "dir");
+
   // Mirror the mocked db modules at the same relative depth the routes
   // expect (tmp/db/cameras.mjs etc.). The mock modules import the shared
   // state via a relative path that no longer holds after the copy, so the
@@ -96,7 +112,7 @@ async function buildTree() {
   const mocksDir = path.join(root, "tests", "helpers", "mocks");
   const mockStateUrl = pathToFileURL(path.join(root, "tests", "helpers", "mock-state.mjs")).href;
   await mkdir(path.join(tree, "db"), { recursive: true });
-  for (const mockName of ["cameras", "camera-edits", "corrections", "geocode", "moderation", "auth", "users", "photos", "appeals", "confirmations"]) {
+  for (const mockName of ["cameras", "camera-edits", "corrections", "geocode", "moderation", "auth", "users", "photos", "appeals", "confirmations", "passkeys"]) {
     const source = await readFile(path.join(mocksDir, `${mockName}.mjs`), "utf8");
     await writeFile(
       path.join(tree, "db", `${mockName}.mjs`),
