@@ -65,12 +65,20 @@ before(async () => {
   installFetchMock(() => jsonResponse({ records: [], total: 0, nextOffset: null }));
 });
 
-afterEach(() => {
+afterEach(async () => {
   rtl?.cleanup();
   __resetPublicCamerasCache();
   // Reset the navigation stub: URL shell empty, pathname back to the
   // fallback, router.push/replace logs cleared.
   setNavState({ pushed: [], replaced: [], replaceCalls: [], search: "", pathname: "/" });
+  // Reset the leaflet recording stub (markers, maps AND the viewport
+  // bounds — t_b9666d09): the geocode tests shrink the viewport to assert
+  // the pan landing; a stale narrow viewport leaking into the next test
+  // would silently filter its list (records outside the leftover bounds
+  // disappear). Every test must start whole-world. AWAITED: the helper is
+  // async (module load), and skipping the await lets the next test race
+  // the bounds restore under a slow/instrumented runner (coverage).
+  await resetLeafletMarkers();
 });
 
 // ---------------------------------------------------------------------------
@@ -158,10 +166,11 @@ test("MappaTool renders the map tool shell with the shared FiltersBar and the vi
   assert.ok(screen.queryByRole("heading", { name: "Explore documented cameras" }) === null, "no duplicated section heading on /mappa");
   assert.ok(screen.getByText("Prototype mode.").closest(".prototype-banner-compact"), "the prototype banner is the compact variant");
   assert.ok(screen.getByLabelText("Camera type").closest(".map-card"), "the FiltersBar row is attached to the map card");
-  // The search moved into the sidebar column (t_702c10af): the FiltersBar
-  // row keeps kind/freshness/sort/reset, the search lives at the top of the
-  // left column — exactly ONE search control on the page.
-  assert.ok(screen.getByLabelText("Filter the points in the current view"), "sidebar search at the top of the left column");
+  // The search moved into the sidebar column (t_702c10af); it is now
+  // DUAL-FUNCTION (t_b9666d09): it filters the viewport points AND suggests
+  // places through the geocoder (combobox). The FiltersBar row keeps
+  // kind/freshness/sort/reset — exactly ONE search control on the page.
+  assert.ok(screen.getByLabelText("Filter the points in the current view or search a place"), "sidebar search at the top of the left column");
   assert.ok(screen.queryByLabelText("Search the public directory") === null, "no duplicated FiltersBar search on /mappa");
   assert.ok(screen.getByLabelText("Camera type"), "shared FiltersBar kind filter");
 
@@ -189,37 +198,48 @@ test("MappaTool kind filter narrows the sidebar list and the markers", async () 
   assert.match(screen.getByText(/1 public record found/).textContent, /1 public record found/);
 });
 
-test("MappaTool freshness filter on the demo seed yields the truthful empty state with a clear action", async () => {
+test("MappaTool freshness filter on the demo seed keeps the map rendered and shows the truthful in-list empty note with a clear action", async () => {
   const { screen } = rtl;
   const user = rtl.userEvent.setup();
   await renderWithLocale(React.createElement(MappaTool));
 
   // The prototype seed has no finite freshness date ("Demo data"), so any
-  // freshness window filters everything out — never a silent empty map.
+  // freshness window filters everything out. Map-always-visible contract
+  // (t_b9666d09): the map and the sidebar STAY rendered — the truthful
+  // empty state moves INSIDE the list as a note with a clear action, it
+  // never replaces the map.
   await user.selectOptions(screen.getByLabelText("Record freshness"), "7d");
 
-  assert.ok(screen.getByRole("heading", { name: "No published record matches those filters." }), "truthful empty state");
-  assert.ok(screen.getByRole("button", { name: /Clear filters/ }), "empty state offers a clear action");
-  // The compact prototype banner is map-contextual (t_966254a1): when no
-  // record matches, the map is replaced by the truthful empty state and the
-  // banner about the illustrative pins must not render.
-  assert.ok(screen.queryByText("Prototype mode.") === null, "no prototype banner over the empty state");
+  // The map region is still on the page (never replaced by an empty state).
+  assert.ok(screen.getByRole("region", { name: "Interactive OpenStreetMap map" }), "the map stays rendered with zero matching records");
+  // The sidebar keeps the search + the list header, and the in-list note
+  // carries the truthful wording and the clear action.
+  assert.ok(screen.getByLabelText("Filter the points in the current view or search a place"), "the sidebar search stays rendered");
+  assert.ok(screen.getByText("No published record matches those filters."), "truthful in-list empty note");
+  assert.ok(screen.getByText(/This does not mean that there are no cameras/), "the note never implies an area has no surveillance");
+  assert.ok(screen.getByRole("button", { name: /Clear filters/ }), "the in-list note offers a clear action");
+  // The compact prototype banner is map-contextual (t_966254a1): it
+  // describes the illustrative pins, so with zero matching records it must
+  // not render.
+  assert.ok(screen.queryByText("Prototype mode.") === null, "no prototype banner with zero matching records");
 
   await user.click(screen.getByRole("button", { name: /Clear filters/ }));
   assert.ok(screen.getByRole("button", { name: /Illustrative record A/ }), "clearing restores the records to the list");
 });
 
-test("MappaTool deep link applies the seeded URL filters fully (type + freshness, demo seed → truthful empty state)", async () => {
+test("MappaTool deep link applies the seeded URL filters fully (type + freshness, demo seed → in-list empty note, map kept)", async () => {
   setNavState({ search: "type=Traffic monitoring&freshness=7d" });
   const { screen } = rtl;
   await renderWithLocale(React.createElement(MappaTool));
 
   // F4 (useCameraFilters): the URL is no longer just a shell — the deep link
   // seeds kind AND applies the derived freshness cutoff. The demo seed has
-  // no finite freshness date ("Demo data"), so the truthful empty state
-  // shows instead of a half-applied shell, and the select reflects the URL.
+  // no finite freshness date ("Demo data"), so the truthful in-list empty
+  // note shows instead of a half-applied shell — and, per the
+  // map-always-visible contract (t_b9666d09), the map itself stays.
   assert.equal(screen.getByLabelText("Record freshness").value, "7d", "?freshness= seeds the select");
-  assert.ok(screen.getByRole("heading", { name: "No published record matches those filters." }), "deep link fully applies the seeded filters");
+  assert.ok(screen.getByRole("region", { name: "Interactive OpenStreetMap map" }), "the map stays rendered on a deep link with zero matching records");
+  assert.ok(screen.getByText("No published record matches those filters."), "deep link fully applies the seeded filters (in-list note)");
 });
 
 // Marker/popup contract (t_702c10af): the API mock returns the two seed
@@ -359,6 +379,160 @@ test("MappaTool zoom/pan updates the list to the points in the new viewport (deb
   await waitFor(() => assert.ok(screen.getByText("Showing all 2 points in the current view")));
   assert.ok(screen.getByRole("button", { name: /Illustrative record B/ }));
   installEmptyMock();
+});
+
+// ---------------------------------------------------------------------------
+// /mappa — geocode autocomplete + map-always-visible (t_b9666d09)
+// ---------------------------------------------------------------------------
+
+// Combined fetch mock: the cameras API returns the two seed records, the
+// geocode proxy returns the Ferrara suggestions (fictitious places).
+const installGeocodeMock = (geocodePayload) => installFetchMock((input) => {
+  if (String(input).startsWith("/api/geocode")) return jsonResponse(geocodePayload);
+  return jsonResponse(fakeCamerasPayload(POPUP_RECORDS));
+});
+const FERRARA_SUGGESTIONS = {
+  results: [
+    { display_name: "Ferrara, Emilia-Romagna, Italia", lat: 44.838124, lng: 11.619791, type: "administrative", boundingbox: ["44.7198493", "44.9637886", "11.5109915", "11.8870544"] },
+    { display_name: "Via del Duomo, Ferrara, Italia", lat: 44.8355, lng: 11.619, type: "road", boundingbox: ["44.83", "44.84", "11.61", "11.63"] },
+  ],
+};
+
+test("MappaTool geocode autocomplete suggests places in a combobox; keyboard selection pans the map and clears the local filter", async () => {
+  installGeocodeMock(FERRARA_SUGGESTIONS);
+  await resetLeafletMarkers();
+  const { screen, waitFor } = rtl;
+  const user = rtl.userEvent.setup();
+  await renderWithLocale(React.createElement(MappaTool));
+
+  const input = screen.getByRole("combobox", { name: /Filter the points in the current view or search a place/ });
+  assert.equal(input.getAttribute("aria-expanded"), "false", "the combobox starts collapsed");
+
+  // Typing a query that does not match any local point opens the geocode
+  // dropdown after the ~300ms debounce (the map itself stays rendered).
+  await user.type(input, "Ferrara");
+  const listbox = await waitFor(() => screen.getByRole("listbox", { name: "Place suggestions" }), { timeout: 5000 });
+  assert.equal(input.getAttribute("aria-expanded"), "true", "typing expands the combobox");
+  assert.ok(input.getAttribute("aria-controls") !== null, "aria-controls points at the listbox while open");
+  // Scoped to the listbox: the FiltersBar selects also carry native
+  // <option> elements, so getAllByRole("option") must not count them.
+  const options = rtl.within(listbox).getAllByRole("option");
+  assert.equal(options.length, 2);
+  assert.match(options[0].textContent, /Ferrara, Emilia-Romagna, Italia/);
+  assert.match(options[1].textContent, /Via del Duomo/);
+
+  // Keyboard: ArrowDown highlights the first option (aria-activedescendant
+  // follows), Enter selects it — the combobox pattern.
+  await user.keyboard("{ArrowDown}");
+  assert.equal(options[0].getAttribute("aria-selected"), "true", "ArrowDown highlights the first option");
+  assert.equal(input.getAttribute("aria-activedescendant"), "geocode-option-0");
+  await user.keyboard("{Enter}");
+
+  // Selection: the dropdown closes, the input keeps the chosen display
+  // name, and the LOCAL point filter (?q=) is cleared so the list can
+  // follow the new viewport unfiltered.
+  assert.equal(input.getAttribute("aria-expanded"), "false", "selection closes the dropdown");
+  assert.equal(input.value, "Ferrara, Emilia-Romagna, Italia", "the input keeps the chosen place name");
+  const nav = await getNavState();
+  assert.ok(!nav.replaced.at(-1).includes("q="), "selecting a place clears the local point filter");
+
+  // The map panned to the place: setView([lat,lng], zoom ≥ 15).
+  const leaflet = await loadDomModule("node_modules/leaflet/index.mjs");
+  await waitFor(() => assert.ok(leaflet.__maps.length > 0));
+  const map = leaflet.__maps.at(-1);
+  const lastView = map.views.at(-1);
+  assert.deepEqual(lastView.center, [44.838124, 11.619791], "the map pans to the selected place");
+  assert.ok(lastView.zoom >= 15, "the pan zooms to at least 15");
+
+  // Simulate the pan landing (new viewport bounds) → the list follows the
+  // viewport and the first point in view is focused ("focus sul primo
+  // punto se presente"). The new bounds contain only record B, so the
+  // selection must move from A to B.
+  leaflet.__setBounds({
+    getSouth: () => 41.9, getNorth: () => 41.95,
+    getWest: () => 12.5, getEast: () => 12.52,
+    contains: () => true,
+  });
+  for (const handler of map.handlers["moveend zoomend"] ?? []) handler();
+  // Wait for the pan to land AND the focus effect to select the first
+  // visible point: the list-update render and the onSelect(…[0].id) effect
+  // commit in sequence, so asserting outside the waitFor would race the
+  // second render (flaky in the full suite, deterministic alone).
+  await waitFor(() => {
+    assert.ok(screen.getByText("Showing 1 of 2 points in the current view"));
+    assert.equal(screen.getByRole("button", { name: /Illustrative record B/ }).getAttribute("aria-current"), "true", "the first visible point is focused after the pan");
+  }, { timeout: 3000 });
+  // The new bounds contain only record B — record A is OUTSIDE the new
+  // viewport and must leave the list (the sidebar follows the map).
+  assert.ok(screen.queryByRole("button", { name: /Illustrative record A/ }) === null, "records outside the new viewport leave the list");
+  installEmptyMock();
+});
+
+test("MappaTool geocode dropdown closes on Escape and on click outside", async () => {
+  installGeocodeMock(FERRARA_SUGGESTIONS);
+  const { screen, waitFor } = rtl;
+  const user = rtl.userEvent.setup();
+  await renderWithLocale(React.createElement(MappaTool));
+
+  const input = screen.getByRole("combobox", { name: /Filter the points in the current view or search a place/ });
+  await user.type(input, "Ferrara");
+  await waitFor(() => assert.ok(screen.getByRole("listbox", { name: "Place suggestions" })), { timeout: 5000 });
+  assert.equal(input.getAttribute("aria-expanded"), "true");
+
+  await user.keyboard("{Escape}");
+  assert.equal(input.getAttribute("aria-expanded"), "false", "Escape closes the dropdown");
+  assert.ok(screen.queryByRole("listbox") === null, "the listbox is removed on close");
+
+  // Clicking outside the search wrapper closes the dropdown again.
+  await user.type(input, "a");
+  await waitFor(() => assert.ok(screen.getByRole("listbox", { name: "Place suggestions" })), { timeout: 5000 });
+  rtl.fireEvent.mouseDown(document.body);
+  assert.equal(input.getAttribute("aria-expanded"), "false", "click outside closes the dropdown");
+  installEmptyMock();
+});
+
+test("MappaTool geocode autocomplete shows honest no-results and unavailable states", async () => {
+  // No place matches the query → the dropdown states it, with attribution.
+  installGeocodeMock({ results: [] });
+  const { screen, waitFor } = rtl;
+  const user = rtl.userEvent.setup();
+  await renderWithLocale(React.createElement(MappaTool));
+  const input = screen.getByRole("combobox", { name: /Filter the points in the current view or search a place/ });
+
+  await user.type(input, "Xyzzy");
+  await waitFor(() => assert.ok(screen.getByText("No results for “Xyzzy”")), { timeout: 5000 });
+  assert.ok(screen.getByText("Places © OpenStreetMap contributors"), "the dropdown keeps the ODbL attribution");
+
+  // The geocoder fails (503) → an honest "unavailable" note, never a
+  // fabricated "no places" claim; the local filter and the map keep working.
+  installFetchMock((input) => {
+    if (String(input).startsWith("/api/geocode")) return jsonResponse({ error: "unavailable" }, { status: 503 });
+    return jsonResponse(fakeCamerasPayload(POPUP_RECORDS));
+  });
+  rtl.fireEvent.change(input, { target: { value: "Roma" } });
+  await waitFor(() => assert.ok(screen.getByText("Place search is temporarily unavailable.")), { timeout: 5000 });
+  assert.ok(screen.getByRole("region", { name: "Interactive OpenStreetMap map" }), "a geocoder failure never breaks the map");
+  installEmptyMock();
+});
+
+test("MappaTool text search with no matching record keeps the map rendered (in-list note, map-always-visible)", async () => {
+  const { screen, fireEvent } = rtl;
+  const user = rtl.userEvent.setup();
+  // Whole-world viewport, deterministic start (t_b9666d09): a leftover
+  // narrow viewport from a previous test would silently hide record A.
+  await resetLeafletMarkers();
+  await renderWithLocale(React.createElement(MappaTool));
+
+  // A query that matches no local point empties ONLY the list (the map and
+  // the sidebar stay); the truthful in-list note offers the clear action.
+  await user.type(screen.getByLabelText("Filter the points in the current view or search a place"), "no-such-camera");
+  await rtl.waitFor(() => assert.ok(screen.getByText("No published record matches those filters.")), { timeout: 5000 });
+
+  assert.ok(screen.getByRole("region", { name: "Interactive OpenStreetMap map" }), "the map stays rendered after a no-match search");
+  assert.ok(screen.getByRole("button", { name: /Clear filters/ }), "the in-list note offers the clear action");
+
+  fireEvent.change(screen.getByLabelText("Filter the points in the current view or search a place"), { target: { value: "" } });
+  await rtl.waitFor(() => assert.ok(screen.getByRole("button", { name: /Illustrative record A/ }), "clearing restores the records"), { timeout: 5000 });
 });
 
 // ---------------------------------------------------------------------------

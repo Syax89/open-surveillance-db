@@ -56,11 +56,23 @@ export const en = {
   offlineBody: "Showing the last loaded records.",
   offlineAction: "Try again",
   // Viewport-synced sidebar list (/mappa redesign, t_702c10af): the left
-  // column shows only the points inside the current map view.
-  listSearchLabel: "Filter the points in the current view",
-  listSearchPlaceholder: "Search by title, address or type",
+  // column shows only the points inside the current map view. The search
+  // field is DUAL-FUNCTION (t_b9666d09): it filters those points by
+  // title/address/type as before AND, while typing, suggests places through
+  // the same-origin Nominatim geocoder (/api/geocode) in a dropdown below
+  // the field. Selecting a suggestion pans the map to the place; the list
+  // then follows the new viewport.
+  listSearchLabel: "Filter the points in the current view or search a place",
+  listSearchPlaceholder: "Search a place or filter the points in view",
   listSearchHelp:
-    "The list shows only the points inside the current map view. Searching filters those points by title, address or type; moving or zooming the map updates the list.",
+    "The list shows only the points inside the current map view. Searching filters those points by title, address or type and suggests matching places from OpenStreetMap below the field; picking a place moves the map there.",
+  // Geocode autocomplete dropdown (t_b9666d09): the listbox under the
+  // sidebar search field. Attribution is required by the ODbL for
+  // Nominatim-derived place data (see docs/OSM_INTEGRATION.md §8).
+  geocodeLabel: "Place suggestions",
+  geocodeNoResults: (query: string) => `No results for “${query}”`,
+  geocodeAttribution: "Places © OpenStreetMap contributors",
+  geocodeUnavailable: "Place search is temporarily unavailable.",
   listTitle: "Points in the current view",
   listMapSyncHelp: "The list updates as you move or zoom the map: zoom in to narrow it, zoom out to widen it.",
   listCount: (visible: number, total: number) =>
@@ -126,11 +138,23 @@ export const it: Translation<typeof en> = {
   offlineBody: "Mostriamo gli ultimi record caricati.",
   offlineAction: "Riprova",
   // Elenco laterale sincronizzato col viewport (redesign /mappa, t_702c10af):
-  // la colonna sinistra mostra solo i punti dentro la vista corrente.
-  listSearchLabel: "Filtra i punti nella vista corrente",
-  listSearchPlaceholder: "Cerca per titolo, indirizzo o tipo",
+  // la colonna sinistra mostra solo i punti dentro la vista corrente. Il
+  // campo di ricerca è DOPPIA FUNZIONE (t_b9666d09): filtra quei punti per
+  // titolo, indirizzo o tipo come prima E, mentre si digita, suggerisce
+  // luoghi tramite il geocoder Nominatim same-origin (/api/geocode) in un
+  // menu a tendina sotto il campo. Selezionando un suggerimento la mappa si
+  // sposta sul luogo; l'elenco segue poi la nuova vista.
+  listSearchLabel: "Filtra i punti nella vista corrente o cerca un luogo",
+  listSearchPlaceholder: "Cerca un luogo o filtra i punti in vista",
   listSearchHelp:
-    "L'elenco mostra solo i punti dentro la vista corrente della mappa. La ricerca filtra quei punti per titolo, indirizzo o tipo; spostando o zoomando la mappa l'elenco si aggiorna.",
+    "L'elenco mostra solo i punti dentro la vista corrente della mappa. La ricerca filtra quei punti per titolo, indirizzo o tipo e suggerisce luoghi corrispondenti da OpenStreetMap sotto il campo; scegliendo un luogo la mappa si sposta lì.",
+  // Menu a tendina del geocoding (t_b9666d09): la listbox sotto il campo di
+  // ricerca della sidebar. L'attribuzione è richiesta da ODbL per i dati dei
+  // luoghi derivati da Nominatim (vedi docs/OSM_INTEGRATION.md §8).
+  geocodeLabel: "Suggerimenti di luoghi",
+  geocodeNoResults: (query: string) => `Nessun risultato per “${query}”`,
+  geocodeAttribution: "Luoghi © OpenStreetMap contributors",
+  geocodeUnavailable: "La ricerca dei luoghi non è al momento disponibile.",
   listTitle: "Punti nella vista corrente",
   listMapSyncHelp:
     "L'elenco si aggiorna mentre muovi o zoomi la mappa: ingrandendo si restringe, rimpicciolendo si allarga.",

@@ -14,7 +14,6 @@ import {
 } from "../../lib/use-camera-filters";
 import { MapPanel } from "../home/MapPanel";
 import { FiltersBar } from "../FiltersBar";
-import { EmptyState } from "../EmptyState";
 
 /**
  * /mappa tool body (F4, t_522638a5; viewport redesign t_702c10af; integrated
@@ -32,6 +31,13 @@ import { EmptyState } from "../EmptyState";
  * debounced by SurveillanceMap). ?focus=ID (deep link from /directory)
  * preselects a record and pans the map to it — focus management,
  * FRONTEND_DESIGN §6.2.
+ *
+ * Map-always-visible contract (t_b9666d09): the MapPanel (map + sidebar)
+ * is rendered UNCONDITIONALLY — a filter that matches nothing must never
+ * replace the map with an empty state. The truthful "no record matches"
+ * note lives inside the sidebar list (MapPanel), with the Clear filters
+ * action wired to onReset; the compact prototype banner stays conditional
+ * because it describes the illustrative pins.
  */
 export function MappaTool() {
   const t = useMessages().map;
@@ -103,9 +109,12 @@ export function MappaTool() {
             (sidebar list + full map) and the export footer below. */}
         <div className="map-card">
           <FiltersBar variant="panel" hideSearch cameraKinds={cameraKinds} search={qInput} setSearch={setQ} kindFilter={filters.type} setKindFilter={setType} freshnessFilter={filters.freshness} setFreshnessFilter={setFreshness} sortOrder={filters.sort} setSortOrder={setSort} resultCount={filteredRecords.length} onReset={reset} />
-          {filteredRecords.length === 0
-            ? <EmptyState heading="h2" title={t.emptyTitle} body={t.emptyBody} action={<button type="button" className="text-button" onClick={reset}>{t.clearSearch} <span aria-hidden="true">→</span></button>} />
-            : <MapPanel filteredRecords={filteredRecords} visibleRecords={visibleRecords} selectedId={selectedId} onSelect={setSelectedId} onPick={() => {}} coordinates={focusLocation} selectedCamera={selectedCamera} loading={loading} notice={notice} issueHref="/correggi" directoryHref="/directory" search={qInput} setSearch={setQ} onBoundsChange={handleBoundsChange} />}
+          {/* Map-always-visible (t_b9666d09): MapPanel renders the map AND
+              the sidebar unconditionally. When no record matches the
+              filters the sidebar shows the truthful in-list note with the
+              Clear filters action (onReset); the map itself never
+              disappears. */}
+          <MapPanel filteredRecords={filteredRecords} visibleRecords={visibleRecords} selectedId={selectedId} onSelect={setSelectedId} onPick={() => {}} coordinates={focusLocation} selectedCamera={selectedCamera} loading={loading} notice={notice} issueHref="/correggi" directoryHref="/directory" search={qInput} setSearch={setQ} onBoundsChange={handleBoundsChange} viewportBounds={viewportBounds} onReset={reset} />
         </div>
       </div>
     </section>

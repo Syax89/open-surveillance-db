@@ -219,3 +219,70 @@ never writes user reports into OpenStreetMap automatically. Map tiles are a
 visual base layer only. Any future import/export relationship with OSM needs
 a documented community discussion, tag mapping, licence analysis, and a
 reversible workflow (see OPEN_SOURCE.md for the ODbL implications).
+
+## 8. Geocoding: the same-origin Nominatim autocomplete proxy
+
+The /mappa sidebar search is dual-function (kanban t_b9666d09): it filters
+the viewport points by title/address/type AND suggests places through a
+geocoder dropdown. Like the tiles, the geocoder is never called from the
+browser — `GET /api/geocode?q=…&limit=5&lang=…` is a same-origin proxy
+(`app/api/geocode/route.ts`) that forwards to Nominatim with the same
+compliance posture as the tile proxy:
+
+- **Identification**: every upstream request carries the app User-Agent
+  `OpenSurveillanceDB/0.1 (+https://github.com/Syax89/open-surveillance-db;
+  contact: privacy@opensurveillancedb.org)` and forwards the end user's
+  Referer verbatim (Nominatim requires a valid UA or Referer; §3.4 of the
+  proxy policy — never strip the Referer).
+- **Rate limiting**: a per-caller bucket (default 30/min,
+  `GEOCODE_RATE_LIMIT_MAX` / `GEOCODE_RATE_LIMIT_WINDOW_SECONDS`) keeps the
+  average well below the Nominatim ceiling (~1 request/second/client); the
+  check runs BEFORE the cache lookup so cache hits cannot dodge the throttle.
+- **Caching**: replies are stored in the Cloudflare Cache API keyed by the
+  query URL — 24 h TTL for non-empty results (place data changes rarely),
+  1 h for empty ones (a typo that later becomes a real place resolves
+  quickly). The cache stores only the geocoder reply, never requestor data.
+- **Validation**: `q` is required and capped (200 chars), `limit` is
+  clamped to 1–5, `countrycodes` must be ISO 3166-1 alpha-2 codes and
+  `lang` only `en`/`it` — the endpoint cannot be used to scrape arbitrary
+  paths or drive bulk downloads (§4).
+- **Data minimization**: the response carries ONLY
+  `{ results: [{ display_name, lat, lng, type, boundingbox }] }` — the
+  Nominatim metadata fields (place_id, osm_type, importance, address, …)
+  are dropped server-side.
+- **Failure posture**: a failed/overloaded upstream answers 502 with
+  `no-store` (never fabricated "no places"); the client shows an honest
+  "place search unavailable" note and the local point filter keeps working.
+
+Two surfaces touch the external geocoder, both through the same `User-Agent`
+and the `GEOCODER_BASE_URL` knob (default `https://nominatim.openstreetmap.org`):
+
+| Surface | Purpose | Result shape |
+| --- | --- | --- |
+| `db/geocode.ts` (used by `GET /api/cameras/search`) | resolve ONE place to a point + bounding box for the locality search radius | `ResolvedPlace` (first result only) |
+| `GET /api/geocode` (this proxy) | autocomplete suggestions for the /mappa dropdown | `{ results: […] }` (up to 5) |
+
+Attribution: place suggestions are derived from OpenStreetMap data
+(ODbL 1.0) — the dropdown renders the line "Places © OpenStreetMap
+contributors" (i18n `geocodeAttribution`) next to the results, in addition
+to the map's own tile attribution.
+
+### Environment knobs
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `GEOCODER_BASE_URL` | `https://nominatim.openstreetmap.org` | Upstream base URL (shared with `db/geocode.ts`). Point at an approved instance without a code change. |
+| `GEOCODE_RATE_LIMIT_MAX` | `30` | Max autocomplete requests per caller per window. |
+| `GEOCODE_RATE_LIMIT_WINDOW_SECONDS` | `60` | Rate-limit window. |
+| `GEOCODE_UPSTREAM_TIMEOUT_MS` | `5000` | Upstream fetch timeout; a slow geocoder answers 502 instead of pinning the request. |
+| `GEOCODE_MAX_BYTES` | `524288` (512 KiB) | Hard cap on the upstream body; over-cap replies are rejected with 502 and never cached. |
+
+### Testing
+
+`tests/geocode-proxy.test.mjs` exercises the route handler with real
+`Request` objects against a stubbed `fetch` and an injected `caches.default`:
+validation (400), upstream URL/UA/Referer forwarding, response shape + data
+minimization, cache TTLs (24 h / 1 h) and hit/miss behaviour, per-URL cache
+keys, failure modes (502, timeout, body cap), and the per-caller rate limit
+(429 + Retry-After).
+
