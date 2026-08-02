@@ -17,8 +17,12 @@ import { FiltersBar } from "../FiltersBar";
 import { EmptyState } from "../EmptyState";
 
 /**
- * /mappa tool body (F4, t_522638a5; viewport redesign t_702c10af): the
- * filters live in the URL (?q= ?type= ?freshness= ?sort= ?focus= —
+ * /mappa tool body (F4, t_522638a5; viewport redesign t_702c10af; integrated
+ * layout t_966254a1). ONE tool header (eyebrow + h1 + intro) owns the page;
+ * below it a single map card hosts the compact prototype banner, the
+ * FiltersBar row (kind/freshness/sort/reset — attached to the card top,
+ * width-aligned with the map) and the viewport-synced sidebar list + full
+ * map. The filters live in the URL (?q= ?type= ?freshness= ?sort= ?focus= —
  * useCameraFilters) and kind/freshness are forwarded to the API (F0
  * server-side filters). The map keeps needing ALL matching points (plan
  * §3.3), so it walks the server-filtered list; the left sidebar shows only
@@ -82,10 +86,23 @@ export function MappaTool() {
   return (
     <section className="tool-section map-tool" aria-labelledby="map-tool-title">
       <div className="tool-heading"><p className="eyebrow"><span /> {t.livePrototype}</p><h1 id="map-tool-title">{t.pageTitle}</h1><p>{t.pageIntro}</p></div>
-      <FiltersBar variant="panel" hideSearch cameraKinds={cameraKinds} search={qInput} setSearch={setQ} kindFilter={filters.type} setKindFilter={setType} freshnessFilter={filters.freshness} setFreshnessFilter={setFreshness} sortOrder={filters.sort} setSortOrder={setSort} resultCount={filteredRecords.length} onReset={reset} />
-      {filteredRecords.length === 0
-        ? <EmptyState title={t.emptyTitle} body={t.emptyBody} action={<button type="button" className="text-button" onClick={reset}>{t.clearSearch} <span aria-hidden="true">→</span></button>} />
-        : <MapPanel filteredRecords={filteredRecords} visibleRecords={visibleRecords} selectedId={selectedId} onSelect={setSelectedId} onPick={() => {}} coordinates={focusLocation} selectedCamera={selectedCamera} loading={loading} notice={notice} issueHref="/correggi" directoryHref="/directory" search={qInput} setSearch={setQ} onBoundsChange={handleBoundsChange} />}
+      <div className="map-layout">
+        {/* Compact prototype banner (t_966254a1): a slim one-liner between
+            the single tool header and the map card — only when the map is
+            actually rendered (never over the truthful empty state). */}
+        {filteredRecords.length > 0 && (
+          <div className="prototype-banner prototype-banner-compact" role="note"><b>{t.prototypeMode}</b> {t.prototypeBanner}</div>
+        )}
+        {/* The whole workspace is ONE card: filters attached to the top
+            edge (same width, same background, no gap), then the split
+            (sidebar list + full map) and the export footer below. */}
+        <div className="map-card">
+          <FiltersBar variant="panel" hideSearch cameraKinds={cameraKinds} search={qInput} setSearch={setQ} kindFilter={filters.type} setKindFilter={setType} freshnessFilter={filters.freshness} setFreshnessFilter={setFreshness} sortOrder={filters.sort} setSortOrder={setSort} resultCount={filteredRecords.length} onReset={reset} />
+          {filteredRecords.length === 0
+            ? <EmptyState heading="h2" title={t.emptyTitle} body={t.emptyBody} action={<button type="button" className="text-button" onClick={reset}>{t.clearSearch} <span aria-hidden="true">→</span></button>} />
+            : <MapPanel filteredRecords={filteredRecords} visibleRecords={visibleRecords} selectedId={selectedId} onSelect={setSelectedId} onPick={() => {}} coordinates={focusLocation} selectedCamera={selectedCamera} loading={loading} notice={notice} issueHref="/correggi" directoryHref="/directory" search={qInput} setSearch={setQ} onBoundsChange={handleBoundsChange} />}
+        </div>
+      </div>
     </section>
   );
 }

@@ -19,12 +19,11 @@ export const en = {
   pageTitle: "Interactive map",
   pageIntro:
     "Explore documented public cameras on the map. Use the filters to narrow the view; every marker opens its public record. An empty area never proves that no cameras are present.",
-  // Map section (extracted from the home page bundle in F1).
+  // Map tool chrome (t_966254a1): the tool has ONE header (pageTitle) —
+  // the old "Explore documented cameras" section heading and its coverage
+  // note were removed with the duplicated header; pageIntro already covers
+  // the "an empty area never proves absence" truthfulness contract.
   livePrototype: "Live prototype",
-  mapTitle: "Explore documented cameras",
-  osmBaseMap: "OpenStreetMap base map",
-  mapCoverageNote:
-    "The map shows documented public records only; an empty area does not prove that no cameras are present.",
   prototypeMode: "Prototype mode.",
   prototypeBanner:
     "The base map is real OpenStreetMap data; the two visible camera pins are clearly labelled illustrative records. Click anywhere on the map to select a position for a report.",
@@ -88,12 +87,12 @@ export const it: Translation<typeof en> = {
   pageTitle: "Mappa interattiva",
   pageIntro:
     "Esplora le telecamere pubbliche documentate sulla mappa. Usa i filtri per restringere la vista; ogni segnaposto apre il record pubblico. Un'area vuota non dimostra mai l'assenza di telecamere.",
-  // Sezione mappa (estratta dal bundle della home nella F1).
+  // Chrome del tool mappa (t_966254a1): il tool ha UN solo header (pageTitle)
+  // — il vecchio heading di sezione "Esplora le telecamere documentate" e la
+  // sua nota di copertura sono stati rimossi con l'header duplicato;
+  // pageIntro copre già il contratto di veridicità "un'area vuota non
+  // dimostra l'assenza di telecamere".
   livePrototype: "Prototipo attivo",
-  mapTitle: "Esplora le telecamere documentate",
-  osmBaseMap: "Mappa di base OpenStreetMap",
-  mapCoverageNote:
-    "La mappa mostra solo record pubblici documentati; un'area vuota non dimostra che non ci siano telecamere.",
   prototypeMode: "Modalità prototipo.",
   prototypeBanner:
     "La mappa di base usa dati reali di OpenStreetMap; i due pin visibili sono record illustrativi chiaramente etichettati. Fai clic in un punto della mappa per selezionare la posizione di una segnalazione.",
