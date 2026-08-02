@@ -29,6 +29,12 @@ export const en = {
   prototypeBanner:
     "The base map is real OpenStreetMap data; the two visible camera pins are clearly labelled illustrative records. Click anywhere on the map to select a position for a report.",
   mapHint: "Click the map to choose a report position",
+  // Map-click report picker (t_6abb96ac): clicking empty map space opens a
+  // popup with the click coordinates and a direct link to the /segnala
+  // form, pre-filled with that position.
+  pickTitle: "New report",
+  pickCoordinates: "Coordinates",
+  pickReportHere: "Report a camera here",
   recordId: "Record ID",
   source: "Source",
   freshness: "Freshness",
@@ -92,6 +98,12 @@ export const it: Translation<typeof en> = {
   prototypeBanner:
     "La mappa di base usa dati reali di OpenStreetMap; i due pin visibili sono record illustrativi chiaramente etichettati. Fai clic in un punto della mappa per selezionare la posizione di una segnalazione.",
   mapHint: "Fai clic sulla mappa per scegliere la posizione della segnalazione",
+  // Selettore segnalazione al clic sulla mappa (t_6abb96ac): cliccando uno
+  // spazio vuoto della mappa si apre un popup con le coordinate del clic e
+  // un link diretto al modulo /segnala, precompilato con quella posizione.
+  pickTitle: "Nuova segnalazione",
+  pickCoordinates: "Coordinate",
+  pickReportHere: "Segnala una telecamera qui",
   recordId: "ID record",
   source: "Fonte",
   freshness: "Aggiornamento",

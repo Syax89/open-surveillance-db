@@ -4,16 +4,26 @@ import { useState } from "react";
 import { useMessages } from "../LocaleProvider";
 import { ReportForm } from "../home/ReportForm";
 import { useReportFlow } from "../../lib/useReportFlow";
+import type { ReportCoordinates } from "../../lib/report-coordinates";
+
+type Props = {
+  /**
+   * Position pre-filled from the /segnala URL shell (?lat=&lng= — the deep
+   * link the /mappa pick popup builds, t_6abb96ac). Null when the form is
+   * opened plain (no deep link).
+   */
+  initialCoordinates?: ReportCoordinates | null;
+};
 
 /**
  * /segnala tool body (F1 route group (tools)): the extracted ReportForm +
  * useReportFlow promoted to its own route. Noindex is set by the page's
  * metadata (robots), so this form page is never indexed.
  */
-export function SegnalaTool() {
+export function SegnalaTool({ initialCoordinates = null }: Props) {
   const t = useMessages().report;
   const [notice, setNotice] = useState("");
-  const report = useReportFlow({ setNotice });
+  const report = useReportFlow({ setNotice, initialCoordinates });
 
   return (
     <section className="tool-section report-tool" aria-labelledby="report-tool-title">

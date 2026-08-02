@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useMessages } from "../components/LocaleProvider";
+import type { ReportCoordinates } from "./report-coordinates";
 
 export type NearbyCandidate = { id: number; title: string; kind: string; distanceMeters: number; similarity: number; matchStrength: "high" | "medium" | "low" };
 
@@ -14,15 +15,20 @@ export type PhotoItem = { id: number; mimeType: string; width: number; height: n
  * map section displays it), so the page injects its setter. The page
  * reads `coordinates`/`selectCoordinates` from the hook to drive the map.
  *
+ * `initialCoordinates` (t_6abb96ac) pre-fills the form from the /segnala
+ * URL shell (?lat=&lng= — the deep link the /mappa pick popup builds):
+ * the coordinate state, the manual fields and the nearby check all start
+ * from the URL position instead of an empty form.
+ *
  * Extracted from ReportForm.tsx in F1 (kanban t_03c0fa15, QA t_14b1949c):
  * the hook owns the ~130 lines of flow logic so the component file stays
  * under the ~150-line refactor target.
  */
-export function useReportFlow({ setNotice }: { setNotice: (notice: string) => void }) {
+export function useReportFlow({ setNotice, initialCoordinates = null }: { setNotice: (notice: string) => void; initialCoordinates?: ReportCoordinates | null }) {
   const t = useMessages().report;
-  const [coordinates, setCoordinates] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [manualLatitude, setManualLatitude] = useState("");
-  const [manualLongitude, setManualLongitude] = useState("");
+  const [coordinates, setCoordinates] = useState<{ latitude: number; longitude: number } | null>(initialCoordinates);
+  const [manualLatitude, setManualLatitude] = useState(initialCoordinates ? initialCoordinates.latitude.toFixed(5) : "");
+  const [manualLongitude, setManualLongitude] = useState(initialCoordinates ? initialCoordinates.longitude.toFixed(5) : "");
   const [nearbyCandidates, setNearbyCandidates] = useState<NearbyCandidate[]>([]);
   const [nearbyLoading, setNearbyLoading] = useState(false);
   const [nearbyError, setNearbyError] = useState("");
@@ -39,6 +45,18 @@ export function useReportFlow({ setNotice }: { setNotice: (notice: string) => vo
   const photoInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => () => nearbyRequest.current?.abort(), []);
+
+  // Deep link (?lat=&lng=, t_6abb96ac): when the form opens with a URL
+  // position, run the same nearby check a map click would, once, so the
+  // duplicate gate is already populated. Guarded by a ref: the URL is
+  // external state (deep link), not a value the user edits in the form.
+  const initialRunRef = useRef(false);
+  useEffect(() => {
+    if (!initialCoordinates || initialRunRef.current) return;
+    initialRunRef.current = true;
+    void selectCoordinates(initialCoordinates.latitude, initialCoordinates.longitude);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- URL deep link (FRONTEND_DESIGN §6.2): one-shot on mount with the URL position; selectCoordinates is the flow's own stable handler.
+  }, [initialCoordinates]);
 
   async function selectCoordinates(latitude: number, longitude: number) {
     nearbyRequest.current?.abort();

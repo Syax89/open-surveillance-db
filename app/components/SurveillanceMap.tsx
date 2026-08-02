@@ -75,6 +75,7 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
   const prevSelectedIdRef = useRef(selectedId);
   const onBoundsChangeRef = useRef(onBoundsChange);
   const popupHtmlForRef = useRef(popupHtmlFor);
+  const pickPopupHtmlRef = useRef<(latitude: number, longitude: number) => string>(() => "");
   const boundsTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -96,6 +97,31 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
   useEffect(() => {
     popupHtmlForRef.current = popupHtmlFor;
   }, [popupHtmlFor]);
+
+  // Map-click report picker (t_6abb96ac): clicking empty map space opens a
+  // popup with the click coordinates and a direct link to /segnala,
+  // pre-filled with that position. Rebuilt whenever the locale changes,
+  // read through a ref inside the map click handler (same pattern as
+  // popupHtmlForRef). Coordinate strings come from toFixed(5) on numbers —
+  // no user input, nothing to escape.
+  const t = useMessages().map;
+  useEffect(() => {
+    const build = (latitude: number, longitude: number) => {
+      const lat = latitude.toFixed(5);
+      const lng = longitude.toFixed(5);
+      const href = `/segnala?lat=${lat}&lng=${lng}`;
+      return [
+        `<div class="osm-popup">`,
+        `<h3>${t.pickTitle}</h3>`,
+        `<dl>`,
+        `<div><dt>${t.pickCoordinates}</dt><dd>${lat}, ${lng}</dd></div>`,
+        `</dl>`,
+        `<p class="osm-popup-actions"><a href="${href}">${t.pickReportHere} <span aria-hidden="true">→</span></a></p>`,
+        `</div>`,
+      ].join("");
+    };
+    pickPopupHtmlRef.current = build;
+  }, [t]);
 
   // Offline state: the tiles cannot load and the records are the last ones
   // the browser received. The map stays visible (the markers are already on
@@ -147,7 +173,19 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
           attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a> &middot; <a href="https://www.openstreetmap.org/fixthemap">Fix the map</a>',
         }).addTo(map);
         markersRef.current = L.layerGroup().addTo(map);
-        map.on("click", (event) => onPickRef.current(event.latlng.lat, event.latlng.lng));
+        // Map-click report picker (t_6abb96ac): clicking empty map space
+        // opens a popup with the click coordinates and a direct link to
+        // /segnala?lat=&lng= (the pre-filled report form). The picker
+        // complements onPick: onPick keeps its contract (nearby-check
+        // start), the popup gives the click a visible, actionable outcome.
+        map.on("click", (event) => {
+          onPickRef.current(event.latlng.lat, event.latlng.lng);
+          map.openPopup(pickPopupHtmlRef.current(event.latlng.lat, event.latlng.lng), event.latlng, {
+            maxWidth: 300,
+            minWidth: 220,
+            className: "osm-camera-popup",
+          });
+        });
         mapRef.current = map;
         // moveend fires after every pan/zoom settles; zoomend is redundant
         // with it in Leaflet but cheap to listen to as a belt-and-braces
@@ -253,7 +291,6 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
       { animate: false },
     );
   }, [focusLat, focusLng]);
-  const t = useMessages().map;
   const label = t.mapLabel;
   const description = t.mapDescription;
   const directoryLink = t.mapDirectoryLink;
