@@ -195,6 +195,21 @@ changes accumulate under `[Unreleased]`.
   gated moderation API: the public record page keeps exposing only the
   filtered public revision projection (AC-5)
   ([#187](https://github.com/Syax89/open-surveillance-db/pull/187)).
+- /mappa redesign (user request, t_702c10af): the interactive map now fills
+  nearly the whole tool viewport with a scrollable left sidebar that lists
+  ONLY the points inside the current map view — zoom in narrows the list,
+  zoom out widens it (moveend/zoomend, 200 ms debounce; the pure
+  bounds→list contract lives in `app/lib/map-viewport.ts` and is unit
+  tested). The search input moved to the top of the sidebar (same `?q=`
+  state as the FiltersBar, which keeps kind/freshness/sort/reset — one
+  search control per page). Clicking a marker opens a Leaflet popup with
+  title, kind, status, record id, coordinates, address/description
+  (HTML-escaped) and the correction (`/correggi?record=ID`) + detail links;
+  selecting a list row pans the map and opens the popup, selecting a marker
+  highlights its row (`aria-current`). Below 768 px the sidebar becomes a
+  panel above the map. The home hub still renders the static MapTeaser
+  (no Leaflet mounted), and GeoJSON/CSV export, offline state, text
+  fallback and `/records/[id]` are untouched.
 
 ### Changed
 

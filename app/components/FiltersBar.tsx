@@ -30,6 +30,7 @@ export function FiltersBar({
   setSortOrder,
   resultCount,
   onReset,
+  hideSearch = false,
 }: {
   variant: "inline" | "panel";
   cameraKinds: string[];
@@ -49,16 +50,25 @@ export function FiltersBar({
   setSortOrder: (value: "alphabetical" | "position") => void;
   resultCount: number;
   onReset: () => void;
+  /**
+   * Optional (t_702c10af): /mappa moves the search into the sidebar column
+   * (map-list-search, same ?q= state) so the tool has exactly ONE search
+   * control; the kind/freshness/sort/reset row stays. Defaults to false —
+   * the home page and /directory keep their search input byte-identical.
+   */
+  hideSearch?: boolean;
 }) {
   const t = useMessages().directory;
   return (
     <>
       <div className={`directory-controls filters-${variant}`}>
-        <div className="record-search">
-          <label htmlFor="record-search">{t.searchDirectory}</label>
-          <input id="record-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t.searchPlaceholder} aria-describedby="record-search-help record-search-count" />
-          <p id="record-search-help">{t.searchHelp}</p>
-        </div>
+        {!hideSearch && (
+          <div className="record-search">
+            <label htmlFor="record-search">{t.searchDirectory}</label>
+            <input id="record-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t.searchPlaceholder} aria-describedby="record-search-help record-search-count" />
+            <p id="record-search-help">{t.searchHelp}</p>
+          </div>
+        )}
         <div className="record-filter">
           <label htmlFor="record-kind-filter">{t.cameraType}</label>
           <select id="record-kind-filter" value={kindFilter} onChange={(event) => setKindFilter(event.target.value)}>

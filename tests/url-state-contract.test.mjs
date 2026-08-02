@@ -371,9 +371,14 @@ test("/mappa?focus=ID preselects the record (focus management, FRONTEND_DESIGN Â
   installApiMock();
   await renderWithLocale(React.createElement(MappaTool));
 
-  // The map card (aria-live) shows the focused record once the API resolves;
-  // ?focus= is read from the URL, so a deep link lands on the right record.
-  await rtl.waitFor(() => assert.ok(screen.getByRole("heading", { name: "Bullet camera 2" })));
+  // The sidebar list is the keyboard/text equivalent of the map: a ?focus=
+  // deep link lands with the focused record selected (aria-current on its
+  // row, t_702c10af), and the marker selection follows the same onSelect
+  // path as a click â€” the map card is gone, replaced by the list.
+  await rtl.waitFor(() => assert.equal(
+    screen.getByRole("button", { name: /Bullet camera 2/ }).getAttribute("aria-current"),
+    "true",
+  ));
 });
 
 test("DirectoryTool 'Show on map' pushes /mappa with the ACTIVE filters and the focus id (push, not replace)", async () => {

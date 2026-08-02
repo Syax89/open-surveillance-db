@@ -378,7 +378,7 @@ I componenti esistenti formano già un design system implicito. Lo formalizzo:
 | `Hero` | `app/components/home/Hero.tsx` | `/` | hero scuro con stat |
 | `SurveillanceMap` | `app/components/SurveillanceMap.tsx` | `/mappa` (e teaser `/`) | mappa Leaflet con fallback |
 | `RecordCard` | `app/components/RecordCard.tsx` | `/directory`, search results | card record condivisa |
-| `MapPanel` | `app/components/home/MapPanel.tsx` | `/mappa` | mappa + card record + export |
+| `MapPanel` | `app/components/home/MapPanel.tsx` | `/mappa` | mappa + sidebar lista sincronizzata col viewport + popup + export (t_702c10af) |
 | `PublicDirectory` | `app/components/home/PublicDirectory.tsx` | `/directory` | search + filtri + lista |
 | `ReportForm` | `app/components/home/ReportForm.tsx` | `/segnala` | form segnalazione |
 | `CorrectionForm` | `app/components/home/CorrectionForm.tsx` | `/correggi` | form correzione |

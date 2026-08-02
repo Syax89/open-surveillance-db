@@ -49,6 +49,25 @@ export const en = {
   offlineTitle: "You are offline",
   offlineBody: "Showing the last loaded records.",
   offlineAction: "Try again",
+  // Viewport-synced sidebar list (/mappa redesign, t_702c10af): the left
+  // column shows only the points inside the current map view.
+  listSearchLabel: "Filter the points in the current view",
+  listSearchPlaceholder: "Search by title, address or type",
+  listSearchHelp:
+    "The list shows only the points inside the current map view. Searching filters those points by title, address or type; moving or zooming the map updates the list.",
+  listTitle: "Points in the current view",
+  listMapSyncHelp: "The list updates as you move or zoom the map: zoom in to narrow it, zoom out to widen it.",
+  listCount: (visible: number, total: number) =>
+    visible === 0
+      ? "No points in the current view"
+      : visible === total
+        ? `Showing all ${visible} points in the current view`
+        : `Showing ${visible} of ${total} points in the current view`,
+  listEmptyInView:
+    "No documented points in the current view. Move the map or zoom out to explore more.",
+  // Marker popup (t_702c10af): opens on marker click with the record info
+  // and its correction/detail links.
+  popupDetail: "Open record",
 } as const;
 
 export const it: Translation<typeof en> = {
@@ -93,4 +112,24 @@ export const it: Translation<typeof en> = {
   offlineTitle: "Sei offline",
   offlineBody: "Mostriamo gli ultimi record caricati.",
   offlineAction: "Riprova",
+  // Elenco laterale sincronizzato col viewport (redesign /mappa, t_702c10af):
+  // la colonna sinistra mostra solo i punti dentro la vista corrente.
+  listSearchLabel: "Filtra i punti nella vista corrente",
+  listSearchPlaceholder: "Cerca per titolo, indirizzo o tipo",
+  listSearchHelp:
+    "L'elenco mostra solo i punti dentro la vista corrente della mappa. La ricerca filtra quei punti per titolo, indirizzo o tipo; spostando o zoomando la mappa l'elenco si aggiorna.",
+  listTitle: "Punti nella vista corrente",
+  listMapSyncHelp:
+    "L'elenco si aggiorna mentre muovi o zoomi la mappa: ingrandendo si restringe, rimpicciolendo si allarga.",
+  listCount: (visible: number, total: number) =>
+    visible === 0
+      ? "Nessun punto nella vista corrente"
+      : visible === total
+        ? `Mostrati tutti i ${visible} punti nella vista corrente`
+        : `Mostrati ${visible} di ${total} punti nella vista corrente`,
+  listEmptyInView:
+    "Nessun punto documentato nella vista corrente. Sposta la mappa o rimpicciolisci per esplorare di più.",
+  // Popup del segnaposto (t_702c10af): si apre al clic sul marker con le
+  // informazioni del record e i link a correzione/dettaglio.
+  popupDetail: "Apri il record",
 };
