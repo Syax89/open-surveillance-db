@@ -53,6 +53,14 @@ const ROUTES = [
   { source: "app/api/auth/passkey/login/complete/route.ts", output: "app/api/auth/passkey/login/complete/route.mjs" },
   { source: "app/api/auth/passkey/credentials/route.ts", output: "app/api/auth/passkey/credentials/route.mjs" },
   { source: "app/api/auth/recovery/route.ts", output: "app/api/auth/recovery/route.mjs" },
+  // External OIDC login (Fase D, ADR 0020 decision 4): /start begins the
+  // PKCE redirect, /callback consumes the provider handshake, /merge is the
+  // manual email-conflict merge backend. The [provider] path segment is
+  // parsed from the URL inside the handler, so the same compiled module
+  // serves both providers.
+  { source: "app/api/auth/oidc/[provider]/start/route.ts", output: "app/api/auth/oidc/[provider]/start/route.mjs" },
+  { source: "app/api/auth/oidc/[provider]/callback/route.ts", output: "app/api/auth/oidc/[provider]/callback/route.mjs" },
+  { source: "app/api/auth/oidc/merge/route.ts", output: "app/api/auth/oidc/merge/route.mjs" },
   { source: "app/api/photos/route.ts", output: "app/api/photos/route.mjs" },
   { source: "app/api/photos/[id]/route.ts", output: "app/api/photos/[id]/route.mjs" },
   // Contributor appeals (ADR 0014): POST/GET on the collection, PATCH on the
@@ -112,7 +120,7 @@ async function buildTree() {
   const mocksDir = path.join(root, "tests", "helpers", "mocks");
   const mockStateUrl = pathToFileURL(path.join(root, "tests", "helpers", "mock-state.mjs")).href;
   await mkdir(path.join(tree, "db"), { recursive: true });
-  for (const mockName of ["cameras", "camera-edits", "corrections", "geocode", "moderation", "auth", "users", "photos", "appeals", "confirmations", "passkeys"]) {
+  for (const mockName of ["cameras", "camera-edits", "corrections", "geocode", "moderation", "auth", "users", "photos", "appeals", "confirmations", "passkeys", "oidc"]) {
     const source = await readFile(path.join(mocksDir, `${mockName}.mjs`), "utf8");
     await writeFile(
       path.join(tree, "db", `${mockName}.mjs`),
