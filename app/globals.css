@@ -587,7 +587,20 @@ footer>p { margin:0; color:#586870; font-size:var(--text-md); line-height:1.5; }
    button right-aligned in the last (auto) column instead of wrapping alone
    to a second row (it used to inherit the 3-column .directory-controls
    template and land misaligned under the kind filter). */
-.map-card .filters-panel { padding:14px 18px 12px; border-bottom:1px solid var(--line); background:#fffef9; grid-template-columns:minmax(0,1fr) minmax(175px,.34fr) minmax(190px,.38fr) auto; }
+.map-card .filters-panel { padding:14px 18px 12px; border-bottom:1px solid var(--line); background:#fffef9; }
+/* FIX /mappa (CEO feedback 2026-08-02): the panel FiltersBar row is its own
+   4-column grid on DESKTOP — kind / freshness / sort / reset on ONE line, the
+   reset button right-aligned in the last (auto) column instead of wrapping
+   alone to a second row (it used to inherit the 3-column .directory-controls
+   template and land misaligned under the kind filter). The rule is scoped to
+   (min-width:981px) because the ≤980px/≤700px overrides below must win on
+   smaller viewports: with equal specificity, a base rule declared AFTER the
+   media queries would otherwise crush the filters to 4 narrow columns on
+   mobile (kind-filter select ~30px wide — Lighthouse target-size WCAG 2.5.8
+   failure, t_9e8642a0). */
+@media (min-width:981px) {
+  .map-card .filters-panel { grid-template-columns:minmax(0,1fr) minmax(175px,.34fr) minmax(190px,.38fr) auto; }
+}
 /* FIX /mappa (CEO feedback 2026-08-02): the result counter sat 2px from the
    card's left edge while the filters above it are inset 18px — give it the
    same 18px inset so it aligns with the filters grid (and with the
@@ -613,7 +626,7 @@ footer>p { margin:0; color:#586870; font-size:var(--text-md); line-height:1.5; }
 .map-record:focus-visible { outline:3px solid var(--focus); outline-offset:1px; }
 .map-record.selected { border-left-color:#1a7c60; background:#e4efe6; }
 .map-record-title { display:block; color:#174e58; font-size:var(--text-base); font-weight:800; letter-spacing:-.02em; }
-.map-record-meta { display:block; margin-top:3px; color:#60737d; font-size:var(--text-sm); line-height:1.35; }
+.map-record-meta { display:block; margin-top:3px; color:#546d78; font-size:var(--text-sm); line-height:1.35; }
 .map-list-empty { margin:0; padding:18px 16px; color:#60737d; font-size:var(--text-md); line-height:1.5; }
 /* Geocode autocomplete dropdown (t_b9666d09): the ARIA listbox under the
    sidebar search field. The dropdown overlays the list below the search

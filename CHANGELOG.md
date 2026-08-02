@@ -304,7 +304,15 @@ changes accumulate under `[Unreleased]`.
   la riga download GeoJSON/CSV è stata SPOSTATA da /mappa a /directory
   (`.data-actions` da `MapPanel` a `DirectoryTool`, nuove chiavi
   `directory.downloadGeoJson/downloadCsv/readDataPolicy` EN/IT; il tool mappa
-  non ha più il footer export). Test: asserzioni aggiornate e nuove in
+  non ha più il footer export). Regressione a11y intercettata dal gate
+  Lighthouse (t_9e8642a0): la griglia 4-colonne dichiarata DOPO le media
+  query responsive vinceva su mobile (stessa specificità, ultima regola) —
+  su ≤980px i filtri restavano su 4 colonne strette (kind-filter ~30px,
+  target-size WCAG 2.5.8 FAIL, accessibility 0.93) — ora la regola desktop è
+  scoped a `@media (min-width:981px)` così gli override ≤980px/≤700px
+  tornano a vincere; contrasto `.map-record-meta` #60737d→#546d78 (4.64:1 su
+  `.map-record.selected` #e4efe6, era 4.18 < 4.5:1). Test: asserzioni
+  aggiornate e nuove in
   `tests/client-tools.test.mjs` (banner assente su /mappa, download presenti
   solo su /directory), docs `FRONTEND_DESIGN.md` §6.2.6/§6.3.7 aggiornati.
 
