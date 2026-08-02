@@ -50,12 +50,14 @@ type Props = {
 /**
  * Map tool workspace (F1 route group (tools), redesign t_702c10af;
  * integrated layout t_966254a1): the viewport-synced sidebar list + the
- * interactive map split, with loading notice and data-export footer. The
- * tool page (MappaTool) owns the single header, the compact prototype
- * banner and the FiltersBar row — this component renders ONLY the split
- * workspace, so /mappa has exactly one header and the map gets the full
- * remaining height. Used by /mappa; the home hub (F2) renders only the
- * static MapTeaser and never mounts this component (no Leaflet on the hub).
+ * interactive map split, with loading notice. The tool page (MappaTool)
+ * owns the single header and the FiltersBar row — this component renders
+ * ONLY the split workspace, so /mappa has exactly one header and the map
+ * gets the full remaining height. Used by /mappa; the home hub (F2)
+ * renders only the static MapTeaser and never mounts this component (no
+ * Leaflet on the hub). The download GeoJSON/CSV row moved to /directory
+ * (CEO feedback 2026-08-02): the map tool no longer carries the data-export
+ * footer — /directory owns the export row next to its text list.
  *
  * Layout: a scrollable left column (search + list of the points currently
  * framed by the map) and a near-fullscreen OSM map. The list is the
@@ -141,7 +143,6 @@ export function MapPanel({ filteredRecords, visibleRecords, selectedId, onSelect
         <div className="map-panel"><SurveillanceMap cameras={filteredRecords} selectedId={selectedId} focusLocation={focusLocation} onSelect={onSelect} onPick={onPick} directoryHref={directoryHref} onBoundsChange={onBoundsChange} popupHtmlFor={popupHtmlForCamera} /><div className="map-hint">{t.mapHint}</div></div>
       </div>
       {loading && <p className="loading-note">{t.loadingRecords}</p>}{notice && <p className="notice" role="status">{notice}</p>}
-      <div className="data-actions"><a href="/api/cameras?format=geojson" download="opensurveillancedb-cameras.geojson">{t.downloadGeoJson}</a><span>·</span><a href="/api/cameras?format=csv" download="opensurveillancedb-cameras.csv">{t.downloadCsv}</a><span>·</span><a href="/guide">{t.readDataPolicy}</a></div>
     </>
   );
 }

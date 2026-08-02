@@ -17,27 +17,29 @@ import { FiltersBar } from "../FiltersBar";
 
 /**
  * /mappa tool body (F4, t_522638a5; viewport redesign t_702c10af; integrated
- * layout t_966254a1; heading cleanup t_11e38eab). No visible tool header:
- * the page starts directly with the compact prototype banner and the single
- * map card. The h1 stays in the DOM as sr-only (a11y — document hierarchy
- * and the section's aria-labelledby keep working). The map card hosts the
- * FiltersBar row (kind/freshness/sort/reset — attached to the card top,
- * width-aligned with the map) and the viewport-synced sidebar list + full
- * map. The filters live in the URL (?q= ?type= ?freshness= ?sort= ?focus= —
- * useCameraFilters) and kind/freshness are forwarded to the API (F0
- * server-side filters). The map keeps needing ALL matching points (plan
- * §3.3), so it walks the server-filtered list; the left sidebar shows only
- * the points inside the current viewport (map.getBounds() → recordsInBounds,
- * debounced by SurveillanceMap). ?focus=ID (deep link from /directory)
- * preselects a record and pans the map to it — focus management,
- * FRONTEND_DESIGN §6.2.
+ * layout t_966254a1; heading cleanup t_11e38eab; CEO feedback 2026-08-02:
+ * prototype banner removed). No visible tool header: the page starts
+ * directly with the single map card. The h1 stays in the DOM as sr-only
+ * (a11y — document hierarchy and the section's aria-labelledby keep
+ * working). The map card hosts the FiltersBar row (kind/freshness/sort/
+ * reset — attached to the card top, width-aligned with the map) and the
+ * viewport-synced sidebar list + full map. The filters live in the URL
+ * (?q= ?type= ?freshness= ?sort= ?focus= — useCameraFilters) and
+ * kind/freshness are forwarded to the API (F0 server-side filters). The map
+ * keeps needing ALL matching points (plan §3.3), so it walks the
+ * server-filtered list; the left sidebar shows only the points inside the
+ * current viewport (map.getBounds() → recordsInBounds, debounced by
+ * SurveillanceMap). ?focus=ID (deep link from /directory) preselects a
+ * record and pans the map to it — focus management, FRONTEND_DESIGN §6.2.
  *
  * Map-always-visible contract (t_b9666d09): the MapPanel (map + sidebar)
  * is rendered UNCONDITIONALLY — a filter that matches nothing must never
  * replace the map with an empty state. The truthful "no record matches"
  * note lives inside the sidebar list (MapPanel), with the Clear filters
- * action wired to onReset; the compact prototype banner stays conditional
- * because it describes the illustrative pins.
+ * action wired to onReset. The prototype banner was removed (CEO feedback
+ * 2026-08-02): the map is no longer framed as a prototype — the truthfulness
+ * contract ("an empty area never proves absence") is carried by pageIntro
+ * and the in-list notes.
  */
 export function MappaTool() {
   const t = useMessages().map;
@@ -98,17 +100,11 @@ export function MappaTool() {
           section's aria-labelledby survive. */}
       <h1 id="map-tool-title" className="sr-only">{t.pageTitle}</h1>
       <div className="map-layout">
-        {/* Compact prototype banner (t_966254a1): a slim one-liner between
-            the map card — only when the map is
-            actually rendered (never over the truthful empty state).
-            F4 (P3): `prototype-banner-compact` era una no-op — lo stile
-            compatto arriva da `.map-layout .prototype-banner` (audit F1 §6). */}
-        {filteredRecords.length > 0 && (
-          <div className="prototype-banner" role="note"><b>{t.prototypeMode}</b> {t.prototypeBanner}</div>
-        )}
         {/* The whole workspace is ONE card: filters attached to the top
             edge (same width, same background, no gap), then the split
-            (sidebar list + full map) and the export footer below. */}
+            (sidebar list + full map). The prototype banner was removed
+            (CEO feedback 2026-08-02) — the page starts directly with the
+            map card. */}
         <div className="map-card">
           <FiltersBar variant="panel" hideSearch cameraKinds={cameraKinds} search={qInput} setSearch={setQ} kindFilter={filters.type} setKindFilter={setType} freshnessFilter={filters.freshness} setFreshnessFilter={setFreshness} sortOrder={filters.sort} setSortOrder={setSort} resultCount={filteredRecords.length} onReset={reset} />
           {/* Map-always-visible (t_b9666d09): MapPanel renders the map AND

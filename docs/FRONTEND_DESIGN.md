@@ -548,9 +548,11 @@ Shell condivisa da `not-found.tsx` (404) ed `error.tsx` (500) (t_7eed4601).
 #### 6.2.6 Workspace mappa — `MappaTool` + `MapPanel` ✅
 
 - **Struttura:** `tool-section.map-tool` → h1 sr-only → `.map-layout`
-  (1440px) → `.prototype-banner` compatto (solo se record > 0) → `.map-card`
-  (unica card: `FiltersBar variant="panel"` come bordo superiore, `MapPanel`
-  sotto, `.data-actions` export in coda).
+  (1440px) → `.map-card` (unica card: `FiltersBar variant="panel"` come
+  bordo superiore, `MapPanel` sotto). Il banner prototipo e il footer
+  `.data-actions` sono stati rimossi (feedback CEO 2026-08-02): la pagina
+  parte direttamente con la card, la riga download GeoJSON/CSV vive su
+  /directory.
 - **MapPanel:** `map-split` 340px sidebar + mappa full-height
   (`calc(100vh - 300px)`, min 540px); mappa sempre renderizzata
   (map-always-visible t_b9666d09); `?focus=ID` deep link panna sul record
@@ -626,7 +628,8 @@ Sempre truthfull: "nessun record pubblicato trovato" — mai "non esiste".
 #### 6.3.7 Altri pattern ✅
 
 - `.notice` (verde, bordo-sx 3px), `.offline-state` (ambra), `.prototype-banner`
-  (giallo-verde, `-compact` per la mappa), `.duplicate-alert` (ambra).
+  (giallo-verde, usato solo dal tool locale di moderazione — su /mappa il
+  banner è stato rimosso, feedback CEO 2026-08-02), `.duplicate-alert` (ambra).
 - `.auth-error` / `.auth-danger-zone` (rosso `#8a3b2c`).
 - `.faq-item`: disclosure nativa `<details>`, summary 17px/800, marker "+"/"–"
   in cerchio `#e3eee4`, focus outline offset -3px.

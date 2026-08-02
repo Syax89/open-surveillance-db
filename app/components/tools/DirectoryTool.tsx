@@ -21,7 +21,9 @@ import { PublicDirectory } from "../home/PublicDirectory";
  * the demo seed fallback and the client-only dimensions (q, sort, plan
  * §3.3). Deep links, shareable URLs and back/forward all re-derive the same
  * state from the URL — no local filter state to desync (D4, one pattern
- * with /mappa).
+ * with /mappa). The data export row (GeoJSON/CSV + data policy) lives HERE
+ * (CEO feedback 2026-08-02): the text list owns the downloads, /mappa no
+ * longer carries the export footer.
  */
 export function DirectoryTool() {
   const t = useMessages().directory;
@@ -62,6 +64,10 @@ export function DirectoryTool() {
         mapHref="/mappa"
         reportHref="/segnala"
       />
+      {/* Data export row (CEO feedback 2026-08-02): moved from /mappa — the
+          accessible text list owns the public data downloads, matching the
+          guide/regole pattern (data-actions footer). */}
+      <div className="data-actions"><a href="/api/cameras?format=geojson" download="opensurveillancedb-cameras.geojson">{t.downloadGeoJson}</a><span>·</span><a href="/api/cameras?format=csv" download="opensurveillancedb-cameras.csv">{t.downloadCsv}</a><span>·</span><a href="/guide">{t.readDataPolicy}</a></div>
     </section>
   );
 }

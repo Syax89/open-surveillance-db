@@ -73,6 +73,12 @@ export const en = {
     "This means only that no reviewed record in this database falls inside the search area. It is not evidence that no cameras exist there.",
   placeEmptySubmit: "Submit a private observation",
   placeEmptyCoverage: "About data coverage limits",
+  // Data export row (moved from /mappa to /directory — CEO feedback
+  // 2026-08-02): the text list owns the public data downloads, the map tool
+  // no longer carries an export footer.
+  downloadGeoJson: "Download public GeoJSON",
+  downloadCsv: "Download public CSV",
+  readDataPolicy: "Read the data policy",
   recordId: "Record ID",
   source: "Source",
   location: "Location",
@@ -147,6 +153,12 @@ export const it: Translation<typeof en> = {
     "Questo significa solo che nessun record revisionato di questo database rientra nell'area di ricerca. Non è la prova che lì non ci siano telecamere.",
   placeEmptySubmit: "Invia un'osservazione privata",
   placeEmptyCoverage: "I limiti della copertura dati",
+  // Riga export dati (spostata da /mappa a /directory — feedback CEO
+  // 2026-08-02): l'elenco testuale possiede i download dei dati pubblici, il
+  // tool mappa non ha più un footer di export.
+  downloadGeoJson: "Scarica il GeoJSON pubblico",
+  downloadCsv: "Scarica il CSV pubblico",
+  readDataPolicy: "Leggi la politica dei dati",
   recordId: "ID record",
   source: "Fonte",
   location: "Posizione",

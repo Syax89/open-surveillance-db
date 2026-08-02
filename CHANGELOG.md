@@ -289,6 +289,25 @@ changes accumulate under `[Unreleased]`.
 
 ### Fixed
 
+- `/mappa` CEO feedback 2026-08-02 (t_9e8642a0): (1) il banner "Prototype
+  mode" sopra la mappa è stato RIMOSSO — la pagina parte direttamente con la
+  card della mappa, la mappa non è più presentata come prototipo (la
+  veridicità resta in pageIntro e nelle note in-lista; chiavi i18n
+  `map.prototypeMode/prototypeBanner` e CSS `.map-layout .prototype-banner`
+  rimossi); (2) il contatore "X public records found" su /mappa era a 2px dal
+  bordo sinistro della card — ora ha lo stesso inset di 18px della riga
+  filtri (`.map-card .search-count`); (3) il bottone "Reset filters" della
+  variante panel finiva da solo su una seconda riga della griglia a 3 colonne
+  — ora `.map-card .filters-panel` è una griglia a 4 colonne
+  (kind/freshness/sort/reset su UNA riga, bottone allineato a destra
+  nell'ultima colonna auto; override responsive ≤980px/≤700px coerenti); (4)
+  la riga download GeoJSON/CSV è stata SPOSTATA da /mappa a /directory
+  (`.data-actions` da `MapPanel` a `DirectoryTool`, nuove chiavi
+  `directory.downloadGeoJson/downloadCsv/readDataPolicy` EN/IT; il tool mappa
+  non ha più il footer export). Test: asserzioni aggiornate e nuove in
+  `tests/client-tools.test.mjs` (banner assente su /mappa, download presenti
+  solo su /directory), docs `FRONTEND_DESIGN.md` §6.2.6/§6.3.7 aggiornati.
+
 - P1-1 `confirmationCountsFor()` D1 bound-parameter cap (t_b2d59dfc): a
   public camera page with more than 100 records used to build a single
   `IN (?, ...)` over every id, blowing past D1's 100-bound-parameter limit
