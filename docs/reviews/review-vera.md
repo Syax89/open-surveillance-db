@@ -4,7 +4,7 @@
 **Data:** 2026-08-02
 **Commit review:** `6f56d22` (main, `feat(header): auth entry point in top-right corner` #215)
 **Documenti di riferimento:** `docs/FRONTEND_DESIGN.md` v2 (uncommitted, working tree di
-`/home/simone/workspace/open-surveillance-db`), `docs/design-audit.md` (F1, uncommitted),
+`working tree locale del repo`), `docs/design-audit.md` (F1, uncommitted),
 `docs/workstreams/PRODUCT_UX.md`. **Nessuna modifica al codice: solo review.**
 
 ---
@@ -19,7 +19,7 @@ componenti, tutte le route pubbliche e private, i bundle i18n. Verifica con **re
 **Finding principale (processo):** il main @6f56d22 **NON contiene i fix code-side F4**
 (`.tool-heading`/`.tool-section`, `.status-dot.demo/.pending`, pesi tipografici 800/700,
 `body 16/1.5`, 6 contrasti AA, touch target 44px). Essi esistono solo come modifiche
-uncommitted nel working tree di `/home/simone/workspace/open-surveillance-db` (dove il file
+uncommitted nel working tree di `working tree locale del repo` (dove il file
 `globals.css` è anche in stato di conflitto merge con marker `<<<<<<<` non risolti). Il
 documento FRONTEND_DESIGN.md v2 dichiara quindi come "✅ implementato" uno stato che su main
 non esiste. **Priorità numero uno: portare F4 in main (commit) o ricreare i fix in una PR.**
@@ -237,11 +237,11 @@ manca coerenza con il design system dichiarato.
 ## 6. Note di processo
 
 - Il documento `FRONTEND_DESIGN.md` v2 e `design-audit.md` sono **non committati** nel working
-  tree di `/home/simone/workspace/open-surveillance-db` (che è a @200f415 + fix F4); main è a
+  tree di `working tree locale del repo` (che è a @200f415 + fix F4); main è a
   @6f56d22. Il doc v2 dichiara D16–D20 "✅" ma su main quelle voci sono ancora 🔒. **Il doc e
   il codice devono viaggiare insieme in una PR unica** (F4 + doc), altrimenti il design system
   "vincolante" descrive uno stato inesistente.
-- `app/globals.css` nel working tree di `/home/simone/workspace/open-surveillance-db` contiene
+- `app/globals.css` nel working tree di `working tree locale del repo` contiene
   **marker di conflitto git non risolti** (`<<<<<<< Updated upstream` / `>>>>>>> Stashed
   changes`, righe 3, 40-44, 47-48, …). Da risolvere PRIMA del merge.
 - Nessuna modifica al codice è stata fatta da questa review (solo lettura + dev server locale).
