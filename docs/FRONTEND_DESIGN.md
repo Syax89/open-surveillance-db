@@ -101,6 +101,35 @@ link "Use the map instead" (directory), report-rule "Before submitting"
 (segnala) e "Urgent concern" (correggi). Gerarchia heading: h1 tool →
 h2 sezione (es. place-search) → h3 card.
 
+**Directory catalog mode (t_127492f1 — redesign /directory):** la tool page
+usa `PublicDirectory variant="catalog"` con un layout a tre fasce, nell'ordine
+"filtri → count/export → lista" richiesto dalla CEO:
+
+1. `.directory-tool-heading` = `.tool-heading` con il link "Use the map
+   instead" allineato a destra (modifier: il layout flex vale SOLO per
+   /directory, /segnala e /correggi restano invariati).
+2. `FiltersBar variant="bare"` — la stessa griglia controlli (search + type +
+   freshness + sort + reset, ids storici `record-*`) SENZA il counter.
+3. `.directory-meta` — count (`role=status`, id `record-search-count`),
+   trigger del pannello luogo (`aria-expanded`/`aria-controls`) e export
+   CSV/GeoJSON (`.data-actions`, filtri server kind+freshness).
+4. `.place-search` come pannello collassabile (`.place-search-closed` =
+   `display:none` finché il trigger non lo apre — mai l'attributo `hidden`,
+   vietato dal contratto pages-render): un solo input di ricerca visibile
+   alla volta — la ricerca per luogo è una *modalità*, non una feature
+   sorella (principio già stabilito da /mappa con `hideSearch`).
+5. `h2.sr-only` "Directory results" (chiave `resultsRegion`) prima della
+   lista: mantiene la scala h1 → h2 → h3.
+6. `.directory-tool .record-list` a UNA colonna con righe piatte ~80px
+   (hairline, 3 colonne titolo/fatti/azioni — stile contestuale, la classe
+   `record-list-card` di `RecordCard` resta byte-identica per le suite
+   a11y), ~3× densità delle card 270px. Un solo flusso di risultati: una
+   ricerca luogo attiva sostituisce la lista (banner `.place-banner` con
+   area + count + clear, fact Distanza).
+
+La home resta su `variant="hub"` (output byte-identico: records-heading +
+blocco place-search + FiltersBar inline + count + griglia 2 colonne).
+
 ### 2.3 Eccezioni header
 
 - **Error pages (404/500):** header ridotto a **1 link** (`nav-action` "Torna
@@ -418,13 +447,14 @@ Legenda: **[spec]** = sezione dedicata sotto · **[patt.]** = pattern condiviso
 | `lib/map-popup.ts` | `/mappa` | **builder HTML marker popup** (bindPopup) | **[spec] 6.2.2** |
 
 **Directory e tool**
-| `DirectoryTool` | `/directory` | tool-heading + PublicDirectory | [spec] 2.2 |
+| `DirectoryTool` | `/directory` | tool-heading (con link mappa) + PublicDirectory catalog | [spec] 2.2 |
+| `DirectoryCatalog` | `/directory` | **layout catalog**: FiltersBar bare + meta row + pannello luogo + righe | **[spec] 2.2** |
 | `SegnalaTool` | `/segnala` | tool-heading + ReportForm | [spec] 2.2 |
 | `CorreggiTool` | `/correggi` | tool-heading + CorrectionForm | [spec] 2.2 |
-| `PublicDirectory` | `/directory` | search + filtri + lista + place-search | [patt.] |
+| `PublicDirectory` | `/directory`, home | catalog (delega a DirectoryCatalog) / hub (sezione home) | [patt.] |
 | `ReportForm` | `/segnala` | form guidato + coordinate + foto | [patt.] |
 | `CorrectionForm` | `/correggi` | form correzione + duplicate alert | [patt.] |
-| `FiltersBar` | `/mappa`, `/directory` | filtri condivisi D4, varianti `inline`/`panel` | **[spec] 6.3.3** |
+| `FiltersBar` | `/mappa`, `/directory`, home | filtri condivisi D4, varianti `inline`/`panel`/`bare` | **[spec] 6.3.3** |
 | `RecordCard` | directory, search, moderation | card record condivisa | [patt.] |
 | `EmptyState` | directory, mappa, moderation | empty state truthfull (heading h2\|h3) | [patt.] |
 
@@ -618,6 +648,15 @@ Stesso componente su `/mappa` e `/directory` (D4, stato URL identico):
 | Ordinamento | `<select>` (alpha/position) | `?sort=` |
 | Reset | `<button>` | rimuove i params |
 
+**Varianti (t_127492f1):** `inline` (home: riga controlli + counter),
+`panel` (/mappa: bordo superiore della map-card, `hideSearch`), `bare`
+(/directory catalog: la stessa griglia controlli SENZA il counter — il
+counter vive nella `.directory-meta` renderizzata da `PublicDirectory`
+catalog, accanto a export e trigger luogo). Le varianti condividono ids
+(`record-search`, `record-kind-filter`, `record-freshness-filter`,
+`record-sort`, `record-search-count`), label e stato URL — solo la resa
+del counter cambia.
+
 Feedback immediato (contatore `role="status"`, niente bottone "applica"),
 reset sempre visibile, empty state truthfull, solo filtri a basso rischio
 (tipo/freshness/sort — mai stato, produttore, dati sensibili).
@@ -628,6 +667,13 @@ reset sempre visibile, empty state truthfull, solo filtri a basso rischio
 padding 24px, bordo `--line`, radius `--radius-lg`, bg `#fffef9`;
 `.card-topline` + h3 + dl fatti (3 colonne) + azioni. Su ≤700px: dl 2
 colonne; azioni in colonna.
+
+**Righe contestuali (t_127492f1):** in `.directory-tool .record-list` la
+stessa `RecordCard` diventa riga piatta (hairline inferiore, niente
+min-height/radius/bg, 3 colonne `titolo | fatti | azioni`, titolo 17px) —
+lo stile arriva dal contesto della lista, la classe dell'articolo resta
+byte-identica (`class="record-list-card"`, conteggiata dalle suite a11y).
+Home e moderation restano card (griglie fuori da `.directory-tool`).
 
 #### 6.3.5 Form ✅
 
@@ -735,6 +781,7 @@ VoiceOver, zoom 200% a 320px, contrasto per stato.
 | Hero | 1 colonna, padding ridotto | 1 colonna | 2 colonne |
 | **Mappa** | **pannello sidebar sopra la mappa** (≤768px, 38vh) | sidebar + mappa | sidebar 340px + mappa |
 | Directory controls | 1 colonna (≤700) | 2 colonne (≤980) | 3 colonne |
+| Directory catalog (t_127492f1) | controlli 1 col; righe 1 col; meta in colonna (≤700) | controlli 2 col; righe 1 col | righe piatte full-width |
 | Record grid | 1 colonna | 1 colonna | 2 colonne |
 | Form | 1 colonna | 2 colonne | 2 colonne |
 | Footer | 1 colonna (≤700) | 2 colonne (≤980) | 3 colonne |
