@@ -601,3 +601,30 @@ export const cameraEditRequests = sqliteTable(
     index("camera_edit_requests_contributor_idx").on(table.contributorId),
   ],
 );
+
+/**
+ * Outbound transactional-email send log (AUTH MULTI-METODO Fase A2, migration
+ * 0029). Exists ONLY to enforce the 3-emails-per-contributor-per-hour
+ * re-send limit for account verification and password reset (ADR 0020
+ * decision 2). Privacy by design: the row stores NO content, NO recipient
+ * address (the address already lives on `contributors.email`) and NO IP —
+ * a leak of this table reveals nothing beyond "account X was emailed for
+ * kind Y at time T". `kind` is 'verify' | 'reset'; the rate-limit window
+ * counts rows newer than now - 1h for the contributor. Rows cascade-delete
+ * with the account (ADR 0013 erasure).
+ * Declared here so drizzle-kit generate never re-emits it (convention
+ * 0012/0014: hand-written migration + schema declaration together).
+ */
+export const emailSendLog = sqliteTable(
+  "email_send_log",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    contributorId: integer("contributor_id").notNull().references(() => contributors.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(),
+    sentAt: text("sent_at").notNull(),
+  },
+  (table) => [
+    index("email_send_log_contributor_idx").on(table.contributorId),
+    index("email_send_log_sent_at_idx").on(table.sentAt),
+  ],
+);

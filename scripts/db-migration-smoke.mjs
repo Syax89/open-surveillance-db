@@ -67,6 +67,11 @@ const expectedTables = [
   // WebAuthn ceremony challenges — Fase C (0028): only the SHA-256 of the
   // base64url challenge is stored, 10-minute TTL, single-use (`used_at`).
   "webauthn_challenges",
+  // Outbound transactional-email send log (0029, AUTH MULTI-METODO Fase A2):
+  // the only purpose is the 3-emails/h per contributor re-send limit for
+  // verification/password-reset emails (ADR 0020). No content, no recipient
+  // address, no IP — see the migration header comment.
+  "email_send_log",
 ];
 // Indexes declared by the migrations.
 const expectedIndexes = [
@@ -130,6 +135,10 @@ const expectedIndexes = [
   "webauthn_challenges_challenge_hash_unique",
   "webauthn_challenges_expires_idx",
   "webauthn_challenges_contributor_idx",
+  // Mailer send log (0029): the 3/h rate-limit COUNT is a
+  // `WHERE contributor_id = ? AND sent_at >= ?` range scan.
+  "email_send_log_contributor_idx",
+  "email_send_log_sent_at_idx",
 ];
 // Tables that are not application schema but legitimately appear in a local
 // D1 database. Anything outside this set is an unexpected schema change.
