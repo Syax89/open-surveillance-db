@@ -368,10 +368,104 @@ export const NEARBY_PAGE_DEFAULT_LIMIT = 50;
 export const NEARBY_PAGE_MAX_LIMIT = 100;
 
 /**
+ * Haversine distance in metres, computed in SQL (D1 supports the SQLite math
+ * functions — docs "SQL statements" → Supported SQLite extensions; the
+ * in-memory test harness uses node:sqlite, which ships them too).
+ *
+ * The formula is byte-for-byte the JS `distanceInMeters` helper (same earth
+ * radius, same atan2(sqrt(a), sqrt(1-a)) shape), evaluated on the *rounded*
+ * public coordinates so the page keeps the exact same ordering, filtering and
+ * `distanceMeters` values as the historical JS pass over
+ * `listPublicCamerasNear`. `FLOOR(latitude * 10000 + 0.5) / 10000` is the SQL
+ * equivalent of `Math.round(latitude * 10000) / 10000` (ADR 0008 rounding)
+ * — FLOOR(x + 0.5) === Math.round(x) for every finite x, including negatives.
+ *
+ * Placeholders, in order: fromLat, fromLat, fromLon, fromLat, fromLat, fromLon.
+ */
+const SQL_HAVERSINE_DISTANCE = `2 * 6371000 * atan2(
+  sqrt(
+    pow(sin(radians(FLOOR(latitude * 10000 + 0.5) / 10000 - ?) / 2), 2) +
+    cos(radians(?)) * cos(radians(FLOOR(latitude * 10000 + 0.5) / 10000)) *
+    pow(sin(radians(FLOOR(longitude * 10000 + 0.5) / 10000 - ?) / 2), 2)
+  ),
+  sqrt(1 - (
+    pow(sin(radians(FLOOR(latitude * 10000 + 0.5) / 10000 - ?) / 2), 2) +
+    cos(radians(?)) * cos(radians(FLOOR(latitude * 10000 + 0.5) / 10000)) *
+    pow(sin(radians(FLOOR(longitude * 10000 + 0.5) / 10000 - ?) / 2), 2)
+  ))
+)`;
+
+/**
+ * Paginated proximity search shared by GET /api/cameras/search and
+ * GET /api/cameras/nearby (FRONTEND_PLAN § 3.2.3).
+ *
+ * One implementation, two callers that differ only in their default page size
+ * (search 25, nearby 50) — the historical duplicate functions (audit gap
+ * P1-4) are merged here behind a `defaultLimit` parameter. The pagination now
+ * happens in SQL (LIMIT/OFFSET on the exact haversine distance) instead of
+ * loading the whole candidate set and slicing in memory: the bounding box
+ * pre-filter narrows the rows, the DB computes the exact distance, orders and
+ * pages them, and only the requested page crosses the wire. `total` comes
+ * from a matching COUNT, so the shape ({ records, total, nextOffset }) and
+ * the exact ordering are preserved for every existing caller.
+ */
+export async function findPublicCamerasNearPage(
+  latitude: number,
+  longitude: number,
+  radiusMeters: number,
+  options: { limit: number; offset: number },
+  defaultLimit: number,
+  maxLimit: number,
+): Promise<{ records: NearbyPublicCameraRecord[]; total: number; nextOffset: number | null }> {
+  const limit = Math.min(Math.max(Math.trunc(options.limit) || defaultLimit, 1), maxLimit);
+  const offset = Math.max(Math.trunc(options.offset) || 0, 0);
+  const d1 = await getD1();
+  const { sql: publicPredicate, parameters: predicateParameters } = publicCameraPredicate(new Date().toISOString());
+  // Same bounding-box pre-filter as listPublicCamerasNear: ~1° latitude ≈
+  // 111,320 m, longitude degrees shrink with cos(latitude), 15 m padding for
+  // the ~10 m public-coordinate rounding (ADR 0008). The composite index
+  // (drizzle/0014) serves the BETWEEN.
+  const ROUNDING_PADDING_METERS = 15;
+  const latitudeDelta = (radiusMeters + ROUNDING_PADDING_METERS) / 111_320;
+  const longitudeDelta = (radiusMeters + ROUNDING_PADDING_METERS) / (111_320 * Math.max(Math.cos((latitude * Math.PI) / 180), 0.01));
+  const bboxParameters = [latitude - latitudeDelta, latitude + latitudeDelta, longitude - longitudeDelta, longitude + longitudeDelta];
+  // The haversine expression references the query point three times (lat,
+  // lat, lon) and repeats it twice (a and 1 - a): six bound parameters.
+  const distanceParameters = [latitude, latitude, longitude, latitude, latitude, longitude];
+
+  // Public record columns, publish-flag CASEs and coordinate rounding exactly
+  // as in listPublicCamerasNear (the shared public boundary).
+  const selectColumns = `id, title, kind, CASE WHEN publish_manufacturer = 1 THEN manufacturer ELSE NULL END AS manufacturer, CASE WHEN publish_observed_on = 1 THEN observed_on ELSE NULL END AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, FLOOR(latitude * 10000 + 0.5) / 10000 AS latitude, FLOOR(longitude * 10000 + 0.5) / 10000 AS longitude, status, source, updated, description, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt`;
+
+  const fromWhere = `FROM cameras WHERE ${publicPredicate} AND latitude BETWEEN ? AND ? AND longitude BETWEEN ? AND ?`;
+  // Bind order follows the lexical placeholder order of the SQL: the six
+  // haversine placeholders sit in the SELECT clause (before FROM/WHERE), so
+  // they bind first, then predicate + bbox, then the outer radius.
+  const countResult = await d1
+    .prepare(`SELECT COUNT(*) AS total FROM (SELECT ${SQL_HAVERSINE_DISTANCE} AS distanceMeters ${fromWhere}) WHERE distanceMeters <= ?`)
+    .bind(...distanceParameters, ...predicateParameters, ...bboxParameters, radiusMeters)
+    .first<{ total: number }>();
+  const total = countResult?.total ?? 0;
+
+  // ORDER BY distanceMeters ASC, id DESC replicates the historical JS sort
+  // (stable sort over the box's id DESC order: equal distances keep the
+  // highest id first, as the previous in-memory path did). The outer WHERE
+  // applies the exact radius filter after the inner subquery computed the
+  // distance (SQLite cannot reference the SELECT alias in the same WHERE).
+  const result = await d1
+    .prepare(`SELECT * FROM (SELECT ${selectColumns}, ${SQL_HAVERSINE_DISTANCE} AS distanceMeters ${fromWhere}) WHERE distanceMeters <= ? ORDER BY distanceMeters ASC, id DESC LIMIT ? OFFSET ?`)
+    .bind(...distanceParameters, ...predicateParameters, ...bboxParameters, radiusMeters, limit, offset)
+    .all<NearbyPublicCameraRecord>();
+  const records = result.results;
+  const nextOffset = offset + records.length < total ? offset + records.length : null;
+  return { records, total, nextOffset };
+}
+
+/**
  * Paginated variant of searchPublicCamerasNear for GET /api/cameras/search:
  * same exact distance ordering, same shape as the list pagination
  * ({ records, total, nextOffset }) so the frontend reuses one pagination
- * contract (FRONTEND_PLAN § 3.2.3).
+ * contract (FRONTEND_PLAN § 3.2.3). Default page 25, hard cap 100.
  */
 export async function searchPublicCamerasNearPage(
   latitude: number,
@@ -379,19 +473,16 @@ export async function searchPublicCamerasNearPage(
   radiusMeters: number,
   options: { limit: number; offset: number } = { limit: SEARCH_PAGE_DEFAULT_LIMIT, offset: 0 },
 ): Promise<{ records: NearbyPublicCameraRecord[]; total: number; nextOffset: number | null }> {
-  const limit = Math.min(Math.max(Math.trunc(options.limit) || SEARCH_PAGE_DEFAULT_LIMIT, 1), SEARCH_PAGE_MAX_LIMIT);
-  const offset = Math.max(Math.trunc(options.offset) || 0, 0);
-  const records = await searchPublicCamerasNear(latitude, longitude, radiusMeters);
-  const total = records.length;
-  const page = records.slice(offset, offset + limit);
-  const nextOffset = offset + page.length < total ? offset + page.length : null;
-  return { records: page, total, nextOffset };
+  return findPublicCamerasNearPage(latitude, longitude, radiusMeters, options, SEARCH_PAGE_DEFAULT_LIMIT, SEARCH_PAGE_MAX_LIMIT);
 }
 
 /**
  * Paginated variant of searchPublicCamerasNear for GET /api/cameras/nearby
  * (FRONTEND_PLAN § 3.2.3): same distance ordering, same pagination shape,
- * larger default page (50).
+ * larger default page (50). The pre-submit duplicate warning on the report
+ * form calls this with limit=8 to keep its warning compact; the server-side
+ * duplicate check (POST /api/cameras) keeps using findNearbyPublicCameras
+ * directly.
  */
 export async function findNearbyPublicCamerasPage(
   latitude: number,
@@ -399,11 +490,5 @@ export async function findNearbyPublicCamerasPage(
   radiusMeters: number,
   options: { limit: number; offset: number } = { limit: NEARBY_PAGE_DEFAULT_LIMIT, offset: 0 },
 ): Promise<{ records: NearbyPublicCameraRecord[]; total: number; nextOffset: number | null }> {
-  const limit = Math.min(Math.max(Math.trunc(options.limit) || NEARBY_PAGE_DEFAULT_LIMIT, 1), NEARBY_PAGE_MAX_LIMIT);
-  const offset = Math.max(Math.trunc(options.offset) || 0, 0);
-  const records = await searchPublicCamerasNear(latitude, longitude, radiusMeters);
-  const total = records.length;
-  const page = records.slice(offset, offset + limit);
-  const nextOffset = offset + page.length < total ? offset + page.length : null;
-  return { records: page, total, nextOffset };
+  return findPublicCamerasNearPage(latitude, longitude, radiusMeters, options, NEARBY_PAGE_DEFAULT_LIMIT, NEARBY_PAGE_MAX_LIMIT);
 }
