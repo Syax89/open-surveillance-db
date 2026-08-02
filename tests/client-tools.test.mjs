@@ -578,9 +578,11 @@ test("DirectoryTool renders the directory shell with the shared FiltersBar and b
   assert.equal(useMap.getAttribute("href"), "/mappa", "the directory links the map tool route");
 
   // CEO feedback 2026-08-02: the data export row moved from /mappa to
-  // /directory — the accessible text list owns the public data downloads.
-  assert.ok(screen.getByRole("link", { name: "Download public GeoJSON" }), "download GeoJSON row on /directory");
-  assert.ok(screen.getByRole("link", { name: "Download public CSV" }), "download CSV row on /directory");
+  // /directory — the catalog meta row (DirectoryCatalog) owns the
+  // filter-aware CSV/GeoJSON downloads (t_127492f1) and the data-actions
+  // footer keeps the data policy link (guide/regole pattern, merge #229 × #231).
+  assert.ok(screen.getByRole("link", { name: "Download GeoJSON" }), "download GeoJSON row on /directory");
+  assert.ok(screen.getByRole("link", { name: "Download CSV" }), "download CSV row on /directory");
   assert.equal(screen.getByRole("link", { name: "Read the data policy" }).getAttribute("href"), "/guide", "the data policy link points at /guide");
 });
 
@@ -893,4 +895,32 @@ test("CorreggiTool ignores an unknown ?record= id (no prefill, no announcement)"
 
   assert.equal(screen.getByLabelText("Related public record").value, "", "no preselection for an unknown id");
   assert.ok(!screen.queryByRole("status"), "no announcement when nothing was pre-selected");
+});
+
+// ---------------------------------------------------------------------------
+// /404 + /500 — ErrorPage document title (F5 P3-3, WCAG 2.4.2)
+// ---------------------------------------------------------------------------
+
+test("ErrorPage sets a page-specific document.title for 404 and 500 (WCAG 2.4.2)", async () => {
+  // The SSR <title> comes from the root layout; not-found.tsx cannot export
+  // metadata in this build and error.tsx is a client boundary, so the page
+  // must set its own <title> client-side (F5 P3-3). A tab on an error page
+  // must not show the home title.
+  const ErrorPage = (await loadDomModule("app/components/ErrorPage.mjs")).default;
+
+  document.title = "unrelated";
+  await renderWithLocale(React.createElement(ErrorPage, { statusCode: 404 }));
+  assert.equal(
+    document.title,
+    "Page not found — OpenSurveillanceDB",
+    "the 404 page owns its <title> (EN bundle)",
+  );
+
+  document.title = "unrelated";
+  await renderWithLocale(React.createElement(ErrorPage, { statusCode: 500 }));
+  assert.equal(
+    document.title,
+    "Something went wrong — OpenSurveillanceDB",
+    "the 500 page owns its <title> (EN bundle)",
+  );
 });

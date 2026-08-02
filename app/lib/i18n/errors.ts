@@ -25,6 +25,11 @@ export const en = {
     "An unexpected error occurred while serving this page. Please try again, or head back to the homepage.",
   backHome: "Back to the homepage",
   tryAgain: "Try again",
+  // Document <title> (WCAG 2.4.2 Page Titled): not-found.tsx exports
+  // generateMetadata (SSR); error.tsx is a client boundary, so ErrorPage
+  // sets the same titles client-side via document.title.
+  notFoundMetaTitle: "Page not found — OpenSurveillanceDB",
+  serverErrorMetaTitle: "Something went wrong — OpenSurveillanceDB",
 } as const;
 
 export const it: Translation<typeof en> = {
@@ -42,4 +47,9 @@ export const it: Translation<typeof en> = {
     "Si è verificato un errore imprevisto durante il caricamento di questa pagina. Riprova oppure torna alla home.",
   backHome: "Torna alla home",
   tryAgain: "Riprova",
+  // <title> del documento (WCAG 2.4.2 Page Titled): not-found.tsx esporta
+  // generateMetadata (SSR); error.tsx è un boundary client, quindi ErrorPage
+  // imposta gli stessi titoli lato client via document.title.
+  notFoundMetaTitle: "Pagina non trovata — OpenSurveillanceDB",
+  serverErrorMetaTitle: "Qualcosa è andato storto — OpenSurveillanceDB",
 };
