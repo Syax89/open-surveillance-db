@@ -103,34 +103,12 @@ declare module "cloudflare:workers" {
     PHOTOS: R2Bucket;
     // Multi-method auth — Fase B/A2 (mailer): the Cloudflare `send_email`
     // binding is optional by design. When absent the mailer falls back to a
-    // dev log (registration and reset still succeed — see app/lib/mailer.ts).
-    // VERIFY_BASE_URL overrides the link base (defaults to the request
-    // origin); MAIL_FROM overrides the sender (default no-reply@opensurveillancedb.org).
-    SEND_EMAIL?: {
-      send(message: EmailMessage): Promise<void>;
-    };
+    // dev log (registration and reset still succeed — see db/mailer.ts and
+    // app/lib/mailer.ts). VERIFY_BASE_URL overrides the link base (defaults
+    // to the request origin); MAIL_FROM overrides the sender (default
+    // no-reply@opensurveillancedb.org).
     VERIFY_BASE_URL?: string;
     MAIL_FROM?: string;
   }
   export const env: Env;
-}
-
-// Cloudflare Email Workers send_email API (used by app/lib/mailer.ts). The
-// binding is optional (dev fallback logs instead), so these globals only
-// exist at runtime inside a Worker with the binding configured; the mailer
-// constructs them lazily, never at module load.
-declare class EmailMessage {
-  constructor(from: string, to: string, raw: string | ReadableStream);
-  setFrom(address: string): void;
-  setTo(addresses: string | string[]): void;
-  setSubject(subject: string): void;
-  setContent(...parts: EmailContent[]): void;
-  setHeader(name: string, value: string): void;
-}
-type EmailContent = TextPart | HtmlPart;
-declare class TextPart {
-  constructor(text: string);
-}
-declare class HtmlPart {
-  constructor(html: string);
 }

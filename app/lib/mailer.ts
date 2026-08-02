@@ -59,7 +59,12 @@ async function deliver(
     actionUrl: string;
   },
 ): Promise<MailSendResult> {
-  const binding = (env as EnvLike).SEND_EMAIL;
+  // The Cloudflare `send_email` binding is named EMAIL in wrangler.jsonc
+  // (AUTH MULTI-METODO Fase A2 / #234, ADR 0020). The binding surface is the
+  // structured builder API: send({ to, from, subject, html, text }) →
+  // { messageId } — see db/mailer.ts sendMail(), which is the A2 canonical
+  // implementation this module mirrors for the Fase B routes.
+  const binding = (env as { EMAIL?: { send(message: unknown): Promise<{ messageId: string }> } }).EMAIL;
   if (!binding) {
     // Dev/test fallback: surface the action link so local flows and the E2E
     // harness can complete the verification without a real mail backend.
@@ -68,14 +73,13 @@ async function deliver(
   }
   try {
     const from = sender(env);
-    // The binding object is structural; the EmailMessage global exists at
-    // runtime only inside a Worker with the binding configured.
-    const message = new EmailMessage(from, options.to, "");
-    message.setFrom(from);
-    message.setTo([options.to]);
-    message.setSubject(options.subject);
-    message.setContent(new TextPart(options.plain), new HtmlPart(options.html));
-    await (binding as { send(message: unknown): Promise<void> }).send(message);
+    await binding.send({
+      to: options.to,
+      from,
+      subject: options.subject,
+      html: options.html,
+      text: options.plain,
+    });
     return { delivered: true };
   } catch (error) {
     // Mail must never break auth: log and continue (the user can re-send).

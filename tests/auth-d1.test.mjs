@@ -695,8 +695,8 @@ test("revokeAllContributorSessions kills every live session of a contributor", a
 test("the purpose column defaults to 'verify' for legacy-shaped inserts", async () => {
   const { auth } = runtime;
   const contributor = await makeContributor(auth);
-  // A raw insert that omits purpose must land as 'verify' (migration 0028
-  // default), keeping every pre-0028 writer valid.
+  // A raw insert that omits purpose must land as 'verify' (migration 0030
+  // default), keeping every pre-0030 writer valid.
   await runtime.env.DB.prepare(
     "INSERT INTO email_verification_tokens (contributor_id, token_hash, created_at, expires_at) VALUES (?, ?, ?, ?)",
   ).bind(contributor.id, "legacy-hash", NOW, "2026-08-02T00:00:00.000Z").run();

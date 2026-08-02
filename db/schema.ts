@@ -144,7 +144,7 @@ export const contributors = sqliteTable(
 );
 
 /**
- * Email verification tokens (migration 0027, Fase B; purpose column 0028).
+ * Email verification tokens (migration 0027, Fase B; purpose column 0030).
  * Only the SHA-256 of the raw token is stored — a database leak cannot
  * replay it (same rule as `sessions.token_hash`, ADR 0013). A token is dead
  * after `expires_at` (24h) or once `used_at` is set (single-use; consume is
@@ -152,7 +152,7 @@ export const contributors = sqliteTable(
  * expiry sweep. Declared here so drizzle-kit generate never re-emits it
  * (convention 0012/0014).
  *
- * `purpose` (migration 0028) separates the two flows sharing this table:
+ * `purpose` (migration 0030) separates the two flows sharing this table:
  * 'verify' — email verification at registration (Fase B); 'reset' — the
  * password-reset link (Fase B). Each purpose gets its own 3/h send limit
  * and its own consume semantics (a reset link never re-verifies the email
