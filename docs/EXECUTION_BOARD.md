@@ -59,7 +59,7 @@ Open only the selected pilot area, with a deliberately small contributor group a
 
 These are the next technical tickets once Wave A has named owners and approved the pilot policy.
 
-Status reflects the local prototype as of 2026-08-01; every `Done` row is evidenced in the Progress log below.
+Status reflects the local prototype as of 2026-08-02; every `Done` row is evidenced in the Progress log below.
 
 | Priority | Ticket | Owner | Depends on | Status |
 | --- | --- | --- | --- | --- |
@@ -72,8 +72,8 @@ Status reflects the local prototype as of 2026-08-01; every `Done` row is eviden
 | P0 | Add route-level rate limits, input limits, and abuse alerts | Operations | Hosting choice | Done — per-route limits, input caps, abuse alerts (PR #43) |
 | P0 | Configure staging, secrets, backups, restore rehearsal, and monitoring | Operations | Hosting choice | In progress — local LXC 114 covered (ops/ scripts); Cloudflare staging deferred (CEO local-first decision) |
 | P1 | Create separate private evidence/media pipeline with scanning, EXIF removal, and redaction | Data & trust | Approved retention and review policy | Done (local prototype) — intake caps, magic-byte verification, EXIF/XMP/IPTC strip, R2 storage, moderation/redaction gate (PR #64) |
-| P1 | Internationalise safety-critical UI strings | Product | Pilot language decision | Done — bilingual EN/IT surfaces (PRs #68, #72, #78, #88); per-domain bundle refactor in flight (PR #80) |
-| P1 | Publish versioned data exports, data dictionary, and changelog | Data & trust + Operations | Final data licence | In progress — CSV export done; changelog done (PR #86); ODbL export notice open (PR #81) |
+| P1 | Internationalise safety-critical UI strings | Product | Pilot language decision | Done — bilingual EN/IT surfaces (PRs #68, #72, #78, #88); per-domain bundle refactor merged (PR #80) |
+| P1 | Publish versioned data exports, data dictionary, and changelog | Data & trust + Operations | Final data licence | In progress — CSV export done; changelog done (PR #86); ODbL export notice merged (PR #81); versioned release cadence remains future work |
 | P1 | Add privacy-preserving aggregate service metrics and transparency reporting | Operations + Product | Privacy review | Open |
 
 ## Progress log
@@ -186,6 +186,15 @@ Status reflects the local prototype as of 2026-08-01; every `Done` row is eviden
 - **2026-08-01 — Private evidence/media pipeline implemented (Wave B, Data & Trust):** `/api/photos` intake applies size/MIME/dimension caps and magic-byte container verification, strips EXIF/XMP/IPTC metadata fail-closed, stores sanitised bytes in R2 with metadata only in D1, and publishes a photo only after moderation/redaction approval for a public camera — pending or rejected evidence never leaks (PR #64, STATUS gap #3).
 - **2026-08-01 — Public information-site restructure completed (Wave C item 5):** bilingual pages `/manifesto`, `/regole`, `/faq`, `/contatti`, `/privacy`, `/termini`, `/licenze`, and `/moderazione` are wired into a single global site footer with institutional links and ODbL/OSM attribution; GDPR art. 13/14 short-notice links now appear in the report, correction, and register forms; a full navigation QA pass (link resolution, accessibility, EN/IT coverage, leak and render checks) and a footer de-duplication fix keep the restructure consistent. Site structure is documented in [SITEMAP.md](SITEMAP.md). (PRs #65, #67, #68, #70, #71, #72, #73, #75, #76, #88.)
 - **2026-08-01 — Local LXC 114 operations added (Wave B, Operations):** `ops/` now provides `health-check.sh` (LAN reachability and endpoint checks, run every 5 minutes), `backup-lxc114.sh` (vzdump snapshot to the NAS, 7 kept, nightly 02:30), `snapshot-pre-deploy.sh`, and `rollback-lxc114.sh` (polls the Proxmox task UPID, stops → restores → restarts the container). A live drill on 2026-08-01 backed up the container (1.02 GB in ~40 s), rolled back a pre-deploy snapshot, and brought the site back with the health check 5/5. Documented in [OPERATIONS.md](OPERATIONS.md) §8 and its appendix. (PRs #58, #60.)
+- **2026-08-01 — Frontend refactor F1–F3 completed (Wave C, Product):** the four tool routes became dedicated pages (`/mappa`, `/directory`, `/segnala`, `/correggi` under `app/(tools)/` with a shared `ToolLayout`, F1, PR #158); the home page is now a hub with a static map teaser and four tool cards, no longer rendering the old anchor sections (F2, PR #162); tool routes are linked from the home nav and the global footer, and `LegacyAnchorRedirect` client-side-redirects the legacy anchors (`/#map`, `/#records`, `/#report`, `/#correction`) to the tool routes (F3, PR #161).
+- **2026-08-01 — Community verification system C1–C6 implemented (Wave C, Data & Trust, ADR 0018):** sighting confirmations as a toggle on record pages (C1, PR #174, migrations 0020–0023), profile API with `deriveLevel` and machine-readable level metadata (C2, PR #176), two-track contribution editing with moderated `camera_edit_requests` (C3, PR #177), corrections `issue_type` whitelist plus per-submitter dedupe (C4, PR #175), extended `/account` with level badge and paginated contributions plus the verification widget (C5, PR #181), and the owner edit page `/records/[id]/edit` (C6, PR #180). Anti-gaming QA suite in PR #179; community docs in PR #178.
+- **2026-08-01 — H1 pre-submit duplicate gate implemented (Wave C, Data & Trust, ADR 0019):** `POST /api/cameras` runs the nearby-duplicate check before storage and answers `409` with `possibleDuplicates` for a `high`-strength candidate unless the payload carries `duplicateConfirmed: true` (PR #188); the correction→record outcome UI association followed (PR #187).
+- **2026-08-01 — H2 accessibility fixes (Wave C, Product):** `/mappa` reflow, sr-only focus badge, and per-page titles (PR #189).
+- **2026-08-02 — Map UX completed (Wave C, Product):** `/mappa` redesign with viewport-synced sidebar list, marker popups, and sidebar search (PR #202); integrated single-header layout (PR #205); map click opens the report picker with a `/segnala?lat=&lng=` link (PR #206); visible tool header replaced by an sr-only h1 (PR #210); geocoding autocomplete through the Nominatim proxy (PR #211) with follow-up fixes for a visible, stable dropdown (PRs #212, #213); marker pane no longer empty when the cameras prop is stable (PR #204).
+- **2026-08-02 — Header and error-page polish (Wave C, Product):** a shared `PublicNav` header with the same six home links on every public page (PR #207), the header auth entry point in the top-right corner with session-free SSR (PR #215), and custom bilingual 404/500 pages with no path or error echoed (PR #208).
+- **2026-08-02 — Design token layer F3 (Wave C, Product):** spacing/radius/type-scale CSS custom properties in `globals.css` as the single source for the design system (PR #214).
+- **2026-08-02 — Docs aligned with main (docs audit P3-9):** STATUS.md, SITEMAP.md, DATA_MODEL.md, ARCHITECTURE.md, README.md, FUTURE_ROADMAP.md, QA_COVERAGE.md, LOCAL_PLAYBOOK.md, and DEVELOPMENT_SETUP.md updated to the current code — community C1–C6, migrations 0000–0025, 13 tables, 9 API routes, F1–F4 done state (PRs #191, #193, #197, #198, #199; consolidated in [AUDIT_REPORT.md](AUDIT_REPORT.md)).
+- **2026-08-02 — CI and ops hardening:** D1 commands use the `osdb-production` database name (PRs #185, #186, #192); the deploy dry-run no longer uses the non-existent `--dry-run` flag (PR #192); alert workflow gets `issues:write` permission and runs also on `workflow_dispatch` (PR #196); PROD_URL repository variable documented (PR #209); Drizzle snapshots 0011–0025 regenerated with a no-op generate guard in `db:smoke` (PR #201); flaky debounce-sensitive tests hardened (PRs #183, #184, #216).
 
 ## Active next plan
 
@@ -198,14 +207,16 @@ archived in [NEXT_SPRINT.md](NEXT_SPRINT.md); current capability is tracked in
 
 The board sequence continues with [Wave C — verify the pilot](#wave-c--verify-the-pilot).
 
-As of 2026-08-01 that cycle is complete on the local prototype — reasoned,
-append-only audited decisions with reviewer roles and appeals (ADR 0009/0014) —
-and the two items it deliberately deferred (contributor accounts and erasure,
-ADR 0013; evidence/media pipeline, PR #64) have landed too. The next cycle
-therefore starts beyond accounts and media; see [NEXT_SPRINT.md](NEXT_SPRINT.md)
+As of 2026-08-02 the reliable-local-moderation cycle is complete on the
+local prototype — reasoned, append-only audited decisions with reviewer
+roles and appeals (ADR 0009/0014), contributor accounts and erasure
+(ADR 0013), the evidence/media pipeline (PR #64), the community system
+(ADR 0018, C1–C6), the H1 duplicate gate (ADR 0019), and the frontend
+refactor (F1–F4) have all landed. The next cycle therefore starts beyond
+accounts, media, and community features; see [NEXT_SPRINT.md](NEXT_SPRINT.md)
 and [STATUS.md](STATUS.md) for the current local-capability list. Public
-hosting, provisioning real operator identities with MFA, versioned exports, and
-Android work remain future gates.
+hosting, provisioning real operator identities with MFA, versioned exports,
+and Android work remain future gates.
 
 The longer sequence from local prototype to a potential public alpha and Android
 companion is maintained in the [future roadmap](FUTURE_ROADMAP.md). Its gates
