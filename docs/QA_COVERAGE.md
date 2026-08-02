@@ -1,16 +1,16 @@
 # QA Coverage Report
 
-Baseline generata il **2026-08-02** su commit `d83c466` con
-`npm run coverage && npm run coverage:docs`. Suite: 1443/1443 test PASS, 0 fail.
+Baseline generata il **2026-08-02** su commit `d452ad1` con
+`npm run coverage && npm run coverage:docs`. Suite: 1502/1502 test PASS, 0 fail.
 
 ## Riepilogo (solo codice di produzione, esclusi test/helper/mock/fixture)
 
 | Metrica | Coperto | Totale | % |
 |---|---|---|---|
-| Righe | 8144 | 8705 | **93.56%** |
-| Branch | 1862 | 2036 | 91.45% |
-| Funzioni | 301 | 313 | 96.17% |
-| Statement | 8144 | 8705 | 93.56% |
+| Righe | 8250 | 8705 | **94.77%** |
+| Branch | 1897 | 2061 | 92.04% |
+| Funzioni | 305 | 313 | 97.44% |
+| Statement | 8250 | 8705 | 94.77% |
 
 ## Soglia minima CI
 
@@ -20,9 +20,6 @@ sotto soglia il job fallisce.
 
 ## Moduli a coverage più bassa (priorità per nuovi test)
 
-- `app/api/auth/me/route.ts` — righe 54.72% (58/106), branch 71.43%, funzioni 50.00%
-- `db/camera-edits.ts` — righe 76.45% (263/344), branch 69.33%, funzioni 77.78%
-- `db/users.ts` — righe 82.05% (64/78), branch 75.00%, funzioni 71.43%
 - `app/api/auth/logout/route.ts` — righe 82.50% (33/40), branch 60.00%, funzioni 100.00%
 - `app/api/auth/me/submissions/route.ts` — righe 86.11% (31/36), branch 50.00%, funzioni 100.00%
 - `app/api/moderation/corrections/route.ts` — righe 87.18% (68/78), branch 78.57%, funzioni 100.00%
@@ -30,14 +27,14 @@ sotto soglia il job fallisce.
 - `app/api/cameras/[id]/confirmation/route.ts` — righe 88.83% (167/188), branch 87.50%, funzioni 100.00%
 - `app/api/cameras/[id]/route.ts` — righe 89.16% (181/203), branch 94.29%, funzioni 100.00%
 - `app/lib/image-metadata.ts` — righe 89.82% (300/334), branch 92.31%, funzioni 100.00%
+- `db/camera-edits.ts` — righe 89.83% (309/344), branch 77.33%, funzioni 88.89%
+- `app/lib/trust-levels.ts` — righe 89.86% (62/69), branch 100.00%, funzioni 66.67%
+- `app/lib/abuse-alerts.ts` — righe 90.74% (147/162), branch 96.67%, funzioni 100.00%
 
 ## Dettaglio per file
 
 | File (sorgente) | Righe % | Branch % | Funzioni % | Righe coperte/totali |
 |---|---|---|---|---|
-| `app/api/auth/me/route.ts` | 54.72 | 71.43 | 50.00 | 58/106 |
-| `db/camera-edits.ts` | 76.45 | 69.33 | 77.78 | 263/344 |
-| `db/users.ts` | 82.05 | 75.00 | 71.43 | 64/78 |
 | `app/api/auth/logout/route.ts` | 82.50 | 60.00 | 100.00 | 33/40 |
 | `app/api/auth/me/submissions/route.ts` | 86.11 | 50.00 | 100.00 | 31/36 |
 | `app/api/moderation/corrections/route.ts` | 87.18 | 78.57 | 100.00 | 68/78 |
@@ -45,6 +42,7 @@ sotto soglia il job fallisce.
 | `app/api/cameras/[id]/confirmation/route.ts` | 88.83 | 87.50 | 100.00 | 167/188 |
 | `app/api/cameras/[id]/route.ts` | 89.16 | 94.29 | 100.00 | 181/203 |
 | `app/lib/image-metadata.ts` | 89.82 | 92.31 | 100.00 | 300/334 |
+| `db/camera-edits.ts` | 89.83 | 77.33 | 88.89 | 309/344 |
 | `app/lib/trust-levels.ts` | 89.86 | 100.00 | 66.67 | 62/69 |
 | `app/lib/abuse-alerts.ts` | 90.74 | 96.67 | 100.00 | 147/162 |
 | `worker/index.ts` | 91.63 | 97.67 | 76.92 | 197/215 |
@@ -67,6 +65,7 @@ sotto soglia il job fallisce.
 | `app/api/appeals/route.ts` | 97.78 | 93.10 | 100.00 | 176/180 |
 | `db/retention.ts` | 97.84 | 92.31 | 100.00 | 407/416 |
 | `app/api/geocode/route.ts` | 97.96 | 91.21 | 100.00 | 288/294 |
+| `app/api/auth/me/route.ts` | 98.11 | 100.00 | 100.00 | 104/106 |
 | `app/api/auth/me/contributions/route.ts` | 98.32 | 93.75 | 100.00 | 117/119 |
 | `app/lib/rate-limit.ts` | 98.48 | 100.00 | 100.00 | 195/198 |
 | `db/auth.ts` | 98.55 | 91.89 | 96.55 | 542/550 |
@@ -91,6 +90,7 @@ sotto soglia il job fallisce.
 | `db/corrections.ts` | 100.00 | 100.00 | 100.00 | 81/81 |
 | `db/freshness.ts` | 100.00 | 96.30 | 100.00 | 80/80 |
 | `db/photos.ts` | 100.00 | 91.80 | 100.00 | 230/230 |
+| `db/users.ts` | 100.00 | 100.00 | 100.00 | 78/78 |
 
 ## Metodologia
 
