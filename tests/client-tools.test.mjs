@@ -598,7 +598,31 @@ test("DirectoryTool search narrows the list (debounced URL commit); the empty st
 
   // F4 (useCameraFilters): the search input feels instant but commits to the
   // URL (and therefore filters) after the ~400ms debounce (R2 URL churn; t_3c4b188e: pure history.replaceState).
+  //
+  // Determinism gate (t_2c1a8518): the debounce-sensitive asserts below are
+  // meaningful only once the seed list is actually rendered — "A disappeared"
+  // is ALSO true while the list is still loading (A never mounted), so pin
+  // the precondition explicitly instead of inferring it from the waitFor.
+  await rtl.waitFor(() => {
+    assert.ok(screen.getByRole("heading", { name: "Illustrative record A" }), "seed list rendered (record A) before typing");
+    assert.ok(screen.getByRole("heading", { name: "Illustrative record B" }), "seed list rendered (record B) before typing");
+  }, DEBOUNCE_WAIT);
+
   await user.type(screen.getByLabelText("Search the public directory"), "Illustrative record B");
+
+  // t_2c1a8518 (CI flake on main after PR #213): wait for the EXPLICIT ?q=
+  // URL commit before the clear below. The clear is a no-op while the
+  // committed mirror (filtersRef.q) is still "" (the debounce has not fired),
+  // so "A is gone" is not a safe proxy — under CI load A may never have
+  // mounted, making waitFor(A===null) pass BEFORE the 400ms commit, and then
+  // the immediate clear hits the guard and commits nothing (the assert below
+  // would count ONE replaceState, not two). historyReplaceCalls is a spy
+  // local to this test and the typed commit is the only q=-bearing URL it
+  // ever sees, so the assertion is precise, not just more generous.
+  await rtl.waitFor(() => assert.ok(
+    historyReplaceCalls.some((href) => href.includes("q=")),
+    "the typed q committed via history.replaceState",
+  ), DEBOUNCE_WAIT);
   await rtl.waitFor(() => assert.ok(screen.queryByRole("heading", { name: "Illustrative record A" }) === null), DEBOUNCE_WAIT);
   assert.ok(screen.getByRole("heading", { name: "Illustrative record B" }));
 
