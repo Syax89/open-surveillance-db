@@ -160,15 +160,15 @@ test("MappaTool renders the map tool shell with the shared FiltersBar and the vi
   // Integrated layout (t_966254a1) + heading cleanup (t_11e38eab): no
   // visible tool header — the page starts directly with the map. The h1 is
   // sr-only (still the accessible page heading), the duplicated section
-  // heading ("Explore documented cameras") is gone, the compact prototype
-  // banner sits above the map card and the FiltersBar is attached to the
-  // card top edge. The visible eyebrow ("Live prototype") is also gone.
+  // heading ("Explore documented cameras") is gone (the prototype banner
+  // above the map card was removed too — CEO feedback 2026-08-02) and the
+  // FiltersBar is attached to the card top edge. The visible eyebrow
+  // ("Live prototype") is also gone.
   assert.ok(screen.queryByRole("heading", { name: "Explore documented cameras" }) === null, "no duplicated section heading on /mappa");
-  // F4 (P3, design-audit §11): `.prototype-banner-compact` era una classe
-  // no-op (mai definita nel CSS) ed è stata rimossa dal markup — la variante
-  // compatta arriva dalla regola `.map-layout .prototype-banner`, quindi il
-  // banner deve stare dentro `.map-layout`.
-  assert.ok(screen.getByText("Prototype mode.").closest(".map-layout .prototype-banner"), "the compact prototype banner sits inside .map-layout (.map-layout .prototype-banner CSS)");
+  // CEO feedback 2026-08-02: the prototype banner was REMOVED from /mappa —
+  // the page starts directly with the map card, the map is no longer framed
+  // as a prototype (truthfulness stays in pageIntro and the in-list notes).
+  assert.ok(screen.queryByText("Prototype mode.") === null, "no prototype banner on /mappa (CEO feedback)");
   assert.ok(screen.getByLabelText("Camera type").closest(".map-card"), "the FiltersBar row is attached to the map card");
   // The search moved into the sidebar column (t_702c10af); it is now
   // DUAL-FUNCTION (t_b9666d09): it filters the viewport points AND suggests
@@ -188,6 +188,10 @@ test("MappaTool renders the map tool shell with the shared FiltersBar and the vi
   // Map-task alternative links point at the tool routes, not the home anchors.
   const directoryLink = screen.getByRole("link", { name: "Go to the accessible directory" });
   assert.equal(directoryLink.getAttribute("href"), "/directory");
+
+  // CEO feedback 2026-08-02: the download GeoJSON/CSV row moved to
+  // /directory — /mappa must NOT carry the data export footer anymore.
+  assert.ok(screen.queryByRole("link", { name: /Download/ }) === null, "no data export row on /mappa (moved to /directory)");
 });
 
 test("MappaTool kind filter narrows the sidebar list and the markers", async () => {
@@ -222,10 +226,9 @@ test("MappaTool freshness filter on the demo seed keeps the map rendered and sho
   assert.ok(screen.getByText("No published record matches those filters."), "truthful in-list empty note");
   assert.ok(screen.getByText(/This does not mean that there are no cameras/), "the note never implies an area has no surveillance");
   assert.ok(screen.getByRole("button", { name: /Clear filters/ }), "the in-list note offers a clear action");
-  // The compact prototype banner is map-contextual (t_966254a1): it
-  // describes the illustrative pins, so with zero matching records it must
-  // not render.
-  assert.ok(screen.queryByText("Prototype mode.") === null, "no prototype banner with zero matching records");
+  // The prototype banner was removed entirely (CEO feedback 2026-08-02):
+  // never rendered, with or without matching records.
+  assert.ok(screen.queryByText("Prototype mode.") === null, "no prototype banner on /mappa (removed — CEO feedback)");
 
   await user.click(screen.getByRole("button", { name: /Clear filters/ }));
   assert.ok(screen.getByRole("button", { name: /Illustrative record A/ }), "clearing restores the records to the list");
@@ -573,6 +576,14 @@ test("DirectoryTool renders the directory shell with the shared FiltersBar and b
 
   const useMap = screen.getByRole("link", { name: /Use the map instead/ });
   assert.equal(useMap.getAttribute("href"), "/mappa", "the directory links the map tool route");
+
+  // CEO feedback 2026-08-02: the data export row moved from /mappa to
+  // /directory — the catalog meta row (DirectoryCatalog) owns the
+  // filter-aware CSV/GeoJSON downloads (t_127492f1) and the data-actions
+  // footer keeps the data policy link (guide/regole pattern, merge #229 × #231).
+  assert.ok(screen.getByRole("link", { name: "Download GeoJSON" }), "download GeoJSON row on /directory");
+  assert.ok(screen.getByRole("link", { name: "Download CSV" }), "download CSV row on /directory");
+  assert.equal(screen.getByRole("link", { name: "Read the data policy" }).getAttribute("href"), "/guide", "the data policy link points at /guide");
 });
 
 test("DirectoryTool search narrows the list (debounced URL commit); the empty state offers a clear action that restores it", async (t) => {
@@ -884,4 +895,32 @@ test("CorreggiTool ignores an unknown ?record= id (no prefill, no announcement)"
 
   assert.equal(screen.getByLabelText("Related public record").value, "", "no preselection for an unknown id");
   assert.ok(!screen.queryByRole("status"), "no announcement when nothing was pre-selected");
+});
+
+// ---------------------------------------------------------------------------
+// /404 + /500 — ErrorPage document title (F5 P3-3, WCAG 2.4.2)
+// ---------------------------------------------------------------------------
+
+test("ErrorPage sets a page-specific document.title for 404 and 500 (WCAG 2.4.2)", async () => {
+  // The SSR <title> comes from the root layout; not-found.tsx cannot export
+  // metadata in this build and error.tsx is a client boundary, so the page
+  // must set its own <title> client-side (F5 P3-3). A tab on an error page
+  // must not show the home title.
+  const ErrorPage = (await loadDomModule("app/components/ErrorPage.mjs")).default;
+
+  document.title = "unrelated";
+  await renderWithLocale(React.createElement(ErrorPage, { statusCode: 404 }));
+  assert.equal(
+    document.title,
+    "Page not found — OpenSurveillanceDB",
+    "the 404 page owns its <title> (EN bundle)",
+  );
+
+  document.title = "unrelated";
+  await renderWithLocale(React.createElement(ErrorPage, { statusCode: 500 }));
+  assert.equal(
+    document.title,
+    "Something went wrong — OpenSurveillanceDB",
+    "the 500 page owns its <title> (EN bundle)",
+  );
 });

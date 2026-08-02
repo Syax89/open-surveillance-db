@@ -41,9 +41,35 @@ declare module "cloudflare:workers" {
     delete(key: string): Promise<void>;
   }
 
+  /**
+   * Cloudflare Email Service structured builder (send_email binding).
+   * See https://developers.cloudflare.com/email-service/api/send-emails/workers-api/
+   * The `send()` method is the only surface the mailer uses; errors carry a
+   * `.code` property (E_SENDER_NOT_VERIFIED, E_RATE_LIMIT_EXCEEDED, ...).
+   */
+  export interface EmailAddress {
+    email: string;
+    name?: string;
+  }
+
+  export interface EmailMessageBuilder {
+    to: string | EmailAddress | (string | EmailAddress)[];
+    from: string | EmailAddress;
+    subject: string;
+    html?: string;
+    text?: string;
+    replyTo?: string | EmailAddress;
+  }
+
+  export interface SendEmail {
+    send(message: EmailMessageBuilder): Promise<{ messageId: string }>;
+  }
+
   export interface Env {
     ASSETS: Fetcher;
     DB: D1Database;
+    /** Email Service binding (wrangler.jsonc `send_email`, name EMAIL). */
+    EMAIL?: SendEmail;
     IMAGES: {
       input(stream: ReadableStream): {
         transform(options: Record<string, unknown>): {

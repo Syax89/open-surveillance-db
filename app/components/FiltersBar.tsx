@@ -14,7 +14,12 @@ import { useMessages } from "./LocaleProvider";
  * page, so the ids never collide.
  *
  * @param variant "inline" renders the classic directory-controls row;
- *                "panel" is the /mappa variant (same controls, panel class).
+ *                "panel" is the /mappa variant (same controls, panel class);
+ *                "bare" (t_127492f1) is the /directory catalog variant:
+ *                the same controls grid WITHOUT the trailing result counter —
+ *                the counter moves into the catalog meta row (.directory-meta)
+ *                next to export and the place-search trigger, so count + export
+ *                sit between filters and list ("filtri+lista+export" order).
  */
 export function FiltersBar({
   variant,
@@ -32,7 +37,7 @@ export function FiltersBar({
   onReset,
   hideSearch = false,
 }: {
-  variant: "inline" | "panel";
+  variant: "inline" | "panel" | "bare";
   cameraKinds: string[];
   search: string;
   setSearch: (value: string) => void;
@@ -98,7 +103,11 @@ export function FiltersBar({
         </div>
         <button type="button" className="text-button" onClick={onReset}>{t.resetFilters} <span aria-hidden="true">→</span></button>
       </div>
-      <p className="search-count" id="record-search-count" role="status">{resultCount === 1 ? t.oneRecordFound : `${resultCount} ${t.recordsFound}`}</p>
+      {/* The result counter. "bare" (catalog) omits it: the counter lives in
+          the .directory-meta row rendered by PublicDirectory (catalog) so it
+          sits next to export and above the list (t_127492f1). */}{variant !== "bare" && (
+        <p className="search-count" id="record-search-count" role="status">{resultCount === 1 ? t.oneRecordFound : `${resultCount} ${t.recordsFound}`}</p>
+      )}
     </>
   );
 }

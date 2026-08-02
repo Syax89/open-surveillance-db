@@ -10,6 +10,19 @@
     "binding": "ASSETS"
   },
   "images": { "binding": "IMAGES" },
+  "send_email": [
+    {
+      "name": "EMAIL",
+      // Transactional mail (AUTH MULTI-METODO Fase A2, ADR 0020): the only
+      // allowed sender is the noreply address on the onboarded domain —
+      // restricting the binding is defence in depth: even a compromised
+      // worker cannot send from any other address. Recipients are arbitrary
+      // contributor addresses (verification / password reset), so no
+      // destination allowlist. The binding is simulated locally by wrangler
+      // (emails are logged, not sent) unless `remote: true` is set.
+      "allowed_sender_addresses": ["noreply@opensurveillancedb.org"]
+    }
+  ],
   "triggers": {
     "crons": ["0 3 * * *"]
   },

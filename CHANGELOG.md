@@ -14,6 +14,22 @@ changes accumulate under `[Unreleased]`.
 
 ### Added
 
+- **Auth — mailer Cloudflare (Fase A2, t_4c398006, ADR 0020 decision 2):**
+  transactional email infrastructure for account verification and password
+  reset, with zero new third parties (Cloudflare Email Service on
+  `opensurveillancedb.org`, covered by the existing Cloudflare DPA — PR1).
+  New `EMAIL` send binding in `wrangler.jsonc` restricted to
+  `noreply@opensurveillancedb.org`; bilingual EN/IT (ADR 0007) HTML + plain
+  templates in `app/lib/email-templates.ts` with a **zero-tracking
+  contract** (no pixels/remote assets/links beyond the action URL, asserted
+  in `tests/mailer.test.mjs`); `db/mailer.ts` send layer with fail-closed
+  `VERIFY_BASE_URL` (missing → 503, never a broken link) and a durable
+  **3 emails/h per contributor** re-send limit enforced in D1 via the new
+  `email_send_log` table (migration 0029 — stores only contributor_id,
+  kind and sent_at: no content, no recipient address, no IP). The routes
+  that consume the mailer land in Fase B; this PR ships the mailer itself
+  plus schema, harness, docs (DEPLOYMENT.md) and 16 tests.
+
 - **Docs/GDPR — AUTH MULTI-METODO Fase F (t_c9fc674b, ADR 0020):** new
   [ADR 0020](docs/decisions/0020-multi-method-authentication.md)
   (multi-method authentication — email+password with verification, passkeys/
@@ -305,6 +321,33 @@ changes accumulate under `[Unreleased]`.
   (no monolithic info/legal bundles; legal stays in `app/lib/legal/`).
 
 ### Fixed
+
+- `/mappa` CEO feedback 2026-08-02 (t_9e8642a0): (1) il banner "Prototype
+  mode" sopra la mappa è stato RIMOSSO — la pagina parte direttamente con la
+  card della mappa, la mappa non è più presentata come prototipo (la
+  veridicità resta in pageIntro e nelle note in-lista; chiavi i18n
+  `map.prototypeMode/prototypeBanner` e CSS `.map-layout .prototype-banner`
+  rimossi); (2) il contatore "X public records found" su /mappa era a 2px dal
+  bordo sinistro della card — ora ha lo stesso inset di 18px della riga
+  filtri (`.map-card .search-count`); (3) il bottone "Reset filters" della
+  variante panel finiva da solo su una seconda riga della griglia a 3 colonne
+  — ora `.map-card .filters-panel` è una griglia a 4 colonne
+  (kind/freshness/sort/reset su UNA riga, bottone allineato a destra
+  nell'ultima colonna auto; override responsive ≤980px/≤700px coerenti); (4)
+  la riga download GeoJSON/CSV è stata SPOSTATA da /mappa a /directory
+  (`.data-actions` da `MapPanel` a `DirectoryTool`, nuove chiavi
+  `directory.downloadGeoJson/downloadCsv/readDataPolicy` EN/IT; il tool mappa
+  non ha più il footer export). Regressione a11y intercettata dal gate
+  Lighthouse (t_9e8642a0): la griglia 4-colonne dichiarata DOPO le media
+  query responsive vinceva su mobile (stessa specificità, ultima regola) —
+  su ≤980px i filtri restavano su 4 colonne strette (kind-filter ~30px,
+  target-size WCAG 2.5.8 FAIL, accessibility 0.93) — ora la regola desktop è
+  scoped a `@media (min-width:981px)` così gli override ≤980px/≤700px
+  tornano a vincere; contrasto `.map-record-meta` #60737d→#546d78 (4.64:1 su
+  `.map-record.selected` #e4efe6, era 4.18 < 4.5:1). Test: asserzioni
+  aggiornate e nuove in
+  `tests/client-tools.test.mjs` (banner assente su /mappa, download presenti
+  solo su /directory), docs `FRONTEND_DESIGN.md` §6.2.6/§6.3.7 aggiornati.
 
 - P1-1 `confirmationCountsFor()` D1 bound-parameter cap (t_b2d59dfc): a
   public camera page with more than 100 records used to build a single

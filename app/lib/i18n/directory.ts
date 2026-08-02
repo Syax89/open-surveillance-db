@@ -20,10 +20,24 @@ export const en = {
   recordsTitle: "Browse public records without the map",
   recordsIntro:
     "Search covers the same reviewed records shown on the map. A result is never evidence that an area has no surveillance.",
+  // Catalog mode (t_127492f1): the sr-only heading of the results region —
+  // keeps the h1 → h2 → h3 ladder on /directory now that the place-search
+  // block is a collapsible panel instead of the section heading.
+  resultsRegion: "Directory results",
   searchDirectory: "Search the public directory",
-  searchPlaceholder: "Type, source, place or coordinate",
+  searchPlaceholder: "Type, source or record ID",
   searchHelp:
     "Only reviewed public records and labelled prototype records appear here.",
+  // Catalog mode: data export of the filtered set. The API applies the
+  // server-side filters (kind + freshness); q and sort are client-side, so
+  // the hint below says exactly what the export contains.
+  exportCsv: "Download CSV",
+  exportGeoJson: "Download GeoJSON",
+  exportHint: "Exports apply the current type and freshness filters.",
+  // Catalog mode: the place-search panel trigger in the results meta row
+  // (the panel itself keeps the historical place-search strings).
+  searchNearPlace: "Search near a place…",
+  placeHide: "Hide place search",
   cameraType: "Camera type",
   allTypes: "All types",
   freshnessFilter: "Record freshness",
@@ -73,6 +87,11 @@ export const en = {
     "This means only that no reviewed record in this database falls inside the search area. It is not evidence that no cameras exist there.",
   placeEmptySubmit: "Submit a private observation",
   placeEmptyCoverage: "About data coverage limits",
+  // Data policy link (CEO feedback 2026-08-02, merge #229 × #231): the
+  // CSV/GeoJSON downloads live in the catalog meta row (DirectoryCatalog —
+  // exportCsv/exportGeoJson, filter-aware); the footer keeps the data policy
+  // link only.
+  readDataPolicy: "Read the data policy",
   recordId: "Record ID",
   source: "Source",
   location: "Location",
@@ -94,10 +113,24 @@ export const it: Translation<typeof en> = {
   recordsTitle: "Sfoglia i record pubblici senza usare la mappa",
   recordsIntro:
     "La ricerca include gli stessi record revisionati mostrati sulla mappa. Un risultato non prova mai l'assenza di sorveglianza in un'area.",
+  // Modalità catalogo (t_127492f1): heading sr-only della regione risultati —
+  // mantiene la scala h1 → h2 → h3 su /directory ora che la ricerca per luogo
+  // è un pannello collassabile e non più l'heading di sezione.
+  resultsRegion: "Risultati dell'elenco",
   searchDirectory: "Cerca nell'elenco pubblico",
-  searchPlaceholder: "Tipo, fonte, luogo o coordinate",
+  searchPlaceholder: "Tipo, fonte o ID record",
   searchHelp:
     "Qui compaiono solo record pubblici revisionati e record prototipo etichettati.",
+  // Modalità catalogo: export dei dati filtrati. L'API applica i filtri
+  // server (tipo + aggiornamento); q e ordinamento restano client, quindi
+  // il suggerimento dichiara esattamente cosa contiene l'export.
+  exportCsv: "Scarica CSV",
+  exportGeoJson: "Scarica GeoJSON",
+  exportHint: "Gli export applicano i filtri di tipo e aggiornamento correnti.",
+  // Modalità catalogo: trigger del pannello ricerca-per-luogo nella riga
+  // meta dei risultati (il pannello conserva le stringhe storiche).
+  searchNearPlace: "Cerca vicino a un luogo…",
+  placeHide: "Nascondi ricerca per luogo",
   cameraType: "Tipo di telecamera",
   allTypes: "Tutti i tipi",
   freshnessFilter: "Aggiornamento record",
@@ -147,6 +180,11 @@ export const it: Translation<typeof en> = {
     "Questo significa solo che nessun record revisionato di questo database rientra nell'area di ricerca. Non è la prova che lì non ci siano telecamere.",
   placeEmptySubmit: "Invia un'osservazione privata",
   placeEmptyCoverage: "I limiti della copertura dati",
+  // Link politica dati (feedback CEO 2026-08-02, merge #229 × #231): i
+  // download CSV/GeoJSON vivono nella riga meta del catalogo
+  // (DirectoryCatalog — exportCsv/exportGeoJson, filtro-aware); il footer
+  // tiene solo il link alla politica dati.
+  readDataPolicy: "Leggi la politica dei dati",
   recordId: "ID record",
   source: "Fonte",
   location: "Posizione",

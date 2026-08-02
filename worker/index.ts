@@ -1,7 +1,7 @@
 /** Cloudflare Worker entry point for OpenSurveillanceDB. */
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
-import type { D1Database, Fetcher, R2Bucket } from "cloudflare:workers";
+import type { D1Database, Fetcher, R2Bucket, SendEmail } from "cloudflare:workers";
 import { DEFAULT_RETENTION_POLICY, runRetentionSweep, type RetentionSummary } from "../db/retention";
 
 interface Env {
@@ -16,6 +16,21 @@ interface Env {
   };
   /** Photo evidence object storage (D1 stores metadata only). */
   PHOTOS: R2Bucket;
+  /** Cloudflare Email Service binding (send_email in wrangler.jsonc). */
+  EMAIL?: SendEmail;
+  /**
+   * Transactional mail (AUTH MULTI-METODO Fase A2, ADR 0020): the public
+   * base URL used to build verification / password-reset action links
+   * (e.g. https://opensurveillancedb.org). Required for the mailer to send:
+   * without it sendAuthEmail answers missing_config and the route returns
+   * 503 — fail-closed, never a broken link. Locally set it in .dev.vars.
+   */
+  VERIFY_BASE_URL?: string;
+  /** Sender address override for the EMAIL binding (default noreply@opensurveillancedb.org). */
+  MAILER_FROM?: string;
+  /** Re-send rate limit for auth emails: max sends per contributor per window. */
+  EMAIL_SEND_LIMIT_MAX?: string;
+  EMAIL_SEND_LIMIT_WINDOW_SECONDS?: string;
   /** Moderation access control. At least one credential must be configured. */
   MODERATION_USER?: string;
   MODERATION_PASSWORD?: string;

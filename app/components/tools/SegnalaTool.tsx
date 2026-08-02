@@ -47,6 +47,7 @@ export function SegnalaTool({ initialCoordinates = null }: Props) {
         removePhoto={report.removePhoto}
         selectManualCoordinates={report.selectManualCoordinates}
         submitReport={report.submitReport}
+        showHeading={false}
       />
       {notice && <p className="notice" role="status">{notice}</p>}
     </section>

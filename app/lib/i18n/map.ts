@@ -25,9 +25,8 @@ export const en = {
   // heading, its coverage note and the "Live prototype" eyebrow were removed
   // with the duplicated header; pageIntro still covers the "an empty area
   // never proves absence" truthfulness contract (SSR metadata + a11y intro).
-  prototypeMode: "Prototype mode.",
-  prototypeBanner:
-    "The base map is real OpenStreetMap data; the two visible camera pins are clearly labelled illustrative records. Click anywhere on the map to select a position for a report.",
+  // The prototype banner itself was removed (CEO feedback 2026-08-02) — the
+  // map is no longer framed as a prototype.
   mapHint: "Click the map to choose a report position",
   // Map-click report picker (t_6abb96ac): clicking empty map space opens a
   // popup with the click coordinates and a direct link to the /segnala
@@ -41,9 +40,6 @@ export const en = {
   location: "Location",
   reportIssue: "Report an issue",
   loadingRecords: "Loading the public record API…",
-  downloadGeoJson: "Download GeoJSON",
-  downloadCsv: "Download CSV",
-  readDataPolicy: "Read the data policy",
   unknown: "Unknown",
   apiUnavailable:
     "The public API is not available yet, so the prototype is showing illustrative records.",
@@ -106,10 +102,9 @@ export const it: Translation<typeof en> = {
   // "Esplora le telecamere documentate", la sua nota di copertura e l'eyebrow
   // "Prototipo attivo" sono stati rimossi con l'header duplicato; pageIntro
   // copre ancora il contratto di veridicità "un'area vuota non dimostra
-  // l'assenza di telecamere" (metadata SSR + intro a11y).
-  prototypeMode: "Modalità prototipo.",
-  prototypeBanner:
-    "La mappa di base usa dati reali di OpenStreetMap; i due pin visibili sono record illustrativi chiaramente etichettati. Fai clic in un punto della mappa per selezionare la posizione di una segnalazione.",
+  // l'assenza di telecamere" (metadata SSR + intro a11y). Il banner di
+  // prototipo è stato rimosso (feedback CEO 2026-08-02) — la mappa non è più
+  // presentata come prototipo.
   mapHint: "Fai clic sulla mappa per scegliere la posizione della segnalazione",
   // Selettore segnalazione al clic sulla mappa (t_6abb96ac): cliccando uno
   // spazio vuoto della mappa si apre un popup con le coordinate del clic e
@@ -123,9 +118,6 @@ export const it: Translation<typeof en> = {
   location: "Posizione",
   reportIssue: "Segnala un problema",
   loadingRecords: "Caricamento dell'API dei record pubblici…",
-  downloadGeoJson: "Scarica GeoJSON",
-  downloadCsv: "Scarica CSV",
-  readDataPolicy: "Leggi la politica dei dati",
   unknown: "Sconosciuto",
   apiUnavailable:
     "L'API pubblica non è ancora disponibile: il prototipo mostra record illustrativi.",

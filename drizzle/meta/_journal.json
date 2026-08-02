@@ -204,6 +204,13 @@
    "when": 1785871200000,
    "tag": "0028_webauthn_challenges",
    "breakpoints": true
+  },
+  {
+   "idx": 29,
+   "version": "6",
+   "when": 1785697840107,
+   "tag": "0029_email_send_log",
+   "breakpoints": true
   }
- ]
+]
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { SiteHeader } from "./SiteHeader";
 import { useMessages } from "./LocaleProvider";
@@ -33,6 +34,14 @@ export default function ErrorPage({
 }) {
   const t = useMessages().errors;
   const notFound = statusCode === 404;
+
+  // F5 (P3-3, WCAG 2.4.2): the 500 page is a client boundary (error.tsx),
+  // so it cannot export generateMetadata — set the document <title> here.
+  // The 404 title is already SSR'd by not-found.tsx's generateMetadata;
+  // this effect reinforces the same value on hydration.
+  useEffect(() => {
+    document.title = notFound ? t.notFoundMetaTitle : t.serverErrorMetaTitle;
+  }, [notFound, t]);
 
   return (
     <main id="main-content" className="record-page">
