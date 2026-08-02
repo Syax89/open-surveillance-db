@@ -164,7 +164,11 @@ test("MappaTool renders the map tool shell with the shared FiltersBar and the vi
   // banner sits above the map card and the FiltersBar is attached to the
   // card top edge. The visible eyebrow ("Live prototype") is also gone.
   assert.ok(screen.queryByRole("heading", { name: "Explore documented cameras" }) === null, "no duplicated section heading on /mappa");
-  assert.ok(screen.getByText("Prototype mode.").closest(".prototype-banner-compact"), "the prototype banner is the compact variant");
+  // F4 (P3, design-audit §11): `.prototype-banner-compact` era una classe
+  // no-op (mai definita nel CSS) ed è stata rimossa dal markup — la variante
+  // compatta arriva dalla regola `.map-layout .prototype-banner`, quindi il
+  // banner deve stare dentro `.map-layout`.
+  assert.ok(screen.getByText("Prototype mode.").closest(".map-layout .prototype-banner"), "the compact prototype banner sits inside .map-layout (.map-layout .prototype-banner CSS)");
   assert.ok(screen.getByLabelText("Camera type").closest(".map-card"), "the FiltersBar row is attached to the map card");
   // The search moved into the sidebar column (t_702c10af); it is now
   // DUAL-FUNCTION (t_b9666d09): it filters the viewport points AND suggests
