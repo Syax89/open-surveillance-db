@@ -24,6 +24,14 @@ import { LocaleToggle, useMessages } from "./LocaleProvider";
  * t.navigation / t.mainNavigation). The only string read here is the mobile
  * menu button label (home bundle), which exists on the homepage variant.
  *
+ * Since t_94b3726d the mobile-menu boundary is <768px (was 700px): the
+ * hamburger and the collapsible .nav-links panel now cover the whole range
+ * where the six links + auth entry point cannot fit on one line, so the
+ * header never wraps or overflows between 701-767px either. The auth links
+ * live inside the .nav-links container (PublicNav renders AuthNavLinks as
+ * its last item), so they collapse with the menu on mobile and stay visible
+ * in the inline row on desktop.
+ *
  * Renders exactly the markup the per-page copies produced, so adopting it
  * is behaviour-neutral by construction (see tests/rendered-html.test.mjs
  * and the SSR byte-diff harness for the structural contracts that stay
@@ -54,15 +62,6 @@ export interface SiteHeaderProps {
    * "none" suppresses it (record/moderation render it inside their actions).
    */
   toggle?: "after" | "none";
-  /**
-   * Optional element rendered at the very end of the nav shell, to the RIGHT
-   * of the LocaleToggle — the "top-right corner" slot (t_65b778c5). The
-   * public pages pass <AuthNavLinks /> here so login/register/account stay
-   * visible even on mobile, where .nav-links collapses into the menu.
-   * Defaults to nothing, so record/moderation/account shells (which render
-   * their own actions) keep the exact baseline markup.
-   */
-  trailing?: ReactNode;
   /** Per-area links/actions rendered between the brand and the locale toggle. */
   children: ReactNode;
 }
@@ -76,7 +75,6 @@ export function SiteHeader({
   menuOpen = false,
   onMenuToggle,
   toggle = "after",
-  trailing,
   children,
 }: SiteHeaderProps) {
   const t = useMessages().home;
@@ -119,7 +117,6 @@ export function SiteHeader({
       ) : null}
       {children}
       {toggle === "after" ? <LocaleToggle /> : null}
-      {trailing}
     </nav>
   );
 }

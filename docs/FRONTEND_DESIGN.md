@@ -266,9 +266,11 @@ testo, niente glow.
 **Breakpoint (✅ implementato — v1 documentava solo 700/980/1320):**
 
 ```
-480px  — nav wrap, coordinate-fields e report-metadata-fields a 1 colonna
-700px  — tablet: griglie a 1 colonna, menu mobile, footer a 1 colonna
-768px  — mappa: sidebar diventa pannello sopra la mappa (max-height 38vh)
+480px  — header compatto (brand ridotto, gap stretti) + nav wrap safety,
+        coordinate-fields e report-metadata-fields a 1 colonna
+700px  — tablet: griglie a 1 colonna, footer a 1 colonna
+768px  — header: menu mobile (hamburger + dropdown, t_94b3726d); mappa:
+        sidebar diventa pannello sopra la mappa (max-height 38vh)
 980px  — desktop: griglie a 2/3 colonne, hero 2 colonne
 1320px — wide: container max (nav-shell, hero)
 ```
@@ -436,14 +438,28 @@ Legenda: **[spec]** = sezione dedicata sotto · **[patt.]** = pattern condiviso
 Unico header di TUTTE le pagine pubbliche (t_a72a3106).
 
 - **Anatomia:** brand (mark 29px cerchio navy/mint + nome 19px/800/-.04em) ·
-  nav-links (6 link) · LocaleToggle · menu button (mobile).
+  nav-links (6 link + **auth entry point**, t_65b778c5) · LocaleToggle ·
+  menu button (mobile).
 - **Set link (ordine fisso):** Mappa `/mappa`, Directory `/directory`, Guide
   `/guide`, Regole `/regole`, Manifesto `/manifesto`, **Segnala CTA**
   `/segnala` (`.nav-action`). Pagina corrente: `aria-current="page"`.
+- **Auth entry point (`AuthNavLinks`, t_65b778c5, fix mobile t_94b3726d):**
+  "Log in" `/login` + "Create account" `/register` (anonimo) o link account
+  `/account` (autenticato, aria-label sempre) — ULTIMO item di `.nav-links`,
+  con `aria-current` sulla rotta auth corrente. Stato da `GET /api/auth/me`;
+  stato iniziale/errore = nulla (nessun leak in SSR, fail-closed).
 - **Stile:** link 14px/700 `#405462`, hover `#16715e`; CTA con bordo
   `#b7c2bd`, radius `--radius-lg` (9px→binding), padding 11px 15px.
-- **Mobile (≤700px):** `.menu-button` visibile; `.nav-links` pannello
+- **Mobile (<768px):** `.menu-button` visibile; `.nav-links` pannello
   assoluto con `--shadow-menu`, `aria-expanded` sul toggle, `.is-open`.
+  I link auth viaggiano NEL dropdown (separati da hairline), così la barra
+  superiore (brand + menu + LocaleToggle) non va mai a capo a 320/390px
+  (feedback CEO live). Regole scoped con `:has(.menu-button)` così gli
+  header contestuali (login/register/account/error) non collassano.
+- **≤480px:** header compatto — brand 13px/mark 24px, margini 12px, gap 6px
+  (fit a 320px); `flex-wrap:wrap` resta solo come safety net.
+- **Desktop (≥768px):** `.nav-links` riempie la shell (flex:1) e il cluster
+  auth è spinto a destra (`margin-left:auto`) accanto al LocaleToggle.
 - **Accessibilità:** landmark `nav` con `aria-label` localizzata; skip-link;
   focus `:focus-visible` outline 3px `var(--focus)` offset 3px.
 - **Varianti brand:** home usa `brandHref="#top"` + `brandAs="anchor"`;
@@ -693,9 +709,9 @@ VoiceOver, zoom 200% a 320px, contrasto per stato.
 
 ### 9.1 Comportamento per breakpoint (corretto in v2)
 
-| Componente | Mobile (<700px) | Tablet (700–980px) | Desktop (≥980px) |
+| Componente | Mobile (<768px) | Tablet (768–980px) | Desktop (≥980px) |
 |------------|-----------------|--------------------|-------------------|
-| Nav header | menu hamburger (≤700) | inline, wrap | inline |
+| Nav header | menu hamburger (≤768, auth nel dropdown) | inline, wrap | inline |
 | Hero | 1 colonna, padding ridotto | 1 colonna | 2 colonne |
 | **Mappa** | **pannello sidebar sopra la mappa** (≤768px, 38vh) | sidebar + mappa | sidebar 340px + mappa |
 | Directory controls | 1 colonna (≤700) | 2 colonne (≤980) | 3 colonne |
@@ -730,9 +746,9 @@ risultati; form coordinate a 1 colonna (≤480px).
 - **URL language-neutral:** route slug neutri; deep-link con
   `GET /api/locale?lang=it&next=/mappa`.
 - **Rotture di layout:** IT ~15-20% più lungo — `overflow-wrap:anywhere` su
-  `dd` di card e facts; nav 6 link con wrap a ≤700px (v1 diceva "fino a 5
-  link" — errato: il set è 6, t_a72a3106); eyebrow uppercase con tracking
-  .14em verificato su label IT.
+  `dd` di card e facts; nav 6 link + auth che collassano nel menu mobile a
+  ≤768px (t_94b3726d; v1 diceva "fino a 5 link" — errato: il set è 6,
+  t_a72a3106); eyebrow uppercase con tracking .14em verificato su label IT.
 
 ---
 
