@@ -117,6 +117,15 @@ export const correctionRequests = sqliteTable(
  * (`pbkdf2$<iterations>$<saltB64>$<hashB64>`). `display_name` is an optional
  * public handle. Anonymous submissions remain possible by design; an account
  * is only needed to track and attribute your own reports.
+ *
+ * Multi-method auth (migration 0027, AUTH_OPTIONS.md — Fase A):
+ *   - `email_verified_at` — ISO timestamp of the verification; NULL while
+ *     the address is unverified (write sessions are gated on it in Fase B).
+ *   - `auth_provider` — registration method: 'password' | 'passkey' |
+ *     'github' | 'google' (validated in code); defaults to 'password' so
+ *     every legacy row stays valid without a backfill.
+ *   - `external_sub` — OIDC subject for external providers (Fase D), NULL
+ *     otherwise; the provider email is never stored (privacy by design).
  */
 export const contributors = sqliteTable(
   "contributors",
@@ -125,10 +134,124 @@ export const contributors = sqliteTable(
     email: text("email").notNull(),
     displayName: text("display_name"),
     passwordHash: text("password_hash").notNull(),
+    emailVerifiedAt: text("email_verified_at"),
+    authProvider: text("auth_provider").notNull().default("password"),
+    externalSub: text("external_sub"),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
   (table) => [uniqueIndex("contributors_email_unique").on(table.email)],
+);
+
+/**
+ * Email verification tokens (migration 0027, Fase B). Only the SHA-256 of
+ * the raw token is stored — a database leak cannot replay it (same rule as
+ * `sessions.token_hash`, ADR 0013). A token is dead after `expires_at`
+ * (24h) or once `used_at` is set (single-use; consume is an atomic
+ * conditional UPDATE in Fase B). The `expires_at` index serves the expiry
+ * sweep. Declared here so drizzle-kit generate never re-emits it
+ * (convention 0012/0014).
+ */
+export const emailVerificationTokens = sqliteTable(
+  "email_verification_tokens",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    contributorId: integer("contributor_id")
+      .notNull()
+      .references(() => contributors.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull(),
+    createdAt: text("created_at").notNull(),
+    expiresAt: text("expires_at").notNull(),
+    usedAt: text("used_at"),
+  },
+  (table) => [
+    uniqueIndex("email_verification_tokens_token_hash_unique").on(table.tokenHash),
+    index("email_verification_tokens_contributor_idx").on(table.contributorId),
+    index("email_verification_tokens_expires_idx").on(table.expiresAt),
+  ],
+);
+
+/**
+ * WebAuthn passkeys (migration 0027, Fase C). Only the COSE public key is
+ * stored — the private key never leaves the user's authenticator.
+ * `credential_id` is globally UNIQUE per relying party; `counter` tracks
+ * the signature counter to detect cloned authenticators; `transports` is an
+ * optional JSON array (SimpleWebAuthn) for ceremony hints. Declared here so
+ * drizzle-kit generate never re-emits it (convention 0012/0014).
+ */
+export const passkeys = sqliteTable(
+  "passkeys",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    contributorId: integer("contributor_id")
+      .notNull()
+      .references(() => contributors.id, { onDelete: "cascade" }),
+    credentialId: text("credential_id").notNull(),
+    publicKey: text("public_key").notNull(),
+    counter: integer("counter").notNull().default(0),
+    transports: text("transports"),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("passkeys_credential_id_unique").on(table.credentialId),
+    index("passkeys_contributor_idx").on(table.contributorId),
+  ],
+);
+
+/**
+ * One-time recovery codes (migration 0027, Fase C): the 10 codes issued at
+ * passkey enrollment, stored hashed (SHA-256) and single-use (`used_at`).
+ * `code_hash` is globally UNIQUE so consuming a code is a point lookup by
+ * hash alone; ownership is checked in code against the contributor. The
+ * `contributor_id` index serves the per-account list and erasure. Declared
+ * here so drizzle-kit generate never re-emits it (convention 0012/0014).
+ */
+export const recoveryCodes = sqliteTable(
+  "recovery_codes",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    contributorId: integer("contributor_id")
+      .notNull()
+      .references(() => contributors.id, { onDelete: "cascade" }),
+    codeHash: text("code_hash").notNull(),
+    createdAt: text("created_at").notNull(),
+    usedAt: text("used_at"),
+  },
+  (table) => [
+    uniqueIndex("recovery_codes_code_hash_unique").on(table.codeHash),
+    index("recovery_codes_contributor_idx").on(table.contributorId),
+  ],
+);
+
+/**
+ * WebAuthn ceremony challenges (migration 0028, Fase C). Only the SHA-256 of
+ * the base64url challenge is stored — a database leak cannot replay a live
+ * ceremony (same rule as `sessions.token_hash`). `kind` separates the
+ * 'register' (session-bound) from the 'login' (public) ceremony; `expires_at`
+ * is created_at + 10 minutes (WEBAUTHN_CHALLENGE_TTL_MS, no KV binding in
+ * this project so the store lives in D1 with an expiry sweep) and `used_at`
+ * makes each challenge single-use (atomic conditional consume). Declared here
+ * so drizzle-kit generate never re-emits it (convention 0012/0014).
+ */
+export const webauthnChallenges = sqliteTable(
+  "webauthn_challenges",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    challengeHash: text("challenge_hash").notNull(),
+    kind: text("kind").notNull(),
+    contributorId: integer("contributor_id").references(() => contributors.id, {
+      onDelete: "cascade",
+    }),
+    userHandle: text("user_handle"),
+    createdAt: text("created_at").notNull(),
+    expiresAt: text("expires_at").notNull(),
+    usedAt: text("used_at"),
+  },
+  (table) => [
+    uniqueIndex("webauthn_challenges_challenge_hash_unique").on(table.challengeHash),
+    index("webauthn_challenges_expires_idx").on(table.expiresAt),
+    index("webauthn_challenges_contributor_idx").on(table.contributorId),
+  ],
 );
 
 /**

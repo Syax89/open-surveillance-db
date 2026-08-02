@@ -32,6 +32,7 @@
     "db:seed": "wrangler d1 execute osdb-production --local --file=scripts/demo-cameras.sql --yes"
   },
   "dependencies": {
+    "@simplewebauthn/server": "^13.3.2",
     "drizzle-orm": "0.45.2",
     "leaflet": "^1.9.4",
     "next": "^16.2.12",
