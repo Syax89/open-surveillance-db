@@ -271,6 +271,16 @@ changes accumulate under `[Unreleased]`.
 
 ### Fixed
 
+- P1-1 `confirmationCountsFor()` D1 bound-parameter cap (t_b2d59dfc): a
+  public camera page with more than 100 records used to build a single
+  `IN (?, ...)` over every id, blowing past D1's 100-bound-parameter limit
+  and turning `GET /api/cameras` (default limit 500) into a 503. The counts
+  query now iterates in chunks of at most 100 ids and merges the GROUP BY
+  results into one Map — same pattern as the correction-history events in
+  `db/moderation.ts`. The in-memory D1 test harness
+  (`tests/helpers/d1-sqlite.mjs`) now enforces the same 100-param cap, so a
+  >100-record regression test fails on the unfixed code instead of passing
+  on node:sqlite's higher SQLITE_MAX_VARIABLE_NUMBER.
 - `verifyPassword` now derives at the iteration count embedded in the stored
   hash instead of the current `PBKDF2_ITERATIONS` constant (t_fe668331, P1-2
   security review): bumping the constant (e.g. 210k → 600k, AUTH_OPTIONS §8)

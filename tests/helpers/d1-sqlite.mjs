@@ -24,6 +24,15 @@ function toPlain(value) {
   return Object.fromEntries(Object.entries(value));
 }
 
+// D1 caps bound parameters at 100 per statement (the same cap the retention
+// sweep and correction-history chunk against, db/retention.ts
+// D1_MAX_BOUND_PARAMS). node:sqlite's own SQLITE_MAX_VARIABLE_NUMBER is far
+// higher, so the adapter would silently accept IN (...) queries that the real
+// D1 binding rejects with a 500/503. Throwing here keeps the in-memory
+// harness faithful to the production cap and lets a >100-record regression
+// test actually fail on the unfixed code.
+const D1_MAX_BOUND_PARAMS = 100;
+
 export class D1SqliteStatement {
   constructor(database, sql) {
     this.database = database;
@@ -32,6 +41,11 @@ export class D1SqliteStatement {
   }
 
   bind(...args) {
+    if (args.length > D1_MAX_BOUND_PARAMS) {
+      throw new Error(
+        `D1 bound-parameter cap exceeded: ${args.length} params (max ${D1_MAX_BOUND_PARAMS}) — split the IN (...) into chunks like db/confirmations.ts confirmationCountsFor`,
+      );
+    }
     this.boundArgs = args;
     return this;
   }
