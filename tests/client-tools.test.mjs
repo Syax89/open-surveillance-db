@@ -129,6 +129,13 @@ test("MappaTool renders the map tool shell with the shared FiltersBar and the vi
   await renderWithLocale(React.createElement(MappaTool));
 
   assert.ok(screen.getByRole("heading", { name: "Interactive map" }), "map pageTitle heading");
+  // Integrated layout (t_966254a1): ONE tool header — the h1 is the only
+  // page heading, the duplicated section heading ("Explore documented
+  // cameras") is gone, the compact prototype banner sits above the map card
+  // and the FiltersBar is attached to the card top edge.
+  assert.ok(screen.queryByRole("heading", { name: "Explore documented cameras" }) === null, "no duplicated section heading on /mappa");
+  assert.ok(screen.getByText("Prototype mode.").closest(".prototype-banner-compact"), "the prototype banner is the compact variant");
+  assert.ok(screen.getByLabelText("Camera type").closest(".map-card"), "the FiltersBar row is attached to the map card");
   // The search moved into the sidebar column (t_702c10af): the FiltersBar
   // row keeps kind/freshness/sort/reset, the search lives at the top of the
   // left column — exactly ONE search control on the page.
@@ -171,6 +178,10 @@ test("MappaTool freshness filter on the demo seed yields the truthful empty stat
 
   assert.ok(screen.getByRole("heading", { name: "No published record matches those filters." }), "truthful empty state");
   assert.ok(screen.getByRole("button", { name: /Clear filters/ }), "empty state offers a clear action");
+  // The compact prototype banner is map-contextual (t_966254a1): when no
+  // record matches, the map is replaced by the truthful empty state and the
+  // banner about the illustrative pins must not render.
+  assert.ok(screen.queryByText("Prototype mode.") === null, "no prototype banner over the empty state");
 
   await user.click(screen.getByRole("button", { name: /Clear filters/ }));
   assert.ok(screen.getByRole("button", { name: /Illustrative record A/ }), "clearing restores the records to the list");

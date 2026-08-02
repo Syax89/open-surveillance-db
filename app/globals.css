@@ -189,7 +189,7 @@ button { cursor:pointer; }
 .record-list-card dd { margin:0; color:#2f4751; font-size:12px; line-height:1.4; overflow-wrap:anywhere; }
 .record-list-actions { display:flex; align-items:center; justify-content:space-between; gap:16px; }
 .empty-state { max-width:650px; margin-top:16px; padding:28px; border:1px dashed #b9c7bf; border-radius:10px; background:#eef4ea; }
-.empty-state h3 { margin:0; font-size:20px; letter-spacing:-.035em; }
+.empty-state h2, .empty-state h3 { margin:0; font-size:20px; letter-spacing:-.035em; }
 .empty-state p { max-width:570px; color:#52656d; font-size:14px; line-height:1.5; }
 .record-page { min-height:100vh; background:var(--paper); }
 .record-detail { width:min(760px, calc(100% - 48px)); margin:45px auto 100px; padding:50px; border:1px solid var(--line); border-radius:16px; background:#fffef9; box-shadow:0 20px 45px rgba(25,46,52,.08); }
@@ -462,14 +462,26 @@ footer>p { margin:0; color:#586870; font-size:13px; line-height:1.5; }
 .contributions-pagination .button { padding:9px 14px; font-size:13px; }
 .page-indicator { color:#52656d; font-size:13px; font-weight:700; }
 
-/* ---- /mappa redesign (t_702c10af): sidebar list + near-fullscreen map ----
-   The tool keeps the heading + FiltersBar row; the workspace below splits
-   into a 340px scrollable sidebar (search + viewport-synced list) and an OSM
-   map that fills the remaining viewport height ("quasi a tutto schermo"). */
-.map-layout { width:min(1440px, calc(100% - 32px)); padding:56px 0 72px; }
-.map-layout .live-map-workspace.map-split { grid-template-columns:340px 1fr; height:calc(100vh - 320px); min-height:560px; }
-.map-layout .map-panel .live-map { height:100%; min-height:560px; }
-.map-layout .map-panel .map-fallback { height:100%; min-height:560px; }
+/* ---- /mappa integrated layout (t_702c10af sidebar+fullscreen map;
+   t_966254a1: ONE tool header, compact banner + FiltersBar attached to the
+   map card, sidebar list + full map as a single workspace) ----
+   The tool heading (h1 + intro) is the only page header. Below it: a slim
+   prototype banner, then ONE card that owns the whole workspace — the
+   FiltersBar row is the card's top edge (same width, paper background, no
+   gap, so the filters read as part of the map), the split below is the
+   340px scrollable sidebar + the OSM map filling the remaining viewport
+   height ("quasi a tutto schermo"), and the export footer closes the card. */
+.map-layout { width:min(1440px, calc(100% - 32px)); margin:0 auto; padding:6px 0 72px; }
+.map-layout .prototype-banner { margin:0 0 16px; padding:8px 14px; border:1px solid #d3ded0; border-left:3px solid #43a979; border-radius:8px; background:#eef4ea; color:#42605a; font-size:12px; line-height:1.5; }
+.map-card { border:1px solid var(--line); border-radius:14px; overflow:hidden; background:#f9faf7; box-shadow:0 20px 45px rgba(25,46,52,.08); }
+.map-card .filters-panel { padding:14px 18px 12px; border-bottom:1px solid var(--line); background:#fffef9; }
+.map-card .search-count { margin:10px 2px 0; }
+.map-card .live-map-workspace { border:0; border-radius:0; box-shadow:none; }
+.map-card .map-split { grid-template-columns:340px 1fr; height:calc(100vh - 300px); min-height:540px; }
+.map-card .map-panel .live-map { height:100%; min-height:540px; }
+.map-card .map-panel .map-fallback { height:100%; min-height:540px; }
+.map-card .loading-note, .map-card .notice { margin-left:18px; margin-right:18px; }
+.map-card .data-actions { margin:16px 18px 18px; }
 .map-sidebar { display:flex; flex-direction:column; min-height:0; border-right:1px solid var(--line); background:#fffef9; }
 .map-list-search { padding:16px 16px 12px; border-bottom:1px solid var(--line); }
 .map-list-search label { display:block; margin-bottom:6px; color:#63717b; font-size:10px; text-transform:uppercase; letter-spacing:.1em; font-weight:800; }
@@ -498,13 +510,14 @@ footer>p { margin:0; color:#586870; font-size:13px; line-height:1.5; }
 .osm-popup-address, .osm-popup-description { margin:6px 0 0; color:#435963; font-size:12px; line-height:1.45; }
 .osm-popup-actions { display:flex; gap:14px; margin:10px 0 0; }
 .osm-popup-actions a { color:#0a705d; font-weight:800; font-size:12px; }
-/* Mobile-first (t_702c10af): below 768px the sidebar becomes a panel ABOVE
-   the map (search + list, internally scrollable) instead of a side column. */
+/* Mobile-first (t_702c10af, t_966254a1): below 768px the sidebar becomes a
+   panel ABOVE the map (search + list, internally scrollable) instead of a
+   side column; the card keeps the compact banner + filters on top. */
 @media (max-width:768px) {
-  .map-layout { width:min(100% - 32px,1180px); padding:40px 0 56px; }
-  .map-layout .live-map-workspace.map-split { grid-template-columns:1fr; grid-template-rows:auto 1fr; height:auto; min-height:0; }
+  .map-layout { width:min(100% - 32px,1180px); padding:2px 0 56px; }
+  .map-card .map-split { grid-template-columns:1fr; grid-template-rows:auto 1fr; height:auto; min-height:0; }
   .map-sidebar { border-right:0; border-bottom:1px solid var(--line); max-height:38vh; }
   .map-list-scroll { max-height:30vh; }
-  .map-layout .map-panel .live-map { height:55vh; min-height:380px; }
-  .map-layout .map-panel .map-fallback { height:55vh; min-height:380px; }
+  .map-card .map-panel .live-map { height:55vh; min-height:380px; }
+  .map-card .map-panel .map-fallback { height:55vh; min-height:380px; }
 }
