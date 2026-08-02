@@ -25,7 +25,7 @@ export function CorreggiTool() {
   return (
     <section className="tool-section correction-tool" aria-labelledby="correction-tool-title">
       <div className="tool-heading"><p className="eyebrow"><span /> {t.accountability}</p><h1 id="correction-tool-title">{t.pageTitle}</h1><p>{t.pageIntro}</p></div>
-      <CorrectionForm records={records} defaultRecordId={defaultRecordId} />
+      <CorrectionForm records={records} defaultRecordId={defaultRecordId} showHeading={false} />
     </section>
   );
 }

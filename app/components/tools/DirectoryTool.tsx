@@ -61,6 +61,7 @@ export function DirectoryTool() {
         onResetFilters={reset}
         mapHref="/mappa"
         reportHref="/segnala"
+        showHeading={false}
       />
     </section>
   );

@@ -162,7 +162,11 @@ test("server-rendered /mappa provides the map region and /directory the text-lis
   // keyboard path.
   const directory = await renderRoute("/directory");
   assert.equal(directory.response.status, 200);
-  assert.match(directory.html, /Browse public records without the map/);
+  // F5 (P1-5): one page header per tool page — the .tool-heading h1 and the
+  // pageIntro are the only header copy; the duplicated records-heading h2 is
+  // removed when the directory is embedded in the tool page.
+  assert.match(directory.html, /<h1[^>]*>Public directory<\/h1>/);
+  assert.doesNotMatch(directory.html, /Browse public records without the map/);
   assert.match(directory.html, /id="record-search"/);
   assert.match(directory.html, /id="record-search-count"[^>]*role="status"/);
   assert.match(directory.html, /Show on map/);
