@@ -64,6 +64,14 @@ function defaultPopupHtml(camera: MapCamera): string {
 export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLocation, directoryHref = "#records", onBoundsChange, popupHtmlFor }: Props) {
   const [mapUnavailable, setMapUnavailable] = useState(false);
   const [offline, setOffline] = useState(false);
+  // True once the lazy leaflet import has resolved and the layer group
+  // exists. The marker-population effect below depends on it: at mount the
+  // import is still in flight (leafletRef.current === null), so without
+  // this flag a stable `cameras` array (prototype seed, unreachable API —
+  // the realistic case) would make the effect early-return once and never
+  // run again, leaving .leaflet-marker-pane empty while the sidebar shows
+  // the same records (t_eb2e33a3 regression after #202).
+  const [mapReady, setMapReady] = useState(false);
   const mapElement = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<import("leaflet").Map | null>(null);
   const markersRef = useRef<import("leaflet").LayerGroup | null>(null);
@@ -149,6 +157,11 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
         markersRef.current = L.layerGroup().addTo(map);
         map.on("click", (event) => onPickRef.current(event.latlng.lat, event.latlng.lng));
         mapRef.current = map;
+        // The layer group now exists: the marker-population effect can run
+        // (it also depends on this flag, see the state declaration above).
+        // Must be set AFTER markersRef so the effect never observes a ready
+        // flag with a missing layer.
+        setMapReady(true);
         // moveend fires after every pan/zoom settles; zoomend is redundant
         // with it in Leaflet but cheap to listen to as a belt-and-braces
         // trigger. The list refresh is debounced so a drag never spams it.
@@ -173,15 +186,29 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
         boundsTimerRef.current = null;
       }
       mapRef.current?.remove(); mapRef.current = null; markersRef.current = null; markersByIdRef.current = null;
+      // Reset the ready flag so a StrictMode remount (or any future
+      // recreate) re-runs the population effect against the fresh layer
+      // group — otherwise mapReady stays true, the deps do not change and
+      // the new map would render with an empty marker pane again.
+      setMapReady(false);
     };
   }, [emitBounds]);
 
-  // Marker population depends only on the camera list and the click
-  // handler — NOT on the selection. Rebuilding every marker on each
-  // selection change would recreate N Leaflet DOM nodes per click; the
-  // selection is applied by the dedicated effect below.
+  // Marker population depends on the camera list, the click handler — NOT
+  // on the selection. Rebuilding every marker on each selection change
+  // would recreate N Leaflet DOM nodes per click; the selection is applied
+  // by the dedicated effect below.
+  //
+  // `mapReady` guards the first run: leaflet is imported lazily, so at
+  // mount `leafletRef.current` is null and the effect must no-op; once the
+  // map creation effect flips the flag, this effect re-runs and populates
+  // the markers even when `cameras` never changes identity (prototype seed
+  // with an unreachable/empty API — the t_eb2e33a3 marker-pane regression
+  // after #202: the sidebar listed the records while .leaflet-marker-pane
+  // stayed empty because the effect had early-returned before the import
+  // resolved and no later render re-triggered it).
   useEffect(() => {
-    const L = leafletRef.current; const layer = markersRef.current; if (!L || !layer) return;
+    const L = leafletRef.current; const layer = markersRef.current; if (!L || !layer || !mapReady) return;
     layer.clearLayers();
     const byId = new Map<number, MarkerEntry>();
     cameras.forEach((camera) => {
@@ -217,7 +244,7 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
       entry.marker.setIcon(buildMarkerIcon(L, entry.camera, true));
       if (focusLocationRef.current) entry.marker.openPopup();
     }
-  }, [cameras, onSelect]);
+  }, [cameras, onSelect, mapReady]);
 
   // Selection: swap the `selected` class only on the previously and the
   // newly selected marker (two setIcon calls, no layer rebuild). When the
