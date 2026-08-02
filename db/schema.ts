@@ -224,6 +224,37 @@ export const recoveryCodes = sqliteTable(
 );
 
 /**
+ * WebAuthn ceremony challenges (migration 0028, Fase C). Only the SHA-256 of
+ * the base64url challenge is stored — a database leak cannot replay a live
+ * ceremony (same rule as `sessions.token_hash`). `kind` separates the
+ * 'register' (session-bound) from the 'login' (public) ceremony; `expires_at`
+ * is created_at + 10 minutes (WEBAUTHN_CHALLENGE_TTL_MS, no KV binding in
+ * this project so the store lives in D1 with an expiry sweep) and `used_at`
+ * makes each challenge single-use (atomic conditional consume). Declared here
+ * so drizzle-kit generate never re-emits it (convention 0012/0014).
+ */
+export const webauthnChallenges = sqliteTable(
+  "webauthn_challenges",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    challengeHash: text("challenge_hash").notNull(),
+    kind: text("kind").notNull(),
+    contributorId: integer("contributor_id").references(() => contributors.id, {
+      onDelete: "cascade",
+    }),
+    userHandle: text("user_handle"),
+    createdAt: text("created_at").notNull(),
+    expiresAt: text("expires_at").notNull(),
+    usedAt: text("used_at"),
+  },
+  (table) => [
+    uniqueIndex("webauthn_challenges_challenge_hash_unique").on(table.challengeHash),
+    index("webauthn_challenges_expires_idx").on(table.expiresAt),
+    index("webauthn_challenges_contributor_idx").on(table.contributorId),
+  ],
+);
+
+/**
  * Login sessions (ADR 0013). Only the SHA-256 of the raw session token is
  * stored, plus a per-session CSRF token echoed through a non-HttpOnly cookie
  * and verified on state-changing requests. A row is dead after `expires_at`
