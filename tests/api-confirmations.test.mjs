@@ -91,6 +91,7 @@ const authedToggle = (method, pathAndQuery, { headers = {}, ...rest } = {}) =>
 
 test("PUT confirms a public record and returns the decayed count (no-store)", async () => {
   stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
   stub("setConfirmation", async () => ({ kind: "ok", count: 3 }));
   const { PUT } = await confirmationRoute();
   const response = await PUT(authedToggle("PUT", "/api/cameras/5/confirmation"));
@@ -113,6 +114,7 @@ test("PUT rejects a live session with a missing or wrong CSRF token", async (t) 
   const { PUT } = await confirmationRoute();
   await t.test("missing header", async () => {
     stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
     const response = await PUT(sessionRequest("/api/cameras/5/confirmation", { method: "PUT" }));
     assert.equal(response.status, 403);
     assert.equal((await responseBody(response)).error, "Invalid CSRF token. Refresh the page and try again.");
@@ -120,6 +122,7 @@ test("PUT rejects a live session with a missing or wrong CSRF token", async (t) 
   });
   await t.test("wrong header", async () => {
     stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
     const response = await PUT(
       sessionRequest("/api/cameras/5/confirmation", {
         method: "PUT",
@@ -148,6 +151,7 @@ test("PUT maps camera_not_public to 404 and malformed ids never touch the db", a
   const { PUT } = await confirmationRoute();
   await t.test("camera_not_public", async () => {
     stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
     stub("setConfirmation", async () => ({ kind: "camera_not_public" }));
     const response = await PUT(authedToggle("PUT", "/api/cameras/9/confirmation"));
     assert.equal(response.status, 404);
@@ -156,6 +160,7 @@ test("PUT maps camera_not_public to 404 and malformed ids never touch the db", a
   for (const id of ["abc", "0", "-1", "1e3"]) {
     await t.test(`malformed id ${id}`, async () => {
       stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
       const response = await PUT(authedToggle("PUT", `/api/cameras/${id}/confirmation`));
       assert.equal(response.status, 404, `id ${id} must be 404`);
       assert.equal(callArgs("setConfirmation").length, 0, `id ${id} must not reach the db`);
@@ -167,6 +172,7 @@ test("PUT maps level_gate and self_verify to 403 with distinct messages", async 
   const { PUT } = await confirmationRoute();
   await t.test("level_gate", async () => {
     stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
     stub("setConfirmation", async () => ({ kind: "level_gate" }));
     const response = await PUT(authedToggle("PUT", "/api/cameras/5/confirmation"));
     assert.equal(response.status, 403);
@@ -177,6 +183,7 @@ test("PUT maps level_gate and self_verify to 403 with distinct messages", async 
   });
   await t.test("self_verify", async () => {
     stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
     stub("setConfirmation", async () => ({ kind: "self_verify" }));
     const response = await PUT(authedToggle("PUT", "/api/cameras/5/confirmation"));
     assert.equal(response.status, 403);
@@ -186,6 +193,7 @@ test("PUT maps level_gate and self_verify to 403 with distinct messages", async 
 
 test("PUT maps duplicate to 409", async () => {
   stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
   stub("setConfirmation", async () => ({ kind: "duplicate" }));
   const { PUT } = await confirmationRoute();
   const response = await PUT(authedToggle("PUT", "/api/cameras/5/confirmation"));
@@ -201,6 +209,7 @@ test("PUT maps both quota kinds to 429 with Retry-After", async (t) => {
   ]) {
     await t.test(kind, async () => {
       stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
       stub("setConfirmation", async () => result);
       const response = await PUT(authedToggle("PUT", "/api/cameras/5/confirmation"));
       assert.equal(response.status, 429);
@@ -215,6 +224,7 @@ test("PUT respects the confirm rate-limit bucket, independent of the read bucket
   env.CONFIRM_RATE_LIMIT_MAX = "1";
   env.CONFIRM_RATE_LIMIT_WINDOW_SECONDS = "60";
   stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
   stub("setConfirmation", async () => ({ kind: "ok", count: 1 }));
   const { PUT } = await confirmationRoute();
 
@@ -239,6 +249,7 @@ test("PUT trips the IP-hash burst bucket and the alert never carries the raw IP"
   env.CONFIRM_IP_BURST_WINDOW_SECONDS = "60";
   env.ABUSE_ALERT_THRESHOLD = "1";
   stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
   stub("setConfirmation", async () => ({ kind: "ok", count: 1 }));
   const { PUT } = await confirmationRoute();
 
@@ -275,6 +286,7 @@ test("PUT trips the IP-hash burst bucket and the alert never carries the raw IP"
 
 test("PUT returns 503 when the database is unavailable", async () => {
   stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
   stub("setConfirmation", async () => {
     throw new Error("Database binding unavailable");
   });
@@ -290,6 +302,7 @@ test("PUT returns 503 when the database is unavailable", async () => {
 
 test("DELETE removes the verification and returns the decayed count (no-store)", async () => {
   stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
   stub("removeConfirmation", async () => ({ kind: "ok", count: 2 }));
   const { DELETE } = await confirmationRoute();
   const response = await DELETE(authedToggle("DELETE", "/api/cameras/5/confirmation"));
@@ -303,6 +316,7 @@ test("DELETE removes the verification and returns the decayed count (no-store)",
 
 test("DELETE answers 404 when no verification exists", async () => {
   stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
   stub("removeConfirmation", async () => ({ kind: "not_found" }));
   const { DELETE } = await confirmationRoute();
   const response = await DELETE(authedToggle("DELETE", "/api/cameras/5/confirmation"));
@@ -319,6 +333,7 @@ test("DELETE shares the guard order: 401 anonymous, 403 CSRF, 403 cross-origin",
   });
   await t.test("missing CSRF", async () => {
     stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
     const response = await DELETE(sessionRequest("/api/cameras/5/confirmation", { method: "DELETE" }));
     assert.equal(response.status, 403);
     assert.equal(callArgs("removeConfirmation").length, 0);
@@ -351,6 +366,7 @@ test("GET returns the caller's personal state from the confirmation row", async 
   const { GET } = await confirmationRoute();
   await t.test("row exists", async () => {
     stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
     stub("getConfirmation", async () => ({ id: 1, cameraId: 5, contributorId: 7, createdAt: "2026-08-01T09:00:00.000Z" }));
     const response = await GET(sessionRequest("/api/cameras/5/confirmation"));
     assert.equal(response.status, 200);
@@ -360,6 +376,7 @@ test("GET returns the caller's personal state from the confirmation row", async 
   });
   await t.test("no row", async () => {
     stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
     stub("getConfirmation", async () => null);
     const response = await GET(sessionRequest("/api/cameras/5/confirmation"));
     assert.equal(response.status, 200);

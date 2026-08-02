@@ -7,11 +7,45 @@ import { after, beforeEach, test } from "node:test";
 import { apiRequest, cleanupRouteTree, loadRoute, responseBody } from "./helpers/api-harness.mjs";
 import { callArgs, resetMockState, stub } from "./helpers/mock-state.mjs";
 
+// Session fixture (ADR 0013 double-submit CSRF): the write gate (Fase E1)
+// resolves the session cookie through resolveOptionalContributor ->
+// findSessionByToken (stubbed), requires same-origin + x-csrf-token, then
+// requires a VERIFIED contributor (getContributorVerification stubbed).
+const session = {
+  id: 7,
+  tokenHash: "hash",
+  csrfToken: "csrf-token-123",
+  createdAt: "2026-08-01T00:00:00.000Z",
+  expiresAt: "2026-09-01T00:00:00.000Z",
+  revokedAt: null,
+};
+const contributor = { id: 7, email: "linus@osdb.test", displayName: "Linus", createdAt: "2026-07-01T00:00:00.000Z", updatedAt: "2026-07-01T00:00:00.000Z" };
+
+// POST with a verified session cookie + CSRF (the default for intake tests —
+// the gate itself has its own suite, tests/write-gate.test.mjs).
+function sessionPost(body, headers = {}) {
+  return apiRequest("/api/cameras", {
+    method: "POST",
+    body,
+    headers: {
+      cookie: "osdb_session=raw-session-token-abc123; osdb_csrf=csrf-token-123",
+      "x-csrf-token": "csrf-token-123",
+      ...headers,
+    },
+  });
+}
+
 beforeEach(() => {
   resetMockState();
   // The JSON list now computes facets inline; every list test gets the empty
   // facet shape unless it overrides the stub.
   stub("getPublicCameraFacets", defaultFacets);
+  // Write gate (Fase E1): a VERIFIED session by default — the intake
+  // validation tests below focus on the payload; the gate itself has its own
+  // dedicated suite (tests/write-gate.test.mjs). Tests that exercise the gate
+  // (anonymous / unverified / CSRF) override these stubs.
+  stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
 });
 after(async () => cleanupRouteTree());
 
@@ -284,9 +318,7 @@ test("POST /api/cameras stores a trimmed, date-validated pending report", async 
   stub("createPendingCamera", async (input) => ({ id: 7, ...input }));
   const { POST } = await camerasRoute();
   const response = await POST(
-    apiRequest("/api/cameras", {
-      method: "POST",
-      body: {
+    sessionPost({
         title: "  Nuova telecamera  ",
         kind: "  PTZ  ",
         manufacturer: "  VendorCorp  ",
@@ -295,8 +327,7 @@ test("POST /api/cameras stores a trimmed, date-validated pending report", async 
         notes: "  vista sul parco  ",
         latitude: 44.1,
         longitude: 12.2,
-      },
-    }),
+      }),
   );
 
   assert.equal(response.status, 201);
@@ -312,7 +343,7 @@ test("POST /api/cameras stores a trimmed, date-validated pending report", async 
       notes: "vista sul parco",
       latitude: 44.1,
       longitude: 12.2,
-      contributorId: null,
+      contributorId: 7,
     },
   ]);
 });
@@ -321,10 +352,7 @@ test("POST /api/cameras without optional metadata passes nulls and empty strings
   stub("createPendingCamera", async (input) => ({ id: 8, ...input }));
   const { POST } = await camerasRoute();
   const response = await POST(
-    apiRequest("/api/cameras", {
-      method: "POST",
-      body: { title: "Minimal", kind: "Dome", latitude: 45.0, longitude: 9.0 },
-    }),
+    sessionPost({ title: "Minimal", kind: "Dome", latitude: 45.0, longitude: 9.0 }),
   );
   assert.equal(response.status, 201);
   assert.deepEqual(callArgs("createPendingCamera")[0][0], {
@@ -336,7 +364,7 @@ test("POST /api/cameras without optional metadata passes nulls and empty strings
     notes: "",
     latitude: 45,
     longitude: 9,
-    contributorId: null,
+    contributorId: 7,
   });
 });
 
@@ -352,7 +380,7 @@ test("POST /api/cameras rejects missing or blank required fields", async (t) => 
   ];
   for (const { name, body } of cases) {
     await t.test(name, async () => {
-      const response = await POST(apiRequest("/api/cameras", { method: "POST", body }));
+      const response = await POST(sessionPost(body));
       assert.equal(response.status, 400, name);
       const parsed = await responseBody(response);
       assert.match(parsed.error, /A title, type, valid position/, name);
@@ -375,10 +403,7 @@ test("POST /api/cameras rejects non-numeric or out-of-range coordinates", async 
   for (const { name, lat, lon } of cases) {
     await t.test(name, async () => {
       const response = await POST(
-        apiRequest("/api/cameras", {
-          method: "POST",
-          body: { title: "X", kind: "Y", latitude: lat, longitude: lon ?? 10 },
-        }),
+        sessionPost({ title: "X", kind: "Y", latitude: lat, longitude: lon ?? 10 }),
       );
       assert.equal(response.status, 400, name);
       assert.equal(callArgs("createPendingCamera").length, 0, name);
@@ -391,10 +416,7 @@ test("POST /api/cameras accepts coordinate boundary values", async () => {
   const { POST } = await camerasRoute();
   for (const [latitude, longitude] of [[-90, -180], [90, 180], [0, 0]]) {
     const response = await POST(
-      apiRequest("/api/cameras", {
-        method: "POST",
-        body: { title: "Edge", kind: "Dome", latitude, longitude },
-      }),
+      sessionPost({ title: "Edge", kind: "Dome", latitude, longitude }),
     );
     assert.equal(response.status, 201, `${latitude},${longitude}`);
   }
@@ -414,10 +436,7 @@ test("POST /api/cameras accepts only exact, real calendar dates", async (t) => {
   for (const observedOn of cases) {
     await t.test(`observedOn=${observedOn}`, async () => {
       const response = await POST(
-        apiRequest("/api/cameras", {
-          method: "POST",
-          body: { title: "X", kind: "Y", latitude: 1, longitude: 1, observedOn },
-        }),
+        sessionPost({ title: "X", kind: "Y", latitude: 1, longitude: 1, observedOn }),
       );
       assert.equal(response.status, 400, observedOn);
     });
@@ -428,17 +447,14 @@ test("POST /api/cameras truncates long fields to their documented limits", async
   stub("createPendingCamera", async (input) => ({ id: 10, ...input }));
   const { POST } = await camerasRoute();
   const response = await POST(
-    apiRequest("/api/cameras", {
-      method: "POST",
-      body: {
-        title: "T".repeat(95),
-        kind: "K".repeat(70),
-        address: "A".repeat(200),
-        notes: "N".repeat(1200),
-        manufacturer: "M".repeat(90),
-        latitude: 1,
-        longitude: 1,
-      },
+    sessionPost({
+      title: "T".repeat(95),
+      kind: "K".repeat(70),
+      address: "A".repeat(200),
+      notes: "N".repeat(1200),
+      manufacturer: "M".repeat(90),
+      latitude: 1,
+      longitude: 1,
     }),
   );
   assert.equal(response.status, 201);
@@ -454,16 +470,13 @@ test("POST /api/cameras normalises an ISO datetime observedOn to its date part",
   stub("createPendingCamera", async (input) => ({ id: 11, ...input }));
   const { POST } = await camerasRoute();
   const response = await POST(
-    apiRequest("/api/cameras", {
-      method: "POST",
-      body: {
+    sessionPost({
         title: "X",
         kind: "Y",
         latitude: 1,
         longitude: 1,
         observedOn: "2026-07-01T23:59:59.000Z",
-      },
-    }),
+      }),
   );
   assert.equal(response.status, 201);
   assert.equal(callArgs("createPendingCamera")[0][0].observedOn, "2026-07-01");
@@ -473,7 +486,7 @@ test("POST /api/cameras maps malformed JSON bodies to 400", async () => {
   stub("createPendingCamera", async (input) => ({ id: 12, ...input }));
   const { POST } = await camerasRoute();
   const response = await POST(
-    apiRequest("/api/cameras", { method: "POST", body: '{"title": broken' }),
+    sessionPost('{"title": broken'),
   );
   assert.equal(response.status, 400);
   const body = await responseBody(response);
@@ -487,23 +500,21 @@ test("POST /api/cameras links uploaded photo ids to the new report", async () =>
   stub("findNearbyPublicCameras", async () => []);
   const { POST } = await camerasRoute();
   const response = await POST(
-    apiRequest("/api/cameras", {
-      method: "POST",
-      body: {
-        title: "With photo evidence",
-        kind: "Dome",
-        latitude: 45.0,
-        longitude: 9.0,
-        photoIds: [101, 102],
-      },
+    sessionPost({
+      title: "With photo evidence",
+      kind: "Dome",
+      latitude: 45.0,
+      longitude: 9.0,
+      photoIds: [101, 102],
     }),
   );
   assert.equal(response.status, 201);
   const body = await responseBody(response);
   assert.equal(body.record.id, 14);
   assert.equal(body.linkedPhotos, 2);
-  // Anonymous submitter → contributorId null; anonymous photos stay linkable.
-  assert.deepEqual(callArgs("linkPhotosToCamera")[0], [14, [101, 102], null]);
+  // Verified contributor (Fase E1 default fixture) → the id is threaded into
+  // photo linking; anonymous uploads no longer exist.
+  assert.deepEqual(callArgs("linkPhotosToCamera")[0], [14, [101, 102], 7]);
 });
 
 test("POST /api/cameras passes the authenticated submitter's contributor id into photo linking", async () => {
@@ -511,12 +522,14 @@ test("POST /api/cameras passes the authenticated submitter's contributor id into
   // contributor at upload may only be linked by that same contributor. The
   // route must forward the resolved contributor id so linkPhotosToCamera can
   // enforce it — a session-carrying submitter with valid CSRF gets their id
-  // threaded through; the anonymous path keeps null (covered above).
+  // threaded through; with Fase E1 there is no anonymous path anymore — the
+  // default fixture already covers the verified contributor.
   stub("findSessionByToken", async () => ({
     tokenHash: "x",
     csrfToken: "csrf-token-123",
     contributor: { id: 7, email: "linus@osdb.test", displayName: "Linus" },
   }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
   stub("createPendingCamera", async (input) => ({ id: 14, ...input }));
   stub("linkPhotosToCamera", async () => 2);
   stub("findNearbyPublicCameras", async () => []);
@@ -547,16 +560,13 @@ test("POST /api/cameras rejects non-integer photo ids with 400", async () => {
   stub("createPendingCamera", async (input) => ({ id: 15, ...input }));
   const { POST } = await camerasRoute();
   const response = await POST(
-    apiRequest("/api/cameras", {
-      method: "POST",
-      body: {
+    sessionPost({
         title: "Bad photo ids",
         kind: "Dome",
         latitude: 45.0,
         longitude: 9.0,
         photoIds: [101, "102"],
-      },
-    }),
+      }),
   );
   assert.equal(response.status, 400);
   assert.equal(callArgs("linkPhotosToCamera").length, 0, "no linking on invalid ids");
@@ -570,16 +580,13 @@ test("POST /api/cameras keeps photo linking best-effort when storage fails", asy
   stub("findNearbyPublicCameras", async () => []);
   const { POST } = await camerasRoute();
   const response = await POST(
-    apiRequest("/api/cameras", {
-      method: "POST",
-      body: {
+    sessionPost({
         title: "Linking failure",
         kind: "Dome",
         latitude: 45.0,
         longitude: 9.0,
         photoIds: [101],
-      },
-    }),
+      }),
   );
   assert.equal(response.status, 201, "a storage hiccup must never fail the report");
   assert.equal((await responseBody(response)).linkedPhotos, 0);
@@ -594,28 +601,25 @@ test("POST /api/cameras accepts nonexistent photo ids best-effort with linkedPho
   stub("findNearbyPublicCameras", async () => []);
   const { POST } = await camerasRoute();
   const response = await POST(
-    apiRequest("/api/cameras", {
-      method: "POST",
-      body: {
+    sessionPost({
         title: "Nonexistent photo ids",
         kind: "Dome",
         latitude: 45.0,
         longitude: 9.0,
         photoIds: [999_999, 999_998],
-      },
-    }),
+      }),
   );
   assert.equal(response.status, 201);
   const body = await responseBody(response);
   assert.equal(body.record.id, 17);
   assert.equal(body.linkedPhotos, 0, "unmatched photo ids must not fail the report");
-  assert.deepEqual(callArgs("linkPhotosToCamera")[0], [17, [999999, 999998], null]);
+  assert.deepEqual(callArgs("linkPhotosToCamera")[0], [17, [999999, 999998], 7]);
 });
 
 test("POST /api/cameras rejects non-object JSON bodies", async () => {
   const { POST } = await camerasRoute();
   for (const body of ["42", "[1,2]", '"hello"']) {
-    const response = await POST(apiRequest("/api/cameras", { method: "POST", body }));
+    const response = await POST(sessionPost(body));
     assert.equal(response.status, 400, body);
     assert.equal(callArgs("createPendingCamera").length, 0, body);
   }
@@ -623,7 +627,7 @@ test("POST /api/cameras rejects non-object JSON bodies", async () => {
 
 test("POST /api/cameras rejects a JSON null body with 400 (OSDB-QA-001)", async () => {
   const { POST } = await camerasRoute();
-  const response = await POST(apiRequest("/api/cameras", { method: "POST", body: "null" }));
+  const response = await POST(sessionPost("null"));
   assert.equal(response.status, 400);
   assert.equal(callArgs("createPendingCamera").length, 0);
 });
@@ -633,10 +637,7 @@ test("POST /api/cameras rejects non-string observedOn values", async (t) => {
   for (const observedOn of [20260701, { year: 2026 }, ["2026-07-01"], true]) {
     await t.test(`observedOn=${JSON.stringify(observedOn)}`, async () => {
       const response = await POST(
-        apiRequest("/api/cameras", {
-          method: "POST",
-          body: { title: "X", kind: "Y", latitude: 1, longitude: 1, observedOn },
-        }),
+        sessionPost({ title: "X", kind: "Y", latitude: 1, longitude: 1, observedOn }),
       );
       assert.equal(response.status, 400, JSON.stringify(observedOn));
       assert.equal(callArgs("createPendingCamera").length, 0);
@@ -652,10 +653,7 @@ test("POST /api/cameras maps database failures to 500 with a generic client-safe
   });
   const { POST } = await camerasRoute();
   const response = await POST(
-    apiRequest("/api/cameras", {
-      method: "POST",
-      body: { title: "X", kind: "Y", latitude: 1, longitude: 1 },
-    }),
+    sessionPost({ title: "X", kind: "Y", latitude: 1, longitude: 1 }),
   );
   assert.equal(response.status, 500);
   assert.equal((await responseBody(response)).error, "Unable to save report");
@@ -668,10 +666,7 @@ test("POST /api/cameras coerces empty-string and null coordinates to 0,0", async
   const { POST } = await camerasRoute();
   for (const latitude of ["", null]) {
     const response = await POST(
-      apiRequest("/api/cameras", {
-        method: "POST",
-        body: { title: "X", kind: "Y", latitude, longitude: latitude },
-      }),
+      sessionPost({ title: "X", kind: "Y", latitude, longitude: latitude }),
     );
     assert.equal(response.status, 201, `latitude=${String(latitude)}`);
     assert.deepEqual(
@@ -805,10 +800,7 @@ test("POST includes nearby reviewed records as possibleDuplicates without blocki
   stub("findNearbyPublicCameras", async () => [duplicateFixture]);
   const { POST } = await camerasRoute();
   const response = await POST(
-    apiRequest("/api/cameras", {
-      method: "POST",
-      body: { title: "Camera porta nord", kind: "Fixed dome", address: "Via Roma 1", latitude: 41.9004, longitude: 12.4936 },
-    }),
+    sessionPost({ title: "Camera porta nord", kind: "Fixed dome", address: "Via Roma 1", latitude: 41.9004, longitude: 12.4936 }),
   );
   assert.equal(response.status, 201);
   const body = await responseBody(response);
@@ -833,10 +825,7 @@ test("POST rejects a high-strength duplicate with 409 and does NOT store the rec
   stub("findNearbyPublicCameras", async () => [duplicateFixture]);
   const { POST } = await camerasRoute();
   const response = await POST(
-    apiRequest("/api/cameras", {
-      method: "POST",
-      body: { title: "Camera porta nord", kind: "Fixed dome", address: "Via Roma 1", latitude: 41.9004, longitude: 12.4936 },
-    }),
+    sessionPost({ title: "Camera porta nord", kind: "Fixed dome", address: "Via Roma 1", latitude: 41.9004, longitude: 12.4936 }),
   );
   assert.equal(response.status, 409, "a likely duplicate must be refused before storage");
   const body = await responseBody(response);
@@ -856,10 +845,7 @@ test("POST stores the report once the submitter explicitly confirms the duplicat
   stub("findNearbyPublicCameras", async () => [duplicateFixture]);
   const { POST } = await camerasRoute();
   const response = await POST(
-    apiRequest("/api/cameras", {
-      method: "POST",
-      body: { title: "Camera porta nord", kind: "Fixed dome", address: "Via Roma 1", latitude: 41.9004, longitude: 12.4936, duplicateConfirmed: true },
-    }),
+    sessionPost({ title: "Camera porta nord", kind: "Fixed dome", address: "Via Roma 1", latitude: 41.9004, longitude: 12.4936, duplicateConfirmed: true }),
   );
   assert.equal(response.status, 201, "an explicit confirmation must let the report through");
   const body = await responseBody(response);
@@ -880,10 +866,7 @@ test("POST treats a non-boolean duplicateConfirmed as absent (fail-closed)", asy
   const { POST } = await camerasRoute();
   for (const bogus of ["true", 1, "yes"]) {
     const response = await POST(
-      apiRequest("/api/cameras", {
-        method: "POST",
-        body: { title: "Camera porta nord", kind: "Fixed dome", latitude: 41.9004, longitude: 12.4936, duplicateConfirmed: bogus },
-      }),
+      sessionPost({ title: "Camera porta nord", kind: "Fixed dome", latitude: 41.9004, longitude: 12.4936, duplicateConfirmed: bogus }),
     );
     assert.equal(response.status, 409, `duplicateConfirmed=${JSON.stringify(bogus)} must fail closed`);
   }
@@ -897,10 +880,7 @@ test("POST survives a failing duplicate check with an empty possibleDuplicates l
   });
   const { POST } = await camerasRoute();
   const response = await POST(
-    apiRequest("/api/cameras", {
-      method: "POST",
-      body: { title: "X", kind: "Y", latitude: 1, longitude: 1 },
-    }),
+    sessionPost({ title: "X", kind: "Y", latitude: 1, longitude: 1 }),
   );
   assert.equal(response.status, 201);
   const body = await responseBody(response);

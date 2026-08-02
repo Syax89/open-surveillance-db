@@ -13,25 +13,40 @@ import { after, beforeEach, test } from "node:test";
 import { apiRequest, cleanupRouteTree, loadLibModule, loadRoute, loadTreeModule, responseBody } from "./helpers/api-harness.mjs";
 import { callArgs, resetMockState, stub } from "./helpers/mock-state.mjs";
 
-beforeEach(() => resetMockState());
+beforeEach(() => {
+  resetMockState();
+  // Write gate (Fase E1): a VERIFIED session by default — the intake
+  // validation tests below focus on the payload; the gate itself has its
+  // own dedicated suite (tests/write-gate.test.mjs). Tests that exercise
+  // the gate (anonymous / unverified / revoked) override these stubs.
+  stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
+});
 after(async () => cleanupRouteTree());
 
 const photosRoute = () => loadRoute("app/api/photos/route.mjs");
 const photoItemRoute = () => loadRoute("app/api/photos/[id]/route.mjs");
 const moderationPhotoRoute = () => loadRoute("app/api/moderation/photos/[id]/route.mjs");
 
+// Session fixture (ADR 0013 double-submit CSRF): the route resolves the
+// session cookie through requireVerifiedContributor ->
+// resolveOptionalContributor -> findSessionByToken (stubbed), then requires
+// same-origin + x-csrf-token.
+const session = {
+  id: 7,
+  tokenHash: "hash",
+  csrfToken: "csrf-token-123",
+  createdAt: "2026-08-01T00:00:00.000Z",
+  expiresAt: "2026-09-01T00:00:00.000Z",
+  revokedAt: null,
+};
+const contributor = { id: 7, email: "linus@osdb.test", displayName: "Linus", createdAt: "2026-07-01T00:00:00.000Z", updatedAt: "2026-07-01T00:00:00.000Z" };
+
 // Default pending-photo quota state for tests that are not about the quota:
 // zero pending photos, zero pending bytes — the upload is always allowed by
 // the state quota and the test exercises whatever behaviour it stubbed.
 function quotaOk() {
   return stub("pendingPhotoUsage", async () => ({ count: 0, sizeBytes: 0 }));
-}
-
-// SHA-256 hex of a string, matching app/lib/abuse-alerts.ts sha256Hex — used
-// to assert the anonymous quota bucket key is the hashed caller key.
-async function sha256HexOf(value) {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
-  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 // Synthetic EXIF-carrying JPEG bytes (see image-metadata.test.mjs fixtures).
@@ -51,10 +66,20 @@ function jpegBytes() {
   return concat(Uint8Array.from([0xff, 0xd8]), app0, app1Exif, sof0, sos, Uint8Array.from([0x12, 0x34]), Uint8Array.from([0xff, 0xd9]));
 }
 
-function photoRequest(body, { contentType = "image/jpeg", headers = {} } = {}) {
+function photoRequest(body, { contentType = "image/jpeg", headers = {}, anon = false } = {}) {
   return new Request("https://osdb.test/api/photos", {
     method: "POST",
-    headers: { "content-type": contentType, ...headers },
+    headers: {
+      "content-type": contentType,
+      // Write gate (Fase E1): the default fixture is a VERIFIED session —
+      // the payload-validation tests must pass the gate to reach the body
+      // checks. Pass `anon: true` to exercise the gate itself.
+      ...(anon ? {} : {
+        cookie: "osdb_session=raw-session-token-abc123; osdb_csrf=csrf-token-123",
+        "x-csrf-token": "csrf-token-123",
+      }),
+      ...headers,
+    },
     body,
   });
 }
@@ -97,8 +122,10 @@ test("POST /api/photos stores a sanitised photo and returns metadata only", asyn
   assert.equal(received.mimeType, "image/jpeg");
   assert.equal(received.width, 64);
   assert.equal(received.height, 48);
-  // No session cookie → anonymous upload, no contributor attribution.
-  assert.equal(received.contributorId, null);
+  // Write gate (Fase E1): the default fixture is a verified session, so the
+  // stored row is attributed to the verified contributor (id 7) — anonymous
+  // uploads no longer exist.
+  assert.equal(received.contributorId, 7);
 });
 
 test("POST /api/photos attributes an authenticated upload to its contributor", async () => {
@@ -108,6 +135,7 @@ test("POST /api/photos attributes an authenticated upload to its contributor", a
     csrfToken: "csrf-token-123",
     contributor: { id: 7, email: "linus@osdb.test", displayName: "Linus" },
   }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
   stub("createPendingPhoto", async () => photoFixture);
   const { POST } = await photosRoute();
   const response = await POST(
@@ -131,6 +159,7 @@ test("POST /api/photos rejects an authenticated upload without a valid CSRF toke
     csrfToken: "csrf-token-123",
     contributor: { id: 7, email: "linus@osdb.test", displayName: "Linus" },
   }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
   const { POST } = await photosRoute();
   const response = await POST(
     new Request("https://osdb.test/api/photos", {
@@ -287,7 +316,10 @@ test("POST /api/photos allows uploads under the pending-photo quota unchanged", 
   assert.equal(response.status, 201);
   assert.equal(callArgs("createPendingPhoto").length, 1);
   const received = callArgs("createPendingPhoto")[0][0];
-  assert.equal(received.submitterKey, `anon:${await sha256HexOf("unknown")}`);
+  // Write gate (Fase E1): the default fixture is a verified session, so the
+  // quota bucket is the contributor id — the anonymous hashed-key branch no
+  // longer exists on this route.
+  assert.equal(received.submitterKey, "contributor:7");
   // The storage layer must still receive the sanitised bytes and attribution.
   assert.ok(received.bytes instanceof Uint8Array);
   assert.equal(received.mimeType, "image/jpeg");
@@ -329,6 +361,7 @@ test("POST /api/photos buckets an authenticated upload by contributor id", async
     csrfToken: "csrf-token-123",
     contributor: { id: 7, email: "linus@osdb.test", displayName: "Linus" },
   }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
   stub("createPendingPhoto", async () => photoFixture);
   const { POST } = await photosRoute();
   const response = await POST(
@@ -347,18 +380,18 @@ test("POST /api/photos buckets an authenticated upload by contributor id", async
   assert.equal(callArgs("createPendingPhoto")[0][0].submitterKey, "contributor:7");
 });
 
-test("POST /api/photos buckets an anonymous upload by hashed caller key", async () => {
+test("POST /api/photos refuses an anonymous upload with 401 (write gate)", async () => {
   quotaOk();
   stub("createPendingPhoto", async () => photoFixture);
   const { POST } = await photosRoute();
-  // With no cf-connecting-ip header the rate-limit callerKey falls back to
-  // "unknown"; the quota key is the SHA-256 of that value, never the raw key.
-  const response = await POST(photoRequest(jpegBytes()));
-  assert.equal(response.status, 201);
-  const key = callArgs("pendingPhotoUsage")[0][0];
-  assert.match(key, /^anon:[0-9a-f]{64}$/);
-  assert.equal(key, `anon:${await sha256HexOf("unknown")}`);
-  assert.equal(callArgs("createPendingPhoto")[0][0].submitterKey, key);
+  // With no session cookie at all the write gate answers 401 before any
+  // quota/body work: anonymous uploads are no longer possible (Fase E1).
+  const response = await POST(photoRequest(jpegBytes(), { anon: true }));
+  assert.equal(response.status, 401);
+  const body = await responseBody(response);
+  assert.equal(body.error, "Authentication required.");
+  assert.equal(callArgs("pendingPhotoUsage").length, 0, "the quota is never consulted for an anonymous caller");
+  assert.equal(callArgs("createPendingPhoto").length, 0, "nothing is stored");
 });
 
 // ---------------------------------------------------------------------------
@@ -381,12 +414,18 @@ test("POST /api/photos rejects an empty body (0 bytes) without storing anything"
 test("POST /api/photos rejects a missing Content-Type even with a valid binary body", async () => {
   // Content-Type is required: the allowlist check runs before the body is
   // read, so a valid JPEG without a declared type answers 415, never 201.
+  // The request carries a VERIFIED session (Fase E1 default fixture) so it
+  // passes the write gate and reaches the content-type check.
   quotaOk();
   stub("createPendingPhoto", async () => photoFixture);
   const { POST } = await photosRoute();
   const response = await POST(
     new Request("https://osdb.test/api/photos", {
       method: "POST",
+      headers: {
+        cookie: "osdb_session=raw-session-token-abc123; osdb_csrf=csrf-token-123",
+        "x-csrf-token": "csrf-token-123",
+      },
       body: jpegBytes(), // no content-type header at all
     }),
   );
@@ -473,32 +512,22 @@ test("POST /api/photos fails closed on a zip-bomb PNG (huge declared chunk) with
   assert.equal(callArgs("createPendingPhoto").length, 0);
 });
 
-test("POST /api/photos treats a revoked or expired session cookie as anonymous", async () => {
+test("POST /api/photos refuses an upload with a revoked or expired session cookie (401)", async () => {
   // A cookie whose token no longer resolves (logout revoked it, or it aged
-  // past AUTH_SESSION_TTL_DAYS) must not fail the upload nor attribute it:
-  // resolveOptionalContributor returns null → anonymous intake, no CSRF gate.
+  // past AUTH_SESSION_TTL_DAYS): the write gate treats a dead session
+  // exactly like an anonymous request — 401, single uniform body, nothing
+  // stored, no attribution (Fase E1, anti-enumeration).
   quotaOk();
   stub("createPendingPhoto", async () => photoFixture);
   // findSessionByToken returning null = revoked/expired/unknown token.
   stub("findSessionByToken", async () => null);
   const { POST } = await photosRoute();
-  const response = await POST(
-    new Request("https://osdb.test/api/photos", {
-      method: "POST",
-      headers: {
-        "content-type": "image/jpeg",
-        cookie: "osdb_session=dead-session-token; osdb_csrf=stale-csrf",
-        "x-csrf-token": "stale-csrf",
-        origin: "https://osdb.test",
-      },
-      body: jpegBytes(),
-    }),
-  );
-  assert.equal(response.status, 201);
-  const received = callArgs("createPendingPhoto")[0][0];
-  assert.equal(received.contributorId, null, "no attribution for a dead session");
-  const key = callArgs("pendingPhotoUsage")[0][0];
-  assert.match(key, /^anon:/, "dead session is bucketed as anonymous");
+  const response = await POST(photoRequest(jpegBytes()));
+  assert.equal(response.status, 401);
+  const body = await responseBody(response);
+  assert.equal(body.error, "Authentication required.");
+  assert.equal(callArgs("pendingPhotoUsage").length, 0, "the quota is never consulted for a dead session");
+  assert.equal(callArgs("createPendingPhoto").length, 0, "nothing is stored");
 });
 
 // ---------------------------------------------------------------------------

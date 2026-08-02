@@ -73,6 +73,12 @@ const DEFAULT_ENV = {
 
 beforeEach(async () => {
   resetMockState();
+  // Write gate (Fase E1): the submit routes (photos, cameras) require a
+  // VERIFIED contributor session. The rate limiter runs BEFORE the gate on
+  // both routes, so a burst is still 429 for any caller — but the first
+  // (under-limit) request must pass the gate to reach its normal handler
+  // path (415 image validation / 201 store). Default fixture: verified.
+  stubContributorSession();
   if (!env) {
     env = await sharedEnv();
     [rateLimit, abuseAlerts] = await Promise.all([
@@ -148,6 +154,7 @@ const stubContributorSession = () => {
     revokedAt: null,
     contributor: CONTRIBUTOR_PUBLIC,
   }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
   stubAuth(CONTRIBUTOR);
   // The route resolves the role identity through the contributor_id link,
   // never by email equality.
@@ -172,13 +179,22 @@ const build = {
   photos: (ip, xff) =>
     apiRequest("/api/photos", {
       method: "POST",
-      headers: { "content-type": "image/jpeg", ...identityHeaders(ip, xff) },
+      headers: {
+        "content-type": "image/jpeg",
+        cookie: "osdb_session=raw-session-token-abc123; osdb_csrf=csrf-token-123",
+        "x-csrf-token": "csrf-token-123",
+        ...identityHeaders(ip, xff),
+      },
     }),
   cameras: (ip) =>
     apiRequest("/api/cameras", {
       method: "POST",
       body: { title: "Rate-limit test camera", kind: "Dome", latitude: 44.4, longitude: 12.2 },
-      headers: identityHeaders(ip),
+      headers: {
+        cookie: "osdb_session=raw-session-token-abc123; osdb_csrf=csrf-token-123",
+        "x-csrf-token": "csrf-token-123",
+        ...identityHeaders(ip),
+      },
     }),
   appeals: (ip) =>
     apiRequest("/api/appeals", {
@@ -390,6 +406,7 @@ test("calls under the threshold are not rate-limited on any route family", async
       name: "POST /api/photos",
       knob: "POST_RATE_LIMIT_MAX",
       setup: () => {
+        stubContributorSession();
         stub("pendingPhotoUsage", async () => ({ count: 0, bytes: 0 }));
       },
       handler: async () => (await routes.photos()).POST,
@@ -400,6 +417,7 @@ test("calls under the threshold are not rate-limited on any route family", async
       name: "POST /api/cameras",
       knob: "POST_RATE_LIMIT_MAX",
       setup: () => {
+        stubContributorSession();
         stub("createPendingCamera", async (input) => ({ id: 1, ...input }));
         stub("linkPhotosToCamera", async () => 0);
         stub("findNearbyPublicCameras", async () => []);

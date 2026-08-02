@@ -177,6 +177,58 @@ test("authenticateContributor verifies against the stored hash", async () => {
 });
 
 // ---------------------------------------------------------------------------
+// Write gate verification state (multi-method auth Fase E1)
+// ---------------------------------------------------------------------------
+
+test("getContributorVerification reports an unverified account (email_verified_at NULL)", async () => {
+  const { auth } = runtime;
+  const profile = await auth.createContributor({ email: "linus@osdb.test", displayName: "Linus", password: "supersecret123" });
+
+  const state = await auth.getContributorVerification(profile.id);
+  assert.ok(state, "the account exists");
+  assert.equal(state.id, profile.id);
+  // Fase B sets email_verified_at; until then the account cannot write.
+  assert.equal(state.emailVerifiedAt, null);
+  assert.equal(state.authProvider, "password", "the legacy default keeps every existing row valid");
+});
+
+test("getContributorVerification reports a verified account once email_verified_at is set", async () => {
+  const { auth } = runtime;
+  const profile = await auth.createContributor({ email: "ada@example.org", displayName: "Ada", password: "supersecret123" });
+  // Fase B/C/D set the column at the verification boundary; here we simulate
+  // the post-verification state directly on the real schema.
+  await runtime.env.DB
+    .prepare("UPDATE contributors SET email_verified_at = ?, auth_provider = ? WHERE id = ?")
+    .bind("2026-08-01T09:30:00.000Z", "github", profile.id)
+    .run();
+
+  const state = await auth.getContributorVerification(profile.id);
+  assert.equal(state.emailVerifiedAt, "2026-08-01T09:30:00.000Z");
+  assert.equal(state.authProvider, "github");
+});
+
+test("getContributorVerification returns null for an erased account (write gate 401 path)", async () => {
+  const { auth } = runtime;
+  assert.equal(await auth.getContributorVerification(9999), null);
+});
+
+test("the write gate reads the same email_verified_at column the schema exposes", async () => {
+  const { auth } = runtime;
+  const profile = await auth.createContributor({ email: "gate@osdb.test", displayName: "Gate", password: "supersecret123" });
+
+  const before = await auth.getContributorVerification(profile.id);
+  assert.equal(before.emailVerifiedAt, null);
+
+  await runtime.env.DB
+    .prepare("UPDATE contributors SET email_verified_at = ? WHERE id = ?")
+    .bind("2026-08-02T00:00:00.000Z", profile.id)
+    .run();
+
+  const after = await auth.getContributorVerification(profile.id);
+  assert.equal(after.emailVerifiedAt, "2026-08-02T00:00:00.000Z");
+});
+
+// ---------------------------------------------------------------------------
 // Sessions
 // ---------------------------------------------------------------------------
 
