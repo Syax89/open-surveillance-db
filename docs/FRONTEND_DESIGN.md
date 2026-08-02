@@ -397,6 +397,61 @@ I componenti esistenti formano già un design system implicito. Lo formalizzo:
 - **`.status-dot`** + `.verified` / `.community-report` / `.needs-review` /
   `.demo` — dot di stato semantico (sempre con label testuale).
 
+### 3.6 Token layer implementato (F3, t_27bfa729)
+
+Implementato in `app/globals.css` (`:root`). I token rispecchiano ESATTAMENTE
+i valori preesistenti — nessun cambio di rendering (verificato: screenshot
+prima/dopo identici al pixel su tutte le route pubbliche, Lighthouse a11y
+>= 0.95 su ogni route).
+
+**Spacing** — scala 4px (già in §3.4): `--space-1..24`
+(`--space-1:4px`, `--space-2:8px`, `--space-3:12px`, `--space-4:16px`,
+`--space-5:20px`, `--space-6:24px`, `--space-8:32px`, `--space-10:40px`,
+`--space-12:48px`, `--space-16:64px`, `--space-20:80px`, `--space-24:96px`).
+
+**Radius** — consolidato dai valori esistenti:
+
+```
+--radius-xs:4px   (notice, offline-state, photo-moderate-note)
+--radius-sm:6px   (form inputs, photo-list, legal-note, map-hint)
+--radius-md:8px   (coordinate-entry, metadata-publication, photo-upload, map-record)
+--radius-lg:12px  (tool-card, report/correction-form, faq-item, confirm-dialog)
+--radius-xl:16px  (record-detail)
+--radius-2xl:22px (hero)
+--radius-full:999px (filter-chip pill, section-note)
+--radius-round:50% (dot, brand-mark, marker, faq summary ::before)
+```
+
+I valori fuori scala esistenti (7px, 9px, 10px, 14px, 18px, 99px) restano
+letterali finché non entrano in scala — nessun arrotondamento.
+
+**Type scale** — valori esistenti (F2 §3.3) come token:
+
+```
+--text-2xs:10px   --text-xs:11px   --text-sm:12px   --text-md:13px
+--text-base:14px  --text-lg:15px   --text-xl:16px   --text-2xl:17px
+--text-3xl:18px   --text-4xl:20px  --text-5xl:22px
+--text-hero:clamp(48px, 6vw, 82px)     --text-display:clamp(42px,6vw,70px)
+--text-section:clamp(34px,4vw,53px)    --text-legal:clamp(23px,3vw,32px)
+--text-moderation:clamp(28px,3vw,42px) --text-teaser:clamp(30px,3.6vw,48px)
+--text-auth:clamp(34px,5vw,54px)
+```
+
+I valori 19px (brand) e 21px (hero-stats dt) restano letterali (fuori scala).
+
+**Container widths** (§3.4) come token:
+
+```
+--container-standard:min(1180px, calc(100% - 48px))
+--container-readable:min(760px, calc(100% - 48px))
+--container-wide:min(1320px, calc(100% - 48px))
+```
+
+**Palette** — completata con i token mancanti di §3.2: `--focus` (#0b705c),
+`--status-verified` (#42a979), `--status-community` (#d3963e),
+`--status-review` (#d8715e); le classi `.verified` / `.community-report` /
+`.needs-review` e i focus ring usano i token.
+
 ---
 
 ## 4. Pattern dei filtri (directory e mappa)
