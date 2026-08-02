@@ -314,6 +314,13 @@ changes accumulate under `[Unreleased]`.
   once the lazy leaflet import resolves (`mapReady` flag), instead of
   early-returning at mount and never being re-triggered by a stable
   `cameras` prop (t_eb2e33a3 regression after the #202 redesign).
+- Photo uploads no longer leak orphaned R2 objects when the D1 metadata
+  INSERT fails (t_00e63031, P1-3): `createPendingPhoto` now deletes the
+  just-stored R2 object best-effort before rethrowing, so a failed upload
+  cannot leave bytes in the `PHOTOS` bucket with no D1 row (which the
+  retention sweep — D1-only — could never collect). The storage key is a
+  fresh UUID per attempt, so retries are idempotent: a failed attempt
+  leaves no object behind and the retry stores exactly one.
 
 ### Security
 
