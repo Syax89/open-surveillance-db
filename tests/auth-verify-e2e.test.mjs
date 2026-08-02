@@ -134,17 +134,22 @@ test("resend revokes the old link and honours the 3/h budget", async () => {
 
   const resendTwo = await resendRoute.POST(withSession("/api/auth/verify-email/resend", session, { method: "POST" }));
   assert.equal(resendTwo.status, 200); // send #3
+  const thirdToken = new URL((await responseBody(resendTwo)).devLink).searchParams.get("token");
+  assert.ok(thirdToken && thirdToken !== secondToken, "resend mints a fresh token every time");
 
   // The 4th send is blocked: register + 2 resends already used the 3/h budget.
   const blocked = await resendRoute.POST(withSession("/api/auth/verify-email/resend", session, { method: "POST" }));
   assert.equal(blocked.status, 429);
   assert.ok(Number(blocked.headers.get("retry-after")) > 0);
 
-  // The first (revoked) link is Gone; the newest one verifies.
+  // Every older link is Gone — each re-send revokes ALL previous unused
+  // tokens of the same purpose, so only the newest (third) link verifies.
   const stale = await verifyEmailRoute.GET(apiRequest(`/api/auth/verify-email?token=${encodeURIComponent(firstToken)}`));
   assert.equal(stale.status, 410, "a re-send revokes every older unused link");
-  const fresh = await verifyEmailRoute.GET(apiRequest(`/api/auth/verify-email?token=${encodeURIComponent(secondToken)}`));
-  assert.equal(fresh.status, 200);
+  const staleTwo = await verifyEmailRoute.GET(apiRequest(`/api/auth/verify-email?token=${encodeURIComponent(secondToken)}`));
+  assert.equal(staleTwo.status, 410, "the second link is revoked by the third send");
+  const fresh = await verifyEmailRoute.GET(apiRequest(`/api/auth/verify-email?token=${encodeURIComponent(thirdToken)}`));
+  assert.equal(fresh.status, 200, "only the newest link verifies");
 });
 
 test("resend without a session is 401", async () => {
