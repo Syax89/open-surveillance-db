@@ -1,11 +1,17 @@
 /**
  * Client-side DOM tests for AuthNavLinks — the header auth entry point
- * (kanban t_65b778c5, CEO request 2026-08-02).
+ * (kanban t_65b778c5, CEO request 2026-08-02; mobile placement fix
+ * t_94b3726d).
  *
- * The shared public header now carries login/register/account links in the
- * TOP-RIGHT corner (SiteHeader `trailing` slot, to the right of the
- * LocaleToggle). Session state comes from GET /api/auth/me (the same
- * endpoint the account page uses — server half app/lib/auth-session.ts).
+ * The shared public header carries login/register/account links as the
+ * LAST item of the .nav-links container (PublicNav renders AuthNavLinks
+ * right after PublicNavLinks): on mobile (<768px) the container collapses
+ * into the hamburger menu, so the auth links travel inside it — no more
+ * separate top-bar slot that wrapped the header at 320/390px (CEO live
+ * feedback 2026-08-02); on desktop (≥768px) the container is the inline
+ * row and the auth cluster stays visible in the header, pushed to the
+ * right end. Session state comes from GET /api/auth/me (the same endpoint
+ * the account page uses — server half app/lib/auth-session.ts).
  *
  * Covers:
  *   1. anonymous (401): renders "Log in" (/login) + "Create account"
@@ -20,10 +26,11 @@
  *      interpret — privacy by design);
  *   5. no session leak into SSR HTML: the initial state renders nothing
  *      (the links appear only after the endpoint resolves);
- *   6. PublicNav integration: the header renders AuthNavLinks in the
- *      top-right slot AFTER the LocaleToggle, while the six shared nav
- *      links (.nav-links) stay untouched (contract guard: the deepEqual
- *      pin in client-tools/a11y-interactive keeps passing);
+ *   6. PublicNav integration: the auth links render INSIDE the mobile menu
+ *      container (#main-links), right after the six shared nav links —
+ *      never in a separate top-bar slot (the deepEqual pin below guards
+ *      both the six content links and the in-menu auth placement, and the
+ *      CSS viewport contract lives in header-mobile-menu-contract);
  *   7. locale: Italian labels ("Accedi", "Crea account") when the stored
  *      locale is IT (labels from i18n/auth.ts:90/91).
  *
@@ -183,36 +190,48 @@ test("auth header: renders NOTHING before the endpoint resolves (no session leak
   await rtl.waitFor(() => assert.ok(screen.getByRole("link", { name: "Log in" })));
 });
 
-test("PublicNav: AuthNavLinks renders in the top-right slot, after the LocaleToggle, without touching the six nav links", async () => {
+test("PublicNav: auth links live INSIDE the mobile menu (#main-links), after the six nav links — no top-bar slot", async () => {
   const { screen, waitFor } = rtl;
   installFetchMock(meHandler(401, { error: "Not authenticated." }));
-  await setNavState({ pathname: "/mappa" });
+  await setNavState({ pathname: "/login" });
 
   const view = await renderWithLocale(
     React.createElement(PublicNav, { navLabel: "Main navigation", homeLabel: "OpenSurveillanceDB home" }),
   );
   const container = view.container;
 
-  // The six shared links are untouched (contract guard for the deepEqual
-  // pins in client-tools / a11y-interactive).
+  // The auth entry point resolves INSIDE #main-links — the container that
+  // collapses into the hamburger menu on mobile (<768px). There must be NO
+  // separate top-bar auth slot (the old trailing slot wrapped the header
+  // at 320/390px, CEO live feedback).
+  await waitFor(() => assert.ok(screen.getByRole("link", { name: "Log in" })));
+
+  // The six shared links stay first and untouched; the auth links follow
+  // INSIDE the same container (t_94b3726d: the mobile-menu placement).
   const navLinks = [...container.querySelectorAll(".nav-links a")].map((a) => a.getAttribute("href"));
   assert.deepEqual(
     navLinks,
-    ["/mappa", "/directory", "/guide", "/regole", "/manifesto", "/segnala"],
-    "the six shared public nav links must stay unchanged",
+    ["/mappa", "/directory", "/guide", "/regole", "/manifesto", "/segnala", "/login", "/register"],
+    "the six shared public nav links must stay unchanged, with the auth links appended inside the menu container",
   );
 
-  // The auth entry point resolves into the top-right slot, after the toggle.
-  await waitFor(() => assert.ok(screen.getByRole("link", { name: "Log in" })));
-  const toggle = container.querySelector(".locale-toggle");
+  const mainLinks = container.querySelector("#main-links");
+  assert.ok(mainLinks, "the mobile menu container #main-links must render");
   const authLinks = container.querySelector(".auth-nav-links");
-  assert.ok(toggle, "LocaleToggle must render");
   assert.ok(authLinks, "AuthNavLinks must render inside the header");
-  // Order contract: brand → nav-links → LocaleToggle → auth-nav-links.
+  assert.ok(mainLinks.contains(authLinks), "auth links must be INSIDE the mobile menu container");
+
+  // aria-current travels with the auth links into the menu (WCAG 2.2 AA):
+  // the current auth route is marked inside the dropdown, not on a hidden
+  // desktop-only slot.
+  const loginLink = authLinks.querySelector('a[href="/login"]');
+  assert.equal(loginLink.getAttribute("aria-current"), "page", "the in-menu Log in link marks the current page");
+
+  // The top bar (direct children of the nav shell) carries no auth slot:
+  // brand, menu button, nav-links, locale toggle only.
   const shell = container.querySelector("nav.nav-shell");
-  const children = [...shell.children].filter((el) => el.classList.contains("nav-links") || el.classList.contains("locale-toggle") || el.classList.contains("auth-nav-links"));
-  const classes = children.map((el) => el.className.trim());
-  assert.deepEqual(classes, ["nav-links", "locale-toggle", "auth-nav-links"], "auth links must sit to the RIGHT of the LocaleToggle");
+  const classes = [...shell.children].map((el) => el.className.trim());
+  assert.ok(!classes.includes("auth-nav-links"), "no auth slot in the top bar — auth lives inside the mobile menu");
 });
 
 test("auth header: Italian labels from the auth bundle (i18n/auth.ts:90/91)", async () => {

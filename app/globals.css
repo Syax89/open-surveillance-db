@@ -83,10 +83,22 @@ button { cursor:pointer; }
 .brand { display:inline-flex; align-items:center; gap:10px; font-weight:800; letter-spacing:-.04em; font-size:19px; }
 .brand-mark { display:grid; place-items:center; width:29px; height:29px; border-radius:var(--radius-round); background:var(--ink); color:var(--mint); font-size:var(--text-4xl); line-height:1; }
 .nav-links { display:flex; align-items:center; gap:28px; font-size:var(--text-base); font-weight:700; }
-/* Auth entry point in the top-right corner (t_65b778c5): login/register
-   (anonymous) or the account link (signed in). Rendered AFTER the
-   LocaleToggle via SiteHeader's `trailing` slot; always visible — also on
-   mobile, where .nav-links collapses into the hamburger menu. */
+/* t_94b3726d: the auth entry point lives INSIDE .nav-links (PublicNav
+   renders AuthNavLinks as its last item, so it is part of the mobile
+   dropdown). On desktop (≥768px) .nav-links is the inline header row: it
+   fills the shell (flex:1) and the auth cluster is pushed to the right
+   end, next to the LocaleToggle — the top-right corner of t_65b778c5.
+   flex-wrap keeps the 768-980px tablet range from overflowing the
+   document (design doc §9.1: "inline, wrap"); below 768px the dropdown
+   rule overrides with column direction. Scoped to the hamburger header
+   (:has(.menu-button)) so the auth/record shells keep their own layout
+   untouched. */
+.nav-shell:has(.menu-button) .nav-links { flex:1; min-width:0; flex-wrap:wrap; row-gap:10px }
+.nav-links .auth-nav-links { margin-left:auto }
+/* Auth entry point (t_65b778c5, mobile fix t_94b3726d): login/register
+   (anonymous) or the account link (signed in). Rendered as the LAST item
+   of .nav-links: it collapses with the hamburger menu on mobile (<768px)
+   and stays in the inline header row on desktop (≥768px). */
 .auth-nav-links { display:inline-flex; align-items:center; gap:10px; font-size:var(--text-base); font-weight:700; }
 .auth-nav-links a:not(.nav-action) { color:#405462; }
 .auth-nav-links a:not(.nav-action):hover { color:#16715e; }
@@ -343,14 +355,24 @@ footer>p { margin:0; color:#586870; font-size:var(--text-md); line-height:1.5; }
   .report-section, .correction-section { grid-template-columns:1fr 1fr }
   .principles-grid { max-width:720px }
 }
-@media (max-width:700px) {
-  .nav-shell, .hero, .map-section, .records-section, .principles, .report-section, .correction-section, .moderation-page, footer, .tool-section { width:min(100% - 32px,1180px) }
-  .tool-section { padding:40px 0 72px }
-  .nav-shell { padding:16px 0;position:relative }
+@media (max-width:768px) {
+  /* Header nav (t_94b3726d): the hamburger + dropdown now cover <768px —
+     the range where the six links + auth entry point cannot fit on one
+     line (the old 700px boundary left 701-767px overflowing). Scoped with
+     :has(.menu-button) so the auth/record shells (login, register,
+     account, error — no hamburger) keep their inline "back home" row. */
+  .nav-shell { width:min(100% - 32px,1180px); padding:16px 0; position:relative }
   .menu-button { display:block }
-  .nav-links { display:none;position:absolute;z-index:10;top:62px;right:0;left:0;padding:var(--space-4);border:1px solid var(--line);border-radius:10px;background:#fff;box-shadow:0 12px 24px rgba(30,45,45,.15);flex-direction:column;align-items:stretch;gap:14px }
-  .nav-links.is-open { display:flex }
-  .nav-action { text-align:center }
+  .nav-shell:has(.menu-button) .nav-links { display:none; position:absolute; z-index:10; top:62px; right:0; left:0; padding:var(--space-4); border:1px solid var(--line); border-radius:10px; background:#fff; box-shadow:0 12px 24px rgba(30,45,45,.15); flex-direction:column; flex-wrap:nowrap; align-items:stretch; gap:14px }
+  .nav-shell:has(.menu-button) .nav-links.is-open { display:flex }
+  /* Auth links travel with the dropdown (t_94b3726d): separated from the
+     six content links by a hairline, as a full-width bottom row. */
+  .nav-shell:has(.menu-button) .nav-links .auth-nav-links { margin-left:0; margin-top:2px; padding-top:14px; border-top:1px solid var(--line); justify-content:space-between }
+  .nav-shell:has(.menu-button) .nav-action { text-align:center }
+}
+@media (max-width:700px) {
+  .hero, .map-section, .records-section, .principles, .report-section, .correction-section, .moderation-page, footer, .tool-section { width:min(100% - 32px,1180px) }
+  .tool-section { padding:40px 0 72px }
   .nav-actions, .nav-record-actions { gap:9px }
   .nav-record-actions .text-button { max-width:105px;text-align:right }
   .hero-copy { padding:52px 28px 39px }
@@ -412,7 +434,17 @@ footer>p { margin:0; color:#586870; font-size:var(--text-md); line-height:1.5; }
   .record-search { grid-column:auto }
 }
 @media (max-width:480px) {
-  .nav-shell { flex-wrap:wrap;row-gap:var(--space-3) }
+  /* t_94b3726d: compact top bar for 320px viewports — brand + menu button
+     + LocaleToggle must stay on ONE line (the CEO live feedback found it
+     wrapping at 320/390px when the auth links were in the bar). Smaller
+     brand + tighter gaps + 12px side margins put ~294px of content into a
+     296px shell at 320px; flex-wrap stays only as a safety net (graceful
+     degradation, never clipping). Scoped to the hamburger header so the
+     auth/record shells keep their margins. */
+  .nav-shell:has(.menu-button) { width:min(100% - 24px,1180px); gap:6px }
+  .nav-shell:has(.menu-button) .brand { font-size:13px; gap:7px }
+  .nav-shell:has(.menu-button) .brand-mark { width:24px; height:24px; font-size:var(--text-3xl) }
+  .nav-shell { flex-wrap:wrap; row-gap:var(--space-3) }
   .nav-record-actions, .nav-actions { flex:1;justify-content:space-between }
   .coordinate-fields, .report-metadata-fields { grid-template-columns:1fr }
   .coordinate-button { width:100%;justify-content:center }
