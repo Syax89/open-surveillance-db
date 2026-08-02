@@ -101,6 +101,14 @@ declare module "cloudflare:workers" {
     /** Max accepted upstream geocode body in bytes (default 512 KiB). */
     GEOCODE_MAX_BYTES?: string;
     PHOTOS: R2Bucket;
+    // Multi-method auth — Fase B/A2 (mailer): the Cloudflare `send_email`
+    // binding is optional by design. When absent the mailer falls back to a
+    // dev log (registration and reset still succeed — see db/mailer.ts and
+    // app/lib/mailer.ts). VERIFY_BASE_URL overrides the link base (defaults
+    // to the request origin); MAIL_FROM overrides the sender (default
+    // no-reply@opensurveillancedb.org).
+    VERIFY_BASE_URL?: string;
+    MAIL_FROM?: string;
   }
   export const env: Env;
 }

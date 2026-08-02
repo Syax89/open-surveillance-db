@@ -159,11 +159,18 @@ export type Contributor = {
   email: string;
   displayName: string | null;
   passwordHash: string;
+  emailVerifiedAt: string | null;
+  authProvider: string;
   createdAt: string;
   updatedAt: string;
 };
 
-/** What the API ever returns: the password hash never leaves the db layer. */
+/**
+ * What the API ever returns: the password hash never leaves the db layer.
+ * `emailVerifiedAt` (migration 0027, Fase B) tells the client whether the
+ * account can write yet — NULL until the address is verified, ISO timestamp
+ * after. The write gate (Fase E1) enforces the same column server-side.
+ */
 export type PublicContributor = Omit<Contributor, "passwordHash">;
 
 export type Session = {
@@ -211,10 +218,10 @@ export function isValidEmail(value: unknown): value is string {
 // ---------------------------------------------------------------------------
 
 const contributorColumns =
-  "id, email, display_name AS displayName, password_hash AS passwordHash, created_at AS createdAt, updated_at AS updatedAt";
+  "id, email, display_name AS displayName, password_hash AS passwordHash, email_verified_at AS emailVerifiedAt, auth_provider AS authProvider, created_at AS createdAt, updated_at AS updatedAt";
 
 const publicContributorColumns =
-  "id, email, display_name AS displayName, created_at AS createdAt, updated_at AS updatedAt";
+  "id, email, display_name AS displayName, email_verified_at AS emailVerifiedAt, auth_provider AS authProvider, created_at AS createdAt, updated_at AS updatedAt";
 
 /**
  * Create a contributor and return the public profile. The unique email index
@@ -298,6 +305,8 @@ export async function authenticateContributor(
     id: contributor.id,
     email: contributor.email,
     displayName: contributor.displayName,
+    emailVerifiedAt: contributor.emailVerifiedAt,
+    authProvider: contributor.authProvider,
     createdAt: contributor.createdAt,
     updatedAt: contributor.updatedAt,
   };
@@ -533,6 +542,7 @@ export async function findSessionByToken(
       `SELECT s.id, s.contributor_id AS sessionContributorId, s.token_hash AS tokenHash, s.csrf_token AS csrfToken,
               s.created_at AS createdAt, s.expires_at AS expiresAt, s.revoked_at AS revokedAt,
               c.id AS contributorId, c.email AS email, c.display_name AS displayName,
+              c.email_verified_at AS emailVerifiedAt, c.auth_provider AS authProvider,
               c.created_at AS contributorCreatedAt, c.updated_at AS contributorUpdatedAt
        FROM sessions s JOIN contributors c ON c.id = s.contributor_id
        WHERE s.token_hash = ?`,
@@ -549,6 +559,8 @@ export async function findSessionByToken(
       contributorId: number;
       email: string;
       displayName: string | null;
+      emailVerifiedAt: string | null;
+      authProvider: string;
       contributorCreatedAt: string;
       contributorUpdatedAt: string;
     }>();
@@ -567,6 +579,8 @@ export async function findSessionByToken(
       id: row.contributorId,
       email: row.email,
       displayName: row.displayName,
+      emailVerifiedAt: row.emailVerifiedAt,
+      authProvider: row.authProvider,
       createdAt: row.contributorCreatedAt,
       updatedAt: row.contributorUpdatedAt,
     },
@@ -619,6 +633,195 @@ export async function getContributorVerification(
     )
     .bind(contributorId)
     .first<ContributorVerification>();
+}
+
+// Email verification + password reset tokens (multi-method auth Fase B)
+// ---------------------------------------------------------------------------
+//
+// Both flows that prove mailbox control share the `email_verification_tokens`
+// table (migration 0027 + purpose column 0031): 'verify' links emailed at
+// registration, 'reset' links emailed by the reset-request handler. The
+// security model is inherited from 0027:
+//   - only the SHA-256 of the raw token is stored (a DB leak cannot replay);
+//   - tokens die after 24h (`expires_at`) or on first use (`used_at`);
+//   - consuming a token is an atomic conditional UPDATE, so two parallel
+//     requests cannot both succeed (single-use even under a race);
+//   - creating a new token for a purpose revokes every older UNUSED token of
+//     the same purpose: only the newest link works, and replaying a stale
+//     link answers 410 Gone instead of silently re-verifying.
+//
+// Send throttling is a COUNT over rows created inside the window (per
+// contributor + purpose): each send creates exactly one row, so "3 sends per
+// hour" is a COUNT <= 3 — no separate counter table, and the count is immune
+// to tokens being consumed or revoked in between. Register, re-send and
+// reset-request all funnel through `countVerificationTokensSentSince`.
+
+export const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
+/** Max emails (verify or reset, each with its own budget) per window. */
+export const VERIFICATION_SEND_LIMIT = 3;
+export const VERIFICATION_SEND_WINDOW_MS = 60 * 60 * 1000;
+
+export type EmailVerificationPurpose = "verify" | "reset";
+
+/**
+ * Create a verification/reset token for a contributor and return the RAW
+ * token (the only thing the mailer may see — the DB stores only its hash).
+ * Older UNUSED tokens of the same purpose are revoked (used_at set) first,
+ * so a re-send invalidates every previously mailed link and a stale link
+ * answers 410 instead of verifying twice.
+ *
+ * `now` is injectable for deterministic tests (same convention as
+ * createSession).
+ */
+export async function createVerificationToken(
+  contributorId: number,
+  purpose: EmailVerificationPurpose,
+  now: string = new Date().toISOString(),
+): Promise<{ rawToken: string; expiresAt: string }> {
+  const d1 = await getD1();
+  const rawToken = randomBase64Url(TOKEN_BYTES);
+  const tokenHash = await sha256Hex(rawToken);
+  const expiresAt = new Date(Date.parse(now) + VERIFICATION_TOKEN_TTL_MS).toISOString();
+  await d1.batch([
+    // Revoke older unused tokens of the same purpose: only the newest link
+    // stays valid. (Used/expired rows are left alone — they are already dead.)
+    d1.prepare(
+      "UPDATE email_verification_tokens SET used_at = ? WHERE contributor_id = ? AND purpose = ? AND used_at IS NULL",
+    ).bind(now, contributorId, purpose),
+    d1.prepare(
+      "INSERT INTO email_verification_tokens (contributor_id, token_hash, purpose, created_at, expires_at) VALUES (?, ?, ?, ?, ?)",
+    ).bind(contributorId, tokenHash, purpose, now, expiresAt),
+  ]);
+  return { rawToken, expiresAt };
+}
+
+export type VerificationConsumeResult =
+  | { kind: "verified"; contributorId: number }
+  | { kind: "invalid" }
+  | { kind: "used" }
+  | { kind: "expired" };
+
+/**
+ * Atomically consume a raw token for the given purpose.
+ *
+ *   - unknown hash, or a hash belonging to the OTHER purpose -> "invalid"
+ *     (the response must not reveal whether a token exists — anti-enumeration);
+ *   - already consumed (used_at set) -> "used";
+ *   - past expires_at -> "expired";
+ *   - live -> "verified": the row is burned single-use (conditional UPDATE,
+ *     so a concurrent request loses the race and sees "used") and the
+ *     contributor id is returned for the caller to act on.
+ *
+ * The caller (verify-email or reset-confirm route) performs the side effect
+ * — setting `email_verified_at` and/or rotating the password — so this
+ * function stays a single-purpose token gate. `now` is injectable for
+ * deterministic tests.
+ */
+export async function consumeVerificationToken(
+  rawToken: string,
+  purpose: EmailVerificationPurpose,
+  now: string = new Date().toISOString(),
+): Promise<VerificationConsumeResult> {
+  const d1 = await getD1();
+  const tokenHash = await sha256Hex(rawToken);
+  const row = await d1
+    .prepare(
+      "SELECT id, contributor_id AS contributorId, purpose, used_at AS usedAt, expires_at AS expiresAt FROM email_verification_tokens WHERE token_hash = ?",
+    )
+    .bind(tokenHash)
+    .first<{ id: number; contributorId: number; purpose: string; usedAt: string | null; expiresAt: string }>();
+  if (!row || row.purpose !== purpose) return { kind: "invalid" };
+  if (row.usedAt !== null) return { kind: "used" };
+  if (row.expiresAt <= now) return { kind: "expired" };
+
+  // Single-use under a race: the conditional UPDATE is the consume. If two
+  // requests present the same live token, exactly one wins (changes = 1);
+  // the loser sees used_at already set and gets "used".
+  const consumed = (await d1
+    .prepare("UPDATE email_verification_tokens SET used_at = ? WHERE id = ? AND used_at IS NULL AND expires_at > ?")
+    .bind(now, row.id, now)
+    .run()) as { meta: { changes: number } };
+  if (consumed.meta.changes === 0) return { kind: "used" };
+  return { kind: "verified", contributorId: row.contributorId };
+}
+
+/**
+ * How many tokens of a purpose were CREATED for a contributor inside the
+ * window ending at `now` — the send budget (default 3/h). Every send creates
+ * a row, so this count is exact regardless of consumption/revocation.
+ */
+export async function countVerificationTokensSentSince(
+  contributorId: number,
+  purpose: EmailVerificationPurpose,
+  since: string,
+): Promise<number> {
+  const d1 = await getD1();
+  const result = await d1
+    .prepare(
+      "SELECT COUNT(*) AS n FROM email_verification_tokens WHERE contributor_id = ? AND purpose = ? AND created_at >= ?",
+    )
+    .bind(contributorId, purpose, since)
+    .first<{ n: number }>();
+  return Number(result?.n ?? 0);
+}
+
+/**
+ * Set `email_verified_at` on a contributor (idempotent: the first
+ * verification wins, the original timestamp is preserved — COALESCE). This
+ * is the flip that turns a read-only session into a write-capable one; the
+ * write gate (Fase E1) reads the column on every state-changing write.
+ * Returns the refreshed public profile, or null when the account no longer
+ * exists (erased between the token consume and this update).
+ */
+export async function markContributorEmailVerified(
+  contributorId: number,
+  now: string = new Date().toISOString(),
+): Promise<PublicContributor | null> {
+  const d1 = await getD1();
+  return d1
+    .prepare(
+      `UPDATE contributors
+       SET email_verified_at = COALESCE(email_verified_at, ?), updated_at = ?
+       WHERE id = ?
+       RETURNING ${publicContributorColumns}`,
+    )
+    .bind(now, now, contributorId)
+    .first<PublicContributor>();
+}
+
+/**
+ * Rotate a contributor's password hash (password reset confirm, Fase B).
+ * The PBKDF2 hash embeds its own iteration count, so a newer constant never
+ * locks the account out on the next login (ADR 0013).
+ */
+export async function resetContributorPassword(
+  contributorId: number,
+  newPassword: string,
+  now: string = new Date().toISOString(),
+): Promise<void> {
+  const d1 = await getD1();
+  const passwordHash = await hashPassword(newPassword);
+  await d1
+    .prepare("UPDATE contributors SET password_hash = ?, updated_at = ? WHERE id = ?")
+    .bind(passwordHash, now, contributorId)
+    .run();
+}
+
+/**
+ * Revoke every live session of a contributor (password reset hardening):
+ * after the hash rotates, any session opened with the old password must die.
+ * Returns the number of sessions revoked.
+ */
+export async function revokeAllContributorSessions(
+  contributorId: number,
+  now: string = new Date().toISOString(),
+): Promise<number> {
+  const d1 = await getD1();
+  const result = (await d1
+    .prepare("UPDATE sessions SET revoked_at = ? WHERE contributor_id = ? AND revoked_at IS NULL")
+    .bind(now, contributorId)
+    .run()) as { meta: { changes: number } };
+  return result.meta.changes;
 }
 
 // ---------------------------------------------------------------------------

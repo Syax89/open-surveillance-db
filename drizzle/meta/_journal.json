@@ -218,6 +218,13 @@
    "when": 1785879000000,
    "tag": "0030_oidc_states",
    "breakpoints": true
+  },
+  {
+   "idx": 31,
+   "version": "6",
+   "when": 1785696042587,
+   "tag": "0031_email_verification_purpose",
+   "breakpoints": true
   }
-]
+ ]
 }
