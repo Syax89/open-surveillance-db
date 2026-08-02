@@ -53,6 +53,9 @@ beforeEach(async () => {
       const entry = r2.get(key);
       return entry ? { arrayBuffer: async () => entry.bytes } : null;
     },
+    delete: async (key) => {
+      r2.delete(key);
+    },
   };
   photos = runtime.photos;
 });
@@ -160,6 +163,70 @@ test("createPendingPhoto throws when the photo storage binding is missing", asyn
     photos.createPendingPhoto({ bytes: jpegBytes(), mimeType: "image/jpeg", width: 1, height: 1 }),
     /Photo storage binding unavailable/,
   );
+});
+
+test("createPendingPhoto removes the R2 object when the D1 INSERT fails (P1-3, no orphan)", async () => {
+  // Simulate a D1 failure at INSERT time (e.g. transient worker error): the
+  // bytes were already put into R2, so the fix must delete them — otherwise
+  // the object is orphaned with no D1 row and the retention sweep (which
+  // only sees D1 rows) can never collect it.
+  db.exec("DROP TABLE photos"); // INSERT then throws "no such table"
+  await assert.rejects(
+    photos.createPendingPhoto({ bytes: jpegBytes(), mimeType: "image/jpeg", width: 64, height: 48 }),
+    /no such table/,
+  );
+  assert.equal(r2.size, 0, "the R2 object must be deleted when the metadata INSERT fails");
+});
+
+test("createPendingPhoto surfaces the original INSERT error even when the R2 cleanup also fails", async () => {
+  // Best-effort cleanup: a failing PHOTOS.delete must not mask the INSERT
+  // error (the upload failed either way, and the object stays as debris
+  // only if the bucket itself is also down).
+  db.exec("DROP TABLE photos");
+  runtime.env.PHOTOS.delete = async () => {
+    throw new Error("R2 delete simulated failure");
+  };
+  await assert.rejects(
+    photos.createPendingPhoto({ bytes: jpegBytes(), mimeType: "image/jpeg", width: 64, height: 48 }),
+    /no such table/,
+  );
+  assert.equal(r2.size, 1, "object stays when the best-effort delete fails (documented debris)");
+});
+
+test("createPendingPhoto retries cleanly after a D1 INSERT failure (idempotent, one object)", async () => {
+  // Idempotency on retry: a client retry after a failed attempt must start
+  // from a clean state — the failed attempt's object is gone, and the retry
+  // stores exactly one object + one row (fresh UUID per attempt).
+  let insertCalls = 0;
+  const originalPrepare = db.prepare.bind(db);
+  db.prepare = (sql) => {
+    const statement = originalPrepare(sql);
+    if (sql.includes("INSERT INTO photos")) {
+      const originalFirst = statement.first.bind(statement);
+      statement.first = (...args) => {
+        insertCalls += 1;
+        if (insertCalls === 1) throw new Error("D1 INSERT simulated failure");
+        return originalFirst(...args);
+      };
+    }
+    return statement;
+  };
+
+  await assert.rejects(
+    photos.createPendingPhoto({ bytes: jpegBytes(), mimeType: "image/jpeg", width: 64, height: 48 }),
+    /D1 INSERT simulated failure/,
+  );
+  assert.equal(r2.size, 0, "failed attempt leaves no R2 object behind");
+
+  const retried = await photos.createPendingPhoto({
+    bytes: jpegBytes(),
+    mimeType: "image/jpeg",
+    width: 64,
+    height: 48,
+  });
+  assert.equal(r2.size, 1, "retry stores exactly one R2 object");
+  const row = await db.prepare("SELECT storage_key AS storageKey FROM photos WHERE id = ?").bind(retried.id).first();
+  assert.ok(row.storageKey.startsWith("photos/"));
 });
 
 // ---------------------------------------------------------------------------
