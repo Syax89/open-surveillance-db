@@ -208,9 +208,18 @@ test("record detail: L1+ toggle PUTs with the CSRF token, updates the count and 
 
   await renderWithLocale(React.createElement(RecordPage));
   await screen.findByText("Fixture Public Camera");
-  const button = await screen.findByRole("button", { name: "Confirm this record exists" });
-  assert.equal(button.disabled, false);
-  assert.equal(button.getAttribute("aria-pressed"), "false");
+  // The gate settles asynchronously (personal-state confirmation + auth/me
+  // fetches): the button renders disabled first and flips to enabled only
+  // after both resolve. findByRole resolves as soon as the button is in the
+  // DOM, so wait for the enabled state instead of asserting it
+  // synchronously — under the coverage runner the fetches may not have
+  // settled yet (same latent flake class as t_b6bef670 / PR #216, P0-1).
+  const button = await waitFor(() => {
+    const current = screen.getByRole("button", { name: "Confirm this record exists" });
+    assert.equal(current.disabled, false, "the L1+ gate must settle before the toggle is enabled");
+    assert.equal(current.getAttribute("aria-pressed"), "false");
+    return current;
+  }, { timeout: 5000 });
 
   const user = rtl.userEvent.setup();
   await user.click(button);
