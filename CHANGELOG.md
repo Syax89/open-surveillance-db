@@ -335,6 +335,17 @@ changes accumulate under `[Unreleased]`.
 
 ### Fixed
 
+- P1-1 reset-password/request binary account-existence oracle (t_11b6a22d,
+  Ada security review): the 3/h reset budget branch answered `429 Too many
+  reset emails` ONLY for registered addresses, while unknown addresses always
+  get `200 { sent: true }` — 4 POSTs against a known address (3 delivered
+  mails + 1 429) were enough to confirm the account exists, violating the
+  route's own anti-enumeration contract (docstring). The budget-exhausted
+  branch now answers the same generic `ok()` 200 `{ sent: true }` WITHOUT
+  minting a token or sending mail; the budget still caps real emails at 3/h
+  per contributor (only the response is now indistinguishable). Test updated
+  in `tests/api-auth.test.mjs` to pin the 200 instead of the old 429.
+
 - `/mappa` CEO feedback 2026-08-02 (t_9e8642a0): (1) il banner "Prototype
   mode" sopra la mappa è stato RIMOSSO — la pagina parte direttamente con la
   card della mappa, la mappa non è più presentata come prototipo (la

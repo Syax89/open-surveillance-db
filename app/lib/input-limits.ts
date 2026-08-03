@@ -17,6 +17,18 @@ export const DEFAULT_MAX_BODY_BYTES = 32 * 1024; // 32 KiB
 export const DEFAULT_MAX_URL_CHARS = 4096;
 
 /**
+ * Maximum accepted pagination `offset` on the public list/search routes.
+ *
+ * `limit` is clamped to a hard cap (500 / 100), so a hostile client could
+ * otherwise pass `?offset=9007199254740991` (MAX_SAFE_INTEGER — accepted by
+ * the plain-integer validator) and force an astronomical SQL OFFSET on the
+ * D1 on every request: a slow full scan that returns nothing (review P2-4).
+ * 10_000 covers every legitimate deep-pagination pattern (500 records/page
+ * × 20 pages) while rejecting abuse with a clean 400 BEFORE any db work.
+ */
+export const MAX_PAGE_OFFSET = 10_000;
+
+/**
  * Base class for transport-level request-body errors that carry an HTTP
  * status. Handlers answer `status` with `error.message`; subclasses pin
  * specific codes (413 too large, 400 malformed JSON).
