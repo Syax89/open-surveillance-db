@@ -48,7 +48,7 @@ export const en = {
     "Detailed field-of-view or operational capability that could create a safety risk, or sensitive locations where publication could increase risk.",
   beforeSubmittingTitle: "Before submitting",
   beforeSubmittingBody:
-    "Do not upload or describe people, licence plates, private homes, security weaknesses or sensitive locations. Submissions are private until a moderator reviews them; they are not published automatically.",
+    "Submitting requires a verified contributor account. Do not upload or describe people, licence plates, private homes, security weaknesses or sensitive locations. Submissions are private until a moderator reviews them; they are not published automatically.",
   moderationEyebrow: "Moderation",
   moderationTitle: "Every record is reviewed by a person.",
   moderationBody:
@@ -75,7 +75,7 @@ export const en = {
   correctionEyebrow: "Corrections and appeals",
   correctionTitle: "A simple way to challenge a record.",
   correctionBody:
-    "Anyone can request a correction, challenge a record, or report harm. Requests are private, reviewed by humans, and never change the map automatically.",
+    "Any verified contributor can request a correction, challenge a record, or report harm. Requests are private, reviewed by humans, and never change the map automatically.",
   correctionOneTitle: "Request a correction",
   correctionOneBody:
     "Inaccurate, outdated or duplicate records can be flagged for review.",
@@ -144,7 +144,7 @@ export const it: Translation<typeof en> = {
     "Dettagli sul campo visivo o sulle capacità operative che potrebbero creare un rischio per la sicurezza, o località sensibili la cui pubblicazione potrebbe aumentare il rischio.",
   beforeSubmittingTitle: "Prima di inviare",
   beforeSubmittingBody:
-    "Non caricare né descrivere persone, targhe, abitazioni private, debolezze di sicurezza o località sensibili. Gli invii restano privati finché un moderatore non li esamina; non vengono pubblicati automaticamente.",
+    "Per inviare serve un account verificato. Non caricare né descrivere persone, targhe, abitazioni private, debolezze di sicurezza o località sensibili. Gli invii restano privati finché un moderatore non li esamina; non vengono pubblicati automaticamente.",
   moderationEyebrow: "Moderazione",
   moderationTitle: "Ogni record viene esaminato da una persona.",
   moderationBody:
@@ -171,7 +171,7 @@ export const it: Translation<typeof en> = {
   correctionEyebrow: "Correzioni e ricorsi",
   correctionTitle: "Un modo semplice per contestare un record.",
   correctionBody:
-    "Chiunque può richiedere una correzione, contestare un record o segnalare un danno. Le richieste sono private, esaminate da persone e non modificano mai la mappa automaticamente.",
+    "Ogni account verificato può richiedere una correzione, contestare un record o segnalare un danno. Le richieste sono private, esaminate da persone e non modificano mai la mappa automaticamente.",
   correctionOneTitle: "Richiedi una correzione",
   correctionOneBody:
     "I record inaccurati, obsoleti o duplicati possono essere segnalati per la revisione.",

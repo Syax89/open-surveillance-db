@@ -17,7 +17,7 @@ export const en = {
   eyebrow: "Project guide",
   title: "A public database, built with care.",
   intro:
-    "This guide explains what OpenSurveillanceDB documents, how to use the map and directory pages, how a report becomes public data, and the limits of this local prototype.",
+    "This guide explains what OpenSurveillanceDB documents, how to use the map and directory pages, how a report becomes public data, and the boundaries of what this public database claims.",
   exploreMap: "Explore the map",
   browseDirectory: "Browse directory",
   missionEyebrow: "Purpose and boundaries",
@@ -69,16 +69,16 @@ export const en = {
   accountEyebrow: "Your account",
   accountTitle: "Why create an account?",
   accountBody:
-    "A free, verified account is required to submit reports and corrections. It also lets you keep track of your own reports, verify records you have seen, and build a trust level from your verified contributions.",
+    "Browsing the data requires no account. An account lets you submit reports, keep track of your contributions, verify records you have seen, and build a trust level from your verified contributions.",
   accountWhyTitle: "What an account gives you",
   accountWhyBody:
     "Your reports are linked to your account, you can edit your own contributions, add verifications to records, and see your trust level grow as your contributions are verified.",
-  accountHowTitle: "How registration works today",
+  accountHowTitle: "How accounts work",
   accountHowBody:
-    "Registration uses an email address and a password, stored hashed and never exposed (ADR 0013). You can also sign in with a passkey or a social account; when you add a passkey you receive 10 one-time recovery codes.",
-  accountAnonymousTitle: "Browsing stays anonymous",
+    "You register with an email address and a password, stored hashed and never exposed. Email verification is required before you can publish, and you can add passkeys or social sign-in (GitHub or Google) to the same account (ADR 0020).",
+  accountAnonymousTitle: "Browsing stays open",
   accountAnonymousBody:
-    "You can browse the map, the directory and every public record without an account. An account is required only to submit reports and corrections; it adds attribution and community features.",
+    "You can explore the map, the directory and the exports without an account. Submitting a report or a correction requires a verified contributor account.",
   editEyebrow: "Editing a contribution",
   editTitle: "You can edit your own contributions.",
   editBody:
@@ -129,14 +129,14 @@ export const en = {
   downloadCsv: "Download public CSV",
   geoJsonTitle: "A reusable public export",
   geoJsonBody:
-    "GeoJSON is a common geographic data format. It is intended for civic analysis, research and compatible mapping tools — not for finding camera feeds or sensitive operational information.",
+    "GeoJSON is a common geographic data format. It is intended for civic analysis, research and compatible mapping tools—not for finding camera feeds or sensitive operational information.",
   osmTitle: "OpenStreetMap provides the base map",
   osmBody:
     "The map background is provided by OpenStreetMap contributors. It is separate from this project’s camera records and always needs visible attribution and responsible use.",
-  localLabel: "Local prototype",
-  localTitle: "This version is not a public service",
+  localLabel: "Project status",
+  localTitle: "A public site in development",
   localBody:
-    "It runs locally for product development. Its illustrative records, queues and decisions are test material; no claim should be made about real surveillance infrastructure from this prototype.",
+    "OpenSurveillanceDB is a public civic database under active development. Every record is reviewed by a human before publication, and the project makes no claim that the data is complete, current or authoritative.",
   footer: "Built for transparency, not tracking.",
 } as const;
 
@@ -150,7 +150,7 @@ export const it: Translation<typeof en> = {
   eyebrow: "Guida al progetto",
   title: "Un database pubblico, costruito con attenzione.",
   intro:
-    "Questa guida spiega cosa documenta OpenSurveillanceDB, come usare le pagine della mappa e dell'elenco, come una segnalazione diventa un dato pubblico e quali sono i limiti di questo prototipo locale.",
+    "Questa guida spiega cosa documenta OpenSurveillanceDB, come usare le pagine della mappa e dell'elenco, come una segnalazione diventa un dato pubblico e quali sono i confini di ciò che questo database pubblico dichiara.",
   exploreMap: "Esplora la mappa",
   browseDirectory: "Sfoglia l’elenco",
   missionEyebrow: "Scopo e limiti",
@@ -202,16 +202,16 @@ export const it: Translation<typeof en> = {
   accountEyebrow: "Il tuo account",
   accountTitle: "Perché creare un account?",
   accountBody:
-    "Per inviare segnalazioni e correzioni serve un account gratuito e verificato. Ti permette anche di tenere traccia delle tue segnalazioni, verificare i record che hai visto e costruire un livello di fiducia con i tuoi contributi verificati.",
+    "La consultazione dei dati non richiede un account. Un account ti permette di inviare segnalazioni, tenere traccia dei tuoi contributi, verificare i record che hai visto e costruire un livello di fiducia con i tuoi contributi verificati.",
   accountWhyTitle: "Cosa ti dà un account",
   accountWhyBody:
     "Le tue segnalazioni sono collegate al tuo account, puoi modificare i tuoi contributi, aggiungere verifiche ai record e vedere crescere il tuo livello di fiducia man mano che i contributi vengono verificati.",
-  accountHowTitle: "Come funziona la registrazione oggi",
+  accountHowTitle: "Come funzionano gli account",
   accountHowBody:
-    "La registrazione usa un indirizzo email e una password, salvata come hash e mai esposta (ADR 0013). Puoi anche accedere con una passkey o con un account social; quando aggiungi una passkey ricevi 10 codici di recupero monouso.",
-  accountAnonymousTitle: "La navigazione resta anonima",
+    "Ti registri con un indirizzo email e una password, salvata come hash e mai esposta. La verifica dell'email è richiesta prima di poter pubblicare e puoi aggiungere passkey o l'accesso social (GitHub o Google) allo stesso account (ADR 0020).",
+  accountAnonymousTitle: "La consultazione resta aperta",
   accountAnonymousBody:
-    "Puoi consultare la mappa, l'elenco e ogni record pubblico senza account. L'account serve solo per inviare segnalazioni e correzioni; aggiunge attribuzione e funzioni community.",
+    "Puoi esplorare mappa, elenco ed esportazioni senza account. Inviare una segnalazione o una correzione richiede un account verificato.",
   editEyebrow: "Modificare un contributo",
   editTitle: "Puoi modificare i tuoi contributi.",
   editBody:
@@ -266,9 +266,9 @@ export const it: Translation<typeof en> = {
   osmTitle: "OpenStreetMap fornisce la mappa di base",
   osmBody:
     "Lo sfondo della mappa proviene dai contributori di OpenStreetMap. È separato dai record sulle telecamere del progetto e richiede sempre attribuzione visibile e uso responsabile.",
-  localLabel: "Prototipo locale",
-  localTitle: "Questa versione non è un servizio pubblico",
+  localLabel: "Stato del progetto",
+  localTitle: "Un sito pubblico in sviluppo",
   localBody:
-    "Funziona localmente per lo sviluppo del prodotto. Record illustrativi, code e decisioni sono materiale di test: da questo prototipo non si deve dedurre nulla su infrastrutture di sorveglianza reali.",
+    "OpenSurveillanceDB è un database civico pubblico in sviluppo attivo. Ogni record viene revisionato da una persona prima della pubblicazione e il progetto non dichiara che i dati siano completi, aggiornati o autorevoli.",
   footer: "Creato per la trasparenza, non per il tracciamento.",
 };
