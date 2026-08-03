@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 import { findNearbyPublicCamerasPage, NEARBY_PAGE_DEFAULT_LIMIT, NEARBY_PAGE_MAX_LIMIT } from "../../../../db/cameras";
 import { recordRateLimitBlock } from "../../../lib/abuse-alerts";
-import { urlTooLong } from "../../../lib/input-limits";
+import { MAX_PAGE_OFFSET, urlTooLong } from "../../../lib/input-limits";
 import { callerKey, checkRateLimit, limitsFor } from "../../../lib/rate-limit";
 
 function readNumber(value: string | null) { if (value === null || value.trim() === "") return null; const number = Number(value); return Number.isFinite(number) ? number : null; }
@@ -56,8 +56,8 @@ export async function GET(request: Request) {
   if (latitude === null || longitude === null || radius === null || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180 || radius < 10 || radius > 500) {
     return Response.json({ error: "Valid latitude, longitude and a radius between 10 and 500 metres are required." }, { status: 400 });
   }
-  if (limit === null || offset === null || limit < 1) {
-    return Response.json({ error: `limit must be an integer between 1 and ${NEARBY_PAGE_MAX_LIMIT} and offset a non-negative integer.` }, { status: 400 });
+  if (limit === null || offset === null || limit < 1 || offset > MAX_PAGE_OFFSET) {
+    return Response.json({ error: `limit must be an integer between 1 and ${NEARBY_PAGE_MAX_LIMIT} and offset a non-negative integer up to ${MAX_PAGE_OFFSET}.` }, { status: 400 });
   }
 
   try {
