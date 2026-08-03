@@ -27,6 +27,10 @@ type Props = {
   setFreshnessCutoff?: (value: number | null) => void;
   sortOrder: "alphabetical" | "position";
   setSortOrder: (value: "alphabetical" | "position") => void;
+  /** Optional (t_f13fcb1c): /directory result page (?page=, URL-backed). */
+  page?: number;
+  /** Optional (t_f13fcb1c): /directory pagination setter. */
+  setPage?: (value: number) => void;
   /** Keyboard path: select a record on the map and move focus to it. */
   showRecordOnMap: (id: number) => void;
   /** Place-search hit: focus the map / report position on the area. */
@@ -40,9 +44,9 @@ type Props = {
   /** P1-5 (F5): tool pages own the page header via .tool-heading (h1). */
   showHeading?: boolean;
   /**
-   * t_127492f1: "hub" (default) = the historical home section, byte-identical
-   * (records-heading + place-search block + FiltersBar inline + card grid);
-   * "catalog" = the /directory flat catalog (DirectoryCatalog).
+   * t_127492f1/t_f13fcb1c: "hub" (default) = the historical home section,
+   * byte-identical (records-heading + place-search block + FiltersBar inline
+   * + card grid); "catalog" = the /directory browse layout (DirectoryCatalog).
    */
   variant?: "hub" | "catalog";
   /** Optional (catalog): download links for the filtered set (CSV/GeoJSON). */
@@ -56,7 +60,7 @@ type Props = {
  * /directory (catalog mode — the actual layout lives in DirectoryCatalog).
  * The place-search flow lives in the shared usePlaceSearch hook.
  */
-export function PublicDirectory({ filteredRecords, cameraKinds, search, setSearch, kindFilter, setKindFilter, freshnessFilter, setFreshnessFilter, setFreshnessCutoff, sortOrder, setSortOrder, showRecordOnMap, setCoordinates, onResetFilters, mapHref = "#map", reportHref = "#report", showHeading = true, variant = "hub", exportHrefs = null }: Props) {
+export function PublicDirectory({ filteredRecords, cameraKinds, search, setSearch, kindFilter, setKindFilter, freshnessFilter, setFreshnessFilter, setFreshnessCutoff, sortOrder, setSortOrder, page = 1, setPage, showRecordOnMap, setCoordinates, onResetFilters, mapHref = "#map", reportHref = "#report", showHeading = true, variant = "hub", exportHrefs = null }: Props) {
   const t = useMessages().directory;
   const statuses = useMessages().status;
   const { locale } = useLocale();
@@ -100,6 +104,8 @@ export function PublicDirectory({ filteredRecords, cameraKinds, search, setSearc
         setFreshnessFilter={setFreshnessFilter}
         sortOrder={sortOrder}
         setSortOrder={setSortOrder}
+        page={page}
+        setPage={setPage}
         showRecordOnMap={showRecordOnMap}
         setCoordinates={setCoordinates}
         onResetFilters={onResetFilters ?? resetFilters}

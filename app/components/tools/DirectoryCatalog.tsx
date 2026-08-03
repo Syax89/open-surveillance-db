@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocale, useMessages } from "../LocaleProvider";
 import { publicStatusLabel } from "../../lib/public-status";
 import { formatDistance } from "../../lib/search";
@@ -10,6 +10,9 @@ import { RecordCard } from "../RecordCard";
 import { FiltersBar } from "../FiltersBar";
 import { EmptyState } from "../EmptyState";
 import { usePlaceSearch } from "../../lib/usePlaceSearch";
+
+/** Records per page in the /directory catalog (t_f13fcb1c). */
+export const DIRECTORY_PAGE_SIZE = 20;
 
 type Props = {
   filteredRecords: Camera[];
@@ -22,6 +25,10 @@ type Props = {
   setFreshnessFilter: (value: string) => void;
   sortOrder: "alphabetical" | "position";
   setSortOrder: (value: "alphabetical" | "position") => void;
+  /** Optional (t_f13fcb1c): result page from the URL (?page=, clamped). */
+  page?: number;
+  /** Optional (t_f13fcb1c): pagination setter (writes ?page=). */
+  setPage?: (value: number) => void;
   /** Keyboard path: select a record on the map and move focus to it. */
   showRecordOnMap: (id: number) => void;
   /** Place-search hit: focus the map / report position on the area. */
@@ -35,27 +42,39 @@ type Props = {
 };
 
 /**
- * /directory catalog layout (t_127492f1): the flat, scannable directory —
- * FiltersBar "bare" (controls only) → .directory-meta (count + export +
- * place-search trigger) → collapsible place-search panel → one-column flat
- * rows (RecordCard inside `.directory-tool .record-list`, styled
- * contextually). One result flow: a successful place search replaces the
- * list (banner + Distance fact); empty/not-found render truthful EmptyState.
- * The home hub keeps the classic section via PublicDirectory (hub mode).
+ * /directory catalog layout (t_127492f1; redesign t_f13fcb1c): the
+ * browse-record page. Order: shared FiltersBar "bare" (controls only) with
+ * the place-search toggle in the SAME controls row (one search concept per
+ * page — the trigger is part of the search cluster) → collapsible place-search
+ * panel → VISIBLE results header (h2 + count role=status + CSV/GeoJSON) →
+ * active-filter chips (one-shot removal) → alphabetical index (Wikipedia
+ * AllPages pattern, only in alphabetical order) → one-column flat rows
+ * (RecordCard, sliced to DIRECTORY_PAGE_SIZE) → pagination bar
+ * (Previous / "Showing X–Y of Z · Page N of M" / Next, ?page= URL-backed).
+ *
+ * The result page lives in the URL (?page=, owned by useCameraFilters like
+ * every other dimension): deep links, share and back/forward re-derive it,
+ * and every filter change resets it to 1 (the setters commit page: 1).
+ * A place search replaces the list entirely (one result flow — banner +
+ * Distance facts) and hides the index/pagination/chips, which only make
+ * sense for the filtered list.
  */
-export function DirectoryCatalog({ filteredRecords, cameraKinds, search, setSearch, kindFilter, setKindFilter, freshnessFilter, setFreshnessFilter, sortOrder, setSortOrder, showRecordOnMap, setCoordinates, onResetFilters, reportHref = "/segnala", exportHrefs = null }: Props) {
+export function DirectoryCatalog({ filteredRecords, cameraKinds, search, setSearch, kindFilter, setKindFilter, freshnessFilter, setFreshnessFilter, sortOrder, setSortOrder, page = 1, setPage, showRecordOnMap, setCoordinates, onResetFilters, reportHref = "/segnala", exportHrefs = null }: Props) {
   const t = useMessages().directory;
   const statuses = useMessages().status;
   const { locale } = useLocale();
   const place = usePlaceSearch(t, locale, (coordinates) => setCoordinates(coordinates));
   // The place-search lives in a collapsible panel (unhidden by the
-  // .directory-meta trigger) so /directory has exactly ONE visible search
+  // controls-row trigger) so /directory has exactly ONE visible search
   // input at a time.
   const [placeOpen, setPlaceOpen] = useState(false);
   // Offline state: the directory keeps working (records are already on the
   // page — "the last loaded records"). SSR-safe: navigator is undefined on
   // the server, so the banner never appears in first paint.
   const [offline, setOffline] = useState(false);
+  // The results heading: pagination and the A–Z index move the reading
+  // position here (focus follows for AT, scroll is CSS-reduced-motion aware).
+  const resultsRef = useRef<HTMLHeadingElement | null>(null);
 
   useEffect(() => {
     if (typeof navigator === "undefined" || typeof window === "undefined") return;
@@ -101,40 +120,153 @@ export function DirectoryCatalog({ filteredRecords, cameraKinds, search, setSear
     ? t.placeResultsFound(placeActive ? placeRecords.length : 0)
     : filteredRecords.length === 1 ? t.oneRecordFound : `${filteredRecords.length} ${t.recordsFound}`;
 
+  // Pagination (t_f13fcb1c): client slice over the filtered memo — the walk
+  // is already bounded by the server kind/freshness filters, and q/sort stay
+  // client-side, so a slice gives bounded DOM + ?page= deep links without
+  // touching the API or the shared hooks. Lenient parse: a stale ?page=
+  // (narrowed filter set) clamps to the last real page, never a blank list.
+  const totalRecords = filteredRecords.length;
+  const pageCount = Math.max(1, Math.ceil(totalRecords / DIRECTORY_PAGE_SIZE));
+  const safePage = Math.min(Math.max(1, page), pageCount);
+  const pageRecords = placeActive
+    ? placeRecords
+    : filteredRecords.slice((safePage - 1) * DIRECTORY_PAGE_SIZE, safePage * DIRECTORY_PAGE_SIZE);
+
+  // Active-filter chips: one per non-default dimension, one-shot removal
+  // (calls the same URL setters as the controls — D4). Hidden while a place
+  // search owns the results (the place banner communicates that context).
+  const activeFilters = useMemo(() => {
+    const chips: Array<{ id: string; label: string; clear: () => void }> = [];
+    if (kindFilter && kindFilter !== "all") chips.push({ id: `type-${kindFilter}`, label: kindFilter, clear: () => setKindFilter("all") });
+    if (freshnessFilter && freshnessFilter !== "all") {
+      const label = ({ "7d": t.freshness7d, "30d": t.freshness30d, "90d": t.freshness90d } as Record<string, string>)[freshnessFilter] ?? freshnessFilter;
+      chips.push({ id: `freshness-${freshnessFilter}`, label, clear: () => setFreshnessFilter("all") });
+    }
+    const q = search.trim();
+    if (q) chips.push({ id: "q", label: q, clear: () => setSearch("") });
+    return chips;
+  }, [kindFilter, freshnessFilter, search, setKindFilter, setFreshnessFilter, setSearch, t]);
+
+  // Alphabetical index (Wikipedia AllPages pattern): ALL 26 letters are
+  // shown — the ones present in the filtered set are jump links (to the page
+  // holding the first record with that letter), the absent ones are muted
+  // placeholders (aria-hidden, decorative). With a sparse set the bar still
+  // reads as a real A–Z index. Hidden for positional sorting and while a
+  // place search owns the results.
+  const alphaIndex = useMemo(() => {
+    if (sortOrder !== "alphabetical" || placeActive || filteredRecords.length === 0) return null;
+    const letters: Array<{ letter: string; page: number | null }> = [];
+    for (let code = 65; code <= 90; code += 1) {
+      const letter = String.fromCharCode(code);
+      const index = filteredRecords.findIndex((camera) => camera.title.trim().toLocaleUpperCase().startsWith(letter));
+      letters.push({ letter, page: index === -1 ? null : Math.floor(index / DIRECTORY_PAGE_SIZE) + 1 });
+    }
+    return letters;
+  }, [filteredRecords, sortOrder, placeActive]);
+
+  // Letters whose first record sits on the current page → aria-current.
+  const currentPageLetters = useMemo(() => {
+    if (!alphaIndex) return new Set<string>();
+    const start = (safePage - 1) * DIRECTORY_PAGE_SIZE;
+    const end = Math.min(start + DIRECTORY_PAGE_SIZE, totalRecords);
+    const set = new Set<string>();
+    for (let i = start; i < end; i += 1) {
+      const first = filteredRecords[i]?.title.trim().charAt(0).toLocaleUpperCase();
+      if (first && /^[A-Z]$/.test(first)) set.add(first);
+    }
+    return set;
+  }, [alphaIndex, safePage, totalRecords, filteredRecords]);
+
+  // Move the reading position to the results header after a page/index jump
+  // (the header is above the list, so it never moves with the slice; the
+  // CSS scroll-behavior honours prefers-reduced-motion).
+  function moveToResults() {
+    resultsRef.current?.scrollIntoView({ block: "start" });
+    resultsRef.current?.focus({ preventScroll: true });
+  }
+
+  function goToPage(nextPage: number) {
+    const clamped = Math.min(Math.max(1, nextPage), pageCount);
+    if (clamped === safePage) return;
+    setPage?.(clamped);
+    moveToResults();
+  }
+
+  function goToLetter(letter: string) {
+    const hit = alphaIndex?.find((entry) => entry.letter === letter);
+    if (!hit || hit.page === null) return;
+    if (hit.page !== safePage) {
+      setPage?.(hit.page);
+      // Let the new slice render before scrolling (the header sits above
+      // the list, but the list height changes between pages).
+      requestAnimationFrame(moveToResults);
+    } else {
+      moveToResults();
+    }
+  }
+
   return (
     <section className="records-section" id="records" aria-label={t.accessibleDirectory}>
       {offline && <div className="offline-state" role="status"><b>{t.offlineTitle}.</b> {t.offlineBody} <button type="button" className="text-button" onClick={() => window.location.reload()}>{t.offlineAction} <span aria-hidden="true">→</span></button></div>}
-      <FiltersBar variant="bare" cameraKinds={cameraKinds} search={search} setSearch={setSearch} kindFilter={kindFilter} setKindFilter={setKindFilter} freshnessFilter={freshnessFilter} setFreshnessFilter={setFreshnessFilter} sortOrder={sortOrder} setSortOrder={setSortOrder} resultCount={filteredRecords.length} onReset={onResetFilters} />
-      {/* Results meta row (t_127492f1): count + export + place-search
-          trigger — the "filtri → count/export → lista" order the CEO
-          asked for. The count keeps the historical id and role=status so
-          the input's aria-describedby and the AT announcements work as
-          before. */}
-      <div className="directory-meta">
-        <p className="search-count" id="record-search-count" role="status">{countLabel}</p>
-        <div className="directory-meta-actions">
-          <button type="button" className="text-button" aria-expanded={placeOpen} aria-controls="directory-place-panel" onClick={() => setPlaceOpen((value) => !value)}>{placeOpen ? t.placeHide : t.searchNearPlace} <span aria-hidden="true">↓</span></button>
-          {exportHrefs && (
-            <div className="data-actions" aria-describedby="directory-export-hint"><a href={exportHrefs.csv}>{t.exportCsv} <span aria-hidden="true">→</span></a><span aria-hidden="true">·</span><a href={exportHrefs.geojson}>{t.exportGeoJson} <span aria-hidden="true">→</span></a></div>
-          )}
-          <p className="sr-only" id="directory-export-hint">{t.exportHint}</p>
-        </div>
-      </div>
-      {/* Place-search panel (collapsed until the trigger opens it): keeps
-          the historical ids/classes so the a11y suite and the AT labels
-          keep matching. Collapse via the .place-search-closed class — the
-          raw `hidden` attribute is forbidden by the pages-render leak
-          contract; display:none keeps the form out of the tab order and
-          the a11y tree while closed. */}
+      <FiltersBar variant="bare" cameraKinds={cameraKinds} search={search} setSearch={setSearch} kindFilter={kindFilter} setKindFilter={setKindFilter} freshnessFilter={freshnessFilter} setFreshnessFilter={setFreshnessFilter} sortOrder={sortOrder} setSortOrder={setSortOrder} resultCount={filteredRecords.length} onReset={onResetFilters} extraControls={<button type="button" className="text-button place-search-toggle" aria-expanded={placeOpen} aria-controls="directory-place-panel" onClick={() => setPlaceOpen((value) => !value)}>{placeOpen ? t.placeHide : t.searchNearPlace} <span aria-hidden="true">{placeOpen ? "↑" : "↓"}</span></button>} />
+      {/* Place-search panel (collapsed until the controls-row trigger opens
+          it): keeps the historical ids/classes so the a11y suite and the AT
+          labels keep matching. Collapse via the .place-search-closed class —
+          the raw `hidden` attribute is forbidden by the pages-render leak
+          contract; display:none keeps the form out of the tab order and the
+          a11y tree while closed. */}
       <div className={placeOpen ? "place-search" : "place-search place-search-closed"} id="directory-place-panel">
         <h2 className="place-search-title">{t.placeSearchTitle}</h2>
         <p>{t.placeSearchHelp}</p>
         <form className="place-search-form" role="search" onSubmit={place.searchByPlace}><label htmlFor="place-search">{t.placeSearchLabel}</label><div className="place-search-row"><input id="place-search" type="search" value={place.placeQuery} onChange={(event) => place.setPlaceQuery(event.target.value)} maxLength={200} placeholder={t.placeSearchPlaceholder} autoComplete="off" /><button className="button" type="submit">{t.placeSearchSubmit}</button>{place.placeResult && place.placeResult.status !== "loading" ? <button type="button" className="text-button" onClick={place.clearPlaceSearch}>{t.placeClearResults} <span aria-hidden="true">→</span></button> : null}</div></form>
         <div aria-live="polite">{place.placeResult?.status === "loading" && <p className="loading-note" role="status">{t.placeSearchLoading}</p>}{place.placeResult?.status === "error" && <p className="nearby-error" role="alert">{place.placeResult.message}</p>}</div>
       </div>
-      {/* sr-only results heading: keeps the h1 → h2 → h3 ladder on the
-          tool page now that the place-search h2 is a collapsed panel. */}
-      <h2 className="sr-only">{t.resultsRegion}</h2>
+      {/* Visible results header (t_f13fcb1c): replaces the sr-only h2 with a
+          real browse context — heading + count (role=status, historical id)
+          + the CSV/GeoJSON downloads. The count keeps the historical format
+          so the input's aria-describedby and the AT announcements work as
+          before. */}
+      <div className="directory-results">
+        <div className="directory-results-head">
+          <h2 id="directory-results-title" tabIndex={-1} ref={resultsRef}>{t.resultsRegion}</h2>
+          <p className="search-count" id="record-search-count" role="status">{countLabel}</p>
+        </div>
+        {exportHrefs && (
+          <div className="directory-results-actions" aria-describedby="directory-export-hint">
+            <a className="export-button" href={exportHrefs.csv}>{t.exportCsv} <span aria-hidden="true">↓</span></a>
+            <a className="export-button" href={exportHrefs.geojson}>{t.exportGeoJson} <span aria-hidden="true">↓</span></a>
+            <p className="sr-only" id="directory-export-hint">{t.exportHint}</p>
+          </div>
+        )}
+      </div>
+      {/* Active-filter chips: the state of the list at a glance, removable
+          one at a time (Google Maps / CKAN pattern). */}
+      {!placeActive && activeFilters.length > 0 && (
+        <ul className="filter-chips" aria-label={t.activeFilters}>
+          {activeFilters.map((chip) => (
+            <li key={chip.id}>
+              <button type="button" className="filter-chip" onClick={chip.clear} aria-label={t.removeFilter(chip.label)}>{chip.label} <span aria-hidden="true">✕</span></button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {/* Alphabetical index: jump bar over the filtered set (Wikipedia
+          AllPages pattern), only in alphabetical order. */}
+      {alphaIndex && (
+        <nav className="alpha-index" aria-label={t.alphaIndexTitle}>
+          <ul>
+            {alphaIndex.map(({ letter, page: targetPage }) => (
+              <li key={letter}>
+                {targetPage === null ? (
+                  <span className="alpha-index-link is-muted" aria-hidden="true">{letter}</span>
+                ) : (
+                  <button type="button" className={currentPageLetters.has(letter) ? "alpha-index-link is-current" : "alpha-index-link"} onClick={() => goToLetter(letter)} aria-label={t.alphaIndexAria(letter)} aria-current={currentPageLetters.has(letter) ? "true" : undefined}>{letter}</button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </nav>
+      )}
       {place.placeResult?.status === "not-found" && <EmptyState title={t.placeNotFoundTitle} body={t.placeNotFoundBody} />}
       {place.placeResult?.status === "empty" && <EmptyState title={t.placeEmptyTitle} body={t.placeEmptyBody} action={<a className="text-button" href={reportHref}>{t.placeEmptySubmit} <span aria-hidden="true">→</span></a>} />}
       {placeActive && place.placeResult?.area && (
@@ -143,7 +275,16 @@ export function DirectoryCatalog({ filteredRecords, cameraKinds, search, setSear
           <button type="button" className="text-button" onClick={place.clearPlaceSearch}>{t.placeClearResults} <span aria-hidden="true">→</span></button>
         </div>
       )}
-      {showList ? <ul className="record-list">{(placeActive ? placeRecords : filteredRecords).map((camera) => <li key={camera.id}><RecordCard camera={camera} statusLabel={publicStatusLabel(statuses, camera.status, t.unknown)} facts={placeActive ? [{ label: t.distance, value: formatDistance((camera as Camera & { distanceMeters: number }).distanceMeters) }, { label: t.location, value: camera.address || `${camera.latitude.toFixed(4)}, ${camera.longitude.toFixed(4)}` }, { label: t.lastVerification, value: formatPublicDate(camera.updated, locale) }] : mainFacts(camera)} actions={cardActions(camera)} /></li>)}</ul> : !placeDone && <EmptyState title={t.emptyTitle} body={t.emptyBody} action={<p className="empty-state-actions"><button type="button" className="text-button" onClick={() => setSearch("")}>{t.clearSearch} <span aria-hidden="true">→</span></button><a className="text-button" href={reportHref}>{t.submitObservation} <span aria-hidden="true">→</span></a></p>} />}
+      {showList ? <ul className="record-list">{pageRecords.map((camera) => <li key={camera.id}><RecordCard camera={camera} statusLabel={publicStatusLabel(statuses, camera.status, t.unknown)} facts={placeActive ? [{ label: t.distance, value: formatDistance((camera as Camera & { distanceMeters: number }).distanceMeters) }, { label: t.location, value: camera.address || `${camera.latitude.toFixed(4)}, ${camera.longitude.toFixed(4)}` }, { label: t.lastVerification, value: formatPublicDate(camera.updated, locale) }] : mainFacts(camera)} actions={cardActions(camera)} /></li>)}</ul> : !placeDone && <EmptyState title={t.emptyTitle} body={t.emptyBody} action={<p className="empty-state-actions"><button type="button" className="text-button" onClick={() => setSearch("")}>{t.clearSearch} <span aria-hidden="true">→</span></button><a className="text-button" href={reportHref}>{t.submitObservation} <span aria-hidden="true">→</span></a></p>} />}
+      {/* Pagination bar (t_f13fcb1c): only when the filtered set spans more
+          than one page; Previous / "Showing X–Y of Z · Page N of M" / Next. */}
+      {!placeActive && totalRecords > DIRECTORY_PAGE_SIZE && (
+        <nav className="directory-pagination" aria-label={t.resultsRegion}>
+          <button type="button" className="pagination-button" disabled={safePage <= 1} onClick={() => goToPage(safePage - 1)}><span aria-hidden="true">←</span> {t.previousPage}</button>
+          <p className="pagination-summary">{t.showingRecords((safePage - 1) * DIRECTORY_PAGE_SIZE + 1, Math.min(safePage * DIRECTORY_PAGE_SIZE, totalRecords), totalRecords)} · {t.pageOf(safePage, pageCount)}</p>
+          <button type="button" className="pagination-button" disabled={safePage >= pageCount} onClick={() => goToPage(safePage + 1)}>{t.nextPage} <span aria-hidden="true">→</span></button>
+        </nav>
+      )}
     </section>
   );
 }

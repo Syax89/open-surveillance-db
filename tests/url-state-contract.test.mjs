@@ -133,7 +133,7 @@ function PaginationProbe({ filters }) {
 
 test("parseCameraFilters: an empty URL yields the safe defaults", () => {
   assert.deepEqual(parseCameraFilters(new URLSearchParams("")), {
-    q: "", type: "all", freshness: "all", sort: "alphabetical", focus: null,
+    q: "", type: "all", freshness: "all", sort: "alphabetical", focus: null, page: 1,
   });
 });
 
@@ -151,17 +151,26 @@ test("parseCameraFilters: invalid values fall back to safe defaults — never a 
 
 test("stringifyCameraFilters omits defaults (minimal URL, R2) and round-trips encoding", () => {
   assert.equal(
-    stringifyCameraFilters({ q: "", type: "all", freshness: "all", sort: "alphabetical", focus: null }),
+    stringifyCameraFilters({ q: "", type: "all", freshness: "all", sort: "alphabetical", focus: null, page: 1 }),
     "",
     "all-default filters serialize to no query string",
   );
   const encoded = stringifyCameraFilters({
-    q: "Via Roma, 45", type: "Fixed dome", freshness: "7d", sort: "position", focus: 3,
+    q: "Via Roma, 45", type: "Fixed dome", freshness: "7d", sort: "position", focus: 3, page: 1,
   });
   assert.equal(encoded, "?q=Via+Roma%2C+45&type=Fixed+dome&freshness=7d&sort=position&focus=3");
   assert.deepEqual(parseCameraFilters(new URLSearchParams(encoded.slice(1))), {
-    q: "Via Roma, 45", type: "Fixed dome", freshness: "7d", sort: "position", focus: 3,
+    q: "Via Roma, 45", type: "Fixed dome", freshness: "7d", sort: "position", focus: 3, page: 1,
   });
+  // t_f13fcb1c: ?page= is a real dimension — >1 serializes, 1 is omitted.
+  assert.equal(
+    stringifyCameraFilters({ q: "", type: "all", freshness: "all", sort: "alphabetical", focus: null, page: 2 }),
+    "?page=2",
+    "page 2 serializes to ?page=2",
+  );
+  assert.equal(parseCameraFilters(new URLSearchParams("page=2")).page, 2);
+  assert.equal(parseCameraFilters(new URLSearchParams("page=0")).page, 1, "page 0 falls back to 1 (lenient parse)");
+  assert.equal(parseCameraFilters(new URLSearchParams("page=abc")).page, 1, "non-numeric page falls back to 1");
 });
 
 test("freshnessCutoffFor derives the cutoff from the window (never separate state)", () => {

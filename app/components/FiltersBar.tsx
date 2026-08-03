@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useMessages } from "./LocaleProvider";
 
 /**
@@ -36,6 +37,7 @@ export function FiltersBar({
   resultCount,
   onReset,
   hideSearch = false,
+  extraControls,
 }: {
   variant: "inline" | "panel" | "bare";
   cameraKinds: string[];
@@ -62,6 +64,15 @@ export function FiltersBar({
    * the home page and /directory keep their search input byte-identical.
    */
   hideSearch?: boolean;
+  /**
+   * Optional (t_f13fcb1c): extra controls rendered at the END of the
+   * .directory-controls grid, after the reset button — used by the /directory
+   * catalog to place the "Search near a place" toggle in the same cluster as
+   * the search input (one search concept per page, the trigger is part of
+   * the controls row). The inline/panel variants never pass it, so the home
+   * page and /mappa stay byte-identical.
+   */
+  extraControls?: ReactNode;
 }) {
   const t = useMessages().directory;
   return (
@@ -102,6 +113,7 @@ export function FiltersBar({
           </select>
         </div>
         <button type="button" className="text-button" onClick={onReset}>{t.resetFilters} <span aria-hidden="true">→</span></button>
+        {extraControls}
       </div>
       {/* The result counter. "bare" (catalog) omits it: the counter lives in
           the .directory-meta row rendered by PublicDirectory (catalog) so it
