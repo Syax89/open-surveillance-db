@@ -350,6 +350,27 @@ changes accumulate under `[Unreleased]`.
 
 ### Fixed
 
+- **UI /directory — record rows now render as visible cards with a status
+  rail (t_d089a17e, Vera design, CEO feedback 2026-08-03):** the catalog
+  rows blended into the paper background (transparent bg on `--paper`,
+  hairline only) and read as random boxes. Every row is now a real card
+  (`#fffef9` bg, 1px `var(--line)` border, `radius-lg`, 3px left rail)
+  while keeping the flat three-column layout of the #258 redesign (A–Z
+  index, chips, pagination, `?page=`). The rail is coloured with the
+  EXISTING `--status-*` tokens (verified/community/review/pending/demo) +
+  a precomputed 9% tint over the card background; the status-dot and its
+  text label stay in the topline so colour is never the only signal (WCAG
+  1.4.1 — the two lightest text colours on the tinted cards were darkened
+  to hold ≥4.5:1). The same logic applies to the /mappa sidebar rows
+  (`MapRecordList`: white card + 8% tint + a new status-dot/label line —
+  selection moved from the left edge to the background wash so it never
+  fights the status rail) and to the home hub cards (same rail, scoped to
+  `.records-section`). No global token changes (no ADR). Tests: new
+  status-dot-per-card + CSS source-guard tests in
+  `tests/a11y-interactive.test.mjs` and a sidebar status test in
+  `tests/client-tools.test.mjs`; rendered-html/a11y suites green unchanged
+  (RecordCard markup byte-identical).
+
 - Audit finding MEDIUM #2 (t_6b61fc3f, Ada): `PATCH /api/moderation` accepted
   a client-supplied `actorId` for admin-role callers ("stepping in for the
   demo actor selector"), letting an admin write moderation events as ANOTHER

@@ -129,11 +129,13 @@ usa `PublicDirectory variant="catalog"` con il layout browse-record
    le lettere presenti nel set filtrato; click → pagina della prima
    occorrenza + focus sull'header risultati; `aria-current` sulle lettere
    della pagina corrente. Visibile solo con sort alfabetico.
-7. `.directory-tool .record-list` a UNA colonna con righe piatte (hairline,
-   `titolo | meta line | azioni` — la meta line è il `<dl>` di RecordCard
-   renderizzato come riga orizzontale di coppie dt/dd: etichette NON ripetute
-   in griglia 3+1, audit V7; la classe `record-list-card` resta byte-identica
-   per le suite a11y e il contratto rendered-html `<dt>Record ID</dt>`).
+7. `.directory-tool .record-list` a UNA colonna di **card visibili** (fix
+   t_d089a17e: `titolo | meta line | azioni` su 3 colonne dentro un
+   contenitore `#fffef9`/bordo `--line`/radius con barra di stato 3px —
+   la meta line è il `<dl>` di RecordCard renderizzato come riga
+   orizzontale di coppie dt/dd: etichette NON ripetute in griglia 3+1,
+   audit V7; la classe `record-list-card` resta byte-identica per le suite
+   a11y e il contratto rendered-html `<dt>Record ID</dt>`).
 8. `.directory-pagination` — paginazione "Previous / Showing X–Y of Z ·
    Page N of M / Next", stato `?page=` in URL (6ª dimensione di
    useCameraFilters, reset a 1 su ogni cambio filtro; /mappa parsa ma non
@@ -686,12 +688,23 @@ padding 24px, bordo `--line`, radius `--radius-lg`, bg `#fffef9`;
 `.card-topline` + h3 + dl fatti (3 colonne) + azioni. Su ≤700px: dl 2
 colonne; azioni in colonna.
 
-**Righe contestuali (t_127492f1):** in `.directory-tool .record-list` la
-stessa `RecordCard` diventa riga piatta (hairline inferiore, niente
-min-height/radius/bg, 3 colonne `titolo | fatti | azioni`, titolo 17px) —
-lo stile arriva dal contesto della lista, la classe dell'articolo resta
-byte-identica (`class="record-list-card"`, conteggiata dalle suite a11y).
-Home e moderation restano card (griglie fuori da `.directory-tool`).
+**Righe contestuali (t_127492f1, fix t_d089a17e):** in `.directory-tool
+.record-list` la stessa `RecordCard` resta una riga flat a 3 colonne
+`titolo | fatti | azioni` (titolo 17px), ma ogni riga è ora una **card
+visibile** — bg `#fffef9`, bordo 1px `--line`, radius `--radius-lg`,
+padding `16px 20px` — con una **barra di stato** a sinistra (3px) nel
+colore del token `--status-*` e una tint tenue (9% del token su
+`#fffef9`). Lo stile arriva dal contesto della lista, la classe
+dell'articolo resta byte-identica (`class="record-list-card"`,
+conteggiata dalle suite a11y). Il colore non è mai l'unico segnale: lo
+`status-dot` + la label testuale restano nella topline (WCAG 1.4.1), e i
+due colori di testo più chiari della card sono scuriti sulla superficie
+tintata per tenere ≥4.5:1 (vedi commento in globals.css). Home e
+moderation restano card; la home condivide la stessa barra di stato
+(scope `.records-section`). Le righe della sidebar /mappa
+(`.map-record`) usano la stessa logica: card bianca, rail 3px del token
++ tint 8%, con status-dot + label nella riga (la selezione è passata dal
+bordo sinistro alla wash di sfondo per non competere con il rail).
 
 #### 6.3.5 Form ✅
 

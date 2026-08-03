@@ -21,6 +21,13 @@ type Props = {
     emptyBody: string;
     clearSearch: string;
   };
+  /**
+   * Whitelisted, localized status label for a camera status (t_d089a17e):
+   * rendered next to the status-dot in each row so the status rail colour
+   * is never the only signal (WCAG 1.4.1). Comes from the shared
+   * publicStatusLabel helper (never a raw status string).
+   */
+  statusLabel: (status: string) => string;
 };
 
 /**
@@ -32,7 +39,7 @@ type Props = {
  * Extracted from MapPanel so the workspace stays a thin orchestrator
  * (~150-line contract, component-smoke.test.mjs).
  */
-export function MapRecordList({ filteredRecords, visibleRecords, selectedId, onSelect, onReset, labels }: Props) {
+export function MapRecordList({ filteredRecords, visibleRecords, selectedId, onSelect, onReset, labels, statusLabel }: Props) {
   return (
     <>
       <div className="map-list-header">
@@ -69,6 +76,7 @@ export function MapRecordList({ filteredRecords, visibleRecords, selectedId, onS
                         aria-current={selected ? "true" : undefined}
                         onClick={() => onSelect(camera.id)}
                       >
+                        <span className="map-record-status"><span className={`status-dot ${camera.status}`} /> {statusLabel(camera.status)}</span>
                         <span className="map-record-title">{camera.title}</span>
                         <span className="map-record-meta">{camera.kind}{camera.address ? ` · ${camera.address}` : ""}</span>
                       </button>
