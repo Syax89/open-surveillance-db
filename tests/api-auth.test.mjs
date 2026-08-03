@@ -91,6 +91,9 @@ test("register creates a contributor, mints a verification token, opens a sessio
   stub("createContributor", async () => contributor);
   stub("createVerificationToken", async () => ({ rawToken: "verify-token-abc", expiresAt: "2026-08-02T08:00:00.000Z" }));
   stub("createSession", async () => newSession);
+  // The canonical mailer (db/mailer.ts sendAuthEmail) is invoked with the
+  // minted token; the provider accepts, so sent:true.
+  stub("sendAuthEmail", async () => ({ ok: true, messageId: "m1" }));
   const { POST } = await registerRoute();
   const response = await POST(
     apiRequest("/api/auth/register", {
@@ -111,18 +114,26 @@ test("register creates a contributor, mints a verification token, opens a sessio
   assert.equal(tokenArgs[0], contributor.id);
   assert.equal(tokenArgs[1], "verify");
   assert.ok(typeof tokenArgs[2] === "string" && tokenArgs[2].length > 0, "token created_at is an ISO timestamp");
+  // The canonical mailer receives the minted token for THIS contributor.
+  const [mailArgs] = callArgs("sendAuthEmail");
+  assert.deepEqual(mailArgs[0].contributorId, contributor.id);
+  assert.equal(mailArgs[0].to, "ada@example.org");
+  assert.equal(mailArgs[0].kind, "verify");
+  assert.equal(mailArgs[0].rawToken, "verify-token-abc");
+  assert.ok(typeof mailArgs[0].nowIso === "string" && mailArgs[0].nowIso.length > 0, "nowIso is an ISO timestamp");
   // The DB TTL follows the same env knob as the cookie (sessionTtlSeconds):
   // default 30 days = 2592000 s, so expires_at and Max-Age can never diverge
   // (audit t_5ca60ab2, P2).
   const [sessionArgs] = callArgs("createSession");
   assert.deepEqual(sessionArgs, [7, { ttlSeconds: 2592000 }]);
 
-  // With no EMAIL binding the mailer falls back to a dev link, which
-  // register echoes so local flows can complete verification. The response
-  // still marks the session read-only: the contributor's emailVerifiedAt is
-  // NULL (the fixture above) and the write gate (Fase E1) enforces it.
-  assert.deepEqual(body.verification.sent, false);
-  assert.match(body.verification.devLink, /^https:\/\/osdb\.test\/api\/auth\/verify-email\?token=verify-token-abc$/);
+  // The provider accepted the email: sent:true. The raw token is NEVER in
+  // the response — it lives only in the mail channel (fail-closed, no
+  // devLink echo, P1-1). The response still marks the session read-only:
+  // the contributor's emailVerifiedAt is NULL (the fixture above) and the
+  // write gate (Fase E1) enforces it.
+  assert.deepEqual(body.verification, { sent: true });
+  assert.ok(!("devLink" in body.verification), "no raw token in the API response");
 
   // Cookie pair: HttpOnly session cookie + script-readable CSRF cookie.
   assert.deepEqual(cookieNames(response).sort(), ["osdb_csrf", "osdb_session"]);
@@ -139,6 +150,31 @@ test("register creates a contributor, mints a verification token, opens a sessio
   assert.match(csrfCookie, /SameSite=Strict/);
 });
 
+test("register reports sent:false when the mailer cannot deliver (provider error) — and never echoes the token", async () => {
+  stub("createContributor", async () => contributor);
+  stub("createVerificationToken", async () => ({ rawToken: "verify-token-abc", expiresAt: "2026-08-02T08:00:00.000Z" }));
+  stub("createSession", async () => newSession);
+  // Mail must never break registration: a provider rejection still answers
+  // 201, but sent:false — the user can re-send from the session.
+  stub("sendAuthEmail", async () => ({
+    ok: false,
+    reason: "provider",
+    code: "E_SENDER_NOT_VERIFIED",
+    message: "sender domain not verified",
+  }));
+  const { POST } = await registerRoute();
+  const response = await POST(
+    apiRequest("/api/auth/register", {
+      method: "POST",
+      body: { email: "ada@example.org", password: "supersecret123", displayName: "Ada" },
+    }),
+  );
+  assert.equal(response.status, 201);
+  const body = await responseBody(response);
+  assert.deepEqual(body.verification, { sent: false });
+  assert.equal(JSON.stringify(body).includes("verify-token-abc"), false, "the raw token never leaves the mail channel");
+});
+
 test("register propagates AUTH_SESSION_TTL_DAYS to BOTH the DB session and the cookie Max-Age (no TTL divergence)", async () => {
   // Audit t_5ca60ab2, P2: the DB expires_at and the cookie Max-Age must
   // derive from the same sessionTtlSeconds(env). With the knob at 7 days the
@@ -150,6 +186,7 @@ test("register propagates AUTH_SESSION_TTL_DAYS to BOTH the DB session and the c
     stub("createContributor", async () => contributor);
     stub("createVerificationToken", async () => ({ rawToken: "verify-token-abc", expiresAt: "2026-08-02T08:00:00.000Z" }));
     stub("createSession", async () => newSession);
+    stub("sendAuthEmail", async () => ({ ok: true, messageId: "m1" }));
     const { POST } = await registerRoute();
     const response = await POST(
       apiRequest("/api/auth/register", {
@@ -258,6 +295,7 @@ test("register respects the auth rate-limit bucket", async () => {
   stub("createContributor", async () => contributor);
   stub("createVerificationToken", async () => ({ rawToken: "verify-token-abc", expiresAt: "2026-08-02T08:00:00.000Z" }));
   stub("createSession", async () => newSession);
+  stub("sendAuthEmail", async () => ({ ok: true, messageId: "m1" }));
   const { POST } = await registerRoute();
   for (let index = 0; index < 10; index += 1) {
     const response = await POST(
@@ -864,10 +902,13 @@ test("resend on an already-verified account is a no-op success", async () => {
   assert.equal(callArgs("createVerificationToken").length, 0, "no new token for a verified account");
 });
 
-test("resend mints a fresh verify token and returns the dev link when mail falls back", async () => {
+test("resend mints a fresh verify token and sends it through the canonical mailer", async () => {
   stub("findSessionByToken", async () => ({ ...session, contributor }));
-  stub("countVerificationTokensSentSince", async () => 0);
+  // Budget pre-flight (email_send_log): allowed.
+  stub("canSendAuthEmail", async () => ({ allowed: true, retryAfterSeconds: 0 }));
   stub("createVerificationToken", async () => ({ rawToken: "resend-token-456", expiresAt: "2026-08-02T09:00:00.000Z" }));
+  // The canonical mailer accepts the email.
+  stub("sendAuthEmail", async () => ({ ok: true, messageId: "m1" }));
   const { POST } = await resendRoute();
   const response = await POST(
     sessionRequest("/api/auth/verify-email/resend", "raw-session-token-abc123", { method: "POST" }),
@@ -875,22 +916,31 @@ test("resend mints a fresh verify token and returns the dev link when mail falls
   assert.equal(response.status, 200);
   const body = await responseBody(response);
   assert.deepEqual(body.sent, true);
-  assert.match(body.devLink, /^https:\/\/osdb\.test\/api\/auth\/verify-email\?token=resend-token-456$/);
-  // The new token is minted for the caller's own account, purpose 'verify'.
+  // Fail-closed: the raw token is NEVER echoed in the API response — it
+  // lives only in the mail channel (P1-1: devLink echo removed).
+  assert.ok(!("devLink" in body), "no raw token in the response");
+  // The new token is minted for the caller's own account, purpose 'verify',
+  // and handed to the canonical mailer.
   const [tokenArgs] = callArgs("createVerificationToken");
   assert.deepEqual(tokenArgs.slice(0, 2), [7, "verify"]);
+  const [mailArgs] = callArgs("sendAuthEmail");
+  assert.deepEqual(mailArgs[0].contributorId, 7);
+  assert.equal(mailArgs[0].kind, "verify");
+  assert.equal(mailArgs[0].rawToken, "resend-token-456");
 });
 
 test("resend honours the 3/h budget: the 4th email answers 429 with Retry-After", async () => {
   stub("findSessionByToken", async () => ({ ...session, contributor }));
-  stub("countVerificationTokensSentSince", async () => 3);
+  // Budget pre-flight: the email_send_log window is exhausted (3 sends).
+  stub("canSendAuthEmail", async () => ({ allowed: false, retryAfterSeconds: 3600 }));
   const { POST } = await resendRoute();
   const response = await POST(
     sessionRequest("/api/auth/verify-email/resend", "raw-session-token-abc123", { method: "POST" }),
   );
   assert.equal(response.status, 429);
-  assert.ok(Number(response.headers.get("retry-after")) > 0);
+  assert.equal(response.headers.get("retry-after"), "3600");
   assert.equal(callArgs("createVerificationToken").length, 0, "no token minted past the budget");
+  assert.equal(callArgs("sendAuthEmail").length, 0, "no mail sent past the budget");
 });
 
 // ---------------------------------------------------------------------------
@@ -913,8 +963,9 @@ test("reset request answers 200 {sent:true} for an UNKNOWN email (anti-enumerati
 
 test("reset request mints a reset token for a known email and never echoes it", async () => {
   stub("findContributorByEmail", async () => contributor);
-  stub("countVerificationTokensSentSince", async () => 0);
+  stub("canSendAuthEmail", async () => ({ allowed: true, retryAfterSeconds: 0 }));
   stub("createVerificationToken", async () => ({ rawToken: "reset-token-789", expiresAt: "2026-08-02T10:00:00.000Z" }));
+  stub("sendAuthEmail", async () => ({ ok: true, messageId: "m1" }));
   const { POST } = await resetRequestRoute();
   const response = await POST(
     apiRequest("/api/auth/reset-password/request", {
@@ -928,11 +979,16 @@ test("reset request mints a reset token for a known email and never echoes it", 
   // and the token NEVER appears in the response (it goes only in the mail).
   assert.deepEqual(body, { sent: true });
   assert.deepEqual(callArgs("createVerificationToken")[0].slice(0, 2), [7, "reset"]);
+  // The reset link is handed to the canonical mailer (kind 'reset').
+  const [mailArgs] = callArgs("sendAuthEmail");
+  assert.deepEqual(mailArgs[0].contributorId, 7);
+  assert.equal(mailArgs[0].kind, "reset");
+  assert.equal(mailArgs[0].rawToken, "reset-token-789");
 });
 
 test("reset request keeps answering 200 {sent:true} past the 3/h budget (no token, no mail)", async () => {
   stub("findContributorByEmail", async () => contributor);
-  stub("countVerificationTokensSentSince", async () => 3);
+  stub("canSendAuthEmail", async () => ({ allowed: false, retryAfterSeconds: 3600 }));
   const { POST } = await resetRequestRoute();
   const response = await POST(
     apiRequest("/api/auth/reset-password/request", {
@@ -947,6 +1003,7 @@ test("reset request keeps answering 200 {sent:true} past the 3/h budget (no toke
   assert.equal(response.status, 200);
   assert.deepEqual((await responseBody(response)), { sent: true });
   assert.equal(callArgs("createVerificationToken").length, 0, "no token minted past the budget");
+  assert.equal(callArgs("sendAuthEmail").length, 0, "no mail sent past the budget");
 });
 
 // ---------------------------------------------------------------------------

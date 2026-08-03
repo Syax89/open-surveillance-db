@@ -22,9 +22,13 @@ interface Env {
   /**
    * Transactional mail (AUTH MULTI-METODO Fase A2, ADR 0020): the public
    * base URL used to build verification / password-reset action links
-   * (e.g. https://opensurveillancedb.org). Required for the mailer to send:
-   * without it sendAuthEmail answers missing_config and the route returns
-   * 503 — fail-closed, never a broken link. Locally set it in .dev.vars.
+   * (e.g. https://opensurveillancedb.org). REQUIRED for the mailer to send:
+   * without it sendAuthEmail answers missing_config and no email goes out —
+   * there is NO fallback to the request origin (the Host header is
+   * attacker-controllable and was the P1-1 token-harvesting vector). Routes
+   * stay best-effort: register answers 201 with verification.sent=false,
+   * resend answers 503, reset-request stays `{sent:true}` (anti-enumeration).
+   * Set it in production and in .dev.vars.
    */
   VERIFY_BASE_URL?: string;
   /** Sender address override for the EMAIL binding (default noreply@opensurveillancedb.org). */

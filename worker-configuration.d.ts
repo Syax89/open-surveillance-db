@@ -101,14 +101,15 @@ declare module "cloudflare:workers" {
     /** Max accepted upstream geocode body in bytes (default 512 KiB). */
     GEOCODE_MAX_BYTES?: string;
     PHOTOS: R2Bucket;
-    // Multi-method auth — Fase B/A2 (mailer): the Cloudflare `send_email`
-    // binding is optional by design. When absent the mailer falls back to a
-    // dev log (registration and reset still succeed — see db/mailer.ts and
-    // app/lib/mailer.ts). VERIFY_BASE_URL overrides the link base (defaults
-    // to the request origin); MAIL_FROM overrides the sender (default
-    // no-reply@opensurveillancedb.org).
+    // Multi-method auth — Fase A2 (mailer, ADR 0020): the canonical mailer
+    // db/mailer.ts sends through the Cloudflare `send_email` binding (EMAIL)
+    // and fails closed. VERIFY_BASE_URL is REQUIRED to build action links —
+    // without it sendAuthEmail answers missing_config and no email is sent
+    // (no fallback to the request origin; the Host header is never trusted).
+    // MAILER_FROM overrides the sender (default noreply@opensurveillancedb.org,
+    // which MUST stay in the binding's allowed_sender_addresses).
     VERIFY_BASE_URL?: string;
-    MAIL_FROM?: string;
+    MAILER_FROM?: string;
   }
   export const env: Env;
 }
