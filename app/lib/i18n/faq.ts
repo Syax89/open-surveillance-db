@@ -27,13 +27,13 @@ export const en = {
     "The map shows only reviewed public records, and published coordinates are intentionally rounded to about 4 decimal places (roughly 10 metres). A status describes the current review state, not a guarantee that a camera is active. An empty area does not prove that no cameras are present — it only shows that no reviewed record is currently published there.",
   qCorrect: "How do I correct an error?",
   aCorrect:
-    "Use the private correction form on the home page (“Correct a record or raise a concern”) or write to privacy@opensurveillancedb.org. Correction requests are private: they do not change the map automatically and are never included in the public export. First response within 48 hours; substantive response within 14 days.",
+    "Use the private correction form, or write to privacy@opensurveillancedb.org. Correction requests are private: they do not change the map automatically and are never included in the public export. First response within 48 hours; substantive response within 14 days.",
   qPrivacy: "What about privacy?",
   aPrivacy:
     "Reports are private while pending; published records contain no faces, licence plates or personal data. The data controller is Simone Rondina (syax89) / OpenSurveillanceDB, Italy. Data-subject rights (access, rectification, erasure, objection) can be exercised via privacy@opensurveillancedb.org.",
   qAccount: "Do I need an account?",
   aAccount:
-    "No. Browsing, reporting a camera and sending a correction all work without an account. An account is optional and adds attribution: you can follow your own reports, edit your contributions, verify records you have seen and build a trust level from your verified contributions.",
+    "Browsing works without an account. Submitting a report or a correction requires a free, verified account, which also adds attribution: you can follow your own reports, edit your contributions, verify records you have seen and build a trust level from your verified contributions.",
   qVerifications: "What are verifications?",
   aVerifications:
     "A verification is a personal confirmation that a camera exists at the documented location. Each account can add one verification per record, so the count reflects distinct people. Public pages show only the total number of verifications — who verified a record is never shown.",
@@ -48,7 +48,7 @@ export const en = {
     "Account erasure removes the link between you and the community data: verifications you received are deleted, verifications you gave are de-identified (they stay on the record without pointing to you), and your published reports remain published without attribution to you.",
   moreTitle: "Still have questions?",
   moreBody:
-    "For corrections, removals and privacy requests use the correction form on the home page or the contact page.",
+    "For corrections, removals and privacy requests, use the correction form or the contact page.",
   contactCta: "Open the contact page",
   correctionCta: "Go to the correction form",
   footer: "Built for transparency, not tracking.",
@@ -74,13 +74,13 @@ export const it: Translation<typeof en> = {
     "La mappa mostra solo record pubblici revisionati e le coordinate pubblicate sono volutamente arrotondate a circa 4 decimali (circa 10 metri). Uno stato descrive la situazione di revisione corrente, non la garanzia che una telecamera sia attiva. Un'area vuota non dimostra che non ci siano telecamere: mostra solo che in quel punto non c'è attualmente alcun record revisionato pubblicato.",
   qCorrect: "Come si corregge un errore?",
   aCorrect:
-    "Usa il modulo privato di correzione nella home page (“Correggi un record o segnala un problema”) oppure scrivi a privacy@opensurveillancedb.org. Le richieste di correzione sono private: non modificano la mappa automaticamente e non finiscono mai nell'esportazione pubblica. Prima risposta entro 48 ore; risposta sostanziale entro 14 giorni.",
+    "Usa il modulo privato di correzione oppure scrivi a privacy@opensurveillancedb.org. Le richieste di correzione sono private: non modificano la mappa automaticamente e non finiscono mai nell'esportazione pubblica. Prima risposta entro 48 ore; risposta sostanziale entro 14 giorni.",
   qPrivacy: "E per quanto riguarda la privacy?",
   aPrivacy:
     "Le segnalazioni sono private finché sono in attesa; i record pubblicati non contengono volti, targhe o dati personali. Il titolare del trattamento è Simone Rondina (syax89) / OpenSurveillanceDB, Italia. I diritti dell'interessato (accesso, rettifica, cancellazione, opposizione) si esercitano scrivendo a privacy@opensurveillancedb.org.",
   qAccount: "Serve un account?",
   aAccount:
-    "No. Consultare, segnalare una telecamera e inviare una correzione funzionano anche senza account. L'account è facoltativo e aggiunge l'attribuzione: puoi seguire le tue segnalazioni, modificare i tuoi contributi, verificare i record che hai visto e costruire un livello di fiducia con i tuoi contributi verificati.",
+    "Per consultare, no. Per segnalare una telecamera o inviare una correzione serve un account gratuito e verificato, che aggiunge anche l'attribuzione: puoi seguire le tue segnalazioni, modificare i tuoi contributi, verificare i record che hai visto e costruire un livello di fiducia con i tuoi contributi verificati.",
   qVerifications: "Cosa sono le verifiche?",
   aVerifications:
     "Una verifica è una conferma personale che una telecamera esista nella posizione documentata. Ogni account può aggiungere una verifica per record, quindi il conteggio riflette persone distinte. Le pagine pubbliche mostrano solo il numero totale di verifiche: chi ha verificato un record non viene mai mostrato.",
@@ -95,7 +95,7 @@ export const it: Translation<typeof en> = {
     "La cancellazione dell'account rimuove il collegamento tra te e i dati community: le verifiche che hai ricevuto vengono eliminate, quelle che hai dato vengono de-identificate (restano sul record senza puntare a te) e i tuoi record pubblicati restano pubblicati senza attribuzione a te.",
   moreTitle: "Hai ancora domande?",
   moreBody:
-    "Per correzioni, rimozioni e richieste relative alla privacy usa il modulo di correzione nella home page o la pagina dei contatti.",
+    "Per correzioni, rimozioni e richieste relative alla privacy usa il modulo di correzione o la pagina dei contatti.",
   contactCta: "Apri la pagina dei contatti",
   correctionCta: "Vai al modulo di correzione",
   footer: "Creato per la trasparenza, non per il tracciamento.",

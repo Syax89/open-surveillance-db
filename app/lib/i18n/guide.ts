@@ -69,16 +69,16 @@ export const en = {
   accountEyebrow: "Your account",
   accountTitle: "Why create an account?",
   accountBody:
-    "An account is optional. It lets you keep track of your own reports, verify records you have seen, and build a trust level from your verified contributions.",
+    "A free, verified account is required to submit reports and corrections. It also lets you keep track of your own reports, verify records you have seen, and build a trust level from your verified contributions.",
   accountWhyTitle: "What an account gives you",
   accountWhyBody:
     "Your reports are linked to your account, you can edit your own contributions, add verifications to records, and see your trust level grow as your contributions are verified.",
   accountHowTitle: "How registration works today",
   accountHowBody:
-    "Registration uses an email address and a password, stored hashed and never exposed (ADR 0013). The login method may change before launch; this guide will be updated to match the final choice.",
-  accountAnonymousTitle: "Anonymous remains possible",
+    "Registration uses an email address and a password, stored hashed and never exposed (ADR 0013). You can also sign in with a passkey or a social account; when you add a passkey you receive 10 one-time recovery codes.",
+  accountAnonymousTitle: "Browsing stays anonymous",
   accountAnonymousBody:
-    "You can still submit a report or a correction without an account. An account adds attribution and community features; it is never required to participate.",
+    "You can browse the map, the directory and every public record without an account. An account is required only to submit reports and corrections; it adds attribution and community features.",
   editEyebrow: "Editing a contribution",
   editTitle: "You can edit your own contributions.",
   editBody:
@@ -129,7 +129,7 @@ export const en = {
   downloadCsv: "Download public CSV",
   geoJsonTitle: "A reusable public export",
   geoJsonBody:
-    "GeoJSON is a common geographic data format. It is intended for civic analysis, research and compatible mapping tools—not for finding camera feeds or sensitive operational information.",
+    "GeoJSON is a common geographic data format. It is intended for civic analysis, research and compatible mapping tools — not for finding camera feeds or sensitive operational information.",
   osmTitle: "OpenStreetMap provides the base map",
   osmBody:
     "The map background is provided by OpenStreetMap contributors. It is separate from this project’s camera records and always needs visible attribution and responsible use.",
@@ -202,16 +202,16 @@ export const it: Translation<typeof en> = {
   accountEyebrow: "Il tuo account",
   accountTitle: "Perché creare un account?",
   accountBody:
-    "L'account è facoltativo. Ti permette di tenere traccia delle tue segnalazioni, verificare i record che hai visto e costruire un livello di fiducia con i tuoi contributi verificati.",
+    "Per inviare segnalazioni e correzioni serve un account gratuito e verificato. Ti permette anche di tenere traccia delle tue segnalazioni, verificare i record che hai visto e costruire un livello di fiducia con i tuoi contributi verificati.",
   accountWhyTitle: "Cosa ti dà un account",
   accountWhyBody:
     "Le tue segnalazioni sono collegate al tuo account, puoi modificare i tuoi contributi, aggiungere verifiche ai record e vedere crescere il tuo livello di fiducia man mano che i contributi vengono verificati.",
   accountHowTitle: "Come funziona la registrazione oggi",
   accountHowBody:
-    "La registrazione usa un indirizzo email e una password, salvata come hash e mai esposta (ADR 0013). Il metodo di accesso può cambiare prima del lancio; questa guida verrà aggiornata in base alla scelta finale.",
-  accountAnonymousTitle: "L'anonimato resta possibile",
+    "La registrazione usa un indirizzo email e una password, salvata come hash e mai esposta (ADR 0013). Puoi anche accedere con una passkey o con un account social; quando aggiungi una passkey ricevi 10 codici di recupero monouso.",
+  accountAnonymousTitle: "La navigazione resta anonima",
   accountAnonymousBody:
-    "Puoi comunque inviare una segnalazione o una correzione senza account. L'account aggiunge attribuzione e funzioni community; non è mai obbligatorio per partecipare.",
+    "Puoi consultare la mappa, l'elenco e ogni record pubblico senza account. L'account serve solo per inviare segnalazioni e correzioni; aggiunge attribuzione e funzioni community.",
   editEyebrow: "Modificare un contributo",
   editTitle: "Puoi modificare i tuoi contributi.",
   editBody:

@@ -157,7 +157,7 @@ export const it: Translation<typeof en> = {
   levelDescriptions: {
     new: "Sei un nuovo contributor. Le tue segnalazioni sono esaminate dai moderatori prima della pubblicazione, come quelle di tutti.",
     trusted:
-      "Sei un contributor fidato. I tuoi contributi costanti e verificati fanno sì che le tue segnalazioni possano essere prioritarizzate nella coda di moderazione.",
+      "Sei un contributor fidato. I tuoi contributi costanti e verificati fanno sì che le tue segnalazioni possano avere priorità nella coda di moderazione.",
     experienced:
       "Sei un contributor esperto. Il tuo storico di contributi accurati e verificati è riconosciuto dalla community.",
   },
