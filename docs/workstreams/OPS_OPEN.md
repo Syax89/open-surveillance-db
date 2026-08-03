@@ -162,12 +162,21 @@ harm.
   a second layer over the edge gate.
 - The in-memory limiter is per-isolate: on a public multi-isolate deployment
   the per-caller counts are not global, so the effective ceiling scales with
-  the number of isolates. Before public alpha, evaluate Cloudflare's
-  rate-limiting product (or a KV/DO-backed counter) for the critical
-  buckets — auth, submissions, and tiles — where a determined caller could
-  otherwise spread a burst across isolates. The per-isolate limiter remains
-  the correct first layer everywhere and the only one needed for the local
-  and staging single-isolate deployments.
+  the number of isolates. **Resolved for the critical buckets (audit #3,
+  MEDIUM, t_dff3dadf):** auth, write (submissions), read and tiles now run on
+  the Cloudflare Workers Rate Limiting binding (`ratelimits` in
+  `wrangler.jsonc`), whose counters are enforced by Cloudflare edge
+  infrastructure shared across worker isolates — a caller can no longer
+  spread a burst across isolates to bypass those ceilings. The binding
+  enforces per Cloudflare location (datacenter), not globally, which is the
+  documented platform behaviour. The remaining families (export, nearby,
+  revisions, moderate, appeal, geocode, search, confirm, edit) still use the
+  per-isolate in-memory window: acceptable for the current single-isolate
+  staging, migrate them to bindings before launch if the threat model calls
+  for it (the abstraction in `app/lib/rate-limit.ts` makes it a one-line
+  change per family). The per-isolate limiter remains the correct first
+  layer everywhere and the only one needed for the local and staging
+  single-isolate deployments.
 - Caller identity is only as trustworthy as the edge that sets it. The
   per-caller buckets key on `cf-connecting-ip` when present (set by
   Cloudflare, unspoofable at the worker) and fall back to the first

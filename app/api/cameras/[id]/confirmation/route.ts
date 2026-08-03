@@ -59,7 +59,7 @@ async function guardMutation(
 
   const key = callerKey(request);
   const limitOptions = limitsFor("confirm", env);
-  const limit = checkRateLimit("confirm", key, limitOptions);
+  const limit = await checkRateLimit(env, "confirm", key, limitOptions);
   if (!limit.allowed) {
     console.warn("PUT/DELETE /api/cameras/[id]/confirmation rate limited");
     recordRateLimitBlock(env, {
@@ -181,7 +181,7 @@ export async function GET(request: Request) {
 
   const key = callerKey(request);
   const limitOptions = limitsFor("confirm", env);
-  const limit = checkRateLimit("confirm", key, limitOptions);
+  const limit = await checkRateLimit(env, "confirm", key, limitOptions);
   if (!limit.allowed) {
     console.warn("GET /api/cameras/[id]/confirmation rate limited");
     recordRateLimitBlock(env, {

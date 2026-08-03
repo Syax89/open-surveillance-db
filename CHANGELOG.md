@@ -445,6 +445,22 @@ changes accumulate under `[Unreleased]`.
 
 ### Security
 
+- **Rate limiting — Cloudflare Workers Rate Limiting binding (audit #3,
+  MEDIUM, t_dff3dadf):** the four critical public route families (auth,
+  write/submissions, read, tiles) no longer rely on the per-isolate
+  in-memory buckets, which a caller could bypass by spreading a burst across
+  worker isolates on a multi-isolate deployment. `app/lib/rate-limit.ts` now
+  prefers the `ratelimits` bindings declared in `wrangler.jsonc`
+  (`AUTH_LIMITER`, `WRITE_LIMITER`, `READ_LIMITER`, `TILES_LIMITER`,
+  namespace_id self-defined per the platform docs) and falls back to the
+  in-memory sliding window only when a binding is absent — local dev, the
+  test suite, staging without the binding (documented in
+  `docs/DEVELOPMENT_SETUP.md` §2.2). Binding thresholds mirror the current
+  per-family defaults (pending Ada sign-off); the env knobs remain the
+  source of truth for the fallback and the unbound families. New
+  `tests/rate-limit-binding.test.mjs` pins the selection logic and the
+  429/Retry-After contract on both backends.
+
 - Moderation access control implemented and documented
   ([ADR 0003](docs/decisions/0003-moderation-access-control.md)); rate limits
   added on submission routes.

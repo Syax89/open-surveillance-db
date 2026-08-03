@@ -49,7 +49,7 @@ export async function GET(request: Request) {
     );
   }
 
-  const blocked = authLimit(request, env, `/api/auth/oidc/${provider}/start`);
+  const blocked = await authLimit(request, env, `/api/auth/oidc/${provider}/start`);
   if (blocked) return blocked;
 
   const redirectTo = safeRedirectTarget(url.searchParams.get("redirect_to")) ?? "/account";

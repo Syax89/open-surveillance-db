@@ -27,7 +27,7 @@ export async function GET(request: Request) {
     return Response.json({ error: "Cross-origin request rejected." }, { status: 403 });
   }
 
-  const blocked = authLimit(request, env, "/api/auth/passkey/credentials");
+  const blocked = await authLimit(request, env, "/api/auth/passkey/credentials");
   if (blocked) return blocked;
 
   try {
@@ -52,7 +52,7 @@ export async function DELETE(request: Request) {
     return Response.json({ error: "Cross-origin request rejected." }, { status: 403 });
   }
 
-  const blocked = authLimit(request, env, "/api/auth/passkey/credentials");
+  const blocked = await authLimit(request, env, "/api/auth/passkey/credentials");
   if (blocked) return blocked;
 
   try {

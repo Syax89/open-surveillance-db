@@ -55,11 +55,18 @@ export function loginLockoutPolicy(env: unknown): LoginLockoutPolicy {
  * Rate limit the auth endpoints. Register and login are credential-guessing
  * surfaces, so the dedicated `auth` bucket (default 10/min per caller) sits
  * deliberately low; the same bucket also covers the session/profile reads.
+ * In production the bucket is enforced by the AUTH_LIMITER binding
+ * (wrangler.jsonc `ratelimits`); without the binding (local dev, tests) the
+ * in-memory fallback applies — see app/lib/rate-limit.ts.
  */
-export function authLimit(request: Request, env: unknown, route: string): Response | null {
+export async function authLimit(
+  request: Request,
+  env: unknown,
+  route: string,
+): Promise<Response | null> {
   const key = callerKey(request);
   const limitOptions = limitsFor("auth", env);
-  const limit = checkRateLimit("auth", key, limitOptions);
+  const limit = await checkRateLimit(env, "auth", key, limitOptions);
   if (!limit.allowed) {
     console.warn(`${route} rate limited`);
     recordRateLimitBlock(env, {

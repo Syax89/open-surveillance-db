@@ -61,10 +61,10 @@ function parseAppealRequest(value: unknown): {
   return { entity, entityId, decisionEventId, reason };
 }
 
-function appealLimit(request: Request) {
+async function appealLimit(request: Request) {
   const key = callerKey(request);
   const limitOptions = limitsFor("appeal", env);
-  const limit = checkRateLimit("appeal", key, limitOptions);
+  const limit = await checkRateLimit(env, "appeal", key, limitOptions);
   if (!limit.allowed) {
     console.warn("/api/appeals rate limited");
     recordRateLimitBlock(env, {
@@ -145,7 +145,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const blocked = appealLimit(request);
+  const blocked = await appealLimit(request);
   if (blocked) return blocked;
 
   try {
@@ -220,7 +220,7 @@ export async function GET(request: Request) {
   const auth = await requireRole(request, "moderator");
   if (!auth.ok) return auth.response;
 
-  const blocked = appealLimit(request);
+  const blocked = await appealLimit(request);
   if (blocked) return blocked;
 
   try {

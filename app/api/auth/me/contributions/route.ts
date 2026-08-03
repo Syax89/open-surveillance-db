@@ -42,7 +42,7 @@ export async function GET(request: Request) {
     return Response.json({ error: "Request URI too long." }, { status: 414 });
   }
 
-  const blocked = authLimit(request, env, "/api/auth/me/contributions");
+  const blocked = await authLimit(request, env, "/api/auth/me/contributions");
   if (blocked) return blocked;
 
   const url = new URL(request.url);
