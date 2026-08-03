@@ -107,9 +107,11 @@ export async function setUserRole(id: number, role: UserRole): Promise<UserRecor
 
 /**
  * The reviewer profile linked to a user account, if any. The moderation PATCH
- * uses this to derive the acting reviewer server-side: a `moderator`-role
- * user acts as their own linked reviewer, an `admin` may act as any active
- * reviewer (stepping in for the demo actor selector).
+ * uses this to derive the acting reviewer server-side for EVERY caller: a
+ * `moderator`-role user acts as their own linked reviewer, and an `admin` does
+ * the same in production — only the development demo actor selector
+ * (`ENVIRONMENT = "development"`, see app/api/moderation/route.ts and
+ * ADR 0014 §3) lets an admin act as a different reviewer.
  */
 export async function getReviewerByUserId(userId: number): Promise<{
   id: number;

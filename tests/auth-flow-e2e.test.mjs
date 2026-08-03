@@ -61,8 +61,10 @@ const REVIEWERS = {
 // ADR 0014 identity mapping: the moderation route derives the acting reviewer
 // from the authenticated user (x-osdb-user-email header) instead of trusting a
 // client-chosen actor id. Migration 0009 seeds the five demo reviewer accounts
-// (reviewers 1-5). Reviewer ids outside that set (negative tests) use the
-// admin identity so the payload actorId stays authoritative.
+// (reviewers 1-5). Reviewer ids outside that set (negative tests) fall back to
+// the admin identity, so the route exercises the server-derived path — the
+// spoofed payload actorId is ignored in production (audit t_6b61fc3f) and
+// must never reach the audit trail.
 const reviewerEmail = {
   1: "intake@osdb.test",
   2: "record@osdb.test",
@@ -595,12 +597,37 @@ test("E2E: an intake reviewer cannot approve (403) — role matrix enforced end 
   assert.equal(row.status, "pending");
 });
 
-test("E2E: unknown and inactive reviewers are rejected through the real route", async () => {
+test("E2E: a spoofed client actorId is ignored — the admin acts as their own reviewer (t_6b61fc3f)", async () => {
   const record = await submitCamera();
 
+  // Reviewer id 999 does not exist. In production the client actorId is no
+  // longer authoritative: with the admin identity the route derives the
+  // admin's OWN reviewer (id 5, escalate-only), so an approve attempt fails
+  // on the role matrix — NOT with "reviewer not found" (the spoofed id never
+  // reaches the db layer).
   const missing = await moderateCamera(record.id, "approve", REASON.verified, 999);
-  assert.equal(missing.status, 404);
-  assert.match((await responseBody(missing)).error, /Reviewer not found/i);
+  assert.equal(missing.status, 403);
+  assert.match((await responseBody(missing)).error, /role does not permit/i);
+
+  // Nothing was written: no audit event for the spoofed id.
+  assert.equal((await auditEvents()).length, 0);
+  const stillPending = await env.DB.prepare("SELECT status FROM cameras WHERE id = ?").bind(record.id).first();
+  assert.equal(stillPending.status, "pending");
+
+  // The same spoofed id with an action the admin reviewer MAY take succeeds,
+  // and the event is attributed to the server-derived reviewer (5) — the
+  // spoofed 999 never reaches the append-only audit trail.
+  const escalated = await moderateCamera(record.id, "escalate", REASON.privacy, 999, {
+    note: "Spoofed actor ignored: attributed to the server-derived reviewer.",
+  });
+  assert.equal(escalated.status, 200);
+  const body = await responseBody(escalated);
+  assert.equal(body.event.reviewerId, REVIEWERS.admin);
+  assert.notEqual(body.event.reviewerId, 999);
+});
+
+test("E2E: an inactive reviewer is rejected through the real route", async () => {
+  const record = await submitCamera();
 
   await env.DB.prepare("UPDATE reviewers SET active = 0 WHERE id = ?").bind(REVIEWERS.record).run();
   const inactive = await moderateCamera(record.id, "approve", REASON.verified, REVIEWERS.record);
