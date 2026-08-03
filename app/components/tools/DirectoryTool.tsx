@@ -24,22 +24,24 @@ import { PublicDirectory } from "../home/PublicDirectory";
  * 2026-08-02): the map tool no longer carries the export footer and the
  * text list owns the public data downloads.
  *
- * Catalog mode (t_127492f1): the page renders the flat catalog layout
- * (PublicDirectory variant="catalog") — controls row, then the results meta
- * row (count + CSV/GeoJSON export + place-search trigger), then the flat
- * record rows. "Use the map instead" moves into the tool heading (the
- * records-heading action row no longer exists on the tool page).
+ * Catalog mode (t_127492f1, redesign t_f13fcb1c): the page renders the
+ * browse-record layout (PublicDirectory variant="catalog" → DirectoryCatalog)
+ * — controls row (search + filters + place-search toggle), collapsible
+ * place-search card, visible results header (count + CSV/GeoJSON export +
+ * active-filter chips), A–Z index, flat record rows and pagination (?page=).
+ * "Use the map instead" moves into the tool heading (the records-heading
+ * action row no longer exists on the tool page).
  *
- * Export ownership (merge #229 × #231): the catalog meta row (DirectoryCatalog)
- * renders the CSV/GeoJSON downloads with the current type/freshness filters
- * applied (exportHrefs); the data-actions footer below keeps the
- * guide/regole pattern with the data policy link only — no duplicate
- * download row.
+ * Export ownership (merge #229 × #231; redesign t_f13fcb1c): the results
+ * header (DirectoryCatalog) renders the CSV/GeoJSON downloads as buttons
+ * with the current type/freshness filters applied (exportHrefs); the
+ * data-actions footer below keeps the guide/regole pattern with the data
+ * policy link only — no duplicate download row.
  */
 export function DirectoryTool() {
   const t = useMessages().directory;
   const router = useRouter();
-  const { filters, qInput, setQ, setType, setFreshness, setSort, reset } = useCameraFilters();
+  const { filters, qInput, setQ, setType, setFreshness, setSort, setPage, reset } = useCameraFilters();
   const serverFilters = useMemo(() => serverFiltersFrom(filters), [filters]);
   const { records } = usePublicCameras({
     seed: publicRecords(prototypeRecords),
@@ -89,6 +91,8 @@ export function DirectoryTool() {
         setFreshnessFilter={setFreshness}
         sortOrder={filters.sort}
         setSortOrder={setSort}
+        page={filters.page}
+        setPage={setPage}
         showRecordOnMap={showRecordOnMap}
         setCoordinates={() => {}}
         onResetFilters={reset}
