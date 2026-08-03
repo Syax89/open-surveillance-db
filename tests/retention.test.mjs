@@ -802,6 +802,97 @@ test("R16: the bounded sweep drains >100 stale rows across multiple rounds in on
   assert.equal(await count("login_attempts"), 1, "only the fresh row survives");
 });
 
+// ---------------------------------------------------------------------------
+// R12 — demo records (QA#4 finding B) + email_send_log (QA#4 finding A)
+// ---------------------------------------------------------------------------
+
+test("R12: demo records are purged WITH their evidence outside development (QA#4 finding B)", async () => {
+  // Fail-closed default: ENVIRONMENT unset behaves as production.
+  delete runtime.env.ENVIRONMENT;
+  const demo = await insertCamera({ title: "Demo A", status: "demo", createdAt: daysBefore(200) });
+  await insertPhoto({ cameraId: demo, status: "pending", createdAt: daysBefore(100), storageKey: "demo-evidence.jpg" });
+  const verified = await insertCamera({ title: "Verified B", status: "verified", createdAt: daysBefore(200) });
+  // A rejected record near its R2 cutoff must NOT be confused with a demo row:
+  // the reject decision is recent, so R2 leaves it alone and only R12 is
+  // entitled to touch `demo` rows anyway.
+  const rejected = await insertCamera({ title: "Rejected C", status: "rejected", createdAt: daysBefore(200) });
+  await insertRejectEvent(rejected, daysBefore(5));
+
+  const { r2, deletedKeys } = makeR2Spy();
+  const summary = await runtime.retention.runRetentionSweep(NOW, { r2 });
+
+  assert.equal(summary.demoRecordsPurged, 1, "the demo record is hard-deleted");
+  assert.equal(await count("cameras", "id = ?", demo), 0, "the demo row is gone");
+  assert.equal(await count("photos", "storage_key = 'demo-evidence.jpg'"), 0, "its evidence is deleted with it (R6)");
+  assert.deepEqual(deletedKeys, ["demo-evidence.jpg"], "the R2 object follows the D1 row");
+  assert.equal(await count("cameras", "id = ?", verified), 1, "non-demo records are untouched");
+  assert.equal(await count("cameras", "title = 'Rejected C'"), 1, "rejected records are NOT swept by R12 (no time window applies)");
+  assert.equal(summary.rejectedPurged, 0, "the R2 sweep needs the 30-day reject window, not the demo purge");
+  assert.equal(summary.failures, 0);
+});
+
+test("R12: ENVIRONMENT=development keeps the illustrative demo rows (local seed guard)", async () => {
+  const previous = runtime.env.ENVIRONMENT;
+  runtime.env.ENVIRONMENT = "development";
+  try {
+    const demo = await insertCamera({ title: "Demo Dev", status: "demo", createdAt: daysBefore(200) });
+    await insertPhoto({ cameraId: demo, status: "pending", createdAt: daysBefore(100), storageKey: "demo-dev.jpg" });
+
+    const summary = await runtime.retention.runRetentionSweep(NOW);
+
+    assert.equal(summary.demoRecordsPurged, 0, "no R12 purge in development");
+    assert.equal(await count("cameras", "id = ?", demo), 1, "the illustrative seed survives locally");
+    assert.equal(await count("photos", "storage_key = 'demo-dev.jpg'"), 1, "its evidence survives too");
+  } finally {
+    if (previous === undefined) delete runtime.env.ENVIRONMENT;
+    else runtime.env.ENVIRONMENT = previous;
+  }
+});
+
+test("email_send_log: rows older than the 30-day window are purged, fresh ones survive (QA#4 finding A)", async () => {
+  const contributor = await runtime.env.DB.prepare(
+    "INSERT INTO contributors (email, display_name, password_hash, created_at, updated_at) VALUES (?, 'Mail Log', 'pbkdf2$1$x$y', ?, ?) RETURNING id",
+  )
+    .bind("mail-log@example.com", NOW, NOW)
+    .first();
+  const insertLog = async (sentAt) =>
+    runtime.env.DB.prepare(
+      "INSERT INTO email_send_log (contributor_id, kind, sent_at) VALUES (?, 'verify', ?)",
+    ).bind(contributor.id, sentAt).run();
+
+  await insertLog(daysBefore(31)); // past the cutoff → purged
+  await insertLog(daysBefore(30)); // exactly 30d → survives (strict <)
+  await insertLog(daysBefore(1)); // fresh → survives
+  await insertLog(daysBefore(400)); // very stale → purged
+
+  const summary = await runtime.retention.runRetentionSweep(NOW);
+
+  assert.equal(summary.emailSendLogPurged, 2, "only rows strictly older than 30 days are removed");
+  assert.equal(await count("email_send_log"), 2, "the 30d-boundary and the fresh row survive");
+  assert.equal(await count("email_send_log", "sent_at < ?", daysBefore(30)), 0, "no row past the cutoff survives");
+  assert.equal(summary.failures, 0);
+});
+
+test("email_send_log: the sweep is driven by the policy knob (retention-contract alignment)", async () => {
+  const contributor = await runtime.env.DB.prepare(
+    "INSERT INTO contributors (email, display_name, password_hash, created_at, updated_at) VALUES (?, 'Mail Log 2', 'pbkdf2$1$x$y', ?, ?) RETURNING id",
+  )
+    .bind("mail-log2@example.com", NOW, NOW)
+    .first();
+  await runtime.env.DB.prepare(
+    "INSERT INTO email_send_log (contributor_id, kind, sent_at) VALUES (?, 'verify', ?)",
+  ).bind(contributor.id, daysBefore(10)).run();
+
+  // A 10-day-old row survives the default 30d policy but is purged by a
+  // custom 5-day policy — proves the window comes from RetentionPolicy.
+  const summary = await runtime.retention.runRetentionSweep(NOW, {
+    policy: { ...runtime.retention.DEFAULT_RETENTION_POLICY, emailSendLogDays: 5 },
+  });
+
+  assert.equal(summary.emailSendLogPurged, 1);
+  assert.equal(await count("email_send_log"), 0);
+});
+
 function daysAfter(days) {
   return new Date(Date.parse(NOW) + days * day).toISOString();
 }

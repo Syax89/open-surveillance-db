@@ -18,6 +18,11 @@
  *                                       photos after 30 days (R13: anchored on
  *                                       the photo reject event)
  *   R7  sessions                      → delete expired / revoked rows
+ *   R12 demo records                  → hard-deleted on every sweep outside
+ *                                       ENVIRONMENT=development (the demo
+ *                                       seed is a LOCAL fixture; there is
+ *                                       no time window — the schedule says
+ *                                       "purged before public launch")
  *   R15 auth rows                     → expired email-verification tokens
  *                                       (24h TTL) and lapsed WebAuthn
  *                                       challenge rows (10-min TTL) purged
@@ -78,6 +83,7 @@
  *    injectable so tests can assert object deletion without a binding.
  */
 
+import { env } from "cloudflare:workers";
 import { getD1 } from "./cameras";
 import { runFreshnessSweep } from "./moderation";
 import { addMonths } from "./freshness";
@@ -185,6 +191,12 @@ export type RetentionSummary = {
   /** QA F5: per-IP registration log rows older than the cap window removed (30 days). */
   registrationIpLogPurged: number;
   /** QA F5: email send-log rows older than the mail budget window removed (24 hours). */
+  /**
+   * R12: `demo` records hard-deleted (with their evidence) on every sweep
+   * outside ENVIRONMENT=development — the demo seed is a LOCAL fixture and
+   * the schedule says "purged before public launch" (no time window).
+   */
+  demoRecordsPurged: number;
   emailSendLogPurged: number;
   /** Records/chunks whose D1 or R2 step threw; the sweep skipped them and continued. */
   failures: number;
@@ -337,6 +349,7 @@ export async function runRetentionSweep(
     challengesPurged: 0,
     loginAttemptsPurged: 0,
     registrationIpLogPurged: 0,
+    demoRecordsPurged: 0,
     emailSendLogPurged: 0,
     failures: 0,
     moderationEventsRetained: 0,
@@ -384,6 +397,41 @@ export async function runRetentionSweep(
     } catch (error) {
       summary.failures += 1;
       console.error(`Retention: R3 removal failed for camera ${id}`, error);
+    }
+  }
+
+  // --- R12 (ADR 0008 demo gate, audit CTO #7 / t_d7a4b99b): `demo` records
+  // are prototype-only and must be purged before public launch
+  // (RETENTION_SCHEDULE.md R12: "Fictional, clearly labelled content; not
+  // personal data"). scripts/demo-cameras.sql is the ONLY place demo data is
+  // created and migration 0017 removed the demo identities but NOT the demo
+  // cameras, so a DB that was ever seeded (or promoted from dev) still holds
+  // the illustrative rows. The fail-closed gate demoRecordsPublic()
+  // (db/cameras.ts) hides them from every public surface, but hiding is not
+  // deleting — the sweep hard-deletes each `demo` record WITH its evidence
+  // (R6) and closes its queue items, reusing purgeCameraRecord so the
+  // destructive work stays one atomic d1.batch (same law of R1/R2).
+  // The env guard mirrors demoRecordsPublic() EXACTLY: only the exact value
+  // "development" keeps the illustrative rows; unset or any other value
+  // behaves as production (fail-closed, worker-configuration.d.ts). There is
+  // deliberately NO time window and NO hold/appeal exemption: the schedule
+  // says "purged before public launch" and demo rows are fictional content,
+  // not real data under legal protection.
+  if (env.ENVIRONMENT !== "development") {
+    const demos = await d1
+      .prepare("SELECT id FROM cameras WHERE status = 'demo'")
+      .all<{ id: number }>();
+    for (const { id } of demos.results) {
+      try {
+        const { photoRows, r2Deleted, r2Failed } = await purgeCameraRecord(d1, r2, id, now);
+        summary.photosDeleted += photoRows;
+        summary.r2ObjectsDeleted += r2Deleted;
+        summary.r2ObjectsFailed += r2Failed;
+        summary.demoRecordsPurged += 1;
+      } catch (error) {
+        summary.failures += 1;
+        console.error(`Retention: R12 demo purge failed for camera ${id}`, error);
+      }
     }
   }
 

@@ -1,28 +1,32 @@
-// QA #4 — riproduzione finding retention (t_56d09899).
+// QA #4 — riproduzione finding retention (t_56d09899), convertito da
+// "documenta il comportamento attuale" a test rosso→verde con asserzioni
+// (t_a852d1a4).
 //
 // Finding candidato A: `email_send_log` (migration 0029, ADR 0020 rate-limit
-// 3/h) non ha NESSUNA sweep nel retention cron. R7/R15/R16 coprono sessions,
-// email_verification_tokens, webauthn_challenges e login_attempts, ma le
-// righe di email_send_log vivono per sempre finché l'account non viene
-// cancellato (l'unico DELETE è in db/auth.ts deleteAccount). Ogni email
-// inviata = 1 riga; un contributore attivo che usa il limite 3/h accumula
-// ~90 righe/mese di puro garbage (il rate-limit conta solo la finestra 1h).
+// 3/h) non aveva NESSUNA sweep nel retention cron: le righe vivevano per
+// sempre finché l'account non veniva cancellato (l'unico DELETE era la
+// cascade di db/auth.ts deleteAccount). Ogni email inviata = 1 riga; un
+// contributore attivo che usa il limite 3/h accumula ~90 righe/mese di puro
+// garbage (il rate-limit conta solo la finestra 1h).
 //
 // Finding candidato B: R12 (`demo` records, RETENTION_SCHEDULE.md "Purged
-// before public launch") NON ha alcuna implementazione nel retention sweep:
-// le query R1/R2/R3 filtrano solo pending/rejected/needs_review/stale e il
-// gate fail-closed (demoRecordsPublic) le nasconde dalle superfici pubbliche,
-// ma le righe demo restano nel DB di produzione per sempre se qualcuno ha
-// eseguito `npm run db:seed` (o in un DB promosso da dev).
+// before public launch") NON aveva alcuna implementazione nel retention
+// sweep: il gate fail-closed (demoRecordsPublic) nasconde le righe dalle
+// superfici pubbliche, ma le righe demo restavano nel DB per sempre se
+// qualcuno aveva eseguito `npm run db:seed` (o in un DB promosso da dev).
 //
-// Il test documenta il COMPORTAMENTO ATTUALE (senza asserzioni di valore):
-// stampa quanti row di ciascuna categoria sopravvivono allo sweep, così il
-// report QA può citare numeri reali.
+// Il test ora ASSERISCE il comportamento corretto:
+//   - email_send_log: le righe oltre la TTL (30d, EMAIL_SEND_LOG_RETENTION_DAYS)
+//     vengono eliminate; la riga fresca sopravvive; il contatore
+//     summary.emailSendLogPurged riflette la sweep;
+//   - demo: le righe `demo` vengono eliminate in produzione (ENVIRONMENT
+//     unset = fail-closed, stessa convenzione di demoRecordsPublic) insieme
+//     alle loro evidence (R6), e SOPRAVVIVONO in ENVIRONMENT=development
+//     (guard R12: il seed illustrativo è un fixture locale);
+//   - sessions (R7): controllo positivo — le sessioni scadute spariscono.
 
-import { test } from "node:test";
-import { readFile } from "node:fs/promises";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+import assert from "node:assert/strict";
+import { after, beforeEach, test } from "node:test";
 import { D1SqliteDatabase } from "./helpers/d1-sqlite.mjs";
 import {
   applyDrizzleMigrations,
@@ -30,98 +34,140 @@ import {
   loadDbRuntime,
 } from "./helpers/db-runtime-harness.mjs";
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-
 let runtime;
 
-async function setup() {
+beforeEach(async () => {
   if (!runtime) runtime = await loadDbRuntime();
   const db = new D1SqliteDatabase();
   await applyDrizzleMigrations(db);
   runtime.env.DB = db;
-  return db;
-}
+  // Fail-closed default: ENVIRONMENT unset behaves as production (same
+  // convention as tests/demo-export-gate.test.mjs).
+  delete runtime.env.ENVIRONMENT;
+});
+
+after(async () => cleanupDbRuntime());
 
 const NOW = "2026-08-01T00:00:00.000Z";
 const day = 86_400_000;
 const daysBefore = (days) => new Date(Date.parse(NOW) - days * day).toISOString();
 
-test("QA#4 riproduzione: email_send_log e demo records dopo runRetentionSweep", async () => {
-  const db = await setup();
-
-  // --- Fixture: un contributore con email_send_log vecchie (90 e 400 giorni).
-  await db
-    .prepare(
-      "INSERT INTO contributors (email, display_name, password_hash, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
-    )
-    .bind("qa-repro@invalid", "QA Repro", "pbkdf2$1$x$y", NOW, NOW)
-    .run();
-  const contributor = await db
-    .prepare("SELECT id FROM contributors WHERE email = ?")
-    .bind("qa-repro@invalid")
+async function count(table, where = "1=1", ...args) {
+  const row = await runtime.env.DB.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE ${where}`)
+    .bind(...args)
     .first();
-  await db
-    .prepare(
-      "INSERT INTO email_send_log (contributor_id, kind, sent_at) VALUES (?, 'verify', ?)",
-    )
-    .bind(contributor.id, daysBefore(90))
-    .run();
-  await db
-    .prepare(
-      "INSERT INTO email_send_log (contributor_id, kind, sent_at) VALUES (?, 'reset', ?)",
-    )
-    .bind(contributor.id, daysBefore(400))
-    .run();
+  return row.n;
+}
 
-  // --- Fixture: una demo camera (come da scripts/demo-cameras.sql).
-  await db
-    .prepare(
-      "INSERT INTO cameras (title, kind, latitude, longitude, status, source, updated, description, created_at) VALUES (?, 'Fixed dome', 41.9, 12.49, 'demo', 'Prototype seed', 'Demo data', 'QA repro demo', ?)",
-    )
+async function seedFixtures() {
+  // Un contributore con email_send_log vecchie (90 e 400 giorni) e una fresca.
+  const contributor = await runtime.env.DB.prepare(
+    "INSERT INTO contributors (email, display_name, password_hash, created_at, updated_at) VALUES (?, ?, ?, ?, ?) RETURNING id",
+  )
+    .bind("qa-repro@invalid", "QA Repro", "pbkdf2$1$x$y", NOW, NOW)
+    .first();
+  await runtime.env.DB.prepare(
+    "INSERT INTO email_send_log (contributor_id, kind, sent_at) VALUES (?, 'verify', ?)",
+  ).bind(contributor.id, daysBefore(90)).run();
+  await runtime.env.DB.prepare(
+    "INSERT INTO email_send_log (contributor_id, kind, sent_at) VALUES (?, 'reset', ?)",
+  ).bind(contributor.id, daysBefore(400)).run();
+  await runtime.env.DB.prepare(
+    "INSERT INTO email_send_log (contributor_id, kind, sent_at) VALUES (?, 'verify', ?)",
+  ).bind(contributor.id, daysBefore(0)).run(); // 0 giorni fa → fresca, deve sopravvivere
+
+  // Una demo camera (come da scripts/demo-cameras.sql) con una foto di
+  // supporto: l'evidence segue il record (R6) anche nella purge R12.
+  const demo = await runtime.env.DB.prepare(
+    "INSERT INTO cameras (title, kind, latitude, longitude, status, source, updated, description, created_at) VALUES (?, 'Fixed dome', 41.9, 12.49, 'demo', 'Prototype seed', 'Demo data', 'QA repro demo', ?) RETURNING id",
+  )
     .bind("QA repro demo record", daysBefore(200))
-    .run();
+    .first();
+  await runtime.env.DB.prepare(
+    "INSERT INTO photos (camera_id, contributor_id, storage_key, mime_type, width, height, size_bytes, status, exif_stripped, redaction_confirmed, created_at, updated_at) VALUES (?, NULL, 'qa-repro-demo.jpg', 'image/jpeg', 100, 100, 1000, 'pending', 1, 0, ?, ?)",
+  ).bind(demo.id, daysBefore(200), daysBefore(200)).run();
 
-  // --- Fixture: sessioni scadute (R7, controllo positivo: DEVE sparire).
-  await db
-    .prepare(
-      "INSERT INTO sessions (token_hash, csrf_token, contributor_id, expires_at, created_at) VALUES (?, ?, ?, ?, ?)",
-    )
-    .bind("deadbeef", "csrf123", contributor.id, daysBefore(1), NOW)
-    .run();
+  // Una sessione scaduta (R7, controllo positivo).
+  await runtime.env.DB.prepare(
+    "INSERT INTO sessions (token_hash, csrf_token, contributor_id, expires_at, created_at) VALUES (?, ?, ?, ?, ?)",
+  ).bind("deadbeef", "csrf123", contributor.id, daysBefore(1), NOW).run();
+}
 
-  const before = {
-    sendLog: await db
-      .prepare("SELECT COUNT(*) AS n FROM email_send_log")
-      .first(),
-    demo: await db
-      .prepare("SELECT COUNT(*) AS n FROM cameras WHERE status = 'demo'")
-      .first(),
-    sessions: await db
-      .prepare("SELECT COUNT(*) AS n FROM sessions")
-      .first(),
-  };
+test("QA#4: sweep produzione — email_send_log e demo records vengono purgati, sessioni pure (rosso→verde)", async () => {
+  await seedFixtures();
 
-  // --- Esegue il retention sweep reale con `now` iniettato.
+  assert.equal(await count("email_send_log"), 3, "fixture: 3 righe di log email");
+  assert.equal(await count("cameras", "status = 'demo'"), 1, "fixture: 1 demo camera");
+  assert.equal(await count("sessions"), 1, "fixture: 1 sessione scaduta");
+
   const { runRetentionSweep } = runtime.retention;
   const summary = await runRetentionSweep(NOW, {});
 
-  const after = {
-    sendLog: await db
-      .prepare("SELECT COUNT(*) AS n FROM email_send_log")
-      .first(),
-    demo: await db
-      .prepare("SELECT COUNT(*) AS n FROM cameras WHERE status = 'demo'")
-      .first(),
-    sessions: await db
-      .prepare("SELECT COUNT(*) AS n FROM sessions")
-      .first(),
-  };
+  // Finding A: le righe oltre la TTL 30d spariscono, la fresca sopravvive.
+  assert.equal(await count("email_send_log"), 1, "le 2 righe vecchie (90d/400d) sono eliminate");
+  assert.equal(await count("email_send_log", "sent_at < ?", daysBefore(30)), 0, "nessuna riga oltre la TTL sopravvive");
+  assert.equal(summary.emailSendLogPurged, 2, "il contatore del summary riflette la sweep");
 
-  console.log("\n=== QA#4 riproduzione retention ===");
-  console.log("email_send_log rows:  before=" + before.sendLog.n + " after=" + after.sendLog.n + "  (atteso: invariato se nessuna sweep R-mail-log)");
-  console.log("demo cameras rows:    before=" + before.demo.n + " after=" + after.demo.n + "  (atteso: invariato se R12 non implementato)");
-  console.log("sessions (R7):        before=" + before.sessions.n + " after=" + after.sessions.n + "  (controllo positivo: deve calare)");
-  console.log("summary.sessionsPurged=" + summary.sessionsPurged);
+  // Finding B: la demo camera è eliminata CON la sua evidence (R6).
+  assert.equal(await count("cameras", "status = 'demo'"), 0, "la demo record è purgata in produzione");
+  assert.equal(summary.demoRecordsPurged, 1, "il contatore R12 riflette la purge");
+  assert.equal(await count("photos", "storage_key = 'qa-repro-demo.jpg'"), 0, "l'evidence della demo è eliminata con il record");
 
-  await cleanupDbRuntime();
+  // Controllo positivo R7: la sessione scaduta sparisce.
+  assert.equal(await count("sessions"), 0);
+  assert.equal(summary.sessionsPurged, 1);
+
+  assert.equal(summary.failures, 0, "nessun errore durante la sweep");
+});
+
+test("QA#4: ENVIRONMENT=development — le demo records SOPRAVVIVONO (guard R12, seed locale)", async () => {
+  await seedFixtures();
+
+  runtime.env.ENVIRONMENT = "development";
+
+  const { runRetentionSweep } = runtime.retention;
+  const summary = await runRetentionSweep(NOW, {});
+
+  assert.equal(await count("cameras", "status = 'demo'"), 1, "il seed illustrativo resta in development");
+  assert.equal(await count("photos", "storage_key = 'qa-repro-demo.jpg'"), 1, "anche la sua evidence resta");
+  assert.equal(summary.demoRecordsPurged, 0, "nessuna purge R12 in development");
+
+  // Le altre sweep NON sono condizionate dall'ambiente: email e sessioni
+  // vengono purgate comunque.
+  assert.equal(await count("email_send_log"), 1, "la sweep email_send_log non dipende da ENVIRONMENT");
+  assert.equal(summary.emailSendLogPurged, 2);
+  assert.equal(await count("sessions"), 0, "la sweep sessioni non dipende da ENVIRONMENT");
+  assert.equal(summary.sessionsPurged, 1);
+
+  delete runtime.env.ENVIRONMENT;
+});
+
+test("QA#4: ENVIRONMENT=production esplicito — stessa purge fail-closed del default", async () => {
+  await seedFixtures();
+
+  runtime.env.ENVIRONMENT = "production";
+
+  const { runRetentionSweep } = runtime.retention;
+  const summary = await runRetentionSweep(NOW, {});
+
+  assert.equal(await count("cameras", "status = 'demo'"), 0, "anche con ENVIRONMENT='production' la demo è purgata");
+  assert.equal(summary.demoRecordsPurged, 1);
+  assert.equal(await count("email_send_log"), 1);
+  assert.equal(summary.emailSendLogPurged, 2);
+
+  delete runtime.env.ENVIRONMENT;
+});
+
+test("QA#4: un valore ENVIRONMENT sconosciuto è trattato come produzione (fail-closed)", async () => {
+  await seedFixtures();
+
+  runtime.env.ENVIRONMENT = "staging";
+
+  const { runRetentionSweep } = runtime.retention;
+  const summary = await runRetentionSweep(NOW, {});
+
+  assert.equal(await count("cameras", "status = 'demo'"), 0, "solo l'esatto valore 'development' tiene le demo");
+  assert.equal(summary.demoRecordsPurged, 1);
+
+  delete runtime.env.ENVIRONMENT;
 });
