@@ -6,6 +6,7 @@ import type { MapCamera } from "../SurveillanceMap";
 import type { ViewportBounds } from "../../lib/map-viewport";
 import type { Camera } from "../../lib/records";
 import { useMessages } from "../LocaleProvider";
+import { publicStatusLabel } from "../../lib/public-status";
 import { popupHtmlFor } from "../../lib/map-popup";
 import { GeocodeSearch } from "./GeocodeSearch";
 import type { GeocodeSuggestion } from "./GeocodeSearch";
@@ -138,7 +139,7 @@ export function MapPanel({ filteredRecords, visibleRecords, selectedId, onSelect
       <div className="live-map-workspace map-split">
         <aside className="map-sidebar" aria-labelledby="map-list-title">
           <GeocodeSearch search={search} onSearchChange={setSearch} onPlaceSelect={handlePlaceSelect} />
-          <MapRecordList filteredRecords={filteredRecords} visibleRecords={visibleRecords} selectedId={selectedId} onSelect={onSelect} onReset={onReset} labels={t} />
+          <MapRecordList filteredRecords={filteredRecords} visibleRecords={visibleRecords} selectedId={selectedId} onSelect={onSelect} onReset={onReset} labels={t} statusLabel={(status) => publicStatusLabel(statuses, status, t.unknown)} />
         </aside>
         <div className="map-panel"><SurveillanceMap cameras={filteredRecords} selectedId={selectedId} focusLocation={focusLocation} onSelect={onSelect} onPick={onPick} directoryHref={directoryHref} onBoundsChange={onBoundsChange} popupHtmlFor={popupHtmlForCamera} /><div className="map-hint">{t.mapHint}</div></div>
       </div>

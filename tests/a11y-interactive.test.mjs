@@ -166,6 +166,51 @@ test("every directory record has a real 'Show on map' button (keyboard path for 
   );
 });
 
+test("every directory record card carries a status dot + text label (status is never colour-only)", async () => {
+  // t_d089a17e: the record rows are colour-accented by status (left rail +
+  // tint). WCAG 1.4.1 requires the dot AND its text label to stay — one
+  // status-dot per card, with a PUBLIC whitelisted status class only.
+  const { html } = await renderRoute("/directory");
+  const recordsSection = html.slice(html.indexOf('id="records"'));
+  const recordCards = (recordsSection.match(/class="record-list-card"/g) ?? []).length;
+  const dots = recordsSection.match(/class="status-dot ([a-z-]+)"/g) ?? [];
+  assert.equal(dots.length, recordCards, `one status dot per card (cards=${recordCards}, dots=${dots.length})`);
+  for (const dot of dots) {
+    assert.match(dot, /status-dot (verified|demo)/, "only whitelisted public statuses may render on the directory");
+  }
+});
+
+test("the status accent is a visible card container + token rail (static guard on globals.css)", async () => {
+  // t_d089a17e (CEO feedback 2026-08-03): the /directory rows must read as
+  // cards (bg + border + radius) with a 3px status rail built from the
+  // --status-* tokens + a precomputed tenue tint; the /mappa sidebar rows
+  // follow the same logic. Colour is paired with the dot+label (asserted
+  // above), so the CSS never relies on colour alone. No global token
+  // changes (the rail references the existing --status-* tokens).
+  const css = await readFile(path.join(root, "app", "globals.css"), "utf8");
+  assert.match(
+    css,
+    /\.directory-tool \.record-list \.record-list-card \{[^}]*border:1px solid var\(--line\)[^}]*border-left-width:3px[^}]*border-radius:var\(--radius-lg\)[^}]*background:#fffef9/,
+    "the /directory row is a visible card container (bg, border, radius, 3px left rail)",
+  );
+  assert.match(
+    css,
+    /\.records-section \.record-list \.record-list-card:has\(\.status-dot\.verified\) \{[^}]*border-left-color:var\(--status-verified\)[^}]*background:#eef6ed/,
+    "the verified rail uses the existing token + a 9% precomputed tint (no new global token)",
+  );
+  assert.match(
+    css,
+    /\.map-record \{[^}]*border:1px solid var\(--line\)[^}]*border-left-width:3px[^}]*border-radius:var\(--radius-md\)[^}]*background:#fff/,
+    "the /mappa sidebar rows get the same visible-container treatment",
+  );
+  assert.match(
+    css,
+    /\.map-record:has\(\.status-dot\.verified\) \{[^}]*border-left-color:var\(--status-verified\)[^}]*background:#f0f8f4/,
+    "the map row rail uses the same token logic (8% tint over #fff)",
+  );
+  assert.match(css, /--status-verified:#42a979/, "the global status tokens are untouched (no ADR needed)");
+});
+
 test("the 'Show on map' action navigates to /mappa with the record preselected (URL focus path)", async () => {
   // F2 home hub: showRecordOnMap moved to /directory (DirectoryTool). The
   // keyboard path for the map-selection task is a router push to /mappa
