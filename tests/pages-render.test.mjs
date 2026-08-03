@@ -52,6 +52,9 @@ const KNOWN_ROUTES = new Set([
   "/api/cameras/nearby", "/api/cameras/search", "/api/cameras/revisions",
   "/api/tiles", "/api/auth/me", "/api/auth/me/submissions", "/api/auth/logout",
   "/api/auth/account", "/api/moderation", "/api/appeals", "/api/corrections",
+  // Multi-method auth (Fase E2): the OIDC /start routes the /login social
+  // buttons point at (302 to the provider).
+  "/api/auth/oidc/github/start", "/api/auth/oidc/google/start",
 ]);
 
 // Pattern di stato non pubblico nel markup statico. `aria-hidden="true"` è un

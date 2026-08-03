@@ -24,6 +24,12 @@
  *      invalid (1-char) name marks the field aria-invalid and sends
  *      nothing, a 429 maps to the localized rate-limit error;
  *   9. a 401 from /api/auth/me renders the "Not logged in" state.
+ *  10. passkey management (Fase E2): the enrolled list renders with the
+ *      enrollment date, enrolling runs the real WebAuthn ceremony flow
+ *      (register/begin -> navigator.credentials.create ->
+ *      register/complete) and shows the once-only recovery codes in the
+ *      accessible dialog, and removing a passkey requires the accessible
+ *      confirm and DELETEs /api/auth/passkey/credentials with CSRF.
  *
  * Fixtures are fictitious (example.test address, made-up titles).
  */
@@ -69,13 +75,50 @@ const emptyContributionsFixture = {
   level: { level: 0, verifiedCount: 0, threshold: 0, nextThreshold: 1 },
 };
 
-function routeHandler({ me = profileFixture, contributions = contributionsFixture } = {}) {
+const passkeyFixture = {
+  credentials: [
+    { id: 1, credentialId: "cred-1", transports: "[\"internal\"]", createdAt: "2026-01-15T10:00:00.000Z" },
+    { id: 2, credentialId: "cred-2", transports: null, createdAt: "2026-03-02T09:00:00.000Z" },
+  ],
+};
+
+function routeHandler({ me = profileFixture, contributions = contributionsFixture, passkeys = [] } = {}) {
   return (input) => {
     if (input === "/api/auth/me") return jsonResponse(me, { status: me === null ? 401 : 200 });
     if (typeof input === "string" && input.startsWith("/api/auth/me/contributions")) {
       return jsonResponse(contributions);
     }
+    if (input === "/api/auth/passkey/credentials") return jsonResponse({ credentials: passkeys });
     return jsonResponse({ error: "unexpected route" }, { status: 404 });
+  };
+}
+
+/** Fake the WebAuthn browser surface (navigator.credentials + the
+ *  PublicKeyCredential constructor) so browserSupportsWebAuthn() passes and
+ *  the ceremony functions return a scriptable credential. */
+function installWebAuthnGlobals(createImpl, getImpl) {
+  globalThis.PublicKeyCredential = class FakePublicKeyCredential {};
+  Object.defineProperty(globalThis.navigator, "credentials", {
+    configurable: true,
+    value: {
+      create: async () => createImpl(),
+      get: async () => getImpl(),
+    },
+  });
+}
+
+/** A PublicKeyCredential-shaped object for the registration ceremony. */
+function fakeRegistrationCredential() {
+  return {
+    id: "cred-new-id",
+    rawId: new Uint8Array([1, 2, 3]).buffer,
+    type: "public-key",
+    response: {
+      clientDataJSON: new Uint8Array([4, 5]).buffer,
+      attestationObject: new Uint8Array([6, 7]).buffer,
+      getTransports: () => ["internal"],
+    },
+    getClientExtensionResults: () => ({}),
   };
 }
 
@@ -242,6 +285,7 @@ test("account: contributions error renders the honest alert, list is not blanked
     if (typeof input === "string" && input.startsWith("/api/auth/me/contributions")) {
       return jsonResponse({ error: "boom" }, { status: 503 });
     }
+    if (input === "/api/auth/passkey/credentials") return jsonResponse({ credentials: [] });
     return jsonResponse({ error: "unexpected route" }, { status: 404 });
   });
 
@@ -409,4 +453,197 @@ test("account: 401 from the profile endpoint renders the not-logged-in state", a
   // Both auth entry points are offered.
   assert.ok(screen.getByRole("link", { name: "Log in" }));
   assert.ok(screen.getByRole("link", { name: "Create account" }));
+});
+
+test("account: enrolled passkeys render with a remove action; empty state is honest", async () => {
+  const { screen, waitFor } = rtl;
+  installFetchMock(routeHandler({ passkeys: passkeyFixture.credentials }));
+
+  await renderWithLocale(React.createElement(AccountPage));
+  await waitFor(() => assert.ok(screen.getByText("Passkeys")));
+  // The section lists each credential with its enrollment date label.
+  const rows = await screen.findAllByRole("button", { name: "Remove" });
+  assert.equal(rows.length, 2);
+  assert.equal(screen.getAllByText(/Enrolled:/).length, 2);
+  assert.ok(screen.getByRole("button", { name: "Add passkey" }));
+
+  rtl.cleanup();
+  installFetchMock(routeHandler());
+  await renderWithLocale(React.createElement(AccountPage));
+  await waitFor(() => assert.ok(screen.getByText("Passkeys")));
+  await waitFor(() => assert.ok(screen.getByText("No passkeys enrolled yet.")));
+});
+
+test("account: enrolling a passkey runs begin -> create -> complete and shows the recovery codes once", async () => {
+  const { screen, waitFor, within } = rtl;
+  const user = rtl.userEvent.setup();
+  const requests = [];
+  installFetchMock((input, init) => {
+    requests.push({ input, init });
+    if (input === "/api/auth/me") return jsonResponse(profileFixture);
+    if (typeof input === "string" && input.startsWith("/api/auth/me/contributions")) {
+      return jsonResponse(contributionsFixture);
+    }
+    if (input === "/api/auth/passkey/credentials") return jsonResponse({ credentials: [] });
+    if (input === "/api/auth/passkey/register/begin") {
+      return jsonResponse({
+        options: {
+          challenge: "begin-challenge-b64",
+          rp: { id: "osdb.test", name: "OpenSurveillanceDB" },
+          user: { id: "MQ", name: "contributor@example.test", displayName: "Fixture Contributor" },
+          pubKeyCredParams: [{ type: "public-key", alg: -7 }],
+          timeout: 60000,
+          attestation: "none",
+          authenticatorSelection: { residentKey: "preferred", userVerification: "preferred" },
+        },
+      });
+    }
+    if (input === "/api/auth/passkey/register/complete") {
+      return jsonResponse({
+        credential: { id: "cred-new-id" },
+        recoveryCodes: ["aaaa-bbbb-cccc-dddd", "eeee-ffff-0000-1111"],
+        recoveryCodesRemaining: 2,
+      });
+    }
+    return jsonResponse({ error: "unexpected route" }, { status: 404 });
+  });
+  installWebAuthnGlobals(() => fakeRegistrationCredential(), () => { throw new Error("unused"); });
+  document.cookie = "osdb_csrf=fixture-csrf-token; path=/";
+
+  await renderWithLocale(React.createElement(AccountPage));
+  await waitFor(() => assert.ok(screen.queryByText("Fixture Contributor")));
+  await user.click(screen.getByRole("button", { name: "Add passkey" }));
+
+  // The once-only recovery codes land in the accessible alertdialog.
+  const dialog = await screen.findByRole("alertdialog");
+  assert.ok(within(dialog).getByText("aaaa-bbbb-cccc-dddd"));
+  assert.ok(within(dialog).getByText("eeee-ffff-0000-1111"));
+
+  // begin carried the CSRF header; complete carried challenge + response.
+  const beginRequest = requests.find((r) => r.input === "/api/auth/passkey/register/begin");
+  assert.ok(beginRequest, "register/begin must be called");
+  assert.equal(beginRequest.init.method, "POST");
+  assert.equal(beginRequest.init.headers["x-csrf-token"], "fixture-csrf-token");
+  const completeRequest = requests.find((r) => r.input === "/api/auth/passkey/register/complete");
+  assert.ok(completeRequest, "register/complete must be called");
+  const completeBody = JSON.parse(completeRequest.init.body);
+  assert.equal(completeBody.challenge, "begin-challenge-b64");
+  assert.equal(completeBody.response.id, "cred-new-id");
+  // rawId [1,2,3] -> base64url "AQID"; attestationObject [6,7] -> "Bgc".
+  assert.equal(completeBody.response.rawId, "AQID");
+  assert.equal(completeBody.response.response.attestationObject, "Bgc");
+  assert.deepEqual(completeBody.response.response.transports, ["internal"]);
+  assert.equal(completeRequest.init.headers["x-csrf-token"], "fixture-csrf-token");
+
+  // Dismissing requires the explicit acknowledgment; the success note is polite.
+  await user.click(within(dialog).getByRole("button", { name: "I saved them" }));
+  await waitFor(() => assert.equal(screen.queryByRole("alertdialog"), null));
+  assert.ok(screen.getByText("Passkey added."));
+});
+
+test("account: cancelling the passkey remove confirm sends no DELETE", async () => {
+  const { screen, within } = rtl;
+  const user = rtl.userEvent.setup();
+  const requests = [];
+  installFetchMock((input, init) => {
+    requests.push({ input, init });
+    if (input === "/api/auth/me") return jsonResponse(profileFixture);
+    if (typeof input === "string" && input.startsWith("/api/auth/me/contributions")) {
+      return jsonResponse(contributionsFixture);
+    }
+    if (input === "/api/auth/passkey/credentials") return jsonResponse(passkeyFixture);
+    return jsonResponse({ error: "unexpected route" }, { status: 404 });
+  });
+  document.cookie = "osdb_csrf=fixture-csrf-token; path=/";
+
+  await renderWithLocale(React.createElement(AccountPage));
+  const removeButtons = await screen.findAllByRole("button", { name: "Remove" });
+  assert.equal(removeButtons.length, 2);
+  await user.click(removeButtons[0]);
+
+  const dialog = await screen.findByRole("alertdialog");
+  assert.ok(screen.getByRole("heading", { name: "Remove this passkey?" }));
+  await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.equal(
+    requests.some((r) => r.input === "/api/auth/passkey/credentials" && r.init?.method === "DELETE"),
+    false,
+    "cancelling must not DELETE",
+  );
+  assert.equal(screen.queryByRole("alertdialog"), null);
+  assert.equal(screen.getAllByRole("button", { name: "Remove" }).length, 2);
+});
+
+test("account: confirming the passkey remove DELETEs /api/auth/passkey/credentials with CSRF", async () => {
+  const { screen, waitFor, within } = rtl;
+  const user = rtl.userEvent.setup();
+  const requests = [];
+  installFetchMock((input, init) => {
+    requests.push({ input, init });
+    if (input === "/api/auth/me") return jsonResponse(profileFixture);
+    if (typeof input === "string" && input.startsWith("/api/auth/me/contributions")) {
+      return jsonResponse(contributionsFixture);
+    }
+    if (input === "/api/auth/passkey/credentials" && init?.method === "DELETE") {
+      return jsonResponse({ ok: true }, { status: 200 });
+    }
+    if (input === "/api/auth/passkey/credentials") return jsonResponse(passkeyFixture);
+    return jsonResponse({ error: "unexpected route" }, { status: 404 });
+  });
+  document.cookie = "osdb_csrf=fixture-csrf-token; path=/";
+
+  await renderWithLocale(React.createElement(AccountPage));
+  const removeButtons = await screen.findAllByRole("button", { name: "Remove" });
+  await user.click(removeButtons[0]);
+  const dialog = await screen.findByRole("alertdialog");
+  await user.click(within(dialog).getByRole("button", { name: "Remove" }));
+
+  await waitFor(() => assert.ok(
+    requests.some((r) => r.input === "/api/auth/passkey/credentials" && r.init?.method === "DELETE"),
+  ));
+  const deleteRequest = requests.find(
+    (r) => r.input === "/api/auth/passkey/credentials" && r.init?.method === "DELETE",
+  );
+  assert.equal(JSON.parse(deleteRequest.init.body).credentialId, "cred-1");
+  assert.equal(deleteRequest.init.headers["x-csrf-token"], "fixture-csrf-token");
+  // The row disappears locally and the dialog closes.
+  await waitFor(() => assert.equal(screen.queryByRole("alertdialog"), null));
+  await waitFor(() => assert.equal(screen.getAllByRole("button", { name: "Remove" }).length, 1));
+});
+
+test("account: a 409 on enroll completion shows the already-enrolled error, no recovery dialog", async () => {
+  const { screen, waitFor } = rtl;
+  const user = rtl.userEvent.setup();
+  installFetchMock((input) => {
+    if (input === "/api/auth/me") return jsonResponse(profileFixture);
+    if (typeof input === "string" && input.startsWith("/api/auth/me/contributions")) {
+      return jsonResponse(contributionsFixture);
+    }
+    if (input === "/api/auth/passkey/credentials") return jsonResponse({ credentials: [] });
+    if (input === "/api/auth/passkey/register/begin") {
+      return jsonResponse({
+        options: {
+          challenge: "begin-challenge-b64",
+          rp: { id: "osdb.test", name: "OpenSurveillanceDB" },
+          user: { id: "MQ", name: "contributor@example.test", displayName: "Fixture Contributor" },
+          pubKeyCredParams: [{ type: "public-key", alg: -7 }],
+        },
+      });
+    }
+    if (input === "/api/auth/passkey/register/complete") {
+      return jsonResponse({ error: "duplicate" }, { status: 409 });
+    }
+    return jsonResponse({ error: "unexpected route" }, { status: 404 });
+  });
+  installWebAuthnGlobals(() => fakeRegistrationCredential(), () => { throw new Error("unused"); });
+  document.cookie = "osdb_csrf=fixture-csrf-token; path=/";
+
+  await renderWithLocale(React.createElement(AccountPage));
+  await waitFor(() => assert.ok(screen.queryByText("Fixture Contributor")));
+  await user.click(screen.getByRole("button", { name: "Add passkey" }));
+
+  await waitFor(() => assert.ok(screen.getByRole("alert")));
+  assert.ok(screen.getByText("This passkey is already enrolled on your account."));
+  assert.equal(screen.queryByRole("alertdialog"), null);
 });

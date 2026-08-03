@@ -6,8 +6,10 @@ import { useRouter } from "next/navigation";
 import { useMessages } from "../components/LocaleProvider";
 import { SiteHeader } from "../components/SiteHeader";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { RecoveryCodesDialog } from "../components/RecoveryCodesDialog";
 import { LevelBadge } from "../components/LevelBadge";
 import type { TrustLevelMeta } from "../lib/trust-levels";
+import { browserSupportsWebAuthn, createCredential } from "../lib/webauthn-client";
 
 /**
  * /account — extended contributor profile (COMMUNITY_PLAN §2.3, C5 + C6).
@@ -60,6 +62,14 @@ type ContributionsPage = {
     totalPages: number;
     hasMore: boolean;
   };
+};
+
+/** Public descriptor of an enrolled passkey (GET /api/auth/passkey/credentials). */
+type Passkey = {
+  id: number;
+  credentialId: string;
+  transports: string | null;
+  createdAt: string;
 };
 
 const PAGE_SIZE = 25;
@@ -124,6 +134,19 @@ export default function AccountPageBody() {
   // window.confirm — C6 deliverable 4: focus management + alertdialog).
   const [confirmDelete, setConfirmDelete] = useState(false);
 
+  // Passkey management (Fase E2): the enrolled list, the enrollment
+  // ceremony state, the removal confirmation and the once-only recovery
+  // codes issued by the /complete route (shown in RecoveryCodesDialog).
+  const [passkeys, setPasskeys] = useState<Passkey[]>([]);
+  const [passkeysLoading, setPasskeysLoading] = useState(true);
+  const [passkeysError, setPasskeysError] = useState<string | null>(null);
+  const [enrolling, setEnrolling] = useState(false);
+  const [enrollError, setEnrollError] = useState<string | null>(null);
+  const [passkeyAdded, setPasskeyAdded] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState<Passkey | null>(null);
+  const [removingId, setRemovingId] = useState<number | null>(null);
+  const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null);
+
   const loadProfile = useCallback(() => {
     const controller = new AbortController();
     fetch("/api/auth/me", { signal: controller.signal })
@@ -182,6 +205,122 @@ export default function AccountPageBody() {
     return () => controller.abort();
   }, [t.errorGeneric]);
 
+  // Passkey list (Fase E2): refreshed after every enrollment/removal so the
+  // section always mirrors the server. A failure renders an honest inline
+  // error and keeps the rest of the page usable.
+  const loadPasskeys = useCallback(() => {
+    const controller = new AbortController();
+    Promise.resolve()
+      .then(() => { setPasskeysLoading(true); setPasskeysError(null); })
+      .then(() => fetch("/api/auth/passkey/credentials", { signal: controller.signal }))
+      .then(async (response) => {
+        if (response.status === 401) {
+          setContributor(null);
+          return;
+        }
+        if (!response.ok) {
+          setPasskeysError(t.passkeysError);
+          return;
+        }
+        const body = (await response.json()) as { credentials?: Passkey[] };
+        setPasskeys(body.credentials ?? []);
+      })
+      .catch((reason: unknown) => {
+        if (reason instanceof Error && reason.name !== "AbortError") setPasskeysError(t.passkeysError);
+      })
+      .finally(() => setPasskeysLoading(false));
+    return () => controller.abort();
+  }, [t.passkeysError]);
+
+  async function onEnrollPasskey() {
+    const csrfToken = readCsrfToken();
+    setEnrollError(null);
+    setPasskeyAdded(false);
+    if (!browserSupportsWebAuthn()) {
+      setEnrollError(t.passkeyUnsupported);
+      return;
+    }
+    setEnrolling(true);
+    try {
+      const beginResponse = await fetch("/api/auth/passkey/register/begin", {
+        method: "POST",
+        headers: csrfToken ? { "x-csrf-token": csrfToken } : {},
+      });
+      if (beginResponse.status === 401 || beginResponse.status === 403) {
+        setEnrollError(beginResponse.status === 403 ? t.errorCrossOrigin : t.passkeySessionLost);
+        return;
+      }
+      if (!beginResponse.ok) {
+        setEnrollError(t.passkeyEnrollError);
+        return;
+      }
+      const { options } = await beginResponse.json() as { options: Parameters<typeof createCredential>[0] };
+
+      // The ceremony itself: throws NotAllowedError when the user cancels
+      // the device prompt — a silent abort, never an error message.
+      const credential = await createCredential(options);
+
+      const completeResponse = await fetch("/api/auth/passkey/register/complete", {
+        method: "POST",
+        headers: { "content-type": "application/json", ...(csrfToken ? { "x-csrf-token": csrfToken } : {}) },
+        body: JSON.stringify({ challenge: options.challenge, response: credential }),
+      });
+      if (completeResponse.status === 409) {
+        setEnrollError(t.passkeyAlreadyEnrolled);
+        return;
+      }
+      if (completeResponse.status === 401) {
+        setEnrollError(t.passkeySessionLost);
+        return;
+      }
+      if (completeResponse.status === 403) {
+        setEnrollError(t.errorCrossOrigin);
+        return;
+      }
+      if (!completeResponse.ok) {
+        setEnrollError(t.passkeyEnrollError);
+        return;
+      }
+      const body = await completeResponse.json() as { credential?: { id: string }; recoveryCodes?: string[] };
+      setRecoveryCodes(body.recoveryCodes ?? []);
+      setPasskeyAdded(true);
+      // Reload the list (the new credential is on the server now); the
+      // returned abort function is the effect-cleanup contract, not
+      // something to call here.
+      void loadPasskeys();
+    } catch (reason) {
+      if (reason instanceof Error && reason.name === "NotAllowedError") return;
+      setEnrollError(t.passkeyEnrollError);
+    } finally {
+      setEnrolling(false);
+    }
+  }
+
+  async function onRemovePasskey(passkey: Passkey) {
+    const csrfToken = readCsrfToken();
+    setPasskeysError(null);
+    setRemovingId(passkey.id);
+    try {
+      const response = await fetch("/api/auth/passkey/credentials", {
+        method: "DELETE",
+        headers: { "content-type": "application/json", ...(csrfToken ? { "x-csrf-token": csrfToken } : {}) },
+        body: JSON.stringify({ credentialId: passkey.credentialId }),
+      });
+      if (!response.ok) {
+        if (response.status === 404) setPasskeysError(t.passkeyNotFound);
+        else if (response.status === 403) setPasskeysError(t.errorCrossOrigin);
+        else setPasskeysError(t.passkeyRemoveError);
+        return;
+      }
+      setConfirmRemove(null);
+      setPasskeys((current) => current.filter((item) => item.id !== passkey.id));
+    } catch {
+      setPasskeysError(t.passkeyRemoveError);
+    } finally {
+      setRemovingId(null);
+    }
+  }
+
   useEffect(() => loadProfile(), [loadProfile]);
 
   useEffect(() => {
@@ -189,6 +328,12 @@ export default function AccountPageBody() {
     const cancel = loadContributions(filter, page);
     return cancel;
   }, [contributor, filter, page, loadContributions]);
+
+  useEffect(() => {
+    if (contributor === null) return;
+    const cancel = loadPasskeys();
+    return cancel;
+  }, [contributor, loadPasskeys]);
 
   // Move focus into the name input when inline editing opens.
   useEffect(() => {
@@ -514,6 +659,60 @@ export default function AccountPageBody() {
               ) : null}
             </section>
 
+            <section aria-labelledby="passkeys-title">
+              <h2 id="passkeys-title">{t.passkeysSection}</h2>
+              <p className="record-detail-summary">{t.passkeysHint}</p>
+
+              {passkeysLoading ? <p>{t.loading}</p> : null}
+
+              {!passkeysLoading && passkeysError ? (
+                <p className="auth-error" role="alert">{passkeysError}</p>
+              ) : null}
+
+              {!passkeysLoading && !passkeysError ? (
+                passkeys.length === 0 ? (
+                  <p className="passkey-empty">{t.passkeysEmpty}</p>
+                ) : (
+                  <ul className="auth-submissions passkey-list" aria-label={t.passkeysSection}>
+                    {passkeys.map((passkey) => {
+                      const enrolledOn = new Date(passkey.createdAt).toLocaleDateString();
+                      return (
+                        <li key={passkey.id} className="passkey-row">
+                          <span className="passkey-kind">
+                            <span className="status-dot verified" aria-hidden="true" />
+                            {t.passkeyEnrolledLabel}: {enrolledOn}
+                          </span>
+                          <button
+                            className="text-button"
+                            type="button"
+                            disabled={removingId === passkey.id}
+                            aria-haspopup="dialog"
+                            onClick={() => setConfirmRemove(passkey)}
+                          >
+                            {removingId === passkey.id ? t.passkeyRemoveBusy : t.passkeyRemove}
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )
+              ) : null}
+
+              {enrollError ? <p className="auth-error" role="alert">{enrollError}</p> : null}
+              {passkeyAdded ? <p className="passkey-added" role="status">{t.passkeyAdded}</p> : null}
+              <div className="passkey-actions">
+                <button
+                  className="button detail-outline"
+                  type="button"
+                  onClick={() => void onEnrollPasskey()}
+                  disabled={enrolling}
+                >
+                  {enrolling ? t.loading : t.passkeyAdd}
+                </button>
+                <small className="auth-method-hint">{t.passkeyAddHelp}</small>
+              </div>
+            </section>
+
             {error ? <p className="auth-error" role="alert">{error}</p> : null}
             <button className="button detail-outline" type="button" onClick={() => void onLogout()}>
               {t.logout}
@@ -549,6 +748,29 @@ export default function AccountPageBody() {
         busy={deleting}
         onConfirm={() => void onDeleteAccount()}
         onCancel={() => setConfirmDelete(false)}
+      />
+
+      <ConfirmDialog
+        open={confirmRemove !== null}
+        title={t.passkeyRemoveConfirm}
+        body={t.passkeyRemoveConfirmBody}
+        confirmLabel={t.passkeyRemove}
+        cancelLabel={t.passkeyRemoveCancel}
+        busyLabel={t.passkeyRemoveBusy}
+        busy={removingId !== null}
+        onConfirm={() => { if (confirmRemove) void onRemovePasskey(confirmRemove); }}
+        onCancel={() => setConfirmRemove(null)}
+      />
+
+      <RecoveryCodesDialog
+        open={recoveryCodes !== null}
+        codes={recoveryCodes ?? []}
+        title={t.recoveryTitle}
+        body={t.recoveryBody}
+        copyLabel={t.recoveryCopy}
+        copiedLabel={t.recoveryCopied}
+        savedLabel={t.recoverySaved}
+        onClose={() => setRecoveryCodes(null)}
       />
     </main>
   );

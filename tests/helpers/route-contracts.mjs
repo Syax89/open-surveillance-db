@@ -102,7 +102,7 @@ export function registeredRoutes() {
         i18n: "client-locale-toggle.test.mjs",
         a11y: "axe-audit.test.mjs",
       },
-      note: "aria-invalid chiuso in F-QA (QA-2026-08-01-2)",
+      note: "aria-invalid chiuso in F-QA (QA-2026-08-01-2); multi-method Fase E2: client-auth-methods.test.mjs (passkey/OIDC/merge)",
     },
     {
       route: "/register",
