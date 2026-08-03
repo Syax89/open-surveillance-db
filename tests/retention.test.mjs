@@ -802,6 +802,53 @@ test("R16: the bounded sweep drains >100 stale rows across multiple rounds in on
   assert.equal(await count("login_attempts"), 1, "only the fresh row survives");
 });
 
+// ---------------------------------------------------------------------------
+// R12 — demo records (QA#4 finding B)
+// ---------------------------------------------------------------------------
+
+test("R12: demo records are purged WITH their evidence outside development (QA#4 finding B)", async () => {
+  // Fail-closed default: ENVIRONMENT unset behaves as production.
+  delete runtime.env.ENVIRONMENT;
+  const demo = await insertCamera({ title: "Demo A", status: "demo", createdAt: daysBefore(200) });
+  await insertPhoto({ cameraId: demo, status: "pending", createdAt: daysBefore(100), storageKey: "demo-evidence.jpg" });
+  const verified = await insertCamera({ title: "Verified B", status: "verified", createdAt: daysBefore(200) });
+  // A rejected record near its R2 cutoff must NOT be confused with a demo row:
+  // the reject decision is recent, so R2 leaves it alone and only R12 is
+  // entitled to touch `demo` rows anyway.
+  const rejected = await insertCamera({ title: "Rejected C", status: "rejected", createdAt: daysBefore(200) });
+  await insertRejectEvent(rejected, daysBefore(5));
+
+  const { r2, deletedKeys } = makeR2Spy();
+  const summary = await runtime.retention.runRetentionSweep(NOW, { r2 });
+
+  assert.equal(summary.demoRecordsPurged, 1, "the demo record is hard-deleted");
+  assert.equal(await count("cameras", "id = ?", demo), 0, "the demo row is gone");
+  assert.equal(await count("photos", "storage_key = 'demo-evidence.jpg'"), 0, "its evidence is deleted with it (R6)");
+  assert.deepEqual(deletedKeys, ["demo-evidence.jpg"], "the R2 object follows the D1 row");
+  assert.equal(await count("cameras", "id = ?", verified), 1, "non-demo records are untouched");
+  assert.equal(await count("cameras", "title = 'Rejected C'"), 1, "rejected records are NOT swept by R12 (no time window applies)");
+  assert.equal(summary.rejectedPurged, 0, "the R2 sweep needs the 30-day reject window, not the demo purge");
+  assert.equal(summary.failures, 0);
+});
+
+test("R12: ENVIRONMENT=development keeps the illustrative demo rows (local seed guard)", async () => {
+  const previous = runtime.env.ENVIRONMENT;
+  runtime.env.ENVIRONMENT = "development";
+  try {
+    const demo = await insertCamera({ title: "Demo Dev", status: "demo", createdAt: daysBefore(200) });
+    await insertPhoto({ cameraId: demo, status: "pending", createdAt: daysBefore(100), storageKey: "demo-dev.jpg" });
+
+    const summary = await runtime.retention.runRetentionSweep(NOW);
+
+    assert.equal(summary.demoRecordsPurged, 0, "no R12 purge in development");
+    assert.equal(await count("cameras", "id = ?", demo), 1, "the illustrative seed survives locally");
+    assert.equal(await count("photos", "storage_key = 'demo-dev.jpg'"), 1, "its evidence survives too");
+  } finally {
+    if (previous === undefined) delete runtime.env.ENVIRONMENT;
+    else runtime.env.ENVIRONMENT = previous;
+  }
+});
+
 function daysAfter(days) {
   return new Date(Date.parse(NOW) + days * day).toISOString();
 }
