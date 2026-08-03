@@ -89,7 +89,7 @@ export async function POST(request: Request) {
 
   const key = callerKey(request);
   const limitOptions = submissionLimits(env);
-  const limit = checkRateLimit("submit", key, limitOptions);
+  const limit = await checkRateLimit(env, "submit", key, limitOptions);
   if (!limit.allowed) {
     console.warn("POST /api/photos rate limited");
     recordRateLimitBlock(env, {
@@ -207,7 +207,7 @@ export async function GET(request: Request) {
   // unthrottled).
   const key = callerKey(request);
   const limitOptions = limitsFor("read", env);
-  const limit = checkRateLimit("read", key, limitOptions);
+  const limit = await checkRateLimit(env, "read", key, limitOptions);
   if (!limit.allowed) {
     console.warn("GET /api/photos rate limited");
     recordRateLimitBlock(env, {

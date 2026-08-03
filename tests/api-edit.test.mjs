@@ -479,7 +479,7 @@ test("E9 the edit bucket is 5/min and independent of the confirm bucket", async 
   // toggle still passes while the edit bucket is exhausted.
   const confirmEnv = { ...env, CONFIRM_RATE_LIMIT_MAX: "30", CONFIRM_RATE_LIMIT_WINDOW_SECONDS: "60" };
   assert.equal(
-    rateLimit.checkRateLimit("confirm", "caller", rateLimit.limitsFor("confirm", confirmEnv)).allowed,
+    (await rateLimit.checkRateLimit({}, "confirm", "caller", rateLimit.limitsFor("confirm", confirmEnv))).allowed,
     true,
     "the confirm bucket must be unaffected by edit-bucket exhaustion",
   );

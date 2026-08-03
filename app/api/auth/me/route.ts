@@ -23,7 +23,7 @@ export async function GET(request: Request) {
     return Response.json({ error: "Request URI too long." }, { status: 414 });
   }
 
-  const blocked = authLimit(request, env, "/api/auth/me");
+  const blocked = await authLimit(request, env, "/api/auth/me");
   if (blocked) return blocked;
 
   try {
@@ -77,7 +77,7 @@ export async function PATCH(request: Request) {
     return Response.json({ error: "Cross-origin request rejected." }, { status: 403, headers: NO_STORE_HEADERS });
   }
 
-  const blocked = authLimit(request, env, "/api/auth/me");
+  const blocked = await authLimit(request, env, "/api/auth/me");
   if (blocked) return blocked;
 
   try {

@@ -56,7 +56,7 @@ export async function PATCH(request: Request) {
   // ever affecting public read traffic.
   const key = callerKey(request);
   const limitOptions = limitsFor("moderate", env);
-  const limit = checkRateLimit("moderate", key, limitOptions);
+  const limit = await checkRateLimit(env, "moderate", key, limitOptions);
   if (!limit.allowed) {
     console.warn("PATCH /api/appeals/[id] rate limited");
     recordRateLimitBlock(env, {

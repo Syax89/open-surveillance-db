@@ -23,7 +23,7 @@ export async function GET(request: Request) {
   // export buckets.
   const key = callerKey(request);
   const limitOptions = limitsFor("revisions", env);
-  const limit = checkRateLimit("revisions", key, limitOptions);
+  const limit = await checkRateLimit(env, "revisions", key, limitOptions);
   if (!limit.allowed) {
     console.warn("GET /api/cameras/revisions rate limited");
     recordRateLimitBlock(env, {

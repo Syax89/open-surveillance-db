@@ -29,7 +29,7 @@ export async function GET(request: Request) {
   // answered 404 without touching storage and are not counted.
   const key = callerKey(request);
   const limitOptions = limitsFor("read", env);
-  const limit = checkRateLimit("read", key, limitOptions);
+  const limit = await checkRateLimit(env, "read", key, limitOptions);
   if (!limit.allowed) {
     console.warn("GET /api/photos/[id] rate limited");
     recordRateLimitBlock(env, {

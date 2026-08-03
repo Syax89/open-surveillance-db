@@ -44,7 +44,7 @@ export async function POST(request: Request) {
 
   const key = callerKey(request);
   const limitOptions = submissionLimits(env);
-  const limit = checkRateLimit("submit", key, limitOptions);
+  const limit = await checkRateLimit(env, "submit", key, limitOptions);
   if (!limit.allowed) {
     console.warn("POST /api/corrections rate limited");
     recordRateLimitBlock(env, {

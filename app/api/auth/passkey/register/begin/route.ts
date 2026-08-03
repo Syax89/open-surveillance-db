@@ -35,7 +35,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "Cross-origin request rejected." }, { status: 403 });
   }
 
-  const blocked = authLimit(request, env, "/api/auth/passkey/register/begin");
+  const blocked = await authLimit(request, env, "/api/auth/passkey/register/begin");
   if (blocked) return blocked;
 
   try {

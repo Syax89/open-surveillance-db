@@ -219,7 +219,7 @@ export async function GET(request: Request) {
   // otherwise hammer the community geocoder past its usage policy.
   const key = callerKey(request);
   const limitOptions = geocodeLimits(env);
-  const limit = checkRateLimit("geocode", key, limitOptions);
+  const limit = await checkRateLimit(env, "geocode", key, limitOptions);
   if (!limit.allowed) {
     console.warn("GET /api/geocode rate limited");
     recordRateLimitBlock(env, {
