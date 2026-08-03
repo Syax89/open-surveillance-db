@@ -299,6 +299,31 @@ Alternatives and rules:
   the same rule).
 - `.wrangler/` is gitignored; local state is never committed.
 
+### 6.1 Working copies: one active copy per task
+
+Two rules keep the repository copies in sync and the critical paths safe:
+
+1. **One active working copy per task.** Work on a task in a single
+   checkout/worktree, on a dedicated branch
+   (`feature/<owner>/t_<task-id>-<slug>`), never in parallel copies. When the
+   task is done, push the branch and return the copy to `main`; do not leave
+   a second checkout parked on a stale branch with uncommitted leftovers.
+
+2. **No uncommitted files on critical paths at the end of a session.**
+   At the end of a session the working tree must be clean on the critical
+   paths: auth routes (`app/api/auth/`, `app/api/appeals/`,
+   `app/lib/csrf.ts`), the data layer (`db/*.ts`), and the migration set
+   (`drizzle/*.sql`, `drizzle/meta/_journal.json`,
+   `drizzle/meta/*_snapshot.json`). Uncommitted migration files (SQL +
+   journal + snapshot) are the worst case: they silently desync the local
+   database and `db:generate` from the branch for every later contributor.
+   If the work is not ready to commit, stash it on the dedicated branch —
+   never leave it in the working tree.
+
+These rules were introduced after QA #4 (PR #276) found a shared checkout
+with 8 uncommitted files including a migration (0033) and its
+journal/snapshot, which exposed local databases to migration drift.
+
 ## 7. Troubleshooting
 
 | Symptom | Cause | Fix |
