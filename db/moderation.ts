@@ -1,3 +1,4 @@
+import type { D1PreparedStatement } from "cloudflare:workers";
 import { getD1, type CameraRecord } from "./cameras";
 import type { CorrectionRequest } from "./corrections";
 import { listPendingPhotos, type PendingPhotoReport } from "./photos";
@@ -251,6 +252,18 @@ async function getModerationD1() {
 export type ModerationD1 = Awaited<ReturnType<typeof getModerationD1>>;
 
 /**
+ * One statement result from `d1.batch(...)`. The `cloudflare:workers` type
+ * declares `batch` as `Promise<unknown[]>`, so read-backs cast through this
+ * shape (P1-2 atomic write path): a RETURNING statement populates `results`,
+ * everything else only `meta`.
+ */
+type D1BatchResult = {
+  success: boolean;
+  results: Record<string, unknown>[];
+  meta: { changes: number; lastRowId: number };
+};
+
+/**
  * Reopens an entity's moderation queue item after an upheld appeal (the old
  * row is `closed`, so the partial unique index permits a fresh open row).
  * The reopened item returns to `queued` for a fresh decision by a different
@@ -362,16 +375,22 @@ async function getOrCreateQueueItem(
   return created;
 }
 
-async function updateQueueState(
+/**
+ * Statement builder for the queue state UPDATE. The `AND state != 'closed'`
+ * guard mirrors the partial unique index: a closed queue row is never
+ * touched again, so a late decision on an already-closed item is a no-op
+ * instead of re-opening history (P1-2).
+ */
+function buildQueueStateStatement(
   d1: ModerationD1,
   queueId: number,
   state: QueueState,
   extra: { secondReviewerId?: number | null; escalationReason?: string | null } = {},
-): Promise<ModerationQueueItem> {
+): D1PreparedStatement {
   const now = new Date().toISOString();
-  const result = await d1
+  return d1
     .prepare(
-      `UPDATE moderation_queue SET state = ?, updated_at = ?, second_reviewer_id = COALESCE(?, second_reviewer_id), escalation_reason = COALESCE(?, escalation_reason) WHERE id = ?`,
+      `UPDATE moderation_queue SET state = ?, updated_at = ?, second_reviewer_id = COALESCE(?, second_reviewer_id), escalation_reason = COALESCE(?, escalation_reason) WHERE id = ? AND state != 'closed'`,
     )
     .bind(
       state,
@@ -379,15 +398,30 @@ async function updateQueueState(
       extra.secondReviewerId ?? null,
       extra.escalationReason ?? null,
       queueId,
-    )
-    .run() as { meta: { changes: number } };
-  if (result.meta.changes === 0) throw new Error("Moderation queue item could not be updated");
-  // SQLite does not allow JOINs inside RETURNING, so the fresh state is read
-  // back with the reviewer display names in a separate statement.
-  const updated = await d1
+    );
+}
+
+/**
+ * Statement builder for the queue readback SELECT (SQLite cannot JOIN inside
+ * RETURNING, so the reviewer display names are read back separately).
+ */
+function buildQueueReadbackStatement(d1: ModerationD1, queueId: number): D1PreparedStatement {
+  return d1
     .prepare(`SELECT ${queueSelect} ${queueJoin} WHERE q.id = ?`)
-    .bind(queueId)
-    .first<ModerationQueueItem>();
+    .bind(queueId);
+}
+
+export async function updateQueueState(
+  d1: ModerationD1,
+  queueId: number,
+  state: QueueState,
+  extra: { secondReviewerId?: number | null; escalationReason?: string | null } = {},
+): Promise<ModerationQueueItem> {
+  const result = (await buildQueueStateStatement(d1, queueId, state, extra).run()) as {
+    meta: { changes: number };
+  };
+  if (result.meta.changes === 0) throw new Error("Moderation queue item could not be updated");
+  const updated = await buildQueueReadbackStatement(d1, queueId).first<ModerationQueueItem>();
   if (!updated) throw new Error("Moderation queue item could not be updated");
   return updated;
 }
@@ -539,40 +573,60 @@ export async function runFreshnessSweep(nowIso: string = new Date().toISOString(
     .prepare("SELECT id FROM cameras WHERE status = 'verified' AND review_due_at IS NOT NULL AND review_due_at < ?")
     .bind(nowIso)
     .all<{ id: number }>();
+  const dueStatements: D1PreparedStatement[] = [];
   for (const { id } of due.results) {
-    await d1
-      .prepare("UPDATE cameras SET status = 'needs_review', updated = ? WHERE id = ?")
-      .bind(nowIso, id)
-      .run();
-    await createModerationEvent(d1, {
-      entity: "camera",
-      entityId: id,
-      previousStatus: "verified",
-      newStatus: "needs_review",
-      action: "scheduled-expiry",
-      reasonCode: "inaccurate-or-outdated",
-      note: "Review window elapsed; re-verification required before the record can be public again.",
-    });
+    // UPDATE + guarded event pair: the event only lands when the UPDATE
+    // actually moved the record (same atomic pair as the decision batches).
+    dueStatements.push(
+      d1.prepare("UPDATE cameras SET status = 'needs_review', updated = ? WHERE id = ?").bind(nowIso, id),
+      buildGuardedEventStatement(
+        d1,
+        {
+          entity: "camera",
+          entityId: id,
+          previousStatus: "verified",
+          newStatus: "needs_review",
+          action: "scheduled-expiry",
+          reasonCode: "inaccurate-or-outdated",
+          note: "Review window elapsed; re-verification required before the record can be public again.",
+        },
+        "cameras",
+        id,
+        "needs_review",
+      ),
+    );
   }
 
   const unconfirmed = await d1
     .prepare("SELECT id FROM cameras WHERE status = 'needs_review' AND review_due_at IS NOT NULL AND review_due_at < ?")
     .bind(staleThreshold)
     .all<{ id: number }>();
+  const unconfirmedStatements: D1PreparedStatement[] = [];
   for (const { id } of unconfirmed.results) {
-    await d1
-      .prepare("UPDATE cameras SET status = 'stale', updated = ? WHERE id = ?")
-      .bind(nowIso, id)
-      .run();
-    await createModerationEvent(d1, {
-      entity: "camera",
-      entityId: id,
-      previousStatus: "needs_review",
-      newStatus: "stale",
-      action: "expiry-not-reconfirmed",
-      reasonCode: "inaccurate-or-outdated",
-      note: `No re-verification within ${STALE_GRACE_DAYS} days of the scheduled review.`,
-    });
+    unconfirmedStatements.push(
+      d1.prepare("UPDATE cameras SET status = 'stale', updated = ? WHERE id = ?").bind(nowIso, id),
+      buildGuardedEventStatement(
+        d1,
+        {
+          entity: "camera",
+          entityId: id,
+          previousStatus: "needs_review",
+          newStatus: "stale",
+          action: "expiry-not-reconfirmed",
+          reasonCode: "inaccurate-or-outdated",
+          note: `No re-verification within ${STALE_GRACE_DAYS} days of the scheduled review.`,
+        },
+        "cameras",
+        id,
+        "stale",
+      ),
+    );
+  }
+
+  // Flush in chunks of at most 100 statements (50 records) — the D1 batch cap.
+  const statements = [...dueStatements, ...unconfirmedStatements];
+  for (let offset = 0; offset < statements.length; offset += 100) {
+    await d1.batch(statements.slice(offset, offset + 100));
   }
 
   return { scheduledExpiry: due.results.length, becameStale: unconfirmed.results.length };
@@ -616,12 +670,18 @@ export async function recordModerationEvent(
   return createModerationEvent(d1, event);
 }
 
-async function createModerationEvent(
+/**
+ * Statement builder for the append-only audit event. Kept as the single source
+ * of the INSERT ... RETURNING SQL so decision batches can include the event
+ * atomically (P1-2) instead of awaiting a second write after the entity
+ * UPDATE. `createdAt` is fixed at build time, same as the old createModerationEvent.
+ */
+export function buildModerationEventStatement(
   d1: ModerationD1,
   event: ModerationEventInput,
-): Promise<ModerationEvent> {
+): D1PreparedStatement {
   const createdAt = new Date().toISOString();
-  const result = await d1
+  return d1
     .prepare(
       `INSERT INTO moderation_events (entity, entity_id, previous_status, new_status, action, reason_code, note, actor, reviewer_id, actor_role, recused, escalated, second_reviewer_id, appeal_id, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -643,9 +703,59 @@ async function createModerationEvent(
       event.secondReviewerId ?? null,
       event.appealId ?? null,
       createdAt,
-    )
-    .first<ModerationEvent>();
+    );
+}
 
+/**
+ * Guarded audit-event INSERT for decision batches (P1-2 atomic write path).
+ * Same columns as buildModerationEventStatement, but the row is built with
+ * `INSERT ... SELECT ... WHERE EXISTS` so the event only lands when the
+ * entity's row already carries the decision's `expectedStatus` — i.e. the
+ * UPDATE that ran just before this statement in the same batch actually
+ * applied. A double-moderation race (UPDATE matched 0 rows) leaves the
+ * EXISTS check on the pre-decision status and no event is recorded.
+ */
+function buildGuardedEventStatement(
+  d1: ModerationD1,
+  event: ModerationEventInput,
+  guardTable: string,
+  guardId: number,
+  expectedStatus: string,
+): D1PreparedStatement {
+  const createdAt = new Date().toISOString();
+  return d1
+    .prepare(
+      `INSERT INTO moderation_events (entity, entity_id, previous_status, new_status, action, reason_code, note, actor, reviewer_id, actor_role, recused, escalated, second_reviewer_id, appeal_id, created_at)
+       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+       WHERE EXISTS (SELECT 1 FROM ${guardTable} WHERE id = ? AND status = ?)
+       RETURNING id, entity, entity_id AS entityId, previous_status AS previousStatus, new_status AS newStatus, action, reason_code AS reasonCode, note, actor, reviewer_id AS reviewerId, actor_role AS actorRole, recused, escalated, second_reviewer_id AS secondReviewerId, appeal_id AS appealId, created_at AS createdAt`,
+    )
+    .bind(
+      event.entity,
+      event.entityId,
+      event.previousStatus,
+      event.newStatus,
+      event.action,
+      event.reasonCode,
+      event.note,
+      event.actor ?? event.reviewer?.displayName ?? localModerator,
+      event.reviewer?.id ?? null,
+      event.reviewer?.role ?? null,
+      event.recused ? 1 : 0,
+      event.escalated ? 1 : 0,
+      event.secondReviewerId ?? null,
+      event.appealId ?? null,
+      createdAt,
+      guardId,
+      expectedStatus,
+    );
+}
+
+async function createModerationEvent(
+  d1: ModerationD1,
+  event: ModerationEventInput,
+): Promise<ModerationEvent> {
+  const result = await buildModerationEventStatement(d1, event).first<ModerationEvent>();
   if (!result) throw new Error("Moderation event could not be recorded");
   return result;
 }
@@ -719,22 +829,28 @@ export async function moderateCamera(
   if (action === "escalate") {
     if (!context) return { kind: "forbidden" };
     if (!note) return { kind: "escalation_requires_note" };
-    const updatedQueue = await updateQueueState(d1, queue.id!, "escalated", {
-      escalationReason: note,
-    });
-    const event = await createModerationEvent(d1, {
-      entity: "camera",
-      entityId: id,
-      previousStatus: current.status,
-      newStatus: current.status,
-      action,
-      reasonCode,
-      note,
-      reviewer,
-      recused: false,
-      escalated: true,
-      secondReviewerId: null,
-    });
+    // One batch: escalate the queue + record the intent event + read back the
+    // queue state. The intent event is a plain INSERT (no status guard — it
+    // records the decision intent, not a status transition).
+    const results = (await d1.batch([
+      buildQueueStateStatement(d1, queue.id!, "escalated", { escalationReason: note }),
+      buildModerationEventStatement(d1, {
+        entity: "camera",
+        entityId: id,
+        previousStatus: current.status,
+        newStatus: current.status,
+        action,
+        reasonCode,
+        note,
+        reviewer,
+        recused: false,
+        escalated: true,
+        secondReviewerId: null,
+      }),
+      buildQueueReadbackStatement(d1, queue.id!),
+    ])) as D1BatchResult[];
+    const event = results[1].results?.[0] as ModerationEvent;
+    const updatedQueue = (results[2].results?.[0] as ModerationQueueItem | undefined) ?? queue;
     return { kind: "ok", item: (await loadCamera(d1, id))!, event, queue: updatedQueue };
   }
 
@@ -748,20 +864,25 @@ export async function moderateCamera(
 
   if (needsSecondReview && queue.state !== "second_review") {
     // First reviewer acts: record the intent; the status is not final yet.
-    const event = await createModerationEvent(d1, {
-      entity: "camera",
-      entityId: id,
-      previousStatus: current.status,
-      newStatus: current.status,
-      action,
-      reasonCode,
-      note,
-      reviewer,
-      recused: false,
-      escalated: false,
-      secondReviewerId: null,
-    });
-    const updatedQueue = await updateQueueState(d1, queue.id!, "second_review");
+    const results = (await d1.batch([
+      buildModerationEventStatement(d1, {
+        entity: "camera",
+        entityId: id,
+        previousStatus: current.status,
+        newStatus: current.status,
+        action,
+        reasonCode,
+        note,
+        reviewer,
+        recused: false,
+        escalated: false,
+        secondReviewerId: null,
+      }),
+      buildQueueStateStatement(d1, queue.id!, "second_review"),
+      buildQueueReadbackStatement(d1, queue.id!),
+    ])) as D1BatchResult[];
+    const event = results[0].results?.[0] as ModerationEvent;
+    const updatedQueue = (results[2].results?.[0] as ModerationQueueItem | undefined) ?? queue;
     return {
       kind: "second_review_pending",
       item: (await loadCamera(d1, id))!,
@@ -791,9 +912,82 @@ export async function moderateCamera(
   const refreshClock = action === "approve" || action === "reverify";
   const publishMetadata = current.status === "pending" && action === "approve";
 
-  let item: ModerationCameraRecord | null = null;
+  const transitionStatement = buildCameraTransitionStatement(
+    d1,
+    id,
+    current.status,
+    transition,
+    nowIso,
+    publishMetadata,
+    refreshClock,
+    metadataPublication,
+  );
+  // The decision event is guarded on the record's post-decision status: it
+  // only lands when the UPDATE above actually applied (P1-2 race guard).
+  const eventStatement = buildGuardedEventStatement(
+    d1,
+    {
+      entity: "camera",
+      entityId: id,
+      previousStatus: current.status,
+      newStatus: transition.newStatus,
+      action,
+      reasonCode,
+      note,
+      reviewer,
+      recused: false,
+      escalated: false,
+      secondReviewerId,
+    },
+    "cameras",
+    id,
+    transition.newStatus,
+  );
+
+  if (context) {
+    // ONE batch: camera UPDATE, guarded event, queue close, queue readback.
+    const results = (await d1.batch([
+      transitionStatement,
+      eventStatement,
+      buildQueueStateStatement(d1, queue.id!, "closed", {
+        secondReviewerId: secondReviewerId ?? (needsSecondReview ? reviewer!.id : null),
+      }),
+      buildQueueReadbackStatement(d1, queue.id!),
+    ])) as D1BatchResult[];
+    const item = results[0].results?.[0] as ModerationCameraRecord | undefined;
+    if (!item) return { kind: "not_found" };
+    const event = results[1].results?.[0] as ModerationEvent;
+    const updatedQueue = (results[3].results?.[0] as ModerationQueueItem | undefined) ?? queue;
+    return { kind: "ok", item, event, queue: updatedQueue };
+  }
+
+  // Legacy / no-context path: the queue stays the synthesized item.
+  const results = (await d1.batch([transitionStatement, eventStatement])) as D1BatchResult[];
+  const item = results[0].results?.[0] as ModerationCameraRecord | undefined;
+  if (!item) return { kind: "not_found" };
+  const event = results[1].results?.[0] as ModerationEvent;
+  return { kind: "ok", item, event, queue };
+}
+
+/**
+ * Statement builder for the camera status UPDATE in the final decision batch.
+ * Same three variants as the pre-batch code (pending+approve publishes
+ * metadata; approve/reverify refresh the freshness clocks; anything else only
+ * flips the status), each with the `WHERE id = ? AND status = <current>`
+ * guard and RETURNING the full camera columns.
+ */
+function buildCameraTransitionStatement(
+  d1: ModerationD1,
+  id: number,
+  currentStatus: string,
+  transition: { newStatus: string; updated: string },
+  nowIso: string,
+  publishMetadata: boolean,
+  refreshClock: boolean,
+  metadataPublication?: MetadataPublicationChoices,
+): D1PreparedStatement {
   if (publishMetadata) {
-    item = await d1
+    return d1
       .prepare(
         `UPDATE cameras SET status = ?, updated = ?, publish_manufacturer = ?, publish_observed_on = ?, last_verified_at = ?, review_due_at = ?, review_interval_months = ? WHERE id = ? AND status = ? RETURNING ${cameraColumns}`,
       )
@@ -806,11 +1000,11 @@ export async function moderateCamera(
         computeReviewDueAt(nowIso, DEFAULT_REVIEW_INTERVAL_MONTHS),
         DEFAULT_REVIEW_INTERVAL_MONTHS,
         id,
-        current.status,
-      )
-      .first<ModerationCameraRecord>();
-  } else if (refreshClock) {
-    item = await d1
+        currentStatus,
+      );
+  }
+  if (refreshClock) {
+    return d1
       .prepare(
         `UPDATE cameras SET status = ?, updated = ?, last_verified_at = ?, review_due_at = ?, review_interval_months = ? WHERE id = ? AND status = ? RETURNING ${cameraColumns}`,
       )
@@ -821,38 +1015,14 @@ export async function moderateCamera(
         computeReviewDueAt(nowIso, DEFAULT_REVIEW_INTERVAL_MONTHS),
         DEFAULT_REVIEW_INTERVAL_MONTHS,
         id,
-        current.status,
-      )
-      .first<ModerationCameraRecord>();
-  } else {
-    item = await d1
-      .prepare(
-        `UPDATE cameras SET status = ?, updated = ? WHERE id = ? AND status = ? RETURNING ${cameraColumns}`,
-      )
-      .bind(transition.newStatus, transition.updated, id, current.status)
-      .first<ModerationCameraRecord>();
+        currentStatus,
+      );
   }
-  if (!item) return { kind: "not_found" };
-
-  const event = await createModerationEvent(d1, {
-    entity: "camera",
-    entityId: id,
-    previousStatus: current.status,
-    newStatus: transition.newStatus,
-    action,
-    reasonCode,
-    note,
-    reviewer,
-    recused: false,
-    escalated: false,
-    secondReviewerId,
-  });
-  const updatedQueue = context
-    ? await updateQueueState(d1, queue.id!, "closed", {
-        secondReviewerId: secondReviewerId ?? (needsSecondReview ? reviewer!.id : null),
-      })
-    : queue;
-  return { kind: "ok", item, event, queue: updatedQueue };
+  return d1
+    .prepare(
+      `UPDATE cameras SET status = ?, updated = ? WHERE id = ? AND status = ? RETURNING ${cameraColumns}`,
+    )
+    .bind(transition.newStatus, transition.updated, id, currentStatus);
 }
 
 function getCameraTransition(
@@ -950,9 +1120,9 @@ export async function moderateCorrection(
   if (reviewer && !roleAllowsAction(reviewer.role, action)) return { kind: "forbidden" };
 
   const current = await d1
-    .prepare("SELECT status FROM correction_requests WHERE id = ?")
+    .prepare("SELECT status, camera_id AS cameraId FROM correction_requests WHERE id = ?")
     .bind(id)
-    .first<{ status: string }>();
+    .first<{ status: string; cameraId: number | null }>();
   if (!current) return { kind: "not_found" };
 
   // The route validates cameraId as a positive integer, but existence must
@@ -1005,22 +1175,26 @@ export async function moderateCorrection(
   if (action === "escalate") {
     if (!context) return { kind: "forbidden" };
     if (!note) return { kind: "escalation_requires_note" };
-    const updatedQueue = await updateQueueState(d1, queue.id!, "escalated", {
-      escalationReason: note,
-    });
-    const event = await createModerationEvent(d1, {
-      entity: "correction",
-      entityId: id,
-      previousStatus: current.status,
-      newStatus: current.status,
-      action,
-      reasonCode,
-      note,
-      reviewer,
-      recused: false,
-      escalated: true,
-      secondReviewerId: null,
-    });
+    // ONE batch: queue escalate + intent event + queue readback.
+    const results = (await d1.batch([
+      buildQueueStateStatement(d1, queue.id!, "escalated", { escalationReason: note }),
+      buildModerationEventStatement(d1, {
+        entity: "correction",
+        entityId: id,
+        previousStatus: current.status,
+        newStatus: current.status,
+        action,
+        reasonCode,
+        note,
+        reviewer,
+        recused: false,
+        escalated: true,
+        secondReviewerId: null,
+      }),
+      buildQueueReadbackStatement(d1, queue.id!),
+    ])) as D1BatchResult[];
+    const event = results[1].results?.[0] as ModerationEvent;
+    const updatedQueue = (results[2].results?.[0] as ModerationQueueItem | undefined) ?? queue;
     return { kind: "ok", item: (await loadCorrection(d1, id))!, event, queue: updatedQueue };
   }
 
@@ -1033,20 +1207,25 @@ export async function moderateCorrection(
     (queue.requiresSecondReview === 1 || queue.sensitivity !== "standard");
 
   if (needsSecondReview && queue.state !== "second_review") {
-    const event = await createModerationEvent(d1, {
-      entity: "correction",
-      entityId: id,
-      previousStatus: current.status,
-      newStatus: current.status,
-      action,
-      reasonCode,
-      note,
-      reviewer,
-      recused: false,
-      escalated: false,
-      secondReviewerId: null,
-    });
-    const updatedQueue = await updateQueueState(d1, queue.id!, "second_review");
+    const results = (await d1.batch([
+      buildModerationEventStatement(d1, {
+        entity: "correction",
+        entityId: id,
+        previousStatus: current.status,
+        newStatus: current.status,
+        action,
+        reasonCode,
+        note,
+        reviewer,
+        recused: false,
+        escalated: false,
+        secondReviewerId: null,
+      }),
+      buildQueueStateStatement(d1, queue.id!, "second_review"),
+      buildQueueReadbackStatement(d1, queue.id!),
+    ])) as D1BatchResult[];
+    const event = results[0].results?.[0] as ModerationEvent;
+    const updatedQueue = (results[2].results?.[0] as ModerationQueueItem | undefined) ?? queue;
     return {
       kind: "second_review_pending",
       item: (await loadCorrection(d1, id))!,
@@ -1092,52 +1271,85 @@ export async function moderateCorrection(
   }
   binds.push(id);
 
-  const item = await d1
-    .prepare(
-      `UPDATE correction_requests SET ${sets.join(", ")} WHERE id = ? AND status = 'pending' RETURNING id, camera_id AS cameraId, issue_type AS issueType, message, contact, status, outcome, created_at AS createdAt`,
-    )
-    .bind(...binds)
-    .first<PendingCorrectionRequest>();
-  if (!item) return { kind: "not_found" };
+  // ONE batch: correction UPDATE, the guarded decision event, optional
+  // camera-outcome statements, queue close, queue readback. Everything is
+  // atomic, so a crash cannot leave the audit trail half-written. The decision
+  // event comes BEFORE the outcome statements so the audit trail preserves the
+  // historical insertion order (decision event first, then the outcome events),
+  // exactly like the pre-batch code wrote them.
+  const statements: D1PreparedStatement[] = [
+    d1
+      .prepare(
+        `UPDATE correction_requests SET ${sets.join(", ")} WHERE id = ? AND status = 'pending' RETURNING id, camera_id AS cameraId, issue_type AS issueType, message, contact, status, outcome, created_at AS createdAt`,
+      )
+      .bind(...binds),
+  ];
 
-  const event =
-    action === "associate"
-      ? await createModerationEvent(d1, {
-          entity: "correction",
-          entityId: id,
-          previousStatus: "pending",
-          newStatus: "pending",
-          action: "associate",
-          reasonCode,
-          note,
-          reviewer,
-          recused: false,
-          escalated: false,
-          secondReviewerId: null,
-        })
-      : await createModerationEvent(d1, {
-          entity: "correction",
-          entityId: id,
-          previousStatus: current.status,
-          newStatus: status,
-          action,
-          reasonCode,
-          note,
-          reviewer,
-          recused: false,
-          escalated: false,
-          secondReviewerId,
-        });
+  const eventIndex = statements.length;
+  statements.push(
+    buildGuardedEventStatement(
+      d1,
+      action === "associate"
+        ? {
+            entity: "correction",
+            entityId: id,
+            previousStatus: "pending",
+            newStatus: "pending",
+            action: "associate",
+            reasonCode,
+            note,
+            reviewer,
+            recused: false,
+            escalated: false,
+            secondReviewerId: null,
+          }
+        : {
+            entity: "correction",
+            entityId: id,
+            previousStatus: current.status,
+            newStatus: status,
+            action,
+            reasonCode,
+            note,
+            reviewer,
+            recused: false,
+            escalated: false,
+            secondReviewerId,
+          },
+      "correction_requests",
+      id,
+      action === "associate" ? "pending" : status,
+    ),
+  );
 
-  if (action === "approve" && outcome !== undefined && item.cameraId !== null) {
-    await applyCorrectionOutcome(d1, item.cameraId, outcome, reasonCode, note);
+  // The outcome targets the correction's effective camera: the explicitly
+  // linked one (options.cameraId) when given, otherwise the request's stored
+  // link. buildCorrectionOutcomeStatements re-reads the camera and returns []
+  // for no-ops, so the batch shape stays correct either way.
+  const effectiveCameraId = cameraId !== undefined ? cameraId : current.cameraId;
+  if (action === "approve" && outcome !== undefined && effectiveCameraId !== null) {
+    statements.push(...(await buildCorrectionOutcomeStatements(d1, effectiveCameraId, outcome, reasonCode, note, now)));
   }
 
-  const updatedQueue = context
-    ? await updateQueueState(d1, queue.id!, "closed", {
+  let readbackIndex: number | null = null;
+  if (context) {
+    statements.push(
+      buildQueueStateStatement(d1, queue.id!, "closed", {
         secondReviewerId: secondReviewerId ?? (needsSecondReview ? reviewer!.id : null),
-      })
-    : queue;
+      }),
+      buildQueueReadbackStatement(d1, queue.id!),
+    );
+    readbackIndex = statements.length - 1;
+  }
+
+  const results = (await d1.batch(statements)) as D1BatchResult[];
+  const item = results[0].results?.[0] as PendingCorrectionRequest | undefined;
+  if (!item) return { kind: "not_found" };
+  const event = results[eventIndex].results?.[0] as ModerationEvent;
+  const updatedQueue =
+    context && readbackIndex !== null
+      ? (results[readbackIndex].results?.[0] as ModerationQueueItem | undefined) ?? queue
+      : queue;
   return { kind: "ok", item, event, queue: updatedQueue };
 }
 
@@ -1228,20 +1440,26 @@ export async function moderateCameraEdit(
     (queue.requiresSecondReview === 1 || queue.sensitivity !== "standard");
 
   if (needsSecondReview && queue.state !== "second_review") {
-    const event = await createModerationEvent(d1, {
-      entity: "camera_edit",
-      entityId: id,
-      previousStatus: current.status,
-      newStatus: current.status,
-      action,
-      reasonCode,
-      note,
-      reviewer,
-      recused: false,
-      escalated: false,
-      secondReviewerId: null,
-    });
-    const updatedQueue = await updateQueueState(d1, queue.id!, "second_review");
+    // ONE batch: intent event + queue transition + queue readback.
+    const results = (await d1.batch([
+      buildModerationEventStatement(d1, {
+        entity: "camera_edit",
+        entityId: id,
+        previousStatus: current.status,
+        newStatus: current.status,
+        action,
+        reasonCode,
+        note,
+        reviewer,
+        recused: false,
+        escalated: false,
+        secondReviewerId: null,
+      }),
+      buildQueueStateStatement(d1, queue.id!, "second_review"),
+      buildQueueReadbackStatement(d1, queue.id!),
+    ])) as D1BatchResult[];
+    const event = results[0].results?.[0] as ModerationEvent;
+    const updatedQueue = (results[2].results?.[0] as ModerationQueueItem | undefined) ?? queue;
     return {
       kind: "second_review_pending",
       item: (await loadEditRequestItem(d1, id))!,
@@ -1268,6 +1486,12 @@ export async function moderateCameraEdit(
   const newStatus = action === "approve" ? "approved" : "rejected";
   const eventAction = action === "approve" ? "edit_applied" : "edit_rejected";
 
+  // ONE batch: [approve only] camera COALESCE diff, the request UPDATE, the
+  // guarded decision event (guarded on the request's new terminal status, so
+  // it only lands when the UPDATE actually decided the request), then queue
+  // close + readback. Everything commits atomically.
+  const statements: D1PreparedStatement[] = [];
+
   if (action === "approve") {
     // The target must still be published-editable at decision time: a camera
     // removed (or re-edited past the queue) while the request sat in the
@@ -1283,49 +1507,70 @@ export async function moderateCameraEdit(
     // COALESCE(proposed, current): a NULL proposed column means "unchanged"
     // and keeps the stored value. Only the whitelist columns are touched —
     // status, contributor_id, source, publish_*, freshness clocks stay put.
-    await d1
-      .prepare(
-        `UPDATE cameras SET
-           title = COALESCE((SELECT proposed_title FROM camera_edit_requests WHERE id = ?), title),
-           kind = COALESCE((SELECT proposed_kind FROM camera_edit_requests WHERE id = ?), kind),
-           address = COALESCE((SELECT proposed_address FROM camera_edit_requests WHERE id = ?), address),
-           notes = COALESCE((SELECT proposed_notes FROM camera_edit_requests WHERE id = ?), notes),
-           manufacturer = COALESCE((SELECT proposed_manufacturer FROM camera_edit_requests WHERE id = ?), manufacturer),
-           observed_on = COALESCE((SELECT proposed_observed_on FROM camera_edit_requests WHERE id = ?), observed_on),
-           description = COALESCE((SELECT proposed_description FROM camera_edit_requests WHERE id = ?), description),
-           updated = ?
-         WHERE id = ?`,
-      )
-      .bind(id, id, id, id, id, id, id, nowIso, current.cameraId)
-      .run();
+    statements.push(
+      d1
+        .prepare(
+          `UPDATE cameras SET
+             title = COALESCE((SELECT proposed_title FROM camera_edit_requests WHERE id = ?), title),
+             kind = COALESCE((SELECT proposed_kind FROM camera_edit_requests WHERE id = ?), kind),
+             address = COALESCE((SELECT proposed_address FROM camera_edit_requests WHERE id = ?), address),
+             notes = COALESCE((SELECT proposed_notes FROM camera_edit_requests WHERE id = ?), notes),
+             manufacturer = COALESCE((SELECT proposed_manufacturer FROM camera_edit_requests WHERE id = ?), manufacturer),
+             observed_on = COALESCE((SELECT proposed_observed_on FROM camera_edit_requests WHERE id = ?), observed_on),
+             description = COALESCE((SELECT proposed_description FROM camera_edit_requests WHERE id = ?), description),
+             updated = ?
+           WHERE id = ?`,
+        )
+        .bind(id, id, id, id, id, id, id, nowIso, current.cameraId),
+    );
   }
 
-  const event = await createModerationEvent(d1, {
-    entity: "camera_edit",
-    entityId: id,
-    previousStatus: "pending",
-    newStatus,
-    action: eventAction,
-    reasonCode,
-    note,
-    reviewer,
-    recused: false,
-    escalated: false,
-    secondReviewerId,
-  });
+  statements.push(
+    d1
+      .prepare(
+        "UPDATE camera_edit_requests SET status = ?, decided_by = ?, decision_note = ?, decided_at = ?, updated_at = ? WHERE id = ? AND status = 'pending'",
+      )
+      .bind(newStatus, reviewer?.id ?? null, note, nowIso, nowIso, id),
+  );
 
-  await d1
-    .prepare(
-      "UPDATE camera_edit_requests SET status = ?, decided_by = ?, decision_note = ?, decided_at = ?, updated_at = ? WHERE id = ? AND status = 'pending'",
-    )
-    .bind(newStatus, reviewer?.id ?? null, note, nowIso, nowIso, id)
-    .run();
+  const eventIndex = statements.length;
+  statements.push(
+    buildGuardedEventStatement(
+      d1,
+      {
+        entity: "camera_edit",
+        entityId: id,
+        previousStatus: "pending",
+        newStatus,
+        action: eventAction,
+        reasonCode,
+        note,
+        reviewer,
+        recused: false,
+        escalated: false,
+        secondReviewerId,
+      },
+      "camera_edit_requests",
+      id,
+      newStatus,
+    ),
+  );
 
-  const updatedQueue = context
-    ? await updateQueueState(d1, queue.id!, "closed", {
+  let updatedQueue = queue;
+  if (context) {
+    statements.push(
+      buildQueueStateStatement(d1, queue.id!, "closed", {
         secondReviewerId: secondReviewerId ?? (needsSecondReview ? reviewer!.id : null),
-      })
-    : queue;
+      }),
+      buildQueueReadbackStatement(d1, queue.id!),
+    );
+  }
+
+  const results = (await d1.batch(statements)) as D1BatchResult[];
+  const event = results[eventIndex].results?.[0] as ModerationEvent;
+  if (context) {
+    updatedQueue = (results[results.length - 1].results?.[0] as ModerationQueueItem | undefined) ?? queue;
+  }
 
   return { kind: "ok", item: (await loadEditRequestItem(d1, id))!, event, queue: updatedQueue };
 }
@@ -1369,76 +1614,102 @@ export type CameraEditDecisionItem = {
   createdAt: string;
 };
 
-async function applyCorrectionOutcome(
+/**
+ * Statement builder for the camera side of an approve-with-outcome decision
+ * (P1-2 atomic write path). Same logic as the pre-batch `applyCorrectionOutcome`:
+ * re-reads the camera record first and returns [] for no-ops; otherwise returns
+ * the UPDATE + guarded event pair for the given outcome (marked-stale only when
+ * the record is verified, with its status guard; removed/corrected always). The
+ * caller splices the returned statements into the decision batch, so the camera
+ * mutation and its audit event commit atomically with the correction decision.
+ */
+async function buildCorrectionOutcomeStatements(
   d1: ModerationD1,
   cameraId: number,
   outcome: CorrectionOutcome,
   reasonCode: ModerationReasonCode,
   note: string | null,
-): Promise<void> {
+  nowIso: string,
+): Promise<D1PreparedStatement[]> {
   const record = await d1
     .prepare("SELECT status FROM cameras WHERE id = ?")
     .bind(cameraId)
     .first<{ status: string }>();
-  if (!record) return;
+  if (!record) return [];
 
   // Same P1-2 contract as the camera transitions: `updated` always carries a
   // comparable ISO timestamp (the descriptive outcome text stays in the
   // moderation event note), so directory ordering and freshness stay intact.
-  const nowIso = new Date().toISOString();
-
   if (outcome === "marked-stale") {
     // A credible correction sends a verified record back to needs_review while
     // it is reassessed (DATA_TRUST SLA).
-    if (record.status !== "verified") return;
-    await d1
-      .prepare("UPDATE cameras SET status = 'needs_review', updated = ? WHERE id = ? AND status = 'verified'")
-      .bind(nowIso, cameraId)
-      .run();
-    await createModerationEvent(d1, {
-      entity: "camera",
-      entityId: cameraId,
-      previousStatus: "verified",
-      newStatus: "needs_review",
-      action: "marked-stale",
-      reasonCode,
-      note,
-    });
-    return;
+    if (record.status !== "verified") return [];
+    return [
+      d1
+        .prepare("UPDATE cameras SET status = 'needs_review', updated = ? WHERE id = ? AND status = 'verified'")
+        .bind(nowIso, cameraId),
+      buildGuardedEventStatement(
+        d1,
+        {
+          entity: "camera",
+          entityId: cameraId,
+          previousStatus: "verified",
+          newStatus: "needs_review",
+          action: "marked-stale",
+          reasonCode,
+          note,
+        },
+        "cameras",
+        cameraId,
+        "needs_review",
+      ),
+    ];
   }
 
   if (outcome === "removed") {
-    await d1
-      .prepare("UPDATE cameras SET status = 'removed', updated = ? WHERE id = ?")
-      .bind(nowIso, cameraId)
-      .run();
-    await createModerationEvent(d1, {
-      entity: "camera",
-      entityId: cameraId,
-      previousStatus: record.status,
-      newStatus: "removed",
-      action: "removed",
-      reasonCode,
-      note,
-    });
-    return;
+    return [
+      d1.prepare("UPDATE cameras SET status = 'removed', updated = ? WHERE id = ?").bind(nowIso, cameraId),
+      buildGuardedEventStatement(
+        d1,
+        {
+          entity: "camera",
+          entityId: cameraId,
+          previousStatus: record.status,
+          newStatus: "removed",
+          action: "removed",
+          reasonCode,
+          note,
+        },
+        "cameras",
+        cameraId,
+        "removed",
+      ),
+    ];
   }
 
   if (outcome === "corrected") {
-    await d1
-      .prepare("UPDATE cameras SET updated = ? WHERE id = ?")
-      .bind(nowIso, cameraId)
-      .run();
-    await createModerationEvent(d1, {
-      entity: "camera",
-      entityId: cameraId,
-      previousStatus: record.status,
-      newStatus: record.status,
-      action: "corrected",
-      reasonCode,
-      note,
-    });
+    return [
+      d1.prepare("UPDATE cameras SET updated = ? WHERE id = ?").bind(nowIso, cameraId),
+      buildGuardedEventStatement(
+        d1,
+        {
+          entity: "camera",
+          entityId: cameraId,
+          previousStatus: record.status,
+          newStatus: record.status,
+          action: "corrected",
+          reasonCode,
+          note,
+        },
+        "cameras",
+        cameraId,
+        record.status,
+      ),
+    ];
   }
+
+  // kept / escalated: no record mutation, nothing to batch.
+  return [];
 }
 
 /**

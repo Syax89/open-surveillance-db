@@ -70,6 +70,7 @@ export const {
   markContributorEmailVerified,
   resetContributorPassword,
   revokeAllContributorSessions,
+  applyPasswordReset,
 } = makeMock({
   createContributor: "createContributor",
   findContributorByEmail: "findContributorByEmail",
@@ -98,6 +99,7 @@ export const {
   markContributorEmailVerified: "markContributorEmailVerified",
   resetContributorPassword: "resetContributorPassword",
   revokeAllContributorSessions: "revokeAllContributorSessions",
+  applyPasswordReset: "applyPasswordReset",
 });
 
 export const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;

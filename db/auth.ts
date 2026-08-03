@@ -824,6 +824,42 @@ export async function revokeAllContributorSessions(
   return result.meta.changes;
 }
 
+/**
+ * One statement result from `d1.batch(...)`: a RETURNING statement populates
+ * `results`, everything else only `meta` (P1-2 atomic write path).
+ */
+type D1BatchResult = {
+  success: boolean;
+  results: Record<string, unknown>[];
+  meta: { changes: number; lastRowId: number };
+};
+
+/**
+ * Apply a completed password reset (Fase B confirm): rotate the hash, revoke
+ * EVERY live session, and mark the email verified — in ONE atomic batch. A
+ * crash cannot leave the hash rotated but sessions live, or sessions dead but
+ * the hash old. `consumeVerificationToken` stays a separate single-use gate by
+ * design: the token is consumed (and so single-use) before this write, and the
+ * two writes cannot be combined because the token consume is a read-then-write
+ * on the same row. Returns the refreshed public profile, or null when the
+ * account vanished between the consume and this update.
+ */
+export async function applyPasswordReset(
+  contributorId: number,
+  newPassword: string,
+  now: string = new Date().toISOString(),
+): Promise<PublicContributor | null> {
+  const d1 = await getD1();
+  const passwordHash = await hashPassword(newPassword);
+  const results = (await d1.batch([
+    d1.prepare("UPDATE contributors SET password_hash = ?, updated_at = ? WHERE id = ?").bind(passwordHash, now, contributorId),
+    d1.prepare("UPDATE sessions SET revoked_at = ? WHERE contributor_id = ? AND revoked_at IS NULL").bind(now, contributorId),
+    d1.prepare(`UPDATE contributors SET email_verified_at = COALESCE(email_verified_at, ?), updated_at = ? WHERE id = ? RETURNING ${publicContributorColumns}`).bind(now, now, contributorId),
+  ])) as D1BatchResult[];
+  const contributor = results[2]?.results?.[0] as PublicContributor | undefined;
+  return contributor ?? null;
+}
+
 // ---------------------------------------------------------------------------
 // Contributor's own submissions
 // ---------------------------------------------------------------------------
