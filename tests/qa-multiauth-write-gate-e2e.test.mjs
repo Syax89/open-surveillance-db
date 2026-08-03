@@ -42,10 +42,12 @@ import {
 let env;
 let registerRoute;
 let verifyEmailRoute;
+let resendRoute;
 let camerasRoute;
 let recoveryRoute;
 let oidcStartRoute;
 let oidcCallbackRoute;
+let oidcMergeRoute;
 let passkeyRegisterBeginRoute;
 let passkeyRegisterCompleteRoute;
 let passkeyLoginBeginRoute;
@@ -64,10 +66,12 @@ beforeEach(async () => {
   rateLimit.resetRateLimitState();
   registerRoute = await loadE2ERoute("app/api/auth/register/route.mjs");
   verifyEmailRoute = await loadE2ERoute("app/api/auth/verify-email/route.mjs");
+  resendRoute = await loadE2ERoute("app/api/auth/verify-email/resend/route.mjs");
   camerasRoute = await loadE2ERoute("app/api/cameras/route.mjs");
   recoveryRoute = await loadE2ERoute("app/api/auth/recovery/route.mjs");
   oidcStartRoute = await loadE2ERoute("app/api/auth/oidc/[provider]/start/route.mjs");
   oidcCallbackRoute = await loadE2ERoute("app/api/auth/oidc/[provider]/callback/route.mjs");
+  oidcMergeRoute = await loadE2ERoute("app/api/auth/oidc/merge/route.mjs");
   passkeyRegisterBeginRoute = await loadE2ERoute("app/api/auth/passkey/register/begin/route.mjs");
   passkeyRegisterCompleteRoute = await loadE2ERoute("app/api/auth/passkey/register/complete/route.mjs");
   passkeyLoginBeginRoute = await loadE2ERoute("app/api/auth/passkey/login/begin/route.mjs");
@@ -395,7 +399,7 @@ const GITHUB_USER = {
 };
 const GITHUB_EMAILS = [{ email: "oidc-github-user@example.org", verified: true }];
 
-function stubProviderFetch() {
+function stubProviderFetch({ user = GITHUB_USER, emails = GITHUB_EMAILS } = {}) {
   const original = globalThis.fetch;
   globalThis.fetch = async (url) => {
     const href = typeof url === "string" ? url : url.href;
@@ -405,8 +409,8 @@ function stubProviderFetch() {
         headers: { "content-type": "application/json" },
       });
     if (href.includes("login/oauth/access_token")) return json(200, { access_token: "at-qa" });
-    if (href.includes("api.github.com/user/emails")) return json(200, GITHUB_EMAILS);
-    if (href.includes("api.github.com/user")) return json(200, GITHUB_USER);
+    if (href.includes("api.github.com/user/emails")) return json(200, emails);
+    if (href.includes("api.github.com/user")) return json(200, user);
     throw new Error(`unexpected provider fetch: ${href}`);
   };
   return () => {
@@ -460,6 +464,133 @@ test("oidc: callback linked (email del provider verificata) apre una sessione ch
       apiRequest(`/api/auth/oidc/github/callback?code=the-code&state=${state}`),
     );
     assert.equal(replayed.status, 400, "replayed state must be rejected");
+  } finally {
+    restoreFetch();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// 4. Rate-limit mail 3/h in E2E COMPLETO (review P2-1): register + 2 resend
+//    reali → 429 sul 4° invio; il 429 NON consuma il token corrente
+//    (pre-flight prima del mint) → verify reale → write 201.
+// ---------------------------------------------------------------------------
+
+test("email: budget mail 3/h esaurito con register+2 resend reali → 429 sul 4°, il link corrente resta valido e scrive", async () => {
+  const email = `qa-mail-budget-${crypto.randomUUID()}@example.org`;
+  const response = await registerRoute.POST(apiRequest("/api/auth/register", {
+    method: "POST",
+    body: { email, displayName: "QA Mail Budget", password: "supersecret123" },
+  }));
+  assert.equal(response.status, 201); // invio #1
+  const body = await responseBody(response);
+  const headers = sessionHeaders(response);
+  const firstToken = new URL(body.verification.devLink).searchParams.get("token");
+  assert.ok(firstToken, "dev link carries the raw verification token");
+
+  const resendOne = await resendRoute.POST(apiRequest("/api/auth/verify-email/resend", { method: "POST", headers }));
+  assert.equal(resendOne.status, 200); // invio #2
+  const secondToken = new URL((await responseBody(resendOne)).devLink).searchParams.get("token");
+  assert.ok(secondToken && secondToken !== firstToken, "resend mints a fresh token");
+
+  const resendTwo = await resendRoute.POST(apiRequest("/api/auth/verify-email/resend", { method: "POST", headers }));
+  assert.equal(resendTwo.status, 200); // invio #3
+  const thirdToken = new URL((await responseBody(resendTwo)).devLink).searchParams.get("token");
+  assert.ok(thirdToken && thirdToken !== secondToken, "resend mints a fresh token every time");
+
+  // 4° invio: il budget 3/h è esaurito → 429 con Retry-After, PRIMA di ogni
+  // mint/send (pre-flight): il link corrente non viene né consumato né
+  // revocato — il count in tabella resta a 3.
+  const blocked = await resendRoute.POST(apiRequest("/api/auth/verify-email/resend", { method: "POST", headers }));
+  assert.equal(blocked.status, 429, "the 4th send in the hour is blocked");
+  assert.ok(Number(blocked.headers.get("retry-after")) > 0);
+  const contributorRow = await env.DB.prepare("SELECT id FROM contributors WHERE email = ?").bind(email).first();
+  const tokenCount = await env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM email_verification_tokens WHERE contributor_id = ?",
+  ).bind(contributorRow.id).first();
+  assert.equal(tokenCount.n, 3, "the 429 must not mint a 4th token (pre-flight quota gate)");
+
+  // Il link corrente (terzo) verifica ancora: il 429 non l'ha toccato.
+  const verify = await verifyEmailRoute.GET(apiRequest(`/api/auth/verify-email?token=${encodeURIComponent(thirdToken)}`));
+  assert.equal(verify.status, 200, "the current token stays valid after the 429");
+
+  // E2E completo: la stessa sessione ora supera il write gate con una
+  // scrittura reale — il budget mail esaurito non blocca l'account.
+  const accepted = await camerasRoute.POST(writeWith(headers));
+  assert.equal(accepted.status, 201, "a verified session writes even after the mail budget is spent");
+});
+
+// ---------------------------------------------------------------------------
+// 5. Merge OIDC manuale end-to-end REALE (review P2-2): account esistente +
+//    callback con la STESSA email (provider verificata) → merge token →
+//    POST /api/auth/oidc/merge reale → sessione linked → write 201.
+// ---------------------------------------------------------------------------
+
+test("oidc: conflitto email → merge manuale reale → sessione linked → write 201", async () => {
+  // Account email+password esistente, NON verificato via mail: sarà il merge
+  // a verificarlo sfruttando il verified flag del provider.
+  const email = `qa-merge-${crypto.randomUUID()}@example.org`;
+  const register = await registerRoute.POST(apiRequest("/api/auth/register", {
+    method: "POST",
+    body: { email, displayName: "QA Merge Target", password: "supersecret123" },
+  }));
+  assert.equal(register.status, 201);
+  const contributorId = (await responseBody(register)).contributor.id;
+
+  // Il provider (solo la rete esterna è stubata) dichiara la STESSA email
+  // come verificata: il callback NON deve auto-linkare, ma emettere un merge
+  // token single-use (mai una sessione a questo punto).
+  const restoreFetch = stubProviderFetch({
+    user: { id: 98765, email, name: "OIDC Merging User", login: "oidc-merge" },
+    emails: [{ email, verified: true }],
+  });
+  try {
+    env.OIDC_GITHUB_CLIENT_ID = "gh-client-qa";
+    env.OIDC_GITHUB_CLIENT_SECRET = "gh-secret-qa";
+    env.OIDC_BASE_URL = "https://osdb.test";
+
+    const start = await oidcStartRoute.GET(apiRequest("/api/auth/oidc/github/start?redirect_to=/account"));
+    assert.equal(start.status, 302);
+    const state = new URL(start.headers.get("location")).searchParams.get("state");
+    assert.ok(state, "start must carry the state param");
+
+    const callback = await oidcCallbackRoute.GET(
+      apiRequest(`/api/auth/oidc/github/callback?code=the-code&state=${state}`),
+    );
+    assert.equal(callback.status, 302);
+    const callbackUrl = new URL(callback.headers.get("location"));
+    assert.equal(callbackUrl.pathname, "/login", "an email conflict never auto-links: it lands on /login");
+    const mergeToken = callbackUrl.searchParams.get("merge");
+    assert.ok(mergeToken, "the callback issues a single-use merge token");
+    assert.equal(callback.headers.getSetCookie().length, 0, "no session is issued before the manual merge");
+
+    // Merge manuale reale: la proprietà dell'account è provata con
+    // email+password (stesso path lockout-protetto del login).
+    const merge = await oidcMergeRoute.POST(apiRequest("/api/auth/oidc/merge", {
+      method: "POST",
+      body: { token: mergeToken, email, password: "supersecret123" },
+    }));
+    assert.equal(merge.status, 200);
+    const mergedBody = await responseBody(merge);
+    assert.equal(mergedBody.contributor.id, contributorId, "the external identity is linked to the EXISTING account");
+    const mergedHeaders = sessionHeaders(merge);
+
+    // La sessione post-merge è verificata (flag del provider) → scrive.
+    const accepted = await camerasRoute.POST(writeWith(mergedHeaders));
+    assert.equal(accepted.status, 201, "the merged session must pass the write gate");
+
+    const linked = await env.DB.prepare(
+      "SELECT auth_provider, external_sub, email_verified_at FROM contributors WHERE id = ?",
+    ).bind(contributorId).first();
+    assert.equal(linked.auth_provider, "github");
+    assert.equal(linked.external_sub, "98765");
+    assert.ok(linked.email_verified_at, "the merge verifies the account via the provider's verified flag");
+
+    // Single-use: riusare lo stesso token risponde 410 e non apre sessioni.
+    const replay = await oidcMergeRoute.POST(apiRequest("/api/auth/oidc/merge", {
+      method: "POST",
+      body: { token: mergeToken, email, password: "supersecret123" },
+    }));
+    assert.equal(replay.status, 410, "the merge token is single-use");
   } finally {
     restoreFetch();
   }

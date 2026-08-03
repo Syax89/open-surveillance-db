@@ -1,16 +1,16 @@
 # QA Coverage Report
 
-Baseline generata il **2026-08-02** su commit `d452ad1` con
-`npm run coverage && npm run coverage:docs`. Suite: 1502/1502 test PASS, 0 fail.
+Baseline generata il **2026-08-03** su commit `c5d35d0` con
+`npm run coverage && npm run coverage:docs`. Suite: 1715/1715 test PASS, 0 fail.
 
 ## Riepilogo (solo codice di produzione, esclusi test/helper/mock/fixture)
 
 | Metrica | Coperto | Totale | % |
 |---|---|---|---|
-| Righe | 8250 | 8705 | **94.77%** |
-| Branch | 1897 | 2061 | 92.04% |
-| Funzioni | 305 | 313 | 97.44% |
-| Statement | 8250 | 8705 | 94.77% |
+| Righe | 10917 | 11549 | **94.53%** |
+| Branch | 2274 | 2538 | 89.60% |
+| Funzioni | 393 | 402 | 97.76% |
+| Statement | 10917 | 11549 | 94.53% |
 
 ## Soglia minima CI
 
@@ -20,55 +20,71 @@ sotto soglia il job fallisce.
 
 ## Moduli a coverage più bassa (priorità per nuovi test)
 
+- `app/api/auth/passkey/credentials/route.ts` — righe 77.22% (61/79), branch 57.89%, funzioni 100.00%
+- `app/api/auth/recovery/route.ts` — righe 79.45% (58/73), branch 70.00%, funzioni 100.00%
+- `app/api/auth/passkey/login/complete/route.ts` — righe 80.91% (89/110), branch 56.25%, funzioni 100.00%
+- `app/api/auth/reset-password/confirm/route.ts` — righe 82.43% (61/74), branch 62.50%, funzioni 100.00%
 - `app/api/auth/logout/route.ts` — righe 82.50% (33/40), branch 60.00%, funzioni 100.00%
+- `app/api/auth/reset-password/request/route.ts` — righe 83.56% (61/73), branch 46.15%, funzioni 100.00%
+- `app/lib/mailer.ts` — righe 84.38% (108/128), branch 66.67%, funzioni 83.33%
+- `app/api/auth/passkey/register/complete/route.ts` — righe 85.44% (88/103), branch 63.16%, funzioni 100.00%
 - `app/api/auth/me/submissions/route.ts` — righe 86.11% (31/36), branch 50.00%, funzioni 100.00%
 - `app/api/moderation/corrections/route.ts` — righe 87.18% (68/78), branch 78.57%, funzioni 100.00%
-- `db/moderation.ts` — righe 87.37% (955/1093), branch 93.87%, funzioni 100.00%
-- `app/api/cameras/[id]/confirmation/route.ts` — righe 88.83% (167/188), branch 87.50%, funzioni 100.00%
-- `app/api/cameras/[id]/route.ts` — righe 89.16% (181/203), branch 94.29%, funzioni 100.00%
-- `app/lib/image-metadata.ts` — righe 89.82% (300/334), branch 92.31%, funzioni 100.00%
-- `db/camera-edits.ts` — righe 89.83% (309/344), branch 77.33%, funzioni 88.89%
-- `app/lib/trust-levels.ts` — righe 89.86% (62/69), branch 100.00%, funzioni 66.67%
-- `app/lib/abuse-alerts.ts` — righe 90.74% (147/162), branch 96.67%, funzioni 100.00%
 
 ## Dettaglio per file
 
 | File (sorgente) | Righe % | Branch % | Funzioni % | Righe coperte/totali |
 |---|---|---|---|---|
+| `app/api/auth/passkey/credentials/route.ts` | 77.22 | 57.89 | 100.00 | 61/79 |
+| `app/api/auth/recovery/route.ts` | 79.45 | 70.00 | 100.00 | 58/73 |
+| `app/api/auth/passkey/login/complete/route.ts` | 80.91 | 56.25 | 100.00 | 89/110 |
+| `app/api/auth/reset-password/confirm/route.ts` | 82.43 | 62.50 | 100.00 | 61/74 |
 | `app/api/auth/logout/route.ts` | 82.50 | 60.00 | 100.00 | 33/40 |
+| `app/api/auth/reset-password/request/route.ts` | 83.56 | 46.15 | 100.00 | 61/73 |
+| `app/lib/mailer.ts` | 84.38 | 66.67 | 83.33 | 108/128 |
+| `app/api/auth/passkey/register/complete/route.ts` | 85.44 | 63.16 | 100.00 | 88/103 |
 | `app/api/auth/me/submissions/route.ts` | 86.11 | 50.00 | 100.00 | 31/36 |
 | `app/api/moderation/corrections/route.ts` | 87.18 | 78.57 | 100.00 | 68/78 |
-| `db/moderation.ts` | 87.37 | 93.87 | 100.00 | 955/1093 |
-| `app/api/cameras/[id]/confirmation/route.ts` | 88.83 | 87.50 | 100.00 | 167/188 |
+| `db/moderation.ts` | 87.48 | 93.87 | 100.00 | 964/1102 |
+| `worker/index.ts` | 87.67 | 97.67 | 76.92 | 199/227 |
+| `app/api/auth/passkey/login/begin/route.ts` | 88.00 | 75.00 | 100.00 | 66/75 |
 | `app/api/cameras/[id]/route.ts` | 89.16 | 94.29 | 100.00 | 181/203 |
+| `app/api/cameras/[id]/confirmation/route.ts` | 89.29 | 89.58 | 100.00 | 175/196 |
 | `app/lib/image-metadata.ts` | 89.82 | 92.31 | 100.00 | 300/334 |
 | `db/camera-edits.ts` | 89.83 | 77.33 | 88.89 | 309/344 |
 | `app/lib/trust-levels.ts` | 89.86 | 100.00 | 66.67 | 62/69 |
+| `app/api/auth/oidc/merge/route.ts` | 90.27 | 86.21 | 100.00 | 102/113 |
+| `app/api/auth/verify-email/resend/route.ts` | 90.28 | 69.23 | 100.00 | 65/72 |
 | `app/lib/abuse-alerts.ts` | 90.74 | 96.67 | 100.00 | 147/162 |
-| `worker/index.ts` | 91.63 | 97.67 | 76.92 | 197/215 |
-| `db/cameras.ts` | 91.82 | 85.19 | 94.12 | 292/318 |
+| `app/api/auth/passkey/register/begin/route.ts` | 91.03 | 57.14 | 100.00 | 71/78 |
+| `app/api/auth/verify-email/route.ts` | 92.06 | 75.00 | 100.00 | 58/63 |
+| `db/cameras.ts` | 93.35 | 89.23 | 94.44 | 365/391 |
 | `app/api/moderation/photos/[id]/route.ts` | 93.75 | 60.00 | 100.00 | 30/32 |
-| `app/api/cameras/route.ts` | 93.77 | 97.48 | 100.00 | 241/257 |
-| `app/api/cameras/search/route.ts` | 93.81 | 97.22 | 100.00 | 91/97 |
 | `app/api/cameras/[id]/edit/route.ts` | 93.90 | 85.71 | 100.00 | 77/82 |
-| `app/api/photos/route.ts` | 94.82 | 92.86 | 100.00 | 183/193 |
-| `app/api/corrections/route.ts` | 95.33 | 92.11 | 100.00 | 102/107 |
+| `app/api/cameras/route.ts` | 93.92 | 96.58 | 100.00 | 247/263 |
+| `app/api/cameras/search/route.ts` | 94.06 | 97.30 | 100.00 | 95/101 |
+| `app/api/auth/oidc/[provider]/start/route.ts` | 95.38 | 81.82 | 100.00 | 62/65 |
+| `app/api/photos/route.ts` | 95.39 | 92.86 | 100.00 | 207/217 |
 | `app/lib/confirm-ip-burst.ts` | 95.83 | 94.44 | 100.00 | 69/72 |
 | `app/api/auth/account/route.ts` | 96.23 | 90.91 | 100.00 | 51/53 |
-| `db/confirmations.ts` | 96.39 | 84.62 | 90.00 | 160/166 |
+| `app/api/auth/me/route.ts` | 96.52 | 96.55 | 100.00 | 111/115 |
+| `app/lib/oidc.ts` | 96.54 | 75.64 | 100.00 | 223/231 |
+| `db/confirmations.ts` | 96.65 | 84.62 | 90.00 | 173/179 |
 | `db/geocode.ts` | 96.85 | 72.73 | 100.00 | 123/127 |
 | `db/appeals.ts` | 97.22 | 80.39 | 100.00 | 210/216 |
-| `app/api/auth/register/route.ts` | 97.26 | 95.83 | 100.00 | 71/73 |
-| `app/api/auth/login/route.ts` | 97.40 | 95.65 | 100.00 | 75/77 |
+| `app/api/auth/oidc/[provider]/callback/route.ts` | 97.52 | 96.15 | 100.00 | 118/121 |
+| `app/api/auth/login/route.ts` | 97.56 | 95.65 | 100.00 | 80/82 |
 | `app/api/tiles/[z]/[x]/[y]/route.ts` | 97.61 | 92.31 | 100.00 | 245/251 |
 | `app/api/moderation/route.ts` | 97.77 | 90.97 | 100.00 | 351/359 |
-| `app/api/appeals/route.ts` | 97.78 | 93.10 | 100.00 | 176/180 |
+| `app/api/appeals/route.ts` | 97.83 | 93.10 | 100.00 | 180/184 |
 | `db/retention.ts` | 97.84 | 92.31 | 100.00 | 407/416 |
 | `app/api/geocode/route.ts` | 97.96 | 91.21 | 100.00 | 288/294 |
-| `app/api/auth/me/route.ts` | 98.11 | 100.00 | 100.00 | 104/106 |
+| `app/api/corrections/route.ts` | 98.10 | 94.12 | 100.00 | 103/105 |
+| `app/api/auth/register/route.ts` | 98.17 | 95.83 | 100.00 | 107/109 |
 | `app/api/auth/me/contributions/route.ts` | 98.32 | 93.75 | 100.00 | 117/119 |
+| `app/lib/photo-quota.ts` | 98.41 | 90.00 | 100.00 | 62/63 |
 | `app/lib/rate-limit.ts` | 98.48 | 100.00 | 100.00 | 195/198 |
-| `db/auth.ts` | 98.55 | 91.89 | 96.55 | 542/550 |
+| `db/auth.ts` | 98.93 | 92.55 | 97.22 | 743/751 |
 | `app/api/appeals/[id]/route.ts` | 100.00 | 97.67 | 100.00 | 121/121 |
 | `app/api/cameras/nearby/route.ts` | 100.00 | 100.00 | 100.00 | 72/72 |
 | `app/api/cameras/revisions/route.ts` | 100.00 | 94.12 | 100.00 | 58/58 |
@@ -80,17 +96,22 @@ sotto soglia il job fallisce.
 | `app/lib/csrf.ts` | 100.00 | 92.59 | 100.00 | 107/107 |
 | `app/lib/data-license.ts` | 100.00 | 100.00 | 100.00 | 11/11 |
 | `app/lib/duplicate-detection.ts` | 100.00 | 96.97 | 100.00 | 75/75 |
+| `app/lib/email-templates.ts` | 100.00 | 89.47 | 100.00 | 165/165 |
 | `app/lib/guards.ts` | 100.00 | 100.00 | 100.00 | 3/3 |
-| `app/lib/input-limits.ts` | 100.00 | 93.75 | 100.00 | 76/76 |
+| `app/lib/input-limits.ts` | 100.00 | 93.75 | 100.00 | 87/87 |
 | `app/lib/map-viewport.ts` | 100.00 | 100.00 | 100.00 | 52/52 |
-| `app/lib/photo-quota.ts` | 100.00 | 100.00 | 100.00 | 63/63 |
+| `app/lib/passkey.ts` | 100.00 | 100.00 | 100.00 | 99/99 |
 | `app/lib/public-status.ts` | 100.00 | 100.00 | 100.00 | 24/24 |
 | `app/lib/records.ts` | 100.00 | 100.00 | 100.00 | 37/37 |
 | `app/lib/search.ts` | 100.00 | 100.00 | 100.00 | 93/93 |
+| `app/lib/write-gate.ts` | 100.00 | 100.00 | 100.00 | 74/74 |
 | `db/corrections.ts` | 100.00 | 100.00 | 100.00 | 81/81 |
 | `db/freshness.ts` | 100.00 | 96.30 | 100.00 | 80/80 |
-| `db/photos.ts` | 100.00 | 91.80 | 100.00 | 230/230 |
-| `db/users.ts` | 100.00 | 100.00 | 100.00 | 78/78 |
+| `db/mailer.ts` | 100.00 | 87.50 | 100.00 | 172/172 |
+| `db/oidc.ts` | 100.00 | 85.71 | 100.00 | 207/207 |
+| `db/passkeys.ts` | 100.00 | 92.31 | 100.00 | 221/221 |
+| `db/photos.ts` | 100.00 | 92.19 | 100.00 | 250/250 |
+| `db/users.ts` | 100.00 | 100.00 | 100.00 | 93/93 |
 
 ## Metodologia
 
