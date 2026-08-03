@@ -699,3 +699,31 @@ export const emailSendLog = sqliteTable(
     index("email_send_log_sent_at_idx").on(table.sentAt),
   ],
 );
+
+/**
+ * Per-IP registration attempts (P3-4, CEO decision t_0941036b; migration
+ * 0032). One row per POST /api/auth/register request, keyed by the SHA-256
+ * of the caller key (cf-connecting-ip) — NEVER the raw IP (privacy by
+ * design, same rule as `photos.submitter_key` and the abuse-alert
+ * `callerHash`). The register route records the attempt and counts the
+ * rolling window (`WHERE ip_hash = ? AND created_at >= ?`) in ONE D1 batch,
+ * so two concurrent registrations cannot race past a stale count; the
+ * request that brings the count to the cap (default 5 per 24h) answers 429.
+ * Rows older than the window fall out of the COUNT, so the cap resets
+ * automatically without any cleanup job. Declared here so drizzle-kit
+ * generate never re-emits it (convention 0012/0014: hand-written migration
+ * + schema declaration together).
+ */
+export const registrationIpLog = sqliteTable(
+  "registrations_ip_log",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    ipHash: text("ip_hash").notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [
+    // The window COUNT is `WHERE ip_hash = ? AND created_at >= ?`, so
+    // (ip_hash, created_at) turns it into an index-only seek.
+    index("registrations_ip_log_ip_created_idx").on(table.ipHash, table.createdAt),
+  ],
+);

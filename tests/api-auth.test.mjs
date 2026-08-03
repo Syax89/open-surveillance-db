@@ -12,6 +12,7 @@
 // tests/auth-d1.test.mjs against an in-memory D1.
 
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { after, beforeEach, test } from "node:test";
 import { apiRequest, cleanupRouteTree, loadLibModule, loadRoute, loadTreeModule, responseBody } from "./helpers/api-harness.mjs";
 import { callArgs, resetMockState, stub } from "./helpers/mock-state.mjs";
@@ -20,6 +21,17 @@ let rateLimit;
 
 beforeEach(async () => {
   resetMockState();
+  // Per-IP registration cap (P3-4, t_0941036b): the reservation answers
+  // count 0 by default so the register contract tests keep exercising the
+  // validation / session / mail layers; the cap's own behaviour (4 ok, 5th
+  // 429, 24h reset) has a dedicated E2E suite
+  // (tests/registration-ip-cap.test.mjs).
+  stub("recordRegistrationAttempt", async () => ({ id: 1, count: 0 }));
+  stub("deleteRegistrationAttempt", async () => {});
+  // The route hashes the caller key before reserving the attempt; sha256Hex is
+  // a pure helper, so run the real implementation (same digest the db layer
+  // produces — the E2E cap suite asserts the stored key against it).
+  stub("sha256Hex", async (value) => createHash("sha256").update(value).digest("hex"));
   if (!rateLimit) rateLimit = await loadLibModule("rate-limit");
   rateLimit.resetRateLimitState();
 });

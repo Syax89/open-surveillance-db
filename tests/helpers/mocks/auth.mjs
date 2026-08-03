@@ -54,6 +54,10 @@ export const {
   verifyPassword,
   randomBase64Url,
   sha256Hex,
+  // Per-IP registration cap (P3-4, t_0941036b): db-touching, stubbed per
+  // test like the rest of db/auth.
+  recordRegistrationAttempt,
+  deleteRegistrationAttempt,
   // Per-email login lockout (ADR 0016): pure helpers run for real, db-touching
   // functions are stubbed per test like the rest of db/auth.
   loginLockoutKey,
@@ -88,6 +92,8 @@ export const {
   verifyPassword: "verifyPassword",
   randomBase64Url: "randomBase64Url",
   sha256Hex: "sha256Hex",
+  recordRegistrationAttempt: "recordRegistrationAttempt",
+  deleteRegistrationAttempt: "deleteRegistrationAttempt",
   loginLockoutKey: "loginLockoutKey",
   getLoginLockout: "getLoginLockout",
   recordFailedLogin: "recordFailedLogin",

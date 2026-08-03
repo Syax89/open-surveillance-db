@@ -228,6 +228,22 @@ L3–L4→Experienced. I test i18n/a11y dei badge si scrivono su questo mapping.
 4. **Livello non decade** per inattività (tranne revoke/moderation): il decay delle conferme
    (§4.2f) basta per la freschezza del dato.
 5. **No-op edit senza evento** (2.2): non si può farmare il livello con PATCH inutili.
+6. **Cap per-IP alla registrazione** (P3-4, decisione CEO 2026-08-03, t_0941036b): max **5
+   tentativi di registrazione / 24h rolling per IP** — il 5° tentativo nella finestra riceve
+   **429** con body generico anti-enumeration + Retry-After (di fatto ≤ 4 account/IP/giorno;
+   un farm non può nemmeno sondare l'endpoint). Stato quota **D1** (`registrations_ip_log`),
+   NON bucket in-memory: la finestra di 24h deve reggere tra isolate (stessa logica di
+   `appealAppellantLimits` e del cap giornaliero conferme §4.2.3). La riga dell'attempt viene
+   riservata e contata in **un unico batch** (atomico, niente race), e **rollbackata su ogni
+   uscita non-201** (tentativi falliti non consumano budget; il contratto no-write dei body
+   malformati resta). Chiave = **SHA-256 del caller key** (`cf-connecting-ip`), mai l'IP raw
+   (pattern `photos.submitter_key` / `callerHash` abuse-alerts). Finestra rolling → reset
+   automatico dopo 24h senza job di cleanup. Knob env: `REGISTER_IP_RATE_LIMIT_MAX` (default 5),
+   `REGISTER_IP_RATE_LIMIT_WINDOW_SECONDS` (default 86400). **Caveat NAT/CGNAT**: più utenti
+   legittimi dietro lo stesso IP condividono il budget — al cap viene risposto 429 (soft-flag
+   per il bucket conferme §4.2.5, hard-cap qui per scelta della decisione); eventuale
+   affinamento (es. proof-of-work o allowlist) è follow-up. Le righe oltre la finestra restano
+   come log (inerti); una purga retention allineata a R16 (login attempts) è follow-up.
 
 ---
 
