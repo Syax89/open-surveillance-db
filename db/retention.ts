@@ -30,6 +30,14 @@
  *                                       active lock (locked_until in the
  *                                       future) is never touched (audit
  *                                       finding 5 / review-ada P3-10)
+ *   R17 registrations_ip_log          → per-IP registration-cap rows older
+ *                                       than 30 days purged (QA F5,
+ *                                       t_894e0cc3 — the 24h cap COUNT only
+ *                                       reads the window; unsalted SHA-256
+ *                                       caller keys must not accumulate)
+ *   R18 email_send_log                → mail-budget rows older than 24 hours
+ *                                       purged (QA F5, t_894e0cc3 — the 3/h
+ *                                       budget only needs the last hour)
  *
  * Deliberately NOT purged here:
  *   R5  moderation_events             → append-only by design (BEFORE UPDATE /
@@ -91,6 +99,10 @@ export const CORRECTION_RETENTION_DAYS = 730;
 export const ORPHAN_PHOTO_RETENTION_DAYS = PENDING_RETENTION_DAYS;
 /** R16: a failed-login counter row is dead after 30 days of inactivity. */
 export const LOGIN_ATTEMPT_RETENTION_DAYS = 30;
+/** QA F5: per-IP registration log rows are dead after 30 days (specular to R16). */
+export const REGISTRATION_IP_RETENTION_DAYS = 30;
+/** QA F5: email send-log rows are dead after 24 hours (the 3/h mail budget only needs the last hour). */
+export const EMAIL_SEND_LOG_RETENTION_DAYS = 1;
 
 /**
  * R16 sweep bounds: each round selects and deletes at most D1_MAX_BOUND_PARAMS
@@ -116,6 +128,10 @@ export type RetentionPolicy = {
   orphanPhotoDays: number;
   /** R16: failed-login counters (login_attempts) expire after this many days of inactivity. */
   loginAttemptDays: number;
+  /** QA F5: per-IP registration log rows (registrations_ip_log) expire after this many days. */
+  registrationsIpDays: number;
+  /** QA F5: email send-log rows (email_send_log) expire after this many days. */
+  emailSendLogDays: number;
 };
 
 export const DEFAULT_RETENTION_POLICY: RetentionPolicy = {
@@ -125,6 +141,8 @@ export const DEFAULT_RETENTION_POLICY: RetentionPolicy = {
   correctionDays: CORRECTION_RETENTION_DAYS,
   orphanPhotoDays: ORPHAN_PHOTO_RETENTION_DAYS,
   loginAttemptDays: LOGIN_ATTEMPT_RETENTION_DAYS,
+  registrationsIpDays: REGISTRATION_IP_RETENTION_DAYS,
+  emailSendLogDays: EMAIL_SEND_LOG_RETENTION_DAYS,
 };
 
 /** Minimal R2 surface the sweep needs (the real PHOTOS bucket satisfies it). */
@@ -164,6 +182,10 @@ export type RetentionSummary = {
   challengesPurged: number;
   /** R16: stale failed-login counter rows removed (30-day window, bounded sweep). */
   loginAttemptsPurged: number;
+  /** QA F5: per-IP registration log rows older than the cap window removed (30 days). */
+  registrationIpLogPurged: number;
+  /** QA F5: email send-log rows older than the mail budget window removed (24 hours). */
+  emailSendLogPurged: number;
   /** Records/chunks whose D1 or R2 step threw; the sweep skipped them and continued. */
   failures: number;
   /** Audit rows are append-only by design; never touched. */
@@ -314,6 +336,8 @@ export async function runRetentionSweep(
     emailTokensPurged: 0,
     challengesPurged: 0,
     loginAttemptsPurged: 0,
+    registrationIpLogPurged: 0,
+    emailSendLogPurged: 0,
     failures: 0,
     moderationEventsRetained: 0,
   };
@@ -617,6 +641,32 @@ export async function runRetentionSweep(
     }
   }
   summary.loginAttemptsPurged = loginAttemptsPurged;
+
+  // --- QA F5: registrations_ip_log (per-IP registration cap state) and
+  // email_send_log (mail budget state) are dead rows after their window.
+  // The cap COUNT and the mail budget COUNT only read rows inside their
+  // window (24h / 1h); older rows are inert yet accumulate forever, and the
+  // registration log additionally stores unsalted SHA-256 caller keys that
+  // the project's data-minimisation policy should not keep indefinitely.
+  // REGISTRATION_IP_RETENTION_DAYS (30) is specular to R16; the mail log is
+  // purged after EMAIL_SEND_LOG_RETENTION_DAYS (1) — the budget needs only
+  // the last hour, a 24h floor keeps the sweep conservative. Both tables are
+  // TTL-bounded and small, so a single bounded DELETE per table is enough
+  // (same pattern as the R7/R15 sweeps); a broken sweep is logged by the
+  // scheduled handler and retried next run.
+  const registrationIpLogCutoff = daysAgo(now, policy.registrationsIpDays);
+  const registrationIpPurged = (await d1
+    .prepare("DELETE FROM registrations_ip_log WHERE created_at < ?")
+    .bind(registrationIpLogCutoff)
+    .run()) as { meta: { changes: number } };
+  summary.registrationIpLogPurged = registrationIpPurged.meta.changes;
+
+  const emailSendLogCutoff = daysAgo(now, policy.emailSendLogDays);
+  const emailSendLogPurged = (await d1
+    .prepare("DELETE FROM email_send_log WHERE sent_at < ?")
+    .bind(emailSendLogCutoff)
+    .run()) as { meta: { changes: number } };
+  summary.emailSendLogPurged = emailSendLogPurged.meta.changes;
 
   return summary;
 }

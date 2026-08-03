@@ -18,9 +18,9 @@
 //   2. calls under the threshold are not rate-limited (no spurious 429);
 //   3. each route family keeps an independent window (a submit burst never
 //      starves read/search/nearby/revisions and vice versa);
-//   4. the caller key prefers the edge IP over X-Forwarded-For, falls back
-//      to the first forwarded hop, and degrades to "unknown" without
-//      crashing when no identity header is present;
+//   4. the caller key prefers the edge IP and, without it, degrades to the
+//      shared "unknown" bucket — a client-controlled X-Forwarded-For header
+//      is NEVER trusted as caller identity (QA F7, t_894e0cc3);
 //   5. a block is a clean 429 (never a 500) and the hashed abuse alert
 //      fires at most once per cooldown window.
 //
@@ -569,18 +569,22 @@ test("the caller key prefers the edge IP over X-Forwarded-For at the route layer
   assert.notEqual(edgeB.status, 429, "a different edge IP must have its own window");
 });
 
-test("the caller key falls back to the first X-Forwarded-For hop without an edge IP", async () => {
+test("without an edge IP the X-Forwarded-For header is NOT trusted (shared unknown key)", async () => {
   env.POST_RATE_LIMIT_MAX = "1";
   env.POST_RATE_LIMIT_WINDOW_SECONDS = "60";
   stub("pendingPhotoUsage", async () => ({ count: 0, bytes: 0 })); // photo quota (#123), route contract on main
   const { POST } = await routes.photos();
 
+  // QA F7 (t_894e0cc3): on a deployment without the Cloudflare edge the
+  // X-Forwarded-For header is client-controlled, so a caller that only
+  // sends it must NOT get a per-hop window — every such caller shares the
+  // single "unknown" bucket (fail-closed), exactly like the no-header case.
   const first = await POST(build.photos(undefined, "203.0.113.9, 10.0.0.1"));
-  assert.notEqual(first.status, 429, "first request for this forwarded hop must pass");
+  assert.notEqual(first.status, 429, "the first request without an edge IP must pass");
   const sameHop = await POST(build.photos(undefined, "203.0.113.9, 10.0.0.1"));
-  assertBlocked(sameHop, "a second request with the same first hop must be blocked");
+  assertBlocked(sameHop, "a second request must be blocked (shared unknown bucket)");
   const otherHop = await POST(build.photos(undefined, "203.0.113.10, 10.0.0.1"));
-  assert.notEqual(otherHop.status, 429, "a different first hop must have its own window");
+  assertBlocked(otherHop, "a different X-Forwarded-For must NOT get its own window — the header is spoofable and must not reset the cap");
 });
 
 test("a request with no identity header degrades to the unknown key without crashing", async () => {

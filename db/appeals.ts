@@ -227,25 +227,41 @@ export async function fileAppeal(input: {
   // ONE batch: the appeal INSERT + the audit event. The two WRITES are atomic
   // (a crash cannot file an appeal without its event, or record an event for
   // an appeal that never landed); the readback is a separate read afterwards.
-  const results = (await d1.batch([
-    d1
-      .prepare(
-        "INSERT INTO moderation_appeals (entity, entity_id, decision_event_id, appellant_id, reason, status, created_at) VALUES (?, ?, ?, ?, ?, 'pending', ?) RETURNING id",
-      )
-      .bind(input.entity, input.entityId, input.decisionEventId, input.appellantId, input.reason, now),
-    buildAppealFiledEventStatement(
-      d1,
-      {
-        entity: input.entity,
-        entityId: input.entityId,
-        previousStatus: decision.previousStatus,
-        newStatus: decision.newStatus,
-        action: "appeal-filed",
-        reasonCode: "other",
-      },
-      input.reason,
-    ),
-  ])) as D1BatchResult[];
+  // QA F2 (t_894e0cc3): the partial UNIQUE index
+  // moderation_appeals_pending_decision_unique (migration 0033) makes the
+  // pending-duplicate check atomic at the SQL level — two concurrent POSTs on
+  // the same decision cannot both pass the SELECT above. The second INSERT
+  // violates the index, the batch rolls back (event included) and the
+  // constraint error is mapped to duplicate_pending, exactly like the
+  // sequential path.
+  let results: D1BatchResult[];
+  try {
+    results = (await d1.batch([
+      d1
+        .prepare(
+          "INSERT INTO moderation_appeals (entity, entity_id, decision_event_id, appellant_id, reason, status, created_at) VALUES (?, ?, ?, ?, ?, 'pending', ?) RETURNING id",
+        )
+        .bind(input.entity, input.entityId, input.decisionEventId, input.appellantId, input.reason, now),
+      buildAppealFiledEventStatement(
+        d1,
+        {
+          entity: input.entity,
+          entityId: input.entityId,
+          previousStatus: decision.previousStatus,
+          newStatus: decision.newStatus,
+          action: "appeal-filed",
+          reasonCode: "other",
+        },
+        input.reason,
+      ),
+    ])) as D1BatchResult[];
+  } catch (error) {
+    if (error instanceof Error && /UNIQUE constraint failed/i.test(error.message)) {
+      // The concurrent POST filed first: this one is the duplicate.
+      return { kind: "duplicate_pending" };
+    }
+    throw error;
+  }
 
   const created = results[0].results?.[0] as { id: number } | undefined;
   if (!created) throw new Error("Appeal could not be recorded");
@@ -319,7 +335,14 @@ export async function decideAppeal(input: {
 
   const appealUpdate = d1
     .prepare(
-      "UPDATE moderation_appeals SET status = ?, decided_by = ?, decision_note = ?, decided_at = ? WHERE id = ? RETURNING id",
+      // QA F3 (t_894e0cc3): the UPDATE must carry the SAME state guard as the
+      // SELECT above — WHERE id = ? AND status IN ('pending','escalated'). The
+      // pre-read guard alone is not atomic: two concurrent PATCHes both read
+      // 'pending', both pass every check, and last-write-wins would flip a
+      // decision already taken (double decision event, queue reopened twice).
+      // Guarding the UPDATE closes the race at the SQL level; changes=0 maps
+      // to not_pending below, exactly like db/moderation.ts moderateCamera.
+      "UPDATE moderation_appeals SET status = ?, decided_by = ?, decision_note = ?, decided_at = ? WHERE id = ? AND status IN ('pending', 'escalated') RETURNING id",
     )
     .bind(status, input.reviewer.id, input.note, now, input.id);
 
@@ -355,7 +378,13 @@ export async function decideAppeal(input: {
     ])) as D1BatchResult[];
 
     const updated = results[0].results?.[0] as { id: number } | undefined;
-    if (!updated) return { kind: "not_found" };
+    if (!updated) {
+      // The SELECT above found a pending/escalated appeal, but the guarded
+      // UPDATE touched 0 rows: another decider won the race and the appeal is
+      // no longer decidable. That is not_pending (409), never not_found —
+      // the row still exists, it just changed state under us (QA F3).
+      return { kind: "not_pending" };
+    }
     const event = results[3].results?.[0] as ModerationEvent;
     const appealView = results[4].results?.[0] as ModerationAppeal | undefined;
     const appealResult = appealView ?? (await loadAppeal(d1, input.id));
@@ -381,7 +410,10 @@ export async function decideAppeal(input: {
   ])) as D1BatchResult[];
 
   const updated = results[0].results?.[0] as { id: number } | undefined;
-  if (!updated) return { kind: "not_found" };
+  if (!updated) {
+    // Guarded UPDATE touched 0 rows: another decider won the race (QA F3).
+    return { kind: "not_pending" };
+  }
   const event = results[1].results?.[0] as ModerationEvent;
   const appealView = results[2].results?.[0] as ModerationAppeal | undefined;
   const appealResult = appealView ?? (await loadAppeal(d1, input.id));

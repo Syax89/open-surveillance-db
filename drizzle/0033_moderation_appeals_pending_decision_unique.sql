@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX `moderation_appeals_pending_decision_unique` ON `moderation_appeals` (`decision_event_id`) WHERE status = 'pending';
