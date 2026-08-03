@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { getD1 } from "./cameras";
+import { demoRecordsPublic, getD1 } from "./cameras";
 import { PUBLIC_CAMERA_STATUSES } from "../app/lib/public-status";
 
 /**
@@ -172,7 +172,12 @@ export async function setConfirmation(input: {
   // 1. Load the camera and apply the shared public predicate. The IN
   //    whitelist is built from PUBLIC_CAMERA_STATUSES, never hardcoded:
   //    status IN (PUBLIC_CAMERA_STATUSES) AND (status = 'demo' OR
-  //    review_due_at IS NULL OR review_due_at >= now).
+  //    review_due_at IS NULL OR review_due_at >= now). The ADR 0008 demo
+  //    gate (t_d7a4b99b) applies here too: outside ENVIRONMENT=development
+  //    a demo record is not public, so a verification toggle on it fails
+  //    closed (camera_not_public) — the confirmation count is part of the
+  //    public record payload and must never be writable on demo data in
+  //    production.
   const camera = await d1
     .prepare(
       "SELECT id, contributor_id AS contributorId, status, review_due_at AS reviewDueAt, last_verified_at AS lastVerifiedAt FROM cameras WHERE id = ?",
@@ -187,9 +192,10 @@ export async function setConfirmation(input: {
     }>();
   if (!camera) return { kind: "camera_not_public" };
   const placeholders = PUBLIC_CAMERA_STATUSES.map(() => "?").join(", ");
+  const demoGate = demoRecordsPublic() ? "" : " AND status != 'demo'";
   const publicCheck = await d1
     .prepare(
-      `SELECT 1 AS ok FROM cameras WHERE id = ? AND status IN (${placeholders}) AND (status = 'demo' OR review_due_at IS NULL OR review_due_at >= ?)`,
+      `SELECT 1 AS ok FROM cameras WHERE id = ? AND status IN (${placeholders}) AND (status = 'demo' OR review_due_at IS NULL OR review_due_at >= ?)${demoGate}`,
     )
     .bind(input.cameraId, ...PUBLIC_CAMERA_STATUSES, input.now)
     .first<{ ok: number }>();

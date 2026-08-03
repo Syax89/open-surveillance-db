@@ -82,13 +82,15 @@ declare module "cloudflare:workers" {
     ASSETS: Fetcher;
     DB: D1Database;
     /**
-     * Deployment environment flag. Only the exact value "development" opens
-     * the moderation demo actor selector (admin may pick a client-supplied
-     * actorId). Unset or any other value = production: the moderation route
-     * ALWAYS derives the acting reviewer server-side, so the append-only
-     * audit trail cannot be forged by impersonation (t_6b61fc3f). Set it
-     * locally via `.dev.vars` (gitignored) — never in wrangler.jsonc, which
-     * is shared with the production deploy.
+     * Deployment environment flag (fail-closed). Only the exact value
+     * "development" opens the dev-only behaviours: demo records on public
+     * surfaces (ADR 0008 demo gate, t_d7a4b99b) and the moderation demo
+     * actor selector (admin may pick a client-supplied actorId, t_6b61fc3f).
+     * Unset or any other value = production: demo records never cross a
+     * public surface and the moderation route ALWAYS derives the acting
+     * reviewer server-side, so the append-only audit trail cannot be forged
+     * by impersonation. Set it locally via `.dev.vars` (gitignored) — never
+     * in wrangler.jsonc, which is shared with the production deploy.
      */
     ENVIRONMENT?: string;
     /** Email Service binding (wrangler.jsonc `send_email`, name EMAIL). */

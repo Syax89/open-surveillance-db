@@ -108,18 +108,27 @@ test("a fresh database starts empty: no demo records are seeded at runtime", asy
 test("the public camera query returns only verified and demo records", async () => {
   const { env, cameras } = await realDb();
   await resetDb({ env, cameras });
-  const statuses = ["pending", "needs_review", "rejected", "removed", "stale", "verified", "demo"];
-  for (const status of statuses) {
-    await insertCamera(env, { title: `Record ${status}`, status });
-  }
+  // ADR 0008 demo gate (t_d7a4b99b): `demo` records are public ONLY in the
+  // local development environment. This contract pins the prototype status
+  // whitelist, so the shared harness env is flipped to development for the
+  // duration of the test.
+  env.ENVIRONMENT = "development";
+  try {
+    const statuses = ["pending", "needs_review", "rejected", "removed", "stale", "verified", "demo"];
+    for (const status of statuses) {
+      await insertCamera(env, { title: `Record ${status}`, status });
+    }
 
-  const records = await cameras.listPublicCameras();
-  const returned = records.filter((record) => record.source === "Community report");
-  assert.deepEqual(
-    returned.map((record) => record.status).sort(),
-    ["demo", "verified"],
-    "pending/needs_review/rejected/removed/stale must never cross the public boundary",
-  );
+    const records = await cameras.listPublicCameras();
+    const returned = records.filter((record) => record.source === "Community report");
+    assert.deepEqual(
+      returned.map((record) => record.status).sort(),
+      ["demo", "verified"],
+      "pending/needs_review/rejected/removed/stale must never cross the public boundary",
+    );
+  } finally {
+    delete env.ENVIRONMENT;
+  }
 });
 
 test("the public camera query never selects the private notes field", async () => {
@@ -392,32 +401,40 @@ test("findNearbyPublicCameras keeps a raw-inside candidate that would round outs
 test("findPublicCamerasNearPage pages by distance in SQL with the historical ordering and totals", async () => {
   const { env, cameras } = await realDb();
   await resetDb({ env, cameras });
-  // Same fixture family as findNearbyPublicCameras: ~11 m, ~111 m, ~1.1 km,
-  // plus a pending record that must never surface and a demo record that must.
-  await insertCamera(env, { title: "Near", latitude: 44.101 });
-  await insertCamera(env, { title: "Closer", latitude: 44.1001 });
-  await insertCamera(env, { title: "Far", latitude: 44.11 });
-  await insertCamera(env, { title: "Pending far", latitude: 44.2, status: "pending" });
-  await insertCamera(env, { title: "Demo near", latitude: 44.1002, status: "demo" });
+  // ADR 0008 demo gate (t_d7a4b99b): `demo` records are public ONLY in
+  // development; this contract pins the prototype nearby surface, so the
+  // shared harness env is flipped for the duration of the test.
+  env.ENVIRONMENT = "development";
+  try {
+    // Same fixture family as findNearbyPublicCameras: ~11 m, ~111 m, ~1.1 km,
+    // plus a pending record that must never surface and a demo record that must.
+    await insertCamera(env, { title: "Near", latitude: 44.101 });
+    await insertCamera(env, { title: "Closer", latitude: 44.1001 });
+    await insertCamera(env, { title: "Far", latitude: 44.11 });
+    await insertCamera(env, { title: "Pending far", latitude: 44.2, status: "pending" });
+    await insertCamera(env, { title: "Demo near", latitude: 44.1002, status: "demo" });
 
-  // Page 1 with limit 2: the two closest, in distance order.
-  const page1 = await cameras.findPublicCamerasNearPage(44.1, 12.2, 200, { limit: 2, offset: 0 }, 25, 100);
-  assert.deepEqual(page1.records.map((record) => record.title), ["Closer", "Demo near"], "page 1 must be the two closest in ascending distance");
-  assert.equal(page1.total, 3, "total must count every reviewed public record inside the radius");
-  assert.equal(page1.nextOffset, 2, "nextOffset must point at the next page");
+    // Page 1 with limit 2: the two closest, in distance order.
+    const page1 = await cameras.findPublicCamerasNearPage(44.1, 12.2, 200, { limit: 2, offset: 0 }, 25, 100);
+    assert.deepEqual(page1.records.map((record) => record.title), ["Closer", "Demo near"], "page 1 must be the two closest in ascending distance");
+    assert.equal(page1.total, 3, "total must count every reviewed public record inside the radius");
+    assert.equal(page1.nextOffset, 2, "nextOffset must point at the next page");
 
-  // Page 2 with limit 2: the remaining record; nextOffset must be null.
-  const page2 = await cameras.findPublicCamerasNearPage(44.1, 12.2, 200, { limit: 2, offset: 2 }, 25, 100);
-  assert.deepEqual(page2.records.map((record) => record.title), ["Near"], "page 2 must carry the last in-range record");
-  assert.equal(page2.total, 3);
-  assert.equal(page2.nextOffset, null, "the last page must not advertise a next offset");
+    // Page 2 with limit 2: the remaining record; nextOffset must be null.
+    const page2 = await cameras.findPublicCamerasNearPage(44.1, 12.2, 200, { limit: 2, offset: 2 }, 25, 100);
+    assert.deepEqual(page2.records.map((record) => record.title), ["Near"], "page 2 must carry the last in-range record");
+    assert.equal(page2.total, 3);
+    assert.equal(page2.nextOffset, null, "the last page must not advertise a next offset");
 
-  // Every returned record is inside the radius and rounded to ~10 m (ADR 0008).
-  for (const record of [...page1.records, ...page2.records]) {
-    assert.ok(record.distanceMeters > 0 && record.distanceMeters <= 200, `distance ${record.distanceMeters} must be within the radius`);
-    assert.equal(record.latitude, Math.round(record.latitude * 10000) / 10000, "public coordinates must be rounded (ADR 0008)");
-    assert.equal(record.longitude, Math.round(record.longitude * 10000) / 10000);
-    assert.equal("notes" in record, false, "notes must never leave the module");
+    // Every returned record is inside the radius and rounded to ~10 m (ADR 0008).
+    for (const record of [...page1.records, ...page2.records]) {
+      assert.ok(record.distanceMeters > 0 && record.distanceMeters <= 200, `distance ${record.distanceMeters} must be within the radius`);
+      assert.equal(record.latitude, Math.round(record.latitude * 10000) / 10000, "public coordinates must be rounded (ADR 0008)");
+      assert.equal(record.longitude, Math.round(record.longitude * 10000) / 10000);
+      assert.equal("notes" in record, false, "notes must never leave the module");
+    }
+  } finally {
+    delete env.ENVIRONMENT;
   }
 });
 

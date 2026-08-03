@@ -116,6 +116,12 @@ async function buildDbModules() {
     '  get DB() {\n' +
     '    return globalThis.__OSDB_FRESHNESS_D1__;\n' +
     '  },\n' +
+    // ADR 0008 demo gate (t_d7a4b99b): db/cameras.ts reads env.ENVIRONMENT at
+    // query time to decide whether `demo` records are public. A live getter
+    // lets tests flip the deployment environment between tests.
+    '  get ENVIRONMENT() {\n' +
+    '    return globalThis.__OSDB_FRESHNESS_ENV__;\n' +
+    '  },\n' +
     '};\n',
   );
 

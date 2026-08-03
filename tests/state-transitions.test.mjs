@@ -254,40 +254,49 @@ test("moderating a missing camera or a demo record returns null and writes nothi
 // ---------------------------------------------------------------------------
 
 test("only verified and demo cameras are publicly visible; every other status disappears", async (t) => {
-  const visibility = [
-    { status: "pending", visible: false },
-    { status: "verified", visible: true },
-    { status: "needs_review", visible: false },
-    { status: "rejected", visible: false },
-    { status: "removed", visible: false },
-    { status: "demo", visible: true },
-  ];
+  // ADR 0008 demo gate (t_d7a4b99b): `demo` is public ONLY in the local
+  // development environment. This suite pins the prototype visibility
+  // matrix (the boundary behind JSON/GeoJSON/CSV), so the runtime env is
+  // flipped to development for the duration of the test.
+  runtime.env.ENVIRONMENT = "development";
+  try {
+    const visibility = [
+      { status: "pending", visible: false },
+      { status: "verified", visible: true },
+      { status: "needs_review", visible: false },
+      { status: "rejected", visible: false },
+      { status: "removed", visible: false },
+      { status: "demo", visible: true },
+    ];
 
-  for (const { status, visible } of visibility) {
-    await t.test(`${status} -> ${visible ? "visible" : "hidden"}`, async () => {
-      const report = await submitReport({ title: `Visibility ${status}`, latitude: 41.9, longitude: 12.5 });
-      if (status === "demo") {
-        // H3: demo is not a moderation-reachable status; simulate the legacy
-        // reserved status with a direct database edit.
-        await db.prepare("UPDATE cameras SET status = 'demo' WHERE id = ?").bind(report.id).run();
-      } else {
-        await toStatus(report.id, status);
-      }
+    for (const { status, visible } of visibility) {
+      await t.test(`${status} -> ${visible ? "visible" : "hidden"}`, async () => {
+        const report = await submitReport({ title: `Visibility ${status}`, latitude: 41.9, longitude: 12.5 });
+        if (status === "demo") {
+          // H3: demo is not a moderation-reachable status; simulate the legacy
+          // reserved status with a direct database edit.
+          await db.prepare("UPDATE cameras SET status = 'demo' WHERE id = ?").bind(report.id).run();
+        } else {
+          await toStatus(report.id, status);
+        }
 
-      const publicRecords = await cameras.listPublicCameras();
-      assert.equal(
-        publicRecords.some((record) => record.id === report.id),
-        visible,
-        `status ${status} must ${visible ? "appear in" : "stay out of"} the public list`,
-      );
+        const publicRecords = await cameras.listPublicCameras();
+        assert.equal(
+          publicRecords.some((record) => record.id === report.id),
+          visible,
+          `status ${status} must ${visible ? "appear in" : "stay out of"} the public list`,
+        );
 
-      const nearby = await cameras.findNearbyPublicCameras(41.9, 12.5, 100);
-      assert.equal(
-        nearby.some((record) => record.id === report.id),
-        visible,
-        `status ${status} must ${visible ? "appear in" : "stay out of"} nearby search`,
-      );
-    });
+        const nearby = await cameras.findNearbyPublicCameras(41.9, 12.5, 100);
+        assert.equal(
+          nearby.some((record) => record.id === report.id),
+          visible,
+          `status ${status} must ${visible ? "appear in" : "stay out of"} nearby search`,
+        );
+      });
+    }
+  } finally {
+    delete runtime.env.ENVIRONMENT;
   }
 });
 
