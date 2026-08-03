@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useMessages } from "../components/LocaleProvider";
-import { SiteHeader } from "../components/SiteHeader";
+import { PublicNav } from "../components/PublicNav";
 
 /**
  * /forgot-password body (P1-3 Vera design).
@@ -52,11 +52,7 @@ export function ForgotPasswordBody() {
 
   return (
     <main id="main-content" className="record-page">
-      <SiteHeader navLabel={t.navigation} homeLabel={t.homeAria}>
-        <div className="nav-links">
-          <Link className="nav-action" href="/">{t.backHome}</Link>
-        </div>
-      </SiteHeader>
+      <PublicNav navLabel={t.navigation} homeLabel={t.homeAria} />
 
       <article className="record-detail auth-card">
         <p className="eyebrow"><span /> {t.forgotTitle}</p>

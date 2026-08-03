@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useMessages } from "../components/LocaleProvider";
-import { SiteHeader } from "../components/SiteHeader";
+import { PublicNav } from "../components/PublicNav";
 
 /**
  * /verify-email body (P1-1 Vera design) — consumes the single-use token from
@@ -107,11 +107,7 @@ export function VerifyEmailBody() {
 
   return (
     <main id="main-content" className="record-page">
-      <SiteHeader navLabel={t.navigation} homeLabel={t.homeAria}>
-        <div className="nav-links">
-          <Link className="nav-action" href="/">{t.backHome}</Link>
-        </div>
-      </SiteHeader>
+      <PublicNav navLabel={t.navigation} homeLabel={t.homeAria} />
 
       <article className="record-detail auth-card">
         <p className="eyebrow"><span /> {t.verifyTitle}</p>

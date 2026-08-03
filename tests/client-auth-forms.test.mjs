@@ -247,8 +247,11 @@ test("register: a password missing one class is refused client-side without a PO
   const { screen } = rtl;
   const user = makeUser();
   let fetchCalled = false;
-  installFetchMock(() => {
-    fetchCalled = true;
+  // PublicNav (t_96f0d374) mounts AuthNavLinks, whose session check issues a
+  // GET /api/auth/me on mount. The assertion below is about the FORM not
+  // POSTing — count only POSTs, not the nav's session GET.
+  installFetchMock((input, init) => {
+    if (init?.method === "POST") fetchCalled = true;
     return jsonResponse({}, { status: 200 });
   });
 

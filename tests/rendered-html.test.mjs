@@ -285,6 +285,30 @@ test("register page links to the privacy notice and terms next to the submit but
   assert.match(html, /Create account<\/button>[\s\S]{0,200}href="\/privacy"/);
 });
 
+test("auth pages render the full public nav (six links + mobile menu), not the backHome-only header (t_96f0d374)", async () => {
+  // Vera's design (t_e0dcc292): the auth pages used to render SiteHeader
+  // with a single "Back to the map" link; CEO feedback 2026-08-03 wants the
+  // SAME PublicNav as the other public pages (PublicNavLinks 6 links +
+  // AuthNavLinks) while the auth-card stays compact. End-to-end pin on the
+  // real SSR output: the six shared links and the mobile menu button are
+  // present, the bare backHome header is gone (its auth i18n key was
+  // removed), and the EN/IT locale toggle stays in the header.
+  const AUTH_ROUTES = ["/login", "/register", "/forgot-password", "/reset-password", "/verify-email", "/account"];
+  const PUBLIC_LINKS = ["/mappa", "/directory", "/guide", "/regole", "/manifesto", "/segnala"];
+  for (const route of AUTH_ROUTES) {
+    const { response, html } = await renderRoute(route);
+    assert.equal(response.status, 200, `${route} must render 200`);
+    for (const href of PUBLIC_LINKS) {
+      assert.ok(html.includes(`href="${href}"`), `${route}: the public nav must link ${href}`);
+    }
+    assert.ok(html.includes("class=\"menu-button\""), `${route}: PublicNav must render the mobile menu button`);
+    assert.ok(html.includes("id=\"main-links\""), `${route}: the mobile menu container #main-links must render`);
+    assert.ok(html.includes("class=\"locale-toggle\""), `${route}: the EN/IT toggle stays in the header`);
+    assert.doesNotMatch(html, />Back to the map</, `${route}: no backHome-only header link`);
+    assert.doesNotMatch(html, />Torna alla mappa</, `${route}: no backHome-only header link (IT)`);
+  }
+});
+
 test("server-rendered /manifesto is accessible and carries the mission, principles, non-goals and publish boundaries", async () => {
   const { response, html } = await renderRoute("/manifesto");
 

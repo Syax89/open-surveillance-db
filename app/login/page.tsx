@@ -4,7 +4,7 @@ import { Suspense, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMessages } from "../components/LocaleProvider";
-import { SiteHeader } from "../components/SiteHeader";
+import { PublicNav } from "../components/PublicNav";
 import { browserSupportsWebAuthn, getCredential } from "../lib/webauthn-client";
 
 /**
@@ -230,11 +230,7 @@ function LoginPageBody() {
 
   return (
     <main id="main-content" className="record-page">
-      <SiteHeader navLabel={t.navigation} homeLabel={t.homeAria}>
-        <div className="nav-links">
-          <Link className="nav-action" href="/">{t.backHome}</Link>
-        </div>
-      </SiteHeader>
+      <PublicNav navLabel={t.navigation} homeLabel={t.homeAria} />
 
       <article className="record-detail auth-card">
         <p className="eyebrow"><span /> {mergeMode ? t.mergeTitle : t.loginTitle}</p>

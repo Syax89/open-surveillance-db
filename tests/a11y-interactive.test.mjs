@@ -499,9 +499,12 @@ test("aria-invalid marks the failing auth field on submit and clears as the user
   // only appears after a failed submit).
   const rtl = await setupDom();
   const user = rtl.userEvent.setup();
-  let fetchCalled = false;
-  installFetchMock(() => {
-    fetchCalled = true;
+  let loginFetchCalled = false;
+  installFetchMock((input) => {
+    // The header (PublicNav -> AuthNavLinks, t_96f0d374) legitimately calls
+    // GET /api/auth/me on mount — only the form's own POST must never fire
+    // on client-side validation errors.
+    if (String(input) === "/api/auth/login") loginFetchCalled = true;
     return jsonResponse({ error: "invalid credentials" }, { status: 401 });
   });
 
@@ -516,7 +519,7 @@ test("aria-invalid marks the failing auth field on submit and clears as the user
   await user.click(rtl.screen.getByRole("button", { name: /log in/i }));
   assert.equal(emailInput.getAttribute("aria-invalid"), "true", "empty email must be invalid");
   assert.equal(passwordInput.getAttribute("aria-invalid"), "true", "short password must be invalid");
-  assert.equal(fetchCalled, false, "client-side field errors must not fire the network request");
+  assert.equal(loginFetchCalled, false, "client-side field errors must not fire the network request");
 
   // Fixing the email clears only its own flag; the password stays invalid.
   await user.type(emailInput, "contributor@example.test");

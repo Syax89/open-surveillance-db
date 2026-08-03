@@ -216,8 +216,11 @@ test("reset-password: the requirements list is visible and a weak password is re
   const { screen } = rtl;
   const user = rtl.userEvent.setup();
   let fetchCalled = false;
-  installFetchMock(() => {
-    fetchCalled = true;
+  // PublicNav (t_96f0d374) mounts AuthNavLinks, whose session check issues a
+  // GET /api/auth/me on mount. The assertion below is about the FORM not
+  // POSTing — count only POSTs, not the nav's session GET.
+  installFetchMock((input, init) => {
+    if (init?.method === "POST") fetchCalled = true;
     return jsonResponse({ ok: true });
   });
   await setNavState({ url: "/reset-password?token=reset-token-abc" });
