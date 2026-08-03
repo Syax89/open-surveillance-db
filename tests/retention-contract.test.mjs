@@ -206,3 +206,29 @@ test("R15: the retention sweep purges expired email tokens and lapsed WebAuthn c
     "the sweep must report the purged challenge count in the summary",
   );
 });
+
+test("R16: RETENTION_SCHEDULE.md pins the 30-day login_attempts window matching the code contract (audit finding 5 / P3-10)", async () => {
+  const schedule = await readSource("docs/legal/RETENTION_SCHEDULE.md");
+  const retention = await readSource("db/retention.ts");
+
+  assert.match(
+    schedule,
+    /R16 \| Failed-login counters[\s\S]*?\*\*30 days\*\*/,
+    "R16 must pin 30 days for failed-login counter rows (RETENTION_SCHEDULE.md)",
+  );
+  assert.match(
+    retention,
+    /LOGIN_ATTEMPT_RETENTION_DAYS\s*=\s*30/,
+    "the code must use the 30-day constant for login_attempts",
+  );
+  assert.match(
+    retention,
+    /locked_until IS NULL OR locked_until < \?/,
+    "the sweep must never delete a row under an ACTIVE lock",
+  );
+  assert.match(
+    retention,
+    /summary\.loginAttemptsPurged/,
+    "the sweep must report the purged login_attempts count in the summary",
+  );
+});

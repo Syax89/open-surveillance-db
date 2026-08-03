@@ -361,6 +361,11 @@ export const sessions = sqliteTable(
  * so the duration backs off exponentially (capped in code). All queries go
  * through db/auth.ts; this definition exists so the drizzle model stays the
  * single schema reference.
+ *
+ * Retention (R16, RETENTION_SCHEDULE.md): the retention cron sweeps rows
+ * whose `window_start` is older than LOGIN_ATTEMPT_RETENTION_DAYS (30 days)
+ * with a bounded delete; a row whose `locked_until` is still in the future
+ * (an ACTIVE lock) is never swept — the cleanup must not weaken a lockout.
  */
 export const loginAttempts = sqliteTable(
   "login_attempts",

@@ -193,6 +193,12 @@ in wrangler.jsonc non è un segreto), né violazioni del data boundary pubblico.
 - **Problema:** righe `login_attempts` per email mai autenticate restano per sempre (crescono col
   tentativo di enumerazione, pur essendo hash-only).
 - **Fix proposto:** aggiungere una regola R8 nel sweep (DELETE dove `window_start < now - N giorni`).
+- **Risolto (t_aca36902):** regola **R16** in `db/retention.ts` — sweep **bounded** che cancella le righe
+  `login_attempts` con `window_start` più vecchio di 30 giorni (`LOGIN_ATTEMPT_RETENTION_DAYS`), in round
+  da ≤100 chiavi con cap per run; un lock **attivo** (`locked_until` nel futuro) non viene mai toccato.
+  Documentata in RETENTION_SCHEDULE.md (R16), AUDIT_REPORT finding 5 e tests/retention.test.mjs. Nota:
+  numerata **R16** (e non R8 come proposto qui) perché **R8 è già assegnata** in RETENTION_SCHEDULE.md alla
+  moderator identity — due regole con lo stesso id nel documento legale sarebbero state incoerenti.
 
 ---
 
