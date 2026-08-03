@@ -1,5 +1,5 @@
-import { LOCALE_COOKIE } from "../../lib/i18n";
-import type { Locale } from "../../lib/i18n";
+import { LOCALE_COOKIE, resolveLocale } from "../../lib/i18n/types";
+import type { Locale } from "../../lib/i18n/types";
 import { urlTooLong } from "../../lib/input-limits";
 
 /**
@@ -25,8 +25,9 @@ export async function GET(request: Request) {
   }
 
   const url = new URL(request.url);
-  const lang = url.searchParams.get("lang");
-  const locale: Locale = lang === "it" ? "it" : "en";
+  // Registry-driven: only registered locale codes are accepted, anything
+  // else falls back to the pilot language (no it/en ternary).
+  const locale: Locale = resolveLocale(url.searchParams.get("lang"));
 
   // Safe redirect target: same-site path only. Rejects absolute URLs,
   // protocol-relative //host and backslash tricks, literal CR/LF and the

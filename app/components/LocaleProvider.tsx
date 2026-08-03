@@ -2,8 +2,8 @@
 
 import { createContext, useContext, useEffect, useMemo, useSyncExternalStore, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { LOCALE_COOKIE, messages } from "../lib/i18n";
-import type { Locale, MessageBundle } from "../lib/i18n";
+import { DEFAULT_LOCALE, LOCALE_COOKIE, SUPPORTED_LOCALES, messages, resolveLocale } from "../lib/i18n";
+import type { Locale, LocaleInfo, MessageBundle } from "../lib/i18n";
 
 type LocaleContextValue = {
   locale: Locale;
@@ -34,9 +34,10 @@ const SERVER_RENDERED_INFO_ROUTES = new Set([
 ]);
 
 function readStoredLocale(): Locale {
-  if (typeof window === "undefined") return "en";
+  if (typeof window === "undefined") return DEFAULT_LOCALE;
   const savedLocale = window.localStorage.getItem(storageKey);
-  return savedLocale === "en" || savedLocale === "it" ? savedLocale : "en";
+  // Registry-driven: unknown/absent values resolve to the pilot language.
+  return resolveLocale(savedLocale);
 }
 
 function subscribeToLocale(callback: () => void) {
@@ -50,7 +51,7 @@ function subscribeToLocale(callback: () => void) {
 
 export function LocaleProvider({
   children,
-  serverLocale = "en",
+  serverLocale = DEFAULT_LOCALE,
 }: {
   children: ReactNode;
   /**
@@ -101,7 +102,16 @@ export function useMessages(): MessageBundle {
   return messages[locale];
 }
 
-export function LocaleToggle() {
+/**
+ * Language switcher.
+ *
+ * The buttons are GENERATED from the locale registry (SUPPORTED_LOCALES):
+ * one button per registered language, labelled with the registry label.
+ * Adding a language to the registry automatically adds its button — no
+ * hardcoded EN/IT pair. The `locales` prop exists for previews/demos and
+ * lets tests exercise the toggle with a 3+-language mock registry.
+ */
+export function LocaleToggle({ locales = SUPPORTED_LOCALES }: { locales?: readonly LocaleInfo[] }) {
   const { locale, setLocale } = useLocale();
   const router = useRouter();
   const pathname = usePathname();
@@ -118,7 +128,14 @@ export function LocaleToggle() {
   };
 
   return <div className="locale-toggle" aria-label={common.languageSelection}>
-    <button type="button" className={locale === "en" ? "is-active" : ""} aria-pressed={locale === "en"} onClick={() => changeLocale("en")}>EN</button>
-    <button type="button" className={locale === "it" ? "is-active" : ""} aria-pressed={locale === "it"} onClick={() => changeLocale("it")}>IT</button>
+    {locales.map(({ code, label }) => (
+      <button
+        key={code}
+        type="button"
+        className={locale === code ? "is-active" : ""}
+        aria-pressed={locale === code}
+        onClick={() => changeLocale(code)}
+      >{label}</button>
+    ))}
   </div>;
 }

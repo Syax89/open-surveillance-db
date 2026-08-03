@@ -57,6 +57,9 @@ const DB_MODULES = [
   // the 3/h re-send rate limit runs real SQL against the same in-memory D1.
   { source: "db/mailer.ts", output: "db/mailer.mjs" },
   { source: "app/lib/email-templates.ts", output: "app/lib/email-templates.mjs" },
+  // app/lib/email-templates.ts imports the locale registry from
+  // ./i18n/types (kanban t_6424f961); mirror it so the import resolves.
+  { source: "app/lib/i18n/types.ts", output: "app/lib/i18n/types.mjs" },
   // Auth roles + appeals (ADR 0014): db/users (identity accounts, coarse
   // role) and db/appeals (appeal workflow) run against the same env.DB.
   // db/appeals imports ./moderation + ./users; db/users imports ./cameras.

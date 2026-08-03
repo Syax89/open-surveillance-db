@@ -567,8 +567,13 @@ test("switching locale updates document.documentElement.lang (screen-reader read
     "the provider must keep the root lang in sync with the selected locale",
   );
   assert.match(provider, /useEffect\(\(\) => \{\s*document\.documentElement\.lang = locale;\s*\}, \[locale\]\)/, "the sync must run on every locale change");
-  assert.match(provider, /aria-pressed=\{locale === "en"\}/, "the EN button must reflect its pressed state");
-  assert.match(provider, /aria-pressed=\{locale === "it"\}/, "the IT button must reflect its pressed state");
+  // The toggle buttons are GENERATED from the locale registry (kanban
+  // t_6424f961): one button per SUPPORTED_LOCALES entry, each reflecting
+  // its pressed state via `locale === code`. The SSR regex above pins the
+  // rendered EN/IT output; this pins the data-driven source.
+  assert.match(provider, /aria-pressed=\{locale === code\}/, "each generated toggle button must reflect its pressed state");
+  assert.match(provider, /locales\.map\(/, "the toggle buttons must be generated from the locale registry (not a hardcoded EN/IT pair)");
+  assert.match(provider, /SUPPORTED_LOCALES/, "the toggle must default to the registered locales");
 });
 
 // ---------------------------------------------------------------------------

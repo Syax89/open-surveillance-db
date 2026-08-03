@@ -5,6 +5,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocale, useMessages } from "../LocaleProvider";
+import { LOCALE_BCP47 } from "../../lib/i18n";
 import type { CameraInQueue, CorrectionInQueue, DecisionFormApi, EditRequestInQueue, ModerationAction, ModerationEvent, PhotoInQueue, QueueEntity, QueueItem, QueuePayload, ReasonCode, Reviewer } from "./types";
 
 export function useModerationQueue() {
@@ -37,7 +38,8 @@ export function useModerationQueue() {
   function readableDate(value?: string) {
     if (!value) return t.timeUnavailable;
     const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? value : date.toLocaleString(locale === "it" ? "it-IT" : "en-US");
+    // BCP 47 tag from the locale registry (LOCALE_BCP47) — no it-IT/en-US ternary (t_6424f961).
+    return Number.isNaN(date.getTime()) ? value : date.toLocaleString(LOCALE_BCP47[locale]);
   }
 
   function actionLabel(action: ModerationAction) { return t.action[action]; }

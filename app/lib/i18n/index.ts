@@ -1,15 +1,22 @@
 /**
  * i18n entry point.
  *
- * `messages` maps every `Locale` to its message bundle. English is the
- * pilot language: each domain file (e.g. `home.ts`, `auth.ts`) defines the
- * canonical EN key set for its namespace, and its IT counterpart is
- * type-checked against it via `Translation<typeof en>` (see `types.ts`).
+ * `messages` maps every registered `Locale` (SUPPORTED_LOCALES) to its
+ * message bundle. English is the pilot language: each domain file (e.g.
+ * `home.ts`, `auth.ts`) defines the canonical EN key set for its
+ * namespace, and its IT counterpart is type-checked against it via
+ * `Translation<typeof en>` (see `types.ts`).
  *
  * The assembled `messages` shape is the public API — client components
  * consume it through `useMessages()`:
  *   const { locale } = useLocale();
  *   const t = messages[locale].home;
+ *
+ * `messages` is DERIVED from the registry (Object.fromEntries over
+ * SUPPORTED_LOCALES): it can never drift from the supported-language
+ * list. Adding a language = one bundle + one registry line (+ the
+ * mechanical import/entry below) — see docs/DEVELOPMENT_SETUP.md §
+ * "Aggiungere una lingua".
  */
 import { en as commonEn, it as commonIt } from "./common";
 import { en as mapEn, it as mapIt } from "./map";
@@ -30,7 +37,17 @@ import { en as authEn, it as authIt } from "./auth";
 import { en as communityEn, it as communityIt } from "./community";
 import { en as errorsEn, it as errorsIt } from "./errors";
 import { en as footerEn, it as footerIt } from "./footer";
-import type { Locale, Translation } from "./types";
+import {
+  DEFAULT_LOCALE,
+  LOCALE_BCP47,
+  LOCALE_COOKIE,
+  SUPPORTED_LOCALES,
+  isLocale,
+  resolveLocale,
+  type Locale,
+  type LocaleInfo,
+  type Translation,
+} from "./types";
 
 export const en = {
   common: commonEn,
@@ -76,17 +93,20 @@ export const it: Translation<typeof en> = {
   footer: footerIt,
 };
 
-export const messages = { en, it } as const;
+/**
+ * Per-language assembled bundles, keyed by locale code. `en` is the pilot
+ * and defines the canonical shape; `it` is parity-checked against it.
+ * A new language's bundle (single file, `Translation<typeof en>`) is
+ * attached here with one import + one line — the registry line in
+ * types.ts is what actually announces it to the product.
+ */
+const bundleSources = { en, it } as const;
+
+/** Messages keyed exactly by the registry — never by hand. */
+export const messages = Object.fromEntries(
+  SUPPORTED_LOCALES.map(({ code }) => [code, bundleSources[code]]),
+) as Record<Locale, MessageBundle>;
 
 export type MessageBundle = Translation<typeof en>;
-export type { Locale, Translation };
-
-/**
- * Cookie name used to persist the interface locale server-side.
- *
- * The client toggle writes the same value to `localStorage` (multi-tab sync,
- * see LocaleProvider) and to this cookie; server components read the cookie
- * to render the correct bundle and <html lang> (SSR/SEO, task t_c36fe96c).
- * The cookie is a pure preference, never a tracker: no personal data.
- */
-export const LOCALE_COOKIE = "opensurveillancedb-locale";
+export type { Locale, LocaleInfo, Translation };
+export { DEFAULT_LOCALE, LOCALE_BCP47, LOCALE_COOKIE, SUPPORTED_LOCALES, isLocale, resolveLocale };

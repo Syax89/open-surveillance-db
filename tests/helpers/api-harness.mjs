@@ -145,26 +145,35 @@ async function buildTree() {
     await readFile(path.join(mocksDir, "cloudflare-workers.mjs"), "utf8"),
   );
 
-  // Mirror app/lib/*.ts (pure helpers, no Workers bindings) so relative
-  // `lib/*` imports resolve inside the temp tree.
+  // Mirror app/lib/**/*.ts (pure helpers, no Workers bindings) so relative
+  // `lib/*` imports resolve inside the temp tree. Recursive: lib
+  // subdirectories (i18n/, legal/) hold the locale registry and the legal
+  // content, which routes now import (kanban t_6424f961).
   const libDir = path.join(root, "app", "lib");
-  const libOutputDir = path.join(tree, "app", "lib");
-  await mkdir(libOutputDir, { recursive: true });
-  for (const entry of await readdir(libDir, { withFileTypes: true })) {
-    if (!entry.isFile() || !entry.name.endsWith(".ts")) continue;
-    const libCompiled = rewriteSpecifiers(
-      ts.transpileModule(await readFile(path.join(libDir, entry.name), "utf8"), {
-        compilerOptions: {
-          module: ts.ModuleKind.ESNext,
-          target: ts.ScriptTarget.ESNext,
-          moduleResolution: ts.ModuleResolutionKind.Bundler,
-        },
-        fileName: path.join(libDir, entry.name),
-      }).outputText,
-      "",
-    );
-    await writeFile(path.join(libOutputDir, entry.name.replace(/\.ts$/, ".mjs")), libCompiled);
-  }
+  const walkLib = async (dir, relOut) => {
+    for (const entry of await readdir(dir, { withFileTypes: true })) {
+      const abs = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        await walkLib(abs, path.join(relOut, entry.name));
+      } else if (entry.isFile() && entry.name.endsWith(".ts")) {
+        const libCompiled = rewriteSpecifiers(
+          ts.transpileModule(await readFile(abs, "utf8"), {
+            compilerOptions: {
+              module: ts.ModuleKind.ESNext,
+              target: ts.ScriptTarget.ESNext,
+              moduleResolution: ts.ModuleResolutionKind.Bundler,
+            },
+            fileName: abs,
+          }).outputText,
+          "",
+        );
+        const outPath = path.join(tree, relOut, entry.name.replace(/\.ts$/, ".mjs"));
+        await mkdir(path.dirname(outPath), { recursive: true });
+        await writeFile(outPath, libCompiled);
+      }
+    }
+  };
+  await walkLib(libDir, "app/lib");
 
   for (const { source, output } of ROUTES) {
     const sourcePath = path.join(root, source);
@@ -218,6 +227,30 @@ async function buildTree() {
 
     await writeFile(path.join(tree, output), rewritten);
   }
+
+  // Directory-index fixup: a relative specifier that points at a directory
+  // (e.g. `../lib/i18n` rewritten to `../lib/i18n.mjs`) resolves to the
+  // directory's index module when the .mjs file does not exist — same rule
+  // as the DOM harness and the bundler (app/lib/i18n, app/lib/legal).
+  const fixup = async (dir) => {
+    for (const entry of await readdir(dir, { withFileTypes: true })) {
+      const abs = path.join(dir, entry.name);
+      if (entry.isDirectory()) await fixup(abs);
+      else if (entry.name.endsWith(".mjs")) {
+        let code = await readFile(abs, "utf8");
+        const original = code;
+        code = code.replace(/from\s*["'](\.[^"']+)\.mjs["']/g, (match, spec) => {
+          const resolved = path.resolve(path.dirname(abs), spec);
+          const asFile = `${resolved}.mjs`;
+          const asIndex = path.join(resolved, "index.mjs");
+          if (!existsSync(asFile) && existsSync(asIndex)) return `from "${spec}/index.mjs"`;
+          return match;
+        });
+        if (code !== original) await writeFile(abs, code);
+      }
+    }
+  };
+  await fixup(tree);
   return tree;
 }
 
