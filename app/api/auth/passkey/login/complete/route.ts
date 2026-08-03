@@ -32,12 +32,17 @@ import {
  * Layered checks, in order:
  *  1. single-use challenge consume (anti-replay — a ceremony cannot run
  *     twice, and only a challenge this RP issued can complete);
- *  2. the credential must exist in D1 (credential_id is globally unique);
- *  3. SimpleWebAuthn verifies the assertion (signature, rpIdHash, origin,
+ *  2. when /begin was email-narrowed, the challenge recorded the target
+ *     userHandle and the assertion, WHEN it carries one, must echo the SAME
+ *     handle (the migration 0028 double-check, P3-3; early rejection before
+ *     the credential lookup). Non-resident credentials assert no userHandle
+ *     (spec §6.3.2), which is not a mismatch — those stay bound by 3+5;
+ *  3. the credential must exist in D1 (credential_id is globally unique);
+ *  4. SimpleWebAuthn verifies the assertion (signature, rpIdHash, origin,
  *     clientData challenge) against the stored COSE public key;
- *  4. the assertion userHandle, when present, must decode to the passkey
+ *  5. the assertion userHandle, when present, must decode to the passkey
  *     owner (defence-in-depth binding);
- *  5. signature-counter advancement (anti-replay for cloned authenticators,
+ *  6. signature-counter advancement (anti-replay for cloned authenticators,
  *     spec §6.1): a non-increasing counter with either side non-zero is
  *     rejected — see isCounterAdvancementOk.
  *
@@ -75,13 +80,35 @@ export async function POST(request: Request) {
 
     const response = payload.response as unknown as AuthenticationResponseJSON;
 
-    // 2. The credential must be one this relying party issued.
+    // 2. Challenge userHandle binding (P3-3, review-ada-2): when /begin was
+    //    email-narrowed it stored the target userHandle on the challenge;
+    //    the assertion must echo the SAME handle — the double-check the 0028
+    //    migration promised but nothing enforced. The compare only runs when
+    //    the assertion actually carries a handle: non-resident credentials
+    //    (residentKey:"preferred" is not a guarantee — security keys with
+    //    full slots, U2F-mode authenticators) return NO userHandle per spec
+    //    §6.3.2, so an absent assertion handle is not a mismatch and those
+    //    logins stay bound by the credential lookup (3) and the owner check
+    //    (5) below. Early rejection: runs before the credential lookup and
+    //    the crypto verification.
+    if (
+      typeof response.response.userHandle === "string" &&
+      typeof consumed.userHandle === "string" &&
+      consumed.userHandle !== response.response.userHandle
+    ) {
+      console.warn(
+        `POST /api/auth/passkey/login/complete rejected: assertion userHandle does not match the challenge's recorded handle (challenge ${consumed.id})`,
+      );
+      return Response.json({ error: "Passkey verification failed." }, { status: 401 });
+    }
+
+    // 3. The credential must be one this relying party issued.
     const passkey = await findPasskeyByCredentialId(response.id);
     if (!passkey) {
       return Response.json({ error: "Passkey verification failed." }, { status: 401 });
     }
 
-    // 3. Cryptographic verification against the stored COSE public key.
+    // 4. Cryptographic verification against the stored COSE public key.
     let authenticationInfo;
     try {
       const verification = await verifyAuthenticationResponse({
@@ -101,7 +128,7 @@ export async function POST(request: Request) {
       return Response.json({ error: "Passkey verification failed." }, { status: 401 });
     }
 
-    // 4. userHandle binding: when the authenticator echoes the handle, it
+    // 5. userHandle binding: when the authenticator echoes the handle, it
     //    must be the passkey owner's (v13 nests it under `response`).
     const assertedHandle = response.response.userHandle;
     if (typeof assertedHandle === "string" && assertedHandle.length > 0) {
@@ -114,7 +141,7 @@ export async function POST(request: Request) {
       }
     }
 
-    // 5. Signature-counter anti-replay (cloned authenticators).
+    // 6. Signature-counter anti-replay (cloned authenticators).
     if (!isCounterAdvancementOk(authenticationInfo.newCounter, passkey.counter)) {
       console.warn(
         `POST /api/auth/passkey/login/complete rejected: signature counter did not advance (credential ${passkey.id}, stored ${passkey.counter}, new ${authenticationInfo.newCounter}) — possible cloned authenticator`,

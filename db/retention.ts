@@ -18,6 +18,12 @@
  *                                       photos after 30 days (R13: anchored on
  *                                       the photo reject event)
  *   R7  sessions                      → delete expired / revoked rows
+ *   R15 auth rows                     → expired email-verification tokens
+ *                                       (24h TTL) and lapsed WebAuthn
+ *                                       challenge rows (10-min TTL) purged
+ *                                       on expiry — the cron enforces the
+ *                                       sweep the 0027/0028 migrations
+ *                                       promised (review-ada-2 P3-1)
  *
  * Deliberately NOT purged here:
  *   R5  moderation_events             → append-only by design (BEFORE UPDATE /
@@ -61,6 +67,7 @@
 import { getD1 } from "./cameras";
 import { runFreshnessSweep } from "./moderation";
 import { addMonths } from "./freshness";
+import { sweepExpiredWebAuthnChallenges } from "./passkeys";
 
 // ---------------------------------------------------------------------------
 // Policy constants (RETENTION_SCHEDULE.md / ADR 0004)
@@ -131,6 +138,10 @@ export type RetentionSummary = {
   r2ObjectsFailed: number;
   /** R7: expired/revoked session rows removed. */
   sessionsPurged: number;
+  /** R15: expired email-verification token rows removed (24h TTL, cron sweep). */
+  emailTokensPurged: number;
+  /** R15: expired WebAuthn challenge rows removed (10-min TTL, centralized in the cron). */
+  challengesPurged: number;
   /** Records/chunks whose D1 or R2 step threw; the sweep skipped them and continued. */
   failures: number;
   /** Audit rows are append-only by design; never touched. */
@@ -278,6 +289,8 @@ export async function runRetentionSweep(
     r2ObjectsDeleted: 0,
     r2ObjectsFailed: 0,
     sessionsPurged: 0,
+    emailTokensPurged: 0,
+    challengesPurged: 0,
     failures: 0,
     moderationEventsRetained: 0,
   };
@@ -506,6 +519,30 @@ export async function runRetentionSweep(
     .bind(now)
     .run() as { meta: { changes: number } };
   summary.sessionsPurged = sessions.meta.changes;
+
+  // --- R15 (ADR 0020): expired auth-method rows are garbage collection too.
+  // The 0027/0028 migrations promised an expiry sweep served by the
+  // `expires_at` index; the cron is where that promise is enforced
+  // (review-ada-2 P3-1). Email-verification tokens die 24h after issue
+  // (R15: "deleted on use or expiry"); WebAuthn challenges after 10 minutes.
+  // Both tables are TTL-bounded and small, so a single bounded DELETE is
+  // enough — no chunking needed (the R7 session sweep follows the same
+  // pattern). Failures are deliberately NOT counted here: a broken sweep
+  // run is logged by the worker's scheduled handler and retried next run;
+  // the rows are inert (lookups reject expired rows at read time), so a
+  // failed sweep never breaks the request path.
+  const emailTokens = (await d1
+    .prepare("DELETE FROM email_verification_tokens WHERE expires_at < ?")
+    .bind(now)
+    .run()) as { meta: { changes: number } };
+  summary.emailTokensPurged = emailTokens.meta.changes;
+
+  // The WebAuthn challenge sweep already lives in db/passkeys.ts (exported,
+  // TTL-bounded, `now`-injectable) and runs opportunistically on each begin
+  // ceremony; the cron call below centralizes it so challenges are swept
+  // even when no ceremony ever starts (the 10-minute TTL keeps the table
+  // small, but the guarantee must not depend on traffic).
+  summary.challengesPurged = await sweepExpiredWebAuthnChallenges(now);
 
   return summary;
 }

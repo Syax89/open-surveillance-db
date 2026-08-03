@@ -68,6 +68,19 @@ export async function POST(request: Request) {
       );
     }
 
+    // P3-2 (review-ada-2): the challenge is bound to the contributor who
+    // started the ceremony at /begin — only that session may complete it.
+    // Without this check a register challenge started under session A could
+    // be completed by session B, enrolling the passkey to B's account. The
+    // generic 400 mirrors the consume failure so the response never reveals
+    // which layer rejected the ceremony.
+    if (consumed.contributorId !== resolved.contributor.id) {
+      return Response.json(
+        { error: "This enrollment has expired or was already used. Please start again." },
+        { status: 400 },
+      );
+    }
+
     let verification;
     try {
       verification = await verifyRegistrationResponse({
