@@ -292,6 +292,13 @@ asserted by `tests/mailer.test.mjs`. The send rate limit (3 emails/h per
 contributor, ADR 0020) is enforced in D1 via `email_send_log` (migration
 0029) and is durable across worker isolates.
 
+**Token TTLs are per-purpose** (`db/auth.ts`, ADR 0020): verification
+links expire after **24 h** (`VERIFICATION_TOKEN_TTL_MS`), password-reset
+links after **3 h** (`RESET_TOKEN_TTL_MS`, same table, purpose column).
+The reset email copy and the `/forgot-password` confirmation both tell
+the user the reset link expires in 3 hours — keep them in sync when the
+TTL ever changes.
+
 ## Local LXC deployment (current)
 
 The always-on test site lives on Proxmox container **114 `osdb-test`**

@@ -633,24 +633,37 @@ async function makeContributor(auth, email = "verify@example.org") {
   return auth.createContributor({ email, displayName: "Verifier", password: "supersecret123" });
 }
 
-test("createVerificationToken stores only the SHA-256 hash, 24h TTL, with the purpose", async () => {
+test("createVerificationToken stores only the SHA-256 hash, per-purpose TTL (verify 24h / reset 3h), with the purpose", async () => {
   const { auth } = runtime;
   const contributor = await makeContributor(auth);
   const { rawToken, expiresAt } = await auth.createVerificationToken(contributor.id, "verify", NOW);
 
   assert.equal(typeof rawToken, "string");
   assert.ok(rawToken.length >= 32, "raw token is high-entropy");
-  assert.equal(expiresAt, "2026-08-02T00:00:00.000Z", "TTL is exactly 24h");
+  assert.equal(expiresAt, "2026-08-02T00:00:00.000Z", "verify TTL is exactly 24h");
 
-  const rows = await runtime.env.DB.prepare("SELECT * FROM email_verification_tokens").all();
-  assert.equal(rows.results.length, 1);
-  const [row] = rows.results;
+  const resetToken = await auth.createVerificationToken(contributor.id, "reset", NOW);
+  assert.equal(resetToken.expiresAt, "2026-08-01T03:00:00.000Z", "reset TTL is exactly 3h");
+
+  const rows = await runtime.env.DB.prepare("SELECT * FROM email_verification_tokens ORDER BY id").all();
+  assert.equal(rows.results.length, 2);
+  const [row, resetRow] = rows.results;
   assert.equal(row.token_hash, await auth.sha256Hex(rawToken), "only the hash is stored");
   assert.notEqual(row.token_hash, rawToken);
   assert.equal(row.purpose, "verify");
   assert.equal(row.used_at, null);
   assert.equal(row.expires_at, expiresAt);
   assert.equal(row.contributor_id, contributor.id);
+  // The reset row carries the shorter 3h window and its own purpose.
+  assert.equal(resetRow.purpose, "reset");
+  assert.equal(resetRow.expires_at, "2026-08-01T03:00:00.000Z");
+});
+
+test("createVerificationToken honours an explicit ttlMs override (tests forcing expiry)", async () => {
+  const { auth } = runtime;
+  const contributor = await makeContributor(auth);
+  const { expiresAt } = await auth.createVerificationToken(contributor.id, "verify", NOW, 5 * 60 * 1000);
+  assert.equal(expiresAt, "2026-08-01T00:05:00.000Z", "explicit ttlMs wins over the purpose default");
 });
 
 test("consumeVerificationToken burns a live token once, then answers used", async () => {
@@ -692,6 +705,35 @@ test("consumeVerificationToken rejects the wrong purpose and expired tokens", as
   assert.deepEqual(await auth.consumeVerificationToken(rawToken, "verify", afterTtl), { kind: "expired" });
   // Unknown hashes answer invalid — never "used", so probing cannot enumerate.
   assert.deepEqual(await auth.consumeVerificationToken("nonexistent-token", "verify", NOW), { kind: "invalid" });
+});
+
+test("reset tokens expire after 3h — a reset link dies at the 3h mark, verify lives on", async () => {
+  const { auth } = runtime;
+  const contributor = await makeContributor(auth);
+  const { rawToken: resetToken } = await auth.createVerificationToken(contributor.id, "reset", NOW);
+  const { rawToken: verifyToken } = await auth.createVerificationToken(contributor.id, "verify", NOW);
+
+  // Inside the 3h window both are live.
+  const justBefore = new Date(Date.parse(NOW) + 3 * 60 * 60 * 1000 - 1000).toISOString();
+  assert.deepEqual(await auth.consumeVerificationToken(resetToken, "reset", justBefore), {
+    kind: "verified",
+    contributorId: contributor.id,
+  }, "reset token is still live one second before the 3h mark");
+  const again = await auth.createVerificationToken(contributor.id, "reset", NOW);
+  assert.deepEqual(await auth.consumeVerificationToken(again.rawToken, "reset", justBefore), {
+    kind: "verified",
+    contributorId: contributor.id,
+  });
+  // A reset link consumed at/past the 3h mark answers expired, while the
+  // 24h verify token is still valid at the same instant.
+  const atTtl = new Date(Date.parse(NOW) + 3 * 60 * 60 * 1000).toISOString();
+  const freshReset = await auth.createVerificationToken(contributor.id, "reset", NOW);
+  assert.deepEqual(await auth.consumeVerificationToken(freshReset.rawToken, "reset", atTtl), { kind: "expired" },
+    "reset token dies exactly at the 3h TTL");
+  assert.deepEqual(await auth.consumeVerificationToken(verifyToken, "verify", atTtl), {
+    kind: "verified",
+    contributorId: contributor.id,
+  }, "verify token (24h) survives the reset 3h mark");
 });
 
 test("creating a new token revokes older UNUSED tokens of the same purpose only", async () => {
