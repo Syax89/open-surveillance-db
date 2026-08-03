@@ -4,6 +4,16 @@ import { PUBLIC_CAMERA_STATUSES } from "../app/lib/public-status";
 import type { ModerationEvent } from "./moderation";
 
 /**
+ * One statement result from `d1.batch(...)`: a RETURNING statement populates
+ * `results`, everything else only `meta` (P1-2 atomic write path).
+ */
+type D1BatchResult = {
+  success: boolean;
+  results: Record<string, unknown>[];
+  meta: { changes: number; lastRowId: number };
+};
+
+/**
  * Photo evidence (STATUS gap #3): D1 stores metadata ONLY; image bytes live
  * in the R2 bucket bound as `PHOTOS` under an opaque key.
  *
@@ -282,69 +292,40 @@ export async function moderatePhoto(
   const newStatus = action === "approve" ? "approved" : "rejected";
   const redactionFlag = action === "approve" ? 1 : current.redactionConfirmed;
   const now = new Date().toISOString();
-  const updated = await d1
-    .prepare(
-      `UPDATE photos SET status = ?, redaction_confirmed = ?, updated_at = ?
-       WHERE id = ? AND status = 'pending'
-       RETURNING ${photoColumns}`,
-    )
-    .bind(newStatus, redactionFlag, now, id)
-    .first<PhotoRecord>();
-  if (!updated) return { kind: "not_found" };
-
+  // Reviewer display-name lookup stays a pre-batch SELECT (P1-2).
   const actor = actorId
     ? await d1
         .prepare("SELECT display_name AS displayName FROM reviewers WHERE id = ? AND active = 1")
         .bind(actorId)
         .first<{ displayName: string }>()
     : null;
-  const event = await createPhotoModerationEvent(d1, {
-    entityId: id,
-    previousStatus: "pending",
-    newStatus,
-    action,
-    reasonCode,
-    note,
-    actor: actor?.displayName ?? "Local moderator",
-    reviewerId: actorId ?? null,
-  });
-  return { kind: "ok", item: withoutStorageKey(updated), event };
-}
+  const actorName = actor?.displayName ?? "Local moderator";
 
-async function createPhotoModerationEvent(
-  d1: Awaited<ReturnType<typeof getD1>>,
-  input: {
-    entityId: number;
-    previousStatus: string;
-    newStatus: string;
-    action: string;
-    reasonCode: string;
-    note: string | null;
-    actor: string;
-    reviewerId: number | null;
-  },
-): Promise<ModerationEvent> {
-  const createdAt = new Date().toISOString();
-  const result = await d1
-    .prepare(
-      `INSERT INTO moderation_events (entity, entity_id, previous_status, new_status, action, reason_code, note, actor, reviewer_id, actor_role, recused, escalated, second_reviewer_id, created_at)
-       VALUES ('photo', ?, ?, ?, ?, ?, ?, ?, ?, NULL, 0, 0, NULL, ?)
-       RETURNING id, entity, entity_id AS entityId, previous_status AS previousStatus, new_status AS newStatus, action, reason_code AS reasonCode, note, actor, reviewer_id AS reviewerId, actor_role AS actorRole, recused, escalated, second_reviewer_id AS secondReviewerId, created_at AS createdAt`,
-    )
-    .bind(
-      input.entityId,
-      input.previousStatus,
-      input.newStatus,
-      input.action,
-      input.reasonCode,
-      input.note,
-      input.actor,
-      input.reviewerId,
-      createdAt,
-    )
-    .first<ModerationEvent>();
-  if (!result) throw new Error("Moderation event could not be recorded");
-  return result;
+  // ONE batch: the photo UPDATE + the guarded audit event. The event only
+  // lands when the UPDATE actually applied (photo status equals the decision's
+  // newStatus), so a crash between the two can never corrupt the audit trail.
+  const results = (await d1.batch([
+    d1
+      .prepare(
+        `UPDATE photos SET status = ?, redaction_confirmed = ?, updated_at = ?
+         WHERE id = ? AND status = 'pending'
+         RETURNING ${photoColumns}`,
+      )
+      .bind(newStatus, redactionFlag, now, id),
+    d1
+      .prepare(
+        `INSERT INTO moderation_events (entity, entity_id, previous_status, new_status, action, reason_code, note, actor, reviewer_id, actor_role, recused, escalated, second_reviewer_id, created_at)
+         SELECT 'photo', ?, ?, ?, ?, ?, ?, ?, ?, NULL, 0, 0, NULL, ?
+         WHERE EXISTS (SELECT 1 FROM photos WHERE id = ? AND status = ?)
+         RETURNING id, entity, entity_id AS entityId, previous_status AS previousStatus, new_status AS newStatus, action, reason_code AS reasonCode, note, actor, reviewer_id AS reviewerId, actor_role AS actorRole, recused, escalated, second_reviewer_id AS secondReviewerId, created_at AS createdAt`,
+      )
+      .bind(id, "pending", newStatus, action, reasonCode, note, actorName, actorId ?? null, now, id, newStatus),
+  ])) as D1BatchResult[];
+
+  const updated = results[0].results?.[0] as PhotoRecord | undefined;
+  if (!updated) return { kind: "not_found" };
+  const event = results[1].results?.[0] as ModerationEvent;
+  return { kind: "ok", item: withoutStorageKey(updated), event };
 }
 
 /** Read stored bytes by photo id — moderation preview only (edge-gated). */

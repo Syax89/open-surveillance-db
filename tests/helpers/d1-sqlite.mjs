@@ -93,18 +93,29 @@ export class D1SqliteDatabase {
 
   // D1 batch runs its statements in order; the in-memory adapter wraps them
   // in a transaction so partial failures roll back like the real binding.
+  // Returns one D1Result per statement, mirroring the real binding: RETURNING
+  // statements AND plain SELECT statements execute via all() (their rows land
+  // in `results` — real D1 populates `results` for SELECTs in a batch too),
+  // everything else via run() (only `meta`).
   batch(statements) {
     this.db.exec("BEGIN");
     try {
+      const results = [];
       for (const statement of statements) {
-        statement.run();
+        if (/\breturning\b/i.test(statement.sql) || /^\s*(SELECT|WITH|PRAGMA)\b/i.test(statement.sql)) {
+          const { results: rows } = statement.all();
+          results.push({ success: true, results: rows, meta: { changes: rows.length, lastRowId: 0 } });
+        } else {
+          const { meta } = statement.run();
+          results.push({ success: true, results: [], meta });
+        }
       }
       this.db.exec("COMMIT");
+      return results;
     } catch (error) {
       this.db.exec("ROLLBACK");
       throw error;
     }
-    return [];
   }
 
   close() {
