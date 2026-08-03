@@ -143,6 +143,31 @@ declare module "cloudflare:workers" {
     // which MUST stay in the binding's allowed_sender_addresses).
     VERIFY_BASE_URL?: string;
     MAILER_FROM?: string;
+    // Re-send rate limit for auth emails (ADR 0020): max sends per
+    // contributor inside the rolling window.
+    EMAIL_SEND_LIMIT_MAX?: string;
+    EMAIL_SEND_LIMIT_WINDOW_SECONDS?: string;
+    // Moderation gate credentials (ADR 0002): HTTP Basic (USER/PASSWORD)
+    // and/or bearer token; at least one must be configured (fail-closed).
+    MODERATION_USER?: string;
+    MODERATION_PASSWORD?: string;
+    MODERATION_TOKEN?: string;
+    // Edge-set identity injected after a successful moderation gate (ADR
+    // 0014): sent as `x-osdb-user-email`; fail-closed when unset (401).
+    MODERATION_IDENTITY_EMAIL?: string;
+    // Pass through the ChatGPT-platform identity headers (`oai-*`) instead
+    // of stripping them (ADR 0014). Only set behind the platform gateway.
+    TRUST_PLATFORM_HEADERS?: string;
+    // Contributor auth (ADR 0013): session lifetime and cookie policy.
+    AUTH_SESSION_TTL_DAYS?: string;
+    AUTH_COOKIE_SECURE?: string;
+    // Contributor auth rate limits (per-IP, enforced in-app).
+    AUTH_RATE_LIMIT_MAX?: string;
+    AUTH_RATE_LIMIT_WINDOW_SECONDS?: string;
+    // Edge-cache purge (t_ae600b90): Cloudflare Cache Purge API credentials
+    // used by the moderation write path; absent = documented no-op.
+    CACHE_PURGE_TOKEN?: string;
+    CACHE_PURGE_ZONE_ID?: string;
     /** Per-IP registration cap — P3-4 (t_0941036b, anti account-farm): max
      * registration attempts per caller IP inside a rolling window, enforced
      * as a D1 state quota (`registrations_ip_log`). Defaults 5 / 86400s. */
