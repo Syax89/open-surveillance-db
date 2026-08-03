@@ -19,7 +19,7 @@ import { BodyReadError, readJsonBody, urlTooLong } from "../../../../lib/input-l
  *                                  dead but the hash old.
  *   - 400  malformed token/password, or unknown token — generic body
  *          (anti-enumeration).
- *   - 410  token already used or past its 24h TTL — Gone, the link is dead.
+ *   - 410  token already used or past its 3h TTL — Gone, the link is dead.
  *
  * The response is `no-store`: a one-shot auth outcome.
  */

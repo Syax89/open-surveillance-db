@@ -14,7 +14,7 @@ import { SiteHeader } from "../components/SiteHeader";
  *   200 → success (sessions revoked, email verified — the contributor can
  *         log in with the new password);
  *   400 → malformed/unknown token or weak password (generic body);
- *   410 → token already used or past its 24h TTL — dead link, request a new
+ *   410 → token already used or past its 3h TTL — dead link, request a new
  *         one from /forgot-password.
  * The page mirrors the server's anti-enumeration: 400 and 410 share the
  * same generic "invalid or expired" copy, exactly like the API.

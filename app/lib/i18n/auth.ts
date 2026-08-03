@@ -176,7 +176,7 @@ export const en = {
     "Enter the email address of your account and we will send you a reset link.",
   forgotSubmit: "Send reset link",
   forgotSent:
-    "If an account exists for this email, a reset link is on its way. Check your inbox.",
+    "If an account exists for this email, a reset link is on its way. The link expires in 3 hours. Check your inbox.",
   forgotBackToLogin: "Back to log in",
   // /reset-password page (consumes the single-use token from the email).
   resetTitle: "Set a new password",
@@ -389,7 +389,7 @@ export const it: Translation<typeof en> = {
     "Inserisci l'email del tuo account: ti invieremo un link per reimpostare la password.",
   forgotSubmit: "Invia il link di reset",
   forgotSent:
-    "Se esiste un account per questa email, il link di reset è in arrivo. Controlla la casella di posta.",
+    "Se esiste un account per questa email, il link di reset è in arrivo. Il link scade tra 3 ore. Controlla la casella di posta.",
   forgotBackToLogin: "Torna all'accesso",
   // Pagina /reset-password (consuma il token monouso dell'email).
   resetTitle: "Imposta una nuova password",
