@@ -15,6 +15,9 @@ in-memory (e2e-journeys, auth-verify-e2e, qa-multiauth-write-gate-e2e, appeals, 
 Sono emerse **5 issue concrete** (2 P2, 3 P3), tutte con riproduzione. Le prime due sono
 state riprodotte con un test dedicato che esegue il retention sweep REALE contro le
 migrazioni reali su D1 in-memory (tests/qa4-retention-gap-repro.test.mjs, verde = comportamento attuale documentato).
+Nota (post-review PR #276): l'Issue 5 come scritta era un **falso positivo del tool** — la
+route `/api/locale` ha un test dedicato dal #132 (tests/locale-route.test.mjs, Miniflare-dispatch);
+il gap reale è metodologico in scripts/qa-route-gap.mjs, corretto con il fix in questo report.
 
 ---
 
@@ -134,27 +137,48 @@ il risultato. Aggiungere un test che confronta i due set di chiavi (coerenza Env
 
 ---
 
-## Issue 5 — P3: /api/locale senza test (1 route su 38 non coperta)
+## Issue 5 — P3: /api/locale "senza test" = FALSO POSITIVO dello script gap-route (corretto)
 
-**Area:** test suite / gap · **File:** app/api/locale/route.ts, tests/
+**Area:** test suite / tooling gap · **File:** app/api/locale/route.ts, tests/locale-route.test.mjs,
+scripts/qa-route-gap.mjs
 
-**Descrizione.** Gap analysis scriptata su tutte le 38 route API (scripts/qa-route-gap.mjs):
-**solo** `/api/locale` non ha alcun test diretto (`loadRoute("app/api/locale/route.mjs")`
-non compare in nessun test). La route ha logica di sicurezza non banale — validazione del
-redirect target anti open-redirect (`next.startsWith("/")`, blocca `//host`, backslash,
-CRLF e `%0d/%0a`), Set-Cookie del locale, X-Robots-Tag — completamente non testata. Il
-client-side toggle è coperto (client-locale-toggle.test.mjs) ma la route server no.
+**Descrizione (come scritta in origine, ERRATA).** La gap analysis scriptata sulle 38 route API
+(scripts/qa-route-gap.mjs) segnalava `/api/locale` come unica route senza test diretto, perché
+`loadRoute("app/api/locale/route.mjs")` non compare in nessun test. Verifica indipendente (Ada,
+review PR #276): **il finding era un falso positivo del tool** — la route HA un test dedicato.
 
-**Riproduzione:**
+**Stato reale.** `/api/locale` è coperta da tests/locale-route.test.mjs (dal #132, commit 0e44417),
+che esercita il worker **buildato** via Miniflare-dispatch e copre esattamente gli scenari che il
+fix proposto avrebbe aggiunto: 302 + Set-Cookie su `lang=it&next=/guide`, default `/` quando
+`next` manca, rifiuto open-redirect (URL assoluto, protocol-relative, backslash, CRLF) con
+fallback a `/`, fallback EN su `lang` ignoto, `X-Robots-Tag: noindex`. Il test gira in CI
+(`npm test` = build + `node --test "tests/*.test.mjs"`). Il client toggle è coperto da
+client-locale-toggle.test.mjs.
+
+**Causa radice.** scripts/qa-route-gap.mjs rileva solo il pattern `loadRoute("app/api/.../route.mjs")`
+e ignora i test dispatch/Miniflare-based (11 file di test usano `dispatch`/`dispatchFetch`/
+Miniflare sul worker buildato) — il gap reale è **metodologico, nel tool**.
+
+**Riproduzione (prima → dopo il fix):**
 ```
-node scripts/qa-route-gap.mjs
+node scripts/qa-route-gap.mjs        # prima: solo pattern loadRoute
   ROUTE SENZA TEST DIRETTI (loadRoute): locale
   total: 38, tested: 37, untested: 1
+
+node scripts/qa-route-gap.mjs        # dopo: riconosce anche i test dispatch/Miniflare
+  ROUTE SENZA TEST DIRETTI (loadRoute o dispatch/Miniflare):
+    (nessuna — tutte le route coperte)
+  COVERAGE PER TIPO:
+    loadRoute: 37 route
+    dispatch:  4 route (locale, moderation, moderation/photos/[id], photos/[id])
+  total: 38, tested: 38, untested: 0
 ```
 
-**Fix proposto.** tests/api-locale.test.mjs: GET con `lang=it&next=/guide` → 302 + cookie
-+ Location corretto; `lang=xx` → fallback EN; `next=//evil.com`, `next=\evil.com`,
-`next=/x%0d%0a` → Location "/"; 414 su URI lunghi. Pattern: api-auth-me-patch.test.mjs.
+**Fix applicato.** Esteso scripts/qa-route-gap.mjs per riconoscere la copertura dispatch-based
+(`dispatch("/api/...")`, `dispatchFetch`, `renderRoute`/`renderPath` su Miniflare, vettori di
+route e probe passati al dispatch) con matching dei segmenti dinamici (`[z]/[x]/[y]`), e stampare
+il tipo di copertura (loadRoute vs dispatch). **NON aggiunto alcun test per /api/locale** — esiste
+già; l'output "untested" non include più falsi positivi.
 
 ---
 
@@ -188,4 +212,6 @@ node scripts/qa-route-gap.mjs
 - Report: docs/qa/qa-e2e-grace.md (questo file)
 - Riproduzione Issue 1+2: tests/qa4-retention-gap-repro.test.mjs (verde; documenta il
   comportamento attuale — da convertire in test rosso→verde quando i fix saranno applicati)
-- Gap analysis route: scripts/qa-route-gap.mjs (QA tooling, non produzione)
+- Gap analysis route: scripts/qa-route-gap.mjs (QA tooling, non produzione) — esteso in questo
+  fix per riconoscere i test dispatch/Miniflare-based (Issue 5 ritrattata: locale-route.test.mjs
+  dal #132 copriva già /api/locale; l'output ora è 38/38/0 con tipo di copertura)
