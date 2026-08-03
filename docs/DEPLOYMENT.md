@@ -447,15 +447,40 @@ or client bundles (the secrets gate in CI rejects hardcoded credentials).
 | `ABUSE_ALERT_COOLDOWN_SECONDS` | 300 | Minimum seconds between two alerts for the same key/route |
 | `ABUSE_ALERT_WEBHOOK_URL` | unset | Optional JSON webhook; without it alerts go to the server log |
 
-The limiter is a per-isolate sliding window (60 s default) — see
-`app/lib/rate-limit.ts`. Input caps live in `app/lib/input-limits.ts`; alerts
-in `app/lib/abuse-alerts.ts`. Alerts carry only a SHA-256 hash of the caller
+The limiter (`app/lib/rate-limit.ts`) has **two backends**, selected per
+route family at runtime:
+
+- **Cloudflare Workers Rate Limiting binding** — the PRODUCTION backend for
+  the four critical public families: **auth, write (submissions), read and
+  tiles**. Declared in `wrangler.jsonc` under `ratelimits`, the binding's
+  counters are enforced by Cloudflare edge infrastructure shared across
+  worker isolates, so a caller cannot spread a burst across isolates to
+  bypass the ceiling (that per-isolate in-memory bucket was audit #3, MEDIUM).
+  The binding enforces its own `simple.limit` / `simple.period`; the
+  `${PREFIX}_RATE_LIMIT_*` env knobs are **ignored** for these four families
+  while a binding is present. `simple.period` accepts only 10 or 60 seconds;
+  all current defaults are 60 s windows. The thresholds in `wrangler.jsonc`
+  mirror `ROUTE_LIMIT_DEFAULTS` (pending final sign-off by Ada, t_dff3dadf).
+  Locality note: limits are enforced per Cloudflare location (per
+  datacenter), not globally — the documented platform behaviour, still a
+  strict improvement over per-isolate buckets.
+- **In-memory sliding window** — the fallback for local dev, the test suite
+  and staging without the binding (documented in
+  `docs/DEVELOPMENT_SETUP.md` §2.2). Per-isolate by nature: on a
+  multi-isolate deployment WITHOUT the binding the effective ceiling scales
+  with the number of isolates, so it must never be the production backend.
+
+Every other route family (export, nearby, revisions, moderate, appeal,
+geocode, search, confirm, edit) keeps the in-memory fallback for now — the
+abstraction is uniform, so adding a binding is a one-line change per family
+(see `BUCKET_BINDING` in `app/lib/rate-limit.ts` and the `ratelimits` block
+in `wrangler.jsonc`); migrate them before launch if the threat model calls
+for it.
+
+Input caps live in `app/lib/input-limits.ts`; alerts in
+`app/lib/abuse-alerts.ts`. Alerts carry only a SHA-256 hash of the caller
 key (never the raw IP) and never request bodies or query strings (see
-`docs/workstreams/OPS_OPEN.md` §Observability). For a public deployment that
-needs global or long-window limits, replace the in-memory limiter with
-Cloudflare's rate-limiting product (see `docs/workstreams/OPS_OPEN.md`
-§Security for the per-isolate caveat and the buckets to migrate first) or a
-KV/DO-backed counter.
+`docs/workstreams/OPS_OPEN.md` §Observability).
 
 ### Media, tiles, and auth environment variables
 

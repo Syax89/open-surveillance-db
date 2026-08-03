@@ -63,7 +63,7 @@ Tutti i 7 audit convergono: **il codice è avanti, la documentazione è stale**.
 |---|---|---|
 | 1 | ~~**HIGH**~~ **RISOLTO** | **POST /api/appeals irraggiungibile**: edge gate-a `/api/appeals` (identityPath → credenziali moderation), ma la rotta richiede solo ruolo contributor → i contributori non possono MAI appellare (401/503 prima di requireRole). **Risolto** con decisione CEO (opzione a): `POST /api/appeals` fuori da identityPath, auth a sessione ADR 0013 al route layer; `GET`/`PATCH` restano dietro il gate moderation; test edge-worker aggiunti (PR t_df331399). |
 | 2 | MEDIUM | **Admin può impersonare qualunque reviewer** nell'audit trail (actorId client fidato per admin, moderation/route.ts 389-399): integrità dell'audit append-only compromessa. Da rimuovere in produzione. |
-| 3 | MEDIUM | Rate-limit **per-isolate in-memory**: bypassabile su deploy multi-isolate (sostituire con CF Rate Limiting prima del lancio). |
+| 3 | ~~MEDIUM~~ **RISOLTO** | Rate-limit **per-isolate in-memory**: bypassabile su deploy multi-isolate. **Risolto** (t_dff3dadf): le 4 famiglie pubbliche critiche (auth, write, read, tiles) passano al Cloudflare Workers Rate Limiting binding (`ratelimits` in wrangler.jsonc) con fallback in-memory solo per dev/test; soglie = default attuali, sign-off Ada pendente. |
 | 4 | MEDIUM | **callerKey spoofabile** (fallback x-forwarded-for fuori da CF): rate-limit, burst conferme, quota foto anonime aggirabili su deployment non-CF. |
 | 5 | MED/LOW | `latitude: null` → record a **(0,0)** (`Number(null)===0`): vettore junk/submission-spam, documentato ma live. Fix: `typeof payload.latitude === "number"`. |
 | 6 | LOW | Query riflessa nel 404 di search (XSS bassissimo, da neutralizzare). |
@@ -101,7 +101,7 @@ Tutti i 7 audit convergono: **il codice è avanti, la documentazione è stale**.
 | 2 | **P1** | **ops-monitoring muto**: 403 "Resource not accessible by integration" (manca `permissions: issues: write`) + PROD_URL mai impostata. L'alerting primario non ha MAI consegnato nulla. |
 | 3 | **P1/P2** | **main SENZA branch protection** ("Branch not protected"): push diretto bypassa CI; cancel-in-progress può nascondere commit rotti. |
 | 4 | P2 | **Deploy dichiarato ≠ implementato**: deploy.yml NON ha `db:provision --remote` (DEPLOYMENT.md lo promette), secret PROVISION_ACCOUNTS assente, environment production senza required reviewers, worker CF con 0 secret (moderazione = 503 fail-closed sul deploy). |
-| 5 | P3 | Hardening: azioni non pinnate a SHA, allowed_actions all, HSTS assente (task t_6148aa6f), rate limit in-memory per-isolate, AUTH_COOKIE_SECURE default false. |
+| 5 | P3 | Hardening: azioni non pinnate a SHA, allowed_actions all, HSTS assente (task t_6148aa6f), ~~rate limit in-memory per-isolate~~ (**risolto**, t_dff3dadf → binding CF), AUTH_COOKIE_SECURE default false. |
 
 **Stato deploy reale (Cloudflare):** worker 2 versioni manuali (attiva 7cd46db4, 01/08); D1 `osdb-production` **14 commit dietro main** (0015–0025 pendenti); nessun deploy GitHub Actions in assoluto; backup D1: ultimi 3 run falliti al guard secret (da confermare al run 02/08 con i secret ora presenti).
 
@@ -201,7 +201,7 @@ Tutti i 7 audit convergono: **il codice è avanti, la documentazione è stale**.
 11. **Docs**: fix README (dedup+community+ADR), DATA_MODEL (13 tabelle+26 migrazioni+6 route), SITEMAP (stati reali+rotta fantasma), STATUS (community wave), EXECUTION_BOARD (righe stale) (marie).
 
 ### P2 — prima del lancio pubblico
-12. **Ops/Security**: rate-limit per-isolate → CF product; HSTS + AUTH_COOKIE_SECURE=true; pinning azioni a SHA; allowed_actions (ken).
+12. **Ops/Security**: ~~rate-limit per-isolate → CF product~~ (**fatto**, t_dff3dadf: binding `ratelimits` su auth/write/read/tiles, fallback in-memory per dev); HSTS + AUTH_COOKIE_SECURE=true; pinning azioni a SHA; allowed_actions (ken).
 13. **Backend**: retention login_attempts; query reflection search; TRUST_PLATFORM_HEADERS (linus/ada).
 14. **Legal**: terminologia trust level (F4), docs retention (F5), R14 + de-attribuzione photos (F7/F8), riga IP (F10), indice licenza (F11) (rosa).
 15. **Frontend**: cleanup 31 anchor legacy (BUG 3), aria-invalid (vera).

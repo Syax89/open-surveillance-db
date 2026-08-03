@@ -1,11 +1,28 @@
 /**
  * Per-caller sliding-window rate limiter for public endpoints.
  *
- * State lives in the worker isolate's memory, which is the correct scope for a
- * Cloudflare Worker deployment: each isolate only sees its own traffic and the
- * windows are short (default 60 seconds). If a public deployment needs global
- * or long-window limits, replace this module with Cloudflare's rate-limiting
- * product or a Durable Object / KV-backed counter.
+ * Two backends, selected per route family at runtime:
+ *
+ * 1. Cloudflare Workers Rate Limiting binding (`ratelimits` in
+ *    wrangler.jsonc) — the PRODUCTION backend for the four critical public
+ *    families (auth, submit/write, read, tiles). The binding's counters are
+ *    enforced by Cloudflare edge infrastructure shared across worker
+ *    isolates, so a caller cannot spread a burst across isolates to bypass
+ *    the limit — that per-isolate in-memory bucket was audit finding #3
+ *    (MEDIUM, task t_dff3dadf). The binding enforces its own
+ *    `simple.limit` / `simple.period` from the configuration: the documented
+ *    `limit()` API takes only a `key`, so the `${PREFIX}_RATE_LIMIT_*` env
+ *    knobs below are IGNORED for the four bound families in production.
+ *    They remain the source of truth for the in-memory fallback and for
+ *    every unbound family. Default thresholds are mirrored in the binding
+ *    config (pending final sign-off by Ada, audit t_dff3dadf).
+ *
+ * 2. In-memory sliding window — the LOCAL DEV / TEST fallback, used whenever
+ *    the binding is absent from `env` (`npm run dev`, the route test
+ *    harness, staging without the binding). Per-isolate by nature: on a
+ *    multi-isolate deployment WITHOUT the binding the effective ceiling
+ *    scales with the number of isolates, so it is fine for a single-isolate
+ *    dev/staging host but must never be the production backend.
  *
  * Every route family gets its own independent limit (see `RouteKind`), so a
  * burst on one endpoint never starves another: read APIs, exports, nearby
@@ -110,7 +127,81 @@ function pruneKey(key: string, windowStart: number): number[] {
   return timestamps;
 }
 
-export function checkRateLimit(
+/**
+ * Structural surface of the Cloudflare Workers Rate Limiting binding
+ * (wrangler.jsonc `ratelimits`). Kept local on purpose: this module must
+ * stay runnable in plain Node (the route test harness transpiles and imports
+ * it), so it never imports `cloudflare:workers` — the shape is structural.
+ * Per the platform docs the `limit()` call takes only a `key` (any string)
+ * and returns `{ success }`; the call itself counts toward the limit.
+ */
+export interface RateLimitBinding {
+  limit(args: { key: string }): Promise<{ success: boolean }>;
+}
+
+/**
+ * Route families that get a production rate-limiter binding (audit #3,
+ * MEDIUM, t_dff3dadf): auth, write (submissions), read and tiles are the
+ * public surfaces a determined caller could otherwise spread across
+ * isolates. The binding names map to the `ratelimits` entries in
+ * wrangler.jsonc; every other family keeps the in-memory fallback (see the
+ * module docstring). Keys are namespaced per family (`auth:203.0.113.5`) so
+ * counters never collide even if two bindings ever shared a namespace.
+ */
+const BUCKET_BINDING: Partial<Record<string, string>> = {
+  auth: "AUTH_LIMITER",
+  submit: "WRITE_LIMITER",
+  read: "READ_LIMITER",
+  tiles: "TILES_LIMITER",
+};
+
+/** Resolve the rate-limiter binding configured for a bucket, if any. */
+export function rateLimitBindingFor(
+  env: unknown,
+  bucket: string,
+): RateLimitBinding | undefined {
+  const bindingName = BUCKET_BINDING[bucket];
+  if (!bindingName) return undefined;
+  const candidate = (env as EnvLike)[bindingName] as RateLimitBinding | undefined;
+  return candidate && typeof candidate.limit === "function" ? candidate : undefined;
+}
+
+/**
+ * Check a caller against a rate-limit bucket.
+ *
+ * Prefers the Cloudflare Rate Limiting binding when the bucket has one and
+ * the binding is present in `env` (production); otherwise falls back to the
+ * in-memory sliding window (local dev, tests, staging without the binding).
+ *
+ * `env` is the first parameter on purpose: like `limitsFor`, the module must
+ * stay runnable in plain Node, and the binding is read structurally from the
+ * env object the route already passes in.
+ */
+export async function checkRateLimit(
+  env: unknown,
+  bucket: string,
+  key: string,
+  options: RateLimitOptions,
+  now: number = Date.now(),
+): Promise<RateLimitDecision> {
+  const binding = rateLimitBindingFor(env, bucket);
+  if (binding) {
+    const result = await binding.limit({ key: `${bucket}:${key}` });
+    if (result.success) return { allowed: true, retryAfterSeconds: 0 };
+    // The binding does not expose the counter's reset time; Retry-After is
+    // the window upper bound (the platform resets at the end of the period).
+    return { allowed: false, retryAfterSeconds: options.windowSeconds };
+  }
+  return checkRateLimitInMemory(bucket, key, options, now);
+}
+
+/**
+ * In-memory sliding-window core (local dev / test fallback backend). The
+ * original per-isolate implementation: state lives in this module instance
+ * and is correct only where one isolate serves all traffic. Exported so the
+ * test suites can exercise the window logic directly.
+ */
+export function checkRateLimitInMemory(
   bucket: string,
   key: string,
   options: RateLimitOptions,

@@ -42,7 +42,7 @@ export async function GET(request: Request) {
   // without touching the database and are not counted.
   const key = callerKey(request);
   const limitOptions = limitsFor("read", env);
-  const limit = checkRateLimit("read", key, limitOptions);
+  const limit = await checkRateLimit(env, "read", key, limitOptions);
   if (!limit.allowed) {
     console.warn(`GET /api/cameras/[id] rate limited for caller ${key}`);
     recordRateLimitBlock(env, {
@@ -128,7 +128,7 @@ export async function PATCH(request: Request) {
 
   const key = callerKey(request);
   const limitOptions = limitsFor("edit", env);
-  const limit = checkRateLimit("edit", key, limitOptions);
+  const limit = await checkRateLimit(env, "edit", key, limitOptions);
   if (!limit.allowed) {
     console.warn("PATCH /api/cameras/[id] rate limited");
     recordRateLimitBlock(env, {

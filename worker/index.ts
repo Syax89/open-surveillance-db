@@ -5,6 +5,11 @@ import type { D1Database, Fetcher, R2Bucket, SendEmail } from "cloudflare:worker
 import { DEFAULT_RETENTION_POLICY, runRetentionSweep, type RetentionSummary } from "../db/retention";
 import { sweepOidcExpired } from "../db/oidc";
 
+/** Structural surface of a Cloudflare rate-limiter binding (`ratelimits`). */
+interface RateLimiterBinding {
+  limit(args: { key: string }): Promise<{ success: boolean }>;
+}
+
 interface Env {
   ASSETS: Fetcher;
   DB: D1Database;
@@ -17,6 +22,19 @@ interface Env {
   };
   /** Photo evidence object storage (D1 stores metadata only). */
   PHOTOS: R2Bucket;
+  /**
+   * Cloudflare Workers Rate Limiting bindings (wrangler.jsonc `ratelimits`,
+   * audit #3 MEDIUM, t_dff3dadf): the production enforcement point for the
+   * four critical public route families (auth, write, read, tiles). Optional:
+   * when a binding is absent the route layer falls back to the in-memory
+   * per-isolate limiter (local dev / tests — never the public API). The
+   * routes read them structurally from env; this interface documents the
+   * shape for the worker entry itself.
+   */
+  AUTH_LIMITER?: RateLimiterBinding;
+  WRITE_LIMITER?: RateLimiterBinding;
+  READ_LIMITER?: RateLimiterBinding;
+  TILES_LIMITER?: RateLimiterBinding;
   /** Cloudflare Email Service binding (send_email in wrangler.jsonc). */
   EMAIL?: SendEmail;
   /**

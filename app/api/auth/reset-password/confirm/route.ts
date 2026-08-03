@@ -32,7 +32,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "Cross-origin request rejected." }, { status: 403, headers: NO_STORE_HEADERS });
   }
 
-  const blocked = authLimit(request, env, "/api/auth/reset-password/confirm");
+  const blocked = await authLimit(request, env, "/api/auth/reset-password/confirm");
   if (blocked) return blocked;
 
   try {

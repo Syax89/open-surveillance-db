@@ -35,7 +35,7 @@ export async function DELETE(request: Request) {
     return Response.json({ error: "Cross-origin request rejected." }, { status: 403 });
   }
 
-  const blocked = authLimit(request, env, "/api/auth/account");
+  const blocked = await authLimit(request, env, "/api/auth/account");
   if (blocked) return blocked;
 
   try {

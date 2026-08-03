@@ -63,7 +63,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "Cross-origin request rejected." }, { status: 403 });
   }
 
-  const blocked = authLimit(request, env, "/api/auth/oidc/merge");
+  const blocked = await authLimit(request, env, "/api/auth/oidc/merge");
   if (blocked) return blocked;
 
   try {

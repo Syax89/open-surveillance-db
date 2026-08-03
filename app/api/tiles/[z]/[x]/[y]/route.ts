@@ -162,7 +162,7 @@ export async function GET(request: Request, context: { params: Promise<TileParam
   // edge cache below.
   const key = callerKey(request);
   const limitOptions = limitsFor("tiles", env);
-  const limit = checkRateLimit("tiles", key, limitOptions);
+  const limit = await checkRateLimit(env, "tiles", key, limitOptions);
   if (!limit.allowed) {
     console.warn("GET /api/tiles/[z]/[x]/[y] rate limited");
     recordRateLimitBlock(env, {

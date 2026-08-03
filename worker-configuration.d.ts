@@ -65,6 +65,19 @@ declare module "cloudflare:workers" {
     send(message: EmailMessageBuilder): Promise<{ messageId: string }>;
   }
 
+  /**
+   * Cloudflare Workers Rate Limiting binding (wrangler.jsonc `ratelimits`,
+   * audit #3 MEDIUM, t_dff3dadf). The `limit()` call takes only a `key`
+   * (any string, namespaced per route family) and returns `{ success }`; the
+   * call itself counts toward the binding's `simple.limit` within
+   * `simple.period`. Enforced by Cloudflare edge infrastructure shared
+   * across worker isolates — a caller cannot spread a burst across isolates
+   * to bypass it (the per-isolate in-memory bucket it replaces).
+   */
+  export interface RateLimit {
+    limit(args: { key: string }): Promise<{ success: boolean }>;
+  }
+
   export interface Env {
     ASSETS: Fetcher;
     DB: D1Database;
@@ -80,6 +93,14 @@ declare module "cloudflare:workers" {
     ENVIRONMENT?: string;
     /** Email Service binding (wrangler.jsonc `send_email`, name EMAIL). */
     EMAIL?: SendEmail;
+    /** Rate-limiter bindings for the four critical public route families
+     * (auth, write, read, tiles). Optional: when absent the route layer
+     * falls back to the in-memory per-isolate limiter (local dev / tests —
+     * never the public API). See app/lib/rate-limit.ts. */
+    AUTH_LIMITER?: RateLimit;
+    WRITE_LIMITER?: RateLimit;
+    READ_LIMITER?: RateLimit;
+    TILES_LIMITER?: RateLimit;
     IMAGES: {
       input(stream: ReadableStream): {
         transform(options: Record<string, unknown>): {

@@ -59,14 +59,16 @@ const flushAlerts = () => abuseAlerts.flushAbuseAlertDeliveries();
 // rate-limit.ts
 // ---------------------------------------------------------------------------
 
-test("each route family gets an independent sliding window", () => {
+test("each route family gets an independent sliding window", async () => {
   const readOptions = { maxRequests: 2, windowSeconds: 60 };
   const submitOptions = { maxRequests: 1, windowSeconds: 60 };
   const now = 1_000_000_000_000;
+  // No rate-limiter bindings in the env: the in-memory fallback runs.
+  const noBindings = {};
 
-  assert.equal(rateLimit.checkRateLimit("read", "203.0.113.9", readOptions, now).allowed, true);
-  assert.equal(rateLimit.checkRateLimit("read", "203.0.113.9", readOptions, now + 1).allowed, true);
-  const blocked = rateLimit.checkRateLimit("read", "203.0.113.9", readOptions, now + 2);
+  assert.equal((await rateLimit.checkRateLimit(noBindings, "read", "203.0.113.9", readOptions, now)).allowed, true);
+  assert.equal((await rateLimit.checkRateLimit(noBindings, "read", "203.0.113.9", readOptions, now + 1)).allowed, true);
+  const blocked = await rateLimit.checkRateLimit(noBindings, "read", "203.0.113.9", readOptions, now + 2);
   assert.equal(blocked.allowed, false);
   assert.ok(
     blocked.retryAfterSeconds >= 1 && blocked.retryAfterSeconds <= 61,
@@ -75,11 +77,11 @@ test("each route family gets an independent sliding window", () => {
 
   // A different caller is unaffected, and so is a different bucket for the
   // same caller.
-  assert.equal(rateLimit.checkRateLimit("read", "203.0.113.10", readOptions, now + 2).allowed, true);
-  assert.equal(rateLimit.checkRateLimit("submit", "203.0.113.9", submitOptions, now + 2).allowed, true);
+  assert.equal((await rateLimit.checkRateLimit(noBindings, "read", "203.0.113.10", readOptions, now + 2)).allowed, true);
+  assert.equal((await rateLimit.checkRateLimit(noBindings, "submit", "203.0.113.9", submitOptions, now + 2)).allowed, true);
 
   // The window slides: old timestamps drop out.
-  assert.equal(rateLimit.checkRateLimit("read", "203.0.113.9", readOptions, now + 61_000).allowed, true);
+  assert.equal((await rateLimit.checkRateLimit(noBindings, "read", "203.0.113.9", readOptions, now + 61_000)).allowed, true);
 });
 
 test("environment overrides tune the per-route limits", () => {
