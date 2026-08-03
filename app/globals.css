@@ -289,14 +289,18 @@ button { cursor:pointer; }
 .record-list-card dt { margin-bottom:4px; color:#63717b; font-size:var(--text-2xs); text-transform:uppercase; letter-spacing:.1em; font-weight:800; }
 .record-list-card dd { margin:0; color:#2f4751; font-size:var(--text-sm); line-height:1.4; overflow-wrap:anywhere; }
 .record-list-actions { display:flex; align-items:center; justify-content:space-between; gap:var(--space-4); }
-/* /directory catalog rows (t_127492f1): flat catalog row — hairline bottom
-   border instead of the bordered card (no min-height, no radius, no bg).
-   Three columns: title | facts | actions. Scoped to the catalog list
-   context so the RecordCard class stays byte-identical (the a11y suite
-   counts `class="record-list-card"`) and the home hub / moderation grids
-   keep their cards. */
-.directory-tool .record-list { grid-template-columns:1fr; }
-.directory-tool .record-list .record-list-card { min-height:0; display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,1.9fr) auto; grid-template-rows:none; gap:var(--space-5); align-items:center; padding:var(--space-4) 0; border:0; border-bottom:1px solid var(--line); border-radius:0; background:transparent; }
+/* /directory catalog rows (t_127492f1; fix t_d089a17e): VISIBLE card
+   container per row — the hairline flat rows blended into the paper
+   background and read as random boxes (CEO feedback 2026-08-03). The row
+   keeps the flat three-column layout of redesign #258 (title | facts |
+   actions) and the surrounding chrome (A–Z index, chips, pagination), but
+   each row is now a real card: #fffef9 background, 1px var(--line) border,
+   radius-lg and a 3px status rail on the left (status-accent block below).
+   Scoped to the catalog list context so the RecordCard class stays
+   byte-identical (the a11y suite counts `class="record-list-card"`) and
+   the home hub / moderation grids keep their own cards. */
+.directory-tool .record-list { grid-template-columns:1fr; gap:var(--space-3); }
+.directory-tool .record-list .record-list-card { min-height:0; display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,1.9fr) auto; grid-template-rows:none; gap:var(--space-5); align-items:center; padding:var(--space-4) var(--space-5); border:1px solid var(--line); border-left-width:3px; border-radius:var(--radius-lg); background:#fffef9; }
 .directory-tool .record-list .record-list-card .card-topline { margin:0 0 5px; }
 .directory-tool .record-list .record-list-card h3 { margin:0; font-size:var(--text-2xl); letter-spacing:-.03em; line-height:1.25; }
 .directory-tool .record-list .record-list-card .record-kind { margin:4px 0 0; font-size:var(--text-sm); }
@@ -310,6 +314,26 @@ button { cursor:pointer; }
 .directory-tool .record-list .record-list-card dd { margin:0; color:var(--ink); font-size:var(--text-sm); line-height:1.4; overflow-wrap:anywhere; font-variant-numeric:tabular-nums; }
 .directory-tool .record-list .record-list-card .record-list-actions { justify-content:flex-end; gap:var(--space-5); }
 .directory-tool .record-list .record-list-card .text-button { min-height:44px; display:inline-flex; align-items:center; }
+/* Status accent (t_d089a17e, CEO 2026-08-03): every public record
+   card/row carries a 3px LEFT RAIL in its status token colour + a tenue
+   9% tint of the same token over the card background — the box reads as
+   ONE object with a state, never as a random transparent row. Colour is
+   NEVER the only signal (WCAG 1.4.1): the status-dot and its text label
+   stay in the card topline, and the two lightest text colours are
+   darkened here to hold >=4.5:1 on the tints (verified #eef6ed is the
+   darkest — see the contrast table in the PR). Tints are PRECOMPUTED
+   from the --status-* tokens (9% over #fffef9); regenerate if a token
+   changes. Scoped to the public list surfaces (.records-section = home
+   hub + /directory catalog; moderation grids keep their own cards). No
+   global token changes — the --status-* tokens are untouched (no ADR). */
+.records-section .record-list .record-list-card { border-left-width:3px; }
+.records-section .record-list .record-list-card .card-topline { color:var(--muted); }
+.records-section .record-list .record-list-card .record-kind { color:#576d77; }
+.records-section .record-list .record-list-card:has(.status-dot.verified) { border-left-color:var(--status-verified); background:#eef6ed; }
+.records-section .record-list .record-list-card:has(.status-dot.community-report) { border-left-color:var(--status-community); background:#fbf5e8; }
+.records-section .record-list .record-list-card:has(.status-dot.needs-review) { border-left-color:var(--status-review); background:#fbf1eb; }
+.records-section .record-list .record-list-card:has(.status-dot.pending) { border-left-color:var(--status-pending); background:#f4f5f1; }
+.records-section .record-list .record-list-card:has(.status-dot.demo) { border-left-color:var(--status-demo); background:#f1f2f2; }
 .empty-state { max-width:650px; margin-top:16px; padding:28px; border:1px dashed #b9c7bf; border-radius:var(--radius-lg); background:#eef4ea; }
 .empty-state h2, .empty-state h3 { margin:0; font-size:var(--text-4xl); letter-spacing:-.035em; font-weight:700; }
 /* F4 (P3): azioni dell'empty state (reset + link a /segnala, FRONTEND_DESIGN
@@ -440,7 +464,7 @@ footer>p { margin:0; color:#586870; font-size:var(--text-md); line-height:1.5; }
      .record-list-card dl / actions rules above already handle the facts
      and the action row. */
   .directory-tool-heading { align-items:flex-start;flex-direction:column;gap:var(--space-3) }
-  .directory-tool .record-list .record-list-card { grid-template-columns:1fr; gap:var(--space-3); padding:var(--space-4) 0; }
+  .directory-tool .record-list .record-list-card { grid-template-columns:1fr; gap:var(--space-3); padding:var(--space-4) var(--space-5); }
   .directory-tool .record-list .record-list-card .record-list-actions { align-items:flex-start; }
   /* Results header (t_f13fcb1c, ex .directory-meta): stack on narrow screens. */
   .directory-results { align-items:flex-start; flex-direction:column; gap:var(--space-3); }
@@ -794,12 +818,29 @@ footer>p { margin:0; color:#586870; font-size:var(--text-md); line-height:1.5; }
 .map-list-header h3 { margin:0; font-size:var(--text-md); letter-spacing:-.02em; color:#174e58; }
 .map-list-count { margin:0; color:var(--muted); font-size:var(--text-xs); }
 .map-list-scroll { flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; }
-.map-record-list { list-style:none; margin:0; padding:0 8px 12px; }
+.map-record-list { list-style:none; margin:0; padding:0 8px 12px; display:grid; gap:var(--space-2); }
 .map-record-list li { margin:0; }
-.map-record { display:block; width:100%; padding:11px 12px; border:0; border-left:3px solid transparent; border-radius:var(--radius-md); background:transparent; text-align:left; cursor:pointer; color:inherit; font:inherit; }
-.map-record:hover { background:#eef3ea; }
+/* /mappa sidebar rows (t_d089a17e): same visible-container + status-rail
+   logic as the directory cards — white card, 1px var(--line) border, 3px
+   left rail coloured by the status token + an 8% tint of the same token
+   over #fff. The status-dot and its text label live in
+   .map-record-status (colour is never the only signal, WCAG 1.4.1). The
+   left rail keeps the STATUS colour when a row is selected — selection is
+   the background wash + aria-current (the old green left edge moved to
+   the wash so the two signals do not fight over the same edge). */
+.map-record { display:block; width:100%; padding:10px 12px; border:1px solid var(--line); border-left-width:3px; border-left-color:var(--line); border-radius:var(--radius-md); background:#fff; text-align:left; cursor:pointer; color:inherit; font:inherit; }
+.map-record-status { display:flex; align-items:center; gap:6px; margin-bottom:3px; color:var(--muted); font-size:var(--text-2xs); text-transform:uppercase; letter-spacing:.09em; font-weight:800; }
+.map-record-status .status-dot { flex:none; }
+.map-record:has(.status-dot.verified) { border-left-color:var(--status-verified); background:#f0f8f4; }
+.map-record:has(.status-dot.community-report) { border-left-color:var(--status-community); background:#fbf7f0; }
+.map-record:has(.status-dot.needs-review) { border-left-color:var(--status-review); background:#fcf4f2; }
+.map-record:has(.status-dot.pending) { border-left-color:var(--status-pending); background:#f6f7f7; }
+.map-record:has(.status-dot.demo) { border-left-color:var(--status-demo); background:#f2f4f8; }
 .map-record:focus-visible { outline:3px solid var(--focus); outline-offset:1px; }
-.map-record.selected { border-left-color:#1a7c60; background:#e4efe6; }
+/* Hover/selected come AFTER the status rules (equal specificity, source
+   order wins): the wash changes, the status rail and the dot+label stay. */
+.map-record-list .map-record:hover { background:#eef3ea; }
+.map-record-list .map-record.selected { background:#e4efe6; }
 .map-record-title { display:block; color:#174e58; font-size:var(--text-base); font-weight:800; letter-spacing:-.02em; }
 .map-record-meta { display:block; margin-top:3px; color:#546d78; font-size:var(--text-sm); line-height:1.35; }
 .map-list-empty { margin:0; padding:18px 16px; color:#60737d; font-size:var(--text-md); line-height:1.5; }

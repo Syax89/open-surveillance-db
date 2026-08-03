@@ -236,6 +236,23 @@ test("MappaTool renders the map tool shell with the shared FiltersBar and the vi
   assert.ok(screen.queryByRole("link", { name: /Download/ }) === null, "no data export row on /mappa (moved to /directory)");
 });
 
+test("the /mappa sidebar rows carry the status dot + localized label (status rail is never colour-only)", async () => {
+  // t_d089a17e: same status-accent logic as the directory cards — every
+  // visible row shows the status-dot AND its whitelisted label (WCAG
+  // 1.4.1), so the coloured left rail is never the only signal.
+  const { container } = await renderWithLocale(React.createElement(MappaTool));
+
+  const rows = container.querySelectorAll(".map-record");
+  assert.ok(rows.length >= 2, "the sidebar must list the visible points");
+  for (const row of rows) {
+    const dot = row.querySelector(".map-record-status .status-dot");
+    assert.ok(dot, "each sidebar row has a status dot");
+    assert.match(dot?.getAttribute("class") ?? "", /status-dot (verified|demo)/, "only public whitelisted statuses render");
+    const statusText = row.querySelector(".map-record-status")?.textContent ?? "";
+    assert.match(statusText, /Illustrative record|Verified/, "each row announces the localized status label next to the dot");
+  }
+});
+
 test("MappaTool kind filter narrows the sidebar list and the markers", async () => {
   const { screen } = rtl;
   const user = rtl.userEvent.setup();

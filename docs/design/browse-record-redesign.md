@@ -402,3 +402,34 @@ EmptyState truthfull se 0 risultati (invariato)
   ambiente); la verifica reale avviene nel job lighthouse della PR. I token e
   i target usati (≥44px su chip/index/pagination/export, contrasti da
   palette) sono stati scelti per superarlo.
+
+---
+
+## 7. Follow-up CEO (t_d089a17e, 2026-08-03): card visibili + barra di stato
+
+Dopo il merge di #258 il CEO segnala: *"i box/righe dei record si fondono
+con lo sfondo — background transparent su sfondo carta, sembrano messi a
+caso"*. Le righe flat (hairline + bg trasparente su `--paper`) non reggono
+come contenitori. Fix (Vera design):
+
+1. **/directory**: ogni riga resta flat a 3 colonne (indice A–Z, chips,
+   paginazione e `?page=` intatti), ma dentro una **card visibile**
+   (`#fffef9`, bordo 1px `--line`, `radius-lg`, padding 16×20px, gap 12px
+   tra card) + **barra di stato** sinistra 3px nel colore del token
+   `--status-*` e tint 9% del token su `#fffef9` (precalcolata).
+2. **/mappa (MapRecordList)**: stessa logica — card bianca, rail 3px, tint
+   8% su `#fff`, e la riga ora espone **status-dot + label testuale**
+   (nuova riga `.map-record-status`): il colore non è mai l'unico segnale.
+   La selezione è passata dal bordo sinistro alla wash di sfondo
+   (`#e4efe6` + `aria-current`) per non competere con il rail di stato.
+3. **Hub home**: stessa barra di stato sulle card esistenti (scope
+   `.records-section .record-list`), zero tocchi a RecordCard.
+4. **A11y**: i due testi più chiari sulla superficie tintata
+   (`.card-topline` → `var(--muted)`, `.record-kind` → `#576d77`) sono
+   scuriti per tenere ≥4.5:1 su tutte le tint (min misurato 4.85:1); dot +
+   label restano (WCAG 1.4.1). Tutti i valori derivano dai token
+   `--status-*` esistenti — nessun token globale nuovo (nessun ADR).
+5. **Test**: nuovi guard in `a11y-interactive.test.mjs` (status-dot per
+   card + source-guard CSS) e `client-tools.test.mjs` (righe sidebar
+   /mappa con dot + label); rendered-html invariato (markup RecordCard
+   byte-identico).
