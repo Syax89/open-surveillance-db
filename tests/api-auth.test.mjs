@@ -55,8 +55,18 @@ const contributor = {
   id: 7,
   email: "ada@example.org",
   displayName: "Ada",
+  // Fase B: a fresh account is unverified — the write gate reads this same
+  // column on every write (403 until set), and since t_6dc1c96f the login
+  // route refuses sessions while it is null (generic 401).
+  emailVerifiedAt: null,
   createdAt: "2026-08-01T08:00:00.000Z",
   updatedAt: "2026-08-01T08:00:00.000Z",
+};
+
+/** The verified variant used by the verify-email / reset fixtures. */
+const verifiedContributor = {
+  ...contributor,
+  emailVerifiedAt: "2026-08-01T08:30:00.000Z",
 };
 
 const session = {
@@ -349,7 +359,9 @@ test("register returns 500 when the database is unavailable", async () => {
 test("login authenticates, opens a session, and sets both cookies", async () => {
   stub("loginLockoutKey", async (email) => `lockout:${email}`);
   stub("getLoginLockout", async () => ({ locked: false, retryAfterSeconds: 0 }));
-  stub("authenticateContributor", async () => contributor);
+  // Verified account: since t_6dc1c96f the login route only opens a session
+  // when email_verified_at is set (CEO feedback 2026-08-03, option (a)).
+  stub("authenticateContributor", async () => verifiedContributor);
   stub("clearLoginAttempts", async () => {});
   stub("createSession", async () => newSession);
   const { POST } = await loginRoute();
@@ -361,11 +373,35 @@ test("login authenticates, opens a session, and sets both cookies", async () => 
   );
   assert.equal(response.status, 200);
   const body = await responseBody(response);
-  assert.deepEqual(body.contributor, contributor);
+  assert.deepEqual(body.contributor, verifiedContributor);
   assert.deepEqual(callArgs("authenticateContributor")[0], ["ada@example.org", "supersecret123"]);
   assert.deepEqual(callArgs("loginLockoutKey")[0], ["ada@example.org"], "the key derives from the normalised email");
   assert.deepEqual(callArgs("clearLoginAttempts")[0], ["lockout:ada@example.org"], "a successful login clears the per-email counter");
   assert.deepEqual(cookieNames(response).sort(), ["osdb_csrf", "osdb_session"]);
+});
+
+test("login refuses a correct password on an UNVERIFIED account with the same generic 401 (no session, no counter change)", async () => {
+  // CEO feedback 2026-08-03 (t_6dc1c96f, option (a)): "finché non è
+  // attivato non è possibile fare login". A correct password on an account
+  // whose email is not yet verified must NOT open a session.
+  stub("loginLockoutKey", async (email) => `lockout:${email}`);
+  stub("getLoginLockout", async () => ({ locked: false, retryAfterSeconds: 0 }));
+  stub("authenticateContributor", async () => contributor); // fixture: emailVerifiedAt null
+  const { POST } = await loginRoute();
+  const response = await POST(
+    apiRequest("/api/auth/login", {
+      method: "POST",
+      body: { email: "ada@example.org", password: "supersecret123" },
+    }),
+  );
+  assert.equal(response.status, 401);
+  // Identical body to unknown email / wrong password — the response never
+  // reveals the account exists (anti-enumeration, the login route rule).
+  assert.equal((await responseBody(response)).error, "Invalid credentials.");
+  assert.equal(callArgs("createSession").length, 0, "no session for an unverified account");
+  assert.equal(callArgs("clearLoginAttempts").length, 0, "the counter is not cleared (the login did not succeed)");
+  assert.equal(callArgs("recordFailedLogin").length, 0, "a correct password is not a failed attempt — no lockout DoS for the owner");
+  assert.equal(response.headers.getSetCookie().length, 0, "no cookies are set");
 });
 
 test("login answers the same generic 401 for unknown email and wrong password", async (t) => {
@@ -831,11 +867,6 @@ test("a dead session cookie is refused by the write gate (401, no-store, no db w
 // ---------------------------------------------------------------------------
 // GET /api/auth/verify-email (multi-method auth Fase B)
 // ---------------------------------------------------------------------------
-
-const verifiedContributor = {
-  ...contributor,
-  emailVerifiedAt: "2026-08-01T08:30:00.000Z",
-};
 
 test("verify-email consumes a live token and flips the account to verified", async () => {
   stub("consumeVerificationToken", async () => ({ kind: "verified", contributorId: 7 }));

@@ -1214,6 +1214,20 @@ async function registerContributor() {
   return response;
 }
 
+/**
+ * Mark the lockout fixture's email verified in the DB. The lockout tests are
+ * about the counter, not the verification gate (t_6dc1c96f, CEO feedback
+ * 2026-08-03): since login refuses unverified accounts with a generic 401,
+ * the "successful login" half of these tests needs a verified address to
+ * reach the 200 path.
+ */
+async function verifyContributorEmail() {
+  await env.DB
+    .prepare("UPDATE contributors SET email_verified_at = ? WHERE email = ?")
+    .bind(new Date().toISOString(), AUTH_EMAIL)
+    .run();
+}
+
 function loginAttempt(ip, password) {
   return loginRoute.POST(apiRequest("/api/auth/login", {
     method: "POST",
@@ -1250,6 +1264,10 @@ test("E2E: N failed logins from different IPs lock the account (429 + Retry-Afte
 test("E2E: a successful login resets the per-email counter", async () => {
   env.AUTH_LOCKOUT_MAX_ATTEMPTS = "3";
   await registerContributor();
+  // The successful logins below need a VERIFIED account (t_6dc1c96f): the
+  // gate blocks unverified accounts with a generic 401 before the counter
+  // reset can happen.
+  await verifyContributorEmail();
 
   assert.equal((await loginAttempt("10.0.0.1", "wrong-password-1")).status, 401);
   assert.equal((await loginAttempt("10.0.0.2", "wrong-password-2")).status, 401);
@@ -1265,6 +1283,9 @@ test("E2E: the lockout expires after the duration and the account logs in again"
   env.AUTH_LOCKOUT_MAX_ATTEMPTS = "3";
   env.AUTH_LOCKOUT_DURATION_SECONDS = "1";
   await registerContributor();
+  // Same as above: the post-lock successful login requires a verified
+  // address (t_6dc1c96f verification gate).
+  await verifyContributorEmail();
 
   assert.equal((await loginAttempt("10.0.0.1", "wrong-password-1")).status, 401);
   assert.equal((await loginAttempt("10.0.0.2", "wrong-password-2")).status, 401);

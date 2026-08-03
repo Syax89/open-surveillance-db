@@ -27,6 +27,22 @@ import { BodyReadError, readJsonBody, urlTooLong } from "../../../lib/input-limi
  * response never reveals which part was wrong. Success sets the same cookie
  * pair as registration (`osdb_session` + `osdb_csrf`).
  *
+ * Verification gate (CEO feedback 2026-08-03, t_6dc1c96f): "finché non è
+ * attivato non è possibile fare login" — an account whose email is NOT yet
+ * verified (email_verified_at NULL) cannot open a session at login. The
+ * read-only session opened at register (Fase B) stays the only session an
+ * unverified account can hold: it powers the /account banner and the
+ * verify-email resend, so the user is never stranded. The gate is enforced
+ * AFTER the PBKDF2 check — a correct password still pays the full hashing
+ * cost — and answers the SAME generic 401 body as every other failure, so
+ * the response can never be used to tell "account exists but unverified"
+ * from "no such account" (anti-enumeration, the project-wide login rule).
+ * The lockout counter is deliberately left untouched on this branch: the
+ * password was correct, so this is not a credential failure to count, and
+ * NOT clearing the counter keeps brute-force protection for the account
+ * intact. Guidance lives on the /login page as static copy
+ * (`auth.loginVerifyHint`), never as a per-account response.
+ *
  * Brute-force defence is layered (ADR 0016): the per-IP `auth` bucket
  * (authLimit) throttles a single caller, and a per-email lockout — keyed by
  * the SHA-256 of the normalised email, never the address — stops distributed
@@ -85,6 +101,20 @@ export async function POST(request: Request) {
           { status: 429, headers: { "Retry-After": String(after.retryAfterSeconds) } },
         );
       }
+      return Response.json({ error: "Invalid credentials." }, { status: 401 });
+    }
+
+    // Verification gate (CEO feedback 2026-08-03, t_6dc1c96f — option (a)):
+    // "finché non è attivato non è possibile fare login". An account whose
+    // email is not verified cannot open a session at login. The password was
+    // correct, so the PBKDF2 cost has already been paid — the branch below
+    // adds no timing signal. The response is the SAME generic 401 body as an
+    // unknown email or a wrong password: never "verify your email", which
+    // would let a caller tell "account exists but unverified" apart from "no
+    // such account". The lockout counter is NOT touched: a correct password
+    // is not a credential failure to count, and not clearing it keeps the
+    // brute-force protection intact (a successful login still clears it).
+    if (!contributor.emailVerifiedAt) {
       return Response.json({ error: "Invalid credentials." }, { status: 401 });
     }
 

@@ -287,6 +287,21 @@ changes accumulate under `[Unreleased]`.
 
 ### Changed
 
+- **Auth — login bloccato finché l'email non è verificata (t_6dc1c96f, CEO
+  feedback 2026-08-03, option (a)):** `POST /api/auth/login` ora risponde 401
+  (stesso corpo generico "Invalid credentials." di email sconosciuta /
+  password errata) quando `email_verified_at` è NULL — "finché non è attivato
+  non è possibile fare login". Il gate gira DOPO la verifica PBKDF2 (nessun
+  timing oracle) e non tocca il contatore lockout (una password corretta non
+  è un tentativo fallito: nessun lockout-DoS per il proprietario). La
+  sessione read-only aperta da register (Fase B) resta l'unica sessione che un
+  account non verificato può avere — alimenta il banner /account e il resend
+  di verifica. Il messaggio "verifica la tua email" è copy statico su /login
+  (`auth.loginVerifyHint`, EN/IT, mostrato a tutti): l'API non rivela mai
+  l'esistenza dell'account (anti-enumeration intatta). Test: api-auth
+  (nuovo caso unverified-401), auth-verify-e2e (register → login 401 →
+  verify → login 200).
+
 - Header mobile menu boundary moved from 700px to 768px and the auth entry
   point moved INSIDE the menu (t_94b3726d, CEO live feedback 2026-08-02):
   `AuthNavLinks` is now the last item of `.nav-links` instead of a separate

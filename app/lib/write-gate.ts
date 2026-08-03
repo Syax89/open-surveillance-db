@@ -23,7 +23,11 @@
  * "NIENTE sessioni write prima di verifica": a session opened at register
  * (Fase B) is read-only until `email_verified_at` is set — this gate is the
  * enforcement point at the write boundary for every route, independent of
- * what the register/login flows do with their cookies.
+ * what the register/login flows do with their cookies. Since t_6dc1c96f
+ * (CEO feedback 2026-08-03) the login flow is stricter: POST /api/auth/login
+ * refuses unverified accounts entirely (generic 401), so the only session an
+ * unverified account can hold is the read-only one from register — and this
+ * gate still blocks every write for it (403).
  *
  * The db half (`getContributorVerification`, db/auth.ts) reads the same
  * `email_verified_at` column that Fase A migration 0027 introduces and Fase

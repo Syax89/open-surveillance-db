@@ -63,14 +63,28 @@ conclusion for three reasons:
    Anonymous browsing and reporting remain possible and unchanged
    (ADR 0013 decision 4): no method is ever required to use the service.
 
-2. **Email verification is required for write access.** `contributors.email_verified_at`
+2. **Email verification is required for write access — and, since the CEO
+   feedback 2026-08-03 (t_6dc1c96f), for login itself.** `contributors.email_verified_at`
    is set by a single-use, **SHA-256-hashed** verification token emailed
    through Cloudflare Email Routing (`opensurveillancedb.org`, HTML + plain
    templates, zero tracking), 24 h TTL, rate-limited re-send (3/h per
    contributor). Sessions from unverified accounts are **read-only**: the
    write gate (`resolveVerifiedContributor`) answers **401** for anonymous and
    **403** for not-yet-verified on write routes (Fase E1). Password reset uses
-   the same mailer with the same single-use token discipline.
+   the same mailer with the same single-use token discipline. **Login gate
+   (t_6dc1c96f, option (a) — "finché non è attivato non è possibile fare
+   login"):** `POST /api/auth/login` refuses an account whose
+   `email_verified_at` is NULL with the **same generic 401** as unknown email
+   / wrong password, so the response never reveals account existence
+   (anti-enumeration, ADR 0013). The gate runs **after** the PBKDF2 check
+   (no timing oracle) and does **not** touch the lockout counter (a correct
+   password is not a failed attempt — no lockout-DoS for the owner, and not
+   clearing the counter keeps brute-force protection intact). The read-only
+   session opened at register stays the only session an unverified account
+   can hold: it powers the `/account` banner and the verification resend, so
+   the user is never stranded. Guidance lives as **static copy** on `/login`
+   (`auth.loginVerifyHint`, EN/IT, shown to everyone) — never as a
+   per-account response.
 
 3. **Passkeys are an optional parallel method with a mandatory fallback.**
    New D1 table `passkeys` (`credential_id` UNIQUE, COSE public key, sign

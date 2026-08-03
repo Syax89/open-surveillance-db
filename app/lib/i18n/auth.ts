@@ -48,6 +48,13 @@ export const en = {
   errorEmailTaken: "An account with this email already exists.",
   errorGeneric: "Something went wrong. Please try again.",
   errorCrossOrigin: "Cross-site request rejected.",
+  // Static copy on /login (t_6dc1c96f — CEO feedback 2026-08-03): login is
+  // blocked until the email is verified, and the API answers the same generic
+  // 401 for every failure (anti-enumeration). This note is shown to everyone,
+  // so it never reveals account existence — it just explains, in advance, why
+  // a correct password might be rejected right after registering.
+  loginVerifyHint:
+    "Just registered? Check your inbox for the verification email — you can sign in only once your email is verified.",
   loading: "Loading…",
   anonymous: "Anonymous",
   notAuthenticatedTitle: "Not logged in",
@@ -252,6 +259,14 @@ export const it: Translation<typeof en> = {
   errorEmailTaken: "Esiste già un account con questa email.",
   errorGeneric: "Qualcosa è andato storto. Riprova.",
   errorCrossOrigin: "Richiesta cross-site rifiutata.",
+  // Testo statico su /login (t_6dc1c96f — feedback CEO 2026-08-03): l'accesso
+  // è bloccato finché l'email non è verificata, e l'API risponde con lo stesso
+  // 401 generico per ogni errore (anti-enumeration). La nota è mostrata a
+  // tutti, quindi non rivela mai l'esistenza di un account — spiega solo, in
+  // anticipo, perché una password corretta può essere rifiutata subito dopo
+  // la registrazione.
+  loginVerifyHint:
+    "Ti sei appena registrato? Controlla la casella di posta: puoi accedere solo dopo aver verificato l'email con il link che ti abbiamo inviato.",
   loading: "Caricamento…",
   anonymous: "Anonimo",
   notAuthenticatedTitle: "Non hai effettuato l'accesso",
