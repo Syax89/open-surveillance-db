@@ -536,6 +536,41 @@ footer>p { margin:0; color:#586870; font-size:var(--text-md); line-height:1.5; }
 .auth-danger-zone .button:hover { background:#fdf0ec; border-color:#c0745f; }
 .auth-danger-zone .button:disabled { opacity:.55; cursor:progress; }
 
+/* Multi-method auth (Fase E2 — Vera design): method selector on /login,
+   passkey management + recovery codes on /account. The selector is a
+   native radio group (keyboard-arrow navigation for free); the selected
+   chip inverts to the focus green with the focus ring on :focus-visible
+   of the (visually hidden but focusable) radio input. */
+.auth-methods { display:flex; gap:var(--space-2); flex-wrap:wrap; margin:26px 0 6px; }
+.auth-method-option { position:relative; }
+.auth-method-option input { position:absolute; inset:0; margin:0; opacity:0; cursor:pointer; }
+.auth-method-option label { display:inline-flex; align-items:center; min-height:44px; padding:10px 16px; border:1px solid #b7c2bd; border-radius:var(--radius-lg); background:#fff; color:#1c4858; font-size:var(--text-base); font-weight:800; line-height:1.2; cursor:pointer; }
+.auth-method-option input:checked + label { border-color:#0b705c; background:#eaf6f0; color:#0b3f33; }
+.auth-method-option input:focus-visible + label { outline:3px solid var(--focus); outline-offset:2px; }
+.auth-method-option input:hover:not(:checked) + label { border-color:#3e9477; }
+.auth-method-hint { margin:0; color:#5c6c75; font-size:var(--text-sm); line-height:1.5; }
+.oidc-panel { margin:30px 0 8px; }
+.oidc-buttons { display:grid; gap:10px; }
+.oidc-button { justify-content:center; width:100%; }
+.oidc-disclosure { margin:14px 0 0; padding:12px 14px; border:1px solid #cdd6ce; border-radius:var(--radius-md); background:#fffef9; color:#52656d; font-size:var(--text-sm); line-height:1.55; }
+.oidc-disclosure a { color:var(--focus); font-weight:800; text-decoration:underline; text-underline-offset:3px; }
+.passkey-list { margin:18px 0 10px; }
+.passkey-kind { display:inline-flex; align-items:center; gap:8px; }
+.passkey-row .status-dot { margin-left:0; }
+.passkey-row .text-button { margin-left:auto; }
+.passkey-empty { margin:18px 0 10px; color:#5c6c75; font-size:var(--text-base); }
+.passkey-added { margin:10px 0 0; color:var(--focus); font-weight:800; }
+.passkey-actions { display:grid; gap:8px; justify-items:start; margin-top:12px; }
+/* Recovery codes dialog: the once-only codes get a wider modal and a
+   monospace grid so the user can read/copy them reliably. */
+.recovery-dialog { max-width:560px; }
+.recovery-codes { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; margin:0 0 18px; padding:0; list-style:none; }
+.recovery-code { padding:10px 12px; border:1px solid #cdd6ce; border-radius:var(--radius-md); background:#f5f3ec; color:#174e58; font-family:"SFMono-Regular", Consolas, "Liberation Mono", monospace; font-size:var(--text-md); letter-spacing:.04em; text-align:center; }
+.recovery-dialog-actions { justify-content:flex-start; }
+@media (max-width:480px) {
+  .recovery-codes { grid-template-columns:1fr; }
+}
+
 /* Inline display name edit (C6/C8 profile field). */
 .display-name-form { display:grid; gap:10px; }
 .display-name-form .auth-field { gap:6px; }
