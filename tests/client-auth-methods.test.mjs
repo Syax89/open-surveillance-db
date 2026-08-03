@@ -263,6 +263,12 @@ test("login: a 410 from the merge route drops merge mode and announces the expir
   // The normal login (method selector + password form) is back.
   await waitFor(() => assert.ok(screen.getByRole("radio", { name: "Email + password" })));
   assert.ok(screen.getByRole("button", { name: "Log in" }));
+  // The stale ?merge= token is stripped from the address bar via
+  // router.replace (no scroll jump) so it is not re-submittable/shared.
+  const nav = await getNavState();
+  assert.deepEqual(nav.replaced, ["/login"]);
+  assert.equal(nav.url.pathname, "/login");
+  assert.equal(nav.url.search, "");
 });
 
 test("login: ?oidc_error=1 announces the provider failure", async () => {

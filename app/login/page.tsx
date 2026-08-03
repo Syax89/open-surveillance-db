@@ -184,8 +184,15 @@ function LoginPageBody() {
       if (response.status === 410) {
         // The single-use token expired or was already consumed: drop the
         // merge mode and fall back to the normal login, announcing why.
+        // Also strip ?merge= from the address bar (router.replace, no
+        // scroll jump) so the stale token stops being re-submittable or
+        // shareable in the URL — ada review PR #242.
         setMergeToken(null);
         setError(t.mergeErrorExpired);
+        const cleanParams = new URLSearchParams(searchParams.toString());
+        cleanParams.delete("merge");
+        const cleanQuery = cleanParams.toString();
+        router.replace(cleanQuery ? `/login?${cleanQuery}` : "/login", { scroll: false });
       } else if (response.status === 401) {
         setError(t.errorInvalidCredentials);
       } else if (response.status === 429) {

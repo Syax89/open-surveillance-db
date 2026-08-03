@@ -247,7 +247,10 @@ export default function AccountPageBody() {
         headers: csrfToken ? { "x-csrf-token": csrfToken } : {},
       });
       if (beginResponse.status === 401 || beginResponse.status === 403) {
-        setEnrollError(beginResponse.status === 403 ? t.errorCrossOrigin : t.passkeySessionLost);
+        // Same-origin fetch: a 403 here is the expired/mismatched CSRF
+        // token (backend: "Invalid CSRF token"), never a real cross-site
+        // request — surface the actionable message, not errorCrossOrigin.
+        setEnrollError(beginResponse.status === 403 ? t.passkeyCsrfExpired : t.passkeySessionLost);
         return;
       }
       if (!beginResponse.ok) {
@@ -274,7 +277,8 @@ export default function AccountPageBody() {
         return;
       }
       if (completeResponse.status === 403) {
-        setEnrollError(t.errorCrossOrigin);
+        // Same-origin fetch: 403 = CSRF token expired/mismatched.
+        setEnrollError(t.passkeyCsrfExpired);
         return;
       }
       if (!completeResponse.ok) {
@@ -308,7 +312,7 @@ export default function AccountPageBody() {
       });
       if (!response.ok) {
         if (response.status === 404) setPasskeysError(t.passkeyNotFound);
-        else if (response.status === 403) setPasskeysError(t.errorCrossOrigin);
+        else if (response.status === 403) setPasskeysError(t.passkeyCsrfExpired);
         else setPasskeysError(t.passkeyRemoveError);
         return;
       }
