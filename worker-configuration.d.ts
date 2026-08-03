@@ -68,6 +68,16 @@ declare module "cloudflare:workers" {
   export interface Env {
     ASSETS: Fetcher;
     DB: D1Database;
+    /**
+     * Deployment environment flag. Only the exact value "development" opens
+     * the moderation demo actor selector (admin may pick a client-supplied
+     * actorId). Unset or any other value = production: the moderation route
+     * ALWAYS derives the acting reviewer server-side, so the append-only
+     * audit trail cannot be forged by impersonation (t_6b61fc3f). Set it
+     * locally via `.dev.vars` (gitignored) — never in wrangler.jsonc, which
+     * is shared with the production deploy.
+     */
+    ENVIRONMENT?: string;
     /** Email Service binding (wrangler.jsonc `send_email`, name EMAIL). */
     EMAIL?: SendEmail;
     IMAGES: {

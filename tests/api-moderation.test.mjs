@@ -681,6 +681,125 @@ test("PATCH maps malformed JSON bodies to 400", async () => {
 });
 
 // ---------------------------------------------------------------------------
+// PATCH /api/moderation — actor identity (audit finding t_6b61fc3f)
+// ---------------------------------------------------------------------------
+//
+// Production (ENVIRONMENT unset or != "development"): the acting reviewer is
+// ALWAYS derived server-side from the authenticated user's linked reviewer.
+// The client-supplied actorId is IGNORED for every role — an admin can no
+// longer write moderation events as another reviewer, so the append-only
+// audit trail cannot be forged by impersonation. Only the development demo
+// actor selector (ENVIRONMENT="development" + admin role) still honours a
+// client-chosen actorId.
+
+const adminUser = {
+  id: 1,
+  email: "admin@osdb.test",
+  displayName: "Demo Administrator",
+  role: "admin",
+  active: 1,
+  mfaEnabled: 0,
+  createdAt: "2026-08-01T00:00:00.000Z",
+  updatedAt: "2026-08-01T00:00:00.000Z",
+};
+const adminReviewer = { id: 1, displayName: "Demo Administrator", role: "administrator", active: 1 };
+const authAs = (user) => (path, opts = {}) =>
+  publicRequest(path, { ...opts, headers: { "x-osdb-user-email": user.email, ...(opts.headers ?? {}) } });
+const stubIdentity = (user) => stub("getUserByEmail", async (email) => (email === user.email ? user : null));
+
+test("PATCH in production ignores a client actorId for a moderator (server-derived reviewer)", async () => {
+  stub("moderateCamera", async () => okResult());
+  const { PATCH } = await route();
+  const response = await PATCH(
+    authRequest("/api/moderation", {
+      method: "PATCH",
+      body: { entity: "camera", id: 5, action: "approve", reasonCode: validReasonCode, actorId: 999 },
+    }),
+  );
+  assert.equal(response.status, 200);
+  // The spoofed 999 must never reach the db layer: the moderator acts as
+  // their own linked reviewer (moderatorReviewer.id = 2).
+  assert.deepEqual(callArgs("moderateCamera")[0][5], { actorId: 2 });
+});
+
+test("PATCH in production ignores a client actorId for an admin (no impersonation)", async () => {
+  stubIdentity(adminUser);
+  stub("getReviewerByUserId", async () => adminReviewer);
+  stub("moderateCamera", async () => okResult());
+  const { PATCH } = await route();
+  const response = await PATCH(
+    authAs(adminUser)("/api/moderation", {
+      method: "PATCH",
+      body: { entity: "camera", id: 5, action: "approve", reasonCode: validReasonCode, actorId: 999 },
+    }),
+  );
+  assert.equal(response.status, 200);
+  // The admin acts as their OWN reviewer (id 1), never as the spoofed 999.
+  assert.deepEqual(callArgs("moderateCamera")[0][5], { actorId: 1 });
+});
+
+test("PATCH in production rejects an admin without a reviewer profile (403, no write)", async () => {
+  stubIdentity(adminUser);
+  stub("getReviewerByUserId", async () => null);
+  const { PATCH } = await route();
+  const response = await PATCH(
+    authAs(adminUser)("/api/moderation", {
+      method: "PATCH",
+      body: { entity: "camera", id: 5, action: "approve", reasonCode: validReasonCode, actorId: 42 },
+    }),
+  );
+  assert.equal(response.status, 403);
+  assert.equal(
+    (await responseBody(response)).error,
+    "Your account has no reviewer profile to act with.",
+  );
+  assert.equal(callArgs("moderateCamera").length, 0, "no db write without a server-derived reviewer");
+});
+
+test("PATCH in development lets an admin act as any reviewer (demo actor selector)", async () => {
+  stubIdentity(adminUser);
+  stub("getReviewerByUserId", async () => adminReviewer);
+  stub("moderateCamera", async () => okResult());
+  const envModule = await loadTreeModule("cloudflare-workers.mjs");
+  envModule.env.ENVIRONMENT = "development";
+  try {
+    const { PATCH } = await route();
+    const response = await PATCH(
+      authAs(adminUser)("/api/moderation", {
+        method: "PATCH",
+        body: { entity: "camera", id: 5, action: "approve", reasonCode: validReasonCode, actorId: 42 },
+      }),
+    );
+    assert.equal(response.status, 200);
+    // Dev-only demo selector: the client-chosen reviewer is honoured.
+    assert.deepEqual(callArgs("moderateCamera")[0][5], { actorId: 42 });
+  } finally {
+    delete envModule.env.ENVIRONMENT;
+  }
+});
+
+test("PATCH in development still forces a moderator to their own reviewer", async () => {
+  stub("moderateCamera", async () => okResult());
+  const envModule = await loadTreeModule("cloudflare-workers.mjs");
+  envModule.env.ENVIRONMENT = "development";
+  try {
+    const { PATCH } = await route();
+    const response = await PATCH(
+      authRequest("/api/moderation", {
+        method: "PATCH",
+        body: { entity: "camera", id: 5, action: "approve", reasonCode: validReasonCode, actorId: 42 },
+      }),
+    );
+    assert.equal(response.status, 200);
+    // Even in development the demo selector is admin-only: a moderator is
+    // always pinned to their own linked reviewer (id 2).
+    assert.deepEqual(callArgs("moderateCamera")[0][5], { actorId: 2 });
+  } finally {
+    delete envModule.env.ENVIRONMENT;
+  }
+});
+
+// ---------------------------------------------------------------------------
 // PATCH /api/moderation — edge-cache purge (follow-up F0, t_ae600b90)
 // ---------------------------------------------------------------------------
 
