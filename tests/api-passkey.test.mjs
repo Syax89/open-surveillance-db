@@ -447,6 +447,40 @@ test("login/complete passes the challenge handle binding when the assertion echo
   );
 });
 
+test("login/complete does not reject an email-narrowed challenge when the assertion carries NO userHandle (non-resident credential, P3-3)", async () => {
+  // /begin was email-narrowed, so the challenge recorded handle-7. The
+  // authenticator is a NON-resident credential (residentKey:"preferred" is
+  // not a guarantee — security key with full slots, U2F-mode authenticator):
+  // per spec §6.3.2 its assertion has NO userHandle, so
+  // response.response.userHandle is undefined. The binding check must NOT
+  // treat the absence as a mismatch — the login proceeds to the credential
+  // lookup, which stays the real binding (credential_id → owner).
+  stub("consumeWebAuthnChallenge", async () => ({ id: 1, kind: "login", userHandle: "handle-7" }));
+  stub("findPasskeyByCredentialId", async () => null);
+  const { POST } = await loginCompleteRoute();
+  const response = await POST(
+    apiRequest("/api/auth/passkey/login/complete", {
+      method: "POST",
+      body: {
+        challenge: "c1",
+        response: {
+          id: "ghost-cred",
+          rawId: "ghost-cred",
+          type: "public-key",
+          // userHandle intentionally absent — a non-resident assertion.
+          response: { clientDataJSON: "e30=" },
+        },
+      },
+    }),
+  );
+  assert.equal(response.status, 401);
+  assert.equal(
+    callArgs("findPasskeyByCredentialId").length,
+    1,
+    "an absent assertion userHandle is not a mismatch: the flow reaches the credential lookup",
+  );
+});
+
 // ---------------------------------------------------------------------------
 // GET/DELETE /api/auth/passkey/credentials
 // ---------------------------------------------------------------------------

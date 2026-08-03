@@ -33,8 +33,10 @@ import {
  *  1. single-use challenge consume (anti-replay — a ceremony cannot run
  *     twice, and only a challenge this RP issued can complete);
  *  2. when /begin was email-narrowed, the challenge recorded the target
- *     userHandle and the assertion must echo the SAME handle (the migration
- *     0028 double-check, P3-3; early rejection before the credential lookup);
+ *     userHandle and the assertion, WHEN it carries one, must echo the SAME
+ *     handle (the migration 0028 double-check, P3-3; early rejection before
+ *     the credential lookup). Non-resident credentials assert no userHandle
+ *     (spec §6.3.2), which is not a mismatch — those stay bound by 3+5;
  *  3. the credential must exist in D1 (credential_id is globally unique);
  *  4. SimpleWebAuthn verifies the assertion (signature, rpIdHash, origin,
  *     clientData challenge) against the stored COSE public key;
@@ -81,11 +83,19 @@ export async function POST(request: Request) {
     // 2. Challenge userHandle binding (P3-3, review-ada-2): when /begin was
     //    email-narrowed it stored the target userHandle on the challenge;
     //    the assertion must echo the SAME handle — the double-check the 0028
-    //    migration promised but nothing enforced. Discoverable ceremonies
-    //    record no handle (`consumed.userHandle` stays null) and are bound
-    //    by the owner check (5) below instead. Early rejection: runs before
-    //    the credential lookup and the crypto verification.
-    if (typeof consumed.userHandle === "string" && consumed.userHandle !== response.response.userHandle) {
+    //    migration promised but nothing enforced. The compare only runs when
+    //    the assertion actually carries a handle: non-resident credentials
+    //    (residentKey:"preferred" is not a guarantee — security keys with
+    //    full slots, U2F-mode authenticators) return NO userHandle per spec
+    //    §6.3.2, so an absent assertion handle is not a mismatch and those
+    //    logins stay bound by the credential lookup (3) and the owner check
+    //    (5) below. Early rejection: runs before the credential lookup and
+    //    the crypto verification.
+    if (
+      typeof response.response.userHandle === "string" &&
+      typeof consumed.userHandle === "string" &&
+      consumed.userHandle !== response.response.userHandle
+    ) {
       console.warn(
         `POST /api/auth/passkey/login/complete rejected: assertion userHandle does not match the challenge's recorded handle (challenge ${consumed.id})`,
       );
