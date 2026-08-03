@@ -2,6 +2,7 @@ import { env } from "cloudflare:workers";
 import { searchPublicCamerasNearPage, SEARCH_PAGE_DEFAULT_LIMIT, SEARCH_PAGE_MAX_LIMIT } from "../../../../db/cameras";
 import { resolvePlace } from "../../../../db/geocode";
 import { callerKey, checkRateLimit, searchLimits } from "../../../lib/rate-limit";
+import { MAX_PAGE_OFFSET } from "../../../lib/input-limits";
 import {
   coordinateRadiusMeters,
   formatDistance,
@@ -91,8 +92,11 @@ export async function GET(request: Request) {
   // geocoder or database work.
   const limit = readPageNumber(url.searchParams.get("limit"), SEARCH_PAGE_DEFAULT_LIMIT, SEARCH_PAGE_MAX_LIMIT);
   const offset = readPageNumber(url.searchParams.get("offset"), 0, Number.MAX_SAFE_INTEGER);
-  if (limit === null || offset === null || limit < 1) {
-    return Response.json({ error: `limit must be an integer between 1 and ${SEARCH_PAGE_MAX_LIMIT} and offset a non-negative integer.` }, { status: 400 });
+  // An offset beyond MAX_PAGE_OFFSET is rejected (not clamped) so a hostile
+  // ?offset=9007199254740991 cannot force an astronomical SQL OFFSET on the
+  // D1 (review P2-4). The check runs before any geocoder or db work.
+  if (limit === null || offset === null || limit < 1 || offset > MAX_PAGE_OFFSET) {
+    return Response.json({ error: `limit must be an integer between 1 and ${SEARCH_PAGE_MAX_LIMIT} and offset a non-negative integer up to ${MAX_PAGE_OFFSET}.` }, { status: 400 });
   }
 
   const key = callerKey(request);

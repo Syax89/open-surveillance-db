@@ -18,6 +18,7 @@ import { recordRateLimitBlock } from "../../lib/abuse-alerts";
 import { CACHE_TAGS } from "../../lib/cache-purge";
 import {
   BodyReadError,
+  MAX_PAGE_OFFSET,
   readJsonBody,
   urlTooLong,
 } from "../../lib/input-limits";
@@ -151,8 +152,11 @@ export async function GET(request: Request) {
     // max); offset is optional and starts at 0. Invalid values answer 400.
     const limit = readPageNumber(params.get("limit"), PUBLIC_CAMERAS_PAGE_DEFAULT_LIMIT, PUBLIC_CAMERAS_PAGE_MAX_LIMIT);
     const offset = readPageNumber(params.get("offset"), 0);
-    if (limit === null || offset === null || limit < 1) {
-      return Response.json({ error: `limit must be an integer between 1 and ${PUBLIC_CAMERAS_PAGE_MAX_LIMIT} and offset a non-negative integer.` }, { status: 400 });
+    // An offset beyond MAX_PAGE_OFFSET is rejected (not clamped) so a
+    // hostile ?offset=9007199254740991 cannot force an astronomical SQL
+    // OFFSET on the D1 (review P2-4). The check runs before any db work.
+    if (limit === null || offset === null || limit < 1 || offset > MAX_PAGE_OFFSET) {
+      return Response.json({ error: `limit must be an integer between 1 and ${PUBLIC_CAMERAS_PAGE_MAX_LIMIT} and offset a non-negative integer up to ${MAX_PAGE_OFFSET}.` }, { status: 400 });
     }
     const [page, facets] = await Promise.all([
       listPublicCamerasPage(filters, { limit, offset }),

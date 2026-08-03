@@ -83,6 +83,12 @@ const ROUTES = [
   { source: "app/api/auth/passkey/login/complete/route.ts", output: "app/api/auth/passkey/login/complete/route.mjs" },
   { source: "app/api/auth/oidc/[provider]/start/route.ts", output: "app/api/auth/oidc/[provider]/start/route.mjs" },
   { source: "app/api/auth/oidc/[provider]/callback/route.ts", output: "app/api/auth/oidc/[provider]/callback/route.mjs" },
+  // Manual email-conflict merge (Fase D): the merge POST proves ownership
+  // of the existing account with email+password and atomically links the
+  // OIDC identity — exercised end to end with a REAL merge token issued by
+  // the real callback route (tests/qa-multiauth-write-gate-e2e.test.mjs,
+  // review P2-2).
+  { source: "app/api/auth/oidc/merge/route.ts", output: "app/api/auth/oidc/merge/route.mjs" },
   // Auth roles + appeals (ADR 0014): contributor files an appeal, moderators
   // list and decide it. The [id] route lives in its own directory.
   { source: "app/api/appeals/route.ts", output: "app/api/appeals/route.mjs" },
