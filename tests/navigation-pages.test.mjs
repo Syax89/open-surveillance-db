@@ -326,18 +326,18 @@ test("core text/background pairs meet WCAG AA contrast (≥ 4.5:1)", async () =>
     ["#5e707a", "#f5f3ec"],
     // Primary action/link colour on paper and on cards.
     ["#0b705c", "#f5f3ec"],
-    ["#0b705c", "#fffef9"],
-    ["#0a705d", "#fffef9"],
+    ["#0b705c", "#fff"],
+    ["#0a705d", "#fff"],
     // White text on active locale button (#174e58).
     ["#ffffff", "#174e58"],
-    // Record list / card text on card background (#fffef9).
-    ["#2f4751", "#fffef9"],
-    ["#203841", "#fffef9"],
-    ["#63717b", "#fffef9"],
-    ["#60737d", "#fffef9"],
-    ["#536771", "#fffef9"],
-    ["#52656d", "#fffef9"],
-    ["#5c6c75", "#fffef9"],
+    // Record list / card text on card background (#fff — white card on paper).
+    ["#2f4751", "#fff"],
+    ["#203841", "#fff"],
+    ["#63717b", "#fff"],
+    ["#60737d", "#fff"],
+    ["#536771", "#fff"],
+    ["#52656d", "#fff"],
+    ["#5c6c75", "#fff"],
     // Auth error text on its alert background.
     ["#8a3b2c", "#fdf0ec"],
     // Danger-zone heading on its panel.

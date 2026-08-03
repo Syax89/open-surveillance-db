@@ -433,3 +433,34 @@ come contenitori. Fix (Vera design):
    card + source-guard CSS) e `client-tools.test.mjs` (righe sidebar
    /mappa con dot + label); rendered-html invariato (markup RecordCard
    byte-identico).
+
+---
+
+## Fix t_d52fde50 (CEO feedback 2, 2026-08-03): card EVIDENTI sul paper
+
+Il primo giro (#261) rendeva le righe card visibili (`#fffef9` + bordo +
+rail 3px + tint 9%), ma il CEO le vedeva ancora "trasparenti": `#fffef9`
+e le tint 9%-over-`#fffef9` hanno contrasto ~1:1 con `--paper`
+(`#f5f3ec`), quindi il box si fondeva con la pagina e solo il rail lo
+separava. Verificato visivamente su LXC (192.168.1.201:3000/directory,
+screenshot `screenshots/directory-BEFORE-lxc.png`).
+
+### Decisioni di design (Vera)
+
+1. **La card è il contenitore evidente**: superficie bianca `#fff`
+   (vs paper crema), bordo scoped `#b9c7bf` (già in uso su
+   `.empty-state`) visibile su bianco e su paper, `box-shadow` soft
+   (`0 1px 2px` + `0 6px 16px rgba(16,35,50,…)`) come cue di elevazione.
+2. **Tint 14% over `#fff`** (da 9% over `#fffef9`): verified `#e5f3ec`,
+   community `#f9f0e4`, review `#faebe8`, pending `#eff0f1`, demo
+   `#e9ecf3` — una wash percepibile ma tenue; il rail 3px pieno del token
+   resta il segnale di stato forte.
+3. **A11y mantenuta**: il testo più chiaro su tint (dt) scurito a
+   `#576d77`; peggior coppia misurata `#576d77`-on-`#faebe8` = 4.69:1
+   (script di verifica in corso PR). Colore mai unico segnale (dot +
+   label restano, WCAG 1.4.1).
+4. **Coerenza**: stesso trattamento sul `.record-list-card` condiviso
+   (guide/regole/manifesto/moderazione diventano card visibili); /mappa
+   rows (bianche con rail) già ok, invariati.
+5. **Nessun token globale toccato** (nessun ADR): solo valori scoped
+   nelle regole esistenti + tint precalcolate dai `--status-*`.
