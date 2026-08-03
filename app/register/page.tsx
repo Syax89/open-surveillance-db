@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMessages } from "../components/LocaleProvider";
 import { SiteHeader } from "../components/SiteHeader";
+import { passwordRuleFailures } from "../lib/password-policy";
 
 export default function RegisterPage() {
   const bundle = useMessages();
@@ -27,7 +28,9 @@ export default function RegisterPage() {
   function clientValidation() {
     const emailInvalid = !email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
     const displayNameInvalid = displayName.trim().length > 0 && displayName.trim().length < 2;
-    const passwordInvalid = password.length < 10;
+    // Full policy (CEO feedback 2026-08-03): length + uppercase + lowercase +
+    // digit + special. Same rules as the server (./lib/password-policy).
+    const passwordInvalid = passwordRuleFailures(password).length > 0;
     const errors = {
       email: emailInvalid || undefined,
       displayName: displayNameInvalid || undefined,
@@ -122,13 +125,27 @@ export default function RegisterPage() {
               required
               minLength={10}
               aria-invalid={fieldErrors.password || undefined}
+              aria-describedby="password-requirements"
               value={password}
               onChange={(event) => {
                 setPassword(event.target.value);
                 if (fieldErrors.password) setFieldErrors((f) => ({ ...f, password: undefined }));
               }}
             />
-            <small>{t.passwordHint}</small>
+            <div
+              className="password-requirements"
+              id="password-requirements"
+              data-invalid={fieldErrors.password || undefined}
+            >
+              <span className="password-requirements-label">{t.passwordRequirements}</span>
+              <ul className="password-requirements-list">
+                <li>{t.passwordRuleLength}</li>
+                <li>{t.passwordRuleUppercase}</li>
+                <li>{t.passwordRuleLowercase}</li>
+                <li>{t.passwordRuleDigit}</li>
+                <li>{t.passwordRuleSpecial}</li>
+              </ul>
+            </div>
           </label>
           {error ? <p className="auth-error" role="alert">{error}</p> : null}
           <button className="button button-primary" type="submit" disabled={submitting}>

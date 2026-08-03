@@ -163,7 +163,7 @@ test("414 guard: reset-password/confirm answers 414 for an absurd URL", async ()
     apiRequest(absurdUrl("/api/auth/reset-password/confirm"), {
       method: "POST",
       headers: evilOrigin(),
-      body: { token: "x".repeat(24), password: "supersecret123" },
+      body: { token: "x".repeat(24), password: "Sup3rsecret!123" },
     }),
   );
   assert.equal(response.status, 414);
@@ -264,12 +264,12 @@ test("429 bucket: reset-password/confirm trips the auth bucket with Retry-After"
   const { POST } = await resetConfirmRoute();
   for (let index = 0; index < 10; index += 1) {
     const response = await POST(
-      apiRequest("/api/auth/reset-password/confirm", { method: "POST", body: { token: "x".repeat(24), password: "supersecret123" } }),
+      apiRequest("/api/auth/reset-password/confirm", { method: "POST", body: { token: "x".repeat(24), password: "Sup3rsecret!123" } }),
     );
     assert.notEqual(response.status, 429, `request ${index + 1} must stay allowed (400 for bad token)`);
   }
   const blocked = await POST(
-    apiRequest("/api/auth/reset-password/confirm", { method: "POST", body: { token: "x".repeat(24), password: "supersecret123" } }),
+    apiRequest("/api/auth/reset-password/confirm", { method: "POST", body: { token: "x".repeat(24), password: "Sup3rsecret!123" } }),
   );
   assert.equal(blocked.status, 429);
   assert.ok(Number(blocked.headers.get("retry-after")) > 0);
@@ -404,7 +404,7 @@ test("503: reset-password/confirm returns 503 (no-store) when the db is unavaila
   const response = await POST(
     apiRequest("/api/auth/reset-password/confirm", {
       method: "POST",
-      body: { token: "valid-token-0123456789abcdef", password: "supersecret123" },
+      body: { token: "valid-token-0123456789abcdef", password: "Sup3rsecret!123" },
     }),
   );
   assert.equal(response.status, 503);
