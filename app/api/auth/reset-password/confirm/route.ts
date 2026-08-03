@@ -1,10 +1,5 @@
 import { env } from "cloudflare:workers";
-import {
-  consumeVerificationToken,
-  markContributorEmailVerified,
-  resetContributorPassword,
-  revokeAllContributorSessions,
-} from "../../../../../db/auth";
+import { applyPasswordReset, consumeVerificationToken } from "../../../../../db/auth";
 import { authLimit, isValidPassword } from "../../../../lib/auth-route-helpers";
 import { sameOrigin } from "../../../../lib/csrf";
 import { isRecord } from "../../../../lib/guards";
@@ -18,7 +13,10 @@ import { BodyReadError, readJsonBody, urlTooLong } from "../../../../lib/input-l
  *                                  live session revoked (a session opened
  *                                  with the old password must die), and the
  *                                  email marked verified (proving mailbox
- *                                  control is what a reset does).
+ *                                  control is what a reset does) — all in ONE
+ *                                  atomic batch, so a crash cannot leave the
+ *                                  hash rotated but sessions live, or sessions
+ *                                  dead but the hash old.
  *   - 400  malformed token/password, or unknown token — generic body
  *          (anti-enumeration).
  *   - 410  token already used or past its 24h TTL — Gone, the link is dead.
@@ -63,13 +61,12 @@ export async function POST(request: Request) {
     }
 
     const now = new Date().toISOString();
-    // Rotate the hash, kill every live session, then verify the address
-    // (idempotent). Order matters: the new hash must be in place before the
-    // next login, and revocation happens before the response so a stolen
-    // old session cannot race the reset.
-    await resetContributorPassword(consumed.contributorId, password, now);
-    await revokeAllContributorSessions(consumed.contributorId, now);
-    const contributor = await markContributorEmailVerified(consumed.contributorId, now);
+    // Rotate the hash, kill every live session and verify the address
+    // (idempotent) in ONE atomic batch: the new hash must be in place before
+    // the next login, revocation happens before the response so a stolen old
+    // session cannot race the reset, and a crash mid-way can never leave the
+    // hash rotated but sessions live (or vice versa).
+    const contributor = await applyPasswordReset(consumed.contributorId, password, now);
     if (!contributor) {
       // Account erased between consume and update: nothing to reset into.
       return Response.json({ error: "Invalid or expired reset link." }, { status: 400, headers: NO_STORE_HEADERS });
