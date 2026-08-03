@@ -140,7 +140,9 @@ export function renderVerificationEmail(context: AuthEmailContext): RenderedAuth
 
 /**
  * Render the password-reset message. Same mailer, same single-use token
- * discipline as verification (ADR 0020 decision 2).
+ * discipline as verification (ADR 0020 decision 2), but the reset link dies
+ * after 3h (RESET_TOKEN_TTL_MS) — shorter window than the 24h verification
+ * link, because a stolen reset link is the higher-stakes path.
  */
 export function renderPasswordResetEmail(context: AuthEmailContext): RenderedAuthEmail {
   const siteName = context.siteName || DEFAULT_SITE_NAME;
@@ -152,7 +154,7 @@ export function renderPasswordResetEmail(context: AuthEmailContext): RenderedAut
 
   const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.5;color:#1a1a1a;max-width:600px;margin:0 auto;">
   <p>${escapeHtml(greeting(name))}</p>
-  <p>We received a request to reset the password for your ${escapeHtml(siteName)} account. This link works for <strong>24 hours</strong> and can be used only once.</p>
+  <p>We received a request to reset the password for your ${escapeHtml(siteName)} account. This link works for <strong>3 hours</strong> and can be used only once.</p>
   <p style="margin:24px 0;">
     <a href="${actionUrlEscaped}" style="background-color:#0b705c;color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:6px;font-weight:bold;">Reset password</a>
   </p>
@@ -162,7 +164,7 @@ export function renderPasswordResetEmail(context: AuthEmailContext): RenderedAut
   <hr style="border:none;border-top:1px solid #e0e0e0;margin:24px 0;" />
   <p lang="it" style="color:#444444;">— Italiano —</p>
   <p lang="it">${escapeHtml(greetingIt(name))}</p>
-  <p lang="it">Abbiamo ricevuto una richiesta di reimpostazione della password per il tuo account ${escapeHtml(siteName)}. Il link è valido per <strong>24 ore</strong> e può essere usato una sola volta.</p>
+  <p lang="it">Abbiamo ricevuto una richiesta di reimpostazione della password per il tuo account ${escapeHtml(siteName)}. Il link è valido per <strong>3 ore</strong> e può essere usato una sola volta.</p>
   <p lang="it" style="margin:24px 0;">
     <a href="${actionUrlEscaped}" style="background-color:#0b705c;color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:6px;font-weight:bold;">Reimposta la password</a>
   </p>
@@ -176,7 +178,7 @@ export function renderPasswordResetEmail(context: AuthEmailContext): RenderedAut
   const text = [
     greeting(name),
     "",
-    `We received a request to reset the password for your ${siteName} account. This link works for 24 hours and can be used only once.`,
+    `We received a request to reset the password for your ${siteName} account. This link works for 3 hours and can be used only once.`,
     "",
     `Reset password: ${actionUrl}`,
     "",
@@ -185,7 +187,7 @@ export function renderPasswordResetEmail(context: AuthEmailContext): RenderedAut
     "— Italiano —",
     "",
     greetingIt(name),
-    `Abbiamo ricevuto una richiesta di reimpostazione della password per il tuo account ${siteName}. Il link è valido per 24 ore e può essere usato una sola volta.`,
+    `Abbiamo ricevuto una richiesta di reimpostazione della password per il tuo account ${siteName}. Il link è valido per 3 ore e può essere usato una sola volta.`,
     "",
     `Reimposta la password: ${actionUrl}`,
     "",

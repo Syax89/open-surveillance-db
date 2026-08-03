@@ -36,7 +36,7 @@ import { cleanupE2ETree, e2eEnv, loadE2EModule, loadE2ERoute } from "./helpers/e
 
 const IP_A = "203.0.113.42";
 const IP_B = "198.51.100.7";
-const PASSWORD = "correct-horse-battery";
+const PASSWORD = "Correct-Horse-Battery1";
 
 let env;
 let registerRoute;

@@ -61,7 +61,7 @@ const SUBMIT = {
 const CONTRIBUTOR = {
   email: "journey@example.org",
   displayName: "Journey Tester",
-  password: "supersecret123",
+  password: "Sup3rsecret!123",
 };
 
 // ---------------------------------------------------------------------------
@@ -77,7 +77,7 @@ async function submitterSessionHeaders() {
   const profile = await auth.createContributor({
     email: "journey-submitter@example.org",
     displayName: "Journey Submitter",
-    password: "supersecret123",
+    password: "Sup3rsecret!123",
   });
   await env.DB.prepare("UPDATE contributors SET email_verified_at = ? WHERE id = ?")
     .bind(new Date().toISOString(), profile.id)
@@ -307,7 +307,7 @@ async function registerContributor(overrides = {}) {
   const email = `edit-journey-${crypto.randomUUID()}@example.org`;
   const response = await registerRoute.POST(apiRequest("/api/auth/register", {
     method: "POST",
-    body: { email, displayName: "Edit Journey Tester", password: "supersecret123", ...overrides },
+    body: { email, displayName: "Edit Journey Tester", password: "Sup3rsecret!123", ...overrides },
   }));
   assert.equal(response.status, 201, "register must return 201");
   const cookies = response.headers.getSetCookie().join("; ");

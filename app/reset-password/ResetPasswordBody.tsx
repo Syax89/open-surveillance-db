@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useMessages } from "../components/LocaleProvider";
 import { SiteHeader } from "../components/SiteHeader";
+import { passwordRuleFailures } from "../lib/password-policy";
 
 /**
  * /reset-password body (P1-3 Vera design).
@@ -14,7 +15,7 @@ import { SiteHeader } from "../components/SiteHeader";
  *   200 → success (sessions revoked, email verified — the contributor can
  *         log in with the new password);
  *   400 → malformed/unknown token or weak password (generic body);
- *   410 → token already used or past its 24h TTL — dead link, request a new
+ *   410 → token already used or past its 3h TTL — dead link, request a new
  *         one from /forgot-password.
  * The page mirrors the server's anti-enumeration: 400 and 410 share the
  * same generic "invalid or expired" copy, exactly like the API.
@@ -41,8 +42,10 @@ export function ResetPasswordBody() {
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     setError(null);
-    if (password.length < 10) {
-      setError(t.passwordHint);
+    // Full policy (CEO feedback 2026-08-03): length + uppercase + lowercase +
+    // digit + special. Same rules as the server (./lib/password-policy).
+    if (passwordRuleFailures(password).length > 0) {
+      setError(t.passwordWeak);
       return;
     }
     if (password !== confirm) {
@@ -109,10 +112,24 @@ export function ResetPasswordBody() {
                   autoComplete="new-password"
                   required
                   minLength={10}
+                  aria-describedby="password-requirements"
                   value={password}
                   onChange={(event) => { setPassword(event.target.value); if (error) setError(null); }}
                 />
-                <small>{t.passwordHint}</small>
+                <div
+                  className="password-requirements"
+                  id="password-requirements"
+                  data-invalid={error === t.passwordWeak ? "true" : undefined}
+                >
+                  <span className="password-requirements-label">{t.passwordRequirements}</span>
+                  <ul className="password-requirements-list">
+                    <li>{t.passwordRuleLength}</li>
+                    <li>{t.passwordRuleUppercase}</li>
+                    <li>{t.passwordRuleLowercase}</li>
+                    <li>{t.passwordRuleDigit}</li>
+                    <li>{t.passwordRuleSpecial}</li>
+                  </ul>
+                </div>
               </label>
               <label className="auth-field">
                 <span>{t.resetConfirmPassword}</span>

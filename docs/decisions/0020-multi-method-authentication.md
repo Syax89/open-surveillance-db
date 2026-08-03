@@ -71,36 +71,39 @@ conclusion for three reasons:
    contributor). Sessions from unverified accounts are **read-only**: the
    write gate (`resolveVerifiedContributor`) answers **401** for anonymous and
    **403** for not-yet-verified on write routes (Fase E1). Password reset uses
-   the same mailer with the same single-use token discipline. **Login gate
-   (t_6dc1c96f, option (a) — "finché non è attivato non è possibile fare
-   login"):** `POST /api/auth/login` refuses an account whose
-   `email_verified_at` is NULL with the **same generic 401** as unknown email
-   / wrong password, so the response never reveals account existence
-   (anti-enumeration, ADR 0013). The gate runs **after** the PBKDF2 check
-   (no timing oracle) and does **not** touch the lockout counter (a correct
-   password is not a failed attempt — no lockout-DoS for the owner, and not
-   clearing the counter keeps brute-force protection intact). The read-only
-   session opened at register stays the only session an unverified account
-   can hold: it powers the `/account` banner and the verification resend, so
-   the user is never stranded. Guidance lives as **static copy** on `/login`
-   (`auth.loginVerifyHint`, EN/IT, shown to everyone) — never as a
-   per-account response.
-   **The gate is a single choke-point (`sessionGate`,
-   app/lib/auth-route-helpers.ts) enforced by EVERY session-opening method
-   (t_f940482b):** `POST /api/auth/login` (password), `POST
-   /api/auth/passkey/login/complete` (passkey) and `POST /api/auth/recovery`
-   (one-time code) all refuse an unverified account with the same generic
-   401 as their other failures, after the full credential verification and
-   without touching any lockout counter. **Passkey enrollment is
-   deliberately allowed pre-verification** (register/begin): the enrolled
-   credential is *inert* until the email is verified — login/complete is
-   gated, so no session can be opened with it, and the write gate (403)
-   blocks every write — and the user can set up their second factor in the
-   same read-only session where they verify. The same applies to the 10
-   recovery codes issued at enrollment: redemption on an unverified account
-   answers 401 (the valid single-use code is still consumed). OIDC remains
-   exempt by construction: linked accounts are born verified from the
-   provider flag (decision 4).
+  the same mailer with the same single-use token discipline, but a **shorter
+  TTL: reset links die after 3 h** (`RESET_TOKEN_TTL_MS`) — the reset path is
+  the higher-stakes target for a stolen link, so its window is intentionally
+  tighter than the 24 h verification window. **Login gate
+  (t_6dc1c96f, option (a) — "finché non è attivato non è possibile fare
+  login"):** `POST /api/auth/login` refuses an account whose
+  `email_verified_at` is NULL with the **same generic 401** as unknown email
+  / wrong password, so the response never reveals account existence
+  (anti-enumeration, ADR 0013). The gate runs **after** the PBKDF2 check
+  (no timing oracle) and does **not** touch the lockout counter (a correct
+  password is not a failed attempt — no lockout-DoS for the owner, and not
+  clearing the counter keeps brute-force protection intact). The read-only
+  session opened at register stays the only session an unverified account
+  can hold: it powers the `/account` banner and the verification resend, so
+  the user is never stranded. Guidance lives as **static copy** on `/login`
+  (`auth.loginVerifyHint`, EN/IT, shown to everyone) — never as a
+  per-account response.
+  **The gate is a single choke-point (`sessionGate`,
+  app/lib/auth-route-helpers.ts) enforced by EVERY session-opening method
+  (t_f940482b):** `POST /api/auth/login` (password), `POST
+  /api/auth/passkey/login/complete` (passkey) and `POST /api/auth/recovery`
+  (one-time code) all refuse an unverified account with the same generic
+  401 as their other failures, after the full credential verification and
+  without touching any lockout counter. **Passkey enrollment is
+  deliberately allowed pre-verification** (register/begin): the enrolled
+  credential is *inert* until the email is verified — login/complete is
+  gated, so no session can be opened with it, and the write gate (403)
+  blocks every write — and the user can set up their second factor in the
+  same read-only session where they verify. The same applies to the 10
+  recovery codes issued at enrollment: redemption on an unverified account
+  answers 401 (the valid single-use code is still consumed). OIDC remains
+  exempt by construction: linked accounts are born verified from the
+  provider flag (decision 4).
 
 3. **Passkeys are an optional parallel method with a mandatory fallback.**
    New D1 table `passkeys` (`credential_id` UNIQUE, COSE public key, sign
@@ -121,7 +124,8 @@ conclusion for three reasons:
 
 5. **Schema (multi-auth migration).** New columns on `contributors`:
    `email_verified_at`, `auth_provider`, `external_sub` (unique per provider);
-   new tables `email_verification_tokens` (SHA-256 hash, 24 h, single-use),
+   new tables `email_verification_tokens` (SHA-256 hash, single-use; TTL
+   per-purpose: verify 24 h, reset 3 h),
    `passkeys`, `recovery_codes` (10, hashed). The migration takes the next
    free index on main (the phase task named it `0026_multi_auth.sql`, but
    `0026_users_contributor_link` landed first — the actual file will be
@@ -153,9 +157,9 @@ conclusion for three reasons:
   cloud — Apple/Google/Microsoft — the user controls sync, the site shares
   nothing); OIDC tracking disclosure (provider sees login and IP; provider's
   own terms apply at sign-in; opt-in only).
-- **Retention (R15):** verification tokens 24 h (single-use, deleted on use);
-  passkeys and recovery codes while the account is active, hard-deleted at
-  erasure.
+- **Retention (R15):** verification tokens 24 h, reset tokens 3 h (single-use,
+  deleted on use); passkeys and recovery codes while the account is active,
+  hard-deleted at erasure.
 - **Security posture:** token hash at rest (SHA-256), recovery codes hashed,
   anti-replay counters, ADR 0016 lockout applies to the password path. OIDC
   accounts inherit the provider's account security (including the provider's

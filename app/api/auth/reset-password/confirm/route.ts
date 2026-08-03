@@ -19,7 +19,7 @@ import { BodyReadError, readJsonBody, urlTooLong } from "../../../../lib/input-l
  *                                  dead but the hash old.
  *   - 400  malformed token/password, or unknown token — generic body
  *          (anti-enumeration).
- *   - 410  token already used or past its 24h TTL — Gone, the link is dead.
+ *   - 410  token already used or past its 3h TTL — Gone, the link is dead.
  *
  * The response is `no-store`: a one-shot auth outcome.
  */
@@ -44,7 +44,8 @@ export async function POST(request: Request) {
     const token = typeof payload.token === "string" ? payload.token : "";
     const password = payload.password;
     // Same token shape rule as the verify endpoint; the password policy is
-    // the shared one (10..200 chars, no composition rules).
+    // the shared NEW-password one (10..200 chars + composition rules, CEO
+    // feedback 2026-08-03).
     if (!/^[A-Za-z0-9_-]{20,128}$/.test(token) || !isValidPassword(password)) {
       return Response.json({ error: "Invalid or expired reset link." }, { status: 400, headers: NO_STORE_HEADERS });
     }

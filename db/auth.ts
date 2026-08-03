@@ -693,7 +693,8 @@ export async function getContributorVerification(
 // registration, 'reset' links emailed by the reset-request handler. The
 // security model is inherited from 0027:
 //   - only the SHA-256 of the raw token is stored (a DB leak cannot replay);
-//   - tokens die after 24h (`expires_at`) or on first use (`used_at`);
+//   - tokens die after their per-purpose TTL (`expires_at` — verify 24h,
+//     reset 3h) or on first use (`used_at`);
 //   - consuming a token is an atomic conditional UPDATE, so two parallel
 //     requests cannot both succeed (single-use even under a race);
 //   - creating a new token for a purpose revokes every older UNUSED token of
@@ -706,7 +707,16 @@ export async function getContributorVerification(
 // to tokens being consumed or revoked in between. Register, re-send and
 // reset-request all funnel through `countVerificationTokensSentSince`.
 
+/** TTL for email-address verification links (registration + re-send). */
 export const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
+/** TTL for password-reset links — shorter window, higher-stakes purpose. */
+export const RESET_TOKEN_TTL_MS = 3 * 60 * 60 * 1000;
+
+/** Per-purpose TTL, so callers cannot accidentally mix the two windows. */
+export const TOKEN_TTL_MS_BY_PURPOSE: Record<EmailVerificationPurpose, number> = {
+  verify: VERIFICATION_TOKEN_TTL_MS,
+  reset: RESET_TOKEN_TTL_MS,
+};
 /** Max emails (verify or reset, each with its own budget) per window. */
 export const VERIFICATION_SEND_LIMIT = 3;
 export const VERIFICATION_SEND_WINDOW_MS = 60 * 60 * 1000;
@@ -720,6 +730,10 @@ export type EmailVerificationPurpose = "verify" | "reset";
  * so a re-send invalidates every previously mailed link and a stale link
  * answers 410 instead of verifying twice.
  *
+ * The TTL is per-purpose: verify links live 24h, reset links 3h
+ * (TOKEN_TTL_MS_BY_PURPOSE). Pass `ttlMs` explicitly only when a caller
+ * needs a window different from the purpose default (tests forcing expiry).
+ *
  * `now` is injectable for deterministic tests (same convention as
  * createSession).
  */
@@ -727,11 +741,12 @@ export async function createVerificationToken(
   contributorId: number,
   purpose: EmailVerificationPurpose,
   now: string = new Date().toISOString(),
+  ttlMs: number = TOKEN_TTL_MS_BY_PURPOSE[purpose],
 ): Promise<{ rawToken: string; expiresAt: string }> {
   const d1 = await getD1();
   const rawToken = randomBase64Url(TOKEN_BYTES);
   const tokenHash = await sha256Hex(rawToken);
-  const expiresAt = new Date(Date.parse(now) + VERIFICATION_TOKEN_TTL_MS).toISOString();
+  const expiresAt = new Date(Date.parse(now) + ttlMs).toISOString();
   await d1.batch([
     // Revoke older unused tokens of the same purpose: only the newest link
     // stays valid. (Used/expired rows are left alone — they are already dead.)

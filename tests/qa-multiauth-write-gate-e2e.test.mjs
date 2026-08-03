@@ -145,7 +145,7 @@ async function registerVerifiedContributor() {
   const email = `qa-write-${crypto.randomUUID()}@example.org`;
   const response = await registerRoute.POST(apiRequest("/api/auth/register", {
     method: "POST",
-    body: { email, displayName: "QA Writer", password: "supersecret123" },
+    body: { email, displayName: "QA Writer", password: "Sup3rsecret!123" },
   }));
   assert.equal(response.status, 201);
   const body = await responseBody(response);
@@ -168,7 +168,7 @@ test("email: una sessione fresca NON scrive (403), dopo verify-email scrive (201
   const email = `qa-write-gate-${crypto.randomUUID()}@example.org`;
   const response = await registerRoute.POST(apiRequest("/api/auth/register", {
     method: "POST",
-    body: { email, displayName: "QA Writer", password: "supersecret123" },
+    body: { email, displayName: "QA Writer", password: "Sup3rsecret!123" },
   }));
   assert.equal(response.status, 201);
   const headers = sessionHeaders(response);
@@ -554,7 +554,7 @@ test("verify-email: un token oltre il TTL di 24h risponde 410 (link morto)", asy
   const email = `qa-expired-${crypto.randomUUID()}@example.org`;
   const response = await registerRoute.POST(apiRequest("/api/auth/register", {
     method: "POST",
-    body: { email, displayName: "QA Expired", password: "supersecret123" },
+    body: { email, displayName: "QA Expired", password: "Sup3rsecret!123" },
   }));
   assert.equal(response.status, 201);
   const rawToken = mailToken();
@@ -672,7 +672,7 @@ test("email: budget mail 3/h esaurito con register+2 resend reali → 429 sul 4�
   const email = `qa-mail-budget-${crypto.randomUUID()}@example.org`;
   const response = await registerRoute.POST(apiRequest("/api/auth/register", {
     method: "POST",
-    body: { email, displayName: "QA Mail Budget", password: "supersecret123" },
+    body: { email, displayName: "QA Mail Budget", password: "Sup3rsecret!123" },
   }));
   assert.equal(response.status, 201); // invio #1
   const body = await responseBody(response);
@@ -724,7 +724,7 @@ test("oidc: conflitto email → merge manuale reale → sessione linked → writ
   const email = `qa-merge-${crypto.randomUUID()}@example.org`;
   const register = await registerRoute.POST(apiRequest("/api/auth/register", {
     method: "POST",
-    body: { email, displayName: "QA Merge Target", password: "supersecret123" },
+    body: { email, displayName: "QA Merge Target", password: "Sup3rsecret!123" },
   }));
   assert.equal(register.status, 201);
   const contributorId = (await responseBody(register)).contributor.id;
@@ -760,7 +760,7 @@ test("oidc: conflitto email → merge manuale reale → sessione linked → writ
     // email+password (stesso path lockout-protetto del login).
     const merge = await oidcMergeRoute.POST(apiRequest("/api/auth/oidc/merge", {
       method: "POST",
-      body: { token: mergeToken, email, password: "supersecret123" },
+      body: { token: mergeToken, email, password: "Sup3rsecret!123" },
     }));
     assert.equal(merge.status, 200);
     const mergedBody = await responseBody(merge);
@@ -781,7 +781,7 @@ test("oidc: conflitto email → merge manuale reale → sessione linked → writ
     // Single-use: riusare lo stesso token risponde 410 e non apre sessioni.
     const replay = await oidcMergeRoute.POST(apiRequest("/api/auth/oidc/merge", {
       method: "POST",
-      body: { token: mergeToken, email, password: "supersecret123" },
+      body: { token: mergeToken, email, password: "Sup3rsecret!123" },
     }));
     assert.equal(replay.status, 410, "the merge token is single-use");
   } finally {

@@ -186,8 +186,8 @@ test("reset-password: posts token + new password and renders the success state",
   await setNavState({ url: "/reset-password?token=reset-token-abc" });
 
   await renderWithLocale(React.createElement(ResetPasswordBody));
-  await user.type(screen.getByLabelText(/^New password/), "fresh-horse-battery");
-  await user.type(screen.getByLabelText(/^Repeat the new password/), "fresh-horse-battery");
+  await user.type(screen.getByLabelText(/^New password/), "Fresh-Horse-Battery1");
+  await user.type(screen.getByLabelText(/^Repeat the new password/), "Fresh-Horse-Battery1");
   await user.click(screen.getByRole("button", { name: "Change password" }));
 
   await waitFor(() => assert.ok(screen.getByRole("heading", { name: "Password changed" })));
@@ -204,12 +204,44 @@ test("reset-password: mismatched passwords are refused client-side", async () =>
   await setNavState({ url: "/reset-password?token=reset-token-abc" });
 
   await renderWithLocale(React.createElement(ResetPasswordBody));
-  await user.type(screen.getByLabelText(/^New password/), "fresh-horse-battery");
+  await user.type(screen.getByLabelText(/^New password/), "Fresh-Horse-Battery1");
   await user.type(screen.getByLabelText(/^Repeat the new password/), "different-password");
   await user.click(screen.getByRole("button", { name: "Change password" }));
 
   assert.ok(screen.getByRole("alert"));
   assert.match(screen.getByRole("alert").textContent, /do not match/);
+});
+
+test("reset-password: the requirements list is visible and a weak password is refused client-side", async () => {
+  const { screen } = rtl;
+  const user = rtl.userEvent.setup();
+  let fetchCalled = false;
+  installFetchMock(() => {
+    fetchCalled = true;
+    return jsonResponse({ ok: true });
+  });
+  await setNavState({ url: "/reset-password?token=reset-token-abc" });
+
+  await renderWithLocale(React.createElement(ResetPasswordBody));
+  // The requirements list is visible (CEO feedback 2026-08-03).
+  const requirements = screen.getByText("Your password must include:");
+  assert.equal(requirements.closest(".password-requirements").id, "password-requirements");
+  for (const rule of [
+    "At least 10 characters",
+    "An uppercase letter (A–Z)",
+    "A lowercase letter (a–z)",
+    "A number (0–9)",
+    "A special character (e.g. ! @ # $ %)",
+  ]) {
+    assert.ok(screen.getByText(rule), rule);
+  }
+  // 11 chars, lowercase + digit + special — no uppercase → refused, no POST.
+  await user.type(screen.getByLabelText(/^New password/), "lowercase1!");
+  await user.type(screen.getByLabelText(/^Repeat the new password/), "lowercase1!");
+  await user.click(screen.getByRole("button", { name: "Change password" }));
+
+  assert.equal(fetchCalled, false, "no POST while the password violates the policy");
+  assert.match(screen.getByRole("alert").textContent, /does not meet the requirements/);
 });
 
 test("reset-password: a dead token (410) offers a new request link", async () => {
@@ -224,8 +256,8 @@ test("reset-password: a dead token (410) offers a new request link", async () =>
   await setNavState({ url: "/reset-password?token=dead-reset-token" });
 
   await renderWithLocale(React.createElement(ResetPasswordBody));
-  await user.type(screen.getByLabelText(/^New password/), "fresh-horse-battery");
-  await user.type(screen.getByLabelText(/^Repeat the new password/), "fresh-horse-battery");
+  await user.type(screen.getByLabelText(/^New password/), "Fresh-Horse-Battery1");
+  await user.type(screen.getByLabelText(/^Repeat the new password/), "Fresh-Horse-Battery1");
   await user.click(screen.getByRole("button", { name: "Change password" }));
 
   await waitFor(() => assert.match(screen.getByText(/has already been used or has expired/).textContent, /already been used/));

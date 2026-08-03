@@ -8,10 +8,14 @@
 
 import { recordRateLimitBlock } from "./abuse-alerts";
 import { callerKey, checkRateLimit, limitsFor } from "./rate-limit";
+import {
+  isValidNewPassword,
+  MAX_PASSWORD_LENGTH,
+  MIN_PASSWORD_LENGTH,
+} from "./password-policy";
 import type { LoginLockoutPolicy } from "../../db/auth";
 
-export const MIN_PASSWORD_LENGTH = 10;
-export const MAX_PASSWORD_LENGTH = 200;
+export { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH };
 export const MAX_DISPLAY_NAME_LENGTH = 60;
 
 /**
@@ -82,8 +86,23 @@ export async function authLimit(
   return null;
 }
 
-/** Password policy: length-bounded only (no composition rules). */
+/**
+ * Password policy for NEW passwords (register, password reset): 10..200
+ * chars with at least one uppercase, one lowercase, one digit and one
+ * special character (CEO feedback 2026-08-03). The rules live in
+ * ./password-policy so the client forms validate with the same policy.
+ */
 export function isValidPassword(value: unknown): value is string {
+  return isValidNewPassword(value);
+}
+
+/**
+ * Shape-only check for LOGIN (and the OIDC merge proof-of-ownership):
+ * a string of 10..200 chars with NO composition rules. Accounts created
+ * under the old length-only policy keep signing in — the composition policy
+ * applies only to NEW passwords (register, reset).
+ */
+export function isValidPasswordShape(value: unknown): value is string {
   return (
     typeof value === "string" &&
     value.length >= MIN_PASSWORD_LENGTH &&

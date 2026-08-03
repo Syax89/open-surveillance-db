@@ -60,14 +60,14 @@ test("login: valid submit POSTs to /api/auth/login and redirects to /account", a
 
   await loginForm();
   await user.type(screen.getByLabelText("Email"), "contributor@example.test");
-  await user.type(screen.getByLabelText(/^Password/), "correct-horse-battery");
+  await user.type(screen.getByLabelText(/^Password/), "Correct-Horse-Battery1");
   await user.click(screen.getByRole("button", { name: "Log in" }));
 
   await waitFor(() => assert.ok(capturedRequest, "fetch chiamato"));
   assert.equal(capturedRequest.input, "/api/auth/login");
   assert.equal(capturedRequest.init.method, "POST");
   const body = JSON.parse(capturedRequest.init.body);
-  assert.deepEqual(body, { email: "contributor@example.test", password: "correct-horse-battery" });
+  assert.deepEqual(body, { email: "contributor@example.test", password: "Correct-Horse-Battery1" });
 
   const nav = await getNavState();
   await waitFor(() => assert.deepEqual(nav.pushed, ["/account"]));
@@ -95,7 +95,7 @@ test("login: 429 and 403 map to their localized messages", async () => {
   installFetchMock(() => jsonResponse({ error: "rate limited" }, { status: 429 }));
   await loginForm();
   await user.type(screen.getByLabelText("Email"), "contributor@example.test");
-  await user.type(screen.getByLabelText(/^Password/), "correct-horse-battery");
+  await user.type(screen.getByLabelText(/^Password/), "Correct-Horse-Battery1");
   await user.click(screen.getByRole("button", { name: "Log in" }));
   assert.equal((await screen.findByRole("alert")).textContent, "Something went wrong. Please try again.");
   rtl.cleanup();
@@ -103,7 +103,7 @@ test("login: 429 and 403 map to their localized messages", async () => {
   installFetchMock(() => jsonResponse({ error: "cross origin" }, { status: 403 }));
   await loginForm();
   await user.type(screen.getByLabelText("Email"), "contributor@example.test");
-  await user.type(screen.getByLabelText(/^Password/), "correct-horse-battery");
+  await user.type(screen.getByLabelText(/^Password/), "Correct-Horse-Battery1");
   await user.click(screen.getByRole("button", { name: "Log in" }));
   assert.equal((await screen.findByRole("alert")).textContent, "Cross-site request rejected.");
 });
@@ -115,7 +115,7 @@ test("login: network failure falls back to the generic error", async () => {
 
   await loginForm();
   await user.type(screen.getByLabelText("Email"), "contributor@example.test");
-  await user.type(screen.getByLabelText(/^Password/), "correct-horse-battery");
+  await user.type(screen.getByLabelText(/^Password/), "Correct-Horse-Battery1");
   await user.click(screen.getByRole("button", { name: "Log in" }));
   assert.equal((await screen.findByRole("alert")).textContent, "Something went wrong. Please try again.");
 });
@@ -143,7 +143,7 @@ test("login: submit button disables and shows loading while pending", async () =
   await loginForm();
   const button = screen.getByRole("button", { name: "Log in" });
   await user.type(screen.getByLabelText("Email"), "contributor@example.test");
-  await user.type(screen.getByLabelText(/^Password/), "correct-horse-battery");
+  await user.type(screen.getByLabelText(/^Password/), "Correct-Horse-Battery1");
   await user.click(button);
 
   await waitFor(() => assert.equal(button.disabled, true));
@@ -167,7 +167,7 @@ test("register: valid submit POSTs to /api/auth/register and redirects", async (
   await registerForm();
   await user.type(screen.getByLabelText("Email"), "contributor@example.test");
   await user.type(screen.getByLabelText("Display name (optional)"), "Fixture Contributor");
-  await user.type(screen.getByLabelText(/^Password/), "correct-horse-battery");
+  await user.type(screen.getByLabelText(/^Password/), "Correct-Horse-Battery1");
   await user.click(screen.getByRole("button", { name: "Create account" }));
 
   await waitFor(() => assert.ok(capturedRequest));
@@ -176,7 +176,7 @@ test("register: valid submit POSTs to /api/auth/register and redirects", async (
   const body = JSON.parse(capturedRequest.init.body);
   assert.deepEqual(body, {
     email: "contributor@example.test",
-    password: "correct-horse-battery",
+    password: "Correct-Horse-Battery1",
     displayName: "Fixture Contributor",
   });
 
@@ -195,7 +195,7 @@ test("register: blank displayName is omitted from the payload", async () => {
 
   await registerForm();
   await user.type(screen.getByLabelText("Email"), "contributor@example.test");
-  await user.type(screen.getByLabelText(/^Password/), "correct-horse-battery");
+  await user.type(screen.getByLabelText(/^Password/), "Correct-Horse-Battery1");
   await user.click(screen.getByRole("button", { name: "Create account" }));
 
   await waitFor(() => assert.ok(capturedRequest));
@@ -210,7 +210,7 @@ test("register: 409 shows the email-taken error", async () => {
 
   await registerForm();
   await user.type(screen.getByLabelText("Email"), "contributor@example.test");
-  await user.type(screen.getByLabelText(/^Password/), "correct-horse-battery");
+  await user.type(screen.getByLabelText(/^Password/), "Correct-Horse-Battery1");
   await user.click(screen.getByRole("button", { name: "Create account" }));
   assert.equal((await screen.findByRole("alert")).textContent, "An account with this email already exists.");
 });
@@ -222,4 +222,43 @@ test("register: password field carries minLength 10 and new-password autocomplet
   assert.equal(password.hasAttribute("required"), true);
   assert.equal(password.getAttribute("minlength"), "10");
   assert.equal(password.getAttribute("autocomplete"), "new-password");
+});
+
+test("register: the password requirements list is visible and linked to the field", async () => {
+  const { screen } = rtl;
+  await registerForm();
+  const requirements = screen.getByText("Your password must include:");
+  assert.equal(requirements.closest(".password-requirements").id, "password-requirements");
+  const password = screen.getByLabelText(/^Password/);
+  assert.equal(password.getAttribute("aria-describedby"), "password-requirements");
+  // Every policy rule is spelled out (CEO feedback 2026-08-03).
+  for (const rule of [
+    "At least 10 characters",
+    "An uppercase letter (A–Z)",
+    "A lowercase letter (a–z)",
+    "A number (0–9)",
+    "A special character (e.g. ! @ # $ %)",
+  ]) {
+    assert.ok(screen.getByText(rule), rule);
+  }
+});
+
+test("register: a password missing one class is refused client-side without a POST", async () => {
+  const { screen } = rtl;
+  const user = makeUser();
+  let fetchCalled = false;
+  installFetchMock(() => {
+    fetchCalled = true;
+    return jsonResponse({}, { status: 200 });
+  });
+
+  await registerForm();
+  await user.type(screen.getByLabelText("Email"), "contributor@example.test");
+  // 11 chars, lowercase + digit + special — no uppercase.
+  await user.type(screen.getByLabelText(/^Password/), "lowercase1!");
+  await user.click(screen.getByRole("button", { name: "Create account" }));
+
+  assert.equal(fetchCalled, false, "no POST while the password violates the policy");
+  const password = screen.getByLabelText(/^Password/);
+  assert.equal(password.getAttribute("aria-invalid"), "true");
 });

@@ -25,7 +25,13 @@ export const en = {
   haveAccount: "Already have an account?",
   createOne: "Create one",
   signIn: "Log in instead",
-  passwordHint: "At least 10 characters.",
+  passwordRequirements: "Your password must include:",
+  passwordRuleLength: "At least 10 characters",
+  passwordRuleUppercase: "An uppercase letter (A–Z)",
+  passwordRuleLowercase: "A lowercase letter (a–z)",
+  passwordRuleDigit: "A number (0–9)",
+  passwordRuleSpecial: "A special character (e.g. ! @ # $ %)",
+  passwordWeak: "Your password does not meet the requirements above.",
   anonymousNote:
     "You do not need an account to report a camera. An account lets you track your own reports.",
   privacyNotice: "Privacy notice",
@@ -176,7 +182,7 @@ export const en = {
     "Enter the email address of your account and we will send you a reset link.",
   forgotSubmit: "Send reset link",
   forgotSent:
-    "If an account exists for this email, a reset link is on its way. Check your inbox.",
+    "If an account exists for this email, a reset link is on its way. The link expires in 3 hours. Check your inbox.",
   forgotBackToLogin: "Back to log in",
   // /reset-password page (consumes the single-use token from the email).
   resetTitle: "Set a new password",
@@ -236,7 +242,13 @@ export const it: Translation<typeof en> = {
   haveAccount: "Hai già un account?",
   createOne: "Crea un account",
   signIn: "Accedi invece",
-  passwordHint: "Almeno 10 caratteri.",
+  passwordRequirements: "La password deve contenere:",
+  passwordRuleLength: "Almeno 10 caratteri",
+  passwordRuleUppercase: "Una lettera maiuscola (A–Z)",
+  passwordRuleLowercase: "Una lettera minuscola (a–z)",
+  passwordRuleDigit: "Un numero (0–9)",
+  passwordRuleSpecial: "Un carattere speciale (es. ! @ # $ %)",
+  passwordWeak: "La password non rispetta i requisiti sopra indicati.",
   anonymousNote:
     "Non serve un account per segnalare una telecamera. Un account ti permette di tenere traccia delle tue segnalazioni.",
   privacyNotice: "Informativa privacy",
@@ -389,7 +401,7 @@ export const it: Translation<typeof en> = {
     "Inserisci l'email del tuo account: ti invieremo un link per reimpostare la password.",
   forgotSubmit: "Invia il link di reset",
   forgotSent:
-    "Se esiste un account per questa email, il link di reset è in arrivo. Controlla la casella di posta.",
+    "Se esiste un account per questa email, il link di reset è in arrivo. Il link scade tra 3 ore. Controlla la casella di posta.",
   forgotBackToLogin: "Torna all'accesso",
   // Pagina /reset-password (consuma il token monouso dell'email).
   resetTitle: "Imposta una nuova password",

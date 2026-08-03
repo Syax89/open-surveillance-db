@@ -13,7 +13,7 @@ import { sessionCookieHeaders, sessionTtlSeconds } from "../../../lib/auth-sessi
 import {
   authLimit,
   cookieHeaderInit,
-  isValidPassword,
+  isValidPasswordShape,
   loginLockoutPolicy,
   sessionGate,
 } from "../../../lib/auth-route-helpers";
@@ -73,7 +73,7 @@ export async function POST(request: Request) {
 
     const email = typeof payload.email === "string" ? normalizeEmail(payload.email) : "";
     const password = payload.password;
-    if (!isValidEmail(email) || !isValidPassword(password)) {
+    if (!isValidEmail(email) || !isValidPasswordShape(password)) {
       return Response.json({ error: "Invalid credentials." }, { status: 401 });
     }
 
