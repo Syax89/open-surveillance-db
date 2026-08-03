@@ -339,6 +339,14 @@ function LoginPageBody() {
                 <p className="auth-forgot">
                   <Link href="/forgot-password">{t.forgotPassword}</Link>
                 </p>
+                {/* Static verification note (t_6dc1c96f, CEO feedback
+                    2026-08-03): login is blocked until the email is verified
+                    and the API answers the same generic 401 for every
+                    failure (anti-enumeration). This copy is shown to
+                    everyone, so it explains in advance why a correct
+                    password can be rejected right after registering —
+                    without ever revealing account existence. */}
+                <p className="record-detail-summary">{t.loginVerifyHint}</p>
                 {error ? <p className="auth-error" role="alert">{error}</p> : null}
                 <button className="button button-primary" type="submit" disabled={submitting}>
                   {submitting ? t.loading : t.login}

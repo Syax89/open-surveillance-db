@@ -151,6 +151,36 @@ test("register→verify→me: a fresh account is read-only, then flips to verifi
   assert.equal(reuse.status, 410);
 });
 
+test("login is blocked with the generic 401 until the email is verified, then works (CEO feedback 2026-08-03, option (a))", async () => {
+  const email = `login-gate-e2e-${crypto.randomUUID()}@example.org`;
+  const { rawToken, session } = await registerAndExtract(email);
+  assert.equal((await responseBody(await meRoute.GET(withSession("/api/auth/me", session)))).contributor.emailVerifiedAt, null);
+
+  // The CORRECT password BEFORE verification: no session — the same generic
+  // 401 as an unknown email or a wrong password, so the response never
+  // reveals the account exists (anti-enumeration, t_6dc1c96f).
+  const blocked = await loginRoute.POST(apiRequest("/api/auth/login", {
+    method: "POST",
+    body: { email, password: "supersecret123" },
+  }));
+  assert.equal(blocked.status, 401);
+  assert.deepEqual(await responseBody(blocked), { error: "Invalid credentials." });
+  assert.equal(blocked.headers.getSetCookie().length, 0, "no session cookie is issued");
+
+  // Verify through the emailed link, then the SAME password logs in.
+  const verify = await verifyEmailRoute.GET(apiRequest(`/api/auth/verify-email?token=${encodeURIComponent(rawToken)}`));
+  assert.equal(verify.status, 200);
+
+  const login = await loginRoute.POST(apiRequest("/api/auth/login", {
+    method: "POST",
+    body: { email, password: "supersecret123" },
+  }));
+  assert.equal(login.status, 200);
+  const loginBody = await responseBody(login);
+  assert.ok(loginBody.contributor.emailVerifiedAt, "after verification the account can log in");
+  assert.ok(login.headers.getSetCookie().some((cookie) => cookie.startsWith("osdb_session=")), "a session cookie is issued");
+});
+
 test("resend revokes the old link and honours the 3/h budget", async () => {
   const email = `resend-e2e-${crypto.randomUUID()}@example.org`;
   const { rawToken: firstToken, session } = await registerAndExtract(email); // send #1
