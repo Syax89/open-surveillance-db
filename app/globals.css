@@ -604,6 +604,14 @@ footer>p { margin:0; color:#586870; font-size:var(--text-md); line-height:1.5; }
 .auth-field input { width:100%; border:1px solid #cdd6ce; border-radius:var(--radius-md); padding:12px 13px; background:#fff; color:#203841; font-size:var(--text-lg); font-weight:400; }
 .auth-field input:focus { border-color:#3e9477; outline:3px solid var(--focus); outline-offset:2px; }
 .auth-field small { color:var(--muted); font-size:var(--text-sm); font-weight:400; line-height:1.45; }
+/* Password policy (CEO feedback 2026-08-03): visible requirements list under
+   the password field on /register and /reset-password. Reads as muted helper
+   copy, same voice as .auth-field small; the label turns warning-red only
+   when the submitted password failed the policy. */
+.password-requirements { display:grid; gap:4px; color:var(--muted); font-size:var(--text-sm); font-weight:400; line-height:1.45; }
+.password-requirements-list { display:grid; gap:2px; margin:0; padding-left:18px; list-style:disc; }
+.password-requirements[data-invalid="true"] .password-requirements-label { color:#8a3b2c; font-weight:800; }
+.password-requirements[data-invalid="true"] .password-requirements-list { color:#8a3b2c; }
 .auth-error { margin:0; padding:12px 14px; border:1px solid #e6b8ad; border-radius:var(--radius-md); background:#fdf0ec; color:#8a3b2c; font-size:var(--text-md); line-height:1.45; }
 .auth-switch { margin:22px 0 0; color:#52656d; font-size:var(--text-base); line-height:1.6; }
 .auth-switch a { color:var(--focus); font-weight:800; text-decoration:underline; text-underline-offset:3px; }

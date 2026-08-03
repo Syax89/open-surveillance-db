@@ -1203,7 +1203,7 @@ test("E2E: erasure requires a live session — anonymous DELETE is rejected", as
 // ---------------------------------------------------------------------------
 
 const AUTH_EMAIL = "lockout-e2e@example.org";
-const AUTH_PASSWORD = "correct-horse-battery";
+const AUTH_PASSWORD = "Correct-Horse-Battery1";
 
 async function registerContributor() {
   const response = await registerRoute.POST(apiRequest("/api/auth/register", {

@@ -106,7 +106,7 @@ function withSession(pathAndQuery, rawToken, init = {}) {
 async function registerAndExtract(email) {
   const response = await registerRoute.POST(apiRequest("/api/auth/register", {
     method: "POST",
-    body: { email, displayName: "E2E Verifier", password: "supersecret123" },
+    body: { email, displayName: "E2E Verifier", password: "Sup3rsecret!123" },
   }));
   assert.equal(response.status, 201);
   const body = await responseBody(response);
@@ -161,7 +161,7 @@ test("login is blocked with the generic 401 until the email is verified, then wo
   // reveals the account exists (anti-enumeration, t_6dc1c96f).
   const blocked = await loginRoute.POST(apiRequest("/api/auth/login", {
     method: "POST",
-    body: { email, password: "supersecret123" },
+    body: { email, password: "Sup3rsecret!123" },
   }));
   assert.equal(blocked.status, 401);
   assert.deepEqual(await responseBody(blocked), { error: "Invalid credentials." });
@@ -173,7 +173,7 @@ test("login is blocked with the generic 401 until the email is verified, then wo
 
   const login = await loginRoute.POST(apiRequest("/api/auth/login", {
     method: "POST",
-    body: { email, password: "supersecret123" },
+    body: { email, password: "Sup3rsecret!123" },
   }));
   assert.equal(login.status, 200);
   const loginBody = await responseBody(login);
@@ -250,7 +250,7 @@ test("reset confirm rotates the password, revokes every session, and verifies th
 
   const confirm = await resetConfirmRoute.POST(apiRequest("/api/auth/reset-password/confirm", {
     method: "POST",
-    body: { token: rawToken, password: "rotated-password-1" },
+    body: { token: rawToken, password: "Rotated-Password-1" },
   }));
   assert.equal(confirm.status, 200);
   assert.equal((await responseBody(confirm)).ok, true);
@@ -262,7 +262,7 @@ test("reset confirm rotates the password, revokes every session, and verifies th
   // The NEW password logs in; the OLD one answers 401.
   const newLogin = await loginRoute.POST(apiRequest("/api/auth/login", {
     method: "POST",
-    body: { email, password: "rotated-password-1" },
+    body: { email, password: "Rotated-Password-1" },
   }));
   assert.equal(newLogin.status, 200);
   const newSessionBody = await responseBody(newLogin);
@@ -270,7 +270,7 @@ test("reset confirm rotates the password, revokes every session, and verifies th
 
   const oldLogin = await loginRoute.POST(apiRequest("/api/auth/login", {
     method: "POST",
-    body: { email, password: "supersecret123" },
+    body: { email, password: "Sup3rsecret!123" },
   }));
   assert.equal(oldLogin.status, 401);
 });
@@ -283,20 +283,20 @@ test("reset confirm rejects a used reset token (410) and does not rotate anythin
 
   const first = await resetConfirmRoute.POST(apiRequest("/api/auth/reset-password/confirm", {
     method: "POST",
-    body: { token: rawToken, password: "rotated-password-1" },
+    body: { token: rawToken, password: "Rotated-Password-1" },
   }));
   assert.equal(first.status, 200);
 
   const second = await resetConfirmRoute.POST(apiRequest("/api/auth/reset-password/confirm", {
     method: "POST",
-    body: { token: rawToken, password: "another-password-2" },
+    body: { token: rawToken, password: "Another-Password-2" },
   }));
   assert.equal(second.status, 410);
 
   // The password was rotated only once: the FIRST new password is live.
   const login = await loginRoute.POST(apiRequest("/api/auth/login", {
     method: "POST",
-    body: { email, password: "rotated-password-1" },
+    body: { email, password: "Rotated-Password-1" },
   }));
   assert.equal(login.status, 200);
 });
