@@ -41,10 +41,34 @@ let resetConfirmRoute;
 let meRoute;
 let loginRoute;
 
+// Captured outbound messages: the canonical mailer (db/mailer.ts, ADR 0020)
+// sends through the EMAIL binding, so the harness injects a capture mock and
+// tests read the action link from the captured message — the raw token now
+// exists ONLY in the mail channel (fail-closed, no devLink echo, P1-1).
+let capturedMail = [];
+
+function mailToken(fromIndex = -1) {
+  const message = capturedMail.at(fromIndex);
+  assert.ok(message, "an auth email must have been captured");
+  const match = /token=([^"&<\s]+)/.exec(message.text ?? message.html);
+  assert.ok(match, "captured mail carries the action link");
+  return decodeURIComponent(match[1]);
+}
+
 beforeEach(async () => {
   env = await e2eEnv();
   env.DB = new D1SqliteDatabase();
   await applyDrizzleMigrations(env.DB);
+  // Canonical mailer wiring: a working EMAIL binding (capture mock) plus the
+  // public link base, so sendAuthEmail renders → rate-limits → sends → logs.
+  capturedMail = [];
+  env.EMAIL = {
+    send: async (message) => {
+      capturedMail.push(message);
+      return { messageId: `m${capturedMail.length}` };
+    },
+  };
+  env.VERIFY_BASE_URL = "https://osdb.test";
   // This suite hammers /api/auth endpoints (register, resend, reset, login);
   // raise the per-IP auth bucket and wipe the in-memory counters so one test
   // never trips the 10/min default or leaks into the next one.
@@ -86,9 +110,13 @@ async function registerAndExtract(email) {
   }));
   assert.equal(response.status, 201);
   const body = await responseBody(response);
-  assert.equal(body.verification.sent, false, "dev fallback: no binding, not delivered");
-  const rawToken = new URL(body.verification.devLink).searchParams.get("token");
-  assert.ok(rawToken, "dev link carries the raw verification token");
+  // The canonical mailer delivered through the EMAIL binding mock.
+  assert.equal(body.verification.sent, true, "email delivered through the EMAIL binding");
+  // Fail-closed: the raw token is never in the API response — it exists only
+  // in the mail channel (P1-1: devLink echo removed).
+  assert.ok(!("devLink" in body.verification), "no raw token in the API response");
+  const rawToken = mailToken();
+  assert.ok(rawToken, "captured mail carries the raw verification token");
   return { response, body, rawToken, session: sessionCookie(response) };
 }
 
@@ -129,12 +157,13 @@ test("resend revokes the old link and honours the 3/h budget", async () => {
 
   const resendOne = await resendRoute.POST(withSession("/api/auth/verify-email/resend", session, { method: "POST" }));
   assert.equal(resendOne.status, 200);
-  const secondToken = new URL((await responseBody(resendOne)).devLink).searchParams.get("token");
+  assert.equal((await responseBody(resendOne)).sent, true);
+  const secondToken = mailToken(); // send #2
   assert.ok(secondToken && secondToken !== firstToken, "resend mints a fresh token");
 
   const resendTwo = await resendRoute.POST(withSession("/api/auth/verify-email/resend", session, { method: "POST" }));
   assert.equal(resendTwo.status, 200); // send #3
-  const thirdToken = new URL((await responseBody(resendTwo)).devLink).searchParams.get("token");
+  const thirdToken = mailToken();
   assert.ok(thirdToken && thirdToken !== secondToken, "resend mints a fresh token every time");
 
   // The 4th send is blocked: register + 2 resends already used the 3/h budget.

@@ -128,6 +128,11 @@ const REAL_DB_MODULES = [
   // db/camera-edits.ts (community editing, ADR 0018 §4) is imported by the
   // PATCH /api/cameras/[id] route; it must run the real two-track SQL.
   { source: "db/camera-edits.ts", output: "db/camera-edits.mjs" },
+  // db/mailer.ts (canonical transactional mailer, ADR 0020) is imported by
+  // the register / verify-email/resend / reset-password/request routes; the
+  // real render→rate-limit→send→log path must run in the tree (the EMAIL
+  // binding is injected via the harness env mock).
+  { source: "db/mailer.ts", output: "db/mailer.mjs" },
 ];
 
 let builtTreePromise = null;

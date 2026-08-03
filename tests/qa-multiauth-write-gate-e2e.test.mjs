@@ -23,7 +23,9 @@
 //      (email_verified_at dal provider) → POST /api/cameras → 201.
 //
 // Nessun dato personale: tutti i fixture sono fittizi. Nessuna rete reale:
-// il mailer resta sul dev path, il provider OIDC è stubato.
+// il mailer passa dal binding EMAIL mockato (messaggi catturati in memoria,
+// token letto dalla mail — niente devLink nella risposta API, P1-1), il
+// provider OIDC è stubato.
 import assert from "node:assert/strict";
 import { after, beforeEach, test } from "node:test";
 import { apiRequest, responseBody } from "./helpers/api-harness.mjs";
@@ -53,10 +55,34 @@ let passkeyRegisterCompleteRoute;
 let passkeyLoginBeginRoute;
 let passkeyLoginCompleteRoute;
 
+// Captured outbound messages: the canonical mailer (db/mailer.ts, ADR 0020)
+// sends through the EMAIL binding; the harness injects a capture mock and
+// tests read the action link from the captured message — the raw token now
+// exists ONLY in the mail channel (fail-closed, no devLink echo, P1-1).
+let capturedMail = [];
+
+function mailToken() {
+  const message = capturedMail.at(-1);
+  assert.ok(message, "an auth email must have been captured");
+  const match = /token=([^"&<\s]+)/.exec(message.text ?? message.html);
+  assert.ok(match, "captured mail carries the action link");
+  return decodeURIComponent(match[1]);
+}
+
 beforeEach(async () => {
   env = await e2eEnv();
   env.DB = new D1SqliteDatabase();
   await applyDrizzleMigrations(env.DB);
+  // Canonical mailer wiring: a working EMAIL binding (capture mock) plus the
+  // public link base, so sendAuthEmail renders → rate-limits → sends → logs.
+  capturedMail = [];
+  env.EMAIL = {
+    send: async (message) => {
+      capturedMail.push(message);
+      return { messageId: `m${capturedMail.length}` };
+    },
+  };
+  env.VERIFY_BASE_URL = "https://osdb.test";
   // Auth endpoints (register, recovery, OIDC, passkey) hanno bucket per-IP:
   // alza il tetto e azzera i contatori in-memory così un test non fa
   // scattare il 429 sul successivo (stesso pattern di auth-verify-e2e).
@@ -124,8 +150,9 @@ async function registerVerifiedContributor() {
   assert.equal(response.status, 201);
   const body = await responseBody(response);
   const headers = sessionHeaders(response);
-  const rawToken = new URL(body.verification.devLink).searchParams.get("token");
-  assert.ok(rawToken, "dev link carries the raw verification token");
+  assert.equal(body.verification.sent, true, "email delivered through the EMAIL binding");
+  const rawToken = mailToken();
+  assert.ok(rawToken, "captured mail carries the raw verification token");
   const verify = await verifyEmailRoute.GET(
     apiRequest(`/api/auth/verify-email?token=${encodeURIComponent(rawToken)}`),
   );
@@ -144,7 +171,6 @@ test("email: una sessione fresca NON scrive (403), dopo verify-email scrive (201
     body: { email, displayName: "QA Writer", password: "supersecret123" },
   }));
   assert.equal(response.status, 201);
-  const body = await responseBody(response);
   const headers = sessionHeaders(response);
 
   // Sessione read-only: il write gate rifiuta PRIMA della verifica.
@@ -152,9 +178,10 @@ test("email: una sessione fresca NON scrive (403), dopo verify-email scrive (201
   assert.equal(denied.status, 403, "unverified session must be denied by the write gate");
   assert.equal(denied.headers.get("cache-control"), "no-store", "denials must be no-store");
 
-  // Verifica con l'endpoint reale (token dal dev link, come da mailbox reale).
-  const rawToken = new URL(body.verification.devLink).searchParams.get("token");
-  assert.ok(rawToken, "dev link carries the raw verification token");
+  // Verifica con l'endpoint reale (token dalla mail catturata, come da
+  // mailbox reale — niente devLink nella risposta API, P1-1).
+  const rawToken = mailToken();
+  assert.ok(rawToken, "captured mail carries the raw verification token");
   const verify = await verifyEmailRoute.GET(
     apiRequest(`/api/auth/verify-email?token=${encodeURIComponent(rawToken)}`),
   );
@@ -364,8 +391,8 @@ test("verify-email: un token oltre il TTL di 24h risponde 410 (link morto)", asy
     body: { email, displayName: "QA Expired", password: "supersecret123" },
   }));
   assert.equal(response.status, 201);
-  const body = await responseBody(response);
-  const rawToken = new URL(body.verification.devLink).searchParams.get("token");
+  const rawToken = mailToken();
+  assert.ok(rawToken, "captured mail carries the raw verification token");
 
   // Scade il token forzando expires_at nel passato (stesso effetto del TTL).
   const contributorId = (await env.DB.prepare(
@@ -484,17 +511,17 @@ test("email: budget mail 3/h esaurito con register+2 resend reali → 429 sul 4�
   assert.equal(response.status, 201); // invio #1
   const body = await responseBody(response);
   const headers = sessionHeaders(response);
-  const firstToken = new URL(body.verification.devLink).searchParams.get("token");
-  assert.ok(firstToken, "dev link carries the raw verification token");
+  assert.equal(body.verification.sent, true, "register reports the mail was accepted (no devLink, P1-1)");
+  const firstToken = mailToken();
 
   const resendOne = await resendRoute.POST(apiRequest("/api/auth/verify-email/resend", { method: "POST", headers }));
   assert.equal(resendOne.status, 200); // invio #2
-  const secondToken = new URL((await responseBody(resendOne)).devLink).searchParams.get("token");
+  const secondToken = mailToken();
   assert.ok(secondToken && secondToken !== firstToken, "resend mints a fresh token");
 
   const resendTwo = await resendRoute.POST(apiRequest("/api/auth/verify-email/resend", { method: "POST", headers }));
   assert.equal(resendTwo.status, 200); // invio #3
-  const thirdToken = new URL((await responseBody(resendTwo)).devLink).searchParams.get("token");
+  const thirdToken = mailToken();
   assert.ok(thirdToken && thirdToken !== secondToken, "resend mints a fresh token every time");
 
   // 4° invio: il budget 3/h è esaurito → 429 con Retry-After, PRIMA di ogni

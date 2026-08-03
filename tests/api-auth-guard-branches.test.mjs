@@ -15,9 +15,6 @@
 // The db/auth and db/passkeys modules are mocked exactly like the rest of
 // api-auth.test.mjs / api-passkey.test.mjs; pure helpers (urlTooLong,
 // csrf sameOrigin, authLimit + the real rate-limit module) run for real.
-// P1-2: app/lib/mailer.ts deliver() branches with the EMAIL binding present
-// (send ok / send failure) — the branch coverage gap (66.67%) found by the
-// same review.
 
 import assert from "node:assert/strict";
 import { after, beforeEach, test } from "node:test";
@@ -413,54 +410,4 @@ test("503: reset-password/confirm returns 503 (no-store) when the db is unavaila
   assert.equal(response.status, 503);
   assert.equal((await responseBody(response)).error, "Unable to reset the password");
   assert.equal(response.headers.get("cache-control"), "no-store");
-});
-
-// ---------------------------------------------------------------------------
-// 5. P1-2: app/lib/mailer.ts deliver() with the EMAIL binding PRESENT.
-//    The dev-fallback branch (binding absent) is already covered by the
-//    register/reset routes; these two tests cover the missing 66.67% branch
-//    gap: send accepted -> delivered:true, send throws -> delivered:false
-//    (mail must never break auth).
-// ---------------------------------------------------------------------------
-
-test("mailer: sendVerificationEmail delivers through the EMAIL binding when present", async () => {
-  const mailer = await loadLibModule("mailer");
-  const sent = [];
-  const result = await mailer.sendVerificationEmail(
-    { EMAIL: { send: async (message) => { sent.push(message); return { messageId: "m-1" }; } }, MAIL_FROM: "no-reply@example.org" },
-    { to: "ada@example.org", rawToken: "tok-1", requestOrigin: "https://osdb.test" },
-  );
-  assert.deepEqual(result, { delivered: true });
-  assert.equal(sent.length, 1);
-  assert.equal(sent[0].to, "ada@example.org");
-  assert.equal(sent[0].from, "no-reply@example.org");
-  assert.match(sent[0].html, /confirm your email/i);
-});
-
-test("mailer: sendPasswordResetEmail delivers through the EMAIL binding when present", async () => {
-  const mailer = await loadLibModule("mailer");
-  const sent = [];
-  const result = await mailer.sendPasswordResetEmail(
-    { EMAIL: { send: async (message) => { sent.push(message); return { messageId: "m-2" }; } }, VERIFY_BASE_URL: "https://osdb.test" },
-    { to: "ada@example.org", rawToken: "tok-2", requestOrigin: "https://osdb.test" },
-  );
-  assert.deepEqual(result, { delivered: true });
-  assert.equal(sent[0].subject, "OpenSurveillanceDB — reset your password");
-  assert.match(sent[0].html, /reset your password/i);
-});
-
-test("mailer: a failing EMAIL binding is swallowed (delivered:false, never throws)", async () => {
-  const mailer = await loadLibModule("mailer");
-  const result = await mailer.sendVerificationEmail(
-    {
-      EMAIL: {
-        send: async () => {
-          throw new Error("E_RATE_LIMIT_EXCEEDED: provider rejected");
-        },
-      },
-    },
-    { to: "ada@example.org", rawToken: "tok-3", requestOrigin: "https://osdb.test" },
-  );
-  // Mail must never break auth: the caller sees delivered:false and moves on.
-  assert.deepEqual(result, { delivered: false });
 });
