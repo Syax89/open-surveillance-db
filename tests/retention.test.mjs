@@ -17,6 +17,9 @@
 //   R7  expired / revoked sessions purged
 //   R15 expired email-verification tokens + lapsed WebAuthn challenges
 //       purged by the cron sweep (review-ada-2 P3-1)
+//   R16 stale failed-login counters (login_attempts) purged after
+//       LOGIN_ATTEMPT_RETENTION_DAYS of inactivity; rows under an ACTIVE lock
+//       are never swept; >100 stale rows drain across multiple bounded rounds
 //   atomicity: purgeCameraRecord deletes photos, queue item and camera in one
 //       d1.batch (regression: photos were deleted before the batch)
 //   R2/R3 photos are deleted only AFTER their D1 rows succeed (R2-first rule)
@@ -181,6 +184,18 @@ async function insertChallenge({ expiresAt, usedAt = null, userHandle = null }) 
     .bind(`challenge-hash-${Math.random()}`, userHandle, NOW, expiresAt, usedAt)
     .run();
   return lastRowId;
+}
+
+// A failed-login counter row (migration 0016, ADR 0016). Hash-only by design:
+// `emailKey` is the SHA-256 of the normalised email; the sweep anchors on
+// window_start and must never delete a row with an ACTIVE lock.
+async function insertLoginAttempt({ emailKey, windowStart, lockedUntil = null }) {
+  await runtime.env.DB.prepare(
+    `INSERT INTO login_attempts (email_key, failed_count, window_start, locked_until, lockout_level)
+     VALUES (?, 1, ?, ?, 0)`,
+  )
+    .bind(emailKey, windowStart, lockedUntil)
+    .run();
 }
 
 async function count(table, where = "1=1", ...args) {
@@ -729,6 +744,62 @@ test("R15: lapsed WebAuthn challenges are swept by the cron (P3-1)", async () =>
 
   assert.equal(summary.challengesPurged, 2, "both expired challenges are removed");
   assert.equal(await count("webauthn_challenges"), 1, "the live challenge survives");
+});
+
+// ---------------------------------------------------------------------------
+// R16 — stale failed-login counters (audit finding 5 / review-ada P3-10)
+// ---------------------------------------------------------------------------
+
+test("R16: stale login_attempts rows are purged after 30 days, fresh ones survive", async () => {
+  await insertLoginAttempt({ emailKey: "stale", windowStart: daysBefore(31) }); // past the cutoff → purged
+  await insertLoginAttempt({ emailKey: "boundary", windowStart: daysBefore(30) }); // exactly 30d → survives (strict <)
+  await insertLoginAttempt({ emailKey: "fresh", windowStart: daysBefore(1) }); // live counter → survives
+  await insertLoginAttempt({ emailKey: "future", windowStart: daysAfter(1) }); // defensive → survives
+
+  const summary = await runtime.retention.runRetentionSweep(NOW);
+
+  assert.equal(summary.loginAttemptsPurged, 1, "only the row past the 30-day cutoff is removed");
+  assert.equal(await count("login_attempts"), 3);
+  assert.equal(await count("login_attempts", "email_key = 'stale'"), 0);
+  assert.equal(await count("login_attempts", "email_key = 'fresh'"), 1, "an active counter is untouched");
+});
+
+test("R16: an ACTIVE lock is never swept even when window_start is stale", async () => {
+  await insertLoginAttempt({
+    emailKey: "locked",
+    windowStart: daysBefore(60), // stale by the window…
+    lockedUntil: daysAfter(1), // …but the account is LOCKED right now
+  });
+
+  const summary = await runtime.retention.runRetentionSweep(NOW);
+
+  assert.equal(summary.loginAttemptsPurged, 0, "deleting an active lock would disable the lockout");
+  assert.equal(await count("login_attempts", "email_key = 'locked'"), 1, "the lock survives");
+});
+
+test("R16: an expired lock with a stale window is swept", async () => {
+  await insertLoginAttempt({
+    emailKey: "expired-lock",
+    windowStart: daysBefore(60),
+    lockedUntil: daysBefore(5), // lock already over → dead row
+  });
+
+  const summary = await runtime.retention.runRetentionSweep(NOW);
+
+  assert.equal(summary.loginAttemptsPurged, 1);
+  assert.equal(await count("login_attempts", "email_key = 'expired-lock'"), 0);
+});
+
+test("R16: the bounded sweep drains >100 stale rows across multiple rounds in one run", async () => {
+  for (let i = 0; i < 250; i += 1) {
+    await insertLoginAttempt({ emailKey: `stale-${i}`, windowStart: daysBefore(31 + (i % 5)) });
+  }
+  await insertLoginAttempt({ emailKey: "fresh", windowStart: daysBefore(1) });
+
+  const summary = await runtime.retention.runRetentionSweep(NOW);
+
+  assert.equal(summary.loginAttemptsPurged, 250, "every stale row across batches is purged");
+  assert.equal(await count("login_attempts"), 1, "only the fresh row survives");
 });
 
 function daysAfter(days) {
