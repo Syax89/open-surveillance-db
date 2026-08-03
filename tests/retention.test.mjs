@@ -803,7 +803,7 @@ test("R16: the bounded sweep drains >100 stale rows across multiple rounds in on
 });
 
 // ---------------------------------------------------------------------------
-// R12 — demo records (QA#4 finding B) + email_send_log (QA#4 finding A)
+// R12 — demo records (QA#4 finding B)
 // ---------------------------------------------------------------------------
 
 test("R12: demo records are purged WITH their evidence outside development (QA#4 finding B)", async () => {
@@ -847,50 +847,6 @@ test("R12: ENVIRONMENT=development keeps the illustrative demo rows (local seed 
     if (previous === undefined) delete runtime.env.ENVIRONMENT;
     else runtime.env.ENVIRONMENT = previous;
   }
-});
-
-test("email_send_log: rows older than the 30-day window are purged, fresh ones survive (QA#4 finding A)", async () => {
-  const contributor = await runtime.env.DB.prepare(
-    "INSERT INTO contributors (email, display_name, password_hash, created_at, updated_at) VALUES (?, 'Mail Log', 'pbkdf2$1$x$y', ?, ?) RETURNING id",
-  )
-    .bind("mail-log@example.com", NOW, NOW)
-    .first();
-  const insertLog = async (sentAt) =>
-    runtime.env.DB.prepare(
-      "INSERT INTO email_send_log (contributor_id, kind, sent_at) VALUES (?, 'verify', ?)",
-    ).bind(contributor.id, sentAt).run();
-
-  await insertLog(daysBefore(31)); // past the cutoff → purged
-  await insertLog(daysBefore(30)); // exactly 30d → survives (strict <)
-  await insertLog(daysBefore(1)); // fresh → survives
-  await insertLog(daysBefore(400)); // very stale → purged
-
-  const summary = await runtime.retention.runRetentionSweep(NOW);
-
-  assert.equal(summary.emailSendLogPurged, 2, "only rows strictly older than 30 days are removed");
-  assert.equal(await count("email_send_log"), 2, "the 30d-boundary and the fresh row survive");
-  assert.equal(await count("email_send_log", "sent_at < ?", daysBefore(30)), 0, "no row past the cutoff survives");
-  assert.equal(summary.failures, 0);
-});
-
-test("email_send_log: the sweep is driven by the policy knob (retention-contract alignment)", async () => {
-  const contributor = await runtime.env.DB.prepare(
-    "INSERT INTO contributors (email, display_name, password_hash, created_at, updated_at) VALUES (?, 'Mail Log 2', 'pbkdf2$1$x$y', ?, ?) RETURNING id",
-  )
-    .bind("mail-log2@example.com", NOW, NOW)
-    .first();
-  await runtime.env.DB.prepare(
-    "INSERT INTO email_send_log (contributor_id, kind, sent_at) VALUES (?, 'verify', ?)",
-  ).bind(contributor.id, daysBefore(10)).run();
-
-  // A 10-day-old row survives the default 30d policy but is purged by a
-  // custom 5-day policy — proves the window comes from RetentionPolicy.
-  const summary = await runtime.retention.runRetentionSweep(NOW, {
-    policy: { ...runtime.retention.DEFAULT_RETENTION_POLICY, emailSendLogDays: 5 },
-  });
-
-  assert.equal(summary.emailSendLogPurged, 1);
-  assert.equal(await count("email_send_log"), 0);
 });
 
 function daysAfter(days) {

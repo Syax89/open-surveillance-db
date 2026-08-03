@@ -16,8 +16,8 @@
 // qualcuno aveva eseguito `npm run db:seed` (o in un DB promosso da dev).
 //
 // Il test ora ASSERISCE il comportamento corretto:
-//   - email_send_log: le righe oltre la TTL (30d, EMAIL_SEND_LOG_RETENTION_DAYS)
-//     vengono eliminate; la riga fresca sopravvive; il contatore
+//   - email_send_log: le righe oltre la TTL (R18, 24h — EMAIL_SEND_LOG_RETENTION_DAYS
+//     da #275) vengono eliminate; la riga fresca sopravvive; il contatore
 //     summary.emailSendLogPurged riflette la sweep;
 //   - demo: le righe `demo` vengono eliminate in produzione (ENVIRONMENT
 //     unset = fail-closed, stessa convenzione di demoRecordsPublic) insieme
@@ -103,7 +103,7 @@ test("QA#4: sweep produzione — email_send_log e demo records vengono purgati, 
   const { runRetentionSweep } = runtime.retention;
   const summary = await runRetentionSweep(NOW, {});
 
-  // Finding A: le righe oltre la TTL 30d spariscono, la fresca sopravvive.
+  // Finding A: le righe oltre la TTL (R18, 24h) spariscono, la fresca sopravvive.
   assert.equal(await count("email_send_log"), 1, "le 2 righe vecchie (90d/400d) sono eliminate");
   assert.equal(await count("email_send_log", "sent_at < ?", daysBefore(30)), 0, "nessuna riga oltre la TTL sopravvive");
   assert.equal(summary.emailSendLogPurged, 2, "il contatore del summary riflette la sweep");
