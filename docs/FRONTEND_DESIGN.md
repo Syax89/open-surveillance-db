@@ -101,31 +101,45 @@ link "Use the map instead" (directory), report-rule "Before submitting"
 (segnala) e "Urgent concern" (correggi). Gerarchia heading: h1 tool →
 h2 sezione (es. place-search) → h3 card.
 
-**Directory catalog mode (t_127492f1 — redesign /directory):** la tool page
-usa `PublicDirectory variant="catalog"` con un layout a tre fasce, nell'ordine
-"filtri → count/export → lista" richiesto dalla CEO:
+**Directory catalog mode (t_127492f1; redesign t_f13fcb1c):** la tool page
+usa `PublicDirectory variant="catalog"` con il layout browse-record
+"indice editoriale" (proposta vincente di `docs/design/browse-record-redesign.md`):
 
 1. `.directory-tool-heading` = `.tool-heading` con il link "Use the map
    instead" allineato a destra (modifier: il layout flex vale SOLO per
    /directory, /segnala e /correggi restano invariati).
 2. `FiltersBar variant="bare"` — la stessa griglia controlli (search + type +
-   freshness + sort + reset, ids storici `record-*`) SENZA il counter.
-3. `.directory-meta` — count (`role=status`, id `record-search-count`),
-   trigger del pannello luogo (`aria-expanded`/`aria-controls`) e export
-   CSV/GeoJSON (`.data-actions`, filtri server kind+freshness).
-4. `.place-search` come pannello collassabile (`.place-search-closed` =
-   `display:none` finché il trigger non lo apre — mai l'attributo `hidden`,
-   vietato dal contratto pages-render): un solo input di ricerca visibile
-   alla volta — la ricerca per luogo è una *modalità*, non una feature
-   sorella (principio già stabilito da /mappa con `hideSearch`).
-5. `h2.sr-only` "Directory results" (chiave `resultsRegion`) prima della
-   lista: mantiene la scala h1 → h2 → h3.
-6. `.directory-tool .record-list` a UNA colonna con righe piatte ~80px
-   (hairline, 3 colonne titolo/fatti/azioni — stile contestuale, la classe
-   `record-list-card` di `RecordCard` resta byte-identica per le suite
-   a11y), ~3× densità delle card 270px. Un solo flusso di risultati: una
-   ricerca luogo attiva sostituisce la lista (banner `.place-banner` con
-   area + count + clear, fact Distanza).
+   freshness + sort + reset, ids storici `record-*`) SENZA il counter, in una
+   griglia a DUE righe pulite: search a tutta larghezza, poi type/freshness/
+   sort/reset + il toggle "Search near a place" (`extraControls`, FiltersBar)
+   nella seconda riga — un solo cluster di ricerca per pagina.
+3. `.place-search` come pannello collassabile a CARD contenuta
+   (`.place-search-closed` = `display:none` finché il trigger non lo apre —
+   mai l'attributo `hidden`, vietato dal contratto pages-render; l'input è
+   finalmente stilizzato come gli altri input — audit V1). Un solo input di
+   ricerca visibile alla volta; la ricerca per luogo è una *modalità*, non
+   una feature sorella (principio già stabilito da /mappa con `hideSearch`).
+4. `.directory-results` — header risultati VISIBILE: h2 "Directory results"
+   (chiave `resultsRegion`, niente più h2 sr-only) + count (`role=status`, id
+   `record-search-count`) + export CSV/GeoJSON come bottoni secondari
+   (`.export-button`, restano `<a role=link>` per i contratti).
+5. `.filter-chips` — chips dei filtri attivi (type/freshness/q), rimozione
+   one-shot, target ≥44px (pattern Google Maps/CKAN).
+6. `.alpha-index` — indice alfabetico A–Z (pattern Wikipedia AllPages): solo
+   le lettere presenti nel set filtrato; click → pagina della prima
+   occorrenza + focus sull'header risultati; `aria-current` sulle lettere
+   della pagina corrente. Visibile solo con sort alfabetico.
+7. `.directory-tool .record-list` a UNA colonna con righe piatte (hairline,
+   `titolo | meta line | azioni` — la meta line è il `<dl>` di RecordCard
+   renderizzato come riga orizzontale di coppie dt/dd: etichette NON ripetute
+   in griglia 3+1, audit V7; la classe `record-list-card` resta byte-identica
+   per le suite a11y e il contratto rendered-html `<dt>Record ID</dt>`).
+8. `.directory-pagination` — paginazione "Previous / Showing X–Y of Z ·
+   Page N of M / Next", stato `?page=` in URL (6ª dimensione di
+   useCameraFilters, reset a 1 su ogni cambio filtro; /mappa parsa ma non
+   scrive mai page → URL invariati). Un solo flusso di risultati: una ricerca
+   luogo attiva sostituisce la lista (banner `.place-banner` con area + count
+   + clear, fact Distanza) e nasconde indice/chips/paginazione.
 
 La home resta su `variant="hub"` (output byte-identico: records-heading +
 blocco place-search + FiltersBar inline + count + griglia 2 colonne).
@@ -448,7 +462,7 @@ Legenda: **[spec]** = sezione dedicata sotto · **[patt.]** = pattern condiviso
 
 **Directory e tool**
 | `DirectoryTool` | `/directory` | tool-heading (con link mappa) + PublicDirectory catalog | [spec] 2.2 |
-| `DirectoryCatalog` | `/directory` | **layout catalog**: FiltersBar bare + meta row + pannello luogo + righe | **[spec] 2.2** |
+| `DirectoryCatalog` | `/directory` | **layout catalog**: FiltersBar bare + pannello luogo + header risultati + chips + indice A–Z + righe + paginazione `?page=` | **[spec] 2.2** |
 | `SegnalaTool` | `/segnala` | tool-heading + ReportForm | [spec] 2.2 |
 | `CorreggiTool` | `/correggi` | tool-heading + CorrectionForm | [spec] 2.2 |
 | `PublicDirectory` | `/directory`, home | catalog (delega a DirectoryCatalog) / hub (sezione home) | [patt.] |
@@ -648,14 +662,16 @@ Stesso componente su `/mappa` e `/directory` (D4, stato URL identico):
 | Tipo camera | `<select>` | `?type=` |
 | Freshness | `<select>` (all/7d/30d/90d) | `?freshness=` |
 | Ordinamento | `<select>` (alpha/position) | `?sort=` |
+| Pagina risultati (solo /directory, t_f13fcb1c) | paginazione "Prev/Next" | `?page=` |
 | Reset | `<button>` | rimuove i params |
 
-**Varianti (t_127492f1):** `inline` (home: riga controlli + counter),
-`panel` (/mappa: bordo superiore della map-card, `hideSearch`), `bare`
-(/directory catalog: la stessa griglia controlli SENZA il counter — il
-counter vive nella `.directory-meta` renderizzata da `PublicDirectory`
-catalog, accanto a export e trigger luogo). Le varianti condividono ids
-(`record-search`, `record-kind-filter`, `record-freshness-filter`,
+**Varianti (t_127492f1; t_f13fcb1c):** `inline` (home: riga controlli +
+counter), `panel` (/mappa: bordo superiore della map-card, `hideSearch`),
+`bare` (/directory catalog: la stessa griglia controlli SENZA il counter —
+il counter vive nella `.directory-results` renderizzata da `PublicDirectory`
+catalog, accanto a export; il toggle luogo arriva via `extraControls`,
+renderizzato in fondo alla griglia accanto a Reset). Le varianti condividono
+ids (`record-search`, `record-kind-filter`, `record-freshness-filter`,
 `record-sort`, `record-search-count`), label e stato URL — solo la resa
 del counter cambia.
 

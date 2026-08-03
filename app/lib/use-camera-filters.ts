@@ -4,8 +4,8 @@
  * useCameraFilters — URL as the single source of truth for the tool filters
  * (F4, kanban t_522638a5; docs/FRONTEND_PLAN.md §1.2/2.5/3.3, CTO t_f24c3227).
  *
- * The five filter dimensions (q, type, freshness, sort, focus) live in the
- * URL query string and are read via useSearchParams, never mirrored in local
+ * The six filter dimensions (q, type, freshness, sort, focus, page) live in
+ * the URL query string and are read via useSearchParams, never mirrored in local
  * state. Every UI change writes the URL with `router.replace(href, { scroll:
  * false })`, so filter edits never pollute browser history (R2 URL churn):
  * back/forward traverse page navigations (push), not filter edits (replace).
@@ -84,6 +84,14 @@ export type CameraFilters = {
   sort: SortOrder;
   /** Record preselected on /mappa (?focus=ID); null when unset/invalid. */
   focus: number | null;
+  /**
+   * Result page (?page=, t_f13fcb1c). 1 = first page. Owned by the URL like
+   * every other dimension; only /directory renders pagination, /mappa
+   * parses it (lenient) but never sets it — so the map round-trip preserves
+   * the directory page and /mappa URLs are unaffected (page 1 is omitted
+   * by stringifyCameraFilters).
+   */
+  page: number;
 };
 
 const FRESHNESS_SET = new Set<string>(FRESHNESS_WINDOWS);
@@ -127,7 +135,10 @@ export function parseCameraFilters(searchParams: URLSearchParams): CameraFilters
   const focusRaw = searchParams.get("focus");
   const focusId = focusRaw === null ? null : Number(focusRaw);
   const focus = focusId !== null && Number.isInteger(focusId) && focusId > 0 ? focusId : null;
-  return { q, type, freshness, sort, focus };
+  const pageRaw = searchParams.get("page");
+  const pageNumber = pageRaw === null ? 1 : Number(pageRaw);
+  const page = Number.isInteger(pageNumber) && pageNumber > 0 ? pageNumber : 1;
+  return { q, type, freshness, sort, focus, page };
 }
 
 /**
@@ -143,6 +154,9 @@ export function stringifyCameraFilters(filters: CameraFilters): string {
   if (filters.freshness !== "all") params.set("freshness", filters.freshness);
   if (filters.sort !== "alphabetical") params.set("sort", filters.sort);
   if (filters.focus !== null) params.set("focus", String(filters.focus));
+  // Page 1 is the default and is omitted (R2 minimal URLs); /mappa never
+  // sets page, so its URLs never carry ?page=.
+  if (filters.page > 1) params.set("page", String(filters.page));
   const query = params.toString();
   return query ? `?${query}` : "";
 }
@@ -209,7 +223,7 @@ export function mapHrefWithFocus(filters: CameraFilters, focusId: number): strin
 }
 
 export type UseCameraFiltersResult = {
-  /** The five dimensions parsed from the current URL. */
+  /** The six dimensions parsed from the current URL. */
   filters: CameraFilters;
   /** Instant search input value (the URL q lags it by the debounce). */
   qInput: string;
@@ -221,6 +235,8 @@ export type UseCameraFiltersResult = {
   setFreshness: (value: string) => void;
   /** Commit the sort order immediately (replace, scroll:false). */
   setSort: (value: SortOrder) => void;
+  /** Commit the result page (?page=, /directory pagination). */
+  setPage: (value: number) => void;
   /** Clear every filter dimension (replace to the bare pathname). */
   reset: () => void;
 };
@@ -260,7 +276,7 @@ export function useCameraFilters(): UseCameraFiltersResult {
   // ref writes during render are forbidden, and the debounce/write callbacks
   // only ever run AFTER a render (user events / timers), so the effect has
   // always refreshed the refs by the time they are read.
-  const filtersRef = useRef<CameraFilters>({ q: "", type: "all", freshness: "all", sort: "alphabetical", focus: null });
+  const filtersRef = useRef<CameraFilters>({ q: "", type: "all", freshness: "all", sort: "alphabetical", focus: null, page: 1 });
   useEffect(() => {
     filtersRef.current = committed;
   });
@@ -320,13 +336,14 @@ export function useCameraFilters(): UseCameraFiltersResult {
   // or reset write from silently dropping the typed q.
   const hrefFor = useCallback((filters: CameraFilters) => {
     const params = new URLSearchParams(searchParamsRef.current);
-    for (const key of ["q", "type", "freshness", "sort", "focus"]) params.delete(key);
+    for (const key of ["q", "type", "freshness", "sort", "focus", "page"]) params.delete(key);
     const q = filters.q.trim();
     if (q) params.set("q", q);
     if (filters.type && filters.type !== "all") params.set("type", filters.type);
     if (filters.freshness !== "all") params.set("freshness", filters.freshness);
     if (filters.sort !== "alphabetical") params.set("sort", filters.sort);
     if (filters.focus !== null) params.set("focus", String(filters.focus));
+    if (filters.page > 1) params.set("page", String(filters.page));
     const query = params.toString();
     return query ? `${pathname}?${query}` : pathname;
   }, [pathname]);
@@ -408,27 +425,33 @@ export function useCameraFilters(): UseCameraFiltersResult {
     // render-scope committed: filtersRef.current may still lag it, and a
     // stale spread would resurrect the cleared q in the URL write.
     if (trimmed === "") {
-      applyFilters({ ...committed, q: "" }, "history");
+      applyFilters({ ...committed, q: "", page: 1 }, "history");
       return;
     }
     debounceRef.current = setTimeout(() => {
       debounceRef.current = null;
-      applyFilters({ ...filtersRef.current, q: trimmed }, "history");
+      applyFilters({ ...filtersRef.current, q: trimmed, page: 1 }, "history");
     }, QUERY_DEBOUNCE_MS);
   }
 
   function setType(value: string) {
-    applyFilters({ ...filtersRef.current, type: value });
+    applyFilters({ ...filtersRef.current, type: value, page: 1 });
   }
 
   function setFreshness(value: string) {
     // Select values are whitelisted by the markup; a stray value (or a
     // tampered option) falls back to "all" instead of writing a bad URL.
-    applyFilters({ ...filtersRef.current, freshness: (FRESHNESS_SET.has(value) ? value : "all") as FreshnessWindow });
+    applyFilters({ ...filtersRef.current, freshness: (FRESHNESS_SET.has(value) ? value : "all") as FreshnessWindow, page: 1 });
   }
 
   function setSort(value: SortOrder) {
-    applyFilters({ ...filtersRef.current, sort: value });
+    applyFilters({ ...filtersRef.current, sort: value, page: 1 });
+  }
+
+  /** /directory pagination (t_f13fcb1c): clamp to >= 1, write ?page=. */
+  function setPage(value: number) {
+    const page = Number.isInteger(value) && value > 0 ? value : 1;
+    applyFilters({ ...filtersRef.current, page });
   }
 
   function reset() {
@@ -437,12 +460,12 @@ export function useCameraFilters(): UseCameraFiltersResult {
       debounceRef.current = null;
     }
     setQInput("");
-    applyFilters({ q: "", type: "all", freshness: "all", sort: "alphabetical", focus: null });
+    applyFilters({ q: "", type: "all", freshness: "all", sort: "alphabetical", focus: null, page: 1 });
   }
 
   // The revision value itself is intentionally unused: it exists so the
   // renderer re-runs after every URL write (see the hook docs).
   void revision;
 
-  return { filters: committed, qInput, setQ, setType, setFreshness, setSort, reset };
+  return { filters: committed, qInput, setQ, setType, setFreshness, setSort, setPage, reset };
 }
