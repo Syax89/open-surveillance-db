@@ -141,10 +141,13 @@ test("record page: found record renders public fields and revision history", asy
   assert.ok(screen.getByText("Community report"));
   // Revision history row with the localized action label; the date is
   // rendered through toLocaleDateString (e.g. "1 March 2026"), not raw ISO.
+  // P2 (formatPublicDate): the record's own `lastVerification` fact is now
+  // formatted the same way, so the date may legitimately appear twice
+  // (the fact + the history row) when they share the fixture timestamp.
   assert.ok(screen.getByText("Approved and published"));
   const expectedDate = new Date("2026-03-01T00:00:00.000Z")
     .toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
-  assert.ok(screen.getByText(expectedDate));
+  assert.ok(screen.getAllByText(expectedDate).length >= 1);
   // Back to directory link resolves.
   const back = screen.getByRole("link", { name: "← Back to directory" });
   assert.equal(back.getAttribute("href"), "/#records");

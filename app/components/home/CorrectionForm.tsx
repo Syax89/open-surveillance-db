@@ -40,6 +40,13 @@ export function CorrectionForm({ records, defaultRecordId = null, showHeading = 
     const payload = { cameraId: String(form.get("cameraId") || ""), issueType: String(form.get("issueType") || ""), message: String(form.get("message") || ""), contact: String(form.get("contact") || "") };
     try {
       const response = await fetch("/api/corrections", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      // P1-2 (Vera design): the write gate answers 401 (no session) and 403
+      // (unverified email) with a single canonical EN body; surface the
+      // localized guidance instead of the raw server string ("Authentication
+      // required."). The login wall covers the common case; this maps the
+      // mid-form session death.
+      if (response.status === 401) { setCorrectionNotice(t.loginRequired); return; }
+      if (response.status === 403) { setCorrectionNotice(t.verifyRequired); return; }
       const data = await response.json() as { referenceId?: number; error?: string };
       if (!response.ok) throw new Error(data.error || t.saveRequestError);
       formElement.reset();

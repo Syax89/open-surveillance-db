@@ -35,10 +35,23 @@ const PAGES = [
   { route: "/guide", source: "app/guide/page.tsx", relative: "app/guide/page.mjs" },
   { route: "/login", source: "app/login/page.tsx", relative: "app/login/page.mjs" },
   { route: "/register", source: "app/register/page.tsx", relative: "app/register/page.mjs" },
+  { route: "/verify-email", source: "app/verify-email/page.tsx", relative: "app/verify-email/page.mjs" },
+  { route: "/forgot-password", source: "app/forgot-password/page.tsx", relative: "app/forgot-password/page.mjs" },
+  { route: "/reset-password", source: "app/reset-password/page.tsx", relative: "app/reset-password/page.mjs" },
   { route: "/account", source: "app/account/AccountPageBody.tsx", relative: "app/account/AccountPageBody.mjs" },
   { route: "/moderation", source: "app/moderation/page.tsx", relative: "app/moderation/page.mjs" },
   { route: "/records/[id]", source: "app/records/[id]/RecordPageBody.tsx", relative: "app/records/[id]/RecordPageBody.mjs" },
   { route: "/records/[id]/edit", source: "app/records/[id]/edit/page.tsx", relative: "app/records/[id]/edit/page.mjs" },
+];
+
+// Client body components imported by the page shells above but living outside
+// app/lib and app/components (which are transpiled recursively). They are
+// needed in the tree so the pages resolve their imports, but they are NOT
+// rendered as standalone routes.
+const EXTRA_SOURCES = [
+  { source: "app/verify-email/VerifyEmailBody.tsx", relative: "app/verify-email/VerifyEmailBody.mjs" },
+  { source: "app/forgot-password/ForgotPasswordBody.tsx", relative: "app/forgot-password/ForgotPasswordBody.mjs" },
+  { source: "app/reset-password/ResetPasswordBody.tsx", relative: "app/reset-password/ResetPasswordBody.mjs" },
 ];
 
 // Le route del repo (pagine + API) note al momento del test: usate per
@@ -48,6 +61,9 @@ const KNOWN_ROUTES = new Set([
   "/manifesto", "/regole", "/faq", "/contatti", "/privacy", "/termini", "/licenze", "/accessibility",
   // Route tool separate (F1 route group (tools), t_03c0fa15).
   "/mappa", "/directory", "/segnala", "/correggi",
+  // Auth UX (P1-1/P1-3 Vera design): verification landing, forgot-password
+  // and reset-password pages linked from /login and the emailed links.
+  "/verify-email", "/forgot-password", "/reset-password",
   "/api/cameras", "/api/cameras?format=geojson", "/api/cameras?format=csv",
   "/api/cameras/nearby", "/api/cameras/search", "/api/cameras/revisions",
   "/api/tiles", "/api/auth/me", "/api/auth/me/submissions", "/api/auth/logout",
@@ -55,6 +71,8 @@ const KNOWN_ROUTES = new Set([
   // Multi-method auth (Fase E2): the OIDC /start routes the /login social
   // buttons point at (302 to the provider).
   "/api/auth/oidc/github/start", "/api/auth/oidc/google/start",
+  "/api/auth/verify-email", "/api/auth/verify-email/resend",
+  "/api/auth/reset-password/request", "/api/auth/reset-password/confirm",
 ]);
 
 // Pattern di stato non pubblico nel markup statico. `aria-hidden="true"` è un
@@ -152,6 +170,10 @@ export const headers = async () => new Headers();
 
   // Le pagine stesse.
   for (const { source, relative } of PAGES) {
+    sources.push({ abs: path.join(root, source), out: relative });
+  }
+  // I body client importati dalle pagine ma fuori da app/lib e app/components.
+  for (const { source, relative } of EXTRA_SOURCES) {
     sources.push({ abs: path.join(root, source), out: relative });
   }
 
