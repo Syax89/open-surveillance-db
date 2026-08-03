@@ -78,7 +78,8 @@ the routes.
    data, contributor identities, internal notes, or operational details.
 5. **Public pages stay public, tool pages stay tooled.** Public-facing
    informational routes are linked in nav/footer. Private tool routes
-   (`/moderation` dashboard, `/account`, `/login`, `/register`) are never
+   (`/moderation` dashboard, `/account`, `/login`, `/register`,
+   `/verify-email`, `/forgot-password`, `/reset-password`) are never
    linked from the public navigation.
 6. **Accessibility is part of the layout.** Every page starts with the skip
    link (provided by `LocaleProvider`), uses one `main#main-content`, a
@@ -126,6 +127,8 @@ or `legal` bundle — legal content is a separate typed layer
 | Record detail | `/records/[id]` | `record.ts` |
 | Verification widget | `/records/[id]` (aggregate count + personal toggle) | `community.ts` (shared vocabulary: levels, verifications) |
 | Auth | `/login`, `/register`, `/account` | `auth.ts` |
+| Auth — email verification | `/verify-email?token=` (landing from the emailed link, P1-1) | `auth.ts` |
+| Auth — password reset | `/forgot-password`, `/reset-password?token=` (P1-3) | `auth.ts` |
 | Contribution editing | `/records/[id]/edit` | `record.ts` (form) + `community.ts` (moderation notice, statuses) |
 | Community (levels, verifications) | `/account`, `/records/[id]`, `/records/[id]/edit`, `/guide` | `community.ts` (new per-domain bundle, EN pilot + IT) |
 | Moderation (private dashboard) | `/moderation` | `moderation.ts` |
@@ -231,6 +234,10 @@ proposed).
 - **Content:** `app/(tools)/segnala/page.tsx` + `SegnalaTool`
   (`app/components/tools/SegnalaTool.tsx`, `"use client"`), reusing
   `ReportForm` + `useReportFlow`. Bundle: `report.ts`.
+- **Auth (P1-2):** the form is gated by `WriteGateWall` — the write gate
+  (Fase E1, ADR 0020 d.1) requires a verified contributor. Anonymous
+  visitors get the bilingual login wall (`/login?returnTo=/segnala`);
+  signed-in-but-unverified visitors get the verify-email wall with resend.
 - **SEO/privacy:** `robots: noindex, nofollow` (form page; submissions are
   private until moderated).
 - **Nav/footer:** in tool nav (`ToolLayout`); linked from the home nav as
@@ -246,6 +253,10 @@ proposed).
   (`app/components/tools/CorreggiTool.tsx`, `"use client"`), wrapped in a
   `Suspense` boundary (`useSearchParams`), reusing `CorrectionForm`. Bundle:
   `correction.ts`.
+- **Auth (P1-2):** the form is gated by `WriteGateWall` — the write gate
+  (Fase E1, ADR 0020 d.1) requires a verified contributor. Anonymous
+  visitors get the bilingual login wall (`/login?returnTo=/correggi`);
+  signed-in-but-unverified visitors get the verify-email wall with resend.
 - **SEO/privacy:** `robots: noindex, nofollow` (form page; corrections are
   private requests).
 - **Nav/footer:** in tool nav (`ToolLayout`); linked from the global footer
@@ -281,11 +292,49 @@ proposed).
   `role="status"` counter), "Modifica" links to `/records/[id]/edit` for the
   owner only (C6), truthful empty state. There is **no separate
   `/account/contributions` route** — the list is a section of `/account`.
+  Since P1-1 the page also reads `contributor.emailVerifiedAt`: an
+  unverified contributor sees the verification banner with a resend action
+  (the register→verify→write flow is no longer a dead end).
   Bundles: `auth.ts` (profile chrome) + `community.ts` (levels/verifications
   vocabulary).
 - **SEO/privacy:** `robots: noindex` (private account surface).
 - **Nav/footer:** never linked from public navigation (account surface).
 - **Auth:** auth-gated (contributor session, ADR 0013); anonymous → 401.
+
+### `/verify-email` — Email verification landing (implemented, P1-1 Vera)
+
+- **Purpose:** the human landing for the verification link emailed at
+  registration. Previously the link pointed at GET /api/auth/verify-email
+  (raw JSON in the browser); now the mailer (app/lib/mailer.ts,
+  app/lib/email-templates.ts buildAuthActionUrl) links here with
+  `?token=`, and the page consumes the same API client-side.
+- **Content:** `app/verify-email/page.tsx` + `VerifyEmailBody` (client,
+  Suspense-wrapped for `useSearchParams`). Outcomes: verified (200),
+  invalid (400), expired/used (410, with resend action), error (5xx).
+  Bundle: `auth.ts`.
+- **SEO/privacy:** `robots: noindex, nofollow` (one-shot auth outcome,
+  never indexed).
+
+### `/forgot-password` — Password reset request (implemented, P1-3 Vera)
+
+- **Purpose:** request a reset link; mirrors the anti-enumeration contract
+  of POST /api/auth/reset-password/request (every well-formed email gets
+  the same generic confirmation).
+- **Content:** `app/forgot-password/page.tsx` + `ForgotPasswordBody`
+  (client). Bundle: `auth.ts`. Reached from the "Forgot password?" link on
+  /login.
+- **SEO/privacy:** `robots: noindex, nofollow`.
+
+### `/reset-password` — Consume the reset token (implemented, P1-3 Vera)
+
+- **Purpose:** the landing for the reset link emailed by
+  sendPasswordResetEmail (which has always pointed here — the page simply
+  did not exist, so the link 404'd). Reads `?token=`, posts the new
+  password to POST /api/auth/reset-password/confirm, renders
+  success / invalid / expired outcomes.
+- **Content:** `app/reset-password/page.tsx` + `ResetPasswordBody` (client,
+  Suspense-wrapped). Bundle: `auth.ts`.
+- **SEO/privacy:** `robots: noindex, nofollow`.
 
 ### `/records/[id]/edit` — Edit contribution (implemented, community C6)
 

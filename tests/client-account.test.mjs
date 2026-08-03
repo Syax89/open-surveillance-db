@@ -54,6 +54,7 @@ const profileFixture = {
     id: 1,
     email: "contributor@example.test",
     displayName: "Fixture Contributor",
+    emailVerifiedAt: "2026-01-15T10:00:00.000Z",
     createdAt: "2026-01-15T10:00:00.000Z",
     updatedAt: "2026-01-15T10:00:00.000Z",
   },
@@ -675,4 +676,59 @@ test("account: a 403 on enroll begin (expired CSRF) shows the actionable securit
   // CSRF token, and the user gets the actionable refresh message instead.
   assert.equal(screen.queryByText("Cross-site request rejected."), null);
   assert.equal(screen.queryByRole("alertdialog"), null);
+});
+
+test("account: an unverified contributor sees the verification banner with a working resend", async () => {
+  const { screen, waitFor } = rtl;
+  const user = rtl.userEvent.setup();
+  const requests = [];
+  installFetchMock((input, init) => {
+    const url = String(input);
+    requests.push({ url, method: init?.method ?? "GET" });
+    if (url === "/api/auth/me") {
+      return jsonResponse({
+        contributor: {
+          id: 1,
+          email: "newbie@example.test",
+          displayName: null,
+          emailVerifiedAt: null,
+          createdAt: "2026-01-15T10:00:00.000Z",
+          updatedAt: "2026-01-15T10:00:00.000Z",
+        },
+        level: { level: 0, verifiedCount: 0, threshold: 0, nextThreshold: 1 },
+      });
+    }
+    if (typeof url === "string" && url.startsWith("/api/auth/me/contributions")) {
+      return jsonResponse(emptyContributionsFixture);
+    }
+    if (url === "/api/auth/passkey/credentials") return jsonResponse({ credentials: [] });
+    if (url === "/api/auth/verify-email/resend" && init?.method === "POST") return jsonResponse({ sent: true });
+    return jsonResponse({ error: "unexpected route" }, { status: 404 });
+  });
+
+  await renderWithLocale(React.createElement(AccountPage));
+
+  // P1-1 (Vera design): the banner explains the write gate and offers the
+  // resend — the register→verify→write flow is no longer a dead end.
+  await waitFor(() => assert.ok(screen.getByRole("heading", { name: "Verify your email to contribute" })));
+  await user.click(screen.getByRole("button", { name: "Resend the email" }));
+  await waitFor(() => assert.ok(requests.some((r) => r.url === "/api/auth/verify-email/resend" && r.method === "POST")));
+  assert.ok(screen.getByText("Confirmation email sent."));
+});
+
+test("account: a verified contributor sees the done line instead of the banner", async () => {
+  const { screen, waitFor } = rtl;
+  installFetchMock((input) => {
+    if (input === "/api/auth/me") return jsonResponse(profileFixture);
+    if (typeof input === "string" && input.startsWith("/api/auth/me/contributions")) {
+      return jsonResponse(contributionsFixture);
+    }
+    if (input === "/api/auth/passkey/credentials") return jsonResponse({ credentials: [] });
+    return jsonResponse({ error: "unexpected route" }, { status: 404 });
+  });
+
+  await renderWithLocale(React.createElement(AccountPage));
+  await waitFor(() => assert.ok(screen.queryByText("Fixture Contributor")));
+  assert.ok(screen.getByText("Email verified — you can contribute."));
+  assert.equal(screen.queryByRole("heading", { name: "Verify your email to contribute" }), null);
 });

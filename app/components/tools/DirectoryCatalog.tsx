@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useLocale, useMessages } from "../LocaleProvider";
 import { publicStatusLabel } from "../../lib/public-status";
 import { formatDistance } from "../../lib/search";
+import { formatPublicDate } from "../../lib/format-date";
 import type { Camera } from "../../lib/records";
 import { RecordCard } from "../RecordCard";
 import { FiltersBar } from "../FiltersBar";
@@ -81,7 +82,7 @@ export function DirectoryCatalog({ filteredRecords, cameraKinds, search, setSear
     return [
       { label: t.recordId, value: camera.id },
       { label: t.source, value: camera.source },
-      { label: t.lastVerification, value: camera.updated },
+      { label: t.lastVerification, value: formatPublicDate(camera.updated, locale) },
       { label: t.location, value: camera.address || `${camera.latitude.toFixed(4)}, ${camera.longitude.toFixed(4)}` },
     ];
   }
@@ -142,7 +143,7 @@ export function DirectoryCatalog({ filteredRecords, cameraKinds, search, setSear
           <button type="button" className="text-button" onClick={place.clearPlaceSearch}>{t.placeClearResults} <span aria-hidden="true">→</span></button>
         </div>
       )}
-      {showList ? <ul className="record-list">{(placeActive ? placeRecords : filteredRecords).map((camera) => <li key={camera.id}><RecordCard camera={camera} statusLabel={publicStatusLabel(statuses, camera.status, t.unknown)} facts={placeActive ? [{ label: t.distance, value: formatDistance((camera as Camera & { distanceMeters: number }).distanceMeters) }, { label: t.location, value: camera.address || `${camera.latitude.toFixed(4)}, ${camera.longitude.toFixed(4)}` }, { label: t.lastVerification, value: camera.updated }] : mainFacts(camera)} actions={cardActions(camera)} /></li>)}</ul> : !placeDone && <EmptyState title={t.emptyTitle} body={t.emptyBody} action={<p className="empty-state-actions"><button type="button" className="text-button" onClick={() => setSearch("")}>{t.clearSearch} <span aria-hidden="true">→</span></button><a className="text-button" href={reportHref}>{t.submitObservation} <span aria-hidden="true">→</span></a></p>} />}
+      {showList ? <ul className="record-list">{(placeActive ? placeRecords : filteredRecords).map((camera) => <li key={camera.id}><RecordCard camera={camera} statusLabel={publicStatusLabel(statuses, camera.status, t.unknown)} facts={placeActive ? [{ label: t.distance, value: formatDistance((camera as Camera & { distanceMeters: number }).distanceMeters) }, { label: t.location, value: camera.address || `${camera.latitude.toFixed(4)}, ${camera.longitude.toFixed(4)}` }, { label: t.lastVerification, value: formatPublicDate(camera.updated, locale) }] : mainFacts(camera)} actions={cardActions(camera)} /></li>)}</ul> : !placeDone && <EmptyState title={t.emptyTitle} body={t.emptyBody} action={<p className="empty-state-actions"><button type="button" className="text-button" onClick={() => setSearch("")}>{t.clearSearch} <span aria-hidden="true">→</span></button><a className="text-button" href={reportHref}>{t.submitObservation} <span aria-hidden="true">→</span></a></p>} />}
     </section>
   );
 }

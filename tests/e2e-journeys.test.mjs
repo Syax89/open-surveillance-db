@@ -177,15 +177,18 @@ async function ssr(route) {
 // Journey 2: segnala → submit → coda moderazione
 // ---------------------------------------------------------------------------
 
-test("journey segnala: the report form renders on the SSR /segnala tool (no JS needed to see it)", async () => {
+test("journey segnala: the report tool renders on the SSR /segnala route (form is client-gated)", async () => {
   // F2 moved the report form off the home hub into the /segnala tool route
-  // (F1 route group). The home hub links it (browse-filter-record asserts
-  // href="/segnala"); here we assert the form itself SSRs on its route.
+  // (F1 route group). P1-2 (Vera design): the form is gated by WriteGateWall
+  // (the write gate requires a verified contributor), so the anonymous SSR
+  // renders the tool heading + the wall's loading state — the form itself
+  // mounts client-side after the verified-session check. The write journey
+  // (next test) exercises the real API with a verified session.
   const { response, html } = await ssr("/segnala");
   assert.equal(response.status, 200);
   assert.match(html, /id="report-tool-title"/, "the segnala tool heading must SSR");
-  assert.match(html, /<form class="report-form"/, "the report form must be part of the /segnala SSR");
-  assert.match(html, /id="report"/, "the segnala section anchor must exist");
+  assert.match(html, /write-gate-wall/, "the login wall gates the form on SSR");
+  assert.doesNotMatch(html, /<form class="report-form"/, "the gated form must not leak into anonymous SSR");
 });
 
 test("journey segnala: submit → moderation queue → approve → public listing → record detail", async () => {

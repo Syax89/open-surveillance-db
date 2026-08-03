@@ -38,7 +38,25 @@ before(async () => {
   const camerasMod = await loadDomModule("app/lib/use-public-cameras.mjs");
   __resetPublicCamerasCache = camerasMod.__resetPublicCamerasCache;
   // Default fetch mock: empty public list (prototype seed keeps rendering).
-  installFetchMock(() => jsonResponse({ records: [], total: 0, nextOffset: null }));
+  // P1-2 (Vera design): SegnalaTool is gated by WriteGateWall, which checks
+  // /api/auth/me on mount — the default mock answers a VERIFIED contributor
+  // so the /segnala deep-link tests exercise the form, not the wall.
+  installFetchMock((input) => {
+    if (String(input) === "/api/auth/me") {
+      return jsonResponse({
+        contributor: {
+          id: 1,
+          email: "contributor@example.test",
+          displayName: "Fixture Contributor",
+          emailVerifiedAt: "2026-01-15T10:00:00.000Z",
+          createdAt: "2026-01-15T10:00:00.000Z",
+          updatedAt: "2026-01-15T10:00:00.000Z",
+        },
+        level: { level: 1, verifiedCount: 1, threshold: 1, nextThreshold: 5 },
+      });
+    }
+    return jsonResponse({ records: [], total: 0, nextOffset: null });
+  });
 });
 
 afterEach(() => {
@@ -108,6 +126,21 @@ test("map click still calls onPick (picker is an addition, not a replacement)", 
 test("/segnala deep link pre-fills the form and runs the nearby check on mount", async () => {
   const nearbyCalls = [];
   installFetchMock((input) => {
+    // P1-2: the WriteGateWall gates the form on /api/auth/me — answer a
+    // verified contributor so the deep-link prefill is exercised.
+    if (String(input) === "/api/auth/me") {
+      return jsonResponse({
+        contributor: {
+          id: 1,
+          email: "contributor@example.test",
+          displayName: "Fixture Contributor",
+          emailVerifiedAt: "2026-01-15T10:00:00.000Z",
+          createdAt: "2026-01-15T10:00:00.000Z",
+          updatedAt: "2026-01-15T10:00:00.000Z",
+        },
+        level: { level: 1, verifiedCount: 1, threshold: 1, nextThreshold: 5 },
+      });
+    }
     if (typeof input === "string" && input.startsWith("/api/cameras/nearby?")) {
       nearbyCalls.push(input);
       return jsonResponse({ records: [] });
@@ -121,7 +154,7 @@ test("/segnala deep link pre-fills the form and runs the nearby check on mount",
   }));
 
   // The coordinate readout appears with the deep-linked position.
-  assert.ok(screen.getByText("Selected point"));
+  assert.ok(await screen.findByText("Selected point"));
   assert.ok(screen.getByText("41.90040, 12.49360"));
 
   // The manual coordinate fields are pre-filled (same 5-decimal precision).
@@ -143,6 +176,8 @@ test("/segnala without a deep link renders the plain empty form", async () => {
   const { screen } = rtl;
   await renderWithLocale(React.createElement(SegnalaTool, {}));
 
+  // P1-2: wait for the verified-session gate before asserting the form.
+  await screen.findByLabelText("Latitude");
   assert.equal(screen.queryByText("Selected point"), null, "no readout without coordinates");
   const latInput = screen.getByLabelText("Latitude");
   const lngInput = screen.getByLabelText("Longitude");

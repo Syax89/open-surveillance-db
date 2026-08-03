@@ -122,7 +122,7 @@ test("register creates a contributor, mints a verification token, opens a sessio
   // still marks the session read-only: the contributor's emailVerifiedAt is
   // NULL (the fixture above) and the write gate (Fase E1) enforces it.
   assert.deepEqual(body.verification.sent, false);
-  assert.match(body.verification.devLink, /^https:\/\/osdb\.test\/api\/auth\/verify-email\?token=verify-token-abc$/);
+  assert.match(body.verification.devLink, /^https:\/\/osdb\.test\/verify-email\?token=verify-token-abc$/);
 
   // Cookie pair: HttpOnly session cookie + script-readable CSRF cookie.
   assert.deepEqual(cookieNames(response).sort(), ["osdb_csrf", "osdb_session"]);
@@ -875,7 +875,7 @@ test("resend mints a fresh verify token and returns the dev link when mail falls
   assert.equal(response.status, 200);
   const body = await responseBody(response);
   assert.deepEqual(body.sent, true);
-  assert.match(body.devLink, /^https:\/\/osdb\.test\/api\/auth\/verify-email\?token=resend-token-456$/);
+  assert.match(body.devLink, /^https:\/\/osdb\.test\/verify-email\?token=resend-token-456$/);
   // The new token is minted for the caller's own account, purpose 'verify'.
   const [tokenArgs] = callArgs("createVerificationToken");
   assert.deepEqual(tokenArgs.slice(0, 2), [7, "verify"]);

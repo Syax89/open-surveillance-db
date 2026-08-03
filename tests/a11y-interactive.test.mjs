@@ -198,11 +198,37 @@ test("the skip link is the first focusable element on the page (before the nav s
 
 test("manual coordinates (keyboard path for map location picking) have labelled, described inputs", async () => {
   // F2 home hub: the report form moved to /segnala (the keyboard path for
-  // map location picking lives with the form).
-  const { html } = await renderRoute("/segnala");
-  assert.match(html, /<label for="manual-latitude">Latitude<input id="manual-latitude"[^>]*aria-describedby="manual-coordinates-help"/);
-  assert.match(html, /<label for="manual-longitude">Longitude<input id="manual-longitude"[^>]*aria-describedby="manual-coordinates-help"/);
-  assert.match(html, /id="manual-coordinates-help"/, "the shared help text must exist");
+  // map location picking lives with the form). P1-2 (Vera design): the form
+  // is gated by WriteGateWall (verified contributor required by the write
+  // gate), so the labelled inputs are asserted client-side with a verified
+  // session — the anonymous SSR shell renders the login wall instead.
+  const rtl = await setupDom();
+  const SegnalaTool = (await loadDomModule("app/components/tools/SegnalaTool.mjs")).SegnalaTool;
+  installFetchMock((input) => {
+    if (String(input) === "/api/auth/me") {
+      return jsonResponse({
+        contributor: {
+          id: 1,
+          email: "contributor@example.test",
+          displayName: "Fixture Contributor",
+          emailVerifiedAt: "2026-01-15T10:00:00.000Z",
+          createdAt: "2026-01-15T10:00:00.000Z",
+          updatedAt: "2026-01-15T10:00:00.000Z",
+        },
+        level: { level: 1, verifiedCount: 1, threshold: 1, nextThreshold: 5 },
+      });
+    }
+    return jsonResponse({ records: [], total: 0, nextOffset: null });
+  });
+  const { container } = await renderWithLocale(React.createElement(SegnalaTool));
+  await rtl.waitFor(() => {
+    const latitude = container.querySelector("#manual-latitude");
+    const longitude = container.querySelector("#manual-longitude");
+    const help = container.querySelector("#manual-coordinates-help");
+    assert.ok(latitude && longitude && help, "the manual coordinate fields must render for a verified contributor");
+    assert.match(latitude?.getAttribute("aria-describedby") ?? "", /manual-coordinates-help/);
+    assert.match(longitude?.getAttribute("aria-describedby") ?? "", /manual-coordinates-help/);
+  });
 });
 
 test("place search exposes role=search with a labelled input", async () => {

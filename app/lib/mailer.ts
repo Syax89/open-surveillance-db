@@ -107,7 +107,10 @@ export async function sendVerificationEmail(
   options: { to: string; rawToken: string; requestOrigin: string },
 ): Promise<MailSendResult> {
   const base = linkBase(env, options.requestOrigin);
-  const actionUrl = `${base}/api/auth/verify-email?token=${encodeURIComponent(options.rawToken)}`;
+  // The link lands on the /verify-email UI page (P1-1 Vera design): the page
+  // consumes GET /api/auth/verify-email client-side and renders a real
+  // outcome with a resend action — never raw JSON in the browser.
+  const actionUrl = `${base}/verify-email?token=${encodeURIComponent(options.rawToken)}`;
   const plain = [
     "Confirm your email address",
     "",

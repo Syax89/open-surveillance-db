@@ -129,13 +129,15 @@ test("displayName is HTML-escaped in the rendered body (no markup injection)", (
 
 test("buildAuthActionUrl encodes the token and strips trailing slashes from the base", () => {
   const { emailTemplates } = runtime;
+  // P1-1/P1-3 (Vera design): the links land on the /verify-email and
+  // /reset-password UI pages — never on a raw JSON API route.
   assert.equal(
     emailTemplates.buildAuthActionUrl("verify", "abc/def+", "https://opensurveillancedb.org/"),
-    "https://opensurveillancedb.org/api/auth/verify-email?token=abc%2Fdef%2B",
+    "https://opensurveillancedb.org/verify-email?token=abc%2Fdef%2B",
   );
   assert.equal(
     emailTemplates.buildAuthActionUrl("reset", "xyz", "https://osdb.example"),
-    "https://osdb.example/api/auth/reset-password?token=xyz",
+    "https://osdb.example/reset-password?token=xyz",
   );
 });
 
@@ -264,8 +266,8 @@ test("sendAuthEmail renders, sends through the EMAIL binding and logs the send",
   assert.match(message.subject, /^Verify your email/);
   assert.ok(message.html.includes("Test Contributor"), "display name in the greeting");
   assert.ok(
-    message.html.includes("https://opensurveillancedb.org/api/auth/verify-email?token=raw-token-value"),
-    "action link uses VERIFY_BASE_URL + encoded token",
+    message.html.includes("https://opensurveillancedb.org/verify-email?token=raw-token-value"),
+    "action link uses VERIFY_BASE_URL + encoded token, landing on the /verify-email UI page (P1-1)",
   );
   assert.ok(message.text.length > 0, "plain text sent too");
 
