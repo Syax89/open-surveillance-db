@@ -14,7 +14,11 @@
 //   2. RUNTIME real-SQL boundary on an in-memory D1: seeding one record per
 //      known status (including `stale`, which the earlier suites did not
 //      exercise) must yield EXACTLY the whitelisted statuses — for the list,
-//      the by-id lookup, and the nearby search.
+//      the by-id lookup, and the nearby search. ADR 0008 demo gate
+//      (t_d7a4b99b): `demo` is public ONLY in the local development
+//      environment (ENVIRONMENT=development); this suite pins the prototype
+//      whitelist matrix, so the runtime env is flipped to development for
+//      the duration of the runtime tests.
 //   3. CLIENT hardening: the public UI never renders a raw non-public status
 //      string and drops non-whitelisted records before any component can
 //      display them (defense in depth behind the API boundary).
@@ -177,51 +181,73 @@ async function seedAllStatuses() {
 }
 
 test("runtime: listPublicCameras returns exactly the whitelisted statuses (real SQL)", async () => {
-  const { cameras } = await realDb();
-  const ids = await seedAllStatuses();
+  // ADR 0008 demo gate (t_d7a4b99b): `demo` is public ONLY in development;
+  // this contract pins the prototype whitelist matrix, so the shared
+  // harness env is flipped for the duration of the test.
+  const { env, cameras } = await realDb();
+  env.ENVIRONMENT = "development";
+  try {
+    const ids = await seedAllStatuses();
 
-  const records = await cameras.listPublicCameras();
-  const returned = records.filter((record) => record.source === "Community report");
-  assert.deepEqual(
-    returned.map((record) => record.status).sort(),
-    ["demo", "verified"],
-    `no record outside PUBLIC_CAMERA_STATUSES may cross the boundary (got: ${returned
-      .map((record) => record.status)
-      .join(", ")})`,
-  );
-  const returnedIds = returned.map((record) => record.id).sort();
-  assert.deepEqual(
-    returnedIds,
-    [ids.demo, ids.verified].sort(),
-    "the returned rows must be exactly the seeded verified and demo records",
-  );
+    const records = await cameras.listPublicCameras();
+    const returned = records.filter((record) => record.source === "Community report");
+    assert.deepEqual(
+      returned.map((record) => record.status).sort(),
+      ["demo", "verified"],
+      `no record outside PUBLIC_CAMERA_STATUSES may cross the boundary (got: ${returned
+        .map((record) => record.status)
+        .join(", ")})`,
+    );
+    const returnedIds = returned.map((record) => record.id).sort();
+    assert.deepEqual(
+      returnedIds,
+      [ids.demo, ids.verified].sort(),
+      "the returned rows must be exactly the seeded verified and demo records",
+    );
+  } finally {
+    delete env.ENVIRONMENT;
+  }
 });
 
 test("runtime: getPublicCameraById resolves only whitelisted statuses (real SQL)", async () => {
-  const { cameras } = await realDb();
-  const ids = await seedAllStatuses();
+  // ADR 0008 demo gate (t_d7a4b99b): demo by-id resolution is a development
+  // prototype behaviour; the shared harness env is flipped for the duration.
+  const { env, cameras } = await realDb();
+  env.ENVIRONMENT = "development";
+  try {
+    const ids = await seedAllStatuses();
 
-  for (const status of ["verified", "demo"]) {
-    const record = await cameras.getPublicCameraById(ids[status]);
-    assert.ok(record, `${status} must resolve through the public by-id lookup`);
-    assert.equal(record.status, status);
-  }
-  for (const status of ["pending", "needs_review", "stale", "rejected", "removed"]) {
-    const record = await cameras.getPublicCameraById(ids[status]);
-    assert.equal(record, null, `${status} must never resolve through the public by-id lookup`);
+    for (const status of ["verified", "demo"]) {
+      const record = await cameras.getPublicCameraById(ids[status]);
+      assert.ok(record, `${status} must resolve through the public by-id lookup`);
+      assert.equal(record.status, status);
+    }
+    for (const status of ["pending", "needs_review", "stale", "rejected", "removed"]) {
+      const record = await cameras.getPublicCameraById(ids[status]);
+      assert.equal(record, null, `${status} must never resolve through the public by-id lookup`);
+    }
+  } finally {
+    delete env.ENVIRONMENT;
   }
 });
 
 test("runtime: the nearby search also stays behind the whitelist (real SQL)", async () => {
-  const { cameras } = await realDb();
-  await seedAllStatuses();
+  // ADR 0008 demo gate (t_d7a4b99b): demo searchability is a development
+  // prototype behaviour; the shared harness env is flipped for the duration.
+  const { env, cameras } = await realDb();
+  env.ENVIRONMENT = "development";
+  try {
+    await seedAllStatuses();
 
-  const nearby = await cameras.findNearbyPublicCameras(44.1, 12.2, 500);
-  const titles = nearby.map((record) => record.title);
-  assert.ok(titles.includes("Record verified"), "verified records must be searchable");
-  assert.ok(titles.includes("Record demo"), "demo records must be searchable");
-  for (const status of ["pending", "needs_review", "stale", "rejected", "removed"]) {
-    assert.ok(!titles.includes(`Record ${status}`), `${status} records must never be searchable`);
+    const nearby = await cameras.findNearbyPublicCameras(44.1, 12.2, 500);
+    const titles = nearby.map((record) => record.title);
+    assert.ok(titles.includes("Record verified"), "verified records must be searchable");
+    assert.ok(titles.includes("Record demo"), "demo records must be searchable");
+    for (const status of ["pending", "needs_review", "stale", "rejected", "removed"]) {
+      assert.ok(!titles.includes(`Record ${status}`), `${status} records must never be searchable`);
+    }
+  } finally {
+    delete env.ENVIRONMENT;
   }
 });
 

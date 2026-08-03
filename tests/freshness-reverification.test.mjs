@@ -171,26 +171,36 @@ test("a verified record past its review window is never presented as current", a
   );
 });
 
-test("demo records remain publicly current without a schedule", async () => {
-  const { cameras, d1 } = await freshRuntime();
-  // H3: demo records are never seeded at runtime — the fresh DB starts
-  // empty (migrations only). The reserved 'demo' status is simulated with
-  // a direct database edit, mirroring a legacy record.
-  await cameras.createPendingCamera({
-    title: "Legacy demo record",
-    kind: "Fixed dome",
-    manufacturer: null,
-    observedOn: null,
-    address: "Via Roma 9",
-    notes: "",
-    latitude: 41.9,
-    longitude: 12.5,
-  });
-  const inserted = await d1.prepare("SELECT id FROM cameras WHERE title = 'Legacy demo record'").first();
-  await d1.prepare("UPDATE cameras SET status = 'demo' WHERE id = ?").bind(inserted.id).run();
-  const publicList = await cameras.listPublicCameras();
-  assert.equal(publicList.length, 1);
-  assert.ok(publicList.every((record) => record.status === "demo"));
+test("demo records remain publicly current without a schedule (development environment)", async () => {
+  // ADR 0008 demo gate (t_d7a4b99b): `demo` records are public ONLY in the
+  // local development environment (ENVIRONMENT=development); outside it the
+  // gate excludes them from every public surface. This suite pins the
+  // prototype behaviour, so the harness env is flipped to development for
+  // the duration of the test.
+  globalThis.__OSDB_FRESHNESS_ENV__ = "development";
+  try {
+    const { cameras, d1 } = await freshRuntime();
+    // H3: demo records are never seeded at runtime — the fresh DB starts
+    // empty (migrations only). The reserved 'demo' status is simulated with
+    // a direct database edit, mirroring a legacy record.
+    await cameras.createPendingCamera({
+      title: "Legacy demo record",
+      kind: "Fixed dome",
+      manufacturer: null,
+      observedOn: null,
+      address: "Via Roma 9",
+      notes: "",
+      latitude: 41.9,
+      longitude: 12.5,
+    });
+    const inserted = await d1.prepare("SELECT id FROM cameras WHERE title = 'Legacy demo record'").first();
+    await d1.prepare("UPDATE cameras SET status = 'demo' WHERE id = ?").bind(inserted.id).run();
+    const publicList = await cameras.listPublicCameras();
+    assert.equal(publicList.length, 1);
+    assert.ok(publicList.every((record) => record.status === "demo"));
+  } finally {
+    delete globalThis.__OSDB_FRESHNESS_ENV__;
+  }
 });
 
 test("pending and needs_review records are never public", async () => {

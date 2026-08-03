@@ -459,6 +459,22 @@ changes accumulate under `[Unreleased]`.
   retention sweep — D1-only — could never collect). The storage key is a
   fresh UUID per attempt, so retries are idempotent: a failed attempt
   leaves no object behind and the retry stores exactly one.
+- ADR 0008 demo purge gate (audit CTO #7, R12, t_d7a4b99b): the guarantee
+  "demo mai esportati" (ADR 0008 decision 1 / retention schedule R12)
+  previously rested on the manual pre-launch purge alone — a forgotten R12
+  run would have served `status='demo'` prototype records to the public.
+  Every public read surface now excludes demo records unless the
+  deployment explicitly sets `ENVIRONMENT=development` (fail-closed; unset
+  or any other value behaves as production, same convention as the
+  moderation demo actor selector, `worker-configuration.d.ts`). The gate
+  lives in the shared `demoRecordsPublic()` helper and is applied by
+  `publicCameraPredicate()` (JSON list, CSV/GeoJSON exports, bbox, by-id,
+  nearby, facets) and by the two surfaces that duplicate the camera
+  predicate inline — `getPublicPhoto` (GET /api/photos/[id]) and
+  `setConfirmation` (PUT /api/cameras/[id]/confirmation). New dedicated
+  suite `tests/demo-export-gate.test.mjs` (9 tests, real D1) plus
+  production/development cases added to the photos, confirmations,
+  freshness, state-transition and status-leak-boundary suites.
 
 ### Security
 
