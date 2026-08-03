@@ -139,7 +139,7 @@ test("account: renders profile, trust-level badge and the contributions list", a
   installFetchMock(routeHandler());
 
   await renderWithLocale(React.createElement(AccountPage));
-  await waitFor(() => assert.ok(screen.queryByText("Fixture Contributor")));
+  await waitFor(() => assert.ok(screen.queryAllByText("Fixture Contributor").length >= 1));
 
   assert.equal(screen.getByText("contributor@example.test").tagName, "DD");
   // LevelBadge: the frozen badge label + the textual progress line, no bar.
@@ -176,7 +176,7 @@ test("account: level badge at L4 omits the progress line (no next threshold)", a
   }));
 
   await renderWithLocale(React.createElement(AccountPage));
-  await waitFor(() => assert.ok(screen.queryByText("Fixture Contributor")));
+  await waitFor(() => assert.ok(screen.queryAllByText("Fixture Contributor").length >= 1));
 
   assert.ok(screen.getByText("Experienced contributor"));
   assert.equal(screen.queryByText(/verified contributions? to reach the next trust level/), null);
@@ -221,7 +221,7 @@ test("account: empty states — no contributions vs. filter without matches", as
   // No contributions at all.
   installFetchMock(routeHandler({ contributions: emptyContributionsFixture }));
   await renderWithLocale(React.createElement(AccountPage));
-  await waitFor(() => assert.ok(screen.queryByText("Fixture Contributor")));
+  await waitFor(() => assert.ok(screen.queryAllByText("Fixture Contributor").length >= 1));
   // The empty state renders after the contributions fetch resolves (second
   // effect cycle), so wait for it.
   await waitFor(() => assert.ok(screen.queryByText("No contributions yet")));
@@ -302,7 +302,7 @@ test("account: contributions error renders the honest alert, list is not blanked
   });
 
   await renderWithLocale(React.createElement(AccountPage));
-  await waitFor(() => assert.ok(screen.queryByText("Fixture Contributor")));
+  await waitFor(() => assert.ok(screen.queryAllByText("Fixture Contributor").length >= 1));
   // The error alert renders after the contributions fetch rejects (second
   // effect cycle), so wait for it. jsdom computes an empty accessible name
   // for <p role="alert">, so assert presence + text content rather than
@@ -325,7 +325,7 @@ test("account: cancelling the delete confirm sends no DELETE", async () => {
   });
 
   await renderWithLocale(React.createElement(AccountPage));
-  await waitFor(() => assert.ok(screen.queryByText("Fixture Contributor")));
+  await waitFor(() => assert.ok(screen.queryAllByText("Fixture Contributor").length >= 1));
   await user.click(screen.getByRole("button", { name: "Delete account" }));
 
   // The accessible alertdialog opens; cancelling must send no DELETE.
@@ -359,7 +359,7 @@ test("account: confirming erasure DELETEs /api/auth/account with CSRF and shows 
   document.cookie = "osdb_csrf=fixture-csrf-token; path=/";
 
   await renderWithLocale(React.createElement(AccountPage));
-  await waitFor(() => assert.ok(screen.queryByText("Fixture Contributor")));
+  await waitFor(() => assert.ok(screen.queryAllByText("Fixture Contributor").length >= 1));
   await user.click(screen.getByRole("button", { name: "Delete account" }));
   const dialog = await screen.findByRole("alertdialog");
   await user.click(within(dialog).getByRole("button", { name: "Delete account" }));
@@ -390,7 +390,7 @@ test("account: display name inline edit — save PATCHes /api/auth/me with CSRF 
   document.cookie = "osdb_csrf=fixture-csrf-token; path=/";
 
   await renderWithLocale(React.createElement(AccountPage));
-  await waitFor(() => assert.ok(screen.queryByText("Fixture Contributor")));
+  await waitFor(() => assert.ok(screen.queryAllByText("Fixture Contributor").length >= 1));
 
   await user.click(screen.getByRole("button", { name: "Edit display name" }));
   const input = screen.getByLabelText(/display name/i);
@@ -416,7 +416,7 @@ test("account: display name inline edit — invalid 1-char name marks aria-inval
   });
 
   await renderWithLocale(React.createElement(AccountPage));
-  await waitFor(() => assert.ok(screen.queryByText("Fixture Contributor")));
+  await waitFor(() => assert.ok(screen.queryAllByText("Fixture Contributor").length >= 1));
 
   await user.click(screen.getByRole("button", { name: "Edit display name" }));
   const input = screen.getByLabelText(/display name/i);
@@ -441,7 +441,7 @@ test("account: display name inline edit — 429 maps to the localized rate-limit
   });
 
   await renderWithLocale(React.createElement(AccountPage));
-  await waitFor(() => assert.ok(screen.queryByText("Fixture Contributor")));
+  await waitFor(() => assert.ok(screen.queryAllByText("Fixture Contributor").length >= 1));
 
   await user.click(screen.getByRole("button", { name: "Edit display name" }));
   const input = screen.getByLabelText(/display name/i);
@@ -456,15 +456,19 @@ test("account: display name inline edit — 429 maps to the localized rate-limit
 });
 
 test("account: 401 from the profile endpoint renders the not-logged-in state", async () => {
-  const { screen, waitFor } = rtl;
+  const { screen, waitFor, within } = rtl;
   installFetchMock(routeHandler({ me: null }));
 
   await renderWithLocale(React.createElement(AccountPage));
   await waitFor(() => assert.ok(screen.queryByText("Not logged in")));
   assert.ok(screen.getByText("Log in to see your profile and your attributed reports."));
-  // Both auth entry points are offered.
-  assert.ok(screen.getByRole("link", { name: "Log in" }));
-  assert.ok(screen.getByRole("link", { name: "Create account" }));
+  // Both auth entry points are offered in the not-logged-in CARD. The
+  // header (PublicNav -> AuthNavLinks, t_96f0d374) renders the same pair
+  // on the anonymous state, so scope to the card to pin the card contract.
+  const card = document.querySelector("article.auth-card");
+  assert.ok(card, "the not-logged-in card must render");
+  assert.ok(within(card).getByRole("link", { name: "Log in" }));
+  assert.ok(within(card).getByRole("link", { name: "Create account" }));
 });
 
 test("account: enrolled passkeys render with a remove action; empty state is honest", async () => {
@@ -523,7 +527,7 @@ test("account: enrolling a passkey runs begin -> create -> complete and shows th
   document.cookie = "osdb_csrf=fixture-csrf-token; path=/";
 
   await renderWithLocale(React.createElement(AccountPage));
-  await waitFor(() => assert.ok(screen.queryByText("Fixture Contributor")));
+  await waitFor(() => assert.ok(screen.queryAllByText("Fixture Contributor").length >= 1));
   await user.click(screen.getByRole("button", { name: "Add passkey" }));
 
   // The once-only recovery codes land in the accessible alertdialog.
@@ -570,7 +574,7 @@ test("account: enrolling a passkey in a browser without WebAuthn shows an explan
   document.cookie = "osdb_csrf=fixture-csrf-token; path=/";
 
   await renderWithLocale(React.createElement(AccountPage));
-  await waitFor(() => assert.ok(screen.queryByText("Fixture Contributor")));
+  await waitFor(() => assert.ok(screen.queryAllByText("Fixture Contributor").length >= 1));
   await user.click(screen.getByRole("button", { name: "Add passkey" }));
 
   // Explanatory alert, no crash, no ceremony fetch: the guard runs before
@@ -686,7 +690,7 @@ test("account: a 409 on enroll completion shows the already-enrolled error, no r
   document.cookie = "osdb_csrf=fixture-csrf-token; path=/";
 
   await renderWithLocale(React.createElement(AccountPage));
-  await waitFor(() => assert.ok(screen.queryByText("Fixture Contributor")));
+  await waitFor(() => assert.ok(screen.queryAllByText("Fixture Contributor").length >= 1));
   await user.click(screen.getByRole("button", { name: "Add passkey" }));
 
   await waitFor(() => assert.ok(screen.getByRole("alert")));
@@ -712,7 +716,7 @@ test("account: a 403 on enroll begin (expired CSRF) shows the actionable securit
   document.cookie = "osdb_csrf=stale-csrf-token; path=/";
 
   await renderWithLocale(React.createElement(AccountPage));
-  await waitFor(() => assert.ok(screen.queryByText("Fixture Contributor")));
+  await waitFor(() => assert.ok(screen.queryAllByText("Fixture Contributor").length >= 1));
   await user.click(screen.getByRole("button", { name: "Add passkey" }));
 
   await waitFor(() => assert.ok(screen.getByRole("alert")));
@@ -773,7 +777,7 @@ test("account: a verified contributor sees the done line instead of the banner",
   });
 
   await renderWithLocale(React.createElement(AccountPage));
-  await waitFor(() => assert.ok(screen.queryByText("Fixture Contributor")));
+  await waitFor(() => assert.ok(screen.queryAllByText("Fixture Contributor").length >= 1));
   assert.ok(screen.getByText("Email verified — you can contribute."));
   assert.equal(screen.queryByRole("heading", { name: "Verify your email to contribute" }), null);
 });
