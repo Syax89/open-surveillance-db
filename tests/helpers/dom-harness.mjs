@@ -59,6 +59,13 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 const PAGES = [
   { source: "app/login/page.tsx", relative: "app/login/page.mjs" },
   { source: "app/register/page.tsx", relative: "app/register/page.mjs" },
+  // P1-1/P1-3 (Vera design): the auth-ux pages are loaded as their client
+  // BODY components (like /account) — the page.tsx shells import
+  // getServerMessages (next/headers), which the DOM harness stubs cannot
+  // resolve; the shells are covered by pages-render.test.mjs instead.
+  { source: "app/verify-email/VerifyEmailBody.tsx", relative: "app/verify-email/VerifyEmailBody.mjs" },
+  { source: "app/forgot-password/ForgotPasswordBody.tsx", relative: "app/forgot-password/ForgotPasswordBody.mjs" },
+  { source: "app/reset-password/ResetPasswordBody.tsx", relative: "app/reset-password/ResetPasswordBody.mjs" },
   { source: "app/account/AccountPageBody.tsx", relative: "app/account/AccountPageBody.mjs" },
   { source: "app/records/[id]/RecordPageBody.tsx", relative: "app/records/[id]/RecordPageBody.mjs" },
   { source: "app/records/[id]/edit/page.tsx", relative: "app/records/[id]/edit/page.mjs" },
@@ -77,6 +84,9 @@ const PAGES = [
   { source: "app/components/tools/DirectoryTool.tsx", relative: "app/components/tools/DirectoryTool.mjs" },
   { source: "app/components/tools/SegnalaTool.tsx", relative: "app/components/tools/SegnalaTool.mjs" },
   { source: "app/components/tools/CorreggiTool.tsx", relative: "app/components/tools/CorreggiTool.mjs" },
+  // P1-2 (Vera design): the write-tool login wall gates the /segnala and
+  // /correggi forms behind the verified-contributor session check.
+  { source: "app/components/WriteGateWall.tsx", relative: "app/components/WriteGateWall.mjs" },
 ];
 
 const transpile = (sourcePath) =>

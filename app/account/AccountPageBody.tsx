@@ -39,6 +39,7 @@ type Contributor = {
   id: number;
   email: string;
   displayName: string | null;
+  emailVerifiedAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -146,6 +147,34 @@ export default function AccountPageBody() {
   const [confirmRemove, setConfirmRemove] = useState<Passkey | null>(null);
   const [removingId, setRemovingId] = useState<number | null>(null);
   const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null);
+
+  // Email-verification banner (P1-1 Vera design): the profile read exposes
+  // contributor.emailVerifiedAt; when it is null the page explains the write
+  // gate (Fase E1) and offers a resend. Same session contract as the
+  // /verify-email page: POST /api/auth/verify-email/resend.
+  const [resendingVerification, setResendingVerification] = useState(false);
+  const [verificationMessage, setVerificationMessage] = useState<string | null>(null);
+
+  async function onResendVerification() {
+    setResendingVerification(true);
+    setVerificationMessage(null);
+    try {
+      const response = await fetch("/api/auth/verify-email/resend", { method: "POST" });
+      if (response.ok) {
+        setVerificationMessage(t.verifyBannerResent);
+        return;
+      }
+      if (response.status === 429) {
+        setVerificationMessage(t.verifyResendRateLimited);
+        return;
+      }
+      setVerificationMessage(t.verifyResendError);
+    } catch {
+      setVerificationMessage(t.verifyResendError);
+    } finally {
+      setResendingVerification(false);
+    }
+  }
 
   const loadProfile = useCallback(() => {
     const controller = new AbortController();
@@ -565,6 +594,25 @@ export default function AccountPageBody() {
                 />
               ) : null}
             </section>
+
+            {/* Email-verification banner (P1-1 Vera design): until
+                emailVerifiedAt is set the write gate (Fase E1) refuses every
+                public write, so the account page must say so and offer the
+                resend — the register→verify→write flow was a dead end. */}
+            {!contributor.emailVerifiedAt ? (
+              <section className="verify-banner" aria-labelledby="verify-banner-title">
+                <h2 id="verify-banner-title">{t.verifyBannerTitle}</h2>
+                <p className="record-detail-summary">{t.verifyBannerBody}</p>
+                <p className="auth-switch">
+                  <button className="button detail-outline" type="button" onClick={() => void onResendVerification()} disabled={resendingVerification}>
+                    {resendingVerification ? t.loading : t.verifyBannerResend}
+                  </button>
+                </p>
+                {verificationMessage ? <p className="auth-error" role="alert">{verificationMessage}</p> : null}
+              </section>
+            ) : (
+              <p className="verify-banner-done" role="status">{t.verifyBannerDone}</p>
+            )}
 
             <section aria-labelledby="contributions-title">
               <h2 id="contributions-title">{community.yourContributions}</h2>

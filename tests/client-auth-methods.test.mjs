@@ -107,9 +107,11 @@ test("login: OIDC providers link to the /start routes and declare the privacy ri
   await user.click(screen.getByRole("radio", { name: "Social sign-in" }));
 
   const github = screen.getByRole("link", { name: "Continue with GitHub" });
-  assert.equal(github.getAttribute("href"), "/api/auth/oidc/github/start?redirect_to=/account");
+  // P1-2: the redirect target is built with encodeURIComponent (returnTo or
+  // the /account default); the /start route decodes it via searchParams.
+  assert.equal(github.getAttribute("href"), "/api/auth/oidc/github/start?redirect_to=%2Faccount");
   const google = screen.getByRole("link", { name: "Continue with Google" });
-  assert.equal(google.getAttribute("href"), "/api/auth/oidc/google/start?redirect_to=/account");
+  assert.equal(google.getAttribute("href"), "/api/auth/oidc/google/start?redirect_to=%2Faccount");
 
   // Fase D disclosure (AUTH_OPTIONS.md §4a): the provider tracking surface
   // and the EU-US transfer are declared here, with a link to the notice.
@@ -278,4 +280,77 @@ test("login: ?oidc_error=1 announces the provider failure", async () => {
 
   await loginForm();
   assert.match(screen.getByRole("alert").textContent ?? "", /Social sign-in failed or was cancelled/i);
+});
+
+// ---------------------------------------------------------------------------
+// P1-3 + P1-4 (Vera design): forgot-password entry + per-method risk matrix
+// ---------------------------------------------------------------------------
+
+test("login: the password panel links 'Forgot password?' to /forgot-password", async () => {
+  const { screen } = rtl;
+  await loginForm();
+  const forgot = screen.getByRole("link", { name: "Forgot password?" });
+  assert.equal(forgot.getAttribute("href"), "/forgot-password");
+});
+
+test("login: every method declares its own risk disclosure (P1-4 risk matrix)", async () => {
+  const { screen } = rtl;
+  const user = rtl.userEvent.setup();
+  await loginForm();
+
+  // Password method: PII + phishing surface, in the same disclosure box the
+  // OIDC panel uses (the risk matrix is per-method, ADR 0020 d.6).
+  assert.ok(
+    screen.getByText((_, element) => element?.classList?.contains("auth-method-disclosure") ?? false),
+    "the password panel carries a disclosure box",
+  );
+
+  await user.click(screen.getByRole("radio", { name: "Passkey" }));
+  const passkeyDisclosure = screen.getByText((_, element) => element?.classList?.contains("auth-method-disclosure") ?? false);
+  // The old hint claimed "Nothing leaves your device" — false for synced
+  // passkeys; the disclosure must name the sync vendor surface honestly.
+  assert.match(passkeyDisclosure.textContent ?? "", /synced/i);
+  assert.match(passkeyDisclosure.textContent ?? "", /vendor/i);
+  assert.doesNotMatch(passkeyDisclosure.textContent ?? "", /Nothing leaves your device/i);
+
+  await user.click(screen.getByRole("radio", { name: "Social sign-in" }));
+  // OIDC keeps its own (pre-existing) disclosure; the risk matrix now has
+  // all three methods covered.
+  assert.ok(screen.getByText((_, element) => element?.classList?.contains("oidc-disclosure") ?? false));
+});
+
+test("login: ?returnTo= redirects back to the tool after a successful password login", async () => {
+  const { screen, waitFor } = rtl;
+  const user = rtl.userEvent.setup();
+  installFetchMock((input) => {
+    if (String(input) === "/api/auth/login") return jsonResponse({ contributor: { id: 1 } });
+    return jsonResponse({ error: "unexpected route" }, { status: 404 });
+  });
+  await setNavState({ url: "/login?returnTo=%2Fsegnala", pushed: [] });
+
+  await loginForm();
+  await user.type(screen.getByLabelText("Email"), "contributor@example.test");
+  await user.type(screen.getByLabelText(/^Password/), "correct-horse-battery");
+  await user.click(screen.getByRole("button", { name: "Log in" }));
+
+  const nav = await getNavState();
+  await waitFor(() => assert.deepEqual(nav.pushed, ["/segnala"]));
+});
+
+test("login: ?returnTo= is ignored for off-site targets (same-site only)", async () => {
+  const { screen, waitFor } = rtl;
+  const user = rtl.userEvent.setup();
+  installFetchMock((input) => {
+    if (String(input) === "/api/auth/login") return jsonResponse({ contributor: { id: 1 } });
+    return jsonResponse({ error: "unexpected route" }, { status: 404 });
+  });
+  await setNavState({ url: "/login?returnTo=https%3A%2F%2Fevil.example%2Fsteal", pushed: [] });
+
+  await loginForm();
+  await user.type(screen.getByLabelText("Email"), "contributor@example.test");
+  await user.type(screen.getByLabelText(/^Password/), "correct-horse-battery");
+  await user.click(screen.getByRole("button", { name: "Log in" }));
+
+  const nav = await getNavState();
+  await waitFor(() => assert.deepEqual(nav.pushed, ["/account"]), "off-site returnTo must fall back to /account");
 });

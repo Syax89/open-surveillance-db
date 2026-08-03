@@ -62,7 +62,27 @@ before(async () => {
   // Default fetch mock: the API answers with an empty public list, so the
   // tools keep their prototype seed (same as a healthy-but-empty DB) and no
   // test ever trips an unhandled ReferenceError on a missing fetch.
-  installFetchMock(() => jsonResponse({ records: [], total: 0, nextOffset: null }));
+  // P1-2 (Vera design): the write tools are gated by WriteGateWall, which
+  // checks /api/auth/me on mount — the default mock answers a VERIFIED
+  // contributor so the form tests exercise the form, not the wall (the wall
+  // states get their own dedicated tests below).
+  installFetchMock((input) => {
+    const url = String(input);
+    if (url === "/api/auth/me") {
+      return jsonResponse({
+        contributor: {
+          id: 1,
+          email: "contributor@example.test",
+          displayName: "Fixture Contributor",
+          emailVerifiedAt: "2026-01-15T10:00:00.000Z",
+          createdAt: "2026-01-15T10:00:00.000Z",
+          updatedAt: "2026-01-15T10:00:00.000Z",
+        },
+        level: { level: 1, verifiedCount: 1, threshold: 1, nextThreshold: 5 },
+      });
+    }
+    return jsonResponse({ records: [], total: 0, nextOffset: null });
+  });
 });
 
 afterEach(async () => {
@@ -79,6 +99,28 @@ afterEach(async () => {
   // async (module load), and skipping the await lets the next test race
   // the bounds restore under a slow/instrumented runner (coverage).
   await resetLeafletMarkers();
+  // Restore the default verified-session fetch mock (P1-2): per-test mocks
+  // (installRecordsMock/installEmptyMock/geocode…) replace the `before()`
+  // default and are NOT restored automatically — without this a later
+  // SegnalaTool/CorreggiTool test would see the previous test's records-only
+  // mock and the WriteGateWall would render the wall instead of the form.
+  installFetchMock((input) => {
+    const url = String(input);
+    if (url === "/api/auth/me") {
+      return jsonResponse({
+        contributor: {
+          id: 1,
+          email: "contributor@example.test",
+          displayName: "Fixture Contributor",
+          emailVerifiedAt: "2026-01-15T10:00:00.000Z",
+          createdAt: "2026-01-15T10:00:00.000Z",
+          updatedAt: "2026-01-15T10:00:00.000Z",
+        },
+        level: { level: 1, verifiedCount: 1, threshold: 1, nextThreshold: 5 },
+      });
+    }
+    return jsonResponse({ records: [], total: 0, nextOffset: null });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -258,6 +300,30 @@ const POPUP_RECORDS = [
 ];
 const installRecordsMock = () => installFetchMock(() => jsonResponse(fakeCamerasPayload(POPUP_RECORDS)));
 const installEmptyMock = () => installFetchMock(() => jsonResponse({ records: [], total: 0, nextOffset: null }));
+
+/**
+ * P1-2 (Vera design): per-test fetch mocks for the SegnalaTool form tests
+ * must answer /api/auth/me with a VERIFIED contributor (the WriteGateWall
+ * gates the form on that check); anything else falls through to the given
+ * handler. Without this the wall would see the records payload as an
+ * unverified session and render the wall instead of the form.
+ */
+const installSegnalaMock = (handler) => installFetchMock((input, init) => {
+  if (String(input) === "/api/auth/me") {
+    return jsonResponse({
+      contributor: {
+        id: 1,
+        email: "contributor@example.test",
+        displayName: "Fixture Contributor",
+        emailVerifiedAt: "2026-01-15T10:00:00.000Z",
+        createdAt: "2026-01-15T10:00:00.000Z",
+        updatedAt: "2026-01-15T10:00:00.000Z",
+      },
+      level: { level: 1, verifiedCount: 1, threshold: 1, nextThreshold: 5 },
+    });
+  }
+  return handler(input, init);
+});
 
 test("MappaTool marker popup carries record info and the correction/detail links", async () => {
   installRecordsMock();
@@ -702,7 +768,9 @@ test("SegnalaTool renders the report form with the report bundle", async () => {
   await renderWithLocale(React.createElement(SegnalaTool));
 
   assert.ok(screen.getByRole("heading", { name: "Report a camera" }), "report pageTitle heading");
-  assert.ok(screen.getByLabelText("Record title"), "title field");
+  // P1-2: the WriteGateWall gates the form on the verified-session check —
+  // wait for the /api/auth/me fetch to resolve before asserting the fields.
+  assert.ok(await screen.findByLabelText("Record title"), "title field");
   assert.ok(screen.getByLabelText("Camera type"), "kind select");
   assert.ok(screen.getByRole("checkbox"), "privacy/safety consent checkbox");
   assert.ok(screen.getByRole("button", { name: /Send to moderation/ }), "submit button");
@@ -715,6 +783,7 @@ test("SegnalaTool refuses a submit without a position with a guidance notice", a
 
   // Fill the required fields so the submit event fires (jsdom constraint
   // validation), then submit without any coordinates.
+  await screen.findByLabelText("Record title");
   await user.type(screen.getByLabelText("Record title"), "Fixture public camera");
   await user.selectOptions(screen.getByLabelText("Camera type"), "Fixed dome");
   await user.click(screen.getByRole("checkbox"));
@@ -731,7 +800,7 @@ test("SegnalaTool manual coordinates + full submit reach the moderation API", as
   const { screen } = rtl;
   const user = rtl.userEvent.setup();
   const calls = [];
-  installFetchMock(async (input, init) => {
+  installSegnalaMock(async (input, init) => {
     const url = String(input);
     calls.push(`${init?.method ?? "GET"} ${url}`);
     if (url.startsWith("/api/cameras/nearby")) return jsonResponse({ records: [] });
@@ -741,6 +810,7 @@ test("SegnalaTool manual coordinates + full submit reach the moderation API", as
   await renderWithLocale(React.createElement(SegnalaTool));
 
   // Manual coordinates: the nearby check runs, the position is announced.
+  await screen.findByLabelText("Latitude");
   await user.type(screen.getByLabelText("Latitude"), "45.46420");
   await user.type(screen.getByLabelText("Longitude"), "9.19000");
   await user.click(screen.getByRole("button", { name: /Use these coordinates/ }));
@@ -762,7 +832,7 @@ test("SegnalaTool requires an explicit duplicate confirmation after a 409 gate",
   const { screen } = rtl;
   const user = rtl.userEvent.setup();
   const postedBodies = [];
-  installFetchMock(async (input, init) => {
+  installSegnalaMock(async (input, init) => {
     const url = String(input);
     if (url.startsWith("/api/cameras/nearby")) return jsonResponse({ records: [] });
     if (url === "/api/cameras" && init?.method === "POST") {
@@ -786,6 +856,7 @@ test("SegnalaTool requires an explicit duplicate confirmation after a 409 gate",
   await renderWithLocale(React.createElement(SegnalaTool));
 
   // Fill the report like the plain-submit test.
+  await screen.findByLabelText("Latitude");
   await user.type(screen.getByLabelText("Latitude"), "45.46420");
   await user.type(screen.getByLabelText("Longitude"), "9.19000");
   await user.click(screen.getByRole("button", { name: /Use these coordinates/ }));
@@ -814,7 +885,7 @@ test("SegnalaTool refuses to resubmit an unconfirmed duplicate via implicit form
   const { screen } = rtl;
   const user = rtl.userEvent.setup();
   let postCount = 0;
-  installFetchMock(async (input, init) => {
+  installSegnalaMock(async (input, init) => {
     const url = String(input);
     if (url.startsWith("/api/cameras/nearby")) return jsonResponse({ records: [] });
     if (url === "/api/cameras" && init?.method === "POST") {
@@ -836,6 +907,7 @@ test("SegnalaTool refuses to resubmit an unconfirmed duplicate via implicit form
   });
   await renderWithLocale(React.createElement(SegnalaTool));
 
+  await screen.findByLabelText("Latitude");
   await user.type(screen.getByLabelText("Latitude"), "45.46420");
   await user.type(screen.getByLabelText("Longitude"), "9.19000");
   await user.click(screen.getByRole("button", { name: /Use these coordinates/ }));
@@ -862,7 +934,8 @@ test("CorreggiTool renders the correction form with the correction bundle", asyn
   await renderWithLocale(React.createElement(CorreggiTool));
 
   assert.ok(screen.getByRole("heading", { name: "Correct a record" }), "correction pageTitle heading");
-  assert.ok(screen.getByLabelText("Related public record"), "related record select");
+  // P1-2: wait for the verified-session gate before asserting the form.
+  assert.ok(await screen.findByLabelText("Related public record"), "related record select");
   assert.ok(screen.getByRole("button", { name: /Send private request/ }), "submit button");
 });
 
@@ -871,6 +944,9 @@ test("CorreggiTool ?record=ID pre-selects the related record and announces it", 
   const { screen } = rtl;
   await renderWithLocale(React.createElement(CorreggiTool));
 
+  // P1-2: the verified-session gate resolves before the form (and its
+  // pre-selection announcement) renders.
+  await screen.findByLabelText("Related public record");
   assert.equal(screen.getByLabelText("Related public record").value, "1", "the select is pre-selected");
   assert.match(
     screen.getByRole("status").textContent,
@@ -884,6 +960,7 @@ test("CorreggiTool ignores an invalid ?record= value (no prefill, no announcemen
   const { screen } = rtl;
   await renderWithLocale(React.createElement(CorreggiTool));
 
+  await screen.findByLabelText("Related public record");
   assert.equal(screen.getByLabelText("Related public record").value, "", "no preselection for a non-numeric id");
   assert.ok(!screen.queryByRole("status"), "no announcement when nothing was pre-selected");
 });
@@ -893,6 +970,7 @@ test("CorreggiTool ignores an unknown ?record= id (no prefill, no announcement)"
   const { screen } = rtl;
   await renderWithLocale(React.createElement(CorreggiTool));
 
+  await screen.findByLabelText("Related public record");
   assert.equal(screen.getByLabelText("Related public record").value, "", "no preselection for an unknown id");
   assert.ok(!screen.queryByRole("status"), "no announcement when nothing was pre-selected");
 });
@@ -923,4 +1001,97 @@ test("ErrorPage sets a page-specific document.title for 404 and 500 (WCAG 2.4.2)
     "Something went wrong — OpenSurveillanceDB",
     "the 500 page owns its <title> (EN bundle)",
   );
+});
+
+// ---------------------------------------------------------------------------
+// P1-2 (Vera design) — WriteGateWall on the write tools
+// ---------------------------------------------------------------------------
+
+test("SegnalaTool shows the login wall for an anonymous visitor (no form, returnTo)", async () => {
+  const { screen, waitFor } = rtl;
+  installFetchMock((input) => {
+    if (String(input) === "/api/auth/me") return jsonResponse({ error: "Not authenticated." }, { status: 401 });
+    return jsonResponse({ records: [], total: 0, nextOffset: null });
+  });
+  await renderWithLocale(React.createElement(SegnalaTool));
+
+  // The wall replaces the form for anonymous visitors: no title/consent
+  // fields, bilingual CTA with the returnTo deep link back to /segnala.
+  await waitFor(() => assert.ok(screen.getByRole("heading", { name: "Log in to contribute" })));
+  assert.equal(screen.queryByLabelText("Record title"), null, "no form for an anonymous visitor");
+  const login = screen.getByRole("link", { name: "Log in" });
+  assert.equal(login.getAttribute("href"), "/login?returnTo=%2Fsegnala", "login CTA carries the returnTo");
+  assert.ok(screen.getByRole("link", { name: "Create an account" }));
+});
+
+test("CorreggiTool shows the login wall for an anonymous visitor (no form, returnTo)", async () => {
+  const { screen, waitFor } = rtl;
+  installFetchMock((input) => {
+    if (String(input) === "/api/auth/me") return jsonResponse({ error: "Not authenticated." }, { status: 401 });
+    return jsonResponse({ records: [], total: 0, nextOffset: null });
+  });
+  await renderWithLocale(React.createElement(CorreggiTool));
+
+  await waitFor(() => assert.ok(screen.getByRole("heading", { name: "Log in to contribute" })));
+  assert.equal(screen.queryByLabelText("Related public record"), null, "no form for an anonymous visitor");
+  const login = screen.getByRole("link", { name: "Log in" });
+  assert.equal(login.getAttribute("href"), "/login?returnTo=%2Fcorreggi", "login CTA carries the returnTo");
+});
+
+test("SegnalaTool shows the verify-email wall for an unverified session (resend action)", async () => {
+  const { screen, waitFor } = rtl;
+  const user = rtl.userEvent.setup();
+  const requests = [];
+  installFetchMock((input, init) => {
+    const url = String(input);
+    requests.push({ url, method: init?.method ?? "GET" });
+    if (url === "/api/auth/me") {
+      // Live session, contributor NOT verified (emailVerifiedAt null).
+      return jsonResponse({
+        contributor: {
+          id: 1,
+          email: "contributor@example.test",
+          displayName: "Fixture Contributor",
+          emailVerifiedAt: null,
+          createdAt: "2026-01-15T10:00:00.000Z",
+          updatedAt: "2026-01-15T10:00:00.000Z",
+        },
+        level: { level: 0, verifiedCount: 0, threshold: 0, nextThreshold: 1 },
+      });
+    }
+    if (url === "/api/auth/verify-email/resend" && init?.method === "POST") return jsonResponse({ sent: true });
+    return jsonResponse({ records: [], total: 0, nextOffset: null });
+  });
+  await renderWithLocale(React.createElement(SegnalaTool));
+
+  await waitFor(() => assert.ok(screen.getByRole("heading", { name: "Verify your email to contribute" })));
+  assert.equal(screen.queryByLabelText("Record title"), null, "no form for an unverified session");
+
+  await user.click(screen.getByRole("button", { name: "Resend verification email" }));
+  await waitFor(() => assert.ok(requests.some((r) => r.url === "/api/auth/verify-email/resend" && r.method === "POST")));
+  assert.ok(screen.getByText("Verification email sent."), "the resend confirmation is announced");
+});
+
+test("WriteGateWall renders children for a verified contributor (wall never shows)", async () => {
+  const { screen, waitFor } = rtl;
+  installFetchMock((input) => {
+    if (String(input) === "/api/auth/me") {
+      return jsonResponse({
+        contributor: {
+          id: 1,
+          email: "contributor@example.test",
+          displayName: "Fixture Contributor",
+          emailVerifiedAt: "2026-01-15T10:00:00.000Z",
+          createdAt: "2026-01-15T10:00:00.000Z",
+          updatedAt: "2026-01-15T10:00:00.000Z",
+        },
+        level: { level: 1, verifiedCount: 1, threshold: 1, nextThreshold: 5 },
+      });
+    }
+    return jsonResponse({ records: [], total: 0, nextOffset: null });
+  });
+  await renderWithLocale(React.createElement(SegnalaTool));
+
+  await waitFor(() => assert.ok(screen.getByLabelText("Record title")));
+  assert.equal(screen.queryByRole("heading", { name: "Log in to contribute" }), null, "no wall for a verified contributor");
 });

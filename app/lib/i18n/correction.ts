@@ -52,6 +52,13 @@ export const en = {
   correctionSaved: "Private correction request saved with reference",
   correctionPrivate: "It is not displayed in the public directory.",
   correctionUnavailable: "The correction queue is unavailable. Please try again later.",
+  // P1-2 (Vera design): the write gate answers 401 (no session) and 403
+  // (unverified email) with a single canonical body; these map the mid-form
+  // session death to localized guidance instead of the raw server string.
+  loginRequired:
+    "Your session has ended. Log in again to send the correction.",
+  verifyRequired:
+    "Your email is not verified yet. Verify it from your account page to send the correction.",
   // ?record=ID prefill announcement (aria-live).
   recordPreselected: (recordId: number, title: string) =>
     `Record ${recordId} preselected: ${title}. Describe the issue below.`,
@@ -99,6 +106,14 @@ export const it: Translation<typeof en> = {
   correctionSaved: "Richiesta privata di correzione salvata con riferimento",
   correctionPrivate: "Non viene mostrata nell'elenco pubblico.",
   correctionUnavailable: "La coda delle correzioni non è disponibile. Riprova più tardi.",
+  // P1-2 (design Vera): il write gate risponde 401 (nessuna sessione) e 403
+  // (email non verificata) con un body canonico unico; questi mappano la
+  // sessione scaduta a metà modulo in indicazioni localizzate invece della
+  // stringa grezza del server.
+  loginRequired:
+    "La sessione è terminata. Accedi di nuovo per inviare la correzione.",
+  verifyRequired:
+    "La tua email non è ancora verificata. Verificala dalla pagina del tuo account per inviare la correzione.",
   // Annuncio precompilazione ?record=ID (aria-live).
   recordPreselected: (recordId: number, title: string) =>
     `Record ${recordId} preselezionato: ${title}. Descrivi il problema qui sotto.`,
