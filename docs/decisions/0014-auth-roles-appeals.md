@@ -72,12 +72,16 @@ against the new `users` table exactly like `app/chatgpt-auth.ts` documents.
    The worker edge Basic/Bearer gate (ADR 0003) stays as the transport-level
    login for the moderation dashboard; the route gate is the authorization
    layer and works for both identity headers.
-3. **Server-derived reviewer identity.** The moderation PATCH no longer trusts
-   a client-chosen `actorId`. A `moderator` acts as their own linked reviewer
-   (derived via `getReviewerByUserId`); an `admin` may still act as any
-   reviewer (the demo actor selector). A moderator with no reviewer profile is
-   rejected 403 before any write. This closes the ADR 0009 trade-off where the
-   actor was caller-supplied.
+3. **Server-derived reviewer identity.** The moderation PATCH never trusts a
+   client-chosen `actorId` in production: the acting reviewer is ALWAYS
+   derived server-side via `getReviewerByUserId` — a `moderator` acts as their
+   own linked reviewer, and an `admin` does the same (no impersonation, the
+   append-only audit trail stays attribution-exact). The demo actor selector
+   (admin may step in as any reviewer) survives ONLY behind the development
+   flag `ENVIRONMENT = "development"`; unset or any other value is treated as
+   production and the flag is fail-closed (audit finding t_6b61fc3f). A caller
+   with no reviewer profile is rejected 403 before any write. This closes the
+   ADR 0009 trade-off where the actor was caller-supplied.
 4. **Appeals (`moderation_appeals` + `/api/appeals`).** A contributor contests
    a *final* decision event (`previous_status != new_status`; intent events —
    recusals, escalations, second-review steps — cannot be appealed). One

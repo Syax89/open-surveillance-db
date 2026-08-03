@@ -335,6 +335,23 @@ changes accumulate under `[Unreleased]`.
 
 ### Fixed
 
+- Audit finding MEDIUM #2 (t_6b61fc3f, Ada): `PATCH /api/moderation` accepted
+  a client-supplied `actorId` for admin-role callers ("stepping in for the
+  demo actor selector"), letting an admin write moderation events as ANOTHER
+  reviewer and corrupt the append-only audit trail in production. The acting
+  reviewer is now ALWAYS derived server-side via `getReviewerByUserId` — an
+  admin acts as their own reviewer like any moderator. The demo actor
+  selector survives only behind the development flag `ENVIRONMENT =
+  "development"` (set locally via `.dev.vars`, gitignored; unset = production,
+  fail-closed; documented in worker-configuration.d.ts and ADR 0014 §3).
+  Client actorId values outside that dev-only path are ignored, never
+  honoured. Tests: new actor-identity suite in `tests/api-moderation.test.mjs`
+  (admin in production ignores the spoofed id; admin in development keeps the
+  demo selector; moderator in development still server-derived; no-reviewer
+  profile 403) and `tests/auth-flow-e2e.test.mjs` rewritten — a spoofed
+  actorId with admin identity now fails the role matrix and the escalated
+  event lands on the server-derived reviewer, never the spoofed id.
+
 - P1-1 reset-password/request binary account-existence oracle (t_11b6a22d,
   Ada security review): the 3/h reset budget branch answered `429 Too many
   reset emails` ONLY for registered addresses, while unknown addresses always
