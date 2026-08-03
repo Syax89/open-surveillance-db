@@ -25,9 +25,11 @@ import { sendPasswordResetEmail } from "../../../../lib/mailer";
  * the same request path and cost the same response.
  *
  * Budget: 3 reset emails per hour per CONTRIBUTOR (reset purpose has its
- * own budget, independent from the verify budget). An attacker hammering
- * one known address hits 429 after the 3rd email; the per-IP `auth` bucket
- * bounds requests to unknown addresses.
+ * own budget, independent from the verify budget). Past the budget the
+ * route keeps answering the generic 200 `{ sent: true }` WITHOUT minting a
+ * token or sending mail — a 429 here would be reachable only for registered
+ * addresses and turn the route into a binary existence oracle. The per-IP
+ * `auth` bucket bounds raw request volume regardless of the address.
  *
  * The link goes to the client-side reset page (Fase E2 UI), which calls
  * POST /api/auth/reset-password/confirm with the token + new password.
@@ -61,14 +63,12 @@ export async function POST(request: Request) {
     const since = new Date(Date.now() - VERIFICATION_SEND_WINDOW_MS).toISOString();
     const sent = await countVerificationTokensSentSince(contributor.id, "reset", since);
     if (sent >= VERIFICATION_SEND_LIMIT) {
-      const retryAfterSeconds = Math.max(
-        1,
-        Math.ceil((Date.parse(now) - Date.parse(since)) / 1000),
-      );
-      return Response.json(
-        { error: "Too many reset emails. Please try again later." },
-        { status: 429, headers: { ...NO_STORE_HEADERS, "Retry-After": String(retryAfterSeconds) } },
-      );
+      // Budget exhausted: still answer the generic success. A 429 here would
+      // be reachable only for registered addresses (unknown emails always get
+      // 200 { sent: true }), turning the route into a binary existence oracle.
+      // No token is minted and no mail is sent — the budget still caps real
+      // emails at VERIFICATION_SEND_LIMIT per window.
+      return ok();
     }
 
     const { rawToken } = await createVerificationToken(contributor.id, "reset", now);
