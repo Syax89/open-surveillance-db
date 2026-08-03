@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 import { searchPublicCamerasNearPage, SEARCH_PAGE_DEFAULT_LIMIT, SEARCH_PAGE_MAX_LIMIT } from "../../../../db/cameras";
 import { resolvePlace } from "../../../../db/geocode";
+import { resolveLocale } from "../../../lib/i18n/types";
 import { callerKey, checkRateLimit, searchLimits } from "../../../lib/rate-limit";
 import { MAX_PAGE_OFFSET } from "../../../lib/input-limits";
 import {
@@ -119,7 +120,9 @@ export async function GET(request: Request) {
     }, limit, offset);
   }
 
-  const language = url.searchParams.get("lang") === "it" ? "it" : "en";
+  // Registry-driven: the client's locale code selects the geocoder result
+  // language; unknown values fall back to the pilot (no it/en ternary).
+  const language = resolveLocale(url.searchParams.get("lang"));
   let place;
   try {
     place = await resolvePlace(query, { language });

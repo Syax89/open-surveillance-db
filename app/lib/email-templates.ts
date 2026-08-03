@@ -20,9 +20,18 @@
  * locale, so both languages ship in the same message — the recipient reads
  * the one they prefer. The subject line is EN (site primary language).
  *
+ * The bilingual copy is REGISTRY-DRIVEN: EMAIL_COPY is typed
+ * `Record<Locale, EmailCopy>`, so adding a language to SUPPORTED_LOCALES
+ * (app/lib/i18n/types.ts) forces a copy block for it here at `tsc` time,
+ * and the renderers automatically ship that language's block (with its
+ * BCP 47 `lang` attribute from the registry) in every message.
+ *
  * This module is PURE: no Cloudflare bindings, no DB — it renders strings
  * and can run in plain Node (route tests import it via loadLibModule).
  */
+
+import { SUPPORTED_LOCALES } from "./i18n/types";
+import type { Locale } from "./i18n/types";
 
 export type AuthEmailKind = "verify" | "reset";
 
@@ -45,7 +54,9 @@ export type RenderedAuthEmail = {
 
 const DEFAULT_SITE_NAME = "OpenSurveillanceDB";
 
-/** Escape user-controlled text for safe inclusion in HTML email body. */
+/**
+ * Escape user-controlled text for safe inclusion in HTML email body.
+ */
 export function escapeHtml(value: string): string {
   return value
     .replaceAll("&", "&amp;")
@@ -70,12 +81,147 @@ export function buildAuthActionUrl(kind: AuthEmailKind, rawToken: string, verify
   return `${base}${path}?token=${encodeURIComponent(rawToken)}`;
 }
 
-function greeting(displayName: string | null | undefined): string {
-  return displayName ? `Hi ${displayName},` : "Hi,";
+type Greeting = (displayName: string | null | undefined) => string;
+
+/** One kind's localized copy block (intro/button/ignore, see EMAIL_COPY). */
+type EmailBlockCopy = {
+  /**
+   * Intro paragraph. `{SITE}` is replaced with the (HTML-escaped) brand
+   * name; the duration phrase may carry <strong> markup, which the
+   * plain-text renderer strips (renderBilingualText).
+   */
+  intro: string;
+  /** Action button / plain-text link label. */
+  button: string;
+  /** "You can ignore this email" closing line; `{SITE}` supported. */
+  ignore: string;
+};
+
+/** Per-locale email copy. Every registered locale must have one (tsc). */
+type EmailCopy = {
+  greeting: Greeting;
+  /** Self-name of the language shown as the block divider ("— Italiano —"). */
+  divider: string;
+  /** Shared "if the button does not work" fallback line. */
+  buttonFallback: string;
+  verify: EmailBlockCopy;
+  reset: EmailBlockCopy;
+};
+
+/** Substitute the brand name placeholder in a copy string. */
+function fillSiteName(copy: string, siteName: string): string {
+  return copy.replaceAll("{SITE}", siteName);
 }
 
-function greetingIt(displayName: string | null | undefined): string {
-  return displayName ? `Ciao ${displayName},` : "Ciao,";
+/** Strip <strong>…</strong> markup for the plain-text body. */
+function stripStrong(value: string): string {
+  return value.replace(/<strong>(.*?)<\/strong>/g, "$1");
+}
+
+/**
+ * Bilingual copy per registered locale (ADR 0007 — both languages ship in
+ * every message). `Record<Locale, EmailCopy>` is the parity guarantee: a
+ * new SUPPORTED_LOCALES entry fails `tsc` until a copy block exists here.
+ */
+const EMAIL_COPY: Record<Locale, EmailCopy> = {
+  en: {
+    greeting: (displayName) => (displayName ? `Hi ${displayName},` : "Hi,"),
+    divider: "— English —",
+    buttonFallback: "If the button does not work, copy and paste this link into your browser:",
+    verify: {
+      intro:
+        "Please confirm that this email address belongs to you so you can start contributing to {SITE}. This link works for <strong>24 hours</strong> and can be used only once.",
+      button: "Verify email address",
+      ignore: "If you did not create an account on {SITE}, you can ignore this email.",
+    },
+    reset: {
+      intro:
+        "We received a request to reset the password for your {SITE} account. This link works for <strong>3 hours</strong> and can be used only once.",
+      button: "Reset password",
+      ignore: "If you did not request a password reset, you can ignore this email — your password stays unchanged.",
+    },
+  },
+  it: {
+    greeting: (displayName) => (displayName ? `Ciao ${displayName},` : "Ciao,"),
+    divider: "— Italiano —",
+    buttonFallback: "Se il pulsante non funziona, copia e incolla questo link nel browser:",
+    verify: {
+      intro:
+        "Conferma che questo indirizzo email ti appartiene per iniziare a contribuire a {SITE}. Il link è valido per <strong>24 ore</strong> e può essere usato una sola volta.",
+      button: "Verifica l'indirizzo email",
+      ignore: "Se non hai creato un account su {SITE}, puoi ignorare questa email.",
+    },
+    reset: {
+      intro:
+        "Abbiamo ricevuto una richiesta di reimpostazione della password per il tuo account {SITE}. Il link è valido per <strong>3 ore</strong> e può essere usato una sola volta.",
+      button: "Reimposta la password",
+      ignore: "Se non hai richiesto la reimpostazione della password, puoi ignorare questa email — la tua password resta invariata.",
+    },
+  },
+};
+
+const BUTTON_STYLE = "background-color:#0b705c;color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:6px;font-weight:bold;";
+const TEXT_LINK_STYLE = "color:#0b705c;";
+const HR_STYLE = "border:none;border-top:1px solid #e0e0e0;margin:24px 0;";
+const DIVIDER_STYLE = "color:#444444;";
+
+/** Render the HTML body for `kind`: every registered locale, pilot first. */
+function renderBilingualHtml(kind: AuthEmailKind, context: AuthEmailContext): string {
+  const siteName = context.siteName || DEFAULT_SITE_NAME;
+  const actionUrl = context.actionUrl;
+  const actionUrlEscaped = escapeHtml(actionUrl);
+  const name = context.displayName ?? null;
+
+  const block = (locale: (typeof SUPPORTED_LOCALES)[number], isPilot: boolean) => {
+    const copy = EMAIL_COPY[locale.code];
+    const lang = isPilot ? "" : ` lang="${locale.bcp47}"`;
+    const lines = [
+      `<p${lang}>${escapeHtml(copy.greeting(name))}</p>`,
+      // Escape the substituted brand name only: the template's own <strong>
+      // markup must survive (the plain-text renderer strips it later).
+      `<p${lang}>${fillSiteName(copy[kind].intro, escapeHtml(siteName))}</p>`,
+      `<p${lang} style="margin:24px 0;">\n    <a href="${actionUrlEscaped}" style="${BUTTON_STYLE}">${copy[kind].button}</a>\n  </p>`,
+      `<p${lang}>${copy.buttonFallback}</p>`,
+      `<p${lang}><a href="${actionUrlEscaped}" style="${TEXT_LINK_STYLE}">${actionUrlEscaped}</a></p>`,
+      `<p${lang}>${fillSiteName(copy[kind].ignore, escapeHtml(siteName))}</p>`,
+    ];
+    if (isPilot) return lines.join("\n  ");
+    return `<hr style="${HR_STYLE}" />\n  <p${lang} style="${DIVIDER_STYLE}">${copy.divider}</p>\n  ${lines.join("\n  ")}`;
+  };
+
+  const body = SUPPORTED_LOCALES.map((locale, index) => block(locale, index === 0)).join("\n  ");
+
+  return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.5;color:#1a1a1a;max-width:600px;margin:0 auto;">
+  ${body}
+  <hr style="${HR_STYLE}" />
+  <p style="color:#666666;font-size:13px;">${escapeHtml(siteName)} · ${escapeHtml(context.siteUrl)}</p>
+</div>`;
+}
+
+/** Render the plain-text body for `kind`: every registered locale, pilot first. */
+function renderBilingualText(kind: AuthEmailKind, context: AuthEmailContext): string {
+  const siteName = context.siteName || DEFAULT_SITE_NAME;
+  const actionUrl = context.actionUrl;
+  const name = context.displayName ?? null;
+
+  const block = (locale: (typeof SUPPORTED_LOCALES)[number], isPilot: boolean) => {
+    const copy = EMAIL_COPY[locale.code];
+    const lines = [
+      copy.greeting(name),
+      "",
+      stripStrong(fillSiteName(copy[kind].intro, siteName)),
+      "",
+      `${copy[kind].button}: ${actionUrl}`,
+      "",
+      fillSiteName(copy[kind].ignore, siteName),
+      "",
+    ];
+    return isPilot ? lines : [copy.divider, "", ...lines];
+  };
+
+  const parts = SUPPORTED_LOCALES.map((locale, index) => block(locale, index === 0)).flat();
+  parts.push(`${siteName} · ${context.siteUrl}`);
+  return parts.join("\n");
 }
 
 /**
@@ -85,118 +231,28 @@ function greetingIt(displayName: string | null | undefined): string {
  */
 export function renderVerificationEmail(context: AuthEmailContext): RenderedAuthEmail {
   const siteName = context.siteName || DEFAULT_SITE_NAME;
-  const actionUrl = context.actionUrl;
-  const actionUrlEscaped = escapeHtml(actionUrl);
-  const name = context.displayName ?? null;
-
-  const subject = `Verify your email · ${siteName}`;
-
-  const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.5;color:#1a1a1a;max-width:600px;margin:0 auto;">
-  <p>${escapeHtml(greeting(name))}</p>
-  <p>Please confirm that this email address belongs to you so you can start contributing to ${escapeHtml(siteName)}. This link works for <strong>24 hours</strong> and can be used only once.</p>
-  <p style="margin:24px 0;">
-    <a href="${actionUrlEscaped}" style="background-color:#0b705c;color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:6px;font-weight:bold;">Verify email address</a>
-  </p>
-  <p>If the button does not work, copy and paste this link into your browser:</p>
-  <p><a href="${actionUrlEscaped}" style="color:#0b705c;">${actionUrlEscaped}</a></p>
-  <p>If you did not create an account on ${escapeHtml(siteName)}, you can ignore this email.</p>
-  <hr style="border:none;border-top:1px solid #e0e0e0;margin:24px 0;" />
-  <p lang="it" style="color:#444444;">— Italiano —</p>
-  <p lang="it">${escapeHtml(greetingIt(name))}</p>
-  <p lang="it">Conferma che questo indirizzo email ti appartiene per iniziare a contribuire a ${escapeHtml(siteName)}. Il link è valido per <strong>24 ore</strong> e può essere usato una sola volta.</p>
-  <p lang="it" style="margin:24px 0;">
-    <a href="${actionUrlEscaped}" style="background-color:#0b705c;color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:6px;font-weight:bold;">Verifica l'indirizzo email</a>
-  </p>
-  <p lang="it">Se il pulsante non funziona, copia e incolla questo link nel browser:</p>
-  <p lang="it"><a href="${actionUrlEscaped}" style="color:#0b705c;">${actionUrlEscaped}</a></p>
-  <p lang="it">Se non hai creato un account su ${escapeHtml(siteName)}, puoi ignorare questa email.</p>
-  <hr style="border:none;border-top:1px solid #e0e0e0;margin:24px 0;" />
-  <p style="color:#666666;font-size:13px;">${escapeHtml(siteName)} · ${escapeHtml(context.siteUrl)}</p>
-</div>`;
-
-  const text = [
-    greeting(name),
-    "",
-    `Please confirm that this email address belongs to you so you can start contributing to ${siteName}. This link works for 24 hours and can be used only once.`,
-    "",
-    `Verify email address: ${actionUrl}`,
-    "",
-    "If you did not create an account on " + siteName + ", you can ignore this email.",
-    "",
-    "— Italiano —",
-    "",
-    greetingIt(name),
-    `Conferma che questo indirizzo email ti appartiene per iniziare a contribuire a ${siteName}. Il link è valido per 24 ore e può essere usato una sola volta.`,
-    "",
-    `Verifica l'indirizzo email: ${actionUrl}`,
-    "",
-    "Se non hai creato un account su " + siteName + ", puoi ignorare questa email.",
-    "",
-    `${siteName} · ${context.siteUrl}`,
-  ].join("\n");
-
-  return { subject, html, text };
+  return {
+    subject: `Verify your email · ${siteName}`,
+    html: renderBilingualHtml("verify", context),
+    text: renderBilingualText("verify", context),
+  };
 }
 
 /**
  * Render the password-reset message. Same mailer, same single-use token
- * discipline as verification (ADR 0020 decision 2), but the reset link dies
- * after 3h (RESET_TOKEN_TTL_MS) — shorter window than the 24h verification
- * link, because a stolen reset link is the higher-stakes path.
+ * discipline as verification (ADR 0020 decision 2), but the reset link
+ * dies after 3h (RESET_TOKEN_TTL_MS) — shorter window than the 24h
+ * verification link, because a stolen reset link is the higher-stakes
+ * path. The copy says so without hard-coding a number the route layer
+ * owns.
  */
 export function renderPasswordResetEmail(context: AuthEmailContext): RenderedAuthEmail {
   const siteName = context.siteName || DEFAULT_SITE_NAME;
-  const actionUrl = context.actionUrl;
-  const actionUrlEscaped = escapeHtml(actionUrl);
-  const name = context.displayName ?? null;
-
-  const subject = `Reset your password · ${siteName}`;
-
-  const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.5;color:#1a1a1a;max-width:600px;margin:0 auto;">
-  <p>${escapeHtml(greeting(name))}</p>
-  <p>We received a request to reset the password for your ${escapeHtml(siteName)} account. This link works for <strong>3 hours</strong> and can be used only once.</p>
-  <p style="margin:24px 0;">
-    <a href="${actionUrlEscaped}" style="background-color:#0b705c;color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:6px;font-weight:bold;">Reset password</a>
-  </p>
-  <p>If the button does not work, copy and paste this link into your browser:</p>
-  <p><a href="${actionUrlEscaped}" style="color:#0b705c;">${actionUrlEscaped}</a></p>
-  <p>If you did not request a password reset, you can ignore this email — your password stays unchanged.</p>
-  <hr style="border:none;border-top:1px solid #e0e0e0;margin:24px 0;" />
-  <p lang="it" style="color:#444444;">— Italiano —</p>
-  <p lang="it">${escapeHtml(greetingIt(name))}</p>
-  <p lang="it">Abbiamo ricevuto una richiesta di reimpostazione della password per il tuo account ${escapeHtml(siteName)}. Il link è valido per <strong>3 ore</strong> e può essere usato una sola volta.</p>
-  <p lang="it" style="margin:24px 0;">
-    <a href="${actionUrlEscaped}" style="background-color:#0b705c;color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:6px;font-weight:bold;">Reimposta la password</a>
-  </p>
-  <p lang="it">Se il pulsante non funziona, copia e incolla questo link nel browser:</p>
-  <p lang="it"><a href="${actionUrlEscaped}" style="color:#0b705c;">${actionUrlEscaped}</a></p>
-  <p lang="it">Se non hai richiesto la reimpostazione della password, puoi ignorare questa email — la tua password resta invariata.</p>
-  <hr style="border:none;border-top:1px solid #e0e0e0;margin:24px 0;" />
-  <p style="color:#666666;font-size:13px;">${escapeHtml(siteName)} · ${escapeHtml(context.siteUrl)}</p>
-</div>`;
-
-  const text = [
-    greeting(name),
-    "",
-    `We received a request to reset the password for your ${siteName} account. This link works for 3 hours and can be used only once.`,
-    "",
-    `Reset password: ${actionUrl}`,
-    "",
-    "If you did not request a password reset, you can ignore this email — your password stays unchanged.",
-    "",
-    "— Italiano —",
-    "",
-    greetingIt(name),
-    `Abbiamo ricevuto una richiesta di reimpostazione della password per il tuo account ${siteName}. Il link è valido per 3 ore e può essere usato una sola volta.`,
-    "",
-    `Reimposta la password: ${actionUrl}`,
-    "",
-    "Se non hai richiesto la reimpostazione della password, puoi ignorare questa email — la tua password resta invariata.",
-    "",
-    `${siteName} · ${context.siteUrl}`,
-  ].join("\n");
-
-  return { subject, html, text };
+  return {
+    subject: `Reset your password · ${siteName}`,
+    html: renderBilingualHtml("reset", context),
+    text: renderBilingualText("reset", context),
+  };
 }
 
 /** Render whichever template `kind` selects. */

@@ -176,15 +176,23 @@ async function buildTree() {
     await readFile(path.join(root, "tests/helpers/mocks/cloudflare-workers.mjs"), "utf8"),
   );
 
-  // 2. app/lib/*.ts pure helpers (same set the api-harness compiles).
+  // 2. app/lib/**/*.ts pure helpers (same set the api-harness compiles,
+  //    recursive so lib subdirs — i18n/, legal/ — resolve; t_6424f961).
   const libDir = path.join(root, "app", "lib");
-  const libOutputDir = path.join(tree, "app", "lib");
-  await mkdir(libOutputDir, { recursive: true });
-  for (const entry of await readdir(libDir, { withFileTypes: true })) {
-    if (!entry.isFile() || !entry.name.endsWith(".ts")) continue;
-    const compiled = rewriteSpecifiers(transpile(path.join(libDir, entry.name)), "");
-    await writeFile(path.join(libOutputDir, entry.name.replace(/\.ts$/, ".mjs")), compiled);
-  }
+  const walkLib = async (dir, relOut) => {
+    for (const entry of await readdir(dir, { withFileTypes: true })) {
+      const abs = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        await walkLib(abs, path.join(relOut, entry.name));
+      } else if (entry.isFile() && entry.name.endsWith(".ts")) {
+        const compiled = rewriteSpecifiers(transpile(abs), "");
+        const outPath = path.join(tree, relOut, entry.name.replace(/\.ts$/, ".mjs"));
+        await mkdir(path.dirname(outPath), { recursive: true });
+        await writeFile(outPath, compiled);
+      }
+    }
+  };
+  await walkLib(libDir, "app/lib");
 
   // 3. Real db modules into db/*.mjs (their ./x and ../app/lib/x imports get
   //    explicit .mjs and resolve inside the tree).

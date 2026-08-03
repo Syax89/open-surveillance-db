@@ -103,9 +103,12 @@ const MODERATION_COMPONENTS = [
  * validazione client, cleanup, getter/setter per DecisionFormApi). Stato e
  * accessor appartengono all'hook decisionale condiviso; l'estrazione in un
  * file separato non ridurrebbe la superficie. Baseline pinnata a 168 righe.
+ * Deviazione H1 +2 (t_6424f961): il lookup data è ora registry-driven
+ * (LOCALE_BCP47 da SUPPORTED_LOCALES, niente ternario it-IT/en-US):
+ * un import dal registro + un commento — baseline aggiornata a 170 righe.
  */
 const KNOWN_DEVIATIONS = new Map([
-  ["app/components/moderation/useModerationQueue.tsx", { baselineLines: 168, reason: "H1 t_69891619: campi associazione correzione→esito record (outcome + record id, validazione, cleanup) + commento contratto server/client aggiornato (fix PR #187)" }],
+  ["app/components/moderation/useModerationQueue.tsx", { baselineLines: 170, reason: "H1 t_69891619: campi associazione correzione→esito record (outcome + record id, validazione, cleanup) + commento contratto server/client aggiornato (fix PR #187); +2 t_6424f961: lookup data registry-driven LOCALE_BCP47 (no ternario it-IT/en-US)" }],
 ]);
 
 /** Componente condiviso atteso dal refactor di Linus. */

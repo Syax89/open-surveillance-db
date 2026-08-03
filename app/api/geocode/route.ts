@@ -1,5 +1,6 @@
 import { env } from "cloudflare:workers";
 import { recordRateLimitBlock } from "../../lib/abuse-alerts";
+import { isLocale } from "../../lib/i18n/types";
 import { callerKey, checkRateLimit, geocodeLimits } from "../../lib/rate-limit";
 import { maxQueryLength } from "../../lib/search";
 
@@ -174,7 +175,10 @@ function parseQuery(url: URL): GeocodeQuery | null {
   }
 
   const langRaw = url.searchParams.get("lang");
-  const language = langRaw === "it" || langRaw === "en" ? langRaw : null;
+  // Registry-driven whitelist: only registered locale codes pass through
+  // as the upstream accept-language (a future locale becomes supported
+  // here automatically — no second hardcoded en/it list).
+  const language = isLocale(langRaw) ? langRaw : null;
 
   return { query, limit, countrycodes, language };
 }

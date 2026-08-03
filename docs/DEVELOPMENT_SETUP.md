@@ -314,7 +314,51 @@ Alternatives and rules:
 | Moderation/appeals API returns `401 Authentication required` after a successful Basic login | The gate passed but no server-side identity was injected | Set `MODERATION_IDENTITY_EMAIL` (e.g. `admin@osdb.test` for the prototype) — the worker only injects identity from that setting (ADR 0014) |
 | Port 3000 already in use | Another instance is running | Stop it, or start with a different port (`npm run dev -- --port 3001`) |
 
-## 8. Related documentation
+## 8. Aggiungere una lingua (i18n)
+
+Le lingue supportate sono definite da UN SOLO registro centrale:
+`SUPPORTED_LOCALES` in `app/lib/i18n/types.ts`. Tutto il resto ne
+deriva: il tipo `Locale`, la mappa `messages`, `legalMessages`, i bottoni
+del LocaleToggle, la risoluzione lato server/API, i tag BCP 47 per i
+formattatori di date e gli attributi `lang`, e la copia delle email
+transazionali. Non esiste più alcun ternario hardcoded `en`/`it`.
+
+Aggiungere una lingua (es. il tedesco, codice `de`):
+
+1. **File bundle**: crea `app/lib/i18n/de.ts` con tutti i namespace
+   (`common`, `map`, `directory`, …) in un unico file, tipizzato
+   `Translation<typeof en>` (importato da `app/lib/i18n/index.ts`). Il
+   tipo mapped garantisce la parità a `tsc`: chiave mancante o extra
+   rompe la build (ADR 0007).
+2. **Una riga nel registro**: aggiungi l'entry a `SUPPORTED_LOCALES` in
+   `app/lib/i18n/types.ts`, es.
+   `{ code: "de", label: "DE", bcp47: "de-DE" }`.
+   `label` è il testo del bottone nel toggle; `bcp47` alimenta
+   `LOCALE_BCP47` (Intl e attributi `lang`). L'inglese (`en`) deve
+   restare la PRIMA entry: `DEFAULT_LOCALE` ne deriva.
+3. **Assemblaggio**: in `app/lib/i18n/index.ts` aggiungi l'import del
+   bundle e una riga in `bundleSources` — la mappa `messages` esportata è
+   derivata dal registro e si aggiorna da sola.
+4. **Contenuti legali**: crea `app/lib/legal/de.ts` (tipizzato
+   `LegalContent`) e aggiungilo a `legalSources` in
+   `app/lib/legal/index.ts` — anche qui la mappa esportata è derivata dal
+   registro.
+5. **Email transazionali**: `EMAIL_COPY` in `app/lib/email-templates.ts`
+   è tipizzata `Record<Locale, EmailCopy>`: `tsc` ti obbliga ad aggiungere
+   il blocco copia della nuova lingua, e i renderer la includono
+   automaticamente (con `lang="de-DE"` dal registro) in ogni messaggio.
+6. **Verifica**: `npx tsc --noEmit` (parità bundle), `npm run lint`, e i
+   test `tests/i18n-registry.test.mjs` (parità registro ↔ bundle, lookup
+   dinamico) + `tests/i18n-pages.test.mjs` (SSR EN/IT) + la suite client
+   del toggle. Nessuna nuova libreria: il sistema è interamente
+   types-first.
+
+Nota: il controllo "nessuna frase inglese non tradotta nel bundle
+italiano" (`tests/navigation-pages.test.mjs`) è specifico per en/it; per
+le altre lingue la parità è garantita da `Translation<typeof en>` a
+`tsc`.
+
+## 9. Related documentation
 
 - [Local playbook](LOCAL_PLAYBOOK.md) — fictional submit → moderate →
   public-result acceptance checks, and the cautious reset policy.
