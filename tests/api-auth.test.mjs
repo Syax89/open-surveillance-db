@@ -1012,9 +1012,7 @@ test("reset request keeps answering 200 {sent:true} past the 3/h budget (no toke
 
 test("reset confirm rotates the password, revokes sessions, and verifies the email", async () => {
   stub("consumeVerificationToken", async () => ({ kind: "verified", contributorId: 7 }));
-  stub("resetContributorPassword", async () => {});
-  stub("revokeAllContributorSessions", async () => 1);
-  stub("markContributorEmailVerified", async () => verifiedContributor);
+  stub("applyPasswordReset", async () => verifiedContributor);
   const { POST } = await resetConfirmRoute();
   const response = await POST(
     apiRequest("/api/auth/reset-password/confirm", {
@@ -1026,13 +1024,11 @@ test("reset confirm rotates the password, revokes sessions, and verifies the ema
   const body = await responseBody(response);
   assert.equal(body.ok, true);
   assert.deepEqual(body.contributor, verifiedContributor);
-  // Consumed with purpose 'reset'; hash rotated; every live session revoked;
-  // address verified (COALESCE keeps the original timestamp).
+  // Consumed with purpose 'reset'; the atomic applyPasswordReset batch rotates
+  // the hash, revokes every live session and verifies the address.
   assert.deepEqual(callArgs("consumeVerificationToken")[0][1], "reset");
-  assert.equal(callArgs("resetContributorPassword")[0][0], 7);
-  assert.equal(callArgs("resetContributorPassword")[0][1], "brand-new-password1");
-  assert.equal(callArgs("revokeAllContributorSessions")[0][0], 7);
-  assert.equal(callArgs("markContributorEmailVerified")[0][0], 7);
+  assert.equal(callArgs("applyPasswordReset")[0][0], 7);
+  assert.equal(callArgs("applyPasswordReset")[0][1], "brand-new-password1");
 });
 
 test("reset confirm answers 400 for malformed input and unknown tokens", async () => {
@@ -1075,7 +1071,7 @@ test("reset confirm answers 410 Gone for used and expired reset tokens", async (
     }),
   );
   assert.equal(used.status, 410);
-  assert.equal(callArgs("resetContributorPassword").length, 0, "no hash rotation on a dead token");
+  assert.equal(callArgs("applyPasswordReset").length, 0, "no hash rotation on a dead token");
 
   stub("consumeVerificationToken", async () => ({ kind: "expired" }));
   const expired = await POST(
@@ -1089,9 +1085,7 @@ test("reset confirm answers 410 Gone for used and expired reset tokens", async (
 
 test("reset confirm treats an erased account like an unknown token (400)", async () => {
   stub("consumeVerificationToken", async () => ({ kind: "verified", contributorId: 7 }));
-  stub("resetContributorPassword", async () => {});
-  stub("revokeAllContributorSessions", async () => 1);
-  stub("markContributorEmailVerified", async () => null);
+  stub("applyPasswordReset", async () => null);
   const { POST } = await resetConfirmRoute();
   const response = await POST(
     apiRequest("/api/auth/reset-password/confirm", {

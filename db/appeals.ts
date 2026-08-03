@@ -1,14 +1,24 @@
 import { env } from "cloudflare:workers";
+import type { D1PreparedStatement } from "cloudflare:workers";
 import { getD1 } from "./cameras";
 import { getUserById } from "./users";
 import {
-  recordModerationEvent,
-  reopenQueueForItem,
+  buildModerationEventStatement,
   type ModerationD1,
   type ModerationEntity,
   type ModerationEvent,
 } from "./moderation";
 import { appealAppellantLimits } from "../app/lib/rate-limit";
+
+/**
+ * One statement result from `d1.batch(...)`: a RETURNING statement populates
+ * `results`, everything else only `meta` (P1-2 atomic write path).
+ */
+type D1BatchResult = {
+  success: boolean;
+  results: Record<string, unknown>[];
+  meta: { changes: number; lastRowId: number };
+};
 
 /**
  * Contributor appeals (docs/workstreams/DATA_TRUST.md "Corrections, removals,
@@ -101,11 +111,52 @@ const appealColumns = [
 const appealJoin =
   "FROM moderation_appeals a LEFT JOIN users u ON u.id = a.appellant_id LEFT JOIN moderation_events de ON de.id = a.decision_event_id LEFT JOIN reviewers r ON r.id = a.decided_by";
 
+function buildLoadAppealStatement(d1: ModerationD1, id: number): D1PreparedStatement {
+  return d1.prepare(`SELECT ${appealColumns} ${appealJoin} WHERE a.id = ?`).bind(id);
+}
+
 async function loadAppeal(d1: ModerationD1, id: number): Promise<ModerationAppeal | null> {
+  return buildLoadAppealStatement(d1, id).first<ModerationAppeal>();
+}
+
+/**
+ * Statement builder for the "appeal-filed" audit event (P1-2 atomic write
+ * path). The appeal id is unknown until the appeal INSERT in the same batch,
+ * so both the note and `appeal_id` derive from `last_insert_rowid()` — inside
+ * one batch/transaction the appeal row's id is the last insert before this
+ * event, so the expression is stable (verified at runtime in the atomic-writes
+ * suite).
+ */
+function buildAppealFiledEventStatement(
+  d1: ModerationD1,
+  event: {
+    entity: ModerationEntity;
+    entityId: number;
+    previousStatus: string;
+    newStatus: string;
+    action: string;
+    reasonCode: string;
+  },
+  reason: string,
+): D1PreparedStatement {
+  const createdAt = new Date().toISOString();
   return d1
-    .prepare(`SELECT ${appealColumns} ${appealJoin} WHERE a.id = ?`)
-    .bind(id)
-    .first<ModerationAppeal>();
+    .prepare(
+      `INSERT INTO moderation_events (entity, entity_id, previous_status, new_status, action, reason_code, note, actor, reviewer_id, actor_role, recused, escalated, second_reviewer_id, appeal_id, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ('Appeal #' || last_insert_rowid() || ': ' || ?), ?, NULL, NULL, 0, 0, NULL, last_insert_rowid(), ?)
+       RETURNING id, entity, entity_id AS entityId, previous_status AS previousStatus, new_status AS newStatus, action, reason_code AS reasonCode, note, actor, reviewer_id AS reviewerId, actor_role AS actorRole, recused, escalated, second_reviewer_id AS secondReviewerId, appeal_id AS appealId, created_at AS createdAt`,
+    )
+    .bind(
+      event.entity,
+      event.entityId,
+      event.previousStatus,
+      event.newStatus,
+      event.action,
+      event.reasonCode,
+      reason,
+      "Local moderator",
+      createdAt,
+    );
 }
 
 /**
@@ -173,24 +224,32 @@ export async function fileAppeal(input: {
   }
 
   const now = new Date().toISOString();
-  const created = await d1
-    .prepare(
-      "INSERT INTO moderation_appeals (entity, entity_id, decision_event_id, appellant_id, reason, status, created_at) VALUES (?, ?, ?, ?, ?, 'pending', ?) RETURNING id",
-    )
-    .bind(input.entity, input.entityId, input.decisionEventId, input.appellantId, input.reason, now)
-    .first<{ id: number }>();
-  if (!created) throw new Error("Appeal could not be recorded");
+  // ONE batch: the appeal INSERT + the audit event. The two WRITES are atomic
+  // (a crash cannot file an appeal without its event, or record an event for
+  // an appeal that never landed); the readback is a separate read afterwards.
+  const results = (await d1.batch([
+    d1
+      .prepare(
+        "INSERT INTO moderation_appeals (entity, entity_id, decision_event_id, appellant_id, reason, status, created_at) VALUES (?, ?, ?, ?, ?, 'pending', ?) RETURNING id",
+      )
+      .bind(input.entity, input.entityId, input.decisionEventId, input.appellantId, input.reason, now),
+    buildAppealFiledEventStatement(
+      d1,
+      {
+        entity: input.entity,
+        entityId: input.entityId,
+        previousStatus: decision.previousStatus,
+        newStatus: decision.newStatus,
+        action: "appeal-filed",
+        reasonCode: "other",
+      },
+      input.reason,
+    ),
+  ])) as D1BatchResult[];
 
-  const event = await recordModerationEvent(d1, {
-    entity: input.entity,
-    entityId: input.entityId,
-    previousStatus: decision.previousStatus,
-    newStatus: decision.newStatus,
-    action: "appeal-filed",
-    reasonCode: "other",
-    note: `Appeal #${created.id}: ${input.reason}`,
-    appealId: created.id,
-  });
+  const created = results[0].results?.[0] as { id: number } | undefined;
+  if (!created) throw new Error("Appeal could not be recorded");
+  const event = results[1].results?.[0] as ModerationEvent;
 
   const appeal = await loadAppeal(d1, created.id);
   if (!appeal) throw new Error("Appeal could not be loaded");
@@ -258,48 +317,74 @@ export async function decideAppeal(input: {
   const status: AppealStatus =
     input.decision === "uphold" ? "upheld" : input.decision === "dismiss" ? "dismissed" : "escalated";
 
-  const updated = await d1
+  const appealUpdate = d1
     .prepare(
       "UPDATE moderation_appeals SET status = ?, decided_by = ?, decision_note = ?, decided_at = ? WHERE id = ? RETURNING id",
     )
-    .bind(status, input.reviewer.id, input.note, now, input.id)
-    .first<{ id: number }>();
-  if (!updated) return { kind: "not_found" };
+    .bind(status, input.reviewer.id, input.note, now, input.id);
 
-  let previousStatus = decision.previousStatus;
-  let newStatus = decision.newStatus;
   if (input.decision === "uphold") {
-    // Reverse the decision: the entity returns to the moderation queue for a
-    // fresh decision by a different reviewer. Never publish directly.
-    if (appeal.entity === "camera") {
-      await d1
-        .prepare("UPDATE cameras SET status = 'pending', updated = ? WHERE id = ?")
-        .bind(now, appeal.entityId)
-        .run();
-    } else {
-      await d1
-        .prepare("UPDATE correction_requests SET status = 'pending' WHERE id = ?")
-        .bind(appeal.entityId)
-        .run();
-    }
-    await reopenQueueForItem(appeal.entity, appeal.entityId);
-    previousStatus = decision.newStatus;
-    newStatus = "pending";
+    // ONE batch: appeal UPDATE, entity back to pending, reopen queue, the
+    // appeal-uphold event, appeal readback. The reopen uses ON CONFLICT DO
+    // NOTHING against the partial unique index (entity, entity_id) WHERE
+    // state != 'closed' — same outcome as the old SELECT-first getOrCreate.
+    const results = (await d1.batch([
+      appealUpdate,
+      appeal.entity === "camera"
+        ? d1.prepare("UPDATE cameras SET status = 'pending', updated = ? WHERE id = ?").bind(now, appeal.entityId)
+        : d1.prepare("UPDATE correction_requests SET status = 'pending' WHERE id = ?").bind(appeal.entityId),
+      d1
+        .prepare(
+          `INSERT INTO moderation_queue (entity, entity_id, state, assignee_id, sensitivity, requires_second_review, second_reviewer_id, escalation_reason, created_at, updated_at)
+           VALUES (?, ?, 'queued', NULL, 'standard', 0, NULL, NULL, ?, ?)
+           ON CONFLICT(entity, entity_id) WHERE state != 'closed' DO NOTHING`,
+        )
+        .bind(appeal.entity, appeal.entityId, now, now),
+      buildModerationEventStatement(d1, {
+        entity: appeal.entity,
+        entityId: appeal.entityId,
+        previousStatus: decision.newStatus,
+        newStatus: "pending",
+        action: `appeal-${input.decision}`,
+        reasonCode: "other",
+        note: input.note,
+        reviewer: input.reviewer,
+        appealId: input.id,
+      }),
+      buildLoadAppealStatement(d1, input.id),
+    ])) as D1BatchResult[];
+
+    const updated = results[0].results?.[0] as { id: number } | undefined;
+    if (!updated) return { kind: "not_found" };
+    const event = results[3].results?.[0] as ModerationEvent;
+    const appealView = results[4].results?.[0] as ModerationAppeal | undefined;
+    const appealResult = appealView ?? (await loadAppeal(d1, input.id));
+    if (!appealResult) throw new Error("Appeal could not be loaded");
+    return { kind: "ok", appeal: appealResult, event };
   }
 
-  const event = await recordModerationEvent(d1, {
-    entity: appeal.entity,
-    entityId: appeal.entityId,
-    previousStatus,
-    newStatus,
-    action: `appeal-${input.decision}`,
-    reasonCode: "other",
-    note: input.note,
-    reviewer: input.reviewer,
-    appealId: input.id,
-  });
+  // dismiss / escalate: ONE batch — appeal UPDATE, decision event, readback.
+  const results = (await d1.batch([
+    appealUpdate,
+    buildModerationEventStatement(d1, {
+      entity: appeal.entity,
+      entityId: appeal.entityId,
+      previousStatus: decision.previousStatus,
+      newStatus: decision.newStatus,
+      action: `appeal-${input.decision}`,
+      reasonCode: "other",
+      note: input.note,
+      reviewer: input.reviewer,
+      appealId: input.id,
+    }),
+    buildLoadAppealStatement(d1, input.id),
+  ])) as D1BatchResult[];
 
-  const appealView = await loadAppeal(d1, input.id);
-  if (!appealView) throw new Error("Appeal could not be loaded");
-  return { kind: "ok", appeal: appealView, event };
+  const updated = results[0].results?.[0] as { id: number } | undefined;
+  if (!updated) return { kind: "not_found" };
+  const event = results[1].results?.[0] as ModerationEvent;
+  const appealView = results[2].results?.[0] as ModerationAppeal | undefined;
+  const appealResult = appealView ?? (await loadAppeal(d1, input.id));
+  if (!appealResult) throw new Error("Appeal could not be loaded");
+  return { kind: "ok", appeal: appealResult, event };
 }

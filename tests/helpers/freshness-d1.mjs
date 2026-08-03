@@ -46,9 +46,31 @@ export class FreshnessD1 {
     this.database.exec(sql);
   }
 
-  // Used by getD1()/getModerationD1() for CREATE TABLE/INDEX batches.
+  // Used by getD1()/getModerationD1() for CREATE TABLE/INDEX batches and by
+  // the atomic write paths (decision batches). Wraps in BEGIN/COMMIT/ROLLBACK
+  // and returns one per-statement result like the real binding: RETURNING
+  // statements AND plain SELECT statements execute via all() (rows in
+  // `results` — real D1 populates `results` for SELECTs in a batch too),
+  // others via run().
   batch(statements) {
-    return statements.map((statement) => statement.run());
+    this.database.exec("BEGIN");
+    try {
+      const results = [];
+      for (const statement of statements) {
+        if (/\breturning\b/i.test(statement.sql) || /^\s*(SELECT|WITH|PRAGMA)\b/i.test(statement.sql)) {
+          const { results: rows } = statement.all();
+          results.push({ success: true, results: rows, meta: { changes: rows.length, lastRowId: 0 } });
+        } else {
+          const { meta } = statement.run();
+          results.push({ success: true, results: [], meta });
+        }
+      }
+      this.database.exec("COMMIT");
+      return results;
+    } catch (error) {
+      this.database.exec("ROLLBACK");
+      throw error;
+    }
   }
 }
 

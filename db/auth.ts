@@ -824,6 +824,42 @@ export async function revokeAllContributorSessions(
   return result.meta.changes;
 }
 
+/**
+ * One statement result from `d1.batch(...)`: a RETURNING statement populates
+ * `results`, everything else only `meta` (P1-2 atomic write path).
+ */
+type D1BatchResult = {
+  success: boolean;
+  results: Record<string, unknown>[];
+  meta: { changes: number; lastRowId: number };
+};
+
+/**
+ * Apply a completed password reset (Fase B confirm): rotate the hash, revoke
+ * EVERY live session, and mark the email verified — in ONE atomic batch. A
+ * crash cannot leave the hash rotated but sessions live, or sessions dead but
+ * the hash old. `consumeVerificationToken` stays a separate single-use gate by
+ * design: the token is consumed (and so single-use) before this write, and the
+ * two writes cannot be combined because the token consume is a read-then-write
+ * on the same row. Returns the refreshed public profile, or null when the
+ * account vanished between the consume and this update.
+ */
+export async function applyPasswordReset(
+  contributorId: number,
+  newPassword: string,
+  now: string = new Date().toISOString(),
+): Promise<PublicContributor | null> {
+  const d1 = await getD1();
+  const passwordHash = await hashPassword(newPassword);
+  const results = (await d1.batch([
+    d1.prepare("UPDATE contributors SET password_hash = ?, updated_at = ? WHERE id = ?").bind(passwordHash, now, contributorId),
+    d1.prepare("UPDATE sessions SET revoked_at = ? WHERE contributor_id = ? AND revoked_at IS NULL").bind(now, contributorId),
+    d1.prepare(`UPDATE contributors SET email_verified_at = COALESCE(email_verified_at, ?), updated_at = ? WHERE id = ? RETURNING ${publicContributorColumns}`).bind(now, now, contributorId),
+  ])) as D1BatchResult[];
+  const contributor = results[2]?.results?.[0] as PublicContributor | undefined;
+  return contributor ?? null;
+}
+
 // ---------------------------------------------------------------------------
 // Contributor's own submissions
 // ---------------------------------------------------------------------------
@@ -1024,6 +1060,15 @@ export type ErasureResult = {
  * gone but reports still attributed, or verifications deleted but the
  * contributor row surviving).
  *
+ * Auth artifacts are hard-deleted explicitly, in the same batch: passkeys,
+ * recovery codes, email-verification tokens, the transactional-email send
+ * log, WebAuthn ceremony challenges and pending OIDC merge requests are the
+ * contributor's own data (art. 17), and each of those tables declares
+ * ON DELETE CASCADE on `contributors.id` — mirrored here because the test
+ * harness does not enforce foreign keys (P2-2, t_adfc121b; same rule as
+ * `sessions` and `camera_confirmations`). `oidc_states` is NOT included: it
+ * is pre-auth state with no contributor link.
+ *
  * Returns the number of reports de-attributed, community verifications
  * deleted and correction reports de-attributed (for the erasure response and
  * the audit trail) and whether the account row existed at all.
@@ -1072,6 +1117,30 @@ export async function eraseContributor(contributorId: number): Promise<ErasureRe
     // provisioned role identity) survives, but can no longer attribute
     // appeals to the erased contributor.
     d1.prepare("UPDATE users SET contributor_id = NULL WHERE contributor_id = ?").bind(contributorId),
+    // Explicit auth-artifact deletion, mirroring the session rule below:
+    // every table that references contributors with ON DELETE CASCADE is
+    // deleted HERE, in the app layer, because the test harness does not
+    // enforce FKs (real D1 would cascade on the contributor delete). Left
+    // to the cascade alone, the in-memory harness leaves orphan rows and
+    // the erasure contract is not actually exercised (P2-2, t_adfc121b).
+    // Passkeys: the authenticator credential is the contributor's own
+    // data (art. 17) — after erasure no ceremony may resolve it.
+    d1.prepare("DELETE FROM passkeys WHERE contributor_id = ?").bind(contributorId),
+    // Recovery codes: hashed single-use codes, own data — hard-deleted.
+    d1.prepare("DELETE FROM recovery_codes WHERE contributor_id = ?").bind(contributorId),
+    // Verification tokens: hashed, single-use — own data, hard-deleted.
+    d1.prepare("DELETE FROM email_verification_tokens WHERE contributor_id = ?").bind(contributorId),
+    // Transactional-email send log: rate-limit rows (no content, no
+    // recipient) — own data, hard-deleted.
+    d1.prepare("DELETE FROM email_send_log WHERE contributor_id = ?").bind(contributorId),
+    // WebAuthn ceremony challenges: hashed challenges, own data. The
+    // column is nullable, so the WHERE also covers challenge rows whose
+    // contributor was never linked (no-op).
+    d1.prepare("DELETE FROM webauthn_challenges WHERE contributor_id = ?").bind(contributorId),
+    // Pending OIDC merge requests: single-use merge tokens bound to the
+    // account — own data, hard-deleted (an unmergeable account must not
+    // leave a live token behind).
+    d1.prepare("DELETE FROM oidc_merge_requests WHERE contributor_id = ?").bind(contributorId),
     // Explicit session revocation, mirroring logout: after erasure no
     // session of this contributor may resolve, in every environment
     // (real D1 would cascade on contributor delete, but the test harness

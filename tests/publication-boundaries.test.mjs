@@ -484,8 +484,13 @@ test("camera lifecycle keeps published and review-only transitions explicit", as
   );
   assert.match(
     moderation,
-    /\.bind\(transition\.newStatus,\s*transition\.updated,\s*id,\s*current\.status\)/,
+    /\.bind\(transition\.newStatus,\s*transition\.updated,\s*id,\s*currentStatus\)/,
     "the compare-and-set guard must use the exact status validated by the lifecycle transition",
+  );
+  assert.match(
+    moderation,
+    /buildCameraTransitionStatement\([\s\S]{0,120}current\.status/,
+    "the transition statement builder must receive the exact status read from the record",
   );
 });
 

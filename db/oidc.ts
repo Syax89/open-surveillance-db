@@ -50,6 +50,16 @@ export type OidcMergeRequest = {
   usedAt: string | null;
 };
 
+/**
+ * One statement result from `d1.batch(...)`: a RETURNING statement populates
+ * `results`, everything else only `meta` (P1-2 atomic write path).
+ */
+type D1BatchResult = {
+  success: boolean;
+  results: Record<string, unknown>[];
+  meta: { changes: number; lastRowId: number };
+};
+
 // ---------------------------------------------------------------------------
 // OIDC authorization state (PKCE)
 // ---------------------------------------------------------------------------
@@ -271,30 +281,37 @@ export async function linkExternalIdentity(
 ): Promise<LinkedContributor | null> {
   const d1 = await getD1();
   const tokenHash = await sha256Hex(rawToken);
-  const result = await d1
-    .prepare(
-      `UPDATE contributors
-       SET auth_provider = ?, external_sub = ?,
-           email_verified_at = COALESCE(email_verified_at,
-             CASE WHEN (SELECT email_verified FROM oidc_merge_requests
-                        WHERE token_hash = ? AND provider = ? AND external_sub = ?
-                          AND used_at IS NULL AND expires_at > ?) = 1
-                  THEN ? END),
-           updated_at = ?
-       WHERE id = (SELECT contributor_id FROM oidc_merge_requests
-                   WHERE token_hash = ? AND provider = ? AND external_sub = ?
-                     AND used_at IS NULL AND expires_at > ?)
-       RETURNING ${linkedColumns}`,
-    )
-    .bind(provider, externalSub, tokenHash, provider, externalSub, now, now, now, tokenHash, provider, externalSub, now)
-    .first<LinkedContributor>();
-  if (result) {
-    await d1
-      .prepare(`UPDATE oidc_merge_requests SET used_at = ? WHERE token_hash = ? AND used_at IS NULL`)
-      .bind(now, tokenHash)
-      .run();
-  }
-  return result;
+  // ONE batch: link the identity AND burn the single-use merge request. The
+  // burn carries the SAME provider/sub/expiry guards as the contributor UPDATE,
+  // so it only consumes a request the link actually matched (a wrong-provider
+  // or expired attempt leaves the request pending, exactly like the old
+  // `if (result)` gate) — but atomically now: a crash cannot link the identity
+  // while leaving the request usable, or burn the request without linking.
+  const results = (await d1.batch([
+    d1
+      .prepare(
+        `UPDATE contributors
+         SET auth_provider = ?, external_sub = ?,
+             email_verified_at = COALESCE(email_verified_at,
+               CASE WHEN (SELECT email_verified FROM oidc_merge_requests
+                          WHERE token_hash = ? AND provider = ? AND external_sub = ?
+                            AND used_at IS NULL AND expires_at > ?) = 1
+                    THEN ? END),
+             updated_at = ?
+         WHERE id = (SELECT contributor_id FROM oidc_merge_requests
+                     WHERE token_hash = ? AND provider = ? AND external_sub = ?
+                       AND used_at IS NULL AND expires_at > ?)
+         RETURNING ${linkedColumns}`,
+      )
+      .bind(provider, externalSub, tokenHash, provider, externalSub, now, now, now, tokenHash, provider, externalSub, now),
+    d1
+      .prepare(
+        `UPDATE oidc_merge_requests SET used_at = ? WHERE token_hash = ? AND provider = ? AND external_sub = ? AND used_at IS NULL AND expires_at > ?`,
+      )
+      .bind(now, tokenHash, provider, externalSub, now),
+  ])) as D1BatchResult[];
+  const result = results[0]?.results?.[0] as LinkedContributor | undefined;
+  return result ?? null;
 }
 
 // ---------------------------------------------------------------------------
