@@ -15,6 +15,7 @@ import {
   cookieHeaderInit,
   isValidPasswordShape,
   loginLockoutPolicy,
+  sessionGate,
 } from "../../../lib/auth-route-helpers";
 import { sameOrigin } from "../../../lib/csrf";
 import { isRecord } from "../../../lib/guards";
@@ -114,9 +115,10 @@ export async function POST(request: Request) {
     // such account". The lockout counter is NOT touched: a correct password
     // is not a credential failure to count, and not clearing it keeps the
     // brute-force protection intact (a successful login still clears it).
-    if (!contributor.emailVerifiedAt) {
-      return Response.json({ error: "Invalid credentials." }, { status: 401 });
-    }
+    // Shared choke-point: sessionGate (app/lib/auth-route-helpers.ts) —
+    // passkey/login/complete and recovery enforce the same policy.
+    const denied = sessionGate(contributor, "Invalid credentials.");
+    if (denied) return denied;
 
     // A successful login resets the per-email counter.
     await clearLoginAttempts(emailKey);

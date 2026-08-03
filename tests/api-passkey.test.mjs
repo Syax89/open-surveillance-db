@@ -27,6 +27,7 @@ import {
   responseBody,
 } from "./helpers/api-harness.mjs";
 import { callArgs, resetMockState, stub } from "./helpers/mock-state.mjs";
+import { buildAuthenticationResponse, generateKeypair } from "./helpers/webauthn-fixtures.mjs";
 
 let rateLimit;
 
@@ -49,6 +50,7 @@ const contributor = {
   id: 7,
   email: "ada@example.org",
   displayName: "Ada",
+  emailVerifiedAt: "2026-08-01T08:30:00.000Z",
   createdAt: "2026-08-01T08:00:00.000Z",
   updatedAt: "2026-08-01T08:00:00.000Z",
 };
@@ -87,6 +89,38 @@ function authedRequest(pathAndQuery, { headers = {}, ...rest } = {}) {
 
 function stubSession() {
   stub("findSessionByToken", async () => ({ ...session, contributor }));
+}
+
+/**
+ * A GENUINE WebAuthn assertion (tests/helpers/webauthn-fixtures.mjs) signed
+ * for contributor 7 against the harness RP identity (WEBAUTHN_RP_ID=localhost,
+ * WEBAUTHN_ORIGIN=https://osdb.test) — so the route's REAL
+ * verifyAuthenticationResponse passes and the request reaches the
+ * verification gate / createSession, instead of dying on a garbage assertion
+ * like the rejection-path tests.
+ */
+function validAssertion() {
+  const keypair = generateKeypair();
+  const credentialId = `cred-real-${crypto.randomUUID().replaceAll("-", "")}`;
+  return {
+    credentialId,
+    assertion: buildAuthenticationResponse({
+      challenge: "c1",
+      credentialId,
+      keypair,
+      signCount: 1,
+      userHandle: Buffer.from("7").toString("base64url"),
+    }),
+    passkey: {
+      id: 1,
+      contributorId: 7,
+      credentialId,
+      publicKey: Buffer.from(keypair.cosePublicKey).toString("base64url"),
+      counter: 0,
+      transports: null,
+      createdAt: "2026-08-01T08:00:00.000Z",
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -149,6 +183,26 @@ test("register/begin excludes the contributor's existing passkeys from re-enroll
   assert.deepEqual(body.options.excludeCredentials, [
     { id: "cred-1", transports: ["usb"], type: "public-key" },
   ]);
+});
+
+test("register/begin allows enrollment for an UNVERIFIED account (documented choice, t_f940482b)", async () => {
+  // CEO decision (a): the LOGIN is blocked pre-verification, but enrollment
+  // stays open — the enrolled passkey is INERT until the email is verified
+  // (login/complete is gated by sessionGate), so allowing it is harmless and
+  // lets the user set up their second factor in the same read-only register
+  // session where they verify. The write gate (403) blocks every write
+  // regardless. See the route comment and ADR 0020 decision 2.
+  stub("findSessionByToken", async () => ({
+    ...session,
+    contributor: { ...contributor, emailVerifiedAt: null },
+  }));
+  stub("sweepExpiredWebAuthnChallenges", async () => 0);
+  stub("listPasskeys", async () => []);
+  stub("createWebAuthnChallenge", async () => ({ id: 1 }));
+  const { POST } = await registerBeginRoute();
+  const response = await POST(authedRequest("/api/auth/passkey/register/begin", { method: "POST" }));
+  assert.equal(response.status, 200);
+  assert.ok((await responseBody(response)).options, "a register ceremony can start for an unverified account");
 });
 
 // ---------------------------------------------------------------------------
@@ -481,6 +535,61 @@ test("login/complete does not reject an email-narrowed challenge when the assert
   );
 });
 
+test("login/complete refuses to open a session for an UNVERIFIED account (t_f940482b)", async () => {
+  // A GENUINE signed assertion (validAssertion): every verification layer —
+  // challenge consume, credential lookup, signature, userHandle, counter —
+  // PASSES, so the request reaches the verification gate. The account's
+  // email is not verified → the SAME generic 401 as every other failure
+  // (anti-enumeration: the response never reveals the account state) and NO
+  // session. CEO decision (a) extended to passkey: "finché non è attivato
+  // non è possibile fare login". The counter IS advanced before the gate
+  // (the assertion was valid — updatePasskeyCounter ran), matching /login
+  // where the PBKDF2 cost is paid before the gate.
+  const { passkey, assertion } = validAssertion();
+  stub("consumeWebAuthnChallenge", async () => ({ id: 1, kind: "login", contributorId: 7 }));
+  stub("findPasskeyByCredentialId", async () => passkey);
+  stub("updatePasskeyCounter", async () => true);
+  stub("getContributorById", async () => ({ ...contributor, emailVerifiedAt: null }));
+  stub("createSession", async () => newSession); // must NOT be called
+  const { POST } = await loginCompleteRoute();
+  const response = await POST(
+    apiRequest("/api/auth/passkey/login/complete", {
+      method: "POST",
+      body: { challenge: "c1", response: assertion },
+    }),
+  );
+  assert.equal(response.status, 401);
+  assert.deepEqual(await responseBody(response), { error: "Passkey verification failed." });
+  assert.equal(response.headers.getSetCookie().length, 0, "no session cookie for an unverified account");
+  assert.equal(callArgs("createSession").length, 0, "no session for an unverified account");
+});
+
+test("login/complete opens a session for a VERIFIED account (t_f940482b)", async () => {
+  // Same ceremony, but the account IS verified → the gate lets the flow
+  // through and createSession runs (the happy path the rejection-path tests
+  // could never reach — a real signed assertion is required).
+  const { passkey, assertion } = validAssertion();
+  stub("consumeWebAuthnChallenge", async () => ({ id: 1, kind: "login", contributorId: 7 }));
+  stub("findPasskeyByCredentialId", async () => passkey);
+  stub("updatePasskeyCounter", async () => true);
+  stub("getContributorById", async () => contributor); // fixture: verified
+  stub("createSession", async () => newSession);
+  const { POST } = await loginCompleteRoute();
+  const response = await POST(
+    apiRequest("/api/auth/passkey/login/complete", {
+      method: "POST",
+      body: { challenge: "c1", response: assertion },
+    }),
+  );
+  assert.equal(response.status, 200);
+  assert.equal((await responseBody(response)).contributor.id, 7);
+  assert.deepEqual(callArgs("createSession")[0][0], 7, "the session is created for the passkey owner");
+  assert.ok(
+    response.headers.getSetCookie().some((cookie) => cookie.startsWith("osdb_session=")),
+    "a session cookie is issued",
+  );
+});
+
 // ---------------------------------------------------------------------------
 // GET/DELETE /api/auth/passkey/credentials
 // ---------------------------------------------------------------------------
@@ -583,6 +692,31 @@ test("recovery redeems a single-use code and opens a session", async () => {
   assert.equal(body.reEnrollmentRequired, true, "a fresh passkey enrollment is required after recovery");
   assert.deepEqual(cookieNames(response).sort(), ["osdb_csrf", "osdb_session"]);
   assert.deepEqual(callArgs("consumeRecoveryCode")[0], [7, "abcd-efgh-ijkl-mnop"]);
+});
+
+test("recovery refuses to open a session for an UNVERIFIED account (t_f940482b)", async () => {
+  // CEO decision (a) applies to EVERY session-opening method: a valid code
+  // for an unverified account answers the SAME generic 401 as a wrong code
+  // (anti-enumeration). The single-use code IS consumed (it was valid and
+  // consumed atomically; the account state is what blocks the session) —
+  // exactly like passkey login/complete advances the counter before the
+  // gate. No session, no lockout.
+  stub("findContributorByEmail", async () => contributor);
+  stub("consumeRecoveryCode", async () => true);
+  stub("getContributorById", async () => ({ ...contributor, emailVerifiedAt: null }));
+  stub("createSession", async () => newSession); // must NOT be called
+  const { POST } = await recoveryRoute();
+  const response = await POST(
+    apiRequest("/api/auth/recovery", {
+      method: "POST",
+      body: { email: "ada@example.org", code: "abcd-efgh-ijkl-mnop" },
+    }),
+  );
+  assert.equal(response.status, 401);
+  assert.deepEqual(await responseBody(response), { error: "Invalid recovery code." });
+  assert.equal(response.headers.getSetCookie().length, 0, "no session cookie for an unverified account");
+  assert.equal(callArgs("createSession").length, 0, "no session for an unverified account");
+  assert.equal(callArgs("consumeRecoveryCode").length, 1, "the valid single-use code is still consumed");
 });
 
 test("recovery answers the same 401 for unknown email, wrong code and used code", async () => {

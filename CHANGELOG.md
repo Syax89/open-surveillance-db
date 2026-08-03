@@ -302,6 +302,28 @@ changes accumulate under `[Unreleased]`.
   (nuovo caso unverified-401), auth-verify-e2e (register → login 401 →
   verify → login 200).
 
+- **Auth — verification gate esteso a TUTTI i metodi di login (finding
+  review-ada PR #262 P2, t_f940482b):** `POST /api/auth/passkey/login/complete`
+  apriva una sessione (createSession) senza controllare `email_verified_at`,
+  e `POST /api/auth/recovery` idem col riscatto di un recovery code — un
+  account NON verificato (sessione read-only di register) poteva iscriversi
+  una passkey e ri-autenticarsi, by-passando il gate di login della decisione
+  CEO (a). Ora il gate è un **choke-point unico** (`sessionGate` in
+  app/lib/auth-route-helpers.ts) applicato da login (password),
+  passkey/login/complete e recovery: 401 generico (stesso body degli altri
+  fallimenti, anti-enumeration), dopo la piena verifica della credenziale
+  (PBKDF2 / asserzione WebAuthn / consume del codice), **nessun lockout,
+  nessuna sessione**. L'enrollment passkey pre-verifica resta **permesso e
+  documentato** (register/begin): la passkey è inerte finché l'email non è
+  verificata, e il recovery code valido riscattato da un account non
+  verificato è consumato ma non apre sessioni. OIDC intatto (account nati
+  verified dal flag provider). Test: api-passkey (unit — asserzione WebAuthn
+  reale firmata via webauthn-fixtures: unverified → 401 no createSession,
+  verified → 200; recovery unverified → 401), qa-multiauth-write-gate-e2e
+  (register → enroll passkey → login passkey 401 → verify → login passkey
+  200 → write 201; recovery 401 → verify → 200 → write 201). ADR 0020
+  decision 2 aggiornata.
+
 - Header mobile menu boundary moved from 700px to 768px and the auth entry
   point moved INSIDE the menu (t_94b3726d, CEO live feedback 2026-08-02):
   `AuthNavLinks` is now the last item of `.nav-links` instead of a separate

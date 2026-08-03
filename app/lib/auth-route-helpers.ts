@@ -127,3 +127,38 @@ export function parseDisplayName(value: unknown): string | null | undefined {
 export function cookieHeaderInit(cookies: string[]): [string, string][] {
   return cookies.map((cookie) => ["Set-Cookie", cookie]);
 }
+
+/**
+ * Login-session verification gate (CEO feedback 2026-08-03, t_6dc1c96f
+ * option (a) — "finché non è attivato non è possibile fare login",
+ * extended to every session-opening method by t_f940482b).
+ *
+ * An account whose email is NOT verified cannot open a login session by ANY
+ * method: password (POST /api/auth/login), passkey
+ * (POST /api/auth/passkey/login/complete) or recovery code
+ * (POST /api/auth/recovery). Returns null when the account is verified — the
+ * caller proceeds to createSession — otherwise a **401 Response carrying the
+ * route's own generic failure body**, so the answer is never distinguishable
+ * from the route's other failures (anti-enumeration, the project-wide login
+ * rule; no per-account "verify your email" response).
+ *
+ * The register flow is the deliberate exception: its read-only session is
+ * the ONLY session an unverified account may hold (it powers the /account
+ * banner and the verify-email resend), so register does NOT pass through
+ * this gate. OIDC sessions are exempt by construction: linked accounts are
+ * born verified from the provider flag (ADR 0020 decision 4).
+ *
+ * Callers invoke this AFTER their full credential verification (PBKDF2 for
+ * password, the WebAuthn assertion for passkey, the code consume for
+ * recovery) and right BEFORE createSession — the gate adds no timing signal
+ * on top of the credential work, and no lockout counter is touched: a valid
+ * credential for an unverified account is not a credential failure to count
+ * (same policy as the login lockout, ADR 0016).
+ */
+export function sessionGate(
+  contributor: { emailVerifiedAt: string | null } | null,
+  genericError: string,
+): Response | null {
+  if (contributor && contributor.emailVerifiedAt) return null;
+  return Response.json({ error: genericError }, { status: 401 });
+}

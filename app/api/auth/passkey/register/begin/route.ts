@@ -25,6 +25,15 @@ import { userHandleForContributor, webauthnRpConfig } from "../../../../../lib/p
  * authenticator does not re-register the same key. `attestationType: "none"`
  * keeps the ceremony privacy-preserving (no device attestation is
  * collected — AUTH_OPTIONS.md §3: verification is enough).
+ *
+ * Enrollment is deliberately open to UNVERIFIED accounts (t_f940482b,
+ * CEO decision (a)): an account holding the read-only register session may
+ * enroll a passkey here, but the passkey is INERT until the email is
+ * verified — login/complete refuses it with the same generic 401 as any
+ * other failure (sessionGate), so no session can be opened with it, and the
+ * write gate (403) blocks every write. Allowing the enrollment means the
+ * user can set up their second factor during the same session where they
+ * verify; the login gate stays the enforcement point.
  */
 export async function POST(request: Request) {
   if (urlTooLong(request)) {

@@ -88,6 +88,22 @@ conclusion for three reasons:
   the user is never stranded. Guidance lives as **static copy** on `/login`
   (`auth.loginVerifyHint`, EN/IT, shown to everyone) — never as a
   per-account response.
+  **The gate is a single choke-point (`sessionGate`,
+  app/lib/auth-route-helpers.ts) enforced by EVERY session-opening method
+  (t_f940482b):** `POST /api/auth/login` (password), `POST
+  /api/auth/passkey/login/complete` (passkey) and `POST /api/auth/recovery`
+  (one-time code) all refuse an unverified account with the same generic
+  401 as their other failures, after the full credential verification and
+  without touching any lockout counter. **Passkey enrollment is
+  deliberately allowed pre-verification** (register/begin): the enrolled
+  credential is *inert* until the email is verified — login/complete is
+  gated, so no session can be opened with it, and the write gate (403)
+  blocks every write — and the user can set up their second factor in the
+  same read-only session where they verify. The same applies to the 10
+  recovery codes issued at enrollment: redemption on an unverified account
+  answers 401 (the valid single-use code is still consumed). OIDC remains
+  exempt by construction: linked accounts are born verified from the
+  provider flag (decision 4).
 
 3. **Passkeys are an optional parallel method with a mandatory fallback.**
    New D1 table `passkeys` (`credential_id` UNIQUE, COSE public key, sign
