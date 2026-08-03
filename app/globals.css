@@ -71,7 +71,7 @@ button { cursor:pointer; }
    queste classi erano usate ma MAI definite → h1 a 16px/400 (audit F1 G1). */
 .tool-section { width:var(--container-standard); margin:0 auto; padding:48px 0 96px; }
 .tool-heading { margin:0 0 34px; }
-.tool-heading h1 { margin:0; max-width:640px; font-size:clamp(34px, 4.5vw, 52px); line-height:1.04; letter-spacing:-.06em; font-weight:800; }
+.tool-heading h1 { margin:0; max-width:640px; font-size:clamp(34px, 4.5vw, 52px); line-height:1.08; letter-spacing:-.06em; font-weight:800; text-wrap:balance; overflow-wrap:anywhere; }
 .tool-heading .eyebrow { margin-bottom:14px; }
 .tool-heading p:not(.eyebrow) { margin:18px 0 0; max-width:600px; color:#5e707a; font-size:var(--text-xl); line-height:1.55; }
 /* /mappa exception (t_11e38eab): no visible header, the page starts with
@@ -127,7 +127,12 @@ button { cursor:pointer; }
 .eyebrow { margin:0 0 18px; text-transform:uppercase; letter-spacing:.14em; font-size:var(--text-xs); font-weight:800; color:#5f7078; }
 .eyebrow span { display:inline-block; width:7px; height:7px; margin-right:8px; vertical-align:1px; border-radius:var(--radius-round); background:#57b37f; }
 .hero .eyebrow { color:#bed4d6; }
-.hero h1 { margin:0; max-width:590px; font-size:var(--text-hero); line-height:.96; letter-spacing:-.075em; font-weight:800; }
+/* IT layout (t_c18b48f0): line-height .96 collided on multi-line Italian
+   headlines (descenders of "pubblici"/"sorveglianza" crashed into the next
+   line's ascenders). 1.06 keeps the tight display look while clearing the
+   ink box; balance evens the ragged IT wraps; anywhere is the last-resort
+   break for unbreakable tokens (e.g. "OpenSurveillanceDB"). */
+.hero h1 { margin:0; max-width:590px; font-size:var(--text-hero); line-height:1.06; letter-spacing:-.075em; font-weight:800; text-wrap:balance; overflow-wrap:anywhere; }
 .hero-intro { max-width:525px; margin:28px 0; color:#c9d7de; font-size:var(--text-3xl); line-height:1.58; }
 .hero-actions { display:flex; align-items:center; gap:var(--space-3); flex-wrap:wrap; }
 .button { border:1px solid transparent; padding:13px 18px; border-radius:var(--radius-lg); display:inline-flex; align-items:center; gap:13px; font-size:var(--text-base); font-weight:800; transition:transform .2s ease, background .2s ease; }
@@ -344,7 +349,7 @@ button { cursor:pointer; }
 .record-page { min-height:100vh; background:var(--paper); }
 .record-detail { width:var(--container-readable); margin:45px auto 100px; padding:50px; border:1px solid var(--line); border-radius:var(--radius-xl); background:#fffef9; box-shadow:0 20px 45px rgba(25,46,52,.08); }
 .record-detail .card-topline { margin:0 0 22px; }
-.record-detail h1 { max-width:620px; margin:0; font-size:var(--text-display); letter-spacing:-.07em; line-height:.96; font-weight:700; }
+.record-detail h1 { max-width:620px; margin:0; font-size:var(--text-display); letter-spacing:-.07em; line-height:1.06; font-weight:700; text-wrap:balance; overflow-wrap:anywhere; }
 .record-detail-kind { margin:18px 0 0; color:#356170; font-size:var(--text-3xl); font-weight:800; }
 .record-detail-summary { max-width:620px; margin:30px 0; color:#536771; font-size:var(--text-2xl); line-height:1.6; }
 .record-detail-facts { display:grid; grid-template-columns:repeat(2,1fr); gap:var(--space-5); margin:32px 0; padding:25px 0; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
@@ -354,7 +359,7 @@ button { cursor:pointer; }
 .detail-outline { color:#1c4858; border-color:#b7c2bd; }
 .record-detail-note { margin:28px 0 0; padding-top:20px; border-top:1px solid var(--line); color:var(--muted); font-size:var(--text-sm); line-height:1.5; }
 .moderation-page { width:var(--container-standard); margin:30px auto 100px; }
-.moderation-page>h1 { margin:0; font-size:var(--text-display); letter-spacing:-.07em; line-height:.96; font-weight:700; }
+.moderation-page>h1 { margin:0; font-size:var(--text-display); letter-spacing:-.07em; line-height:1.06; font-weight:700; text-wrap:balance; overflow-wrap:anywhere; }
 .moderation-page>h1+p { max-width:660px; margin:20px 0 28px; color:#536771; font-size:var(--text-2xl); line-height:1.6; }
 .moderation-section { margin-top:58px; }
 .moderation-section h2 { margin:0; font-size:var(--text-moderation); letter-spacing:-.06em; line-height:1; font-weight:800; }
@@ -598,7 +603,7 @@ footer>p { margin:0; color:#586870; font-size:var(--text-md); line-height:1.5; }
 }
 /* Contributor auth (STATUS gap #1, ADR 0013): login / register / account. */
 .auth-card { max-width:560px; }
-.auth-card h1 { font-size:var(--text-auth); font-weight:800; }
+.auth-card h1 { font-size:var(--text-auth); font-weight:800; text-wrap:balance; overflow-wrap:anywhere; }
 .auth-form { display:grid; gap:18px; margin:30px 0 8px; }
 .auth-field { display:grid; gap:var(--space-2); color:#435963; font-size:var(--text-sm); font-weight:800; }
 .auth-field input { width:100%; border:1px solid #cdd6ce; border-radius:var(--radius-md); padding:12px 13px; background:#fff; color:#203841; font-size:var(--text-lg); font-weight:400; }
