@@ -478,6 +478,24 @@ changes accumulate under `[Unreleased]`.
   `tests/rate-limit-binding.test.mjs` pins the selection logic and the
   429/Retry-After contract on both backends.
 
+- **Per-IP registration cap (P3-4, decisione CEO 2026-08-03, t_0941036b):**
+  max 5 tentativi di registrazione / 24h rolling per IP, enforced come
+  *stato quota* su D1 (`registrations_ip_log`, migration 0032) accanto al
+  bucket `auth` in-memory — che da solo non può reggere una finestra di 24h
+  tra isolate. Il 5° tentativo nella finestra risponde **429** con body
+  generico anti-enumeration + `Retry-After` (di fatto ≤ 4 account/IP/giorno;
+  un account-farm non può nemmeno sondare l'endpoint). L'attempt viene
+  riservato e contato in **un unico batch D1** (atomico, niente race), e
+  **rollbackato su ogni uscita non-201** (tentativi falliti non consumano
+  budget; il contratto no-write dei body malformati resta). Chiave =
+  **SHA-256 del caller key** (`cf-connecting-ip`), mai l'IP raw (privacy by
+  design, pattern `photos.submitter_key`). Finestra rolling → reset
+  automatico dopo 24h senza job di cleanup. Knob env
+  `REGISTER_IP_RATE_LIMIT_MAX`/`_WINDOW_SECONDS` (default 5/86400).
+  Documentato in `docs/COMMUNITY_PLAN.md` §3.3; suite E2E dedicata
+  `tests/registration-ip-cap.test.mjs` (4 ok, 5a/6a 429, reset 24h, per-IP,
+  hash-only, rollback, knob).
+
 - Moderation access control implemented and documented
   ([ADR 0003](docs/decisions/0003-moderation-access-control.md)); rate limits
   added on submission routes.
