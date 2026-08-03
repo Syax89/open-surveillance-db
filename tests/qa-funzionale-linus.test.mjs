@@ -219,10 +219,13 @@ test("F3: la UPDATE di decideAppeal non deve ribaltare un appeal già deciso (gu
   const appeal = await db.prepare("SELECT id FROM moderation_appeals LIMIT 1").first();
 
   // Statement ESATTO di db/appeals.ts:320-324 (l'UPDATE finale di
-  // decideAppeal). Su un appeal con status='upheld' deve toccare 0 righe.
+  // decideAppeal) DOPO il fix F3: la guardia di stato atomica
+  // `AND status IN ('pending','escalated')` è nella UPDATE stessa (non solo
+  // nel SELECT precedente). Su un appeal con status='upheld' deve toccare 0
+  // righe — prima del fix la UPDATE non aveva la guardia e ne toccava 1.
   const result = await db
     .prepare(
-      "UPDATE moderation_appeals SET status = 'dismissed', decided_by = ?, decision_note = NULL, decided_at = ? WHERE id = ?",
+      "UPDATE moderation_appeals SET status = 'dismissed', decided_by = ?, decision_note = NULL, decided_at = ? WHERE id = ? AND status IN ('pending', 'escalated')",
     )
     .bind(reviewer.id, NOW, appeal.id)
     .run();
@@ -454,11 +457,18 @@ test("F7: il cap per-IP di registrazione regge anche con X-Forwarded-For ruotato
     );
     results.push(response.status);
   }
-  assert.equal(
-    results.filter((status) => status === 201).length,
-    5,
-    `il cap per-IP (5/24h) deve reggere anche ruotando X-Forwarded-For: ` +
-      `callerKey (rate-limit.ts:236) fida del primo hop senza cf-connecting-ip, ` +
-      `il cap è aggirabile. Status osservati: ${results.join(", ")}`,
+  // DOPO il fix: tutte le richieste senza cf-connecting-ip condividono il
+  // bucket "unknown" (una sola callerKey), quindi la sequenza è identica a
+  // quella di un singolo IP — 4 ok, 5a 429, 6a 429 — come pinnato da
+  // registration-ip-cap.test.mjs. Prima del fix ogni rotazione di XFF aveva
+  // una callerKey diversa e tutte e 6 le registrazioni passavano (cap
+  // aggirabile).
+  assert.deepEqual(
+    results,
+    [201, 201, 201, 201, 429, 429],
+    "il cap per-IP (5/24h) deve reggere anche ruotando X-Forwarded-For: " +
+      "callerKey (rate-limit.ts:236) NON deve fidarsi del primo hop senza " +
+      "cf-connecting-ip, il cap è aggirabile. Status osservati: " +
+      results.join(", "),
   );
 });

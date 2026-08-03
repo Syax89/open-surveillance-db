@@ -72,6 +72,12 @@ export async function purgeCacheTags(
   if (tags.length === 0) return { purged: false, reason: "no-tags" };
 
   try {
+    // QA F4 (t_894e0cc3): the moderation write path awaits purgeCacheTags
+    // INLINE after the D1 batch has already committed the decision (see
+    // app/api/moderation/route.ts) — a slow/hung Cloudflare Purge API must
+    // not hold the moderation response hostage (the moderator would retry
+    // and hit a 404 on an item that already transitioned). Same bounded
+    // AbortSignal.timeout pattern as the tiles and geocode fetches.
     const response = await fetch(`${PURGE_API}/${encodeURIComponent(zoneId)}/purge_cache`, {
       method: "POST",
       headers: {
@@ -79,6 +85,7 @@ export async function purgeCacheTags(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ tags: [...tags] }),
+      signal: AbortSignal.timeout(2500),
     });
     if (!response.ok) {
       console.warn(

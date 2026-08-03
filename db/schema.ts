@@ -508,6 +508,17 @@ export const moderationAppeals = sqliteTable(
   (table) => [
     index("moderation_appeals_status_idx").on(table.status),
     index("moderation_appeals_entity_idx").on(table.entity, table.entityId),
+    // QA F2 (t_894e0cc3): fileAppeal's SELECT-then-INSERT is not atomic —
+    // two concurrent POSTs on the same decision both pass the pending check
+    // and file two pending appeals. The partial UNIQUE index on
+    // (decision_event_id) WHERE status='pending' makes duplicate_pending
+    // atomic at the SQL level: the second INSERT fails (or ON CONFLICT DO
+    // NOTHING in fileAppeal), closing the race. The index is PARTIAL so an
+    // already-decided appeal does not block a later appeal on the same
+    // decision (the 409 is only for a second PENDING one).
+    uniqueIndex("moderation_appeals_pending_decision_unique")
+      .on(table.decisionEventId)
+      .where(sql`status = 'pending'`),
   ],
 );
 

@@ -142,15 +142,19 @@ test("environment overrides tune the per-route limits", () => {
   );
 });
 
-test("the caller key prefers the edge IP over forwarded hops", () => {
+test("the caller key prefers the edge IP and never trusts a spoofable X-Forwarded-For", () => {
   const request = new Request("https://osdb.test/api/cameras", {
     headers: { "cf-connecting-ip": "198.51.100.4", "x-forwarded-for": "203.0.113.9, 10.0.0.1" },
   });
   assert.equal(rateLimit.callerKey(request), "198.51.100.4");
+  // QA F7 (t_894e0cc3): without the edge IP the forwarded hop is NOT used —
+  // on a non-Cloudflare deployment X-Forwarded-For is client-controlled and
+  // trusting it would let an account farm reset every per-IP cap by rotating
+  // the header. Such a caller is "unknown" (one global bucket, fail-closed).
   const forwardedOnly = new Request("https://osdb.test/api/cameras", {
     headers: { "x-forwarded-for": "203.0.113.9, 10.0.0.1" },
   });
-  assert.equal(rateLimit.callerKey(forwardedOnly), "203.0.113.9");
+  assert.equal(rateLimit.callerKey(forwardedOnly), "unknown");
   assert.equal(rateLimit.callerKey(new Request("https://osdb.test/api/cameras")), "unknown");
 });
 

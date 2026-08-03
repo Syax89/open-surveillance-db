@@ -109,7 +109,18 @@ export async function POST(request: Request) {
   // cookie is HttpOnly + SameSite=Strict, and the state-changing request
   // must also pass the same-origin + double-submit CSRF checks, matching
   // every other authenticated write route (cameras, corrections, photos).
-  const session = await resolveOptionalContributor(request);
+  // QA F1 (t_894e0cc3): session resolution must NEVER escape the handler.
+  // A malformed cookie (parseCookies already degrades it to absent, see
+  // csrf.ts) or any transient resolution error makes the caller anonymous:
+  // resolveOptionalContributor is therefore wrapped so an unexpected throw
+  // answers 401 (anonymous) instead of a framework 500, and the per-IP
+  // bucket below still bounds abuse.
+  let session = null;
+  try {
+    session = await resolveOptionalContributor(request);
+  } catch (error) {
+    console.warn("POST /api/appeals could not resolve the session; treating as anonymous", error);
+  }
   if (!session) {
     return Response.json(
       { error: "Authentication required. Log in to file an appeal." },

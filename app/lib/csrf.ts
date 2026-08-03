@@ -40,7 +40,17 @@ export function parseCookies(request: Request): Record<string, string> {
     if (separator < 0) continue;
     const name = part.slice(0, separator).trim();
     const value = part.slice(separator + 1).trim();
-    if (name && cookies[name] === undefined) cookies[name] = decodeURIComponent(value);
+    // QA F1 (t_894e0cc3): a malformed percent-encoding (e.g. a truncated
+    // `%E0%A4%A`) makes decodeURIComponent throw URIError, which an
+    // unprotected parseCookies call would turn into a 503 / handler crash.
+    // A malformed cookie is an ABSENT cookie: treat the value as missing.
+    if (name && cookies[name] === undefined) {
+      try {
+        cookies[name] = decodeURIComponent(value);
+      } catch {
+        // percent-encoding malformato: il cookie è trattato come assente
+      }
+    }
   }
   return cookies;
 }

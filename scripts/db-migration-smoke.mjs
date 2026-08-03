@@ -157,6 +157,10 @@ const expectedIndexes = [
   "oidc_merge_requests_token_hash_unique",
   "oidc_merge_requests_contributor_idx",
   "oidc_merge_requests_expires_idx",
+  // Appeals duplicate-pending atomicity (0033, QA F2 t_894e0cc3): the
+  // partial UNIQUE index on (decision_event_id) WHERE status='pending'
+  // makes fileAppeal's duplicate check atomic at the SQL level.
+  "moderation_appeals_pending_decision_unique",
 ];
 // Tables that are not application schema but legitimately appear in a local
 // D1 database. Anything outside this set is an unexpected schema change.

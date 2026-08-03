@@ -232,15 +232,26 @@ export function checkRateLimitInMemory(
   return { allowed: true, retryAfterSeconds: 0 };
 }
 
-/** Best-effort caller identity: the edge-provided IP, then the first forwarded hop. */
+/**
+ * Best-effort caller identity: the edge-provided IP only.
+ *
+ * QA F7 (t_894e0cc3): on a deployment WITHOUT the Cloudflare edge (e.g. the
+ * local LXC prototype served over plain HTTP, worker/index.ts) the
+ * `X-Forwarded-For` header is entirely client-controlled. Trusting its first
+ * hop as the caller identity lets an account farm rotate the header on every
+ * request and reset EVERY per-IP cap (registration 5/24h, auth, submit,
+ * tiles, geocode). The edge-provided `cf-connecting-ip` is always present
+ * and authoritative behind Cloudflare; anywhere else the caller is unknown
+ * and shares one global bucket (fail-closed). A deployment behind a trusted
+ * non-Cloudflare proxy that needs per-client caps again must opt in
+ * explicitly (a TRUST_XFF knob is the documented follow-up; absent the knob,
+ * XFF is never trusted).
+ */
 export function callerKey(request: Request): string {
   const direct = request.headers.get("cf-connecting-ip");
   if (direct) return direct;
-  const forwarded = request.headers.get("x-forwarded-for");
-  if (forwarded) {
-    const firstHop = forwarded.split(",")[0]?.trim();
-    if (firstHop) return firstHop;
-  }
+  // Deliberately NOT reading x-forwarded-for here: without the edge, it is
+  // spoofable and would turn every cap into a no-op (QA F7).
   return "unknown";
 }
 
