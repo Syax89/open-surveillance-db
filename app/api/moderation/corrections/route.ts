@@ -37,7 +37,7 @@ export async function GET(request: Request) {
   const auth = await requireRole(request, "moderator");
   if (!auth.ok) return auth.response;
 
-  const blocked = moderationLimit(request);
+  const blocked = await moderationLimit(request);
   if (blocked) return blocked;
 
   const cameraId = Number(new URL(request.url).searchParams.get("cameraId"));
@@ -70,10 +70,10 @@ export async function GET(request: Request) {
  * authenticated reviewer gets a bounded read rate, and the alert signal is
  * emitted with a hashed caller identity only.
  */
-function moderationLimit(request: Request) {
+async function moderationLimit(request: Request) {
   const key = callerKey(request);
   const limitOptions = limitsFor("moderate", env);
-  const limit = checkRateLimit("moderate", key, limitOptions);
+  const limit = await checkRateLimit(env, "moderate", key, limitOptions);
   if (!limit.allowed) {
     console.warn("GET /api/moderation/corrections rate limited");
     recordRateLimitBlock(env, {

@@ -77,7 +77,7 @@ export async function GET(request: Request) {
   const kind: RouteKind = format === "csv" || format === "geojson" ? "export" : "read";
   const key = callerKey(request);
   const limitOptions = limitsFor(kind, env);
-  const limit = checkRateLimit(kind, key, limitOptions);
+  const limit = await checkRateLimit(env, kind, key, limitOptions);
   if (!limit.allowed) {
     console.warn(`GET /api/cameras rate limited (${kind} bucket)`);
     recordRateLimitBlock(env, {
@@ -182,7 +182,7 @@ export async function POST(request: Request) {
 
   const key = callerKey(request);
   const limitOptions = submissionLimits(env);
-  const limit = checkRateLimit("submit", key, limitOptions);
+  const limit = await checkRateLimit(env, "submit", key, limitOptions);
   if (!limit.allowed) {
     console.warn("POST /api/cameras rate limited");
     recordRateLimitBlock(env, {

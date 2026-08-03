@@ -265,10 +265,10 @@ function parseModerationRequest(value: unknown): ParsedModerationRequest {
  * authenticated reviewer gets a bounded moderate bucket, and the alert
  * signal is emitted with a hashed caller identity only.
  */
-function moderationLimit(request: Request) {
+async function moderationLimit(request: Request) {
   const key = callerKey(request);
   const limitOptions = limitsFor("moderate", env);
-  const limit = checkRateLimit("moderate", key, limitOptions);
+  const limit = await checkRateLimit(env, "moderate", key, limitOptions);
   if (!limit.allowed) {
     console.warn("/api/moderation rate limited");
     recordRateLimitBlock(env, {
@@ -343,7 +343,7 @@ export async function GET(request: Request) {
   const auth = await requireRole(request, "moderator");
   if (!auth.ok) return auth.response;
 
-  const blocked = moderationLimit(request);
+  const blocked = await moderationLimit(request);
   if (blocked) return blocked;
 
   try {
@@ -365,13 +365,16 @@ export async function PATCH(request: Request) {
 
   // Role gate: decisions are moderator+ only. The acting reviewer is derived
   // server-side from the authenticated user's linked reviewer profile instead
-  // of trusting a client-supplied actor id (ADR 0013 closes the ADR 0009
-  // trade-off). An admin-role user may act as any reviewer (stepping in for
-  // the demo actor selector); a moderator acts as their own reviewer only.
+  // of trusting a client-supplied actor id (ADR 0014 §3 closes the ADR 0009
+  // trade-off). Only the demo actor selector — admin-role callers on a
+  // development build (`ENVIRONMENT = "development"`) — may still pick another
+  // reviewer. Everywhere else the client actorId is IGNORED: an admin acts as
+  // their own reviewer like any moderator, so the append-only audit trail
+  // cannot be forged by impersonation (audit finding t_6b61fc3f).
   const auth = await requireRole(request, "moderator");
   if (!auth.ok) return auth.response;
 
-  const blocked = moderationLimit(request);
+  const blocked = await moderationLimit(request);
   if (blocked) return blocked;
 
   try {
@@ -386,8 +389,15 @@ export async function PATCH(request: Request) {
       );
     }
 
-    let actorId = payload.context.actorId;
-    if (auth.user.role !== "admin") {
+    let actorId: number;
+    if (env.ENVIRONMENT === "development" && auth.user.role === "admin") {
+      // Demo actor selector (development only): an admin may step in as any
+      // reviewer. Never honoured in production, where the actor is always
+      // server-derived — honouring a client-chosen id here would let an admin
+      // write moderation events as another reviewer, corrupting the
+      // append-only audit trail.
+      actorId = payload.context.actorId;
+    } else {
       const reviewer = await getReviewerByUserId(auth.user.id);
       if (!reviewer) {
         return Response.json(

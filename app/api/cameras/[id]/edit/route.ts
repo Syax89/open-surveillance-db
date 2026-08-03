@@ -39,7 +39,7 @@ export async function GET(request: Request) {
 
   const key = callerKey(request);
   const limitOptions = limitsFor("read", env);
-  const limit = checkRateLimit("read", key, limitOptions);
+  const limit = await checkRateLimit(env, "read", key, limitOptions);
   if (!limit.allowed) {
     console.warn("GET /api/cameras/[id]/edit rate limited");
     recordRateLimitBlock(env, {

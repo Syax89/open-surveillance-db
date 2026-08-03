@@ -95,3 +95,6 @@ auth provider can be attached without a schema change.
 - Trade-off: no authorization is cryptographically enforced in the prototype —
   the API trusts the client-supplied `actorId`. Acceptable for local demo
   mode; the public-alpha auth ticket must make `actorId` server-derived.
+  **Closed by ADR 0014 §3 and audit finding t_6b61fc3f:** the acting reviewer
+  is always derived server-side via `getReviewerByUserId`; the demo actor
+  selector survives only behind `ENVIRONMENT = "development"`.

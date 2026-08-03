@@ -32,7 +32,7 @@ export async function GET(request: Request) {
   // own bucket independent of the plain read and export buckets.
   const key = callerKey(request);
   const limitOptions = limitsFor("nearby", env);
-  const rateLimit = checkRateLimit("nearby", key, limitOptions);
+  const rateLimit = await checkRateLimit(env, "nearby", key, limitOptions);
   if (!rateLimit.allowed) {
     console.warn("GET /api/cameras/nearby rate limited");
     recordRateLimitBlock(env, {

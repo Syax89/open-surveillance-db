@@ -335,6 +335,23 @@ changes accumulate under `[Unreleased]`.
 
 ### Fixed
 
+- Audit finding MEDIUM #2 (t_6b61fc3f, Ada): `PATCH /api/moderation` accepted
+  a client-supplied `actorId` for admin-role callers ("stepping in for the
+  demo actor selector"), letting an admin write moderation events as ANOTHER
+  reviewer and corrupt the append-only audit trail in production. The acting
+  reviewer is now ALWAYS derived server-side via `getReviewerByUserId` — an
+  admin acts as their own reviewer like any moderator. The demo actor
+  selector survives only behind the development flag `ENVIRONMENT =
+  "development"` (set locally via `.dev.vars`, gitignored; unset = production,
+  fail-closed; documented in worker-configuration.d.ts and ADR 0014 §3).
+  Client actorId values outside that dev-only path are ignored, never
+  honoured. Tests: new actor-identity suite in `tests/api-moderation.test.mjs`
+  (admin in production ignores the spoofed id; admin in development keeps the
+  demo selector; moderator in development still server-derived; no-reviewer
+  profile 403) and `tests/auth-flow-e2e.test.mjs` rewritten — a spoofed
+  actorId with admin identity now fails the role matrix and the escalated
+  event lands on the server-derived reviewer, never the spoofed id.
+
 - P1-1 reset-password/request binary account-existence oracle (t_11b6a22d,
   Ada security review): the 3/h reset budget branch answered `429 Too many
   reset emails` ONLY for registered addresses, while unknown addresses always
@@ -444,6 +461,22 @@ changes accumulate under `[Unreleased]`.
   leaves no object behind and the retry stores exactly one.
 
 ### Security
+
+- **Rate limiting — Cloudflare Workers Rate Limiting binding (audit #3,
+  MEDIUM, t_dff3dadf):** the four critical public route families (auth,
+  write/submissions, read, tiles) no longer rely on the per-isolate
+  in-memory buckets, which a caller could bypass by spreading a burst across
+  worker isolates on a multi-isolate deployment. `app/lib/rate-limit.ts` now
+  prefers the `ratelimits` bindings declared in `wrangler.jsonc`
+  (`AUTH_LIMITER`, `WRITE_LIMITER`, `READ_LIMITER`, `TILES_LIMITER`,
+  namespace_id self-defined per the platform docs) and falls back to the
+  in-memory sliding window only when a binding is absent — local dev, the
+  test suite, staging without the binding (documented in
+  `docs/DEVELOPMENT_SETUP.md` §2.2). Binding thresholds mirror the current
+  per-family defaults (pending Ada sign-off); the env knobs remain the
+  source of truth for the fallback and the unbound families. New
+  `tests/rate-limit-binding.test.mjs` pins the selection logic and the
+  429/Retry-After contract on both backends.
 
 - Moderation access control implemented and documented
   ([ADR 0003](docs/decisions/0003-moderation-access-control.md)); rate limits

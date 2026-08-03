@@ -208,19 +208,26 @@ proposed).
 - **Nav/footer:** in tool nav (`ToolLayout`); also linked from the home nav
   and the global footer (F3, t_2ca69725).
 
-### `/directory` — Directory (implemented, F1 t_03c0fa15; catalog t_127492f1)
+### `/directory` — Directory (implemented, F1 t_03c0fa15; catalog t_127492f1; browse redesign t_f13fcb1c)
 
 - **Purpose:** the searchable text directory, the keyboard/AT-equivalent of
-  the map. Search, low-risk filters (type, freshness), sort, result count,
-  truthful empty state, server-side pagination.
+  the map. Browse (A–Z index + pagination `?page=`), search, low-risk filters
+  (type, freshness), sort, result count, truthful empty state, server-side
+  pagination.
 - **Content:** `app/(tools)/directory/page.tsx` + `DirectoryTool`
   (`app/components/tools/DirectoryTool.tsx`, `"use client"`), reusing
-  `FiltersBar` (`bare`), `EmptyState`, `RecordCard` (righe contestuali in
-  `.directory-tool .record-list`). Since
-  t_127492f1 the page is a **flat catalog**: tool heading (with "Use the map
-  instead" action) → controls row → results meta row (count + CSV/GeoJSON
-  export of the filtered set + collapsible place-search panel) → one-column
-  flat rows. Bundle: `directory.ts`.
+  `FiltersBar` (`bare`, con `extraControls` per il toggle luogo), `EmptyState`,
+  `RecordCard` (righe contestuali in `.directory-tool .record-list`). Since
+  t_127492f1/t_f13fcb1c the page is a **browse catalog** ("indice editoriale",
+  `docs/design/browse-record-redesign.md`): tool heading (with "Use the map
+  instead" action) → controls (search full-width + type/freshness/sort/reset +
+  toggle luogo) → collapsible place-search panel (card) → visible results
+  header (h2 + count + CSV/GeoJSON buttons) → active-filter chips → A–Z index
+  → one-column flat rows → pagination (Showing X–Y of Z · Page N of M).
+  Bundle: `directory.ts`.
+- **URL state:** the six dimensions of `useCameraFilters` (`?q= ?type=
+  ?freshness= ?sort= ?focus= ?page=`); `page` is reset to 1 by every filter
+  change and omitted when 1; /mappa parses it but never sets it.
 - **SEO:** the only tool page with real SEO value (`docs/FRONTEND_PLAN.md`
   §1.3) — indexable, own metadata.
 - **Nav/footer:** in tool nav (`ToolLayout`); also linked from the home nav

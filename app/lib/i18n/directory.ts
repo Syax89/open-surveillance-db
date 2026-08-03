@@ -34,6 +34,16 @@ export const en = {
   exportCsv: "Download CSV",
   exportGeoJson: "Download GeoJSON",
   exportHint: "Exports apply the current type and freshness filters.",
+  // Catalog mode (t_f13fcb1c): the visible results header, the active-filter
+  // chips, the alphabetical index and the pagination bar.
+  activeFilters: "Active filters",
+  removeFilter: (label: string) => `Remove filter: ${label}`,
+  alphaIndexTitle: "Alphabetical index",
+  alphaIndexAria: (letter: string) => `Jump to records starting with ${letter}`,
+  showingRecords: (from: number, to: number, total: number) => `Showing ${from}–${to} of ${total} records`,
+  pageOf: (page: number, pages: number) => `Page ${page} of ${pages}`,
+  previousPage: "Previous page",
+  nextPage: "Next page",
   // Catalog mode: the place-search panel trigger in the results meta row
   // (the panel itself keeps the historical place-search strings).
   searchNearPlace: "Search near a place…",
@@ -127,6 +137,16 @@ export const it: Translation<typeof en> = {
   exportCsv: "Scarica CSV",
   exportGeoJson: "Scarica GeoJSON",
   exportHint: "Gli export applicano i filtri di tipo e aggiornamento correnti.",
+  // Modalità catalogo (t_f13fcb1c): header risultati visibile, chips dei
+  // filtri attivi, indice alfabetico e barra di paginazione.
+  activeFilters: "Filtri attivi",
+  removeFilter: (label: string) => `Rimuovi filtro: ${label}`,
+  alphaIndexTitle: "Indice alfabetico",
+  alphaIndexAria: (letter: string) => `Vai ai record che iniziano con ${letter}`,
+  showingRecords: (from: number, to: number, total: number) => `Mostrando ${from}–${to} di ${total} record`,
+  pageOf: (page: number, pages: number) => `Pagina ${page} di ${pages}`,
+  previousPage: "Pagina precedente",
+  nextPage: "Pagina successiva",
   // Modalità catalogo: trigger del pannello ricerca-per-luogo nella riga
   // meta dei risultati (il pannello conserva le stringhe storiche).
   searchNearPlace: "Cerca vicino a un luogo…",

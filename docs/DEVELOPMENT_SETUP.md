@@ -56,6 +56,30 @@ curl -s -o /dev/null -w '%{http_code}\n' http://localhost:3000/moderation # 503 
 The moderation route intentionally answers `503 Moderation is unavailable.`
 without configured credentials; that is the fail-closed default, not a bug.
 
+### 2.2 Rate limiting in local development
+
+The rate limiter (`app/lib/rate-limit.ts`) has two backends, selected per
+route family at runtime:
+
+- **Cloudflare Workers Rate Limiting binding** (`AUTH_LIMITER` /
+  `WRITE_LIMITER` / `READ_LIMITER` / `TILES_LIMITER`, declared in
+  `wrangler.jsonc` `ratelimits`) — the production backend for the four
+  critical public families (auth, write, read, tiles; audit #3, MEDIUM).
+- **In-memory sliding window** — the fallback, used whenever the binding is
+  absent from `env`.
+
+Local development and the test suite run **without** the bindings: `npm run
+dev` and the route harness (`tests/helpers/api-harness.mjs`) do not inject
+them, so the in-memory backend enforces the per-route limits exactly like
+before (single-isolate scope — fine locally, never the public API). You can
+verify this by lowering a knob, e.g. `AUTH_RATE_LIMIT_MAX=1` in `.dev.vars`
+and hammering `/api/auth/login`: the second request from the same caller
+answers `429` with `Retry-After`. The env knobs
+(`*_RATE_LIMIT_MAX` / `*_RATE_LIMIT_WINDOW_SECONDS`) are the source of truth
+for the in-memory backend; in production the four bound families are enforced
+by the binding's `simple.limit` / `simple.period` in `wrangler.jsonc`
+instead (see `docs/DEPLOYMENT.md`).
+
 ## 3. How the local database works
 
 The schema comes exclusively from the versioned Drizzle migrations in
