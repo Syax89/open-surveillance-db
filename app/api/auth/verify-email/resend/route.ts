@@ -1,14 +1,9 @@
 import { env } from "cloudflare:workers";
-import {
-  countVerificationTokensSentSince,
-  createVerificationToken,
-  VERIFICATION_SEND_LIMIT,
-  VERIFICATION_SEND_WINDOW_MS,
-} from "../../../../../db/auth";
+import { createVerificationToken } from "../../../../../db/auth";
 import { resolveOptionalContributor } from "../../../../lib/auth-session";
 import { authLimit } from "../../../../lib/auth-route-helpers";
 import { sameOrigin } from "../../../../lib/csrf";
-import { sendVerificationEmail } from "../../../../lib/mailer";
+import { canSendAuthEmail, sendAuthEmail } from "../../../../../db/mailer";
 import { urlTooLong } from "../../../../lib/input-limits";
 
 /**
@@ -20,11 +15,15 @@ import { urlTooLong } from "../../../../lib/input-limits";
  * account is already verified the endpoint answers 200 with
  * `verified: true` and sends nothing (idempotent no-op, no error).
  *
- * Send budget: 3 verification emails per hour per contributor (counted over
- * rows created in the window — register's own email counts as the first
- * send). The 4th attempt answers 429 with Retry-After before any token or
- * mail work happens. Creating the new token atomically revokes every older
- * unused verify token for the account, so only the newest link works.
+ * Send budget: 3 auth emails per hour per contributor, counted over
+ * `email_send_log` rows (the canonical mailer budget, ADR 0020 decision 2 —
+ * the log row is written ONLY after the provider accepted the email, so a
+ * failed send never consumes the budget and register's own email counts as
+ * the first send). The 4th attempt answers 429 with Retry-After before any
+ * token or mail work happens, so a blocked request never mints a new token
+ * (which would revoke the previous, still-valid link). Creating the new
+ * token atomically revokes every older unused verify token for the account,
+ * so only the newest link works.
  *
  * Guard order mirrors the other auth mutations: urlTooLong -> sameOrigin ->
  * auth rate-limit -> session (401) -> budget (429) -> token+mail.
@@ -52,37 +51,47 @@ export async function POST(request: Request) {
     }
 
     const now = new Date().toISOString();
-    const since = new Date(Date.now() - VERIFICATION_SEND_WINDOW_MS).toISOString();
-    const sent = await countVerificationTokensSentSince(
-      resolved.contributor.id,
-      "verify",
-      since,
-    );
-    if (sent >= VERIFICATION_SEND_LIMIT) {
-      // The budget counts emails already produced (register = 1). Retry-After
-      // is the remaining window, at least 1s.
-      const retryAfterSeconds = Math.max(
-        1,
-        Math.ceil((Date.parse(now) - Date.parse(since)) / 1000),
-      );
+    // Pre-flight budget check BEFORE minting: a blocked request must not
+    // revoke the previous link by creating a token it will never mail.
+    // sendAuthEmail re-checks inside (authoritative), so this is only the
+    // fast 429 path — the canonical check still gates the provider call.
+    const decision = await canSendAuthEmail(resolved.contributor.id, now, env);
+    if (!decision.allowed) {
       return Response.json(
         { error: "Too many verification emails. Please try again later." },
-        { status: 429, headers: { ...NO_STORE_HEADERS, "Retry-After": String(retryAfterSeconds) } },
+        { status: 429, headers: { ...NO_STORE_HEADERS, "Retry-After": String(decision.retryAfterSeconds) } },
       );
     }
 
     const { rawToken } = await createVerificationToken(resolved.contributor.id, "verify", now);
-    const mail = await sendVerificationEmail(env, {
+    const mail = await sendAuthEmail({
+      contributorId: resolved.contributor.id,
       to: resolved.contributor.email,
+      kind: "verify",
       rawToken,
-      requestOrigin: new URL(request.url).origin,
+      nowIso: now,
     });
 
-    // The register contract is mirrored here: the dev/test fallback returns
-    // the link so local flows can complete; a real deployment never echoes it.
-    const payload: Record<string, unknown> = { sent: true };
-    if (!mail.delivered && mail.devLink) payload.devLink = mail.devLink;
-    return Response.json(payload, { headers: NO_STORE_HEADERS });
+    if (!mail.ok && mail.reason === "rate_limited") {
+      // A concurrent request won the window between the pre-flight and the
+      // send. Answer 429 like the pre-flight would have.
+      return Response.json(
+        { error: "Too many verification emails. Please try again later." },
+        { status: 429, headers: { ...NO_STORE_HEADERS, "Retry-After": String(mail.retryAfterSeconds) } },
+      );
+    }
+    if (!mail.ok) {
+      // missing_config (VERIFY_BASE_URL unset) or provider rejection: the
+      // email did not go out. Honest failure — the raw token is NEVER
+      // echoed; the user can retry once the deployment is fixed.
+      console.error("POST /api/auth/verify-email/resend mail failed", mail);
+      return Response.json(
+        { error: "Unable to resend the verification email" },
+        { status: 503, headers: NO_STORE_HEADERS },
+      );
+    }
+
+    return Response.json({ sent: true }, { headers: NO_STORE_HEADERS });
   } catch (error) {
     console.error("POST /api/auth/verify-email/resend failed", error);
     return Response.json({ error: "Unable to resend the verification email" }, { status: 503, headers: NO_STORE_HEADERS });

@@ -1,18 +1,15 @@
 import { env } from "cloudflare:workers";
 import {
-  countVerificationTokensSentSince,
   createVerificationToken,
   findContributorByEmail,
   isValidEmail,
   normalizeEmail,
-  VERIFICATION_SEND_LIMIT,
-  VERIFICATION_SEND_WINDOW_MS,
 } from "../../../../../db/auth";
 import { authLimit } from "../../../../lib/auth-route-helpers";
 import { sameOrigin } from "../../../../lib/csrf";
 import { isRecord } from "../../../../lib/guards";
 import { BodyReadError, readJsonBody, urlTooLong } from "../../../../lib/input-limits";
-import { sendPasswordResetEmail } from "../../../../lib/mailer";
+import { canSendAuthEmail, sendAuthEmail } from "../../../../../db/mailer";
 
 /**
  * POST /api/auth/reset-password/request — start a password reset
@@ -24,12 +21,14 @@ import { sendPasswordResetEmail } from "../../../../lib/mailer";
  * reset token is created and the mailer invoked); unknown addresses consume
  * the same request path and cost the same response.
  *
- * Budget: 3 reset emails per hour per CONTRIBUTOR (reset purpose has its
- * own budget, independent from the verify budget). Past the budget the
- * route keeps answering the generic 200 `{ sent: true }` WITHOUT minting a
- * token or sending mail — a 429 here would be reachable only for registered
- * addresses and turn the route into a binary existence oracle. The per-IP
- * `auth` bucket bounds raw request volume regardless of the address.
+ * Budget: 3 auth emails per hour per CONTRIBUTOR, counted over
+ * `email_send_log` rows (canonical mailer budget, ADR 0020 decision 2 — the
+ * log row is written ONLY after the provider accepted the email, so a
+ * failed send never consumes the budget). Past the budget the route keeps
+ * answering the generic 200 `{ sent: true }` WITHOUT minting a token or
+ * sending mail — a 429 here would be reachable only for registered addresses
+ * and turn the route into a binary existence oracle. The per-IP `auth`
+ * bucket bounds raw request volume regardless of the address.
  *
  * The link goes to the client-side reset page (Fase E2 UI), which calls
  * POST /api/auth/reset-password/confirm with the token + new password.
@@ -60,22 +59,30 @@ export async function POST(request: Request) {
     if (!contributor) return ok();
 
     const now = new Date().toISOString();
-    const since = new Date(Date.now() - VERIFICATION_SEND_WINDOW_MS).toISOString();
-    const sent = await countVerificationTokensSentSince(contributor.id, "reset", since);
-    if (sent >= VERIFICATION_SEND_LIMIT) {
-      // Budget exhausted: still answer the generic success. A 429 here would
-      // be reachable only for registered addresses (unknown emails always get
-      // 200 { sent: true }), turning the route into a binary existence oracle.
-      // No token is minted and no mail is sent — the budget still caps real
-      // emails at VERIFICATION_SEND_LIMIT per window.
+    // Pre-flight budget check BEFORE minting: a blocked request must not
+    // revoke the previous link by creating a token it will never mail.
+    // sendAuthEmail re-checks inside (authoritative), so this is only the
+    // fast path for known accounts.
+    const decision = await canSendAuthEmail(contributor.id, now, env);
+    if (!decision.allowed) {
+      // Budget exhausted: still answer the generic success (anti-enumeration).
+      // A 429 here would be reachable only for registered addresses (unknown
+      // emails always get 200 { sent: true }), turning the route into a binary
+      // existence oracle. No token is minted and no mail is sent — the budget
+      // still caps real emails at the canonical limit per window.
       return ok();
     }
 
     const { rawToken } = await createVerificationToken(contributor.id, "reset", now);
-    await sendPasswordResetEmail(env, {
+    // Mail result is deliberately swallowed: the reset endpoint is public
+    // and must answer `{ sent: true }` even if the provider rejects — the
+    // response can never reveal whether the address is registered.
+    await sendAuthEmail({
+      contributorId: contributor.id,
       to: contributor.email,
+      kind: "reset",
       rawToken,
-      requestOrigin: new URL(request.url).origin,
+      nowIso: now,
     });
     return ok();
   } catch (error) {

@@ -17,7 +17,7 @@ import {
 import { sameOrigin } from "../../../lib/csrf";
 import { isRecord } from "../../../lib/guards";
 import { BodyReadError, readJsonBody, urlTooLong } from "../../../lib/input-limits";
-import { sendVerificationEmail } from "../../../lib/mailer";
+import { sendAuthEmail } from "../../../../db/mailer";
 
 /**
  * POST /api/auth/register — create a contributor account and open a
@@ -26,8 +26,8 @@ import { sendVerificationEmail } from "../../../lib/mailer";
  * Registration now proves mailbox control before the account can write:
  *   1. the contributor is created with `email_verified_at = NULL`;
  *   2. a single-use, 24h verification token is minted (hash-only in D1) and
- *      emailed via the Cloudflare `send_email` binding (dev/test fallback:
- *      the link is logged and echoed as `verification.devLink`);
+ *      emailed via the Cloudflare `send_email` binding (canonical mailer
+ *      db/mailer.ts, ADR 0020 — render → rate-limit → send → log);
  *   3. a session is opened exactly as before — but it is READ-ONLY until
  *      `email_verified_at` is set: the write gate (Fase E1) refuses every
  *      state-changing write for unverified accounts (403). GET /api/auth/me
@@ -36,8 +36,9 @@ import { sendVerificationEmail } from "../../../lib/mailer";
  *
  * Mail is best-effort and NEVER fails registration: a mail outage still
  * returns 201 (the user can re-send from the session via
- * POST /api/auth/verify-email/resend). `verification.devLink` is present
- * ONLY in the no-binding fallback — a real deployment never echoes the token.
+ * POST /api/auth/verify-email/resend). `verification.sent` is true ONLY
+ * when the provider accepted the email; the raw token NEVER appears in the
+ * response (it lives only in the email — fail-closed, no dev-link echo).
  *
  * The email+password contract from ADR 0013 is unchanged (PBKDF2 hashing,
  * no magic links, cookies `osdb_session` + `osdb_csrf`).
@@ -96,15 +97,17 @@ export async function POST(request: Request) {
       throw error;
     }
 
-    // Verification link (Fase B): mint + mail. The raw token lives only in
-    // the email (hash-only in D1); the mailer swallows send failures so a
-    // mail outage never breaks registration.
+    // Verification link (Fase B): mint + mail through the canonical mailer.
+    // The raw token lives only in the email (hash-only in D1); the mailer
+    // swallows send failures so a mail outage never breaks registration.
     const now = new Date().toISOString();
     const { rawToken } = await createVerificationToken(contributor.id, "verify", now);
-    const mail = await sendVerificationEmail(env, {
+    const mail = await sendAuthEmail({
+      contributorId: contributor.id,
       to: contributor.email,
+      kind: "verify",
       rawToken,
-      requestOrigin: new URL(request.url).origin,
+      nowIso: now,
     });
 
     const { rawToken: sessionRawToken, csrfToken } = await createSession(contributor.id, {
@@ -114,11 +117,10 @@ export async function POST(request: Request) {
       // cookie is gone, or expire sessions the client still holds).
       ttlSeconds: sessionTtlSeconds(env),
     });
-    const verification: Record<string, unknown> = { sent: mail.delivered };
-    // Dev/test fallback only: with no EMAIL binding the mailer returns
-    // the action link so local flows can complete verification; production
-    // (binding present) never exposes the token in an API response.
-    if (!mail.delivered && mail.devLink) verification.devLink = mail.devLink;
+    // sent = the provider accepted the email. No devLink, ever: the token is
+    // only in the mail channel, so a misconfigured deployment (missing EMAIL
+    // binding / VERIFY_BASE_URL) cannot leak it through the API.
+    const verification = { sent: mail.ok };
     return Response.json(
       { contributor, verification },
       { status: 201, headers: cookieHeaderInit(sessionCookieHeaders(sessionRawToken, csrfToken, env)) },
