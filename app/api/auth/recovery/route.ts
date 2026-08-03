@@ -8,7 +8,7 @@ import {
 } from "../../../../db/auth";
 import { consumeRecoveryCode } from "../../../../db/passkeys";
 import { sessionCookieHeaders, sessionTtlSeconds } from "../../../lib/auth-session";
-import { authLimit, cookieHeaderInit } from "../../../lib/auth-route-helpers";
+import { authLimit, cookieHeaderInit, sessionGate } from "../../../lib/auth-route-helpers";
 import { sameOrigin } from "../../../lib/csrf";
 import { isRecord } from "../../../lib/guards";
 import { BodyReadError, readJsonBody, urlTooLong } from "../../../lib/input-limits";
@@ -23,9 +23,18 @@ import { BodyReadError, readJsonBody, urlTooLong } from "../../../lib/input-limi
  * the user who lost their authenticator must enroll a fresh one from the
  * /account page (Fase E2 UX). The account's other passkeys stay valid.
  *
- * Anti-enumeration: unknown email, wrong code and already-used code all
- * answer the same generic 401. The per-IP auth rate limit throttles
- * guessing; the code itself carries 96 bits of entropy.
+ * Verification gate (t_f940482b, CEO decision (a) — "login bloccato finché
+ * email non verificata"): like every other session-opening method, recovery
+ * refuses an account whose `email_verified_at` is NULL with the SAME
+ * generic 401 as a wrong code — the code IS consumed on the denied
+ * redemption (it was valid and single-use; the account state is what blocks
+ * the session), but no session, no lockout. An unverified account cannot
+ * hold any login session; its only session is the read-only one from
+ * register. Shared choke-point: sessionGate.
+ *
+ * Anti-enumeration: unknown email, wrong code, used code and unverified
+ * account all answer the same generic 401. The per-IP auth rate limit
+ * throttles guessing; the code itself carries 96 bits of entropy.
  */
 export async function POST(request: Request) {
   if (urlTooLong(request)) {
@@ -66,6 +75,14 @@ export async function POST(request: Request) {
     if (!publicContributor) {
       return Response.json({ error: "Invalid recovery code." }, { status: 401 });
     }
+
+    // Verification gate (t_f940482b, CEO decision (a)): a valid redemption
+    // for an unverified account does not open a session — same generic 401
+    // as a wrong code (anti-enumeration). The code was already consumed
+    // above: it was valid and single-use, the account state is what blocks
+    // the session. No lockout, no session. Shared choke-point: sessionGate.
+    const denied = sessionGate(publicContributor, "Invalid recovery code.");
+    if (denied) return denied;
 
     const { rawToken, csrfToken } = await createSession(contributor.id, {
       ttlSeconds: sessionTtlSeconds(env),

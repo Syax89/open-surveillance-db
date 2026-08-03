@@ -14,7 +14,7 @@ import {
   updatePasskeyCounter,
 } from "../../../../../../db/passkeys";
 import { sessionCookieHeaders, sessionTtlSeconds } from "../../../../../lib/auth-session";
-import { authLimit, cookieHeaderInit } from "../../../../../lib/auth-route-helpers";
+import { authLimit, cookieHeaderInit, sessionGate } from "../../../../../lib/auth-route-helpers";
 import { sameOrigin } from "../../../../../lib/csrf";
 import { isRecord } from "../../../../../lib/guards";
 import { BodyReadError, readJsonBody, urlTooLong } from "../../../../../lib/input-limits";
@@ -151,9 +151,18 @@ export async function POST(request: Request) {
     await updatePasskeyCounter(passkey.id, authenticationInfo.newCounter);
 
     const contributor = (await getContributorById(passkey.contributorId)) as PublicContributor | null;
-    if (!contributor) {
-      return Response.json({ error: "Passkey verification failed." }, { status: 401 });
-    }
+
+    // Verification gate (CEO feedback 2026-08-03, t_6dc1c96f option (a),
+    // extended to passkey by t_f940482b): a VALID assertion for an account
+    // whose email is not yet verified must NOT open a session — same generic
+    // 401 as every other failure (anti-enumeration), enforced AFTER the full
+    // verification cost (challenge consume, signature, counter), no lockout
+    // (a valid assertion is not a credential failure), no session. The
+    // passkey stays enrolled and becomes usable once the account verifies —
+    // enrollment is deliberately allowed pre-verification (register/begin
+    // documents the choice). Shared choke-point: sessionGate.
+    const denied = sessionGate(contributor, "Passkey verification failed.");
+    if (denied) return denied;
 
     const { rawToken, csrfToken } = await createSession(passkey.contributorId, {
       ttlSeconds: sessionTtlSeconds(env),
