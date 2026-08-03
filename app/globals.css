@@ -281,7 +281,7 @@ button { cursor:pointer; }
 .record-search p, .search-count { margin:8px 0 0; color:var(--muted); font-size:var(--text-sm); line-height:1.45; }
 .search-count { margin-top:23px; font-weight:800; }
 .record-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--space-4); margin:16px 0 0; padding:0; list-style:none; }
-.record-list-card { min-height:270px; display:grid; grid-template-rows:auto 1fr auto; gap:22px; padding:var(--space-6); border:1px solid var(--line); border-radius:var(--radius-lg); background:#fffef9; }
+.record-list-card { min-height:270px; display:grid; grid-template-rows:auto 1fr auto; gap:22px; padding:var(--space-6); border:1px solid #b9c7bf; border-radius:var(--radius-lg); background:#fff; box-shadow:0 1px 2px rgba(16,35,50,.05), 0 6px 16px rgba(16,35,50,.06); }
 .record-list-card .card-topline { margin:0; }
 .record-list-card h3 { margin:13px 0 6px; font-size:var(--text-5xl); letter-spacing:-.04em; line-height:1.08; font-weight:700; }
 .record-kind { margin:0; color:#60737d; font-size:var(--text-base); }
@@ -300,7 +300,7 @@ button { cursor:pointer; }
    byte-identical (the a11y suite counts `class="record-list-card"`) and
    the home hub / moderation grids keep their own cards. */
 .directory-tool .record-list { grid-template-columns:1fr; gap:var(--space-3); }
-.directory-tool .record-list .record-list-card { min-height:0; display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,1.9fr) auto; grid-template-rows:none; gap:var(--space-5); align-items:center; padding:var(--space-4) var(--space-5); border:1px solid var(--line); border-left-width:3px; border-radius:var(--radius-lg); background:#fffef9; }
+.directory-tool .record-list .record-list-card { min-height:0; display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,1.9fr) auto; grid-template-rows:none; gap:var(--space-5); align-items:center; padding:var(--space-4) var(--space-5); border:1px solid #b9c7bf; border-left-width:3px; border-radius:var(--radius-lg); background:#fff; }
 .directory-tool .record-list .record-list-card .card-topline { margin:0 0 5px; }
 .directory-tool .record-list .record-list-card h3 { margin:0; font-size:var(--text-2xl); letter-spacing:-.03em; line-height:1.25; }
 .directory-tool .record-list .record-list-card .record-kind { margin:4px 0 0; font-size:var(--text-sm); }
@@ -314,26 +314,32 @@ button { cursor:pointer; }
 .directory-tool .record-list .record-list-card dd { margin:0; color:var(--ink); font-size:var(--text-sm); line-height:1.4; overflow-wrap:anywhere; font-variant-numeric:tabular-nums; }
 .directory-tool .record-list .record-list-card .record-list-actions { justify-content:flex-end; gap:var(--space-5); }
 .directory-tool .record-list .record-list-card .text-button { min-height:44px; display:inline-flex; align-items:center; }
-/* Status accent (t_d089a17e, CEO 2026-08-03): every public record
-   card/row carries a 3px LEFT RAIL in its status token colour + a tenue
-   9% tint of the same token over the card background — the box reads as
-   ONE object with a state, never as a random transparent row. Colour is
-   NEVER the only signal (WCAG 1.4.1): the status-dot and its text label
-   stay in the card topline, and the two lightest text colours are
-   darkened here to hold >=4.5:1 on the tints (verified #eef6ed is the
-   darkest — see the contrast table in the PR). Tints are PRECOMPUTED
-   from the --status-* tokens (9% over #fffef9); regenerate if a token
-   changes. Scoped to the public list surfaces (.records-section = home
-   hub + /directory catalog; moderation grids keep their own cards). No
-   global token changes — the --status-* tokens are untouched (no ADR). */
+/* Status accent (t_d089a17e, CEO 2026-08-03; fix t_d52fde50 CEO feedback 2):
+   every public record card/row carries a 3px LEFT RAIL in its status token
+   colour + a precomputed tint of the same token over the card background —
+   the box reads as ONE object with a state, never as a random transparent
+   row. Colour is NEVER the only signal (WCAG 1.4.1): the status-dot and its
+   text label stay in the card topline. CEO feedback 2 (t_d52fde50): the
+   9%-over-#fffef9 tints were nearly identical to --paper (#f5f3ec), so the
+   cards still read as transparent. The tints are now 14% over #fff and the
+   card surfaces are white with a scoped darker border (#b9c7bf) + a soft
+   shadow — the box is evident on the paper while the tint stays a subtle
+   status wash. The two lightest text colours are darkened here to hold
+   >=4.5:1 on every tint (verified #e5f3ec is the darkest — worst pair
+   #576d77-on-#faebe8 = 4.69:1, see contrast table in the PR). Tints are
+   PRECOMPUTED from the --status-* tokens (14% over #ffffff); regenerate if
+   a token changes. Scoped to the public list surfaces (.records-section =
+   home hub + /directory catalog; moderation grids keep their own cards).
+   No global token changes — the --status-* tokens are untouched (no ADR). */
 .records-section .record-list .record-list-card { border-left-width:3px; }
 .records-section .record-list .record-list-card .card-topline { color:var(--muted); }
 .records-section .record-list .record-list-card .record-kind { color:#576d77; }
-.records-section .record-list .record-list-card:has(.status-dot.verified) { border-left-color:var(--status-verified); background:#eef6ed; }
-.records-section .record-list .record-list-card:has(.status-dot.community-report) { border-left-color:var(--status-community); background:#fbf5e8; }
-.records-section .record-list .record-list-card:has(.status-dot.needs-review) { border-left-color:var(--status-review); background:#fbf1eb; }
-.records-section .record-list .record-list-card:has(.status-dot.pending) { border-left-color:var(--status-pending); background:#f4f5f1; }
-.records-section .record-list .record-list-card:has(.status-dot.demo) { border-left-color:var(--status-demo); background:#f1f2f2; }
+.records-section .record-list .record-list-card dt { color:#576d77; }
+.records-section .record-list .record-list-card:has(.status-dot.verified) { border-left-color:var(--status-verified); background:#e5f3ec; }
+.records-section .record-list .record-list-card:has(.status-dot.community-report) { border-left-color:var(--status-community); background:#f9f0e4; }
+.records-section .record-list .record-list-card:has(.status-dot.needs-review) { border-left-color:var(--status-review); background:#faebe8; }
+.records-section .record-list .record-list-card:has(.status-dot.pending) { border-left-color:var(--status-pending); background:#eff0f1; }
+.records-section .record-list .record-list-card:has(.status-dot.demo) { border-left-color:var(--status-demo); background:#e9ecf3; }
 .empty-state { max-width:650px; margin-top:16px; padding:28px; border:1px dashed #b9c7bf; border-radius:var(--radius-lg); background:#eef4ea; }
 .empty-state h2, .empty-state h3 { margin:0; font-size:var(--text-4xl); letter-spacing:-.035em; font-weight:700; }
 /* F4 (P3): azioni dell'empty state (reset + link a /segnala, FRONTEND_DESIGN

@@ -187,16 +187,20 @@ test("the status accent is a visible card container + token rail (static guard o
   // follow the same logic. Colour is paired with the dot+label (asserted
   // above), so the CSS never relies on colour alone. No global token
   // changes (the rail references the existing --status-* tokens).
+  // t_d52fde50 (CEO feedback 2): the 9%-over-#fffef9 tints were ~1:1 vs
+  // --paper (#f5f3ec), so cards still read as transparent — surfaces are
+  // now white (#fff) with a scoped darker border (#b9c7bf) + soft shadow,
+  // and the tints are 14% over white (see contrast table in the PR).
   const css = await readFile(path.join(root, "app", "globals.css"), "utf8");
   assert.match(
     css,
-    /\.directory-tool \.record-list \.record-list-card \{[^}]*border:1px solid var\(--line\)[^}]*border-left-width:3px[^}]*border-radius:var\(--radius-lg\)[^}]*background:#fffef9/,
-    "the /directory row is a visible card container (bg, border, radius, 3px left rail)",
+    /\.directory-tool \.record-list \.record-list-card \{[^}]*border:1px solid #b9c7bf[^}]*border-left-width:3px[^}]*border-radius:var\(--radius-lg\)[^}]*background:#fff/,
+    "the /directory row is a visible card container (white bg, darker border, radius, 3px left rail)",
   );
   assert.match(
     css,
-    /\.records-section \.record-list \.record-list-card:has\(\.status-dot\.verified\) \{[^}]*border-left-color:var\(--status-verified\)[^}]*background:#eef6ed/,
-    "the verified rail uses the existing token + a 9% precomputed tint (no new global token)",
+    /\.records-section \.record-list \.record-list-card:has\(\.status-dot\.verified\) \{[^}]*border-left-color:var\(--status-verified\)[^}]*background:#e5f3ec/,
+    "the verified rail uses the existing token + a 14% precomputed tint over white (no new global token)",
   );
   assert.match(
     css,
