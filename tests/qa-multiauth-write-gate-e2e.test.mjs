@@ -400,7 +400,7 @@ async function registerUnverifiedAndEnrollPasskey() {
   const email = `qa-gate-${crypto.randomUUID()}@example.org`;
   const response = await registerRoute.POST(apiRequest("/api/auth/register", {
     method: "POST",
-    body: { email, displayName: "QA Gate", password: "supersecret123" },
+    body: { email, displayName: "QA Gate", password: "Sup3rsecret!123" },
   }));
   assert.equal(response.status, 201);
   const session = sessionHeaders(response);
