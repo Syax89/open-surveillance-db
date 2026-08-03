@@ -126,6 +126,7 @@ export const en = {
   passkeyAlreadyEnrolled: "This passkey is already enrolled on your account.",
   passkeyEnrollError: "Unable to add the passkey. Please try again.",
   passkeySessionLost: "Your session has expired. Log in again and retry.",
+  passkeyCsrfExpired: "Your security token expired. Refresh the page and try again.",
   passkeysError: "Unable to load your passkeys. Please try again.",
   // Recovery codes (issued exactly once at passkey enrollment).
   recoveryTitle: "Recovery codes",
@@ -256,6 +257,7 @@ export const it: Translation<typeof en> = {
   passkeyAlreadyEnrolled: "Questa passkey è già registrata sul tuo account.",
   passkeyEnrollError: "Impossibile aggiungere la passkey. Riprova.",
   passkeySessionLost: "La sessione è scaduta. Accedi di nuovo e riprova.",
+  passkeyCsrfExpired: "Il token di sicurezza è scaduto. Ricarica la pagina e riprova.",
   passkeysError: "Impossibile caricare le tue passkey. Riprova.",
   // Codici di recupero (emessi una sola volta alla registrazione della passkey).
   recoveryTitle: "Codici di recupero",

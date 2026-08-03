@@ -647,3 +647,32 @@ test("account: a 409 on enroll completion shows the already-enrolled error, no r
   assert.ok(screen.getByText("This passkey is already enrolled on your account."));
   assert.equal(screen.queryByRole("alertdialog"), null);
 });
+
+test("account: a 403 on enroll begin (expired CSRF) shows the actionable security-token error, not cross-site", async () => {
+  const { screen, waitFor } = rtl;
+  const user = rtl.userEvent.setup();
+  installFetchMock((input) => {
+    if (input === "/api/auth/me") return jsonResponse(profileFixture);
+    if (typeof input === "string" && input.startsWith("/api/auth/me/contributions")) {
+      return jsonResponse(contributionsFixture);
+    }
+    if (input === "/api/auth/passkey/credentials") return jsonResponse({ credentials: [] });
+    if (input === "/api/auth/passkey/register/begin") {
+      return jsonResponse({ error: "Invalid CSRF token. Refresh the page and try again." }, { status: 403 });
+    }
+    return jsonResponse({ error: "unexpected route" }, { status: 404 });
+  });
+  installWebAuthnGlobals(() => fakeRegistrationCredential(), () => { throw new Error("unused"); });
+  document.cookie = "osdb_csrf=stale-csrf-token; path=/";
+
+  await renderWithLocale(React.createElement(AccountPage));
+  await waitFor(() => assert.ok(screen.queryByText("Fixture Contributor")));
+  await user.click(screen.getByRole("button", { name: "Add passkey" }));
+
+  await waitFor(() => assert.ok(screen.getByRole("alert")));
+  assert.ok(screen.getByText("Your security token expired. Refresh the page and try again."));
+  // The old cross-site mapping is gone — a same-origin 403 means an expired
+  // CSRF token, and the user gets the actionable refresh message instead.
+  assert.equal(screen.queryByText("Cross-site request rejected."), null);
+  assert.equal(screen.queryByRole("alertdialog"), null);
+});
