@@ -356,6 +356,32 @@ export function appealAppellantLimits(
   };
 }
 
+/**
+ * Per-IP registration cap (P3-4, CEO decision t_0941036b — anti account-farm):
+ * max 5 registration attempts per caller IP inside a rolling 24h window. This
+ * is a *state* quota enforced as a D1 COUNT over `registrations_ip_log`
+ * (atomic record+count in one batch inside the register route), NOT an
+ * in-memory bucket: the window is long and must hold across worker isolates
+ * (see the module docstring — long-window limits need D1/KV/DO). The request
+ * that brings the count to the cap answers 429, so the 5th request in the
+ * window is blocked (≤ 4 accounts per IP per day).
+ *
+ *   - REGISTER_IP_RATE_LIMIT_MAX (default 5)
+ *   - REGISTER_IP_RATE_LIMIT_WINDOW_SECONDS (default 86400 = 24h)
+ */
+export function registrationIpLimits(
+  env: unknown,
+  defaults: RateLimitOptions = { maxRequests: 5, windowSeconds: 86400 },
+): RateLimitOptions {
+  const config = env as EnvLike;
+  const maxRequests = Number(config.REGISTER_IP_RATE_LIMIT_MAX);
+  const windowSeconds = Number(config.REGISTER_IP_RATE_LIMIT_WINDOW_SECONDS);
+  return {
+    maxRequests: Number.isFinite(maxRequests) && maxRequests > 0 ? maxRequests : defaults.maxRequests,
+    windowSeconds: Number.isFinite(windowSeconds) && windowSeconds > 0 ? windowSeconds : defaults.windowSeconds,
+  };
+}
+
 /** Test/observability hook: clear all in-memory counters between runs. */
 export function resetRateLimitState(): void {
   attemptsByKey.clear();

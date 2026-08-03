@@ -143,6 +143,11 @@ declare module "cloudflare:workers" {
     // which MUST stay in the binding's allowed_sender_addresses).
     VERIFY_BASE_URL?: string;
     MAILER_FROM?: string;
+    /** Per-IP registration cap — P3-4 (t_0941036b, anti account-farm): max
+     * registration attempts per caller IP inside a rolling window, enforced
+     * as a D1 state quota (`registrations_ip_log`). Defaults 5 / 86400s. */
+    REGISTER_IP_RATE_LIMIT_MAX?: string;
+    REGISTER_IP_RATE_LIMIT_WINDOW_SECONDS?: string;
   }
   export const env: Env;
 }

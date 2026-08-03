@@ -129,6 +129,17 @@ test("environment overrides tune the per-route limits", () => {
     rateLimit.appealAppellantLimits({ APPEAL_APPELLANT_RATE_LIMIT_MAX: "-1", APPEAL_APPELLANT_RATE_LIMIT_WINDOW_SECONDS: "0" }),
     { maxRequests: 5, windowSeconds: 86400 },
   );
+  // The per-IP registration cap (P3-4, t_0941036b) defaults to 5 attempts /
+  // 24h and honours its own env knobs; invalid overrides fall back.
+  assert.deepEqual(rateLimit.registrationIpLimits({}), { maxRequests: 5, windowSeconds: 86400 });
+  assert.deepEqual(
+    rateLimit.registrationIpLimits({ REGISTER_IP_RATE_LIMIT_MAX: "2", REGISTER_IP_RATE_LIMIT_WINDOW_SECONDS: "3600" }),
+    { maxRequests: 2, windowSeconds: 3600 },
+  );
+  assert.deepEqual(
+    rateLimit.registrationIpLimits({ REGISTER_IP_RATE_LIMIT_MAX: "-1", REGISTER_IP_RATE_LIMIT_WINDOW_SECONDS: "0" }),
+    { maxRequests: 5, windowSeconds: 86400 },
+  );
 });
 
 test("the caller key prefers the edge IP over forwarded hops", () => {

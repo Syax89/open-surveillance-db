@@ -3,8 +3,11 @@ import {
   createContributor,
   createSession,
   createVerificationToken,
+  deleteRegistrationAttempt,
   isValidEmail,
   normalizeEmail,
+  recordRegistrationAttempt,
+  sha256Hex,
   type PublicContributor,
 } from "../../../../db/auth";
 import { sessionCookieHeaders, sessionTtlSeconds } from "../../../lib/auth-session";
@@ -17,6 +20,8 @@ import {
 import { sameOrigin } from "../../../lib/csrf";
 import { isRecord } from "../../../lib/guards";
 import { BodyReadError, readJsonBody, urlTooLong } from "../../../lib/input-limits";
+import { recordRateLimitBlock } from "../../../lib/abuse-alerts";
+import { callerKey, registrationIpLimits } from "../../../lib/rate-limit";
 import { sendAuthEmail } from "../../../../db/mailer";
 
 /**
@@ -58,11 +63,52 @@ export async function POST(request: Request) {
   const blocked = await authLimit(request, env, "/api/auth/register");
   if (blocked) return blocked;
 
+  // Per-IP registration cap (P3-4, CEO decision t_0941036b — anti account-farm,
+  // docs/COMMUNITY_PLAN.md §3.3): max 5 registration attempts per caller IP in
+  // a rolling 24h window, enforced as a D1 state quota (`registrations_ip_log`)
+  // — the in-memory auth bucket above only bounds bursts per isolate, it
+  // cannot hold a 24h window across worker isolates. Runs BEFORE readJsonBody
+  // so an account farm cannot even probe the endpoint.
+  // `recordRegistrationAttempt` reserves the attempt and counts the window in
+  // ONE batch (atomic, so concurrent registrations cannot race past a stale
+  // count); the request that brings the count to the cap answers 429 with the
+  // generic anti-enumeration body (no email/IP echo) and its reservation row
+  // STAYS so the cap keeps holding. On any non-201 exit the reservation is
+  // rolled back (no account was created -> the budget is not consumed and the
+  // malformed-body "no write" contract holds). The stored key is a SHA-256 of
+  // the caller key, never the raw IP (privacy by design).
+  const registerIpKey = callerKey(request);
+  const registerIpHash = await sha256Hex(registerIpKey);
+  const registerIpLimits = registrationIpLimits(env);
+  const nowMs = Date.now();
+  const reservation = await recordRegistrationAttempt({
+    ipHash: registerIpHash,
+    now: new Date(nowMs).toISOString(),
+    windowStart: new Date(nowMs - registerIpLimits.windowSeconds * 1000).toISOString(),
+  });
+  const rollbackAttempt = () => deleteRegistrationAttempt(reservation.id);
+  if (reservation.count >= registerIpLimits.maxRequests) {
+    console.warn("POST /api/auth/register per-IP registration cap exceeded");
+    recordRateLimitBlock(env, {
+      route: "/api/auth/register",
+      key: registerIpKey,
+      windowSeconds: registerIpLimits.windowSeconds,
+    });
+    return Response.json(
+      { error: "Too many requests. Please try again shortly." },
+      {
+        status: 429,
+        headers: { "Retry-After": String(registerIpLimits.windowSeconds) },
+      },
+    );
+  }
+
   try {
     const payload: unknown = await readJsonBody(request, env);
     if (!isRecord(payload)) {
       // Generic body shared with the 409 below: register is a public
       // endpoint and must not reveal why it failed (account enumeration).
+      await rollbackAttempt();
       return Response.json(
         { error: "Unable to register with this email." },
         { status: 400 },
@@ -72,6 +118,7 @@ export async function POST(request: Request) {
     const email = typeof payload.email === "string" ? normalizeEmail(payload.email) : "";
     const displayName = parseDisplayName(payload.displayName);
     if (!isValidEmail(email) || !isValidPassword(payload.password) || displayName === undefined) {
+      await rollbackAttempt();
       return Response.json(
         { error: "Unable to register with this email." },
         { status: 400 },
@@ -92,6 +139,7 @@ export async function POST(request: Request) {
       // register race; map the constraint error to the same generic 409
       // (body identical to the 400 above so responses stay indistinguishable).
       if (error instanceof Error && error.message.includes("UNIQUE constraint failed")) {
+        await rollbackAttempt();
         return Response.json({ error: "Unable to register with this email." }, { status: 409 });
       }
       throw error;
@@ -128,9 +176,11 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof BodyReadError) {
       console.warn("POST /api/auth/register payload rejected: body too large or not valid JSON");
+      await rollbackAttempt();
       return Response.json({ error: error.message }, { status: error.status });
     }
     console.error("POST /api/auth/register failed", error);
+    await rollbackAttempt();
     return Response.json({ error: "Unable to create account" }, { status: 500 });
   }
 }

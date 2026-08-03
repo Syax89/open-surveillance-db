@@ -77,6 +77,11 @@ const expectedTables = [
   // prove the existing account with its password before linking).
   "oidc_states",
   "oidc_merge_requests",
+  // Per-IP registration cap — P3-4 (0032, CEO decision t_0941036b): one row
+  // per registration attempt, keyed by the SHA-256 of the caller IP — never
+  // the raw address. Counted in a rolling 24h window; rows older than the
+  // window are inert (see the migration header comment).
+  "registrations_ip_log",
 ];
 // Indexes declared by the migrations.
 const expectedIndexes = [
