@@ -226,7 +226,13 @@ test("search clamps an over-max limit and rejects invalid pagination values", as
   assert.equal(clamped.status, 200);
   assert.deepEqual(callArgs("searchPublicCamerasNearPage")[0], [41.9004, 12.4936, 2000, { limit: 100, offset: 0 }], "an over-max limit is clamped to the hard cap");
 
-  for (const query of ["limit=abc", "limit=-5", "limit=1.5", "limit=0", "offset=abc", "offset=-3"]) {
+  const invalidQueries = [
+    "limit=abc", "limit=-5", "limit=1.5", "limit=0", "offset=abc", "offset=-3",
+    // review P2-4: a huge but VALID integer offset must still be rejected
+    // (MAX_SAFE_INTEGER passes isSafeInteger) before any geocoder/db work.
+    "offset=9007199254740991", "offset=10001",
+  ];
+  for (const query of invalidQueries) {
     await t.test(query, async () => {
       const response = await GET(apiRequest(`/api/cameras/search?q=Rome&${query}`));
       assert.equal(response.status, 400, query);
@@ -234,6 +240,14 @@ test("search clamps an over-max limit and rejects invalid pagination values", as
       assert.equal(callArgs("searchPublicCamerasNearPage").length, 0);
     });
   }
+});
+
+test("search accepts an offset at the MAX_PAGE_OFFSET boundary", async () => {
+  stub("searchPublicCamerasNearPage", async () => ({ records: [], total: 0, nextOffset: null }));
+  const { GET } = await searchRoute();
+  const response = await GET(apiRequest("/api/cameras/search?q=41.9004%2C%2012.4936&offset=10000"));
+  assert.equal(response.status, 200, "offset == MAX_PAGE_OFFSET is the last allowed page");
+  assert.deepEqual(callArgs("searchPublicCamerasNearPage")[0], [41.9004, 12.4936, 2000, { limit: 25, offset: 10000 }]);
 });
 
 test("a zero-result search reports total 0 and a null nextOffset with the searched area", async () => {

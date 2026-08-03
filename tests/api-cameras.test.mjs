@@ -278,6 +278,11 @@ test("GET /api/cameras rejects invalid limit and offset values with 400", async 
     { name: "offset text", query: "offset=abc" },
     { name: "offset negative", query: "offset=-3" },
     { name: "offset decimal", query: "offset=2.5" },
+    // review P2-4: a huge but VALID integer offset must still be rejected —
+    // 9007199254740991 is MAX_SAFE_INTEGER (passes isSafeInteger), and
+    // 10001 is just past the documented cap (MAX_PAGE_OFFSET = 10000).
+    { name: "offset MAX_SAFE_INTEGER", query: "offset=9007199254740991" },
+    { name: "offset above MAX_PAGE_OFFSET", query: "offset=10001" },
   ];
   for (const { name, query } of cases) {
     await t.test(name, async () => {
@@ -286,6 +291,14 @@ test("GET /api/cameras rejects invalid limit and offset values with 400", async 
       assert.equal(callArgs("listPublicCamerasPage").length, 0, "no query must run for invalid pagination");
     });
   }
+});
+
+test("GET /api/cameras accepts an offset at the MAX_PAGE_OFFSET boundary", async () => {
+  stub("listPublicCamerasPage", async () => ({ records: [], total: 0, nextOffset: null }));
+  const { GET } = await camerasRoute();
+  const response = await GET(apiRequest("/api/cameras?offset=10000"));
+  assert.equal(response.status, 200, "offset == MAX_PAGE_OFFSET is the last allowed page");
+  assert.deepEqual(callArgs("listPublicCamerasPage")[0], [{}, { limit: 500, offset: 10000 }]);
 });
 
 test("GET /api/cameras export formats ignore pagination parameters entirely", async () => {
@@ -766,7 +779,12 @@ test("nearby search rejects radius outside 10–500 metres", async (t) => {
 
 test("nearby search rejects invalid limit and offset values with 400", async (t) => {
   const { GET } = await nearbyRoute();
-  for (const query of ["limit=abc", "limit=-5", "limit=1.5", "limit=0", "offset=abc", "offset=-3"]) {
+  const cases = [
+    "limit=abc", "limit=-5", "limit=1.5", "limit=0", "offset=abc", "offset=-3",
+    // review P2-4: huge-but-valid integers are rejected before any db work.
+    "offset=9007199254740991", "offset=10001",
+  ];
+  for (const query of cases) {
     await t.test(query, async () => {
       const response = await GET(apiRequest(`/api/cameras/nearby?latitude=0&longitude=0&${query}`));
       assert.equal(response.status, 400, query);

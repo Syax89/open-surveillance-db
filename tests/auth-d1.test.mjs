@@ -331,6 +331,53 @@ test("eraseContributor de-attributes the reports, revokes all sessions, and hard
   const first = await auth.createSession(profile.id, { ttlDays: 7, now: NOW });
   const second = await auth.createSession(profile.id, { ttlDays: 7, now: NOW });
 
+  // A second contributor whose auth artifacts must survive the erasure
+  // untouched (isolation, P2-2).
+  const keeper = await auth.createContributor({ email: "keeper@example.org", displayName: "Keeper", password: "supersecret123" });
+
+  // Seed every auth-artifact table that references contributors with
+  // ON DELETE CASCADE — the erasure must clean these explicitly because the
+  // harness does not enforce FKs (same rule as sessions).
+  const seedAuthArtifacts = (contributorId, suffix) => {
+    const createdAt = NOW;
+    const expiresAt = "2026-08-02T00:00:00.000Z";
+    const db = runtime.env.DB;
+    db.prepare(
+      "INSERT INTO passkeys (contributor_id, credential_id, public_key, counter, transports, created_at) VALUES (?, ?, ?, 0, NULL, ?)",
+    ).bind(contributorId, `cred-${suffix}`, `pub-${suffix}`, createdAt).run();
+    db.prepare(
+      "INSERT INTO recovery_codes (contributor_id, code_hash, created_at) VALUES (?, ?, ?)",
+    ).bind(contributorId, `recovery-hash-${suffix}`, createdAt).run();
+    db.prepare(
+      "INSERT INTO email_verification_tokens (contributor_id, token_hash, created_at, expires_at) VALUES (?, ?, ?, ?)",
+    ).bind(contributorId, `verify-hash-${suffix}`, createdAt, expiresAt).run();
+    db.prepare(
+      "INSERT INTO email_send_log (contributor_id, kind, sent_at) VALUES (?, 'verify', ?)",
+    ).bind(contributorId, createdAt).run();
+    db.prepare(
+      "INSERT INTO webauthn_challenges (challenge_hash, kind, contributor_id, user_handle, created_at, expires_at) VALUES (?, 'login', ?, NULL, ?, ?)",
+    ).bind(`challenge-hash-${suffix}`, contributorId, createdAt, expiresAt).run();
+    db.prepare(
+      "INSERT INTO oidc_merge_requests (token_hash, provider, external_sub, contributor_id, email_verified, created_at, expires_at) VALUES (?, 'github', ?, ?, 0, ?, ?)",
+    ).bind(`merge-hash-${suffix}`, `sub-${suffix}`, contributorId, createdAt, expiresAt).run();
+  };
+  seedAuthArtifacts(profile.id, "erased");
+  seedAuthArtifacts(keeper.id, "keeper");
+  // A WebAuthn challenge with no contributor link (pre-auth) is a no-op for
+  // the erasure and must survive.
+  runtime.env.DB.prepare(
+    "INSERT INTO webauthn_challenges (challenge_hash, kind, contributor_id, user_handle, created_at, expires_at) VALUES ('challenge-hash-anonymous', 'login', NULL, NULL, ?, ?)",
+  ).bind(NOW, "2026-08-02T00:00:00.000Z").run();
+
+  const artifactTables = ["passkeys", "recovery_codes", "email_verification_tokens", "email_send_log", "webauthn_challenges", "oidc_merge_requests"];
+
+  // This suite owns the erasure contract, so it models the no-FK
+  // environment the explicit DELETEs exist for (P2-2, t_adfc121b): with
+  // `PRAGMA foreign_keys = OFF` the ON DELETE CASCADE never fires, and the
+  // app-layer deletes in eraseContributor are the ONLY thing that cleans the
+  // auth-artifact tables. Without them this test turns red.
+  runtime.env.DB.exec("PRAGMA foreign_keys = OFF");
+
   const attributed = await cameras.createPendingCamera({
     title: "Attributed camera",
     kind: "Dome",
@@ -387,6 +434,33 @@ test("eraseContributor de-attributes the reports, revokes all sessions, and hard
   assert.equal(other.contributorId, null);
   const all = await runtime.env.DB.prepare("SELECT COUNT(*) AS n FROM cameras").first();
   assert.equal(Number(all.n), 3, "no report row is deleted by erasure");
+
+  // Every auth artifact of the erased contributor is hard-deleted
+  // (P2-2: explicit DELETEs, the harness does not enforce FKs).
+  for (const table of artifactTables) {
+    const gone = await runtime.env.DB.prepare(
+      `SELECT COUNT(*) AS n FROM ${table} WHERE contributor_id = ?`,
+    ).bind(profile.id).first();
+    assert.equal(Number(gone.n), 0, `${table}: no row survives the erasure`);
+  }
+  // Sessions too, already covered above — re-checked via the count path.
+  const sessionsGone = await runtime.env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM sessions WHERE contributor_id = ?",
+  ).bind(profile.id).first();
+  assert.equal(Number(sessionsGone.n), 0, "sessions: no row survives the erasure");
+
+  // Isolation: the keeper's artifacts are untouched, and the pre-auth
+  // challenge with a NULL contributor survives as a no-op.
+  for (const table of artifactTables) {
+    const kept = await runtime.env.DB.prepare(
+      `SELECT COUNT(*) AS n FROM ${table} WHERE contributor_id = ?`,
+    ).bind(keeper.id).first();
+    assert.equal(Number(kept.n), 1, `${table}: the other contributor's row survives`);
+  }
+  const anonymousChallenge = await runtime.env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM webauthn_challenges WHERE contributor_id IS NULL",
+  ).first();
+  assert.equal(Number(anonymousChallenge.n), 1, "pre-auth challenge is a no-op for erasure");
 });
 
 test("eraseContributor on an unknown id reports deleted: false and de-attributes nothing", async () => {
