@@ -87,11 +87,33 @@ export function publicCameraPredicate(nowIso: string): { sql: string; parameters
   // every other public status must still be current at read time. Every public
   // query (directory list, by-id lookup, facets, bbox) shares this predicate so
   // a status change takes effect on every surface at once.
+  //
+  // ADR 0008 demo gate (audit CTO #7, t_d7a4b99b): `demo` records are
+  // prototype-only and purged before launch (retention schedule R12); they
+  // must NEVER cross a public surface in production ("mai esportati a un
+  // pubblico"). Outside ENVIRONMENT=development the gate clause below removes
+  // them from EVERY public read (JSON list, CSV/GeoJSON exports, bbox, by-id,
+  // nearby, search, facets) — fail-closed, so a forgotten R12 purge degrades
+  // to "demo invisible on all public surfaces", never to "demo served".
   const placeholders = PUBLIC_CAMERA_STATUSES.map(() => "?").join(", ");
+  const demoGate = demoRecordsPublic() ? "" : " AND status != 'demo'";
   return {
-    sql: `status IN (${placeholders}) AND (status = 'demo' OR review_due_at IS NULL OR review_due_at >= ?)`,
+    sql: `status IN (${placeholders}) AND (status = 'demo' OR review_due_at IS NULL OR review_due_at >= ?)${demoGate}`,
     parameters: [...PUBLIC_CAMERA_STATUSES, nowIso],
   };
+}
+
+/**
+ * ADR 0008 demo gate (audit CTO #7, t_d7a4b99b): are `demo` records visible
+ * on public surfaces? The illustrative demo seed is a LOCAL DEVELOPMENT
+ * fixture only (retention schedule R12: purged before launch), so the gate is
+ * fail-closed and follows the codebase-wide ENVIRONMENT convention
+ * (worker-configuration.d.ts; moderation demo actor selector t_6b61fc3f):
+ * only the exact value "development" enables demo visibility — unset or any
+ * other value behaves as production.
+ */
+export function demoRecordsPublic(): boolean {
+  return env.ENVIRONMENT === "development";
 }
 
 export async function listPublicCameras(

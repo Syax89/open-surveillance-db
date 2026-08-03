@@ -233,11 +233,25 @@ test("only publicly current cameras can be confirmed", async (t) => {
     const result = await setConfirmation(cameraId, verifier);
     assert.equal(result.kind, "camera_not_public");
   });
-  await t.test("demo stays public without a review window", async () => {
+  await t.test("demo stays public without a review window (development environment)", async () => {
+    // ADR 0008 demo gate (t_d7a4b99b): demo records are public ONLY in the
+    // local development environment; the harness env is flipped for the
+    // duration of this subtest.
+    runtime.env.ENVIRONMENT = "development";
+    try {
+      const verifier = await makeVerifiedContributor();
+      const cameraId = await insertCamera({ status: "demo" });
+      const result = await setConfirmation(cameraId, verifier);
+      assert.equal(result.kind, "ok");
+    } finally {
+      delete runtime.env.ENVIRONMENT;
+    }
+  });
+  await t.test("demo fails closed in production (unset ENVIRONMENT)", async () => {
     const verifier = await makeVerifiedContributor();
     const cameraId = await insertCamera({ status: "demo" });
     const result = await setConfirmation(cameraId, verifier);
-    assert.equal(result.kind, "ok");
+    assert.equal(result.kind, "camera_not_public", "a demo record must not be confirmable outside development");
   });
 });
 

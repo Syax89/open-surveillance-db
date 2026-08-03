@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { getD1 } from "./cameras";
+import { demoRecordsPublic, getD1 } from "./cameras";
 import { PUBLIC_CAMERA_STATUSES } from "../app/lib/public-status";
 import type { ModerationEvent } from "./moderation";
 
@@ -200,14 +200,18 @@ export async function getPublicPhoto(
   const placeholders = PUBLIC_CAMERA_STATUSES.map(() => "?").join(", ");
   // Same public predicate as db/cameras.ts but qualified to the cameras
   // table: `status IN (…)` refers to the camera's status, and the freshness
-  // carve-out keeps `demo` records public without a schedule.
+  // carve-out keeps `demo` records public without a schedule. The ADR 0008
+  // demo gate (t_d7a4b99b) applies here too: outside ENVIRONMENT=development
+  // a demo camera's photo must never be served (fail-closed, so a forgotten
+  // R12 purge hides the evidence with the record).
+  const demoGate = demoRecordsPublic() ? "" : " AND c.status != 'demo'";
   const result = await d1
     .prepare(
       `SELECT p.id, p.camera_id AS cameraId, p.storage_key AS storageKey, p.mime_type AS mimeType, p.width, p.height, p.size_bytes AS sizeBytes, p.status, p.exif_stripped AS exifStripped, p.redaction_confirmed AS redactionConfirmed, p.created_at AS createdAt, p.updated_at AS updatedAt
        FROM photos p JOIN cameras c ON c.id = p.camera_id
        WHERE p.id = ? AND p.status = 'approved' AND p.redaction_confirmed = 1
          AND c.status IN (${placeholders})
-         AND (c.status = 'demo' OR c.review_due_at IS NULL OR c.review_due_at >= ?)`,
+         AND (c.status = 'demo' OR c.review_due_at IS NULL OR c.review_due_at >= ?)${demoGate}`,
     )
     .bind(id, ...PUBLIC_CAMERA_STATUSES, nowIso)
     .first<PhotoRecord>();

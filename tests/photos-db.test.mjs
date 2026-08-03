@@ -293,11 +293,26 @@ test("getPublicPhoto fails closed when the linked camera is not public or its re
   assert.equal(await photos.getPublicPhoto(11), null, "stale review window → hidden");
 });
 
-test("getPublicPhoto keeps demo cameras public without a review window", async () => {
+test("getPublicPhoto keeps demo cameras public without a review window (development environment)", async () => {
+  // ADR 0008 demo gate (t_d7a4b99b): demo records are public ONLY in the
+  // local development environment. This suite pins the prototype carve-out,
+  // so the harness env is flipped for the duration of the test.
+  runtime.env.ENVIRONMENT = "development";
+  try {
+    await insertCamera({ status: "demo", reviewDueAt: "2020-01-01T00:00:00.000Z", id: 1 });
+    await insertPhoto({ id: 11, cameraId: 1, status: "approved", redactionConfirmed: 1 });
+    const photo = await photos.getPublicPhoto(11);
+    assert.equal(photo.id, 11, "demo carve-out keeps the photo public even with a past review_due_at");
+  } finally {
+    delete runtime.env.ENVIRONMENT;
+  }
+});
+
+test("getPublicPhoto fails closed for demo cameras in production (unset ENVIRONMENT)", async () => {
   await insertCamera({ status: "demo", reviewDueAt: "2020-01-01T00:00:00.000Z", id: 1 });
   await insertPhoto({ id: 11, cameraId: 1, status: "approved", redactionConfirmed: 1 });
   const photo = await photos.getPublicPhoto(11);
-  assert.equal(photo.id, 11, "demo carve-out keeps the photo public even with a past review_due_at");
+  assert.equal(photo, null, "a demo camera's photo must never be served outside ENVIRONMENT=development");
 });
 
 test("getPublicPhoto honours an explicit now for the review window", async () => {
