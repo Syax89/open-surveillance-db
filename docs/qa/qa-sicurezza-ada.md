@@ -95,7 +95,7 @@ UPDATE photos SET contributor_id = NULL WHERE contributor_id = ?
 - `db/auth.ts:271-300` — `recordRegistrationAttempt`: INSERT (riga 279) e COUNT (riga 282); l'unico DELETE è il rollback per-id su registrazione fallita (riga 299)
 - `db/retention.ts` — la sweep copre R7/R15/R16 (sessioni, token, challenges, `login_attempts`) ma **non `registrations_ip_log`**
 - `db/schema.ts:723,732` — tabella + indice `(ip_hash, created_at)`
-- `app/lib/rate-limit.ts:362-366` — il commento conferma: "the cap resets automatically without a cleanup job"
+- `db/auth.ts:266` — il commento di `recordRegistrationAttempt` conferma: "the cap resets automatically without a cleanup job" (nessuna sweep prevista); il meccanismo state-quota è descritto anche a `app/lib/rate-limit.ts:360-367`
 
 **Descrizione.** Ogni tentativo di registrazione lascia una riga `ip_hash` + `created_at` per sempre. `ip_hash` è SHA-256 dell'IP del chiamante: lo spazio degli IPv4 è 2^32, quindi l'hash è **invertibile con una tabella precomputata** — di fatto PII. Nessuna retention definita (GDPR art. 5(1)(e)) e crescita illimitata di D1.
 
