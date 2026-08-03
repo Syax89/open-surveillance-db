@@ -144,7 +144,7 @@ export const it: Translation<typeof en> = {
     "Dettagli sul campo visivo o sulle capacità operative che potrebbero creare un rischio per la sicurezza, o località sensibili la cui pubblicazione potrebbe aumentare il rischio.",
   beforeSubmittingTitle: "Prima di inviare",
   beforeSubmittingBody:
-    "Per inviare serve un account di contributore verificato. Non caricare né descrivere persone, targhe, abitazioni private, debolezze di sicurezza o località sensibili. Gli invii restano privati finché un moderatore non li esamina; non vengono pubblicati automaticamente.",
+    "Per inviare serve un account verificato. Non caricare né descrivere persone, targhe, abitazioni private, debolezze di sicurezza o località sensibili. Gli invii restano privati finché un moderatore non li esamina; non vengono pubblicati automaticamente.",
   moderationEyebrow: "Moderazione",
   moderationTitle: "Ogni record viene esaminato da una persona.",
   moderationBody:
@@ -171,7 +171,7 @@ export const it: Translation<typeof en> = {
   correctionEyebrow: "Correzioni e ricorsi",
   correctionTitle: "Un modo semplice per contestare un record.",
   correctionBody:
-    "Ogni contributore verificato può richiedere una correzione, contestare un record o segnalare un danno. Le richieste sono private, esaminate da persone e non modificano mai la mappa automaticamente.",
+    "Ogni account verificato può richiedere una correzione, contestare un record o segnalare un danno. Le richieste sono private, esaminate da persone e non modificano mai la mappa automaticamente.",
   correctionOneTitle: "Richiedi una correzione",
   correctionOneBody:
     "I record inaccurati, obsoleti o duplicati possono essere segnalati per la revisione.",

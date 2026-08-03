@@ -211,7 +211,7 @@ export const it: Translation<typeof en> = {
     "Ti registri con un indirizzo email e una password, salvata come hash e mai esposta. La verifica dell'email è richiesta prima di poter pubblicare e puoi aggiungere passkey o l'accesso social (GitHub o Google) allo stesso account (ADR 0020).",
   accountAnonymousTitle: "La consultazione resta aperta",
   accountAnonymousBody:
-    "Puoi esplorare mappa, elenco ed esportazioni senza account. Inviare una segnalazione o una correzione richiede un account di contributore verificato.",
+    "Puoi esplorare mappa, elenco ed esportazioni senza account. Inviare una segnalazione o una correzione richiede un account verificato.",
   editEyebrow: "Modificare un contributo",
   editTitle: "Puoi modificare i tuoi contributi.",
   editBody:
