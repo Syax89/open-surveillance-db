@@ -45,13 +45,13 @@ Tutti i 7 audit convergono: **il codice è avanti, la documentazione è stale**.
 | 2 | MED | docs/STATUS.md indietro di un'intera wave: manca community C1–C6 (ADR 0018) e fix H1/H2 del 08-02; header "Last reviewed 2026-08-01" contiene item del 08-02. |
 | 3 | MED | docs/ARCHITECTURE.md non menziona ADR 0018/0019 (community layer, two-track PATCH, duplicate gate). |
 | 4 | MED | docs/EXECUTION_BOARD.md righe stale: "ODbL export notice open (PR #81)" → implementato; "per-domain bundle in flight (PR #80)" → completato; "security.txt drafted" → merged. |
-| 5 | LOW | `login_attempts` senza regola di retention (crescita illimitata per email mai autenticate). |
+| 5 | ~~LOW~~ **RISOLTO** | `login_attempts` senza regola di retention (crescita illimitata per email mai autenticate). **Risolto** con la regola **R16** nel cron retention (PR t_aca36902): sweep bounded che cancella le righe con `window_start` più vecchio di 30 giorni (RETENTION_SCHEDULE.md R16), escludendo sempre i lock attivi (`locked_until` futuro). |
 | 6 | LOW | Dipendenze pre-1.0: vinext 0.0.50 (runtime entry), miniflare alpha. Rischio churn API/supply-chain. |
 | 7 | OBS | Demo records nelle export CSV/GeoJSON: coerente con ADR 0001 ma la garanzia ADR 0008 "mai esportati" poggia solo sul purge R12 pre-lancio (nessun gate nel codice). |
 
 **Punti di forza verificati:** confine pubblico/privato a strati con `PUBLIC_CAMERA_STATUSES` come fonte unica; `roundPublicCoordinate` su ogni superficie pubblica; freshness ancorata a `last_verified_at`; anti-gaming dentro il write path; level mai denormalizzato (`deriveLevel` puro); erasure atomica con de-attribuzione; edge come unica autorità identità; audit trail immutabile (trigger ABORT); retention con costanti legali non overridabili.
 
-**Azioni:** Ada/Linus → rigenerare snapshot 0011–0025 + check "generate no-op" in db-migration-smoke. Marie → riallineare STATUS/ARCHITECTURE/EXECUTION_BOARD. Linus → retention login_attempts. Ada/Ken → pinning vinext/miniflare + gate demo purge R12.
+**Azioni:** Ada/Linus → rigenerare snapshot 0011–0025 + check "generate no-op" in db-migration-smoke. Marie → riallineare STATUS/ARCHITECTURE/EXECUTION_BOARD. Linus → retention login_attempts ✅ (R16, PR t_aca36902). Ada/Ken → pinning vinext/miniflare + gate demo purge R12.
 
 ---
 

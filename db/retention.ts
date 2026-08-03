@@ -24,6 +24,12 @@
  *                                       on expiry — the cron enforces the
  *                                       sweep the 0027/0028 migrations
  *                                       promised (review-ada-2 P3-1)
+ *   R16 login_attempts                → stale failed-login counters
+ *                                       (window_start older than 30 days)
+ *                                       purged with a BOUNDED sweep; an
+ *                                       active lock (locked_until in the
+ *                                       future) is never touched (audit
+ *                                       finding 5 / review-ada P3-10)
  *
  * Deliberately NOT purged here:
  *   R5  moderation_events             → append-only by design (BEFORE UPDATE /
@@ -83,6 +89,17 @@ export const UNVERIFIED_REMOVAL_MONTHS = 6;
 export const CORRECTION_RETENTION_DAYS = 730;
 /** R6: pending photo never linked to a record expires with the pending window. */
 export const ORPHAN_PHOTO_RETENTION_DAYS = PENDING_RETENTION_DAYS;
+/** R16: a failed-login counter row is dead after 30 days of inactivity. */
+export const LOGIN_ATTEMPT_RETENTION_DAYS = 30;
+
+/**
+ * R16 sweep bounds: each round selects and deletes at most D1_MAX_BOUND_PARAMS
+ * keys, and the loop runs at most this many rounds, so one daily run touches
+ * at most 100 × 100 = 10 000 rows and no single statement is unbounded. Rows
+ * left behind (a pathological flood between rounds) are picked up by the next
+ * daily run.
+ */
+export const LOGIN_ATTEMPT_SWEEP_MAX_ROUNDS = 100;
 
 /**
  * Cloudflare D1 caps bound parameters at 100 per query. Any `WHERE ... IN (?)`
@@ -97,6 +114,8 @@ export type RetentionPolicy = {
   unverifiedRemovalMonths: number;
   correctionDays: number;
   orphanPhotoDays: number;
+  /** R16: failed-login counters (login_attempts) expire after this many days of inactivity. */
+  loginAttemptDays: number;
 };
 
 export const DEFAULT_RETENTION_POLICY: RetentionPolicy = {
@@ -105,6 +124,7 @@ export const DEFAULT_RETENTION_POLICY: RetentionPolicy = {
   unverifiedRemovalMonths: UNVERIFIED_REMOVAL_MONTHS,
   correctionDays: CORRECTION_RETENTION_DAYS,
   orphanPhotoDays: ORPHAN_PHOTO_RETENTION_DAYS,
+  loginAttemptDays: LOGIN_ATTEMPT_RETENTION_DAYS,
 };
 
 /** Minimal R2 surface the sweep needs (the real PHOTOS bucket satisfies it). */
@@ -142,6 +162,8 @@ export type RetentionSummary = {
   emailTokensPurged: number;
   /** R15: expired WebAuthn challenge rows removed (10-min TTL, centralized in the cron). */
   challengesPurged: number;
+  /** R16: stale failed-login counter rows removed (30-day window, bounded sweep). */
+  loginAttemptsPurged: number;
   /** Records/chunks whose D1 or R2 step threw; the sweep skipped them and continued. */
   failures: number;
   /** Audit rows are append-only by design; never touched. */
@@ -291,6 +313,7 @@ export async function runRetentionSweep(
     sessionsPurged: 0,
     emailTokensPurged: 0,
     challengesPurged: 0,
+    loginAttemptsPurged: 0,
     failures: 0,
     moderationEventsRetained: 0,
   };
@@ -543,6 +566,57 @@ export async function runRetentionSweep(
   // even when no ceremony ever starts (the 10-minute TTL keeps the table
   // small, but the guarantee must not depend on traffic).
   summary.challengesPurged = await sweepExpiredWebAuthnChallenges(now);
+
+  // --- R16 (audit finding 5 / review-ada P3-10): stale failed-login counters
+  // are dead rows after LOGIN_ATTEMPT_RETENTION_DAYS of inactivity. The anchor
+  // is `window_start`: recordFailedLogin (db/auth.ts) re-anchors it on every
+  // new failure window and on every lock trip, and clearLoginAttempts deletes
+  // the row on a successful login — so a row whose window_start is older than
+  // the window is an abandoned counter (enumeration attempts against emails
+  // that never log in, or counters never cleared). Rows are hash-only by
+  // design (SHA-256 email key, migration 0016) but still grow the table
+  // unboundedly, which is the audit finding.
+  // The sweep is BOUNDED: each round selects at most D1_MAX_BOUND_PARAMS keys
+  // (which is also the D1 bound-parameter cap, so the DELETE always fits one
+  // statement) and deletes them, keeping memory O(batch) with no unbounded
+  // statement; the loop is capped at LOGIN_ATTEMPT_SWEEP_MAX_ROUNDS so a
+  // pathological flood of new rows cannot make one cron run spin forever
+  // (rows left behind are picked up by the next daily run).
+  // NEVER touch a row whose `locked_until` is still in the future: deleting
+  // an ACTIVE lock would hand the attacker a fresh counter and silently
+  // disable the lockout — the sweep must not weaken security, whatever the
+  // lockout cap is set to.
+  const loginAttemptCutoff = daysAgo(now, policy.loginAttemptDays);
+  let loginAttemptsPurged = 0;
+  for (let round = 0; round < LOGIN_ATTEMPT_SWEEP_MAX_ROUNDS; round += 1) {
+    const stale = await d1
+      .prepare(
+        `SELECT email_key AS emailKey
+         FROM login_attempts
+         WHERE window_start < ? AND (locked_until IS NULL OR locked_until < ?)
+         LIMIT ${D1_MAX_BOUND_PARAMS}`,
+      )
+      .bind(loginAttemptCutoff, now)
+      .all<{ emailKey: string }>();
+    if (stale.results.length === 0) break;
+    const keys = stale.results.map((row) => row.emailKey);
+    try {
+      const placeholders = keys.map(() => "?").join(", ");
+      await d1
+        .prepare(`DELETE FROM login_attempts WHERE email_key IN (${placeholders})`)
+        .bind(...keys)
+        .run();
+      loginAttemptsPurged += keys.length;
+    } catch (error) {
+      summary.failures += 1;
+      console.error(
+        `Retention: R16 chunk delete failed for ${keys.length} login_attempts rows`,
+        error,
+      );
+      break; // stop the loop; the surviving rows are retried by the next run
+    }
+  }
+  summary.loginAttemptsPurged = loginAttemptsPurged;
 
   return summary;
 }
