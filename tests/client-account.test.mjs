@@ -107,6 +107,17 @@ function installWebAuthnGlobals(createImpl, getImpl) {
   });
 }
 
+/** Remove the WebAuthn browser surface — the jsdom default, and the state a
+ *  browser without passkey support (no secure context / old UA) presents. */
+function clearWebAuthnGlobals() {
+  delete globalThis.PublicKeyCredential;
+  try {
+    delete globalThis.navigator.credentials;
+  } catch {
+    /* keep the jsdom navigator as-is */
+  }
+}
+
 /** A PublicKeyCredential-shaped object for the registration ceremony. */
 function fakeRegistrationCredential() {
   return {
@@ -539,6 +550,40 @@ test("account: enrolling a passkey runs begin -> create -> complete and shows th
   await user.click(within(dialog).getByRole("button", { name: "I saved them" }));
   await waitFor(() => assert.equal(screen.queryByRole("alertdialog"), null));
   assert.ok(screen.getByText("Passkey added."));
+});
+
+test("account: enrolling a passkey in a browser without WebAuthn shows an explanatory alert and never calls the API", async () => {
+  const { screen, waitFor } = rtl;
+  const user = rtl.userEvent.setup();
+  clearWebAuthnGlobals();
+  const requests = [];
+  installFetchMock((input, init) => {
+    requests.push({ input, init });
+    if (input === "/api/auth/me") return jsonResponse(profileFixture);
+    if (typeof input === "string" && input.startsWith("/api/auth/me/contributions")) {
+      return jsonResponse(contributionsFixture);
+    }
+    if (input === "/api/auth/passkey/credentials") return jsonResponse({ credentials: [] });
+    return jsonResponse({ error: "unexpected route" }, { status: 404 });
+  });
+  document.cookie = "osdb_csrf=fixture-csrf-token; path=/";
+
+  await renderWithLocale(React.createElement(AccountPage));
+  await waitFor(() => assert.ok(screen.queryByText("Fixture Contributor")));
+  await user.click(screen.getByRole("button", { name: "Add passkey" }));
+
+  // Explanatory alert, no crash, no ceremony fetch: the guard runs before
+  // any network call (browserSupportsWebAuthn() false → setEnrollError).
+  const alert = await screen.findByRole("alert");
+  assert.match(alert.textContent ?? "", /does not support passkeys/i);
+  assert.equal(
+    requests.filter((r) => String(r.input).includes("/api/auth/passkey/register/begin")).length,
+    0,
+    "without WebAuthn no ceremony fetch may start",
+  );
+  assert.equal(requests.filter((r) => String(r.input).includes("/api/auth/passkey/register/complete")).length, 0);
+  // The page stays interactive: the button is not stuck in a busy state.
+  assert.equal(screen.getByRole("button", { name: "Add passkey" }).disabled, false);
 });
 
 test("account: cancelling the passkey remove confirm sends no DELETE", async () => {
