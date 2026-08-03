@@ -37,6 +37,13 @@ import { browserSupportsWebAuthn, getCredential } from "../lib/webauthn-client";
 
 type Method = "password" | "passkey" | "social";
 
+/** Same-site redirect target from ?returnTo= (login wall return, P1-2). */
+function safeReturnTo(value: string | null): string | null {
+  if (!value) return null;
+  if (!value.startsWith("/") || value.startsWith("//")) return null;
+  return value;
+}
+
 function LoginPageBody() {
   const bundle = useMessages();
   const t = bundle.auth;
@@ -46,6 +53,15 @@ function LoginPageBody() {
   const [mergeToken, setMergeToken] = useState<string | null>(() => searchParams.get("merge"));
   const [oidcError] = useState<boolean>(() => searchParams.get("oidc_error") === "1");
   const [method, setMethod] = useState<Method>("password");
+  // Login-wall return (P1-2 Vera design): /login?returnTo=/segnala (or
+  // /correggi) lands the contributor back on the tool after a successful
+  // sign-in instead of always dumping them on /account.
+  const [returnTo] = useState<string | null>(() => safeReturnTo(searchParams.get("returnTo")));
+
+  function afterLogin() {
+    router.push(returnTo ?? "/account");
+    router.refresh();
+  }
 
   // Email + password panel state.
   const [email, setEmail] = useState("");
@@ -96,8 +112,7 @@ function LoginPageBody() {
         body: JSON.stringify({ email, password }),
       });
       if (response.ok) {
-        router.push("/account");
-        router.refresh();
+        afterLogin();
         return;
       }
       if (response.status === 429) setError(t.errorGeneric);
@@ -149,8 +164,7 @@ function LoginPageBody() {
         body: JSON.stringify({ challenge: options.challenge, response: credential }),
       });
       if (completeResponse.ok) {
-        router.push("/account");
-        router.refresh();
+        afterLogin();
         return;
       }
       if (completeResponse.status === 401) setPasskeyError(t.passkeyErrorFailed);
@@ -177,8 +191,7 @@ function LoginPageBody() {
         body: JSON.stringify({ token: mergeToken, email: mergeEmail, password: mergePassword }),
       });
       if (response.ok) {
-        router.push("/account");
-        router.refresh();
+        afterLogin();
         return;
       }
       if (response.status === 410) {
@@ -323,10 +336,21 @@ function LoginPageBody() {
                     }}
                   />
                 </label>
+                <p className="auth-forgot">
+                  <Link href="/forgot-password">{t.forgotPassword}</Link>
+                </p>
                 {error ? <p className="auth-error" role="alert">{error}</p> : null}
                 <button className="button button-primary" type="submit" disabled={submitting}>
                   {submitting ? t.loading : t.login}
                 </button>
+                {/* Per-method risk disclosure (P1-4 Vera design — the risk
+                    matrix is per-method, ADR 0020 d.6): the password method
+                    declares its PII + phishing surface, exactly like the
+                    passkey and OIDC panels below. */}
+                <p className="oidc-disclosure auth-method-disclosure">
+                  <span className="sr-only">{t.methodDisclosureLabel}: </span>
+                  {t.passwordDisclosure}
+                </p>
               </form>
             ) : null}
 
@@ -343,21 +367,28 @@ function LoginPageBody() {
                   />
                   <small>{t.passkeyEmailHint}</small>
                 </label>
-                <p className="auth-method-hint">{t.passkeyLoginHint}</p>
                 {passkeyError ? <p className="auth-error" role="alert">{passkeyError}</p> : null}
                 <button className="button button-primary" type="submit" disabled={passkeyBusy}>
                   {passkeyBusy ? t.loading : t.passkeyLogin}
                 </button>
+                {/* P1-4: honest per-method disclosure. The old hint claimed
+                    "Nothing leaves your device" — false for synced passkeys
+                    (vendor cloud sees usage); the disclosure below replaces
+                    that claim. */}
+                <p className="oidc-disclosure auth-method-disclosure">
+                  <span className="sr-only">{t.methodDisclosureLabel}: </span>
+                  {t.passkeyDisclosure}
+                </p>
               </form>
             ) : null}
 
             {method === "social" ? (
               <div className="oidc-panel">
                 <div className="oidc-buttons">
-                  <a className="button detail-outline oidc-button" href="/api/auth/oidc/github/start?redirect_to=/account">
+                  <a className="button detail-outline oidc-button" href={`/api/auth/oidc/github/start?redirect_to=${encodeURIComponent(returnTo ?? "/account")}`}>
                     {t.oidcGithub}
                   </a>
-                  <a className="button detail-outline oidc-button" href="/api/auth/oidc/google/start?redirect_to=/account">
+                  <a className="button detail-outline oidc-button" href={`/api/auth/oidc/google/start?redirect_to=${encodeURIComponent(returnTo ?? "/account")}`}>
                     {t.oidcGoogle}
                   </a>
                 </div>

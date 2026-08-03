@@ -101,8 +101,15 @@ export const en = {
     "Report saved. It is now marked ‘In moderation’ and is not shown publicly until reviewed.",
   reportSavedWithNearby:
     "Reviewed records were found close to this position — a moderator will check whether this is a duplicate before publication.",
+  // P1-2 (Vera design): the write gate (Fase E1) refuses submissions from
+  // anonymous (401) and unverified (403) sessions. The login wall gates the
+  // form itself; these messages cover a session that dies mid-form.
+  loginRequired:
+    "Your session has ended. Log in again to submit the report.",
+  verifyRequired:
+    "Your email is not verified yet. Verify it from your account page to submit the report.",
   moderationUnavailable:
-    "The moderation queue is unavailable. Please try again after restarting the local prototype.",
+    "The moderation queue is unavailable. Please try again later.",
 } as const;
 
 export const it: Translation<typeof en> = {
@@ -198,6 +205,13 @@ export const it: Translation<typeof en> = {
     "Segnalazione salvata. Ora è in moderazione e non viene mostrata pubblicamente finché non è revisionata.",
   reportSavedWithNearby:
     "Trovati record revisionati vicino a questa posizione: un moderatore verificherà se si tratta di un duplicato prima della pubblicazione.",
+  // P1-2 (design Vera): il write gate (Fase E1) rifiuta gli invii da sessioni
+  // anonime (401) e non verificate (403). Il login wall copre il modulo; questi
+  // messaggi gestiscono una sessione che scade a modulo compilato.
+  loginRequired:
+    "La sessione è terminata. Accedi di nuovo per inviare la segnalazione.",
+  verifyRequired:
+    "La tua email non è ancora verificata. Verificala dalla pagina del tuo account per inviare la segnalazione.",
   moderationUnavailable:
-    "La coda di moderazione non è disponibile. Riprova dopo aver riavviato il prototipo locale.",
+    "La coda di moderazione non è disponibile. Riprova più tardi.",
 };

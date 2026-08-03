@@ -84,8 +84,6 @@ export const en = {
   passkeyEmailOptional: "Account email (optional)",
   passkeyEmailHint:
     "Optional: narrows the prompt to this account's passkeys. Leave it empty to use any passkey saved on this device.",
-  passkeyLoginHint:
-    "Your device will ask you to confirm with a fingerprint, face or PIN. Nothing leaves your device.",
   passkeyUnsupported:
     "This browser does not support passkeys. Use email + password, or update your browser.",
   passkeyErrorBegin: "Unable to start passkey sign-in. Please try again.",
@@ -135,6 +133,82 @@ export const en = {
   recoveryCopy: "Copy codes",
   recoveryCopied: "Copied.",
   recoverySaved: "I saved them",
+  // Email verification (Fase B UI — Vera design): /verify-email page and the
+  // /account banner. The verification link in the email now lands on a real
+  // page (not raw JSON); the page consumes GET /api/auth/verify-email and
+  // offers a resend when the token is dead.
+  verifyTitle: "Verify your email",
+  verifyChecking: "Checking your verification link…",
+  verifySuccessTitle: "Email verified",
+  verifySuccessBody:
+    "Your email address is verified. You can now log in and start contributing.",
+  verifyInvalidTitle: "Invalid or expired link",
+  verifyInvalidBody:
+    "This verification link is invalid or has already been used. You can request a new link.",
+  verifyExpiredTitle: "This link is no longer valid",
+  verifyExpiredBody:
+    "This verification link has already been used or has expired. Request a new link to continue.",
+  verifyResend: "Resend verification email",
+  verifyResent: "Verification email sent.",
+  verifyResendRateLimited: "Too many emails. Please try again later.",
+  verifyResendError: "Unable to resend the email. Please try again.",
+  verifyLoginToResend: "Log in to request a new link.",
+  verifyGoToAccount: "Go to your account",
+  verifyError: "Unable to verify your email. Please try again.",
+  // /account verification banner (read from contributor.emailVerifiedAt).
+  verifyBannerTitle: "Verify your email to contribute",
+  verifyBannerBody:
+    "Check your inbox for the confirmation link. A verified email is required to submit reports and corrections.",
+  verifyBannerResend: "Resend the email",
+  verifyBannerResent: "Confirmation email sent.",
+  verifyBannerDone: "Email verified — you can contribute.",
+  // Forgot password (P1-3): entry from /login and the /forgot-password page.
+  forgotPassword: "Forgot password?",
+  forgotTitle: "Reset your password",
+  forgotIntro:
+    "Enter the email address of your account and we will send you a reset link.",
+  forgotSubmit: "Send reset link",
+  forgotSent:
+    "If an account exists for this email, a reset link is on its way. Check your inbox.",
+  forgotBackToLogin: "Back to log in",
+  // /reset-password page (consumes the single-use token from the email).
+  resetTitle: "Set a new password",
+  resetIntro: "Choose a new password for your account.",
+  resetNewPassword: "New password",
+  resetConfirmPassword: "Repeat the new password",
+  resetMismatch: "The two passwords do not match.",
+  resetSubmit: "Change password",
+  resetSuccessTitle: "Password changed",
+  resetSuccessBody:
+    "Your password has been changed and every session was closed. Log in with the new password.",
+  resetInvalid: "Invalid or expired reset link.",
+  resetExpired:
+    "This reset link has already been used or has expired. Request a new one.",
+  resetGoToLogin: "Log in",
+  resetRequestAnother: "Request a new link",
+  // Login wall on the write tools (P1-2 — Vera design): anonymous and
+  // unverified states replace the form on /segnala and /correggi.
+  wallLoginTitle: "Log in to contribute",
+  wallLoginBody:
+    "Reports and corrections are published by verified contributors. Log in or create an account to continue.",
+  wallLogIn: "Log in",
+  wallCreateAccount: "Create an account",
+  wallVerifyTitle: "Verify your email to contribute",
+  wallVerifyBody:
+    "Your account is not verified yet. Check your inbox for the confirmation link, or resend it.",
+  wallResend: "Resend verification email",
+  wallResent: "Verification email sent.",
+  wallGoToAccount: "Go to your account",
+  wallChecking: "Checking…",
+  wallError: "Unable to check your session. Please try again.",
+  // Per-method privacy disclosure (P1-4 — risk matrix complete, ADR 0020
+  // decision 6). Each sign-in method declares its own risk surface; the OIDC
+  // disclosure already existed and is kept unchanged.
+  methodDisclosureLabel: "Privacy note",
+  passwordDisclosure:
+    "Your email address is personal data and is stored to run your account. Password-only logins can be targeted by phishing — always check the address bar before typing your password.",
+  passkeyDisclosure:
+    "The biometric check (fingerprint, face or PIN) happens on your device. If your passkey is synced through a vendor cloud (Apple, Google, Microsoft), that vendor can see that you use this site; device-bound passkeys are never synced.",
 } as const;
 
 export const it: Translation<typeof en> = {
@@ -215,8 +289,6 @@ export const it: Translation<typeof en> = {
   passkeyEmailOptional: "Email dell'account (facoltativa)",
   passkeyEmailHint:
     "Facoltativa: limita la richiesta alle passkey di questo account. Lascia vuoto per usare qualsiasi passkey salvata su questo dispositivo.",
-  passkeyLoginHint:
-    "Il dispositivo ti chiederà di confermare con impronta, volto o PIN. Nulla lascia il tuo dispositivo.",
   passkeyUnsupported:
     "Questo browser non supporta le passkey. Usa email + password oppure aggiorna il browser.",
   passkeyErrorBegin: "Impossibile avviare l'accesso con passkey. Riprova.",
@@ -266,4 +338,80 @@ export const it: Translation<typeof en> = {
   recoveryCopy: "Copia i codici",
   recoveryCopied: "Copiati.",
   recoverySaved: "Li ho salvati",
+  // Verifica email (UI Fase B — design Vera): pagina /verify-email e banner
+  // su /account. Il link nella email ora atterra su una pagina vera (non JSON
+  // grezzo); la pagina consuma GET /api/auth/verify-email e offre il re-invio
+  // quando il token è morto.
+  verifyTitle: "Verifica la tua email",
+  verifyChecking: "Verifica del link in corso…",
+  verifySuccessTitle: "Email verificata",
+  verifySuccessBody:
+    "Il tuo indirizzo email è verificato. Ora puoi accedere e iniziare a contribuire.",
+  verifyInvalidTitle: "Link non valido o scaduto",
+  verifyInvalidBody:
+    "Questo link di verifica non è valido o è già stato usato. Puoi richiedere un nuovo link.",
+  verifyExpiredTitle: "Questo link non è più valido",
+  verifyExpiredBody:
+    "Questo link di verifica è già stato usato o è scaduto. Richiedi un nuovo link per continuare.",
+  verifyResend: "Invia di nuovo l'email di verifica",
+  verifyResent: "Email di verifica inviata.",
+  verifyResendRateLimited: "Troppe email. Riprova più tardi.",
+  verifyResendError: "Impossibile inviare di nuovo l'email. Riprova.",
+  verifyLoginToResend: "Accedi per richiedere un nuovo link.",
+  verifyGoToAccount: "Vai al tuo account",
+  verifyError: "Impossibile verificare la tua email. Riprova.",
+  // Banner di verifica su /account (letto da contributor.emailVerifiedAt).
+  verifyBannerTitle: "Verifica la tua email per contribuire",
+  verifyBannerBody:
+    "Controlla la casella di posta: il link di conferma è arrivato via email. Per inviare segnalazioni e correzioni è necessaria un'email verificata.",
+  verifyBannerResend: "Invia di nuovo l'email",
+  verifyBannerResent: "Email di conferma inviata.",
+  verifyBannerDone: "Email verificata — puoi contribuire.",
+  // Password dimenticata (P1-3): ingresso da /login e pagina /forgot-password.
+  forgotPassword: "Password dimenticata?",
+  forgotTitle: "Reimposta la password",
+  forgotIntro:
+    "Inserisci l'email del tuo account: ti invieremo un link per reimpostare la password.",
+  forgotSubmit: "Invia il link di reset",
+  forgotSent:
+    "Se esiste un account per questa email, il link di reset è in arrivo. Controlla la casella di posta.",
+  forgotBackToLogin: "Torna all'accesso",
+  // Pagina /reset-password (consuma il token monouso dell'email).
+  resetTitle: "Imposta una nuova password",
+  resetIntro: "Scegli una nuova password per il tuo account.",
+  resetNewPassword: "Nuova password",
+  resetConfirmPassword: "Ripeti la nuova password",
+  resetMismatch: "Le due password non coincidono.",
+  resetSubmit: "Cambia password",
+  resetSuccessTitle: "Password cambiata",
+  resetSuccessBody:
+    "La tua password è stata cambiata e tutte le sessioni sono state chiuse. Accedi con la nuova password.",
+  resetInvalid: "Link di reset non valido o scaduto.",
+  resetExpired:
+    "Questo link di reset è già stato usato o è scaduto. Richiedine uno nuovo.",
+  resetGoToLogin: "Accedi",
+  resetRequestAnother: "Richiedi un nuovo link",
+  // Login wall sui tool di scrittura (P1-2 — design Vera): gli stati anonimo
+  // e non verificato sostituiscono il modulo su /segnala e /correggi.
+  wallLoginTitle: "Accedi per contribuire",
+  wallLoginBody:
+    "Segnalazioni e correzioni sono pubblicate da contributor verificati. Accedi o crea un account per continuare.",
+  wallLogIn: "Accedi",
+  wallCreateAccount: "Crea un account",
+  wallVerifyTitle: "Verifica la tua email per contribuire",
+  wallVerifyBody:
+    "Il tuo account non è ancora verificato. Controlla la casella di posta per il link di conferma, oppure invialo di nuovo.",
+  wallResend: "Invia di nuovo l'email di verifica",
+  wallResent: "Email di verifica inviata.",
+  wallGoToAccount: "Vai al tuo account",
+  wallChecking: "Verifica in corso…",
+  wallError: "Impossibile verificare la sessione. Riprova.",
+  // Disclosure privacy per metodo (P1-4 — matrice rischi completa, ADR 0020
+  // decisione 6). Ogni metodo dichiara la propria superficie di rischio; la
+  // disclosure OIDC esisteva già e resta invariata.
+  methodDisclosureLabel: "Nota sulla privacy",
+  passwordDisclosure:
+    "Il tuo indirizzo email è un dato personale ed è conservato per gestire il tuo account. Gli accessi con sola password possono essere presi di mira dal phishing: controlla sempre la barra degli indirizzi prima di digitare la password.",
+  passkeyDisclosure:
+    "Il controllo biometrico (impronta, volto o PIN) avviene sul tuo dispositivo. Se la passkey è sincronizzata tramite il cloud del fornitore (Apple, Google, Microsoft), quel fornitore può vedere che usi questo sito; le passkey legate al dispositivo non vengono mai sincronizzate.",
 };

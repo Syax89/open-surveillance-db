@@ -228,39 +228,36 @@ test("global footer exposes every institutional page, the ODbL data licence and 
 
 test("collection points link to the privacy notice and terms (GDPR art. 13 short notice)", async () => {
   // F2 home hub: the report and correction forms moved to their own routes
-  // (/segnala, /correggi). The art. 13(1) GDPR collection-point contract is
-  // asserted on the routes that actually collect the data.
+  // (/segnala, /correggi). P1-2 (Vera design): the forms are gated by
+  // WriteGateWall — the write gate (Fase E1) requires a verified contributor,
+  // so the anonymous SSR shell renders the bilingual login wall, and the
+  // forms (with their art. 13 mini-notice at the collection point) render
+  // client-side for verified contributors. The form-level legal contract is
+  // asserted in the jsdom suite (tests/client-report-legal.test.mjs — the
+  // #report-art13-note / #correction-art13-note blocks with /privacy + /termini
+  // + privacy contact). Here we assert the SSR shell: 200, the wall's login
+  // CTA, and the privacy/terms links reachable from the login path.
   const report = await renderRoute("/segnala");
   assert.equal(report.response.status, 200);
-
-  // Report form: the consent checkbox must be followed by explicit links to
-  // /privacy and /termini at the point of collection (footer alone is not
-  // enough — art. 13(1) GDPR requires the short notice at collection time).
-  // React SSR inserts <!-- --> markers between text and elements.
-  assert.match(report.html, /I confirm this observation was made from public space and contains no personal data\.[\s\S]{0,80}<a href="\/privacy">Privacy notice<\/a>\s*·\s*<a href="\/termini">Terms of use<\/a>/);
-
-  // Photo upload: the help line mentions EXIF stripping and points to the
-  // privacy notice.
-  assert.match(report.html, /EXIF metadata is stripped on upload[\s\S]{0,120}href="\/privacy"/);
+  // The wall is client-rendered: SSR shows its initial "Checking…" state
+  // (the gated form content never leaks into the static markup), and the
+  // login/verify states resolve client-side after /api/auth/me.
+  assert.match(report.html, /Checking…/, "anonymous SSR shows the WriteGateWall loading state, not the gated form");
+  assert.doesNotMatch(report.html, /I confirm this observation was made from public space/, "the gated form must not leak into SSR");
 
   const correction = await renderRoute("/correggi");
   assert.equal(correction.response.status, 200);
+  assert.match(correction.html, /Checking…/, "anonymous SSR shows the WriteGateWall loading state, not the gated form");
+  assert.doesNotMatch(correction.html, /I understand that this request is private/, "the gated form must not leak into SSR");
 
-  // Correction form: same requirement for the private correction request.
-  assert.match(correction.html, /I understand that this request is private[\s\S]{0,200}href="\/privacy"/);
-  assert.match(correction.html, /I understand that this request is private[\s\S]{0,200}href="\/termini"/);
-
-  // Count check: footer (1) + report form (1) + photo help (1) = 3 explicit
-  // /privacy links on /segnala; footer (1) + correction form (1) = 2 on
-  // /correggi (terms: footer + form in both).
-  const reportPrivacy = (report.html.match(/href="\/privacy"/g) ?? []).length;
-  const reportTerms = (report.html.match(/href="\/termini"/g) ?? []).length;
-  const correctionPrivacy = (correction.html.match(/href="\/privacy"/g) ?? []).length;
-  const correctionTerms = (correction.html.match(/href="\/termini"/g) ?? []).length;
-  assert.ok(reportPrivacy >= 3, `expected >= 3 /privacy links on /segnala, found ${reportPrivacy}`);
-  assert.ok(reportTerms >= 2, `expected >= 2 /termini links on /segnala, found ${reportTerms}`);
-  assert.ok(correctionPrivacy >= 2, `expected >= 2 /privacy links on /correggi, found ${correctionPrivacy}`);
-  assert.ok(correctionTerms >= 2, `expected >= 2 /termini links on /correggi, found ${correctionTerms}`);
+  // The art. 13 links themselves are reachable from the login page the wall
+  // points to (the /login auth-form legal links and /register art. 13 note
+  // are asserted by the account/client-auth suites); the footer also carries
+  // /privacy and /termini on every route.
+  assert.ok((report.html.match(/href="\/privacy"/g) ?? []).length >= 1, "footer privacy link on /segnala");
+  assert.ok((report.html.match(/href="\/termini"/g) ?? []).length >= 1, "footer terms link on /segnala");
+  assert.ok((correction.html.match(/href="\/privacy"/g) ?? []).length >= 1, "footer privacy link on /correggi");
+  assert.ok((correction.html.match(/href="\/termini"/g) ?? []).length >= 1, "footer terms link on /correggi");
 });
 
 test("/segnala SSR without photos never renders the photo-redaction confirmation (G3 negative)", async () => {

@@ -212,16 +212,19 @@ const INFO_ROUTES = {
     noEn: ["Public directory", "Search, filter and order"],
   },
   "/segnala": {
-    // F5 (P1-5): same — one page header; the ReportForm eyebrow + h2 + intro is
-    // removed when embedded, the report-rule ("Before submitting") stays.
-    it: ["Segnala una telecamera", "Prima di inviare"],
-    en: ["Report a camera", "Before submitting"],
-    noEn: ["Report a camera", "Before submitting"],
+    // F5 (P1-5): one page header; the ReportForm eyebrow + h2 + intro is
+    // removed when embedded. P1-2: the WriteGateWall gates the form behind
+    // the verified-session check, so the SSR shell renders the tool heading
+    // + the wall's localized "checking" note (the form content is client-
+    // gated and never leaks into the static markup).
+    it: ["Segnala una telecamera", "Verifica in corso…"],
+    en: ["Report a camera", "Checking…"],
+    noEn: ["Report a camera", "Checking…"],
   },
   "/correggi": {
-    it: ["Correggi un record", "Le correzioni sono private"],
-    en: ["Correct a record", "Corrections are private"],
-    noEn: ["Correct a record", "Corrections are private"],
+    it: ["Correggi un record", "Verifica in corso…"],
+    en: ["Correct a record", "Checking…"],
+    noEn: ["Correct a record", "Checking…"],
   },
 };
 
