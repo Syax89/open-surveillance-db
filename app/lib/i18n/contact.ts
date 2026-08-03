@@ -25,7 +25,7 @@ export const en = {
   rolesTitle: "Roles and owners",
   rolesIntro: "Initial roles for the pilot were named on 2026-07-31:",
   roleMaintainers: "Maintainers",
-  roleMaintainersBody: "Simone (syax89) and Ada (CTO). Ada is the sole merge authority.",
+  roleMaintainersBody: "Simone (syax89) and Ada (CTO). Ada is the only person who can merge code changes.",
   roleOps: "Operations owner",
   roleOpsBody: "Ken — hosting, deployments, backups.",
   roleData: "Data stewards",
@@ -39,7 +39,7 @@ export const en = {
     "Simone Rondina (syax89) / OpenSurveillanceDB — Italy (decision of 2026-07-31; final legal-entity wording to be confirmed at launch).",
   correctionTitle: "Corrections and removal",
   correctionBody:
-    "Use the private correction form on the home page, or write to the privacy contact. Requests are private, reviewed by a human, and never published. Response targets: first response within 48 hours, substantive response within 14 days, emergency content hide within 24 hours.",
+    "Use the private correction form, or write to the privacy contact. Requests are private, reviewed by a human, and never published. Response targets: first response within 48 hours, substantive response within 14 days, emergency content hide within 24 hours.",
   correctionForm: "Open the correction form",
   correctionEmail: "privacy@opensurveillancedb.org",
   correctionEmailNote:
@@ -74,7 +74,7 @@ export const it: Translation<typeof en> = {
   rolesTitle: "Ruoli e responsabili",
   rolesIntro: "I ruoli iniziali del pilota sono stati nominati il 2026-07-31:",
   roleMaintainers: "Manutentori",
-  roleMaintainersBody: "Simone (syax89) e Ada (CTO). Ada è l'unica autorità di merge.",
+  roleMaintainersBody: "Simone (syax89) e Ada (CTO). Ada è l'unica persona autorizzata a fare il merge del codice.",
   roleOps: "Responsabile operativo",
   roleOpsBody: "Ken — hosting, deployment, backup.",
   roleData: "Data steward",
@@ -88,7 +88,7 @@ export const it: Translation<typeof en> = {
     "Simone Rondina (syax89) / OpenSurveillanceDB — Italia (decisione del 2026-07-31; formulazione definitiva dell'entità giuridica da confermare al lancio).",
   correctionTitle: "Correzioni e rimozioni",
   correctionBody:
-    "Usa il modulo privato di correzione nella home page oppure scrivi al contatto privacy. Le richieste sono private, esaminate da una persona e mai pubblicate. Obiettivi di risposta: prima risposta entro 48 ore, risposta sostanziale entro 14 giorni, rimozione d'emergenza dei contenuti entro 24 ore.",
+    "Usa il modulo privato di correzione oppure scrivi al contatto privacy. Le richieste sono private, esaminate da una persona e mai pubblicate. Obiettivi di risposta: prima risposta entro 48 ore, risposta sostanziale entro 14 giorni, rimozione d'emergenza dei contenuti entro 24 ore.",
   correctionForm: "Apri il modulo di correzione",
   correctionEmail: "privacy@opensurveillancedb.org",
   correctionEmailNote:

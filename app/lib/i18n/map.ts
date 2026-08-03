@@ -42,7 +42,7 @@ export const en = {
   loadingRecords: "Loading the public record API…",
   unknown: "Unknown",
   apiUnavailable:
-    "The public API is not available yet, so the prototype is showing illustrative records.",
+    "The public API is temporarily unreachable, so the map is showing illustrative records.",
   // Truthful empty state (never a silent map).
   emptyTitle: "No published record matches those filters.",
   emptyBody:
@@ -120,7 +120,7 @@ export const it: Translation<typeof en> = {
   loadingRecords: "Caricamento dell'API dei record pubblici…",
   unknown: "Sconosciuto",
   apiUnavailable:
-    "L'API pubblica non è ancora disponibile: il prototipo mostra record illustrativi.",
+    "L'API pubblica è temporaneamente non raggiungibile: la mappa mostra record illustrativi.",
   // Stato vuoto truthful (mai una mappa muta).
   emptyTitle: "Nessun record pubblicato corrisponde a questi filtri.",
   emptyBody:

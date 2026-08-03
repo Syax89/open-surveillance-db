@@ -107,7 +107,7 @@ test("community bundle exposes Eva's frozen EN/IT terminology", async () => {
     ["badgeLabels.experienced", "Experienced contributor", "Contributor esperto"],
     ["levelDescriptions.trusted",
       "You are a trusted contributor. Your consistent, verified contributions mean your reports may be prioritised in the moderation queue.",
-      "Sei un contributor fidato. I tuoi contributi costanti e verificati fanno sì che le tue segnalazioni possano essere prioritarizzate nella coda di moderazione."],
+      "Sei un contributor fidato. I tuoi contributi costanti e verificati fanno sì che le tue segnalazioni possano avere priorità nella coda di moderazione."],
     // Verifications (frozen: "verifications", never stars).
     ["verifications", "Verifications", "Verifiche"],
     ["verifiedByCommunity", "Verified by the community", "Verificato dalla community"],
@@ -210,10 +210,10 @@ test("plural formatters produce the frozen Italian and English forms", async () 
 // 4. Pre-existing IT fix: "contributore" → "contributor"
 // ---------------------------------------------------------------------------
 
-test("auth.ts IT registerTitle uses contributor (fix, COMMUNITY_PLAN §6.1)", async () => {
+test("auth.ts IT registerTitle is natural Italian (copy finale, t_ee3adc33)", async () => {
   const auth = await transpileAndImport(path.join(i18nDir, "auth.ts"));
   assert.equal(auth.en.registerTitle, "Create a contributor account");
-  assert.equal(auth.it.registerTitle, "Crea un account da contributor");
+  assert.equal(auth.it.registerTitle, "Crea un account per contribuire");
 });
 
 test("no \"contributore\" is left in any Italian bundle (auth, moderazione, …)", async () => {

@@ -113,7 +113,7 @@ test("correction rows offer the record outcome, record id and Link to record act
 
   // The correction-only decision fields are present.
   assert.ok(screen.getByLabelText(/Record outcome/, { selector: "#correction-3-outcome" }));
-  assert.ok(screen.getByLabelText(/Record id/, { selector: "#correction-3-camera" }));
+  assert.ok(screen.getByLabelText(/Record ID/, { selector: "#correction-3-camera" }));
   const actions = screen.getByLabelText("Decision for correction 3");
   const buttons = [...actions.querySelectorAll("button")].map((button) => button.textContent);
   assert.deepEqual(buttons, ["Approve", "Reject", "Link to record", "Escalate"]);
@@ -131,7 +131,7 @@ test("correction rows offer the record outcome, record id and Link to record act
   await waitFor(() => assert.equal(approve.disabled, false));
   const associate = [...actions.querySelectorAll("button")].find((button) => button.textContent === "Link to record");
   assert.equal(associate.disabled, true, "associate stays locked until a record id is entered");
-  await user.type(screen.getByLabelText(/Record id/, { selector: "#correction-3-camera" }), "7");
+  await user.type(screen.getByLabelText(/Record ID/, { selector: "#correction-3-camera" }), "7");
   await waitFor(() => assert.equal(associate.disabled, false));
 });
 
@@ -153,7 +153,7 @@ test("approve on a correction dispatches PATCH with the record outcome and linke
   await user.selectOptions(screen.getByRole("combobox", { name: /^Acting reviewer/ }), "2");
   await user.selectOptions(screen.getByLabelText("Required reason", { selector: "#correction-3-reason" }), "inaccurate-or-outdated");
   await user.selectOptions(screen.getByLabelText(/Record outcome/, { selector: "#correction-3-outcome" }), "corrected");
-  await user.type(screen.getByLabelText(/Record id/, { selector: "#correction-3-camera" }), "7");
+  await user.type(screen.getByLabelText(/Record ID/, { selector: "#correction-3-camera" }), "7");
   const actions = screen.getByLabelText("Decision for correction 3");
   await user.click(actions.querySelector("button"));
 
@@ -188,7 +188,7 @@ test("associate links a pending correction to a record without deciding", async 
 
   await user.selectOptions(screen.getByRole("combobox", { name: /^Acting reviewer/ }), "2");
   await user.selectOptions(screen.getByLabelText("Required reason", { selector: "#correction-3-reason" }), "insufficient-evidence");
-  await user.type(screen.getByLabelText(/Record id/, { selector: "#correction-3-camera" }), "7");
+  await user.type(screen.getByLabelText(/Record ID/, { selector: "#correction-3-camera" }), "7");
   const actions = screen.getByLabelText("Decision for correction 3");
   const associate = [...actions.querySelectorAll("button")].find((button) => button.textContent === "Link to record");
   await user.click(associate);
@@ -221,7 +221,7 @@ test("the record history section renders a record's correction trail", async () 
 
   await renderQueue();
 
-  const input = screen.getByLabelText(/Record id/, { selector: "#correction-history-record" });
+  const input = screen.getByLabelText(/Record ID/, { selector: "#correction-history-record" });
   await user.type(input, "7");
   await user.click(screen.getByRole("button", { name: "Show history" }));
 
@@ -256,7 +256,7 @@ test("record history surfaces the not-found and empty states", async () => {
   await renderQueue();
 
   // Unknown record → server 404 surfaces in role=alert.
-  const input = screen.getByLabelText(/Record id/, { selector: "#correction-history-record" });
+  const input = screen.getByLabelText(/Record ID/, { selector: "#correction-history-record" });
   await user.type(input, "4242");
   await user.click(screen.getByRole("button", { name: "Show history" }));
   await waitFor(() => assert.ok(screen.queryByText("Record not found.")));

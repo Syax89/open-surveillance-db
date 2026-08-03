@@ -32,7 +32,7 @@ export const en = {
   passwordRuleSpecial: "A special character (e.g. ! @ # $ %)",
   passwordWeak: "Your password does not meet the requirements above.",
   anonymousNote:
-    "You do not need an account to report a camera. An account lets you track your own reports.",
+    "A free account is required to report a camera, and it lets you track your own reports.",
   privacyNotice: "Privacy notice",
   termsOfUse: "Terms of use",
   registerArt13:
@@ -228,7 +228,7 @@ export const it: Translation<typeof en> = {
   homeAria: "Pagina iniziale di OpenSurveillanceDB",
   accountAria: "Il tuo account",
   loginTitle: "Accedi",
-  registerTitle: "Crea un account da contributor",
+  registerTitle: "Crea un account per contribuire",
   accountTitle: "Il tuo account",
   email: "Email",
   password: "Password",
@@ -248,7 +248,7 @@ export const it: Translation<typeof en> = {
   passwordRuleSpecial: "Un carattere speciale (es. ! @ # $ %)",
   passwordWeak: "La password non rispetta i requisiti sopra indicati.",
   anonymousNote:
-    "Non serve un account per segnalare una telecamera. Un account ti permette di tenere traccia delle tue segnalazioni.",
+    "Per segnalare una telecamera serve un account gratuito, che ti permette anche di tenere traccia delle tue segnalazioni.",
   privacyNotice: "Informativa privacy",
   termsOfUse: "Termini d’uso",
   registerArt13:
@@ -308,7 +308,7 @@ export const it: Translation<typeof en> = {
   methodSelectorLabel: "Scegli come accedere",
   methodPassword: "Email e password",
   methodPasskey: "Passkey",
-  methodSocial: "Accesso con social",
+  methodSocial: "Accesso tramite social",
   // Accesso con passkey (Fase C).
   passkeyLogin: "Accedi con passkey",
   passkeyEmailOptional: "Email dell'account (facoltativa)",
