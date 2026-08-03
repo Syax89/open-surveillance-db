@@ -181,3 +181,28 @@ test("wrangler.jsonc declares the daily cron trigger and the PHOTOS bucket bindi
     "the PHOTOS binding name must match worker/index.ts Env.PHOTOS",
   );
 });
+
+test("R15: the retention sweep purges expired email tokens and lapsed WebAuthn challenges (P3-1)", async () => {
+  const retention = await readSource("db/retention.ts");
+
+  assert.match(
+    retention,
+    /DELETE FROM email_verification_tokens WHERE expires_at < \?/,
+    "expired email-verification tokens must be swept by the retention cron (R15)",
+  );
+  assert.match(
+    retention,
+    /sweepExpiredWebAuthnChallenges/,
+    "the WebAuthn challenge sweep must be centralized in the retention sweep",
+  );
+  assert.match(
+    retention,
+    /summary\.emailTokensPurged/,
+    "the sweep must report the purged token count in the summary",
+  );
+  assert.match(
+    retention,
+    /summary\.challengesPurged/,
+    "the sweep must report the purged challenge count in the summary",
+  );
+});

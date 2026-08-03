@@ -15,6 +15,8 @@
 //   R6  orphan pending photos + rejected photos removed from D1 and R2;
 //       the >100-photo scenario (D1 bound-parameter cap) is a regression test
 //   R7  expired / revoked sessions purged
+//   R15 expired email-verification tokens + lapsed WebAuthn challenges
+//       purged by the cron sweep (review-ada-2 P3-1)
 //   atomicity: purgeCameraRecord deletes photos, queue item and camera in one
 //       d1.batch (regression: photos were deleted before the batch)
 //   R2/R3 photos are deleted only AFTER their D1 rows succeed (R2-first rule)
@@ -150,6 +152,33 @@ async function insertSession({ expiresAt, revokedAt = null }) {
     "INSERT INTO sessions (contributor_id, token_hash, csrf_token, created_at, expires_at, revoked_at) VALUES ((SELECT id FROM contributors ORDER BY id DESC LIMIT 1), ?, 'csrf', ?, ?, ?)",
   )
     .bind(`token-${Math.random()}`, NOW, expiresAt, revokedAt)
+    .run();
+  return lastRowId;
+}
+
+// An email-verification token row (migration 0027 + purpose column 0031).
+// Creates its contributor like insertSession does (FK enforcement is ON).
+async function insertEmailToken({ expiresAt, usedAt = null }) {
+  await runtime.env.DB.prepare(
+    "INSERT INTO contributors (email, password_hash, created_at, updated_at) VALUES (?, 'x', ?, ?)",
+  )
+    .bind(`token-contrib-${Math.random()}@example.com`, NOW, NOW)
+    .run();
+  const { lastRowId } = await runtime.env.DB.prepare(
+    "INSERT INTO email_verification_tokens (contributor_id, token_hash, purpose, created_at, expires_at, used_at) VALUES ((SELECT id FROM contributors ORDER BY id DESC LIMIT 1), ?, 'verify', ?, ?, ?)",
+  )
+    .bind(`token-hash-${Math.random()}`, NOW, expiresAt, usedAt)
+    .run();
+  return lastRowId;
+}
+
+// A WebAuthn challenge row (migration 0028). `contributorId` stays NULL for
+// public login ceremonies — the real /login/begin stores no binding.
+async function insertChallenge({ expiresAt, usedAt = null, userHandle = null }) {
+  const { lastRowId } = await runtime.env.DB.prepare(
+    "INSERT INTO webauthn_challenges (challenge_hash, kind, contributor_id, user_handle, created_at, expires_at, used_at) VALUES (?, 'login', NULL, ?, ?, ?, ?)",
+  )
+    .bind(`challenge-hash-${Math.random()}`, userHandle, NOW, expiresAt, usedAt)
     .run();
   return lastRowId;
 }
@@ -674,6 +703,32 @@ test("R7: expired and revoked sessions are purged, live ones survive", async () 
 
   assert.equal(summary.sessionsPurged, 2);
   assert.equal(await count("sessions"), 1, "the live session survives");
+});
+
+// ---------------------------------------------------------------------------
+// R15 — expired auth-method rows (review-ada-2 P3-1)
+// ---------------------------------------------------------------------------
+
+test("R15: expired email-verification tokens are purged, live ones survive (P3-1)", async () => {
+  await insertEmailToken({ expiresAt: daysBefore(1) }); // expired → purged
+  await insertEmailToken({ expiresAt: daysBefore(1), usedAt: daysBefore(2) }); // used + expired → purged
+  await insertEmailToken({ expiresAt: daysAfter(1) }); // live → survives
+
+  const summary = await runtime.retention.runRetentionSweep(NOW);
+
+  assert.equal(summary.emailTokensPurged, 2, "both expired rows are removed");
+  assert.equal(await count("email_verification_tokens"), 1, "the live token survives");
+});
+
+test("R15: lapsed WebAuthn challenges are swept by the cron (P3-1)", async () => {
+  await insertChallenge({ expiresAt: daysBefore(1) }); // expired → purged
+  await insertChallenge({ expiresAt: daysBefore(1), usedAt: daysBefore(2) }); // used + expired → purged
+  await insertChallenge({ expiresAt: daysAfter(1) }); // live → survives
+
+  const summary = await runtime.retention.runRetentionSweep(NOW);
+
+  assert.equal(summary.challengesPurged, 2, "both expired challenges are removed");
+  assert.equal(await count("webauthn_challenges"), 1, "the live challenge survives");
 });
 
 function daysAfter(days) {

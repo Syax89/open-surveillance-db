@@ -223,6 +223,28 @@ test("register/complete rejects an invalid attestation (verification runs for re
   assert.equal(callArgs("createPasskey").length, 0, "no credential stored on a failed verification");
 });
 
+test("register/complete rejects a challenge bound to a DIFFERENT contributor (P3-2)", async () => {
+  // The session belongs to contributor 7; the challenge was started under
+  // contributor 99 (another session). The ceremony must fail before any
+  // credential is stored — the challenge is bound to whoever began it.
+  stubSession();
+  stub("consumeWebAuthnChallenge", async () => ({ id: 1, kind: "register", contributorId: 99 }));
+  const { POST } = await registerCompleteRoute();
+  const response = await POST(
+    authedRequest("/api/auth/passkey/register/complete", {
+      method: "POST",
+      body: { challenge: "c1", response: { id: "cred-x", response: {} } },
+    }),
+  );
+  assert.equal(response.status, 400);
+  assert.equal(
+    (await responseBody(response)).error,
+    "This enrollment has expired or was already used. Please start again.",
+    "the rejection is generic: it must not reveal the binding layer",
+  );
+  assert.equal(callArgs("createPasskey").length, 0, "no credential stored for the wrong account");
+});
+
 // ---------------------------------------------------------------------------
 // POST /api/auth/passkey/login/begin
 // ---------------------------------------------------------------------------
@@ -366,6 +388,63 @@ test("login/complete rejects an invalid assertion (verification runs for real)",
   );
   assert.equal(response.status, 401);
   assert.equal(callArgs("createSession").length, 0, "no session on a failed verification");
+});
+
+test("login/complete rejects an assertion whose userHandle does not match the challenge's recorded handle (P3-3)", async () => {
+  // Email-narrowed ceremony: /begin stored handle-7 on the challenge. The
+  // assertion echoes handle-8 → early rejection, BEFORE the credential
+  // lookup (the binding check runs first).
+  stub("consumeWebAuthnChallenge", async () => ({ id: 1, kind: "login", userHandle: "handle-7" }));
+  const { POST } = await loginCompleteRoute();
+  const response = await POST(
+    apiRequest("/api/auth/passkey/login/complete", {
+      method: "POST",
+      body: {
+        challenge: "c1",
+        response: {
+          id: "cred-1",
+          rawId: "cred-1",
+          type: "public-key",
+          response: { clientDataJSON: "e30=", userHandle: "handle-8" },
+        },
+      },
+    }),
+  );
+  assert.equal(response.status, 401);
+  assert.equal(
+    callArgs("findPasskeyByCredentialId").length,
+    0,
+    "the mismatched handle is rejected before the credential lookup",
+  );
+});
+
+test("login/complete passes the challenge handle binding when the assertion echoes the recorded handle (P3-3)", async () => {
+  // Same handle on challenge and assertion → the binding check passes and
+  // the flow proceeds to the credential lookup (which answers unknown here,
+  // proving the check did not short-circuit).
+  stub("consumeWebAuthnChallenge", async () => ({ id: 1, kind: "login", userHandle: "handle-7" }));
+  stub("findPasskeyByCredentialId", async () => null);
+  const { POST } = await loginCompleteRoute();
+  const response = await POST(
+    apiRequest("/api/auth/passkey/login/complete", {
+      method: "POST",
+      body: {
+        challenge: "c1",
+        response: {
+          id: "ghost-cred",
+          rawId: "ghost-cred",
+          type: "public-key",
+          response: { clientDataJSON: "e30=", userHandle: "handle-7" },
+        },
+      },
+    }),
+  );
+  assert.equal(response.status, 401);
+  assert.equal(
+    callArgs("findPasskeyByCredentialId").length,
+    1,
+    "a matching handle proceeds past the binding check to the credential lookup",
+  );
 });
 
 // ---------------------------------------------------------------------------
