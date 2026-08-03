@@ -930,7 +930,7 @@ test("reset request mints a reset token for a known email and never echoes it", 
   assert.deepEqual(callArgs("createVerificationToken")[0].slice(0, 2), [7, "reset"]);
 });
 
-test("reset request respects the 3/h reset budget with 429 + Retry-After", async () => {
+test("reset request keeps answering 200 {sent:true} past the 3/h budget (no token, no mail)", async () => {
   stub("findContributorByEmail", async () => contributor);
   stub("countVerificationTokensSentSince", async () => 3);
   const { POST } = await resetRequestRoute();
@@ -940,9 +940,13 @@ test("reset request respects the 3/h reset budget with 429 + Retry-After", async
       body: { email: "ada@example.org" },
     }),
   );
-  assert.equal(response.status, 429);
-  assert.ok(Number(response.headers.get("retry-after")) > 0);
-  assert.equal(callArgs("createVerificationToken").length, 0);
+  // Anti-enumeration (P1-1): an exhausted budget MUST NOT answer differently
+  // from an unknown address — a 429 here is reachable only for registered
+  // emails and is a binary existence oracle. Same generic body, no token
+  // minted, no mail sent (the budget still caps real sends at 3/h).
+  assert.equal(response.status, 200);
+  assert.deepEqual((await responseBody(response)), { sent: true });
+  assert.equal(callArgs("createVerificationToken").length, 0, "no token minted past the budget");
 });
 
 // ---------------------------------------------------------------------------
