@@ -17,6 +17,10 @@ export const en = {
   needs_review: "Needs review",
   removed: "Removed",
   rejected: "Rejected",
+  // ADR 0021 §6.3 (FASE 3 UI): hidden/removed records are reachable by
+  // direct link with a banner; the labels feed the banner and the record
+  // status line (publicStatusLabel whitelist extended for the record page).
+  hidden: "Hidden",
 } as const;
 
 export const it: Translation<typeof en> = {
@@ -27,4 +31,5 @@ export const it: Translation<typeof en> = {
   needs_review: "Da ricontrollare",
   removed: "Rimosso",
   rejected: "Rifiutato",
+  hidden: "Nascosto",
 };

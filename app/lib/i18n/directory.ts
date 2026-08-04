@@ -60,6 +60,20 @@ export const en = {
   orderRecords: "Order records",
   alphabetical: "Alphabetical",
   positionOrder: "Position (south to north)",
+  // Community ranking (ADR 0021 §10, FASE 3 UI): the three server sort
+  // options surface usefulness (weighted likes), freshness (last confirm)
+  // and confirmation volume. Same frozen vocabulary as the action widget.
+  sortUseful: "Most useful",
+  sortRecent: "Recently confirmed",
+  sortConfirmations: "Most confirmations",
+  // Confirmation-status filter (?state=, FASE 3 UI): a record's "state"
+  // in the directory sense is its community confirmation — never
+  // hidden/removed, which are excluded from the public list by design
+  // (ADR §6.3).
+  stateFilter: "Confirmation status",
+  stateAll: "Any",
+  stateConfirmed: "Confirmed",
+  stateNever: "Never confirmed",
   oneRecordFound: "1 public record found",
   recordsFound: "public records found",
   lastVerification: "Last verification",
@@ -170,6 +184,20 @@ export const it: Translation<typeof en> = {
   orderRecords: "Ordina i record",
   alphabetical: "Alfabetico",
   positionOrder: "Posizione (da sud a nord)",
+  // Ranking della community (ADR 0021 §10, FASE 3 UI): le tre opzioni di
+  // ordinamento del server esprimono utilità (like pesati), freschezza
+  // (ultima conferma) e volume di conferme. Stesso vocabolario congelato
+  // del widget azioni.
+  sortUseful: "Più utili",
+  sortRecent: "Confermate di recente",
+  sortConfirmations: "Più conferme",
+  // Filtro stato di conferma (?state=, FASE 3 UI): lo "stato" di un record
+  // nel senso dell'elenco è la sua conferma community — mai nascosto/rimosso,
+  // che per design sono esclusi dall'elenco pubblico (ADR §6.3).
+  stateFilter: "Stato di conferma",
+  stateAll: "Qualsiasi",
+  stateConfirmed: "Confermata",
+  stateNever: "Mai confermata",
   oneRecordFound: "1 record pubblico trovato",
   recordsFound: "record pubblici trovati",
   lastVerification: "Ultima verifica",

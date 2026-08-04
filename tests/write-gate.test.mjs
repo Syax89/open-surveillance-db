@@ -183,21 +183,21 @@ test("requireVerifiedContributor accepts the injectable clock", async () => {
 test("POST /api/cameras: 401 anonymous, 403 unverified, no db write either way", async (t) => {
   const { POST } = await camerasRoute();
   await t.test("anonymous -> 401", async () => {
-    stub("createPendingCamera", async () => ({ id: 1 }));
+    stub("createCamera", async () => ({ id: 1 }));
     const response = await POST(gateRequest("/api/cameras"));
     assert.equal(response.status, 401);
     assert.equal((await responseBody(response)).error, "Authentication required.");
     assert.equal(response.headers.get("cache-control"), "no-store");
-    assert.equal(callArgs("createPendingCamera").length, 0);
+    assert.equal(callArgs("createCamera").length, 0);
   });
   await t.test("unverified -> 403", async () => {
     liveSession();
     unverified();
-    stub("createPendingCamera", async () => ({ id: 1 }));
+    stub("createCamera", async () => ({ id: 1 }));
     const response = await POST(sessionRequest("/api/cameras"));
     assert.equal(response.status, 403);
     assert.equal((await responseBody(response)).error, "Authentication required.");
-    assert.equal(callArgs("createPendingCamera").length, 0);
+    assert.equal(callArgs("createCamera").length, 0);
   });
 });
 

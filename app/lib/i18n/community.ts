@@ -140,6 +140,36 @@ export const en = {
   deleteContributionBody:
     "The record will be removed from the public directory and sent to moderation. This cannot be undone.",
   deleteContribution: "Delete contribution",
+
+  // --- Community actions (ADR 0021 §3, FASE 3 UI): five-action surface on
+  // the record detail and the map popup. Vocabulary frozen by the ADR:
+  // useful / utile, confirm / confermo ancora presente, no longer there /
+  // non c'è più, flag / segnala, privacy / privacy. Counts are aggregates
+  // only (never attribution); the anonymous surface shows counts + a
+  // register/login call-to-action.
+  actions: {
+    sectionLabel: "Community actions",
+    like: "Useful",
+    confirm: "Confirm",
+    gone: "No longer there",
+    problem: "Flag",
+    privacy: "Privacy",
+    likeHelp: "Mark this record as useful to the directory.",
+    confirmHelp: "I confirm this record is still present at the documented location.",
+    goneHelp: "I believe this camera is no longer there.",
+    problemHelp: "Something is wrong with this record (details, position, description).",
+    privacyHelp: "This record raises a privacy or legal concern.",
+    countOf: (label: string, count: number) => `${label}: ${count}`,
+    anonymousCta: "Log in or register to take part",
+    anonymousCtaAction: "Log in",
+    removeYourAction: "Remove your action",
+    updating: "Updating…",
+    errorDuplicate: "You already set this action.",
+    errorSelfAction: "You cannot mark your own report as useful or confirm it.",
+    errorSessionEnded: "Your session has ended. Log in again to take part.",
+    errorVerifyRequired: "Verify your email to take part in community actions.",
+    errorGeneric: "Could not update the action. Try again.",
+  },
 } as const;
 
 export const it: Translation<typeof en> = {
@@ -270,4 +300,34 @@ export const it: Translation<typeof en> = {
   deleteContributionBody:
     "Il record verrà rimosso dall'elenco pubblico e inviato in moderazione. Questa azione non può essere annullata.",
   deleteContribution: "Elimina contributo",
+
+  // --- Azioni della community (ADR 0021 §3, FASE 3 UI): superficie a
+  // cinque azioni su dettaglio record e popup mappa. Vocabolario congelato
+  // dall'ADR: utile, confermo ancora presente, non c'è più, segnala,
+  // privacy. I conteggi sono solo aggregati (mai attribuzioni); la
+  // superficie anonima mostra i conteggi + una call-to-action di
+  // accesso/registrazione.
+  actions: {
+    sectionLabel: "Azioni della community",
+    like: "Utile",
+    confirm: "Confermo",
+    gone: "Non c'è più",
+    problem: "Segnala",
+    privacy: "Privacy",
+    likeHelp: "Segna questo record come utile per l'elenco.",
+    confirmHelp: "Confermo che questo record è ancora presente nella posizione documentata.",
+    goneHelp: "Credo che questa telecamera non ci sia più.",
+    problemHelp: "C'è qualcosa di sbagliato in questo record (dettagli, posizione, descrizione).",
+    privacyHelp: "Questo record solleva un problema di privacy o legale.",
+    countOf: (label: string, count: number) => `${label}: ${count}`,
+    anonymousCta: "Accedi o registrati per partecipare",
+    anonymousCtaAction: "Accedi",
+    removeYourAction: "Rimuovi la tua azione",
+    updating: "Aggiornamento…",
+    errorDuplicate: "Hai già impostato questa azione.",
+    errorSelfAction: "Non puoi segnare come utile o confermare una tua segnalazione.",
+    errorSessionEnded: "La sessione è terminata. Accedi di nuovo per partecipare.",
+    errorVerifyRequired: "Verifica la tua email per partecipare alle azioni della community.",
+    errorGeneric: "Impossibile aggiornare l'azione. Riprova.",
+  },
 };

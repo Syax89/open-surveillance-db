@@ -942,19 +942,19 @@ const validCameraBody = {
 };
 
 test("anonymous camera submissions are refused by the write gate (401, no-store)", async () => {
-  stub("createPendingCamera", async () => cameraFixture);
+  stub("createCamera", async () => cameraFixture);
   const { POST } = await camerasRoute();
   const response = await POST(apiRequest("/api/cameras", { method: "POST", body: validCameraBody }));
   assert.equal(response.status, 401);
   assert.equal((await responseBody(response)).error, "Authentication required.");
   assert.equal(response.headers.get("cache-control"), "no-store");
-  assert.equal(callArgs("createPendingCamera").length, 0, "the gate must fail before any db write");
+  assert.equal(callArgs("createCamera").length, 0, "the gate must fail before any db write");
 });
 
 test("authenticated camera submissions carry the contributor id", async () => {
   stub("findSessionByToken", async () => ({ ...session, contributor }));
   stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
-  stub("createPendingCamera", async () => cameraFixture);
+  stub("createCamera", async () => cameraFixture);
   const { POST } = await camerasRoute();
   const response = await POST(
     sessionRequest("/api/cameras", "raw-session-token-abc123", {
@@ -964,7 +964,7 @@ test("authenticated camera submissions carry the contributor id", async () => {
     }),
   );
   assert.equal(response.status, 201);
-  assert.deepEqual(callArgs("createPendingCamera")[0][0].contributorId, 7);
+  assert.deepEqual(callArgs("createCamera")[0][0].contributorId, 7);
 });
 
 test("authenticated camera submissions without a valid CSRF token are rejected", async () => {
@@ -978,12 +978,12 @@ test("authenticated camera submissions without a valid CSRF token are rejected",
     }),
   );
   assert.equal(response.status, 403);
-  assert.equal(callArgs("createPendingCamera").length, 0);
+  assert.equal(callArgs("createCamera").length, 0);
 });
 
 test("a dead session cookie is refused by the write gate (401, no-store, no db write)", async () => {
   stub("findSessionByToken", async () => null);
-  stub("createPendingCamera", async () => cameraFixture);
+  stub("createCamera", async () => cameraFixture);
   const { POST } = await camerasRoute();
   const response = await POST(
     sessionRequest("/api/cameras", "dead-token", { method: "POST", body: validCameraBody }),
@@ -991,7 +991,7 @@ test("a dead session cookie is refused by the write gate (401, no-store, no db w
   assert.equal(response.status, 401);
   assert.equal((await responseBody(response)).error, "Authentication required.");
   assert.equal(response.headers.get("cache-control"), "no-store");
-  assert.equal(callArgs("createPendingCamera").length, 0, "the gate must fail before any db write");
+  assert.equal(callArgs("createCamera").length, 0, "the gate must fail before any db write");
 });
 
 // ---------------------------------------------------------------------------

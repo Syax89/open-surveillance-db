@@ -17,8 +17,22 @@
 export const PUBLIC_CAMERA_STATUSES = ["active", "demo"] as const;
 export type PublicCameraStatus = (typeof PUBLIC_CAMERA_STATUSES)[number];
 
+/**
+ * Record-page statuses (ADR 0021 §6.3, FASE 3 UI): the direct-link banner
+ * contract adds hidden/removed to the whitelist ONLY for the record detail
+ * resolver. LIST surfaces (directory, map, search, GeoJSON) keep the strict
+ * PUBLIC_CAMERA_STATUSES gate via isPublicStatus — a withdrawn record is
+ * never listed, only reachable by its own link.
+ */
+export const RECORD_PAGE_STATUSES = ["active", "demo", "hidden", "removed"] as const;
+
 export function isPublicStatus(status: string): status is PublicCameraStatus {
   return (PUBLIC_CAMERA_STATUSES as readonly string[]).includes(status);
+}
+
+/** True for statuses the record detail page may render (banner included). */
+export function isRecordPageStatus(status: string): boolean {
+  return (RECORD_PAGE_STATUSES as readonly string[]).includes(status);
 }
 
 /**

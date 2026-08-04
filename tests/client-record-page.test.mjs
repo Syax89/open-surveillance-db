@@ -1,25 +1,33 @@
 /**
  * Client-side interaction tests for /records/[id] and the SurveillanceMap
- * marker status gate — QA t_61b90f6a.
+ * marker status gate — QA t_61b90f6a, extended for ADR 0021 FASE 3 UI
+ * (kanban t_b533b254): the record page now resolves through the dedicated
+ * endpoint (active/demo AND hidden/removed direct-link banner contract),
+ * renders the community action widget, the community status badge and the
+ * public event timeline, and drops the old moderation change-history.
  *
  * RecordPage (jsdom + @testing-library/react + user-event):
- *   1. loading state is announced while both fetches are pending;
- *   2. found: the record's public fields render (title, status label, id,
- *      source, revision history);
- *   3. found on a later page: with the paginated GET /api/cameras
- *      (PR #149, { records, total, nextOffset }, limit 500), a public id
- *      that lives beyond the first page still resolves — the shared layer
- *      walks pages until it finds the id (t_cc94f340);
- *   4. not-found: an id absent from the public payload renders the "could
+ *   1. loading state is announced while the record and its events are
+ *      pending;
+ *   2. found: public fields + community badge (never confirmed without a
+ *      lastVerifiedAt) + event timeline render;
+ *   3. found with confirmations: the badge shows "confirmed N times · last
+ *      confirmed <date>" from the aggregate counts;
+ *   4. found on a later page: the dedicated endpoint resolves the id with
+ *      ONE fetch — no client-side paginated walk (t_cc94f340);
+ *   5. hidden record (direct-link banner, ADR §6.3): the banner renders
+ *      with the history anchor, the community widget stays mounted, and
+ *      the "view on map" action is suppressed;
+ *   6. removed record: the removed banner renders with the history link;
+ *   7. not-found: an id absent from the public payload renders the "could
  *      not find" state with a browse-directory link;
- *   5. fetch error: the page renders the honest error state with a retry
+ *   8. fetch error: the page renders the honest error state with a retry
  *      (a dead API is never reported as "not found" — audit t_c6da60f0);
- *   6. empty public payload: an API that answers with no records renders the
- *      not-found state, not an error;
- *   7. retry: reloading after a failed fetch recovers and renders the record.
+ *   9. retry: reloading after a failed fetch recovers and renders the
+ *      record.
  *
- * SurveillanceMap status-leak gate:
- *   8. markers only receive the CSS status class for whitelisted public
+ * SurveillanceMap status-leak gate (unchanged):
+ *  10. markers only receive the CSS status class for whitelisted public
  *      statuses (active/demo); pending/rejected markers render with an
  *      empty status class (reuses the isPublicStatus whitelist).
  *
@@ -80,23 +88,32 @@ const olderRecordFixture = {
   address: "Illustrative location, Rome",
 };
 
-const revisionsFixture = {
-  recordId: 7,
-  revisions: [
-    { id: 1, action: "approve", previousStatus: "pending", newStatus: "active", createdAt: "2026-03-01T00:00:00.000Z" },
+// Public lifecycle events (ADR 0021 §7): unattributed aggregate rows as the
+// /api/cameras/[id]/events endpoint serves them (detail already parsed).
+const eventsFixture = {
+  events: [
+    { id: 1, eventType: "published", detail: null, createdAt: "2026-03-01T00:00:00.000Z" },
+    { id: 2, eventType: "confirmed", detail: { count: 3 }, createdAt: "2026-03-02T00:00:00.000Z" },
   ],
 };
 
+const emptyEventsFixture = { events: [] };
+
 /**
- * Record mock (QA#5 F1, t_ab0d4c75): the record page resolves a deep link
- * through the DEDICATED endpoint `GET /api/cameras/[id]` — one round trip,
- * never a client-side paginated walk (the PR #149 list contract is still
- * used by the home directory walk, tested in client-public-cameras-layer).
- * The endpoint answers `{ record }` for the public id and 404 for anything
- * else (fail-closed: same answer the old walk would give after exhausting
- * every page, at 1/N of the cost).
+ * Record mock (QA#5 F1, t_ab0d4c75, FASE 3 UI): the record page resolves a
+ * deep link through the DEDICATED endpoint `GET /api/cameras/[id]` — one
+ * round trip, never a client-side paginated walk. The endpoint answers
+ * `{ record }` for public ids AND for hidden/removed ones (ADR §6.3
+ * direct-link banner), 404 for anything else. The page also fetches the
+ * public events timeline, the anonymous-friendly personal action state and
+ * the session probe.
  */
-function recordHandler({ record = publicRecordFixture, revisions = revisionsFixture, fail = false } = {}) {
+function recordHandler({
+  record = publicRecordFixture,
+  events = eventsFixture,
+  fail = false,
+  personalAction = null,
+} = {}) {
   return (input) => {
     if (fail) return Promise.reject(new TypeError("Failed to fetch"));
     const single = typeof input === "string" && input.match(/^\/api\/cameras\/(\d+)$/);
@@ -106,8 +123,15 @@ function recordHandler({ record = publicRecordFixture, revisions = revisionsFixt
         ? jsonResponse({ record })
         : jsonResponse({ error: "not found" }, { status: 404 });
     }
-    if (input === "/api/cameras/revisions?cameraId=7") return jsonResponse(revisions);
-    if (input === "/api/cameras/revisions?cameraId=99") return jsonResponse({ recordId: 99, revisions: [] });
+    if (typeof input === "string" && input.match(/^\/api\/cameras\/\d+\/events$/)) {
+      return jsonResponse(events);
+    }
+    if (typeof input === "string" && input.match(/^\/api\/cameras\/\d+\/actions$/)) {
+      return jsonResponse({ action: personalAction });
+    }
+    if (input === "/api/auth/me") {
+      return jsonResponse({ error: "anonymous" }, { status: 401 });
+    }
     return jsonResponse({ error: "unexpected route" }, { status: 404 });
   };
 }
@@ -119,7 +143,9 @@ test("record page: loading state is announced while fetches are pending", async 
     if (input === "/api/cameras/7") {
       return new Promise((resolve) => { resolveRecord = resolve; });
     }
-    if (input === "/api/cameras/revisions?cameraId=7") return jsonResponse({ recordId: 7, revisions: [] });
+    if (input === "/api/cameras/7/events") return jsonResponse(emptyEventsFixture);
+    if (input === "/api/cameras/7/actions") return jsonResponse({ action: null });
+    if (input === "/api/auth/me") return jsonResponse({ error: "anonymous" }, { status: 401 });
     return jsonResponse({ error: "unexpected route" }, { status: 404 });
   });
   await setNavState({ params: { id: "7" } });
@@ -131,7 +157,7 @@ test("record page: loading state is announced while fetches are pending", async 
   await screen.findByText("Fixture Public Camera");
 });
 
-test("record page: found record renders public fields and revision history", async () => {
+test("record page: found record renders public fields, community badge and event timeline", async () => {
   const { screen } = rtl;
   installFetchMock(recordHandler());
   await setNavState({ params: { id: "7" } });
@@ -143,18 +169,89 @@ test("record page: found record renders public fields and revision history", asy
   assert.ok(screen.getByText("Active"));
   assert.equal(screen.getByText("7").tagName, "DD"); // Record ID
   assert.ok(screen.getByText("Community report"));
-  // Revision history row with the localized action label; the date is
-  // rendered through toLocaleDateString (e.g. "1 March 2026"), not raw ISO.
-  // P2 (formatPublicDate): the record's own `lastVerification` fact is now
-  // formatted the same way, so the date may legitimately appear twice
-  // (the fact + the history row) when they share the fixture timestamp.
-  assert.ok(screen.getByText("Approved and published"));
+  // Community status badge: no lastVerifiedAt in the fixture → the neutral
+  // "Never confirmed" state (ADR §9.1), never a fabricated count.
+  assert.ok(screen.getByText("Never confirmed"));
+  // Public event timeline (ADR §7): the published + confirmed rows with the
+  // localized labels; the date is rendered through toLocaleDateString
+  // (e.g. "1 March 2026"), not raw ISO.
+  assert.ok(screen.getByText("Published"));
+  assert.ok(screen.getByText("Confirmed present — 3 people"));
   const expectedDate = new Date("2026-03-01T00:00:00.000Z")
     .toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
   assert.ok(screen.getAllByText(expectedDate).length >= 1);
+  // Community action widget is mounted; anonymous session → counts visible
+  // + register CTA, buttons disabled.
+  const widget = screen.getByRole("region", { name: "Community actions" });
+  assert.ok(widget);
+  const cta = await screen.findByText("Log in or register to take part");
+  assert.ok(cta);
+  const useful = screen.getByRole("button", { name: /Mark this record as useful/ });
+  assert.ok(useful.disabled);
+  assert.ok(screen.getByText("Useful: 0"));
   // Back to directory link resolves.
   const back = screen.getByRole("link", { name: "← Back to directory" });
   assert.equal(back.getAttribute("href"), "/#records");
+});
+
+test("record page: confirmed record shows the community badge with count and last-confirmed date", async () => {
+  const { screen } = rtl;
+  const confirmed = {
+    ...publicRecordFixture,
+    lastVerifiedAt: "2026-03-02T00:00:00.000Z",
+    confirmCount: 3,
+  };
+  installFetchMock(recordHandler({ record: confirmed }));
+  await setNavState({ params: { id: "7" } });
+
+  await renderWithLocale(React.createElement(RecordPage));
+  await screen.findByText("Fixture Public Camera");
+
+  assert.ok(screen.getByText(/Confirmed 3 times/));
+  const expectedDate = new Date("2026-03-02T00:00:00.000Z")
+    .toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+  assert.ok(screen.getByText(new RegExp(`Last confirmed: ${expectedDate}`)));
+  // Never confirmed is gone once a confirmation exists.
+  assert.equal(screen.queryByText("Never confirmed"), null);
+});
+
+test("record page: hidden record renders the direct-link banner with history anchor (ADR §6.3)", async () => {
+  const { screen } = rtl;
+  const hidden = { ...publicRecordFixture, status: "hidden" };
+  installFetchMock(recordHandler({ record: hidden, events: emptyEventsFixture }));
+  await setNavState({ params: { id: "7" } });
+
+  await renderWithLocale(React.createElement(RecordPage));
+  await screen.findByText("Fixture Public Camera");
+
+  // Banner title + body, never the raw internal status.
+  assert.ok(screen.getByText("Record hidden"));
+  assert.ok(screen.getByText(/This record was withdrawn pending community or legal verification/));
+  // The history link is the transparency control → anchors the timeline.
+  const historyLink = screen.getByRole("link", { name: /View the public history/ });
+  assert.equal(historyLink.getAttribute("href"), "#record-timeline");
+  // The status line still carries the safe localized label ("Hidden").
+  assert.ok(screen.getByText("Hidden"));
+  // Reversal signals stay open: the widget is mounted even on hidden.
+  assert.ok(screen.getByRole("region", { name: "Community actions" }));
+  // No "view on map" for withdrawn records (it is not on any map).
+  assert.equal(screen.queryByRole("link", { name: /View on map/ }), null);
+});
+
+test("record page: removed record renders the removed banner with history link", async () => {
+  const { screen } = rtl;
+  const removed = { ...publicRecordFixture, status: "removed" };
+  installFetchMock(recordHandler({ record: removed, events: emptyEventsFixture }));
+  await setNavState({ params: { id: "7" } });
+
+  await renderWithLocale(React.createElement(RecordPage));
+  await screen.findByText("Fixture Public Camera");
+
+  assert.ok(screen.getByText("Reported as no longer present"));
+  assert.ok(screen.getByText(/The community reported that this camera is no longer there/));
+  assert.ok(screen.getByRole("link", { name: /View the public history/ }));
+  assert.ok(screen.getByText("Removed"));
+  assert.equal(screen.queryByRole("link", { name: /View on map/ }), null);
 });
 
 test("record page: a deep link resolves via the dedicated endpoint — no client-side paginated walk (F1)", async () => {
@@ -167,7 +264,9 @@ test("record page: a deep link resolves via the dedicated endpoint — no client
   installFetchMock((input) => {
     calls.push(input);
     if (input === "/api/cameras/6") return jsonResponse({ record: olderRecordFixture });
-    if (input === "/api/cameras/revisions?cameraId=6") return jsonResponse({ recordId: 6, revisions: [] });
+    if (input === "/api/cameras/6/events") return jsonResponse(emptyEventsFixture);
+    if (input === "/api/cameras/6/actions") return jsonResponse({ action: null });
+    if (input === "/api/auth/me") return jsonResponse({ error: "anonymous" }, { status: 401 });
     return jsonResponse({ error: "unexpected route" }, { status: 404 });
   });
   await setNavState({ params: { id: "6" } });
@@ -176,15 +275,15 @@ test("record page: a deep link resolves via the dedicated endpoint — no client
   await screen.findByText("Older Fixture Camera");
   assert.ok(screen.getByText("6"));
   // F1: exactly ONE record fetch — the dedicated endpoint (the later
-  // /confirmation and /edit calls are not part of the resolve), never the
-  // paginated list walk (limit=500&offset=... series).
+  // /events, /actions and /auth/me calls are not part of the resolve),
+  // never the paginated list walk (limit=500&offset=... series).
   const recordFetches = calls.filter((input) => typeof input === "string" && input.match(/^\/api\/cameras\/\d+$/));
   assert.deepEqual(recordFetches, ["/api/cameras/6"]);
 });
 
 test("record page: unknown id renders the not-found state", async () => {
   const { screen } = rtl;
-  installFetchMock(recordHandler());
+  installFetchMock(recordHandler({ events: emptyEventsFixture }));
   await setNavState({ params: { id: "99" } });
 
   await renderWithLocale(React.createElement(RecordPage));
@@ -215,7 +314,9 @@ test("record page: the dedicated endpoint answers 404 for a non-public id (fail-
   const { screen } = rtl;
   installFetchMock((input) => {
     if (input === "/api/cameras/7") return jsonResponse({ error: "not found" }, { status: 404 });
-    if (input === "/api/cameras/revisions?cameraId=7") return jsonResponse({ recordId: 7, revisions: [] });
+    if (input === "/api/cameras/7/events") return jsonResponse(emptyEventsFixture);
+    if (input === "/api/cameras/7/actions") return jsonResponse({ action: null });
+    if (input === "/api/auth/me") return jsonResponse({ error: "anonymous" }, { status: 401 });
     return jsonResponse({ error: "unexpected route" }, { status: 404 });
   });
   await setNavState({ params: { id: "7" } });
@@ -236,7 +337,9 @@ test("record page: retry after a failed load refetches and renders the record", 
         ? Promise.reject(new TypeError("Failed to fetch"))
         : jsonResponse({ record: publicRecordFixture });
     }
-    if (input === "/api/cameras/revisions?cameraId=7") return jsonResponse(revisions);
+    if (input === "/api/cameras/7/events") return jsonResponse(eventsFixture);
+    if (input === "/api/cameras/7/actions") return jsonResponse({ action: null });
+    if (input === "/api/auth/me") return jsonResponse({ error: "anonymous" }, { status: 401 });
     return jsonResponse({ error: "unexpected route" }, { status: 404 });
   });
   await setNavState({ params: { id: "7" } });

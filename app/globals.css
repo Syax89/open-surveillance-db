@@ -1054,3 +1054,82 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
   .map-card .map-panel .live-map { height:55vh; min-height:380px; }
   .map-card .map-panel .map-fallback { height:55vh; min-height:380px; }
 }
+
+/* ============================================================
+   ADR 0021 community UI (FASE 3, t_b533b254) — action widget,
+   status badges, withdrawn banner, public timeline, popup actions.
+   Zero new tokens: everything reuses the existing civic-tech palette.
+   ============================================================ */
+
+/* Status dots for the post-pivot statuses. `active` is the new public
+   domain status (migration 0039); `hidden` is the reversible withdrawal.
+   Colour is never the only signal (WCAG 1.4.1) — the label always
+   accompanies the dot. */
+.status-dot.active { background:var(--status-verified); }
+.status-dot.hidden { background:var(--offline-accent); }
+
+/* Community status badge (ADR §9.1): informational freshness line under
+   the topline — a neutral "never confirmed" / "confirmed N times ·
+   last confirmed" summary. Never a state change. */
+.community-badge { margin:14px 0 0; color:var(--ink-3); font-size:var(--text-sm); line-height:1.5; }
+.community-badge-label { color:var(--label); font-size:var(--text-2xs); text-transform:uppercase; letter-spacing:.1em; font-weight:800; }
+
+/* Community action widget (ADR §3): five action buttons with live
+   aggregate counts. Sober text-button family — no stars, no badges. */
+.community-actions { margin:26px 0 4px; padding:0 0 26px; border-bottom:1px solid var(--line); }
+.community-actions-grid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:var(--space-2); }
+.community-action {
+  display:flex; flex-direction:column; align-items:flex-start; gap:4px;
+  min-height:56px; padding:10px 12px; border:1px solid var(--control-border);
+  border-radius:var(--radius-md); background:var(--form-bg);
+  color:var(--outline-ink); font-size:var(--text-sm); font-weight:800;
+  text-align:left; cursor:pointer; transition:border-color .12s ease, background .12s ease;
+}
+.community-action:hover:not(:disabled) { border-color:var(--focus); background:var(--notice-bg); }
+.community-action:focus-visible { outline:3px solid var(--focus); outline-offset:2px; }
+.community-action:disabled { cursor:not-allowed; color:var(--disabled-ink); border-color:var(--line); background:var(--surface-muted); }
+.community-action.is-active { border-color:var(--focus); background:var(--notice-bg); color:var(--notice-ink); }
+.community-action-label { line-height:1.3; }
+.community-count { color:var(--ink-5); font-size:var(--text-xs); font-weight:700; }
+.community-action:disabled .community-count { color:var(--disabled-ink); }
+.community-actions-cta { margin:12px 0 0; }
+.community-actions-cta a { color:var(--action); font-weight:800; font-size:var(--text-md); }
+.community-actions .auth-error { margin:10px 0 0; }
+
+/* Compact variant — the marker popup (300px): two-column grid so the
+   five actions stay tappable (≥44px targets). */
+.community-actions-compact .community-actions-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.community-actions-compact .community-action { min-height:44px; padding:8px 10px; }
+.osm-popup-community { margin:10px 0 0; border-top:1px solid var(--line); padding-top:10px; }
+.osm-popup-community .community-actions { margin:0; padding:0; border-bottom:0; }
+
+/* Withdrawn-record banner (ADR §6.3): direct-link access with an explicit
+   note + the history link. Amber for hidden (reversible withdrawal),
+   review-red for removed (community says it is gone) — both soft, sober,
+   never alarmist. */
+.record-banner { margin:0 0 30px; padding:16px 18px; border-left:3px solid; border-radius:var(--radius-md); }
+.record-banner-hidden { border-color:var(--offline-accent); background:var(--offline-bg); color:var(--offline-ink); }
+.record-banner-removed { border-color:var(--status-review); background:var(--status-review-card-bg); color:var(--nearby-error-ink); }
+.record-banner-title { margin:0 0 6px; font-weight:800; font-size:var(--text-base); }
+.record-banner-title .status-dot { margin-right:6px; }
+.record-banner-body { margin:0 0 6px; line-height:1.5; }
+.record-banner-body .text-button { color:inherit; text-decoration:underline; }
+.record-banner-note { margin:0; font-size:var(--text-sm); opacity:.85; }
+
+/* Public event timeline (ADR §7): the unattributed aggregate history —
+   same visual family as the retired change-history list. */
+.record-timeline { margin:30px 0 0; padding-top:22px; border-top:1px solid var(--line); scroll-margin-top:20px; }
+.record-timeline h2 { margin:0 0 16px; font-size:var(--text-2xl); letter-spacing:-.03em; font-weight:800; }
+.record-timeline-list { list-style:none; margin:0; padding:0; }
+.record-timeline-list li { display:flex; justify-content:space-between; align-items:baseline; gap:16px; padding:10px 0; border-bottom:1px solid var(--line); }
+.record-timeline-label { color:var(--ink-5); font-size:var(--text-md); line-height:1.45; }
+.record-timeline-list time { color:var(--muted); font-size:var(--text-sm); white-space:nowrap; }
+.record-timeline-empty { margin:0; color:var(--muted); font-size:var(--text-md); }
+.record-timeline-note { margin:14px 0 0; color:var(--muted); font-size:var(--text-sm); line-height:1.5; }
+
+/* Narrow viewports: the five-action grid collapses to two columns
+   (same as the popup) and the timeline rows stack. */
+@media (max-width:560px) {
+  .community-actions-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .record-timeline-list li { flex-direction:column; align-items:flex-start; gap:4px; }
+}

@@ -133,7 +133,7 @@ function PaginationProbe({ filters }) {
 
 test("parseCameraFilters: an empty URL yields the safe defaults", () => {
   assert.deepEqual(parseCameraFilters(new URLSearchParams("")), {
-    q: "", type: "all", freshness: "all", sort: "alphabetical", focus: null, page: 1,
+    q: "", type: "all", freshness: "all", sort: "alphabetical", state: "all", focus: null, page: 1,
   });
 });
 
@@ -151,26 +151,50 @@ test("parseCameraFilters: invalid values fall back to safe defaults — never a 
 
 test("stringifyCameraFilters omits defaults (minimal URL, R2) and round-trips encoding", () => {
   assert.equal(
-    stringifyCameraFilters({ q: "", type: "all", freshness: "all", sort: "alphabetical", focus: null, page: 1 }),
+    stringifyCameraFilters({ q: "", type: "all", freshness: "all", sort: "alphabetical", state: "all", focus: null, page: 1 }),
     "",
     "all-default filters serialize to no query string",
   );
   const encoded = stringifyCameraFilters({
-    q: "Via Roma, 45", type: "Fixed dome", freshness: "7d", sort: "position", focus: 3, page: 1,
+    q: "Via Roma, 45", type: "Fixed dome", freshness: "7d", sort: "position", state: "all", focus: 3, page: 1,
   });
   assert.equal(encoded, "?q=Via+Roma%2C+45&type=Fixed+dome&freshness=7d&sort=position&focus=3");
   assert.deepEqual(parseCameraFilters(new URLSearchParams(encoded.slice(1))), {
-    q: "Via Roma, 45", type: "Fixed dome", freshness: "7d", sort: "position", focus: 3, page: 1,
+    q: "Via Roma, 45", type: "Fixed dome", freshness: "7d", sort: "position", state: "all", focus: 3, page: 1,
   });
   // t_f13fcb1c: ?page= is a real dimension — >1 serializes, 1 is omitted.
   assert.equal(
-    stringifyCameraFilters({ q: "", type: "all", freshness: "all", sort: "alphabetical", focus: null, page: 2 }),
+    stringifyCameraFilters({ q: "", type: "all", freshness: "all", sort: "alphabetical", state: "all", focus: null, page: 2 }),
     "?page=2",
     "page 2 serializes to ?page=2",
   );
   assert.equal(parseCameraFilters(new URLSearchParams("page=2")).page, 2);
   assert.equal(parseCameraFilters(new URLSearchParams("page=0")).page, 1, "page 0 falls back to 1 (lenient parse)");
   assert.equal(parseCameraFilters(new URLSearchParams("page=abc")).page, 1, "non-numeric page falls back to 1");
+});
+
+test("parseCameraFilters: confirmation-state dimension (?state=) parses and serializes (FASE 3 UI)", () => {
+  // Default: "all" — absent from the URL, safe on invalid values.
+  assert.equal(parseCameraFilters(new URLSearchParams("")).state, "all");
+  assert.equal(parseCameraFilters(new URLSearchParams("state=sideways")).state, "all", "unknown state falls back to 'all'");
+  assert.equal(parseCameraFilters(new URLSearchParams("state=confirmed")).state, "confirmed");
+  assert.equal(parseCameraFilters(new URLSearchParams("state=never")).state, "never");
+  // Serialization: default omitted, non-default written.
+  assert.equal(
+    stringifyCameraFilters({ q: "", type: "all", freshness: "all", sort: "alphabetical", state: "all", focus: null, page: 1 }),
+    "",
+    "state=all is the default and is omitted",
+  );
+  assert.equal(
+    stringifyCameraFilters({ q: "", type: "all", freshness: "all", sort: "alphabetical", state: "never", focus: null, page: 1 }),
+    "?state=never",
+  );
+  // Round-trip: parse(stringify(x)) === x.
+  const encoded = stringifyCameraFilters({ q: "", type: "all", freshness: "all", sort: "useful", state: "confirmed", focus: null, page: 1 });
+  assert.equal(encoded, "?sort=useful&state=confirmed");
+  assert.deepEqual(parseCameraFilters(new URLSearchParams(encoded.slice(1))), {
+    q: "", type: "all", freshness: "all", sort: "useful", state: "confirmed", focus: null, page: 1,
+  });
 });
 
 test("freshnessCutoffFor derives the cutoff from the window (never separate state)", () => {
@@ -191,16 +215,55 @@ test("applyCameraFilters: combined filters + sort, freshness anchored on lastVer
     makeCamera(4, { title: "Charlie", kind: "Dome", lastVerifiedAt: null, updated: "2026-07-28T00:00:00.000Z" }),
   ];
   const filtered = applyCameraFilters(records, {
-    q: "", type: "Dome", freshness: "7d", sort: "alphabetical", focus: null,
+    q: "", type: "Dome", freshness: "7d", sort: "alphabetical", state: "all", focus: null,
   }, now);
   assert.deepEqual(filtered.map((camera) => camera.title), ["Charlie", "Zulu"],
     "type + freshness combined, sorted alphabetically, legacy anchor falls back to updated");
   const positioned = applyCameraFilters(records, {
-    q: "", type: "all", freshness: "all", sort: "position", focus: null,
+    q: "", type: "all", freshness: "all", sort: "position", state: "all", focus: null,
   }, now);
   // Fixture latitudes ascend with id (41.901 → 41.904): south→north.
   assert.deepEqual(positioned.map((camera) => camera.title), ["Zulu", "Alpha", "Bravo", "Charlie"],
     "position order sorts south→north by latitude");
+});
+
+test("applyCameraFilters: confirmation-state filter (?state=) and community sort (FASE 3 UI)", () => {
+  const now = Date.parse("2026-08-01T00:00:00Z");
+  const records = [
+    makeCamera(1, { title: "Alpha", status: "active", lastVerifiedAt: "2026-07-30T00:00:00.000Z", confirmCount: 5, usefulCount: 12 }),
+    makeCamera(2, { title: "Bravo", status: "active", lastVerifiedAt: null, confirmCount: 0, usefulCount: 3 }),
+    makeCamera(3, { title: "Charlie", status: "active", lastVerifiedAt: "2026-05-01T00:00:00.000Z", confirmCount: 2, usefulCount: 8 }),
+  ];
+  // state=confirmed: only records with a confirmation anchor.
+  const confirmed = applyCameraFilters(records, {
+    q: "", type: "all", freshness: "all", sort: "alphabetical", state: "confirmed", focus: null,
+  }, now);
+  assert.deepEqual(confirmed.map((camera) => camera.title), ["Alpha", "Charlie"]);
+  // state=never: only records without one.
+  const never = applyCameraFilters(records, {
+    q: "", type: "all", freshness: "all", sort: "alphabetical", state: "never", focus: null,
+  }, now);
+  assert.deepEqual(never.map((camera) => camera.title), ["Bravo"]);
+  // state=all is a no-op.
+  const all = applyCameraFilters(records, {
+    q: "", type: "all", freshness: "all", sort: "alphabetical", state: "all", focus: null,
+  }, now);
+  assert.equal(all.length, 3);
+  // sort=useful (ranking, ADR §10): most useful first.
+  const useful = applyCameraFilters(records, {
+    q: "", type: "all", freshness: "all", sort: "useful", state: "all", focus: null,
+  }, now);
+  assert.deepEqual(useful.map((camera) => camera.title), ["Alpha", "Charlie", "Bravo"]);
+  // sort=recent: last confirmed first, never-confirmed sink to the bottom.
+  const recent = applyCameraFilters(records, {
+    q: "", type: "all", freshness: "all", sort: "recent", state: "all", focus: null,
+  }, now);
+  assert.deepEqual(recent.map((camera) => camera.title), ["Alpha", "Charlie", "Bravo"]);
+  // sort=confirmations: confirmation volume first.
+  const confirmations = applyCameraFilters(records, {
+    q: "", type: "all", freshness: "all", sort: "confirmations", state: "all", focus: null,
+  }, now);
+  assert.deepEqual(confirmations.map((camera) => camera.title), ["Alpha", "Charlie", "Bravo"]);
 });
 
 test("applyCameraFilters P1-2: a real record with a non-parseable updated is KEPT under a freshness window (never silently dropped)", () => {
@@ -214,7 +277,7 @@ test("applyCameraFilters P1-2: a real record with a non-parseable updated is KEP
     makeCamera(2, { title: "Modern verified", status: "active", lastVerifiedAt: "2026-07-30T00:00:00.000Z" }),
   ];
   const filtered = applyCameraFilters(records, {
-    q: "", type: "all", freshness: "7d", sort: "alphabetical", focus: null,
+    q: "", type: "all", freshness: "7d", sort: "alphabetical", state: "all", focus: null,
   }, now);
   assert.deepEqual(filtered.map((camera) => camera.title), ["Legacy verified", "Modern verified"],
     "a non-parseable updated must not drop a real record; a fresh lastVerifiedAt anchors as usual");
@@ -231,12 +294,12 @@ test("applyCameraFilters P1-2: demo pins keep the truthful empty-note contract (
     makeCamera(2, { title: "Verified real", status: "active", lastVerifiedAt: "2026-07-30T00:00:00.000Z" }),
   ];
   const filtered = applyCameraFilters(records, {
-    q: "", type: "all", freshness: "7d", sort: "alphabetical", focus: null,
+    q: "", type: "all", freshness: "7d", sort: "alphabetical", state: "all", focus: null,
   }, now);
   assert.deepEqual(filtered.map((camera) => camera.title), ["Verified real"],
     "demo pins without a freshness date are excluded; real records are never dropped");
   const unfiltered = applyCameraFilters(records, {
-    q: "", type: "all", freshness: "all", sort: "alphabetical", focus: null,
+    q: "", type: "all", freshness: "all", sort: "alphabetical", state: "all", focus: null,
   }, now);
   assert.deepEqual(unfiltered.map((camera) => camera.title), ["Illustrative record A", "Verified real"],
     "with freshness=all the demo pins render as usual");

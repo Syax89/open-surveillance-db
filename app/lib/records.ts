@@ -23,6 +23,17 @@ export type Camera = MapCamera & {
    * the fallback anchor in the client freshness gate).
    */
   lastVerifiedAt?: string | null;
+  /**
+   * Community-action counts (ADR 0021 §10.2, FASE 3 UI): COUNT DISTINCT per
+   * action type, exposed by the list and detail APIs. The demo seed omits
+   * them; the action widget falls back to zero counts until the live
+   * payload arrives.
+   */
+  usefulCount?: number;
+  confirmCount?: number;
+  goneCount?: number;
+  problemCount?: number;
+  privacyCount?: number;
 };
 
 /**

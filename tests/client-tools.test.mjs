@@ -817,7 +817,7 @@ test("SegnalaTool renders the report form with the report bundle", async () => {
   assert.ok(await screen.findByLabelText("Record title"), "title field");
   assert.ok(screen.getByLabelText("Camera type"), "kind select");
   assert.ok(screen.getByRole("checkbox"), "privacy/safety consent checkbox");
-  assert.ok(screen.getByRole("button", { name: /Send to moderation/ }), "submit button");
+  assert.ok(screen.getByRole("button", { name: /Publish report/ }), "submit button");
 });
 
 test("SegnalaTool refuses a submit without a position with a guidance notice", async () => {
@@ -831,7 +831,7 @@ test("SegnalaTool refuses a submit without a position with a guidance notice", a
   await user.type(screen.getByLabelText("Record title"), "Fixture public camera");
   await user.selectOptions(screen.getByLabelText("Camera type"), "Fixed dome");
   await user.click(screen.getByRole("checkbox"));
-  await user.click(screen.getByRole("button", { name: /Send to moderation/ }));
+  await user.click(screen.getByRole("button", { name: /Publish report/ }));
 
   assert.match(
     screen.getByRole("status").textContent,
@@ -866,10 +866,10 @@ test("SegnalaTool manual coordinates + full submit reach the moderation API", as
   await user.type(screen.getByLabelText("Record title"), "Fixture public camera");
   await user.selectOptions(screen.getByLabelText("Camera type"), "Fixed dome");
   await user.click(screen.getByRole("checkbox"));
-  await user.click(screen.getByRole("button", { name: /Send to moderation/ }));
+  await user.click(screen.getByRole("button", { name: /Publish report/ }));
 
   assert.ok(calls.some((call) => call === "POST /api/cameras"), "report must POST to /api/cameras");
-  assert.match(screen.getByRole("status").textContent, /Report saved/, "saved confirmation after a 2xx");
+  assert.match(screen.getByRole("status").textContent, /Report published/, "immediate-publication confirmation after a 2xx (ADR 0021 §1)");
 });
 
 test("SegnalaTool requires an explicit duplicate confirmation after a 409 gate", async () => {
@@ -907,22 +907,22 @@ test("SegnalaTool requires an explicit duplicate confirmation after a 409 gate",
   await user.type(screen.getByLabelText("Record title"), "Fixture public camera");
   await user.selectOptions(screen.getByLabelText("Camera type"), "Fixed dome");
   await user.click(screen.getByRole("checkbox"));
-  await user.click(screen.getByRole("button", { name: /Send to moderation/ }));
+  await user.click(screen.getByRole("button", { name: /Publish report/ }));
 
   // The 409 surfaces the authoritative candidate list and the confirmation
   // checkbox; the submit button is disabled until the checkbox is checked.
   assert.match(screen.getByRole("alert").textContent, /Camera porta nord/, "the 409 candidate must be listed in the duplicate alert");
   const confirmCheckbox = screen.getByRole("checkbox", { name: /I confirm this is a distinct camera/ });
   assert.ok(confirmCheckbox, "the confirmation checkbox must appear after a 409 gate");
-  assert.equal(screen.getByRole("button", { name: /Send to moderation/ }).disabled, true, "submit stays disabled until confirmed");
+  assert.equal(screen.getByRole("button", { name: /Publish report/ }).disabled, true, "submit stays disabled until confirmed");
   assert.equal(postedBodies[0].duplicateConfirmed, undefined, "the first POST must NOT carry the confirmation flag");
 
   // Acknowledge and resubmit: the second POST carries duplicateConfirmed: true.
   await user.click(confirmCheckbox);
-  assert.equal(screen.getByRole("button", { name: /Send to moderation/ }).disabled, false, "submit re-enables once confirmed");
-  await user.click(screen.getByRole("button", { name: /Send to moderation/ }));
+  assert.equal(screen.getByRole("button", { name: /Publish report/ }).disabled, false, "submit re-enables once confirmed");
+  await user.click(screen.getByRole("button", { name: /Publish report/ }));
   assert.equal(postedBodies[1].duplicateConfirmed, true, "the confirmed resubmit must carry duplicateConfirmed: true");
-  assert.match(screen.getByRole("status").textContent, /Report saved/, "the confirmed report lands the saved confirmation");
+  assert.match(screen.getByRole("status").textContent, /Report published/, "the confirmed report lands the immediate-publication confirmation");
 });
 
 test("SegnalaTool refuses to resubmit an unconfirmed duplicate via implicit form submission", async () => {
@@ -958,7 +958,7 @@ test("SegnalaTool refuses to resubmit an unconfirmed duplicate via implicit form
   await user.type(screen.getByLabelText("Record title"), "Fixture public camera");
   await user.selectOptions(screen.getByLabelText("Camera type"), "Fixed dome");
   await user.click(screen.getByRole("checkbox"));
-  await user.click(screen.getByRole("button", { name: /Send to moderation/ }));
+  await user.click(screen.getByRole("button", { name: /Publish report/ }));
   assert.equal(postCount, 1, "the gate rejects the first POST");
 
   // Enter in the title field submits the form even with a disabled button;

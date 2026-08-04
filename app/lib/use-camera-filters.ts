@@ -59,8 +59,19 @@ import type { ServerCameraFilters } from "./use-public-cameras";
 export const FRESHNESS_WINDOWS = ["all", "7d", "30d", "90d"] as const;
 export type FreshnessWindow = (typeof FRESHNESS_WINDOWS)[number];
 
-export const SORT_ORDERS = ["alphabetical", "position"] as const;
+export const SORT_ORDERS = ["alphabetical", "position", "useful", "recent", "confirmations"] as const;
 export type SortOrder = (typeof SORT_ORDERS)[number];
+
+/**
+ * Confirmation-state filter (?state=, FASE 3 UI): "all" (default),
+ * "confirmed" (at least one community confirm) or "never" (lastVerifiedAt
+ * null). Client-side predicate over the walked public list — the server has
+ * no state dimension and hidden/removed are excluded from the list by
+ * design (ADR §6.3), so the only meaningful "state" in the directory is
+ * confirmation.
+ */
+export const STATE_VALUES = ["all", "confirmed", "never"] as const;
+export type StateFilter = (typeof STATE_VALUES)[number];
 
 /**
  * Debounce for ?q= commits (R2 URL churn: history + AT announcements).
@@ -82,6 +93,11 @@ export type CameraFilters = {
   freshness: FreshnessWindow;
   /** Sort order (?sort=); "alphabetical" is the default. */
   sort: SortOrder;
+  /**
+   * Confirmation state (?state=, FASE 3 UI); "all" when unset. Client-side
+   * predicate on lastVerifiedAt — see STATE_VALUES.
+   */
+  state: StateFilter;
   /** Record preselected on /mappa (?focus=ID); null when unset/invalid. */
   focus: number | null;
   /**
@@ -96,6 +112,7 @@ export type CameraFilters = {
 
 const FRESHNESS_SET = new Set<string>(FRESHNESS_WINDOWS);
 const SORT_SET = new Set<string>(SORT_ORDERS);
+const STATE_SET = new Set<string>(STATE_VALUES);
 
 /**
  * Milliseconds cutoff for a freshness window, or null for "any time".
@@ -132,13 +149,15 @@ export function parseCameraFilters(searchParams: URLSearchParams): CameraFilters
   const freshness = (FRESHNESS_SET.has(freshnessRaw) ? freshnessRaw : "all") as FreshnessWindow;
   const sortRaw = searchParams.get("sort") ?? "alphabetical";
   const sort = (SORT_SET.has(sortRaw) ? sortRaw : "alphabetical") as SortOrder;
+  const stateRaw = searchParams.get("state") ?? "all";
+  const state = (STATE_SET.has(stateRaw) ? stateRaw : "all") as StateFilter;
   const focusRaw = searchParams.get("focus");
   const focusId = focusRaw === null ? null : Number(focusRaw);
   const focus = focusId !== null && Number.isInteger(focusId) && focusId > 0 ? focusId : null;
   const pageRaw = searchParams.get("page");
   const pageNumber = pageRaw === null ? 1 : Number(pageRaw);
   const page = Number.isInteger(pageNumber) && pageNumber > 0 ? pageNumber : 1;
-  return { q, type, freshness, sort, focus, page };
+  return { q, type, freshness, sort, state, focus, page };
 }
 
 /**
@@ -153,6 +172,7 @@ export function stringifyCameraFilters(filters: CameraFilters): string {
   if (filters.type && filters.type !== "all") params.set("type", filters.type);
   if (filters.freshness !== "all") params.set("freshness", filters.freshness);
   if (filters.sort !== "alphabetical") params.set("sort", filters.sort);
+  if (filters.state !== "all") params.set("state", filters.state);
   if (filters.focus !== null) params.set("focus", String(filters.focus));
   // Page 1 is the default and is omitted (R2 minimal URLs); /mappa never
   // sets page, so its URLs never carry ?page=.
@@ -205,11 +225,39 @@ export function applyCameraFilters(records: Camera[], filters: CameraFilters, no
       }
       if (new Date(rawAnchor).getTime() < cutoff) return false;
     }
+    // Confirmation-state filter (FASE 3 UI): "confirmed" needs a
+    // lastVerifiedAt, "never" needs it absent. A record with no anchor at
+    // all counts as never confirmed.
+    if (filters.state === "confirmed" && !camera.lastVerifiedAt) return false;
+    if (filters.state === "never" && camera.lastVerifiedAt) return false;
     return true;
   });
-  return matching.sort((first, second) => filters.sort === "alphabetical"
-    ? first.title.localeCompare(second.title)
-    : first.latitude - second.latitude || first.longitude - second.longitude || first.title.localeCompare(second.title));
+  return matching.sort((first, second) => {
+    switch (filters.sort) {
+      case "useful":
+        // Ranking (ADR §10): most useful first; the API orders by weighted
+        // SUM server-side for exports, the client comparator uses the
+        // exposed human count (usefulCount) — same spirit, never weights.
+        return (second.usefulCount ?? 0) - (first.usefulCount ?? 0) || second.id - first.id;
+      case "recent":
+        // Freshness: last confirmed first; never-confirmed records sink to
+        // the bottom (nulls last, mirroring the server's NULLS LAST).
+        return (lastVerifiedMs(second) ?? -Infinity) - (lastVerifiedMs(first) ?? -Infinity) || second.id - first.id;
+      case "confirmations":
+        return (second.confirmCount ?? 0) - (first.confirmCount ?? 0) || second.id - first.id;
+      case "position":
+        return first.latitude - second.latitude || first.longitude - second.longitude || first.title.localeCompare(second.title);
+      default:
+        return first.title.localeCompare(second.title);
+    }
+  });
+}
+
+/** Parseable lastVerifiedAt timestamp, or null. Shared by the recent sort. */
+function lastVerifiedMs(camera: Camera): number | null {
+  if (!camera.lastVerifiedAt) return null;
+  const ms = new Date(camera.lastVerifiedAt).getTime();
+  return Number.isFinite(ms) ? ms : null;
 }
 
 /** Distinct camera kinds present in a record set (kind filter options). */
@@ -223,7 +271,7 @@ export function mapHrefWithFocus(filters: CameraFilters, focusId: number): strin
 }
 
 export type UseCameraFiltersResult = {
-  /** The six dimensions parsed from the current URL. */
+  /** The seven dimensions parsed from the current URL. */
   filters: CameraFilters;
   /** Instant search input value (the URL q lags it by the debounce). */
   qInput: string;
@@ -235,6 +283,8 @@ export type UseCameraFiltersResult = {
   setFreshness: (value: string) => void;
   /** Commit the sort order immediately (replace, scroll:false). */
   setSort: (value: SortOrder) => void;
+  /** Commit the confirmation-state filter immediately (FASE 3 UI). */
+  setState: (value: StateFilter) => void;
   /** Commit the result page (?page=, /directory pagination). */
   setPage: (value: number) => void;
   /** Clear every filter dimension (replace to the bare pathname). */
@@ -276,7 +326,7 @@ export function useCameraFilters(): UseCameraFiltersResult {
   // ref writes during render are forbidden, and the debounce/write callbacks
   // only ever run AFTER a render (user events / timers), so the effect has
   // always refreshed the refs by the time they are read.
-  const filtersRef = useRef<CameraFilters>({ q: "", type: "all", freshness: "all", sort: "alphabetical", focus: null, page: 1 });
+  const filtersRef = useRef<CameraFilters>({ q: "", type: "all", freshness: "all", sort: "alphabetical", state: "all", focus: null, page: 1 });
   useEffect(() => {
     filtersRef.current = committed;
   });
@@ -336,12 +386,13 @@ export function useCameraFilters(): UseCameraFiltersResult {
   // or reset write from silently dropping the typed q.
   const hrefFor = useCallback((filters: CameraFilters) => {
     const params = new URLSearchParams(searchParamsRef.current);
-    for (const key of ["q", "type", "freshness", "sort", "focus", "page"]) params.delete(key);
+    for (const key of ["q", "type", "freshness", "sort", "state", "focus", "page"]) params.delete(key);
     const q = filters.q.trim();
     if (q) params.set("q", q);
     if (filters.type && filters.type !== "all") params.set("type", filters.type);
     if (filters.freshness !== "all") params.set("freshness", filters.freshness);
     if (filters.sort !== "alphabetical") params.set("sort", filters.sort);
+    if (filters.state !== "all") params.set("state", filters.state);
     if (filters.focus !== null) params.set("focus", String(filters.focus));
     if (filters.page > 1) params.set("page", String(filters.page));
     const query = params.toString();
@@ -448,6 +499,10 @@ export function useCameraFilters(): UseCameraFiltersResult {
     applyFilters({ ...filtersRef.current, sort: value, page: 1 });
   }
 
+  function setState(value: StateFilter) {
+    applyFilters({ ...filtersRef.current, state: (STATE_SET.has(value) ? value : "all") as StateFilter, page: 1 });
+  }
+
   /** /directory pagination (t_f13fcb1c): clamp to >= 1, write ?page=. */
   function setPage(value: number) {
     const page = Number.isInteger(value) && value > 0 ? value : 1;
@@ -460,12 +515,12 @@ export function useCameraFilters(): UseCameraFiltersResult {
       debounceRef.current = null;
     }
     setQInput("");
-    applyFilters({ q: "", type: "all", freshness: "all", sort: "alphabetical", focus: null, page: 1 });
+    applyFilters({ q: "", type: "all", freshness: "all", sort: "alphabetical", state: "all", focus: null, page: 1 });
   }
 
   // The revision value itself is intentionally unused: it exists so the
   // renderer re-runs after every URL write (see the hook docs).
   void revision;
 
-  return { filters: committed, qInput, setQ, setType, setFreshness, setSort, setPage, reset };
+  return { filters: committed, qInput, setQ, setType, setFreshness, setSort, setState, setPage, reset };
 }

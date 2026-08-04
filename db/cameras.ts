@@ -352,6 +352,33 @@ export async function searchPublicCamerasNear(latitude: number, longitude: numbe
     .sort((first, second) => first.distanceMeters - second.distanceMeters);
 }
 export async function createPendingCamera(input: { title: string; kind: string; manufacturer: string | null; observedOn: string | null; address: string; notes: string; latitude: number; longitude: number; direction?: number | null; contributorId?: number | null }): Promise<CameraRecord> { const d1 = await getD1(); const now = new Date().toISOString(); const result = await d1.prepare("INSERT INTO cameras (title, kind, manufacturer, observed_on, publish_manufacturer, publish_observed_on, address, notes, latitude, longitude, direction, status, source, updated, description, contributor_id, created_at) VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, 'pending', 'Community report', ?, '', ?, ?) RETURNING id, title, kind, manufacturer, observed_on AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, notes, latitude, longitude, direction, status, source, updated, description, contributor_id AS contributorId, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt").bind(input.title, input.kind, input.manufacturer, input.observedOn, input.address || null, input.notes, input.latitude, input.longitude, input.direction ?? null, now, input.contributorId ?? null, now).first<CameraRecord & { contributorId: number | null }>(); if (!result) throw new Error("Report could not be stored"); return result; }
+
+/**
+ * Immediate-publication report insert (ADR 0021 §1, FASE 3 UI): a verified
+ * contributor's report lands DIRECTLY as `active` — public in the list, map,
+ * GeoJSON and record page from the first millisecond — and appends the
+ * opening `published` row of the public lifecycle history (ADR §7) in the
+ * same atomic batch. No `pending`, no queue row, no moderation signature.
+ *
+ * The legacy `createPendingCamera` above is intentionally untouched: the
+ * moderation queue survives for legal-emergency flows and its tests.
+ */
+export async function createCamera(input: { title: string; kind: string; manufacturer: string | null; observedOn: string | null; address: string; notes: string; latitude: number; longitude: number; direction?: number | null; contributorId?: number | null }): Promise<CameraRecord> {
+  const d1 = await getD1();
+  const now = new Date().toISOString();
+  const result = await d1.prepare("INSERT INTO cameras (title, kind, manufacturer, observed_on, publish_manufacturer, publish_observed_on, address, notes, latitude, longitude, direction, status, source, updated, description, contributor_id, created_at) VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, 'active', 'Community report', ?, '', ?, ?) RETURNING id, title, kind, manufacturer, observed_on AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, notes, latitude, longitude, direction, status, source, updated, description, contributor_id AS contributorId, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt").bind(input.title, input.kind, input.manufacturer, input.observedOn, input.address || null, input.notes, input.latitude, input.longitude, input.direction ?? null, now, input.contributorId ?? null, now).first<CameraRecord & { contributorId: number | null }>();
+  if (!result) throw new Error("Report could not be stored");
+  // Opening public lifecycle event: `published` (ADR §7.2). Unattributed —
+  // the public history never carries the contributor id. Fail-open logging:
+  // the record is already public; a lost opening event must never roll back
+  // the report itself.
+  try {
+    await d1.prepare("INSERT INTO camera_lifecycle_events (camera_id, event_type, detail, created_at) VALUES (?, 'published', NULL, ?)").bind(result.id, now).run();
+  } catch (error) {
+    console.error("createCamera: published lifecycle event failed", error);
+  }
+  return result;
+}
 export async function getPublicCameraById(id: number, nowIso: string = new Date().toISOString()): Promise<PublicCameraRecord | null> {
   const d1 = await getD1();
   // Same shared public predicate as listPublicCameras: only records whose
@@ -367,6 +394,47 @@ export async function getPublicCameraById(id: number, nowIso: string = new Date(
   // Decayed community-verification count (ADR 0018 §2.3), aggregate only.
   const confirmationCount = await confirmationCountsFor([id]).then((map) => map.get(id) ?? 0);
   // Community-action counts (ADR 0021 §10.2): COUNT DISTINCT, never weights.
+  const actionCounts = await communityActionCountsFor([id]).then((map) => map.get(id) ?? { like: 0, confirm: 0, gone: 0, problem: 0, privacy: 0 });
+  return {
+    ...result,
+    latitude: roundPublicCoordinate(result.latitude),
+    longitude: roundPublicCoordinate(result.longitude),
+    confirmationCount,
+    usefulCount: actionCounts.like,
+    confirmCount: actionCounts.confirm,
+    goneCount: actionCounts.gone,
+    problemCount: actionCounts.problem,
+    privacyCount: actionCounts.privacy,
+  };
+}
+
+/**
+ * Record-page resolver (ADR 0021 §6.3, FASE 3 UI): a hidden/removed record
+ * stays reachable by DIRECT LINK with an explicit banner, so the record
+ * detail API must resolve it — while every LIST surface (directory, map,
+ * search, GeoJSON) keeps the strict public predicate via getPublicCameraById
+ * and listPublicCameras. Order: public predicate first (the common case),
+ * then the withdrawn fallback. Same payload shape and same aggregate counts
+ * as the public resolver — the banner contract never leaks attribution.
+ */
+export async function getCommunityRecordById(id: number, nowIso: string = new Date().toISOString()): Promise<PublicCameraRecord | null> {
+  const d1 = await getD1();
+  const { sql: publicPredicate, parameters } = publicCameraPredicate(nowIso);
+  const baseSelect = `SELECT id, title, kind, CASE WHEN publish_manufacturer = 1 THEN manufacturer ELSE NULL END AS manufacturer, CASE WHEN publish_observed_on = 1 THEN observed_on ELSE NULL END AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, latitude, longitude, direction, status, source, updated, description, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt FROM cameras`;
+  let result = await d1
+    .prepare(`${baseSelect} WHERE id = ? AND ${publicPredicate}`)
+    .bind(id, ...parameters)
+    .first<PublicCameraRecord>();
+  if (!result) {
+    // Withdrawn fallback (ADR §6.3): only hidden/removed — never pending/
+    // rejected, which have no direct-link contract.
+    result = await d1
+      .prepare(`${baseSelect} WHERE id = ? AND status IN ('hidden', 'removed')`)
+      .bind(id)
+      .first<PublicCameraRecord>();
+  }
+  if (!result) return null;
+  const confirmationCount = await confirmationCountsFor([id]).then((map) => map.get(id) ?? 0);
   const actionCounts = await communityActionCountsFor([id]).then((map) => map.get(id) ?? { like: 0, confirm: 0, gone: 0, problem: 0, privacy: 0 });
   return {
     ...result,

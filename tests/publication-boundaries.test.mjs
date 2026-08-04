@@ -295,19 +295,19 @@ test("manual report coordinates are bounded and reuse the public-only selection 
   );
 });
 
-test("optional report metadata is normalised, date-validated, and kept pending", async () => {
+test("optional report metadata is normalised, date-validated, and published immediately (ADR 0021)", async () => {
   const route = await readSource("app/api/cameras/route.ts");
   const cameras = await readSource("db/cameras.ts");
   const postStart = route.indexOf("export async function POST");
   const post = route.slice(postStart);
-  const createStart = cameras.indexOf("export async function createPendingCamera");
+  const createStart = cameras.indexOf("export async function createCamera");
   const create = cameras.slice(createStart);
   const dateHelperStart = route.indexOf("function cleanObservedOn");
   const dateHelperEnd = route.indexOf("function csvCell", dateHelperStart);
   const dateHelper = route.slice(dateHelperStart, dateHelperEnd);
 
   assert.ok(postStart >= 0, "camera reports must have an explicit POST handler");
-  assert.ok(createStart >= 0, "camera reports must use the pending-record writer");
+  assert.ok(createStart >= 0, "camera reports must use the immediate-publication writer (ADR 0021 §1)");
   assert.match(
     post,
     /const\s+manufacturer\s*=\s*cleanText\(payload\.manufacturer,\s*80\)/,
@@ -331,13 +331,13 @@ test("optional report metadata is normalised, date-validated, and kept pending",
   );
   assert.match(
     post,
-    /createPendingCamera\(\{[\s\S]*\bmanufacturer\b[\s\S]*\bobservedOn\b[\s\S]*\}\)/,
-    "validated optional metadata must be passed only to the pending-record writer",
+    /createCamera\(\{[\s\S]*\bmanufacturer\b[\s\S]*\bobservedOn\b[\s\S]*\}\)/,
+    "validated optional metadata must be passed to the immediate-publication writer",
   );
   assert.match(
     create,
-    /INSERT\s+INTO\s+cameras[\s\S]*['"]pending['"]/i,
-    "reports with optional metadata must still be inserted as pending",
+    /INSERT\s+INTO\s+cameras[\s\S]*['"]active['"]/i,
+    "reports with optional metadata must be inserted as active (published immediately)",
   );
 });
 

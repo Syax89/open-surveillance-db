@@ -41,7 +41,7 @@ import { PublicDirectory } from "../home/PublicDirectory";
 export function DirectoryTool() {
   const t = useMessages().directory;
   const router = useRouter();
-  const { filters, qInput, setQ, setType, setFreshness, setSort, setPage, reset } = useCameraFilters();
+  const { filters, qInput, setQ, setType, setFreshness, setSort, setState, setPage, reset } = useCameraFilters();
   const serverFilters = useMemo(() => serverFiltersFrom(filters), [filters]);
   const { records } = usePublicCameras({
     seed: publicRecords(prototypeRecords),
@@ -91,6 +91,8 @@ export function DirectoryTool() {
         setFreshnessFilter={setFreshness}
         sortOrder={filters.sort}
         setSortOrder={setSort}
+        stateFilter={filters.state}
+        setStateFilter={setState}
         page={filters.page}
         setPage={setPage}
         showRecordOnMap={showRecordOnMap}

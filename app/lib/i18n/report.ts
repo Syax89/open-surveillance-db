@@ -11,14 +11,14 @@ export const en = {
   // Page-level chrome (/segnala).
   pageTitle: "Report a camera",
   pageIntro:
-    "Choose a location on the map or enter coordinates, then add only what you can observe from public space. Photos are optional, stored privately, and only published after human review with confirmed redaction.",
+    "Choose a location on the map or enter coordinates, then add only what you can observe from public space. Your report is published immediately; photos are optional, stored privately, and only published after review with confirmed redaction.",
   navigation: "Report navigation",
   homeAria: "OpenSurveillanceDB home",
   // Report section (extracted from the home page bundle in F1).
   contribute: "Contribute",
   reportTitle: "Help make public space legible.",
   reportIntro:
-    "Choose a location on the map or enter coordinates, then add only what you can observe from public space. Photos are optional, stored privately, and only published after human review with confirmed redaction.",
+    "Choose a location on the map or enter coordinates, then add only what you can observe from public space. Your report is published immediately; photos are optional, stored privately, and only published after review with confirmed redaction.",
   beforeSubmitting: "Before submitting",
   beforeSubmittingBody:
     "Do not upload or describe people, licence plates, private homes, security weaknesses or sensitive locations.",
@@ -29,10 +29,10 @@ export const en = {
   latitude: "Latitude",
   longitude: "Longitude",
   useCoordinates: "Use these coordinates",
-  checkingNearby: "Checking reviewed records within 75 metres…",
+  checkingNearby: "Checking nearby public records…",
   possibleDuplicate: "Possible duplicate nearby",
   duplicateBody:
-    "These reviewed records are within 75 metres. You can still submit a new report; it will be reviewed separately.",
+    "These public records are within 75 metres. You can still submit a new report; it will be published immediately.",
   metresAway: "m away",
   matchVeryClose: "very close match",
   matchLikely: "likely match",
@@ -44,11 +44,11 @@ export const en = {
     "A very close match was found nearby. Confirm that this is a distinct camera to submit, or use the correction form for the existing record.",
   duplicateConfirmTitle: "A very close match already exists nearby",
   duplicateConfirmBody:
-    "A reviewed record at almost the same spot was found. If this is the same camera, use the correction form. If it is a different camera, confirm below to submit it for moderation.",
+    "A reviewed record at almost the same spot was found. If this is the same camera, use the correction form. If it is a different camera, confirm below to publish it.",
   duplicateConfirmLabel:
     "I confirm this is a distinct camera and I still want to submit it.",
   nearbyUnavailable:
-    "We could not check nearby records. You can still submit this report for moderation.",
+    "We could not check nearby records. You can still submit this report.",
   recordTitle: "Record title",
   recordTitlePlaceholder: "e.g. Public security camera",
   selectOne: "Select one",
@@ -95,7 +95,7 @@ export const en = {
   photoMaxReached: "A report can include up to 5 photos.",
   photoRedactionReminder:
     "Redact faces and licence plates before uploading. Photos are never shown publicly without moderator approval and confirmed redaction.",
-  sendModeration: "Send to moderation",
+  sendModeration: "Publish report",
   positionSelected: "Position selected",
   nearbyCheckError: "Unable to check nearby records",
   choosePosition:
@@ -106,9 +106,9 @@ export const en = {
   unknown: "Unknown",
   submitReportError: "Unable to submit report",
   reportSaved:
-    "Report saved. It is now marked ‘In moderation’ and is not shown publicly until reviewed.",
+    "Report published — it is now visible in the directory and on the map.",
   reportSavedWithNearby:
-    "Reviewed records were found close to this position — a moderator will check whether this is a duplicate before publication.",
+    "Nearby records were found close to this position — the community will check whether this is a duplicate.",
   // P1-2 (Vera design): the write gate (Fase E1) refuses submissions from
   // anonymous (401) and unverified (403) sessions. The login wall gates the
   // form itself; these messages cover a session that dies mid-form.
@@ -117,21 +117,21 @@ export const en = {
   verifyRequired:
     "Your email is not verified yet. Verify it from your account page to submit the report.",
   moderationUnavailable:
-    "The moderation queue is unavailable. Please try again later.",
+    "Publishing is unavailable. Please try again later.",
 } as const;
 
 export const it: Translation<typeof en> = {
   // Chrome di pagina (/segnala).
   pageTitle: "Segnala una telecamera",
   pageIntro:
-    "Scegli una posizione sulla mappa o inserisci le coordinate, poi aggiungi solo ciò che puoi osservare dallo spazio pubblico. Le foto sono facoltative, restano private e vengono pubblicate solo dopo revisione umana con redazione confermata.",
+    "Scegli una posizione sulla mappa o inserisci le coordinate, poi aggiungi solo ciò che puoi osservare dallo spazio pubblico. La tua segnalazione viene pubblicata subito; le foto sono facoltative, restano private e vengono pubblicate solo dopo revisione con redazione confermata.",
   navigation: "Navigazione segnalazione",
   homeAria: "Pagina iniziale di OpenSurveillanceDB",
   // Sezione segnalazione (estratta dal bundle della home nella F1).
   contribute: "Contribuisci",
   reportTitle: "Rendi leggibile lo spazio pubblico.",
   reportIntro:
-    "Scegli una posizione sulla mappa o inserisci le coordinate, poi aggiungi solo ciò che puoi osservare dallo spazio pubblico. Le foto sono facoltative, restano private e vengono pubblicate solo dopo revisione umana con redazione confermata.",
+    "Scegli una posizione sulla mappa o inserisci le coordinate, poi aggiungi solo ciò che puoi osservare dallo spazio pubblico. La tua segnalazione viene pubblicata subito; le foto sono facoltative, restano private e vengono pubblicate solo dopo revisione con redazione confermata.",
   beforeSubmitting: "Prima di inviare",
   beforeSubmittingBody:
     "Non caricare né descrivere persone, targhe, abitazioni private, debolezze di sicurezza o luoghi sensibili.",
@@ -142,10 +142,10 @@ export const it: Translation<typeof en> = {
   latitude: "Latitudine",
   longitude: "Longitudine",
   useCoordinates: "Usa queste coordinate",
-  checkingNearby: "Verifica dei record revisionati entro 75 metri…",
+  checkingNearby: "Verifica dei record pubblici vicini…",
   possibleDuplicate: "Possibile duplicato nelle vicinanze",
   duplicateBody:
-    "Questi record revisionati sono entro 75 metri. Puoi comunque inviare una nuova segnalazione: sarà revisionata separatamente.",
+    "Questi record pubblici sono entro 75 metri. Puoi comunque inviare una nuova segnalazione: verrà pubblicata subito.",
   metresAway: "m di distanza",
   matchVeryClose: "corrispondenza molto vicina",
   matchLikely: "corrispondenza probabile",
@@ -157,11 +157,11 @@ export const it: Translation<typeof en> = {
     "Trovata una corrispondenza molto vicina. Conferma che si tratta di una telecamera diversa per inviare, oppure usa il modulo di correzione per il record esistente.",
   duplicateConfirmTitle: "Una corrispondenza molto vicina esiste già nelle vicinanze",
   duplicateConfirmBody:
-    "È stato trovato un record revisionato quasi nello stesso punto. Se è la stessa telecamera, usa il modulo di correzione. Se è una telecamera diversa, conferma qui sotto per inviarla in moderazione.",
+    "È stato trovato un record revisionato quasi nello stesso punto. Se è la stessa telecamera, usa il modulo di correzione. Se è una telecamera diversa, conferma qui sotto per pubblicarla.",
   duplicateConfirmLabel:
     "Confermo che è una telecamera diversa e voglio comunque inviarla.",
   nearbyUnavailable:
-    "Non è stato possibile verificare i record vicini. Puoi comunque inviare la segnalazione per la moderazione.",
+    "Non è stato possibile verificare i record vicini. Puoi comunque inviare la segnalazione.",
   recordTitle: "Titolo del record",
   recordTitlePlaceholder: "es. Telecamera di sicurezza pubblica",
   selectOne: "Seleziona un'opzione",
@@ -207,7 +207,7 @@ export const it: Translation<typeof en> = {
   photoMaxReached: "Una segnalazione può includere fino a 5 foto.",
   photoRedactionReminder:
     "Oscura volti e targhe prima del caricamento. Le foto non vengono mai mostrate pubblicamente senza approvazione del moderatore e redazione confermata.",
-  sendModeration: "Invia alla moderazione",
+  sendModeration: "Pubblica la segnalazione",
   positionSelected: "Posizione selezionata",
   nearbyCheckError: "Impossibile verificare i record vicini",
   choosePosition:
@@ -218,9 +218,9 @@ export const it: Translation<typeof en> = {
   unknown: "Sconosciuto",
   submitReportError: "Impossibile inviare la segnalazione",
   reportSaved:
-    "Segnalazione salvata. Ora è in moderazione e non viene mostrata pubblicamente finché non è revisionata.",
+    "Segnalazione pubblicata — ora è visibile nell'elenco e sulla mappa.",
   reportSavedWithNearby:
-    "Trovati record revisionati vicino a questa posizione: un moderatore verificherà se si tratta di un duplicato prima della pubblicazione.",
+    "Trovati record pubblici vicino a questa posizione — la community verificherà se si tratta di un duplicato.",
   // P1-2 (design Vera): il write gate (Fase E1) rifiuta gli invii da sessioni
   // anonime (401) e non verificate (403). Il login wall copre il modulo; questi
   // messaggi gestiscono una sessione che scade a modulo compilato.
@@ -229,5 +229,5 @@ export const it: Translation<typeof en> = {
   verifyRequired:
     "La tua email non è ancora verificata. Verificala dalla pagina del tuo account per inviare la segnalazione.",
   moderationUnavailable:
-    "La coda di moderazione non è disponibile. Riprova più tardi.",
+    "La pubblicazione non è disponibile. Riprova più tardi.",
 };

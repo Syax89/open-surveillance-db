@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { applyCameraEdit, parseEditableEditFields } from "../../../../db/camera-edits";
-import { getPublicCameraById } from "../../../../db/cameras";
+import { getCommunityRecordById } from "../../../../db/cameras";
 import { recordRateLimitBlock } from "../../../lib/abuse-alerts";
 import { resolveOptionalContributor } from "../../../lib/auth-session";
 import { CACHE_TAGS } from "../../../lib/cache-purge";
@@ -60,7 +60,11 @@ export async function GET(request: Request) {
   }
 
   try {
-    const record = await getPublicCameraById(id);
+    // Record-page resolver (ADR 0021 §6.3, FASE 3 UI): public records AND
+    // hidden/removed ones (direct-link banner contract). List surfaces keep
+    // the strict public predicate — only this detail route resolves
+    // withdrawn records, and only with their banner-required fields.
+    const record = await getCommunityRecordById(id);
     if (!record) {
       // Fail closed, indistinguishable from "does not exist".
       return Response.json({ error: "Camera not found." }, { status: 404 });

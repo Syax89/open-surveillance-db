@@ -386,8 +386,8 @@ test("GET /api/cameras returns 503 when the database is unavailable", async () =
 // POST /api/cameras — community reports
 // ---------------------------------------------------------------------------
 
-test("POST /api/cameras stores a trimmed, date-validated pending report", async () => {
-  stub("createPendingCamera", async (input) => ({ id: 7, ...input }));
+test("POST /api/cameras stores a trimmed, date-validated report for immediate publication (ADR 0021)", async () => {
+  stub("createCamera", async (input) => ({ id: 7, ...input }));
   const { POST } = await camerasRoute();
   const response = await POST(
     sessionPost({
@@ -405,7 +405,7 @@ test("POST /api/cameras stores a trimmed, date-validated pending report", async 
   assert.equal(response.status, 201);
   const body = await responseBody(response);
   assert.equal(body.record.id, 7);
-  assert.deepEqual(callArgs("createPendingCamera")[0], [
+  assert.deepEqual(callArgs("createCamera")[0], [
     {
       title: "Nuova telecamera",
       kind: "PTZ",
@@ -423,13 +423,13 @@ test("POST /api/cameras stores a trimmed, date-validated pending report", async 
 });
 
 test("POST /api/cameras without optional metadata passes nulls and empty strings", async () => {
-  stub("createPendingCamera", async (input) => ({ id: 8, ...input }));
+  stub("createCamera", async (input) => ({ id: 8, ...input }));
   const { POST } = await camerasRoute();
   const response = await POST(
     sessionPost({ title: "Minimal", kind: "Dome", latitude: 45.0, longitude: 9.0 }),
   );
   assert.equal(response.status, 201);
-  assert.deepEqual(callArgs("createPendingCamera")[0][0], {
+  assert.deepEqual(callArgs("createCamera")[0][0], {
     title: "Minimal",
     kind: "Dome",
     manufacturer: null,
@@ -459,7 +459,7 @@ test("POST /api/cameras rejects missing or blank required fields", async (t) => 
       assert.equal(response.status, 400, name);
       const parsed = await responseBody(response);
       assert.match(parsed.error, /A title, type, valid position/, name);
-      assert.equal(callArgs("createPendingCamera").length, 0, "no write must happen");
+      assert.equal(callArgs("createCamera").length, 0, "no write must happen");
     });
   }
 });
@@ -481,13 +481,13 @@ test("POST /api/cameras rejects non-numeric or out-of-range coordinates", async 
         sessionPost({ title: "X", kind: "Y", latitude: lat, longitude: lon ?? 10 }),
       );
       assert.equal(response.status, 400, name);
-      assert.equal(callArgs("createPendingCamera").length, 0, name);
+      assert.equal(callArgs("createCamera").length, 0, name);
     });
   }
 });
 
 test("POST /api/cameras accepts coordinate boundary values", async () => {
-  stub("createPendingCamera", async (input) => ({ id: 9, ...input }));
+  stub("createCamera", async (input) => ({ id: 9, ...input }));
   const { POST } = await camerasRoute();
   for (const [latitude, longitude] of [[-90, -180], [90, 180], [0, 0]]) {
     const response = await POST(
@@ -519,25 +519,25 @@ test("POST /api/cameras accepts only exact, real calendar dates", async (t) => {
 });
 
 test("POST /api/cameras accepts a direction bearing between 0 and 359 and stores it", async () => {
-  stub("createPendingCamera", async (input) => ({ id: 30, ...input }));
+  stub("createCamera", async (input) => ({ id: 30, ...input }));
   const { POST } = await camerasRoute();
   for (const direction of [0, 1, 90, 180, 359]) {
     const response = await POST(
       sessionPost({ title: "X", kind: "PTZ", latitude: 1, longitude: 1, direction }),
     );
     assert.equal(response.status, 201, `direction=${direction}`);
-    assert.equal(callArgs("createPendingCamera").at(-1)[0].direction, direction, `direction=${direction} must be stored verbatim (0 is a valid north bearing, never falsy)`);
+    assert.equal(callArgs("createCamera").at(-1)[0].direction, direction, `direction=${direction} must be stored verbatim (0 is a valid north bearing, never falsy)`);
   }
 });
 
 test("POST /api/cameras accepts direction null and stores NULL (non-directional / clear)", async () => {
-  stub("createPendingCamera", async (input) => ({ id: 31, ...input }));
+  stub("createCamera", async (input) => ({ id: 31, ...input }));
   const { POST } = await camerasRoute();
   const response = await POST(
     sessionPost({ title: "X", kind: "PTZ", latitude: 1, longitude: 1, direction: null }),
   );
   assert.equal(response.status, 201);
-  assert.equal(callArgs("createPendingCamera")[0][0].direction, null, "an explicit null direction is stored as NULL");
+  assert.equal(callArgs("createCamera")[0][0].direction, null, "an explicit null direction is stored as NULL");
 });
 
 test("POST /api/cameras rejects out-of-range or non-integer direction with 422", async (t) => {
@@ -558,27 +558,27 @@ test("POST /api/cameras rejects out-of-range or non-integer direction with 422",
       assert.equal(response.status, 422, `${name} must answer 422 (distinct from the 400 shape errors)`);
       const body = await responseBody(response);
       assert.match(body.error, /direction/, `${name} error must name the field`);
-      assert.equal(callArgs("createPendingCamera").length, 0, `${name}: no write before validation`);
+      assert.equal(callArgs("createCamera").length, 0, `${name}: no write before validation`);
     });
   }
 });
 
 test("POST /api/cameras ignores direction for dome cameras (dome rule, stored NULL)", async () => {
-  stub("createPendingCamera", async (input) => ({ id: 32, ...input }));
+  stub("createCamera", async (input) => ({ id: 32, ...input }));
   const { POST } = await camerasRoute();
   const response = await POST(
     sessionPost({ title: "Dome cam", kind: "Fixed dome", latitude: 1, longitude: 1, direction: 90 }),
   );
   assert.equal(response.status, 201);
   assert.equal(
-    callArgs("createPendingCamera")[0][0].direction,
+    callArgs("createCamera")[0][0].direction,
     null,
     "a dome camera never stores a bearing: the supplied direction is normalised to NULL (t_1b08fe12 dome rule)",
   );
 });
 
 test("POST /api/cameras truncates long fields to their documented limits", async () => {
-  stub("createPendingCamera", async (input) => ({ id: 10, ...input }));
+  stub("createCamera", async (input) => ({ id: 10, ...input }));
   const { POST } = await camerasRoute();
   const response = await POST(
     sessionPost({
@@ -592,7 +592,7 @@ test("POST /api/cameras truncates long fields to their documented limits", async
     }),
   );
   assert.equal(response.status, 201);
-  const input = callArgs("createPendingCamera")[0][0];
+  const input = callArgs("createCamera")[0][0];
   assert.equal(input.title.length, 90);
   assert.equal(input.kind.length, 60);
   assert.equal(input.address.length, 180);
@@ -601,7 +601,7 @@ test("POST /api/cameras truncates long fields to their documented limits", async
 });
 
 test("POST /api/cameras normalises an ISO datetime observedOn to its date part", async () => {
-  stub("createPendingCamera", async (input) => ({ id: 11, ...input }));
+  stub("createCamera", async (input) => ({ id: 11, ...input }));
   const { POST } = await camerasRoute();
   const response = await POST(
     sessionPost({
@@ -613,11 +613,11 @@ test("POST /api/cameras normalises an ISO datetime observedOn to its date part",
       }),
   );
   assert.equal(response.status, 201);
-  assert.equal(callArgs("createPendingCamera")[0][0].observedOn, "2026-07-01");
+  assert.equal(callArgs("createCamera")[0][0].observedOn, "2026-07-01");
 });
 
 test("POST /api/cameras maps malformed JSON bodies to 400", async () => {
-  stub("createPendingCamera", async (input) => ({ id: 12, ...input }));
+  stub("createCamera", async (input) => ({ id: 12, ...input }));
   const { POST } = await camerasRoute();
   const response = await POST(
     sessionPost('{"title": broken'),
@@ -625,11 +625,11 @@ test("POST /api/cameras maps malformed JSON bodies to 400", async () => {
   assert.equal(response.status, 400);
   const body = await responseBody(response);
   assert.ok(body.error, "an error message must be returned");
-  assert.equal(callArgs("createPendingCamera").length, 0, "no db write for malformed JSON");
+  assert.equal(callArgs("createCamera").length, 0, "no db write for malformed JSON");
 });
 
 test("POST /api/cameras links uploaded photo ids to the new report", async () => {
-  stub("createPendingCamera", async (input) => ({ id: 14, ...input }));
+  stub("createCamera", async (input) => ({ id: 14, ...input }));
   stub("linkPhotosToCamera", async () => 2);
   stub("findNearbyPublicCameras", async () => []);
   const { POST } = await camerasRoute();
@@ -664,7 +664,7 @@ test("POST /api/cameras passes the authenticated submitter's contributor id into
     contributor: { id: 7, email: "linus@osdb.test", displayName: "Linus" },
   }));
   stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
-  stub("createPendingCamera", async (input) => ({ id: 14, ...input }));
+  stub("createCamera", async (input) => ({ id: 14, ...input }));
   stub("linkPhotosToCamera", async () => 2);
   stub("findNearbyPublicCameras", async () => []);
   const { POST } = await camerasRoute();
@@ -691,7 +691,7 @@ test("POST /api/cameras passes the authenticated submitter's contributor id into
 });
 
 test("POST /api/cameras rejects non-integer photo ids with 400", async () => {
-  stub("createPendingCamera", async (input) => ({ id: 15, ...input }));
+  stub("createCamera", async (input) => ({ id: 15, ...input }));
   const { POST } = await camerasRoute();
   const response = await POST(
     sessionPost({
@@ -707,7 +707,7 @@ test("POST /api/cameras rejects non-integer photo ids with 400", async () => {
 });
 
 test("POST /api/cameras keeps photo linking best-effort when storage fails", async () => {
-  stub("createPendingCamera", async (input) => ({ id: 16, ...input }));
+  stub("createCamera", async (input) => ({ id: 16, ...input }));
   stub("linkPhotosToCamera", async () => {
     throw new Error("R2 unavailable");
   });
@@ -730,7 +730,7 @@ test("POST /api/cameras accepts nonexistent photo ids best-effort with linkedPho
   // Photo id linking with ids that do not exist (audit t_0de37378 #6): the
   // link is best-effort and silent — the report is still created (201), the
   // db layer returns 0 for unmatched ids (no existence oracle, no throw).
-  stub("createPendingCamera", async (input) => ({ id: 17, ...input }));
+  stub("createCamera", async (input) => ({ id: 17, ...input }));
   stub("linkPhotosToCamera", async () => 0);
   stub("findNearbyPublicCameras", async () => []);
   const { POST } = await camerasRoute();
@@ -755,7 +755,7 @@ test("POST /api/cameras rejects non-object JSON bodies", async () => {
   for (const body of ["42", "[1,2]", '"hello"']) {
     const response = await POST(sessionPost(body));
     assert.equal(response.status, 400, body);
-    assert.equal(callArgs("createPendingCamera").length, 0, body);
+    assert.equal(callArgs("createCamera").length, 0, body);
   }
 });
 
@@ -763,7 +763,7 @@ test("POST /api/cameras rejects a JSON null body with 400 (OSDB-QA-001)", async 
   const { POST } = await camerasRoute();
   const response = await POST(sessionPost("null"));
   assert.equal(response.status, 400);
-  assert.equal(callArgs("createPendingCamera").length, 0);
+  assert.equal(callArgs("createCamera").length, 0);
 });
 
 test("POST /api/cameras rejects non-string observedOn values", async (t) => {
@@ -774,7 +774,7 @@ test("POST /api/cameras rejects non-string observedOn values", async (t) => {
         sessionPost({ title: "X", kind: "Y", latitude: 1, longitude: 1, observedOn }),
       );
       assert.equal(response.status, 400, JSON.stringify(observedOn));
-      assert.equal(callArgs("createPendingCamera").length, 0);
+      assert.equal(callArgs("createCamera").length, 0);
     });
   }
 });
@@ -782,7 +782,7 @@ test("POST /api/cameras rejects non-string observedOn values", async (t) => {
 test("POST /api/cameras maps database failures to 500 with a generic client-safe message", async () => {
   // The route must not leak the underlying error message to the client
   // (pre-hosting hardening): the status is 500, the message is generic.
-  stub("createPendingCamera", async () => {
+  stub("createCamera", async () => {
     throw new Error("Report could not be stored");
   });
   const { POST } = await camerasRoute();
@@ -796,7 +796,7 @@ test("POST /api/cameras maps database failures to 500 with a generic client-safe
 test("POST /api/cameras coerces empty-string and null coordinates to 0,0", async () => {
   // Documented edge case: Number("") === 0 and Number(null) === 0, so the
   // bounds check passes and the record is stored at 0,0. Flagged for review.
-  stub("createPendingCamera", async (input) => ({ id: 13, ...input }));
+  stub("createCamera", async (input) => ({ id: 13, ...input }));
   const { POST } = await camerasRoute();
   for (const latitude of ["", null]) {
     const response = await POST(
@@ -804,7 +804,7 @@ test("POST /api/cameras coerces empty-string and null coordinates to 0,0", async
     );
     assert.equal(response.status, 201, `latitude=${String(latitude)}`);
     assert.deepEqual(
-      [callArgs("createPendingCamera")[0][0].latitude, callArgs("createPendingCamera")[0][0].longitude],
+      [callArgs("createCamera")[0][0].latitude, callArgs("createCamera")[0][0].longitude],
       [0, 0],
     );
   }
@@ -935,7 +935,7 @@ test("POST includes nearby reviewed records as possibleDuplicates without blocki
     similarity: 0.4,
     matchStrength: "medium",
   };
-  stub("createPendingCamera", async (input) => ({ id: 14, ...input }));
+  stub("createCamera", async (input) => ({ id: 14, ...input }));
   stub("findNearbyPublicCameras", async () => [duplicateFixture]);
   const { POST } = await camerasRoute();
   const response = await POST(
@@ -960,7 +960,7 @@ test("POST rejects a high-strength duplicate with 409 and does NOT store the rec
     similarity: 0.82,
     matchStrength: "high",
   };
-  stub("createPendingCamera", async (input) => ({ id: 14, ...input }));
+  stub("createCamera", async (input) => ({ id: 14, ...input }));
   stub("findNearbyPublicCameras", async () => [duplicateFixture]);
   const { POST } = await camerasRoute();
   const response = await POST(
@@ -970,7 +970,7 @@ test("POST rejects a high-strength duplicate with 409 and does NOT store the rec
   const body = await responseBody(response);
   assert.ok(body.error, "the 409 must explain the gate");
   assert.deepEqual(body.possibleDuplicates, [duplicateFixture], "the 409 must carry the candidate list so the client can surface it");
-  assert.equal(callArgs("createPendingCamera").length, 0, "no db write for an unconfirmed duplicate");
+  assert.equal(callArgs("createCamera").length, 0, "no db write for an unconfirmed duplicate");
   assert.equal(callArgs("linkPhotosToCamera").length, 0, "no photo linking for an unconfirmed duplicate");
 });
 
@@ -980,7 +980,7 @@ test("POST stores the report once the submitter explicitly confirms the duplicat
     similarity: 0.82,
     matchStrength: "high",
   };
-  stub("createPendingCamera", async (input) => ({ id: 14, ...input }));
+  stub("createCamera", async (input) => ({ id: 14, ...input }));
   stub("findNearbyPublicCameras", async () => [duplicateFixture]);
   const { POST } = await camerasRoute();
   const response = await POST(
@@ -1000,7 +1000,7 @@ test("POST treats a non-boolean duplicateConfirmed as absent (fail-closed)", asy
     similarity: 0.82,
     matchStrength: "high",
   };
-  stub("createPendingCamera", async (input) => ({ id: 14, ...input }));
+  stub("createCamera", async (input) => ({ id: 14, ...input }));
   stub("findNearbyPublicCameras", async () => [duplicateFixture]);
   const { POST } = await camerasRoute();
   for (const bogus of ["true", 1, "yes"]) {
@@ -1009,11 +1009,11 @@ test("POST treats a non-boolean duplicateConfirmed as absent (fail-closed)", asy
     );
     assert.equal(response.status, 409, `duplicateConfirmed=${JSON.stringify(bogus)} must fail closed`);
   }
-  assert.equal(callArgs("createPendingCamera").length, 0, "no db write for any non-boolean confirmation");
+  assert.equal(callArgs("createCamera").length, 0, "no db write for any non-boolean confirmation");
 });
 
 test("POST survives a failing duplicate check with an empty possibleDuplicates list", async () => {
-  stub("createPendingCamera", async (input) => ({ id: 15, ...input }));
+  stub("createCamera", async (input) => ({ id: 15, ...input }));
   stub("findNearbyPublicCameras", async () => {
     throw new Error("Database binding unavailable");
   });
@@ -1034,7 +1034,7 @@ test("POST survives a failing duplicate check with an empty possibleDuplicates l
 const cameraIdRoute = () => loadRoute("app/api/cameras/[id]/route.mjs");
 
 test("GET /api/cameras/[id] returns the public record wrapped in { record }", async () => {
-  stub("getPublicCameraById", async () => cameraFixture);
+  stub("getCommunityRecordById", async () => cameraFixture);
   const { GET } = await cameraIdRoute();
   const response = await GET(apiRequest("/api/cameras/1"));
 
@@ -1042,17 +1042,17 @@ test("GET /api/cameras/[id] returns the public record wrapped in { record }", as
   assert.equal(response.headers.get("cache-control"), "public, s-maxage=300, stale-while-revalidate=600", "the record detail is cached for a bounded window like the list");
   assert.equal(response.headers.get("cache-tag"), "camera-1", "the record detail carries its per-id cache-tag for moderation purge");
   assert.deepEqual(await responseBody(response), { record: cameraFixture });
-  assert.deepEqual(callArgs("getPublicCameraById")[0], [1]);
+  assert.deepEqual(callArgs("getCommunityRecordById")[0], [1]);
 });
 
 test("GET /api/cameras/[id] fails closed with 404 for non-public or missing records", async () => {
-  stub("getPublicCameraById", async () => null);
+  stub("getCommunityRecordById", async () => null);
   const { GET } = await cameraIdRoute();
   const response = await GET(apiRequest("/api/cameras/999"));
   assert.equal(response.status, 404);
   const body = await responseBody(response);
   assert.equal(body.error, "Camera not found.");
-  assert.deepEqual(callArgs("getPublicCameraById")[0], [999]);
+  assert.deepEqual(callArgs("getCommunityRecordById")[0], [999]);
 });
 
 test("GET /api/cameras/[id] rejects non-numeric and non-positive ids with 404", async (t) => {
@@ -1074,13 +1074,13 @@ test("GET /api/cameras/[id] rejects non-numeric and non-positive ids with 404", 
     await t.test(path, async () => {
       const response = await GET(apiRequest(path));
       assert.equal(response.status, 404, path);
-      assert.equal(callArgs("getPublicCameraById").length, 0, "no lookup must run for a malformed id");
+      assert.equal(callArgs("getCommunityRecordById").length, 0, "no lookup must run for a malformed id");
     });
   }
 });
 
 test("GET /api/cameras/[id] returns 503 when the database is unavailable", async () => {
-  stub("getPublicCameraById", async () => {
+  stub("getCommunityRecordById", async () => {
     throw new Error("Database binding unavailable");
   });
   const { GET } = await cameraIdRoute();

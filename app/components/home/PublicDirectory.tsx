@@ -26,8 +26,9 @@ type Props = {
   setFreshnessFilter: (value: string) => void;
   /** Optional (F4): tool pages derive the cutoff from the freshness window inside useCameraFilters. */
   setFreshnessCutoff?: (value: number | null) => void;
-  sortOrder: "alphabetical" | "position";
-  setSortOrder: (value: "alphabetical" | "position") => void;
+  sortOrder: "alphabetical" | "position" | "useful" | "recent" | "confirmations";
+  setSortOrder: (value: "alphabetical" | "position" | "useful" | "recent" | "confirmations") => void;
+  stateFilter?: "all" | "confirmed" | "never"; setStateFilter?: (value: "all" | "confirmed" | "never") => void;
   /** Optional (t_f13fcb1c): /directory result page (?page=, URL-backed). */
   page?: number;
   /** Optional (t_f13fcb1c): /directory pagination setter. */
@@ -61,7 +62,7 @@ type Props = {
  * /directory (catalog mode — the actual layout lives in DirectoryCatalog).
  * The place-search flow lives in the shared usePlaceSearch hook.
  */
-export function PublicDirectory({ filteredRecords, cameraKinds, search, setSearch, kindFilter, setKindFilter, freshnessFilter, setFreshnessFilter, setFreshnessCutoff, sortOrder, setSortOrder, page = 1, setPage, showRecordOnMap, setCoordinates, onResetFilters, mapHref = "#map", reportHref = "#report", showHeading = true, variant = "hub", exportHrefs = null }: Props) {
+export function PublicDirectory({ filteredRecords, cameraKinds, search, setSearch, kindFilter, setKindFilter, freshnessFilter, setFreshnessFilter, setFreshnessCutoff, sortOrder, setSortOrder, stateFilter, setStateFilter, page = 1, setPage, showRecordOnMap, setCoordinates, onResetFilters, mapHref = "#map", reportHref = "#report", showHeading = true, variant = "hub", exportHrefs = null }: Props) {
   const t = useMessages().directory;
   const statuses = useMessages().status;
   const { locale } = useLocale();
@@ -89,7 +90,7 @@ export function PublicDirectory({ filteredRecords, cameraKinds, search, setSearc
     setKindFilter("all");
     setFreshnessFilter("all");
     setFreshnessCutoff?.(null);
-    setSortOrder("alphabetical");
+    setSortOrder("alphabetical"); setStateFilter?.("all");
   }
 
   if (variant === "catalog") {
@@ -105,6 +106,7 @@ export function PublicDirectory({ filteredRecords, cameraKinds, search, setSearc
         setFreshnessFilter={setFreshnessFilter}
         sortOrder={sortOrder}
         setSortOrder={setSortOrder}
+        stateFilter={stateFilter} setStateFilter={setStateFilter}
         page={page}
         setPage={setPage}
         showRecordOnMap={showRecordOnMap}

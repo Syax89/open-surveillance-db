@@ -192,7 +192,7 @@ test("email: una sessione fresca NON scrive (403), dopo verify-email scrive (201
   const accepted = await camerasRoute.POST(writeWith(headers));
   assert.equal(accepted.status, 201, "verified session must pass the write gate");
   const { record } = await responseBody(accepted);
-  assert.equal(record.status, "pending", "a fresh report starts pending");
+  assert.equal(record.status, "active", "ADR 0021 §1: a fresh report publishes immediately");
   // Attribuzione reale: il record è legato al contributor verificato.
   const row = await env.DB.prepare("SELECT contributor_id FROM cameras WHERE id = ?")
     .bind(record.id).first();
@@ -356,7 +356,7 @@ test("passkey: enroll reale → login reale → write 201, e il counter replay �
   // La sessione da login passkey scrive (contributor già verificato).
   const accepted = await camerasRoute.POST(writeWith(passkeySession));
   assert.equal(accepted.status, 201, "passkey-opened session must pass the write gate");
-  assert.equal((await responseBody(accepted)).record.status, "pending");
+  assert.equal((await responseBody(accepted)).record.status, "active", "passkey-opened session: immediate publication (ADR 0021 §1)");
 
   // --- Counter replay: stessa chiave, stesso counter (2), challenge nuova →
   //     rifiuto 401 (isCounterAdvancementOk). ---
@@ -640,7 +640,7 @@ test("oidc: callback linked (email del provider verificata) apre una sessione ch
     const accepted = await camerasRoute.POST(writeWith(headers));
     assert.equal(accepted.status, 201, "OIDC-linked verified session must pass the write gate");
     const { record } = await responseBody(accepted);
-    assert.equal(record.status, "pending");
+    assert.equal(record.status, "active", "OIDC-linked session: immediate publication (ADR 0021 §1)");
     // Privacy (Fase D): la email del provider NON è salvata — solo il
     // placeholder RFC 2606 derivato da (provider, sub) + il flag verified.
     const contributor = await env.DB.prepare(

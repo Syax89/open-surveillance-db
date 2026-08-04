@@ -61,7 +61,7 @@ export default async function HomePage() {
 
       <ToolCards heading={t.toolsTitle} cards={tools} />
 
-      <section className="principles" id="how-it-works"><div className="principles-intro"><p className="eyebrow"><span /> {t.civicCommons}</p><h2>{t.principlesTitle}</h2><p>{t.principlesIntro}</p><a className="text-button" href="/manifesto">{t.manifestoLink} <span aria-hidden="true">→</span></a></div><div className="principles-grid"><article><span>01</span><h3>{t.openDefault}</h3><p>{t.openDefaultBody}</p></article><article><span>02</span><h3>{t.privacyFirst}</h3><p>{t.privacyFirstBody}</p></article><article><span>03</span><h3>{t.moderatedReports}</h3><p>{t.moderatedReportsBody}</p></article></div></section>
+      <section className="principles" id="how-it-works"><div className="principles-intro"><p className="eyebrow"><span /> {t.civicCommons}</p><h2>{t.principlesTitle}</h2><p>{t.principlesIntro}</p><a className="text-button" href="/manifesto">{t.manifestoLink} <span aria-hidden="true">→</span></a></div><div className="principles-grid"><article><span>01</span><h3>{t.openDefault}</h3><p>{t.openDefaultBody}</p></article><article><span>02</span><h3>{t.privacyFirst}</h3><p>{t.privacyFirstBody}</p></article><article><span>03</span><h3>{t.communityVerified}</h3><p>{t.communityVerifiedBody}</p></article></div></section>
     </main>
   );
 }

@@ -56,7 +56,7 @@ export const en = {
   toolDirectoryTitle: "Directory",
   toolDirectoryBody: "Browse public records without the map.",
   toolReportTitle: "Report a camera",
-  toolReportBody: "Submit a new camera for moderation.",
+  toolReportBody: "Publish a newly observed camera right away.",
   toolCorrectionTitle: "Correct a record",
   toolCorrectionBody: "Fix or update a published record.",
   civicCommons: "A civic data commons",
@@ -69,9 +69,9 @@ export const en = {
   privacyFirst: "Privacy first",
   privacyFirstBody:
     "Faces, licence plates and personal information must be removed before publication.",
-  moderatedReports: "Moderated reports",
-  moderatedReportsBody:
-    "New records wait for human review. A report is not made public just because it was submitted.",
+  communityVerified: "Community-verified",
+  communityVerifiedBody:
+    "Reports publish right away and the community keeps them accurate: confirm what is still there, flag what is gone, mark what is useful.",
   manifestoLink: "Read the manifesto",
 } as const;
 
@@ -113,7 +113,7 @@ export const it: Translation<typeof en> = {
   toolDirectoryTitle: "Elenco",
   toolDirectoryBody: "Sfoglia i record pubblici senza usare la mappa.",
   toolReportTitle: "Segnala una telecamera",
-  toolReportBody: "Invia una nuova telecamera alla moderazione.",
+  toolReportBody: "Pubblica subito una nuova telecamera osservata.",
   toolCorrectionTitle: "Correggi un record",
   toolCorrectionBody: "Correggi o aggiorna un record pubblicato.",
   civicCommons: "Un bene comune di dati civici",
@@ -126,8 +126,8 @@ export const it: Translation<typeof en> = {
   privacyFirst: "La privacy prima di tutto",
   privacyFirstBody:
     "Volti, targhe e informazioni personali devono essere rimossi prima della pubblicazione.",
-  moderatedReports: "Segnalazioni moderate",
-  moderatedReportsBody:
-    "I nuovi record attendono la revisione umana. Una segnalazione non diventa pubblica solo perché è stata inviata.",
+  communityVerified: "Verificati dalla comunità",
+  communityVerifiedBody:
+    "Le segnalazioni vengono pubblicate subito e la comunità le mantiene accurate: conferma ciò che c'è ancora, segnala ciò che non c'è più, marca ciò che è utile.",
   manifestoLink: "Leggi il manifesto",
 };

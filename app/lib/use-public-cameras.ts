@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { publicRecords, type Camera } from "./records";
-import { isPublicStatus } from "./public-status";
+import { isPublicStatus, isRecordPageStatus } from "./public-status";
 
 /**
  * Shared public-cameras data layer (audit t_c6da60f0, P2; pagination t_cc94f340).
@@ -220,7 +220,13 @@ function releaseAll() {
  */
 function ensureRecord(id: number): Promise<Camera | null> {
   if (cachedRecords !== null) {
-    return Promise.resolve(cachedRecords.find((record) => record.id === id) ?? null);
+    const found = cachedRecords.find((record) => record.id === id);
+    if (found) return Promise.resolve(found);
+    // Fall through to the dedicated endpoint (ADR 0021 §6.3, FASE 3 UI):
+    // the list cache only carries public records, while a withdrawn record
+    // (hidden/removed) stays reachable by DIRECT LINK through
+    // GET /api/cameras/[id] — the banner contract must survive a warm
+    // directory cache.
   }
   if (listWalk) {
     return listWalk.promise.then((records) => records?.find((record) => record.id === id) ?? null);
@@ -235,7 +241,11 @@ function ensureRecord(id: number): Promise<Camera | null> {
     .then(async (response) => {
       if (response.ok) {
         const data = (await response.json()) as { record?: Camera };
-        if (!data.record || !isPublicStatus(data.record.status)) return null;
+        // Record-page whitelist (ADR 0021 §6.3): active/demo plus the
+        // hidden/removed direct-link banner contract. LIST surfaces keep
+        // the strict isPublicStatus gate (publicRecords) — only this
+        // single-record resolver widens, and only for the record page.
+        if (!data.record || !isRecordPageStatus(data.record.status)) return null;
         return data.record;
       }
       if (response.status === 404) {
@@ -424,7 +434,13 @@ export function usePublicCamera(id: number): UsePublicCameraResult {
   const [record, setRecord] = useState<Camera | null>(() => cachedRecords === null
     ? null
     : cachedRecords.find((item) => item.id === id) ?? null);
-  const [loading, setLoading] = useState(() => cachedRecords === null);
+  // Loading stays true when the warm cache does NOT contain the id: the
+  // dedicated endpoint may still resolve a withdrawn record (direct-link
+  // banner, ADR §6.3) — a flash of "not found" before the answer would be
+  // a lie. Found-in-cache ids are instant, as before.
+  const [loading, setLoading] = useState(() => cachedRecords === null
+    ? true
+    : !cachedRecords.some((item) => item.id === id));
   const [error, setError] = useState(false);
   const [attempt, setAttempt] = useState(0);
 

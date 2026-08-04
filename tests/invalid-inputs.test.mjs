@@ -270,7 +270,7 @@ const moderationRoute = () => loadRoute("app/api/moderation/route.mjs");
 
 test("POST /api/cameras never forwards prototype-pollution or unknown keys to the db layer", async () => {
   stubVerifiedSession();
-  stub("createPendingCamera", async (input) => ({ id: 9, ...input }));
+  stub("createCamera", async (input) => ({ id: 9, ...input }));
   stub("findNearbyPublicCameras", async () => []);
   const { POST } = await camerasRoute();
   const response = await POST(
@@ -284,7 +284,7 @@ test("POST /api/cameras never forwards prototype-pollution or unknown keys to th
   assert.equal(body.record.title, "Safe cam");
   assert.deepEqual(body.possibleDuplicates, [], "duplicate check must complete with clean inputs");
 
-  const [args] = callArgs("createPendingCamera");
+  const [args] = callArgs("createCamera");
   assert.deepEqual(Object.keys(args[0]).sort(), [
     "address",
     "contributorId",

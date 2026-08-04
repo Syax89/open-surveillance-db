@@ -238,7 +238,7 @@ test("PUT respects the confirm rate-limit bucket, independent of the read bucket
 
   // The confirm bucket is separate from the read bucket: a plain record read
   // still passes even while the toggle is blocked.
-  stub("getPublicCameraById", async () => ({ id: 5, title: "Read still ok" }));
+  stub("getCommunityRecordById", async () => ({ id: 5, title: "Read still ok" }));
   const { GET: recordGet } = await recordRoute();
   const read = await recordGet(apiRequest("/api/cameras/5"));
   assert.equal(read.status, 200);

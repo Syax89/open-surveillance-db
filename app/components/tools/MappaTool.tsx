@@ -43,7 +43,7 @@ import { FiltersBar } from "../FiltersBar";
  */
 export function MappaTool() {
   const t = useMessages().map;
-  const { filters, qInput, setQ, setType, setFreshness, setSort, reset } = useCameraFilters();
+  const { filters, qInput, setQ, setType, setFreshness, setSort, setState, reset } = useCameraFilters();
   const [selectedId, setSelectedId] = useState(() => filters.focus ?? 1);
   const [viewportBounds, setViewportBounds] = useState<ViewportBounds | null>(null);
   const [notice, setNotice] = useState("");
@@ -106,7 +106,7 @@ export function MappaTool() {
             (CEO feedback 2026-08-02) — the page starts directly with the
             map card. */}
         <div className="map-card">
-          <FiltersBar variant="panel" hideSearch cameraKinds={cameraKinds} search={qInput} setSearch={setQ} kindFilter={filters.type} setKindFilter={setType} freshnessFilter={filters.freshness} setFreshnessFilter={setFreshness} sortOrder={filters.sort} setSortOrder={setSort} resultCount={filteredRecords.length} onReset={reset} />
+          <FiltersBar variant="panel" hideSearch showCommunitySort stateFilter={filters.state} setStateFilter={setState} cameraKinds={cameraKinds} search={qInput} setSearch={setQ} kindFilter={filters.type} setKindFilter={setType} freshnessFilter={filters.freshness} setFreshnessFilter={setFreshness} sortOrder={filters.sort} setSortOrder={setSort} resultCount={filteredRecords.length} onReset={reset} />
           {/* Map-always-visible (t_b9666d09): MapPanel renders the map AND
               the sidebar unconditionally. When no record matches the
               filters the sidebar shows the truthful in-list note with the

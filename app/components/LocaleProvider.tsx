@@ -14,7 +14,14 @@ type LocaleContextValue = {
   setLocale: (locale: Locale) => void;
 };
 
-const LocaleContext = createContext<LocaleContextValue | null>(null);
+/**
+ * Locale context — exported for standalone roots OUTSIDE the Next tree (the
+ * map popup action widget, lib/popup-actions): those roots render without a
+ * LocaleProvider, so the widget reads the context directly and falls back to
+ * the pre-resolved bundle prop instead of crashing (useMessages/useLocale
+ * throw by design — see CommunityActions `bundle` prop).
+ */
+export const LocaleContext = createContext<LocaleContextValue | null>(null);
 const storageKey = "opensurveillancedb-locale";
 const localeChangeEvent = "opensurveillancedb-locale-change";
 

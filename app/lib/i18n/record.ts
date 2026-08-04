@@ -87,6 +87,56 @@ export const en = {
   // Record detail fact (t_f8b775ec): "Direction: NE 45°" when the record
   // has a stored bearing (domes and unknown directions omit the row).
   direction: "Direction",
+
+  // --- Community status badge (ADR 0021 §9, FASE 3 UI): informational
+  // freshness line — never a state change. A record with no confirmations
+  // shows the neutral "never confirmed" badge; a confirmed one shows the
+  // count and the last-confirmed date.
+  communityStatus: "Community status",
+  neverConfirmed: "Never confirmed",
+  confirmedTimes: (count: number) =>
+    `Confirmed ${count} ${count === 1 ? "time" : "times"}`,
+  lastConfirmed: "Last confirmed",
+
+  // --- Hidden/removed banner (ADR 0021 §6.3, FASE 3 UI): a withdrawn
+  // record stays reachable by direct link with an explicit banner; the
+  // reversal signals (confirm / gone) stay open, and the public history
+  // link is the transparency control.
+  hiddenTitle: "Record hidden",
+  hiddenBody:
+    "This record was withdrawn pending community or legal verification. It is not listed in the directory or on the map; you can still read its public history and take part.",
+  removedTitle: "Reported as no longer present",
+  removedBody:
+    "The community reported that this camera is no longer there. It is not listed in the directory or on the map; you can still read its public history and confirm it if it is back.",
+  bannerHistoryLink: "View the public history",
+  bannerNote: "The reversal signals (confirm, no longer there) stay open on this record.",
+
+  // --- Public per-record event timeline (ADR 0021 §7, FASE 3 UI): the
+  // unattributed aggregate history. Labels cover every semantic event type
+  // the API can emit; anything unknown falls back to the neutral fallback.
+  timeline: "Public history",
+  timelineNote:
+    "Aggregate public events only — never contributor identities, emails or internal notes.",
+  timelineEmpty: "No public events yet.",
+  timelineFallback: "Record updated",
+  timelineLabels: {
+    published: "Published",
+    confirmed: "Confirmed present",
+    liked: "Marked useful",
+    "gone-flagged": "Flagged as no longer there",
+    hidden: "Hidden",
+    removed: "Removed",
+    restored: "Restored to the directory",
+    "action-consumed": "Triggering actions reset",
+    migration: "History migrated",
+    "setting-changed": "Settings changed",
+  },
+  hideReasons: {
+    problem: "reason: flagged",
+    privacy: "reason: privacy",
+    adminLegal: "reason: legal emergency",
+  },
+  eventPeople: (count: number) => `${count} ${count === 1 ? "person" : "people"}`,
 } as const;
 
 export const it: Translation<typeof en> = {
@@ -172,4 +222,55 @@ export const it: Translation<typeof en> = {
   // record ha un rilevamento salvato (le cupole e le direzioni ignote
   // omettono la riga).
   direction: "Direzione",
+
+  // --- Badge di stato della community (ADR 0021 §9, FASE 3 UI): riga di
+  // freschezza informativa — mai un cambio di stato. Un record senza
+  // conferme mostra il badge neutro "mai confermata"; uno confermato
+  // mostra il conteggio e la data dell'ultima conferma.
+  communityStatus: "Stato della community",
+  neverConfirmed: "Mai confermata",
+  confirmedTimes: (count: number) =>
+    `Confermata ${count} ${count === 1 ? "volta" : "volte"}`,
+  lastConfirmed: "Ultima conferma",
+
+  // --- Banner nascosto/rimosso (ADR 0021 §6.3, FASE 3 UI): un record
+  // ritirato resta raggiungibile tramite link diretto con un banner
+  // esplicito; i segnali di inversione (confermo / non c'è più) restano
+  // aperti e il link alla cronologia pubblica è il controllo di trasparenza.
+  hiddenTitle: "Record nascosto",
+  hiddenBody:
+    "Questo record è stato ritirato in attesa di verifica da parte della community o legale. Non è elencato nell'elenco né sulla mappa; puoi comunque leggere la sua cronologia pubblica e partecipare.",
+  removedTitle: "Segnalato come non più presente",
+  removedBody:
+    "La community ha segnalato che questa telecamera non c'è più. Non è elencata nell'elenco né sulla mappa; puoi comunque leggere la sua cronologia pubblica e confermarla se è tornata.",
+  bannerHistoryLink: "Vedi la cronologia pubblica",
+  bannerNote: "I segnali di inversione (confermo, non c'è più) restano aperti su questo record.",
+
+  // --- Cronologia eventi pubblica per record (ADR 0021 §7, FASE 3 UI):
+  // la storia aggregata senza attribuzioni. Le etichette coprono ogni tipo
+  // di evento semantico che l'API può emettere; gli sconosciuti cadono sul
+  // fallback neutro.
+  timeline: "Cronologia pubblica",
+  timelineNote:
+    "Solo eventi pubblici aggregati — mai identità dei contributori, email o note interne.",
+  timelineEmpty: "Nessun evento pubblico ancora.",
+  timelineFallback: "Record aggiornato",
+  timelineLabels: {
+    published: "Pubblicato",
+    confirmed: "Confermato presente",
+    liked: "Segnato come utile",
+    "gone-flagged": "Segnalato come non più presente",
+    hidden: "Nascosto",
+    removed: "Rimosso",
+    restored: "Ripristinato nell'elenco",
+    "action-consumed": "Azioni di soglia azzerate",
+    migration: "Cronologia migrata",
+    "setting-changed": "Impostazioni modificate",
+  },
+  hideReasons: {
+    problem: "motivo: segnalazione",
+    privacy: "motivo: privacy",
+    adminLegal: "motivo: emergenza legale",
+  },
+  eventPeople: (count: number) => `${count} ${count === 1 ? "persona" : "persone"}`,
 };
