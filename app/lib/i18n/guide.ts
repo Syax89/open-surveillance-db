@@ -17,13 +17,13 @@ export const en = {
   eyebrow: "Project guide",
   title: "A public database, built with care.",
   intro:
-    "This guide explains what OpenSurveillanceDB documents, how to use the map and directory pages, how a report becomes public data, and the boundaries of what this public database claims.",
+    "This guide explains what OpenSurveillanceDB documents and how to use the map and the directory. It also shows how a report becomes public data, and what the database does not claim.",
   exploreMap: "Explore the map",
   browseDirectory: "Browse directory",
   missionEyebrow: "Purpose and boundaries",
   missionTitle: "Visibility without operational surveillance.",
   missionBody:
-    "OpenSurveillanceDB helps people understand visible surveillance infrastructure in public space. It is a civic record of public-facing equipment, not a tool for watching, tracking, or bypassing it.",
+    "OpenSurveillanceDB helps people understand visible surveillance infrastructure in public space. It is a civic record of public-facing equipment, not a tool for watching, tracking or bypassing lawful surveillance.",
   missionOneTitle: "What we document",
   missionOneBody:
     "Visible camera infrastructure, approximate location, type, source and a review status.",
@@ -52,30 +52,30 @@ export const en = {
   publishLabel: "Publish",
   publishTitle: "Only reviewed data appears",
   publishBody:
-    "Approved records are marked verified and can appear in the map, directory and GeoJSON export. Other reports remain out of public outputs.",
+    "Approved records are marked verified and can appear in the map, directory and GeoJSON export. Other reports stay private.",
   statusEyebrow: "Reading the records",
   statusTitle: "Each status says what the record can support.",
   statusIntro:
     "A status describes the current review state, not a guarantee that a camera is active, complete or permanently accurate.",
   verifiedTitle: "Reviewed and publishable",
   verifiedBody:
-    "A moderator has approved this record for public display. It can appear in the map, directory and GeoJSON download.",
+    "A moderator has approved this record for public display. It can appear in the map, directory and GeoJSON export.",
   reviewTitle: "Temporarily withheld",
   reviewBody:
     "Something needs checking: the record may be old, unclear, duplicated or the subject of a correction. It is not a public record while under review.",
   pendingTitle: "Awaiting a decision",
   pendingBody:
-    "A submission has been saved for local review but is not visible in public data, the map, the directory or exports.",
+    "A submission has been saved for review but is not visible in public data, the map, the directory or exports.",
   accountEyebrow: "Your account",
   accountTitle: "Why create an account?",
   accountBody:
-    "Browsing the data requires no account. An account lets you submit reports, keep track of your contributions, verify records you have seen, and build a trust level from your verified contributions.",
+    "Browsing the data requires no account. With an account you can submit reports, follow your contributions, verify records you have seen and build a trust level.",
   accountWhyTitle: "What an account gives you",
   accountWhyBody:
-    "Your reports are linked to your account, you can edit your own contributions, add verifications to records, and see your trust level grow as your contributions are verified.",
+    "Reports are linked to your account. You can edit your contributions, verify records and watch your trust level grow.",
   accountHowTitle: "How accounts work",
   accountHowBody:
-    "You register with an email address and a password, stored hashed and never exposed. Email verification is required before you can publish, and you can add passkeys or social sign-in (GitHub or Google) to the same account (ADR 0020).",
+    "You register with an email address and a password, stored as a hash and never exposed. Email verification is required before you can publish. You can also add a passkey or social sign-in (GitHub or Google) to the same account.",
   accountAnonymousTitle: "Browsing stays open",
   accountAnonymousBody:
     "You can explore the map, the directory and the exports without an account. Submitting a report or a correction requires a verified contributor account.",
@@ -91,7 +91,7 @@ export const en = {
     "When a record is already public, an edit goes back into moderation and replaces the record only after a human review approves it.",
   editNotImmediateTitle: "Not immediately public",
   editNotImmediateBody:
-    "An edited record does not appear in the map, directory or exports right away: it stays out of public outputs until the review of the edit is complete.",
+    "An edited record does not appear in the map, directory or exports right away. It stays out of public outputs until the review is complete.",
   verifyEyebrow: "Verifications",
   verifyTitle: "What verifications confirm.",
   verifyBody:
@@ -104,7 +104,7 @@ export const en = {
     "Each account can add one verification per record. It is a check, not a popularity contest: one person, one verification.",
   verifyFairTitle: "Kept fair",
   verifyFairBody:
-    "Verifying needs at least one published contribution of your own, you cannot verify your own record, and daily limits stop automated or mass verification.",
+    "Verifying requires at least one published contribution of your own. You cannot verify your own record, and daily limits stop automated or mass verification.",
   verifyPrivateTitle: "Not attributed publicly",
   verifyPrivateBody:
     "Public pages show only the total number of verifications. Who verified a record is never shown and never linked to a profile.",
@@ -114,7 +114,7 @@ export const en = {
     "Trust levels reflect how many of your contributions have been verified by reviewers. They are a quiet recognition of accurate work, not a ranking.",
   levelThresholdsTitle: "Levels and thresholds",
   levelThresholdsBody:
-    "Only verified contributions count. The thresholds are 1, 5, 20 and 50 verified contributions; reports still in moderation, rejected or removed do not count.",
+    "Only verified contributions count. The thresholds are 1, 5, 20 and 50; reports in moderation, rejected or removed do not count.",
   levelBadgeTitle: "Three badges",
   levelBadgeBody:
     "Your profile shows one of three badges: New contributor, Trusted contributor or Experienced contributor. The badge is informative, never a rank.",
@@ -129,14 +129,14 @@ export const en = {
   downloadCsv: "Download public CSV",
   geoJsonTitle: "A reusable public export",
   geoJsonBody:
-    "GeoJSON is a common geographic data format. It is intended for civic analysis, research and compatible mapping tools—not for finding camera feeds or sensitive operational information.",
+    "GeoJSON is a common geographic data format. It is intended for civic analysis, research and compatible mapping tools — not for finding camera feeds or sensitive operational information.",
   osmTitle: "OpenStreetMap provides the base map",
   osmBody:
     "The map background is provided by OpenStreetMap contributors. It is separate from this project’s camera records and always needs visible attribution and responsible use.",
   localLabel: "Project status",
-  localTitle: "A public site in development",
+  localTitle: "A project under development",
   localBody:
-    "OpenSurveillanceDB is a public civic database under active development. Every record is reviewed by a human before publication, and the project makes no claim that the data is complete, current or authoritative.",
+    "OpenSurveillanceDB is under active development. Every record is reviewed by a person before publication, and the project makes no claim that the data is complete, current or authoritative.",
   footer: "Built for transparency, not tracking.",
 } as const;
 
@@ -150,13 +150,13 @@ export const it: Translation<typeof en> = {
   eyebrow: "Guida al progetto",
   title: "Un database pubblico, costruito con attenzione.",
   intro:
-    "Questa guida spiega cosa documenta OpenSurveillanceDB, come usare le pagine della mappa e dell'elenco, come una segnalazione diventa un dato pubblico e quali sono i confini di ciò che questo database pubblico dichiara.",
+    "Questa guida spiega cosa documenta OpenSurveillanceDB e come usare mappa ed elenco. Spiega anche come una segnalazione diventa un dato pubblico e cosa il database non dichiara.",
   exploreMap: "Esplora la mappa",
   browseDirectory: "Sfoglia l’elenco",
   missionEyebrow: "Scopo e limiti",
   missionTitle: "Visibilità senza sorveglianza operativa.",
   missionBody:
-    "OpenSurveillanceDB aiuta a comprendere l’infrastruttura di sorveglianza visibile nello spazio pubblico. È un registro civico di apparecchiature rivolte al pubblico, non uno strumento per osservare, tracciare o aggirarle.",
+    "OpenSurveillanceDB aiuta a comprendere l’infrastruttura di sorveglianza visibile nello spazio pubblico. È un registro civico di apparecchiature rivolte al pubblico, non uno strumento per osservare, tracciare o aggirare la sorveglianza legittima.",
   missionOneTitle: "Cosa documentiamo",
   missionOneBody:
     "Infrastrutture di telecamere visibili, posizione approssimativa, tipo, fonte e stato di revisione.",
@@ -170,7 +170,7 @@ export const it: Translation<typeof en> = {
   cycleTitle: "Dall’osservazione al record pubblico.",
   cycleBody:
     "Le segnalazioni sono intenzionalmente separate dai record pubblicati. Mappa, elenco ed esportazioni non sono una copia automatica degli invii.",
-  cycleRuleTitle: "La regola predefinita è non pubblicare.",
+  cycleRuleTitle: "La regola di base è non pubblicare.",
   cycleRuleBody:
     "Una segnalazione diventa pubblica solo dopo una revisione umana che la ritenga pertinente, sufficientemente documentata e sicura da pubblicare.",
   cycleStepsLabel: "Ciclo di pubblicazione",
@@ -185,30 +185,30 @@ export const it: Translation<typeof en> = {
   publishLabel: "Pubblica",
   publishTitle: "Appaiono solo dati revisionati",
   publishBody:
-    "I record approvati sono marcati come verificati e possono comparire in mappa, elenco ed esportazione GeoJSON. Le altre segnalazioni restano fuori dagli output pubblici.",
+    "I record approvati sono marcati come verificati e possono comparire in mappa, elenco ed esportazione GeoJSON. Le altre segnalazioni restano private.",
   statusEyebrow: "Leggere i record",
-  statusTitle: "Ogni stato chiarisce cosa può sostenere un record.",
+  statusTitle: "Ogni stato indica cosa può dimostrare un record.",
   statusIntro:
-    "Lo stato descrive la condizione corrente della revisione, non garantisce che una telecamera sia attiva, completa o accurata in modo permanente.",
+    "Lo stato descrive la revisione in corso. Non garantisce che una telecamera sia attiva, completa o sempre accurata.",
   verifiedTitle: "Revisionata e pubblicabile",
   verifiedBody:
-    "Un moderatore ha approvato il record per la visualizzazione pubblica. Può comparire in mappa, elenco e download GeoJSON.",
+    "Un moderatore ha approvato il record per la visualizzazione pubblica. Può comparire in mappa, elenco ed esportazione GeoJSON.",
   reviewTitle: "Temporaneamente non visibile",
   reviewBody:
     "Qualcosa deve essere verificato: il record può essere vecchio, poco chiaro, duplicato o oggetto di una correzione. Non è pubblico durante la revisione.",
   pendingTitle: "In attesa di una decisione",
   pendingBody:
-    "Una segnalazione è stata salvata per la revisione locale, ma non è visibile nei dati pubblici, nella mappa, nell’elenco o nelle esportazioni.",
+    "Una segnalazione è stata salvata per la revisione, ma non è visibile nei dati pubblici, nella mappa, nell’elenco o nelle esportazioni.",
   accountEyebrow: "Il tuo account",
   accountTitle: "Perché creare un account?",
   accountBody:
-    "La consultazione dei dati non richiede un account. Un account ti permette di inviare segnalazioni, tenere traccia dei tuoi contributi, verificare i record che hai visto e costruire un livello di fiducia con i tuoi contributi verificati.",
+    "Consultare i dati non richiede account. Con un account puoi inviare segnalazioni, seguire i tuoi contributi, verificare i record che hai visto e costruire un livello di fiducia.",
   accountWhyTitle: "Cosa ti dà un account",
   accountWhyBody:
-    "Le tue segnalazioni sono collegate al tuo account, puoi modificare i tuoi contributi, aggiungere verifiche ai record e vedere crescere il tuo livello di fiducia man mano che i contributi vengono verificati.",
+    "Le tue segnalazioni sono collegate al tuo account. Puoi modificare i tuoi contributi, aggiungere verifiche ai record e vedere crescere il tuo livello di fiducia.",
   accountHowTitle: "Come funzionano gli account",
   accountHowBody:
-    "Ti registri con un indirizzo email e una password, salvata come hash e mai esposta. La verifica dell'email è richiesta prima di poter pubblicare e puoi aggiungere passkey o l'accesso social (GitHub o Google) allo stesso account (ADR 0020).",
+    "Ti registri con un indirizzo email e una password, salvata come hash e mai esposta. La verifica dell'email è richiesta prima di poter pubblicare. Puoi anche aggiungere una passkey o l'accesso social (GitHub o Google) allo stesso account.",
   accountAnonymousTitle: "La consultazione resta aperta",
   accountAnonymousBody:
     "Puoi esplorare mappa, elenco ed esportazioni senza account. Inviare una segnalazione o una correzione richiede un account verificato.",
@@ -224,7 +224,7 @@ export const it: Translation<typeof en> = {
     "Quando un record è già pubblico, una modifica torna in moderazione e sostituisce il record solo dopo l'approvazione di una revisione umana.",
   editNotImmediateTitle: "Non subito pubblico",
   editNotImmediateBody:
-    "Un record modificato non compare subito in mappa, elenco o esportazioni: resta fuori dagli output pubblici finché la revisione della modifica non è completata.",
+    "Un record modificato non compare subito in mappa, elenco o esportazioni: resta fuori dai dati pubblici finché la revisione non è completata.",
   verifyEyebrow: "Verifiche",
   verifyTitle: "Cosa confermano le verifiche.",
   verifyBody:
@@ -237,7 +237,7 @@ export const it: Translation<typeof en> = {
     "Ogni account può aggiungere una verifica per record. È un controllo, non una gara di popolarità: una persona, una verifica.",
   verifyFairTitle: "Con regole eque",
   verifyFairBody:
-    "Per verificare serve almeno un contributo pubblicato, non puoi verificare un tuo record e i limiti giornalieri fermano le verifiche automatiche o di massa.",
+    "Per verificare serve almeno un contributo pubblicato. Non puoi verificare un tuo record e i limiti giornalieri fermano le verifiche automatiche o di massa.",
   verifyPrivateTitle: "Mai attribuita pubblicamente",
   verifyPrivateBody:
     "Le pagine pubbliche mostrano solo il numero totale di verifiche. Chi ha verificato un record non viene mai mostrato né collegato a un profilo.",
@@ -247,10 +247,10 @@ export const it: Translation<typeof en> = {
     "I livelli di fiducia riflettono quanti dei tuoi contributi sono stati verificati dai revisori. Sono un riconoscimento discreto del lavoro accurato, non una classifica.",
   levelThresholdsTitle: "Livelli e soglie",
   levelThresholdsBody:
-    "Contano solo i contributi verificati. Le soglie sono 1, 5, 20 e 50 contributi verificati; le segnalazioni in moderazione, rifiutate o rimosse non contano.",
+    "Contano solo i contributi verificati. Le soglie sono 1, 5, 20 e 50; le segnalazioni in moderazione, rifiutate o rimosse non contano.",
   levelBadgeTitle: "Tre badge",
   levelBadgeBody:
-    "Il tuo profilo mostra uno di tre badge: Nuovo contributor, Contributor fidato o Contributor esperto. Il badge è informativo, mai un grado.",
+    "Il tuo profilo mostra uno dei tre badge: Nuovo contributor, Contributor fidato o Contributor esperto. Il badge è informativo, mai un grado.",
   levelRecognitionTitle: "Non è una classifica",
   levelRecognitionBody:
     "I livelli sono personali. Non esiste alcuna classifica pubblica e il livello degli altri non viene mai mostrato.",
@@ -265,10 +265,10 @@ export const it: Translation<typeof en> = {
     "GeoJSON è un formato geografico comune. È pensato per analisi civica, ricerca e strumenti cartografici compatibili, non per individuare feed o informazioni operative sensibili.",
   osmTitle: "OpenStreetMap fornisce la mappa di base",
   osmBody:
-    "Lo sfondo della mappa proviene dai contributori di OpenStreetMap. È separato dai record sulle telecamere del progetto e richiede sempre attribuzione visibile e uso responsabile.",
+    "Lo sfondo della mappa proviene dalla community di OpenStreetMap. È separato dai record sulle telecamere del progetto e richiede sempre attribuzione visibile e uso responsabile.",
   localLabel: "Stato del progetto",
-  localTitle: "Un sito pubblico in sviluppo",
+  localTitle: "Un progetto in sviluppo",
   localBody:
-    "OpenSurveillanceDB è un database civico pubblico in sviluppo attivo. Ogni record viene revisionato da una persona prima della pubblicazione e il progetto non dichiara che i dati siano completi, aggiornati o autorevoli.",
+    "OpenSurveillanceDB è ancora in sviluppo attivo. Ogni record viene revisionato da una persona prima della pubblicazione e il progetto non dichiara che i dati siano completi, aggiornati o autorevoli.",
   footer: "Creato per la trasparenza, non per il tracciamento.",
 };

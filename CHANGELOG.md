@@ -369,6 +369,19 @@ changes accumulate under `[Unreleased]`.
 - i18n mapping documented: per-domain bundles kept, with a conceptual
   route→bundle table in `docs/SITEMAP.md` and `docs/REFACTOR_I18N.md`
   (no monolithic info/legal bundles; legal stays in `app/lib/legal/`).
+- **Copy — riscrittura migliorativa pagine informative (t_faa06594, CEO
+  2026-08-04 «riscriviamo meglio le pagine»):** pass qualitativo sui
+  bundle `home` (hero+hub), `guide`, `rules`, `manifesto`, `faq`,
+  `contact` (EN+IT) — frasi più corte, zero ripetizioni entro pagina,
+  IT naturale senza calchi («Aperto di default», «fin dalla
+  progettazione», «dati pubblici» al posto di «output pubblici»,
+  «community di OpenStreetMap» al posto di «contributori»), EN
+  britannico pulito (em-dash spaziato in `guide.geoJsonBody`, compound
+  modifier «community-maintained», niente Oxford comma), rimozione del
+  riferimento interno «(ADR 0020)» dalla guida pubblica e degli
+  obiettivi di risposta duplicati in `/contatti`. Zero nuove chiavi
+  i18n; parità EN/IT garantita da `tsc` (0 errori); nessuna stringa
+  pinnata nei test modificata. Report: `docs/design/riscrittura-pagine.md`.
 
 ### Fixed
 
