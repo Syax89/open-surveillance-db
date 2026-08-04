@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useMessages } from "./LocaleProvider";
+import { useMessages } from "../lib/use-messages";
 
 /**
  * Shared filter bar (F1 route group (tools), D4): search + kind + freshness +

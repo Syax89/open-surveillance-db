@@ -104,8 +104,11 @@ test("environment overrides tune the per-route limits", () => {
     rateLimit.limitsFor("appeal", { APPEAL_RATE_LIMIT_MAX: "7", APPEAL_RATE_LIMIT_WINDOW_SECONDS: "30" }),
     { maxRequests: 7, windowSeconds: 30 },
   );
-  // The tile proxy gets its own conservative default and env knobs.
-  assert.deepEqual(rateLimit.limitsFor("tiles", {}), { maxRequests: 60, windowSeconds: 60 });
+  // The tile proxy gets its own dedicated interactive threshold (QA#5 F4:
+  // a full viewport is ~24 tiles at z13-19, so 240/min leaves room for
+  // ~10 zoom steps while still capping upstream scraping on cache misses)
+  // and env knobs.
+  assert.deepEqual(rateLimit.limitsFor("tiles", {}), { maxRequests: 240, windowSeconds: 60 });
   assert.deepEqual(
     rateLimit.limitsFor("tiles", { TILES_RATE_LIMIT_MAX: "120", TILES_RATE_LIMIT_WINDOW_SECONDS: "30" }),
     { maxRequests: 120, windowSeconds: 30 },

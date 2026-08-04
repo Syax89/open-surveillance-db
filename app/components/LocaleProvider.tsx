@@ -2,8 +2,12 @@
 
 import { createContext, useContext, useEffect, useMemo, useSyncExternalStore, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { DEFAULT_LOCALE, LOCALE_COOKIE, SUPPORTED_LOCALES, messages, resolveLocale } from "../lib/i18n";
-import type { Locale, LocaleInfo, MessageBundle } from "../lib/i18n";
+import { en as commonEn, it as commonIt } from "../lib/i18n/common";
+// Light import path (F5 qa#5, t_ab0d4c75): registry/cookie constants live
+// in types.ts, NOT in the index barrel that assembles the full two-locale
+// dictionary. Importing them from here would pull ~150 KB of messages
+// into the root chunk.
+import { DEFAULT_LOCALE, LOCALE_COOKIE, SUPPORTED_LOCALES, resolveLocale, type Locale, type LocaleInfo } from "../lib/i18n/types";
 
 type LocaleContextValue = {
   locale: Locale;
@@ -49,6 +53,18 @@ function subscribeToLocale(callback: () => void) {
   };
 }
 
+/**
+ * Root-layout strings, scoped to the `common` domain only (F5 qa#5,
+ * t_ab0d4c75): the root shell renders the skip link and the toggle
+ * labels, and must NOT import the full two-locale dictionary — that stays
+ * in route chunks via useMessages() (app/lib/use-messages.ts). Adding a
+ * language means adding its common domain here next to the registry line.
+ */
+const commonByLocale = {
+  en: commonEn,
+  it: commonIt,
+} as const;
+
 export function LocaleProvider({
   children,
   serverLocale = DEFAULT_LOCALE,
@@ -82,7 +98,7 @@ export function LocaleProvider({
     },
   }), [locale]);
 
-  const common = messages[locale].common;
+  const common = commonByLocale[locale];
 
   return <LocaleContext.Provider value={value}>
     <a className="skip-link" href="#main-content">{common.skipLink}</a>
@@ -94,12 +110,6 @@ export function useLocale() {
   const context = useContext(LocaleContext);
   if (!context) throw new Error("useLocale must be used within LocaleProvider");
   return context;
-}
-
-/** Typed message bundle for the current locale (English pilot, Italian parity). */
-export function useMessages(): MessageBundle {
-  const { locale } = useLocale();
-  return messages[locale];
 }
 
 /**
@@ -115,7 +125,7 @@ export function LocaleToggle({ locales = SUPPORTED_LOCALES }: { locales?: readon
   const { locale, setLocale } = useLocale();
   const router = useRouter();
   const pathname = usePathname();
-  const common = messages[locale].common;
+  const common = commonByLocale[locale];
 
   const changeLocale = (nextLocale: Locale) => {
     setLocale(nextLocale);

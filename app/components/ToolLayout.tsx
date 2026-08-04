@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import { PublicNav } from "./PublicNav";
-import { useMessages } from "./LocaleProvider";
+import { useMessages } from "../lib/use-messages";
 
 /**
  * Shared layout for the public tool routes (F1 route group (tools)):

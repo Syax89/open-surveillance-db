@@ -3,7 +3,16 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { SiteHeader } from "./SiteHeader";
-import { useMessages } from "./LocaleProvider";
+// Error boundary is part of the root graph: import only the `errors`
+// domain (F5 qa#5, t_ab0d4c75) instead of the full dictionary.
+import { useLocale } from "./LocaleProvider";
+import { en as errorsEn, it as errorsIt } from "../lib/i18n/errors";
+import type { Locale, Translation } from "../lib/i18n";
+
+const errorsByLocale: Record<Locale, Translation<typeof errorsEn>> = {
+  en: errorsEn,
+  it: errorsIt,
+};
 
 /**
  * Custom error page shell shared by the 404 (app/not-found.tsx) and the
@@ -32,7 +41,8 @@ export default function ErrorPage({
   /** Optional retry handler (500 only — error.tsx receives reset()). */
   onRetry?: () => void;
 }) {
-  const t = useMessages().errors;
+  const { locale } = useLocale();
+  const t = errorsByLocale[locale];
   const notFound = statusCode === 404;
 
   // F5 (P3-3, WCAG 2.4.2): the 500 page is a client boundary (error.tsx),

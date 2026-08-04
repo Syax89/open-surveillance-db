@@ -3,7 +3,16 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
-import { LocaleToggle, useMessages } from "./LocaleProvider";
+import { LocaleToggle, useLocale } from "./LocaleProvider";
+// Header lives on EVERY page: import only the `home` domain (F5 qa#5,
+// t_ab0d4c75) instead of the full dictionary via useMessages().
+import { en as homeEn, it as homeIt } from "../lib/i18n/home";
+import type { Locale, Translation } from "../lib/i18n";
+
+const homeByLocale: Record<Locale, Translation<typeof homeEn>> = {
+  en: homeEn,
+  it: homeIt,
+};
 
 /**
  * Global site header (landmark: navigation) shared by every page.
@@ -77,7 +86,8 @@ export function SiteHeader({
   toggle = "after",
   children,
 }: SiteHeaderProps) {
-  const t = useMessages().home;
+  const { locale } = useLocale();
+  const t = homeByLocale[locale];
   // The brand link represents the home page: mark it with aria-current on
   // the root path (finding QA-2026-08-01-3, closed in F-QA t_7b716c97).
   // The homepage itself renders the brand as an in-page anchor to "#top",

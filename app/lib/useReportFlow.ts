@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { useMessages } from "../components/LocaleProvider";
+import { useMessages } from "./use-messages";
 import type { ReportCoordinates } from "./report-coordinates";
 
 export type NearbyCandidate = { id: number; title: string; kind: string; distanceMeters: number; similarity: number; matchStrength: "high" | "medium" | "low" };

@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useMessages, useLocale } from "../LocaleProvider";
+import { useLocale } from "../LocaleProvider";
+import { useMessages } from "../../lib/use-messages";
 
 /**
  * One place suggestion returned by the same-origin geocode proxy

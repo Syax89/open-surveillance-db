@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { useMessages } from "../LocaleProvider";
+import { useMessages } from "../../lib/use-messages";
 import { publicRecords, prototypeRecords } from "../../lib/records";
 import { usePublicCameras } from "../../lib/use-public-cameras";
 import {

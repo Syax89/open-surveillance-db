@@ -72,7 +72,10 @@ const twoPageList = [
   { offset: 10, records: pageTwo, total: 20, nextOffset: null },
 ];
 
-/** Paginated GET /api/cameras mock; records every camera fetch in `calls`. */
+/** Paginated GET /api/cameras mock; records every camera fetch in `calls`.
+ * Handles BOTH surfaces the layer uses (QA#5 F1): the list walk
+ * (/api/cameras?offset=) AND the dedicated record endpoint
+ * (/api/cameras/<id>, answered from the same page fixture set). */
 function pageMock(pages, calls = []) {
   installFetchMock((input) => {
     if (typeof input === "string" && input.startsWith("/api/cameras?")) {
@@ -80,6 +83,14 @@ function pageMock(pages, calls = []) {
       const offset = Number(new URL(input, "https://osdb.test").searchParams.get("offset") ?? 0);
       const page = pages.find((candidate) => candidate.offset === offset) ?? pages[pages.length - 1];
       return jsonResponse({ records: page.records, total: page.total, nextOffset: page.nextOffset });
+    }
+    if (typeof input === "string" && /^\/api\/cameras\/\d+$/.test(input)) {
+      calls.push(input);
+      const id = Number(input.split("/").pop());
+      const record = [...pageOne, ...pageTwo].find((camera) => camera.id === id);
+      return record
+        ? jsonResponse({ record })
+        : jsonResponse({ error: "Camera not found." }, { status: 404 });
     }
     return jsonResponse({ error: "unexpected route" }, { status: 404 });
   });
@@ -164,7 +175,7 @@ test("layer: a failure on a later page surfaces the error state and keeps the se
   assert.equal(calls.length, 2);
 });
 
-test("layer: record deep link on the first page resolves with a single fetch", async () => {
+test("layer: record deep link resolves with a SINGLE fetch to the dedicated endpoint (QA#5 F1)", async () => {
   const { screen } = rtl;
   const calls = pageMock(twoPageList);
 
@@ -172,11 +183,13 @@ test("layer: record deep link on the first page resolves with a single fetch", a
   await rtl.waitFor(() => assert.equal(screen.getByTestId("rloading").textContent, "false"));
   assert.equal(screen.getByTestId("rid").textContent, "15");
   assert.equal(screen.getByTestId("rnotfound").textContent, "false");
-  // Early exit: the id is on page 1 (id DESC), no second page fetched.
-  assert.deepEqual(calls, ["/api/cameras?limit=500&offset=0"]);
+  // F1: the record page resolves deep links through GET /api/cameras/[id] —
+  // ONE round trip, never a client-side walk (which cost ceil((maxId −
+  // id)/500) + 1 serialised fetches and burned the READ_LIMITER bucket).
+  assert.deepEqual(calls, ["/api/cameras/15"]);
 });
 
-test("layer: record deep link on a later page resolves with an early-exit walk", async () => {
+test("layer: a deep link to a LATER page id also resolves with one fetch (no walk, QA#5 F1)", async () => {
   const { screen } = rtl;
   const calls = pageMock(twoPageList);
 
@@ -184,11 +197,12 @@ test("layer: record deep link on a later page resolves with an early-exit walk",
   await rtl.waitFor(() => assert.equal(screen.getByTestId("rloading").textContent, "false"));
   assert.equal(screen.getByTestId("rid").textContent, "5");
   assert.equal(screen.getByTestId("rnotfound").textContent, "false");
-  // The id lives on page 2: the walk fetches exactly the two pages it needs.
-  assert.deepEqual(calls, ["/api/cameras?limit=500&offset=0", "/api/cameras?limit=500&offset=10"]);
+  // Before F1 the id on page 2 (id DESC) cost a 2-page early-exit walk;
+  // the dedicated endpoint answers it in one fetch.
+  assert.deepEqual(calls, ["/api/cameras/5"]);
 });
 
-test("layer: an absent id exhausts the walk, reports not-found and seeds the cache", async () => {
+test("layer: an absent id answers 404 from the endpoint → not-found, without seeding the list cache (QA#5 F1)", async () => {
   const { screen } = rtl;
   const calls = pageMock(twoPageList);
 
@@ -197,16 +211,30 @@ test("layer: an absent id exhausts the walk, reports not-found and seeds the cac
   assert.equal(screen.getByTestId("rid").textContent, "none");
   assert.equal(screen.getByTestId("rnotfound").textContent, "true");
   assert.equal(screen.getByTestId("rerror").textContent, "false");
-  assert.equal(calls.length, 2);
+  // One fetch to the dedicated endpoint; the 404 is the fail-closed public
+  // answer, the same the old exhaustive walk would have reached after N
+  // pages — at 1/N of the cost.
+  assert.deepEqual(calls, ["/api/cameras/99"]);
 
-  // The exhausted walk seeded the module cache: the home list now renders
-  // the full directory with ZERO additional fetches.
+  // F1 note: the single 404 does NOT seed the full-list module cache (the
+  // old exhausted walk did). The home list keeps its own walk on first
+  // visit; a record page visited BEFORE the directory simply costs the
+  // directory its normal walk later, never an extra hidden walk.
   view.unmount();
+  const listCalls = [];
+  installFetchMock((input) => {
+    if (typeof input === "string" && input.startsWith("/api/cameras?")) {
+      listCalls.push(input);
+      const offset = Number(new URL(input, "https://osdb.test").searchParams.get("offset") ?? 0);
+      const page = twoPageList.find((candidate) => candidate.offset === offset) ?? twoPageList[twoPageList.length - 1];
+      return jsonResponse({ records: page.records, total: page.total, nextOffset: page.nextOffset });
+    }
+    return jsonResponse({ error: "unexpected route" }, { status: 404 });
+  });
   rtl.render(React.createElement(ListProbe, { seed: seedCameras }));
   await rtl.waitFor(() => assert.equal(screen.getByTestId("loading").textContent, "false"));
   assert.equal(screen.getByTestId("count").textContent, "20");
-  assert.equal(screen.getByTestId("total").textContent, "20");
-  assert.equal(calls.length, 2);
+  assert.equal(listCalls.length, 2, "the home list walk runs normally after a not-found deep link");
 });
 
 test("layer: a record fetch failure surfaces the error state, never a fake not-found", async () => {

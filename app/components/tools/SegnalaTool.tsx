@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useMessages } from "../LocaleProvider";
+import { useMessages } from "../../lib/use-messages";
 import { ReportForm } from "../home/ReportForm";
 import { WriteGateWall } from "../WriteGateWall";
 import { useReportFlow } from "../../lib/useReportFlow";

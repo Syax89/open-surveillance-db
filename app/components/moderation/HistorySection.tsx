@@ -6,7 +6,7 @@
 // (the monolith rendered empty/records directly), so it keeps its own
 // section shell instead of reusing QueueSection.
 
-import { useMessages } from "../LocaleProvider";
+import { useMessages } from "../../lib/use-messages";
 import type { ModerationEvent } from "./types";
 
 type Props = {

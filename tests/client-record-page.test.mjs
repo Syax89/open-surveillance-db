@@ -88,19 +88,23 @@ const revisionsFixture = {
 };
 
 /**
- * Paginated GET /api/cameras mock (PR #149 contract): the layer fetches
- * `/api/cameras?limit=500&offset=N`; each page answers
- * `{ records, total, nextOffset }` (nextOffset null on the last page).
- * `pages` is the ordered list of pages the walk should see; an offset past
- * the last page keeps answering the last page (a defensive server stub).
+ * Record mock (QA#5 F1, t_ab0d4c75): the record page resolves a deep link
+ * through the DEDICATED endpoint `GET /api/cameras/[id]` — one round trip,
+ * never a client-side paginated walk (the PR #149 list contract is still
+ * used by the home directory walk, tested in client-public-cameras-layer).
+ * The endpoint answers `{ record }` for the public id and 404 for anything
+ * else (fail-closed: same answer the old walk would give after exhausting
+ * every page, at 1/N of the cost).
  */
-function recordHandler({ pages = [{ records: [publicRecordFixture], total: 1, nextOffset: null }], revisions = revisionsFixture, fail = false } = {}) {
+function recordHandler({ record = publicRecordFixture, revisions = revisionsFixture, fail = false } = {}) {
   return (input) => {
     if (fail) return Promise.reject(new TypeError("Failed to fetch"));
-    if (typeof input === "string" && input.startsWith("/api/cameras?")) {
-      const offset = Number(new URL(input, "https://osdb.test").searchParams.get("offset") ?? 0);
-      const pageIndex = Math.min(Math.floor(offset / 500), pages.length - 1);
-      return jsonResponse(pages[pageIndex]);
+    const single = typeof input === "string" && input.match(/^\/api\/cameras\/(\d+)$/);
+    if (single) {
+      const id = Number(single[1]);
+      return id === record.id
+        ? jsonResponse({ record })
+        : jsonResponse({ error: "not found" }, { status: 404 });
     }
     if (input === "/api/cameras/revisions?cameraId=7") return jsonResponse(revisions);
     if (input === "/api/cameras/revisions?cameraId=99") return jsonResponse({ recordId: 99, revisions: [] });
@@ -110,10 +114,10 @@ function recordHandler({ pages = [{ records: [publicRecordFixture], total: 1, ne
 
 test("record page: loading state is announced while fetches are pending", async () => {
   const { screen } = rtl;
-  let resolveCameras;
+  let resolveRecord;
   installFetchMock((input) => {
-    if (typeof input === "string" && input.startsWith("/api/cameras?")) {
-      return new Promise((resolve) => { resolveCameras = resolve; });
+    if (input === "/api/cameras/7") {
+      return new Promise((resolve) => { resolveRecord = resolve; });
     }
     if (input === "/api/cameras/revisions?cameraId=7") return jsonResponse({ recordId: 7, revisions: [] });
     return jsonResponse({ error: "unexpected route" }, { status: 404 });
@@ -123,7 +127,7 @@ test("record page: loading state is announced while fetches are pending", async 
   await renderWithLocale(React.createElement(RecordPage));
   assert.ok(screen.getByText("Loading the public record…"));
 
-  resolveCameras(jsonResponse({ records: [publicRecordFixture], total: 1, nextOffset: null }));
+  resolveRecord(jsonResponse({ record: publicRecordFixture }));
   await screen.findByText("Fixture Public Camera");
 });
 
@@ -153,19 +157,16 @@ test("record page: found record renders public fields and revision history", asy
   assert.equal(back.getAttribute("href"), "/#records");
 });
 
-test("record page: a public record beyond the first page still resolves (pagination walk)", async () => {
+test("record page: a deep link resolves via the dedicated endpoint — no client-side paginated walk (F1)", async () => {
   const { screen } = rtl;
-  // id 6 lives on page 2 (records are id DESC, 500/page): the targeted walk
-  // must fetch page 2 and resolve it instead of reporting "not found".
+  // id 6 is not on the first page (records are id DESC, 500/page): the old
+  // client walk would serialize the list pages until the id showed up. F1
+  // resolves it with ONE fetch to GET /api/cameras/6 — the id not being on
+  // the first page costs nothing extra.
   const calls = [];
   installFetchMock((input) => {
     calls.push(input);
-    if (typeof input === "string" && input.startsWith("/api/cameras?")) {
-      const offset = Number(new URL(input, "https://osdb.test").searchParams.get("offset") ?? 0);
-      return jsonResponse(offset === 0
-        ? { records: [publicRecordFixture], total: 2, nextOffset: 500 }
-        : { records: [olderRecordFixture], total: 2, nextOffset: null });
-    }
+    if (input === "/api/cameras/6") return jsonResponse({ record: olderRecordFixture });
     if (input === "/api/cameras/revisions?cameraId=6") return jsonResponse({ recordId: 6, revisions: [] });
     return jsonResponse({ error: "unexpected route" }, { status: 404 });
   });
@@ -174,10 +175,11 @@ test("record page: a public record beyond the first page still resolves (paginat
   await renderWithLocale(React.createElement(RecordPage));
   await screen.findByText("Older Fixture Camera");
   assert.ok(screen.getByText("6"));
-  // The targeted walk fetched exactly the pages it needed (early exit on
-  // the page that contains the id).
-  const cameraFetches = calls.filter((input) => typeof input === "string" && input.startsWith("/api/cameras?"));
-  assert.deepEqual(cameraFetches, ["/api/cameras?limit=500&offset=0", "/api/cameras?limit=500&offset=500"]);
+  // F1: exactly ONE record fetch — the dedicated endpoint (the later
+  // /confirmation and /edit calls are not part of the resolve), never the
+  // paginated list walk (limit=500&offset=... series).
+  const recordFetches = calls.filter((input) => typeof input === "string" && input.match(/^\/api\/cameras\/\d+$/));
+  assert.deepEqual(recordFetches, ["/api/cameras/6"]);
 });
 
 test("record page: unknown id renders the not-found state", async () => {
@@ -209,14 +211,18 @@ test("record page: fetch failure renders the honest error state, never a fake 'n
   assert.ok(screen.getByRole("button", { name: "Try again" }));
 });
 
-test("record page: an empty public payload renders the not-found state, not an error", async () => {
+test("record page: the dedicated endpoint answers 404 for a non-public id (fail-closed, F1)", async () => {
   const { screen } = rtl;
-  installFetchMock(recordHandler({ pages: [{ records: [], total: 0, nextOffset: null }] }));
+  installFetchMock((input) => {
+    if (input === "/api/cameras/7") return jsonResponse({ error: "not found" }, { status: 404 });
+    if (input === "/api/cameras/revisions?cameraId=7") return jsonResponse({ recordId: 7, revisions: [] });
+    return jsonResponse({ error: "unexpected route" }, { status: 404 });
+  });
   await setNavState({ params: { id: "7" } });
 
   await renderWithLocale(React.createElement(RecordPage));
-  // The API answered 200 but published nothing: "not public / removed" is
-  // the honest reading, not an unreachable-service error.
+  // The endpoint shares the public predicate: a 404 means "not public /
+  // removed" — the honest reading, not an unreachable-service error.
   await screen.findByText("We could not find that public record.");
 });
 
@@ -224,11 +230,11 @@ test("record page: retry after a failed load refetches and renders the record", 
   const { screen } = rtl;
   let cameraCalls = 0;
   installFetchMock((input) => {
-    if (typeof input === "string" && input.startsWith("/api/cameras?")) {
+    if (input === "/api/cameras/7") {
       cameraCalls += 1;
       return cameraCalls === 1
         ? Promise.reject(new TypeError("Failed to fetch"))
-        : jsonResponse({ records: [publicRecordFixture], total: 1, nextOffset: null });
+        : jsonResponse({ record: publicRecordFixture });
     }
     if (input === "/api/cameras/revisions?cameraId=7") return jsonResponse(revisions);
     return jsonResponse({ error: "unexpected route" }, { status: 404 });

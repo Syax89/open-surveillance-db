@@ -17,6 +17,14 @@ export async function generateMetadata(): Promise<Metadata> {
   const bundle = await getServerMessages();
   const title = bundle.common.metaTitle;
   const description = bundle.common.metaDescription;
+  // F6 qa#5 (t_ab0d4c75): metadataBase is intentionally conditional — the
+  // repo convention (docs/DEPLOYMENT.md "Environment variables") forbids an
+  // absolute-URL fallback that would leak `localhost` into metadata on
+  // deployments without a public domain. When NEXT_PUBLIC_SITE_URL IS set,
+  // Next resolves the relative "/og.png" below against metadataBase, so
+  // og:image/twitter:image become absolute automatically. The regenerated
+  // asset is 1200x630 / ~163 KiB (from 1,626,075 B) — within the social
+  // preview weight budget.
   return {
     ...(process.env.NEXT_PUBLIC_SITE_URL
       ? { metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL) }
@@ -26,7 +34,14 @@ export async function generateMetadata(): Promise<Metadata> {
     openGraph: {
       title,
       description,
-      images: ["/og.png"],
+      images: [
+        {
+          url: "/og.png",
+          width: 1200,
+          height: 630,
+          alt: "OpenSurveillanceDB — public data about public surveillance",
+        },
+      ],
     },
     twitter: {
       card: "summary_large_image",

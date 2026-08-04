@@ -3,7 +3,16 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { useMessages } from "./LocaleProvider";
+// Header lives on EVERY page: import only the `auth` domain (F5 qa#5,
+// t_ab0d4c75) instead of the full dictionary via useMessages().
+import { useLocale } from "./LocaleProvider";
+import { en as authEn, it as authIt } from "../lib/i18n/auth";
+import type { Locale, Translation } from "../lib/i18n";
+
+const authByLocale: Record<Locale, Translation<typeof authEn>> = {
+  en: authEn,
+  it: authIt,
+};
 
 /**
  * AuthNavLinks — login/register/account links of the shared public header
@@ -47,7 +56,8 @@ type AuthState =
   | { status: "authenticated"; displayName: string | null };
 
 export function AuthNavLinks() {
-  const t = useMessages().auth;
+  const { locale } = useLocale();
+  const t = authByLocale[locale];
   const pathname = usePathname();
   const [auth, setAuth] = useState<AuthState>({ status: "unknown" });
 
