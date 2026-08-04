@@ -14,6 +14,11 @@ export const en = {
   loginTitle: "Log in",
   registerTitle: "Create a contributor account",
   accountTitle: "Your account",
+  // F5 (QA#6): per-page metadata for the client auth pages (/login, /register).
+  loginMetaDescription:
+    "Log in to submit reports and corrections to the OpenSurveillanceDB public database.",
+  registerMetaDescription:
+    "Create a free contributor account to report public surveillance cameras.",
   email: "Email",
   password: "Password",
   displayName: "Display name (optional)",
@@ -230,6 +235,11 @@ export const it: Translation<typeof en> = {
   loginTitle: "Accedi",
   registerTitle: "Crea un account per contribuire",
   accountTitle: "Il tuo account",
+  // F5 (QA#6): metadata per pagina per le pagine auth client (/login, /register).
+  loginMetaDescription:
+    "Accedi per inviare segnalazioni e correzioni al database pubblico OpenSurveillanceDB.",
+  registerMetaDescription:
+    "Crea un account gratuito per contribuire al database delle telecamere di sorveglianza pubbliche.",
   email: "Email",
   password: "Password",
   displayName: "Nome visualizzato (facoltativo)",

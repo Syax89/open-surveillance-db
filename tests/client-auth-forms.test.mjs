@@ -18,7 +18,7 @@
 import assert from "node:assert/strict";
 import test, { afterEach, before } from "node:test";
 import {
-  setupDom, loadDomPage, installFetchMock, jsonResponse, getNavState, setNavState,
+  setupDom, loadDomModule, installFetchMock, jsonResponse, getNavState, setNavState,
   renderWithLocale, React,
 } from "./helpers/dom-harness.mjs";
 
@@ -28,8 +28,10 @@ let RegisterPage;
 
 before(async () => {
   rtl = await setupDom();
-  LoginPage = await loadDomPage("app/login/page.mjs");
-  RegisterPage = await loadDomPage("app/register/page.mjs");
+  // QA#6 F2/F5 (t_9467ee7f): /login and /register are thin server shells;
+  // the interactive body is the named-export client component.
+  LoginPage = (await loadDomModule("app/login/LoginPageBody.mjs")).LoginPageBody;
+  RegisterPage = (await loadDomModule("app/register/RegisterPageBody.mjs")).RegisterPageBody;
 });
 
 // Unmount between tests so queries never see stale markup (RTL auto-cleanup

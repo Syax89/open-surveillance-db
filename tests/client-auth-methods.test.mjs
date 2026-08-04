@@ -24,7 +24,7 @@
 import assert from "node:assert/strict";
 import test, { afterEach, before } from "node:test";
 import {
-  setupDom, loadDomPage, loadDomModule, installFetchMock, jsonResponse,
+  setupDom, loadDomModule, installFetchMock, jsonResponse,
   getNavState, setNavState, renderWithLocale, React,
 } from "./helpers/dom-harness.mjs";
 
@@ -33,7 +33,9 @@ let LoginPage;
 
 before(async () => {
   rtl = await setupDom();
-  LoginPage = await loadDomPage("app/login/page.mjs");
+  // QA#6 F2/F5 (t_9467ee7f): /login is a thin server shell; the interactive
+  // body is the named-export client component LoginPageBody.
+  LoginPage = (await loadDomModule("app/login/LoginPageBody.mjs")).LoginPageBody;
 });
 
 afterEach(() => rtl?.cleanup());

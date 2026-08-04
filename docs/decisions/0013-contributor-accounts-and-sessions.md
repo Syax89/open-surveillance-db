@@ -135,9 +135,14 @@ single email+password method to **three methods**, all producing the same
    verified flag only, **no email imported**, activation gated on DPA +
    EU–US DPF (PROCESSOR_REGISTER PR5/PR6, currently conditional).
 
-The session/CSRF/PBKDF2 baseline and the anonymous-submissions rule
-(decision 4) are unchanged. **Email verification is now required for write
-access** (unverified sessions are read-only — ADR 0020 decision 2). Erasure
+The session/CSRF/PBKDF2 baseline is unchanged. The anonymous-submissions rule
+(decision 4) is **superseded for writes**: every write route now enforces a
+VERIFIED contributor session (write gate, Fase E1 — anonymous → 401,
+unverified → 403), so `cameras.contributor_id` is `NULL` only through the R7
+erasure de-attribution path, never for new submissions. Anonymous browsing of
+the public data remains possible and unchanged. **Email verification is now
+required for write access** (unverified sessions are read-only — ADR 0020
+decision 2). Erasure
 (decision 2 above / R7) extends to the new auth data: verification tokens,
 passkeys and recovery codes are hard-deleted, `external_sub` is cleared
 (RETENTION_SCHEDULE R15).

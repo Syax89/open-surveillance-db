@@ -313,7 +313,7 @@ export const enLegal: LegalContent = {
               "**Consultation:** browse the map, the record directory and individual record pages; search and read the public dataset.",
               "**Exports:** download public data via the JSON/CSV/GeoJSON exports and the public API, and reuse it, subject to the ODbL 1.0 licence (section 7) and to the abuse limits in section 4.",
               "**Reports:** submit observations of visible public surveillance infrastructure for human moderation. Reports are never guaranteed to be published (section 5).",
-              "**Lawful purposes:** the data may be used for research, journalism, civic advocacy, and any purpose consistent with these terms and with the ODbL 1.0 licence. No account is required to browse **or to report**: submissions may be anonymous, or attributed to an optional free contributor account (email + pseudonymous display name). Contributions use a **pseudonymous internal ID**, never a real-name requirement.",
+              "**Lawful purposes:** the data may be used for research, journalism, civic advocacy, and any purpose consistent with these terms and with the ODbL 1.0 licence. Browsing the public data never requires an account. Submitting a report or a correction requires a verified contributor account (section 3.7; ADR 0020), and every submission is attributed to it through a **pseudonymous internal ID** — never a real-name requirement.",
             ],
           },
         ],
@@ -556,7 +556,7 @@ export const enLegal: LegalContent = {
     intro:
       "OpenSurveillanceDB is a public-interest civic database. This statement describes our accessibility commitment, our current compliance status, and how you can report a barrier.",
     versionNote:
-      "Version 0.1 — 1 August 2026. Draft — pre-launch, prototype stage. The repository copy (docs/ACCESSIBILITY_STATEMENT.md) remains canonical.",
+      "Version 0.1 — 1 August 2026. Draft — pre-launch, project stage. The repository copy (docs/ACCESSIBILITY_STATEMENT.md) remains canonical.",
     sections: [
       {
         heading: "1. Commitment",
@@ -572,7 +572,7 @@ export const enLegal: LegalContent = {
         blocks: [
           {
             type: "paragraph",
-            text: "**Partially compliant.** The current prototype implements a meaningful accessibility baseline, but it has **not yet passed formal automated or manual accessibility testing**, and some known limitations remain (listed below). This section will be replaced by a measured conformance statement (WCAG 2.2 A/AA, per success criterion) once the testing gates are complete.",
+            text: "**Partially compliant.** The current project implements a meaningful accessibility baseline, but it has **not yet passed formal automated or manual accessibility testing**, and some known limitations remain (listed below). This section will be replaced by a measured conformance statement (WCAG 2.2 A/AA, per success criterion) once the testing gates are complete.",
           },
         ],
       },
@@ -588,7 +588,7 @@ export const enLegal: LegalContent = {
               "A searchable text directory and record-detail pages that work **without map interaction**; map and directory present the same public fields.",
               "Report-location selection by map click **or** validated manual coordinates.",
               "An English/Italian interface with a device-local language preference; the language choice does not affect API data.",
-              "A bilingual in-app guide at [/guide](/guide) explaining data states, workflow and prototype boundaries.",
+              "A bilingual in-app guide at [/guide](/guide) explaining data states and the moderation workflow.",
               "Status information is never conveyed by colour alone (text and icon labels are used).",
             ],
           },

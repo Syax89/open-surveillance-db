@@ -19,6 +19,8 @@ export const en = {
   pageTitle: "Interactive map",
   pageIntro:
     "Explore documented public cameras on the map. Use the filters to narrow the view; every marker opens its public record. An empty area never proves that no cameras are present.",
+  // F2 (QA#6): SSR Suspense fallback for the client tool body.
+  loading: "Loading the map…",
   // Map tool chrome (t_966254a1, t_11e38eab): no visible tool header — the
   // page starts directly with the map card. The h1 (pageTitle) stays in the
   // DOM as sr-only for a11y; the old "Explore documented cameras" section
@@ -96,6 +98,8 @@ export const it: Translation<typeof en> = {
   pageTitle: "Mappa interattiva",
   pageIntro:
     "Esplora le telecamere pubbliche documentate sulla mappa. Usa i filtri per restringere la vista; ogni segnaposto apre il record pubblico. Un'area vuota non dimostra mai l'assenza di telecamere.",
+  // F2 (QA#6): fallback SSR Suspense per il corpo tool client.
+  loading: "Caricamento della mappa…",
   // Chrome del tool mappa (t_966254a1, t_11e38eab): nessun header visibile —
   // la pagina parte direttamente con la card della mappa. L'h1 (pageTitle)
   // resta nel DOM come sr-only per a11y; il vecchio heading di sezione

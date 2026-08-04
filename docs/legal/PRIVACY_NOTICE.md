@@ -33,7 +33,7 @@ OpenSurveillanceDB publishes a public-interest map of **visible, public surveill
 | Published records | Moderated reports / official public sources | The public dataset (ODbL 1.0) | art. 6(1)(f) / 6(1)(e) — see LAWFUL_BASIS.md |
 | Community profile (display name, trust level, verifications received, list of contributions) | Contributor (voluntary, **opt-in public** — default private, COMMUNITY_PLAN.md § 5.2) | Contributor recognition and community verification of contributions | art. 6(1)(f) — recognition/incentive; **never consent** (core feature, imbalance art. 6(1)(a)); only the chosen display name is public, never real name or email; no public leaderboard/ranking (see § 4) |
 | Verifications given to other records (verifier, record, timestamp) | Contributor | Dataset quality — community verification | art. 6(1)(f); one verification per user per record (anti-gaming); no free text |
-| Edit history (revisions: author, timestamp, diff, reason) | Contributor (authenticated or anonymous) | Accountability (art. 5(2)), accuracy (art. 16), moderation of edits | art. 6(1)(f); append-only diff, author pseudonymous or NULL for anonymous edits; never rewritten in place |
+| Edit history (revisions: author, timestamp, diff, reason) | Contributor (authenticated) | Accountability (art. 5(2)), accuracy (art. 16), moderation of edits | art. 6(1)(f); append-only diff, author pseudonymous — `NULL` only after account erasure (de-attribution, R14); never rewritten in place |
 | Email-verification token (SHA-256 hash of a single-use token, 24 h TTL) | The project (verification email sent through Cloudflare Email Routing) | Prove ownership of the email; unlock write access | art. 6(1)(f); stored only as SHA-256, single-use, deleted after use or after 24 h (RETENTION_SCHEDULE.md R15); re-send rate-limited (3/h) |
 | Passkey credential (credential_id, COSE public key, sign counter) | Contributor's device (WebAuthn enrollment, optional method) | Passwordless, phishing-resistant login | art. 6(1)(f); public-key material only — no secret ever stored server-side; anti-replay counter; **synced passkeys** are backed up through the OS vendor's cloud (Apple/Google/Microsoft) at the user's choice (§ 3.1); hard-deleted at account erasure (R15) |
 | Recovery codes (10, hashed) | The project (issued at passkey enrollment) | Regain access after device loss | art. 6(1)(f); stored only hashed, single-use, replaced on re-enrollment; deleted at account erasure (R15) |
@@ -50,8 +50,9 @@ OpenSurveillanceDB publishes a public-interest map of **visible, public surveill
 ### 3.1 How you authenticate — three methods, your choice (ADR 0020)
 
 Contributor accounts can be used with **three authentication methods**. You
-choose; none is ever required (browsing and reporting stay possible
-anonymously — ADR 0013). What each implies:
+choose; none is ever required to **browse** the public data. Submitting a
+report or a correction requires a **verified contributor account** (ADR 0020,
+write gate Fase E1 — anonymous → 401, unverified → 403). What each implies:
 
 1. **Email + password (baseline).** The email is collected directly from you
    and used for login and attribution. **Email verification is required for

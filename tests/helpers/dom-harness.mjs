@@ -57,12 +57,15 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 // the explicit isolation contract — the interaction tests load them by
 // these exact paths.
 const PAGES = [
-  { source: "app/login/page.tsx", relative: "app/login/page.mjs" },
-  { source: "app/register/page.tsx", relative: "app/register/page.mjs" },
   // P1-1/P1-3 (Vera design): the auth-ux pages are loaded as their client
   // BODY components (like /account) — the page.tsx shells import
   // getServerMessages (next/headers), which the DOM harness stubs cannot
   // resolve; the shells are covered by pages-render.test.mjs instead.
+  // /login and /register follow the same split (QA#6 F2/F5, t_9467ee7f):
+  // the thin server shells were introduced when the per-page metadata and
+  // the localized SSR Suspense fallback moved server-side.
+  { source: "app/login/LoginPageBody.tsx", relative: "app/login/LoginPageBody.mjs" },
+  { source: "app/register/RegisterPageBody.tsx", relative: "app/register/RegisterPageBody.mjs" },
   { source: "app/verify-email/VerifyEmailBody.tsx", relative: "app/verify-email/VerifyEmailBody.mjs" },
   { source: "app/forgot-password/ForgotPasswordBody.tsx", relative: "app/forgot-password/ForgotPasswordBody.mjs" },
   { source: "app/reset-password/ResetPasswordBody.tsx", relative: "app/reset-password/ResetPasswordBody.mjs" },

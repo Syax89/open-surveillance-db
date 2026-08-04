@@ -12,6 +12,8 @@ export const en = {
   pageTitle: "Public directory",
   pageIntro:
     "Search, filter and order the reviewed public records without the map. A result is never evidence that an area has no surveillance.",
+  // F2 (QA#6): SSR Suspense fallback for the client tool body.
+  loading: "Loading the directory…",
   navigation: "Directory navigation",
   homeAria: "OpenSurveillanceDB home",
   useMapInstead: "Use the map instead",
@@ -27,7 +29,7 @@ export const en = {
   searchDirectory: "Search the public directory",
   searchPlaceholder: "Type, source or record ID",
   searchHelp:
-    "Only reviewed public records and labelled prototype records appear here.",
+    "Only reviewed public records and labelled illustrative records appear here.",
   // Catalog mode: data export of the filtered set. The API applies the
   // server-side filters (kind + freshness); q and sort are client-side, so
   // the hint below says exactly what the export contains.
@@ -104,6 +106,11 @@ export const en = {
   readDataPolicy: "Read the data policy",
   recordId: "Record ID",
   source: "Source",
+  // F4 (QA#6): the demo seed rows carry raw, language-neutral markers
+  // ("Prototype seed"/"Demo data" — test contract, see DATA_DICTIONARY);
+  // the presentation shows these localized labels instead.
+  demoSource: "Illustrative seed",
+  demoUpdated: "Demo data",
   location: "Location",
   unknown: "Unknown",
   manufacturerLabel: "Manufacturer",
@@ -115,6 +122,8 @@ export const it: Translation<typeof en> = {
   pageTitle: "Elenco pubblico",
   pageIntro:
     "Cerca, filtra e ordina i record pubblici revisionati senza usare la mappa. Un risultato non è mai la prova che un'area non abbia sorveglianza.",
+  // F2 (QA#6): fallback SSR Suspense per il corpo tool client.
+  loading: "Caricamento dell'elenco…",
   navigation: "Navigazione elenco",
   homeAria: "Pagina iniziale di OpenSurveillanceDB",
   useMapInstead: "Usa invece la mappa",
@@ -130,7 +139,7 @@ export const it: Translation<typeof en> = {
   searchDirectory: "Cerca nell'elenco pubblico",
   searchPlaceholder: "Tipo, fonte o ID record",
   searchHelp:
-    "Qui compaiono solo record pubblici revisionati e record prototipo etichettati.",
+    "Qui compaiono solo record pubblici revisionati e record illustrativi etichettati.",
   // Modalità catalogo: export dei dati filtrati. L'API applica i filtri
   // server (tipo + aggiornamento); q e ordinamento restano client, quindi
   // il suggerimento dichiara esattamente cosa contiene l'export.
@@ -207,6 +216,11 @@ export const it: Translation<typeof en> = {
   readDataPolicy: "Leggi la politica dei dati",
   recordId: "ID record",
   source: "Fonte",
+  // F4 (QA#6): i record del seed demo hanno marcatori grezzi neutri
+  // ("Prototype seed"/"Demo data" — contratto di test, vedi DATA_DICTIONARY);
+  // la presentazione mostra invece queste etichette localizzate.
+  demoSource: "Seed illustrativo",
+  demoUpdated: "Dato dimostrativo",
   location: "Posizione",
   unknown: "Sconosciuto",
   manufacturerLabel: "Produttore",

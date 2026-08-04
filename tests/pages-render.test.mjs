@@ -49,6 +49,8 @@ const PAGES = [
 // needed in the tree so the pages resolve their imports, but they are NOT
 // rendered as standalone routes.
 const EXTRA_SOURCES = [
+  { source: "app/login/LoginPageBody.tsx", relative: "app/login/LoginPageBody.mjs" },
+  { source: "app/register/RegisterPageBody.tsx", relative: "app/register/RegisterPageBody.mjs" },
   { source: "app/verify-email/VerifyEmailBody.tsx", relative: "app/verify-email/VerifyEmailBody.mjs" },
   { source: "app/forgot-password/ForgotPasswordBody.tsx", relative: "app/forgot-password/ForgotPasswordBody.mjs" },
   { source: "app/reset-password/ResetPasswordBody.tsx", relative: "app/reset-password/ResetPasswordBody.mjs" },

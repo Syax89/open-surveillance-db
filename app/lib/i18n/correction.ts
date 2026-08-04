@@ -12,6 +12,8 @@ export const en = {
   pageTitle: "Correct a record",
   pageIntro:
     "Corrections are private. They do not change the map automatically and are never included in the public data export.",
+  // F2 (QA#6): SSR Suspense fallback for the client tool body.
+  loading: "Loading…",
   navigation: "Correction navigation",
   homeAria: "OpenSurveillanceDB home",
   // Correction section (extracted from the home page bundle in F1).
@@ -69,6 +71,8 @@ export const it: Translation<typeof en> = {
   pageTitle: "Correggi un record",
   pageIntro:
     "Le correzioni sono private. Non modificano automaticamente la mappa e non sono mai incluse nell'esportazione dei dati pubblici.",
+  // F2 (QA#6): fallback SSR Suspense per il corpo tool client.
+  loading: "Caricamento…",
   navigation: "Navigazione correzione",
   homeAria: "Pagina iniziale di OpenSurveillanceDB",
   // Sezione correzione (estratta dal bundle della home nella F1).

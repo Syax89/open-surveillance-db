@@ -15,13 +15,18 @@ export const en = {
   recordId: "Record ID",
   source: "Source",
   lastVerification: "Last verification",
+  // F4 (QA#6): the demo seed rows carry raw, language-neutral markers
+  // ("Prototype seed"/"Demo data" — test contract, see DATA_DICTIONARY);
+  // the presentation shows these localized labels instead.
+  demoSource: "Illustrative seed",
+  demoUpdated: "Demo data",
   generalLocation: "General location",
   manufacturer: "Manufacturer",
   observedOn: "Observed on",
   viewOnMap: "View on map",
   reportIssue: "Report an issue",
   recordNote:
-    "This page contains only reviewed public records or clearly labelled prototype data. It does not provide live feeds or operational camera details.",
+    "This page contains only reviewed public records or clearly labelled illustrative records. It does not provide live feeds or operational camera details.",
   unavailable: "Record unavailable",
   notFound: "We could not find that public record.",
   notFoundDetail:
@@ -83,13 +88,18 @@ export const it: Translation<typeof en> = {
   recordId: "ID record",
   source: "Fonte",
   lastVerification: "Ultima verifica",
+  // F4 (QA#6): i record del seed demo hanno marcatori grezzi neutri
+  // ("Prototype seed"/"Demo data" — contratto di test, vedi DATA_DICTIONARY);
+  // la presentazione mostra invece queste etichette localizzate.
+  demoSource: "Seed illustrativo",
+  demoUpdated: "Dato dimostrativo",
   generalLocation: "Posizione generale",
   manufacturer: "Produttore",
   observedOn: "Data osservata",
   viewOnMap: "Vedi sulla mappa",
   reportIssue: "Segnala un problema",
   recordNote:
-    "Questa pagina contiene solo record pubblici revisionati o dati di prototipo chiaramente etichettati. Non fornisce flussi video in diretta né dettagli operativi delle telecamere.",
+    "Questa pagina contiene solo record pubblici revisionati o record illustrativi chiaramente etichettati. Non fornisce flussi video in diretta né dettagli operativi delle telecamere.",
   unavailable: "Record non disponibile",
   notFound: "Non è stato possibile trovare questo record pubblico.",
   notFoundDetail:

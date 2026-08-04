@@ -2,7 +2,7 @@
 
 An open, non-commercial civic database for documenting **visible public surveillance infrastructure**. The project helps people understand where cameras are installed in shared spaces; it does not provide video feeds, tracking tools, or advice on avoiding lawful surveillance.
 
-> Current state: local working prototype. The map uses OpenStreetMap and shows only clearly labelled illustrative records; contributor accounts, moderation, roles, and appeals run locally, but the service is not yet a public registry.
+> Current state: local project deployment. The map uses OpenStreetMap and shows only clearly labelled illustrative records; contributor accounts, moderation, roles, and appeals run locally, but the service is not yet a public registry.
 
 ## Principles
 
@@ -12,7 +12,7 @@ An open, non-commercial civic database for documenting **visible public surveill
 - Privacy and safety by design: no private-home cameras, no sensitive operational details, and no live-feed links.
 - Human moderation before community submissions become public.
 
-## What is in this prototype
+## What is implemented
 
 - Interactive OpenStreetMap-based map.
 - Searchable, map-equivalent public record directory and individual record pages.
@@ -33,10 +33,11 @@ An open, non-commercial civic database for documenting **visible public surveill
 - Report-location selection by map click or valid manual coordinates, using the
   same non-blocking nearby-record check in either case.
 - Private correction/request-for-review form that creates a non-public moderation request.
-- Contributor accounts: email+password registration, login/logout, and an
+- Contributor accounts: email+password registration with email verification, login/logout, and an
   account page listing the contributor's own submissions, with PBKDF2-SHA256
   password hashing, hashed opaque session cookies, and CSRF protection.
-  Anonymous submissions remain possible by design (ADR 0013).
+  A verified contributor account is required to submit reports or corrections
+  (ADR 0020); browsing the public data never requires an account.
 - Self-service account erasure with de-attribution (GDPR art. 17): deleting an
   account detaches its submissions from the identity without unpublishing them
   (ADR 0013).
@@ -82,7 +83,7 @@ An open, non-commercial civic database for documenting **visible public surveill
 - Draft accessibility statement and design for a non-sensitive usability-feedback route (see `docs/ACCESSIBILITY_STATEMENT.md` and ADR 0006).
 - Cloudflare D1-compatible data layer, with local demo records.
 
-The prototype is deliberately not a public registry yet. The code and draft
+The project is deliberately not a public registry yet. The code and draft
 policies are public, but accepting real-world reports still requires a public
 launch: independent legal review of the draft terms and privacy documents, real
 moderation staffing, and operational safeguards.
@@ -163,7 +164,7 @@ regenerate a migration with `npm run db:generate` before running
 `db:migrate`.
 
 For local moderation testing, open `http://localhost:3000/moderation`. This
-route is intentionally not linked from the public prototype. Access is gated by
+route is intentionally not linked from the public site. Access is gated by
 the `MODERATION_USER`/`MODERATION_PASSWORD` (Basic auth) or `MODERATION_TOKEN`
 (bearer) environment variables and fails closed: with none configured, the
 dashboard and `/api/moderation` return `503`. Protected routes additionally

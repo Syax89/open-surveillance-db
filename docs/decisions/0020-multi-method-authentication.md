@@ -21,7 +21,9 @@
 
 ADR 0013 (2026-08-01) established email+password as the contributor
 authentication mechanism: salted PBKDF2-SHA256 hashes, hashed opaque sessions,
-double-submit CSRF, and anonymous submissions remaining possible by design.
+double-submit CSRF, and anonymous submissions remaining possible by design —
+a baseline this ADR changes: the write gate (decision 2, Fase E1) now requires
+a verified contributor account for every submission.
 It explicitly deferred **email verification and password reset** because no
 outbound mailer existed.
 
@@ -38,7 +40,7 @@ conclusion for three reasons:
    check quoted in AUTH_OPTIONS § 3 (~36 % of accounts passkey-enrolled, ~26 %
    of sign-ins) means a passkey-only path would exclude most contributors, and
    a password-only path keeps the credential-stuffing/account-takeover gap
-   open. The civic mission (anonymous, lightweight contribution, ADR 0013)
+   open. The civic mission (lightweight, low-friction contribution)
    argues for letting each contributor choose the method whose trade-off they
    accept — with the risks **disclosed**, not paternalistically excluded.
 2. **The mailer constraint disappeared.** Transactional email can run on
@@ -60,8 +62,11 @@ conclusion for three reasons:
       reset**;
    b. **passkeys (WebAuthn/FIDO2)** as an optional, parallel method;
    c. **OIDC via GitHub or Google** as an optional, per-account method.
-   Anonymous browsing and reporting remain possible and unchanged
-   (ADR 0013 decision 4): no method is ever required to use the service.
+   Anonymous browsing remains possible and unchanged
+   (ADR 0013 decision 4): no method is ever required to browse the service.
+   **Reporting and every other write now require a verified contributor
+   account** (decision 2, write gate Fase E1) — ADR 0013's anonymous-submissions
+   rule is superseded for writes.
 
 2. **Email verification is required for write access — and, since the CEO
    feedback 2026-08-03 (t_6dc1c96f), for login itself.** `contributors.email_verified_at`
