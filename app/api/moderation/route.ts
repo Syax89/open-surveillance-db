@@ -266,7 +266,7 @@ function parseModerationRequest(value: unknown): ParsedModerationRequest {
  * signal is emitted with a hashed caller identity only.
  */
 async function moderationLimit(request: Request) {
-  const key = callerKey(request);
+  const key = callerKey(request, env);
   const limitOptions = limitsFor("moderate", env);
   const limit = await checkRateLimit(env, "moderate", key, limitOptions);
   if (!limit.allowed) {

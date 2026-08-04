@@ -160,7 +160,7 @@ export async function GET(request: Request, context: { params: Promise<TileParam
   // well past its usage policy. Interactive map panning stays far below
   // the default; the same caller on the same tiles is absorbed by the
   // edge cache below.
-  const key = callerKey(request);
+  const key = callerKey(request, env);
   const limitOptions = limitsFor("tiles", env);
   const limit = await checkRateLimit(env, "tiles", key, limitOptions);
   if (!limit.allowed) {

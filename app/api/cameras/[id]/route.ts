@@ -40,7 +40,7 @@ export async function GET(request: Request) {
   // Public read route: metered per caller in the read-family bucket, same as
   // the directory list and the photo bytes. Malformed ids above answered 404
   // without touching the database and are not counted.
-  const key = callerKey(request);
+  const key = callerKey(request, env);
   const limitOptions = limitsFor("read", env);
   const limit = await checkRateLimit(env, "read", key, limitOptions);
   if (!limit.allowed) {
@@ -126,7 +126,7 @@ export async function PATCH(request: Request) {
     return Response.json({ error: "Cross-origin request rejected." }, { status: 403, headers: NO_STORE_HEADERS });
   }
 
-  const key = callerKey(request);
+  const key = callerKey(request, env);
   const limitOptions = limitsFor("edit", env);
   const limit = await checkRateLimit(env, "edit", key, limitOptions);
   if (!limit.allowed) {

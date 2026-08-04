@@ -21,7 +21,7 @@ export async function GET(request: Request) {
   // Rate limits: the change summary is a public read that can be probed per
   // camera id, so it gets its own bucket independent of the plain read and
   // export buckets.
-  const key = callerKey(request);
+  const key = callerKey(request, env);
   const limitOptions = limitsFor("revisions", env);
   const limit = await checkRateLimit(env, "revisions", key, limitOptions);
   if (!limit.allowed) {

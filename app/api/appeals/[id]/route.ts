@@ -54,7 +54,7 @@ export async function PATCH(request: Request) {
   // edge gate): only authenticated moderators reach this point, and the
   // per-caller limit bounds a compromised or over-zealous account without
   // ever affecting public read traffic.
-  const key = callerKey(request);
+  const key = callerKey(request, env);
   const limitOptions = limitsFor("moderate", env);
   const limit = await checkRateLimit(env, "moderate", key, limitOptions);
   if (!limit.allowed) {

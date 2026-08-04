@@ -36,6 +36,20 @@ export const CACHE_TAGS = {
 
 const PURGE_API = "https://api.cloudflare.com/client/v4/zones";
 
+/** Default purge timeout: 2.5s (QA F4, t_894e0cc3). */
+const DEFAULT_PURGE_TIMEOUT_MS = 2500;
+
+/**
+ * Effective purge timeout, honouring the `CACHE_PURGE_TIMEOUT_MS` knob
+ * (follow-up t_b6f04976, same pattern as the tiles/geocode
+ * `TILE_UPSTREAM_TIMEOUT_MS` / geocode upstream timeout knobs). The default
+ * stays the value pinned by the QA F4 test.
+ */
+function purgeTimeoutMs(envValue: unknown): number {
+  const value = Number((envValue as Record<string, unknown>).CACHE_PURGE_TIMEOUT_MS);
+  return Number.isFinite(value) && value > 0 ? value : DEFAULT_PURGE_TIMEOUT_MS;
+}
+
 /**
  * Purge every cached representation that can contain a moderated record.
  *
@@ -85,7 +99,7 @@ export async function purgeCacheTags(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ tags: [...tags] }),
-      signal: AbortSignal.timeout(2500),
+      signal: AbortSignal.timeout(purgeTimeoutMs(env)),
     });
     if (!response.ok) {
       console.warn(

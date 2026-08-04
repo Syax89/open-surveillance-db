@@ -72,7 +72,8 @@ export function pendingPhotoQuota(env: unknown): PendingPhotoQuota {
 export async function submitterKeyFor(
   auth: { contributor: { id: number } } | null,
   request: Request,
+  env?: unknown,
 ): Promise<string> {
   if (auth) return `contributor:${auth.contributor.id}`;
-  return `anon:${await sha256Hex(callerKey(request))}`;
+  return `anon:${await sha256Hex(callerKey(request, env))}`;
 }

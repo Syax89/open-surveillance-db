@@ -55,11 +55,19 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 // app/lib/csrf.ts:43 `cookies[name] = decodeURIComponent(value)` non protegge
 // il decode: un cookie `osdb_session=%E0%A4%A` (percent-encoding troncato)
 // lancia URIError. Su GET /api/auth/me (readCookie dentro il try) la route
-// risponde 503 "Unable to read the session" invece del 401 da anonimo; su
+// rispondeva 503 "Unable to read the session" invece del 401 da anonimo; su
 // POST /api/appeals (resolveOptionalContributor a riga 112, FUORI dal try)
-// l'eccezione esce dall'handler -> 500. Un chiamante anonimo può generare
+// l'eccezione usciva dall'handler -> 500. Un chiamante anonimo poteva generare
 // errori 5xx a piacere (robustezza/error handling).
-// Fix: try/catch attorno a decodeURIComponent (valore malformato -> assente).
+// Fix (t_894e0cc3 + follow-up t_b6f04976):
+//   1. try/catch attorno a decodeURIComponent: un valore malformato è trattato
+//      come ASSENTE (parseCookies non lancia mai più) — le route di lettura
+//      che degradano l'assenza ad anonimo rispondono 401 pulito;
+//   2. le route SCRIVENTI (write gate, PATCH /api/auth/me, POST /api/appeals)
+//      distinguono ora "nessun cookie" da "cookie PRESENTE ma corrotto" tramite
+//      malformedSessionCookieGuard (app/lib/auth-session.ts): un cookie rotto è
+//      un bug del client, la risposta è un 400 pulito e actionable (cancella i
+//      cookie) — mai un 5xx, mai un 401 silenzioso che nasconde la corruzione.
 
 let e2e;
 
@@ -94,7 +102,7 @@ test("F1a: GET /api/auth/me con cookie malformato risponde 401 (anonimo), non 50
   );
 });
 
-test("F1b: POST /api/appeals con cookie malformato non deve lanciare e risponde 401", async () => {
+test("F1b: POST /api/appeals con cookie malformato risponde 400 pulito (mai 5xx, mai throw di handler)", async () => {
   const appeals = await loadE2ERoute("app/api/appeals/route.mjs");
   const request = apiRequest("/api/appeals", {
     method: "POST",
@@ -117,11 +125,25 @@ test("F1b: POST /api/appeals con cookie malformato non deve lanciare e risponde 
   assert.equal(
     threw,
     null,
-    "resolveOptionalContributor (app/api/appeals/route.ts:112) è fuori dal " +
-      "try: un cookie malformato fa esplodere l'handler (URIError). Deve " +
-      `essere trattato come anonimo. Errore osservato: ${threw}`,
+    "resolveOptionalContributor (app/api/appeals/route.ts:112) era fuori dal " +
+      "try: un cookie malformato faceva esplodere l'handler (URIError). Deve " +
+      `essere intercettato dal guard. Errore osservato: ${threw}`,
   );
-  assert.equal(response.status, 401, "il chiamante anonimo deve ricevere 401");
+  assert.equal(
+    response.status,
+    400,
+    "un cookie di sessione PRESENTE ma non decodificabile è un bug del client: " +
+      "le route scriventi rispondono 400 pulito (cancella i cookie) — follow-up " +
+      "t_b6f04976 sul contratto 401-anonimo del report originale — mai un " +
+      `500/503 da URIError. Status osservato: ${response.status}`,
+  );
+  const body = await response.json();
+  assert.match(
+    body.error,
+    /Malformed session cookie/,
+    "il 400 deve spiegare l'azione correttiva (cancellare i cookie), non " +
+      `nascondere la corruzione. Body: ${JSON.stringify(body)}`,
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -286,9 +308,9 @@ test("F3b: decideAppeal reale su un appeal già deciso risponde not_pending e no
 // attende `await purgeCacheTags(...)` DOPO che il batch D1 ha committato la
 // decisione: un'API CF lenta/hung blocca la risposta di moderazione — il
 // moderatore vede un errore e ritenta, ma l'item è già transitato (404).
-// Fix: AbortSignal.timeout(~2.5s) sul fetch (o fire-and-forget).
-// Test: fetch stub che si risolve solo all'abort — oggi la chiamata non ha
-// signal e non risolve mai; dopo il fix abortisce entro il budget.
+// Fix (t_894e0cc3 + follow-up t_b6f04976): AbortSignal.timeout sul fetch,
+// default 2.5s, personalizzabile con CACHE_PURGE_TIMEOUT_MS (stesso pattern
+// dei knob TILE_UPSTREAM_TIMEOUT_MS/geocode). Fail-open: mai un throw.
 
 test("F4: purgeCacheTags deve avere un bound temporale sul fetch (AbortSignal.timeout)", async () => {
   const cachePurge = await loadE2EModule("app/lib/cache-purge.mjs");
@@ -317,6 +339,45 @@ test("F4: purgeCacheTags deve avere un bound temporale sul fetch (AbortSignal.ti
         "non ha AbortSignal.timeout e la moderation route lo attende inline " +
         "dopo che il batch D1 ha già committato la decisione",
     );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("F4b: CACHE_PURGE_TIMEOUT_MS accorcia il bound del fetch purge (knob t_b6f04976)", async () => {
+  const cachePurge = await loadE2EModule("app/lib/cache-purge.mjs");
+  e2e.CACHE_PURGE_TOKEN = "test-token";
+  e2e.CACHE_PURGE_ZONE_ID = "test-zone";
+  e2e.CACHE_PURGE_TIMEOUT_MS = "80"; // ben sotto il default 2500ms
+
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (_url, init) =>
+    new Promise((resolve, reject) => {
+      const signal = init?.signal;
+      if (!signal) return;
+      signal.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
+    });
+
+  try {
+    const start = Date.now();
+    const result = await Promise.race([
+      cachePurge.purgeCacheTags(["cameras-list"], e2e),
+      new Promise((resolve) => setTimeout(() => resolve({ __timeout: true }), 1500)),
+    ]);
+    assert.notEqual(
+      result.__timeout,
+      true,
+      "con CACHE_PURGE_TIMEOUT_MS=80 la chiamata deve abortire entro il knob, " +
+        "non restare appesa fino al default 2500ms (oltre il budget del race)",
+    );
+    assert.ok(
+      Date.now() - start < 1500,
+      "l'abort deve arrivare molto prima del budget del race (knob rispettato)",
+    );
+    // Fail-open documentato: l'abort non deve mai propagarsi come throw sul
+    // write path di moderazione — risposta di purge pulita, decisione già
+    // committata su D1.
+    assert.deepEqual(result, { purged: false, reason: "network-error" });
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -493,21 +554,62 @@ test("F6b: la quota giornaliera per contributor (max 1) non deve essere superabi
   );
 });
 
+test("F6c: INSERT e probe di classificazione girano nella STESSA d1.batch (snapshot unico, follow-up t_b6f04976)", async () => {
+  // Dopo #281 l'ENFORCEMENT della quota era atomico (INSERT ... SELECT ...
+  // WHERE) ma la CLASSIFICAZIONE della risposta (duplicate / daily_quota /
+  // per_record_cap) dopo un INSERT rifiutato girava in tre SELECT separate:
+  // sotto race (un DELETE concorrente libera uno slot, o un INSERT atterra tra
+  // il tentativo e le letture) potevano disallinearsi dal motivo reale del
+  // rifiuto e rispondere il kind sbagliato. Il follow-up t_b6f04976 sposta le
+  // probe nella STESSA d1.batch dell'INSERT: un solo snapshot, nessun TOCTOU
+  // residuo. Il harness D1 sincrono non può interleave: si pinna la struttura.
+  const source = await readFile(path.join(root, "db", "confirmations.ts"), "utf8");
+  const batch = source.match(/d1\.batch\(\[[\s\S]*?\]\)/);
+  assert.ok(
+    batch,
+    "setConfirmation deve usare d1.batch([...]) per insert+probe: il blocco " +
+      "reale non è quello atteso dal test — il test non può più essere vacuo",
+  );
+  const block = batch[0];
+  assert.match(
+    block,
+    /INSERT INTO camera_confirmations[\s\S]*?RETURNING id/,
+    "l'INSERT condizionale deve stare DENTRO la batch (enforcement atomico)",
+  );
+  assert.match(
+    block,
+    /SELECT 1 AS ok FROM camera_confirmations/,
+    "la probe existing-pair deve stare nella STESSA batch dell'INSERT, così la " +
+      "classificazione duplicate usa lo snapshot del tentativo di scrittura",
+  );
+  assert.match(
+    block,
+    /SELECT COUNT\(\*\) AS n FROM camera_confirmations WHERE contributor_id/,
+    "la probe della quota giornaliera deve stare nella stessa batch (stesso snapshot)",
+  );
+  assert.match(
+    block,
+    /SELECT COUNT\(\*\) AS n FROM camera_confirmations WHERE camera_id/,
+    "la probe del per-record cap deve stare nella stessa batch (stesso snapshot)",
+  );
+});
+
 // ---------------------------------------------------------------------------
 // F7 (P3) — callerKey fida di X-Forwarded-For spoofabile senza cf-connecting-ip
 // ---------------------------------------------------------------------------
 // app/lib/rate-limit.ts:236-245: senza cf-connecting-ip il primo hop di
-// X-Forwarded-For è usato come identità del chiamante. Su una deployment NON
+// X-Forwarded-For era usato come identità del chiamante. Su una deployment NON
 // dietro l'edge Cloudflare (es. il prototype LXC 114 servito in HTTP diretto
 // — worker/index.ts:211-214) l'header è interamente controllato dal client:
-// un account-farm può ruotare X-Forwarded-For a ogni richiesta e azzerare
+// un account-farm poteva ruotare X-Forwarded-For a ogni richiesta e azzerare
 // TUTTI i cap per-IP — incluso il cap registrazione 5/24h (anti account-farm,
 // t_0941036b) e i bucket auth/submit/tiles/geocode.
-// Fix: senza cf-connecting-ip non fidarsi di XFF (default "unknown"), oppure
-// richiedere un knob esplicito TRUST_XFF per deployment dietro un proxy
-// affidabile. Nota: abuse-controls.test.mjs:151-153 pinna il comportamento
-// attuale — il fix va coordinato con Ada.
-// Test: il cap per-IP di registrazione deve reggere anche ruotando XFF.
+// Fix (t_894e0cc3 + follow-up t_b6f04976): senza cf-connecting-ip XFF NON è
+// mai fidato di default (callerKey = "unknown", un bucket globale, fail-closed).
+// Il follow-up aggiunge l'opt-in esplicito TRUST_XFF=true per deployment dietro
+// un proxy affidabile che sanifica/sovrascrive XFF (mai il valore client):
+// ogni route passa ora `env` a callerKey, quindi il knob è raggiungibile.
+// Nota: abuse-controls.test.mjs pinna il default (no knob -> "unknown").
 
 test("F7: il cap per-IP di registrazione regge anche con X-Forwarded-For ruotato (niente cf-connecting-ip)", async () => {
   const register = await loadE2ERoute("app/api/auth/register/route.mjs");
@@ -544,5 +646,42 @@ test("F7: il cap per-IP di registrazione regge anche con X-Forwarded-For ruotato
       "callerKey (rate-limit.ts:236) NON deve fidarsi del primo hop senza " +
       "cf-connecting-ip, il cap è aggirabile. Status osservati: " +
       results.join(", "),
+  );
+});
+
+test("F7b: TRUST_XFF=true (opt-in esplicito t_b6f04976) ripristina i cap per-IP dietro un proxy affidabile", async () => {
+  const register = await loadE2ERoute("app/api/auth/register/route.mjs");
+  // Cap per-IP di default (5/24h); l'operatore DICHIARA che la deployment sta
+  // dietro un proxy affidabile che sanifica/sovrascrive X-Forwarded-For (mai
+  // il valore client) e abilita il knob: le route passano env a callerKey,
+  // quindi il primo hop XFF torna a essere la callerKey.
+  delete e2e.REGISTER_IP_RATE_LIMIT_MAX;
+  e2e.TRUST_XFF = "true";
+
+  const results = [];
+  for (let index = 0; index < 6; index += 1) {
+    const response = await register.POST(
+      apiRequest("/api/auth/register", {
+        method: "POST",
+        headers: { "x-forwarded-for": `203.0.113.${100 + index}` },
+        body: {
+          email: `trusted-proxy${index}@osdb.test`,
+          displayName: `Trusted ${index}`,
+          password: "Sup3rsecret!",
+        },
+      }),
+    );
+    results.push(response.status);
+  }
+  // Con TRUST_XFF=true ogni hop XFF è una callerKey distinta: 6 IP diversi
+  // passano tutti (cap per-IP tornato per-client, comportamento speculare a
+  // registration-ip-cap.test.mjs con cf-connecting-ip). Senza il knob il
+  // default fail-closed (F7) li raggrupperebbe tutti in "unknown" -> 429.
+  assert.deepEqual(
+    results,
+    [201, 201, 201, 201, 201, 201],
+    "TRUST_XFF=true deve ripristinare i cap per-IP leggendo il primo hop di " +
+      "X-Forwarded-For (proxy dichiarato affidabile): 6 IP diversi devono " +
+      `passare tutti. Status osservati: ${results.join(", ")}`,
   );
 });

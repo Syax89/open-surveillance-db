@@ -55,6 +55,33 @@ export function parseCookies(request: Request): Record<string, string> {
   return cookies;
 }
 
+/**
+ * Names of cookies whose value failed percent-decoding (QA F1, follow-up
+ * t_b6f04976). `parseCookies` degrades a malformed value to "absent" so no
+ * caller ever crashes; this surface lets session-resolving routes answer a
+ * clean 400 for a PRESENT-but-undecodable session cookie instead of silently
+ * treating the caller as anonymous (a corrupt cookie is a client bug, not a
+ * logged-out user — clearing it is actionable, a silent 401 hides it).
+ */
+export function malformedCookieNames(request: Request): string[] {
+  const header = request.headers.get("cookie");
+  if (!header) return [];
+  const malformed: string[] = [];
+  for (const part of header.split(";")) {
+    const separator = part.indexOf("=");
+    if (separator < 0) continue;
+    const name = part.slice(0, separator).trim();
+    const value = part.slice(separator + 1).trim();
+    if (!name) continue;
+    try {
+      decodeURIComponent(value);
+    } catch {
+      malformed.push(name);
+    }
+  }
+  return malformed;
+}
+
 export function readCookie(request: Request, name: string): string | null {
   return parseCookies(request)[name] ?? null;
 }
