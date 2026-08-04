@@ -69,6 +69,9 @@ const cameraFixture = {
   notes: "",
   latitude: 41.9004,
   longitude: 12.4936,
+  // Dome fixture (kind "Fixed dome"): the dome rule (t_1b08fe12) means the
+  // stored direction is always NULL — the map renders it circular.
+  direction: null,
   status: "verified",
   source: "Community report",
   updated: "2026-01-01T00:00:00.000Z",
@@ -129,6 +132,31 @@ test("GET /api/cameras?format=geojson emits lon/lat FeatureCollection with expor
   assert.deepEqual(feature.geometry, { type: "Point", coordinates: [12.4936, 41.9004] });
   assert.equal(feature.properties.id, cameraFixture.id);
   assert.equal(feature.properties.title, cameraFixture.title);
+  assert.equal(feature.properties.direction, null, "the dome fixture carries direction null in GeoJSON properties");
+});
+
+test("GET /api/cameras?format=geojson exposes a directional camera's bearing in properties.direction", async () => {
+  const directional = { ...cameraFixture, kind: "PTZ", direction: 135 };
+  stub("listPublicCameras", async () => [directional]);
+  const { GET } = await camerasRoute();
+  const response = await GET(apiRequest("/api/cameras?format=geojson"));
+  assert.equal(response.status, 200);
+  const body = await responseBody(response);
+  assert.equal(body.features[0].properties.direction, 135, "a directional camera carries its bearing in properties");
+});
+
+test("GET /api/cameras?format=csv exports a directional camera's bearing in the trailing direction column", async () => {
+  const directional = { ...cameraFixture, kind: "PTZ", direction: 135 };
+  stub("listPublicCameras", async () => [directional]);
+  const { GET } = await camerasRoute();
+  const response = await GET(apiRequest("/api/cameras?format=csv"));
+  assert.equal(response.status, 200);
+  const csv = await responseBody(response);
+  assert.match(
+    csv,
+    /"41\.9004","12\.4936","135"\n/,
+    "a directional camera's bearing must appear in the trailing direction column",
+  );
 });
 
 test("GET /api/cameras?format=csv escapes quotes and neutralises spreadsheet formulas", async () => {
@@ -157,11 +185,11 @@ test("GET /api/cameras?format=csv escapes quotes and neutralises spreadsheet for
   assert.equal(response.headers.get("cache-control"), "public, s-maxage=3600", "export snapshots may be cached for a bounded window");
   assert.equal(response.headers.get("cache-tag"), "cameras-export", "exports carry the shared export cache-tag for moderation purge");
   const csv = await responseBody(response);
-  assert.match(csv, /^id,title,kind,manufacturer,observed_on,status,source,updated,description,address,latitude,longitude\n/);
+  assert.match(csv, /^id,title,kind,manufacturer,observed_on,status,source,updated,description,address,latitude,longitude,direction\n/);
   assert.match(
     csv,
-    /"1","'=SUM\(A1:A2\)","Fixed dome","'-leading","2026-01-01","verified","Community report","2026-01-01T00:00:00\.000Z","He said ""hi"", ok","","41\.9004","12\.4936"\n/,
-    "formula injection must be neutralised with a leading apostrophe, quotes doubled, nulls empty",
+    /"1","'=SUM\(A1:A2\)","Fixed dome","'-leading","2026-01-01","verified","Community report","2026-01-01T00:00:00\.000Z","He said ""hi"", ok","","41\.9004","12\.4936",""\n/,
+    "formula injection must be neutralised with a leading apostrophe, quotes doubled, nulls empty (direction NULL = blank cell)",
   );
   // ODbL 1.0 attribution (TERMS § 7.1): the CSV export must end with the
   // licence notice as a comment line, keeping the header row parseable.
@@ -366,6 +394,8 @@ test("POST /api/cameras stores a trimmed, date-validated pending report", async 
       notes: "vista sul parco",
       latitude: 44.1,
       longitude: 12.2,
+      // Absent direction = non-directional/unknown (NULL), t_1b08fe12.
+      direction: null,
       contributorId: 7,
     },
   ]);
@@ -387,6 +417,7 @@ test("POST /api/cameras without optional metadata passes nulls and empty strings
     notes: "",
     latitude: 45,
     longitude: 9,
+    direction: null,
     contributorId: 7,
   });
 });
@@ -464,6 +495,65 @@ test("POST /api/cameras accepts only exact, real calendar dates", async (t) => {
       assert.equal(response.status, 400, observedOn);
     });
   }
+});
+
+test("POST /api/cameras accepts a direction bearing between 0 and 359 and stores it", async () => {
+  stub("createPendingCamera", async (input) => ({ id: 30, ...input }));
+  const { POST } = await camerasRoute();
+  for (const direction of [0, 1, 90, 180, 359]) {
+    const response = await POST(
+      sessionPost({ title: "X", kind: "PTZ", latitude: 1, longitude: 1, direction }),
+    );
+    assert.equal(response.status, 201, `direction=${direction}`);
+    assert.equal(callArgs("createPendingCamera").at(-1)[0].direction, direction, `direction=${direction} must be stored verbatim (0 is a valid north bearing, never falsy)`);
+  }
+});
+
+test("POST /api/cameras accepts direction null and stores NULL (non-directional / clear)", async () => {
+  stub("createPendingCamera", async (input) => ({ id: 31, ...input }));
+  const { POST } = await camerasRoute();
+  const response = await POST(
+    sessionPost({ title: "X", kind: "PTZ", latitude: 1, longitude: 1, direction: null }),
+  );
+  assert.equal(response.status, 201);
+  assert.equal(callArgs("createPendingCamera")[0][0].direction, null, "an explicit null direction is stored as NULL");
+});
+
+test("POST /api/cameras rejects out-of-range or non-integer direction with 422", async (t) => {
+  const { POST } = await camerasRoute();
+  const cases = [
+    ["above 359", 360],
+    ["negative", -1],
+    ["decimal", 45.5],
+    ["numeric string", "45"],
+    ["boolean", true],
+    ["array", [45]],
+  ];
+  for (const [name, direction] of cases) {
+    await t.test(name, async () => {
+      const response = await POST(
+        sessionPost({ title: "X", kind: "PTZ", latitude: 1, longitude: 1, direction }),
+      );
+      assert.equal(response.status, 422, `${name} must answer 422 (distinct from the 400 shape errors)`);
+      const body = await responseBody(response);
+      assert.match(body.error, /direction/, `${name} error must name the field`);
+      assert.equal(callArgs("createPendingCamera").length, 0, `${name}: no write before validation`);
+    });
+  }
+});
+
+test("POST /api/cameras ignores direction for dome cameras (dome rule, stored NULL)", async () => {
+  stub("createPendingCamera", async (input) => ({ id: 32, ...input }));
+  const { POST } = await camerasRoute();
+  const response = await POST(
+    sessionPost({ title: "Dome cam", kind: "Fixed dome", latitude: 1, longitude: 1, direction: 90 }),
+  );
+  assert.equal(response.status, 201);
+  assert.equal(
+    callArgs("createPendingCamera")[0][0].direction,
+    null,
+    "a dome camera never stores a bearing: the supplied direction is normalised to NULL (t_1b08fe12 dome rule)",
+  );
 });
 
 test("POST /api/cameras truncates long fields to their documented limits", async () => {

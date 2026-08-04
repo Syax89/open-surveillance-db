@@ -30,6 +30,11 @@ export type PendingEditRequest = {
   proposedNotes: string | null;
   proposedManufacturer: string | null;
   proposedObservedOn: string | null;
+  // Proposed field-of-view bearing 0-359 or NULL (t_1b08fe12). NULL reads
+  // as "column unchanged" on the published path (COALESCE model); the dome
+  // rule is enforced at apply time (a diff whose final kind is a dome
+  // stores NULL, and applyCameraEdit drops it before the request is created).
+  proposedDirection: number | null;
   proposedDescription: string | null;
   currentTitle: string | null;
   currentKind: string | null;
@@ -37,6 +42,7 @@ export type PendingEditRequest = {
   currentNotes: string | null;
   currentManufacturer: string | null;
   currentObservedOn: string | null;
+  currentDirection: number | null;
   currentDescription: string | null;
   cameraStatus: string | null;
 };
@@ -278,7 +284,7 @@ export async function reopenQueueForItem(
 }
 
 const cameraColumns =
-  "id, title, kind, manufacturer, observed_on AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, notes, latitude, longitude, status, source, updated, description, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt";
+  "id, title, kind, manufacturer, observed_on AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, notes, latitude, longitude, direction, status, source, updated, description, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt";
 
 const queueSelect = [
   "q.id",
@@ -498,11 +504,13 @@ export async function listPendingModerationItems(): Promise<ModerationQueue> {
                   er.proposed_title AS proposedTitle, er.proposed_kind AS proposedKind,
                   er.proposed_address AS proposedAddress, er.proposed_notes AS proposedNotes,
                   er.proposed_manufacturer AS proposedManufacturer, er.proposed_observed_on AS proposedObservedOn,
+                  er.proposed_direction AS proposedDirection,
                   er.proposed_description AS proposedDescription,
                   er.created_at AS createdAt, er.updated_at AS updatedAt,
                   c.title AS currentTitle, c.kind AS currentKind, c.address AS currentAddress,
                   c.notes AS currentNotes, c.manufacturer AS currentManufacturer,
-                  c.observed_on AS currentObservedOn, c.description AS currentDescription,
+                  c.observed_on AS currentObservedOn, c.direction AS currentDirection,
+                  c.description AS currentDescription,
                   c.status AS cameraStatus
            FROM camera_edit_requests er LEFT JOIN cameras c ON c.id = er.camera_id
            WHERE er.status = 'pending'
@@ -1507,6 +1515,10 @@ export async function moderateCameraEdit(
     // COALESCE(proposed, current): a NULL proposed column means "unchanged"
     // and keeps the stored value. Only the whitelist columns are touched —
     // status, contributor_id, source, publish_*, freshness clocks stay put.
+    // direction re-applies the dome rule (t_1b08fe12) as belt-and-braces:
+    // when the FINAL kind (proposed kind, falling back to the stored kind)
+    // is a dome, the direction is forced to NULL even if a stale request
+    // row carries a proposed value.
     statements.push(
       d1
         .prepare(
@@ -1517,11 +1529,16 @@ export async function moderateCameraEdit(
              notes = COALESCE((SELECT proposed_notes FROM camera_edit_requests WHERE id = ?), notes),
              manufacturer = COALESCE((SELECT proposed_manufacturer FROM camera_edit_requests WHERE id = ?), manufacturer),
              observed_on = COALESCE((SELECT proposed_observed_on FROM camera_edit_requests WHERE id = ?), observed_on),
+             direction = CASE
+               WHEN COALESCE((SELECT proposed_kind FROM camera_edit_requests WHERE id = ?), kind) = 'Fixed dome'
+               THEN NULL
+               ELSE COALESCE((SELECT proposed_direction FROM camera_edit_requests WHERE id = ?), direction)
+             END,
              description = COALESCE((SELECT proposed_description FROM camera_edit_requests WHERE id = ?), description),
              updated = ?
            WHERE id = ?`,
         )
-        .bind(id, id, id, id, id, id, id, nowIso, current.cameraId),
+        .bind(id, id, id, id, id, id, id, id, id, nowIso, current.cameraId),
     );
   }
 
@@ -1584,7 +1601,7 @@ async function loadEditRequestItem(
 ): Promise<CameraEditDecisionItem | null> {
   return d1
     .prepare(
-      "SELECT id, camera_id AS cameraId, contributor_id AS contributorId, status, decided_by AS decidedBy, decision_note AS decisionNote, decided_at AS decidedAt, created_at AS createdAt FROM camera_edit_requests WHERE id = ?",
+      "SELECT id, camera_id AS cameraId, contributor_id AS contributorId, status, proposed_direction AS proposedDirection, decided_by AS decidedBy, decision_note AS decisionNote, decided_at AS decidedAt, created_at AS createdAt FROM camera_edit_requests WHERE id = ?",
     )
     .bind(id)
     .first<CameraEditDecisionItem>();
@@ -1608,6 +1625,8 @@ export type CameraEditDecisionItem = {
   cameraId: number | null;
   contributorId: number | null;
   status: string;
+  /** Proposed field-of-view bearing 0-359 or NULL (t_1b08fe12). */
+  proposedDirection: number | null;
   decidedBy: number | null;
   decisionNote: string | null;
   decidedAt: string | null;

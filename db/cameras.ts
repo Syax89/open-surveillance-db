@@ -15,6 +15,11 @@ export type CameraRecord = {
   notes: string;
   latitude: number;
   longitude: number;
+  // Field-of-view direction (migration 0035, kanban t_1b08fe12): compass
+  // bearing 0-359 clockwise from north for DIRECTIONAL cameras; NULL for
+  // non-directional / unknown. Invariant: a camera whose kind is DOME_KIND
+  // always has direction NULL (domes render circular, never a triangle).
+  direction: number | null;
   status: string;
   source: string;
   updated: string;
@@ -65,6 +70,16 @@ export async function getD1() {
 export const freshnessWindows = ["7d", "30d", "90d", "all"] as const;
 export type FreshnessWindow = (typeof freshnessWindows)[number];
 export type PublicCameraFilters = { kind?: string; freshness?: FreshnessWindow };
+
+/**
+ * Canonical stored kind value for dome cameras (kanban t_1b08fe12). A dome
+ * has no directional field of view — the map renders it circular — so any
+ * supplied `direction` is ignored and stored as NULL whenever the final
+ * kind is a dome. The value mirrors the frontend KIND_OPTIONS
+ * (app/records/[id]/edit/page.tsx, app/components/home/ReportForm.tsx);
+ * the backend treats `kind` as a controlled string, not a whitelist.
+ */
+export const DOME_KIND = "Fixed dome";
 
 // Domain decision (F0, FRONTEND_PLAN § 3.2.6): the public freshness windows
 // answer "when was this last verified on the ground?", so they are anchored
@@ -137,7 +152,7 @@ export async function listPublicCameras(
   // current. This mirrors isPubliclyCurrent() in db/freshness.ts.
   const { sql: publicPredicate, parameters: predicateParameters } = publicCameraPredicate(nowIso);
   parameters.push(...predicateParameters);
-  let query = `SELECT id, title, kind, CASE WHEN publish_manufacturer = 1 THEN manufacturer ELSE NULL END AS manufacturer, CASE WHEN publish_observed_on = 1 THEN observed_on ELSE NULL END AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, latitude, longitude, status, source, updated, description, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt FROM cameras WHERE ${publicPredicate}`;
+  let query = `SELECT id, title, kind, CASE WHEN publish_manufacturer = 1 THEN manufacturer ELSE NULL END AS manufacturer, CASE WHEN publish_observed_on = 1 THEN observed_on ELSE NULL END AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, latitude, longitude, direction, status, source, updated, description, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt FROM cameras WHERE ${publicPredicate}`;
   if (filters?.kind) {
     query += " AND kind = ?";
     parameters.push(filters.kind);
@@ -212,7 +227,7 @@ export async function listPublicCamerasPage(
   const countResult = await d1.prepare(`SELECT COUNT(*) AS total ${query}`).bind(...parameters).first<{ total: number }>();
   const total = countResult?.total ?? 0;
   const result = await d1
-    .prepare(`SELECT id, title, kind, CASE WHEN publish_manufacturer = 1 THEN manufacturer ELSE NULL END AS manufacturer, CASE WHEN publish_observed_on = 1 THEN observed_on ELSE NULL END AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, latitude, longitude, status, source, updated, description, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt ${query} ORDER BY id DESC LIMIT ? OFFSET ?`)
+    .prepare(`SELECT id, title, kind, CASE WHEN publish_manufacturer = 1 THEN manufacturer ELSE NULL END AS manufacturer, CASE WHEN publish_observed_on = 1 THEN observed_on ELSE NULL END AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, latitude, longitude, direction, status, source, updated, description, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt ${query} ORDER BY id DESC LIMIT ? OFFSET ?`)
     .bind(...parameters, limit, offset)
     .all<PublicCameraRecord>();
   const records = result.results.map((record) => ({ ...record, latitude: roundPublicCoordinate(record.latitude), longitude: roundPublicCoordinate(record.longitude), confirmationCount: 0 }));
@@ -277,7 +292,7 @@ export async function listPublicCamerasNear(
     longitude - longitudeDelta,
     longitude + longitudeDelta,
   ];
-  const query = `SELECT id, title, kind, CASE WHEN publish_manufacturer = 1 THEN manufacturer ELSE NULL END AS manufacturer, CASE WHEN publish_observed_on = 1 THEN observed_on ELSE NULL END AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, latitude, longitude, status, source, updated, description, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt FROM cameras WHERE ${publicPredicate} AND latitude BETWEEN ? AND ? AND longitude BETWEEN ? AND ? ORDER BY id DESC`;
+  const query = `SELECT id, title, kind, CASE WHEN publish_manufacturer = 1 THEN manufacturer ELSE NULL END AS manufacturer, CASE WHEN publish_observed_on = 1 THEN observed_on ELSE NULL END AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, latitude, longitude, direction, status, source, updated, description, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt FROM cameras WHERE ${publicPredicate} AND latitude BETWEEN ? AND ? AND longitude BETWEEN ? AND ? ORDER BY id DESC`;
   const result = await d1.prepare(query).bind(...parameters).all<PublicCameraRecord>();
   // Internal raw read for the duplicate check only (INTERNAL ONLY, same rule
   // as listPublicCameras' rounding boundary): the pre-submit duplicate
@@ -304,7 +319,7 @@ export async function searchPublicCamerasNear(latitude: number, longitude: numbe
     .filter((record) => record.distanceMeters <= radiusMeters)
     .sort((first, second) => first.distanceMeters - second.distanceMeters);
 }
-export async function createPendingCamera(input: { title: string; kind: string; manufacturer: string | null; observedOn: string | null; address: string; notes: string; latitude: number; longitude: number; contributorId?: number | null }): Promise<CameraRecord> { const d1 = await getD1(); const now = new Date().toISOString(); const result = await d1.prepare("INSERT INTO cameras (title, kind, manufacturer, observed_on, publish_manufacturer, publish_observed_on, address, notes, latitude, longitude, status, source, updated, description, contributor_id, created_at) VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?, 'pending', 'Community report', ?, '', ?, ?) RETURNING id, title, kind, manufacturer, observed_on AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, notes, latitude, longitude, status, source, updated, description, contributor_id AS contributorId, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt").bind(input.title, input.kind, input.manufacturer, input.observedOn, input.address || null, input.notes, input.latitude, input.longitude, now, input.contributorId ?? null, now).first<CameraRecord & { contributorId: number | null }>(); if (!result) throw new Error("Report could not be stored"); return result; }
+export async function createPendingCamera(input: { title: string; kind: string; manufacturer: string | null; observedOn: string | null; address: string; notes: string; latitude: number; longitude: number; direction?: number | null; contributorId?: number | null }): Promise<CameraRecord> { const d1 = await getD1(); const now = new Date().toISOString(); const result = await d1.prepare("INSERT INTO cameras (title, kind, manufacturer, observed_on, publish_manufacturer, publish_observed_on, address, notes, latitude, longitude, direction, status, source, updated, description, contributor_id, created_at) VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, 'pending', 'Community report', ?, '', ?, ?) RETURNING id, title, kind, manufacturer, observed_on AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, notes, latitude, longitude, direction, status, source, updated, description, contributor_id AS contributorId, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt").bind(input.title, input.kind, input.manufacturer, input.observedOn, input.address || null, input.notes, input.latitude, input.longitude, input.direction ?? null, now, input.contributorId ?? null, now).first<CameraRecord & { contributorId: number | null }>(); if (!result) throw new Error("Report could not be stored"); return result; }
 export async function getPublicCameraById(id: number, nowIso: string = new Date().toISOString()): Promise<PublicCameraRecord | null> {
   const d1 = await getD1();
   // Same shared public predicate as listPublicCameras: only records whose
@@ -312,7 +327,7 @@ export async function getPublicCameraById(id: number, nowIso: string = new Date(
   const { sql: publicPredicate, parameters } = publicCameraPredicate(nowIso);
   const result = await d1
     .prepare(
-      `SELECT id, title, kind, CASE WHEN publish_manufacturer = 1 THEN manufacturer ELSE NULL END AS manufacturer, CASE WHEN publish_observed_on = 1 THEN observed_on ELSE NULL END AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, latitude, longitude, status, source, updated, description, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt FROM cameras WHERE id = ? AND ${publicPredicate}`,
+      `SELECT id, title, kind, CASE WHEN publish_manufacturer = 1 THEN manufacturer ELSE NULL END AS manufacturer, CASE WHEN publish_observed_on = 1 THEN observed_on ELSE NULL END AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, latitude, longitude, direction, status, source, updated, description, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt FROM cameras WHERE id = ? AND ${publicPredicate}`,
     )
     .bind(id, ...parameters)
     .first<PublicCameraRecord>();
@@ -378,7 +393,7 @@ export async function listPublicCamerasInBbox(
   const d1 = await getD1();
   const { sql: publicPredicate, parameters: predicateParameters } = publicCameraPredicate(nowIso);
   const parameters = [...predicateParameters, bbox.south, bbox.north, bbox.west, bbox.east];
-  const query = `SELECT id, title, kind, CASE WHEN publish_manufacturer = 1 THEN manufacturer ELSE NULL END AS manufacturer, CASE WHEN publish_observed_on = 1 THEN observed_on ELSE NULL END AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, latitude, longitude, status, source, updated, description, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt FROM cameras WHERE ${publicPredicate} AND latitude BETWEEN ? AND ? AND longitude BETWEEN ? AND ? ORDER BY id DESC`;
+  const query = `SELECT id, title, kind, CASE WHEN publish_manufacturer = 1 THEN manufacturer ELSE NULL END AS manufacturer, CASE WHEN publish_observed_on = 1 THEN observed_on ELSE NULL END AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, latitude, longitude, direction, status, source, updated, description, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt FROM cameras WHERE ${publicPredicate} AND latitude BETWEEN ? AND ? AND longitude BETWEEN ? AND ? ORDER BY id DESC`;
   const result = await d1.prepare(query).bind(...parameters).all<PublicCameraRecord>();
   return result.results.map((record) => ({ ...record, latitude: roundPublicCoordinate(record.latitude), longitude: roundPublicCoordinate(record.longitude) }));
 }
@@ -457,7 +472,7 @@ export async function findPublicCamerasNearPage(
 
   // Public record columns, publish-flag CASEs and coordinate rounding exactly
   // as in listPublicCamerasNear (the shared public boundary).
-  const selectColumns = `id, title, kind, CASE WHEN publish_manufacturer = 1 THEN manufacturer ELSE NULL END AS manufacturer, CASE WHEN publish_observed_on = 1 THEN observed_on ELSE NULL END AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, FLOOR(latitude * 10000 + 0.5) / 10000 AS latitude, FLOOR(longitude * 10000 + 0.5) / 10000 AS longitude, status, source, updated, description, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt`;
+  const selectColumns = `id, title, kind, CASE WHEN publish_manufacturer = 1 THEN manufacturer ELSE NULL END AS manufacturer, CASE WHEN publish_observed_on = 1 THEN observed_on ELSE NULL END AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, FLOOR(latitude * 10000 + 0.5) / 10000 AS latitude, FLOOR(longitude * 10000 + 0.5) / 10000 AS longitude, direction, status, source, updated, description, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt`;
 
   const fromWhere = `FROM cameras WHERE ${publicPredicate} AND latitude BETWEEN ? AND ? AND longitude BETWEEN ? AND ?`;
   // Bind order follows the lexical placeholder order of the SQL: the six

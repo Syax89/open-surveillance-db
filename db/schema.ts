@@ -15,6 +15,14 @@ export const cameras = sqliteTable(
     notes: text("notes").notNull().default(""),
     latitude: real("latitude").notNull(),
     longitude: real("longitude").notNull(),
+    // Field-of-view direction (migration 0035, kanban t_1b08fe12): compass
+    // bearing in degrees 0-359 (clockwise from north) for DIRECTIONAL
+    // cameras; NULL for non-directional / unknown. The map layer draws a
+    // field-of-view triangle from it. A camera whose kind is the canonical
+    // 'Fixed dome' always stores NULL — domes render circular, never with a
+    // direction. Same nullable-integer semantics as every other optional
+    // column: absent and NULL both mean "no direction".
+    direction: integer("direction"),
     status: text("status").notNull().default("pending"),
     source: text("source").notNull(),
     updated: text("updated").notNull(),
@@ -719,6 +727,12 @@ export const cameraEditRequests = sqliteTable(
     proposedNotes: text("proposed_notes"),
     proposedManufacturer: text("proposed_manufacturer"),
     proposedObservedOn: text("proposed_observed_on"),
+    // Proposed field-of-view direction (migration 0035, kanban t_1b08fe12):
+    // integer bearing 0-359 or NULL. Mirrors the editable whitelist of
+    // db/camera-edits.ts; NULL proposed = column unchanged (same COALESCE
+    // model as the other proposed_* columns). The dome rule is enforced at
+    // apply time: a diff whose final kind is 'Fixed dome' stores NULL.
+    proposedDirection: integer("proposed_direction"),
     proposedDescription: text("proposed_description"),
     status: text("status").notNull().default("pending"),
     decidedBy: integer("decided_by").references(() => reviewers.id),

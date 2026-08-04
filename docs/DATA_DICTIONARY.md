@@ -114,6 +114,7 @@ some fields entirely (marked `—`).
 | `address` | ✓ | ✓ | — | string \| null | General location text, not a private address. Not exported in GeoJSON. |
 | `latitude` | ✓ | ✓ | — (in geometry) | number | WGS84 latitude of publicly visible infrastructure; rounded/generalised where precision would be unsafe. In GeoJSON it lives in the feature geometry, not the properties. |
 | `longitude` | ✓ | ✓ | — (in geometry) | number | WGS84 longitude; same precision rule as latitude. GeoJSON geometry is `[longitude, latitude]`. |
+| `direction` | ✓ | ✓ | ✓ | integer \| null | Field-of-view compass bearing in degrees 0-359 (clockwise from north) for DIRECTIONAL cameras; `null` for non-directional / unknown (kanban `t_1b08fe12`, migration 0035). A dome camera (canonical kind `Fixed dome`) always carries `null` — the map renders domes circular, never a triangle. Out-of-range or non-integer values are rejected with `422` on input. |
 | `status` | ✓ | ✓ | ✓ | string | `verified` (reviewed, real) or `demo` (fictional, clearly labelled). No other status can be present in a public output. |
 | `source` | ✓ | ✓ | ✓ | string | Provenance label. In the prototype the observed values are `Prototype seed` (illustrative demo records) and `Community report` (submitted and later approved). Future provenance classes are defined in [workstreams/DATA_TRUST.md](workstreams/DATA_TRUST.md). |
 | `updated` | ✓ | ✓ | ✓ | string | Last public verification date (ISO 8601) — every code path that touches `cameras.updated` writes a comparable ISO timestamp (P1-2); the descriptive text of a moderation action lives in `moderation_events.note`, never in this column. Freshness windows (`7d`/`30d`/`90d`) match only ISO values: the seeded demo records deliberately carry the literal label `Demo data` (illustrative pins are excluded from freshness windows by the client gate). Migration `0007_directory_freshness_backfill` converted the pre-existing prose labels of verified records into comparable ISO timestamps. |
@@ -133,7 +134,8 @@ field:
 ## Submission input fields (`POST /api/cameras`)
 
 Input is trimmed and length-limited; invalid positions or an invalid optional
-observation date are rejected with `400`. The response (`201`) echoes the
+observation date are rejected with `400`; an out-of-range `direction` is
+rejected with `422` (kanban `t_1b08fe12`). The response (`201`) echoes the
 stored private record, which the submitter may inspect; none of it is public
 until a moderator approves the record.
 

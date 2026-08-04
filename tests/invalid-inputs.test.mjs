@@ -288,6 +288,10 @@ test("POST /api/cameras never forwards prototype-pollution or unknown keys to th
   assert.deepEqual(Object.keys(args[0]).sort(), [
     "address",
     "contributorId",
+    // Field-of-view bearing (t_1b08fe12): always forwarded to the db layer —
+    // the route normalises it to null for dome cameras ("Fixed dome" here),
+    // and an absent input becomes null (non-directional/unknown).
+    "direction",
     "kind",
     "latitude",
     "longitude",
