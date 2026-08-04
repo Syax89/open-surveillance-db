@@ -191,7 +191,7 @@ test("journey segnala: the report tool renders on the SSR /segnala route (form i
   assert.doesNotMatch(html, /<form class="report-form"/, "the gated form must not leak into anonymous SSR");
 });
 
-test("journey segnala: submit → moderation queue → approve → public listing → record detail", async () => {
+test("journey segnala: submit → immediate publication → public listing → record detail (ADR 0021 §1)", async () => {
   // 1. The contributor submits the report through the real route (write gate
   //    Fase E1: a verified contributor session is required).
   const submitted = await camerasRoute.POST(apiRequest("/api/cameras", {
@@ -201,35 +201,26 @@ test("journey segnala: submit → moderation queue → approve → public listin
   }));
   assert.equal(submitted.status, 201, "submission must return 201");
   const { record } = await responseBody(submitted);
-  assert.equal(record.status, "pending", "a fresh report starts pending");
+  assert.equal(record.status, "active", "ADR 0021 §1: a fresh report publishes immediately");
 
-  // 2. It lands in the moderation queue (not yet public anywhere).
+  // 2. No moderation queue row is created for the normal flow (the queue
+  //    survives only for legal-emergency admin actions, ADR §8).
   const queueResponse = await moderationRoute.GET(apiRequest("/api/moderation", {
     headers: { "x-osdb-user-email": identityFor(REVIEWERS.record) },
   }));
   assert.equal(queueResponse.status, 200);
   const queue = await responseBody(queueResponse);
   assert.ok(
-    queue.cameraReports?.some((item) => item.id === record.id && item.status === "pending"),
-    "the pending report must appear in the moderation queue",
+    !queue.cameraReports?.some((item) => item.id === record.id),
+    "immediate publication must not create a moderation queue entry",
   );
 
-  const beforePublish = await camerasRoute.GET(apiRequest("/api/cameras"));
-  assert.equal((await responseBody(beforePublish)).records.length, 0, "pending must be absent from the public listing");
-
-  // 3. A moderator approves it.
-  const approved = await moderationRoute.PATCH(apiRequest("/api/moderation", {
-    method: "PATCH",
-    headers: { "x-osdb-user-email": identityFor(REVIEWERS.record) },
-    body: { entity: "camera", id: record.id, action: "approve", reasonCode: "verified-public-infrastructure", actorId: REVIEWERS.record },
-  }));
-  assert.equal(approved.status, 200, "approve must succeed");
-
-  // 4. It is now public, and the record detail is reachable over SSR.
+  // 3. The report is public immediately.
   const listing = await camerasRoute.GET(apiRequest("/api/cameras"));
   const publicRecords = (await responseBody(listing)).records;
-  assert.ok(publicRecords.some((item) => item.id === record.id &&     item.status === "active"), "approved report must be public");
+  assert.ok(publicRecords.some((item) => item.id === record.id && item.status === "active"), "the fresh report must be public right away");
 
+  // 4. The record detail is reachable over SSR.
   const detail = await ssr(`/records/${record.id}`);
   assert.equal(detail.response.status, 200, "the public record detail must render");
   // The record detail is a client-fetched page (F0 [id] API): SSR renders
@@ -323,7 +314,7 @@ const editPatch = (pathAndQuery, body, auth) =>
     body,
   });
 
-test("journey edit: pending edits direct, active goes to re-moderation, foreign edits 403", async () => {
+test("journey edit: immediate publication → owner edit goes to re-moderation, foreign edits 403", async () => {
   // 1. register → two contributors (owner + outsider).
   const owner = await registerContributor();
   const outsider = await registerContributor();
@@ -334,7 +325,8 @@ test("journey edit: pending edits direct, active goes to re-moderation, foreign 
   const me = await meRoute.GET(apiRequest("/api/auth/me", { headers: { cookie: owner.cookies } }));
   const { contributor } = await responseBody(me);
 
-  // 2. submit → pending record attributed to the owner.
+  // 2. submit → ACTIVE record attributed to the owner (ADR 0021 §1 —
+  //    immediate publication; there is no pending state for new reports).
   const submitted = await camerasRoute.POST(apiRequest("/api/cameras", {
     method: "POST",
     headers: { cookie: owner.cookies, "x-csrf-token": owner.csrfToken },
@@ -342,40 +334,13 @@ test("journey edit: pending edits direct, active goes to re-moderation, foreign 
   }));
   assert.equal(submitted.status, 201);
   const { record } = await responseBody(submitted);
-  assert.equal(record.status, "pending");
+  assert.equal(record.status, "active", "a fresh report publishes immediately");
   assert.equal(record.contributorId, contributor.id);
 
-  // 3. edit pending: the owner PATCHes the pending record directly (binario
-  //    diretto) and gets the owner view back, no moderation round-trip.
-  const pendingEdit = await cameraEditRoute.PATCH(editPatch(`/api/cameras/${record.id}`, {
-    title: "Renamed before publish",
-    expectedUpdated: record.updated,
-  }, owner));
-  assert.equal(pendingEdit.status, 200);
-  const pendingView = await responseBody(pendingEdit);
-  assert.equal(pendingView.changed, true);
-  assert.equal(pendingView.record.title, "Renamed before publish");
-  assert.equal(pendingView.record.status, "pending", "status is never editable");
-
-  // 4. approve → active (a moderator publishes it).
-  const approved = await moderationRoute.PATCH(apiRequest("/api/moderation", {
-    method: "PATCH",
-    headers: { "x-osdb-user-email": identityFor(REVIEWERS.record) },
-    body: { entity: "camera", id: record.id, action: "approve", reasonCode: "verified-public-infrastructure", actorId: REVIEWERS.record },
-  }));
-  assert.equal(approved.status, 200, "approve must succeed");
-  const listing = await camerasRoute.GET(apiRequest("/api/cameras"));
-  assert.ok((await responseBody(listing)).records.some((item) => item.id === record.id && item.status === "active"));
-
-  // 5. edit altrui: the outsider cannot edit the active record → 403
-  //    (moderators and non-owners act only through the moderation endpoints).
-  const foreign = await cameraEditRoute.PATCH(editPatch(`/api/cameras/${record.id}`, {
-    title: "Hijacked title",
-  }, outsider));
-  assert.equal(foreign.status, 403);
-
-  // 6. edit active: the owner's PATCH never touches `cameras` — it creates
-  //    an edit request (binario moderazione) and answers 202.
+  // 3. edit active: the owner's PATCH never touches `cameras` directly — it
+  //    creates an edit request (binario moderazione) and answers 202. The
+  //    old "pending edits apply direct" branch no longer exists: no new
+  //    report is pending (ADR §1).
   const verifiedEdit = await cameraEditRoute.PATCH(editPatch(`/api/cameras/${record.id}`, {
     title: "Community corrected title",
   }, owner));
@@ -387,7 +352,14 @@ test("journey edit: pending edits direct, active goes to re-moderation, foreign 
   // The record is unchanged until a human decides.
   const publicRecord = await cameraEditRoute.GET(apiRequest(`/api/cameras/${record.id}`));
   const { record: stillOld } = await responseBody(publicRecord);
-  assert.equal(stillOld.title, "Renamed before publish", "the public record must not change until approve");
+  assert.equal(stillOld.title, "Old corner shop title", "the public record must not change until approve");
+
+  // 4. edit altrui: the outsider cannot edit the active record → 403
+  //    (moderators and non-owners act only through the moderation endpoints).
+  const foreign = await cameraEditRoute.PATCH(editPatch(`/api/cameras/${record.id}`, {
+    title: "Hijacked title",
+  }, outsider));
+  assert.equal(foreign.status, 403);
 
   // The edit request is visible in the moderation queue (entity camera_edit).
   const queueResponse = await moderationRoute.GET(apiRequest("/api/moderation", {
@@ -397,9 +369,9 @@ test("journey edit: pending edits direct, active goes to re-moderation, foreign 
   const queuedEdit = queue.cameraEditRequests?.find((item) => item.id === editRequest.id);
   assert.ok(queuedEdit, "the edit request must appear in the moderation queue");
   assert.equal(queuedEdit.proposedTitle, "Community corrected title");
-  assert.equal(queuedEdit.currentTitle, "Renamed before publish", "the queue carries old+new for the diff UI");
+  assert.equal(queuedEdit.currentTitle, "Old corner shop title", "the queue carries old+new for the diff UI");
 
-  // 7. re-moderation: a moderator approves the diff → the record changes.
+  // 5. re-moderation: a moderator approves the diff → the record changes.
   const decided = await moderationRoute.PATCH(apiRequest("/api/moderation", {
     method: "PATCH",
     headers: { "x-osdb-user-email": identityFor(REVIEWERS.record) },

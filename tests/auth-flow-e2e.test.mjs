@@ -176,6 +176,32 @@ async function submitCamera(overrides = {}) {
 }
 
 /**
+ * Create a pending record DIRECTLY through the legacy db writer for the
+ * moderation machinery tests below. ADR 0021 §1 (FASE 3 UI): the normal
+ * intake route publishes immediately (`active`, no queue) — so a pending
+ * record can no longer be produced through POST /api/cameras. The pending
+ * writer survives for the legal-emergency flows (ADR §8, admin hide/remove)
+ * and the moderation lifecycle tests exercise THAT surface, exactly like
+ * appeals.test.mjs does. `contributorId` defaults to null (unattributed
+ * fixture); the moderation route derives the acting reviewer from the
+ * authenticated identity header, not from the record owner.
+ */
+async function submitPendingCamera(overrides = {}) {
+  const cameras = await loadE2EModule("db/cameras.mjs");
+  return cameras.createPendingCamera({
+    title: "Corner shop entrance",
+    kind: "Fixed dome",
+    manufacturer: "Acme Cameras",
+    observedOn: "2026-07-01",
+    address: "Via Roma 1",
+    notes: "Private internal note — must never be published",
+    latitude: 41.9005,
+    longitude: 12.4937,
+    ...overrides,
+  });
+}
+
+/**
  * Verified contributor session for the write gate (Fase E1): camera intake
  * is no longer anonymous — every report requires a session whose account is
  * email-verified. Created lazily per test (env.DB is fresh in beforeEach).
@@ -482,21 +508,21 @@ test("auth gate: appeals are split — moderator surfaces gated, contributor fil
 // 2) Submit → pending → absent from public
 // ---------------------------------------------------------------------------
 
-test("E2E: a submitted camera starts pending and is absent from every public surface", async () => {
+test("E2E: a submitted camera is published immediately and appears on every public surface (ADR 0021 §1)", async () => {
   const record = await submitCamera();
-  assert.equal(record.status, "pending");
+  assert.equal(record.status, "active", "ADR 0021 §1: a verified report publishes immediately — no pending state");
   assert.equal(record.source, "Community report");
 
   const records = await publicListing();
-  assert.equal(records.length, 0, "pending records must not appear in the public listing");
+  assert.equal(records.length, 1, "the fresh report must be public right away");
+  assert.equal(records[0].id, record.id);
+  assert.equal(records[0].status, "active");
 
+  // The immediate-publication contract: no moderation queue row is created
+  // for the normal flow (the queue survives only for legal emergencies).
   const queue = await moderationQueue();
-  assert.equal(queue.cameraReports.length, 1);
-  assert.equal(queue.cameraReports[0].id, record.id);
-  assert.equal(queue.cameraReports[0].status, "pending");
-  assert.equal(queue.queueItems.length, 1);
-  assert.equal(queue.queueItems[0].entity, "camera");
-  assert.equal(queue.queueItems[0].entityId, record.id);
+  assert.equal(queue.cameraReports.length, 0, "immediate publication creates no moderation queue entry");
+  assert.equal(queue.queueItems.length, 0);
 });
 
 // ---------------------------------------------------------------------------
@@ -504,7 +530,7 @@ test("E2E: a submitted camera starts pending and is absent from every public sur
 // ---------------------------------------------------------------------------
 
 test("E2E: approving a pending camera publishes it and records the audit event", async () => {
-  const record = await submitCamera();
+  const record = await submitPendingCamera();
 
   const response = await moderateCamera(record.id, "approve", REASON.verified, REVIEWERS.record, {
     publishManufacturer: true,
@@ -555,7 +581,7 @@ test("E2E: approving a pending camera publishes it and records the audit event",
 // ---------------------------------------------------------------------------
 
 test("E2E: rejecting a pending camera keeps it non-public and records the event", async () => {
-  const record = await submitCamera();
+  const record = await submitPendingCamera();
 
   const response = await moderateCamera(record.id, "reject", REASON.insufficient, REVIEWERS.intake);
   assert.equal(response.status, 200);
@@ -582,7 +608,7 @@ test("E2E: rejecting a pending camera keeps it non-public and records the event"
 // ---------------------------------------------------------------------------
 
 test("E2E: an intake reviewer cannot approve (403) — role matrix enforced end to end", async () => {
-  const record = await submitCamera();
+  const record = await submitPendingCamera();
   const response = await moderateCamera(record.id, "approve", REASON.verified, REVIEWERS.intake);
   assert.equal(response.status, 403);
   const body = await responseBody(response);
@@ -598,7 +624,7 @@ test("E2E: an intake reviewer cannot approve (403) — role matrix enforced end 
 });
 
 test("E2E: a spoofed client actorId is ignored — the admin acts as their own reviewer (t_6b61fc3f)", async () => {
-  const record = await submitCamera();
+  const record = await submitPendingCamera();
 
   // Reviewer id 999 does not exist. In production the client actorId is no
   // longer authoritative: with the admin identity the route derives the
@@ -627,7 +653,7 @@ test("E2E: a spoofed client actorId is ignored — the admin acts as their own r
 });
 
 test("E2E: an inactive reviewer is rejected through the real route", async () => {
-  const record = await submitCamera();
+  const record = await submitPendingCamera();
 
   await env.DB.prepare("UPDATE reviewers SET active = 0 WHERE id = ?").bind(REVIEWERS.record).run();
   const inactive = await moderateCamera(record.id, "approve", REASON.verified, REVIEWERS.record);
@@ -640,7 +666,7 @@ test("E2E: an inactive reviewer is rejected through the real route", async () =>
 // ---------------------------------------------------------------------------
 
 test("E2E: a sensitive approval needs a second reviewer — 202 then resolved by a different reviewer", async () => {
-  const record = await submitCamera();
+  const record = await submitPendingCamera();
 
   const first = await moderateCamera(record.id, "approve", REASON.verified, REVIEWERS.record, {
     sensitivity: "sensitive",
@@ -681,7 +707,7 @@ test("E2E: a sensitive approval needs a second reviewer — 202 then resolved by
 
 test("E2E: a contested privacy correction is escalated and handled by a senior moderator", async () => {
   // Publish a record first.
-  const record = await submitCamera();
+  const record = await submitPendingCamera();
   await moderateCamera(record.id, "approve", REASON.verified, REVIEWERS.record);
 
   // Requester contests it (private correction intake — write gate Fase E1:
@@ -778,7 +804,7 @@ test("E2E: a contested privacy correction is escalated and handled by a senior m
 // ---------------------------------------------------------------------------
 
 test("E2E: full lifecycle writes one append-only audit event per legal transition", async () => {
-  const record = await submitCamera();
+  const record = await submitPendingCamera();
   await moderateCamera(record.id, "approve", REASON.verified, REVIEWERS.record);
   await moderateCamera(record.id, "mark-stale", REASON.stale, REVIEWERS.record);
   await moderateCamera(record.id, "reverify", REASON.verified, REVIEWERS.record);
@@ -814,13 +840,16 @@ test("E2E: full lifecycle writes one append-only audit event per legal transitio
 });
 
 test("E2E: nearby and coordinate search return only published records", async () => {
+  // ADR 0021 §1: the intake route publishes immediately — the "published"
+  // record needs no approval step anymore.
   const published = await submitCamera({ title: "Published camera" });
-  await moderateCamera(published.id, "approve", REASON.verified, REVIEWERS.record);
-  // Same coordinates as the published record → the Horizon 1 gate (ADR 0019)
-  // answers 409 unless the submitter confirms the camera is distinct. The
-  // explicit confirmation is exactly the flow a real contributor follows;
-  // the point of this test is the public boundary, not the gate itself.
-  await submitCamera({ title: "Pending camera", duplicateConfirmed: true });
+  assert.equal(published.status, "active");
+  // A pending record (legal-emergency writer) must stay absent from the
+  // public search surfaces. Same coordinates as the published record → the
+  // Horizon 1 gate (ADR 0019) would answer 409 through the route, so the
+  // pending row is created with the legacy writer directly (the point of
+  // this test is the public boundary, not the gate).
+  await submitPendingCamera({ title: "Pending camera" });
 
   const nearby = await responseBody(
     await nearbyRoute.GET(apiRequest(`/api/cameras/nearby?latitude=${SUBMIT.latitude}&longitude=${SUBMIT.longitude}&radius=100`)),
@@ -849,7 +878,7 @@ test("E2E: nearby and coordinate search return only published records", async ()
 // ---------------------------------------------------------------------------
 
 test("E2E: a contributor appeals a rejection; an independent senior moderator upholds it and the record returns to the queue", async () => {
-  const record = await submitCamera();
+  const record = await submitPendingCamera();
   await moderateCamera(record.id, "reject", REASON.insufficient, REVIEWERS.intake);
 
   // The rejection is a final decision: the contributor contests it.
@@ -927,7 +956,7 @@ test("E2E: a contributor appeals a rejection; an independent senior moderator up
 });
 
 test("E2E: appeals validation and role gates hold through the real routes", async () => {
-  const record = await submitCamera();
+  const record = await submitPendingCamera();
   // Approve by the SENIOR moderator: the independence rule must block the
   // original decider from reviewing their own decision's appeal (409).
   await moderateCamera(record.id, "approve", REASON.verified, REVIEWERS.senior);
@@ -1069,7 +1098,7 @@ test("E2E: appeals route maps a syntactically invalid JSON body to 400 (not 500)
 });
 
 test("E2E: an appeal reason below the relevance floor is rejected with 400", async () => {
-  const record = await submitCamera();
+  const record = await submitPendingCamera();
   await moderateCamera(record.id, "reject", REASON.insufficient, REVIEWERS.intake);
   const decisionEvent = (await auditEvents())[0];
 
@@ -1091,7 +1120,7 @@ test("E2E: the per-appellant appeal threshold answers 429 through the route", as
     const records = [];
     const decisionIds = [];
     for (let i = 0; i < 3; i += 1) {
-      const record = await submitCamera();
+      const record = await submitPendingCamera();
       await moderateCamera(record.id, "reject", REASON.insufficient, REVIEWERS.intake);
       records.push(record);
       decisionIds.push((await auditEvents()).find((event) => event.entity_id === record.id).id);
@@ -1153,10 +1182,9 @@ test("E2E: erasing a contributor de-attributes their reports, keeps them public,
   //    every session, not just the one making the request.
   await auth.createSession(profile.id, { ttlDays: 7 });
 
-  // 3. Moderators publish the report, so it is public before erasure.
-  const approved = await moderateCamera(record.id, "approve", REASON.verified, REVIEWERS.record);
-  assert.equal(approved.status, 200);
-  assert.equal((await publicListing()).length, 1, "the record must be public before erasure");
+  // 3. ADR 0021 §1: the report is public IMMEDIATELY — no moderator approval
+  //    step needed before erasure (the record is already on every surface).
+  assert.equal((await publicListing()).length, 1, "the report must be public right away (immediate publication)");
 
   // 4. Erasure: the authenticated contributor deletes their account.
   const erased = await accountRoute.DELETE(apiRequest("/api/auth/account", {
@@ -1186,11 +1214,14 @@ test("E2E: erasing a contributor de-attributes their reports, keeps them public,
   assert.equal(listing.length, 1, "the de-attributed record stays public");
   assert.equal(listing[0].title, "Camera to de-attribute");
 
-  // 7. The append-only audit trail is untouched: the publish event survives.
-  const events = await auditEvents();
-  assert.equal(events.length, 1);
-  assert.equal(events[0].action, "approve");
-  assert.equal(events[0].entity_id, record.id);
+  // 7. The public lifecycle history is untouched: the opening `published`
+  //    event (ADR 0021 §7) survives erasure — aggregate and unattributed.
+  const lifecycle = await env.DB.prepare(
+    "SELECT event_type AS eventType, detail FROM camera_lifecycle_events WHERE camera_id = ? ORDER BY id ASC",
+  ).bind(record.id).all();
+  assert.equal(lifecycle.results.length, 1);
+  assert.equal(lifecycle.results[0].eventType, "published");
+  assert.equal(lifecycle.results[0].detail, null, "the opening event carries no personal data");
 });
 
 test("E2E: erasure requires a live session — anonymous DELETE is rejected", async () => {

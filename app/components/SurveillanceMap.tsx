@@ -7,6 +7,7 @@ import { useMessages } from "../lib/use-messages";
 import { isDomeKind } from "../lib/camera-kinds";
 import { FOV_MIN_ZOOM, fovCircleRadiusMeters, fovPolygonPoints } from "../lib/field-of-view";
 import { formatDirection } from "../lib/compass";
+import { mountPopupActions, unmountPopupActions } from "../lib/popup-actions";
 
 export type MapCamera = {
   id: number;
@@ -25,6 +26,16 @@ export type MapCamera = {
   /** Optional popup fields (present on real API records and the seed). */
   address?: string | null;
   description?: string;
+  /**
+   * Community-action counts (ADR 0021 §10.2, FASE 3 UI): the popup action
+   * widget renders them from the shared record payload. Optional — the
+   * demo seed omits them and the widget falls back to zero.
+   */
+  usefulCount?: number;
+  confirmCount?: number;
+  goneCount?: number;
+  problemCount?: number;
+  privacyCount?: number;
 };
 export type MapLocation = { latitude: number; longitude: number };
 type Props = {
@@ -123,6 +134,10 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
   const onBoundsChangeRef = useRef(onBoundsChange);
   const popupHtmlForRef = useRef(popupHtmlFor);
   const pickPopupHtmlRef = useRef<(latitude: number, longitude: number) => string>(() => "");
+  // Latest cameras for the popupopen handler: the map-creation effect runs
+  // once and would otherwise close over the FIRST camera list (same pattern
+  // as popupHtmlForRef — the popup mount needs the CURRENT counts).
+  const camerasRef = useRef(cameras);
   const boundsTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -144,6 +159,9 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
   useEffect(() => {
     popupHtmlForRef.current = popupHtmlFor;
   }, [popupHtmlFor]);
+  useEffect(() => {
+    camerasRef.current = cameras;
+  }, [cameras]);
 
   // Map-click report picker (t_6abb96ac): clicking empty map space opens a
   // popup with the click coordinates and a direct link to /segnala,
@@ -256,6 +274,33 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
             className: "osm-camera-popup",
           });
         });
+        // Community action widget mount (ADR 0021 §3, FASE 3 UI): when a
+        // marker popup opens, render the compact widget into its mount node
+        // (a separate React root — see lib/popup-actions). The pick popup
+        // has no mount node and is skipped; popupclose unmounts the root so
+        // a destroyed Leaflet popup never leaks a React tree.
+        map.on("popupopen", (event: { popup?: { getElement?: () => HTMLElement | null } }) => {
+          const content = event.popup?.getElement?.();
+          const node = content?.querySelector?.(".osm-popup-community");
+          if (!node) return;
+          const raw = node.getAttribute("data-record-id");
+          const id = raw ? Number(raw) : NaN;
+          if (!Number.isInteger(id) || id <= 0) return;
+          const camera = camerasRef.current.find((item) => item.id === id);
+          if (!camera) return;
+          try {
+            mountPopupActions(node as HTMLElement, id, {
+              like: camera.usefulCount,
+              confirm: camera.confirmCount,
+              gone: camera.goneCount,
+              problem: camera.problemCount,
+              privacy: camera.privacyCount,
+            });
+          } catch (error) {
+            console.error("popup action widget mount failed", error);
+          }
+        });
+        map.on("popupclose", () => unmountPopupActions());
         mapRef.current = map;
         // The layer group now exists: the marker-population effect can run
         // (it also depends on this flag, see the state declaration above).

@@ -241,7 +241,7 @@ test("report form: 'I don't know' (default) submits direction: null", async () =
 
   await fillReportBase(user, screen, { kind: "Bullet" });
   await user.click(screen.getByRole("checkbox", { name: CONSENT_NAME })); // consent
-  await user.click(screen.getByRole("button", { name: /Send to moderation/ }));
+  await user.click(screen.getByRole("button", { name: /Publish report/ }));
   await new Promise((resolve) => setTimeout(resolve, 30));
   assert.ok(posted, "the report must POST");
   assert.equal(posted.direction, null, "no direction specified → NULL (non so)");
@@ -267,7 +267,7 @@ test("report form: specifying a bearing submits it as an integer 0-359 with arro
   assert.ok(screen.getByText("NE 45°"), "the readout shows the compass name + degrees");
 
   await user.click(screen.getByRole("checkbox", { name: CONSENT_NAME })); // consent
-  await user.click(screen.getByRole("button", { name: /Send to moderation/ }));
+  await user.click(screen.getByRole("button", { name: /Publish report/ }));
   await new Promise((resolve) => setTimeout(resolve, 30));
   assert.ok(posted);
   assert.equal(posted.direction, 45, "the bearing must be submitted as an integer");
@@ -288,7 +288,7 @@ test("report form: switching from a directional kind to a dome clears the bearin
   await user.selectOptions(screen.getByLabelText("Camera type"), "Fixed dome");
   assert.equal(screen.queryByText("Field of view direction"), null, "field hidden for dome");
   await user.click(screen.getByRole("checkbox", { name: CONSENT_NAME })); // consent
-  await user.click(screen.getByRole("button", { name: /Send to moderation/ }));
+  await user.click(screen.getByRole("button", { name: /Publish report/ }));
   await new Promise((resolve) => setTimeout(resolve, 30));
   assert.ok(posted);
   assert.equal(posted.direction, null, "a dome report never carries a bearing");

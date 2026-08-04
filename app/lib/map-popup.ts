@@ -61,6 +61,11 @@ export function popupHtmlFor(
     `</dl>`,
     address,
     description,
+    // Community action widget mount (ADR 0021 §3, FASE 3 UI): SurveillanceMap
+    // renders the compact CommunityActions React root into this node on
+    // 'popupopen'. The data-record-id attribute is the only contract — the
+    // counts travel via the shared cameras payload, never through HTML.
+    `<div class="osm-popup-community" data-record-id="${camera.id}"></div>`,
     `<p class="osm-popup-actions">`,
     `<a href="/records/${camera.id}">${labels.popupDetail} <span aria-hidden="true">→</span></a>`,
     `<a href="${issueHref}?record=${camera.id}">${labels.reportIssue} <span aria-hidden="true">→</span></a>`,

@@ -359,7 +359,11 @@ test("the record page labels via the safe helper and never appends a raw status"
   const hook = await readSource("app/lib/use-public-cameras.ts");
   assert.match(page, /usePublicCamera(?:s)?\(/, "the record page must load records through the shared filtered hook");
   assert.match(hook, /publicRecords\(/, "the shared hook must filter records through the client whitelist");
-  assert.match(page, /publicStatusLabel\(statuses,\s*record\.status,\s*t\.statusFallback\)/, "record status must come from the safe helper");
+  // FASE 3 UI (ADR 0021 §6.3): the record page widens the status whitelist
+  // to the direct-link banner statuses (active/demo/hidden/removed) via the
+  // dedicated isRecordPageStatus guard — labels still come from the safe
+  // helper family, never from a raw status value.
+  assert.match(page, /isRecordPageStatus\(record\.status\)\s*\?\s*statuses\[record\.status\]\s*:\s*t\.statusFallback/, "record status must come from the safe helper");
   assert.doesNotMatch(page, /\$\{t\.statusFallback\}[^}]*record\.status/, "the record page must not append the raw status to the fallback");
   assert.doesNotMatch(page, /statuses\[record\.status\]\s*\?\?\s*record\.status/, "the record page must not render a raw status value");
 });

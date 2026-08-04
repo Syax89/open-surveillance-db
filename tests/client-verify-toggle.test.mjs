@@ -1,9 +1,10 @@
 /**
- * Client-side interaction tests for the community verification toggle
- * (C5, ADR 0018 §2) — StarConfirmButton standalone AND wired into the
- * record detail (/records/[id]).
+ * Client-side interaction tests for community actions on records — the
+ * legacy StarConfirmButton standalone AND the community action widget
+ * (ADR 0021 §3, FASE 3 UI) wired into the record detail (/records/[id]).
  *
- * Standalone component (COMMUNITY_PLAN §6.3 C2/C9):
+ * Standalone component (COMMUNITY_PLAN §6.3 C2/C9 — legacy verification
+ * surface, kept for the account page family):
  *   1. accessible name flips between "Confirm this record exists" and
  *      "Remove verification" (localized);
  *   2. aria-pressed mirrors the confirmed state; the counter is a polite
@@ -14,20 +15,20 @@
  *      under the button (anonymous / L0 gates are fail-closed);
  *   5. aria-busy while a toggle is in flight.
  *
- * Record detail wiring:
- *   6. anonymous caller → toggle disabled with "Log in to verify this
- *      record" (server answers 401; the button never pretends);
- *   7. L0 contributor → toggle disabled with the gateL1 help copy (403
- *      fail-closed server-side);
- *   8. L1+ → PUT with the CSRF token echoes the cookie, the count updates
- *      from the server reply and aria-pressed flips;
- *   9. confirmed → DELETE removes the verification (aria-pressed flips
- *      back);
- *  10. self-verify (403) surfaces the localized error and stays disabled;
- *      an already-verified duplicate (409) shows its error.
+ * Record detail wiring (FASE 3 UI — CommunityActions replaces the old
+ * verification toggle on the record page; ADR §3.2 one-action contract):
+ *   6. anonymous caller → disabled buttons + "Log in or register" CTA,
+ *      aggregate counts still visible;
+ *   7. signed-in → PUT /api/cameras/[id]/actions with the CSRF token, the
+ *      count updates from the server reply and aria-pressed flips;
+ *   8. active action → DELETE removes it and the count drops;
+ *   9. self-action 403 surfaces the localized error (fail-closed);
+ *  10. duplicate action (409) shows its localized error;
+ *  11. a dead session fails open on the probe but the 401 answers honestly
+ *      (error alert + login CTA — never a silent working-looking button).
  *
- * The widget renders ONLY in the record detail — never in cards, the
- * directory or the home page (C3). Fixtures are fictitious.
+ * The action widget renders ONLY on the record detail and in the map popup
+ * (never in cards/directory/home, C3). Fixtures are fictitious.
  */
 import assert from "node:assert/strict";
 import test, { afterEach, before } from "node:test";
@@ -126,76 +127,62 @@ const recordFixture = {
   updated: "2026-03-01T00:00:00.000Z",
   description: "Fictitious public record used only in tests.",
   address: "Illustrative location, Rome",
-  confirmationCount: 3,
-};
-
-const levelOneProfile = {
-  contributor: { id: 1, email: "contributor@example.test", displayName: "Fixture Contributor", createdAt: "2026-01-15T10:00:00.000Z", updatedAt: "2026-01-15T10:00:00.000Z" },
-  level: { level: 1, verifiedCount: 1, threshold: 1, nextThreshold: 5 },
-};
-
-const levelZeroProfile = {
-  contributor: { id: 1, email: "contributor@example.test", displayName: "Fixture Contributor", createdAt: "2026-01-15T10:00:00.000Z", updatedAt: "2026-01-15T10:00:00.000Z" },
-  level: { level: 0, verifiedCount: 0, threshold: 0, nextThreshold: 1 },
+  // Community-action aggregates (ADR 0021 §10.2): the record page passes
+  // these into the action widget as the initial live counts.
+  usefulCount: 3,
+  confirmCount: 2,
+  goneCount: 0,
+  problemCount: 0,
+  privacyCount: 0,
 };
 
 /**
- * Record-detail fetch mock: the dedicated record endpoint (QA#5 F1 —
- * GET /api/cameras/[id], one round trip, no client-side walk), the
- * revisions call, the personal confirmation state and the session
- * profile. `toggle` answers the PUT/DELETE mutation with the server reply.
+ * Record-detail fetch mock (FASE 3 UI wiring): the dedicated record endpoint,
+ * the public events timeline, the personal action state and the session
+ * probe. `toggle` answers the PUT/DELETE mutation with the server reply —
+ * the same contract client-community-actions exercises standalone, here
+ * through the REAL record page.
  */
 function recordHandler({
-  confirmation = { confirmed: false },
-  profile = levelOneProfile,
-  toggle = (method) => jsonResponse({ confirmed: method === "PUT", count: method === "PUT" ? 4 : 2 }, { status: 200 }),
+  personal = null,
+  me = levelOneProfile,
+  toggle = (method, action) => jsonResponse({
+    action: method === "PUT" ? action : null,
+    counts: { like: 3, confirm: method === "PUT" ? 3 : 1, gone: 0, problem: 0, privacy: 0 },
+  }, { status: 200 }),
 } = {}) {
   return (input, init) => {
     if (input === "/api/cameras/7") return jsonResponse({ record: recordFixture });
-    if (input === "/api/cameras/revisions?cameraId=7") return jsonResponse({ recordId: 7, revisions: [] });
-    if (input === "/api/cameras/7/confirmation") {
-      if (init && init.method === "PUT") return toggle("PUT");
-      if (init && init.method === "DELETE") return toggle("DELETE");
-      return jsonResponse(confirmation);
+    if (input === "/api/cameras/7/events") return jsonResponse({ events: [] });
+    if (input === "/api/cameras/7/actions") {
+      if (init && init.method === "PUT") return toggle("PUT", JSON.parse(init.body).action);
+      if (init && init.method === "DELETE") return toggle("DELETE", null);
+      return jsonResponse({ action: personal });
     }
-    if (input === "/api/auth/me") return jsonResponse(profile, { status: profile === null ? 401 : 200 });
+    if (input === "/api/auth/me") return jsonResponse(me, { status: me === null ? 401 : 200 });
     return jsonResponse({ error: "unexpected route" }, { status: 404 });
   };
 }
 
-test("record detail: anonymous caller sees the disabled toggle with the login copy", async () => {
+test("record detail: anonymous caller sees the disabled widget with the login CTA", async () => {
   const { screen } = rtl;
-  installFetchMock(recordHandler({ profile: null }));
+  installFetchMock(recordHandler({ me: null }));
   await setNavState({ params: { id: "7" } });
 
   await renderWithLocale(React.createElement(RecordPage));
   await screen.findByText("Fixture Public Camera");
-  // The widget renders only here (record detail); anonymous → disabled.
-  const button = await screen.findByRole("button", { name: "Confirm this record exists" });
-  assert.equal(button.disabled, true);
-  // The gate copy settles only AFTER the personal-state fetch resolves
-  // (checking → anonymous): findByRole resolves as soon as the button is in
-  // the DOM, so wait for the copy instead of reading it synchronously —
-  // under the coverage runner the fetch may not have settled yet.
-  await screen.findByText("Log in to verify this record");
-  // The aggregate count still shows (public data, no session needed).
-  assert.ok(screen.getByText("3 verifications"));
+  // The five action buttons render disabled; the counts are public data.
+  const useful = await screen.findByRole("button", { name: /Mark this record as useful/ });
+  assert.equal(useful.disabled, true);
+  assert.ok(screen.getByRole("button", { name: /I confirm this record is still present/ }).disabled);
+  // The anonymous surface explains the gate and links to login.
+  await screen.findByRole("link", { name: /Log in or register to take part/ });
+  // Aggregate counts still show (public data, no session needed).
+  assert.ok(screen.getByText("Useful: 3"));
+  assert.ok(screen.getByText("Confirm: 2"));
 });
 
-test("record detail: L0 contributor sees the disabled toggle with the gate copy", async () => {
-  const { screen } = rtl;
-  installFetchMock(recordHandler({ profile: levelZeroProfile }));
-  await setNavState({ params: { id: "7" } });
-
-  await renderWithLocale(React.createElement(RecordPage));
-  await screen.findByText("Fixture Public Camera");
-  const button = await screen.findByRole("button", { name: "Confirm this record exists" });
-  assert.equal(button.disabled, true);
-  // Same gate-settling race as the anonymous test: wait for the copy.
-  await screen.findByText("You can verify records after your first contribution is published.");
-});
-
-test("record detail: L1+ toggle PUTs with the CSRF token, updates the count and flips aria-pressed", async () => {
+test("record detail: signed-in caller PUTs with the CSRF token, updates the count and flips aria-pressed", async () => {
   const { screen, waitFor } = rtl;
   const requests = [];
   installFetchMock((input, init) => {
@@ -207,59 +194,55 @@ test("record detail: L1+ toggle PUTs with the CSRF token, updates the count and 
 
   await renderWithLocale(React.createElement(RecordPage));
   await screen.findByText("Fixture Public Camera");
-  // The gate settles asynchronously (personal-state confirmation + auth/me
-  // fetches): the button renders disabled first and flips to enabled only
-  // after both resolve. findByRole resolves as soon as the button is in the
-  // DOM, so wait for the enabled state instead of asserting it
-  // synchronously — under the coverage runner the fetches may not have
-  // settled yet (same latent flake class as t_b6bef670 / PR #216, P0-1).
-  const button = await waitFor(() => {
-    const current = screen.getByRole("button", { name: "Confirm this record exists" });
-    assert.equal(current.disabled, false, "the L1+ gate must settle before the toggle is enabled");
+  // The session probe settles asynchronously: the button renders disabled
+  // first and flips to enabled only after the probe resolves.
+  const confirm = await waitFor(() => {
+    const current = screen.getByRole("button", { name: /I confirm this record is still present/ });
+    assert.equal(current.disabled, false, "the session probe must settle before the action is enabled");
     assert.equal(current.getAttribute("aria-pressed"), "false");
     return current;
   }, { timeout: 5000 });
 
   const user = rtl.userEvent.setup();
-  await user.click(button);
+  await user.click(confirm);
 
-  await waitFor(() => assert.ok(screen.getByRole("button", { name: "Remove verification" })));
-  const put = requests.find((r) => r.input === "/api/cameras/7/confirmation" && r.init?.method === "PUT");
-  assert.ok(put, "the toggle must PUT to the confirmation endpoint");
+  await waitFor(() => assert.equal(confirm.getAttribute("aria-pressed"), "true"));
+  const put = requests.find((r) => r.input === "/api/cameras/7/actions" && r.init?.method === "PUT");
+  assert.ok(put, "the action must PUT to the community-actions endpoint");
   assert.equal(put.init.headers["x-csrf-token"], "fixture-csrf-token");
-  // Count updated from the server reply (3 → 4), announced via live region.
-  assert.ok(screen.getByText("4 verifications"));
-  assert.equal(screen.getByRole("button", { name: "Remove verification" }).getAttribute("aria-pressed"), "true");
+  assert.deepEqual(JSON.parse(put.init.body), { action: "confirm" });
+  // Count updated from the server reply (2 → 3), announced via live region.
+  assert.ok(screen.getByText("Confirm: 3"));
 });
 
-test("record detail: confirmed caller DELETEs and the count drops", async () => {
+test("record detail: active action DELETEs and the count drops", async () => {
   const { screen, waitFor } = rtl;
   const requests = [];
   installFetchMock((input, init) => {
     requests.push({ input, init });
-    return recordHandler({ confirmation: { confirmed: true } })(input, init);
+    return recordHandler({ personal: "confirm" })(input, init);
   });
   document.cookie = "osdb_csrf=fixture-csrf-token; path=/";
   await setNavState({ params: { id: "7" } });
 
   await renderWithLocale(React.createElement(RecordPage));
   await screen.findByText("Fixture Public Camera");
-  const button = await screen.findByRole("button", { name: "Remove verification" });
-  assert.equal(button.getAttribute("aria-pressed"), "true");
+  const confirm = await screen.findByRole("button", { name: /I confirm this record is still present/ });
+  await waitFor(() => assert.equal(confirm.getAttribute("aria-pressed"), "true"));
 
   const user = rtl.userEvent.setup();
-  await user.click(button);
+  await user.click(confirm);
 
-  await waitFor(() => assert.ok(screen.getByRole("button", { name: "Confirm this record exists" })));
-  const del = requests.find((r) => r.input === "/api/cameras/7/confirmation" && r.init?.method === "DELETE");
-  assert.ok(del, "the toggle must DELETE the personal confirmation");
-  assert.ok(screen.getByText("2 verifications"));
+  await waitFor(() => assert.equal(confirm.getAttribute("aria-pressed"), "false"));
+  const del = requests.find((r) => r.input === "/api/cameras/7/actions" && r.init?.method === "DELETE");
+  assert.ok(del, "removing the action must DELETE the personal action");
+  assert.ok(screen.getByText("Confirm: 1"));
 });
 
-test("record detail: self-verify 403 surfaces the error and disables the toggle (fail-closed)", async () => {
+test("record detail: self-action 403 surfaces the error (fail-closed)", async () => {
   const { screen, waitFor } = rtl;
   installFetchMock(recordHandler({
-    toggle: () => jsonResponse({ error: "You cannot verify your own report." }, { status: 403 }),
+    toggle: () => jsonResponse({ error: "You cannot mark your own report as useful or confirm it." }, { status: 403 }),
   }));
   document.cookie = "osdb_csrf=fixture-csrf-token; path=/";
   await setNavState({ params: { id: "7" } });
@@ -267,19 +250,16 @@ test("record detail: self-verify 403 surfaces the error and disables the toggle 
   await renderWithLocale(React.createElement(RecordPage));
   await screen.findByText("Fixture Public Camera");
   const user = rtl.userEvent.setup();
-  await user.click(await screen.findByRole("button", { name: "Confirm this record exists" }));
+  await user.click(await screen.findByRole("button", { name: /I confirm this record is still present/ }));
 
-  await waitFor(() => assert.ok(screen.queryByRole("alert")));
-  assert.ok(screen.getByText("You cannot verify your own record."));
-  // Fail-closed: after the 403 the toggle is disabled, not silently retrying.
-  const button = screen.getByRole("button", { name: "Confirm this record exists" });
-  assert.equal(button.disabled, true);
+  await waitFor(() => assert.ok(screen.getByRole("alert")));
+  assert.ok(screen.getByText("You cannot mark your own report as useful or confirm it."));
 });
 
-test("record detail: duplicate verification (409) shows its localized error", async () => {
+test("record detail: duplicate action (409) shows its localized error", async () => {
   const { screen, waitFor } = rtl;
   installFetchMock(recordHandler({
-    toggle: () => jsonResponse({ error: "This record is already verified by you." }, { status: 409 }),
+    toggle: () => jsonResponse({ error: "You already set this action." }, { status: 409 }),
   }));
   document.cookie = "osdb_csrf=fixture-csrf-token; path=/";
   await setNavState({ params: { id: "7" } });
@@ -287,24 +267,45 @@ test("record detail: duplicate verification (409) shows its localized error", as
   await renderWithLocale(React.createElement(RecordPage));
   await screen.findByText("Fixture Public Camera");
   const user = rtl.userEvent.setup();
-  await user.click(await screen.findByRole("button", { name: "Confirm this record exists" }));
+  await user.click(await screen.findByRole("button", { name: /I confirm this record is still present/ }));
 
-  await waitFor(() => assert.ok(screen.getByText("You have already verified this record.")));
+  await waitFor(() => assert.ok(screen.getByText("You already set this action.")));
 });
 
-test("record detail: a dead session fetch fails closed (toggle disabled, honest state)", async () => {
-  const { screen } = rtl;
-  installFetchMock((input) => {
+test("record detail: a dead session fails open on the probe but the 401 answers honestly", async () => {
+  const { screen, waitFor } = rtl;
+  // The session probe rejects (dead session); the widget deliberately does
+  // NOT block actions on a failed probe (a transient probe failure must not
+  // freeze the surface). The server is the authority: the click answers 401
+  // and the widget shows the honest session-ended error + the login CTA.
+  installFetchMock((input, init) => {
     if (input === "/api/cameras/7") return jsonResponse({ record: recordFixture });
-    if (input === "/api/cameras/revisions?cameraId=7") return jsonResponse({ recordId: 7, revisions: [] });
-    if (input === "/api/cameras/7/confirmation") return Promise.reject(new TypeError("Failed to fetch"));
+    if (input === "/api/cameras/7/events") return jsonResponse({ events: [] });
+    if (input === "/api/cameras/7/actions" && init?.method === "PUT") {
+      return jsonResponse({ error: "session ended" }, { status: 401 });
+    }
+    if (input === "/api/cameras/7/actions") return Promise.reject(new TypeError("Failed to fetch"));
     if (input === "/api/auth/me") return Promise.reject(new TypeError("Failed to fetch"));
     return jsonResponse({ error: "unexpected route" }, { status: 404 });
   });
+  document.cookie = "osdb_csrf=fixture-csrf-token; path=/";
   await setNavState({ params: { id: "7" } });
 
   await renderWithLocale(React.createElement(RecordPage));
   await screen.findByText("Fixture Public Camera");
-  const button = await screen.findByRole("button", { name: "Confirm this record exists" });
-  assert.equal(button.disabled, true, "a dead session must never leave a working-looking toggle");
+  const button = await screen.findByRole("button", { name: /I confirm this record is still present/ });
+
+  const user = rtl.userEvent.setup();
+  await user.click(button);
+  // The 401 is surfaced honestly (role="alert") and the anonymous CTA
+  // returns — a dead session never looks like a working action.
+  await waitFor(() => assert.ok(screen.getByRole("alert")));
+  assert.ok(screen.getByText("Your session has ended. Log in again to take part."));
+  await waitFor(() => assert.ok(screen.getByRole("link", { name: /Log in or register to take part/ })));
 });
+
+const levelOneProfile = {
+  contributor: { id: 1, email: "contributor@example.test", displayName: "Fixture Contributor", createdAt: "2026-01-15T10:00:00.000Z", updatedAt: "2026-01-15T10:00:00.000Z" },
+  level: { level: 1, verifiedCount: 1, threshold: 1, nextThreshold: 5 },
+};
+

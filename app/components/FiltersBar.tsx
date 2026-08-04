@@ -38,6 +38,9 @@ export function FiltersBar({
   onReset,
   hideSearch = false,
   extraControls,
+  stateFilter,
+  setStateFilter,
+  showCommunitySort = false,
 }: {
   variant: "inline" | "panel" | "bare";
   cameraKinds: string[];
@@ -53,8 +56,8 @@ export function FiltersBar({
    * prop; the home page still owns the cutoff in local state and passes it.
    */
   setFreshnessCutoff?: (value: number | null) => void;
-  sortOrder: "alphabetical" | "position";
-  setSortOrder: (value: "alphabetical" | "position") => void;
+  sortOrder: "alphabetical" | "position" | "useful" | "recent" | "confirmations";
+  setSortOrder: (value: "alphabetical" | "position" | "useful" | "recent" | "confirmations") => void;
   resultCount: number;
   onReset: () => void;
   /**
@@ -73,6 +76,19 @@ export function FiltersBar({
    * page and /mappa stay byte-identical.
    */
   extraControls?: ReactNode;
+  /**
+   * Confirmation-state filter (FASE 3 UI): optional so the home page stays
+   * byte-identical; the /directory and /mappa tools pass the ?state=
+   * dimension through the shared hook.
+   */
+  stateFilter?: "all" | "confirmed" | "never";
+  setStateFilter?: (value: "all" | "confirmed" | "never") => void;
+  /**
+   * Community-ranking sort options (FASE 3 UI): opt-in so the home page
+   * keeps its byte-identical output; the /directory and /mappa tools pass
+   * true to expose useful / recent / confirmations.
+   */
+  showCommunitySort?: boolean;
 }) {
   const t = useMessages().directory;
   return (
@@ -107,11 +123,26 @@ export function FiltersBar({
         </div>
         <div className="record-filter">
           <label htmlFor="record-sort">{t.orderRecords}</label>
-          <select id="record-sort" value={sortOrder} onChange={(event) => setSortOrder(event.target.value as "alphabetical" | "position")}>
+          <select id="record-sort" value={sortOrder} onChange={(event) => setSortOrder(event.target.value as "alphabetical" | "position" | "useful" | "recent" | "confirmations")}>
             <option value="alphabetical">{t.alphabetical}</option>
             <option value="position">{t.positionOrder}</option>
+            {showCommunitySort && <>
+              <option value="useful">{t.sortUseful}</option>
+              <option value="recent">{t.sortRecent}</option>
+              <option value="confirmations">{t.sortConfirmations}</option>
+            </>}
           </select>
         </div>
+        {stateFilter !== undefined && setStateFilter !== undefined && (
+          <div className="record-filter">
+            <label htmlFor="record-state-filter">{t.stateFilter}</label>
+            <select id="record-state-filter" value={stateFilter} onChange={(event) => setStateFilter(event.target.value as "all" | "confirmed" | "never")}>
+              <option value="all">{t.stateAll}</option>
+              <option value="confirmed">{t.stateConfirmed}</option>
+              <option value="never">{t.stateNever}</option>
+            </select>
+          </div>
+        )}
         <button type="button" className="text-button" onClick={onReset}>{t.resetFilters} <span aria-hidden="true">→</span></button>
         {extraControls}
       </div>

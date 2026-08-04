@@ -307,7 +307,7 @@ test("POST /api/photos rate-limits the submit family with 429 + Retry-After", as
 test("POST /api/cameras rate-limits the submit family with 429 + Retry-After", async () => {
   env.POST_RATE_LIMIT_MAX = "1";
   env.POST_RATE_LIMIT_WINDOW_SECONDS = "60";
-  stub("createPendingCamera", async (input) => ({ id: 1, ...input }));
+  stub("createCamera", async (input) => ({ id: 1, ...input }));
   stub("linkPhotosToCamera", async () => 0);
   stub("findNearbyPublicCameras", async () => []);
   const { POST } = await routes.cameras();
@@ -319,7 +319,7 @@ test("POST /api/cameras rate-limits the submit family with 429 + Retry-After", a
   const blocked = await POST(build.cameras(caller));
   assertBlocked(blocked);
   await assertErrorBody(blocked, /too many submissions/i);
-  assert.equal(callArgs("createPendingCamera").length, 1, "the blocked request must not reach the db layer");
+  assert.equal(callArgs("createCamera").length, 1, "the blocked request must not reach the db layer");
 });
 
 test("POST /api/appeals rate-limits the appeal family with 429 + Retry-After", async () => {
@@ -418,7 +418,7 @@ test("calls under the threshold are not rate-limited on any route family", async
       knob: "POST_RATE_LIMIT_MAX",
       setup: () => {
         stubContributorSession();
-        stub("createPendingCamera", async (input) => ({ id: 1, ...input }));
+        stub("createCamera", async (input) => ({ id: 1, ...input }));
         stub("linkPhotosToCamera", async () => 0);
         stub("findNearbyPublicCameras", async () => []);
       },

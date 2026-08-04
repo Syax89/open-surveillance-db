@@ -453,6 +453,9 @@ export async function setCommunityAction(input: {
     }
 
     const counts = await communityActionCountsFor([input.cameraId]).then((map) => map.get(input.cameraId) ?? zeroCounts());
+    // Public aggregate event (ADR §7.2): the timeline shows the action
+    // landing, with the resulting count — never the actor.
+    await appendActionLifecycleEvent({ cameraId: input.cameraId, actionType, counts, now: input.now });
     return { kind: "ok", actionType, counts };
   }
 
@@ -502,6 +505,9 @@ export async function setCommunityAction(input: {
     }
 
     const counts = await communityActionCountsFor([input.cameraId]).then((map) => map.get(input.cameraId) ?? zeroCounts());
+    // Public aggregate event for the NEW action (ADR §7.2): the timeline
+    // shows the switch landing, with the resulting count — never the actor.
+    await appendActionLifecycleEvent({ cameraId: input.cameraId, actionType, counts, now: input.now });
     return { kind: "switched", actionType, switchedFrom: oldType as CommunityActionType, counts };
   }
 
@@ -554,6 +560,41 @@ export async function getCommunityAction(
 
 function zeroCounts(): CommunityActionCounts {
   return { like: 0, confirm: 0, gone: 0, problem: 0, privacy: 0 };
+}
+
+/**
+ * Append the public aggregate lifecycle event for an action upsert
+ * (ADR 0021 §7.2, FASE 3 UI): `liked` / `confirmed` / `gone-flagged` with
+ * the distinct-contributor count in the detail — counts only, never
+ * attribution. problem/privacy actions deliberately emit NO event here:
+ * the ADR's semantic list has no problem/privacy flag type; they surface
+ * publicly only when the threshold triggers the `hidden` transition (with
+ * the reason in its detail). Fail-open logging: the action is already
+ * committed; a lost aggregate event must never roll it back.
+ */
+async function appendActionLifecycleEvent(input: {
+  cameraId: number;
+  actionType: string;
+  counts: CommunityActionCounts;
+  now: string;
+}): Promise<void> {
+  const eventType =
+    input.actionType === "like" ? "liked"
+    : input.actionType === "confirm" ? "confirmed"
+    : input.actionType === "gone" ? "gone-flagged"
+    : null;
+  if (eventType === null) return;
+  const count = input.counts[input.actionType as keyof CommunityActionCounts] ?? 0;
+  const detail = JSON.stringify({ count });
+  try {
+    const d1 = await getD1();
+    await d1
+      .prepare("INSERT INTO camera_lifecycle_events (camera_id, event_type, detail, created_at) VALUES (?, ?, ?, ?)")
+      .bind(input.cameraId, eventType, detail, input.now)
+      .run();
+  } catch (error) {
+    console.error("appendActionLifecycleEvent failed", error);
+  }
 }
 
 /**

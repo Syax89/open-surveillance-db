@@ -23,7 +23,9 @@ export const {
   searchPublicCamerasNear,
   searchPublicCamerasNearPage,
   createPendingCamera,
+  createCamera,
   getPublicCameraById,
+  getCommunityRecordById,
   getPublicCameraFacets,
   listPublicCamerasInBbox,
 } = makeMock({
@@ -34,7 +36,9 @@ export const {
   searchPublicCamerasNear: "searchPublicCamerasNear",
   searchPublicCamerasNearPage: "searchPublicCamerasNearPage",
   createPendingCamera: "createPendingCamera",
+  createCamera: "createCamera",
   getPublicCameraById: "getPublicCameraById",
+  getCommunityRecordById: "getCommunityRecordById",
   getPublicCameraFacets: "getPublicCameraFacets",
   listPublicCamerasInBbox: "listPublicCamerasInBbox",
 });

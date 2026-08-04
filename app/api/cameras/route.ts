@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { createPendingCamera, DOME_KIND, findNearbyPublicCameras, freshnessWindows, getPublicCameraFacets, listPublicCameras, listPublicCamerasInBbox, listPublicCamerasPage, PUBLIC_CAMERAS_PAGE_DEFAULT_LIMIT, PUBLIC_CAMERAS_PAGE_MAX_LIMIT, PUBLIC_CAMERA_SORT_OPTIONS, type FreshnessWindow, type PublicCameraFacets, type PublicCameraFilters } from "../../../db/cameras";
+import { createCamera, DOME_KIND, findNearbyPublicCameras, freshnessWindows, getPublicCameraFacets, listPublicCameras, listPublicCamerasInBbox, listPublicCamerasPage, PUBLIC_CAMERAS_PAGE_DEFAULT_LIMIT, PUBLIC_CAMERAS_PAGE_MAX_LIMIT, PUBLIC_CAMERA_SORT_OPTIONS, type FreshnessWindow, type PublicCameraFacets, type PublicCameraFilters } from "../../../db/cameras";
 import { requiresDuplicateConfirmation } from "../../lib/duplicate-detection";
 import { requireVerifiedContributor } from "../../lib/write-gate";
 import { csrfVerified, sameOrigin } from "../../lib/csrf";
@@ -316,7 +316,12 @@ export async function POST(request: Request) {
         { status: 409 },
       );
     }
-    const record = await createPendingCamera({ title, kind, address, notes, manufacturer: manufacturer || null, observedOn: observedOn || null, latitude, longitude, direction: normalizeDomeDirection(kind, direction), contributorId: gate.contributor.id });
+    // ADR 0021 §1 (FASE 3 UI): immediate publication — the verified
+    // contributor's report is inserted directly as `active` and becomes
+    // public right away (list, map, GeoJSON, record page), with the opening
+    // `published` lifecycle event. The legacy pending insert survives only
+    // for legal-emergency flows (createPendingCamera, moderation queue).
+    const record = await createCamera({ title, kind, address, notes, manufacturer: manufacturer || null, observedOn: observedOn || null, latitude, longitude, direction: normalizeDomeDirection(kind, direction), contributorId: gate.contributor.id });
     // Link photo evidence after the report row exists. Linking is best-effort:
     // a photo that fails the pending/unlinked guard is simply left orphaned
     // (it will never be public without moderation). Photos attributed to a
