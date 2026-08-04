@@ -261,34 +261,43 @@ export async function evaluateCommunityThresholds(input: {
   const actor = `community:${input.contributorId}`;
   const actionCode = `community-${triggerType}-${newStatus}`;
 
-  // Build the atomic batch: conditional UPDATE + guarded INSERTs + consumption DELETE
+  // Atomic compare-and-swap: the ONLY statement that decides the winner.
+  // The conditional UPDATE changes exactly one row for the first evaluator;
+  // a concurrent evaluator that read the same `currentStatus` finds 0 changes
+  // and returns without recording anything (test 12 races two evaluators and
+  // asserts exactly one transition + one event). The moderation.ts guarded-
+  // INSERT pattern is fine for serialised manual moderation; community actions
+  // are genuinely concurrent, so the winner must be decided HERE, not by an
+  // EXISTS guard that a losing evaluator would still see as true after the
+  // winner's commit.
+  const updateResult = (await d1
+    .prepare("UPDATE cameras SET status = ?, updated = ? WHERE id = ? AND status = ?")
+    .bind(newStatus, input.now, input.cameraId, currentStatus)
+    .run()) as { meta: { changes: number } };
+  if (updateResult.meta.changes === 0) {
+    // A concurrent evaluation already performed this transition (or the
+    // status changed under us): record nothing, consume nothing.
+    return;
+  }
+
+  // We won the transition: status is now `newStatus` (committed by the CAS
+  // above), so the event writes below can never double-fire. One batch keeps
+  // them atomic against partial failures.
   const batchStatements: D1PreparedStatement[] = [];
 
-  // 1. Conditional status UPDATE
+  // 2. Public lifecycle event
   batchStatements.push(
     d1
-      .prepare("UPDATE cameras SET status = ?, updated = ? WHERE id = ? AND status = ?")
-      .bind(newStatus, input.now, input.cameraId, currentStatus),
+      .prepare("INSERT INTO camera_lifecycle_events (camera_id, event_type, detail, created_at) VALUES (?, ?, ?, ?)")
+      .bind(input.cameraId, eventType, detailJson, input.now),
   );
 
-  // 2. Guarded public lifecycle event INSERT
-  batchStatements.push(
-    d1
-      .prepare(
-        `INSERT INTO camera_lifecycle_events (camera_id, event_type, detail, created_at)
-         SELECT ?, ?, ?, ?
-         WHERE EXISTS (SELECT 1 FROM cameras WHERE id = ? AND status = ?)`,
-      )
-      .bind(input.cameraId, eventType, detailJson, input.now, input.cameraId, newStatus),
-  );
-
-  // 3. Guarded moderation_events INSERT (internal audit)
+  // 3. moderation_events INSERT (internal audit)
   batchStatements.push(
     d1
       .prepare(
         `INSERT INTO moderation_events (entity, entity_id, previous_status, new_status, action, reason_code, note, actor, reviewer_id, actor_role, recused, escalated, second_reviewer_id, created_at)
-         SELECT 'camera', ?, ?, ?, ?, ?, ?, ?, NULL, NULL, 0, 0, NULL, ?
-         WHERE EXISTS (SELECT 1 FROM cameras WHERE id = ? AND status = ?)`,
+         VALUES ('camera', ?, ?, ?, ?, ?, ?, ?, NULL, NULL, 0, 0, NULL, ?)`,
       )
       .bind(
         input.cameraId,
@@ -299,31 +308,21 @@ export async function evaluateCommunityThresholds(input: {
         JSON.stringify({ triggerType, counts: { sum: trigger.sum, distinct: trigger.distinctCount } }),
         actor,
         input.now,
-        input.cameraId,
-        newStatus,
       ),
   );
 
-  // 4. Guarded consumption DELETE: remove trigger action rows
+  // 4. Consumption DELETE: remove trigger action rows
   batchStatements.push(
     d1
-      .prepare(
-        `DELETE FROM camera_community_actions
-         WHERE camera_id = ? AND action_type = ?
-         AND EXISTS (SELECT 1 FROM cameras WHERE id = ? AND status = ?)`,
-      )
-      .bind(input.cameraId, triggerType, input.cameraId, newStatus),
+      .prepare("DELETE FROM camera_community_actions WHERE camera_id = ? AND action_type = ?")
+      .bind(input.cameraId, triggerType),
   );
 
-  // 5. Guarded action-consumed public event
+  // 5. Action-consumed public event
   batchStatements.push(
     d1
-      .prepare(
-        `INSERT INTO camera_lifecycle_events (camera_id, event_type, detail, created_at)
-         SELECT ?, 'action-consumed', ?, ?
-         WHERE EXISTS (SELECT 1 FROM cameras WHERE id = ? AND status = ?)`,
-      )
-      .bind(input.cameraId, JSON.stringify({ actionType: triggerType, count: trigger.distinctCount }), input.now, input.cameraId, newStatus),
+      .prepare("INSERT INTO camera_lifecycle_events (camera_id, event_type, detail, created_at) VALUES (?, 'action-consumed', ?, ?)")
+      .bind(input.cameraId, JSON.stringify({ actionType: triggerType, count: trigger.distinctCount }), input.now),
   );
 
   await d1.batch(batchStatements);

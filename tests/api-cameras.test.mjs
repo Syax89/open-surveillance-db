@@ -269,6 +269,27 @@ test("GET /api/cameras rejects freshness values outside the whitelist with 400",
   }
 });
 
+test("GET /api/cameras rejects sort values outside the ranking whitelist with 400", async (t) => {
+  const { GET } = await camerasRoute();
+  for (const sort of ["helpful", "likes", "votes", "", "useful;DROP", "USEFUL"]) {
+    await t.test(`sort=${JSON.stringify(sort)}`, async () => {
+      const response = await GET(apiRequest(`/api/cameras?sort=${encodeURIComponent(sort)}`));
+      assert.equal(response.status, 400, sort);
+      const body = await responseBody(response);
+      assert.match(body.error, /Unknown sort option/, sort);
+      assert.equal(callArgs("listPublicCamerasPage").length, 0, "no query must run for an invalid sort");
+    });
+  }
+});
+
+test("GET /api/cameras forwards a valid ranking sort to the paginated query", async () => {
+  stub("listPublicCamerasPage", async () => ({ records: [cameraFixture], total: 1, nextOffset: null }));
+  const { GET } = await camerasRoute();
+  const response = await GET(apiRequest("/api/cameras?sort=useful"));
+  assert.equal(response.status, 200);
+  assert.deepEqual(callArgs("listPublicCamerasPage")[0], [{ sort: "useful" }, { limit: 500, offset: 0 }]);
+});
+
 test("GET /api/cameras export formats honour the same safe filters", async () => {
   stub("listPublicCameras", async () => [cameraFixture]);
   const { GET } = await camerasRoute();
