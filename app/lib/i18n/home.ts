@@ -17,6 +17,9 @@ import type { Translation } from "./types";
 export const en = {
   mainNavigation: "Main navigation",
   homeAria: "OpenSurveillanceDB home",
+  pageTitle: "Open public surveillance infrastructure database",
+  pageDescription:
+    "OpenSurveillanceDB is a civic, non-commercial database of visible public surveillance infrastructure: sourced, moderated and privacy-first.",
   // QA#2 F1 (axe serious): the scrollable legal tables (/privacy data
   // table) become a focusable region when they overflow — the aria-label
   // tells keyboard users why the region is in the tab order and how to
@@ -75,6 +78,9 @@ export const en = {
 export const it: Translation<typeof en> = {
   mainNavigation: "Navigazione principale",
   homeAria: "Pagina iniziale di OpenSurveillanceDB",
+  pageTitle: "Database aperto dell'infrastruttura di sorveglianza pubblica",
+  pageDescription:
+    "OpenSurveillanceDB è un database civico e non commerciale dell'infrastruttura di sorveglianza pubblica visibile: documentato, moderato e progettato per la privacy.",
   tableScrollAria: "Tabella — scorri in orizzontale per vedere le altre colonne",
   menu: "Menu",
   exploreMap: "Esplora la mappa",

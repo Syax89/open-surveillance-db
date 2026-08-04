@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { HomeNav } from "./components/home/HomeNav";
 import { Hero } from "./components/home/Hero";
 import { MapTeaser } from "./components/home/MapTeaser";
@@ -22,6 +23,18 @@ import { getServerMessages } from "./lib/server-i18n";
  *    the hero stat (usePublicCount, ONE lightweight fetch → server total,
  *    progressive enhancement; the shared data layer is untouched).
  */
+export async function generateMetadata(): Promise<Metadata> {
+  const bundle = await getServerMessages();
+  const t = bundle.home;
+  return {
+    title: t.pageTitle,
+    description: t.pageDescription,
+    alternates: { canonical: "/" },
+    openGraph: { title: t.pageTitle, description: t.pageDescription, images: ["/og.png"] },
+    twitter: { card: "summary_large_image", title: t.pageTitle, description: t.pageDescription, images: ["/og.png"] },
+  };
+}
+
 export default async function HomePage() {
   const bundle = await getServerMessages();
   const t = bundle.home;
