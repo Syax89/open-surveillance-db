@@ -125,6 +125,74 @@ test("verifyPassword falls back to the constant for legacy 3-part hashes", async
 });
 
 // ---------------------------------------------------------------------------
+// QA#3 F1 — timing-oracle neutralisation (unknown-email dummy derivation)
+// ---------------------------------------------------------------------------
+
+test("verifyPasswordDummy derives a real PBKDF2 at the current count and always answers false", async () => {
+  const { auth } = runtime;
+  const started = Date.now();
+  const result = await auth.verifyPasswordDummy("any-password-string");
+  const elapsed = Date.now() - started;
+  assert.equal(result, false, "the dummy verify always answers false (callers discard it)");
+  assert.ok(elapsed >= 10, `the dummy derivation must actually pay the PBKDF2 cost (took ${elapsed}ms)`);
+});
+
+test("authenticateContributor on an unknown email pays the dummy derivation (no timing oracle)", async () => {
+  const { auth } = runtime;
+  // Warm-up: the first PBKDF2 in a fresh isolate can include JIT cost.
+  await auth.verifyPasswordDummy("warmup");
+  const unknownStart = Date.now();
+  const unknown = await auth.authenticateContributor("nobody@example.org", "WrongPass-12345!");
+  const unknownElapsed = Date.now() - unknownStart;
+  assert.equal(unknown, null, "unknown email still answers the generic null");
+
+  // The registered-email path with a wrong password must take comparable time:
+  await auth.createContributor({ email: "timing@example.org", displayName: "Timing", password: "supersecret123" });
+  const realStart = Date.now();
+  const wrong = await auth.authenticateContributor("timing@example.org", "WrongPass-12345!");
+  const realElapsed = Date.now() - realStart;
+  assert.equal(wrong, null, "wrong password still answers the generic null");
+  // Ratio guard: the unknown path is at least 1/3 of the real verify cost —
+  // a pre-fix fast return (~0ms) would fail this by an order of magnitude.
+  assert.ok(
+    unknownElapsed >= realElapsed / 3,
+    `unknown-email path must pay ~the same PBKDF2 cost (unknown=${unknownElapsed}ms, real=${realElapsed}ms)`,
+  );
+});
+
+// ---------------------------------------------------------------------------
+// QA#3 F4 — registrations_ip_log caller-key derivation (keyed HMAC)
+// ---------------------------------------------------------------------------
+
+test("registrationIpHash with a configured key is a keyed HMAC, not an invertible SHA-256", async () => {
+  const { auth } = runtime;
+  const key = "server-secret-please-rotate";
+  const ip = "203.0.113.7";
+  const derived = await auth.registrationIpHash(ip, key);
+  // Fixed output shape: 128 bits = 32 hex chars, independent of branch.
+  assert.match(derived, /^[0-9a-f]{32}$/, "keyed output is 32 hex chars (128 bits)");
+  // Deterministic: same input+key → same stored key (the cap COUNT needs it).
+  assert.equal(await auth.registrationIpHash(ip, key), derived);
+  // NOT the plain SHA-256 of the IP (which a precomputed IPv4 table would
+  // invert): the HMAC output must differ from the raw digest.
+  const plain = await auth.sha256Hex(ip);
+  assert.notEqual(derived, plain, "the keyed value is not the invertible SHA-256");
+  assert.notEqual(derived, plain.slice(0, 32), "nor a truncation of it");
+  // Different key → different stored value for the same IP.
+  assert.notEqual(await auth.registrationIpHash(ip, "another-key"), derived);
+});
+
+test("registrationIpHash without a key falls back to truncated SHA-256 (never the raw IP)", async () => {
+  const { auth } = runtime;
+  const ip = "198.51.100.9";
+  const derived = await auth.registrationIpHash(ip, undefined);
+  assert.match(derived, /^[0-9a-f]{32}$/, "fallback is also 32 hex chars (128 bits)");
+  const plain = await auth.sha256Hex(ip);
+  assert.equal(derived, plain.slice(0, 32), "the no-key fallback is the documented truncated digest");
+  assert.notEqual(derived, ip, "never the raw address");
+});
+
+// ---------------------------------------------------------------------------
 // Contributors
 // ---------------------------------------------------------------------------
 
@@ -414,9 +482,29 @@ test("eraseContributor de-attributes the reports, revokes all sessions, and hard
   });
   assert.equal(anonymous.contributorId, null);
 
+  // QA#3 F3: photo evidence attributed to the erased contributor must be
+  // de-attributed (SET NULL) exactly like reports — the photo row survives
+  // its R6/R13 lifecycle, the personal link is severed. Two photos: one
+  // attributed, one anonymous (must survive untouched).
+  const photoInsert = (contributorId, storageKey) =>
+    runtime.env.DB.prepare(
+      `INSERT INTO photos (camera_id, contributor_id, storage_key, mime_type, width, height, size_bytes, status, exif_stripped, redaction_confirmed, created_at, updated_at)
+       VALUES (?, ?, ?, 'image/jpeg', 100, 100, 1000, 'pending', 1, 0, ?, ?)`,
+    )
+      .bind(attributed.id, contributorId, storageKey, NOW, NOW)
+      .run();
+  photoInsert(profile.id, "photos/erased-photo-1");
+  photoInsert(null, "photos/anonymous-photo-1");
+  // A keeper photo (attributed to the SURVIVING contributor, not to the
+  // erased one) must survive untouched — `attributed.id` is the camera row
+  // id and numerically coincides with profile.id in this suite, so the
+  // keeper photo must be attributed to `keeper.id` to stay out of the count.
+  photoInsert(keeper.id, "photos/keeper-photo-1");
+
   const result = await auth.eraseContributor(profile.id);
   assert.equal(result.deleted, true);
   assert.equal(result.deattributedReports, 2, "both attributed reports are counted");
+  assert.equal(result.deattributedPhotos, 1, "QA#3 F3: the attributed photo is counted and severed");
 
   // Account and sessions are gone.
   assert.equal(await auth.getContributorById(profile.id), null);
@@ -434,6 +522,24 @@ test("eraseContributor de-attributes the reports, revokes all sessions, and hard
   assert.equal(other.contributorId, null);
   const all = await runtime.env.DB.prepare("SELECT COUNT(*) AS n FROM cameras").first();
   assert.equal(Number(all.n), 3, "no report row is deleted by erasure");
+
+  // QA#3 F3: photos survive with contributor_id NULL; the anonymous photo
+  // and the keeper photo are untouched (the erased account's link is gone,
+  // the evidence rows remain).
+  const erasedPhoto = await runtime.env.DB.prepare(
+    "SELECT contributor_id AS contributorId FROM photos WHERE storage_key = ?",
+  ).bind("photos/erased-photo-1").first();
+  assert.equal(erasedPhoto.contributorId, null, "the erased contributor's photo is de-attributed");
+  const anonymousPhoto = await runtime.env.DB.prepare(
+    "SELECT contributor_id AS contributorId FROM photos WHERE storage_key = ?",
+  ).bind("photos/anonymous-photo-1").first();
+  assert.equal(anonymousPhoto.contributorId, null, "anonymous photo untouched");
+  const keeperPhoto = await runtime.env.DB.prepare(
+    "SELECT contributor_id AS contributorId FROM photos WHERE storage_key = ?",
+  ).bind("photos/keeper-photo-1").first();
+  assert.equal(keeperPhoto.contributorId, keeper.id, "keeper photo stays attributed to the surviving contributor");
+  const photoCount = await runtime.env.DB.prepare("SELECT COUNT(*) AS n FROM photos").first();
+  assert.equal(Number(photoCount.n), 3, "no photo row is deleted by erasure (evidence survives)");
 
   // Every auth artifact of the erased contributor is hard-deleted
   // (P2-2: explicit DELETEs, the harness does not enforce FKs).

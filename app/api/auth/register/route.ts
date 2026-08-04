@@ -7,7 +7,7 @@ import {
   isValidEmail,
   normalizeEmail,
   recordRegistrationAttempt,
-  sha256Hex,
+  registrationIpHash,
   type PublicContributor,
 } from "../../../../db/auth";
 import { sessionCookieHeaders, sessionTtlSeconds } from "../../../lib/auth-session";
@@ -75,10 +75,13 @@ export async function POST(request: Request) {
   // generic anti-enumeration body (no email/IP echo) and its reservation row
   // STAYS so the cap keeps holding. On any non-201 exit the reservation is
   // rolled back (no account was created -> the budget is not consumed and the
-  // malformed-body "no write" contract holds). The stored key is a SHA-256 of
-  // the caller key, never the raw IP (privacy by design).
+  // malformed-body "no write" contract holds). The stored key is
+  // `registrationIpHash(callerKey, REGISTRATION_IP_HMAC_KEY)` — a keyed HMAC
+  // (or truncated SHA-256 when the key is absent, local prototype/tests),
+  // never the raw IP and never an invertible hash (privacy by design,
+  // QA#3 F4).
   const registerIpKey = callerKey(request, env);
-  const registerIpHash = await sha256Hex(registerIpKey);
+  const registerIpHash = await registrationIpHash(registerIpKey, env.REGISTRATION_IP_HMAC_KEY);
   const registerIpLimits = registrationIpLimits(env);
   const nowMs = Date.now();
   const reservation = await recordRegistrationAttempt({

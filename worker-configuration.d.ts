@@ -152,6 +152,18 @@ declare module "cloudflare:workers" {
     MODERATION_USER?: string;
     MODERATION_PASSWORD?: string;
     MODERATION_TOKEN?: string;
+    // Per-operator moderation credentials (QA#3 F5): a JSON array of
+    // `{ user, password, email }` objects. When set, Basic auth validates
+    // ONLY against this list and each operator's actions are attributed to
+    // their own `email` (the shared MODERATION_USER/PASSWORD pair is ignored
+    // in this configuration). Malformed JSON fails closed (503).
+    MODERATION_OPERATORS?: string;
+    // Demo actor selector key (QA#3 F5): the moderation route honours a
+    // client-supplied `actorId` ONLY when BOTH this is "true" AND
+    // `ENVIRONMENT === "development"` — two keys so a production deploy with
+    // ENVIRONMENT accidentally left at development still cannot forge the
+    // audit trail. Unset/absent = the selector is OFF everywhere.
+    MODERATION_DEMO_ACTOR_SELECTOR?: string;
     // Edge-set identity injected after a successful moderation gate (ADR
     // 0014): sent as `x-osdb-user-email`; fail-closed when unset (401).
     MODERATION_IDENTITY_EMAIL?: string;
@@ -173,6 +185,13 @@ declare module "cloudflare:workers" {
      * as a D1 state quota (`registrations_ip_log`). Defaults 5 / 86400s. */
     REGISTER_IP_RATE_LIMIT_MAX?: string;
     REGISTER_IP_RATE_LIMIT_WINDOW_SECONDS?: string;
+    /** Keyed-HMAC secret for the per-IP registration log (QA#3 F4): when set,
+     * `registrations_ip_log.ip_hash` is HMAC-SHA256(key, callerKey) truncated
+     * to 128 bits instead of plain SHA-256, so a database leak cannot be
+     * dictionary-attacked offline (the IPv4 space is 2^32). Unset = the
+     * truncated-SHA-256 fallback (local prototype / tests); production must
+     * set it (deploy checklist). */
+    REGISTRATION_IP_HMAC_KEY?: string;
   }
   export const env: Env;
 }
