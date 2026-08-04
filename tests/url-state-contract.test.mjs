@@ -374,9 +374,13 @@ test("clearing the search commits immediately (no debounce dead air) and reset c
 
     await user.clear(screen.getByLabelText("Search the public directory"));
     // Clearing commits immediately (no debounce wait), through the same
-    // pure-history path — the committed URL must drop q.
-    assert.ok(historyReplaceCalls.length >= 2, "clearing writes the URL immediately (no debounce wait)");
-    assert.equal(new URLSearchParams(historyReplaceCalls.at(-1).split("?")[1] ?? "").get("q"), null, "cleared q is dropped from the URL");
+    // pure-history path — the committed URL must drop q. The commit lands
+    // on a React effect tick, so poll with waitFor like the type above
+    // (CI coverage runs are timing-sensitive — t_c8dc3281).
+    await rtl.waitFor(() => {
+      assert.ok(historyReplaceCalls.length >= 2, "clearing writes the URL immediately (no debounce wait)");
+      assert.equal(new URLSearchParams(historyReplaceCalls.at(-1).split("?")[1] ?? "").get("q"), null, "cleared q is dropped from the URL");
+    }, { timeout: 5000 });
 
     await user.click(screen.getByRole("button", { name: /Reset filters/ }));
     // Reset is an EXPLICIT action → router.replace (the R2 churn guard may
