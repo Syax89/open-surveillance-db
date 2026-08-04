@@ -1,7 +1,9 @@
 // Anti-gaming DB layer for community verifications (ADR 0018 §5, C1).
 //
 // DB-layer integration tests against the REAL db/confirmations.ts SQL on a
-// fresh in-memory SQLite (schema from the real Drizzle migrations 0000-0023).
+// fresh in-memory SQLite (schema from the real Drizzle migrations 0000-0039;
+// since ADR 0021 FASE 1 — t_4a7469bb — the confirmation module is an ALIAS
+// over `camera_community_actions` filtered on action_type='confirm').
 // The route-level HTTP contract is covered separately in
 // tests/api-confirmations.test.mjs; this suite pins the six anti-gaming
 // layers at the database boundary, exactly like photo-pending-quota.test.mjs
@@ -14,7 +16,8 @@
 //   5. per-record cap (5 distinct contributors/day, 6th -> 429);
 //   6. decay (created_at >= last_verified_at) + re-verification renewal.
 // Plus confirmationCountsFor (one GROUP BY IN, no N+1), removeConfirmation
-// and the extended eraseContributor (GDPR art. 17, ADR 0018 §6.2).
+// and the extended eraseContributor (GDPR art. 17, ADR 0018 §6.2 /
+// ADR 0021 §13.1 — community actions hard-deleted).
 //
 // No personal data: all fixtures are fictional; the clock is injected.
 
@@ -126,8 +129,10 @@ async function makeVerifiedContributor() {
 
 async function insertConfirmation(cameraId, contributorId, createdAt) {
   await db
-    .prepare("INSERT INTO camera_confirmations (camera_id, contributor_id, created_at) VALUES (?, ?, ?)")
-    .bind(cameraId, contributorId, createdAt)
+    .prepare(
+      "INSERT INTO camera_community_actions (camera_id, contributor_id, action_type, weight, created_at, updated_at) VALUES (?, ?, 'confirm', 1, ?, ?)",
+    )
+    .bind(cameraId, contributorId, createdAt, createdAt)
     .run();
 }
 
@@ -145,8 +150,8 @@ test("the UNIQUE (camera_id, contributor_id) constraint rejects a second row at 
   await insertConfirmation(cameraId, contributorId, "2026-08-01T12:00:00.000Z");
   assert.throws(
     () => {
-      db.prepare("INSERT INTO camera_confirmations (camera_id, contributor_id, created_at) VALUES (?, ?, ?)")
-        .bind(cameraId, contributorId, "2026-08-01T12:00:00.000Z")
+      db.prepare("INSERT INTO camera_community_actions (camera_id, contributor_id, action_type, weight, created_at, updated_at) VALUES (?, ?, 'confirm', 1, ?, ?)")
+        .bind(cameraId, contributorId, "2026-08-01T12:00:00.000Z", "2026-08-01T12:00:00.000Z")
         .run();
     },
     /UNIQUE/i,
@@ -175,7 +180,7 @@ test("race: two concurrent setConfirmation calls yield exactly one row", async (
     .sort();
   assert.deepEqual(kinds, ["duplicate", "ok"]);
   const rows = await db
-    .prepare("SELECT COUNT(*) AS n FROM camera_confirmations WHERE camera_id = ? AND contributor_id = ?")
+    .prepare("SELECT COUNT(*) AS n FROM camera_community_actions WHERE camera_id = ? AND contributor_id = ?")
     .bind(cameraId, contributorId)
     .first();
   assert.equal(Number(rows.n), 1, "the race must produce exactly one row");
@@ -424,8 +429,8 @@ test("eraseContributor deletes verifications and de-attributes community data", 
   assert.equal(result.deattributedCorrections, 1, "corrections are de-attributed, never deleted");
   assert.equal(result.deattributedReports, 1, "owned reports are de-attributed (ADR 0013 pattern)");
 
-  const confirmationsLeft = await db.prepare("SELECT COUNT(*) AS n FROM camera_confirmations WHERE contributor_id = ?").bind(erased).first();
-  assert.equal(Number(confirmationsLeft.n), 0, "no verification row survives the erasure");
+  const confirmationsLeft = await db.prepare("SELECT COUNT(*) AS n FROM camera_community_actions WHERE contributor_id = ?").bind(erased).first();
+  assert.equal(Number(confirmationsLeft.n), 0, "no community-action row survives the erasure");
 
   const edits = await db.prepare("SELECT contributor_id AS cid FROM camera_edit_requests").all();
   assert.equal(edits.results.length, 1, "the edit-request row survives for the audit trail");

@@ -1,19 +1,32 @@
 import { env } from "cloudflare:workers";
 import { demoRecordsPublic, getD1 } from "./cameras";
 import { PUBLIC_CAMERA_STATUSES } from "../app/lib/public-status";
+import { deriveLevel } from "../app/lib/trust-levels";
 
 /**
- * Community verifications (ADR 0018 §2, C1).
+ * Community verifications (ADR 0018 §2, C1) — ALIAS OVER THE ADR 0021 ACTION
+ * SURFACE (kanban t_4a7469bb, FASE 1 DB).
  *
- * Toggle semantics, one confirmation type per (record, contributor). The
- * UNIQUE (camera_id, contributor_id) index is the structural anti-gaming
- * layer; this module owns the six anti-gaming layers on top of it:
+ * ADR 0021 replaces `camera_confirmations` with `camera_community_actions`
+ * (one active action per record+contributor, five types, weight snapshot);
+ * migration 0039 copies every confirmation row into the new table as
+ * `action_type='confirm'` and drops the old one. The confirmation endpoints
+ * are KEPT AS AN ALIAS for one release (ADR 0021 "New / changed endpoints" —
+ * cleanup row: "or kept as alias for one release — CEO choice") so the API
+ * and its tests stay green while FASE 2 introduces the real `actions`
+ * endpoints. This module therefore reads/writes
+ * `camera_community_actions` filtered on `action_type='confirm'`, preserving
+ * the toggle contract (409 duplicate, quota 429s, decay counts).
+ *
+ * The alias still owns the six anti-gaming layers on top of the UNIQUE
+ * (camera_id, contributor_id) constraint:
  *
  *   1. UNIQUE constraint + `ON CONFLICT DO NOTHING RETURNING` (race-safe:
  *      two concurrent PUTs yield exactly one row, the second answers
  *      `duplicate` / 409);
- *   2. level gate (>= 1 verified contribution, never email verification —
- *      no mailer exists, ADR 0013) + self-verify rejection (403);
+ *   2. level gate (>= 1 verified/active contribution, never email
+ *      verification — no mailer exists, ADR 0013) + self-verify rejection
+ *      (403);
  *   3. daily per-account quota as D1 state (a COUNT inside the write path,
  *      NOT an in-memory per-isolate limiter — a per-isolate limiter cannot
  *      be the source of truth) -> 429 + Retry-After;
@@ -27,6 +40,11 @@ import { PUBLIC_CAMERA_STATUSES } from "../app/lib/public-status";
  *   6. decay: confirmations older than the review window
  *      (`created_at >= cameras.last_verified_at`) do not count; a
  *      re-verified record renews them.
+ *
+ * New in the alias (ADR 0021 §3): the `weight` column is the contributor's
+ * trust-level weight AT ACTION TIME (L0 0.25 … L4 5, snapshot rule §3.4) —
+ * stored, never rewritten, exactly like migration 0039 snapshots the
+ * migrated rows. FASE 2 drops this module and the confirmation endpoints.
  *
  * The daily quota is enforced entirely inside `setConfirmation`, so no route
  * can bypass it. `env` is read at call time from the passed-in value (or the
@@ -63,6 +81,9 @@ export type SetConfirmationResult =
   | { kind: "daily_quota_exceeded"; retryAfterSeconds: number }
   | { kind: "per_record_cap_exceeded"; retryAfterSeconds: number };
 
+/** Weight snapshot per trust level (ADR 0021 §4 table): L0 0.25, L1 1, L2 2, L3 3, L4 5. */
+export const ACTION_WEIGHT_BY_LEVEL: readonly number[] = [0.25, 1, 2, 3, 5];
+
 function envNumber(envValue: unknown, key: string, fallback: number): number {
   const value = Number((envValue as EnvLike)[key]);
   return Number.isFinite(value) && value > 0 ? value : fallback;
@@ -72,7 +93,9 @@ function envNumber(envValue: unknown, key: string, fallback: number): number {
  * Confirmation quota knobs (env-tunable, appealAppellantLimits pattern).
  * The daily cap is 20 verifications/account/day, 40 for trusted accounts
  * (>= 1 verified contribution); the per-record cap is 5 verifications/day
- * from distinct accounts on one record. All enforced as D1 counts.
+ * from distinct accounts on one record. All enforced as D1 counts. These
+ * mirror the ADR 0021 §5 `quotas.*` seeds (20 / 40 / 5); FASE 2 moves the
+ * reads to community_settings.
  */
 export function confirmationQuota(envValue: unknown): {
   maxPerDay: number;
@@ -93,14 +116,17 @@ function confirmationLevelGateMin(envValue: unknown): number {
 
 /**
  * L1 gate helper: how many of the contributor's cameras are currently
- * `verified`. Only verified records count — never pending/rejected/removed
- * (ADR 0018 §3.2, anti-farming rule 1). Backed by the
- * (contributor_id, status) index (migration 0023).
+ * public (`verified` — legacy — or `active`, the ADR 0021 status after
+ * migration 0039). Never pending/rejected/removed (ADR 0018 §3.2,
+ * anti-farming rule 1). Backed by the (contributor_id, status) index
+ * (migration 0023); the dual predicate keeps the legacy rows counted while
+ * the pivot's `active` rows count too — FASE 2 narrows it to `active` only
+ * (ADR 0021 §12.1).
  */
 export async function verifiedContributionCount(contributorId: number): Promise<number> {
   const d1 = await getD1();
   const row = await d1
-    .prepare("SELECT COUNT(*) AS n FROM cameras WHERE contributor_id = ? AND status = 'verified'")
+    .prepare("SELECT COUNT(*) AS n FROM cameras WHERE contributor_id = ? AND status IN ('verified', 'active')")
     .bind(contributorId)
     .first<{ n: number }>();
   return Number(row?.n ?? 0);
@@ -130,8 +156,8 @@ export async function confirmationCountsFor(cameraIds: number[]): Promise<Map<nu
     const result = await d1
       .prepare(
         `SELECT cc.camera_id AS cameraId, COUNT(*) AS count
-         FROM camera_confirmations cc JOIN cameras c ON c.id = cc.camera_id
-         WHERE cc.camera_id IN (${placeholders}) AND (c.last_verified_at IS NULL OR cc.created_at >= c.last_verified_at)
+         FROM camera_community_actions cc JOIN cameras c ON c.id = cc.camera_id
+         WHERE cc.action_type = 'confirm' AND cc.camera_id IN (${placeholders}) AND (c.last_verified_at IS NULL OR cc.created_at >= c.last_verified_at)
          GROUP BY cc.camera_id`,
       )
       .bind(...chunk)
@@ -154,7 +180,7 @@ export async function getConfirmation(
   const d1 = await getD1();
   return d1
     .prepare(
-      "SELECT id, camera_id AS cameraId, contributor_id AS contributorId, created_at AS createdAt FROM camera_confirmations WHERE camera_id = ? AND contributor_id = ?",
+      "SELECT id, camera_id AS cameraId, contributor_id AS contributorId, created_at AS createdAt FROM camera_community_actions WHERE camera_id = ? AND contributor_id = ? AND action_type = 'confirm'",
     )
     .bind(cameraId, contributorId)
     .first<ConfirmationRecord>();
@@ -220,10 +246,12 @@ export async function setConfirmation(input: {
   if (camera.contributorId === input.contributorId) return { kind: "self_verify" };
 
   // 3. Level gate (fail-closed): at least `gateMin` (default 1) verified
-  //    contributions. Never email verification (no mailer, ADR 0013).
+  //    contributions. Never email verification (no mailer, ADR 0013). The
+  //    count also feeds the weight snapshot below (ADR 0021 §3.4).
   const verifiedCount = await verifiedContributionCount(input.contributorId);
   const gateMin = confirmationLevelGateMin(effectiveEnv);
   if (verifiedCount < gateMin) return { kind: "level_gate" };
+  const weight = ACTION_WEIGHT_BY_LEVEL[deriveLevel(verifiedCount)] ?? 0.25;
 
   // 4. Quota knobs: daily per-account cap (trusted accounts, >= gateMin
   //    verified contributions, get the higher knob) + per-record cap.
@@ -238,7 +266,9 @@ export async function setConfirmation(input: {
   //    SQLite statement: two concurrent PUTs cannot both read a stale COUNT
   //    and overshoot the caps by +1 (the old SELECT COUNT -> INSERT pair was
   //    a TOCTOU). ON CONFLICT DO NOTHING still dedupes the same
-  //    (camera_id, contributor_id) pair.
+  //    (camera_id, contributor_id) pair (the alias writes
+  //    action_type='confirm' only, so the conflict fires exactly like the
+  //    old toggle's 409).
   //
   //    The RESPONSE-KIND selection (duplicate vs daily_quota vs per-record
   //    cap) runs in the SAME d1.batch: the existing-pair probe and the two
@@ -253,16 +283,18 @@ export async function setConfirmation(input: {
   const batch = (await d1.batch([
     d1
       .prepare(
-        `INSERT INTO camera_confirmations (camera_id, contributor_id, created_at)
-         SELECT ?, ?, ?
-         WHERE (SELECT COUNT(*) FROM camera_confirmations WHERE contributor_id = ? AND created_at >= ?) < ?
-           AND (SELECT COUNT(*) FROM camera_confirmations WHERE camera_id = ? AND created_at >= ?) < ?
+        `INSERT INTO camera_community_actions (camera_id, contributor_id, action_type, weight, created_at, updated_at)
+         SELECT ?, ?, 'confirm', ?, ?, ?
+         WHERE (SELECT COUNT(*) FROM camera_community_actions WHERE contributor_id = ? AND action_type = 'confirm' AND created_at >= ?) < ?
+           AND (SELECT COUNT(*) FROM camera_community_actions WHERE camera_id = ? AND action_type = 'confirm' AND created_at >= ?) < ?
          ON CONFLICT (camera_id, contributor_id) DO NOTHING
          RETURNING id`,
       )
       .bind(
         input.cameraId,
         input.contributorId,
+        weight,
+        input.now,
         input.now,
         input.contributorId,
         windowStart,
@@ -272,13 +304,13 @@ export async function setConfirmation(input: {
         quota.perRecordPerDay,
       ),
     d1
-      .prepare("SELECT 1 AS ok FROM camera_confirmations WHERE camera_id = ? AND contributor_id = ?")
+      .prepare("SELECT 1 AS ok FROM camera_community_actions WHERE camera_id = ? AND contributor_id = ? AND action_type = 'confirm'")
       .bind(input.cameraId, input.contributorId),
     d1
-      .prepare("SELECT COUNT(*) AS n FROM camera_confirmations WHERE contributor_id = ? AND created_at >= ?")
+      .prepare("SELECT COUNT(*) AS n FROM camera_community_actions WHERE contributor_id = ? AND action_type = 'confirm' AND created_at >= ?")
       .bind(input.contributorId, windowStart),
     d1
-      .prepare("SELECT COUNT(*) AS n FROM camera_confirmations WHERE camera_id = ? AND created_at >= ?")
+      .prepare("SELECT COUNT(*) AS n FROM camera_community_actions WHERE camera_id = ? AND action_type = 'confirm' AND created_at >= ?")
       .bind(input.cameraId, windowStart),
   ])) as D1BatchResult[];
 
@@ -320,7 +352,7 @@ export async function removeConfirmation(input: {
 }): Promise<{ kind: "ok"; count: number } | { kind: "not_found" }> {
   const d1 = await getD1();
   const deleted = await d1
-    .prepare("DELETE FROM camera_confirmations WHERE camera_id = ? AND contributor_id = ? RETURNING id")
+    .prepare("DELETE FROM camera_community_actions WHERE camera_id = ? AND contributor_id = ? AND action_type = 'confirm' RETURNING id")
     .bind(input.cameraId, input.contributorId)
     .first<{ id: number }>();
   if (!deleted) return { kind: "not_found" };

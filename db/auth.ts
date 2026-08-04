@@ -1228,12 +1228,12 @@ export type ErasureResult = {
  * contributor's own data (art. 17), and each of those tables declares
  * ON DELETE CASCADE on `contributors.id` — mirrored here because the test
  * harness does not enforce foreign keys (P2-2, t_adfc121b; same rule as
- * `sessions` and `camera_confirmations`). `oidc_states` is NOT included: it
- * is pre-auth state with no contributor link.
+ * `sessions` and `camera_community_actions`). `oidc_states` is NOT included:
+ * it is pre-auth state with no contributor link.
  *
- * Returns the number of reports de-attributed, community verifications
- * deleted and correction reports de-attributed (for the erasure response and
- * the audit trail) and whether the account row existed at all.
+ * Returns the number of reports de-attributed, community actions deleted
+ * (ADR 0021 §13.1) and correction reports de-attributed (for the erasure
+ * response and the audit trail) and whether the account row existed at all.
  */
 export async function eraseContributor(contributorId: number): Promise<ErasureResult> {
   const d1 = await getD1();
@@ -1254,9 +1254,13 @@ export async function eraseContributor(contributorId: number): Promise<ErasureRe
     .first<{ n: number }>();
   const deattributedReports = Number(attributed?.n ?? 0);
   const confirmations = await d1
-    .prepare("SELECT COUNT(*) AS n FROM camera_confirmations WHERE contributor_id = ?")
+    .prepare("SELECT COUNT(*) AS n FROM camera_community_actions WHERE contributor_id = ?")
     .bind(contributorId)
     .first<{ n: number }>();
+  // ADR 0021 §13.1: the contributor's community actions are their own data
+  // (art. 17) — all types (confirm/like/gone/problem/privacy) are hard
+  // deleted. The response field keeps the legacy name `deletedConfirmations`
+  // for API compatibility; it now counts every deleted action row.
   const deletedConfirmations = Number(confirmations?.n ?? 0);
   const corrections = await d1
     .prepare("SELECT COUNT(*) AS n FROM correction_requests WHERE contributor_id = ?")
@@ -1277,9 +1281,12 @@ export async function eraseContributor(contributorId: number): Promise<ErasureRe
   const deattributedPhotos = Number(photos?.n ?? 0);
 
   await d1.batch([
-    // Community verifications are the contributor's own data (art. 17): the
-    // rows are hard-deleted. The count drops back on every public record.
-    d1.prepare("DELETE FROM camera_confirmations WHERE contributor_id = ?").bind(contributorId),
+    // Community actions (ADR 0021 §13.1) are the contributor's own data
+    // (art. 17): the rows are hard-deleted. Their influence on thresholds
+    // and counts ends immediately — counts are recomputed live. Transitions
+    // that already happened stay in history (aggregate, unattributed — no
+    // personal data in camera_lifecycle_events).
+    d1.prepare("DELETE FROM camera_community_actions WHERE contributor_id = ?").bind(contributorId),
     // Contribution-edit requests: SET NULL, never delete — the edit request
     // (and its moderation trail) survives, unlinked (audit, ADR 0018 §6.2).
     d1.prepare("UPDATE camera_edit_requests SET contributor_id = NULL WHERE contributor_id = ?").bind(contributorId),
