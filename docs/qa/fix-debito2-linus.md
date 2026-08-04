@@ -45,27 +45,27 @@ reali dal preview server Miniflare (`scripts/nowrap-390-check.mjs`, riproducibil
 |---|---|---|---|---|
 | 1 | `.sr-only` (56) | helper screen-reader, clip a 1px | **SICURO** | nowrap parte della ricetta sr-only (nessun testo visibile, niente clip visivo) |
 | 2 | `.directory-tool-heading .text-button` (90) | link "Usa invece la mappa" nell'header /directory | **SICURO** | 144px, nessun overflow (già verificato in t_c18b48f0: righe ~90/~498 OK a 1280/1024/900/768/390) |
-| 3 | `.photo-file-name` (389) | nome file foto in /segnala (ReportForm) | **DA INTERVENIRE** | ellipsis intenzionale ma il GRID PADRE `.photo-list` (387) ha colonna auto → col nome IT lungo la riga esplode a 748px e il documento va a 825px > 390px. Fix: `grid-template-columns:minmax(0,1fr)` su `.photo-list` (verificato empiricamente: 825→390, ellipsis attivo 592→24px) |
-| 4 | `.directory-tool .directory-controls > .text-button` (509) | bottone "Azzera i filtri" nei controlli /directory | **SICURO** | 161px, grid 1fr ≤700px, nessun overflow |
-| 5 | `.confirm-count` (773) | contatore verifiche nel toggle record | **SICURO** | testo breve "N verifica/verifiche" (12–15ch), niente ellipsis, nessun overflow (record demo assenti in preview → verificato staticamente + pattern) |
-| 6 | `.geocode-option-type` (875) | label tipo nel dropdown geocoding /mappa | **SICURO** | 54px, font 11px, capitalize — "street/via" corti, il nome dell'opzione wrappa, il tipo resta su una riga |
+| 3 | `.photo-file-name` (516) | nome file foto in /segnala (ReportForm) | **OK** ✅ (post-fix) | ellipsis attivo (scrollWidth 592 → clientWidth 192), documento a 390px — fix applicato in follow-up t_4877eafc |
+| 4 | `.directory-tool .directory-controls > .text-button` (519) | bottone "Azzera i filtri" nei controlli /directory | **SICURO** | 161px, grid 1fr ≤700px, nessun overflow |
+| 5 | `.confirm-count` (783) | contatore verifiche nel toggle record | **SICURO** | testo breve "N verifica/verifiche" (12–15ch), niente ellipsis, nessun overflow (record demo assenti in preview → verificato staticamente + pattern) |
+| 6 | `.geocode-option-type` (885) | label tipo nel dropdown geocoding /mappa | **SICURO** | 54px, font 11px, capitalize — "street/via" corti, il nome dell'opzione wrappa, il tipo resta su una riga |
 
 Le due `flex-wrap:nowrap` (442 menu mobile, 483 indice A–Z) NON sono `white-space` e sono
 intenzionali (dropdown / scroll orizzontale) — fuori scope.
 
-### Fix richiesto (follow-up post design PR t_be89b99c)
+### Fix applicato (follow-up t_4877eafc, post design PR t_be89b99c)
 
 ```css
-/* app/globals.css riga 387 — da applicare dopo il merge della design PR */
-.photo-list { display:grid; gap:7px; margin:0; padding:0; list-style:none;
-              grid-template-columns:minmax(0,1fr); }
+/* app/globals.css riga 514 — applicato dopo il merge della design PR (#291, 750ed1d) */
+.photo-list { display:grid; grid-template-columns:minmax(0,1fr); gap:7px; margin:0; padding:0; list-style:none; }
 ```
 
 Il solo `minmax(0,1fr)` sulla colonna di `.photo-list` è sufficiente e minimale: la riga
 `li` (flex) viene vincolata alla larghezza del contenitore, `.photo-file-name`
 (`flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis`) può finalmente
-contrarsi ed ellissare il nome lungo. Verificato a 390px IT: document scrollWidth 825 → 390,
-nome ellissato (scrollWidth 592 → clientWidth 24).
+contrarsi ed ellissare il nome lungo. **Verificato a 390px IT (verdetto finale):
+document scrollWidth 825 → 390, nome ellissato (scrollWidth 592 → clientWidth 192,
+ellipsis attivo), check 6/6 OK.**
 
 ## 3. File toccati
 
@@ -74,6 +74,7 @@ nome ellissato (scrollWidth 592 → clientWidth 24).
 - `app/layout.tsx` — commento fallback aggiornato
 - `tests/rendered-html.test.mjs` — asserzioni metadata home EN+IT
 - `scripts/nowrap-390-check.mjs` — verifica nowrap 390px (riproducibile)
+- `app/globals.css` — **follow-up t_4877eafc:** `.photo-list` → `grid-template-columns:minmax(0,1fr)` (riga 514)
 - Questo report: `docs/qa/fix-debito2-linus.md`
 
 ## 4. Verifiche eseguite
@@ -82,4 +83,4 @@ nome ellissato (scrollWidth 592 → clientWidth 24).
 - `npm run lint` → exit 0
 - `npm run build` → exit 0
 - `node --test tests/*.test.mjs` → **1901/1901 pass** (rendered-html 25/25, axe 22/22)
-- Verifica browser 390px IT (`scripts/nowrap-390-check.mjs`) → 5 OK + 1 intervento documentato
+- Verifica browser 390px IT (`scripts/nowrap-390-check.mjs`) → **6/6 OK** (photo-file-name da FAIL-atteso a OK con ellipsis; document scrollWidth 390 ≤ 390)
