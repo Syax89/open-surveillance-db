@@ -82,8 +82,9 @@ test("server-rendered homepage carries the public app metadata", async () => {
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
-  // The real app metadata (app/layout.tsx), not the starter's placeholder.
-  assert.match(html, /<title>OpenSurveillanceDB[^<]*Public data about public surveillance<\/title>/i);
+  // Home owns dedicated, localized metadata rather than inheriting layout fallback.
+  assert.match(html, /<title>Open public surveillance infrastructure database[^<]*<\/title>/i);
+  assert.match(html, /<meta name="description" content="OpenSurveillanceDB is a civic, non-commercial database of visible public surveillance infrastructure: sourced, moderated and privacy-first\."/i);
   assert.match(html, /<html[^>]*lang="en"/);
   assert.match(html, /OpenSurveillanceDB/);
   assert.match(html, /Public data about public surveillance\./);
@@ -126,8 +127,9 @@ test("server-rendered homepage honours the persisted locale cookie (SSR lang + m
 
   assert.equal(response.status, 200);
   assert.match(html, /<html[^>]*lang="it"/);
-  assert.match(html, /<title>OpenSurveillanceDB[^<]*Dati pubblici sulla sorveglianza pubblica<\/title>/i);
-  assert.match(html, /Un database aperto e mantenuto dalla/);
+  assert.match(html, /<title>Database aperto dell(?:'|&#x27;)infrastruttura di sorveglianza pubblica[^<]*<\/title>/i);
+  assert.match(html, /<meta name="description" content="OpenSurveillanceDB è un database civico e non commerciale dell(?:'|&#x27;)infrastruttura di sorveglianza pubblica visibile: documentato, moderato e progettato per la privacy\."/i);
+  assert.match(html, /Database aperto · mantenuto dalla comunità/);
 });
 
 test("server-rendered informational pages honour the locale cookie (html lang + per-route metadata)", async () => {

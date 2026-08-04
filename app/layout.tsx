@@ -9,7 +9,8 @@ import "./globals.css";
  * Root metadata, localized from the locale cookie (ADR 0015).
  *
  * This is the fallback <title>/<description> for every route without its own
- * generateMetadata (home, records, auth pages). The informational pages
+ * generateMetadata (records, auth pages). The home page defines its own
+ * localized metadata (app/page.tsx, t_e06f5c87). The informational pages
  * define their own per-route metadata. Without a cookie the server renders
  * the pilot language (English, ADR 0007) — which is also what crawlers see.
  */
