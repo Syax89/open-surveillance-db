@@ -35,14 +35,16 @@ type Props = {
    * domes, whose 360° vision needs no bearing); direction is the bearing
    * 0-359 or null ("non so"); directionKnown flips when the contributor
    * specifies one. All state lives in useReportFlow, like the rest of the
-   * form, so it resets with the form on success.
+   * form, so it resets with the form on success. Optional with safe
+   * defaults: a host that does not wire the direction state (direct
+   * embedding, tests) renders the plain form without the fieldset.
    */
-  kind: string;
-  setKind: (value: string) => void;
-  direction: number | null;
-  setDirection: (value: number | null) => void;
-  directionKnown: boolean;
-  setDirectionKnown: (value: boolean) => void;
+  kind?: string;
+  setKind?: (value: string) => void;
+  direction?: number | null;
+  setDirection?: (value: number | null) => void;
+  directionKnown?: boolean;
+  setDirectionKnown?: (value: boolean) => void;
   /**
    * P1-5 (F5): /segnala owns the page header via .tool-heading (h1). When
    * embedded in the tool page the form must not repeat eyebrow + h2 +
@@ -58,11 +60,13 @@ type Props = {
  * photos (uploaded to the private evidence store) and submit for
  * moderation. State and handlers come from `useReportFlow` via props.
  */
-export function ReportForm({ coordinates, manualLatitude, setManualLatitude, manualLongitude, setManualLongitude, nearbyCandidates, nearbyLoading, nearbyError, duplicateConfirmationRequired, duplicateConfirmed, setDuplicateConfirmed, photos, photoUploading, photoInputRef, onPhotoSelected, removePhoto, selectManualCoordinates, submitReport, kind, setKind, direction, setDirection, directionKnown, setDirectionKnown, showHeading = true }: Props) {
+export function ReportForm({ coordinates, manualLatitude, setManualLatitude, manualLongitude, setManualLongitude, nearbyCandidates, nearbyLoading, nearbyError, duplicateConfirmationRequired, duplicateConfirmed, setDuplicateConfirmed, photos, photoUploading, photoInputRef, onPhotoSelected, removePhoto, selectManualCoordinates, submitReport, kind = "", setKind = () => {}, direction = null, setDirection = () => {}, directionKnown = false, setDirectionKnown = () => {}, showHeading = true }: Props) {
   const t = useMessages().report;
   // Dome selection hides the direction field entirely (a dome's 360° vision
   // has no bearing — the backend stores NULL for domes as an invariant).
   // Switching TO a dome clears any bearing the contributor may have picked.
+  // A blank/unwired kind never shows the field (safe default for direct
+  // embeddings that do not pass the direction state).
   const showDirectionField = kind !== "" && !isDomeKind(kind);
   const handleKindChange = (value: string) => {
     setKind(value);
