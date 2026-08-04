@@ -2,8 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { isPublicStatus } from "../lib/public-status";
-import { BOUNDS_DEBOUNCE_MS, escapeHtml } from "../lib/map-viewport";
-import type { ViewportBounds } from "../lib/map-viewport";
+import { BOUNDS_DEBOUNCE_MS, escapeHtml, recordsInBounds, type ViewportBounds } from "../lib/map-viewport";
 import { useMessages } from "./LocaleProvider";
 
 export type MapCamera = {
@@ -72,6 +71,17 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
   // run again, leaving .leaflet-marker-pane empty while the sidebar shows
   // the same records (t_eb2e33a3 regression after #202).
   const [mapReady, setMapReady] = useState(false);
+  // Viewport culling (QA#5 F3, t_ab0d4c75 — PM directive: ZERO new
+  // libraries, no Leaflet.markercluster, no supercluster): only the records
+  // inside the CURRENT map viewport (padded) get a marker. The full dataset
+  // is never materialised as N DOM nodes — on a realistic civic DB
+  // (thousands of cameras) rendering every record as a divIcon marker is
+  // what degraded Leaflet pan/zoom and blew the DOM. The culled set is
+  // recomputed on every moveend/zoomend (debounced, same cadence as the
+  // sidebar list), so panning/zooming lazily loads exactly the markers the
+  // user can see. Null = viewport not emitted yet: keep every marker (the
+  // same contract as recordsInBounds, so the first paint is never blank).
+  const [viewportBounds, setViewportBounds] = useState<ViewportBounds | null>(null);
   const mapElement = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<import("leaflet").Map | null>(null);
   const markersRef = useRef<import("leaflet").LayerGroup | null>(null);
@@ -148,13 +158,23 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
   }, []);
 
   // Viewport→list sync: read the current bounds and hand them to the parent
-  // (the sidebar list). Called debounced on moveend/zoomend and once after
-  // the map is created so the list starts in sync with the initial view.
+  // (the sidebar list) AND keep a local copy for marker culling (QA#5 F3).
+  // Called debounced on moveend/zoomend and once after the map is created
+  // so the list starts in sync with the initial view.
   const emitBounds = useCallback(() => {
     const map = mapRef.current;
     if (!map) return;
     const bounds = map.getBounds();
-    onBoundsChangeRef.current?.({ south: bounds.getSouth(), north: bounds.getNorth(), west: bounds.getWest(), east: bounds.getEast() });
+    const next = { south: bounds.getSouth(), north: bounds.getNorth(), west: bounds.getWest(), east: bounds.getEast() };
+    onBoundsChangeRef.current?.(next);
+    // Identity-guarded: a moveend burst during a pan emits the same
+    // rectangle; skipping the state write avoids a pointless marker
+    // rebuild (the culling effect keys on this object).
+    setViewportBounds((current) => (
+      current && current.south === next.south && current.north === next.north && current.west === next.west && current.east === next.east
+        ? current
+        : next
+    ));
   }, []);
 
   useEffect(() => {
@@ -232,10 +252,10 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
     };
   }, [emitBounds]);
 
-  // Marker population depends on the camera list, the click handler — NOT
-  // on the selection. Rebuilding every marker on each selection change
-  // would recreate N Leaflet DOM nodes per click; the selection is applied
-  // by the dedicated effect below.
+  // Marker population depends on the camera list, the click handler and
+  // the viewport culling rectangle — NOT on the selection. Rebuilding every
+  // marker on each selection change would recreate N Leaflet DOM nodes per
+  // click; the selection is applied by the dedicated effect below.
   //
   // `mapReady` guards the first run: leaflet is imported lazily, so at
   // mount `leafletRef.current` is null and the effect must no-op; once the
@@ -245,11 +265,22 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
   // after #202: the sidebar listed the records while .leaflet-marker-pane
   // stayed empty because the effect had early-returned before the import
   // resolved and no later render re-triggered it).
+  //
+  // QA#5 F3 (t_ab0d4c75, PM directive: ZERO new libraries — no
+  // Leaflet.markercluster, no supercluster): only the records inside the
+  // CURRENT viewport rectangle get a marker (recordsInBounds, same helper
+  // the sidebar list uses, so map and list can never disagree). A pan or
+  // zoom settles → moveend → debounced emitBounds → new viewportBounds →
+  // this effect rebuilds exactly the visible markers, so the DOM never
+  // materialises the full dataset (thousands of divIcon nodes on a civic
+  // DB is what degraded Leaflet pan/zoom). Null bounds (viewport not
+  // emitted yet) keeps every marker, so the first paint is never blank.
   useEffect(() => {
     const L = leafletRef.current; const layer = markersRef.current; if (!L || !layer || !mapReady) return;
     layer.clearLayers();
     const byId = new Map<number, MarkerEntry>();
-    cameras.forEach((camera) => {
+    const visible = recordsInBounds(cameras, viewportBounds);
+    visible.forEach((camera) => {
       const marker = L.marker([camera.latitude, camera.longitude], { icon: buildMarkerIcon(L, camera, false), title: camera.title });
       marker.bindTooltip(`${camera.title}<br/><small>${camera.kind}</small>`, { direction: "top", offset: [0, -12] });
       // Popup opens on marker click (Leaflet default) and carries the
@@ -282,7 +313,7 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
       entry.marker.setIcon(buildMarkerIcon(L, entry.camera, true));
       if (focusLocationRef.current) entry.marker.openPopup();
     }
-  }, [cameras, onSelect, mapReady]);
+  }, [cameras, onSelect, mapReady, viewportBounds]);
 
   // Selection: swap the `selected` class only on the previously and the
   // newly selected marker (two setIcon calls, no layer rebuild). When the
