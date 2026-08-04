@@ -13,6 +13,7 @@ export const EDITABLE_EDIT_FIELDS = [
   "notes",
   "manufacturer",
   "observedOn",
+  "direction",
   "description",
 ];
 
@@ -23,6 +24,7 @@ export const EDITABLE_EDIT_FIELD_LIMITS = {
   notes: 1000,
   manufacturer: 80,
   observedOn: 10,
+  direction: 3,
   description: 1000,
 };
 
@@ -72,6 +74,20 @@ export function parseEditableEditFields(value) {
     }
     const maxLength = EDITABLE_EDIT_FIELD_LIMITS[key];
     const raw = body[key];
+    // direction (t_1b08fe12): nullable integer bearing 0-359, handled before
+    // the string columns because an explicit null is a MEANINGFUL clear.
+    if (key === "direction") {
+      if (raw === undefined) continue;
+      if (raw === null) {
+        fields.direction = null;
+        continue;
+      }
+      if (typeof raw !== "number" || !Number.isInteger(raw) || raw < 0 || raw > 359) {
+        return { ok: false, error: 'Field "direction" must be an integer between 0 and 359, or null.', status: 422 };
+      }
+      fields.direction = raw;
+      continue;
+    }
     if (raw === undefined || raw === null) continue;
     if (typeof raw !== "string") {
       return { ok: false, error: `Field "${key}" must be a string.` };

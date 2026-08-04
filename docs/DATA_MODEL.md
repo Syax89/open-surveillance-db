@@ -190,6 +190,9 @@ of `cameras` and the input contract of the submission routes.
 
 The public record plus moderation state. Public projection: `id`, `title`,
 `kind`, `manufacturer`/`observedOn` (conditional on the publish flags),
+`direction` (field-of-view bearing 0-359 for directional cameras, `NULL`
+otherwise — migration `0035`, kanban `t_1b08fe12`; a dome camera, canonical
+kind `Fixed dome`, always stores `NULL` and renders circular on the map),
 `address`, `description`, `latitude`, `longitude`, `source`, `updated`,
 `status`, `createdAt`. Private columns: `notes` (intake notes, never public),
 `publishManufacturer`, `publishObservedOn`, freshness state
@@ -304,7 +307,8 @@ Community contribution editing (ADR 0018 §4, migration `0021`). Published-
 record edits never mutate `cameras` directly: they insert a row here with
 the explicit per-column diff against the editable whitelist (`proposedTitle`,
 `proposedKind`, `proposedAddress`, `proposedNotes`, `proposedManufacturer`,
-`proposedObservedOn`, `proposedDescription`) plus a `moderation_queue` row
+`proposedObservedOn`, `proposedDirection`, `proposedDescription` — the
+direction column is migration `0035`) plus a `moderation_queue` row
 (entity `camera_edit`). `cameraId` (set null on delete), `contributorId`,
 `status` (`pending` → `approved` | `rejected`), `decidedBy` → `reviewers.id`,
 `decisionNote`, `decidedAt`, timestamps. The partial unique index

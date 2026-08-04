@@ -90,6 +90,8 @@ const ownerView = {
   notes: "Private note",
   latitude: 41.9005,
   longitude: 12.4937,
+  // Dome fixture (kind "Fixed dome"): direction is always NULL (t_1b08fe12).
+  direction: null,
   status: "pending",
   source: "Community report",
   updated: "Community edit",
@@ -447,6 +449,49 @@ test("E5 clearing a nullable field is a valid edit and reaches the db layer", as
   assert.equal(input.fields.address, null, "empty address clears the field (null)");
 });
 
+test("E5 direction: a bearing 0-359 is a valid editable field and reaches the db layer", async () => {
+  liveSession();
+  stub("applyCameraEdit", async () => ({ kind: "direct_applied", record: ownerView }));
+  const { PATCH } = await cameraEditRoute();
+  for (const direction of [0, 45, 359]) {
+    const response = await PATCH(authedPatch("/api/cameras/5", { direction }));
+    assert.equal(response.status, 200, `direction=${direction} must be a valid edit`);
+    const [input] = callArgs("applyCameraEdit").at(-1);
+    assert.equal(input.fields.direction, direction, `direction=${direction} must reach the db layer`);
+  }
+});
+
+test("E5 direction: explicit null clears the bearing (meaningful clear, reaches the db layer)", async () => {
+  liveSession();
+  stub("applyCameraEdit", async () => ({ kind: "direct_applied", record: ownerView }));
+  const { PATCH } = await cameraEditRoute();
+  const response = await PATCH(authedPatch("/api/cameras/5", { direction: null }));
+  assert.equal(response.status, 200);
+  const [input] = callArgs("applyCameraEdit")[0];
+  assert.equal(input.fields.direction, null, "an explicit null direction must be forwarded as a clear");
+});
+
+test("E5 direction: out-of-range or non-integer bearings answer 422 before any write", async (t) => {
+  const { PATCH } = await cameraEditRoute();
+  const cases = [
+    ["above 359", 360],
+    ["negative", -1],
+    ["decimal", 90.5],
+    ["numeric string", "45"],
+    ["boolean", true],
+  ];
+  for (const [name, direction] of cases) {
+    await t.test(name, async () => {
+      liveSession();
+      const response = await PATCH(authedPatch("/api/cameras/5", { direction }));
+      assert.equal(response.status, 422, `${name} must answer 422 (distinct from the 400 whitelist violations)`);
+      const body = await responseBody(response);
+      assert.match(body.error, /direction/, `${name} error must name the field`);
+      assert.equal(callArgs("applyCameraEdit").length, 0, `${name}: no write before validation`);
+    });
+  }
+});
+
 test("E9 malformed ids answer 404 and never reach the db layer", async (t) => {
   const { PATCH } = await cameraEditRoute();
   for (const id of ["abc", "0", "-1", "1e3"]) {
@@ -560,6 +605,7 @@ async function insertCamera(overrides = {}) {
     notes: "",
     latitude: 44.1,
     longitude: 12.2,
+    direction: null,
     status: "pending",
     source: "Community report",
     updated: "Submitted just now",
@@ -573,13 +619,13 @@ async function insertCamera(overrides = {}) {
   };
   return (await db
     .prepare(
-      `INSERT INTO cameras (title, kind, manufacturer, observed_on, publish_manufacturer, publish_observed_on, address, notes, latitude, longitude, status, source, updated, description, last_verified_at, review_due_at, review_interval_months, contributor_id, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO cameras (title, kind, manufacturer, observed_on, publish_manufacturer, publish_observed_on, address, notes, latitude, longitude, direction, status, source, updated, description, last_verified_at, review_due_at, review_interval_months, contributor_id, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        RETURNING id`,
     )
     .bind(
       row.title, row.kind, row.manufacturer, row.observedOn, row.publishManufacturer, row.publishObservedOn,
-      row.address, row.notes, row.latitude, row.longitude, row.status, row.source, row.updated, row.description,
+      row.address, row.notes, row.latitude, row.longitude, row.direction, row.status, row.source, row.updated, row.description,
       row.lastVerifiedAt, row.reviewDueAt, row.reviewIntervalMonths, row.contributorId, row.createdAt,
     )
     .first()).id;
@@ -623,6 +669,153 @@ test("E1 real SQL: owner pending edit updates the record and records an edit_app
   assert.equal(row.notes, "Updated note");
   // Audit trail: exactly one edit_applied event for the camera.
   assert.equal(await moderationEventCount("camera", cameraId, "edit_applied"), 1);
+});
+
+test("E1 real SQL: owner pending edit sets and clears the direction bearing", async () => {
+  await freshDb();
+  const ownerId = await insertContributor();
+  const cameraId = await insertCamera({ contributorId: ownerId, kind: "PTZ", direction: null });
+
+  // Set: a directional camera stores the proposed bearing.
+  const set = await cameraEdits.applyCameraEdit({
+    cameraId, contributorId: ownerId, fields: { direction: 135 }, now: NOW,
+  });
+  assert.equal(set.kind, "direct_applied");
+  assert.equal(set.record.direction, 135, "the applied edit must echo the stored bearing");
+
+  const afterSet = await db.prepare("SELECT direction FROM cameras WHERE id = ?").bind(cameraId).first();
+  assert.equal(afterSet.direction, 135);
+
+  // Clear: an explicit null removes the bearing (meaningful clear).
+  const clear = await cameraEdits.applyCameraEdit({
+    cameraId, contributorId: ownerId, fields: { direction: null }, now: NOW,
+  });
+  assert.equal(clear.kind, "direct_applied");
+  assert.equal(clear.record.direction, null);
+
+  const afterClear = await db.prepare("SELECT direction FROM cameras WHERE id = ?").bind(cameraId).first();
+  assert.equal(afterClear.direction, null, "explicit null must clear the stored bearing");
+  assert.equal(await moderationEventCount("camera", cameraId, "edit_applied"), 2);
+});
+
+test("E1 real SQL: the dome rule drops a proposed direction when the final kind is a dome", async () => {
+  await freshDb();
+  const ownerId = await insertContributor();
+  const cameraId = await insertCamera({ contributorId: ownerId, kind: "PTZ", direction: 120 });
+
+  // Turning the camera into a dome while proposing a bearing: the direction
+  // must be IGNORED (the map renders domes circular), the kind change kept.
+  const result = await cameraEdits.applyCameraEdit({
+    cameraId, contributorId: ownerId,
+    fields: { kind: "Fixed dome", direction: 45 },
+    now: NOW,
+  });
+  assert.equal(result.kind, "direct_applied");
+  assert.equal(result.record.kind, "Fixed dome");
+  assert.equal(result.record.direction, null, "a dome never stores a bearing even when one is proposed");
+
+  const row = await db.prepare("SELECT kind, direction FROM cameras WHERE id = ?").bind(cameraId).first();
+  assert.equal(row.kind, "Fixed dome");
+  assert.equal(row.direction, null, "the stored direction must stay NULL for a dome");
+});
+
+test("E3 real SQL: published-record edit proposes direction and approve applies it", async () => {
+  await freshDb();
+  const ownerId = await insertContributor();
+  const cameraId = await insertCamera({
+    contributorId: ownerId, status: "verified", kind: "PTZ", direction: null,
+    lastVerifiedAt: NOW, reviewDueAt: "2027-08-01T00:00:00.000Z",
+  });
+
+  const created = await cameraEdits.applyCameraEdit({
+    cameraId, contributorId: ownerId, fields: { direction: 270 }, now: NOW,
+  });
+  assert.equal(created.kind, "edit_request_created");
+
+  const request = await db
+    .prepare("SELECT proposed_direction AS proposedDirection FROM camera_edit_requests WHERE id = ?")
+    .bind(created.editRequest.id)
+    .first();
+  assert.equal(request.proposedDirection, 270, "the diff must store the proposed bearing");
+
+  const cameraBefore = await db.prepare("SELECT direction FROM cameras WHERE id = ?").bind(cameraId).first();
+  assert.equal(cameraBefore.direction, null, "cameras must not be mutated until approval");
+
+  db.exec(`
+    INSERT INTO users (id, email, display_name, role, active, mfa_enabled, created_at, updated_at) VALUES
+      (2, 'record@osdb.test', 'Demo Record Reviewer', 'moderator', 1, 0, '2026-08-01T00:00:00.000Z', '2026-08-01T00:00:00.000Z');
+    INSERT INTO reviewers (id, display_name, role, active, mfa_enabled, created_at, updated_at) VALUES
+      (2, 'Demo Record Reviewer', 'record_reviewer', 1, 0, '2026-07-31T00:00:00.000Z', '2026-07-31T00:00:00.000Z');
+  `);
+
+  const decided = await moderation.moderateCameraEdit(
+    created.editRequest.id, "approve", "verified-public-infrastructure", null,
+    { actorId: 2 },
+  );
+  assert.equal(decided.kind, "ok");
+  const camera = await db.prepare("SELECT direction FROM cameras WHERE id = ?").bind(cameraId).first();
+  assert.equal(camera.direction, 270, "approve must apply the proposed bearing to the camera");
+});
+
+test("E3 real SQL: moderation queue exposes proposedDirection and currentDirection (moderators see the field)", async () => {
+  await freshDb();
+  const ownerId = await insertContributor();
+  const cameraId = await insertCamera({
+    contributorId: ownerId, status: "verified", kind: "PTZ", direction: 45,
+    lastVerifiedAt: NOW, reviewDueAt: "2027-08-01T00:00:00.000Z",
+  });
+
+  const created = await cameraEdits.applyCameraEdit({
+    cameraId, contributorId: ownerId, fields: { direction: 200 }, now: NOW,
+  });
+  assert.equal(created.kind, "edit_request_created");
+
+  // The moderator's queue must carry BOTH the current bearing and the
+  // proposed one so the decision UI can show a before/after (t_1b08fe12 §5).
+  const queue = await moderation.listPendingModerationItems();
+  const pending = queue.cameraEditRequests.find((item) => item.id === created.editRequest.id);
+  assert.ok(pending, "the pending edit request must appear in the queue");
+  assert.equal(pending.currentDirection, 45, "the queue shows the current bearing of the camera");
+  assert.equal(pending.proposedDirection, 200, "the queue shows the proposed bearing of the edit");
+});
+
+test("E3 real SQL: the dome rule is re-applied at moderation apply time (belt-and-braces)", async () => {
+  await freshDb();
+  const ownerId = await insertContributor();
+  const cameraId = await insertCamera({
+    contributorId: ownerId, status: "verified", kind: "PTZ", direction: 90,
+    lastVerifiedAt: NOW, reviewDueAt: "2027-08-01T00:00:00.000Z",
+  });
+
+  // Force a stale request row directly in SQL: proposed_kind dome + a
+  // proposed_direction. The apply-time CASE must store NULL regardless.
+  const inserted = await db
+    .prepare(
+      `INSERT INTO camera_edit_requests (camera_id, contributor_id, proposed_kind, proposed_direction, status, created_at, updated_at)
+       VALUES (?, ?, 'Fixed dome', 200, 'pending', ?, ?) RETURNING id`,
+    )
+    .bind(cameraId, ownerId, NOW, NOW)
+    .first();
+  await db
+    .prepare("INSERT INTO moderation_queue (entity, entity_id, state, sensitivity, created_at, updated_at) VALUES ('camera_edit', ?, 'open', 'standard', ?, ?)")
+    .bind(inserted.id, NOW, NOW)
+    .first();
+
+  db.exec(`
+    INSERT INTO users (id, email, display_name, role, active, mfa_enabled, created_at, updated_at) VALUES
+      (2, 'record@osdb.test', 'Demo Record Reviewer', 'moderator', 1, 0, '2026-08-01T00:00:00.000Z', '2026-08-01T00:00:00.000Z');
+    INSERT INTO reviewers (id, display_name, role, active, mfa_enabled, created_at, updated_at) VALUES
+      (2, 'Demo Record Reviewer', 'record_reviewer', 1, 0, '2026-07-31T00:00:00.000Z', '2026-07-31T00:00:00.000Z');
+  `);
+
+  const decided = await moderation.moderateCameraEdit(
+    inserted.id, "approve", "verified-public-infrastructure", null,
+    { actorId: 2 },
+  );
+  assert.equal(decided.kind, "ok");
+  const camera = await db.prepare("SELECT kind, direction FROM cameras WHERE id = ?").bind(cameraId).first();
+  assert.equal(camera.kind, "Fixed dome");
+  assert.equal(camera.direction, null, "a stale dome edit request must never write a bearing (dome rule at apply time)");
 });
 
 test("E1 real SQL: non-owner and anonymous-record edits answer not_found (fail-closed)", async () => {

@@ -145,10 +145,12 @@ test("the public camera query never selects the private notes field", async () =
   // absent before it (the PR head may predate it even when main has it).
   const tableInfo = await env.DB.prepare("PRAGMA table_info(cameras)").all();
   const hasFreshness = tableInfo.results.some((column) => column.name === "last_verified_at");
+  const hasDirection = tableInfo.results.some((column) => column.name === "direction");
   const expectedKeys = [
     "address",
     "createdAt",
     "description",
+    ...(hasDirection ? ["direction"] : []),
     "id",
     "kind",
     ...(hasFreshness ? ["lastVerifiedAt"] : []),

@@ -1,4 +1,4 @@
-import { getD1 } from "./cameras";
+import { DOME_KIND, getD1 } from "./cameras";
 import { recordModerationEvent } from "./moderation";
 
 /**
@@ -19,7 +19,8 @@ import { recordModerationEvent } from "./moderation";
  *   - `removed` / `rejected` (terminal) -> `status_blocked` (409).
  *
  * Only the whitelist columns are ever touched (title, kind, address, notes,
- * manufacturer, observedOn, description — same limits as POST /api/cameras).
+ * manufacturer, observedOn, direction, description — same limits as POST
+ * /api/cameras; direction is an integer bearing 0-359 or null, t_1b08fe12).
  * `status`, `contributor_id`, `source`, `publish_*`, `last_verified_at` /
  * `review_due_at` (freshness clock) are never editable: the parser rejects
  * them per-field with 400 before any write, so there are never partial
@@ -38,6 +39,9 @@ export const EDITABLE_EDIT_FIELD_LIMITS = {
   notes: 1000,
   manufacturer: 80,
   observedOn: 10,
+  // Bearing 0-359 (t_1b08fe12): the length cap is a sanity bound only — the
+  // real validation is integer-in-range in parseEditableEditFields.
+  direction: 3,
   description: 1000,
 } as const;
 
@@ -69,6 +73,8 @@ export type EditableCameraFields = {
   notes?: string;
   manufacturer?: string | null;
   observedOn?: string | null;
+  /** Integer bearing 0-359 (clockwise from north), or null to clear (t_1b08fe12). */
+  direction?: number | null;
   description?: string;
 };
 
@@ -80,7 +86,7 @@ export type ParsedEditPayload = {
 
 export type ParseEditResult =
   | { ok: true; payload: ParsedEditPayload }
-  | { ok: false; error: string };
+  | { ok: false; error: string; status?: number };
 
 /** The owner view of a camera: the full row, notes included. */
 export type OwnerCameraRecord = {
@@ -95,6 +101,8 @@ export type OwnerCameraRecord = {
   notes: string;
   latitude: number;
   longitude: number;
+  /** Field-of-view bearing 0-359, or null (t_1b08fe12). */
+  direction: number | null;
   status: string;
   source: string;
   updated: string;
@@ -201,6 +209,7 @@ export async function getCameraEditView(
       notes: camera.notes,
       latitude: camera.latitude,
       longitude: camera.longitude,
+      direction: camera.direction,
       status: camera.status,
       source: camera.source,
       updated: camera.updated,
@@ -223,7 +232,8 @@ function isCalendarDate(value: string): boolean {
 /**
  * Validate one PATCH body against the editable whitelist. Every key must be
  * an editable field (title, kind, address, notes, manufacturer, observedOn,
- * description) or the optional `expectedUpdated` precondition; any other key
+ * direction, description) or the optional `expectedUpdated` precondition;
+ * any other key
  * (status, contributor_id, source, publish_*, freshness clock, coordinates)
  * is rejected per-field with the field named — before any database write, so
  * a rejected payload never has partial effects. Length caps mirror POST
@@ -253,6 +263,23 @@ export function parseEditableEditFields(value: unknown): ParseEditResult {
     const field = key as EditableEditField;
     const maxLength = EDITABLE_EDIT_FIELD_LIMITS[field];
     const raw = body[field];
+    // direction (t_1b08fe12): nullable integer bearing 0-359. Unlike the
+    // string columns, an explicit null is a MEANINGFUL value here (clear
+    // the direction), so it is handled before the "not supplied" skip.
+    // Out-of-range / non-integer values answer 422 so the route can render
+    // the field error distinctly from the generic 400 whitelist violations.
+    if (field === "direction") {
+      if (raw === undefined) continue;
+      if (raw === null) {
+        fields.direction = null;
+        continue;
+      }
+      if (typeof raw !== "number" || !Number.isInteger(raw) || raw < 0 || raw > 359) {
+        return { ok: false, error: 'Field "direction" must be an integer between 0 and 359, or null.', status: 422 };
+      }
+      fields.direction = raw;
+      continue;
+    }
     // null / undefined: the client did not supply a value for this column.
     if (raw === undefined || raw === null) continue;
     if (typeof raw !== "string") {
@@ -305,6 +332,7 @@ type CameraEditRow = {
   notes: string;
   latitude: number;
   longitude: number;
+  direction: number | null;
   status: string;
   source: string;
   updated: string;
@@ -317,7 +345,7 @@ type CameraEditRow = {
 };
 
 const ownerColumns =
-  "id, title, kind, manufacturer, observed_on AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, notes, latitude, longitude, status, source, updated, description, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, contributor_id AS contributorId, created_at AS createdAt";
+  "id, title, kind, manufacturer, observed_on AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, notes, latitude, longitude, direction, status, source, updated, description, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, contributor_id AS contributorId, created_at AS createdAt";
 
 async function loadCameraForEdit(d1: Awaited<ReturnType<typeof getD1>>, cameraId: number): Promise<CameraEditRow | null> {
   return d1
@@ -344,8 +372,41 @@ function diffFields(row: CameraEditRow, fields: EditableCameraFields): EditableC
   if (fields.observedOn !== undefined && fields.observedOn !== storedText(row.observedOn)) {
     diff.observedOn = fields.observedOn;
   }
+  // direction is a nullable INTEGER: NULL and the stored value compare
+  // directly (no storedText normalisation needed). Explicit null (clear)
+  // diffs against a non-null stored value; null-vs-null is a no-op.
+  if (fields.direction !== undefined && fields.direction !== row.direction) {
+    diff.direction = fields.direction;
+  }
   if (fields.description !== undefined && fields.description !== row.description) diff.description = fields.description;
   return diff;
+}
+
+/**
+ * Dome rule (t_1b08fe12): a dome camera never stores a direction. When the
+ * FINAL kind after this edit is the canonical DOME_KIND — either the kind
+ * is being changed to a dome, or the record already is one and no kind
+ * change is proposed — any proposed direction is dropped from the diff. It
+ * is IGNORED, never rejected, so a contributor who fills the field while
+ * picking a dome loses nothing (the map renders domes circular anyway).
+ * The moderation apply path re-applies the same rule in SQL
+ * (db/moderation.ts moderateCameraEdit) as belt-and-braces.
+ *
+ * Kind-change invariant: when the edit CONVERTS a directional camera into a
+ * dome, the stored bearing must be cleared (NULL) too — not just the newly
+ * proposed one — or the record would violate "domes always carry NULL".
+ * So the rule also forces diff.direction = null when the record currently
+ * holds a bearing. (In the published path the SQL CASE in moderateCameraEdit
+ * enforces the same NULL; here the diff simply records the clear.)
+ */
+function applyDomeDirectionRule(camera: CameraEditRow, fields: EditableCameraFields, diff: EditableCameraFields): void {
+  const finalKind = fields.kind ?? camera.kind;
+  if (finalKind === DOME_KIND) {
+    if (diff.direction !== undefined) delete diff.direction;
+    // Conversion invariant: a dome never stores a bearing — clear the
+    // existing one so the stored row obeys the rule even without a proposal.
+    if (camera.direction !== null) diff.direction = null;
+  }
 }
 
 /**
@@ -373,6 +434,7 @@ export async function applyCameraEdit(input: {
     if (camera.contributorId !== input.contributorId) return { kind: "not_found" };
 
     const diff = diffFields(camera, input.fields);
+    applyDomeDirectionRule(camera, input.fields, diff);
     if (Object.keys(diff).length === 0) return { kind: "no_changes" };
 
     // Optimistic-concurrency precondition: when the client echoes the
@@ -434,6 +496,7 @@ export async function applyCameraEdit(input: {
     if (camera.contributorId !== input.contributorId) return { kind: "not_owner" };
 
     const diff = diffFields(camera, input.fields);
+    applyDomeDirectionRule(camera, input.fields, diff);
     if (Object.keys(diff).length === 0) return { kind: "no_changes" };
 
     // One open edit-request per camera, enforced by the partial unique index
@@ -444,8 +507,8 @@ export async function applyCameraEdit(input: {
     try {
       const inserted = await d1
         .prepare(
-          `INSERT INTO camera_edit_requests (camera_id, contributor_id, proposed_title, proposed_kind, proposed_address, proposed_notes, proposed_manufacturer, proposed_observed_on, proposed_description, status, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
+          `INSERT INTO camera_edit_requests (camera_id, contributor_id, proposed_title, proposed_kind, proposed_address, proposed_notes, proposed_manufacturer, proposed_observed_on, proposed_direction, proposed_description, status, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
            RETURNING id`,
         )
         .bind(
@@ -457,6 +520,10 @@ export async function applyCameraEdit(input: {
           diff.notes ?? null,
           diff.manufacturer ?? null,
           diff.observedOn ?? null,
+          // Same COALESCE model as the other nullable columns: an explicit
+          // "clear to null" diff is stored as NULL and reads back as
+          // "unchanged" on the published path (pre-existing convention).
+          diff.direction ?? null,
           diff.description ?? null,
           now,
           now,
@@ -501,11 +568,12 @@ function sqlColumn(field: EditableEditField): string {
     case "notes": return "notes";
     case "manufacturer": return "manufacturer";
     case "observedOn": return "observed_on";
+    case "direction": return "direction";
     case "description": return "description";
   }
 }
 
-function storageValue(field: EditableEditField, value: string | null | undefined): string | null {
+function storageValue(field: EditableEditField, value: string | number | null | undefined): string | number | null {
   if (value === undefined) return null;
   if ((field === "address" || field === "manufacturer" || field === "observedOn") && value === "") return null;
   return value;

@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { createPendingCamera, findNearbyPublicCameras, freshnessWindows, getPublicCameraFacets, listPublicCameras, listPublicCamerasInBbox, listPublicCamerasPage, PUBLIC_CAMERAS_PAGE_DEFAULT_LIMIT, PUBLIC_CAMERAS_PAGE_MAX_LIMIT, type FreshnessWindow, type PublicCameraFacets, type PublicCameraFilters } from "../../../db/cameras";
+import { createPendingCamera, DOME_KIND, findNearbyPublicCameras, freshnessWindows, getPublicCameraFacets, listPublicCameras, listPublicCamerasInBbox, listPublicCamerasPage, PUBLIC_CAMERAS_PAGE_DEFAULT_LIMIT, PUBLIC_CAMERAS_PAGE_MAX_LIMIT, type FreshnessWindow, type PublicCameraFacets, type PublicCameraFilters } from "../../../db/cameras";
 import { requiresDuplicateConfirmation } from "../../lib/duplicate-detection";
 import { requireVerifiedContributor } from "../../lib/write-gate";
 import { csrfVerified, sameOrigin } from "../../lib/csrf";
@@ -50,6 +50,31 @@ function cleanObservedOn(value: unknown) {
   return date && /^\d{4}-\d{2}-\d{2}$/.test(date) && isValidCalendarDate(date) ? date : "";
 }
 
+/**
+ * Field-of-view direction input (kanban t_1b08fe12): a compass bearing in
+ * degrees 0-359 (clockwise from north), or null/absent for
+ * non-directional / unknown. Only a plain integer number is accepted —
+ * strings ("45"), floats (45.5) and booleans are rejected. The caller maps
+ * "invalid" to 422. 0 is a VALID bearing (north) and must never be treated
+ * as falsy.
+ */
+function readDirection(value: unknown): number | null | "invalid" {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 0 || value > 359) return "invalid";
+  return value;
+}
+
+/**
+ * The dome rule (t_1b08fe12 decision, documented in db/cameras.ts DOME_KIND):
+ * a camera whose kind is a dome has no directional field of view, so any
+ * supplied direction is IGNORED (normalised to null) rather than rejected —
+ * the map renders domes circular. The invariant is re-applied at every write
+ * boundary (POST here, applyCameraEdit / moderateCameraEdit for edits).
+ */
+function normalizeDomeDirection(kind: string, direction: number | null): number | null {
+  return kind === DOME_KIND ? null : direction;
+}
+
 function csvCell(value: string | number | null) {
   const text = value === null ? "" : String(value);
   const safeText = /^[=+\-@]/.test(text) ? `'${text}` : text;
@@ -57,8 +82,10 @@ function csvCell(value: string | number | null) {
 }
 
 function toCsv(records: Awaited<ReturnType<typeof listPublicCameras>>) {
-  const header = ["id", "title", "kind", "manufacturer", "observed_on", "status", "source", "updated", "description", "address", "latitude", "longitude"];
-  const rows = records.map((record) => [record.id, record.title, record.kind, record.manufacturer, record.observedOn, record.status, record.source, record.updated, record.description, record.address, record.latitude, record.longitude].map(csvCell).join(","));
+  // `direction` is appended LAST so the historical column positions stay
+  // stable for existing consumers (t_1b08fe12); blank cell = non-directional.
+  const header = ["id", "title", "kind", "manufacturer", "observed_on", "status", "source", "updated", "description", "address", "latitude", "longitude", "direction"];
+  const rows = records.map((record) => [record.id, record.title, record.kind, record.manufacturer, record.observedOn, record.status, record.source, record.updated, record.description, record.address, record.latitude, record.longitude, record.direction].map(csvCell).join(","));
   // ODbL 1.0 attribution (TERMS_OF_USE § 7.1): the licence requires the
   // notice when the database is shared, so every export carries it. The
   // footer comment keeps the header line parseable by spreadsheet tools.
@@ -127,7 +154,7 @@ export async function GET(request: Request) {
         return Response.json({ error: "bbox must be a valid geographic rectangle: west<east and south<north within world bounds." }, { status: 400 });
       }
       const records = await listPublicCamerasInBbox({ west, south, east, north });
-      return Response.json({ type: "FeatureCollection", license: DATA_LICENSE_ID, attribution: DATA_LICENSE_NOTICE, features: records.map((record) => ({ type: "Feature", geometry: { type: "Point", coordinates: [record.longitude, record.latitude] }, properties: { id: record.id, title: record.title, kind: record.kind, manufacturer: record.manufacturer, observedOn: record.observedOn, status: record.status, source: record.source, updated: record.updated, description: record.description } })) }, { headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600", "Cache-Tag": CACHE_TAGS.bbox } });
+      return Response.json({ type: "FeatureCollection", license: DATA_LICENSE_ID, attribution: DATA_LICENSE_NOTICE, features: records.map((record) => ({ type: "Feature", geometry: { type: "Point", coordinates: [record.longitude, record.latitude] }, properties: { id: record.id, title: record.title, kind: record.kind, manufacturer: record.manufacturer, observedOn: record.observedOn, status: record.status, source: record.source, updated: record.updated, description: record.description, direction: record.direction } })) }, { headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600", "Cache-Tag": CACHE_TAGS.bbox } });
     }
 
     if (format === "geojson") {
@@ -140,7 +167,7 @@ export async function GET(request: Request) {
       // cache is acceptable (the dataset changes through moderation, not live
       // feeds), and revalidation happens after the window. Deliberately NOT
       // `immutable` — the export URL's content does change when moderators act.
-      return Response.json({ type: "FeatureCollection", license: DATA_LICENSE_ID, attribution: DATA_LICENSE_NOTICE, features: records.map((record) => ({ type: "Feature", geometry: { type: "Point", coordinates: [record.longitude, record.latitude] }, properties: { id: record.id, title: record.title, kind: record.kind, manufacturer: record.manufacturer, observedOn: record.observedOn, status: record.status, source: record.source, updated: record.updated, description: record.description } })) }, { headers: { "Content-Disposition": "attachment; filename=opensurveillancedb-cameras.geojson", "Cache-Control": "public, s-maxage=3600", "Cache-Tag": CACHE_TAGS.export } });
+      return Response.json({ type: "FeatureCollection", license: DATA_LICENSE_ID, attribution: DATA_LICENSE_NOTICE, features: records.map((record) => ({ type: "Feature", geometry: { type: "Point", coordinates: [record.longitude, record.latitude] }, properties: { id: record.id, title: record.title, kind: record.kind, manufacturer: record.manufacturer, observedOn: record.observedOn, status: record.status, source: record.source, updated: record.updated, description: record.description, direction: record.direction } })) }, { headers: { "Content-Disposition": "attachment; filename=opensurveillancedb-cameras.geojson", "Cache-Control": "public, s-maxage=3600", "Cache-Tag": CACHE_TAGS.export } });
     }
     if (format === "csv") {
       const records = await listPublicCameras(filters);
@@ -230,6 +257,13 @@ export async function POST(request: Request) {
     const notes = cleanText(payload.notes, 1000);
     const manufacturer = cleanText(payload.manufacturer, 80);
     const observedOn = cleanObservedOn(payload.observedOn);
+    // Field-of-view direction (t_1b08fe12): integer bearing 0-359 or null.
+    // Out-of-range / non-integer values answer 422 — distinct from the 400
+    // generic shape errors so a client can render the field error inline.
+    const direction = readDirection(payload.direction);
+    if (direction === "invalid") {
+      return Response.json({ error: 'Field "direction" must be an integer between 0 and 359, or null.' }, { status: 422 });
+    }
     const latitude = Number(payload.latitude);
     const longitude = Number(payload.longitude);
     // Optional photo evidence: uploaded photos (POST /api/photos) may be
@@ -277,7 +311,7 @@ export async function POST(request: Request) {
         { status: 409 },
       );
     }
-    const record = await createPendingCamera({ title, kind, address, notes, manufacturer: manufacturer || null, observedOn: observedOn || null, latitude, longitude, contributorId: gate.contributor.id });
+    const record = await createPendingCamera({ title, kind, address, notes, manufacturer: manufacturer || null, observedOn: observedOn || null, latitude, longitude, direction: normalizeDomeDirection(kind, direction), contributorId: gate.contributor.id });
     // Link photo evidence after the report row exists. Linking is best-effort:
     // a photo that fails the pending/unlinked guard is simply left orphaned
     // (it will never be public without moderation). Photos attributed to a

@@ -177,7 +177,10 @@ export async function PATCH(request: Request) {
 
   const parsed = parseEditableEditFields(payload);
   if (!parsed.ok) {
-    return Response.json({ error: parsed.error }, { status: 400, headers: NO_STORE_HEADERS });
+    // Direction violations carry their own 422 (t_1b08fe12) so the edit
+    // form can render the field error distinctly from the generic 400
+    // whitelist violations (both fail before any write, no partial effects).
+    return Response.json({ error: parsed.error }, { status: parsed.status ?? 400, headers: NO_STORE_HEADERS });
   }
 
   try {
