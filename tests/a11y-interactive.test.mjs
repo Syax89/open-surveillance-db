@@ -52,7 +52,6 @@ import {
   installFetchMock,
   jsonResponse,
   loadDomModule,
-  loadDomPage,
   renderWithLocale,
   setNavState,
   setupDom,
@@ -409,8 +408,8 @@ test("every register form control has an accessible name (wrapping label)", asyn
 
 test("auth errors are announced through a live region (role=alert)", async () => {
   const [login, register, account] = await Promise.all([
-    readFile(path.join(root, "app", "login", "page.tsx"), "utf8"),
-    readFile(path.join(root, "app", "register", "page.tsx"), "utf8"),
+    readFile(path.join(root, "app", "login", "LoginPageBody.tsx"), "utf8"),
+    readFile(path.join(root, "app", "register", "RegisterPageBody.tsx"), "utf8"),
     readFile(path.join(root, "app", "account", "AccountPageBody.tsx"), "utf8"),
   ]);
   // role="alert" is an implicit assertive live region: the message is read
@@ -512,7 +511,9 @@ test("aria-invalid marks the failing auth field on submit and clears as the user
     return jsonResponse({ error: "invalid credentials" }, { status: 401 });
   });
 
-  const LoginPage = await loadDomPage("app/login/page.mjs");
+  // QA#6 F2/F5 (t_9467ee7f): /login is a thin server shell; the interactive
+  // body is the named-export client component LoginPageBody.
+  const LoginPage = (await loadDomModule("app/login/LoginPageBody.mjs")).LoginPageBody;
   rtl.render(await wrapWithLocale(React.createElement(LoginPage)));
   const emailInput = rtl.screen.getByLabelText("Email");
   const passwordInput = rtl.screen.getByLabelText(/^Password/);
@@ -534,7 +535,9 @@ test("aria-invalid marks the failing auth field on submit and clears as the user
 
   // Register mirrors the contract, including the optional displayName
   // (only marked when present but below the 2-char minimum).
-  const RegisterPage = await loadDomPage("app/register/page.mjs");
+  // QA#6 F2/F5 (t_9467ee7f): /register is a thin server shell; the
+  // interactive body is the named-export client component RegisterPageBody.
+  const RegisterPage = (await loadDomModule("app/register/RegisterPageBody.mjs")).RegisterPageBody;
   rtl.render(await wrapWithLocale(React.createElement(RegisterPage)));
   const regEmail = rtl.screen.getByLabelText("Email");
   const regName = rtl.screen.getByLabelText(/display name|nickname/i);

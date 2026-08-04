@@ -239,7 +239,7 @@ export const it: Translation<typeof en> = {
   loginMetaDescription:
     "Accedi per inviare segnalazioni e correzioni al database pubblico OpenSurveillanceDB.",
   registerMetaDescription:
-    "Crea un account contributore gratuito per segnalare telecamere di sorveglianza pubbliche.",
+    "Crea un account gratuito per contribuire al database delle telecamere di sorveglianza pubbliche.",
   email: "Email",
   password: "Password",
   displayName: "Nome visualizzato (facoltativo)",

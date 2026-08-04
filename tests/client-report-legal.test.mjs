@@ -20,7 +20,7 @@
 import assert from "node:assert/strict";
 import test, { afterEach, before } from "node:test";
 import {
-  setupDom, loadDomModule, loadDomPage, renderWithLocale, React,
+  setupDom, loadDomModule, renderWithLocale, React,
 } from "./helpers/dom-harness.mjs";
 
 let rtl;
@@ -33,7 +33,9 @@ before(async () => {
   rtl = await setupDom();
   ReportForm = (await loadDomModule("app/components/home/ReportForm.mjs")).ReportForm;
   CorrectionForm = (await loadDomModule("app/components/home/CorrectionForm.mjs")).CorrectionForm;
-  RegisterPage = await loadDomPage("app/register/page.mjs");
+  // QA#6 F2/F5 (t_9467ee7f): /register is a thin server shell; the
+  // interactive body is the named-export client component RegisterPageBody.
+  RegisterPage = (await loadDomModule("app/register/RegisterPageBody.mjs")).RegisterPageBody;
   LocaleToggle = (await loadDomModule("app/components/LocaleProvider.mjs")).LocaleToggle;
 });
 
