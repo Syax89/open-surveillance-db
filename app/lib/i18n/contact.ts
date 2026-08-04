@@ -21,7 +21,7 @@ export const en = {
     "OpenSurveillanceDB is an open, non-commercial civic database of visible public surveillance infrastructure. It documents public-facing equipment; it never provides feeds, tracking tools or advice on avoiding lawful surveillance.",
   whoTitle: "Who we are",
   whoBody:
-    "A small pilot team of named volunteers maintains the project. These are initial nominations for the pilot, not a claim that a full public governance structure already exists.",
+    "A small team of named volunteers maintains the project. These are initial nominations for the pilot, not a claim that full public governance already exists.",
   rolesTitle: "Roles and owners",
   rolesIntro: "Initial roles for the pilot were named on 2026-07-31:",
   roleMaintainers: "Maintainers",
@@ -50,7 +50,7 @@ export const en = {
   securityAdvisory: "Open the private advisory form",
   securityPgpTitle: "Encrypting sensitive payloads",
   securityPgpBody:
-    "For payloads that contain personal data or operational details, encrypt them with the project PGP key (fingerprint 04E8 A3EE 7C72 188B D3AF 925D 496C F0BD 4920 D3F7) and include the ciphertext in the advisory. Response commitment: first response within 48 hours, substantive response within 14 days, emergency hide within 24 hours.",
+    "For payloads that contain personal data or operational details, encrypt them with the project PGP key (fingerprint 04E8 A3EE 7C72 188B D3AF 925D 496C F0BD 4920 D3F7) and include the ciphertext in the advisory. Response targets match the corrections section above.",
   securityRouteNote:
     "Security reports and privacy requests travel on separate channels: private advisories for vulnerabilities, the correction form and privacy contact for data-subject requests.",
   footer: "Built for transparency, not tracking.",
@@ -70,7 +70,7 @@ export const it: Translation<typeof en> = {
     "OpenSurveillanceDB è un database civico aperto e non commerciale delle infrastrutture di sorveglianza pubblica visibili. Documenta apparecchiature rivolte allo spazio pubblico; non fornisce feed, strumenti di tracciamento né consigli per eludere la sorveglianza legittima.",
   whoTitle: "Chi siamo",
   whoBody:
-    "Un piccolo team pilota di volontari nominati mantiene il progetto. Sono nomine iniziali per il pilota, non la rivendicazione di una struttura di governance pubblica già completa.",
+    "Un piccolo team di volontari nominati mantiene il progetto. Sono nomine iniziali per il pilota, non la pretesa che esista già una governance pubblica completa.",
   rolesTitle: "Ruoli e responsabili",
   rolesIntro: "I ruoli iniziali del pilota sono stati nominati il 2026-07-31:",
   roleMaintainers: "Manutentori",
@@ -99,7 +99,7 @@ export const it: Translation<typeof en> = {
   securityAdvisory: "Apri il modulo per l'advisory privato",
   securityPgpTitle: "Crittografia dei dati sensibili",
   securityPgpBody:
-    "Per payload che contengono dati personali o dettagli operativi, crittografali con la chiave PGP del progetto (impronta 04E8 A3EE 7C72 188B D3AF 925D 496C F0BD 4920 D3F7) e includi il testo cifrato nell'advisory. Impegno di risposta: prima risposta entro 48 ore, risposta sostanziale entro 14 giorni, rimozione d'emergenza entro 24 ore.",
+    "Per i payload che contengono dati personali o dettagli operativi, crittografali con la chiave PGP del progetto (impronta 04E8 A3EE 7C72 188B D3AF 925D 496C F0BD 4920 D3F7) e includi il testo cifrato nell'advisory. Gli obiettivi di risposta sono gli stessi della sezione correzioni qui sopra.",
   securityRouteNote:
     "Le segnalazioni di sicurezza e le richieste relative alla privacy viaggiano su canali separati: advisory privati per le vulnerabilità, modulo di correzione e contatto privacy per le richieste dell'interessato.",
   footer: "Creato per la trasparenza, non per il tracciamento.",

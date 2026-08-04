@@ -18,14 +18,14 @@ export const en = {
   eyebrow: "Project manifesto",
   title: "A manifesto for legible public space.",
   intro:
-    "OpenSurveillanceDB is an open, non-commercial civic database of visible public surveillance infrastructure. This page states what the project is for, the principles that govern it, what we deliberately do not do, and what is — and is not — published.",
+    "OpenSurveillanceDB is an open, non-commercial civic database of visible public surveillance infrastructure. This page states the project's purpose, the principles that govern it, the boundaries it accepts, and what is — and is not — published.",
   exploreMap: "Explore the map",
   browseDirectory: "Browse the directory",
   readGuide: "Read the guide",
   missionEyebrow: "Mission",
   missionTitle: "Help people understand the systems around them.",
   missionBody:
-    "The project maps visible camera infrastructure in shared spaces so people can understand what is installed around them. It documents public-facing equipment only. It is not a tool for watching, tracking, or bypassing lawful surveillance.",
+    "The project maps visible camera infrastructure in shared spaces, so the public can see what is installed nearby. It documents public-facing equipment only. It is not a tool for watching, tracking or bypassing lawful surveillance.",
   missionOneTitle: "What we document",
   missionOneBody:
     "Visible camera infrastructure, approximate location, type, source and a review status.",
@@ -36,7 +36,7 @@ export const en = {
   missionThreeBody:
     "An absent record does not show that an area is free of surveillance. It only shows that no reviewed record is currently published.",
   principlesEyebrow: "Principles",
-  principlesTitle: "Free, open, and safe by design.",
+  principlesTitle: "Free, open and safe by design.",
   principlesIntro:
     "Five commitments shape every decision in this project, from the data model to the moderation queue.",
   principleOneTitle: "Free to use",
@@ -73,7 +73,7 @@ export const en = {
   publishEyebrow: "What we publish",
   publishTitle: "Open where it is safe to be open.",
   publishBody:
-    "Only reviewed, public-facing infrastructure enters the public outputs. Every published record is a fact about visible equipment, not about a person.",
+    "Only reviewed, public-facing infrastructure enters the public outputs. Every record is a fact about visible equipment, not about a person.",
   publishedTitle: "Published",
   publishedItemOne: "Visible camera infrastructure and its approximate location",
   publishedItemTwo: "Type, source and review status for every record",
@@ -100,14 +100,14 @@ export const it: Translation<typeof en> = {
   eyebrow: "Manifesto del progetto",
   title: "Un manifesto per uno spazio pubblico leggibile.",
   intro:
-    "OpenSurveillanceDB è un database civico aperto e non commerciale dell’infrastruttura di sorveglianza pubblica visibile. Questa pagina dichiara a cosa serve il progetto, i principi che lo governano, cosa scegliamo deliberatamente di non fare e cosa viene — e non viene — pubblicato.",
+    "OpenSurveillanceDB è un database civico aperto e non commerciale che documenta l’infrastruttura di sorveglianza pubblica visibile. Questa pagina dichiara a cosa serve il progetto, quali principi lo governano, quali confini accetta e cosa viene — e non viene — pubblicato.",
   exploreMap: "Esplora la mappa",
   browseDirectory: "Sfoglia l’elenco",
   readGuide: "Leggi la guida",
   missionEyebrow: "Missione",
   missionTitle: "Aiutare le persone a comprendere i sistemi che le circondano.",
   missionBody:
-    "Il progetto mappa l’infrastruttura di telecamere visibile negli spazi condivisi, così che le persone possano capire cosa è installato attorno a loro. Documenta solo apparecchiature rivolte al pubblico. Non è uno strumento per osservare, tracciare o aggirare la sorveglianza legittima.",
+    "Il progetto mappa l’infrastruttura di telecamere visibile negli spazi condivisi, così che tutti possano vedere cosa è installato nelle vicinanze. Documenta solo apparecchiature rivolte al pubblico. Non è uno strumento per osservare, tracciare o aggirare la sorveglianza legittima.",
   missionOneTitle: "Cosa documentiamo",
   missionOneBody:
     "Infrastrutture di telecamere visibili, posizione approssimativa, tipo, fonte e stato di revisione.",
@@ -118,7 +118,7 @@ export const it: Translation<typeof en> = {
   missionThreeBody:
     "L’assenza di un record non dimostra che un’area sia libera da sorveglianza. Indica solo che non è pubblicato alcun record revisionato.",
   principlesEyebrow: "Principi",
-  principlesTitle: "Gratuito, aperto e sicuro per progettazione.",
+  principlesTitle: "Gratuito, aperto e sicuro fin dalla progettazione.",
   principlesIntro:
     "Cinque impegni guidano ogni decisione del progetto, dal modello dati alla coda di moderazione.",
   principleOneTitle: "Gratuito da usare",
@@ -155,7 +155,7 @@ export const it: Translation<typeof en> = {
   publishEyebrow: "Cosa pubblichiamo",
   publishTitle: "Aperti dove è sicuro esserlo.",
   publishBody:
-    "Solo l’infrastruttura revisionata e rivolta al pubblico entra negli output pubblici. Ogni record pubblicato è un fatto su apparecchiature visibili, non su una persona.",
+    "Solo l’infrastruttura revisionata e rivolta al pubblico entra nei dati pubblici. Ogni record pubblicato è un fatto su apparecchiature visibili, non su una persona.",
   publishedTitle: "Pubblicato",
   publishedItemOne: "Infrastruttura di telecamere visibile e sua posizione approssimativa",
   publishedItemTwo: "Tipo, fonte e stato di revisione per ogni record",

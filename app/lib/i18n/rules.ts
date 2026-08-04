@@ -17,7 +17,7 @@ export const en = {
   eyebrow: "Participation rules",
   title: "What we publish, and how you can help.",
   intro:
-    "These rules explain what OpenSurveillanceDB documents, what contributors may report, how moderation works, how to correct a record, and how the data can be reused.",
+    "These rules explain what OpenSurveillanceDB documents and what contributors may report. They cover moderation, corrections and data reuse.",
   reportEyebrow: "What you can report",
   reportTitle: "Public space, observed from public space.",
   reportBody:
@@ -45,7 +45,7 @@ export const en = {
     "Live video, stream URLs, credentials, network information, or control interfaces.",
   neverFourTitle: "Sensitive details",
   neverFourBody:
-    "Detailed field-of-view or operational capability that could create a safety risk, or sensitive locations where publication could increase risk.",
+    "Detailed field-of-view or operational capability that could create a safety risk, or sensitive locations where publication could be unsafe.",
   beforeSubmittingTitle: "Before submitting",
   beforeSubmittingBody:
     "Submitting requires a verified contributor account. Do not upload or describe people, licence plates, private homes, security weaknesses or sensitive locations. Submissions are private until a moderator reviews them; they are not published automatically.",
@@ -65,7 +65,7 @@ export const en = {
     "A moderator assesses whether the camera is public, visible, current and within local policy.",
   flowFourTitle: "Minimise",
   flowFourBody:
-    "The least specific location and metadata that still serves transparency are published. Exact coordinates stay in the private moderation record; published coordinates are rounded to about 10 metres.",
+    "Only the least specific location and metadata that still serve transparency are published. Exact coordinates stay in the private moderation record; published coordinates are rounded to about 10 metres.",
   flowFiveTitle: "Decide",
   flowFiveBody:
     "Approve, request clarification, reject, or escalate — always recording a reason.",
@@ -113,7 +113,7 @@ export const it: Translation<typeof en> = {
   eyebrow: "Regole di partecipazione",
   title: "Cosa pubblichiamo e come puoi aiutare.",
   intro:
-    "Queste regole spiegano cosa documenta OpenSurveillanceDB, cosa possono segnalare i contributori, come funziona la moderazione, come correggere un record e come riutilizzare i dati.",
+    "Queste regole spiegano cosa documenta OpenSurveillanceDB e cosa si può segnalare. Coprono la moderazione, le correzioni e il riuso dei dati.",
   reportEyebrow: "Cosa puoi segnalare",
   reportTitle: "Spazio pubblico, osservato dallo spazio pubblico.",
   reportBody:
@@ -141,7 +141,7 @@ export const it: Translation<typeof en> = {
     "Video in diretta, URL di streaming, credenziali, informazioni di rete o interfacce di controllo.",
   neverFourTitle: "Dettagli sensibili",
   neverFourBody:
-    "Dettagli sul campo visivo o sulle capacità operative che potrebbero creare un rischio per la sicurezza, o località sensibili la cui pubblicazione potrebbe aumentare il rischio.",
+    "Dettagli sul campo visivo o sulle capacità operative che potrebbero creare un rischio per la sicurezza, o località sensibili la cui pubblicazione potrebbe essere pericolosa.",
   beforeSubmittingTitle: "Prima di inviare",
   beforeSubmittingBody:
     "Per inviare serve un account verificato. Non caricare né descrivere persone, targhe, abitazioni private, debolezze di sicurezza o località sensibili. Gli invii restano privati finché un moderatore non li esamina; non vengono pubblicati automaticamente.",
@@ -161,7 +161,7 @@ export const it: Translation<typeof en> = {
     "Un moderatore valuta se la telecamera è pubblica, visibile, attuale e conforme alla policy locale.",
   flowFourTitle: "Minimizzazione",
   flowFourBody:
-    "Viene pubblicata la posizione e la quantità minima di metadati necessaria alla trasparenza. Le coordinate esatte restano nel record privato di moderazione; quelle pubblicate sono arrotondate a circa 10 metri.",
+    "Si pubblicano solo la posizione e i metadati minimi utili alla trasparenza. Le coordinate esatte restano nel record privato di moderazione; quelle pubblicate sono arrotondate a circa 10 metri.",
   flowFiveTitle: "Decisione",
   flowFiveBody:
     "Approvare, chiedere chiarimenti, respingere o inoltrare — registrando sempre una motivazione.",
@@ -177,7 +177,7 @@ export const it: Translation<typeof en> = {
     "I record inaccurati, obsoleti o duplicati possono essere segnalati per la revisione.",
   correctionTwoTitle: "Segnala un problema di privacy o sicurezza",
   correctionTwoBody:
-    "Le segnalazioni urgenti vengono temporaneamente nascoste dagli output pubblici durante la revisione.",
+    "Le segnalazioni urgenti vengono temporaneamente nascoste dai dati pubblici durante la revisione.",
   correctionThreeTitle: "Nessun dato personale richiesto",
   correctionThreeBody:
     "Descrivi solo il minimo necessario a identificare il problema. Non includere dati personali, link a feed live, credenziali o immagini.",
@@ -195,6 +195,6 @@ export const it: Translation<typeof en> = {
     "Le esportazioni sono pensate per analisi civica, ricerca e strumenti cartografici compatibili — non per trovare feed di telecamere o informazioni operative sensibili.",
   reuseThreeTitle: "Attribuzione a OpenStreetMap",
   reuseThreeBody:
-    "Lo sfondo della mappa proviene dai contributori di OpenStreetMap ed è separato dai record sulle telecamere del progetto.",
+    "Lo sfondo della mappa proviene dalla community di OpenStreetMap ed è separato dai record sulle telecamere del progetto.",
   footer: "Creato per la trasparenza, non per il tracciamento.",
 };
