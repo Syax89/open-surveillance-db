@@ -55,8 +55,16 @@ export const en = {
   cameraType: "Camera type",
   fixedDome: "Fixed dome",
   bullet: "Bullet",
+  ptz: "PTZ",
   trafficReader: "Traffic / licence plate reader",
   otherUnknown: "Other / unknown",
+  // Field-of-view direction (t_f8b775ec): shown only for directional kinds
+  // (never for domes). A compass slider 0-359 with an arrow preview plus a
+  // "don't know" option that stores NULL.
+  directionTitle: "Field of view direction",
+  directionHelp: "The compass bearing the camera points towards, clockwise from north (0–359°).",
+  directionUnknown: "I don't know the direction",
+  directionDegrees: "Direction",
   manufacturer: "Manufacturer (optional)",
   manufacturerPlaceholder: "e.g. manufacturer name",
   observedOn: "Date observed (optional)",
@@ -160,8 +168,16 @@ export const it: Translation<typeof en> = {
   cameraType: "Tipo di telecamera",
   fixedDome: "Dome fissa",
   bullet: "Bullet",
+  ptz: "PTZ",
   trafficReader: "Traffico / lettore targhe",
   otherUnknown: "Altro / sconosciuto",
+  // Direzione del campo visivo (t_f8b775ec): visibile solo per i tipi
+  // direzionali (mai per le cupole). Slider bussola 0-359 con anteprima a
+  // freccia più opzione "non so" che salva NULL.
+  directionTitle: "Direzione del campo visivo",
+  directionHelp: "Il rilevamento verso cui punta la telecamera, in senso orario da nord (0–359°).",
+  directionUnknown: "Non conosco la direzione",
+  directionDegrees: "Direzione",
   manufacturer: "Produttore (facoltativo)",
   manufacturerPlaceholder: "es. nome del produttore",
   observedOn: "Data osservata (facoltativa)",

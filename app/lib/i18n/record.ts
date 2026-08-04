@@ -78,6 +78,15 @@ export const en = {
   editFieldTooLong: (limit: number) =>
     `This field must be at most ${limit} characters.`,
   editObservedOnInvalid: "Enter a valid date (YYYY-MM-DD).",
+  // Field-of-view direction (t_f8b775ec) — edit form, same pattern as the
+  // report form: only for directional kinds, compass slider + "don't know".
+  editDirectionTitle: "Field of view direction",
+  editDirectionHelp: "The compass bearing the camera points towards, clockwise from north (0–359°).",
+  editDirectionUnknown: "I don't know the direction",
+  editDirectionDegrees: "Direction",
+  // Record detail fact (t_f8b775ec): "Direction: NE 45°" when the record
+  // has a stored bearing (domes and unknown directions omit the row).
+  direction: "Direction",
 } as const;
 
 export const it: Translation<typeof en> = {
@@ -152,4 +161,15 @@ export const it: Translation<typeof en> = {
   editFieldTooLong: (limit: number) =>
     `Questo campo deve avere al massimo ${limit} caratteri.`,
   editObservedOnInvalid: "Inserisci una data valida (AAAA-MM-GG).",
+  // Direzione del campo visivo (t_f8b775ec) — form di modifica, stesso
+  // pattern del form di segnalazione: solo per tipi direzionali, slider
+  // bussola + "non so".
+  editDirectionTitle: "Direzione del campo visivo",
+  editDirectionHelp: "Il rilevamento verso cui punta la telecamera, in senso orario da nord (0–359°).",
+  editDirectionUnknown: "Non conosco la direzione",
+  editDirectionDegrees: "Direzione",
+  // Fattore del dettaglio record (t_f8b775ec): "Direzione: NE 45°" quando il
+  // record ha un rilevamento salvato (le cupole e le direzioni ignote
+  // omettono la riga).
+  direction: "Direzione",
 };

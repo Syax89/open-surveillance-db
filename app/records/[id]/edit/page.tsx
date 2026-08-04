@@ -6,6 +6,8 @@ import { useEffect, useRef, useState } from "react";
 import { LocaleToggle } from "../../../components/LocaleProvider";
 import { useMessages } from "../../../lib/use-messages";
 import { SiteHeader } from "../../../components/SiteHeader";
+import { KIND_OPTIONS, isDomeKind } from "../../../lib/camera-kinds";
+import { formatDirection } from "../../../lib/compass";
 
 /**
  * /records/[id]/edit — dedicated contribution edit page (COMMUNITY_PLAN §2.2,
@@ -62,6 +64,8 @@ type OwnerRecord = {
   description: string;
   status: string;
   updated: string;
+  /** Field-of-view bearing 0-359 or NULL (domes/unknown), migration 0035 (t_f8b775ec). */
+  direction: number | null;
 };
 
 type EditRequest = { id: number; cameraId: number; status: "pending"; createdAt: string };
@@ -69,15 +73,6 @@ type EditRequest = { id: number; cameraId: number; status: "pending"; createdAt:
 type EditView = { record: OwnerRecord; editRequest: EditRequest | null };
 
 const PUBLISHED_STATUSES = ["verified", "needs_review", "stale"];
-
-/** Stable select options: value is the canonical English kind stored in the DB. */
-const KIND_OPTIONS = [
-  { value: "Fixed dome", labelKey: "fixedDome" },
-  { value: "Bullet", labelKey: "bullet" },
-  { value: "PTZ", labelKey: "ptz" },
-  { value: "Traffic / licence plate reader", labelKey: "trafficReader" },
-  { value: "Other / unknown", labelKey: "otherUnknown" },
-] as const;
 
 type Phase = "loading" | "login" | "notFound" | "notOwner" | "error" | "ready";
 
@@ -90,7 +85,11 @@ export default function RecordEditPage() {
 
   const [phase, setPhase] = useState<Phase>("loading");
   const [view, setView] = useState<EditView | null>(null);
-  const [values, setValues] = useState({ title: "", kind: "", manufacturer: "", observedOn: "", address: "", notes: "", description: "" });
+  const [values, setValues] = useState({ title: "", kind: "", manufacturer: "", observedOn: "", address: "", notes: "", description: "", direction: null as number | null });
+  // Field-of-view direction (t_f8b775ec): mirrors the record's stored
+  // bearing; directionKnown is true only when the record HAS one (so the
+  // slider pre-fills) and resets when the contributor checks "non so".
+  const [directionKnown, setDirectionKnown] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string | undefined>>({});
   const [serverError, setServerError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -119,7 +118,9 @@ export default function RecordEditPage() {
           address: data.record.address ?? "",
           notes: data.record.notes,
           description: data.record.description,
+          direction: data.record.direction,
         });
+        setDirectionKnown(data.record.direction !== null && typeof data.record.direction === "number" && Number.isFinite(data.record.direction));
         setPhase("ready");
       })
       .catch(() => { if (!cancelled) setPhase("error"); });
@@ -174,6 +175,10 @@ export default function RecordEditPage() {
       manufacturer: values.manufacturer.trim(),
       observedOn: values.observedOn.trim(),
       description: values.description.trim(),
+      // Field-of-view direction (t_f8b775ec): always sent — a bearing when
+      // the contributor specified one, null otherwise ("non so" clears /
+      // leaves it unset; the server re-applies the dome rule on apply).
+      direction: directionKnown && values.direction !== null ? values.direction : null,
       // Optimistic concurrency: the PATCH answers 409 when the record
       // changed since the page loaded (race), never a silent overwrite.
       expectedUpdated: record?.updated,
@@ -225,6 +230,17 @@ export default function RecordEditPage() {
 
   const kindKnown = record !== null && KIND_OPTIONS.some((option) => option.value === record?.kind);
   const kindLabel = (key: string): string => t.editKindOptions[key as keyof typeof t.editKindOptions] ?? key;
+  // Dome rule (t_f8b775ec): a dome has no directional field of view — the
+  // direction fieldset is hidden and any stored/selected bearing is cleared
+  // when the kind becomes a dome (the server normalises NULL on write too).
+  const showDirectionField = !isDomeKind(values.kind);
+  const handleKindChange = (value: string) => {
+    setField("kind", value);
+    if (isDomeKind(value)) {
+      setValues((v) => ({ ...v, direction: null }));
+      setDirectionKnown(false);
+    }
+  };
 
   return (
     <main id="main-content" className="record-page">
@@ -328,7 +344,7 @@ export default function RecordEditPage() {
                 aria-invalid={fieldErrors.kind ? true : undefined}
                 aria-describedby={fieldErrors.kind ? "edit-kind-error" : undefined}
                 value={values.kind}
-                onChange={(event) => setField("kind", event.target.value)}
+                onChange={(event) => handleKindChange(event.target.value)}
               >
                 {!kindKnown && values.kind !== "" ? <option value={values.kind}>{values.kind}</option> : null}
                 {KIND_OPTIONS.map((option) => (
@@ -337,6 +353,44 @@ export default function RecordEditPage() {
               </select>
               {fieldErrors.kind ? <small id="edit-kind-error">{fieldErrors.kind}</small> : null}
             </label>
+
+            {showDirectionField ? (
+              <fieldset className="direction-entry" aria-labelledby="edit-direction-title">
+                <legend id="edit-direction-title">{t.editDirectionTitle}</legend>
+                <p className="search-count" id="edit-direction-help">{t.editDirectionHelp}</p>
+                <label className="check-label check-direction-unknown">
+                  <input
+                    type="checkbox"
+                    checked={!directionKnown}
+                    onChange={(event) => {
+                      setDirectionKnown(!event.target.checked);
+                      if (!event.target.checked) setValues((v) => ({ ...v, direction: null }));
+                    }}
+                  />
+                  <span>{t.editDirectionUnknown}</span>
+                </label>
+                {directionKnown ? (
+                  <div className="direction-controls">
+                    <span className="direction-arrow" aria-hidden="true" style={{ transform: `rotate(${values.direction ?? 0}deg)` }}>→</span>
+                    <div className="direction-slider-row">
+                      <label htmlFor="edit-direction-slider">{t.editDirectionDegrees}</label>
+                      <input
+                        id="edit-direction-slider"
+                        name="direction"
+                        type="range"
+                        min={0}
+                        max={359}
+                        step={1}
+                        value={values.direction ?? 0}
+                        onChange={(event) => setValues((v) => ({ ...v, direction: Number(event.target.value) }))}
+                        aria-describedby="edit-direction-help"
+                      />
+                      <output htmlFor="edit-direction-slider" className="direction-output">{formatDirection(values.direction ?? 0)}</output>
+                    </div>
+                  </div>
+                ) : null}
+              </fieldset>
+            ) : null}
 
             <div className="report-metadata-fields">
               <label className="auth-field">

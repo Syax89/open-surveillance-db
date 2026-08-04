@@ -54,6 +54,12 @@ export function SegnalaTool({ initialCoordinates = null }: Props) {
           removePhoto={report.removePhoto}
           selectManualCoordinates={report.selectManualCoordinates}
           submitReport={report.submitReport}
+          kind={report.kind}
+          setKind={report.setKind}
+          direction={report.direction}
+          setDirection={report.setDirection}
+          directionKnown={report.directionKnown}
+          setDirectionKnown={report.setDirectionKnown}
           showHeading={false}
         />
       </WriteGateWall>

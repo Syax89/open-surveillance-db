@@ -10,6 +10,7 @@
  */
 import { escapeHtml } from "./map-viewport";
 import { publicStatusLabel } from "./public-status";
+import { formatDirection } from "./compass";
 import type { MapCamera } from "../components/SurveillanceMap";
 
 /** Localized strings the popup renders (a subset of the map dictionary). */
@@ -19,6 +20,8 @@ export type PopupLabels = {
   popupDetail: string;
   reportIssue: string;
   unknown: string;
+  /** Label for the field-of-view direction row (t_f8b775ec). */
+  fovDirection: string;
 };
 
 /** Status label helper compatible with publicStatusLabel's signature. */
@@ -39,6 +42,13 @@ export function popupHtmlFor(
   const coords = `${camera.latitude.toFixed(4)}, ${camera.longitude.toFixed(4)}`;
   const address = camera.address ? `<p class="osm-popup-address">${escapeHtml(camera.address)}</p>` : "";
   const description = camera.description ? `<p class="osm-popup-description">${escapeHtml(camera.description)}</p>` : "";
+  // Field-of-view direction (t_f8b775ec): rendered as TEXT — the popup is
+  // the accessible equivalent of the decorative map cone. Only directional
+  // cameras with a stored bearing show it (domes are NULL by invariant).
+  const directionRow =
+    typeof camera.direction === "number" && Number.isFinite(camera.direction)
+      ? `<div><dt>${labels.fovDirection}</dt><dd>${formatDirection(camera.direction)}</dd></div>`
+      : "";
   return [
     `<div class="osm-popup">`,
     `<h3>${escapeHtml(camera.title)}</h3>`,
@@ -47,6 +57,7 @@ export function popupHtmlFor(
     `<dl>`,
     `<div><dt>${labels.recordId}</dt><dd>${camera.id}</dd></div>`,
     `<div><dt>${labels.location}</dt><dd>${coords}</dd></div>`,
+    directionRow,
     `</dl>`,
     address,
     description,

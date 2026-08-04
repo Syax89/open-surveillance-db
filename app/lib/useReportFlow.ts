@@ -39,6 +39,14 @@ export function useReportFlow({ setNotice, initialCoordinates = null }: { setNot
   // share one source of truth.
   const [duplicateConfirmationRequired, setDuplicateConfirmationRequired] = useState(false);
   const [duplicateConfirmed, setDuplicateConfirmed] = useState(false);
+  // Field-of-view direction (t_f8b775ec): kind is controlled so the form
+  // can hide the direction field for domes; direction is the bearing 0-359
+  // or null (NULL = unknown/"non so", the default); directionKnown flips
+  // when the contributor actually specifies a bearing. All three reset with
+  // the form on success.
+  const [kind, setKind] = useState("");
+  const [direction, setDirection] = useState<number | null>(null);
+  const [directionKnown, setDirectionKnown] = useState(false);
   const nearbyRequest = useRef<AbortController | null>(null);
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
   const [photoUploading, setPhotoUploading] = useState(false);
@@ -147,6 +155,14 @@ export function useReportFlow({ setNotice, initialCoordinates = null }: { setNot
     if (duplicateConfirmationRequired && !duplicateConfirmed) { setNotice(t.duplicateConfirmNotice); return; }
     const manufacturer = String(form.get("manufacturer") || "").trim();
     const observedOn = String(form.get("observedOn") || "").trim();
+    // Direction payload (t_f8b775ec): the hidden input carries the bearing
+    // when the contributor specified one (directionKnown), empty otherwise —
+    // empty maps to NULL ("non so"), which the API stores as no direction.
+    const directionRaw = String(form.get("direction") || "").trim();
+    const directionValue =
+      directionKnown && directionRaw !== "" && Number.isFinite(Number(directionRaw))
+        ? Math.min(359, Math.max(0, Math.round(Number(directionRaw))))
+        : null;
     const payload = {
       title: String(form.get("title") || t.defaultReportTitle),
       kind: String(form.get("kind") || t.unknown),
@@ -154,6 +170,9 @@ export function useReportFlow({ setNotice, initialCoordinates = null }: { setNot
       notes: String(form.get("notes") || ""),
       latitude: coordinates.latitude,
       longitude: coordinates.longitude,
+      // Always sent: null is explicit ("no direction") and the server's
+      // dome rule normalises it for domes anyway.
+      direction: directionValue,
       ...(manufacturer ? { manufacturer } : {}),
       ...(observedOn ? { observedOn } : {}),
       ...(photos.length > 0 ? { photoIds: photos.map((photo) => photo.id) } : {}),
@@ -191,9 +210,10 @@ export function useReportFlow({ setNotice, initialCoordinates = null }: { setNot
       const duplicates = Array.isArray(data.possibleDuplicates) ? data.possibleDuplicates : [];
       formElement.reset(); setCoordinates(null); setManualLatitude(""); setManualLongitude(""); setPhotos([]);
       setDuplicateConfirmationRequired(false); setDuplicateConfirmed(false);
+      setKind(""); setDirection(null); setDirectionKnown(false);
       setNotice(duplicates.length > 0 ? `${t.reportSaved} ${t.reportSavedWithNearby}` : t.reportSaved);
     } catch { setNotice(t.moderationUnavailable); }
   }
 
-  return { coordinates, setCoordinates, manualLatitude, setManualLatitude, manualLongitude, setManualLongitude, nearbyCandidates, nearbyLoading, nearbyError, selectCoordinates, selectManualCoordinates, photos, photoUploading, photoInputRef, onPhotoSelected, removePhoto, submitReport, duplicateConfirmationRequired, duplicateConfirmed, setDuplicateConfirmed };
+  return { coordinates, setCoordinates, manualLatitude, setManualLatitude, manualLongitude, setManualLongitude, nearbyCandidates, nearbyLoading, nearbyError, selectCoordinates, selectManualCoordinates, photos, photoUploading, photoInputRef, onPhotoSelected, removePhoto, submitReport, duplicateConfirmationRequired, duplicateConfirmed, setDuplicateConfirmed, kind, setKind, direction, setDirection, directionKnown, setDirectionKnown };
 }

@@ -56,6 +56,9 @@ export const prototypeRecords: Camera[] = [
     status: "demo",
     latitude: 41.9047,
     longitude: 12.5031,
+    // Field-of-view bearing (t_f8b775ec): demonstrates the map cone on the
+    // prototype seed (a dome would store NULL and render circular instead).
+    direction: 45,
     source: "Prototype seed",
     updated: "Demo data",
     description: "The field of view is deliberately approximate and should never be treated as a record of live activity.",

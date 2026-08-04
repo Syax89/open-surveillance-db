@@ -4,6 +4,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { isPublicStatus } from "../lib/public-status";
 import { BOUNDS_DEBOUNCE_MS, escapeHtml, recordsInBounds, type ViewportBounds } from "../lib/map-viewport";
 import { useMessages } from "../lib/use-messages";
+import { isDomeKind } from "../lib/camera-kinds";
+import { FOV_MIN_ZOOM, fovCircleRadiusMeters, fovPolygonPoints } from "../lib/field-of-view";
+import { formatDirection } from "../lib/compass";
 
 export type MapCamera = {
   id: number;
@@ -12,6 +15,13 @@ export type MapCamera = {
   status: string;
   latitude: number;
   longitude: number;
+  /**
+   * Field-of-view bearing (migration 0035, t_1b08fe12): 0-359 clockwise
+   * from north for DIRECTIONAL cameras; NULL/absent for domes (which are
+   * never directional) and for unknown directions. The map draws a cone
+   * from it, or a 360° circle for domes (t_f8b775ec).
+   */
+  direction?: number | null;
   /** Optional popup fields (present on real API records and the seed). */
   address?: string | null;
   description?: string;
@@ -57,7 +67,15 @@ function buildMarkerIcon(L: LeafletModule, camera: MapCamera, isSelected: boolea
 }
 
 function defaultPopupHtml(camera: MapCamera): string {
-  return `<div class="osm-popup"><h3>${escapeHtml(camera.title)}</h3><p class="osm-popup-kind">${escapeHtml(camera.kind)}</p></div>`;
+  // Field-of-view direction (t_f8b775ec): even the minimal standalone
+  // fallback keeps the direction as TEXT (the a11y contract — the cone is
+  // decorative, the popup is the accessible source). Language-neutral:
+  // wind name + degrees, no label needed.
+  const direction =
+    typeof camera.direction === "number" && Number.isFinite(camera.direction)
+      ? ` · ${formatDirection(camera.direction)}`
+      : "";
+  return `<div class="osm-popup"><h3>${escapeHtml(camera.title)}</h3><p class="osm-popup-kind">${escapeHtml(camera.kind)}${direction}</p></div>`;
 }
 
 export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLocation, directoryHref = "#records", onBoundsChange, popupHtmlFor }: Props) {
@@ -82,6 +100,17 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
   // user can see. Null = viewport not emitted yet: keep every marker (the
   // same contract as recordsInBounds, so the first paint is never blank).
   const [viewportBounds, setViewportBounds] = useState<ViewportBounds | null>(null);
+  // Field-of-view layer (t_f8b775ec): the cones/circles live in their own
+  // layer group so they can be cleared/redrawn independently of the markers.
+  // The group renders into Leaflet's overlayPane (z-index below the marker
+  // pane), so the wedge/circle always sits UNDER the marker icon.
+  const fovLayerRef = useRef<import("leaflet").LayerGroup | null>(null);
+  // Current map zoom (t_f8b775ec): cones/circles are only drawn above
+  // FOV_MIN_ZOOM (performance — the geometry is never materialised at
+  // street-unreadable zooms). Kept in state so the FOV effect re-runs when
+  // the user zooms across the threshold even if the bounds object identity
+  // does not change.
+  const [mapZoom, setMapZoom] = useState(13);
   const mapElement = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<import("leaflet").Map | null>(null);
   const markersRef = useRef<import("leaflet").LayerGroup | null>(null);
@@ -201,6 +230,19 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
           attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a> &middot; <a href="https://www.openstreetmap.org/fixthemap">Fix the map</a>',
         }).addTo(map);
         markersRef.current = L.layerGroup().addTo(map);
+        // Field-of-view layer (t_f8b775ec): separate group so the cones and
+        // circles can be cleared/redrawn without touching the markers. The
+        // default renderer draws paths into the overlayPane, which sits
+        // BELOW the marker pane in Leaflet's z-index stack — the wedge is
+        // always under the marker icon, never on top of it.
+        fovLayerRef.current = L.layerGroup().addTo(map);
+        // A11y (t_f8b775ec, PM directive): the FOV geometry is purely
+        // decorative — the same information is available as TEXT inside the
+        // marker popup (popupHtmlFor renders "Field of view: NE 45°" when a
+        // direction exists). Marking the whole overlay pane aria-hidden
+        // removes every path (cones AND circles) from the accessibility
+        // tree; markers live in a separate pane and stay exposed.
+        map.getPane?.("overlayPane")?.setAttribute?.("aria-hidden", "true");
         // Map-click report picker (t_6abb96ac): clicking empty map space
         // opens a popup with the click coordinates and a direct link to
         // /segnala?lat=&lng= (the pre-filled report form). The picker
@@ -224,6 +266,10 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
         // with it in Leaflet but cheap to listen to as a belt-and-braces
         // trigger. The list refresh is debounced so a drag never spams it.
         map.on("moveend zoomend", () => {
+          // Zoom is read synchronously (cheap) so the FOV layer can cross
+          // the FOV_MIN_ZOOM threshold immediately; the bounds/list update
+          // below stays debounced at its usual cadence.
+          setMapZoom(map.getZoom());
           if (boundsTimerRef.current !== null) window.clearTimeout(boundsTimerRef.current);
           boundsTimerRef.current = window.setTimeout(emitBounds, BOUNDS_DEBOUNCE_MS);
         });
@@ -243,7 +289,7 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
         window.clearTimeout(boundsTimerRef.current);
         boundsTimerRef.current = null;
       }
-      mapRef.current?.remove(); mapRef.current = null; markersRef.current = null; markersByIdRef.current = null;
+      mapRef.current?.remove(); mapRef.current = null; markersRef.current = null; fovLayerRef.current = null; markersByIdRef.current = null;
       // Reset the ready flag so a StrictMode remount (or any future
       // recreate) re-runs the population effect against the fresh layer
       // group — otherwise mapReady stays true, the deps do not change and
@@ -314,6 +360,48 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
       if (focusLocationRef.current) entry.marker.openPopup();
     }
   }, [cameras, onSelect, mapReady, viewportBounds]);
+
+  // Field-of-view layer (t_f8b775ec): draw the camera's field of view with
+  // native Leaflet only — a ~60°/35 m wedge (L.polygon, points computed by
+  // field-of-view.ts trig) for directional cameras with a stored direction,
+  // a 360° circle (L.circle) for domes. Performance contracts, same as the
+  // marker culling: geometry is drawn ONLY above FOV_MIN_ZOOM and ONLY for
+  // records inside the current viewport, so a city-wide zoom never
+  // materialises hundreds of paths. The layer is decorative — the overlay
+  // pane carries aria-hidden and the same information is textual inside the
+  // marker popup (map-popup.ts renders "Field of view: NE 45°"). Colors
+  // come from the status CSS classes (.fov-cone.<status>), never from JS.
+  useEffect(() => {
+    const L = leafletRef.current; const layer = fovLayerRef.current; if (!L || !layer || !mapReady) return;
+    layer.clearLayers();
+    if (mapZoom < FOV_MIN_ZOOM) return;
+    const visible = recordsInBounds(cameras, viewportBounds);
+    visible.forEach((camera) => {
+      if (isDomeKind(camera.kind)) {
+        // Dome: 360° vision — a circle around the marker (same radius as the
+        // wedge, so both render at the same visual scale).
+        L.circle([camera.latitude, camera.longitude], {
+          radius: fovCircleRadiusMeters(),
+          className: `fov-cone fov-circle ${camera.status}`,
+          interactive: false,
+          weight: 1,
+          opacity: 0.55,
+          fillOpacity: 0.3,
+        }).addTo(layer);
+      } else if (typeof camera.direction === "number" && Number.isFinite(camera.direction)) {
+        // Directional camera with a known bearing: the cone points TOWARDS
+        // the direction the camera looks (vertex on the marker).
+        const points = fovPolygonPoints(camera.latitude, camera.longitude, camera.direction);
+        L.polygon(points, {
+          className: `fov-cone ${camera.status}`,
+          interactive: false,
+          weight: 1,
+          opacity: 0.55,
+          fillOpacity: 0.3,
+        }).addTo(layer);
+      }
+    });
+  }, [cameras, mapReady, viewportBounds, mapZoom]);
 
   // Selection: swap the `selected` class only on the previously and the
   // newly selected marker (two setIcon calls, no layer rebuild). When the
