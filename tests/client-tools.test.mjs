@@ -600,13 +600,27 @@ test("MappaTool geocode dropdown closes on Escape and on click outside", async (
   }, { timeout: 5000 });
 
   // Clicking outside the search wrapper closes the dropdown again. The
-  // document-level mousedown listener is attached by an effect on open,
-  // so the close lands on the same act flush as the re-open — same
-  // waitFor treatment as the Escape branch above.
+  // document-level mousedown listener is attached by a PASSIVE effect that
+  // React 19 flushes AFTER the render that shows the listbox (scheduler
+  // setImmediate — Node event-loop CHECK phase), while waitFor polls from
+  // the TIMERS phase (setInterval) and from MutationObserver microtasks:
+  // both can run BEFORE the effect attach. The re-open here comes from the
+  // module-level 250ms geocode debounce (a REAL timer, outside act), so the
+  // commit that shows the listbox and the effect that attaches the listener
+  // land in DIFFERENT event-loop turns. Under parallel-suite contention the
+  // waitFor can therefore observe the listbox while the listener is still
+  // pending, and the ONE-SHOT fireEvent.mouseDown below is lost — nothing
+  // ever closes the dropdown and the waitFor times out (CI run 30951627009,
+  // test #794, 1 fail / 1954; t_18d6f344).
+  // t_18d6f344 fix: retry the outside mousedown on every poll until the
+  // close actually lands. Once the effect has attached the listener, the
+  // next poll's mousedown closes the dropdown and the asserts pass; if the
+  // close logic itself breaks, the retry still times out and the test fails
+  // — the retry covers ONLY the attach race, never the close behavior.
   await user.type(input, "a");
   await waitFor(() => assert.ok(screen.getByRole("listbox", { name: "Place suggestions" })), { timeout: 5000 });
-  rtl.fireEvent.mouseDown(document.body);
   await waitFor(() => {
+    rtl.fireEvent.mouseDown(document.body);
     assert.equal(input.getAttribute("aria-expanded"), "false", "click outside closes the dropdown");
     assert.ok(screen.queryByRole("listbox") === null, "the listbox is removed on click outside");
   }, { timeout: 5000 });
