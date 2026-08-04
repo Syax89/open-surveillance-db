@@ -162,7 +162,7 @@ test("E2E: the cap is per-IP — a different caller IP can still register after 
 // 3. Privacy by design: hash-only storage
 // ---------------------------------------------------------------------------
 
-test("E2E: only the SHA-256 of the caller IP is stored — never the raw address", async () => {
+test("E2E: only a non-invertible hash of the caller IP is stored — never the raw address", async () => {
   await registerAttempt(IP_A, "p-0");
   await registerAttempt(IP_A, "p-1");
 
@@ -174,10 +174,15 @@ test("E2E: only the SHA-256 of the caller IP is stored — never the raw address
   const serialized = JSON.stringify(rows.results);
   assert.ok(!serialized.includes(IP_A), "no raw IP in the table");
 
-  const hashA = await authModule.sha256Hex(IP_A);
-  const hashB = await authModule.sha256Hex(IP_B);
+  // QA#3 F4: the stored key is `registrationIpHash` — with no
+  // REGISTRATION_IP_HMAC_KEY in the test env this is the truncated
+  // SHA-256 fallback (128 bits = 32 hex chars), never a raw IP and never
+  // an invertible full digest. Production sets the HMAC key (deploy
+  // checklist), which makes the value uncomputable offline.
+  const hashA = (await authModule.sha256Hex(IP_A)).slice(0, 32);
+  const hashB = (await authModule.sha256Hex(IP_B)).slice(0, 32);
   for (const row of rows.results) {
-    assert.match(row.ipHash, /^[0-9a-f]{64}$/, "the stored key is a SHA-256 hex digest");
+    assert.match(row.ipHash, /^[0-9a-f]{32}$/, "the stored key is a 128-bit (32 hex) non-invertible digest");
     assert.equal(row.ipHash, hashA, "both attempts from the same IP share one key");
   }
   assert.notEqual(hashA, hashB, "a different IP hashes to a different key");

@@ -28,10 +28,13 @@ beforeEach(async () => {
   // (tests/registration-ip-cap.test.mjs).
   stub("recordRegistrationAttempt", async () => ({ id: 1, count: 0 }));
   stub("deleteRegistrationAttempt", async () => {});
-  // The route hashes the caller key before reserving the attempt; sha256Hex is
-  // a pure helper, so run the real implementation (same digest the db layer
-  // produces — the E2E cap suite asserts the stored key against it).
-  stub("sha256Hex", async (value) => createHash("sha256").update(value).digest("hex"));
+  // The route derives the per-IP registration key before reserving the
+  // attempt; registrationIpHash is a pure helper, so run the real
+  // implementation (the E2E cap suite asserts the stored key against it).
+  // QA#3 F4: with no REGISTRATION_IP_HMAC_KEY in the test env this is the
+  // truncated-SHA-256 fallback — never a raw IP.
+  stub("registrationIpHash", async (value) => createHash("sha256").update(value).digest("hex").slice(0, 32));
+  stub("verifyPasswordDummy", async () => false);
   if (!rateLimit) rateLimit = await loadLibModule("rate-limit");
   rateLimit.resetRateLimitState();
 });
@@ -165,11 +168,82 @@ test("register creates a contributor, mints a verification token, opens a sessio
   assert.match(sessionCookie, /SameSite=Strict/);
   assert.match(sessionCookie, /Path=\//);
   assert.match(sessionCookie, /Max-Age=2592000/);
-  assert.doesNotMatch(sessionCookie, /Secure/);
+  // QA#3 F2: Secure is the DEFAULT (fail-closed). The test env has no
+  // AUTH_COOKIE_SECURE and no ENVIRONMENT=development, so the cookie must
+  // carry Secure — the old fail-open default (Secure only when the operator
+  // remembered the var) is gone. The explicit non-Secure dev override is
+  // covered by its own test below.
+  assert.match(sessionCookie, /Secure/);
   const csrfCookie = findCookie(response, "osdb_csrf");
   assert.match(csrfCookie, /osdb_csrf=csrf-token-123/);
   assert.doesNotMatch(csrfCookie, /HttpOnly/);
   assert.match(csrfCookie, /SameSite=Strict/);
+});
+
+// ---------------------------------------------------------------------------
+// Cookie Secure policy (QA#3 F2, t_63e0d13c) — secure-by-default
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a register POST against an env override and return the session cookie.
+ * The mock env object is shared (cloudflare-workers.mjs); we mutate the knob,
+ * run, and restore it so sibling tests see the original state.
+ */
+async function sessionCookieWithEnv(envModule, envChanges) {
+  const previous = {};
+  for (const [key, value] of Object.entries(envChanges)) {
+    previous[key] = envModule.env[key];
+    envModule.env[key] = value;
+  }
+  try {
+    resetMockState();
+    stub("recordRegistrationAttempt", async () => ({ id: 1, count: 0 }));
+    stub("deleteRegistrationAttempt", async () => {});
+    stub("registrationIpHash", async (value) => createHash("sha256").update(value).digest("hex").slice(0, 32));
+    stub("createContributor", async () => contributor);
+    stub("createVerificationToken", async () => ({ rawToken: "verify-token-abc", expiresAt: "2026-08-02T08:00:00.000Z" }));
+    stub("createSession", async () => newSession);
+    stub("sendAuthEmail", async () => ({ ok: true, messageId: "m1" }));
+    const { POST } = await registerRoute();
+    const response = await POST(
+      apiRequest("/api/auth/register", {
+        method: "POST",
+        body: { email: "ada@example.org", password: "Sup3rsecret!123", displayName: "Ada" },
+      }),
+    );
+    return findCookie(response, "osdb_session");
+  } finally {
+    for (const [key] of Object.entries(envChanges)) {
+      if (previous[key] === undefined) delete envModule.env[key];
+      else envModule.env[key] = previous[key];
+    }
+  }
+}
+
+test("cookie Secure is the fail-closed default (no AUTH_COOKIE_SECURE, no ENVIRONMENT)", async () => {
+  // Already covered by the register test above (Secure matched with a bare
+  // env); this test pins the policy table explicitly via cookieSecure().
+  const { cookieSecure } = await loadLibModule("auth-session");
+  assert.equal(cookieSecure({}), true, "unset env → Secure (fail-closed)");
+  assert.equal(cookieSecure({ AUTH_COOKIE_SECURE: "true" }), true, "explicit true → Secure");
+  assert.equal(cookieSecure({ AUTH_COOKIE_SECURE: "false" }), false, "explicit false → non-Secure (local HTTP prototype)");
+  assert.equal(cookieSecure({ ENVIRONMENT: "development" }), false, "development env → non-Secure (plain-HTTP LAN prototype)");
+  assert.equal(cookieSecure({ ENVIRONMENT: "production" }), true, "production env → Secure even without the var");
+  assert.equal(cookieSecure({ ENVIRONMENT: "staging" }), true, "any non-development env → Secure");
+});
+
+test("AUTH_COOKIE_SECURE=false (local prototype on plain HTTP) drops Secure from the cookie", async () => {
+  const envModule = await loadTreeModule("cloudflare-workers.mjs");
+  const sessionCookie = await sessionCookieWithEnv(envModule, { AUTH_COOKIE_SECURE: "false" });
+  assert.match(sessionCookie, /osdb_session=raw-session-token-abc123/);
+  assert.doesNotMatch(sessionCookie, /Secure/, "explicit false override must drop Secure on the LAN prototype");
+  assert.match(sessionCookie, /SameSite=Strict/, "SameSite stays Strict on every path");
+});
+
+test("ENVIRONMENT=development alone also drops Secure (plain-HTTP prototype default)", async () => {
+  const envModule = await loadTreeModule("cloudflare-workers.mjs");
+  const sessionCookie = await sessionCookieWithEnv(envModule, { ENVIRONMENT: "development" });
+  assert.doesNotMatch(sessionCookie, /Secure/);
 });
 
 test("register reports sent:false when the mailer cannot deliver (provider error) — and never echoes the token", async () => {
@@ -469,6 +543,10 @@ test("login answers 429 with Retry-After while the account is locked, before any
   assert.equal(response.headers.get("retry-after"), "42");
   assert.equal(callArgs("authenticateContributor").length, 0, "no credential work happens while locked");
   assert.equal(callArgs("recordFailedLogin").length, 0, "a blocked attempt is not counted again");
+  // QA#3 F1: the locked branch must still pay the constant PBKDF2 cost, so
+  // the 429 timing cannot reveal whether the email exists (a locked account
+  // vs. a never-seen address must be indistinguishable by response time).
+  assert.equal(callArgs("verifyPasswordDummy").length, 1, "the locked path derives the dummy hash");
 });
 
 test("login answers 429 when the failed attempt trips the lockout", async () => {
@@ -686,7 +764,7 @@ test("me/submissions returns 401 without a session", async () => {
 test("account erasure deletes the account, de-attributes reports, and clears cookies", async () => {
   stub("findSessionByToken", async () => ({ ...session, contributor }));
   stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
-  stub("eraseContributor", async () => ({ deleted: true, deattributedReports: 3 }));
+  stub("eraseContributor", async () => ({ deleted: true, deattributedReports: 3, deattributedPhotos: 2 }));
   const { DELETE } = await accountRoute();
   const response = await DELETE(
     sessionRequest("/api/auth/account", "raw-session-token-abc123", {
@@ -695,7 +773,8 @@ test("account erasure deletes the account, de-attributes reports, and clears coo
     }),
   );
   assert.equal(response.status, 200);
-  assert.deepEqual(await responseBody(response), { ok: true, deattributedReports: 3 });
+  // QA#3 F3: the erasure response now also reports the de-attributed photos.
+  assert.deepEqual(await responseBody(response), { ok: true, deattributedReports: 3, deattributedPhotos: 2 });
   assert.deepEqual(callArgs("eraseContributor")[0], [7]);
   const cookies = response.headers.getSetCookie();
   assert.match(cookies.join(" "), /osdb_session=;/);

@@ -8,6 +8,7 @@ import {
   loginLockoutKey,
   normalizeEmail,
   recordFailedLogin,
+  verifyPasswordDummy,
 } from "../../../../db/auth";
 import { sessionCookieHeaders, sessionTtlSeconds } from "../../../lib/auth-session";
 import {
@@ -83,6 +84,11 @@ export async function POST(request: Request) {
     const emailKey = await loginLockoutKey(email);
     const lockout = await getLoginLockout(emailKey, policy);
     if (lockout.locked) {
+      // QA#3 F1 (t_63e0d13c): this branch returns BEFORE any hashing, which
+      // would let a caller distinguish "locked (already attacked)" from
+      // "never seen" by response time. Pay the same PBKDF2 cost as every
+      // other failure so the 429 timing carries no signal.
+      await verifyPasswordDummy(password);
       console.warn(`POST /api/auth/login rejected: account locked (emailKey ${emailKey})`);
       return Response.json(
         { error: "Too many failed login attempts. Please try again later." },

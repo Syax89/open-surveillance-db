@@ -150,6 +150,41 @@ export async function verifyPassword(password: string, stored: string): Promise<
   }
 }
 
+/**
+ * A structurally valid PBKDF2 hash the code never verifies against: it exists
+ * ONLY to make unknown-email lookups pay the same derivation cost as a real
+ * password check. The salt and key are fixed constants — the comparison
+ * result is discarded, so neither value carries any secret.
+ *
+ * QA#3 F1 (t_63e0d13c): the login response body is anti-enumeration (one
+ * generic 401), but the response TIME was not — an unknown email returned
+ * immediately while a registered email paid 210 000 PBKDF2 iterations
+ * (~50-150 ms). authenticateContributor and the lockout branch of the login
+ * route both call verifyPasswordDummy on the fast paths so the response time
+ * no longer reveals whether the email exists.
+ */
+const DUMMY_PASSWORD_HASH =
+  "pbkdf2$210000$WlpaWlpaWlpaWlpaWlpaWg$zU4WhYARxiSZk8T4hHTDxIt0TKfuJ3ZGBFxf6wvNosY";
+
+/**
+ * Pay the full PBKDF2 derivation cost against the dummy hash and return
+ * false. Callers DISCARD the result — the point is the timing, not the
+ * boolean — but returning false keeps the call site honest about the fact
+ * that this is a failed verification.
+ */
+export async function verifyPasswordDummy(password: string): Promise<boolean> {
+  try {
+    const parts = DUMMY_PASSWORD_HASH.split("$");
+    // Derive at the DUMMY hash's own (fixed) iteration count, exactly like a
+    // real verify would — the comparison result is discarded on purpose.
+    await derivePasswordKey(password, base64UrlToBytes(parts[2]), Number(parts[1]));
+  } catch {
+    // Derivation never fails for a string password; swallow so the fast path
+    // stays uniform (a throwing caller would reintroduce a timing signal).
+  }
+  return false;
+}
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -250,6 +285,51 @@ export async function createContributor(input: {
 }
 
 /**
+ * Derive the stored key for the per-IP registration cap (QA#3 F4,
+ * t_63e0d13c). The register route keys `registrations_ip_log` by this value
+ * — never by the raw IP.
+ *
+ * Plain SHA-256 of the caller key is INVERTIBLE for practical purposes: the
+ * IPv4 space is 2^32, so a precomputed table maps any stored hash back to
+ * the caller's address (PII at rest, GDPR art. 5(1)(e)). The fix:
+ *
+ *   - when `REGISTRATION_IP_HMAC_KEY` is configured (production), the value
+ *     is HMAC-SHA256(key, callerKey) TRUNCATED to 128 bits — the key is a
+ *     server secret, so the stored value is not computable offline and a
+ *     database leak cannot be dictionary-attacked;
+ *   - without a key (local prototype / tests), the fallback is plain
+ *     SHA-256 truncated to 128 bits: still not a raw IP, and the 30-day
+ *     retention sweep (R17) bounds the exposure; the QA-accepted "truncate"
+ *     option. Production must set the key (deploy checklist).
+ *
+ * The output is always 32 hex characters (128 bits), independent of which
+ * branch ran, so the column/index shape never changes.
+ */
+export async function registrationIpHash(
+  callerKeyValue: string,
+  hmacKey: string | undefined,
+): Promise<string> {
+  if (hmacKey && hmacKey.length > 0) {
+    const keyMaterial = await crypto.subtle.importKey(
+      "raw",
+      new TextEncoder().encode(hmacKey),
+      { name: "HMAC", hash: PBKDF2_HASH },
+      false,
+      ["sign"],
+    );
+    const mac = await crypto.subtle.sign(
+      "HMAC",
+      keyMaterial,
+      new TextEncoder().encode(callerKeyValue),
+    );
+    return [...new Uint8Array(mac).slice(0, 16)]
+      .map((byte) => byte.toString(16).padStart(2, "0"))
+      .join("");
+  }
+  return (await sha256Hex(callerKeyValue)).slice(0, 32);
+}
+
+/**
  * Record one registration attempt and return the reserved row id plus the
  * number of attempts for the caller's IP hash inside the rolling window —
  * atomically, in ONE D1 batch.
@@ -258,8 +338,10 @@ export async function createContributor(input: {
  * docs/COMMUNITY_PLAN.md §3.3): the register route inserts the attempt and
  * counts the window (`created_at >= windowStart`) in the same batch, so two
  * concurrent registrations cannot both read a stale count below the cap. The
- * stored key is `sha256Hex(callerKey)` — never the raw IP (privacy by design,
- * same rule as `photos.submitter_key` and the abuse-alert `callerHash`).
+ * stored key is `registrationIpHash(callerKey)` — a keyed HMAC (or truncated
+ * SHA-256) of the caller key, never the raw IP and never an invertible hash
+ * (privacy by design, QA#3 F4; same rule as `photos.submitter_key` and the
+ * abuse-alert `callerHash`).
  * The route answers 429 once the count reaches `registrationIpLimits(env).maxRequests`
  * (so the 5th request in the window is blocked and its row stays — it must
  * keep counting for the 6th to stay blocked too); rows older than the window
@@ -342,13 +424,24 @@ export async function updateContributorDisplayName(
  * public profile on success, null on unknown email or wrong password — the
  * route maps both to the same generic 401 so responses do not reveal which
  * part was wrong.
+ *
+ * QA#3 F1 (t_63e0d13c): an unknown email used to return immediately while a
+ * registered email paid the full PBKDF2 cost — a response-TIME oracle that
+ * enumerated accounts. The unknown-email branch now pays the same derivation
+ * cost via verifyPasswordDummy, so the only remaining difference is the
+ * lookup itself (a single indexed SELECT, no measurable signal).
  */
 export async function authenticateContributor(
   email: string,
   password: string,
 ): Promise<PublicContributor | null> {
   const contributor = await findContributorByEmail(email);
-  if (!contributor) return null;
+  if (!contributor) {
+    // Same 401, same cost: pay the PBKDF2 derivation so the response time
+    // cannot distinguish "no such email" from "wrong password" (QA#3 F1).
+    await verifyPasswordDummy(password);
+    return null;
+  }
   const valid = await verifyPassword(password, contributor.passwordHash);
   if (!valid) return null;
   return {
@@ -1097,6 +1190,8 @@ export type ErasureResult = {
   deletedConfirmations: number;
   /** Number of correction reports de-attributed to anonymous (SET NULL). */
   deattributedCorrections: number;
+  /** Number of uploaded photos de-attributed to anonymous (SET NULL, QA#3 F3). */
+  deattributedPhotos: number;
 };
 
 /**
@@ -1118,7 +1213,9 @@ export type ErasureResult = {
  * by the erased account disappear with it. `camera_edit_requests` and
  * `correction_requests` are de-attributed with SET NULL, never deleted: the
  * requests (audit trail) survive, unlinked. `cameras` are never touched
- * beyond the existing de-attribution (the ADR 0013 pattern).
+ * beyond the existing de-attribution (the ADR 0013 pattern); the same
+ * SET NULL rule now covers `photos.contributor_id` (QA#3 F3) — the photo
+ * row survives its R6/R13 lifecycle, the personal link is severed.
  *
  * The statements run as one atomic batch: a failure in any step rolls back
  * the whole erasure, so an account is never left half-deleted (e.g. sessions
@@ -1148,7 +1245,7 @@ export async function eraseContributor(contributorId: number): Promise<ErasureRe
     .bind(contributorId)
     .first<{ n: number }>();
   if (Number(existing?.n ?? 0) === 0) {
-    return { deleted: false, deattributedReports: 0, deletedConfirmations: 0, deattributedCorrections: 0 };
+    return { deleted: false, deattributedReports: 0, deletedConfirmations: 0, deattributedCorrections: 0, deattributedPhotos: 0 };
   }
 
   const attributed = await d1
@@ -1166,6 +1263,18 @@ export async function eraseContributor(contributorId: number): Promise<ErasureRe
     .bind(contributorId)
     .first<{ n: number }>();
   const deattributedCorrections = Number(corrections?.n ?? 0);
+  // QA#3 F3 (t_63e0d13c): photo attribution is personal data (art. 17) and
+  // was the one attribution `eraseContributor` never severed — after an
+  // account deletion every consumer resolving `photos.contributor_id`
+  // (ownership guards, moderation, the profile contributions list) hit an
+  // account that no longer exists. Photos follow the same rule as cameras:
+  // the evidence row survives (R6/R13 lifecycle), the attribution link is
+  // cut. The count feeds the erasure response like the report count.
+  const photos = await d1
+    .prepare("SELECT COUNT(*) AS n FROM photos WHERE contributor_id = ?")
+    .bind(contributorId)
+    .first<{ n: number }>();
+  const deattributedPhotos = Number(photos?.n ?? 0);
 
   await d1.batch([
     // Community verifications are the contributor's own data (art. 17): the
@@ -1177,6 +1286,11 @@ export async function eraseContributor(contributorId: number): Promise<ErasureRe
     // Correction reports: SET NULL, never delete (same rule as cameras).
     d1.prepare("UPDATE correction_requests SET contributor_id = NULL WHERE contributor_id = ?").bind(contributorId),
     d1.prepare("UPDATE cameras SET contributor_id = NULL WHERE contributor_id = ?").bind(contributorId),
+    // Photo evidence (QA#3 F3): the attribution is severed like the cameras —
+    // the image row survives (its lifecycle is R6/R13, tied to the record),
+    // the personal link to the erased account is cut. This closes the one
+    // attribution that the batch previously left orphaned.
+    d1.prepare("UPDATE photos SET contributor_id = NULL WHERE contributor_id = ?").bind(contributorId),
     // Role-identity link (audit t_5ca60ab2, P2): sever the explicit
     // users.contributor_id mapping so the users row (an independently
     // provisioned role identity) survives, but can no longer attribute
@@ -1214,5 +1328,5 @@ export async function eraseContributor(contributorId: number): Promise<ErasureRe
     d1.prepare("DELETE FROM contributors WHERE id = ?").bind(contributorId),
   ]);
 
-  return { deleted: true, deattributedReports, deletedConfirmations, deattributedCorrections };
+  return { deleted: true, deattributedReports, deletedConfirmations, deattributedCorrections, deattributedPhotos };
 }
