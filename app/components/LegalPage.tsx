@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { LegalPageContent, LegalBlock } from "../lib/legal";
 import { PublicNav } from "./PublicNav";
+import { LegalTableWrap } from "./LegalTableWrap";
 
 /**
  * Shared layout for the public legal / information pages
@@ -32,10 +33,25 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
   return parts.map((part, index) => {
     const key = `${keyPrefix}-${index}`;
     if (part.startsWith("**") && part.endsWith("**") && part.length > 4) {
-      return <strong key={key}>{part.slice(2, -2)}</strong>;
+      // Recursive (QA#2 F2): the greedy bold token can swallow an inner
+      // link — `**[ODbL 1.0](url)**` matches as ONE bold token, so the
+      // link must be re-rendered from the inner text. Recurse only when
+      // the inner text carries markup (a link; `[^*]` inside the token
+      // means no `**` can be nested), keeping plain bold as plain text.
+      const inner = part.slice(2, -2);
+      return (
+        <strong key={key}>
+          {/\[[^\]]+\]\([^)]+\)/.test(inner) ? renderInline(inner, key) : inner}
+        </strong>
+      );
     }
     if (part.startsWith("*") && part.endsWith("*") && part.length > 2) {
-      return <em key={key}>{part.slice(1, -1)}</em>;
+      const inner = part.slice(1, -1);
+      return (
+        <em key={key}>
+          {/\[[^\]]+\]\([^)]+\)/.test(inner) ? renderInline(inner, key) : inner}
+        </em>
+      );
     }
     const link = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
     if (link) {
@@ -71,7 +87,12 @@ function renderBlock(block: LegalBlock, keyPrefix: string): ReactNode {
       );
     case "table":
       return (
-        <div className="legal-table-wrap" key={keyPrefix}>
+        // QA#2 F1: the wrapper is scrollable (overflow-x: auto in
+        // globals.css) — LegalTableWrap makes it a keyboard-focusable
+        // region (tabIndex=0 + role=region + aria-label) only when the
+        // table actually overflows, so keyboard users can reach and
+        // scroll it (WCAG 2.1.1, axe scrollable-region-focusable).
+        <LegalTableWrap key={keyPrefix}>
           <table className="legal-table">
             {block.caption ? <caption>{block.caption}</caption> : null}
             <thead>
@@ -95,7 +116,7 @@ function renderBlock(block: LegalBlock, keyPrefix: string): ReactNode {
               ))}
             </tbody>
           </table>
-        </div>
+        </LegalTableWrap>
       );
   }
 }

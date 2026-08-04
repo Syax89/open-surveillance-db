@@ -218,6 +218,10 @@ export const en = {
   wallGoToAccount: "Go to your account",
   wallChecking: "Checking…",
   wallError: "Unable to check your session. Please try again.",
+  // QA#2 F4: the error-wall retry button label (the old ternary rendered
+  // t.loading — a truthy string — so the button ALWAYS said "Verify your
+  // email" even though its action retries the session check).
+  wallRetry: "Try again",
   // Per-method privacy disclosure (P1-4 — risk matrix complete, ADR 0020
   // decision 6). Each sign-in method declares its own risk surface; the OIDC
   // disclosure already existed and is kept unchanged.
@@ -441,6 +445,7 @@ export const it: Translation<typeof en> = {
   wallGoToAccount: "Vai al tuo account",
   wallChecking: "Verifica in corso…",
   wallError: "Impossibile verificare la sessione. Riprova.",
+  wallRetry: "Riprova",
   // Disclosure privacy per metodo (P1-4 — matrice rischi completa, ADR 0020
   // decisione 6). Ogni metodo dichiara la propria superficie di rischio; la
   // disclosure OIDC esisteva già e resta invariata.

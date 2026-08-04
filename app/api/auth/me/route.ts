@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { malformedSessionCookieGuard, resolveOptionalContributor } from "../../../lib/auth-session";
-import { authLimit, parseDisplayName } from "../../../lib/auth-route-helpers";
+import { authLimit, parseDisplayName, sessionLimit } from "../../../lib/auth-route-helpers";
 import { csrfVerified, sameOrigin } from "../../../lib/csrf";
 import { BodyReadError, readJsonBody, urlTooLong } from "../../../lib/input-limits";
 import { trustLevelMeta } from "../../../lib/trust-levels";
@@ -17,13 +17,19 @@ import { countVerifiedCameras, updateContributorDisplayName } from "../../../../
  * line from this single call, without a second request. The level is
  * personal data, so the response stays `no-store` and no other endpoint
  * exposes it.
+ *
+ * Rate limit: the SESSION bucket (QA#2 F3) — the public header and the
+ * write gate call this endpoint on EVERY page view, so the auth mutation
+ * bucket (10/min) would 429 a user navigating quickly. The session bucket
+ * defaults to 120/min (far above interactive navigation); the PATCH below
+ * stays on the auth mutation bucket.
  */
 export async function GET(request: Request) {
   if (urlTooLong(request)) {
     return Response.json({ error: "Request URI too long." }, { status: 414 });
   }
 
-  const blocked = await authLimit(request, env, "/api/auth/me");
+  const blocked = await sessionLimit(request, env, "/api/auth/me");
   if (blocked) return blocked;
 
   try {

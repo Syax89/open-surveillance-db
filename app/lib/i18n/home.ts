@@ -17,6 +17,11 @@ import type { Translation } from "./types";
 export const en = {
   mainNavigation: "Main navigation",
   homeAria: "OpenSurveillanceDB home",
+  // QA#2 F1 (axe serious): the scrollable legal tables (/privacy data
+  // table) become a focusable region when they overflow — the aria-label
+  // tells keyboard users why the region is in the tab order and how to
+  // scroll it.
+  tableScrollAria: "Table — scroll horizontally for more columns",
   menu: "Menu",
   exploreMap: "Explore map",
   browseRecords: "Browse records",
@@ -70,6 +75,7 @@ export const en = {
 export const it: Translation<typeof en> = {
   mainNavigation: "Navigazione principale",
   homeAria: "Pagina iniziale di OpenSurveillanceDB",
+  tableScrollAria: "Tabella — scorri in orizzontale per vedere le altre colonne",
   menu: "Menu",
   exploreMap: "Esplora la mappa",
   browseRecords: "Sfoglia i record",

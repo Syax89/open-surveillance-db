@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useMessages } from "../lib/use-messages";
+import { fetchSessionMe } from "../lib/session-fetch";
 
 /**
  * WriteGateWall (P1-2 Vera design) — the login wall for the public write
@@ -42,7 +43,10 @@ export function WriteGateWall({ returnTo, children }: { returnTo: string; childr
     // AccountPageBody's loaders and the /verify-email page.
     Promise.resolve()
       .then(() => { setState({ kind: "checking" }); setResendMessage(null); })
-      .then(() => fetch("/api/auth/me", { signal: controller.signal }))
+      // QA#2 F3: bounded retry on 429 — the session read has its own
+      // generous bucket (120/min); a transient burst retries briefly
+      // instead of throwing the write gate into its error wall.
+      .then(() => fetchSessionMe(controller.signal))
       .then(async (response) => {
         if (response.status === 401) {
           setState({ kind: "anonymous" });
@@ -130,7 +134,11 @@ export function WriteGateWall({ returnTo, children }: { returnTo: string; childr
           <h2>{t.wallLoginTitle}</h2>
           <p className="record-detail-summary">{t.wallError}</p>
           <p className="auth-switch">
-            <button className="text-button" type="button" onClick={() => check()}>{t.loading ? t.verifyTitle : t.wallLogIn}</button>
+            {/* QA#2 F4: the retry button used `t.loading ? ... : ...` —
+                a TRUTHY string, so it ALWAYS showed t.verifyTitle ("Verify
+                your email") even though the action retries the session
+                check. The dedicated wallRetry label matches the action. */}
+            <button className="text-button" type="button" onClick={() => check()}>{t.wallRetry}</button>
           </p>
         </>
       ) : null}
