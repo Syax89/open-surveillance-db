@@ -19,6 +19,9 @@ import { PUBLIC_CAMERA_STATUSES } from "../app/lib/public-status";
  *      be the source of truth) -> 429 + Retry-After;
  *   4. per-record cap (max verifications/day from distinct accounts on one
  *      record) -> 429;
+ *      NB (3)+(4) are enforced atomically: the COUNTs live in the WHERE of
+ *      the INSERT ... SELECT ... itself, so the check and the write are one
+ *      SQLite statement (QA F6 — no count-then-insert TOCTOU);
  *   5. IP-hash burst bucket lives in app/lib/confirm-ip-burst.ts (route
  *      layer, photos.submitter_key pattern — never the raw IP);
  *   6. decay: confirmations older than the review window
@@ -210,40 +213,71 @@ export async function setConfirmation(input: {
   const gateMin = confirmationLevelGateMin(effectiveEnv);
   if (verifiedCount < gateMin) return { kind: "level_gate" };
 
-  // 4. Daily per-account quota as D1 state inside the write path. Trusted
-  //    accounts (>= gateMin verified contributions) get the higher cap.
+  // 4. Quota knobs: daily per-account cap (trusted accounts, >= gateMin
+  //    verified contributions, get the higher knob) + per-record cap.
   const windowStartMs = nowMs - 24 * 60 * 60 * 1000;
   const windowStart = new Date(windowStartMs).toISOString();
   const quota = confirmationQuota(effectiveEnv);
   const dailyLimit = verifiedCount >= gateMin ? quota.maxPerDayTrusted : quota.maxPerDay;
-  const daily = await d1
-    .prepare("SELECT COUNT(*) AS n FROM camera_confirmations WHERE contributor_id = ? AND created_at >= ?")
-    .bind(input.contributorId, windowStart)
-    .first<{ n: number }>();
-  if ((daily?.n ?? 0) >= dailyLimit) {
-    return { kind: "daily_quota_exceeded", retryAfterSeconds: windowRetryAfterSeconds(windowStartMs, nowMs) };
-  }
 
-  // 5. Per-record cap: max verifications/day from distinct accounts on one
-  //    record; the 6th distinct account answers 429.
-  const perRecord = await d1
-    .prepare("SELECT COUNT(*) AS n FROM camera_confirmations WHERE camera_id = ? AND created_at >= ?")
-    .bind(input.cameraId, windowStart)
-    .first<{ n: number }>();
-  if ((perRecord?.n ?? 0) >= quota.perRecordPerDay) {
-    return { kind: "per_record_cap_exceeded", retryAfterSeconds: windowRetryAfterSeconds(windowStartMs, nowMs) };
-  }
-
-  // 6. Race-safe insert: the UNIQUE (camera_id, contributor_id) index with
-  //    ON CONFLICT DO NOTHING means two concurrent PUTs yield exactly one
-  //    row; no row returned -> duplicate (409).
+  // 5+6. Daily quota, per-record cap AND the insert as ONE atomic statement
+  //    (QA F6, t_0b7dd8fc). The COUNTs live INSIDE the INSERT ... SELECT ...
+  //    WHERE, so the check and the write are a single SQLite statement: two
+  //    concurrent PUTs cannot both read a stale COUNT and overshoot the caps
+  //    by +1 (the old SELECT COUNT -> INSERT pair was a TOCTOU). ON CONFLICT
+  //    DO NOTHING still dedupes the same (camera_id, contributor_id) pair.
   const inserted = await d1
     .prepare(
-      "INSERT INTO camera_confirmations (camera_id, contributor_id, created_at) VALUES (?, ?, ?) ON CONFLICT (camera_id, contributor_id) DO NOTHING RETURNING id",
+      `INSERT INTO camera_confirmations (camera_id, contributor_id, created_at)
+       SELECT ?, ?, ?
+       WHERE (SELECT COUNT(*) FROM camera_confirmations WHERE contributor_id = ? AND created_at >= ?) < ?
+         AND (SELECT COUNT(*) FROM camera_confirmations WHERE camera_id = ? AND created_at >= ?) < ?
+       ON CONFLICT (camera_id, contributor_id) DO NOTHING
+       RETURNING id`,
     )
-    .bind(input.cameraId, input.contributorId, input.now)
+    .bind(
+      input.cameraId,
+      input.contributorId,
+      input.now,
+      input.contributorId,
+      windowStart,
+      dailyLimit,
+      input.cameraId,
+      windowStart,
+      quota.perRecordPerDay,
+    )
     .first<{ id: number }>();
-  if (!inserted) return { kind: "duplicate" };
+
+  if (!inserted) {
+    // No row: either the pair already exists or one of the two caps is
+    // reached. The atomic statement above is the enforcement; these reads
+    // only pick the response kind (deterministic sequentially — under a
+    // race, whichever cap/conflict the atomic statement rejected wins).
+    const existing = await d1
+      .prepare("SELECT 1 AS ok FROM camera_confirmations WHERE camera_id = ? AND contributor_id = ?")
+      .bind(input.cameraId, input.contributorId)
+      .first<{ ok: number }>();
+    if (existing) return { kind: "duplicate" };
+    const daily = await d1
+      .prepare("SELECT COUNT(*) AS n FROM camera_confirmations WHERE contributor_id = ? AND created_at >= ?")
+      .bind(input.contributorId, windowStart)
+      .first<{ n: number }>();
+    if ((daily?.n ?? 0) >= dailyLimit) {
+      return { kind: "daily_quota_exceeded", retryAfterSeconds: windowRetryAfterSeconds(windowStartMs, nowMs) };
+    }
+    const perRecord = await d1
+      .prepare("SELECT COUNT(*) AS n FROM camera_confirmations WHERE camera_id = ? AND created_at >= ?")
+      .bind(input.cameraId, windowStart)
+      .first<{ n: number }>();
+    if ((perRecord?.n ?? 0) >= quota.perRecordPerDay) {
+      return { kind: "per_record_cap_exceeded", retryAfterSeconds: windowRetryAfterSeconds(windowStartMs, nowMs) };
+    }
+    // Defensive fallback: the statement rejected without a conflict and with
+    // both caps now below limit only if a concurrent request freed a slot
+    // between the attempt and these reads (DELETE race). The write was still
+    // rejected at its instant: 429 with Retry-After, never a false ok.
+    return { kind: "daily_quota_exceeded", retryAfterSeconds: windowRetryAfterSeconds(windowStartMs, nowMs) };
+  }
 
   // 7. Refresh the decayed count (created_at >= last_verified_at) for the
   //    response; the just-inserted confirmation counts when in window.

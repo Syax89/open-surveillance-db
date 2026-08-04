@@ -26,7 +26,10 @@
 //                                     spoofabile quando manca cf-connecting-ip
 
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { after, beforeEach, test } from "node:test";
+import { fileURLToPath } from "node:url";
 import { apiRequest } from "./helpers/api-harness.mjs";
 import {
   applyDrizzleMigrations,
@@ -42,6 +45,9 @@ import {
 } from "./helpers/e2e-harness.mjs";
 
 const NOW = "2026-08-01T00:00:00.000Z";
+
+// Repo root (per i test STRUTTURALI che leggono il sorgente reale dei fix).
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 // ---------------------------------------------------------------------------
 // F1 (P2) — cookie di sessione malformato: decodeURIComponent lancia URIError
@@ -176,10 +182,39 @@ test("F2: deve esistere un indice UNIQUE parziale su decision_event_id (pending)
 // il last-write-wins ribalta una decisione già presa e l'audit trail registra
 // due eventi di decisione (la coda può essere riaperta due volte).
 // Fix: aggiungere la guardia di stato alla UPDATE e mappare changes=0 a
-// not_found/not_pending. Test: la UPDATE esatta usata da decideAppeal non
-// deve poter ribaltare un appeal già deciso (guardia a livello SQL).
+// not_found/not_pending.
+//
+// NOTA (follow-up t_0b7dd8fc): la prima versione di questo test hardcoded la
+// UPDATE GIÀ corretta nel test stesso (`AND status IN ('pending',
+// 'escalated')`), quindi passava anche su main col bug (test VACUO: non
+// verificava il codice reale). Riscritto su due livelli:
+//   1. STRUTTURALE — la UPDATE reale in db/appeals.ts (il sorgente, non un
+//      copia-incolla nel test) deve contenere la guardia: rosso su main
+//      senza il fix, verde con il fix.
+//   2. COMPORTAMENTALE — decideAppeal() REALE invocato su un appeal già
+//      deciso deve rispondere not_pending senza toccare righe.
 
-test("F3: la UPDATE di decideAppeal non deve ribaltare un appeal già deciso (guardia di stato mancante)", async () => {
+test("F3a: la UPDATE di decideAppeal in db/appeals.ts porta la guardia di stato atomica (strutturale)", async () => {
+  const source = await readFile(path.join(root, "db", "appeals.ts"), "utf8");
+  const update = source.match(
+    /UPDATE moderation_appeals SET status = \?, decided_by = \?, decision_note = \?, decided_at = \? WHERE id = \?[\s\S]*?RETURNING id/,
+  );
+  assert.ok(
+    update,
+    "UPDATE finale di decideAppeal non trovata in db/appeals.ts: lo statement " +
+      "reale non è quello atteso dal test — il test non può più essere vacuo",
+  );
+  assert.ok(
+    update[0].includes("AND status IN ('pending', 'escalated')"),
+    "la UPDATE di decideAppeal (db/appeals.ts) non ha la guardia di stato: " +
+      "WHERE id = ? senza AND status IN ('pending','escalated') — due " +
+      "decisioni concorrenti sullo stesso appeal passano entrambe la " +
+      "pre-lettura e il last-write-wins ribalta una decisione già presa " +
+      "(come db/moderation.ts moderateCamera)",
+  );
+});
+
+test("F3b: decideAppeal reale su un appeal già deciso risponde not_pending e non tocca righe", async () => {
   const runtime = await loadDbRuntime();
   const db = new D1SqliteDatabase();
   await applyDrizzleMigrations(db);
@@ -218,24 +253,28 @@ test("F3: la UPDATE di decideAppeal non deve ribaltare un appeal già deciso (gu
     .run();
   const appeal = await db.prepare("SELECT id FROM moderation_appeals LIMIT 1").first();
 
-  // Statement ESATTO di db/appeals.ts:320-324 (l'UPDATE finale di
-  // decideAppeal) DOPO il fix F3: la guardia di stato atomica
-  // `AND status IN ('pending','escalated')` è nella UPDATE stessa (non solo
-  // nel SELECT precedente). Su un appeal con status='upheld' deve toccare 0
-  // righe — prima del fix la UPDATE non aveva la guardia e ne toccava 1.
-  const result = await db
-    .prepare(
-      "UPDATE moderation_appeals SET status = 'dismissed', decided_by = ?, decision_note = NULL, decided_at = ? WHERE id = ? AND status IN ('pending', 'escalated')",
-    )
-    .bind(reviewer.id, NOW, appeal.id)
-    .run();
+  // decideAppeal REALE (runtime.appeals = db/appeals.ts transpilato) su un
+  // appeal già 'upheld': la pre-lettura lo vede deciso e la guarded UPDATE
+  // (F3a) non deve comunque toccare righe. Prima del fix la UPDATE senza
+  // guardia avrebbe ribaltato upheld -> dismissed.
+  const result = await runtime.appeals.decideAppeal({
+    id: appeal.id,
+    decision: "dismiss",
+    reviewer: { id: reviewer.id, displayName: "QA Reviewer", role: "senior_moderator", active: 1 },
+    note: "second decision attempt",
+  });
   assert.equal(
-    result.meta.changes,
-    0,
-    "la UPDATE di decideAppeal non ha la guardia di stato: ribalta un appeal " +
-      "già deciso (upheld -> dismissed) in una race tra due moderatori; " +
-      "serve WHERE id = ? AND status IN ('pending','escalated') come " +
-      "db/moderation.ts moderateCamera",
+    result.kind,
+    "not_pending",
+    "decideAppeal su un appeal già deciso deve rispondere not_pending, " +
+      `non ${result.kind} — un secondo moderatore non può ribaltare una decisione presa`,
+  );
+  const after = await db.prepare("SELECT status FROM moderation_appeals WHERE id = ?").bind(appeal.id).first();
+  assert.equal(
+    after.status,
+    "upheld",
+    "l'appeal già deciso non deve cambiare stato: 0 righe toccate (guardia " +
+      "di stato nella UPDATE, db/appeals.ts)",
   );
 });
 
@@ -354,17 +393,52 @@ test("F5: il retention sweep deve eliminare le righe scadute di registrations_ip
 // F6 (P3) — setConfirmation: quota giornaliera/per-record TOCTOU
 // ---------------------------------------------------------------------------
 // db/confirmations.ts:219-245: conteggio (SELECT COUNT) e INSERT sono due
-// statement separati. Due PUT concorrenti dello stesso contributor su record
+// statement separate. Due PUT concorrenti dello stesso contributor su record
 // diversi (o di account diversi sullo stesso record) passano entrambe il
 // conteggio al limite e inseriscono: il cap giornaliero/per-record viene
 // sforato di +1 per ogni race. L'UNIQUE (camera_id, contributor_id) deduplica
-// solo la stessa coppia, non le quote. Il harness D1 sincrono non può
-// interleave: il test pinna il contratto sequenziale (che il fix deve
-// preservare rendendo atomico il check) e il report documenta la race e la
-// soluzione (INSERT condizionale con il conteggio in una sola statement, o
-// re-count post-insert con compensazione).
+// solo la stessa coppia, non le quote.
+// Fix (t_0b7dd8fc): INSERT condizionale con i conteggi nella STESSA
+// statement (`INSERT ... SELECT ... WHERE (SELECT COUNT(*) ...) < max ...
+// ON CONFLICT DO NOTHING RETURNING id`): la verifica della quota e la write
+// sono un unico statement SQLite atomico — due PUT concorrenti non possono
+// leggere entrambe un COUNT stantio.
+// Test: il contratto sequenziale (pin del comportamento, sotto) + il vincolo
+// STRUTTURALE che il fix introduce (conteggio dentro l'INSERT, non in una
+// SELECT COUNT separata). Il harness D1 sincrono non può interleave: la race
+// vera richiede il deploy D1 reale; il test struttura fa da rosso-prima-verde.
 
-test("F6: la quota giornaliera per contributor (max 1) non deve essere superabile in sequenza", async () => {
+test("F6a: la quota di setConfirmation è verificata nella STESSA statement dell'INSERT (niente count-then-insert)", async () => {
+  const source = await readFile(path.join(root, "db", "confirmations.ts"), "utf8");
+  const insert = source.match(/INSERT INTO camera_confirmations[\s\S]*?RETURNING id/);
+  assert.ok(
+    insert,
+    "INSERT di setConfirmation non trovata in db/confirmations.ts: lo " +
+      "statement reale non è quello atteso dal test",
+  );
+  const statement = insert[0];
+  assert.match(
+    statement,
+    /SELECT \?, \?, \?/,
+    "l'INSERT deve essere condizionale (INSERT ... SELECT ... WHERE): oggi " +
+      "db/confirmations.ts fa SELECT COUNT -> INSERT in due statement " +
+      "separate (TOCTOU, quota sforabile di +1/race)",
+  );
+  assert.match(
+    statement,
+    /WHERE \(SELECT COUNT\(\*\) FROM camera_confirmations/,
+    "il conteggio della quota deve stare nella WHERE della stessa statement " +
+      "dell'INSERT: solo così due PUT concorrenti non leggono un COUNT stantio",
+  );
+  assert.match(
+    statement,
+    /ON CONFLICT \(camera_id, contributor_id\) DO NOTHING/,
+    "l'ON CONFLICT DO NOTHING sulla coppia UNIQUE deve restare (deduplica " +
+      "della stessa coppia, 409)",
+  );
+});
+
+test("F6b: la quota giornaliera per contributor (max 1) non deve essere superabile in sequenza", async () => {
   const runtime = await loadDbRuntime();
   const db = new D1SqliteDatabase();
   await applyDrizzleMigrations(db);
