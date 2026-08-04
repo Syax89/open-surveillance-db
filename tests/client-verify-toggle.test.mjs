@@ -140,9 +140,10 @@ const levelZeroProfile = {
 };
 
 /**
- * Record-detail fetch mock: the shared cameras walk, the revisions call,
- * the personal confirmation state and the session profile. `toggle`
- * answers the PUT/DELETE mutation with the server reply.
+ * Record-detail fetch mock: the dedicated record endpoint (QA#5 F1 —
+ * GET /api/cameras/[id], one round trip, no client-side walk), the
+ * revisions call, the personal confirmation state and the session
+ * profile. `toggle` answers the PUT/DELETE mutation with the server reply.
  */
 function recordHandler({
   confirmation = { confirmed: false },
@@ -150,9 +151,7 @@ function recordHandler({
   toggle = (method) => jsonResponse({ confirmed: method === "PUT", count: method === "PUT" ? 4 : 2 }, { status: 200 }),
 } = {}) {
   return (input, init) => {
-    if (typeof input === "string" && input.startsWith("/api/cameras?")) {
-      return jsonResponse({ records: [recordFixture], total: 1, nextOffset: null });
-    }
+    if (input === "/api/cameras/7") return jsonResponse({ record: recordFixture });
     if (input === "/api/cameras/revisions?cameraId=7") return jsonResponse({ recordId: 7, revisions: [] });
     if (input === "/api/cameras/7/confirmation") {
       if (init && init.method === "PUT") return toggle("PUT");
@@ -296,9 +295,7 @@ test("record detail: duplicate verification (409) shows its localized error", as
 test("record detail: a dead session fetch fails closed (toggle disabled, honest state)", async () => {
   const { screen } = rtl;
   installFetchMock((input) => {
-    if (typeof input === "string" && input.startsWith("/api/cameras?")) {
-      return jsonResponse({ records: [recordFixture], total: 1, nextOffset: null });
-    }
+    if (input === "/api/cameras/7") return jsonResponse({ record: recordFixture });
     if (input === "/api/cameras/revisions?cameraId=7") return jsonResponse({ recordId: 7, revisions: [] });
     if (input === "/api/cameras/7/confirmation") return Promise.reject(new TypeError("Failed to fetch"));
     if (input === "/api/auth/me") return Promise.reject(new TypeError("Failed to fetch"));

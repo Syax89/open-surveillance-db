@@ -26,8 +26,7 @@ export function useModerationQueue() {
   const [actorId, setActorId] = useState("");
   const [reasons, setReasons] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState<Record<string, string>>({});
-  // Correction-only decision fields (H1, t_69891619): the record outcome
-  // chosen for approve and the record id the request is linked to.
+  // Correction-only decision fields (H1, t_69891619): outcome + linked record id.
   const [outcomes, setOutcomes] = useState<Record<string, string>>({});
   const [cameraIds, setCameraIds] = useState<Record<string, string>>({});
   const [metadataPublication, setMetadataPublication] = useState<Record<string, { manufacturer: boolean; observedOn: boolean }>>({});

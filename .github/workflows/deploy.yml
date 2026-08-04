@@ -44,6 +44,9 @@ concurrency:
 
 permissions:
   contents: read
+  # F9 qa#5 (t_ab0d4c75): l'upload dello snapshot D1 pre-migrazione e del
+  # version-id precedente come artifact del run richiede actions: write.
+  actions: write
 
 jobs:
   deploy:
@@ -110,6 +113,68 @@ jobs:
           npx wrangler deploy --dry-run --outdir=.wrangler/dry-run
           echo "Dry run completato: nessuna modifica remota."
 
+      - name: Capture previous version id (rollback reference, F9 qa#5)
+        if: ${{ github.event.inputs.mode == 'deploy' }}
+        id: capture-version
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          # F9 (t_ab0d4c75): salva il version-id ATTUALMENTE deployato PRIMA di
+          # migrazioni/deploy, così il rollback ha il target esatto senza
+          # scavare nei log del run (OPERATIONS.md §5.1). Parsing difensivo:
+          # prima --json, poi fallback sulla tabella testuale.
+          npx wrangler versions list --json > versions.json 2>/dev/null || npx wrangler versions list > versions.txt 2>&1
+          PREV_ID=$(node -e '
+            const fs = require("fs");
+            let id = "";
+            try {
+              const arr = JSON.parse(fs.readFileSync("versions.json", "utf8"));
+              if (Array.isArray(arr) && arr.length && arr[0].id) id = String(arr[0].id);
+            } catch {}
+            if (!id) {
+              const txt = fs.readFileSync("versions.txt", "utf8");
+              const m = txt.match(/^([0-9a-f]{32})\s/m);
+              if (m) id = m[1];
+            }
+            process.stdout.write(id);
+          ')
+          if [ -z "$PREV_ID" ]; then
+            echo "::warning::Impossibile parsare il version-id precedente (wrangler versions list): il target di rollback andrà cercato a mano."
+          else
+            echo "previous_version_id=${PREV_ID}" >> "$GITHUB_OUTPUT"
+            echo "$PREV_ID" > previous-version-id.txt
+            echo "Version-id precedente: ${PREV_ID}"
+          fi
+
+      - name: Snapshot D1 pre-migrazione (F9 qa#5, cifrato se BACKUP_PASSPHRASE)
+        if: ${{ github.event.inputs.mode == 'deploy' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          # F9 (t_ab0d4c75): snapshot del D1 di produzione nello stesso run del
+          # deploy, PRIMA delle migrazioni — una migrazione distruttiva ha
+          # sempre il restore dello stesso run (il backup notturno 02:00
+          # potrebbe essere vecchio di un giorno). Mai artifact in chiaro:
+          # cifrato se BACKUP_PASSPHRASE è configurato, altrimenti il file
+          # resta solo sul runner effimero (non caricato).
+          sha=$(git rev-parse --short HEAD)
+          stamp=$(date +%Y%m%d-%H%M%S)
+          f="pre-deploy-${sha}-${stamp}.sql"
+          npx wrangler d1 export osdb-production --remote --output="$f"
+          ls -la "$f"
+          if [ -n "${BACKUP_PASSPHRASE:-}" ]; then
+            openssl enc -aes-256-cbc -salt -pbkdf2 -pass "pass:${BACKUP_PASSPHRASE}" -in "$f" -out "${f}.enc"
+            sha256sum "${f}.enc" > "${f}.enc.sha256"
+            rm -f "$f"
+            echo "snapshot_enc=${f}.enc" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::BACKUP_PASSPHRASE non configurato: snapshot lasciato NON cifrato sul runner (non verrà caricato come artifact)."
+            echo "snapshot_enc=" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Apply D1 migrations (remoto, produzione)
         if: ${{ github.event.inputs.mode == 'deploy' }}
         env:
@@ -127,3 +192,29 @@ jobs:
           npx wrangler deploy
           echo "Registrazione version id (correlazione rollback, OPERATIONS.md §5.1):"
           npx wrangler versions list | head -8
+          # F9 (t_ab0d4c75): comando di rollback esatto nel job summary, con
+          # il version-id precedente catturato prima del deploy.
+          PREV_ID="${{ steps.capture-version.outputs.previous_version_id }}"
+          {
+            echo "## Rollback"
+            if [ -n "$PREV_ID" ]; then
+              echo "Target: version-id precedente \`${PREV_ID}\` (catturato prima del deploy)."
+              echo '```bash'
+              echo "npx wrangler rollback ${PREV_ID}"
+              echo '```'
+            else
+              echo "Version-id precedente NON catturato: cercare l'ultimo deploy in \`wrangler versions list\`."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload snapshot D1 + version-id (artifact run, F9 qa#5)
+        if: ${{ github.event.inputs.mode == 'deploy' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: pre-deploy-${{ github.sha }}
+          path: |
+            pre-deploy-*.enc
+            pre-deploy-*.enc.sha256
+            previous-version-id.txt
+          if-no-files-found: warn
+          retention-days: 30
