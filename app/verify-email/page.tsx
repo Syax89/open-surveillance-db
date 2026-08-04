@@ -23,9 +23,10 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default function VerifyEmailPage() {
+export default async function VerifyEmailPage() {
+  const t = (await getServerMessages()).auth;
   return (
-    <Suspense fallback={<p className="loading-note">Loading…</p>}>
+    <Suspense fallback={<p className="loading-note">{t.loading}</p>}>
       <VerifyEmailBody />
     </Suspense>
   );

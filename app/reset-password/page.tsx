@@ -19,9 +19,10 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default function ResetPasswordPage() {
+export default async function ResetPasswordPage() {
+  const t = (await getServerMessages()).auth;
   return (
-    <Suspense fallback={<p className="loading-note">Loading…</p>}>
+    <Suspense fallback={<p className="loading-note">{t.loading}</p>}>
       <ResetPasswordBody />
     </Suspense>
   );

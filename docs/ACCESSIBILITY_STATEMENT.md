@@ -1,12 +1,12 @@
 # Accessibility statement
 
-- **Status:** draft — pre-launch, prototype stage
+- **Status:** draft — pre-launch, project stage
 - **Owner:** Marie (documentation) with review by Ada (technical) and Rosa (privacy/legal)
 - **Standards target:** WCAG 2.2 AA (Web Content Accessibility Guidelines)
 - **Related documents:** [PRODUCT_UX.md](workstreams/PRODUCT_UX.md), [ADR 0006 — non-sensitive usability-feedback route](decisions/0006-non-sensitive-usability-feedback-route.md), [MODERATION_SLA.md](legal/MODERATION_SLA.md)
 
 This statement describes the accessibility of the OpenSurveillanceDB public web
-application. It is written for the current **local prototype** and will be
+application. It is written for the current **local project** and will be
 updated before any public launch, when the pilot area, languages, and review
 method are decided (see [FUTURE_ROADMAP.md](FUTURE_ROADMAP.md), Horizon 2 and 4).
 
@@ -22,7 +22,7 @@ by disabled users before the pilot is widened, as agreed in
 
 ## Compliance status
 
-**Partially compliant.** The local prototype implements a meaningful
+**Partially compliant.** The local project implements a meaningful
 accessibility baseline, and **automated checks now run in CI**: the F-QA
 gate audits the SSR HTML of every public route with axe-core (WCAG 2.1/2.2
 A/AA tags) and enforces 0 critical/serious violations. **Formal manual
@@ -31,7 +31,7 @@ known limitations remain (listed below). This section will be replaced by a
 measured conformance statement (WCAG 2.2 A/AA, per success criterion) once
 the manual testing gates in Horizon 2 are complete.
 
-### What is already implemented in the prototype
+### What is already implemented in the project
 
 - A skip link and main-content target on every app surface.
 - Visible keyboard focus states and logical focus order.
@@ -41,8 +41,8 @@ the manual testing gates in Horizon 2 are complete.
 - Report-location selection by map click **or** validated manual coordinates.
 - English/Italian interface with a device-local language preference; the
   language choice does not affect API data.
-- An in-app bilingual guide at `/guide` explaining data states, workflow, and
-  prototype boundaries.
+- An in-app bilingual guide at `/guide` explaining data states and the
+  moderation workflow.
 - Status information is not conveyed by colour alone (text and icon labels are
   used), and safe type/order filters are shared by map and directory.
 - **Automated accessibility gates run in CI on every PR:** axe-core over every
@@ -96,7 +96,7 @@ will be available at `/feedback` and will ask only for:
 No account, no mandatory email, no analytics, and no behavioural tracking are
 involved. The route is designed to collect no sensitive personal data.
 
-### Alternative channels (current prototype)
+### Alternative channels (current project)
 
 Until `/feedback` is implemented, please report accessibility barriers through
 one of these channels:
@@ -140,13 +140,13 @@ This statement is reviewed:
 
 # Dichiarazione di accessibilità
 
-- **Stato:** bozza — pre-lancio, fase di prototipo locale
+- **Stato:** bozza — pre-lancio, fase di progetto locale
 - **Responsabile:** Marie (documentazione) con revisione di Ada (tecnica) e Rosa (privacy/legale)
 - **Standard di riferimento:** WCAG 2.2 AA (Web Content Accessibility Guidelines)
 - **Documenti correlati:** [PRODUCT_UX.md](workstreams/PRODUCT_UX.md), [ADR 0006 — percorso di feedback di usabilità non sensibile](decisions/0006-non-sensitive-usability-feedback-route.md), [MODERATION_SLA.md](legal/MODERATION_SLA.md)
 
 Questa dichiarazione descrive l'accessibilità dell'applicazione web pubblica di
-OpenSurveillanceDB. È redatta per l'attuale **prototipo locale** e sarà
+OpenSurveillanceDB. È redatta per l'attuale **progetto locale** e sarà
 aggiornata prima di qualsiasi lancio pubblico, quando saranno decisi l'area
 pilota, le lingue e il metodo di verifica (vedi [FUTURE_ROADMAP.md](FUTURE_ROADMAP.md), Orizzonte 2 e 4).
 
@@ -163,7 +163,7 @@ prima di ampliare il pilota, come concordato in
 
 ## Stato di conformità
 
-**Parzialmente conforme.** Il prototipo locale implementa una base di
+**Parzialmente conforme.** Il progetto locale implementa una base di
 accessibilità significativa, e **i controlli automatizzati ora girano in CI**:
 il gate F-QA verifica l'HTML SSR di ogni route pubblica con axe-core (tag
 WCAG 2.1/2.2 A/AA) e impone 0 violazioni critiche/serie. **Il test manuale
@@ -173,7 +173,7 @@ sostituita da una dichiarazione di conformità misurata (WCAG 2.2 A/AA, per
 singolo criterio di successo) al termine dei test manuali previsti
 nell'Orizzonte 2.
 
-### Cosa è già implementato nel prototipo
+### Cosa è già implementato nel progetto
 
 - Collegamento "salta al contenuto" (skip link) e destinazione del contenuto principale su ogni schermata.
 - Stati di focus visibili e ordine di focus logico.
@@ -181,7 +181,7 @@ nell'Orizzonte 2.
 - Directory testuale ricercabile e pagine di dettaglio utilizzabili **senza interazione con la mappa**; mappa e directory mostrano gli stessi campi pubblici.
 - Selezione della posizione tramite clic sulla mappa **oppure** coordinate manuali validate.
 - Interfaccia in inglese e italiano con preferenza di lingua salvata solo sul dispositivo; la scelta non influisce sui dati API.
-- Guida in-app bilingue su `/guide` che spiega stati dei dati, flusso di lavoro e confini del prototipo.
+- Guida in-app bilingue su `/guide` che spiega gli stati dei dati e il flusso di lavoro di moderazione.
 - Lo stato non è comunicato solo con il colore (sono usate etichette testuali e icone) e i filtri sicuri per tipo/ordine sono condivisi tra mappa e directory.
 - **Gate di accessibilità automatizzati in CI su ogni PR:** axe-core su ogni rotta SSR (jsdom) più un gate Lighthouse CI in Chromium reale che applica le regole di layout WCAG 2.2 AA che jsdom non può valutare — color-contrast, target-size (2.5.8), link-in-text-block, scrollable-region-focusable — con punteggio di accessibilità minimo **0.95**. Lighthouse controlla una rotta rappresentativa per ogni template di layout distinto (tutte le pagine auth, mappa, catalogo, form segnala/correggi, dettaglio record e i due template statici — InfoPage via `/guide`, LegalPage via `/privacy`, quest'ultimo che copre le pagine legali/statiche con i propri token colore su `.legal-table`/`.legal-note`), quindi ogni layout dell'app è coperto dal rendering reale, mentre le regole di contenuto axe-core restano attive su ogni rotta (`.github/workflows/lighthouse.yml`, verifica locale: `npx lhci autorun`).
 
@@ -206,7 +206,7 @@ implementato, il percorso sarà disponibile su `/feedback` e chiederà solo:
 
 Nessun account, nessuna email obbligatoria, nessuna analisi e nessun tracciamento comportamentale. Il percorso è progettato per non raccogliere dati personali sensibili.
 
-### Canali alternativi (prototipo attuale)
+### Canali alternativi (progetto attuale)
 
 Finché `/feedback` non è implementato, segnala le barriere di accessibilità tramite uno di questi canali:
 

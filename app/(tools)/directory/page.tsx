@@ -21,13 +21,14 @@ export async function generateMetadata(): Promise<Metadata> {
  *
  * F4 wires useCameraFilters (useSearchParams) into DirectoryTool, which
  * requires a Suspense boundary in Next 16 during static/build rendering —
- * same pattern as /mappa and /correggi. The fallback is the SSR loading
- * note; the tool body renders synchronously, so the boundary never flashes
- * in practice.
+ * same pattern as /mappa and /correggi. The fallback is the localized SSR
+ * loading note (F2 QA#6); the tool body renders synchronously, so the
+ * boundary never flashes in practice.
  */
-export default function DirectoryPage() {
+export default async function DirectoryPage() {
+  const t = (await getServerMessages()).directory;
   return (
-    <Suspense fallback={<p className="loading-note">Loading the directory…</p>}>
+    <Suspense fallback={<p className="loading-note">{t.loading}</p>}>
       <DirectoryTool />
     </Suspense>
   );

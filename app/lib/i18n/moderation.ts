@@ -10,11 +10,11 @@ import type { Translation } from "./types";
 export const en = {
   navigation: "Moderation navigation",
   home: "OpenSurveillanceDB home",
-  returnPublic: "Return to public prototype",
+  returnPublic: "Return to public site",
   localAdministration: "Local administration",
   title: "Moderation queue",
   intro:
-    "This interface is for the local prototype only. It is not linked from the public experience and does not publish any new information by itself.",
+    "This interface is for local administration only. It is not linked from the public site and does not publish any new information by itself.",
   localTool: "Local-only tool.",
   localWarning:
     "Review text and approximate locations only. Photos in the queue are private evidence: check redaction before approving, and never add personal data, credentials, live-feed links, or operational security details.",
@@ -243,11 +243,11 @@ export const en = {
 export const it: Translation<typeof en> = {
   navigation: "Navigazione moderazione",
   home: "Home di OpenSurveillanceDB",
-  returnPublic: "Torna al prototipo pubblico",
+  returnPublic: "Torna al sito pubblico",
   localAdministration: "Amministrazione locale",
   title: "Coda di moderazione",
   intro:
-    "Questa interfaccia è riservata al prototipo locale. Non è collegata all'esperienza pubblica e non pubblica autonomamente nuove informazioni.",
+    "Questa interfaccia è riservata esclusivamente all'amministrazione locale. Non è collegata al sito pubblico e non pubblica autonomamente nuove informazioni.",
   localTool: "Strumento solo locale.",
   localWarning:
     "Valuta solo testo e posizioni approssimative. Le foto in coda sono prove private: verifica la redazione prima di approvare e non aggiungere mai dati personali, credenziali, link a feed live o dettagli sulla sicurezza operativa.",

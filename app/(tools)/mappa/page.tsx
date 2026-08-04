@@ -20,12 +20,13 @@ export async function generateMetadata(): Promise<Metadata> {
  * The page is a thin server shell: the interactive body is MappaTool
  * ("use client"). useSearchParams (URL shell ?type=&freshness=&lat=&lng=&z=,
  * deep links) requires a Suspense boundary in Next 16 during static/build
- * rendering, so the tool body is wrapped here — the fallback is the SSR
- * loading note, matching the /records/[id] pattern.
+ * rendering, so the tool body is wrapped here — the fallback is the
+ * localized SSR loading note (F2 QA#6), matching the /records/[id] pattern.
  */
-export default function MappaPage() {
+export default async function MappaPage() {
+  const t = (await getServerMessages()).map;
   return (
-    <Suspense fallback={<p className="loading-note">Loading the map…</p>}>
+    <Suspense fallback={<p className="loading-note">{t.loading}</p>}>
       <MappaTool />
     </Suspense>
   );

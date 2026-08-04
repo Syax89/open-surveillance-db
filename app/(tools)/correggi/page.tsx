@@ -20,11 +20,14 @@ export async function generateMetadata(): Promise<Metadata> {
  *
  * CorreggiTool reads ?record=ID via useSearchParams to pre-fill the related
  * record, which requires a Suspense boundary in Next 16 (same pattern as
- * /mappa). The fallback is the SSR loading note.
+ * /mappa). The fallback is the localized SSR loading note (F2 QA#6): the
+ * bundle is resolved server-side from the locale cookie, so Italian users
+ * never see the English "Loading…".
  */
-export default function CorreggiPage() {
+export default async function CorreggiPage() {
+  const t = (await getServerMessages()).correction;
   return (
-    <Suspense fallback={<p className="loading-note">Loading…</p>}>
+    <Suspense fallback={<p className="loading-note">{t.loading}</p>}>
       <CorreggiTool />
     </Suspense>
   );

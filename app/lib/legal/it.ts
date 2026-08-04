@@ -316,7 +316,7 @@ export const itLegal: LegalContent = {
               "**Consultazione:** navigare la mappa, l'elenco dei record e le singole pagine dei record; cercare e leggere il dataset pubblico.",
               "**Esportazioni:** scaricare i dati pubblici tramite le esportazioni JSON/CSV/GeoJSON e l'API pubblica, e riutilizzarli, nel rispetto della licenza ODbL 1.0 (sezione 7) e dei limiti anti-abuso della sezione 4.",
               "**Segnalazioni:** inviare osservazioni su infrastrutture di sorveglianza pubbliche e visibili per la moderazione umana. Le segnalazioni non sono mai garantite come pubblicate (sezione 5).",
-              "**Finalità lecite:** i dati possono essere usati per ricerca, giornalismo, attivismo civico e per qualsiasi finalità compatibile con questi termini e con la licenza ODbL 1.0. Non è richiesto alcun account per navigare **né per segnalare**: gli invii possono essere anonimi o attribuiti a un account contributore gratuito facoltativo (email + nome visualizzato pseudonimo). I contributi usano un **ID interno pseudonimo**, mai un requisito di nome reale.",
+              "**Finalità lecite:** i dati possono essere usati per ricerca, giornalismo, attivismo civico e per qualsiasi finalità compatibile con questi termini e con la licenza ODbL 1.0. La consultazione dei dati pubblici non richiede mai un account. Inviare una segnalazione o una correzione richiede un account contributore verificato (sezione 3.7; ADR 0020) e ogni invio è attribuito a esso tramite un **ID interno pseudonimo** — mai un requisito di nome reale.",
             ],
           },
         ],
@@ -559,7 +559,7 @@ export const itLegal: LegalContent = {
     intro:
       "OpenSurveillanceDB è un database civico di interesse pubblico. Questa dichiarazione descrive il nostro impegno per l'accessibilità, lo stato attuale di conformità e come segnalare una barriera.",
     versionNote:
-      "Versione 0.1 — 1 agosto 2026. Bozza — fase pre-lancio, prototipo. La copia repository (docs/ACCESSIBILITY_STATEMENT.md) resta la versione canonica.",
+      "Versione 0.1 — 1 agosto 2026. Bozza — fase pre-lancio, progetto. La copia repository (docs/ACCESSIBILITY_STATEMENT.md) resta la versione canonica.",
     sections: [
       {
         heading: "1. Impegno",
@@ -575,7 +575,7 @@ export const itLegal: LegalContent = {
         blocks: [
           {
             type: "paragraph",
-            text: "**Parzialmente conforme.** Il prototipo attuale implementa una base di accessibilità significativa, ma **non ha ancora superato test di accessibilità formali, automatici o manuali**, e permangono alcune limitazioni note (elencate sotto). Questa sezione sarà sostituita da una dichiarazione di conformità misurata (WCAG 2.2 A/AA, per criterio di successo) al completamento delle verifiche.",
+            text: "**Parzialmente conforme.** Il progetto attuale implementa una base di accessibilità significativa, ma **non ha ancora superato test di accessibilità formali, automatici o manuali**, e permangono alcune limitazioni note (elencate sotto). Questa sezione sarà sostituita da una dichiarazione di conformità misurata (WCAG 2.2 A/AA, per criterio di successo) al completamento delle verifiche.",
           },
         ],
       },
@@ -591,7 +591,7 @@ export const itLegal: LegalContent = {
               "Una directory testuale ricercabile e pagine di dettaglio dei record che funzionano **senza interazione con la mappa**; mappa e directory presentano gli stessi campi pubblici.",
               "Selezione della posizione della segnalazione tramite clic sulla mappa **o** coordinate manuali validate.",
               "Un'interfaccia in inglese/italiano con preferenza di lingua locale al dispositivo; la scelta della lingua non influisce sui dati API.",
-              "Una guida in-app bilingue su [/guide](/guide) che spiega gli stati dei dati, il flusso di lavoro e i confini del prototipo.",
+              "Una guida in-app bilingue su [/guide](/guide) che spiega gli stati dei dati e il flusso di lavoro di moderazione.",
               "Lo stato delle informazioni non è mai comunicato solo con il colore (vengono usati testo ed etichette con icone).",
             ],
           },
