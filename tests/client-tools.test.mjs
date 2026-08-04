@@ -589,14 +589,27 @@ test("MappaTool geocode dropdown closes on Escape and on click outside", async (
   assert.equal(input.getAttribute("aria-expanded"), "true");
 
   await user.keyboard("{Escape}");
-  assert.equal(input.getAttribute("aria-expanded"), "false", "Escape closes the dropdown");
-  assert.ok(screen.queryByRole("listbox") === null, "the listbox is removed on close");
+  // t_2ec5e072: the close is a state update flushed by act — under heavy
+  // parallel-suite contention (CI run 30934261030: 1 fail / 1954 on this
+  // assert) the flush can land a tick after the immediate assert. Poll
+  // for the closed state instead (same pattern as the pan-land waitFor
+  // above and url-state-contract #282).
+  await waitFor(() => {
+    assert.equal(input.getAttribute("aria-expanded"), "false", "Escape closes the dropdown");
+    assert.ok(screen.queryByRole("listbox") === null, "the listbox is removed on close");
+  }, { timeout: 5000 });
 
-  // Clicking outside the search wrapper closes the dropdown again.
+  // Clicking outside the search wrapper closes the dropdown again. The
+  // document-level mousedown listener is attached by an effect on open,
+  // so the close lands on the same act flush as the re-open — same
+  // waitFor treatment as the Escape branch above.
   await user.type(input, "a");
   await waitFor(() => assert.ok(screen.getByRole("listbox", { name: "Place suggestions" })), { timeout: 5000 });
   rtl.fireEvent.mouseDown(document.body);
-  assert.equal(input.getAttribute("aria-expanded"), "false", "click outside closes the dropdown");
+  await waitFor(() => {
+    assert.equal(input.getAttribute("aria-expanded"), "false", "click outside closes the dropdown");
+    assert.ok(screen.queryByRole("listbox") === null, "the listbox is removed on click outside");
+  }, { timeout: 5000 });
   installEmptyMock();
 });
 
