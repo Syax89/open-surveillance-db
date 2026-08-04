@@ -75,7 +75,7 @@ export async function GET(request: Request) {
   // GeoJSON) get a stricter one so anomalous export traffic is throttled.
   const format = new URL(request.url).searchParams.get("format");
   const kind: RouteKind = format === "csv" || format === "geojson" ? "export" : "read";
-  const key = callerKey(request);
+  const key = callerKey(request, env);
   const limitOptions = limitsFor(kind, env);
   const limit = await checkRateLimit(env, kind, key, limitOptions);
   if (!limit.allowed) {
@@ -180,7 +180,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "Submissions are temporarily disabled." }, { status: 503 });
   }
 
-  const key = callerKey(request);
+  const key = callerKey(request, env);
   const limitOptions = submissionLimits(env);
   const limit = await checkRateLimit(env, "submit", key, limitOptions);
   if (!limit.allowed) {

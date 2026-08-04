@@ -7,7 +7,7 @@ import {
 } from "../../../db/appeals";
 import { requireRole } from "../../lib/authz";
 import { getUserByContributorId, roleAtLeast } from "../../../db/users";
-import { resolveOptionalContributor } from "../../lib/auth-session";
+import { malformedSessionCookieGuard, resolveOptionalContributor } from "../../lib/auth-session";
 import { csrfVerified, sameOrigin } from "../../lib/csrf";
 import { isRecord } from "../../lib/guards";
 import { BodyReadError, readJsonBody, urlTooLong } from "../../lib/input-limits";
@@ -62,7 +62,7 @@ function parseAppealRequest(value: unknown): {
 }
 
 async function appealLimit(request: Request) {
-  const key = callerKey(request);
+  const key = callerKey(request, env);
   const limitOptions = limitsFor("appeal", env);
   const limit = await checkRateLimit(env, "appeal", key, limitOptions);
   if (!limit.allowed) {
@@ -114,7 +114,12 @@ export async function POST(request: Request) {
   // csrf.ts) or any transient resolution error makes the caller anonymous:
   // resolveOptionalContributor is therefore wrapped so an unexpected throw
   // answers 401 (anonymous) instead of a framework 500, and the per-IP
-  // bucket below still bounds abuse.
+  // bucket below still bounds abuse. Follow-up (t_b6f04976): a PRESENT-but-
+  // undecodable session cookie is a client bug — the guard answers a clean
+  // 400 (clear cookies) instead of a silent 401.
+  const malformed = malformedSessionCookieGuard(request);
+  if (malformed) return malformed;
+
   let session = null;
   try {
     session = await resolveOptionalContributor(request);

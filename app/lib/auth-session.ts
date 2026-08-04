@@ -11,6 +11,7 @@ import { findSessionByToken, type PublicContributor, type Session } from "../../
 import {
   buildSessionCookies,
   clearSessionCookies,
+  malformedCookieNames,
   readCookie,
   SESSION_COOKIE,
 } from "./csrf";
@@ -39,6 +40,38 @@ export type ResolvedSession = {
   contributor: PublicContributor;
   session: Session;
 };
+
+/**
+ * True when the request carries an `osdb_session` cookie that is present but
+ * undecodable (QA F1 follow-up, t_b6f04976). A malformed session cookie is a
+ * client bug: routes answer a clean 400 (never 503/500 from an unhandled
+ * URIError, never a silent 401 that hides the corrupt cookie). `parseCookies`
+ * already degrades the value to "absent" so nothing crashes; this surface
+ * lets the routes distinguish "no cookie" from "broken cookie".
+ */
+export function sessionCookieMalformed(request: Request): boolean {
+  return malformedCookieNames(request).includes(SESSION_COOKIE);
+}
+
+/** Clean 400 for a request carrying a malformed session cookie. */
+export function malformedSessionCookieResponse(): Response {
+  return Response.json(
+    { error: "Malformed session cookie. Clear cookies and log in again." },
+    { status: 400, headers: { "Cache-Control": "no-store" } },
+  );
+}
+
+/**
+ * One-call guard for session-REQUIRED routes (QA F1, t_b6f04976): returns a
+ * clean 400 when the request carries a present-but-undecodable session
+ * cookie, or null when the cookie is absent/valid (route proceeds). Routes
+ * that treat a missing session as "anonymous" call this BEFORE resolving:
+ * a corrupt cookie is a client bug — clearing it is actionable, a silent
+ * 401 would hide it.
+ */
+export function malformedSessionCookieGuard(request: Request): Response | null {
+  return sessionCookieMalformed(request) ? malformedSessionCookieResponse() : null;
+}
 
 /**
  * Resolve the request's session cookie to a live session + contributor.

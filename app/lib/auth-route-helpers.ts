@@ -68,7 +68,7 @@ export async function authLimit(
   env: unknown,
   route: string,
 ): Promise<Response | null> {
-  const key = callerKey(request);
+  const key = callerKey(request, env);
   const limitOptions = limitsFor("auth", env);
   const limit = await checkRateLimit(env, "auth", key, limitOptions);
   if (!limit.allowed) {

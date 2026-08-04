@@ -77,7 +77,7 @@ export async function POST(request: Request) {
   // rolled back (no account was created -> the budget is not consumed and the
   // malformed-body "no write" contract holds). The stored key is a SHA-256 of
   // the caller key, never the raw IP (privacy by design).
-  const registerIpKey = callerKey(request);
+  const registerIpKey = callerKey(request, env);
   const registerIpHash = await sha256Hex(registerIpKey);
   const registerIpLimits = registrationIpLimits(env);
   const nowMs = Date.now();

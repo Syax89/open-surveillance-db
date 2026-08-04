@@ -30,7 +30,7 @@ export async function GET(request: Request) {
 
   // Rate limits: nearby search is public and cheap to hammer, so it gets its
   // own bucket independent of the plain read and export buckets.
-  const key = callerKey(request);
+  const key = callerKey(request, env);
   const limitOptions = limitsFor("nearby", env);
   const rateLimit = await checkRateLimit(env, "nearby", key, limitOptions);
   if (!rateLimit.allowed) {

@@ -37,7 +37,7 @@ export async function GET(request: Request) {
     return Response.json({ error: "Request URI too long." }, { status: 414, headers: NO_STORE_HEADERS });
   }
 
-  const key = callerKey(request);
+  const key = callerKey(request, env);
   const limitOptions = limitsFor("read", env);
   const limit = await checkRateLimit(env, "read", key, limitOptions);
   if (!limit.allowed) {

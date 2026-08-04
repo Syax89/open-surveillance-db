@@ -221,7 +221,7 @@ export async function GET(request: Request) {
   // Metering happens before the cache lookup so a caller cannot use cache
   // hits to dodge the throttle: bulk scraping of fresh queries would
   // otherwise hammer the community geocoder past its usage policy.
-  const key = callerKey(request);
+  const key = callerKey(request, env);
   const limitOptions = geocodeLimits(env);
   const limit = await checkRateLimit(env, "geocode", key, limitOptions);
   if (!limit.allowed) {

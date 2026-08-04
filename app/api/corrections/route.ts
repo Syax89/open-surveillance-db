@@ -42,7 +42,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "Correction requests are temporarily disabled." }, { status: 503 });
   }
 
-  const key = callerKey(request);
+  const key = callerKey(request, env);
   const limitOptions = submissionLimits(env);
   const limit = await checkRateLimit(env, "submit", key, limitOptions);
   if (!limit.allowed) {

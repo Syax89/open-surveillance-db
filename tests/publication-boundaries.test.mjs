@@ -250,7 +250,7 @@ test("locality search stays behind the public-list boundary and is rate-limited"
     /import\s*\{[^}]*\bcheckRateLimit\b[^}]*\}\s*from\s*["'][^"']*lib\/rate-limit["']/,
     "the search route must use the shared per-caller rate limiter",
   );
-  assert.match(route, /callerKey\(request\)/, "the rate limiter must be keyed on the caller identity");
+  assert.match(route, /callerKey\(request(?:,\s*env)?\)/, "the rate limiter must be keyed on the caller identity");
   assert.match(route, /status:\s*429/, "exceeding the limit must return 429");
   assert.match(route, /Retry-After/, "the 429 response must include a retry window");
   assert.match(limiter, /SEARCH_RATE_LIMIT_MAX/, "the search request limit must be configurable through environment");
@@ -613,7 +613,7 @@ test("public POST endpoints are rate-limited per caller and can be disabled", as
     /import\s*\{[^}]*\bcheckRateLimit\b[^}]*\}\s*from\s*["'][^"']*lib\/rate-limit["']/,
     "the POST handler must use the shared per-caller rate limiter",
   );
-  assert.match(route, /callerKey\(request\)/, "the rate limiter must be keyed on the caller identity");
+  assert.match(route, /callerKey\(request(?:,\s*env)?\)/, "the rate limiter must be keyed on the caller identity");
   assert.match(post, /status:\s*429/, "exceeding the limit must return 429");
   assert.match(post, /Retry-After/, "the 429 response must include a retry window");
   assert.match(post, /submissionsDisabled\(env\)/, "submissions must be disableable through environment");
@@ -633,7 +633,7 @@ test("every public route family applies its own rate limit with 429 and Retry-Af
 
   const hasRateLimiter = (source) =>
     /import\s*\{[^}]*\bcheckRateLimit\b[^}]*\}\s*from\s*["'][^"']*lib\/rate-limit["']/.test(source) &&
-    /callerKey\(request\)/.test(source) &&
+    /callerKey\(request(?:,\s*env)?\)/.test(source) &&
     /status:\s*429/.test(source) &&
     /Retry-After/.test(source);
 
