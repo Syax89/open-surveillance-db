@@ -73,7 +73,7 @@ test("approve records a full audit event and publishes the record", async () => 
     publishManufacturer: true,
     publishObservedOn: false,
   });
-  assert.equal(decision.item.status, "verified");
+  assert.equal(decision.item.status, "active");
   assert.match(
     decision.item.updated,
     /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/,
@@ -88,7 +88,7 @@ test("approve records a full audit event and publishes the record", async () => 
     entity: "camera",
     entityId: camera.id,
     previousStatus: "pending",
-    newStatus: "verified",
+    newStatus: "active",
     action: "approve",
     reasonCode: "verified-public-infrastructure",
     note: "Looks legit",
@@ -145,7 +145,7 @@ test("verified records can be marked stale and re-verified, each step recorded",
   assert.ok(Number.isFinite(new Date(stale.item.updated).getTime()), "the ISO timestamp must be parseable");
 
   const reverified = await moderation.moderateCamera(camera.id, "reverify", "verified-public-infrastructure", null);
-  assert.equal(reverified.item.status, "verified");
+  assert.equal(reverified.item.status, "active");
   assert.match(
     reverified.item.updated,
     /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/,
@@ -155,9 +155,9 @@ test("verified records can be marked stale and re-verified, each step recorded",
 
   const rows = await eventRows(env);
   assert.deepEqual(rows.map((row) => ({ action: row.action, previous_status: row.previous_status, new_status: row.new_status })), [
-    { action: "approve", previous_status: "pending", new_status: "verified" },
-    { action: "mark-stale", previous_status: "verified", new_status: "needs_review" },
-    { action: "reverify", previous_status: "needs_review", new_status: "verified" },
+    { action: "approve", previous_status: "pending", new_status: "active" },
+    { action: "mark-stale", previous_status: "active", new_status: "needs_review" },
+    { action: "reverify", previous_status: "needs_review", new_status: "active" },
   ]);
 });
 

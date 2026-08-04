@@ -228,7 +228,7 @@ test("journey segnala: submit → moderation queue → approve → public listin
   // 4. It is now public, and the record detail is reachable over SSR.
   const listing = await camerasRoute.GET(apiRequest("/api/cameras"));
   const publicRecords = (await responseBody(listing)).records;
-  assert.ok(publicRecords.some((item) => item.id === record.id && item.status === "verified"), "approved report must be public");
+  assert.ok(publicRecords.some((item) => item.id === record.id &&     item.status === "active"), "approved report must be public");
 
   const detail = await ssr(`/records/${record.id}`);
   assert.equal(detail.response.status, 200, "the public record detail must render");
@@ -323,7 +323,7 @@ const editPatch = (pathAndQuery, body, auth) =>
     body,
   });
 
-test("journey edit: pending edits direct, verified goes to re-moderation, foreign edits 403", async () => {
+test("journey edit: pending edits direct, active goes to re-moderation, foreign edits 403", async () => {
   // 1. register → two contributors (owner + outsider).
   const owner = await registerContributor();
   const outsider = await registerContributor();
@@ -357,7 +357,7 @@ test("journey edit: pending edits direct, verified goes to re-moderation, foreig
   assert.equal(pendingView.record.title, "Renamed before publish");
   assert.equal(pendingView.record.status, "pending", "status is never editable");
 
-  // 4. approve → verified (a moderator publishes it).
+  // 4. approve → active (a moderator publishes it).
   const approved = await moderationRoute.PATCH(apiRequest("/api/moderation", {
     method: "PATCH",
     headers: { "x-osdb-user-email": identityFor(REVIEWERS.record) },
@@ -365,16 +365,16 @@ test("journey edit: pending edits direct, verified goes to re-moderation, foreig
   }));
   assert.equal(approved.status, 200, "approve must succeed");
   const listing = await camerasRoute.GET(apiRequest("/api/cameras"));
-  assert.ok((await responseBody(listing)).records.some((item) => item.id === record.id && item.status === "verified"));
+  assert.ok((await responseBody(listing)).records.some((item) => item.id === record.id && item.status === "active"));
 
-  // 5. edit altrui: the outsider cannot edit the verified record → 403
+  // 5. edit altrui: the outsider cannot edit the active record → 403
   //    (moderators and non-owners act only through the moderation endpoints).
   const foreign = await cameraEditRoute.PATCH(editPatch(`/api/cameras/${record.id}`, {
     title: "Hijacked title",
   }, outsider));
   assert.equal(foreign.status, 403);
 
-  // 6. edit verified: the owner's PATCH never touches `cameras` — it creates
+  // 6. edit active: the owner's PATCH never touches `cameras` — it creates
   //    an edit request (binario moderazione) and answers 202.
   const verifiedEdit = await cameraEditRoute.PATCH(editPatch(`/api/cameras/${record.id}`, {
     title: "Community corrected title",
@@ -410,5 +410,5 @@ test("journey edit: pending edits direct, verified goes to re-moderation, foreig
   const afterDecision = await cameraEditRoute.GET(apiRequest(`/api/cameras/${record.id}`));
   const { record: corrected } = await responseBody(afterDecision);
   assert.equal(corrected.title, "Community corrected title", "approve applies the diff to the public record");
-  assert.equal(corrected.status, "verified", "status and freshness clocks are never touched");
+  assert.equal(corrected.status, "active", "status and freshness clocks are never touched");
 });

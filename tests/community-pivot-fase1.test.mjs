@@ -227,7 +227,7 @@ test("0039: confirmations -> actions with weight snapshot, then camera_confirmat
   const c0 = await insertContributor({ id: 1 });
   const c1 = await insertContributor({ id: 2 });
   const c2 = await insertContributor({ id: 3 });
-  await insertCamera({ contributorId: c1, status: "verified" }); // -> active
+  await insertCamera({ contributorId: c1, status: "active" }); // -> active
   for (let i = 0; i < 6; i += 1) await insertCamera({ contributorId: c2, status: "pending" }); // -> active
 
   const t1 = await insertCamera({ id: 100, title: "Target 1" });

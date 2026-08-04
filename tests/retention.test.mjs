@@ -570,7 +570,7 @@ test("R6: the sweep is idempotent — a second run deletes nothing new", async (
 test("R6: approved + redacted photos on a verified camera are never touched", async () => {
   // R13: approved evidence on a verified camera follows the 12-month record
   // cycle (R3) and is deleted WITH the record — never by the photo sweep.
-  const verified = await insertCamera({ title: "Verified camera", status: "verified", createdAt: daysBefore(200) });
+  const verified = await insertCamera({ title: "Verified camera", status: "active", createdAt: daysBefore(200) });
   await insertPhoto({
     cameraId: verified,
     status: "approved",
@@ -680,7 +680,7 @@ test("R6: rejected photos are swept even when linked to a live camera; pending l
   // The orphan query requires camera_id IS NULL, but the rejected query has
   // NO camera_id filter: rejected evidence is never public and expires 30
   // days after the reject decision even if the record is still alive.
-  const verified = await insertCamera({ title: "Verified", status: "verified", createdAt: daysBefore(200) });
+  const verified = await insertCamera({ title: "Verified", status: "active", createdAt: daysBefore(200) });
   const rejectedLinked = await insertPhoto({
     cameraId: verified,
     status: "rejected",
@@ -811,7 +811,7 @@ test("R12: demo records are purged WITH their evidence outside development (QA#4
   delete runtime.env.ENVIRONMENT;
   const demo = await insertCamera({ title: "Demo A", status: "demo", createdAt: daysBefore(200) });
   await insertPhoto({ cameraId: demo, status: "pending", createdAt: daysBefore(100), storageKey: "demo-evidence.jpg" });
-  const verified = await insertCamera({ title: "Verified B", status: "verified", createdAt: daysBefore(200) });
+  const verified = await insertCamera({ title: "Verified B", status: "active", createdAt: daysBefore(200) });
   // A rejected record near its R2 cutoff must NOT be confused with a demo row:
   // the reject decision is recent, so R2 leaves it alone and only R12 is
   // entitled to touch `demo` rows anyway.

@@ -506,14 +506,14 @@ test("F6b: la quota giornaliera per contributor (max 1) non deve essere superabi
   runtime.env.DB = db;
   const confirmations = runtime.confirmations;
 
-  // Due record pubblici (verified) ANONIMI (contributor_id NULL, così il
-  // self-verify check non scatta) e un terzo record del contributor 99 per
+  // Due record pubblici (active, ADR 0021 §12.1) ANONIMI (contributor_id NULL)
+  // per il self-verify check e un terzo record del contributor 99 per
   // superare il level gate (>= 1 contributo verificato). Quota imposta a 1
   // sia per gli account normali sia per i trusted.
   for (const cameraId of [1, 2]) {
     await db
       .prepare(
-        "INSERT INTO cameras (id, title, kind, address, notes, latitude, longitude, status, source, updated, description, contributor_id, created_at, review_due_at) VALUES (?, ?, 'Fixed dome', NULL, '', 41.9, 12.5, 'verified', 'test', ?, '', NULL, ?, NULL)",
+        "INSERT INTO cameras (id, title, kind, address, notes, latitude, longitude, status, source, updated, description, contributor_id, created_at, review_due_at) VALUES (?, ?, 'Fixed dome', NULL, '', 41.9, 12.5, 'active', 'test', ?, '', NULL, ?, NULL)",
       )
       .bind(cameraId, `Camera ${cameraId}`, NOW, NOW)
       .run();
@@ -524,10 +524,10 @@ test("F6b: la quota giornaliera per contributor (max 1) non deve essere superabi
     )
     .bind(NOW, NOW)
     .run();
-  // Il contributor ha 1 contributo verificato (per il level gate).
+  // Il contributor ha 1 contributo attivo (per il level gate, ADR 0021 §12.1).
   await db
     .prepare(
-      "INSERT INTO cameras (id, title, kind, address, notes, latitude, longitude, status, source, updated, description, contributor_id, created_at, review_due_at) VALUES (3, 'Own verified', 'Fixed dome', NULL, '', 41.9, 12.5, 'verified', 'test', ?, '', 99, ?, NULL)",
+      "INSERT INTO cameras (id, title, kind, address, notes, latitude, longitude, status, source, updated, description, contributor_id, created_at, review_due_at) VALUES (3, 'Own verified', 'Fixed dome', NULL, '', 41.9, 12.5, 'active', 'test', ?, '', 99, ?, NULL)",
     )
     .bind(NOW, NOW)
     .run();

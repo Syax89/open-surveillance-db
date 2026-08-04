@@ -8,6 +8,9 @@
 import type { Translation } from "./types";
 
 export const en = {
+  // ADR 0021: after migration 0039 the public domain status is "active"
+  // ("verified" remains for legacy moderation flows and profile filters).
+  active: "Active",
   verified: "Verified",
   demo: "Illustrative record",
   pending: "In moderation",
@@ -17,6 +20,7 @@ export const en = {
 } as const;
 
 export const it: Translation<typeof en> = {
+  active: "Attivo",
   verified: "Verificato",
   demo: "Record illustrativo",
   pending: "In moderazione",

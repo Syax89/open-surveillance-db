@@ -44,7 +44,7 @@ export const NEVER_EDITABLE_EDIT_FIELDS = [
   "updated",
 ];
 
-export const PUBLISHED_EDITABLE_STATUSES = ["verified", "needs_review", "stale"];
+export const PUBLISHED_EDITABLE_STATUSES = ["active", "needs_review", "stale"];
 export const TERMINAL_EDITABLE_STATUSES = ["removed", "rejected"];
 
 function isCalendarDate(value) {

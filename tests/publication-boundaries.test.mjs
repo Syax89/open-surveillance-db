@@ -26,8 +26,8 @@ test("the public camera query excludes non-public states via the shared status w
   assert.ok(functionStart >= 0, "listPublicCameras must remain the public read boundary");
   assert.match(
     shared,
-    /export\s+const\s+PUBLIC_CAMERA_STATUSES\s*=\s*\[\s*['"]verified['"]\s*,\s*['"]demo['"]\s*\]\s*as\s+const/,
-    "the shared whitelist must be the single source of truth for verified and demo",
+    /export\s+const\s+PUBLIC_CAMERA_STATUSES\s*=\s*\[\s*['"]active['"]\s*,\s*['"]demo['"]\s*\]\s*as\s+const/,
+    "the shared whitelist must be the single source of truth for active and demo",
   );
   assert.match(
     publicQuery,
@@ -36,7 +36,7 @@ test("the public camera query excludes non-public states via the shared status w
   );
   assert.doesNotMatch(
     publicQuery,
-    /status\s+IN\s*\(\s*['"](?:verified|demo|pending|rejected|removed|needs_review|stale)['"]/,
+    /status\s+IN\s*\(\s*['"](?:active|demo|pending|rejected|removed|needs_review|stale)['"]/,
     "the whitelist must never be hand-written into the query",
   );
   assert.match(
@@ -96,18 +96,18 @@ test("verification transitions store an ISO timestamp so the public freshness fi
 
   assert.match(
     transitions,
-    /action === "approve"[\s\S]*?newStatus: "verified",\s*updated:\s*nowIso/,
+    /action === "approve"[\s\S]*?newStatus: "active",\s*updated:\s*nowIso/,
     "approve must record the verification moment as a comparable ISO timestamp",
   );
   assert.match(
     transitions,
-    /action === "reverify"[\s\S]*?newStatus: "verified",\s*updated:\s*nowIso/,
+    /action === "reverify"[\s\S]*?newStatus: "active",\s*updated:\s*nowIso/,
     "reverify must refresh the verification timestamp, not a human-readable label",
   );
   assert.doesNotMatch(
     transitions,
-    /newStatus: "verified",\s*updated:\s*"Local moderation:/,
-    "verified public records must never carry a prose string in updated (breaks freshness ordering)",
+    /newStatus: "active",\s*updated:\s*"Local moderation:/,
+    "active public records must never carry a prose string in updated (breaks freshness ordering)",
   );
 });
 
@@ -469,8 +469,8 @@ test("camera lifecycle keeps published and review-only transitions explicit", as
   );
   assert.match(
     moderation,
-    /["']reverify["'][\s\S]{0,600}["']verified["']/,
-    "reverify must transition a needs_review camera back to verified",
+    /["']reverify["'][\s\S]{0,600}["']active["']/,
+    "reverify must transition a needs_review camera back to active",
   );
   assert.match(
     moderation,
@@ -510,8 +510,8 @@ test("the moderation queue separates published records from records requiring re
   assert.match(queue, /\breviewCameras\b/, "the queue must expose cameras requiring review separately");
   assert.match(
     queue,
-    /(?:status\s*=\s*\?|status\s+IN\s*\(\s*\?)[\s\S]{0,200}\.bind\([\s\S]{0,80}["']verified["']/i,
-    "the published-camera queue must explicitly select verified records",
+    /(?:status\s*=\s*\?|status\s+IN\s*\(\s*\?)[\s\S]{0,200}\.bind\([\s\S]{0,80}["']active["']/i,
+    "the published-camera queue must explicitly select active records",
   );
   assert.match(
     queue,
@@ -858,7 +858,7 @@ test("the public change summary is served only for currently public records", as
   );
   assert.doesNotMatch(
     getBoundary,
-    /status\s+IN\s*\(\s*['"](?:verified|demo)['"]/,
+    /status\s+IN\s*\(\s*['"](?:active|demo)['"]/,
     "the lookup must not hand-write the status whitelist",
   );
   assert.doesNotMatch(getBoundary, /\bnotes\b/, "the lookup must not select the private notes field");

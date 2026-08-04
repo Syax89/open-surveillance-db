@@ -72,7 +72,7 @@ const cameraFixture = {
   // Dome fixture (kind "Fixed dome"): the dome rule (t_1b08fe12) means the
   // stored direction is always NULL — the map renders it circular.
   direction: null,
-  status: "verified",
+  status: "active",
   source: "Community report",
   updated: "2026-01-01T00:00:00.000Z",
   description: "",
@@ -167,7 +167,7 @@ test("GET /api/cameras?format=csv escapes quotes and neutralises spreadsheet for
     kind: "Fixed dome",
     manufacturer: "-leading",
     observedOn: "2026-01-01",
-    status: "verified",
+    status: "active",
     source: "Community report",
     updated: "2026-01-01T00:00:00.000Z",
     description: 'He said "hi", ok',
@@ -188,7 +188,7 @@ test("GET /api/cameras?format=csv escapes quotes and neutralises spreadsheet for
   assert.match(csv, /^id,title,kind,manufacturer,observed_on,status,source,updated,description,address,latitude,longitude,direction\n/);
   assert.match(
     csv,
-    /"1","'=SUM\(A1:A2\)","Fixed dome","'-leading","2026-01-01","verified","Community report","2026-01-01T00:00:00\.000Z","He said ""hi"", ok","","41\.9004","12\.4936",""\n/,
+    /"1","'=SUM\(A1:A2\)","Fixed dome","'-leading","2026-01-01","active","Community report","2026-01-01T00:00:00\.000Z","He said ""hi"", ok","","41\.9004","12\.4936",""\n/,
     "formula injection must be neutralised with a leading apostrophe, quotes doubled, nulls empty (direction NULL = blank cell)",
   );
   // ODbL 1.0 attribution (TERMS § 7.1): the CSV export must end with the
@@ -267,6 +267,27 @@ test("GET /api/cameras rejects freshness values outside the whitelist with 400",
       assert.equal(callArgs("listPublicCamerasPage").length, 0, "no query must run for an invalid window");
     });
   }
+});
+
+test("GET /api/cameras rejects sort values outside the ranking whitelist with 400", async (t) => {
+  const { GET } = await camerasRoute();
+  for (const sort of ["helpful", "likes", "votes", "", "useful;DROP", "USEFUL"]) {
+    await t.test(`sort=${JSON.stringify(sort)}`, async () => {
+      const response = await GET(apiRequest(`/api/cameras?sort=${encodeURIComponent(sort)}`));
+      assert.equal(response.status, 400, sort);
+      const body = await responseBody(response);
+      assert.match(body.error, /Unknown sort option/, sort);
+      assert.equal(callArgs("listPublicCamerasPage").length, 0, "no query must run for an invalid sort");
+    });
+  }
+});
+
+test("GET /api/cameras forwards a valid ranking sort to the paginated query", async () => {
+  stub("listPublicCamerasPage", async () => ({ records: [cameraFixture], total: 1, nextOffset: null }));
+  const { GET } = await camerasRoute();
+  const response = await GET(apiRequest("/api/cameras?sort=useful"));
+  assert.equal(response.status, 200);
+  assert.deepEqual(callArgs("listPublicCamerasPage")[0], [{ sort: "useful" }, { limit: 500, offset: 0 }]);
 });
 
 test("GET /api/cameras export formats honour the same safe filters", async () => {

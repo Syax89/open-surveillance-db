@@ -36,11 +36,11 @@ let runtime;
 let cameras;
 let db;
 
-async function seedVerifiedAndDemo() {
+async function seedActiveAndDemo() {
   // Two pending reports, then the reserved statuses are applied directly —
   // mirroring the H3 reality that demo records are never seeded at runtime
   // (migrations only) and the 'demo' status survives only as a legacy row.
-  const verified = await cameras.createPendingCamera({
+  const active = await cameras.createPendingCamera({
     title: "Verified export record",
     kind: "Fixed dome",
     manufacturer: null,
@@ -60,9 +60,9 @@ async function seedVerifiedAndDemo() {
     latitude: 41.901,
     longitude: 12.494,
   });
-  await db.prepare("UPDATE cameras SET status = 'verified' WHERE id = ?").bind(verified.id).run();
+  await db.prepare("UPDATE cameras SET status = 'active' WHERE id = ?").bind(active.id).run();
   await db.prepare("UPDATE cameras SET status = 'demo' WHERE id = ?").bind(demo.id).run();
-  return { verifiedId: verified.id, demoId: demo.id };
+  return { activeId: active.id, demoId: demo.id };
 }
 
 beforeEach(async () => {
@@ -83,10 +83,10 @@ after(async () => cleanupDbRuntime());
 // ---------------------------------------------------------------------------
 
 test("unset ENVIRONMENT excludes demo records from the export source (CSV/GeoJSON full list)", async () => {
-  const { verifiedId, demoId } = await seedVerifiedAndDemo();
+  const { activeId, demoId } = await seedActiveAndDemo();
 
   const records = await cameras.listPublicCameras();
-  assert.ok(records.some((record) => record.id === verifiedId), "verified records stay public");
+  assert.ok(records.some((record) => record.id === activeId), "active records stay public");
   assert.ok(
     !records.some((record) => record.id === demoId),
     "demo records must never cross the export source outside ENVIRONMENT=development",
@@ -98,22 +98,22 @@ test("unset ENVIRONMENT excludes demo records from the export source (CSV/GeoJSO
 });
 
 test("unset ENVIRONMENT excludes demo records from the GeoJSON bbox surface", async () => {
-  const { verifiedId, demoId } = await seedVerifiedAndDemo();
+  const { activeId, demoId } = await seedActiveAndDemo();
 
   const bbox = await cameras.listPublicCamerasInBbox({ west: 12.4, south: 41.8, east: 12.6, north: 42.0 });
-  assert.ok(bbox.some((record) => record.id === verifiedId), "verified markers stay public");
+  assert.ok(bbox.some((record) => record.id === activeId), "active markers stay public");
   assert.ok(!bbox.some((record) => record.id === demoId), "demo markers must not appear in production");
 });
 
 test("unset ENVIRONMENT excludes demo records from the by-id lookup and the JSON list API", async () => {
-  const { verifiedId, demoId } = await seedVerifiedAndDemo();
+  const { activeId, demoId } = await seedActiveAndDemo();
 
-  assert.ok(await cameras.getPublicCameraById(verifiedId), "verified by-id lookup still resolves");
+  assert.ok(await cameras.getPublicCameraById(activeId), "active by-id lookup still resolves");
   assert.equal(await cameras.getPublicCameraById(demoId), null, "demo by-id lookup must fail in production");
 
   const page = await cameras.listPublicCamerasPage({}, { limit: 10, offset: 0 });
   assert.equal(page.total, 1, "the JSON list API total must not count demo records");
-  assert.ok(page.records.some((record) => record.id === verifiedId));
+  assert.ok(page.records.some((record) => record.id === activeId));
   assert.ok(!page.records.some((record) => record.id === demoId));
 });
 
@@ -122,7 +122,7 @@ test("unset ENVIRONMENT excludes demo records from the by-id lookup and the JSON
 // ---------------------------------------------------------------------------
 
 test("unset ENVIRONMENT fails closed for photo bytes of a demo camera (GET /api/photos/[id])", async () => {
-  const { verifiedId, demoId } = await seedVerifiedAndDemo();
+  const { activeId, demoId } = await seedActiveAndDemo();
   const photos = runtime.photos;
 
   // Approved, redaction-confirmed photos on both cameras.
@@ -130,7 +130,7 @@ test("unset ENVIRONMENT fails closed for photo bytes of a demo camera (GET /api/
     .prepare(
       "INSERT INTO photos (camera_id, contributor_id, submitter_key, storage_key, mime_type, width, height, size_bytes, status, exif_stripped, redaction_confirmed, created_at, updated_at) VALUES (?, NULL, 'seed', 'photos/verified.jpg', 'image/jpeg', 1, 1, 1, 'approved', 1, 1, '2026-08-01T00:00:00.000Z', '2026-08-01T00:00:00.000Z')",
     )
-    .bind(verifiedId)
+    .bind(activeId)
     .run();
   await db
     .prepare(
@@ -139,14 +139,14 @@ test("unset ENVIRONMENT fails closed for photo bytes of a demo camera (GET /api/
     .bind(demoId)
     .run();
 
-  const verifiedPhoto = await photos.getPublicPhoto(1);
-  assert.ok(verifiedPhoto, "photos of verified cameras stay public");
-  assert.equal(verifiedPhoto.storageKey, "photos/verified.jpg");
+  const activePhoto = await photos.getPublicPhoto(1);
+  assert.ok(activePhoto, "photos of active cameras stay public");
+  assert.equal(activePhoto.storageKey, "photos/verified.jpg");
   assert.equal(await photos.getPublicPhoto(2), null, "a demo camera's photo must not be served in production");
 });
 
 test("unset ENVIRONMENT fails closed for the confirmation toggle on a demo record", async () => {
-  const { demoId } = await seedVerifiedAndDemo();
+  const { demoId } = await seedActiveAndDemo();
 
   // Level gate requires a verified contribution; the camera-public check
   // runs BEFORE the gate, so camera_not_public proves the demo gate closed
@@ -162,7 +162,7 @@ test("unset ENVIRONMENT fails closed for the confirmation toggle on a demo recor
 test("ENVIRONMENT=development keeps photo bytes and confirmations on demo data public", async () => {
   runtime.env.ENVIRONMENT = "development";
   try {
-    const { verifiedId, demoId } = await seedVerifiedAndDemo();
+    const { activeId, demoId } = await seedActiveAndDemo();
     const photos = runtime.photos;
 
     await db
@@ -184,7 +184,7 @@ test("ENVIRONMENT=development keeps photo bytes and confirmations on demo data p
     // is decided by the later anti-gaming layers (level gate), never
     // camera_not_public — the gate is open for the prototype.
     assert.notEqual(confirm.kind, "camera_not_public", "demo confirmations must not be blocked in development");
-    void verifiedId;
+    void activeId;
   } finally {
     delete runtime.env.ENVIRONMENT;
   }
@@ -196,19 +196,19 @@ test("ENVIRONMENT=development keeps photo bytes and confirmations on demo data p
 
 test("ENVIRONMENT=production excludes demo records (same gate as the unset default)", async () => {
   runtime.env.ENVIRONMENT = "production";
-  const { verifiedId, demoId } = await seedVerifiedAndDemo();
+  const { activeId, demoId } = await seedActiveAndDemo();
 
   const records = await cameras.listPublicCameras();
-  assert.ok(records.some((record) => record.id === verifiedId));
+  assert.ok(records.some((record) => record.id === activeId));
   assert.ok(!records.some((record) => record.id === demoId));
 });
 
 test("ENVIRONMENT=development keeps demo records public (local prototype)", async () => {
   runtime.env.ENVIRONMENT = "development";
-  const { verifiedId, demoId } = await seedVerifiedAndDemo();
+  const { activeId, demoId } = await seedActiveAndDemo();
 
   const records = await cameras.listPublicCameras();
-  assert.ok(records.some((record) => record.id === verifiedId));
+  assert.ok(records.some((record) => record.id === activeId));
   assert.ok(records.some((record) => record.id === demoId), "the prototype demo seed stays visible in development");
 });
 

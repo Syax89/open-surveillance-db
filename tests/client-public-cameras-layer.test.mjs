@@ -54,7 +54,7 @@ const makeCameras = (ids) => ids.map((id) => ({
   id,
   title: `Camera ${id}`,
   kind: "Dome",
-  status: "verified",
+  status: "active",
   latitude: 41.9,
   longitude: 12.49,
   source: "Community report",

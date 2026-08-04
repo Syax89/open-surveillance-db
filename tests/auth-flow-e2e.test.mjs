@@ -512,14 +512,14 @@ test("E2E: approving a pending camera publishes it and records the audit event",
   });
   assert.equal(response.status, 200);
   const decision = await responseBody(response);
-  assert.equal(decision.item.status, "verified");
+  assert.equal(decision.item.status, "active");
   assert.equal(decision.item.publishManufacturer, 1);
   assert.equal(decision.item.publishObservedOn, 0);
 
   const records = await publicListing();
   assert.equal(records.length, 1, "approved record must now be public");
   assert.equal(records[0].id, record.id);
-  assert.equal(records[0].status, "verified");
+  assert.equal(records[0].status, "active");
   assert.equal(records[0].notes, undefined, "private notes must never be published");
   assert.equal(records[0].manufacturer, "Acme Cameras");
 
@@ -529,7 +529,7 @@ test("E2E: approving a pending camera publishes it and records the audit event",
   assert.equal(events[0].entity, "camera");
   assert.equal(events[0].entity_id, record.id);
   assert.equal(events[0].previous_status, "pending");
-  assert.equal(events[0].new_status, "verified");
+  assert.equal(events[0].new_status, "active");
   assert.equal(events[0].action, "approve");
   assert.equal(events[0].reason_code, REASON.verified);
   assert.equal(events[0].actor, "Demo Record Reviewer");
@@ -545,7 +545,7 @@ test("E2E: approving a pending camera publishes it and records the audit event",
   assert.equal(revisions.recordId, record.id);
   assert.equal(revisions.revisions.length, 1);
   assert.equal(revisions.revisions[0].action, "approve");
-  assert.equal(revisions.revisions[0].newStatus, "verified");
+  assert.equal(revisions.revisions[0].newStatus, "active");
   assert.equal(revisions.revisions[0].actor, undefined, "revisions must not leak reviewer identity");
   assert.equal(revisions.revisions[0].note, undefined, "revisions must not leak internal notes");
 });
@@ -663,11 +663,11 @@ test("E2E: a sensitive approval needs a second reviewer — 202 then resolved by
   });
   assert.equal(second.status, 200);
   const done = await responseBody(second);
-  assert.equal(done.item.status, "verified");
+  assert.equal(done.item.status, "active");
 
   const records = await publicListing();
   assert.equal(records.length, 1);
-  assert.equal(records[0].status, "verified");
+  assert.equal(records[0].status, "active");
 
   // Audit: approve-intent + completed approve, with the second reviewer linked.
   const events = await auditEvents();
@@ -705,7 +705,7 @@ test("E2E: a contested privacy correction is escalated and handled by a senior m
   const records = await publicListing();
   assert.equal(records.length, 1);
   assert.equal(records[0].id, record.id);
-  assert.equal(records[0].status, "verified");
+  assert.equal(records[0].status, "active");
 
   // The moderation queue surfaces the correction request.
   const queue = await moderationQueue();
@@ -765,7 +765,7 @@ test("E2E: a contested privacy correction is escalated and handled by a senior m
   assert.deepEqual(
     events.map((event) => [event.entity, event.action, event.new_status]),
     [
-      ["camera", "approve", "verified"],
+      ["camera", "approve", "active"],
       ["correction", "escalate", "pending"],
       ["correction", "approve", "reviewed"],
       ["camera", "marked-stale", "needs_review"],
@@ -788,10 +788,10 @@ test("E2E: full lifecycle writes one append-only audit event per legal transitio
   assert.deepEqual(
     events.map((event) => [event.action, event.previous_status, event.new_status]),
     [
-      ["approve", "pending", "verified"],
-      ["mark-stale", "verified", "needs_review"],
-      ["reverify", "needs_review", "verified"],
-      ["hide", "verified", "removed"],
+      ["approve", "pending", "active"],
+      ["mark-stale", "active", "needs_review"],
+      ["reverify", "needs_review", "active"],
+      ["hide", "active", "removed"],
     ],
     "each legal transition must produce exactly one event in order",
   );
@@ -1047,9 +1047,9 @@ test("E2E: appeals validation and role gates hold through the real routes", asyn
   assert.equal(adminResolves.status, 200);
   assert.equal((await responseBody(adminResolves)).appeal.status, "dismissed");
 
-  // The record stays verified: a dismissed appeal changes nothing public.
+  // The record stays active: a dismissed appeal changes nothing public.
   const row = await env.DB.prepare("SELECT status FROM cameras WHERE id = ?").bind(record.id).first();
-  assert.equal(row.status, "verified");
+  assert.equal(row.status, "active");
 });
 
 test("E2E: appeals route maps a syntactically invalid JSON body to 400 (not 500)", async () => {
@@ -1181,7 +1181,7 @@ test("E2E: erasing a contributor de-attributes their reports, keeps them public,
     "SELECT contributor_id AS contributorId, status FROM cameras WHERE id = ?",
   ).bind(record.id).first();
   assert.equal(rows.contributorId, null, "contributor_id must be NULL after erasure");
-  assert.equal(rows.status, "verified", "the record keeps its published state");
+  assert.equal(rows.status, "active", "the record keeps its published state");
   const listing = await publicListing();
   assert.equal(listing.length, 1, "the de-attributed record stays public");
   assert.equal(listing[0].title, "Camera to de-attribute");

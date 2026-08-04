@@ -376,7 +376,7 @@ async function insertCamera(db, overrides = {}) {
     notes: "",
     latitude: 44.1,
     longitude: 12.2,
-    status: "verified",
+    status: "active",
     source: "Community report",
     updated: "Test update",
     description: "",
@@ -480,19 +480,19 @@ async function insertPhoto(db, overrides = {}) {
   return result.id;
 }
 
-test("R1: countVerifiedCameras counts ONLY status='verified' rows (real SQL)", async () => {
+test("R1: countVerifiedCameras counts ONLY status='active' rows (real SQL)", async () => {
   const { db, auth } = await realDbFixture();
   const contributorId = await insertContributor(db);
-  await insertCamera(db, { contributorId, status: "verified", createdAt: "2026-07-01T00:00:00.000Z" });
-  await insertCamera(db, { contributorId, status: "verified", createdAt: "2026-07-02T00:00:00.000Z" });
+  await insertCamera(db, { contributorId, status: "active", createdAt: "2026-07-01T00:00:00.000Z" });
+  await insertCamera(db, { contributorId, status: "active", createdAt: "2026-07-02T00:00:00.000Z" });
   await insertCamera(db, { contributorId, status: "pending", createdAt: "2026-07-03T00:00:00.000Z" });
   await insertCamera(db, { contributorId, status: "rejected", createdAt: "2026-07-04T00:00:00.000Z" });
   await insertCamera(db, { contributorId, status: "removed", createdAt: "2026-07-05T00:00:00.000Z" });
   await insertCamera(db, { contributorId, status: "needs_review", createdAt: "2026-07-06T00:00:00.000Z" });
-  // Another contributor's verified row must not leak into the count.
+  // Another contributor's active row must not leak into the count.
   const otherId = await insertContributor(db);
-  await insertCamera(db, { contributorId: otherId, status: "verified", createdAt: "2026-07-07T00:00:00.000Z" });
-  assert.equal(await auth.countVerifiedCameras(contributorId), 2, "only the two verified rows of this contributor count");
+  await insertCamera(db, { contributorId: otherId, status: "active", createdAt: "2026-07-07T00:00:00.000Z" });
+  assert.equal(await auth.countVerifiedCameras(contributorId), 2, "only the two active rows of this contributor count");
 });
 
 test("R2: listContributorContributions returns the UNION of all three kinds, newest first", async () => {
@@ -500,9 +500,9 @@ test("R2: listContributorContributions returns the UNION of all three kinds, new
   const contributorId = await insertContributor(db);
   const camId = await insertCamera(db, {
     contributorId,
-    status: "verified",
+    status: "active",
     createdAt: "2026-08-01T10:00:00.000Z",
-    title: "Oldest verified",
+    title: "Oldest active",
   });
   await insertCorrection(db, {
     contributorId,
@@ -525,13 +525,13 @@ test("R2: listContributorContributions returns the UNION of all three kinds, new
   );
   assert.equal(page.contributions[0].status, "approved");
   assert.equal(page.contributions[1].issueType, "inaccurate");
-  assert.equal(page.contributions[2].title, "Oldest verified");
+  assert.equal(page.contributions[2].title, "Oldest active");
 });
 
 test("R3: listContributorContributions filters by type and status, and paginates", async () => {
   const { db, auth } = await realDbFixture();
   const contributorId = await insertContributor(db);
-  await insertCamera(db, { contributorId, status: "verified", createdAt: "2026-08-01T10:00:00.000Z" });
+  await insertCamera(db, { contributorId, status: "active", createdAt: "2026-08-01T10:00:00.000Z" });
   await insertCamera(db, { contributorId, status: "pending", createdAt: "2026-08-01T09:00:00.000Z" });
   await insertCorrection(db, { contributorId, status: "pending", createdAt: "2026-08-01T08:00:00.000Z" });
   await insertCorrection(db, { contributorId, status: "reviewed", createdAt: "2026-08-01T07:00:00.000Z" });
@@ -557,7 +557,7 @@ test("R4: listContributorContributions never lists another contributor's rows", 
   const { db, auth } = await realDbFixture();
   const contributorId = await insertContributor(db);
   const otherId = await insertContributor(db);
-  await insertCamera(db, { contributorId: otherId, status: "verified", createdAt: "2026-08-01T10:00:00.000Z" });
+  await insertCamera(db, { contributorId: otherId, status: "active", createdAt: "2026-08-01T10:00:00.000Z" });
   await insertCorrection(db, { contributorId: otherId, status: "pending", createdAt: "2026-08-01T09:00:00.000Z" });
   const page = await auth.listContributorContributions(contributorId, { limit: 10, offset: 0 });
   assert.equal(page.total, 0);
@@ -567,7 +567,7 @@ test("R4: listContributorContributions never lists another contributor's rows", 
 test("R5: listContributorContributions clamps limit to [1,100] and offset to >= 0 at the db boundary", async () => {
   const { db, auth } = await realDbFixture();
   const contributorId = await insertContributor(db);
-  await insertCamera(db, { contributorId, status: "verified", createdAt: "2026-08-01T10:00:00.000Z" });
+  await insertCamera(db, { contributorId, status: "active", createdAt: "2026-08-01T10:00:00.000Z" });
   const huge = await auth.listContributorContributions(contributorId, { limit: 5000, offset: -5 });
   assert.equal(huge.contributions.length, 1);
   assert.equal(huge.total, 1);

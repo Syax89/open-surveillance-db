@@ -66,7 +66,7 @@ async function submitReport(overrides = {}) {
 async function toStatus(id, status, reason = REASON.verified) {
   if (status === "pending") return;
   // "rejected" is only reachable directly from pending: reject from
-  // verified is an illegal transition (verified allows mark-stale/hide).
+  // active is an illegal transition (active allows mark-stale/hide).
   if (status === "rejected") {
     const decision = await moderation.moderateCamera(id, "reject", reason, null);
     assert.ok(decision, `reject on pending #${id} must succeed`);
@@ -74,7 +74,7 @@ async function toStatus(id, status, reason = REASON.verified) {
   }
   const decision = await moderation.moderateCamera(id, "approve", reason, null);
   assert.ok(decision, `approve on pending #${id} must succeed`);
-  if (status === "verified") return;
+  if (status === "active") return;
   const second =
     status === "removed"
       ? await moderation.moderateCamera(id, "hide", reason, null)
@@ -153,12 +153,12 @@ test("a submitted camera starts pending and is absent from every public represen
 
 test("every legal camera transition updates the status and records an append-only event", async (t) => {
   const cases = [
-    { from: "pending", action: "approve", to: "verified", updated: "ISO", reason: REASON.verified },
+    { from: "pending", action: "approve", to: "active", updated: "ISO", reason: REASON.verified },
     { from: "pending", action: "reject", to: "rejected", updated: "ISO", reason: REASON.duplicate },
     { from: "pending", action: "hide", to: "removed", updated: "ISO", reason: REASON.sensitive },
-    { from: "verified", action: "mark-stale", to: "needs_review", updated: "ISO", reason: REASON.stale },
-    { from: "verified", action: "hide", to: "removed", updated: "ISO", reason: REASON.sensitive },
-    { from: "needs_review", action: "reverify", to: "verified", updated: "ISO", reason: REASON.verified },
+    { from: "active", action: "mark-stale", to: "needs_review", updated: "ISO", reason: REASON.stale },
+    { from: "active", action: "hide", to: "removed", updated: "ISO", reason: REASON.sensitive },
+    { from: "needs_review", action: "reverify", to: "active", updated: "ISO", reason: REASON.verified },
     { from: "needs_review", action: "hide", to: "removed", updated: "ISO", reason: REASON.sensitive },
   ];
 
@@ -176,7 +176,7 @@ test("every legal camera transition updates the status and records an append-onl
         // Publicly visible transitions must record a comparable ISO verification
         // timestamp so the directory freshness filter stays meaningful; the
         // exact instant is not asserted, only the format.
-        assert.match(decision.item.updated, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/, "verified transitions must record an ISO 8601 verification timestamp");
+        assert.match(decision.item.updated, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/, "active transitions must record an ISO 8601 verification timestamp");
         assert.ok(Number.isFinite(new Date(decision.item.updated).getTime()), "the ISO timestamp must be parseable");
       } else {
         assert.equal(decision.item.updated, updated);
@@ -209,7 +209,7 @@ test("every legal camera transition updates the status and records an append-onl
 test("every illegal camera transition is a no-op: status unchanged and no event recorded", async (t) => {
   const cases = [
     { from: "pending", actions: ["reverify", "mark-stale"] },
-    { from: "verified", actions: ["approve", "reject", "reverify"] },
+    { from: "active", actions: ["approve", "reject", "reverify"] },
     { from: "needs_review", actions: ["approve", "reject", "mark-stale"] },
     { from: "rejected", actions: ["approve", "reject", "hide", "mark-stale", "reverify"] },
     { from: "removed", actions: ["approve", "reject", "hide", "mark-stale", "reverify"] },
@@ -253,7 +253,7 @@ test("moderating a missing camera or a demo record returns null and writes nothi
 // Public visibility per status — the single boundary behind JSON/GeoJSON/CSV
 // ---------------------------------------------------------------------------
 
-test("only verified and demo cameras are publicly visible; every other status disappears", async (t) => {
+test("only active and demo cameras are publicly visible; every other status disappears", async (t) => {
   // ADR 0008 demo gate (t_d7a4b99b): `demo` is public ONLY in the local
   // development environment. This suite pins the prototype visibility
   // matrix (the boundary behind JSON/GeoJSON/CSV), so the runtime env is
@@ -262,7 +262,7 @@ test("only verified and demo cameras are publicly visible; every other status di
   try {
     const visibility = [
       { status: "pending", visible: false },
-      { status: "verified", visible: true },
+      { status: "active", visible: true },
       { status: "needs_review", visible: false },
       { status: "rejected", visible: false },
       { status: "removed", visible: false },
@@ -303,20 +303,20 @@ test("only verified and demo cameras are publicly visible; every other status di
 test("approving a camera publishes it; marking it stale withdraws it; reverifying republishes it", async () => {
   const report = await submitReport({ title: "Lifecycle camera" });
 
-  // pending -> verified: published.
+  // pending -> active: published.
   const approved = await moderation.moderateCamera(report.id, "approve", REASON.verified, null);
-  assert.equal(approved.item.status, "verified");
+  assert.equal(approved.item.status, "active");
   assert.ok(publicTitles(await cameras.listPublicCameras()).includes("Lifecycle camera"));
 
-  // verified -> needs_review: withdrawn from public output.
+  // active -> needs_review: withdrawn from public output.
   const stale = await moderation.moderateCamera(report.id, "mark-stale", REASON.stale, "sensor drift");
   assert.equal(stale.item.status, "needs_review");
   assert.ok(!publicTitles(await cameras.listPublicCameras()).includes("Lifecycle camera"));
   assert.ok(!(await cameras.findNearbyPublicCameras(41.9005, 12.4937, 200)).some((record) => record.id === report.id));
 
-  // needs_review -> verified: published again.
+  // needs_review -> active: published again.
   const reverified = await moderation.moderateCamera(report.id, "reverify", REASON.verified, null);
-  assert.equal(reverified.item.status, "verified");
+  assert.equal(reverified.item.status, "active");
   assert.ok(publicTitles(await cameras.listPublicCameras()).includes("Lifecycle camera"));
 });
 
@@ -391,9 +391,9 @@ test("a full lifecycle writes three ordered events with correct previous/new sta
   assert.deepEqual(
     events.map((event) => [event.previousStatus, event.newStatus]),
     [
-      ["needs_review", "verified"],
-      ["verified", "needs_review"],
-      ["pending", "verified"],
+      ["needs_review", "active"],
+      ["active", "needs_review"],
+      ["pending", "active"],
     ],
   );
   for (const event of events) {
@@ -543,7 +543,7 @@ test("approve with outcome on a non-existent camera is rejected without side eff
   assert.equal(row.status, "pending", "approve on a ghost camera must not mark the request reviewed");
   assert.equal(row.cameraId, report.id, "the camera link must be preserved");
   const camera = await db.prepare("SELECT status FROM cameras WHERE id = ?").bind(report.id).first();
-  assert.equal(camera.status, "verified", "the linked camera must be untouched");
+  assert.equal(camera.status, "active", "the linked camera must be untouched");
   assert.equal(await eventCount(), eventsBefore, "no moderation event may be recorded");
 });
 
@@ -609,7 +609,7 @@ test("deleting a camera unlinks its corrections (ON DELETE SET NULL)", async () 
 
 test("malformed actions and identifiers leave every status untouched", async () => {
   const report = await submitReport({ title: "Fuzz target" });
-  await toStatus(report.id, "verified");
+  await toStatus(report.id, "active");
 
   const malformed = [null, 42, "", "approve ", "APPROVE", "approve\n", "DELETE FROM cameras", "drop table cameras"];
   const before = await eventCount();
@@ -617,6 +617,6 @@ test("malformed actions and identifiers leave every status untouched", async () 
     const decision = await moderation.moderateCamera(report.id, action, REASON.verified, null);
     assert.equal(decision.kind, "not_found", `action ${JSON.stringify(action)} must be rejected`);
   }
-  assert.equal(await statusOf(report.id), "verified");
+  assert.equal(await statusOf(report.id), "active");
   assert.equal(await eventCount(), before);
 });

@@ -260,7 +260,7 @@ test("getPhotoById returns full metadata (including storage key) or null", async
 // ---------------------------------------------------------------------------
 
 test("getPublicPhoto serves an approved, redacted photo linked to a public camera", async () => {
-  await insertCamera({ status: "verified", id: 1 });
+  await insertCamera({ status: "active", id: 1 });
   await insertPhoto({ id: 11, cameraId: 1, status: "approved", redactionConfirmed: 1 });
 
   const photo = await photos.getPublicPhoto(11);
@@ -270,7 +270,7 @@ test("getPublicPhoto serves an approved, redacted photo linked to a public camer
 });
 
 test("getPublicPhoto fails closed for pending, rejected, and unredacted photos", async () => {
-  await insertCamera({ status: "verified", id: 1 });
+  await insertCamera({ status: "active", id: 1 });
   await insertPhoto({ id: 11, cameraId: 1, status: "pending" });
   await insertPhoto({ id: 12, cameraId: 1, status: "rejected" });
   await insertPhoto({ id: 13, cameraId: 1, status: "approved", redactionConfirmed: 0 });
@@ -316,7 +316,7 @@ test("getPublicPhoto fails closed for demo cameras in production (unset ENVIRONM
 });
 
 test("getPublicPhoto honours an explicit now for the review window", async () => {
-  await insertCamera({ status: "verified", reviewDueAt: "2030-01-01T00:00:00.000Z", id: 1 });
+  await insertCamera({ status: "active", reviewDueAt: "2030-01-01T00:00:00.000Z", id: 1 });
   await insertPhoto({ id: 11, cameraId: 1, status: "approved", redactionConfirmed: 1 });
   // review_due_at is the deadline: a future deadline means the record is
   // still current; a past one means the review window closed.
@@ -330,7 +330,7 @@ test("getPublicPhoto honours an explicit now for the review window", async () =>
 // ---------------------------------------------------------------------------
 
 test("listApprovedPhotosForCamera returns only approved+redacted photos of the camera", async () => {
-  await insertCamera({ status: "verified", id: 1 });
+  await insertCamera({ status: "active", id: 1 });
   await insertPhoto({ id: 11, cameraId: 1, status: "approved", redactionConfirmed: 1 });
   await insertPhoto({ id: 12, cameraId: 1, status: "approved", redactionConfirmed: 0 });
   await insertPhoto({ id: 13, cameraId: 1, status: "pending" });
@@ -350,7 +350,7 @@ test("linkPhotosToCamera is a no-op for an empty id list", async () => {
 });
 
 test("linkPhotosToCamera leaves already-linked photos alone", async () => {
-  await insertCamera({ status: "verified", id: 1 });
+  await insertCamera({ status: "active", id: 1 });
   await insertPhoto({ id: 11, cameraId: 1, status: "pending" });
   const linked = await photos.linkPhotosToCamera(2, [11], null);
   assert.equal(linked, 0, "an already-linked pending photo must not be relinked");
@@ -445,7 +445,7 @@ test("readPhotoBytes returns null for unknown photos and missing R2 objects", as
 });
 
 test("readPublicPhotoBytes serves only publicly visible photos, fail closed otherwise", async () => {
-  await insertCamera({ status: "verified", id: 1 });
+  await insertCamera({ status: "active", id: 1 });
   await insertPhoto({ id: 11, cameraId: 1, status: "approved", redactionConfirmed: 1 });
   await insertPhoto({ id: 12, cameraId: 1, status: "pending" });
   r2.set("photos/fixture.jpg", { bytes: jpegBytes(), opts: {} });

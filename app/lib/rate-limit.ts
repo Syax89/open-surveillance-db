@@ -57,7 +57,8 @@ export type RouteKind =
   | "tiles"
   | "geocode"
   | "confirm"
-  | "edit";
+  | "edit"
+  | "action";
 
 const ROUTE_LIMIT_DEFAULTS: Record<RouteKind, RateLimitOptions> = {
   read: { maxRequests: 60, windowSeconds: 60 },
@@ -114,6 +115,11 @@ const ROUTE_LIMIT_DEFAULTS: Record<RouteKind, RateLimitOptions> = {
   // interactive form use (a record edit is a deliberate, slow action) while
   // still throttling edit-farming attempts.
   edit: { maxRequests: 5, windowSeconds: 60 },
+  // Community actions (ADR 0021 §11.5): per-caller bucket for the PUT/DELETE
+  // action endpoints, independent from read/confirm so an action burst never
+  // starves other community surfaces. The default 10/min mirrors the
+  // `rateLimit.actionPerMinute` operator knob (ADR 0021 §5.1).
+  action: { maxRequests: 10, windowSeconds: 60 },
 };
 
 const ROUTE_LIMIT_ENV_PREFIX: Record<RouteKind, string> = {
@@ -130,6 +136,7 @@ const ROUTE_LIMIT_ENV_PREFIX: Record<RouteKind, string> = {
   geocode: "GEOCODE",
   confirm: "CONFIRM",
   edit: "EDIT",
+  action: "ACTION",
 };
 
 const attemptsByKey = new Map<string, number[]>();

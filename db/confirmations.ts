@@ -116,17 +116,16 @@ function confirmationLevelGateMin(envValue: unknown): number {
 
 /**
  * L1 gate helper: how many of the contributor's cameras are currently
- * public (`verified` — legacy — or `active`, the ADR 0021 status after
- * migration 0039). Never pending/rejected/removed (ADR 0018 §3.2,
- * anti-farming rule 1). Backed by the (contributor_id, status) index
- * (migration 0023); the dual predicate keeps the legacy rows counted while
- * the pivot's `active` rows count too — FASE 2 narrows it to `active` only
- * (ADR 0021 §12.1).
+ * public (`active`, the ADR 0021 status after migration 0039). Never
+ * pending/rejected/removed (ADR 0018 §3.2, anti-farming rule 1). Backed
+ * by the (contributor_id, status) index (migration 0023). After ADR 0021
+ * §12.1, narrowed to `active` only; legacy `verified` rows no longer
+ * exist as a domain status.
  */
 export async function verifiedContributionCount(contributorId: number): Promise<number> {
   const d1 = await getD1();
   const row = await d1
-    .prepare("SELECT COUNT(*) AS n FROM cameras WHERE contributor_id = ? AND status IN ('verified', 'active')")
+    .prepare("SELECT COUNT(*) AS n FROM cameras WHERE contributor_id = ? AND status = 'active'")
     .bind(contributorId)
     .first<{ n: number }>();
   return Number(row?.n ?? 0);

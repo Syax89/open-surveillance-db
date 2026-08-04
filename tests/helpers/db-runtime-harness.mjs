@@ -53,6 +53,12 @@ const DB_MODULES = [
   // community configuration — code defaults + the read path merging DB rows
   // over them; imports getD1 from ./cameras. Mirror it for the pivot tests.
   { source: "db/community-settings.ts", output: "db/community-settings.mjs" },
+  // db/community-actions.ts (ADR 0021 FASE 2, kanban t_a9f23581): action
+  // surface write path + threshold evaluation. Imports getD1 from ./cameras,
+  // verifiedContributionCount + ACTION_WEIGHT_BY_LEVEL from ./confirmations,
+  // deriveLevel from app/lib/trust-levels, and getCommunitySettingsCached
+  // from ./community-settings — all already in this tree.
+  { source: "db/community-actions.ts", output: "db/community-actions.mjs" },
   // db/appeals.ts imports ../app/lib/rate-limit (pure, no CF binding) for the
   // per-appellant appeal threshold knobs; mirror it into the temp tree too.
   { source: "app/lib/rate-limit.ts", output: "app/lib/rate-limit.mjs" },
@@ -157,7 +163,8 @@ export async function loadDbRuntime() {
   const emailTemplates = await import(pathToFileURL(path.join(tree, "app/lib/email-templates.mjs")).href);
   const oidc = await import(pathToFileURL(path.join(tree, "db/oidc.mjs")).href);
   const communitySettings = await import(pathToFileURL(path.join(tree, "db/community-settings.mjs")).href);
-  return { env: envModule.env, cameras, corrections, moderation, auth, users, appeals, photos, retention, confirmations, cameraEdits, passkeys, mailer, emailTemplates, oidc, communitySettings };
+  const communityActions = await import(pathToFileURL(path.join(tree, "db/community-actions.mjs")).href);
+  return { env: envModule.env, cameras, corrections, moderation, auth, users, appeals, photos, retention, confirmations, cameraEdits, passkeys, mailer, emailTemplates, oidc, communitySettings, communityActions };
 }
 
 // Replays the real Drizzle migration files (drizzle/0000-*.sql ... 0017-*.sql)

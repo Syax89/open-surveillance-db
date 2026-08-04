@@ -15,9 +15,10 @@ import { getD1 } from "./cameras";
  * `rateLimit.actionPerMinute` is not fixed by the ADR — the value here (and
  * in the seed) is the operator-tunable default.
  *
- * FASE 2 adds the 60 s in-process read cache and the admin settings
- * endpoint (ADR 0021 §5.2/5.3); this module stays the single source of the
- * fallback values.
+ * The 60 s in-process read cache (`getCommunitySettingsCached`) is the
+ * only FASE 2 addition to this module so far (ADR 0021 §5.2); the admin
+ * settings endpoint is not part of this phase. `getCommunitySettings()`
+ * remains uncached for test callers that need fresh data.
  */
 
 export const DEFAULT_COMMUNITY_SETTINGS: Record<string, unknown> = {
@@ -77,4 +78,31 @@ export async function getCommunitySettings(): Promise<Record<string, unknown>> {
     }
   }
   return settings;
+}
+
+/** In-process read cache (ADR 0021 §5.2): TTL 60 s. */
+let cachedSettings: Record<string, unknown> | null = null;
+let cacheFetchedAt = 0;
+const CACHE_TTL_MS = 60_000;
+
+/**
+ * Cached variant of `getCommunitySettings()` with a 60 s TTL. Used by the
+ * community action paths to avoid a D1 round-trip on every evaluation.
+ * The uncached `getCommunitySettings()` still exists for test callers.
+ */
+export async function getCommunitySettingsCached(): Promise<Record<string, unknown>> {
+  const now = Date.now();
+  if (cachedSettings && now - cacheFetchedAt < CACHE_TTL_MS) {
+    return { ...cachedSettings };
+  }
+  const settings = await getCommunitySettings();
+  cachedSettings = settings;
+  cacheFetchedAt = now;
+  return { ...settings };
+}
+
+/** Drop the in-process cache (test helper). */
+export function resetCommunitySettingsCache(): void {
+  cachedSettings = null;
+  cacheFetchedAt = 0;
 }

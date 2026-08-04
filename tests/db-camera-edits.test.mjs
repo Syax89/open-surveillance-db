@@ -124,7 +124,7 @@ test("applyCameraEdit published no-op answers no_changes and writes NO event (an
   await freshDb();
   const ownerId = await insertContributor();
   const cameraId = await insertCamera({
-    contributorId: ownerId, status: "verified", title: "Same title",
+    contributorId: ownerId, status: "active", title: "Same title",
     lastVerifiedAt: NOW, reviewDueAt: "2027-08-01T00:00:00.000Z",
   });
 
@@ -182,7 +182,7 @@ test("getCameraEditView includes the open pending edit request when one exists",
   await freshDb();
   const ownerId = await insertContributor();
   const cameraId = await insertCamera({
-    contributorId: ownerId, status: "verified", title: "Old title",
+    contributorId: ownerId, status: "active", title: "Old title",
     lastVerifiedAt: NOW, reviewDueAt: "2027-08-01T00:00:00.000Z",
   });
 
@@ -204,7 +204,7 @@ test("getCameraEditView answers not_owner for a published record owned by someon
   const ownerId = await insertContributor();
   const otherId = await insertContributor();
   const cameraId = await insertCamera({
-    contributorId: ownerId, status: "verified",
+    contributorId: ownerId, status: "active",
     lastVerifiedAt: NOW, reviewDueAt: "2027-08-01T00:00:00.000Z",
   });
 

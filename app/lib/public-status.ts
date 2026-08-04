@@ -10,8 +10,11 @@
 // one withdraws it from every surface at once. Anything not listed here is a
 // non-public state (pending, needs_review, stale, rejected, removed, ...) and
 // must never cross the UI/API/GeoJSON boundary.
+//
+// After migration 0039, "verified" no longer exists as a domain status;
+// public records are now `active` (the migrated status) and `demo`.
 
-export const PUBLIC_CAMERA_STATUSES = ["verified", "demo"] as const;
+export const PUBLIC_CAMERA_STATUSES = ["active", "demo"] as const;
 export type PublicCameraStatus = (typeof PUBLIC_CAMERA_STATUSES)[number];
 
 export function isPublicStatus(status: string): status is PublicCameraStatus {

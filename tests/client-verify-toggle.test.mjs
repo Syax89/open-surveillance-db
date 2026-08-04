@@ -119,7 +119,7 @@ const recordFixture = {
   id: 7,
   title: "Fixture Public Camera",
   kind: "Fixed dome",
-  status: "verified",
+  status: "active",
   latitude: 41.9004,
   longitude: 12.4936,
   source: "Community report",

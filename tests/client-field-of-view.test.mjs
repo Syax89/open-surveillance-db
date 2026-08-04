@@ -55,7 +55,7 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 const directionalCamera = {
-  id: 1, title: "Bullet camera", kind: "Bullet", status: "verified",
+  id: 1, title: "Bullet camera", kind: "Bullet", status: "active",
   latitude: 41.9004, longitude: 12.4936, direction: 45,
 };
 const domeCamera = {
@@ -63,7 +63,7 @@ const domeCamera = {
   latitude: 41.9047, longitude: 12.5031,
 };
 const noDirectionCamera = {
-  id: 3, title: "Unknown camera", kind: "Bullet", status: "verified",
+  id: 3, title: "Unknown camera", kind: "Bullet", status: "active",
   latitude: 41.902, longitude: 12.499, direction: null,
 };
 
@@ -105,7 +105,7 @@ test("map: directional camera draws a cone polygon above zoom 16, colored by sta
   assert.ok(Array.isArray(cone.latlngs) && cone.latlngs.length >= 4, "the wedge ring has the vertex + arc points");
   assert.deepEqual(cone.latlngs[0], [41.9004, 12.4936], "the vertex sits on the marker");
   assert.match(cone.opts.className, /fov-cone/, "the cone carries the fov-cone class");
-  assert.match(cone.opts.className, /verified/, "the cone is colored by the camera status");
+  assert.match(cone.opts.className, /active/, "the cone is colored by the camera status");
   assert.equal(cone.opts.interactive, false, "the decorative path never captures pointer events");
 });
 

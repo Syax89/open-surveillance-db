@@ -40,7 +40,7 @@ const publicRecord = {
   address: null,
   latitude: 41.9,
   longitude: 12.5,
-  status: "verified",
+  status: "active",
   source: "Community report",
   updated: "2026-07-12T09:00:00.000Z",
   description: "",

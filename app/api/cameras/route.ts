@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { createPendingCamera, DOME_KIND, findNearbyPublicCameras, freshnessWindows, getPublicCameraFacets, listPublicCameras, listPublicCamerasInBbox, listPublicCamerasPage, PUBLIC_CAMERAS_PAGE_DEFAULT_LIMIT, PUBLIC_CAMERAS_PAGE_MAX_LIMIT, type FreshnessWindow, type PublicCameraFacets, type PublicCameraFilters } from "../../../db/cameras";
+import { createPendingCamera, DOME_KIND, findNearbyPublicCameras, freshnessWindows, getPublicCameraFacets, listPublicCameras, listPublicCamerasInBbox, listPublicCamerasPage, PUBLIC_CAMERAS_PAGE_DEFAULT_LIMIT, PUBLIC_CAMERAS_PAGE_MAX_LIMIT, PUBLIC_CAMERA_SORT_OPTIONS, type FreshnessWindow, type PublicCameraFacets, type PublicCameraFilters } from "../../../db/cameras";
 import { requiresDuplicateConfirmation } from "../../lib/duplicate-detection";
 import { requireVerifiedContributor } from "../../lib/write-gate";
 import { csrfVerified, sameOrigin } from "../../lib/csrf";
@@ -125,9 +125,14 @@ export async function GET(request: Request) {
     if (freshness !== null && !freshnessWindows.includes(freshness as FreshnessWindow)) {
       return Response.json({ error: `Unknown freshness window. Use one of: ${freshnessWindows.join(", ")}.` }, { status: 400 });
     }
+    const sort = params.get("sort");
+    if (sort !== null && !PUBLIC_CAMERA_SORT_OPTIONS.includes(sort as "useful" | "recent" | "confirmations")) {
+      return Response.json({ error: `Unknown sort option. Use one of: ${PUBLIC_CAMERA_SORT_OPTIONS.join(", ")}.` }, { status: 400 });
+    }
     const filters: PublicCameraFilters = {};
     if (kindFilter) filters.kind = kindFilter;
     if (freshness && freshness !== "all") filters.freshness = freshness as FreshnessWindow;
+    if (sort) filters.sort = sort as "useful" | "recent" | "confirmations";
 
     // Map marker layer (FRONTEND_PLAN § 3.3): `bbox=west,south,east,north`
     // returns every public point inside the box as GeoJSON. Bounded 5-minute
