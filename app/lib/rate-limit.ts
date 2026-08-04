@@ -233,7 +233,8 @@ export function checkRateLimitInMemory(
 }
 
 /**
- * Best-effort caller identity: the edge-provided IP only.
+ * Best-effort caller identity: the edge-provided IP only, unless the
+ * deployment explicitly opts into trusting X-Forwarded-For.
  *
  * QA F7 (t_894e0cc3): on a deployment WITHOUT the Cloudflare edge (e.g. the
  * local LXC prototype served over plain HTTP, worker/index.ts) the
@@ -242,16 +243,29 @@ export function checkRateLimitInMemory(
  * request and reset EVERY per-IP cap (registration 5/24h, auth, submit,
  * tiles, geocode). The edge-provided `cf-connecting-ip` is always present
  * and authoritative behind Cloudflare; anywhere else the caller is unknown
- * and shares one global bucket (fail-closed). A deployment behind a trusted
- * non-Cloudflare proxy that needs per-client caps again must opt in
- * explicitly (a TRUST_XFF knob is the documented follow-up; absent the knob,
- * XFF is never trusted).
+ * and shares one global bucket (fail-closed).
+ *
+ * The documented follow-up knob (t_b6f04976): a deployment that sits behind
+ * a TRUSTED reverse proxy which sanitises/overwrites X-Forwarded-For (never
+ * forwards a client-supplied value) may set `TRUST_XFF=true` to restore
+ * per-client caps again. This is an explicit operator declaration — absent
+ * the knob, XFF is never trusted. There is no automatic proxy whitelist:
+ * without the edge there is no reliable signal of who the direct peer is, so
+ * the only safe opt-in is a boolean the operator sets knowingly.
  */
-export function callerKey(request: Request): string {
+export function callerKey(request: Request, env?: unknown): string {
   const direct = request.headers.get("cf-connecting-ip");
   if (direct) return direct;
-  // Deliberately NOT reading x-forwarded-for here: without the edge, it is
-  // spoofable and would turn every cap into a no-op (QA F7).
+  const config = (env ?? {}) as EnvLike;
+  if (config.TRUST_XFF === "true") {
+    // The operator declared the deployment sits behind a trusted proxy that
+    // sanitises XFF: the first hop is the real client.
+    const forwarded = request.headers.get("x-forwarded-for");
+    const firstHop = forwarded?.split(",")[0]?.trim();
+    if (firstHop) return firstHop;
+  }
+  // Deliberately NOT reading x-forwarded-for without the knob: without the
+  // edge it is spoofable and would turn every cap into a no-op (QA F7).
   return "unknown";
 }
 

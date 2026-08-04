@@ -35,6 +35,18 @@ import { PUBLIC_CAMERA_STATUSES } from "../app/lib/public-status";
 
 type EnvLike = { [key: string]: unknown };
 
+/**
+ * One statement result from `d1.batch(...)`: a RETURNING/SELECT statement
+ * populates `results`, everything else only `meta` (same shape as the
+ * appeals/moderation batch helpers — the response-kind probes of the
+ * confirmation toggle share the INSERT's batch snapshot, QA F6 follow-up).
+ */
+type D1BatchResult = {
+  success: boolean;
+  results: Record<string, unknown>[];
+  meta: { changes: number; lastRowId: number };
+};
+
 export type ConfirmationRecord = {
   id: number;
   cameraId: number;
@@ -220,69 +232,81 @@ export async function setConfirmation(input: {
   const quota = confirmationQuota(effectiveEnv);
   const dailyLimit = verifiedCount >= gateMin ? quota.maxPerDayTrusted : quota.maxPerDay;
 
-  // 5+6. Daily quota, per-record cap AND the insert as ONE atomic statement
-  //    (QA F6, t_0b7dd8fc). The COUNTs live INSIDE the INSERT ... SELECT ...
-  //    WHERE, so the check and the write are a single SQLite statement: two
-  //    concurrent PUTs cannot both read a stale COUNT and overshoot the caps
-  //    by +1 (the old SELECT COUNT -> INSERT pair was a TOCTOU). ON CONFLICT
-  //    DO NOTHING still dedupes the same (camera_id, contributor_id) pair.
-  const inserted = await d1
-    .prepare(
-      `INSERT INTO camera_confirmations (camera_id, contributor_id, created_at)
-       SELECT ?, ?, ?
-       WHERE (SELECT COUNT(*) FROM camera_confirmations WHERE contributor_id = ? AND created_at >= ?) < ?
-         AND (SELECT COUNT(*) FROM camera_confirmations WHERE camera_id = ? AND created_at >= ?) < ?
-       ON CONFLICT (camera_id, contributor_id) DO NOTHING
-       RETURNING id`,
-    )
-    .bind(
-      input.cameraId,
-      input.contributorId,
-      input.now,
-      input.contributorId,
-      windowStart,
-      dailyLimit,
-      input.cameraId,
-      windowStart,
-      quota.perRecordPerDay,
-    )
-    .first<{ id: number }>();
-
-  if (!inserted) {
-    // No row: either the pair already exists or one of the two caps is
-    // reached. The atomic statement above is the enforcement; these reads
-    // only pick the response kind (deterministic sequentially — under a
-    // race, whichever cap/conflict the atomic statement rejected wins).
-    const existing = await d1
+  // 5+6. Daily quota, per-record cap AND the insert as ONE atomic batch
+  //    (QA F6, t_0b7dd8fc + follow-up t_b6f04976). The COUNTs live INSIDE the
+  //    INSERT ... SELECT ... WHERE, so the check and the write are a single
+  //    SQLite statement: two concurrent PUTs cannot both read a stale COUNT
+  //    and overshoot the caps by +1 (the old SELECT COUNT -> INSERT pair was
+  //    a TOCTOU). ON CONFLICT DO NOTHING still dedupes the same
+  //    (camera_id, contributor_id) pair.
+  //
+  //    The RESPONSE-KIND selection (duplicate vs daily_quota vs per-record
+  //    cap) runs in the SAME d1.batch: the existing-pair probe and the two
+  //    COUNT reads share the batch's snapshot with the INSERT, so the kind
+  //    returned always matches what the INSERT actually saw. After #281 the
+  //    enforcement was atomic but the classification reads after a rejected
+  //    INSERT were three SEPARATE statements — under a race (a concurrent
+  //    DELETE freeing a slot, or a concurrent INSERT landing between the
+  //    attempt and the reads) they could disagree with the rejection reason
+  //    and report the wrong kind (or fall through to a guessed 429). One
+  //    batch = one snapshot = the residual TOCTOU is gone.
+  const batch = (await d1.batch([
+    d1
+      .prepare(
+        `INSERT INTO camera_confirmations (camera_id, contributor_id, created_at)
+         SELECT ?, ?, ?
+         WHERE (SELECT COUNT(*) FROM camera_confirmations WHERE contributor_id = ? AND created_at >= ?) < ?
+           AND (SELECT COUNT(*) FROM camera_confirmations WHERE camera_id = ? AND created_at >= ?) < ?
+         ON CONFLICT (camera_id, contributor_id) DO NOTHING
+         RETURNING id`,
+      )
+      .bind(
+        input.cameraId,
+        input.contributorId,
+        input.now,
+        input.contributorId,
+        windowStart,
+        dailyLimit,
+        input.cameraId,
+        windowStart,
+        quota.perRecordPerDay,
+      ),
+    d1
       .prepare("SELECT 1 AS ok FROM camera_confirmations WHERE camera_id = ? AND contributor_id = ?")
-      .bind(input.cameraId, input.contributorId)
-      .first<{ ok: number }>();
-    if (existing) return { kind: "duplicate" };
-    const daily = await d1
+      .bind(input.cameraId, input.contributorId),
+    d1
       .prepare("SELECT COUNT(*) AS n FROM camera_confirmations WHERE contributor_id = ? AND created_at >= ?")
-      .bind(input.contributorId, windowStart)
-      .first<{ n: number }>();
-    if ((daily?.n ?? 0) >= dailyLimit) {
-      return { kind: "daily_quota_exceeded", retryAfterSeconds: windowRetryAfterSeconds(windowStartMs, nowMs) };
-    }
-    const perRecord = await d1
+      .bind(input.contributorId, windowStart),
+    d1
       .prepare("SELECT COUNT(*) AS n FROM camera_confirmations WHERE camera_id = ? AND created_at >= ?")
-      .bind(input.cameraId, windowStart)
-      .first<{ n: number }>();
-    if ((perRecord?.n ?? 0) >= quota.perRecordPerDay) {
-      return { kind: "per_record_cap_exceeded", retryAfterSeconds: windowRetryAfterSeconds(windowStartMs, nowMs) };
-    }
-    // Defensive fallback: the statement rejected without a conflict and with
-    // both caps now below limit only if a concurrent request freed a slot
-    // between the attempt and these reads (DELETE race). The write was still
-    // rejected at its instant: 429 with Retry-After, never a false ok.
-    return { kind: "daily_quota_exceeded", retryAfterSeconds: windowRetryAfterSeconds(windowStartMs, nowMs) };
+      .bind(input.cameraId, windowStart),
+  ])) as D1BatchResult[];
+
+  const inserted = (batch[0].results?.[0] as { id?: number } | undefined)?.id;
+  if (inserted !== undefined) {
+    // 7. Refresh the decayed count (created_at >= last_verified_at) for the
+    //    response; the just-inserted confirmation counts when in window.
+    const count = await recordConfirmationCount(input.cameraId);
+    return { kind: "ok", count };
   }
 
-  // 7. Refresh the decayed count (created_at >= last_verified_at) for the
-  //    response; the just-inserted confirmation counts when in window.
-  const count = await recordConfirmationCount(input.cameraId);
-  return { kind: "ok", count };
+  // The INSERT produced no row. All three probes below ran in the SAME batch
+  // as the INSERT, so their snapshot is exactly what the INSERT evaluated:
+  // at least one of the three conditions must hold, and the FIRST one that
+  // holds is the truthful rejection reason — no guesswork, no fallthrough.
+  const existing = batch[1].results?.[0] as { ok?: number } | undefined;
+  if (existing?.ok) return { kind: "duplicate" };
+  const daily = batch[2].results?.[0] as { n?: number } | undefined;
+  if (Number(daily?.n ?? 0) >= dailyLimit) {
+    return { kind: "daily_quota_exceeded", retryAfterSeconds: windowRetryAfterSeconds(windowStartMs, nowMs) };
+  }
+  const perRecord = batch[3].results?.[0] as { n?: number } | undefined;
+  if (Number(perRecord?.n ?? 0) >= quota.perRecordPerDay) {
+    return { kind: "per_record_cap_exceeded", retryAfterSeconds: windowRetryAfterSeconds(windowStartMs, nowMs) };
+  }
+  // Unreachable in a consistent snapshot (the INSERT's WHERE would have
+  // passed); kept fail-closed as a defensive invariant.
+  return { kind: "daily_quota_exceeded", retryAfterSeconds: windowRetryAfterSeconds(windowStartMs, nowMs) };
 }
 
 /**

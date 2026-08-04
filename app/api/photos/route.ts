@@ -87,7 +87,7 @@ export async function POST(request: Request) {
     return photoError("Submissions are temporarily disabled.", 503);
   }
 
-  const key = callerKey(request);
+  const key = callerKey(request, env);
   const limitOptions = submissionLimits(env);
   const limit = await checkRateLimit(env, "submit", key, limitOptions);
   if (!limit.allowed) {
@@ -127,7 +127,7 @@ export async function POST(request: Request) {
     // the byte quota is enforced after stripping, still before any R2 store.
     // The state quota is separate from the "submit" rate limit: the limiter
     // bounds the request rate, this bounds accumulated pending storage.
-    const submitterKey = await submitterKeyFor(gate, request);
+    const submitterKey = await submitterKeyFor(gate, request, env);
     const quota = pendingPhotoQuota(env);
     const pendingUsage = await pendingPhotoUsage(submitterKey);
     if (pendingUsage.count >= quota.maxPendingCount) {
@@ -205,7 +205,7 @@ export async function GET(request: Request) {
   // READ_RATE_LIMIT_* knobs) bounds bulk scraping, mirroring the byte route
   // GET /api/photos/[id] (audit t_5ca60ab2, P2 — the list was previously
   // unthrottled).
-  const key = callerKey(request);
+  const key = callerKey(request, env);
   const limitOptions = limitsFor("read", env);
   const limit = await checkRateLimit(env, "read", key, limitOptions);
   if (!limit.allowed) {

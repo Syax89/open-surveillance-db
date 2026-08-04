@@ -38,7 +38,11 @@
  */
 
 import { getContributorVerification } from "../../db/auth";
-import { resolveOptionalContributor, type ResolvedSession } from "./auth-session";
+import {
+  malformedSessionCookieGuard,
+  resolveOptionalContributor,
+  type ResolvedSession,
+} from "./auth-session";
 
 /** The one canonical error body for every denied write (anti-enumeration). */
 export const WRITE_GATE_ERROR = "Authentication required.";
@@ -74,6 +78,13 @@ export async function requireVerifiedContributor(
   request: Request,
   now: string = new Date().toISOString(),
 ): Promise<WriteGateResult> {
+  // QA F1 (t_b6f04976): a PRESENT-but-undecodable session cookie is a client
+  // bug, not an anonymous caller — answer a clean 400 so the browser clears
+  // the corrupt cookie instead of silently failing the write gate with the
+  // generic 401 (which hides the corruption from the user).
+  const malformed = malformedSessionCookieGuard(request);
+  if (malformed) return { ok: false, response: malformed };
+
   const resolved = await resolveOptionalContributor(request, now);
   if (!resolved) return denied(401);
 

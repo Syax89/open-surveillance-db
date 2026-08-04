@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { resolveOptionalContributor } from "../../../lib/auth-session";
+import { malformedSessionCookieGuard, resolveOptionalContributor } from "../../../lib/auth-session";
 import { authLimit, parseDisplayName } from "../../../lib/auth-route-helpers";
 import { csrfVerified, sameOrigin } from "../../../lib/csrf";
 import { BodyReadError, readJsonBody, urlTooLong } from "../../../lib/input-limits";
@@ -79,6 +79,12 @@ export async function PATCH(request: Request) {
 
   const blocked = await authLimit(request, env, "/api/auth/me");
   if (blocked) return blocked;
+
+  // QA F1 (t_b6f04976): present-but-undecodable session cookie = client bug.
+  // Clean 400 (actionable: clear cookies) instead of a silent 401 that hides
+  // the corruption, and never a 503 from an unhandled URIError.
+  const malformed = malformedSessionCookieGuard(request);
+  if (malformed) return malformed;
 
   try {
     const resolved = await resolveOptionalContributor(request);

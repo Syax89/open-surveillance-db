@@ -27,7 +27,7 @@ export async function GET(request: Request) {
   // bucket metered per caller (default 60/min, READ_RATE_LIMIT_* knobs)
   // protects bandwidth from bulk scraping. Malformed ids above already
   // answered 404 without touching storage and are not counted.
-  const key = callerKey(request);
+  const key = callerKey(request, env);
   const limitOptions = limitsFor("read", env);
   const limit = await checkRateLimit(env, "read", key, limitOptions);
   if (!limit.allowed) {

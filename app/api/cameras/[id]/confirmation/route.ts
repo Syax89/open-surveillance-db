@@ -57,7 +57,7 @@ async function guardMutation(
     return Response.json({ error: "Cross-origin request rejected." }, { status: 403, headers: NO_STORE_HEADERS });
   }
 
-  const key = callerKey(request);
+  const key = callerKey(request, env);
   const limitOptions = limitsFor("confirm", env);
   const limit = await checkRateLimit(env, "confirm", key, limitOptions);
   if (!limit.allowed) {
@@ -179,7 +179,7 @@ export async function GET(request: Request) {
     return Response.json({ error: "Camera not found." }, { status: 404, headers: NO_STORE_HEADERS });
   }
 
-  const key = callerKey(request);
+  const key = callerKey(request, env);
   const limitOptions = limitsFor("confirm", env);
   const limit = await checkRateLimit(env, "confirm", key, limitOptions);
   if (!limit.allowed) {

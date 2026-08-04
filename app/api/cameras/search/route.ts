@@ -100,7 +100,7 @@ export async function GET(request: Request) {
     return Response.json({ error: `limit must be an integer between 1 and ${SEARCH_PAGE_MAX_LIMIT} and offset a non-negative integer up to ${MAX_PAGE_OFFSET}.` }, { status: 400 });
   }
 
-  const key = callerKey(request);
+  const key = callerKey(request, env);
   const rateLimit = await checkRateLimit(env, "search", key, searchLimits(env));
   if (!rateLimit.allowed) {
     console.warn(`GET /api/cameras/search rate limited for caller ${key}`);
