@@ -1,7 +1,7 @@
 "use client";
 
 import type { FormEvent, ChangeEvent, RefObject } from "react";
-import { useMessages } from "../LocaleProvider";
+import { useMessages } from "../../lib/use-messages";
 import { useReportFlow, type NearbyCandidate, type PhotoItem } from "../../lib/useReportFlow";
 
 // Re-exported so the home page and /segnala can import the hook and its

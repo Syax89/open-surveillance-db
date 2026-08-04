@@ -236,15 +236,20 @@ test("no \"contributore\" is left in any Italian bundle (auth, moderazione, …)
 });
 
 // ---------------------------------------------------------------------------
-// 5. Registered in index.ts for both locales (ADR 0007)
+// 5. Registered in both per-locale bundles (ADR 0007; F5 qa#5 split: the
+//    assemblies moved from index.ts to bundles/{en,it}.ts so the dictionary
+//    leaves the root chunk)
 // ---------------------------------------------------------------------------
 
-test("community bundle is registered in index.ts for both locales", async () => {
-  const src = await readFile(path.join(i18nDir, "index.ts"), "utf8");
-  assert.match(src, /import \{ en as communityEn, it as communityIt \} from "\.\/community"/,
-    "index.ts must import the community bundle");
-  assert.match(src, /community: communityEn/,
+test("community bundle is registered in both per-locale bundles", async () => {
+  const enSrc = await readFile(path.join(i18nDir, "bundles", "en.ts"), "utf8");
+  const itSrc = await readFile(path.join(i18nDir, "bundles", "it.ts"), "utf8");
+  assert.match(enSrc, /import \{ en as communityEn \} from "\.\.\/community"/,
+    "bundles/en.ts must import the community EN bundle");
+  assert.match(enSrc, /community: communityEn/,
     "the EN messages object must include the community namespace");
-  assert.match(src, /community: communityIt/,
+  assert.match(itSrc, /import \{ it as communityIt \} from "\.\.\/community"/,
+    "bundles/it.ts must import the community IT bundle");
+  assert.match(itSrc, /community: communityIt/,
     "the IT messages object must include the community namespace");
 });

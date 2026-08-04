@@ -170,8 +170,13 @@ test("JSON, GeoJSON, and CSV are all derived from the public camera list", async
   );
   assert.match(
     getHandler,
-    /return\s+Response\.json\(\{\s*records:\s*page\.records,\s*total:\s*page\.total,\s*nextOffset:\s*page\.nextOffset,\s*facets\s*\}/,
-    "the default JSON list must return the paginated shape (records, total, nextOffset) plus the inline facets",
+    /facets.*getPublicCameraFacets\(\)/,
+    "the facets are OPT-IN (QA#5 F2): getPublicCameraFacets must only run behind the ?facets=1 gate",
+  );
+  assert.match(
+    getHandler,
+    /return\s+Response\.json\(\s*facets\s*\?\s*\{/,
+    "the default JSON list must return the paginated shape (records, total, nextOffset) — facets included ONLY when explicitly requested",
   );
   assert.match(route, /function\s+toCsv\s*\(records/, "CSV must have an explicit serializer");
   assert.match(getHandler, /format\s*===\s*["']csv["']/, "the public route must recognise the CSV format");

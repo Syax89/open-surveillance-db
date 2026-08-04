@@ -5,7 +5,7 @@ import { SurveillanceMap } from "../SurveillanceMap";
 import type { MapCamera } from "../SurveillanceMap";
 import type { ViewportBounds } from "../../lib/map-viewport";
 import type { Camera } from "../../lib/records";
-import { useMessages } from "../LocaleProvider";
+import { useMessages } from "../../lib/use-messages";
 import { publicStatusLabel } from "../../lib/public-status";
 import { popupHtmlFor } from "../../lib/map-popup";
 import { GeocodeSearch } from "./GeocodeSearch";

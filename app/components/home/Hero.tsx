@@ -1,6 +1,6 @@
 "use client";
 
-import { useMessages } from "../LocaleProvider";
+import { useMessages } from "../../lib/use-messages";
 import { usePublicCount } from "../../lib/use-public-count";
 
 /**

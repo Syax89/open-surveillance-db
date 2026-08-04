@@ -14,7 +14,8 @@ name: Ops Backup D1
 
 on:
   schedule:
-    - cron: "0 2 * * *" # ogni giorno 02:00 UTC
+    - cron: "0 2 * * *" # ogni giorno 02:00 UTC — backup D1 (gated su vars.ENABLE_CF_BACKUP, F10)
+    - cron: "0 3 1 */3 *" # trimestrale 03:00 UTC — restore drill (gated su vars.ENABLE_RESTORE_DRILL + ENABLE_CF_BACKUP, F10)
   workflow_dispatch: {} # esecuzione manuale (drill)
 
 concurrency:
@@ -26,6 +27,12 @@ jobs:
     name: Export D1 + verify + encrypt
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # F10 qa#5 (t_ab0d4c75): il run notturno NON deve più essere rosso per
+    # design durante la fase LXC. Lo schedule salta il job (visibile come
+    # "skipped", non rosso) finché vars.ENABLE_CF_BACKUP != "true"; il
+    # workflow_dispatch manuale (drill) procede SEMPRE, anche con la var
+    # spenta, per permettere il test del pipeline quando serve.
+    if: ${{ github.event_name != 'schedule' || vars.ENABLE_CF_BACKUP == 'true' }}
 
     steps:
       - name: Checkout
@@ -110,3 +117,118 @@ jobs:
             d1-backup-*.enc.sha256
             d1-counts.json
           retention-days: 30
+
+      - name: Copia off-site su R2 (F10 qa#5)
+        # F10 (t_ab0d4c75): gli artifact GitHub (30 gg) sono l'UNICA location
+        # del backup — se l'account/repo ha un problema i dump spariscono.
+        # Copia cifrata sul bucket R2 esistente (opensurveillancedb-photos),
+        # prefisso d1-backups/ che non collide mai con le chiavi foto (le
+        # foto sono servite per key = photo id). Il bucket è privato: nessun
+        # oggetto è esposto senza il worker + gate.
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          f="${{ steps.export.outputs.file }}"
+          npx wrangler r2 object put "opensurveillancedb-photos/d1-backups/${f}.enc" --file="${f}.enc"
+          npx wrangler r2 object put "opensurveillancedb-photos/d1-backups/${f}.enc.sha256" --file="${f}.enc.sha256"
+          echo "R2 aggiornato: opensurveillancedb-photos/d1-backups/ (off-site copy OK)"
+
+  restore-drill:
+    name: Restore drill (D1 temporaneo, F10 qa#5)
+    # F10 (t_ab0d4c75): il restore non era MAI stato esercitato. Il drill
+    # scarica l'ultimo backup cifrato, lo applica a un D1 temporaneo e fa
+    # smoke sui conteggi. Manuale (workflow_dispatch) oppure trimestrale,
+    # ma solo se il backup CF è attivo E il drill è esplicitamente abilitato
+    # (vars.ENABLE_RESTORE_DRILL == "true") — niente run rossi per design.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      actions: read
+      contents: read
+    if: ${{ github.event_name == 'workflow_dispatch' || (vars.ENABLE_CF_BACKUP == 'true' && vars.ENABLE_RESTORE_DRILL == 'true') }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check secrets (fail-fast)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          if [ -z "${CLOUDFLARE_API_TOKEN}" ] || [ -z "${CLOUDFLARE_ACCOUNT_ID}" ]; then
+            echo "::error::Secrets Cloudflare mancanti per il restore drill."
+            exit 1
+          fi
+          if [ -z "${BACKUP_PASSPHRASE}" ]; then
+            echo "::error::BACKUP_PASSPHRASE mancante: il dump cifrato non può essere decifrato."
+            exit 1
+          fi
+
+      - name: Scarica l'ultimo backup cifrato (artifact più recente non scaduto)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ART=$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" \
+            -q '[.artifacts[] | select(.name | startswith("d1-backup-")) | select(.expired == false)] | sort_by(.created_at) | reverse | .[0]')
+          if [ -z "$ART" ] || [ "$ART" = "null" ]; then
+            echo "::error::Nessun artifact d1-backup-* disponibile: esegui prima il job backup."
+            exit 1
+          fi
+          ART_ID=$(echo "$ART" | jq -r .id)
+          ART_NAME=$(echo "$ART" | jq -r .name)
+          echo "artifact: ${ART_NAME} (id ${ART_ID})"
+          gh api -H "Accept: application/vnd.github+json" \
+            "repos/${GITHUB_REPOSITORY}/actions/artifacts/${ART_ID}/zip" > backup.zip
+          unzip -o backup.zip
+          ls -la d1-backup-*.enc
+
+      - name: Decifra il dump (AES-256) + verifica sha256
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          enc=$(ls d1-backup-*.enc | head -1)
+          sha256sum -c "${enc}.sha256"
+          openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:${BACKUP_PASSPHRASE}" -in "$enc" -out restore.sql
+          echo "Decifrato: restore.sql ($(wc -l < restore.sql) righe)"
+
+      - name: Crea D1 temporaneo + applica dump + smoke conteggi + cleanup
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          stamp=$(date +%s)
+          db="osdb-restore-drill-${stamp}"
+          create_out=$(npx wrangler d1 create "$db" 2>&1)
+          db_id=$(echo "$create_out" | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' | head -1)
+          if [ -z "$db_id" ]; then
+            echo "::error::Creazione D1 temporaneo fallita: ${create_out}"
+            exit 1
+          fi
+          echo "D1 temporaneo: ${db} (${db_id})"
+          # Config temporanea con il binding del drill (il file committato resta intatto)
+          DB_NAME="$db" DB_ID="$db_id" node -e '
+            const fs = require("fs");
+            const cfg = JSON.parse(fs.readFileSync("wrangler.jsonc", "utf8"));
+            cfg.d1_databases.push({ binding: "DB_DRILL", database_name: process.env.DB_NAME, database_id: process.env.DB_ID });
+            fs.writeFileSync("wrangler-drill.jsonc", JSON.stringify(cfg, null, 2));
+          '
+          npx wrangler d1 execute "$db" --remote --config=wrangler-drill.jsonc --file=restore.sql --yes
+          echo "--- Smoke conteggi (D1 temporaneo) ---"
+          npx wrangler d1 execute "$db" --remote --config=wrangler-drill.jsonc \
+            --command="SELECT 'cameras' t, COUNT(*) n FROM cameras UNION ALL SELECT 'correction_requests', COUNT(*) FROM correction_requests UNION ALL SELECT 'moderation_events', COUNT(*) FROM moderation_events;" \
+            --json | tee drill-counts.json
+          echo "RESTORE DRILL OK: dump applicato e conteggi verificati su D1 temporaneo."
+          npx wrangler d1 delete "$db" --config=wrangler-drill.jsonc --yes \
+            || echo "::warning::Cleanup D1 temporaneo fallito: ${db}"

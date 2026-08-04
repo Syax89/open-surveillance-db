@@ -9,6 +9,11 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: t.pageTitle,
     description: t.pageIntro,
+    // F6 qa#5 (t_ab0d4c75): /mappa is reachable with URL-state params
+    // (?type=&freshness=&lat=&lng=&z=, deep links). Every variant
+    // canonicalizes to the bare route so crawlers index ONE url per page
+    // (resolved against metadataBase when NEXT_PUBLIC_SITE_URL is set).
+    alternates: { canonical: "/mappa" },
     openGraph: { title: t.pageTitle, description: t.pageIntro, images: ["/og.png"] },
     twitter: { card: "summary_large_image", title: t.pageTitle, description: t.pageIntro, images: ["/og.png"] },
   };

@@ -8,7 +8,7 @@
 // without deciding) and escalate — so a moderator can resolve a request
 // while associating it with the record outcome in one place.
 
-import { useMessages } from "../LocaleProvider";
+import { useMessages } from "../../lib/use-messages";
 import { DecisionForm } from "./DecisionForm";
 import type { CorrectionInQueue, DecisionFormApi } from "./types";
 

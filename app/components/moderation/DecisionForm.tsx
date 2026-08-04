@@ -15,7 +15,7 @@
 // Both fields stay correction-only; camera/photo/edit rows render exactly
 // the previous form.
 
-import { useMessages } from "../LocaleProvider";
+import { useMessages } from "../../lib/use-messages";
 import { correctionOutcomeOptions, reasonOptions } from "./types";
 import type { DecisionFormApi, ModerationAction, QueueEntity } from "./types";
 

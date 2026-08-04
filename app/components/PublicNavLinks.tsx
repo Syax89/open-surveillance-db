@@ -2,7 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useMessages } from "./LocaleProvider";
+import { useLocale } from "./LocaleProvider";
+import { en as homeEn, it as homeIt } from "../lib/i18n/home";
+import type { Locale, Translation } from "../lib/i18n";
+
+const homeByLocale: Record<Locale, Translation<typeof homeEn>> = {
+  en: homeEn,
+  it: homeIt,
+};
 
 /**
  * PublicNavLinks — the ONE public navigation set (header nav, task
@@ -23,7 +30,8 @@ import { useMessages } from "./LocaleProvider";
  * per-page (SiteHeader prop), as before.
  */
 export function PublicNavLinks() {
-  const t = useMessages().home;
+  const { locale } = useLocale();
+  const t = homeByLocale[locale];
   const pathname = usePathname();
 
   const links: Array<{ href: string; label: string; action?: boolean }> = [

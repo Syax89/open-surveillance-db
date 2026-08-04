@@ -1,6 +1,6 @@
 "use client";
 
-import { useMessages } from "./LocaleProvider";
+import { useMessages } from "../lib/use-messages";
 
 /**
  * Community verification toggle (COMMUNITY_PLAN §6.3 C2/C9 — Vera's design,

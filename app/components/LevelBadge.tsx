@@ -1,7 +1,7 @@
 "use client";
 
 import { badgeKeyForLevel } from "../lib/trust-levels";
-import { useMessages } from "./LocaleProvider";
+import { useMessages } from "../lib/use-messages";
 
 /**
  * Trust-level badge (COMMUNITY_PLAN §6.3 C1 — Vera's design).

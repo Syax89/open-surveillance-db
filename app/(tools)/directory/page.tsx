@@ -9,6 +9,11 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: t.pageTitle,
     description: t.pageIntro,
+    // F6 qa#5 (t_ab0d4c75): the pagination/filter state lives in the URL
+    // (?page=&type=&freshness=); all variants canonicalize to the bare route
+    // so crawlers never see duplicate content per page number (resolved
+    // against metadataBase when NEXT_PUBLIC_SITE_URL is set).
+    alternates: { canonical: "/directory" },
     openGraph: { title: t.pageTitle, description: t.pageIntro, images: ["/og.png"] },
     twitter: { card: "summary_large_image", title: t.pageTitle, description: t.pageIntro, images: ["/og.png"] },
   };

@@ -17,26 +17,17 @@
  * list. Adding a language = one bundle + one registry line (+ the
  * mechanical import/entry below) — see docs/DEVELOPMENT_SETUP.md §
  * "Aggiungere una lingua".
+ *
+ * Bundle splitting (F5 qa#5, t_ab0d4c75): the two per-locale assemblies
+ * live in `./bundles/{en,it}.ts`. The ROOT layout graph must NOT import
+ * `messages` (both locales, every domain): it imports only the domain
+ * files it renders (`common` in LocaleProvider, `footer` in SiteFooter),
+ * so the ~150 KB dictionary leaves the initial JS chunk. `useMessages()`
+ * (app/lib/use-messages.ts) pulls the full map into the chunks that
+ * actually translate on the client.
  */
-import { en as commonEn, it as commonIt } from "./common";
-import { en as mapEn, it as mapIt } from "./map";
-import { en as directoryEn, it as directoryIt } from "./directory";
-import { en as reportEn, it as reportIt } from "./report";
-import { en as correctionEn, it as correctionIt } from "./correction";
-import { en as statusEn, it as statusIt } from "./status";
-import { en as homeEn, it as homeIt } from "./home";
-import { en as guideEn, it as guideIt } from "./guide";
-import { en as manifestoEn, it as manifestoIt } from "./manifesto";
-import { en as moderazioneEn, it as moderazioneIt } from "./moderazione";
-import { en as faqEn, it as faqIt } from "./faq";
-import { en as contactEn, it as contactIt } from "./contact";
-import { en as rulesEn, it as rulesIt } from "./rules";
-import { en as recordEn, it as recordIt } from "./record";
-import { en as moderationEn, it as moderationIt } from "./moderation";
-import { en as authEn, it as authIt } from "./auth";
-import { en as communityEn, it as communityIt } from "./community";
-import { en as errorsEn, it as errorsIt } from "./errors";
-import { en as footerEn, it as footerIt } from "./footer";
+import { en } from "./bundles/en";
+import { it } from "./bundles/it";
 import {
   DEFAULT_LOCALE,
   LOCALE_BCP47,
@@ -48,50 +39,6 @@ import {
   type LocaleInfo,
   type Translation,
 } from "./types";
-
-export const en = {
-  common: commonEn,
-  map: mapEn,
-  directory: directoryEn,
-  report: reportEn,
-  correction: correctionEn,
-  status: statusEn,
-  home: homeEn,
-  guide: guideEn,
-  manifesto: manifestoEn,
-  moderazione: moderazioneEn,
-  faq: faqEn,
-  contact: contactEn,
-  rules: rulesEn,
-  record: recordEn,
-  moderation: moderationEn,
-  auth: authEn,
-  community: communityEn,
-  errors: errorsEn,
-  footer: footerEn,
-} as const;
-
-export const it: Translation<typeof en> = {
-  common: commonIt,
-  map: mapIt,
-  directory: directoryIt,
-  report: reportIt,
-  correction: correctionIt,
-  status: statusIt,
-  home: homeIt,
-  guide: guideIt,
-  manifesto: manifestoIt,
-  moderazione: moderazioneIt,
-  faq: faqIt,
-  contact: contactIt,
-  rules: rulesIt,
-  record: recordIt,
-  moderation: moderationIt,
-  auth: authIt,
-  community: communityIt,
-  errors: errorsIt,
-  footer: footerIt,
-};
 
 /**
  * Per-language assembled bundles, keyed by locale code. `en` is the pilot

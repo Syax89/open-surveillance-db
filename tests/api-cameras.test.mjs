@@ -89,9 +89,19 @@ test("GET /api/cameras returns the public list as JSON by default", async () => 
   assert.match(response.headers.get("content-type"), /application\/json/);
   assert.equal(response.headers.get("cache-control"), "public, s-maxage=300, stale-while-revalidate=600", "the directory list is cached for a bounded window and revalidated after moderation decisions");
   assert.equal(response.headers.get("cache-tag"), "cameras-list", "the list carries the shared list cache-tag for moderation purge");
-  assert.deepEqual(await responseBody(response), { records: [cameraFixture], total: 1, nextOffset: null, facets: emptyFacets });
+  assert.deepEqual(await responseBody(response), { records: [cameraFixture], total: 1, nextOffset: null });
   assert.deepEqual(callArgs("listPublicCamerasPage")[0], [{}, { limit: 500, offset: 0 }], "the default page is the first 500 records");
-  assert.equal(callArgs("getPublicCameraFacets").length, 1, "the facets are computed inline for the filter UI");
+  assert.equal(callArgs("getPublicCameraFacets").length, 0, "facets are OPT-IN (QA#5 F2): the default JSON list never pays for the two full-set aggregates");
+});
+
+test("GET /api/cameras?facets=1 includes the facets for the filter UI (opt-in, QA#5 F2)", async () => {
+  stub("listPublicCamerasPage", async () => ({ records: [cameraFixture], total: 1, nextOffset: null }));
+  const { GET } = await camerasRoute();
+  const response = await GET(apiRequest("/api/cameras?facets=1"));
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await responseBody(response), { records: [cameraFixture], total: 1, nextOffset: null, facets: emptyFacets });
+  assert.equal(callArgs("getPublicCameraFacets").length, 1, "the facets are computed only when the filter UI requests them");
 });
 
 test("GET /api/cameras?format=geojson emits lon/lat FeatureCollection with export headers", async () => {
@@ -167,7 +177,7 @@ test("GET /api/cameras ignores unknown format values and returns JSON", async ()
   const { GET } = await camerasRoute();
   const response = await GET(apiRequest("/api/cameras?format=xml"));
   assert.equal(response.status, 200);
-  assert.deepEqual(await responseBody(response), { records: [cameraFixture], total: 1, nextOffset: null, facets: emptyFacets });
+  assert.deepEqual(await responseBody(response), { records: [cameraFixture], total: 1, nextOffset: null });
 });
 
 test("GET /api/cameras?kind= filters the public list by an exact, parameterised category", async () => {
@@ -176,7 +186,7 @@ test("GET /api/cameras?kind= filters the public list by an exact, parameterised 
   const response = await GET(apiRequest("/api/cameras?kind=Fixed%20dome"));
 
   assert.equal(response.status, 200);
-  assert.deepEqual(await responseBody(response), { records: [cameraFixture], total: 1, nextOffset: null, facets: emptyFacets });
+  assert.deepEqual(await responseBody(response), { records: [cameraFixture], total: 1, nextOffset: null });
   assert.deepEqual(callArgs("listPublicCamerasPage")[0], [{ kind: "Fixed dome" }, { limit: 500, offset: 0 }]);
 });
 
@@ -972,14 +982,14 @@ test("GET /api/cameras/[id] returns 503 when the database is unavailable", async
 // GET /api/cameras — facets and bounding-box GeoJSON
 // ---------------------------------------------------------------------------
 
-test("GET /api/cameras includes kind and freshness facets computed on the public boundary", async () => {
+test("GET /api/cameras?facets=1 includes kind and freshness facets computed on the public boundary", async () => {
   stub("listPublicCamerasPage", async () => ({ records: [cameraFixture], total: 512, nextOffset: 25 }));
   stub("getPublicCameraFacets", async () => ({
     kinds: [{ kind: "Fixed dome", count: 210 }, { kind: "PTZ", count: 44 }],
     freshness: { "7d": 12, "30d": 64, "90d": 130, all: 512 },
   }));
   const { GET } = await camerasRoute();
-  const response = await GET(apiRequest("/api/cameras"));
+  const response = await GET(apiRequest("/api/cameras?facets=1"));
   assert.equal(response.status, 200);
   const body = await responseBody(response);
   assert.deepEqual(body.facets, {
@@ -987,6 +997,16 @@ test("GET /api/cameras includes kind and freshness facets computed on the public
     freshness: { "7d": 12, "30d": 64, "90d": 130, all: 512 },
   });
   assert.equal(body.total, 512);
+});
+
+test("GET /api/cameras without ?facets=1 omits the facets (QA#5 F2: no consumer, no full-set aggregates)", async () => {
+  stub("listPublicCamerasPage", async () => ({ records: [cameraFixture], total: 512, nextOffset: 25 }));
+  const { GET } = await camerasRoute();
+  const response = await GET(apiRequest("/api/cameras"));
+  assert.equal(response.status, 200);
+  const body = await responseBody(response);
+  assert.equal(body.facets, undefined, "facets must not be present in the default JSON list");
+  assert.equal(callArgs("getPublicCameraFacets").length, 0, "the aggregate queries must not run on a default read");
 });
 
 test("GET /api/cameras?format=geojson&bbox= returns only the points inside the box with a 5-minute cache", async () => {

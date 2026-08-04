@@ -153,32 +153,17 @@ export async function GET(request: Request, context: { params: Promise<TileParam
     });
   }
 
-  // Per-caller tile bucket (default 60/min, TILES_RATE_LIMIT_* knobs).
-  // Metering happens before the edge-cache lookup so a caller cannot use
-  // cache hits to dodge the throttle: bulk scraping of fresh coordinates
-  // would otherwise hammer the upstream (OSMF community tile service)
-  // well past its usage policy. Interactive map panning stays far below
-  // the default; the same caller on the same tiles is absorbed by the
-  // edge cache below.
-  const key = callerKey(request, env);
-  const limitOptions = limitsFor("tiles", env);
-  const limit = await checkRateLimit(env, "tiles", key, limitOptions);
-  if (!limit.allowed) {
-    console.warn("GET /api/tiles/[z]/[x]/[y] rate limited");
-    recordRateLimitBlock(env, {
-      route: "/api/tiles/[z]/[x]/[y]",
-      key,
-      windowSeconds: limitOptions.windowSeconds,
-    });
-    return new Response("Too many tile requests. Please try again shortly.", {
-      status: 429,
-      headers: {
-        "Retry-After": String(limit.retryAfterSeconds),
-        "Cache-Control": "no-store",
-      },
-    });
-  }
-
+  // Tile request budget (QA#5 F4, t_ab0d4c75): the per-caller bucket guards
+  // the UPSTREAM (OSMF community tile service), so metering happens AFTER
+  // the edge-cache lookup and counts only cache MISSES — a miss is exactly
+  // the request that will fetch upstream. Cache hits are served from the
+  // edge and consume no upstream capacity, so they do not consume the
+  // bucket: an interactive pan/zoom burst re-fetching tiles already in the
+  // cache can never 429 the map into a patchwork. The dedicated threshold
+  // is 240/min (wrangler.jsonc TILES_LIMITER + ROUTE_LIMIT_DEFAULTS.tiles):
+  // a full viewport is ~24 tiles at z13-19, so ~10 zoom steps/min stay
+  // comfortably inside, while a scraper probing fresh coordinates still
+  // hits the ceiling on real upstream traffic.
   const cache = tileCache();
   // The Cache API matches on URL + method, and the incoming Request object is
   // sometimes a wrapped runtime object that workerd's cache cannot serialise
@@ -196,6 +181,25 @@ export async function GET(request: Request, context: { params: Promise<TileParam
     } catch (error) {
       console.error("tile cache lookup failed", error);
     }
+  }
+
+  const key = callerKey(request, env);
+  const limitOptions = limitsFor("tiles", env);
+  const limit = await checkRateLimit(env, "tiles", key, limitOptions);
+  if (!limit.allowed) {
+    console.warn("GET /api/tiles/[z]/[x]/[y] rate limited");
+    recordRateLimitBlock(env, {
+      route: "/api/tiles/[z]/[x]/[y]",
+      key,
+      windowSeconds: limitOptions.windowSeconds,
+    });
+    return new Response("Too many tile requests. Please try again shortly.", {
+      status: 429,
+      headers: {
+        "Retry-After": String(limit.retryAfterSeconds),
+        "Cache-Control": "no-store",
+      },
+    });
   }
 
   let upstream: Response;

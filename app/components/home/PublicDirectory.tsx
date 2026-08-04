@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useLocale, useMessages } from "../LocaleProvider";
+import { useLocale } from "../LocaleProvider";
+import { useMessages } from "../../lib/use-messages";
 import { publicStatusLabel } from "../../lib/public-status";
 import { formatDistance } from "../../lib/search";
 import { formatPublicDate } from "../../lib/format-date";

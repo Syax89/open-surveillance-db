@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useMessages } from "../components/LocaleProvider";
+import { useMessages } from "../lib/use-messages";
 import { PublicNav } from "../components/PublicNav";
 import { browserSupportsWebAuthn, getCredential } from "../lib/webauthn-client";
 

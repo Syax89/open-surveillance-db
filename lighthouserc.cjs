@@ -8,6 +8,11 @@
  * A PR whose preview fails this gate is rejected by the lighthouse job in
  * .github/workflows/lighthouse.yml.
  *
+ * F8 (qa#5, t_ab0d4c75): the same run now also WARNS on performance/SEO
+ * (categories:performance >= 0.6, categories:seo >= 0.9, LCP <= 4.0 s,
+ * CLS <= 0.1) — non-blocking until the perf baseline stabilizes (see the
+ * assert block for the rationale).
+ *
  * Coverage model (reliability fix t_2f6e49a0, 2026-08-02): the list below is
  * ONE representative route per DISTINCT layout template, not every URL —
  * Lighthouse audits the layout-dependent rules, and the app has 5 shared
@@ -79,6 +84,21 @@ module.exports = {
       assertions: {
         // BLOCKING GATE: accessibility category score >= 0.95.
         "categories:accessibility": ["error", { minScore: 0.95 }],
+        // F8 qa#5 (t_ab0d4c75): performance/SEO were collected but never
+        // asserted — a +100 KB bundle regression or a doubled LCP passed
+        // the gate silently. These thresholds are WARN (non-blocking) on
+        // purpose: the current mobile-4x baseline is perf 65-77 / LCP
+        // 4.1-7.1 s (docs/qa/qa-infra-ken.md F5), so error thresholds
+        // would turn the whole job red before the perf work lands. Once
+        // the baseline stabilizes, promote to ["error", ...] in the same
+        // keys. numberOfRuns stays 1 (t_2f6e49a0): 3 runs would triple the
+        // ~8-10 min runtime against the 15-min step timeout and re-saturate
+        // the runner pool; the median smoothing can be adopted together
+        // with the timeout bump when the error thresholds are enabled.
+        "categories:performance": ["warn", { minScore: 0.6 }],
+        "categories:seo": ["warn", { minScore: 0.9 }],
+        "largest-contentful-paint": ["warn", { maxNumericValue: 4000 }],
+        "cumulative-layout-shift": ["warn", { maxNumericValue: 0.1 }],
       },
     },
     upload: {
