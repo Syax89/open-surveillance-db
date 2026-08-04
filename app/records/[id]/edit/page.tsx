@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { LocaleToggle, useMessages } from "../../../components/LocaleProvider";
+import { LocaleToggle } from "../../../components/LocaleProvider";
+import { useMessages } from "../../../lib/use-messages";
 import { SiteHeader } from "../../../components/SiteHeader";
 
 /**

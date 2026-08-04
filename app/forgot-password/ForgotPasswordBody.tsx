@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
-import { useMessages } from "../components/LocaleProvider";
+import { useMessages } from "../lib/use-messages";
 import { PublicNav } from "../components/PublicNav";
 
 /**

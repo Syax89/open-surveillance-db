@@ -4,7 +4,8 @@
 // monolith (kanban t_c7460073): owns fetch, decision state, formatters.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useLocale, useMessages } from "../LocaleProvider";
+import { useLocale } from "../LocaleProvider";
+import { useMessages } from "../../lib/use-messages";
 import { LOCALE_BCP47 } from "../../lib/i18n";
 import type { CameraInQueue, CorrectionInQueue, DecisionFormApi, EditRequestInQueue, ModerationAction, ModerationEvent, PhotoInQueue, QueueEntity, QueueItem, QueuePayload, ReasonCode, Reviewer } from "./types";
 

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { useMessages } from "./LocaleProvider";
+import { useMessages } from "../lib/use-messages";
 
 /**
  * WriteGateWall (P1-2 Vera design) — the login wall for the public write

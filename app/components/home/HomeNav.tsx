@@ -1,7 +1,7 @@
 "use client";
 
 import { PublicNav } from "../PublicNav";
-import { useMessages } from "../LocaleProvider";
+import { useMessages } from "../../lib/use-messages";
 
 /**
  * HomeNav — navigation shell of the home hub (F2, t_52dcb95e).

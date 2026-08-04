@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMessages } from "../components/LocaleProvider";
+import { useMessages } from "../lib/use-messages";
 import { PublicNav } from "../components/PublicNav";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { RecoveryCodesDialog } from "../components/RecoveryCodesDialog";

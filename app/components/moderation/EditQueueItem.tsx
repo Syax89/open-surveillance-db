@@ -7,7 +7,7 @@
 // payload). The card is a11y-consistent with the other queue cards: labelled
 // rows, dt/dd pairs, and the DecisionForm's aria-labelled action group.
 
-import { useMessages } from "../LocaleProvider";
+import { useMessages } from "../../lib/use-messages";
 import { DecisionForm } from "./DecisionForm";
 import type { DecisionFormApi, EditRequestInQueue } from "./types";
 

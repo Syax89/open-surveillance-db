@@ -2,7 +2,17 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useMessages } from "./LocaleProvider";
+import { useLocale } from "./LocaleProvider";
+// Root-layout graph: import ONLY the footer domain (F5 qa#5, t_ab0d4c75)
+// so the ~150 KB two-locale dictionary never lands in the initial JS
+// chunk — the footer is rendered on every page, so it must stay cheap.
+import { en as footerEn, it as footerIt } from "../lib/i18n/footer";
+import type { Locale, Translation } from "../lib/i18n";
+
+const footerByLocale: Record<Locale, Translation<typeof footerEn>> = {
+  en: footerEn,
+  it: footerIt,
+};
 
 /**
  * Global site footer (landmark: contentinfo).
@@ -32,7 +42,8 @@ import { useMessages } from "./LocaleProvider";
  * suite asserts that no public page exposes a moderation/admin endpoint.
  */
 export function SiteFooter() {
-  const t = useMessages().footer;
+  const { locale } = useLocale();
+  const t = footerByLocale[locale];
   // Mark the current page in the institutional navigation (finding
   // QA-2026-08-01-3, closed in F-QA t_7b716c97): WCAG 2.4.2 / ARIA require
   // the active page to be exposed to assistive technology. The brand link

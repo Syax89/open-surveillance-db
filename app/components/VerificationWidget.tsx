@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { StarConfirmButton } from "./StarConfirmButton";
-import { useMessages } from "./LocaleProvider";
+import { useMessages } from "../lib/use-messages";
 import type { TrustLevelMeta } from "../lib/trust-levels";
 
 /**

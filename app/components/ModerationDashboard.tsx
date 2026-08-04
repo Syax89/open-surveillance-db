@@ -7,7 +7,8 @@
 // ./moderation. This file only composes them.
 
 import Link from "next/link";
-import { LocaleToggle, useMessages } from "./LocaleProvider";
+import { LocaleToggle } from "./LocaleProvider";
+import { useMessages } from "../lib/use-messages";
 import { SiteHeader } from "./SiteHeader";
 import { CameraQueueItem } from "./moderation/CameraQueueItem";
 import { CorrectionHistorySection } from "./moderation/CorrectionHistorySection";

@@ -4,7 +4,7 @@
 // the approve/reject decision. Extracted from the ModerationDashboard
 // monolith (kanban t_c7460073).
 
-import { useMessages } from "../LocaleProvider";
+import { useMessages } from "../../lib/use-messages";
 import { DecisionForm } from "./DecisionForm";
 import type { DecisionFormApi, PhotoInQueue } from "./types";
 

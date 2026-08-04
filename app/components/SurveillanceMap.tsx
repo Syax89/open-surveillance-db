@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { isPublicStatus } from "../lib/public-status";
 import { BOUNDS_DEBOUNCE_MS, escapeHtml, recordsInBounds, type ViewportBounds } from "../lib/map-viewport";
-import { useMessages } from "./LocaleProvider";
+import { useMessages } from "../lib/use-messages";
 
 export type MapCamera = {
   id: number;

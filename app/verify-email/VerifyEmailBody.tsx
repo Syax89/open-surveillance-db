@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useMessages } from "../components/LocaleProvider";
+import { useMessages } from "../lib/use-messages";
 import { PublicNav } from "../components/PublicNav";
 
 /**

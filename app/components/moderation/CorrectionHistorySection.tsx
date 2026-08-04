@@ -11,7 +11,7 @@
 // listPublicCameraRevisions projection (AC-5).
 
 import { useState } from "react";
-import { useMessages } from "../LocaleProvider";
+import { useMessages } from "../../lib/use-messages";
 import type { ModerationEvent } from "./types";
 
 type HistoryRequest = {
