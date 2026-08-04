@@ -28,7 +28,6 @@ const MAX_DELAY_MS = 3_000;
 
 export async function fetchSessionMe(signal?: AbortSignal): Promise<Response> {
   let attempts = 0;
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     const response = await fetch("/api/auth/me", { signal });
     if (response.status !== 429 || attempts >= MAX_RETRIES) return response;
