@@ -1,4 +1,5 @@
 import { env } from "cloudflare:workers";
+import type { D1PreparedStatement } from "cloudflare:workers";
 import { getD1 } from "./cameras";
 import { ACTION_WEIGHT_BY_LEVEL, verifiedContributionCount } from "./confirmations";
 import { deriveLevel } from "../app/lib/trust-levels";
@@ -25,8 +26,6 @@ import { getCommunitySettingsCached } from "./community-settings";
  * with a 60 s in-process cache (getCommunitySettingsCached). The daily
  * window for all limits is 24 h.
  */
-
-type EnvLike = { [key: string]: unknown };
 
 type D1BatchResult = {
   success: boolean;

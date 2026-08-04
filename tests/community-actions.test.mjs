@@ -350,7 +350,7 @@ test("GET returns {action:null} for anonymous callers with no-store", async () =
 
 test("GET returns the caller's action with no-store", async () => {
   stub("findSessionByToken", async () => ({ ...sessionFixture, contributor }));
-  stub("getCommunityAction", async (cameraId, contribId) => ({ actionType: "like" }));
+  stub("getCommunityAction", async () => ({ actionType: "like" }));
   const { GET } = await actionsRoute();
   const response = await GET(sessionRequest("/api/cameras/5/actions"));
   assert.equal(response.status, 200);
