@@ -762,6 +762,11 @@ test("PATCH in development lets an admin act as any reviewer (demo actor selecto
   stub("moderateCamera", async () => okResult());
   const envModule = await loadTreeModule("cloudflare-workers.mjs");
   envModule.env.ENVIRONMENT = "development";
+  // QA#3 F5: the demo selector needs BOTH keys — the explicit
+  // MODERATION_DEMO_ACTOR_SELECTOR AND ENVIRONMENT=development. The old
+  // gate trusted ENVIRONMENT alone, so a production deploy with the env var
+  // accidentally left at development let an admin forge the audit trail.
+  envModule.env.MODERATION_DEMO_ACTOR_SELECTOR = "true";
   try {
     const { PATCH } = await route();
     const response = await PATCH(
@@ -775,6 +780,34 @@ test("PATCH in development lets an admin act as any reviewer (demo actor selecto
     assert.deepEqual(callArgs("moderateCamera")[0][5], { actorId: 42 });
   } finally {
     delete envModule.env.ENVIRONMENT;
+    delete envModule.env.MODERATION_DEMO_ACTOR_SELECTOR;
+  }
+});
+
+test("PATCH with ENVIRONMENT=development but WITHOUT the demo selector key ignores actorId (two-key gate)", async () => {
+  // QA#3 F5 fail-closed: a dev-lookalike environment (ENVIRONMENT left at
+  // development) must NOT be enough by itself — the explicit selector key
+  // is required too, so a misconfigured production deploy cannot let an
+  // admin impersonate another reviewer on the append-only audit trail.
+  stubIdentity(adminUser);
+  stub("getReviewerByUserId", async () => adminReviewer);
+  stub("moderateCamera", async () => okResult());
+  const envModule = await loadTreeModule("cloudflare-workers.mjs");
+  envModule.env.ENVIRONMENT = "development";
+  try {
+    const { PATCH } = await route();
+    const response = await PATCH(
+      authAs(adminUser)("/api/moderation", {
+        method: "PATCH",
+        body: { entity: "camera", id: 5, action: "approve", reasonCode: validReasonCode, actorId: 42 },
+      }),
+    );
+    assert.equal(response.status, 200);
+    // The spoofed 42 must never reach the db layer: the admin acts as their
+    // OWN reviewer (id 1), exactly like production.
+    assert.deepEqual(callArgs("moderateCamera")[0][5], { actorId: 1 });
+  } finally {
+    delete envModule.env.ENVIRONMENT;
   }
 });
 
@@ -782,6 +815,7 @@ test("PATCH in development still forces a moderator to their own reviewer", asyn
   stub("moderateCamera", async () => okResult());
   const envModule = await loadTreeModule("cloudflare-workers.mjs");
   envModule.env.ENVIRONMENT = "development";
+  envModule.env.MODERATION_DEMO_ACTOR_SELECTOR = "true";
   try {
     const { PATCH } = await route();
     const response = await PATCH(
@@ -796,6 +830,7 @@ test("PATCH in development still forces a moderator to their own reviewer", asyn
     assert.deepEqual(callArgs("moderateCamera")[0][5], { actorId: 2 });
   } finally {
     delete envModule.env.ENVIRONMENT;
+    delete envModule.env.MODERATION_DEMO_ACTOR_SELECTOR;
   }
 });
 

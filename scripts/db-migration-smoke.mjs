@@ -82,6 +82,9 @@ const expectedTables = [
   // the raw address. Counted in a rolling 24h window; rows older than the
   // window are inert (see the migration header comment).
   "registrations_ip_log",
+  // R5 archival store (0034, QA#3 F6): anonymized moderation decisions
+  // older than the 2-year window, moved by the daily sweep.
+  "moderation_events_archive",
 ];
 // Indexes declared by the migrations.
 const expectedIndexes = [
@@ -161,6 +164,8 @@ const expectedIndexes = [
   // partial UNIQUE index on (decision_event_id) WHERE status='pending'
   // makes fileAppeal's duplicate check atomic at the SQL level.
   "moderation_appeals_pending_decision_unique",
+  // R5 archival store (0034, QA#3 F6): sweep anchors on created_at.
+  "moderation_events_archive_created_at_idx",
 ];
 // Tables that are not application schema but legitimately appear in a local
 // D1 database. Anything outside this set is an unexpected schema change.

@@ -68,6 +68,23 @@ interface Env {
    */
   MODERATION_IDENTITY_EMAIL?: string;
   /**
+   * Per-operator moderation credentials (QA#3 F5, t_63e0d13c): a JSON array
+   * of `{ user, password, email }` objects. When set, Basic auth validates
+   * ONLY against this list and each operator's actions are attributed to
+   * their own `email` (the shared MODERATION_USER/PASSWORD pair is ignored
+   * in this configuration). Malformed JSON fails closed (503). Secrets live
+   * in worker secrets / .dev.vars, never in wrangler.jsonc.
+   */
+  MODERATION_OPERATORS?: string;
+  /**
+   * Demo actor selector key (QA#3 F5): the moderation route honours a
+   * client-supplied `actorId` ONLY when BOTH this is "true" AND
+   * `ENVIRONMENT === "development"` — two keys so a production deploy with
+   * ENVIRONMENT accidentally left at development still cannot let an admin
+   * forge the audit trail. Unset/absent = the selector is OFF everywhere.
+   */
+  MODERATION_DEMO_ACTOR_SELECTOR?: string;
+  /**
    * Pass through the ChatGPT-platform identity headers (`oai-*`) instead of
    * stripping them. Only set in a real ChatGPT-plugin deployment, where the
    * platform gateway (not arbitrary clients) sits in front of this worker.
@@ -153,34 +170,166 @@ function safeEqual(expected: string, actual: string) {
 }
 
 function moderationCredentialsConfigured(env: Env) {
-  return Boolean((env.MODERATION_USER && env.MODERATION_PASSWORD) || env.MODERATION_TOKEN);
+  return Boolean(
+    (env.MODERATION_USER && env.MODERATION_PASSWORD) ||
+      env.MODERATION_TOKEN ||
+      (env.MODERATION_OPERATORS !== undefined && env.MODERATION_OPERATORS !== ""),
+  );
 }
 
-function requireModerationAuth(request: Request, env: Env): Response | null {
+/**
+ * A per-operator credential entry (QA#3 F5, t_63e0d13c): one username /
+ * password pair mapped SERVER-SIDE to its own identity email. Each operator
+ * gets a distinct `x-osdb-user-email` after the gate, so every moderation
+ * action is attributable to the operator who performed it (the route layer
+ * derives the reviewer from the email) instead of every operator sharing one
+ * `MODERATION_IDENTITY_EMAIL`.
+ */
+type ModerationOperator = { user: string; password: string; email: string };
+
+/**
+ * Parse `MODERATION_OPERATORS` (a JSON array of
+ * `{ user, password, email }` objects). Returns null when the variable is
+ * absent; FAILS CLOSED (null) on malformed JSON or an entry missing any
+ * field — a broken operator list must never silently fall back to a shared
+ * identity, which would defeat per-operator attribution.
+ */
+function parseModerationOperators(env: Env): ModerationOperator[] | null {
+  const raw = env.MODERATION_OPERATORS;
+  if (raw === undefined || raw === "") return null;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return null;
+    const operators: ModerationOperator[] = [];
+    for (const entry of parsed) {
+      if (typeof entry !== "object" || entry === null) return null;
+      const candidate = entry as Record<string, unknown>;
+      const user = candidate.user;
+      const password = candidate.password;
+      const email = candidate.email;
+      if (
+        typeof user !== "string" ||
+        user.length === 0 ||
+        typeof password !== "string" ||
+        password.length === 0 ||
+        typeof email !== "string" ||
+        email.length === 0
+      ) {
+        return null;
+      }
+      operators.push({ user, password, email });
+    }
+    return operators;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Match an `Authorization` header against the per-operator list. Only the
+ * operator's own pair admits; the comparison is constant-time per field so a
+ * timing side channel cannot help guess a colleague's password.
+ */
+function matchBasicOperator(
+  authorization: string,
+  operators: ModerationOperator[],
+): ModerationOperator | null {
+  if (!authorization.startsWith("Basic ")) return null;
+  let decoded: string;
+  try {
+    decoded = atob(authorization.slice("Basic ".length));
+  } catch {
+    return null;
+  }
+  const separator = decoded.indexOf(":");
+  if (separator < 0) return null;
+  const user = decoded.slice(0, separator);
+  const password = decoded.slice(separator + 1);
+  for (const operator of operators) {
+    if (safeEqual(operator.user, user) && safeEqual(operator.password, password)) {
+      return operator;
+    }
+  }
+  return null;
+}
+
+/**
+ * The moderation gate (ADR 0002 / ADR 0014, QA#3 F5). Returns the denial
+ * response when the request must not pass, plus the SERVER-CHOSEN identity
+ * email the worker injects as `x-osdb-user-email` after a successful gate.
+ *
+ * Identity resolution order:
+ *   1. Bearer token (`MODERATION_TOKEN`) → `MODERATION_IDENTITY_EMAIL`
+ *      (a machine/ops identity, unchanged);
+ *   2. Basic auth against `MODERATION_OPERATORS` (per-operator list) → the
+ *      matched operator's OWN email — each operator is now distinguishable
+ *      in the append-only audit trail;
+ *   3. legacy single Basic pair (`MODERATION_USER`/`MODERATION_PASSWORD`)
+ *      → `MODERATION_IDENTITY_EMAIL` (prototype / single-operator deploys).
+ *
+ * When `MODERATION_OPERATORS` is configured it is the ONLY Basic source of
+ * truth: mixing in the legacy pair would reintroduce a shared identity that
+ * all operators could impersonate, so the legacy pair is ignored in that
+ * configuration. Fail-closed everywhere: no credentials → 503, wrong
+ * credential → 401, malformed operator list → 503.
+ */
+function requireModerationAuth(request: Request, env: Env): { denied: Response | null; identityEmail: string | null } {
+  const operators = parseModerationOperators(env);
+  if (env.MODERATION_OPERATORS !== undefined && env.MODERATION_OPERATORS !== "" && operators === null) {
+    console.error("Moderation access control: MODERATION_OPERATORS is not a valid operator list; denying", request.url);
+    return {
+      denied: Response.json(
+        { error: "Moderation is unavailable." },
+        { status: 503, headers: { "Cache-Control": "no-store" } },
+      ),
+      identityEmail: null,
+    };
+  }
   if (!moderationCredentialsConfigured(env)) {
     console.error("Moderation access control is not configured; denying", request.url);
-    return Response.json({ error: "Moderation is unavailable." }, {
-      status: 503,
-      headers: { "Cache-Control": "no-store" },
-    });
+    return {
+      denied: Response.json(
+        { error: "Moderation is unavailable." },
+        { status: 503, headers: { "Cache-Control": "no-store" } },
+      ),
+      identityEmail: null,
+    };
   }
 
   const authorization = request.headers.get("Authorization") ?? "";
   if (env.MODERATION_TOKEN && safeEqual(`Bearer ${env.MODERATION_TOKEN}`, authorization)) {
-    return null;
+    return { denied: null, identityEmail: env.MODERATION_IDENTITY_EMAIL ?? null };
+  }
+  if (operators !== null && operators.length > 0) {
+    const operator = matchBasicOperator(authorization, operators);
+    if (operator) return { denied: null, identityEmail: operator.email };
+    return {
+      denied: new Response("Unauthorized", {
+        status: 401,
+        headers: {
+          "WWW-Authenticate": 'Basic realm="moderation", charset="UTF-8"',
+          "Cache-Control": "no-store",
+        },
+      }),
+      identityEmail: null,
+    };
   }
   if (env.MODERATION_USER && env.MODERATION_PASSWORD) {
     const expected = `Basic ${btoa(`${env.MODERATION_USER}:${env.MODERATION_PASSWORD}`)}`;
-    if (safeEqual(expected, authorization)) return null;
+    if (safeEqual(expected, authorization)) {
+      return { denied: null, identityEmail: env.MODERATION_IDENTITY_EMAIL ?? null };
+    }
   }
-
-  return new Response("Unauthorized", {
-    status: 401,
-    headers: {
-      "WWW-Authenticate": 'Basic realm="moderation", charset="UTF-8"',
-      "Cache-Control": "no-store",
-    },
-  });
+  return {
+    denied: new Response("Unauthorized", {
+      status: 401,
+      headers: {
+        "WWW-Authenticate": 'Basic realm="moderation", charset="UTF-8"',
+        "Cache-Control": "no-store",
+      },
+    }),
+    identityEmail: null,
+  };
 }
 
 /**
@@ -271,16 +420,16 @@ function stripIdentityHeaders(request: Request, env: Env): Request {
 }
 
 /**
- * After the moderation gate succeeds, set the server-chosen identity
- * (`MODERATION_IDENTITY_EMAIL`) as `x-osdb-user-email`. Fail-closed: without
- * a configured identity the request passes through anonymous and the route
- * layer rejects it (401), so a misconfigured host can never accidentally
- * grant a role.
+ * After the moderation gate succeeds, set the server-chosen identity (the
+ * per-operator email resolved by the gate, or `MODERATION_IDENTITY_EMAIL`)
+ * as `x-osdb-user-email` (QA#3 F5). Fail-closed: without a resolved identity
+ * the request passes through anonymous and the route layer rejects it (401),
+ * so a misconfigured host can never accidentally grant a role.
  */
-function injectIdentityAfterGate(request: Request, env: Env): Request {
-  if (!env.MODERATION_IDENTITY_EMAIL) return request;
+function injectIdentityAfterGate(request: Request, identityEmail: string | null): Request {
+  if (!identityEmail) return request;
   const headers = new Headers(request.headers);
-  headers.set(PROTOTYPE_IDENTITY_HEADER, env.MODERATION_IDENTITY_EMAIL);
+  headers.set(PROTOTYPE_IDENTITY_HEADER, identityEmail);
   return new Request(request, { headers });
 }
 
@@ -294,8 +443,8 @@ const worker = {
 
     if (gatedPath(request.method, url.pathname)) {
       const gate = requireModerationAuth(gated, env);
-      if (gate) return withSecurityHeaders(gate);
-      gated = injectIdentityAfterGate(gated, env);
+      if (gate.denied) return withSecurityHeaders(gate.denied);
+      gated = injectIdentityAfterGate(gated, gate.identityEmail);
     }
 
     if (url.pathname === "/_vinext/image") {

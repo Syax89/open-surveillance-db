@@ -290,6 +290,120 @@ test("gate admits a correct Bearer token and rejects a wrong one", async () => {
   assert.equal(app.__calls.length, 1);
 });
 
+// ---------------------------------------------------------------------------
+// QA#3 F5 — per-operator moderation credentials (MODERATION_OPERATORS)
+// ---------------------------------------------------------------------------
+
+test("gate with MODERATION_OPERATORS admits each operator only with their own pair", async () => {
+  const { worker, app } = await loadWorker();
+  const env = testEnv({
+    MODERATION_OPERATORS: JSON.stringify([
+      { user: "alice", password: "alice-pass", email: "alice@mod.osdb" },
+      { user: "bob", password: "bob-pass", email: "bob@mod.osdb" },
+    ]),
+  });
+  // Alice's own pair admits and injects HER identity.
+  const alice = await worker.fetch(
+    request("/api/moderation", { headers: { authorization: basic("alice", "alice-pass") } }),
+    env,
+    ctx(),
+  );
+  assert.equal(alice.status, 200);
+  // Bob's pair admits and injects HIS identity.
+  const bob = await worker.fetch(
+    request("/api/moderation", { headers: { authorization: basic("bob", "bob-pass") } }),
+    env,
+    ctx(),
+  );
+  assert.equal(bob.status, 200);
+  // Cross-operator credentials are rejected: alice cannot act as bob.
+  const cross = await worker.fetch(
+    request("/api/moderation", { headers: { authorization: basic("alice", "bob-pass") } }),
+    env,
+    ctx(),
+  );
+  assert.equal(cross.status, 401);
+  // An operator not in the list is rejected.
+  const stranger = await worker.fetch(
+    request("/api/moderation", { headers: { authorization: basic("mallory", "alice-pass") } }),
+    env,
+    ctx(),
+  );
+  assert.equal(stranger.status, 401);
+  assert.equal(app.__calls.length, 2, "only the two admitted operators reach the handler");
+});
+
+test("gate with MODERATION_OPERATORS injects each operator's own identity email", async () => {
+  const { worker, app } = await loadWorker();
+  const env = testEnv({
+    MODERATION_OPERATORS: JSON.stringify([
+      { user: "alice", password: "alice-pass", email: "alice@mod.osdb" },
+      { user: "bob", password: "bob-pass", email: "bob@mod.osdb" },
+    ]),
+  });
+  await worker.fetch(
+    request("/api/moderation", { headers: { authorization: basic("alice", "alice-pass") } }),
+    env,
+    ctx(),
+  );
+  await worker.fetch(
+    request("/api/moderation", { headers: { authorization: basic("bob", "bob-pass") } }),
+    env,
+    ctx(),
+  );
+  const identities = app.__calls.map((call) => call.headers["x-osdb-user-email"]);
+  assert.deepEqual(
+    identities,
+    ["alice@mod.osdb", "bob@mod.osdb"],
+    "each operator's actions are attributed to their OWN email, not a shared identity",
+  );
+});
+
+test("gate with MODERATION_OPERATORS ignores the legacy shared pair (no shared identity to impersonate)", async () => {
+  const { worker, app } = await loadWorker();
+  const env = testEnv({
+    MODERATION_USER: "shared",
+    MODERATION_PASSWORD: "shared-pass",
+    MODERATION_OPERATORS: JSON.stringify([{ user: "alice", password: "alice-pass", email: "alice@mod.osdb" }]),
+  });
+  // The legacy pair must NOT admit when the per-operator list is configured.
+  const legacy = await worker.fetch(
+    request("/api/moderation", { headers: { authorization: basic("shared", "shared-pass") } }),
+    env,
+    ctx(),
+  );
+  assert.equal(legacy.status, 401, "the legacy shared pair is ignored when operators are configured");
+  // The operator's own pair still admits.
+  const alice = await worker.fetch(
+    request("/api/moderation", { headers: { authorization: basic("alice", "alice-pass") } }),
+    env,
+    ctx(),
+  );
+  assert.equal(alice.status, 200);
+  assert.equal(app.__calls.length, 1);
+});
+
+test("gate with malformed MODERATION_OPERATORS fails closed (503), never falls back to a shared identity", async () => {
+  const { worker, app } = await loadWorker();
+  for (const malformed of [
+    "not-json",
+    "{}",
+    '[{"user":"alice"}]',
+    '[{"user":"alice","password":"pw"}]',
+    '[{"password":"pw","email":"a@b.c"}]',
+    "null",
+  ]) {
+    const env = testEnv({
+      MODERATION_USER: "shared",
+      MODERATION_PASSWORD: "shared-pass",
+      MODERATION_OPERATORS: malformed,
+    });
+    const response = await worker.fetch(request("/api/moderation"), env, ctx());
+    assert.equal(response.status, 503, `malformed operator list ${JSON.stringify(malformed)} must fail closed`);
+    assert.equal(app.__calls.length, 0, "the handler must never run on a broken operator list");
+  }
+});
+
 test("token-only config admits Bearer without any user/password pair", async () => {
   const { worker, app } = await loadWorker();
   const env = testEnv({ MODERATION_TOKEN: "tok-only" });

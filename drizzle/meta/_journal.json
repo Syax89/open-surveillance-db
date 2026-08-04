@@ -239,6 +239,13 @@
    "when": 1785795122053,
    "tag": "0033_moderation_appeals_pending_decision_unique",
    "breakpoints": true
+  },
+  {
+   "idx": 34,
+   "version": "6",
+   "when": 1785816564571,
+   "tag": "0034_moderation_events_archive",
+   "breakpoints": true
   }
  ]
 }

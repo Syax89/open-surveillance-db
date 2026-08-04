@@ -52,8 +52,17 @@ export const {
   eraseContributor,
   hashPassword,
   verifyPassword,
+  // QA#3 F1 (t_63e0d13c): constant-cost dummy derivation — the login route
+  // pays a full PBKDF2 on unknown-email and locked-account paths so the
+  // response TIME cannot enumerate emails. Pure/crypto helper: stubbed per
+  // test like verifyPassword.
+  verifyPasswordDummy,
   randomBase64Url,
   sha256Hex,
+  // QA#3 F4 (t_63e0d13c): keyed-HMAC (or truncated SHA-256) caller-key
+  // derivation for the per-IP registration log — never a raw IP, never an
+  // invertible hash. Pure/crypto helper: stubbed per test.
+  registrationIpHash,
   // Per-IP registration cap (P3-4, t_0941036b): db-touching, stubbed per
   // test like the rest of db/auth.
   recordRegistrationAttempt,
@@ -90,8 +99,10 @@ export const {
   eraseContributor: "eraseContributor",
   hashPassword: "hashPassword",
   verifyPassword: "verifyPassword",
+  verifyPasswordDummy: "verifyPasswordDummy",
   randomBase64Url: "randomBase64Url",
   sha256Hex: "sha256Hex",
+  registrationIpHash: "registrationIpHash",
   recordRegistrationAttempt: "recordRegistrationAttempt",
   deleteRegistrationAttempt: "deleteRegistrationAttempt",
   loginLockoutKey: "loginLockoutKey",

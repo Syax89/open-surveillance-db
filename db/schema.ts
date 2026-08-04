@@ -528,7 +528,9 @@ export const moderationAppeals = sqliteTable(
  * escalation flags, and the second reviewer involved in a two-person review.
  * `appeal_id` links an appeal's audit events back to the appeal row.
  * UPDATE/DELETE are blocked at the database layer (triggers in migration
- * 0008); the API exposes no way to mutate history.
+ * 0008, re-created by migration 0034 to admit ONLY the R5 archival
+ * transition: setting `archived_at` on a live row, then deleting the
+ * archived row); the API exposes no way to mutate history.
  */
 export const moderationEvents = sqliteTable(
   "moderation_events",
@@ -552,6 +554,11 @@ export const moderationEvents = sqliteTable(
     // reference between moderation_appeals and moderation_events.
     appealId: integer("appeal_id"),
     createdAt: text("created_at").notNull(),
+    // R5 archival marker (QA#3 F6): set by the retention sweep on the live
+    // row BEFORE it is deleted; the re-created 0034 triggers permit UPDATE
+    // only for this NULL → timestamp transition and DELETE only of rows with
+    // it set. An archived row is immutable and purgeable, nothing else is.
+    archivedAt: text("archived_at"),
   },
   (table) => [
     index("moderation_events_created_at_idx").on(table.createdAt, table.id),
@@ -568,6 +575,45 @@ export const moderationEvents = sqliteTable(
     // Declared here so drizzle-kit generate never re-emits it (convention
     // 0012/0014: hand-written migration + schema declaration together).
     index("moderation_events_entity_action_idx").on(table.entity, table.action, table.entityId),
+  ],
+);
+
+/**
+ * R5 archival store (QA#3 F6): moderation decisions older than the 2-year
+ * retention window are moved here by the daily sweep, ANONYMIZED — `note`
+ * (free-text, may hold personal data of reporter/subject) and `actor` /
+ * `reviewer_id` / `second_reviewer_id` (who decided) are deliberately NOT
+ * copied. The archive keeps the decision structure (entity, action, status
+ * transition, reason code, role, timestamps, appeal link) so the trail of
+ * WHAT was decided survives the retention window without the WHO or the
+ * free-text notes. No foreign keys: the archive outlives the reviewer /
+ * appeal rows it references. Append-only by convention; there is no code
+ * path that deletes from it.
+ */
+export const moderationEventsArchive = sqliteTable(
+  "moderation_events_archive",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    entity: text("entity").notNull(),
+    entityId: integer("entity_id").notNull(),
+    previousStatus: text("previous_status").notNull(),
+    newStatus: text("new_status").notNull(),
+    action: text("action").notNull(),
+    reasonCode: text("reason_code").notNull(),
+    note: text("note"),
+    actor: text("actor"),
+    reviewerId: integer("reviewer_id"),
+    actorRole: text("actor_role"),
+    recused: integer("recused").notNull().default(0),
+    escalated: integer("escalated").notNull().default(0),
+    secondReviewerId: integer("second_reviewer_id"),
+    appealId: integer("appeal_id"),
+    createdAt: text("created_at").notNull(),
+    archivedAt: text("archived_at").notNull(),
+  },
+  (table) => [
+    // The sweep anchors on created_at to pick the rows to archive.
+    index("moderation_events_archive_created_at_idx").on(table.createdAt, table.id),
   ],
 );
 

@@ -18,7 +18,7 @@ The current implementation is already a solid, conventional email+password stack
 |---|---|
 | Password storage | Salted PBKDF2-HMAC-SHA256, 210,000 iterations (OWASP 2023), format `pbkdf2$<iter>$<saltB64>$<hashB64>` (iteration count is embedded, so it can be raised without a migration) |
 | Sessions | Opaque 32-byte random token, stored in D1 **only as SHA-256** (a DB leak cannot replay live sessions); 30-day TTL (`AUTH_SESSION_TTL_DAYS`); revoked on logout |
-| Cookies | `HttpOnly; SameSite=Strict; Path=/`; `Secure` behind `AUTH_COOKIE_SECURE=true` (HTTPS precondition) |
+| Cookies | `HttpOnly; SameSite=Strict; Path=/`; `Secure` di default (fail-closed, QA#3 F2) salvo `ENVIRONMENT=development` / `AUTH_COOKIE_SECURE=false` (prototipo LAN su HTTP) |
 | CSRF | Double-submit: per-session token in a non-HttpOnly cookie echoed via `X-CSRF-Token` (constant-time compare) + same-origin check |
 | Abuse protection | Login lockout (ADR 0016: 5 fails / 15 min → exponential backoff up to 2 h) + auth rate limit (default 10 req/min) |
 | GDPR | Data-minimising accounts, self-service erasure with de-attribution (art. 17), no third-party identity providers |
@@ -118,7 +118,7 @@ Every option below is scored on:
 
 Against the OWASP Session Management Cheat Sheet, the current implementation is already strong (opaque hashed tokens, HttpOnly/SameSite=Strict, server-side revocation, CSRF). The remaining gaps, in increasing effort:
 
-1. **Enforce `Secure` in production.** `AUTH_COOKIE_SECURE=true` must be a release precondition; consider making the worker refuse to set session cookies over plain HTTP in production (fail-closed) rather than relying on an env flag.
+1. **~~Enforce `Secure` in production~~** (chiuso, QA#3 F2): il cookie è `Secure` di default (fail-closed); solo `ENVIRONMENT=development` o `AUTH_COOKIE_SECURE=false` lo tolgono (prototipo LAN su HTTP).
 2. **Add an idle timeout** (e.g. 14 days) alongside the 30-day absolute TTL — OWASP recommends both; today a stolen cookie is valid for up to 30 days of continuous use.
 3. **Rotate the session token mid-life and on privilege change.** Today a new session is minted at login only. Add rotation when a contributor's role escalates (ADR 0014) and, optionally, a periodic renewal (e.g. every 7 days) so a long-lived cookie is periodically invalidated. Rotation = mint new token, revoke old, keep the session row.
 4. **Raise PBKDF2 iterations to 600,000** (OWASP Password Storage Cheat Sheet, current recommendation; the stored hash format already carries the iteration count, so existing hashes re-verify and new ones are stored with the higher count — no migration beyond a constant bump + rehash-on-login).
