@@ -56,7 +56,14 @@ const expectedTables = [
   // Community verifications + edit requests (0020/0021, ADR 0018): the
   // toggle table (one confirmation per record+contributor) and the two-track
   // PATCH edit-request table.
-  "camera_confirmations",
+  // ADR 0021 pivot — FASE 1 (0036-0039, t_4a7469bb): camera_confirmations
+  // was replaced by camera_community_actions (five-type action surface, one
+  // action per record+contributor, weight snapshot), the tunable
+  // community_settings (seeded with the ADR's defaults) and the public
+  // camera_lifecycle_events history (no attribution).
+  "camera_community_actions",
+  "community_settings",
+  "camera_lifecycle_events",
   "camera_edit_requests",
   // Multi-method auth — Fase A (0027): email verification tokens (hashed,
   // 24h TTL, single-use), WebAuthn passkeys (public keys only) and the
@@ -115,10 +122,16 @@ const expectedIndexes = [
   "cameras_status_kind_idx",
   "cameras_status_updated_idx",
   "cameras_status_last_verified_idx",
-  // Community verifications (0020): UNIQUE (camera, contributor) + the
-  // (contributor_id, created_at) quota-count index.
-  "camera_confirmations_camera_contributor_unique",
-  "camera_confirmations_contributor_created_idx",
+  // Community actions (0036, ADR 0021 §3): UNIQUE (camera, contributor) —
+  // ONE active action per pair (switch, never a second row); (camera_id,
+  // action_type) serves the threshold evaluation (GROUP BY + COUNT(DISTINCT
+  // contributor) + SUM(weight)); (contributor_id, created_at) serves the
+  // daily-quota counts and erasure.
+  "camera_community_actions_camera_contributor_unique",
+  "camera_community_actions_camera_action_idx",
+  "camera_community_actions_contributor_created_idx",
+  // Public lifecycle history (0038, ADR 0021 §7): per-record timeline.
+  "camera_lifecycle_events_camera_created_idx",
   // Contribution editing (0021): one open edit-request per camera + the
   // per-contributor "my edits" index.
   "camera_edit_requests_open_unique",
@@ -178,6 +191,11 @@ const allowedExtraTables = ["_cf_METADATA", "sqlite_sequence", "d1_migrations"];
 const expectedSeedCounts = {
   reviewers: 0,
   users: 0,
+  // ADR 0021 §5 (migration 0037): community_settings is deliberately seeded
+  // with the pivot's defaults (weights/thresholds/quotas/cooldowns), so a
+  // fresh DB carries exactly the same rows as the code fallback
+  // (db/community-settings.ts DEFAULT_COMMUNITY_SETTINGS).
+  community_settings: 15,
 };
 
 let failures = 0;

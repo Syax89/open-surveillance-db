@@ -296,12 +296,12 @@ test("getPublicCameraById carries the decayed community-verification count", asy
   const live = await insertCamera(env, { title: "Live cam" });
   const decayed = await insertCamera(env, { title: "Decayed cam" });
   // One confirmation inside the review window (counts) and one before it (decayed).
-  await env.DB.prepare("INSERT INTO camera_confirmations (camera_id, contributor_id, created_at) VALUES (?, ?, ?)")
-    .bind(live.id, 7, "2026-08-15T00:00:00.000Z")
+  await env.DB.prepare("INSERT INTO camera_community_actions (camera_id, contributor_id, action_type, weight, created_at, updated_at) VALUES (?, ?, 'confirm', 1, ?, ?)")
+    .bind(live.id, 7, "2026-08-15T00:00:00.000Z", "2026-08-15T00:00:00.000Z")
     .run();
   await env.DB.prepare("UPDATE cameras SET last_verified_at = '2026-08-10T00:00:00.000Z' WHERE id = ?").bind(live.id).run();
-  await env.DB.prepare("INSERT INTO camera_confirmations (camera_id, contributor_id, created_at) VALUES (?, ?, ?)")
-    .bind(decayed.id, 7, "2026-08-01T00:00:00.000Z")
+  await env.DB.prepare("INSERT INTO camera_community_actions (camera_id, contributor_id, action_type, weight, created_at, updated_at) VALUES (?, ?, 'confirm', 1, ?, ?)")
+    .bind(decayed.id, 7, "2026-08-01T00:00:00.000Z", "2026-08-01T00:00:00.000Z")
     .run();
   await env.DB.prepare("UPDATE cameras SET last_verified_at = '2026-08-10T00:00:00.000Z' WHERE id = ?").bind(decayed.id).run();
 
