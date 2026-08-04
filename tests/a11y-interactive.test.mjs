@@ -188,30 +188,33 @@ test("the status accent is a visible card container + token rail (static guard o
   // changes (the rail references the existing --status-* tokens).
   // t_d52fde50 (CEO feedback 2): the 9%-over-#fffef9 tints were ~1:1 vs
   // --paper (#f5f3ec), so cards still read as transparent — surfaces are
-  // now white (#fff) with a scoped darker border (#b9c7bf) + soft shadow,
-  // and the tints are 14% over white (see contrast table in the PR).
+  // now white (--white) with a scoped darker border (--card-border =
+  // #b9c7bf) + soft shadow, and the tints are 14% over white (see contrast
+  // table in the PR). t_be89b99c: hex literals tokenized (same sRGB values).
   const css = await readFile(path.join(root, "app", "globals.css"), "utf8");
   assert.match(
     css,
-    /\.directory-tool \.record-list \.record-list-card \{[^}]*border:1px solid #b9c7bf[^}]*border-left-width:3px[^}]*border-radius:var\(--radius-lg\)[^}]*background:#fff/,
+    /\.directory-tool \.record-list \.record-list-card \{[^}]*border:1px solid var\(--card-border\)[^}]*border-left-width:3px[^}]*border-radius:var\(--radius-lg\)[^}]*background:var\(--white\)/,
     "the /directory row is a visible card container (white bg, darker border, radius, 3px left rail)",
   );
   assert.match(
     css,
-    /\.records-section \.record-list \.record-list-card:has\(\.status-dot\.verified\) \{[^}]*border-left-color:var\(--status-verified\)[^}]*background:#e5f3ec/,
-    "the verified rail uses the existing token + a 14% precomputed tint over white (no new global token)",
+    /\.records-section \.record-list \.record-list-card:has\(\.status-dot\.verified\) \{[^}]*border-left-color:var\(--status-verified\)[^}]*background:var\(--status-verified-card-bg\)/,
+    "the verified rail uses the existing token + a 14% precomputed tint over white (--status-verified-card-bg)",
   );
   assert.match(
     css,
-    /\.map-record \{[^}]*border:1px solid var\(--line\)[^}]*border-left-width:3px[^}]*border-radius:var\(--radius-md\)[^}]*background:#fff/,
+    /\.map-record \{[^}]*border:1px solid var\(--line\)[^}]*border-left-width:3px[^}]*border-radius:var\(--radius-md\)[^}]*background:var\(--white\)/,
     "the /mappa sidebar rows get the same visible-container treatment",
   );
   assert.match(
     css,
-    /\.map-record:has\(\.status-dot\.verified\) \{[^}]*border-left-color:var\(--status-verified\)[^}]*background:#f0f8f4/,
-    "the map row rail uses the same token logic (8% tint over #fff)",
+    /\.map-record:has\(\.status-dot\.verified\) \{[^}]*border-left-color:var\(--status-verified\)[^}]*background:var\(--status-verified-bg\)/,
+    "the map row rail uses the same token logic (8% tint over white)",
   );
-  assert.match(css, /--status-verified:#42a979/, "the global status tokens are untouched (no ADR needed)");
+  // t_be89b99c: the global status tokens keep their exact values, now as
+  // rgb() literals (--status-verified:#42a979 == rgb(66 169 121)).
+  assert.match(css, /--status-verified:rgb\(66 169 121\)/, "the global status tokens are untouched (no ADR needed)");
 });
 
 test("the 'Show on map' action navigates to /mappa with the record preselected (URL focus path)", async () => {
