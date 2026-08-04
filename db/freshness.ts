@@ -70,7 +70,10 @@ export function evaluateFreshness(
 ): FreshnessPhase {
   if (record.status === "demo") return "current";
   if (record.status === "stale") return "stale";
-  if (record.status === "verified" || record.status === "needs_review") {
+  // ADR 0021 §12.1: after migration 0039, the domain status is "active"
+  // (was "verified"). Both are treated identically for freshness evaluation;
+  // the old "verified" path remains for legacy moderation flows.
+  if (record.status === "active" || record.status === "verified" || record.status === "needs_review") {
     if (!record.reviewDueAt) {
       // Legacy record without a schedule: not provably stale, and for
       // `verified` still eligible for public output.

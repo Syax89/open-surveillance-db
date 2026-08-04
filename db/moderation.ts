@@ -578,11 +578,11 @@ export async function runFreshnessSweep(nowIso: string = new Date().toISOString(
   const staleThreshold = addDays(nowIso, -STALE_GRACE_DAYS);
 
   const due = await d1
-    .prepare("SELECT id FROM cameras WHERE status = 'verified' AND review_due_at IS NOT NULL AND review_due_at < ?")
+    .prepare("SELECT id, status FROM cameras WHERE status IN ('active','verified') AND review_due_at IS NOT NULL AND review_due_at < ?")
     .bind(nowIso)
-    .all<{ id: number }>();
+    .all<{ id: number; status: string }>();
   const dueStatements: D1PreparedStatement[] = [];
-  for (const { id } of due.results) {
+  for (const { id, status } of due.results) {
     // UPDATE + guarded event pair: the event only lands when the UPDATE
     // actually moved the record (same atomic pair as the decision batches).
     dueStatements.push(
@@ -592,7 +592,7 @@ export async function runFreshnessSweep(nowIso: string = new Date().toISOString(
         {
           entity: "camera",
           entityId: id,
-          previousStatus: "verified",
+          previousStatus: status,
           newStatus: "needs_review",
           action: "scheduled-expiry",
           reasonCode: "inaccurate-or-outdated",
@@ -1662,10 +1662,10 @@ async function buildCorrectionOutcomeStatements(
   if (outcome === "marked-stale") {
     // A credible correction sends a verified record back to needs_review while
     // it is reassessed (DATA_TRUST SLA).
-    if (record.status !== "verified") return [];
+    if (record.status !== "active" && record.status !== "verified") return [];
     return [
       d1
-        .prepare("UPDATE cameras SET status = 'needs_review', updated = ? WHERE id = ? AND status = 'verified'")
+        .prepare("UPDATE cameras SET status = 'needs_review', updated = ? WHERE id = ? AND status IN ('active','verified')")
         .bind(nowIso, cameraId),
       buildGuardedEventStatement(
         d1,

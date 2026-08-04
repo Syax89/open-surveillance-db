@@ -1,5 +1,6 @@
 import { env } from "cloudflare:workers";
 import { searchPublicCamerasNearPage, SEARCH_PAGE_DEFAULT_LIMIT, SEARCH_PAGE_MAX_LIMIT } from "../../../../db/cameras";
+import { likeWeightSumsFor } from "../../../../db/community-actions";
 import { resolvePlace } from "../../../../db/geocode";
 import { resolveLocale } from "../../../lib/i18n/types";
 import { callerKey, checkRateLimit, searchLimits } from "../../../lib/rate-limit";
@@ -28,11 +29,9 @@ import {
  *     (db/geocode.ts, Nominatim). The place's bounding box decides the
  *     radius, so "near a street" stays small while "near a city" scales up.
  *
- * The response carries the resolved area explicitly so clients can show a
- * text description of what was searched and a truthful zero-result state,
- * and uses the same pagination contract as the directory list
- * ({ records, total, nextOffset }, FRONTEND_PLAN § 3.2.3) so the frontend
- * reuses one pagination helper.
+ * Sort (ADR 0021 §10.1, kanban t_a9f23581 FASE 2): `sort=useful` overrides
+ * the default distance ordering; results are re-sorted by total like weight
+ * within the current page. The default (no sort param) stays distance-ordered.
  */
 
 type SearchArea = {
@@ -51,9 +50,21 @@ function readPageNumber(value: string | null, fallback: number, max: number): nu
   return Math.min(parsed, max);
 }
 
-async function searchArea(query: string, area: SearchArea, limit: number, offset: number) {
+async function searchArea(query: string, area: SearchArea, limit: number, offset: number, sort?: string) {
   try {
     const page = await searchPublicCamerasNearPage(area.latitude, area.longitude, area.radiusMeters, { limit, offset });
+    let records = page.records;
+    // ADR 0021 §10.1: sort=useful overrides distance order (query-time, no denormalised columns).
+    // Re-sort the current page by total like weight DESC, preserving id DESC as tiebreaker.
+    if (sort === "useful" && records.length > 0) {
+      const weightSums = await likeWeightSumsFor(records.map((r) => r.id));
+      records = [...records].sort((a, b) => {
+        const aWeight = weightSums.get(a.id) ?? 0;
+        const bWeight = weightSums.get(b.id) ?? 0;
+        if (aWeight !== bWeight) return bWeight - aWeight;
+        return b.id - a.id;
+      });
+    }
     return Response.json({
       query,
       area: {
@@ -65,7 +76,7 @@ async function searchArea(query: string, area: SearchArea, limit: number, offset
         radiusLabel: formatDistance(area.radiusMeters),
       },
       count: page.total,
-      records: page.records,
+      records,
       total: page.total,
       nextOffset: page.nextOffset,
     }, {
@@ -86,6 +97,12 @@ export async function GET(request: Request) {
   }
   if (query.length > maxQueryLength) {
     return Response.json({ error: "That search is too long. Try a shorter locality, address, or coordinates." }, { status: 400 });
+  }
+
+  // Sort (ADR 0021 §10.1): only "useful" is supported for search.
+  const sort = url.searchParams.get("sort");
+  if (sort !== null && sort !== "useful") {
+    return Response.json({ error: "The only sort option for search is \"useful\"." }, { status: 400 });
   }
 
   // Pagination (FRONTEND_PLAN § 3.2.3): same limit/offset contract as the
@@ -117,7 +134,7 @@ export async function GET(request: Request) {
       latitude: coordinates.latitude,
       longitude: coordinates.longitude,
       radiusMeters: coordinateRadiusMeters,
-    }, limit, offset);
+    }, limit, offset, sort ?? undefined);
   }
 
   // Registry-driven: the client's locale code selects the geocoder result
@@ -143,5 +160,5 @@ export async function GET(request: Request) {
     latitude: place.latitude,
     longitude: place.longitude,
     radiusMeters: radiusForBoundingBox(place.boundingBox),
-  }, limit, offset);
+  }, limit, offset, sort ?? undefined);
 }

@@ -133,6 +133,12 @@ const REAL_DB_MODULES = [
   // real render→rate-limit→send→log path must run in the tree (the EMAIL
   // binding is injected via the harness env mock).
   { source: "db/mailer.ts", output: "db/mailer.mjs" },
+  // db/community-settings.ts (ADR 0021 §5.1, t_4a7469bb FASE 1): tunable
+  // community configuration. db/community-actions.ts imports it.
+  { source: "db/community-settings.ts", output: "db/community-settings.mjs" },
+  // db/community-actions.ts (ADR 0021 FASE 2, kanban t_a9f23581): action
+  // surface write path + threshold evaluation. db/cameras.ts imports it.
+  { source: "db/community-actions.ts", output: "db/community-actions.mjs" },
 ];
 
 let builtTreePromise = null;

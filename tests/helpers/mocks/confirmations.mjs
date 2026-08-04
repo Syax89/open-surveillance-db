@@ -18,6 +18,8 @@ export function confirmationQuota(envValue) {
   };
 }
 
+export const ACTION_WEIGHT_BY_LEVEL = [0.25, 1, 2, 3, 5];
+
 export const {
   confirmationCountsFor,
   recordConfirmationCount,

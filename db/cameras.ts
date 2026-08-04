@@ -2,6 +2,7 @@ import { env } from "cloudflare:workers";
 import { classifyDuplicateMatch, textSimilarity, type MatchStrength } from "../app/lib/duplicate-detection";
 import { PUBLIC_CAMERA_STATUSES } from "../app/lib/public-status";
 import { confirmationCountsFor } from "./confirmations";
+import { communityActionCountsFor, type CommunityActionCounts } from "./community-actions";
 
 export type CameraRecord = {
   id: number;
@@ -43,6 +44,12 @@ export type PublicCameraRecord = Omit<CameraRecord, "notes"> & {
    * bbox surfaces keep their historical shape and do not populate it.
    */
   confirmationCount: number;
+  /** Aggregated community-action counts (ADR 0021 §10.2): COUNT DISTINCT, never weights. */
+  usefulCount: number;
+  confirmCount: number;
+  goneCount: number;
+  problemCount: number;
+  privacyCount: number;
 };
 
 /**
@@ -69,7 +76,8 @@ export async function getD1() {
 
 export const freshnessWindows = ["7d", "30d", "90d", "all"] as const;
 export type FreshnessWindow = (typeof freshnessWindows)[number];
-export type PublicCameraFilters = { kind?: string; freshness?: FreshnessWindow };
+export type PublicCameraFilters = { kind?: string; freshness?: FreshnessWindow; sort?: "useful" | "recent" | "confirmations" };
+export const PUBLIC_CAMERA_SORT_OPTIONS = ["useful", "recent", "confirmations"] as const;
 
 /**
  * Canonical stored kind value for dome cameras (kanban t_1b08fe12). A dome
@@ -226,18 +234,42 @@ export async function listPublicCamerasPage(
   }
   const countResult = await d1.prepare(`SELECT COUNT(*) AS total ${query}`).bind(...parameters).first<{ total: number }>();
   const total = countResult?.total ?? 0;
+
+  // Sort ordering (ADR 0021 §10.1, kanban t_a9f23581 FASE 2): whitelist
+  // approach — the route validates, the DB boundary never inlines raw strings.
+  // Default (no sort filter present): ORDER BY id DESC (INVARIANT).
+  let orderBy = "ORDER BY id DESC";
+  if (filters?.sort === "useful") {
+    orderBy = "ORDER BY (SELECT COALESCE(SUM(weight),0) FROM camera_community_actions WHERE camera_id=cameras.id AND action_type='like') DESC, id DESC";
+  } else if (filters?.sort === "recent") {
+    orderBy = "ORDER BY updated DESC, id DESC";
+  } else if (filters?.sort === "confirmations") {
+    // NULLS LAST: records never confirmed sort to the bottom (SQLite: IS NULL first).
+    orderBy = "ORDER BY last_verified_at IS NULL, last_verified_at DESC, id DESC";
+  }
+
   const result = await d1
-    .prepare(`SELECT id, title, kind, CASE WHEN publish_manufacturer = 1 THEN manufacturer ELSE NULL END AS manufacturer, CASE WHEN publish_observed_on = 1 THEN observed_on ELSE NULL END AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, latitude, longitude, direction, status, source, updated, description, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt ${query} ORDER BY id DESC LIMIT ? OFFSET ?`)
+    .prepare(`SELECT id, title, kind, CASE WHEN publish_manufacturer = 1 THEN manufacturer ELSE NULL END AS manufacturer, CASE WHEN publish_observed_on = 1 THEN observed_on ELSE NULL END AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, latitude, longitude, direction, status, source, updated, description, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt ${query} ${orderBy} LIMIT ? OFFSET ?`)
     .bind(...parameters, limit, offset)
     .all<PublicCameraRecord>();
-  const records = result.results.map((record) => ({ ...record, latitude: roundPublicCoordinate(record.latitude), longitude: roundPublicCoordinate(record.longitude), confirmationCount: 0 }));
+  const ids = result.results.map((record) => record.id);
   // Community-verification counts (ADR 0018 §2.3): one GROUP BY IN query for
   // the whole page — never an N+1 per record. The counts are decayed (only
   // confirmations at/after last_verified_at count).
-  if (records.length > 0) {
-    const counts = await confirmationCountsFor(records.map((record) => record.id));
-    for (const record of records) record.confirmationCount = counts.get(record.id) ?? 0;
-  }
+  const confirmationCounts = ids.length > 0 ? await confirmationCountsFor(ids) : new Map<number, number>();
+  // Community-action counts (ADR 0021 §10.2): COUNT DISTINCT, never weights.
+  const actionCounts = ids.length > 0 ? await communityActionCountsFor(ids) : new Map<number, CommunityActionCounts>();
+  const records = result.results.map((record) => ({
+    ...record,
+    latitude: roundPublicCoordinate(record.latitude),
+    longitude: roundPublicCoordinate(record.longitude),
+    confirmationCount: confirmationCounts.get(record.id) ?? 0,
+    usefulCount: actionCounts.get(record.id)?.like ?? 0,
+    confirmCount: actionCounts.get(record.id)?.confirm ?? 0,
+    goneCount: actionCounts.get(record.id)?.gone ?? 0,
+    problemCount: actionCounts.get(record.id)?.problem ?? 0,
+    privacyCount: actionCounts.get(record.id)?.privacy ?? 0,
+  }));
   const nextOffset = offset + records.length < total ? offset + records.length : null;
   return { records, total, nextOffset };
 }
@@ -334,7 +366,19 @@ export async function getPublicCameraById(id: number, nowIso: string = new Date(
   if (!result) return null;
   // Decayed community-verification count (ADR 0018 §2.3), aggregate only.
   const confirmationCount = await confirmationCountsFor([id]).then((map) => map.get(id) ?? 0);
-  return { ...result, latitude: roundPublicCoordinate(result.latitude), longitude: roundPublicCoordinate(result.longitude), confirmationCount };
+  // Community-action counts (ADR 0021 §10.2): COUNT DISTINCT, never weights.
+  const actionCounts = await communityActionCountsFor([id]).then((map) => map.get(id) ?? { like: 0, confirm: 0, gone: 0, problem: 0, privacy: 0 });
+  return {
+    ...result,
+    latitude: roundPublicCoordinate(result.latitude),
+    longitude: roundPublicCoordinate(result.longitude),
+    confirmationCount,
+    usefulCount: actionCounts.like,
+    confirmCount: actionCounts.confirm,
+    goneCount: actionCounts.gone,
+    problemCount: actionCounts.problem,
+    privacyCount: actionCounts.privacy,
+  };
 }
 
 export type PublicCameraFacets = {
