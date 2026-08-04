@@ -247,3 +247,26 @@ test("auth header: Italian labels from the auth bundle (i18n/auth.ts:90/91)", as
   const register = screen.getByRole("link", { name: "Crea account" });
   assert.equal(register.getAttribute("href"), "/register");
 });
+
+test("auth header: a transient 429 on the session read is retried, then resolves (QA#2 F3)", async () => {
+  // F3: the session read used to share the auth MUTATION bucket (10/min),
+  // so fast navigation could 429 the header and silently drop its links.
+  // The client now retries a 429 briefly (session-fetch.ts) — the header
+  // must recover on the retry instead of fail-closing on the first 429.
+  const { screen, waitFor } = rtl;
+  let calls = 0;
+  // The previous test sets the Italian locale in localStorage; reset to the
+  // default so the anonymous links render with the English labels.
+  window.localStorage.removeItem("opensurveillancedb-locale");
+  installFetchMock((input) => {
+    assert.equal(input, "/api/auth/me", "AuthNavLinks must read the session from /api/auth/me");
+    calls += 1;
+    if (calls === 1) return jsonResponse({ error: "Too many requests." }, { status: 429, headers: { "retry-after": "1" } });
+    return jsonResponse({ error: "Not authenticated." }, { status: 401 });
+  });
+
+  await renderWithLocale(React.createElement(AuthNavLinks));
+  // The retry sleeps ~1s (Retry-After): give waitFor a generous budget.
+  await waitFor(() => assert.ok(screen.getByRole("link", { name: "Log in" })), { timeout: 4000 });
+  assert.equal(calls, 2, "the 429 must be retried once, then the 401 resolves to the anonymous links");
+});

@@ -8,6 +8,7 @@ import { usePathname } from "next/navigation";
 import { useLocale } from "./LocaleProvider";
 import { en as authEn, it as authIt } from "../lib/i18n/auth";
 import type { Locale, Translation } from "../lib/i18n";
+import { fetchSessionMe } from "../lib/session-fetch";
 
 const authByLocale: Record<Locale, Translation<typeof authEn>> = {
   en: authEn,
@@ -66,7 +67,11 @@ export function AuthNavLinks() {
     let cancelled = false;
     (async () => {
       try {
-        const response = await fetch("/api/auth/me", { signal: controller.signal });
+        // QA#2 F3: bounded retry on 429 — the endpoint has its own
+        // generous session bucket (120/min), and a transient burst
+        // (back/forward spam, shared NAT IP) retries briefly instead of
+        // silently dropping the session links.
+        const response = await fetchSessionMe(controller.signal);
         if (cancelled) return;
         if (response.status === 401) {
           setAuth({ status: "anonymous" });

@@ -78,6 +78,30 @@ test("public legal pages are served with their English content", async () => {
     assert.match(html, /class="legal-section"/);
     assert.match(html, /class="record-detail-note"/);
 
+    // QA#2 F1: the legal-table-wrap wrapper (scrollable on narrow
+    // viewports) must be present; the client island adds tabindex/role/
+    // aria-label only when the table overflows (hydration, viewport
+    // dependent), so the SSR shell is the plain wrapper.
+    if (requestPath === "/privacy") {
+      assert.match(html, /class="legal-table-wrap"/, "/privacy must render the scrollable table wrapper");
+      assert.match(html, /class="legal-table"/, "/privacy must render the data table");
+    }
+
+    // QA#2 F2: inline markdown links inside bold text (e.g. `**[ODbL
+    // 1.0](url)**` on /termini and /licenze) must be rendered as REAL
+    // anchors — never the raw `[label](url)` source text.
+    if (requestPath === "/termini" || requestPath === "/licenze") {
+      assert.match(
+        html,
+        /<a href="https:\/\/opendatacommons\.org\/licenses\/odbl\/"[^>]*>ODbL 1\.0<\/a>/,
+        `${requestPath} must render the ODbL link inside the bold text`,
+      );
+      assert.ok(
+        !html.includes("**[ODbL 1.0]"),
+        `${requestPath} must not leak the raw markdown bold syntax`,
+      );
+    }
+
     // The global site footer (SiteFooter in the root layout) links the
     // public legal pages on every route.
     assert.match(html, /class="site-footer"/);

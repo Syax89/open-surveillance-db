@@ -1112,3 +1112,35 @@ test("WriteGateWall renders children for a verified contributor (wall never show
   await waitFor(() => assert.ok(screen.getByLabelText("Record title")));
   assert.equal(screen.queryByRole("heading", { name: "Log in to contribute" }), null, "no wall for a verified contributor");
 });
+
+test("WriteGateWall error wall: retry button label matches the retry action (QA#2 F4)", async () => {
+  // F4: the error-state retry button used `t.loading ? t.verifyTitle :
+  // t.wallLogIn` — t.loading is a TRUTHY string, so the button ALWAYS said
+  // "Verify your email" even though its action re-runs the session check.
+  // It must say "Try again" and actually retry the /api/auth/me read.
+  const { screen, waitFor } = rtl;
+  const user = rtl.userEvent.setup();
+  let meCalls = 0;
+  installFetchMock((input) => {
+    if (String(input) === "/api/auth/me") {
+      meCalls += 1;
+      if (meCalls === 1) return jsonResponse({ error: "Unable to read the session" }, { status: 503 });
+      // Retry succeeds as anonymous: the wall must flip to the login wall.
+      return jsonResponse({ error: "Not authenticated." }, { status: 401 });
+    }
+    return jsonResponse({ records: [], total: 0, nextOffset: null });
+  });
+  await renderWithLocale(React.createElement(SegnalaTool));
+
+  await waitFor(() => assert.ok(screen.getByRole("heading", { name: "Log in to contribute" })));
+  const retry = screen.getByRole("button", { name: "Try again" });
+  assert.equal(
+    screen.queryByRole("button", { name: "Verify your email" }),
+    null,
+    "the retry button must NOT carry the verify-email label (QA#2 F4)",
+  );
+
+  await user.click(retry);
+  await waitFor(() => assert.ok(screen.getByRole("link", { name: "Log in" })));
+  assert.equal(meCalls, 2, "clicking Try again must re-run the session check");
+});

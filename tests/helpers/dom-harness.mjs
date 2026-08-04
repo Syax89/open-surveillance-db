@@ -589,12 +589,15 @@ export async function setupDom({ url = "https://osdb.test/" } = {}) {
 
 // Build a Response-like object the client components can consume
 // (response.ok, response.status, response.json()).
-export function jsonResponse(body, { status = 200, ok } = {}) {
+export function jsonResponse(body, { status = 200, ok, headers = {} } = {}) {
   const isOk = ok ?? (status >= 200 && status < 300);
   return {
     ok: isOk,
     status,
     statusText: isOk ? "OK" : "Error",
+    headers: {
+      get: (name) => headers[name.toLowerCase()] ?? null,
+    },
     json: async () => body,
     text: async () => JSON.stringify(body),
   };

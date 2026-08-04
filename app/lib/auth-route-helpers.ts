@@ -56,21 +56,53 @@ export function loginLockoutPolicy(env: unknown): LoginLockoutPolicy {
 }
 
 /**
- * Rate limit the auth endpoints. Register and login are credential-guessing
+ * Rate limit the auth MUTATIONS. Register and login are credential-guessing
  * surfaces, so the dedicated `auth` bucket (default 10/min per caller) sits
- * deliberately low; the same bucket also covers the session/profile reads.
- * In production the bucket is enforced by the AUTH_LIMITER binding
- * (wrangler.jsonc `ratelimits`); without the binding (local dev, tests) the
- * in-memory fallback applies — see app/lib/rate-limit.ts.
+ * deliberately low. In production the bucket is enforced by the AUTH_LIMITER
+ * binding (wrangler.jsonc `ratelimits`); without the binding (local dev,
+ * tests) the in-memory fallback applies — see app/lib/rate-limit.ts.
+ *
+ * The session/profile READS (GET /api/auth/me) use sessionLimit() instead
+ * (QA#2 F3): the header and write gate hit that endpoint on every page
+ * view, so it gets its own generous bucket, not the mutation ceiling.
  */
 export async function authLimit(
   request: Request,
   env: unknown,
   route: string,
 ): Promise<Response | null> {
-  const key = callerKey(request, env);
-  const limitOptions = limitsFor("auth", env);
-  const limit = await checkRateLimit(env, "auth", key, limitOptions);
+  return bucketLimit(request, env, route, "auth");
+}
+
+/**
+ * Rate limit the session/profile READS (GET /api/auth/me, QA#2 F3).
+ *
+ * The public header (AuthNavLinks) and the write gate (WriteGateWall) call
+ * GET /api/auth/me on EVERY page view; the auth MUTATION bucket (10/min)
+ * would 429 a user navigating quickly (11+ page views/min), silently
+ * dropping the header's session links and tripping the write gate into its
+ * error wall. Session reads are not a credential-guessing surface, so they
+ * use the dedicated `session` bucket (default 120/min — see
+ * ROUTE_LIMIT_DEFAULTS) while every auth mutation (register, login,
+ * passkey, OIDC, PATCH /me, logout, erasure) stays on the `auth` bucket.
+ */
+export async function sessionLimit(
+  request: Request,
+  env: unknown,
+  route: string,
+): Promise<Response | null> {
+  return bucketLimit(request, env, route, "session");
+}
+
+async function bucketLimit(
+  request: Request,
+  env: unknown,
+  route: string,
+  bucket: "auth" | "session",
+): Promise<Response | null> {
+  const key = callerKey(request);
+  const limitOptions = limitsFor(bucket, env);
+  const limit = await checkRateLimit(env, bucket, key, limitOptions);
   if (!limit.allowed) {
     console.warn(`${route} rate limited`);
     recordRateLimitBlock(env, {

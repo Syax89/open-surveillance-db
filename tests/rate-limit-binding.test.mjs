@@ -95,8 +95,11 @@ test("only auth, submit, read and tiles buckets resolve a rate-limiter binding",
 
   // Every other family stays on the in-memory fallback: binding the four
   // critical public surfaces is the audit #3 scope; the rest are documented
-  // follow-ups for the public launch.
-  for (const bucket of ["export", "nearby", "revisions", "moderate", "appeal", "geocode", "confirm", "edit", "search"]) {
+  // follow-ups for the public launch. session (QA#2 F3 — GET /api/auth/me
+  // reads) is deliberately unbound too: it is a per-caller personal read,
+  // not a credential-guessing or data-exfiltration surface, and its
+  // generous default (120/min) is a scraper bound, not a security gate.
+  for (const bucket of ["export", "nearby", "revisions", "moderate", "appeal", "geocode", "confirm", "edit", "search", "session"]) {
     assert.equal(
       rateLimit.rateLimitBindingFor(fullEnv, bucket),
       undefined,

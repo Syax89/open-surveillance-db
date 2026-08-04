@@ -736,6 +736,51 @@ test("me returns 503 when the session lookup fails", async () => {
   assert.equal(response.status, 503);
 });
 
+test("GET /me uses the session bucket, NOT the auth mutation bucket (QA#2 F3)", async () => {
+  // The auth bucket (10/min) exists to slow credential-guessing mutations;
+  // the header and the write gate call GET /me on EVERY page view, so it
+  // must not share that ceiling. 15 rapid reads (above the auth limit of
+  // 10) must all be answered — the PATCH-side independence is pinned by
+  // the existing "PATCH /api/auth/me respects the auth rate-limit bucket"
+  // test, which still trips at 10 with this same GET path untouched.
+  const envModule = await loadTreeModule("cloudflare-workers.mjs");
+  const previous = envModule.env.SESSION_RATE_LIMIT_MAX;
+  // Default session ceiling is 120/min; keep it there (knob unset) and
+  // lower it only in the dedicated session-bucket test below.
+  try {
+    const { GET } = await meRoute();
+    for (let index = 0; index < 15; index += 1) {
+      const response = await GET(apiRequest("/api/auth/me"));
+      assert.notEqual(response.status, 429, `GET /me request ${index + 1} must not be auth-rate-limited`);
+      assert.equal(response.status, 401, `GET /me request ${index + 1} must reach the session check`);
+    }
+  } finally {
+    if (previous === undefined) delete envModule.env.SESSION_RATE_LIMIT_MAX;
+    else envModule.env.SESSION_RATE_LIMIT_MAX = previous;
+  }
+});
+
+test("GET /me honours its own session bucket ceiling (QA#2 F3)", async () => {
+  // The dedicated session bucket is independently configurable: with the
+  // knob at 1/min, the SECOND rapid read answers 429 with Retry-After —
+  // even though the auth mutation bucket (10/min) has not been touched.
+  const envModule = await loadTreeModule("cloudflare-workers.mjs");
+  const previous = envModule.env.SESSION_RATE_LIMIT_MAX;
+  envModule.env.SESSION_RATE_LIMIT_MAX = "1";
+  try {
+    const { GET } = await meRoute();
+    const first = await GET(apiRequest("/api/auth/me"));
+    assert.notEqual(first.status, 429, "the first session read within the window must be answered");
+    const blocked = await GET(apiRequest("/api/auth/me"));
+    assert.equal(blocked.status, 429);
+    assert.equal((await responseBody(blocked)).error, "Too many requests. Please try again shortly.");
+    assert.ok(Number(blocked.headers.get("retry-after")) > 0);
+  } finally {
+    if (previous === undefined) delete envModule.env.SESSION_RATE_LIMIT_MAX;
+    else envModule.env.SESSION_RATE_LIMIT_MAX = previous;
+  }
+});
+
 test("me/submissions lists only the contributor's attributed reports", async () => {
   stub("findSessionByToken", async () => ({ ...session, contributor }));
   stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));

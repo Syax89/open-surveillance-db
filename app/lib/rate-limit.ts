@@ -53,6 +53,7 @@ export type RouteKind =
   | "moderate"
   | "appeal"
   | "auth"
+  | "session"
   | "tiles"
   | "geocode"
   | "confirm"
@@ -74,6 +75,15 @@ const ROUTE_LIMIT_DEFAULTS: Record<RouteKind, RateLimitOptions> = {
   // deliberate per-caller bucket keeps brute force slow while staying far
   // above the rate of legitimate interactive use.
   auth: { maxRequests: 10, windowSeconds: 60 },
+  // Session/profile READS (GET /api/auth/me, QA#2 F3): the public header
+  // and the write gate call this endpoint on EVERY page view, so the
+  // mutation bucket (10/min, above) would 429 a user navigating quickly
+  // (11+ page views/min) and drop the header's session links / trip the
+  // write gate. Session reads are NOT a credential-guessing surface, so
+  // they get their own generous bucket: 120/min is far above interactive
+  // navigation while still bounding a scraper. Mutations (PATCH /me,
+  // register, login, logout, passkey, OIDC) stay on the auth bucket.
+  session: { maxRequests: 120, windowSeconds: 60 },
   // Tile proxy (QA#5 F4, t_ab0d4c75): the per-caller bucket guards the
   // upstream (the OSMF community tile service) — a cache miss is exactly
   // the request that fetches upstream, so the tiles route meters AFTER the
@@ -115,6 +125,7 @@ const ROUTE_LIMIT_ENV_PREFIX: Record<RouteKind, string> = {
   moderate: "MODERATION",
   appeal: "APPEAL",
   auth: "AUTH",
+  session: "SESSION",
   tiles: "TILES",
   geocode: "GEOCODE",
   confirm: "CONFIRM",
