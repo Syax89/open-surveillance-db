@@ -324,6 +324,31 @@ button { cursor:pointer; }
 .osm-camera-marker i { width:8px; height:8px; border-radius:var(--radius-round); background:var(--mint); }
 .osm-camera-marker.demo { background:var(--status-demo); }
 .osm-camera-marker.selected { outline:6px solid rgba(24,97,79,.22); }
+/* Field-of-view layer (t_f8b775ec): the decorative wedge/circle showing a
+   camera's field of view on the map. Colours come from the SAME status
+   tokens as the markers (--status-*), with !important to beat Leaflet's
+   inline path styles; fill-opacity keeps the geometry clearly under the
+   marker. pointer-events:none on the whole overlay pane guarantees the
+   geometry never intercepts clicks (the markers live in the marker pane). */
+.leaflet-overlay-pane { pointer-events:none; }
+.fov-cone { fill-opacity:.3; stroke-width:1; stroke-opacity:.55; }
+.fov-cone.verified { fill:var(--status-verified) !important; stroke:var(--status-verified) !important; }
+.fov-cone.demo { fill:var(--status-demo) !important; stroke:var(--status-demo) !important; }
+.fov-cone.community-report { fill:var(--status-community) !important; stroke:var(--status-community) !important; }
+.fov-cone.needs-review { fill:var(--status-review) !important; stroke:var(--status-review) !important; }
+/* Direction control (t_f8b775ec): compass slider 0-359 + arrow preview +
+   "don't know" option, shared by the report and edit forms. The fieldset
+   appears only for directional kinds (never for domes). */
+.direction-entry { display:grid; gap:var(--space-2); margin:0; padding:16px 18px; border:1px solid var(--field-border); border-radius:var(--radius-sm); background:var(--surface-muted); }
+.direction-entry legend { padding:0 5px; color:var(--notice-ink); font-size:var(--text-md); font-weight:800; }
+.direction-entry .check-label { display:grid; grid-template-columns:17px 1fr; align-items:start; gap:9px; font-size:var(--text-sm); line-height:1.4; font-weight:400; color:var(--ink-2); }
+.direction-entry .check-label input { width:15px; height:15px; margin-top:1px; }
+.direction-controls { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+.direction-arrow { display:inline-grid; place-items:center; width:34px; height:34px; border-radius:var(--radius-round); background:var(--white); border:1px solid var(--field-border); color:var(--focus); font-size:var(--text-lg); font-weight:800; transition:transform .1s ease; }
+.direction-slider-row { display:grid; gap:6px; flex:1; min-width:200px; }
+.direction-slider-row label { font-size:var(--text-sm); font-weight:800; color:var(--ink-2); }
+.direction-slider-row input[type="range"] { width:100%; border:0; padding:0; background:transparent; accent-color:var(--focus); }
+.direction-output { font-size:var(--text-md); font-weight:800; color:var(--focus); font-variant-numeric:tabular-nums; }
 .leaflet-container { font-family:Arial, Helvetica, sans-serif; }
 .leaflet-control-attribution { font-size:var(--text-2xs) !important; }
 .data-actions { margin:20px 0 0; color:var(--data-action-ink); font-size:var(--text-md); }

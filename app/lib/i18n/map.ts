@@ -84,6 +84,9 @@ export const en = {
   // Marker popup (t_702c10af): opens on marker click with the record info
   // and its correction/detail links.
   popupDetail: "Open record",
+  // Field-of-view direction row in the marker popup (t_f8b775ec): the
+  // textual, accessible equivalent of the decorative map cone.
+  fovDirection: "Field of view",
 } as const;
 
 export const it: Translation<typeof en> = {
@@ -165,4 +168,7 @@ export const it: Translation<typeof en> = {
   // Popup del segnaposto (t_702c10af): si apre al clic sul marker con le
   // informazioni del record e i link a correzione/dettaglio.
   popupDetail: "Apri il record",
+  // Riga della direzione del campo visivo nel popup (t_f8b775ec): l'equivalente
+  // testuale e accessibile del cono decorativo sulla mappa.
+  fovDirection: "Campo visivo",
 };

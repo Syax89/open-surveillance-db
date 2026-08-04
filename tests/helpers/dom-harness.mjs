@@ -261,8 +261,10 @@ export const usePathname = () => state.url.pathname;
   }));
   await writeFile(path.join(nodeModules, "leaflet", "index.mjs"),
     `const markers = [];
+const paths = [];
 const maps = [];
 export const __markers = markers;
+export const __paths = paths;
 export const __maps = maps;
 // Whole-world viewport by default (t_702c10af): the stub map reports
 // bounds that contain every record, so the viewport→list sync keeps the
@@ -282,21 +284,29 @@ const wholeWorldBounds = {
 };
 let currentBounds = wholeWorldBounds;
 export const __setBounds = (b) => { currentBounds = b; };
-export const __resetMarkers = () => { markers.length = 0; maps.length = 0; currentBounds = wholeWorldBounds; };
+export const __resetMarkers = () => { markers.length = 0; maps.length = 0; paths.length = 0; currentBounds = wholeWorldBounds; };
 export function map(el, opts) {
   const m = {
     // setView records every call (t_b9666d09 geocode pan assertions):
     // m.views accumulates { center, zoom } so tests can assert the map
     // really moved to the selected place.
     views: [],
+    // Zoom is mutable (t_f8b775ec): tests set m.zoom = 17 to cross the
+    // field-of-view threshold (FOV_MIN_ZOOM) and fire the moveend/zoomend
+    // handler; getZoom reads it live.
+    zoom: 13,
+    // Field-of-view a11y (t_f8b775ec): getPane records attribute writes so
+    // tests can assert the decorative overlay pane is aria-hidden.
+    paneAttrs: {},
     setView: (center, zoom, opts) => { m.views.push({ center, zoom, opts }); return m; }, // chainable, like the real Leaflet map API
     on: (event, handler) => { (m.handlers[event] ??= []).push(handler); return m; },
     remove: () => {},
     invalidateSize: () => {},
-    getZoom: () => 13,
+    getZoom: () => m.zoom,
     getBounds: () => currentBounds,
     panTo: () => m,
     handlers: {},
+    getPane: () => ({ setAttribute: (key, value) => { m.paneAttrs[key] = value; } }),
     // Map-click picker (t_6abb96ac): map.openPopup records the popup
     // content + position so tests can assert the report-picker popup
     // (coordinates + /segnala deep link) that a map click opens.
@@ -308,7 +318,30 @@ export function map(el, opts) {
 }
 export const control = { zoom: () => ({ addTo: () => {} }) };
 export const tileLayer = () => ({ addTo: () => {} });
-export const layerGroup = () => ({ addTo: () => ({ clearLayers: () => { markers.length = 0; }, addLayer: (m) => markers.push(m) }) });
+// Each layerGroup owns its items (t_f8b775ec): the field-of-view group and
+// the marker group are independent in real Leaflet, so clearing one must
+// never clear the other. The exported __markers/__paths arrays stay the
+// LIVE UNION of every group's items (addLayer appends, clearLayers removes
+// only that group's items) — existing marker-count assertions keep working.
+export const layerGroup = () => {
+  const own = [];
+  return {
+    addTo: () => ({
+      clearLayers: () => {
+        for (const item of own) {
+          const arr = item && item.__isPath ? paths : markers;
+          const index = arr.indexOf(item);
+          if (index !== -1) arr.splice(index, 1);
+        }
+        own.length = 0;
+      },
+      addLayer: (m) => {
+        own.push(m);
+        (m && m.__isPath ? paths : markers).push(m);
+      },
+    }),
+  };
+};
 export function marker(latlng, opts) {
   const m = {
     latlng, opts,
@@ -327,6 +360,19 @@ export function marker(latlng, opts) {
     setIcon: (icon) => { m.opts = { ...m.opts, icon }; return m; },
   };
   return m;
+}
+// Field-of-view geometry (t_f8b775ec): polygon/circle stubs record their
+// latlngs + options into the shared paths array (kept separate from
+// markers so existing marker-count assertions stay stable). __isPath routes
+// the layerGroup's addLayer into the right array. getElement mirrors the
+// real Path API (the component never calls it, but the contract stays).
+export function polygon(latlngs, opts) {
+  const p = { latlngs, opts, __isPath: true, getElement: () => null, addTo: (layer) => { layer.addLayer(p); return p; } };
+  return p;
+}
+export function circle(latlng, opts) {
+  const c = { latlng, opts, __isPath: true, getElement: () => null, addTo: (layer) => { layer.addLayer(c); return c; } };
+  return c;
 }
 export const divIcon = (opts) => opts;
 `);
@@ -468,6 +514,12 @@ export async function goForward() {
 export async function leafletMarkers() {
   const mod = await loadDomModule("node_modules/leaflet/index.mjs");
   return mod.__markers;
+}
+
+// Field-of-view geometry (t_f8b775ec): the recorded polygon/circle stubs.
+export async function leafletPaths() {
+  const mod = await loadDomModule("node_modules/leaflet/index.mjs");
+  return mod.__paths;
 }
 
 export async function leafletMaps() {
