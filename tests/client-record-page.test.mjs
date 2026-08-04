@@ -139,8 +139,8 @@ test("record page: found record renders public fields and revision history", asy
   await renderWithLocale(React.createElement(RecordPage));
   await screen.findByText("Fixture Public Camera");
 
-  // Public label from the whitelisted status ("Verified"), never the raw key.
-  assert.ok(screen.getByText("Verified"));
+  // Public label from the whitelisted status ("Active"), never the raw key.
+  assert.ok(screen.getByText("Active"));
   assert.equal(screen.getByText("7").tagName, "DD"); // Record ID
   assert.ok(screen.getByText("Community report"));
   // Revision history row with the localized action label; the date is

@@ -72,7 +72,9 @@ type EditRequest = { id: number; cameraId: number; status: "pending"; createdAt:
 
 type EditView = { record: OwnerRecord; editRequest: EditRequest | null };
 
-const PUBLISHED_STATUSES = ["verified", "needs_review", "stale"];
+// ADR 0021 §12.1: after migration 0039 the published status is "active"
+// ("verified" remains for legacy moderation flows).
+const PUBLISHED_STATUSES = ["active", "verified", "needs_review", "stale"];
 
 type Phase = "loading" | "login" | "notFound" | "notOwner" | "error" | "ready";
 
