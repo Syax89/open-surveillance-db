@@ -110,6 +110,7 @@ The documentation is part of the project and is intended to be discussed openly.
 - [Privacy and safety](docs/PRIVACY_AND_SAFETY.md)
 - [Accessibility statement](docs/ACCESSIBILITY_STATEMENT.md)
 - [Open-source and data licensing](docs/OPEN_SOURCE.md)
+- [Public data sources (censimento e licenze)](docs/data-sources/README.md)
 - [OpenStreetMap integration](docs/OSM_INTEGRATION.md)
 - [Deployment and operations](docs/DEPLOYMENT.md)
 - [Operations manual](docs/OPERATIONS.md)
