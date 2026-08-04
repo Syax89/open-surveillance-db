@@ -1,8 +1,8 @@
 # CSS Tokenizzazione — FIX DEBITO #1 (t_be89b99c)
 
 Task: `t_be89b99c` — tokenizzazione colori CSS (audit CEO 2026-08-04).
-Branch: `feature/design/t_be89b99c-css-tokens`.
-Stato: **completato e verificato pixel-perfect**.
+Branch: `feature/design/t_be89b99c-css-tokens` — PR: **#291**.
+Stato: **completato e verificato pixel-perfect** (attende review+merge Ada).
 
 ---
 
