@@ -25,7 +25,7 @@ const cameraFixture = {
   address: "Via Roma 1",
   latitude: 41.9004,
   longitude: 12.4936,
-  status: "verified",
+  status: "active",
   source: "Community report",
   updated: "2026-01-01T00:00:00.000Z",
   description: "",

@@ -20,7 +20,7 @@
  *
  * SurveillanceMap status-leak gate:
  *   8. markers only receive the CSS status class for whitelisted public
- *      statuses (verified/demo); pending/rejected markers render with an
+ *      statuses (active/demo); pending/rejected markers render with an
  *      empty status class (reuses the isPublicStatus whitelist).
  *
  * Fixtures are fictitious (made-up camera titles, example.test).
@@ -58,7 +58,7 @@ const publicRecordFixture = {
   id: 7,
   title: "Fixture Public Camera",
   kind: "Fixed dome",
-  status: "verified",
+  status: "active",
   latitude: 41.9004,
   longitude: 12.4936,
   source: "Community report",
@@ -71,7 +71,7 @@ const olderRecordFixture = {
   id: 6,
   title: "Older Fixture Camera",
   kind: "Dome",
-  status: "verified",
+  status: "active",
   latitude: 41.901,
   longitude: 12.494,
   source: "Community report",
@@ -83,7 +83,7 @@ const olderRecordFixture = {
 const revisionsFixture = {
   recordId: 7,
   revisions: [
-    { id: 1, action: "approve", previousStatus: "pending", newStatus: "verified", createdAt: "2026-03-01T00:00:00.000Z" },
+    { id: 1, action: "approve", previousStatus: "pending", newStatus: "active", createdAt: "2026-03-01T00:00:00.000Z" },
   ],
 };
 
@@ -253,7 +253,7 @@ test("map: markers only carry the CSS status class for whitelisted public status
   await resetLeafletMarkers();
 
   const cameras = [
-    { id: 1, title: "Verified camera", kind: "Dome", status: "verified", latitude: 41.9004, longitude: 12.4936 },
+    { id: 1, title: "Active camera", kind: "Dome", status: "active", latitude: 41.9004, longitude: 12.4936 },
     { id: 2, title: "Demo camera", kind: "Dome", status: "demo", latitude: 41.9047, longitude: 12.5031 },
     { id: 3, title: "Pending camera", kind: "Dome", status: "pending", latitude: 41.91, longitude: 12.5 },
     { id: 4, title: "Rejected camera", kind: "Dome", status: "rejected", latitude: 41.92, longitude: 12.51 },
@@ -277,10 +277,10 @@ test("map: markers only carry the CSS status class for whitelisted public status
   const htmlByTitle = Object.fromEntries(markers.map((marker) => [marker.opts.title, marker.opts.icon.html]));
 
   // Whitelisted statuses get the status class on the marker span.
-  assert.match(htmlByTitle["Verified camera"], /osm-camera-marker verified/);
+  assert.match(htmlByTitle["Active camera"], /osm-camera-marker active/);
   assert.match(htmlByTitle["Demo camera"], /osm-camera-marker demo/);
   // Selected marker also carries the selection class.
-  assert.match(htmlByTitle["Verified camera"], /osm-camera-marker verified selected/);
+  assert.match(htmlByTitle["Active camera"], /osm-camera-marker active selected/);
 
   // Non-public statuses must NOT leak as marker classes.
   assert.doesNotMatch(htmlByTitle["Pending camera"], /osm-camera-marker pending/);

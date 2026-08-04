@@ -55,7 +55,7 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 const directionalCamera = {
-  id: 1, title: "Bullet camera", kind: "Bullet", status: "verified",
+  id: 1, title: "Bullet camera", kind: "Bullet", status: "active",
   latitude: 41.9004, longitude: 12.4936, direction: 45,
 };
 const domeCamera = {
@@ -63,7 +63,7 @@ const domeCamera = {
   latitude: 41.9047, longitude: 12.5031,
 };
 const noDirectionCamera = {
-  id: 3, title: "Unknown camera", kind: "Bullet", status: "verified",
+  id: 3, title: "Unknown camera", kind: "Bullet", status: "active",
   latitude: 41.902, longitude: 12.499, direction: null,
 };
 

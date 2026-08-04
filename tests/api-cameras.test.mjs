@@ -72,7 +72,7 @@ const cameraFixture = {
   // Dome fixture (kind "Fixed dome"): the dome rule (t_1b08fe12) means the
   // stored direction is always NULL — the map renders it circular.
   direction: null,
-  status: "verified",
+  status: "active",
   source: "Community report",
   updated: "2026-01-01T00:00:00.000Z",
   description: "",
@@ -167,7 +167,7 @@ test("GET /api/cameras?format=csv escapes quotes and neutralises spreadsheet for
     kind: "Fixed dome",
     manufacturer: "-leading",
     observedOn: "2026-01-01",
-    status: "verified",
+    status: "active",
     source: "Community report",
     updated: "2026-01-01T00:00:00.000Z",
     description: 'He said "hi", ok',
@@ -188,7 +188,7 @@ test("GET /api/cameras?format=csv escapes quotes and neutralises spreadsheet for
   assert.match(csv, /^id,title,kind,manufacturer,observed_on,status,source,updated,description,address,latitude,longitude,direction\n/);
   assert.match(
     csv,
-    /"1","'=SUM\(A1:A2\)","Fixed dome","'-leading","2026-01-01","verified","Community report","2026-01-01T00:00:00\.000Z","He said ""hi"", ok","","41\.9004","12\.4936",""\n/,
+    /"1","'=SUM\(A1:A2\)","Fixed dome","'-leading","2026-01-01","active","Community report","2026-01-01T00:00:00\.000Z","He said ""hi"", ok","","41\.9004","12\.4936",""\n/,
     "formula injection must be neutralised with a leading apostrophe, quotes doubled, nulls empty (direction NULL = blank cell)",
   );
   // ODbL 1.0 attribution (TERMS § 7.1): the CSV export must end with the

@@ -313,7 +313,7 @@ test("decideAppeal enforces the independence and seniority rules", async () => {
   assert.equal(events.length, 3);
   assert.equal(events[2].action, "appeal-uphold");
   assert.equal(events[2].appeal_id, appealId);
-  assert.equal(events[2].previous_status, "verified");
+  assert.equal(events[2].previous_status, "active");
   assert.equal(events[2].new_status, "pending");
 });
 
@@ -368,9 +368,9 @@ test("decideAppeal: the original reviewer is blocked; escalation needs a note an
   assert.equal(adminDismisses.kind, "ok");
   assert.equal(adminDismisses.appeal.status, "dismissed");
 
-  // A dismissed appeal changes nothing: the record stays verified.
+  // A dismissed appeal changes nothing: the record stays active.
   const row = await env.DB.prepare("SELECT status FROM cameras WHERE id = ?").bind(record.id).first();
-  assert.equal(row.status, "verified");
+  assert.equal(row.status, "active");
 });
 
 test("listAppeals returns the joined display fields, newest first", async () => {

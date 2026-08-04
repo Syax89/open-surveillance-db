@@ -2,7 +2,7 @@
 //
 // Wave A (tests/publication-boundaries.test.mjs, tests/db-public-contracts
 // .test.mjs) established the public read boundary with static guarantees and
-// runtime checks for the verified/demo whitelist. Wave B closes the loop:
+// runtime checks for the active/demo whitelist. Wave B closes the loop:
 //
 //   1. SINGLE SOURCE OF TRUTH: the public status whitelist lives in exactly
 //      one place — PUBLIC_CAMERA_STATUSES in app/lib/public-status.ts — and
@@ -42,7 +42,7 @@ after(async () => cleanupRouteTree());
 // may ever cross the public boundary.
 const KNOWN_STATUSES = [
   "pending",
-  "verified",
+  "active",
   "demo",
   "needs_review",
   "stale",
@@ -78,7 +78,7 @@ async function insertCamera(d1, status, overrides = {}) {
 // 1. Single source of truth
 // ---------------------------------------------------------------------------
 
-test("PUBLIC_CAMERA_STATUSES is the single whitelist: exactly verified and demo", async () => {
+test("PUBLIC_CAMERA_STATUSES is the single whitelist: exactly active and demo", async () => {
   const shared = await readSource("app/lib/public-status.ts");
   const match = shared.match(/export\s+const\s+PUBLIC_CAMERA_STATUSES\s*=\s*\[([^\]]*)\]\s*as\s+const/);
   assert.ok(match, "the shared module must declare PUBLIC_CAMERA_STATUSES as a const array");
@@ -86,8 +86,8 @@ test("PUBLIC_CAMERA_STATUSES is the single whitelist: exactly verified and demo"
   const statuses = [...match[1].matchAll(/['"]([^'"]+)['"]/g)].map((entry) => entry[1]);
   assert.deepEqual(
     statuses,
-    ["verified", "demo"],
-    "only verified and demo may be public; any new public status must be a deliberate change here",
+    ["active", "demo"],
+    "only active and demo may be public; any new public status must be a deliberate change here",
   );
 });
 
@@ -117,7 +117,7 @@ test("both public SQL queries derive the status whitelist from the shared predic
   assert.match(list, /publicCameraPredicate\(/, "the list query must use the shared predicate");
   assert.doesNotMatch(
     list,
-    /status\s+IN\s*\(\s*['"](?:verified|demo)['"]/,
+    /status\s+IN\s*\(\s*['"](?:active|demo)['"]/,
     "the list query must not hand-write the status whitelist",
   );
 
@@ -125,7 +125,7 @@ test("both public SQL queries derive the status whitelist from the shared predic
   assert.match(byId, /publicCameraPredicate\(/, "the by-id lookup must use the shared predicate");
   assert.doesNotMatch(
     byId,
-    /status\s+IN\s*\(\s*['"](?:verified|demo)['"]/,
+    /status\s+IN\s*\(\s*['"](?:active|demo)['"]/,
     "the by-id lookup must not hand-write the status whitelist",
   );
 
@@ -193,7 +193,7 @@ test("runtime: listPublicCameras returns exactly the whitelisted statuses (real 
     const returned = records.filter((record) => record.source === "Community report");
     assert.deepEqual(
       returned.map((record) => record.status).sort(),
-      ["demo", "verified"],
+      ["active", "demo"],
       `no record outside PUBLIC_CAMERA_STATUSES may cross the boundary (got: ${returned
         .map((record) => record.status)
         .join(", ")})`,
@@ -201,8 +201,8 @@ test("runtime: listPublicCameras returns exactly the whitelisted statuses (real 
     const returnedIds = returned.map((record) => record.id).sort();
     assert.deepEqual(
       returnedIds,
-      [ids.demo, ids.verified].sort(),
-      "the returned rows must be exactly the seeded verified and demo records",
+      [ids.demo, ids.active].sort(),
+      "the returned rows must be exactly the seeded active and demo records",
     );
   } finally {
     delete env.ENVIRONMENT;
@@ -217,7 +217,7 @@ test("runtime: getPublicCameraById resolves only whitelisted statuses (real SQL)
   try {
     const ids = await seedAllStatuses();
 
-    for (const status of ["verified", "demo"]) {
+    for (const status of ["active", "demo"]) {
       const record = await cameras.getPublicCameraById(ids[status]);
       assert.ok(record, `${status} must resolve through the public by-id lookup`);
       assert.equal(record.status, status);
@@ -241,7 +241,7 @@ test("runtime: the nearby search also stays behind the whitelist (real SQL)", as
 
     const nearby = await cameras.findNearbyPublicCameras(44.1, 12.2, 500);
     const titles = nearby.map((record) => record.title);
-    assert.ok(titles.includes("Record verified"), "verified records must be searchable");
+    assert.ok(titles.includes("Record active"), "active records must be searchable");
     assert.ok(titles.includes("Record demo"), "demo records must be searchable");
     for (const status of ["pending", "needs_review", "stale", "rejected", "removed"]) {
       assert.ok(!titles.includes(`Record ${status}`), `${status} records must never be searchable`);
@@ -257,7 +257,7 @@ test("runtime: a whitelisted status still respects the freshness window (real SQ
   await applyDrizzleMigrations(env.DB);
   await env.DB.prepare("DELETE FROM cameras").run();
 
-  const fresh = await insertCamera(env.DB, "verified", { title: "Fresh verified", updated: "2026-07-01T00:00:00.000Z" });
+  const fresh = await insertCamera(env.DB, "active", { title: "Fresh active", updated: "2026-07-01T00:00:00.000Z" });
   await env.DB.prepare("UPDATE cameras SET last_verified_at = '2026-07-01T00:00:00.000Z', review_due_at = '2026-07-02T00:00:00.000Z', review_interval_months = 12 WHERE id = ?").bind(fresh.id).run();
 
   const inWindow = await cameras.listPublicCameras("2026-07-01T12:00:00.000Z");
@@ -274,9 +274,9 @@ test("runtime: a whitelisted status still respects the freshness window (real SQ
 // 3. Client hardening (runtime on the real client modules)
 // ---------------------------------------------------------------------------
 
-test("client: isPublicStatus whitelists only verified and demo", async () => {
+test("client: isPublicStatus whitelists only active and demo", async () => {
   const { isPublicStatus } = await loadLib("app/lib/public-status.mjs");
-  assert.equal(isPublicStatus("verified"), true);
+  assert.equal(isPublicStatus("active"), true);
   assert.equal(isPublicStatus("demo"), true);
   for (const status of ["pending", "needs_review", "stale", "rejected", "removed", ""]) {
     assert.equal(isPublicStatus(status), false, `${status} must not be client-whitelisted`);
@@ -285,9 +285,9 @@ test("client: isPublicStatus whitelists only verified and demo", async () => {
 
 test("client: publicStatusLabel never renders a non-public status verbatim", async () => {
   const { publicStatusLabel } = await loadLib("app/lib/public-status.mjs");
-  const labels = { verified: "Verified", demo: "Illustrative record" };
+  const labels = { active: "Active", demo: "Illustrative record" };
 
-  assert.equal(publicStatusLabel(labels, "verified", "Status"), "Verified");
+  assert.equal(publicStatusLabel(labels, "active", "Status"), "Active");
   assert.equal(publicStatusLabel(labels, "demo", "Status"), "Illustrative record");
   assert.equal(
     publicStatusLabel(labels, "needs_review", "Status"),
@@ -297,7 +297,7 @@ test("client: publicStatusLabel never renders a non-public status verbatim", asy
   assert.equal(publicStatusLabel(labels, "stale", "Status"), "Status");
   assert.equal(publicStatusLabel(labels, "pending", "Status"), "Status");
   assert.equal(publicStatusLabel(labels, "unknown-future-status", "Status"), "Status");
-  assert.equal(publicStatusLabel({}, "verified", "Status"), "Status", "missing label falls back too");
+  assert.equal(publicStatusLabel({}, "active", "Status"), "Status", "missing label falls back too");
 });
 
 test("client: publicRecords drops non-whitelisted records before rendering", async () => {
@@ -314,11 +314,11 @@ test("client: publicRecords drops non-whitelisted records before rendering", asy
     description: "",
   });
 
-  const mixed = ["verified", "demo", "pending", "stale", "removed"].map(makeRecord);
+  const mixed = ["active", "demo", "pending", "stale", "removed"].map(makeRecord);
   const filtered = publicRecords(mixed);
   assert.deepEqual(
     filtered.map((record) => record.status),
-    ["verified", "demo"],
+    ["active", "demo"],
     "only whitelisted records may reach the components",
   );
   assert.deepEqual(publicRecords([]), []);

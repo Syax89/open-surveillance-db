@@ -78,7 +78,7 @@ const makeCamera = (id, overrides = {}) => ({
   id,
   title: `Camera ${id}`,
   kind: "Dome",
-  status: "verified",
+  status: "active",
   latitude: 41.9 + id / 1000,
   longitude: 12.49,
   source: "Community report",
@@ -210,8 +210,8 @@ test("applyCameraFilters P1-2: a real record with a non-parseable updated is KEP
   // compute NaN and drop a verified record — it has no freshness signal, so
   // it stays visible (the descriptive text lives in the moderation note).
   const records = [
-    makeCamera(1, { title: "Legacy verified", status: "verified", lastVerifiedAt: null, updated: "Local moderation: rejected" }),
-    makeCamera(2, { title: "Modern verified", status: "verified", lastVerifiedAt: "2026-07-30T00:00:00.000Z" }),
+    makeCamera(1, { title: "Legacy verified", status: "active", lastVerifiedAt: null, updated: "Local moderation: rejected" }),
+    makeCamera(2, { title: "Modern verified", status: "active", lastVerifiedAt: "2026-07-30T00:00:00.000Z" }),
   ];
   const filtered = applyCameraFilters(records, {
     q: "", type: "all", freshness: "7d", sort: "alphabetical", focus: null,
@@ -228,7 +228,7 @@ test("applyCameraFilters P1-2: demo pins keep the truthful empty-note contract (
   // applies to REAL records only.
   const records = [
     makeCamera(1, { title: "Illustrative record A", status: "demo", lastVerifiedAt: null, updated: "Demo data" }),
-    makeCamera(2, { title: "Verified real", status: "verified", lastVerifiedAt: "2026-07-30T00:00:00.000Z" }),
+    makeCamera(2, { title: "Verified real", status: "active", lastVerifiedAt: "2026-07-30T00:00:00.000Z" }),
   ];
   const filtered = applyCameraFilters(records, {
     q: "", type: "all", freshness: "7d", sort: "alphabetical", focus: null,

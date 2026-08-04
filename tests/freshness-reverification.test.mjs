@@ -97,15 +97,15 @@ test("freshness phases: current, review_due, stale, not_applicable", async () =>
   assert.equal(evaluateFreshness({ status: "removed", reviewDueAt: null }, now), "not_applicable");
 });
 
-test("isPubliclyCurrent: only demo and in-window verified records", async () => {
+test("isPubliclyCurrent: only demo and in-window active records", async () => {
   const { freshness } = await freshRuntime();
   const { isPubliclyCurrent } = freshness;
   const now = "2026-07-31T00:00:00.000Z";
 
   assert.equal(isPubliclyCurrent({ status: "demo", reviewDueAt: null }, now), true);
-  assert.equal(isPubliclyCurrent({ status: "verified", reviewDueAt: "2026-12-31T00:00:00.000Z" }, now), true);
-  assert.equal(isPubliclyCurrent({ status: "verified", reviewDueAt: null }, now), true);
-  assert.equal(isPubliclyCurrent({ status: "verified", reviewDueAt: "2026-01-01T00:00:00.000Z" }, now), false);
+  assert.equal(isPubliclyCurrent({ status: "active", reviewDueAt: "2026-12-31T00:00:00.000Z" }, now), true);
+  assert.equal(isPubliclyCurrent({ status: "active", reviewDueAt: null }, now), true);
+  assert.equal(isPubliclyCurrent({ status: "active", reviewDueAt: "2026-01-01T00:00:00.000Z" }, now), false);
   assert.equal(isPubliclyCurrent({ status: "needs_review", reviewDueAt: "2026-12-31T00:00:00.000Z" }, now), false);
   assert.equal(isPubliclyCurrent({ status: "stale", reviewDueAt: "2026-01-01T00:00:00.000Z" }, now), false);
   assert.equal(isPubliclyCurrent({ status: "pending", reviewDueAt: null }, now), false);
@@ -129,7 +129,7 @@ test("approval restarts the freshness clocks and publishes the record", async ()
 
   const decision = await approveFirstPending(moderation);
   const item = decision.item;
-  assert.equal(item.status, "verified");
+  assert.equal(item.status, "active");
   assert.ok(item.lastVerifiedAt, "approval must record last_verified_at");
   assert.ok(item.reviewDueAt, "approval must schedule the next review");
   assert.equal(item.reviewIntervalMonths, 12);
@@ -141,11 +141,11 @@ test("approval restarts the freshness clocks and publishes the record", async ()
   const publicList = await cameras.listPublicCameras();
   assert.ok(
     publicList.some((record) => record.id === item.id),
-    "a fresh verified record must be publicly current",
+    "a fresh active record must be publicly current",
   );
 });
 
-test("a verified record past its review window is never presented as current", async () => {
+test("an active record past its review window is never presented as current", async () => {
   const { cameras, moderation } = await freshRuntime();
   await cameras.createPendingCamera({
     title: "Scheduled review overdue",
@@ -159,7 +159,7 @@ test("a verified record past its review window is never presented as current", a
   });
   const decision = await approveFirstPending(moderation);
   const item = decision.item;
-  assert.equal(item.status, "verified");
+  assert.equal(item.status, "active");
 
   // Time travel: as of one day after the scheduled review, the record must
   // drop out of the public list even though the sweep has not run yet.
@@ -167,7 +167,7 @@ test("a verified record past its review window is never presented as current", a
   const publicList = await cameras.listPublicCameras(overdue);
   assert.ok(
     !publicList.some((record) => record.id === item.id),
-    "a verified record past its review date must not be published as current",
+    "an active record past its review date must not be published as current",
   );
 });
 
@@ -251,7 +251,7 @@ test("sweep: verified past its review window moves to needs_review with an event
   assert.ok(!queue.publishedCameras.some((record) => record.id === item.id), "expired record must leave the published list");
   const event = queue.recentEvents.find((entry) => entry.entityId === item.id && entry.action === "scheduled-expiry");
   assert.equal(event?.action, "scheduled-expiry");
-  assert.equal(event?.previousStatus, "verified");
+  assert.equal(event?.previousStatus, "active");
   assert.equal(event?.newStatus, "needs_review");
 
   // And it must not be public under the same clock.
@@ -342,7 +342,7 @@ test("reverify from needs_review restarts the clocks and republishes", async () 
 
   const reverified = await moderation.moderateCamera(item.id, "reverify", REASON.verified, null);
   assert.ok(reverified, "reverify must succeed from needs_review");
-  assert.equal(reverified.item.status, "verified");
+  assert.equal(reverified.item.status, "active");
   assert.ok(new Date(reverified.item.lastVerifiedAt) >= new Date(item.lastVerifiedAt), "last_verified_at must not go backwards");
   assert.ok(new Date(reverified.item.reviewDueAt) >= new Date(item.reviewDueAt), "review due must be rescheduled from the re-verification time");
 
@@ -374,7 +374,7 @@ test("reverify from stale reconfirms the record and republishes it", async () =>
 
   const reverified = await moderation.moderateCamera(item.id, "reverify", REASON.verified, "confirmed on site");
   assert.ok(reverified, "reverify must succeed from stale");
-  assert.equal(reverified.item.status, "verified");
+  assert.equal(reverified.item.status, "active");
 
   const publicList = await cameras.listPublicCameras();
   assert.ok(publicList.some((record) => record.id === item.id), "reconfirmed record must be public again");
@@ -482,7 +482,7 @@ test("the scheduled-expiry sweep transitions and events are explicit", async () 
   assert.match(moderation, /action:\s*"scheduled-expiry"/, "verified -> needs_review must record a scheduled-expiry event");
   assert.match(moderation, /action:\s*"expiry-not-reconfirmed"/, "needs_review -> stale must record an expiry event");
   assert.match(moderation, /STALE_GRACE_DAYS/, "the stale grace period must drive the second sweep step");
-  assert.match(moderation, /previousStatus\s*===\s*"stale"[\s\S]*newStatus:\s*"verified"/, "stale records must be re-verifiable");
+  assert.match(moderation, /previousStatus\s*===\s*"stale"[\s\S]*newStatus:\s*"active"/, "stale records must be re-verifiable");
 });
 
 test("freshness constants follow DATA_TRUST clocks (12 months / 90 days)", async () => {

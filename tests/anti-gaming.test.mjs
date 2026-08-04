@@ -46,7 +46,7 @@ after(async () => cleanupDbRuntime());
 let contributorSeq = 0;
 
 // Raw INSERT of a camera with every NOT NULL column (nullable metadata uses
-// its fixture default). `status` defaults to verified (public, no review
+// its fixture default). `status` defaults to active (public, no review
 // window when reviewDueAt stays null).
 async function insertCamera(overrides = {}) {
   const row = {
@@ -60,7 +60,7 @@ async function insertCamera(overrides = {}) {
     notes: "",
     latitude: 44.1,
     longitude: 12.2,
-    status: "verified",
+    status: "active",
     source: "Community report",
     updated: "Test update",
     description: "",
@@ -123,7 +123,7 @@ async function insertContributor(overrides = {}) {
 // A contributor who clears the level gate: owns one verified camera.
 async function makeVerifiedContributor() {
   const contributorId = await insertContributor();
-  await insertCamera({ contributorId, status: "verified" });
+  await insertCamera({ contributorId, status: "active" });
   return contributorId;
 }
 
@@ -234,7 +234,7 @@ test("only publicly current cameras can be confirmed", async (t) => {
   }
   await t.test("verified but review-due in the past", async () => {
     const verifier = await makeVerifiedContributor();
-    const cameraId = await insertCamera({ status: "verified", reviewDueAt: "2026-01-01T00:00:00.000Z" });
+    const cameraId = await insertCamera({ status: "active", reviewDueAt: "2026-01-01T00:00:00.000Z" });
     const result = await setConfirmation(cameraId, verifier);
     assert.equal(result.kind, "camera_not_public");
   });
@@ -323,7 +323,7 @@ test("per-record cap: 5 distinct contributors, the 6th answers 429", async () =>
 // ---------------------------------------------------------------------------
 
 test("decay: confirmations before last_verified_at do not count; a re-verified record renews", async () => {
-  const cameraId = await insertCamera({ status: "verified", lastVerifiedAt: "2026-08-10T00:00:00.000Z" });
+  const cameraId = await insertCamera({ status: "active", lastVerifiedAt: "2026-08-10T00:00:00.000Z" });
   const first = await insertContributor();
   const second = await insertContributor();
 

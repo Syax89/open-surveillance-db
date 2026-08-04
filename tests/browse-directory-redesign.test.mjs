@@ -35,7 +35,7 @@ const TWENTY_FIVE = Array.from({ length: 25 }, (_, i) => ({
   id: i + 1,
   title: `Record number ${i + 1}`,
   kind: i < 22 ? "Fixed dome" : "Bullet",
-  status: "verified",
+  status: "active",
   latitude: 41.9 + i * 0.001,
   longitude: 12.49 + i * 0.0001,
   source: "Community report",
@@ -46,10 +46,10 @@ const TWENTY_FIVE = Array.from({ length: 25 }, (_, i) => ({
 
 /** 4 records whose titles start with distinct letters (A/B/G/D). */
 const FOUR_LETTERS = [
-  { id: 1, title: "Alpha one", kind: "Fixed dome", status: "verified", latitude: 41.9, longitude: 12.49, source: "Community report", updated: "2026-07-01", description: "Illustrative fixture record.", address: "Via Alpha 1" },
-  { id: 2, title: "Beta two", kind: "Bullet", status: "verified", latitude: 41.91, longitude: 12.5, source: "Community report", updated: "2026-07-01", description: "Illustrative fixture record.", address: "Via Beta 2" },
-  { id: 3, title: "Gamma three", kind: "Fixed dome", status: "verified", latitude: 41.92, longitude: 12.51, source: "Community report", updated: "2026-07-01", description: "Illustrative fixture record.", address: "Via Gamma 3" },
-  { id: 4, title: "Delta four", kind: "Bullet", status: "verified", latitude: 41.93, longitude: 12.52, source: "Community report", updated: "2026-07-01", description: "Illustrative fixture record.", address: "Via Delta 4" },
+  { id: 1, title: "Alpha one", kind: "Fixed dome", status: "active", latitude: 41.9, longitude: 12.49, source: "Community report", updated: "2026-07-01", description: "Illustrative fixture record.", address: "Via Alpha 1" },
+  { id: 2, title: "Beta two", kind: "Bullet", status: "active", latitude: 41.91, longitude: 12.5, source: "Community report", updated: "2026-07-01", description: "Illustrative fixture record.", address: "Via Beta 2" },
+  { id: 3, title: "Gamma three", kind: "Fixed dome", status: "active", latitude: 41.92, longitude: 12.51, source: "Community report", updated: "2026-07-01", description: "Illustrative fixture record.", address: "Via Gamma 3" },
+  { id: 4, title: "Delta four", kind: "Bullet", status: "active", latitude: 41.93, longitude: 12.52, source: "Community report", updated: "2026-07-01", description: "Illustrative fixture record.", address: "Via Delta 4" },
 ];
 
 function installRecords(records) {

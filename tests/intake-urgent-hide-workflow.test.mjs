@@ -79,7 +79,7 @@ async function toStatus(id, status, reason = REASON.verified) {
     publishObservedOn: false,
   });
   assert.ok(approved, `approve on pending #${id} must succeed`);
-  if (status === "verified") return;
+  if (status === "active") return;
   const secondReason = status === "removed" ? REASON.privacy : REASON.stale;
   const second =
     status === "rejected"
@@ -140,7 +140,7 @@ test("a removal-style intake accepts a request without an identifiable cameraId"
 
 test("creating a correction request never alters the referenced camera", async () => {
   const report = await cameras.createPendingCamera(reportInput);
-  await toStatus(report.id, "verified");
+  await toStatus(report.id, "active");
 
   await corrections.createCorrectionRequest({
     cameraId: report.id,
@@ -152,7 +152,7 @@ test("creating a correction request never alters the referenced camera", async (
   const records = await cameras.listPublicCameras();
   const record = publicRecordById(records, report.id);
   assert.ok(record, "a plain correction request must not hide the record automatically");
-  assert.equal(record.status, "verified");
+  assert.equal(record.status, "active");
   assert.equal(record.latitude, reportInput.latitude);
   assert.equal(record.longitude, reportInput.longitude);
 });
@@ -163,7 +163,7 @@ test("creating a correction request never alters the referenced camera", async (
 
 test("a verified camera disappears from the public list after an urgent hide", async () => {
   const report = await cameras.createPendingCamera(reportInput);
-  await toStatus(report.id, "verified");
+  await toStatus(report.id, "active");
 
   const before = await cameras.listPublicCameras();
   assert.ok(publicRecordById(before, report.id), "the verified record must be public before the hide");
@@ -193,7 +193,7 @@ test("a verified camera disappears from the public list after an urgent hide", a
 
 test("an urgent hide removes the record from every public surface, not just the list", async () => {
   const report = await cameras.createPendingCamera(reportInput);
-  await toStatus(report.id, "verified");
+  await toStatus(report.id, "active");
   await moderation.moderateCamera(report.id, "hide", REASON.privacy, "Urgent hide pending review");
 
   // 1. Public list (JSON/GeoJSON/CSV are all derived from this query).
@@ -213,7 +213,7 @@ test("an urgent hide removes the record from every public surface, not just the 
 
 test("an urgent hide writes an auditable event with the full transition", async () => {
   const report = await cameras.createPendingCamera(reportInput);
-  await toStatus(report.id, "verified");
+  await toStatus(report.id, "active");
 
   const hidden = await moderation.moderateCamera(
     report.id,
@@ -224,7 +224,7 @@ test("an urgent hide writes an auditable event with the full transition", async 
 
   assert.equal(hidden.event.entity, "camera");
   assert.equal(hidden.event.entityId, report.id);
-  assert.equal(hidden.event.previousStatus, "verified");
+  assert.equal(hidden.event.previousStatus, "active");
   assert.equal(hidden.event.newStatus, "removed");
   assert.equal(hidden.event.action, "hide");
   assert.equal(hidden.event.reasonCode, REASON.privacy);
@@ -235,7 +235,7 @@ test("an urgent hide writes an auditable event with the full transition", async 
   const queue = await moderation.listPendingModerationItems();
   const matchingEvent = queue.recentEvents.find((event) => event.entityId === report.id);
   assert.ok(matchingEvent, "the hide must be visible in the recent audit events");
-  assert.equal(matchingEvent.previousStatus, "verified");
+  assert.equal(matchingEvent.previousStatus, "active");
   assert.equal(matchingEvent.newStatus, "removed");
 });
 
@@ -245,7 +245,7 @@ test("both privacy/safety reason codes are accepted for the urgent hide", async 
     ["private-or-sensitive-location", REASON.sensitive],
   ]) {
     const report = await cameras.createPendingCamera({ ...reportInput, title: `Camera ${name}` });
-    await toStatus(report.id, "verified");
+    await toStatus(report.id, "active");
     const hidden = await moderation.moderateCamera(report.id, "hide", reason, null);
     assert.ok(hidden, `${name}: hide must succeed`);
     assert.equal(hidden.item.status, "removed", name);
@@ -266,7 +266,7 @@ test("an urgent hide also works on a record already under review", async () => {
 
 test("an urgent hide also works on a stale record", async () => {
   const report = await cameras.createPendingCamera(reportInput);
-  await toStatus(report.id, "verified");
+  await toStatus(report.id, "active");
   await moderation.moderateCamera(report.id, "mark-stale", REASON.stale, null);
   await moderation.moderateCamera(report.id, "hide", REASON.privacy, null);
   assert.equal((await cameras.listPublicCameras()).some((r) => r.id === report.id), false);
@@ -274,7 +274,7 @@ test("an urgent hide also works on a stale record", async () => {
 
 test("a removed record cannot be reverted to a public status by any action", async () => {
   const report = await cameras.createPendingCamera(reportInput);
-  await toStatus(report.id, "verified");
+  await toStatus(report.id, "active");
   await moderation.moderateCamera(report.id, "hide", REASON.privacy, null);
 
   // No transition leads out of `removed` in the current lifecycle.
@@ -293,7 +293,7 @@ test("a removed record cannot be reverted to a public status by any action", asy
 
 test("a privacy/safety request is resolved with a removed outcome against the hidden record", async () => {
   const report = await cameras.createPendingCamera(reportInput);
-  await toStatus(report.id, "verified");
+  await toStatus(report.id, "active");
 
   const request = await corrections.createCorrectionRequest({
     cameraId: report.id,
@@ -395,14 +395,14 @@ test("pending reports never appear in the public list", async () => {
   assert.equal(report.status, "pending");
 });
 
-test("the public list returns only verified records on a migrated database", async () => {
+test("the public list returns only active records on a migrated database", async () => {
   const report = await cameras.createPendingCamera(reportInput);
-  await toStatus(report.id, "verified");
+  await toStatus(report.id, "active");
   await moderation.moderateCamera(report.id, "mark-stale", REASON.stale, null);
 
   const records = await cameras.listPublicCameras();
   for (const record of records) {
-    assert.equal(record.status, "verified", `unexpected public status ${record.status}`);
+    assert.equal(record.status, "active", `unexpected public status ${record.status}`);
   }
   assert.equal(publicRecordById(records, report.id), undefined);
 });

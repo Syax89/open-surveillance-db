@@ -57,7 +57,7 @@ const domeCamera = {
   id: 1,
   title: "Fixture public camera",
   kind: "Dome",
-  status: "verified",
+  status: "active",
   latitude: 41.9,
   longitude: 12.49,
   source: "Community report",

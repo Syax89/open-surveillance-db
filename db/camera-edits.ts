@@ -145,7 +145,7 @@ export type ApplyCameraEditResult =
   // edit now waits for a human moderator. 202.
   | { kind: "edit_request_created"; editRequest: EditRequestSummary };
 
-export const PUBLISHED_EDITABLE_STATUSES = ["verified", "needs_review", "stale"] as const;
+export const PUBLISHED_EDITABLE_STATUSES = ["active", "needs_review", "stale"] as const;
 export const TERMINAL_EDITABLE_STATUSES = ["removed", "rejected"] as const;
 
 /**

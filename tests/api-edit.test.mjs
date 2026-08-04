@@ -723,7 +723,7 @@ test("E3 real SQL: published-record edit proposes direction and approve applies 
   await freshDb();
   const ownerId = await insertContributor();
   const cameraId = await insertCamera({
-    contributorId: ownerId, status: "verified", kind: "PTZ", direction: null,
+    contributorId: ownerId, status: "active", kind: "PTZ", direction: null,
     lastVerifiedAt: NOW, reviewDueAt: "2027-08-01T00:00:00.000Z",
   });
 
@@ -761,7 +761,7 @@ test("E3 real SQL: moderation queue exposes proposedDirection and currentDirecti
   await freshDb();
   const ownerId = await insertContributor();
   const cameraId = await insertCamera({
-    contributorId: ownerId, status: "verified", kind: "PTZ", direction: 45,
+    contributorId: ownerId, status: "active", kind: "PTZ", direction: 45,
     lastVerifiedAt: NOW, reviewDueAt: "2027-08-01T00:00:00.000Z",
   });
 
@@ -783,7 +783,7 @@ test("E3 real SQL: the dome rule is re-applied at moderation apply time (belt-an
   await freshDb();
   const ownerId = await insertContributor();
   const cameraId = await insertCamera({
-    contributorId: ownerId, status: "verified", kind: "PTZ", direction: 90,
+    contributorId: ownerId, status: "active", kind: "PTZ", direction: 90,
     lastVerifiedAt: NOW, reviewDueAt: "2027-08-01T00:00:00.000Z",
   });
 
@@ -872,7 +872,7 @@ test("E3 real SQL: published-record edit creates the diff + moderation_queue row
   await freshDb();
   const ownerId = await insertContributor();
   const cameraId = await insertCamera({
-    contributorId: ownerId, status: "verified", title: "Old title", lastVerifiedAt: NOW, reviewDueAt: "2027-08-01T00:00:00.000Z",
+    contributorId: ownerId, status: "active", title: "Old title", lastVerifiedAt: NOW, reviewDueAt: "2027-08-01T00:00:00.000Z",
   });
 
   const result = await cameraEdits.applyCameraEdit({
@@ -902,7 +902,7 @@ test("E3 real SQL: approve applies the diff and records edit_applied, queue clos
   await freshDb();
   const ownerId = await insertContributor();
   const cameraId = await insertCamera({
-    contributorId: ownerId, status: "verified", title: "Old title", notes: "Old notes",
+    contributorId: ownerId, status: "active", title: "Old title", notes: "Old notes",
     lastVerifiedAt: NOW, reviewDueAt: "2027-08-01T00:00:00.000Z",
   });
   const created = await cameraEdits.applyCameraEdit({
@@ -943,7 +943,7 @@ test("E3 real SQL: approve is idempotent — a second approve never re-applies o
   await freshDb();
   const ownerId = await insertContributor();
   const cameraId = await insertCamera({
-    contributorId: ownerId, status: "verified", title: "Old title",
+    contributorId: ownerId, status: "active", title: "Old title",
     lastVerifiedAt: NOW, reviewDueAt: "2027-08-01T00:00:00.000Z",
   });
   const created = await cameraEdits.applyCameraEdit({
@@ -970,7 +970,7 @@ test("E3 real SQL: reject discards the diff and records edit_rejected", async ()
   await freshDb();
   const ownerId = await insertContributor();
   const cameraId = await insertCamera({
-    contributorId: ownerId, status: "verified", title: "Old title",
+    contributorId: ownerId, status: "active", title: "Old title",
     lastVerifiedAt: NOW, reviewDueAt: "2027-08-01T00:00:00.000Z",
   });
   const created = await cameraEdits.applyCameraEdit({
@@ -1011,7 +1011,7 @@ test("E3 real SQL: the partial unique yields exactly one open edit-request per c
   await freshDb();
   const ownerId = await insertContributor();
   const cameraId = await insertCamera({
-    contributorId: ownerId, status: "verified", title: "Old title",
+    contributorId: ownerId, status: "active", title: "Old title",
     lastVerifiedAt: NOW, reviewDueAt: "2027-08-01T00:00:00.000Z",
   });
 
@@ -1035,7 +1035,7 @@ test("E10 real SQL: eraseContributor de-attributes pending and decided edit requ
   await freshDb();
   const ownerId = await insertContributor();
   const cameraId = await insertCamera({
-    contributorId: ownerId, status: "verified", title: "Old title",
+    contributorId: ownerId, status: "active", title: "Old title",
     lastVerifiedAt: NOW, reviewDueAt: "2027-08-01T00:00:00.000Z",
   });
   const created = await cameraEdits.applyCameraEdit({

@@ -69,7 +69,7 @@ async function insertCamera(env, overrides = {}) {
     notes: "",
     latitude: 44.1,
     longitude: 12.2,
-    status: "verified",
+    status: "active",
     source: "Community report",
     updated: "Test update",
     description: "",
@@ -105,7 +105,7 @@ test("a fresh database starts empty: no demo records are seeded at runtime", asy
   assert.equal(records.length, 0, "no demo records may be seeded at runtime (H3)");
 });
 
-test("the public camera query returns only verified and demo records", async () => {
+test("the public camera query returns only active and demo records", async () => {
   const { env, cameras } = await realDb();
   await resetDb({ env, cameras });
   // ADR 0008 demo gate (t_d7a4b99b): `demo` records are public ONLY in the
@@ -114,7 +114,7 @@ test("the public camera query returns only verified and demo records", async () 
   // duration of the test.
   env.ENVIRONMENT = "development";
   try {
-    const statuses = ["pending", "needs_review", "rejected", "removed", "stale", "verified", "demo"];
+    const statuses = ["pending", "needs_review", "rejected", "removed", "stale", "active", "demo"];
     for (const status of statuses) {
       await insertCamera(env, { title: `Record ${status}`, status });
     }
@@ -123,7 +123,7 @@ test("the public camera query returns only verified and demo records", async () 
     const returned = records.filter((record) => record.source === "Community report");
     assert.deepEqual(
       returned.map((record) => record.status).sort(),
-      ["demo", "verified"],
+      ["active", "demo"],
       "pending/needs_review/rejected/removed/stale must never cross the public boundary",
     );
   } finally {
@@ -134,7 +134,7 @@ test("the public camera query returns only verified and demo records", async () 
 test("the public camera query never selects the private notes field", async () => {
   const { env, cameras } = await realDb();
   await resetDb({ env, cameras });
-  await insertCamera(env, { title: "Sensitive", status: "verified", notes: "INTAKE SECRET" });
+  await insertCamera(env, { title: "Sensitive", status: "active", notes: "INTAKE SECRET" });
 
   const [record] = await cameras.listPublicCameras();
   assert.equal(record.title, "Sensitive");
@@ -268,8 +268,8 @@ test("listPublicCamerasPage applies the same public boundary, filters and coordi
   const { env, cameras } = await realDb();
   await resetDb({ env, cameras });
   await insertCamera(env, { title: "Hidden pending", status: "pending", kind: "PTZ" });
-  await insertCamera(env, { title: "Verified dome", status: "verified", kind: "Fixed dome", latitude: 44.12346, longitude: 12.34568 });
-  await insertCamera(env, { title: "Verified ptz", status: "verified", kind: "PTZ" });
+  await insertCamera(env, { title: "Verified dome", status: "active", kind: "Fixed dome", latitude: 44.12346, longitude: 12.34568 });
+  await insertCamera(env, { title: "Verified ptz", status: "active", kind: "PTZ" });
 
   const all = await cameras.listPublicCamerasPage(undefined, { limit: 10, offset: 0 });
   assert.equal(all.total, 2, "pending records never enter the paginated total");
@@ -543,7 +543,7 @@ test("moderation approval with publication choices makes metadata public", async
   });
   const published = await cameras.listPublicCameras();
   const record = published.find((item) => item.id === pending.id);
-  assert.equal(record.status, "verified");
+  assert.equal(record.status, "active");
   assert.equal(record.manufacturer, "Acme", "manufacturer published after moderator opt-in");
   assert.equal(record.observedOn, null, "observedOn stays private without opt-in");
 });
@@ -563,7 +563,7 @@ const cameraFixture = {
   address: "Via Roma 1",
   latitude: 41.9004,
   longitude: 12.4936,
-  status: "verified",
+  status: "active",
   source: "Community report",
   updated: "2026-01-15T09:30:00.000Z",
   description: "Corner traffic lights",
@@ -599,7 +599,7 @@ test("GeoJSON properties carry exactly the documented field set", async () => {
     kind: "Fixed dome",
     manufacturer: "Acme",
     observedOn: "2026-01-01",
-    status: "verified",
+    status: "active",
     source: "Community report",
     updated: "2026-01-15T09:30:00.000Z",
     description: "Corner traffic lights",

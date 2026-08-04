@@ -53,11 +53,11 @@ const ownerRecordFixture = {
   updated: "2026-02-10T08:00:00.000Z",
 };
 
-const verifiedRecordFixture = {
+const activeRecordFixture = {
   ...ownerRecordFixture,
   id: 42,
   title: "Fixture Published Camera",
-  status: "verified",
+  status: "active",
   updated: "2026-02-11T09:00:00.000Z",
 };
 
@@ -128,13 +128,13 @@ test("edit page: pending record PATCHes directly with CSRF + expectedUpdated and
   await waitFor(() => assert.ok(screen.getByText("Changes saved.")));
 });
 
-test("edit page: verified record shows the moderation notice and submits for review (C6)", async () => {
+test("edit page: active record shows the moderation notice and submits for review (C6)", async () => {
   const { screen, waitFor } = rtl;
   const user = rtl.userEvent.setup();
   const requests = [];
   installFetchMock((input, init) => {
     requests.push({ input, init });
-    if (input === "/api/cameras/42/edit") return jsonResponse({ record: verifiedRecordFixture, editRequest: null });
+    if (input === "/api/cameras/42/edit") return jsonResponse({ record: activeRecordFixture, editRequest: null });
     if (input === "/api/cameras/42" && init.method === "PATCH") {
       return jsonResponse(
         { editRequest: { id: 9, cameraId: 42, status: "pending", createdAt: "2026-03-01T10:00:00.000Z" } },
@@ -164,7 +164,7 @@ test("edit page: verified record shows the moderation notice and submits for rev
 test("edit page: an open edit-request renders the request state, never the form (C6)", async () => {
   const { screen, waitFor } = rtl;
   installFetchMock(editViewHandler({
-    record: verifiedRecordFixture,
+    record: activeRecordFixture,
     editRequest: { id: 3, cameraId: 42, status: "pending", createdAt: "2026-02-20T00:00:00.000Z" },
   }));
 

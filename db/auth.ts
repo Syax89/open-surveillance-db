@@ -1163,15 +1163,17 @@ export async function listContributorContributions(
 }
 
 /**
- * Count the contributor's verified camera reports — the ONLY number that
- * feeds the trust level (ADR 0018 §3, COMMUNITY_PLAN §3.1: "contano solo i
- * record status='verified'"). The (contributor_id, status) index from
- * migration 0023 makes this an index-only COUNT.
+ * Count the contributor's active camera reports — the ONLY number that
+ * feeds the trust level (ADR 0018 §3, ADR 0021 §12.1: after migration 0039
+ * the domain status is "active"). The (contributor_id, status) index from
+ * migration 0023 makes this an index-only COUNT. Kept as
+ * `countVerifiedCameras` for backward compatibility; the name remains the
+ * same for existing importers.
  */
 export async function countVerifiedCameras(contributorId: number): Promise<number> {
   const d1 = await getD1();
   const result = await d1
-    .prepare("SELECT COUNT(*) AS n FROM cameras WHERE contributor_id = ? AND status = 'verified'")
+    .prepare("SELECT COUNT(*) AS n FROM cameras WHERE contributor_id = ? AND status = 'active'")
     .bind(contributorId)
     .first<{ n: number }>();
   return Number(result?.n ?? 0);

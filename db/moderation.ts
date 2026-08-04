@@ -474,7 +474,7 @@ export async function listPendingModerationItems(): Promise<ModerationQueue> {
         .prepare(
           `SELECT ${cameraColumns} FROM cameras WHERE status = ? ORDER BY created_at ASC, id ASC`,
         )
-        .bind("verified")
+        .bind("active")
         .all<CameraRecord>(),
       d1
         .prepare(
@@ -1044,7 +1044,7 @@ function getCameraTransition(
   const nowIso = new Date().toISOString();
   if (previousStatus === "pending") {
     if (action === "approve") {
-      return { newStatus: "verified", updated: nowIso };
+      return { newStatus: "active", updated: nowIso };
     }
     if (action === "reject") {
       return { newStatus: "rejected", updated: nowIso };
@@ -1054,7 +1054,7 @@ function getCameraTransition(
     }
   }
 
-  if (previousStatus === "verified") {
+  if (previousStatus === "verified" || previousStatus === "active") {
     if (action === "mark-stale") {
       return {
         newStatus: "needs_review",
@@ -1068,7 +1068,7 @@ function getCameraTransition(
 
   if (previousStatus === "needs_review") {
     if (action === "reverify") {
-      return { newStatus: "verified", updated: nowIso };
+      return { newStatus: "active", updated: nowIso };
     }
     if (action === "hide") {
       return { newStatus: "removed", updated: nowIso };
@@ -1077,7 +1077,7 @@ function getCameraTransition(
 
   if (previousStatus === "stale") {
     if (action === "reverify") {
-      return { newStatus: "verified", updated: nowIso };
+      return { newStatus: "active", updated: nowIso };
     }
     if (action === "hide") {
       return { newStatus: "removed", updated: nowIso };
@@ -1593,7 +1593,7 @@ export async function moderateCameraEdit(
 }
 
 /** Camera statuses a pending edit-request diff may be applied to. */
-const PUBLISHED_EDITABLE_CAMERA_STATUSES = new Set(["verified", "needs_review", "stale"]);
+const PUBLISHED_EDITABLE_CAMERA_STATUSES = new Set(["active", "needs_review", "stale"]);
 
 async function loadEditRequestItem(
   d1: ModerationD1,

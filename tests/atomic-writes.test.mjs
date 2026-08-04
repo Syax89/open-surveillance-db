@@ -264,7 +264,7 @@ test("applyPasswordReset rolls back rotate + revoke + verify when the verify UPD
 test("runFreshnessSweep rolls back the status UPDATE when the scheduled-expiry event fails", async () => {
   const record = await submitPending();
   const approved = await moderation.moderateCamera(record.id, "approve", "verified-public-infrastructure", null);
-  assert.equal(approved.item.status, "verified");
+  assert.equal(approved.item.status, "active");
   assert.ok(approved.item.reviewDueAt, "approval must schedule the next review");
 
   const pastDue = new Date(new Date(approved.item.reviewDueAt).getTime() + dayMs).toISOString();
@@ -275,7 +275,7 @@ test("runFreshnessSweep rolls back the status UPDATE when the scheduled-expiry e
   );
 
   const camera = await env.DB.prepare("SELECT status FROM cameras WHERE id = ?").bind(record.id).first();
-  assert.equal(camera.status, "verified", "the sweep UPDATE must roll back with the failed event");
+  assert.equal(camera.status, "active", "the sweep UPDATE must roll back with the failed event");
   const expired = await env.DB
     .prepare("SELECT COUNT(*) AS n FROM moderation_events WHERE entity = 'camera' AND entity_id = ? AND action = 'scheduled-expiry'")
     .bind(record.id)
@@ -290,10 +290,10 @@ test("decision batch read-backs return the item, event and queue (happy path)", 
   });
 
   assert.equal(decision.kind, "ok");
-  assert.equal(decision.item.status, "verified", "the RETURNING item must carry the new status");
+  assert.equal(decision.item.status, "active", "the RETURNING item must carry the new status");
   assert.equal(typeof decision.event.id, "number", "the RETURNING event must carry its row id");
   assert.equal(decision.event.entityId, record.id);
-  assert.equal(decision.event.newStatus, "verified");
+  assert.equal(decision.event.newStatus, "active");
   assert.equal(decision.event.actorRole, "record_reviewer");
   assert.equal(decision.queue.entity, "camera");
   assert.equal(decision.queue.entityId, record.id);
