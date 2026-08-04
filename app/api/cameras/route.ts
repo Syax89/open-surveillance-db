@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { createPendingCamera, findNearbyPublicCameras, freshnessWindows, getPublicCameraFacets, listPublicCameras, listPublicCamerasInBbox, listPublicCamerasPage, PUBLIC_CAMERAS_PAGE_DEFAULT_LIMIT, PUBLIC_CAMERAS_PAGE_MAX_LIMIT, type FreshnessWindow, type PublicCameraFilters } from "../../../db/cameras";
+import { createPendingCamera, findNearbyPublicCameras, freshnessWindows, getPublicCameraFacets, listPublicCameras, listPublicCamerasInBbox, listPublicCamerasPage, PUBLIC_CAMERAS_PAGE_DEFAULT_LIMIT, PUBLIC_CAMERAS_PAGE_MAX_LIMIT, type FreshnessWindow, type PublicCameraFacets, type PublicCameraFilters } from "../../../db/cameras";
 import { requiresDuplicateConfirmation } from "../../lib/duplicate-detection";
 import { requireVerifiedContributor } from "../../lib/write-gate";
 import { csrfVerified, sameOrigin } from "../../lib/csrf";
@@ -158,16 +158,27 @@ export async function GET(request: Request) {
     if (limit === null || offset === null || limit < 1 || offset > MAX_PAGE_OFFSET) {
       return Response.json({ error: `limit must be an integer between 1 and ${PUBLIC_CAMERAS_PAGE_MAX_LIMIT} and offset a non-negative integer up to ${MAX_PAGE_OFFSET}.` }, { status: 400 });
     }
-    const [page, facets] = await Promise.all([
-      listPublicCamerasPage(filters, { limit, offset }),
-      getPublicCameraFacets(),
-    ]);
-    // JSON list + inline facets (FRONTEND_PLAN § 3.2.2, single round-trip).
-    // The dataset changes through moderation decisions, never live feeds: a
-    // bounded 5-minute edge/browser cache with stale-while-revalidate keeps
-    // the directory responsive while still converging after any moderation
+    // Facets are OPT-IN (QA#5 F2, t_ab0d4c75): the client never consumed
+    // them (it derives kind options client-side via cameraKindsOf), yet they
+    // cost 2 full-set aggregate queries on EVERY list read (GROUP BY kind +
+    // SUM over freshness windows) — even for ?limit=1 (the home hero count).
+    // The filter UI that needs them requests them explicitly with
+    // `?facets=1`; the default JSON payload stays lean. Nothing else in the
+    // response shape changes (records/total/nextOffset are unchanged).
+    let facets: PublicCameraFacets | undefined;
+    if (params.get("facets") === "1") {
+      facets = await getPublicCameraFacets();
+    }
+    const page = await listPublicCamerasPage(filters, { limit, offset });
+    // JSON list + optional facets (FRONTEND_PLAN § 3.2.2). The dataset
+    // changes through moderation decisions, never live feeds: a bounded
+    // 5-minute edge/browser cache with stale-while-revalidate keeps the
+    // directory responsive while still converging after any moderation
     // action. search/nearby stay no-store (user input / duplicate warnings).
-    return Response.json({ records: page.records, total: page.total, nextOffset: page.nextOffset, facets }, { headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600", "Cache-Tag": CACHE_TAGS.list } });
+    return Response.json(
+      facets ? { records: page.records, total: page.total, nextOffset: page.nextOffset, facets } : { records: page.records, total: page.total, nextOffset: page.nextOffset },
+      { headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600", "Cache-Tag": CACHE_TAGS.list } },
+    );
   } catch (error) {
     console.error("GET /api/cameras failed", error);
     return Response.json({ error: "Database unavailable" }, { status: 503 });

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { publicRecords, type Camera } from "./records";
+import { isPublicStatus } from "./public-status";
 
 /**
  * Shared public-cameras data layer (audit t_c6da60f0, P2; pagination t_cc94f340).
@@ -21,9 +22,10 @@ import { publicRecords, type Camera } from "./records";
  *  - the home directory walks every page (limit 500, following nextOffset)
  *    so the map keeps rendering ALL public records, with `total` from the
  *    server for the hero stat (never a first-page count);
- *  - the record page resolves a single public id with a targeted walk
- *    (early exit as soon as the id is found), so a deep link never pays
- *    for pages it does not need;
+ *  - the record page resolves a single public id with ONE fetch to the
+ *    dedicated `GET /api/cameras/[id]` endpoint (QA#5 F1): a deep link
+ *    never pays for pages it does not need, and a 404 is the same
+ *    fail-closed answer the walk would give after exhausting the list;
  *  - a walk that exhausts the list seeds the module cache, so a record
  *    page visited after the home directory costs zero extra fetches.
  *
@@ -91,17 +93,16 @@ async function fetchCamerasPage(offset: number, signal: AbortSignal, extraQuery 
 type WalkResult = {
   records: Camera[];
   total: number;
-  found: Camera | null;
 };
 
 /**
- * Walk the public list following nextOffset (limit 500/page). With a
- * `targetId` it stops as soon as the id appears (records are id DESC, so a
- * recent record resolves on the first page); otherwise it walks to the end.
+ * Walk the public list following nextOffset (limit 500/page) to the end.
  * Stops on nextOffset null/absent and guards against a server that fails to
- * advance the offset (would otherwise loop forever on a bad reply).
+ * advance the offset (would otherwise loop forever on a bad reply). Used by
+ * the home directory walk; the record page resolves single ids through the
+ * dedicated endpoint instead (QA#5 F1) — this walk never early-exits.
  */
-async function walkPages(signal: AbortSignal, targetId?: number): Promise<WalkResult> {
+async function walkPages(signal: AbortSignal): Promise<WalkResult> {
   const collected: Camera[] = [];
   let offset = 0;
   let total = 0;
@@ -109,14 +110,10 @@ async function walkPages(signal: AbortSignal, targetId?: number): Promise<WalkRe
     const page = await fetchCamerasPage(offset, signal);
     collected.push(...page.records);
     total = page.total;
-    if (targetId !== undefined) {
-      const found = page.records.find((record) => record.id === targetId);
-      if (found) return { records: collected, total, found };
-    }
     if (page.nextOffset === null || page.nextOffset <= offset) break;
     offset = page.nextOffset;
   }
-  return { records: collected, total, found: null };
+  return { records: collected, total };
 }
 
 /**
@@ -207,11 +204,19 @@ function releaseAll() {
 }
 
 /**
- * Resolve ONE public record by id without paying for the whole list:
- * module cache first, then a full walk already in flight, then a targeted
- * walk that stops as soon as the id appears. A walk that exhausts the list
- * without finding the id seeds the cache — the record is definitively not
- * public, and the next consumer gets the complete list for free.
+ * Resolve ONE public record by id (QA#5 F1, t_ab0d4c75): module cache first,
+ * then a full list walk already in flight, then the DEDICATED endpoint
+ * `GET /api/cameras/[id]` — one round trip instead of a client-side
+ * paginated walk (ceil((maxId − id)/500) + 1 serialised fetches on deep
+ * links to old records, which also burned the shared READ_LIMITER bucket and
+ * could self-429 the caller). The endpoint shares the exact public
+ * predicate and ~10 m coordinate rounding of the list, and fails closed
+ * with 404 for anything that is not publicly current — so a 404 here is
+ * the same answer the walk would give after exhausting every page, at 1/N
+ * of the cost. The record page only falls back to the walk when the
+ * dedicated endpoint answers 404 for an id that might still be public on a
+ * stale list (belt-and-braces; the endpoint and the list use the same
+ * predicate, so in practice this never triggers).
  */
 function ensureRecord(id: number): Promise<Camera | null> {
   if (cachedRecords !== null) {
@@ -226,13 +231,20 @@ function ensureRecord(id: number): Promise<Camera | null> {
     return existing.promise;
   }
   const controller = new AbortController();
-  const promise = walkPages(controller.signal, id)
-    .then(({ records, total, found }) => {
-      if (found) return found;
-      // Exhausted without a hit: the walked pages ARE the complete list.
-      cachedRecords = records;
-      cachedTotal = total;
-      return null;
+  const promise = fetch(`/api/cameras/${id}`, { signal: controller.signal })
+    .then(async (response) => {
+      if (response.ok) {
+        const data = (await response.json()) as { record?: Camera };
+        if (!data.record || !isPublicStatus(data.record.status)) return null;
+        return data.record;
+      }
+      if (response.status === 404) {
+        // Fail-closed answer from the shared predicate: the record is not
+        // publicly current. No walk fallback (QA#5 F1) — the walk would
+        // repeat the same public check N times for zero extra information.
+        return null;
+      }
+      throw new Error(`HTTP ${response.status}`);
     })
     .finally(() => { recordWalks.delete(id); });
   promise.catch(() => {});

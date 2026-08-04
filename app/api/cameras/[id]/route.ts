@@ -11,13 +11,16 @@ import { callerKey, checkRateLimit, limitsFor } from "../../../lib/rate-limit";
 /**
  * GET /api/cameras/[id] — one public record (FRONTEND_PLAN § 3.2.1).
  *
- * The /records/[id] page used to resolve its record by walking the whole
- * client-side list; with server-side pagination that pattern breaks, so the
- * page fetches this endpoint instead. The lookup shares the exact public
- * predicate and ~10 m coordinate rounding of the directory list, and fails
- * closed with 404 for anything that is not publicly current — a pending,
- * stale, rejected or removed record is indistinguishable from a missing id
- * (no existence leak, same rule as the photo route).
+ * The /records/[id] page resolves its record through THIS endpoint: the
+ * record page's data layer (app/lib/use-public-cameras.ts, ensureRecord)
+ * fetches `GET /api/cameras/[id]` directly on deep links (QA#5 F1) instead
+ * of walking the client-side list page by page — one round trip instead of
+ * ceil((maxId − id)/500) + 1 serialised fetches. The lookup shares the
+ * exact public predicate and ~10 m coordinate rounding of the directory
+ * list, and fails closed with 404 for anything that is not publicly
+ * current — a pending, stale, rejected or removed record is
+ * indistinguishable from a missing id (no existence leak, same rule as the
+ * photo route).
  *
  * The id is parsed from the URL path (works identically under Next.js App
  * Router and the plain-Node route harness, which invokes handlers with a
