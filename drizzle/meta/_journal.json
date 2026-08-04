@@ -253,6 +253,34 @@
    "when": 1785862000000,
    "tag": "0035_cameras_direction",
    "breakpoints": true
+  },
+  {
+   "idx": 36,
+   "version": "6",
+   "when": 1785863901191,
+   "tag": "0036_camera_community_actions",
+   "breakpoints": true
+  },
+  {
+   "idx": 37,
+   "version": "6",
+   "when": 1785863902191,
+   "tag": "0037_community_settings",
+   "breakpoints": true
+  },
+  {
+   "idx": 38,
+   "version": "6",
+   "when": 1785863903191,
+   "tag": "0038_camera_lifecycle_events",
+   "breakpoints": true
+  },
+  {
+   "idx": 39,
+   "version": "6",
+   "when": 1785863904191,
+   "tag": "0039_community_pivot_data_migration",
+   "breakpoints": true
   }
  ]
 }

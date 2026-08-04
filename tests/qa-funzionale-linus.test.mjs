@@ -471,7 +471,7 @@ test("F5: il retention sweep deve eliminare le righe scadute di registrations_ip
 
 test("F6a: la quota di setConfirmation è verificata nella STESSA statement dell'INSERT (niente count-then-insert)", async () => {
   const source = await readFile(path.join(root, "db", "confirmations.ts"), "utf8");
-  const insert = source.match(/INSERT INTO camera_confirmations[\s\S]*?RETURNING id/);
+  const insert = source.match(/INSERT INTO camera_community_actions[\s\S]*?RETURNING id/);
   assert.ok(
     insert,
     "INSERT di setConfirmation non trovata in db/confirmations.ts: lo " +
@@ -480,14 +480,14 @@ test("F6a: la quota di setConfirmation è verificata nella STESSA statement dell
   const statement = insert[0];
   assert.match(
     statement,
-    /SELECT \?, \?, \?/,
+    /SELECT \?, \?, 'confirm', \?, \?, \?/,
     "l'INSERT deve essere condizionale (INSERT ... SELECT ... WHERE): oggi " +
       "db/confirmations.ts fa SELECT COUNT -> INSERT in due statement " +
       "separate (TOCTOU, quota sforabile di +1/race)",
   );
   assert.match(
     statement,
-    /WHERE \(SELECT COUNT\(\*\) FROM camera_confirmations/,
+    /WHERE \(SELECT COUNT\(\*\) FROM camera_community_actions/,
     "il conteggio della quota deve stare nella WHERE della stessa statement " +
       "dell'INSERT: solo così due PUT concorrenti non leggono un COUNT stantio",
   );
@@ -573,23 +573,23 @@ test("F6c: INSERT e probe di classificazione girano nella STESSA d1.batch (snaps
   const block = batch[0];
   assert.match(
     block,
-    /INSERT INTO camera_confirmations[\s\S]*?RETURNING id/,
+    /INSERT INTO camera_community_actions[\s\S]*?RETURNING id/,
     "l'INSERT condizionale deve stare DENTRO la batch (enforcement atomico)",
   );
   assert.match(
     block,
-    /SELECT 1 AS ok FROM camera_confirmations/,
+    /SELECT 1 AS ok FROM camera_community_actions/,
     "la probe existing-pair deve stare nella STESSA batch dell'INSERT, così la " +
       "classificazione duplicate usa lo snapshot del tentativo di scrittura",
   );
   assert.match(
     block,
-    /SELECT COUNT\(\*\) AS n FROM camera_confirmations WHERE contributor_id/,
+    /SELECT COUNT\(\*\) AS n FROM camera_community_actions WHERE contributor_id/,
     "la probe della quota giornaliera deve stare nella stessa batch (stesso snapshot)",
   );
   assert.match(
     block,
-    /SELECT COUNT\(\*\) AS n FROM camera_confirmations WHERE camera_id/,
+    /SELECT COUNT\(\*\) AS n FROM camera_community_actions WHERE camera_id/,
     "la probe del per-record cap deve stare nella stessa batch (stesso snapshot)",
   );
 });

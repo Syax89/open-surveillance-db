@@ -186,6 +186,22 @@ async function buildDbModules() {
   ).outputText;
   await writeFile(path.join(tree, "app", "lib", "public-status.mjs"), compiledPublicStatus);
 
+  // db/confirmations.ts imports ../app/lib/trust-levels (pure deriveLevel,
+  // ADR 0018 §3) for the action weight snapshot (ADR 0021 §3.4); mirror it
+  // too so the rewritten import resolves in this tree as well.
+  const compiledTrustLevels = ts.transpileModule(
+    await readFile(path.join(appLibDir, "trust-levels.ts"), "utf8"),
+    {
+      compilerOptions: {
+        module: ts.ModuleKind.ESNext,
+        target: ts.ScriptTarget.ESNext,
+        moduleResolution: ts.ModuleResolutionKind.Bundler,
+      },
+      fileName: path.join(appLibDir, "trust-levels.ts"),
+    },
+  ).outputText;
+  await writeFile(path.join(tree, "app", "lib", "trust-levels.mjs"), compiledTrustLevels);
+
   modules.cameras = await import(pathToFileURL(path.join(tree, "db", "cameras.mjs")).href);
   modules.corrections = await import(pathToFileURL(path.join(tree, "db", "corrections.mjs")).href);
   modules.freshness = await import(pathToFileURL(path.join(tree, "db", "freshness.mjs")).href);

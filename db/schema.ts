@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { index, integer, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { check, index, integer, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const cameras = sqliteTable(
   "cameras",
@@ -672,21 +672,30 @@ export const photos = sqliteTable(
 );
 
 /**
- * Community verifications (ADR 0018 §2, migration 0020). Toggle semantics,
- * one confirmation type per (record, contributor): the UNIQUE
- * (camera_id, contributor_id) index is the structural anti-gaming layer —
- * one active verification per pair, enforced at the database level (a
- * concurrent double-PUT yields exactly one row, the second answers 409).
- * `created_at` drives the daily-quota COUNT (per contributor) and the
- * per-record cap; `(contributor_id, created_at)` serves both. The decay rule
- * (`created_at >= cameras.last_verified_at`) is applied in the count query,
- * not here. ON DELETE CASCADE is mirrored by an explicit delete in
- * eraseContributor because the test harness does not enforce foreign keys.
+ * Community actions (ADR 0021 §3, migration 0036). The pivot replaces the
+ * verification toggle (former `camera_confirmations`, ADR 0018 §2 — dropped
+ * by migration 0039 after its rows were copied here as `confirm` actions)
+ * with a five-type action surface. `UNIQUE (camera_id, contributor_id)` is
+ * the structural anti-gaming layer: ONE active action per (record,
+ * contributor), enforced at the database level — a switch overwrites the
+ * row, never a second row (ADR 0021 §3.2).
+ *
+ * `weight` is a SNAPSHOT taken from the contributor's trust level at action
+ * time (ADR 0021 §3.4): deterministic and auditable, later level changes
+ * never rewrite history. The `action_type` whitelist is a CHECK constraint
+ * (like / confirm / gone / problem / privacy, ADR 0021 §3). The
+ * `(camera_id, action_type)` index serves the threshold evaluation (one
+ * indexed GROUP BY over active actions of the triggering type:
+ * COUNT(DISTINCT contributor_id) + SUM(weight)); `(contributor_id,
+ * created_at)` serves the daily-quota counts and erasure.
+ *
+ * ON DELETE CASCADE is mirrored by an explicit delete in eraseContributor
+ * because the test harness does not enforce foreign keys.
  * Declared here so drizzle-kit generate never re-emits it (convention
  * 0012/0014: hand-written migration + schema declaration together).
  */
-export const cameraConfirmations = sqliteTable(
-  "camera_confirmations",
+export const cameraCommunityActions = sqliteTable(
+  "camera_community_actions",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
     cameraId: integer("camera_id")
@@ -695,11 +704,64 @@ export const cameraConfirmations = sqliteTable(
     contributorId: integer("contributor_id")
       .notNull()
       .references(() => contributors.id, { onDelete: "cascade" }),
+    actionType: text("action_type").notNull(),
+    weight: real("weight").notNull(),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("camera_community_actions_camera_contributor_unique").on(table.cameraId, table.contributorId),
+    index("camera_community_actions_camera_action_idx").on(table.cameraId, table.actionType),
+    index("camera_community_actions_contributor_created_idx").on(table.contributorId, table.createdAt),
+    check("camera_community_actions_action_type_check", sql`action_type IN ('like', 'confirm', 'gone', 'problem', 'privacy')`),
+  ],
+);
+
+/**
+ * Tunable community configuration (ADR 0021 §5, migration 0037). Every
+ * threshold, weight, quota and cooldown of the pivot is a key; `value` is
+ * a JSON TEXT blob (a bare number, or an object like `weights.byLevel`).
+ * The migration seeds the ADR's defaults so config and code agree at first
+ * boot; the code fallback lives in db/community-settings.ts
+ * (`DEFAULT_COMMUNITY_SETTINGS`) so a missing row can never fail an
+ * evaluation. Declared here so drizzle-kit generate never re-emits it
+ * (convention 0012/0014: hand-written migration + schema declaration
+ * together).
+ */
+export const communitySettings = sqliteTable(
+  "community_settings",
+  {
+    key: text("key").primaryKey(),
+    value: text("value").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+);
+
+/**
+ * Public per-record lifecycle history (ADR 0021 §7, migration 0038).
+ * Semantic, aggregate event types (`published`, `confirmed` (count),
+ * `liked` (count), `gone-flagged`, `hidden` (reason + counts), `removed`
+ * (counts), `restored` (counts), `action-consumed`, `migration`,
+ * `setting-changed`); `detail` carries the threshold counts / reasons as
+ * JSON. NO actor attribution, ever: public rows never carry contributor
+ * ids, emails or IP-derived data (identification risk — ADR 0018 § 3.4).
+ * The `(camera_id, created_at)` index serves the per-record timeline.
+ * Declared here so drizzle-kit generate never re-emits it (convention
+ * 0012/0014: hand-written migration + schema declaration together).
+ */
+export const cameraLifecycleEvents = sqliteTable(
+  "camera_lifecycle_events",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    cameraId: integer("camera_id")
+      .notNull()
+      .references(() => cameras.id, { onDelete: "cascade" }),
+    eventType: text("event_type").notNull(),
+    detail: text("detail"),
     createdAt: text("created_at").notNull(),
   },
   (table) => [
-    uniqueIndex("camera_confirmations_camera_contributor_unique").on(table.cameraId, table.contributorId),
-    index("camera_confirmations_contributor_created_idx").on(table.contributorId, table.createdAt),
+    index("camera_lifecycle_events_camera_created_idx").on(table.cameraId, table.createdAt),
   ],
 );
 
