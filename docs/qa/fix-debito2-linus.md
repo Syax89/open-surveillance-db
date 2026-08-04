@@ -43,14 +43,14 @@ reali dal preview server Miniflare (`scripts/nowrap-390-check.mjs`, riproducibil
 
 | # | Regola (riga attuale) | Contesto | Verdetto 390px IT | Note |
 |---|---|---|---|---|
-| 1 | `.sr-only` (56) | helper screen-reader, clip a 1px | **SICURO** | nowrap parte della ricetta sr-only (nessun testo visibile, niente clip visivo) |
-| 2 | `.directory-tool-heading .text-button` (90) | link "Usa invece la mappa" nell'header /directory | **SICURO** | 144px, nessun overflow (già verificato in t_c18b48f0: righe ~90/~498 OK a 1280/1024/900/768/390) |
+| 1 | `.sr-only` (183) | helper screen-reader, clip a 1px | **SICURO** | nowrap parte della ricetta sr-only (nessun testo visibile, niente clip visivo) |
+| 2 | `.directory-tool-heading .text-button` (217) | link "Usa invece la mappa" nell'header /directory | **SICURO** | 144px, nessun overflow (già verificato in t_c18b48f0: righe ~90/~498 OK a 1280/1024/900/768/390) |
 | 3 | `.photo-file-name` (516) | nome file foto in /segnala (ReportForm) | **OK** ✅ (post-fix) | ellipsis attivo (scrollWidth 592 → clientWidth 192), documento a 390px — fix applicato in follow-up t_4877eafc |
-| 4 | `.directory-tool .directory-controls > .text-button` (519) | bottone "Azzera i filtri" nei controlli /directory | **SICURO** | 161px, grid 1fr ≤700px, nessun overflow |
-| 5 | `.confirm-count` (783) | contatore verifiche nel toggle record | **SICURO** | testo breve "N verifica/verifiche" (12–15ch), niente ellipsis, nessun overflow (record demo assenti in preview → verificato staticamente + pattern) |
-| 6 | `.geocode-option-type` (885) | label tipo nel dropdown geocoding /mappa | **SICURO** | 54px, font 11px, capitalize — "street/via" corti, il nome dell'opzione wrappa, il tipo resta su una riga |
+| 4 | `.directory-tool .directory-controls > .text-button` (636) | bottone "Azzera i filtri" nei controlli /directory | **SICURO** | 161px, grid 1fr ≤700px, nessun overflow |
+| 5 | `.confirm-count` (900) | contatore verifiche nel toggle record | **SICURO** | testo breve "N verifica/verifiche" (12–15ch), niente ellipsis, nessun overflow (record demo assenti in preview → verificato staticamente + pattern) |
+| 6 | `.geocode-option-type` (1002) | label tipo nel dropdown geocoding /mappa | **SICURO** | 54px, font 11px, capitalize — "street/via" corti, il nome dell'opzione wrappa, il tipo resta su una riga |
 
-Le due `flex-wrap:nowrap` (442 menu mobile, 483 indice A–Z) NON sono `white-space` e sono
+Le due `flex-wrap:nowrap` (569 menu mobile, 610 indice A–Z) NON sono `white-space` e sono
 intenzionali (dropdown / scroll orizzontale) — fuori scope.
 
 ### Fix applicato (follow-up t_4877eafc, post design PR t_be89b99c)
