@@ -43,13 +43,22 @@
  *   R18 email_send_log                → mail-budget rows older than 24 hours
  *                                       purged (QA F5, t_894e0cc3 — the 3/h
  *                                       budget only needs the last hour)
+ *   R5  moderation_events             → 2-YEAR ARCHIVAL PATH (QA#3 F6,
+ *                                       t_97e552bf): rows older than
+ *                                       MODERATION_EVENT_ARCHIVE_DAYS are
+ *                                       copied to `moderation_events_archive`
+ *                                       ANONYMIZED (note, actor, reviewer
+ *                                       ids → NULL; the decision structure
+ *                                       survives), marked `archived_at` and
+ *                                       purged from the live table, one
+ *                                       atomic batch per chunk. Migration
+ *                                       0034 re-created the append-only
+ *                                       triggers to admit exactly this
+ *                                       transition.
  *
  * Deliberately NOT purged here:
- *   R5  moderation_events             → append-only by design (BEFORE UPDATE /
- *                                       DELETE triggers in migration 0008).
- *                                       A 2-year archival path requires an
- *                                       archive table + migration and a
- *                                       separate decision; out of scope.
+ *   (none — R5 now has an archival path; the archive table itself is
+ *    append-only by convention and has no retention of its own.)
  *
  * Design notes:
  *  - The windows are FIXED legal values (RETENTION_SCHEDULE.md, ADR 0008):
@@ -109,6 +118,14 @@ export const LOGIN_ATTEMPT_RETENTION_DAYS = 30;
 export const REGISTRATION_IP_RETENTION_DAYS = 30;
 /** QA F5: email send-log rows are dead after 24 hours (the 3/h mail budget only needs the last hour). */
 export const EMAIL_SEND_LOG_RETENTION_DAYS = 1;
+/**
+ * R5 (QA#3 F6): moderation decisions are archived after 2 years — the same
+ * legal window as R4 correction requests (CORRECTION_RETENTION_DAYS, the
+ * RETENTION_SCHEDULE "2 years" default). The sweep copies the row to
+ * `moderation_events_archive` (anonymized) and deletes it from the live
+ * table; the archive itself is append-only.
+ */
+export const MODERATION_EVENT_ARCHIVE_DAYS = 730;
 
 /**
  * R16 sweep bounds: each round selects and deletes at most D1_MAX_BOUND_PARAMS
@@ -138,6 +155,8 @@ export type RetentionPolicy = {
   registrationsIpDays: number;
   /** QA F5: email send-log rows (email_send_log) expire after this many days. */
   emailSendLogDays: number;
+  /** R5 (QA#3 F6): moderation decisions are archived after this many days. */
+  moderationEventArchiveDays: number;
 };
 
 export const DEFAULT_RETENTION_POLICY: RetentionPolicy = {
@@ -149,6 +168,7 @@ export const DEFAULT_RETENTION_POLICY: RetentionPolicy = {
   loginAttemptDays: LOGIN_ATTEMPT_RETENTION_DAYS,
   registrationsIpDays: REGISTRATION_IP_RETENTION_DAYS,
   emailSendLogDays: EMAIL_SEND_LOG_RETENTION_DAYS,
+  moderationEventArchiveDays: MODERATION_EVENT_ARCHIVE_DAYS,
 };
 
 /** Minimal R2 surface the sweep needs (the real PHOTOS bucket satisfies it). */
@@ -198,10 +218,12 @@ export type RetentionSummary = {
    */
   demoRecordsPurged: number;
   emailSendLogPurged: number;
+  /** R5 (QA#3 F6): moderation decisions archived to `moderation_events_archive` (anonymized). */
+  moderationEventsArchived: number;
+  /** R5: archived moderation rows purged from the live append-only table. */
+  moderationEventsPurged: number;
   /** Records/chunks whose D1 or R2 step threw; the sweep skipped them and continued. */
   failures: number;
-  /** Audit rows are append-only by design; never touched. */
-  moderationEventsRetained: 0;
 };
 
 // ---------------------------------------------------------------------------
@@ -351,8 +373,9 @@ export async function runRetentionSweep(
     registrationIpLogPurged: 0,
     demoRecordsPurged: 0,
     emailSendLogPurged: 0,
+    moderationEventsArchived: 0,
+    moderationEventsPurged: 0,
     failures: 0,
-    moderationEventsRetained: 0,
   };
 
   // --- R3 part 1: reuse the freshness sweep (verified → needs_review → stale).
@@ -715,6 +738,76 @@ export async function runRetentionSweep(
     .bind(emailSendLogCutoff)
     .run()) as { meta: { changes: number } };
   summary.emailSendLogPurged = emailSendLogPurged.meta.changes;
+
+  // --- R5 (QA#3 F6): moderation decisions older than the 2-year window are
+  // ARCHIVED then purged. The live table is append-only by design (migration
+  // 0008 triggers), so this sweep is the ONLY writer that may mutate it, and
+  // only through the archival transition migration 0034 admits:
+  //   1. copy the row to `moderation_events_archive`, ANONYMIZED — `note`
+  //      (free-text, may hold personal data), `actor` and the reviewer ids
+  //      are copied as NULL, so the archive keeps WHAT was decided (entity,
+  //      action, statuses, reason code, role, timestamps, appeal link)
+  //      without the WHO or the notes (RETENTION_SCHEDULE R5, art. 5(1)(e));
+  //   2. mark the live row `archived_at = now` (the trigger permits exactly
+  //      the NULL → timestamp transition);
+  //   3. delete the archived row (the trigger permits deleting only rows
+  //      with archived_at set).
+  // Steps 1-3 run in ONE d1.batch per chunk, so a row is either fully
+  // archived (present in the archive, gone from the live table) or fully
+  // untouched — a failure rolls back the whole chunk and the next daily run
+  // retries it. The sweep is BOUNDED like R16: at most D1_MAX_BOUND_PARAMS
+  // rows per round (also the D1 bound-parameter cap) and
+  // LOGIN_ATTEMPT_SWEEP_MAX_ROUNDS rounds, so a pathological backlog drains
+  // across days instead of pinning one cron run forever.
+  const moderationEventCutoff = daysAgo(now, policy.moderationEventArchiveDays);
+  let moderationEventsArchived = 0;
+  let moderationEventsPurged = 0;
+  for (let round = 0; round < LOGIN_ATTEMPT_SWEEP_MAX_ROUNDS; round += 1) {
+    const staleEvents = await d1
+      .prepare(
+        "SELECT id FROM moderation_events WHERE created_at < ? AND archived_at IS NULL LIMIT ?",
+      )
+      .bind(moderationEventCutoff, D1_MAX_BOUND_PARAMS)
+      .all<{ id: number }>();
+    if (staleEvents.results.length === 0) break;
+    const ids = staleEvents.results.map((row) => row.id);
+    const placeholders = ids.map(() => "?").join(", ");
+    try {
+      await d1.batch([
+        // 1. Anonymized copy (note/actor/reviewer ids → NULL; the archive's
+        //    own archived_at is the sweep timestamp).
+        d1
+          .prepare(
+            `INSERT INTO moderation_events_archive
+               (id, entity, entity_id, previous_status, new_status, action, reason_code,
+                note, actor, reviewer_id, actor_role, recused, escalated, second_reviewer_id,
+                appeal_id, created_at, archived_at)
+             SELECT id, entity, entity_id, previous_status, new_status, action, reason_code,
+                NULL, NULL, NULL, actor_role, recused, escalated, NULL,
+                appeal_id, created_at, ?
+             FROM moderation_events WHERE id IN (${placeholders})`,
+          )
+          .bind(now, ...ids),
+        // 2. Mark archived (the ONLY UPDATE the 0034 trigger permits).
+        d1
+          .prepare(`UPDATE moderation_events SET archived_at = ? WHERE id IN (${placeholders})`)
+          .bind(now, ...ids),
+        // 3. Purge the archived row (the ONLY DELETE the 0034 trigger permits).
+        d1.prepare(`DELETE FROM moderation_events WHERE id IN (${placeholders})`).bind(...ids),
+      ]);
+      moderationEventsArchived += ids.length;
+      moderationEventsPurged += ids.length;
+    } catch (error) {
+      summary.failures += 1;
+      console.error(
+        `Retention: R5 archive+purge failed for ${ids.length} moderation_events rows`,
+        error,
+      );
+      break; // stop the loop; the surviving rows are retried by the next run
+    }
+  }
+  summary.moderationEventsArchived = moderationEventsArchived;
+  summary.moderationEventsPurged = moderationEventsPurged;
 
   return summary;
 }

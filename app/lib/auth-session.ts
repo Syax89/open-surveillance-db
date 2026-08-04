@@ -28,12 +28,28 @@ export function sessionTtlSeconds(env: unknown): number {
 }
 
 /**
- * `Secure` cookie attribute. Off by default because the local prototype runs
- * over plain HTTP on a LAN (a `Secure` cookie would never be sent); set
- * `AUTH_COOKIE_SECURE=true` in production, where HTTPS is a precondition.
+ * `Secure` cookie attribute — SECURE-BY-DEFAULT (QA#3 F2, t_63e0d13c).
+ *
+ * The old default was fail-open: `Secure` was set ONLY when
+ * `AUTH_COOKIE_SECURE === "true"`, so a production deploy that forgot the
+ * var served the session cookie over plain HTTP. The new rule:
+ *
+ *   - `AUTH_COOKIE_SECURE=true`  → always Secure;
+ *   - `AUTH_COOKIE_SECURE=false` → never Secure (explicit local-prototype
+ *     override on plain HTTP, documented in .dev.vars);
+ *   - unset                     → Secure EXCEPT when `ENVIRONMENT ===
+ *     "development"` (the local prototype runs on plain HTTP on a LAN; a
+ *     Secure cookie would never be sent back). Unset in production = Secure
+ *     (fail-closed).
+ *
+ * SameSite is `Strict` on every path (app/lib/csrf.ts) regardless of this
+ * flag: the ENVIRONMENT conditioning only ever relaxes `Secure`.
  */
 export function cookieSecure(env: unknown): boolean {
-  return (env as EnvLike).AUTH_COOKIE_SECURE === "true";
+  const value = (env as EnvLike).AUTH_COOKIE_SECURE;
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return (env as EnvLike).ENVIRONMENT !== "development";
 }
 
 export type ResolvedSession = {

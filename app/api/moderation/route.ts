@@ -390,12 +390,14 @@ export async function PATCH(request: Request) {
     }
 
     let actorId: number;
-    if (env.ENVIRONMENT === "development" && auth.user.role === "admin") {
-      // Demo actor selector (development only): an admin may step in as any
-      // reviewer. Never honoured in production, where the actor is always
-      // server-derived — honouring a client-chosen id here would let an admin
-      // write moderation events as another reviewer, corrupting the
-      // append-only audit trail.
+    if (env.MODERATION_DEMO_ACTOR_SELECTOR === "true" && env.ENVIRONMENT === "development" && auth.user.role === "admin") {
+      // Demo actor selector (QA#3 F5): ONLY when BOTH the explicit
+      // MODERATION_DEMO_ACTOR_SELECTOR key AND ENVIRONMENT=development are
+      // set may an admin step in as any reviewer. Two keys so a production
+      // deploy with ENVIRONMENT accidentally left at development still
+      // cannot let an admin write moderation events as another reviewer,
+      // corrupting the append-only audit trail. Unset/absent = OFF
+      // everywhere; in production the actor is always server-derived.
       actorId = payload.context.actorId;
     } else {
       const reviewer = await getReviewerByUserId(auth.user.id);
