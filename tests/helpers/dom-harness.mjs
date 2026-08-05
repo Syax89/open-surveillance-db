@@ -300,6 +300,10 @@ export function map(el, opts) {
     paneAttrs: {},
     setView: (center, zoom, opts) => { m.views.push({ center, zoom, opts }); return m; }, // chainable, like the real Leaflet map API
     on: (event, handler) => { (m.handlers[event] ??= []).push(handler); return m; },
+    // P0 t_bb310428: the coordinate picker is registered ONLY while the
+    // "Add here" mode is active — off() removes the handler so tests can
+    // assert the map is SILENT outside the explicit mode.
+    off: (event, handler) => { const list = m.handlers[event]; if (list) { const i = list.indexOf(handler); if (i !== -1) list.splice(i, 1); } return m; },
     remove: () => {},
     invalidateSize: () => {},
     getZoom: () => m.zoom,
@@ -325,22 +329,31 @@ export const tileLayer = () => ({ addTo: () => {} });
 // only that group's items) — existing marker-count assertions keep working.
 export const layerGroup = () => {
   const own = [];
-  return {
-    addTo: () => ({
-      clearLayers: () => {
-        for (const item of own) {
-          const arr = item && item.__isPath ? paths : markers;
-          const index = arr.indexOf(item);
-          if (index !== -1) arr.splice(index, 1);
-        }
-        own.length = 0;
-      },
-      addLayer: (m) => {
-        own.push(m);
-        (m && m.__isPath ? paths : markers).push(m);
-      },
-    }),
+  const group = {
+    clearLayers: () => {
+      for (const item of own) {
+        const arr = item && item.__isPath ? paths : markers;
+        const index = arr.indexOf(item);
+        if (index !== -1) arr.splice(index, 1);
+      }
+      own.length = 0;
+    },
+    addLayer: (m) => {
+      own.push(m);
+      (m && m.__isPath ? paths : markers).push(m);
+    },
+    // P0 t_bb310428 (reconcile): removeLayer removes ONLY the given marker
+    // — the marker population effect diffs the desired set instead of
+    // clearLayers, so an open popup on a KEPT marker survives a rebuild.
+    removeLayer: (m) => {
+      const index = own.indexOf(m);
+      if (index !== -1) own.splice(index, 1);
+      const arr = m && m.__isPath ? paths : markers;
+      const arrIndex = arr.indexOf(m);
+      if (arrIndex !== -1) arr.splice(arrIndex, 1);
+    },
   };
+  return { addTo: () => group };
 };
 export function marker(latlng, opts) {
   const m = {
@@ -355,10 +368,17 @@ export function marker(latlng, opts) {
     // isPopupOpen() to open idempotently (a click on an already-open popup
     // keeps it open instead of toggling it closed).
     isPopupOpen: () => m.popupOpened === true,
+    // P0 t_bb310428 (reconcile): setPopupContent / setTooltipContent update
+    // a KEPT marker in place — the open popup keeps its DOM.
+    setPopupContent: (html) => { m.popupHtml = html; return m; },
+    setTooltipContent: () => m,
     getLatLng: () => latlng,
     // Grid badges set an aria-label on the real element (t_26ce96f3); the
-    // stub records the attribute so the contract stays assertable.
-    getElement: () => ({ setAttribute: (key, value) => { m.elementAttrs ??= {}; m.elementAttrs[key] = value; } }),
+    // stub records the attribute so the contract stays assertable. The
+    // reconcile badge-count update queries the badge text node — the stub
+    // exposes a querySelector that returns null (always triggers the icon
+    // refresh), which is harmless for assertions.
+    getElement: () => ({ setAttribute: (key, value) => { m.elementAttrs ??= {}; m.elementAttrs[key] = value; }, querySelector: () => null }),
     handlers: {},
     addTo: (layer) => { layer.addLayer(m); return m; },
     // Real Leaflet API: setIcon replaces the marker icon in place. The
