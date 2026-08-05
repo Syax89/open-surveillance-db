@@ -1,19 +1,23 @@
-// OSDB-QA retention contract tests (kanban t_ff40be8d, audit t_0de37378).
+// OSDB-QA retention contract tests (kanban t_ff40be8d, audit t_0de37378;
+// re-pinned to the community model 2026-08-05, ADR 0021 / t_499df642).
 //
 // Pins the retention contract AS IT EXISTS TODAY, in three layers:
-//   1. POLICY DOCS — the legal retention schedule (ADR 0008 decision +
+//   1. POLICY DOCS — the legal retention schedule (ADR 0021 decision +
 //      docs/legal/RETENTION_SCHEDULE.md) is machine-checkable so the
-//      documented values cannot drift unnoticed (12-month renewal cycle,
-//      90d pending, 30d rejected, 30d session TTL).
-//   2. IMPLEMENTED RUNTIME CONTRACT — the 12-month review clock
-//      (DEFAULT_REVIEW_INTERVAL_MONTHS), the freshness sweep
-//      (runFreshnessSweep in db/moderation.ts), the sessions table
-//      (expires_at NOT NULL + index) and the read-time expiry rejection
-//      in db/auth.ts. These are the pieces that DO exist and are tested
-//      at runtime elsewhere (freshness-reverification, auth-d1).
+//      documented values cannot drift unnoticed (community model: no
+//      time-based record retention; `active`/`hidden`/`removed` states;
+//      photo states 90/30 days; 30d session TTL).
+//   2. IMPLEMENTED RUNTIME CONTRACT — the pre-pivot 12-month review clock
+//      (DEFAULT_REVIEW_INTERVAL_MONTHS) and the freshness sweep
+//      (runFreshnessSweep in db/moderation.ts) are STILL PRESENT in the code
+//      but RETIRED by ADR 0021 § 2.2; removal is tracked as code follow-up
+//      (retention cron must stop changing record status). The pins below
+//      document the transitional code state until the sweep is removed.
+//      The sessions table (expires_at NOT NULL + index) and the read-time
+//      expiry rejection in db/auth.ts are the pieces that remain unchanged.
 //   3. AUTOMATED PURGE CONTRACT (implemented in PR #87) — the worker
 //      exposes a `scheduled` handler, wrangler.jsonc declares the daily
-//      cron trigger, and db/retention.ts runs the R1-R7 sweep. These
+//      cron trigger, and db/retention.ts runs the R12-R18 sweep. These
 //      positive assertions pin the automation that replaced the old
 //      KNOWN GAP (worker was fetch-only, no triggers, no retention.ts).
 //      Runtime behaviour of the sweep itself is covered by
@@ -32,48 +36,60 @@ const readSource = (relativePath) => readFile(path.join(root, relativePath), "ut
 // 1. Policy documents
 // ---------------------------------------------------------------------------
 
-test("ADR 0008 documents the 12-month renewal cycle and ~4-decimal precision", async () => {
-  const adr = await readSource("docs/decisions/0008-data-licence-precision-retention-contact.md");
+test("ADR 0021 retires the timer-driven freshness cycle; ADR 0008's precision/contact decisions stand", async () => {
+  const adr21 = await readSource("docs/decisions/0021-community-driven-pivot.md");
+  const adr8 = await readSource("docs/decisions/0008-data-licence-precision-retention-contact.md");
 
+  // ADR 0021 § 2.2: no state transition happens on a timer — the old
+  // verified → needs_review → stale freshness sweep is retired.
   assert.match(
-    adr,
-    /Retention:\s*12 months for verified records/,
-    "ADR 0008 must pin the 12-month retention decision (CEO, 2026-07-31)",
+    adr21,
+    /No transition happens on a timer\./,
+    "ADR 0021 must pin the no-timer-transitions rule (§ 2.2)",
   );
   assert.match(
-    adr,
-    /re-verified at least every 12 months/,
-    "ADR 0008 must require re-verification at least every 12 months",
+    adr21,
+    /freshness sweep[\s\S]*?is retired/,
+    "ADR 0021 must retire the verified → needs_review → stale freshness sweep",
   );
   assert.match(
-    adr,
+    adr21,
+    /nothing changes status[\s\S]*?without community \(or admin-legal\) action/,
+    "ADR 0021 must pin that status changes require community/admin-legal action, never a timer",
+  );
+  // ADR 0008 decisions that remain live: ~4-decimal publication precision.
+  assert.match(
+    adr8,
     /~4 decimal places by default/,
-    "ADR 0008 must pin ~4-decimal publication precision",
-  );
-  assert.match(
-    adr,
-    /moves to `needs_review` and is removed after 6 months\s+unverified/,
-    "ADR 0008 must pin the 6-month unverified removal path after needs_review",
+    "ADR 0008 must still pin ~4-decimal publication precision",
   );
 });
 
-test("RETENTION_SCHEDULE.md pins R1/R2/R3/R7 values matching the code contract", async () => {
+test("RETENTION_SCHEDULE.md pins R1/R2/R3/R7 values matching the community-model contract", async () => {
   const schedule = await readSource("docs/legal/RETENTION_SCHEDULE.md");
 
-  // R1 — pending reports hard-deleted after 90 days.
-  assert.match(schedule, /R1 \| `pending` report[\s\S]*?\*\*90 days\*\*/, "R1 must pin 90 days for pending reports");
-  // R2 — rejected reports hard-deleted after 30 days.
-  assert.match(schedule, /R2 \| `rejected` report[\s\S]*?\*\*30 days\*\*/, "R2 must pin 30 days for rejected reports");
-  // R3 — verified records on a 12-month renewal cycle, 6-month unverified removal.
+  // R1 — active records have no time-based retention (ADR 0021 § 9.3); no transition on a timer.
   assert.match(
     schedule,
-    /R3 \| `verified` record[\s\S]*?\*\*12 months with renewal\*\*/,
-    "R3 must pin the 12-month renewal cycle for verified records",
+    /R1 \| `active` record[\s\S]*?\*\*No time-based retention\*\*/,
+    "R1 must pin no time-based retention for active records",
   );
   assert.match(
     schedule,
-    /after 6 months unverified → `removed`/,
-    "R3 must pin the 6-month unverified removal path",
+    /no transition on a timer \(\§ 2\.2\)/,
+    "R1 must pin that no transition happens on a timer",
+  );
+  // R2 — hidden records: reversible, no automatic deletion on a timer.
+  assert.match(
+    schedule,
+    /R2 \| `hidden` record[\s\S]*?\*\*No automatic deletion on a timer\*\*/,
+    "R2 must pin no automatic timer deletion for hidden records",
+  );
+  // R3 — removed records: reversible, no automatic deletion on a timer.
+  assert.match(
+    schedule,
+    /R3 \| `removed` record[\s\S]*?\*\*No automatic deletion on a timer\*\*/,
+    "R3 must pin no automatic timer deletion for removed records",
   );
   // R7 — sessions expire 30 days after issue (matches AUTH_SESSION_TTL_DAYS default).
   assert.match(
@@ -87,22 +103,24 @@ test("RETENTION_SCHEDULE.md pins R1/R2/R3/R7 values matching the code contract",
 // 2. Implemented runtime contract
 // ---------------------------------------------------------------------------
 
-test("the 12-month review clock is the implemented default (DEFAULT_REVIEW_INTERVAL_MONTHS)", async () => {
+test("the pre-pivot 12-month review clock is still in the code (transitional — retirement tracked)", async () => {
   const freshness = await readSource("db/freshness.ts");
   const moderation = await readSource("db/moderation.ts");
 
+  // TRANSITIONAL PIN (ADR 0021 § 2.2): the freshness sweep is retired by the
+  // community model, but the code still carries DEFAULT_REVIEW_INTERVAL_MONTHS
+  // and runFreshnessSweep (called from db/retention.ts runRetentionSweep and
+  // db/moderation.ts). Removal is tracked as code follow-up; these assertions
+  // document the current code state and must be REMOVED when the sweep lands.
   assert.match(
     freshness,
     /DEFAULT_REVIEW_INTERVAL_MONTHS\s*=\s*12/,
-    "the review clock default must stay 12 months (ADR 0008 R3)",
+    "the pre-pivot review clock is still present in db/freshness.ts (pending retirement)",
   );
-  // The sweep is exported from the moderation boundary and drives the
-  // verified -> needs_review -> stale transitions (runtime-tested in
-  // freshness-reverification.test.mjs).
   assert.match(
     moderation,
     /export async function runFreshnessSweep/,
-    "runFreshnessSweep must remain the exported freshness sweep entry point",
+    "runFreshnessSweep is still exported from the moderation boundary (pending retirement)",
   );
 });
 
