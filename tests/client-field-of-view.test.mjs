@@ -383,8 +383,19 @@ test("edit form: changing the stored bearing submits the new value", async () =>
   await renderEdit();
   await waitFor(() => assert.ok(screen.queryByDisplayValue("Fixture Camera Report")));
 
-  const slider = screen.getByLabelText("Direction");
-  setSlider(rtl, slider, 270);
+  // Race (t_c97844c2, CI run 30964829750): sotto contesa il load dell'edit
+  // page committa in un render TRAILING dopo il waitFor del titolo; quel
+  // commit risincronizza lo slider controllato al bearing salvato (45) e
+  // React salta l'onChange (input value tracker già riallineato a 45) → il
+  // fireEvent.change ONE-SHOT va perso e il PATCH parte con 45 (1 fail /
+  // 2051, rerun verde). Probe misurata: 6/400 col change perso, readout mai
+  // aggiornato. Retry del change a ogni poll finché il readout riflette il
+  // nuovo bearing — copre SOLO la race di commit; se la logica si rompe,
+  // il timeout fa fallire il test LOUD (nessuna regressione mascherata).
+  await waitFor(() => {
+    setSlider(rtl, screen.getByLabelText("Direction"), 270);
+    assert.ok(screen.getByText("W 270°"), "the readout reflects the new bearing before submit");
+  }, { timeout: 2000 });
   await user.click(screen.getByRole("button", { name: "Save changes" }));
   await waitFor(() => assert.ok(payload));
   assert.equal(payload.direction, 270, "the new bearing is submitted as an integer");
