@@ -1,0 +1,31 @@
+{
+  "slug": "osm-surveillance-italia-2026",
+  "source_name": "OpenStreetMap contributors",
+  "license": "ODbL 1.0 (OSM)",
+  "fetched_at": "2026-08-05T07:01:49.826Z",
+  "payload_checksum": "5b2e230f4328c9d7445b00679bd937eb419fec91c95432781a5ef297d4d6b318",
+  "local_d1_db": ".wrangler/state/v3/d1/miniflare-D1DatabaseObject/da01e38663ffd53c1547afdd4ed68775d03749bb46b95a8be67ceade87e516f5.sqlite",
+  "existing_cameras": 4,
+  "rows": {
+    "raw": 11629,
+    "limited": 11629,
+    "valid": 11629,
+    "invalid": 0
+  },
+  "skipped_by_parse": {
+    "total": 48,
+    "reasons": {
+      "surveillance:type=guard": 48
+    }
+  },
+  "dedup": {
+    "intra_skipped": 1233,
+    "intra_flagged_pairs": 0,
+    "cross_skipped_duplicate": 0,
+    "cross_review": 0,
+    "cross_insert": 10396
+  },
+  "review_items": [],
+  "invariant": true,
+  "summary": "total 11629 | invalid 0 | dedup 1233 | review 0 | insert 10396"
+}

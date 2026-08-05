@@ -1,0 +1,36 @@
+{
+  "slug": "osm-surveillance-italia-2026",
+  "source_name": "OpenStreetMap contributors",
+  "format": "osm-overpass",
+  "license": "ODbL 1.0 (OSM)",
+  "license_url": "https://opendatacommons.org/licenses/odbl/1-0/",
+  "attribution_text": "© OpenStreetMap contributors (https://www.openstreetmap.org/copyright)",
+  "source_url": "https://overpass-api.de/api/interpreter",
+  "overpass_query": "node/way[\"man_made\"=\"surveillance\"][\"surveillance\"~\"^(public|outdoor)$\"]",
+  "overpass_bbox_chunks": 12,
+  "overpass_timeout": 120,
+  "overpass_sleep_ms": 3000,
+  "overpass_instances": [
+    "https://overpass-api.de/api/interpreter",
+    "https://overpass.kumi.systems/api/interpreter"
+  ],
+  "kind_map": {
+    "dome": "Fixed dome",
+    "fixed": "Bullet",
+    "panning": "PTZ",
+    "alpr": "Traffic / licence plate reader",
+    "traffic": "Traffic / licence plate reader"
+  },
+  "surveillance_type_map": {
+    "alpr": "Traffic / licence plate reader",
+    "camera": null,
+    "guard": null
+  },
+  "skip_if": {
+    "surveillance": "indoor"
+  },
+  "external_id_prefix": "osm:",
+  "enrich": false,
+  "max_records": 20000,
+  "notes": "Query Overpass per bbox Italia a chunk (12 celle) per rispettare il rate limit delle istanze pubbliche (censimento § 3.4: bbox intera -> limiti). Filtro surveillance public|outdoor (task: surveillance=public; design § 3.3: escludere indoor). camera:type->kind (dome->Fixed dome, fixed->Bullet, panning->PTZ — spec task FASE B), surveillance:type ALPR->Traffic reader, guard->skip. operator->notes solo se entità pubblica (mai persone, § 7.6). Attribuzione: © OpenStreetMap contributors (licenze-compatibilita.md § 3.4)."
+}
