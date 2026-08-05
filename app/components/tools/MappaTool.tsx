@@ -49,7 +49,16 @@ export function MappaTool() {
 
   const { records, loading } = usePublicCameras({
     filters: serverFiltersFrom(filters),
-    onRecords: (next) => setSelectedId((current) => (filters.focus !== null ? current : next[0].id)),
+    // P0 hotfix (t_444b15e4, post-#321): the API answers a VALID empty
+    // list ({records: []}) when the DB has no public records — never
+    // dereference next[0] on it. Without records there is nothing to
+    // select: keep the current selection (the focus management effect and
+    // MapPanel's fallbacks already handle a selectedId that matches
+    // nothing), so no spurious popup or deep link can fire.
+    onRecords: (next) => setSelectedId((current) => {
+      if (filters.focus !== null || next.length === 0) return current;
+      return next[0].id;
+    }),
     onError: () => setNotice(t.apiUnavailable),
   });
 

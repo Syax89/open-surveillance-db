@@ -317,6 +317,32 @@ test("MappaTool deep link applies the seeded URL filters fully (type + freshness
   await rtl.waitFor(() => assert.ok(screen.getByText("No published record matches those filters."), "deep link fully applies the seeded filters (in-list note)"));
 });
 
+test("MappaTool with a valid EMPTY /api/cameras answer keeps the map and shows the honest empty state (P0 t_444b15e4: no next[0] dereference)", async () => {
+  // P0 hotfix (t_444b15e4, post-#321): the API may answer 200 with a
+  // VALID empty list ({records: []}) when the DB has no public records —
+  // onRecords must never dereference next[0].id on it (TypeError before
+  // the guard). The map stays rendered (map-always-visible contract
+  // t_b9666d09), the sidebar shows the truthful in-list empty note, and
+  // no exception surfaces.
+  installEmptyMock();
+  const { screen } = rtl;
+  await renderWithLocale(React.createElement(MappaTool));
+
+  // The map region is still on the page (never replaced by an empty state).
+  assert.ok(screen.getByRole("region", { name: "Interactive OpenStreetMap map" }), "the map stays rendered with zero records from the API");
+
+  // The sidebar shows the truthful empty state (same note as a filter that
+  // matches nothing) with the clear action — never a crash, never a
+  // spurious selection/popup/deep link.
+  await rtl.waitFor(() => {
+    assert.ok(screen.getByText("No published record matches those filters."), "truthful in-list empty note on an empty API answer");
+    assert.ok(screen.getByText(/This does not mean that there are no cameras/), "the note never implies an area has no surveillance");
+    assert.ok(screen.getByRole("button", { name: /Clear filters/ }), "the in-list note offers a clear action");
+  });
+  // No record rows exist — nothing to select, no spurious marker/popup.
+  assert.ok(screen.queryByRole("button", { name: /Illustrative record/ }) === null, "no record rows with an empty API answer");
+});
+
 // Marker/popup contract (t_702c10af): the API mock returns the two seed
 // records so usePublicCameras swaps the seed for a NEW array — the marker
 // effect then runs with leaflet ready (same re-render path as production).
