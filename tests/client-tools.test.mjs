@@ -481,11 +481,15 @@ test("MappaTool zoom/pan updates the list to the points in the new viewport (deb
   await renderWithLocale(React.createElement(MappaTool));
 
   // The map (and its moveend handler) exists after the lazy leaflet import
-  // resolves; the viewport starts whole-world so both rows are listed.
+  // resolves. The viewport-bounded data layer (t_bb310428) fetches the
+  // records AFTER the map emits its first bounds (debounced), so the list
+  // assertions must wait for the viewport payload to land.
   await waitFor(() => assert.ok(leaflet.__maps.length > 0));
   const map = leaflet.__maps.at(-1);
-  assert.ok(screen.getByText("Showing all 2 points in the current view"));
-  assert.ok(screen.getByRole("button", { name: /Illustrative record A/ }));
+  await waitFor(() => {
+    assert.ok(screen.getByText("Showing all 2 points in the current view"));
+    assert.ok(screen.getByRole("button", { name: /Illustrative record A/ }));
+  });
 
   // Zoom in: a narrow viewport excludes every record — the list empties
   // truthfully (the map itself keeps all markers) and the aria-live count

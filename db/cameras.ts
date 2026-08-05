@@ -535,6 +535,89 @@ export async function listPublicCamerasInBbox(
   return result.results.map((record) => ({ ...record, latitude: roundPublicCoordinate(record.latitude), longitude: roundPublicCoordinate(record.longitude) }));
 }
 
+/** Default and hard-max page size for the bbox JSON list (map viewport contract, kanban t_bb310428). */
+export const PUBLIC_CAMERAS_BBOX_DEFAULT_LIMIT = 1000;
+export const PUBLIC_CAMERAS_BBOX_MAX_LIMIT = 10_000;
+
+/**
+ * Bounded JSON bbox contract for the interactive map (kanban t_bb310428 —
+ * P0 map UX regression: the /mappa data layer walked ALL public pages
+ * serially, so markers arrived only after the full-list walk completed).
+ *
+ * The map fetches ONLY the records inside the current viewport: one query,
+ * bounded by the box (plus the optional kind/freshness filters). The shape
+ * is the same `{ records, total, nextOffset }` as the directory page, so the
+ * client reuses one pagination contract — `total` here is the count of
+ * records matching the filters INSIDE the bbox (the set the caller can page
+ * through with offset), NOT the dataset-wide count. ORDER BY id DESC keeps
+ * offsets stable between requests, exactly like listPublicCamerasPage.
+ *
+ * Every record carries the same aggregate counts as the directory page
+ * (confirmationCount + the five community-action counts, one GROUP BY IN
+ * query — never an N+1), because the marker popup renders the action widget
+ * from the shared payload.
+ *
+ * Boundedness: `limit` is clamped to [1, PUBLIC_CAMERAS_BBOX_MAX_LIMIT] at
+ * the db boundary — a bbox can never force an unbounded page, and a dense
+ * national viewport still arrives in ONE request (the client asks for the
+ * max and pages only if nextOffset is non-null).
+ */
+export async function listPublicCamerasInBboxPage(
+  bbox: { west: number; south: number; east: number; north: number },
+  nowIsoOrFilters?: string | PublicCameraFilters,
+  options: { limit: number; offset: number } = { limit: PUBLIC_CAMERAS_BBOX_DEFAULT_LIMIT, offset: 0 },
+): Promise<PublicCameraListPage> {
+  const d1 = await getD1();
+  // Same dual first argument as listPublicCamerasPage: an ISO boundary
+  // string (freshness-reverification suite) or a filter object (route).
+  const filters = typeof nowIsoOrFilters === "string" ? undefined : nowIsoOrFilters;
+  const nowIso = typeof nowIsoOrFilters === "string" ? nowIsoOrFilters : new Date().toISOString();
+  // Defensive clamp at the db boundary (the route validates too): a bbox
+  // page is bounded by construction, never by the caller's politeness.
+  const limit = Math.min(Math.max(Math.trunc(options.limit) || PUBLIC_CAMERAS_BBOX_DEFAULT_LIMIT, 1), PUBLIC_CAMERAS_BBOX_MAX_LIMIT);
+  const offset = Math.max(Math.trunc(options.offset) || 0, 0);
+  const parameters: (string | number)[] = [];
+  const { sql: publicPredicate, parameters: predicateParameters } = publicCameraPredicate(nowIso);
+  parameters.push(...predicateParameters);
+  // Bbox geometry binds after the predicate (the composite coordinates
+  // index serves the BETWEEN, same as listPublicCamerasNear).
+  parameters.push(bbox.south, bbox.north, bbox.west, bbox.east);
+  let query = `FROM cameras WHERE ${publicPredicate} AND latitude BETWEEN ? AND ? AND longitude BETWEEN ? AND ?`;
+  if (filters?.kind) {
+    query += " AND kind = ?";
+    parameters.push(filters.kind);
+  }
+  if (filters?.freshness && filters.freshness !== "all") {
+    query += " AND last_verified_at >= ?";
+    parameters.push(freshnessCutoff(filters.freshness));
+  }
+  const countResult = await d1.prepare(`SELECT COUNT(*) AS total ${query}`).bind(...parameters).first<{ total: number }>();
+  const total = countResult?.total ?? 0;
+  const result = await d1
+    .prepare(`SELECT id, title, kind, CASE WHEN publish_manufacturer = 1 THEN manufacturer ELSE NULL END AS manufacturer, CASE WHEN publish_observed_on = 1 THEN observed_on ELSE NULL END AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, latitude, longitude, direction, status, source, updated, description, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt ${query} ORDER BY id DESC LIMIT ? OFFSET ?`)
+    .bind(...parameters, limit, offset)
+    .all<PublicCameraRecord>();
+  const ids = result.results.map((record) => record.id);
+  // Community-verification counts (ADR 0018 §2.3): one GROUP BY IN query for
+  // the whole page — never an N+1 per record.
+  const confirmationCounts = ids.length > 0 ? await confirmationCountsFor(ids) : new Map<number, number>();
+  // Community-action counts (ADR 0021 §10.2): COUNT DISTINCT, never weights.
+  const actionCounts = ids.length > 0 ? await communityActionCountsFor(ids) : new Map<number, CommunityActionCounts>();
+  const records = result.results.map((record) => ({
+    ...record,
+    latitude: roundPublicCoordinate(record.latitude),
+    longitude: roundPublicCoordinate(record.longitude),
+    confirmationCount: confirmationCounts.get(record.id) ?? 0,
+    usefulCount: actionCounts.get(record.id)?.like ?? 0,
+    confirmCount: actionCounts.get(record.id)?.confirm ?? 0,
+    goneCount: actionCounts.get(record.id)?.gone ?? 0,
+    problemCount: actionCounts.get(record.id)?.problem ?? 0,
+    privacyCount: actionCounts.get(record.id)?.privacy ?? 0,
+  }));
+  const nextOffset = offset + records.length < total ? offset + records.length : null;
+  return { records, total, nextOffset };
+}
+
 /** Default and hard-max page size for search/nearby (FRONTEND_PLAN § 3.2.3). */
 export const SEARCH_PAGE_DEFAULT_LIMIT = 25;
 export const SEARCH_PAGE_MAX_LIMIT = 100;

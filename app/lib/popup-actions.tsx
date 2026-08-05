@@ -23,7 +23,7 @@ import { LOCALE_COOKIE, resolveLocale, type Locale } from "./i18n/types";
  * leak and warn on every marker click.
  */
 
-let activeRoot: { root: Root; node: HTMLElement } | null = null;
+let activeRoot: { root: Root; node: HTMLElement; recordId: number } | null = null;
 
 const STORAGE_KEY = "opensurveillancedb-locale";
 
@@ -50,8 +50,15 @@ export function unmountPopupActions(): void {
  * Render the compact action widget into a popup mount node. `counts` come
  * from the shared record payload (list API already exposes them); the
  * widget falls back to zero when the seed lacks them.
+ *
+ * P0 t_bb310428 (popup flicker): the mount is IDEMPOTENT for the SAME
+ * record + node — a popupopen that re-fires on the same popup (Leaflet
+ * re-fires the event in some openPopup paths) must NOT unmount/remount the
+ * root: a remount resets the widget's local state (counts, disclosure,
+ * personal action) and makes the buttons visibly reset.
  */
 export function mountPopupActions(node: HTMLElement, recordId: number, counts?: Partial<ActionCounts>): void {
+  if (activeRoot && activeRoot.node === node && activeRoot.recordId === recordId) return;
   unmountPopupActions();
   const root = createRoot(node);
   root.render(
@@ -62,5 +69,5 @@ export function mountPopupActions(node: HTMLElement, recordId: number, counts?: 
       bundle={messages[resolvePopupLocale()]}
     />,
   );
-  activeRoot = { root, node };
+  activeRoot = { root, node, recordId };
 }

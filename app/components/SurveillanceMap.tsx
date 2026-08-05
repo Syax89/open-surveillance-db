@@ -153,6 +153,11 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
   const mapRef = useRef<import("leaflet").Map | null>(null);
   const markersRef = useRef<import("leaflet").LayerGroup | null>(null);
   const markersByIdRef = useRef<Map<number, MarkerEntry> | null>(null);
+  // Grid badges (t_26ce96f3, reconcile t_bb310428): tracked SEPARATELY from
+  // the individual markers — a badge is keyed by its 48px cell, never by a
+  // record id, and never carries a popup, so badge churn (zoom/density
+  // changes) must not touch the marker/popup bookkeeping.
+  const badgesRef = useRef<Map<string, import("leaflet").Marker>>(new Map());
   const leafletRef = useRef<LeafletModule | null>(null);
   const onPickRef = useRef(onPick);
   const focusLocationRef = useRef(focusLocation);
@@ -239,6 +244,30 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
     pickPopupHtmlRef.current = build;
   }, [t]);
 
+  // Pick handler (popup lifecycle t_33b82720, P0 t_bb310428): registered on
+  // the map ONLY while the explicit "Add here" mode is active — base map
+  // navigation is SILENT by construction, not just by guard. Marker clicks
+  // never reach it anyway (they stop propagation), so it can never replace
+  // a marker popup. Reads the CURRENT picker HTML and onPick through refs.
+  const handleMapClick = useCallback((event: { latlng: { lat: number; lng: number } }) => {
+    onPickRef.current(event.latlng.lat, event.latlng.lng);
+    mapRef.current?.openPopup(pickPopupHtmlRef.current(event.latlng.lat, event.latlng.lng), event.latlng, {
+      maxWidth: 300,
+      minWidth: 220,
+      className: "osm-camera-popup",
+    });
+  }, []);
+  // The map may not exist yet when the toggle first flips (lazy leaflet
+  // import); the map-creation effect registers the handler too when the
+  // mode is already active at creation time.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (addMode) map.on("click", handleMapClick);
+    else map.off?.("click", handleMapClick);
+    return () => { map.off?.("click", handleMapClick); };
+  }, [addMode, handleMapClick]);
+
   // Offline state: the tiles cannot load and the records are the last ones
   // the browser received. The map stays visible (the markers are already on
   // the page); a status notice explains why nothing refreshes. SSR-safe:
@@ -277,6 +306,7 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
 
   useEffect(() => {
     let disposed = false;
+    const badges = badgesRef.current;
     async function createMap() {
       if (!mapElement.current || mapRef.current) return;
       try {
@@ -312,25 +342,18 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
         // removes every path (cones AND circles) from the accessibility
         // tree; markers live in a separate pane and stay exposed.
         map.getPane?.("overlayPane")?.setAttribute?.("aria-hidden", "true");
-        // Map-click report picker (t_6abb96ac, popup lifecycle t_33b82720):
-        // base map navigation is SILENT — a click/tap on empty map space
-        // must never open a popup while the user is just exploring (that
-        // was the "pan/zoom makes popups appear" report). The coordinate
-        // picker opens ONLY in the explicit "Add here" mode toggled in the
-        // map chrome (accessible: aria-pressed button). Marker clicks never
-        // reach this handler anyway: they stop propagation in the marker
-        // population effect, so the picker can never replace a marker
-        // popup. onPick keeps its contract (nearby-check start) and fires
-        // with the same click — but only inside the explicit mode.
-        map.on("click", (event) => {
-          if (!addModeRef.current) return;
-          onPickRef.current(event.latlng.lat, event.latlng.lng);
-          map.openPopup(pickPopupHtmlRef.current(event.latlng.lat, event.latlng.lng), event.latlng, {
-            maxWidth: 300,
-            minWidth: 220,
-            className: "osm-camera-popup",
-          });
-        });
+        // Map-click report picker (t_6abb96ac, popup lifecycle t_33b82720,
+        // P0 t_bb310428): base map navigation is SILENT — a click/tap on
+        // empty map space must never open a popup while the user is just
+        // exploring (that was the "pan/zoom makes popups appear" report).
+        // The coordinate picker opens ONLY in the explicit "Add here" mode:
+        // the handler is REGISTERED only while the toggle is active (the
+        // addMode effect above keeps it in sync) — never a guarded
+        // unconditional listener. Marker clicks never reach this handler
+        // anyway (they stop propagation in the marker population effect),
+        // so the picker can never replace a marker popup. onPick keeps its
+        // contract (nearby-check start) and fires with the same click.
+        if (addModeRef.current) map.on("click", handleMapClick);
         // Community action widget mount (ADR 0021 §3, FASE 3 UI): when a
         // marker popup opens, render the compact widget into its mount node
         // (a separate React root — see lib/popup-actions). The pick popup
@@ -405,13 +428,14 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
         boundsTimerRef.current = null;
       }
       mapRef.current?.remove(); mapRef.current = null; markersRef.current = null; fovLayerRef.current = null; markersByIdRef.current = null;
+      badges.clear();
       // Reset the ready flag so a StrictMode remount (or any future
       // recreate) re-runs the population effect against the fresh layer
       // group — otherwise mapReady stays true, the deps do not change and
       // the new map would render with an empty marker pane again.
       setMapReady(false);
     };
-  }, [emitBounds]);
+  }, [emitBounds, handleMapClick]);
 
   // Marker population depends on the camera list, the click handler, the
   // viewport culling rectangle and the CURRENT ZOOM (the grid-vs-individual
@@ -452,147 +476,161 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
   //  record lands in exactly one cell, and a deep-linked selectedId is
   //  ALWAYS rendered as an individual marker on top of the grid (see the
   //  selected-overlay block below), so ?focus=ID keeps its popup.
+  //
+  //  RECONCILE, NOT clearLayers (P0 t_bb310428 — popup flicker): the OLD
+  //  rebuild called layer.clearLayers() on every viewport/cameras/grid
+  //  change, which DESTROYED every marker DOM node — including the one
+  //  with the open popup. Leaflet closed the popup (popupclose fired),
+  //  React mounted the community widget, then the restore logic re-opened
+  //  it (popupopen fired again): measured as popup destroy/recreate around
+  //  288ms/518ms after a click, with the widget buttons resetting. This
+  //  effect now DIFFS the desired set against the existing markers: kept
+  //  markers (same record id still visible) are NEVER removed, so an open
+  //  popup survives the rebuild with its DOM intact — zero close/reopen,
+  //  zero widget resets. Only markers that genuinely leave the desired set
+  //  (record out of view / filtered out / aggregated into a cell) are
+  //  removed, and only they can close a popup — and that close is the
+  //  rebuild path (rebuildingRef), so the active popup is restored when
+  //  the record comes back into view.
   useEffect(() => {
     const L = leafletRef.current; const layer = markersRef.current; if (!L || !layer || !mapReady) return;
-    // Popup lifecycle (t_33b82720): remember the popup that is open BEFORE
-    // clearLayers destroys the markers (removing a marker closes its popup
-    // and fires popupclose, which resets activePopupIdRef). After the
-    // rebuild the popup is restored ONLY if its record is still rendered —
-    // a rebuild is popup-NEUTRAL and never opens anything else.
-    const restoreId = activePopupIdRef.current;
     rebuildingRef.current = true;
-    layer.clearLayers();
-    rebuildingRef.current = false;
-    const byId = new Map<number, MarkerEntry>();
-    // Viewport-first: never materialise the dataset before the first
-    // bounds. (The sidebar list still shows everything via its own
-    // recordsInBounds(records, null) call — text is cheap, DOM markers are
-    // not.)
-    if (!viewportBounds) {
-      markersByIdRef.current = byId;
-      return;
-    }
-    const { visible, cells, individual } = markersForViewport(cameras, viewportBounds, mapZoom);
-    // Grid badges: one marker per aggregated cell. Clicking zooms in toward
-    // the centroid (2 levels — enough to split the cell into readable
-    // pieces or individual markers). The badge is a button (Leaflet
-    // interactive marker: role=button + tabindex) whose aria-label/tooltip
-    // carry the count; the visible text is the count itself.
-    cells.forEach((cell) => {
-      const marker = L.marker([cell.centroidLat, cell.centroidLng], {
-        icon: buildGridBadgeIcon(L, cell.count),
-        title: t.gridBadgeTooltip(cell.count),
-      });
-      marker.bindTooltip(t.gridBadgeTooltip(cell.count), { direction: "top", offset: [0, -16] });
-      marker.on("click", () => {
-        const map = mapRef.current;
-        if (!map) return;
-        map.setView([cell.centroidLat, cell.centroidLng], map.getZoom() + 2, { animate: true });
-      });
-      marker.addTo(layer);
-      marker.getElement()?.setAttribute?.("aria-label", t.gridBadgeLabel(cell.count));
-    });
-    // Individual markers: only the records NOT aggregated into a multi-
-    // record cell (single-record cells render directly). Popup opens on
-    // marker click (Leaflet default) and carries the record info +
-    // correction/detail links built by the parent page.
-    individual.forEach((camera) => {
-      const marker = L.marker([camera.latitude, camera.longitude], { icon: buildMarkerIcon(L, camera, false), title: camera.title });
-      marker.bindTooltip(`${camera.title}<br/><small>${camera.kind}</small>`, { direction: "top", offset: [0, -12] });
-      marker.bindPopup(popupHtmlForRef.current ? popupHtmlForRef.current(camera) : defaultPopupHtml(camera), {
-        maxWidth: 300,
-        minWidth: 220,
-        className: "osm-camera-popup",
-      });
-      // Popup lifecycle (t_33b82720): stop the click from bubbling to the
-      // map — Leaflet bubbles marker clicks by default, and the map click
-      // handler would open the coordinate picker OVER the marker popup
-      // (the "popup appears and disappears" report). Open idempotently:
-      // one click opens once and stays open; a second click on the SAME
-      // marker keeps it open (the default bindPopup toggle is neutralised
-      // by re-opening here); a click on another marker transfers the
-      // popup once.
-      marker.on("click", (event) => {
-        L.DomEvent.stopPropagation(event);
-        onSelect(camera.id);
-        if (!marker.isPopupOpen()) marker.openPopup();
-      });
-      marker.addTo(layer);
-      byId.set(camera.id, { marker, camera });
-    });
-    // Deep-link contract (t_26ce96f3): the selected record is ALWAYS
-    // rendered as an individual marker, even when the rest of the view is
-    // aggregated into a grid cell — a ?focus=ID deep link must be visible
-    // and its popup must open. (If the selection is inside a multi-record
-    // cell, its badge would swallow the individual popup.)
-    const selectedIdNow = selectedIdRef.current;
-    if (selectedIdNow !== null && !byId.has(selectedIdNow)) {
-      const camera = visible.find((item) => item.id === selectedIdNow);
-      if (camera) {
-        const marker = L.marker([camera.latitude, camera.longitude], { icon: buildMarkerIcon(L, camera, true), title: camera.title });
+    try {
+      // 1) Desired set: grid badges (keyed by 48px cell) + individual
+      //    markers (keyed by record id) + the selected-overlay marker.
+      const desiredBadges = new Map<string, { lat: number; lng: number; count: number }>();
+      const desiredMarkers = new Map<number, MapCamera>();
+      if (viewportBounds) {
+        const { visible, cells, individual } = markersForViewport(cameras, viewportBounds, mapZoom);
+        cells.forEach((cell) => desiredBadges.set(`${cell.x}:${cell.y}`, { lat: cell.centroidLat, lng: cell.centroidLng, count: cell.count }));
+        individual.forEach((camera) => desiredMarkers.set(camera.id, camera));
+        // Deep-link contract (t_26ce96f3): the selected record is ALWAYS
+        // rendered as an individual marker, even when the rest of the view
+        // is aggregated into a grid cell — a ?focus=ID deep link must be
+        // visible and its popup must open.
+        const selectedIdNow = selectedIdRef.current;
+        if (selectedIdNow !== null && !desiredMarkers.has(selectedIdNow)) {
+          const camera = visible.find((item) => item.id === selectedIdNow);
+          if (camera) desiredMarkers.set(selectedIdNow, camera);
+        }
+      }
+      // 2) Reconcile badges. Badges never carry popups, so removing/
+      //    recreating them on zoom/density changes is popup-safe; a kept
+      //    badge only updates its count label when the count changed.
+      const badges = badgesRef.current;
+      for (const [key, badge] of badges) {
+        if (!desiredBadges.has(key)) {
+          layer.removeLayer(badge);
+          badges.delete(key);
+        }
+      }
+      for (const [key, spec] of desiredBadges) {
+        const existing = badges.get(key);
+        if (existing) {
+          const el = existing.getElement?.();
+          const text = el?.querySelector?.(".osm-grid-badge")?.textContent;
+          if (text !== String(spec.count)) {
+            existing.setIcon(buildGridBadgeIcon(L, spec.count));
+            existing.setTooltipContent(t.gridBadgeTooltip(spec.count));
+            el?.setAttribute?.("aria-label", t.gridBadgeLabel(spec.count));
+          }
+        } else {
+          const badge = L.marker([spec.lat, spec.lng], {
+            icon: buildGridBadgeIcon(L, spec.count),
+            title: t.gridBadgeTooltip(spec.count),
+          });
+          badge.bindTooltip(t.gridBadgeTooltip(spec.count), { direction: "top", offset: [0, -16] });
+          badge.on("click", () => {
+            const map = mapRef.current;
+            if (!map) return;
+            map.setView([spec.lat, spec.lng], map.getZoom() + 2, { animate: true });
+          });
+          badge.addTo(layer);
+          badge.getElement?.()?.setAttribute?.("aria-label", t.gridBadgeLabel(spec.count));
+          badges.set(key, badge);
+        }
+      }
+      // 3) Reconcile individual markers (popup-bearing).
+      const byId = markersByIdRef.current ?? new Map<number, MarkerEntry>();
+      for (const [id, entry] of byId) {
+        const camera = desiredMarkers.get(id);
+        if (!camera) {
+          // The record left the view / filters / the grid threshold: remove
+          // ONLY this marker. If its popup was open, Leaflet closes it —
+          // rebuildingRef keeps activePopupIdRef so it is restored when the
+          // record comes back.
+          layer.removeLayer(entry.marker);
+          byId.delete(id);
+        } else if (entry.camera !== camera) {
+          // Kept marker with refreshed data: update IN PLACE. An open popup
+          // keeps its DOM — setPopupContent swaps the content without
+          // closing, so no popupclose/popupopen churn (P0 t_bb310428).
+          entry.camera = camera;
+          entry.marker.setPopupContent(popupHtmlForRef.current ? popupHtmlForRef.current(camera) : defaultPopupHtml(camera));
+          entry.marker.setTooltipContent(`${camera.title}<br/><small>${camera.kind}</small>`);
+          entry.marker.setIcon(buildMarkerIcon(L, camera, camera.id === selectedIdRef.current));
+        }
+      }
+      for (const [id, camera] of desiredMarkers) {
+        if (byId.has(id)) continue;
+        const isSelected = camera.id === selectedIdRef.current;
+        const marker = L.marker([camera.latitude, camera.longitude], { icon: buildMarkerIcon(L, camera, isSelected), title: camera.title });
         marker.bindTooltip(`${camera.title}<br/><small>${camera.kind}</small>`, { direction: "top", offset: [0, -12] });
         marker.bindPopup(popupHtmlForRef.current ? popupHtmlForRef.current(camera) : defaultPopupHtml(camera), {
           maxWidth: 300,
           minWidth: 220,
           className: "osm-camera-popup",
         });
-        // Same popup-lifecycle click contract as the regular markers above.
+        // Popup lifecycle (t_33b82720): stop the click from bubbling to the
+        // map — Leaflet bubbles marker clicks by default, and the map click
+        // handler would open the coordinate picker OVER the marker popup
+        // (the "popup appears and disappears" report). Open idempotently:
+        // one click opens once and stays open; a second click on the SAME
+        // marker keeps it open (the default bindPopup toggle is neutralised
+        // by re-opening here); a click on another marker transfers the
+        // popup once.
         marker.on("click", (event) => {
           L.DomEvent.stopPropagation(event);
           onSelect(camera.id);
           if (!marker.isPopupOpen()) marker.openPopup();
         });
         marker.addTo(layer);
-        byId.set(camera.id, { marker, camera });
+        byId.set(id, { marker, camera });
       }
-    }
-    markersByIdRef.current = byId;
-    // Freshly built markers start unselected; re-apply the current
-    // selection icon here so a rebuild (filter/directory change) keeps the
-    // same selected marker even when selectedId itself did not change.
-    // A URL focus deep link (?focus=ID) also opens the popup once the
-    // marker exists, so the record's balloon is visible after the pan.
-    // NOTE: prevSelectedIdRef is deliberately NOT updated here — it tracks
-    // "the last id the selection effect processed". A rebuild may run in
-    // the same commit as a selection change (the parent passes a fresh
-    // array identity); resetting the ref here would make the selection
-    // effect early-return and swallow the pan+popup. Icons stay correct in
-    // both cases: the rebuild applies the current selection, the selection
-    // effect re-applies it idempotently when it actually fires.
-    const current = selectedIdRef.current;
-    const entry = byId.get(current);
-    if (entry) {
-      entry.marker.setIcon(buildMarkerIcon(L, entry.camera, true));
-    }
-    // Deep-link ?focus (t_26ce96f3, popup lifecycle t_33b82720): the
-    // selected popup opens ONCE per focus value — the first rebuild after
-    // the pan (the selected-overlay marker above). Later moveend rebuilds
-    // must NOT reopen it: that unconditional open on every rebuild was the
-    // "pan/zoom makes popups appear" bug with a ?focus deep link.
-    const focus = focusLocationRef.current;
-    let focusOpened = false;
-    if (focus) {
-      const focusKey = `${focus.latitude},${focus.longitude}`;
-      if (focusPopupShownRef.current !== focusKey) {
-        const focusEntry = byId.get(current);
-        if (focusEntry) {
-          focusEntry.marker.openPopup();
-          focusPopupShownRef.current = focusKey;
-          focusOpened = true;
+      markersByIdRef.current = byId;
+      // 4) Deep-link ?focus (t_26ce96f3, popup lifecycle t_33b82720): the
+      //    selected popup opens ONCE per focus value — the first rebuild
+      //    after the pan (the selected-overlay marker above). Later
+      //    moveend rebuilds must NOT reopen it: that unconditional open on
+      //    every rebuild was the "pan/zoom makes popups appear" bug with a
+      //    ?focus deep link.
+      const current = selectedIdRef.current;
+      const focus = focusLocationRef.current;
+      let focusOpened = false;
+      if (focus) {
+        const focusKey = `${focus.latitude},${focus.longitude}`;
+        if (focusPopupShownRef.current !== focusKey) {
+          const focusEntry = byId.get(current);
+          if (focusEntry) {
+            focusEntry.marker.openPopup();
+            focusPopupShownRef.current = focusKey;
+            focusOpened = true;
+          }
         }
       }
-    }
-    // Popup lifecycle (t_33b82720): restore the popup that was open BEFORE
-    // the rebuild (restoreId, saved above clearLayers) — and ONLY it, and
-    // ONLY while its record is still rendered in this view. A rebuild
-    // (moveend, zoomend, filter change) never opens a popup the user did
-    // not have open. If the focus just opened its own popup, it wins (it
-    // is the explicit navigation intent). When the record is NOT visible,
-    // the active id is KEPT (the popup was not closed by the user — it
-    // will be restored on the next rebuild where the record is back).
-    if (restoreId != null && !focusOpened) {
-      const restoreEntry = byId.get(restoreId);
-      if (restoreEntry) restoreEntry.marker.openPopup();
+      // 5) Popup lifecycle (t_33b82720): restore ONLY the popup that was
+      //    closed BY THIS REBUILD (its marker was removed and is back in
+      //    view). A popup on a KEPT marker is untouched (still open, DOM
+      //    intact); a popup closed by the user stays closed
+      //    (activePopupIdRef was cleared by its popupclose). If the focus
+      //    just opened its own popup, it wins (explicit navigation intent).
+      const restoreId = activePopupIdRef.current;
+      if (restoreId != null && !focusOpened) {
+        const restoreEntry = byId.get(restoreId);
+        if (restoreEntry && !restoreEntry.marker.isPopupOpen()) restoreEntry.marker.openPopup();
+      }
+    } finally {
+      rebuildingRef.current = false;
     }
   }, [cameras, onSelect, mapReady, viewportBounds, mapZoom, t]);
 
@@ -648,6 +686,9 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
   // selection comes from the sidebar list (or a deep link) the marker is
   // panned into view and its popup opens — the reverse direction of the
   // marker click, which already selects + opens the popup natively.
+  // P0 t_bb310428: opening is IDEMPOTENT — a marker click already opened
+  // the popup, so the selection effect must not re-open it (that second
+  // open was the measured double popupopen after a click).
   useEffect(() => {
     const L = leafletRef.current; const byId = markersByIdRef.current; if (!L || !byId) return;
     const prev = prevSelectedIdRef.current;
@@ -661,7 +702,7 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
       if (map) {
         const latlng = nextEntry.marker.getLatLng();
         if (!map.getBounds().contains(latlng)) map.panTo(latlng);
-        nextEntry.marker.openPopup();
+        if (!nextEntry.marker.isPopupOpen()) nextEntry.marker.openPopup();
       }
     }
     prevSelectedIdRef.current = selectedId;

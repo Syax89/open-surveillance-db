@@ -1,0 +1,109 @@
+{
+  "task": "t_bb310428",
+  "date": "2026-08-05T22:03:10.484Z",
+  "base": "http://localhost:3000",
+  "datasetRecords": 7378,
+  "runsPerBbox": 3,
+  "serialWalk": {
+    "requests": 15,
+    "firstRequestMs": 240.128174,
+    "totalMs": 3708.56855,
+    "bytes": 4071105,
+    "perRequest": [
+      {
+        "offset": 0,
+        "ms": 240
+      },
+      {
+        "offset": 1,
+        "ms": 227
+      },
+      {
+        "offset": 2,
+        "ms": 247
+      },
+      {
+        "offset": 3,
+        "ms": 240
+      },
+      {
+        "offset": 4,
+        "ms": 240
+      },
+      {
+        "offset": 5,
+        "ms": 241
+      },
+      {
+        "offset": 6,
+        "ms": 249
+      },
+      {
+        "offset": 7,
+        "ms": 252
+      },
+      {
+        "offset": 8,
+        "ms": 252
+      },
+      {
+        "offset": 9,
+        "ms": 240
+      },
+      {
+        "offset": 10,
+        "ms": 232
+      },
+      {
+        "offset": 11,
+        "ms": 273
+      },
+      {
+        "offset": 12,
+        "ms": 238
+      },
+      {
+        "offset": 13,
+        "ms": 262
+      },
+      {
+        "offset": 14,
+        "ms": 256
+      }
+    ]
+  },
+  "bbox": {
+    "italy": {
+      "label": "italy-national",
+      "runs": [
+        2037,
+        2046,
+        2066
+      ],
+      "medianMs": 2046,
+      "bytes": 4039786,
+      "status": 200,
+      "count": 7378
+    },
+    "rome": {
+      "label": "rome-z13",
+      "runs": [
+        165,
+        185,
+        200
+      ],
+      "medianMs": 185,
+      "bytes": 146005,
+      "status": 200,
+      "count": 269
+    }
+  },
+  "summary": {
+    "oldWalkTotalMs": 3708.56855,
+    "oldFirstRequestMs": 240.128174,
+    "newNationalViewportMedianMs": 2046,
+    "newRomeViewportMedianMs": 185,
+    "improvementNational": 1.81,
+    "improvementInitialViewport": 20.05
+  }
+}
