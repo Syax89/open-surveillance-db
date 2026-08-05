@@ -169,6 +169,22 @@ export const en = {
     errorSessionEnded: "Your session has ended. Log in again to take part.",
     errorVerifyRequired: "Verify your email to take part in community actions.",
     errorGeneric: "Could not update the action. Try again.",
+    // Compact toolbar (map popup, redesign t_b7728ad0): the trigger that
+    // opens the disclosure with the remaining three actions, and the
+    // explicit-copy privacy confirmation (the only action that asks before
+    // sending — a privacy report is the GDPR-friendly fast-hide request).
+    // The slash form ("Update/report") is deliberate: the trigger sits in a
+    // ~90px grid column next to Utile/Conferma — a long label would wrap to
+    // three ragged lines at 300px popup width.
+    moreActions: "Update/report",
+    moreActionsHelp:
+      "More actions for this record: report that it is gone, flag a problem, or raise a privacy concern.",
+    moreMenuLabel: "Update or report actions",
+    privacyConfirmTitle: "Confirm the privacy report?",
+    privacyConfirmBody:
+      "A privacy report asks reviewers to hide this record. You cannot undo it.",
+    privacyConfirmAction: "Report privacy concern",
+    cancel: "Cancel",
   },
 } as const;
 
@@ -329,5 +345,22 @@ export const it: Translation<typeof en> = {
     errorSessionEnded: "La sessione è terminata. Accedi di nuovo per partecipare.",
     errorVerifyRequired: "Verifica la tua email per partecipare alle azioni della community.",
     errorGeneric: "Impossibile aggiornare l'azione. Riprova.",
+    // Toolbar compatta (popup mappa, redesign t_b7728ad0): il trigger che
+    // apre il disclosure con le tre azioni rimanenti, e la conferma con
+    // copy esplicito per la privacy (l'unica azione che chiede prima di
+    // inviare — una segnalazione privacy è la richiesta di hide rapida
+    // GDPR-friendly). La forma con la barra ("Aggiorna/segnala") è
+    // deliberata: il trigger sta in una colonna di griglia da ~90px accanto
+    // a Utile/Conferma — una label lunga andrebbe a capo su righe sfilacciate
+    // alla larghezza popup di 300px.
+    moreActions: "Aggiorna/segnala",
+    moreActionsHelp:
+      "Altre azioni per questo record: segnala che non c'è più, un problema o una questione di privacy.",
+    moreMenuLabel: "Azioni di aggiornamento o segnalazione",
+    privacyConfirmTitle: "Confermi la segnalazione di privacy?",
+    privacyConfirmBody:
+      "Una segnalazione di privacy chiede ai moderatori di nascondere questo record. Non puoi annullarla.",
+    privacyConfirmAction: "Segnala la questione di privacy",
+    cancel: "Annulla",
   },
 };

@@ -161,7 +161,7 @@ test("map: marker popup renders the direction as text (NE 45°) when present", a
   view.rerender(await wrapWithLocale(React.createElement(SurveillanceMap, {
     cameras: [directionalCamera, domeCamera, noDirectionCamera], selectedId: 1,
     onSelect: () => {}, onPick: () => {},
-    popupHtmlFor: (camera) => popupHtmlFor(camera, statuses, labels, "/correggi"),
+    popupHtmlFor: (camera) => popupHtmlFor(camera, statuses, labels),
   })));
   await new Promise((resolve) => setTimeout(resolve, 10));
   const markers = await leafletMarkers();
@@ -200,7 +200,7 @@ test("map: marker popup provenance line shows readable source, licence and added
     locale: "en",
   };
 
-  const importedHtml = popupHtmlFor(imported, statuses, labels, "/correggi", importOptions);
+  const importedHtml = popupHtmlFor(imported, statuses, labels, importOptions);
   assert.match(importedHtml, /osm-popup-provenance/, "the provenance line renders at the bottom");
   assert.match(importedHtml, /Source: Fixture City — Open Data/);
   assert.match(importedHtml, /<a href="https:\/\/example\.invalid\/licenses\/cc0"[^>]*>CC0 1\.0<\/a>/, "licence links out");
@@ -214,7 +214,7 @@ test("map: marker popup provenance line shows readable source, licence and added
   assert.match(importedHtml, /data-import-date="2026-08-05T08:51:38\.000Z"/);
 
   // Community report: localized label, no licence, date still shown.
-  const reportHtml = popupHtmlFor(report, statuses, labels, "/correggi", { provenance: null, locale: "en" });
+  const reportHtml = popupHtmlFor(report, statuses, labels, { provenance: null, locale: "en" });
   assert.match(reportHtml, /Source: Community report/);
   assert.ok(!reportHtml.includes("licenses/cc0"), "community reports carry no licence");
   assert.match(reportHtml, /Added: 1 July 2026/);
@@ -223,7 +223,7 @@ test("map: marker popup provenance line shows readable source, licence and added
 
   // IT parity: the real bundle labels + it-IT date.
   const mapMod = await loadDomModule("app/lib/i18n/map.mjs");
-  const itHtml = popupHtmlFor(imported, statuses, mapMod.it, "/correggi", { ...importOptions, locale: "it" });
+  const itHtml = popupHtmlFor(imported, statuses, mapMod.it, { ...importOptions, locale: "it" });
   assert.match(itHtml, /Fonte: Fixture City — Open Data/);
   assert.match(itHtml, /Aggiunta: 5 agosto 2026/);
 });

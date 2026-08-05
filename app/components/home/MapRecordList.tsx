@@ -28,6 +28,15 @@ type Props = {
    * publicStatusLabel helper (never a raw status string).
    */
   statusLabel: (status: string) => string;
+  /**
+   * Mobile map-first panel (t_b7728ad0): whether the points list is
+   * collapsed to its header (the map is the primary function on small
+   * screens — the list starts compact with its count, expandable from
+   * the header toggle). Desktop ignores the flag entirely.
+   */
+  collapsed?: boolean;
+  /** Toggle handler for the mobile collapse (optional; renders the toggle). */
+  onToggleCollapse?: () => void;
 };
 
 /**
@@ -39,15 +48,35 @@ type Props = {
  * Extracted from MapPanel so the workspace stays a thin orchestrator
  * (~150-line contract, component-smoke.test.mjs).
  */
-export function MapRecordList({ filteredRecords, visibleRecords, selectedId, onSelect, onReset, labels, statusLabel }: Props) {
+export function MapRecordList({ filteredRecords, visibleRecords, selectedId, onSelect, onReset, labels, statusLabel, collapsed = false, onToggleCollapse }: Props) {
+  // Mobile map-first (t_b7728ad0): the "Points in the current view" panel
+  // starts compact below the map. The header stays visible (title + count)
+  // and carries an accessible disclosure toggle (aria-expanded, keyboard
+  // reachable); the scrollable list itself is hidden while collapsed. On
+  // desktop the flag is ignored — the sidebar column always shows the list.
   return (
     <>
       <div className="map-list-header">
         <h2 id="map-list-title">{labels.listTitle}</h2>
         <p className="map-list-count" role="status">{labels.listCount(visibleRecords.length, filteredRecords.length)}</p>
+        {onToggleCollapse && (
+          <button
+            type="button"
+            className={`map-list-toggle${collapsed ? "" : " is-open"}`}
+            aria-expanded={!collapsed}
+            aria-controls="map-list-scroll"
+            aria-label={`${labels.listTitle}: ${labels.listCount(visibleRecords.length, filteredRecords.length)}`}
+            onClick={onToggleCollapse}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+            <span className="sr-only">{collapsed ? labels.listTitle : `${labels.listTitle}: ${labels.listCount(visibleRecords.length, filteredRecords.length)}`}</span>
+          </button>
+        )}
       </div>
       <p id="map-list-sync-help" className="sr-only">{labels.listMapSyncHelp}</p>
-      <div className="map-list-scroll">
+      <div className={`map-list-scroll${collapsed ? " is-collapsed" : ""}`} id="map-list-scroll">
         {filteredRecords.length === 0
           // The map NEVER disappears (t_b9666d09): a filter that
           // matches nothing keeps the map and the sidebar rendered; the

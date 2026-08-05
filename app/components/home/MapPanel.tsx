@@ -29,8 +29,6 @@ type Props = {
   loading: boolean;
   /** Page-level status notice, displayed under the map. */
   notice: string;
-  /** Where the popup "Report an issue" link points (default: /correggi tool route). */
-  issueHref?: string;
   /** Where the sr-only "accessible directory" alternative points (default: /directory tool route). */
   directoryHref?: string;
   /** Instant search input value (same ?q= filter state as the FiltersBar). */
@@ -78,7 +76,7 @@ type Props = {
  * nothing never replaces the map with an empty state (the truthful "no
  * record matches" note lives inside the list).
  */
-export function MapPanel({ filteredRecords, visibleRecords, selectedId, onSelect, onPick, coordinates, loading, notice, issueHref = "/correggi", directoryHref = "/directory", search, setSearch, onBoundsChange, viewportBounds, onReset }: Props) {
+export function MapPanel({ filteredRecords, visibleRecords, selectedId, onSelect, onPick, coordinates, loading, notice, directoryHref = "/directory", search, setSearch, onBoundsChange, viewportBounds, onReset }: Props) {
   const t = useMessages().map;
   const statuses = useMessages().status;
   const { locale } = useLocale();
@@ -91,6 +89,14 @@ export function MapPanel({ filteredRecords, visibleRecords, selectedId, onSelect
   // effect once the pan's bounds land, selecting the first point in view.
   const placeFocusRef = useRef<{ latitude: number; longitude: number } | null>(null);
   const viewportAtSelectionRef = useRef<ViewportBounds | null>(null);
+  // Mobile map-first (t_b7728ad0): the points panel starts collapsed on
+  // small screens so the map is the first thing users see. Desktop (and
+  // SSR/tests without matchMedia) keep it expanded. The toggle in the
+  // panel header re-expands it from the keyboard.
+  const [pointsCollapsed, setPointsCollapsed] = useState<boolean>(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false;
+    return window.matchMedia("(max-width: 768px)").matches;
+  });
 
   // Popup content (t_702c10af): built by the shared lib/map-popup (escaped
   // + safe labels). Import provenance (FASE C, t_4dbce318): committed
@@ -103,8 +109,8 @@ export function MapPanel({ filteredRecords, visibleRecords, selectedId, onSelect
     return () => { cancelled = true; };
   }, []);
   const popupHtmlForCamera = useCallback(
-    (camera: MapCamera) => popupHtmlFor(camera, statuses, t, issueHref, { provenance: importSourceOf(camera, sources), locale }),
-    [statuses, t, issueHref, sources, locale],
+    (camera: MapCamera) => popupHtmlFor(camera, statuses, t, { provenance: importSourceOf(camera, sources), locale }),
+    [statuses, t, sources, locale],
   );
 
   // Geocode selection (GeocodeSearch → onPlaceSelect): remember the viewport
@@ -149,7 +155,7 @@ export function MapPanel({ filteredRecords, visibleRecords, selectedId, onSelect
       <div className="live-map-workspace map-split">
         <aside className="map-sidebar" aria-labelledby="map-list-title">
           <GeocodeSearch search={search} onSearchChange={setSearch} onPlaceSelect={handlePlaceSelect} />
-          <MapRecordList filteredRecords={filteredRecords} visibleRecords={visibleRecords} selectedId={selectedId} onSelect={onSelect} onReset={onReset} labels={t} statusLabel={(status) => publicStatusLabel(statuses, status, t.unknown)} />
+          <MapRecordList filteredRecords={filteredRecords} visibleRecords={visibleRecords} selectedId={selectedId} onSelect={onSelect} onReset={onReset} labels={t} statusLabel={(status) => publicStatusLabel(statuses, status, t.unknown)} collapsed={pointsCollapsed} onToggleCollapse={() => setPointsCollapsed((current) => !current)} />
         </aside>
         <div className="map-panel"><SurveillanceMap cameras={filteredRecords} selectedId={selectedId} focusLocation={focusLocation} onSelect={onSelect} onPick={onPick} directoryHref={directoryHref} onBoundsChange={onBoundsChange} popupHtmlFor={popupHtmlForCamera} /><div className="map-hint">{t.mapHint}</div></div>
       </div>

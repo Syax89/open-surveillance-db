@@ -357,8 +357,14 @@ test("MappaTool marker popup carries record info and the correction/detail links
   assert.match(popupByTitle["Illustrative record A"], /41\.9004, 12\.4936/, "popup coordinates");
   assert.match(popupByTitle["Illustrative record A"], /Illustrative record/, "popup status label comes from the public safe helper");
   assert.match(popupByTitle["Illustrative record A"], /href="\/records\/1"/, "popup detail link");
-  assert.match(popupByTitle["Illustrative record A"], /href="\/correggi\?record=1"/, "popup correction link pre-selects the record");
-  assert.match(popupByTitle["Illustrative record B"], /href="\/correggi\?record=2"/);
+  // Redesign t_b7728ad0: the "Report an issue" link is REMOVED from the
+  // popup footer — the disclosure's Problema/Privacy community actions are
+  // the record-level report surface, so the footer no longer competes with
+  // them (the correction form stays on the record detail page).
+  assert.ok(!popupByTitle["Illustrative record A"].includes("/correggi"), "popup footer no longer carries the report-issue link");
+  assert.ok(!popupByTitle["Illustrative record B"].includes("/correggi"));
+  // The footer keeps the single detail action.
+  assert.match(popupByTitle["Illustrative record A"], /osm-popup-footer/, "popup footer block");
   // Record fields are escaped: hostile markup in a title stays inert.
   assert.doesNotMatch(popupByTitle["Illustrative record A"], /<script>/);
   installEmptyMock();

@@ -1,5 +1,6 @@
 /**
- * Marker popup HTML builder (t_702c10af, refactor t_b9666d09).
+ * Marker popup HTML builder (t_702c10af, refactor t_b9666d09, redesign
+ * t_b7728ad0).
  *
  * The map popup is assembled client-side as an HTML string and bound with
  * Leaflet's bindPopup. Every record field is HTML-escaped — the popup must
@@ -7,6 +8,15 @@
  * (publicStatusLabel), never from a raw value. Extracted from MapPanel so
  * the map workspace stays a thin orchestrator (~150-line contract,
  * component-smoke.test.mjs) and the popup shape has one owner.
+ *
+ * Layout (redesign t_b7728ad0, CEO 2026-08-05): compact and scannable —
+ * a header block (title, kind, status dot), a dense two-column facts grid
+ * (record id, location, field of view), optional address/description, the
+ * community action toolbar mount (Utile + Conferma visible, the rest behind
+ * an accessible disclosure — see CommunityActions), a footer with the
+ * single detail action (the "Report an issue" link was REMOVED: the
+ * disclosure's Problema/Privacy actions cover it, so the footer no longer
+ * competes with them), and the discreet provenance metadata line (FASE C).
  */
 import { escapeHtml } from "./map-viewport";
 import { publicStatusLabel } from "./public-status";
@@ -20,7 +30,6 @@ export type PopupLabels = {
   recordId: string;
   location: string;
   popupDetail: string;
-  reportIssue: string;
   unknown: string;
   /** Label for the field-of-view direction row (t_f8b775ec). */
   fovDirection: string;
@@ -54,19 +63,16 @@ export type PopupProvenanceOptions = {
 };
 
 /**
- * Build the popup HTML for one camera marker: title, kind, status dot +
- * label, record id, coordinates, optional address/description, the
- * correction + detail links, and — when `options` is given — the small
- * provenance line at the bottom (FASE C): readable source (imported →
- * entity + licence link; community report → localized label) and the
- * record's added date. `issueHref` is the base route the "Report an
- * issue" action links to (defaults to /correggi in MapPanel).
+ * Build the popup HTML for one camera marker: header (title, kind, status
+ * dot + label), the dense facts grid (record id, coordinates, field of
+ * view), optional address/description, the community action toolbar mount,
+ * the footer detail link, and — when `options` is given — the small
+ * provenance line at the bottom (FASE C).
  */
 export function popupHtmlFor(
   camera: MapCamera,
   statuses: StatusLabels,
   labels: PopupLabels,
-  issueHref: string,
   options?: PopupProvenanceOptions,
 ): string {
   const coords = `${camera.latitude.toFixed(4)}, ${camera.longitude.toFixed(4)}`;
@@ -77,7 +83,7 @@ export function popupHtmlFor(
   // cameras with a stored bearing show it (domes are NULL by invariant).
   const directionRow =
     typeof camera.direction === "number" && Number.isFinite(camera.direction)
-      ? `<div><dt>${labels.fovDirection}</dt><dd>${formatDirection(camera.direction)}</dd></div>`
+      ? `<div class="osm-popup-fact"><dt>${labels.fovDirection}</dt><dd>${formatDirection(camera.direction)}</dd></div>`
       : "";
   // Import provenance line (FASE C, t_4dbce318): discreet secondary text
   // at the very bottom — it must never steal space from the community
@@ -105,12 +111,16 @@ export function popupHtmlFor(
     : "";
   return [
     `<div class="osm-popup">`,
+    // Header: title, kind, status — one compact block (t_b7728ad0).
+    `<header class="osm-popup-header">`,
     `<h3>${escapeHtml(camera.title)}</h3>`,
     `<p class="osm-popup-kind">${escapeHtml(camera.kind)}</p>`,
     `<p class="osm-popup-status"><span class="status-dot ${camera.status}" aria-hidden="true"></span> ${publicStatusLabel(statuses, camera.status, labels.unknown)}</p>`,
-    `<dl>`,
-    `<div><dt>${labels.recordId}</dt><dd>${camera.id}</dd></div>`,
-    `<div><dt>${labels.location}</dt><dd>${coords}</dd></div>`,
+    `</header>`,
+    // Dense facts grid: id, location, direction (t_b7728ad0).
+    `<dl class="osm-popup-facts">`,
+    `<div class="osm-popup-fact"><dt>${labels.recordId}</dt><dd>${camera.id}</dd></div>`,
+    `<div class="osm-popup-fact"><dt>${labels.location}</dt><dd>${coords}</dd></div>`,
     directionRow,
     `</dl>`,
     address,
@@ -120,9 +130,12 @@ export function popupHtmlFor(
     // 'popupopen'. The data-record-id attribute is the only contract — the
     // counts travel via the shared cameras payload, never through HTML.
     `<div class="osm-popup-community" data-record-id="${camera.id}"></div>`,
-    `<p class="osm-popup-actions">`,
+    // Footer: the single detail action (t_b7728ad0). The former "Report an
+    // issue" link was removed — the disclosure's Problema/Privacy actions
+    // are the record-level report surface; the detail page keeps the
+    // correction form, so the popup footer no longer competes with it.
+    `<p class="osm-popup-footer">`,
     `<a href="/records/${camera.id}">${labels.popupDetail} <span aria-hidden="true">→</span></a>`,
-    `<a href="${issueHref}?record=${camera.id}">${labels.reportIssue} <span aria-hidden="true">→</span></a>`,
     `</p>`,
     provenanceBlock,
     `</div>`,

@@ -295,14 +295,14 @@ test("community actions: 401 mid-action returns the anonymous CTA and names the 
   assert.ok(screen.getByRole("link", { name: /Log in or register to take part/ }));
 });
 
-test("community actions: compact variant (map popup) renders with the compact class and a pre-resolved bundle", async () => {
-  const { screen } = rtl;
+test("community actions: compact variant (map popup) renders the toolbar and disclosure (t_b7728ad0)", async () => {
+  const { screen, waitFor } = rtl;
   installFetchMock(widgetMock({ me: null }));
   // The popup root lives OUTSIDE the Next tree: the bundle prop is the
   // contract (LocaleProvider context is unavailable there).
   const mod = await loadDomModule("app/lib/i18n/index.mjs");
   const bundle = mod.messages.en;
-  const view = await renderWithLocale(React.createElement(CommunityActions, {
+  await renderWithLocale(React.createElement(CommunityActions, {
     recordId: 7,
     counts: likeCounts,
     compact: true,
@@ -311,8 +311,70 @@ test("community actions: compact variant (map popup) renders with the compact cl
 
   const section = screen.getByRole("region", { name: "Community actions" });
   assert.match(section.className, /community-actions-compact/);
-  // Same five actions, same anonymous CTA.
+  // The two primary actions are visible with count + icon; the disclosure
+  // trigger is present and the remaining actions are behind it.
   assert.ok(screen.getByText("Useful: 12"));
   assert.ok(await screen.findByRole("link", { name: /Log in or register to take part/ }));
-  assert.ok(view.container.querySelector(".community-actions-compact .community-action"));
+  const useful = screen.getByRole("button", { name: /Mark this record as useful/ });
+  assert.ok(useful.querySelector("svg"), "the visible action carries an icon (t_b7728ad0)");
+  assert.ok(screen.getByRole("button", { name: /I confirm this record is still present/ }));
+  const trigger = screen.getByRole("button", { name: /More actions for this record/ });
+  assert.equal(trigger.getAttribute("aria-expanded"), "false", "disclosure starts closed");
+  assert.ok(trigger.getAttribute("aria-controls"), "disclosure names its panel");
+
+  // The three remaining actions live behind the disclosure, not as cards.
+  assert.ok(!screen.queryByRole("button", { name: /I believe this camera is no longer there/ }), "gone is hidden until opened");
+  assert.ok(!screen.queryByRole("button", { name: /This record raises a privacy or legal concern/ }), "privacy is hidden until opened");
+
+  // Opening the disclosure exposes them; Escape closes it.
+  await rtl.userEvent.click(trigger);
+  assert.equal(trigger.getAttribute("aria-expanded"), "true");
+  assert.ok(await screen.findByRole("button", { name: /I believe this camera is no longer there/ }));
+  assert.ok(screen.getByRole("button", { name: /Something is wrong with this record/ }));
+  await rtl.userEvent.keyboard("{Escape}");
+  assert.equal(trigger.getAttribute("aria-expanded"), "false", "Escape closes the disclosure");
+  await waitFor(() => {});
+});
+
+test("community actions: compact privacy action asks explicit confirmation before sending (t_b7728ad0)", async () => {
+  const { screen, waitFor } = rtl;
+  // Signed-in session: the write gate is open, so clicking Privacy must
+  // show the confirm step instead of sending immediately.
+  let putCount = 0;
+  const countingMock = (input, init) => {
+    const method = init?.method ?? "GET";
+    if (input === "/api/auth/me") return jsonResponse({ id: 7, displayName: "Ada" });
+    if (input === "/api/cameras/7/actions") {
+      if (method === "GET") return jsonResponse({ action: null });
+      putCount += 1;
+      return jsonResponse({ error: "unexpected PUT in counting mock" }, { status: 500 });
+    }
+    return jsonResponse({ error: "unexpected route" }, { status: 404 });
+  };
+  installFetchMock(countingMock);
+  const mod = await loadDomModule("app/lib/i18n/index.mjs");
+  const bundle = mod.messages.en;
+  await renderWithLocale(React.createElement(CommunityActions, {
+    recordId: 7,
+    counts: likeCounts,
+    compact: true,
+    bundle,
+  }));
+
+  const trigger = await screen.findByRole("button", { name: /More actions for this record/ });
+  await rtl.userEvent.click(trigger);
+  await rtl.userEvent.click(await screen.findByRole("button", { name: /This record raises a privacy or legal concern/ }));
+
+  // The panel swaps to the explicit confirm step.
+  assert.ok(await screen.findByText("Confirm the privacy report?"), "the privacy confirm step shows explicit copy");
+  assert.ok(screen.getByRole("button", { name: /Report privacy concern/ }), "the confirm action is explicit");
+  assert.ok(screen.getByRole("button", { name: /Cancel/ }), "cancel returns to the menu");
+  // No PUT has been sent yet — the widget only mirrors the server.
+  assert.equal(putCount, 0, "no action sent before confirmation");
+
+  // Cancelling returns to the three-action menu without sending.
+  await rtl.userEvent.click(screen.getByRole("button", { name: /Cancel/ }));
+  assert.ok(await screen.findByRole("button", { name: /I believe this camera is no longer there/ }), "cancel goes back to the menu");
+  assert.equal(putCount, 0, "cancel sends nothing");
+  await waitFor(() => {});
 });
