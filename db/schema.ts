@@ -38,6 +38,20 @@ export const cameras = sqliteTable(
     // report (ADR 0013). NULL for anonymous submissions, which remain allowed.
     contributorId: integer("contributor_id").references(() => contributors.id),
     createdAt: text("created_at").notNull(),
+    // Import provenance (migration 0040, FONTI PUBBLICHE pipeline FASE A —
+    // docs/data-sources/normalizzazione-pipeline.md §6.3): NULL for community
+    // reports, which are the pre-existing population. `external_id` is the
+    // source-native stable identifier and `import_batch_id` the FK to the
+    // import run that inserted the row. Together with `source =
+    // 'import:<slug>'` (the provenance string, immutable for the row's life)
+    // they carry attribution, the idempotency key (partial UNIQUE
+    // (source, external_id) — re-running a batch can never double-insert)
+    // and the rollback handle. Imported rows are community-owned once
+    // inserted: the community validates them like any other record and the
+    // rollback (removing a whole batch) only ever touches rows this batch
+    // itself inserted.
+    externalId: text("external_id"),
+    importBatchId: integer("import_batch_id").references(() => importBatches.id),
   },
   (table) => [
     index("cameras_status_idx").on(table.status),
@@ -65,6 +79,94 @@ export const cameras = sqliteTable(
     // contributor_id and orders by created_at DESC; the leading-contributor
     // composite turns that into an index scan instead of a full table scan.
     index("cameras_contributor_created_idx").on(table.contributorId, sql`created_at DESC`),
+    // Import provenance (migration 0040, FONTI PUBBLICHE pipeline FASE A —
+    // docs/data-sources/normalizzazione-pipeline.md §6.3): the partial
+    // UNIQUE (source, external_id) is the idempotency key of the import
+    // runner — re-running a batch can never double-insert a row — and
+    // (import_batch_id) is the rollback/attribution handle (a whole batch is
+    // removed in one indexed DELETE). Both are declared here so
+    // drizzle-kit generate never re-emits them (convention 0012/0014:
+    // hand-written migration + schema declaration together).
+    uniqueIndex("cameras_source_external_unique")
+      .on(table.source, table.externalId)
+      .where(sql`external_id IS NOT NULL`),
+    index("cameras_import_batch_idx").on(table.importBatchId),
+  ],
+);
+
+/**
+ * Import runs (FONTI PUBBLICHE pipeline FASE A, migration 0040 —
+ * docs/data-sources/normalizzazione-pipeline.md §6.2). One row per import
+ * run; `slug` is the unique key ('<dataset>-<year>', lower-kebab) and is
+ * embedded verbatim in every inserted camera's `source` column as
+ * `import:<slug>` — attribution by construction. Every field the kanban
+ * task listed is present: fonte (`source_name` + `source_url`), licenza
+ * (`license` + `license_url` + `attribution_text`), data import
+ * (`import_date`), n record (the `records_*` counters) e rollback
+ * (`status` + `rollback_payload`).
+ *
+ * Lifecycle (`status`): 'running' while the batch is being written,
+ * 'committed' on success, 'failed' when the write phase aborted, and
+ * 'rolled_back' after `import:rollback` removed every row the batch
+ * inserted. The runner aborts unless the slug is free (idempotency);
+ * `--force` refreshes an existing batch in place.
+ *
+ * No ON DELETE action on the cameras.import_batch_id FK by design: batch
+ * rows are never deleted; rollback deletes *cameras* rows, not the batch
+ * row (design doc §6.3).
+ *
+ * Declared here so drizzle-kit generate never re-emits it (convention
+ * 0012/0014: hand-written migration + schema declaration together).
+ */
+export const importBatches = sqliteTable(
+  "import_batches",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    // 'milano-videosorveglianza-2026' — the unique key of the run and the
+    // tail of every inserted camera's `source` ('import:<slug>').
+    slug: text("slug").notNull().unique(),
+    // 'Comune di Milano — Open Data'
+    sourceName: text("source_name").notNull(),
+    // 'csv' | 'geojson' | 'osm-overpass' | 'wfs' (FASE B adapter family).
+    format: text("format").notNull(),
+    // 'IODL 2.0' | 'ODbL 1.0 (OSM)' | 'CC-BY 4.0' | ... — hard-gated by the
+    // runner against the licence matrix (docs/data-sources/licenze-compatibilita.md).
+    license: text("license").notNull(),
+    licenseUrl: text("license_url"),
+    // Human-readable attribution required by the source licence, e.g.
+    // '© OpenStreetMap contributors' — surfaced on /licenze (FASE P5).
+    attributionText: text("attribution_text"),
+    // Landing page / download URL from the census (#1).
+    sourceUrl: text("source_url").notNull(),
+    // ISO 8601 import timestamp.
+    importDate: text("import_date").notNull(),
+    // 'running' | 'committed' | 'rolled_back' | 'failed'
+    status: text("status").notNull().default("running"),
+    recordsTotal: integer("records_total").notNull().default(0),
+    recordsInserted: integer("records_inserted").notNull().default(0),
+    recordsSkippedDuplicate: integer("records_skipped_duplicate").notNull().default(0),
+    recordsMerged: integer("records_merged").notNull().default(0),
+    recordsReview: integer("records_review").notNull().default(0),
+    recordsInvalid: integer("records_invalid").notNull().default(0),
+    // sha256 of the downloaded payload — reproducibility gate (a re-run
+    // against a changed payload is a different batch unless --force).
+    sourceChecksum: text("source_checksum"),
+    // JSON {camera_id: {col: oldValue}} — merge phase (enrich) only, v1 empty.
+    rollbackPayload: text("rollback_payload"),
+    // JSON: per-row errors, review candidates, kind_map misses.
+    report: text("report"),
+    notes: text("notes"),
+    createdBy: text("created_by").notNull().default("import-runner"),
+    createdAt: text("created_at").notNull(),
+    // Last mutation (commit/rollback/force-refresh) — mirrors the
+    // created_at/updated_at convention of every mutable table in the
+    // project (contributors, users, reviewers, ...). NULL until the first
+    // status transition (a just-created 'running' batch has no update yet).
+    updatedAt: text("updated_at"),
+  },
+  (table) => [
+    index("import_batches_status_idx").on(table.status),
+    check("import_batches_status_check", sql`status IN ('running', 'committed', 'rolled_back', 'failed')`),
   ],
 );
 
