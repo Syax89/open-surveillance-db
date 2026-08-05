@@ -65,9 +65,9 @@ export default async function GuidePage() {
           <div><p className="eyebrow"><span /> {t.statusEyebrow}</p><h2 id="status-title">{t.statusTitle}</h2><p>{t.statusIntro}</p></div>
         </div>
         <div className="record-list">
-          <article className="record-list-card"><div><p className="card-topline"><span className="status-dot verified" /> {statuses.verified}</p><h3>{t.verifiedTitle}</h3><p className="record-kind">{t.verifiedBody}</p></div></article>
-          <article className="record-list-card"><div><p className="card-topline"><span className="status-dot needs-review" /> {statuses.needs_review}</p><h3>{t.reviewTitle}</h3><p className="record-kind">{t.reviewBody}</p></div></article>
-          <article className="record-list-card"><div><p className="card-topline"><span className="status-dot community-report" /> {statuses.pending}</p><h3>{t.pendingTitle}</h3><p className="record-kind">{t.pendingBody}</p></div></article>
+          <article className="record-list-card"><div><p className="card-topline"><span className="status-dot active" /> {statuses.active}</p><h3>{t.verifiedTitle}</h3><p className="record-kind">{t.verifiedBody}</p></div></article>
+          <article className="record-list-card"><div><p className="card-topline"><span className="status-dot hidden" /> {statuses.hidden}</p><h3>{t.reviewTitle}</h3><p className="record-kind">{t.reviewBody}</p></div></article>
+          <article className="record-list-card"><div><p className="card-topline"><span className="status-dot removed" /> {statuses.removed}</p><h3>{t.pendingTitle}</h3><p className="record-kind">{t.pendingBody}</p></div></article>
         </div>
       </section>
 

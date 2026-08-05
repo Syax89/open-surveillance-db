@@ -44,7 +44,7 @@ export const en = {
     "A very close match was found nearby. Confirm that this is a distinct camera to submit, or use the correction form for the existing record.",
   duplicateConfirmTitle: "A very close match already exists nearby",
   duplicateConfirmBody:
-    "A reviewed record at almost the same spot was found. If this is the same camera, use the correction form. If it is a different camera, confirm below to publish it.",
+    "A record is already published at almost the same spot. If this is the same camera, use the correction form. If it is a different camera, confirm below to publish it.",
   duplicateConfirmLabel:
     "I confirm this is a distinct camera and I still want to submit it.",
   nearbyUnavailable:
@@ -157,7 +157,7 @@ export const it: Translation<typeof en> = {
     "Trovata una corrispondenza molto vicina. Conferma che si tratta di una telecamera diversa per inviare, oppure usa il modulo di correzione per il record esistente.",
   duplicateConfirmTitle: "Una corrispondenza molto vicina esiste già nelle vicinanze",
   duplicateConfirmBody:
-    "È stato trovato un record revisionato quasi nello stesso punto. Se è la stessa telecamera, usa il modulo di correzione. Se è una telecamera diversa, conferma qui sotto per pubblicarla.",
+    "È già pubblicato un record quasi nello stesso punto. Se è la stessa telecamera, usa il modulo di correzione. Se è una telecamera diversa, conferma qui sotto per pubblicarla.",
   duplicateConfirmLabel:
     "Confermo che è una telecamera diversa e voglio comunque inviarla.",
   nearbyUnavailable:

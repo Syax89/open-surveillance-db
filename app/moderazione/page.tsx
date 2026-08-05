@@ -15,13 +15,15 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 /**
- * Public "How moderation works" page (/moderazione).
+ * Public "How publication works" page (/moderazione).
  *
- * Explains the review flow, appeals and corrections, and the moderator
- * safeguards, sourced from docs/MODERATION.md and ADR 0014. This is the
- * PUBLIC informational page; the private moderator queue stays at
- * /moderation (gated at the worker edge) and is deliberately not linked
- * anywhere in the public experience (publication-boundaries suite).
+ * Explains the community-driven model (ADR 0021): immediate publication,
+ * community actions with automatic thresholds, the public per-record event
+ * history, private corrections and the residual legal-emergency surface,
+ * sourced from docs/decisions/0021-community-driven-pivot.md. This is the
+ * PUBLIC informational page; the private legal-emergency moderation tool
+ * stays at /moderation (gated at the worker edge) and is deliberately not
+ * linked anywhere in the public experience (publication-boundaries suite).
  *
  * Server Component (SSR/SEO): static content rendered on the server with
  * per-route metadata; only the LocaleToggle is a client island.

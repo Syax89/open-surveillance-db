@@ -26,95 +26,95 @@ export const en = {
     "OpenSurveillanceDB helps people understand visible surveillance infrastructure in public space. It is a civic record of public-facing equipment, not a tool for watching, tracking or bypassing lawful surveillance.",
   missionOneTitle: "What we document",
   missionOneBody:
-    "Visible camera infrastructure, approximate location, type, source and a review status.",
+    "Visible camera infrastructure, approximate location, type, source and a community status.",
   missionTwoTitle: "What we do not collect",
   missionTwoBody:
     "Camera feeds, credentials, private-home details, operational weaknesses, faces, licence plates or other personal data.",
   missionThreeTitle: "What the map cannot prove",
   missionThreeBody:
-    "An absent record does not show that an area is free of surveillance. It only shows that no reviewed record is currently published.",
-  cycleEyebrow: "A reviewed process",
+    "An absent record does not show that an area is free of surveillance. It only shows that no record is currently published there.",
+  cycleEyebrow: "A community process",
   cycleTitle: "From observation to public record.",
   cycleBody:
-    "Reports are deliberately separated from published records. The public map, directory and exports are not an automatic mirror of submissions.",
-  cycleRuleTitle: "The default is not publication.",
+    "A report from a verified account becomes a public record right away. The community then keeps the directory accurate: what is still there gets confirmed, what is gone gets flagged, what is useful gets marked.",
+  cycleRuleTitle: "Publication is immediate.",
   cycleRuleBody:
-    "A report becomes public only after a human review finds it suitable, sufficiently documented and safe to publish.",
+    "A report is published as soon as a verified contributor submits it. No queue, no waiting: accuracy is maintained by the community, not by a reviewer.",
   cycleStepsLabel: "Publication cycle",
   submitLabel: "Submit",
   submitTitle: "An observation is submitted",
   submitBody:
-    "A contributor chooses an approximate public-space location and adds a short description. The report begins as private pending data.",
-  moderateLabel: "Moderate",
-  moderateTitle: "A person reviews it",
+    "A contributor chooses an approximate public-space location and adds a short description. The report is published immediately.",
+  moderateLabel: "Community",
+  moderateTitle: "The community keeps it accurate",
   moderateBody:
-    "Review checks relevance, duplication, accuracy and whether the report contains material that should not be made public.",
-  publishLabel: "Publish",
-  publishTitle: "Only reviewed data appears",
+    "People can confirm that a camera is still there, flag it as no longer present, mark it useful, or raise a problem. Every action needs a verified account; thresholds decide what changes.",
+  publishLabel: "Maintain",
+  publishTitle: "Records stay live until the community says otherwise",
   publishBody:
-    "Approved records are marked verified and can appear in the map, directory and GeoJSON export. Other reports stay private.",
+    "A record leaves the public list only after enough community flags — or a legal emergency — and every transition is recorded in the record's public history.",
   statusEyebrow: "Reading the records",
   statusTitle: "Each status says what the record can support.",
   statusIntro:
-    "A status describes the current review state, not a guarantee that a camera is active, complete or permanently accurate.",
-  verifiedTitle: "Reviewed and publishable",
+    "A status describes the current state, not a guarantee that a camera is active, complete or permanently accurate.",
+  verifiedTitle: "Published and live",
   verifiedBody:
-    "A moderator has approved this record for public display. It can appear in the map, directory and GeoJSON export.",
-  reviewTitle: "Temporarily withheld",
+    "The record is public: it appears in the map, directory and GeoJSON export. The community can act on it at any time.",
+  reviewTitle: "Hidden",
   reviewBody:
-    "Something needs checking: the record may be old, unclear, duplicated or the subject of a correction. It is not a public record while under review.",
-  pendingTitle: "Awaiting a decision",
+    "The record was withdrawn pending community or legal verification. It is not listed, but its public history stays visible and confirmations can bring it back.",
+  pendingTitle: "Reported as no longer present",
   pendingBody:
-    "A submission has been saved for review but is not visible in public data, the map, the directory or exports.",
+    "The community reported that this camera is no longer there. It is not listed, and the record can be restored if confirmations show it is back.",
   accountEyebrow: "Your account",
   accountTitle: "Why create an account?",
   accountBody:
-    "Browsing the data requires no account. With an account you can submit reports, follow your contributions, verify records you have seen and build a trust level.",
+    "Browsing the data requires no account. With an account you can submit reports, take part in community actions, follow your contributions and build a trust level.",
   accountWhyTitle: "What an account gives you",
   accountWhyBody:
-    "Reports are linked to your account. You can edit your contributions, verify records and watch your trust level grow.",
+    "Reports are linked to your account. You can edit your contributions, confirm records, flag problems and watch your trust level grow.",
   accountHowTitle: "How accounts work",
   accountHowBody:
-    "You register with an email address and a password, stored as a hash and never exposed. Email verification is required before you can publish. You can also add a passkey or social sign-in (GitHub or Google) to the same account.",
+    "You register with an email address and a password, stored as a hash and never exposed. Email verification is required before you can publish or take part in community actions. You can also add a passkey or social sign-in (GitHub or Google) to the same account.",
   accountAnonymousTitle: "Browsing stays open",
   accountAnonymousBody:
-    "You can explore the map, the directory and the exports without an account. Submitting a report or a correction requires a verified contributor account.",
+    "You can explore the map, the directory and the exports without an account. Submitting a report, sending a correction or taking part in community actions requires a verified contributor account.",
   editEyebrow: "Editing a contribution",
   editTitle: "You can edit your own contributions.",
   editBody:
-    "Only the contributor who submitted a record can edit it. Changes to a published record are reviewed again before they appear in public data.",
+    "Only the contributor who submitted a record can edit it. Changes to a published record are reviewed before they appear in public data.",
   editOwnerTitle: "Owner only",
   editOwnerBody:
     "You can edit a record only if you submitted it. Other people's records cannot be edited from the community pages.",
-  editRemoderationTitle: "Published changes are re-moderated",
+  editRemoderationTitle: "Published changes are reviewed",
   editRemoderationBody:
-    "When a record is already public, an edit goes back into moderation and replaces the record only after a human review approves it.",
+    "When a record is already public, an edit is checked before it replaces the record. Corrections and edits to published records stay private while they are reviewed.",
   editNotImmediateTitle: "Not immediately public",
   editNotImmediateBody:
     "An edited record does not appear in the map, directory or exports right away. It stays out of public outputs until the review is complete.",
-  verifyEyebrow: "Verifications",
-  verifyTitle: "What verifications confirm.",
+  verifyEyebrow: "Confirmations",
+  verifyTitle: "What confirmations mean.",
   verifyBody:
-    "A verification is a personal confirmation that a camera is present at the documented location. It helps readers trust a record without revealing who confirmed it.",
+    "A confirmation is a personal check that a camera is still present at the documented location. It helps readers trust a record without revealing who confirmed it.",
   verifyWhatTitle: "A personal check",
   verifyWhatBody:
-    "By verifying, you confirm from your own observation that the camera exists where the record says it is.",
+    "By confirming, you state from your own observation that the camera still exists where the record says it is.",
   verifyOneTitle: "One per user",
   verifyOneBody:
-    "Each account can add one verification per record. It is a check, not a popularity contest: one person, one verification.",
+    "Each account can keep one community action per record. It is a check, not a popularity contest: one person, one signal.",
   verifyFairTitle: "Kept fair",
   verifyFairBody:
-    "Verifying requires at least one published contribution of your own. You cannot verify your own record, and daily limits stop automated or mass verification.",
+    "Community actions require a verified account, new accounts weigh less than trusted ones, and daily limits stop automated or mass actions. You cannot confirm or mark your own record.",
   verifyPrivateTitle: "Not attributed publicly",
   verifyPrivateBody:
-    "Public pages show only the total number of verifications. Who verified a record is never shown and never linked to a profile.",
+    "Public pages show only aggregate counts and the record's public history. Who confirmed or flagged a record is never shown and never linked to a profile.",
   levelEyebrow: "Trust levels",
   levelTitle: "Recognition, not competition.",
   levelBody:
-    "Trust levels reflect how many of your contributions have been verified by reviewers. They are a quiet recognition of accurate work, not a ranking.",
+    "Trust levels reflect how many of your contributions are live in the directory. They are a quiet recognition of accurate work, not a ranking.",
   levelThresholdsTitle: "Levels and thresholds",
   levelThresholdsBody:
-    "Only verified contributions count. The thresholds are 1, 5, 20 and 50; reports in moderation, rejected or removed do not count.",
+    "Only live contributions count. The thresholds are 1, 5, 20 and 50; hidden or removed records do not count.",
   levelBadgeTitle: "Three badges",
   levelBadgeBody:
     "Your profile shows one of three badges: New contributor, Trusted contributor or Experienced contributor. The badge is informative, never a rank.",
@@ -124,7 +124,7 @@ export const en = {
   dataEyebrow: "Open data and map base",
   dataTitle: "Open where it is safe to be open.",
   dataBody:
-    "Published records are available as GeoJSON and CSV for reuse and inspection. The public dataset contains only records that passed review; submissions and corrections are excluded.",
+    "Published records are available as GeoJSON and CSV for reuse and inspection. The public dataset contains the live records; private correction requests are never included.",
   downloadGeoJson: "Download public GeoJSON",
   downloadCsv: "Download public CSV",
   geoJsonTitle: "A reusable public export",
@@ -136,7 +136,7 @@ export const en = {
   localLabel: "Project status",
   localTitle: "A project under development",
   localBody:
-    "OpenSurveillanceDB is under active development. Every record is reviewed by a person before publication, and the project makes no claim that the data is complete, current or authoritative.",
+    "OpenSurveillanceDB is under active development. Records are published immediately from verified accounts and kept accurate by the community, and the project makes no claim that the data is complete, current or authoritative.",
   footer: "Built for transparency, not tracking.",
 } as const;
 
@@ -159,95 +159,95 @@ export const it: Translation<typeof en> = {
     "OpenSurveillanceDB aiuta a comprendere l’infrastruttura di sorveglianza visibile nello spazio pubblico. È un registro civico di apparecchiature rivolte al pubblico, non uno strumento per osservare, tracciare o aggirare la sorveglianza legittima.",
   missionOneTitle: "Cosa documentiamo",
   missionOneBody:
-    "Infrastrutture di telecamere visibili, posizione approssimativa, tipo, fonte e stato di revisione.",
+    "Infrastrutture di telecamere visibili, posizione approssimativa, tipo, fonte e stato della community.",
   missionTwoTitle: "Cosa non raccogliamo",
   missionTwoBody:
     "Feed delle telecamere, credenziali, dettagli di abitazioni private, debolezze operative, volti, targhe o altri dati personali.",
   missionThreeTitle: "Cosa la mappa non può dimostrare",
   missionThreeBody:
-    "L’assenza di un record non dimostra che un’area sia libera da sorveglianza. Indica solo che non è pubblicato alcun record revisionato.",
-  cycleEyebrow: "Un processo revisionato",
+    "L’assenza di un record non dimostra che un’area sia libera da sorveglianza. Indica solo che in quel punto non è pubblicato alcun record.",
+  cycleEyebrow: "Un processo della community",
   cycleTitle: "Dall’osservazione al record pubblico.",
   cycleBody:
-    "Le segnalazioni sono intenzionalmente separate dai record pubblicati. Mappa, elenco ed esportazioni non sono una copia automatica degli invii.",
-  cycleRuleTitle: "La regola di base è non pubblicare.",
+    "Una segnalazione di un account verificato diventa subito un record pubblico. Poi è la community a mantenere accurato l’elenco: ciò che c’è ancora viene confermato, ciò che non c’è più viene segnalato, ciò che è utile viene marcato.",
+  cycleRuleTitle: "La pubblicazione è immediata.",
   cycleRuleBody:
-    "Una segnalazione diventa pubblica solo dopo una revisione umana che la ritenga pertinente, sufficientemente documentata e sicura da pubblicare.",
+    "Una segnalazione viene pubblicata appena un contributor verificato la invia. Niente code, niente attese: l’accuratezza è mantenuta dalla community, non da un revisore.",
   cycleStepsLabel: "Ciclo di pubblicazione",
   submitLabel: "Segnala",
   submitTitle: "Viene inviata un’osservazione",
   submitBody:
-    "Chi contribuisce sceglie una posizione approssimativa nello spazio pubblico e aggiunge una breve descrizione. La segnalazione nasce come dato privato in attesa.",
-  moderateLabel: "Revisiona",
-  moderateTitle: "Una persona la valuta",
+    "Chi contribuisce sceglie una posizione approssimativa nello spazio pubblico e aggiunge una breve descrizione. La segnalazione viene pubblicata subito.",
+  moderateLabel: "Community",
+  moderateTitle: "La community la mantiene accurata",
   moderateBody:
-    "La revisione controlla pertinenza, duplicati, accuratezza e la presenza di materiale che non dovrebbe essere pubblico.",
-  publishLabel: "Pubblica",
-  publishTitle: "Appaiono solo dati revisionati",
+    "Le persone possono confermare che una telecamera c’è ancora, segnalarla come non più presente, marcarla come utile o segnalare un problema. Ogni azione richiede un account verificato; le soglie decidono cosa cambia.",
+  publishLabel: "Manutenzione",
+  publishTitle: "I record restano pubblici finché la community non decide altrimenti",
   publishBody:
-    "I record approvati sono marcati come verificati e possono comparire in mappa, elenco ed esportazione GeoJSON. Le altre segnalazioni restano private.",
+    "Un record esce dall’elenco pubblico solo dopo abbastanza segnalazioni della community — o un’emergenza legale — e ogni transizione è registrata nella cronologia pubblica del record.",
   statusEyebrow: "Leggere i record",
   statusTitle: "Ogni stato indica cosa può dimostrare un record.",
   statusIntro:
-    "Lo stato descrive la revisione in corso. Non garantisce che una telecamera sia attiva, completa o sempre accurata.",
-  verifiedTitle: "Revisionata e pubblicabile",
+    "Lo stato descrive la situazione corrente, non la garanzia che una telecamera sia attiva, completa o sempre accurata.",
+  verifiedTitle: "Pubblicato e attivo",
   verifiedBody:
-    "Un moderatore ha approvato il record per la visualizzazione pubblica. Può comparire in mappa, elenco ed esportazione GeoJSON.",
-  reviewTitle: "Temporaneamente non visibile",
+    "Il record è pubblico: compare in mappa, elenco ed esportazione GeoJSON. La community può intervenire in qualsiasi momento.",
+  reviewTitle: "Nascosto",
   reviewBody:
-    "Qualcosa deve essere verificato: il record può essere vecchio, poco chiaro, duplicato o oggetto di una correzione. Non è pubblico durante la revisione.",
-  pendingTitle: "In attesa di una decisione",
+    "Il record è stato ritirato in attesa di verifica da parte della community o legale. Non è elencato, ma la sua cronologia pubblica resta visibile e le conferme possono riportarlo online.",
+  pendingTitle: "Segnalato come non più presente",
   pendingBody:
-    "Una segnalazione è stata salvata per la revisione, ma non è visibile nei dati pubblici, nella mappa, nell’elenco o nelle esportazioni.",
+    "La community ha segnalato che questa telecamera non c’è più. Non è elencato e può essere ripristinato se le conferme mostrano che è tornata.",
   accountEyebrow: "Il tuo account",
   accountTitle: "Perché creare un account?",
   accountBody:
-    "Consultare i dati non richiede account. Con un account puoi inviare segnalazioni, seguire i tuoi contributi, verificare i record che hai visto e costruire un livello di fiducia.",
+    "Consultare i dati non richiede account. Con un account puoi inviare segnalazioni, partecipare alle azioni della community, seguire i tuoi contributi e costruire un livello di fiducia.",
   accountWhyTitle: "Cosa ti dà un account",
   accountWhyBody:
-    "Le tue segnalazioni sono collegate al tuo account. Puoi modificare i tuoi contributi, aggiungere verifiche ai record e vedere crescere il tuo livello di fiducia.",
+    "Le tue segnalazioni sono collegate al tuo account. Puoi modificare i tuoi contributi, confermare record, segnalare problemi e vedere crescere il tuo livello di fiducia.",
   accountHowTitle: "Come funzionano gli account",
   accountHowBody:
-    "Ti registri con un indirizzo email e una password, salvata come hash e mai esposta. La verifica dell'email è richiesta prima di poter pubblicare. Puoi anche aggiungere una passkey o l'accesso social (GitHub o Google) allo stesso account.",
+    "Ti registri con un indirizzo email e una password, salvata come hash e mai esposta. La verifica dell'email è richiesta prima di poter pubblicare o partecipare alle azioni della community. Puoi anche aggiungere una passkey o l'accesso social (GitHub o Google) allo stesso account.",
   accountAnonymousTitle: "La consultazione resta aperta",
   accountAnonymousBody:
-    "Puoi esplorare mappa, elenco ed esportazioni senza account. Inviare una segnalazione o una correzione richiede un account verificato.",
+    "Puoi esplorare mappa, elenco ed esportazioni senza account. Inviare una segnalazione, una correzione o partecipare alle azioni della community richiede un account verificato.",
   editEyebrow: "Modificare un contributo",
   editTitle: "Puoi modificare i tuoi contributi.",
   editBody:
-    "Solo chi ha inviato un record può modificarlo. Le modifiche a un record già pubblicato vengono riviste di nuovo prima di comparire nei dati pubblici.",
+    "Solo chi ha inviato un record può modificarlo. Le modifiche a un record già pubblicato vengono riviste prima di comparire nei dati pubblici.",
   editOwnerTitle: "Solo chi ha inviato",
   editOwnerBody:
     "Puoi modificare un record solo se l'hai inviato tu. I record degli altri non sono modificabili dalle pagine community.",
-  editRemoderationTitle: "Le modifiche ai record pubblicati sono riviste di nuovo",
+  editRemoderationTitle: "Le modifiche ai record pubblicati sono riviste",
   editRemoderationBody:
-    "Quando un record è già pubblico, una modifica torna in moderazione e sostituisce il record solo dopo l'approvazione di una revisione umana.",
+    "Quando un record è già pubblico, una modifica viene controllata prima di sostituire il record. Correzioni e modifiche ai record pubblicati restano private durante la revisione.",
   editNotImmediateTitle: "Non subito pubblico",
   editNotImmediateBody:
     "Un record modificato non compare subito in mappa, elenco o esportazioni: resta fuori dai dati pubblici finché la revisione non è completata.",
-  verifyEyebrow: "Verifiche",
-  verifyTitle: "Cosa confermano le verifiche.",
+  verifyEyebrow: "Conferme",
+  verifyTitle: "Cosa significano le conferme.",
   verifyBody:
-    "Una verifica è una conferma personale che una telecamera sia presente nella posizione documentata. Aiuta a fidarsi di un record senza rivelare chi lo ha confermato.",
+    "Una conferma è un controllo personale che una telecamera sia ancora presente nella posizione documentata. Aiuta a fidarsi di un record senza rivelare chi lo ha confermato.",
   verifyWhatTitle: "Un controllo personale",
   verifyWhatBody:
-    "Verificando, confermi sulla base della tua osservazione che la telecamera esiste dove dice il record.",
+    "Confermando, dichiari sulla base della tua osservazione che la telecamera esiste ancora dove dice il record.",
   verifyOneTitle: "Una per utente",
   verifyOneBody:
-    "Ogni account può aggiungere una verifica per record. È un controllo, non una gara di popolarità: una persona, una verifica.",
+    "Ogni account può mantenere una sola azione della community per record. È un controllo, non una gara di popolarità: una persona, un segnale.",
   verifyFairTitle: "Con regole eque",
   verifyFairBody:
-    "Per verificare serve almeno un contributo pubblicato. Non puoi verificare un tuo record e i limiti giornalieri fermano le verifiche automatiche o di massa.",
+    "Le azioni della community richiedono un account verificato, i nuovi account pesano meno di quelli fidati e i limiti giornalieri fermano le azioni automatiche o di massa. Non puoi confermare o marcare un tuo record.",
   verifyPrivateTitle: "Mai attribuita pubblicamente",
   verifyPrivateBody:
-    "Le pagine pubbliche mostrano solo il numero totale di verifiche. Chi ha verificato un record non viene mai mostrato né collegato a un profilo.",
+    "Le pagine pubbliche mostrano solo conteggi aggregati e la cronologia pubblica del record. Chi ha confermato o segnalato un record non viene mai mostrato né collegato a un profilo.",
   levelEyebrow: "Livelli di fiducia",
   levelTitle: "Riconoscimento, non competizione.",
   levelBody:
-    "I livelli di fiducia riflettono quanti dei tuoi contributi sono stati verificati dai revisori. Sono un riconoscimento discreto del lavoro accurato, non una classifica.",
+    "I livelli di fiducia riflettono quanti dei tuoi contributi sono attivi nell'elenco. Sono un riconoscimento discreto del lavoro accurato, non una classifica.",
   levelThresholdsTitle: "Livelli e soglie",
   levelThresholdsBody:
-    "Contano solo i contributi verificati. Le soglie sono 1, 5, 20 e 50; le segnalazioni in moderazione, rifiutate o rimosse non contano.",
+    "Contano solo i contributi attivi. Le soglie sono 1, 5, 20 e 50; i record nascosti o rimossi non contano.",
   levelBadgeTitle: "Tre badge",
   levelBadgeBody:
     "Il tuo profilo mostra uno dei tre badge: Nuovo contributor, Contributor fidato o Contributor esperto. Il badge è informativo, mai un grado.",
@@ -257,7 +257,7 @@ export const it: Translation<typeof en> = {
   dataEyebrow: "Dati aperti e base cartografica",
   dataTitle: "Aperti dove è sicuro esserlo.",
   dataBody:
-    "I record pubblicati sono disponibili in GeoJSON e CSV per riuso e verifica. Il dataset pubblico contiene solo record che hanno superato la revisione; segnalazioni e correzioni sono escluse.",
+    "I record pubblicati sono disponibili in GeoJSON e CSV per riuso e verifica. Il dataset pubblico contiene i record attivi; le richieste private di correzione non sono mai incluse.",
   downloadGeoJson: "Scarica il GeoJSON pubblico",
   downloadCsv: "Scarica il CSV pubblico",
   geoJsonTitle: "Un’esportazione pubblica riutilizzabile",
@@ -269,6 +269,6 @@ export const it: Translation<typeof en> = {
   localLabel: "Stato del progetto",
   localTitle: "Un progetto in sviluppo",
   localBody:
-    "OpenSurveillanceDB è ancora in sviluppo attivo. Ogni record viene revisionato da una persona prima della pubblicazione e il progetto non dichiara che i dati siano completi, aggiornati o autorevoli.",
+    "OpenSurveillanceDB è ancora in sviluppo attivo. I record vengono pubblicati subito da account verificati e mantenuti accurati dalla community; il progetto non dichiara che i dati siano completi, aggiornati o autorevoli.",
   footer: "Creato per la trasparenza, non per il tracciamento.",
 };

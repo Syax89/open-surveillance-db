@@ -17,7 +17,7 @@ export const en = {
   eyebrow: "Participation rules",
   title: "What we publish, and how you can help.",
   intro:
-    "These rules explain what OpenSurveillanceDB documents and what contributors may report. They cover moderation, corrections and data reuse.",
+    "These rules explain what OpenSurveillanceDB documents and what contributors may report. They cover publication, community actions, corrections and data reuse.",
   reportEyebrow: "What you can report",
   reportTitle: "Public space, observed from public space.",
   reportBody:
@@ -33,7 +33,7 @@ export const en = {
     "A record from an official public source, marked with its source and verification date.",
   neverTitle: "Never report",
   neverBody:
-    "Reports containing any of the following are screened out and are never published.",
+    "Reports containing any of the following are never kept in the public dataset.",
   neverOneTitle: "Private homes",
   neverOneBody:
     "Residential or private cameras, including doorbells and cameras facing a private home.",
@@ -48,47 +48,47 @@ export const en = {
     "Detailed field-of-view or operational capability that could create a safety risk, or sensitive locations where publication could be unsafe.",
   beforeSubmittingTitle: "Before submitting",
   beforeSubmittingBody:
-    "Submitting requires a verified contributor account. Do not upload or describe people, licence plates, private homes, security weaknesses or sensitive locations. Submissions are private until a moderator reviews them; they are not published automatically.",
-  moderationEyebrow: "Moderation",
-  moderationTitle: "Every record is reviewed by a person.",
+    "Submitting requires a verified contributor account. Do not upload or describe people, licence plates, private homes, security weaknesses or sensitive locations. Your report is published immediately, so make sure it is safe to be public.",
+  moderationEyebrow: "Publication",
+  moderationTitle: "Every report is published immediately.",
   moderationBody:
-    "Reports are deliberately separated from published records. The public map and exports are not an automatic mirror of submissions.",
-  flowLabel: "Review flow",
-  flowOneTitle: "Receive",
+    "A report from a verified account becomes a public record right away. The community then keeps the directory accurate: what is still there gets confirmed, what is gone gets flagged, what is problematic gets withdrawn.",
+  flowLabel: "How a record lives",
+  flowOneTitle: "Submit",
   flowOneBody:
-    "A private pending record is created and acknowledged without promising publication.",
-  flowTwoTitle: "Screen",
+    "A verified contributor submits an observation from public space. The report is published immediately — no queue, no waiting.",
+  flowTwoTitle: "Publish",
   flowTwoBody:
-    "Spam, personal data, prohibited content and dangerous details are removed.",
-  flowThreeTitle: "Verify",
+    "The record appears in the map, the directory and the exports with the least specific location that still serves transparency: coordinates are rounded to about 10 metres.",
+  flowThreeTitle: "Act",
   flowThreeBody:
-    "A moderator assesses whether the camera is public, visible, current and within local policy.",
-  flowFourTitle: "Minimise",
+    "Anyone with a verified account can confirm the camera is still there, flag it as no longer present, mark it useful, or raise a problem.",
+  flowFourTitle: "Thresholds",
   flowFourBody:
-    "Only the least specific location and metadata that still serve transparency are published. Exact coordinates stay in the private moderation record; published coordinates are rounded to about 10 metres.",
-  flowFiveTitle: "Decide",
+    "Automatic thresholds decide what changes: enough flags hide or remove a record, a privacy flag hides it immediately, and every transition is recorded in the public history.",
+  flowFiveTitle: "Withdraw",
   flowFiveBody:
-    "Approve, request clarification, reject, or escalate — always recording a reason.",
-  flowSixTitle: "Maintain",
+    "A record that the community flags enough is hidden or removed from the public list. It stays reachable by direct link, with a banner and its public history.",
+  flowSixTitle: "Restore",
   flowSixBody:
-    "Records are re-checked periodically and respond to corrections or removal requests.",
-  correctionEyebrow: "Corrections and appeals",
-  correctionTitle: "A simple way to challenge a record.",
+    "A hidden or removed record can return with enough confirmations from the community. No single account — human or not — controls publication.",
+  correctionEyebrow: "Corrections",
+  correctionTitle: "A private way to challenge a record.",
   correctionBody:
-    "Any verified contributor can request a correction, challenge a record, or report harm. Requests are private, reviewed by humans, and never change the map automatically.",
+    "Any verified contributor can request a correction, challenge a record, or report harm. Requests are private, reviewed by a person, and never change the map automatically.",
   correctionOneTitle: "Request a correction",
   correctionOneBody:
     "Inaccurate, outdated or duplicate records can be flagged for review.",
   correctionTwoTitle: "Report a privacy or safety concern",
   correctionTwoBody:
-    "Urgent reports are temporarily hidden from the public outputs while they are reviewed.",
+    "A privacy concern hides a record immediately, pending community verification. Legal emergencies use the same immediate path.",
   correctionThreeTitle: "No personal data needed",
   correctionThreeBody:
     "Describe only the minimum needed to identify the problem. Do not include personal data, live-feed links, credentials, or images.",
   dataEyebrow: "Data reuse",
   dataTitle: "Open where it is safe to be open.",
   dataBody:
-    "Published records are available as GeoJSON and CSV for reuse and inspection. The public dataset contains only records that passed review; submissions and corrections are excluded.",
+    "Published records are available as GeoJSON and CSV for reuse and inspection. The public dataset contains the live records; private correction requests are never included.",
   downloadGeoJson: "Download public GeoJSON",
   downloadCsv: "Download public CSV",
   reuseOneTitle: "Licensing and provenance",
@@ -113,7 +113,7 @@ export const it: Translation<typeof en> = {
   eyebrow: "Regole di partecipazione",
   title: "Cosa pubblichiamo e come puoi aiutare.",
   intro:
-    "Queste regole spiegano cosa documenta OpenSurveillanceDB e cosa si può segnalare. Coprono la moderazione, le correzioni e il riuso dei dati.",
+    "Queste regole spiegano cosa documenta OpenSurveillanceDB e cosa si può segnalare. Coprono la pubblicazione, le azioni della community, le correzioni e il riuso dei dati.",
   reportEyebrow: "Cosa puoi segnalare",
   reportTitle: "Spazio pubblico, osservato dallo spazio pubblico.",
   reportBody:
@@ -129,7 +129,7 @@ export const it: Translation<typeof en> = {
     "Un record proveniente da una fonte pubblica ufficiale, marcato con la sua fonte e la data di verifica.",
   neverTitle: "Da non segnalare mai",
   neverBody:
-    "Le segnalazioni che contengono uno dei seguenti elementi vengono filtrate e non vengono mai pubblicate.",
+    "Le segnalazioni che contengono uno dei seguenti elementi non vengono mai mantenute nel dataset pubblico.",
   neverOneTitle: "Abitazioni private",
   neverOneBody:
     "Telecamere residenziali o private, inclusi videocitofoni e telecamere rivolte verso un’abitazione privata.",
@@ -144,47 +144,47 @@ export const it: Translation<typeof en> = {
     "Dettagli sul campo visivo o sulle capacità operative che potrebbero creare un rischio per la sicurezza, o località sensibili la cui pubblicazione potrebbe essere pericolosa.",
   beforeSubmittingTitle: "Prima di inviare",
   beforeSubmittingBody:
-    "Per inviare serve un account verificato. Non caricare né descrivere persone, targhe, abitazioni private, debolezze di sicurezza o località sensibili. Gli invii restano privati finché un moderatore non li esamina; non vengono pubblicati automaticamente.",
-  moderationEyebrow: "Moderazione",
-  moderationTitle: "Ogni record viene esaminato da una persona.",
+    "Per inviare serve un account verificato. Non caricare né descrivere persone, targhe, abitazioni private, debolezze di sicurezza o luoghi sensibili. La tua segnalazione viene pubblicata subito: assicurati che sia sicuro renderla pubblica.",
+  moderationEyebrow: "Pubblicazione",
+  moderationTitle: "Ogni segnalazione viene pubblicata subito.",
   moderationBody:
-    "Le segnalazioni sono intenzionalmente separate dai record pubblicati. Mappa ed esportazioni non sono una copia automatica degli invii.",
-  flowLabel: "Flusso di revisione",
-  flowOneTitle: "Ricezione",
+    "Una segnalazione di un account verificato diventa subito un record pubblico. Poi è la community a mantenere accurato l’elenco: ciò che c’è ancora viene confermato, ciò che non c’è più viene segnalato, ciò che è problematico viene ritirato.",
+  flowLabel: "La vita di un record",
+  flowOneTitle: "Invio",
   flowOneBody:
-    "Viene creato un record privato in attesa e l’invio è riconosciuto senza promettere la pubblicazione.",
-  flowTwoTitle: "Filtro",
+    "Un contributor verificato invia un’osservazione dallo spazio pubblico. La segnalazione viene pubblicata subito — niente code, niente attese.",
+  flowTwoTitle: "Pubblicazione",
   flowTwoBody:
-    "Spam, dati personali, contenuti vietati e dettagli pericolosi vengono rimossi.",
-  flowThreeTitle: "Verifica",
+    "Il record compare in mappa, elenco ed esportazioni con la posizione meno specifica che serve comunque alla trasparenza: le coordinate sono arrotondate a circa 10 metri.",
+  flowThreeTitle: "Azioni",
   flowThreeBody:
-    "Un moderatore valuta se la telecamera è pubblica, visibile, attuale e conforme alla policy locale.",
-  flowFourTitle: "Minimizzazione",
+    "Chiunque abbia un account verificato può confermare che la telecamera c’è ancora, segnalarla come non più presente, marcarla come utile o segnalare un problema.",
+  flowFourTitle: "Soglie",
   flowFourBody:
-    "Si pubblicano solo la posizione e i metadati minimi utili alla trasparenza. Le coordinate esatte restano nel record privato di moderazione; quelle pubblicate sono arrotondate a circa 10 metri.",
-  flowFiveTitle: "Decisione",
+    "Soglie automatiche decidono cosa cambia: abbastanza segnalazioni nascondono o rimuovono un record, una segnalazione di privacy lo nasconde subito, e ogni transizione è registrata nella cronologia pubblica.",
+  flowFiveTitle: "Ritiro",
   flowFiveBody:
-    "Approvare, chiedere chiarimenti, respingere o inoltrare — registrando sempre una motivazione.",
-  flowSixTitle: "Manutenzione",
+    "Un record che la community segnala a sufficienza viene nascosto o rimosso dall’elenco pubblico. Resta raggiungibile tramite link diretto, con un banner e la sua cronologia pubblica.",
+  flowSixTitle: "Ripristino",
   flowSixBody:
-    "I record vengono ricontrollati periodicamente e rispondono a correzioni o richieste di rimozione.",
-  correctionEyebrow: "Correzioni e ricorsi",
-  correctionTitle: "Un modo semplice per contestare un record.",
+    "Un record nascosto o rimosso può tornare online con abbastanza conferme dalla community. Nessun singolo account — umano o no — controlla la pubblicazione.",
+  correctionEyebrow: "Correzioni",
+  correctionTitle: "Un modo privato per contestare un record.",
   correctionBody:
-    "Ogni account verificato può richiedere una correzione, contestare un record o segnalare un danno. Le richieste sono private, esaminate da persone e non modificano mai la mappa automaticamente.",
+    "Ogni account verificato può richiedere una correzione, contestare un record o segnalare un danno. Le richieste sono private, esaminate da una persona e non modificano mai la mappa automaticamente.",
   correctionOneTitle: "Richiedi una correzione",
   correctionOneBody:
     "I record inaccurati, obsoleti o duplicati possono essere segnalati per la revisione.",
   correctionTwoTitle: "Segnala un problema di privacy o sicurezza",
   correctionTwoBody:
-    "Le segnalazioni urgenti vengono temporaneamente nascoste dai dati pubblici durante la revisione.",
+    "Un problema di privacy nasconde un record subito, in attesa di verifica della community. Le emergenze legali usano lo stesso percorso immediato.",
   correctionThreeTitle: "Nessun dato personale richiesto",
   correctionThreeBody:
     "Descrivi solo il minimo necessario a identificare il problema. Non includere dati personali, link a feed live, credenziali o immagini.",
   dataEyebrow: "Riuso dei dati",
   dataTitle: "Aperti dove è sicuro esserlo.",
   dataBody:
-    "I record pubblicati sono disponibili in GeoJSON e CSV per riuso e verifica. Il dataset pubblico contiene solo record che hanno superato la revisione; segnalazioni e correzioni sono escluse.",
+    "I record pubblicati sono disponibili in GeoJSON e CSV per riuso e verifica. Il dataset pubblico contiene i record attivi; le richieste private di correzione non sono mai incluse.",
   downloadGeoJson: "Scarica il GeoJSON pubblico",
   downloadCsv: "Scarica il CSV pubblico",
   reuseOneTitle: "Licenza e provenienza",

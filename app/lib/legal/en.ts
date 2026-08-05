@@ -21,7 +21,7 @@ export const enLegal: LegalContent = {
     intro:
       "How OpenSurveillanceDB processes personal data, what we publish, what we never collect, and how you can exercise your rights under the GDPR.",
     versionNote:
-      "Version 0.5 — 1 August 2026. Draft for pre-launch review; § 10 (cookies) added with the functional-language cookie documentation (art. 122 D.Lgs. 196/2003). The repository copy (docs/legal/PRIVACY_NOTICE.md) remains canonical.",
+      "Version 0.6 — 5 August 2026. Updated for the community-driven model (ADR 0021): reports publish immediately from verified accounts; § 7 retention aligned with the retired review cycle; § 10 (cookies) unchanged. The repository copy (docs/legal/PRIVACY_NOTICE.md) remains canonical.",
     sections: [
       {
         heading: "1. Who we are (controller)",
@@ -41,7 +41,7 @@ export const enLegal: LegalContent = {
         blocks: [
           {
             type: "paragraph",
-            text: "OpenSurveillanceDB publishes a public-interest map of **visible, public surveillance infrastructure** (for example cameras mounted in public streets, squares, station exteriors), reviewed by trained moderators before publication. It is a civic-transparency project, not a commercial platform: no behavioural advertising, no tracking, no sale of data.",
+            text: "OpenSurveillanceDB publishes a public-interest map of **visible, public surveillance infrastructure** (for example cameras mounted in public streets, squares, station exteriors), published immediately from verified contributor accounts and kept accurate by the community through confirmations, flags and automatic thresholds (ADR 0021). It is a civic-transparency project, not a commercial platform: no behavioural advertising, no tracking, no sale of data.",
           },
         ],
       },
@@ -60,7 +60,7 @@ export const enLegal: LegalContent = {
               [
                 "Report content: location, description, optional manufacturer / observation date, private notes",
                 "Reporter (data subject)",
-                "Build the public record; moderation queue",
+                "Build the public record; community accuracy actions",
                 "Art. 6(1)(f) GDPR",
               ],
               [
@@ -107,7 +107,7 @@ export const enLegal: LegalContent = {
               ],
               [
                 "Published records",
-                "Moderated reports / official public sources",
+                "Published reports / official public sources",
                 "The public dataset (ODbL 1.0)",
                 "Art. 6(1)(f) / 6(1)(e) GDPR",
               ],
@@ -140,10 +140,10 @@ export const enLegal: LegalContent = {
               "**No video, live streams, credentials, network information or control interfaces** — the project documents the *existence* of visible surveillance infrastructure, never its output or access.",
               "**No private-home cameras** or cameras pointing into private interiors.",
               "**No personal names, faces, vehicle plates or precise operational details.**",
-              "**No coordinates beyond zone-level precision:** published locations are rounded to **~4 decimal places (~10 m)**; the exact location remains in the private moderation record, visible only to moderators.",
+              "**No coordinates beyond zone-level precision:** published locations are rounded to **~4 decimal places (~10 m)**; the exact location stays in the database and is never published.",
               "**No behavioural advertising, no tracking, no sale of data**, no analytics libraries.",
               "**No published photo without moderation and confirmed redaction:** uploaded photos (JPEG/PNG/WebP, ≤10 MB / 4096 px) are stripped of EXIF/XMP/IPTC metadata at the boundary (fail-closed — a container that cannot be walked safely is rejected, never stored unstripped), stored with sanitised bytes in R2 and metadata only in D1, and are **never public** until a moderator approves them with `redaction_confirmed = 1`. The storage key is never exposed.",
-              "Submissions are stored as pending and are **never public** until a moderator approves them. Rejected content is never published.",
+              "Reports are published immediately from verified accounts and are part of the public dataset from the moment they are submitted. Content that violates the rules is withdrawn by the community or by a legal emergency, and withdrawn content is never re-published.",
             ],
           },
         ],
@@ -156,7 +156,7 @@ export const enLegal: LegalContent = {
             items: [
               "**Cloudflare, Inc.** — hosting and database (Workers + D1). Processor (Art. 28) under the Cloudflare Data Processing Addendum (DPA v6.3, June 2025) incorporating **EU Standard Contractual Clauses (2021/914)**; Cloudflare is certified under the **EU–US Data Privacy Framework**. D1 is configured for EU residency.",
               "**OpenAI (ChatGPT sign-in)** — identity provider for moderators. OpenAI is an **independent controller of its own authentication service** (its privacy policy applies at sign-in); no OpenSurveillanceDB data is sent to OpenAI — we only receive the identity attributes listed above. Never published, never logged.",
-              "**Publication itself:** verified records become part of a public dataset licensed ODbL 1.0 and may be downloaded or exported (JSON/CSV/GeoJSON). Copies already downloaded cannot be recalled; removed records are excluded from future exports.",
+              "**Publication itself:** published records become part of a public dataset licensed ODbL 1.0 and may be downloaded or exported (JSON/CSV/GeoJSON). Copies already downloaded cannot be recalled; withdrawn records are excluded from future exports.",
               "No other recipients; no behavioural advertising; no analytics libraries.",
             ],
           },
@@ -179,11 +179,11 @@ export const enLegal: LegalContent = {
         blocks: [
           {
             type: "paragraph",
-            text: "Pending reports: 90 days. Rejected reports: 30 days. Verified records: **12-month renewal review cycle**. Correction requests and audit entries: 2 years. Evidence: tied to the record. Operational logs: up to 12 months (aggregate). Backups: rotated by the provider (up to 30 days point-in-time recovery).",
+            text: "Reports are published immediately and stay public while the community keeps confirming them; records withdrawn by the community or by a legal emergency are excluded from public outputs and follow the repository retention schedule (docs/legal/RETENTION_SCHEDULE.md). Correction requests and audit entries: 2 years. Evidence: tied to the record. Operational logs: up to 12 months (aggregate). Backups: rotated by the provider (up to 30 days point-in-time recovery).",
           },
           {
             type: "paragraph",
-            text: "Automated enforcement of the deletion and expiry rules is a pre-launch implementation item; until then the schedule is applied by the moderation workflow.",
+            text: "Automated enforcement of the deletion and expiry rules is a pre-launch implementation item; until then the schedule is applied by the automated retention sweep.",
           },
         ],
       },
@@ -274,7 +274,7 @@ export const enLegal: LegalContent = {
     intro:
       "These terms govern the use of OpenSurveillanceDB, the open, community-maintained database of visible public surveillance infrastructure. They apply to the web application, the public API, the data exports and related services (\"the Service\").",
     versionNote:
-      "Version 0.3 — 1 August 2026. Draft for pre-launch review; the repository copy (docs/TERMS_OF_USE.md) remains canonical.",
+      "Version 0.4 — 5 August 2026. Updated for the community-driven model (ADR 0021): § 5 describes immediate publication and community actions instead of the human review queue; § 6 replaces appeals with private corrections and the legal-emergency power. The repository copy (docs/TERMS_OF_USE.md) remains canonical.",
     sections: [
       {
         heading: "1. Who we are",
@@ -285,7 +285,7 @@ export const enLegal: LegalContent = {
           },
           {
             type: "paragraph",
-            text: "**Contact:** [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org) — a dedicated mailbox — for any question, correction, appeal or privacy request. Response times: first response within 48 hours, substantive decision within 14 days.",
+            text: "**Contact:** [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org) — a dedicated mailbox — for any question, correction, removal or privacy request. Response times: first response within 48 hours, substantive decision within 14 days.",
           },
         ],
       },
@@ -312,7 +312,7 @@ export const enLegal: LegalContent = {
             items: [
               "**Consultation:** browse the map, the record directory and individual record pages; search and read the public dataset.",
               "**Exports:** download public data via the JSON/CSV/GeoJSON exports and the public API, and reuse it, subject to the ODbL 1.0 licence (section 7) and to the abuse limits in section 4.",
-              "**Reports:** submit observations of visible public surveillance infrastructure for human moderation. Reports are never guaranteed to be published (section 5).",
+              "**Reports:** submit observations of visible public surveillance infrastructure. A report from a verified account is **published immediately** and is part of the public dataset from submission (section 5).",
               "**Lawful purposes:** the data may be used for research, journalism, civic advocacy, and any purpose consistent with these terms and with the ODbL 1.0 licence. Browsing the public data never requires an account. Submitting a report or a correction requires a verified contributor account (section 3.7; ADR 0020), and every submission is attributed to it through a **pseudonymous internal ID** — never a real-name requirement.",
             ],
           },
@@ -323,7 +323,7 @@ export const enLegal: LegalContent = {
         blocks: [
           {
             type: "paragraph",
-            text: "**Prohibited content.** The exclusions of the moderation policy apply to everything you send, including reports, notes and any future evidence uploads. In particular, do not submit:",
+            text: "**Prohibited content.** The exclusions of the publication rules apply to everything you send, including reports, notes and any future evidence uploads. In particular, do not submit:",
           },
           {
             type: "list",
@@ -343,7 +343,7 @@ export const enLegal: LegalContent = {
           },
           {
             type: "paragraph",
-            text: "**No abuse.** Do not exceed the applicable rate limits, do not scrape the Service beyond reasonable personal use, do not attempt to access non-public records (pending, rejected, moderation queues, correction requests), and do not circumvent access controls or use the Service to harass or facilitate harm.",
+            text: "**No abuse.** Do not exceed the applicable rate limits, do not scrape the Service beyond reasonable personal use, do not attempt to access non-public records (withdrawn records, correction requests), and do not circumvent access controls or use the Service to harass or facilitate harm.",
           },
           {
             type: "paragraph",
@@ -358,24 +358,25 @@ export const enLegal: LegalContent = {
             type: "list",
             ordered: true,
             items: [
-              "**No guarantee of publication.** Every report enters the database as pending. Trained human moderators screen, verify, and decide per the moderation policy. A report may be rejected, hidden, or removed at any time; rejected content is never published and is scheduled for deletion 30 days after the rejection decision.",
-              "**What you keep and what you grant.** You retain whatever rights you have in the content you submit. By submitting, you grant the project a non-exclusive, worldwide, royalty-free licence to store and review the report and — **if and only if** the record is verified and published — to publish it and make it available under **ODbL 1.0**, as part of the open database, with attribution to contributors per the ODbL notice. No licence to publish is granted by the mere act of submitting.",
+              "**Immediate publication.** A report from a verified contributor is published immediately: it enters the public dataset as soon as it is submitted. There is no review queue and no waiting. The community keeps the directory accurate: records are confirmed, flagged as no longer present, marked useful, or withdrawn through automatic thresholds (ADR 0021). A record can be hidden or removed at any time by enough community signals, or by a legal-emergency decision; withdrawn records stay reachable by direct link with a banner and a public event history, and can be restored by enough confirmations.",
+              "**What you keep and what you grant.** You retain whatever rights you have in the content you submit. By submitting, you grant the project a non-exclusive, worldwide, royalty-free licence to store, review and publish the report as part of the open database, made available under **ODbL 1.0**, with attribution to contributors per the ODbL notice. Publication happens at submission, not after an approval step.",
               "**Your warranties.** By submitting you confirm that: the content is accurate to the best of your knowledge; you are entitled to share it; it complies with section 4; and you meet the minimum age for using the Service in your jurisdiction (in Italy, 14 years).",
-              "**Verification may be refused.** Records republished from official public sources follow their own legal regime, checked per record; community reports are verified against the moderation publication standard, not against official registers.",
-              "**Photo evidence.** Reports may include photos (JPEG, PNG or WebP, up to **10 MB and 4096 px per side**). On upload, the service **strips EXIF/XMP/IPTC metadata at the boundary** (fail-closed: if the container cannot be walked safely the upload is rejected — never stored unstripped), verifies the container from magic bytes (never trusting the declared Content-Type), stores the sanitised bytes in object storage (**R2**) with metadata only in the database (**D1**), and keeps every photo **private (pending) and never public** until a moderator approves it with `redaction_confirmed = 1` — the moderator must confirm the subject was redacted. Photos follow the record's retention (deleted with the record; hard-deleted immediately if the record is rejected or removed). The storage key is never exposed; clients interact with photos by id only.",
+              "**Community accuracy.** Records republished from official public sources follow their own legal regime, checked per record; community reports are kept accurate by the community's confirmations and flags under the automatic thresholds, not against official registers.",
+              "**Photo evidence.** Reports may include photos (JPEG, PNG or WebP, up to **10 MB and 4096 px per side**). On upload, the service **strips EXIF/XMP/IPTC metadata at the boundary** (fail-closed: if the container cannot be walked safely the upload is rejected — never stored unstripped), verifies the container from magic bytes (never trusting the declared Content-Type), stores the sanitised bytes in object storage (**R2**) with metadata only in the database (**D1**), and keeps every photo **private (pending) and never public** until a moderator approves it with `redaction_confirmed = 1` — the moderator must confirm the subject was redacted. Photos follow the record's retention (deleted with the record; hard-deleted immediately if the record is withdrawn). The storage key is never exposed; clients interact with photos by id only.",
             ],
           },
         ],
       },
       {
-        heading: "6. Moderation, corrections, appeals",
+        heading: "6. Community actions, corrections, legal emergencies",
         blocks: [
           {
             type: "list",
             ordered: true,
             items: [
-              "Moderation follows the published policy and service levels: emergency hides within **24 hours**, first response within **48 hours**, substantive decision within **14 days**, re-review of temporary hides within **30 days**.",
-              "Any person affected by a moderation decision may request correction or removal via the in-app correction form (home page, \"Report a problem / correction\" section) or [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org) within **30 days** of the decision. Appeals are decided by a **different reviewer** than the original decision, with escalation for disputed cases.",
+              "**Community actions.** Any verified account can mark a record useful, confirm it is still present, flag it as no longer present, or raise a problem or privacy concern. One account, one active action per record. Automatic thresholds — including a deliberately low privacy threshold — decide when a record is hidden or removed; every transition is recorded in the record's public history without attribution to any profile.",
+              "**Corrections.** Any person may request a correction or removal via the private correction form (home page, \"Report a problem / correction\" section) or [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org). Requests are private, reviewed by a person, and never change the map automatically. Response targets: first response within **48 hours**, substantive response within **14 days**; legal-emergency hides are immediate.",
+              "**Legal emergencies.** The only human write power left is the administrator's legal-emergency hide or removal, used when the law requires it and reviewed retrospectively. Administrators cannot restore or un-hide unilaterally: the community consensus of section 5 is the only reversal path.",
               "Data-subject rights (access, rectification, erasure, restriction, objection, portability) are described in the [privacy notice](/privacy) and exercised through the same contact.",
             ],
           },
@@ -403,10 +404,10 @@ export const enLegal: LegalContent = {
             type: "list",
             ordered: true,
             items: [
-              "OpenSurveillanceDB is a **civic, community-maintained dataset — not an official record and not a statement of legal fact.** Records may be incomplete, outdated, or inaccurate despite human moderation; publication is deliberately conservative.",
+              "OpenSurveillanceDB is a **civic, community-maintained dataset — not an official record and not a statement of legal fact.** Records may be incomplete, outdated, or inaccurate despite community maintenance; publication is immediate, not conservative.",
               "Do not rely on the dataset for safety-critical or official decisions. Verify against official sources (for example the relevant public administration) before acting on it. The Service provides information about visible infrastructure only — it is not a directory of every camera, and absence of a record proves nothing.",
               "Records from official sources are marked with their source and verification date; community records carry no such guarantee.",
-              "Published coordinates are rounded to **~4 decimal places (~10 m)** — zone-level precision. The exact location is never published and remains in the private moderation record, visible only to moderators.",
+              "Published coordinates are rounded to **~4 decimal places (~10 m)** — zone-level precision. The exact location is never published and stays in the database.",
             ],
           },
         ],
@@ -416,7 +417,7 @@ export const enLegal: LegalContent = {
         blocks: [
           {
             type: "paragraph",
-            text: "Your use of the Service is governed by the [privacy notice](/privacy). Key points: no tracking, no behavioural advertising; reports are private while pending; your GDPR rights are exercisable via [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org) within the statutory timelines (Art. 12(3) GDPR).",
+            text: "Your use of the Service is governed by the [privacy notice](/privacy). Key points: no tracking, no behavioural advertising; reports are public as soon as they are published and private correction requests stay private; your GDPR rights are exercisable via [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org) within the statutory timelines (Art. 12(3) GDPR).",
           },
         ],
       },
@@ -442,8 +443,8 @@ export const enLegal: LegalContent = {
             type: "list",
             ordered: true,
             items: [
-              "We may suspend or limit access, or remove content, where necessary to enforce these terms, to protect users or data subjects, or per the moderation policy — aiming to notify the affected person where proportionate and possible.",
-              "Contributors may request deletion of their pending submissions via [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org); verified published records are subject to the **12-month renewal** retention and review cycle and to the correction path of section 6.",
+              "We may suspend or limit access, or remove content, where necessary to enforce these terms, to protect users or data subjects, or under the publication rules — aiming to notify the affected person where proportionate and possible.",
+              "Contributors may request deletion of their reports via [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org); published records stay public while the community keeps confirming them, and follow the correction and withdrawal paths of section 6.",
             ],
           },
         ],
@@ -481,8 +482,8 @@ export const enLegal: LegalContent = {
           {
             type: "list",
             items: [
-              "**Privacy, corrections, appeals, rights:** [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org) (dedicated mailbox).",
-              "Moderation and abuse emergencies use the same channel (hide within 24 hours).",
+              "**Privacy, corrections, rights:** [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org) (dedicated mailbox).",
+              "Legal emergencies and abuse reports use the same channel (immediate hide).",
             ],
           },
         ],
@@ -588,7 +589,7 @@ export const enLegal: LegalContent = {
               "A searchable text directory and record-detail pages that work **without map interaction**; map and directory present the same public fields.",
               "Report-location selection by map click **or** validated manual coordinates.",
               "An English/Italian interface with a device-local language preference; the language choice does not affect API data.",
-              "A bilingual in-app guide at [/guide](/guide) explaining data states and the moderation workflow.",
+              "A bilingual in-app guide at [/guide](/guide) explaining data states and the publication workflow.",
               "Status information is never conveyed by colour alone (text and icon labels are used).",
             ],
           },

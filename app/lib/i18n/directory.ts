@@ -11,7 +11,7 @@ export const en = {
   // Page-level chrome (/directory).
   pageTitle: "Public directory",
   pageIntro:
-    "Search, filter and order the reviewed public records without the map. A result is never evidence that an area has no surveillance.",
+    "Search, filter and order the public records without the map. A result is never evidence that an area has no surveillance.",
   // F2 (QA#6): SSR Suspense fallback for the client tool body.
   loading: "Loading the directory…",
   navigation: "Directory navigation",
@@ -21,7 +21,7 @@ export const en = {
   accessibleDirectory: "Accessible directory",
   recordsTitle: "Browse public records without the map",
   recordsIntro:
-    "Search covers the same reviewed records shown on the map. A result is never evidence that an area has no surveillance.",
+    "Search covers the same public records shown on the map. A result is never evidence that an area has no surveillance.",
   // Catalog mode (t_127492f1): the sr-only heading of the results region —
   // keeps the h1 → h2 → h3 ladder on /directory now that the place-search
   // block is a collapsible panel instead of the section heading.
@@ -29,7 +29,7 @@ export const en = {
   searchDirectory: "Search the public directory",
   searchPlaceholder: "Type, source or record ID",
   searchHelp:
-    "Only reviewed public records and labelled illustrative records appear here.",
+    "Only public records and labelled illustrative records appear here.",
   // Catalog mode: data export of the filtered set. The API applies the
   // server-side filters (kind + freshness); q and sort are client-side, so
   // the hint below says exactly what the export contains.
@@ -76,14 +76,14 @@ export const en = {
   stateNever: "Never confirmed",
   oneRecordFound: "1 public record found",
   recordsFound: "public records found",
-  lastVerification: "Last verification",
+  lastVerification: "Last confirmed",
   showOnMap: "Show on map",
   openRecord: "Open record",
   emptyTitle: "No published record matches that search.",
   emptyBody:
-    "This does not mean that there are no cameras in the area. You can clear the search, explore the map, or submit a private observation for moderation.",
+    "This does not mean that there are no cameras in the area. You can clear the search, explore the map, or submit a report from a verified account.",
   clearSearch: "Clear search",
-  submitObservation: "Submit a private observation",
+  submitObservation: "Submit a report",
   resetFilters: "Reset filters",
   offlineTitle: "You are offline",
   offlineBody: "Showing the last loaded records.",
@@ -93,9 +93,9 @@ export const en = {
   placeSearchLabel: "Locality, address, or coordinates",
   placeSearchPlaceholder: "e.g. Town centre, Via Roma, or 45.46420, 9.19000",
   placeSearchHelp:
-    "Finds reviewed public records near the place you enter. A result is never proof that an area has no surveillance.",
+    "Finds public records near the place you enter. A result is never proof that an area has no surveillance.",
   placeSearchSubmit: "Search",
-  placeSearchLoading: "Searching reviewed public records near that place…",
+  placeSearchLoading: "Searching public records near that place…",
   placeSearchUnavailable: "Search is temporarily unavailable. Please try again shortly.",
   placeSearchRateLimited: "Too many searches. Please wait a moment and try again.",
   placeSearchEmptyQuery: "Enter a locality, address, or coordinates to search.",
@@ -105,13 +105,13 @@ export const en = {
       ? `Search area: near ${area.displayName} (within ${area.radiusLabel})`
       : `Search area: within ${area.radiusLabel} of ${area.latitude.toFixed(5)}, ${area.longitude.toFixed(5)}`,
   placeResultsFound: (count: number) =>
-    `${count} ${count === 1 ? "reviewed public record" : "reviewed public records"} found near this place`,
+    `${count} ${count === 1 ? "public record" : "public records"} found near this place`,
   placeNotFoundTitle: "We could not find that place.",
   placeNotFoundBody: "Check the spelling, or enter coordinates (latitude, longitude) instead.",
   placeEmptyTitle: "No published record was found in this area.",
   placeEmptyBody:
-    "This means only that no reviewed record in this database falls inside the search area. It is not evidence that no cameras exist there.",
-  placeEmptySubmit: "Submit a private observation",
+    "This means only that no public record in this database falls inside the search area. It is not evidence that no cameras exist there.",
+  placeEmptySubmit: "Submit a report",
   placeEmptyCoverage: "About data coverage limits",
   // Data policy link (CEO feedback 2026-08-02, merge #229 × #231): the
   // CSV/GeoJSON downloads live in the catalog meta row (DirectoryCatalog —
@@ -135,7 +135,7 @@ export const it: Translation<typeof en> = {
   // Chrome di pagina (/directory).
   pageTitle: "Elenco pubblico",
   pageIntro:
-    "Cerca, filtra e ordina i record pubblici revisionati senza usare la mappa. Un risultato non è mai la prova che un'area non abbia sorveglianza.",
+    "Cerca, filtra e ordina i record pubblici senza usare la mappa. Un risultato non è mai la prova che un'area non abbia sorveglianza.",
   // F2 (QA#6): fallback SSR Suspense per il corpo tool client.
   loading: "Caricamento dell'elenco…",
   navigation: "Navigazione elenco",
@@ -145,7 +145,7 @@ export const it: Translation<typeof en> = {
   accessibleDirectory: "Elenco accessibile",
   recordsTitle: "Sfoglia i record pubblici senza usare la mappa",
   recordsIntro:
-    "La ricerca include gli stessi record revisionati mostrati sulla mappa. Un risultato non prova mai l'assenza di sorveglianza in un'area.",
+    "La ricerca include gli stessi record pubblici mostrati sulla mappa. Un risultato non prova mai l'assenza di sorveglianza in un'area.",
   // Modalità catalogo (t_127492f1): heading sr-only della regione risultati —
   // mantiene la scala h1 → h2 → h3 su /directory ora che la ricerca per luogo
   // è un pannello collassabile e non più l'heading di sezione.
@@ -153,7 +153,7 @@ export const it: Translation<typeof en> = {
   searchDirectory: "Cerca nell'elenco pubblico",
   searchPlaceholder: "Tipo, fonte o ID record",
   searchHelp:
-    "Qui compaiono solo record pubblici revisionati e record illustrativi etichettati.",
+    "Qui compaiono solo record pubblici e record illustrativi etichettati.",
   // Modalità catalogo: export dei dati filtrati. L'API applica i filtri
   // server (tipo + aggiornamento); q e ordinamento restano client, quindi
   // il suggerimento dichiara esattamente cosa contiene l'export.
@@ -200,14 +200,14 @@ export const it: Translation<typeof en> = {
   stateNever: "Mai confermata",
   oneRecordFound: "1 record pubblico trovato",
   recordsFound: "record pubblici trovati",
-  lastVerification: "Ultima verifica",
+  lastVerification: "Ultima conferma",
   showOnMap: "Mostra sulla mappa",
   openRecord: "Apri record",
   emptyTitle: "Nessun record pubblicato corrisponde alla ricerca.",
   emptyBody:
-    "Questo non significa che nell'area non ci siano telecamere. Puoi cancellare la ricerca, esplorare la mappa o inviare un'osservazione privata per la moderazione.",
+    "Questo non significa che nell'area non ci siano telecamere. Puoi cancellare la ricerca, esplorare la mappa o inviare una segnalazione da un account verificato.",
   clearSearch: "Cancella ricerca",
-  submitObservation: "Invia un'osservazione privata",
+  submitObservation: "Invia una segnalazione",
   resetFilters: "Azzera i filtri",
   offlineTitle: "Sei offline",
   offlineBody: "Mostriamo gli ultimi record caricati.",
@@ -217,9 +217,9 @@ export const it: Translation<typeof en> = {
   placeSearchLabel: "Località, indirizzo o coordinate",
   placeSearchPlaceholder: "es. Centro città, Via Roma, o 45.46420, 9.19000",
   placeSearchHelp:
-    "Trova record pubblici revisionati vicino al luogo inserito. Un risultato non è mai la prova che un'area non abbia sorveglianza.",
+    "Trova record pubblici vicino al luogo inserito. Un risultato non è mai la prova che un'area non abbia sorveglianza.",
   placeSearchSubmit: "Cerca",
-  placeSearchLoading: "Ricerca dei record pubblici revisionati vicino a questo luogo…",
+  placeSearchLoading: "Ricerca dei record pubblici vicino a questo luogo…",
   placeSearchUnavailable: "La ricerca è temporaneamente non disponibile. Riprova tra poco.",
   placeSearchRateLimited: "Troppe ricerche. Attendi un momento e riprova.",
   placeSearchEmptyQuery: "Inserisci una località, un indirizzo o delle coordinate per cercare.",
@@ -229,13 +229,13 @@ export const it: Translation<typeof en> = {
       ? `Area di ricerca: vicino a ${area.displayName} (entro ${area.radiusLabel})`
       : `Area di ricerca: entro ${area.radiusLabel} da ${area.latitude.toFixed(5)}, ${area.longitude.toFixed(5)}`,
   placeResultsFound: (count: number) =>
-    `${count} ${count === 1 ? "record pubblico revisionato" : "record pubblici revisionati"} trovati vicino a questo luogo`,
+    `${count} ${count === 1 ? "record pubblico" : "record pubblici"} trovati vicino a questo luogo`,
   placeNotFoundTitle: "Non siamo riusciti a trovare questo luogo.",
   placeNotFoundBody: "Controlla l'ortografia oppure inserisci le coordinate (latitudine, longitudine).",
   placeEmptyTitle: "In questa area non è stato trovato alcun record pubblicato.",
   placeEmptyBody:
-    "Questo significa solo che nessun record revisionato di questo database rientra nell'area di ricerca. Non è la prova che lì non ci siano telecamere.",
-  placeEmptySubmit: "Invia un'osservazione privata",
+    "Questo significa solo che nessun record pubblico di questo database rientra nell'area di ricerca. Non è la prova che lì non ci siano telecamere.",
+  placeEmptySubmit: "Invia una segnalazione",
   placeEmptyCoverage: "I limiti della copertura dati",
   // Link politica dati (feedback CEO 2026-08-02, merge #229 × #231): i
   // download CSV/GeoJSON vivono nella riga meta del catalogo
