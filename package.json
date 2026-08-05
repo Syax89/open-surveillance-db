@@ -29,7 +29,9 @@
     "db:smoke": "node scripts/db-migration-smoke.mjs",
     "db:reset": "node scripts/db-reset.mjs",
     "db:provision": "node scripts/provision-alpha-accounts.mjs",
-    "db:seed": "wrangler d1 execute osdb-production --local --file=scripts/demo-cameras.sql --yes"
+    "db:seed": "wrangler d1 execute osdb-production --local --file=scripts/demo-cameras.sql --yes",
+    "import:run": "node scripts/import/cli.mjs run",
+    "import:rollback": "node scripts/import/cli.mjs rollback"
   },
   "dependencies": {
     "@simplewebauthn/server": "^13.3.2",

@@ -92,6 +92,10 @@ const expectedTables = [
   // R5 archival store (0034, QA#3 F6): anonymized moderation decisions
   // older than the 2-year window, moved by the daily sweep.
   "moderation_events_archive",
+  // Import provenance (0040, FONTI PUBBLICHE pipeline FASE A — kanban
+  // t_6030d390): one row per import run; `slug` is the unique key and the
+  // tail of every inserted camera's `source` ('import:<slug>').
+  "import_batches",
 ];
 // Indexes declared by the migrations.
 const expectedIndexes = [
@@ -179,6 +183,14 @@ const expectedIndexes = [
   "moderation_appeals_pending_decision_unique",
   // R5 archival store (0034, QA#3 F6): sweep anchors on created_at.
   "moderation_events_archive_created_at_idx",
+  // Import provenance (0040, FONTI PUBBLICHE pipeline FASE A): the partial
+  // UNIQUE (source, external_id) is the import idempotency key and
+  // (import_batch_id) the rollback/attribution handle; the batch status
+  // index serves rollback/ops lookups.
+  "import_batches_slug_unique",
+  "import_batches_status_idx",
+  "cameras_source_external_unique",
+  "cameras_import_batch_idx",
 ];
 // Tables that are not application schema but legitimately appear in a local
 // D1 database. Anything outside this set is an unexpected schema change.
@@ -400,6 +412,26 @@ for (const col of ["email_verified_at", "auth_provider", "external_sub"]) {
     console.log(`      ✓ contributors.${col}`);
   } else {
     fail(`expected contributors.${col} is missing after fresh migration`);
+  }
+}
+
+// 7b. Import-provenance columns on `cameras` (0040): the ALTER TABLE part
+// of the migration must have landed — external_id (idempotency key) and
+// import_batch_id (rollback/attribution handle), both NULL for the
+// pre-existing community population.
+let cameraColumns;
+try {
+  const colRows = query("PRAGMA table_info(cameras);");
+  cameraColumns = namesOf(colRows);
+} catch (err) {
+  fail(`could not read cameras columns: ${err.message}`);
+  cameraColumns = [];
+}
+for (const col of ["external_id", "import_batch_id"]) {
+  if (cameraColumns.includes(col)) {
+    console.log(`      ✓ cameras.${col}`);
+  } else {
+    fail(`expected cameras.${col} is missing after fresh migration`);
   }
 }
 
