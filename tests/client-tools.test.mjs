@@ -195,6 +195,7 @@ test("ToolLayout renders the shared public nav on unknown paths too (no per-page
 // ---------------------------------------------------------------------------
 
 test("MappaTool renders the map tool shell with the shared FiltersBar and the viewport-synced record list", async () => {
+  installRecordsMock();
   const { screen } = rtl;
   await renderWithLocale(React.createElement(MappaTool));
 
@@ -220,12 +221,14 @@ test("MappaTool renders the map tool shell with the shared FiltersBar and the vi
   assert.ok(screen.queryByLabelText("Search the public directory") === null, "no duplicated FiltersBar search on /mappa");
   assert.ok(screen.getByLabelText("Camera type"), "shared FiltersBar kind filter");
 
-  // The sidebar lists the points inside the current viewport (prototype
-  // seed: both records are in the initial view) as buttons, with the
-  // aria-live count announcing the visible points.
-  assert.ok(screen.getByRole("button", { name: /Illustrative record A/ }), "list row for record A");
-  assert.ok(screen.getByRole("button", { name: /Illustrative record B/ }), "list row for record B");
-  assert.ok(screen.getByText("Showing all 2 points in the current view"), "aria-live count announces the visible points");
+  // The sidebar lists the points inside the current viewport (both mocked
+  // records are in the initial view) as buttons, with the aria-live count
+  // announcing the visible points, once the mocked fetch resolves.
+  await rtl.waitFor(() => {
+    assert.ok(screen.getByRole("button", { name: /Illustrative record A/ }), "list row for record A");
+    assert.ok(screen.getByRole("button", { name: /Illustrative record B/ }), "list row for record B");
+    assert.ok(screen.getByText("Showing all 2 points in the current view"), "aria-live count announces the visible points");
+  });
 
   // Map-task alternative links point at the tool routes, not the home anchors.
   const directoryLink = screen.getByRole("link", { name: "Go to the accessible directory" });
@@ -240,10 +243,11 @@ test("the /mappa sidebar rows carry the status dot + localized label (status rai
   // t_d089a17e: same status-accent logic as the directory cards — every
   // visible row shows the status-dot AND its whitelisted label (WCAG
   // 1.4.1), so the coloured left rail is never the only signal.
+  installRecordsMock();
   const { container } = await renderWithLocale(React.createElement(MappaTool));
 
+  await rtl.waitFor(() => assert.ok(container.querySelectorAll(".map-record").length >= 2, "the sidebar must list the visible points"));
   const rows = container.querySelectorAll(".map-record");
-  assert.ok(rows.length >= 2, "the sidebar must list the visible points");
   for (const row of rows) {
     const dot = row.querySelector(".map-record-status .status-dot");
     assert.ok(dot, "each sidebar row has a status dot");
@@ -254,9 +258,11 @@ test("the /mappa sidebar rows carry the status dot + localized label (status rai
 });
 
 test("MappaTool kind filter narrows the sidebar list and the markers", async () => {
+  installRecordsMock();
   const { screen } = rtl;
   const user = rtl.userEvent.setup();
   await renderWithLocale(React.createElement(MappaTool));
+  await rtl.waitFor(() => assert.ok(screen.getByRole("button", { name: /Illustrative record A/ })));
 
   await user.selectOptions(screen.getByLabelText("Camera type"), "Fixed dome");
 
@@ -265,12 +271,14 @@ test("MappaTool kind filter narrows the sidebar list and the markers", async () 
   assert.match(screen.getByText(/1 public record found/).textContent, /1 public record found/);
 });
 
-test("MappaTool freshness filter on the demo seed keeps the map rendered and shows the truthful in-list empty note with a clear action", async () => {
+test("MappaTool freshness filter on the mocked records keeps the map rendered and shows the truthful in-list empty note with a clear action", async () => {
+  installRecordsMock();
   const { screen } = rtl;
   const user = rtl.userEvent.setup();
   await renderWithLocale(React.createElement(MappaTool));
+  await rtl.waitFor(() => assert.ok(screen.getByRole("button", { name: /Illustrative record A/ })));
 
-  // The prototype seed has no finite freshness date ("Demo data"), so any
+  // The mocked records carry no finite freshness date ("Demo data"), so any
   // freshness window filters everything out. Map-always-visible contract
   // (t_b9666d09): the map and the sidebar STAY rendered — the truthful
   // empty state moves INSIDE the list as a note with a clear action, it
@@ -293,19 +301,20 @@ test("MappaTool freshness filter on the demo seed keeps the map rendered and sho
   assert.ok(screen.getByRole("button", { name: /Illustrative record A/ }), "clearing restores the records to the list");
 });
 
-test("MappaTool deep link applies the seeded URL filters fully (type + freshness, demo seed → in-list empty note, map kept)", async () => {
+test("MappaTool deep link applies the seeded URL filters fully (type + freshness, mocked records → in-list empty note, map kept)", async () => {
+  installRecordsMock();
   setNavState({ search: "type=Traffic monitoring&freshness=7d" });
   const { screen } = rtl;
   await renderWithLocale(React.createElement(MappaTool));
 
   // F4 (useCameraFilters): the URL is no longer just a shell — the deep link
-  // seeds kind AND applies the derived freshness cutoff. The demo seed has
-  // no finite freshness date ("Demo data"), so the truthful in-list empty
-  // note shows instead of a half-applied shell — and, per the
+  // seeds kind AND applies the derived freshness cutoff. The mocked records
+  // carry no finite freshness date ("Demo data"), so the truthful in-list
+  // empty note shows instead of a half-applied shell — and, per the
   // map-always-visible contract (t_b9666d09), the map itself stays.
   assert.equal(screen.getByLabelText("Record freshness").value, "7d", "?freshness= seeds the select");
   assert.ok(screen.getByRole("region", { name: "Interactive OpenStreetMap map" }), "the map stays rendered on a deep link with zero matching records");
-  assert.ok(screen.getByText("No published record matches those filters."), "deep link fully applies the seeded filters (in-list note)");
+  await rtl.waitFor(() => assert.ok(screen.getByText("No published record matches those filters."), "deep link fully applies the seeded filters (in-list note)"));
 });
 
 // Marker/popup contract (t_702c10af): the API mock returns the two seed
@@ -658,12 +667,14 @@ test("MappaTool geocode autocomplete shows honest no-results and unavailable sta
 });
 
 test("MappaTool text search with no matching record keeps the map rendered (in-list note, map-always-visible)", async () => {
+  installRecordsMock();
   const { screen, fireEvent } = rtl;
   const user = rtl.userEvent.setup();
   // Whole-world viewport, deterministic start (t_b9666d09): a leftover
   // narrow viewport from a previous test would silently hide record A.
   await resetLeafletMarkers();
   await renderWithLocale(React.createElement(MappaTool));
+  await rtl.waitFor(() => assert.ok(screen.getByRole("button", { name: /Illustrative record A/ })));
 
   // A query that matches no local point empties ONLY the list (the map and
   // the sidebar stay); the truthful in-list note offers the clear action.
@@ -681,14 +692,17 @@ test("MappaTool text search with no matching record keeps the map rendered (in-l
 // /directory — DirectoryTool
 // ---------------------------------------------------------------------------
 
-test("DirectoryTool renders the directory shell with the shared FiltersBar and both seed records", async () => {
+test("DirectoryTool renders the directory shell with the shared FiltersBar and both mocked records", async () => {
+  installRecordsMock();
   const { screen } = rtl;
   await renderWithLocale(React.createElement(DirectoryTool));
 
   assert.ok(screen.getByRole("heading", { name: "Public directory" }), "directory pageTitle heading");
   assert.ok(screen.getByLabelText("Search the public directory"), "shared FiltersBar search (inline variant)");
-  assert.ok(screen.getByRole("heading", { name: "Illustrative record A" }));
-  assert.ok(screen.getByRole("heading", { name: "Illustrative record B" }));
+  await rtl.waitFor(() => {
+    assert.ok(screen.getByRole("heading", { name: "Illustrative record A" }));
+    assert.ok(screen.getByRole("heading", { name: "Illustrative record B" }));
+  });
 
   const useMap = screen.getByRole("link", { name: /Use the map instead/ });
   assert.equal(useMap.getAttribute("href"), "/mappa", "the directory links the map tool route");
@@ -703,6 +717,7 @@ test("DirectoryTool renders the directory shell with the shared FiltersBar and b
 });
 
 test("DirectoryTool search narrows the list (debounced URL commit); the empty state offers a clear action that restores it", async (t) => {
+  installRecordsMock();
   const { screen, fireEvent } = rtl;
   const user = rtl.userEvent.setup();
   await renderWithLocale(React.createElement(DirectoryTool));
@@ -782,9 +797,11 @@ test("DirectoryTool search narrows the list (debounced URL commit); the empty st
 });
 
 test("DirectoryTool kind filter narrows and Reset filters restores the full list", async () => {
+  installRecordsMock();
   const { screen } = rtl;
   const user = rtl.userEvent.setup();
   await renderWithLocale(React.createElement(DirectoryTool));
+  await rtl.waitFor(() => assert.ok(screen.getByRole("heading", { name: "Illustrative record A" })));
 
   await user.selectOptions(screen.getByLabelText("Camera type"), "Fixed dome");
   assert.ok(screen.getByRole("heading", { name: "Illustrative record A" }));
@@ -795,14 +812,18 @@ test("DirectoryTool kind filter narrows and Reset filters restores the full list
 });
 
 test("DirectoryTool Show on map pushes /mappa?focus=ID through the navigation stub", async () => {
+  installRecordsMock();
   const { screen } = rtl;
   const user = rtl.userEvent.setup();
   await renderWithLocale(React.createElement(DirectoryTool));
 
   // Record A is first (alphabetical default order): its action pushes the
   // /mappa deep link with the focus id (F4 wires the focus handling).
-  const showButtons = screen.getAllByRole("button", { name: /^Show on map/ });
-  assert.equal(showButtons.length, 2, "every record card exposes the keyboard map path");
+  const showButtons = await rtl.waitFor(() => {
+    const buttons = screen.getAllByRole("button", { name: /^Show on map/ });
+    assert.equal(buttons.length, 2, "every record card exposes the keyboard map path");
+    return buttons;
+  });
   await user.click(showButtons[0]);
 
   const navState = await getNavState();
@@ -990,6 +1011,12 @@ test("CorreggiTool renders the correction form with the correction bundle", asyn
 });
 
 test("CorreggiTool ?record=ID pre-selects the related record and announces it", async () => {
+  // CorreggiTool is gated by WriteGateWall (checks /api/auth/me on mount):
+  // installRecordsMock() alone would answer /api/auth/me with camera
+  // records too, so the wall never resolves to a verified session and the
+  // form (and its select) never renders. installSegnalaMock answers the
+  // session check correctly and falls through to the cameras payload.
+  installSegnalaMock(() => jsonResponse(fakeCamerasPayload(POPUP_RECORDS)));
   setNavState({ search: "record=1" });
   const { screen } = rtl;
   await renderWithLocale(React.createElement(CorreggiTool));
@@ -997,7 +1024,7 @@ test("CorreggiTool ?record=ID pre-selects the related record and announces it", 
   // P1-2: the verified-session gate resolves before the form (and its
   // pre-selection announcement) renders.
   await screen.findByLabelText("Related public record");
-  assert.equal(screen.getByLabelText("Related public record").value, "1", "the select is pre-selected");
+  await rtl.waitFor(() => assert.equal(screen.getByLabelText("Related public record").value, "1", "the select is pre-selected"));
   assert.match(
     screen.getByRole("status").textContent,
     /Record 1 preselected: Illustrative record A\./,

@@ -422,6 +422,50 @@ changes accumulate under `[Unreleased]`.
 
 ### Fixed
 
+- **UI /mappa, /directory, /correggi — removed the hardcoded two-record
+  demo seed from every tool surface:** `MappaTool`, `DirectoryTool` and
+  `CorreggiTool` used to pass a synthetic `prototypeRecords` fallback
+  (`app/lib/records.ts`, two fictional "Illustrative record" pins) into
+  `usePublicCameras` as the initial/loading state. On a real deployment
+  with real public records this produced a visible flash — the two demo
+  pins rendered first, then the real API payload silently replaced them a
+  moment later — and on an empty or unreachable API it kept showing the
+  fictional pins indefinitely (`usePublicCameras` never blanks a healthy
+  empty answer). The three tools now start from the shared hook's own
+  default (`[]`) with no local seed: the SSR shell and first client paint
+  show the honest "no record loaded yet" / empty state, records appear
+  once the real `GET /api/cameras` fetch resolves, and an empty or failed
+  API answer stays honestly empty instead of showing fictional data.
+  `prototypeRecords` is removed from `app/lib/records.ts` (dead code — no
+  remaining callers). The local dev seed (`npm run db:seed`, two
+  `status='demo'` rows in D1 for manual interface checks) is unaffected
+  and still opt-in. Tests: ~15 assertions in `tests/client-tools.test.mjs`
+  reworked to exercise a mocked `/api/cameras` response with `waitFor`
+  instead of the synchronous seed; the two Miniflare SSR contracts that
+  asserted "at least one record renders" in `tests/a11y-interactive.test.mjs`
+  and `tests/rendered-html.test.mjs` now assert the truthful empty-state
+  shell instead (the per-record markup contract stays covered client-side,
+  post-hydration); `tests/status-leak-boundaries.test.mjs` drops the
+  now-inapplicable "every tool filters its local seed" guard (the
+  whitelist guard lives solely in the shared hook already).
+
+- **UI /mappa mobile — filters panel collapsed to a wall of chrome above
+  the fold below 700px:** the `.map-card .filters-panel` 2-column grid
+  intended by the MAP-FIRST redesign (#316) was being silently crushed
+  back to 1 column by the generic `.directory-controls` rule (shared with
+  `/directory` and the home hub), which carries `!important` at the same
+  breakpoint. On a 390px viewport this pushed the map itself below the
+  fold behind five stacked selects. Scoped `!important` on
+  `.map-card .filters-panel` restores the intended 2-column layout below
+  700px; no change ≥768px.
+
+- **UI home hero mobile — decorative marker overlapping the caption
+  text:** `.signal-three` (`right:10%;top:74%`) landed under
+  `.visual-label` ("Mapping public space with public knowledge") below
+  700px, the amber dot partially covering the text. Repositioned to the
+  otherwise-empty upper-right area of the illustration; both elements are
+  `aria-hidden`, so this is a visual-only fix.
+
 - **UI /directory — record rows now render as visible cards with a status
   rail (t_d089a17e, Vera design, CEO feedback 2026-08-03):** the catalog
   rows blended into the paper background (transparent bg on `--paper`,

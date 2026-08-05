@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useMessages } from "../../lib/use-messages";
-import { publicRecords, prototypeRecords } from "../../lib/records";
 import { usePublicCameras } from "../../lib/use-public-cameras";
 import { recordsInBounds } from "../../lib/map-viewport";
 import type { ViewportBounds } from "../../lib/map-viewport";
@@ -49,7 +48,6 @@ export function MappaTool() {
   const [notice, setNotice] = useState("");
 
   const { records, loading } = usePublicCameras({
-    seed: publicRecords(prototypeRecords),
     filters: serverFiltersFrom(filters),
     onRecords: (next) => setSelectedId((current) => (filters.focus !== null ? current : next[0].id)),
     onError: () => setNotice(t.apiUnavailable),

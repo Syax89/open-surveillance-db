@@ -2,7 +2,6 @@
 
 import { useSearchParams } from "next/navigation";
 import { useMessages } from "../../lib/use-messages";
-import { publicRecords, prototypeRecords } from "../../lib/records";
 import { usePublicCameras } from "../../lib/use-public-cameras";
 import { CorrectionForm } from "../home/CorrectionForm";
 import { WriteGateWall } from "../WriteGateWall";
@@ -24,9 +23,7 @@ export function CorreggiTool() {
   const recordParam = searchParams.get("record");
   const defaultRecordId = recordParam && /^\d+$/.test(recordParam) ? Number(recordParam) : null;
 
-  const { records } = usePublicCameras({
-    seed: publicRecords(prototypeRecords),
-  });
+  const { records } = usePublicCameras();
 
   return (
     <section className="tool-section correction-tool" aria-labelledby="correction-tool-title">

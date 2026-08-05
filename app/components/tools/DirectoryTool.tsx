@@ -3,7 +3,6 @@
 import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useMessages } from "../../lib/use-messages";
-import { publicRecords, prototypeRecords } from "../../lib/records";
 import { usePublicCameras } from "../../lib/use-public-cameras";
 import {
   applyCameraFilters,
@@ -44,7 +43,6 @@ export function DirectoryTool() {
   const { filters, qInput, setQ, setType, setFreshness, setSort, setState, setOrigin, setPage, reset } = useCameraFilters();
   const serverFilters = useMemo(() => serverFiltersFrom(filters), [filters]);
   const { records } = usePublicCameras({
-    seed: publicRecords(prototypeRecords),
     filters: serverFilters,
   });
 
