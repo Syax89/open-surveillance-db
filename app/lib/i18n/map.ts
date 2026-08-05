@@ -92,6 +92,14 @@ export const en = {
   // "Community report") with its licence, and the record's added date.
   popupAdded: "Added",
   popupCommunityReport: "Community report",
+  // Pixel-grid aggregation badges (t_26ce96f3, CEO 2026-08-05): at low zoom
+  // / high density the map renders one count badge per 48px screen cell
+  // instead of thousands of DOM markers. The badge is a button with a
+  // count; clicking it zooms in toward the cell centroid. The tooltip and
+  // the aria-label carry the same message (the count is the badge text).
+  gridBadgeLabel: (count: number) => `${count} cameras in this area — zoom in to see them`,
+  gridBadgeTooltip: (count: number) => `${count} cameras here`,
+  gridBadgeZoom: (count: number) => `${count} cameras — zoom in to see them individually`,
 } as const;
 
 export const it: Translation<typeof en> = {
@@ -182,4 +190,11 @@ export const it: Translation<typeof en> = {
   // di aggiunta del record.
   popupAdded: "Aggiunta",
   popupCommunityReport: "Segnalazione della community",
+  // Badge di aggregazione a griglia (t_26ce96f3, CEO 2026-08-05): a zoom
+  // basso / densità alta la mappa mostra un badge con conteggio per cella
+  // di 48px invece di migliaia di marker DOM. Il badge è un pulsante con
+  // conteggio; cliccandolo si ingrandisce verso il centro della cella.
+  gridBadgeLabel: (count: number) => `${count} telecamere in quest'area — ingrandisci per vederle`,
+  gridBadgeTooltip: (count: number) => `${count} telecamere qui`,
+  gridBadgeZoom: (count: number) => `${count} telecamere — ingrandisci per vederle singolarmente`,
 };
