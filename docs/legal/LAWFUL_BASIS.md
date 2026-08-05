@@ -27,48 +27,49 @@ This assessment covers those operations. Where a record is republished from an o
 
 | Operation | Personal data involved | Basis | Necessity / safeguards |
 |-----------|----------------------|-------|------------------------|
-| Collect & store reports (pending) | Location, description, optional metadata, notes, pseudonymous ID | 6(1)(f) | Needed to run a community-sourced civic map; pseudonymous IDs; private by default; 90-day retention |
-| Moderate (screen/verify/decide) | Report content, evidence, reviewer pseudonym | 6(1)(f) | Two-person review for sensitive records; audit log pseudonymous; never public |
-| Publish verified records + exports (ODbL) | Generally **not personal data** (infrastructure) | 6(1)(f) / 6(1)(e) | Per-field opt-in for `manufacturer`/`observedOn`; least-specific location (**~4-decimal default**, decision 2026-07-31); no images until redaction workflow exists |
+| Collect & store reports | Location, description, optional metadata, notes, pseudonymous ID | 6(1)(f) | Needed to run a community-sourced civic map; pseudonymous IDs; published immediately from verified accounts (ADR 0021); no time-based record retention |
+| Community actions on records (like/confirm/gone/problem/privacy) | Action type, weight snapshot, timestamp | 6(1)(f) | Verified-account gate (ADR 0020); one action per user per record; aggregates only in public payloads (ADR 0021 § 3/§ 7); erasure covers actions (§ 13) |
+| Residual human moderation (photo redaction gate; legal-emergency hide/remove) | Photo decision, reviewer pseudonym | 6(1)(f) | Photo approval requires `redaction_confirmed = 1` (fail-closed); legal-emergency actions single-person, reviewed retrospectively (ADR 0021 § 8); audit log pseudonymous; never public |
+| Publish records + exports (ODbL) | Generally **not personal data** (infrastructure) | 6(1)(f) / 6(1)(e) | Per-field opt-in for `manufacturer`/`observedOn`; least-specific location (**~4-decimal default**, decision 2026-07-31); photos only after the redaction gate |
 | Handle correction/takedown requests | Requester contact data | 6(1)(c) + 6(1)(f) | Needed to comply with arts. 15-22; identity verification proportionate |
 | Security & abuse prevention | IP-level rate limiting (no logs retained), submissions metadata | 6(1)(f) | No behavioural advertising; rate limiting per H2 |
 | Moderator authentication | Email/name via ChatGPT sign-in | 6(1)(f) | Never logged, never stored; session-only (M4) |
 
 ## 3. Lawful bases
 
-### 3.1 Publication of verified records — art. 6(1)(f) legitimate interest (primary)
+### 3.1 Publication of records — art. 6(1)(f) legitimate interest (primary)
 
 - **Legitimate interest:** civic transparency about visible public surveillance infrastructure; public awareness and accountability of public authorities; enabling communities and journalists to assess the extent of surveillance in public space.
-- **Necessity:** the map requires publishing locations of infrastructure that is *already visible to anyone in the street*; no less intrusive means achieves the transparency purpose (generalising locations further would defeat it; the moderation queue and private fields show we do not publish more than needed).
+- **Necessity:** the map requires publishing locations of infrastructure that is *already visible to anyone in the street*; no less intrusive means achieves the transparency purpose (generalising locations further would defeat it; the verified-account gate and the automatic safeguards show we do not publish more than needed).
 - **Balancing test (LIA):**
 
 | Factor | Assessment |
 |--------|-----------|
 | Controller/third-party interest | Strong, public-interest purpose (non-commercial, community-governed) |
-| Impact on data subjects | **Low**: records concern infrastructure, not persons; no images, plates, faces, private interiors; least-specific coordinates (**~4 decimal places by default**, decision 2026-07-31); per-field opt-in for `manufacturer`/`observedOn`; no live video, no credentials, no operational detail |
+| Impact on data subjects | **Low**: records concern infrastructure, not persons; no images, plates, faces, private interiors unless redaction-confirmed by a moderator (photo gate); least-specific coordinates (**~4 decimal places by default**, decision 2026-07-31); per-field opt-in for `manufacturer`/`observedOn`; no live video, no credentials, no operational detail; the public per-record history carries no attribution (aggregates only, ADR 0021 § 7) |
 | Reasonable expectations | A camera on a public street is observable by anyone; its existence is not private information |
-| Safeguards | Human moderation before publication; retention schedule; correction/removal path with SLA; appeals with independent reviewer; no tracking/ads; ODbL licensing |
-| Residual risk | Low, provided the safeguards are implemented (see review findings H1-H4) |
+| Safeguards | **Verified-account write gate** (ADR 0020 — every report and every community action requires a verified contributor account, 401/403 fail-closed); **privacy threshold ≥ 1 → `hidden`** (a single verified privacy action withdraws the record immediately — prudential, reversible only by high-bar consensus + cooldown, ADR 0021 § 4.3); **public per-record event history without attribution** (transparency, ADR 0021 § 7); **erasure covers community actions** (art. 17, ADR 0021 § 13 — actions are deleted atomically with the account); **private corrections** (never change the map automatically, TERMS § 6.2); **photo redaction gate** (`redaction_confirmed = 1`, fail-closed); retention schedule; no tracking/ads; ODbL licensing |
+| Residual risk | Low, provided the automatic safeguards are in force and monitored (thresholds tunable via audited admin settings, ADR 0021 § 5) |
 
-- **Conclusion:** legitimate interest is balanced for the publication purpose. Review annually and on any material change (art. 6(1)(f) requires a documented, current balancing test).
+- **Conclusion:** legitimate interest is balanced for the publication purpose. The balancing test is current as of 2026-08-05 (community-driven model, ADR 0021); review annually and on any material change (art. 6(1)(f) requires a documented, current balancing test; art. 5(2) accountability).
 
-#### 3.1.1 Community system — profile, trust levels, verifications, edit history (art. 6(1)(f))
+#### 3.1.1 Community actions — like / confirm / gone / problem / privacy (art. 6(1)(f))
 
-The community system (COMMUNITY_PLAN.md § 5) adds processing of contributor personal data: the contributor profile (display name, trust level, verifications received, list of contributions), verifications given to other records, and edit-history authorship. All are personal data (art. 4(1) — tied to `contributors.id`; pseudonymisation does not exclude identifiability, art. 4(5), Recital 26). The basis is **art. 6(1)(f)** — **never consent** (art. 6(1)(a)): the community features are a core function of the service, and the imbalance between controller and data subject makes consent an inappropriate basis.
+The community-driven model (ADR 0021) processes contributor personal data through **community actions** on records: action type, trust-weight snapshot and timestamp per record (`camera_community_actions`). All are personal data (art. 4(1) — tied to `contributors.id`; pseudonymisation does not exclude identifiability, art. 4(5), Recital 26). The basis is **art. 6(1)(f)** — **never consent** (art. 6(1)(a)): community moderation is a core function of the service, and the imbalance between controller and data subject makes consent an inappropriate basis.
 
-- **Legitimate interest:** contributor recognition and community verification of dataset quality — the civic-transparency purpose of § 3.1 extended to the people who build the dataset; verifications are a quality signal for consumers of the public data.
-- **Necessity:** trust levels are **derived from data already collected** (verified contributions) — no new collection, no behavioural metrics; verifications are minimal by design (one per user per record, no free text); edit authorship is required for accountability (art. 5(2)) and accuracy (art. 16).
+- **Legitimate interest:** community-driven accuracy and freshness of the civic-transparency dataset — the § 3.1 purpose extended to the people who keep the dataset current; automatic, trust-weighted thresholds (ADR 0021 § 4) replace the retired human review queue.
+- **Necessity:** no new collection beyond the report itself — actions are minimal by design (one per user per record, whitelisted types, no free text); the weight is a **snapshot of the contributor's existing trust level at action time** (ADR 0021 § 3.4), derived from data already held (level = COUNT over `active` records, ADR 0021 § 12).
 - **Balancing test (LIA):**
 
 | Factor | Assessment |
 |--------|-----------|
-| Controller/third-party interest | Strong: recognition incentivises contributors and verifications improve dataset quality; non-commercial, community-governed |
-| Impact on data subjects | **Low, conditional:** the public profile is **strictly opt-in, private by default** (COMMUNITY_PLAN.md § 5.2, binding); only the chosen display name is ever public — never real name or email; **no public leaderboard/ranking** (trust levels/verifications are informative, non-ordinal indicators, not profiling under art. 4(4)/22); no export of profiles; erasure (art. 17) covers profile, verifications and edit authorship (R14) |
-| Reasonable expectations | A contributor who opts in to a public profile, with a documented notice (PRIVACY_NOTICE.md § 3/§ 5), can expect the chosen display name and derived indicators to be visible; anonymous contributors are fully supported (no account needed to report) |
-| Safeguards | Opt-in public profile with private default; pseudonymous display name only; no ranking/leaderboard; edit queue moderated before publication (MODERATION.md "Edit moderation"); append-only revision history; erasure extended to profile/verifications/authorship, tested before the community schema PR merges (COMMUNITY_PLAN.md § 5.2); one verification per user per record (anti-gaming); art. 22 note: trust levels are derived with transparent, non-discriminatory, documented criteria — not automated decision-making with legal or similarly significant effects |
-| Residual risk | Low, provided the safeguards are implemented; identification risk for contributors who document surveillance is mitigated by the private-by-default profile and the pseudonymous display name |
+| Controller/third-party interest | Strong: community actions are the mechanism that keeps the public dataset accurate without human review; non-commercial, community-governed |
+| Impact on data subjects | **Lower than the pre-pivot community plan** (COMMUNITY_PLAN.md § 5, superseded): **no public profile, no attribution, no edit flow** — public payloads expose **aggregates only** (counts/scores, never who acted — ADR 0021 § 3.5/§ 7); one action per user per record; no free text; actions carry no email, real name or IP-derived data |
+| Reasonable expectations | A contributor who acts on records with a verified account can expect only aggregate signals to be visible; the notice states actions are aggregated and never attributed (PRIVACY_NOTICE.md § 3) |
+| Safeguards | Verified-account write gate (ADR 0020); one action per user per record (UNIQUE, ADR 0021 § 3); self-action restrictions (no self-like/self-confirm, 403); daily/per-record quotas and IP-hash burst alerts (anti-gaming, ADR 0021 § 11); privacy threshold ≥ 1 → immediate `hidden`, reversible only by high-bar consensus + cooldown; public history without attribution; **erasure (art. 17) deletes the contributor's actions atomically with the account** (ADR 0021 § 13) and the history survives only as aggregates |
+| Residual risk | Low, provided the automatic safeguards are in force and monitored; thresholds tunable via audited admin settings (ADR 0021 § 5) |
 
-- **Conclusion:** legitimate interest is balanced for the community-system purposes, on the condition that the binding safeguards of COMMUNITY_PLAN.md § 5.2 (opt-in public profile, private default, no public ranking) are implemented before go-live. Review together with § 3.1 on any material change.
+- **Conclusion:** legitimate interest is balanced for the community-action purposes. The impact is *lower* than the pre-pivot community plan (no public profile, no attribution, no edit flow), so the § 3.1 conclusion — art. 6(1)(f) balanced for the publication purpose — holds **a fortiori** for community actions. Review together with § 3.1 on any material change.
 
 ### 3.2 Public-interest basis — art. 6(1)(e) (complementary)
 

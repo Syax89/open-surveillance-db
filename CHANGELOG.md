@@ -287,6 +287,31 @@ changes accumulate under `[Unreleased]`.
 
 ### Changed
 
+- **Docs/legal — allineamento follow-up ADR 0021 (t_499df642):**
+  `docs/legal/RETENTION_SCHEDULE.md` (R1–R3 riscritte sul modello community:
+  niente retention a tempo per i record, stati `active`/`hidden`/`removed`
+  reversibili senza cancellazione automatica, copertura esplicita di
+  hidden/removed, R13 foto sul retention del record, R14 community actions
+  con erasure atomica, § 3 enforcement senza sweep di freshness),
+  `docs/legal/LAWFUL_BASIS.md` (§ 3.1 LIA con i safeguards reali del modello
+  nuovo — verified-account gate ADR 0020, soglia privacy ≥ 1 → hidden,
+  storia pubblica senza attribuzione, erasure su azioni, correzioni private;
+  § 3.1.1 riscritto per le community actions, conclusione 6(1)(f) invariata
+  a fortiori, balancing test aggiornato art. 5(2)),
+  `docs/MODERATION.md` (riscritto sul modello residuo: photo redaction gate
+  + legal-emergency admin hide/remove; rimosso il flusso review/appeals/edit),
+  `docs/legal/MODERATION_SLA.md` (SLA residue S2/S3 allineate alle
+  dichiarazioni inline 48h/14gg di TERMS/PRIVACY; S4 retrospective review;
+  rimosse S5/S6) e `docs/COMMUNITY_PLAN.md` (marcata **superseded** per il
+  moderation model — ADR 0021; sezioni § 2.2/§ 4/§ 5.2/§ 5.3 archiviate,
+  restano attuali § 1 auth e § 3 trust levels). Fix copy residuo in canonica
+  (PRIVACY_NOTICE § 3.1 / TERMS_OF_USE § 3.7: "submit, edit or verify
+  records" → "submit reports or act on records (community actions)") e
+  armonizzazione del potere umano residuo (PRIVACY § 3 vs TERMS § 6.3: il
+  photo-approval agisce sullo stato FOTO, non sul lifecycle del record).
+  Parity EN/IT invariata (documenti canonici in inglese; le traduzioni
+  pubbliche restano nel bundle `app/lib/legal/`, allineato separatamente).
+
 - **Docs/legal — canonica allineata al pivot community ADR 0021 (t_29c29f92):**
   `docs/legal/PRIVACY_NOTICE.md` (v0.10 → **v0.11**) e `docs/TERMS_OF_USE.md`
   (v0.6 → **v0.7**) riscritte sul modello community-driven già applicato ai

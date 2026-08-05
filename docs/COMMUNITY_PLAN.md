@@ -1,7 +1,9 @@
 # Community system plan — piano consolidato (login, profilo contributi, livelli, verifiche)
 
-Last reviewed: 2026-08-02
-Status: **roadmap da approvare** (consolidamento dei pareri di Ricerca/Data/CTO/QA/Legal/Copy/Docs/Backend/Design) — § 1 aggiornato alla decisione multi-method auth ([ADR 0020](decisions/0020-multi-method-authentication.md), 2026-08-02)
+Last reviewed: 2026-08-05
+Status: **roadmap superseded per il modello di moderazione (ADR 0021, 2026-08-04)** — conservato come riferimento storico delle decisioni di autenticazione (ADR 0020) e trust levels (riusati come pesi, ADR 0021 § 4); le sezioni sul *profilo pubblico opt-in, verifiche/stelline ed editing con moderazione* (§ 2.2, § 4, § 5.2/§ 5.3, fasi C2–C6) **non sono implementate** e sono sostituite dalle community actions di ADR 0021. Per lo stato attuale fanno fede ADR 0021, MODERATION.md, DATA_MODEL.md, TERMS_OF_USE.md e PRIVACY_NOTICE.md.
+
+> **SUPERSEDED (ADR 0021 — community-driven pivot, decisione CEO 2026-08-04).** Questo piano descriveva il modello *profilo + verifiche/stelline + editing moderato*. Il pivot lo sostituisce: pubblicazione immediata da account verificati, **community actions** (`like`/`confirm`/`gone`/`problem`/`privacy`, una per utente per record) con soglie automatiche trust-weighted, cronologia pubblica **senza attribuzione**, **nessun profilo pubblico**, **nessuna verifica/stella**, **nessun flusso di edit**, erasure estesa alle azioni (art. 17, ADR 0021 § 13). Le sezioni § 2.2 (editing a due binari), § 4 (verifiche), § 5.2/§ 5.3 (profilo opt-in, verifications, edit), § 6 (i18n verifiche) e le fasi C2–C6 del § 7 sono **archiviate/not-implemented**. Restano attuali: § 1 (scelta autenticazione, ADR 0020) e § 3 (trust levels come primitiva di peso, riusata da ADR 0021 § 4/§ 12).
 
 Questo documento è il **piano unico** del community system: login sicuro, profilo dei
 contributi, trust levels e verifiche (stelline) sui record. Consolida:
@@ -108,6 +110,8 @@ pulito (RETENTION_SCHEDULE R15; PRIVACY_NOTICE § 10).
 ---
 
 ## 2. Architettura profilo contributi + editing
+
+> **ARCHIVIATA (ADR 0021, 2026-08-04).** Questa sezione descriveva il modello *profilo contributi + editing con moderazione* — **non implementato**. Nel modello community-driven non esiste flusso di edit: pubblicazione immediata da account verificati + community actions con soglie automatiche (ADR 0021 § 3/§ 4). Resta architetturalmente valido il fatto § 2.1 (identità contributore vs moderatore separate, ADR 0013/0014). Testo storico conservato per tracciabilità.
 
 Fonte: Ada (t_e7e94d17), Linus (t_25843be7), Vera (t_c9a9ca46), Marie (t_2acb8f70).
 
@@ -249,6 +253,8 @@ L3–L4→Experienced. I test i18n/a11y dei badge si scrivono su questo mapping.
 
 ## 4. Sistema verifiche/stelle (modello dati, anti-gaming)
 
+> **ARCHIVIATA (ADR 0021, 2026-08-04).** Il sistema verifiche/stelle descritto in questa sezione **non è implementato** — le community actions (`confirm`/`like`/`gone`/`problem`/`privacy`, una per utente per record) con soglie automatiche trust-weighted lo sostituiscono (ADR 0021 § 3/§ 4); nessuna verifica/stella pubblica, nessuna attribuzione. Testo storico conservato per tracciabilità.
+
 Fonte: Nora (t_f49b0226), Linus (t_25843be7), Ada (t_e7e94d17), Grace (t_45ff2bfd).
 
 ### 4.1 Modello dati — migrazioni D1 0020–0023 (convenzione hand-written + journal/snapshot)
@@ -321,6 +327,8 @@ non discriminatori; se un domani condizionasse diritti legali → valutazione 13
 
 ### 5.2 Decisioni vincolanti
 
+> **SUPERSEDED (ADR 0021, 2026-08-04).** Le decisioni 1–5 sotto si riferivano al modello profilo/verifiche/editing, **non implementato**. Nel modello community-driven valgono: **nessun profilo pubblico** (niente opt-in profile, niente display name pubblico); **nessun ranking/leaderboard** (invariato — i pesi non sono mai esposti, ADR 0021 § 10.2); **erasure estesa** a profilo/verifiche/authorship → sostituita dall'erasure delle **community actions** (deleted atomicamente con l'account, ADR 0021 § 13; la cronologia pubblica sopravvive solo come aggregati); **editing con gate umano** → **nessun flusso di edit**; le verifiche dell'utente cancellato → le sue azioni spariscono con l'account e le soglie vengono ricalcolate live. Il testo storico è conservato qui sotto per tracciabilità.
+
 1. **Niente leaderboard/ranking pubblici** (R1 Medio-Alto: conflitto PRODUCT_UX + identificabilità
    + potenziale art. 22). Livelli/verifiche non sono mai una classifica.
 2. **Profilo pubblico OPT-IN, default privato** (R4). Mai nome reale/email pubblici, solo
@@ -337,6 +345,8 @@ non discriminatori; se un domani condizionasse diritti legali → valutazione 13
    restano de-identificate sul record; conferme su record altrui non sono suoi dati.
 
 ### 5.3 Aggiornamenti documentali (check-list)
+
+> **SUPERSEDED (ADR 0021).** La check-list sotto elenca gli aggiornamenti del vecchio modello (profilo opt-in, verifications, editing) — **non eseguiti perché il modello è stato sostituito**. Gli allineamenti effettivamente eseguiti per ADR 0021 sono tracciati in ADR 0021 "Consequences", PRIVACY_NOTICE v0.11, TERMS v0.7, RETENTION_SCHEDULE (R1–R3/R13/R14 riscritte), MODERATION.md (riscritto) e LAWFUL_BASIS § 3.1/§ 3.1.1 (riscritti).
 
 | Documento | Azione |
 |---|---|
@@ -361,6 +371,8 @@ non discriminatori; se un domani condizionasse diritti legali → valutazione 13
 ---
 
 ## 6. Requisiti i18n/design
+
+> **ARCHIVIATA (ADR 0021, 2026-08-04).** I requisiti i18n/design di questa sezione si riferivano al modello verifiche/profilo/editing — terminologia congelata e fixture microcopy **non più applicabili** (i bundle EN/IT attuali riflettono le community actions; sweep PR #307). Testo storico conservato per tracciabilità.
 
 Fonte: Eva (t_290dce27), Vera (t_c9a9ca46), Marie (t_2acb8f70).
 
@@ -428,6 +440,8 @@ Token nuovi: **nessuno** (riuso `--status-verified`/`--status-community`, D6/D7)
 
 ## 7. Piano di implementazione a fasi
 
+> **ARCHIVIATA in parte (ADR 0021, 2026-08-04).** Le fasi C2–C6 (profilo, verifiche, editing, moderazione umana) **non sono implementate**; la fase C1 (autenticazione multi-metodo, ADR 0020) è stata realizzata. Le fasi community-driven sono state implementate direttamente: DB (PR #297), API (PR #299), UI (PR #305). Testo storico conservato per tracciabilità.
+
 **Vincolo CTO: una PR per fase, CI verde, review Ada + approve QA. Le fasi backend sono
 sequenziali (dipendono l'una dall'altra); le fasi docs/legal/i18n girano in parallelo.**
 Stima: 1-2 giorni/fase, ~2-3 sprint totali. Zero librerie nuove.
@@ -457,6 +471,8 @@ C2/C3/C4 → C5/C6 → C-docs + C-QA.
 ---
 
 ## 8. Criteri di accettazione
+
+> **ARCHIVIATA (ADR 0021, 2026-08-04).** I criteri di accettazione di questo piano si riferivano al modello profilo/verifiche/editing — **non implementato**. I criteri attuali del modello community-driven vivono in ADR 0021 e nei task kanban (DB/API/UI: PR #297/#299/#305). Testo storico conservato per tracciabilità.
 
 Fonte: Grace (t_45ff2bfd) + pattern FRONTEND_PLAN §7.
 
