@@ -1135,6 +1135,56 @@ test("GET /api/cameras?format=geojson&bbox= returns only the points inside the b
   assert.deepEqual(callArgs("listPublicCamerasInBbox")[0], [{ west: 12.4, south: 41.8, east: 12.6, north: 42.0 }]);
 });
 
+test("GET /api/cameras?bbox= returns the JSON viewport page (map data contract, t_bb310428)", async () => {
+  // The JSON bbox contract is the map's data layer: same {records,total,
+  // nextOffset} shape as the directory list, bounded inside the box. The
+  // default (no format) request must reach listPublicCamerasInBboxPage with
+  // the bbox + parsed filters and the default page size.
+  stub("listPublicCamerasInBboxPage", async () => ({ records: [cameraFixture], total: 1, nextOffset: null }));
+  const { GET } = await camerasRoute();
+  const response = await GET(apiRequest("/api/cameras?bbox=12.4,41.8,12.6,42.0"));
+
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("cache-control"), "public, s-maxage=300, stale-while-revalidate=600", "the viewport page is cached like the directory list");
+  assert.equal(response.headers.get("cache-tag"), "cameras-list", "the viewport page shares the list cache-tag for moderation purge");
+  const body = await responseBody(response);
+  assert.deepEqual(body.records, [cameraFixture]);
+  assert.equal(body.total, 1, "total is the count INSIDE the bbox (the set the caller can page through)");
+  assert.equal(body.nextOffset, null);
+  assert.equal(body.facets, undefined, "the viewport page must not compute full-set facets (no consumer, no aggregate cost)");
+  const args = callArgs("listPublicCamerasInBboxPage")[0];
+  assert.deepEqual(args[0], { west: 12.4, south: 41.8, east: 12.6, north: 42.0 });
+  assert.deepEqual(args[1], {}, "no kind/freshness filters are forwarded when none are present");
+  assert.deepEqual(args[2], { limit: 1000, offset: 0 }, "the default bbox page size is PUBLIC_CAMERAS_BBOX_DEFAULT_LIMIT");
+});
+
+test("GET /api/cameras?bbox= forwards kind/freshness filters and explicit limit/offset to the bbox page", async () => {
+  stub("listPublicCamerasInBboxPage", async () => ({ records: [], total: 0, nextOffset: null }));
+  const { GET } = await camerasRoute();
+  const response = await GET(apiRequest("/api/cameras?bbox=12.4,41.8,12.6,42.0&kind=Dome&freshness=30d&limit=200&offset=40"));
+
+  assert.equal(response.status, 200);
+  const args = callArgs("listPublicCamerasInBboxPage")[0];
+  assert.deepEqual(args[0], { west: 12.4, south: 41.8, east: 12.6, north: 42.0 });
+  assert.deepEqual(args[1], { kind: "Dome", freshness: "30d" }, "F0 server-side filters apply to the viewport page too");
+  assert.deepEqual(args[2], { limit: 200, offset: 40 });
+});
+
+test("GET /api/cameras?bbox=&limit= clamps the viewport page size to the bbox max and rejects bad offsets", async () => {
+  stub("listPublicCamerasInBboxPage", async () => ({ records: [], total: 0, nextOffset: null }));
+  const { GET } = await camerasRoute();
+
+  const overMax = await GET(apiRequest("/api/cameras?bbox=12.4,41.8,12.6,42.0&limit=999999"));
+  assert.equal(overMax.status, 200);
+  assert.deepEqual(callArgs("listPublicCamerasInBboxPage")[0][2], { limit: 10_000, offset: 0 }, "limit clamps to PUBLIC_CAMERAS_BBOX_MAX_LIMIT (never unbounded)");
+
+  const badLimit = await GET(apiRequest("/api/cameras?bbox=12.4,41.8,12.6,42.0&limit=abc"));
+  assert.equal(badLimit.status, 400);
+
+  const badOffset = await GET(apiRequest("/api/cameras?bbox=12.4,41.8,12.6,42.0&offset=-1"));
+  assert.equal(badOffset.status, 400);
+});
+
 test("GET /api/cameras bbox validation rejects malformed and inverted rectangles", async (t) => {
   const { GET } = await camerasRoute();
   const cases = [
@@ -1158,18 +1208,25 @@ test("GET /api/cameras bbox validation rejects malformed and inverted rectangles
     "0x10,41.8,12.6,42.0",
   ];
   for (const bbox of cases) {
-    await t.test(bbox, async () => {
+    await t.test(`geojson ${bbox}`, async () => {
       const response = await GET(apiRequest(`/api/cameras?format=geojson&bbox=${encodeURIComponent(bbox)}`));
       assert.equal(response.status, 400, bbox);
       assert.equal(callArgs("listPublicCamerasInBbox").length, 0, "no query must run for an invalid bbox");
     });
+    await t.test(`json ${bbox}`, async () => {
+      const response = await GET(apiRequest(`/api/cameras?bbox=${encodeURIComponent(bbox)}`));
+      assert.equal(response.status, 400, bbox);
+      assert.equal(callArgs("listPublicCamerasInBboxPage").length, 0, "no query must run for an invalid bbox");
+    });
   }
 });
 
-test("GET /api/cameras bbox requires format=geojson", async () => {
+test("GET /api/cameras?bbox= rejects CSV and unknown formats (snapshots stay complete)", async () => {
   const { GET } = await camerasRoute();
-  const response = await GET(apiRequest("/api/cameras?bbox=12.4,41.8,12.6,42.0"));
-  assert.equal(response.status, 400);
-  const body = await responseBody(response);
+  const csv = await GET(apiRequest("/api/cameras?bbox=12.4,41.8,12.6,42.0&format=csv"));
+  assert.equal(csv.status, 400);
+  const body = await responseBody(csv);
   assert.match(body.error, /format=geojson/);
+  const xml = await GET(apiRequest("/api/cameras?bbox=12.4,41.8,12.6,42.0&format=xml"));
+  assert.equal(xml.status, 400);
 });
