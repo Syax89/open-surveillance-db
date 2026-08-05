@@ -2,7 +2,7 @@
 
 - **Status:** all documents are **drafts** for pre-launch review; nothing here is a published commitment.
 - **Owner:** Rosa (Legal & Privacy Officer / privacy contact)
-- **Decisions applied (2026-07-31, CEO — recorded in ADR 0008, docs task t_0b3d47e2):** controller entity **Simone Rondina (syax89) / OpenSurveillanceDB (Italy)**; data licence **ODbL 1.0** (software stays as in the repository: AGPL-3.0-or-later in LICENSE + package.json — note: the CEO decision cited "MIT already present", which does not match the repository; confirmation requested, see task t_e4bfcfbc); publication precision **~4 decimal places (~10 m)** with exact detail private to moderators; retention **12 months with renewal**; correction/removal contact **`privacy@opensurveillancedb.org`** (dedicated, monitored mailbox) + private form.
+- **Decisions applied (2026-07-31, CEO — recorded in ADR 0008, docs task t_0b3d47e2):** controller entity **Simone Rondina (syax89) / OpenSurveillanceDB (Italy)**; data licence **ODbL 1.0** (software stays as in the repository: AGPL-3.0-or-later in LICENSE + package.json — note: the CEO decision cited "MIT already present", which does not match the repository; confirmation requested, see task t_e4bfcfbc); publication precision **~4 decimal places (~10 m)** with exact detail private to moderators; correction/removal contact **`privacy@opensurveillancedb.org`** (dedicated, monitored mailbox) + private form. **Community-driven model (2026-08-04/05, ADR 0021):** the 12-month renewal review cycle is **retired** — records publish immediately and stay public while the community keeps confirming them (no time-based record retention); residual human moderation = photo redaction gate + legal-emergency admin actions.
 - **Location:** canonical folder for pre-launch legal deliverables: `docs/legal/` (per ADR 0002).
 - **Produced from:** review findings P1-P6, M1-M5 in [`REVIEW_POLICY_LEGALE_2026-07-31.md`](REVIEW_POLICY_LEGALE_2026-07-31.md) (committed to the repository with this index; task t_05d84417).
 
@@ -10,7 +10,7 @@
 
 | Document | Covers (findings) | Status | Owner |
 |----------|-------------------|--------|-------|
-| [RETENTION_SCHEDULE.md](RETENTION_SCHEDULE.md) | P1, M3 — retention values (90/30 days, **12-month renewal review cycle** — decided 2026-07-31, 2-year audit, evidence, backups, operational logs), legal hold, deletion definition | Draft | Rosa |
+| [RETENTION_SCHEDULE.md](RETENTION_SCHEDULE.md) | P1, M3 — retention values (community model: no time-based record retention for `active`/`hidden`/`removed`; 90/30-day photo states; 2-year audit; evidence, backups, operational logs; R14 community actions), legal hold, deletion definition | Draft | Rosa |
 | [PRIVACY_NOTICE.md](PRIVACY_NOTICE.md) | P6, M4 — purposes, bases, rights (arts. 12-22), negative scope, contact, 1-month response, identity verification | Draft | Rosa |
 | [LAWFUL_BASIS.md](LAWFUL_BASIS.md) | P3 — art. 6(1)(f) + LIA balancing test, 6(1)(e) for official sources, IT jurisdiction (D.Lgs. 196/2003) | Draft | Rosa |
 | [PROCESSOR_REGISTER.md](PROCESSOR_REGISTER.md) | P5, M4 — Cloudflare (DPA v6.3 + SCC + EU residency + EU–US DPF; **Workers + D1 + R2 photo storage**), OpenAI auth (not a processor; never log emails), others | Draft | Rosa |
