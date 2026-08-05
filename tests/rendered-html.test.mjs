@@ -171,13 +171,13 @@ test("server-rendered /mappa provides the map region and /directory the text-lis
   assert.doesNotMatch(directory.html, /Browse public records without the map/);
   assert.match(directory.html, /id="record-search"/);
   assert.match(directory.html, /id="record-search-count"[^>]*role="status"/);
-  assert.match(directory.html, /Show on map/);
-  assert.match(directory.html, /record-list/);
-  // The directory is the map's text equivalent: every SSR'd record card
-  // exposes the public record ID (Browse acceptance, PRODUCT_UX.md).
-  const recordIdFields = (directory.html.match(/<dt>Record ID<\/dt>/g) ?? []).length;
-  assert.ok(recordIdFields >= 2, `expected the record ID in each list card, found ${recordIdFields}`);
-  assert.match(directory.html, /<dt>Record ID<\/dt><dd>1<\/dd>/);
+  // Records are client-fetched only (no synthetic seed, no D1 binding in
+  // this Miniflare render): the SSR shell is always the honest "no record
+  // loaded yet" state here, never a fake record. The per-record "Show on
+  // map" button / record-ID markup contract is exercised with real
+  // (mocked) records post-hydration in tests/client-tools.test.mjs
+  // ("DirectoryTool" suite).
+  assert.match(directory.html, /class="empty-state"/, "the SSR shell shows the truthful empty state before hydration");
 });
 
 test("global footer exposes every institutional page, the ODbL data licence and OSM attribution", async () => {

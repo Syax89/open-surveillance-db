@@ -113,7 +113,9 @@ test("journey browse→filtri: search narrows the directory and the live count f
   assert.ok(searchInput, "the directory search input must render");
   const cards = () => container.querySelectorAll("ul.record-list li").length;
 
-  assert.equal(cards(), 2, "the directory must show both fictional records");
+  // Records are client-fetched only (no synthetic seed): wait for the
+  // mocked fetch to resolve before asserting the list is populated.
+  await rtl.waitFor(() => assert.equal(cards(), 2, "the directory must show both fictional records"), DEBOUNCE_WAIT);
 
   // Search narrows to the matching record. F4 (useCameraFilters) debounces
   // the ?q= URL commit (~400ms, R2 URL churn — pure history.replaceState, t_3c4b188e): the input feels instant but

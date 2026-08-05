@@ -335,16 +335,15 @@ test("the public tool surfaces filter through publicRecords and label via the sa
   // (tools)): /mappa (MappaTool → MapPanel), /directory (DirectoryTool →
   // PublicDirectory) and /correggi (CorreggiTool → CorrectionForm). The
   // client whitelist + safe-label guards apply to those components.
-  const mappaTool = await readSource("app/components/tools/MappaTool.tsx");
-  const directoryTool = await readSource("app/components/tools/DirectoryTool.tsx");
-  const correggiTool = await readSource("app/components/tools/CorreggiTool.tsx");
+  // The tool surfaces (MappaTool/DirectoryTool/CorreggiTool) no longer carry
+  // a local synthetic seed (removed: the fallback masked how long the real
+  // API took to answer, and there is no server data to filter client-side
+  // until the shared hook's fetch resolves). The whitelist guard now lives
+  // ONLY in the shared data layer, checked below.
   const mapPanel = await readSource("app/components/home/MapPanel.tsx");
   const directory = await readSource("app/components/home/PublicDirectory.tsx");
   const toolUi = mapPanel + directory;
   const hook = await readSource("app/lib/use-public-cameras.ts");
-  for (const tool of [mappaTool, directoryTool, correggiTool]) {
-    assert.match(tool, /publicRecords\(/, "every tool surface must filter its demo seed through the client whitelist");
-  }
   assert.match(hook, /publicRecords\(data\.records\)/, "API data must be filtered before entering state (shared hook)");
   assert.doesNotMatch(
     toolUi,
