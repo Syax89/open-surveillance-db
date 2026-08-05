@@ -23,6 +23,12 @@ export const IMPORTABLE_LICENSES = new Set([
   // Creative Commons Attribution — attribution only.
   "CC BY 4.0",
   "CC-BY 4.0",
+  // CC BY 3.0 Italia (Comune di Milano — open data CKAN dichiara 'cc-by'
+  // senza versione; la 3.0 IT è quella storica del portale, da confermare
+  // con l'ente prima del primo import in produzione). Permissiva, solo
+  // attribuzione — stessa classe di compatibilità di CC BY 4.0 (matrice
+  // licenze-compatibilita.md § 3.2).
+  "CC BY 3.0 IT",
   // Public-domain dedication — no obligations.
   "CC0",
   "CC0 1.0",

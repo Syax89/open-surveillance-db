@@ -1,0 +1,26 @@
+{
+  "slug": "zurigo-videokameras-2026",
+  "source_name": "Stadt Zürich — Open Data Zürich",
+  "format": "csv",
+  "license": "CC0 1.0",
+  "license_url": "http://www.opendefinition.org/licenses/cc-zero",
+  "attribution_text": "Fonte: Stadt Zürich, dataset \"Aktuelle Auflistung von Videokameras der Stadtverwaltung Zürich\" (https://data.stadt-zuerich.ch/dataset/prd_stez_liste_videokameras_stadtverwaltung), concesso con CC0 1.0 (http://www.opendefinition.org/licenses/cc-zero).",
+  "source_url": "https://data.stadt-zuerich.ch/dataset/prd_stez_liste_videokameras_stadtverwaltung",
+  "encoding": "utf-8",
+  "delimiter": ",",
+  "decimal_comma": false,
+  "crs": "EPSG:4326",
+  "columns": {
+    "standort_beschreibung": "title",
+    "adresse_beschreibung": "address",
+    "lat": "latitude",
+    "lon": "longitude",
+    "bereich_detail_beschreibung": "description"
+  },
+  "kind_map": {},
+  "skip_if": {},
+  "external_id_prefix": "",
+  "enrich": false,
+  "max_records": 10000,
+  "notes": "Per-sito (un record per standort, non per singola telecamera): il dataset elenca siti con conteggi anzahl_kameras_*. Nessuna colonna id sorgente -> external_id deterministico (sha1 titolo+coordinate, pipeline § 7.4). Campi verantwortliche_da / aufbewahrungsdauer / rechtsgrundlage_url NON importati (potenziale PII / non mappabili, § 7.6)."
+}
