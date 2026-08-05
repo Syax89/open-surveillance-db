@@ -230,6 +230,22 @@ button { cursor:pointer; }
    (:has(.menu-button)) so the auth/record shells keep their own layout
    untouched. */
 .nav-shell:has(.menu-button) .nav-links { flex:1; min-width:0; flex-wrap:wrap; row-gap:10px }
+@media (max-width:480px) {
+  /* t_94b3726d: compact top bar for 320px viewports — brand + menu button
+     + LocaleToggle must stay on ONE line (the CEO live feedback found it
+     wrapping at 320/390px when the auth links were in the bar). Smaller
+     brand + tighter gaps + 12px side margins put ~294px of content into a
+     296px shell at 320px; flex-wrap stays only as a safety net (graceful
+     degradation, never clipping). Scoped to the hamburger header so the
+     auth/record shells keep their margins. */
+  .nav-shell:has(.menu-button) { width:min(100% - 24px,1180px); gap:6px }
+  .nav-shell:has(.menu-button) .brand { font-size:13px; gap:7px }
+  .nav-shell:has(.menu-button) .brand-mark { width:24px; height:24px; font-size:var(--text-3xl) }
+  .nav-shell { flex-wrap:wrap; row-gap:var(--space-3) }
+  .nav-record-actions, .nav-actions { flex:1;justify-content:space-between }
+  .coordinate-fields, .report-metadata-fields { grid-template-columns:1fr }
+  .coordinate-button { width:100%;justify-content:center }
+}
 .nav-links .auth-nav-links { margin-left:auto }
 /* Auth entry point (t_65b778c5, mobile fix t_94b3726d): login/register
    (anonymous) or the account link (signed in). Rendered as the LAST item
@@ -766,22 +782,6 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
   .directory-controls { grid-template-columns:minmax(0,1fr) !important }
   .map-card .filters-panel { grid-template-columns:minmax(0,1fr) }
   .record-search { grid-column:auto }
-}
-@media (max-width:480px) {
-  /* t_94b3726d: compact top bar for 320px viewports — brand + menu button
-     + LocaleToggle must stay on ONE line (the CEO live feedback found it
-     wrapping at 320/390px when the auth links were in the bar). Smaller
-     brand + tighter gaps + 12px side margins put ~294px of content into a
-     296px shell at 320px; flex-wrap stays only as a safety net (graceful
-     degradation, never clipping). Scoped to the hamburger header so the
-     auth/record shells keep their margins. */
-  .nav-shell:has(.menu-button) { width:min(100% - 24px,1180px); gap:6px }
-  .nav-shell:has(.menu-button) .brand { font-size:13px; gap:7px }
-  .nav-shell:has(.menu-button) .brand-mark { width:24px; height:24px; font-size:var(--text-3xl) }
-  .nav-shell { flex-wrap:wrap; row-gap:var(--space-3) }
-  .nav-record-actions, .nav-actions { flex:1;justify-content:space-between }
-  .coordinate-fields, .report-metadata-fields { grid-template-columns:1fr }
-  .coordinate-button { width:100%;justify-content:center }
 }
 /* Contributor auth (STATUS gap #1, ADR 0013): login / register / account. */
 .auth-card { max-width:560px; }
