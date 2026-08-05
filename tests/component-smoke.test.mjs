@@ -119,10 +119,19 @@ const MODERATION_COMPONENTS = [
  * passa come options (4° arg); +6 righe per lo stato pointsCollapsed
  * (matchMedia al mount) del pannello punti mobile map-first. Baseline
  * aggiornata a 165.
+ *
+ * Deviazione hydration (t_66766914, P0): MapPanel cresce a 188 righe — lo
+ * stato pointsCollapsed è ora DETERMINISTICO (expanded) sia SSR sia primo
+ * render client, e la preferenza mobile (matchMedia ≤768px) viene applicata
+ * SOLO dopo hydration in un effect (+ guardia ref per non sovrascrivere una
+ * scelta utente, + listener change per il resize). Il lazy initializer che
+ * leggeva window.matchMedia causava il mismatch di hydration riportato dal
+ * CEO (server is-open aria-expanded=true vs client collapsed). Baseline
+ * aggiornata a 188.
  */
 const KNOWN_DEVIATIONS = new Map([
   ["app/components/moderation/useModerationQueue.tsx", { baselineLines: 170, reason: "H1 t_69891619: campi associazione correzione→esito record (outcome + record id, validazione, cleanup) + commento contratto server/client aggiornato (fix PR #187); +2 t_6424f961: lookup data registry-driven LOCALE_BCP47 (no ternario it-IT/en-US)" }],
-  ["app/components/home/MapPanel.tsx", { baselineLines: 165, reason: "t_b7728ad0: redesign popup (report-issue link rimosso, provenance via options) + stato pointsCollapsed del pannello punti mobile map-first (matchMedia al mount) — blocco isolato" }],
+  ["app/components/home/MapPanel.tsx", { baselineLines: 188, reason: "t_b7728ad0: redesign popup (report-issue link rimosso, provenance via options) + stato pointsCollapsed pannello punti mobile map-first; t_66766914: stato DETERMINISTICO expanded SSR/client + preferenza mobile applicata solo post-hydration in effect (fix mismatch hydration CEO) — blocchi isolati" }],
 ]);
 
 /** Componente condiviso atteso dal refactor di Linus. */
