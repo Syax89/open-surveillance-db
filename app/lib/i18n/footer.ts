@@ -27,6 +27,10 @@ export const en = {
   privacy: "Privacy",
   terms: "Terms of use",
   licenses: "Licenses",
+  // Imported public datasets (import pipeline FASE C, t_4dbce318): the
+  // footer links the dedicated /fonti page (per-source attribution), NOT
+  // the main navigation — institutional pages group, next to Licenses.
+  sources: "Data sources",
   faq: "FAQ",
   contact: "Contact",
   accessibility: "Accessibility statement",
@@ -54,6 +58,11 @@ export const it: Translation<typeof en> = {
   privacy: "Privacy",
   terms: "Termini d'uso",
   licenses: "Licenze",
+  // Dataset pubblici importati (import pipeline FASE C, t_4dbce318): il
+  // footer collega la pagina dedicata /fonti (attribuzione per fonte), NON
+  // nella navigazione principale — gruppo pagine istituzionali, accanto a
+  // Licenze.
+  sources: "Fonti dei dati",
   faq: "FAQ",
   contact: "Contatti",
   accessibility: "Dichiarazione di accessibilità",

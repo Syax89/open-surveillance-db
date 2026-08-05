@@ -130,7 +130,9 @@ async function buildDbModules() {
   const modules = {};
   // db/cameras.ts imports ./confirmations at runtime (the public payload
   // carries confirmationCount), so the real db layer must resolve it.
-  for (const file of ["cameras.ts", "corrections.ts", "freshness.ts", "moderation.ts", "photos.ts", "confirmations.ts", "community-actions.ts", "community-settings.ts"]) {
+  // db/import-sources.ts (FASE C, t_4dbce318) is imported by db/cameras.ts
+  // for the record-detail provenance — same tree requirement.
+  for (const file of ["cameras.ts", "corrections.ts", "freshness.ts", "moderation.ts", "photos.ts", "confirmations.ts", "community-actions.ts", "community-settings.ts", "import-sources.ts"]) {
     const compiled = ts.transpileModule(await readFile(path.join(dbDir, file), "utf8"), {
       compilerOptions: {
         module: ts.ModuleKind.ESNext,

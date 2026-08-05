@@ -14,6 +14,10 @@ export const en = {
   publicRecord: "Public record",
   recordId: "Record ID",
   source: "Source",
+  // Creation date (FASE C, t_4dbce318): `cameras.created_at` — when the
+  // record entered the database (import or community report). The detail
+  // page shows it alongside provenance and the last confirmation.
+  addedOn: "Added",
   lastVerification: "Last confirmation",
   // F4 (QA#6): the demo seed rows carry raw, language-neutral markers
   // ("Prototype seed"/"Demo data" — test contract, see DATA_DICTIONARY);
@@ -97,6 +101,11 @@ export const en = {
   confirmedTimes: (count: number) =>
     `Confirmed ${count} ${count === 1 ? "time" : "times"}`,
   lastConfirmed: "Last confirmed",
+  // Import provenance (import pipeline FASE C, t_4dbce318): imported
+  // records carry a provenance line next to the community badge — the
+  // source dataset (linked) and its licence (linked), never the raw
+  // "import:<slug>" internal value.
+  importedFrom: "Imported from",
 
   // --- Hidden/removed banner (ADR 0021 §6.3, FASE 3 UI): a withdrawn
   // record stays reachable by direct link with an explicit banner; the
@@ -146,6 +155,10 @@ export const it: Translation<typeof en> = {
   publicRecord: "Record pubblico",
   recordId: "ID record",
   source: "Fonte",
+  // Data di creazione (FASE C, t_4dbce318): `cameras.created_at` — quando
+  // il record è entrato nel database (import o segnalazione). La pagina di
+  // dettaglio la mostra accanto alla provenienza e all'ultima conferma.
+  addedOn: "Aggiunta",
   lastVerification: "Ultima conferma",
   // F4 (QA#6): i record del seed demo hanno marcatori grezzi neutri
   // ("Prototype seed"/"Demo data" — contratto di test, vedi DATA_DICTIONARY);
@@ -232,6 +245,11 @@ export const it: Translation<typeof en> = {
   confirmedTimes: (count: number) =>
     `Confermata ${count} ${count === 1 ? "volta" : "volte"}`,
   lastConfirmed: "Ultima conferma",
+  // Provenienza import (import pipeline FASE C, t_4dbce318): i record
+  // importati portano una riga di provenienza accanto al badge della
+  // community — il dataset della fonte (linkato) e la sua licenza
+  // (linkata), mai il valore interno grezzo "import:<slug>".
+  importedFrom: "Importato da",
 
   // --- Banner nascosto/rimosso (ADR 0021 §6.3, FASE 3 UI): un record
   // ritirato resta raggiungibile tramite link diretto con un banner

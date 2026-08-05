@@ -58,7 +58,7 @@ test("public legal pages are served with their English content", async () => {
   const cases = [
     { path: "/privacy", markers: ["Privacy notice", "Controller", "Art. 6(1)(f) GDPR", "privacy@opensurveillancedb.org", "Cookies", "opensurveillancedb-locale", "art. 122 D.Lgs. 196/2003"] },
     { path: "/termini", markers: ["Terms of use", "Controller / operator", "ODbL 1.0", "privacy@opensurveillancedb.org"] },
-    { path: "/licenze", markers: ["Licences", "AGPL-3.0-or-later", "ODbL 1.0", "CC BY-SA 4.0"] },
+    { path: "/licenze", markers: ["Licences", "AGPL-3.0-or-later", "ODbL 1.0", "CC BY-SA 4.0", "Imported public datasets", "href=\"/fonti\""] },
     { path: "/accessibility", markers: ["Accessibility statement", "WCAG 2.2 AA", "Partially compliant", "privacy@opensurveillancedb.org"] },
   ];
 

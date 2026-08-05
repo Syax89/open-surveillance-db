@@ -151,6 +151,7 @@ test("map: marker popup renders the direction as text (NE 45°) when present", a
   const labels = {
     recordId: "Record ID", location: "Location", popupDetail: "Open record",
     reportIssue: "Report an issue", unknown: "Unknown", fovDirection: "Field of view",
+    popupAdded: "Added", popupCommunityReport: "Community report", source: "Source",
   };
   const statuses = { verified: "Verified", demo: "Demo" };
   const view = await renderWithLocale(React.createElement(SurveillanceMap, {
@@ -170,6 +171,61 @@ test("map: marker popup renders the direction as text (NE 45°) when present", a
   assert.match(byTitle["Bullet camera"], /NE 45°/, "the popup carries the compass+degrees text");
   assert.ok(!byTitle["Dome camera"].includes("Field of view"), "domes (direction NULL) omit the row");
   assert.ok(!byTitle["Unknown camera"].includes("Field of view"), "unknown direction omits the row");
+});
+
+test("map: marker popup provenance line shows readable source, licence and added date (FASE C)", async () => {
+  // The popup builder is pure — exercise it directly (the MapPanel wires
+  // it with the sources map + locale). Imported records show the entity +
+  // licence link + added date; community reports show the localized
+  // "Community report" label without a licence; the raw slug never leaks.
+  const popupHtmlFor = (await loadDomModule("app/lib/map-popup.mjs")).popupHtmlFor;
+  const labels = {
+    recordId: "Record ID", location: "Location", popupDetail: "Open record",
+    reportIssue: "Report an issue", unknown: "Unknown", fovDirection: "Field of view",
+    popupAdded: "Added", popupCommunityReport: "Community report", source: "Source",
+  };
+  const statuses = { verified: "Verified", demo: "Demo" };
+  const imported = {
+    id: 10, title: "Imported camera", kind: "Bullet", status: "active",
+    latitude: 41.9, longitude: 12.49, source: "import:fixture-zurigo-2026",
+    createdAt: "2026-08-05T08:51:38.000Z",
+  };
+  const report = {
+    id: 11, title: "Reported camera", kind: "Dome", status: "active",
+    latitude: 41.9, longitude: 12.49, source: "Community report",
+    createdAt: "2026-07-01T00:00:00.000Z",
+  };
+  const importOptions = {
+    provenance: { sourceName: "Fixture City — Open Data", license: "CC0 1.0", licenseUrl: "https://example.invalid/licenses/cc0" },
+    locale: "en",
+  };
+
+  const importedHtml = popupHtmlFor(imported, statuses, labels, "/correggi", importOptions);
+  assert.match(importedHtml, /osm-popup-provenance/, "the provenance line renders at the bottom");
+  assert.match(importedHtml, /Source: Fixture City — Open Data/);
+  assert.match(importedHtml, /<a href="https:\/\/example\.invalid\/licenses\/cc0"[^>]*>CC0 1\.0<\/a>/, "licence links out");
+  assert.match(importedHtml, /Added: 5 August 2026/, "added date renders localized");
+  assert.ok(!importedHtml.includes("import:fixture-zurigo-2026"), "the raw import slug never renders");
+  // Data contract for the popup redesign (t_b7728ad0): machine-readable
+  // attributes on the provenance block, independent of the localized text.
+  assert.match(importedHtml, /data-source="Fixture City — Open Data"/);
+  assert.match(importedHtml, /data-license="CC0 1\.0"/);
+  assert.match(importedHtml, /data-license-url="https:\/\/example\.invalid\/licenses\/cc0"/);
+  assert.match(importedHtml, /data-import-date="2026-08-05T08:51:38\.000Z"/);
+
+  // Community report: localized label, no licence, date still shown.
+  const reportHtml = popupHtmlFor(report, statuses, labels, "/correggi", { provenance: null, locale: "en" });
+  assert.match(reportHtml, /Source: Community report/);
+  assert.ok(!reportHtml.includes("licenses/cc0"), "community reports carry no licence");
+  assert.match(reportHtml, /Added: 1 July 2026/);
+  assert.match(reportHtml, /data-source="Community report"/);
+  assert.ok(!reportHtml.includes("data-license="), "no licence attribute for community reports");
+
+  // IT parity: the real bundle labels + it-IT date.
+  const mapMod = await loadDomModule("app/lib/i18n/map.mjs");
+  const itHtml = popupHtmlFor(imported, statuses, mapMod.it, "/correggi", { ...importOptions, locale: "it" });
+  assert.match(itHtml, /Fonte: Fixture City — Open Data/);
+  assert.match(itHtml, /Aggiunta: 5 agosto 2026/);
 });
 
 // ---------------------------------------------------------------------------

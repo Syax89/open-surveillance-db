@@ -6,8 +6,10 @@ import type { MapCamera } from "../SurveillanceMap";
 import type { ViewportBounds } from "../../lib/map-viewport";
 import type { Camera } from "../../lib/records";
 import { useMessages } from "../../lib/use-messages";
+import { useLocale } from "../LocaleProvider";
 import { publicStatusLabel } from "../../lib/public-status";
 import { popupHtmlFor } from "../../lib/map-popup";
+import { fetchImportSources, importSourceOf, type ImportSourceInfo } from "../../lib/import-sources";
 import { GeocodeSearch } from "./GeocodeSearch";
 import type { GeocodeSuggestion } from "./GeocodeSearch";
 import { MapRecordList } from "./MapRecordList";
@@ -79,6 +81,7 @@ type Props = {
 export function MapPanel({ filteredRecords, visibleRecords, selectedId, onSelect, onPick, coordinates, loading, notice, issueHref = "/correggi", directoryHref = "/directory", search, setSearch, onBoundsChange, viewportBounds, onReset }: Props) {
   const t = useMessages().map;
   const statuses = useMessages().status;
+  const { locale } = useLocale();
 
   // Pan target chosen from the dropdown: overrides the ?focus= coordinates
   // while set (both feed SurveillanceMap's focusLocation effect, which does
@@ -89,12 +92,19 @@ export function MapPanel({ filteredRecords, visibleRecords, selectedId, onSelect
   const placeFocusRef = useRef<{ latitude: number; longitude: number } | null>(null);
   const viewportAtSelectionRef = useRef<ViewportBounds | null>(null);
 
-  // Popup content (t_702c10af): title, kind, status label, id, coordinates,
-  // address/description and the correction + detail links — built by the
-  // shared lib/map-popup helper (escaped + safe status labels, t_b9666d09).
+  // Popup content (t_702c10af): built by the shared lib/map-popup (escaped
+  // + safe labels). Import provenance (FASE C, t_4dbce318): committed
+  // batches fetched ONCE — the bottom line shows the readable source +
+  // licence and the added date, never the raw 'import:<slug>'.
+  const [sources, setSources] = useState<Map<string, ImportSourceInfo>>(new Map());
+  useEffect(() => {
+    let cancelled = false;
+    fetchImportSources().then((map) => { if (!cancelled) setSources(map); }).catch(() => undefined);
+    return () => { cancelled = true; };
+  }, []);
   const popupHtmlForCamera = useCallback(
-    (camera: MapCamera) => popupHtmlFor(camera, statuses, t, issueHref),
-    [statuses, t, issueHref],
+    (camera: MapCamera) => popupHtmlFor(camera, statuses, t, issueHref, { provenance: importSourceOf(camera, sources), locale }),
+    [statuses, t, issueHref, sources, locale],
   );
 
   // Geocode selection (GeocodeSearch → onPlaceSelect): remember the viewport

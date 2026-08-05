@@ -517,7 +517,7 @@ export const enLegal: LegalContent = {
     intro:
       "How the OpenSurveillanceDB software, documentation and data are licensed, and what that means for reuse.",
     versionNote:
-      "Updated 31 July 2026 (data licence decision — ADR 0008). The repository copy (docs/OPEN_SOURCE.md) remains canonical.",
+      "Updated 31 July 2026 (data licence decision — ADR 0008) and 5 August 2026 (imported public datasets). The repository copy (docs/OPEN_SOURCE.md) remains canonical.",
     sections: [
       {
         heading: "1. Software",
@@ -565,6 +565,19 @@ export const enLegal: LegalContent = {
           {
             type: "paragraph",
             text: "Contributors must submit only material they are entitled to share. They grant the project the rights needed to publish accepted code, documentation and data under the relevant project licence. Photo evidence uploads are **active** (2026-08): images are stripped of EXIF/XMP/IPTC metadata at the boundary (fail-closed), stored privately (bytes in R2, metadata in D1), and never published until a moderator approves them with confirmed redaction (see TERMS section 5).",
+          },
+        ],
+      },
+      {
+        heading: "6. Imported public datasets",
+        blocks: [
+          {
+            type: "paragraph",
+            text: "The project may integrate public datasets released by public administrations and open-data projects (for example city camera inventories or OpenStreetMap surveillance features). Every integrated source keeps its own licence and attribution: the database licence above applies to the project's own compilation, it never replaces the licence of an individual source. The [Data sources](/fonti) page lists each imported dataset with its source, licence, import date, record count and the required attribution text.",
+          },
+          {
+            type: "note",
+            text: "Records imported from a source are marked with their provenance on the record page. They are subject to the same community verification as any other record and are never exempt from review.",
           },
         ],
       },

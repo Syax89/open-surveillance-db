@@ -87,6 +87,10 @@ const DB_MODULES = [
   // from ./cameras and the shared public whitelist; db/cameras.ts imports
   // confirmationCountsFor from it, so the pair runs against the same binding.
   { source: "db/confirmations.ts", output: "db/confirmations.mjs" },
+  // db/import-sources.ts (import pipeline FASE C, t_4dbce318): the public
+  // read side of import_batches. db/cameras.ts imports getImportBatchById
+  // from it for the record-detail provenance, so it must be in the tree.
+  { source: "db/import-sources.ts", output: "db/import-sources.mjs" },
   // db/camera-edits.ts (community editing, ADR 0018 §4) imports getD1 from
   // ./cameras and recordModerationEvent from ./moderation — both already in
   // this tree — so the real two-track logic runs against the same binding.
@@ -164,7 +168,8 @@ export async function loadDbRuntime() {
   const oidc = await import(pathToFileURL(path.join(tree, "db/oidc.mjs")).href);
   const communitySettings = await import(pathToFileURL(path.join(tree, "db/community-settings.mjs")).href);
   const communityActions = await import(pathToFileURL(path.join(tree, "db/community-actions.mjs")).href);
-  return { env: envModule.env, cameras, corrections, moderation, auth, users, appeals, photos, retention, confirmations, cameraEdits, passkeys, mailer, emailTemplates, oidc, communitySettings, communityActions };
+  const importSources = await import(pathToFileURL(path.join(tree, "db/import-sources.mjs")).href);
+  return { env: envModule.env, cameras, corrections, moderation, auth, users, appeals, photos, retention, confirmations, cameraEdits, passkeys, mailer, emailTemplates, oidc, communitySettings, communityActions, importSources };
 }
 
 // Replays the real Drizzle migration files (drizzle/0000-*.sql ... 0017-*.sql)

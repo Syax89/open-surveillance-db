@@ -41,6 +41,11 @@ export function FiltersBar({
   stateFilter,
   setStateFilter,
   showCommunitySort = false,
+  // Import-origin filter (?origin=, FASE C, t_4dbce318): optional like
+  // the state filter — only the tool pages pass it (home keeps the
+  // classic control row).
+  originFilter,
+  setOriginFilter,
 }: {
   variant: "inline" | "panel" | "bare";
   cameraKinds: string[];
@@ -83,6 +88,13 @@ export function FiltersBar({
    */
   stateFilter?: "all" | "confirmed" | "never";
   setStateFilter?: (value: "all" | "confirmed" | "never") => void;
+  /**
+   * Import-origin filter (FASE C, t_4dbce318): optional so the home page
+   * stays byte-identical; the /directory and /mappa tools pass the ?origin=
+   * dimension through the shared hook.
+   */
+  originFilter?: "all" | "reports" | "imported";
+  setOriginFilter?: (value: "all" | "reports" | "imported") => void;
   /**
    * Community-ranking sort options (FASE 3 UI): opt-in so the home page
    * keeps its byte-identical output; the /directory and /mappa tools pass
@@ -140,6 +152,16 @@ export function FiltersBar({
               <option value="all">{t.stateAll}</option>
               <option value="confirmed">{t.stateConfirmed}</option>
               <option value="never">{t.stateNever}</option>
+            </select>
+          </div>
+        )}
+        {originFilter !== undefined && setOriginFilter !== undefined && (
+          <div className="record-filter">
+            <label htmlFor="record-origin-filter">{t.originFilter}</label>
+            <select id="record-origin-filter" value={originFilter} onChange={(event) => setOriginFilter(event.target.value as "all" | "reports" | "imported")}>
+              <option value="all">{t.originAll}</option>
+              <option value="reports">{t.originReports}</option>
+              <option value="imported">{t.originImported}</option>
             </select>
           </div>
         )}

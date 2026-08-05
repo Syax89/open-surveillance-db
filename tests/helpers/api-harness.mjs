@@ -78,6 +78,7 @@ const ROUTES = [
   { source: "app/api/appeals/[id]/route.ts", output: "app/api/appeals/[id]/route.mjs" },
   { source: "app/api/cameras/[id]/actions/route.ts", output: "app/api/cameras/[id]/actions/route.mjs" },
   { source: "app/api/cameras/[id]/events/route.ts", output: "app/api/cameras/[id]/events/route.mjs" },
+  { source: "app/api/import-sources/route.ts", output: "app/api/import-sources/route.mjs" },
 ];
 
 // Real db/* modules compiled into the temp tree so runtime tests can
@@ -111,6 +112,11 @@ const REAL_DB_MODULES = [
   // in this tree. The threshold evaluation runs real SQL against the same
   // in-memory D1 as every other db module.
   { source: "db/community-actions.ts", output: "db-real/community-actions.mjs" },
+  // db/import-sources.ts (import pipeline FASE C, t_4dbce318): the public
+  // read side of import_batches; db/cameras.ts imports getImportBatchById
+  // from it for the record-detail provenance, so the real db tree must
+  // resolve it (the /api/import-sources route also imports it directly).
+  { source: "db/import-sources.ts", output: "db-real/import-sources.mjs" },
 ];
 // db/moderation.ts imports ./freshness (pure, no CF binding) once the
 // freshness feature is present. CI checks out the PR head, not the merge
@@ -141,7 +147,7 @@ async function buildTree() {
   const mocksDir = path.join(root, "tests", "helpers", "mocks");
   const mockStateUrl = pathToFileURL(path.join(root, "tests", "helpers", "mock-state.mjs")).href;
   await mkdir(path.join(tree, "db"), { recursive: true });
-  for (const mockName of ["cameras", "camera-edits", "corrections", "geocode", "moderation", "auth", "users", "photos", "appeals", "confirmations", "passkeys", "oidc", "mailer", "community-actions"]) {
+  for (const mockName of ["cameras", "camera-edits", "corrections", "geocode", "moderation", "auth", "users", "photos", "appeals", "confirmations", "passkeys", "oidc", "mailer", "community-actions", "import-sources"]) {
     const source = await readFile(path.join(mocksDir, `${mockName}.mjs`), "utf8");
     await writeFile(
       path.join(tree, "db", `${mockName}.mjs`),

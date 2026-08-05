@@ -106,9 +106,16 @@ const MODERATION_COMPONENTS = [
  * Deviazione H1 +2 (t_6424f961): il lookup data è ora registry-driven
  * (LOCALE_BCP47 da SUPPORTED_LOCALES, niente ternario it-IT/en-US):
  * un import dal registro + un commento — baseline aggiornata a 170 righe.
+ *
+ * Deviazione FASE C (t_4dbce318): MapPanel cresce di ~9 righe per il wiring
+ * della provenienza import nel popup (fetch unico dei batch committed +
+ * risoluzione slug→fonte condivisa + locale per la data di aggiunta). Il
+ * blocco è semanticamente isolato (.osm-popup-provenance con data-* attrs)
+ * e verrà sostituito dal redesign popup (t_b7728ad0): baseline 159 righe.
  */
 const KNOWN_DEVIATIONS = new Map([
   ["app/components/moderation/useModerationQueue.tsx", { baselineLines: 170, reason: "H1 t_69891619: campi associazione correzione→esito record (outcome + record id, validazione, cleanup) + commento contratto server/client aggiornato (fix PR #187); +2 t_6424f961: lookup data registry-driven LOCALE_BCP47 (no ternario it-IT/en-US)" }],
+  ["app/components/home/MapPanel.tsx", { baselineLines: 159, reason: "FASE C t_4dbce318: provenienza import nel popup (fetch unico import_batches + mapping slug→fonte condiviso + locale data aggiunta) — blocco isolato, verra' sostituito dal redesign popup t_b7728ad0" }],
 ]);
 
 /** Componente condiviso atteso dal refactor di Linus. */

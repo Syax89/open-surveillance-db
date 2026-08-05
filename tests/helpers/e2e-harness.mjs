@@ -139,6 +139,11 @@ const REAL_DB_MODULES = [
   // db/community-actions.ts (ADR 0021 FASE 2, kanban t_a9f23581): action
   // surface write path + threshold evaluation. db/cameras.ts imports it.
   { source: "db/community-actions.ts", output: "db/community-actions.mjs" },
+  // db/import-sources.ts (import pipeline FASE C, t_4dbce318): the public
+  // read side of import_batches; db/cameras.ts imports getImportBatchById
+  // from it for the record-detail provenance, so the e2e tree must resolve
+  // it (the /api/import-sources route imports it directly too).
+  { source: "db/import-sources.ts", output: "db/import-sources.mjs" },
 ];
 
 let builtTreePromise = null;

@@ -87,6 +87,11 @@ export const en = {
   // Field-of-view direction row in the marker popup (t_f8b775ec): the
   // textual, accessible equivalent of the decorative map cone.
   fovDirection: "Field of view",
+  // Import provenance line in the marker popup (FASE C, t_4dbce318):
+  // small secondary text at the bottom — the readable source (entity or
+  // "Community report") with its licence, and the record's added date.
+  popupAdded: "Added",
+  popupCommunityReport: "Community report",
 } as const;
 
 export const it: Translation<typeof en> = {
@@ -171,4 +176,10 @@ export const it: Translation<typeof en> = {
   // Riga della direzione del campo visivo nel popup (t_f8b775ec): l'equivalente
   // testuale e accessibile del cono decorativo sulla mappa.
   fovDirection: "Campo visivo",
+  // Riga di provenienza import nel popup del segnaposto (FASE C,
+  // t_4dbce318): piccolo testo secondario in basso — la fonte leggibile
+  // (ente o "Segnalazione della community") con la sua licenza, e la data
+  // di aggiunta del record.
+  popupAdded: "Aggiunta",
+  popupCommunityReport: "Segnalazione della community",
 };

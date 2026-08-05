@@ -11,6 +11,8 @@
 import { escapeHtml } from "./map-viewport";
 import { publicStatusLabel } from "./public-status";
 import { formatDirection } from "./compass";
+import { formatPublicDate } from "./format-date";
+import type { Locale } from "./i18n";
 import type { MapCamera } from "../components/SurveillanceMap";
 
 /** Localized strings the popup renders (a subset of the map dictionary). */
@@ -22,15 +24,42 @@ export type PopupLabels = {
   unknown: string;
   /** Label for the field-of-view direction row (t_f8b775ec). */
   fovDirection: string;
+  /** Label for the provenance "Added" date (FASE C, t_4dbce318). */
+  popupAdded: string;
+  /** Label for the community-report source (FASE C). */
+  popupCommunityReport: string;
+  /** Label for the source row (map bundle `source`). */
+  source: string;
 };
 
 /** Status label helper compatible with publicStatusLabel's signature. */
 export type StatusLabels = Parameters<typeof publicStatusLabel>[0];
 
 /**
+ * Resolved import provenance for one record (FASE C, t_4dbce318): the
+ * readable entity + licence from the batch, never the raw slug. The map
+ * workspace resolves it via app/lib/import-sources (shared with the
+ * record page); null = community report / demo seed.
+ */
+export type PopupProvenance = {
+  sourceName: string;
+  license: string;
+  licenseUrl: string | null;
+};
+
+/** Optional provenance context for the popup bottom line. */
+export type PopupProvenanceOptions = {
+  provenance: PopupProvenance | null;
+  locale: Locale;
+};
+
+/**
  * Build the popup HTML for one camera marker: title, kind, status dot +
- * label, record id, coordinates, optional address/description, and the
- * correction + detail links. `issueHref` is the base route the "Report an
+ * label, record id, coordinates, optional address/description, the
+ * correction + detail links, and — when `options` is given — the small
+ * provenance line at the bottom (FASE C): readable source (imported →
+ * entity + licence link; community report → localized label) and the
+ * record's added date. `issueHref` is the base route the "Report an
  * issue" action links to (defaults to /correggi in MapPanel).
  */
 export function popupHtmlFor(
@@ -38,6 +67,7 @@ export function popupHtmlFor(
   statuses: StatusLabels,
   labels: PopupLabels,
   issueHref: string,
+  options?: PopupProvenanceOptions,
 ): string {
   const coords = `${camera.latitude.toFixed(4)}, ${camera.longitude.toFixed(4)}`;
   const address = camera.address ? `<p class="osm-popup-address">${escapeHtml(camera.address)}</p>` : "";
@@ -49,6 +79,30 @@ export function popupHtmlFor(
     typeof camera.direction === "number" && Number.isFinite(camera.direction)
       ? `<div><dt>${labels.fovDirection}</dt><dd>${formatDirection(camera.direction)}</dd></div>`
       : "";
+  // Import provenance line (FASE C, t_4dbce318): discreet secondary text
+  // at the very bottom — it must never steal space from the community
+  // action widget. Imported records show the readable entity + licence
+  // (linked); community reports show the localized label without a
+  // licence; the offline demo seed falls back to its raw source value.
+  // The block carries machine-readable data attributes (data-source /
+  // data-license / data-license-url / data-import-date) — the stable data
+  // contract the popup redesign (t_b7728ad0) consumes without refactor;
+  // the visible text stays localized, never hardcoded.
+  const provenanceBlock = options
+    ? (() => {
+        const isImported = options.provenance !== null;
+        const sourceText = isImported
+          ? `${labels.source}: ${escapeHtml(options.provenance!.sourceName)}${options.provenance!.licenseUrl ? ` · <a href="${escapeHtml(options.provenance!.licenseUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(options.provenance!.license)}</a>` : ` · ${escapeHtml(options.provenance!.license)}`}`
+          : `${labels.source}: ${escapeHtml(camera.source === "Community report" ? labels.popupCommunityReport : (camera.source ?? labels.popupCommunityReport))}`;
+        const added = camera.createdAt
+          ? `${labels.popupAdded}: ${escapeHtml(formatPublicDate(camera.createdAt, options.locale))}`
+          : "";
+        const dataAttrs = isImported
+          ? ` data-source="${escapeHtml(options.provenance!.sourceName)}" data-license="${escapeHtml(options.provenance!.license)}"${options.provenance!.licenseUrl ? ` data-license-url="${escapeHtml(options.provenance!.licenseUrl)}"` : ""}${camera.createdAt ? ` data-import-date="${escapeHtml(camera.createdAt)}"` : ""}`
+          : ` data-source="${escapeHtml(camera.source === "Community report" ? labels.popupCommunityReport : (camera.source ?? labels.popupCommunityReport))}"`;
+        return `<p class="osm-popup-provenance"${dataAttrs}>${sourceText}${added ? ` · ${added}` : ""}</p>`;
+      })()
+    : "";
   return [
     `<div class="osm-popup">`,
     `<h3>${escapeHtml(camera.title)}</h3>`,
@@ -70,6 +124,7 @@ export function popupHtmlFor(
     `<a href="/records/${camera.id}">${labels.popupDetail} <span aria-hidden="true">→</span></a>`,
     `<a href="${issueHref}?record=${camera.id}">${labels.reportIssue} <span aria-hidden="true">→</span></a>`,
     `</p>`,
+    provenanceBlock,
     `</div>`,
   ].join("");
 }

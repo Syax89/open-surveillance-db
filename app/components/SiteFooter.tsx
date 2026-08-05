@@ -71,6 +71,7 @@ export function SiteFooter() {
         <Link href="/privacy" aria-current={pageCurrent("/privacy")}>{t.privacy}</Link>
         <Link href="/termini" aria-current={pageCurrent("/termini")}>{t.terms}</Link>
         <Link href="/licenze" aria-current={pageCurrent("/licenze")}>{t.licenses}</Link>
+        <Link href="/fonti" aria-current={pageCurrent("/fonti")}>{t.sources}</Link>
         <Link href="/accessibility" aria-current={pageCurrent("/accessibility")}>{t.accessibility}</Link>
         <Link href="/faq" aria-current={pageCurrent("/faq")}>{t.faq}</Link>
         <Link href="/contatti" aria-current={pageCurrent("/contatti")}>{t.contact}</Link>
