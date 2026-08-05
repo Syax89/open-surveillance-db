@@ -24,7 +24,7 @@ export const itLegal: LegalContent = {
     intro:
       "Come OpenSurveillanceDB tratta i dati personali, cosa pubblichiamo, cosa non raccogliamo mai e come puoi esercitare i tuoi diritti ai sensi del GDPR.",
     versionNote:
-      "Versione 0.6 — 5 agosto 2026. Aggiornata per il modello community-driven (ADR 0021): le segnalazioni vengono pubblicate subito da account verificati; il § 7 sulla conservazione è allineato al ciclo di revisione ritirato; il § 10 (cookie) è invariato. La copia repository (docs/legal/PRIVACY_NOTICE.md) resta la versione canonica.",
+      "Versione 0.6 — 5 agosto 2026. Aggiornata per il modello community-driven (ADR 0021): le segnalazioni vengono pubblicate subito da account verificati; § 7 conservazione allineata al ciclo di revisione ritirato; § 10 (cookie) invariato. Risincronizzata con la PRIVACY_NOTICE canonica v0.11 mergiata (docs/legal/PRIVACY_NOTICE.md resta la versione canonica): tabella § 3 allineata alle disclosure canoniche (riga azioni della community aggiunta; finalità dell'audit di moderazione aggiornata a \"ricorsi storici chiusi con la migrazione\") e aggiunta la nota sulla cronologia pubblica degli eventi per record.",
     sections: [
       {
         heading: "1. Chi siamo (titolare del trattamento)",
@@ -97,6 +97,12 @@ export const itLegal: LegalContent = {
                 "Art. 6(1)(c) GDPR (artt. 15–22) e 6(1)(f)",
               ],
               [
+                "Azioni della community sui record (tipo di azione `like` / `confirm` / `gone` / `problem` / `privacy`, snapshot del peso, data e ora)",
+                "Contributore (account verificato)",
+                "Accuratezza del dataset — moderazione community-driven",
+                "Art. 6(1)(f) GDPR; un'azione per utente per record (`UNIQUE(camera_id, contributor_id)`), peso catturato al momento dell'azione, **solo aggregati nei payload pubblici** — mai attribuiti a un profilo (ADR 0021 §3/§13)",
+              ],
+              [
                 "Identità del moderatore (email, nome visualizzato, nome completo tramite accesso ChatGPT)",
                 "OpenAI (fornitore di identità)",
                 "Autenticare i moderatori; credenziali di moderazione separate",
@@ -105,7 +111,7 @@ export const itLegal: LegalContent = {
               [
                 "Voci di audit della moderazione (decisione, codice motivo, data e ora, pseudonimo del revisore)",
                 "Il progetto",
-                "Responsabilità, ricorsi",
+                "Responsabilità; ricorsi storici chiusi con la migrazione (ADR 0021 §7)",
                 "Art. 6(1)(f) GDPR; mai pubbliche (solo report di trasparenza aggregati)",
               ],
               [
@@ -119,6 +125,10 @@ export const itLegal: LegalContent = {
           {
             type: "note",
             text: "**Record provenienti da fonti pubbliche ufficiali:** quando un record è ripubblicato da una fonte pubblica ufficiale, i dati non sono stati ottenuti dall'interessato. Categorie di origine: registri pubblici e portali di trasparenza delle pubbliche amministrazioni (ad esempio in Italia i dataset del D.Lgs. 33/2013), documenti pubblicati dalle autorità pubbliche e altre fonti ufficiali accessibili al pubblico. Tali record sono verificati caso per caso secondo il regime giuridico proprio della fonte.",
+          },
+          {
+            type: "note",
+            text: "**Cronologia pubblica degli eventi per record (ADR 0021 § 7):** ogni transizione della community (pubblicato, confermato, apprezzato, segnalato come non più presente, nascosto, rimosso, ripristinato) è registrata in una **cronologia pubblica del ciclo di vita senza alcuna attribuzione** — niente id di contributori, email o dati derivati da IP nelle righe pubbliche. È un controllo di trasparenza del titolare, non una nuova raccolta di dati personali (solo aggregati).",
           },
           {
             type: "note",
@@ -277,7 +287,7 @@ export const itLegal: LegalContent = {
     intro:
       "Questi termini disciplinano l'uso di OpenSurveillanceDB, il database aperto e gestito dalla comunità delle infrastrutture di sorveglianza pubbliche e visibili. Si applicano all'applicazione web, all'API pubblica, alle esportazioni dei dati e ai servizi correlati (\"il Servizio\").",
     versionNote:
-      "Versione 0.4 — 5 agosto 2026. Aggiornati per il modello community-driven (ADR 0021): il § 5 descrive la pubblicazione immediata e le azioni della community al posto della coda di revisione umana; il § 6 sostituisce i ricorsi con le correzioni private e il potere di emergenza legale. La copia repository (docs/TERMS_OF_USE.md) resta la versione canonica.",
+      "Versione 0.4 — 5 agosto 2026. Aggiornati per il modello community-driven (ADR 0021): il § 5 descrive la pubblicazione immediata e le azioni della community al posto della coda di revisione umana; il § 6 sostituisce i ricorsi con le correzioni private e il potere di emergenza legale. Risincronizzati con la TERMS_OF_USE canonica v0.7 mergiata (docs/TERMS_OF_USE.md resta la versione canonica): ripristinata la disclosure di autenticazione § 3.7 (verifica email per l'accesso in scrittura, passkey, OIDC — ADR 0020).",
     sections: [
       {
         heading: "1. Chi siamo",
@@ -316,7 +326,17 @@ export const itLegal: LegalContent = {
               "**Consultazione:** navigare la mappa, l'elenco dei record e le singole pagine dei record; cercare e leggere il dataset pubblico.",
               "**Esportazioni:** scaricare i dati pubblici tramite le esportazioni JSON/CSV/GeoJSON e l'API pubblica, e riutilizzarli, nel rispetto della licenza ODbL 1.0 (sezione 7) e dei limiti anti-abuso della sezione 4.",
               "**Segnalazioni:** inviare osservazioni su infrastrutture di sorveglianza pubbliche e visibili. Una segnalazione di un account verificato viene **pubblicata subito** e fa parte del dataset pubblico dal momento dell'invio (sezione 5).",
-              "**Finalità lecite:** i dati possono essere usati per ricerca, giornalismo, attivismo civico e per qualsiasi finalità compatibile con questi termini e con la licenza ODbL 1.0. La consultazione dei dati pubblici non richiede mai un account. Inviare una segnalazione o una correzione richiede un account contributore verificato (sezione 3.7; ADR 0020) e ogni invio è attribuito a esso tramite un **ID interno pseudonimo** — mai un requisito di nome reale.",
+              "**Finalità lecite:** i dati possono essere usati per ricerca, giornalismo, attivismo civico e per qualsiasi finalità compatibile con questi termini e con la licenza ODbL 1.0. La consultazione dei dati pubblici non richiede mai un account. Inviare una segnalazione o una correzione richiede un account contributore verificato (sezione 3.5; ADR 0020) e ogni invio è attribuito a esso tramite un **ID interno pseudonimo** — mai un requisito di nome reale.",
+              "**Metodi di autenticazione (multi-metodo, ADR 0020).** Gli account contributore supportano **tre metodi**, a tua scelta: **(a) email + password** — il metodo di base, con **verifica dell'email richiesta per l'accesso in scrittura** (link monouso, 24 ore; finché non verifichi, la tua sessione è in sola lettura); **(b) passkey (WebAuthn)** — facoltative, senza password; **(c) OIDC tramite GitHub o Google** — facoltativo, opt-in. Le regole:",
+            ],
+          },
+          {
+            type: "list",
+            items: [
+              "**Verifica dell'email.** Dopo la registrazione devi verificare l'indirizzo email prima di poter inviare, modificare o verificare record; finché non lo fai, la tua sessione è in sola lettura. Le email di verifica e di reset della password vengono inviate tramite Cloudflare Email Routing senza contenuti di tracciamento. Un indirizzo email = un account; tienilo accessibile se perdi la password.",
+              "**Passkey.** Se registri una passkey, il sito memorizza solo materiale di chiave pubblica; la chiave privata resta sul tuo dispositivo. **Nota del fornitore:** le passkey *sincronizzate* sono salvate nel cloud del fornitore del sistema operativo (Apple/Google/Microsoft) a tua scelta — il fornitore viene a sapere che hai un account qui, il sito non condivide nulla con loro e tu controlli la sincronizzazione. Conserva i 10 codici di recupero emessi alla registrazione in un luogo sicuro; senza di essi, un dispositivo smarrito può significare perdere l'accesso al metodo passkey (il percorso email+password resta comunque disponibile).",
+              "**OIDC tramite GitHub/Google — disclosure di tracciamento.** Accedendo con GitHub o Google, **GitHub o Google osserva che accedi a questo Servizio, e il tuo indirizzo IP**, a ogni accesso; si applicano i termini e l'informativa privacy del fornitore. **Non importiamo la tua email** dal fornitore (solo subject id + flag di verifica) e non uniamo mai gli account automaticamente in base alla corrispondenza dell'email — un conflitto richiede un'unione manuale e verificata. Questo metodo è **opt-in e dichiarato** (matrice dei rischi nella pagina di accesso); **non è ancora attivo** finché non supera il gate di attivazione OIDC (DPA + EU–US DPF).",
+              "Puoi aggiungere, cambiare o rimuovere i metodi in qualsiasi momento dalla pagina del tuo account; eliminando l'account vengono eliminati i dati di ogni metodo (informativa privacy § 7 R15, § 8).",
             ],
           },
         ],
