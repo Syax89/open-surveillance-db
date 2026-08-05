@@ -1,15 +1,19 @@
-// H1 freshness + re-verification contract (docs/FUTURE_ROADMAP.md Horizon 1,
-// docs/workstreams/DATA_TRUST.md "Review and expiry clocks").
+// H1 freshness + re-verification contract — read boundary and informational
+// clocks only (ADR 0021 § 2.2 / § 9.2, docs/legal/RETENTION_SCHEDULE.md).
 //
-// Covers, against the REAL database layer (see helpers/freshness-d1.mjs):
-//   1. the pure freshness logic (review clocks, phases, public currency);
+// The pre-pivot freshness SWEEP (`verified → needs_review → stale`) is
+// RETIRED: no record status transition happens on a timer. What remains and
+// is covered here, against the REAL database layer (see
+// helpers/freshness-d1.mjs):
+//   1. the pure informational logic (review schedule, phases, public
+//      currency) — metadata for the "last confirmed X" badge, never a state
+//      change;
 //   2. the public read boundary — a verified record past its review window is
-//      never presented as current, even before the sweep runs;
-//   3. the scheduled-expiry sweep (verified -> needs_review -> stale) with
-//      moderation events;
-//   4. re-verification: reverify restarts the clocks and republishes the
-//      record, from both needs_review and stale;
-//   5. static guarantees on the source of the public query and the sweep.
+//      never presented as current, even without any sweep (read-time only);
+//   3. re-verification: reverify restarts the informational clocks and
+//      republishes the record, from both needs_review and stale;
+//   4. static guarantees that the scheduled-expiry sweep is GONE from the
+//      code (the retention cron never changes record status, ADR 0021 § 2.2).
 
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
@@ -44,13 +48,12 @@ async function approveFirstPending(moderation) {
   return decision;
 }
 
-// --- 1. Pure freshness logic -------------------------------------------------
+// --- 1. Pure informational logic -------------------------------------------
 
-test("review clocks: default 12 months, month-end clamping, leap years", async () => {
+test("informational review schedule: explicit months, month-end clamping, leap years", async () => {
   const { freshness } = await freshRuntime();
-  const { computeReviewDueAt, staleAfter, DEFAULT_REVIEW_INTERVAL_MONTHS, STALE_GRACE_DAYS } = freshness;
+  const { computeReviewDueAt, staleAfter, STALE_GRACE_DAYS } = freshness;
 
-  assert.equal(DEFAULT_REVIEW_INTERVAL_MONTHS, 12);
   assert.equal(STALE_GRACE_DAYS, 90);
 
   const january = "2026-01-15T10:00:00.000Z";
@@ -114,7 +117,7 @@ test("isPubliclyCurrent: only demo and in-window active records", async () => {
 
 // --- 2. Public read boundary -------------------------------------------------
 
-test("approval restarts the freshness clocks and publishes the record", async () => {
+test("approval restarts the informational clocks and publishes the record", async () => {
   const { cameras, moderation } = await freshRuntime();
   await cameras.createPendingCamera({
     title: "Bus stop camera",
@@ -131,7 +134,7 @@ test("approval restarts the freshness clocks and publishes the record", async ()
   const item = decision.item;
   assert.equal(item.status, "active");
   assert.ok(item.lastVerifiedAt, "approval must record last_verified_at");
-  assert.ok(item.reviewDueAt, "approval must schedule the next review");
+  assert.ok(item.reviewDueAt, "approval must schedule the informational next review");
   assert.equal(item.reviewIntervalMonths, 12);
 
   const now = new Date(item.lastVerifiedAt).getTime();
@@ -162,7 +165,7 @@ test("an active record past its review window is never presented as current", as
   assert.equal(item.status, "active");
 
   // Time travel: as of one day after the scheduled review, the record must
-  // drop out of the public list even though the sweep has not run yet.
+  // drop out of the public list — read-time boundary, no sweep involved.
   const overdue = new Date(new Date(item.reviewDueAt).getTime() + 24 * 3600 * 1000).toISOString();
   const publicList = await cameras.listPublicCameras(overdue);
   assert.ok(
@@ -225,77 +228,12 @@ test("pending and needs_review records are never public", async () => {
   assert.ok(!publicList.some((record) => record.id === item.id), "needs_review must be withdrawn");
 });
 
-// --- 3. Scheduled-expiry sweep ----------------------------------------------
+// --- 3. No timer-driven sweep (ADR 0021 § 2.2) -------------------------------
 
-test("sweep: verified past its review window moves to needs_review with an event", async () => {
-  const { cameras, moderation } = await freshRuntime();
-  await cameras.createPendingCamera({
-    title: "Expiring camera",
-    kind: "Fixed dome",
-    manufacturer: null,
-    observedOn: null,
-    address: "Corso Europa",
-    notes: "",
-    latitude: 41.88,
-    longitude: 12.48,
-  });
-  const decision = await approveFirstPending(moderation);
-  const item = decision.item;
-
-  const afterDue = new Date(new Date(item.reviewDueAt).getTime() + 24 * 3600 * 1000).toISOString();
-  const result = await moderation.runFreshnessSweep(afterDue);
-  assert.deepEqual(result, { scheduledExpiry: 1, becameStale: 0 });
-
-  const queue = await moderation.listPendingModerationItems();
-  assert.ok(queue.reviewCameras.some((record) => record.id === item.id), "expired record must enter the review queue");
-  assert.ok(!queue.publishedCameras.some((record) => record.id === item.id), "expired record must leave the published list");
-  const event = queue.recentEvents.find((entry) => entry.entityId === item.id && entry.action === "scheduled-expiry");
-  assert.equal(event?.action, "scheduled-expiry");
-  assert.equal(event?.previousStatus, "active");
-  assert.equal(event?.newStatus, "needs_review");
-
-  // And it must not be public under the same clock.
-  const publicList = await cameras.listPublicCameras(afterDue);
-  assert.ok(!publicList.some((record) => record.id === item.id));
-});
-
-test("sweep: needs_review not re-confirmed within the grace period becomes stale", async () => {
-  const { cameras, moderation } = await freshRuntime();
-  await cameras.createPendingCamera({
-    title: "Never re-confirmed",
-    kind: "Traffic monitoring",
-    manufacturer: null,
-    observedOn: null,
-    address: "Via Verdi",
-    notes: "",
-    latitude: 41.87,
-    longitude: 12.47,
-  });
-  const decision = await approveFirstPending(moderation);
-  const item = decision.item;
-  await moderation.moderateCamera(item.id, "mark-stale", REASON.stale, "unconfirmed");
-
-  // First sweep: one day after the review date -> needs_review.
-  const afterDue = new Date(new Date(item.reviewDueAt).getTime() + 24 * 3600 * 1000).toISOString();
-  await moderation.runFreshnessSweep(afterDue);
-
-  // Second sweep: well beyond the 90-day grace period -> stale.
-  const pastGrace = new Date(new Date(item.reviewDueAt).getTime() + 95 * 24 * 3600 * 1000).toISOString();
-  const result = await moderation.runFreshnessSweep(pastGrace);
-  assert.deepEqual(result, { scheduledExpiry: 0, becameStale: 1 });
-
-  const queue = await moderation.listPendingModerationItems();
-  assert.ok(queue.staleCameras.some((record) => record.id === item.id), "unconfirmed record must be labelled stale");
-  assert.ok(!queue.reviewCameras.some((record) => record.id === item.id));
-  const event = queue.recentEvents.find((entry) => entry.entityId === item.id && entry.action === "expiry-not-reconfirmed");
-  assert.equal(event?.previousStatus, "needs_review");
-  assert.equal(event?.newStatus, "stale");
-});
-
-test("the moderation queue applies the lazy sweep before listing", async () => {
+test("the moderation queue does NOT apply a lazy freshness sweep (ADR 0021 § 2.2)", async () => {
   const { cameras, moderation, d1 } = await freshRuntime();
   await cameras.createPendingCamera({
-    title: "Lazy sweep target",
+    title: "No lazy sweep",
     kind: "Fixed dome",
     manufacturer: null,
     observedOn: null,
@@ -308,14 +246,18 @@ test("the moderation queue applies the lazy sweep before listing", async () => {
   const item = decision.item;
 
   // Backdate the review date directly (simulates a record that aged while the
-  // service was not reading the queue), then read the queue: the lazy sweep
-  // must move the expired record into review without any explicit call.
+  // service was not reading the queue), then read the queue. Under the
+  // community model NO transition happens on a timer: the record must stay
+  // `active` in the published list and NOT move into review, and no
+  // scheduled-expiry event may be written.
   const pastDue = new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString();
   await d1.prepare("UPDATE cameras SET review_due_at = ? WHERE id = ?").bind(pastDue, item.id).run();
 
   const queue = await moderation.listPendingModerationItems();
-  assert.ok(queue.reviewCameras.some((record) => record.id === item.id), "lazy sweep must move the expired record into review");
-  assert.ok(!queue.publishedCameras.some((record) => record.id === item.id));
+  assert.ok(queue.publishedCameras.some((record) => record.id === item.id), "the record must stay active (no lazy sweep)");
+  assert.ok(!queue.reviewCameras.some((record) => record.id === item.id), "no timer may move the record into review");
+  const event = queue.recentEvents.find((entry) => entry.entityId === item.id && entry.action === "scheduled-expiry");
+  assert.equal(event, undefined, "no scheduled-expiry event may be written on a timer");
 });
 
 // --- 4. Re-verification ------------------------------------------------------
@@ -334,11 +276,8 @@ test("reverify from needs_review restarts the clocks and republishes", async () 
   });
   const approved = await approveFirstPending(moderation);
   const item = approved.item;
+  // mark-stale is the remaining (manual, non-timer) path into needs_review.
   await moderation.moderateCamera(item.id, "mark-stale", REASON.stale, "drift");
-
-  // Sweep the record into the past so it is genuinely due for re-verification.
-  const afterDue = new Date(new Date(item.reviewDueAt).getTime() + 24 * 3600 * 1000).toISOString();
-  await moderation.runFreshnessSweep(afterDue);
 
   const reverified = await moderation.moderateCamera(item.id, "reverify", REASON.verified, null);
   assert.ok(reverified, "reverify must succeed from needs_review");
@@ -351,7 +290,7 @@ test("reverify from needs_review restarts the clocks and republishes", async () 
 });
 
 test("reverify from stale reconfirms the record and republishes it", async () => {
-  const { cameras, moderation } = await freshRuntime();
+  const { cameras, moderation, d1 } = await freshRuntime();
   await cameras.createPendingCamera({
     title: "Stale but reconfirmed",
     kind: "Fixed dome",
@@ -364,10 +303,9 @@ test("reverify from stale reconfirms the record and republishes it", async () =>
   });
   const approved = await approveFirstPending(moderation);
   const item = approved.item;
-  await moderation.moderateCamera(item.id, "mark-stale", REASON.stale, "no response");
-
-  const pastGrace = new Date(new Date(item.reviewDueAt).getTime() + 95 * 24 * 3600 * 1000).toISOString();
-  await moderation.runFreshnessSweep(pastGrace);
+  // With the sweep retired, `stale` is only reachable as a legacy/manual
+  // status — simulate it directly, as the demo gate test does.
+  await d1.prepare("UPDATE cameras SET status = 'stale' WHERE id = ?").bind(item.id).run();
 
   const queue = await moderation.listPendingModerationItems();
   assert.ok(queue.staleCameras.some((record) => record.id === item.id), "record must be stale first");
@@ -383,7 +321,7 @@ test("reverify from stale reconfirms the record and republishes it", async () =>
 });
 
 test("a stale record can be removed; illegal transitions stay rejected", async () => {
-  const { cameras, moderation } = await freshRuntime();
+  const { cameras, moderation, d1 } = await freshRuntime();
   await cameras.createPendingCamera({
     title: "Stale removal",
     kind: "Traffic monitoring",
@@ -396,9 +334,7 @@ test("a stale record can be removed; illegal transitions stay rejected", async (
   });
   const approved = await approveFirstPending(moderation);
   const item = approved.item;
-  await moderation.moderateCamera(item.id, "mark-stale", REASON.stale, null);
-  const pastGrace = new Date(new Date(item.reviewDueAt).getTime() + 95 * 24 * 3600 * 1000).toISOString();
-  await moderation.runFreshnessSweep(pastGrace);
+  await d1.prepare("UPDATE cameras SET status = 'stale' WHERE id = ?").bind(item.id).run();
 
   // Illegal transitions from stale must not apply.
   const badApprove = await moderation.moderateCamera(item.id, "approve", REASON.verified, null);
@@ -462,31 +398,31 @@ test("the public camera query enforces the freshness window at read time", async
   );
 });
 
-test("approval and re-verification both write the freshness clocks", async () => {
+test("approval and re-verification both write the informational clocks", async () => {
   const moderation = await readSource("db/moderation.ts");
   assert.match(
     moderation,
     /last_verified_at\s*=\s*\?,[\s\S]*review_due_at\s*=\s*\?,[\s\S]*review_interval_months\s*=\s*\?/,
-    "moderation updates must write the freshness clocks",
+    "moderation updates must write the informational review metadata",
   );
   assert.match(
     moderation,
-    /computeReviewDueAt\(nowIso,\s*DEFAULT_REVIEW_INTERVAL_MONTHS\)/,
-    "the next review date must be derived from the verification clock",
+    /computeReviewDueAt\(nowIso,\s*REVIEW_INTERVAL_MONTHS\)/,
+    "the next review date must be derived from the informational schedule",
   );
 });
 
-test("the scheduled-expiry sweep transitions and events are explicit", async () => {
+test("the scheduled-expiry sweep is gone from the code (ADR 0021 § 2.2)", async () => {
   const moderation = await readSource("db/moderation.ts");
-  assert.match(moderation, /export async function runFreshnessSweep/, "the sweep must be an explicit exported function");
-  assert.match(moderation, /action:\s*"scheduled-expiry"/, "verified -> needs_review must record a scheduled-expiry event");
-  assert.match(moderation, /action:\s*"expiry-not-reconfirmed"/, "needs_review -> stale must record an expiry event");
-  assert.match(moderation, /STALE_GRACE_DAYS/, "the stale grace period must drive the second sweep step");
-  assert.match(moderation, /previousStatus\s*===\s*"stale"[\s\S]*newStatus:\s*"active"/, "stale records must be re-verifiable");
+  const retention = await readSource("db/retention.ts");
+  assert.doesNotMatch(moderation, /export async function runFreshnessSweep/, "the sweep must no longer be exported");
+  assert.doesNotMatch(moderation, /action:\s*"scheduled-expiry"/, "the scheduled-expiry event must be gone");
+  assert.doesNotMatch(moderation, /action:\s*"expiry-not-reconfirmed"/, "the expiry event must be gone");
+  assert.doesNotMatch(retention, /runFreshnessSweep/, "the retention cron must not invoke the sweep");
 });
 
-test("freshness constants follow DATA_TRUST clocks (12 months / 90 days)", async () => {
+test("freshness constants: STALE_GRACE_DAYS=90, pre-pivot 12-month clock removed", async () => {
   const freshness = await readSource("db/freshness.ts");
-  assert.match(freshness, /DEFAULT_REVIEW_INTERVAL_MONTHS\s*=\s*12/);
   assert.match(freshness, /STALE_GRACE_DAYS\s*=\s*90/);
+  assert.doesNotMatch(freshness, /DEFAULT_REVIEW_INTERVAL_MONTHS/, "the pre-pivot default review clock must be removed");
 });

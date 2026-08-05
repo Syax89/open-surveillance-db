@@ -2,7 +2,16 @@ import type { D1PreparedStatement } from "cloudflare:workers";
 import { getD1, type CameraRecord } from "./cameras";
 import type { CorrectionRequest } from "./corrections";
 import { listPendingPhotos, type PendingPhotoReport } from "./photos";
-import { DEFAULT_REVIEW_INTERVAL_MONTHS, STALE_GRACE_DAYS, addDays, computeReviewDueAt } from "./freshness";
+import { computeReviewDueAt } from "./freshness";
+
+/**
+ * Informational review-clock interval (ADR 0021 § 9.2): after the community
+ * pivot, `review_due_at` / `review_interval_months` are metadata ONLY — the
+ * record page shows a neutral "last confirmed X" badge, never a state change.
+ * No transition ever happens on a timer (§ 2.2), so this value only feeds the
+ * informational schedule written on approve/reverify.
+ */
+const REVIEW_INTERVAL_MONTHS = 12;
 
 export type ModerationCameraRecord = CameraRecord;
 
@@ -456,12 +465,10 @@ function synthesizedQueueItem(
 
 export async function listPendingModerationItems(): Promise<ModerationQueue> {
   const d1 = await getModerationD1();
-  // Lazy freshness sweep: before the queue is read, records whose review
-  // window elapsed are moved to `needs_review` (scheduled expiry) and records
-  // not re-confirmed within the grace period are labelled `stale`. Public
-  // routes never depend on this sweep: listPublicCameras() enforces the same
-  // freshness boundary at read time.
-  await runFreshnessSweep();
+  // ADR 0021 § 2.2: no timer-driven status transition. The lazy freshness
+  // sweep was retired with the pre-pivot review cycle — the queue lists
+  // exactly what the records say, and transitions come only from community
+  // actions (db/community-actions.ts) or admin-legal decisions.
   const [cameraReports, publishedCameras, reviewCameras, staleCameras, correctionRequests, cameraEditRequests, recentEvents, reviewers, openQueueItems] =
     await Promise.all([
       d1
@@ -564,80 +571,6 @@ export async function listPendingModerationItems(): Promise<ModerationQueue> {
     reviewers: reviewers,
     queueItems,
   };
-}
-
-/**
- * Scheduled-expiry sweep (docs/workstreams/DATA_TRUST.md "Review and expiry
- * clocks"): a `verified` record whose review window elapsed moves to
- * `needs_review`; a `needs_review` record still unconfirmed STALE_GRACE_DAYS
- * days after its scheduled review becomes `stale`. Every transition writes a
- * moderation event (action `scheduled-expiry` / `expiry-not-reconfirmed`).
- */
-export async function runFreshnessSweep(nowIso: string = new Date().toISOString()): Promise<{ scheduledExpiry: number; becameStale: number }> {
-  const d1 = await getModerationD1();
-  const staleThreshold = addDays(nowIso, -STALE_GRACE_DAYS);
-
-  const due = await d1
-    .prepare("SELECT id, status FROM cameras WHERE status IN ('active','verified') AND review_due_at IS NOT NULL AND review_due_at < ?")
-    .bind(nowIso)
-    .all<{ id: number; status: string }>();
-  const dueStatements: D1PreparedStatement[] = [];
-  for (const { id, status } of due.results) {
-    // UPDATE + guarded event pair: the event only lands when the UPDATE
-    // actually moved the record (same atomic pair as the decision batches).
-    dueStatements.push(
-      d1.prepare("UPDATE cameras SET status = 'needs_review', updated = ? WHERE id = ?").bind(nowIso, id),
-      buildGuardedEventStatement(
-        d1,
-        {
-          entity: "camera",
-          entityId: id,
-          previousStatus: status,
-          newStatus: "needs_review",
-          action: "scheduled-expiry",
-          reasonCode: "inaccurate-or-outdated",
-          note: "Review window elapsed; re-verification required before the record can be public again.",
-        },
-        "cameras",
-        id,
-        "needs_review",
-      ),
-    );
-  }
-
-  const unconfirmed = await d1
-    .prepare("SELECT id FROM cameras WHERE status = 'needs_review' AND review_due_at IS NOT NULL AND review_due_at < ?")
-    .bind(staleThreshold)
-    .all<{ id: number }>();
-  const unconfirmedStatements: D1PreparedStatement[] = [];
-  for (const { id } of unconfirmed.results) {
-    unconfirmedStatements.push(
-      d1.prepare("UPDATE cameras SET status = 'stale', updated = ? WHERE id = ?").bind(nowIso, id),
-      buildGuardedEventStatement(
-        d1,
-        {
-          entity: "camera",
-          entityId: id,
-          previousStatus: "needs_review",
-          newStatus: "stale",
-          action: "expiry-not-reconfirmed",
-          reasonCode: "inaccurate-or-outdated",
-          note: `No re-verification within ${STALE_GRACE_DAYS} days of the scheduled review.`,
-        },
-        "cameras",
-        id,
-        "stale",
-      ),
-    );
-  }
-
-  // Flush in chunks of at most 100 statements (50 records) — the D1 batch cap.
-  const statements = [...dueStatements, ...unconfirmedStatements];
-  for (let offset = 0; offset < statements.length; offset += 100) {
-    await d1.batch(statements.slice(offset, offset + 100));
-  }
-
-  return { scheduledExpiry: due.results.length, becameStale: unconfirmed.results.length };
 }
 
 // ---------------------------------------------------------------------------
@@ -914,9 +847,10 @@ export async function moderateCamera(
   }
 
   const nowIso = new Date().toISOString();
-  // Approval and re-verification both restart the freshness clocks: the record
-  // is considered re-verified as of now, and its next review is due in
-  // DEFAULT_REVIEW_INTERVAL_MONTHS (standard confidence, DATA_TRUST clocks).
+  // Approval and re-verification both write the informational review metadata
+  // (ADR 0021 § 9.2): last_verified_at is refreshed and the next review_due_at
+  // is scheduled at REVIEW_INTERVAL_MONTHS for the neutral "last confirmed X"
+  // badge — information, never a state change (no transition on a timer).
   const refreshClock = action === "approve" || action === "reverify";
   const publishMetadata = current.status === "pending" && action === "approve";
 
@@ -1005,8 +939,8 @@ function buildCameraTransitionStatement(
         metadataPublication?.publishManufacturer ? 1 : 0,
         metadataPublication?.publishObservedOn ? 1 : 0,
         nowIso,
-        computeReviewDueAt(nowIso, DEFAULT_REVIEW_INTERVAL_MONTHS),
-        DEFAULT_REVIEW_INTERVAL_MONTHS,
+        computeReviewDueAt(nowIso, REVIEW_INTERVAL_MONTHS),
+        REVIEW_INTERVAL_MONTHS,
         id,
         currentStatus,
       );
@@ -1020,8 +954,8 @@ function buildCameraTransitionStatement(
         transition.newStatus,
         transition.updated,
         nowIso,
-        computeReviewDueAt(nowIso, DEFAULT_REVIEW_INTERVAL_MONTHS),
-        DEFAULT_REVIEW_INTERVAL_MONTHS,
+        computeReviewDueAt(nowIso, REVIEW_INTERVAL_MONTHS),
+        REVIEW_INTERVAL_MONTHS,
         id,
         currentStatus,
       );
@@ -1844,8 +1778,6 @@ const PUBLIC_LIFECYCLE_ACTIONS = new Set([
   "hide",
   "mark-stale",
   "reverify",
-  "scheduled-expiry",
-  "expiry-not-reconfirmed",
   "marked-stale",
   "removed",
   "corrected",

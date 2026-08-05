@@ -8,9 +8,6 @@
 //   R1  pending reports hard-deleted after PENDING_RETENTION_DAYS
 //   R2  rejected reports purged REJECTED_RETENTION_DAYS after the reject
 //       decision, falling back to created_at for legacy rows without an event
-//   R3  needs_review/stale records unverified for 6 months → `removed`
-//       tombstone, with a moderation event whose previous_status is the REAL
-//       prior state (regression: it was hard-coded to 'removed')
 //   R4  resolved correction requests purged after CORRECTION_RETENTION_DAYS
 //   R6  orphan pending photos + rejected photos removed from D1 and R2;
 //       the >100-photo scenario (D1 bound-parameter cap) is a regression test
@@ -22,7 +19,12 @@
 //       are never swept; >100 stale rows drain across multiple bounded rounds
 //   atomicity: purgeCameraRecord deletes photos, queue item and camera in one
 //       d1.batch (regression: photos were deleted before the batch)
-//   R2/R3 photos are deleted only AFTER their D1 rows succeed (R2-first rule)
+//   R2 photos are deleted only AFTER their D1 rows succeed (R2-first rule)
+//
+// ADR 0021 § 2.2 (community pivot): the cron NEVER transitions record
+// status — the old freshness sweep (verified → needs_review → stale) and the
+// former R3 (needs_review/stale → `removed` after 6 months unverified) are
+// retired and deliberately not exercised here.
 
 import assert from "node:assert/strict";
 import { after, beforeEach, test } from "node:test";
@@ -311,56 +313,6 @@ test("R2: the purge closes open moderation_queue items atomically", async () => 
 });
 
 // ---------------------------------------------------------------------------
-// R3 — unverified removal
-// ---------------------------------------------------------------------------
-
-test("R3: a stale record unverified for 6 months becomes a removed tombstone", async () => {
-  const staleId = await insertCamera({
-    title: "Stale beyond grace",
-    status: "stale",
-    createdAt: daysBefore(400),
-    reviewDueAt: daysBefore(200),
-  });
-  const freshStale = await insertCamera({
-    title: "Stale but recent",
-    status: "stale",
-    createdAt: daysBefore(400),
-    reviewDueAt: daysBefore(100),
-  });
-  await insertPhoto({ cameraId: staleId, status: "approved", createdAt: daysBefore(400), storageKey: "stale-photo.jpg" });
-
-  const { r2, deletedKeys } = makeR2Spy();
-  const summary = await runtime.retention.runRetentionSweep(NOW, { r2 });
-
-  assert.equal(summary.unverifiedRemoved, 1, "only the record past the 6-month removal window");
-  assert.equal(await count("cameras", "id = ? AND status = 'removed'", staleId), 1, "the row stays as a tombstone");
-  assert.equal(await count("cameras", "id = ?", freshStale), 1, "a record inside the window must survive");
-  assert.equal(await count("photos", "camera_id = ?", staleId), 0, "evidence must be deleted with the record");
-  assert.deepEqual(deletedKeys, ["stale-photo.jpg"]);
-});
-
-test("R3: the tombstone event records the REAL previous_status, never 'removed'", async () => {
-  const staleId = await insertCamera({
-    title: "R3 previous status",
-    status: "stale",
-    createdAt: daysBefore(400),
-    reviewDueAt: daysBefore(200),
-  });
-
-  await runtime.retention.runRetentionSweep(NOW);
-
-  const event = await runtime.env.DB.prepare(
-    "SELECT previous_status AS previousStatus, new_status AS newStatus, action FROM moderation_events WHERE entity = 'camera' AND entity_id = ? AND action = 'removed'",
-  )
-    .bind(staleId)
-    .first();
-  assert.ok(event, "a removal event must be written");
-  assert.equal(event.previousStatus, "stale", "previous_status must be the real prior state (BLOCKER 1)");
-  assert.equal(event.newStatus, "removed");
-  assert.notEqual(event.previousStatus, "removed", "removed -> removed would corrupt the audit trail");
-});
-
-// ---------------------------------------------------------------------------
 // R4 — resolved correction requests
 // ---------------------------------------------------------------------------
 
@@ -568,8 +520,9 @@ test("R6: the sweep is idempotent — a second run deletes nothing new", async (
 });
 
 test("R6: approved + redacted photos on a verified camera are never touched", async () => {
-  // R13: approved evidence on a verified camera follows the 12-month record
-  // cycle (R3) and is deleted WITH the record — never by the photo sweep.
+  // R13: approved evidence on a verified camera follows the record's own
+  // lifecycle (ADR 0021: no time-based record retention) and is deleted WITH
+  // the record — never by the photo sweep.
   const verified = await insertCamera({ title: "Verified camera", status: "active", createdAt: daysBefore(200) });
   await insertPhoto({
     cameraId: verified,
@@ -642,7 +595,7 @@ test("R6: a failed chunk retries cleanly on the next run (rows + objects stay co
   assert.equal(await count("photos"), 0, "the retry clears the leftover chunk");
 });
 
-test("R2/R3: a failing record is isolated — the sweep continues and counts it (review t_eed5f080 #2)", async () => {
+test("R2: a failing record is isolated — the sweep continues and counts it (review t_eed5f080 #2)", async () => {
   // Two expired rejected cameras; the FIRST purge (DELETE FROM cameras) fails.
   const a = await insertCamera({ title: "Rejected A", status: "rejected", createdAt: daysBefore(200) });
   const b = await insertCamera({ title: "Rejected B", status: "rejected", createdAt: daysBefore(200) });
@@ -898,16 +851,8 @@ test("R6 deletion chunks against the D1 100-bound-parameter cap", async () => {
   );
 });
 
-test("the R3 unverified SELECT carries the real status for the audit event", async () => {
+test("the R3 unverified removal is gone from the sweep (ADR 0021 § 2.2)", async () => {
   const retention = await readSource("db/retention.ts");
-  const r3Start = retention.indexOf("const unverifiedCutoff");
-  const r3End = retention.indexOf("// --- R1");
-  const r3 = retention.slice(r3Start, r3End);
-
-  assert.match(r3, /SELECT id, status FROM cameras/, "the SELECT must read the real status (BLOCKER 1)");
-  assert.match(
-    r3,
-    /\.bind\(id, status, /,
-    "the audit event must bind the real status as previous_status (BLOCKER 1)",
-  );
+  assert.doesNotMatch(retention, /unverifiedCutoff|UNVERIFIED_REMOVAL_MONTHS|needs_review[\s\S]*'removed'/, "no timer may transition needs_review/stale records to removed");
+  assert.doesNotMatch(retention, /runFreshnessSweep/, "the sweep no longer reuses the retired freshness sweep");
 });

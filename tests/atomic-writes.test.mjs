@@ -14,7 +14,9 @@
 //   - moderatePhoto    : photo UPDATE + photo event
 //   - linkExternalIdentity : identity link + merge-request burn
 //   - applyPasswordReset   : hash rotate + session revoke + email verify
-//   - runFreshnessSweep    : verified -> needs_review + scheduled-expiry event
+//
+// (The pre-pivot runFreshnessSweep crash-window test was removed with the
+// sweep itself — ADR 0021 § 2.2 retires timer-driven status transitions.)
 //
 // Plus one happy-path assertion that the batch read-backs (RETURNING rows)
 // keep the pre-batch response shape.
@@ -38,7 +40,6 @@ const RECORD = { id: 2, displayName: "Demo Record Reviewer", role: "record_revie
 const SENIOR = { id: 3, displayName: "Demo Senior Moderator", role: "senior_moderator", active: 1 };
 
 const NOW = "2026-08-02T08:00:00.000Z";
-const dayMs = 86_400_000;
 
 beforeEach(async () => {
   ({ env, cameras, moderation, appeals, auth, oidc, photos } = await loadDbRuntime());
@@ -259,28 +260,6 @@ test("applyPasswordReset rolls back rotate + revoke + verify when the verify UPD
     .bind(profile.id)
     .first();
   assert.equal(revoked.n, 0, "no session may be revoked when the batch rolls back");
-});
-
-test("runFreshnessSweep rolls back the status UPDATE when the scheduled-expiry event fails", async () => {
-  const record = await submitPending();
-  const approved = await moderation.moderateCamera(record.id, "approve", "verified-public-infrastructure", null);
-  assert.equal(approved.item.status, "active");
-  assert.ok(approved.item.reviewDueAt, "approval must schedule the next review");
-
-  const pastDue = new Date(new Date(approved.item.reviewDueAt).getTime() + dayMs).toISOString();
-  env.DB = makeFailOnNthBatchStatement(env.DB, "moderation_events", 1);
-  await assert.rejects(
-    moderation.runFreshnessSweep(pastDue),
-    /simulated D1 batch failure/,
-  );
-
-  const camera = await env.DB.prepare("SELECT status FROM cameras WHERE id = ?").bind(record.id).first();
-  assert.equal(camera.status, "active", "the sweep UPDATE must roll back with the failed event");
-  const expired = await env.DB
-    .prepare("SELECT COUNT(*) AS n FROM moderation_events WHERE entity = 'camera' AND entity_id = ? AND action = 'scheduled-expiry'")
-    .bind(record.id)
-    .first();
-  assert.equal(expired.n, 0, "no scheduled-expiry event may survive the rollback");
 });
 
 test("decision batch read-backs return the item, event and queue (happy path)", async () => {

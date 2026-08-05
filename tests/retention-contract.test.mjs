@@ -7,14 +7,13 @@
 //      documented values cannot drift unnoticed (community model: no
 //      time-based record retention; `active`/`hidden`/`removed` states;
 //      photo states 90/30 days; 30d session TTL).
-//   2. IMPLEMENTED RUNTIME CONTRACT — the pre-pivot 12-month review clock
-//      (DEFAULT_REVIEW_INTERVAL_MONTHS) and the freshness sweep
-//      (runFreshnessSweep in db/moderation.ts) are STILL PRESENT in the code
-//      but RETIRED by ADR 0021 § 2.2; removal is tracked as code follow-up
-//      (retention cron must stop changing record status). The pins below
-//      document the transitional code state until the sweep is removed.
-//      The sessions table (expires_at NOT NULL + index) and the read-time
-//      expiry rejection in db/auth.ts are the pieces that remain unchanged.
+//   2. IMPLEMENTED RUNTIME CONTRACT — ADR 0021 § 2.2: no state transition on
+//      a timer. The pre-pivot 12-month review clock and the freshness sweep
+//      (runFreshnessSweep) are REMOVED from the code; the retention cron
+//      deletes data whose retention elapsed, it never pushes records through
+//      lifecycle states. The sessions table (expires_at NOT NULL + index) and
+//      the read-time expiry rejection in db/auth.ts are the pieces that remain
+//      unchanged.
 //   3. AUTOMATED PURGE CONTRACT (implemented in PR #87) — the worker
 //      exposes a `scheduled` handler, wrangler.jsonc declares the daily
 //      cron trigger, and db/retention.ts runs the R12-R18 sweep. These
@@ -103,24 +102,34 @@ test("RETENTION_SCHEDULE.md pins R1/R2/R3/R7 values matching the community-model
 // 2. Implemented runtime contract
 // ---------------------------------------------------------------------------
 
-test("the pre-pivot 12-month review clock is still in the code (transitional — retirement tracked)", async () => {
+test("ADR 0021 § 2.2 is implemented: no timer-driven review clock or freshness sweep in the code", async () => {
   const freshness = await readSource("db/freshness.ts");
   const moderation = await readSource("db/moderation.ts");
+  const retention = await readSource("db/retention.ts");
 
-  // TRANSITIONAL PIN (ADR 0021 § 2.2): the freshness sweep is retired by the
-  // community model, but the code still carries DEFAULT_REVIEW_INTERVAL_MONTHS
-  // and runFreshnessSweep (called from db/retention.ts runRetentionSweep and
-  // db/moderation.ts). Removal is tracked as code follow-up; these assertions
-  // document the current code state and must be REMOVED when the sweep lands.
-  assert.match(
+  // The retirement is implemented, not just documented: the pre-pivot
+  // 12-month review clock constant and the scheduled-expiry sweep are gone
+  // from the code, and the retention cron no longer transitions records
+  // (it deletes data whose retention elapsed, nothing else).
+  assert.doesNotMatch(
     freshness,
     /DEFAULT_REVIEW_INTERVAL_MONTHS\s*=\s*12/,
-    "the pre-pivot review clock is still present in db/freshness.ts (pending retirement)",
+    "the pre-pivot 12-month review clock must be removed from db/freshness.ts",
   );
-  assert.match(
+  assert.doesNotMatch(
     moderation,
     /export async function runFreshnessSweep/,
-    "runFreshnessSweep is still exported from the moderation boundary (pending retirement)",
+    "runFreshnessSweep must no longer be exported from the moderation boundary",
+  );
+  assert.doesNotMatch(
+    retention,
+    /runFreshnessSweep/,
+    "the retention cron must no longer invoke the freshness sweep",
+  );
+  assert.doesNotMatch(
+    retention,
+    /status\s+IN\s*\(\s*'needs_review',\s*'stale'\s*\)|unverifiedRemoved|UNVERIFIED_REMOVAL_MONTHS/,
+    "the 6-month unverified removal (former R3) must be gone from the retention cron",
   );
 });
 

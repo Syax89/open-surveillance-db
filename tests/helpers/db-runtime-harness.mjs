@@ -79,9 +79,9 @@ const DB_MODULES = [
   { source: "db/users.ts", output: "db/users.mjs" },
   { source: "db/appeals.ts", output: "db/appeals.mjs" },
   // db/retention.ts (scheduled retention sweep, ADR 0004/0008) imports
-  // getD1 from ./cameras and runFreshnessSweep from ./moderation — both
-  // already in this tree — and exercises destructive R1-R7 work against the
-  // same binding.
+  // getD1 from ./cameras — already in this tree — and exercises destructive
+  // R1-R18 work against the same binding. ADR 0021 § 2.2: the cron never
+  // transitions record status (no runFreshnessSweep reuse anymore).
   { source: "db/retention.ts", output: "db/retention.mjs" },
   // db/confirmations.ts (community verifications, ADR 0018) imports getD1
   // from ./cameras and the shared public whitelist; db/cameras.ts imports
