@@ -287,6 +287,18 @@ changes accumulate under `[Unreleased]`.
 
 ### Changed
 
+- **Docs/legal — canonica allineata al pivot community ADR 0021 (t_29c29f92):**
+  `docs/legal/PRIVACY_NOTICE.md` (v0.10 → **v0.11**) e `docs/TERMS_OF_USE.md`
+  (v0.6 → **v0.7**) riscritte sul modello community-driven già applicato ai
+  bundle runtime (`app/lib/legal/en.ts`/`it.ts`, 0.6/0.4): pubblicazione
+  immediata da account verificati, azioni community con soglie automatiche,
+  cronologia pubblica per record senza attribuzione, correzioni private,
+  emergenza legale come unico potere umano, retention § 7 senza il ciclo
+  pending/12-mesi. Version history aggiornata. **Nota versioning:** la
+  canonica e i bundle runtime restano su due schemi distinti (0.11/0.7 vs
+  0.6/0.4) finché non si unifica il versioning — i bundle dichiarano la
+  copia repository come canonica, da qui l'allineamento.
+
 - **Auth — login bloccato finché l'email non è verificata (t_6dc1c96f, CEO
   feedback 2026-08-03, option (a)):** `POST /api/auth/login` ora risponde 401
   (stesso corpo generico "Invalid credentials." di email sconosciuta /
