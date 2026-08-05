@@ -1,13 +1,16 @@
 /**
  * Client-side interaction tests for the map-click report picker
- * (kanban t_6abb96ac): clicking empty map space on /mappa opens a popup
- * with the click coordinates and a direct link to /segnala?lat=&lng=,
- * and the /segnala form pre-fills that position (URL deep link).
+ * (kanban t_6abb96ac, popup lifecycle t_33b82720): the picker is an
+ * EXPLICIT mode — clicking empty map space on /mappa is silent during
+ * exploration, and opens the coordinate popup with a direct link to
+ * /segnala?lat=&lng= ONLY while the accessible "Add here" toggle is
+ * active; the /segnala form pre-fills that position (URL deep link).
  *
  *   1. map click opens the report-picker popup with the click coordinates
- *      and a /segnala?lat=&lng= deep link (SurveillanceMap, leaflet stub);
+ *      and a /segnala?lat=&lng= deep link (SurveillanceMap, leaflet stub)
+ *      while the explicit add mode is active;
  *   2. the map click still calls onPick (contract kept — the popup is an
- *      addition, not a replacement);
+ *      addition, not a replacement), and is SILENT outside add mode;
  *   3. /segnala with ?lat=&lng= pre-fills the form (SegnalaTool with
  *      initialCoordinates): coordinate readout, manual fields, and the
  *      nearby-duplicate check runs on mount;
@@ -86,6 +89,11 @@ test("map click opens the report-picker popup with coordinates and a /segnala de
   const maps = await leafletMaps();
   assert.ok(maps.length >= 1, "the leaflet stub must record the created map");
 
+  // The picker is an EXPLICIT mode (popup lifecycle t_33b82720): base map
+  // navigation is silent — the user must activate "Add here" first.
+  const { screen, userEvent } = rtl;
+  await userEvent.click(await screen.findByRole("button", { name: /Add here/i }));
+
   const clickHandler = maps[0].handlers.click?.[0];
   assert.ok(clickHandler, "the map click handler must be registered");
   clickHandler({ latlng: { lat: 41.9004, lng: 12.4936 } });
@@ -113,10 +121,17 @@ test("map click still calls onPick (picker is an addition, not a replacement)", 
   await new Promise((resolve) => setTimeout(resolve, 10));
 
   const maps = await leafletMaps();
-  const clickHandler = maps[0].handlers.click?.[0];
-  clickHandler({ latlng: { lat: 41.9004, lng: 12.4936 } });
+  // Without the explicit add mode, an exploration click is SILENT (no
+  // onPick — the popup-lifecycle contract, t_33b82720).
+  maps[0].handlers.click?.[0]?.({ latlng: { lat: 41.9004, lng: 12.4936 } });
+  assert.equal(picked, null, "onPick must NOT fire outside the explicit add mode");
 
-  assert.deepEqual(picked, [41.9004, 12.4936], "onPick must still receive the click coordinates");
+  // In the explicit add mode the picker fires with the click coordinates.
+  const { screen, userEvent } = rtl;
+  await userEvent.click(await screen.findByRole("button", { name: /Add here/i }));
+  maps[0].handlers.click?.[0]?.({ latlng: { lat: 41.9004, lng: 12.4936 } });
+
+  assert.deepEqual(picked, [41.9004, 12.4936], "onPick must receive the click coordinates in add mode");
 });
 
 // ---------------------------------------------------------------------------

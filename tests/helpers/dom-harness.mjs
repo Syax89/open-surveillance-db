@@ -351,7 +351,14 @@ export function marker(latlng, opts) {
     // openPopup() records that the balloon was requested.
     bindPopup: (html) => { m.popupHtml = html; return m; },
     openPopup: () => { m.popupOpened = true; return m; },
+    // Popup lifecycle (t_33b82720): the marker click handler calls
+    // isPopupOpen() to open idempotently (a click on an already-open popup
+    // keeps it open instead of toggling it closed).
+    isPopupOpen: () => m.popupOpened === true,
     getLatLng: () => latlng,
+    // Grid badges set an aria-label on the real element (t_26ce96f3); the
+    // stub records the attribute so the contract stays assertable.
+    getElement: () => ({ setAttribute: (key, value) => { m.elementAttrs ??= {}; m.elementAttrs[key] = value; } }),
     handlers: {},
     addTo: (layer) => { layer.addLayer(m); return m; },
     // Real Leaflet API: setIcon replaces the marker icon in place. The
@@ -375,6 +382,14 @@ export function circle(latlng, opts) {
   return c;
 }
 export const divIcon = (opts) => opts;
+// Popup-lifecycle (t_33b82720): L.DomEvent.stopPropagation is called by the
+// marker click handler so a marker click NEVER bubbles to the map click
+// handler (which would open the generic coordinate picker over the marker
+// popup). The stub records the stop so tests can assert the propagation
+// really was halted.
+export const DomEvent = {
+  stopPropagation: (e) => { if (e && typeof e === "object") e.__stopped = true; },
+};
 `);
 
   // --- transpile app/lib, app/components and the client pages ------------
