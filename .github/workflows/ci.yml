@@ -59,6 +59,20 @@ jobs:
       # Build + full suite con coverage, poi soglia minima sulle righe (solo
       # codice di produzione, esclusi test/helper/mock/fixture): sotto
       # COVERAGE_LINES (default 75) il job fallisce. Baseline in docs/QA_COVERAGE.md.
+      #
+      # NOTA OPERATIVA (t_c97844c2, run 30964829750 su main d31f53cc):
+      # 1) Il riepilogo inline "all files ~48.18%" stampato da node --test NON è
+      #    la metrica del gate: è un artefatto degli include su .coverage/trees/**
+      #    (alberi transpilati) e appare identico anche nei run verdi. La soglia
+      #    reale (~95% su main) è il report c8 prodotto da coverage:docs.
+      # 2) npm run coverage usa set -euo pipefail: se UN test flaky fallisce,
+      #    node --test esce 1 e il job muore PRIMA del passo soglia, con messaggio
+      #    fuorviante. La causa del rosso del 2026-08-05 era il test
+      #    client-field-of-view.test.mjs:378 (race change one-shot sullo slider
+      #    controllato, 1/2051, probe 6/400), NON un calo di coverage. Fix nel
+      #    test (retry del change in waitFor, stesso pattern di t_18d6f344).
+      #    Se il job torna rosso: controllare PRIMA i test falliti nel log, non
+      #    il totale inline — un re-run pulito NON copre regressioni reali.
       - name: Coverage run
         run: npm run coverage
 

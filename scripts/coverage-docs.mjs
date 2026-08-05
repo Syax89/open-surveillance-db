@@ -206,6 +206,17 @@ async function main() {
     ...rows.map((r) => `| \`${r.file}\` | ${pct(r.lines).toFixed(2)} | ${pct(r.branches).toFixed(2)} | ${pct(r.functions).toFixed(2)} | ${r.lines.covered}/${r.lines.total} |`),
   ].join("\n");
 
+  // Preserve any manually-curated CI note between markers so it survives
+  // regeneration (e.g. the t_c97844c2 note on the coverage job flake).
+  const NOTE_BEGIN = "<!-- CI-NOTE-BEGIN -->";
+  const NOTE_END = "<!-- CI-NOTE-END -->";
+  let preservedNote = "";
+  try {
+    const existing = await readFile(OUT_MD, "utf8");
+    const m = existing.match(new RegExp(`${NOTE_BEGIN}[\\s\\S]*?${NOTE_END}`));
+    if (m) preservedNote = m[0];
+  } catch { /* first run: nothing to preserve */ }
+
   const md = `# QA Coverage Report
 
 Baseline generata il **${date}** su commit \`${commit}\` con
@@ -225,6 +236,8 @@ Baseline generata il **${date}** su commit \`${commit}\` con
 La soglia minima sulle righe è **${THRESHOLD}%** (default 75, override con \`COVERAGE_LINES\`).
 È applicata dal job \`coverage\` in \`.github/workflows/ci.yml\` (\`scripts/coverage-docs.mjs --check\`):
 sotto soglia il job fallisce.
+
+${preservedNote}
 
 ## Moduli a coverage più bassa (priorità per nuovi test)
 
