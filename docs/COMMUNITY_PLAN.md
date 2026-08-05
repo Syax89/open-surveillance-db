@@ -1,7 +1,9 @@
 # Community system plan — piano consolidato (login, profilo contributi, livelli, verifiche)
 
-Last reviewed: 2026-08-02
-Status: **roadmap da approvare** (consolidamento dei pareri di Ricerca/Data/CTO/QA/Legal/Copy/Docs/Backend/Design) — § 1 aggiornato alla decisione multi-method auth ([ADR 0020](decisions/0020-multi-method-authentication.md), 2026-08-02)
+Last reviewed: 2026-08-05
+Status: **roadmap superseded per il modello di moderazione (ADR 0021, 2026-08-04)** — conservato come riferimento storico delle decisioni di autenticazione (ADR 0020) e trust levels (riusati come pesi, ADR 0021 § 4); le sezioni sul *profilo pubblico opt-in, verifiche/stelline ed editing con moderazione* (§ 2.2, § 4, § 5.2/§ 5.3, fasi C2–C6) **non sono implementate** e sono sostituite dalle community actions di ADR 0021. Per lo stato attuale fanno fede ADR 0021, MODERATION.md, DATA_MODEL.md, TERMS_OF_USE.md e PRIVACY_NOTICE.md.
+
+> **SUPERSEDED (ADR 0021 — community-driven pivot, decisione CEO 2026-08-04).** Questo piano descriveva il modello *profilo + verifiche/stelline + editing moderato*. Il pivot lo sostituisce: pubblicazione immediata da account verificati, **community actions** (`like`/`confirm`/`gone`/`problem`/`privacy`, una per utente per record) con soglie automatiche trust-weighted, cronologia pubblica **senza attribuzione**, **nessun profilo pubblico**, **nessuna verifica/stella**, **nessun flusso di edit**, erasure estesa alle azioni (art. 17, ADR 0021 § 13). Le sezioni § 2.2 (editing a due binari), § 4 (verifiche), § 5.2/§ 5.3 (profilo opt-in, verifications, edit), § 6 (i18n verifiche) e le fasi C2–C6 del § 7 sono **archiviate/not-implemented**. Restano attuali: § 1 (scelta autenticazione, ADR 0020) e § 3 (trust levels come primitiva di peso, riusata da ADR 0021 § 4/§ 12).
 
 Questo documento è il **piano unico** del community system: login sicuro, profilo dei
 contributi, trust levels e verifiche (stelline) sui record. Consolida:
@@ -321,6 +323,8 @@ non discriminatori; se un domani condizionasse diritti legali → valutazione 13
 
 ### 5.2 Decisioni vincolanti
 
+> **SUPERSEDED (ADR 0021, 2026-08-04).** Le decisioni 1–5 sotto si riferivano al modello profilo/verifiche/editing, **non implementato**. Nel modello community-driven valgono: **nessun profilo pubblico** (niente opt-in profile, niente display name pubblico); **nessun ranking/leaderboard** (invariato — i pesi non sono mai esposti, ADR 0021 § 10.2); **erasure estesa** a profilo/verifiche/authorship → sostituita dall'erasure delle **community actions** (deleted atomicamente con l'account, ADR 0021 § 13; la cronologia pubblica sopravvive solo come aggregati); **editing con gate umano** → **nessun flusso di edit**; le verifiche dell'utente cancellato → le sue azioni spariscono con l'account e le soglie vengono ricalcolate live. Il testo storico è conservato qui sotto per tracciabilità.
+
 1. **Niente leaderboard/ranking pubblici** (R1 Medio-Alto: conflitto PRODUCT_UX + identificabilità
    + potenziale art. 22). Livelli/verifiche non sono mai una classifica.
 2. **Profilo pubblico OPT-IN, default privato** (R4). Mai nome reale/email pubblici, solo
@@ -337,6 +341,8 @@ non discriminatori; se un domani condizionasse diritti legali → valutazione 13
    restano de-identificate sul record; conferme su record altrui non sono suoi dati.
 
 ### 5.3 Aggiornamenti documentali (check-list)
+
+> **SUPERSEDED (ADR 0021).** La check-list sotto elenca gli aggiornamenti del vecchio modello (profilo opt-in, verifications, editing) — **non eseguiti perché il modello è stato sostituito**. Gli allineamenti effettivamente eseguiti per ADR 0021 sono tracciati in ADR 0021 "Consequences", PRIVACY_NOTICE v0.11, TERMS v0.7, RETENTION_SCHEDULE (R1–R3/R13/R14 riscritte), MODERATION.md (riscritto) e LAWFUL_BASIS § 3.1/§ 3.1.1 (riscritti).
 
 | Documento | Azione |
 |---|---|
