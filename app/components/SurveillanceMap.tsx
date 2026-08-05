@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { isPublicStatus } from "../lib/public-status";
-import { BOUNDS_DEBOUNCE_MS, escapeHtml, recordsInBounds, type ViewportBounds } from "../lib/map-viewport";
+import { BOUNDS_DEBOUNCE_MS, escapeHtml, type ViewportBounds } from "../lib/map-viewport";
+import { markersForViewport } from "../lib/map-grid";
 import { useMessages } from "../lib/use-messages";
 import { isDomeKind } from "../lib/camera-kinds";
 import { FOV_MIN_ZOOM, fovCircleRadiusMeters, fovPolygonPoints } from "../lib/field-of-view";
@@ -83,6 +84,23 @@ function buildMarkerIcon(L: LeafletModule, camera: MapCamera, isSelected: boolea
     html: `<span class="osm-camera-marker ${statusClass} ${isSelected ? "selected" : ""}" aria-hidden="true"><i></i></span>`,
     iconSize: [28, 28],
     iconAnchor: [14, 14],
+  });
+}
+
+/**
+ * Grid-badge icon (t_26ce96f3): ONE divIcon per 48px screen cell showing
+ * the record count instead of one divIcon per record. The badge is a real
+ * interactive marker (Leaflet gives it role=button + tabindex + the title
+ * below); the count is the visible text, the tooltip/aria-label carry the
+ * same message for screen readers. Clicking zooms in toward the centroid
+ * (see the marker-population effect).
+ */
+function buildGridBadgeIcon(L: LeafletModule, count: number) {
+  return L.divIcon({
+    className: "osm-grid-badge-wrap",
+    html: `<span class="osm-grid-badge" aria-hidden="true">${count}</span>`,
+    iconSize: [30, 30],
+    iconAnchor: [15, 15],
   });
 }
 
@@ -352,10 +370,11 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
     };
   }, [emitBounds]);
 
-  // Marker population depends on the camera list, the click handler and
-  // the viewport culling rectangle — NOT on the selection. Rebuilding every
-  // marker on each selection change would recreate N Leaflet DOM nodes per
-  // click; the selection is applied by the dedicated effect below.
+  // Marker population depends on the camera list, the click handler, the
+  // viewport culling rectangle and the CURRENT ZOOM (the grid-vs-individual
+  // decision reads it) — NOT on the selection. Rebuilding every marker on
+  // each selection change would recreate N Leaflet DOM nodes per click; the
+  // selection is applied by the dedicated effect below.
   //
   // `mapReady` guards the first run: leaflet is imported lazily, so at
   // mount `leafletRef.current` is null and the effect must no-op; once the
@@ -366,25 +385,69 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
   // stayed empty because the effect had early-returned before the import
   // resolved and no later render re-triggered it).
   //
-  // QA#5 F3 (t_ab0d4c75, PM directive: ZERO new libraries — no
-  // Leaflet.markercluster, no supercluster): only the records inside the
-  // CURRENT viewport rectangle get a marker (recordsInBounds, same helper
-  // the sidebar list uses, so map and list can never disagree). A pan or
-  // zoom settles → moveend → debounced emitBounds → new viewportBounds →
-  // this effect rebuilds exactly the visible markers, so the DOM never
-  // materialises the full dataset (thousands of divIcon nodes on a civic
-  // DB is what degraded Leaflet pan/zoom). Null bounds (viewport not
-  // emitted yet) keeps every marker, so the first paint is never blank.
+  // t_26ce96f3 (CEO 2026-08-05, "visualizzazione lenta" with 7.374+
+  // points): two changes over the QA#5 F3 culling.
+  //
+  //  VIEWPORT-FIRST — the OLD first paint materialised EVERY record: at
+  //  mount viewportBounds is null, recordsInBounds(null) returns the full
+  //  dataset and the effect created 7.374 divIcon DOM nodes before the
+  //  first emitBounds culled them (measured: 7.378 nodes at z5, pan fell
+  //  to ~6-14 fps). Now bounds === null renders an EMPTY pane: the first
+  //  emitBounds arrives one frame after the map is created (end of
+  //  createMap), so the wait is invisible, and the full dataset is NEVER
+  //  materialised. The sidebar list keeps its "never blank" contract
+  //  (recordsInBounds(records, null) — text, cheap).
+  //
+  //  PIXEL-GRID AGGREGATION — zero new libraries (PM directive): above the
+  //  density threshold (or below GRID_MAX_ZOOM) markersForViewport buckets
+  //  the visible records into 48px screen cells; each cell renders ONE
+  //  badge divIcon with the count, and clicking it zooms in 2 levels toward
+  //  the centroid (the rebuild then shows smaller cells or individual
+  //  markers). Individual markers (popup + tooltip + click->select) render
+  //  only when the visible set is small (<= MAX_INDIVIDUAL_MARKERS) or the
+  //  zoom is high (>= GRID_MAX_ZOOM). No record is lost: every visible
+  //  record lands in exactly one cell, and a deep-linked selectedId is
+  //  ALWAYS rendered as an individual marker on top of the grid (see the
+  //  selected-overlay block below), so ?focus=ID keeps its popup.
   useEffect(() => {
     const L = leafletRef.current; const layer = markersRef.current; if (!L || !layer || !mapReady) return;
     layer.clearLayers();
     const byId = new Map<number, MarkerEntry>();
-    const visible = recordsInBounds(cameras, viewportBounds);
-    visible.forEach((camera) => {
+    // Viewport-first: never materialise the dataset before the first
+    // bounds. (The sidebar list still shows everything via its own
+    // recordsInBounds(records, null) call — text is cheap, DOM markers are
+    // not.)
+    if (!viewportBounds) {
+      markersByIdRef.current = byId;
+      return;
+    }
+    const { visible, cells, individual } = markersForViewport(cameras, viewportBounds, mapZoom);
+    // Grid badges: one marker per aggregated cell. Clicking zooms in toward
+    // the centroid (2 levels — enough to split the cell into readable
+    // pieces or individual markers). The badge is a button (Leaflet
+    // interactive marker: role=button + tabindex) whose aria-label/tooltip
+    // carry the count; the visible text is the count itself.
+    cells.forEach((cell) => {
+      const marker = L.marker([cell.centroidLat, cell.centroidLng], {
+        icon: buildGridBadgeIcon(L, cell.count),
+        title: t.gridBadgeTooltip(cell.count),
+      });
+      marker.bindTooltip(t.gridBadgeTooltip(cell.count), { direction: "top", offset: [0, -16] });
+      marker.on("click", () => {
+        const map = mapRef.current;
+        if (!map) return;
+        map.setView([cell.centroidLat, cell.centroidLng], map.getZoom() + 2, { animate: true });
+      });
+      marker.addTo(layer);
+      marker.getElement()?.setAttribute?.("aria-label", t.gridBadgeLabel(cell.count));
+    });
+    // Individual markers: only the records NOT aggregated into a multi-
+    // record cell (single-record cells render directly). Popup opens on
+    // marker click (Leaflet default) and carries the record info +
+    // correction/detail links built by the parent page.
+    individual.forEach((camera) => {
       const marker = L.marker([camera.latitude, camera.longitude], { icon: buildMarkerIcon(L, camera, false), title: camera.title });
       marker.bindTooltip(`${camera.title}<br/><small>${camera.kind}</small>`, { direction: "top", offset: [0, -12] });
-      // Popup opens on marker click (Leaflet default) and carries the
-      // record info + correction/detail links built by the parent page.
       marker.bindPopup(popupHtmlForRef.current ? popupHtmlForRef.current(camera) : defaultPopupHtml(camera), {
         maxWidth: 300,
         minWidth: 220,
@@ -394,6 +457,28 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
       marker.addTo(layer);
       byId.set(camera.id, { marker, camera });
     });
+    // Deep-link contract (t_26ce96f3): the selected record is ALWAYS
+    // rendered as an individual marker, even when the rest of the view is
+    // aggregated into a grid cell — a ?focus=ID deep link must be visible
+    // and its popup must open. (If the selection is inside a multi-record
+    // cell, its badge would swallow the individual popup.)
+    const selectedIdNow = selectedIdRef.current;
+    if (selectedIdNow !== null && !byId.has(selectedIdNow)) {
+      const camera = visible.find((item) => item.id === selectedIdNow);
+      if (camera) {
+        const marker = L.marker([camera.latitude, camera.longitude], { icon: buildMarkerIcon(L, camera, true), title: camera.title });
+        marker.bindTooltip(`${camera.title}<br/><small>${camera.kind}</small>`, { direction: "top", offset: [0, -12] });
+        marker.bindPopup(popupHtmlForRef.current ? popupHtmlForRef.current(camera) : defaultPopupHtml(camera), {
+          maxWidth: 300,
+          minWidth: 220,
+          className: "osm-camera-popup",
+        });
+        marker.on("click", () => onSelect(camera.id));
+        marker.addTo(layer);
+        byId.set(camera.id, { marker, camera });
+        if (focusLocationRef.current) marker.openPopup();
+      }
+    }
     markersByIdRef.current = byId;
     // Freshly built markers start unselected; re-apply the current
     // selection icon here so a rebuild (filter/directory change) keeps the
@@ -413,7 +498,7 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
       entry.marker.setIcon(buildMarkerIcon(L, entry.camera, true));
       if (focusLocationRef.current) entry.marker.openPopup();
     }
-  }, [cameras, onSelect, mapReady, viewportBounds]);
+  }, [cameras, onSelect, mapReady, viewportBounds, mapZoom, t]);
 
   // Field-of-view layer (t_f8b775ec): draw the camera's field of view with
   // native Leaflet only — a ~60°/35 m wedge (L.polygon, points computed by
@@ -429,7 +514,12 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
     const L = leafletRef.current; const layer = fovLayerRef.current; if (!L || !layer || !mapReady) return;
     layer.clearLayers();
     if (mapZoom < FOV_MIN_ZOOM) return;
-    const visible = recordsInBounds(cameras, viewportBounds);
+    // t_26ce96f3 viewport-first: FOV geometry follows the SAME marker
+    // contract (markersForViewport) — never materialise geometry for
+    // records before the first bounds, and only for the records that are
+    // actually rendered individually (at FOV_MIN_ZOOM=16 the grid is
+    // inactive by construction: GRID_MAX_ZOOM=14 < 16).
+    const { visible } = markersForViewport(cameras, viewportBounds, mapZoom);
     visible.forEach((camera) => {
       if (isDomeKind(camera.kind)) {
         // Dome: 360° vision — a circle around the marker (same radius as the

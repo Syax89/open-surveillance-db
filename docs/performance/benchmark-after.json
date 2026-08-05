@@ -1,0 +1,129 @@
+{
+  "label": "after",
+  "url": "http://localhost:3000/mappa",
+  "ts": "2026-08-05T14:46:22.825Z",
+  "node": "v22.22.3",
+  "browser": "151.0.7922.34",
+  "walk": {
+    "requests": 15,
+    "totalMs": 5421,
+    "perRequest": [
+      {
+        "offset": "0",
+        "ms": 471
+      },
+      {
+        "offset": "500",
+        "ms": 1727
+      },
+      {
+        "offset": "1000",
+        "ms": 249
+      },
+      {
+        "offset": "1500",
+        "ms": 259
+      },
+      {
+        "offset": "2000",
+        "ms": 244
+      },
+      {
+        "offset": "2500",
+        "ms": 233
+      },
+      {
+        "offset": "3000",
+        "ms": 254
+      },
+      {
+        "offset": "3500",
+        "ms": 239
+      },
+      {
+        "offset": "4000",
+        "ms": 262
+      },
+      {
+        "offset": "4500",
+        "ms": 247
+      },
+      {
+        "offset": "5000",
+        "ms": 233
+      },
+      {
+        "offset": "5500",
+        "ms": 253
+      },
+      {
+        "offset": "6000",
+        "ms": 259
+      },
+      {
+        "offset": "6500",
+        "ms": 237
+      },
+      {
+        "offset": "7000",
+        "ms": 234
+      }
+    ],
+    "bytes": 4040401
+  },
+  "markers": {
+    "national": {
+      "markers": 29,
+      "divIcons": 29
+    },
+    "city": {
+      "markers": 53,
+      "divIcons": 53
+    }
+  },
+  "paint": {
+    "fcp": 620,
+    "lcp": 760,
+    "firstMarker": 162
+  },
+  "popup": {
+    "openMs": 125,
+    "zoomedToReach": 0,
+    "individualCount": 17,
+    "visible": true,
+    "hasTitle": true,
+    "hasActions": false
+  },
+  "heap": {
+    "usedJSHeapSize": 27600000,
+    "totalJSHeapSize": 33100000
+  },
+  "interactionNational": {
+    "zoom": 5,
+    "pan": {
+      "frames": 101,
+      "fps": 58.3,
+      "avgFrameMs": 17.2
+    },
+    "zoomIn": {
+      "frames": 128,
+      "fps": 95.2,
+      "avgFrameMs": 10.5
+    },
+    "markersAfter": 24
+  },
+  "interactionCity": {
+    "zoom": 13,
+    "pan": {
+      "frames": 291,
+      "fps": 181.3,
+      "avgFrameMs": 5.5
+    },
+    "zoomIn": {
+      "frames": 244,
+      "fps": 243,
+      "avgFrameMs": 4.1
+    },
+    "markersAfter": 0
+  }
+}

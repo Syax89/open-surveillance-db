@@ -1,0 +1,129 @@
+{
+  "label": "before",
+  "url": "http://localhost:3000/mappa",
+  "ts": "2026-08-05T14:43:04.197Z",
+  "node": "v22.22.3",
+  "browser": "151.0.7922.34",
+  "walk": {
+    "requests": 15,
+    "totalMs": 5767,
+    "perRequest": [
+      {
+        "offset": "0",
+        "ms": 497
+      },
+      {
+        "offset": "500",
+        "ms": 1689
+      },
+      {
+        "offset": "1000",
+        "ms": 251
+      },
+      {
+        "offset": "1500",
+        "ms": 235
+      },
+      {
+        "offset": "2000",
+        "ms": 247
+      },
+      {
+        "offset": "2500",
+        "ms": 240
+      },
+      {
+        "offset": "3000",
+        "ms": 248
+      },
+      {
+        "offset": "3500",
+        "ms": 249
+      },
+      {
+        "offset": "4000",
+        "ms": 591
+      },
+      {
+        "offset": "4500",
+        "ms": 267
+      },
+      {
+        "offset": "5000",
+        "ms": 239
+      },
+      {
+        "offset": "5500",
+        "ms": 247
+      },
+      {
+        "offset": "6000",
+        "ms": 266
+      },
+      {
+        "offset": "6500",
+        "ms": 264
+      },
+      {
+        "offset": "7000",
+        "ms": 209
+      }
+    ],
+    "bytes": 4040401
+  },
+  "markers": {
+    "national": {
+      "markers": 7378,
+      "divIcons": 7378
+    },
+    "city": {
+      "markers": 184,
+      "divIcons": 184
+    }
+  },
+  "paint": {
+    "fcp": 1296,
+    "lcp": 1364,
+    "firstMarker": 235
+  },
+  "popup": {
+    "openMs": 128,
+    "zoomedToReach": 0,
+    "individualCount": 308,
+    "visible": true,
+    "hasTitle": true,
+    "hasActions": false
+  },
+  "heap": {
+    "usedJSHeapSize": 29400000,
+    "totalJSHeapSize": 35100000
+  },
+  "interactionNational": {
+    "zoom": 5,
+    "pan": {
+      "frames": 35,
+      "fps": 6.8,
+      "avgFrameMs": 147.1
+    },
+    "zoomIn": {
+      "frames": 8,
+      "fps": 1.5,
+      "avgFrameMs": 678.5
+    },
+    "markersAfter": 5560
+  },
+  "interactionCity": {
+    "zoom": 13,
+    "pan": {
+      "frames": 98,
+      "fps": 60,
+      "avgFrameMs": 16.7
+    },
+    "zoomIn": {
+      "frames": 122,
+      "fps": 121,
+      "avgFrameMs": 8.3
+    },
+    "markersAfter": 0
+  }
+}
