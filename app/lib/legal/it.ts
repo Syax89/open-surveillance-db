@@ -24,7 +24,7 @@ export const itLegal: LegalContent = {
     intro:
       "Come OpenSurveillanceDB tratta i dati personali, cosa pubblichiamo, cosa non raccogliamo mai e come puoi esercitare i tuoi diritti ai sensi del GDPR.",
     versionNote:
-      "Versione 0.5 — 1 agosto 2026. Bozza per la revisione pre-lancio; aggiunto il § 10 (cookie) con la documentazione del cookie funzionale di lingua (art. 122 D.Lgs. 196/2003). La copia repository (docs/legal/PRIVACY_NOTICE.md) resta la versione canonica.",
+      "Versione 0.6 — 5 agosto 2026. Aggiornata per il modello community-driven (ADR 0021): le segnalazioni vengono pubblicate subito da account verificati; il § 7 sulla conservazione è allineato al ciclo di revisione ritirato; il § 10 (cookie) è invariato. La copia repository (docs/legal/PRIVACY_NOTICE.md) resta la versione canonica.",
     sections: [
       {
         heading: "1. Chi siamo (titolare del trattamento)",
@@ -44,7 +44,7 @@ export const itLegal: LegalContent = {
         blocks: [
           {
             type: "paragraph",
-            text: "OpenSurveillanceDB pubblica una mappa di interesse pubblico delle **infrastrutture di sorveglianza visibili e pubbliche** (ad esempio telecamere installate in strade, piazze, esterni di stazioni), verificate da moderatori formati prima della pubblicazione. È un progetto di trasparenza civica, non una piattaforma commerciale: niente pubblicità comportamentale, niente tracciamento, nessuna vendita di dati.",
+            text: "OpenSurveillanceDB pubblica una mappa di interesse pubblico delle **infrastrutture di sorveglianza visibili e pubbliche** (ad esempio telecamere installate in strade, piazze, esterni di stazioni), pubblicate subito da account contributori verificati e mantenute accurate dalla community tramite conferme, segnalazioni e soglie automatiche (ADR 0021). È un progetto di trasparenza civica, non una piattaforma commerciale: niente pubblicità comportamentale, niente tracciamento, nessuna vendita di dati.",
           },
         ],
       },
@@ -63,7 +63,7 @@ export const itLegal: LegalContent = {
               [
                 "Contenuto della segnalazione: posizione, descrizione, produttore / data di osservazione facoltativi, note private",
                 "Segnalante (interessato)",
-                "Costruire il registro pubblico; coda di moderazione",
+                "Costruire il registro pubblico; azioni della community per l'accuratezza",
                 "Art. 6(1)(f) GDPR",
               ],
               [
@@ -110,7 +110,7 @@ export const itLegal: LegalContent = {
               ],
               [
                 "Record pubblicati",
-                "Segnalazioni moderate / fonti pubbliche ufficiali",
+                "Segnalazioni pubblicate / fonti pubbliche ufficiali",
                 "Il dataset pubblico (ODbL 1.0)",
                 "Art. 6(1)(f) / 6(1)(e) GDPR",
               ],
@@ -143,10 +143,10 @@ export const itLegal: LegalContent = {
               "**Niente video, live stream, credenziali, informazioni di rete o interfacce di controllo** — il progetto documenta l'*esistenza* di infrastrutture di sorveglianza visibili, mai il loro output o accesso.",
               "**Niente telecamere di case private** né telecamere puntate verso interni privati.",
               "**Niente nomi, volti, targhe o dettagli operativi precisi.**",
-              "**Niente coordinate oltre la precisione di zona:** le posizioni pubblicate sono arrotondate a **~4 decimali (~10 m)**; la posizione esatta resta nel record privato di moderazione, visibile solo ai moderatori.",
+              "**Niente coordinate oltre la precisione di zona:** le posizioni pubblicate sono arrotondate a **~4 decimali (~10 m)**; la posizione esatta resta nel database e non viene mai pubblicata.",
               "**Niente pubblicità comportamentale, niente tracciamento, nessuna vendita di dati**, nessuna libreria di analisi.",
               "**Nessuna foto pubblicata senza moderazione e redazione confermata:** le foto caricate (JPEG/PNG/WebP, ≤10 MB / 4096 px) vengono private dei metadati EXIF/XMP/IPTC al confine (fail-closed — un contenitore che non può essere percorso in sicurezza viene rifiutato, mai memorizzato senza stripping), conservate con byte sanitizzati in R2 e metadati solo in D1, e **non sono mai pubbliche** finché un moderatore non le approva con `redaction_confirmed = 1`. La chiave di storage non viene mai esposta.",
-              "Le segnalazioni sono conservate come pending e **non sono mai pubbliche** finché un moderatore non le approva. Il contenuto rifiutato non viene mai pubblicato.",
+              "Le segnalazioni vengono pubblicate subito da account verificati e fanno parte del dataset pubblico dal momento dell'invio. I contenuti che violano le regole vengono ritirati dalla community o per emergenza legale, e i contenuti ritirati non vengono mai ripubblicati.",
             ],
           },
         ],
@@ -159,7 +159,7 @@ export const itLegal: LegalContent = {
             items: [
               "**Cloudflare, Inc.** — hosting e database (Workers + D1). Responsabile del trattamento (art. 28) ai sensi del Cloudflare Data Processing Addendum (DPA v6.3, giugno 2025) che incorpora le **clausole contrattuali standard UE (2021/914)**; Cloudflare è certificato ai sensi dell'**EU–US Data Privacy Framework**. D1 è configurato con residenza dati UE.",
               "**OpenAI (accesso ChatGPT)** — fornitore di identità per i moderatori. OpenAI è **titolare autonomo del proprio servizio di autenticazione** (la sua privacy policy si applica al momento dell'accesso); nessun dato di OpenSurveillanceDB viene inviato a OpenAI — riceviamo solo gli attributi di identità elencati sopra. Mai pubblicati, mai registrati.",
-              "**La pubblicazione stessa:** i record verificati diventano parte di un dataset pubblico con licenza ODbL 1.0 e possono essere scaricati o esportati (JSON/CSV/GeoJSON). Le copie già scaricate non possono essere richiamate; i record rimossi sono esclusi dalle esportazioni future.",
+              "**La pubblicazione stessa:** i record pubblicati diventano parte di un dataset pubblico con licenza ODbL 1.0 e possono essere scaricati o esportati (JSON/CSV/GeoJSON). Le copie già scaricate non possono essere richiamate; i record ritirati sono esclusi dalle esportazioni future.",
               "Nessun altro destinatario; niente pubblicità comportamentale; nessuna libreria di analisi.",
             ],
           },
@@ -182,11 +182,11 @@ export const itLegal: LegalContent = {
         blocks: [
           {
             type: "paragraph",
-            text: "Segnalazioni pending: 90 giorni. Segnalazioni rifiutate: 30 giorni. Record verificati: **ciclo di revisione con rinnovo a 12 mesi**. Richieste di correzione e voci di audit: 2 anni. Prove: legate al record. Log operativi: fino a 12 mesi (aggregati). Backup: ruotati dal fornitore (fino a 30 giorni di ripristino point-in-time).",
+            text: "Le segnalazioni vengono pubblicate subito e restano pubbliche finché la community continua a confermarle; i record ritirati dalla community o per emergenza legale sono esclusi dagli output pubblici e seguono il calendario di conservazione del repository (docs/legal/RETENTION_SCHEDULE.md). Richieste di correzione e voci di audit: 2 anni. Prove: legate al record. Log operativi: fino a 12 mesi (aggregati). Backup: ruotati dal fornitore (fino a 30 giorni di ripristino point-in-time).",
           },
           {
             type: "paragraph",
-            text: "L'applicazione automatica delle regole di cancellazione e scadenza è un elemento di implementazione pre-lancio; fino ad allora il calendario è applicato dal flusso di moderazione.",
+            text: "L'applicazione automatica delle regole di cancellazione e scadenza è un elemento di implementazione pre-lancio; fino ad allora il calendario è applicato dallo sweep automatico di conservazione.",
           },
         ],
       },
@@ -277,7 +277,7 @@ export const itLegal: LegalContent = {
     intro:
       "Questi termini disciplinano l'uso di OpenSurveillanceDB, il database aperto e gestito dalla comunità delle infrastrutture di sorveglianza pubbliche e visibili. Si applicano all'applicazione web, all'API pubblica, alle esportazioni dei dati e ai servizi correlati (\"il Servizio\").",
     versionNote:
-      "Versione 0.3 — 1 agosto 2026. Bozza per la revisione pre-lancio; la copia repository (docs/TERMS_OF_USE.md) resta la versione canonica.",
+      "Versione 0.4 — 5 agosto 2026. Aggiornati per il modello community-driven (ADR 0021): il § 5 descrive la pubblicazione immediata e le azioni della community al posto della coda di revisione umana; il § 6 sostituisce i ricorsi con le correzioni private e il potere di emergenza legale. La copia repository (docs/TERMS_OF_USE.md) resta la versione canonica.",
     sections: [
       {
         heading: "1. Chi siamo",
@@ -288,7 +288,7 @@ export const itLegal: LegalContent = {
           },
           {
             type: "paragraph",
-            text: "**Contatto:** [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org) — casella dedicata — per ogni domanda, correzione, ricorso o richiesta relativa alla privacy. Tempi di risposta: prima risposta entro 48 ore, decisione sostanziale entro 14 giorni.",
+            text: "**Contatto:** [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org) — casella dedicata — per ogni domanda, correzione, rimozione o richiesta relativa alla privacy. Tempi di risposta: prima risposta entro 48 ore, decisione sostanziale entro 14 giorni.",
           },
         ],
       },
@@ -315,7 +315,7 @@ export const itLegal: LegalContent = {
             items: [
               "**Consultazione:** navigare la mappa, l'elenco dei record e le singole pagine dei record; cercare e leggere il dataset pubblico.",
               "**Esportazioni:** scaricare i dati pubblici tramite le esportazioni JSON/CSV/GeoJSON e l'API pubblica, e riutilizzarli, nel rispetto della licenza ODbL 1.0 (sezione 7) e dei limiti anti-abuso della sezione 4.",
-              "**Segnalazioni:** inviare osservazioni su infrastrutture di sorveglianza pubbliche e visibili per la moderazione umana. Le segnalazioni non sono mai garantite come pubblicate (sezione 5).",
+              "**Segnalazioni:** inviare osservazioni su infrastrutture di sorveglianza pubbliche e visibili. Una segnalazione di un account verificato viene **pubblicata subito** e fa parte del dataset pubblico dal momento dell'invio (sezione 5).",
               "**Finalità lecite:** i dati possono essere usati per ricerca, giornalismo, attivismo civico e per qualsiasi finalità compatibile con questi termini e con la licenza ODbL 1.0. La consultazione dei dati pubblici non richiede mai un account. Inviare una segnalazione o una correzione richiede un account contributore verificato (sezione 3.7; ADR 0020) e ogni invio è attribuito a esso tramite un **ID interno pseudonimo** — mai un requisito di nome reale.",
             ],
           },
@@ -326,7 +326,7 @@ export const itLegal: LegalContent = {
         blocks: [
           {
             type: "paragraph",
-            text: "**Contenuti vietati.** Le esclusioni della policy di moderazione si applicano a tutto ciò che invii, incluse segnalazioni, note ed eventuali futuri caricamenti di prove. In particolare, non inviare:",
+            text: "**Contenuti vietati.** Le esclusioni delle regole di pubblicazione si applicano a tutto ciò che invii, incluse segnalazioni, note ed eventuali futuri caricamenti di prove. In particolare, non inviare:",
           },
           {
             type: "list",
@@ -346,7 +346,7 @@ export const itLegal: LegalContent = {
           },
           {
             type: "paragraph",
-            text: "**Niente abusi.** Non superare i limiti di frequenza applicabili, non fare scraping del Servizio oltre un ragionevole uso personale, non tentare di accedere a record non pubblici (pending, rifiutati, code di moderazione, richieste di correzione) e non aggirare i controlli di accesso né usare il Servizio per molestare o facilitare danni.",
+            text: "**Niente abusi.** Non superare i limiti di frequenza applicabili, non fare scraping del Servizio oltre un ragionevole uso personale, non tentare di accedere a record non pubblici (record ritirati, richieste di correzione) e non aggirare i controlli di accesso né usare il Servizio per molestare o facilitare danni.",
           },
           {
             type: "paragraph",
@@ -361,24 +361,25 @@ export const itLegal: LegalContent = {
             type: "list",
             ordered: true,
             items: [
-              "**Nessuna garanzia di pubblicazione.** Ogni segnalazione entra nel database come pending. Moderatori umani formati la esaminano, verificano e decidono secondo la policy di moderazione. Una segnalazione può essere rifiutata, nascosta o rimossa in qualsiasi momento; il contenuto rifiutato non viene mai pubblicato ed è programmato per la cancellazione 30 giorni dopo la decisione di rifiuto.",
-              "**Cosa conservi e cosa concedi.** Conservi tutti i diritti che hai sul contenuto che invii. Con l'invio concedi al progetto una licenza non esclusiva, mondiale, esente da royalty per conservare ed esaminare la segnalazione e — **solo se** il record viene verificato e pubblicato — per pubblicarla e renderla disponibile con licenza **ODbL 1.0**, come parte del database aperto, con attribuzione ai contributori secondo l'avviso ODbL. Il semplice atto di inviare non concede alcuna licenza di pubblicazione.",
-              "**Le tue dichiarazioni.** Inviando confermi che: il contenuto è accurato al meglio delle tue conoscenze; hai il diritto di condividerlo; è conforme alla sezione 4; e hai l'età minima per usare il Servizio nella tua giurisdizione (in Italia, 14 anni).",
-              "**La verifica può essere rifiutata.** I record ripubblicati da fonti pubbliche ufficiali seguono il proprio regime giuridico, verificato caso per caso; le segnalazioni della comunità sono verificate secondo lo standard di pubblicazione della moderazione, non contro registri ufficiali.",
-              "**Prove fotografiche.** Le segnalazioni possono includere foto (JPEG, PNG o WebP, fino a **10 MB e 4096 px per lato**). Al caricamento, il servizio **rimuove i metadati EXIF/XMP/IPTC al confine** (fail-closed: se il contenitore non può essere percorso in sicurezza il caricamento viene rifiutato — mai memorizzato senza stripping), verifica il contenitore dai magic bytes (senza mai fidarsi del Content-Type dichiarato), conserva i byte sanitizzati nell'object storage (**R2**) con metadati solo nel database (**D1**), e tiene ogni foto **privata (`pending`) e mai pubblica** finché un moderatore non la approva con `redaction_confirmed = 1` — il moderatore deve confermare che il soggetto è stato oscurato. Le foto seguono la conservazione del record (cancellate col record; hard-delete immediato se il record viene rifiutato o rimosso). `storage_key` non viene mai esposto; i client interagiscono con le foto solo tramite id.",
+              "**Pubblicazione immediata.** Una segnalazione di un contributore verificato viene pubblicata subito: entra nel dataset pubblico appena inviata. Niente coda di revisione, niente attese. È la community a mantenere accurato l'elenco: i record vengono confermati, segnalati come non più presenti, marcati come utili o ritirati attraverso soglie automatiche (ADR 0021). Un record può essere nascosto o rimosso in qualsiasi momento da abbastanza segnalazioni della community, o da una decisione di emergenza legale; i record ritirati restano raggiungibili tramite link diretto con un banner e una cronologia pubblica degli eventi, e possono essere ripristinati da abbastanza conferme.",
+              "**Cosa conservi e cosa concedi.** Conservi tutti i diritti che hai sul contenuto che invii. Con l'invio concedi al progetto una licenza non esclusiva, mondiale, esente da royalty per conservare, esaminare e pubblicare la segnalazione come parte del database aperto, reso disponibile con licenza **ODbL 1.0**, con attribuzione ai contributori secondo l'avviso ODbL. La pubblicazione avviene all'invio, non dopo un passaggio di approvazione.",
+              "**Le tue dichiarazioni.** Inviando conferisci che: il contenuto è accurato al meglio delle tue conoscenze; hai il diritto di condividerlo; è conforme alla sezione 4; e hai l'età minima per usare il Servizio nella tua giurisdizione (in Italia, 14 anni).",
+              "**Accuratezza della community.** I record ripubblicati da fonti pubbliche ufficiali seguono il proprio regime giuridico, verificato caso per caso; i record della community sono mantenuti accurati da conferme e segnalazioni sotto le soglie automatiche, non contro registri ufficiali.",
+              "**Prove fotografiche.** Le segnalazioni possono includere foto (JPEG, PNG o WebP, fino a **10 MB e 4096 px per lato**). Al caricamento, il servizio **rimuove i metadati EXIF/XMP/IPTC al confine** (fail-closed: se il contenitore non può essere percorso in sicurezza il caricamento viene rifiutato — mai memorizzato senza stripping), verifica il contenitore dai magic bytes (senza mai fidarsi del Content-Type dichiarato), conserva i byte sanitizzati nell'object storage (**R2**) con metadati solo nel database (**D1**), e tiene ogni foto **privata (`pending`) e mai pubblica** finché un moderatore non la approva con `redaction_confirmed = 1` — il moderatore deve confermare che il soggetto è stato oscurato. Le foto seguono la conservazione del record (cancellate col record; hard-delete immediato se il record viene ritirato). `storage_key` non viene mai esposto; i client interagiscono con le foto solo tramite id.",
             ],
           },
         ],
       },
       {
-        heading: "6. Moderazione, correzioni, ricorsi",
+        heading: "6. Azioni della community, correzioni, emergenze legali",
         blocks: [
           {
             type: "list",
             ordered: true,
             items: [
-              "La moderazione segue la policy e i livelli di servizio pubblicati: nascondimenti d'emergenza entro **24 ore**, prima risposta entro **48 ore**, decisione sostanziale entro **14 giorni**, riesame dei nascondimenti temporanei entro **30 giorni**.",
-              "Chiunque sia interessato da una decisione di moderazione può richiederne la correzione o la rimozione tramite il modulo di correzione nell'app (home page, sezione \"Segnala un problema / correzione\") o [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org) entro **30 giorni** dalla decisione. I ricorsi sono decisi da un **revisore diverso** da quello della decisione originaria, con escalation per i casi contestati.",
+              "**Azioni della community.** Ogni account verificato può marcare un record come utile, confermare che è ancora presente, segnalarlo come non più presente o sollevare un problema o una preoccupazione di privacy. Un account, un'azione attiva per record. Soglie automatiche — inclusa una soglia di privacy deliberatamente bassa — decidono quando un record viene nascosto o rimosso; ogni transizione è registrata nella cronologia pubblica del record senza attribuzione a nessun profilo.",
+              "**Correzioni.** Chiunque può richiedere una correzione o una rimozione tramite il modulo privato di correzione (home page, sezione \"Segnala un problema / correzione\") o [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org). Le richieste sono private, esaminate da una persona e non modificano mai la mappa automaticamente. Obiettivi di risposta: prima risposta entro **48 ore**, risposta sostanziale entro **14 giorni**; i nascondimenti per emergenza legale sono immediati.",
+              "**Emergenze legali.** L'unico potere di scrittura umano rimasto è il nascondimento o la rimozione per emergenza legale da parte dell'amministratore, usato quando la legge lo richiede e rivisto a posteriori. Gli amministratori non possono ripristinare o rendere visibile un record unilateralmente: il consenso della community della sezione 5 è l'unico percorso di inversione.",
               "I diritti dell'interessato (accesso, rettifica, cancellazione, limitazione, opposizione, portabilità) sono descritti nell'[informativa sulla privacy](/privacy) e si esercitano tramite lo stesso contatto.",
             ],
           },
@@ -406,10 +407,10 @@ export const itLegal: LegalContent = {
             type: "list",
             ordered: true,
             items: [
-              "OpenSurveillanceDB è un **dataset civico, mantenuto dalla comunità — non un registro ufficiale e non una dichiarazione di fatto giuridico.** Nonostante la moderazione umana, i record possono essere incompleti, obsoleti o imprecisi; la pubblicazione è deliberatamente prudente.",
+              "OpenSurveillanceDB è un **dataset civico, mantenuto dalla comunità — non un registro ufficiale e non una dichiarazione di fatto giuridico.** Nonostante la manutenzione della community, i record possono essere incompleti, obsoleti o imprecisi; la pubblicazione è immediata, non prudente.",
               "Non fare affidamento sul dataset per decisioni critiche per la sicurezza o ufficiali. Verifica presso fonti ufficiali (ad esempio la pubblica amministrazione competente) prima di agire. Il Servizio fornisce informazioni solo sulle infrastrutture visibili — non è un elenco di tutte le telecamere, e l'assenza di un record non prova nulla.",
               "I record provenienti da fonti ufficiali riportano la fonte e la data di verifica; i record della comunità non offrono tale garanzia.",
-              "Le coordinate pubblicate sono arrotondate a **~4 decimali (~10 m)** — precisione di zona. La posizione esatta non viene mai pubblicata e resta nel record privato di moderazione, visibile solo ai moderatori.",
+              "Le coordinate pubblicate sono arrotondate a **~4 decimali (~10 m)** — precisione di zona. La posizione esatta non viene mai pubblicata e resta nel database.",
             ],
           },
         ],
@@ -419,7 +420,7 @@ export const itLegal: LegalContent = {
         blocks: [
           {
             type: "paragraph",
-            text: "Il tuo uso del Servizio è disciplinato dall'[informativa sulla privacy](/privacy). Punti chiave: niente tracciamento, niente pubblicità comportamentale; le segnalazioni sono private finché pending; i tuoi diritti GDPR si esercitano tramite [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org) nei termini di legge (art. 12(3) GDPR).",
+            text: "Il tuo uso del Servizio è disciplinato dall'[informativa sulla privacy](/privacy). Punti chiave: niente tracciamento, niente pubblicità comportamentale; le segnalazioni sono pubbliche appena pubblicate e le richieste private di correzione restano private; i tuoi diritti GDPR si esercitano tramite [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org) nei termini di legge (art. 12(3) GDPR).",
           },
         ],
       },
@@ -445,8 +446,8 @@ export const itLegal: LegalContent = {
             type: "list",
             ordered: true,
             items: [
-              "Possiamo sospendere o limitare l'accesso, o rimuovere contenuti, quando necessario per far rispettare questi termini, per proteggere utenti o interessati, o secondo la policy di moderazione — con l'obiettivo di informare la persona interessata dove proporzionato e possibile.",
-              "I contributori possono richiedere la cancellazione delle proprie segnalazioni pending tramite [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org); i record verificati e pubblicati sono soggetti al ciclo di conservazione e revisione con **rinnovo a 12 mesi** e al percorso di correzione della sezione 6.",
+              "Possiamo sospendere o limitare l'accesso, o rimuovere contenuti, quando necessario per far rispettare questi termini, per proteggere utenti o interessati, o secondo le regole di pubblicazione — con l'obiettivo di informare la persona interessata dove proporzionato e possibile.",
+              "I contributori possono richiedere la cancellazione delle proprie segnalazioni tramite [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org); i record pubblicati restano pubblici finché la community continua a confermarli e seguono i percorsi di correzione e ritiro della sezione 6.",
             ],
           },
         ],
@@ -484,8 +485,8 @@ export const itLegal: LegalContent = {
           {
             type: "list",
             items: [
-              "**Privacy, correzioni, ricorsi, diritti:** [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org) (casella dedicata).",
-              "Le emergenze di moderazione o abuso usano lo stesso canale (nascondimento entro 24 ore).",
+              "**Privacy, correzioni, diritti:** [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org) (casella dedicata).",
+              "Le emergenze legali e le segnalazioni di abuso usano lo stesso canale (nascondimento immediato).",
             ],
           },
         ],
@@ -591,7 +592,7 @@ export const itLegal: LegalContent = {
               "Una directory testuale ricercabile e pagine di dettaglio dei record che funzionano **senza interazione con la mappa**; mappa e directory presentano gli stessi campi pubblici.",
               "Selezione della posizione della segnalazione tramite clic sulla mappa **o** coordinate manuali validate.",
               "Un'interfaccia in inglese/italiano con preferenza di lingua locale al dispositivo; la scelta della lingua non influisce sui dati API.",
-              "Una guida in-app bilingue su [/guide](/guide) che spiega gli stati dei dati e il flusso di lavoro di moderazione.",
+              "Una guida in-app bilingue su [/guide](/guide) che spiega gli stati dei dati e il flusso di pubblicazione.",
               "Lo stato delle informazioni non è mai comunicato solo con il colore (vengono usati testo ed etichette con icone).",
             ],
           },

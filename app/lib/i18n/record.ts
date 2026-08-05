@@ -14,7 +14,7 @@ export const en = {
   publicRecord: "Public record",
   recordId: "Record ID",
   source: "Source",
-  lastVerification: "Last verification",
+  lastVerification: "Last confirmation",
   // F4 (QA#6): the demo seed rows carry raw, language-neutral markers
   // ("Prototype seed"/"Demo data" — test contract, see DATA_DICTIONARY);
   // the presentation shows these localized labels instead.
@@ -26,7 +26,7 @@ export const en = {
   viewOnMap: "View on map",
   reportIssue: "Report an issue",
   recordNote:
-    "This page contains only reviewed public records or clearly labelled illustrative records. It does not provide live feeds or operational camera details.",
+    "This page contains only live public records or clearly labelled illustrative records. It does not provide live feeds or operational camera details.",
   unavailable: "Record unavailable",
   notFound: "We could not find that public record.",
   notFoundDetail:
@@ -42,13 +42,13 @@ export const en = {
   statusFallback: "Status",
   changeHistory: "Change history",
   changeHistoryNote:
-    "This history lists reviewed changes only. It never includes contributor identities or internal notes.",
+    "This history lists public events only. It never includes contributor identities or internal notes.",
   changeHistoryFallback: "Record updated",
   changeHistoryLabels: {
-    approve: "Approved and published",
-    "mark-stale": "Marked for re-review",
+    approve: "Published",
+    "mark-stale": "Flagged as no longer there",
     reverify: "Re-verified",
-    hide: "Removed from public listing",
+    hide: "Hidden",
   },
   // Contribution edit form (/records/[id]/edit, C6). The page keeps its own
   // field labels here (record.ts is the form bundle per SITEMAP) instead of
@@ -146,7 +146,7 @@ export const it: Translation<typeof en> = {
   publicRecord: "Record pubblico",
   recordId: "ID record",
   source: "Fonte",
-  lastVerification: "Ultima verifica",
+  lastVerification: "Ultima conferma",
   // F4 (QA#6): i record del seed demo hanno marcatori grezzi neutri
   // ("Prototype seed"/"Demo data" — contratto di test, vedi DATA_DICTIONARY);
   // la presentazione mostra invece queste etichette localizzate.
@@ -158,7 +158,7 @@ export const it: Translation<typeof en> = {
   viewOnMap: "Vedi sulla mappa",
   reportIssue: "Segnala un problema",
   recordNote:
-    "Questa pagina contiene solo record pubblici revisionati o record illustrativi chiaramente etichettati. Non fornisce flussi video in diretta né dettagli operativi delle telecamere.",
+    "Questa pagina contiene solo record pubblici attivi o record illustrativi chiaramente etichettati. Non fornisce flussi video in diretta né dettagli operativi delle telecamere.",
   unavailable: "Record non disponibile",
   notFound: "Non è stato possibile trovare questo record pubblico.",
   notFoundDetail:
@@ -174,13 +174,13 @@ export const it: Translation<typeof en> = {
   statusFallback: "Stato",
   changeHistory: "Cronologia delle modifiche",
   changeHistoryNote:
-    "Questa cronologia elenca solo le modifiche revisionate. Non include mai identità dei contributori né note interne.",
+    "Questa cronologia elenca solo eventi pubblici. Non include mai identità dei contributori né note interne.",
   changeHistoryFallback: "Record aggiornato",
   changeHistoryLabels: {
-    approve: "Approvato e pubblicato",
-    "mark-stale": "Segnalato per un nuovo riesame",
+    approve: "Pubblicato",
+    "mark-stale": "Segnalato come non più presente",
     reverify: "Riverificato",
-    hide: "Rimosso dall'elenco pubblico",
+    hide: "Nascosto",
   },
   // Form di modifica del contributo (/records/[id]/edit, C6). La pagina
   // tiene qui le proprie label di campo (record.ts è il bundle del form

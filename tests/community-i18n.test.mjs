@@ -106,8 +106,8 @@ test("community bundle exposes Eva's frozen EN/IT terminology", async () => {
     ["badgeLabels.trusted", "Trusted contributor", "Contributor fidato"],
     ["badgeLabels.experienced", "Experienced contributor", "Contributor esperto"],
     ["levelDescriptions.trusted",
-      "You are a trusted contributor. Your consistent, verified contributions mean your reports may be prioritised in the moderation queue.",
-      "Sei un contributor fidato. I tuoi contributi costanti e verificati fanno sì che le tue segnalazioni possano avere priorità nella coda di moderazione."],
+      "You are a trusted contributor. Your consistent, live contributions mean your community actions carry more weight in the automatic thresholds.",
+      "Sei un contributor fidato. I tuoi contributi costanti e attivi fanno sì che le tue azioni della community pesino di più nelle soglie automatiche."],
     // Verifications (frozen: "verifications", never stars).
     ["verifications", "Verifications", "Verifiche"],
     ["verifiedByCommunity", "Verified by the community", "Verificato dalla community"],
@@ -187,22 +187,22 @@ test("plural formatters produce the frozen Italian and English forms", async () 
   assert.equal(it.recordHasVerifications(1), "Questo record ha 1 verifica");
   assert.equal(it.recordHasVerifications(3), "Questo record ha 3 verifiche");
 
-  // Progress row: 1 verified contribution / 3 verified contributions.
+  // Progress row: 1 live contribution / 3 live contributions.
   assert.equal(
     it.progressToNextLevel(1),
-    "1 contributo verificato per raggiungere il prossimo livello di fiducia",
+    "1 contributo attivo per raggiungere il prossimo livello di fiducia",
   );
   assert.equal(
     it.progressToNextLevel(3),
-    "3 contributi verificati per raggiungere il prossimo livello di fiducia",
+    "3 contributi attivi per raggiungere il prossimo livello di fiducia",
   );
   assert.equal(
     en.progressToNextLevel(1),
-    "1 verified contribution to reach the next trust level",
+    "1 live contribution to reach the next trust level",
   );
   assert.equal(
     en.progressToNextLevel(3),
-    "3 verified contributions to reach the next trust level",
+    "3 live contributions to reach the next trust level",
   );
 });
 

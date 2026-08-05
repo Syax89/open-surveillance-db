@@ -26,14 +26,14 @@ export const en = {
     experienced: "Experienced contributor",
   },
   levelDescriptions: {
-    new: "You are a new contributor. Your reports are reviewed by moderators before publication, like everyone else's.",
+    new: "You are a new contributor. Your reports are published immediately, like everyone else's, and your community actions carry less weight until you build a track record.",
     trusted:
-      "You are a trusted contributor. Your consistent, verified contributions mean your reports may be prioritised in the moderation queue.",
+      "You are a trusted contributor. Your consistent, live contributions mean your community actions carry more weight in the automatic thresholds.",
     experienced:
-      "You are an experienced contributor. Your track record of accurate, verified contributions is recognised by the community.",
+      "You are an experienced contributor. Your track record of accurate, live contributions is recognised by the community.",
   },
   progressToNextLevel: (count: number) =>
-    `${count} verified ${count === 1 ? "contribution" : "contributions"} to reach the next trust level`,
+    `${count} live ${count === 1 ? "contribution" : "contributions"} to reach the next trust level`,
 
   // --- Verifications (frozen: NEVER "stars", "badges", "upvotes") ---
   verifications: "Verifications",
@@ -57,7 +57,7 @@ export const en = {
   reportAbuseHelp:
     "Use this only if the verification appears false, automated, or submitted in bad faith.",
   abuseReportSent: "Abuse report sent",
-  abuseReportThanks: "Thank you. A moderator will review this verification.",
+  abuseReportThanks: "Thank you. Your report has been recorded.",
   noVerificationsYet: "No verifications yet",
   notVerifiedByCommunity:
     "This record has not been independently verified by the community yet.",
@@ -138,7 +138,7 @@ export const en = {
   remove: "Remove",
   deleteContributionTitle: "Delete this contribution?",
   deleteContributionBody:
-    "The record will be removed from the public directory and sent to moderation. This cannot be undone.",
+    "The record will be removed from the public directory. This cannot be undone.",
   deleteContribution: "Delete contribution",
 
   // --- Community actions (ADR 0021 §3, FASE 3 UI): five-action surface on
@@ -185,14 +185,14 @@ export const it: Translation<typeof en> = {
     experienced: "Contributor esperto",
   },
   levelDescriptions: {
-    new: "Sei un nuovo contributor. Le tue segnalazioni sono esaminate dai moderatori prima della pubblicazione, come quelle di tutti.",
+    new: "Sei un nuovo contributor. Le tue segnalazioni vengono pubblicate subito, come quelle di tutti, e le tue azioni della community pesano meno finché non costruisci uno storico.",
     trusted:
-      "Sei un contributor fidato. I tuoi contributi costanti e verificati fanno sì che le tue segnalazioni possano avere priorità nella coda di moderazione.",
+      "Sei un contributor fidato. I tuoi contributi costanti e attivi fanno sì che le tue azioni della community pesino di più nelle soglie automatiche.",
     experienced:
-      "Sei un contributor esperto. Il tuo storico di contributi accurati e verificati è riconosciuto dalla community.",
+      "Sei un contributor esperto. Il tuo storico di contributi accurati e attivi è riconosciuto dalla community.",
   },
   progressToNextLevel: (count: number) =>
-    `${count} contribut${count === 1 ? "o" : "i"} verificat${count === 1 ? "o" : "i"} per raggiungere il prossimo livello di fiducia`,
+    `${count} contribut${count === 1 ? "o" : "i"} attiv${count === 1 ? "o" : "i"} per raggiungere il prossimo livello di fiducia`,
 
   // --- Verifiche (congelato: MAI "stars", "badges", "upvotes") ---
   verifications: "Verifiche",
@@ -216,7 +216,7 @@ export const it: Translation<typeof en> = {
   reportAbuseHelp:
     "Usalo solo se la verifica appare falsa, automatizzata o inviata in malafede.",
   abuseReportSent: "Segnalazione di abuso inviata",
-  abuseReportThanks: "Grazie. Un moderatore esaminerà questa verifica.",
+  abuseReportThanks: "Grazie. La tua segnalazione è stata registrata.",
   noVerificationsYet: "Nessuna verifica",
   notVerifiedByCommunity:
     "Questo record non è ancora stato verificato indipendentemente dalla community.",
@@ -298,7 +298,7 @@ export const it: Translation<typeof en> = {
   remove: "Rimuovi",
   deleteContributionTitle: "Eliminare questo contributo?",
   deleteContributionBody:
-    "Il record verrà rimosso dall'elenco pubblico e inviato in moderazione. Questa azione non può essere annullata.",
+    "Il record verrà rimosso dall'elenco pubblico. Questa azione non può essere annullata.",
   deleteContribution: "Elimina contributo",
 
   // --- Azioni della community (ADR 0021 §3, FASE 3 UI): superficie a

@@ -154,10 +154,14 @@ const INFO_ROUTES = {
     en: ["What we publish, and how you can help."],
     noEn: ["What we publish, and how you can help."],
   },
+  // ADR 0021 pivot (2026-08-05): /moderazione explains the community-driven
+  // model — immediate publication, community actions, public event history.
+  // The old human-review framing ("Reviewed by people, not published by
+  // default") is gone with the queue; markers pin the new copy.
   "/moderazione": {
-    it: ["Come funziona la moderazione", "Revisionato da persone, non pubblicato di default."],
-    en: ["Reviewed by people, not published by default."],
-    noEn: ["Reviewed by people, not published by default."],
+    it: ["Come funziona la pubblicazione", "Pubblicato subito, mantenuto accurato dalla community."],
+    en: ["How publication works", "Published immediately, kept accurate by the community."],
+    noEn: ["How publication works", "Published immediately, kept accurate by the community."],
   },
   "/guide": {
     it: ["Guida al progetto", "Un database pubblico, costruito con attenzione."],
