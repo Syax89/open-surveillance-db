@@ -29,7 +29,14 @@ export const en = {
   // never proves absence" truthfulness contract (SSR metadata + a11y intro).
   // The prototype banner itself was removed (CEO feedback 2026-08-02) — the
   // map is no longer framed as a prototype.
-  mapHint: "Click the map to choose a report position",
+  mapHint: "Use “Add here” to place a report at a precise position",
+  // Explicit "Add here" mode (popup lifecycle t_33b82720): base map
+  // navigation is SILENT — the coordinate picker opens only while this
+  // accessible toggle is active.
+  mapAddModeLabel: "Add a report on the map",
+  mapAddHere: "Add here",
+  mapAddModeStop: "Stop adding",
+  mapAddHint: "Click the map to place a new report at that position",
   // Map-click report picker (t_6abb96ac): clicking empty map space opens a
   // popup with the click coordinates and a direct link to the /segnala
   // form, pre-filled with that position.
@@ -125,7 +132,14 @@ export const it: Translation<typeof en> = {
   // l'assenza di telecamere" (metadata SSR + intro a11y). Il banner di
   // prototipo è stato rimosso (feedback CEO 2026-08-02) — la mappa non è più
   // presentata come prototipo.
-  mapHint: "Fai clic sulla mappa per scegliere la posizione della segnalazione",
+  mapHint: "Usa “Aggiungi qui” per posizionare una segnalazione in un punto preciso",
+  // Modalità esplicita "Aggiungi qui" (popup lifecycle t_33b82720): la
+  // navigazione base della mappa è SILENZIOSA — il selettore delle
+  // coordinate si apre solo mentre questo toggle accessibile è attivo.
+  mapAddModeLabel: "Aggiungi una segnalazione sulla mappa",
+  mapAddHere: "Aggiungi qui",
+  mapAddModeStop: "Ferma l'aggiunta",
+  mapAddHint: "Clicca sulla mappa per posizionare una nuova segnalazione in quel punto",
   // Selettore segnalazione al clic sulla mappa (t_6abb96ac): cliccando uno
   // spazio vuoto della mappa si apre un popup con le coordinate del clic e
   // un link diretto al modulo /segnala, precompilato con quella posizione.

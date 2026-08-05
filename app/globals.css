@@ -188,7 +188,7 @@ button { cursor:pointer; }
    Scoped to a:focus inside .sr-only, so the shared skip-link/description
    pattern is untouched. */
 .sr-only a:focus { position:fixed; top:10px; left:10px; width:auto; height:auto; clip:auto; margin:0; padding:11px 14px; border-radius:var(--radius-md); background:var(--card-bg); color:var(--button-ink); font-size:var(--text-base); font-weight:800; outline:3px solid var(--focus); outline-offset:2px; z-index:2100; }
-.map-region { min-width:0; }
+.map-region { min-width:0; position:relative; }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior:auto; }
   *, *::before, *::after { animation-duration:.01ms !important; animation-iteration-count:1 !important; scroll-behavior:auto !important; transition-duration:.01ms !important; }
@@ -336,6 +336,16 @@ button { cursor:pointer; }
 .map-fallback p { max-width:440px; margin:0 auto; }
 .map-fallback-title { font-size:var(--text-2xl); font-weight:800; color:var(--heading); }
 .map-hint { position:absolute; z-index:500; left:16px; bottom:16px; max-width:calc(100% - 32px); padding:9px 11px; border:1px solid rgba(202,215,205,.9); border-radius:var(--radius-sm); background:rgba(255,255,251,.92); box-shadow:0 2px 12px rgba(30,48,40,.12); color:var(--map-hint-ink); font-size:var(--text-xs); font-weight:700; overflow-wrap:anywhere; }
+/* Explicit "Add here" mode (popup lifecycle t_33b82720): the coordinate
+   picker opens only while this accessible toggle is active — base map
+   navigation is silent. The toggle floats above the Leaflet container
+   (z-index above Leaflet's panes, which top out at 700) and sits OUTSIDE
+   .live-map so the map never swallows its clicks. */
+.map-addmode { position:absolute; z-index:800; top:12px; right:12px; display:flex; flex-direction:column; align-items:flex-end; gap:6px; }
+.map-addmode-toggle { min-height:44px; padding:8px 14px; border:1px solid var(--line); border-radius:var(--radius-full); background:rgba(255,255,251,.95); box-shadow:0 2px 12px rgba(30,48,40,.14); color:var(--ink-2); font-size:var(--text-sm); font-weight:800; cursor:pointer; }
+.map-addmode-toggle[aria-pressed="true"] { background:var(--status-active, #1e6b57); border-color:transparent; color:#fff; }
+.map-addmode-toggle:focus-visible { outline:3px solid var(--focus-ring, #2f7d68); outline-offset:2px; }
+.map-addmode-hint { margin:0; max-width:260px; padding:7px 10px; border:1px solid rgba(202,215,205,.9); border-radius:var(--radius-sm); background:rgba(255,255,251,.92); box-shadow:0 2px 12px rgba(30,48,40,.12); color:var(--map-hint-ink); font-size:var(--text-xs); font-weight:700; overflow-wrap:anywhere; text-align:right; }
 .osm-camera-marker { display:grid; place-items:center; width:25px; height:25px; border:3px solid white; border-radius:var(--radius-round); background:var(--marker); box-shadow:0 2px 7px rgba(30,54,45,.35); }
 .osm-camera-marker i { width:8px; height:8px; border-radius:var(--radius-round); background:var(--mint); }
 .osm-camera-marker.demo { background:var(--status-demo); }
