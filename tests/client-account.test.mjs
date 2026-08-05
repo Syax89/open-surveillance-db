@@ -144,7 +144,7 @@ test("account: renders profile, trust-level badge and the contributions list", a
   assert.equal(screen.getByText("contributor@example.test").tagName, "DD");
   // LevelBadge: the frozen badge label + the textual progress line, no bar.
   assert.ok(screen.getByText("Trusted contributor"));
-  assert.ok(screen.getByText("4 verified contributions to reach the next trust level"));
+  assert.ok(screen.getByText("4 live contributions to reach the next trust level"));
   // No numeric points anywhere (badge text only).
   assert.equal(screen.queryByText(/^[0-9]+ points?$/i), null);
 
@@ -179,7 +179,7 @@ test("account: level badge at L4 omits the progress line (no next threshold)", a
   await waitFor(() => assert.ok(screen.queryAllByText("Fixture Contributor").length >= 1));
 
   assert.ok(screen.getByText("Experienced contributor"));
-  assert.equal(screen.queryByText(/verified contributions? to reach the next trust level/), null);
+  assert.equal(screen.queryByText(/live contributions? to reach the next trust level/), null);
 });
 
 test("account: local status filter refetches with ?status= and keeps the URL clean", async () => {

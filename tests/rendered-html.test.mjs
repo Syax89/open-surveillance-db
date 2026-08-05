@@ -84,7 +84,7 @@ test("server-rendered homepage carries the public app metadata", async () => {
 
   // Home owns dedicated, localized metadata rather than inheriting layout fallback.
   assert.match(html, /<title>Open public surveillance infrastructure database[^<]*<\/title>/i);
-  assert.match(html, /<meta name="description" content="OpenSurveillanceDB is a civic, non-commercial database of visible public surveillance infrastructure: sourced, moderated and privacy-first\."/i);
+  assert.match(html, /<meta name="description" content="OpenSurveillanceDB is a civic, non-commercial database of visible public surveillance infrastructure: sourced, community-maintained and privacy-first\."/i);
   assert.match(html, /<html[^>]*lang="en"/);
   assert.match(html, /OpenSurveillanceDB/);
   assert.match(html, /Public data about public surveillance\./);
@@ -128,7 +128,7 @@ test("server-rendered homepage honours the persisted locale cookie (SSR lang + m
   assert.equal(response.status, 200);
   assert.match(html, /<html[^>]*lang="it"/);
   assert.match(html, /<title>Database aperto dell(?:'|&#x27;)infrastruttura di sorveglianza pubblica[^<]*<\/title>/i);
-  assert.match(html, /<meta name="description" content="OpenSurveillanceDB è un database civico e non commerciale dell(?:'|&#x27;)infrastruttura di sorveglianza pubblica visibile: documentato, moderato e progettato per la privacy\."/i);
+  assert.match(html, /<meta name="description" content="OpenSurveillanceDB è un database civico e non commerciale dell(?:'|&#x27;)infrastruttura di sorveglianza pubblica visibile: documentato, mantenuto dalla community e progettato per la privacy\."/i);
   assert.match(html, /Database aperto · mantenuto dalla comunità/);
 });
 
@@ -336,7 +336,7 @@ test("server-rendered /manifesto is accessible and carries the mission, principl
   assert.match(html, /Open source/);
   assert.match(html, /Open data with provenance/);
   assert.match(html, /Privacy and safety by design/);
-  assert.match(html, /Human moderation first/);
+  assert.match(html, /Community accuracy first/);
   assert.match(html, /No camera feeds/);
   assert.match(html, /No tracking tools/);
   assert.match(html, /No evasion advice/);
@@ -346,7 +346,7 @@ test("server-rendered /manifesto is accessible and carries the mission, principl
   assert.match(html, /<h2[^>]*id="publish-title">Open where it is safe to be open\.<\/h2>/);
   assert.match(html, /<ul class="manifesto-list">/);
   assert.match(html, /Never published/);
-  assert.match(html, /Submissions and corrections before — or without — human review/);
+  assert.match(html, /Private correction requests, which never enter the public dataset/);
 
   // Shared info-page layout. The only footer on the page is the global
   // SiteFooter rendered by the root layout (SITEMAP: "footer mai copiato
@@ -373,7 +373,7 @@ test("rules page carries the shared layout, the fixed never-report heading and a
   // a11y fix from review #67: the "never report" heading carries the title,
   // and the body text renders as a paragraph (title/body were swapped).
   assert.match(html, /<h2[^>]*id="never-title">Never report<\/h2>/);
-  assert.match(html, /<p>Reports containing any of the following are screened out and are never published\.<\/p>/);
+  assert.match(html, /<p>Reports containing any of the following are never kept in the public dataset\.<\/p>/);
   assert.doesNotMatch(html, /<h2[^>]*id="never-title">Reports containing/);
 
   // Single footer: only the global SiteFooter from the root layout
@@ -422,34 +422,35 @@ test("info pages reuse the shared layout styles (approved contrast palette)", as
 
 });
 
-test("moderation info page explains review flow, appeals and safeguards", async () => {
+test("moderation info page explains publication flow, corrections and safeguards", async () => {
   const { response, html } = await renderRoute("/moderazione");
 
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
-  // The public "How moderation works" page covers the three required
-  // sections (SITEMAP: review flow, appeals and corrections, safeguards).
-  assert.match(html, /How moderation works/);
-  assert.match(html, /The review flow/);
-  assert.match(html, /Appeals and corrections/);
-  assert.match(html, /Moderator safeguards/);
+  // The public "How publication works" page covers the three required
+  // sections (SITEMAP: publication flow, corrections and legal emergencies,
+  // safeguards).
+  assert.match(html, /How publication works/);
+  assert.match(html, /The life of a record/);
+  assert.match(html, /Corrections and legal emergencies/);
+  assert.match(html, /Safeguards/);
 
-  // Review flow steps from docs/MODERATION.md (receive → maintain).
-  assert.match(html, />Receive</);
-  assert.match(html, />Screen</);
-  assert.match(html, />Verify</);
-  assert.match(html, />Minimise</);
-  assert.match(html, />Decide</);
-  assert.match(html, />Maintain</);
+  // Publication flow steps from docs/MODERATION.md (submit → restore).
+  assert.match(html, />Submit</);
+  assert.match(html, />Publish</);
+  assert.match(html, />Act</);
+  assert.match(html, />Thresholds</);
+  assert.match(html, />Withdraw</);
+  assert.match(html, />Restore</);
 
   // Coordinate minimisation promise from the 2026-07-31 decision.
   assert.match(html, /rounded to about 4 decimal places/);
 
-  // Appeal outcomes from ADR 0014: upheld / dismissed / escalated.
-  assert.match(html, />Upheld</);
-  assert.match(html, />Dismissed</);
-  assert.match(html, />Escalated</);
+  // Record outcomes from ADR 0021: hidden / removed / restored.
+  assert.match(html, />Hidden</);
+  assert.match(html, />Removed</);
+  assert.match(html, />Restored</);
 
   // This is the PUBLIC page: it must not link the private moderation
   // dashboard or any moderation/admin endpoint (publication-boundaries).
