@@ -1,5 +1,5 @@
 /**
- * Automated retention sweep (ADR 0004 §3, ADR 0008 p.3, RETENTION_SCHEDULE.md).
+ * Automated retention sweep (ADR 0004 §3, RETENTION_SCHEDULE.md).
  *
  * Runs as a Cloudflare Worker scheduled handler (see worker/index.ts and the
  * `triggers.crons` binding in wrangler.jsonc) on a daily cadence and enforces
@@ -7,10 +7,6 @@
  *
  *   R1  pending reports               → hard delete after 90 days (created_at)
  *   R2  rejected reports              → hard delete after 30 days (decision date)
- *   R3  verified records              → needs_review at review_due_at, then
- *                                       `removed` after 6 months unverified
- *                                       (the review clocks themselves live in
- *                                       db/freshness.ts + runFreshnessSweep)
  *   R4  resolved correction requests  → archived in the audit log, then
  *                                       deleted after 2 years (RESOLUTION date)
  *   R6  photo evidence                → deleted with its record; orphan
@@ -57,16 +53,20 @@
  *                                       transition.
  *
  * Deliberately NOT purged here:
- *   (none — R5 now has an archival path; the archive table itself is
+ *   - Record STATUS TRANSITIONS. ADR 0021 § 2.2 (community-driven pivot):
+ *     no state transition happens on a timer — `active`/`hidden`/`removed`
+ *     are driven only by community actions or admin-legal emergencies. The
+ *     old freshness sweep (verified → needs_review → stale) and the 6-month
+ *     unverified removal (former R3) are RETIRED and are NOT run here; the
+ *     community thresholds (confirm/gone/problem/privacy) are the only
+ *     transition engine (db/community-actions.ts).
+ *   - (none — R5 now has an archival path; the archive table itself is
  *    append-only by convention and has no retention of its own.)
  *
  * Design notes:
  *  - The windows are FIXED legal values (RETENTION_SCHEDULE.md, ADR 0008):
  *    there is deliberately NO env knob to override them — an env override
- *    could silently extend a legally defined retention window. The "master
- *    12-month" clock of ADR 0008 p.3 is the freshness review interval
- *    (DEFAULT_REVIEW_INTERVAL_MONTHS in db/freshness.ts), not a retention
- *    constant here.
+ *    could silently extend a legally defined retention window.
  *  - `cameras.updated` holds a human note, not a timestamp — so the R2
  *    "rejection decision date" is anchored on the moderation event
  *    (action='reject'), with `created_at` as fallback for legacy rows.
@@ -94,8 +94,6 @@
 
 import { env } from "cloudflare:workers";
 import { getD1 } from "./cameras";
-import { runFreshnessSweep } from "./moderation";
-import { addMonths } from "./freshness";
 import { sweepExpiredWebAuthnChallenges } from "./passkeys";
 
 // ---------------------------------------------------------------------------
@@ -106,8 +104,6 @@ import { sweepExpiredWebAuthnChallenges } from "./passkeys";
 export const PENDING_RETENTION_DAYS = 90;
 /** R2: `rejected` reports expire after 30 days from the rejection decision. */
 export const REJECTED_RETENTION_DAYS = 30;
-/** R3: a record not re-verified within 6 CALENDAR MONTHS of its review date is removed. */
-export const UNVERIFIED_REMOVAL_MONTHS = 6;
 /** R4: resolved correction/takedown requests are kept 2 years. */
 export const CORRECTION_RETENTION_DAYS = 730;
 /** R6: pending photo never linked to a record expires with the pending window. */
@@ -146,7 +142,6 @@ export const D1_MAX_BOUND_PARAMS = 100;
 export type RetentionPolicy = {
   pendingDays: number;
   rejectedDays: number;
-  unverifiedRemovalMonths: number;
   correctionDays: number;
   orphanPhotoDays: number;
   /** R16: failed-login counters (login_attempts) expire after this many days of inactivity. */
@@ -162,7 +157,6 @@ export type RetentionPolicy = {
 export const DEFAULT_RETENTION_POLICY: RetentionPolicy = {
   pendingDays: PENDING_RETENTION_DAYS,
   rejectedDays: REJECTED_RETENTION_DAYS,
-  unverifiedRemovalMonths: UNVERIFIED_REMOVAL_MONTHS,
   correctionDays: CORRECTION_RETENTION_DAYS,
   orphanPhotoDays: ORPHAN_PHOTO_RETENTION_DAYS,
   loginAttemptDays: LOGIN_ATTEMPT_RETENTION_DAYS,
@@ -183,11 +177,6 @@ export type RetentionR2 = {
 export type RetentionSummary = {
   now: string;
   policy: RetentionPolicy;
-  /** R3 part 1, from the reused freshness sweep. */
-  scheduledExpiry: number;
-  becameStale: number;
-  /** R3 part 2: needs_review/stale records unverified for 6 months → removed. */
-  unverifiedRemoved: number;
   /** R1: pending reports hard-deleted with their evidence. */
   pendingPurged: number;
   /** R2: rejected reports hard-deleted with their evidence. */
@@ -357,9 +346,6 @@ export async function runRetentionSweep(
   const summary: RetentionSummary = {
     now,
     policy,
-    scheduledExpiry: 0,
-    becameStale: 0,
-    unverifiedRemoved: 0,
     pendingPurged: 0,
     rejectedPurged: 0,
     correctionsPurged: 0,
@@ -377,51 +363,6 @@ export async function runRetentionSweep(
     moderationEventsPurged: 0,
     failures: 0,
   };
-
-  // --- R3 part 1: reuse the freshness sweep (verified → needs_review → stale).
-  const freshness = await runFreshnessSweep(now);
-  summary.scheduledExpiry = freshness.scheduledExpiry;
-  summary.becameStale = freshness.becameStale;
-
-  // --- R3 part 2: needs_review/stale records unverified for 6 months → removed.
-  // The 6-month clock starts at review_due_at; `stale` is only reached 90 days
-  // past it, so `removed` strictly follows `stale`. Evidence is deleted with
-  // the record (R6); the row stays as a `removed` tombstone (never public).
-  // The window is CALENDAR months (addMonths), matching the freshness clocks
-  // and the legal wording "6 months unverified" (review t_eed5f080).
-  const unverifiedCutoff = addMonths(now, -policy.unverifiedRemovalMonths);
-  const unverified = await d1
-    .prepare(
-      "SELECT id, status FROM cameras WHERE status IN ('needs_review', 'stale') AND review_due_at IS NOT NULL AND review_due_at < ?",
-    )
-    .bind(unverifiedCutoff)
-    .all<{ id: number; status: string }>();
-  for (const { id, status } of unverified.results) {
-    try {
-      const photos = await selectPhotosForCamera(d1, id);
-      await d1.batch([
-        ...(photos.length > 0
-          ? [d1.prepare("DELETE FROM photos WHERE camera_id = ?").bind(id)]
-          : []),
-        d1
-          .prepare("UPDATE cameras SET status = 'removed', updated = ? WHERE id = ?")
-          .bind(now, id),
-        d1
-          .prepare(
-            "INSERT INTO moderation_events (entity, entity_id, previous_status, new_status, action, reason_code, note, actor, reviewer_id, actor_role, recused, escalated, second_reviewer_id, appeal_id, created_at) VALUES ('camera', ?, ?, 'removed', 'removed', 'inaccurate-or-outdated', ?, 'Retention sweep', NULL, NULL, 0, 0, NULL, NULL, ?)",
-          )
-          .bind(id, status, `Removed after ${policy.unverifiedRemovalMonths} months unverified (R3).`, now),
-      ]);
-      const { deleted, failed } = await deleteR2Objects(r2, photos.map((photo) => photo.storageKey));
-      summary.photosDeleted += photos.length;
-      summary.r2ObjectsDeleted += deleted;
-      summary.r2ObjectsFailed += failed;
-      summary.unverifiedRemoved += 1;
-    } catch (error) {
-      summary.failures += 1;
-      console.error(`Retention: R3 removal failed for camera ${id}`, error);
-    }
-  }
 
   // --- R12 (ADR 0008 demo gate, audit CTO #7 / t_d7a4b99b): `demo` records
   // are prototype-only and must be purged before public launch

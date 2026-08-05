@@ -90,7 +90,7 @@ async function buildWorkerTree() {
   await writeFile(
     path.join(dbDir, "retention.mjs"),
     "export const __calls = [];\n" +
-      "export const DEFAULT_RETENTION_POLICY = { pendingDays: 90, rejectedDays: 30, unverifiedRemovalMonths: 6, correctionDays: 730, orphanPhotoDays: 90 };\n" +
+      "export const DEFAULT_RETENTION_POLICY = { pendingDays: 90, rejectedDays: 30, correctionDays: 730, orphanPhotoDays: 90 };\n" +
       "export async function runRetentionSweep(...args) { __calls.push(args); return {}; }\n",
   );
   await writeFile(

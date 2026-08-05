@@ -1,20 +1,20 @@
-// Freshness state for camera records.
+// Freshness state for camera records — read-time boundary and informational
+// metadata only (ADR 0021 § 2.2 / § 9.2).
 //
-// A verified record is presented as "current" only while it is inside its
-// scheduled review window. Once the review date passes, the record must not
-// be represented as current: the public read boundary excludes it and the
-// moderation sweep moves it to `needs_review` for re-verification. Records
-// still unconfirmed 90 days after their scheduled review date are labelled
-// stale in the moderation queue.
-//
-// The clocks follow docs/workstreams/DATA_TRUST.md:
-//   - default recheck every 12 months (standard confidence);
-//   - records not re-confirmed within 90 days of the scheduled review become
-//     stale and must never be silently represented as current.
+// After the community-driven pivot, NO record status transition happens on a
+// timer: the old freshness sweep (`verified → needs_review → stale`) and the
+// pre-pivot 12-month review clock are RETIRED. The remaining pieces here
+// serve two non-transitioning purposes:
+//   1. the public read boundary — a record is presented as "current" only
+//      while it is inside its scheduled review window (mirrored in SQL by
+//      publicCameraPredicate in db/cameras.ts);
+//   2. the informational badge — `review_due_at` / `review_interval_months`
+//      are metadata written on approve/reverify (db/moderation.ts) so the
+//      record page can show a neutral "last confirmed X" label, never a
+//      state change.
 
 import { PUBLIC_CAMERA_STATUSES } from "../app/lib/public-status";
 
-export const DEFAULT_REVIEW_INTERVAL_MONTHS = 12;
 export const STALE_GRACE_DAYS = 90;
 
 export type FreshnessPhase =
@@ -49,9 +49,15 @@ export function addMonths(iso: string, months: number): string {
   return target.toISOString();
 }
 
+/**
+ * Informational review schedule (ADR 0021 § 9.2): the next `review_due_at`
+ * after a verification, in calendar months. The interval is explicit — the
+ * pre-pivot default review clock is retired; the value only feeds the badge
+ * metadata, never a state transition.
+ */
 export function computeReviewDueAt(
   lastVerifiedAt: string,
-  intervalMonths: number = DEFAULT_REVIEW_INTERVAL_MONTHS,
+  intervalMonths: number,
 ): string {
   if (!Number.isInteger(intervalMonths) || intervalMonths < 1) {
     throw new Error(`Invalid review interval: ${intervalMonths}`);
