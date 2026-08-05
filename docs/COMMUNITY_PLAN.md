@@ -111,6 +111,8 @@ pulito (RETENTION_SCHEDULE R15; PRIVACY_NOTICE § 10).
 
 ## 2. Architettura profilo contributi + editing
 
+> **ARCHIVIATA (ADR 0021, 2026-08-04).** Questa sezione descriveva il modello *profilo contributi + editing con moderazione* — **non implementato**. Nel modello community-driven non esiste flusso di edit: pubblicazione immediata da account verificati + community actions con soglie automatiche (ADR 0021 § 3/§ 4). Resta architetturalmente valido il fatto § 2.1 (identità contributore vs moderatore separate, ADR 0013/0014). Testo storico conservato per tracciabilità.
+
 Fonte: Ada (t_e7e94d17), Linus (t_25843be7), Vera (t_c9a9ca46), Marie (t_2acb8f70).
 
 ### 2.1 Fatto architetturale: due identità separate
@@ -251,6 +253,8 @@ L3–L4→Experienced. I test i18n/a11y dei badge si scrivono su questo mapping.
 
 ## 4. Sistema verifiche/stelle (modello dati, anti-gaming)
 
+> **ARCHIVIATA (ADR 0021, 2026-08-04).** Il sistema verifiche/stelle descritto in questa sezione **non è implementato** — le community actions (`confirm`/`like`/`gone`/`problem`/`privacy`, una per utente per record) con soglie automatiche trust-weighted lo sostituiscono (ADR 0021 § 3/§ 4); nessuna verifica/stella pubblica, nessuna attribuzione. Testo storico conservato per tracciabilità.
+
 Fonte: Nora (t_f49b0226), Linus (t_25843be7), Ada (t_e7e94d17), Grace (t_45ff2bfd).
 
 ### 4.1 Modello dati — migrazioni D1 0020–0023 (convenzione hand-written + journal/snapshot)
@@ -368,6 +372,8 @@ non discriminatori; se un domani condizionasse diritti legali → valutazione 13
 
 ## 6. Requisiti i18n/design
 
+> **ARCHIVIATA (ADR 0021, 2026-08-04).** I requisiti i18n/design di questa sezione si riferivano al modello verifiche/profilo/editing — terminologia congelata e fixture microcopy **non più applicabili** (i bundle EN/IT attuali riflettono le community actions; sweep PR #307). Testo storico conservato per tracciabilità.
+
 Fonte: Eva (t_290dce27), Vera (t_c9a9ca46), Marie (t_2acb8f70).
 
 ### 6.1 Terminologia congelata (prerequisito QA #1)
@@ -434,6 +440,8 @@ Token nuovi: **nessuno** (riuso `--status-verified`/`--status-community`, D6/D7)
 
 ## 7. Piano di implementazione a fasi
 
+> **ARCHIVIATA in parte (ADR 0021, 2026-08-04).** Le fasi C2–C6 (profilo, verifiche, editing, moderazione umana) **non sono implementate**; la fase C1 (autenticazione multi-metodo, ADR 0020) è stata realizzata. Le fasi community-driven sono state implementate direttamente: DB (PR #297), API (PR #299), UI (PR #305). Testo storico conservato per tracciabilità.
+
 **Vincolo CTO: una PR per fase, CI verde, review Ada + approve QA. Le fasi backend sono
 sequenziali (dipendono l'una dall'altra); le fasi docs/legal/i18n girano in parallelo.**
 Stima: 1-2 giorni/fase, ~2-3 sprint totali. Zero librerie nuove.
@@ -463,6 +471,8 @@ C2/C3/C4 → C5/C6 → C-docs + C-QA.
 ---
 
 ## 8. Criteri di accettazione
+
+> **ARCHIVIATA (ADR 0021, 2026-08-04).** I criteri di accettazione di questo piano si riferivano al modello profilo/verifiche/editing — **non implementato**. I criteri attuali del modello community-driven vivono in ADR 0021 e nei task kanban (DB/API/UI: PR #297/#299/#305). Testo storico conservato per tracciabilità.
 
 Fonte: Grace (t_45ff2bfd) + pattern FRONTEND_PLAN §7.
 
