@@ -93,10 +93,33 @@ export function MapPanel({ filteredRecords, visibleRecords, selectedId, onSelect
   // small screens so the map is the first thing users see. Desktop (and
   // SSR/tests without matchMedia) keep it expanded. The toggle in the
   // panel header re-expands it from the keyboard.
-  const [pointsCollapsed, setPointsCollapsed] = useState<boolean>(() => {
-    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false;
-    return window.matchMedia("(max-width: 768px)").matches;
-  });
+  //
+  // Hydration-safe (t_66766914): the initial state is ALWAYS expanded on
+  // BOTH server and client — a lazy initializer reading window.matchMedia
+  // produced the CEO's hydration error (server html carried
+  // map-list-toggle is-open aria-expanded=true, the first client render
+  // collapsed the panel on mobile). The mobile preference is applied ONLY
+  // after hydration, in the effect below; a later manual toggle (user
+  // choice) always wins over a media-query change (pointsUserToggledRef),
+  // so the panel never flickers back after the user interacts.
+  const [pointsCollapsed, setPointsCollapsed] = useState<boolean>(false);
+  const pointsUserToggledRef = useRef(false);
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+    const mql = window.matchMedia("(max-width: 768px)");
+    const apply = () => {
+      // The user's own toggle always wins over a media-query change.
+      if (pointsUserToggledRef.current) return;
+      setPointsCollapsed(mql.matches);
+    };
+    apply(); // apply the mobile preference only after hydration
+    if (mql.addEventListener) {
+      mql.addEventListener("change", apply);
+      return () => mql.removeEventListener("change", apply);
+    }
+    mql.addListener(apply); // legacy MediaQueryList (older Safari)
+    return () => mql.removeListener(apply);
+  }, []);
 
   // Popup content (t_702c10af): built by the shared lib/map-popup (escaped
   // + safe labels). Import provenance (FASE C, t_4dbce318): committed
@@ -155,7 +178,7 @@ export function MapPanel({ filteredRecords, visibleRecords, selectedId, onSelect
       <div className="live-map-workspace map-split">
         <aside className="map-sidebar" aria-labelledby="map-list-title">
           <GeocodeSearch search={search} onSearchChange={setSearch} onPlaceSelect={handlePlaceSelect} />
-          <MapRecordList filteredRecords={filteredRecords} visibleRecords={visibleRecords} selectedId={selectedId} onSelect={onSelect} onReset={onReset} labels={t} statusLabel={(status) => publicStatusLabel(statuses, status, t.unknown)} collapsed={pointsCollapsed} onToggleCollapse={() => setPointsCollapsed((current) => !current)} />
+          <MapRecordList filteredRecords={filteredRecords} visibleRecords={visibleRecords} selectedId={selectedId} onSelect={onSelect} onReset={onReset} labels={t} statusLabel={(status) => publicStatusLabel(statuses, status, t.unknown)} collapsed={pointsCollapsed} onToggleCollapse={() => { pointsUserToggledRef.current = true; setPointsCollapsed((current) => !current); }} />
         </aside>
         <div className="map-panel"><SurveillanceMap cameras={filteredRecords} selectedId={selectedId} focusLocation={focusLocation} onSelect={onSelect} onPick={onPick} directoryHref={directoryHref} onBoundsChange={onBoundsChange} popupHtmlFor={popupHtmlForCamera} /><div className="map-hint">{t.mapHint}</div></div>
       </div>
