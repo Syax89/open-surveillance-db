@@ -21,7 +21,7 @@ export const enLegal: LegalContent = {
     intro:
       "How OpenSurveillanceDB processes personal data, what we publish, what we never collect, and how you can exercise your rights under the GDPR.",
     versionNote:
-      "Version 0.6 — 5 August 2026. Updated for the community-driven model (ADR 0021): reports publish immediately from verified accounts; § 7 retention aligned with the retired review cycle; § 10 (cookies) unchanged. The repository copy (docs/legal/PRIVACY_NOTICE.md) remains canonical.",
+      "Version 0.6 — 5 August 2026. Updated for the community-driven model (ADR 0021): reports publish immediately from verified accounts; § 7 retention aligned with the retired review cycle; § 10 (cookies) unchanged. Re-synchronised with the merged canonical PRIVACY_NOTICE v0.11 (docs/legal/PRIVACY_NOTICE.md remains canonical): § 3 table aligned with the canonical disclosures (community-actions row added; moderation-audit purpose updated to \"historical appeals closed by migration\") and the public per-record event-history note added.",
     sections: [
       {
         heading: "1. Who we are (controller)",
@@ -94,6 +94,12 @@ export const enLegal: LegalContent = {
                 "Art. 6(1)(c) GDPR (Articles 15–22) and 6(1)(f)",
               ],
               [
+                "Community actions on records (action type `like` / `confirm` / `gone` / `problem` / `privacy`, weight snapshot, timestamp)",
+                "Contributor (verified account)",
+                "Dataset accuracy — community-driven moderation",
+                "Art. 6(1)(f) GDPR; one action per user per record (`UNIQUE(camera_id, contributor_id)`), weight snapshot at action time, **aggregates only in public payloads** — never attributed to any profile (ADR 0021 §3/§13)",
+              ],
+              [
                 "Moderator identity (email, display name, full name via ChatGPT sign-in)",
                 "OpenAI (identity provider)",
                 "Authenticate moderators; separate moderation credentials",
@@ -102,7 +108,7 @@ export const enLegal: LegalContent = {
               [
                 "Moderation audit entries (decision, reason code, timestamp, reviewer pseudonym)",
                 "The project",
-                "Accountability, appeals",
+                "Accountability; historical appeals closed by migration (ADR 0021 §7)",
                 "Art. 6(1)(f) GDPR; never public (aggregate transparency reports only)",
               ],
               [
@@ -116,6 +122,10 @@ export const enLegal: LegalContent = {
           {
             type: "note",
             text: "**Records from official public sources:** where a record is republished from an official public source, the data was not obtained from the data subject. Source categories: public registers and transparency portals of public administrations (for example in Italy, D.Lgs. 33/2013 datasets), published public-authority documents, and other publicly accessible official sources. Such records are checked per record under the source's own legal regime.",
+          },
+          {
+            type: "note",
+            text: "**Public per-record event history (ADR 0021 § 7):** every community transition (published, confirmed, liked, gone-flagged, hidden, removed, restored) is recorded in a **public lifecycle history without any attribution** — no contributor ids, emails, or IP-derived data in public rows. It is a transparency control of the controller, not a new collection of personal data (aggregates only).",
           },
           {
             type: "note",
@@ -274,7 +284,7 @@ export const enLegal: LegalContent = {
     intro:
       "These terms govern the use of OpenSurveillanceDB, the open, community-maintained database of visible public surveillance infrastructure. They apply to the web application, the public API, the data exports and related services (\"the Service\").",
     versionNote:
-      "Version 0.4 — 5 August 2026. Updated for the community-driven model (ADR 0021): § 5 describes immediate publication and community actions instead of the human review queue; § 6 replaces appeals with private corrections and the legal-emergency power. The repository copy (docs/TERMS_OF_USE.md) remains canonical.",
+      "Version 0.4 — 5 August 2026. Updated for the community-driven model (ADR 0021): § 5 describes immediate publication and community actions instead of the human review queue; § 6 replaces appeals with private corrections and the legal-emergency power. Re-synchronised with the merged canonical TERMS_OF_USE v0.7 (docs/TERMS_OF_USE.md remains canonical): § 3.7 authentication disclosure restored (email verification for write access, passkeys, OIDC — ADR 0020).",
     sections: [
       {
         heading: "1. Who we are",
@@ -313,7 +323,17 @@ export const enLegal: LegalContent = {
               "**Consultation:** browse the map, the record directory and individual record pages; search and read the public dataset.",
               "**Exports:** download public data via the JSON/CSV/GeoJSON exports and the public API, and reuse it, subject to the ODbL 1.0 licence (section 7) and to the abuse limits in section 4.",
               "**Reports:** submit observations of visible public surveillance infrastructure. A report from a verified account is **published immediately** and is part of the public dataset from submission (section 5).",
-              "**Lawful purposes:** the data may be used for research, journalism, civic advocacy, and any purpose consistent with these terms and with the ODbL 1.0 licence. Browsing the public data never requires an account. Submitting a report or a correction requires a verified contributor account (section 3.7; ADR 0020), and every submission is attributed to it through a **pseudonymous internal ID** — never a real-name requirement.",
+              "**Lawful purposes:** the data may be used for research, journalism, civic advocacy, and any purpose consistent with these terms and with the ODbL 1.0 licence. Browsing the public data never requires an account. Submitting a report or a correction requires a verified contributor account (section 3.5; ADR 0020), and every submission is attributed to it through a **pseudonymous internal ID** — never a real-name requirement.",
+              "**Authentication methods (multi-method, ADR 0020).** Contributor accounts support **three methods**, and you choose: **(a) email + password** — the baseline, with **email verification required for write access** (single-use link, 24 h; until you verify, your session is read-only); **(b) passkeys (WebAuthn)** — optional, passwordless; **(c) OIDC via GitHub or Google** — optional, opt-in. The rules:",
+            ],
+          },
+          {
+            type: "list",
+            items: [
+              "**Email verification.** After registration you must verify the email address before you can submit, edit or verify records; until then your session is read-only. Verification and password-reset emails are sent through Cloudflare Email Routing with no tracking content. One email address = one account; keep it accessible if you lose your password.",
+              "**Passkeys.** If you enroll a passkey, the site stores only public-key material; the private key stays on your device. **Vendor note:** *synced* passkeys are backed up through the OS vendor's cloud (Apple/Google/Microsoft) at your choice — the vendor learns you have an account here, the site shares nothing with them, and you control sync. Keep the 10 recovery codes issued at enrollment in a safe place; without them, a lost device may mean losing access to the passkey method (the email+password path remains).",
+              "**OIDC via GitHub/Google — tracking disclosure.** Signing in with GitHub or Google means **GitHub or Google observes that you sign in to this Service, and your IP address**, at each login; the provider's own terms and privacy policy apply at sign-in. We **do not import your email** from the provider (subject id + verified flag only) and we never merge accounts automatically on an email match — a conflict requires a manual, verified merge. This method is **opt-in and disclosed** (risk matrix on the login page); it is **not yet active** until the OIDC activation gate (DPA + EU–US DPF) passes.",
+              "You may add, change or remove methods from your account page at any time; deleting your account deletes the data of every method (privacy notice § 7 R15, § 8).",
             ],
           },
         ],
