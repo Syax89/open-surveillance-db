@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useMessages } from "../../lib/use-messages";
-import { usePublicCameras } from "../../lib/use-public-cameras";
+import { useViewportCameras } from "../../lib/use-viewport-cameras";
 import { recordsInBounds } from "../../lib/map-viewport";
 import type { ViewportBounds } from "../../lib/map-viewport";
 import {
@@ -24,12 +24,29 @@ import { FiltersBar } from "../FiltersBar";
  * reset — attached to the card top, width-aligned with the map) and the
  * viewport-synced sidebar list + full map. The filters live in the URL
  * (?q= ?type= ?freshness= ?sort= ?focus= — useCameraFilters) and
- * kind/freshness are forwarded to the API (F0 server-side filters). The map
- * keeps needing ALL matching points (plan §3.3), so it walks the
- * server-filtered list; the left sidebar shows only the points inside the
- * current viewport (map.getBounds() → recordsInBounds, debounced by
- * SurveillanceMap). ?focus=ID (deep link from /directory) preselects a
- * record and pans the map to it — focus management, FRONTEND_DESIGN §6.2.
+ * kind/freshness are forwarded to the API (F0 server-side filters).
+ *
+ * Viewport data contract (kanban t_bb310428 — P0 map UX regression): the
+ * map NO LONGER walks all public pages serially (15 × /api/cameras?limit=500
+ * on 7,374 records, ~5.35s before any marker). useViewportCameras fetches
+ * ONLY the current viewport through the bounded JSON bbox contract, with a
+ * module cache, in-flight dedupe and a merged store. The sidebar list and
+ * the markers behave exactly as before — the same applyCameraFilters /
+ * recordsInBounds pipeline — just over the records loaded so far. The
+ * filter-bar count is the client-side match count over that store (it
+ * converges to the dataset total as the user explores; the server total for
+ * the current server filters is exposed on the hook result). ?focus=ID
+ * (deep link from /directory) preselects a record and pans the map to it —
+ * the hook resolves the focused record through the dedicated endpoint even
+ * when it lies outside every loaded bbox — focus management,
+ * FRONTEND_DESIGN §6.2.
+ *
+ * Kind options (FiltersBar dropdown) come from the opt-in facets query
+ * (?facets=1, QA#5 F2): with viewport loading the store only sees the kinds
+ * inside the boxes fetched so far, and the filter UI must keep offering
+ * every kind of the dataset — the facets describe the FULL public set in
+ * one cached request. While the facets are in flight the dropdown falls
+ * back to the kinds present in the store.
  *
  * Map-always-visible contract (t_b9666d09): the MapPanel (map + sidebar)
  * is rendered UNCONDITIONALLY — a filter that matches nothing must never
@@ -47,8 +64,16 @@ export function MappaTool() {
   const [viewportBounds, setViewportBounds] = useState<ViewportBounds | null>(null);
   const [notice, setNotice] = useState("");
 
-  const { records, loading } = usePublicCameras({
+  // Viewport-bounded data layer (t_bb310428): only the records inside the
+  // current map bounds are requested; the merged store feeds the same
+  // filter/list pipeline as before.
+  const { records, loading } = useViewportCameras({
+    bounds: viewportBounds,
     filters: serverFiltersFrom(filters),
+    // ?focus= deep link: the hook resolves the record even when it is
+    // outside every loaded bbox (dedicated endpoint), so the pan + popup
+    // contract survives viewport loading.
+    focusId: filters.focus,
     // P0 hotfix (t_444b15e4, post-#321): the API answers a VALID empty
     // list ({records: []}) when the DB has no public records — never
     // dereference next[0] on it. Without records there is nothing to
@@ -63,7 +88,21 @@ export function MappaTool() {
   });
 
   const filteredRecords = useMemo(() => applyCameraFilters(records, filters), [records, filters]);
-  const cameraKinds = useMemo(() => cameraKindsOf(records), [records]);
+  // Kind options: facets (full-dataset kinds, one cached request) while
+  // loading, falling back to the kinds seen in the loaded store.
+  const [facetsKinds, setFacetsKinds] = useState<string[] | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/cameras?facets=1&limit=1")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (cancelled || !data || !Array.isArray(data.facets?.kinds)) return;
+        setFacetsKinds(data.facets.kinds.map((item: { kind: string }) => item.kind).sort((a: string, b: string) => a.localeCompare(b)));
+      })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, []);
+  const cameraKinds = facetsKinds ?? cameraKindsOf(records);
   // Viewport→list sync: only the points inside the current map bounds.
   // Zoom in → the list narrows; zoom out → it widens. Before the first
   // bounds emission the list shows everything (never a blank column).

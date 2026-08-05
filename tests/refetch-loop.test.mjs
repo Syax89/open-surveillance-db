@@ -71,7 +71,9 @@ const domeCamera = {
 /**
  * Counting fetch mock: every GET /api/cameras? page answers with the single
  * Dome camera and nextOffset null (one fetch per walk), and records the
- * request URL in `calls`.
+ * request URL in `calls`. /mappa (t_bb310428) now also fires the opt-in
+ * facets query (?facets=1) and viewport bbox queries — the mock answers
+ * every /api/cameras? URL with the same camera so both surfaces settle.
  */
 function installCountingCameraMock(calls) {
   installFetchMock((input) => {
@@ -84,6 +86,11 @@ function installCountingCameraMock(calls) {
   });
 }
 
+/** The viewport bbox request URLs (the map's data fetches, excluding facets). */
+function bboxCalls(calls) {
+  return calls.filter((url) => url.includes("bbox="));
+}
+
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
@@ -91,8 +98,12 @@ const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
  * fetch count must stay FLAT — no refetch loop. Sampled at settle, +100ms and
  * +500ms (the probe measured 62 → 770 fetches over the same window on the
  * buggy code, so a loop fails this hard).
+ *
+ * `select` narrows the counted calls AFTER the record renders (for /mappa:
+ * the bbox viewport queries, excluding the one-shot facets request — the
+ * selection is evaluated at each sample point, not once up front).
  */
-async function assertFetchCountIsFlat(screen, calls) {
+async function assertFetchCountIsFlat(screen, calls, select = (list) => list) {
   // Wait for the walk to settle: the server record is rendered. /mappa
   // (t_702c10af) renders records as sidebar list buttons instead of the old
   // record card, /directory keeps the card heading — accept either shape so
@@ -104,13 +115,13 @@ async function assertFetchCountIsFlat(screen, calls) {
   });
   // Let the state flush (setRecords → re-render) before the first sample.
   await pause(50);
-  const settled = calls.length;
+  const settled = select(calls).length;
   assert.ok(settled >= 1, "the filtered walk must fetch at least once");
 
   await pause(100);
-  const at100ms = calls.length;
+  const at100ms = select(calls).length;
   await pause(400);
-  const at500ms = calls.length;
+  const at500ms = select(calls).length;
 
   assert.equal(
     at100ms,
@@ -136,12 +147,15 @@ test("MappaTool: ?type= active — camera fetch count is FLAT after the filtered
   const { screen } = rtl;
   await renderWithLocale(React.createElement(MappaTool));
 
-  await assertFetchCountIsFlat(screen, calls);
+  // t_bb310428: /mappa fetches the VIEWPORT (bbox), not the paginated
+  // walk; the facets query (?facets=1) is a separate one-shot. Flatness is
+  // asserted on the bbox fetches — the map's data channel.
+  await assertFetchCountIsFlat(screen, calls, (list) => bboxCalls(list));
 
   // The URL kind filter reached the API (server-side filter contract F0).
   assert.ok(
-    calls[0].includes("kind=Dome"),
-    `the filtered walk must forward kind to the API (got ${calls[0]})`,
+    bboxCalls(calls).some((url) => url.includes("kind=Dome")),
+    `the viewport query must forward kind to the API (got ${calls[0]})`,
   );
 });
 
@@ -153,12 +167,12 @@ test("MappaTool: ?type= + ?freshness= active — camera fetch count is FLAT afte
   const { screen } = rtl;
   await renderWithLocale(React.createElement(MappaTool));
 
-  await assertFetchCountIsFlat(screen, calls);
+  await assertFetchCountIsFlat(screen, calls, (list) => bboxCalls(list));
 
   // Both server filter dimensions reached the API.
   assert.ok(
-    calls[0].includes("kind=Dome") && calls[0].includes("freshness=30d"),
-    `the filtered walk must forward kind AND freshness (got ${calls[0]})`,
+    bboxCalls(calls).some((url) => url.includes("kind=Dome") && url.includes("freshness=30d")),
+    `the viewport query must forward kind AND freshness (got ${calls[0]})`,
   );
 });
 
