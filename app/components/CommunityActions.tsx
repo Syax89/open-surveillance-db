@@ -50,8 +50,6 @@ function csrfToken(): string | null {
   return match ? decodeURIComponent(match.slice("osdb_csrf=".length)) : null;
 }
 
-const zeroCounts = (): ActionCounts => ({ like: 0, confirm: 0, gone: 0, problem: 0, privacy: 0 });
-
 export function CommunityActions({
   recordId,
   counts: initialCounts,

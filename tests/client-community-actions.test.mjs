@@ -29,7 +29,7 @@ import assert from "node:assert/strict";
 import test, { afterEach, before } from "node:test";
 import {
   setupDom, loadDomModule, installFetchMock, jsonResponse,
-  renderWithLocale, wrapWithLocale, React,
+  renderWithLocale, React,
 } from "./helpers/dom-harness.mjs";
 
 let rtl;

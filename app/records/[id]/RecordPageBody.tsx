@@ -8,7 +8,7 @@ import { useMessages } from "../../lib/use-messages";
 import { SiteHeader } from "../../components/SiteHeader";
 import { CommunityActions } from "../../components/CommunityActions";
 import { usePublicCamera } from "../../lib/use-public-cameras";
-import { publicStatusLabel, isRecordPageStatus } from "../../lib/public-status";
+import { isRecordPageStatus } from "../../lib/public-status";
 import { formatPublicDate } from "../../lib/format-date";
 import { formatDirection } from "../../lib/compass";
 
@@ -60,7 +60,6 @@ export default function RecordPageBody() {
   // revalidating is fine — the loading gate keys on the resolved id only.
   useEffect(() => {
     let cancelled = false;
-    setEvents(null);
     fetch(`/api/cameras/${recordId}/events`)
       .then((response) => response.ok ? response.json() as Promise<{ events: LifecycleEvent[] }> : Promise.reject(new Error()))
       .then((data) => { if (!cancelled) setEvents(Array.isArray(data.events) ? data.events : []); })

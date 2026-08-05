@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { publicRecords, type Camera } from "./records";
-import { isPublicStatus, isRecordPageStatus } from "./public-status";
+import { isRecordPageStatus } from "./public-status";
 
 /**
  * Shared public-cameras data layer (audit t_c6da60f0, P2; pagination t_cc94f340).
