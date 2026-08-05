@@ -1,6 +1,6 @@
 "use client";
 
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useId, useRef, useState } from "react";
 import { LocaleContext } from "../components/LocaleProvider";
 import { messages } from "../lib/i18n";
 import type { MessageBundle } from "../lib/i18n";
@@ -11,7 +11,12 @@ import type { MessageBundle } from "../lib/i18n";
  * gone, problem, privacy. One component, two mounts:
  *
  *   - full: /records/[id] — five labelled buttons with live counts;
- *   - compact: map marker popup — same buttons, tighter spacing.
+ *   - compact: map marker popup — the redesigned toolbar (t_b7728ad0):
+ *     'Utile' and 'Conferma' stay visible with icon + count, the remaining
+ *     three actions ('Non c'è più', 'Problema', 'Privacy') live behind an
+ *     accessible disclosure trigger ('Aggiorna o segnala'); Privacy asks
+ *     for explicit confirmation before sending (the only destructive
+ *     request — GDPR-friendly fast hide).
  *
  * Contract (ADR §3.2/§3.3/§10.2):
  *   - one action per (record, contributor): PUT upserts/switches, PUT with
@@ -24,10 +29,13 @@ import type { MessageBundle } from "../lib/i18n";
  *     one's own record ARE allowed (GDPR-friendly fast hide);
  *   - counts are COUNT DISTINCT aggregates, never attribution.
  *
- * a11y (task FASE 3): each count is a role="status" live region whose
- * sr-only text carries the label ("Useful: 12"), so a count change is
- * announced without spamming five regions on first paint; buttons use
- * aria-pressed for the active action; errors land in role="alert".
+ * a11y (task FASE 3 + redesign t_b7728ad0): each count is a role="status"
+ * live region whose sr-only text carries the label ("Useful: 12"), so a
+ * count change is announced without spamming five regions on first paint;
+ * buttons use aria-pressed for the active action; the disclosure trigger
+ * carries aria-expanded + aria-controls, opening moves focus to the first
+ * menu action, Escape closes and restores focus to the trigger; errors
+ * land in role="alert".
  */
 
 export type ActionCounts = {
@@ -41,6 +49,11 @@ export type ActionCounts = {
 const ACTION_ORDER = ["like", "confirm", "gone", "problem", "privacy"] as const;
 export type ActionType = (typeof ACTION_ORDER)[number];
 
+/** The two always-visible toolbar actions (redesign t_b7728ad0). */
+const TOOLBAR_ACTIONS: readonly ActionType[] = ["like", "confirm"];
+/** The actions behind the disclosure trigger. */
+const MENU_ACTIONS: readonly ActionType[] = ["gone", "problem", "privacy"];
+
 function csrfToken(): string | null {
   if (typeof document === "undefined") return null;
   const match = document.cookie
@@ -48,6 +61,46 @@ function csrfToken(): string | null {
     .map((part) => part.trim())
     .find((part) => part.startsWith("osdb_csrf="));
   return match ? decodeURIComponent(match.slice("osdb_csrf=".length)) : null;
+}
+
+/** Inline 16px icons (redesign t_b7728ad0) — no icon library (PM
+ * directive: ZERO new libraries). Stroke-only, currentColor, aria-hidden. */
+function ToolbarIcon({ name }: { name: "useful" | "confirm" | "more" }) {
+  const common = {
+    width: 16,
+    height: 16,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 2,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    "aria-hidden": true,
+  };
+  if (name === "useful") {
+    // Thumbs-up (feather glyph): mark the record as useful.
+    return (
+      <svg {...common}>
+        <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" />
+      </svg>
+    );
+  }
+  if (name === "confirm") {
+    // Check-circle (feather glyph): confirm the record is still present.
+    return (
+      <svg {...common}>
+        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+        <polyline points="22 4 12 14.01 9 11.01" />
+      </svg>
+    );
+  }
+  // Chevron-down: the disclosure trigger affordance; CSS rotates it when
+  // the panel is open (aria-expanded on the button drives the class).
+  return (
+    <svg {...common}>
+      <polyline points="6 9 12 15 18 9" />
+    </svg>
+  );
 }
 
 export function CommunityActions({
@@ -93,6 +146,14 @@ export function CommunityActions({
   const [authState, setAuthState] = useState<"checking" | "anonymous" | "signed-in">("checking");
   const [busyAction, setBusyAction] = useState<ActionType | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Redesign t_b7728ad0 (compact only): the disclosure state — whether the
+  // "Aggiorna o segnala" panel is open, and whether the Privacy action is
+  // awaiting its explicit confirmation step inside the panel.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [privacyConfirming, setPrivacyConfirming] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const panelId = useId();
 
   // Personal state + session state, both no-store reads. All setState calls
   // happen in async continuations (react-hooks/set-state-in-effect).
@@ -114,6 +175,33 @@ export function CommunityActions({
       });
     return () => { cancelled = true; };
   }, [recordId]);
+
+  // Disclosure focus management (t_b7728ad0): opening moves focus to the
+  // first menu action (or the privacy confirm button when the confirm step
+  // is showing); Escape closes and returns focus to the trigger. The
+  // trigger is a disclosure, not a menu — the panel keeps normal tab order.
+  useEffect(() => {
+    if (!compact || !menuOpen) return;
+    const first = menuRef.current?.querySelector<HTMLElement>("button, a");
+    first?.focus();
+  }, [compact, menuOpen, privacyConfirming]);
+
+  useEffect(() => {
+    if (!compact || !menuOpen) return;
+    // Escape closes the disclosure wherever focus sits inside the widget —
+    // the panel itself is not focusable, so a keydown on body (or a menu
+    // action) must still reach the handler. Listened on document: the
+    // Leaflet popup is the only surface that can host this root.
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMenuOpen(false);
+        setPrivacyConfirming(false);
+        triggerRef.current?.focus();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [compact, menuOpen]);
 
   async function toggle(action: ActionType) {
     if (authState !== "signed-in" || busyAction !== null) return;
@@ -138,6 +226,10 @@ export function CommunityActions({
           setMyAction(body.action);
           if (body.counts) setCounts(body.counts);
         }
+        // A completed action closes the disclosure panel (the record state
+        // is now visible on the toolbar / menu counts).
+        setMenuOpen(false);
+        setPrivacyConfirming(false);
         return;
       }
       if (response.status === 401) {
@@ -175,30 +267,105 @@ export function CommunityActions({
     privacy: actions.privacyHelp,
   };
 
+  const renderActionButton = (action: ActionType, variant: "toolbar" | "menu" | "full") => {
+    const count = counts[action];
+    const busy = busyAction === action;
+    const disabled = authState !== "signed-in" || busyAction !== null;
+    return (
+      <button
+        key={action}
+        type="button"
+        className={`community-action${myAction === action ? " is-active" : ""}${variant === "menu" ? " community-action-menu" : ""}`}
+        aria-pressed={myAction === action}
+        aria-label={`${helpFor[action]}${myAction === action ? ` (${actions.removeYourAction})` : ""}`}
+        disabled={disabled}
+        onClick={() => {
+          // Privacy always goes through the explicit confirm step first
+          // (redesign t_b7728ad0): the panel swaps to the confirmation.
+          if (compact && action === "privacy") {
+            setPrivacyConfirming(true);
+            return;
+          }
+          void toggle(action);
+        }}
+      >
+        {variant === "toolbar" && <ToolbarIcon name={action === "like" ? "useful" : "confirm"} />}
+        <span className="community-action-label">{labelFor[action]}{busy ? ` ${actions.updating}` : ""}</span>
+        <span className="community-count" aria-hidden="true">{count}</span>
+        <span role="status" className="sr-only">{actions.countOf(labelFor[action], count)}</span>
+      </button>
+    );
+  };
+
+  // Compact (map popup): toolbar = the two visible actions + the disclosure
+  // trigger; the remaining actions live in the accessible panel. Full
+  // (record page): the classic five-action grid, unchanged.
+  const body = compact ? (
+    <>
+      <div className="community-toolbar">
+        {TOOLBAR_ACTIONS.map((action) => renderActionButton(action, "toolbar"))}
+        <button
+          ref={triggerRef}
+          type="button"
+          className={`community-more-trigger${menuOpen ? " is-open" : ""}`}
+          aria-expanded={menuOpen}
+          aria-controls={panelId}
+          aria-label={actions.moreActionsHelp}
+          onClick={() => {
+            setMenuOpen((open) => !open);
+            setPrivacyConfirming(false);
+          }}
+        >
+          <ToolbarIcon name="more" />
+          <span className="community-action-label">{actions.moreActions}</span>
+        </button>
+      </div>
+      <div
+        ref={menuRef}
+        id={panelId}
+        className={`community-toolbar-panel${menuOpen ? " is-open" : ""}`}
+        role="group"
+        aria-label={actions.moreMenuLabel}
+        hidden={!menuOpen}
+      >
+        {privacyConfirming ? (
+          <div className="community-privacy-confirm" role="alertdialog" aria-label={actions.privacyConfirmTitle}>
+            <p className="community-privacy-confirm-title">{actions.privacyConfirmTitle}</p>
+            <p className="community-privacy-confirm-body">{actions.privacyConfirmBody}</p>
+            <div className="community-privacy-confirm-actions">
+              <button
+                type="button"
+                className="community-action community-action-menu community-action-danger"
+                disabled={authState !== "signed-in" || busyAction !== null}
+                onClick={() => void toggle("privacy")}
+              >
+                <span className="community-action-label">{actions.privacyConfirmAction}</span>
+                <span role="status" className="sr-only">{actions.countOf(labelFor.privacy, counts.privacy)}</span>
+              </button>
+              <button
+                type="button"
+                className="community-action community-action-menu"
+                disabled={busyAction !== null}
+                onClick={() => setPrivacyConfirming(false)}
+              >
+                <span className="community-action-label">{actions.cancel}</span>
+              </button>
+            </div>
+          </div>
+        ) : (
+          MENU_ACTIONS.map((action) => renderActionButton(action, "menu"))
+        )}
+      </div>
+    </>
+  ) : (
+    <div className="community-actions-grid">
+      {ACTION_ORDER.map((action) => renderActionButton(action, "full"))}
+    </div>
+  );
+
   return (
     <section className={`community-actions${compact ? " community-actions-compact" : ""}`} aria-label={actions.sectionLabel}>
-      <div className="community-actions-grid">
-        {ACTION_ORDER.map((action) => {
-          const count = counts[action];
-          const busy = busyAction === action;
-          const disabled = authState !== "signed-in" || busyAction !== null;
-          return (
-            <button
-              key={action}
-              type="button"
-              className={`community-action${myAction === action ? " is-active" : ""}`}
-              aria-pressed={myAction === action}
-              aria-label={`${helpFor[action]}${myAction === action ? ` (${actions.removeYourAction})` : ""}`}
-              disabled={disabled}
-              onClick={() => void toggle(action)}
-            >
-              <span className="community-action-label">{labelFor[action]}{busy ? ` ${actions.updating}` : ""}</span>
-              <span className="community-count" aria-hidden="true">{count}</span>
-              <span role="status" className="sr-only">{actions.countOf(labelFor[action], count)}</span>
-            </button>
-          );
-        })}
-      </div>
+      {body}
       {authState === "anonymous" && (
         <p className="community-actions-cta">
           <a href="/login">{actions.anonymousCta} <span aria-hidden="true">→</span></a>

@@ -112,7 +112,7 @@ export function MappaTool() {
               filters the sidebar shows the truthful in-list note with the
               Clear filters action (onReset); the map itself never
               disappears. */}
-          <MapPanel filteredRecords={filteredRecords} visibleRecords={visibleRecords} selectedId={selectedId} onSelect={setSelectedId} onPick={() => {}} coordinates={focusLocation} selectedCamera={selectedCamera} loading={loading} notice={notice} issueHref="/correggi" directoryHref="/directory" search={qInput} setSearch={setQ} onBoundsChange={handleBoundsChange} viewportBounds={viewportBounds} onReset={reset} />
+          <MapPanel filteredRecords={filteredRecords} visibleRecords={visibleRecords} selectedId={selectedId} onSelect={setSelectedId} onPick={() => {}} coordinates={focusLocation} selectedCamera={selectedCamera} loading={loading} notice={notice} directoryHref="/directory" search={qInput} setSearch={setQ} onBoundsChange={handleBoundsChange} viewportBounds={viewportBounds} onReset={reset} />
         </div>
       </div>
     </section>

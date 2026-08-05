@@ -112,10 +112,17 @@ const MODERATION_COMPONENTS = [
  * risoluzione slug→fonte condivisa + locale per la data di aggiunta). Il
  * blocco è semanticamente isolato (.osm-popup-provenance con data-* attrs)
  * e verrà sostituito dal redesign popup (t_b7728ad0): baseline 159 righe.
+ *
+ * Deviazione redesign popup + mappa mobile (t_b7728ad0): MapPanel raggiunge
+ * 165 righe — il link "Report an issue" è stato RIMOSSO dal popup (le
+ * azioni Problema/Privacy del disclosure la coprono) e la provenienza ora
+ * passa come options (4° arg); +6 righe per lo stato pointsCollapsed
+ * (matchMedia al mount) del pannello punti mobile map-first. Baseline
+ * aggiornata a 165.
  */
 const KNOWN_DEVIATIONS = new Map([
   ["app/components/moderation/useModerationQueue.tsx", { baselineLines: 170, reason: "H1 t_69891619: campi associazione correzione→esito record (outcome + record id, validazione, cleanup) + commento contratto server/client aggiornato (fix PR #187); +2 t_6424f961: lookup data registry-driven LOCALE_BCP47 (no ternario it-IT/en-US)" }],
-  ["app/components/home/MapPanel.tsx", { baselineLines: 159, reason: "FASE C t_4dbce318: provenienza import nel popup (fetch unico import_batches + mapping slug→fonte condiviso + locale data aggiunta) — blocco isolato, verra' sostituito dal redesign popup t_b7728ad0" }],
+  ["app/components/home/MapPanel.tsx", { baselineLines: 165, reason: "t_b7728ad0: redesign popup (report-issue link rimosso, provenance via options) + stato pointsCollapsed del pannello punti mobile map-first (matchMedia al mount) — blocco isolato" }],
 ]);
 
 /** Componente condiviso atteso dal refactor di Linus. */

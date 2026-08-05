@@ -1,0 +1,414 @@
+[
+  {
+    "vp": "390",
+    "locale": "en",
+    "map": {
+      "x": 17,
+      "y": 652,
+      "w": 356,
+      "h": 464
+    },
+    "popup": {
+      "x": 22,
+      "y": 452,
+      "w": 347,
+      "h": 623
+    },
+    "content": {
+      "x": 43,
+      "y": 466,
+      "w": 301,
+      "h": 595
+    },
+    "h3": {
+      "x": 43,
+      "y": 466,
+      "w": 301,
+      "h": 20
+    },
+    "dl": {
+      "x": 43,
+      "y": 564,
+      "w": 301,
+      "h": 94
+    },
+    "popupCommunity": {
+      "x": 43,
+      "y": 756,
+      "w": 301,
+      "h": 216
+    },
+    "popupActions": {
+      "x": 43,
+      "y": 990,
+      "w": 301,
+      "h": 16
+    },
+    "provenance": {
+      "x": 43,
+      "y": 1022,
+      "w": 301,
+      "h": 39
+    },
+    "actions": [
+      {
+        "label": "UsefulUseful:",
+        "rect": {
+          "x": 43,
+          "y": 767,
+          "w": 147,
+          "h": 52
+        }
+      },
+      {
+        "label": "ConfirmConfirm:",
+        "rect": {
+          "x": 198,
+          "y": 767,
+          "w": 147,
+          "h": 52
+        }
+      },
+      {
+        "label": "No longer thereNo longer there",
+        "rect": {
+          "x": 43,
+          "y": 827,
+          "w": 147,
+          "h": 52
+        }
+      },
+      {
+        "label": "FlagFlag:",
+        "rect": {
+          "x": 198,
+          "y": 827,
+          "w": 147,
+          "h": 52
+        }
+      },
+      {
+        "label": "PrivacyPrivacy:",
+        "rect": {
+          "x": 43,
+          "y": 887,
+          "w": 147,
+          "h": 52
+        }
+      }
+    ],
+    "actionCount": 5,
+    "popupHeightPct": 134,
+    "popupOverflowBottom": 231,
+    "scrollableOverflow": 19
+  },
+  {
+    "vp": "390",
+    "locale": "it",
+    "map": {
+      "x": 17,
+      "y": 652,
+      "w": 356,
+      "h": 464
+    },
+    "popup": {
+      "x": 22,
+      "y": 452,
+      "w": 347,
+      "h": 623
+    },
+    "content": {
+      "x": 43,
+      "y": 466,
+      "w": 301,
+      "h": 595
+    },
+    "h3": {
+      "x": 43,
+      "y": 466,
+      "w": 301,
+      "h": 20
+    },
+    "dl": {
+      "x": 43,
+      "y": 564,
+      "w": 301,
+      "h": 94
+    },
+    "popupCommunity": {
+      "x": 43,
+      "y": 756,
+      "w": 301,
+      "h": 216
+    },
+    "popupActions": {
+      "x": 43,
+      "y": 990,
+      "w": 301,
+      "h": 16
+    },
+    "provenance": {
+      "x": 43,
+      "y": 1022,
+      "w": 301,
+      "h": 39
+    },
+    "actions": [
+      {
+        "label": "UtileUtile:",
+        "rect": {
+          "x": 43,
+          "y": 767,
+          "w": 147,
+          "h": 52
+        }
+      },
+      {
+        "label": "ConfermoConfermo:",
+        "rect": {
+          "x": 198,
+          "y": 767,
+          "w": 147,
+          "h": 52
+        }
+      },
+      {
+        "label": "Non c'è piùNon c'è più:",
+        "rect": {
+          "x": 43,
+          "y": 827,
+          "w": 147,
+          "h": 52
+        }
+      },
+      {
+        "label": "SegnalaSegnala:",
+        "rect": {
+          "x": 198,
+          "y": 827,
+          "w": 147,
+          "h": 52
+        }
+      },
+      {
+        "label": "PrivacyPrivacy:",
+        "rect": {
+          "x": 43,
+          "y": 887,
+          "w": 147,
+          "h": 52
+        }
+      }
+    ],
+    "actionCount": 5,
+    "popupHeightPct": 134,
+    "popupOverflowBottom": 231,
+    "scrollableOverflow": 19
+  },
+  {
+    "vp": "1280",
+    "locale": "en",
+    "map": {
+      "x": 357,
+      "y": 313,
+      "w": 906,
+      "h": 540
+    },
+    "popup": {
+      "x": 636,
+      "y": 113,
+      "w": 347,
+      "h": 623
+    },
+    "content": {
+      "x": 657,
+      "y": 127,
+      "w": 301,
+      "h": 595
+    },
+    "h3": {
+      "x": 657,
+      "y": 127,
+      "w": 301,
+      "h": 20
+    },
+    "dl": {
+      "x": 657,
+      "y": 225,
+      "w": 301,
+      "h": 94
+    },
+    "popupCommunity": {
+      "x": 657,
+      "y": 418,
+      "w": 301,
+      "h": 216
+    },
+    "popupActions": {
+      "x": 657,
+      "y": 651,
+      "w": 301,
+      "h": 16
+    },
+    "provenance": {
+      "x": 657,
+      "y": 683,
+      "w": 301,
+      "h": 39
+    },
+    "actions": [
+      {
+        "label": "UsefulUseful:",
+        "rect": {
+          "x": 657,
+          "y": 429,
+          "w": 147,
+          "h": 52
+        }
+      },
+      {
+        "label": "ConfirmConfirm:",
+        "rect": {
+          "x": 812,
+          "y": 429,
+          "w": 147,
+          "h": 52
+        }
+      },
+      {
+        "label": "No longer thereNo longer there",
+        "rect": {
+          "x": 657,
+          "y": 488,
+          "w": 147,
+          "h": 52
+        }
+      },
+      {
+        "label": "FlagFlag:",
+        "rect": {
+          "x": 812,
+          "y": 488,
+          "w": 147,
+          "h": 52
+        }
+      },
+      {
+        "label": "PrivacyPrivacy:",
+        "rect": {
+          "x": 657,
+          "y": 548,
+          "w": 147,
+          "h": 52
+        }
+      }
+    ],
+    "actionCount": 5,
+    "popupHeightPct": 115,
+    "popupOverflowBottom": -64,
+    "scrollableOverflow": 19
+  },
+  {
+    "vp": "1280",
+    "locale": "it",
+    "map": {
+      "x": 357,
+      "y": 313,
+      "w": 906,
+      "h": 540
+    },
+    "popup": {
+      "x": 636,
+      "y": 113,
+      "w": 347,
+      "h": 623
+    },
+    "content": {
+      "x": 657,
+      "y": 127,
+      "w": 301,
+      "h": 595
+    },
+    "h3": {
+      "x": 657,
+      "y": 127,
+      "w": 301,
+      "h": 20
+    },
+    "dl": {
+      "x": 657,
+      "y": 225,
+      "w": 301,
+      "h": 94
+    },
+    "popupCommunity": {
+      "x": 657,
+      "y": 418,
+      "w": 301,
+      "h": 216
+    },
+    "popupActions": {
+      "x": 657,
+      "y": 651,
+      "w": 301,
+      "h": 16
+    },
+    "provenance": {
+      "x": 657,
+      "y": 683,
+      "w": 301,
+      "h": 39
+    },
+    "actions": [
+      {
+        "label": "UtileUtile:",
+        "rect": {
+          "x": 657,
+          "y": 429,
+          "w": 147,
+          "h": 52
+        }
+      },
+      {
+        "label": "ConfermoConfermo:",
+        "rect": {
+          "x": 812,
+          "y": 429,
+          "w": 147,
+          "h": 52
+        }
+      },
+      {
+        "label": "Non c'è piùNon c'è più:",
+        "rect": {
+          "x": 657,
+          "y": 488,
+          "w": 147,
+          "h": 52
+        }
+      },
+      {
+        "label": "SegnalaSegnala:",
+        "rect": {
+          "x": 812,
+          "y": 488,
+          "w": 147,
+          "h": 52
+        }
+      },
+      {
+        "label": "PrivacyPrivacy:",
+        "rect": {
+          "x": 657,
+          "y": 548,
+          "w": 147,
+          "h": 52
+        }
+      }
+    ],
+    "actionCount": 5,
+    "popupHeightPct": 115,
+    "popupOverflowBottom": -64,
+    "scrollableOverflow": 19
+  }
+]
