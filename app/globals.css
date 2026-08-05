@@ -649,6 +649,12 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
   .hero-intro { font-size:var(--text-xl) }
   .hero-stats { margin-top:48px;gap:18px }
   .hero-visual { min-height:260px }
+  /* Fix: on narrow screens .signal-three (right:10%;top:74%, base rule)
+     lands directly under .visual-label (right:26px;bottom:28px below),
+     the amber dot overlapping the caption text. Move it up into the
+     otherwise-empty upper-right area, clear of both signal-one
+     (right:24%;top:28%) and the label. */
+  .signal-three { right:20%;top:18%; }
   .map-teaser { grid-template-columns:1fr; gap:30px; padding:64px 0 24px }
   .map-teaser-visual { min-height:210px }
   .tool-cards-grid { grid-template-columns:1fr }
@@ -1124,8 +1130,13 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
   .map-layout { width:min(100% - 32px,1180px); padding:2px 0 calc(56px + env(safe-area-inset-bottom)); }
   /* Filters: compact but readable — the panel keeps the 2-col grid so the
      five selects + reset do not stack into 278px of chrome; the field
-     labels/selects shrink (select stays ≥44px touch, WCAG 2.5.8). */
-  .map-card .filters-panel { padding:10px 14px 12px; gap:10px 12px; }
+     labels/selects shrink (select stays ≥44px touch, WCAG 2.5.8).
+     grid-template-columns needs !important here: below 700px the generic
+     `.directory-controls { grid-template-columns:minmax(0,1fr) !important }`
+     rule (shared with /directory and the home hub) otherwise wins over the
+     unscoped 2-col rule at max-width:980px and silently collapses this
+     panel back to 1 column, undoing the map-first intent above. */
+  .map-card .filters-panel { grid-template-columns:minmax(0,1fr) minmax(0,1fr) !important; padding:10px 14px 12px; gap:10px 12px; }
   .map-card .record-filter label { margin-bottom:4px; font-size:var(--text-2xs); letter-spacing:.06em; }
   .map-card .record-filter select { padding:11px 10px; font-size:var(--text-md); min-height:44px; }
   /* MAP-FIRST: order puts the map before the sidebar in the single column
