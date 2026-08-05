@@ -33,6 +33,15 @@ export default async function ManifestoPage() {
         </>
       }
     >
+      <section className="founder-declaration" aria-labelledby="founder-title">
+        <div className="founder-statement">
+          <p className="eyebrow"><span /> {t.founderEyebrow}</p>
+          <h2 id="founder-title">{t.founderTitle}</h2>
+          <p className="founder-body">{t.founderBody}</p>
+          <p className="founder-signature"><cite>{t.founderSignature}</cite></p>
+        </div>
+      </section>
+
       <section className="principles" aria-labelledby="mission-title">
         <div className="principles-intro">
           <p className="eyebrow"><span /> {t.missionEyebrow}</p>
