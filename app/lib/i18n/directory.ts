@@ -74,6 +74,12 @@ export const en = {
   stateAll: "Any",
   stateConfirmed: "Confirmed",
   stateNever: "Never confirmed",
+  // Import-origin filter (?origin=, FASE C, t_4dbce318): where a record
+  // comes from — a community report or an imported public dataset.
+  originFilter: "Origin",
+  originAll: "Any",
+  originReports: "Community reports",
+  originImported: "Imported data",
   oneRecordFound: "1 public record found",
   recordsFound: "public records found",
   lastVerification: "Last confirmed",
@@ -198,6 +204,13 @@ export const it: Translation<typeof en> = {
   stateAll: "Qualsiasi",
   stateConfirmed: "Confermata",
   stateNever: "Mai confermata",
+  // Filtro origine import (?origin=, FASE C, t_4dbce318): da dove arriva
+  // un record — una segnalazione della community o un dataset pubblico
+  // importato.
+  originFilter: "Origine",
+  originAll: "Qualsiasi",
+  originReports: "Segnalazioni",
+  originImported: "Dati importati",
   oneRecordFound: "1 record pubblico trovato",
   recordsFound: "record pubblici trovati",
   lastVerification: "Ultima conferma",

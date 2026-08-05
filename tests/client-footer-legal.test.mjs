@@ -170,16 +170,16 @@ test("footer: contentinfo landmark with localized aria-label and labelled nav", 
   assert.equal(nav.getAttribute("aria-label"), "Site navigation");
 
   const links = collectLinks(footer);
-  // brand + 4 tool links + 9 institutional links + 2 external
-  // licence/attribution links
-  assert.equal(links.length, 16);
+  // brand + 4 tool links + 10 institutional links (incl. /fonti, import
+  // pipeline FASE C) + 2 external licence/attribution links
+  assert.equal(links.length, 17);
   const internal = links.filter((l) => l.href.startsWith("/"));
-  assert.equal(internal.length, 14);
+  assert.equal(internal.length, 15);
   for (const expected of [
     // Public tool routes (F3 t_2ca69725, FRONTEND_DESIGN §2.5).
     "/mappa", "/directory", "/segnala", "/correggi",
     // Institutional pages.
-    "/manifesto", "/regole", "/guide", "/privacy", "/termini", "/licenze", "/accessibility", "/faq", "/contatti",
+    "/manifesto", "/regole", "/guide", "/privacy", "/termini", "/licenze", "/fonti", "/accessibility", "/faq", "/contatti",
   ]) {
     assert.ok(
       internal.some((l) => l.href === expected),

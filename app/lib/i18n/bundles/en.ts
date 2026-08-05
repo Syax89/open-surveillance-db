@@ -22,6 +22,7 @@ import { en as faqEn } from "../faq";
 import { en as contactEn } from "../contact";
 import { en as rulesEn } from "../rules";
 import { en as recordEn } from "../record";
+import { en as sourcesEn } from "../sources";
 import { en as moderationEn } from "../moderation";
 import { en as authEn } from "../auth";
 import { en as communityEn } from "../community";
@@ -43,6 +44,7 @@ export const en = {
   contact: contactEn,
   rules: rulesEn,
   record: recordEn,
+  sources: sourcesEn,
   moderation: moderationEn,
   auth: authEn,
   community: communityEn,

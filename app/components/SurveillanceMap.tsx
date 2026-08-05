@@ -27,6 +27,15 @@ export type MapCamera = {
   address?: string | null;
   description?: string;
   /**
+   * Import provenance (FASE C, t_4dbce318): the raw source value
+   * ('import:<slug>' for imported rows, 'Community report' for reports,
+   * 'Prototype seed' for the offline demo seed). Present on real API
+   * records and the seed; the popup provenance line resolves it.
+   */
+  source?: string;
+  /** Creation date (ISO, `cameras.created_at`). Present on real API records. */
+  createdAt?: string;
+  /**
    * Community-action counts (ADR 0021 §10.2, FASE 3 UI): the popup action
    * widget renders them from the shared record payload. Optional — the
    * demo seed omits them and the widget falls back to zero.

@@ -29,6 +29,9 @@ type Props = {
   /** Optional (FASE 3 UI): confirmation-state filter (?state=), wired by the /directory tool. */
   stateFilter?: "all" | "confirmed" | "never";
   setStateFilter?: (value: "all" | "confirmed" | "never") => void;
+  /** Optional (FASE C, t_4dbce318): import-origin filter (?origin=), wired by the /directory tool. */
+  originFilter?: "all" | "reports" | "imported";
+  setOriginFilter?: (value: "all" | "reports" | "imported") => void;
   /** Optional (t_f13fcb1c): result page from the URL (?page=, clamped). */
   page?: number;
   /** Optional (t_f13fcb1c): pagination setter (writes ?page=). */
@@ -63,7 +66,7 @@ type Props = {
  * Distance facts) and hides the index/pagination/chips, which only make
  * sense for the filtered list.
  */
-export function DirectoryCatalog({ filteredRecords, cameraKinds, search, setSearch, kindFilter, setKindFilter, freshnessFilter, setFreshnessFilter, sortOrder, setSortOrder, stateFilter, setStateFilter, page = 1, setPage, showRecordOnMap, setCoordinates, onResetFilters, reportHref = "/segnala", exportHrefs = null }: Props) {
+export function DirectoryCatalog({ filteredRecords, cameraKinds, search, setSearch, kindFilter, setKindFilter, freshnessFilter, setFreshnessFilter, sortOrder, setSortOrder, stateFilter, setStateFilter, originFilter, setOriginFilter, page = 1, setPage, showRecordOnMap, setCoordinates, onResetFilters, reportHref = "/segnala", exportHrefs = null }: Props) {
   const t = useMessages().directory;
   const statuses = useMessages().status;
   const { locale } = useLocale();
@@ -214,7 +217,7 @@ export function DirectoryCatalog({ filteredRecords, cameraKinds, search, setSear
   return (
     <section className="records-section" id="records" aria-label={t.accessibleDirectory}>
       {offline && <div className="offline-state" role="status"><b>{t.offlineTitle}.</b> {t.offlineBody} <button type="button" className="text-button" onClick={() => window.location.reload()}>{t.offlineAction} <span aria-hidden="true">→</span></button></div>}
-      <FiltersBar variant="bare" showCommunitySort stateFilter={stateFilter} setStateFilter={setStateFilter} cameraKinds={cameraKinds} search={search} setSearch={setSearch} kindFilter={kindFilter} setKindFilter={setKindFilter} freshnessFilter={freshnessFilter} setFreshnessFilter={setFreshnessFilter} sortOrder={sortOrder} setSortOrder={setSortOrder} resultCount={filteredRecords.length} onReset={onResetFilters} extraControls={<button type="button" className="text-button place-search-toggle" aria-expanded={placeOpen} aria-controls="directory-place-panel" onClick={() => setPlaceOpen((value) => !value)}>{placeOpen ? t.placeHide : t.searchNearPlace} <span aria-hidden="true">{placeOpen ? "↑" : "↓"}</span></button>} />
+      <FiltersBar variant="bare" showCommunitySort stateFilter={stateFilter} setStateFilter={setStateFilter} originFilter={originFilter} setOriginFilter={setOriginFilter} cameraKinds={cameraKinds} search={search} setSearch={setSearch} kindFilter={kindFilter} setKindFilter={setKindFilter} freshnessFilter={freshnessFilter} setFreshnessFilter={setFreshnessFilter} sortOrder={sortOrder} setSortOrder={setSortOrder} resultCount={filteredRecords.length} onReset={onResetFilters} extraControls={<button type="button" className="text-button place-search-toggle" aria-expanded={placeOpen} aria-controls="directory-place-panel" onClick={() => setPlaceOpen((value) => !value)}>{placeOpen ? t.placeHide : t.searchNearPlace} <span aria-hidden="true">{placeOpen ? "↑" : "↓"}</span></button>} />
       {/* Place-search panel (collapsed until the controls-row trigger opens
           it): keeps the historical ids/classes so the a11y suite and the AT
           labels keep matching. Collapse via the .place-search-closed class —

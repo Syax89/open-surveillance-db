@@ -20,6 +20,7 @@ import { it as faqIt } from "../faq";
 import { it as contactIt } from "../contact";
 import { it as rulesIt } from "../rules";
 import { it as recordIt } from "../record";
+import { it as sourcesIt } from "../sources";
 import { it as moderationIt } from "../moderation";
 import { it as authIt } from "../auth";
 import { it as communityIt } from "../community";
@@ -41,6 +42,7 @@ export const it: Translation<typeof import("./en").en> = {
   contact: contactIt,
   rules: rulesIt,
   record: recordIt,
+  sources: sourcesIt,
   moderation: moderationIt,
   auth: authIt,
   community: communityIt,

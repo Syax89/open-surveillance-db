@@ -1067,6 +1067,12 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 .osm-popup-address, .osm-popup-description { margin:6px 0 0; color:var(--ink-2); font-size:var(--text-sm); line-height:1.45; }
 .osm-popup-actions { display:flex; gap:14px; margin:10px 0 0; }
 .osm-popup-actions a { color:var(--action); font-weight:800; font-size:var(--text-sm); }
+/* Import provenance line (FASE C, t_4dbce318): discreet secondary text at
+   the very bottom of the marker popup — readable source + licence and the
+   added date. Small, muted, never competes with the community widget. */
+.osm-popup-provenance { margin:8px 0 0; padding-top:8px; border-top:1px solid var(--line); color:var(--ink-3); font-size:var(--text-2xs); line-height:1.5; }
+.osm-popup-provenance a { color:var(--ink-2); text-decoration:underline; text-underline-offset:2px; }
+.osm-popup-provenance a:focus-visible { outline:3px solid var(--focus); outline-offset:2px; border-radius:var(--radius-sm); }
 /* Mobile-first (t_702c10af, t_966254a1): below 768px the sidebar becomes a
    panel ABOVE the map (search + list, internally scrollable) instead of a
    side column; the card keeps the compact banner + filters on top. */
@@ -1097,6 +1103,12 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
    last confirmed" summary. Never a state change. */
 .community-badge { margin:14px 0 0; color:var(--ink-3); font-size:var(--text-sm); line-height:1.5; }
 .community-badge-label { color:var(--label); font-size:var(--text-2xs); text-transform:uppercase; letter-spacing:.1em; font-weight:800; }
+/* Import provenance (FASE C, t_4dbce318): the attribution line under the
+   community badge on imported records — same secondary voice, links keep
+   the badge colour so the line reads as one notice. */
+.record-provenance { margin:4px 0 0; color:var(--ink-3); font-size:var(--text-sm); line-height:1.5; }
+.record-provenance a { color:inherit; text-decoration:underline; text-underline-offset:2px; }
+.record-provenance a:focus-visible { outline:3px solid var(--focus); outline-offset:2px; border-radius:var(--radius-sm); }
 
 /* Community action widget (ADR §3): five action buttons with live
    aggregate counts. Sober text-button family — no stars, no badges. */

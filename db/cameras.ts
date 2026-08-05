@@ -3,6 +3,7 @@ import { classifyDuplicateMatch, textSimilarity, type MatchStrength } from "../a
 import { PUBLIC_CAMERA_STATUSES } from "../app/lib/public-status";
 import { confirmationCountsFor } from "./confirmations";
 import { communityActionCountsFor, type CommunityActionCounts } from "./community-actions";
+import { getImportBatchById, type ImportBatchPublic } from "./import-sources";
 
 export type CameraRecord = {
   id: number;
@@ -50,6 +51,16 @@ export type PublicCameraRecord = Omit<CameraRecord, "notes"> & {
   goneCount: number;
   problemCount: number;
   privacyCount: number;
+  /**
+   * Import provenance (import pipeline FASE C, t_4dbce318): present only
+   * for records imported from a public dataset (cameras.import_batch_id
+   * set) — the batch's source name, licence and links, exactly as
+   * persisted by the runner. `null` for community reports and the demo
+   * seed. Populated by the two by-id resolvers (detail page provenance
+   * line); list surfaces keep their historical shape (no N+1 over
+   * thousands of rows).
+   */
+  importBatch?: ImportBatchPublic | null;
 };
 
 /**
@@ -379,6 +390,18 @@ export async function createCamera(input: { title: string; kind: string; manufac
   }
   return result;
 }
+/**
+ * Attach import provenance (FASE C, t_4dbce318): one indexed lookup by
+ * primary key, only when the row carries an import_batch_id — community
+ * reports and demo rows resolve to `null` without a query.
+ */
+async function attachImportBatch<T extends { importBatchId?: number | null }>(
+  record: T,
+): Promise<T & { importBatch?: ImportBatchPublic | null }> {
+  if (!record.importBatchId) return { ...record, importBatch: null };
+  return { ...record, importBatch: await getImportBatchById(record.importBatchId) };
+}
+
 export async function getPublicCameraById(id: number, nowIso: string = new Date().toISOString()): Promise<PublicCameraRecord | null> {
   const d1 = await getD1();
   // Same shared public predicate as listPublicCameras: only records whose
@@ -386,17 +409,18 @@ export async function getPublicCameraById(id: number, nowIso: string = new Date(
   const { sql: publicPredicate, parameters } = publicCameraPredicate(nowIso);
   const result = await d1
     .prepare(
-      `SELECT id, title, kind, CASE WHEN publish_manufacturer = 1 THEN manufacturer ELSE NULL END AS manufacturer, CASE WHEN publish_observed_on = 1 THEN observed_on ELSE NULL END AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, latitude, longitude, direction, status, source, updated, description, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt FROM cameras WHERE id = ? AND ${publicPredicate}`,
+      `SELECT id, title, kind, CASE WHEN publish_manufacturer = 1 THEN manufacturer ELSE NULL END AS manufacturer, CASE WHEN publish_observed_on = 1 THEN observed_on ELSE NULL END AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, latitude, longitude, direction, status, source, updated, description, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt, import_batch_id AS importBatchId FROM cameras WHERE id = ? AND ${publicPredicate}`,
     )
     .bind(id, ...parameters)
-    .first<PublicCameraRecord>();
+    .first<PublicCameraRecord & { importBatchId?: number | null }>();
   if (!result) return null;
   // Decayed community-verification count (ADR 0018 §2.3), aggregate only.
   const confirmationCount = await confirmationCountsFor([id]).then((map) => map.get(id) ?? 0);
   // Community-action counts (ADR 0021 §10.2): COUNT DISTINCT, never weights.
   const actionCounts = await communityActionCountsFor([id]).then((map) => map.get(id) ?? { like: 0, confirm: 0, gone: 0, problem: 0, privacy: 0 });
+  const withProvenance = await attachImportBatch(result);
   return {
-    ...result,
+    ...withProvenance,
     latitude: roundPublicCoordinate(result.latitude),
     longitude: roundPublicCoordinate(result.longitude),
     confirmationCount,
@@ -420,24 +444,25 @@ export async function getPublicCameraById(id: number, nowIso: string = new Date(
 export async function getCommunityRecordById(id: number, nowIso: string = new Date().toISOString()): Promise<PublicCameraRecord | null> {
   const d1 = await getD1();
   const { sql: publicPredicate, parameters } = publicCameraPredicate(nowIso);
-  const baseSelect = `SELECT id, title, kind, CASE WHEN publish_manufacturer = 1 THEN manufacturer ELSE NULL END AS manufacturer, CASE WHEN publish_observed_on = 1 THEN observed_on ELSE NULL END AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, latitude, longitude, direction, status, source, updated, description, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt FROM cameras`;
+  const baseSelect = `SELECT id, title, kind, CASE WHEN publish_manufacturer = 1 THEN manufacturer ELSE NULL END AS manufacturer, CASE WHEN publish_observed_on = 1 THEN observed_on ELSE NULL END AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, latitude, longitude, direction, status, source, updated, description, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt, import_batch_id AS importBatchId FROM cameras`;
   let result = await d1
     .prepare(`${baseSelect} WHERE id = ? AND ${publicPredicate}`)
     .bind(id, ...parameters)
-    .first<PublicCameraRecord>();
+    .first<PublicCameraRecord & { importBatchId?: number | null }>();
   if (!result) {
     // Withdrawn fallback (ADR §6.3): only hidden/removed — never pending/
     // rejected, which have no direct-link contract.
     result = await d1
       .prepare(`${baseSelect} WHERE id = ? AND status IN ('hidden', 'removed')`)
       .bind(id)
-      .first<PublicCameraRecord>();
+      .first<PublicCameraRecord & { importBatchId?: number | null }>();
   }
   if (!result) return null;
   const confirmationCount = await confirmationCountsFor([id]).then((map) => map.get(id) ?? 0);
   const actionCounts = await communityActionCountsFor([id]).then((map) => map.get(id) ?? { like: 0, confirm: 0, gone: 0, problem: 0, privacy: 0 });
+  const withProvenance = await attachImportBatch(result);
   return {
-    ...result,
+    ...withProvenance,
     latitude: roundPublicCoordinate(result.latitude),
     longitude: roundPublicCoordinate(result.longitude),
     confirmationCount,

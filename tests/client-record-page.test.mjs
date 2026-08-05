@@ -215,6 +215,64 @@ test("record page: confirmed record shows the community badge with count and las
   assert.equal(screen.queryByText("Never confirmed"), null);
 });
 
+test("record page: imported record shows provenance next to the never-confirmed badge (FASE C)", async () => {
+  const { screen } = rtl;
+  // Imported row: raw source 'import:<slug>', never confirmed (ADR §9.1),
+  // batch provenance attached by the detail API.
+  const imported = {
+    ...publicRecordFixture,
+    source: "import:fixture-source-2026",
+    createdAt: "2026-03-01T00:00:00.000Z",
+    importBatch: {
+      sourceName: "Fixture Open Data (test)",
+      sourceUrl: "https://example.invalid/fixture",
+      license: "ODbL 1.0",
+      licenseUrl: "https://opendatacommons.org/licenses/odbl/1-0/",
+    },
+  };
+  installFetchMock(recordHandler({ record: imported }));
+  await setNavState({ params: { id: "7" } });
+
+  await renderWithLocale(React.createElement(RecordPage));
+  await screen.findByText("Fixture Public Camera");
+
+  // The never-confirmed badge stays (imported rows are never pre-verified).
+  assert.ok(screen.getByText("Never confirmed"));
+  // Provenance line: "Imported from <source>" with the licence, both
+  // linked to the original dataset / licence text.
+  const provenance = screen.getByText(/^Imported from:/);
+  assert.ok(provenance);
+  const sourceLink = screen.getByRole("link", { name: "Fixture Open Data (test)" });
+  assert.equal(sourceLink.getAttribute("href"), "https://example.invalid/fixture");
+  const licenseLink = screen.getByRole("link", { name: "ODbL 1.0" });
+  assert.equal(licenseLink.getAttribute("href"), "https://opendatacommons.org/licenses/odbl/1-0/");
+  // The Source fact shows the friendly dataset name, never the raw
+  // 'import:fixture-source-2026' internal slug. It appears twice by design:
+  // as the provenance link and as the "Source" fact row.
+  assert.equal(screen.queryByText("import:fixture-source-2026"), null);
+  assert.ok(screen.getAllByText("Fixture Open Data (test)").length >= 2);
+  // Creation date fact (FASE C): the "Added" row renders the localized date.
+  const expectedAdded = new Date("2026-03-01T00:00:00.000Z")
+    .toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+  const addedDt = screen.getByText("Added");
+  assert.equal(addedDt.tagName, "DT", "the Added fact row renders its label");
+  // The fixture shares the same date for created/updated, so the date
+  // appears in both the Added and Last-confirmation rows.
+  assert.ok(screen.getAllByText(expectedAdded).length >= 2, "the Added row renders the localized creation date");
+});
+
+test("record page: community report shows no import provenance line", async () => {
+  const { screen } = rtl;
+  installFetchMock(recordHandler({ record: publicRecordFixture }));
+  await setNavState({ params: { id: "7" } });
+
+  await renderWithLocale(React.createElement(RecordPage));
+  await screen.findByText("Fixture Public Camera");
+
+  assert.equal(screen.queryByText(/^Imported from:/), null, "community reports never render the provenance line");
+  assert.ok(screen.getByText("Community report"));
+});
+
 test("record page: hidden record renders the direct-link banner with history anchor (ADR §6.3)", async () => {
   const { screen } = rtl;
   const hidden = { ...publicRecordFixture, status: "hidden" };

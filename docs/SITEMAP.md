@@ -139,6 +139,7 @@ or `legal` bundle — legal content is a separate typed layer
 | Info — rules | `/regole` | `rules.ts` |
 | Info — how moderation works | `/moderazione` | `moderazione.ts` |
 | Legal (privacy, terms, licences) | `/privacy`, `/termini`, `/licenze` | `app/lib/legal/` (typed layer, not i18n bundles) |
+| Info — data sources (import pipeline) | `/fonti` | `sources.ts` (page bundle; data from `db/import-sources.ts` — committed import_batches only) |
 
 ## Site map
 
@@ -155,7 +156,8 @@ or `legal` bundle — legal content is a separate typed layer
 | `/moderazione` | How moderation works  | Review flow, appeals, safeguards, SLAs              | — | ✓ | implemented (PR #73) |
 | `/privacy`     | Privacy               | Public privacy notice                               | — | ✓ | implemented (PR #70) |
 | `/termini`     | Terms of use          | Public terms of use                                 | — | ✓ | implemented (PR #70) |
-| `/licenze`     | Licences              | Data and software licences, OSM attribution         | — | ✓ | implemented (PR #70) |
+| `/licenze`     | Licences              | Data and software licences, OSM attribution, general mention of imported public datasets | — | ✓ | implemented (PR #70; FASE C t_4dbce318 section 6) |
+| `/fonti`       | Data sources          | Per-source attribution of imported public datasets (entity + link, licence + link, import date, record count, attribution text) — NOT in the main navigation (CEO route decision 2026-08-05) | — | ✓ | implemented (FASE C, t_4dbce318) |
 | `/accessibility` | Accessibility statement | WCAG 2.2 AA commitment, compliance status, barrier reporting | — | ✓ | implemented (F-legal t_2bef9ebb) |
 | `/faq`         | FAQ                   | Frequent questions                                  | — | ✓ | implemented (PR #68) |
 | `/contatti`    | Contacts              | Who we are, owners, correction/removal contact      | — | ✓ | implemented (PR #68) |

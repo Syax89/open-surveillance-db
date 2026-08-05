@@ -133,7 +133,7 @@ function PaginationProbe({ filters }) {
 
 test("parseCameraFilters: an empty URL yields the safe defaults", () => {
   assert.deepEqual(parseCameraFilters(new URLSearchParams("")), {
-    q: "", type: "all", freshness: "all", sort: "alphabetical", state: "all", focus: null, page: 1,
+    q: "", type: "all", freshness: "all", sort: "alphabetical", state: "all", origin: "all", focus: null, page: 1,
   });
 });
 
@@ -151,20 +151,20 @@ test("parseCameraFilters: invalid values fall back to safe defaults — never a 
 
 test("stringifyCameraFilters omits defaults (minimal URL, R2) and round-trips encoding", () => {
   assert.equal(
-    stringifyCameraFilters({ q: "", type: "all", freshness: "all", sort: "alphabetical", state: "all", focus: null, page: 1 }),
+    stringifyCameraFilters({ q: "", type: "all", freshness: "all", sort: "alphabetical", state: "all", origin: "all", focus: null, page: 1 }),
     "",
     "all-default filters serialize to no query string",
   );
   const encoded = stringifyCameraFilters({
-    q: "Via Roma, 45", type: "Fixed dome", freshness: "7d", sort: "position", state: "all", focus: 3, page: 1,
+    q: "Via Roma, 45", type: "Fixed dome", freshness: "7d", sort: "position", state: "all", origin: "all", focus: 3, page: 1,
   });
   assert.equal(encoded, "?q=Via+Roma%2C+45&type=Fixed+dome&freshness=7d&sort=position&focus=3");
   assert.deepEqual(parseCameraFilters(new URLSearchParams(encoded.slice(1))), {
-    q: "Via Roma, 45", type: "Fixed dome", freshness: "7d", sort: "position", state: "all", focus: 3, page: 1,
+    q: "Via Roma, 45", type: "Fixed dome", freshness: "7d", sort: "position", state: "all", origin: "all", focus: 3, page: 1,
   });
   // t_f13fcb1c: ?page= is a real dimension — >1 serializes, 1 is omitted.
   assert.equal(
-    stringifyCameraFilters({ q: "", type: "all", freshness: "all", sort: "alphabetical", state: "all", focus: null, page: 2 }),
+    stringifyCameraFilters({ q: "", type: "all", freshness: "all", sort: "alphabetical", state: "all", origin: "all", focus: null, page: 2 }),
     "?page=2",
     "page 2 serializes to ?page=2",
   );
@@ -181,19 +181,43 @@ test("parseCameraFilters: confirmation-state dimension (?state=) parses and seri
   assert.equal(parseCameraFilters(new URLSearchParams("state=never")).state, "never");
   // Serialization: default omitted, non-default written.
   assert.equal(
-    stringifyCameraFilters({ q: "", type: "all", freshness: "all", sort: "alphabetical", state: "all", focus: null, page: 1 }),
+    stringifyCameraFilters({ q: "", type: "all", freshness: "all", sort: "alphabetical", state: "all", origin: "all", focus: null, page: 1 }),
     "",
     "state=all is the default and is omitted",
   );
   assert.equal(
-    stringifyCameraFilters({ q: "", type: "all", freshness: "all", sort: "alphabetical", state: "never", focus: null, page: 1 }),
+    stringifyCameraFilters({ q: "", type: "all", freshness: "all", sort: "alphabetical", state: "never", origin: "all", focus: null, page: 1 }),
     "?state=never",
   );
   // Round-trip: parse(stringify(x)) === x.
-  const encoded = stringifyCameraFilters({ q: "", type: "all", freshness: "all", sort: "useful", state: "confirmed", focus: null, page: 1 });
+  const encoded = stringifyCameraFilters({ q: "", type: "all", freshness: "all", sort: "useful", state: "confirmed", origin: "all", focus: null, page: 1 });
   assert.equal(encoded, "?sort=useful&state=confirmed");
   assert.deepEqual(parseCameraFilters(new URLSearchParams(encoded.slice(1))), {
-    q: "", type: "all", freshness: "all", sort: "useful", state: "confirmed", focus: null, page: 1,
+    q: "", type: "all", freshness: "all", sort: "useful", state: "confirmed", origin: "all", focus: null, page: 1,
+  });
+});
+
+test("parseCameraFilters: import-origin dimension (?origin=) parses and serializes (FASE C)", () => {
+  // Default: "all" — absent from the URL, safe on invalid values.
+  assert.equal(parseCameraFilters(new URLSearchParams("")).origin, "all");
+  assert.equal(parseCameraFilters(new URLSearchParams("origin=sideways")).origin, "all", "unknown origin falls back to 'all'");
+  assert.equal(parseCameraFilters(new URLSearchParams("origin=reports")).origin, "reports");
+  assert.equal(parseCameraFilters(new URLSearchParams("origin=imported")).origin, "imported");
+  // Serialization: default omitted, non-default written.
+  assert.equal(
+    stringifyCameraFilters({ q: "", type: "all", freshness: "all", sort: "alphabetical", state: "all", origin: "all", focus: null, page: 1 }),
+    "",
+    "origin=all is the default and is omitted",
+  );
+  assert.equal(
+    stringifyCameraFilters({ q: "", type: "all", freshness: "all", sort: "alphabetical", state: "all", origin: "imported", focus: null, page: 1 }),
+    "?origin=imported",
+  );
+  // Round-trip: parse(stringify(x)) === x.
+  const encoded = stringifyCameraFilters({ q: "", type: "all", freshness: "all", sort: "alphabetical", state: "all", origin: "reports", focus: null, page: 1 });
+  assert.equal(encoded, "?origin=reports");
+  assert.deepEqual(parseCameraFilters(new URLSearchParams(encoded.slice(1))), {
+    q: "", type: "all", freshness: "all", sort: "alphabetical", state: "all", origin: "reports", focus: null, page: 1,
   });
 });
 
@@ -264,6 +288,25 @@ test("applyCameraFilters: confirmation-state filter (?state=) and community sort
     q: "", type: "all", freshness: "all", sort: "confirmations", state: "all", focus: null,
   }, now);
   assert.deepEqual(confirmations.map((camera) => camera.title), ["Alpha", "Charlie", "Bravo"]);
+});
+
+test("applyCameraFilters: import-origin filter (?origin=) separates reports from imported rows (FASE C)", () => {
+  const now = Date.parse("2026-08-01T00:00:00Z");
+  const records = [
+    makeCamera(1, { title: "Community A", source: "Community report" }),
+    makeCamera(2, { title: "Imported Z", source: "import:fixture-zurigo-2026" }),
+    makeCamera(3, { title: "Imported O", source: "import:fixture-osm-2026" }),
+    makeCamera(4, { title: "Demo pin", status: "demo", source: "Prototype seed" }),
+  ];
+  const base = { q: "", type: "all", freshness: "all", sort: "alphabetical", state: "all", focus: null };
+  const reports = applyCameraFilters(records, { ...base, origin: "reports" }, now);
+  assert.deepEqual(reports.map((camera) => camera.title), ["Community A"], "origin=reports keeps only community reports");
+  const imported = applyCameraFilters(records, { ...base, origin: "imported" }, now);
+  assert.deepEqual(imported.map((camera) => camera.title).sort(), ["Imported O", "Imported Z"],
+    "origin=imported keeps only rows whose source starts with 'import:'");
+  // Demo seed matches neither origin — illustrative, not a community report.
+  const all = applyCameraFilters(records, { ...base, origin: "all" }, now);
+  assert.equal(all.length, 4, "origin=all is a no-op and keeps the demo pins");
 });
 
 test("applyCameraFilters P1-2: a real record with a non-parseable updated is KEPT under a freshness window (never silently dropped)", () => {
@@ -340,6 +383,35 @@ test("back/forward preserves state: the URL re-derives the filters on every navi
   view.rerender(await wrapWithLocale(React.createElement(DirectoryTool)));
   await rtl.waitFor(() => assert.ok(screen.getByRole("heading", { name: "Dome camera 1" })));
   assert.ok(screen.getByRole("heading", { name: "Bullet camera 2" }));
+});
+
+test("origin filter (?origin=, FASE C): the select narrows the directory to imported rows or community reports", async () => {
+  const { screen } = rtl;
+  const user = rtl.userEvent.setup();
+  const mixed = [
+    makeCamera(1, { kind: "Dome", title: "Community dome", source: "Community report" }),
+    makeCamera(2, { kind: "Bullet", title: "Imported bullet", source: "import:fixture-zurigo-2026" }),
+    makeCamera(3, { kind: "Dome", title: "Imported dome", source: "import:fixture-osm-2026" }),
+  ];
+  installFetchMock(() => jsonResponse({ records: mixed, total: mixed.length, nextOffset: null }));
+  await renderWithLocale(React.createElement(DirectoryTool));
+  await rtl.waitFor(() => assert.ok(screen.getByRole("heading", { name: "Community dome" })));
+
+  // The shared control row exposes the localized origin select.
+  const origin = screen.getByLabelText("Origin");
+  assert.equal(origin.value, "all");
+
+  // Imported only: the two imported rows stay, the community report goes.
+  await user.selectOptions(origin, "imported");
+  await rtl.waitFor(() => assert.ok(screen.queryByRole("heading", { name: "Community dome" }) === null));
+  assert.ok(screen.getByRole("heading", { name: "Imported bullet" }));
+  assert.ok(screen.getByRole("heading", { name: "Imported dome" }));
+
+  // Reports only: the community report comes back, imports go.
+  await user.selectOptions(screen.getByLabelText("Origin"), "reports");
+  await rtl.waitFor(() => assert.ok(screen.getByRole("heading", { name: "Community dome" })));
+  assert.ok(screen.queryByRole("heading", { name: "Imported bullet" }) === null);
+  assert.ok(screen.queryByRole("heading", { name: "Imported dome" }) === null);
 });
 
 test("invalid query values render with safe fallbacks — the page never 500s", async () => {

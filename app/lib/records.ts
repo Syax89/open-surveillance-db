@@ -34,6 +34,18 @@ export type Camera = MapCamera & {
   goneCount?: number;
   problemCount?: number;
   privacyCount?: number;
+  /**
+   * Import provenance (import pipeline FASE C, t_4dbce318): present on
+   * real API records imported from a public dataset (the detail API fills
+   * it from the batch row); absent on the demo seed and on community
+   * reports. The record page renders the provenance line from it.
+   */
+  importBatch?: {
+    sourceName: string;
+    sourceUrl: string;
+    license: string;
+    licenseUrl: string | null;
+  } | null;
 };
 
 /**

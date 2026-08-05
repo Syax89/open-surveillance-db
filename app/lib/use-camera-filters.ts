@@ -74,6 +74,16 @@ export const STATE_VALUES = ["all", "confirmed", "never"] as const;
 export type StateFilter = (typeof STATE_VALUES)[number];
 
 /**
+ * Import-origin filter (?origin=, import pipeline FASE C, t_4dbce318):
+ * "all" (default), "reports" (community reports — source 'Community
+ * report') or "imported" (rows imported from public datasets — source
+ * 'import:<slug>'). Client-side predicate over the walked public list —
+ * the same model as ?state=: the server has no origin dimension.
+ */
+export const ORIGIN_VALUES = ["all", "reports", "imported"] as const;
+export type OriginFilter = (typeof ORIGIN_VALUES)[number];
+
+/**
  * Debounce for ?q= commits (R2 URL churn: history + AT announcements).
  * t_3c4b188e: must stay LONGER than the geocode autocomplete debounce
  * (GEOCODE_DEBOUNCE_MS, 250ms) so the suggestion dropdown renders BEFORE
@@ -98,6 +108,11 @@ export type CameraFilters = {
    * predicate on lastVerifiedAt — see STATE_VALUES.
    */
   state: StateFilter;
+  /**
+   * Import origin (?origin=, FASE C); "all" when unset. Client-side
+   * predicate on `source` — see ORIGIN_VALUES.
+   */
+  origin: OriginFilter;
   /** Record preselected on /mappa (?focus=ID); null when unset/invalid. */
   focus: number | null;
   /**
@@ -113,6 +128,7 @@ export type CameraFilters = {
 const FRESHNESS_SET = new Set<string>(FRESHNESS_WINDOWS);
 const SORT_SET = new Set<string>(SORT_ORDERS);
 const STATE_SET = new Set<string>(STATE_VALUES);
+const ORIGIN_SET = new Set<string>(ORIGIN_VALUES);
 
 /**
  * Milliseconds cutoff for a freshness window, or null for "any time".
@@ -151,13 +167,15 @@ export function parseCameraFilters(searchParams: URLSearchParams): CameraFilters
   const sort = (SORT_SET.has(sortRaw) ? sortRaw : "alphabetical") as SortOrder;
   const stateRaw = searchParams.get("state") ?? "all";
   const state = (STATE_SET.has(stateRaw) ? stateRaw : "all") as StateFilter;
+  const originRaw = searchParams.get("origin") ?? "all";
+  const origin = (ORIGIN_SET.has(originRaw) ? originRaw : "all") as OriginFilter;
   const focusRaw = searchParams.get("focus");
   const focusId = focusRaw === null ? null : Number(focusRaw);
   const focus = focusId !== null && Number.isInteger(focusId) && focusId > 0 ? focusId : null;
   const pageRaw = searchParams.get("page");
   const pageNumber = pageRaw === null ? 1 : Number(pageRaw);
   const page = Number.isInteger(pageNumber) && pageNumber > 0 ? pageNumber : 1;
-  return { q, type, freshness, sort, state, focus, page };
+  return { q, type, freshness, sort, state, origin, focus, page };
 }
 
 /**
@@ -173,6 +191,7 @@ export function stringifyCameraFilters(filters: CameraFilters): string {
   if (filters.freshness !== "all") params.set("freshness", filters.freshness);
   if (filters.sort !== "alphabetical") params.set("sort", filters.sort);
   if (filters.state !== "all") params.set("state", filters.state);
+  if (filters.origin !== "all") params.set("origin", filters.origin);
   if (filters.focus !== null) params.set("focus", String(filters.focus));
   // Page 1 is the default and is omitted (R2 minimal URLs); /mappa never
   // sets page, so its URLs never carry ?page=.
@@ -230,6 +249,13 @@ export function applyCameraFilters(records: Camera[], filters: CameraFilters, no
     // all counts as never confirmed.
     if (filters.state === "confirmed" && !camera.lastVerifiedAt) return false;
     if (filters.state === "never" && camera.lastVerifiedAt) return false;
+    // Import-origin filter (FASE C, t_4dbce318): "reports" keeps only
+    // community reports (source 'Community report'), "imported" only rows
+    // from public datasets (source 'import:<slug>'). Demo seed rows
+    // ("Prototype seed") match neither — they are illustrative, not a
+    // community report, and only surface under "any".
+    if (filters.origin === "reports" && camera.source !== "Community report") return false;
+    if (filters.origin === "imported" && !camera.source.startsWith("import:")) return false;
     return true;
   });
   return matching.sort((first, second) => {
@@ -285,6 +311,8 @@ export type UseCameraFiltersResult = {
   setSort: (value: SortOrder) => void;
   /** Commit the confirmation-state filter immediately (FASE 3 UI). */
   setState: (value: StateFilter) => void;
+  /** Commit the import-origin filter immediately (FASE C). */
+  setOrigin: (value: OriginFilter) => void;
   /** Commit the result page (?page=, /directory pagination). */
   setPage: (value: number) => void;
   /** Clear every filter dimension (replace to the bare pathname). */
@@ -326,7 +354,7 @@ export function useCameraFilters(): UseCameraFiltersResult {
   // ref writes during render are forbidden, and the debounce/write callbacks
   // only ever run AFTER a render (user events / timers), so the effect has
   // always refreshed the refs by the time they are read.
-  const filtersRef = useRef<CameraFilters>({ q: "", type: "all", freshness: "all", sort: "alphabetical", state: "all", focus: null, page: 1 });
+  const filtersRef = useRef<CameraFilters>({ q: "", type: "all", freshness: "all", sort: "alphabetical", state: "all", origin: "all", focus: null, page: 1 });
   useEffect(() => {
     filtersRef.current = committed;
   });
@@ -386,13 +414,14 @@ export function useCameraFilters(): UseCameraFiltersResult {
   // or reset write from silently dropping the typed q.
   const hrefFor = useCallback((filters: CameraFilters) => {
     const params = new URLSearchParams(searchParamsRef.current);
-    for (const key of ["q", "type", "freshness", "sort", "state", "focus", "page"]) params.delete(key);
+    for (const key of ["q", "type", "freshness", "sort", "state", "origin", "focus", "page"]) params.delete(key);
     const q = filters.q.trim();
     if (q) params.set("q", q);
     if (filters.type && filters.type !== "all") params.set("type", filters.type);
     if (filters.freshness !== "all") params.set("freshness", filters.freshness);
     if (filters.sort !== "alphabetical") params.set("sort", filters.sort);
     if (filters.state !== "all") params.set("state", filters.state);
+    if (filters.origin !== "all") params.set("origin", filters.origin);
     if (filters.focus !== null) params.set("focus", String(filters.focus));
     if (filters.page > 1) params.set("page", String(filters.page));
     const query = params.toString();
@@ -503,6 +532,10 @@ export function useCameraFilters(): UseCameraFiltersResult {
     applyFilters({ ...filtersRef.current, state: (STATE_SET.has(value) ? value : "all") as StateFilter, page: 1 });
   }
 
+  function setOrigin(value: OriginFilter) {
+    applyFilters({ ...filtersRef.current, origin: (ORIGIN_SET.has(value) ? value : "all") as OriginFilter, page: 1 });
+  }
+
   /** /directory pagination (t_f13fcb1c): clamp to >= 1, write ?page=. */
   function setPage(value: number) {
     const page = Number.isInteger(value) && value > 0 ? value : 1;
@@ -515,12 +548,12 @@ export function useCameraFilters(): UseCameraFiltersResult {
       debounceRef.current = null;
     }
     setQInput("");
-    applyFilters({ q: "", type: "all", freshness: "all", sort: "alphabetical", state: "all", focus: null, page: 1 });
+    applyFilters({ q: "", type: "all", freshness: "all", sort: "alphabetical", state: "all", origin: "all", focus: null, page: 1 });
   }
 
   // The revision value itself is intentionally unused: it exists so the
   // renderer re-runs after every URL write (see the hook docs).
   void revision;
 
-  return { filters: committed, qInput, setQ, setType, setFreshness, setSort, setState, setPage, reset };
+  return { filters: committed, qInput, setQ, setType, setFreshness, setSort, setState, setOrigin, setPage, reset };
 }

@@ -520,7 +520,7 @@ export const itLegal: LegalContent = {
     intro:
       "Come sono concessi in licenza il software, la documentazione e i dati di OpenSurveillanceDB, e cosa significa per il riutilizzo.",
     versionNote:
-      "Aggiornato il 31 luglio 2026 (decisione sulla licenza dei dati — ADR 0008). La copia repository (docs/OPEN_SOURCE.md) resta la versione canonica.",
+      "Aggiornato il 31 luglio 2026 (decisione sulla licenza dei dati — ADR 0008) e il 5 agosto 2026 (dataset pubblici importati). La copia repository (docs/OPEN_SOURCE.md) resta la versione canonica.",
     sections: [
       {
         heading: "1. Software",
@@ -568,6 +568,19 @@ export const itLegal: LegalContent = {
           {
             type: "paragraph",
             text: "I contributori devono inviare solo materiale che hanno il diritto di condividere. Concedono al progetto i diritti necessari a pubblicare codice, documentazione e dati accettati con la licenza di progetto pertinente. Il caricamento di prove fotografiche è **attivo** (agosto 2026): le immagini vengono private dei metadati EXIF/XMP/IPTC al confine (fail-closed), conservate privatamente (byte in R2, metadati in D1), e mai pubblicate finché un moderatore non le approva con redazione confermata (vedi sezione 5 dei Termini).",
+          },
+        ],
+      },
+      {
+        heading: "6. Dataset pubblici importati",
+        blocks: [
+          {
+            type: "paragraph",
+            text: "Il progetto può integrare dataset pubblici rilasciati da amministrazioni pubbliche e progetti open data (per esempio inventari comunali delle telecamere o elementi di sorveglianza di OpenStreetMap). Ogni fonte integrata mantiene la propria licenza e la propria attribuzione: la licenza del database sopra indicata si applica alla compilazione del progetto e non sostituisce mai la licenza di una singola fonte. La pagina [Fonti dei dati](/fonti) elenca ogni dataset importato con la fonte, la licenza, la data di importazione, il numero di record e il testo di attribuzione richiesto.",
+          },
+          {
+            type: "note",
+            text: "I record importati da una fonte riportano la loro provenienza nella pagina del record. Sono soggetti alla stessa verifica della community di qualsiasi altro record e non sono mai esenti da revisione.",
           },
         ],
       },

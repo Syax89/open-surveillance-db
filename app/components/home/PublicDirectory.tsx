@@ -29,6 +29,7 @@ type Props = {
   sortOrder: "alphabetical" | "position" | "useful" | "recent" | "confirmations";
   setSortOrder: (value: "alphabetical" | "position" | "useful" | "recent" | "confirmations") => void;
   stateFilter?: "all" | "confirmed" | "never"; setStateFilter?: (value: "all" | "confirmed" | "never") => void;
+  originFilter?: "all" | "reports" | "imported"; setOriginFilter?: (value: "all" | "reports" | "imported") => void;
   /** Optional (t_f13fcb1c): /directory result page (?page=, URL-backed). */
   page?: number;
   /** Optional (t_f13fcb1c): /directory pagination setter. */
@@ -62,7 +63,7 @@ type Props = {
  * /directory (catalog mode — the actual layout lives in DirectoryCatalog).
  * The place-search flow lives in the shared usePlaceSearch hook.
  */
-export function PublicDirectory({ filteredRecords, cameraKinds, search, setSearch, kindFilter, setKindFilter, freshnessFilter, setFreshnessFilter, setFreshnessCutoff, sortOrder, setSortOrder, stateFilter, setStateFilter, page = 1, setPage, showRecordOnMap, setCoordinates, onResetFilters, mapHref = "#map", reportHref = "#report", showHeading = true, variant = "hub", exportHrefs = null }: Props) {
+export function PublicDirectory({ filteredRecords, cameraKinds, search, setSearch, kindFilter, setKindFilter, freshnessFilter, setFreshnessFilter, setFreshnessCutoff, sortOrder, setSortOrder, stateFilter, setStateFilter, originFilter, setOriginFilter, page = 1, setPage, showRecordOnMap, setCoordinates, onResetFilters, mapHref = "#map", reportHref = "#report", showHeading = true, variant = "hub", exportHrefs = null }: Props) {
   const t = useMessages().directory;
   const statuses = useMessages().status;
   const { locale } = useLocale();
@@ -71,8 +72,7 @@ export function PublicDirectory({ filteredRecords, cameraKinds, search, setSearc
 
   useEffect(() => {
     if (typeof navigator === "undefined" || typeof window === "undefined") return;
-    const update = () => setOffline(!navigator.onLine);
-    update();
+    const update = () => setOffline(!navigator.onLine); update();
     window.addEventListener("online", update);
     window.addEventListener("offline", update);
     return () => {
@@ -106,7 +106,7 @@ export function PublicDirectory({ filteredRecords, cameraKinds, search, setSearc
         setFreshnessFilter={setFreshnessFilter}
         sortOrder={sortOrder}
         setSortOrder={setSortOrder}
-        stateFilter={stateFilter} setStateFilter={setStateFilter}
+        stateFilter={stateFilter} setStateFilter={setStateFilter} originFilter={originFilter} setOriginFilter={setOriginFilter}
         page={page}
         setPage={setPage}
         showRecordOnMap={showRecordOnMap}
