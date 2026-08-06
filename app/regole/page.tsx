@@ -59,20 +59,6 @@ export default async function RulesPage() {
         </div>
       </section>
 
-      <section className="records-section" aria-labelledby="moderation-title">
-        <div className="records-heading">
-          <div><p className="eyebrow"><span /> {t.moderationEyebrow}</p><h2 id="moderation-title">{t.moderationTitle}</h2><p>{t.moderationBody}</p></div>
-        </div>
-        <ol className="record-list" aria-label={t.flowLabel}>
-          <li className="record-list-card"><div><p className="card-topline">01 · {t.flowOneTitle}</p><h3>{t.flowOneBody}</h3></div></li>
-          <li className="record-list-card"><div><p className="card-topline">02 · {t.flowTwoTitle}</p><h3>{t.flowTwoBody}</h3></div></li>
-          <li className="record-list-card"><div><p className="card-topline">03 · {t.flowThreeTitle}</p><h3>{t.flowThreeBody}</h3></div></li>
-          <li className="record-list-card"><div><p className="card-topline">04 · {t.flowFourTitle}</p><h3>{t.flowFourBody}</h3></div></li>
-          <li className="record-list-card"><div><p className="card-topline">05 · {t.flowFiveTitle}</p><h3>{t.flowFiveBody}</h3></div></li>
-          <li className="record-list-card"><div><p className="card-topline">06 · {t.flowSixTitle}</p><h3>{t.flowSixBody}</h3></div></li>
-        </ol>
-      </section>
-
       <section className="correction-section" aria-labelledby="correction-title">
         <div>
           <p className="eyebrow"><span /> {t.correctionEyebrow}</p>

@@ -300,12 +300,29 @@ export function map(el, opts) {
     paneAttrs: {},
     setView: (center, zoom, opts) => { m.views.push({ center, zoom, opts }); return m; }, // chainable, like the real Leaflet map API
     on: (event, handler) => { (m.handlers[event] ??= []).push(handler); return m; },
+    // P0 t_bb310428: the coordinate picker is registered ONLY while the
+    // "Add here" mode is active — off() removes the handler so tests can
+    // assert the map is SILENT outside the explicit mode.
+    off: (event, handler) => { const list = m.handlers[event]; if (list) { const i = list.indexOf(handler); if (i !== -1) list.splice(i, 1); } return m; },
     remove: () => {},
     invalidateSize: () => {},
     getZoom: () => m.zoom,
     getBounds: () => currentBounds,
     panTo: () => m,
     handlers: {},
+    // P0 t_bb310428 (strict popup lifecycle instrumentation): fire() mirrors
+    // Leaflet's event dispatch — it records the event in the stub log AND
+    // invokes the registered handlers, exactly like a real map.fire(). The
+    // marker stub uses it to dispatch popupopen (openPopup) and popupclose
+    // (removeLayer of an open-popup marker), so the strict popup-lifecycle
+    // tests can assert EVENT COUNTS (one popupopen per click, zero
+    // close/reopen on rebuild) instead of guessing from DOM state.
+    events: {},
+    fire: (event, data) => {
+      (m.events[event] ??= []).push(data);
+      for (const handler of m.handlers[event] ?? []) handler(data);
+      return m;
+    },
     getPane: () => ({ setAttribute: (key, value) => { m.paneAttrs[key] = value; } }),
     // Map-click picker (t_6abb96ac): map.openPopup records the popup
     // content + position so tests can assert the report-picker popup
@@ -325,22 +342,46 @@ export const tileLayer = () => ({ addTo: () => {} });
 // only that group's items) — existing marker-count assertions keep working.
 export const layerGroup = () => {
   const own = [];
-  return {
-    addTo: () => ({
-      clearLayers: () => {
-        for (const item of own) {
-          const arr = item && item.__isPath ? paths : markers;
-          const index = arr.indexOf(item);
-          if (index !== -1) arr.splice(index, 1);
-        }
-        own.length = 0;
-      },
-      addLayer: (m) => {
-        own.push(m);
-        (m && m.__isPath ? paths : markers).push(m);
-      },
-    }),
+  let groupMap = null;
+  const group = {
+    clearLayers: () => {
+      for (const item of own) {
+        const arr = item && item.__isPath ? paths : markers;
+        const index = arr.indexOf(item);
+        if (index !== -1) arr.splice(index, 1);
+      }
+      own.length = 0;
+    },
+    addLayer: (m) => {
+      own.push(m);
+      m.__map = groupMap;
+      (m && m.__isPath ? paths : markers).push(m);
+    },
+    // P0 t_bb310428 (reconcile): removeLayer removes ONLY the given marker
+    // — the marker population effect diffs the desired set instead of
+    // clearLayers, so an open popup on a KEPT marker survives a rebuild.
+    // Real Leaflet fires popupclose when a marker with an open popup is
+    // removed — mirror that so the strict popup-lifecycle tests can assert
+    // event counts (and the component's popupclose handler unmounts the
+    // community widget exactly like in the browser).
+    removeLayer: (m) => {
+      const index = own.indexOf(m);
+      if (index !== -1) own.splice(index, 1);
+      const arr = m && m.__isPath ? paths : markers;
+      const arrIndex = arr.indexOf(m);
+      if (arrIndex !== -1) arr.splice(arrIndex, 1);
+      // Real Leaflet closes the popup when its marker leaves the map and
+      // resets the marker's own open state — mirror both (the component's
+      // popupclose handler unmounts the community widget exactly like in
+      // the browser, and isPopupOpen() reads false afterwards).
+      if (m?.popupOpened && groupMap?.fire) {
+        m.popupOpened = false;
+        groupMap.fire("popupclose", { marker: m });
+      }
+      m.__map = null;
+    },
   };
+  return { addTo: (map) => { groupMap = map; return group; } };
 };
 export function marker(latlng, opts) {
   const m = {
@@ -350,15 +391,47 @@ export function marker(latlng, opts) {
     // marker so tests can assert the popup content (links, fields), and
     // openPopup() records that the balloon was requested.
     bindPopup: (html) => { m.popupHtml = html; return m; },
-    openPopup: () => { m.popupOpened = true; return m; },
+    // P0 t_bb310428 (strict popup lifecycle instrumentation): openPopup()
+    // mirrors real Leaflet — it materialises the bound HTML into a popup
+    // DOM node and dispatches "popupopen" on the map (recorded in
+    // map.events + invoking the registered handlers, exactly like
+    // map.fire). The component's popupopen handler therefore runs through
+    // the real path when a marker click opens a popup, and the strict
+    // lifecycle tests can assert EVENT COUNTS (one popupopen per click,
+    // zero close/reopen on a rebuild that keeps the marker).
+    openPopup: () => {
+      m.popupOpened = true;
+      const map = m.__map;
+      if (map?.fire) {
+        // Test-only fixture: the div is materialised from the component's
+        // own escaped popup HTML (or the fixture passed by the test), never
+        // from user input — safe to parse here, exactly like the real
+        // Leaflet popup constructor does in the browser.
+        const div = document.createElement("div");
+        if (typeof m.popupHtml === "string" && m.popupHtml.includes("osm-popup-community")) {
+          div.innerHTML = m.popupHtml;
+        } else {
+          div.innerHTML = '<div class="osm-popup-community"></div>';
+        }
+        map.fire("popupopen", { popup: { getElement: () => div }, marker: m });
+      }
+      return m;
+    },
     // Popup lifecycle (t_33b82720): the marker click handler calls
     // isPopupOpen() to open idempotently (a click on an already-open popup
     // keeps it open instead of toggling it closed).
     isPopupOpen: () => m.popupOpened === true,
+    // P0 t_bb310428 (reconcile): setPopupContent / setTooltipContent update
+    // a KEPT marker in place — the open popup keeps its DOM.
+    setPopupContent: (html) => { m.popupHtml = html; return m; },
+    setTooltipContent: () => m,
     getLatLng: () => latlng,
     // Grid badges set an aria-label on the real element (t_26ce96f3); the
-    // stub records the attribute so the contract stays assertable.
-    getElement: () => ({ setAttribute: (key, value) => { m.elementAttrs ??= {}; m.elementAttrs[key] = value; } }),
+    // stub records the attribute so the contract stays assertable. The
+    // reconcile badge-count update queries the badge text node — the stub
+    // exposes a querySelector that returns null (always triggers the icon
+    // refresh), which is harmless for assertions.
+    getElement: () => ({ setAttribute: (key, value) => { m.elementAttrs ??= {}; m.elementAttrs[key] = value; }, querySelector: () => null }),
     handlers: {},
     addTo: (layer) => { layer.addLayer(m); return m; },
     // Real Leaflet API: setIcon replaces the marker icon in place. The

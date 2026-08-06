@@ -49,29 +49,6 @@ export const en = {
   beforeSubmittingTitle: "Before submitting",
   beforeSubmittingBody:
     "Submitting requires a verified contributor account. Do not upload or describe people, licence plates, private homes, security weaknesses or sensitive locations. Your report is published immediately, so make sure it is safe to be public.",
-  moderationEyebrow: "Publication",
-  moderationTitle: "Every report is published immediately.",
-  moderationBody:
-    "A report from a verified account becomes a public record right away. The community then keeps the directory accurate: what is still there gets confirmed, what is gone gets flagged, what is problematic gets withdrawn.",
-  flowLabel: "How a record lives",
-  flowOneTitle: "Submit",
-  flowOneBody:
-    "A verified contributor submits an observation from public space. The report is published immediately — no queue, no waiting.",
-  flowTwoTitle: "Publish",
-  flowTwoBody:
-    "The record appears in the map, the directory and the exports with the least specific location that still serves transparency: coordinates are rounded to about 10 metres.",
-  flowThreeTitle: "Act",
-  flowThreeBody:
-    "Anyone with a verified account can confirm the camera is still there, flag it as no longer present, mark it useful, or raise a problem.",
-  flowFourTitle: "Thresholds",
-  flowFourBody:
-    "Automatic thresholds decide what changes: enough flags hide or remove a record, a privacy flag hides it immediately, and every transition is recorded in the public history.",
-  flowFiveTitle: "Withdraw",
-  flowFiveBody:
-    "A record that the community flags enough is hidden or removed from the public list. It stays reachable by direct link, with a banner and its public history.",
-  flowSixTitle: "Restore",
-  flowSixBody:
-    "A hidden or removed record can return with enough confirmations from the community. No single account — human or not — controls publication.",
   correctionEyebrow: "Corrections",
   correctionTitle: "A private way to challenge a record.",
   correctionBody:
@@ -145,29 +122,6 @@ export const it: Translation<typeof en> = {
   beforeSubmittingTitle: "Prima di inviare",
   beforeSubmittingBody:
     "Per inviare serve un account verificato. Non caricare né descrivere persone, targhe, abitazioni private, debolezze di sicurezza o luoghi sensibili. La tua segnalazione viene pubblicata subito: assicurati che sia sicuro renderla pubblica.",
-  moderationEyebrow: "Pubblicazione",
-  moderationTitle: "Ogni segnalazione viene pubblicata subito.",
-  moderationBody:
-    "Una segnalazione di un account verificato diventa subito un record pubblico. Poi è la community a mantenere accurato l’elenco: ciò che c’è ancora viene confermato, ciò che non c’è più viene segnalato, ciò che è problematico viene ritirato.",
-  flowLabel: "La vita di un record",
-  flowOneTitle: "Invio",
-  flowOneBody:
-    "Un contributor verificato invia un’osservazione dallo spazio pubblico. La segnalazione viene pubblicata subito — niente code, niente attese.",
-  flowTwoTitle: "Pubblicazione",
-  flowTwoBody:
-    "Il record compare in mappa, elenco ed esportazioni con la posizione meno specifica che serve comunque alla trasparenza: le coordinate sono arrotondate a circa 10 metri.",
-  flowThreeTitle: "Azioni",
-  flowThreeBody:
-    "Chiunque abbia un account verificato può confermare che la telecamera c’è ancora, segnalarla come non più presente, marcarla come utile o segnalare un problema.",
-  flowFourTitle: "Soglie",
-  flowFourBody:
-    "Soglie automatiche decidono cosa cambia: abbastanza segnalazioni nascondono o rimuovono un record, una segnalazione di privacy lo nasconde subito, e ogni transizione è registrata nella cronologia pubblica.",
-  flowFiveTitle: "Ritiro",
-  flowFiveBody:
-    "Un record che la community segnala a sufficienza viene nascosto o rimosso dall’elenco pubblico. Resta raggiungibile tramite link diretto, con un banner e la sua cronologia pubblica.",
-  flowSixTitle: "Ripristino",
-  flowSixBody:
-    "Un record nascosto o rimosso può tornare online con abbastanza conferme dalla community. Nessun singolo account — umano o no — controlla la pubblicazione.",
   correctionEyebrow: "Correzioni",
   correctionTitle: "Un modo privato per contestare un record.",
   correctionBody:

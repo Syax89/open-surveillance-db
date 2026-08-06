@@ -7,6 +7,10 @@ export const freshnessWindows = ["7d", "30d", "90d", "all"];
 export const PUBLIC_CAMERA_SORT_OPTIONS = ["useful", "recent", "confirmations"];
 export const PUBLIC_CAMERAS_PAGE_DEFAULT_LIMIT = 500;
 export const PUBLIC_CAMERAS_PAGE_MAX_LIMIT = 500;
+// Bbox JSON list bounds (kanban t_bb310428): mirror of db/cameras.ts — the
+// map viewport contract is bounded at the db boundary.
+export const PUBLIC_CAMERAS_BBOX_DEFAULT_LIMIT = 1000;
+export const PUBLIC_CAMERAS_BBOX_MAX_LIMIT = 10_000;
 export const SEARCH_PAGE_DEFAULT_LIMIT = 25;
 export const SEARCH_PAGE_MAX_LIMIT = 100;
 export const NEARBY_PAGE_DEFAULT_LIMIT = 50;
@@ -28,6 +32,7 @@ export const {
   getCommunityRecordById,
   getPublicCameraFacets,
   listPublicCamerasInBbox,
+  listPublicCamerasInBboxPage,
 } = makeMock({
   listPublicCameras: "listPublicCameras",
   listPublicCamerasPage: "listPublicCamerasPage",
@@ -41,4 +46,5 @@ export const {
   getCommunityRecordById: "getCommunityRecordById",
   getPublicCameraFacets: "getPublicCameraFacets",
   listPublicCamerasInBbox: "listPublicCamerasInBbox",
+  listPublicCamerasInBboxPage: "listPublicCamerasInBboxPage",
 });

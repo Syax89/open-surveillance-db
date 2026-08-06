@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { useMessages } from "../lib/use-messages";
 
 /**
@@ -109,13 +109,30 @@ export function FiltersBar({
   // On constrained layouts the whole filter group becomes one short
   // disclosure. The search always stays visible; a wide workspace opens the
   // group again automatically.
+  //
+  // Hydration-safe (same pattern as MapPanel pointsCollapsed, t_66766914):
+  // the initial state is DETERMINISTIC (open on both server and first
+  // client render — never reads window.matchMedia in an initializer). The
+  // media preference is applied only AFTER hydration in the effect below,
+  // and a manual toggle by the user always wins over a media-query change
+  // (filtersUserToggledRef), so the disclosure never flickers back.
   const [filtersOpen, setFiltersOpen] = useState(true);
+  const filtersUserToggledRef = useRef(false);
   useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
     const media = window.matchMedia("(max-width: 820px)");
-    const update = () => setFiltersOpen(!media.matches);
-    update();
-    media.addEventListener("change", update);
-    return () => media.removeEventListener("change", update);
+    const apply = () => {
+      // The user's own toggle always wins over a media-query change.
+      if (filtersUserToggledRef.current) return;
+      setFiltersOpen(!media.matches);
+    };
+    apply(); // apply the compact preference only after hydration
+    if (media.addEventListener) {
+      media.addEventListener("change", apply);
+      return () => media.removeEventListener("change", apply);
+    }
+    media.addListener(apply); // legacy MediaQueryList (older Safari)
+    return () => media.removeListener(apply);
   }, []);
   function submitSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -135,7 +152,7 @@ export function FiltersBar({
             <p id="record-search-help">{t.searchHelp}</p>
           </form>
         )}
-        <details className="filters-disclosure" open={filtersOpen} onToggle={(event) => setFiltersOpen(event.currentTarget.open)}>
+        <details className="filters-disclosure" open={filtersOpen} onToggle={(event) => { filtersUserToggledRef.current = true; setFiltersOpen(event.currentTarget.open); }}>
           <summary>{t.filters}</summary>
           <div className="filter-controls-row">
         <div className="record-filter">

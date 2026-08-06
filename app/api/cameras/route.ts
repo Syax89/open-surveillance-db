@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { createCamera, DOME_KIND, findNearbyPublicCameras, freshnessWindows, getPublicCameraFacets, listPublicCameras, listPublicCamerasInBbox, listPublicCamerasPage, PUBLIC_CAMERAS_PAGE_DEFAULT_LIMIT, PUBLIC_CAMERAS_PAGE_MAX_LIMIT, PUBLIC_CAMERA_SORT_OPTIONS, type FreshnessWindow, type PublicCameraFacets, type PublicCameraFilters } from "../../../db/cameras";
+import { createCamera, DOME_KIND, findNearbyPublicCameras, freshnessWindows, getPublicCameraFacets, listPublicCameras, listPublicCamerasInBbox, listPublicCamerasInBboxPage, listPublicCamerasPage, PUBLIC_CAMERAS_BBOX_DEFAULT_LIMIT, PUBLIC_CAMERAS_BBOX_MAX_LIMIT, PUBLIC_CAMERAS_PAGE_DEFAULT_LIMIT, PUBLIC_CAMERAS_PAGE_MAX_LIMIT, PUBLIC_CAMERA_SORT_OPTIONS, type FreshnessWindow, type PublicCameraFacets, type PublicCameraFilters } from "../../../db/cameras";
 import { requiresDuplicateConfirmation } from "../../lib/duplicate-detection";
 import { requireVerifiedContributor } from "../../lib/write-gate";
 import { csrfVerified, sameOrigin } from "../../lib/csrf";
@@ -138,10 +138,17 @@ export async function GET(request: Request) {
     // returns every public point inside the box as GeoJSON. Bounded 5-minute
     // edge cache (same policy as the JSON list): moderation decisions change
     // the marker set, so the map must never serve a stale point for long.
+    //
+    // P0 map UX regression (kanban t_bb310428): the JSON LIST also accepts
+    // bbox now — the interactive map fetches ONLY the current viewport
+    // instead of walking all 7,374 records serially. Same strict geometry
+    // validation, same 5-minute cache; the payload is the regular
+    // { records, total, nextOffset } shape (kind/freshness filters apply).
+    // CSV exports never accept a bbox (they are complete snapshots).
     const bboxParam = params.get("bbox");
     if (bboxParam !== null) {
-      if (format !== "geojson") {
-        return Response.json({ error: "The bbox parameter requires format=geojson." }, { status: 400 });
+      if (format !== null && format !== "geojson" && format !== "json") {
+        return Response.json({ error: "The bbox parameter requires format=geojson or the default JSON list (no format)." }, { status: 400 });
       }
       // Strict decimal segments (follow-up F0, t_ae600b90): `Number("")` is 0,
       // so a trailing comma like "12.4,41.8,12.6," would silently parse the
@@ -158,8 +165,24 @@ export async function GET(request: Request) {
       if (west < -180 || east > 180 || south < -90 || north > 90 || west >= east || south >= north) {
         return Response.json({ error: "bbox must be a valid geographic rectangle: west<east and south<north within world bounds." }, { status: 400 });
       }
-      const records = await listPublicCamerasInBbox({ west, south, east, north });
-      return Response.json({ type: "FeatureCollection", license: DATA_LICENSE_ID, attribution: DATA_LICENSE_NOTICE, features: records.map((record) => ({ type: "Feature", geometry: { type: "Point", coordinates: [record.longitude, record.latitude] }, properties: { id: record.id, title: record.title, kind: record.kind, manufacturer: record.manufacturer, observedOn: record.observedOn, status: record.status, source: record.source, updated: record.updated, description: record.description, direction: record.direction } })) }, { headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600", "Cache-Tag": CACHE_TAGS.bbox } });
+      if (format === "geojson") {
+        const records = await listPublicCamerasInBbox({ west, south, east, north });
+        return Response.json({ type: "FeatureCollection", license: DATA_LICENSE_ID, attribution: DATA_LICENSE_NOTICE, features: records.map((record) => ({ type: "Feature", geometry: { type: "Point", coordinates: [record.longitude, record.latitude] }, properties: { id: record.id, title: record.title, kind: record.kind, manufacturer: record.manufacturer, observedOn: record.observedOn, status: record.status, source: record.source, updated: record.updated, description: record.description, direction: record.direction } })) }, { headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600", "Cache-Tag": CACHE_TAGS.bbox } });
+      }
+      // JSON bbox contract (t_bb310428): the map viewport page. limit/offset
+      // page through the bbox subset (bounded by PUBLIC_CAMERAS_BBOX_MAX_LIMIT
+      // at the db boundary); `total` is the count of matching records INSIDE
+      // the box, so total/nextOffset stay equivalent for the caller.
+      const bboxLimit = readPageNumber(params.get("limit"), PUBLIC_CAMERAS_BBOX_DEFAULT_LIMIT, PUBLIC_CAMERAS_BBOX_MAX_LIMIT);
+      const bboxOffset = readPageNumber(params.get("offset"), 0);
+      if (bboxLimit === null || bboxOffset === null || bboxLimit < 1 || bboxOffset > MAX_PAGE_OFFSET) {
+        return Response.json({ error: `limit must be an integer between 1 and ${PUBLIC_CAMERAS_BBOX_MAX_LIMIT} and offset a non-negative integer up to ${MAX_PAGE_OFFSET}.` }, { status: 400 });
+      }
+      const page = await listPublicCamerasInBboxPage({ west, south, east, north }, filters, { limit: bboxLimit, offset: bboxOffset });
+      return Response.json(
+        { records: page.records, total: page.total, nextOffset: page.nextOffset },
+        { headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600", "Cache-Tag": CACHE_TAGS.list } },
+      );
     }
 
     if (format === "geojson") {

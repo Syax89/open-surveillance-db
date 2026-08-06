@@ -336,6 +336,17 @@ test("server-rendered /manifesto is accessible and carries the mission, principl
   assert.match(html, /<h1>A manifesto for legible public space\.<\/h1>/);
   assert.equal((html.match(/<h1>/g) ?? []).length, 1);
 
+  // Founder declaration (t_e428c8d6): a distinct, sober section between the
+  // hero and Mission — labelled landmark, statement and <cite> signature.
+  assert.match(html, /aria-labelledby="founder-title"/);
+  assert.match(html, /<h2[^>]*id="founder-title">Transparency is a condition of public space\.<\/h2>/);
+  assert.match(html, /This project starts from a simple conviction/);
+  assert.match(html, /<p class="founder-signature"><cite>— Simone Rondina, founder of OpenSurveillanceDB<\/cite><\/p>/);
+  assert.ok(
+    html.indexOf('id="founder-title"') < html.indexOf('id="mission-title"'),
+    "founder declaration must render before the Mission section",
+  );
+
   // The four content blocks are labelled landmarks (a11y navigation).
   assert.match(html, /aria-labelledby="mission-title"/);
   assert.match(html, /aria-labelledby="principles-title"/);

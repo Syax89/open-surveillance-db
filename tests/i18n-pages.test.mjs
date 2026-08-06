@@ -145,9 +145,9 @@ const INFO_ROUTES = {
     noEn: ["Who runs this, and how to reach us.", "Contact"],
   },
   "/manifesto": {
-    it: ["Manifesto del progetto", "Un manifesto per uno spazio pubblico leggibile."],
-    en: ["A manifesto for legible public space."],
-    noEn: ["A manifesto for legible public space."],
+    it: ["Manifesto del progetto", "Un manifesto per uno spazio pubblico leggibile.", "Dichiarazione del fondatore", "La trasparenza è una condizione dello spazio pubblico.", "ideatore di OpenSurveillanceDB"],
+    en: ["A manifesto for legible public space.", "Founder's statement", "Transparency is a condition of public space.", "founder of OpenSurveillanceDB"],
+    noEn: ["A manifesto for legible public space.", "Founder's statement", "Transparency is a condition of public space."],
   },
   "/regole": {
     it: ["Regole di partecipazione", "Cosa pubblichiamo e come puoi aiutare."],

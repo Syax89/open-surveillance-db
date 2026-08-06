@@ -253,6 +253,7 @@ export function registeredRoutes() {
       route: "/moderazione",
       name: "legacy publication-model redirect",
       source: "app/moderazione/page.tsx",
+      redirect: true,
       artifacts: {
         ssr: "rendered-html.test.mjs",
       },

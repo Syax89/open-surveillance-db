@@ -496,6 +496,99 @@ test("findPublicCamerasNearPage clamps limit and offset at the db boundary", asy
   assert.equal(beyond.nextOffset, null);
 });
 
+// ---------------------------------------------------------------------------
+// listPublicCamerasInBboxPage — the map viewport data contract (kanban
+// t_bb310428, P0 map UX regression)
+// ---------------------------------------------------------------------------
+
+test("listPublicCamerasInBboxPage returns only the records inside the box, paged with a truthful total", async () => {
+  const { env, cameras } = await realDb();
+  await resetDb({ env, cameras });
+  // Six records: two inside the box, one outside each edge, one pending
+  // inside (must never surface), one demo inside (public in development).
+  await insertCamera(env, { title: "In A", latitude: 41.9, longitude: 12.49 });
+  await insertCamera(env, { title: "In B", latitude: 41.91, longitude: 12.5 });
+  await insertCamera(env, { title: "South", latitude: 41.7, longitude: 12.49 });
+  await insertCamera(env, { title: "East", latitude: 41.9, longitude: 12.7 });
+  await insertCamera(env, { title: "Pending inside", latitude: 41.905, longitude: 12.495, status: "pending" });
+  await insertCamera(env, { title: "Demo inside", latitude: 41.92, longitude: 12.51, status: "demo" });
+  env.ENVIRONMENT = "development";
+  try {
+    const bbox = { west: 12.4, south: 41.8, east: 12.6, north: 42.0 };
+    // Page 1: limit 1 → In B (id DESC), total 3 (In A, In B, Demo inside).
+    const page1 = await cameras.listPublicCamerasInBboxPage(bbox, undefined, { limit: 1, offset: 0 });
+    assert.deepEqual(page1.records.map((record) => record.title), ["Demo inside"], "page 1 must be the newest record inside the box (ORDER BY id DESC)");
+    assert.equal(page1.total, 3, "total must count only the public records INSIDE the box (pending excluded)");
+    assert.equal(page1.nextOffset, 1);
+
+    const page2 = await cameras.listPublicCamerasInBboxPage(bbox, undefined, { limit: 1, offset: 1 });
+    assert.deepEqual(page2.records.map((record) => record.title), ["In B"]);
+    assert.equal(page2.nextOffset, 2);
+
+    const page3 = await cameras.listPublicCamerasInBboxPage(bbox, undefined, { limit: 1, offset: 2 });
+    assert.deepEqual(page3.records.map((record) => record.title), ["In A"]);
+    assert.equal(page3.nextOffset, null, "the last page must not advertise a next offset");
+
+    // Every record carries the public contract: rounded coordinates, no notes,
+    // aggregate counts seeded to 0.
+    for (const record of [...page1.records, ...page2.records, ...page3.records]) {
+      assert.equal(record.latitude, Math.round(record.latitude * 10000) / 10000, "public coordinates must be rounded (ADR 0008)");
+      assert.equal("notes" in record, false, "notes must never leave the module");
+      assert.equal(record.confirmationCount, 0, "the aggregate counts must be present (marker popup widget)");
+      assert.equal(record.usefulCount, 0);
+    }
+
+    // A box that contains nothing: truthful empty page.
+    const empty = await cameras.listPublicCamerasInBboxPage({ west: 1, south: 1, east: 2, north: 2 }, undefined, { limit: 5, offset: 0 });
+    assert.deepEqual(empty.records, []);
+    assert.equal(empty.total, 0);
+    assert.equal(empty.nextOffset, null);
+  } finally {
+    delete env.ENVIRONMENT;
+  }
+});
+
+test("listPublicCamerasInBboxPage applies the public boundary without the demo gate and forwards kind/freshness filters", async () => {
+  const { env, cameras } = await realDb();
+  await resetDb({ env, cameras });
+  // Production default: `demo` records must NOT surface (no ENVIRONMENT flip).
+  await insertCamera(env, { title: "Active dome", kind: "Fixed dome", latitude: 41.9, longitude: 12.49 });
+  await insertCamera(env, { title: "Active PTZ", kind: "PTZ", latitude: 41.91, longitude: 12.5 });
+  await insertCamera(env, { title: "Demo dome", kind: "Fixed dome", latitude: 41.92, longitude: 12.51, status: "demo" });
+  const bbox = { west: 12.4, south: 41.8, east: 12.6, north: 42.0 };
+
+  const all = await cameras.listPublicCamerasInBboxPage(bbox, undefined, { limit: 10, offset: 0 });
+  assert.deepEqual(all.records.map((record) => record.title).sort(), ["Active PTZ", "Active dome"], "demo must not surface in production");
+
+  const byKind = await cameras.listPublicCamerasInBboxPage(bbox, { kind: "PTZ" }, { limit: 10, offset: 0 });
+  assert.deepEqual(byKind.records.map((record) => record.title), ["Active PTZ"], "kind filter applies inside the box");
+
+  const byFreshness = await cameras.listPublicCamerasInBboxPage(bbox, { freshness: "7d" }, { limit: 10, offset: 0 });
+  assert.deepEqual(byFreshness.records.map((record) => record.title), [], "freshness=7d must NOT match records with last_verified_at NULL (SQL NULL >= x is falsy — only verified-within-window records match)");
+
+  // A record verified within the window matches; the NULL one stays out.
+  // (insertCamera does not bind last_verified_at — set it with an UPDATE,
+  // same pattern as the decayed-count test below.)
+  const verifiedRow = await insertCamera(env, { title: "Verified today", latitude: 41.93, longitude: 12.52 });
+  await env.DB.prepare("UPDATE cameras SET last_verified_at = ? WHERE id = ?").bind(new Date().toISOString(), verifiedRow.id).run();
+  const verified = await cameras.listPublicCamerasInBboxPage(bbox, { freshness: "7d" }, { limit: 10, offset: 0 });
+  assert.deepEqual(verified.records.map((record) => record.title), ["Verified today"], "freshness filters on last_verified_at inside the box");
+});
+
+test("listPublicCamerasInBboxPage clamps limit to the bbox max at the db boundary", async () => {
+  const { env, cameras } = await realDb();
+  await resetDb({ env, cameras });
+  await insertCamera(env, { title: "Only", latitude: 41.9, longitude: 12.49 });
+  const bbox = { west: 12.4, south: 41.8, east: 12.6, north: 42.0 };
+
+  const zero = await cameras.listPublicCamerasInBboxPage(bbox, undefined, { limit: 0, offset: 0 });
+  assert.equal(zero.records.length, 1, "a zero limit falls back to the default (1000)");
+  const huge = await cameras.listPublicCamerasInBboxPage(bbox, undefined, { limit: 9_999_999, offset: 0 });
+  assert.equal(huge.records.length, 1, "a huge limit is clamped to PUBLIC_CAMERAS_BBOX_MAX_LIMIT — never unbounded");
+  const negative = await cameras.listPublicCamerasInBboxPage(bbox, undefined, { limit: 5, offset: -3 });
+  assert.deepEqual(negative.records.map((record) => record.title), ["Only"], "negative offset clamps to 0");
+});
+
 test("createCorrectionRequest stores a pending private request", async () => {
   const { env, cameras, corrections } = await realDb();
   await resetDb({ env, cameras });

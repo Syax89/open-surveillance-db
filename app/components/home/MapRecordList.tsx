@@ -7,7 +7,7 @@ type Props = {
   filteredRecords: Camera[];
   /** Records inside the current map viewport (sidebar list). */
   visibleRecords: Camera[];
-  selectedId: number;
+  selectedId: number | null;
   onSelect: (id: number) => void;
   /** Localized strings (a subset of the map dictionary). */
   labels: {

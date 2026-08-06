@@ -17,7 +17,7 @@ type Props = {
   filteredRecords: Camera[];
   /** Records inside the current map viewport (sidebar list). */
   visibleRecords: Camera[];
-  selectedId: number;
+  selectedId: number | null;
   onSelect: (id: number) => void;
   /** Empty-map click: starts a report flow for the chosen coordinates. */
   onPick: (latitude: number, longitude: number) => void;

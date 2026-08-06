@@ -310,7 +310,39 @@ test("MappaTool deep link applies the seeded URL filters fully (type + freshness
   // map-always-visible contract (t_b9666d09), the map itself stays.
   assert.equal(screen.getByLabelText("Record freshness").value, "7d", "?freshness= seeds the select");
   assert.ok(screen.getByRole("region", { name: "Interactive OpenStreetMap map" }), "the map stays rendered on a deep link with zero matching records");
-  await rtl.waitFor(() => assert.ok(screen.getByText("No published record matches those filters."), "deep link fully applies the seeded filters (in-list note)"));
+  await rtl.waitFor(() => assert.ok(screen.getByText("No published record matches those filters.", "deep link fully applies the seeded filters (in-list note)")));
+});
+
+test("MappaTool with a valid EMPTY /api/cameras answer keeps the map and shows the honest empty state (P0 t_444b15e4: no next[0] dereference)", async () => {
+  // P0 hotfix (t_444b15e4, post-#321): the API may answer 200 with a
+  // VALID empty list ({records: []}) when the DB has no public records —
+  // onRecords must never dereference next[0].id on it (TypeError before
+  // the guard). The map stays rendered (map-always-visible contract
+  // t_b9666d09), the sidebar shows the truthful in-list empty note, and
+  // no exception surfaces.
+  installEmptyMock();
+  const { screen } = rtl;
+  await renderWithLocale(React.createElement(MappaTool));
+
+  // The map region is still on the page (never replaced by an empty state).
+  assert.ok(screen.getByRole("region", { name: "Interactive OpenStreetMap map" }), "the map stays rendered with zero records from the API");
+
+  // The sidebar shows the truthful empty state (same note as a filter that
+  // matches nothing) with the reset action above the map — never a crash,
+  // never a spurious selection/popup/deep link. The points rail starts
+  // collapsed (map-first UX, PR #326): expand it to read the note.
+  await rtl.waitFor(async () => {
+    const toggle = screen.queryByRole("button", { name: /Points in the current view/ });
+    if (toggle && toggle.getAttribute("aria-expanded") === "false") {
+      const user = rtl.userEvent.setup();
+      await user.click(toggle);
+    }
+    assert.ok(screen.getByText("No published record matches those filters."), "truthful in-list empty note on an empty API answer");
+    assert.ok(screen.getByText(/This does not mean that there are no cameras/), "the note never implies an area has no surveillance");
+    assert.ok(screen.getByRole("button", { name: /Reset filters/ }), "the controls above the map offer the reset action");
+  });
+  // No record rows exist — nothing to select, no spurious marker/popup.
+  assert.ok(screen.queryByRole("button", { name: /Illustrative record/ }) === null, "no record rows with an empty API answer");
 });
 
 // Marker/popup contract (t_702c10af): the API mock returns the two seed
@@ -386,10 +418,12 @@ test("MappaTool list row click selects the marker and opens its popup (marker �
   const markers = await leafletMarkers();
   const byTitle = Object.fromEntries(markers.map((marker) => [marker.opts.title, marker]));
 
-  // Record A is the default selection: its row carries aria-current and its
-  // marker carries the selected icon class.
-  assert.equal(screen.getByRole("button", { name: /Illustrative record A/ }).getAttribute("aria-current"), "true");
-  assert.match(byTitle["Illustrative record A"].opts.icon.html, /osm-camera-marker demo selected/);
+  // Popup policy (PR #326, review fix): NO record is pre-selected on load —
+  // arriving viewport data must never auto-open a popup. No row carries
+  // aria-current and no marker carries the selected class until the user
+  // clicks (explicit intent only).
+  assert.equal(screen.getByRole("button", { name: /Illustrative record A/ }).getAttribute("aria-current"), null);
+  assert.doesNotMatch(byTitle["Illustrative record A"].opts.icon.html, /selected/);
 
   // Clicking row B: the marker icon swaps, the popup opens, aria-current
   // moves to the new row (the reverse direction is the same onSelect path
@@ -451,11 +485,15 @@ test("MappaTool zoom/pan updates the list to the points in the new viewport (deb
   await renderWithLocale(React.createElement(MappaTool));
 
   // The map (and its moveend handler) exists after the lazy leaflet import
-  // resolves; the viewport starts whole-world so both rows are listed.
+  // resolves. The viewport-bounded data layer (t_bb310428) fetches the
+  // records AFTER the map emits its first bounds (debounced), so the list
+  // assertions must wait for the viewport payload to land.
   await waitFor(() => assert.ok(leaflet.__maps.length > 0));
   const map = leaflet.__maps.at(-1);
-  assert.ok(screen.getByText("Showing all 2 points in the current view"));
-  assert.ok(screen.getByRole("button", { name: /Illustrative record A/ }));
+  await waitFor(() => {
+    assert.ok(screen.getByText("Showing all 2 points in the current view"));
+    assert.ok(screen.getByRole("button", { name: /Illustrative record A/ }));
+  });
 
   // Zoom in: a narrow viewport excludes every record — the list empties
   // truthfully (the map itself keeps all markers) and the aria-live count

@@ -22,6 +22,11 @@ export const en = {
   exploreMap: "Explore the map",
   browseDirectory: "Browse the directory",
   readGuide: "Read the guide",
+  founderEyebrow: "Founder's statement",
+  founderTitle: "Transparency is a condition of public space.",
+  founderBody:
+    "This project starts from a simple conviction: what observes public space must also be legible to the people who live in it. Cameras and automated systems that affect collective life cannot be an opaque presence. As surveillance grows — from large private networks such as Flock Safety in the United States to the European and Italian debates on facial recognition and biometrics — so does the need for public, verifiable and shared knowledge. OpenSurveillanceDB is not against security, and it does not intend to expose people or vulnerable infrastructure. It is a non-commercial tool for making the surveillance infrastructure that faces public space visible, within limits and with responsibility. It publishes data about cameras, not feeds; context, not profiles; transparency, not tracking. I believe data of public interest should remain accessible to the community. That is why this project is open, documented and built together with the people who live in and use the city.",
+  founderSignature: "— Simone Rondina, founder of OpenSurveillanceDB",
   missionEyebrow: "Mission",
   missionTitle: "Help people understand the systems around them.",
   missionBody:
@@ -104,6 +109,11 @@ export const it: Translation<typeof en> = {
   exploreMap: "Esplora la mappa",
   browseDirectory: "Sfoglia l’elenco",
   readGuide: "Leggi la guida",
+  founderEyebrow: "Dichiarazione del fondatore",
+  founderTitle: "La trasparenza è una condizione dello spazio pubblico.",
+  founderBody:
+    "Questo progetto nasce da una convinzione semplice: ciò che osserva lo spazio pubblico deve essere leggibile anche da chi quello spazio lo vive. Le telecamere e i sistemi automatizzati che incidono sulla vita collettiva non possono essere una presenza opaca. Quando la sorveglianza cresce — dalle reti private su larga scala come Flock Safety negli Stati Uniti alle discussioni europee e italiane sul riconoscimento facciale e biometrico — cresce anche il bisogno di conoscenza pubblica, verificabile e condivisa. OpenSurveillanceDB non è contro la sicurezza, né intende esporre persone o infrastrutture vulnerabili. È uno strumento non commerciale per rendere visibili, con limiti e responsabilità, le infrastrutture di sorveglianza rivolte allo spazio pubblico. Pubblica dati sulle telecamere, non feed; contesto, non profili; trasparenza, non tracciamento. Credo che i dati di interesse pubblico debbano restare accessibili alla comunità. Per questo il progetto è aperto, documentato e costruito insieme a chi vive e usa la città.",
+  founderSignature: "— Simone Rondina, ideatore di OpenSurveillanceDB",
   missionEyebrow: "Missione",
   missionTitle: "Aiutare le persone a comprendere i sistemi che le circondano.",
   missionBody:
