@@ -531,15 +531,14 @@ test("FAQ page serves bilingual FAQ content", async () => {
   assert.match(html, /href="\/faq"/);
 });
 
-test("contact page serves owners, privacy and security routes", async () => {
+test("contact page serves correction and security routes without a governance roster", async () => {
   const { response, html } = await renderRoute("/contatti");
 
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
-  // Who we are + named owners (GOVERNANCE.md / README "Roles and contacts").
-  assert.match(html, /Who we are/);
-  assert.match(html, /Simone \(syax89\) and Ada \(CTO\)/);
+  assert.doesNotMatch(html, /Who we are/);
+  assert.doesNotMatch(html, /Simone \(syax89\) and Ada \(CTO\)/);
 
   // Correction / removal contact (privacy contact + in-app form).
   assert.match(html, /Corrections and removal/);

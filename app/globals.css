@@ -693,10 +693,10 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
   .report-section, .correction-section { grid-template-columns:1fr 1fr }
   .principles-grid { max-width:720px }
 }
-@media (max-width:768px) {
-  /* Header nav: the hamburger + dropdown cover <768px —
-     the range where the primary links + auth entry point cannot fit on one
-     line (the old 700px boundary left 701-767px overflowing). Scoped with
+@media (max-width:1080px) {
+  /* Header nav: the hamburger + dropdown cover compact desktops and tablets,
+     before the login/register cluster would wrap below the primary row.
+     Scoped with
      :has(.menu-button) so the auth/record shells (login, register,
      account, error — no hamburger) keep their inline "back home" row. */
   .nav-shell { width:min(100% - 32px,1180px); padding:16px 0; position:relative }

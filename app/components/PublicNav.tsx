@@ -22,9 +22,9 @@ import { AuthNavLinks } from "./AuthNavLinks";
  * Auth entry point (t_65b778c5 + mobile fix t_94b3726d): AuthNavLinks
  * ("Log in" / "Create account", or the account link) renders INSIDE the
  * .nav-links container, as the last item of the mobile menu dropdown. On
- * mobile (<768px) the whole container collapses into the hamburger menu, so
+ * compact desktops and mobile (<1081px) the whole container collapses into the hamburger menu, so
  * the auth links travel with it — no more second row outside the menu, no
- * header wrap (CEO live feedback 2026-08-02, 320/390px). On desktop (≥768px)
+ * header wrap. On wide desktop (≥1081px)
  * the container is the inline nav row and the auth links stay visible in
  * the header, pushed to the right end (margin-left:auto) next to the locale
  * toggle. aria-current marks the current auth route (same pattern as the

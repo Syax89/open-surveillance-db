@@ -60,7 +60,7 @@ const EXTRA_SOURCES = [
 // verificare che ogni href relativo in nav/footer punti a qualcosa di reale.
 const KNOWN_ROUTES = new Set([
   "/", "/guide", "/login", "/register", "/account", "/moderation",
-  "/manifesto", "/regole", "/faq", "/contatti", "/privacy", "/termini", "/licenze", "/accessibility",
+  "/manifesto", "/regole", "/faq", "/contatti", "/fonti", "/privacy", "/termini", "/licenze", "/accessibility",
   // Route tool separate (F1 route group (tools), t_03c0fa15).
   "/mappa", "/directory", "/segnala", "/correggi",
   // Auth UX (P1-1/P1-3 Vera design): verification landing, forgot-password
