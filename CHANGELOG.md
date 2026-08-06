@@ -14,6 +14,8 @@ changes accumulate under `[Unreleased]`.
 
 ### Added
 
+- **Explorer UX (PR #326):** switch Mappa↔Directory con filtri condivisi, ricerca luogo sopra la mappa, pannello punti map-first collassato, legenda, filtri in disclosure, guida con overview, footer a gruppi, redirect `/moderazione` → `/guide`.
+
 - **Auth — mailer Cloudflare (Fase A2, t_4c398006, ADR 0020 decision 2):**
   transactional email infrastructure for account verification and password
   reset, with zero new third parties (Cloudflare Email Service on
