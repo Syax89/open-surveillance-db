@@ -27,7 +27,7 @@ export default async function FaqPage() {
       intro={t.intro}
       actions={
         <>
-          <Link className="button button-primary" href="/#correction">{t.correctionCta} <span aria-hidden="true">→</span></Link>
+          <Link className="button button-primary" href="/correggi">{t.correctionCta} <span aria-hidden="true">→</span></Link>
           <Link className="button detail-outline" href="/contatti">{t.contactCta}</Link>
         </>
       }
@@ -46,41 +46,23 @@ export default async function FaqPage() {
           <p>{t.aCorrect}</p>
         </details>
         <details className="faq-item">
-          <summary>{t.qPrivacy}</summary>
-          <p>{t.aPrivacy}</p>
-        </details>
-        <details className="faq-item">
           <summary>{t.qAccount}</summary>
           <p>{t.aAccount}</p>
         </details>
-        <details className="faq-item">
-          <summary>{t.qVerifications}</summary>
-          <p>{t.aVerifications}</p>
-        </details>
-        <details className="faq-item">
-          <summary>{t.qEdit}</summary>
-          <p>{t.aEdit}</p>
-        </details>
-        <details className="faq-item">
-          <summary>{t.qLevels}</summary>
-          <p>{t.aLevels}</p>
-        </details>
-        <details className="faq-item">
-          <summary>{t.qDeleteAccount}</summary>
-          <p>{t.aDeleteAccount}</p>
-        </details>
       </section>
 
-      <section className="correction-section" aria-labelledby="faq-more-title">
-        <div>
+      <section className="faq-resources" aria-labelledby="faq-more-title">
+        <div className="faq-resources-heading">
           <p className="eyebrow"><span /> {t.eyebrow}</p>
           <h2 id="faq-more-title">{t.moreTitle}</h2>
           <p>{t.moreBody}</p>
-          <div className="data-actions">
-            <Link href="/#correction">{t.correctionCta} <span aria-hidden="true">→</span></Link>
-            <span>·</span>
-            <Link href="/contatti">{t.contactCta} <span aria-hidden="true">→</span></Link>
-          </div>
+        </div>
+        <div className="faq-resource-links">
+          <Link href="/guide">{t.guideCta} <span aria-hidden="true">→</span></Link>
+          <Link href="/regole">{t.rulesCta} <span aria-hidden="true">→</span></Link>
+          <Link href="/privacy">{t.privacyCta} <span aria-hidden="true">→</span></Link>
+          <Link href="/correggi">{t.correctionCta} <span aria-hidden="true">→</span></Link>
+          <Link href="/contatti">{t.contactCta} <span aria-hidden="true">→</span></Link>
         </div>
       </section>
     </InfoPage>

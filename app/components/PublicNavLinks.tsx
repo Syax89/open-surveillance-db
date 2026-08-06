@@ -15,15 +15,11 @@ const homeByLocale: Record<Locale, Translation<typeof homeEn>> = {
  * PublicNavLinks — the ONE public navigation set (header nav, task
  * t_a72a3106).
  *
- * The home hub has six nav links (Explore map /mappa, Browse records
- * /directory, How it works /guide, Rules /regole, Manifesto /manifesto,
- * Add a camera /segnala). The tool routes (/mappa /directory /segnala
- * /correggi) previously rendered their own compact per-page sets (4 links,
- * FRONTEND_DESIGN §2.5 hand-off pattern), which made the header look
- * inconsistent: 4 links on the tools vs 6 on the home. This component
- * replaces every per-page set with the SAME six links of the home, on ALL
- * public pages (home, tools, info/legal pages), marking the current page
- * with aria-current="page" (active state, CEO check 2026-08-02).
+ * The header is deliberately limited to the three primary user tasks:
+ * explore the map, browse the directory and report a camera. Guide, rules
+ * and manifesto remain discoverable from the global footer, where they do
+ * not compete with those actions. The same compact set appears on every
+ * public page, marking the current page with aria-current="page".
  *
  * The labels come from the home bundle so the header is identical
  * everywhere; the page's own aria-label for the <nav> landmark stays
@@ -37,9 +33,6 @@ export function PublicNavLinks() {
   const links: Array<{ href: string; label: string; action?: boolean }> = [
     { href: "/mappa", label: t.exploreMap },
     { href: "/directory", label: t.browseRecords },
-    { href: "/guide", label: t.howItWorks },
-    { href: "/regole", label: t.rules },
-    { href: "/manifesto", label: t.manifesto },
     { href: "/segnala", label: t.addCamera, action: true },
   ];
 

@@ -30,11 +30,17 @@ export function SegnalaTool({ initialCoordinates = null }: Props) {
   const t = useMessages().report;
   const [notice, setNotice] = useState("");
   const report = useReportFlow({ setNotice, initialCoordinates });
+  // A map-picked point is meaningful work. If the write gate asks an
+  // anonymous contributor to log in, preserve the validated coordinates so
+  // they return to the same draft context instead of starting over.
+  const returnTo = initialCoordinates
+    ? `/segnala?lat=${initialCoordinates.latitude}&lng=${initialCoordinates.longitude}`
+    : "/segnala";
 
   return (
     <section className="tool-section report-tool" aria-labelledby="report-tool-title">
       <div className="tool-heading"><p className="eyebrow"><span /> {t.contribute}</p><h1 id="report-tool-title">{t.pageTitle}</h1><p>{t.pageIntro}</p></div>
-      <WriteGateWall returnTo="/segnala">
+      <WriteGateWall returnTo={returnTo}>
         <ReportForm
           coordinates={report.coordinates}
           manualLatitude={report.manualLatitude}

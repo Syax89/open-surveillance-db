@@ -175,15 +175,6 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
   // rebuild after the pan). Keyed by "lat,lng" so a NEW focus reopens it,
   // while plain moveend rebuilds never pop it open out of the blue.
   const focusPopupShownRef = useRef<string | null>(null);
-  // Explicit "Add here" mode: base map navigation is SILENT; the coordinate
-  // picker opens only while this toggle is active (see the map click
-  // handler). Kept in a ref so the once-registered map handler reads the
-  // CURRENT value.
-  const [addMode, setAddMode] = useState(false);
-  const addModeRef = useRef(false);
-  useEffect(() => {
-    addModeRef.current = addMode;
-  }, [addMode]);
   // Set around the rebuild's clearLayers: removing a marker closes its
   // popup (popupclose fires), but that close is NOT a user action — the
   // active popup must survive the rebuild so it can be restored when the
@@ -214,29 +205,19 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
     camerasRef.current = cameras;
   }, [cameras]);
 
-  // Map-click report picker (t_6abb96ac): clicking empty map space opens a
-  // popup with the click coordinates and a direct link to /segnala,
-  // pre-filled with that position. Rebuilt whenever the locale changes,
-  // read through a ref inside the map click handler (same pattern as
-  // popupHtmlForRef). Coordinate strings come from toFixed(5) on numbers —
-  // no user input, nothing to escape.
   const t = useMessages().map;
   useEffect(() => {
-    const build = (latitude: number, longitude: number) => {
+    pickPopupHtmlRef.current = (latitude: number, longitude: number) => {
       const lat = latitude.toFixed(5);
       const lng = longitude.toFixed(5);
-      const href = `/segnala?lat=${lat}&lng=${lng}`;
       return [
         `<div class="osm-popup">`,
         `<h3>${t.pickTitle}</h3>`,
-        `<dl>`,
-        `<div><dt>${t.pickCoordinates}</dt><dd>${lat}, ${lng}</dd></div>`,
-        `</dl>`,
-        `<p class="osm-popup-actions"><a href="${href}">${t.pickReportHere} <span aria-hidden="true">→</span></a></p>`,
+        `<dl><div><dt>${t.pickCoordinates}</dt><dd>${lat}, ${lng}</dd></div></dl>`,
+        `<p class="osm-popup-actions"><a href="/segnala?lat=${lat}&lng=${lng}">${t.pickReportHere} <span aria-hidden="true">→</span></a></p>`,
         `</div>`,
       ].join("");
     };
-    pickPopupHtmlRef.current = build;
   }, [t]);
 
   // Offline state: the tiles cannot load and the records are the last ones
@@ -312,18 +293,10 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
         // removes every path (cones AND circles) from the accessibility
         // tree; markers live in a separate pane and stay exposed.
         map.getPane?.("overlayPane")?.setAttribute?.("aria-hidden", "true");
-        // Map-click report picker (t_6abb96ac, popup lifecycle t_33b82720):
-        // base map navigation is SILENT — a click/tap on empty map space
-        // must never open a popup while the user is just exploring (that
-        // was the "pan/zoom makes popups appear" report). The coordinate
-        // picker opens ONLY in the explicit "Add here" mode toggled in the
-        // map chrome (accessible: aria-pressed button). Marker clicks never
-        // reach this handler anyway: they stop propagation in the marker
-        // population effect, so the picker can never replace a marker
-        // popup. onPick keeps its contract (nearby-check start) and fires
-        // with the same click — but only inside the explicit mode.
+        // Clicking empty space is a direct shortcut to reporting a precise
+        // position. Marker clicks stop propagation in their own handler, so
+        // selecting a record still opens only that record's popup.
         map.on("click", (event) => {
-          if (!addModeRef.current) return;
           onPickRef.current(event.latlng.lat, event.latlng.lng);
           map.openPopup(pickPopupHtmlRef.current(event.latlng.lat, event.latlng.lng), event.latlng, {
             maxWidth: 300,
@@ -685,25 +658,10 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
   const offlineTitle = t.offlineTitle;
   const offlineBody = t.offlineBody;
   const offlineAction = t.offlineAction;
-  const addModeLabel = t.mapAddModeLabel;
-  const addModeToggle = addMode ? t.mapAddModeStop : t.mapAddHere;
-  const addModeHint = t.mapAddHint;
 
   return <div className="map-region" id="map-region" role="region" aria-label={label} aria-describedby="map-accessibility-description" tabIndex={-1}>
     <p className="sr-only" id="map-accessibility-description">{description} <a href={directoryHref}>{directoryLink}</a>.</p>
     {offline && <div className="offline-state" role="status"><b>{offlineTitle}.</b> {offlineBody} <button type="button" className="text-button" onClick={() => window.location.reload()}>{offlineAction} <span aria-hidden="true">→</span></button></div>}
-    {/* Popup lifecycle (t_33b82720): "Add here" is the EXPLICIT,
-        accessible mode for placing a report at a precise position — the
-        coordinate picker opens only while it is active. Base map
-        navigation (click/tap/pan/zoom) stays silent. The toggle sits
-        OUTSIDE the Leaflet container so the map never swallows its
-        clicks. */}
-    <div className="map-addmode" role="group" aria-label={addModeLabel}>
-      <button type="button" className="map-addmode-toggle" aria-pressed={addMode} onClick={() => setAddMode((current) => !current)}>
-        {addModeToggle}
-      </button>
-      {addMode && <p className="map-addmode-hint" role="status">{addModeHint}</p>}
-    </div>
     {mapUnavailable
       ? <div className="map-fallback" role="note"><p className="map-fallback-title">{fallbackTitle}</p><p>{fallbackBody}</p><p><a className="text-button" href={directoryHref}>{directoryLink} <span aria-hidden="true">→</span></a></p></div>
       : <div ref={mapElement} className="live-map" />}

@@ -293,7 +293,21 @@ export function cameraKindsOf(records: Camera[]): string[] {
 
 /** /mappa deep link carrying the current filters plus a record to focus. */
 export function mapHrefWithFocus(filters: CameraFilters, focusId: number): string {
-  return `/mappa${stringifyCameraFilters({ ...filters, focus: focusId })}`;
+  return `/mappa${stringifyCameraFilters({ ...filters, focus: focusId, page: 1 })}`;
+}
+
+/**
+ * Switch from the text directory to the map without losing shared filters.
+ * Focus and pagination belong to one view only, so they are deliberately
+ * cleared while the exploration criteria remain intact.
+ */
+export function exploreMapHref(filters: CameraFilters): string {
+  return `/mappa${stringifyCameraFilters({ ...filters, focus: null, page: 1 })}`;
+}
+
+/** Same exploration criteria, rendered as the accessible text directory. */
+export function exploreDirectoryHref(filters: CameraFilters): string {
+  return `/directory${stringifyCameraFilters({ ...filters, focus: null, page: 1 })}`;
 }
 
 export type UseCameraFiltersResult = {

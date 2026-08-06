@@ -273,7 +273,7 @@ export default function RecordEditPage() {
           <>
             <h2>{t.notFound}</h2>
             <p className="record-detail-summary">{community.errorEditNotFound}</p>
-            <Link className="button button-primary" href="/#records">{t.browseDirectory}</Link>
+            <Link className="button button-primary" href="/directory">{t.browseDirectory}</Link>
           </>
         ) : null}
 
@@ -281,7 +281,7 @@ export default function RecordEditPage() {
           <>
             <h2>{t.unavailable}</h2>
             <p className="record-detail-summary">{community.errorEditNotOwner}</p>
-            <Link className="button button-primary" href="/#records">{t.browseDirectory}</Link>
+            <Link className="button button-primary" href="/directory">{t.browseDirectory}</Link>
           </>
         ) : null}
 
@@ -289,7 +289,7 @@ export default function RecordEditPage() {
           <>
             <h2>{t.unavailable}</h2>
             <p className="record-detail-summary">{t.loadErrorDetail}</p>
-            <Link className="button button-primary" href="/#records">{t.browseDirectory}</Link>
+            <Link className="button button-primary" href="/directory">{t.browseDirectory}</Link>
           </>
         ) : null}
 

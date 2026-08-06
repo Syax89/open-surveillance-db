@@ -30,7 +30,7 @@ export default async function ContactPage() {
       intro={t.intro}
       actions={
         <>
-          <Link className="button button-primary" href="/#correction">{t.correctionForm} <span aria-hidden="true">→</span></Link>
+          <Link className="button button-primary" href="/correggi">{t.correctionForm} <span aria-hidden="true">→</span></Link>
           <Link className="button detail-outline" href="/faq">{t.faqLabel}</Link>
         </>
       }
@@ -57,7 +57,7 @@ export default async function ContactPage() {
           <p className="eyebrow"><span /> {t.eyebrow}</p>
           <h2 id="correction-contact-title">{t.correctionTitle}</h2>
           <p>{t.correctionBody}</p>
-          <div className="data-actions"><Link href="/#correction">{t.correctionForm} <span aria-hidden="true">→</span></Link><span>·</span><a href={`mailto:${t.correctionEmail}`}>{t.correctionEmail}</a></div>
+          <div className="data-actions"><Link href="/correggi">{t.correctionForm} <span aria-hidden="true">→</span></Link><span>·</span><a href={`mailto:${t.correctionEmail}`}>{t.correctionEmail}</a></div>
           <div className="report-rule"><b>{t.correctionEmail}</b><br />{t.correctionEmailNote}</div>
         </div>
       </section>

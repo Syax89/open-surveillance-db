@@ -99,9 +99,9 @@ the routes.
   **before** implementation, per the rule below.
 - **Existing routes are never renamed.** `/guide` (already live) keeps its
   English slug; `/moderation` keeps its role as the **private moderator
-  dashboard** (protected by `requireRole`). The public informational page
-  about how moderation works is a **different route** (`/moderazione`) and
-  must not be confused with the dashboard.
+  dashboard** (protected by `requireRole`). The former public informational
+  URL `/moderazione` is a permanent redirect to the detailed publication
+  section in `/guide`; it must not be confused with the dashboard.
 - New routes must be **kebab-case, lowercase**, and listed in this document
   before implementation.
 
@@ -137,7 +137,7 @@ or `legal` bundle — legal content is a separate typed layer
 | Info — FAQ | `/faq` | `faq.ts` |
 | Info — contacts | `/contatti` | `contact.ts` |
 | Info — rules | `/regole` | `rules.ts` |
-| Info — how moderation works | `/moderazione` | `moderazione.ts` |
+| Legacy — publication model | `/moderazione` → `/guide#guide-publication-details` | `moderazione.ts` (shared by guide) |
 | Legal (privacy, terms, licences) | `/privacy`, `/termini`, `/licenze` | `app/lib/legal/` (typed layer, not i18n bundles) |
 | Info — data sources (import pipeline) | `/fonti` | `sources.ts` (page bundle; data from `db/import-sources.ts` — committed import_batches only) |
 
@@ -145,7 +145,7 @@ or `legal` bundle — legal content is a separate typed layer
 
 | Route          | Page                  | Purpose                                             | In home nav | In footer | Status |
 |----------------|-----------------------|-----------------------------------------------------|:---:|:---:|--------|
-| `/`            | Home (hub)            | Hero + orienting content; static map teaser (`MapTeaser`) + four tool cards (`ToolCards`) | ✓ (brand) | ✓ (brand) | implemented (F2, t_52dcb95e / PR #162) |
+| `/`            | Home (hub)            | Hero con ricerca directory + contenuto orientativo; static map teaser (`MapTeaser`) + four tool cards (`ToolCards`) | ✓ (brand) | ✓ (brand) | implemented |
 | `/mappa`       | Map                   | Interactive map (Leaflet) + viewport-synced sidebar list (t_702c10af), marker popups, filters, export, text fallback | ✓ (F3) | ✓ (F3) | implemented (F1, t_03c0fa15 / PR #158; redesign t_702c10af) |
 | `/directory`   | Directory             | Searchable text directory with filters, sort, count, pagination | ✓ (F3) | ✓ (F3) | implemented (F1, t_03c0fa15 / PR #158) |
 | `/segnala`     | Report a camera       | Guided private submission form (`noindex`)          | ✓ (F3, CTA) | ✓ (F3) | implemented (F1, t_03c0fa15 / PR #158) |
@@ -153,7 +153,7 @@ or `legal` bundle — legal content is a separate typed layer
 | `/guide`       | Guide                 | How to use the site (map, directory, exports)       | ✓ | ✓ | implemented (pre-existing) |
 | `/manifesto`   | Manifesto             | Mission, principles, non-goals, what we publish     | ✓ | ✓ | implemented (PR #65) |
 | `/regole`      | Rules                 | Participation and content rules for contributors    | ✓ | ✓ | implemented (PR #67) |
-| `/moderazione` | How moderation works  | Review flow, appeals, safeguards, SLAs              | — | ✓ | implemented (PR #73) |
+| `/moderazione` | Legacy publication URL | 308 → detailed publication section in `/guide`     | — | ✓ | compatibility redirect |
 | `/privacy`     | Privacy               | Public privacy notice                               | — | ✓ | implemented (PR #70) |
 | `/termini`     | Terms of use          | Public terms of use                                 | — | ✓ | implemented (PR #70) |
 | `/licenze`     | Licences              | Data and software licences, OSM attribution, general mention of imported public datasets | — | ✓ | implemented (PR #70; FASE C t_4dbce318 section 6) |
@@ -164,7 +164,7 @@ or `legal` bundle — legal content is a separate typed layer
 
 "Home nav" means the page is linked from the home page's `nav-shell`. Since
 t_a72a3106 every public page (home, tools, info/legal) renders the SAME
-header `nav-shell` — `PublicNav` with the six home links at the **route
+header `nav-shell` — `PublicNav` with the three primary home links at the **route
 URLs** (`/mappa`, `/directory`, `/guide`, `/regole`, `/manifesto`,
 `/segnala` CTA — F3, t_2ca69725), with the current page marked
 `aria-current="page"`. The old per-page sets (tools 4 links vs home 6,
@@ -185,7 +185,7 @@ proposed).
 
 - **Purpose:** the orienting entry point. Short hero + links to the four
   tool pages; the full tool surfaces live on their own routes since F1.
-- **Content:** hero, static map teaser (`MapTeaser`, a static preview with
+- **Content:** hero con ricerca diretta nella directory, static map teaser (`MapTeaser`, a static preview with
   no Leaflet instance), four tool cards (`ToolCards`: `/mappa`,
   `/directory`, `/segnala`, `/correggi`), and a short principles section
   (kept short; the full manifesto lives at `/manifesto`). The old anchor
@@ -205,7 +205,7 @@ proposed).
   wrapped in a `Suspense` boundary (Next 16 `useSearchParams` requirement).
   Bundle: `map.ts`.
 - **Layout:** route group `app/(tools)/layout.tsx` → `ToolLayout`
-  (`app/components/ToolLayout.tsx`): the shared `PublicNav` header (six home
+  (`app/components/ToolLayout.tsx`): the shared `PublicNav` header (three primary home
   links, t_a72a3106) + `main#main-content`.
 - **Nav/footer:** in tool nav (`ToolLayout`); also linked from the home nav
   and the global footer (F3, t_2ca69725).
@@ -400,14 +400,13 @@ proposed).
   examples, exclusions) and README "Before submitting". Bundle: `rules`.
 - **Nav/footer:** home nav + footer.
 
-### `/moderazione` — How moderation works (implemented, PR #73)
+### `/moderazione` — legacy publication URL
 
-- **Purpose:** public explanation of the review flow, appeals, corrections,
-  and moderator safeguards. **Not** the private dashboard (that stays at
-  `/moderation`).
-- **Content:** from `docs/MODERATION.md` (review flow, appeals and
-  corrections, moderator safeguards) and ADR 0014. Bundle: `moderazione`.
-- **Nav/footer:** footer only (keeps the header lean).
+- **Purpose:** permanent compatibility redirect to
+  `/guide#guide-publication-details`. The detailed public publication model
+  now sits beside the short publication cycle in the Guide, avoiding two
+  visually overlapping information pages.
+- **Boundary:** it remains distinct from `/moderation`, the private dashboard.
 
 ### `/privacy` — Privacy (implemented, PR #70)
 
@@ -469,23 +468,20 @@ proposed).
 
 ### Page navigation (`nav-shell`, shared)
 
-Since t_a72a3106 there IS a shared public header: every public page
-(home, tools, info/legal) renders the SAME `PublicNav` header — brand +
-the six home links + mobile menu + `LocaleToggle` — with the current page
-marked `aria-current="page"` (active state). The compact per-page sets
-(previously 4 links on the tools vs 6 on the home, FRONTEND_DESIGN §2.5
-hand-off pattern) were removed after the CEO check 2026-08-02. Keep the
-six-link set stable:
+Every public page (home, tools, info/legal) renders the same `PublicNav`
+header: brand + the three primary actions + mobile menu + `LocaleToggle`.
+The current page is marked `aria-current="page"`. Institutional pages are
+kept in the footer so they do not compete with the core tasks.
 
 | Page(s)     | `nav-links` (in order)                                        |
 |-------------|---------------------------------------------------------------|
-| every public page (`/`, `/mappa`, `/directory`, `/segnala`, `/correggi`, `/guide`, `/manifesto`, `/regole`, `/faq`, `/contatti`, `/moderazione`, `/privacy`, `/termini`, `/licenze`, `/accessibility`) | Explore map (`/mappa`), Browse records (`/directory`), How it works (`/guide`), Rules (`/regole`), Manifesto (`/manifesto`), CTA Add a camera (`/segnala`) — `PublicNav` + `PublicNavLinks`, current page marked `aria-current="page"` |
+| every public page (`/`, `/mappa`, `/directory`, `/segnala`, `/correggi`, `/guide`, `/manifesto`, `/regole`, `/faq`, `/contatti`, `/moderazione`, `/privacy`, `/termini`, `/licenze`, `/accessibility`) | Explore map (`/mappa`), Browse records (`/directory`), CTA Add a camera (`/segnala`) — `PublicNav` + `PublicNavLinks`, current page marked `aria-current="page"` |
 
 - Mobile: the `menu-button` collapse is implemented in the shared `PublicNav`
   header (t_a72a3106) on EVERY public page — the home was the only page with
   the mobile menu before; now all pages share the same collapsible header.
-- Labels: the six link labels come from the home bundle (`bundle.home`:
-  exploreMap, browseRecords, howItWorks, rules, manifesto, addCamera) via
+- Labels: the three primary link labels come from the home bundle
+  (`bundle.home`: exploreMap, browseRecords, addCamera) via
   `PublicNavLinks`; the `<nav>` landmark aria-label stays per-page
   (`bundle.<page>.navigation` etc.), passed to `PublicNav` as `navLabel`.
 - Legacy anchor links (`/#map`, `/#records`, `/#report`, `/#correction`)
@@ -506,7 +502,7 @@ institutional links and the legal bar:
 | Section    | Content                                                       |
 |------------|---------------------------------------------------------------|
 | Brand      | OpenSurveillanceDB + tagline                                  |
-| Nav        | Map (`/mappa`), Directory (`/directory`), Report (`/segnala`), Correction (`/correggi`), Manifesto, Rules, Guide, Privacy, Terms of use, Licences, Accessibility, FAQ, Contact |
+| Nav        | Four task groups: **Explore** (Map, Directory), **Contribute** (Report, Correction, Rules), **The project** (Guide, Manifesto, Method & sources, FAQ, Contact), and a native expandable **Legal information** group (Privacy, Terms of use, Licences, Accessibility). All routes retain stable URLs. |
 | Legal bar  | Data licence **ODbL 1.0** notice + **© OpenStreetMap contributors** attribution |
 
 - Footer labels are bilingual (EN/IT) via the shared `footer` bundle
@@ -522,14 +518,14 @@ institutional links and the legal bar:
 
 ## Shared layout pattern for informational pages
 
-All informational pages (`/guide`, `/manifesto`, `/regole`, `/moderazione`,
+All informational pages (`/guide`, `/manifesto`, `/regole`,
 `/privacy`, `/termini`, `/licenze`, `/faq`, `/contatti`) share the same
 structure so the QA pass and future maintenance stay uniform. Two variants
 are implemented:
 
 ### Variant A — free-form informational pages (`InfoPage` + `getServerMessages`)
 
-Used by `/guide`, `/manifesto`, `/regole`, `/moderazione`, `/faq`,
+Used by `/guide`, `/manifesto`, `/regole`, `/faq`,
 `/contatti`. Since PR #120 the pages are **Server Components**: the shared
 `InfoPage` component (`app/components/InfoPage.tsx`, no `"use client"`)
 renders the `nav-shell` + `record-detail` layout, and each route is an
@@ -626,7 +622,7 @@ export default async function PrivacyPage() {
 }
 ```
 
-- `LegalPage` renders the shared `PublicNav` header (six home links,
+- `LegalPage` renders the shared `PublicNav` header (three primary home links,
   t_a72a3106), the `record-detail` hero (eyebrow, `h1`, intro) and the
   content sections.
 - Content blocks live in `app/lib/legal/en.ts` / `it.ts`
@@ -671,7 +667,7 @@ export default async function PrivacyPage() {
 | `correction` | `app/lib/i18n/correction.ts` | `/correggi` correction form |
 | `guide`   | `app/lib/i18n/guide.ts` | guide page |
 | `manifesto` | `app/lib/i18n/manifesto.ts` | manifesto page |
-| `moderazione` | `app/lib/i18n/moderazione.ts` | how-moderation-works page |
+| `moderazione` | `app/lib/i18n/moderazione.ts` | detailed publication model inside `/guide` |
 | `faq`     | `app/lib/i18n/faq.ts` | FAQ page |
 | `contact` | `app/lib/i18n/contact.ts` | contacts page |
 | `rules`   | `app/lib/i18n/rules.ts` | rules page |
@@ -702,7 +698,7 @@ Notes:
 | `/correggi`   | `docs/MODERATION.md` (appeals and corrections), `docs/legal/PRIVACY_NOTICE.md` (correction/removal contact), `docs/FRONTEND_PLAN.md` §7.2 |
 | `/manifesto`  | home `principles` section, `README.md` (Principles, non-goals) |
 | `/regole`     | `docs/MODERATION.md` (Publication standard, Eligible examples, Exclusions), README "Before submitting" |
-| `/moderazione`| `docs/MODERATION.md` (Review flow, Appeals and corrections, Moderator safeguards), ADR 0014 |
+| `/guide#guide-publication-details` | `docs/MODERATION.md` (publication model, corrections and safeguards) |
 | `/privacy`    | `docs/legal/PRIVACY_NOTICE.md`                           |
 | `/termini`    | `docs/TERMS_OF_USE.md`                                   |
 | `/licenze`    | `docs/OPEN_SOURCE.md`, `LICENSE`                         |
@@ -720,7 +716,7 @@ with PR #72 (tests: `tests/navigation-pages.test.mjs`,
 `tests/legal-pages.test.mjs`). It covered:
 
 1. Every link in page nav and footer resolves (HTTP 200, no 404).
-2. `/moderazione` exists and is distinct from the `/moderation` dashboard.
+2. `/moderazione` permanently redirects to the Guide and stays distinct from the `/moderation` dashboard.
 3. Each informational page: one `h1`, no skipped heading levels, skip link
    works, visible focus, contrast passes.
 4. EN/IT bundles are complete and coherent on every page (type-checked
@@ -731,13 +727,12 @@ with PR #72 (tests: `tests/navigation-pages.test.mjs`,
 
 ## Open items
 
-- Header nav: pages share the SAME six-link public header (`PublicNav`,
-  t_a72a3106) — no per-page sets. If more pages are added, do not grow the
-  six-link set without an explicit decision.
+- Header nav: pages share the same three-action public header (`PublicNav`)
+  — no per-page sets. Keep institutional navigation in the footer unless a
+  new primary task warrants promotion.
 - Tool nav: the shared `ToolLayout` header is the same public header as the
   home (F1 + t_a72a3106) and the footer tool links are live (F3,
-  t_2ca69725). If the tool count grows, revisit whether the six-link set
-  still fits.
+  t_2ca69725). If the tool count grows, revisit the primary-action set.
 - `/guide` slug kept for compatibility; a future alias `/guida` is possible.
 - `/feedback` route (ADR 0006) remains proposed, not implemented.
 - Community frontend (C5/C6) is implemented: `/account` profile with

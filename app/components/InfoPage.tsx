@@ -3,16 +3,16 @@ import { PublicNav } from "./PublicNav";
 
 /**
  * Shared layout for the public informational pages
- * (/manifesto, /regole, /guide, /faq, /contatti, /moderazione).
+ * (/manifesto, /regole, /guide, /faq and /contatti).
  *
  * Server Component (no "use client"): the pages render statically on the
  * server with per-route metadata (SSR/SEO, task t_c36fe96c). The only client
- * islands are <PublicNav /> (shared header: brand + six public nav links +
+ * islands are <PublicNav /> (shared header: brand + primary public nav links +
  * mobile menu + locale toggle) and the toggle's router.refresh() when the
  * user switches language.
  *
  * Encapsulates the structure those pages previously duplicated: the shared
- * public header (PublicNav, t_a72a3106 — the same six links of the home hub
+ * public header (PublicNav — the same primary links of the home hub
  * on EVERY public page, with the current page marked aria-current), the
  * intro article (eyebrow / title / summary / CTA action row) and the content
  * sections, which each page supplies as children.
@@ -47,7 +47,7 @@ export function InfoPage({
   children,
 }: InfoPageProps) {
   return (
-    <main id="main-content" className="record-page">
+    <main id="main-content" className="record-page" data-surface="info">
       <PublicNav navLabel={navLabel} homeLabel={homeLabel} />
 
       <article className="record-detail">

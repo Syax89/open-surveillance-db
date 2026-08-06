@@ -289,12 +289,12 @@ test("manual coordinates (keyboard path for map location picking) have labelled,
   });
 });
 
-test("place search exposes role=search with a labelled input", async () => {
-  // F2 home hub: the searchable directory moved to /directory.
+test("directory exposes one labelled search form for records and places", async () => {
   const { html } = await renderRoute("/directory");
-  assert.match(html, /<form class="place-search-form" role="search">/);
-  assert.match(html, /<label for="place-search">[\s\S]*?<\/label>/);
-  assert.match(html, /<input id="place-search"[^>]*type="search"/);
+  assert.match(html, /<form(?=[^>]*class="record-search")(?=[^>]*role="search")/);
+  assert.match(html, /<label for="record-search">[\s\S]*?<\/label>/);
+  assert.match(html, /<input id="record-search"[^>]*type="search"/);
+  assert.doesNotMatch(html, /id="place-search"/);
 });
 
 // ---------------------------------------------------------------------------
@@ -624,6 +624,20 @@ test("every <img> in the public HTML carries alt text", async () => {
   assert.match(photoItem, /<img[^>]*alt=\{`\$\{t\.photoEvidence\}/, "photo previews must carry alt text");
 });
 
+test("the footer legal disclosure has a visible keyboard focus and touch-sized target", async () => {
+  const css = await readFile(path.join(root, "app", "globals.css"), "utf8");
+  assert.match(
+    css,
+    /\.site-footer \.footer-policy-group summary \{[^}]*min-height:44px/,
+    "the legal disclosure summary needs a 44px minimum touch target",
+  );
+  assert.match(
+    css,
+    /\.site-footer \.footer-policy-group summary:focus-visible \{[^}]*outline:3px solid var\(--focus\)/,
+    "the legal disclosure summary needs a visible keyboard focus ring",
+  );
+});
+
 test("aria-current marks the active page in the footer and the header brand (QA-2026-08-01-3 closed)", async () => {
   // The audit finding is CLOSED (F-QA t_7b716c97): the footer marks its own
   // link with aria-current="page" on every route in its link set (13 links,
@@ -641,9 +655,9 @@ test("aria-current marks the active page in the footer and the header brand (QA-
     const current = (footer.match(/aria-current="page"/g) ?? []).length;
     assert.equal(current, 1, `${route}: exactly one footer link must be current (found ${current})`);
   }
-  // Pages outside the footer link set (auth, record, moderation info) mark
+  // Pages outside the footer link set (auth, record, private moderation) mark
   // NO footer link as current — none of them is in the footer navigation.
-  for (const route of ["/login", "/register", "/account", "/records/1", "/moderazione", "/moderation"]) {
+  for (const route of ["/login", "/register", "/account", "/records/1", "/moderation"]) {
     const { html } = await renderRoute(route);
     const footer = html.slice(html.indexOf("footer-links"));
     assert.equal((footer.match(/aria-current="page"/g) ?? []).length, 0, `${route}: no footer link may be current`);
@@ -664,7 +678,7 @@ test("aria-current marks the active page in the footer and the header brand (QA-
 test("tool nav: the shared public nav marks the current page with aria-current (t_a72a3106)", async () => {
   // The shared public nav (PublicNavLinks, t_a72a3106) replaced the old
   // per-page sets (F3 t_2ca69725, FRONTEND_DESIGN §2.5 hand-off pattern).
-  // Every tool page now renders the SAME six home links and marks the
+  // Every tool page now renders the same three primary links and marks the
   // current route with aria-current="page" (active state, CEO check
   // 2026-08-02) — in addition to the footer marking (asserted in the test
   // above). This test pins the new contract so a future change cannot drop
@@ -677,7 +691,7 @@ test("tool nav: the shared public nav marks the current page with aria-current (
 
   const links = () => [...container.querySelectorAll(".nav-links a")];
   const currentHrefs = () => links().filter((a) => a.getAttribute("aria-current") === "page").map((a) => a.getAttribute("href"));
-  assert.equal(links().length, 6, "the shared public nav must render the six home links");
+  assert.equal(links().length, 3, "the shared public nav must render the three primary links");
   assert.deepEqual(currentHrefs(), ["/mappa"], "the current page /mappa must be marked aria-current in the header nav");
 
   // Same contract on /directory: the header marks the current page.

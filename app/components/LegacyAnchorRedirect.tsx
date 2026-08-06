@@ -26,9 +26,8 @@ import { useRouter } from "next/navigation";
  *    entry, so the back button returns to the referring page, not to the
  *    fragment URL.
  *
- * Progressive enhancement: SSR renders nothing (the component returns null);
- * with JavaScript disabled the home-page anchors remain usable (F2 replaces
- * them with real route links).
+ * This is only a compatibility path for existing shared links. All in-app
+ * navigation uses the real tool routes, so it works without JavaScript.
  */
 const LEGACY_ANCHOR_ROUTES: Record<string, string> = {
   map: "/mappa",

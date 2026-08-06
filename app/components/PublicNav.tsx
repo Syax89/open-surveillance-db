@@ -6,17 +6,15 @@ import { PublicNavLinks } from "./PublicNavLinks";
 import { AuthNavLinks } from "./AuthNavLinks";
 
 /**
- * PublicNav — the ONE shared header for every public page (t_a72a3106).
+ * PublicNav — the shared header for every public page.
  *
- * The home hub used to be the only page with the full six-link navigation
- * (Explore map /mappa, Browse records /directory, How it works /guide,
- * Rules /regole, Manifesto /manifesto, Add a camera /segnala); the tool
- * routes rendered compact per-page sets (4 links) and the info/legal pages
- * their own copies. The CEO check (2026-08-02) found the header
- * inconsistent: 4 links on the tools vs 6 on the home.
+ * The header focuses on the three primary actions: Explore map /mappa,
+ * Browse records /directory and Add a camera /segnala. Institutional pages
+ * remain in the footer, preventing the header from competing with the main
+ * task.
  *
  * This component is the single header for ALL public pages: brand + mobile
- * menu + the shared six links (PublicNavLinks, active page marked
+ * menu + the shared primary links (PublicNavLinks, active page marked
  * aria-current="page") + locale toggle. The home keeps its in-page brand
  * anchor (brandAs="anchor", brandHref="#top"); every other page uses the
  * default brand link to "/".

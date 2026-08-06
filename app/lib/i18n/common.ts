@@ -22,6 +22,7 @@ export const en = {
   // ToolLayout (F3 t_2ca69725); the labels live here so both the tool chrome
   // and (via footer.ts's own copies) the global footer stay in sync.
   toolNavigation: "Tool navigation",
+  exploreViews: "Explore records as",
   toolHomeAria: "OpenSurveillanceDB home",
   toolMap: "Map",
   toolDirectory: "Directory",
@@ -49,6 +50,7 @@ export const it: Translation<typeof en> = {
   // così sia la chrome tool sia (via le copie in footer.ts) il footer globale
   // restano allineati.
   toolNavigation: "Navigazione strumenti",
+  exploreViews: "Esplora i record come",
   toolHomeAria: "Pagina iniziale di OpenSurveillanceDB",
   toolMap: "Mappa",
   toolDirectory: "Elenco",

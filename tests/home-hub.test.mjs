@@ -185,8 +185,11 @@ test("the hub SSR markup carries hero, static MapTeaser and the four tool cards"
   const html = await runSsrHome();
   // Hero headline + CTA row.
   assert.match(html, /<h1>Public data about public surveillance\.<\/h1>/, "hero h1");
+  assert.match(html, /<form(?=[^>]*class="hero-search")(?=[^>]*action="\/directory")(?=[^>]*role="search")[^>]*>/, "hero directory search");
+  assert.match(html, /name="q"/, "hero search sends the directory query parameter");
   assert.match(html, /href="\/mappa">Explore the map/, "hero CTA → /mappa");
   assert.match(html, /href="\/segnala">Report a camera/, "hero CTA → /segnala");
+  assert.match(html, /href="\/fonti">See sources and methodology/, "hero links to sources and methodology");
   // Static MapTeaser with CTA → /mappa.
   assert.match(html, /class="map-teaser"/, "static map teaser present");
   assert.match(html, /href="\/mappa"[^>]*>Open the map/, "teaser CTA → /mappa");

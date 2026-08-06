@@ -39,9 +39,8 @@ export function usePlaceSearch(t: PlaceSearchMessages, locale: string, onPlaceFo
   const [placeQuery, setPlaceQuery] = useState("");
   const [placeResult, setPlaceResult] = useState<PlaceSearchResult | null>(null);
 
-  async function searchByPlace(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const query = placeQuery.trim();
+  async function searchByQuery(value: string) {
+    const query = value.trim();
     if (!query) {
       setPlaceResult({ status: "error", message: t.placeSearchEmptyQuery });
       return;
@@ -70,10 +69,15 @@ export function usePlaceSearch(t: PlaceSearchMessages, locale: string, onPlaceFo
     }
   }
 
+  function searchByPlace(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    void searchByQuery(placeQuery);
+  }
+
   function clearPlaceSearch() {
     setPlaceResult(null);
     setPlaceQuery("");
   }
 
-  return { placeQuery, setPlaceQuery, placeResult, setPlaceResult, searchByPlace, clearPlaceSearch };
+  return { placeQuery, setPlaceQuery, placeResult, setPlaceResult, searchByPlace, searchByQuery, clearPlaceSearch };
 }

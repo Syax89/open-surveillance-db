@@ -146,6 +146,20 @@ test("server-rendered informational pages honour the locale cookie (html lang + 
   assert.match(html, /<h1[^>]*>Un database pubblico, costruito con attenzione\.<\/h1>/);
 });
 
+test("guide offers a localized table of contents for its long-form sections", async () => {
+  const { response, html } = await renderRoute("/guide");
+
+  assert.equal(response.status, 200);
+  assert.match(html, /<nav[^>]*class="guide-overview"[^>]*aria-labelledby="guide-overview-title"/);
+  assert.match(html, /<h2[^>]*id="guide-overview-title">Find what you need\.<\/h2>/);
+  for (const target of [
+    "guide-purpose", "guide-publication", "guide-statuses", "guide-account", "guide-confirmations", "guide-data",
+  ]) {
+    assert.match(html, new RegExp(`href="#${target}"`), `guide overview must link to #${target}`);
+    assert.match(html, new RegExp(`<section[^>]*id="${target}"`), `guide section #${target} must exist`);
+  }
+});
+
 test("server-rendered /mappa provides the map region and /directory the text-list alternative", async () => {
   // F2 home hub: the interactive map and the accessible directory moved to
   // their own routes (F1 route group (tools)). The home hub renders only the
@@ -287,16 +301,16 @@ test("register page links to the privacy notice and terms next to the submit but
   assert.match(html, /Create account<\/button>[\s\S]{0,200}href="\/privacy"/);
 });
 
-test("auth pages render the full public nav (six links + mobile menu), not the backHome-only header (t_96f0d374)", async () => {
+test("auth pages render the primary public nav (three links + mobile menu), not the backHome-only header", async () => {
   // Vera's design (t_e0dcc292): the auth pages used to render SiteHeader
   // with a single "Back to the map" link; CEO feedback 2026-08-03 wants the
-  // SAME PublicNav as the other public pages (PublicNavLinks 6 links +
+  // SAME PublicNav as the other public pages (PublicNavLinks 3 links +
   // AuthNavLinks) while the auth-card stays compact. End-to-end pin on the
-  // real SSR output: the six shared links and the mobile menu button are
+  // real SSR output: the primary shared links and the mobile menu button are
   // present, the bare backHome header is gone (its auth i18n key was
   // removed), and the EN/IT locale toggle stays in the header.
   const AUTH_ROUTES = ["/login", "/register", "/forgot-password", "/reset-password", "/verify-email", "/account"];
-  const PUBLIC_LINKS = ["/mappa", "/directory", "/guide", "/regole", "/manifesto", "/segnala"];
+  const PUBLIC_LINKS = ["/mappa", "/directory", "/segnala"];
   for (const route of AUTH_ROUTES) {
     const { response, html } = await renderRoute(route);
     assert.equal(response.status, 200, `${route} must render 200`);
@@ -422,8 +436,8 @@ test("info pages reuse the shared layout styles (approved contrast palette)", as
 
 });
 
-test("moderation info page explains publication flow, corrections and safeguards", async () => {
-  const { response, html } = await renderRoute("/moderazione");
+test("guide contains the detailed publication model and the legacy URL redirects to it", async () => {
+  const { response, html } = await renderRoute("/guide");
 
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
@@ -431,10 +445,11 @@ test("moderation info page explains publication flow, corrections and safeguards
   // The public "How publication works" page covers the three required
   // sections (SITEMAP: publication flow, corrections and legal emergencies,
   // safeguards).
-  assert.match(html, /How publication works/);
+  assert.match(html, /The public publication model/);
+  assert.match(html, /Read the detailed publication rules/);
   assert.match(html, /The life of a record/);
-  assert.match(html, /Corrections and legal emergencies/);
-  assert.match(html, /Safeguards/);
+  assert.match(html, /Private requests, one emergency power/);
+  assert.match(html, /Checks on the community model/);
 
   // Publication flow steps from docs/MODERATION.md (submit → restore).
   assert.match(html, />Submit</);
@@ -447,32 +462,16 @@ test("moderation info page explains publication flow, corrections and safeguards
   // Coordinate minimisation promise from the 2026-07-31 decision.
   assert.match(html, /rounded to about 4 decimal places/);
 
-  // Record outcomes from ADR 0021: hidden / removed / restored.
-  assert.match(html, />Hidden</);
-  assert.match(html, />Removed</);
-  assert.match(html, />Restored</);
-
   // This is the PUBLIC page: it must not link the private moderation
   // dashboard or any moderation/admin endpoint (publication-boundaries).
   assert.doesNotMatch(html, /href="\/moderation"/);
   assert.doesNotMatch(html, /href="\/api\/moderation/);
-});
 
-test("moderation info page carries the shared layout without a duplicate footer", async () => {
-  const { response, html } = await renderRoute("/moderazione");
-
-  assert.equal(response.status, 200);
-
-  // The global footer is rendered once by the root layout; the page itself
-  // must not add its own footer (SITEMAP: "footer mai copiato per pagina").
-  const footerCount = (html.match(/<footer\b/g) ?? []).length;
-  assert.equal(footerCount, 1, `expected a single footer landmark, found ${footerCount}`);
-  assert.match(html, /<footer class="site-footer" aria-label="Site footer">/);
-
-  // The page starts with the skip link and uses the shared nav shell.
-  assert.match(html, /Skip to main content/);
-  assert.match(html, /<nav class="nav-shell"/);
-  assert.match(html, /id="main-content"/);
+  const legacy = await renderRoute("/moderazione");
+  // The render helper follows permanent redirects, so the compatibility URL
+  // must resolve to the guide document containing the canonical anchor.
+  assert.equal(legacy.response.status, 200);
+  assert.match(legacy.html, /id="guide-publication-details"/);
 });
 
 test("starter preview skeleton stays removed from the template", async () => {
@@ -509,20 +508,20 @@ test("FAQ page serves bilingual FAQ content", async () => {
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
-  // The four FAQ topics required by the task: reporting, map accuracy,
-  // corrections and privacy.
+  // The four quick answers: reporting, map accuracy, corrections and account.
   assert.match(html, /How do I report a camera\?/);
   assert.match(html, /How accurate is the map\?/);
   assert.match(html, /How do I correct an error\?/);
-  assert.match(html, /What about privacy\?/);
+  assert.match(html, /Do I need an account\?/);
 
   // FAQ items use accessible native disclosure widgets (details/summary).
   assert.match(html, /<details class="faq-item"/);
   assert.match(html, /<summary>/);
 
   // The page links to the correction form and the contact page.
-  assert.match(html, /href="\/#correction"/);
+  assert.match(html, /href="\/correggi"/);
   assert.match(html, /href="\/contatti"/);
+  assert.match(html, /href="\/privacy"/);
 
   // Single footer: only the global SiteFooter from the root layout
   // (SITEMAP: "footer mai copiato per pagina"), which links /faq.
@@ -545,7 +544,7 @@ test("contact page serves owners, privacy and security routes", async () => {
   // Correction / removal contact (privacy contact + in-app form).
   assert.match(html, /Corrections and removal/);
   assert.match(html, /privacy@opensurveillancedb.org/);
-  assert.match(html, /href="\/#correction"/);
+  assert.match(html, /href="\/correggi"/);
 
   // Security route per SECURITY.md: private GitHub advisory, no public issue.
   assert.match(html, /Reporting a security vulnerability/);

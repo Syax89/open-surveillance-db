@@ -135,9 +135,9 @@ const INFO_ROUTES = {
     noEn: ["Accessibility statement", "Compliance status", "Known limitations", "Reporting a barrier"],
   },
   "/faq": {
-    it: ["Domande frequenti", "Come si segnala una telecamera?", "Quanto è precisa la mappa?", "Come si corregge un errore?", "E per quanto riguarda la privacy?"],
-    en: ["How do I report a camera?", "How accurate is the map?", "How do I correct an error?", "What about privacy?"],
-    noEn: ["How do I report a camera?", "How accurate is the map?", "How do I correct an error?", "What about privacy?"],
+    it: ["Domande frequenti", "Come si segnala una telecamera?", "Quanto è precisa la mappa?", "Come si corregge un errore?", "Serve un account?"],
+    en: ["How do I report a camera?", "How accurate is the map?", "How do I correct an error?", "Do I need an account?"],
+    noEn: ["How do I report a camera?", "How accurate is the map?", "How do I correct an error?", "Do I need an account?"],
   },
   "/contatti": {
     it: ["Contatti e responsabilità", "Chi gestisce il progetto e come contattarci."],
@@ -153,15 +153,6 @@ const INFO_ROUTES = {
     it: ["Regole di partecipazione", "Cosa pubblichiamo e come puoi aiutare."],
     en: ["What we publish, and how you can help."],
     noEn: ["What we publish, and how you can help."],
-  },
-  // ADR 0021 pivot (2026-08-05): /moderazione explains the community-driven
-  // model — immediate publication, community actions, public event history.
-  // The old human-review framing ("Reviewed by people, not published by
-  // default") is gone with the queue; markers pin the new copy.
-  "/moderazione": {
-    it: ["Come funziona la pubblicazione", "Pubblicato subito, mantenuto accurato dalla community."],
-    en: ["How publication works", "Published immediately, kept accurate by the community."],
-    noEn: ["How publication works", "Published immediately, kept accurate by the community."],
   },
   "/guide": {
     it: ["Guida al progetto", "Un database pubblico, costruito con attenzione."],

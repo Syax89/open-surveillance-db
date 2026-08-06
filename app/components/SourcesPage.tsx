@@ -40,7 +40,7 @@ export interface SourcesPageProps {
 
 export function SourcesPage({ navLabels, t, locale, batches }: SourcesPageProps) {
   return (
-    <main id="main-content" className="record-page">
+    <main id="main-content" className="record-page" data-surface="sources">
       <PublicNav navLabel={navLabels.mainNavigation} homeLabel={navLabels.homeAria} />
 
       <article className="record-detail">
@@ -48,8 +48,20 @@ export function SourcesPage({ navLabels, t, locale, batches }: SourcesPageProps)
         <h1>{t.title}</h1>
         <p className="record-detail-summary">{t.intro}</p>
 
+        <section className="sources-methodology" aria-labelledby="methodology-heading">
+          <h2 id="methodology-heading">{t.methodologyTitle}</h2>
+          <p>{t.methodologyIntro}</p>
+          <div className="sources-methodology-grid">
+            <article><h3>{t.scopeTitle}</h3><p>{t.scopeBody}</p></article>
+            <article><h3>{t.collectionTitle}</h3><p>{t.collectionBody}</p></article>
+            <article><h3>{t.correctionTitle}</h3><p>{t.correctionBody}</p></article>
+            <article><h3>{t.limitsTitle}</h3><p>{t.limitsBody}</p></article>
+          </div>
+        </section>
+
         <section className="legal-section" aria-labelledby="sources-table-heading">
-          <h2 id="sources-table-heading" className="sr-only">{t.title}</h2>
+          <h2 id="sources-table-heading">{t.sourcesTitle}</h2>
+          <p>{t.sourcesIntro}</p>
           {batches.length === 0 ? (
             <div className="legal-note" role="note">
               <p>{t.emptyTitle}</p>

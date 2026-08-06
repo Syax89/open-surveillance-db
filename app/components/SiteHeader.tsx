@@ -33,10 +33,8 @@ const homeByLocale: Record<Locale, Translation<typeof homeEn>> = {
  * t.navigation / t.mainNavigation). The only string read here is the mobile
  * menu button label (home bundle), which exists on the homepage variant.
  *
- * Since t_94b3726d the mobile-menu boundary is <768px (was 700px): the
- * hamburger and the collapsible .nav-links panel now cover the whole range
- * where the six links + auth entry point cannot fit on one line, so the
- * header never wraps or overflows between 701-767px either. The auth links
+ * The mobile-menu boundary is <768px: the hamburger and collapsible
+ * .nav-links panel keep the primary links and auth entry point compact. The auth links
  * live inside the .nav-links container (PublicNav renders AuthNavLinks as
  * its last item), so they collapse with the menu on mobile and stay visible
  * in the inline row on desktop.

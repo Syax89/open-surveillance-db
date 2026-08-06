@@ -326,15 +326,15 @@ for (const page of PAGES) {
   });
 }
 
-test("auth pages render the FULL public nav (six links + mobile menu), not the backHome-only header (t_96f0d374)", async () => {
+test("auth pages render the primary public nav (three links + mobile menu), not the backHome-only header", async () => {
   // Vera's design (t_e0dcc292): every auth page used to render SiteHeader
   // with a single "Back to the map" link; the CEO feedback wants the SAME
-  // PublicNav as the other public pages (PublicNavLinks 6 link + AuthNavLinks)
+  // PublicNav as the other public pages (PublicNavLinks 3 links + AuthNavLinks)
   // while the auth-card stays compact. This pins the new contract so a
   // future change cannot silently regress the auth header to the bare
   // backHome variant (same pattern as the tool-nav contract test).
   const AUTH_ROUTES = ["/login", "/register", "/forgot-password", "/reset-password", "/verify-email", "/account"];
-  const PUBLIC_LINKS = ["/mappa", "/directory", "/guide", "/regole", "/manifesto", "/segnala"];
+  const PUBLIC_LINKS = ["/mappa", "/directory", "/segnala"];
   const tree = await getTree();
   const LocaleProvider = await loadLocaleProvider(tree);
   for (const route of AUTH_ROUTES) {
@@ -343,7 +343,7 @@ test("auth pages render the FULL public nav (six links + mobile menu), not the b
     const Page = await loadPage(tree, page.relative);
     const element = Page.constructor.name === "AsyncFunction" ? await Page() : React.createElement(Page);
     const html = renderToString(React.createElement(LocaleProvider, null, element));
-    // The six shared public links, exactly like home/tools/info pages.
+    // The three primary public links, exactly like home/tools/info pages.
     for (const href of PUBLIC_LINKS) {
       assert.ok(html.includes(`href="${href}"`), `${route}: the public nav must link ${href}`);
     }

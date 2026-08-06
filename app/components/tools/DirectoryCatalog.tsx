@@ -71,10 +71,6 @@ export function DirectoryCatalog({ filteredRecords, cameraKinds, search, setSear
   const statuses = useMessages().status;
   const { locale } = useLocale();
   const place = usePlaceSearch(t, locale, (coordinates) => setCoordinates(coordinates));
-  // The place-search lives in a collapsible panel (unhidden by the
-  // controls-row trigger) so /directory has exactly ONE visible search
-  // input at a time.
-  const [placeOpen, setPlaceOpen] = useState(false);
   // Offline state: the directory keeps working (records are already on the
   // page — "the last loaded records"). SSR-safe: navigator is undefined on
   // the server, so the banner never appears in first paint.
@@ -217,19 +213,9 @@ export function DirectoryCatalog({ filteredRecords, cameraKinds, search, setSear
   return (
     <section className="records-section" id="records" aria-label={t.accessibleDirectory}>
       {offline && <div className="offline-state" role="status"><b>{t.offlineTitle}.</b> {t.offlineBody} <button type="button" className="text-button" onClick={() => window.location.reload()}>{t.offlineAction} <span aria-hidden="true">→</span></button></div>}
-      <FiltersBar variant="bare" showCommunitySort stateFilter={stateFilter} setStateFilter={setStateFilter} originFilter={originFilter} setOriginFilter={setOriginFilter} cameraKinds={cameraKinds} search={search} setSearch={setSearch} kindFilter={kindFilter} setKindFilter={setKindFilter} freshnessFilter={freshnessFilter} setFreshnessFilter={setFreshnessFilter} sortOrder={sortOrder} setSortOrder={setSortOrder} resultCount={filteredRecords.length} onReset={onResetFilters} extraControls={<button type="button" className="text-button place-search-toggle" aria-expanded={placeOpen} aria-controls="directory-place-panel" onClick={() => setPlaceOpen((value) => !value)}>{placeOpen ? t.placeHide : t.searchNearPlace} <span aria-hidden="true">{placeOpen ? "↑" : "↓"}</span></button>} />
-      {/* Place-search panel (collapsed until the controls-row trigger opens
-          it): keeps the historical ids/classes so the a11y suite and the AT
-          labels keep matching. Collapse via the .place-search-closed class —
-          the raw `hidden` attribute is forbidden by the pages-render leak
-          contract; display:none keeps the form out of the tab order and the
-          a11y tree while closed. */}
-      <div className={placeOpen ? "place-search" : "place-search place-search-closed"} id="directory-place-panel">
-        <h2 className="place-search-title">{t.placeSearchTitle}</h2>
-        <p>{t.placeSearchHelp}</p>
-        <form className="place-search-form" role="search" onSubmit={place.searchByPlace}><label htmlFor="place-search">{t.placeSearchLabel}</label><div className="place-search-row"><input id="place-search" type="search" value={place.placeQuery} onChange={(event) => place.setPlaceQuery(event.target.value)} maxLength={200} placeholder={t.placeSearchPlaceholder} autoComplete="off" /><button className="button" type="submit">{t.placeSearchSubmit}</button>{place.placeResult && place.placeResult.status !== "loading" ? <button type="button" className="text-button" onClick={place.clearPlaceSearch}>{t.placeClearResults} <span aria-hidden="true">→</span></button> : null}</div></form>
-        <div aria-live="polite">{place.placeResult?.status === "loading" && <p className="loading-note" role="status">{t.placeSearchLoading}</p>}{place.placeResult?.status === "error" && <p className="nearby-error" role="alert">{place.placeResult.message}</p>}</div>
-      </div>
+      <FiltersBar variant="bare" showCommunitySort stateFilter={stateFilter} setStateFilter={setStateFilter} originFilter={originFilter} setOriginFilter={setOriginFilter} cameraKinds={cameraKinds} search={search} setSearch={(value) => { place.clearPlaceSearch(); setSearch(value); }} onSearchSubmit={() => { void place.searchByQuery(search); }} kindFilter={kindFilter} setKindFilter={setKindFilter} freshnessFilter={freshnessFilter} setFreshnessFilter={setFreshnessFilter} sortOrder={sortOrder} setSortOrder={setSortOrder} resultCount={filteredRecords.length} onReset={onResetFilters} />
+      {place.placeResult?.status === "loading" && <p className="loading-note" role="status">{t.placeSearchLoading}</p>}
+      {place.placeResult?.status === "error" && <p className="nearby-error" role="alert">{place.placeResult.message}</p>}
       {/* Visible results header (t_f13fcb1c): replaces the sr-only h2 with a
           real browse context — heading + count (role=status, historical id)
           + the CSV/GeoJSON downloads. The count keeps the historical format

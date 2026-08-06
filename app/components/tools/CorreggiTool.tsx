@@ -22,13 +22,17 @@ export function CorreggiTool() {
   const searchParams = useSearchParams();
   const recordParam = searchParams.get("record");
   const defaultRecordId = recordParam && /^\d+$/.test(recordParam) ? Number(recordParam) : null;
+  // Keep the selected record through the login gate. A correction normally
+  // starts from a record detail page, so dropping ?record= would force a
+  // contributor to find it a second time after authenticating.
+  const returnTo = defaultRecordId === null ? "/correggi" : `/correggi?record=${defaultRecordId}`;
 
   const { records } = usePublicCameras();
 
   return (
     <section className="tool-section correction-tool" aria-labelledby="correction-tool-title">
       <div className="tool-heading"><p className="eyebrow"><span /> {t.accountability}</p><h1 id="correction-tool-title">{t.pageTitle}</h1><p>{t.pageIntro}</p></div>
-      <WriteGateWall returnTo="/correggi">
+      <WriteGateWall returnTo={returnTo}>
         <CorrectionForm records={records} defaultRecordId={defaultRecordId} showHeading={false} />
       </WriteGateWall>
     </section>

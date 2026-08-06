@@ -9,8 +9,6 @@ type Props = {
   visibleRecords: Camera[];
   selectedId: number;
   onSelect: (id: number) => void;
-  /** Clear every filter — the in-list "Clear filters" action (t_b9666d09). */
-  onReset?: () => void;
   /** Localized strings (a subset of the map dictionary). */
   labels: {
     listTitle: string;
@@ -48,7 +46,7 @@ type Props = {
  * Extracted from MapPanel so the workspace stays a thin orchestrator
  * (~150-line contract, component-smoke.test.mjs).
  */
-export function MapRecordList({ filteredRecords, visibleRecords, selectedId, onSelect, onReset, labels, statusLabel, collapsed = false, onToggleCollapse }: Props) {
+export function MapRecordList({ filteredRecords, visibleRecords, selectedId, onSelect, labels, statusLabel, collapsed = false, onToggleCollapse }: Props) {
   // Mobile map-first (t_b7728ad0): the "Points in the current view" panel
   // starts compact below the map. The header stays visible (title + count)
   // and carries an accessible disclosure toggle (aria-expanded, keyboard
@@ -69,7 +67,7 @@ export function MapRecordList({ filteredRecords, visibleRecords, selectedId, onS
             onClick={onToggleCollapse}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <polyline points="6 9 12 15 18 9" />
+              <polyline points={collapsed ? "9 6 15 12 9 18" : "15 6 9 12 15 18"} />
             </svg>
             <span className="sr-only">{collapsed ? labels.listTitle : `${labels.listTitle}: ${labels.listCount(visibleRecords.length, filteredRecords.length)}`}</span>
           </button>
@@ -86,9 +84,6 @@ export function MapRecordList({ filteredRecords, visibleRecords, selectedId, onS
             <div className="map-list-empty-note" role="note">
               <p className="map-list-empty-title">{labels.emptyTitle}</p>
               <p className="map-list-empty-body">{labels.emptyBody}</p>
-              {onReset ? (
-                <button type="button" className="text-button" onClick={onReset}>{labels.clearSearch} <span aria-hidden="true">→</span></button>
-              ) : null}
             </div>
           )
           : visibleRecords.length === 0

@@ -42,10 +42,10 @@ type Props = {
   onResetFilters?: () => void;
   /** "Use the map instead" target: home anchor (#map) or /mappa route. */
   mapHref?: string;
-  /** "Submit a private observation" target: home anchor (#report) or /segnala route. */
   reportHref?: string;
-  /** P1-5 (F5): tool pages own the page header via .tool-heading (h1). */
+  /** Tool headers and the explorer switch can suppress duplicate catalog CTAs. */
   showHeading?: boolean;
+  showMapLink?: boolean;
   /**
    * t_127492f1/t_f13fcb1c: "hub" (default) = the historical home section,
    * byte-identical (records-heading + place-search block + FiltersBar inline
@@ -63,7 +63,7 @@ type Props = {
  * /directory (catalog mode — the actual layout lives in DirectoryCatalog).
  * The place-search flow lives in the shared usePlaceSearch hook.
  */
-export function PublicDirectory({ filteredRecords, cameraKinds, search, setSearch, kindFilter, setKindFilter, freshnessFilter, setFreshnessFilter, setFreshnessCutoff, sortOrder, setSortOrder, stateFilter, setStateFilter, originFilter, setOriginFilter, page = 1, setPage, showRecordOnMap, setCoordinates, onResetFilters, mapHref = "#map", reportHref = "#report", showHeading = true, variant = "hub", exportHrefs = null }: Props) {
+export function PublicDirectory({ filteredRecords, cameraKinds, search, setSearch, kindFilter, setKindFilter, freshnessFilter, setFreshnessFilter, setFreshnessCutoff, sortOrder, setSortOrder, stateFilter, setStateFilter, originFilter, setOriginFilter, page = 1, setPage, showRecordOnMap, setCoordinates, onResetFilters, mapHref = "#map", reportHref = "#report", showHeading = true, showMapLink = true, variant = "hub", exportHrefs = null }: Props) {
   const t = useMessages().directory;
   const statuses = useMessages().status;
   const { locale } = useLocale();
@@ -121,7 +121,7 @@ export function PublicDirectory({ filteredRecords, cameraKinds, search, setSearc
   return (
     <section className="records-section" id="records" aria-labelledby={showHeading ? "records-title" : undefined} aria-label={showHeading ? undefined : t.accessibleDirectory}>
       {offline && <div className="offline-state" role="status"><b>{t.offlineTitle}.</b> {t.offlineBody} <button type="button" className="text-button" onClick={() => window.location.reload()}>{t.offlineAction} <span aria-hidden="true">→</span></button></div>}
-      {showHeading ? <div className="records-heading"><div><p className="eyebrow"><span /> {t.accessibleDirectory}</p><h2 id="records-title">{t.recordsTitle}</h2><p>{t.recordsIntro}</p></div><a className="text-button" href={mapHref}>{t.useMapInstead} <span aria-hidden="true">↑</span></a></div> : <div className="records-heading records-heading-actions"><a className="text-button" href={mapHref}>{t.useMapInstead} <span aria-hidden="true">↑</span></a></div>}
+      {showHeading ? <div className="records-heading"><div><p className="eyebrow"><span /> {t.accessibleDirectory}</p><h2 id="records-title">{t.recordsTitle}</h2><p>{t.recordsIntro}</p></div>{showMapLink ? <a className="text-button" href={mapHref}>{t.useMapInstead} <span aria-hidden="true">↑</span></a> : null}</div> : showMapLink ? <div className="records-heading records-heading-actions"><a className="text-button" href={mapHref}>{t.useMapInstead} <span aria-hidden="true">↑</span></a></div> : null}
       <div className="place-search">
         {showHeading ? <h3>{t.placeSearchTitle}</h3> : <h2 className="place-search-title">{t.placeSearchTitle}</h2>}
         <p>{t.placeSearchHelp}</p>

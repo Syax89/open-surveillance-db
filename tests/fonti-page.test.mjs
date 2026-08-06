@@ -8,7 +8,7 @@
  *   - GET /fonti 200: localized title + intro, the attribution table
  *     (source link, licence link, import date, grouped record count,
  *     attribution text), ONLY committed batches (running/failed rows
- *     never leak), the footer "Data sources" link;
+ *     never leak), the footer "Method & sources" link;
  *   - GET /licenze 200: the "Imported public datasets" section linking
  *     /fonti (the general mention, CEO route decision 2026-08-05);
  *   - sitemap.xml includes /fonti.
@@ -133,9 +133,11 @@ test("GET /fonti: server-renders the attribution table with committed batches on
     assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
     // Localized metadata + page copy (EN default, ADR 0007).
-    assert.match(html, /<title>Data sources/);
-    assert.match(html, /<h1[^>]*>Data sources<\/h1>/);
-    assert.match(html, /The public records may include datasets/);
+    assert.match(html, /<title>Methodology and data sources/);
+    assert.match(html, /<h1[^>]*>Methodology and data sources<\/h1>/);
+    assert.match(html, /We document visible public surveillance infrastructure/);
+    assert.match(html, /<h2[^>]*>How the database works<\/h2>/);
+    assert.match(html, /<h2[^>]*>Imported data sources<\/h2>/);
 
     // Attribution table: the five columns.
     for (const header of ["Source", "Licence", "Imported on", "Records", "Attribution"]) {
@@ -160,7 +162,7 @@ test("GET /fonti: server-renders the attribution table with committed batches on
     assert.ok(!html.includes("fixture-running"));
 
     // Footer links the page itself (and it is NOT in the main nav).
-    assert.match(html, /<a[^>]*href="\/fonti"[^>]*>Data sources<\/a>/);
+    assert.match(html, /<a[^>]*href="\/fonti"[^>]*>Method &amp; sources<\/a>/);
   } finally {
     await mf.dispose();
   }
@@ -182,7 +184,7 @@ test("GET /licenze: general mention of imported datasets links /fonti (CEO route
     assert.ok(html.includes("Imported public datasets"), "/licenze must mention the imported-datasets policy");
     assert.match(html, /<a href="\/fonti"[^>]*>Data sources<\/a>/, "/licenze must link the dedicated /fonti page");
     // The footer keeps the /fonti entry on every route.
-    assert.match(html, /<a[^>]*href="\/fonti"[^>]*>Data sources<\/a>/);
+    assert.match(html, /<a[^>]*href="\/fonti"[^>]*>Method &amp; sources<\/a>/);
   } finally {
     await mf.dispose();
   }

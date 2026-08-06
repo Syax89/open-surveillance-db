@@ -79,8 +79,8 @@ const fakeLegalContent = {
 // fictitious fixture mirrors the contract so the tests exercise the same
 // prop shape as production.
 //
-// Since t_a72a3106 the nav LINK SET no longer comes from navLabels: LegalPage
-// renders the shared public nav (PublicNavLinks — the same six home links as
+// The nav LINK SET no longer comes from navLabels: LegalPage
+// renders the shared public nav (PublicNavLinks — the same primary home links as
 // every other public page, with the current page marked aria-current). The
 // navLabels prop now carries ONLY the landmark labels (mainNavigation /
 // homeAria); the link texts come from the home bundle.
@@ -98,10 +98,10 @@ const fakeNavLabels = {
   homeAria: "Fixture home",
 };
 
-// The shared public nav (PublicNavLinks, t_a72a3106) renders the same six
+// The shared public nav (PublicNavLinks) renders the same three primary
 // home links on every public page, in this order, with the current page
 // marked aria-current="page".
-const PUBLIC_NAV_HREFS = ["/mappa", "/directory", "/guide", "/regole", "/manifesto", "/segnala"];
+const PUBLIC_NAV_HREFS = ["/mappa", "/directory", "/segnala"];
 
 // Contract guard: if a future refactor adds/renames a navLabels key, the
 // render below fails with a descriptive message instead of a cryptic
@@ -121,7 +121,7 @@ test("legal: nav shell renders the landmark labels and the shared public nav (co
 
   // The nav link set is the shared public set — no longer per-page copies.
   const linkHrefs = [...container.querySelectorAll(".nav-links a")].map((a) => a.getAttribute("href"));
-  assert.deepEqual(linkHrefs, PUBLIC_NAV_HREFS, "legal pages must render the shared six-link public nav");
+  assert.deepEqual(linkHrefs, PUBLIC_NAV_HREFS, "legal pages must render the shared primary public nav");
   for (const href of PUBLIC_NAV_HREFS) {
     assert.ok(
       linkHrefs.includes(href),
@@ -165,13 +165,18 @@ test("footer: contentinfo landmark with localized aria-label and labelled nav", 
 
   const nav = footer.querySelector("nav.footer-links");
   assert.ok(nav, "footer navigation <nav> must render");
-  // F3 t_2ca69725: the footer nav carries the four public tool routes +
-  // the institutional pages, so the label is "site navigation".
+  // The footer keeps every public route, grouped by the task a visitor is
+  // trying to complete.
   assert.equal(nav.getAttribute("aria-label"), "Site navigation");
+  assert.deepEqual(
+    [...nav.querySelectorAll(".footer-link-group-title, .footer-policy-group summary")].map((node) => node.textContent),
+    ["Explore", "Contribute", "The project", "Legal information"],
+  );
+  assert.ok(nav.querySelector("details.footer-policy-group"), "legal links should be contained in a native disclosure");
 
   const links = collectLinks(footer);
-  // brand + 4 tool links + 10 institutional links (incl. /fonti, import
-  // pipeline FASE C) + 2 external licence/attribution links
+  // brand + 4 tool links + 10 project/legal links (incl. /fonti) + 2
+  // external licence/attribution links
   assert.equal(links.length, 17);
   const internal = links.filter((l) => l.href.startsWith("/"));
   assert.equal(internal.length, 15);
@@ -289,10 +294,9 @@ test("legal: nav shell links resolve, LocaleToggle present, no broken hrefs", as
   assert.equal(view.getByRole("button", { name: "EN" }).getAttribute("aria-pressed"), "true");
 
   const links = collectLinks(container);
-  assert.ok(links.length >= 8, "brand + six shared nav links + inline markup links must render");
-  // Shared public nav (t_a72a3106): the SAME six home links on every public
-  // page — the old per-page legal set (/#map, /#records, /guide) is gone.
-  for (const expected of ["/", "/mappa", "/directory", "/guide", "/regole", "/manifesto", "/segnala", "https://example.test/legal"]) {
+  assert.ok(links.length >= 5, "brand + three shared nav links + inline markup links must render");
+  // Shared public nav: the same primary home links on every public page.
+  for (const expected of ["/", "/mappa", "/directory", "/segnala", "https://example.test/legal"]) {
     assert.ok(links.some((l) => l.href === expected), `expected link ${expected}`);
   }
   assertNoBrokenHrefs(links);

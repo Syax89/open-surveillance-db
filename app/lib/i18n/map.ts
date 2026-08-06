@@ -29,17 +29,13 @@ export const en = {
   // never proves absence" truthfulness contract (SSR metadata + a11y intro).
   // The prototype banner itself was removed (CEO feedback 2026-08-02) — the
   // map is no longer framed as a prototype.
-  mapHint: "Use “Add here” to place a report at a precise position",
-  // Explicit "Add here" mode (popup lifecycle t_33b82720): base map
-  // navigation is SILENT — the coordinate picker opens only while this
-  // accessible toggle is active.
-  mapAddModeLabel: "Add a report on the map",
-  mapAddHere: "Add here",
-  mapAddModeStop: "Stop adding",
-  mapAddHint: "Click the map to place a new report at that position",
-  // Map-click report picker (t_6abb96ac): clicking empty map space opens a
-  // popup with the click coordinates and a direct link to the /segnala
-  // form, pre-filled with that position.
+  mapLegendTitle: "How to use the map",
+  mapLegendMove: "Drag the map or use the + and − controls to explore an area.",
+  mapLegendMarker: "Select a marker to open the public record.",
+  mapLegendFilters: "Use search and filters above the map to refine the results.",
+  mapLegendList: "Open the side rail to browse the points in the current view.",
+  mapLegendAdd: "Click an empty place on the map to report a camera there.",
+  mapLegendReport: "Report a camera",
   pickTitle: "New report",
   pickCoordinates: "Coordinates",
   pickReportHere: "Report a camera here",
@@ -132,17 +128,13 @@ export const it: Translation<typeof en> = {
   // l'assenza di telecamere" (metadata SSR + intro a11y). Il banner di
   // prototipo è stato rimosso (feedback CEO 2026-08-02) — la mappa non è più
   // presentata come prototipo.
-  mapHint: "Usa “Aggiungi qui” per posizionare una segnalazione in un punto preciso",
-  // Modalità esplicita "Aggiungi qui" (popup lifecycle t_33b82720): la
-  // navigazione base della mappa è SILENZIOSA — il selettore delle
-  // coordinate si apre solo mentre questo toggle accessibile è attivo.
-  mapAddModeLabel: "Aggiungi una segnalazione sulla mappa",
-  mapAddHere: "Aggiungi qui",
-  mapAddModeStop: "Ferma l'aggiunta",
-  mapAddHint: "Clicca sulla mappa per posizionare una nuova segnalazione in quel punto",
-  // Selettore segnalazione al clic sulla mappa (t_6abb96ac): cliccando uno
-  // spazio vuoto della mappa si apre un popup con le coordinate del clic e
-  // un link diretto al modulo /segnala, precompilato con quella posizione.
+  mapLegendTitle: "Come usare la mappa",
+  mapLegendMove: "Trascina la mappa o usa i controlli + e − per esplorare un'area.",
+  mapLegendMarker: "Seleziona un segnaposto per aprire il record pubblico.",
+  mapLegendFilters: "Usa ricerca e filtri sopra la mappa per affinare i risultati.",
+  mapLegendList: "Apri la barra laterale per sfogliare i punti nella vista corrente.",
+  mapLegendAdd: "Clicca uno spazio vuoto della mappa per segnalare una telecamera in quel punto.",
+  mapLegendReport: "Segnala una telecamera",
   pickTitle: "Nuova segnalazione",
   pickCoordinates: "Coordinate",
   pickReportHere: "Segnala una telecamera qui",

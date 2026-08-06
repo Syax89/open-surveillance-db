@@ -106,7 +106,7 @@ test("header nav: the old (max-width:700px) block no longer carries nav rules", 
 
 test("header nav: desktop (>=768px) keeps the auth cluster visible in the inline row", async () => {
   const source = await css();
-  // Outside any media query: the six links + auth stay in the inline row,
+  // Outside any media query: the primary links + auth stay in the inline row,
   // auth pushed to the right end (the top-right corner of t_65b778c5).
   assert.match(
     source,
@@ -147,8 +147,8 @@ test("PublicNav renders AuthNavLinks inside the mobile menu container (#main-lin
   const publicNavLinks = source.indexOf("<PublicNavLinks />");
   const authNavLinks = source.indexOf("<AuthNavLinks />");
   assert.ok(mainLinks >= 0, "PublicNav must render the #main-links container");
-  assert.ok(publicNavLinks >= 0, "PublicNav must render the six shared links");
-  assert.ok(authNavLinks > publicNavLinks, "AuthNavLinks must follow the six links INSIDE the container");
+  assert.ok(publicNavLinks >= 0, "PublicNav must render the shared primary links");
+  assert.ok(authNavLinks > publicNavLinks, "AuthNavLinks must follow the primary links INSIDE the container");
   assert.ok(authNavLinks > mainLinks, "AuthNavLinks must be inside #main-links (the mobile menu)");
   assert.doesNotMatch(source, /trailing=/, "no top-bar trailing slot anymore");
 });
