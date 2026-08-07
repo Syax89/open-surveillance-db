@@ -16,6 +16,7 @@ import {
 } from "../../lib/rate-limit";
 import { recordRateLimitBlock } from "../../lib/abuse-alerts";
 import { CACHE_TAGS } from "../../lib/cache-purge";
+import { withPublicCache } from "../../lib/public-cache";
 import {
   BodyReadError,
   MAX_PAGE_OFFSET,
@@ -118,6 +119,13 @@ export async function GET(request: Request) {
     });
   }
 
+  // DB-lightening (CEO 2026-08-07): the worker itself caches the public
+  // read responses (bounded, query-string-keyed, fail-open) so repeat
+  // views of the map/directory don't re-query D1 — on the container there
+  // is no CDN in front, so the edge Cache-Control headers alone never
+  // spared the database. The 429 path above stays uncached by design
+  // (rate limits must be re-evaluated per request).
+  return withPublicCache(request, 300, async () => {
   try {
     const params = new URL(request.url).searchParams;
     const kindFilter = cleanText(params.get("kind"), 60);
@@ -238,6 +246,7 @@ export async function GET(request: Request) {
     console.error("GET /api/cameras failed", error);
     return Response.json({ error: "Database unavailable" }, { status: 503 });
   }
+  });
 }
 
 export async function POST(request: Request) {

@@ -295,6 +295,13 @@
    "when": 1785913024769,
    "tag": "0041_geocode_reverse_cache",
    "breakpoints": true
+  },
+  {
+   "idx": 42,
+   "version": "7",
+   "when": 1786010000000,
+   "tag": "0042_cameras_status_coordinates_idx",
+   "breakpoints": true
   }
- ]
+]
 }
