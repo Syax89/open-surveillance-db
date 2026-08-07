@@ -116,6 +116,16 @@ function defaultPopupHtml(camera: MapCamera): string {
   return `<div class="osm-popup"><h3>${escapeHtml(camera.title)}</h3><p class="osm-popup-kind">${escapeHtml(camera.kind)}${direction}</p></div>`;
 }
 
+// Mobile balloon sizing (CEO 2026-08-07): the popup must not swallow the
+// map on phones. Leaflet sets style.width inline from this option, so the
+// width is controlled here, not in CSS. 300px on desktop (unchanged),
+// 260px on ≤520px screens so a 360-414px phone still sees the map around
+// the balloon. Module-level pure function — safe for SSR (returns 300).
+function popupMaxWidth(): number {
+  if (typeof window === "undefined" || typeof window.innerWidth !== "number") return 300;
+  return window.innerWidth <= 520 ? 260 : 300;
+}
+
 export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLocation, directoryHref = "#records", onBoundsChange, popupHtmlFor }: Props) {
   const [mapUnavailable, setMapUnavailable] = useState(false);
   const [offline, setOffline] = useState(false);
@@ -234,9 +244,13 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
   // after a drag, so panning/zooming stays silent. Reads the CURRENT
   // picker HTML and onPick through refs.
   const handleMapClick = useCallback((event: { latlng: { lat: number; lng: number } }) => {
+    // Mobile balloon (CEO 2026-08-07): on phones the popup must not
+    // swallow the map — maxWidth shrinks with the viewport (260px on
+    // ≤520px screens, 300px on desktop), minWidth stays 220 so the
+    // toolbar still fits.
     onPickRef.current(event.latlng.lat, event.latlng.lng);
     mapRef.current?.openPopup(pickPopupHtmlRef.current(event.latlng.lat, event.latlng.lng), event.latlng, {
-      maxWidth: 300,
+      maxWidth: popupMaxWidth(),
       minWidth: 220,
       className: "osm-camera-popup",
       // Clipping fix (empirical review 2026-08-07): same keepInView /
@@ -607,7 +621,7 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
         const marker = L.marker([camera.latitude, camera.longitude], { icon: buildMarkerIcon(L, camera, isSelected), title: camera.title });
         marker.bindTooltip(`${camera.title}<br/><small>${camera.kind}</small>`, { direction: "top", offset: [0, -12] });
         marker.bindPopup(popupHtmlForRef.current ? popupHtmlForRef.current(camera) : defaultPopupHtml(camera), {
-          maxWidth: 300,
+          maxWidth: popupMaxWidth(),
           minWidth: 220,
           className: "osm-camera-popup",
           // Clipping fix (empirical review 2026-08-07): markers near the map

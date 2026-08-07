@@ -16,7 +16,7 @@ import assert from "node:assert/strict";
 import test, { afterEach, before } from "node:test";
 import {
   setupDom, loadDomModule, installFetchMock, jsonResponse,
-  renderWithLocale, wrapWithLocale, resetLeafletMarkers, leafletMaps, React,
+  renderWithLocale, wrapWithLocale, resetLeafletMarkers, leafletMaps, leafletMarkers, React,
 } from "./helpers/dom-harness.mjs";
 
 let rtl;
@@ -89,6 +89,45 @@ test("map click opens a coordinate-picker shortcut with a report link", async ()
   assert.match(maps[0].popupHtml, /New report/);
   assert.match(maps[0].popupHtml, /41\.90040, 12\.49360/);
   assert.match(maps[0].popupHtml, /href="\/segnala\?lat=41\.90040&lng=12\.49360"/);
+});
+
+// Mobile balloon (CEO 2026-08-07): on phones the popup shrinks to 260px so
+// it does not swallow the map; desktop keeps 300px. Leaflet sets the width
+// inline from this option, so the maxWidth is the contract to assert.
+test("marker and picker popups use a 260px maxWidth on phone viewports (300px desktop)", async () => {
+  const realInnerWidth = Object.getOwnPropertyDescriptor(window, "innerWidth");
+  const setWidth = (value) => {
+    Object.defineProperty(window, "innerWidth", { configurable: true, get: () => value });
+  };
+  const { after } = await import("node:test");
+  after(() => {
+    if (realInnerWidth?.get) Object.defineProperty(window, "innerWidth", realInnerWidth);
+    else delete window.innerWidth;
+  });
+
+  // Phone viewport: marker + picker popups must both cap at 260px.
+  setWidth(390);
+  const CAMERAS = [
+    { id: 1, title: "Via Roma corner", kind: "bullet", status: "active", latitude: 41.9028, longitude: 12.4964, source: "Community report" },
+    { id: 2, title: "Piazza Venezia", kind: "dome", status: "active", latitude: 41.8958, longitude: 12.4823, source: "Community report" },
+  ];
+  await renderMapWithCameras(CAMERAS);
+  const maps = await leafletMaps();
+  const clickHandler = maps[0].handlers.click?.[0];
+  clickHandler({ latlng: { lat: 41.9004, lng: 12.4936 } });
+  assert.equal(maps[0].popupOpts?.maxWidth, 260, "the picker popup shrinks to 260px on a 390px viewport");
+  const markerList = await leafletMarkers();
+  const withPopup = markerList.find((m) => m.popupOpts);
+  assert.ok(withPopup, "markers carry their bindPopup options in the stub");
+  assert.equal(withPopup.popupOpts.maxWidth, 260, "the marker popup shrinks to 260px on a phone");
+
+  // Desktop viewport: unchanged 300px.
+  setWidth(1440);
+  await renderMapWithCameras();
+  const mapsDesktop = await leafletMaps();
+  const clickDesktop = mapsDesktop.at(-1).handlers.click?.[0];
+  clickDesktop({ latlng: { lat: 41.9, lng: 12.49 } });
+  assert.equal(mapsDesktop.at(-1).popupOpts?.maxWidth, 300, "desktop keeps the 300px popup width");
 });
 
 // ---------------------------------------------------------------------------

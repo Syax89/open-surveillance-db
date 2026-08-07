@@ -390,7 +390,7 @@ export function marker(latlng, opts) {
     // Popup contract (t_702c10af): the bound HTML is recorded on the
     // marker so tests can assert the popup content (links, fields), and
     // openPopup() records that the balloon was requested.
-    bindPopup: (html) => { m.popupHtml = html; return m; },
+    bindPopup: (html, opts) => { m.popupHtml = html; m.popupOpts = opts; return m; },
     // P0 t_bb310428 (strict popup lifecycle instrumentation): openPopup()
     // mirrors real Leaflet — it materialises the bound HTML into a popup
     // DOM node and dispatches "popupopen" on the map (recorded in

@@ -1369,6 +1369,22 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
      (0,2,0) — match the tag + container so the ≥44px touch target wins. */
   .leaflet-container .osm-camera-popup a.leaflet-popup-close-button { width:44px; height:44px; line-height:44px; font-size:22px; }
   .osm-camera-popup .osm-popup-header { padding-right:34px; }
+  /* Mobile balloon density (CEO 2026-08-07): the popup already caps its
+     HEIGHT below; tighten the vertical rhythm so the balloon is smaller
+     overall and the map stays visible around it. Touch targets (44px
+     toolbar buttons) are NOT shrunk — WCAG 2.5.8. */
+  .osm-camera-popup .leaflet-popup-content { margin:10px 14px 12px; }
+  .osm-popup-header { margin:0 0 6px; }
+  .osm-camera-popup .osm-popup h3 { font-size:var(--text-base); line-height:1.3; }
+  .osm-popup-kind { margin:0 0 3px; font-size:var(--text-xs); }
+  .osm-popup-status { font-size:var(--text-xs); }
+  .osm-popup-facts { gap:4px 10px; margin:0 0 2px; }
+  .osm-popup-fact { gap:6px; }
+  .osm-popup-address, .osm-popup-description { margin:4px 0 0; font-size:var(--text-xs); }
+  .osm-popup-footer { margin:8px 0 0; padding-top:6px; }
+  .osm-popup-provenance { margin:6px 0 0; padding-top:6px; }
+  .community-actions-compact { margin:14px 0 2px; padding:0 0 14px; }
+  .community-actions-cta { margin:8px 0 0; font-size:var(--text-sm); }
 }
 /* Desktop stays map-first too: a compact 44px rail keeps the points control
    discoverable, while expanding it restores the searchable list. */
