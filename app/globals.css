@@ -1417,8 +1417,14 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
   .map-card:has(.map-points-expanded) .map-explorer-search { left:292px; }
   .map-card .map-explorer-search .map-list-search label { margin-bottom:6px; }
   .map-explorer-search .geocode-dropdown { top:calc(100% + 4px); }
-  /* The split fills the whole card; the map gets the remaining height. */
-  .map-card .map-split { flex:1 1 auto; height:auto; min-height:0; }
+  /* The split fills the whole card; the map gets the remaining height.
+     The map panel is absolutely positioned inside the split (after the
+     points rail) so its height is geometric — a grid-stretched height is
+     NOT "definite" for percentage resolution and .live-map { height:100% }
+     would collapse to 0 (measured on the container). */
+  .map-card .map-split { flex:1 1 auto; height:auto; min-height:0; position:relative; }
+  .map-card .map-panel { position:absolute; top:0; bottom:0; left:44px; right:0; min-height:0; }
+  .map-card .map-split.map-points-expanded .map-panel { left:280px; }
   .map-card .map-panel .live-map { height:100%; min-height:0; }
   .map-card .map-panel .map-fallback { height:100%; min-height:0; }
   .map-sidebar { min-height:0; }
