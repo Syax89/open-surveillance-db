@@ -51,26 +51,36 @@ async function renderMiniMap(props) {
   return view;
 }
 
-test("mini map renders a read-only Leaflet map with the marker at the record position (zoom 17)", async () => {
+test("mini map renders an interactive Leaflet map with the marker at the record position (zoom 17)", async () => {
   await renderMiniMap({});
   const maps = await leafletMaps();
   assert.ok(maps.length >= 1, "a Leaflet map is created");
   const map = maps.at(-1);
-  assert.equal(map.opts.zoomControl, false, "no zoom control on the read-only mini map");
-  assert.equal(map.opts.dragging, false, "no dragging on the read-only mini map");
+  assert.equal(map.opts.zoomControl, true, "the zoom control is available on the mini map");
   assert.deepEqual(map.views.at(-1)?.center, [41.9028, 12.4964], "the map centres on the record position");
-  assert.equal(map.views.at(-1)?.zoom, 17, "fixed zoom 17 (above FOV_MIN_ZOOM so the cone is legible)");
+  assert.equal(map.views.at(-1)?.zoom, 17, "initial zoom 17 (above FOV_MIN_ZOOM so the cone is legible)");
   const markers = await leafletMarkers();
   assert.ok(markers.some((m) => m.latlng?.[0] === 41.9028 && m.latlng?.[1] === 12.4964), "the record marker is placed at the coordinates");
 });
 
-test("mini map is decorative: role=img with the localized label, no interactive popup wiring", async () => {
+test("mini map is interactive: pan/zoom enabled, tiles served by the CSP-safe /api/tiles proxy", async () => {
   const { screen } = rtl;
   await renderMiniMap({});
   const img = screen.getByRole("img", { name: "Position on the map" });
   assert.ok(img, "the container exposes the localized position label");
   const maps = await leafletMaps();
-  assert.equal(maps.at(-1).opts.scrollWheelZoom, false, "no scroll zoom on the read-only mini map");
+  const map = maps.at(-1);
+  // CEO follow-up (2026-08-07): the user wants to pan/zoom the mini map —
+  // dragging must be enabled (option absent → Leaflet default true) and
+  // the zoom control present.
+  assert.equal(map.opts.zoomControl, true, "zoom control is enabled on the interactive mini map");
+  assert.equal(map.opts.dragging, undefined, "dragging stays on the Leaflet default (user can pan)");
+  assert.equal(map.opts.scrollWheelZoom, undefined, "scroll zoom stays on the Leaflet default");
+  // Tiles MUST come from the /api/tiles proxy: the record page CSP is
+  // img-src 'self', a direct tile.openstreetmap hotlink renders an empty
+  // grey map (reproduced live 2026-08-07).
+  const tiles = map.tileLayers ?? [];
+  assert.ok(tiles.some((u) => String(u).includes("/api/tiles/")), "the mini map uses the CSP-safe tile proxy, not a direct hotlink");
 });
 
 test("directional camera with a bearing draws the FOV cone polygon (same rules as /mappa)", async () => {
