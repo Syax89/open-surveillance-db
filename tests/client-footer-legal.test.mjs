@@ -175,16 +175,16 @@ test("footer: contentinfo landmark with localized aria-label and labelled nav", 
   assert.ok(nav.querySelector("details.footer-policy-group"), "legal links should be contained in a native disclosure");
 
   const links = collectLinks(footer);
-  // brand + 4 tool links + 10 project/legal links (incl. /fonti) + 2
-  // external licence/attribution links
-  assert.equal(links.length, 17);
+  // brand + 4 tool links + 11 project/legal links (incl. /fonti e /api-docs,
+  // CEO 2026-08-07) + 2 external licence/attribution links
+  assert.equal(links.length, 18);
   const internal = links.filter((l) => l.href.startsWith("/"));
-  assert.equal(internal.length, 15);
+  assert.equal(internal.length, 16);
   for (const expected of [
     // Public tool routes (F3 t_2ca69725, FRONTEND_DESIGN §2.5).
     "/mappa", "/directory", "/segnala", "/correggi",
     // Institutional pages.
-    "/manifesto", "/regole", "/guide", "/privacy", "/termini", "/licenze", "/fonti", "/accessibility", "/faq", "/contatti",
+    "/manifesto", "/regole", "/guide", "/privacy", "/termini", "/licenze", "/fonti", "/accessibility", "/faq", "/contatti", "/api-docs",
   ]) {
     assert.ok(
       internal.some((l) => l.href === expected),

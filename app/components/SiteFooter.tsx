@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useLocale } from "./LocaleProvider";
+import { BrandMark } from "./BrandMark";
 // Root-layout graph: import ONLY the footer domain (F5 qa#5, t_ab0d4c75)
 // so the ~150 KB two-locale dictionary never lands in the initial JS
 // chunk — the footer is rendered on every page, so it must stay cheap.
@@ -53,7 +54,7 @@ export function SiteFooter() {
     <footer className="site-footer" aria-label={t.landmarkLabel}>
       <div className="footer-brand">
         <Link className="brand" href="/" aria-label={t.homeAria} aria-current={pageCurrent("/")}>
-          <span className="brand-mark" aria-hidden="true">◉</span>
+          <span className="brand-mark" aria-hidden="true"><BrandMark /></span>
           <span>OpenSurveillanceDB</span>
         </Link>
         <p>{t.tagline}</p>
@@ -75,6 +76,7 @@ export function SiteFooter() {
           <Link href="/guide" aria-current={pageCurrent("/guide")}>{t.guide}</Link>
           <Link href="/manifesto" aria-current={pageCurrent("/manifesto")}>{t.manifesto}</Link>
           <Link href="/fonti" aria-current={pageCurrent("/fonti")}>{t.sources}</Link>
+          <Link href="/api-docs" aria-current={pageCurrent("/api-docs")}>{t.apiDocs}</Link>
           <Link href="/faq" aria-current={pageCurrent("/faq")}>{t.faq}</Link>
           <Link href="/contatti" aria-current={pageCurrent("/contatti")}>{t.contact}</Link>
         </div>

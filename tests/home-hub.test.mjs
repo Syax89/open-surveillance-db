@@ -181,7 +181,7 @@ test("SSR render of the home hub completes without any fetch (no client data dep
   }
 });
 
-test("the hub SSR markup carries hero, static MapTeaser and the four tool cards", async () => {
+test("the hub SSR markup carries hero, the four tool cards and NO map teaser (removed as redundant, CEO 2026-08-07)", async () => {
   const html = await runSsrHome();
   // Hero headline + CTA row.
   assert.match(html, /<h1>Public data about public surveillance\.<\/h1>/, "hero h1");
@@ -190,9 +190,10 @@ test("the hub SSR markup carries hero, static MapTeaser and the four tool cards"
   assert.match(html, /href="\/mappa">Explore the map/, "hero CTA → /mappa");
   assert.match(html, /href="\/segnala">Report a camera/, "hero CTA → /segnala");
   assert.match(html, /href="\/fonti">See sources and methodology/, "hero links to sources and methodology");
-  // Static MapTeaser with CTA → /mappa.
-  assert.match(html, /class="map-teaser"/, "static map teaser present");
-  assert.match(html, /href="\/mappa"[^>]*>Open the map/, "teaser CTA → /mappa");
+  // The static MapTeaser was removed (CEO 2026-08-07): the /mappa tool card
+  // is the map entry point — the teaser text+image was redundant.
+  assert.doesNotMatch(html, /class="map-teaser"/, "no static map teaser on the hub");
+  assert.doesNotMatch(html, /Explore the interactive map/, "no teaser headline");
   // The hero stat renders the neutral SSR placeholder (no invented number).
   // role="status" lives on a separate sr-only live region (mounted only when
   // the count resolves), NOT on the <dt> — axe forbids role="status" on

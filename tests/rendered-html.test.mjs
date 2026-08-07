@@ -95,13 +95,14 @@ test("server-rendered homepage carries the public app metadata", async () => {
   // (see app/components/home/Hero.tsx, t_2d2bf33f).
   assert.doesNotMatch(html, /<dt[^>]*role="status"/, "SSR stat placeholder must be a plain <dt>");
 
-  // F2 home hub: the home is an orienteering page. It renders the static
-  // MapTeaser (CTA → /mappa) and the four tool cards (FRONTEND_DESIGN §2.4),
-  // and must NOT embed the interactive map or the directory (they live on
-  // /mappa and /directory — the SSR render of those routes is asserted in
-  // the map/directory test below and in i18n-pages.test.mjs).
-  assert.match(html, /class="map-teaser"/, "the hub must render the static map teaser");
-  assert.match(html, /href="\/mappa"[^>]*>Open the map/, "the teaser CTA must point at /mappa");
+  // F2 home hub: the home is an orienteering page. It renders the four
+  // tool cards (FRONTEND_DESIGN §2.4) and must NOT embed the interactive
+  // map or the directory (they live on /mappa and /directory — the SSR
+  // render of those routes is asserted in the map/directory test below
+  // and in i18n-pages.test.mjs). The static MapTeaser preview was removed
+  // on 2026-08-07 (CEO: redundant next to the /mappa tool card).
+  assert.doesNotMatch(html, /class="map-teaser"/, "the hub must NOT render the static map teaser (removed 2026-08-07)");
+  assert.doesNotMatch(html, /Explore the interactive map/, "the teaser headline must be gone");
   const toolCards = (html.match(/class="tool-card"/g) ?? []).length;
   assert.equal(toolCards, 4, `expected the four tool cards, found ${toolCards}`);
   for (const href of ["/mappa", "/directory", "/segnala", "/correggi"]) {
@@ -225,6 +226,7 @@ test("global footer exposes every institutional page, the ODbL data licence and 
     "/accessibility",
     "/faq",
     "/contatti",
+    "/api-docs",
   ];
   for (const href of publicLinks) {
     assert.ok(html.includes(`href="${href}"`), `expected footer link to ${href}`);

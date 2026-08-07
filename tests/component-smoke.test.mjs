@@ -69,10 +69,16 @@ const HOME_COMPONENTS = [
  */
 const HOME_IMPORTS = [
   { name: "Hero", base: "Hero" },
-  { name: "MapTeaser", base: "MapTeaser" },
   { name: "ToolCards", base: "ToolCards" },
   { name: "HomeNav", base: "HomeNav" },
 ];
+
+/**
+ * Componenti che la home NON deve più importare (CEO 2026-08-07): il
+ * MapTeaser statico è stato rimosso (ridondante accanto alla card /mappa
+ * e all'hero CTA), i tool vivono sulle loro route.
+ */
+const HOME_ABSENT_IMPORTS = ["MapTeaser", "PublicDirectory", "ReportForm", "CorrectionForm", "MapPanel"];
 
 /**
  * Componenti attesi dal refactor moderation di Ada (t_c7460073):
@@ -200,8 +206,9 @@ test("refactor: la home importa i componenti estratti (non li definisce inline)"
     );
   }
   // I componenti tool della vecchia home NON devono tornare nell'hub: la
-  // home è un orienteering page, i tool vivono sulle loro route (F2).
-  for (const base of ["PublicDirectory", "ReportForm", "CorrectionForm", "MapPanel"]) {
+  // home è un orienteering page, i tool vivono sulle loro route (F2); il
+  // MapTeaser è stato rimosso (CEO 2026-08-07).
+  for (const base of HOME_ABSENT_IMPORTS) {
     assert.doesNotMatch(
       source,
       new RegExp(`from\\s+["'].*${base}["']`),

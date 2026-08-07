@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { HomeNav } from "./components/home/HomeNav";
 import { Hero } from "./components/home/Hero";
-import { MapTeaser } from "./components/home/MapTeaser";
 import { ToolCards, type ToolCard } from "./components/home/ToolCards";
 import { getServerMessages } from "./lib/server-i18n";
 
@@ -17,8 +16,9 @@ import { getServerMessages } from "./lib/server-i18n";
  * SSR-pure contract (criterion Grace):
  *  - Server Component: the whole page renders server-side (getServerMessages,
  *    ADR 0015), works without JS and without a client data dependency;
- *  - zero Leaflet on the hub: MapTeaser is a static preview (no map
- *    instance, no leaflet import) — no double mount, no map JS;
+ *  - zero Leaflet on the hub: the /mappa tool card IS the map entry point
+ *    (the static MapTeaser preview was removed 2026-08-07 as redundant —
+ *    CEO: the map card in the tools row already says it);
  *  - the only client islands are the navigation shell (mobile menu) and
  *    the hero stat (usePublicCount, ONE lightweight fetch → server total,
  *    progressive enhancement; the shared data layer is untouched).
@@ -51,13 +51,6 @@ export default async function HomePage() {
       <HomeNav />
 
       <Hero />
-
-      <MapTeaser
-        eyebrow={t.teaserEyebrow}
-        title={t.teaserTitle}
-        body={t.teaserBody}
-        cta={t.teaserCta}
-      />
 
       <ToolCards heading={t.toolsTitle} cards={tools} />
 
