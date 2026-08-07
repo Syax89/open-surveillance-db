@@ -1211,7 +1211,7 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
    .loading-note / .notice insets below). */
 .map-card .search-count { margin:10px 18px 0; }
 .map-card .live-map-workspace { border:0; border-radius:0; box-shadow:none; }
-.map-card .map-split { grid-template-columns:320px 1fr; height:clamp(540px, calc(100svh - 300px), 860px); min-height:540px; }
+.map-card .map-split { grid-template-columns:320px 1fr; height:clamp(540px, calc(100svh - 380px), 860px); min-height:540px; }
 .map-card .map-panel .live-map { height:100%; min-height:540px; }
 .map-card .map-panel .map-fallback { height:100%; min-height:540px; }
 .map-card .loading-note, .map-card .notice { margin-left:18px; margin-right:18px; }
