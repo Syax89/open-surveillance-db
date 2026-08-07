@@ -6,6 +6,7 @@ import { useMessages } from "../../lib/use-messages";
 import { publicStatusLabel } from "../../lib/public-status";
 import { formatDistance } from "../../lib/search";
 import { formatPublicDate } from "../../lib/format-date";
+import { formatLocation } from "../../lib/format-location";
 import type { Camera } from "../../lib/records";
 import { RecordCard } from "../RecordCard";
 import { FiltersBar } from "../FiltersBar";
@@ -107,7 +108,7 @@ export function DirectoryCatalog({ filteredRecords, cameraKinds, search, setSear
       { label: t.recordId, value: camera.id },
       { label: t.source, value: camera.status === "demo" ? t.demoSource : camera.source },
       { label: t.lastVerification, value: camera.status === "demo" ? t.demoUpdated : formatPublicDate(camera.updated, locale) },
-      { label: t.location, value: camera.address || `${camera.latitude.toFixed(4)}, ${camera.longitude.toFixed(4)}` },
+      { label: t.location, value: formatLocation(camera.address, camera.latitude, camera.longitude) },
     ];
   }
 
@@ -270,7 +271,7 @@ export function DirectoryCatalog({ filteredRecords, cameraKinds, search, setSear
           <button type="button" className="text-button" onClick={place.clearPlaceSearch}>{t.placeClearResults} <span aria-hidden="true">→</span></button>
         </div>
       )}
-      {showList ? <ul className="record-list">{pageRecords.map((camera) => <li key={camera.id}><RecordCard camera={camera} statusLabel={publicStatusLabel(statuses, camera.status, t.unknown)} facts={placeActive ? [{ label: t.distance, value: formatDistance((camera as Camera & { distanceMeters: number }).distanceMeters) }, { label: t.location, value: camera.address || `${camera.latitude.toFixed(4)}, ${camera.longitude.toFixed(4)}` }, { label: t.lastVerification, value: camera.status === "demo" ? t.demoUpdated : formatPublicDate(camera.updated, locale) }] : mainFacts(camera)} actions={cardActions(camera)} /></li>)}</ul> : !placeDone && <EmptyState title={t.emptyTitle} body={t.emptyBody} action={<p className="empty-state-actions"><button type="button" className="text-button" onClick={() => setSearch("")}>{t.clearSearch} <span aria-hidden="true">→</span></button><a className="text-button" href={reportHref}>{t.submitObservation} <span aria-hidden="true">→</span></a></p>} />}
+      {showList ? <ul className="record-list">{pageRecords.map((camera) => <li key={camera.id}><RecordCard camera={camera} statusLabel={publicStatusLabel(statuses, camera.status, t.unknown)} facts={placeActive ? [{ label: t.distance, value: formatDistance((camera as Camera & { distanceMeters: number }).distanceMeters) }, { label: t.location, value: formatLocation(camera.address, camera.latitude, camera.longitude) }, { label: t.lastVerification, value: camera.status === "demo" ? t.demoUpdated : formatPublicDate(camera.updated, locale) }] : mainFacts(camera)} actions={cardActions(camera)} /></li>)}</ul> : !placeDone && <EmptyState title={t.emptyTitle} body={t.emptyBody} action={<p className="empty-state-actions"><button type="button" className="text-button" onClick={() => setSearch("")}>{t.clearSearch} <span aria-hidden="true">→</span></button><a className="text-button" href={reportHref}>{t.submitObservation} <span aria-hidden="true">→</span></a></p>} />}
       {/* Pagination bar (t_f13fcb1c): only when the filtered set spans more
           than one page; Previous / "Showing X–Y of Z · Page N of M" / Next. */}
       {!placeActive && totalRecords > DIRECTORY_PAGE_SIZE && (

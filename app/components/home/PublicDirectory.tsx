@@ -5,6 +5,7 @@ import { useLocale } from "../LocaleProvider";
 import { useMessages } from "../../lib/use-messages";
 import { publicStatusLabel } from "../../lib/public-status";
 import { formatDistance } from "../../lib/search";
+import { formatLocation } from "../../lib/format-location";
 import { formatPublicDate } from "../../lib/format-date";
 import type { Camera } from "../../lib/records";
 import { RecordCard } from "../RecordCard";
@@ -59,9 +60,8 @@ type Props = {
 /**
  * Public directory section (F1 route group (tools)): place search, shared
  * FiltersBar and the accessible record list. Reads the `directory` i18n
- * bundle; reused by the home page (anchor fallback, hub mode) and by
- * /directory (catalog mode — the actual layout lives in DirectoryCatalog).
- * The place-search flow lives in the shared usePlaceSearch hook.
+ * bundle; reused by the home page (hub mode) and /directory (catalog mode).
+ * Location shows address AND coordinates (format-location, CEO 2026-08-07).
  */
 export function PublicDirectory({ filteredRecords, cameraKinds, search, setSearch, kindFilter, setKindFilter, freshnessFilter, setFreshnessFilter, setFreshnessCutoff, sortOrder, setSortOrder, stateFilter, setStateFilter, originFilter, setOriginFilter, page = 1, setPage, showRecordOnMap, setCoordinates, onResetFilters, mapHref = "#map", reportHref = "#report", showHeading = true, showMapLink = true, variant = "hub", exportHrefs = null }: Props) {
   const t = useMessages().directory;
@@ -139,12 +139,12 @@ export function PublicDirectory({ filteredRecords, cameraKinds, search, setSearc
           {place.placeResult?.status === "not-found" && <EmptyState title={t.placeNotFoundTitle} body={t.placeNotFoundBody} />}
           {(place.placeResult?.status === "success" || place.placeResult?.status === "empty") && place.placeResult.area && <div className="place-results">
             <p className="search-count" role="status">{t.placeAreaLabel(place.placeResult.area)}</p>
-            {place.placeResult.status === "success" && place.placeResult.records && <><p className="search-count">{t.placeResultsFound(place.placeResult.records.length)}</p><ul className="record-list">{place.placeResult.records.map((camera) => <li key={camera.id}><RecordCard camera={camera} statusLabel={publicStatusLabel(statuses, camera.status, t.unknown)} facts={[{ label: t.distance, value: formatDistance(camera.distanceMeters) }, { label: t.location, value: camera.address || `${camera.latitude.toFixed(4)}, ${camera.longitude.toFixed(4)}` }, { label: t.lastVerification, value: camera.status === "demo" ? t.demoUpdated : formatPublicDate(camera.updated, locale) }]} actions={cardActions(camera)} /></li>)}</ul></>}
+            {place.placeResult.status === "success" && place.placeResult.records && <><p className="search-count">{t.placeResultsFound(place.placeResult.records.length)}</p><ul className="record-list">{place.placeResult.records.map((camera) => <li key={camera.id}><RecordCard camera={camera} statusLabel={publicStatusLabel(statuses, camera.status, t.unknown)} facts={[{ label: t.distance, value: formatDistance(camera.distanceMeters) }, { label: t.location, value: formatLocation(camera.address, camera.latitude, camera.longitude) }, { label: t.lastVerification, value: camera.status === "demo" ? t.demoUpdated : formatPublicDate(camera.updated, locale) }]} actions={cardActions(camera)} /></li>)}</ul></>}
           </div>}
         </div>
       </div>
       <FiltersBar variant="inline" cameraKinds={cameraKinds} search={search} setSearch={setSearch} kindFilter={kindFilter} setKindFilter={setKindFilter} freshnessFilter={freshnessFilter} setFreshnessFilter={setFreshnessFilter} setFreshnessCutoff={setFreshnessCutoff} sortOrder={sortOrder} setSortOrder={setSortOrder} resultCount={filteredRecords.length} onReset={onResetFilters ?? resetFilters} />
-      {filteredRecords.length ? <ul className="record-list">{filteredRecords.map((camera) => <li key={camera.id}><RecordCard camera={camera} statusLabel={publicStatusLabel(statuses, camera.status, t.unknown)} facts={[{ label: t.recordId, value: camera.id }, { label: t.source, value: camera.status === "demo" ? t.demoSource : camera.source }, { label: t.lastVerification, value: camera.status === "demo" ? t.demoUpdated : formatPublicDate(camera.updated, locale) }, { label: t.location, value: camera.address || `${camera.latitude.toFixed(4)}, ${camera.longitude.toFixed(4)}` }, ...(camera.manufacturer ? [{ label: t.manufacturerLabel, value: camera.manufacturer }] : []), ...(camera.observedOn ? [{ label: t.observedOnLabel, value: formatPublicDate(camera.observedOn, locale) }] : [])]} actions={cardActions(camera)} /></li>)}</ul> : <EmptyState title={t.emptyTitle} body={t.emptyBody} action={<p className="empty-state-actions"><button type="button" className="text-button" onClick={() => setSearch("")}>{t.clearSearch} <span aria-hidden="true">→</span></button><a className="text-button" href={reportHref}>{t.submitObservation} <span aria-hidden="true">→</span></a></p>} />}
+      {filteredRecords.length ? <ul className="record-list">{filteredRecords.map((camera) => <li key={camera.id}><RecordCard camera={camera} statusLabel={publicStatusLabel(statuses, camera.status, t.unknown)} facts={[{ label: t.recordId, value: camera.id }, { label: t.source, value: camera.status === "demo" ? t.demoSource : camera.source }, { label: t.lastVerification, value: camera.status === "demo" ? t.demoUpdated : formatPublicDate(camera.updated, locale) }, { label: t.location, value: formatLocation(camera.address, camera.latitude, camera.longitude) }, ...(camera.manufacturer ? [{ label: t.manufacturerLabel, value: camera.manufacturer }] : []), ...(camera.observedOn ? [{ label: t.observedOnLabel, value: formatPublicDate(camera.observedOn, locale) }] : [])]} actions={cardActions(camera)} /></li>)}</ul> : <EmptyState title={t.emptyTitle} body={t.emptyBody} action={<p className="empty-state-actions"><button type="button" className="text-button" onClick={() => setSearch("")}>{t.clearSearch} <span aria-hidden="true">→</span></button><a className="text-button" href={reportHref}>{t.submitObservation} <span aria-hidden="true">→</span></a></p>} />}
     </section>
   );
 }
