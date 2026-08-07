@@ -117,6 +117,10 @@ const REAL_DB_MODULES = [
   // from it for the record-detail provenance, so the real db tree must
   // resolve it (the /api/import-sources route also imports it directly).
   { source: "db/import-sources.ts", output: "db-real/import-sources.mjs" },
+  // db/reverse-geocode.ts (CEO 2026-08-07): coordinate → address via
+  // Nominatim with a persistent geocode_reverse_cache table; imports
+  // getD1 from ./cameras (already in this tree).
+  { source: "db/reverse-geocode.ts", output: "db-real/reverse-geocode.mjs" },
 ];
 // db/moderation.ts imports ./freshness (pure, no CF binding) once the
 // freshness feature is present. CI checks out the PR head, not the merge

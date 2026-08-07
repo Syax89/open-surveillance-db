@@ -96,6 +96,12 @@ const expectedTables = [
   // t_6030d390): one row per import run; `slug` is the unique key and the
   // tail of every inserted camera's `source` ('import:<slug>').
   "import_batches",
+  // Reverse-geocoding cache (0041, reverse-geocoding — PR #339): rounded
+  // lat/lng (~11 m) → Nominatim display address, upserted on CONFLICT so
+  // the same position is never requested twice. Raw-SQL table managed by
+  // db/reverse-geocode.ts + scripts/reverse-geocode-backfill.mjs; fresh DB
+  // is empty by design (cache fills on demand / backfill).
+  "geocode_reverse_cache",
 ];
 // Indexes declared by the migrations.
 const expectedIndexes = [
@@ -191,6 +197,10 @@ const expectedIndexes = [
   "import_batches_status_idx",
   "cameras_source_external_unique",
   "cameras_import_batch_idx",
+  // Reverse-geocoding cache (0041): longitude-range scans on the rounded
+  // key (the PRIMARY KEY covers (lat, lng); the lng index serves sweeps
+  // ordered by longitude, e.g. proximity windows during the backfill).
+  "geocode_reverse_cache_lng_idx",
 ];
 // Tables that are not application schema but legitimately appear in a local
 // D1 database. Anything outside this set is an unexpected schema change.
