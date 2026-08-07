@@ -1211,9 +1211,9 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
    .loading-note / .notice insets below). */
 .map-card .search-count { margin:10px 18px 0; }
 .map-card .live-map-workspace { border:0; border-radius:0; box-shadow:none; }
-.map-card .map-split { grid-template-columns:320px 1fr; height:clamp(540px, calc(100svh - 380px), 860px); min-height:540px; }
-.map-card .map-panel .live-map { height:100%; min-height:540px; }
-.map-card .map-panel .map-fallback { height:100%; min-height:540px; }
+.map-card .map-split { grid-template-columns:320px 1fr; height:clamp(560px, calc(100svh - 300px), 1300px); min-height:560px; }
+.map-card .map-panel .live-map { height:100%; min-height:560px; }
+.map-card .map-panel .map-fallback { height:100%; min-height:560px; }
 .map-card .loading-note, .map-card .notice { margin-left:18px; margin-right:18px; }
 .map-sidebar { display:flex; flex-direction:column; min-height:0; border-right:1px solid var(--line); background:var(--card-bg); }
 .map-list-header { display:flex; align-items:baseline; justify-content:space-between; gap:10px; padding:12px 16px 8px; }
@@ -1385,43 +1385,6 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
   .map-sidebar.is-collapsed .map-list-scroll { display:none; }
   .map-sidebar.is-collapsed .map-list-header { justify-content:center; padding:6px; }
   .map-sidebar.is-collapsed .map-list-toggle { margin-left:0; }
-}
-
-/* FULL-HEIGHT MAP on wide desktops (CEO feedback 2026-08-07: "la mappa è
-   poco alta, l'aumenterei di molto"): on viewports ≥1181px the workspace
-   becomes a true map-first shell — the map fills the viewport below the
-   nav (100svh − 96px ≈ 984px on a 1080p screen, vs 540–700px before), the
-   explorer toolbar + place search float OVER the map as compact panels,
-   and only the filter bar stays in the flow as a short top edge. The
-   points rail (44px / 280px) keeps its full height beside the map; the
-   floating panels start AFTER the rail so they never cover it. */
-@media (min-width:1181px) {
-  .map-layout { padding:0 0 72px; }
-  .map-card { position:relative; height:calc(100svh - 96px); min-height:560px; display:flex; flex-direction:column; overflow:hidden; }
-  /* The filter bar is the card's only in-flow top edge (compact). */
-  .map-card .filters-panel { flex:none; padding-top:8px; padding-bottom:8px; }
-  /* Toolbar + place search float over the map, left-aligned after the
-     points rail (44px collapsed / 280px expanded). */
-  .map-explorer-toolbar {
-    position:absolute; top:12px; left:56px; z-index:1000; max-width:min(340px, calc(100% - 72px));
-    padding:8px 12px; border:1px solid rgba(202,215,205,.9); border-radius:var(--radius-lg);
-    background:rgba(255,255,251,.96); box-shadow:0 2px 12px rgba(30,48,40,.12);
-  }
-  .map-explorer-toolbar>p { margin:0 0 6px; color:var(--label); font-size:var(--text-2xs); font-weight:800; letter-spacing:.1em; text-transform:uppercase; }
-  .map-explorer-search {
-    position:absolute; top:88px; left:56px; z-index:1000; width:min(340px, calc(100% - 72px));
-    padding:10px 12px; border:1px solid rgba(202,215,205,.9); border-radius:var(--radius-lg);
-    background:rgba(255,255,251,.96); box-shadow:0 2px 12px rgba(30,48,40,.12);
-  }
-  .map-card:has(.map-points-expanded) .map-explorer-toolbar { left:292px; }
-  .map-card:has(.map-points-expanded) .map-explorer-search { left:292px; }
-  .map-card .map-explorer-search .map-list-search label { margin-bottom:6px; }
-  .map-explorer-search .geocode-dropdown { top:calc(100% + 4px); }
-  /* The split fills the whole card; the map gets the remaining height. */
-  .map-card .map-split { flex:1 1 auto; height:auto; min-height:0; }
-  .map-card .map-panel .live-map { height:100%; min-height:0; }
-  .map-card .map-panel .map-fallback { height:100%; min-height:0; }
-  .map-sidebar { min-height:0; }
 }
 
 /* ============================================================
