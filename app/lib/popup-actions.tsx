@@ -1,6 +1,7 @@
 "use client";
 
 import { createRoot, type Root } from "react-dom/client";
+import { flushSync } from "react-dom";
 import { CommunityActions, type ActionCounts } from "../components/CommunityActions";
 import { messages } from "./i18n";
 import { LOCALE_COOKIE, resolveLocale, type Locale } from "./i18n/types";
@@ -61,13 +62,21 @@ export function mountPopupActions(node: HTMLElement, recordId: number, counts?: 
   if (activeRoot && activeRoot.node === node && activeRoot.recordId === recordId) return;
   unmountPopupActions();
   const root = createRoot(node);
-  root.render(
-    <CommunityActions
-      recordId={recordId}
-      counts={counts}
-      compact
-      bundle={messages[resolvePopupLocale()]}
-    />,
-  );
+  // P1-7 (review 2026-08-07): flush the first render synchronously. The
+  // popupopen handler runs in a DOM event outside React's tree, and a
+  // plain root.render is scheduled — the browser could paint the popup
+  // with an empty mount node and mount the toolbar one frame later
+  // (first-paint flicker, exactly what the P0 contract forbids). flushSync
+  // forces the widget into the DOM before the popup becomes visible.
+  flushSync(() => {
+    root.render(
+      <CommunityActions
+        recordId={recordId}
+        counts={counts}
+        compact
+        bundle={messages[resolvePopupLocale()]}
+      />,
+    );
+  });
   activeRoot = { root, node, recordId };
 }

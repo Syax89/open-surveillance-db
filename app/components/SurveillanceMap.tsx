@@ -239,6 +239,11 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
       maxWidth: 300,
       minWidth: 220,
       className: "osm-camera-popup",
+      // Clipping fix (empirical review 2026-08-07): same keepInView /
+      // autoPanPadding as the marker popup, so a picker near the map edge
+      // never renders cut off.
+      keepInView: true,
+      autoPanPadding: [48, 48],
     });
   }, []);
 
@@ -334,6 +339,13 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
         // restore exactly that popup — never a random one.
         map.on("popupopen", (event: { popup?: { getElement?: () => HTMLElement | null } }) => {
           const content = event.popup?.getElement?.();
+          // P2-9 (review 2026-08-07): the Leaflet popup is a plain div —
+          // announce it as a dialog and label it with the record title (or
+          // the picker heading) so assistive tech treats it as a modal-ish
+          // surface, not anonymous content.
+          content?.setAttribute?.("role", "dialog");
+          const heading = content?.querySelector?.("h3")?.textContent;
+          if (heading) content?.setAttribute?.("aria-label", heading);
           const node = content?.querySelector?.(".osm-popup-community");
           if (!node) return;
           const raw = node.getAttribute("data-record-id");
@@ -469,8 +481,13 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
       //    markers (keyed by record id) + the selected-overlay marker.
       const desiredBadges = new Map<string, { lat: number; lng: number; count: number }>();
       const desiredMarkers = new Map<number, MapCamera>();
+      // P1-6: the viewport-visible set, needed OUTSIDE the bounds branch to
+      // classify popup-close reasons (out-of-view vs filter vs grid cell).
+      let visible: MapCamera[] = [];
       if (viewportBounds) {
-        const { visible, cells, individual } = markersForViewport(cameras, viewportBounds, mapZoom);
+        const viewport = markersForViewport(cameras, viewportBounds, mapZoom);
+        visible = viewport.visible;
+        const { cells, individual } = viewport;
         cells.forEach((cell) => desiredBadges.set(`${cell.x}:${cell.y}`, { lat: cell.centroidLat, lng: cell.centroidLng, count: cell.count }));
         individual.forEach((camera) => desiredMarkers.set(camera.id, camera));
         // Deep-link contract (t_26ce96f3): the selected record is ALWAYS
@@ -509,7 +526,12 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
             title: t.gridBadgeTooltip(spec.count),
           });
           badge.bindTooltip(t.gridBadgeTooltip(spec.count), { direction: "top", offset: [0, -16] });
-          badge.on("click", () => {
+          badge.on("click", (event) => {
+            // P0 popup contract: a grid badge is NOT empty map space — stop
+            // the click from bubbling to the map handler, which would open
+            // the coordinate picker OVER the zoom animation (review
+            // 2026-08-07, P0-1). Same pattern as the individual marker.
+            L.DomEvent.stopPropagation(event);
             const map = mapRef.current;
             if (!map) return;
             map.setView([spec.lat, spec.lng], map.getZoom() + 2, { animate: true });
@@ -521,23 +543,62 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
       }
       // 3) Reconcile individual markers (popup-bearing).
       const byId = markersByIdRef.current ?? new Map<number, MarkerEntry>();
+      // P1-6 (review 2026-08-07): a record can leave the desired set for
+      // THREE different reasons — out of view (pan), filtered out
+      // (data-driven), or aggregated into a grid cell. Only the FIRST
+      // must keep the popup-restore intent: a filter change or grid
+      // aggregation is not a pan, and restoring the popup when the record
+      // comes back would be an auto-open the user never asked for. Track
+      // the visible set (viewport-arriving) separately from the cameras
+      // prop (post-filter) to tell them apart.
+      const visibleIds = new Set(visible.map((item) => item.id));
       for (const [id, entry] of byId) {
         const camera = desiredMarkers.get(id);
         if (!camera) {
-          // The record left the view / filters / the grid threshold: remove
-          // ONLY this marker. If its popup was open, Leaflet closes it —
+          // The record left the view / the filters / the grid threshold:
+          // remove ONLY this marker. If its popup was open, Leaflet closes it —
           // rebuildingRef keeps activePopupIdRef so it is restored when the
-          // record comes back.
+          // record comes back INTO VIEW; but a filter-driven or grid-cell
+          // removal must NOT survive (no auto-open on filter reset / zoom).
+          const stillInCameras = cameras.some((item) => item.id === id);
+          const stillVisible = visibleIds.has(id);
           layer.removeLayer(entry.marker);
           byId.delete(id);
+          if (!stillInCameras || stillVisible) {
+            // Data-driven removal (filtered out) or grid aggregation:
+            // drop the restore intent — the popup must not re-open on its
+            // own when the record reappears (P1-5/P1-6, review 2026-08-07).
+            if (activePopupIdRef.current === id) activePopupIdRef.current = null;
+          }
         } else if (entry.camera !== camera) {
           // Kept marker with refreshed data: update IN PLACE. An open popup
           // keeps its DOM — setPopupContent swaps the content without
-          // closing, so no popupclose/popupopen churn (P0 t_bb310428).
+          // closing, so no popupclose/popupopen churn (P0 t_bb310428). The
+          // swap destroys the community widget's mount node though, so when
+          // this marker's popup is currently OPEN we must remount the
+          // React root on the fresh node (P0-3, review 2026-08-07) — the
+          // widget would otherwise vanish mid-view until close/reopen.
           entry.camera = camera;
           entry.marker.setPopupContent(popupHtmlForRef.current ? popupHtmlForRef.current(camera) : defaultPopupHtml(camera));
           entry.marker.setTooltipContent(`${camera.title}<br/><small>${camera.kind}</small>`);
           entry.marker.setIcon(buildMarkerIcon(L, camera, camera.id === selectedIdRef.current));
+          if (activePopupIdRef.current === id) {
+            const openElement = entry.marker.getPopup?.()?.getElement?.();
+            const freshNode = openElement?.querySelector?.(".osm-popup-community");
+            if (freshNode) {
+              try {
+                mountPopupActions(freshNode as HTMLElement, id, {
+                  like: camera.usefulCount,
+                  confirm: camera.confirmCount,
+                  gone: camera.goneCount,
+                  problem: camera.problemCount,
+                  privacy: camera.privacyCount,
+                });
+              } catch (error) {
+                console.error("popup action widget remount failed", error);
+              }
+            }
+          }
         }
       }
       for (const [id, camera] of desiredMarkers) {
@@ -549,6 +610,25 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
           maxWidth: 300,
           minWidth: 220,
           className: "osm-camera-popup",
+          // Clipping fix (empirical review 2026-08-07): markers near the map
+          // top opened a popup cut off above the container edge (title
+          // invisible, top=-72px). keepInView forces the popup fully inside
+          // the map bounds; autoPanPadding gives the view margin so the
+          // balloon never sits flush against an edge.
+          keepInView: true,
+          autoPanPadding: [48, 48],
+        });
+        // Keyboard accessibility (P2-9, review 2026-08-07): Leaflet markers
+        // are focusable (role=button, tabindex) but had no keydown handler
+        // — Enter/Space left keyboard users in a focus trap. Open the popup
+        // and select the record exactly like a click does.
+        marker.on("keydown", (event) => {
+          const key = event.originalEvent?.key;
+          if (key !== "Enter" && key !== " ") return;
+          L.DomEvent.stopPropagation(event);
+          event.originalEvent?.preventDefault?.();
+          onSelect(camera.id);
+          if (!marker.isPopupOpen()) marker.openPopup();
         });
         // Popup lifecycle (t_33b82720): stop the click from bubbling to the
         // map — Leaflet bubbles marker clicks by default, and the map click
