@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { LocaleToggle, useLocale } from "./LocaleProvider";
+import { BrandMark } from "./BrandMark";
 // Header lives on EVERY page: import only the `home` domain (F5 qa#5,
 // t_ab0d4c75) instead of the full dictionary via useMessages().
 import { en as homeEn, it as homeIt } from "../lib/i18n/home";
@@ -105,7 +106,7 @@ export function SiteHeader({
   };
   const brandChildren = (
     <>
-      <span className="brand-mark" aria-hidden="true">◉</span>
+      <span className="brand-mark" aria-hidden="true"><BrandMark /></span>
       <span>OpenSurveillanceDB</span>
     </>
   );
