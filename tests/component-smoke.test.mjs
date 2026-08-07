@@ -138,7 +138,7 @@ const KNOWN_DEVIATIONS = new Map([
 const INFO_PAGE_COMPONENT = { name: "InfoPage", file: "app/components/InfoPage.tsx" };
 
 /** Pagine informative che devono usare il layout condiviso InfoPage. */
-const INFO_PAGES = ["guide", "faq", "manifesto", "contatti", "regole", "moderazione"];
+const INFO_PAGES = ["guide", "faq", "manifesto", "contatti", "regole"];
 
 test("refactor: i componenti della home esistono nei path previsti", async () => {
   for (const { name, file } of HOME_COMPONENTS) {

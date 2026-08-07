@@ -17,6 +17,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function GuidePage() {
   const bundle = await getServerMessages();
   const t = bundle.guide;
+  const publication = bundle.moderazione;
   const statuses: Record<string, string> = bundle.status;
 
   return (
@@ -28,12 +29,27 @@ export default async function GuidePage() {
       intro={t.intro}
       actions={
         <>
-          <Link className="button button-primary" href="/#map">{t.exploreMap} <span aria-hidden="true">↘</span></Link>
-          <Link className="button detail-outline" href="/#records">{t.browseDirectory}</Link>
+          <Link className="button button-primary" href="/mappa">{t.exploreMap} <span aria-hidden="true">↘</span></Link>
+          <Link className="button detail-outline" href="/directory">{t.browseDirectory}</Link>
         </>
       }
     >
-      <section className="principles" aria-labelledby="mission-title">
+      <nav className="guide-overview" aria-labelledby="guide-overview-title">
+        <div>
+          <p className="eyebrow"><span /> {t.overviewEyebrow}</p>
+          <h2 id="guide-overview-title">{t.overviewTitle}</h2>
+        </div>
+        <ul>
+          <li><a href="#guide-purpose">{t.overviewPurpose}</a></li>
+          <li><a href="#guide-publication">{t.overviewPublication}</a></li>
+          <li><a href="#guide-statuses">{t.overviewStatuses}</a></li>
+          <li><a href="#guide-account">{t.overviewAccount}</a></li>
+          <li><a href="#guide-confirmations">{t.overviewConfirmations}</a></li>
+          <li><a href="#guide-data">{t.overviewData}</a></li>
+        </ul>
+      </nav>
+
+      <section id="guide-purpose" className="principles guide-principles guide-section-anchor" aria-labelledby="mission-title">
         <div className="principles-intro">
           <p className="eyebrow"><span /> {t.missionEyebrow}</p>
           <h2 id="mission-title">{t.missionTitle}</h2>
@@ -46,7 +62,7 @@ export default async function GuidePage() {
         </div>
       </section>
 
-      <section className="report-section" aria-labelledby="cycle-title">
+      <section id="guide-publication" className="report-section guide-publication-section guide-section-anchor" aria-labelledby="cycle-title">
         <div>
           <p className="eyebrow"><span /> {t.cycleEyebrow}</p>
           <h2 id="cycle-title">{t.cycleTitle}</h2>
@@ -60,7 +76,32 @@ export default async function GuidePage() {
         </div>
       </section>
 
-      <section className="records-section" aria-labelledby="status-title">
+      <section id="guide-publication-details" className="guide-publication-details guide-section-anchor" aria-labelledby="publication-details-title">
+        <div>
+          <p className="eyebrow"><span /> {t.publicationDetailsEyebrow}</p>
+          <h2 id="publication-details-title">{t.publicationDetailsTitle}</h2>
+        </div>
+        <details>
+          <summary>{t.publicationDetailsSummary}</summary>
+          <div className="guide-publication-details-body">
+            <p className="guide-publication-details-intro">{publication.intro}</p>
+            <div className="report-form" aria-label={publication.flowEyebrow}>
+              <div><p className="card-topline">01 · {publication.stepReceiveTitle}</p><h3>{publication.stepReceiveTitle}</h3><p>{publication.stepReceiveBody}</p></div>
+              <div><p className="card-topline">02 · {publication.stepScreenTitle}</p><h3>{publication.stepScreenTitle}</h3><p>{publication.stepScreenBody}</p></div>
+              <div><p className="card-topline">03 · {publication.stepVerifyTitle}</p><h3>{publication.stepVerifyTitle}</h3><p>{publication.stepVerifyBody}</p></div>
+              <div><p className="card-topline">04 · {publication.stepMinimiseTitle}</p><h3>{publication.stepMinimiseTitle}</h3><p>{publication.stepMinimiseBody}</p></div>
+              <div><p className="card-topline">05 · {publication.stepDecideTitle}</p><h3>{publication.stepDecideTitle}</h3><p>{publication.stepDecideBody}</p></div>
+              <div><p className="card-topline">06 · {publication.stepMaintainTitle}</p><h3>{publication.stepMaintainTitle}</h3><p>{publication.stepMaintainBody}</p></div>
+            </div>
+            <div className="guide-publication-details-notes">
+              <div className="report-rule"><b>{publication.appealsTitle}</b><br />{publication.appealsBody}<br /><br /><b>{publication.urgentTitle}</b><br />{publication.urgentBody}<br /><br /><b>{publication.slaTitle}</b><br />{publication.slaBody}</div>
+              <div className="report-rule"><b>{publication.safeguardsTitle}</b><br />{publication.safeguardsBody}<ul><li><b>{publication.safeguardPairTitle}.</b> {publication.safeguardPairBody}</li><li><b>{publication.safeguardEscalationTitle}.</b> {publication.safeguardEscalationBody}</li><li><b>{publication.safeguardCredentialsTitle}.</b> {publication.safeguardCredentialsBody}</li><li><b>{publication.safeguardTrainingTitle}.</b> {publication.safeguardTrainingBody}</li><li><b>{publication.safeguardAuditTitle}.</b> {publication.safeguardAuditBody}</li></ul></div>
+            </div>
+          </div>
+        </details>
+      </section>
+
+      <section id="guide-statuses" className="records-section guide-section-anchor" aria-labelledby="status-title">
         <div className="records-heading">
           <div><p className="eyebrow"><span /> {t.statusEyebrow}</p><h2 id="status-title">{t.statusTitle}</h2><p>{t.statusIntro}</p></div>
         </div>
@@ -71,7 +112,7 @@ export default async function GuidePage() {
         </div>
       </section>
 
-      <section className="records-section" aria-labelledby="account-title">
+      <section id="guide-account" className="records-section guide-section-anchor" aria-labelledby="account-title">
         <div className="records-heading">
           <div><p className="eyebrow"><span /> {t.accountEyebrow}</p><h2 id="account-title">{t.accountTitle}</h2><p>{t.accountBody}</p></div>
         </div>
@@ -82,7 +123,7 @@ export default async function GuidePage() {
         </div>
       </section>
 
-      <section className="records-section" aria-labelledby="edit-title">
+      <section className="records-section guide-section-anchor" aria-labelledby="edit-title">
         <div className="records-heading">
           <div><p className="eyebrow"><span /> {t.editEyebrow}</p><h2 id="edit-title">{t.editTitle}</h2><p>{t.editBody}</p></div>
         </div>
@@ -93,7 +134,7 @@ export default async function GuidePage() {
         </div>
       </section>
 
-      <section className="records-section" aria-labelledby="verify-title">
+      <section id="guide-confirmations" className="records-section guide-section-anchor" aria-labelledby="verify-title">
         <div className="records-heading">
           <div><p className="eyebrow"><span /> {t.verifyEyebrow}</p><h2 id="verify-title">{t.verifyTitle}</h2><p>{t.verifyBody}</p></div>
         </div>
@@ -105,7 +146,7 @@ export default async function GuidePage() {
         </div>
       </section>
 
-      <section className="records-section" aria-labelledby="level-title">
+      <section className="records-section guide-section-anchor" aria-labelledby="level-title">
         <div className="records-heading">
           <div><p className="eyebrow"><span /> {t.levelEyebrow}</p><h2 id="level-title">{t.levelTitle}</h2><p>{t.levelBody}</p></div>
         </div>
@@ -116,7 +157,7 @@ export default async function GuidePage() {
         </div>
       </section>
 
-      <section className="correction-section" aria-labelledby="open-data-title">
+      <section id="guide-data" className="correction-section guide-section-anchor" aria-labelledby="open-data-title">
         <div>
           <p className="eyebrow"><span /> {t.dataEyebrow}</p>
           <h2 id="open-data-title">{t.dataTitle}</h2>

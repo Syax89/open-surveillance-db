@@ -127,13 +127,10 @@ afterEach(async () => {
 // ToolLayout — shared public nav (t_a72a3106)
 // ---------------------------------------------------------------------------
 
-test("ToolLayout renders the shared public nav (six home links) with the current page marked aria-current", async () => {
-  // The nav shell links the SAME six links of the home hub on every tool
-  // page (PublicNavLinks, t_a72a3106): Explore map /mappa, Browse records
-  // /directory, How it works /guide, Rules /regole, Manifesto /manifesto,
-  // Add a camera /segnala — with aria-current="page" on the current route.
-  // This replaced the previous per-page compact sets (4 links,
-  // FRONTEND_DESIGN §2.5 hand-off pattern, CEO check 2026-08-02).
+test("ToolLayout renders the shared primary public nav with the current page marked aria-current", async () => {
+  // The nav shell links the same three primary actions of the home hub on
+  // every tool page: Explore map /mappa, Browse records /directory and Add
+  // a camera /segnala — with aria-current="page" on the current route.
   const cases = {
     "/mappa": "/mappa",
     "/directory": "/directory",
@@ -155,8 +152,8 @@ test("ToolLayout renders the shared public nav (six home links) with the current
     const hrefs = links.map((a) => a.getAttribute("href"));
     assert.deepEqual(
       hrefs,
-      ["/mappa", "/directory", "/guide", "/regole", "/manifesto", "/segnala"],
-      `nav on ${pathname} must be the shared six-link public set`,
+      ["/mappa", "/directory", "/segnala"],
+      `nav on ${pathname} must be the shared primary public set`,
     );
     const current = links.filter((a) => a.getAttribute("aria-current") === "page").map((a) => a.getAttribute("href"));
     assert.deepEqual(
@@ -173,7 +170,7 @@ test("ToolLayout renders the shared public nav (six home links) with the current
 
 test("ToolLayout renders the shared public nav on unknown paths too (no per-page fallback needed)", async () => {
   // With the shared set there is no per-page fallback: every route renders
-  // the same six links (previously an unknown path fell back to the full
+  // the same primary links (previously an unknown path fell back to the full
   // cross-tool set — now that set IS the nav).
   setNavState({ pathname: "/some-future-route" });
   const { screen } = rtl;
@@ -185,8 +182,8 @@ test("ToolLayout renders the shared public nav on unknown paths too (no per-page
   const links = Array.from(main.querySelectorAll(".nav-links a")).map((a) => a.getAttribute("href"));
   assert.deepEqual(
     links,
-    ["/mappa", "/directory", "/guide", "/regole", "/manifesto", "/segnala"],
-    "the shared public nav must render on unknown paths (no dead ends between tools)",
+    ["/mappa", "/directory", "/segnala"],
+    "the shared primary nav must render on unknown paths (no dead ends between tools)",
   );
 });
 
@@ -213,11 +210,11 @@ test("MappaTool renders the map tool shell with the shared FiltersBar and the vi
   // as a prototype (truthfulness stays in pageIntro and the in-list notes).
   assert.ok(screen.queryByText("Prototype mode.") === null, "no prototype banner on /mappa (CEO feedback)");
   assert.ok(screen.getByLabelText("Camera type").closest(".map-card"), "the FiltersBar row is attached to the map card");
-  // The search moved into the sidebar column (t_702c10af); it is now
+  // The search lives in the explorer controls above the map; it is now
   // DUAL-FUNCTION (t_b9666d09): it filters the viewport points AND suggests
   // places through the geocoder (combobox). The FiltersBar row keeps
   // kind/freshness/sort/reset — exactly ONE search control on the page.
-  assert.ok(screen.getByLabelText("Filter the points in the current view or search a place"), "sidebar search at the top of the left column");
+  assert.ok(screen.getByLabelText("Filter the points in the current view or search a place"), "place/point search above the map");
   assert.ok(screen.queryByLabelText("Search the public directory") === null, "no duplicated FiltersBar search on /mappa");
   assert.ok(screen.getByLabelText("Camera type"), "shared FiltersBar kind filter");
 
@@ -271,7 +268,7 @@ test("MappaTool kind filter narrows the sidebar list and the markers", async () 
   assert.match(screen.getByText(/1 public record found/).textContent, /1 public record found/);
 });
 
-test("MappaTool freshness filter on the mocked records keeps the map rendered and shows the truthful in-list empty note with a clear action", async () => {
+test("MappaTool freshness filter keeps the map rendered and uses the global reset above it", async () => {
   installRecordsMock();
   const { screen } = rtl;
   const user = rtl.userEvent.setup();
@@ -281,23 +278,22 @@ test("MappaTool freshness filter on the mocked records keeps the map rendered an
   // The mocked records carry no finite freshness date ("Demo data"), so any
   // freshness window filters everything out. Map-always-visible contract
   // (t_b9666d09): the map and the sidebar STAY rendered — the truthful
-  // empty state moves INSIDE the list as a note with a clear action, it
+  // empty state moves INSIDE the list while reset stays above the map, it
   // never replaces the map.
   await user.selectOptions(screen.getByLabelText("Record freshness"), "7d");
 
   // The map region is still on the page (never replaced by an empty state).
   assert.ok(screen.getByRole("region", { name: "Interactive OpenStreetMap map" }), "the map stays rendered with zero matching records");
-  // The sidebar keeps the search + the list header, and the in-list note
-  // carries the truthful wording and the clear action.
-  assert.ok(screen.getByLabelText("Filter the points in the current view or search a place"), "the sidebar search stays rendered");
+  // The explorer controls stay above the map; the sidebar is just the list.
+  assert.ok(screen.getByLabelText("Filter the points in the current view or search a place"), "the top search stays rendered");
   assert.ok(screen.getByText("No published record matches those filters."), "truthful in-list empty note");
   assert.ok(screen.getByText(/This does not mean that there are no cameras/), "the note never implies an area has no surveillance");
-  assert.ok(screen.getByRole("button", { name: /Clear filters/ }), "the in-list note offers a clear action");
+  assert.ok(screen.getByRole("button", { name: /Reset filters/ }), "the top controls offer the reset action");
   // The prototype banner was removed entirely (CEO feedback 2026-08-02):
   // never rendered, with or without matching records.
   assert.ok(screen.queryByText("Prototype mode.") === null, "no prototype banner on /mappa (removed — CEO feedback)");
 
-  await user.click(screen.getByRole("button", { name: /Clear filters/ }));
+  await user.click(screen.getByRole("button", { name: /Reset filters/ }));
   assert.ok(screen.getByRole("button", { name: /Illustrative record A/ }), "clearing restores the records to the list");
 });
 
@@ -314,7 +310,7 @@ test("MappaTool deep link applies the seeded URL filters fully (type + freshness
   // map-always-visible contract (t_b9666d09), the map itself stays.
   assert.equal(screen.getByLabelText("Record freshness").value, "7d", "?freshness= seeds the select");
   assert.ok(screen.getByRole("region", { name: "Interactive OpenStreetMap map" }), "the map stays rendered on a deep link with zero matching records");
-  await rtl.waitFor(() => assert.ok(screen.getByText("No published record matches those filters."), "deep link fully applies the seeded filters (in-list note)"));
+  await rtl.waitFor(() => assert.ok(screen.getByText("No published record matches those filters.", "deep link fully applies the seeded filters (in-list note)")));
 });
 
 test("MappaTool with a valid EMPTY /api/cameras answer keeps the map and shows the honest empty state (P0 t_444b15e4: no next[0] dereference)", async () => {
@@ -332,12 +328,18 @@ test("MappaTool with a valid EMPTY /api/cameras answer keeps the map and shows t
   assert.ok(screen.getByRole("region", { name: "Interactive OpenStreetMap map" }), "the map stays rendered with zero records from the API");
 
   // The sidebar shows the truthful empty state (same note as a filter that
-  // matches nothing) with the clear action — never a crash, never a
-  // spurious selection/popup/deep link.
-  await rtl.waitFor(() => {
+  // matches nothing) with the reset action above the map — never a crash,
+  // never a spurious selection/popup/deep link. The points rail starts
+  // collapsed (map-first UX, PR #326): expand it to read the note.
+  await rtl.waitFor(async () => {
+    const toggle = screen.queryByRole("button", { name: /Points in the current view/ });
+    if (toggle && toggle.getAttribute("aria-expanded") === "false") {
+      const user = rtl.userEvent.setup();
+      await user.click(toggle);
+    }
     assert.ok(screen.getByText("No published record matches those filters."), "truthful in-list empty note on an empty API answer");
     assert.ok(screen.getByText(/This does not mean that there are no cameras/), "the note never implies an area has no surveillance");
-    assert.ok(screen.getByRole("button", { name: /Clear filters/ }), "the in-list note offers a clear action");
+    assert.ok(screen.getByRole("button", { name: /Reset filters/ }), "the controls above the map offer the reset action");
   });
   // No record rows exist — nothing to select, no spurious marker/popup.
   assert.ok(screen.queryByRole("button", { name: /Illustrative record/ }) === null, "no record rows with an empty API answer");
@@ -416,10 +418,12 @@ test("MappaTool list row click selects the marker and opens its popup (marker �
   const markers = await leafletMarkers();
   const byTitle = Object.fromEntries(markers.map((marker) => [marker.opts.title, marker]));
 
-  // Record A is the default selection: its row carries aria-current and its
-  // marker carries the selected icon class.
-  assert.equal(screen.getByRole("button", { name: /Illustrative record A/ }).getAttribute("aria-current"), "true");
-  assert.match(byTitle["Illustrative record A"].opts.icon.html, /osm-camera-marker demo selected/);
+  // Popup policy (PR #326, review fix): NO record is pre-selected on load —
+  // arriving viewport data must never auto-open a popup. No row carries
+  // aria-current and no marker carries the selected class until the user
+  // clicks (explicit intent only).
+  assert.equal(screen.getByRole("button", { name: /Illustrative record A/ }).getAttribute("aria-current"), null);
+  assert.doesNotMatch(byTitle["Illustrative record A"].opts.icon.html, /selected/);
 
   // Clicking row B: the marker icon swaps, the popup opens, aria-current
   // moves to the new row (the reverse direction is the same onSelect path
@@ -707,12 +711,12 @@ test("MappaTool text search with no matching record keeps the map rendered (in-l
   await rtl.waitFor(() => assert.ok(screen.getByRole("button", { name: /Illustrative record A/ })));
 
   // A query that matches no local point empties ONLY the list (the map and
-  // the sidebar stay); the truthful in-list note offers the clear action.
+  // the sidebar stay); reset remains in the explorer controls above.
   await user.type(screen.getByLabelText("Filter the points in the current view or search a place"), "no-such-camera");
   await rtl.waitFor(() => assert.ok(screen.getByText("No published record matches those filters.")), { timeout: 5000 });
 
   assert.ok(screen.getByRole("region", { name: "Interactive OpenStreetMap map" }), "the map stays rendered after a no-match search");
-  assert.ok(screen.getByRole("button", { name: /Clear filters/ }), "the in-list note offers the clear action");
+  assert.ok(screen.getByRole("button", { name: /Reset filters/ }), "the top controls offer the reset action");
 
   fireEvent.change(screen.getByLabelText("Filter the points in the current view or search a place"), { target: { value: "" } });
   await rtl.waitFor(() => assert.ok(screen.getByRole("button", { name: /Illustrative record A/ }), "clearing restores the records"), { timeout: 5000 });
@@ -734,8 +738,9 @@ test("DirectoryTool renders the directory shell with the shared FiltersBar and b
     assert.ok(screen.getByRole("heading", { name: "Illustrative record B" }));
   });
 
-  const useMap = screen.getByRole("link", { name: /Use the map instead/ });
-  assert.equal(useMap.getAttribute("href"), "/mappa", "the directory links the map tool route");
+  const explorerSwitch = screen.getByRole("navigation", { name: "Explore records as" });
+  const useMap = rtl.within(explorerSwitch).getByRole("link", { name: "Map" });
+  assert.equal(useMap.getAttribute("href"), "/mappa", "the directory explorer switch links the map tool route");
 
   // CEO feedback 2026-08-02: the data export row moved from /mappa to
   // /directory — the catalog meta row (DirectoryCatalog) owns the
@@ -1114,25 +1119,28 @@ test("ErrorPage sets a page-specific document.title for 404 and 500 (WCAG 2.4.2)
 // P1-2 (Vera design) — WriteGateWall on the write tools
 // ---------------------------------------------------------------------------
 
-test("SegnalaTool shows the login wall for an anonymous visitor (no form, returnTo)", async () => {
+test("SegnalaTool preserves a map-picked point through the anonymous login wall", async () => {
   const { screen, waitFor } = rtl;
   installFetchMock((input) => {
     if (String(input) === "/api/auth/me") return jsonResponse({ error: "Not authenticated." }, { status: 401 });
     return jsonResponse({ records: [], total: 0, nextOffset: null });
   });
-  await renderWithLocale(React.createElement(SegnalaTool));
+  await renderWithLocale(React.createElement(SegnalaTool, {
+    initialCoordinates: { latitude: 41.9, longitude: 12.5 },
+  }));
 
   // The wall replaces the form for anonymous visitors: no title/consent
-  // fields, bilingual CTA with the returnTo deep link back to /segnala.
+  // fields, bilingual CTA with the validated picked point still in returnTo.
   await waitFor(() => assert.ok(screen.getByRole("heading", { name: "Log in to contribute" })));
   assert.equal(screen.queryByLabelText("Record title"), null, "no form for an anonymous visitor");
   const login = screen.getByRole("link", { name: "Log in" });
-  assert.equal(login.getAttribute("href"), "/login?returnTo=%2Fsegnala", "login CTA carries the returnTo");
+  assert.equal(login.getAttribute("href"), "/login?returnTo=%2Fsegnala%3Flat%3D41.9%26lng%3D12.5", "login CTA preserves the picked point");
   assert.ok(screen.getByRole("link", { name: "Create an account" }));
 });
 
 test("CorreggiTool shows the login wall for an anonymous visitor (no form, returnTo)", async () => {
   const { screen, waitFor } = rtl;
+  setNavState({ search: "record=42" });
   installFetchMock((input) => {
     if (String(input) === "/api/auth/me") return jsonResponse({ error: "Not authenticated." }, { status: 401 });
     return jsonResponse({ records: [], total: 0, nextOffset: null });
@@ -1142,7 +1150,7 @@ test("CorreggiTool shows the login wall for an anonymous visitor (no form, retur
   await waitFor(() => assert.ok(screen.getByRole("heading", { name: "Log in to contribute" })));
   assert.equal(screen.queryByLabelText("Related public record"), null, "no form for an anonymous visitor");
   const login = screen.getByRole("link", { name: "Log in" });
-  assert.equal(login.getAttribute("href"), "/login?returnTo=%2Fcorreggi", "login CTA carries the returnTo");
+  assert.equal(login.getAttribute("href"), "/login?returnTo=%2Fcorreggi%3Frecord%3D42", "login CTA preserves the selected record");
 });
 
 test("SegnalaTool shows the verify-email wall for an unverified session (resend action)", async () => {

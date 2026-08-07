@@ -191,7 +191,7 @@ test("record page: found record renders public fields, community badge and event
   assert.ok(screen.getByText("Useful: 0"));
   // Back to directory link resolves.
   const back = screen.getByRole("link", { name: "← Back to directory" });
-  assert.equal(back.getAttribute("href"), "/#records");
+  assert.equal(back.getAttribute("href"), "/directory");
 });
 
 test("record page: confirmed record shows the community badge with count and last-confirmed date", async () => {
@@ -350,7 +350,7 @@ test("record page: unknown id renders the not-found state", async () => {
     "It may have been removed, is not public, or the link is incorrect.",
   ));
   const browse = screen.getByRole("link", { name: "Browse the directory" });
-  assert.equal(browse.getAttribute("href"), "/#records");
+  assert.equal(browse.getAttribute("href"), "/directory");
 });
 
 test("record page: fetch failure renders the honest error state, never a fake 'not found'", async () => {

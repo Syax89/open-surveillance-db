@@ -11,7 +11,7 @@ import { useMessages } from "../../lib/use-messages";
  * mobile menu toggle — lives in this small client island, exactly like the
  * other client islands the server pages already embed (SiteFooter,
  * LocaleToggle). The nav is the shared public header (PublicNav,
- * t_a72a3106): the six home links on EVERY public page, with the current
+ * header: the three primary home links on EVERY public page, with the current
  * page marked aria-current. The home keeps its in-page "#top" brand anchor.
  */
 export function HomeNav() {

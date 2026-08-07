@@ -1,20 +1,13 @@
 /**
- * Client-side interaction tests for the map-click report picker
- * (kanban t_6abb96ac, popup lifecycle t_33b82720): the picker is an
- * EXPLICIT mode — clicking empty map space on /mappa is silent during
- * exploration, and opens the coordinate popup with a direct link to
- * /segnala?lat=&lng= ONLY while the accessible "Add here" toggle is
- * active; the /segnala form pre-fills that position (URL deep link).
+ * Client-side tests for map and report-coordinate boundaries. Clicking an
+ * empty map position opens the report shortcut with that coordinate, while
+ * the report route keeps accepting explicit coordinate deep links.
  *
- *   1. map click opens the report-picker popup with the click coordinates
- *      and a /segnala?lat=&lng= deep link (SurveillanceMap, leaflet stub)
- *      while the explicit add mode is active;
- *   2. the map click still calls onPick (contract kept — the popup is an
- *      addition, not a replacement), and is SILENT outside add mode;
- *   3. /segnala with ?lat=&lng= pre-fills the form (SegnalaTool with
+ *   1. the map click opens the coordinate-picker shortcut;
+ *   2. /segnala with ?lat=&lng= pre-fills the form (SegnalaTool with
  *      initialCoordinates): coordinate readout, manual fields, and the
  *      nearby-duplicate check runs on mount;
- *   4. parseReportCoordinates: valid deep links parse, absent/out-of-range
+ *   3. parseReportCoordinates: valid deep links parse, absent/out-of-range
  *      values degrade to a plain empty form (no clamped position).
  *
  * Fixtures are fictitious (illustrative coordinates in Rome, example.test).
@@ -69,7 +62,7 @@ afterEach(() => {
 });
 
 // ---------------------------------------------------------------------------
-// /mappa — map-click report picker
+// /mappa — exploration only
 // ---------------------------------------------------------------------------
 
 async function renderMapWithCameras(cameras = []) {
@@ -84,54 +77,18 @@ async function renderMapWithCameras(cameras = []) {
   return view;
 }
 
-test("map click opens the report-picker popup with coordinates and a /segnala deep link", async () => {
+test("map click opens a coordinate-picker shortcut with a report link", async () => {
   await renderMapWithCameras();
   const maps = await leafletMaps();
   assert.ok(maps.length >= 1, "the leaflet stub must record the created map");
-
-  // The picker is an EXPLICIT mode (popup lifecycle t_33b82720): base map
-  // navigation is silent — the user must activate "Add here" first.
-  const { screen, userEvent } = rtl;
-  await userEvent.click(await screen.findByRole("button", { name: /Add here/i }));
-
   const clickHandler = maps[0].handlers.click?.[0];
-  assert.ok(clickHandler, "the map click handler must be registered");
+  assert.ok(clickHandler, "the map registers the coordinate-picker listener");
   clickHandler({ latlng: { lat: 41.9004, lng: 12.4936 } });
-
   assert.equal(maps[0].popupLatLng.lat, 41.9004);
   assert.equal(maps[0].popupLatLng.lng, 12.4936);
-  // The popup must carry the localized title and a direct link to the
-  // pre-filled report form (5-decimal coordinates, same precision the
-  // form uses for the manual fields).
   assert.match(maps[0].popupHtml, /New report/);
-  assert.match(maps[0].popupHtml, /Coordinates/);
   assert.match(maps[0].popupHtml, /41\.90040, 12\.49360/);
   assert.match(maps[0].popupHtml, /href="\/segnala\?lat=41\.90040&lng=12\.49360"/);
-});
-
-test("map click still calls onPick (picker is an addition, not a replacement)", async () => {
-  let picked = null;
-  const view = await renderWithLocale(React.createElement(SurveillanceMap, {
-    cameras: [], selectedId: 1, onSelect: () => {}, onPick: (lat, lng) => { picked = [lat, lng]; },
-  }));
-  await new Promise((resolve) => setTimeout(resolve, 30));
-  view.rerender(await wrapWithLocale(React.createElement(SurveillanceMap, {
-    cameras: [], selectedId: 1, onSelect: () => {}, onPick: (lat, lng) => { picked = [lat, lng]; },
-  })));
-  await new Promise((resolve) => setTimeout(resolve, 10));
-
-  const maps = await leafletMaps();
-  // Without the explicit add mode, an exploration click is SILENT (no
-  // onPick — the popup-lifecycle contract, t_33b82720).
-  maps[0].handlers.click?.[0]?.({ latlng: { lat: 41.9004, lng: 12.4936 } });
-  assert.equal(picked, null, "onPick must NOT fire outside the explicit add mode");
-
-  // In the explicit add mode the picker fires with the click coordinates.
-  const { screen, userEvent } = rtl;
-  await userEvent.click(await screen.findByRole("button", { name: /Add here/i }));
-  maps[0].handlers.click?.[0]?.({ latlng: { lat: 41.9004, lng: 12.4936 } });
-
-  assert.deepEqual(picked, [41.9004, 12.4936], "onPick must receive the click coordinates in add mode");
 });
 
 // ---------------------------------------------------------------------------

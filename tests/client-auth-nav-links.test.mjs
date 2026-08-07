@@ -20,16 +20,16 @@
  *      display name when present, else the localized account title, and
  *      always the account aria-label;
  *   3. aria-current="page" on /login and /register when that route is the
- *      current page (same pattern as the six public nav links);
+ *      current page (same pattern as the primary public nav links);
  *   4. fail-closed: a 5xx response, a network error, or no fetch at all
  *      renders NO links (never claim "anonymous" on an error we cannot
  *      interpret — privacy by design);
  *   5. no session leak into SSR HTML: the initial state renders nothing
  *      (the links appear only after the endpoint resolves);
  *   6. PublicNav integration: the auth links render INSIDE the mobile menu
- *      container (#main-links), right after the six shared nav links —
+ *      container (#main-links), right after the primary shared nav links —
  *      never in a separate top-bar slot (the deepEqual pin below guards
- *      both the six content links and the in-menu auth placement, and the
+ *      both the primary content links and the in-menu auth placement, and the
  *      CSS viewport contract lives in header-mobile-menu-contract);
  *   7. locale: Italian labels ("Accedi", "Crea account") when the stored
  *      locale is IT (labels from i18n/auth.ts:90/91).
@@ -190,7 +190,7 @@ test("auth header: renders NOTHING before the endpoint resolves (no session leak
   await rtl.waitFor(() => assert.ok(screen.getByRole("link", { name: "Log in" })));
 });
 
-test("PublicNav: auth links live INSIDE the mobile menu (#main-links), after the six nav links — no top-bar slot", async () => {
+test("PublicNav: auth links live INSIDE the mobile menu (#main-links), after the primary nav links — no top-bar slot", async () => {
   const { screen, waitFor } = rtl;
   installFetchMock(meHandler(401, { error: "Not authenticated." }));
   await setNavState({ pathname: "/login" });
@@ -206,13 +206,13 @@ test("PublicNav: auth links live INSIDE the mobile menu (#main-links), after the
   // at 320/390px, CEO live feedback).
   await waitFor(() => assert.ok(screen.getByRole("link", { name: "Log in" })));
 
-  // The six shared links stay first and untouched; the auth links follow
+  // The three primary links stay first and untouched; the auth links follow
   // INSIDE the same container (t_94b3726d: the mobile-menu placement).
   const navLinks = [...container.querySelectorAll(".nav-links a")].map((a) => a.getAttribute("href"));
   assert.deepEqual(
     navLinks,
-    ["/mappa", "/directory", "/guide", "/regole", "/manifesto", "/segnala", "/login", "/register"],
-    "the six shared public nav links must stay unchanged, with the auth links appended inside the menu container",
+    ["/mappa", "/directory", "/segnala", "/login", "/register"],
+    "the primary public nav links must stay unchanged, with the auth links appended inside the menu container",
   );
 
   const mainLinks = container.querySelector("#main-links");

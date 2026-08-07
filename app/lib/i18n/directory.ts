@@ -27,9 +27,10 @@ export const en = {
   // block is a collapsible panel instead of the section heading.
   resultsRegion: "Directory results",
   searchDirectory: "Search the public directory",
-  searchPlaceholder: "Type, source or record ID",
+  searchPlaceholder: "Name, type, address or place",
   searchHelp:
-    "Only public records and labelled illustrative records appear here.",
+    "Search the records as you type, or press Enter to search around a place.",
+  filters: "Filters",
   // Catalog mode: data export of the filtered set. The API applies the
   // server-side filters (kind + freshness); q and sort are client-side, so
   // the hint below says exactly what the export contains.
@@ -74,6 +75,8 @@ export const en = {
   stateAll: "Any",
   stateConfirmed: "Confirmed",
   stateNever: "Never confirmed",
+  advancedFilters: "More filters",
+  advancedFiltersActive: (count: number) => `More filters · ${count} active`,
   // Import-origin filter (?origin=, FASE C, t_4dbce318): where a record
   // comes from — a community report or an imported public dataset.
   originFilter: "Origin",
@@ -157,9 +160,10 @@ export const it: Translation<typeof en> = {
   // è un pannello collassabile e non più l'heading di sezione.
   resultsRegion: "Risultati dell'elenco",
   searchDirectory: "Cerca nell'elenco pubblico",
-  searchPlaceholder: "Tipo, fonte o ID record",
+  searchPlaceholder: "Nome, tipo, indirizzo o luogo",
   searchHelp:
-    "Qui compaiono solo record pubblici e record illustrativi etichettati.",
+    "Cerca i record mentre scrivi, oppure premi Invio per cercare intorno a un luogo.",
+  filters: "Filtri",
   // Modalità catalogo: export dei dati filtrati. L'API applica i filtri
   // server (tipo + aggiornamento); q e ordinamento restano client, quindi
   // il suggerimento dichiara esattamente cosa contiene l'export.
@@ -204,6 +208,8 @@ export const it: Translation<typeof en> = {
   stateAll: "Qualsiasi",
   stateConfirmed: "Confermata",
   stateNever: "Mai confermata",
+  advancedFilters: "Altri filtri",
+  advancedFiltersActive: (count: number) => `Altri filtri · ${count} attivi`,
   // Filtro origine import (?origin=, FASE C, t_4dbce318): da dove arriva
   // un record — una segnalazione della community o un dataset pubblico
   // importato.

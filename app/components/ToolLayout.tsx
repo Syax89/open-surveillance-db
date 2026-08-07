@@ -8,7 +8,7 @@ import { useMessages } from "../lib/use-messages";
  * Shared layout for the public tool routes (F1 route group (tools)):
  * /mappa /directory /segnala /correggi.
  *
- * Renders the shared public header (PublicNav, t_a72a3106 — the same six
+ * Renders the shared public header (PublicNav — the same primary
  * links of the home hub on EVERY public page, with the current page marked
  * aria-current="page") and the main content region.
  *

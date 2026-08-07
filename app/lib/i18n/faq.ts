@@ -49,6 +49,9 @@ export const en = {
   moreTitle: "Still have questions?",
   moreBody:
     "For corrections, removals and privacy requests, use the correction form or the contact page.",
+  guideCta: "Read the project guide",
+  rulesCta: "Read participation rules",
+  privacyCta: "Read privacy details",
   contactCta: "Open the contact page",
   correctionCta: "Go to the correction form",
   footer: "Built for transparency, not tracking.",
@@ -96,6 +99,9 @@ export const it: Translation<typeof en> = {
   moreTitle: "Hai ancora domande?",
   moreBody:
     "Per correzioni, rimozioni e richieste relative alla privacy usa il modulo di correzione o la pagina dei contatti.",
+  guideCta: "Leggi la guida al progetto",
+  rulesCta: "Leggi le regole di partecipazione",
+  privacyCta: "Leggi i dettagli sulla privacy",
   contactCta: "Apri la pagina dei contatti",
   correctionCta: "Vai al modulo di correzione",
   footer: "Creato per la trasparenza, non per il tracciamento.",

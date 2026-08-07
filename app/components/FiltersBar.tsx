@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { useMessages } from "../lib/use-messages";
 
 /**
@@ -38,6 +38,7 @@ export function FiltersBar({
   onReset,
   hideSearch = false,
   extraControls,
+  onSearchSubmit,
   stateFilter,
   setStateFilter,
   showCommunitySort = false,
@@ -81,6 +82,8 @@ export function FiltersBar({
    * page and /mappa stay byte-identical.
    */
   extraControls?: ReactNode;
+  /** Directory: Enter in the single search field can also resolve a place. */
+  onSearchSubmit?: () => void;
   /**
    * Confirmation-state filter (FASE 3 UI): optional so the home page stays
    * byte-identical; the /directory and /mappa tools pass the ?state=
@@ -103,6 +106,38 @@ export function FiltersBar({
   showCommunitySort?: boolean;
 }) {
   const t = useMessages().directory;
+  // On constrained layouts the whole filter group becomes one short
+  // disclosure. The search always stays visible; a wide workspace opens the
+  // group again automatically.
+  //
+  // Hydration-safe (same pattern as MapPanel pointsCollapsed, t_66766914):
+  // the initial state is DETERMINISTIC (open on both server and first
+  // client render — never reads window.matchMedia in an initializer). The
+  // media preference is applied only AFTER hydration in the effect below,
+  // and a manual toggle by the user always wins over a media-query change
+  // (filtersUserToggledRef), so the disclosure never flickers back.
+  const [filtersOpen, setFiltersOpen] = useState(true);
+  const filtersUserToggledRef = useRef(false);
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+    const media = window.matchMedia("(max-width: 820px)");
+    const apply = () => {
+      // The user's own toggle always wins over a media-query change.
+      if (filtersUserToggledRef.current) return;
+      setFiltersOpen(!media.matches);
+    };
+    apply(); // apply the compact preference only after hydration
+    if (media.addEventListener) {
+      media.addEventListener("change", apply);
+      return () => media.removeEventListener("change", apply);
+    }
+    media.addListener(apply); // legacy MediaQueryList (older Safari)
+    return () => media.removeListener(apply);
+  }, []);
+  function submitSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    onSearchSubmit?.();
+  }
   return (
     <>
       {/* F4 (P3): `filters-inline` era una classe no-op (mai definita nel
@@ -111,12 +146,15 @@ export function FiltersBar({
           (audit F1 §6). */}
       <div className={`directory-controls${variant === "panel" ? " filters-panel" : ""}`}>
         {!hideSearch && (
-          <div className="record-search">
+          <form className="record-search" role="search" onSubmit={submitSearch}>
             <label htmlFor="record-search">{t.searchDirectory}</label>
             <input id="record-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t.searchPlaceholder} aria-describedby="record-search-help record-search-count" />
             <p id="record-search-help">{t.searchHelp}</p>
-          </div>
+          </form>
         )}
+        <details className="filters-disclosure" open={filtersOpen} onToggle={(event) => { filtersUserToggledRef.current = true; setFiltersOpen(event.currentTarget.open); }}>
+          <summary>{t.filters}</summary>
+          <div className="filter-controls-row">
         <div className="record-filter">
           <label htmlFor="record-kind-filter">{t.cameraType}</label>
           <select id="record-kind-filter" value={kindFilter} onChange={(event) => setKindFilter(event.target.value)}>
@@ -145,7 +183,7 @@ export function FiltersBar({
             </>}
           </select>
         </div>
-        {stateFilter !== undefined && setStateFilter !== undefined && (
+        {stateFilter !== undefined && setStateFilter !== undefined ? (
           <div className="record-filter">
             <label htmlFor="record-state-filter">{t.stateFilter}</label>
             <select id="record-state-filter" value={stateFilter} onChange={(event) => setStateFilter(event.target.value as "all" | "confirmed" | "never")}>
@@ -154,8 +192,8 @@ export function FiltersBar({
               <option value="never">{t.stateNever}</option>
             </select>
           </div>
-        )}
-        {originFilter !== undefined && setOriginFilter !== undefined && (
+        ) : null}
+        {originFilter !== undefined && setOriginFilter !== undefined ? (
           <div className="record-filter">
             <label htmlFor="record-origin-filter">{t.originFilter}</label>
             <select id="record-origin-filter" value={originFilter} onChange={(event) => setOriginFilter(event.target.value as "all" | "reports" | "imported")}>
@@ -164,9 +202,11 @@ export function FiltersBar({
               <option value="imported">{t.originImported}</option>
             </select>
           </div>
-        )}
+        ) : null}
         <button type="button" className="text-button" onClick={onReset}>{t.resetFilters} <span aria-hidden="true">→</span></button>
         {extraControls}
+          </div>
+        </details>
       </div>
       {/* The result counter. "bare" (catalog) omits it: the counter lives in
           the .directory-meta row rendered by PublicDirectory (catalog) so it

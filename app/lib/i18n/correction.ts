@@ -24,6 +24,9 @@ export const en = {
   urgentConcern: "Urgent privacy or safety concern?",
   urgentConcernBody:
     "Describe only the minimum needed to identify the problem. Do not include personal data, live-feed links, credentials, or images.",
+  stepRecord: "1. Record to review",
+  stepIssue: "2. Describe the issue",
+  stepContact: "3. Contact and send",
   relatedRecord: "Related public record",
   noSpecificRecord: "No specific record / general concern",
   needsReview: "What needs review?",
@@ -83,6 +86,9 @@ export const it: Translation<typeof en> = {
   urgentConcern: "Problema urgente di privacy o sicurezza?",
   urgentConcernBody:
     "Descrivi solo il minimo necessario per identificare il problema. Non includere dati personali, link a feed in diretta, credenziali o immagini.",
+  stepRecord: "1. Record da rivedere",
+  stepIssue: "2. Descrivi il problema",
+  stepContact: "3. Contatto e invio",
   relatedRecord: "Record pubblico collegato",
   noSpecificRecord: "Nessun record specifico / segnalazione generale",
   needsReview: "Cosa deve essere rivisto?",

@@ -8,10 +8,13 @@ import {
   applyCameraFilters,
   cameraKindsOf,
   mapHrefWithFocus,
+  exploreDirectoryHref,
+  exploreMapHref,
   serverFiltersFrom,
   useCameraFilters,
 } from "../../lib/use-camera-filters";
 import { PublicDirectory } from "../home/PublicDirectory";
+import { ExploreViewSwitch } from "../ExploreViewSwitch";
 
 /**
  * /directory tool body (F4, t_522638a5): the filters live in the URL
@@ -48,6 +51,8 @@ export function DirectoryTool() {
 
   const filteredRecords = useMemo(() => applyCameraFilters(records, filters), [records, filters]);
   const cameraKinds = useMemo(() => cameraKindsOf(records), [records]);
+  const mapHref = useMemo(() => exploreMapHref(filters), [filters]);
+  const directoryHref = useMemo(() => exploreDirectoryHref(filters), [filters]);
 
   // Navigation (push, not replace — R2): the map opens with the SAME
   // filters and the record preselected via ?focus=ID. /mappa reads focus
@@ -69,40 +74,40 @@ export function DirectoryTool() {
 
   return (
     <section className="tool-section directory-tool" aria-labelledby="directory-tool-title">
-      <div className="tool-heading directory-tool-heading">
-        <div>
-          <p className="eyebrow"><span /> {t.accessibleDirectory}</p>
-          <h1 id="directory-tool-title">{t.pageTitle}</h1>
-          <p>{t.pageIntro}</p>
+      <h1 id="directory-tool-title" className="sr-only">{t.pageTitle}</h1>
+      <div className="directory-explorer-card">
+        <div className="directory-explorer-toolbar">
+          <p>{t.pageTitle}</p>
+          <ExploreViewSwitch active="directory" mapHref={mapHref} directoryHref={directoryHref} />
         </div>
-        <a className="text-button" href="/mappa">{t.useMapInstead} <span aria-hidden="true">↑</span></a>
+        <PublicDirectory
+          variant="catalog"
+          filteredRecords={filteredRecords}
+          cameraKinds={cameraKinds}
+          search={qInput}
+          setSearch={setQ}
+          kindFilter={filters.type}
+          setKindFilter={setType}
+          freshnessFilter={filters.freshness}
+          setFreshnessFilter={setFreshness}
+          sortOrder={filters.sort}
+          setSortOrder={setSort}
+          stateFilter={filters.state}
+          setStateFilter={setState}
+          originFilter={filters.origin}
+          setOriginFilter={setOrigin}
+          page={filters.page}
+          setPage={setPage}
+          showRecordOnMap={showRecordOnMap}
+          setCoordinates={() => {}}
+          onResetFilters={reset}
+          mapHref={mapHref}
+          reportHref="/segnala"
+          showMapLink={false}
+          exportHrefs={{ csv: exportHref("csv"), geojson: exportHref("geojson") }}
+          showHeading={false}
+        />
       </div>
-      <PublicDirectory
-        variant="catalog"
-        filteredRecords={filteredRecords}
-        cameraKinds={cameraKinds}
-        search={qInput}
-        setSearch={setQ}
-        kindFilter={filters.type}
-        setKindFilter={setType}
-        freshnessFilter={filters.freshness}
-        setFreshnessFilter={setFreshness}
-        sortOrder={filters.sort}
-        setSortOrder={setSort}
-        stateFilter={filters.state}
-        setStateFilter={setState}
-        originFilter={filters.origin}
-        setOriginFilter={setOrigin}
-        page={filters.page}
-        setPage={setPage}
-        showRecordOnMap={showRecordOnMap}
-        setCoordinates={() => {}}
-        onResetFilters={reset}
-        mapHref="/mappa"
-        reportHref="/segnala"
-        exportHrefs={{ csv: exportHref("csv"), geojson: exportHref("geojson") }}
-        showHeading={false}
-      />
       {/* Data policy link (CEO feedback 2026-08-02): the downloads moved
           here from /mappa — the catalog meta row (DirectoryCatalog) owns the
           filter-aware CSV/GeoJSON exports, so this data-actions footer keeps

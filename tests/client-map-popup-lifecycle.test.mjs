@@ -3,21 +3,18 @@
  * non appare subito, appare/scompare, dopo doppio click rimane; pan/zoom fa
  * apparire popup non richiesti").
  *
- * The generic map-click coordinate picker must NEVER fight the marker
- * popup, and marker population (clearLayers on viewport/cameras/grid
+ * Marker population (clearLayers on viewport/cameras/grid
  * rebuilds) must never open or close popups the user did not ask for:
  *
- *   1. marker click opens the marker popup ONCE and keeps it open (the
- *      generic picker must not replace it via click bubbling);
+ *   1. marker click opens the marker popup ONCE and keeps it open;
  *   2. a second click on the SAME marker keeps it open (no toggle-close);
  *      a click on a SECOND marker transfers the popup once;
  *   3. pan (moveend → marker rebuild) opens ZERO new popups and restores
  *      only the popup that was active before the rebuild, and only while
  *      that record is still visible;
  *   4. grid-badge click zooms in WITHOUT opening any popup;
- *   5. an empty map click is SILENT by default (navigation) and opens the
- *      coordinate picker only in the explicit "Add here" mode;
- *   6. mobile touch tap on a marker behaves like (1) — one open, no picker;
+ *   5. empty-map interaction opens a coordinate picker for reporting;
+ *   6. mobile touch tap on a marker behaves like (1);
  *   7. ?focus deep link opens the selected popup ONCE — later pans never
  *      reopen it out of the blue.
  *
@@ -208,59 +205,16 @@ test("grid-badge click zooms in toward the cell with ZERO popups", async () => {
 });
 
 // ---------------------------------------------------------------------------
-// 4) empty map click: silent by default, explicit in add mode
+// 4) empty map click: report shortcut
 // ---------------------------------------------------------------------------
 
-test("empty map click is SILENT by default (exploration must not open popups)", async () => {
-  let picked = null;
-  await renderMap(CAMERAS, { onPick: (lat, lng) => { picked = [lat, lng]; } });
-  const map = (await maps())[0];
-  map.handlers.click?.[0]?.({ latlng: { lat: 41.9, lng: 12.49 } });
-
-  assert.ok(!map.popupHtml, "an exploration click must not open the coordinate picker");
-  assert.equal(picked, null, "onPick must not fire outside the explicit add mode");
-});
-
-test("empty map click opens the coordinate picker ONLY in explicit add mode", async () => {
-  let picked = null;
-  let pickCalls = 0;
-  await renderMap(CAMERAS, { onPick: (lat, lng) => { pickCalls += 1; picked = [lat, lng]; } });
-  // Enter the explicit "Add here" mode through the accessible toggle.
-  const toggle = await rtl.screen.findByRole("button", { name: /Add here/i });
-  assert.equal(toggle.getAttribute("aria-pressed"), "false", "the toggle is unpressed by default");
-  await rtl.userEvent.click(toggle);
-  await new Promise((resolve) => setTimeout(resolve, 10)); // flush the addMode effect
-
-  const map = (await maps())[0];
-  map.handlers.click?.[0]?.({ latlng: { lat: 41.9004, lng: 12.4936 } });
-
-  assert.match(map.popupHtml, /New report/, "add mode opens the picker popup");
-  assert.match(map.popupHtml, /41\.90040, 12\.49360/, "the picker carries the click coordinates");
-  assert.match(map.popupHtml, /href="\/segnala\?lat=41\.90040&lng=12\.49360"/, "the picker links to the pre-filled form");
-  assert.deepEqual(picked, [41.9004, 12.4936], "onPick fires in add mode");
-  assert.equal(pickCalls, 1, "exactly one onPick call in add mode");
-
-  // Leave add mode (the toggle now reads "Stop adding" / aria-pressed):
-  // the next click must be silent — no onPick, no new popup content.
-  const toggleOff = await rtl.screen.findByRole("button", { name: /Stop adding/i });
-  assert.equal(toggleOff.getAttribute("aria-pressed"), "true", "the toggle is pressed while add mode is active");
-  await rtl.userEvent.click(toggleOff);
-  await new Promise((resolve) => setTimeout(resolve, 10)); // flush the addMode effect
-  map.handlers.click?.[0]?.({ latlng: { lat: 41.9, lng: 12.49 } });
-  assert.equal(pickCalls, 1, "leaving add mode makes the click silent (no onPick)");
-  assert.match(map.popupHtml, /41\.90040/, "the already-open picker stays as it was — no new popup content");
-  assert.doesNotMatch(map.popupHtml, /41\.90000/, "the silent click must not open a NEW picker at the second point");
-});
-
-test("marker click inside add mode still opens the MARKER popup, never the picker", async () => {
+test("empty map click opens the report shortcut", async () => {
   await renderMap(CAMERAS);
-  const toggle = await rtl.screen.findByRole("button", { name: /Add here/i });
-  await rtl.userEvent.click(toggle);
-  const m1 = markerById(await markers(), 1);
-  const evt = clickMarker(m1);
-  assert.equal(m1.popupOpened, true, "the marker popup wins over add mode");
-  assert.equal(evt.__stopped, true, "propagation is stopped even in add mode");
-  assert.ok(!(await maps())[0].popupHtml, "the picker must not replace the marker popup");
+  const map = (await maps())[0];
+  map.handlers.click?.[0]?.({ latlng: { lat: 41.9, lng: 12.49 } });
+
+  assert.match(map.popupHtml, /New report/, "an empty-map click opens the report shortcut");
+  assert.match(map.popupHtml, /41\.90000, 12\.49000/, "the shortcut retains the clicked coordinates");
 });
 
 // ---------------------------------------------------------------------------
@@ -277,11 +231,11 @@ test("mobile touch tap on a marker opens once and never the picker", async () =>
   assert.ok(!(await maps())[0].popupHtml, "no generic picker on touch");
 });
 
-test("mobile touch tap on empty map is silent outside add mode", async () => {
+test("mobile touch tap on empty map opens the report shortcut", async () => {
   await renderMap(CAMERAS);
   const map = (await maps())[0];
   map.handlers.click?.[0]?.({ latlng: { lat: 41.9, lng: 12.49 }, originalEvent: { pointerType: "touch" } });
-  assert.ok(!map.popupHtml, "an exploration tap must not open the picker");
+  assert.match(map.popupHtml, /New report/, "an empty-map touch tap opens the report shortcut");
 });
 
 // ---------------------------------------------------------------------------

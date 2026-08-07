@@ -771,13 +771,13 @@ test("every map task has a keyboard/text-list equivalent in the public interface
 
   // The map region is a labelled, programmatically focusable landmark that
   // describes the text-list alternative. On /mappa the alternative link is
-  // the /directory route (parameterised — the home default no longer exists
-  // because the hub has no map; MappaTool passes /directory explicitly).
+  // the /directory route (parameterised so shared exploration filters carry
+  // over to the text representation).
   assert.match(map, /role="region"/);
   assert.match(map, /aria-label=\{\s*label\s*\}/);
   assert.match(map, /tabIndex=\{\s*-1\s*\}/, "the map region must accept programmatic focus");
   assert.match(map, /id="map-region"/);
-  assert.match(mappaTool, /directoryHref="\/directory"/, "/mappa must link the directory route as the text alternative");
+  assert.match(mappaTool, /directoryHref=\{directoryHref\}/, "/mappa must pass the filter-preserving directory route as the text alternative");
   assert.match(map, /href=\{directoryHref\}/, "the directory link must be parameterised (route vs anchor)");
 
   // Map task: map unavailable (blocked script or tile host). The list stays

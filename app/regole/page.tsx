@@ -27,8 +27,8 @@ export default async function RulesPage() {
       intro={t.intro}
       actions={
         <>
-          <Link className="button button-primary" href="/#report">{t.reportEyebrow} <span aria-hidden="true">↘</span></Link>
-          <Link className="button detail-outline" href="/#records">{t.directory}</Link>
+          <Link className="button button-primary" href="/segnala">{t.reportEyebrow} <span aria-hidden="true">↘</span></Link>
+          <Link className="button detail-outline" href="/directory">{t.directory}</Link>
         </>
       }
     >

@@ -89,8 +89,10 @@ test("sources page: renders the attribution table with the five per-source colum
   }));
   const { container } = view;
 
-  assert.equal(view.getByRole("heading", { level: 1 }).textContent, "Data sources");
-  assert.ok(view.getByText(/The public records may include datasets/));
+  assert.equal(view.getByRole("heading", { level: 1 }).textContent, "Methodology and data sources");
+  assert.ok(view.getByText(/We document visible public surveillance infrastructure/));
+  assert.ok(view.getByRole("heading", { level: 2, name: "How the database works" }));
+  assert.ok(view.getByRole("heading", { level: 2, name: "Imported data sources" }));
 
   const table = container.querySelector("table.sources-table");
   assert.ok(table, "the sources table renders");
@@ -144,7 +146,7 @@ test("sources page: IT bundle renders localized labels, date and grouped count (
     batches: fakeBatches,
   }));
 
-  assert.equal(view.getByRole("heading", { level: 1 }).textContent, "Fonti dei dati");
+  assert.equal(view.getByRole("heading", { level: 1 }).textContent, "Metodologia e fonti dei dati");
   const headers = Array.from(view.container.querySelectorAll("thead th")).map((cell) => cell.textContent);
   assert.deepEqual(headers, ["Fonte", "Licenza", "Importato il", "Record", "Attribuzione"]);
   assert.ok(view.getAllByText(itDate).length >= 1, "import dates render localized in Italian");

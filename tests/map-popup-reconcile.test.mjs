@@ -270,22 +270,25 @@ test("a marker that leaves the viewport closes its popup exactly ONCE; returning
 });
 
 // ---------------------------------------------------------------------------
-// 4) generic map clicks never open a popup (add mode is the only exception)
+// 4) generic map clicks: empty space = report shortcut (PR #326 UX), but
+//    never a marker popup, and pan/zoom stays silent
 // ---------------------------------------------------------------------------
 
-test("a generic empty-map click emits ZERO popup events (navigation-silent by construction)", async () => {
+test("a generic empty-map click opens the report shortcut exactly once (PR #326 UX)", async () => {
   await renderMap(CAMERAS);
   const map = (await maps())[0];
   const list = await markers();
 
-  // A plain click on empty map space (exploration): the handler must not
-  // even be registered outside the explicit "Add here" mode — zero popups,
-  // zero picker content.
+  // A plain click on empty map space: the coordinate-picker shortcut opens
+  // with the clicked position and the /segnala link (deliberate UX choice
+  // of PR #326 — the legend explains it). The stub's map.openPopup records
+  // the picker HTML (marker openPopup is the only one that dispatches
+  // popupopen — the picker has no record id and no community widget).
   map.handlers.click?.[0]?.({ latlng: { lat: 41.9, lng: 12.49 } });
 
   const counts = eventCounts(map);
-  assert.equal(counts.popupopen, 0, "an exploration click must not open any popup");
-  assert.equal(counts.popupclose, 0);
-  assert.ok(!map.popupHtml, "the coordinate picker must not open outside add mode");
+  assert.equal(counts.popupclose, 0, "no popup close from an empty-map click");
+  assert.match(map.popupHtml, /New report/, "the shortcut popup carries the picker title");
+  assert.match(map.popupHtml, /href="\/segnala\?lat=41\.90000&lng=12\.49000"/, "the shortcut links to the pre-filled form");
   assert.equal(list.filter((m) => m.popupOpened).length, 0, "no marker popup opens from a map click");
 });

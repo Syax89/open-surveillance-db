@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMessages } from "../../lib/use-messages";
 import { useViewportCameras } from "../../lib/use-viewport-cameras";
 import { recordsInBounds } from "../../lib/map-viewport";
@@ -8,17 +8,21 @@ import type { ViewportBounds } from "../../lib/map-viewport";
 import {
   applyCameraFilters,
   cameraKindsOf,
+  exploreDirectoryHref,
+  exploreMapHref,
   serverFiltersFrom,
   useCameraFilters,
 } from "../../lib/use-camera-filters";
 import { MapPanel } from "../home/MapPanel";
+import { GeocodeSearch, type GeocodeSuggestion } from "../home/GeocodeSearch";
 import { FiltersBar } from "../FiltersBar";
+import { ExploreViewSwitch } from "../ExploreViewSwitch";
 
 /**
  * /mappa tool body (F4, t_522638a5; viewport redesign t_702c10af; integrated
  * layout t_966254a1; heading cleanup t_11e38eab; CEO feedback 2026-08-02:
- * prototype banner removed). No visible tool header: the page starts
- * directly with the single map card. The h1 stays in the DOM as sr-only
+ * prototype banner removed). A compact explorer toolbar replaces a large
+ * tool header; the h1 stays in the DOM as sr-only
  * (a11y — document hierarchy and the section's aria-labelledby keep
  * working). The map card hosts the FiltersBar row (kind/freshness/sort/
  * reset — attached to the card top, width-aligned with the map) and the
@@ -41,28 +45,24 @@ import { FiltersBar } from "../FiltersBar";
  * when it lies outside every loaded bbox — focus management,
  * FRONTEND_DESIGN §6.2.
  *
- * Kind options (FiltersBar dropdown) come from the opt-in facets query
- * (?facets=1, QA#5 F2): with viewport loading the store only sees the kinds
- * inside the boxes fetched so far, and the filter UI must keep offering
- * every kind of the dataset — the facets describe the FULL public set in
- * one cached request. While the facets are in flight the dropdown falls
- * back to the kinds present in the store.
- *
- * Map-always-visible contract (t_b9666d09): the MapPanel (map + sidebar)
- * is rendered UNCONDITIONALLY — a filter that matches nothing must never
- * replace the map with an empty state. The truthful "no record matches"
- * note lives inside the sidebar list (MapPanel), with the Clear filters
- * action wired to onReset. The prototype banner was removed (CEO feedback
- * 2026-08-02): the map is no longer framed as a prototype — the truthfulness
- * contract ("an empty area never proves absence") is carried by pageIntro
- * and the in-list notes.
+ * Popup policy (PR #326 review — "mantieni strettamente la UX del CEO"):
+ * a popup opens ONLY on an explicit marker click, an empty-map click (the
+ * report shortcut, a deliberate UX choice of this PR), a ?focus=ID deep
+ * link, or a place-search selection (first visible point after the pan
+ * lands). Filter changes, viewport data arrival and record churn NEVER
+ * auto-open a popup: selectedId falls back to null (never to the first
+ * record) so the selection effect stays quiet, and the card/list fall back
+ * to the first visible record without opening its popup.
  */
 export function MappaTool() {
   const t = useMessages().map;
   const { filters, qInput, setQ, setType, setFreshness, setSort, setState, setOrigin, reset } = useCameraFilters();
-  const [selectedId, setSelectedId] = useState(() => filters.focus ?? 1);
+  const [selectedId, setSelectedId] = useState<number | null>(() => filters.focus ?? null);
   const [viewportBounds, setViewportBounds] = useState<ViewportBounds | null>(null);
   const [notice, setNotice] = useState("");
+  const [placeFocus, setPlaceFocus] = useState<{ latitude: number; longitude: number } | null>(null);
+  const placeFocusRef = useRef<{ latitude: number; longitude: number } | null>(null);
+  const viewportAtSelectionRef = useRef<ViewportBounds | null>(null);
 
   // Viewport-bounded data layer (t_bb310428): only the records inside the
   // current map bounds are requested; the merged store feeds the same
@@ -77,13 +77,13 @@ export function MappaTool() {
     // P0 hotfix (t_444b15e4, post-#321): the API answers a VALID empty
     // list ({records: []}) when the DB has no public records — never
     // dereference next[0] on it. Without records there is nothing to
-    // select: keep the current selection (the focus management effect and
-    // MapPanel's fallbacks already handle a selectedId that matches
-    // nothing), so no spurious popup or deep link can fire.
-    onRecords: (next) => setSelectedId((current) => {
-      if (filters.focus !== null || next.length === 0) return current;
-      return next[0].id;
-    }),
+    // select: keep the current selection, so no spurious popup or deep
+    // link can fire.
+    //
+    // Popup policy (see the component doc): arriving viewport data must
+    // NOT auto-open a popup, so this callback never falls back to
+    // next[0].id. It only commits a pending focus from the URL.
+    onRecords: () => setSelectedId((current) => (filters.focus !== null ? filters.focus : current)),
     onError: () => setNotice(t.apiUnavailable),
   });
 
@@ -115,50 +115,79 @@ export function MappaTool() {
     const record = filteredRecords.find((camera) => camera.id === filters.focus);
     return record ? { latitude: record.latitude, longitude: record.longitude } : null;
   }, [filters.focus, filteredRecords]);
+  const mapHref = useMemo(() => exploreMapHref(filters), [filters]);
+  const directoryHref = useMemo(() => exploreDirectoryHref(filters), [filters]);
 
   const handleBoundsChange = useCallback((bounds: ViewportBounds) => setViewportBounds(bounds), []);
 
+  // Place-search selection (PR #326 UX — kept strictly): picking a place
+  // pans the map there and, once the pan lands on the new bounds, selects
+  // the first visible point so the marker/list pair stays synchronized.
+  // This is EXPLICIT user intent (a selection from the geocode list), so
+  // the popup that follows is intended.
+  const handlePlaceSelect = useCallback((result: GeocodeSuggestion) => {
+    setPlaceFocus({ latitude: result.lat, longitude: result.lng });
+    placeFocusRef.current = { latitude: result.lat, longitude: result.lng };
+    viewportAtSelectionRef.current = viewportBounds;
+    setQ("");
+  }, [viewportBounds, setQ]);
+
   // Focus management: a ?focus=ID deep link (or back/forward onto one)
-  // selects that record; when the filters hide the current selection the
-  // card falls back to the first visible record — never a filtered-out card.
-  // The setStates are guarded (identity/no-op when nothing changed), so this
-  // is the documented "adjusting state when a prop changes" pattern driven
-  // by the URL (external system), not a cascading-render loop.
+  // selects that record. When the filters hide the current selection the
+  // selection falls back to NULL — never to the first record — so a filter
+  // change never auto-opens a popup (popup policy above). The card/list
+  // fall back to the first visible record for display, without opening it.
   useEffect(() => {
     if (filters.focus !== null) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- URL focus (FRONTEND_DESIGN §6.2) is external state: a deep link / back-forward onto ?focus=ID must select that record exactly once; guard makes it a prop-change sync, not a loop.
       setSelectedId(filters.focus);
     } else if (selectedId !== null && !filteredRecords.some((camera) => camera.id === selectedId)) {
-      const first = filteredRecords[0];
-      setSelectedId(first ? first.id : selectedId);
+      setSelectedId(null);
     }
   }, [filters.focus, filteredRecords, selectedId]);
+
+  // Place-search selection landing: the pending flag is consumed only when
+  // the map emitted NEW bounds since the selection (the pan landed), then
+  // the first visible point is selected — one explicit popup, no churn.
+  useEffect(() => {
+    if (placeFocusRef.current === null) return;
+    if (viewportAtSelectionRef.current !== null && viewportAtSelectionRef.current === viewportBounds) return;
+    placeFocusRef.current = null;
+    viewportAtSelectionRef.current = null;
+    if (visibleRecords.length > 0 && !visibleRecords.some((camera) => camera.id === selectedId)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- the map emitted new external bounds after a chosen place; selecting its first visible point keeps the marker/list pair synchronized.
+      setSelectedId(visibleRecords[0].id);
+    }
+  }, [viewportBounds, visibleRecords, selectedId]);
 
   const selectedCamera = useMemo(
     () => filteredRecords.find((camera) => camera.id === selectedId) ?? filteredRecords[0],
     [filteredRecords, selectedId],
   );
+  const explorerFocusLocation = useMemo(() => placeFocus ?? focusLocation, [placeFocus, focusLocation]);
 
   return (
     <section className="tool-section map-tool" aria-labelledby="map-tool-title">
-      {/* No visible tool header (t_11e38eab): the page starts directly with
-          the map. The h1 stays sr-only so the document hierarchy and the
-          section's aria-labelledby survive. */}
       <h1 id="map-tool-title" className="sr-only">{t.pageTitle}</h1>
       <div className="map-layout">
-        {/* The whole workspace is ONE card: filters attached to the top
-            edge (same width, same background, no gap), then the split
+        {/* The whole workspace is ONE card: a compact explorer switch,
+            filters attached to the top edge, then the split
             (sidebar list + full map). The prototype banner was removed
-            (CEO feedback 2026-08-02) — the page starts directly with the
-            map card. */}
+            (CEO feedback 2026-08-02). */}
         <div className="map-card">
+          <div className="map-explorer-toolbar">
+            <p>{t.pageTitle}</p>
+            <ExploreViewSwitch active="map" mapHref={mapHref} directoryHref={directoryHref} />
+          </div>
+          <div className="map-explorer-search">
+            <GeocodeSearch search={qInput} onSearchChange={setQ} onPlaceSelect={handlePlaceSelect} />
+          </div>
           <FiltersBar variant="panel" hideSearch showCommunitySort stateFilter={filters.state} setStateFilter={setState} originFilter={filters.origin} setOriginFilter={setOrigin} cameraKinds={cameraKinds} search={qInput} setSearch={setQ} kindFilter={filters.type} setKindFilter={setType} freshnessFilter={filters.freshness} setFreshnessFilter={setFreshness} sortOrder={filters.sort} setSortOrder={setSort} resultCount={filteredRecords.length} onReset={reset} />
           {/* Map-always-visible (t_b9666d09): MapPanel renders the map AND
               the sidebar unconditionally. When no record matches the
-              filters the sidebar shows the truthful in-list note with the
-              Clear filters action (onReset); the map itself never
+              filters the sidebar shows the truthful in-list note; the map itself never
               disappears. */}
-          <MapPanel filteredRecords={filteredRecords} visibleRecords={visibleRecords} selectedId={selectedId} onSelect={setSelectedId} onPick={() => {}} coordinates={focusLocation} selectedCamera={selectedCamera} loading={loading} notice={notice} directoryHref="/directory" search={qInput} setSearch={setQ} onBoundsChange={handleBoundsChange} viewportBounds={viewportBounds} onReset={reset} />
+          <MapPanel filteredRecords={filteredRecords} visibleRecords={visibleRecords} selectedId={selectedId} onSelect={setSelectedId} onPick={() => {}} coordinates={explorerFocusLocation} selectedCamera={selectedCamera} loading={loading} notice={notice} directoryHref={directoryHref} onBoundsChange={handleBoundsChange} />
         </div>
       </div>
     </section>

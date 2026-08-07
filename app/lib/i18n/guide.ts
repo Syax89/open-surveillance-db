@@ -20,6 +20,14 @@ export const en = {
     "This guide explains what OpenSurveillanceDB documents and how to use the map and the directory. It also shows how a report becomes public data, and what the database does not claim.",
   exploreMap: "Explore the map",
   browseDirectory: "Browse directory",
+  overviewEyebrow: "Quick guide",
+  overviewTitle: "Find what you need.",
+  overviewPurpose: "What the database documents",
+  overviewPublication: "How a report is published",
+  overviewStatuses: "How to read record statuses",
+  overviewAccount: "Accounts and contributions",
+  overviewConfirmations: "Confirmations and trust",
+  overviewData: "Open data and exports",
   missionEyebrow: "Purpose and boundaries",
   missionTitle: "Visibility without operational surveillance.",
   missionBody:
@@ -53,6 +61,9 @@ export const en = {
   publishTitle: "Records stay live until the community says otherwise",
   publishBody:
     "A record leaves the public list only after enough community flags — or a legal emergency — and every transition is recorded in the record's public history.",
+  publicationDetailsEyebrow: "Publication in detail",
+  publicationDetailsTitle: "The public publication model.",
+  publicationDetailsSummary: "Read the detailed publication rules",
   statusEyebrow: "Reading the records",
   statusTitle: "Each status says what the record can support.",
   statusIntro:
@@ -153,6 +164,14 @@ export const it: Translation<typeof en> = {
     "Questa guida spiega cosa documenta OpenSurveillanceDB e come usare mappa ed elenco. Spiega anche come una segnalazione diventa un dato pubblico e cosa il database non dichiara.",
   exploreMap: "Esplora la mappa",
   browseDirectory: "Sfoglia l’elenco",
+  overviewEyebrow: "Guida rapida",
+  overviewTitle: "Trova ciò che ti serve.",
+  overviewPurpose: "Cosa documenta il database",
+  overviewPublication: "Come viene pubblicata una segnalazione",
+  overviewStatuses: "Come leggere gli stati dei record",
+  overviewAccount: "Account e contributi",
+  overviewConfirmations: "Conferme e fiducia",
+  overviewData: "Dati aperti ed esportazioni",
   missionEyebrow: "Scopo e limiti",
   missionTitle: "Visibilità senza sorveglianza operativa.",
   missionBody:
@@ -186,6 +205,9 @@ export const it: Translation<typeof en> = {
   publishTitle: "I record restano pubblici finché la community non decide altrimenti",
   publishBody:
     "Un record esce dall’elenco pubblico solo dopo abbastanza segnalazioni della community — o un’emergenza legale — e ogni transizione è registrata nella cronologia pubblica del record.",
+  publicationDetailsEyebrow: "La pubblicazione, in dettaglio",
+  publicationDetailsTitle: "Il modello di pubblicazione pubblico.",
+  publicationDetailsSummary: "Leggi le regole di pubblicazione nel dettaglio",
   statusEyebrow: "Leggere i record",
   statusTitle: "Ogni stato indica cosa può dimostrare un record.",
   statusIntro:

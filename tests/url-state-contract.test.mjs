@@ -43,6 +43,8 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 let rtl;
 let parseCameraFilters;
 let stringifyCameraFilters;
+let exploreMapHref;
+let exploreDirectoryHref;
 let freshnessCutoffFor;
 let applyCameraFilters;
 let DirectoryTool;
@@ -55,6 +57,8 @@ before(async () => {
   const filtersMod = await loadDomModule("app/lib/use-camera-filters.mjs");
   parseCameraFilters = filtersMod.parseCameraFilters;
   stringifyCameraFilters = filtersMod.stringifyCameraFilters;
+  exploreMapHref = filtersMod.exploreMapHref;
+  exploreDirectoryHref = filtersMod.exploreDirectoryHref;
   freshnessCutoffFor = filtersMod.freshnessCutoffFor;
   applyCameraFilters = filtersMod.applyCameraFilters;
   DirectoryTool = (await loadDomModule("app/components/tools/DirectoryTool.mjs")).DirectoryTool;
@@ -171,6 +175,13 @@ test("stringifyCameraFilters omits defaults (minimal URL, R2) and round-trips en
   assert.equal(parseCameraFilters(new URLSearchParams("page=2")).page, 2);
   assert.equal(parseCameraFilters(new URLSearchParams("page=0")).page, 1, "page 0 falls back to 1 (lenient parse)");
   assert.equal(parseCameraFilters(new URLSearchParams("page=abc")).page, 1, "non-numeric page falls back to 1");
+});
+
+test("explorer view switch preserves shared filters but clears view-only state", () => {
+  const filters = parseCameraFilters(new URLSearchParams("q=Via+Roma&type=Bullet&freshness=30d&sort=recent&state=confirmed&origin=imported&focus=8&page=3"));
+  const expectedQuery = "?q=Via+Roma&type=Bullet&freshness=30d&sort=recent&state=confirmed&origin=imported";
+  assert.equal(exploreMapHref(filters), `/mappa${expectedQuery}`);
+  assert.equal(exploreDirectoryHref(filters), `/directory${expectedQuery}`);
 });
 
 test("parseCameraFilters: confirmation-state dimension (?state=) parses and serializes (FASE 3 UI)", () => {

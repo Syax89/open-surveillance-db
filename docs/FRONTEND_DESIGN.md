@@ -60,7 +60,7 @@ decorative, niente gradienti aggressivi.
 | `/guide` | Guida all'uso | PublicNav | ✅ |
 | `/manifesto` | Manifesto | PublicNav | ✅ |
 | `/regole` | Regole | PublicNav | ✅ |
-| `/moderazione` | Spiegazione pubblica del flusso di moderazione | PublicNav | ✅ |
+| `/moderazione` | URL compatibile → dettaglio pubblicazione in `/guide` | — | ✅ |
 | `/privacy` `/termini` `/licenze` | Pagine legali | PublicNav | ✅ |
 | `/faq` `/contatti` `/accessibility` | Info | PublicNav | ✅ |
 | `/moderation` | Dashboard moderatori (privata, `requireRole`) | contestuale (`nav-actions`) | ✅ |
@@ -150,7 +150,7 @@ blocco place-search + FiltersBar inline + count + griglia 2 colonne).
 
 - **Error pages (404/500):** header ridotto a **1 link** (`nav-action` "Torna
   alla home") + LocaleToggle. Il footer resta raggiungibile. Eccezione alla
-  regola "PublicNav 6 link" — voluta (un vicolo cieco non deve sembrare una
+  regola "PublicNav a tre azioni" — voluta (un vicolo cieco non deve sembrare una
   pagina rotta, ma non deve nemmeno offrire navigazione fuorviante).
 - **Record detail, auth, moderation:** header contestuale
   (`nav-record-actions` / `nav-actions`) — azioni pertinenti al contesto
@@ -440,17 +440,17 @@ Legenda: **[spec]** = sezione dedicata sotto · **[patt.]** = pattern condiviso
 **Core / layout**
 | Componente | Dove | Note | Stato doc |
 |------------|------|------|:---:|
-| `PublicNav` | tutte le pubbliche | header condiviso 6 link (t_a72a3106) | **[spec] 6.2.1** |
+| `PublicNav` | tutte le pubbliche | header condiviso a 3 azioni | **[spec] 6.2.1** |
 | `PublicNavLinks` | tutte le pubbliche | set nav unico, `aria-current="page"` | [spec] 6.2.1 |
 | `SiteHeader` | root shell pagine | nav-shell brand + children + LocaleToggle | [patt.] |
-| `SiteFooter` | root layout | footer globale 4 tool + istituzionali | [patt.] |
+| `SiteFooter` | root layout | footer globale raggruppato per compito; note legali espandibili | [patt.] |
 | `HomeNav` | `/` | island client del menu mobile (SSR-pure home) | [patt.] |
 | `ToolLayout` | route group `(tools)` | layout condiviso tool: PublicNav + main | [patt.] |
 | `ErrorPage` | 404/500 | shell error condivisa | **[spec] 6.2.5** |
 | `LegacyAnchorRedirect` | root layout | redirect client-side anchor legacy (`router.replace`) | [patt.] |
 
 **Home hub**
-| `Hero` | `/` | hero scuro, 2 CTA, stat | [patt.] |
+| `Hero` | `/` | hero scuro, ricerca directory, 2 CTA, stat | [patt.] |
 | `MapTeaser` | `/` | teaser **statico** (no Leaflet) — non è `SurveillanceMap` | [patt.] |
 | `ToolCards` | `/` | 4 card tool 2×2 | [patt.] |
 
@@ -486,7 +486,7 @@ Legenda: **[spec]** = sezione dedicata sotto · **[patt.]** = pattern condiviso
 | `QueueSection`, `CameraQueueItem`, `CorrectionQueueItem`, `EditQueueItem`, `PhotoQueueItem`, `DecisionForm`, `HistorySection`, `CorrectionHistorySection`, `useModerationQueue` | `/moderation` | coda per sezioni, decisioni, storico | [patt.] — dot `pending` 🔒 (§6.3.2) |
 
 **Pagine info**
-| `InfoPage` | manifesto, guide, faq, contatti, moderazione, accessibility | wrapper SSR free-form | [patt.] |
+| `InfoPage` | manifesto, guide, faq, contatti, accessibility | wrapper SSR free-form | [patt.] |
 | `LegalPage` | privacy, termini, licenze | wrapper SSR strutturato (tabelle, note) | [patt.] |
 | `LocaleToggle` | header | toggle EN/IT (in `LocaleProvider`) | [patt.] |
 
@@ -497,11 +497,11 @@ Legenda: **[spec]** = sezione dedicata sotto · **[patt.]** = pattern condiviso
 Unico header di TUTTE le pagine pubbliche (t_a72a3106).
 
 - **Anatomia:** brand (mark 29px cerchio navy/mint + nome 19px/800/-.04em) ·
-  nav-links (6 link + **auth entry point**, t_65b778c5) · LocaleToggle ·
+  nav-links (3 link primari + **auth entry point**) · LocaleToggle ·
   menu button (mobile).
-- **Set link (ordine fisso):** Mappa `/mappa`, Directory `/directory`, Guide
-  `/guide`, Regole `/regole`, Manifesto `/manifesto`, **Segnala CTA**
-  `/segnala` (`.nav-action`). Pagina corrente: `aria-current="page"`.
+- **Set link (ordine fisso):** Mappa `/mappa`, Directory `/directory`,
+  **Segnala CTA** `/segnala` (`.nav-action`). Guida, Regole e Manifesto
+  restano nel footer. Pagina corrente: `aria-current="page"`.
 - **Auth entry point (`AuthNavLinks`, t_65b778c5, fix mobile t_94b3726d):**
   "Log in" `/login` + "Create account" `/register` (anonimo) o link account
   `/account` (autenticato, aria-label sempre) — ULTIMO item di `.nav-links`,
@@ -845,7 +845,7 @@ risultati; form coordinate a 1 colonna (≤480px).
 - **URL language-neutral:** route slug neutri; deep-link con
   `GET /api/locale?lang=it&next=/mappa`.
 - **Rotture di layout:** IT ~15-20% più lungo — `overflow-wrap:anywhere` su
-  `dd` di card e facts; nav 6 link + auth che collassano nel menu mobile a
+  `dd` di card e facts; nav a 3 azioni + auth che collassano nel menu mobile a
   ≤768px (t_94b3726d; v1 diceva "fino a 5 link" — errato: il set è 6,
   t_a72a3106); eyebrow uppercase con tracking .14em verificato su label IT.
 
@@ -927,7 +927,7 @@ risultati; form coordinate a 1 colonna (≤480px).
 | D8 | Redirect legacy anchor **client-side** (`LegacyAnchorRedirect`) — non 302 (un fragment non arriva al server) | ✅ (v2 corregge la v1) |
 | D9 | Refactor incrementale in fasi (F1–F4 completate) | ✅ |
 | D10 | Touch target ≥44px, zoom 200% a 320px | ⚠ parziale (locale-toggle, filter-chip) |
-| D11 | Header unico `PublicNav` a 6 link su tutte le pubbliche (t_a72a3106) | ✅ |
+| D11 | Header unico `PublicNav` a 3 azioni su tutte le pubbliche | ✅ |
 | D12 | Mappa mobile: pannello sopra la mappa (≤768px), non bottom-sheet | ✅ (v2 corregge la v1) |
 | D13 | Container mappa `min(1440px, calc(100% - 32px))`; breakpoint 480/768 | ✅ |
 | D14 | Error pages custom 404/500 con header ridotto (eccezione 6-link) | ✅ |
@@ -951,7 +951,7 @@ risultati; form coordinate a 1 colonna (≤480px).
 | `CorreggiTool`, `CorrectionForm` | `/correggi` |
 | `RecordPageBody`, `VerificationWidget`, `StarConfirmButton` | `/records/[id]`, `/records/[id]/edit` |
 | `ModerationDashboard` + `moderation/*` (8) + `useModerationQueue` | `/moderation` |
-| `InfoPage` | manifesto, guide, regole, faq, contatti, moderazione, accessibility |
+| `InfoPage` | manifesto, guide, regole, faq, contatti, accessibility |
 | `LegalPage` | privacy, termini, licenze |
 | auth (in page) | login, register, account (+ `LevelBadge`, `ConfirmDialog`) |
 | `PublicNav`, `PublicNavLinks`, `ToolLayout`, `SiteFooter`, `LocaleProvider` | tutte |

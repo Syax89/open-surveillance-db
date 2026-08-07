@@ -22,6 +22,9 @@ export const en = {
   beforeSubmitting: "Before submitting",
   beforeSubmittingBody:
     "Do not upload or describe people, licence plates, private homes, security weaknesses or sensitive locations.",
+  stepLocation: "1. Location",
+  stepObservation: "2. What you observed",
+  stepEvidence: "3. Photo and publish",
   selectedPoint: "Selected point",
   manualCoordinatesTitle: "Or enter coordinates",
   manualCoordinatesHelp:
@@ -135,6 +138,9 @@ export const it: Translation<typeof en> = {
   beforeSubmitting: "Prima di inviare",
   beforeSubmittingBody:
     "Non caricare né descrivere persone, targhe, abitazioni private, debolezze di sicurezza o luoghi sensibili.",
+  stepLocation: "1. Posizione",
+  stepObservation: "2. Cosa hai osservato",
+  stepEvidence: "3. Foto e pubblicazione",
   selectedPoint: "Punto selezionato",
   manualCoordinatesTitle: "Oppure inserisci le coordinate",
   manualCoordinatesHelp:

@@ -25,39 +25,22 @@ export default async function ContactPage() {
     <InfoPage
       navLabel={t.navigation}
       homeLabel={t.homeAria}
-      eyebrow={t.eyebrow}
+      eyebrow={t.contactLabel}
       title={t.title}
       intro={t.intro}
       actions={
         <>
-          <Link className="button button-primary" href="/#correction">{t.correctionForm} <span aria-hidden="true">→</span></Link>
+          <Link className="button button-primary" href="/correggi">{t.correctionForm} <span aria-hidden="true">→</span></Link>
           <Link className="button detail-outline" href="/faq">{t.faqLabel}</Link>
         </>
       }
     >
-      <section className="records-section" aria-labelledby="who-title">
-        <div className="records-heading">
-          <div><p className="eyebrow"><span /> {t.eyebrow}</p><h2 id="who-title">{t.whoTitle}</h2><p>{t.whoBody}</p></div>
-        </div>
-        <div className="record-detail-list">
-          <dl>
-            <div><dt>{t.rolesTitle}</dt><dd>{t.rolesIntro}</dd></div>
-            <div><dt>{t.roleMaintainers}</dt><dd>{t.roleMaintainersBody}</dd></div>
-            <div><dt>{t.roleOps}</dt><dd>{t.roleOpsBody}</dd></div>
-            <div><dt>{t.roleData}</dt><dd>{t.roleDataBody}</dd></div>
-            <div><dt>{t.roleSecurity}</dt><dd>{t.roleSecurityBody}</dd></div>
-            <div><dt>{t.roleModeration}</dt><dd>{t.roleModerationBody}</dd></div>
-            <div><dt>{t.controllerTitle}</dt><dd>{t.controllerBody}</dd></div>
-          </dl>
-        </div>
-      </section>
-
       <section className="correction-section" aria-labelledby="correction-contact-title">
         <div>
           <p className="eyebrow"><span /> {t.eyebrow}</p>
           <h2 id="correction-contact-title">{t.correctionTitle}</h2>
           <p>{t.correctionBody}</p>
-          <div className="data-actions"><Link href="/#correction">{t.correctionForm} <span aria-hidden="true">→</span></Link><span>·</span><a href={`mailto:${t.correctionEmail}`}>{t.correctionEmail}</a></div>
+          <div className="data-actions"><Link href="/correggi">{t.correctionForm} <span aria-hidden="true">→</span></Link><span>·</span><a href={`mailto:${t.correctionEmail}`}>{t.correctionEmail}</a></div>
           <div className="report-rule"><b>{t.correctionEmail}</b><br />{t.correctionEmailNote}</div>
         </div>
       </section>

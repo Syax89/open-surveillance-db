@@ -20,7 +20,7 @@ const authByLocale: Record<Locale, Translation<typeof authEn>> = {
  * (CEO request 2026-08-02, kanban t_65b778c5; mobile placement fix
  * t_94b3726d).
  *
- * The public nav (PublicNavLinks, t_a72a3106) keeps its six content links;
+ * The public nav (PublicNavLinks) keeps its primary content links;
  * this component renders the auth entry point as the LAST item of the
  * .nav-links container (PublicNav renders it right after PublicNavLinks).
  * On mobile (<768px) .nav-links is the hamburger dropdown, so the auth

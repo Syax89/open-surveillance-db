@@ -32,7 +32,11 @@ test("gate: every registered route lists all 4 mandatory artifacts", () => {
   assert.ok(routes.length >= 14, `the registry must cover every SSR-able route (found ${routes.length})`);
   for (const entry of routes) {
     assert.ok(entry.route.startsWith("/"), `${entry.name}: route must start with /`);
-    for (const artifact of REQUIRED_ARTIFACTS) {
+    // Redirect routes carry only the SSR artifact by design (a redirect has
+    // no interactive surface, no own i18n bundle and no page to axe-audit —
+    // the SSR test asserts the redirect target and status).
+    const required = entry.redirect ? ["ssr"] : REQUIRED_ARTIFACTS;
+    for (const artifact of required) {
       assert.ok(
         typeof entry.artifacts?.[artifact] === "string" && entry.artifacts[artifact].length > 0,
         `${entry.route}: missing '${artifact}' artifact in the registry`,
@@ -43,7 +47,8 @@ test("gate: every registered route lists all 4 mandatory artifacts", () => {
 
 test("gate: every artifact file exists on disk", async () => {
   for (const entry of registeredRoutes()) {
-    for (const artifact of REQUIRED_ARTIFACTS) {
+    const required = entry.redirect ? ["ssr"] : REQUIRED_ARTIFACTS;
+    for (const artifact of required) {
       const file = entry.artifacts[artifact];
       await assert.doesNotReject(
         access(path.join(testsDir, file)),

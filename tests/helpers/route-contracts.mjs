@@ -251,15 +251,13 @@ export function registeredRoutes() {
     },
     {
       route: "/moderazione",
-      name: "moderation info page",
+      name: "legacy publication-model redirect",
       source: "app/moderazione/page.tsx",
+      redirect: true,
       artifacts: {
-        ssr: "pages-render.test.mjs",
-        interaction: "client-locale-toggle.test.mjs",
-        i18n: "i18n-pages.test.mjs",
-        a11y: "axe-audit.test.mjs",
+        ssr: "rendered-html.test.mjs",
       },
-      note: "statica",
+      note: "308 → /guide#guide-publication-details",
     },
     {
       route: "/accessibility",

@@ -64,34 +64,35 @@ async function css() {
   return cssSource;
 }
 
-test("header nav: the hamburger + dropdown live in a (max-width:768px) block", async () => {
+test("header nav: the hamburger + dropdown live in a (max-width:1080px) block", async () => {
   const blocks = mediaBlocks(await css());
-  // The FIRST 768px block is the nav one (the second is the map sidebar);
-  // find it by its .menu-button rule to stay unambiguous.
-  const nav768 = blocks.find((b) => b.width === 768 && /\.menu-button/.test(b.body));
-  assert.ok(nav768, "expected a @media (max-width:768px) block with the nav rules");
+  // The FIRST 1080px block is the nav one; find it by its .menu-button
+  // rule to stay unambiguous (PR #326 UX: compact desktops and tablets
+  // get the hamburger, before the auth cluster would wrap).
+  const nav1080 = blocks.find((b) => b.width === 1080 && /\.menu-button/.test(b.body));
+  assert.ok(nav1080, "expected a @media (max-width:1080px) block with the nav rules");
 
-  // Hamburger button becomes visible below 768px.
-  assert.match(nav768.body, /\.menu-button\s*\{\s*display:\s*block/, "menu button must show below 768px");
+  // Hamburger button becomes visible below 1080px.
+  assert.match(nav1080.body, /\.menu-button\s*\{\s*display:\s*block/, "menu button must show below 1080px");
 
   // .nav-links collapses into the absolute dropdown (closed by default).
   assert.match(
-    nav768.body,
+    nav1080.body,
     /\.nav-links\s*\{\s*display:\s*none;[^}]*position:\s*absolute/,
-    "nav-links must collapse into the dropdown below 768px",
+    "nav-links must collapse into the dropdown below 1080px",
   );
-  assert.match(nav768.body, /\.nav-links\.is-open\s*\{\s*display:\s*flex/, "is-open reopens the dropdown");
+  assert.match(nav1080.body, /\.nav-links\.is-open\s*\{\s*display:\s*flex/, "is-open reopens the dropdown");
 
   // The auth entry point is part of the dropdown (t_94b3726d).
   assert.match(
-    nav768.body,
+    nav1080.body,
     /\.nav-links\s+\.auth-nav-links\s*\{\s*margin-left:\s*0/,
-    "the auth cluster must be styled INSIDE the dropdown below 768px",
+    "the auth cluster must be styled INSIDE the dropdown below 1080px",
   );
 
   // Scoping: only headers that actually have the hamburger collapse — the
   // auth/record shells (login/register/account/error) keep their inline row.
-  assert.match(nav768.body, /:has\(\.menu-button\)\s+\.nav-links/, "dropdown must be scoped to the hamburger header");
+  assert.match(nav1080.body, /:has\(\.menu-button\)\s+\.nav-links/, "dropdown must be scoped to the hamburger header");
 });
 
 test("header nav: the old (max-width:700px) block no longer carries nav rules", async () => {
@@ -106,7 +107,7 @@ test("header nav: the old (max-width:700px) block no longer carries nav rules", 
 
 test("header nav: desktop (>=768px) keeps the auth cluster visible in the inline row", async () => {
   const source = await css();
-  // Outside any media query: the six links + auth stay in the inline row,
+  // Outside any media query: the primary links + auth stay in the inline row,
   // auth pushed to the right end (the top-right corner of t_65b778c5).
   assert.match(
     source,
@@ -147,8 +148,8 @@ test("PublicNav renders AuthNavLinks inside the mobile menu container (#main-lin
   const publicNavLinks = source.indexOf("<PublicNavLinks />");
   const authNavLinks = source.indexOf("<AuthNavLinks />");
   assert.ok(mainLinks >= 0, "PublicNav must render the #main-links container");
-  assert.ok(publicNavLinks >= 0, "PublicNav must render the six shared links");
-  assert.ok(authNavLinks > publicNavLinks, "AuthNavLinks must follow the six links INSIDE the container");
+  assert.ok(publicNavLinks >= 0, "PublicNav must render the shared primary links");
+  assert.ok(authNavLinks > publicNavLinks, "AuthNavLinks must follow the primary links INSIDE the container");
   assert.ok(authNavLinks > mainLinks, "AuthNavLinks must be inside #main-links (the mobile menu)");
   assert.doesNotMatch(source, /trailing=/, "no top-bar trailing slot anymore");
 });

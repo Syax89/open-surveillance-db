@@ -9,11 +9,11 @@ import { LegalTableWrap } from "./LegalTableWrap";
  *
  * Server Component (no "use client"): pages render statically with per-route
  * metadata (SSR/SEO, task t_c36fe96c). The only client island is the shared
- * public header <PublicNav /> (brand + six public nav links + mobile menu +
+ * public header <PublicNav /> (brand + primary public nav links + mobile menu +
  * LocaleToggle). The nav landmark labels come from the page as props (the
  * page is a Server Component and cannot call useMessages()); the nav LINK
- * SET is the shared public set (PublicNavLinks via PublicNav, t_a72a3106) —
- * the same six links of the home hub on EVERY public page, with the current
+ * SET is the shared public set (PublicNavLinks via PublicNav) — the same
+ * primary links of the home hub on EVERY public page, with the current
  * page marked aria-current (CEO check 2026-08-02). Content is passed as
  * data by the same page.
  *

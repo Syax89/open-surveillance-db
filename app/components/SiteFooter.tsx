@@ -20,11 +20,9 @@ const footerByLocale: Record<Locale, Translation<typeof footerEn>> = {
  * Rendered once in the root layout so every page — public, guide, record,
  * moderation and auth — shares the same navigation and the required data
  * attribution:
- *  - links to the four public tool routes (map, directory, report,
- *    correction) first, then the institutional pages (manifesto, rules,
- *    guide, privacy, terms, licenses, FAQ, contact, accessibility
- *    statement): the tools are never dead ends and every public surface is
- *    reachable from every page (F3 t_2ca69725, FRONTEND_DESIGN §2.5);
+ *  - a grouped route directory: explore, contribute, project and legal.
+ *    This keeps the tools prominent without turning the footer into a flat
+ *    wall of links; every public surface remains reachable from every page;
  *  - the ODbL 1.0 data licence notice for the database and exports
  *    (ADR 0008, docs/OPEN_SOURCE.md);
  *  - the OpenStreetMap attribution required for the map base layer
@@ -61,20 +59,34 @@ export function SiteFooter() {
         <p>{t.tagline}</p>
       </div>
       <nav className="footer-links" aria-label={t.navigation}>
-        <Link href="/mappa" aria-current={pageCurrent("/mappa")}>{t.toolMap}</Link>
-        <Link href="/directory" aria-current={pageCurrent("/directory")}>{t.toolDirectory}</Link>
-        <Link href="/segnala" aria-current={pageCurrent("/segnala")}>{t.toolReport}</Link>
-        <Link href="/correggi" aria-current={pageCurrent("/correggi")}>{t.toolCorrection}</Link>
-        <Link href="/manifesto" aria-current={pageCurrent("/manifesto")}>{t.manifesto}</Link>
-        <Link href="/regole" aria-current={pageCurrent("/regole")}>{t.rules}</Link>
-        <Link href="/guide" aria-current={pageCurrent("/guide")}>{t.guide}</Link>
-        <Link href="/privacy" aria-current={pageCurrent("/privacy")}>{t.privacy}</Link>
-        <Link href="/termini" aria-current={pageCurrent("/termini")}>{t.terms}</Link>
-        <Link href="/licenze" aria-current={pageCurrent("/licenze")}>{t.licenses}</Link>
-        <Link href="/fonti" aria-current={pageCurrent("/fonti")}>{t.sources}</Link>
-        <Link href="/accessibility" aria-current={pageCurrent("/accessibility")}>{t.accessibility}</Link>
-        <Link href="/faq" aria-current={pageCurrent("/faq")}>{t.faq}</Link>
-        <Link href="/contatti" aria-current={pageCurrent("/contatti")}>{t.contact}</Link>
+        <div className="footer-link-group">
+          <p className="footer-link-group-title">{t.exploreGroup}</p>
+          <Link href="/mappa" aria-current={pageCurrent("/mappa")}>{t.toolMap}</Link>
+          <Link href="/directory" aria-current={pageCurrent("/directory")}>{t.toolDirectory}</Link>
+        </div>
+        <div className="footer-link-group">
+          <p className="footer-link-group-title">{t.contributeGroup}</p>
+          <Link href="/segnala" aria-current={pageCurrent("/segnala")}>{t.toolReport}</Link>
+          <Link href="/correggi" aria-current={pageCurrent("/correggi")}>{t.toolCorrection}</Link>
+          <Link href="/regole" aria-current={pageCurrent("/regole")}>{t.rules}</Link>
+        </div>
+        <div className="footer-link-group">
+          <p className="footer-link-group-title">{t.projectGroup}</p>
+          <Link href="/guide" aria-current={pageCurrent("/guide")}>{t.guide}</Link>
+          <Link href="/manifesto" aria-current={pageCurrent("/manifesto")}>{t.manifesto}</Link>
+          <Link href="/fonti" aria-current={pageCurrent("/fonti")}>{t.sources}</Link>
+          <Link href="/faq" aria-current={pageCurrent("/faq")}>{t.faq}</Link>
+          <Link href="/contatti" aria-current={pageCurrent("/contatti")}>{t.contact}</Link>
+        </div>
+        <details className="footer-link-group footer-policy-group">
+          <summary>{t.legalGroup}</summary>
+          <div className="footer-policy-links">
+            <Link href="/privacy" aria-current={pageCurrent("/privacy")}>{t.privacy}</Link>
+            <Link href="/termini" aria-current={pageCurrent("/termini")}>{t.terms}</Link>
+            <Link href="/licenze" aria-current={pageCurrent("/licenze")}>{t.licenses}</Link>
+            <Link href="/accessibility" aria-current={pageCurrent("/accessibility")}>{t.accessibility}</Link>
+          </div>
+        </details>
       </nav>
       <p className="footer-legal">
         <a href="https://opendatacommons.org/licenses/odbl/1-0/" rel="license">{t.dataLicense}</a>

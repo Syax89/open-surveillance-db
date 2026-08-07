@@ -55,7 +55,32 @@ export function CorrectionForm({ records, defaultRecordId = null, showHeading = 
   }
 
   return (
-    <section className="correction-section" id="correction" aria-labelledby={showHeading ? "correction-title" : undefined} aria-label={showHeading ? undefined : t.accountability}><div>{showHeading && <><p className="eyebrow"><span /> {t.accountability}</p><h2 id="correction-title">{t.correctionTitle}</h2><p>{t.correctionIntro}</p></>}<div className="report-rule"><b>{t.urgentConcern}</b><br />{t.urgentConcernBody}</div></div><form className="correction-form" onSubmit={submitCorrection}>{preselected && <p className="notice" role="status">{t.recordPreselected(preselected.id, preselected.title)}</p>}<label>{t.relatedRecord}<select name="cameraId" defaultValue={preselected ? String(preselected.id) : ""}><option value="">{t.noSpecificRecord}</option>{records.map((camera) => <option key={camera.id} value={camera.id}>{camera.id} — {camera.title}</option>)}</select></label><label>{t.needsReview}<select required name="issueType" defaultValue=""><option value="" disabled>{t.selectOne}</option><option value="inaccurate">{t.inaccurate}</option><option value="missing">{t.missing}</option><option value="removal">{t.removal}</option><option value="abuse">{t.abuse}</option><option value="other">{t.other}</option></select></label><label>{t.briefDescription}<textarea required name="message" maxLength={1500} rows={4} placeholder={t.correctionPlaceholder} /></label><label>{t.contactEmail}<input type="email" name="contact" maxLength={180} placeholder={t.contactPlaceholder} /></label><label className="check-label"><input type="checkbox" required aria-describedby="correction-art13-note" /> <span>{t.correctionConsent} <a href="/privacy">{t.privacyNotice}</a> · <a href="/termini">{t.termsOfUse}</a></span></label><p className="legal-microcopy" id="correction-art13-note">{t.correctionArt13} <a href="/privacy">{t.privacyNotice}</a>. {t.correctionArt13Rights} <a href="mailto:privacy@opensurveillancedb.org">{t.privacyContact}</a>.</p><button className="button button-primary" type="submit">{t.sendPrivateRequest} <span aria-hidden="true">→</span></button>{correctionNotice && <p className="notice" role="status">{correctionNotice}</p>}</form></section>
+    <section className="correction-section" id="correction" aria-labelledby={showHeading ? "correction-title" : undefined} aria-label={showHeading ? undefined : t.accountability}>
+      <div>
+        {showHeading && <><p className="eyebrow"><span /> {t.accountability}</p><h2 id="correction-title">{t.correctionTitle}</h2><p>{t.correctionIntro}</p></>}
+        <div className="report-rule"><b>{t.urgentConcern}</b><br />{t.urgentConcernBody}</div>
+      </div>
+      <form className="correction-form" onSubmit={submitCorrection}>
+        {preselected && <p className="notice" role="status">{t.recordPreselected(preselected.id, preselected.title)}</p>}
+        <fieldset className="contribution-step">
+          <legend>{t.stepRecord}</legend>
+          <label>{t.relatedRecord}<select name="cameraId" defaultValue={preselected ? String(preselected.id) : ""}><option value="">{t.noSpecificRecord}</option>{records.map((camera) => <option key={camera.id} value={camera.id}>{camera.id} — {camera.title}</option>)}</select></label>
+        </fieldset>
+        <fieldset className="contribution-step">
+          <legend>{t.stepIssue}</legend>
+          <label>{t.needsReview}<select required name="issueType" defaultValue=""><option value="" disabled>{t.selectOne}</option><option value="inaccurate">{t.inaccurate}</option><option value="missing">{t.missing}</option><option value="removal">{t.removal}</option><option value="abuse">{t.abuse}</option><option value="other">{t.other}</option></select></label>
+          <label>{t.briefDescription}<textarea required name="message" maxLength={1500} rows={4} placeholder={t.correctionPlaceholder} /></label>
+        </fieldset>
+        <fieldset className="contribution-step contribution-step-send">
+          <legend>{t.stepContact}</legend>
+          <label>{t.contactEmail}<input type="email" name="contact" maxLength={180} placeholder={t.contactPlaceholder} /></label>
+          <label className="check-label"><input type="checkbox" required aria-describedby="correction-art13-note" /> <span>{t.correctionConsent} <a href="/privacy">{t.privacyNotice}</a> · <a href="/termini">{t.termsOfUse}</a></span></label>
+          <p className="legal-microcopy" id="correction-art13-note">{t.correctionArt13} <a href="/privacy">{t.privacyNotice}</a>. {t.correctionArt13Rights} <a href="mailto:privacy@opensurveillancedb.org">{t.privacyContact}</a>.</p>
+          <button className="button button-primary" type="submit">{t.sendPrivateRequest} <span aria-hidden="true">→</span></button>
+        </fieldset>
+        {correctionNotice && <p className="notice" role="status">{correctionNotice}</p>}
+      </form>
+    </section>
 
   );
 }

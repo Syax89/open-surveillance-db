@@ -199,34 +199,18 @@ test("the alphabetical index hides in positional order (and the sort select stil
 });
 
 // ---------------------------------------------------------------------------
-// Place-search toggle (controls row) + panel
+// Single directory search: records while typing, places on Enter
 // ---------------------------------------------------------------------------
 
-test("the place-search toggle lives in the controls row and opens a styled panel with the historical ids", async () => {
+test("the directory search is the only search field and submits a place lookup on Enter", async () => {
   await setUrlState("/directory");
   installRecords(FOUR_LETTERS);
   const { container } = await renderWithLocale(React.createElement(DirectoryTool));
   await rtl.waitFor(() => assert.equal(rows(container), 4));
 
-  const controls = container.querySelector(".directory-controls");
-  const toggle = controls?.querySelector(".place-search-toggle");
-  assert.ok(toggle, "the toggle is part of the controls row (one search cluster)");
-  assert.equal(toggle.getAttribute("aria-expanded"), "false");
-  assert.equal(toggle.getAttribute("aria-controls"), "directory-place-panel");
-
-  const closedPanel = container.querySelector("#directory-place-panel");
-  assert.ok(closedPanel, "the panel keeps its historical id");
-  assert.ok(closedPanel.classList.contains("place-search-closed"), "the panel starts closed via class (never the hidden attribute)");
-
-  await rtl.userEvent.click(toggle);
-  assert.equal(toggle.getAttribute("aria-expanded"), "true");
-  assert.match(toggle.textContent ?? "", /Hide place search/);
-  assert.ok(!closedPanel.classList.contains("place-search-closed"), "the panel opens on toggle");
-  const input = container.querySelector("#place-search");
-  assert.ok(input, "the place-search input keeps its historical id");
-  assert.ok(input.getAttribute("type") === "search");
-
-  await rtl.userEvent.click(toggle);
-  assert.equal(toggle.getAttribute("aria-expanded"), "false");
-  assert.ok(closedPanel.classList.contains("place-search-closed"), "the panel closes on toggle (display:none — out of tab order)");
+  const search = container.querySelector("#record-search");
+  assert.ok(search, "the primary search remains available");
+  assert.equal(container.querySelector("#place-search"), null, "there is no separate place-search field");
+  assert.equal(container.querySelector(".place-search-toggle"), null, "there is no second search trigger");
+  assert.match(search.getAttribute("placeholder") ?? "", /place/, "the field explains that it accepts a place");
 });

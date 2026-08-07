@@ -213,8 +213,17 @@ button { cursor:pointer; }
    page header as a context action aligned to the baseline of the intro —
    the records-heading action row no longer exists on the tool page. The
    modifier keeps /segnala and /correggi headers untouched. */
-.directory-tool-heading { display:flex; justify-content:space-between; align-items:flex-end; gap:var(--space-6); }
-.directory-tool-heading .text-button { flex:none; margin-bottom:4px; white-space:nowrap; }
+.directory-tool { padding-top:6px; }
+.directory-explorer-card { overflow:hidden; border:1px solid var(--line); border-radius:var(--radius-xl); background:var(--card-bg); box-shadow:0 20px 45px rgba(25,46,52,.08); }
+.directory-explorer-toolbar { display:flex; align-items:center; justify-content:space-between; gap:var(--space-4); padding:10px 18px; border-bottom:1px solid var(--line); background:var(--card-bg); }
+.directory-explorer-toolbar > p { margin:0; color:var(--label); font-size:var(--text-xs); font-weight:800; letter-spacing:.1em; text-transform:uppercase; }
+.directory-tool .directory-explorer-card .records-section { width:100%; margin:0; padding:0 24px 32px; }
+.directory-tool .directory-explorer-card .directory-controls { margin:0 -24px; padding:12px 24px; border-bottom:1px solid var(--line); background:var(--map-surface); }
+.directory-tool .directory-explorer-card .directory-results { margin-top:24px; padding-top:18px; }
+.explore-view-switch { display:inline-flex; align-items:center; gap:2px; flex:none; padding:4px; border:1px solid var(--line); border-radius:var(--radius-md); background:var(--card-bg); }
+.explore-view-switch a { min-height:44px; display:inline-flex; align-items:center; padding:0 12px; border-radius:var(--radius-sm); color:var(--nav-ink); font-size:var(--text-sm); font-weight:800; text-decoration:none; }
+.explore-view-switch a[aria-current="page"] { background:var(--heading); color:var(--white); }
+.explore-view-switch a:focus-visible { outline:3px solid var(--focus); outline-offset:2px; }
 .nav-shell { width:var(--container-wide); margin:0 auto; padding:22px 0; display:flex; align-items:center; justify-content:space-between; gap:var(--space-6); }
 .brand { display:inline-flex; align-items:center; gap:10px; font-weight:800; letter-spacing:-.04em; font-size:19px; }
 .brand-mark { display:grid; place-items:center; width:29px; height:29px; border-radius:var(--radius-round); background:var(--ink); color:var(--mint); font-size:var(--text-4xl); line-height:1; }
@@ -277,6 +286,12 @@ button { cursor:pointer; }
    break for unbreakable tokens (e.g. "OpenSurveillanceDB"). */
 .hero h1 { margin:0; max-width:590px; font-size:var(--text-hero); line-height:1.06; letter-spacing:-.075em; font-weight:800; text-wrap:balance; overflow-wrap:anywhere; }
 .hero-intro { max-width:525px; margin:28px 0; color:var(--hero-intro-ink); font-size:var(--text-3xl); line-height:1.58; text-wrap:balance; }
+.hero-search { display:flex; max-width:525px; margin:0 0 16px; border:1px solid rgba(222,245,234,.42); border-radius:var(--radius-lg); background:rgba(255,255,255,.08); overflow:hidden; }
+.hero-search input { min-width:0; flex:1; border:0; padding:13px 15px; background:transparent; color:var(--hero-ink); font-size:var(--text-base); }
+.hero-search input::placeholder { color:var(--hero-stat-ink); opacity:1; }
+.hero-search input:focus-visible { outline:3px solid var(--mint); outline-offset:-3px; }
+.hero-search button { flex:none; border:0; border-left:1px solid rgba(222,245,234,.32); padding:0 16px; background:var(--mint); color:var(--button-ink); font-size:var(--text-base); font-weight:800; }
+.hero-search button:hover { background:var(--mint-hover); }
 .hero-actions { display:flex; align-items:center; gap:var(--space-3); flex-wrap:wrap; }
 .button { border:1px solid transparent; padding:13px 18px; border-radius:var(--radius-lg); display:inline-flex; align-items:center; gap:13px; font-size:var(--text-base); font-weight:800; transition:transform .2s ease, background .2s ease; }
 .button:hover { transform:translateY(-2px); }
@@ -287,6 +302,9 @@ button { cursor:pointer; }
 .hero-stats div { border-left:1px solid rgba(208,240,228,.3); padding-left:12px; }
 .hero-stats dt { font-size:21px; font-weight:800; letter-spacing:-.04em; }
 .hero-stats dd { margin:4px 0 0; color:var(--hero-stat-ink); font-size:var(--text-xs); }
+.hero-trust-note { max-width:525px; margin:26px 0 0; color:var(--hero-stat-ink); font-size:var(--text-sm); line-height:1.5; }
+.hero-trust-note a { color:var(--mint); font-weight:800; text-decoration:underline; text-decoration-thickness:1px; text-underline-offset:3px; }
+.hero-trust-note a:hover { color:var(--mint-hover); }
 .hero-visual { position:relative; overflow:hidden; isolation:isolate; background:radial-gradient(circle at 75% 20%, var(--visual-mid) 0, var(--visual-blue) 24%, transparent 46%),linear-gradient(135deg,var(--visual-deep),var(--visual-deeper)); }
 .hero-grid { position:absolute; inset:-20%; opacity:.6; background-image:linear-gradient(rgba(161,222,208,.11) 1px, transparent 1px),linear-gradient(90deg, rgba(161,222,208,.11) 1px, transparent 1px); background-size:42px 42px; transform:rotate(-24deg) scale(1.2); }
 .hero-orbit { position:absolute; border:1px solid rgba(166,237,210,.2); border-radius:var(--radius-round); }
@@ -322,7 +340,7 @@ button { cursor:pointer; }
 .tool-card:focus-visible { outline:3px solid var(--focus); outline-offset:2px; }
 .tool-card-icon { display:grid; place-items:center; width:38px; height:38px; border-radius:var(--radius-lg); background:var(--surface-muted); color:var(--icon-ink); font-size:var(--text-3xl); line-height:1; }
 .tool-card-title { font-size:var(--text-3xl); font-weight:800; letter-spacing:-.03em; color:var(--ink); text-wrap:balance; }
-.tool-card-body { margin:0; color:var(--ink-3); font-size:var(--text-md); line-height:1.5; text-wrap:balance; }
+.tool-card-body { margin:0; color:var(--ink-3); font-size:var(--text-base); line-height:1.55; text-wrap:balance; }
 .map-section, .principles, .report-section, footer { width:var(--container-standard); margin-left:auto; margin-right:auto; }
 .map-section { padding:112px 0 102px; }
 .section-heading { display:flex; align-items:end; justify-content:space-between; margin-bottom:30px; gap:var(--space-6); }
@@ -335,17 +353,18 @@ button { cursor:pointer; }
 .map-fallback { display:grid; place-content:center; gap:var(--space-3); height:100%; min-height:540px; padding:var(--space-8); text-align:center; background:var(--map-fallback-bg); color:var(--ink-2); font-size:var(--text-base); line-height:1.5; }
 .map-fallback p { max-width:440px; margin:0 auto; }
 .map-fallback-title { font-size:var(--text-2xl); font-weight:800; color:var(--heading); }
-.map-hint { position:absolute; z-index:500; left:16px; bottom:16px; max-width:calc(100% - 32px); padding:9px 11px; border:1px solid rgba(202,215,205,.9); border-radius:var(--radius-sm); background:rgba(255,255,251,.92); box-shadow:0 2px 12px rgba(30,48,40,.12); color:var(--map-hint-ink); font-size:var(--text-xs); font-weight:700; overflow-wrap:anywhere; }
-/* Explicit "Add here" mode (popup lifecycle t_33b82720): the coordinate
-   picker opens only while this accessible toggle is active — base map
-   navigation is silent. The toggle floats above the Leaflet container
-   (z-index above Leaflet's panes, which top out at 700) and sits OUTSIDE
-   .live-map so the map never swallows its clicks. */
-.map-addmode { position:absolute; z-index:800; top:12px; right:12px; display:flex; flex-direction:column; align-items:flex-end; gap:6px; }
-.map-addmode-toggle { min-height:44px; padding:8px 14px; border:1px solid var(--line); border-radius:var(--radius-full); background:rgba(255,255,251,.95); box-shadow:0 2px 12px rgba(30,48,40,.14); color:var(--ink-2); font-size:var(--text-sm); font-weight:800; cursor:pointer; }
-.map-addmode-toggle[aria-pressed="true"] { background:var(--status-active, #1e6b57); border-color:transparent; color:#fff; }
-.map-addmode-toggle:focus-visible { outline:3px solid var(--focus-ring, #2f7d68); outline-offset:2px; }
-.map-addmode-hint { margin:0; max-width:260px; padding:7px 10px; border:1px solid rgba(202,215,205,.9); border-radius:var(--radius-sm); background:rgba(255,255,251,.92); box-shadow:0 2px 12px rgba(30,48,40,.12); color:var(--map-hint-ink); font-size:var(--text-xs); font-weight:700; overflow-wrap:anywhere; text-align:right; }
+.map-legend { position:absolute; z-index:800; left:12px; bottom:12px; max-width:min(330px, calc(100% - 24px)); border:1px solid rgba(202,215,205,.9); border-radius:var(--radius-md); background:rgba(255,255,251,.95); box-shadow:0 2px 12px rgba(30,48,40,.12); color:var(--map-hint-ink); overflow:hidden; }
+.map-legend summary { display:flex; align-items:center; gap:8px; min-height:36px; padding:0 11px; color:var(--ink-2); cursor:pointer; font-size:var(--text-xs); font-weight:800; list-style:none; }
+.map-legend summary::-webkit-details-marker { display:none; }
+.map-legend summary::before { content:"?"; display:grid; place-items:center; width:17px; height:17px; border-radius:var(--radius-round); background:var(--action); color:var(--white); font-size:11px; line-height:1; }
+.map-legend summary::after { content:"+"; margin-left:auto; color:var(--action); font-size:var(--text-lg); }
+.map-legend[open] summary { border-bottom:1px solid var(--line); }
+.map-legend[open] summary::after { content:"−"; }
+.map-legend summary:focus-visible { outline:3px solid var(--focus); outline-offset:-3px; }
+.map-legend > div { padding:10px 11px 12px; font-size:var(--text-xs); line-height:1.42; }
+.map-legend p { margin:0 0 7px; }
+.map-legend p:last-of-type { margin-bottom:9px; }
+.map-legend a { color:var(--action); font-weight:800; }
 .osm-camera-marker { display:grid; place-items:center; width:25px; height:25px; border:3px solid white; border-radius:var(--radius-round); background:var(--marker); box-shadow:0 2px 7px rgba(30,54,45,.35); }
 .osm-camera-marker i { width:8px; height:8px; border-radius:var(--radius-round); background:var(--mint); }
 .osm-camera-marker.demo { background:var(--status-demo); }
@@ -409,6 +428,47 @@ button { cursor:pointer; }
 .offline-state { margin:16px 0 0; padding:12px 15px; border-left:3px solid var(--offline-accent); background:var(--offline-bg); color:var(--offline-ink); border-radius:var(--radius-xs); font-size:var(--text-md); }
 .offline-state .text-button { color:var(--offline-ink); text-decoration:underline; }
 .principles { display:grid; grid-template-columns:.85fr 1.15fr; gap:90px; padding:85px 0; border-top:1px solid var(--line); }
+.guide-overview { width:var(--container-standard); margin:0 auto; display:grid; grid-template-columns:.85fr 1.15fr; gap:90px; padding:0 0 72px; }
+.guide-overview h2 { max-width:390px; margin:0; color:var(--ink); font-size:var(--text-section); letter-spacing:-.065em; line-height:1; font-weight:800; text-wrap:balance; }
+.guide-overview ul { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin:0; padding:0; list-style:none; }
+.guide-overview a { display:flex; align-items:center; justify-content:space-between; min-height:52px; padding:11px 14px; border:1px solid var(--line); border-radius:var(--radius-md); background:var(--card-bg); color:var(--nav-ink); font-size:var(--text-sm); font-weight:800; line-height:1.35; text-decoration:none; transition:border-color .2s ease, transform .2s ease; }
+.guide-overview a::after { content:"↘"; flex:none; margin-left:10px; color:var(--focus); font-size:var(--text-lg); }
+.guide-overview a:hover { border-color:var(--focus); transform:translateY(-1px); }
+.guide-section-anchor { scroll-margin-top:28px; }
+.guide-overview { padding-bottom:48px; }
+.guide-overview, .guide-principles, .report-section.guide-publication-section, .guide-publication-details, .records-section.guide-section-anchor, .correction-section.guide-section-anchor { width:var(--container-readable); }
+.guide-overview { grid-template-columns:1fr; gap:28px; }
+.guide-overview h2 { max-width:560px; }
+.guide-principles { gap:60px; padding:56px 0; border-top:0; }
+.guide-principles { grid-template-columns:1fr; gap:28px; }
+.guide-principles .principles-intro>p:not(.eyebrow) { max-width:640px; }
+.guide-principles .principles-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.guide-principles .principles-grid article:last-child { grid-column:1/-1; }
+.guide-principles .principles-grid article { min-height:0; }
+.report-section.guide-publication-section { gap:64px; padding:60px 0 64px; }
+.report-section.guide-publication-section { grid-template-columns:1fr; gap:28px; }
+.report-section.guide-publication-section>div>p:not(.eyebrow) { max-width:640px; }
+.guide-publication-details { margin:0 auto; padding:0 0 56px; }
+.guide-publication-details>div>h2 { max-width:560px; margin:0 0 22px; color:var(--ink); font-size:var(--text-section); letter-spacing:-.06em; line-height:1.02; text-wrap:balance; }
+.guide-publication-details details { border:1px solid var(--line); border-radius:var(--radius-xl); background:var(--card-bg); overflow:hidden; }
+.guide-publication-details summary { display:flex; align-items:center; justify-content:space-between; gap:var(--space-4); min-height:60px; padding:16px 20px; cursor:pointer; color:var(--nav-ink); font-size:var(--text-lg); font-weight:800; list-style:none; }
+.guide-publication-details summary::-webkit-details-marker { display:none; }
+.guide-publication-details summary::after { content:"+"; display:grid; flex:none; place-items:center; width:28px; height:28px; border-radius:var(--radius-round); background:var(--coordinate-bg); color:var(--icon-ink); font-size:var(--text-2xl); }
+.guide-publication-details details[open] summary { border-bottom:1px solid var(--line); }
+.guide-publication-details details[open] summary::after { content:"–"; }
+.guide-publication-details summary:focus-visible { outline:3px solid var(--focus); outline-offset:-3px; }
+.guide-publication-details-body { padding:28px 20px 20px; }
+.guide-publication-details-intro { max-width:760px; margin:0 0 26px; color:var(--ink-4); font-size:var(--text-lg); line-height:1.55; }
+.guide-publication-details-notes { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--space-4); margin-top:var(--space-4); }
+.guide-publication-details-notes .report-rule { margin:0; }
+.guide-publication-details-notes ul { display:grid; gap:10px; margin:16px 0 0; padding-left:20px; }
+.records-section.guide-section-anchor { padding-bottom:64px; }
+.records-section.guide-section-anchor .records-heading { padding:44px 0 20px; border-top:0; }
+.records-section.guide-section-anchor .record-list-card { min-height:0; gap:14px; padding:20px; border:0; background:var(--surface-muted); box-shadow:none; }
+.records-section.guide-section-anchor .record-list-card:nth-child(2n) { background:var(--principle-surface-2); }
+.records-section.guide-section-anchor .record-list-card:nth-child(3n) { background:var(--principle-surface-3); }
+.guide-publication-section .report-form, .guide-publication-details .report-form, .correction-section.guide-section-anchor .correction-form { border:0; background:var(--surface-muted); }
+.correction-section.guide-section-anchor { grid-template-columns:1fr; gap:28px; padding-bottom:64px; }
 .principles-intro>p:not(.eyebrow) { max-width:440px; color:var(--ink-3); font-size:var(--text-2xl); line-height:1.6; text-wrap:balance; }
 .principles-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:var(--space-4); }
 .principles-grid article { min-height:228px; padding:22px; background:var(--surface-muted); border-radius:var(--radius-lg); }
@@ -456,6 +516,12 @@ button { cursor:pointer; }
 .correction-form input:focus, .correction-form select:focus, .correction-form textarea:focus { border-color:var(--control-focus); outline:3px solid var(--focus); outline-offset:2px; }
 .correction-form textarea { resize:vertical; }
 .correction-form .check-label { grid-template-columns:17px 1fr; align-items:start; gap:9px; font-size:var(--text-sm); line-height:1.4; font-weight:400; }
+/* Contribution forms: short, numbered groups make the next decision obvious
+   without turning a simple form into a multi-page wizard. */
+.contribution-step { min-width:0; display:grid; gap:16px; margin:0; padding:18px; border:1px solid var(--line); border-left:3px solid var(--control-focus); border-radius:var(--radius-md); background:var(--white); }
+.contribution-step legend { padding:0 5px; color:var(--heading); font-size:var(--text-md); font-weight:800; letter-spacing:-.01em; }
+.contribution-step-send { background:var(--surface-muted); }
+.contribution-step-send .button-primary { justify-self:start; }
 .records-section { width:var(--container-standard); margin:0 auto; padding:0 0 95px; }
 .records-heading { display:flex; justify-content:space-between; align-items:end; gap:30px; padding:68px 0 26px; border-top:1px solid var(--line); }
 .records-heading h2 { max-width:650px; margin:0; font-size:var(--text-section); letter-spacing:-.065em; line-height:1; font-weight:800; }
@@ -479,7 +545,7 @@ button { cursor:pointer; }
 .record-kind { margin:0; color:var(--supporting); font-size:var(--text-base); }
 .record-list-card dl { display:grid; grid-template-columns:repeat(3,1fr); gap:13px; align-items:start; margin:0; }
 .record-list-card dt { margin-bottom:4px; color:var(--label); font-size:var(--text-2xs); text-transform:uppercase; letter-spacing:.1em; font-weight:800; }
-.record-list-card dd { margin:0; color:var(--ink-5); font-size:var(--text-sm); line-height:1.4; overflow-wrap:anywhere; }
+.record-list-card dd { margin:0; color:var(--ink-5); font-size:var(--text-base); line-height:1.45; overflow-wrap:anywhere; }
 .record-list-actions { display:flex; align-items:center; justify-content:space-between; gap:var(--space-4); }
 /* /directory catalog rows (t_127492f1; fix t_d089a17e): VISIBLE card
    container per row — the hairline flat rows blended into the paper
@@ -527,6 +593,17 @@ button { cursor:pointer; }
 .records-section .record-list .record-list-card .card-topline { color:var(--muted); }
 .records-section .record-list .record-list-card .record-kind { color:var(--tint-ink); }
 .records-section .record-list .record-list-card dt { color:var(--tint-ink); }
+/* t_ab92aa92 (P1 a11y): --card-label/--supporting/--muted/--tint-ink falliscono
+   (3.68-4.49:1) sulle superfici muted della guida (--surface-muted e
+   --principle-surface-2/3). Il testo delle card della guida passa a --ink-2
+   (5.75-6.08:1, >= 4.5:1 AA). Specificita' >= (0,4,0) per vincere su
+   `.records-section .record-list .record-list-card .card-topline/--kind`
+   (--muted/--tint-ink); scoped a .guide-section-anchor (solo /guide): le
+   altre pagine info restano intatte. */
+.records-section.guide-section-anchor .record-list-card .card-topline,
+.records-section.guide-section-anchor .record-list-card .record-kind,
+.guide-section-anchor .report-form .card-topline,
+.guide-section-anchor .correction-form .card-topline { color: var(--ink-2); }
 .records-section .record-list .record-list-card:has(.status-dot.verified) { border-left-color:var(--status-verified); background:var(--status-verified-card-bg); }
 .records-section .record-list .record-list-card:has(.status-dot.community-report) { border-left-color:var(--status-community); background:var(--status-community-bg); }
 .records-section .record-list .record-list-card:has(.status-dot.needs-review) { border-left-color:var(--status-review); background:var(--status-review-card-bg); }
@@ -596,18 +673,26 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 .site-footer { display:grid; grid-template-columns:auto 1fr auto; align-items:start; gap:28px 32px; }
 .site-footer .footer-brand { display:grid; gap:10px; justify-items:start; max-width:320px; }
 .site-footer .footer-brand p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-height:1.5; }
-.site-footer .footer-links { justify-content:flex-start; flex-wrap:wrap; gap:10px 20px; align-self:center; max-width:560px; }
-.site-footer .footer-links a { color:var(--nav-ink); }
+.site-footer .footer-links { display:grid; grid-template-columns:repeat(4,minmax(112px,1fr)); align-self:start; gap:24px 26px; max-width:720px; }
+.site-footer .footer-link-group { display:grid; align-content:start; gap:8px; min-width:0; }
+.site-footer .footer-link-group-title, .site-footer .footer-policy-group summary { margin:0 0 2px; color:var(--label); font-size:var(--text-2xs); font-weight:800; line-height:1.35; letter-spacing:.1em; text-transform:uppercase; }
+.site-footer .footer-links a { width:fit-content; max-width:100%; color:var(--nav-ink); font-size:var(--text-sm); line-height:1.45; overflow-wrap:anywhere; }
+.site-footer .footer-policy-group summary { display:inline-flex; align-items:center; gap:6px; min-height:44px; padding:0 4px; border-radius:var(--radius-sm); width:fit-content; cursor:pointer; list-style:none; }
+.site-footer .footer-policy-group summary::-webkit-details-marker { display:none; }
+.site-footer .footer-policy-group summary:focus-visible { outline:3px solid var(--focus); outline-offset:2px; }
+.site-footer .footer-policy-group summary::after { content:"+"; color:var(--focus); font-size:var(--text-md); line-height:1; }
+.site-footer .footer-policy-group[open] summary::after { content:"−"; }
+.site-footer .footer-policy-links { display:grid; gap:8px; margin-top:6px; }
 .site-footer .footer-legal { margin:0; align-self:end; justify-self:end; text-align:right; color:var(--muted); font-size:var(--text-xs); line-height:1.6; }
 .site-footer .footer-legal a { color:var(--focus); font-weight:800; text-decoration:underline; text-underline-offset:2px; }
 @media (max-width:980px) {
   .site-footer { grid-template-columns:1fr auto; }
-  .site-footer .footer-links { grid-column:1/-1; order:3; justify-content:flex-start; }
+  .site-footer .footer-links { grid-column:1/-1; order:3; grid-template-columns:repeat(4,minmax(0,1fr)); max-width:none; }
   .site-footer .footer-legal { align-self:end; }
 }
 @media (max-width:700px) {
   .site-footer { grid-template-columns:1fr; gap:18px; }
-  .site-footer .footer-links { grid-column:auto; order:0; }
+  .site-footer .footer-links { grid-column:auto; order:0; grid-template-columns:repeat(2,minmax(0,1fr)); gap:22px 20px; }
   .site-footer .footer-legal { justify-self:start; text-align:left; }
 }
 @media (max-width:980px) {
@@ -623,28 +708,28 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
   .text-button { grid-column:2 }
   .records-heading { align-items:start;flex-direction:column }
   .record-list, .moderation-list { grid-template-columns:1fr }
-  .principles, .report-section, .correction-section { gap:45px }
-  .principles { grid-template-columns:1fr }
+  .principles, .guide-overview, .report-section, .correction-section { gap:45px }
+  .principles, .guide-overview { grid-template-columns:1fr }
   .report-section, .correction-section { grid-template-columns:1fr 1fr }
   .principles-grid { max-width:720px }
 }
-@media (max-width:768px) {
-  /* Header nav (t_94b3726d): the hamburger + dropdown now cover <768px —
-     the range where the six links + auth entry point cannot fit on one
-     line (the old 700px boundary left 701-767px overflowing). Scoped with
+@media (max-width:1080px) {
+  /* Header nav: the hamburger + dropdown cover compact desktops and tablets,
+     before the login/register cluster would wrap below the primary row.
+     Scoped with
      :has(.menu-button) so the auth/record shells (login, register,
      account, error — no hamburger) keep their inline "back home" row. */
   .nav-shell { width:min(100% - 32px,1180px); padding:16px 0; position:relative }
   .menu-button { display:block }
   .nav-shell:has(.menu-button) .nav-links { display:none; position:absolute; z-index:10; top:62px; right:0; left:0; padding:var(--space-4); border:1px solid var(--line); border-radius:var(--radius-lg); background:var(--white); box-shadow:0 12px 24px rgba(30,45,45,.15); flex-direction:column; flex-wrap:nowrap; align-items:stretch; gap:14px }
   .nav-shell:has(.menu-button) .nav-links.is-open { display:flex }
-  /* Auth links travel with the dropdown (t_94b3726d): separated from the
-     six content links by a hairline, as a full-width bottom row. */
+  /* Auth links travel with the dropdown: separated from the primary
+     content links by a hairline, as a full-width bottom row. */
   .nav-shell:has(.menu-button) .nav-links .auth-nav-links { margin-left:0; margin-top:2px; padding-top:14px; border-top:1px solid var(--line); justify-content:space-between }
   .nav-shell:has(.menu-button) .nav-action { text-align:center }
 }
 @media (max-width:700px) {
-  .hero, .map-section, .records-section, .principles, .report-section, .correction-section, .moderation-page, footer, .tool-section, .founder-declaration { width:min(100% - 32px,1180px) }
+  .hero, .map-section, .records-section, .principles, .guide-overview, .report-section, .correction-section, .moderation-page, footer, .tool-section, .founder-declaration { width:min(100% - 32px,1180px) }
   .tool-section { padding:40px 0 72px }
   .nav-actions, .nav-record-actions { gap:9px }
   .nav-record-actions .text-button { max-width:105px;text-align:right }
@@ -656,6 +741,9 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
      SAME number of lines (same h1 height) — the hero below stays put. */
   .hero h1 { font-size:clamp(36px, 10.2vw, 49px) }
   .hero-intro { font-size:var(--text-xl) }
+  .hero-search { flex-direction:column; background:transparent; overflow:visible; border:0; gap:8px; }
+  .hero-search input { min-height:48px; border:1px solid rgba(222,245,234,.42); border-radius:var(--radius-lg); background:rgba(255,255,255,.08); }
+  .hero-search button { min-height:44px; border:0; border-radius:var(--radius-lg); }
   .hero-stats { margin-top:48px;gap:18px }
   .hero-visual { min-height:260px }
   /* Fix: on narrow screens .signal-three (right:10%;top:74%, base rule)
@@ -683,6 +771,8 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
      .record-list-card dl / actions rules above already handle the facts
      and the action row. */
   .directory-tool-heading { align-items:flex-start;flex-direction:column;gap:var(--space-3) }
+  .directory-tool .directory-explorer-card .records-section { padding:0 16px 24px; }
+  .directory-tool .directory-explorer-card .directory-controls { margin:0 -16px; padding:14px 16px; }
   .directory-tool .record-list .record-list-card { grid-template-columns:1fr; gap:var(--space-3); padding:var(--space-4) var(--space-5); }
   .directory-tool .record-list .record-list-card .record-list-actions { align-items:flex-start; }
   /* Results header (t_f13fcb1c, ex .directory-meta): stack on narrow screens. */
@@ -694,12 +784,26 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
   .record-detail-facts { grid-template-columns:1fr }
   .record-history-list li { flex-direction:column;align-items:flex-start;gap:4px }
   .principles { padding:68px 0 }
+  .guide-overview { padding-bottom:40px; }
+  .guide-overview, .guide-principles, .report-section.guide-publication-section, .guide-publication-details, .records-section.guide-section-anchor, .correction-section.guide-section-anchor { width:min(100% - 32px,760px); }
+  .guide-principles { padding:44px 0; }
+  .guide-principles .principles-grid { grid-template-columns:1fr; }
+  .guide-principles .principles-grid article:last-child { grid-column:auto; }
+  .report-section.guide-publication-section { padding:48px 0; }
+  .guide-publication-details { width:min(100% - 32px,1180px); padding-bottom:44px; }
+  .guide-publication-details-body { padding:22px 16px 16px; }
+  .guide-publication-details-notes { grid-template-columns:1fr; }
+  .records-section.guide-section-anchor { padding-bottom:46px; }
+  .records-section.guide-section-anchor .records-heading { padding:36px 0 18px; }
+  .guide-overview ul { grid-template-columns:1fr; }
   .principles-grid { grid-template-columns:1fr }
+  .sources-methodology-grid { grid-template-columns:1fr }
   .principles-grid article { min-height:0 }
   .principles-grid h3 { margin-top:25px }
   .report-section, .correction-section { grid-template-columns:1fr;padding:68px 0 }
   .correction-section { padding-top:0 }
   .report-form, .correction-form { padding:20px }
+  .contribution-step { padding:15px; }
   footer { grid-template-columns:1fr;align-items:start;gap:18px }
   .footer-links { justify-content:flex-start;flex-wrap:wrap }
   .brand { font-size:var(--text-2xl) }
@@ -709,7 +813,10 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
    the place-search toggle (FiltersBar extraControls) share the second row.
    Replaces the fractured 3-column layout (audit V2: search+sort stacked left,
    type+freshness right, reset floating in a gap). */
-.directory-controls { display:grid; grid-template-columns:minmax(0,1fr) minmax(180px,1fr) minmax(150px,1fr) auto auto; gap:16px; align-items:end; }
+.directory-controls { display:grid; gap:12px; }
+.filters-disclosure { min-width:0; }
+.filters-disclosure > summary { display:none; }
+.filter-controls-row { display:grid; grid-template-columns:repeat(3, minmax(180px, 260px)); gap:12px 16px; align-items:end; }
 .record-search { min-width:0; }
 /* IT layout stability (t_690ed55e): the search input must not stretch its
    grid track with its intrinsic size — the IT placeholder is ~1.3x the EN
@@ -718,15 +825,23 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
    fill the track; minmax(0,1fr) keeps the track a pure fraction. */
 .record-search input { width:100%; box-sizing:border-box; min-width:0; }
 .directory-tool .directory-controls .record-search { grid-column:1/-1; max-width:none; }
+/* On the catalog, the short scope note belongs beside the search label rather
+   than consuming an extra visual row. The input itself remains full width,
+   so scanning and typing stay effortless. */
+.directory-tool .directory-controls .record-search { display:grid; grid-template-columns:auto minmax(0,1fr); align-items:baseline; column-gap:12px; row-gap:8px; }
+.directory-tool .directory-controls .record-search label { grid-column:1; grid-row:1; }
+.directory-tool .directory-controls .record-search p { grid-column:2; grid-row:1; margin:0; color:var(--muted); font-size:var(--text-sm); line-height:1.35; }
+.directory-tool .directory-controls .record-search input { grid-column:1/-1; grid-row:2; }
 /* Same fraction-only columns on the /mappa filters panel: IT select labels
    ("Tipo di telecamera") are wider than EN, so fixed-fr tracks avoided a
    ±14px shuffle of the selects between languages. */
-.map-card .filters-panel { grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
+.map-card .filters-panel .filter-controls-row { grid-template-columns:repeat(3, minmax(180px, 260px)); }
 /* Reset + place-search toggle align with the selects (same end edge, ≥44px
    target — WCAG 2.5.8). */
-.directory-tool .directory-controls > .text-button { align-self:end; min-height:44px; display:inline-flex; align-items:center; white-space:nowrap; margin-bottom:2px; }
-.record-filter label { display:block; margin-bottom:8px; color:var(--ink-2); font-size:var(--text-sm); font-weight:800; }
-.record-filter select { width:100%; border:1px solid var(--field-border); border-radius:var(--radius-md); padding:13px 14px; background:var(--white); color:var(--field-ink); font-size:var(--text-lg); }
+.directory-tool .filter-controls-row > .text-button { grid-column:auto; align-self:end; min-height:40px; display:inline-flex; align-items:center; white-space:nowrap; margin-bottom:2px; }
+.record-filter { max-width:260px; }
+.record-filter label { display:block; margin-bottom:5px; color:var(--ink-2); font-size:var(--text-xs); font-weight:800; }
+.record-filter select { width:100%; min-height:40px; border:1px solid var(--field-border); border-radius:var(--radius-md); padding:8px 11px; background:var(--white); color:var(--field-ink); font-size:var(--text-md); }
 .record-filter select:focus { border-color:var(--control-focus); outline:3px solid var(--focus); outline-offset:2px; }
 /* /directory catalog (t_f13fcb1c): the VISIBLE results header between the
    controls and the list — h2 + count (role=status, historical id) on the
@@ -797,19 +912,38 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 .duplicate-guidance { margin-top:10px; }
 .duplicate-guidance .text-button { font-size:var(--text-md); }
 @media (max-width:980px) {
-  .map-card .filters-panel { grid-template-columns:minmax(0,1fr) minmax(0,1fr) }
+  .map-card .filters-panel .filter-controls-row { grid-template-columns:minmax(0,1fr) minmax(0,1fr) }
   .record-search { grid-column:1/-1 }
+  /* Catalog controls stay deliberately paired at tablet widths: type and
+     freshness first, then reset and advanced options. This avoids the old
+     five-column template producing a zig-zag scan path. */
+  .directory-tool .filter-controls-row { grid-template-columns:repeat(2,minmax(0,1fr)); }
   /* /directory catalog: the place-search toggle takes its own row under the
-     two-col select grid (type+freshness / sort+reset). */
+   two-col select grid (type+freshness / sort+reset). */
   .directory-tool .place-search-toggle { grid-column:1/-1; justify-self:start }
 }
 @media (max-width:700px) {
-  .directory-controls { grid-template-columns:minmax(0,1fr) !important }
-  .map-card .filters-panel { grid-template-columns:minmax(0,1fr) }
+  .filter-controls-row { grid-template-columns:minmax(0,1fr) !important }
+  .map-card .filters-panel .filter-controls-row { grid-template-columns:minmax(0,1fr) }
   .record-search { grid-column:auto }
+  .directory-tool .directory-controls .record-search { grid-template-columns:1fr; row-gap:6px; }
+  .directory-tool .directory-controls .record-search label,
+  .directory-tool .directory-controls .record-search p,
+  .directory-tool .directory-controls .record-search input { grid-column:1; grid-row:auto; }
+}
+@media (max-width:820px) {
+  .filters-disclosure { border:1px solid var(--line); border-radius:var(--radius-md); background:var(--card-bg); }
+  .filters-disclosure > summary { display:flex; align-items:center; justify-content:space-between; min-height:40px; padding:0 11px; color:var(--nav-ink); cursor:pointer; font-size:var(--text-sm); font-weight:800; list-style:none; }
+  .filters-disclosure > summary::-webkit-details-marker { display:none; }
+  .filters-disclosure > summary::after { content:"+"; color:var(--focus); font-size:var(--text-xl); }
+  .filters-disclosure[open] > summary { border-bottom:1px solid var(--line); }
+  .filters-disclosure[open] > summary::after { content:"–"; }
+  .filters-disclosure[open] .filter-controls-row { padding:12px; }
 }
 /* Contributor auth (STATUS gap #1, ADR 0013): login / register / account. */
 .auth-card { max-width:560px; }
+.account-card { max-width:940px; }
+.account-card > section:not(.verify-banner):not(.auth-danger-zone) { margin-top:38px; padding-top:32px; border-top:1px solid var(--line); }
 .auth-card h1 { font-size:var(--text-auth); font-weight:800; text-wrap:balance; overflow-wrap:anywhere; }
 .auth-form { display:grid; gap:18px; margin:30px 0 8px; }
 .auth-field { display:grid; gap:var(--space-2); color:var(--ink-2); font-size:var(--text-sm); font-weight:800; }
@@ -934,6 +1068,23 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 .legal-section li { margin:6px 0; }
 .legal-section a { color:var(--focus); font-weight:700; text-decoration:underline; text-underline-offset:3px; }
 .legal-section strong { color:var(--ink-5); }
+.sources-methodology { margin-top:42px; padding-top:32px; border-top:1px solid var(--line); }
+.sources-methodology h2 { margin:0 0 16px; font-size:var(--text-legal); letter-spacing:-.05em; line-height:1.08; font-weight:700; }
+.sources-methodology > p { max-width:620px; margin:0; color:var(--legal-ink); font-size:var(--text-lg); line-height:1.65; }
+.sources-methodology-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--space-3); margin-top:var(--space-6); }
+.sources-methodology-grid article { padding:var(--space-5); border:1px solid var(--line); border-radius:var(--radius-lg); background:var(--form-bg); }
+.sources-methodology-grid h3 { margin:0 0 8px; color:var(--heading); font-size:var(--text-xl); line-height:1.2; font-weight:800; }
+.sources-methodology-grid p { margin:0; color:var(--ink-2); font-size:var(--text-base); line-height:1.55; }
+[data-surface="info"] .record-list-card { border:0; background:var(--surface-muted); box-shadow:none; }
+[data-surface="info"] .record-list-card:nth-child(2n) { background:var(--principle-surface-2); }
+[data-surface="info"] .record-list-card:nth-child(3n) { background:var(--principle-surface-3); }
+[data-surface="info"] .report-form, [data-surface="info"] .correction-form { border:0; background:var(--surface-muted); }
+[data-surface="info"] .faq-item { border:0; background:var(--surface-muted); box-shadow:none; }
+[data-surface="info"] .faq-item:nth-child(2n) { background:var(--principle-surface-2); }
+[data-surface="info"] .faq-item:nth-child(3n) { background:var(--principle-surface-3); }
+[data-surface="sources"] .sources-methodology-grid article { border:0; background:var(--surface-muted); }
+[data-surface="sources"] .sources-methodology-grid article:nth-child(2n) { background:var(--principle-surface-2); }
+[data-surface="sources"] .sources-methodology-grid article:nth-child(3n) { background:var(--principle-surface-3); }
 .legal-note { margin:18px 0; padding:14px 16px; border:1px solid var(--notice-outline); border-left:3px solid var(--notice-border); border-radius:var(--radius-sm); background:var(--notice-bg); color:var(--notice-copy); font-size:var(--text-md); line-height:1.55; }
 .legal-note strong { color:var(--notice-ink); }
 .legal-table-wrap { margin:18px 0; overflow-x:auto; border:1px solid var(--line); border-radius:var(--radius-lg); }
@@ -950,8 +1101,17 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 .faq-item[open] summary::before { content:"–"; }
 .faq-item summary:focus-visible { outline:3px solid var(--focus); outline-offset:-3px; }
 .faq-item p { margin:0; padding:0 22px 22px 60px; color:var(--ink-4); font-size:var(--text-base); line-height:1.55; }
+.faq-resources { width:var(--container-readable); margin:0 auto 100px; padding:42px 0 0; border-top:1px solid var(--line); }
+.faq-resources-heading { max-width:600px; }
+.faq-resources h2 { margin:0; color:var(--ink); font-size:var(--text-section); letter-spacing:-.055em; line-height:1.05; text-wrap:balance; }
+.faq-resources-heading>p:not(.eyebrow) { color:var(--ink-4); font-size:var(--text-lg); line-height:1.55; }
+.faq-resource-links { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin-top:24px; }
+.faq-resource-links a { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:52px; padding:12px 15px; border:1px solid var(--line); border-radius:var(--radius-md); background:var(--card-bg); color:var(--nav-ink); font-size:var(--text-sm); font-weight:800; line-height:1.3; text-decoration:none; }
+.faq-resource-links a:hover { border-color:var(--focus); color:var(--focus); }
+.faq-resource-links a:focus-visible { outline:3px solid var(--focus); outline-offset:3px; }
 @media (max-width:700px) {
   .faq-item p { padding-left:22px; }
+  .faq-resource-links { grid-template-columns:1fr; }
 }
 /* Manifesto page (app/manifesto/page.tsx): compact list inside the
    "Published / Never published" cards. Reuses the correction-form card
@@ -1006,7 +1166,15 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
    filling the remaining viewport height ("quasi a tutto schermo"). */
 .map-layout { width:min(1440px, calc(100% - 32px)); margin:0 auto; padding:6px 0 72px; }
 .map-card { border:1px solid var(--line); border-radius:var(--radius-xl); overflow:hidden; background:var(--map-surface); box-shadow:0 20px 45px rgba(25,46,52,.08); }
-.map-card .filters-panel { padding:14px 18px 12px; border-bottom:1px solid var(--line); background:var(--card-bg); }
+.map-explorer-toolbar { display:flex; align-items:center; justify-content:space-between; gap:var(--space-4); padding:10px 18px; border-bottom:1px solid var(--line); background:var(--card-bg); }
+.map-explorer-toolbar>p { margin:0; color:var(--label); font-size:var(--text-xs); font-weight:800; letter-spacing:.1em; text-transform:uppercase; }
+.map-explorer-search { padding:12px 18px; border-bottom:1px solid var(--line); background:var(--map-surface); }
+.map-explorer-search .map-list-search { position:relative; max-width:none; }
+.map-explorer-search .map-list-search label { display:block; margin-bottom:6px; color:var(--label); font-size:var(--text-2xs); text-transform:uppercase; letter-spacing:.1em; font-weight:800; }
+.map-explorer-search .map-list-search input { width:100%; min-height:44px; box-sizing:border-box; padding:9px 11px; border:1px solid var(--map-input-border); border-radius:var(--radius-md); background:var(--white); color:var(--ink-5); font-size:var(--text-md); }
+.map-explorer-search .geocode-dropdown { left:0; right:0; }
+.map-card .filters-panel { padding:10px 18px; border-bottom:1px solid var(--line); background:var(--card-bg); }
+.map-card .filters-panel .filter-controls-row > .text-button { grid-column:auto; align-self:end; min-height:40px; display:inline-flex; align-items:center; white-space:nowrap; }
 /* FIX /mappa (CEO feedback 2026-08-02): the panel FiltersBar row is its own
    4-column grid on DESKTOP — kind / freshness / sort / reset on ONE line, the
    reset button right-aligned in the last (auto) column instead of wrapping
@@ -1018,7 +1186,24 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
    mobile (kind-filter select ~30px wide — Lighthouse target-size WCAG 2.5.8
    failure, t_9e8642a0). */
 @media (min-width:981px) {
-  .map-card .filters-panel { grid-template-columns:minmax(0,1fr) minmax(175px,.34fr) minmax(190px,.38fr) auto; }
+  .map-card .filters-panel .filter-controls-row { grid-template-columns:repeat(3, minmax(180px, 260px)); }
+}
+/* A wide desktop can afford one short, scannable control line. Keeping all
+   dimensions on the same baseline avoids a tall two-row filter slab above
+   the content; narrower desktops fall back to the 3-column grid below. */
+@media (min-width:1100px) {
+  .filter-controls-row,
+  .map-card .filters-panel .filter-controls-row {
+    grid-template-columns:repeat(5, minmax(120px, 1fr)) auto;
+    gap:12px;
+  }
+  .map-card .filters-panel { padding-top:8px; padding-bottom:8px; }
+  .record-filter label { margin-bottom:3px; font-size:var(--text-2xs); letter-spacing:.04em; }
+}
+/* The explorer remains map-first on compact laptops/tablets: all four
+   primary controls share one short row until the mobile layout takes over. */
+@media (min-width:701px) and (max-width:980px) {
+  .map-card .filters-panel .filter-controls-row { grid-template-columns:repeat(2, minmax(150px, 1fr)); }
 }
 /* FIX /mappa (CEO feedback 2026-08-02): the result counter sat 2px from the
    card's left edge while the filters above it are inset 18px — give it the
@@ -1026,16 +1211,13 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
    .loading-note / .notice insets below). */
 .map-card .search-count { margin:10px 18px 0; }
 .map-card .live-map-workspace { border:0; border-radius:0; box-shadow:none; }
-.map-card .map-split { grid-template-columns:340px 1fr; height:calc(100vh - 300px); min-height:540px; }
-.map-card .map-panel .live-map { height:100%; min-height:540px; }
-.map-card .map-panel .map-fallback { height:100%; min-height:540px; }
+.map-card .map-split { grid-template-columns:320px 1fr; height:clamp(480px, calc(100vh - 250px), 620px); min-height:480px; }
+.map-card .map-panel .live-map { height:100%; min-height:480px; }
+.map-card .map-panel .map-fallback { height:100%; min-height:480px; }
 .map-card .loading-note, .map-card .notice { margin-left:18px; margin-right:18px; }
 .map-sidebar { display:flex; flex-direction:column; min-height:0; border-right:1px solid var(--line); background:var(--card-bg); }
-.map-list-search { padding:16px 16px 12px; border-bottom:1px solid var(--line); }
-.map-list-search label { display:block; margin-bottom:6px; color:var(--label); font-size:var(--text-2xs); text-transform:uppercase; letter-spacing:.1em; font-weight:800; }
-.map-list-search input { width:100%; padding:9px 11px; border:1px solid var(--map-input-border); border-radius:var(--radius-md); background:var(--white); color:var(--ink-5); font-size:var(--text-md); }
 .map-list-header { display:flex; align-items:baseline; justify-content:space-between; gap:10px; padding:12px 16px 8px; }
-.map-list-header h3 { margin:0; font-size:var(--text-md); letter-spacing:-.02em; color:var(--heading); }
+.map-list-header h2 { margin:0; font-size:var(--text-md); letter-spacing:-.02em; color:var(--heading); }
 .map-list-count { margin:0; color:var(--muted); font-size:var(--text-xs); }
 .map-list-scroll { flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; }
 .map-record-list { list-style:none; margin:0; padding:0 8px 12px; display:grid; gap:var(--space-2); }
@@ -1064,10 +1246,8 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 .map-record-title { display:block; color:var(--heading); font-size:var(--text-base); font-weight:800; letter-spacing:-.02em; }
 .map-record-meta { display:block; margin-top:3px; color:var(--map-meta-ink); font-size:var(--text-sm); line-height:1.35; }
 .map-list-empty { margin:0; padding:18px 16px; color:var(--supporting); font-size:var(--text-md); line-height:1.5; }
-/* Geocode autocomplete dropdown (t_b9666d09): the ARIA listbox under the
-   sidebar search field. The dropdown overlays the list below the search
-   box (absolute, same width, high z-index) and stays inside the sidebar. */
-.map-list-search { position:relative; }
+/* Geocode autocomplete dropdown: the ARIA listbox lives in the map's top
+   control area, so the left rail can remain a pure points list. */
 .geocode-dropdown { position:absolute; top:100%; left:16px; right:16px; z-index:30; margin-top:6px; border:1px solid var(--map-input-border); border-radius:var(--radius-lg); background:var(--white); box-shadow:0 14px 30px rgba(25,46,52,.16); overflow:hidden; }
 .geocode-dropdown ul { list-style:none; margin:0; padding:6px; max-height:264px; overflow-y:auto; }
 .geocode-option { display:flex; align-items:baseline; justify-content:space-between; gap:10px; padding:9px 10px; border-radius:var(--radius-md); cursor:pointer; color:var(--ink-5); font-size:var(--text-md); line-height:1.4; }
@@ -1081,6 +1261,7 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 .map-list-empty-note { padding:18px 16px; }
 .map-list-empty-title { margin:0 0 6px; color:var(--heading); font-size:var(--text-base); font-weight:800; letter-spacing:-.02em; }
 .map-list-empty-body { margin:0 0 10px; color:var(--supporting); font-size:var(--text-md); line-height:1.5; }
+.map-list-empty-note .text-button { min-height:44px; display:inline-flex; align-items:center; }
 /* Pixel-grid aggregation badges (t_26ce96f3, CEO 2026-08-05): at low zoom /
    high density ONE badge divIcon per 48px screen cell replaces thousands of
    DOM markers. The badge is a circular count pill with the project's action
@@ -1145,7 +1326,8 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
      rule (shared with /directory and the home hub) otherwise wins over the
      unscoped 2-col rule at max-width:980px and silently collapses this
      panel back to 1 column, undoing the map-first intent above. */
-  .map-card .filters-panel { grid-template-columns:minmax(0,1fr) minmax(0,1fr) !important; padding:10px 14px 12px; gap:10px 12px; }
+  .map-card .filters-panel { padding:10px 14px 12px; }
+  .map-card .filters-panel .filter-controls-row { grid-template-columns:minmax(0,1fr) minmax(0,1fr) !important; gap:10px 12px; }
   .map-card .record-filter label { margin-bottom:4px; font-size:var(--text-2xs); letter-spacing:.06em; }
   .map-card .record-filter select { padding:11px 10px; font-size:var(--text-md); min-height:44px; }
   /* MAP-FIRST: order puts the map before the sidebar in the single column
@@ -1175,7 +1357,6 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
   .map-panel .leaflet-control-zoom { margin-bottom:48px; }
   .map-panel .leaflet-control-zoom a { width:44px; height:44px; line-height:44px; font-size:22px; }
   .map-panel .leaflet-control-attribution { font-size:10px; padding:2px 6px; max-width:calc(100% - 60px); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .map-hint { padding-bottom:calc(8px + env(safe-area-inset-bottom)); }
   /* Marker popup on small screens (t_b7728ad0): the balloon must fit the
      viewport — cap its height and let the CONTENT scroll internally (the
      map stays usable). Leaflet's wrapper takes the cap; the content box
@@ -1189,9 +1370,21 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
   .leaflet-container .osm-camera-popup a.leaflet-popup-close-button { width:44px; height:44px; line-height:44px; font-size:22px; }
   .osm-camera-popup .osm-popup-header { padding-right:34px; }
 }
-/* Desktop keeps the toggle hidden (the sidebar column is always visible). */
+/* Desktop stays map-first too: a compact 44px rail keeps the points control
+   discoverable, while expanding it restores the searchable list. */
 @media (min-width:769px) {
-  .map-list-toggle { display:none; }
+  .map-card .map-split { grid-template-columns:44px 1fr; }
+  .map-card .map-split.map-points-expanded { grid-template-columns:280px 1fr; }
+  .map-list-toggle { display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px; margin-left:auto; flex:none; border:1px solid var(--control-border); border-radius:var(--radius-md); background:var(--form-bg); color:var(--action); cursor:pointer; }
+  .map-list-toggle svg { transition:transform .12s ease; }
+  .map-list-toggle.is-open svg { transform:rotate(180deg); }
+  .map-list-toggle:focus-visible { outline:3px solid var(--focus); outline-offset:2px; }
+  .map-sidebar.is-collapsed .map-list-search,
+  .map-sidebar.is-collapsed .map-list-header h2,
+  .map-sidebar.is-collapsed .map-list-count,
+  .map-sidebar.is-collapsed .map-list-scroll { display:none; }
+  .map-sidebar.is-collapsed .map-list-header { justify-content:center; padding:6px; }
+  .map-sidebar.is-collapsed .map-list-toggle { margin-left:0; }
 }
 
 /* ============================================================

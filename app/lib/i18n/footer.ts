@@ -9,11 +9,9 @@ import type { Translation } from "./types";
 
 export const en = {
   landmarkLabel: "Site footer",
-  // The footer nav carries the four public tool routes first, then the
-  // institutional pages (F3 t_2ca69725, docs/FRONTEND_DESIGN.md §2.5): the
-  // tools are never dead ends and every public surface is reachable from
-  // every page. The label is therefore "site navigation", not
-  // "institutional pages".
+  // The footer groups the public routes by task. Legal documents remain
+  // available in a native disclosure so they are easy to reach without
+  // competing with the primary paths through the site.
   navigation: "Site navigation",
   homeAria: "OpenSurveillanceDB home",
   tagline: "An open database of public surveillance cameras, built for transparency, not tracking.",
@@ -21,16 +19,19 @@ export const en = {
   toolDirectory: "Directory",
   toolReport: "Report",
   toolCorrection: "Correct",
+  exploreGroup: "Explore",
+  contributeGroup: "Contribute",
+  projectGroup: "The project",
+  legalGroup: "Legal information",
   manifesto: "Manifesto",
   rules: "Rules",
   guide: "Guide",
   privacy: "Privacy",
   terms: "Terms of use",
   licenses: "Licenses",
-  // Imported public datasets (import pipeline FASE C, t_4dbce318): the
-  // footer links the dedicated /fonti page (per-source attribution), NOT
-  // the main navigation — institutional pages group, next to Licenses.
-  sources: "Data sources",
+  // The dedicated /fonti page contains both the public-data attribution and
+  // the methodology used to collect and correct records.
+  sources: "Method & sources",
   faq: "FAQ",
   contact: "Contact",
   accessibility: "Accessibility statement",
@@ -40,11 +41,9 @@ export const en = {
 
 export const it: Translation<typeof en> = {
   landmarkLabel: "Piè di pagina del sito",
-  // Il nav del footer porta prima le quattro route tool pubbliche, poi le
-  // pagine istituzionali (F3 t_2ca69725, docs/FRONTEND_DESIGN.md §2.5): i
-  // tool non sono mai vicoli ciechi e ogni superficie pubblica è raggiungibile
-  // da ogni pagina. L'etichetta è quindi "navigazione del sito", non
-  // "pagine istituzionali".
+  // Il footer raggruppa le route pubbliche per compito. I documenti legali
+  // restano disponibili in una disclosure nativa, senza competere con i
+  // percorsi principali del sito.
   navigation: "Navigazione del sito",
   homeAria: "Pagina iniziale di OpenSurveillanceDB",
   tagline: "Un database aperto delle telecamere di sorveglianza pubblica, creato per la trasparenza, non per il tracciamento.",
@@ -52,17 +51,19 @@ export const it: Translation<typeof en> = {
   toolDirectory: "Elenco",
   toolReport: "Segnala",
   toolCorrection: "Correggi",
+  exploreGroup: "Esplora",
+  contributeGroup: "Contribuisci",
+  projectGroup: "Il progetto",
+  legalGroup: "Informazioni legali",
   manifesto: "Manifesto",
   rules: "Regole",
   guide: "Guida",
   privacy: "Privacy",
   terms: "Termini d'uso",
   licenses: "Licenze",
-  // Dataset pubblici importati (import pipeline FASE C, t_4dbce318): il
-  // footer collega la pagina dedicata /fonti (attribuzione per fonte), NON
-  // nella navigazione principale — gruppo pagine istituzionali, accanto a
-  // Licenze.
-  sources: "Fonti dei dati",
+  // La pagina /fonti riunisce attribuzione dei dataset pubblici e metodo
+  // usato per raccogliere e correggere le segnalazioni.
+  sources: "Metodo e fonti",
   faq: "FAQ",
   contact: "Contatti",
   accessibility: "Dichiarazione di accessibilità",

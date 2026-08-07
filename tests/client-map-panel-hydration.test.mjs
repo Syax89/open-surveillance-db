@@ -100,20 +100,21 @@ function toggleMarkup(html) {
   return match ? match[0] : null;
 }
 
-test("SSR html == primo render client a 390px: the toggle is expanded in both (t_66766914)", async () => {
+test("SSR html == primo render client a 390px: the toggle is collapsed in both (t_66766914)", async () => {
   installMatchMedia(); // 390px mobile: (max-width: 768px) matches
   const wrapped = await wrapWithLocale(React.createElement(MappaTool));
 
   // SSR: react-dom/server renders with no window — the panel must be
-  // expanded (deterministic initial state, never a lazy matchMedia read).
+  // COLLAPSED (deterministic initial state, map-first UX PR #326 — never
+  // a lazy matchMedia read).
   const ssrHtml = renderToString(wrapped);
   const ssrToggle = toggleMarkup(ssrHtml);
   assert.ok(ssrToggle, "SSR html contains the map-list-toggle button");
-  assert.match(ssrToggle, /map-list-toggle is-open/, "SSR renders the toggle expanded (is-open)");
-  assert.match(ssrToggle, /aria-expanded="true"/, "SSR aria-expanded=true");
+  assert.doesNotMatch(ssrToggle, /map-list-toggle is-open/, "SSR renders the toggle collapsed (no is-open)");
+  assert.match(ssrToggle, /aria-expanded="false"/, "SSR aria-expanded=false");
 
   // FIRST client render at 390px: capture the DOM committed by the
-  // initial render, BEFORE the post-hydration effect runs (flushSync
+  // initial render, BEFORE any post-hydration effect runs (flushSync
   // commits synchronously; the passive effect is flushed by act only
   // after the callback body). This is exactly the render React compares
   // against the server html during hydration.
@@ -134,33 +135,37 @@ test("SSR html == primo render client a 390px: the toggle is expanded in both (t
     ssrToggle,
     "first client render at 390px must equal the SSR html — no hydration mismatch on the toggle",
   );
-  assert.match(firstClientToggle, /map-list-toggle is-open/, "first client render keeps the panel expanded");
-  assert.match(firstClientToggle, /aria-expanded="true"/, "first client render aria-expanded=true");
+  assert.doesNotMatch(firstClientToggle, /map-list-toggle is-open/, "first client render keeps the panel collapsed");
+  assert.match(firstClientToggle, /aria-expanded="false"/, "first client render aria-expanded=false");
 });
 
-test("mobile preference applied AFTER hydration: at 390px the panel collapses post-mount (t_66766914)", async () => {
+test("mobile preference applied AFTER hydration: at 390px the panel stays collapsed post-mount (t_66766914)", async () => {
   installMatchMedia(); // 390px mobile
   const view = await renderWithLocale(React.createElement(MappaTool));
   const toggle = view.container.querySelector(".map-list-toggle");
   assert.ok(toggle, "the disclosure toggle is rendered");
-  // The post-hydration effect has run (renderWithLocale flushes effects):
-  // on a mobile viewport the panel is now collapsed — the mobile
-  // preference is applied, just not during the first render.
-  assert.equal(toggle.getAttribute("aria-expanded"), "false", "mobile preference collapses the panel after hydration");
-  assert.ok(!toggle.classList.contains("is-open"), "is-open removed after hydration on mobile");
+  // Map-first UX (PR #326): the panel is collapsed from the start, on
+  // every viewport — no media-query flip needed (and none must occur,
+  // because the collapsed state is deterministic).
+  assert.equal(toggle.getAttribute("aria-expanded"), "false", "the panel is collapsed after hydration on mobile");
+  assert.ok(!toggle.classList.contains("is-open"), "is-open absent on mobile");
   // The list is hidden (CSS hook) but still in the DOM (never unmounted).
   const scroll = view.container.querySelector(".map-list-scroll");
   assert.ok(scroll, "the list container stays in the DOM");
   assert.match(scroll.className, /is-collapsed/, "the CSS hook hides the list while collapsed");
 });
 
-test("desktop keeps the panel expanded after hydration (t_66766914)", async () => {
+test("desktop keeps the panel collapsed after hydration (map-first, PR #326)", async () => {
   // Default harness matchMedia stub matches nothing → desktop viewport.
   const view = await renderWithLocale(React.createElement(MappaTool));
   const toggle = view.container.querySelector(".map-list-toggle");
   assert.ok(toggle, "the disclosure toggle is rendered");
-  assert.equal(toggle.getAttribute("aria-expanded"), "true", "desktop keeps the panel expanded");
-  assert.ok(toggle.classList.contains("is-open"), "is-open kept on desktop");
+  assert.equal(toggle.getAttribute("aria-expanded"), "false", "desktop starts collapsed (map-first)");
+  assert.ok(!toggle.classList.contains("is-open"), "is-open absent on desktop");
+
+  // Expanding the rail is a user choice that must persist.
+  await rtl.userEvent.click(toggle);
+  assert.equal(toggle.getAttribute("aria-expanded"), "true", "manual toggle expands the panel on desktop");
 });
 
 test("a later manual toggle is never overridden by a media-query change (t_66766914)", async () => {
@@ -186,27 +191,27 @@ test("a later manual toggle is never overridden by a media-query change (t_66766
 
 test("static guard: no typeof window / matchMedia in a useState lazy initializer (t_66766914)", async () => {
   const source = await readSource("app/components/home/MapPanel.tsx");
-  // The collapse state must be a deterministic literal — never a lazy
-  // initializer that reads the viewport (that was the CEO's hydration
-  // mismatch: server expanded, first client render collapsed).
-  assert.match(source, /useState<boolean>\(false\)/, "pointsCollapsed starts expanded deterministically");
+  // The collapse state must be a deterministic literal (map-first UX
+  // PR #326: collapsed on both server and first client render) — never a
+  // lazy initializer that reads the viewport (that was the CEO's
+  // hydration mismatch: server expanded, first client render collapsed).
+  assert.match(source, /useState<boolean>\(true\)/, "pointsCollapsed starts collapsed deterministically");
   assert.doesNotMatch(
     source,
-    /useState<boolean>\(\(\)\s*=>\s*\{/,
+    /useState<boolean>\(\s*\(\s*\)\s*=>/,
     "pointsCollapsed must not be a lazy initializer",
   );
   // No lazy initializer anywhere in the file may read the browser env.
   assert.doesNotMatch(
     source,
-    /useState\(\(\)\s*=>\s*\{[\s\S]*?(?:matchMedia|typeof window)/,
+    /useState\(\s*\(\s*\)\s*=>\s*\{[\s\S]*?(?:matchMedia|typeof window)/,
     "no lazy useState initializer reads matchMedia / typeof window",
   );
-  // The mobile preference is allowed ONLY inside the hydration effect.
-  assert.match(
+  // Map-first UX: the panel is collapsed at every viewport — MapPanel
+  // must NOT read matchMedia at all (the old media-query flip is gone).
+  assert.doesNotMatch(
     source,
-    /useEffect\([\s\S]*?window\.matchMedia\("\(max-width: 768px\)"\)/,
-    "the mobile preference lives in the post-hydration effect",
+    /window\.matchMedia/,
+    "no matchMedia in MapPanel — the collapsed state is deterministic",
   );
-  // The user-choice guard exists: a manual toggle is never overwritten.
-  assert.match(source, /pointsUserToggledRef/, "user toggle guard ref present");
 });
