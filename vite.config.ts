@@ -25,6 +25,22 @@ export default defineConfig(async () => {
       ...(isCodexSeatbeltSandbox
         ? { watch: { useFsEvents: false, usePolling: true } }
         : {}),
+      // Never let a CDN cache the Vite pre-bundle (CEO 2026-08-07): the
+      // dev server rewrites node_modules/.vite/deps with fresh hashes on
+      // every restart, and Cloudflare was serving the STALE bundle (old
+      // ?v= hash) mixed with new modules → two copies of React →
+      // "Cannot read properties of null (reading 'useContext')" in Slot.
+      // no-store keeps browsers AND edge caches honest.
+      headers: {
+        "Cache-Control": "no-store, must-revalidate",
+      },
+    },
+    // One React instance, always: some deps (vinext shims, @unpic/react)
+    // resolve react through different export paths, which makes Vite
+    // pre-bundle two copies → "Cannot read properties of null (reading
+    // 'useContext')" in Slot. Dedupe pins them to the same module.
+    resolve: {
+      dedupe: ["react", "react-dom"],
     },
     plugins: [
       vinext(),
