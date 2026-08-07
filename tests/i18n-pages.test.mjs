@@ -161,10 +161,12 @@ const INFO_ROUTES = {
   },
   // Public API docs (CEO 2026-08-07): /api-docs is a static InfoPage
   // explaining the read-only API, its endpoints and the per-caller limits.
+  // Marker: the redesigned layout (cards + badges) still carries the same
+  // limit values and the read-only callout.
   "/api-docs": {
-    it: ["API pubblica", "60 richieste / minuto", "Export CSV / GeoJSON", "Tile della mappa"],
-    en: ["Public API", "60 requests / minute", "CSV / GeoJSON exports", "Map tiles"],
-    noEn: ["Public API", "60 requests / minute", "CSV / GeoJSON exports", "Map tiles"],
+    it: ["API pubblica", "60 richieste / minuto", "Export CSV / GeoJSON", "Tile della mappa", "Di sola lettura per design"],
+    en: ["Public API", "60 requests / minute", "CSV / GeoJSON exports", "Map tiles", "Read-only by design"],
+    noEn: ["Public API", "60 requests / minute", "CSV / GeoJSON exports", "Map tiles", "Read-only by design"],
   },
   // Private auth surface (C5): /account SSRs the client shell in the cookie
   // language — the h1 and the loading note are the parity markers (the

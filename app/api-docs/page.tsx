@@ -5,10 +5,10 @@ import { getServerMessages } from "../lib/server-i18n";
 /**
  * /api-docs — public read-only API documentation (CEO 2026-08-07).
  *
- * Static page explaining the public API: the endpoints, their per-caller
- * rate limits and the ODbL licensing. The numbers mirror the real
- * defaults in app/lib/rate-limit.ts (ROUTE_LIMIT_DEFAULTS) — when those
- * change, this page's bundle must be updated with them.
+ * Redesigned (CEO review 2026-08-07): endpoint cards with method badges,
+ * curl-ready examples and per-endpoint query parameters; a limits grid;
+ * a licence section. The numbers mirror the real defaults in
+ * app/lib/rate-limit.ts (ROUTE_LIMIT_DEFAULTS).
  *
  * Deliberately NOT in the main navigation (same route decision as
  * /fonti): the footer links it next to Licences and Method & sources.
@@ -29,17 +29,17 @@ export default async function ApiDocsPage() {
   const t = bundle.api;
 
   const endpointRows = [
-    t.endpoints.list,
-    t.endpoints.bbox,
-    t.endpoints.exportGeojson,
-    t.endpoints.exportCsv,
-    t.endpoints.record,
-    t.endpoints.search,
-    t.endpoints.nearby,
-    t.endpoints.revisions,
-    t.endpoints.geocode,
-    t.endpoints.geocodeReverse,
-    t.endpoints.tiles,
+    { item: t.endpoints.list, params: t.endpointParamsList },
+    { item: t.endpoints.bbox, params: t.endpointParamsBbox },
+    { item: t.endpoints.exportGeojson, params: t.endpointParamsExport },
+    { item: t.endpoints.exportCsv, params: t.endpointParamsExport },
+    { item: t.endpoints.record, params: t.endpointParamsRecord },
+    { item: t.endpoints.search, params: t.endpointParamsSearch },
+    { item: t.endpoints.nearby, params: t.endpointParamsNearby },
+    { item: t.endpoints.revisions, params: t.endpointParamsRevisions },
+    { item: t.endpoints.geocode, params: t.endpointParamsGeocode },
+    { item: t.endpoints.geocodeReverse, params: t.endpointParamsReverse },
+    { item: t.endpoints.tiles, params: t.endpointParamsTiles },
   ];
   const limitRows = [
     t.limits.read,
@@ -58,50 +58,56 @@ export default async function ApiDocsPage() {
       title={t.title}
       intro={t.intro}
     >
-      <p className="record-detail-summary api-readonly-note">{t.readOnlyNote}</p>
+      <div className="api-page">
+        <aside className="api-note" role="note">
+          {t.readOnlyNote}
+        </aside>
 
-      <section aria-labelledby="api-endpoints-title" className="api-section">
-        <h2 id="api-endpoints-title">{t.endpointsTitle}</h2>
-        <p>{t.endpointsIntro}</p>
-        <table className="api-table">
-          <thead>
-            <tr><th scope="col">Method</th><th scope="col">Endpoint</th><th scope="col">Description</th></tr>
-          </thead>
-          <tbody>
-            {endpointRows.map((row) => (
-              <tr key={row.path}>
-                <td><code>{row.method}</code></td>
-                <td><code>{row.path}</code></td>
-                <td>{row.description}</td>
-              </tr>
+        <section className="api-section" aria-labelledby="api-endpoints-title">
+          <div className="api-section-head">
+            <p className="eyebrow"><span /> {t.endpointsTitle}</p>
+            <p>{t.endpointsIntro}</p>
+          </div>
+
+          <div className="api-card-grid">
+            {endpointRows.map(({ item, params }) => (
+              <article className="api-card" key={item.path}>
+                <div className="api-card-topline">
+                  <span className="api-method" aria-label={t.endpointMethod}>{item.method}</span>
+                  <code className="api-path">{item.path}</code>
+                </div>
+                <p className="api-desc">{item.description}</p>
+                <p className="api-params"><span>{t.queryParams}:</span> {params}</p>
+                <code className="api-example" aria-label={t.endpointExample}>{item.example}</code>
+              </article>
             ))}
-          </tbody>
-        </table>
-      </section>
+          </div>
+        </section>
 
-      <section aria-labelledby="api-limits-title" className="api-section">
-        <h2 id="api-limits-title">{t.limitsTitle}</h2>
-        <p>{t.limitsIntro}</p>
-        <table className="api-table">
-          <thead>
-            <tr><th scope="col">Endpoint</th><th scope="col">Limit</th></tr>
-          </thead>
-          <tbody>
+        <section className="api-section" aria-labelledby="api-limits-title">
+          <div className="api-section-head">
+            <p className="eyebrow"><span /> {t.limitsTitle}</p>
+            <p>{t.limitsIntro}</p>
+          </div>
+
+          <div className="api-limit-grid">
             {limitRows.map((row) => (
-              <tr key={row.name}>
-                <td>{row.name}</td>
-                <td><code>{row.requests}</code></td>
-              </tr>
+              <article className="api-limit-card" key={row.name}>
+                <p className="api-limit-name">{row.name}</p>
+                <p className="api-limit-value"><code>{row.requests}</code></p>
+              </article>
             ))}
-          </tbody>
-        </table>
-      </section>
+          </div>
+        </section>
 
-      <section aria-labelledby="api-license-title" className="api-section">
-        <h2 id="api-license-title">{t.licenseTitle}</h2>
-        <p>{t.licenseBody}</p>
-        <p className="api-attribution">{t.attribution}</p>
-      </section>
+        <section className="api-section" aria-labelledby="api-license-title">
+          <div className="api-section-head">
+            <p className="eyebrow"><span /> {t.licenseTitle}</p>
+            <p>{t.licenseBody}</p>
+          </div>
+          <p className="api-attribution">{t.attribution}</p>
+        </section>
+      </div>
     </InfoPage>
   );
 }
