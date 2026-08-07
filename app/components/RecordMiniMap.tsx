@@ -6,17 +6,20 @@ import { fovCircleRadiusMeters, fovPolygonPoints } from "../lib/field-of-view";
 import { useMessages } from "../lib/use-messages";
 
 /**
- * Record-page mini map (CEO 2026-08-07): a small, non-interactive Leaflet
- * map on /records/[id] showing WHERE the camera is and — for directional
- * kinds with a stored bearing — the field-of-view cone (or the 360° dome
+ * Record-page mini map (CEO 2026-08-07): a small Leaflet map on
+ * /records/[id] showing WHERE the camera is and — for directional kinds
+ * with a stored bearing — the field-of-view cone (or the 360° dome
  * circle), the same geometry the main /mappa draws (field-of-view.ts).
  *
- * Deliberately minimal:
- * - fixed zoom 17 (≥ FOV_MIN_ZOOM so the cone/circle is meaningful),
- * - no pan/drag/zoom controls: it is a read-only "you are here" display,
- * - decorative (role="img" + the same information is already textual in
- *   the record facts list — coordinates, direction), so no interactive
- *   popup/selection lifecycle is needed here.
+ * Interactive (CEO follow-up 2026-08-07): the user wanted to be able to
+ * pan and zoom the mini map, so dragging + zoom controls are enabled —
+ * it is a real map, just smaller. It stays free of the popup/selection
+ * machinery of /mappa: no record popups, no picker, no ?focus handling.
+ *
+ * Tiles MUST go through the /api/tiles proxy (same as SurveillanceMap):
+ * the record page CSP is `img-src 'self'`, so a direct tile.openstreetmap
+ * hotlink is blocked by the browser and the map renders as an empty
+ * grey box with only the marker + FOV cone (reproduced live 2026-08-07).
  *
  * Hydration-safe: Leaflet is imported and mounted in an effect only
  * (same pattern as SurveillanceMap), so SSR emits just the container.
@@ -46,19 +49,18 @@ export function RecordMiniMap({
     void import("leaflet")
       .then((L) => {
         if (disposed || !containerRef.current) return;
-        // Read-only display: no dragging, no scroll zoom, no zoom buttons —
-        // it exists to show position + field of view, not to browse.
+        // Interactive mini map: pan + zoom allowed (CEO request). The
+        // record page has no map state to keep in sync, so the default
+        // Leaflet interactions are fine as-is.
         map = L.map(container, {
-          zoomControl: false,
-          dragging: false,
-          scrollWheelZoom: false,
-          doubleClickZoom: false,
-          touchZoom: false,
+          zoomControl: true,
           attributionControl: true,
         });
-        L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-          attribution: "&copy; OpenStreetMap contributors",
+        // Same tile proxy as /mappa — the CSP (img-src 'self') blocks any
+        // direct tile server hotlink, so the map would show no streets.
+        L.tileLayer("/api/tiles/{z}/{x}/{y}.png", {
           maxZoom: 19,
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>',
         }).addTo(map);
         L.marker([latitude, longitude], { title }).addTo(map);
 

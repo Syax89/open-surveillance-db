@@ -344,7 +344,18 @@ export function map(el, opts) {
   return m;
 }
 export const control = { zoom: () => ({ addTo: () => {} }) };
-export const tileLayer = () => ({ addTo: () => {} });
+export const tileLayer = (url, opts) => {
+  const layer = { addTo: () => {} };
+  // CSP-safe tile proxy contract (RecordMiniMap 2026-08-07): record the
+  // URL so tests can assert tiles come from /api/tiles, not a direct
+  // tile.openstreetmap hotlink (blocked by img-src 'self').
+  if (url) {
+    layer.url = url;
+    const mapStub = maps[maps.length - 1];
+    if (mapStub) (mapStub.tileLayers ??= []).push(url);
+  }
+  return layer;
+};
 // Each layerGroup owns its items (t_f8b775ec): the field-of-view group and
 // the marker group are independent in real Leaflet, so clearing one must
 // never clear the other. The exported __markers/__paths arrays stay the
