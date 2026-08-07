@@ -66,6 +66,10 @@ export function SegnalaTool({ initialCoordinates = null }: Props) {
           setDirection={report.setDirection}
           directionKnown={report.directionKnown}
           setDirectionKnown={report.setDirectionKnown}
+          address={report.address}
+          setAddress={report.setAddress}
+          addressTouched={report.addressTouched}
+          reverseGeocoding={report.reverseGeocoding}
           showHeading={false}
         />
       </WriteGateWall>

@@ -75,6 +75,48 @@ test("report form without photos renders no redaction confirmation checkbox", as
   assert.equal(redaction, null, "redaction confirmation must not render when photos.length === 0");
 });
 
+test("reverse geocoding prefill: address input is controlled, shows the resolving placeholder while the lookup runs", async () => {
+  const view = await renderWithLocale(
+    React.createElement(ReportForm, {
+      ...reportFormProps(),
+      address: "Via Roma 12",
+      setAddress: () => {},
+      addressTouched: React.createRef(),
+      reverseGeocoding: true,
+    }),
+  );
+  const { container } = view;
+  const addressInput = container.querySelector("input[name='address']");
+  assert.ok(addressInput, "the address input exists");
+  assert.equal(addressInput.value, "Via Roma 12", "the address input is controlled by the flow state");
+  assert.equal(addressInput.getAttribute("placeholder"), "Resolving address…", "while the reverse lookup runs the placeholder says so");
+  assert.equal(addressInput.getAttribute("aria-busy"), "true", "the input is marked busy during the lookup");
+});
+
+test("reverse geocoding prefill: normal placeholder when idle, user typing wins (addressTouched honored)", async () => {
+  let captured = null;
+  const touchedRef = React.createRef();
+  touchedRef.current = false;
+  const view = await renderWithLocale(
+    React.createElement(ReportForm, {
+      ...reportFormProps(),
+      address: "",
+      setAddress: (value) => { captured = value; },
+      addressTouched: touchedRef,
+      reverseGeocoding: false,
+    }),
+  );
+  const { container } = view;
+  const addressInput = container.querySelector("input[name='address']");
+  assert.equal(addressInput.getAttribute("placeholder"), "Street and city (optional)", "idle placeholder is the standard one");
+  assert.equal(addressInput.getAttribute("aria-busy"), null, "not busy when idle");
+
+  // Simulate a keystroke: the handler marks the field as touched.
+  rtl.fireEvent.input(addressInput, { target: { value: "Via Garibaldi 3" } });
+  assert.equal(touchedRef.current, true, "a keystroke marks the field touched so later lookups never overwrite it");
+  assert.equal(captured, "Via Garibaldi 3", "the keystroke value is propagated to the flow state");
+});
+
 test("report form with photos renders the required redaction confirmation checkbox", async () => {
   const view = await renderWithLocale(React.createElement(ReportForm, reportFormProps([fakePhoto])));
   const { container } = view;
@@ -157,4 +199,66 @@ test("locale toggle flips the redaction confirmation label EN <-> IT", async () 
 
   await user.click(view.getByRole("button", { name: "EN" }));
   assert.ok(container.querySelector(".check-redaction span").textContent.includes("redacted"), "EN label restored");
+});
+
+test("useReportFlow: selectCoordinates prefills the address via /api/geocode/reverse (cache hit path)", async () => {
+  // Host component that surfaces the flow state so the test can drive
+  // selectCoordinates and observe the address prefill.
+  let flow = null;
+  function Harness() {
+    flow = useReportFlow({ setNotice: () => {} });
+    return React.createElement("p", null, flow.address || "(empty)");
+  }
+  const originalFetch = globalThis.fetch;
+  const fetchCalls = [];
+  globalThis.fetch = async (url) => {
+    fetchCalls.push(String(url));
+    if (String(url).startsWith("/api/geocode/reverse")) {
+      return new Response(JSON.stringify({ address: "Via Roma 12, Ferrara" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    // Nearby check (parallel call from selectCoordinates): empty set.
+    return new Response(JSON.stringify({ records: [] }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  };
+  try {
+    const { container } = await renderWithLocale(React.createElement(Harness));
+    assert.equal(container.textContent, "(empty)", "no address before a position is picked");
+
+    await flow.selectCoordinates(44.8378, 11.6183);
+    // The prefill is async — allow the microtasks to settle.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    assert.equal(container.textContent, "Via Roma 12, Ferrara", "the reverse geocoding reply prefills the address");
+    assert.ok(fetchCalls.some((u) => u.startsWith("/api/geocode/reverse?lat=44.8378&lng=11.6183")), "the reverse endpoint is called with the picked coordinates");
+    assert.ok(fetchCalls.some((u) => u.startsWith("/api/cameras/nearby")), "the nearby check still runs in parallel");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("useReportFlow: a geocoder failure leaves the address empty and never blocks the flow", async () => {
+  let flow = null;
+  function Harness() {
+    flow = useReportFlow({ setNotice: () => {} });
+    return React.createElement("p", null, flow.address || "(empty)");
+  }
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    if (String(url).startsWith("/api/geocode/reverse")) {
+      return new Response(JSON.stringify({ error: "down" }), { status: 502 });
+    }
+    return new Response(JSON.stringify({ records: [] }), { status: 200, headers: { "Content-Type": "application/json" } });
+  };
+  try {
+    const { container } = await renderWithLocale(React.createElement(Harness));
+    await flow.selectCoordinates(44.8378, 11.6183);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    assert.equal(container.textContent, "(empty)", "a failed lookup leaves the field empty");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
