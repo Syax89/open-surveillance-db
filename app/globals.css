@@ -1385,6 +1385,17 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
   .osm-popup-provenance { margin:6px 0 0; padding-top:6px; }
   .community-actions-compact { margin:14px 0 2px; padding:0 0 14px; }
   .community-actions-cta { margin:8px 0 0; font-size:var(--text-sm); }
+  /* Mobile toolbar (CEO 2026-08-07): at 260px the three toolbar buttons
+     are ~72px wide — the decorative icons (aria-hidden) pushed the label
+     onto two lines ("usefu/l"). Hide the icons, shrink the type and keep
+     label+count on ONE nowrap line; the 44px touch target (WCAG 2.5.8)
+     is untouched. */
+  .community-toolbar .community-action svg,
+  .community-more-trigger svg { display:none; }
+  .community-toolbar .community-action,
+  .community-more-trigger { gap:2px; padding:6px 2px; font-size:var(--text-xs); }
+  .community-toolbar .community-action-label,
+  .community-more-trigger .community-action-label { white-space:nowrap; }
 }
 /* Desktop stays map-first too: a compact 44px rail keeps the points control
    discoverable, while expanding it restores the searchable list. */
