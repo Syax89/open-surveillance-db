@@ -433,3 +433,50 @@ test("osm-factory: parsePayload maps the same canonical rows for every country",
   assert.equal(de.skipped.reasons["surveillance:type=guard"], 1);
   assert.equal(de.skipped.reasons["surveillance=indoor"], 1);
 });
+
+// ------------------------------------------------------------- Bern / Hamburg official
+
+import { lv95ToWgs84, mapRow } from "../scripts/import/adapters/berna-videouberwachung-2026.mjs";
+import { parsePayload as hamburgParse } from "../scripts/import/adapters/amburgo-verkehrskameras-2026.mjs";
+import { isLicenceImportable } from "../scripts/import/licence-gate.mjs";
+
+test("bern: LV95→WGS84 conversion lands in Bern (46.95, 7.44) for the city centre", () => {
+  const { lat, lon } = lv95ToWgs84(2600000, 1200000);
+  assert.ok(Math.abs(lat - 46.951) < 0.002, `lat ${lat}`);
+  assert.ok(Math.abs(lon - 7.439) < 0.002, `lon ${lon}`);
+});
+
+test("bern: parses GeoParquet-shaped rows into canonical staged rows", () => {
+  const mapped = mapRow({
+    objectid: 62, gebaed_de: "Spital Riggisberg", plz: 3132, ortsname: "Riggisberg", strname: "Eyweg", hausnr: "2", zustng_de: "Insel Gruppe AG", xkoord: 2602981.5, ykoord: 1184740.375,
+  });
+  assert.ok(mapped.staged, "row should map");
+  const row = mapped.staged;
+  assert.equal(row.title, "Spital Riggisberg");
+  assert.equal(row.address, "Eyweg 2, 3132 Riggisberg");
+  assert.equal(row.notes, "Gestione: Insel Gruppe AG");
+  assert.equal(row.external_id, "be-video:62");
+});
+
+test("hamburg: parses OGC API GeoJSON features into canonical staged rows", () => {
+  const { staged } = hamburgParse({
+    features: [
+      { id: "k1", geometry: { type: "Point", coordinates: [10.038, 53.503] }, properties: { lage: "A1 AK Hamburg-Süd", anmerkung: "Kamera mit mehreren Blickrichtungen" } },
+      { id: "k2", geometry: { type: "Point", coordinates: [9.99, 53.55] }, properties: { lage: "B7 Volkspark" } },
+      { id: "k3", geometry: { type: "LineString", coordinates: [] }, properties: {} },
+    ],
+  });
+  assert.equal(staged.length, 2); // LineString skipped
+  assert.equal(staged[0].title, "A1 AK Hamburg-Süd");
+  assert.equal(staged[0].latitude, 53.503);
+  assert.equal(staged[0].longitude, 10.038);
+  assert.equal(staged[0].kind, "Traffic / licence plate reader");
+  assert.match(staged[0].external_id, /^hh-verkehrskamera:k1$/);
+});
+
+test("licence-gate: dl-de-by-2.0 and Swiss open-use are importable; CC BY-NC is not", () => {
+  assert.equal(isLicenceImportable("Datenlizenz Deutschland Namensnennung 2.0 (dl-de-by-2.0)"), true);
+  assert.equal(isLicenceImportable("dl-de-by-2.0"), true);
+  assert.equal(isLicenceImportable("Open use. Attribution required (Kanton Bern)"), true);
+  assert.equal(isLicenceImportable("CC BY-NC 4.0"), false);
+});

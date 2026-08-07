@@ -36,6 +36,8 @@
   "dependencies": {
     "@simplewebauthn/server": "^13.3.2",
     "drizzle-orm": "0.45.2",
+    "fzstd": "^0.1.1",
+    "hyparquet": "^1.28.1",
     "leaflet": "^1.9.4",
     "next": "^16.2.12",
     "react": "^19.2.8",
