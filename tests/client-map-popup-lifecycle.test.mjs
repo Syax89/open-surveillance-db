@@ -134,13 +134,60 @@ test("a second click on the same marker keeps the popup open (no toggle-close)",
 
 test("clicking a second marker transfers the popup once (still no picker)", async () => {
   await renderMap(CAMERAS);
+  const map = (await maps())[0];
   const list = await markers();
   const m1 = markerById(list, 1);
   const m2 = markerById(list, 2);
   clickMarker(m1);
+  const opensAfterFirst = (map.events.popupopen ?? []).length;
   clickMarker(m2);
   assert.equal(m2.popupOpened, true, "the second marker popup must open");
-  assert.ok(!(await maps())[0].popupHtml, "the transfer must not open the generic picker");
+  // P1 (review 2026-08-07): the transfer must be exactly ONE popupopen for
+  // the second marker — the selection effect is idempotent
+  // (isPopupOpen guard), so no double-open fires.
+  assert.equal((map.events.popupopen ?? []).length, opensAfterFirst + 1, "the transfer opens exactly one popup");
+  assert.ok(!map.popupHtml, "the transfer must not open the generic picker");
+});
+
+test("keyboard Enter on a focused marker opens its popup (no picker)", async () => {
+  await renderMap(CAMERAS);
+  const m1 = markerById(await markers(), 1);
+  const evt = { originalEvent: { key: "Enter", preventDefault: () => {} } };
+  m1.handlers.keydown?.[0]?.(evt);
+  assert.equal(m1.popupOpened, true, "Enter on a focused marker must open its popup");
+  assert.equal(evt.__stopped, true, "the keydown must stop propagation to the map");
+  assert.ok(!(await maps())[0].popupHtml, "no generic picker from the keyboard");
+});
+
+// P1 (review 2026-08-07): the user CLOSING a popup then panning must stay
+// closed — the rebuild restore must not re-open what the user dismissed.
+test("a popup closed by the USER stays closed after a pan (no ghost reopen)", async () => {
+  await renderMap(CAMERAS);
+  const map = (await maps())[0];
+  clickMarker(markerById(await markers(), 1));
+  const opensBeforeClose = (map.events.popupopen ?? []).length;
+  // The user dismisses the popup: Leaflet fires popupclose OUTSIDE a
+  // rebuild — the component must clear the active id. The stub does not
+  // reset the marker's own flag on close (no closePopup on the stub), so
+  // reset it by hand to mirror real Leaflet's popup teardown.
+  map.handlers.popupclose?.[0]?.();
+  const closedMarker = markerById(await markers(), 1);
+  closedMarker.popupOpened = false;
+  assert.equal(opensBeforeClose, 1, "sanity: the popup opened once before the user close");
+
+  // Pan (rebuild) while camera 1 stays visible: nothing may reopen. The
+  // bounds MUST differ from the stub default (whole world) or the
+  // identity guard skips the rebuild entirely (no-op test).
+  const cam1View = {
+    getSouth: () => 41.89, getNorth: () => 41.91,
+    getWest: () => 12.47, getEast: () => 12.50,
+    contains: () => true,
+  };
+  await panTo(cam1View);
+  const list = await markers();
+  assert.equal(list.length, CAMERAS.length, "sanity: the rebuild ran (markers re-reconciled)");
+  assert.equal(list.filter((m) => m.popupOpened).length, 0, "the user-closed popup must NOT be restored by a pan");
+  assert.equal((map.events.popupopen ?? []).length, opensBeforeClose, "no extra popupopen after a user close + pan");
 });
 
 // ---------------------------------------------------------------------------
@@ -196,7 +243,12 @@ test("grid-badge click zooms in toward the cell with ZERO popups", async () => {
   assert.ok(badges.length > 0, "260 visible records at zoom 13 must aggregate into grid badges");
   const map = (await maps())[0];
   const zoomBefore = map.zoom;
-  badges[0].handlers.click?.[0]?.();
+  // P0-1 (review 2026-08-07): the badge click must stop propagation like
+  // the individual marker — otherwise the map click handler opens the
+  // coordinate picker over the zoom animation.
+  const evt = {};
+  badges[0].handlers.click?.[0]?.(evt);
+  assert.equal(evt.__stopped, true, "badge click must stop propagation to the map (no picker)");
 
   assert.ok(map.views.length > 0, "badge click must pan/zoom the map");
   assert.equal(map.views.at(-1).zoom, zoomBefore + 2, "badge click zooms in 2 levels");
@@ -253,7 +305,22 @@ test("?focus deep link opens the selected popup once; a pan does not reopen it",
   // is tracked.
   const list0 = await markers();
   assert.equal(markerById(list0, 2).popupOpened, true, "the deep-linked popup opens once on arrival");
+  const opensOnArrival = (map.events.popupopen ?? []).length;
   simulatePopupOpen(map, 2);
+
+  // DISCRIMINATING PHASE (P1, review 2026-08-07): a rebuild that KEEPS
+  // camera 2 visible (different bounds, same viewport content) must NOT
+  // re-fire the focus open. The pre-fix code opened the focus popup on
+  // EVERY rebuild where the record was present — this phase catches it.
+  const keepCam2 = {
+    getSouth: () => 41.89, getNorth: () => 41.90,
+    getWest: () => 12.47, getEast: () => 12.49,
+    contains: () => true,
+  };
+  await panTo(keepCam2);
+  const listKeep = await markers();
+  assert.equal(markerById(listKeep, 2).popupOpened, true, "the kept popup stays open during the rebuild");
+  assert.equal((map.events.popupopen ?? []).length, opensOnArrival, "a rebuild that keeps the record visible must NOT reopen the focus popup");
 
   // Pan AWAY from the focus (viewport excludes camera 2).
   const away = {
@@ -274,4 +341,30 @@ test("?focus deep link opens the selected popup once; a pan does not reopen it",
   const opened = list2.filter((m) => m.popupOpened);
   assert.equal(opened.length, 1, "only the previously-open popup is restored");
   assert.equal(markerById(list2, 2).popupOpened, true, "the deep-linked popup is restored while visible");
+});
+
+// P1-5 (review 2026-08-07): a filter that removes the open record must
+// DROP the popup-restore intent — resetting the filter must not re-open
+// the popup out of the blue (data-driven removal ≠ pan).
+test("filter that removes the open record: popup closes and NEVER auto-reopens on reset", async () => {
+  const view = await renderMap(CAMERAS);
+  const map = (await maps())[0];
+  clickMarker(markerById(await markers(), 1));
+  simulatePopupOpen(map, 1);
+  const opensBefore = (map.events.popupopen ?? []).length;
+
+  // Filter removes camera 1 (rerender with a cameras list without it).
+  view.rerender(await wrapWithLocale(React.createElement(SurveillanceMap, {
+    cameras: CAMERAS.slice(1), selectedId: 1, onSelect: () => {}, onPick: () => {},
+  })));
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.equal((await markers()).filter((m) => m.popupOpened).length, 0, "the popup closes when its record is filtered out");
+
+  // Reset the filter: camera 1 is back — but NO popup may auto-open.
+  view.rerender(await wrapWithLocale(React.createElement(SurveillanceMap, {
+    cameras: CAMERAS, selectedId: 1, onSelect: () => {}, onPick: () => {},
+  })));
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.equal((await markers()).filter((m) => m.popupOpened).length, 0, "the filtered-out popup must NOT auto-reopen on filter reset");
+  assert.equal((map.events.popupopen ?? []).length, opensBefore, "no extra popupopen across the filter round trip");
 });

@@ -626,6 +626,38 @@ test("MappaTool geocode autocomplete suggests places in a combobox; keyboard sel
   installEmptyMock();
 });
 
+// P0-2 (review 2026-08-07): after a ?focus=ID deep link, an explicit
+// marker click must WIN — the focus URL is external state applied only on
+// VALUE change, never a binding that overrides the user's next click.
+test("MappaTool marker click after a ?focus= deep link keeps the clicked record (no focus bounce-back)", async () => {
+  installRecordsMock();
+  await resetLeafletMarkers();
+  // Seed the URL with a focus deep link on record A.
+  setNavState({ pathname: "/mappa", search: "focus=1" });
+  const { screen, waitFor } = rtl;
+  await renderWithLocale(React.createElement(MappaTool));
+
+  // The deep link resolves record A as the selected camera.
+  await waitFor(() => assert.ok(screen.getByRole("button", { name: /Illustrative record A/ })), { timeout: 5000 });
+
+  // Wait for the markers to be materialised (records from the mock).
+  const markers = await leafletMarkers();
+  assert.ok(markers.length >= 2, "both mock records render as markers");
+  const m2 = markers.find((m) => m.latlng && Math.abs(m.latlng[0] - 41.9047) < 1e-9);
+  assert.ok(m2, "record B marker exists");
+
+  // Explicit user click on record B's marker: selects B, opens its popup.
+  const evt = { latlng: { lat: m2.latlng[0], lng: m2.latlng[1] }, originalEvent: {} };
+  m2.handlers.click?.[0]?.(evt);
+
+  // The focus URL must NOT bounce the selection back to A: B stays
+  // current (its list row carries aria-current), no re-open of A's popup.
+  await waitFor(() => {
+    assert.equal(screen.getByRole("button", { name: /Illustrative record B/ }).getAttribute("aria-current"), "true", "the clicked record B stays selected");
+  }, { timeout: 3000 });
+  assert.equal(m2.popupOpened, true, "the clicked marker's popup is open");
+});
+
 test("MappaTool geocode dropdown closes on Escape and on click outside", async () => {
   installGeocodeMock(FERRARA_SUGGESTIONS);
   const { screen, waitFor } = rtl;

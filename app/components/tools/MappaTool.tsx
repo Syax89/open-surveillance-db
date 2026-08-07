@@ -137,10 +137,21 @@ export function MappaTool() {
   // selection falls back to NULL — never to the first record — so a filter
   // change never auto-opens a popup (popup policy above). The card/list
   // fall back to the first visible record for display, without opening it.
+  //
+  // P0-2 (review 2026-08-07): the focus URL must be applied ONLY when its
+  // VALUE changes. The old effect ran on every `selectedId` change, so a
+  // marker click after a deep link (focus still in the URL) was instantly
+  // overridden: the popup jumped from the clicked marker back to the
+  // focused record. Track the last-applied focus in a ref and treat the
+  // URL as external state (sync-on-change), never as a binding.
+  const lastAppliedFocusRef = useRef<number | null>(filters.focus);
   useEffect(() => {
-    if (filters.focus !== null) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- URL focus (FRONTEND_DESIGN §6.2) is external state: a deep link / back-forward onto ?focus=ID must select that record exactly once; guard makes it a prop-change sync, not a loop.
-      setSelectedId(filters.focus);
+    if (filters.focus !== lastAppliedFocusRef.current) {
+      lastAppliedFocusRef.current = filters.focus;
+      if (filters.focus !== null) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- URL focus (FRONTEND_DESIGN §6.2) is external state: a deep link / back-forward onto ?focus=ID must select that record exactly once; guard makes it a prop-change sync, not a loop.
+        setSelectedId(filters.focus);
+      }
     } else if (selectedId !== null && !filteredRecords.some((camera) => camera.id === selectedId)) {
       setSelectedId(null);
     }
