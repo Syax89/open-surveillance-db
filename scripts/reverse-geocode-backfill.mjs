@@ -92,6 +92,47 @@ async function main() {
   let fetched = 0;
   let hits = 0;
   const updates = []; // { id, address }
+  const newCacheRows = new Map(); // rounded key → address (only MISS writes)
+
+  // Checkpoint flush (2026-08-07): the backfill runs for ~2 h and the
+  // container may be restarted — write every FLUSH_EVERY records so an
+  // interruption never loses more than FLUSH_EVERY live fetches. Both
+  // writes are idempotent (UPDATE by id / INSERT OR IGNORE), so a
+  // re-run continues where the last checkpoint stopped.
+  const FLUSH_EVERY = 100;
+  let lastFlush = 0;
+
+  async function flush() {
+    if (updates.length === 0) return;
+    const batch = updates
+      .map((u) => {
+        const escaped = u.address.replaceAll("'", "''");
+        return `UPDATE cameras SET address = '${escaped}' WHERE id = ${u.id};`;
+      })
+      .join("\n");
+    const batchFile = path.join(root, `.reverse-geocode-batch-${process.pid}.sql`);
+    const { writeFileSync, rmSync } = await import("node:fs");
+    writeFileSync(batchFile, batch);
+    d1(["--file", batchFile]);
+    rmSync(batchFile);
+    updates.length = 0;
+    // Cache rows for every address we just persisted (rounded key).
+    const cacheInserts = [...newCacheRows.entries()]
+      .map(([k, address]) => {
+        const escaped = address.replaceAll("'", "''");
+        const [lat, lng] = k.split(",");
+        return `INSERT OR IGNORE INTO geocode_reverse_cache (lat, lng, address, updated_at) VALUES (${lat}, ${lng}, '${escaped}', '${new Date().toISOString()}');`;
+      })
+      .join("\n");
+    if (cacheInserts) {
+      const cacheFile = path.join(root, `.reverse-geocode-cache-${process.pid}.sql`);
+      writeFileSync(cacheFile, cacheInserts);
+      d1(["--file", cacheFile]);
+      rmSync(cacheFile);
+    }
+    newCacheRows.clear();
+    lastFlush = 0;
+  }
 
   for (let i = 0; i < candidates.length; i += 1) {
     const camera = candidates[i];
@@ -105,12 +146,21 @@ async function main() {
     } else {
       address = await reverseLookup(camera.latitude, camera.longitude);
       fetched += 1;
-      if (address) cache.set(k, address);
+      if (address) {
+        cache.set(k, address);
+        newCacheRows.set(k, address);
+      }
       await sleep(SLEEP_MS); // Nominatim usage policy: ~1 request/second
     }
     if (address) updates.push({ id: camera.id, address, latitude: camera.latitude, longitude: camera.longitude });
     if ((i + 1) % 50 === 0 || i === candidates.length - 1) {
       console.log(`[reverse-geocode-backfill] ${i + 1}/${candidates.length} (hits=${hits} fetched=${fetched})`);
+    }
+    // Checkpoint: persist every FLUSH_EVERY records so an interrupted run
+    // (container restart, ssh drop) never loses more than that many fetches.
+    if (!dryRun && (i + 1) % FLUSH_EVERY === 0) {
+      await flush();
+      console.log(`[reverse-geocode-backfill] checkpoint @${i + 1} — ${updates.length === 0 ? "written" : "pending"} (hits=${hits} fetched=${fetched})`);
     }
   }
 
@@ -124,42 +174,9 @@ async function main() {
     return;
   }
 
-  // 3) Write back: cameras.address + the rounded cache row.
-  const batch = updates
-    .map((u) => {
-      const escaped = u.address.replaceAll("'", "''");
-      const [lat, lng] = key(u.latitude ?? 0, u.longitude ?? 0).split(",");
-      return `UPDATE cameras SET address = '${escaped}' WHERE id = ${u.id};`;
-    })
-    .join("\n");
-  // NOTE: address values come from Nominatim (public data) — the quoting
-  // above is the only injection surface and it is escaped.
-  const batchFile = path.join(root, ".reverse-geocode-batch.sql");
-  const { writeFileSync, rmSync } = await import("node:fs");
-  writeFileSync(batchFile, batch);
-  d1(["--file", batchFile]);
-  rmSync(batchFile);
-
-  // Cache rows: reuse the per-record rounded key; store address if missing.
-  const cacheInserts = updates
-    .filter((u) => {
-      const k = key(u.latitude ?? 0, u.longitude ?? 0);
-      return !cache.has(k);
-    })
-    .map((u) => {
-      const escaped = u.address.replaceAll("'", "''");
-      const [lat, lng] = key(u.latitude ?? 0, u.longitude ?? 0).split(",");
-      return `INSERT OR IGNORE INTO geocode_reverse_cache (lat, lng, address, updated_at) VALUES (${lat}, ${lng}, '${escaped}', '${new Date().toISOString()}');`;
-    })
-    .join("\n");
-  if (cacheInserts) {
-    const cacheFile = path.join(root, ".reverse-geocode-cache.sql");
-    writeFileSync(cacheFile, cacheInserts);
-    d1(["--file", cacheFile]);
-    rmSync(cacheFile);
-  }
-
-  console.log(`[reverse-geocode-backfill] done — ${updates.length} addresses written to cameras.address + cache`);
+  // Final flush of any records past the last checkpoint.
+  await flush();
+  console.log(`[reverse-geocode-backfill] done — ${fetched} live fetches, addresses persisted to cameras.address + cache`);
 }
 
 main().catch((error) => {
