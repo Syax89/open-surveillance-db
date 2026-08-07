@@ -593,6 +593,17 @@ button { cursor:pointer; }
 .records-section .record-list .record-list-card .card-topline { color:var(--muted); }
 .records-section .record-list .record-list-card .record-kind { color:var(--tint-ink); }
 .records-section .record-list .record-list-card dt { color:var(--tint-ink); }
+/* t_ab92aa92 (P1 a11y): --card-label/--supporting/--muted/--tint-ink falliscono
+   (3.68-4.49:1) sulle superfici muted della guida (--surface-muted e
+   --principle-surface-2/3). Il testo delle card della guida passa a --ink-2
+   (5.75-6.08:1, >= 4.5:1 AA). Specificita' >= (0,4,0) per vincere su
+   `.records-section .record-list .record-list-card .card-topline/--kind`
+   (--muted/--tint-ink); scoped a .guide-section-anchor (solo /guide): le
+   altre pagine info restano intatte. */
+.records-section.guide-section-anchor .record-list-card .card-topline,
+.records-section.guide-section-anchor .record-list-card .record-kind,
+.guide-section-anchor .report-form .card-topline,
+.guide-section-anchor .correction-form .card-topline { color: var(--ink-2); }
 .records-section .record-list .record-list-card:has(.status-dot.verified) { border-left-color:var(--status-verified); background:var(--status-verified-card-bg); }
 .records-section .record-list .record-list-card:has(.status-dot.community-report) { border-left-color:var(--status-community); background:var(--status-community-bg); }
 .records-section .record-list .record-list-card:has(.status-dot.needs-review) { border-left-color:var(--status-review); background:var(--status-review-card-bg); }
