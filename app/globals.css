@@ -625,6 +625,13 @@ button { cursor:pointer; }
 .record-detail-facts { display:grid; grid-template-columns:repeat(2,1fr); gap:var(--space-5); margin:32px 0; padding:25px 0; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
 .record-detail-facts dt { margin-bottom:5px; color:var(--label); font-size:var(--text-2xs); text-transform:uppercase; letter-spacing:.1em; font-weight:800; }
 .record-detail-facts dd { margin:0; color:var(--ink-5); font-size:var(--text-base); line-height:1.45; overflow-wrap:anywhere; }
+/* Mini map on the record page (CEO 2026-08-07): read-only Leaflet display
+   of the camera position + field of view. Same coherent-box family as the
+   facts list — bordered, rounded, card bg. Non-interactive, so no zoom
+   controls; the height keeps the ~35 m FOV cone legible. */
+.record-minimap { height:280px; margin:0 0 32px; border:1px solid var(--line); border-radius:var(--radius-lg); overflow:hidden; background:var(--map-tile-bg, #e8ece9); }
+.record-minimap .fov-cone { pointer-events:none; }
+.record-minimap .fov-cone.active { stroke:var(--action); fill:var(--action); }
 .record-detail-actions { display:flex; gap:var(--space-3); flex-wrap:wrap; }
 /* IT layout stability (t_690ed55e): the two action buttons must NEVER wrap
    to a second row in one language while staying on one row in the other.

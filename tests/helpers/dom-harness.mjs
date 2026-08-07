@@ -287,6 +287,9 @@ export const __setBounds = (b) => { currentBounds = b; };
 export const __resetMarkers = () => { markers.length = 0; maps.length = 0; paths.length = 0; currentBounds = wholeWorldBounds; };
 export function map(el, opts) {
   const m = {
+    // Map options recorded (RecordMiniMap 2026-08-07): the read-only mini
+    // map asserts zoomControl/dragging/scrollWheelZoom are off.
+    opts: opts ?? {},
     // setView records every call (t_b9666d09 geocode pan assertions):
     // m.views accumulates { center, zoom } so tests can assert the map
     // really moved to the selected place.
@@ -324,6 +327,13 @@ export function map(el, opts) {
       return m;
     },
     getPane: () => ({ setAttribute: (key, value) => { m.paneAttrs[key] = value; } }),
+    // Direct addLayer on the map (RecordMiniMap 2026-08-07): the read-only
+    // mini map adds markers/geometry straight to the map, not via a
+    // layerGroup — record into the same live-union arrays the groups use.
+    addLayer: (item) => {
+      item.__map = m;
+      (item && item.__isPath ? paths : markers).push(item);
+    },
     // Map-click picker (t_6abb96ac): map.openPopup records the popup
     // content + position so tests can assert the report-picker popup
     // (coordinates + /segnala deep link) that a map click opens.
