@@ -47,6 +47,15 @@ export function useReportFlow({ setNotice, initialCoordinates = null }: { setNot
   const [kind, setKind] = useState("");
   const [direction, setDirection] = useState<number | null>(null);
   const [directionKnown, setDirectionKnown] = useState(false);
+  // Reverse geocoding prefill (CEO 2026-08-07): when the contributor picks
+  // a position, /api/geocode/reverse returns the nearest address (cache
+  // hit = free) and the form pre-fills it. The user's own typing ALWAYS
+  // wins: addressTouched flips on first keystroke and the lookup never
+  // overwrites afterwards.
+  const [address, setAddress] = useState("");
+  const [reverseGeocoding, setReverseGeocoding] = useState(false);
+  const addressTouched = useRef(false);
+  const reverseRequest = useRef<AbortController | null>(null);
   const nearbyRequest = useRef<AbortController | null>(null);
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
   const [photoUploading, setPhotoUploading] = useState(false);
@@ -68,6 +77,7 @@ export function useReportFlow({ setNotice, initialCoordinates = null }: { setNot
 
   async function selectCoordinates(latitude: number, longitude: number) {
     nearbyRequest.current?.abort();
+    reverseRequest.current?.abort();
     const controller = new AbortController();
     nearbyRequest.current = controller;
     setCoordinates({ latitude, longitude });
@@ -79,6 +89,31 @@ export function useReportFlow({ setNotice, initialCoordinates = null }: { setNot
     setDuplicateConfirmationRequired(false);
     setDuplicateConfirmed(false);
     setNearbyLoading(true);
+    // Reverse geocode prefill (CEO 2026-08-07): ask the nearest address
+    // in parallel with the nearby check — the D1 cache makes repeat
+    // positions free, a miss costs one Nominatim call. Only pre-fills
+    // when the contributor has not typed their own address.
+    if (!addressTouched.current) {
+      setReverseGeocoding(true);
+      const reverse = new AbortController();
+      reverseRequest.current = reverse;
+      void (async () => {
+        try {
+          const params = new URLSearchParams({ lat: String(latitude), lng: String(longitude) });
+          const response = await fetch(`/api/geocode/reverse?${params}`, { signal: reverse.signal });
+          if (!response.ok) return;
+          const data = await response.json() as { address?: string | null };
+          if (!reverse.signal.aborted && typeof data.address === "string" && data.address && !addressTouched.current) {
+            setAddress(data.address);
+          }
+        } catch {
+          // Lookup unavailable: the field stays empty, the contributor
+          // can type it — never block the flow on a geocoder failure.
+        } finally {
+          if (!reverse.signal.aborted) setReverseGeocoding(false);
+        }
+      })();
+    }
     try {
       const params = new URLSearchParams({ latitude: String(latitude), longitude: String(longitude), radius: "75", limit: "8" });
       const response = await fetch(`/api/cameras/nearby?${params}`, { signal: controller.signal });
@@ -138,6 +173,15 @@ export function useReportFlow({ setNotice, initialCoordinates = null }: { setNot
 
   function removePhoto(id: number) {
     setPhotos((items) => items.filter((photo) => photo.id !== id));
+  }
+
+  // Reverse-geocode prefill guard (CEO 2026-08-07): once the contributor
+  // types, the address is theirs — later lookups must never overwrite it.
+  // Defined here (not inline in the JSX) so the react-compiler eslint rule
+  // sees the ref write inside a handler, not during render.
+  function handleAddressChange(value: string) {
+    addressTouched.current = true;
+    setAddress(value);
   }
 
   async function submitReport(event: FormEvent<HTMLFormElement>) {
@@ -211,9 +255,10 @@ export function useReportFlow({ setNotice, initialCoordinates = null }: { setNot
       formElement.reset(); setCoordinates(null); setManualLatitude(""); setManualLongitude(""); setPhotos([]);
       setDuplicateConfirmationRequired(false); setDuplicateConfirmed(false);
       setKind(""); setDirection(null); setDirectionKnown(false);
+      setAddress(""); addressTouched.current = false; setReverseGeocoding(false);
       setNotice(duplicates.length > 0 ? `${t.reportSaved} ${t.reportSavedWithNearby}` : t.reportSaved);
     } catch { setNotice(t.moderationUnavailable); }
   }
 
-  return { coordinates, setCoordinates, manualLatitude, setManualLatitude, manualLongitude, setManualLongitude, nearbyCandidates, nearbyLoading, nearbyError, selectCoordinates, selectManualCoordinates, photos, photoUploading, photoInputRef, onPhotoSelected, removePhoto, submitReport, duplicateConfirmationRequired, duplicateConfirmed, setDuplicateConfirmed, kind, setKind, direction, setDirection, directionKnown, setDirectionKnown };
+  return { coordinates, setCoordinates, manualLatitude, setManualLatitude, manualLongitude, setManualLongitude, nearbyCandidates, nearbyLoading, nearbyError, selectCoordinates, selectManualCoordinates, photos, photoUploading, photoInputRef, onPhotoSelected, removePhoto, submitReport, duplicateConfirmationRequired, duplicateConfirmed, setDuplicateConfirmed, kind, setKind, direction, setDirection, directionKnown, setDirectionKnown, address, setAddress, handleAddressChange, reverseGeocoding };
 }

@@ -37,6 +37,7 @@ const ROUTES = [
   { source: "app/api/corrections/route.ts", output: "app/api/corrections/route.mjs" },
   { source: "app/api/tiles/[z]/[x]/[y]/route.ts", output: "app/api/tiles/[z]/[x]/[y]/route.mjs" },
   { source: "app/api/geocode/route.ts", output: "app/api/geocode/route.mjs" },
+  { source: "app/api/geocode/reverse/route.ts", output: "app/api/geocode/reverse/route.mjs" },
   { source: "app/api/auth/register/route.ts", output: "app/api/auth/register/route.mjs" },
   { source: "app/api/auth/login/route.ts", output: "app/api/auth/login/route.mjs" },
   { source: "app/api/auth/logout/route.ts", output: "app/api/auth/logout/route.mjs" },
@@ -151,7 +152,7 @@ async function buildTree() {
   const mocksDir = path.join(root, "tests", "helpers", "mocks");
   const mockStateUrl = pathToFileURL(path.join(root, "tests", "helpers", "mock-state.mjs")).href;
   await mkdir(path.join(tree, "db"), { recursive: true });
-  for (const mockName of ["cameras", "camera-edits", "corrections", "geocode", "moderation", "auth", "users", "photos", "appeals", "confirmations", "passkeys", "oidc", "mailer", "community-actions", "import-sources"]) {
+  for (const mockName of ["cameras", "camera-edits", "corrections", "geocode", "reverse-geocode", "moderation", "auth", "users", "photos", "appeals", "confirmations", "passkeys", "oidc", "mailer", "community-actions", "import-sources"]) {
     const source = await readFile(path.join(mocksDir, `${mockName}.mjs`), "utf8");
     await writeFile(
       path.join(tree, "db", `${mockName}.mjs`),

@@ -73,6 +73,7 @@ export const en = {
   observedOn: "Date observed (optional)",
   approximateAddress: "Approximate address",
   addressPlaceholder: "Street and city (optional)",
+  resolvingAddress: "Resolving address…",
   whatObserved: "What did you observe?",
   observedPlaceholder: "Direction, operator, visible notice, model…",
   reportConsent:
@@ -189,6 +190,7 @@ export const it: Translation<typeof en> = {
   observedOn: "Data osservata (facoltativa)",
   approximateAddress: "Indirizzo approssimativo",
   addressPlaceholder: "Via e città (facoltative)",
+  resolvingAddress: "Ricerca indirizzo…",
   whatObserved: "Cosa hai osservato?",
   observedPlaceholder: "Direzione, gestore, avviso visibile, modello…",
   reportConsent:
