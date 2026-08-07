@@ -67,8 +67,7 @@ export function SegnalaTool({ initialCoordinates = null }: Props) {
           directionKnown={report.directionKnown}
           setDirectionKnown={report.setDirectionKnown}
           address={report.address}
-          setAddress={report.setAddress}
-          addressTouched={report.addressTouched}
+          setAddress={report.handleAddressChange}
           reverseGeocoding={report.reverseGeocoding}
           showHeading={false}
         />

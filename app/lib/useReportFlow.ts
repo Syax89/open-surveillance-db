@@ -175,6 +175,15 @@ export function useReportFlow({ setNotice, initialCoordinates = null }: { setNot
     setPhotos((items) => items.filter((photo) => photo.id !== id));
   }
 
+  // Reverse-geocode prefill guard (CEO 2026-08-07): once the contributor
+  // types, the address is theirs — later lookups must never overwrite it.
+  // Defined here (not inline in the JSX) so the react-compiler eslint rule
+  // sees the ref write inside a handler, not during render.
+  function handleAddressChange(value: string) {
+    addressTouched.current = true;
+    setAddress(value);
+  }
+
   async function submitReport(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     // Capture the element synchronously: React nulls event.currentTarget
@@ -251,5 +260,5 @@ export function useReportFlow({ setNotice, initialCoordinates = null }: { setNot
     } catch { setNotice(t.moderationUnavailable); }
   }
 
-  return { coordinates, setCoordinates, manualLatitude, setManualLatitude, manualLongitude, setManualLongitude, nearbyCandidates, nearbyLoading, nearbyError, selectCoordinates, selectManualCoordinates, photos, photoUploading, photoInputRef, onPhotoSelected, removePhoto, submitReport, duplicateConfirmationRequired, duplicateConfirmed, setDuplicateConfirmed, kind, setKind, direction, setDirection, directionKnown, setDirectionKnown, address, setAddress, addressTouched, reverseGeocoding };
+  return { coordinates, setCoordinates, manualLatitude, setManualLatitude, manualLongitude, setManualLongitude, nearbyCandidates, nearbyLoading, nearbyError, selectCoordinates, selectManualCoordinates, photos, photoUploading, photoInputRef, onPhotoSelected, removePhoto, submitReport, duplicateConfirmationRequired, duplicateConfirmed, setDuplicateConfirmed, kind, setKind, direction, setDirection, directionKnown, setDirectionKnown, address, setAddress, handleAddressChange, reverseGeocoding };
 }
