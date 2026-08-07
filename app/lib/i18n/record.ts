@@ -91,6 +91,10 @@ export const en = {
   // Record detail fact (t_f8b775ec): "Direction: NE 45°" when the record
   // has a stored bearing (domes and unknown directions omit the row).
   direction: "Direction",
+  // Mini map on the record page (CEO 2026-08-07): a read-only Leaflet
+  // display of the camera position and its field-of-view cone/circle —
+  // decorative (role="img"), the same facts are textual in the list.
+  positionOnMap: "Position on the map",
 
   // --- Community status badge (ADR 0021 §9, FASE 3 UI): informational
   // freshness line — never a state change. A record with no confirmations
@@ -235,6 +239,7 @@ export const it: Translation<typeof en> = {
   // record ha un rilevamento salvato (le cupole e le direzioni ignote
   // omettono la riga).
   direction: "Direzione",
+  positionOnMap: "Posizione sulla mappa",
 
   // --- Badge di stato della community (ADR 0021 §9, FASE 3 UI): riga di
   // freschezza informativa — mai un cambio di stato. Un record senza
