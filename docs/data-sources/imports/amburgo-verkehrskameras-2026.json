@@ -1,0 +1,11 @@
+{
+  "slug": "amburgo-verkehrskameras-2026",
+  "source_name": "Freie und Hansestadt Hamburg — Verkehrskameras (Polizei Hamburg)",
+  "format": "geojson",
+  "license": "Datenlizenz Deutschland Namensnennung 2.0 (dl-de-by-2.0)",
+  "license_url": "https://www.govdata.de/dl-de/by-2-0",
+  "attribution_text": "Fonte: Freie und Hansestadt Hamburg, Transparenzportal (https://suche.transparenz.hamburg.de/dataset/verkehrskameras), concesso con Datenlizenz Deutschland – Namensnennung 2.0 (https://www.govdata.de/dl-de/by-2-0).",
+  "source_url": "https://api.hamburg.de/datasets/v1/verkehrskameras/collections/verkehr_kameras_internet/items",
+  "max_records": 1000,
+  "notes": "Scan stato-per-stato DE (CEO 2026-08-07): unico dataset ufficiale tedesco con coordinate utilizzabile — telecamere di monitoraggio del traffico gestite dalla Verkehrsleitzentrale della Polizia di Amburgo, via OGC API - Features (GeoJSON). 18 record (collection verkehr_kameras_internet). Licenza dl-de-by-2.0 = attribuzione obbligatoria (stessa classe di CC-BY, matrice compatibile). external_id hh-verkehrskamera:<id>."
+}

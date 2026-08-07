@@ -41,6 +41,15 @@ export const IMPORTABLE_LICENSES = new Set([
   "Licence Ouverte 2.0",
   "Open Government Licence 3.0",
   "OGL 3.0",
+  // German open-data standard (dl-de-by-2.0) — attribution only, the same
+  // obligations class as CC-BY (matrix licenze-compatibilita.md; verified
+  // for the Hamburg Verkehrskameras source, CEO 2026-08-07).
+  "Datenlizenz Deutschland Namensnennung 2.0 (dl-de-by-2.0)",
+  "Datenlizenz Deutschland Namensnennung 2.0",
+  "dl-de-by-2.0",
+  // Swiss OGD standard — free use with mandatory attribution
+  // (opendata.swiss terms; verified for Kanton Bern VIDEO, CEO 2026-08-07).
+  "Open use. Attribution required (Kanton Bern)",
   // No explicit licence but a statutory open-data basis (art. 52 CAD) —
   // only after the legal review has confirmed the specific source.
   "Open data (art. 52 CAD)",
