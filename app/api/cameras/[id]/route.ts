@@ -4,6 +4,7 @@ import { getCommunityRecordById } from "../../../../db/cameras";
 import { recordRateLimitBlock } from "../../../lib/abuse-alerts";
 import { resolveOptionalContributor } from "../../../lib/auth-session";
 import { CACHE_TAGS } from "../../../lib/cache-purge";
+import { withPublicCache } from "../../../lib/public-cache";
 import { csrfVerified, sameOrigin } from "../../../lib/csrf";
 import { BodyReadError, readJsonBody, urlTooLong } from "../../../lib/input-limits";
 import { callerKey, checkRateLimit, limitsFor } from "../../../lib/rate-limit";
@@ -59,6 +60,11 @@ export async function GET(request: Request) {
     });
   }
 
+  // DB-lightening (CEO 2026-08-07): the record page deep-links here on
+  // every visit — wrap the database read in the worker cache (fail-open)
+  // so repeat views of the same record never re-query D1. The 404 path
+  // is NOT cached (it is deliberately indistinguishable from missing).
+  return withPublicCache(request, 300, async () => {
   try {
     // Record-page resolver (ADR 0021 §6.3, FASE 3 UI): public records AND
     // hidden/removed ones (direct-link banner contract). List surfaces keep
@@ -81,6 +87,7 @@ export async function GET(request: Request) {
     console.error("GET /api/cameras/[id] failed", error);
     return Response.json({ error: "Database unavailable" }, { status: 503 });
   }
+  });
 }
 
 const NO_STORE_HEADERS = { "Cache-Control": "no-store" };
