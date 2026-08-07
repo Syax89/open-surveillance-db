@@ -416,6 +416,21 @@ test("every register form control has an accessible name (wrapping label)", asyn
   assertControlsLabeled(form[0], "register");
 });
 
+test("register page carries the same social sign-up panel as login (GitHub + Google, same OIDC routes)", async () => {
+  const { html } = await renderRoute("/register");
+  // The OIDC panel must be the same one the login page uses — same
+  // classes, same routes, so sign-up with GitHub/Google works today
+  // (the callback auto-creates the contributor when no account exists).
+  assert.match(html, /class="oidc-panel"/, "register must render the oidc-panel");
+  assert.match(html, /class="oidc-buttons"/, "register must render the oidc-buttons row");
+  const githubHref = /href="\/api\/auth\/oidc\/github\/start\?redirect_to=[^"]*"/;
+  const googleHref = /href="\/api\/auth\/oidc\/google\/start\?redirect_to=[^"]*"/;
+  assert.match(html, githubHref, "register must link the GitHub OIDC start route");
+  assert.match(html, googleHref, "register must link the Google OIDC start route");
+  // Per-method risk disclosure travels with the panel (P1-4 Vera design).
+  assert.match(html, /class="oidc-disclosure"/, "register must carry the OIDC disclosure");
+});
+
 test("auth errors are announced through a live region (role=alert)", async () => {
   const [login, register, account] = await Promise.all([
     readFile(path.join(root, "app", "login", "LoginPageBody.tsx"), "utf8"),

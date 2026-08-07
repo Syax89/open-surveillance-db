@@ -80,6 +80,30 @@ export function RegisterPageBody() {
         <h1>{t.registerTitle}</h1>
         <p className="record-detail-summary">{t.anonymousNote}</p>
 
+        {/*
+          Social sign-up (CEO 2026-08-07): same OIDC panel as the login
+          page (same routes, same disclosure, same classes). When the
+          provider returns a verified email that matches NO existing
+          account, the OIDC callback creates the contributor on the spot
+          (createOidcContributor) — this IS the Google/GitHub sign-up
+          path. Email conflicts still redirect to /login?merge=… for the
+          password proof (shared backend, unchanged).
+        */}
+        <div className="oidc-panel">
+          <div className="oidc-buttons">
+            <a className="button detail-outline oidc-button" href={`/api/auth/oidc/github/start?redirect_to=${encodeURIComponent("/account")}`}>
+              {t.oidcGithub}
+            </a>
+            <a className="button detail-outline oidc-button" href={`/api/auth/oidc/google/start?redirect_to=${encodeURIComponent("/account")}`}>
+              {t.oidcGoogle}
+            </a>
+          </div>
+          <p className="oidc-disclosure">
+            {t.oidcDisclosure}{" "}
+            <Link href="/privacy">{t.privacyNotice}</Link>.
+          </p>
+        </div>
+
         <form className="auth-form" onSubmit={onSubmit} noValidate>
           <label className="auth-field">
             <span>{t.email}</span>
