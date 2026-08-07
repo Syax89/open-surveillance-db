@@ -384,3 +384,52 @@ test("osm: looksLikeEntityOperator heuristics", () => {
   assert.equal(looksLikeEntityOperator(""), false);
   assert.equal(looksLikeEntityOperator(null), false);
 });
+
+// ------------------------------------------------------------- OSM country factory
+
+import {
+  buildQuery as atBuildQuery,
+  parsePayload as atParse,
+} from "../scripts/import/adapters/osm-surveillance-austria-2026.mjs";
+import {
+  buildQuery as chBuildQuery,
+} from "../scripts/import/adapters/osm-surveillance-svizzera-2026.mjs";
+import {
+  buildQuery as deBuildQuery,
+  parsePayload as deParse,
+} from "../scripts/import/adapters/osm-surveillance-germania-2026.mjs";
+
+test("osm-factory: buildQuery targets the right ISO3166 admin area per country", () => {
+  const at = atBuildQuery([46.5, 9.7, 46.6, 9.8], { timeout: 60 });
+  assert.match(at, /area\["ISO3166-1"="AT"\]\[admin_level=2\]->\.at;/);
+  assert.match(at, /\(area\.at\)\(46\.5000,9\.7000,46\.6000,9\.8000\)/);
+  const ch = chBuildQuery([46.9, 6.1, 47.0, 6.2], { timeout: 60 });
+  assert.match(ch, /area\["ISO3166-1"="CH"\]\[admin_level=2\]->\.ch;/);
+  const de = deBuildQuery([48.1, 8.1, 48.2, 8.2], { timeout: 60 });
+  assert.match(de, /area\["ISO3166-1"="DE"\]\[admin_level=2\]->\.de;/);
+});
+
+test("osm-factory: parsePayload maps the same canonical rows for every country", () => {
+  const fixture = {
+    elements: [
+      { type: "node", id: 1, lat: 48.1, lon: 16.3, tags: { name: "Stephansplatz", "camera:type": "dome", operator: "Stadt Wien", surveillance: "public" } },
+      { type: "node", id: 2, lat: 47.4, lon: 8.5, tags: { "camera:type": "fixed", "camera:direction": "90", operator: "Stadtpolizei Zürich", surveillance: "outdoor" } },
+      { type: "node", id: 3, lat: 52.5, lon: 13.4, tags: { "camera:type": "panning", surveillance: "public", operator: "Berliner Polizei" } },
+      { type: "node", id: 4, lat: 52.6, lon: 13.5, tags: { "surveillance:type": "guard", surveillance: "public" } },
+      { type: "node", id: 5, lat: 52.7, lon: 13.6, tags: { surveillance: "indoor" } },
+    ],
+  };
+  const at = atParse(fixture);
+  const de = deParse(fixture);
+  assert.equal(at.staged.length, 3); // guard + indoor skipped
+  assert.equal(de.staged.length, 3);
+  const dome = de.staged.find((r) => r.external_id === "osm:node/1");
+  assert.equal(dome.kind, "Fixed dome");
+  assert.equal(dome.direction, null); // dome invariant
+  assert.equal(dome.notes, "Operatore: Stadt Wien"); // entity operator kept
+  const fixed = de.staged.find((r) => r.external_id === "osm:node/2");
+  assert.equal(fixed.kind, "Bullet");
+  assert.equal(fixed.direction, 90);
+  assert.equal(de.skipped.reasons["surveillance:type=guard"], 1);
+  assert.equal(de.skipped.reasons["surveillance=indoor"], 1);
+});
