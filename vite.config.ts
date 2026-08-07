@@ -15,9 +15,17 @@ export default defineConfig(async () => {
   const { cloudflare } = await import("@cloudflare/vite-plugin");
 
   return {
-    server: isCodexSeatbeltSandbox
-      ? { watch: { useFsEvents: false, usePolling: true } }
-      : undefined,
+    // External hosts (CEO 2026-08-07): the temporary public domain
+    // osdb.syaxhome89.com (and any future *.syaxhome89.com subdomain)
+    // hits the dev server through the reverse proxy; Vite's default
+    // DNS-rebinding guard rejects it. Wildcard entry keeps future
+    // subdomains working without another config edit.
+    server: {
+      allowedHosts: [".syaxhome89.com"],
+      ...(isCodexSeatbeltSandbox
+        ? { watch: { useFsEvents: false, usePolling: true } }
+        : {}),
+    },
     plugins: [
       vinext(),
       cloudflare({
