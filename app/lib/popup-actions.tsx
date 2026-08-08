@@ -27,6 +27,107 @@ import { LOCALE_COOKIE, resolveLocale, type Locale } from "./i18n/types";
 let activeRoot: { root: Root; node: HTMLElement; recordId: number } | null = null;
 
 /**
+ * Desired popup-widget state, applied in a MICROTASK (t_0b9f5a3c).
+ *
+ * Leaflet fires popupopen/popupclose SYNCHRONOUSLY, and the map opens popups
+ * from inside React effects (the selection effect, the rebuild restore/focus
+ * effects all call marker.openPopup()). If mountPopupActions ran
+ * flushSync() — and unmountPopupActions ran root.unmount() — directly in the
+ * Leaflet handler, they would execute WHILE React is still rendering, which
+ * React forbids:
+ *   - "flushSync was called from inside a lifecycle method. React cannot
+ *     flush when React is already rendering."
+ *   - "Attempted to synchronously unmount a root while React was already
+ *     rendering."
+ * A direct marker click is a DOM event OUTSIDE React's render (legal), which
+ * is why the bug only reproduced on mobile (list click → selection effect).
+ *
+ * The fix defers the actual render/unmount to a microtask (React's own
+ * suggested remedy). Microtasks run after the current task — i.e. after
+ * React's render/effect flush, so flushSync/unmount are legal — but BEFORE
+ * the browser paints, so the P1-7 no-flicker contract still holds: on a real
+ * marker click the popup DOM is inserted synchronously by openPopup and the
+ * widget mounts in the microtask before the popup's first paint.
+ *
+ * The pending state is last-write-wins: a popupopen followed by a popupclose
+ * in the same task leaves desired = null (nothing mounts), and a close
+ * followed by an open leaves the latest target. Each task applies at most
+ * one microtask.
+ */
+let desired: { node: HTMLElement; recordId: number; counts?: Partial<ActionCounts> } | null = null;
+let applyScheduled = false;
+
+function scheduleApply(): void {
+  if (applyScheduled) return;
+  applyScheduled = true;
+  queueMicrotask(() => {
+    applyScheduled = false;
+    applyDesired();
+  });
+}
+
+function applyDesired(): void {
+  if (activeRoot && desired && activeRoot.node === desired.node && activeRoot.recordId === desired.recordId) {
+    return; // already showing the desired widget
+  }
+  if (activeRoot) {
+    activeRoot.root.unmount();
+    activeRoot = null;
+  }
+  if (!desired) return;
+  const { node, recordId, counts } = desired;
+  // BUG t_5bc23d61: seed from the SERVER-CONFIRMED counts when this record
+  // has already been voted on during this page session. The payload counts
+  // passed by the map are a pre-vote snapshot; re-seeding from them after
+  // a rebuild would revert the count the CEO just saw update.
+  const seed = confirmedCounts.get(recordId) ?? counts;
+  const root = createRoot(node);
+  // P1-7 (review 2026-08-07): flush the first render synchronously. The
+  // popupopen handler runs in a DOM event outside React's tree, and a
+  // plain root.render is scheduled — the browser could paint the popup
+  // with an empty mount node and mount the toolbar one frame later
+  // (first-paint flicker, exactly what the P0 contract forbids). flushSync
+  // forces the widget into the DOM before the popup becomes visible. We
+  // are inside a microtask (outside React's render) so flushSync is legal.
+  flushSync(() => {
+    root.render(
+      <CommunityActions
+        recordId={recordId}
+        counts={seed}
+        compact
+        bundle={messages[resolvePopupLocale()]}
+        onCountsChange={(next) => { confirmedCounts.set(recordId, next); }}
+      />,
+    );
+  });
+  activeRoot = { root, node, recordId };
+}
+
+/** Unmount the previous popup widget (a new popup replaced the old one). */
+export function unmountPopupActions(): void {
+  desired = null;
+  scheduleApply();
+}
+
+/**
+ * Render the compact action widget into a popup mount node. `counts` come
+ * from the shared record payload (list API already exposes them); the
+ * widget falls back to zero when the seed lacks them.
+ *
+ * P0 t_bb310428 (popup flicker): the mount is IDEMPOTENT for the SAME
+ * record + node — a popupopen that re-fires on the same popup (Leaflet
+ * re-fires the event in some openPopup paths) must NOT unmount/remount the
+ * root: a remount resets the widget's local state (counts, disclosure,
+ * personal action) and makes the buttons visibly reset.
+ */
+export function mountPopupActions(node: HTMLElement, recordId: number, counts?: Partial<ActionCounts>): void {
+  if (activeRoot && activeRoot.node === node && activeRoot.recordId === recordId) return;
+  if (desired && desired.node === node && desired.recordId === recordId) return; // already scheduled
+  desired = { node, recordId, counts };
+  scheduleApply();
+}
+
+/**
  * Server-confirmed counts per record (BUG t_5bc23d61 — CEO 2026-08-08:
  * "il voto useful sulla mappa non persiste, rimane al numero precedente").
  *
@@ -58,51 +159,4 @@ function resolvePopupLocale(): Locale {
     .map((part) => part.trim())
     .find((part) => part.startsWith(`${LOCALE_COOKIE}=`));
   return match ? resolveLocale(decodeURIComponent(match.slice(LOCALE_COOKIE.length + 1))) : resolveLocale(null);
-}
-
-/** Unmount the previous popup widget (a new popup replaced the old one). */
-export function unmountPopupActions(): void {
-  if (!activeRoot) return;
-  activeRoot.root.unmount();
-  activeRoot = null;
-}
-
-/**
- * Render the compact action widget into a popup mount node. `counts` come
- * from the shared record payload (list API already exposes them); the
- * widget falls back to zero when the seed lacks them.
- *
- * P0 t_bb310428 (popup flicker): the mount is IDEMPOTENT for the SAME
- * record + node — a popupopen that re-fires on the same popup (Leaflet
- * re-fires the event in some openPopup paths) must NOT unmount/remount the
- * root: a remount resets the widget's local state (counts, disclosure,
- * personal action) and makes the buttons visibly reset.
- */
-export function mountPopupActions(node: HTMLElement, recordId: number, counts?: Partial<ActionCounts>): void {
-  if (activeRoot && activeRoot.node === node && activeRoot.recordId === recordId) return;
-  unmountPopupActions();
-  const root = createRoot(node);
-  // BUG t_5bc23d61: seed from the SERVER-CONFIRMED counts when this record
-  // has already been voted on during this page session. The payload counts
-  // passed by the map are a pre-vote snapshot; re-seeding from them after
-  // a rebuild would revert the count the CEO just saw update.
-  const seed = confirmedCounts.get(recordId) ?? counts;
-  // P1-7 (review 2026-08-07): flush the first render synchronously. The
-  // popupopen handler runs in a DOM event outside React's tree, and a
-  // plain root.render is scheduled — the browser could paint the popup
-  // with an empty mount node and mount the toolbar one frame later
-  // (first-paint flicker, exactly what the P0 contract forbids). flushSync
-  // forces the widget into the DOM before the popup becomes visible.
-  flushSync(() => {
-    root.render(
-      <CommunityActions
-        recordId={recordId}
-        counts={seed}
-        compact
-        bundle={messages[resolvePopupLocale()]}
-        onCountsChange={(next) => { confirmedCounts.set(recordId, next); }}
-      />,
-    );
-  });
-  activeRoot = { root, node, recordId };
 }
