@@ -103,6 +103,14 @@ export const en = {
   gridBadgeLabel: (count: number) => `${count} cameras in this area — zoom in to see them`,
   gridBadgeTooltip: (count: number) => `${count} cameras here`,
   gridBadgeZoom: (count: number) => `${count} cameras — zoom in to see them individually`,
+  // Geolocation button (t_18259daa, CEO): a floating control stacked ABOVE
+  // the zoom buttons shows the user's own position on the map. Everything
+  // stays client-side — the position never leaves the browser (privacy by
+  // design). aria-pressed carries the on/off state; the marker is a
+  // precision dot + accuracy circle, never a camera marker.
+  geolocateLabel: "Show my location",
+  geolocateDenied: "Location access was denied. Allow location access and try again.",
+  geolocateError: "Unable to determine your location. Try again.",
 } as const;
 
 export const it: Translation<typeof en> = {
@@ -203,4 +211,12 @@ export const it: Translation<typeof en> = {
   gridBadgeLabel: (count: number) => `${count} telecamere in quest'area — ingrandisci per vederle`,
   gridBadgeTooltip: (count: number) => `${count} telecamere qui`,
   gridBadgeZoom: (count: number) => `${count} telecamere — ingrandisci per vederle singolarmente`,
+  // Pulsante geolocalizzazione (t_18259daa, CEO): un controllo flottante
+  // impilato SOPRA i tasti zoom mostra la posizione dell'utente sulla mappa.
+  // Tutto resta client-side — la posizione non lascia mai il browser
+  // (privacy by design). aria-pressed porta lo stato on/off; il marker è un
+  // punto di precisione + cerchio di accuratezza, mai un marker telecamera.
+  geolocateLabel: "Mostra la mia posizione",
+  geolocateDenied: "Accesso alla posizione negato. Consenti l'accesso e riprova.",
+  geolocateError: "Impossibile determinare la tua posizione. Riprova.",
 };
