@@ -1336,8 +1336,8 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
    .loading-note / .notice insets below). */
 .map-card .search-count { margin:10px 18px 0; }
 .map-card .live-map-workspace { border:0; border-radius:0; box-shadow:none; }
-.map-card .map-split { grid-template-columns:320px 1fr; height:clamp(560px, calc(100svh - 370px), 1300px); min-height:560px; }
-.map-card .map-panel .live-map { height:100%; min-height:560px; }
+.map-card .map-split { grid-template-columns:320px 1fr; height:clamp(620px, calc(100svh - 300px), 1500px); min-height:620px; }
+.map-card .map-panel .map-region, .map-card .map-panel .live-map { height:100%; min-height:560px; }
 .map-card .map-panel .map-fallback { height:100%; min-height:560px; }
 .map-card .loading-note, .map-card .notice { margin-left:18px; margin-right:18px; }
 .map-sidebar { display:flex; flex-direction:column; min-height:0; border-right:1px solid var(--line); background:var(--card-bg); }
@@ -1461,6 +1461,7 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
   .map-card .map-split > .map-panel { order:-1; }
   .map-card .map-panel .live-map { height:calc(100svh - 250px); min-height:340px; max-height:64svh; }
   .map-card .map-panel .map-fallback { height:calc(100svh - 250px); min-height:340px; max-height:64svh; }
+  .map-card .map-panel .map-region { height:auto; min-height:0; }
   /* Points panel below the map: starts collapsed (header only) — the map
      must be the first thing users see; the toggle expands it from the
      keyboard (button, aria-expanded, aria-controls). */
