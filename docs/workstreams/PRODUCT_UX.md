@@ -21,7 +21,7 @@ The first public alpha is a deliberately narrow pilot in one reviewed jurisdicti
 
 - Only reviewed `verified` records are public; illustrative `demo` data is never mixed with real records without prominent labelling.
 - No public field of view, live-feed URL, credentials, precise operational capabilities, or other sensitive detail.
-- Photos are out of scope until the separate evidence, redaction, retention, and moderation pipeline is operating.
+- Photos are out of scope — **removed entirely on 2026-08-08 (CEO decision)**; records are text metadata only, no evidence pipeline is planned.
 - Browsing does not require an account. Submission authentication and rate limiting must be chosen before accepting real reports.
 - The product must name the pilot area and state that absence from the map does not mean absence of surveillance.
 
@@ -133,7 +133,7 @@ competition**: no leaderboard, no public ranking, no gamified metrics
 1. A contributor who already has an account (ADR 0013, email + password)
    signs in and lands on `/account`, their private profile: profile fields,
    their own trust level badge with a textual progress line, and the list of
-   their contributions (camera reports, corrections, photo uploads) with
+   their contributions (camera reports, corrections) with
    **local** state filters (no URL state — the page is private and not
    shareable). Anonymous visitors get the logged-out state, never someone
    else's data.

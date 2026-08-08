@@ -278,18 +278,18 @@ test("collection points link to the privacy notice and terms (GDPR art. 13 short
   assert.ok((correction.html.match(/href="\/termini"/g) ?? []).length >= 1, "footer terms link on /correggi");
 });
 
-test("/segnala SSR without photos never renders the photo-redaction confirmation (G3 negative)", async () => {
-  // G3 (legal): the redaction confirmation checkbox is CONDITIONAL on
-  // photos.length > 0. The server-rendered /segnala (the report form's own
-  // route since F1) has no photos attached, so the checkbox and its
-  // attestation text must not appear — a report without photos must never be
-  // blocked by it. The positive case (checkbox present with photos) is
-  // covered by tests/client-report-legal.test.mjs.
+test("/segnala SSR renders no photo-redaction confirmation (photo upload removed)", async () => {
+  // Photo evidence upload was removed entirely (CEO 2026-08-08): the
+  // redaction-confirmation checkbox that used to be conditional on
+  // photos.length > 0 no longer exists anywhere in the form. The server
+  // must never render it (and the client test in client-report-legal pins
+  // the same absence on the interactive form).
   const { response, html } = await renderRoute("/segnala");
 
   assert.equal(response.status, 200);
   assert.doesNotMatch(html, /I confirm that I have redacted/);
   assert.doesNotMatch(html, /check-redaction/);
+  assert.doesNotMatch(html, /photo-upload/, "the photo-upload fieldset must be gone from the SSR HTML");
 });
 
 test("register page links to the privacy notice and terms next to the submit button", async () => {
@@ -599,14 +599,14 @@ function assertSecurityHeaders(response, route) {
 
 test("security headers reach HTML pages, API errors, 404s and the moderation gate", async () => {
   // Every response class the worker can produce, without a DB binding:
-  // SSR HTML (200), JSON 404 (non-integer photo id — no DB hit), plain
+  // SSR HTML (200), JSON 404 (non-integer camera id — no DB hit), plain
   // 404, the moderation gate (503 fail-closed, no credentials), and the
   // image optimizer (400 malformed request).
   const probes = [
     { route: "/", expect: 200 },
     { route: "/manifesto", expect: 200 },
     { route: "/faq", expect: 200 },
-    { route: "/api/photos/abc", expect: 404 },
+    { route: "/api/cameras/abc", expect: 404 },
     { route: "/nonexistent-xyz", expect: 404 },
     { route: "/moderation", expect: 503 },
     { route: "/_vinext/image?url=/x.png&w=100", expect: 400 },
@@ -619,12 +619,12 @@ test("security headers reach HTML pages, API errors, 404s and the moderation gat
   }
 });
 
-test("security headers do not overwrite a stricter app-level CSP (photo routes)", async () => {
-  // Static guard: the worker middleware must only ADD headers. The photo
-  // routes set `Content-Security-Policy: default-src 'none'; sandbox` on
-  // binary bodies; if the edge ever overwrote it the sandbox would be
-  // silently weakened. (Binary photo bytes need a D1/R2 binding, so the
-  // merge rule is asserted on the source contract instead.)
+test("security headers do not overwrite a stricter app-level CSP", async () => {
+  // Static guard: the worker middleware must only ADD headers. An app route
+  // may set a more restrictive `Content-Security-Policy` (e.g. sandbox) on
+  // its own response; if the edge ever overwrote it, the stricter policy
+  // would be silently weakened. The merge rule is asserted on the source
+  // contract instead of a live binary response.
   const workerSource = await readFile(path.join(root, "worker", "index.ts"), "utf8");
   assert.match(workerSource, /if \(!headers\.has\(name\)\)/, "edge must only add missing headers");
 });

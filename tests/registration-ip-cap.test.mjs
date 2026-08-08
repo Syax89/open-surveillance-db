@@ -10,7 +10,7 @@
 //      counting), so the 6th request is blocked too ("4 ok, 5a 429, 6a 429");
 //   3. the cap is per-IP: a different caller IP can still register;
 //   4. only the SHA-256 of the caller key is stored — never the raw IP
-//      (privacy by design, same rule as photos.submitter_key);
+//      (privacy by design);
 //   5. FAILED registrations (400/409/500) roll back their reservation: junk
 //      attempts never consume the per-IP budget, and the malformed-body
 //      "no write" contract of malformed-json-routes.test.mjs still holds;

@@ -163,7 +163,7 @@ Two facts shape everything below:
 3. **Daily per-account quota** — 20/day (40 trusted) as D1 state count inside
    the toggle transaction → 429 + Retry-After; per-record cap 5/day, 6th →
    429.
-4. **IP-hash bucket** (`photos.submitter_key` pattern) — N accounts from the
+4. **IP-hash bucket** (`submitterKey` pattern) — N accounts from the
    same IP in a burst trip the bucket + surge alert with `callerHash`
    (never raw IP); NAT/CGNAT → soft-flag, not ban.
 5. **Decay** — verifications outside the review window don't count; a

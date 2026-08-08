@@ -30,8 +30,6 @@ CSV, or GeoJSON output. See [DATA_MODEL.md](DATA_MODEL.md) and
 | Nearby JSON | `GET /api/cameras/nearby?latitude=…&longitude=…&radius=…` | `{ "records": [ … ] }`, same fields plus `distanceMeters` |
 | Search JSON | `GET /api/cameras/search?q=…&lang=…` | `{ "query", "area": { "kind", "displayName"?, "latitude", "longitude", "radiusMeters", "radiusLabel" }, "count", "records" }` |
 | Revisions JSON | `GET /api/cameras/revisions?cameraId=N` | `{ "recordId", "revisions": [ { "id", "entityId", "previousStatus", "newStatus", "action", "createdAt" } ] }` |
-| Photos JSON | `GET /api/photos?cameraId=N` | `{ "photos": [ { "id", "mimeType", "width", "height" } ] }` |
-| Photo bytes | `GET /api/photos/[id]` | Raw image bytes (JPEG/PNG/WebP), not a JSON envelope |
 
 The default JSON list is paginated so the payload stays bounded as the
 dataset grows: `limit` (default 500, hard max 500) and `offset` (default 0)
@@ -50,14 +48,12 @@ stale-while-revalidate=600` — the dataset changes through moderation
 decisions, never live feeds, so a bounded 5-minute edge/browser cache keeps
 the directory and map responsive while still converging after any decision
 (and the moderation write path purges the exact `Cache-Tag` immediately).
-The nearby, search, revisions, and photo-list responses answer
+The nearby, search, and revisions responses answer
 `Cache-Control: no-store` — they derive from moderation decisions or user
 input that must never be served stale. The CSV/GeoJSON exports answer
 `Cache-Control: public, max-age=3600`: a bounded 1 h staleness is
 acceptable for a download snapshot, and the URL's content does change when
-moderators act, so it is deliberately not `immutable`. Photo bytes keep
-their longer `public, max-age=3600, immutable` policy because their storage
-key already version-binds the content.
+moderators act, so it is deliberately not `immutable`.
 
 The JSON, CSV, GeoJSON, and nearby outputs derive from the same filtered
 public-record list (`status IN ('verified','demo')`), so a record appears in
@@ -86,15 +82,6 @@ timestamps are listed. It is served **only** for records that are currently
 public — a `404` answers for any other record so pending/rejected/removed
 records cannot be probed and their private history never leaks. It has its
 own rate-limit bucket.
-
-Photo outputs fail closed. `GET /api/photos?cameraId=N` lists only approved
-photos (`status = 'approved'` and `redaction_confirmed = 1`) of a currently
-public camera and answers `404` when the camera is not public, so a pending
-or rejected record never leaks its evidence. `GET /api/photos/[id]` returns
-bytes only under the same conditions; every other case answers an
-indistinguishable `404` (no existence leak), the storage key never appears,
-and the image is served with `Cache-Control: public, max-age=3600,
-immutable`.
 
 ## Public record fields
 
@@ -171,17 +158,6 @@ block and appear in `possibleDuplicates` either way.
 The response is `201 { "referenceId": … }`; requests are private and never
 alter a public record automatically.
 
-### Photo intake input (`POST /api/photos`)
-
-Uploads one image as the raw request body (JPEG/PNG/WebP only, size and
-dimension limits are env-tunable). The route sniffs the container from magic
-bytes (never trusts the caller's `Content-Type`), strips EXIF/XMP/IPTC
-metadata — mandatory, fail closed — and stores sanitised bytes in R2
-(`PHOTOS`) with metadata-only in D1. The response (`201`) is photo metadata
-only: never the storage key, never the bytes back. The photo stays private
-until a moderator approves it and confirms redaction; only then can it
-appear in the public photo outputs above.
-
 ## Community verifications, trust levels and contribution profile (C1/C2)
 
 The community layer (ADR 0018, COMMUNITY_PLAN §2–§4) adds two private,
@@ -213,14 +189,14 @@ the personal toggle state is always `no-store`.
 ### Contribution profile — `GET /api/auth/me/contributions`
 
 The authenticated contributor's own attributed contributions (camera
-reports, corrections, photo uploads), paginated with the canonical F0
+reports, corrections), paginated with the canonical F0
 contract and the caller's own trust level in the meta. Only own data is ever
 served: a `contributorId` query parameter targeting another account answers
 `400` and is never resolved (no cross-account path, no existence oracle).
 
 | Query | Values | Notes |
 | --- | --- | --- |
-| `type` | `camera` \| `correction` \| `photo` | Optional whitelist; unknown value → `400` |
+| `type` | `camera` \| `correction` | Optional whitelist; unknown value → `400` |
 | `status` | `pending` \| `verified` \| `needs_review` \| `removed` | Optional whitelist; unknown value → `400` |
 | `page` | positive integer, default `1` | 1-based |
 | `pageSize` | integer 1–100, default `25` | clamped at the db boundary too |
@@ -230,7 +206,7 @@ Response:
 ```json
 {
   "contributions": [
-    { "type": "camera|correction|photo", "id": 7, "title": "…" | null,
+    { "type": "camera|correction", "id": 7, "title": "…" | null,
       "issueType": "…" | null, "cameraId": 3 | null,
       "status": "verified", "createdAt": "2026-08-01T…Z" }
   ],
@@ -284,10 +260,6 @@ any public output:
   ([workstreams/DATA_TRUST.md](workstreams/DATA_TRUST.md)).
 - Pending reports in any state other than `verified`/`demo` (`pending`,
   `needs_review`, `rejected`, `removed`).
-- `photos.*` — photos that are not approved (`pending`, `rejected`, or
-  `redaction_confirmed = 0`) and their R2 storage keys. The public photo
-  endpoints fail closed with an indistinguishable `404`, never revealing the
-  existence of a non-approved photo.
 - `appeals.*` — appeals against moderation decisions and their reasons; only
   moderators can list them, and no appeal content is ever serialised in a
   public response.

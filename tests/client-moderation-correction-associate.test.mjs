@@ -52,7 +52,6 @@ const queueFixture = {
     },
   ],
   cameraEditRequests: [],
-  photoReports: [],
   recentEvents: [],
   reviewers: [
     { id: 2, displayName: "Fixture Reviewer", role: "moderator" },

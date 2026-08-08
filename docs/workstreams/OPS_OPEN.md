@@ -149,11 +149,10 @@ harm.
   (`app/lib/input-limits.ts`), and hashed abuse alerts with route surge
   detection (`app/lib/abuse-alerts.ts`). Environment knobs and defaults are
   listed in `docs/DEPLOYMENT.md`.
-- Public binary routes are metered per caller: photo bytes
-  (`GET /api/photos/[id]`, read bucket, default 60/min) and the tile proxy
+- Public binary routes are metered per caller: the tile proxy
   (`GET /api/tiles/*`, dedicated bucket, default 60/min, env
   `TILES_RATE_LIMIT_MAX`/`TILES_RATE_LIMIT_WINDOW_SECONDS`) so bulk scraping
-  cannot drive unbounded R2 egress or violate the OSMF community tile usage
+  cannot violate the OSMF community tile usage
   policy. Appeal filing and review (`POST/GET /api/appeals`) have their own
   bucket (default 20/min, env
   `APPEAL_RATE_LIMIT_MAX`/`APPEAL_RATE_LIMIT_WINDOW_SECONDS`) so the appeals
@@ -180,11 +179,10 @@ harm.
 - Caller identity is only as trustworthy as the edge that sets it. The
   per-caller buckets key on `cf-connecting-ip` when present (set by
   Cloudflare, unspoofable at the worker) and fall back to the first
-  `x-forwarded-for` hop (`app/lib/rate-limit.ts` `callerKey`; the anonymous
-  pending-photo quota bucket derives from the same key via
-  `app/lib/photo-quota.ts`). On any deployment NOT fronted by Cloudflare a
+  `x-forwarded-for` hop (`app/lib/rate-limit.ts` `callerKey`). On any
+  deployment NOT fronted by Cloudflare a
   client can set arbitrary `x-forwarded-for` values and rotate its key,
-  making the per-caller limits and the anonymous photo quota best-effort
+  making the per-caller limits best-effort
   rather than a security boundary. The public API must therefore sit behind
   Cloudflare (or an equivalent trusted edge that overwrites the forwarded
   chain); non-CF deployments (local prototype, LAN, staging behind a plain

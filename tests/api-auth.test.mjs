@@ -809,7 +809,7 @@ test("me/submissions returns 401 without a session", async () => {
 test("account erasure deletes the account, de-attributes reports, and clears cookies", async () => {
   stub("findSessionByToken", async () => ({ ...session, contributor }));
   stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
-  stub("eraseContributor", async () => ({ deleted: true, deattributedReports: 3, deattributedPhotos: 2 }));
+  stub("eraseContributor", async () => ({ deleted: true, deattributedReports: 3 }));
   const { DELETE } = await accountRoute();
   const response = await DELETE(
     sessionRequest("/api/auth/account", "raw-session-token-abc123", {
@@ -818,8 +818,7 @@ test("account erasure deletes the account, de-attributes reports, and clears coo
     }),
   );
   assert.equal(response.status, 200);
-  // QA#3 F3: the erasure response now also reports the de-attributed photos.
-  assert.deepEqual(await responseBody(response), { ok: true, deattributedReports: 3, deattributedPhotos: 2 });
+  assert.deepEqual(await responseBody(response), { ok: true, deattributedReports: 3 });
   assert.deepEqual(callArgs("eraseContributor")[0], [7]);
   const cookies = response.headers.getSetCookie();
   assert.match(cookies.join(" "), /osdb_session=;/);

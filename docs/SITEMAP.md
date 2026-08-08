@@ -239,7 +239,7 @@ proposed).
 ### `/segnala` — Report a camera (implemented, F1 t_03c0fa15)
 
 - **Purpose:** guided private submission of a possible record. Eligibility
-  check, minimum fields, coordinates, photo with redaction note, consent,
+  check, minimum fields, coordinates, consent,
   non-public reference ID.
 - **Content:** `app/(tools)/segnala/page.tsx` + `SegnalaTool`
   (`app/components/tools/SegnalaTool.tsx`, `"use client"`), reusing
@@ -292,8 +292,8 @@ proposed).
 ### `/account` — My profile and contributions (implemented, community C5)
 
 - **Purpose:** private profile page of the signed-in contributor: trust-level
-  badge and the paginated list of their contributions (cameras, corrections,
-  photos) with **local** state filters (no URL state — private page, not
+  badge and the paginated list of their contributions (cameras, corrections)
+  with **local** state filters (no URL state — private page, not
   shareable), badge level and a textual progress line ("X verified
   contributions to the next level", no bar).
 - **Content:** `/account` profile (ADR 0018 decision 1/3/4) with the

@@ -178,7 +178,7 @@ infrastructure." (key `moderation.decisionSaved`).
 
 ### aria-live contract for async outcomes
 
-Every async outcome (place search, photo upload, report/correction
+Every async outcome (place search, report/correction
 submission, moderation decision) is announced:
 
 - `role="status"` (polite) for non-urgent results — search results,

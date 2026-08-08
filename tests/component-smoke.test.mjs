@@ -91,7 +91,6 @@ const MODERATION_COMPONENTS = [
   { name: "DecisionForm", file: "app/components/moderation/DecisionForm.tsx" },
   { name: "CameraQueueItem", file: "app/components/moderation/CameraQueueItem.tsx" },
   { name: "CorrectionQueueItem", file: "app/components/moderation/CorrectionQueueItem.tsx" },
-  { name: "PhotoQueueItem", file: "app/components/moderation/PhotoQueueItem.tsx" },
   { name: "HistorySection", file: "app/components/moderation/HistorySection.tsx" },
   { name: "useModerationQueue", file: "app/components/moderation/useModerationQueue.tsx" },
 ];
@@ -279,7 +278,7 @@ test("refactor moderation: la dashboard importa i componenti estratti (non li de
 });
 
 test("refactor moderation: DecisionForm e' importato dalle card che lo usano", async () => {
-  for (const file of ["app/components/moderation/CameraQueueItem.tsx", "app/components/moderation/CorrectionQueueItem.tsx", "app/components/moderation/PhotoQueueItem.tsx"]) {
+  for (const file of ["app/components/moderation/CameraQueueItem.tsx", "app/components/moderation/CorrectionQueueItem.tsx"]) {
     const source = await readFile(path.join(root, file), "utf8");
     assert.match(
       source,

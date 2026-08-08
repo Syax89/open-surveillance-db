@@ -150,7 +150,7 @@ moderazione). No-op edit (stesso contenuto) → 200 "no changes", nessun evento 
 
 ### 2.3 Profilo contributi — estensione di /account
 
-- **API**: `GET /api/auth/me/contributions?type=camera|correction|photo&status=&page=&pageSize=`
+- **API**: `GET /api/auth/me/contributions?type=camera|correction&status=&page=&pageSize=`
   paginato (contratto canonico F0: `page`/`pageSize` max 100, `pagination` object),
   `Cache-Control: no-store` (dato personale, mai edge-cache). Sostituisce/estende
   `me/submissions` (oggi LIMIT 50 senza paginazione); vecchio endpoint resta per
@@ -241,7 +241,7 @@ L3–L4→Experienced. I test i18n/a11y dei badge si scrivono su questo mapping.
    riservata e contata in **un unico batch** (atomico, niente race), e **rollbackata su ogni
    uscita non-201** (tentativi falliti non consumano budget; il contratto no-write dei body
    malformati resta). Chiave = **SHA-256 del caller key** (`cf-connecting-ip`), mai l'IP raw
-   (pattern `photos.submitter_key` / `callerHash` abuse-alerts). Finestra rolling → reset
+   (pattern `submitterKey` / `callerHash` abuse-alerts). Finestra rolling → reset
    automatico dopo 24h senza job di cleanup. Knob env: `REGISTER_IP_RATE_LIMIT_MAX` (default 5),
    `REGISTER_IP_RATE_LIMIT_WINDOW_SECONDS` (default 86400). **Caveat NAT/CGNAT**: più utenti
    legittimi dietro lo stesso IP condividono il budget — al cap viene risposto 429 (soft-flag
@@ -283,7 +283,7 @@ alpha** (Linus): niente colonne confidence in schema ora.
    `(contributor_id, created_at)` dentro la transazione del toggle), NON rate-limiter
    in-memory per-isolate (pattern `appealAppellantLimits`); 429 + Retry-After.
 4. **Cap per-record**: max 5 conferme/giorno su un record da account distinti; 6ª → 429.
-5. **IP-hash bucket** (pattern `photos.submitter_key`): N account stessa IP, burst → bucket IP
+5. **IP-hash bucket** (pattern `submitterKey`): N account stessa IP, burst → bucket IP
    scatta + surge alert con `callerHash` (mai IP raw). NAT/CGNAT: soft-flag, non ban.
 6. **Decay temporale**: conferme oltre la review window (`created_at >= cameras.lastVerifiedAt`)
    escluse da count/score; il record re-verified "rinnova" le conferme.
@@ -492,7 +492,7 @@ Fonte: Grace (t_45ff2bfd) + pattern del piano frontend §7 (archiviato in
 
 | Area | Criteri chiave |
 |---|---|
-| **Profilo (P1–P8)** | 401 anonimo/200 autenticato; solo dati propri (cross-account 400); paginazione invalida mai 500; filtri whitelist 400; `no-store`; profilo pubblico opt-in senza email/coordinate/foto non approvate nel DOM; opt-out reversibile; empty state |
+| **Profilo (P1–P8)** | 401 anonimo/200 autenticato; solo dati propri (cross-account 400); paginazione invalida mai 500; filtri whitelist 400; `no-store`; profilo pubblico opt-in senza email/coordinate nel DOM; opt-out reversibile; empty state |
 | **Editing (E1–E11)** | owner pending → 200 + audit; non-owner/anonimo/moderatore non-owner → 403/401; verified → 202 edit-request → approve/reject idempotente + `edit_applied`; removed → 409; campi non editabili 400 per-campo senza effetti parziali; CSRF; no-op senza evento; race 409; rate-limit 429; erasure de-attribuisce |
 | **Livelli (L1–L8)** | boundary 0/1/4/5/19/20/49/50/51; solo verified conta; monotonia up E down; soglie in un const; sempre server-side; **nessun endpoint espone livelli altrui/globali**; erasure recalcola; funzione pura (niente cache in alpha) |
 | **Verifiche (V1–V14)** | 201/409 toggle; UNIQUE a livello DB + race = 1 riga; DELETE 200/404; self-verify 403; pending/removed 404; L0 403 + bottone disabilitato; cap giornaliero 20→21° 429 + reset finestra; cap per-record 6° 429; IP-hash burst → alert con callerHash; header cache (300/600 vs no-store); staleness ≤5min; decay a `review_due_at`; CSRF+rate-limit; count GROUP BY IN, niente N+1 |

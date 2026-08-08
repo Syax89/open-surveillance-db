@@ -33,7 +33,6 @@ const ROUTES = [
   { source: "app/api/cameras/revisions/route.ts", output: "app/api/cameras/revisions/route.mjs" },
   { source: "app/api/moderation/route.ts", output: "app/api/moderation/route.mjs" },
   { source: "app/api/moderation/corrections/route.ts", output: "app/api/moderation/corrections/route.mjs" },
-  { source: "app/api/moderation/photos/[id]/route.ts", output: "app/api/moderation/photos/[id]/route.mjs" },
   { source: "app/api/corrections/route.ts", output: "app/api/corrections/route.mjs" },
   { source: "app/api/tiles/[z]/[x]/[y]/route.ts", output: "app/api/tiles/[z]/[x]/[y]/route.mjs" },
   { source: "app/api/geocode/route.ts", output: "app/api/geocode/route.mjs" },
@@ -71,8 +70,6 @@ const ROUTES = [
   { source: "app/api/auth/oidc/[provider]/start/route.ts", output: "app/api/auth/oidc/[provider]/start/route.mjs" },
   { source: "app/api/auth/oidc/[provider]/callback/route.ts", output: "app/api/auth/oidc/[provider]/callback/route.mjs" },
   { source: "app/api/auth/oidc/merge/route.ts", output: "app/api/auth/oidc/merge/route.mjs" },
-  { source: "app/api/photos/route.ts", output: "app/api/photos/route.mjs" },
-  { source: "app/api/photos/[id]/route.ts", output: "app/api/photos/[id]/route.mjs" },
   // Contributor appeals (ADR 0014): POST/GET on the collection, PATCH on the
   // item. The [id] route lives in its own directory.
   { source: "app/api/appeals/route.ts", output: "app/api/appeals/route.mjs" },
@@ -95,7 +92,6 @@ const REAL_DB_MODULES = [
   { source: "db/corrections.ts", output: "db-real/corrections.mjs" },
   { source: "db/geocode.ts", output: "db-real/geocode.mjs" },
   { source: "db/moderation.ts", output: "db-real/moderation.mjs" },
-  { source: "db/photos.ts", output: "db-real/photos.mjs" },
   // db/cameras.ts imports ./confirmations at runtime (the public payload
   // carries confirmationCount), so the real db layer must resolve it.
   { source: "db/confirmations.ts", output: "db-real/confirmations.mjs" },
@@ -152,7 +148,7 @@ async function buildTree() {
   const mocksDir = path.join(root, "tests", "helpers", "mocks");
   const mockStateUrl = pathToFileURL(path.join(root, "tests", "helpers", "mock-state.mjs")).href;
   await mkdir(path.join(tree, "db"), { recursive: true });
-  for (const mockName of ["cameras", "camera-edits", "corrections", "geocode", "reverse-geocode", "moderation", "auth", "users", "photos", "appeals", "confirmations", "passkeys", "oidc", "mailer", "community-actions", "import-sources"]) {
+  for (const mockName of ["cameras", "camera-edits", "corrections", "geocode", "reverse-geocode", "moderation", "auth", "users", "appeals", "confirmations", "passkeys", "oidc", "mailer", "community-actions", "import-sources"]) {
     const source = await readFile(path.join(mocksDir, `${mockName}.mjs`), "utf8");
     await writeFile(
       path.join(tree, "db", `${mockName}.mjs`),

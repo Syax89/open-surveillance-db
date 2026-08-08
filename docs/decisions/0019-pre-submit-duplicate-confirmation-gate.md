@@ -48,8 +48,7 @@ whether that gate is a hard block or an explicit confirmation.
 3. When the gate trips and the payload does **not** carry
    `duplicateConfirmed: true` (strictly boolean `true`; `"true"`, `1`, any
    other value fail closed), the route answers **409 Conflict** with
-   `{ error, possibleDuplicates }` and **no row is written** — no camera, no
-   photo linking.
+   `{ error, possibleDuplicates }` and **no row is written** — no camera.
 4. With `duplicateConfirmed: true` the report is stored as usual; the
    `possibleDuplicates` are still returned in the `201` so the moderation
    queue can compare the confirmed report against the nearby record.

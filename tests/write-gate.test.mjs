@@ -5,7 +5,6 @@
 //
 //   POST   /api/cameras                      (record intake)
 //   POST   /api/corrections                  (correction/removal intake)
-//   POST   /api/photos                       (photo evidence upload)
 //   PUT/DELETE /api/cameras/[id]/confirmation (community verification toggle)
 //
 // Contract (mirrored in Fase G QA matrix):
@@ -39,7 +38,6 @@ after(async () => cleanupRouteTree());
 const writeGate = () => loadLibModule("write-gate");
 const camerasRoute = () => loadRoute("app/api/cameras/route.mjs");
 const correctionsRoute = () => loadRoute("app/api/corrections/route.mjs");
-const photosRoute = () => loadRoute("app/api/photos/route.mjs");
 const confirmationRoute = () => loadRoute("app/api/cameras/[id]/confirmation/route.mjs");
 
 // Live session fixture (ADR 0013 double-submit CSRF). The write gate resolves
@@ -219,39 +217,6 @@ test("POST /api/corrections: 401 anonymous, 403 unverified, no db write either w
     assert.equal(response.status, 403);
     assert.equal((await responseBody(response)).error, "Authentication required.");
     assert.equal(callArgs("createCorrectionRequest").length, 0);
-  });
-});
-
-test("POST /api/photos: 401 anonymous, 403 unverified, no db write either way", async (t) => {
-  const { POST } = await photosRoute();
-  const jpeg = Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01]);
-  const photoRequest = (request) => apiRequest("/api/photos", {
-    method: "POST",
-    headers: { "content-type": "image/jpeg" },
-    body: jpeg,
-    ...request,
-  });
-  await t.test("anonymous -> 401", async () => {
-    stub("createPendingPhoto", async () => ({ id: 1 }));
-    const response = await POST(photoRequest({}));
-    assert.equal(response.status, 401);
-    assert.equal((await responseBody(response)).error, "Authentication required.");
-    assert.equal(response.headers.get("cache-control"), "no-store");
-    assert.equal(callArgs("createPendingPhoto").length, 0);
-  });
-  await t.test("unverified -> 403", async () => {
-    liveSession();
-    unverified();
-    stub("createPendingPhoto", async () => ({ id: 1 }));
-    const response = await POST(photoRequest({
-      headers: {
-        cookie: "osdb_session=raw-session-token-abc123; osdb_csrf=csrf-token-123",
-        "x-csrf-token": "csrf-token-123",
-      },
-    }));
-    assert.equal(response.status, 403);
-    assert.equal((await responseBody(response)).error, "Authentication required.");
-    assert.equal(callArgs("createPendingPhoto").length, 0);
   });
 });
 
