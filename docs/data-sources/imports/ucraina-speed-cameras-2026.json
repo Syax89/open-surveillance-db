@@ -1,0 +1,11 @@
+{
+    "slug": "ucraina-speed-cameras-2026",
+    "source_name": "Ukraine — Speed enforcement camera locations (data.gov.ua)",
+    "format": "csv",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "attribution_text": "Fonte: data.gov.ua — Speed enforcement camera locations (https://data.gov.ua/dataset/b7b6349c-d109-45e7-af37-b73310f73cf5), concesso con licenza CC BY 4.0.",
+    "source_url": "https://data.gov.ua/dataset/b7b6349c-d109-45e7-af37-b73310f73cf5/resource/01825845-4d62-4611-b9a6-d2a43d27cd0e/download/cameras_csv.csv",
+    "max_records": 600,
+    "notes": "Scan catalog.csv + verifica diretta (CEO 2026-08-08): 380 telecamere enforcement velocità Ucraina (CSV con lat/lon, attrs ricchi: addressThoroughfare, balanceHolderName, isSpeedRecognition; count 380 verificato). Licenza CC BY 4.0 dichiarata su data.gov.ua. external_id ua-camera:<inventoryNumber>."
+}

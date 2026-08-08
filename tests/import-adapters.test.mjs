@@ -983,3 +983,30 @@ test("atves: parses 3 services (EPSG:2248) into canonical staged rows with src p
   assert.ok(Math.abs(staged[1].latitude - 39.361458) < 0.001, `lat ${staged[1].latitude}`); // 6000 Hillen Rd
   assert.equal(skipped.total, 1);
 });
+
+// -------------------------------------------------- wave 8 (UK / UA): Plymouth, Ukraine
+
+import { parsePayload as plymouthParse } from "../scripts/import/adapters/regno-unito-plymouth-cctv-2026.mjs";
+import { parsePayload as ukraineParse } from "../scripts/import/adapters/ucraina-speed-cameras-2026.mjs";
+
+test("plymouth: parses CSV rows (x/y WGS84) into canonical staged rows", () => {
+  const { staged, skipped } = plymouthParse({
+    text: "fid,Camera Num,Camera Loc,Easting,Northing,x,y\n1,1002,Cattedown Roundabout,248978,54397,-4.125025,50.370026\n2,1040,Chales Church/ edbrington street,248211,54676,-4.135915,50.372335\n3,,bad,,,999,999\n",
+  });
+  assert.equal(staged.length, 2);
+  assert.equal(staged[0].title, "Cattedown Roundabout");
+  assert.equal(staged[0].kind, "Traffic / licence plate reader");
+  assert.equal(staged[0].external_id, "plymouth-cctv:1");
+  assert.equal(skipped.total, 1);
+});
+
+test("ukraine: parses CSV rows (lat/lon) into canonical staged rows", () => {
+  const { staged, skipped } = ukraineParse({
+    text: "inventoryNumber,addressThoroughfare,addressAdminUnitL3,lat,lon,balanceHolderName,isSpeedRecognition\nUA-01,вул. Олени Теліги,Київ,50.479649,30.453529,Патрульна поліція,true\nUA-02,,,0,0,,true\n",
+  });
+  assert.equal(staged.length, 1);
+  assert.equal(staged[0].title, "вул. Олени Теліги");
+  assert.equal(staged[0].kind, "Traffic / licence plate reader");
+  assert.equal(staged[0].external_id, "ua-camera:UA-01");
+  assert.equal(skipped.total, 1);
+});
