@@ -88,6 +88,17 @@ export const en = {
   editDirectionHelp: "The compass bearing the camera points towards, clockwise from north (0–359°).",
   editDirectionUnknown: "I don't know the direction",
   editDirectionDegrees: "Direction",
+  // Camera position (t_775c8400): the interactive map moves the record's
+  // position — click the map or type the coordinates; directional kinds
+  // with a known bearing draw the field-of-view cone (same geometry as the
+  // report mini-map and /mappa).
+  editPositionTitle: "Camera position",
+  editPositionHelp:
+    "Click the map to move the camera position, or type the coordinates below. For directional cameras, drag the round handle on the cone to set the viewing direction.",
+  editPositionMapAria: "Map — click to move the camera position",
+  editLatitude: "Latitude",
+  editLongitude: "Longitude",
+  editPositionInvalid: "Enter valid coordinates (latitude −90 to 90, longitude −180 to 180).",
   // Record detail fact (t_f8b775ec): "Direction: NE 45°" when the record
   // has a stored bearing (domes and unknown directions omit the row).
   direction: "Direction",
@@ -235,6 +246,17 @@ export const it: Translation<typeof en> = {
   editDirectionHelp: "Il rilevamento verso cui punta la telecamera, in senso orario da nord (0–359°).",
   editDirectionUnknown: "Non conosco la direzione",
   editDirectionDegrees: "Direzione",
+  // Posizione della telecamera (t_775c8400): la mappa interattiva sposta la
+  // posizione del record — clicca sulla mappa o digita le coordinate; i tipi
+  // direzionali con rilevamento noto disegnano il cono del campo visivo
+  // (stessa geometria della mini-mappa di segnalazione e di /mappa).
+  editPositionTitle: "Posizione della telecamera",
+  editPositionHelp:
+    "Clicca sulla mappa per spostare la posizione della telecamera, oppure digita le coordinate qui sotto. Per le telecamere direzionali, trascina la maniglia sul cono per impostare la direzione di visuale.",
+  editPositionMapAria: "Mappa — clicca per spostare la posizione della telecamera",
+  editLatitude: "Latitudine",
+  editLongitude: "Longitudine",
+  editPositionInvalid: "Inserisci coordinate valide (latitudine da −90 a 90, longitudine da −180 a 180).",
   // Fattore del dettaglio record (t_f8b775ec): "Direzione: NE 45°" quando il
   // record ha un rilevamento salvato (le cupole e le direzioni ignote
   // omettono la riga).

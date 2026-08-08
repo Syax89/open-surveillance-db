@@ -852,6 +852,12 @@ export const cameraEditRequests = sqliteTable(
     // apply time: a diff whose final kind is 'Fixed dome' stores NULL.
     proposedDirection: integer("proposed_direction"),
     proposedDescription: text("proposed_description"),
+    // Proposed position (migration 0044, kanban t_775c8400): the latitude/
+    // longitude the contributor wants the camera moved to (5-decimal
+    // precision). NULL proposed = column unchanged (same COALESCE model as
+    // the other proposed_* columns); a moderator applies the diff on approve.
+    proposedLatitude: real("proposed_latitude"),
+    proposedLongitude: real("proposed_longitude"),
     status: text("status").notNull().default("pending"),
     decidedBy: integer("decided_by").references(() => reviewers.id),
     decisionNote: text("decision_note"),
