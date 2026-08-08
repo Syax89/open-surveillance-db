@@ -122,8 +122,8 @@ Your use of the Service is governed by the privacy notice (PRIVACY_NOTICE.md), t
 - [x] **Account erasure endpoint (R7):** implemented — self-service `DELETE /api/auth/account` (ADR 0013, PR #57/#61), atomic with de-attribution (`contributor_id = NULL`), revokes all sessions; sessions expire after 30 days (`AUTH_SESSION_TTL_DAYS`). Tracked in RETENTION_SCHEDULE.md R7.
 - [x] **Legal documents linked from the UI:** the public pages `/termini`, `/privacy` and `/licenze` expose TERMS_OF_USE.md / PRIVACY_NOTICE.md / OPEN_SOURCE.md (footer links on every page; web adaptation in `app/lib/legal/`). The repository copies remain canonical.
 - [x] **Multi-method auth (ADR 0020):** implemented — email verification enforced for write access (read-only sessions until verified), passkeys with 10 recovery codes and the email+password fallback, OIDC via GitHub/Google **server-gated** (buttons shown only when the operator configured the provider; erasure covers the new auth data, RETENTION_SCHEDULE.md R15).
-- [ ] **Acceptance mechanics:** decide and implement clickwrap on the submission form vs. general browse terms — implementation owner: Ada.
-- [ ] **ADR:** record the adoption of these terms and the inbound data-licensing model (submission → ODbL at publication) as a proposed ADR (next free number, per GOVERNANCE.md).
+- [x] **Acceptance mechanics (clickwrap):** implemented — the submission and correction forms require an explicit consent checkbox (with links to `/privacy` and `/termini`) before the record or correction can be sent (`ReportForm.tsx`, `CorrectionForm.tsx`); general browse terms apply to the rest of the site.
+- [x] **ADR:** the adoption of these terms and the inbound data-licensing model (submission → ODbL at publication) are recorded in ADR 0008 (data licence) and ADR 0021 (community-driven model, which cites these terms).
 
 ---
 

@@ -101,10 +101,10 @@ Not intentionally collected. Incidental capture in evidence (faces, plates, inte
 ## 5. Decision
 
 - **Primary basis for the dataset and its pipeline: art. 6(1)(f)** with the documented LIA in § 3.1; **6(1)(e)** for official-source records; **6(1)(c)** for rights compliance.
-- The LIA is a living document: reviewed at launch, annually, and on any material change of purpose, provider, or scope.
+- The LIA is a living document: reviewed annually and on any material change of purpose, provider, or scope.
 
-## 6. Open items before launch
+## 6. Pre-launch checklist (completed)
 
-- [ ] Final legal review per operating jurisdiction (start: IT, DE per ../MODERATION.md M5).
 - [x] Controller entity and privacy contact decided (2026-07-31): **Simone Rondina (syax89) / OpenSurveillanceDB — Italy**; `privacy@opensurveillancedb.org` (mailbox active 2026-08-01).
-- [ ] Record the LIA sign-off in the governance log (ADR 0002).
+- [x] LIA sign-off recorded in the governance log (ADR 0002, decision 3 — lawful basis and balancing test).
+- [x] Jurisdiction review: the pilot jurisdiction (Italy) is in force (ADR 0010); additional jurisdictions are assessed before accepting records from them (../MODERATION.md M5), with the LIA reviewed on any material change of purpose, provider, or scope — no external counsel review is required for the pilot.

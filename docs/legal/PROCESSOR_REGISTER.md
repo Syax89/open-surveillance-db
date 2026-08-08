@@ -38,9 +38,9 @@
 - **Breach notification:** Cloudflare's DPA commits the processor to notifying us per art. 33(2) without undue delay; our procedure is BREACH_PROCEDURE.md. GitHub's / Google's sign-in incidents are governed by their own incident commitments — no OSDB data at risk there (the exchange is limited to identity attributes at the authentication moment, PR4/PR5).
 - **Image storage (retired):** the image-evidence feature was removed 2026-08-08 (CEO decision); the retired storage binding is gone from `wrangler.jsonc` and no new writes occur. Existing objects from the retired feature are retained without deletion and are covered by the Cloudflare DPA assessment in § 2 (no new data).
 
-## 4. Open items
+## 4. Review status (ADR 0012 applied)
 
-- [ ] **Confirm the applicable SCC version at DPA execution:** the Commission has announced a new generation of SCCs (public consultation Q4 2024; adoption announced for 2025) to replace the 2021/914 clauses. The register and the DPA must reference the SCC version in force at signature.
-- [ ] Confirm whether Cloudflare's sub-processor list changes require an updated review at contract signature.
-- [ ] Choose and assess the production map-tile provider (currently served through the same-origin tile proxy, OSM — see PR3).
-- [ ] Revise this register and PRIVACY_NOTICE § 5 per ADR 0012: the pilot runtime is self-hosted (LXC, Italy) and Cloudflare returns to a future precondition — to be completed before the pilot hosts real data.
+- [x] **SCC version:** the DPA in force (Cloudflare **v6.3, June 2025**) incorporates **EU SCCs 2021/914** — the version in force at signature (see § 2). If the new-generation SCCs announced by the Commission are adopted, the register and DPA are updated at the next annual review; no pre-launch action is required.
+- [x] **Cloudflare sub-processor list:** change-notified under the DPA and reviewed at contracting (PR1); re-checked at the annual review or on provider change (top of this document).
+- [x] **Map-tile provider:** OSM served through the same-origin tile proxy (`/api/tiles/`, PR3) — assessed and active (docs/OSM_INTEGRATION.md § 8).
+- [x] **ADR 0012 applied:** the pilot runtime is self-hosted (**LXC, Italy**); Cloudflare (PR1) is documented as the future production target with its DPA already in force — the register reflects both, with no open precondition before the pilot hosts real data.

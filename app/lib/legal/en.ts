@@ -186,7 +186,11 @@ export const enLegal: LegalContent = {
           },
           {
             type: "paragraph",
-            text: "Deletion and expiry rules are enforced automatically by the daily retention sweep (see the retention schedule in the privacy notice); correction requests and audit entries: 2 years. Operational logs: up to 12 months (aggregate). Backups: rotated by the provider (up to 30 days point-in-time recovery).",
+            text: "The detailed rules remain in the repository retention schedule (docs/legal/RETENTION_SCHEDULE.md), including: community data (R14) — community actions follow the account (active → erasure; actions cast on other records are deleted with the contributor, ADR 0021 § 13, and the public lifecycle history keeps only aggregates); authentication-method data (R15, ADR 0020) — email-verification tokens 24 hours, reset tokens 3 hours (single-use, deleted on use); passkeys and recovery codes while the account is active, hard-deleted at account erasure — nothing survives to link the account to a provider or a device; failed-login counters (R16), per-IP registration-cap log (R17) and the transactional-email log (R18) swept by the retention cron; demo records (R12) purged by the retention cron outside development.",
+          },
+          {
+            type: "paragraph",
+            text: "The deletion and expiry rules are enforced automatically by the daily retention sweep (scheduled in `worker/index.ts`, daily at 03:00 UTC — RETENTION_SCHEDULE.md § 3): the cron deletes expired rows (R12/R16/R17/R18), archives audit entries at the 2-year mark (R4/R5/R9), and never changes record lifecycle status (community model, ADR 0021 § 2.2).",
           },
         ],
       },

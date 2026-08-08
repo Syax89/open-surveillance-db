@@ -189,7 +189,11 @@ export const itLegal: LegalContent = {
           },
           {
             type: "paragraph",
-            text: "Le regole di cancellazione e scadenza sono applicate automaticamente dallo sweep giornaliero di conservazione (vedi il calendario di conservazione nell'informativa privacy); le richieste di correzione e le voci di audit: 2 anni. Log operativi: fino a 12 mesi (aggregato). Backup: ruotati dal fornitore (fino a 30 giorni di point-in-time recovery).",
+            text: "Le regole dettagliate restano nel calendario di conservazione del repository (docs/legal/RETENTION_SCHEDULE.md), tra cui: dati della community (R14) — le azioni della community seguono l'account (attivo → cancellazione; le azioni su altri record vengono eliminate con il contributore, ADR 0021 § 13, e la cronologia pubblica del ciclo di vita conserva solo aggregati); dati dei metodi di autenticazione (R15, ADR 0020) — token di verifica email 24 ore, token di reset 3 ore (monouso, cancellati all'uso); passkey e codici di recupero finché l'account è attivo, cancellati definitivamente alla cancellazione dell'account — nulla sopravvive per collegare l'account a un provider o a un dispositivo; contatori di login falliti (R16), log del tetto di registrazione per IP (R17) e log email transazionali (R18) ripuliti dal cron di conservazione; record demo (R12) eliminati dal cron di conservazione fuori dall'ambiente di sviluppo.",
+          },
+          {
+            type: "paragraph",
+            text: "Le regole di cancellazione e scadenza sono applicate automaticamente dallo sweep giornaliero di conservazione (pianificato in `worker/index.ts`, ogni giorno alle 03:00 UTC — RETENTION_SCHEDULE.md § 3): il cron elimina le righe scadute (R12/R16/R17/R18), archivia le voci di audit al traguardo dei 2 anni (R4/R5/R9) e non cambia mai lo stato del ciclo di vita dei record (modello community, ADR 0021 § 2.2).",
           },
         ],
       },

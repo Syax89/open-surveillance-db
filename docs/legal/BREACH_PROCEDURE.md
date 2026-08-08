@@ -16,7 +16,7 @@
 | **Technical containment** | Ada (CTO) | Stop the leak, preserve evidence, analyse root cause |
 | **Communication** | Marie (docs) | Internal/external statements under privacy-contact direction |
 | **Escalation** | Angelina (CEO) | High-risk incidents: approval of data-subject notification, external communication |
-| **On-call** | Defined at launch (monitored mailbox + pager rotation) | Guarantee a response outside business hours once the service is public |
+| **On-call** | Monitored mailbox (`privacy@opensurveillancedb.org`, 24/7) + escalation to the roles above | Guarantee a response outside business hours |
 
 ## 2. Detection
 
