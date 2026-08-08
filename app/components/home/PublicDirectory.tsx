@@ -53,8 +53,6 @@ type Props = {
    * + card grid); "catalog" = the /directory browse layout (DirectoryCatalog).
    */
   variant?: "hub" | "catalog";
-  /** Optional (catalog): download links for the filtered set (CSV/GeoJSON). */
-  exportHrefs?: { csv: string; geojson: string } | null;
 };
 
 /**
@@ -63,7 +61,7 @@ type Props = {
  * bundle; reused by the home page (hub mode) and /directory (catalog mode).
  * Location shows address AND coordinates (format-location, CEO 2026-08-07).
  */
-export function PublicDirectory({ filteredRecords, cameraKinds, search, setSearch, kindFilter, setKindFilter, freshnessFilter, setFreshnessFilter, setFreshnessCutoff, sortOrder, setSortOrder, stateFilter, setStateFilter, originFilter, setOriginFilter, page = 1, setPage, showRecordOnMap, setCoordinates, onResetFilters, mapHref = "#map", reportHref = "#report", showHeading = true, showMapLink = true, variant = "hub", exportHrefs = null }: Props) {
+export function PublicDirectory({ filteredRecords, cameraKinds, search, setSearch, kindFilter, setKindFilter, freshnessFilter, setFreshnessFilter, setFreshnessCutoff, sortOrder, setSortOrder, stateFilter, setStateFilter, originFilter, setOriginFilter, page = 1, setPage, showRecordOnMap, setCoordinates, onResetFilters, mapHref = "#map", reportHref = "#report", showHeading = true, showMapLink = true, variant = "hub" }: Props) {
   const t = useMessages().directory;
   const statuses = useMessages().status;
   const { locale } = useLocale();
@@ -113,7 +111,6 @@ export function PublicDirectory({ filteredRecords, cameraKinds, search, setSearc
         setCoordinates={setCoordinates}
         onResetFilters={onResetFilters ?? resetFilters}
         reportHref={reportHref}
-        exportHrefs={exportHrefs}
       />
     );
   }

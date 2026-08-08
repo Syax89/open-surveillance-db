@@ -29,16 +29,16 @@ import { ExploreViewSwitch } from "../ExploreViewSwitch";
  * Catalog mode (t_127492f1, redesign t_f13fcb1c): the page renders the
  * browse-record layout (PublicDirectory variant="catalog" → DirectoryCatalog)
  * — controls row (search + filters + place-search toggle), collapsible
- * place-search card, visible results header (count + CSV/GeoJSON export +
- * active-filter chips), A–Z index, flat record rows and pagination (?page=).
+ * place-search card, visible results header (count + active-filter chips),
+ * A–Z index, flat record rows and pagination (?page=).
  * "Use the map instead" moves into the tool heading (the records-heading
  * action row no longer exists on the tool page).
  *
- * Export ownership (merge #229 × #231; redesign t_f13fcb1c): the results
- * header (DirectoryCatalog) renders the CSV/GeoJSON downloads as buttons
- * with the current type/freshness filters applied (exportHrefs); the
- * data-actions footer below keeps the guide/regole pattern with the data
- * policy link only — no duplicate download row.
+ * Export ownership (merge #229 × #231; redesign t_f13fcb1c; t_b98b1734):
+ * the CSV/GeoJSON downloads are small text links in the data-actions footer
+ * below, on the same row as the data policy link (CEO 2026-08-08: "in basso
+ * e più piccoli, sulla riga di 'Read the data policy'") — filter-aware via
+ * exportHref(), no buttons in the results header.
  */
 export function DirectoryTool() {
   const t = useMessages().directory;
@@ -104,15 +104,21 @@ export function DirectoryTool() {
           mapHref={mapHref}
           reportHref="/segnala"
           showMapLink={false}
-          exportHrefs={{ csv: exportHref("csv"), geojson: exportHref("geojson") }}
           showHeading={false}
         />
       </div>
-      {/* Data policy link (CEO feedback 2026-08-02): the downloads moved
-          here from /mappa — the catalog meta row (DirectoryCatalog) owns the
-          filter-aware CSV/GeoJSON exports, so this data-actions footer keeps
-          only the guide/regole-pattern data policy link. */}
-      <div className="data-actions"><a href="/guide">{t.readDataPolicy}</a></div>
+      {/* Data actions footer (t_b98b1734, CEO 2026-08-08): the CSV/GeoJSON
+          downloads moved here from the results header — small text links on
+          the same row as the data policy link, same font (no buttons). The
+          data policy link keeps the guide/regole pattern (merge #229 × #231). */}
+      <div className="data-actions">
+        <a href={exportHref("csv")} aria-describedby="directory-export-hint">{t.exportCsv}</a>
+        <span aria-hidden="true">·</span>
+        <a href={exportHref("geojson")} aria-describedby="directory-export-hint">{t.exportGeoJson}</a>
+        <span aria-hidden="true">·</span>
+        <a href="/guide">{t.readDataPolicy}</a>
+        <p className="sr-only" id="directory-export-hint">{t.exportHint}</p>
+      </div>
     </section>
   );
 }
