@@ -1,0 +1,11 @@
+{
+    "slug": "regno-unito-tfl-jamcams-2026",
+    "source_name": "Transport for London — JamCams CCTV",
+    "format": "json-api",
+    "license": "OGL 2.0",
+    "license_url": "https://www.nationalarchives.gov.uk/doc/open-government-licence/version/2/",
+    "attribution_text": "Fonte: Transport for London, JamCams API (https://api.tfl.gov.uk/Place/Type/JamCam), concesso con licenza Open Government Licence v2.0. Contiene dati Ordnance Survey © Crown copyright.",
+    "source_url": "https://api.tfl.gov.uk/Place/Type/JamCam",
+    "max_records": 1200,
+    "notes": "Scan catalog.csv (CEO 2026-08-08): 882 telecamere CCTV stradali Londra (API JSON, no key, coords lat/lon verificate, imageUrl/videoUrl/view). Licenza OGL 2.0 verificata sul portale TfL (attribution-only). external_id tfl-jamcam:<id>."
+}
