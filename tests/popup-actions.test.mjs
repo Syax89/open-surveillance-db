@@ -21,7 +21,7 @@
 import assert from "node:assert/strict";
 import test, { afterEach, before } from "node:test";
 import {
-  setupDom, loadDomModule, installFetchMock, jsonResponse,
+  setupDom, loadDomModule, installFetchMock, jsonResponse, React,
 } from "./helpers/dom-harness.mjs";
 
 let popupActions;
@@ -33,8 +33,14 @@ before(async () => {
   installFetchMock(() => jsonResponse({ records: [], total: 0, nextOffset: null }));
 });
 
-afterEach(() => {
-  popupActions.unmountPopupActions();
+afterEach(async () => {
+  // unmountPopupActions defers the real unmount to a microtask
+  // (t_0b9f5a3c): flush it INSIDE act() so the teardown does not emit
+  // React's "update to Root not wrapped in act" warning after the test.
+  await rtl.act(async () => {
+    popupActions.unmountPopupActions();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
   rtl?.cleanup();
 });
 
@@ -102,6 +108,106 @@ test("mounting the same record into a DIFFERENT node replaces the root (new popu
 
   nodeA.remove();
   nodeB.remove();
+});
+
+// ---------------------------------------------------------------------------
+// BUG t_0b9f5a3c (post-deploy finding, run 1910): on /mappa MOBILE the
+// console showed TWO reproducible React warnings when a marker popup opened:
+//   1. "flushSync was called from inside a lifecycle method. React cannot
+//      flush when React is already rendering."
+//   2. "Attempted to synchronously unmount a root while React was already
+//      rendering."
+//
+// Root cause: mountPopupActions used flushSync() and unmountPopupActions
+// used root.unmount() SYNCHRONOUSLY inside Leaflet's popupopen/popupclose
+// handlers. Leaflet fires those events synchronously, so when the popup is
+// opened from inside a React effect (the selection effect calls
+// marker.openPopup(); the rebuild restore/focus effects do too) the handler
+// runs WHILE React is still rendering — flushSync/unmount are illegal there.
+// A direct marker click is a DOM event OUTSIDE React's render (legal), which
+// is why desktop verification passed and mobile (list-click → selection
+// effect) reproduced it.
+//
+// Contract: mounting or unmounting the popup widget from inside a React
+// effect must NOT emit either warning. React's own advice for this error is
+// "Consider moving this call to a scheduler task or micro task" — the
+// implementation defers the actual render/unmount to a microtask so the
+// Leaflet event handler never calls flushSync/unmount while React renders.
+// ---------------------------------------------------------------------------
+
+/** Collect console.error during fn; return the messages (strings). */
+async function captureConsoleErrors(fn) {
+  const original = console.error;
+  const messages = [];
+  console.error = (...args) => messages.push(args.map(String).join(" "));
+  try {
+    await fn();
+  } finally {
+    console.error = original;
+  }
+  return messages;
+}
+
+const REACT_LIFECYCLE_WARNINGS = [
+  /flushSync was called from inside a lifecycle method/,
+  /Attempted to synchronously unmount a root/,
+];
+
+test("mounting the widget from INSIDE a React effect emits ZERO React lifecycle warnings (t_0b9f5a3c)", async () => {
+  const node = mountNode();
+  const messages = await captureConsoleErrors(async () => {
+    // Simulate the real mobile path: the selection effect (or the rebuild
+    // restore/focus effect) calls marker.openPopup() → Leaflet fires
+    // popupopen synchronously → mountPopupActions runs while React is
+    // rendering. A useEffect that mounts the widget is the faithful harness.
+    function EffectMountHarness() {
+      React.useEffect(() => {
+        popupActions.mountPopupActions(node, 42, { like: 3, confirm: 1 });
+      }, []);
+      return null;
+    }
+    await rtl.act(async () => {
+      rtl.render(React.createElement(EffectMountHarness));
+    });
+    // The deferred microtask render must still land (flushSync in a
+    // microtask, outside React's render) — the widget appears.
+    await rtl.waitFor(() => assert.ok(node.querySelector(".community-action"), "the widget renders even when mounted from inside an effect"));
+  });
+
+  const lifecycle = messages.filter((m) => REACT_LIFECYCLE_WARNINGS.some((re) => re.test(m)));
+  assert.deepEqual(lifecycle, [], "no flushSync/synchronous-unmount React warning when mounting from inside an effect");
+
+  node.remove();
+});
+
+test("unmounting the widget from INSIDE a React effect emits ZERO React lifecycle warnings (t_0b9f5a3c)", async () => {
+  const node = mountNode();
+  // First mount the widget for real (popup open).
+  await rtl.act(async () => {
+    popupActions.mountPopupActions(node, 42, { like: 3, confirm: 1 });
+  });
+  assert.ok(node.querySelector(".community-action"), "sanity: the widget is mounted");
+
+  const messages = await captureConsoleErrors(async () => {
+    // Simulate the rebuild path: a marker rebuild (clearLayers/removeLayer)
+    // inside an effect closes the open popup → Leaflet fires popupclose
+    // synchronously → unmountPopupActions runs while React is rendering.
+    function EffectUnmountHarness() {
+      React.useEffect(() => {
+        popupActions.unmountPopupActions();
+      }, []);
+      return null;
+    }
+    await rtl.act(async () => {
+      rtl.render(React.createElement(EffectUnmountHarness));
+    });
+    await rtl.waitFor(() => assert.equal(node.innerHTML, "", "the deferred unmount still tears the root down"));
+  });
+
+  const lifecycle = messages.filter((m) => REACT_LIFECYCLE_WARNINGS.some((re) => re.test(m)));
+  assert.deepEqual(lifecycle, [], "no flushSync/synchronous-unmount React warning when unmounting from inside an effect");
+
+  node.remove();
 });
 
 test("unmountPopupActions tears down the root (popupclose — no leaked React tree)", async () => {
