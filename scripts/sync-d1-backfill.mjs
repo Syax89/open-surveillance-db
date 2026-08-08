@@ -32,7 +32,7 @@
  *     cache whose JSON rows are huge; it rebuilds itself on demand.
  */
 import { DatabaseSync } from "node:sqlite";
-import { writeFileSync, mkdirSync, rmSync, existsSync, readdirSync } from "node:fs";
+import { writeFileSync, mkdirSync, rmSync, existsSync, readdirSync, statSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import path from "node:path";
 
@@ -50,7 +50,13 @@ const DB_PATH =
     (() => {
       const state = path.join(process.cwd(), ".wrangler/state/v3/d1/miniflare-D1DatabaseObject");
       const files = existsSync(state) ? readdirSync(state) : [];
-      const sqlite = files.find((f) => f.endsWith(".sqlite") && !f.endsWith("-shm") && !f.endsWith("-wal"));
+      // Prendi SOLO il DB miniflare reale: nome = hash hex di 64 char.
+      // PITFALL (2026-08-09): esiste anche `db.sqlite` (stale, da un
+      // vecchio state) che finisce in .sqlite ma NON è il DB attivo —
+      // prenderlo silenziosamente sincronizzava un DB vecchio su D1 prod.
+      const sqlite = files
+        .filter((f) => /^[a-f0-9]{64}\.sqlite$/.test(f))
+        .sort((a, b) => statSync(path.join(state, b)).mtimeMs - statSync(path.join(state, a)).mtimeMs)[0];
       return sqlite ?? "";
     })(),
   );
