@@ -594,7 +594,7 @@ export default function AccountPageBody() {
     <main id="main-content" className="record-page">
       <PublicNav navLabel={t.navigation} homeLabel={t.homeAria} />
 
-      <article className="record-detail auth-card account-card">
+      <article className="record-detail auth-card account-card account-dashboard">
         <p className="eyebrow"><span /> {t.accountTitle}</p>
         <h1>{t.accountTitle}</h1>
 
