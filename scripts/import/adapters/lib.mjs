@@ -100,6 +100,44 @@ export function webMercatorToWgs84(x, y) {
   return [Number(lat.toFixed(6)), Number(lon.toFixed(6))];
 }
 
+/**
+ * EPSG:2248 (NAD83 / Maryland, Lambert Conformal Conic, US survey feet)
+ * → WGS84. Usato da CitiWatch Baltimore e ATVES (wkid 2248/102685).
+ * Validato 2026-08-08 vs Nominatim: 6000 Hillen Rd → 39.3615/-76.5801
+ * (reale 39.3615/-76.5803, ~20m).
+ */
+export function lcc2248ToWgs84(x, y) {
+  const a = 6378137.0;
+  const f = 1 / 298.257222101;
+  const e = Math.sqrt(2 * f - f * f);
+  const lat0 = (37.66666666666666 * Math.PI) / 180;
+  const lat1 = (39.45 * Math.PI) / 180;
+  const lat2 = (38.3 * Math.PI) / 180;
+  const lon0 = (-77 * Math.PI) / 180;
+  const X0 = 400000.0;
+  const Y0 = 0.0;
+  const FT2M = 1200.0 / 3937.0;
+  const X = x * FT2M;
+  const Y = y * FT2M;
+  const m = (phi) => Math.cos(phi) / Math.sqrt(1 - e * e * Math.sin(phi) ** 2);
+  const t = (phi) => Math.tan(Math.PI / 4 - phi / 2) / ((1 - e * Math.sin(phi)) / (1 + e * Math.sin(phi))) ** (e / 2);
+  const m1 = m(lat1), m2 = m(lat2), t0 = t(lat0), t1 = t(lat1), t2 = t(lat2);
+  const n = (Math.log(m1) - Math.log(m2)) / (Math.log(t1) - Math.log(t2));
+  const F = m1 / (n * t1 ** n);
+  const rho0 = a * F * t0 ** n;
+  const dx = X - X0, dy = rho0 - Y;
+  const rho = Math.hypot(dx, dy) * Math.sign(n);
+  const theta = Math.atan2(dx, dy);
+  const tt = (rho / (a * F)) ** (1 / n);
+  let phi = Math.PI / 2 - 2 * Math.atan(tt);
+  for (let i = 0; i < 8; i++) {
+    const s = Math.sin(phi);
+    phi = Math.PI / 2 - 2 * Math.atan(tt * ((1 - e * s) / (1 + e * s)) ** (e / 2));
+  }
+  const lon = lon0 + theta / n;
+  return [Number((phi * 180 / Math.PI).toFixed(6)), Number((lon * 180 / Math.PI).toFixed(6))];
+}
+
 export function parseDirection(value) {
   if (value === null || value === undefined) return null;
   const text = String(value).trim().toLocaleLowerCase();

@@ -1,0 +1,11 @@
+{
+    "slug": "usa-baltimore-citiwatch-2026",
+    "source_name": "City of Baltimore — CitiWatch Camera Locations",
+    "format": "arcgis-featureserver",
+    "license": "Maryland public domain + attribution",
+    "license_url": "https://data.baltimorecity.gov",
+    "attribution_text": "Fonte: City of Baltimore, Open Baltimore — CitiWatch Camera Locations (https://baltegis.baltimorecity.gov/mapping/rest/services/CityView/CitiWatchCamera), concesso con licenza Maryland public domain + attribuzione (verificato 2026-08-08).",
+    "source_url": "https://baltegis.baltimorecity.gov/mapping/rest/services/CityView/CitiWatchCamera/FeatureServer/0",
+    "max_records": 1200,
+    "notes": "Scan catalog.csv + verifica diretta (CEO 2026-08-08): 861 telecamere CitiWatch Baltimore PD (FeatureServer, count 861 verificato; attrs CAM_NUMBER/CAM_LOCATION, geometry EPSG:2248 NAD83 Maryland LCC ftUS → lcc2248ToWgs84 validato vs Nominatim). Verdetto legale: PUBBLICABILE (Maryland public domain + attribuzione, Open Baltimore). external_id balt-citiwatch:<CAM_NUMBER>."
+}
