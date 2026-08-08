@@ -1194,11 +1194,26 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 /* ---- /account rework (2026-08-08): profile grid, summary strip, kind
    rows, passkey disclosure. Same design system — no new colour tokens;
    the status rail reuses the --status-* tokens and the coherent-box
-   pattern already accepted for records/map lists. ---- */
-.account-profile-grid { display:grid; grid-template-columns:1fr auto; gap:28px; align-items:start; }
+   pattern already accepted for records/map lists.
+   PR #354 (user UX choices, kept verbatim): dashboard widens to 1120px,
+   each section is its own bordered workspace, profile columns 1.35/.65. */
+.account-dashboard { max-width:1120px; }
+.account-profile-grid { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(220px,.65fr); gap:28px; align-items:start; }
 .account-identity { min-width:0; }
-.account-logout { margin-top:14px; }
+.account-logout { margin-top:18px; }
 .account-trust { min-width:240px; }
+/* Bordered workspaces (PR #354): the main sections become readable
+   cards on the paper, the danger zone stays full-width and the verify
+   banner keeps its own treatment. */
+.account-dashboard > section:not(.verify-banner):not(.auth-danger-zone),
+.account-dashboard > details.passkeys-disclosure { margin-top:18px; padding:24px; border:1px solid var(--line); border-radius:var(--radius-lg); background:var(--surface-muted); }
+.account-dashboard > section:not(.verify-banner):not(.auth-danger-zone) > h2,
+.account-dashboard > details.passkeys-disclosure > summary h2 { margin:0 0 18px; color:var(--ink); font-size:var(--text-3xl); letter-spacing:-.035em; }
+.account-dashboard > section.account-profile-grid { background:var(--card-bg); }
+.account-dashboard > section[aria-labelledby="contributions-title"] { background:var(--card-bg); }
+.account-dashboard .verify-banner { margin:18px 0 0; }
+.account-dashboard > details.passkeys-disclosure { max-width:720px; border-top:1px solid var(--line); }
+.account-dashboard > details.passkeys-disclosure > summary { padding:0 0 6px; }
 .account-section-header { display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:14px; }
 .account-section-header h2 { margin:0; }
 .account-section-actions { display:flex; gap:10px; flex-wrap:wrap; }
@@ -1247,6 +1262,9 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 .passkeys-disclosure summary:focus-visible { outline:3px solid var(--focus); outline-offset:2px; border-radius:var(--radius-md); }
 .passkeys-disclosure[open] summary { border-bottom:1px solid var(--line); }
 @media (max-width:820px) {
+  .account-dashboard { padding:28px 20px; }
+  .account-dashboard > section:not(.verify-banner):not(.auth-danger-zone),
+  .account-dashboard > details.passkeys-disclosure { padding:18px; }
   .account-profile-grid { grid-template-columns:1fr; gap:18px; }
   .account-trust { min-width:0; }
   .account-stats { grid-template-columns:repeat(2,1fr); }
