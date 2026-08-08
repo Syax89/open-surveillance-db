@@ -97,10 +97,10 @@ export const itLegal: LegalContent = {
                 "Art. 6(1)(f) GDPR; un'azione per utente per record (`UNIQUE(camera_id, contributor_id)`), peso catturato al momento dell'azione, **solo aggregati nei payload pubblici** — mai attribuiti a un profilo (ADR 0021 §3/§13)",
               ],
               [
-                "Identità del moderatore (email, nome visualizzato, nome completo tramite accesso ChatGPT)",
-                "OpenAI (fornitore di identità)",
-                "Autenticare i moderatori; credenziali di moderazione separate",
-                "Art. 6(1)(f) GDPR; mai registrata né memorizzata dall'applicazione",
+                "Attributi di identità OIDC (provider, subject id, nome visualizzato, flag di verifica — mai l'email)",
+                "GitHub / Google (fornitore di identità — solo se scegli questo metodo)",
+                "Accesso contributore facoltativo; collegamento dell'account al contributore",
+                "Art. 6(1)(f) GDPR; nessuna email importata; il fornitore osserva l'accesso e l'IP (§ 5/§ 6)",
               ],
               [
                 "Voci di audit della moderazione (decisione, codice motivo, data e ora, pseudonimo del revisore)",
@@ -161,7 +161,7 @@ export const itLegal: LegalContent = {
             type: "list",
             items: [
               "**Cloudflare, Inc.** — hosting e database (Workers + D1). Responsabile del trattamento (art. 28) ai sensi del Cloudflare Data Processing Addendum (DPA v6.3, giugno 2025) che incorpora le **clausole contrattuali standard UE (2021/914)**; Cloudflare è certificato ai sensi dell'**EU–US Data Privacy Framework**. D1 è configurato con residenza dati UE.",
-              "**OpenAI (accesso ChatGPT)** — fornitore di identità per i moderatori. OpenAI è **titolare autonomo del proprio servizio di autenticazione** (la sua privacy policy si applica al momento dell'accesso); nessun dato di OpenSurveillanceDB viene inviato a OpenAI — riceviamo solo gli attributi di identità elencati sopra. Mai pubblicati, mai registrati.",
+              "**GitHub, Inc. / Google LLC (fornitori di identità OIDC — facoltativi, solo se scegli questo metodo).** Sono **titolari autonomi dei propri servizi di autenticazione** (le loro privacy policy si applicano al momento dell'accesso); nessun dato di OpenSurveillanceDB viene inviato a loro — riceviamo solo gli attributi di identità elencati nel § 3 (provider, subject id, nome visualizzato, flag di verifica; mai l'email). Il fornitore osserva l'accesso e il tuo IP. Mai pubblicati, mai registrati.",
               "**La pubblicazione stessa:** i record pubblicati diventano parte di un dataset pubblico con licenza ODbL 1.0 e possono essere scaricati o esportati (JSON/CSV/GeoJSON). Le copie già scaricate non possono essere richiamate; i record ritirati sono esclusi dalle esportazioni future.",
               "Nessun altro destinatario; niente pubblicità comportamentale; nessuna libreria di analisi.",
             ],
@@ -175,7 +175,7 @@ export const itLegal: LegalContent = {
             type: "list",
             items: [
               "**Cloudflare:** trasferimenti coperti dal DPA Cloudflare che incorpora le **clausole contrattuali standard UE (2021/914)**; misure supplementari valutate per il trattamento negli USA (crittografia in transito, residenza UE per D1).",
-              "**Accesso OpenAI:** gli attributi di identità sono scambiati con i servizi OpenAI; il flusso di accesso è disciplinato dai termini e dalla privacy policy di OpenAI.",
+              "**Accesso OIDC (GitHub/Google, se scegli questo metodo):** gli attributi di identità (provider, subject id, nome visualizzato, flag di verifica) sono scambiati con i servizi del fornitore al momento dell'accesso; il flusso è disciplinato dai termini e dalla privacy policy del fornitore.",
             ],
           },
         ],
@@ -328,7 +328,7 @@ export const itLegal: LegalContent = {
             items: [
               "**Verifica dell'email.** Dopo la registrazione devi verificare l'indirizzo email prima di poter inviare, modificare o verificare record; finché non lo fai, la tua sessione è in sola lettura. Le email di verifica e di reset della password vengono inviate tramite Cloudflare Email Routing senza contenuti di tracciamento. Un indirizzo email = un account; tienilo accessibile se perdi la password.",
               "**Passkey.** Se registri una passkey, il sito memorizza solo materiale di chiave pubblica; la chiave privata resta sul tuo dispositivo. **Nota del fornitore:** le passkey *sincronizzate* sono salvate nel cloud del fornitore del sistema operativo (Apple/Google/Microsoft) a tua scelta — il fornitore viene a sapere che hai un account qui, il sito non condivide nulla con loro e tu controlli la sincronizzazione. Conserva i 10 codici di recupero emessi alla registrazione in un luogo sicuro; senza di essi, un dispositivo smarrito può significare perdere l'accesso al metodo passkey (il percorso email+password resta comunque disponibile).",
-              "**OIDC tramite GitHub/Google — disclosure di tracciamento.** Accedendo con GitHub o Google, **GitHub o Google osserva che accedi a questo Servizio, e il tuo indirizzo IP**, a ogni accesso; si applicano i termini e l'informativa privacy del fornitore. **Non importiamo la tua email** dal fornitore (solo subject id + flag di verifica) e non uniamo mai gli account automaticamente in base alla corrispondenza dell'email — un conflitto richiede un'unione manuale e verificata. Questo metodo è **opt-in e dichiarato** (matrice dei rischi nella pagina di accesso); i pulsanti sono mostrati solo quando l'operatore ha attivato il fornitore (credenziali configurate su questa installazione).",
+              "**OIDC tramite GitHub/Google — disclosure di tracciamento.** Accedendo con GitHub o Google, **GitHub o Google osserva che accedi a questo Servizio, e il tuo indirizzo IP**, a ogni accesso; si applicano i termini e l'informativa privacy del fornitore. **Non importiamo la tua email** dal fornitore (solo subject id, nome visualizzato e flag di verifica) e non uniamo mai gli account automaticamente in base alla corrispondenza dell'email — un conflitto richiede un'unione manuale e verificata. Questo metodo è **opt-in e dichiarato** (matrice dei rischi nella pagina di accesso); i pulsanti sono mostrati solo quando l'operatore ha attivato il fornitore (credenziali configurate su questa installazione).",
               "Puoi aggiungere, cambiare o rimuovere i metodi in qualsiasi momento dalla pagina del tuo account; eliminando l'account vengono eliminati i dati di ogni metodo (informativa privacy § 7 R15, § 8).",
             ],
           },

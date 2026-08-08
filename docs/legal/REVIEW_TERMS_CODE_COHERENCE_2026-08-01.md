@@ -4,6 +4,7 @@
 > **rimossa integralmente** per decisione del CEO — i riferimenti all'upload
 > (riga A2 e § 4.1/§ 5.5) non descrivono più il sistema. Questo check-report
 > resta come record storico dell'audit al commit `71c510b`.
+> **Nota aggiuntiva 2026-08-08:** il "ChatGPT sign-in / OpenAI" citato è stato **rimosso** — i provider reali sono **GitHub / Google OIDC** (PRIVACY_NOTICE § 3.1/§ 5/§ 6, PROCESSOR_REGISTER.md PR5/PR6); le righe A1/TERMS su "moderator identity" vanno lette secondo il modello attuale (moderatori = contributor verificati con ruolo, nessun provider separato).
 
 **Autore:** Rosa (DPO / Legal & Privacy Officer)
 **Data:** 2026-08-01

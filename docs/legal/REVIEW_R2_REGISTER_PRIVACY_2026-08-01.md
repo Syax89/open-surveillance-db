@@ -6,6 +6,7 @@
 > `0043`) e PROCESSOR_REGISTER/PRIVACY_NOTICE sono stati aggiornati alla
 > realtà senza foto. Gli oggetti R2 esistenti restano conservati (nessun
 > delete sul bucket); questo report resta come record storico al 2026-08-01.
+> **Nota aggiuntiva 2026-08-08:** la citazione `.openai/hosting.json` è già marcata nel corpo come rimossa; il flusso di autenticazione è cambiato a **GitHub / Google OIDC** (PRIVACY_NOTICE § 3.1/§ 5/§ 6, PROCESSOR_REGISTER.md PR5/PR6) — vedi le note nei documenti vigenti.
 
 **Autore:** Rosa (DPO / Legal & Privacy Officer)
 **Data:** 2026-08-01

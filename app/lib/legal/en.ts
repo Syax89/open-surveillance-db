@@ -94,10 +94,10 @@ export const enLegal: LegalContent = {
                 "Art. 6(1)(f) GDPR; one action per user per record (`UNIQUE(camera_id, contributor_id)`), weight snapshot at action time, **aggregates only in public payloads** — never attributed to any profile (ADR 0021 §3/§13)",
               ],
               [
-                "Moderator identity (email, display name, full name via ChatGPT sign-in)",
-                "OpenAI (identity provider)",
-                "Authenticate moderators; separate moderation credentials",
-                "Art. 6(1)(f) GDPR; never logged or stored by the application",
+                "OIDC identity attributes (provider, subject id, display name, verified flag — never the email)",
+                "GitHub / Google (identity provider — only if you choose that method)",
+                "Optional contributor sign-in; account linking to the contributor",
+                "Art. 6(1)(f) GDPR; no email imported; the provider observes the sign-in and the IP (§ 5/§ 6)",
               ],
               [
                 "Moderation audit entries (decision, reason code, timestamp, reviewer pseudonym)",
@@ -158,7 +158,7 @@ export const enLegal: LegalContent = {
             type: "list",
             items: [
               "**Cloudflare, Inc.** — hosting and database (Workers + D1). Processor (Art. 28) under the Cloudflare Data Processing Addendum (DPA v6.3, June 2025) incorporating **EU Standard Contractual Clauses (2021/914)**; Cloudflare is certified under the **EU–US Data Privacy Framework**. D1 is configured for EU residency.",
-              "**OpenAI (ChatGPT sign-in)** — identity provider for moderators. OpenAI is an **independent controller of its own authentication service** (its privacy policy applies at sign-in); no OpenSurveillanceDB data is sent to OpenAI — we only receive the identity attributes listed above. Never published, never logged.",
+              "**GitHub, Inc. / Google LLC (OIDC identity providers — optional, only if you choose that method).** They are **independent controllers of their own authentication services** (their privacy policies apply at sign-in); no OpenSurveillanceDB data is sent to them — we only receive the identity attributes listed in § 3 (provider, subject id, display name, verified flag; never the email). The provider observes the sign-in and your IP. Never published, never logged.",
               "**Publication itself:** published records become part of a public dataset licensed ODbL 1.0 and may be downloaded or exported (JSON/CSV/GeoJSON). Copies already downloaded cannot be recalled; withdrawn records are excluded from future exports.",
               "No other recipients; no behavioural advertising; no analytics libraries.",
             ],
@@ -172,7 +172,7 @@ export const enLegal: LegalContent = {
             type: "list",
             items: [
               "**Cloudflare:** transfers covered by the Cloudflare DPA incorporating **EU Standard Contractual Clauses (2021/914)**; supplementary measures assessed for US processing (encryption in transit, EU residency for D1).",
-              "**OpenAI sign-in:** identity attributes are exchanged with OpenAI's services; the sign-in flow is governed by OpenAI's terms and privacy policy.",
+              "**OIDC sign-in (GitHub/Google, if you choose that method):** identity attributes (provider, subject id, display name, verified flag) are exchanged with the provider's services at sign-in; the flow is governed by the provider's terms and privacy policy.",
             ],
           },
         ],
@@ -325,7 +325,7 @@ export const enLegal: LegalContent = {
             items: [
               "**Email verification.** After registration you must verify the email address before you can submit, edit or verify records; until then your session is read-only. Verification and password-reset emails are sent through Cloudflare Email Routing with no tracking content. One email address = one account; keep it accessible if you lose your password.",
               "**Passkeys.** If you enroll a passkey, the site stores only public-key material; the private key stays on your device. **Vendor note:** *synced* passkeys are backed up through the OS vendor's cloud (Apple/Google/Microsoft) at your choice — the vendor learns you have an account here, the site shares nothing with them, and you control sync. Keep the 10 recovery codes issued at enrollment in a safe place; without them, a lost device may mean losing access to the passkey method (the email+password path remains).",
-              "**OIDC via GitHub/Google — tracking disclosure.** Signing in with GitHub or Google means **GitHub or Google observes that you sign in to this Service, and your IP address**, at each login; the provider's own terms and privacy policy apply at sign-in. We **do not import your email** from the provider (subject id + verified flag only) and we never merge accounts automatically on an email match — a conflict requires a manual, verified merge. This method is **opt-in and disclosed** (risk matrix on the login page); the buttons are shown only when the operator has activated the provider (credentials configured on this deployment).",
+              "**OIDC via GitHub/Google — tracking disclosure.** Signing in with GitHub or Google means **GitHub or Google observes that you sign in to this Service, and your IP address**, at each login; the provider's own terms and privacy policy apply at sign-in. We **do not import your email** from the provider (subject id, display name and verified flag only) and we never merge accounts automatically on an email match — a conflict requires a manual, verified merge. This method is **opt-in and disclosed** (risk matrix on the login page); the buttons are shown only when the operator has activated the provider (credentials configured on this deployment).",
               "You may add, change or remove methods from your account page at any time; deleting your account deletes the data of every method (privacy notice § 7 R15, § 8).",
             ],
           },
