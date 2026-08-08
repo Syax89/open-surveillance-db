@@ -312,6 +312,8 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
   }, [toggleGeolocation]);
   useEffect(() => {
     geoLabelRef.current = t.geolocateLabel;
+    geoButtonRef.current?.setAttribute("aria-label", t.geolocateLabel);
+    if (geoButtonRef.current) geoButtonRef.current.title = t.geolocateLabel;
   }, [t.geolocateLabel]);
 
   useEffect(() => {
