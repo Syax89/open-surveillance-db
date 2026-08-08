@@ -1,0 +1,11 @@
+{
+    "slug": "usa-caltrans-cctv-2026",
+    "source_name": "California Department of Transportation — CalTrans Highway CCTV",
+    "format": "arcgis-featureserver",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "attribution_text": "Fonte: California Department of Transportation (Caltrans), CalTrans Highway CCTV (https://gisdata.dot.ca.gov/arcgis/rest/services/CHhighway/CCTV), concesso con licenza CC BY 4.0 (Creative Commons Attribution 4.0 International, dichiarata nel licenseInfo dell'item ArcGIS).",
+    "source_url": "https://gisdata.dot.ca.gov/arcgis/rest/services/CHhighway/CCTV/FeatureServer/0",
+    "max_records": 3500,
+    "notes": "Scan catalog.csv + verifica diretta (CEO 2026-08-08): 2.936 telecamere CCTV autostrade California (FeatureServer WGS84 wkid 4326, attrs locationName/nearbyPlace/direction/county/route/district, count 2.936 verificato). Licenza CC BY 4.0 esplicita nel licenseInfo dell'item ArcGIS Online. NOTA: QuickMap KML (3.493, 'none stated') escluso — stesso programma ma senza licenza dichiarata; il FeatureServer CC BY è la fonte autorizzata. external_id caltrans-cctv:<OBJECTID>."
+}

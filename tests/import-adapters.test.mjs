@@ -844,3 +844,68 @@ test("sf: parses red-light + speed rows into canonical staged rows", () => {
   assert.equal(staged[1].external_id, "sf-speed:MTAF001");
   assert.equal(skipped.total, 1);
 });
+
+// -------------------------------------------------- wave 6 (USA, licenze esplicite): CA / MN / CO / NY
+
+import { parsePayload as caltransParse } from "../scripts/import/adapters/usa-caltrans-cctv-2026.mjs";
+import { parsePayload as mndotParse } from "../scripts/import/adapters/usa-mndot-snowplow-cameras-2026.mjs";
+import { parsePayload as denverParse } from "../scripts/import/adapters/usa-denver-halo-cameras-2026.mjs";
+import { parsePayload as thruwayParse } from "../scripts/import/adapters/usa-ny-thruway-gantries-2026.mjs";
+
+test("caltrans: parses ArcGIS features (WGS84) into canonical staged rows", () => {
+  const { staged, skipped } = caltransParse({
+    data: [
+      { attributes: { OBJECTID: 1, locationName: "SR-20 : At SR-1 - Looking East (C020)", nearbyPlace: "Fort Bragg", county: "Mendocino", route: "SR-20", district: 1, latitude: 39.42002, longitude: -123.80779, direction: "East" } },
+      { attributes: { OBJECTID: 2, locationName: "bad", latitude: 0, longitude: 0 } },
+    ],
+  });
+  assert.equal(staged.length, 1);
+  assert.equal(staged[0].title, "SR-20 : At SR-1 - Looking East (C020)");
+  assert.equal(staged[0].kind, "Traffic / licence plate reader");
+  assert.equal(staged[0].direction, 90); // East
+  assert.equal(staged[0].external_id, "caltrans-cctv:1");
+  assert.equal(skipped.total, 1);
+});
+
+test("mndot: parses ArcGIS plow cam features into canonical staged rows", () => {
+  const { staged, skipped } = mndotParse({
+    data: [
+      { attributes: { OBJECTID: 2, PHOTO_ANUMBER: "b468-i", PHOTO_LATITUDE: 45.5726089, PHOTO_LONGITUDE: -93.2248764, REF_POST: 41.66, ROUTE_NAME: "MN 95", PHOTO_URL: "https://crc-public-s3.s3.us-west-2.amazonaws.com/avl/prod/MN/b468" } },
+      { attributes: { OBJECTID: 3, PHOTO_LATITUDE: "x", PHOTO_LONGITUDE: 0 } },
+    ],
+  });
+  assert.equal(staged.length, 1);
+  assert.equal(staged[0].title, "MnDOT plow cam MN 95");
+  assert.equal(staged[0].kind, "Traffic / licence plate reader");
+  assert.equal(staged[0].external_id, "mndot-plow:2");
+  assert.equal(skipped.total, 1);
+});
+
+test("denver: parses ArcGIS HALO features (Web Mercator) into canonical staged rows", () => {
+  const { staged, skipped } = denverParse({
+    data: [
+      { attributes: { OBJECTID: 4626, LOCATION: "Halo D1 15th- Platte", GLOBALID: "f8103ce9-bc6f-4510-b421-641ec9cfb056" }, geometry: { x: -11689599.504325293, y: 4830610.947452243 } },
+      { attributes: { OBJECTID: 2, LOCATION: "x" }, geometry: { x: 0, y: 0 } },
+    ],
+  });
+  assert.equal(staged.length, 1);
+  assert.equal(staged[0].title, "Halo D1 15th- Platte");
+  assert.equal(staged[0].kind, "Other / unknown");
+  assert.ok(Math.abs(staged[0].latitude - 39.756435) < 0.01, `lat ${staged[0].latitude}`);
+  assert.equal(staged[0].external_id, "denver-halo:4626");
+  assert.equal(skipped.total, 1);
+});
+
+test("thruway: parses Socrata gantry rows into canonical staged rows", () => {
+  const { staged, skipped } = thruwayParse({
+    data: [
+      { name: "Grand Island North", description: "Highway", road: "I-190 - Niagara Thruway", milepost: "20", latitude: "43.05845", longitude: "-78.99061", type: "Barrier Fixed Toll" },
+      { name: "bad", latitude: "0", longitude: "0" },
+    ],
+  });
+  assert.equal(staged.length, 1);
+  assert.equal(staged[0].title, "Grand Island North");
+  assert.equal(staged[0].kind, "Traffic / licence plate reader");
+  assert.equal(staged[0].external_id, "ny-thruway:Grand Island North");
+  assert.equal(skipped.total, 1);
+});
