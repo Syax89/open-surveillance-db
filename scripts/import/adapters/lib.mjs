@@ -259,3 +259,26 @@ export async function fetchWithRetry(url, { retries = 2, timeoutMs = 60000, head
 export function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
+/**
+ * Fetch TUTTE le feature di un ArcGIS FeatureServer layer (paginazione
+ * resultOffset/resultRecordCount). Ritorna l'array di feature grezze.
+ * Il chiamante decide conversione coordinate/attributi (vedi
+ * webMercatorToWgs84 per i layer in EPSG:3857).
+ */
+export async function fetchArcGisFeatures(fsUrl, { page = 200, headers = {} } = {}) {
+  const all = [];
+  let offset = 0;
+  for (;;) {
+    const url = `${fsUrl}/query?where=1%3D1&outFields=*&resultOffset=${offset}&resultRecordCount=${page}&f=json`;
+    const res = await fetchWithRetry(url, { headers });
+    const data = await res.json();
+    if (data?.error) throw new Error(`ArcGIS error ${data.error.code}: ${data.error.message}`);
+    const feats = data?.features ?? [];
+    if (!feats.length) break;
+    all.push(...feats);
+    if (feats.length < page) break;
+    offset += page;
+  }
+  return all;
+}
