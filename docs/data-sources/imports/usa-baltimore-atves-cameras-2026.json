@@ -1,0 +1,11 @@
+{
+    "slug": "usa-baltimore-atves-cameras-2026",
+    "source_name": "City of Baltimore — ATVES Automated Enforcement Cameras",
+    "format": "arcgis-featureserver",
+    "license": "Maryland public domain + attribution",
+    "license_url": "https://data.baltimorecity.gov",
+    "attribution_text": "Fonte: City of Baltimore, ATVES — red light, speed fixed e speed portable cameras (https://services3.arcgis.com/ZTvQ9NuONePFYofE), concesso con licenza Maryland public domain + attribuzione (verificato 2026-08-08).",
+    "source_url": "https://services3.arcgis.com/ZTvQ9NuONePFYofE/ArcGIS/rest/services/Baltimore_ATVES_Red_Light_Camera/FeatureServer/0",
+    "max_records": 400,
+    "notes": "Scan catalog.csv + verifica diretta (CEO 2026-08-08): ATVES = 180 red light + 21 speed fixed (layer 3) + 128 speed portable (layer 1) = 329 totali (count verificati; attrs CamType/CamID/Location/SchlLocation, geometry EPSG:2248 → lcc2248ToWgs84). Verdetto legale: PUBBLICABILE (Maryland public domain + attribuzione). external_id balt-atves:<GIS_ID> con prefisso tipo."
+}

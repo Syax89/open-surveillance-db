@@ -910,3 +910,76 @@ test("thruway: parses Socrata gantry rows into canonical staged rows", () => {
   assert.equal(staged[0].external_id, "ny-thruway:Grand Island North");
   assert.equal(skipped.total, 1);
 });
+
+// -------------------------------------------------- wave 7 (USA, verdetti legali): PA / MD / Baltimore
+
+import { parsePayload as penndotParse } from "../scripts/import/adapters/usa-penndot-traffic-cameras-2026.mjs";
+import { parsePayload as mdotParse } from "../scripts/import/adapters/usa-mdot-chart-cameras-2026.mjs";
+import { parsePayload as citiwatchParse } from "../scripts/import/adapters/usa-baltimore-citiwatch-2026.mjs";
+import { parsePayload as atvesParse } from "../scripts/import/adapters/usa-baltimore-atves-cameras-2026.mjs";
+import { lcc2248ToWgs84 } from "../scripts/import/adapters/lib.mjs";
+
+test("lcc2248ToWgs84 lands in Baltimore (~39.29, -76.62) for the CitiWatch anchor", () => {
+  const [lat, lon] = lcc2248ToWgs84(1419616.6991678923, 591850.2132046372);
+  assert.ok(Math.abs(lat - 39.291154) < 0.001, `lat ${lat}`);
+  assert.ok(Math.abs(lon - -76.620948) < 0.001, `lon ${lon}`);
+});
+
+test("penndot: parses ArcGIS features (Web Mercator) into canonical staged rows", () => {
+  const { staged, skipped } = penndotParse({
+    data: [
+      { attributes: { OBJECTID: 1, STATEWIDE_ID: "CAM-08-001", STATUS_NAME: "EXISTING", INSTALL_TYPE_NAME: "PERMANENT" }, geometry: { x: -8572497.387, y: 4923635.152800001 } },
+      { attributes: { OBJECTID: 2, STATEWIDE_ID: "x" }, geometry: { x: 0, y: 0 } },
+    ],
+  });
+  assert.equal(staged.length, 1);
+  assert.equal(staged[0].title, "PennDOT cam CAM-08-001");
+  assert.equal(staged[0].kind, "Traffic / licence plate reader");
+  assert.equal(staged[0].external_id, "penndot:CAM-08-001");
+  assert.equal(skipped.total, 1);
+});
+
+test("mdot: parses ArcGIS features (Web Mercator) into canonical staged rows", () => {
+  const { staged, skipped } = mdotParse({
+    data: [
+      { attributes: { OBJECTID: 1, location: "WPL C506 at Gantry S-9 MP 33.6", county: "Anne Arundel County", feedID: "dd0157c42d7c001300503336c4235c0a", url: "https://chart.maryland.gov/video/video.php?feed=dd0157c42d7c001300503336c4235c0a" }, geometry: { x: -8503572.3371, y: 4720926.744599998 } },
+      { attributes: { OBJECTID: 2, location: "x" }, geometry: { x: 0, y: 0 } },
+    ],
+  });
+  assert.equal(staged.length, 1);
+  assert.equal(staged[0].title, "WPL C506 at Gantry S-9 MP 33.6");
+  assert.equal(staged[0].kind, "Traffic / licence plate reader");
+  assert.equal(staged[0].external_id, "mdot-chart:dd0157c42d7c001300503336c4235c0a");
+  assert.equal(skipped.total, 1);
+});
+
+test("citiwatch: parses ArcGIS features (EPSG:2248) into canonical staged rows", () => {
+  const { staged, skipped } = citiwatchParse({
+    data: [
+      { attributes: { OBJECTID: 1, CAM_NUMBER: "1", CAM_LOCATION: "Eutaw and Lexington Market" }, geometry: { x: 1419616.6991678923, y: 591850.2132046372 } },
+      { attributes: { OBJECTID: 2, CAM_NUMBER: "2", CAM_LOCATION: "x" }, geometry: null },
+    ],
+  });
+  assert.equal(staged.length, 1);
+  assert.equal(staged[0].title, "Eutaw and Lexington Market");
+  assert.equal(staged[0].kind, "Other / unknown");
+  assert.equal(staged[0].external_id, "balt-citiwatch:1");
+  assert.equal(skipped.total, 1);
+});
+
+test("atves: parses 3 services (EPSG:2248) into canonical staged rows with src prefix", () => {
+  const { staged, skipped } = atvesParse({
+    data: [
+      { __svc: "redlight", attributes: { GIS_ID: 1001, CamType: "Red Light Camera", Location: "Bel Air Rd & Erdman Ave SB" }, geometry: { x: 1433012.8000003397, y: 603103.409858346 } },
+      { __svc: "speed-fixed", attributes: { GIS_ID: 4029, CamType: "Speed Camera Fixed", Location: "6000 Hillen Rd SB and NB" }, geometry: { x: 1431066.195297718, y: 617507.945681721 } },
+      { __svc: "speed-portable", attributes: { GIS_ID: 5001, CamType: "Speed Camera Portable", Location: "2700 Blk Gywnns Falls Pkwy WB" }, geometry: { x: 1407967.5902483016, y: 600409.6019257307 } },
+      { __svc: "redlight", attributes: { GIS_ID: 1, CamType: "x", Location: "x" }, geometry: null },
+    ],
+  });
+  assert.equal(staged.length, 3);
+  assert.equal(staged[0].external_id, "balt-atves:redlight:1001");
+  assert.equal(staged[1].external_id, "balt-atves:speed-fixed:4029");
+  assert.equal(staged[2].external_id, "balt-atves:speed-portable:5001");
+  assert.ok(Math.abs(staged[1].latitude - 39.361458) < 0.001, `lat ${staged[1].latitude}`); // 6000 Hillen Rd
+  assert.equal(skipped.total, 1);
+});

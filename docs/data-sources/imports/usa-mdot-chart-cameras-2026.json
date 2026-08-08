@@ -1,0 +1,11 @@
+{
+    "slug": "usa-mdot-chart-cameras-2026",
+    "source_name": "Maryland DOT — SHA CHART Traffic Cameras",
+    "format": "arcgis-featureserver",
+    "license": "Maryland public domain + attribution",
+    "license_url": "https://data.maryland.gov",
+    "attribution_text": "Fonte: Maryland Department of Transportation, SHA CHART Traffic Cameras (https://mdgeodata.md.gov/imap/rest/services/Transportation/MD_TrafficCameras), concesso con licenza Maryland public domain + attribuzione (verificato 2026-08-08).",
+    "source_url": "https://mdgeodata.md.gov/imap/rest/services/Transportation/MD_TrafficCameras/FeatureServer/0",
+    "max_records": 800,
+    "notes": "Scan catalog.csv + verifica diretta (CEO 2026-08-08): 451 telecamere MDOT SHA CHART (FeatureServer, count 451 verificato; attrs location/county/feedID/url, geometry Web Mercator 3857, live feed URL per cam). Verdetto legale: PUBBLICABILE (Maryland public domain + attribuzione). external_id mdot-chart:<feedID>."
+}

@@ -63,6 +63,12 @@ export const IMPORTABLE_LICENSES = new Set([
   // Open Data Commons Public Domain Dedication — public domain,
   // no obligations (SF Socrata red-light/speed citation datasets).
   "PDDL",
+  // Maryland (public domain + attribution) — MDOT SHA CHART, CitiWatch
+  // Baltimore, ATVES. Verificato 2026-08-08: policy dati MD public domain.
+  "Maryland public domain + attribution",
+  // Pennsylvania — PennDOT terms: redistribuzione esplicitamente
+  // consentita con attribuzione (511PA). Verificato 2026-08-08.
+  "PennDOT terms (redistribuzione consentita)",
   "ODC PDDL 1.0",
   // Australian CC-BY 3.0 (TfNSW live cameras, QLD state roads — both
   // data.gov.au / data.qld.gov.au, attribution-only).

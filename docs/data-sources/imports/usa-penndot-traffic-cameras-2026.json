@@ -1,0 +1,11 @@
+{
+    "slug": "usa-penndot-traffic-cameras-2026",
+    "source_name": "Pennsylvania Department of Transportation — PennDOT Traffic Cameras",
+    "format": "arcgis-featureserver",
+    "license": "PennDOT terms (redistribuzione consentita)",
+    "license_url": "https://www.penndot.pa.gov/Pages/default.aspx",
+    "attribution_text": "Fonte: Pennsylvania Department of Transportation (PennDOT), Traffic Cameras (https://gis.penndot.gov/arcgis/rest/services/paprojects/paprojects/MapServer/14), concesso con licenza terms 511PA: redistribuzione esplicitamente consentita con attribuzione (verificato 2026-08-08).",
+    "source_url": "https://gis.penndot.gov/arcgis/rest/services/paprojects/paprojects/MapServer/14",
+    "max_records": 2000,
+    "notes": "Scan catalog.csv + verifica diretta (CEO 2026-08-08): 1.410 telecamere PennDOT (MapServer layer 14, count 1.410 verificato; attrs STATEWIDE_ID/STATUS_NAME/INSTALL_TYPE_NAME, geometry Web Mercator 3857). Verdetto legale: PUBBLICABILE (terms 511PA consentono redistribuzione con attribuzione). external_id penndot:<STATEWIDE_ID>."
+}
