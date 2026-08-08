@@ -72,7 +72,7 @@ export function parsePayload({ features } = {}) {
 
     staged.push({
       title,
-      kind: "Fixed camera",
+      kind: "Other / unknown",
       latitude: Number(lat.toFixed(6)),
       longitude: Number(lon.toFixed(6)),
       direction: null,
