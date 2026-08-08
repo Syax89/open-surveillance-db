@@ -76,6 +76,23 @@ const emptyContributionsFixture = {
   level: { level: 0, verifiedCount: 0, threshold: 0, nextThreshold: 1 },
 };
 
+// Rework fixtures (2026-08-08): summary strip + mixed kinds + the
+// post-0039 "active" status for published cameras.
+const reworkContributionsFixture = {
+  contributions: [
+    { type: "camera", id: 41, title: "Published camera row", issueType: null, cameraId: null, status: "active", createdAt: "2026-02-01T08:00:00.000Z" },
+    { type: "correction", id: 7, title: null, issueType: "inaccurate", cameraId: 41, status: "reviewed", createdAt: "2026-01-20T09:00:00.000Z" },
+    { type: "photo", id: 3, title: null, issueType: null, cameraId: 41, status: "approved", createdAt: "2026-01-10T09:00:00.000Z" },
+  ],
+  pagination: { page: 1, pageSize: 25, total: 3, totalPages: 1, hasMore: false },
+  summary: {
+    total: 3,
+    byType: { camera: 1, correction: 1, photo: 1 },
+    byStatus: { active: 1, reviewed: 1, approved: 1 },
+  },
+  level: { level: 1, verifiedCount: 1, threshold: 1, nextThreshold: 5 },
+};
+
 const passkeyFixture = {
   credentials: [
     { id: 1, credentialId: "cred-1", transports: "[\"internal\"]", createdAt: "2026-01-15T10:00:00.000Z" },
@@ -213,6 +230,106 @@ test("account: local status filter refetches with ?status= and keeps the URL cle
   // The filter is local state: the fetch carried ?status=pending, the URL
   // itself never changed.
   assert.ok(requests.some((r) => typeof r === "string" && r.includes("status=pending")));
+  assert.equal(window.location.search, "");
+});
+
+test("account: summary strip + Published chip (rework 2026-08-08)", async () => {
+  const { screen, waitFor } = rtl;
+  const requests = [];
+  installFetchMock((input) => {
+    requests.push(input);
+    if (input === "/api/auth/me") return jsonResponse(profileFixture);
+    if (typeof input === "string" && input.startsWith("/api/auth/me/contributions")) {
+      const url = new URL(input, "https://osdb.test");
+      if (url.searchParams.get("status") === "active") {
+        return jsonResponse({
+          ...reworkContributionsFixture,
+          contributions: [reworkContributionsFixture.contributions[0]],
+          pagination: { page: 1, pageSize: 25, total: 1, totalPages: 1, hasMore: false },
+        });
+      }
+      return jsonResponse(reworkContributionsFixture);
+    }
+    return jsonResponse({ error: "unexpected route" }, { status: 404 });
+  });
+
+  await renderWithLocale(React.createElement(AccountPage));
+  await waitFor(() => assert.ok(screen.queryByText("Published camera row")));
+
+  // The summary strip renders the global per-kind counts (independent of
+  // filters) with visible labels next to each number.
+  assert.equal(screen.getAllByText("1", { selector: ".account-stat-value" }).length, 3);
+  assert.ok(screen.getAllByText("Camera reports").length >= 2); // stat card + type chip
+  assert.ok(screen.getAllByText("Corrections").length >= 2);
+  assert.ok(screen.getAllByText("Photos").length >= 2);
+  // In-moderation card: 0 pending in this fixture, still rendered.
+  assert.ok(screen.getAllByText("In moderation").length >= 2); // stat card + status chip
+
+  // The "Published" chip exists and refetches with ?status=active — the
+  // post-0039 domain status is now filterable (P0 fix).
+  const user = rtl.userEvent.setup();
+  const publishedChip = screen.getByRole("button", { name: /Published/ });
+  await user.click(publishedChip);
+  assert.ok(requests.some((r) => typeof r === "string" && r.includes("status=active")));
+  // Chip counters come from the summary.
+  assert.ok(screen.getByRole("button", { name: /Published/ }));
+});
+
+test("account: kind rows show icon tile, issue label, date and related-record link (rework)", async () => {
+  const { screen, waitFor } = rtl;
+  installFetchMock(routeHandler({ contributions: reworkContributionsFixture }));
+
+  await renderWithLocale(React.createElement(AccountPage));
+  await waitFor(() => assert.ok(screen.queryByText("Published camera row")));
+
+  // Camera row: title link to /records/41 + kind label + date.
+  const cameraLink = screen.getByRole("link", { name: "Published camera row" });
+  assert.equal(cameraLink.getAttribute("href"), "/records/41");
+  // Correction row: issue label (inaccurate) + link to the related camera.
+  const correctionLink = screen.getByRole("link", { name: "Correction: Inaccurate information" });
+  assert.equal(correctionLink.getAttribute("href"), "/records/41");
+  // Photo row: kind label, no issue, still linked to the camera.
+  const photoLink = screen.getByRole("link", { name: "Photo" });
+  assert.equal(photoLink.getAttribute("href"), "/records/41");
+  // Terminal statuses resolve to human labels (reviewed/approved) — the
+  // literal "Status" fallback must never appear.
+  assert.ok(screen.getByText("Resolved"));
+  assert.ok(screen.getByText("Approved"));
+  assert.equal(screen.queryByText("Status"), null);
+  // Dates render for every row.
+  assert.ok(screen.getAllByRole("link").length >= 3);
+});
+
+test("account: type filter refetches with ?type= (rework 2026-08-08)", async () => {
+  const { screen, waitFor } = rtl;
+  const requests = [];
+  installFetchMock((input) => {
+    requests.push(input);
+    if (input === "/api/auth/me") return jsonResponse(profileFixture);
+    if (typeof input === "string" && input.startsWith("/api/auth/me/contributions")) {
+      const url = new URL(input, "https://osdb.test");
+      if (url.searchParams.get("type") === "correction") {
+        return jsonResponse({
+          ...reworkContributionsFixture,
+          contributions: [reworkContributionsFixture.contributions[1]],
+          pagination: { page: 1, pageSize: 25, total: 1, totalPages: 1, hasMore: false },
+        });
+      }
+      return jsonResponse(reworkContributionsFixture);
+    }
+    return jsonResponse({ error: "unexpected route" }, { status: 404 });
+  });
+
+  await renderWithLocale(React.createElement(AccountPage));
+  await waitFor(() => assert.ok(screen.queryByText("Published camera row")));
+
+  const user = rtl.userEvent.setup();
+  await user.click(screen.getByRole("button", { name: "Corrections" }));
+
+  await waitFor(() => assert.ok(screen.queryByText("Correction: Inaccurate information")));
+  assert.equal(screen.queryByText("Published camera row"), null);
+  assert.ok(requests.some((r) => typeof r === "string" && r.includes("type=correction")));
+  // The filter stays local state: URL untouched.
   assert.equal(window.location.search, "");
 });
 

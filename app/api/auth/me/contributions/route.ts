@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { resolveOptionalContributor } from "../../../../lib/auth-session";
-import { authLimit } from "../../../../lib/auth-route-helpers";
+import { sessionLimit } from "../../../../lib/auth-route-helpers";
 import { urlTooLong } from "../../../../lib/input-limits";
 import { trustLevelMeta } from "../../../../lib/trust-levels";
 import {
@@ -8,6 +8,7 @@ import {
   CONTRIBUTION_TYPES,
   countVerifiedCameras,
   listContributorContributions,
+  summarizeContributorContributions,
   type ContributionType,
 } from "../../../../../db/auth";
 
@@ -42,7 +43,7 @@ export async function GET(request: Request) {
     return Response.json({ error: "Request URI too long." }, { status: 414 });
   }
 
-  const blocked = await authLimit(request, env, "/api/auth/me/contributions");
+  const blocked = await sessionLimit(request, env, "/api/auth/me/contributions");
   if (blocked) return blocked;
 
   const url = new URL(request.url);
@@ -103,9 +104,10 @@ export async function GET(request: Request) {
     }
 
     const offset = (page - 1) * pageSize;
-    const [pageResult, verifiedCount] = await Promise.all([
+    const [pageResult, verifiedCount, summary] = await Promise.all([
       listContributorContributions(resolved.contributor.id, { type, status, limit: pageSize, offset }),
       countVerifiedCameras(resolved.contributor.id),
+      summarizeContributorContributions(resolved.contributor.id),
     ]);
 
     const totalPages = Math.ceil(pageResult.total / pageSize);
@@ -119,6 +121,9 @@ export async function GET(request: Request) {
           totalPages,
           hasMore: page < totalPages,
         },
+        // Global totals (independent of the current filters) for the
+        // account-page summary strip (C7 rework 2026-08-08).
+        summary,
         level: trustLevelMeta(verifiedCount),
       },
       {

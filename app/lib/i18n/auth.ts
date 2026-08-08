@@ -125,6 +125,9 @@ export const en = {
   passkeysHint:
     "Add a passkey to sign in with your device (biometrics, PIN or security key) instead of a password.",
   passkeysEmpty: "No passkeys enrolled yet.",
+  // Disclosure summary count (account rework 2026-08-08).
+  passkeySingular: "passkey",
+  passkeyPlural: "passkeys",
   passkeyAdd: "Add passkey",
   passkeyAddHelp:
     "You will be asked to confirm with your device. When the passkey is added you receive 10 one-time recovery codes — store them somewhere safe.",
@@ -352,6 +355,9 @@ export const it: Translation<typeof en> = {
   passkeysHint:
     "Aggiungi una passkey per accedere con il tuo dispositivo (impronta, PIN o chiave di sicurezza) invece della password.",
   passkeysEmpty: "Nessuna passkey registrata.",
+  // Conteggio nel summary del disclosure (rework account 2026-08-08).
+  passkeySingular: "passkey",
+  passkeyPlural: "passkey",
   passkeyAdd: "Aggiungi passkey",
   passkeyAddHelp:
     "Ti verrà chiesto di confermare con il tuo dispositivo. Quando la passkey viene aggiunta ricevi 10 codici di recupero monouso: conservali in un luogo sicuro.",

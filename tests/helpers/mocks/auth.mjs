@@ -15,6 +15,7 @@ export const PBKDF2_ITERATIONS = 210_000;
 export const CONTRIBUTION_TYPES = ["camera", "correction", "photo"];
 export const CONTRIBUTION_STATUSES = [
   "pending",
+  "active",
   "verified",
   "needs_review",
   "stale",
@@ -48,6 +49,7 @@ export const {
   listContributorSubmissions,
   countVerifiedCameras,
   listContributorContributions,
+  summarizeContributorContributions,
   updateContributorDisplayName,
   eraseContributor,
   hashPassword,
@@ -95,6 +97,7 @@ export const {
   listContributorSubmissions: "listContributorSubmissions",
   countVerifiedCameras: "countVerifiedCameras",
   listContributorContributions: "listContributorContributions",
+  summarizeContributorContributions: "summarizeContributorContributions",
   updateContributorDisplayName: "updateContributorDisplayName",
   eraseContributor: "eraseContributor",
   hashPassword: "hashPassword",
