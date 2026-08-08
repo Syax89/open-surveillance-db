@@ -1,0 +1,11 @@
+{
+  "slug": "spagna-barcelona-cameras-2026",
+  "source_name": "Ajuntament de Barcelona — Inventari de càmeres de seguretat",
+  "format": "csv",
+  "license": "CC BY 4.0",
+  "license_url": "https://creativecommons.org/licenses/by/4.0/",
+  "attribution_text": "Fonte: Ajuntament de Barcelona, Open Data BCN (https://opendata-ajuntament.barcelona.cat), concesso con CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/).",
+  "source_url": "https://opendata-ajuntament.barcelona.cat/data/api/3/action/package_search?q=cameras+seguretat&rows=3",
+  "max_records": 500,
+  "notes": "Scan stato-per-stato ES (CEO 2026-08-08): inventario ufficiale delle telecamere di sicurezza dell'infrastruttura di Barcelona (165 record, CSV con Longitud/Latitud, refresh 2024-02). Licenza CC BY 4.0 dichiarata sul portale. Unico dataset telecamere nel catalogo BCN. external_id bcn-camera:<Id_Cam_Seguretat>."
+}

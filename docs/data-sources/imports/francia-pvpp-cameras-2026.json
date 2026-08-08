@@ -1,0 +1,11 @@
+{
+  "slug": "francia-pvpp-cameras-2026",
+  "source_name": "Ministère de l'Intérieur — Vidéoprotection, implantation des caméras (PVPP Paris)",
+  "format": "kml",
+  "license": "Licence Ouverte 2.0",
+  "license_url": "https://www.etalab.gouv.fr/wp-content/uploads/2014/05/Licence_Ouverte.pdf",
+  "attribution_text": "Fonte: Ministère de l'Intérieur, data.gouv.fr (https://www.data.gouv.fr/datasets/videoprotection-implantation-des-cameras-kml-ods), concesso con Licence Ouverte (https://www.etalab.gouv.fr/wp-content/uploads/2014/05/Licence_Ouverte.pdf).",
+  "source_url": "https://static.data.gouv.fr/resources/videoprotection-implantation-des-cameras-551635/20181116-165730/2018-11-15-export-cameras-pvpp.kml",
+  "max_records": 2000,
+  "notes": "Scan stato-per-stato FR (CEO 2026-08-08): unico dataset nazionale francese con coordinate di camere di sorveglianza — 1339 camere della Prefettura di Polizia di Parigi (PVPP), KML statico del 2018 (dataset vecchio ma ufficiale ministeriale). Licenza fr-lo = Licence Ouverte. external_id pvpp-camera:<lon>,<lat> (il KML non ha id)."
+}

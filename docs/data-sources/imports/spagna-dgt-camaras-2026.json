@@ -1,0 +1,11 @@
+{
+  "slug": "spagna-dgt-camaras-2026",
+  "source_name": "Dirección General de Tráfico — Cámaras de tráfico red estatal (NAP)",
+  "format": "datex2",
+  "license": "CC-BY",
+  "license_url": "https://creativecommons.org/licenses/by/4.0/",
+  "attribution_text": "Fonte: Dirección General de Tráfico, NAP (https://nap.dgt.es/dataset/camaras-dgt-datex2-v3-7), concesso con licenza CC-BY (Creative Commons Attribution).",
+  "source_url": "https://nap.dgt.es/datex2/v3/dgt/DevicePublication/camaras_datex2_v37.xml",
+  "max_records": 3000,
+  "notes": "Scan stato-per-stato ES (CEO 2026-08-08): 1942 telecamere di traffico su strade statali (DATEX2 v3.7 XML, live) via NAP DGT. Coordinate verificate (1942 coppie lat/lon), con roadName/roadDestination e URL immagine. Licenza CC-BY dichiarata sul portale NAP. external_id dgt-camara:<device id>."
+}
