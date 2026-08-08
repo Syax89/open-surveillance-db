@@ -42,7 +42,7 @@ export async function GET(request: Request) {
     return Response.json({ error: "Unknown OIDC provider." }, { status: 404 });
   }
 
-  const config = oidcProviderConfig(env, provider, `${publicOrigin(request)}/api/auth/oidc/${provider}/callback`);
+  const config = oidcProviderConfig(env, provider, `${publicOrigin(request, env)}/api/auth/oidc/${provider}/callback`);
   if (!config) {
     return Response.json(
       { error: "This sign-in method is not available yet." },

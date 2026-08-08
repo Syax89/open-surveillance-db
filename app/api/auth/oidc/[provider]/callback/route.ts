@@ -52,7 +52,7 @@ export async function GET(request: Request) {
     return Response.json({ error: "Unknown OIDC provider." }, { status: 404 });
   }
 
-  const config = oidcProviderConfig(env, provider, `${publicOrigin(request)}/api/auth/oidc/${provider}/callback`);
+  const config = oidcProviderConfig(env, provider, `${publicOrigin(request, env)}/api/auth/oidc/${provider}/callback`);
   if (!config) {
     return Response.json(
       { error: "This sign-in method is not available yet." },
@@ -63,7 +63,7 @@ export async function GET(request: Request) {
   // Provider-side denial/cancel comes back as ?error=... without a code:
   // land the user back on /login (the state row expires on its own).
   if (url.searchParams.has("error")) {
-    return Response.redirect(`${publicOrigin(request)}/login`, 302);
+    return Response.redirect(`${publicOrigin(request, env)}/login`, 302);
   }
 
   const code = url.searchParams.get("code") ?? "";
@@ -76,7 +76,7 @@ export async function GET(request: Request) {
   if (!stateRow) {
     return Response.json({ error: "Invalid or expired OIDC state." }, { status: 400 });
   }
-  const redirectTo = new URL(stateRow.redirectTo, publicOrigin(request)).toString();
+  const redirectTo = new URL(stateRow.redirectTo, publicOrigin(request, env)).toString();
 
   let identity;
   try {
@@ -87,7 +87,7 @@ export async function GET(request: Request) {
     identity = await fetchOidcIdentity(provider, accessToken);
   } catch (error) {
     console.error(`GET /api/auth/oidc/${provider}/callback: provider exchange failed`, error);
-    return Response.redirect(`${publicOrigin(request)}/login?oidc_error=1`, 302);
+    return Response.redirect(`${publicOrigin(request, env)}/login?oidc_error=1`, 302);
   }
 
   try {
@@ -108,7 +108,7 @@ export async function GET(request: Request) {
           contributorId: matched.id,
           emailVerified: identity.emailVerified,
         });
-        return Response.redirect(`${publicOrigin(request)}/login?merge=${encodeURIComponent(rawToken)}`, 302);
+        return Response.redirect(`${publicOrigin(request, env)}/login?merge=${encodeURIComponent(rawToken)}`, 302);
       }
     }
 
@@ -123,7 +123,7 @@ export async function GET(request: Request) {
     return openSessionAndRedirect(redirectTo, created.id);
   } catch (error) {
     console.error(`GET /api/auth/oidc/${provider}/callback failed`, error);
-    return Response.redirect(`${publicOrigin(request)}/login?oidc_error=1`, 302);
+    return Response.redirect(`${publicOrigin(request, env)}/login?oidc_error=1`, 302);
   }
 }
 
