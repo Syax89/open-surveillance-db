@@ -7,28 +7,33 @@ credentials, or sensitive operational details.
 
 ## What this verifies
 
-The local loop has one important boundary:
+The local loop follows the community model (ADR 0021):
 
 ```text
-fictional report → pending moderation → local decision → public result only when approved
+verified contributor → report → published immediately as `active`
+community actions (confirm / no longer there / problem / privacy)
+  → automatic state transitions (hidden / removed, reversible)
+corrections and edit requests → private human review
 ```
 
-`pending`, rejected, `removed`, and correction-request records must never appear
-on the public map, directory, `/api/cameras`, CSV/GeoJSON exports, or nearby search.
+`pending`, rejected, `removed`, `hidden`, and correction-request records must
+never appear on the public map, directory, `/api/cameras`, CSV/GeoJSON
+exports, or nearby search, except for the direct-link banner contract of
+withdrawn records.
 
 ## Rate limits are best-effort locally
 
-The local prototype runs without Cloudflare, so `cf-connecting-ip` is never
-present and the per-caller buckets key on the first `x-forwarded-for` hop
-(`app/lib/rate-limit.ts` `callerKey`). Any client can set
+The local development instance runs without Cloudflare, so `cf-connecting-ip`
+is never present and the per-caller buckets key on the first
+`x-forwarded-for` hop (`app/lib/rate-limit.ts` `callerKey`). Any client can set
 that header, so rate limits are NOT a security
 boundary on a LAN deployment — treat them as development conveniences that
 show the 429 contract, not as abuse protection. The public service must sit
 behind Cloudflare (or an equivalent trusted edge that overwrites the
 forwarded chain), where `cf-connecting-ip` is set by the platform and cannot
-be spoofed; see `docs/workstreams/OPS_OPEN.md` "Service protections".
+be spoofed; see `docs/DEPLOYMENT.md`.
 
-## Start the prototype
+## Start the local instance
 
 Requirements: Node.js 22.13 or newer and a recent npm.
 
@@ -39,12 +44,12 @@ npm run dev
 ```
 
 On a fresh checkout the local database has no schema until you migrate it:
-`npm run db:migrate` creates the 13 schema tables (plus the `d1_migrations`
+`npm run db:migrate` creates the schema tables (plus the `d1_migrations`
 journal) from `drizzle/`. If you are starting from an empty state, this step
 is required — running `npm run dev` first would start against a database
 without tables.
 
-Open the public prototype at `http://localhost:3000` and the local moderation
+Open the app at `http://localhost:3000` and the local moderation
 dashboard at `http://localhost:3000/moderation`. Keep the development server
 running while following the checks below.
 
@@ -63,93 +68,57 @@ npm run db:seed
 
 ## Create a safe test report
 
-1. On the public page, either click an arbitrary position on the map or enter
-   valid latitude and longitude values in the report form. Do not choose a real
-   sensitive location. Manual coordinates must be within the normal geographic
-   ranges: latitude `-90` to `90`, longitude `-180` to `180`.
-2. Confirm the selected coordinates are shown and the map centres on that
+1. Register a verified contributor account (email verification is required
+   for the write gate, ADR 0020) and sign in.
+2. On `/segnala`, either click an arbitrary position on the map or enter
+   valid latitude and longitude values. Do not choose a real sensitive
+   location. Manual coordinates must be within the normal geographic ranges:
+   latitude `-90` to `90`, longitude `-180` to `180`.
+3. Confirm the selected coordinates are shown and the map centres on that
    point. The same non-blocking nearby-record check runs for a map click and
-   valid manual coordinate entry; it considers reviewed/demo public records
+   valid manual coordinate entry; it considers `active`/`demo` public records
    only.
-3. Open **Add a camera**.
 4. Submit a clearly fictional title such as `Local test — do not publish` and a
    generic type such as `Fixed dome`.
 5. If exercising the optional fields, use a fictional manufacturer and a valid
-   observation date in ISO form (`YYYY-MM-DD`). Do not use them for operational
-   claims. Both values stay in the private pending report and are not public
-   merely because the camera is approved. During moderation, opt in separately
-   to publishing the manufacturer and the observation date only when each is
-   accurate, relevant, and safe.
+   observation date in ISO form (`YYYY-MM-DD`). Do not use them for
+   operational claims. Both values stay private in the record unless their
+   individual publication choices are enabled.
 6. Leave the address empty or use `Fictional test location`; use a short note
    that contains no personal or operational information.
-7. Confirm the form notice: the report is saved for moderation and is not
-   public.
+7. Confirm the form notice: with a verified account the report is published
+   **immediately** as `active` (ADR 0021).
 
-Before visiting the moderation dashboard, confirm the new title is absent from
-the map, public directory, `http://localhost:3000/api/cameras`, and its CSV
-and GeoJSON exports.
+After submitting, confirm the new title **is** present in the public map,
+directory, `http://localhost:3000/api/cameras`, and its CSV and GeoJSON
+exports.
 
-## Moderate the report
+## Community transitions (automatic)
 
-Open `http://localhost:3000/moderation`. The report should appear in **Pending
-camera reports**. Select a required reason, optionally add a local note, then
-choose one of the following actions.
+With a second verified contributor (or the same one where allowed by the
+anti-gaming rules), cast community actions on the fictional record and verify
+the automatic thresholds (ADR 0021 §4/§5, defaults in `community_settings`):
 
-| Action | Expected local state | Expected public result |
-| --- | --- | --- |
-| Approve | `verified` | The record appears in the public API, directory, map, CSV/GeoJSON, and relevant nearby results. Manufacturer and observation date remain private unless their individual publication choices are enabled. |
-| Reject | `rejected` | The record remains absent from all public outputs. |
-| Hide | `removed` | The record remains absent from all public outputs. |
+| Actions | Expected result |
+| --- | --- |
+| `gone` sum ≥ 3 (≥ 3 distinct) | record → `removed`; gone actions consumed; public timeline event recorded |
+| `problem` sum ≥ 3 (≥ 2 distinct) | record → `hidden`; banner contract on direct link |
+| `privacy` (1 action) | record → `hidden` |
+| contrary consensus (`confirm` above restore thresholds) | record restored to `active` (with cooldown when the hide reason was privacy) |
 
-Every decision should remove the item from the pending queue and add an entry
-to **Recent decisions**. The event should show the old and new status, action,
-reason, actor, timestamp, and any note.
+Check the public per-record timeline on the record page shows the events
+without contributor identities.
 
-## Manual acceptance checks
+## Edit requests and corrections (human review)
 
-Use a separate fictional report for each action so results are unambiguous.
-
-### Approve
-
-1. Submit a fictional report and approve it with the reason **Verified public
-   infrastructure**.
-2. Refresh the public page and search for its fictional title.
-3. Confirm it appears in the directory and map, and in `/api/cameras`, CSV,
-   and GeoJSON exports.
-4. If using nearby search, query coordinates near the selected point with a
-   radius between 10 and 500 metres; confirm the approved record is returned.
-5. Confirm its audit event says `pending → verified`.
-6. If the fictional report contains manufacturer or observation-date metadata,
-   verify each field independently: it is absent from JSON, CSV, GeoJSON, map,
-   directory, and record detail unless its own publication choice was enabled.
-
-### Reject
-
-1. Submit another fictional report and reject it with an appropriate reason.
-2. Refresh every public view listed above.
-3. Confirm its title is absent from the map, directory, JSON, GeoJSON, and
-   nearby results.
-4. Confirm its audit event says `pending → rejected`.
-
-### Hide
-
-1. Submit a third fictional report and hide it with an appropriate reason.
-2. Refresh every public view listed above.
-3. Confirm its title is absent from the map, directory, JSON, GeoJSON, and
-   nearby results.
-4. Confirm its audit event says `pending → removed`.
-
-### Review and reverify a published record
-
-1. Use a fictional report that has already been approved, so it appears under
-   **Published records** in the local dashboard.
-2. Select a reason and choose **Mark for review**. Confirm the record moves to
-   **Records needing review** and is no longer in the public map, directory,
-   JSON, GeoJSON, or nearby results.
-3. Select a reason and choose **Reverify**. Confirm it returns to the public
-   outputs and its audit history records `needs_review → verified`.
-4. To leave the local exercise clean, choose **Hide** from either lifecycle
-   section and confirm the record is removed from every public output.
+- **Edit a published record** (owner): `/records/[id]/edit` submits a
+  `camera_edit` request that appears in the local moderation dashboard
+  (`/moderation`) under **Edit requests**; applying it updates the record,
+  discarding it leaves the record unchanged. Pending (legacy) records get a
+  direct owner-only update instead.
+- **Submit a correction** via `/correggi`: the request is private and
+  human-reviewed; verify it never appears in any public output and that its
+  resolution is recorded.
 
 ## Nearby API check
 
@@ -162,13 +131,13 @@ The local proximity endpoint is:
 `latitude` and `longitude` are required. `radius` is optional and defaults to
 75 metres; when supplied it must be between 10 and 500 metres. A malformed,
 out-of-range, or incomplete query must return a validation error rather than a
-broader dataset. The endpoint is derived from the same reviewed/demo public
+broader dataset. The endpoint is derived from the same `active`/`demo` public
 list as `/api/cameras`; it is not a separate database query.
 
 ## Reset a local exercise safely
 
 Local state can include submitted fictional reports and their audit history.
-Treat it as data even in a prototype.
+Treat it as data even in local development.
 
 1. Stop the development server before changing any local state.
 2. Identify the project-local runtime state directory created by the local
@@ -194,7 +163,7 @@ npm test
 ```
 
 The suite builds the application and checks the static publication boundaries:
-only reviewed/demo camera records may reach public JSON, CSV, GeoJSON, and
-nearby responses; correction and moderation surfaces remain separate from
-public pages. It also guards the manual-coordinate fallback so it continues to
-use the same selection and nearby-check flow as the map.
+only `active`/`demo` camera records may reach public JSON, CSV, GeoJSON, and
+nearby responses; correction, moderation and community-action surfaces remain
+separate from public pages. It also guards the manual-coordinate fallback so
+it continues to use the same selection and nearby-check flow as the map.

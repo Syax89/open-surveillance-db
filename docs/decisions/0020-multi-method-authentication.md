@@ -12,8 +12,8 @@
   (account lockout — applies to the email+password path), 0018 (community
   verifications and trust levels — the verified-write gate interacts with the
   L1 gate)
-- **Related docs:** `docs/AUTH_OPTIONS.md` (research), `docs/PRIVACY_AND_SAFETY.md`,
-  `docs/COMMUNITY_PLAN.md` (§ 1), `docs/legal/PRIVACY_NOTICE.md`,
+- **Related docs:** auth-options research (archived), `docs/PRIVACY_AND_SAFETY.md`,
+  `docs/legal/PRIVACY_NOTICE.md`,
   `docs/TERMS_OF_USE.md`, `docs/legal/PROCESSOR_REGISTER.md`,
   `docs/legal/RETENTION_SCHEDULE.md` (R15)
 
@@ -27,7 +27,7 @@ a verified contributor account for every submission.
 It explicitly deferred **email verification and password reset** because no
 outbound mailer existed.
 
-`docs/AUTH_OPTIONS.md` (research, Ken, t_530958a2) scored passkeys, third-party
+The auth-options research (Ken, t_530958a2; archived) scored passkeys, third-party
 OIDC, self-hosted OIDC, magic links, TOTP and session hardening. Its
 recommendation was: harden the session stack and add opt-in TOTP first, add
 passkeys next, and treat **third-party OIDC as "not recommended"** because of
@@ -37,7 +37,7 @@ The AUTH MULTI-METODO project (2026-08-02, phases A–G) re-opened that
 conclusion for three reasons:
 
 1. **One method cannot serve the whole community.** The FIDO Alliance reality
-   check quoted in AUTH_OPTIONS § 3 (~36 % of accounts passkey-enrolled, ~26 %
+   check quoted in the research (§ 3: ~36 % of accounts passkey-enrolled, ~26 %
    of sign-ins) means a passkey-only path would exclude most contributors, and
    a password-only path keeps the credential-stuffing/account-takeover gap
    open. The civic mission (lightweight, low-friction contribution)
@@ -47,7 +47,7 @@ conclusion for three reasons:
    **Cloudflare Email Routing** (`opensurveillancedb.org`) — Cloudflare is
    already the processor (PR1, DPA v6.3 + SCC + EU–US DPF), so account
    verification and password reset no longer need a new third party or a new
-   DPA. This is the enabler that ADR 0013 and AUTH_OPTIONS both assumed was
+   DPA. This is the enabler that ADR 0013 and the research both assumed was
    missing.
 3. **The abuse gap is real.** Without verification, an account with a
    throwaway email can write unlimited content; the write gate closes it at
@@ -115,7 +115,7 @@ conclusion for three reasons:
    counter), challenge store with expiry, anti-replay `sign_count` tracking.
    Enrollment issues **10 single-use recovery codes (hashed)** for device
    loss; email+password remains the fallback — passkeys are an *addition*,
-   never a replacement (AUTH_OPTIONS § 3 adoption reality).
+   never a replacement (research § 3 adoption reality).
 
 4. **OIDC (GitHub/Google) is opt-in, minimal by design, and disclosed.**
    PKCE + OIDC discovery; account linking via `auth_provider` +
@@ -169,7 +169,7 @@ conclusion for three reasons:
   anti-replay counters, ADR 0016 lockout applies to the password path. OIDC
   accounts inherit the provider's account security (including the provider's
   own 2FA) — disclosed as such; the site never stores provider passwords.
-- **Community plan:** COMMUNITY_PLAN.md § 1 is amended — third-party OIDC is
+- **Community plan:** the community plan (§ 1, archived) is amended — third-party OIDC is
   no longer blanket-excluded (opt-in method with disclosure instead); the L1
   confirmation gate stays tied to verified contributions, while *write*
   access is gated on email verification (§ 2); § 5.3 gains the new document
@@ -185,14 +185,14 @@ conclusion for three reasons:
 - **Single-method status quo (email+password, no verification):** rejected —
   leaves the no-verification / no-reset / no-2FA gaps open and forces every
   contributor through one method regardless of their threat model.
-- **TOTP-only upgrade (AUTH_OPTIONS § 6):** still valuable, but deferred —
+- **TOTP-only upgrade (research § 6):** still valuable, but deferred —
   passkeys deliver the same local-second-factor story with structural phishing
   resistance; TOTP can be layered later without a new ADR.
 - **OIDC as the default or only method:** rejected — tracking surface without
   opt-in contradicts ADR 0013's minimising posture; first-party methods stay
   primary, OIDC is an extra choice.
-- **Magic-link login (AUTH_OPTIONS § 5):** rejected as a login path
+- **Magic-link login (research § 5):** rejected as a login path
   (phishing, mail-scanner token burning); its real value — email verification
   and password reset — is adopted here via the mailer.
-- **Self-hosted IdP (AUTH_OPTIONS § 4b):** rejected — a new server/ops surface
+- **Self-hosted IdP (research § 4b):** rejected — a new server/ops surface
   for a single civic app; the project has no SSO need.

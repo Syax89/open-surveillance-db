@@ -7,8 +7,7 @@
   precision, retention), 0013 (contributor accounts and sessions),
   0018 (community verifications, trust levels and contribution editing)
 - **Related docs:** `docs/roadmap.md` (Horizon 1 — data quality and
-  lifecycle), `docs/COMMUNITY_PLAN.md` (community system), `docs/QA_REPORT_C-QA.md`
-  (C-QA anti-gaming report)
+  lifecycle), ADR 0018 (community system)
 
 ## Context
 

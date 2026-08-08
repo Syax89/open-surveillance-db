@@ -12,7 +12,7 @@ reviews or lost in chat threads.
 
 | ADR | Title | Status | Date |
 | --- | --- | --- | --- |
-| [0001](0001-public-data-boundary.md) | Separate reviewed public data from submissions | accepted (prototype) | 2026-07-31 |
+| [0001](0001-public-data-boundary.md) | Separate reviewed public data from submissions | accepted | 2026-07-31 |
 | [0002](0002-legal-pre-launch-deliverables.md) | Legal pre-launch deliverables (retention, notice, lawful basis, processors) | proposed | 2026-07-31 |
 | [0003](0003-moderation-access-control.md) | Edge-level access control for the moderation interface | accepted | 2026-07-31 |
 | [0004](0004-retention-and-review-cycle.md) | Retention schedule and review cycle | proposed | 2026-07-31 |

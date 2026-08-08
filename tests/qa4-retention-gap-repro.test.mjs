@@ -79,7 +79,7 @@ async function seedFixtures() {
   // Una demo camera (come da scripts/demo-cameras.sql): la purge R12 la
   // elimina con il suo record.
   await runtime.env.DB.prepare(
-    "INSERT INTO cameras (title, kind, latitude, longitude, status, source, updated, description, created_at) VALUES (?, 'Fixed dome', 41.9, 12.49, 'demo', 'Prototype seed', 'Demo data', 'QA repro demo', ?) RETURNING id",
+    "INSERT INTO cameras (title, kind, latitude, longitude, status, source, updated, description, created_at) VALUES (?, 'Fixed dome', 41.9, 12.49, 'demo', 'Development seed', 'Demo data', 'QA repro demo', ?) RETURNING id",
   )
     .bind("QA repro demo record", daysBefore(200))
     .run();

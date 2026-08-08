@@ -1,9 +1,8 @@
 # Data model and API
 
 > Field-by-field public reference: see the
-> [data dictionary](DATA_DICTIONARY.md). Export releases: see the
-> [export versioning policy](EXPORT_VERSIONING.md). Schema history: Drizzle
-> migrations [`drizzle/`](../drizzle) (`0000`–`0039`), one per incremental
+> [data dictionary](DATA_DICTIONARY.md). Schema history: Drizzle
+> migrations [`drizzle/`](../drizzle) (`0000`–`0044`), one per incremental
 > change, with the live schema in [`db/schema.ts`](../db/schema.ts).
 >
 > **Community-driven model (ADR 0021):** this document describes the current
@@ -66,15 +65,15 @@ The fields formerly listed as "planned for moderated storage" exist today in the
 
 The community pivot (ADR 0021) retired the human review cycle
 (`pending → verified/rejected` via reviewer, `needs_review`, `stale`, scheduled
-freshness sweep). Four domain states remain; `demo` is the technical prototype
-marker and never part of the community flow.
+freshness sweep). Four domain states remain; `demo` marks clearly labelled
+illustrative seed content and never participates in the community flow.
 
 | Status | Public? | Meaning |
 | --- | --- | --- |
 | `active` | Yes | Report is live and listed |
 | `hidden` | No (direct link with banner) | Present but withdrawn pending community/legal consensus — **reversible** |
 | `removed` | No (direct link with banner) | Community agrees it is no longer there (or admin legal removal) — **reversible** |
-| `demo` | Local prototype only | Fictional seed data, never in production |
+| `demo` | Yes (clearly labelled) | Illustrative seed content, purged outside `ENVIRONMENT=development` |
 
 ```mermaid
 stateDiagram-v2
@@ -176,7 +175,7 @@ enforces same-origin + CSRF when a session is present.
 | `GET` | `/api/tiles/:z/:x/:y` | public | Same-origin OSMF-compliant tile proxy: stable User-Agent, Referer forwarded, server-side caching honouring upstream headers, strict zoom/x/y validation. Provider switchable via `TILE_PROVIDER_URL` / `TILE_PROVIDER_KEY` |
 | `GET` | `/api/locale` | public | Persist the interface locale and deep-link (ADR 0015): `?lang=it&next=/guide` sets the preference cookie server-side and redirects (`302`) to the same-site `next` path (open-redirect-safe), so a shared link SSR-renders in the forced language with no EN→IT flash |
 
-The POST routes are no longer prototype-only: they carry rate limiting, input
+The POST routes are no longer restricted to development: they carry rate limiting, input
 limits, optional authenticated attribution with CSRF protection, and (for
 cameras) the duplicate-confirmation gate described above. The reviewer
 interface is the `/api/moderation` queue gated by coarse roles; the worker
@@ -186,14 +185,15 @@ dashboard.
 ## Tables
 
 The D1 schema is defined in [`db/schema.ts`](../db/schema.ts) and built up by
-migrations [`drizzle/0000`–`0039`](../drizzle). All timestamps are ISO 8601
+migrations [`drizzle/0000`–`0044`](../drizzle). All timestamps are ISO 8601
 text. The core community-data tables are described below; the ADR 0020
 authentication tables (`emailVerificationTokens`, `passkeys`,
 `recoveryCodes`, `webauthnChallenges`, `oidcStates`, `oidcMergeRequests`) and
 the operational logs (`emailSendLog`, `registrationIpLog`,
 `moderationEventsArchive`) live in the same schema and are covered by
-[AUTH_OPTIONS.md](AUTH_OPTIONS.md) and the data dictionary. See the
-[data dictionary](DATA_DICTIONARY.md) for the public projection of `cameras`
+[ADR 0020](decisions/0020-multi-method-authentication.md) and the data
+dictionary. See the [data dictionary](DATA_DICTIONARY.md) for the public
+projection of `cameras`
 and the input contract of the submission routes.
 
 ### `cameras`
@@ -254,7 +254,7 @@ queries go through `db/auth.ts`.
 Coarse role identity (ADR 0014): `email` (unique), `displayName`, `role`
 (`contributor` | `moderator` | `admin`), `active`, `mfaEnabled`, timestamps.
 Gates every protected route via `requireRole`. The six "Demo" rows are
-local-prototype seed (migration `0010`) and are replaced by provisioned
+development seed (migration `0010`) and are replaced by provisioned
 accounts before public alpha. Bridged to `contributors` by email at
 provisioning time (see ADR 0014 integration note).
 

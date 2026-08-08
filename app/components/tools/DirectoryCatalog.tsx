@@ -100,7 +100,7 @@ export function DirectoryCatalog({ filteredRecords, cameraKinds, search, setSear
   // expose it — rendered-html contract) plus the three provenance facts;
   // optional manufacturer/observed-on stay on the detail page. F4 (QA#6):
   // demo records (status "demo") show the localized demo labels instead of
-  // the raw seed markers ("Prototype seed"/"Demo data" — DATA_DICTIONARY).
+  // the raw seed markers ("Development seed"/"Demo data" — DATA_DICTIONARY).
   function mainFacts(camera: Camera) {
     return [
       { label: t.recordId, value: camera.id },

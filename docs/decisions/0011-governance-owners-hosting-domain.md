@@ -8,7 +8,7 @@
   boundary), 0008 (data licence, precision, retention, contact)
 - **Related docs:** GOVERNANCE.md, `docs/roadmap.md` (Wave A item 4),
   `docs/DEPLOYMENT.md` (§ Local LXC deployment), `docs/OPERATIONS.md`,
-  `docs/workstreams/OPS_OPEN.md`, `docs/legal/PRIVACY_NOTICE.md`
+  `docs/legal/PRIVACY_NOTICE.md`
 
 ## Context
 
@@ -20,7 +20,7 @@ Two Wave A requirements still lacked owners and an infrastructure decision:
    initial maintainers and publishing moderation contacts before the project
    claims those structures exist. Until now the roles existed only as generic
    workstream leads.
-2. **Hosting and domain.** The prototype has a dual footprint: the
+2. **Hosting and domain.** The project has a dual footprint: the
    repo-documented Cloudflare Workers/D1 deployment (ADR 0005, a future
    precondition) and the always-on local test site on Proxmox container
    **LXC 114 `osdb-test`** (192.168.1.201:3000, LAN-only, per
@@ -61,12 +61,12 @@ this matter to the project team.
    before the pilot hosts any real data.
 
 3. **Future domain: `opensurveillancedb.org`.** Reserved as the canonical
-   domain for the public launch. It is **not yet acquired, configured, or
-   announced**; before it goes live it must be registered in the name of the
+   domain for the public launch. It is **pending acquisition, configuration,
+   and announcement**; before it goes live it must be registered in the name of the
    project organisation or a documented stewardship entity, with registrar
    multi-factor authentication, automatic renewal on a monitored payment
-   path, DNS change logging, and a fallback contact (OPS_OPEN.md,
-   "Repository, domain, and community operations"). Until then the pilot
+   path, DNS change logging, and a fallback contact (repository, domain, and
+   community operations). Until then the pilot
    remains reachable on the LXC LAN endpoint only.
 
 ## Consequences

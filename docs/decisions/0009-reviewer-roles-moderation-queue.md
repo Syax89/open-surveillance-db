@@ -5,7 +5,7 @@
 - **Author:** Ada (architecture / database)
 - **Updates:** ADR 0003-moderation-access-control (named reviewer attribution and
   append-only audit replace the single generic "Local moderator" actor in the
-  local prototype); ADR 0004-retention-and-review-cycle (queue workflow state is
+  local development deployment); ADR 0004-retention-and-review-cycle (queue workflow state is
   tracked per entity without changing the public status lifecycle).
 - **Implementation note (2026-08-01):** the demo-seed removal required by
   decision 1 is implemented by migration `drizzle/0017_remove_demo_seed.sql`
@@ -16,10 +16,10 @@
 
 ## Context
 
-Wave B (Data & Trust) implements the moderation workflow in
-`docs/workstreams/DATA_TRUST.md`: named reviewer roles with separation of
-duties, a per-entity moderation queue, structured decision reasons, and an
-immutable audit trail. The previous prototype recorded moderation events with a
+Wave B (Data & Trust) implements the moderation workflow with named reviewer
+roles with separation of duties, a per-entity moderation queue, structured
+decision reasons, and an immutable audit trail. The previous implementation
+recorded moderation events with a
 generic "Local moderator" actor and no role enforcement, queue state, recusal,
 escalation, or two-person review — so the data workstream's go/no-go items
 ("the moderation queue supports reason codes, recusal, second review for
@@ -27,7 +27,7 @@ sensitive cases, and emergency hide/removal"; "record, submission, evidence,
 decision, and correction objects are separated with access controls and audit
 logging") were unmet.
 
-Real authentication and MFA are out of scope for the local prototype: this ADR
+Real authentication and MFA are out of scope for the local development deployment: this ADR
 defines the data model and the role→action enforcement so that a future
 auth provider can be attached without a schema change.
 
@@ -37,7 +37,7 @@ auth provider can be attached without a schema change.
    `intake_reviewer`, `record_reviewer`, `senior_moderator`,
    `privacy_safety_lead`, `administrator`. `display_name` is unique; `active`
    and `mfa_enabled` are recorded (MFA is enforced only when real
-   authentication lands). The five `Demo *` rows are the local-prototype seed
+   authentication lands). The five `Demo *` rows are the development seed
    and are removed/replaced before any public-alpha deployment.
 2. **Role→action matrix enforced in the db layer.** `approve` (publishing a
    normal record) is reserved to record reviewers and senior moderators;
@@ -83,7 +83,7 @@ auth provider can be attached without a schema change.
 
 ## Consequences
 
-- Every decision in the local prototype is attributable to a named reviewer
+- Every decision in the local development deployment is attributable to a named reviewer
   with a role captured at write time; the audit trail cannot be rewritten at
   the database layer.
 - The dashboard exposes an explicit actor selector, queue-state badges, and
@@ -92,7 +92,8 @@ auth provider can be attached without a schema change.
 - The queue/role machinery is ready for real authentication: provisioning a
   real reviewer replaces a demo row, and `mfa_enabled` becomes enforced by the
   auth layer without a migration.
-- Trade-off: no authorization is cryptographically enforced in the prototype —
+- Trade-off: no authorization is cryptographically enforced in the local
+  development deployment —
   the API trusts the client-supplied `actorId`. Acceptable for local demo
   mode; the public-alpha auth ticket must make `actorId` server-derived.
   **Closed by ADR 0014 §3 and audit finding t_6b61fc3f:** the acting reviewer

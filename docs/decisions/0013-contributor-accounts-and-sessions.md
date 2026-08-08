@@ -42,7 +42,7 @@ Two questions had to be answered before writing code:
    SHA-256 in `sessions`, so a database leak cannot replay live sessions.
    Sessions expire after 30 days (`AUTH_SESSION_TTL_DAYS`) and are revoked on
    logout. The cookie is `HttpOnly; SameSite=Strict; Path=/`; `Secure` is off
-   by default because the LAN staging prototype runs over plain HTTP, and is
+   by default because the LAN staging deployment runs over plain HTTP, and is
    enabled with `AUTH_COOKIE_SECURE=true` in production (HTTPS precondition).
 
 3. **CSRF = double-submit with per-session token.** Each session generates a

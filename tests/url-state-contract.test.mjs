@@ -307,7 +307,7 @@ test("applyCameraFilters: import-origin filter (?origin=) separates reports from
     makeCamera(1, { title: "Community A", source: "Community report" }),
     makeCamera(2, { title: "Imported Z", source: "import:fixture-zurigo-2026" }),
     makeCamera(3, { title: "Imported O", source: "import:fixture-osm-2026" }),
-    makeCamera(4, { title: "Demo pin", status: "demo", source: "Prototype seed" }),
+    makeCamera(4, { title: "Demo pin", status: "demo", source: "Development seed" }),
   ];
   const base = { q: "", type: "all", freshness: "all", sort: "alphabetical", state: "all", focus: null };
   const reports = applyCameraFilters(records, { ...base, origin: "reports" }, now);
@@ -339,7 +339,7 @@ test("applyCameraFilters P1-2: a real record with a non-parseable updated is KEP
 
 test("applyCameraFilters P1-2: demo pins keep the truthful empty-note contract (excluded when they have no freshness date)", () => {
   const now = Date.parse("2026-08-01T00:00:00Z");
-  // Prototype seed records carry the literal "Demo data" label by design:
+  // Development seed records carry the literal "Demo data" label by design:
   // they are illustrative and must never masquerade as "recently verified"
   // under a freshness window (t_b9666d09). The P1-2 keep-if-no-signal rule
   // applies to REAL records only.

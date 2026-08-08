@@ -24,7 +24,7 @@
 
 | # | Question | Decision |
 | --- | --- | --- |
-| D1 | What status do imported records get? | **`active`**, exactly like community reports, with `last_verified_at = NULL`. No new status, no new badge field: ADR 0021 § 9.1 already renders `last_verified_at IS NULL` as "never confirmed", which is precisely the "imported, not yet community-validated" semantic. |
+| D1 | What status do imported records get? | **`active`**, exactly like community reports, with `last_verified_at = NULL`. No new status, no new badge field: ADR 0021 § 9.1 already renders `last_verified_at IS NULL` as "never confirmed", which is precisely the "imported, awaiting community validation" semantic. |
 | D2 | Provenance convention | `cameras.source = 'import:<batch-slug>'` (e.g. `import:milano-videosorveglianza-2026`), plus a new **`import_batches`** table (one row per import run, UNIQUE slug) and two new `cameras` columns: **`external_id`** (source-native id, for idempotency) and **`import_batch_id`** (FK, for attribution and rollback). |
 | D3 | Duplicate strategy | Reuse `app/lib/duplicate-detection.ts` primitives in an **offline batch** mode against **all non-`demo` records** on **raw** coordinates. < 10 m + same kind → auto-skip; < 10 m + different kind → review; ≤ 75 m + text ≥ 0.6 → auto-skip; ≤ 200 m + text ≥ 0.6 → review; collision with `hidden`/`removed` → review (an import never silently resurrects a community-removed camera). |
 | D4 | Merge | **Disabled in v1** (duplicate → skip + report). Optional "enrich-only" merge (fill NULL fields, never overwrite community data) is designed but behind a per-source flag, with rollback payload capture. |

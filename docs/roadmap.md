@@ -1,92 +1,88 @@
-# Roadmap OpenSurveillanceDB
+# Roadmap
 
-> Documento consolidato (2026-08-08): sostituisce `STATUS.md`, `DEVELOPMENT_PLAN.md`,
-> `EXECUTION_BOARD.md`, `FRONTEND_PLAN.md`, `NEXT_SPRINT.md`, `FUTURE_ROADMAP.md`
-> (archiviati in `~/osdb-archive/docs-plans/` sul disco dell'operatore).
+Documento consolidato (2026-08-08): sostituisce i vecchi piani sprint
+(`STATUS.md`, `DEVELOPMENT_PLAN.md`, `EXECUTION_BOARD.md`, `FRONTEND_PLAN.md`,
+`NEXT_SPRINT.md`, `FUTURE_ROADMAP.md`), archiviati fuori dal repository. Per
+lo stato attuale fanno fede questo documento, il README e i documenti tecnici
+collegati.
 
-## Stato attuale (verificato sul container, 2026-08-08)
+## Current state
 
-**Produzione**: app SSR + map-first, DB D1, worker cache letture pubbliche,
-deploy automatico a ogni merge su `main` (container LXC 192.168.1.201:3000,
-dominio pubblico temporaneo `osdb.syaxhome89.com` dietro CDN).
+**Live service**: SSR web app (React/Vinext on Cloudflare Workers), D1
+database, worker cache for public reads, automatic deploy to the public
+domain on every merge to `main`. The interface is bilingual (EN/IT).
 
-### Funzionalità live
-- **Mappa interattiva** (tile OSM via proxy same-origin, cache ≥7gg, provider
-  configurabile — `docs/OSM_INTEGRATION.md`), directory testuale ricercabile,
-  dettaglio record, filtri sicuri (tipo + freschezza `7d/30d/90d`).
-- **Segnalazioni** anonime o con account: posizione da mappa o coordinate
-  manuali, gate anti-duplicato server-enforced (ADR 0019), metadati opzionali
-  (produttore, data osservazione) con pubblicazione per-campo a default privato.
-- **Correzioni/richieste di revisione** private; **moderazione locale** con
-  motivo obbligatorio, nota revisore opzionale, audit append-only; solo
-  `verified` è pubblico (`pending/rejected/removed` mai).
-- **Account contributore**: email+password (PBKDF2-SHA256), sessioni opache
-  hashed, CSRF same-origin, erasure GDPR art. 17 con de-attribuzione;
-  **login OIDC GitHub e Google** (registrazione sociale = riuso del pannello
-  di login, callback auto-crea account) — ADR 0013/0014/0016/0020.
-- **API pubblica**: `/api/cameras` (JSON/GeoJSON/CSV), search, nearby,
-  revisions (proiezione privacy-safe), export con attribuzione ODbL;
-  `/api-docs` ridisegnata; cache public (fail-open, solo 200, TTL da
-  Cache-Control) — `app/lib/public-cache.ts`.
-- **i18n**: EN pilota + IT type-checked; register social; pagine statiche
-  con pattern `InfoPage`; nessun "contributore" nei bundle (ADR 0007/0021).
-- **Accessibilità**: statement draft, skip link, focus treatment,
-  reduced-motion, Lighthouse a11y ≥ 0.95 in CI.
-- **Import dati**: pipeline `scripts/import/` (adapter per fonte, licence-gate
-  fail-closed, dedup cross-source, idempotenza, attribuzione per batch).
+### Features in production
 
-### Fonti dati (2026-08-08)
-| Fonte | Record | Licenza |
-|---|---|---|
-| OSM Italia (ODbL) | ~7.9k | ODbL 1.0 |
-| OSM Austria / Svizzera / Germania | ~57k potenziali | ODbL 1.0 |
-| Milano varchi (ufficiale) | 213 | CC BY 3.0 IT / IODL 2.0 |
-| Zurigo Videokameras (ufficiale) | 134 | CC0 |
-| Kanton Bern VIDEO (ufficiale, GeoParquet) | 76 | Open use + attribuzione |
-| Amburgo Verkehrskameras (ufficiale, OGC API) | 18 | dl-de-by-2.0 |
-| GPSO Grand Paris (ufficiale) | 446 | Licence Ouverte 2.0 |
-| PVPP Parigi (ufficiale, KML) | 1339 | Licence Ouverte 2.0 |
-| Agen (ufficiale) | 123 | ODbL 1.0 |
-| DGT Spagna NAP (ufficiale, DATEX2) | 1942 | CC-BY |
-| Madrid ZBEDEP+ZBE (ufficiale) | 578 | CC BY 4.0 |
-| Barcelona (ufficiale) | 163 | CC BY 4.0 |
-| Utrecht Cameraregister (ufficiale, XLSX) | 372 | CC0 |
-| Amsterdam VIS (ufficiale, API HAL) | 334 | CC BY 4.0 |
+- **Interactive map** (`/mappa`): OSM tiles via same-origin proxy (cache ≥ 7
+  days, configurable provider), viewport-first rendering with native grid
+  aggregation at national zoom, camera field-of-view cones/circles above zoom
+  16, keyboard-accessible popups with community actions.
+- **Public directory** (`/directory`): search, safe type/freshness filters,
+  A–Z index, CSV/GeoJSON exports, `?page=` pagination — the text equivalent
+  of the map.
+- **Reports** (`/segnala`): position from map click or manual coordinates,
+  reverse-geocode address prefill, optional manufacturer/observation-date
+  metadata, server-enforced duplicate gate (ADR 0019), immediate publication
+  from verified accounts (ADR 0021).
+- **Corrections / takedown requests** (`/correggi`): private, human-reviewed
+  channel (ADR 0021 §6.2).
+- **Community system** (ADR 0021): community actions (useful / confirm / no
+  longer there / problem / privacy) with trust-weighted automatic state
+  transitions, public unattributed per-record timeline, banner direct-link
+  contract for withdrawn records.
+- **Accounts**: email+password with verification (PBKDF2-SHA256, opaque
+  hashed sessions, CSRF), passkeys (WebAuthn), GitHub/Google OIDC
+  (server-gated), GDPR erasure with de-attribution — ADR 0013/0014/0016/0020.
+- **Public API**: `/api/cameras` (JSON/GeoJSON/CSV), search, nearby, actions,
+  events, tiles and geocode proxies; built-in `/api-docs` page; fail-open
+  worker cache (`X-OSDB-Cache`) — `app/lib/public-cache.ts`.
+- **Import pipeline**: `scripts/import/` (per-source adapters, fail-closed
+  licence gate, cross-source dedup, idempotency, per-batch attribution on
+  `/fonti`).
+- **i18n**: EN pilot + IT type-checked parity (ADR 0007).
+- **Accessibility**: WCAG 2.2 AA target, axe-core on every SSR route in CI,
+  Lighthouse gate ≥ 0.95 ([docs/ACCESSIBILITY_STATEMENT.md](ACCESSIBILITY_STATEMENT.md)).
 
-Registro completo con attribuzione: `docs/data-sources/README.md` +
-descriptor JSON in `docs/data-sources/imports/`.
+### Public data
 
-## Direzione
+The database holds community reports plus imports from official open-data
+sources: OpenStreetMap coverage (IT/AT/CH/DE), Milan, Zürich, Kanton Bern,
+Hamburg, Paris region (GPSO, PVPP, Agen), Spain (DGT, Madrid, Barcelona), the
+Netherlands (Utrecht, Amsterdam), UK (Plymouth, TfL), Ukraine, Luxembourg,
+Finland, Norway, Canada (BC, Québec) and the United States (PA, MD, Baltimore,
+NY Thruway, Denver, DC, CA, SF, MN, New Orleans, Boulder, Rochester). The full
+registry with licences is in
+[docs/data-sources/README.md](data-sources/README.md); committed batches and
+record counts are shown live on `/fonti`.
+
+## Direction
 
 ```text
-Qualità dati e moderazione affidabile
-  → esperienza pubblica accessibile
-  → operazioni riproducibili
-  → decisioni pilota e garanzie
-  → alpha pubblica limitata
-  → programma multi-città open-data
-  → app Android
+Data quality and reliable moderation
+  → accessible public experience
+  → reproducible operations
+  → pilot decisions and guarantees
+  → limited public alpha
+  → multi-city open-data programme
 ```
 
-Il progetto non scambia qualità di revisione, privacy o apertura per velocità.
+The project does not trade review quality, privacy or openness for speed.
 
-## Prossimi passi (priorità)
+## Next steps (priority)
 
-1. **HTTPS pubblico stabile**: fix reverse proxy NPM (LXC 103,
-   192.168.1.216:81) — serve `proxy_pass` su tutti i path, mai root statica
-   per `/node_modules/`; poi valutare DNS-only su Cloudflare. PR #350
-   (no-store + dedupe) già mergiata.
-2. **Import stato-per-stato**: lanciare gli import OSM AT/CH/DE + fonti
-   ufficiali Berna/Amburgo/FR/ES/NL (pipeline pronta, CLI da documentare).
-3. **P0 audit backend/SRE** (7 punti) → poi Cloudflare pubblico
-   (`opensurveillancedb.org`).
-4. **OG-image** col logo aggiornato + sezione "Quick start" curl nel README.
-5. **Programma multi-città**: scan altri stati (UK, PT, BE, nord-Europa…),
-   geocodifica Parigi BO 2019, chiarire licenza Eindhoven.
+1. **Final domain launch**: cut over from the temporary domain to
+   `opensurveillancedb.org` (deployment variable, no code change — see
+   `docs/DEPLOYMENT.md`), with the remaining operational hardening.
+2. **Multi-country programme**: continue the open-data scan (UK, PT, BE,
+   northern Europe), clarify remaining licence cases, and grow the import
+   pipeline.
+3. **OG image** with the current logo and a "Quick start" curl block in the
+   README.
 
-## Archivi storici
+## Historical archives
 
-I documenti di piano/sprint/review/QA sostituiti vivono in
-`~/osdb-archive/` (fuori dal repo): `docs-plans/`, `qa-reports/`,
-`screenshots/`. I riferimenti nei vecchi report possono puntare a file non
-più tracciati; il README e i documenti legali sono la fonte corrente.
+Superseded plan/sprint/review documents live outside the repository (operator
+archive). References in old reports may point to files that are no longer
+tracked; the README, this document and the linked technical documents are the
+current source of truth.
