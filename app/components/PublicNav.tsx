@@ -8,10 +8,10 @@ import { AuthNavLinks } from "./AuthNavLinks";
 /**
  * PublicNav — the shared header for every public page.
  *
- * The header focuses on the three primary actions: Explore map /mappa,
- * Browse records /directory and Add a camera /segnala. Institutional pages
- * remain in the footer, preventing the header from competing with the main
- * task.
+ * The header focuses on the primary actions: Explore map /mappa, Browse
+ * records /directory, Add a camera /segnala and Support /contribuisci.
+ * Institutional pages remain in the footer, preventing the header from
+ * competing with the main task.
  *
  * This component is the single header for ALL public pages: brand + mobile
  * menu + the shared primary links (PublicNavLinks, active page marked

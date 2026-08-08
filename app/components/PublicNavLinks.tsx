@@ -15,9 +15,10 @@ const homeByLocale: Record<Locale, Translation<typeof homeEn>> = {
  * PublicNavLinks — the ONE public navigation set (header nav, task
  * t_a72a3106).
  *
- * The header is deliberately limited to the three primary user tasks:
- * explore the map, browse the directory and report a camera. Guide, rules
- * and manifesto remain discoverable from the global footer, where they do
+ * The header is deliberately limited to the primary user tasks: explore
+ * the map, browse the directory, report a camera and support the project
+ * (/contribuisci — CEO 2026-08-08, task t_c9c200a8). Guide, rules and
+ * manifesto remain discoverable from the global footer, where they do
  * not compete with those actions. The same compact set appears on every
  * public page, marking the current page with aria-current="page".
  *
@@ -34,6 +35,7 @@ export function PublicNavLinks() {
     { href: "/mappa", label: t.exploreMap },
     { href: "/directory", label: t.browseRecords },
     { href: "/segnala", label: t.addCamera, action: true },
+    { href: "/contribuisci", label: t.contribuisci },
   ];
 
   return (

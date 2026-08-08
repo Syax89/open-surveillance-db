@@ -315,7 +315,7 @@ test("auth pages render the primary public nav (three links + mobile menu), not 
   // present, the bare backHome header is gone (its auth i18n key was
   // removed), and the EN/IT locale toggle stays in the header.
   const AUTH_ROUTES = ["/login", "/register", "/forgot-password", "/reset-password", "/verify-email", "/account"];
-  const PUBLIC_LINKS = ["/mappa", "/directory", "/segnala"];
+  const PUBLIC_LINKS = ["/mappa", "/directory", "/segnala", "/contribuisci"];
   for (const route of AUTH_ROUTES) {
     const { response, html } = await renderRoute(route);
     assert.equal(response.status, 200, `${route} must render 200`);

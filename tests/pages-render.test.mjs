@@ -33,6 +33,7 @@ const PAGES = [
   { route: "/segnala", source: "app/(tools)/segnala/page.tsx", relative: "app/(tools)/segnala/page.mjs", layout: "tools" },
   { route: "/correggi", source: "app/(tools)/correggi/page.tsx", relative: "app/(tools)/correggi/page.mjs", layout: "tools" },
   { route: "/guide", source: "app/guide/page.tsx", relative: "app/guide/page.mjs" },
+  { route: "/contribuisci", source: "app/contribuisci/page.tsx", relative: "app/contribuisci/page.mjs" },
   { route: "/login", source: "app/login/page.tsx", relative: "app/login/page.mjs" },
   { route: "/register", source: "app/register/page.tsx", relative: "app/register/page.mjs" },
   { route: "/verify-email", source: "app/verify-email/page.tsx", relative: "app/verify-email/page.mjs" },
@@ -63,6 +64,8 @@ const KNOWN_ROUTES = new Set([
   "/manifesto", "/regole", "/faq", "/contatti", "/fonti", "/privacy", "/termini", "/licenze", "/accessibility",
   // Route tool separate (F1 route group (tools), t_03c0fa15).
   "/mappa", "/directory", "/segnala", "/correggi",
+  // 4° voce nav pubblica (t_c9c200a8): support/contribute page.
+  "/contribuisci",
   // Auth UX (P1-1/P1-3 Vera design): verification landing, forgot-password
   // and reset-password pages linked from /login and the emailed links.
   "/verify-email", "/forgot-password", "/reset-password",
@@ -334,7 +337,7 @@ test("auth pages render the primary public nav (three links + mobile menu), not 
   // future change cannot silently regress the auth header to the bare
   // backHome variant (same pattern as the tool-nav contract test).
   const AUTH_ROUTES = ["/login", "/register", "/forgot-password", "/reset-password", "/verify-email", "/account"];
-  const PUBLIC_LINKS = ["/mappa", "/directory", "/segnala"];
+  const PUBLIC_LINKS = ["/mappa", "/directory", "/segnala", "/contribuisci"];
   const tree = await getTree();
   const LocaleProvider = await loadLocaleProvider(tree);
   for (const route of AUTH_ROUTES) {

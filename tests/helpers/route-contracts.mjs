@@ -271,6 +271,18 @@ export function registeredRoutes() {
       },
       note: "F-legal G2: pagina pubblica della dichiarazione",
     },
+    {
+      route: "/contribuisci",
+      name: "support / contribute page",
+      source: "app/contribuisci/page.tsx",
+      artifacts: {
+        ssr: "pages-render.test.mjs",
+        interaction: "client-locale-toggle.test.mjs",
+        i18n: "i18n-pages.test.mjs",
+        a11y: "axe-audit.test.mjs",
+      },
+      note: "statica: due CTA esterne (Buy Me a Coffee + GitHub), 4° voce nav pubblica (t_c9c200a8)",
+    },
   ];
 }
 

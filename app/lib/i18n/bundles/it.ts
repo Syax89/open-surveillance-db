@@ -27,6 +27,7 @@ import { it as authIt } from "../auth";
 import { it as communityIt } from "../community";
 import { it as errorsIt } from "../errors";
 import { it as footerIt } from "../footer";
+import { it as contribuisciIt } from "../contribuisci";
 
 export const it: Translation<typeof import("./en").en> = {
   common: commonIt,
@@ -50,4 +51,5 @@ export const it: Translation<typeof import("./en").en> = {
   community: communityIt,
   errors: errorsIt,
   footer: footerIt,
+  contribuisci: contribuisciIt,
 };

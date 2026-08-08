@@ -29,6 +29,7 @@ import { en as authEn } from "../auth";
 import { en as communityEn } from "../community";
 import { en as errorsEn } from "../errors";
 import { en as footerEn } from "../footer";
+import { en as contribuisciEn } from "../contribuisci";
 
 export const en = {
   common: commonEn,
@@ -52,4 +53,5 @@ export const en = {
   community: communityEn,
   errors: errorsEn,
   footer: footerEn,
+  contribuisci: contribuisciEn,
 } as const;

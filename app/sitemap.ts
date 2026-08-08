@@ -40,6 +40,7 @@ const STATIC_ROUTES = [
   "/moderazione",
   "/accessibility",
   "/api-docs",
+  "/contribuisci",
 ];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {

@@ -32,6 +32,7 @@ export const en = {
   rules: "Rules",
   manifesto: "Manifesto",
   addCamera: "Add a camera",
+  contribuisci: "Contribute",
   openDatabase: "Open database · community-maintained",
   heroTitle: "Public data about public surveillance.",
   heroIntro:
@@ -95,6 +96,7 @@ export const it: Translation<typeof en> = {
   rules: "Regole",
   manifesto: "Manifesto",
   addCamera: "Aggiungi una telecamera",
+  contribuisci: "Contribuisci",
   openDatabase: "Database aperto · mantenuto dalla comunità",
   heroTitle: "Dati pubblici sulla sorveglianza pubblica.",
   heroIntro:
