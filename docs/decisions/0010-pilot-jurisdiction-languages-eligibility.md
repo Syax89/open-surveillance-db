@@ -7,11 +7,11 @@
 - **Related ADRs:** 0001 (public data boundary), 0002 (legal pre-launch
   deliverables), 0004 (retention schedule), 0005 (processors and data residency)
 - **Related docs:** README, `docs/PRIVACY_AND_SAFETY.md`,
-  `docs/workstreams/DATA_TRUST.md`, `docs/EXECUTION_BOARD.md` (Wave A items 1–2)
+  `docs/workstreams/DATA_TRUST.md`, `docs/roadmap.md` (Wave A items 1–2)
 
 ## Context
 
-`docs/EXECUTION_BOARD.md` (Wave A) requires, before any public alpha, two
+`docs/roadmap.md` (Wave A) requires, before any public alpha, two
 decisions that define the pilot boundary:
 
 1. select one pilot jurisdiction and working languages;

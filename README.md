@@ -2,7 +2,11 @@
 
 An open, non-commercial civic database for documenting **visible public surveillance infrastructure**. The project helps people understand where cameras are installed in shared spaces; it does not provide video feeds, tracking tools, or advice on avoiding lawful surveillance.
 
-> Current state: local project deployment. The map uses OpenStreetMap and shows only clearly labelled illustrative records; contributor accounts, moderation, roles, and appeals run locally, but the service is not yet a public registry.
+> Current state: deployed and publicly reachable (temporary domain behind a
+> CDN) with moderated community data, official open-data imports from 8+
+> European public sources, and a staging-grade stack. The map uses
+> OpenStreetMap; a full public launch on the project domain with final
+> legal review is still pending (see [docs/roadmap.md](docs/roadmap.md)).
 
 ## Principles
 
@@ -16,7 +20,14 @@ An open, non-commercial civic database for documenting **visible public surveill
 
 - Interactive OpenStreetMap-based map.
 - Searchable, map-equivalent public record directory and individual record pages.
-- Public API endpoint for reviewed records and GeoJSON export.
+- Public API for reviewed records and GeoJSON export, plus `/api/cameras`
+  search, nearby and revision endpoints, a redesigned `/api-docs` page, and a
+  fail-open public cache layer (`X-OSDB-Cache`) for map reads (PR #343).
+- Import pipeline for official open-data sources (`scripts/import/`):
+  adapter per source, fail-closed licence gate, cross-source dedup,
+  idempotency, and per-batch attribution — see
+  [docs/data-sources/README.md](docs/data-sources/README.md) and the
+  [import README](scripts/import/README.md).
 - CSV and GeoJSON exports derived from the same reviewed public record list.
 - Locality/address/coordinate public search (`/api/cameras/search`) with truthful
   empty states: coordinate pairs are parsed locally, other places are resolved
@@ -33,9 +44,12 @@ An open, non-commercial civic database for documenting **visible public surveill
 - Report-location selection by map click or valid manual coordinates, using the
   same non-blocking nearby-record check in either case.
 - Private correction/request-for-review form that creates a non-public moderation request.
-- Contributor accounts: email+password registration with email verification, login/logout, and an
-  account page listing the contributor's own submissions, with PBKDF2-SHA256
-  password hashing, hashed opaque session cookies, and CSRF protection.
+- Contributor accounts: email+password registration with email verification,
+  login/logout, and an account page listing the contributor's own submissions,
+  with PBKDF2-SHA256 password hashing, hashed opaque session cookies, and CSRF
+  protection. Social sign-in via OIDC (GitHub and Google) uses the same
+  panel and callback flow as login — the callback auto-creates the account
+  (ADR 0020).
   A verified contributor account is required to submit reports or corrections
   (ADR 0020); browsing the public data never requires an account.
 - Self-service account erasure with de-attribution (GDPR art. 17): deleting an
@@ -92,11 +106,7 @@ moderation staffing, and operational safeguards.
 
 The documentation is part of the project and is intended to be discussed openly.
 
-- [Development plan](docs/DEVELOPMENT_PLAN.md)
-- [Execution board and workstream ownership](docs/EXECUTION_BOARD.md)
-- [Sprint archive: reliable moderation loop (completed)](docs/NEXT_SPRINT.md)
-- [Future roadmap](docs/FUTURE_ROADMAP.md)
-- [Current status](docs/STATUS.md)
+- [Roadmap and current status](docs/roadmap.md)
 - [Site map and information architecture](docs/SITEMAP.md)
 - [Clean local setup and schema migrations](docs/DEVELOPMENT_SETUP.md)
 - [Local playbook and acceptance checks](docs/LOCAL_PLAYBOOK.md)
@@ -115,7 +125,7 @@ The documentation is part of the project and is intended to be discussed openly.
 - [Deployment and operations](docs/DEPLOYMENT.md)
 - [Operations manual](docs/OPERATIONS.md)
 - [Local release checklist](docs/RELEASE_CHECKLIST.md)
-- [Decision records (ADR 0001–0019)](docs/decisions/)
+- [Decision records (ADR 0001–0021)](docs/decisions/)
 - [Changelog](CHANGELOG.md)
 - [Governance](GOVERNANCE.md)
 

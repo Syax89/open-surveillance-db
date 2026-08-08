@@ -6,7 +6,7 @@
 - **Decision owner:** CEO
 - **Related ADRs:** 0005 (processors and data residency), 0010 (pilot
   boundary), 0008 (data licence, precision, retention, contact)
-- **Related docs:** GOVERNANCE.md, `docs/EXECUTION_BOARD.md` (Wave A item 4),
+- **Related docs:** GOVERNANCE.md, `docs/roadmap.md` (Wave A item 4),
   `docs/DEPLOYMENT.md` (§ Local LXC deployment), `docs/OPERATIONS.md`,
   `docs/workstreams/OPS_OPEN.md`, `docs/legal/PRIVACY_NOTICE.md`
 
@@ -14,7 +14,7 @@
 
 Two Wave A requirements still lacked owners and an infrastructure decision:
 
-1. **Named owners.** `docs/EXECUTION_BOARD.md` requires that "each
+1. **Named owners.** `docs/roadmap.md` requires that "each
    responsibility must have a named, reachable owner before it becomes a
    production dependency", and GOVERNANCE.md ("Before launch") requires naming
    initial maintainers and publishing moderation contacts before the project

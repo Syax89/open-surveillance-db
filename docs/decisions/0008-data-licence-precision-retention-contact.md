@@ -9,11 +9,11 @@
 - **Related docs:** README, `docs/OPEN_SOURCE.md`, `docs/DATA_MODEL.md`,
   `docs/legal/PRIVACY_NOTICE.md`, `docs/legal/RETENTION_SCHEDULE.md`,
   `docs/legal/REVIEW_POLICY_LEGALE_2026-07-31.md` (findings O1, O2, O4),
-  `docs/EXECUTION_BOARD.md` (Wave A item 3)
+  `docs/roadmap.md` (Wave A item 3)
 
 ## Context
 
-`docs/EXECUTION_BOARD.md` (Wave A, item 3) requires, before any public alpha:
+`docs/roadmap.md` (Wave A, item 3) requires, before any public alpha:
 choose the data licence, the publication precision, the retention approach,
 and the correction/removal contact. Without them the Wave A gate — "there is
 no ambiguity about what data may enter the pilot" — cannot be met.

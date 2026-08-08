@@ -3,7 +3,7 @@
 Status: current for main (2026-08-01). This document describes
 every public field exposed by the prototype so that a contributor can
 understand the public dataset from documentation alone (Horizon 3 exit gate in
-[FUTURE_ROADMAP.md](FUTURE_ROADMAP.md)). It is a *lightweight* companion to the
+[roadmap.md](roadmap.md)). It is a *lightweight* companion to the
 [data model and API reference](DATA_MODEL.md): it does not replace that
 document, it spells out each field, its allowed values, and its visibility
 rules per output format.

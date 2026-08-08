@@ -17,12 +17,12 @@
   one, with one line on how)*
 - **Related ADRs:** NNNN (<short label>), NNNN (<short label>) *(optional)*
 - **Related docs:** <path>, <path> *(optional — README, docs/…, GOVERNANCE.md,
-  EXECUTION_BOARD.md items, legal drafts, …)*
+  roadmap.md items, legal drafts, …)*
 
 ## Context
 
 Why is this decision needed now? What problem, gap, or review finding does it
-address? Reference the driving documents (execution board items, STATUS.md
+address? Reference the driving documents (roadmap items, status
 gaps, legal review findings) and the constraints considered. This section
 should give a reader outside the discussion enough to understand the decision
 without digging through chat history.

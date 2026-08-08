@@ -9,7 +9,7 @@
 
 ## Context
 
-STATUS.md gap #1 (and EXECUTION_BOARD Wave B "Authentication/roles") asks for
+roadmap.md (and the roadmap Wave B "Authentication/roles") asks for
 contributor accounts so that people who submit camera reports can be
 identified. The project's privacy posture ("privacy and safety by design",
 ADR 0002/0008) requires that any identity mechanism be *minimising*: no

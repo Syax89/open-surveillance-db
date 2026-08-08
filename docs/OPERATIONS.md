@@ -1,7 +1,7 @@
 # Operations manual — OpenSurveillanceDB
 
 Status: operational draft for production rollout.
-References: `docs/DEPLOYMENT.md` (preconditions and release procedures), `docs/STATUS.md`.
+References: `docs/DEPLOYMENT.md` (preconditions and release procedures), `docs/roadmap.md`.
 Last procedure verification: 2026-08-01 (Ken, CI/CD) — including the local
 LXC 114 operations drill (section 8 and appendix).
 
