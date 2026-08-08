@@ -1010,3 +1010,22 @@ test("ukraine: parses CSV rows (lat/lon) into canonical staged rows", () => {
   assert.equal(staged[0].external_id, "ua-camera:UA-01");
   assert.equal(skipped.total, 1);
 });
+
+// -------------------------------------------------- wave 9 (nuovi paesi): Australia NSW
+
+import { parsePayload as nswParse } from "../scripts/import/adapters/australia-nsw-speed-cameras-2026.mjs";
+
+test("nsw: parses fixed + red-light CSV rows into canonical staged rows", () => {
+  const { staged, skipped } = nswParse({
+    data: [
+      { __src: "fixed", text: "SZ?,SUBURB/TOWN,ROAD/S,Cameras,Lat(1),Long(1),Lat(2),Long(2)\nY,Ashfield,\"Hume Highway, between Murrell Street and Queen Street (school zone)\",1,-33.89017676,151.1279851,,\nN,,bad,1,999,999,,\n" },
+      { __src: "redlight", text: "SZ?,SUBURB/TOWN,ROAD/S,Cameras,Lat(1),Long(1),Lat(2),Long(2),Lat(3),Long(3),\nN,Kotara / Adamstown,Park Avenue and Northcott Drive,1,-32.940335,151.712118,,,,,\n" },
+    ],
+  });
+  assert.equal(staged.length, 2);
+  assert.equal(staged[0].title, "Hume Highway, between Murrell Street and Queen Street (school zone)");
+  assert.equal(staged[0].kind, "Traffic / licence plate reader");
+  assert.equal(staged[0].external_id, "nsw-cam:fixed:0");
+  assert.equal(staged[1].external_id, "nsw-cam:redlight:1");
+  assert.equal(skipped.total, 1);
+});
