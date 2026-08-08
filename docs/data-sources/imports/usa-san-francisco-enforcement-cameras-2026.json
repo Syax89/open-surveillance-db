@@ -1,0 +1,11 @@
+{
+    "slug": "usa-san-francisco-enforcement-cameras-2026",
+    "source_name": "City of San Francisco — Red Light & Speed Camera Citations (SFMTA)",
+    "format": "socrata",
+    "license": "PDDL",
+    "license_url": "https://opendatacommons.org/licenses/pddl/1-0/",
+    "attribution_text": "Fonte: City of San Francisco, SFMTA open data — Red Light Camera Citations e Automated Speed Enforcement Citations (https://data.sfgov.org), concesso con licenza PDDL (Open Data Commons Public Domain Dedication).",
+    "source_url": "https://data.sfgov.org/resource/uzmr-g2uc.json",
+    "max_records": 150,
+    "notes": "Scan catalog.csv (CEO 2026-08-08): 13 red-light (site_ids unici da 646 citation rows) + 56 speed enforcement locations (site_ids unici da 17.532 rows). Socrata API con $group=site_id. Licenza PDDL (public domain) — aggiunta al gate. external_id sf-redlight:<site> / sf-speed:<site_id>."
+}

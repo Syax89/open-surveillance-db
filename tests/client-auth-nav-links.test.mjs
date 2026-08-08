@@ -211,7 +211,7 @@ test("PublicNav: auth links live INSIDE the mobile menu (#main-links), after the
   const navLinks = [...container.querySelectorAll(".nav-links a")].map((a) => a.getAttribute("href"));
   assert.deepEqual(
     navLinks,
-    ["/mappa", "/directory", "/segnala", "/login", "/register"],
+    ["/mappa", "/directory", "/segnala", "/contribuisci", "/login", "/register"],
     "the primary public nav links must stay unchanged, with the auth links appended inside the menu container",
   );
 

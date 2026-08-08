@@ -24,7 +24,7 @@ This folder is the **single canonical location** for the legal deliverables
 | [RETENTION_SCHEDULE.md](RETENTION_SCHEDULE.md) | In force (implemented) | Storage limitation, deletion terms per data category, operational logs, legal hold, deletion definition | P1 |
 | [PRIVACY_NOTICE.md](PRIVACY_NOTICE.md) | In force | Art. 13/14 information, rights (12–22), negative scope, contact, response times | P6 |
 | [LAWFUL_BASIS.md](LAWFUL_BASIS.md) | In force | Art. 6 bases per processing category, balancing test, 6(1)(e) for official sources | P3 |
-| [PROCESSOR_REGISTER.md](PROCESSOR_REGISTER.md) | In force | Art. 30 register: Cloudflare, OpenAI auth, OSM; DPA version, SCC, EU–US DPF | P5, M4 |
+| [PROCESSOR_REGISTER.md](PROCESSOR_REGISTER.md) | In force | Art. 30 register: Cloudflare, GitHub/Google OIDC (PR5/PR6), OSM; DPA version, SCC, EU–US DPF | P5, M4 |
 | [BREACH_PROCEDURE.md](BREACH_PROCEDURE.md) | In force | Art. 33/34 notification procedure, scenario table | P2 |
 | [MODERATION_SLA.md](MODERATION_SLA.md) | In force (implemented) | Response targets, appeals, audit log, moderator privacy | M1–M4 |
 | [DPO_EXCLUSION.md](DPO_EXCLUSION.md) | In force | GDPR art. 37 assessment: no mandatory DPO (art. 37(1) N/A), voluntary DPO declined (art. 37(4)), accountability (arts. 5(2), 24), review triggers | P6, gap 7 |

@@ -98,10 +98,10 @@ const fakeNavLabels = {
   homeAria: "Fixture home",
 };
 
-// The shared public nav (PublicNavLinks) renders the same three primary
+// The shared public nav (PublicNavLinks) renders the same four primary
 // home links on every public page, in this order, with the current page
 // marked aria-current="page".
-const PUBLIC_NAV_HREFS = ["/mappa", "/directory", "/segnala"];
+const PUBLIC_NAV_HREFS = ["/mappa", "/directory", "/segnala", "/contribuisci"];
 
 // Contract guard: if a future refactor adds/renames a navLabels key, the
 // render below fails with a descriptive message instead of a cryptic

@@ -152,7 +152,7 @@ test("ToolLayout renders the shared primary public nav with the current page mar
     const hrefs = links.map((a) => a.getAttribute("href"));
     assert.deepEqual(
       hrefs,
-      ["/mappa", "/directory", "/segnala"],
+      ["/mappa", "/directory", "/segnala", "/contribuisci"],
       `nav on ${pathname} must be the shared primary public set`,
     );
     const current = links.filter((a) => a.getAttribute("aria-current") === "page").map((a) => a.getAttribute("href"));
@@ -182,7 +182,7 @@ test("ToolLayout renders the shared public nav on unknown paths too (no per-page
   const links = Array.from(main.querySelectorAll(".nav-links a")).map((a) => a.getAttribute("href"));
   assert.deepEqual(
     links,
-    ["/mappa", "/directory", "/segnala"],
+    ["/mappa", "/directory", "/segnala", "/contribuisci"],
     "the shared primary nav must render on unknown paths (no dead ends between tools)",
   );
 });

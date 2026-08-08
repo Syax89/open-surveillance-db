@@ -89,6 +89,17 @@ const COMPASS = {
   nnw: 337.5, "nord-nord-ovest": 337.5, "north-north-west": 337.5,
 };
 
+/**
+ * Web Mercator (EPSG:3857) → WGS84. ArcGIS FeatureServers in Web Mercator
+ * (wkid 102100/3857) espongono x/y in metri; la conversione è analitica
+ * (sferica). Sanity: Washington DC x=-8569260 → -76.99, y=4706276 → 38.89.
+ */
+export function webMercatorToWgs84(x, y) {
+  const lon = (x / 20037508.34) * 180;
+  const lat = (Math.atan(Math.exp((y / 20037508.34) * Math.PI)) * 2 - Math.PI / 2) * (180 / Math.PI);
+  return [Number(lat.toFixed(6)), Number(lon.toFixed(6))];
+}
+
 export function parseDirection(value) {
   if (value === null || value === undefined) return null;
   const text = String(value).trim().toLocaleLowerCase();
