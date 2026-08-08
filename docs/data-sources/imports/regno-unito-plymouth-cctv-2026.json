@@ -1,0 +1,11 @@
+{
+    "slug": "regno-unito-plymouth-cctv-2026",
+    "source_name": "Plymouth City Council — CCTV Traffic Cameras",
+    "format": "csv",
+    "license": "OGL 3.0",
+    "license_url": "https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/",
+    "attribution_text": "Fonte: Plymouth City Council, CCTV locations (https://plymouth.thedata.place/dataset/cctv-locations-in-plymouth), concesso con licenza Open Government Licence v3.0.",
+    "source_url": "https://plymouth.thedata.place/dataset/603331e3-5505-44c1-adf4-8278c02535d6/resource/4984b27f-ae96-4c7b-9102-17434408a1b3/download/traffic-cameras.csv",
+    "max_records": 100,
+    "notes": "Scan catalog.csv + verifica diretta (CEO 2026-08-08): 44 telecamere traffico Plymouth (CSV con x/y già WGS84, fid/Camera Num/Camera Loc; count 44 verificato). Licenza OGL 3.0 (data.gov.uk). external_id plymouth-cctv:<fid>."
+}
