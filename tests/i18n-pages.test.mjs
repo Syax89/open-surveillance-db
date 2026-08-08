@@ -168,6 +168,15 @@ const INFO_ROUTES = {
     en: ["Public API", "60 requests / minute", "CSV / GeoJSON exports", "Map tiles", "Read-only by design"],
     noEn: ["Public API", "60 requests / minute", "CSV / GeoJSON exports", "Map tiles", "Read-only by design"],
   },
+  // Support/contribute page (CEO 2026-08-08, t_c9c200a8): the two external
+  // CTA cards are language-neutral brand names (Buy Me a Coffee / GitHub),
+  // so the parity markers are the surrounding copy — IT must never fall
+  // back to the English article copy.
+  "/contribuisci": {
+    it: ["Sostieni il progetto", "Mantieni aperto il database.", "Due modi per aiutare", "Offri un caffè", "Vai al repository", "non vende dati"],
+    en: ["Support the project", "Keep the database open.", "Two ways to help", "Buy a coffee", "View the repository", "never sells data"],
+    noEn: ["Keep the database open.", "Two ways to help", "Buy a coffee", "View the repository", "never sells data"],
+  },
   // Private auth surface (C5): /account SSRs the client shell in the cookie
   // language — the h1 and the loading note are the parity markers (the
   // data-driven profile renders client-side only, never in SSR).

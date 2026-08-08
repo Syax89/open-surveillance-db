@@ -700,7 +700,7 @@ test("tool nav: the shared public nav marks the current page with aria-current (
 
   const links = () => [...container.querySelectorAll(".nav-links a")];
   const currentHrefs = () => links().filter((a) => a.getAttribute("aria-current") === "page").map((a) => a.getAttribute("href"));
-  assert.equal(links().length, 3, "the shared public nav must render the three primary links");
+  assert.equal(links().length, 4, "the shared public nav must render the four primary links");
   assert.deepEqual(currentHrefs(), ["/mappa"], "the current page /mappa must be marked aria-current in the header nav");
 
   // Same contract on /directory: the header marks the current page.
