@@ -1046,18 +1046,18 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 .auth-danger-zone .button:hover { background:var(--danger-bg); border-color:var(--danger-button-hover-border); }
 .auth-danger-zone .button:disabled { opacity:.55; cursor:progress; }
 
-/* Multi-method auth (Fase E2 — Vera design): method selector on /login,
-   passkey management + recovery codes on /account. The selector is a
-   native radio group (keyboard-arrow navigation for free); the selected
-   chip inverts to the focus green with the focus ring on :focus-visible
-   of the (visually hidden but focusable) radio input. */
-.auth-methods { display:flex; gap:var(--space-2); flex-wrap:wrap; margin:26px 0 6px; }
-.auth-method-option { position:relative; }
-.auth-method-option input { position:absolute; inset:0; margin:0; opacity:0; cursor:pointer; }
-.auth-method-option label { display:inline-flex; align-items:center; min-height:44px; padding:10px 16px; border:1px solid var(--control-border); border-radius:var(--radius-lg); background:var(--white); color:var(--outline-ink); font-size:var(--text-base); font-weight:800; line-height:1.2; cursor:pointer; }
-.auth-method-option input:checked + label { border-color:var(--focus); background:var(--selected-bg); color:var(--selected-ink); }
-.auth-method-option input:focus-visible + label { outline:3px solid var(--focus); outline-offset:2px; }
-.auth-method-option input:hover:not(:checked) + label { border-color:var(--control-focus); }
+/* Multi-method auth (Fase E2 — Vera design; CEO 2026-08-08): the three
+   sign-in blocks on /login are ALL visible at once, stacked in the order
+   passkey → email + password → social. Each block is a coherent-box card
+   (white bg + scoped darker border + soft shadow, same family as the
+   record-list cards — the accepted #269 pattern); passkey management +
+   recovery codes on /account keep the hint style below. */
+.auth-methods { display:grid; gap:18px; margin:26px 0 6px; }
+.auth-method-card { padding:24px 26px 26px; border:1px solid var(--card-border); border-radius:var(--radius-lg); background:var(--white); box-shadow:0 1px 2px rgba(16,35,50,.05), 0 6px 16px rgba(16,35,50,.06); }
+.auth-method-card h2 { margin:0 0 4px; color:var(--ink); font-size:var(--text-3xl); letter-spacing:-.035em; line-height:1.15; font-weight:800; }
+.auth-method-card .auth-form { margin:18px 0 0; }
+.auth-method-card .oidc-panel { margin:18px 0 0; }
+.auth-method-card .record-detail-summary { margin:12px 0; color:var(--muted); font-size:var(--text-md); line-height:1.5; }
 .auth-method-hint { margin:0; color:var(--muted); font-size:var(--text-sm); line-height:1.5; }
 .oidc-panel { margin:30px 0 8px; }
 .oidc-buttons { display:grid; gap:10px; }
