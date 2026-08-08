@@ -40,7 +40,7 @@ Nota di processo: l'ambiente non espone reasonix multi-model; le quattro
 proposte sono state eseguite come **richieste separate** (un agente per
 proposta) sul runtime disponibile, con persona di design esplicita nel brief.
 I file originali restano nel workspace della task
-(`~/.hermes/kanban/boards/osdb/workspaces/t_127492f1/proposals/`).
+(fuori dal repo).
 
 ## 3. Sintesi delle proposte
 

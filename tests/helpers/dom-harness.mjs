@@ -550,7 +550,7 @@ export const DomEvent = {
   // After a successful login/register the auth pages call hardNavigate()
   // — a full reload beats router.push + refresh on vinext dev, where the
   // RSC request fires but the UI stays frozen (reproduced live on
-  // osdb.syaxhome89.com). jsdom cannot navigate, so the stub records the
+  // the pre-prod domain). jsdom cannot navigate, so the stub records the
   // destinations in window.__locationAssigns (same contract as nav.pushed)
   // and tests assert them.
   await writeFile(
@@ -754,7 +754,7 @@ export async function setupDom({ url = "https://osdb.test/" } = {}) {
     // the auth pages call hardNavigate() from app/lib/navigate — a full
     // reload beats router.push + refresh on vinext dev, where the RSC
     // request fires but the UI stays frozen on the login page (reproduced
-    // live on osdb.syaxhome89.com). jsdom cannot navigate, so the module
+    // live on the pre-prod domain). jsdom cannot navigate, so the module
     // stub records the destinations in window.__locationAssigns (same
     // contract as nav.pushed) and tests assert them. The stub is written
     // into the DOM tree like the next/navigation mock (see writeTree).

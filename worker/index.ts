@@ -356,7 +356,7 @@ function requireModerationAuth(request: Request, env: Env): { denied: Response |
  *   the header level.
  *
  * HSTS is deliberately NOT set here: the site is currently served over
- * plain HTTP (local LXC 114). `Strict-Transport-Security` should be enabled
+ * plain HTTP (local test container). `Strict-Transport-Security` should be enabled
  * at the Cloudflare zone level (or via a CF header rule) once the public
  * domain is active — see task t_6148aa6f.
  */

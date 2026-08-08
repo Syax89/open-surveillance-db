@@ -154,13 +154,13 @@ Invariante verificata per ogni run:
    portale) — confermare con l'ente prima del primo import in produzione.
    Aggiunto `CC BY 3.0 IT` alla matrice importabile (`licence-gate.mjs`).
 
-## Import reale su D1 locale LXC (osdb-test) — fatto e verificato
+## Import reale su D1 locale del container di test — fatto e verificato
 
 FASE A è atterrata (PR #313) quindi l'import reale è stato eseguito con il
 runner ufficiale contro il D1 locale dell'LXC di test:
 
 ```bash
-# su osdb-test (192.168.1.201), repo a main 7b76917 + adapters FASE B
+# sul container di test, repo a main 7b76917 + adapters FASE B
 D1=.wrangler/state/v3/d1/miniflare-D1DatabaseObject/da01e386….sqlite
 node scripts/import/cli.mjs run --slug=zurigo-videokameras-2026 --apply --d1-path=$D1
 node scripts/import/cli.mjs run --slug=milano-varchi-2026 --apply --d1-path=$D1
@@ -179,7 +179,7 @@ dry-run del runner.)
 - `import_batches`: 3 batch **committed** (zurigo 134/131/3/0/0, milano
   213/213/0/0/0, osm 7 941/7 030/910/1/0) — `attribution_text` persistito
   correttamente per ciascun batch.
-- API `GET /api/cameras` su osdb-test: `total: 7374`, record con
+- API `GET /api/cameras` sul container di test: `total: 7374`, record con
   `source="import:<slug>"`, `status="active"`, `last_verified_at=null`
   (badge «mai confermato», ADR 0021).
 - Mappa: preview Leaflet rigenerata con i dati finali

@@ -12,16 +12,18 @@
  */
 import puppeteer from "puppeteer-core";
 import { globSync } from "node:fs";
+import { homedir } from "node:os";
 
 const BASE = process.env.BASE_URL ?? "http://127.0.0.1:4173";
 // Dev-only helper: resolve a local Chromium. Override with CHROME_PATH, or
 // let it discover the common dev-box locations (puppeteer/playwright caches).
+const HOME = homedir();
 const CHROME =
   process.env.CHROME_PATH ??
   [
-    "/home/simone/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome",
-    "/home/simone/.cache/ms-playwright/chromium-1234/chrome-linux/chrome",
-    "/home/simone/.cache/puppeteer/chrome/linux-*/chrome-linux64/chrome",
+    `${HOME}/.cache/ms-playwright/chromium-*/chrome-linux64/chrome`,
+    `${HOME}/.cache/ms-playwright/chromium-*/chrome-linux/chrome`,
+    `${HOME}/.cache/puppeteer/chrome/linux-*/chrome-linux64/chrome`,
     "/usr/bin/google-chrome",
     "/usr/bin/chromium",
   ].find((p) => globSync(p).length > 0);

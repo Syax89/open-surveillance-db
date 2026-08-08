@@ -442,9 +442,8 @@ Il primo giro (#261) rendeva le righe card visibili (`#fffef9` + bordo +
 rail 3px + tint 9%), ma il CEO le vedeva ancora "trasparenti": `#fffef9`
 e le tint 9%-over-`#fffef9` hanno contrasto ~1:1 con `--paper`
 (`#f5f3ec`), quindi il box si fondeva con la pagina e solo il rail lo
-separava. Verificato visivamente su LXC (192.168.1.201:3000/directory,
-screenshot `directory-BEFORE-lxc.png`, archiviato in
-`~/osdb-archive/screenshots/`).
+separava. Verificato visivamente sul container di test (http://<lan-ip>:3000/directory,
+screenshot `directory-BEFORE-lxc.png`, archiviato fuori dal repo).
 
 ### Decisioni di design (Vera)
 

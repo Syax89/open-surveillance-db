@@ -94,14 +94,16 @@ export default defineConfig(async () => {
   const { cloudflare } = await import("@cloudflare/vite-plugin");
 
   return {
-    // External hosts (CEO 2026-08-07, env-driven 2026-08-08): the pre-prod
-    // domain osdb.syaxhome89.com hits the dev server through the reverse
-    // proxy; Vite's default DNS-rebinding guard rejects it. The launch
-    // domain is NOT hard-coded: ALLOWED_HOSTS (comma-separated) overrides
-    // the pre-prod default so the cutover to the final domain is a
-    // deployment variable, not a code change.
+    // External hosts (CEO 2026-08-07, env-driven 2026-08-08): a dev server
+    // behind a TLS-terminating reverse proxy sees the public domain in the
+    // Host header and Vite's default DNS-rebinding guard would reject it.
+    // The served domain is NOT hard-coded: set ALLOWED_HOSTS
+    // (comma-separated) to the domain(s) your deployment serves — the
+    // cutover to the final domain is a deployment variable, not a code
+    // change. The fallback only keeps plain local development working
+    // (Vite also allows its own LAN address regardless of this list).
     server: {
-      allowedHosts: (process.env.ALLOWED_HOSTS ?? ".syaxhome89.com").split(",").map((h) => h.trim()).filter(Boolean),
+      allowedHosts: (process.env.ALLOWED_HOSTS ?? "localhost,127.0.0.1,::1").split(",").map((h) => h.trim()).filter(Boolean),
       ...(isCodexSeatbeltSandbox
         ? { watch: { useFsEvents: false, usePolling: true } }
         : {}),

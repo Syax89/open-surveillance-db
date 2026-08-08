@@ -1,8 +1,8 @@
 # Local release checklist (current environment)
 
 This checklist covers a release of the **current local environment**: the
-always-on LAN test site on Proxmox LXC 114 (`osdb-test`,
-http://192.168.1.201:3000). It is the concrete step-by-step companion to the
+always-on LAN test site (test container, http://<lan-ip>:3000). It is the
+concrete step-by-step companion to the
 [release procedure](DEPLOYMENT.md#release-procedure) and to the environment
 description in [DEPLOYMENT.md](DEPLOYMENT.md#local-lxc-deployment-current).
 
@@ -17,9 +17,9 @@ LAN.
 - Write access to `https://github.com/Syax89/open-surveillance-db` (branch +
   PR flow; releases are tagged `v*`, CI builds from the tag).
 - A machine with Node.js `>= 22.13` for the verification steps.
-- SSH root access to LXC 114 (`root@192.168.1.201`, deploy key injected at
-  container creation; password login disabled).
-- The site is reachable on the LAN: `http://192.168.1.201:3000`.
+- SSH root access to the test container (`root@<lan-ip>`, deploy key
+  injected at container creation; password login disabled).
+- The site is reachable on the LAN: `http://<lan-ip>:3000`.
 
 ## Checklist
 
@@ -96,10 +96,10 @@ git push origin v0.1.0            # CI builds from the tag
 > release correlates to a `v*` tag. Record the tag/commit next to the deployed
 > version so a rollback can identify it later.
 
-### 6. Deploy to LXC 114
+### 6. Deploy to the test container
 
 ```bash
-ssh root@192.168.1.201
+ssh root@<lan-ip>
 cd /opt/open-surveillance-db
 git fetch origin && git reset --hard origin/main
 npm ci
@@ -122,11 +122,11 @@ From any LAN machine (expected results from the verified procedure in
 [DEPLOYMENT.md](DEPLOYMENT.md#verification)):
 
 ```bash
-curl -sS -o /dev/null -w '%{http_code}\n' http://192.168.1.201:3000/                                        # 200
-curl -sS -o /dev/null -w '%{http_code}\n' "http://192.168.1.201:3000/api/cameras/nearby?latitude=41.9004&longitude=12.4936&radius=50"  # 200
-curl -sS -o /dev/null -w '%{http_code}\n' http://192.168.1.201:3000/guide                                  # 200
-curl -sS -o /dev/null -w '%{http_code}\n' http://192.168.1.201:3000/api/moderation                         # 503 fail-closed (no creds)
-curl -sS http://192.168.1.201:3000/api/cameras | grep -c '"notes"'                                        # 0 — private field never public
+curl -sS -o /dev/null -w '%{http_code}\n' http://<lan-ip>:3000/                                        # 200
+curl -sS -o /dev/null -w '%{http_code}\n' "http://<lan-ip>:3000/api/cameras/nearby?latitude=41.9004&longitude=12.4936&radius=50"  # 200
+curl -sS -o /dev/null -w '%{http_code}\n' http://<lan-ip>:3000/guide                                  # 200
+curl -sS -o /dev/null -w '%{http_code}\n' http://<lan-ip>:3000/api/moderation                         # 503 fail-closed (no creds)
+curl -sS http://<lan-ip>:3000/api/cameras | grep -c '"notes"'                                        # 0 — private field never public
 ```
 
 - [ ] `/` returns 200.
@@ -149,7 +149,7 @@ The local site tracks `origin/main`; rolling back is a redeploy of a previous
 good commit:
 
 ```bash
-ssh root@192.168.1.201
+ssh root@<lan-ip>
 cd /opt/open-surveillance-db
 git fetch origin
 git reset --hard <previous-good-commit-or-tag>

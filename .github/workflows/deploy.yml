@@ -21,8 +21,10 @@ name: Deploy Cloudflare
 #   - Nessun segreto nel file: le credenziali Cloudflare arrivano dai
 #     secrets GitHub, quelle di moderazione sono secrets del worker CF
 #     (`wrangler secret put`), mai hardcoded.
-#   - Fail-fast: se `database_id` è ancora il placeholder o i secrets CF
-#     mancano, il job termina subito con errore chiaro.
+#   - Fail-fast: se il secret `D1_DATABASE_ID` (o i secrets CF) manca, il
+#     job termina subito con errore chiaro. Il database_id reale non è mai
+#     nel repo: wrangler.jsonc tiene il placeholder e il workflow lo
+#     sostituisce al volo dal secret GitHub (template pulito).
 #   - `environment: production` (GitHub Environments): aggiungere required
 #     reviewers per il gate umano sul deploy.
 
@@ -79,15 +81,18 @@ jobs:
           fi
           echo "Secrets Cloudflare: OK"
 
-      - name: Check D1 database_id (fail-fast, mai deploy su DB placeholder)
+      - name: Inject D1 database_id from GitHub secret (fail-fast, mai deploy su DB placeholder)
+        env:
+          D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
         run: |
-          if grep -q '00000000-0000-4000-8000-000000000000' wrangler.jsonc; then
-            echo "::error::wrangler.jsonc ha ancora il database_id placeholder. Prima del primo deploy:"
+          if [ -z "${D1_DATABASE_ID}" ]; then
+            echo "::error::Secret GitHub D1_DATABASE_ID mancante. Il template tiene il placeholder in wrangler.jsonc; prima del primo deploy:"
             echo "  npx wrangler d1 create osdb-production   # output: database_id"
-            echo "  poi sostituire il placeholder in wrangler.jsonc e committare."
+            echo "  gh secret set D1_DATABASE_ID"
             exit 1
           fi
-          echo "database_id: OK"
+          sed -i "s/00000000-0000-4000-8000-000000000000/${D1_DATABASE_ID}/" wrangler.jsonc
+          echo "database_id: iniettato dal secret GitHub (mai committato)"
 
       - name: Build (dist/client per ASSETS + bundle server)
         run: npm run build

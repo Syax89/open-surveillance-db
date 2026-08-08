@@ -9,7 +9,7 @@
 - **Vincolo:** zero nuove librerie (direttiva QA#5 F3 t_ab0d4c75); benchmark
   con soli `node` + `fetch` globali — nessuna dipendenza nel package.json
 
-## Contesto (root cause misurata su LXC 81ddc92)
+## Contesto (root cause misurata sul container di test)
 
 `usePublicCameras` eseguiva **15 richieste seriali** `GET /api/cameras?limit=500`
 (offset 0..14) prima di `setRecords`: primo byte ~0.92s, completamento ~5.35s.
@@ -55,7 +55,7 @@ JSON grezzo: `docs/performance/viewport-benchmark-t_bb310428.json`
 ## Lettura dei risultati
 
 1. **La regressione riportata dal CEO era il viewport iniziale** (Roma z13):
-   prima la mappa aspettava l'intero walk (~3.7s+ sul locale; ~5.35s su LXC)
+   prima la mappa aspettava l'intero walk (~3.7s+ sul locale; ~5.35s sul container di test)
    prima di mostrare QUALSIASI marker; ora il primo viewport arriva con **una
    richiesta da ~185 ms** — ~20× sul walk totale, primo marker visibile ben
    dentro l'obiettivo ≤1s, niente attesa 0 → lista completa.

@@ -51,4 +51,4 @@
 - [x] **OIDC activation gate (ADR 0020, Fase D — owner: legal/CTO):** resolved for **Google** on the pre-prod deployment (DPA + EU–US DPF recorded, PR6 flipped to *active*, 2026-08-08). **GitHub (PR5) stays conditional** until its credentials are configured (`ops/oidc-secrets.sh`) and the same gate is recorded. PRIVACY_NOTICE § 5/§ 6 and TERMS § 3.7 describe the method as "active where the operator has configured the provider".
 - [ ] Confirm whether Cloudflare's sub-processor list changes require an updated review at contract signature.
 - [ ] Choose and assess the production map-tile provider (H5).
-- [ ] Revise this register and PRIVACY_NOTICE § 5 per ADR 0012: the pilot runtime is self-hosted (LXC 114, Italy) and Cloudflare returns to a future precondition — to be completed before the pilot hosts real data.
+- [ ] Revise this register and PRIVACY_NOTICE § 5 per ADR 0012: the pilot runtime is self-hosted (Italy) and Cloudflare returns to a future precondition — to be completed before the pilot hosts real data.

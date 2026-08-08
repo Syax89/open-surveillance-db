@@ -56,10 +56,11 @@
     {
       "binding": "DB",
       "database_name": "osdb-production",
-      // database_id reale del D1 di produzione (creato in Cloudflare D1,
-      // 2026-08-01, fornito da Simone). Il workflow deploy.yml blocca il
-      // deploy se qui c'è ancora il placeholder.
-      "database_id": "53f854a0-b9f9-4334-bfc3-f5ff0aa8c1e4",
+      // Template pulito: qui resta il placeholder. Il database_id reale
+      // del D1 di produzione vive SOLO nel secret GitHub D1_DATABASE_ID e
+      // viene iniettato al deploy da .github/workflows/deploy.yml — mai
+      // committato (vedi docs/OPERATIONS.md §7.2).
+      "database_id": "00000000-0000-4000-8000-000000000000",
       "migrations_dir": "drizzle"
     }
   ]
