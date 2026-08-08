@@ -45,8 +45,6 @@ type Props = {
   onResetFilters: () => void;
   /** "Submit a private observation" target (empty states). */
   reportHref?: string;
-  /** Download links for the filtered set (CSV/GeoJSON). */
-  exportHrefs?: { csv: string; geojson: string } | null;
 };
 
 /**
@@ -67,7 +65,7 @@ type Props = {
  * Distance facts) and hides the index/pagination/chips, which only make
  * sense for the filtered list.
  */
-export function DirectoryCatalog({ filteredRecords, cameraKinds, search, setSearch, kindFilter, setKindFilter, freshnessFilter, setFreshnessFilter, sortOrder, setSortOrder, stateFilter, setStateFilter, originFilter, setOriginFilter, page = 1, setPage, showRecordOnMap, setCoordinates, onResetFilters, reportHref = "/segnala", exportHrefs = null }: Props) {
+export function DirectoryCatalog({ filteredRecords, cameraKinds, search, setSearch, kindFilter, setKindFilter, freshnessFilter, setFreshnessFilter, sortOrder, setSortOrder, stateFilter, setStateFilter, originFilter, setOriginFilter, page = 1, setPage, showRecordOnMap, setCoordinates, onResetFilters, reportHref = "/segnala" }: Props) {
   const t = useMessages().directory;
   const statuses = useMessages().status;
   const { locale } = useLocale();
@@ -218,10 +216,11 @@ export function DirectoryCatalog({ filteredRecords, cameraKinds, search, setSear
       {place.placeResult?.status === "loading" && <p className="loading-note" role="status">{t.placeSearchLoading}</p>}
       {place.placeResult?.status === "error" && <p className="nearby-error" role="alert">{place.placeResult.message}</p>}
       {/* Visible results header (t_f13fcb1c): replaces the sr-only h2 with a
-          real browse context — heading + count (role=status, historical id)
-          + the CSV/GeoJSON downloads. The count keeps the historical format
-          so the input's aria-describedby and the AT announcements work as
-          before. */}
+          real browse context — heading + count (role=status, historical id).
+          The CSV/GeoJSON downloads live in the data-actions footer
+          (DirectoryTool, t_b98b1734) next to the data policy link. The count
+          keeps the historical format so the input's aria-describedby and the
+          AT announcements work as before. */}
       <div className="directory-results">
         <div className="directory-results-head">
           <h2 id="directory-results-title" tabIndex={-1} ref={resultsRef}>{t.resultsRegion}</h2>
@@ -229,17 +228,9 @@ export function DirectoryCatalog({ filteredRecords, cameraKinds, search, setSear
         </div>
         {/* CEO 2026-08-08: a small circular [+] in the header top-right — a
             direct shortcut to the report form (/segnala). Plain link: the
-            write gate on /segnala handles anonymous visitors. Always
-            rendered (it does not depend on the export row). */}
+            write gate on /segnala handles anonymous visitors. */}
         <div className="directory-results-actions">
           <a className="add-button" href={reportHref} aria-label={t.reportCamera}><span aria-hidden="true">+</span></a>
-          {exportHrefs && (
-            <>
-              <a className="export-button" href={exportHrefs.csv} aria-describedby="directory-export-hint">{t.exportCsv} <span aria-hidden="true">↓</span></a>
-              <a className="export-button" href={exportHrefs.geojson} aria-describedby="directory-export-hint">{t.exportGeoJson} <span aria-hidden="true">↓</span></a>
-              <p className="sr-only" id="directory-export-hint">{t.exportHint}</p>
-            </>
-          )}
         </div>
       </div>
       {/* Active-filter chips: the state of the list at a glance, removable

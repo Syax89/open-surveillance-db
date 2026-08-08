@@ -125,10 +125,9 @@ export const en = {
     "This means only that no public record in this database falls inside the search area. It is not evidence that no cameras exist there.",
   placeEmptySubmit: "Submit a report",
   placeEmptyCoverage: "About data coverage limits",
-  // Data policy link (CEO feedback 2026-08-02, merge #229 × #231): the
-  // CSV/GeoJSON downloads live in the catalog meta row (DirectoryCatalog —
-  // exportCsv/exportGeoJson, filter-aware); the footer keeps the data policy
-  // link only.
+  // Data actions footer (t_b98b1734, CEO 2026-08-08): the CSV/GeoJSON
+  // downloads live here as small text links next to the data policy link
+  // (DirectoryTool — exportCsv/exportGeoJson, filter-aware); same row/font.
   readDataPolicy: "Read the data policy",
   recordId: "Record ID",
   source: "Source",
@@ -263,10 +262,10 @@ export const it: Translation<typeof en> = {
     "Questo significa solo che nessun record pubblico di questo database rientra nell'area di ricerca. Non è la prova che lì non ci siano telecamere.",
   placeEmptySubmit: "Invia una segnalazione",
   placeEmptyCoverage: "I limiti della copertura dati",
-  // Link politica dati (feedback CEO 2026-08-02, merge #229 × #231): i
-  // download CSV/GeoJSON vivono nella riga meta del catalogo
-  // (DirectoryCatalog — exportCsv/exportGeoJson, filtro-aware); il footer
-  // tiene solo il link alla politica dati.
+  // Footer azioni dati (t_b98b1734, CEO 2026-08-08): i download CSV/GeoJSON
+  // vivono qui come link di testo piccoli accanto al link della politica
+  // dati (DirectoryTool — exportCsv/exportGeoJson, filtro-aware); stessa
+  // riga/font.
   readDataPolicy: "Leggi la politica dei dati",
   recordId: "ID record",
   source: "Fonte",
