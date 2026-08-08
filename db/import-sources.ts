@@ -35,6 +35,13 @@ export type ImportBatchPublic = {
   /** Exact attribution text persisted by the runner (licence matrix). */
   attributionText: string | null;
   importDate: string;
+  /**
+   * Last mutation of the batch row (commit / rollback / force-refresh).
+   * Set by the runner at commit time; NULL for a just-created row. The
+   * /fonti "Last updated" line uses max(COALESCE(updated_at, import_date))
+   * over the committed batches.
+   */
+  updatedAt: string | null;
   recordsInserted: number;
   recordsTotal: number;
 };
@@ -42,8 +49,8 @@ export type ImportBatchPublic = {
 const PUBLIC_BATCH_COLUMNS = `
   id, slug, source_name AS sourceName, source_url AS sourceUrl,
   license, license_url AS licenseUrl, attribution_text AS attributionText,
-  import_date AS importDate, records_inserted AS recordsInserted,
-  records_total AS recordsTotal
+  import_date AS importDate, updated_at AS updatedAt,
+  records_inserted AS recordsInserted, records_total AS recordsTotal
 `;
 
 /** Every committed import batch, newest first (GET /fonti data source). */
