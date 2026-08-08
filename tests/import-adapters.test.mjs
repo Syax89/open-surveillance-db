@@ -584,6 +584,29 @@ test("barcelona: parses CKAN CSV rows into canonical staged rows", () => {
   assert.equal(skipped.total, 1);
 });
 
+test("utrecht: parses a real XLSX buffer (fflate mini-reader) into staged rows", async () => {
+  const { zipSync, strToU8 } = await import("fflate");
+  const sheetXml = `<?xml version="1.0"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+    <sheetData>
+      <row r="1"><c r="A1"><v>Naam</v></c><c r="B1"><v>straat</v></c><c r="C1"><v>GPS Latitude</v></c><c r="D1"><v>GPS Longtitude</v></c></row>
+      <row r="2"><c r="A2"><v>UTR-CM-501</v></c><c r="B2"><v>Biltstraat</v></c><c r="C2"><v>52.093665</v></c><c r="D2"><v>5.118365</v></c></row>
+    </sheetData></worksheet>`;
+  const buf = Buffer.from(
+    zipSync({
+      "xl/worksheets/sheet1.xml": strToU8(sheetXml),
+      "[Content_Types].xml": strToU8(`<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>`),
+    })
+  );
+  const { staged, skipped } = await utrechtParse({ buf });
+  assert.equal(staged.length, 1);
+  assert.equal(staged[0].title, "UTR-CM-501");
+  assert.equal(staged[0].address, "Biltstraat");
+  assert.equal(staged[0].latitude, 52.093665);
+  assert.equal(staged[0].longitude, 5.118365);
+  assert.match(staged[0].external_id, /^utrecht-camera:UTR-CM-501$/);
+  assert.equal(skipped.total, 0);
+});
+
 test("utrecht: null buffer → empty result (network fetch is live-only)", async () => {
   const { staged, skipped } = await utrechtParse({ buf: null });
   assert.equal(staged.length, 0);

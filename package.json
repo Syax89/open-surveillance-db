@@ -36,7 +36,7 @@
   "dependencies": {
     "@simplewebauthn/server": "^13.3.2",
     "drizzle-orm": "0.45.2",
-    "exceljs": "^4.4.0",
+    "fflate": "^0.8.3",
     "fzstd": "^0.1.1",
     "hyparquet": "^1.28.1",
     "leaflet": "^1.9.4",
