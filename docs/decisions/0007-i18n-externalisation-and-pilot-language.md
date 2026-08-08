@@ -17,9 +17,9 @@ dictionaries per page (`page.tsx`, `guide/page.tsx`, `records/[id]/page.tsx`,
 - no guarantee that a language bundle is complete — a missing key rendered
   as `undefined` in the UI;
 - adding a third language (the future pilot-area language, see
-  `docs/EXECUTION_BOARD.md` Wave A) would mean editing every page.
+  `docs/roadmap.md` Wave A) would mean editing every page.
 
-The roadmap (docs/FUTURE_ROADMAP.md, Horizon 2) calls for externalised
+The roadmap (docs/roadmap.md, Horizon 2) calls for externalised
 interface strings with English plus the pilot-area language.
 
 ## Decision

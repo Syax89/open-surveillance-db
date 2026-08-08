@@ -92,11 +92,7 @@ moderation staffing, and operational safeguards.
 
 The documentation is part of the project and is intended to be discussed openly.
 
-- [Development plan](docs/DEVELOPMENT_PLAN.md)
-- [Execution board and workstream ownership](docs/EXECUTION_BOARD.md)
-- [Sprint archive: reliable moderation loop (completed)](docs/NEXT_SPRINT.md)
-- [Future roadmap](docs/FUTURE_ROADMAP.md)
-- [Current status](docs/STATUS.md)
+- [Roadmap and current status](docs/roadmap.md)
 - [Site map and information architecture](docs/SITEMAP.md)
 - [Clean local setup and schema migrations](docs/DEVELOPMENT_SETUP.md)
 - [Local playbook and acceptance checks](docs/LOCAL_PLAYBOOK.md)

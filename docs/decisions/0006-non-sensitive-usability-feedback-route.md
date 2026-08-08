@@ -3,7 +3,7 @@
 - **Status:** proposed (draft, awaiting implementation)
 - **Date:** 2026-07-31
 - **Author:** Marie (documentation)
-- **Related:** [FUTURE_ROADMAP.md](../FUTURE_ROADMAP.md) (Horizon 2), [PRODUCT_UX.md](../workstreams/PRODUCT_UX.md) (backlog item "Usability feedback route"), [ACCESSIBILITY_STATEMENT.md](../ACCESSIBILITY_STATEMENT.md)
+- **Related:** [roadmap.md](../roadmap.md) (Horizon 2), [PRODUCT_UX.md](../workstreams/PRODUCT_UX.md) (backlog item "Usability feedback route"), [ACCESSIBILITY_STATEMENT.md](../ACCESSIBILITY_STATEMENT.md)
 
 ## Context
 

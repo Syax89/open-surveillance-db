@@ -8,7 +8,7 @@
 This statement describes the accessibility of the OpenSurveillanceDB public web
 application. It is written for the current **local project** and will be
 updated before any public launch, when the pilot area, languages, and review
-method are decided (see [FUTURE_ROADMAP.md](FUTURE_ROADMAP.md), Horizon 2 and 4).
+method are decided (see [roadmap.md](roadmap.md), Horizon 2 and 4).
 
 ## Commitment
 
@@ -148,7 +148,7 @@ This statement is reviewed:
 Questa dichiarazione descrive l'accessibilità dell'applicazione web pubblica di
 OpenSurveillanceDB. È redatta per l'attuale **progetto locale** e sarà
 aggiornata prima di qualsiasi lancio pubblico, quando saranno decisi l'area
-pilota, le lingue e il metodo di verifica (vedi [FUTURE_ROADMAP.md](FUTURE_ROADMAP.md), Orizzonte 2 e 4).
+pilota, le lingue e il metodo di verifica (vedi [roadmap.md](roadmap.md), Orizzonte 2 e 4).
 
 ## Impegno
 

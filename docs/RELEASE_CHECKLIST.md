@@ -9,7 +9,7 @@ description in [DEPLOYMENT.md](DEPLOYMENT.md#local-lxc-deployment-current).
 A **public** release is a different gate: see the
 [preconditions for a public environment](DEPLOYMENT.md#preconditions-for-a-public-environment),
 the operations manual ([docs/OPERATIONS.md](OPERATIONS.md)), and the
-[execution board](EXECUTION_BOARD.md) (Wave C gate) before anything leaves the
+[roadmap](roadmap.md) (Wave C gate) before anything leaves the
 LAN.
 
 ## Prerequisites
@@ -71,7 +71,7 @@ ls db/migrations 2>/dev/null || ls drizzle/          # schema/migration changes
 - [ ] Schema/migration impact is known before deploying (D1 migrations are
       applied through the deploy tooling; the local LXC site uses the demo
       database, so a migration is not applied at runtime there).
-- [ ] User-facing changes are reflected in `docs/STATUS.md`.
+- [ ] User-facing changes are reflected in `docs/roadmap.md`.
 
 ### 4. Update the changelog
 
@@ -140,7 +140,7 @@ curl -sS http://192.168.1.201:3000/api/cameras | grep -c '"notes"'              
 - [ ] Note the deployed commit/tag and (for Workers releases) the
       `wrangler` version-id in the changelog or the release issue, per
       [docs/OPERATIONS.md](OPERATIONS.md#51-identifying-versions).
-- [ ] Update `docs/STATUS.md` if the release changes implemented capability.
+- [ ] Update `docs/roadmap.md` if the release changes implemented capability.
 
 ## Rollback (local environment)
 

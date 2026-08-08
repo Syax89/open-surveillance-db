@@ -8,7 +8,7 @@ published once the project reaches the public-alpha phase. It does not
 describe functionality that exists today.
 
 The corresponding execution-board ticket is *"Publish versioned data exports,
-data dictionary, and changelog"* (P1 in [EXECUTION_BOARD.md](EXECUTION_BOARD.md)),
+data dictionary, and changelog"* (P1 in [roadmap.md](roadmap.md)),
 blocked on the **final data licence** decision (Wave A).
 
 ## Why versioned exports
@@ -110,7 +110,7 @@ internal access:
 4. Any known caveats (e.g. a jurisdiction's records not yet migrated).
 
 Until a dedicated `CHANGELOG.md` exists, release notes live in the
-[status](STATUS.md) and execution-board progress log.
+[status](roadmap.md) and progress log.
 
 ## Open decisions (Wave A blockers)
 

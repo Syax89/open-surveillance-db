@@ -393,4 +393,4 @@ le altre lingue la parità è garantita da `Translation<typeof en>` a
 - [Operations manual](OPERATIONS.md) — backup/restore drills and verified
   wrangler commands (appendice).
 - [Development plan](DEVELOPMENT_PLAN.md) and
-  [Execution board](EXECUTION_BOARD.md) — workstreams and ownership.
+  [Roadmap](roadmap.md) — workstreams and ownership.
