@@ -1,0 +1,11 @@
+{
+    "slug": "australia-nsw-speed-cameras-2026",
+    "source_name": "NSW (Australia) — Speed camera locations (TfNSW Open Data)",
+    "format": "csv",
+    "license": "CC BY 3.0 AU",
+    "license_url": "https://creativecommons.org/licenses/by/3.0/au/",
+    "attribution_text": "Fonte: Transport for NSW, NSW Speed Cameras (https://opendata.transport.nsw.gov.au/dataset/nsw-speed-cameras), concesso con licenza Creative Commons Attribution 3.0 Australia.",
+    "source_url": "https://opendata.transport.nsw.gov.au/data/dataset/fb34bd89-443a-448c-a4a5-7c8caab70c44",
+    "max_records": 500,
+    "notes": "Scan catalog.csv + verifica diretta (CEO 2026-08-08): fixed-speed-cameras.csv 122 righe + red-light-speed-cameras.csv 204 righe con lat/lon (riga = sito, colonna Cameras = numero camere; mobile-speed-camera-locations 1.166 righe SENZA coordinate → escluso). Licenza CC BY 3.0 AU (data.nsw.gov.au). external_id nsw-cam:<tipo>:<indice>."
+}
