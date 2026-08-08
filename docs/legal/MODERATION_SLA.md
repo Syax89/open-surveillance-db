@@ -4,7 +4,7 @@
 - **Owner:** Rosa (Legal & Privacy Officer / privacy contact) with the moderation team
 - **Implements:** ../MODERATION.md (community-driven model — legal-emergency admin actions + private corrections); review findings M1, M2, M3.
 - **Alignment:** response times are compatible with GDPR art. 12(3) (1-month substantive response).
-- **Community model (ADR 0021, 2026-08-05):** the normal flow has no human moderation — the SLAs below cover the **residual human surfaces only**: legal-emergency admin actions and the private correction path. The retired-flow SLAs (old S5/S6) are **removed**: the contrary-consensus mechanism of ADR 0021 § 6 replaces them. **Photo upload removed (2026-08-08, CEO):** the photo redaction gate no longer exists — the moderation surface is legal-emergency + corrections only.
+- **Community model (ADR 0021, 2026-08-05):** the normal flow has no human moderation — the SLAs below cover the **residual human surfaces only**: legal-emergency admin actions and the private correction path. The retired-flow SLAs (old S5/S6) are **removed**: the contrary-consensus mechanism of ADR 0021 § 6 replaces them. **Image evidence removed (2026-08-08, CEO):** the image redaction gate no longer exists — the moderation surface is legal-emergency + corrections only.
 
 > **Disclaimer:** this document is product guidance / not legal advice. The document is in force for the pilot jurisdiction (Italy); per-jurisdiction review remains the documented precondition for an EU-wide launch.
 
@@ -25,7 +25,7 @@
 | S3 | **Substantive response / decision** | **Within 14 days** | Decision, rationale, and next steps; comfortably inside the art. 12(3) 1-month cap; declared inline in TERMS § 6.2 |
 | S4 | **Retrospective review of legal-emergency actions** | **Within 30 days** | Decide: keep, amend, or (for content the law allows) instruct removal; the record itself is restored only by community consensus (ADR 0021 § 6); the requester is informed |
 
-*Removed from the retired flow: decision-review (old S5), advisory-circle escalation (old S6) — replaced by contrary consensus (ADR 0021 § 6/§ 7) — and the photo gate (feature removed 2026-08-08).*
+*Removed from the retired flow: decision-review (old S5), advisory-circle escalation (old S6) — replaced by contrary consensus (ADR 0021 § 6/§ 7) — and the image gate (feature removed 2026-08-08).*
 
 ## 3. Legal-emergency flow (S1)
 

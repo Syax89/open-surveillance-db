@@ -1,7 +1,7 @@
 /**
  * English legal content — PILOT LANGUAGE.
  *
- * Web adaptation of the legal drafts:
+ * Web adaptation of the legal documents:
  *   - docs/TERMS_OF_USE.md          → terms
  *   - docs/legal/PRIVACY_NOTICE.md  → privacy
  *   - docs/OPEN_SOURCE.md           → licenses
@@ -21,7 +21,7 @@ export const enLegal: LegalContent = {
     intro:
       "How OpenSurveillanceDB processes personal data, what we publish, what we never collect, and how you can exercise your rights under the GDPR.",
     versionNote:
-      "Version 0.6 — 5 August 2026. Updated for the community-driven model (ADR 0021): reports publish immediately from verified accounts; § 7 retention aligned with the retired review cycle; § 10 (cookies) unchanged. Re-synchronised with the merged canonical PRIVACY_NOTICE v0.11 (docs/legal/PRIVACY_NOTICE.md remains canonical): § 3 table aligned with the canonical disclosures (community-actions row added; moderation-audit purpose updated to \"historical appeals closed by migration\") and the public per-record event-history note added.",
+      "Version 0.7 — 8 August 2026. Current-state alignment (template-ready): re-synchronised with the canonical PRIVACY_NOTICE v0.13 (docs/legal/PRIVACY_NOTICE.md remains canonical). Community-driven model (ADR 0021): reports publish immediately from verified accounts; § 7 retention enforced by the daily retention sweep; § 3.1 multi-method authentication (email verification, passkeys, OIDC server-gated — ADR 0020); image evidence removed (2026-08-08).",
     sections: [
       {
         heading: "1. Who we are (controller)",
@@ -231,7 +231,7 @@ export const enLegal: LegalContent = {
           },
           {
             type: "paragraph",
-            text: "This notice is reviewed at launch and then at least annually, or on any material change; the version history is kept in the repository.",
+            text: "This notice is reviewed at least annually, or on any material change; the version history is kept in the repository.",
           },
         ],
       },
@@ -277,14 +277,14 @@ export const enLegal: LegalContent = {
     intro:
       "These terms govern the use of OpenSurveillanceDB, the open, community-maintained database of visible public surveillance infrastructure. They apply to the web application, the public API, the data exports and related services (\"the Service\").",
     versionNote:
-      "Version 0.4 — 5 August 2026. Updated for the community-driven model (ADR 0021): § 5 describes immediate publication and community actions instead of the human review queue; § 6 replaces appeals with private corrections and the legal-emergency power. Re-synchronised with the merged canonical TERMS_OF_USE v0.7 (docs/TERMS_OF_USE.md remains canonical): § 3.7 authentication disclosure restored (email verification for write access, passkeys, OIDC — ADR 0020).",
+      "Version 0.5 — 8 August 2026. Current-state alignment (template-ready): re-synchronised with the canonical TERMS_OF_USE v0.8 (docs/TERMS_OF_USE.md remains canonical). § 3.7 authentication disclosure (email verification for write access, passkeys, OIDC — ADR 0020, server-gated); § 5 immediate publication and community actions; § 6 private corrections and the legal-emergency power; image evidence removed (2026-08-08).",
     sections: [
       {
         heading: "1. Who we are",
         blocks: [
           {
             type: "paragraph",
-            text: "**Controller / operator:** Simone Rondina (syax89) / OpenSurveillanceDB — Italy (final legal-entity wording to be confirmed at launch).",
+            text: "**Controller / operator:** Simone Rondina (syax89) / OpenSurveillanceDB — Italy.",
           },
           {
             type: "paragraph",
@@ -537,7 +537,7 @@ export const enLegal: LegalContent = {
           },
           {
             type: "note",
-            text: "This choice must still be checked against jurisdictional rules, source terms, and the final data model before public beta.",
+            text: "Imported sources keep their own licence and attribution; the ODbL licence applies to the project's own compilation (see section 6).",
           },
         ],
       },

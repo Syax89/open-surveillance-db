@@ -1,10 +1,12 @@
 # ADR 0002: Legal pre-launch deliverables (retention, notice, lawful basis, processors)
 
-- **Status:** proposed (drafts in `docs/legal/`, pending maintainer review and
-  external legal review)
-- **Date:** 2026-07-31 (updated 2026-07-31 by PR #8 legal-review consolidation)
-- **Parent:** review findings P1–P6, M1–M5 (`docs/legal/REVIEW_POLICY_LEGALE_2026-07-31.md`,
-  committed to the repository)
+- **Status:** accepted (deliverables in force, see `docs/legal/README.md`;
+  reviewed at least annually or on any material change)
+- **Date:** 2026-07-31 (updated 2026-07-31 by PR #8 legal-review consolidation;
+  updated 2026-08-08 — current-state alignment)
+- **Parent:** review findings P1–P6, M1–M5 (2026-07-31 legal review; the dated
+  review report was archived with the 2026-08-08 consolidation — see
+  `docs/legal/LEGAL_DELIVERABLES_INDEX.md`)
 - **Related ADRs:** 0004 (retention values and enforcement), 0005 (processors
   and data residency) — these record the detailed decisions; this ADR is the
   umbrella decision for the deliverables.
@@ -67,7 +69,7 @@ and added breach procedure (P2) and moderation SLA items (M1–M4).
   and the controller identity/contact finalized before launch (DEPLOYMENT.md
   precondition).
 - The processor register must be re-archived when DPA annexes change and
-  extended for any new processor (e.g. evidence storage) before it goes live.
-- The review document `REVIEW_POLICY_LEGALE_2026-07-31.md` is committed to the
-  repository so the P1–P6/M1–M5/H1–H6 finding codes used across the drafts are
-  resolvable.
+  extended for any new processor before it goes live.
+- The finding codes P1–P6/M1–M5/H1–H6 used across the deliverables were
+  introduced by the 2026-07-31 legal review; the dated review report is
+  archived (see `docs/legal/LEGAL_DELIVERABLES_INDEX.md`).

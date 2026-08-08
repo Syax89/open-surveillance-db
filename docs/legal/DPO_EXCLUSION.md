@@ -3,7 +3,7 @@
 - **Status:** in force — personal open-source project, 2026-08-08; decision recorded (2026-08-01) — no DPO appointed, exclusion documented
 - **Version:** 1.0 (2026-08-01)
 - **Owner:** Rosa (Legal & Privacy Officer / privacy contact)
-- **Decision owner:** CEO (validation recorded on board task t_06c4dc33)
+- **Decision owner:** CEO (validation recorded on the governance board)
 - **Legal basis assessed:** GDPR art. 37(1)(a)/(b)/(c) and art. 37(4)
 - **Cross-references:** ADR 0017 (`docs/decisions/0017-no-dpo-appointed-art37.md`), PRIVACY_NOTICE.md § 1, GOVERNANCE.md (privacy / legal contact), LAWFUL_BASIS.md § 1, PROCESSOR_REGISTER.md, RETENTION_SCHEDULE.md, BREACH_PROCEDURE.md
 
@@ -13,7 +13,7 @@
 
 ## 1. Context (audit gap 7)
 
-The pre-launch legal audit (task t_1de55bfb, gap 7) found that several live
+The 2026-07-31 legal review (gap 7) found that several live
 documents referenced a **"DPO"** as owner or approval title
 (`RETENTION_SCHEDULE.md` § 3, `PROCESSOR_REGISTER.md`, `MODERATION_SLA.md`,
 `BREACH_PROCEDURE.md`, document owner headers) although **no data protection
@@ -71,7 +71,7 @@ processing; geographical extent. For OpenSurveillanceDB:
 | Factor (WP 243 rev.01) | Assessment at pilot and foreseeable public scale |
 |---|---|
 | Number of data subjects | Low — voluntary, pseudonymous contributors; no tracking of third parties. Published records concern infrastructure, not persons |
-| Volume of data | Low — structured records of camera locations; no photo data (photo upload removed 2026-08-08; existing R2 objects retained, no deletion) |
+| Volume of data | Low — structured records of camera locations; no image data (image evidence removed 2026-08-08; existing objects retained, no deletion) |
 | Duration | Bounded — retention schedule with fixed terms (R5–R7); no indefinite accumulation |
 | Geographical extent | Single pilot deployment, community-governed, non-commercial; no EU-wide or cross-border operation |
 
@@ -82,7 +82,7 @@ large-scale under WP 243 rev.01.
 
 Art. 37(4) permits (does not require) a controller to appoint a DPO even
 when art. 37(1) does not mandate one. **This option was explicitly
-considered and deliberately declined for the pre-launch phase.**
+considered and deliberately declined for the current phase.**
 
 Rationale:
 
@@ -92,9 +92,8 @@ Rationale:
   role; availability as contact point for data subjects and the
   supervisory authority under art. 38(4)) and a published identity that
   must be communicated to the supervisory authority. For an organisation
-  that is a single individual plus AI agents, with **no production data**
-  before launch, the formal apparatus adds process without adding
-  protection.
+  that is a single individual plus AI agents, the formal apparatus adds
+  process without adding protection.
 - **The function exists anyway.** The art. 37(4) outcome — an independent,
   competent person overseeing data-protection compliance — is already
   delivered through the functional privacy/legal role (see § 4). The
@@ -122,7 +121,7 @@ The project discharges arts. 5(2) and 24 as follows:
   (LAWFUL_BASIS.md), moderation and redaction (MODERATION.md,
   MODERATION_SLA.md).
 - **Decision record:** this assessment, ADR 0017, and the CEO validation
-  (task t_06c4dc33) are the accountability record for the art. 37 decision
+  are the accountability record for the art. 37 decision
   itself — the reason it is documented rather than omitted.
 - **Art. 13(1)(b) disclosure:** PRIVACY_NOTICE § 1 discloses "no DPO
   appointed — the obligation does not apply" with a pointer to ADR 0017,
@@ -159,7 +158,7 @@ decides; Ada (CTO) is consulted where processing architecture changes.
 The GDPR art. 37(1) obligation does not apply (no public authority; no
 large-scale systematic monitoring; no large-scale special-category or
 criminal-data processing — WP 243 rev.01 factors not met). A voluntary DPO
-under art. 37(4) was considered and is not appointed pre-launch as it is
+under art. 37(4) was considered and is not appointed at this stage as it is
 disproportionate for the current processing profile; the decision is
 revisited at the public-launch gate against the explicit triggers in § 5.
 Accountability under arts. 5(2) and 24 is discharged through the functional

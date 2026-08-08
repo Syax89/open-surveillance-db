@@ -20,8 +20,7 @@ Design constraints from existing policy:
   [LAWFUL_BASIS.md](../legal/LAWFUL_BASIS.md)): no account, no mandatory
   contact data, no behavioural tracking.
 - Write routes need abuse controls before public exposure (rate limiting,
-  review finding H2 in
-  [REVIEW_POLICY_LEGALE_2026-07-31.md](../legal/REVIEW_POLICY_LEGALE_2026-07-31.md)).
+  review finding H2 of the 2026-07-31 legal review).
 - Retention values must come from
   [RETENTION_SCHEDULE.md](../legal/RETENTION_SCHEDULE.md); operational logs are
   aggregate-only and retained ≤ 12 months.
