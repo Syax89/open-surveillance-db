@@ -227,13 +227,20 @@ export function DirectoryCatalog({ filteredRecords, cameraKinds, search, setSear
           <h2 id="directory-results-title" tabIndex={-1} ref={resultsRef}>{t.resultsRegion}</h2>
           <p className="search-count" id="record-search-count" role="status">{countLabel}</p>
         </div>
-        {exportHrefs && (
-          <div className="directory-results-actions" aria-describedby="directory-export-hint">
-            <a className="export-button" href={exportHrefs.csv}>{t.exportCsv} <span aria-hidden="true">↓</span></a>
-            <a className="export-button" href={exportHrefs.geojson}>{t.exportGeoJson} <span aria-hidden="true">↓</span></a>
-            <p className="sr-only" id="directory-export-hint">{t.exportHint}</p>
-          </div>
-        )}
+        {/* CEO 2026-08-08: a small circular [+] in the header top-right — a
+            direct shortcut to the report form (/segnala). Plain link: the
+            write gate on /segnala handles anonymous visitors. Always
+            rendered (it does not depend on the export row). */}
+        <div className="directory-results-actions">
+          <a className="add-button" href={reportHref} aria-label={t.reportCamera}><span aria-hidden="true">+</span></a>
+          {exportHrefs && (
+            <>
+              <a className="export-button" href={exportHrefs.csv} aria-describedby="directory-export-hint">{t.exportCsv} <span aria-hidden="true">↓</span></a>
+              <a className="export-button" href={exportHrefs.geojson} aria-describedby="directory-export-hint">{t.exportGeoJson} <span aria-hidden="true">↓</span></a>
+              <p className="sr-only" id="directory-export-hint">{t.exportHint}</p>
+            </>
+          )}
+        </div>
       </div>
       {/* Active-filter chips: the state of the list at a glance, removable
           one at a time (Google Maps / CKAN pattern). */}

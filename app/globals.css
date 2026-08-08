@@ -907,6 +907,13 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
    queries "Download CSV"/"Download GeoJSON" by role). */
 .export-button { display:inline-flex; align-items:center; gap:7px; min-height:44px; padding:0 16px; border:1px solid var(--field-border); border-radius:var(--radius-md); background:var(--card-bg); color:var(--action); font-size:var(--text-md); font-weight:800; }
 .export-button:hover { border-color:var(--control-focus); }
+/* Report shortcut (CEO 2026-08-08): a small circular [+] in the results
+   header top-right linking to /segnala — the report form write gate handles
+   anonymous visitors, so it is a plain link. 44px circular touch target
+   (WCAG 2.5.8), same secondary-button family as the exports. */
+.add-button { display:inline-flex; align-items:center; justify-content:center; width:44px; height:44px; flex:none; border:1px solid var(--field-border); border-radius:var(--radius-full); background:var(--card-bg); color:var(--action); font-size:var(--text-2xl); font-weight:800; line-height:1; text-decoration:none; }
+.add-button:hover { border-color:var(--control-focus); background:var(--surface-muted); }
+.add-button:focus-visible { outline:3px solid var(--focus); outline-offset:2px; }
 /* Active-filter chips (t_f13fcb1c): one per non-default dimension, removable
    one at a time (Google Maps / CKAN pattern) — the list state at a glance. */
 .filter-chips { display:flex; flex-wrap:wrap; gap:8px; margin:14px 0 0; padding:0; list-style:none; }
