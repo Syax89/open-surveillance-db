@@ -781,6 +781,13 @@ test("DirectoryTool renders the directory shell with the shared FiltersBar and b
   assert.ok(screen.getByRole("link", { name: "Download GeoJSON" }), "download GeoJSON row on /directory");
   assert.ok(screen.getByRole("link", { name: "Download CSV" }), "download CSV row on /directory");
   assert.equal(screen.getByRole("link", { name: "Read the data policy" }).getAttribute("href"), "/guide", "the data policy link points at /guide");
+
+  // CEO 2026-08-08: the small circular [+] in the results header top-right
+  // links to the report form (/segnala) — a plain link, the write gate there
+  // handles anonymous visitors.
+  const reportShortcut = screen.getByRole("link", { name: "Report a camera" });
+  assert.equal(reportShortcut.getAttribute("href"), "/segnala", "the [+] links the report form route");
+  assert.match(reportShortcut.getAttribute("class") ?? "", /add-button/, "the [+] uses the circular add-button style");
 });
 
 test("DirectoryTool search narrows the list (debounced URL commit); the empty state offers a clear action that restores it", async (t) => {

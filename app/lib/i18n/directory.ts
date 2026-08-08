@@ -37,6 +37,9 @@ export const en = {
   exportCsv: "Download CSV",
   exportGeoJson: "Download GeoJSON",
   exportHint: "Exports apply the current type and freshness filters.",
+  // Catalog mode (CEO 2026-08-08): the small circular [+] in the results
+  // header top-right — a direct shortcut to the report form (/segnala).
+  reportCamera: "Report a camera",
   // Catalog mode (t_f13fcb1c): the visible results header, the active-filter
   // chips, the alphabetical index and the pagination bar.
   activeFilters: "Active filters",
@@ -170,6 +173,10 @@ export const it: Translation<typeof en> = {
   exportCsv: "Scarica CSV",
   exportGeoJson: "Scarica GeoJSON",
   exportHint: "Gli export applicano i filtri di tipo e aggiornamento correnti.",
+  // Modalità catalogo (CEO 2026-08-08): il piccolo [+] circolare nell'header
+  // dei risultati in alto a destra — scorciatoia diretta al modulo di
+  // segnalazione (/segnala).
+  reportCamera: "Segnala una telecamera",
   // Modalità catalogo (t_f13fcb1c): header risultati visibile, chips dei
   // filtri attivi, indice alfabetico e barra di paginazione.
   activeFilters: "Filtri attivi",

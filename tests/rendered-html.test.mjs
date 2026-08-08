@@ -193,6 +193,9 @@ test("server-rendered /mappa provides the map region and /directory the text-lis
   // (mocked) records post-hydration in tests/client-tools.test.mjs
   // ("DirectoryTool" suite).
   assert.match(directory.html, /class="empty-state"/, "the SSR shell shows the truthful empty state before hydration");
+  // CEO 2026-08-08: the [+] report shortcut renders in the SSR shell too —
+  // it does not depend on hydration or on the export row.
+  assert.match(directory.html, /class="add-button"[^>]*href="\/segnala"/, "the [+] report shortcut links /segnala from the SSR header");
 });
 
 test("global footer exposes every institutional page, the ODbL data licence and OSM attribution", async () => {
