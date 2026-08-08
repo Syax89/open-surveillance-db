@@ -57,7 +57,7 @@ export const en = {
   outcomeEscalatedBody: "Enough confirmations brought the record back to the public list. The reversal is recorded in its public history.",
   slaTitle: "Response targets",
   slaBody:
-    "Correction and takedown requests: first response within 48 hours, substantive response within 14 days; legal-emergency hides are immediate. These targets are a draft proposed for pre-launch review, not yet in force.",
+    "Correction and takedown requests: first response within 48 hours, substantive response within 14 days; legal-emergency hides are immediate. These targets are in force.",
   safeguardsEyebrow: "Safeguards",
   safeguardsTitle: "Checks on the community model.",
   safeguardsBody: "The model is structured so that no single account controls publication and mistakes stay visible.",
@@ -119,7 +119,7 @@ export const it: Translation<typeof en> = {
   outcomeEscalatedBody: "Abbastanza conferme hanno riportato il record nell'elenco pubblico. L'inversione è registrata nella sua cronologia pubblica.",
   slaTitle: "Obiettivi di risposta",
   slaBody:
-    "Richieste di correzione e rimozione: prima risposta entro 48 ore, risposta sostanziale entro 14 giorni; i nascondimenti per emergenza legale sono immediati. Questi obiettivi sono una bozza proposta per la revisione pre-lancio, non ancora in vigore.",
+    "Richieste di correzione e rimozione: prima risposta entro 48 ore, risposta sostanziale entro 14 giorni; i nascondimenti per emergenza legale sono immediati. Questi obiettivi sono in vigore.",
   safeguardsEyebrow: "Garanzie",
   safeguardsTitle: "Controlli sul modello community.",
   safeguardsBody: "Il modello è strutturato perché nessun singolo account controlli la pubblicazione e gli errori restino visibili.",

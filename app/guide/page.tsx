@@ -29,7 +29,7 @@ export default async function GuidePage() {
       intro={t.intro}
       actions={
         <>
-          <Link className="button button-primary" href="/mappa">{t.exploreMap} <span aria-hidden="true">↘</span></Link>
+          <Link className="button button-primary" href="/mappa">{t.exploreMap} <span aria-hidden="true">→</span></Link>
           <Link className="button detail-outline" href="/directory">{t.browseDirectory}</Link>
         </>
       }

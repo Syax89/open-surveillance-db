@@ -44,6 +44,22 @@ function loginForm() {
   return renderWithLocale(React.createElement(LoginPage));
 }
 
+/**
+ * Render the login page with the OIDC provider-discovery route stubbed to
+ * "both providers configured" (design review 2026-08-08, F1): the social
+ * buttons render only when GET /api/auth/oidc/providers answers a
+ * non-empty list — tests that exercise the social panel must stub it.
+ */
+function loginFormWithSocial() {
+  installFetchMock((input) => {
+    if (String(input) === "/api/auth/oidc/providers") {
+      return jsonResponse({ providers: ["github", "google"] });
+    }
+    return jsonResponse({ error: "unexpected route" }, { status: 404 });
+  });
+  return renderWithLocale(React.createElement(LoginPage));
+}
+
 /** Fake the WebAuthn browser surface with a scriptable get() ceremony. */
 function installWebAuthnGet(assertionImpl) {
   globalThis.PublicKeyCredential = class FakePublicKeyCredential {};
@@ -84,7 +100,7 @@ function fakeAssertionCredential() {
 test("login: the method selector switches between password, passkey and social panels", async () => {
   const { screen } = rtl;
   const user = rtl.userEvent.setup();
-  await loginForm();
+  await loginFormWithSocial();
 
   // Default: the classic email+password panel.
   assert.ok(screen.getByLabelText("Email"));
@@ -103,9 +119,11 @@ test("login: the method selector switches between password, passkey and social p
 });
 
 test("login: OIDC providers link to the /start routes and declare the privacy risk", async () => {
-  const { screen } = rtl;
+  const { screen, waitFor } = rtl;
   const user = rtl.userEvent.setup();
-  await loginForm();
+  await loginFormWithSocial();
+  // The social method appears only after provider discovery resolves.
+  await waitFor(() => assert.ok(screen.getByRole("radio", { name: "Social sign-in" })));
   await user.click(screen.getByRole("radio", { name: "Social sign-in" }));
 
   const github = screen.getByRole("link", { name: "Continue with GitHub" });
@@ -186,7 +204,7 @@ test("login: passkey sign-in runs begin -> getCredential -> complete and redirec
   assert.equal(body.response.response.authenticatorData, client.bytesToBase64Url(new Uint8Array([3, 4])));
 
   const nav = await getNavState();
-  await waitFor(() => assert.deepEqual(nav.pushed, ["/account"]));
+  await waitFor(() => assert.deepEqual(window.__locationAssigns, ["/account"]));
 });
 
 test("login: an optional passkey email narrows the begin payload", async () => {
@@ -245,7 +263,7 @@ test("login: ?merge= shows the merge form and POSTs token + email + password", a
   });
 
   const nav = await getNavState();
-  await waitFor(() => assert.deepEqual(nav.pushed, ["/account"]));
+  await waitFor(() => assert.deepEqual(window.__locationAssigns, ["/account"]));
 });
 
 test("login: a 410 from the merge route drops merge mode and announces the expired link", async () => {
@@ -298,7 +316,7 @@ test("login: the password panel links 'Forgot password?' to /forgot-password", a
 test("login: every method declares its own risk disclosure (P1-4 risk matrix)", async () => {
   const { screen } = rtl;
   const user = rtl.userEvent.setup();
-  await loginForm();
+  await loginFormWithSocial();
 
   // Password method: PII + phishing surface, in the same disclosure box the
   // OIDC panel uses (the risk matrix is per-method, ADR 0020 d.6).
@@ -336,7 +354,7 @@ test("login: ?returnTo= redirects back to the tool after a successful password l
   await user.click(screen.getByRole("button", { name: "Log in" }));
 
   const nav = await getNavState();
-  await waitFor(() => assert.deepEqual(nav.pushed, ["/segnala"]));
+  await waitFor(() => assert.deepEqual(window.__locationAssigns, ["/segnala"]));
 });
 
 test("login: ?returnTo= is ignored for off-site targets (same-site only)", async () => {
@@ -354,5 +372,5 @@ test("login: ?returnTo= is ignored for off-site targets (same-site only)", async
   await user.click(screen.getByRole("button", { name: "Log in" }));
 
   const nav = await getNavState();
-  await waitFor(() => assert.deepEqual(nav.pushed, ["/account"]), "off-site returnTo must fall back to /account");
+  await waitFor(() => assert.deepEqual(window.__locationAssigns, ["/account"]), "off-site returnTo must fall back to /account");
 });

@@ -15,7 +15,7 @@ export const en = {
   title: "Moderation queue",
   intro:
     "This interface is for local administration only. It is not linked from the public site and does not publish any new information by itself.",
-  localTool: "Local-only tool.",
+  localTool: "Restricted administration tool — not linked from the public site.",
   localWarning:
     "Review text and approximate locations only. Photos in the queue are private evidence: check redaction before approving, and never add personal data, credentials, live-feed links, or operational security details.",
   loading: "Loading local moderation queue…",
@@ -248,7 +248,7 @@ export const it: Translation<typeof en> = {
   title: "Coda di moderazione",
   intro:
     "Questa interfaccia è riservata esclusivamente all'amministrazione locale. Non è collegata al sito pubblico e non pubblica autonomamente nuove informazioni.",
-  localTool: "Strumento solo locale.",
+  localTool: "Strumento di amministrazione riservato — non linkato dal sito pubblico.",
   localWarning:
     "Valuta solo testo e posizioni approssimative. Le foto in coda sono prove private: verifica la redazione prima di approvare e non aggiungere mai dati personali, credenziali, link a feed live o dettagli sulla sicurezza operativa.",
   loading: "Caricamento della coda di moderazione locale…",

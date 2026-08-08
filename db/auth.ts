@@ -1048,6 +1048,10 @@ export type ContributionType = (typeof CONTRIBUTION_TYPES)[number];
 /** Whitelist of contribution statuses accepted by the profile list filter. */
 export const CONTRIBUTION_STATUSES = [
   "pending",
+  // Post-migration 0039 the public camera domain status is "active"
+  // (verified/needs_review/stale → active, rejected → removed); the legacy
+  // "verified" key stays in the whitelist only for historical queries.
+  "active",
   "verified",
   "needs_review",
   "stale",
@@ -1160,6 +1164,53 @@ export async function listContributorContributions(
     .bind(...pageParameters)
     .all<ContributorContribution>();
   return { contributions: page.results, total };
+}
+
+// ---------------------------------------------------------------------------
+// Contribution summary (account page stats, C7 rework 2026-08-08)
+// ---------------------------------------------------------------------------
+
+/** Global per-type and per-status counts for the caller's own contributions. */
+export type ContributionSummary = {
+  total: number;
+  byType: Record<ContributionType, number>;
+  byStatus: Record<string, number>;
+};
+
+/**
+ * One grouped query over the three contribution tables — global totals,
+ * INDEPENDENT of any list filter, so the account page can render the
+ * summary strip ("X in moderation · Y published …") without an extra
+ * endpoint. Anonymous rows (contributor_id NULL) never count: the profile
+ * list shows only attributed contributions (ADR 0013).
+ */
+export async function summarizeContributorContributions(contributorId: number): Promise<ContributionSummary> {
+  const d1 = await getD1();
+  const result = await d1
+    .prepare(
+      `SELECT type, status, COUNT(*) AS n FROM (
+        SELECT 'camera' AS type, status FROM cameras WHERE contributor_id = ?
+        UNION ALL
+        SELECT 'correction', status FROM correction_requests WHERE contributor_id = ?
+        UNION ALL
+        SELECT 'photo', status FROM photos WHERE contributor_id = ?
+      ) GROUP BY type, status`,
+    )
+    .bind(contributorId, contributorId, contributorId)
+    .all<{ type: ContributionType; status: string; n: number }>();
+
+  const summary: ContributionSummary = {
+    total: 0,
+    byType: { camera: 0, correction: 0, photo: 0 },
+    byStatus: {},
+  };
+  for (const row of result.results) {
+    const n = Number(row.n) || 0;
+    summary.total += n;
+    summary.byType[row.type] = (summary.byType[row.type] ?? 0) + n;
+    summary.byStatus[row.status] = (summary.byStatus[row.status] ?? 0) + n;
+  }
+  return summary;
 }
 
 /**

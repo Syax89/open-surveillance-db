@@ -1,6 +1,6 @@
 # Retention schedule (operational)
 
-- **Status:** draft for pre-launch review (ADR 0004)
+- **Status:** in force — personal open-source project, 2026-08-08 (ADR 0004)
 - **Owner:** Rosa (Legal & Privacy Officer / privacy contact)
 - **Community-driven model applied (2026-08-05, ADR 0021):** records publish immediately from verified accounts and stay public while the community keeps confirming them — **no time-based retention for records** (ADR 0021 § 9.3) and **no state transition ever happens on a timer** (§ 2.2). The pre-pivot moderation lifecycle and the time-based renewal review cycle (decision 2026-07-31, ADR 0008) are **retired**; the record statuses are `active` / `hidden` / `removed` (+ `demo` technical marker). Privacy contact `privacy@opensurveillancedb.org` (dedicated, monitored mailbox) unchanged.
 - **Photo evidence retention (2026-08-01, DPO — audit gap G6; updated 2026-08-05, ADR 0021):** photo uploads follow their own photo-level lifecycle (R13) — orphaned uploads 90 days, rejected photos 30 days, approved photos **follow the record's retention** (no fixed cycle); deletion always includes the R2 `PHOTOS` object bytes, not just the D1 row.
@@ -12,7 +12,7 @@
 - **Legal basis:** GDPR art. 5(1)(e) (storage limitation), art. 17 (erasure); D.Lgs. 196/2003 (Codice Privacy, IT) as primary jurisdiction; consistent with `../PRIVACY_AND_SAFETY.md` and `../MODERATION.md`.
 - **Scope:** all data held by OpenSurveillanceDB, including reports, community actions, residual-moderation data (photo decisions, legal-emergency actions), evidence, correction requests and backups.
 
-> **Disclaimer:** this document is product guidance / not legal advice. It is a draft for pre-launch review and requires external counsel review before launch.
+> **Disclaimer:** this document is product guidance / not legal advice. The document is in force for the pilot jurisdiction (Italy); per-jurisdiction review remains the documented precondition for an EU-wide launch.
 
 ## 1. Retention table
 

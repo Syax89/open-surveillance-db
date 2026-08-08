@@ -514,6 +514,23 @@ export const DomEvent = {
     await writeFile(outPath, rewriteSpecifiers(transpile(abs)));
   }
 
+  // --- app/lib/navigate stub (2026-08-08) --------------------------------
+  // After a successful login/register the auth pages call hardNavigate()
+  // — a full reload beats router.push + refresh on vinext dev, where the
+  // RSC request fires but the UI stays frozen (reproduced live on
+  // osdb.syaxhome89.com). jsdom cannot navigate, so the stub records the
+  // destinations in window.__locationAssigns (same contract as nav.pushed)
+  // and tests assert them.
+  await writeFile(
+    path.join(tree, "app", "lib", "navigate.mjs"),
+    `export function hardNavigate(href) {
+  if (typeof window !== "undefined" && window.__locationAssigns) {
+    window.__locationAssigns.push(String(href));
+  }
+}
+`,
+  );
+
   // Fixup: relative imports pointing at a directory index (e.g. ../lib/i18n
   // -> ../lib/i18n.mjs) must become ../lib/i18n/index.mjs when the file does
   // not exist but the directory index does.
@@ -570,6 +587,7 @@ export function loadLocaleProvider() {
 // @testing-library render result.
 export async function renderWithLocale(element) {
   const rtl = await setupDom();
+  if (window.__locationAssigns) window.__locationAssigns.length = 0;
   return rtl.render(await wrapWithLocale(element));
 }
 
@@ -699,6 +717,16 @@ export async function setupDom({ url = "https://osdb.test/" } = {}) {
     }
     globalThis.window = window;
     globalThis.document = window.document;
+
+    // Hard-navigation stub (2026-08-08): after a successful login/register
+    // the auth pages call hardNavigate() from app/lib/navigate — a full
+    // reload beats router.push + refresh on vinext dev, where the RSC
+    // request fires but the UI stays frozen on the login page (reproduced
+    // live on osdb.syaxhome89.com). jsdom cannot navigate, so the module
+    // stub records the destinations in window.__locationAssigns (same
+    // contract as nav.pushed) and tests assert them. The stub is written
+    // into the DOM tree like the next/navigation mock (see writeTree).
+    window.__locationAssigns = [];
 
     // jsdom does not implement matchMedia / scrollIntoView; the home page
     // uses both, but keep the polyfills here so any client module that

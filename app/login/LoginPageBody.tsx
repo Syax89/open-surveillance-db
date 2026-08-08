@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMessages } from "../lib/use-messages";
 import { PublicNav } from "../components/PublicNav";
 import { browserSupportsWebAuthn, getCredential } from "../lib/webauthn-client";
+import { hardNavigate } from "../lib/navigate";
 
 /**
  * /login — multi-method sign-in (Fase E2, design Vera).
@@ -60,8 +61,12 @@ export function LoginPageBody() {
   const [returnTo] = useState<string | null>(() => safeReturnTo(searchParams.get("returnTo")));
 
   function afterLogin() {
-    router.push(returnTo ?? "/account");
-    router.refresh();
+    // Hard navigation (2026-08-08): vinext dev fires the RSC request for
+    // router.push() but the UI stays frozen on the login page — reproduced
+    // live on osdb.syaxhome89.com (passkey login: complete 200, /account
+    // RSC 200, no visual change until a manual reload). A full reload
+    // guarantees the freshly-set session cookies are read by the SSR pass.
+    hardNavigate(returnTo ?? "/account");
   }
 
   // Email + password panel state.
@@ -80,6 +85,25 @@ export function LoginPageBody() {
   const [mergeEmail, setMergeEmail] = useState("");
   const [mergePassword, setMergePassword] = useState("");
   const [mergeFieldErrors, setMergeFieldErrors] = useState<{ email?: boolean; password?: boolean }>({});
+
+  // Social sign-in availability (design review 2026-08-08, F1): the OIDC
+  // buttons render ONLY for providers whose credentials are configured on
+  // this deployment (GET /api/auth/oidc/providers). Unconfigured providers
+  // answer 503 mid-flow, so the UI must not offer them. null = still
+  // loading; the social method stays hidden until the answer arrives.
+  const [oidcProviders, setOidcProviders] = useState<string[] | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/auth/oidc/providers")
+      .then((response) => (response.ok ? response.json() : Promise.reject(new Error())))
+      .then((data: { providers?: string[] }) => {
+        if (!cancelled) setOidcProviders(Array.isArray(data.providers) ? data.providers : []);
+      })
+      .catch(() => { if (!cancelled) setOidcProviders([]); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const socialAvailable = Array.isArray(oidcProviders) && oidcProviders.length > 0;
 
   const mergeMode = mergeToken !== null;
 
@@ -226,7 +250,10 @@ export function LoginPageBody() {
   const methods: { key: Method; label: string }[] = [
     { key: "password", label: t.methodPassword },
     { key: "passkey", label: t.methodPasskey },
-    { key: "social", label: t.methodSocial },
+    // Social is offered only when at least one provider is configured
+    // (design review 2026-08-08, F1): an unconfigured provider 503s
+    // mid-flow, so the method must not be selectable.
+    ...(socialAvailable ? [{ key: "social" as Method, label: t.methodSocial }] : []),
   ];
 
   return (
@@ -390,12 +417,16 @@ export function LoginPageBody() {
             {method === "social" ? (
               <div className="oidc-panel">
                 <div className="oidc-buttons">
-                  <a className="button detail-outline oidc-button" href={`/api/auth/oidc/github/start?redirect_to=${encodeURIComponent(returnTo ?? "/account")}`}>
-                    {t.oidcGithub}
-                  </a>
-                  <a className="button detail-outline oidc-button" href={`/api/auth/oidc/google/start?redirect_to=${encodeURIComponent(returnTo ?? "/account")}`}>
-                    {t.oidcGoogle}
-                  </a>
+                  {oidcProviders?.includes("github") ? (
+                    <a className="button detail-outline oidc-button" href={`/api/auth/oidc/github/start?redirect_to=${encodeURIComponent(returnTo ?? "/account")}`}>
+                      {t.oidcGithub}
+                    </a>
+                  ) : null}
+                  {oidcProviders?.includes("google") ? (
+                    <a className="button detail-outline oidc-button" href={`/api/auth/oidc/google/start?redirect_to=${encodeURIComponent(returnTo ?? "/account")}`}>
+                      {t.oidcGoogle}
+                    </a>
+                  ) : null}
                 </div>
                 <p className="oidc-disclosure">
                   {t.oidcDisclosure}{" "}

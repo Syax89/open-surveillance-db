@@ -1,13 +1,13 @@
 # DPO exclusion — GDPR art. 37(4) assessment and documented decision
 
-- **Status:** draft for pre-launch review; decision recorded (2026-08-01) — no DPO appointed, exclusion documented
+- **Status:** in force — personal open-source project, 2026-08-08; decision recorded (2026-08-01) — no DPO appointed, exclusion documented
 - **Version:** 1.0 (2026-08-01)
 - **Owner:** Rosa (Legal & Privacy Officer / privacy contact)
 - **Decision owner:** CEO (validation recorded on board task t_06c4dc33)
 - **Legal basis assessed:** GDPR art. 37(1)(a)/(b)/(c) and art. 37(4)
 - **Cross-references:** ADR 0017 (`docs/decisions/0017-no-dpo-appointed-art37.md`), PRIVACY_NOTICE.md § 1, GOVERNANCE.md (privacy / legal contact), LAWFUL_BASIS.md § 1, PROCESSOR_REGISTER.md, RETENTION_SCHEDULE.md, BREACH_PROCEDURE.md
 
-> **Disclaimer:** this document is product guidance / not legal advice. It is a draft for pre-launch review and requires external counsel review before launch.
+> **Disclaimer:** this document is product guidance / not legal advice. The document is in force for the pilot jurisdiction (Italy); per-jurisdiction review remains the documented precondition for an EU-wide launch.
 
 ---
 

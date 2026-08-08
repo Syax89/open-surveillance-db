@@ -22,6 +22,36 @@
  * calls go through globalThis.fetch, which tests stub.
  */
 
+/**
+ * Build the PUBLIC origin for OIDC redirect URIs.
+ *
+ * Priority (fail-closed):
+ *   1. `OIDC_PUBLIC_ORIGIN` env — the explicit public origin of this
+ *      deployment (e.g. https://osdb.syaxhome89.com). Deterministic: a
+ *      reverse proxy that does not forward X-Forwarded-Proto (verified:
+ *      NPM -> LXC on 2026-08-08) cannot break the redirect.
+ *   2. `X-Forwarded-Proto: https` — standard proxy convention: rebuild
+ *      the origin with the HTTPS scheme and the request host.
+ *   3. `new URL(request.url).origin` — direct deployment (local dev,
+ *      Cloudflare Workers in production, where the origin is already
+ *      correct).
+ *
+ * Without (1)/(2) the dev/pre-prod server behind a TLS-terminating proxy
+ * would emit `http://<host>` while the provider registered the HTTPS
+ * callback — the mismatch answers `400 redirect_uri_mismatch` (reproduced
+ * live on osdb.syaxhome89.com, 2026-08-08).
+ */
+export function publicOrigin(request: Request, env?: unknown): string {
+  const url = new URL(request.url);
+  const explicit = (env as { [key: string]: unknown } | undefined)?.OIDC_PUBLIC_ORIGIN;
+  if (typeof explicit === "string" && explicit.length > 0) return explicit;
+  const forwardedProto = request.headers.get("X-Forwarded-Proto");
+  if (forwardedProto === "https") {
+    return `https://${url.host}`;
+  }
+  return url.origin;
+}
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------

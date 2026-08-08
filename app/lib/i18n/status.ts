@@ -17,6 +17,14 @@ export const en = {
   needs_review: "Needs review",
   removed: "Removed",
   rejected: "Rejected",
+  // Terminal/lifecycle statuses used by moderation outcomes (2026-08-08):
+  // approving a correction sets "reviewed"; approving a photo sets
+  // "approved"; a camera that aged out of review is "stale" (kept for
+  // historical rows). Without these the account page fell back to the
+  // literal label "Status" on approved corrections/photos.
+  reviewed: "Resolved",
+  approved: "Approved",
+  stale: "Stale",
   // ADR 0021 §6.3 (FASE 3 UI): hidden/removed records are reachable by
   // direct link with a banner; the labels feed the banner and the record
   // status line (publicStatusLabel whitelist extended for the record page).
@@ -31,5 +39,8 @@ export const it: Translation<typeof en> = {
   needs_review: "Da ricontrollare",
   removed: "Rimosso",
   rejected: "Rifiutato",
+  reviewed: "Risolta",
+  approved: "Approvata",
+  stale: "Obsoleto",
   hidden: "Nascosto",
 };

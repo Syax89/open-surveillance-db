@@ -83,13 +83,50 @@ export const en = {
   statusFilters: {
     all: "All",
     pending: "In moderation",
+    // Post-0039 the published camera status is "active" — the chip label
+    // says "Published" so the filter vocabulary matches the domain.
+    active: "Published",
     verified: "Verified",
     needs_review: "Needs review",
     removed: "Removed",
+    rejected: "Rejected",
+    reviewed: "Resolved",
+    approved: "Approved",
+    stale: "Stale",
   },
   errorLoadContributions: "Could not load your contributions.",
   errorLoadTrustLevel: "Could not load your trust level.",
   gateL1Help: "You can verify records after your first contribution is published.",
+  // Contribution kinds (account page rework 2026-08-08): the three types
+  // are visually distinct via inline SVG icon + text label (never colour
+  // alone — WCAG 1.4.1), so each row and stats card carries these.
+  typeLabels: {
+    camera: "Camera report",
+    correction: "Correction",
+    photo: "Photo",
+  },
+  // Type filter chips (same look as the status chips; local state, never
+  // in the URL — private page).
+  typeFilters: {
+    all: "All types",
+    camera: "Camera reports",
+    correction: "Corrections",
+    photo: "Photos",
+  },
+  typeFilterLabel: "Filter by type",
+  // Account summary strip: global counts (independent of the active
+  // filters) answering "what do I have in the queue?" at a glance.
+  stats: {
+    camera: "Camera reports",
+    correction: "Corrections",
+    photo: "Photos",
+    inModeration: "In moderation",
+  },
+  statsGroupLabel: "Summary of your contributions",
+  // Contribution loop CTA: the page is no longer a dead end — it links
+  // back into the reporting tools.
+  newReportCta: "Report a camera",
+  newCorrectionCta: "Propose a correction",
   // Profile list pagination (F0 canonical contract) + per-filter empty
   // state: the list is the contributor's own, filters are local to the
   // page (never shareable URLs, COMMUNITY_PLAN §2.3).
@@ -259,13 +296,50 @@ export const it: Translation<typeof en> = {
   statusFilters: {
     all: "Tutti",
     pending: "In moderazione",
+    // Post-0039 lo stato pubblico delle telecamere è "active" — il chip
+    // dice "Pubblicate" così il vocabolario del filtro combacia col dominio.
+    active: "Pubblicate",
     verified: "Verificato",
     needs_review: "Da ricontrollare",
     removed: "Rimosso",
+    rejected: "Rifiutate",
+    reviewed: "Risolta",
+    approved: "Approvata",
+    stale: "Obsoleto",
   },
   errorLoadContributions: "Non è stato possibile caricare i tuoi contributi.",
   errorLoadTrustLevel: "Non è stato possibile caricare il tuo livello di fiducia.",
   gateL1Help: "Puoi verificare i record dopo la pubblicazione del tuo primo contributo.",
+  // Tipi di contributo (rework pagina account 2026-08-08): i tre tipi si
+  // distinguono con icona SVG inline + etichetta testuale (mai solo colore
+  // — WCAG 1.4.1), così ogni riga e ogni card delle stats le porta.
+  typeLabels: {
+    camera: "Segnalazione",
+    correction: "Correzione",
+    photo: "Foto",
+  },
+  // Chip filtro per tipo (stesso look dei chip di stato; stato locale, mai
+  // in URL — pagina privata).
+  typeFilters: {
+    all: "Tutti i tipi",
+    camera: "Segnalazioni",
+    correction: "Correzioni",
+    photo: "Foto",
+  },
+  typeFilterLabel: "Filtra per tipo",
+  // Riga riepilogo account: conteggi globali (indipendenti dai filtri
+  // attivi) che rispondono a colpo d'occhio a "cosa ho in coda?".
+  stats: {
+    camera: "Segnalazioni",
+    correction: "Correzioni",
+    photo: "Foto",
+    inModeration: "In moderazione",
+  },
+  statsGroupLabel: "Riepilogo dei tuoi contributi",
+  // CTA del loop contributivo: la pagina non è più un vicolo cieco —
+  // riporta agli strumenti di segnalazione.
+  newReportCta: "Segnala una telecamera",
+  newCorrectionCta: "Proponi una correzione",
   // Paginazione della lista profilo (contratto canonico F0) + empty state
   // per filtro: la lista è del contributor, i filtri sono locali alla
   // pagina (mai URL condivisibili, COMMUNITY_PLAN §2.3).

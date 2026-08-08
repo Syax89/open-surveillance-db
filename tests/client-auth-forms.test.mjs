@@ -72,7 +72,7 @@ test("login: valid submit POSTs to /api/auth/login and redirects to /account", a
   assert.deepEqual(body, { email: "contributor@example.test", password: "Correct-Horse-Battery1" });
 
   const nav = await getNavState();
-  await waitFor(() => assert.deepEqual(nav.pushed, ["/account"]));
+  await waitFor(() => assert.deepEqual(window.__locationAssigns, ["/account"]));
 });
 
 test("login: 401 surfaces the invalid-credentials error in role=alert", async () => {
@@ -156,6 +156,28 @@ test("login: submit button disables and shows loading while pending", async () =
   assert.equal(button.textContent, "Log in");
 });
 
+test("register: OIDC panel appears only when provider discovery answers a non-empty list", async () => {
+  const { screen } = rtl;
+  // No providers configured -> fail-closed: no social panel, no buttons.
+  installFetchMock(() => jsonResponse({ providers: [] }));
+  await registerForm();
+  assert.equal(screen.queryByRole("link", { name: "Continue with GitHub" }), null);
+  assert.equal(screen.queryByRole("link", { name: "Continue with Google" }), null);
+});
+
+test("register: OIDC panel renders GitHub/Google buttons when providers are configured", async () => {
+  const { screen, waitFor } = rtl;
+  installFetchMock((input) => {
+    if (String(input) === "/api/auth/oidc/providers") return jsonResponse({ providers: ["github", "google"] });
+    return jsonResponse({ error: "unexpected route" }, { status: 404 });
+  });
+  await registerForm();
+  await waitFor(() => assert.ok(screen.getByRole("link", { name: "Continue with GitHub" })));
+  assert.ok(screen.getByRole("link", { name: "Continue with Google" }));
+  const github = screen.getByRole("link", { name: "Continue with GitHub" });
+  assert.equal(github.getAttribute("href"), "/api/auth/oidc/github/start?redirect_to=%2Faccount");
+});
+
 test("register: valid submit POSTs to /api/auth/register and redirects", async () => {
   const { screen, waitFor } = rtl;
   const user = makeUser();
@@ -183,7 +205,7 @@ test("register: valid submit POSTs to /api/auth/register and redirects", async (
   });
 
   const nav = await getNavState();
-  await waitFor(() => assert.deepEqual(nav.pushed, ["/account"]));
+  await waitFor(() => assert.deepEqual(window.__locationAssigns, ["/account"]));
 });
 
 test("register: blank displayName is omitted from the payload", async () => {

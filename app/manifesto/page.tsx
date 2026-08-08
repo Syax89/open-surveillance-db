@@ -27,7 +27,7 @@ export default async function ManifestoPage() {
       intro={t.intro}
       actions={
         <>
-          <Link className="button button-primary" href="/mappa">{t.exploreMap} <span aria-hidden="true">↘</span></Link>
+          <Link className="button button-primary" href="/mappa">{t.exploreMap} <span aria-hidden="true">→</span></Link>
           <Link className="button button-quiet detail-outline" href="/directory">{t.browseDirectory}</Link>
           <Link className="button button-quiet detail-outline" href="/guide">{t.readGuide}</Link>
         </>

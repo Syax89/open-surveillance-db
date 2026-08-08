@@ -381,8 +381,13 @@ test("the account page labels submission statuses from i18n with a neutral fallb
   );
   assert.match(
     page,
-    /statuses\[contribution\.status[^\]]*\]\s*\?\?\s*(?:community\.statusFilters\[[^\]]*\]\s*\?\?\s*)?t\.submissionStatus/,
-    "unknown statuses must fall back to the neutral localized label",
+    /statuses\[status\]\s*\?\?\s*statusFilters\[status\]\s*\?\?\s*fallback/,
+    "the contributionStatusLabel helper must chain bundle.status -> statusFilters -> the neutral localized fallback",
+  );
+  assert.match(
+    page,
+    /contributionStatusLabel\s*\(/,
+    "the account page must label statuses through the safe helper, never inline",
   );
   assert.match(
     page,

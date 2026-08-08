@@ -26,7 +26,7 @@ export function MapTeaser({ eyebrow, title, body, cta }: MapTeaserProps) {
         <p className="eyebrow"><span /> {eyebrow}</p>
         <h2 id="map-teaser-title">{title}</h2>
         <p>{body}</p>
-        <Link className="button button-primary" href="/mappa">{cta} <span aria-hidden="true">↘</span></Link>
+        <Link className="button button-primary" href="/mappa">{cta} <span aria-hidden="true">→</span></Link>
       </div>
       <div className="map-teaser-visual" aria-hidden="true">
         <div className="teaser-grid" />

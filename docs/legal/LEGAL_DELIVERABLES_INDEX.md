@@ -1,6 +1,6 @@
 # Pre-launch legal deliverables — index
 
-- **Status:** all documents are **drafts** for pre-launch review; nothing here is a published commitment.
+- **Status:** in force — personal open-source project, 2026-08-08; all documents are final; the controller is the project owner Simone Rondina (syax89), not a company.
 - **Owner:** Rosa (Legal & Privacy Officer / privacy contact)
 - **Decisions applied (2026-07-31, CEO — recorded in ADR 0008, docs task t_0b3d47e2):** controller entity **Simone Rondina (syax89) / OpenSurveillanceDB (Italy)**; data licence **ODbL 1.0** (software stays as in the repository: AGPL-3.0-or-later in LICENSE + package.json — note: the CEO decision cited "MIT already present", which does not match the repository; confirmation requested, see task t_e4bfcfbc); publication precision **~4 decimal places (~10 m)** with exact detail private to moderators; correction/removal contact **`privacy@opensurveillancedb.org`** (dedicated, monitored mailbox) + private form. **Community-driven model (2026-08-04/05, ADR 0021):** the 12-month renewal review cycle is **retired** — records publish immediately and stay public while the community keeps confirming them (no time-based record retention); residual human moderation = photo redaction gate + legal-emergency admin actions.
 - **Location:** canonical folder for pre-launch legal deliverables: `docs/legal/` (per ADR 0002).

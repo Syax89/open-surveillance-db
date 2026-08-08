@@ -1,6 +1,6 @@
 # Accessibility statement
 
-- **Status:** draft — pre-launch, project stage
+- **Status:** in force (personal open-source project), 2026-08-08 — version 0.2
 - **Owner:** Marie (documentation) with review by Ada (technical) and Rosa (privacy/legal)
 - **Standards target:** WCAG 2.2 AA (Web Content Accessibility Guidelines)
 - **Related documents:** [PRODUCT_UX.md](workstreams/PRODUCT_UX.md), [ADR 0006 — non-sensitive usability-feedback route](decisions/0006-non-sensitive-usability-feedback-route.md), [MODERATION_SLA.md](legal/MODERATION_SLA.md)
