@@ -118,3 +118,61 @@ test("unmountPopupActions tears down the root (popupclose — no leaked React tr
 
   node.remove();
 });
+
+// ---------------------------------------------------------------------------
+// BUG t_5bc23d61 (CEO 2026-08-08): the "useful" vote on /mappa does not
+// persist — the count reverts to the previous number.
+//
+// Root cause: the map's record payload (camera.usefulCount etc.) is a
+// snapshot taken BEFORE the vote, and the popup widget is re-seeded from it
+// on EVERY remount — the map rebuild path (setPopupContent on a kept
+// marker) swaps the popup DOM for a FRESH .osm-popup-community node and
+// calls mountPopupActions again with the STALE payload counts, and a
+// popup close/reopen does the same. The widget's own (server-confirmed)
+// state is destroyed with the old root.
+//
+// Contract: after a successful vote the server response is the ONLY
+// authority. A later remount of the SAME record — with a stale payload —
+// must NOT revert the visible count. The mount helper keeps the
+// server-confirmed counts per record and seeds remounts from them.
+// ---------------------------------------------------------------------------
+test("a remount from a STALE payload after a successful vote must NOT revert the count (t_5bc23d61)", async () => {
+  const nodeA = mountNode();
+  installFetchMock((input, init) => {
+    const method = init?.method ?? "GET";
+    if (input === "/api/auth/me") return jsonResponse({ id: 7, displayName: "Ada" });
+    if (input === "/api/cameras/42/actions") {
+      if (method === "GET") return jsonResponse({ action: null });
+      if (method === "PUT") {
+        return jsonResponse({ action: "like", counts: { like: 4, confirm: 1, gone: 0, problem: 0, privacy: 0 } });
+      }
+    }
+    return jsonResponse({ error: "unexpected route" }, { status: 404 });
+  });
+
+  // The popup opens with the payload counts (like: 3).
+  await rtl.act(async () => {
+    popupActions.mountPopupActions(nodeA, 42, { like: 3, confirm: 1 });
+  });
+  const useful = nodeA.querySelector(".community-action");
+  assert.ok(useful, "the Useful button renders in the compact toolbar");
+  assert.match(nodeA.textContent, /3/, "the payload count is shown before the vote");
+
+  // Signed-in vote: PUT succeeds, the widget mirrors the server counts (4).
+  await rtl.act(async () => {
+    useful.click();
+  });
+  await rtl.waitFor(() => assert.match(nodeA.textContent, /4/, "the vote updates the visible count to the server value"));
+
+  // Map rebuild: setPopupContent swaps the popup DOM — a FRESH mount node,
+  // same record, STALE payload counts (like: 3). The count must STAY 4.
+  const nodeB = mountNode();
+  await rtl.act(async () => {
+    popupActions.mountPopupActions(nodeB, 42, { like: 3, confirm: 1 });
+  });
+  assert.match(nodeB.textContent, /4/, "the remount must seed from the server-confirmed count, not the stale payload");
+  assert.doesNotMatch(nodeB.textContent, /3/, "the stale payload count must never come back");
+
+  nodeA.remove();
+  nodeB.remove();
+});

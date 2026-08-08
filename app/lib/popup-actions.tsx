@@ -26,6 +26,26 @@ import { LOCALE_COOKIE, resolveLocale, type Locale } from "./i18n/types";
 
 let activeRoot: { root: Root; node: HTMLElement; recordId: number } | null = null;
 
+/**
+ * Server-confirmed counts per record (BUG t_5bc23d61 — CEO 2026-08-08:
+ * "il voto useful sulla mappa non persiste, rimane al numero precedente").
+ *
+ * The map's record payload (camera.usefulCount etc.) is a snapshot taken
+ * BEFORE the vote, and the popup widget is re-seeded from it on EVERY
+ * remount: the map rebuild path swaps the popup DOM for a FRESH
+ * .osm-popup-community node (setPopupContent on a kept marker) and calls
+ * mountPopupActions again with the stale payload counts, and a popup
+ * close/reopen does the same. The widget's own (server-confirmed) state
+ * is destroyed with the old root, so the visible count reverts.
+ *
+ * Fix: the widget reports every server-confirmed count change here (one
+ * map per record), and mountPopupActions seeds remounts from this store,
+ * falling back to the payload only when no vote has happened yet. The
+ * server response is the ONLY authority — a stale payload must never
+ * undo it.
+ */
+const confirmedCounts = new Map<number, ActionCounts>();
+
 const STORAGE_KEY = "opensurveillancedb-locale";
 
 function resolvePopupLocale(): Locale {
@@ -62,6 +82,11 @@ export function mountPopupActions(node: HTMLElement, recordId: number, counts?: 
   if (activeRoot && activeRoot.node === node && activeRoot.recordId === recordId) return;
   unmountPopupActions();
   const root = createRoot(node);
+  // BUG t_5bc23d61: seed from the SERVER-CONFIRMED counts when this record
+  // has already been voted on during this page session. The payload counts
+  // passed by the map are a pre-vote snapshot; re-seeding from them after
+  // a rebuild would revert the count the CEO just saw update.
+  const seed = confirmedCounts.get(recordId) ?? counts;
   // P1-7 (review 2026-08-07): flush the first render synchronously. The
   // popupopen handler runs in a DOM event outside React's tree, and a
   // plain root.render is scheduled — the browser could paint the popup
@@ -72,9 +97,10 @@ export function mountPopupActions(node: HTMLElement, recordId: number, counts?: 
     root.render(
       <CommunityActions
         recordId={recordId}
-        counts={counts}
+        counts={seed}
         compact
         bundle={messages[resolvePopupLocale()]}
+        onCountsChange={(next) => { confirmedCounts.set(recordId, next); }}
       />,
     );
   });
