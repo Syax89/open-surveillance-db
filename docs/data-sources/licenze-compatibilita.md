@@ -31,6 +31,10 @@ Regola di metodo: ogni affermazione legale è verificata contro la fonte citata 
 | **CC0** | ✅ Sì, senza obblighi | Nessuno (buona pratica: citare comunque) | No | Importabile |
 | **ODbL 1.0** (OSM) | ✅ Sì (stessa licenza) | Attribuzione «© OpenStreetMap contributors» + link | Sì, già soddisfatto (nostro DB è ODbL) | Importabile |
 | **CC BY-SA** (3.0/4.0) | ❌ No senza permesso del titolare | — | Sì, incompatibile con ODbL | **Da verificare con legale** — di norma NO |
+| **CC BY 3.0 IT** (Milano) | ✅ Sì, con attribuzione | Attribuzione + link licenza | No | Importabile |
+| **Licence Ouverte 2.0** (fr-lo, Francia) | ✅ Sì, con attribuzione | Attribuzione + link (Etalab) | No | Importabile |
+| **dl-de-by-2.0** (Datenlizenz Deutschland Namensnennung, Amburgo) | ✅ Sì, con attribuzione | «Quelle: [ente]» + link licenza | No | Importabile |
+| **CC-BY generico** (DGT Spagna NAP) | ✅ Sì, con attribuzione | Attribuzione + link | No | Importabile |
 | **Licenze custom ministeriali** | ⚠️ Caso per caso | Dipende dai termini | Dipende | **Da verificare con legale** per ogni fonte |
 | **Nessuna licenza esplicita** (art. 52 CAD) | ✅ Sì, con base normativa | Documentare la base (open data by default) | No | Importabile con verifiche |
 
