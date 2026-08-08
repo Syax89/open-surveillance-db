@@ -653,10 +653,10 @@ changes accumulate under `[Unreleased]`.
   `.dev.vars*`, `*.key/*.gpg/*.p12/*.pfx/*.p8/*.jks/*.keystore/*.kdbx`,
   backup/editor files and the maintainer's local tooling dirs
   (`/.claude/`, `/.vscode/`, `/.idea/`). Docs, ops scripts and configs no
-  longer reference private LAN IPs, the internal pre-prod domain
-  (`syaxhome89.com`) or the local container by id (`LXC 114`/`osdb-test`)
-  — replaced with generic placeholders (`<lan-ip>`, `<your-host>`,
-  `<secrets-dir>`); `ops/oidc-secrets.sh` vault default is now the generic
+  longer reference private LAN IPs, the internal pre-prod domain or the
+  local container by id — replaced with generic placeholders
+  (`<lan-ip>`, `<your-host>`, `<secrets-dir>`); `ops/oidc-secrets.sh`
+  vault default is now the generic
   `~/.secrets` (override via `OIDC_VAULT_DIR`). Dev-only
   `.claude/launch.json` removed; `tests/qa-funzionale-linus.test.mjs`
   renamed `qa-funzionale.test.mjs` (no personal names in filenames).
