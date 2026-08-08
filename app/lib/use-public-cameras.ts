@@ -51,8 +51,15 @@ import { isRecordPageStatus } from "./public-status";
  * before: the shared cached walk.
  */
 
-/** Max page size the API accepts (PUBLIC_CAMERAS_PAGE_MAX_LIMIT). */
-const PAGE_LIMIT = 500;
+/**
+ * Max page size the API accepts (PUBLIC_CAMERAS_PAGE_MAX_LIMIT). Raised from
+ * 500 to 2000 with the dataset (kanban t_e11080eb): the directory walk pages
+ * through the WHOLE public set, and at 500/page a 31,926-record dataset needs
+ * 64 serial requests — more than the per-caller read rate limit (60/min),
+ * so the walk could 429 mid-flight on a busy shared bucket and blank the
+ * directory. 2000/page → 16 requests, comfortably inside the budget.
+ */
+const PAGE_LIMIT = 2000;
 
 /** F0 server-side filters forwarded to GET /api/cameras (see the hook doc). */
 export type ServerCameraFilters = {
@@ -67,6 +74,46 @@ type CamerasPage = {
 };
 
 /**
+ * Bounded 429 retry budget for a page of the walk (kanban t_e11080eb). The
+ * read rate limit is 60/min per caller; on the container every anonymous
+ * caller shares ONE bucket (callerKey "unknown" — no Cloudflare edge, no
+ * TRUST_XFF), so a page can 429 mid-walk under concurrent traffic. Waiting
+ * the server's Retry-After and retrying a couple of times lets the walk
+ * survive a transient rate-limit instead of dying into the empty directory.
+ */
+const WALK_RATE_LIMIT_RETRIES = 2;
+
+/** Seconds to wait before retrying a 429 (server Retry-After, bounded). */
+function retryDelaySeconds(response: Response): number {
+  const raw = response.headers.get("retry-after");
+  if (!raw) return 1;
+  const seconds = Number(raw);
+  // Bounded at 10s: a short Retry-After (transient burst) recovers quickly;
+  // a genuinely exhausted shared bucket surfaces the honest error state fast
+  // instead of freezing the directory for the whole window.
+  return Number.isFinite(seconds) && seconds > 0 ? Math.min(seconds, 10) : 1;
+}
+
+/** Sleep that aborts with the caller's signal (the walk is abortable). */
+function sleep(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal.aborted) {
+      reject(new DOMException("Aborted", "AbortError"));
+      return;
+    }
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(new DOMException("Aborted", "AbortError"));
+    };
+    const timer = setTimeout(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
+/**
  * Fetch one page of the public list. Tolerant of the pre-pagination shape
  * (`{ records }` with no total/nextOffset): a payload without nextOffset is
  * a complete list, never a truncated page, so single-fetch consumers and
@@ -74,20 +121,26 @@ type CamerasPage = {
  */
 async function fetchCamerasPage(offset: number, signal: AbortSignal, extraQuery = ""): Promise<CamerasPage> {
   const query = extraQuery ? `&${extraQuery}` : "";
-  const response = await fetch(`/api/cameras?limit=${PAGE_LIMIT}&offset=${offset}${query}`, { signal });
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  const data = (await response.json()) as Partial<CamerasPage>;
-  if (!Array.isArray(data.records)) throw new Error("Malformed /api/cameras payload");
-  return {
-    // Defense-in-depth client gate (publicRecords): the API already filters
-    // server-side, but a non-public record that ever reaches the client
-    // bundle is dropped before any component can display it.
-    records: publicRecords(data.records),
-    total: typeof data.total === "number" ? data.total : data.records.length,
-    // `?? null` normalizes both the new contract (null on last page) and
-    // the legacy shape (field absent) to "stop the walk".
-    nextOffset: data.nextOffset ?? null,
-  };
+  for (let attempt = 0; ; attempt += 1) {
+    const response = await fetch(`/api/cameras?limit=${PAGE_LIMIT}&offset=${offset}${query}`, { signal });
+    if (response.status === 429 && attempt < WALK_RATE_LIMIT_RETRIES) {
+      await sleep(retryDelaySeconds(response) * 1000, signal);
+      continue;
+    }
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = (await response.json()) as Partial<CamerasPage>;
+    if (!Array.isArray(data.records)) throw new Error("Malformed /api/cameras payload");
+    return {
+      // Defense-in-depth client gate (publicRecords): the API already filters
+      // server-side, but a non-public record that ever reaches the client
+      // bundle is dropped before any component can display it.
+      records: publicRecords(data.records),
+      total: typeof data.total === "number" ? data.total : data.records.length,
+      // `?? null` normalizes both the new contract (null on last page) and
+      // the legacy shape (field absent) to "stop the walk".
+      nextOffset: data.nextOffset ?? null,
+    };
+  }
 }
 
 type WalkResult = {
@@ -96,7 +149,8 @@ type WalkResult = {
 };
 
 /**
- * Walk the public list following nextOffset (limit 500/page) to the end.
+ * Walk the public list following nextOffset (limit 2000/page since
+ * t_e11080eb; 500 before the dataset grew past ~30k records) to the end.
  * Stops on nextOffset null/absent and guards against a server that fails to
  * advance the offset (would otherwise loop forever on a bad reply). Used by
  * the home directory walk; the record page resolves single ids through the

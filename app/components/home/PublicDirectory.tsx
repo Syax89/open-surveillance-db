@@ -17,6 +17,8 @@ import { DirectoryCatalog } from "../tools/DirectoryCatalog";
 type Props = {
   /** Records after search/kind/freshness filters and sorting. */
   filteredRecords: Camera[];
+  loadError?: boolean;
+  onRetryLoad?: () => void;
   /** Distinct camera kinds present in the records (kind filter options). */
   cameraKinds: string[];
   search: string;
@@ -61,7 +63,7 @@ type Props = {
  * bundle; reused by the home page (hub mode) and /directory (catalog mode).
  * Location shows address AND coordinates (format-location, CEO 2026-08-07).
  */
-export function PublicDirectory({ filteredRecords, cameraKinds, search, setSearch, kindFilter, setKindFilter, freshnessFilter, setFreshnessFilter, setFreshnessCutoff, sortOrder, setSortOrder, stateFilter, setStateFilter, originFilter, setOriginFilter, page = 1, setPage, showRecordOnMap, setCoordinates, onResetFilters, mapHref = "#map", reportHref = "#report", showHeading = true, showMapLink = true, variant = "hub" }: Props) {
+export function PublicDirectory({ filteredRecords, loadError = false, onRetryLoad, cameraKinds, search, setSearch, kindFilter, setKindFilter, freshnessFilter, setFreshnessFilter, setFreshnessCutoff, sortOrder, setSortOrder, stateFilter, setStateFilter, originFilter, setOriginFilter, page = 1, setPage, showRecordOnMap, setCoordinates, onResetFilters, mapHref = "#map", reportHref = "#report", showHeading = true, showMapLink = true, variant = "hub" }: Props) {
   const t = useMessages().directory;
   const statuses = useMessages().status;
   const { locale } = useLocale();
@@ -95,6 +97,7 @@ export function PublicDirectory({ filteredRecords, cameraKinds, search, setSearc
     return (
       <DirectoryCatalog
         filteredRecords={filteredRecords}
+        loadError={loadError} onRetryLoad={onRetryLoad}
         cameraKinds={cameraKinds}
         search={search}
         setSearch={setSearch}

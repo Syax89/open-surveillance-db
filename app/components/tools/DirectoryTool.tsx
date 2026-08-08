@@ -45,7 +45,11 @@ export function DirectoryTool() {
   const router = useRouter();
   const { filters, qInput, setQ, setType, setFreshness, setSort, setState, setOrigin, setPage, reset } = useCameraFilters();
   const serverFilters = useMemo(() => serverFiltersFrom(filters), [filters]);
-  const { records } = usePublicCameras({
+  // Load failure (kanban t_e11080eb): the walk can fail transiently (429 on
+  // a shared read bucket, network). The directory MUST surface this as a
+  // truthful error state with retry — never as "0 public records found"
+  // (the empty state would lie: the records exist, the map shows them).
+  const { records, error, reload } = usePublicCameras({
     filters: serverFilters,
   });
 
@@ -83,6 +87,8 @@ export function DirectoryTool() {
         <PublicDirectory
           variant="catalog"
           filteredRecords={filteredRecords}
+          loadError={error}
+          onRetryLoad={reload}
           cameraKinds={cameraKinds}
           search={qInput}
           setSearch={setQ}

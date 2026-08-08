@@ -32,7 +32,7 @@ CSV, or GeoJSON output. See [DATA_MODEL.md](DATA_MODEL.md) and
 | Revisions JSON | `GET /api/cameras/revisions?cameraId=N` | `{ "recordId", "revisions": [ { "id", "entityId", "previousStatus", "newStatus", "action", "createdAt" } ] }` |
 
 The default JSON list is paginated so the payload stays bounded as the
-dataset grows: `limit` (default 500, hard max 500) and `offset` (default 0)
+dataset grows: `limit` (default 500, hard max 2000) and `offset` (default 0)
 are optional non-negative integers. `total` is the number of records
 matching the filters independent of the page, and `nextOffset` is the
 offset of the next page (or `null` on the last page) so a client can walk

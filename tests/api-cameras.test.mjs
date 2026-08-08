@@ -318,7 +318,7 @@ test("GET /api/cameras clamps limit above the max and accepts a zero offset", as
   const { GET } = await camerasRoute();
 
   await GET(apiRequest("/api/cameras?limit=999999"));
-  assert.deepEqual(callArgs("listPublicCamerasPage")[0], [{}, { limit: 500, offset: 0 }], "an over-max limit is clamped to the maximum page");
+  assert.deepEqual(callArgs("listPublicCamerasPage")[0], [{}, { limit: 2000, offset: 0 }], "an over-max limit is clamped to the maximum page (2000 since t_e11080eb)");
 
   await GET(apiRequest("/api/cameras?limit=500&offset=0"));
   assert.deepEqual(callArgs("listPublicCamerasPage")[1], [{}, { limit: 500, offset: 0 }], "offset 0 is valid");
