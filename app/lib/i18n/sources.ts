@@ -46,7 +46,12 @@ export const en = {
   emptyTitle: "No imported datasets yet",
   emptyBody:
     "No public dataset has been imported so far. Community reports are always published individually and never need this page. When the first import lands, every source will be listed here with its licence and attribution.",
-  versionNote: "Updated 5 August 2026 (import pipeline). The import descriptors in the repository (docs/data-sources/imports/) remain canonical.",
+  // Dynamic freshness line: the date is derived from the committed batches
+  // at request time (app/fonti/page.tsx), never hardcoded — a static date
+  // here would go stale the moment a new import lands (copy-finale rule:
+  // the page must always tell the truth about its own content).
+  lastUpdatedLabel: "Last updated",
+  descriptorsNote: "The import descriptors in the repository (docs/data-sources/imports/) remain canonical.",
 } as const;
 
 export const it: Translation<typeof en> = {
@@ -79,5 +84,6 @@ export const it: Translation<typeof en> = {
   emptyTitle: "Nessun dataset importato ancora",
   emptyBody:
     "Finora nessun dataset pubblico è stato importato. Le segnalazioni della community vengono sempre pubblicate singolarmente e non richiedono questa pagina. Quando arriverà il primo import, ogni fonte sarà elencata qui con la sua licenza e la sua attribuzione.",
-  versionNote: "Aggiornato il 5 agosto 2026 (pipeline di import). I descriptor di import nel repository (docs/data-sources/imports/) restano la versione canonica.",
+  lastUpdatedLabel: "Ultimo aggiornamento",
+  descriptorsNote: "I descriptor di import nel repository (docs/data-sources/imports/) restano la versione canonica.",
 };

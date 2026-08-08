@@ -11,18 +11,21 @@ import { hardNavigate } from "../lib/navigate";
 /**
  * /login — multi-method sign-in (Fase E2, design Vera).
  *
- * Three methods, selected with a radio group (the panels render one at a
- * time — only the visible controls are in the tab order):
- *  1. Email + password — the original form, unchanged behaviour.
- *  2. Passkey — WebAuthn ceremony client-side: POST /login/begin (optional
+ * Three methods, ALL visible at once as stacked coherent-box cards in the
+ * order the CEO asked for (2026-08-08: passkey, email + password, Google):
+ *  1. Passkey — WebAuthn ceremony client-side: POST /login/begin (optional
  *     email narrows the ceremony to that account, anti-enumeration server
  *     side), navigator.credentials.get(), POST /login/complete. A cancelled
  *     ceremony (NotAllowedError) is a silent abort, not an error.
- *  3. Social sign-in (OIDC, Fase D / ADR 0020 decision 4) — GitHub and
- *     Google are plain GET navigations to the /start routes (302 to the
- *     provider). The disclosure note below the buttons IS the privacy
- *     requirement: the provider tracking surface and the EU-US DPF
- *     transfer are declared on the login page (AUTH_OPTIONS.md §4a).
+ *  2. Email + password — the original form, unchanged behaviour.
+ *  3. Google (OIDC, Fase D / ADR 0020 decision 4) — plain GET navigations
+ *     to the /start routes (302 to the provider). The disclosure note below
+ *     the buttons IS the privacy requirement: the provider tracking surface
+ *     and the EU-US DPF transfer are declared on the login page
+ *     (AUTH_OPTIONS.md §4a).
+ *
+ * Every card carries its own submit — there is no selector, so all three
+ * options are immediately visible without any interaction.
  *
  * The OIDC callback can land back here with two query markers:
  *  - ?merge=<token>  — the provider's VERIFIED email collides with an
@@ -36,8 +39,6 @@ import { hardNavigate } from "../lib/navigate";
  * loading note. The server shell (page.tsx) resolves the localized fallback
  * and per-page metadata via getServerMessages (F2/F5 QA#6).
  */
-
-type Method = "password" | "passkey" | "social";
 
 /** Same-site redirect target from ?returnTo= (login wall return, P1-2). */
 function safeReturnTo(value: string | null): string | null {
@@ -54,7 +55,6 @@ export function LoginPageBody() {
 
   const [mergeToken, setMergeToken] = useState<string | null>(() => searchParams.get("merge"));
   const [oidcError] = useState<boolean>(() => searchParams.get("oidc_error") === "1");
-  const [method, setMethod] = useState<Method>("password");
   // Login-wall return (P1-2 Vera design): /login?returnTo=/segnala (or
   // /correggi) lands the contributor back on the tool after a successful
   // sign-in instead of always dumping them on /account.
@@ -90,7 +90,7 @@ export function LoginPageBody() {
   // buttons render ONLY for providers whose credentials are configured on
   // this deployment (GET /api/auth/oidc/providers). Unconfigured providers
   // answer 503 mid-flow, so the UI must not offer them. null = still
-  // loading; the social method stays hidden until the answer arrives.
+  // loading; the social card stays hidden until the answer arrives.
   const [oidcProviders, setOidcProviders] = useState<string[] | null>(null);
   useEffect(() => {
     let cancelled = false;
@@ -247,15 +247,6 @@ export function LoginPageBody() {
     }
   }
 
-  const methods: { key: Method; label: string }[] = [
-    { key: "password", label: t.methodPassword },
-    { key: "passkey", label: t.methodPasskey },
-    // Social is offered only when at least one provider is configured
-    // (design review 2026-08-08, F1): an unconfigured provider 503s
-    // mid-flow, so the method must not be selectable.
-    ...(socialAvailable ? [{ key: "social" as Method, label: t.methodSocial }] : []),
-  ];
-
   return (
     <main id="main-content" className="record-page">
       <PublicNav navLabel={t.navigation} homeLabel={t.homeAria} />
@@ -311,129 +302,127 @@ export function LoginPageBody() {
           <>
             <p className="record-detail-summary">{t.anonymousNote}</p>
 
-            <div className="auth-methods" role="radiogroup" aria-label={t.methodSelectorLabel}>
-              {methods.map((item) => (
-                <div className="auth-method-option" key={item.key}>
-                  <input
-                    type="radio"
-                    id={`auth-method-${item.key}`}
-                    name="auth-method"
-                    value={item.key}
-                    checked={method === item.key}
-                    onChange={() => setMethod(item.key)}
-                  />
-                  <label htmlFor={`auth-method-${item.key}`}>{item.label}</label>
-                </div>
-              ))}
+            <div className="auth-methods">
+              {/* 1. Passkey — always visible, first in the CEO's order. */}
+              <section className="auth-method-card" aria-labelledby="auth-method-passkey-title">
+                <h2 id="auth-method-passkey-title">{t.methodPasskey}</h2>
+                <form className="auth-form" onSubmit={onPasskeyLogin} noValidate>
+                  <label className="auth-field">
+                    <span>{t.passkeyEmailOptional}</span>
+                    <input
+                      type="email"
+                      name="passkeyEmail"
+                      autoComplete="email webauthn"
+                      value={passkeyEmail}
+                      onChange={(event) => setPasskeyEmail(event.target.value)}
+                    />
+                    <small>{t.passkeyEmailHint}</small>
+                  </label>
+                  {passkeyError ? <p className="auth-error" role="alert">{passkeyError}</p> : null}
+                  <button className="button button-primary" type="submit" disabled={passkeyBusy}>
+                    {passkeyBusy ? t.loading : t.passkeyLogin}
+                  </button>
+                  {/* P1-4: honest per-method disclosure. The old hint claimed
+                      "Nothing leaves your device" — false for synced passkeys
+                      (vendor cloud sees usage); the disclosure below replaces
+                      that claim. */}
+                  <p className="oidc-disclosure auth-method-disclosure">
+                    <span className="sr-only">{t.methodDisclosureLabel}: </span>
+                    {t.passkeyDisclosure}
+                  </p>
+                </form>
+              </section>
+
+              {/* 2. Email + password — always visible. */}
+              <section className="auth-method-card" aria-labelledby="auth-method-password-title">
+                <h2 id="auth-method-password-title">{t.methodPassword}</h2>
+                <form className="auth-form" onSubmit={onSubmit} noValidate>
+                  <label className="auth-field">
+                    <span>{t.email}</span>
+                    <input
+                      type="email"
+                      name="email"
+                      autoComplete="email"
+                      required
+                      aria-invalid={fieldErrors.email || undefined}
+                      value={email}
+                      onChange={(event) => {
+                        setEmail(event.target.value);
+                        if (fieldErrors.email) setFieldErrors((f) => ({ ...f, email: undefined }));
+                      }}
+                    />
+                  </label>
+                  <label className="auth-field">
+                    <span>{t.password}</span>
+                    <input
+                      type="password"
+                      name="password"
+                      autoComplete="current-password"
+                      required
+                      minLength={10}
+                      aria-invalid={fieldErrors.password || undefined}
+                      value={password}
+                      onChange={(event) => {
+                        setPassword(event.target.value);
+                        if (fieldErrors.password) setFieldErrors((f) => ({ ...f, password: undefined }));
+                      }}
+                    />
+                  </label>
+                  <p className="auth-forgot">
+                    <Link href="/forgot-password">{t.forgotPassword}</Link>
+                  </p>
+                  {/* Static verification note (t_6dc1c96f, CEO feedback
+                      2026-08-03): login is blocked until the email is verified
+                      and the API answers the same generic 401 for every
+                      failure (anti-enumeration). This copy is shown to
+                      everyone, so it explains in advance why a correct
+                      password can be rejected right after registering —
+                      without ever revealing account existence. */}
+                  <p className="record-detail-summary">{t.loginVerifyHint}</p>
+                  {error ? <p className="auth-error" role="alert">{error}</p> : null}
+                  <button className="button button-primary" type="submit" disabled={submitting}>
+                    {submitting ? t.loading : t.login}
+                  </button>
+                  {/* Per-method risk disclosure (P1-4 Vera design — the risk
+                      matrix is per-method, ADR 0020 d.6): the password method
+                      declares its PII + phishing surface, exactly like the
+                      passkey and OIDC panels below. */}
+                  <p className="oidc-disclosure auth-method-disclosure">
+                    <span className="sr-only">{t.methodDisclosureLabel}: </span>
+                    {t.passwordDisclosure}
+                  </p>
+                </form>
+              </section>
+
+              {/* 3. Google (OIDC) — server-gated on configured providers
+                  (design review 2026-08-08, F1): the card renders only after
+                  GET /api/auth/oidc/providers answers a non-empty list. In
+                  SSR the social card is absent (fail-closed); it appears
+                  client-side once the discovery resolves. */}
+              {socialAvailable ? (
+                <section className="auth-method-card" aria-labelledby="auth-method-social-title">
+                  <h2 id="auth-method-social-title">{t.methodSocialTitle}</h2>
+                  <div className="oidc-panel">
+                    <div className="oidc-buttons">
+                      {oidcProviders?.includes("github") ? (
+                        <a className="button detail-outline oidc-button" href={`/api/auth/oidc/github/start?redirect_to=${encodeURIComponent(returnTo ?? "/account")}`}>
+                          {t.oidcGithub}
+                        </a>
+                      ) : null}
+                      {oidcProviders?.includes("google") ? (
+                        <a className="button detail-outline oidc-button" href={`/api/auth/oidc/google/start?redirect_to=${encodeURIComponent(returnTo ?? "/account")}`}>
+                          {t.oidcGoogle}
+                        </a>
+                      ) : null}
+                    </div>
+                    <p className="oidc-disclosure">
+                      {t.oidcDisclosure}{" "}
+                      <Link href="/privacy">{t.privacyNotice}</Link>.
+                    </p>
+                  </div>
+                </section>
+              ) : null}
             </div>
-
-            {method === "password" ? (
-              <form className="auth-form" onSubmit={onSubmit} noValidate>
-                <label className="auth-field">
-                  <span>{t.email}</span>
-                  <input
-                    type="email"
-                    name="email"
-                    autoComplete="email"
-                    required
-                    aria-invalid={fieldErrors.email || undefined}
-                    value={email}
-                    onChange={(event) => {
-                      setEmail(event.target.value);
-                      if (fieldErrors.email) setFieldErrors((f) => ({ ...f, email: undefined }));
-                    }}
-                  />
-                </label>
-                <label className="auth-field">
-                  <span>{t.password}</span>
-                  <input
-                    type="password"
-                    name="password"
-                    autoComplete="current-password"
-                    required
-                    minLength={10}
-                    aria-invalid={fieldErrors.password || undefined}
-                    value={password}
-                    onChange={(event) => {
-                      setPassword(event.target.value);
-                      if (fieldErrors.password) setFieldErrors((f) => ({ ...f, password: undefined }));
-                    }}
-                  />
-                </label>
-                <p className="auth-forgot">
-                  <Link href="/forgot-password">{t.forgotPassword}</Link>
-                </p>
-                {/* Static verification note (t_6dc1c96f, CEO feedback
-                    2026-08-03): login is blocked until the email is verified
-                    and the API answers the same generic 401 for every
-                    failure (anti-enumeration). This copy is shown to
-                    everyone, so it explains in advance why a correct
-                    password can be rejected right after registering —
-                    without ever revealing account existence. */}
-                <p className="record-detail-summary">{t.loginVerifyHint}</p>
-                {error ? <p className="auth-error" role="alert">{error}</p> : null}
-                <button className="button button-primary" type="submit" disabled={submitting}>
-                  {submitting ? t.loading : t.login}
-                </button>
-                {/* Per-method risk disclosure (P1-4 Vera design — the risk
-                    matrix is per-method, ADR 0020 d.6): the password method
-                    declares its PII + phishing surface, exactly like the
-                    passkey and OIDC panels below. */}
-                <p className="oidc-disclosure auth-method-disclosure">
-                  <span className="sr-only">{t.methodDisclosureLabel}: </span>
-                  {t.passwordDisclosure}
-                </p>
-              </form>
-            ) : null}
-
-            {method === "passkey" ? (
-              <form className="auth-form" onSubmit={onPasskeyLogin} noValidate>
-                <label className="auth-field">
-                  <span>{t.passkeyEmailOptional}</span>
-                  <input
-                    type="email"
-                    name="passkeyEmail"
-                    autoComplete="email webauthn"
-                    value={passkeyEmail}
-                    onChange={(event) => setPasskeyEmail(event.target.value)}
-                  />
-                  <small>{t.passkeyEmailHint}</small>
-                </label>
-                {passkeyError ? <p className="auth-error" role="alert">{passkeyError}</p> : null}
-                <button className="button button-primary" type="submit" disabled={passkeyBusy}>
-                  {passkeyBusy ? t.loading : t.passkeyLogin}
-                </button>
-                {/* P1-4: honest per-method disclosure. The old hint claimed
-                    "Nothing leaves your device" — false for synced passkeys
-                    (vendor cloud sees usage); the disclosure below replaces
-                    that claim. */}
-                <p className="oidc-disclosure auth-method-disclosure">
-                  <span className="sr-only">{t.methodDisclosureLabel}: </span>
-                  {t.passkeyDisclosure}
-                </p>
-              </form>
-            ) : null}
-
-            {method === "social" ? (
-              <div className="oidc-panel">
-                <div className="oidc-buttons">
-                  {oidcProviders?.includes("github") ? (
-                    <a className="button detail-outline oidc-button" href={`/api/auth/oidc/github/start?redirect_to=${encodeURIComponent(returnTo ?? "/account")}`}>
-                      {t.oidcGithub}
-                    </a>
-                  ) : null}
-                  {oidcProviders?.includes("google") ? (
-                    <a className="button detail-outline oidc-button" href={`/api/auth/oidc/google/start?redirect_to=${encodeURIComponent(returnTo ?? "/account")}`}>
-                      {t.oidcGoogle}
-                    </a>
-                  ) : null}
-                </div>
-                <p className="oidc-disclosure">
-                  {t.oidcDisclosure}{" "}
-                  <Link href="/privacy">{t.privacyNotice}</Link>.
-                </p>
-              </div>
-            ) : null}
 
             <p className="auth-switch">
               {t.noAccount}{" "}

@@ -339,6 +339,46 @@ test("rollback: abort unless the batch is committed (running/failed/rolled_back)
   await assert.rejects(() => rollbackImport(db, "nope"), /not found/);
 });
 
+test("write-phase failure marks the batch 'failed' with a report (never stuck 'running')", async () => {
+  await freshDb();
+  // Simulate a D1 failure DURING the write phase: the batch row was
+  // already created (running), then db.batch throws mid-insert. The
+  // runner must flip the batch to 'failed' with the error in the report
+  // instead of leaving a phantom 'running' row (keep-fonti-fresh.md §5).
+  const failingDb = Object.create(db, {
+    batch: {
+      value: async () => {
+        throw new Error("simulated D1 write failure");
+      },
+    },
+  });
+  await assert.rejects(
+    () =>
+      runImport(failingDb, {
+        slug: "fixture",
+        descriptor: FIXTURE_DESCRIPTOR,
+        payload: RAW_ROWS,
+        options: { apply: true },
+      }),
+    /import write failed: simulated D1 write failure/,
+  );
+  const batch = await db.prepare("SELECT * FROM import_batches WHERE slug = 'fixture'").first();
+  assert.equal(batch.status, "failed", "a write-phase crash must not leave the batch stuck in 'running'");
+  assert.ok(batch.updated_at, "the failure transition is timestamped");
+  const report = JSON.parse(batch.report);
+  assert.match(report.writeError, /simulated D1 write failure/);
+});
+
+test("recovery: a 'failed' batch re-runs without --force and commits (idempotent resume)", async () => {
+  // Continue from the previous test's state: the batch is 'failed' and
+  // nothing was inserted. A re-run resets the counters and commits.
+  const summary = await applyFixture();
+  assert.equal(summary.committed, true);
+  assert.equal(summary.counts.inserted, 3);
+  const batch = await db.prepare("SELECT * FROM import_batches WHERE slug = 'fixture'").first();
+  assert.equal(batch.status, "committed");
+});
+
 // -------------------------------------------------- GDPR-neutral guarantees
 
 test("GDPR: PII-like source fields never reach the database", async () => {

@@ -270,7 +270,13 @@ button { cursor:pointer; }
 .nav-links a:hover, .footer-links a:hover { color:var(--link-hover); }
 .nav-action { border:1px solid var(--control-border); padding:11px 15px; border-radius:var(--radius-lg); color:var(--ink); }
 .menu-button { display:none; border:0; background:transparent; font-weight:700; }
-.hero { width:var(--container-wide); margin:9px auto 0; min-height:590px; overflow:hidden; position:relative; border-radius:var(--radius-2xl); background:var(--navy); color:var(--hero-ink); display:grid; grid-template-columns:1.02fr .98fr; }
+/* Hero (t_7cafab72): the CSS visual is now a full-bleed BACKGROUND of the
+   section (CEO 2026-08-08: "l'immagine di destra è troppo grande, la metterei
+   sullo sfondo e sopra la parte che ora si trova a sinistra"). Single column:
+   .hero-copy (z-index:2) sits above .hero-visual, which is absolutely pinned
+   to the section (inset:0, z-index:0). Both are navy-family, so the light
+   hero ink keeps strong contrast over the gradient without any scrim. */
+.hero { width:var(--container-wide); margin:9px auto 0; min-height:590px; overflow:hidden; position:relative; border-radius:var(--radius-2xl); background:var(--navy); color:var(--hero-ink); }
 .hero-copy { position:relative; z-index:2; padding:78px 0 62px 70px; max-width:640px; }
 .eyebrow { margin:0 0 18px; text-transform:uppercase; letter-spacing:.14em; font-size:var(--text-xs); font-weight:800; color:var(--eyebrow); }
 .eyebrow span { display:inline-block; width:7px; height:7px; margin-right:8px; vertical-align:1px; border-radius:var(--radius-round); background:var(--eyebrow-dot); }
@@ -301,7 +307,7 @@ button { cursor:pointer; }
 .hero-trust-note { max-width:525px; margin:26px 0 0; color:var(--hero-stat-ink); font-size:var(--text-sm); line-height:1.5; }
 .hero-trust-note a { color:var(--mint); font-weight:800; text-decoration:underline; text-decoration-thickness:1px; text-underline-offset:3px; }
 .hero-trust-note a:hover { color:var(--mint-hover); }
-.hero-visual { position:relative; overflow:hidden; isolation:isolate; background:radial-gradient(circle at 75% 20%, var(--visual-mid) 0, var(--visual-blue) 24%, transparent 46%),linear-gradient(135deg,var(--visual-deep),var(--visual-deeper)); }
+.hero-visual { position:absolute; inset:0; z-index:0; overflow:hidden; isolation:isolate; background:radial-gradient(circle at 75% 20%, var(--visual-mid) 0, var(--visual-blue) 24%, transparent 46%),linear-gradient(135deg,var(--visual-deep),var(--visual-deeper)); }
 .hero-grid { position:absolute; inset:-20%; opacity:.6; background-image:linear-gradient(rgba(161,222,208,.11) 1px, transparent 1px),linear-gradient(90deg, rgba(161,222,208,.11) 1px, transparent 1px); background-size:42px 42px; transform:rotate(-24deg) scale(1.2); }
 .hero-orbit { position:absolute; border:1px solid rgba(166,237,210,.2); border-radius:var(--radius-round); }
 .orbit-one { width:430px; height:430px; right:-100px; top:70px; }
@@ -716,9 +722,16 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
   .site-footer .footer-legal { justify-self:start; text-align:left; }
 }
 @media (max-width:980px) {
-  .hero { grid-template-columns:1fr;min-height:auto }
+  /* Hero is single-column since t_7cafab72; the visual is the full-bleed
+     background at every width, so only the copy padding and the min-height
+     floor need adjusting here. */
+  .hero { min-height:auto }
   .hero-copy { padding:64px 50px 50px }
-  .hero-visual { min-height:310px }
+  /* t_7cafab72: below 980px the copy is full-width and the decorative
+     .visual-label (aria-hidden, bottom-right of the background) would sit
+     on top of the trust note — hide it at these widths (it is pure
+     decoration; nothing accessible depends on it). */
+  .visual-label { display:none }
   .live-map-workspace { grid-template-columns:1fr }
   .live-map { height:470px }
   .camera-card { grid-column:1/-1;border-left:0;border-top:1px solid var(--line);display:grid;grid-template-columns:1fr 1.4fr;gap:var(--space-5) }
@@ -765,7 +778,8 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
   .hero-search input { min-height:48px; border:1px solid rgba(222,245,234,.42); border-radius:var(--radius-lg); background:rgba(255,255,255,.08); }
   .hero-search button { min-height:44px; border:0; border-radius:var(--radius-lg); }
   .hero-stats { margin-top:48px;gap:18px }
-  .hero-visual { min-height:260px }
+  /* .hero-visual min-height rules removed with t_7cafab72 — the visual is
+     the absolute inset:0 background and takes its size from the section. */
   /* Fix: on narrow screens .signal-three (right:10%;top:74%, base rule)
      lands directly under .visual-label (right:26px;bottom:28px below),
      the amber dot overlapping the caption text. Move it up into the
@@ -876,6 +890,13 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
    queries "Download CSV"/"Download GeoJSON" by role). */
 .export-button { display:inline-flex; align-items:center; gap:7px; min-height:44px; padding:0 16px; border:1px solid var(--field-border); border-radius:var(--radius-md); background:var(--card-bg); color:var(--action); font-size:var(--text-md); font-weight:800; }
 .export-button:hover { border-color:var(--control-focus); }
+/* Report shortcut (CEO 2026-08-08): a small circular [+] in the results
+   header top-right linking to /segnala — the report form write gate handles
+   anonymous visitors, so it is a plain link. 44px circular touch target
+   (WCAG 2.5.8), same secondary-button family as the exports. */
+.add-button { display:inline-flex; align-items:center; justify-content:center; width:44px; height:44px; flex:none; border:1px solid var(--field-border); border-radius:var(--radius-full); background:var(--card-bg); color:var(--action); font-size:var(--text-2xl); font-weight:800; line-height:1; text-decoration:none; }
+.add-button:hover { border-color:var(--control-focus); background:var(--surface-muted); }
+.add-button:focus-visible { outline:3px solid var(--focus); outline-offset:2px; }
 /* Active-filter chips (t_f13fcb1c): one per non-default dimension, removable
    one at a time (Google Maps / CKAN pattern) — the list state at a glance. */
 .filter-chips { display:flex; flex-wrap:wrap; gap:8px; margin:14px 0 0; padding:0; list-style:none; }
@@ -1008,18 +1029,18 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 .auth-danger-zone .button:hover { background:var(--danger-bg); border-color:var(--danger-button-hover-border); }
 .auth-danger-zone .button:disabled { opacity:.55; cursor:progress; }
 
-/* Multi-method auth (Fase E2 — Vera design): method selector on /login,
-   passkey management + recovery codes on /account. The selector is a
-   native radio group (keyboard-arrow navigation for free); the selected
-   chip inverts to the focus green with the focus ring on :focus-visible
-   of the (visually hidden but focusable) radio input. */
-.auth-methods { display:flex; gap:var(--space-2); flex-wrap:wrap; margin:26px 0 6px; }
-.auth-method-option { position:relative; }
-.auth-method-option input { position:absolute; inset:0; margin:0; opacity:0; cursor:pointer; }
-.auth-method-option label { display:inline-flex; align-items:center; min-height:44px; padding:10px 16px; border:1px solid var(--control-border); border-radius:var(--radius-lg); background:var(--white); color:var(--outline-ink); font-size:var(--text-base); font-weight:800; line-height:1.2; cursor:pointer; }
-.auth-method-option input:checked + label { border-color:var(--focus); background:var(--selected-bg); color:var(--selected-ink); }
-.auth-method-option input:focus-visible + label { outline:3px solid var(--focus); outline-offset:2px; }
-.auth-method-option input:hover:not(:checked) + label { border-color:var(--control-focus); }
+/* Multi-method auth (Fase E2 — Vera design; CEO 2026-08-08): the three
+   sign-in blocks on /login are ALL visible at once, stacked in the order
+   passkey → email + password → social. Each block is a coherent-box card
+   (white bg + scoped darker border + soft shadow, same family as the
+   record-list cards — the accepted #269 pattern); passkey management +
+   recovery codes on /account keep the hint style below. */
+.auth-methods { display:grid; gap:18px; margin:26px 0 6px; }
+.auth-method-card { padding:24px 26px 26px; border:1px solid var(--card-border); border-radius:var(--radius-lg); background:var(--white); box-shadow:0 1px 2px rgba(16,35,50,.05), 0 6px 16px rgba(16,35,50,.06); }
+.auth-method-card h2 { margin:0 0 4px; color:var(--ink); font-size:var(--text-3xl); letter-spacing:-.035em; line-height:1.15; font-weight:800; }
+.auth-method-card .auth-form { margin:18px 0 0; }
+.auth-method-card .oidc-panel { margin:18px 0 0; }
+.auth-method-card .record-detail-summary { margin:12px 0; color:var(--muted); font-size:var(--text-md); line-height:1.5; }
 .auth-method-hint { margin:0; color:var(--muted); font-size:var(--text-sm); line-height:1.5; }
 .oidc-panel { margin:30px 0 8px; }
 .oidc-buttons { display:grid; gap:10px; }
@@ -1312,8 +1333,8 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
    .loading-note / .notice insets below). */
 .map-card .search-count { margin:10px 18px 0; }
 .map-card .live-map-workspace { border:0; border-radius:0; box-shadow:none; }
-.map-card .map-split { grid-template-columns:320px 1fr; height:clamp(560px, calc(100svh - 370px), 1300px); min-height:560px; }
-.map-card .map-panel .live-map { height:100%; min-height:560px; }
+.map-card .map-split { grid-template-columns:320px 1fr; height:clamp(620px, calc(100svh - 300px), 1500px); min-height:620px; }
+.map-card .map-panel .map-region, .map-card .map-panel .live-map { height:100%; min-height:560px; }
 .map-card .map-panel .map-fallback { height:100%; min-height:560px; }
 .map-card .loading-note, .map-card .notice { margin-left:18px; margin-right:18px; }
 .map-sidebar { display:flex; flex-direction:column; min-height:0; border-right:1px solid var(--line); background:var(--card-bg); }
@@ -1437,6 +1458,7 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
   .map-card .map-split > .map-panel { order:-1; }
   .map-card .map-panel .live-map { height:calc(100svh - 250px); min-height:340px; max-height:64svh; }
   .map-card .map-panel .map-fallback { height:calc(100svh - 250px); min-height:340px; max-height:64svh; }
+  .map-card .map-panel .map-region { height:auto; min-height:0; }
   /* Points panel below the map: starts collapsed (header only) — the map
      must be the first thing users see; the toggle expands it from the
      keyboard (button, aria-expanded, aria-controls). */

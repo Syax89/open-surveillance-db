@@ -774,13 +774,28 @@ test("DirectoryTool renders the directory shell with the shared FiltersBar and b
   const useMap = rtl.within(explorerSwitch).getByRole("link", { name: "Map" });
   assert.equal(useMap.getAttribute("href"), "/mappa", "the directory explorer switch links the map tool route");
 
-  // CEO feedback 2026-08-02: the data export row moved from /mappa to
-  // /directory — the catalog meta row (DirectoryCatalog) owns the
-  // filter-aware CSV/GeoJSON downloads (t_127492f1) and the data-actions
-  // footer keeps the data policy link (guide/regole pattern, merge #229 × #231).
-  assert.ok(screen.getByRole("link", { name: "Download GeoJSON" }), "download GeoJSON row on /directory");
-  assert.ok(screen.getByRole("link", { name: "Download CSV" }), "download CSV row on /directory");
-  assert.equal(screen.getByRole("link", { name: "Read the data policy" }).getAttribute("href"), "/guide", "the data policy link points at /guide");
+  // CEO 2026-08-08 (t_b98b1734): the CSV/GeoJSON downloads moved from the
+  // results header to the data-actions footer — small text links on the same
+  // row as the data policy link (same font, no buttons). The footer keeps
+  // the guide/regole pattern (merge #229 × #231) for the policy link.
+  const csvLink = screen.getByRole("link", { name: "Download CSV" });
+  const geojsonLink = screen.getByRole("link", { name: "Download GeoJSON" });
+  const policyLink = screen.getByRole("link", { name: "Read the data policy" });
+  assert.ok(csvLink, "download CSV row on /directory");
+  assert.ok(geojsonLink, "download GeoJSON row on /directory");
+  assert.equal(policyLink.getAttribute("href"), "/guide", "the data policy link points at /guide");
+  const footer = policyLink.closest(".data-actions");
+  assert.ok(footer, "downloads + policy links share the data-actions footer");
+  assert.ok(footer.contains(csvLink) && footer.contains(geojsonLink), "both download links live in the data-actions footer");
+  assert.ok(!footer.querySelector(".export-button"), "footer links are text links, not export buttons");
+  assert.ok(!document.querySelector(".directory-results .export-button"), "no export buttons remain in the results header");
+
+  // CEO 2026-08-08: the small circular [+] in the results header top-right
+  // links to the report form (/segnala) — a plain link, the write gate there
+  // handles anonymous visitors.
+  const reportShortcut = screen.getByRole("link", { name: "Report a camera" });
+  assert.equal(reportShortcut.getAttribute("href"), "/segnala", "the [+] links the report form route");
+  assert.match(reportShortcut.getAttribute("class") ?? "", /add-button/, "the [+] uses the circular add-button style");
 });
 
 test("DirectoryTool search narrows the list (debounced URL commit); the empty state offers a clear action that restores it", async (t) => {

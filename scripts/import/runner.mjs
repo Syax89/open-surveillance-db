@@ -287,7 +287,35 @@ export async function runImport(db, { slug, adapter: adapterOverride, descriptor
   // --- step 7: write phase (--apply only) ---
   let committed = false;
   if (apply) {
-    await writeChunks(db, batchId, slug, inserts, report, counts, nowIso, checksum);
+    try {
+      await writeChunks(db, batchId, slug, inserts, report, counts, nowIso, checksum);
+    } catch (err) {
+      // A crash mid-write would otherwise leave the batch row stuck in
+      // 'running' forever (the row exists, some cameras may already be
+      // inserted, and nothing distinguishes it from an import in
+      // progress). Mark it 'failed' with the error in the report so
+      // operators see the state (keep-fonti-fresh.md §5). Recovery is
+      // unchanged: a re-run without --force resets the counters and
+      // resumes — the partial UNIQUE (source, external_id) makes the
+      // already-inserted rows idempotent no-ops.
+      const failAt = new Date().toISOString();
+      try {
+        await db
+          .prepare("UPDATE import_batches SET status = ?, report = ?, notes = ?, updated_at = ? WHERE id = ?")
+          .bind(
+            BATCH_STATUS.FAILED,
+            JSON.stringify({ writeError: err.message }),
+            `Write phase failed at ${failAt}`,
+            failAt,
+            batchId,
+          )
+          .run();
+      } catch {
+        // The failure update itself can fail (e.g. connection drop): the
+        // original error is the one the operator needs.
+      }
+      throw new Error(`import write failed: ${err.message}`);
+    }
     committed = true;
   }
 
