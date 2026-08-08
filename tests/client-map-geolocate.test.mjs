@@ -70,13 +70,15 @@ function geolocateButton(maps) {
   return { mapStub, control, button };
 }
 
-test("geolocate button stacks ABOVE the zoom control (added first, same corner)", async () => {
+test("geolocate button stacks ABOVE the zoom control (added last, same corner)", async () => {
   await renderMap();
   const maps = await leafletMaps();
   const kinds = maps[0].__controls?.map((entry) => entry.kind) ?? [];
-  // Add order = visual stack order for same-corner controls: geolocate was
-  // added before zoom, so Leaflet renders it above the zoom buttons.
-  assert.deepEqual(kinds, ["geolocate", "zoom"]);
+  // Leaflet renders bottom-corner controls with `flex-direction:
+  // column-reverse`, so the LAST control added appears on TOP. The zoom
+  // control is added first, then the geolocate control — the geolocate
+  // button therefore renders ABOVE the zoom buttons.
+  assert.deepEqual(kinds, ["zoom", "geolocate"]);
   const { button } = geolocateButton(maps);
   assert.equal(button.getAttribute("aria-pressed"), "false");
   assert.equal(button.getAttribute("aria-label"), "Show my location");

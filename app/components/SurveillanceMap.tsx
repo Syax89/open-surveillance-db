@@ -404,12 +404,14 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
         leafletRef.current = L;
         const map = L.map(mapElement.current, { zoomControl: false, scrollWheelZoom: true }).setView([41.9028, 12.4964], 13);
         // Geolocation button (t_18259daa, CEO): a custom Leaflet control
-        // added BEFORE the zoom control — Leaflet stacks same-corner
-        // controls in add order, so the geolocate button renders ABOVE the
-        // zoom buttons ("sopra i tasti aumenta/diminuisci zoom"). The
-        // button lives outside the React tree; the click handler reads the
-        // CURRENT toggle through a ref (same pattern as onPickRef), and
-        // aria-pressed is written directly on the element.
+        // that must render ABOVE the zoom buttons ("sopra i tasti
+        // aumenta/diminuisci zoom"). Leaflet stacks same-corner controls
+        // with `flex-direction: column-reverse` on bottom corners, so the
+        // LAST control added renders on TOP — the zoom control is added
+        // first, then this control. The button lives outside the React
+        // tree; the click handler reads the CURRENT toggle through a ref
+        // (same pattern as onPickRef), and aria-pressed is written
+        // directly on the element.
         const GeoLocateControl = L.Control.extend({
           options: { position: "bottomright" },
           onAdd() {
@@ -441,8 +443,8 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
             return container;
           },
         });
-        new GeoLocateControl().addTo(map);
         L.control.zoom({ position: "bottomright" }).addTo(map);
+        new GeoLocateControl().addTo(map);
         // Tiles are served through the same-origin tile proxy
         // (/api/tiles/{z}/{x}/{y}.png, see docs/OSM_INTEGRATION.md): the
         // client never hotlinks a tile server directly, the upstream request
