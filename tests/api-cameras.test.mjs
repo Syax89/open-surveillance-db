@@ -337,11 +337,10 @@ test("GET /api/cameras rejects invalid limit and offset values with 400", async 
     { name: "offset text", query: "offset=abc" },
     { name: "offset negative", query: "offset=-3" },
     { name: "offset decimal", query: "offset=2.5" },
-    // review P2-4: a huge but VALID integer offset must still be rejected —
-    // 9007199254740991 is MAX_SAFE_INTEGER (passes isSafeInteger), and
-    // 10001 is just past the documented cap (MAX_PAGE_OFFSET = 10000).
-    { name: "offset MAX_SAFE_INTEGER", query: "offset=9007199254740991" },
-    { name: "offset above MAX_PAGE_OFFSET", query: "offset=10001" },
+    // review P2-4 / kanban t_e86c91c4: huge-but-valid integers are NO
+    // longer rejected here — the anti-DoS guard moved to the db boundary
+    // (offset >= total → empty page, no SELECT). See the offset-acceptance
+    // tests below for MAX_SAFE_INTEGER and offsets beyond the old 10000 cap.
   ];
   for (const { name, query } of cases) {
     await t.test(name, async () => {
@@ -352,11 +351,35 @@ test("GET /api/cameras rejects invalid limit and offset values with 400", async 
   }
 });
 
-test("GET /api/cameras accepts an offset at the MAX_PAGE_OFFSET boundary", async () => {
+test("GET /api/cameras accepts offsets beyond the old MAX_PAGE_OFFSET when the dataset is larger (t_e86c91c4)", async () => {
+  // The fixed 10000 cap (PR #250) broke the /directory walk once the dataset
+  // grew past 10000 records: the client requested offset 10500..12000 and got
+  // 400 → empty state. The route now forwards any non-negative offset to the
+  // db layer, which answers an empty page for offset >= total.
+  stub("listPublicCamerasPage", async () => ({ records: [], total: 12_284, nextOffset: null }));
+  const { GET } = await camerasRoute();
+  const response = await GET(apiRequest("/api/cameras?offset=12000"));
+  assert.equal(response.status, 200, "an offset past the old cap is accepted, not 400");
+  assert.deepEqual(callArgs("listPublicCamerasPage")[0], [{}, { limit: 500, offset: 12000 }]);
+});
+
+test("GET /api/cameras forwards a MAX_SAFE_INTEGER offset to the db guard (anti-DoS at the boundary, not the route)", async () => {
+  // review P2-4: the route no longer rejects ?offset=9007199254740991 with
+  // 400 before any db work — the db boundary answers an empty page WITHOUT
+  // running the SELECT (offset >= total), which is the actual protection
+  // against an astronomical SQL OFFSET. The route only checks syntax.
+  stub("listPublicCamerasPage", async () => ({ records: [], total: 0, nextOffset: null }));
+  const { GET } = await camerasRoute();
+  const response = await GET(apiRequest("/api/cameras?offset=9007199254740991"));
+  assert.equal(response.status, 200);
+  assert.deepEqual(callArgs("listPublicCamerasPage")[0], [{}, { limit: 500, offset: 9007199254740991 }]);
+});
+
+test("GET /api/cameras accepts an offset at the old MAX_PAGE_OFFSET boundary", async () => {
   stub("listPublicCamerasPage", async () => ({ records: [], total: 0, nextOffset: null }));
   const { GET } = await camerasRoute();
   const response = await GET(apiRequest("/api/cameras?offset=10000"));
-  assert.equal(response.status, 200, "offset == MAX_PAGE_OFFSET is the last allowed page");
+  assert.equal(response.status, 200, "offset == 10000 stays accepted (no cap regression)");
   assert.deepEqual(callArgs("listPublicCamerasPage")[0], [{}, { limit: 500, offset: 10000 }]);
 });
 
@@ -1183,6 +1206,17 @@ test("GET /api/cameras?bbox=&limit= clamps the viewport page size to the bbox ma
 
   const badOffset = await GET(apiRequest("/api/cameras?bbox=12.4,41.8,12.6,42.0&offset=-1"));
   assert.equal(badOffset.status, 400);
+});
+
+test("GET /api/cameras?bbox= accepts offsets beyond the old MAX_PAGE_OFFSET (t_e86c91c4)", async () => {
+  // The bbox page had the same fixed 10000 cap as the list: a dense
+  // national viewport with >10000 records could 400 the map's paging.
+  // Offsets are forwarded to the db boundary guard like the list page.
+  stub("listPublicCamerasInBboxPage", async () => ({ records: [], total: 12_284, nextOffset: null }));
+  const { GET } = await camerasRoute();
+  const response = await GET(apiRequest("/api/cameras?bbox=12.4,41.8,12.6,42.0&offset=12000"));
+  assert.equal(response.status, 200);
+  assert.deepEqual(callArgs("listPublicCamerasInBboxPage")[0][2], { limit: 1000, offset: 12000 });
 });
 
 test("GET /api/cameras bbox validation rejects malformed and inverted rectangles", async (t) => {

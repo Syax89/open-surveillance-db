@@ -244,7 +244,6 @@ test("listPublicCamerasPage pages are disjoint and cover the whole public set (z
   for (let index = 0; index < 10; index += 1) {
     created.push(await insertCamera(env, { title: `Cover ${index}` }));
   }
-
   const pageOne = await cameras.listPublicCamerasPage(undefined, { limit: 4, offset: 0 });
   const pageTwo = await cameras.listPublicCamerasPage(undefined, { limit: 4, offset: 4 });
   const pageThree = await cameras.listPublicCamerasPage(undefined, { limit: 4, offset: 8 });
@@ -262,6 +261,52 @@ test("listPublicCamerasPage pages are disjoint and cover the whole public set (z
     offset = page.nextOffset;
   }
   assert.deepEqual(walked.map((record) => record.id).sort((a, b) => a - b), created.map((record) => record.id).sort((a, b) => a - b));
+});
+
+test("listPublicCamerasPage answers an empty page for offset >= total without a SELECT (t_e86c91c4)", async () => {
+  // The old MAX_PAGE_OFFSET (10000, PR #250) made the db layer unreachable
+  // past 10000: the /directory walk died with HTTP 400 once the dataset grew
+  // past 10000 records. The guard now lives HERE, where the real `total` is
+  // known: an offset at/beyond the total can never return records, so the
+  // page is answered empty WITHOUT running the SELECT — a hostile
+  // ?offset=9007199254740991 can never force an astronomical SQL OFFSET
+  // (review P2-4 preserved), and a legitimate walk over >10000 records pages
+  // to the end (offset 12000 on a 12284-record dataset must still return
+  // records, not 400).
+  const { env, cameras } = await realDb();
+  await resetDb({ env, cameras });
+  for (let index = 0; index < 7; index += 1) {
+    await insertCamera(env, { title: `Guard ${index}` });
+  }
+
+  const beyondTotal = await cameras.listPublicCamerasPage(undefined, { limit: 500, offset: 10_000 });
+  assert.deepEqual(beyondTotal.records, [], "offset far past the total is an empty page, never an error");
+  assert.equal(beyondTotal.total, 7, "the true total is still reported");
+  assert.equal(beyondTotal.nextOffset, null, "an empty tail page stops the walk");
+
+  const astronomical = await cameras.listPublicCamerasPage(undefined, { limit: 500, offset: 9007199254740991 });
+  assert.deepEqual(astronomical.records, [], "MAX_SAFE_INTEGER offset is an empty page, never a SELECT on the D1");
+  assert.equal(astronomical.total, 7);
+  assert.equal(astronomical.nextOffset, null);
+
+  // The last REAL page still works: offset 6 on a 7-record set returns the
+  // final record (dataset > 10000 equivalent: offset 12000 < total 12284).
+  const lastReal = await cameras.listPublicCamerasPage(undefined, { limit: 500, offset: 6 });
+  assert.equal(lastReal.records.length, 1, "an offset inside the dataset pages normally");
+  assert.equal(lastReal.nextOffset, null);
+});
+
+test("listPublicCamerasInBboxPage answers an empty page for offset >= total (t_e86c91c4)", async () => {
+  const { env, cameras } = await realDb();
+  await resetDb({ env, cameras });
+  for (let index = 0; index < 5; index += 1) {
+    await insertCamera(env, { title: `Bbox guard ${index}`, latitude: 44.1, longitude: 12.2 });
+  }
+  const bbox = { west: 12.0, south: 44.0, east: 12.5, north: 44.5 };
+  const beyond = await cameras.listPublicCamerasInBboxPage(bbox, undefined, { limit: 1000, offset: 10_000 });
+  assert.deepEqual(beyond.records, [], "a bbox page past its total is empty, never 400");
+  assert.equal(beyond.total, 5);
+  assert.equal(beyond.nextOffset, null);
 });
 
 test("listPublicCamerasPage applies the same public boundary, filters and coordinate rounding as the full list", async () => {

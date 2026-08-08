@@ -19,7 +19,6 @@ import { CACHE_TAGS } from "../../lib/cache-purge";
 import { withPublicCache } from "../../lib/public-cache";
 import {
   BodyReadError,
-  MAX_PAGE_OFFSET,
   readJsonBody,
   urlTooLong,
 } from "../../lib/input-limits";
@@ -183,8 +182,8 @@ export async function GET(request: Request) {
       // the box, so total/nextOffset stay equivalent for the caller.
       const bboxLimit = readPageNumber(params.get("limit"), PUBLIC_CAMERAS_BBOX_DEFAULT_LIMIT, PUBLIC_CAMERAS_BBOX_MAX_LIMIT);
       const bboxOffset = readPageNumber(params.get("offset"), 0);
-      if (bboxLimit === null || bboxOffset === null || bboxLimit < 1 || bboxOffset > MAX_PAGE_OFFSET) {
-        return Response.json({ error: `limit must be an integer between 1 and ${PUBLIC_CAMERAS_BBOX_MAX_LIMIT} and offset a non-negative integer up to ${MAX_PAGE_OFFSET}.` }, { status: 400 });
+      if (bboxLimit === null || bboxOffset === null || bboxLimit < 1) {
+        return Response.json({ error: `limit must be an integer between 1 and ${PUBLIC_CAMERAS_BBOX_MAX_LIMIT} and offset a non-negative integer.` }, { status: 400 });
       }
       const page = await listPublicCamerasInBboxPage({ west, south, east, north }, filters, { limit: bboxLimit, offset: bboxOffset });
       return Response.json(
@@ -215,11 +214,17 @@ export async function GET(request: Request) {
     // max); offset is optional and starts at 0. Invalid values answer 400.
     const limit = readPageNumber(params.get("limit"), PUBLIC_CAMERAS_PAGE_DEFAULT_LIMIT, PUBLIC_CAMERAS_PAGE_MAX_LIMIT);
     const offset = readPageNumber(params.get("offset"), 0);
-    // An offset beyond MAX_PAGE_OFFSET is rejected (not clamped) so a
-    // hostile ?offset=9007199254740991 cannot force an astronomical SQL
-    // OFFSET on the D1 (review P2-4). The check runs before any db work.
-    if (limit === null || offset === null || limit < 1 || offset > MAX_PAGE_OFFSET) {
-      return Response.json({ error: `limit must be an integer between 1 and ${PUBLIC_CAMERAS_PAGE_MAX_LIMIT} and offset a non-negative integer up to ${MAX_PAGE_OFFSET}.` }, { status: 400 });
+    // Pagination bounds (kanban t_e86c91c4): an offset is a non-negative
+    // integer and limit is clamped to the max page. There is NO fixed
+    // offset cap here anymore — PR #250's MAX_PAGE_OFFSET (10000) rejected
+    // legitimate deep pagination once the dataset grew past 10000 records
+    // (the /directory walk failed with 400 → empty state). The anti-DoS
+    // guard (review P2-4: never let ?offset=9007199254740991 force an
+    // astronomical SQL OFFSET on the D1) now lives at the db boundary,
+    // which knows the real `total` and answers an empty page WITHOUT
+    // running the SELECT for any offset >= total. Syntax-only checks here.
+    if (limit === null || offset === null || limit < 1) {
+      return Response.json({ error: `limit must be an integer between 1 and ${PUBLIC_CAMERAS_PAGE_MAX_LIMIT} and offset a non-negative integer.` }, { status: 400 });
     }
     // Facets are OPT-IN (QA#5 F2, t_ab0d4c75): the client never consumed
     // them (it derives kind options client-side via cameraKindsOf), yet they
