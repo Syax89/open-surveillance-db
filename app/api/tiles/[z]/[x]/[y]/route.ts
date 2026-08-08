@@ -73,7 +73,7 @@ class TileTooLargeError extends Error {}
 
 /**
  * Read an upstream response body up to `maxBytes`, streaming with a running
- * counter (same shape as readCappedBody in app/api/photos/route.ts). When the
+ * counter. When the
  * cap is exceeded the stream is cancelled immediately — the connection is not
  * drained — and TileTooLargeError is thrown so the route answers 502 without
  * caching. Returns the full body as a single Uint8Array when within the cap.

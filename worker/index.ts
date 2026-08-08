@@ -1,7 +1,7 @@
 /** Cloudflare Worker entry point for OpenSurveillanceDB. */
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
-import type { D1Database, Fetcher, R2Bucket, SendEmail } from "cloudflare:workers";
+import type { D1Database, Fetcher, SendEmail } from "cloudflare:workers";
 import { DEFAULT_RETENTION_POLICY, runRetentionSweep, type RetentionSummary } from "../db/retention";
 import { sweepOidcExpired } from "../db/oidc";
 
@@ -20,8 +20,6 @@ interface Env {
       };
     };
   };
-  /** Photo evidence object storage (D1 stores metadata only). */
-  PHOTOS: R2Bucket;
   /**
    * Cloudflare Workers Rate Limiting bindings (wrangler.jsonc `ratelimits`,
    * audit #3 MEDIUM, t_dff3dadf): the production enforcement point for the
@@ -337,8 +335,8 @@ function requireModerationAuth(request: Request, env: Env): { denied: Response |
  *
  * Applied by the worker edge to EVERY response — pages, API JSON, errors,
  * image optimization, the moderation gate. Individual handlers may set
- * stricter values (e.g. the photo routes ship `Content-Security-Policy:
- * default-src 'none'; sandbox` on binary image bodies): the middleware only
+ * stricter values (an app route may set a more restrictive policy on its
+ * own response): the middleware only
  * ADDS headers that are not already present, so a more restrictive policy
  * set by an app route is never weakened.
  *
@@ -389,7 +387,7 @@ function withSecurityHeaders(response: Response): Response {
   const headers = new Headers(response.headers);
   for (const [name, value] of SECURITY_HEADERS) {
     // Never overwrite an existing header: app routes may set stricter
-    // values (photo CSP sandbox) that must survive the middleware.
+    // values set by an app route that must survive the middleware.
     if (!headers.has(name)) headers.set(name, value);
   }
   return new Response(response.body, {
@@ -466,14 +464,14 @@ const worker = {
    * Scheduled retention sweep (ADR 0004 §3, ADR 0008 p.3 — cron binding in
    * wrangler.jsonc, daily at 03:00 UTC). Runs the retention job from
    * db/retention.ts and the OIDC expiry sweep from db/oidc.ts against the D1
-   * + PHOTOS bindings. Both sweeps must never break the request path: they
+   * binding. Both sweeps must never break the request path: they
    * run inside waitUntil and any failure is caught and logged so the worker
    * stays healthy (the next run retries).
    */
   async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
     const policy = DEFAULT_RETENTION_POLICY;
     ctx.waitUntil(
-      runRetentionSweep(new Date().toISOString(), { policy, r2: env.PHOTOS })
+      runRetentionSweep(new Date().toISOString(), { policy })
         .then((summary: RetentionSummary) => {
           console.log(`Retention sweep ok (${controller.cron}):`, JSON.stringify(summary));
         })

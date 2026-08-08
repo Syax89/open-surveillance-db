@@ -133,7 +133,6 @@ declare module "cloudflare:workers" {
     GEOCODE_UPSTREAM_TIMEOUT_MS?: string;
     /** Max accepted upstream geocode body in bytes (default 512 KiB). */
     GEOCODE_MAX_BYTES?: string;
-    PHOTOS: R2Bucket;
     // Multi-method auth — Fase A2 (mailer, ADR 0020): the canonical mailer
     // db/mailer.ts sends through the Cloudflare `send_email` binding (EMAIL)
     // and fails closed. VERIFY_BASE_URL is REQUIRED to build action links —

@@ -1,7 +1,6 @@
 import type { D1PreparedStatement } from "cloudflare:workers";
 import { getD1, type CameraRecord } from "./cameras";
 import type { CorrectionRequest } from "./corrections";
-import { listPendingPhotos, type PendingPhotoReport } from "./photos";
 import { computeReviewDueAt } from "./freshness";
 
 /**
@@ -66,13 +65,12 @@ export type ModerationQueue = {
   // Each row is a per-column diff against the editable whitelist; the
   // moderator applies or discards it via moderateCameraEdit.
   cameraEditRequests: PendingEditRequest[];
-  photoReports: PendingPhotoReport[];
   recentEvents: ModerationEvent[];
   reviewers: Reviewer[];
   queueItems: ModerationQueueItem[];
 };
 
-export type ModerationEntity = "camera" | "correction" | "photo" | "camera_edit";
+export type ModerationEntity = "camera" | "correction" | "camera_edit";
 export type CameraModerationAction =
   | "approve"
   | "reject"
@@ -566,7 +564,6 @@ export async function listPendingModerationItems(): Promise<ModerationQueue> {
     staleCameras: staleCameras.results,
     correctionRequests: correctionRequests.results,
     cameraEditRequests: cameraEditRequests.results,
-    photoReports: await listPendingPhotos(),
     recentEvents: recentEvents.results,
     reviewers: reviewers,
     queueItems,

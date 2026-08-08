@@ -4,7 +4,6 @@ import { requiresDuplicateConfirmation } from "../../lib/duplicate-detection";
 import { requireVerifiedContributor } from "../../lib/write-gate";
 import { csrfVerified, sameOrigin } from "../../lib/csrf";
 import { DATA_LICENSE_ID, DATA_LICENSE_NOTICE } from "../../lib/data-license";
-import { linkPhotosToCamera } from "../../../db/photos";
 import { isRecord } from "../../lib/guards";
 import {
   callerKey,
@@ -303,21 +302,6 @@ export async function POST(request: Request) {
     }
     const latitude = Number(payload.latitude);
     const longitude = Number(payload.longitude);
-    // Optional photo evidence: uploaded photos (POST /api/photos) may be
-    // attached to the report at submission time. They stay private: the
-    // photos themselves must be individually moderated before they can be
-    // served, regardless of what happens to this report.
-    const photoIds = Array.isArray(payload.photoIds)
-      ? payload.photoIds.filter(
-          (id): id is number => typeof id === "number" && Number.isInteger(id) && id >= 1,
-        ).slice(0, 5)
-      : [];
-    if (
-      Array.isArray(payload.photoIds) &&
-      payload.photoIds.some((id) => typeof id !== "number" || !Number.isInteger(id) || id < 1)
-    ) {
-      return Response.json({ error: "photoIds must be an array of positive integers." }, { status: 400 });
-    }
     if (!title || !kind || !Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180 || (payload.observedOn !== undefined && payload.observedOn !== null && !observedOn)) return Response.json({ error: "A title, type, valid position and (when provided) a valid observation date are required." }, { status: 400 });
     // Horizon 1 duplicate gate (ADR 0019): detect likely duplicates BEFORE the
     // record is stored. The check runs on reviewed public records only (the
@@ -334,8 +318,7 @@ export async function POST(request: Request) {
     }
     // A high-strength candidate (essentially the same spot, or <= 75 m with
     // matching text) forces an explicit acknowledgement. Without it the
-    // report is rejected with 409 and NOT stored — no record row, no photo
-    // linking — so a contributor who skips the UI confirmation can never
+    // report is rejected with 409 and NOT stored — no record row — so a contributor who skips the UI confirmation can never
     // silently file a near-duplicate. The flag is strictly boolean true:
     // anything else ("true", 1) fails closed. This is a confirmation gate,
     // not a hard block: a human can always proceed after acknowledging.
@@ -354,18 +337,7 @@ export async function POST(request: Request) {
     // `published` lifecycle event. The legacy pending insert survives only
     // for legal-emergency flows (createPendingCamera, moderation queue).
     const record = await createCamera({ title, kind, address, notes, manufacturer: manufacturer || null, observedOn: observedOn || null, latitude, longitude, direction: normalizeDomeDirection(kind, direction), contributorId: gate.contributor.id });
-    // Link photo evidence after the report row exists. Linking is best-effort:
-    // a photo that fails the pending/unlinked guard is simply left orphaned
-    // (it will never be public without moderation). Photos attributed to a
-    // contributor (uploaded while signed in) can only be linked by that same
-    // contributor — the ownership guard lives in linkPhotosToCamera.
-    let linkedPhotoCount = 0;
-    try {
-      linkedPhotoCount = await linkPhotosToCamera(record.id, photoIds, gate.contributor.id);
-    } catch (error) {
-      console.error("POST /api/cameras photo linking failed", error);
-    }
-    return Response.json({ record, possibleDuplicates, linkedPhotos: linkedPhotoCount }, { status: 201 });
+    return Response.json({ record, possibleDuplicates }, { status: 201 });
   } catch (error) {
     if (error instanceof BodyReadError) {
       console.warn("POST /api/cameras payload rejected: body too large or not valid JSON");

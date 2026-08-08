@@ -728,52 +728,6 @@ export const moderationEventsArchive = sqliteTable(
 );
 
 /**
- * Photo evidence attached to a camera report. D1 stores METADATA ONLY; the
- * image bytes live in object storage (R2 bucket `PHOTOS`) under an opaque
- * `storage_key` that is never exposed to clients. Photos are never public:
- * they must be approved by a moderator with confirmed redaction, and the
- * linked camera must itself be public (`cameras.status` + freshness).
- * `exif_stripped` records the mandatory intake strip; `redaction_confirmed`
- * is set by the moderator at approval time.
- */
-export const photos = sqliteTable(
-  "photos",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    cameraId: integer("camera_id"),
-    contributorId: integer("contributor_id"),
-    // Internal pending-quota bucket (migration 0013): `contributor:<id>` for
-    // authenticated uploads, `anon:<sha256(caller key)>` for anonymous ones.
-    // Never exposed through the public projection; only 'pending' rows count.
-    submitterKey: text("submitter_key"),
-    storageKey: text("storage_key").notNull(),
-    mimeType: text("mime_type").notNull(),
-    width: integer("width").notNull(),
-    height: integer("height").notNull(),
-    sizeBytes: integer("size_bytes").notNull(),
-    status: text("status").notNull().default("pending"),
-    exifStripped: integer("exif_stripped").notNull().default(1),
-    redactionConfirmed: integer("redaction_confirmed").notNull().default(0),
-    createdAt: text("created_at").notNull(),
-    updatedAt: text("updated_at").notNull(),
-  },
-  (table) => [
-    index("photos_status_idx").on(table.status),
-    index("photos_camera_idx").on(table.cameraId),
-    // Pending-quota lookups always filter on (submitter_key, status='pending').
-    index("photos_pending_submitter_idx")
-      .on(table.submitterKey)
-      .where(sql`${table.status} = 'pending'`),
-    // Community profile contributions list (migration 0025, C2): the "my
-    // photos" branch of listContributorContributions filters on
-    // contributor_id and orders by created_at DESC; photos previously had no
-    // contributor-leading index at all, so this turns a full scan into an
-    // index scan.
-    index("photos_contributor_created_idx").on(table.contributorId, sql`created_at DESC`),
-  ],
-);
-
-/**
  * Community actions (ADR 0021 §3, migration 0036). The pivot replaces the
  * verification toggle (former `camera_confirmations`, ADR 0018 §2 — dropped
  * by migration 0039 after its rows were copied here as `confirm` actions)
@@ -944,8 +898,7 @@ export const emailSendLog = sqliteTable(
  * Per-IP registration attempts (P3-4, CEO decision t_0941036b; migration
  * 0032). One row per POST /api/auth/register request, keyed by the SHA-256
  * of the caller key (cf-connecting-ip) — NEVER the raw IP (privacy by
- * design, same rule as `photos.submitter_key` and the abuse-alert
- * `callerHash`). The register route records the attempt and counts the
+ * design, same rule as the abuse-alert `callerHash`). The register route records the attempt and counts the
  * rolling window (`WHERE ip_hash = ? AND created_at >= ?`) in ONE D1 batch,
  * so two concurrent registrations cannot race past a stale count; the
  * request that brings the count to the cap (default 5 per 24h) answers 429.

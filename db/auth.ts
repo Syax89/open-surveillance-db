@@ -340,8 +340,7 @@ export async function registrationIpHash(
  * concurrent registrations cannot both read a stale count below the cap. The
  * stored key is `registrationIpHash(callerKey)` — a keyed HMAC (or truncated
  * SHA-256) of the caller key, never the raw IP and never an invertible hash
- * (privacy by design, QA#3 F4; same rule as `photos.submitter_key` and the
- * abuse-alert `callerHash`).
+ * (privacy by design, QA#3 F4; same rule as the abuse-alert `callerHash`).
  * The route answers 429 once the count reaches `registrationIpLimits(env).maxRequests`
  * (so the 5th request in the window is blocked and its row stays — it must
  * keep counting for the 6th to stay blocked too); rows older than the window
@@ -1041,8 +1040,8 @@ export async function listContributorSubmissions(contributorId: number): Promise
 // Contributor's own contributions (COMMUNITY_PLAN §2.3, C2)
 // ---------------------------------------------------------------------------
 
-/** The three contribution kinds the profile list can filter on. */
-export const CONTRIBUTION_TYPES = ["camera", "correction", "photo"] as const;
+/** The two contribution kinds the profile list can filter on. */
+export const CONTRIBUTION_TYPES = ["camera", "correction"] as const;
 export type ContributionType = (typeof CONTRIBUTION_TYPES)[number];
 
 /** Whitelist of contribution statuses accepted by the profile list filter. */
@@ -1065,11 +1064,11 @@ export const CONTRIBUTION_STATUSES = [
 export type ContributorContribution = {
   type: ContributionType;
   id: number;
-  /** camera: title; correction/photo: null (no public title of their own). */
+  /** camera: title; correction: null (no public title of their own). */
   title: string | null;
-  /** correction: issue_type; camera/photo: null. */
+  /** correction: issue_type; camera: null. */
   issueType: string | null;
-  /** correction/photo: linked camera; camera: null (it is the camera). */
+  /** correction: linked camera; camera: null (it is the camera). */
   cameraId: number | null;
   status: string;
   createdAt: string;
@@ -1085,8 +1084,8 @@ export type ContributionsPage = {
  * Paginated profile contributions list (COMMUNITY_PLAN §2.3, C2).
  *
  * Replaces the old LIMIT-50 `listContributorSubmissions` (kept for backward
- * compatibility) with a bounded, filterable list over the three contribution
- * kinds: attributed camera reports, filed corrections, and photo uploads.
+ * compatibility) with a bounded, filterable list over the two contribution
+ * kinds: attributed camera reports and filed corrections.
  * Only rows attributed to the caller are ever returned; anonymous
  * submissions are not attributable and therefore never listed.
  *
@@ -1095,7 +1094,7 @@ export type ContributionsPage = {
  * boundary, so a caller can never request an unbounded page. The ORDER BY
  * (created_at DESC, id DESC) matches the old submissions ordering and is
  * served by the (contributor_id, created_at DESC) index added in migration
- * 0025 for cameras and photos; correction_requests already carries a
+ * 0025 for cameras; correction_requests already carries a
  * (contributor_id) index from migration 0022.
  */
 export async function listContributorContributions(
@@ -1116,7 +1115,7 @@ export async function listContributorContributions(
   const types: ContributionType[] = filters.type ? [filters.type] : [...CONTRIBUTION_TYPES];
   const status = filters.status ?? null;
 
-  // One UNION ALL over the three contribution tables: each branch projects
+  // One UNION ALL over the two contribution tables: each branch projects
   // the shared shape (type, id, title, issue_type, camera_id, status,
   // created_at) with NULLs for the columns the table does not have. The
   // per-branch contributor_id predicate plus the global ORDER BY keep the
@@ -1135,11 +1134,6 @@ export async function listContributorContributions(
       case "correction":
         branches.push(
           `SELECT 'correction' AS type, id, NULL AS title, issue_type AS issueType, camera_id AS cameraId, status, created_at AS createdAt FROM correction_requests WHERE contributor_id = ?${status ? " AND status = ?" : ""}`,
-        );
-        break;
-      case "photo":
-        branches.push(
-          `SELECT 'photo' AS type, id, NULL AS title, NULL AS issueType, camera_id AS cameraId, status, created_at AS createdAt FROM photos WHERE contributor_id = ?${status ? " AND status = ?" : ""}`,
         );
         break;
     }
@@ -1178,7 +1172,7 @@ export type ContributionSummary = {
 };
 
 /**
- * One grouped query over the three contribution tables — global totals,
+ * One grouped query over the two contribution tables — global totals,
  * INDEPENDENT of any list filter, so the account page can render the
  * summary strip ("X in moderation · Y published …") without an extra
  * endpoint. Anonymous rows (contributor_id NULL) never count: the profile
@@ -1192,16 +1186,14 @@ export async function summarizeContributorContributions(contributorId: number): 
         SELECT 'camera' AS type, status FROM cameras WHERE contributor_id = ?
         UNION ALL
         SELECT 'correction', status FROM correction_requests WHERE contributor_id = ?
-        UNION ALL
-        SELECT 'photo', status FROM photos WHERE contributor_id = ?
       ) GROUP BY type, status`,
     )
-    .bind(contributorId, contributorId, contributorId)
+    .bind(contributorId, contributorId)
     .all<{ type: ContributionType; status: string; n: number }>();
 
   const summary: ContributionSummary = {
     total: 0,
-    byType: { camera: 0, correction: 0, photo: 0 },
+    byType: { camera: 0, correction: 0 },
     byStatus: {},
   };
   for (const row of result.results) {
@@ -1243,8 +1235,6 @@ export type ErasureResult = {
   deletedConfirmations: number;
   /** Number of correction reports de-attributed to anonymous (SET NULL). */
   deattributedCorrections: number;
-  /** Number of uploaded photos de-attributed to anonymous (SET NULL, QA#3 F3). */
-  deattributedPhotos: number;
 };
 
 /**
@@ -1266,9 +1256,7 @@ export type ErasureResult = {
  * by the erased account disappear with it. `camera_edit_requests` and
  * `correction_requests` are de-attributed with SET NULL, never deleted: the
  * requests (audit trail) survive, unlinked. `cameras` are never touched
- * beyond the existing de-attribution (the ADR 0013 pattern); the same
- * SET NULL rule now covers `photos.contributor_id` (QA#3 F3) — the photo
- * row survives its R6/R13 lifecycle, the personal link is severed.
+ * beyond the existing de-attribution (the ADR 0013 pattern).
  *
  * The statements run as one atomic batch: a failure in any step rolls back
  * the whole erasure, so an account is never left half-deleted (e.g. sessions
@@ -1298,7 +1286,7 @@ export async function eraseContributor(contributorId: number): Promise<ErasureRe
     .bind(contributorId)
     .first<{ n: number }>();
   if (Number(existing?.n ?? 0) === 0) {
-    return { deleted: false, deattributedReports: 0, deletedConfirmations: 0, deattributedCorrections: 0, deattributedPhotos: 0 };
+    return { deleted: false, deattributedReports: 0, deletedConfirmations: 0, deattributedCorrections: 0 };
   }
 
   const attributed = await d1
@@ -1320,18 +1308,6 @@ export async function eraseContributor(contributorId: number): Promise<ErasureRe
     .bind(contributorId)
     .first<{ n: number }>();
   const deattributedCorrections = Number(corrections?.n ?? 0);
-  // QA#3 F3 (t_63e0d13c): photo attribution is personal data (art. 17) and
-  // was the one attribution `eraseContributor` never severed — after an
-  // account deletion every consumer resolving `photos.contributor_id`
-  // (ownership guards, moderation, the profile contributions list) hit an
-  // account that no longer exists. Photos follow the same rule as cameras:
-  // the evidence row survives (R6/R13 lifecycle), the attribution link is
-  // cut. The count feeds the erasure response like the report count.
-  const photos = await d1
-    .prepare("SELECT COUNT(*) AS n FROM photos WHERE contributor_id = ?")
-    .bind(contributorId)
-    .first<{ n: number }>();
-  const deattributedPhotos = Number(photos?.n ?? 0);
 
   await d1.batch([
     // Community actions (ADR 0021 §13.1) are the contributor's own data
@@ -1346,11 +1322,6 @@ export async function eraseContributor(contributorId: number): Promise<ErasureRe
     // Correction reports: SET NULL, never delete (same rule as cameras).
     d1.prepare("UPDATE correction_requests SET contributor_id = NULL WHERE contributor_id = ?").bind(contributorId),
     d1.prepare("UPDATE cameras SET contributor_id = NULL WHERE contributor_id = ?").bind(contributorId),
-    // Photo evidence (QA#3 F3): the attribution is severed like the cameras —
-    // the image row survives (its lifecycle is R6/R13, tied to the record),
-    // the personal link to the erased account is cut. This closes the one
-    // attribution that the batch previously left orphaned.
-    d1.prepare("UPDATE photos SET contributor_id = NULL WHERE contributor_id = ?").bind(contributorId),
     // Role-identity link (audit t_5ca60ab2, P2): sever the explicit
     // users.contributor_id mapping so the users row (an independently
     // provisioned role identity) survives, but can no longer attribute
@@ -1388,5 +1359,5 @@ export async function eraseContributor(contributorId: number): Promise<ErasureRe
     d1.prepare("DELETE FROM contributors WHERE id = ?").bind(contributorId),
   ]);
 
-  return { deleted: true, deattributedReports, deletedConfirmations, deattributedCorrections, deattributedPhotos };
+  return { deleted: true, deattributedReports, deletedConfirmations, deattributedCorrections };
 }
