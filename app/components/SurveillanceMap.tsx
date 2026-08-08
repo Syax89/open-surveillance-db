@@ -159,6 +159,22 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
   // the user zooms across the threshold even if the bounds object identity
   // does not change.
   const [mapZoom, setMapZoom] = useState(13);
+  const t = useMessages().map;
+  // Geolocation button (t_18259daa, CEO): a floating custom control stacked
+  // ABOVE the zoom buttons shows the user's own position on the map. All
+  // client-side (privacy by design — the position never leaves the
+  // browser). geoNotice is a discreet toast (role=status) for permission
+  // denied / location errors; the active state is carried by aria-pressed
+  // on the button element (it lives outside the React tree, so it is
+  // updated via DOM in the toggle handler).
+  const [geoNotice, setGeoNotice] = useState("");
+  const geoActiveRef = useRef(false);
+  const geoButtonRef = useRef<HTMLButtonElement | null>(null);
+  const geoToggleRef = useRef<() => void>(() => {});
+  const geoLabelRef = useRef(t.geolocateLabel);
+  // User-location layer (t_18259daa): separate layerGroup so the marker
+  // reconcile / FOV effects never touch it.
+  const userLayerRef = useRef<import("leaflet").LayerGroup | null>(null);
   const mapElement = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<import("leaflet").Map | null>(null);
   const markersRef = useRef<import("leaflet").LayerGroup | null>(null);
@@ -220,7 +236,86 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
     camerasRef.current = cameras;
   }, [cameras]);
 
-  const t = useMessages().map;
+  // Geolocation toggle (t_18259daa, CEO): the floating button above the
+  // zoom controls turns ON/OFF the user's own position. ON → ask the
+  // browser for the position (client-side ONLY — the coordinate never
+  // leaves the browser, privacy by design), pan/zoom to it (zoom ≥15) and
+  // draw a precision marker: an accuracy circle (radius = accuracy meters)
+  // + a small centred dot. OFF → remove the layer. The active state lives
+  // in aria-pressed on the button element (it is outside the React tree,
+  // so the handler writes the attribute directly). Errors are a discreet
+  // toast (role=status), never a crash; the button itself is hidden at
+  // creation when the browser has no geolocation API.
+  const toggleGeolocation = useCallback(() => {
+    const map = mapRef.current;
+    const L = leafletRef.current;
+    const layer = userLayerRef.current;
+    if (!map || !L || !layer) return;
+    if (geoActiveRef.current) {
+      layer.clearLayers();
+      geoActiveRef.current = false;
+      geoButtonRef.current?.setAttribute("aria-pressed", "false");
+      setGeoNotice("");
+      return;
+    }
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setGeoNotice(t.geolocateError);
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude, accuracy } = position.coords;
+        layer.clearLayers();
+        // Precision circle: radius = the browser's accuracy estimate in
+        // metres (min 5 m so a 0/undefined estimate still renders).
+        L.circle([latitude, longitude], {
+          radius: Number.isFinite(accuracy) && accuracy > 0 ? accuracy : 25,
+          className: "osm-user-accuracy",
+          interactive: false,
+          weight: 1.5,
+          opacity: 0.55,
+          fillOpacity: 0.15,
+          color: "rgb(11 112 92)",
+          fillColor: "rgb(11 112 92)",
+        }).addTo(layer);
+        // Centred dot — deliberately NOT a camera marker (distinct style).
+        L.marker([latitude, longitude], {
+          icon: L.divIcon({
+            className: "osm-user-location",
+            html: '<span class="osm-user-dot" aria-hidden="true"></span>',
+            iconSize: [16, 16],
+            iconAnchor: [8, 8],
+          }),
+          keyboard: false,
+          interactive: false,
+          zIndexOffset: 1000,
+        }).addTo(layer);
+        map.setView([latitude, longitude], Math.max(map.getZoom(), 15), { animate: true });
+        geoActiveRef.current = true;
+        geoButtonRef.current?.setAttribute("aria-pressed", "true");
+        setGeoNotice("");
+      },
+      (error) => {
+        // code 1 = PERMISSION_DENIED (user denied / no permission prompt
+        // possible); codes 2/3 = position unavailable / timeout.
+        const denied = error?.code === 1 || error?.code === error?.PERMISSION_DENIED;
+        setGeoNotice(denied ? t.geolocateDenied : t.geolocateError);
+        geoActiveRef.current = false;
+        geoButtonRef.current?.setAttribute("aria-pressed", "false");
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
+    );
+  }, [t]);
+
+  useEffect(() => {
+    geoToggleRef.current = toggleGeolocation;
+  }, [toggleGeolocation]);
+  useEffect(() => {
+    geoLabelRef.current = t.geolocateLabel;
+    geoButtonRef.current?.setAttribute("aria-label", t.geolocateLabel);
+    if (geoButtonRef.current) geoButtonRef.current.title = t.geolocateLabel;
+  }, [t.geolocateLabel]);
+
   useEffect(() => {
     pickPopupHtmlRef.current = (latitude: number, longitude: number) => {
       const lat = latitude.toFixed(5);
@@ -310,7 +405,48 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
         if (disposed || !mapElement.current) return;
         leafletRef.current = L;
         const map = L.map(mapElement.current, { zoomControl: false, scrollWheelZoom: true }).setView([41.9028, 12.4964], 13);
+        // Geolocation button (t_18259daa, CEO): a custom Leaflet control
+        // that must render ABOVE the zoom buttons ("sopra i tasti
+        // aumenta/diminuisci zoom"). Leaflet stacks same-corner controls
+        // with `flex-direction: column-reverse` on bottom corners, so the
+        // LAST control added renders on TOP — the zoom control is added
+        // first, then this control. The button lives outside the React
+        // tree; the click handler reads the CURRENT toggle through a ref
+        // (same pattern as onPickRef), and aria-pressed is written
+        // directly on the element.
+        const GeoLocateControl = L.Control.extend({
+          options: { position: "bottomright" },
+          onAdd() {
+            const container = document.createElement("div");
+            container.className = "leaflet-bar leaflet-control osm-geolocate";
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "osm-geolocate-btn";
+            button.setAttribute("aria-pressed", "false");
+            button.setAttribute("aria-label", geoLabelRef.current);
+            button.title = geoLabelRef.current;
+            // Locate icon (decorative — the aria-label carries the name).
+            button.innerHTML =
+              '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M12 3v3M12 18v3M3 12h3M18 12h3"/><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></svg>';
+            container.appendChild(button);
+            geoButtonRef.current = button;
+            // Fallback (geolocation unsupported / not allowed in this
+            // context): hide the button instead of failing on click.
+            if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
+              button.hidden = true;
+            }
+            // The click must NEVER reach the map handler (which would open
+            // the coordinate picker) or start a drag — stop propagation.
+            button.addEventListener("click", (event) => {
+              L.DomEvent.stopPropagation(event);
+              event.stopPropagation?.();
+              geoToggleRef.current();
+            });
+            return container;
+          },
+        });
         L.control.zoom({ position: "bottomright" }).addTo(map);
+        new GeoLocateControl().addTo(map);
         // Tiles are served through the same-origin tile proxy
         // (/api/tiles/{z}/{x}/{y}.png, see docs/OSM_INTEGRATION.md): the
         // client never hotlinks a tile server directly, the upstream request
@@ -328,6 +464,10 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
         // BELOW the marker pane in Leaflet's z-index stack — the wedge is
         // always under the marker icon, never on top of it.
         fovLayerRef.current = L.layerGroup().addTo(map);
+        // User-location layer (t_18259daa): separate group for the
+        // geolocation dot + accuracy circle so the marker reconcile and the
+        // FOV redraws never touch it.
+        userLayerRef.current = L.layerGroup().addTo(map);
         // A11y (t_f8b775ec, PM directive): the FOV geometry is purely
         // decorative — the same information is available as TEXT inside the
         // marker popup (popupHtmlFor renders "Field of view: NE 45°" when a
@@ -423,6 +563,7 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
         boundsTimerRef.current = null;
       }
       mapRef.current?.remove(); mapRef.current = null; markersRef.current = null; fovLayerRef.current = null; markersByIdRef.current = null;
+      userLayerRef.current = null; geoButtonRef.current = null; geoActiveRef.current = false;
       badges.clear();
       // Reset the ready flag so a StrictMode remount (or any future
       // recreate) re-runs the population effect against the fresh layer
@@ -798,6 +939,11 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
   return <div className="map-region" id="map-region" role="region" aria-label={label} aria-describedby="map-accessibility-description" tabIndex={-1}>
     <p className="sr-only" id="map-accessibility-description">{description} <a href={directoryHref}>{directoryLink}</a>.</p>
     {offline && <div className="offline-state" role="status"><b>{offlineTitle}.</b> {offlineBody} <button type="button" className="text-button" onClick={() => window.location.reload()}>{offlineAction} <span aria-hidden="true">→</span></button></div>}
+    {/* Geolocation toast (t_18259daa): a discreet, non-blocking notice for
+        permission-denied / location errors. role=status announces it to
+        assistive tech; it is inline (never a modal) and only rendered when
+        an error exists, so SSR emits nothing. */}
+    {geoNotice && <div className="map-geo-notice" role="status">{geoNotice}</div>}
     {mapUnavailable
       ? <div className="map-fallback" role="note"><p className="map-fallback-title">{fallbackTitle}</p><p>{fallbackBody}</p><p><a className="text-button" href={directoryHref}>{directoryLink} <span aria-hidden="true">→</span></a></p></div>
       : <div ref={mapElement} className="live-map" />}

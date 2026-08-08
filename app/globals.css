@@ -402,6 +402,41 @@ button { cursor:pointer; }
 .direction-output { font-size:var(--text-md); font-weight:800; color:var(--focus); font-variant-numeric:tabular-nums; }
 .leaflet-container { font-family:Arial, Helvetica, sans-serif; }
 .leaflet-control-attribution { font-size:var(--text-2xs) !important; }
+/* Geolocation button (t_18259daa, CEO): a floating Leaflet control stacked
+   ABOVE the zoom buttons ("sopra i tasti aumenta/diminuisci zoom"). The
+   button is added before the zoom control, so Leaflet renders it on top of
+   the zoom stack; it lives inside the map (bottom-right corner). Touch
+   target 44px (WCAG 2.5.8); the active (on) state uses the action/mint
+   palette; the icon is decorative (aria-label carries the name). */
+.osm-geolocate { border:0; box-shadow:0 1px 5px rgba(0,0,0,.25); border-radius:var(--radius-md); }
+.osm-geolocate-btn {
+  display:grid; place-items:center; width:44px; height:44px; padding:0;
+  border:1px solid var(--control-border); border-radius:var(--radius-md);
+  background:var(--card-bg); color:var(--action); cursor:pointer;
+}
+.osm-geolocate-btn svg { width:22px; height:22px; }
+.osm-geolocate-btn:hover { background:var(--map-surface); }
+.osm-geolocate-btn:focus-visible { outline:3px solid var(--focus); outline-offset:2px; }
+.osm-geolocate-btn[aria-pressed="true"] { background:var(--action); border-color:var(--action); color:var(--card-bg); }
+.osm-geolocate-btn[hidden] { display:none; }
+/* User-location marker (t_18259daa): a small precision dot + accuracy
+   circle — deliberately NOT a camera marker (distinct style: the camera
+   markers are pinned icons, this is a dot). The dot sits on the marker
+   pane; the circle (Leaflet path, overlay pane) carries the accuracy
+   radius with a translucent mint fill. */
+.osm-user-dot {
+  display:block; width:16px; height:16px; border-radius:var(--radius-round);
+  background:var(--action); border:3px solid var(--card-bg);
+  box-shadow:0 0 0 2px rgb(11 112 92 / .45);
+}
+.map-geo-notice {
+  position:absolute; left:50%; transform:translateX(-50%); bottom:16px; z-index:1200;
+  max-width:min(92%, 420px); padding:10px 14px; border-radius:var(--radius-md);
+  background:var(--card-bg); border:1px solid var(--line);
+  box-shadow:0 6px 24px rgba(25,46,52,.18); color:var(--ink);
+  font-size:var(--text-sm); font-weight:700; text-align:center;
+}
+@media (max-width:520px) { .map-geo-notice { bottom:10px; font-size:var(--text-xs); padding:8px 12px; } }
 .data-actions { margin:20px 0 0; color:var(--data-action-ink); font-size:var(--text-md); }
 .data-actions a { color:var(--focus); font-weight:800; }
 .data-actions span { margin:0 8px; }
