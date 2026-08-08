@@ -79,6 +79,8 @@ const fakeBatches = [
 
 const enDate = new Date("2026-08-05T08:51:38.000Z").toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
 const itDate = new Date("2026-08-05T08:51:38.000Z").toLocaleDateString("it-IT", { day: "numeric", month: "long", year: "numeric" });
+const enUpdated = new Date("2026-08-08T10:00:00.000Z").toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+const itUpdated = new Date("2026-08-08T10:00:00.000Z").toLocaleDateString("it-IT", { day: "numeric", month: "long", year: "numeric" });
 
 test("sources page: renders the attribution table with the five per-source columns", async () => {
   const view = await renderWithLocale(React.createElement(SourcesPage, {
@@ -86,6 +88,7 @@ test("sources page: renders the attribution table with the five per-source colum
     locale: "en",
     t: sourcesEn,
     batches: fakeBatches,
+    lastUpdated: "2026-08-08T10:00:00.000Z",
   }));
   const { container } = view;
 
@@ -122,6 +125,13 @@ test("sources page: renders the attribution table with the five per-source colum
   assert.ok(view.getByText("ODbL 1.0"));
   assert.ok(view.getByText(/7,?030 records/), "grouped record count renders (locale-dependent separator)");
   assert.ok(view.getByText(/© Fixture Map contributors/));
+
+  // Dynamic freshness line: "Last updated" with the prop date, never a
+  // hardcoded note.
+  assert.ok(
+    view.getByText(new RegExp(`Last updated: ${enUpdated}\\.`)),
+    "the freshness note renders the derived date",
+  );
 });
 
 test("sources page: empty state when no committed batch exists", async () => {
@@ -131,11 +141,13 @@ test("sources page: empty state when no committed batch exists", async () => {
     locale: "en",
     t: sourcesEn,
     batches: [],
+    lastUpdated: null,
   }));
 
   assert.ok(screen.getByText("No imported datasets yet"));
   assert.ok(screen.getByText(/No public dataset has been imported so far/));
   assert.equal(screen.queryByRole("table"), null, "no table when there is nothing to attribute");
+  assert.equal(screen.queryByText(/Last updated/), null, "no freshness note without committed batches");
 });
 
 test("sources page: IT bundle renders localized labels, date and grouped count (parity)", async () => {
@@ -144,6 +156,7 @@ test("sources page: IT bundle renders localized labels, date and grouped count (
     locale: "it",
     t: sourcesIt,
     batches: fakeBatches,
+    lastUpdated: "2026-08-08T10:00:00.000Z",
   }));
 
   assert.equal(view.getByRole("heading", { level: 1 }).textContent, "Metodologia e fonti dei dati");
@@ -152,6 +165,10 @@ test("sources page: IT bundle renders localized labels, date and grouped count (
   assert.ok(view.getAllByText(itDate).length >= 1, "import dates render localized in Italian");
   assert.ok(view.getByText("131 record"));
   assert.ok(view.getByText(/7[.,]?030 record/), "grouped record count renders (separator depends on the ICU build)");
+  assert.ok(
+    view.getByText(new RegExp(`Ultimo aggiornamento: ${itUpdated}\\.`)),
+    "the freshness note renders the derived date in Italian",
+  );
 });
 
 test("shared slug→source map: fetchImportSources + importSourceOf resolve readable attribution (FASE C)", async () => {

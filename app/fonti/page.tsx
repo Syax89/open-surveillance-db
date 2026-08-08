@@ -35,12 +35,20 @@ export default async function FontiPage() {
   const [locale, bundle] = await Promise.all([getServerLocale(), getServerMessages()]);
   const home = bundle.home;
   const batches = await listCommittedImportBatches();
+  // "Last updated" = the most recent mutation of any committed batch
+  // (commit time via updated_at; import_date when the row was never
+  // updated). ISO strings compare chronologically, so a plain max works.
+  const lastUpdated = batches.reduce<string | null>((acc, batch) => {
+    const candidate = batch.updatedAt ?? batch.importDate;
+    return acc === null || candidate > acc ? candidate : acc;
+  }, null);
   return (
     <SourcesPage
       navLabels={{ mainNavigation: home.mainNavigation, homeAria: home.homeAria }}
       t={bundle.sources}
       locale={locale}
       batches={batches}
+      lastUpdated={lastUpdated}
     />
   );
 }

@@ -8,6 +8,7 @@ loro compatibilità legale con il database del progetto (ODbL 1.0, ADR 0008).
 | [censimento-fonti.md](censimento-fonti.md) | Censimento e ranking delle fonti (portali comunali, governativi, OSM, progetti civici) | aggiornato al 2026-08-08 (scan IT/AT/CH/DE/FR/ES/NL) |
 | [licenze-compatibilita.md](licenze-compatibilita.md) | Matrice di compatibilità licenze → import ODbL + pattern di attribuzione per la pagina `/licenze` | aggiornato al 2026-08-08 |
 | [normalizzazione-pipeline.md](normalizzazione-pipeline.md) | Design della normalizzazione e della pipeline di import | aggiornato al 2026-08-08 |
+| [keep-fonti-fresh.md](keep-fonti-fresh.md) | Runbook per mantenere `/fonti` allineata agli import (convenzione di commit, verifica, recovery batch bloccati) | nuovo 2026-08-08 |
 | [roadmap import](imports/) | Descriptor JSON per ogni fonte (`docs/data-sources/imports/*.json`) | 14 descriptor live |
 
 ## Fonti importate (2026-08-08)
@@ -39,10 +40,15 @@ Vincoli operativi:
 - Il **licence-gate** (`scripts/import/licence-gate.mjs`) è **fail-closed**:
   una licenza non in whitelist (CC0, ODbL, CC-BY/LO con attribuzione,
   dl-de-by-2.0, uso libero CH) blocca l'intero import.
-- I record importati usano `source: "official"` con riferimento alla fonte e
-  alla data di verifica (TERMS_OF_USE § 8.3; LAWFUL_BASIS § 3.2).
-- L'attribuzione aggregata delle fonti importate vive nella pagina `/licenze`
-  (sezione «Fonti dei dati importati») ed è mantenuta allineata con
-  `app/lib/data-license.ts` e con gli header delle esportazioni.
-- L'attribuzione per singolo batch è generata dalla pipeline e salvata in
-  `docs/data-sources/imports/reports/` a ogni run.
+- I record importati usano `source = 'import:<slug>'` verbatim (il runner
+  possiede la colonna; `scripts/import/runner.mjs`) e l'attribuzione per
+  record è risolta via `cameras.import_batch_id` → `import_batches`
+  (`db/import-sources.ts`). La pagina `/fonti` espone i batch committed;
+  l'attribuzione aggregata vive in `/licenze` (sezione «Fonti dei dati
+  importati») mantenuta allineata con `app/lib/data-license.ts` e con gli
+  header delle esportazioni.
+- L'attribuzione per singolo batch è persistita dal runner nel DB
+  (`import_batches.attribution_text` + `report` JSON con i contatori del
+  run) — i report non vivono più come file nel repo (docs-cleanup #352);
+  la fonte canonica è il database. Runbook per la freschezza:
+  [keep-fonti-fresh.md](keep-fonti-fresh.md).

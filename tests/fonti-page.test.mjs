@@ -94,26 +94,26 @@ async function renderWithSeededD1() {
     const d1 = await mf.getD1Database("DB");
     await seedMigration0040(d1);
     const insert = d1.prepare(
-      `INSERT INTO import_batches (slug, source_name, format, license, license_url, attribution_text, source_url, import_date, status, records_total, records_inserted, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO import_batches (slug, source_name, format, license, license_url, attribution_text, source_url, import_date, status, records_total, records_inserted, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
     await insert.bind(
       "fixture-zurigo-2026", "Fixture City — Open Data", "csv", "CC0 1.0",
       "https://example.invalid/licenses/cc0",
       "Source: Fixture City, dataset \"Fixture cameras\" (https://example.invalid/dataset/fixture-city), CC0 1.0.",
       "https://example.invalid/dataset/fixture-city", "2026-08-05T08:51:38.000Z",
-      "committed", 134, 131, "2026-08-05T08:51:38.000Z",
+      "committed", 134, 131, "2026-08-05T08:51:38.000Z", "2026-08-05T08:52:00.000Z",
     ).run();
     await insert.bind(
       "fixture-osm-2026", "Fixture Map contributors", "osm-overpass", "ODbL 1.0", null,
       "© Fixture Map contributors (https://example.invalid/map/copyright)",
       "https://example.invalid/map", "2026-08-05T08:51:52.000Z",
-      "committed", 7941, 7030, "2026-08-05T08:51:52.000Z",
+      "committed", 7941, 7030, "2026-08-05T08:51:52.000Z", "2026-08-08T10:00:00.000Z",
     ).run();
     await insert.bind(
       "fixture-running", "Half-imported source", "geojson", "ODbL 1.0", null,
       "Partial attribution", "https://example.invalid/partial", "2026-08-05T09:00:00.000Z",
-      "running", 100, 40, "2026-08-05T09:00:00.000Z",
+      "running", 100, 40, "2026-08-05T09:00:00.000Z", null,
     ).run();
 
     const response = await mf.dispatchFetch("http://localhost/fonti", {
@@ -160,6 +160,14 @@ test("GET /fonti: server-renders the attribution table with committed batches on
     // published would be a lie.
     assert.ok(!html.includes("Half-imported source"), "running batches must not appear on /fonti");
     assert.ok(!html.includes("fixture-running"));
+
+    // Dynamic "Last updated" line: derived from the committed batches at
+    // request time (max updated_at — the osm batch was force-refreshed on
+    // 2026-08-08), never a hardcoded date that goes stale.
+    assert.ok(
+      html.includes("Last updated: 8 August 2026. The import descriptors in the repository (docs/data-sources/imports/) remain canonical."),
+      "the note must show the freshest committed mutation, not a static date",
+    );
 
     // Footer links the page itself (and it is NOT in the main nav).
     assert.match(html, /<a[^>]*href="\/fonti"[^>]*>Method &amp; sources<\/a>/);

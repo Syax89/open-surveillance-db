@@ -36,9 +36,16 @@ export interface SourcesPageProps {
   t: Translation<typeof sourcesEn>;
   locale: Locale;
   batches: ImportBatchPublic[];
+  /**
+   * ISO timestamp of the most recent change to the committed batches
+   * (max of `updated_at`, falling back to `import_date`) — rendered as
+   * the "Last updated" line. NULL when no committed batch exists yet
+   * (the note is then hidden; the empty state explains the page).
+   */
+  lastUpdated: string | null;
 }
 
-export function SourcesPage({ navLabels, t, locale, batches }: SourcesPageProps) {
+export function SourcesPage({ navLabels, t, locale, batches, lastUpdated }: SourcesPageProps) {
   return (
     <main id="main-content" className="record-page" data-surface="sources">
       <PublicNav navLabel={navLabels.mainNavigation} homeLabel={navLabels.homeAria} />
@@ -109,7 +116,11 @@ export function SourcesPage({ navLabels, t, locale, batches }: SourcesPageProps)
           )}
         </section>
 
-        <p className="record-detail-note">{t.versionNote}</p>
+        {lastUpdated ? (
+          <p className="record-detail-note">
+            {`${t.lastUpdatedLabel}: ${formatPublicDate(lastUpdated, locale)}. ${t.descriptorsNote}`}
+          </p>
+        ) : null}
       </article>
     </main>
   );

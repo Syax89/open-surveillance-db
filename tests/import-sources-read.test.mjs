@@ -141,6 +141,7 @@ test("listCommittedImportBatches: only committed batches, newest first, full att
   assert.equal(batch.attributionText, "© Fixture contributors (https://example.invalid/copyright)");
   assert.equal(batch.recordsInserted, 2);
   assert.ok(batch.importDate, "import date is present for the /fonti column");
+  assert.ok(batch.updatedAt, "committed batches carry the commit timestamp (the /fonti 'Last updated' line)");
   assert.ok(batch.id > 0);
 });
 
