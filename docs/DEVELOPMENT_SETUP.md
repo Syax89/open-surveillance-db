@@ -392,5 +392,5 @@ le altre lingue la parità è garantita da `Translation<typeof en>` a
   Cloudflare Workers, and the LXC test host.
 - [Operations manual](OPERATIONS.md) — backup/restore drills and verified
   wrangler commands (appendice).
-- [Development plan](DEVELOPMENT_PLAN.md) and
-  [Roadmap](roadmap.md) — workstreams and ownership.
+- [Roadmap](roadmap.md) — consolidated development plan, workstreams and
+  ownership.

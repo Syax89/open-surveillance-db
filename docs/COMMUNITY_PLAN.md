@@ -461,7 +461,8 @@ Stima: 1-2 giorni/fase, ~2-3 sprint totali. Zero librerie nuove.
 | **C-QA** | QA trasversale: suite anti-gaming.test.mjs 1:1 sui 6 layer, axe-core 0, parity i18n, criteri P/E/L/V/A | `t_8f2d89ac` | grace | 4 | C1, C2, C3, C4 |
 
 **Nota allocazione:** le fasi frontend sono assegnate a linus (unico developer full-stack nel
-board, come per FRONTEND_PLAN F1–F4). Se il carico lo richiede, ada può supportare la review
+board, come per le fasi F1–F4 del piano frontend, archiviato in
+`~/osdb-archive/docs-plans/FRONTEND_PLAN.md`). Se il carico lo richiede, ada può supportare la review
 continua; le fasi C5/C6 possono essere parallelizzate dopo C2/C3 solo se il dispatcher non
 satura linus (in tal caso il PM riprogramma le priorità).
 
@@ -474,7 +475,8 @@ C2/C3/C4 → C5/C6 → C-docs + C-QA.
 
 > **ARCHIVIATA (ADR 0021, 2026-08-04).** I criteri di accettazione di questo piano si riferivano al modello profilo/verifiche/editing — **non implementato**. I criteri attuali del modello community-driven vivono in ADR 0021 e nei task kanban (DB/API/UI: PR #297/#299/#305). Testo storico conservato per tracciabilità.
 
-Fonte: Grace (t_45ff2bfd) + pattern FRONTEND_PLAN §7.
+Fonte: Grace (t_45ff2bfd) + pattern del piano frontend §7 (archiviato in
+`~/osdb-archive/docs-plans/FRONTEND_PLAN.md`).
 
 ### 8.1 Globali (bloccanti per ogni PR)
 
@@ -529,7 +531,7 @@ Fonte: Grace (t_45ff2bfd) + pattern FRONTEND_PLAN §7.
 | Verifiche/stelline | Nora (t_f49b0226) + Ada (t_e7e94d17) + Linus (t_25843be7) + Grace (t_45ff2bfd) |
 | Legal/privacy | Rosa (t_9e11b89b) |
 | i18n/design | Eva (t_290dce27) + Vera (t_c9a9ca46) + Marie (t_2acb8f70) |
-| Fasi e criteri | Ada (stima 4 PR backend + frontend) + Grace (criteri) + pattern FRONTEND_PLAN |
+| Fasi e criteri | Ada (stima 4 PR backend + frontend) + Grace (criteri) + pattern del piano frontend (archiviato in `~/osdb-archive/docs-plans/FRONTEND_PLAN.md`) |
 
 ## Punti aperti (decisione CEO/Angelina)
 

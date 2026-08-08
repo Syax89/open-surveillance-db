@@ -25,7 +25,7 @@ provenienza fonte/licenza/data.
   390x700/390x844/768 per la pagina mobile; locale EN vs IT (cookie + localStorage);
   stati anonimo e loggato.
 - Misure geometriche reali (`getBoundingClientRect`) prima/dopo: `geom-before.json` /
-  `geom-after.json` in `docs/design/screenshots/map-popup-redesign/`.
+  `geom-after.json` (archiviati in `~/osdb-archive/screenshots/design/map-popup-redesign/`).
 
 ## Audit PRIMA — popup mappa
 
@@ -178,7 +178,7 @@ Decisioni di design:
 
 ## Screenshot
 
-- Mosaici prima/dopo: `docs/design/screenshots/map-popup-redesign/`
+- Mosaici prima/dopo: `~/osdb-archive/screenshots/design/map-popup-redesign/`
   (`popup-1280-en.png`, `popup-390-en.png`, `popup-1280-it.png`, `mobile-390x844-en.png`,
   `mobile-390x700-en.png`)
 - Misure geometriche: `geom-before.json` / `geom-after.json` (stessa cartella)

@@ -5,10 +5,9 @@ Last reviewed: 2026-08-02 (post-implementation state, F1–F3 + community C1–C
 > **Design & refactor vision:** the refactor that promotes the home-page tool
 > sections to separate routes (`/mappa`, `/directory`, `/segnala`, `/correggi`)
 > is specified in [`docs/FRONTEND_DESIGN.md`](FRONTEND_DESIGN.md) (design
-> vision) and [`docs/FRONTEND_PLAN.md`](FRONTEND_PLAN.md) (consolidated
-> roadmap with phases, API requirements, legal/security/i18n requirements and
-> acceptance criteria). This document describes the implemented state; those
-> documents describe the target state and the phase plan.
+> vision) and in the consolidated [`docs/roadmap.md`](roadmap.md) (current
+> state, direction and next steps). This document describes the implemented
+> state; those documents describe the target state and the phase plan.
 
 This document defines the information architecture of the public website:
 the complete site map, the global navigation (page nav-shell and footer), and
@@ -23,7 +22,7 @@ verification widget — in C5, PR #181, and the owner edit page in C6, PR
 #180). It is the reference for future page changes and for the QA pass over
 the routes.
 
-**Phase status (frontend refactor, roadmap `docs/FRONTEND_PLAN.md`):**
+**Phase status (frontend refactor, roadmap `docs/roadmap.md`):**
 
 - **F1 done** — the four tool routes exist as dedicated pages
   (`/mappa`, `/directory`, `/segnala`, `/correggi`, route group
@@ -95,7 +94,8 @@ the routes.
   documented exception: `/mappa`, `/segnala`, `/correggi` are Italian
   (coherent with the informational slugs), while **`/directory` keeps the
   English slug** — precedent: `/guide` (already live, never renamed).
-  Decided in `docs/FRONTEND_PLAN.md` §1.3 (CTO t_f24c3227) and listed here
+  Decided by the CTO (t_f24c3227, frontend plan §1.3, archived in
+  `~/osdb-archive/docs-plans/FRONTEND_PLAN.md`) and listed here
   **before** implementation, per the rule below.
 - **Existing routes are never renamed.** `/guide` (already live) keeps its
   English slug; `/moderation` keeps its role as the **private moderator
@@ -198,7 +198,7 @@ proposed).
 
 - **Purpose:** the interactive map tool. Full-viewport Leaflet map, record
   panel, filters (type + freshness, applied client-side until the
-  server-side filter gate, `docs/FRONTEND_PLAN.md` §3.3), exports, textual
+  server-side filter gate — roadmap `docs/roadmap.md`), exports, textual
   fallback.
 - **Content:** `app/(tools)/mappa/page.tsx` (thin server shell) +
   `MappaTool` (`app/components/tools/MappaTool.tsx`, `"use client"`),
@@ -230,8 +230,9 @@ proposed).
 - **URL state:** the six dimensions of `useCameraFilters` (`?q= ?type=
   ?freshness= ?sort= ?focus= ?page=`); `page` is reset to 1 by every filter
   change and omitted when 1; /mappa parses it but never sets it.
-- **SEO:** the only tool page with real SEO value (`docs/FRONTEND_PLAN.md`
-  §1.3) — indexable, own metadata.
+- **SEO:** the only tool page with real SEO value (frontend plan §1.3,
+  archived in `~/osdb-archive/docs-plans/FRONTEND_PLAN.md`)
+  — indexable, own metadata.
 - **Nav/footer:** in tool nav (`ToolLayout`); also linked from the home nav
   and the global footer (F3, t_2ca69725).
 
@@ -510,7 +511,8 @@ institutional links and the legal bar:
 - The moderation queue (`/moderation`) is deliberately **not** linked in the
   footer (publication-boundaries suite).
 - The four public tool routes are linked in the footer since F3
-  (t_2ca69725 / PR #161), per `docs/FRONTEND_PLAN.md` §1.3; the form
+  (t_2ca69725 / PR #161), per the frontend plan §1.3 (archived in
+  `~/osdb-archive/docs-plans/FRONTEND_PLAN.md`); the form
   surfaces (`/segnala`, `/correggi`) keep their `noindex` metadata but are
   discoverable from the footer like any other page.
 - De-dup note: pages must **not** render their own footer — the global one
@@ -694,8 +696,8 @@ Notes:
 |---------------|----------------------------------------------------------|
 | `/mappa`      | `docs/FRONTEND_DESIGN.md` (map tool), `docs/OSM_INTEGRATION.md` (tiles/attribution), data layer `app/lib/use-public-cameras.ts` |
 | `/directory`  | `docs/FRONTEND_DESIGN.md` (directory tool), `docs/DATA_MODEL.md` (fields shown), `docs/MODERATION.md` (status meanings) |
-| `/segnala`    | README "Before submitting", `docs/MODERATION.md` (publication standard), `docs/legal/PRIVACY_NOTICE.md` (consent/privacy copy), `docs/FRONTEND_PLAN.md` §7.2 |
-| `/correggi`   | `docs/MODERATION.md` (appeals and corrections), `docs/legal/PRIVACY_NOTICE.md` (correction/removal contact), `docs/FRONTEND_PLAN.md` §7.2 |
+| `/segnala`    | README "Before submitting", `docs/MODERATION.md` (publication standard), `docs/legal/PRIVACY_NOTICE.md` (consent/privacy copy), frontend plan §7.2 (archived in `~/osdb-archive/docs-plans/FRONTEND_PLAN.md`) |
+| `/correggi`   | `docs/MODERATION.md` (appeals and corrections), `docs/legal/PRIVACY_NOTICE.md` (correction/removal contact), frontend plan §7.2 (archived in `~/osdb-archive/docs-plans/FRONTEND_PLAN.md`) |
 | `/manifesto`  | home `principles` section, `README.md` (Principles, non-goals) |
 | `/regole`     | `docs/MODERATION.md` (Publication standard, Eligible examples, Exclusions), README "Before submitting" |
 | `/guide#guide-publication-details` | `docs/MODERATION.md` (publication model, corrections and safeguards) |

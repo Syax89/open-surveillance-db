@@ -223,7 +223,7 @@ superficie:
   write gate: screenshot della parete login, comportamento coperto dai test
   DOM).
 
-Screenshot: `docs/design/screenshots/community-ui/` (8 PNG, EN+IT).
+Screenshot (archiviati in `~/osdb-archive/screenshots/design/community-ui/`, 8 PNG, EN+IT).
 
 ## 10. Limiti e note
 

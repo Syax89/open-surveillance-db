@@ -59,9 +59,10 @@ testabile):
 - `aria-hidden="true"` sull'overlay pane verificato nel DOM;
 - popup marker: `FIELD OF VIEW / SE 135°`.
 
-Screenshot: `docs/design/screenshots/direzione-camere/mappa-zoom16-coni-cerchio.png`
-(coni + cerchio a zoom 16), `.../mappa-zoom13-senza-coni.png` (prima della
-soglia), `.../mappa-popup-direzione.png` (popup col testo direzione).
+Screenshot (archiviati in `~/osdb-archive/screenshots/design/direzione-camere/`):
+`mappa-zoom16-coni-cerchio.png` (coni + cerchio a zoom 16),
+`mappa-zoom13-senza-coni.png` (prima della soglia),
+`mappa-popup-direzione.png` (popup col testo direzione).
 
 ## 2. Form /segnala — campo direzione condizionale
 

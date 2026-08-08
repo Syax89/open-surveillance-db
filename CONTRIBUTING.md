@@ -4,7 +4,7 @@ Thank you for helping build a public-interest tool. Contributions are welcome fr
 
 ## Before opening a change
 
-1. Read the [development plan](docs/DEVELOPMENT_PLAN.md), [privacy and safety rules](docs/PRIVACY_AND_SAFETY.md), and [code of conduct](CODE_OF_CONDUCT.md).
+1. Read the [roadmap](docs/roadmap.md), [privacy and safety rules](docs/PRIVACY_AND_SAFETY.md), and [code of conduct](CODE_OF_CONDUCT.md).
 2. Keep the purpose clear: informed civic transparency, never camera-feed access or surveillance evasion.
 3. Discuss changes affecting data publication, identity, moderation, or licensing before implementing them.
 4. Do not include real camera reports, personal data, credentials, private URLs, or unredacted images in issues, tests, screenshots, or commits.
