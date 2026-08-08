@@ -1,0 +1,11 @@
+{
+    "slug": "usa-rochester-cameras-2026",
+    "source_name": "Rochester Police Department — Rochester Cameras (open data)",
+    "format": "arcgis-featureserver",
+    "license": "ODbL 1.0",
+    "license_url": "https://opendatacommons.org/licenses/odbl/1-0/",
+    "attribution_text": "Fonte: City of Rochester / Rochester Police Department, Rochester Cameras open data (https://data-rpdny.opendata.arcgis.com), concesso con licenza ODbL 1.0 (Open Database License).",
+    "source_url": "https://services7.arcgis.com/wMvCpnbQEKXZsPSQ/arcgis/rest/services/Rochester_Cameras/FeatureServer/0",
+    "max_records": 400,
+    "notes": "Scan catalog.csv (CEO 2026-08-08): 177 telecamere Rochester NY (programmi BlueLight/RedLight, attrs Address/Type/Program, POINT_X/POINT_Y già in WGS84, count 177 verificato). Licenza ODbL 1.0 + DbCL dichiarata sul portale. external_id rochester:<OBJECTID>."
+}

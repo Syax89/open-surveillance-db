@@ -642,3 +642,92 @@ test("licence-gate: FR (Licence Ouverte), ES (CC-BY), NL (CC0) descriptors are i
   assert.equal(isLicenceImportable("CC0 1.0"), true);
   assert.equal(isLicenceImportable("CC BY 4.0"), true);
 });
+
+// -------------------------------------------------- wave 4 (catalog.csv 2026-08-08): NO / UK / FI / US-NY
+
+import { utm33ToWgs84, parsePayload as nvdbParse } from "../scripts/import/adapters/norvegia-nvdb-kamera-2026.mjs";
+import { parsePayload as tflParse } from "../scripts/import/adapters/regno-unito-tfl-jamcams-2026.mjs";
+import { parsePayload as finParse } from "../scripts/import/adapters/finlandia-fintraffic-weathercam-2026.mjs";
+import { parsePayload as rocParse } from "../scripts/import/adapters/usa-rochester-cameras-2026.mjs";
+
+test("nvdb: utm33ToWgs84 lands at Gardermoen (60.009, 11.056) for the E6 anchor", () => {
+  const [lat, lon] = utm33ToWgs84(280145.275, 6659021.026);
+  assert.ok(Math.abs(lat - 60.009) < 0.01, `lat ${lat}`);
+  assert.ok(Math.abs(lon - 11.056) < 0.01, `lon ${lon}`);
+});
+
+test("nvdb: parses NVDB kamera objects (UTM33N → WGS84) into canonical staged rows", () => {
+  const { staged, skipped } = nvdbParse({
+    data: [
+      { id: "83720877", href: "https://nvdbapiles-v3.atlas.vegvesen.no/vegobjekter/163/83720877/1", egenskaper: [{ navn: "Type kamera", verdi: "Fast videokamera" }], geometri: { wkt: "POINT Z(280145.275 6659021.026 177.034)" }, lokasjon: { fylker: [32], kommuner: [3205] } },
+      { id: "2", href: "/163/2/1", egenskaper: [{ navn: "Type kamera", verdi: "Bevegelig videokamera (PTZ/dome)" }], geometri: { wkt: "POINT Z(281000 6658000 10)" } },
+      { id: "3", href: "/163/3/1", egenskaper: [{ navn: "Type kamera", verdi: "Utgår_IP-kamera" }], geometri: { wkt: "POINT Z(280000 6658000 10)" } },
+      { id: "4", href: "/163/4/1", egenskaper: [], geometri: { wkt: "POINT Z(280000 6658000 10)" } },
+      { id: "5", href: "/163/5/1", egenskaper: [{ navn: "Type kamera", verdi: "Fast videokamera" }], geometri: null },
+    ],
+  });
+  assert.equal(staged.length, 2); // Utgår_ + empty-type + no-geometry skipped
+  assert.equal(staged[0].kind, "Fixed dome"); // kind canonical, mai inventato
+  assert.equal(staged[1].kind, "PTZ");
+  assert.equal(staged[0].external_id, "nvdb:83720877/1");
+  assert.ok(Math.abs(staged[0].latitude - 60.009443) < 0.0001, `lat ${staged[0].latitude}`);
+  assert.equal(skipped.total, 3);
+});
+
+test("tfl: parses JamCam places into canonical staged rows", () => {
+  const { staged, skipped } = tflParse({
+    data: [
+      { id: "JamCams_00002.00865", commonName: "A406 Billet Upass E", lat: "51.60067", lon: "-0.01594", additionalProperties: [{ key: "view", value: "West" }, { key: "imageUrl", value: "https://s3-eu-west-1.amazonaws.com/jamcams.tfl.gov.uk/00002.00865.jpg" }] },
+      { id: "x", commonName: "Bad", lat: "999", lon: "-0.01" },
+    ],
+  });
+  assert.equal(staged.length, 1);
+  assert.equal(staged[0].title, "A406 Billet Upass E");
+  assert.equal(staged[0].kind, "Traffic / licence plate reader");
+  assert.equal(staged[0].latitude, 51.60067);
+  assert.equal(staged[0].external_id, "tfl-jamcam:JamCams_00002.00865");
+  assert.equal(skipped.total, 1);
+});
+
+test("fintraffic: parses GeoJSON weathercam stations into canonical staged rows", () => {
+  const { staged, skipped } = finParse({
+    data: {
+      features: [
+        { type: "Feature", id: "C01503", geometry: { type: "Point", coordinates: [23.99616, 60.05374, 0.0] }, properties: { id: "C01503", name: "kt51_Inkoo", collectionStatus: "GATHERING", presets: [{ id: "C0150301" }, { id: "C0150302" }, { id: "C0150309" }] } },
+        { type: "Feature", id: "bad", geometry: { type: "Point", coordinates: [200, 60] }, properties: { id: "bad", name: "x" } },
+      ],
+    },
+  });
+  assert.equal(staged.length, 1);
+  assert.equal(staged[0].title, "kt51_Inkoo");
+  assert.equal(staged[0].kind, "Traffic / licence plate reader");
+  assert.equal(staged[0].latitude, 60.05374);
+  assert.equal(staged[0].notes, "3 camere · Stato: GATHERING");
+  assert.equal(staged[0].external_id, "digitraffic:C01503");
+  assert.equal(skipped.total, 1);
+});
+
+test("rochester: parses ArcGIS features (POINT_X/Y WGS84) into canonical staged rows", () => {
+  const { staged, skipped } = rocParse({
+    data: [
+      { attributes: { OBJECTID: 1, Address: "704 Hudson Ave", Notes: "RFD", Type: "Video", Program: "BlueLight", POINT_X: -77.59863136899997, POINT_Y: 43.17778600100007 } },
+      { attributes: { OBJECTID: 2, Address: null, POINT_X: 0, POINT_Y: 0 } },
+    ],
+  });
+  assert.equal(staged.length, 1);
+  assert.equal(staged[0].title, "704 Hudson Ave");
+  assert.equal(staged[0].kind, "Other / unknown"); // kind canonico, mai inventato
+  assert.equal(staged[0].latitude, 43.177786);
+  assert.equal(staged[0].external_id, "rochester:1");
+  assert.equal(skipped.total, 1);
+});
+
+test("licence-gate: wave-4 descriptors (NLOD, OGL 2.0, CC BY 4.0, ODbL) are importable; BY-SA is NOT", () => {
+  assert.equal(isLicenceImportable("NLOD 2.0"), true);
+  assert.equal(isLicenceImportable("OGL 2.0"), true);
+  assert.equal(isLicenceImportable("OGL-BC"), true);
+  assert.equal(isLicenceImportable("CC BY 3.0 AU"), true);
+  assert.equal(isLicenceImportable("PDDL"), true);
+  assert.equal(isLicenceImportable("CC BY-SA 4.0"), false); // share-alike: escluso
+  assert.equal(isLicenceImportable("CC BY-SA 2.0"), false);
+});

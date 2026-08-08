@@ -39,8 +39,37 @@ export const IMPORTABLE_LICENSES = new Set([
   "ODbL 1.0 (OSM)",
   // Other permissive EU licences the matrix marks compatible.
   "Licence Ouverte 2.0",
+  // UK Open Government Licence family — attribution-only, same obligations
+  // class as CC-BY. OGL 2.0: TfL JamCams API (verified 2026-08-08);
+  // OGL 3.0: data.gov.uk TfGM speed cameras (verified 2026-08-08).
   "Open Government Licence 3.0",
   "OGL 3.0",
+  "Open Government Licence 2.0",
+  "OGL 2.0",
+  // Canadian OGL variants — attribution-only (verified 2026-08-08):
+  // DriveBC via data.gov.bc.ca CKAN API declares exactly
+  // "Open Government Licence - British Columbia".
+  "Open Government Licence - British Columbia",
+  "OGL-BC",
+  "Open Government Licence - Ontario",
+  "OGL-Ontario",
+  // Norwegian open-data standard (NVDB API v3, 13.444 kamera objects,
+  // verified 2026-08-08): attribution-only, same class as CC-BY.
+  "NLOD 2.0",
+  "Norwegian Licence for Open Government Data 2.0",
+  // Korea Open Government License — free use with attribution (KOGL Type 1).
+  "KOGL Type 1",
+  "KOGL",
+  // Open Data Commons Public Domain Dedication — public domain,
+  // no obligations (SF Socrata red-light/speed citation datasets).
+  "PDDL",
+  "ODC PDDL 1.0",
+  // Australian CC-BY 3.0 (TfNSW live cameras, QLD state roads — both
+  // data.gov.au / data.qld.gov.au, attribution-only).
+  "CC BY 3.0 AU",
+  "CC-BY 3.0 AU",
+  // Flemish open-data standard (Verkeerscentrum DATEX II v3 feed).
+  "Vlaamse Open Data Licentie v1.0",
   // German open-data standard (dl-de-by-2.0) — attribution only, the same
   // obligations class as CC-BY (matrix licenze-compatibilita.md; verified
   // for the Hamburg Verkehrskameras source, CEO 2026-08-07).

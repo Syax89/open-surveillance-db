@@ -1,0 +1,11 @@
+{
+    "slug": "finlandia-fintraffic-weathercam-2026",
+    "source_name": "Fintraffic — Digitraffic weathercam stations (tie.digitraffic.fi)",
+    "format": "geojson-api",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "attribution_text": "Fonte: Fintraffic, Digitraffic weathercam stations (https://tie.digitraffic.fi/api/weathercam/v1/stations), concesso con licenza CC BY 4.0 (Creative Commons Attribution 4.0 International).",
+    "source_url": "https://tie.digitraffic.fi/api/weathercam/v1/stations",
+    "max_records": 1200,
+    "notes": "Scan catalog.csv (CEO 2026-08-08): 812 stazioni weathercam su strade statali finlandesi (GeoJSON FeatureCollection, coords [lon,lat,alt], presets con id camera). Licenza CC BY 4.0 dichiarata dal servizio Digitraffic (CC BY 4.0). external_id digitraffic:<station id>."
+}

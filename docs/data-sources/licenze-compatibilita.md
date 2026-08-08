@@ -35,6 +35,13 @@ Regola di metodo: ogni affermazione legale è verificata contro la fonte citata 
 | **Licence Ouverte 2.0** (fr-lo, Francia) | ✅ Sì, con attribuzione | Attribuzione + link (Etalab) | No | Importabile |
 | **dl-de-by-2.0** (Datenlizenz Deutschland Namensnennung, Amburgo) | ✅ Sì, con attribuzione | «Quelle: [ente]» + link licenza | No | Importabile |
 | **CC-BY generico** (DGT Spagna NAP) | ✅ Sì, con attribuzione | Attribuzione + link | No | Importabile |
+| **OGL 2.0/3.0** (Open Government Licence UK, TfL/TfGM) | ✅ Sì, con attribuzione | © Crown copyright + link licenza | No | Importabile |
+| **OGL-BC / OGL-Ontario** (Canada) | ✅ Sì, con attribuzione | Attribuzione + link licenza | No | Importabile |
+| **NLOD 2.0** (Norvegia, NVDB) | ✅ Sì, con attribuzione | Attribuzione + link licenza | No | Importabile |
+| **KOGL Type 1** (Corea, ITS) | ✅ Sì, con attribuzione | Attribuzione + link licenza | No | Importabile |
+| **PDDL** (Open Data Commons Public Domain, San Francisco) | ✅ Sì, pubblico dominio | Nessun obbligo | No | Importabile |
+| **CC BY 3.0 AU** (Australia, TfNSW/QLD) | ✅ Sì, con attribuzione | Attribuzione + link licenza | No | Importabile |
+| **Vlaamse Open Data Licentie v1.0** (Belgio) | ✅ Sì, con attribuzione | Attribuzione + link licenza | No | Importabile |
 | **Licenze custom ministeriali** | ⚠️ Caso per caso | Dipende dai termini | Dipende | **Da verificare con legale** per ogni fonte |
 | **Nessuna licenza esplicita** (art. 52 CAD) | ✅ Sì, con base normativa | Documentare la base (open data by default) | No | Importabile con verifiche |
 

@@ -1,0 +1,11 @@
+{
+    "slug": "norvegia-nvdb-kamera-2026",
+    "source_name": "Statens vegvesen — NVDB vegobjekter type 163 (Kamera)",
+    "format": "json-api",
+    "license": "NLOD 2.0",
+    "license_url": "https://data.norge.no/nlod/en/2.0/",
+    "attribution_text": "Fonte: Statens vegvesen, NVDB (Nasjonal vegdatabank) — vegobjekt type 163 Kamera (https://nvdbapiles-v3.atlas.vegvesen.no), concesso con licenza NLOD 2.0 (Norwegian Licence for Open Government Data).",
+    "source_url": "https://nvdbapiles-v3.atlas.vegvesen.no/vegobjekter/163",
+    "max_records": 15000,
+    "notes": "Scan catalog.csv (CEO 2026-08-08): 13.444 kamera su strade statali norvegesi (API v3, paginazione a token, geometrie UTM33N/EPSG:5973 convertite con formula UTM→WGS84, anchor Gardermoen verificato). Tipo kamera: Fast videokamera / Bevegelig videokamera (PTZ/dome) / Utgår_* (fuori servizio, skippati). Licenza NLOD 2.0 aggiunta al gate. external_id nvdb:<id>/<versjon>."
+}
