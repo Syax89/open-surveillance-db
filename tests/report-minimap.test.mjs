@@ -1,0 +1,214 @@
+/**
+ * ReportMiniMap — the interactive Leaflet mini-map inside /segnala step 1
+ * (t_ebbe0ea3).
+ *
+ * Contracts:
+ *   1. mounts an interactive map (zoom control on) whose tiles come ONLY
+ *      from the CSP-safe /api/tiles proxy (never a direct tile hotlink);
+ *   2. a map click selects the position through onSelect (the flow's
+ *      selectCoordinates) and NEVER opens a popup;
+ *   3. for directional kinds with a known bearing it draws the SAME FOV
+ *      cone as /mappa (field-of-view.ts) plus a draggable round handle on
+ *      the cone's centre line — dragging the handle re-aims the cone and
+ *      publishes the new bearing to setDirection; the handle is
+ *      bubblingMouseEvents:false so a handle click never reaches the
+ *      click-to-select handler;
+ *   4. domes draw the 360° circle, unknown directions draw nothing;
+ *   5. external coordinate changes (deep link, manual entry) move the
+ *      position marker and re-centre the map; bearing-only changes re-aim
+ *      the cone IN PLACE (no layer rebuild, the drag is never interrupted).
+ *
+ * Fixtures are fictitious (example.test coordinates).
+ */
+import assert from "node:assert/strict";
+import test, { after, afterEach, before } from "node:test";
+import {
+  setupDom, loadDomModule, renderWithLocale, leafletMaps, leafletMarkers, leafletPaths, resetLeafletMarkers, React,
+} from "./helpers/dom-harness.mjs";
+import { cleanupRouteTree, loadLib } from "./helpers/api-harness.mjs";
+
+let rtl;
+let ReportMiniMap;
+const fov = await loadLib("app/lib/field-of-view.mjs");
+
+// Example.test fixture (Ferrara): camera position + directional kind.
+const CAM = { latitude: 44.8378, longitude: 11.6183 };
+
+before(async () => {
+  rtl = await setupDom();
+  ReportMiniMap = (await loadDomModule("app/components/home/ReportMiniMap.mjs")).ReportMiniMap;
+});
+
+after(async () => cleanupRouteTree());
+
+afterEach(async () => {
+  rtl?.cleanup();
+  // Async (module load) — awaiting prevents the next test racing the
+  // paths/markers restore under a slow runner.
+  await resetLeafletMarkers();
+});
+
+function miniMapProps(overrides = {}) {
+  return {
+    coordinates: null,
+    onSelect: () => {},
+    kind: "",
+    direction: null,
+    directionKnown: false,
+    setDirection: () => {},
+    ...overrides,
+  };
+}
+
+async function renderMiniMap(props) {
+  const view = await renderWithLocale(React.createElement(ReportMiniMap, miniMapProps(props)));
+  // Leaflet is imported and mounted in an effect — poll until the stub
+  // map exists (dynamic import + promise chain, like the map suites).
+  await rtl.waitFor(async () => {
+    const maps = await leafletMaps();
+    assert.ok(maps.length >= 1, "a Leaflet map is created");
+  }, { timeout: 3000 });
+  return view;
+}
+
+// Host component that re-renders the SAME ReportMiniMap instance with new
+// props (state-driven, like production) — used for the prop-change tests.
+function makeHarness(initialProps) {
+  let setPropsFn;
+  function Harness() {
+    const [props, setProps] = React.useState(initialProps);
+    setPropsFn = setProps;
+    return React.createElement(ReportMiniMap, miniMapProps(props));
+  }
+  return {
+    Harness,
+    update: (patch) => rtl.act(() => setPropsFn((p) => ({ ...p, ...patch }))),
+  };
+}
+
+async function renderHarness(initialProps) {
+  const harness = makeHarness(initialProps);
+  const view = await renderWithLocale(React.createElement(harness.Harness));
+  await rtl.waitFor(async () => {
+    const maps = await leafletMaps();
+    assert.ok(maps.length >= 1, "a Leaflet map is created");
+  }, { timeout: 3000 });
+  return { harness, view };
+}
+
+function conesFrom(paths) {
+  return paths.filter((p) => p.__isPath && p.latlngs && Array.isArray(p.latlngs));
+}
+
+function circlesFrom(paths) {
+  return paths.filter((p) => p.__isPath && Array.isArray(p.latlng) && p.latlng.length === 2 && !Array.isArray(p.latlngs));
+}
+
+function handleFrom(markers) {
+  return markers.find((m) => m.opts?.draggable === true);
+}
+
+test("renders an interactive map with CSP-safe tiles, the map surface labelled and the help text visible", async () => {
+  const { screen } = rtl;
+  const view = await renderMiniMap({});
+  const map = (await leafletMaps()).at(-1);
+  assert.equal(map.opts.zoomControl, true, "the zoom control is available (interactive map)");
+  const tiles = map.tileLayers ?? [];
+  assert.ok(tiles.some((u) => String(u).includes("/api/tiles/")), "tiles come from the CSP-safe /api/tiles proxy, never a direct hotlink");
+
+  const surface = screen.getByRole("application", { name: "Map — click to choose the camera position" });
+  assert.ok(surface, "the map surface carries the localized aria-label");
+  assert.ok(view.container.textContent.includes("Click the map to choose the camera position"), "the help text explains click-to-pick and the drag handle");
+});
+
+test("a map click selects the position through onSelect, zooms into it and NEVER opens a popup", async () => {
+  const picked = [];
+  await renderMiniMap({ onSelect: (lat, lng) => picked.push([lat, lng]) });
+  const map = (await leafletMaps()).at(-1);
+  map.fire("click", { latlng: { lat: 44.8378, lng: 11.6183 } });
+  assert.deepEqual(picked, [[44.8378, 11.6183]], "the click lat/lng reaches onSelect (the flow's selectCoordinates)");
+  assert.equal(map.popupHtml, undefined, "no popup is ever opened by a map click — click means selection only");
+  const lastView = map.views.at(-1);
+  assert.deepEqual(lastView?.center, [44.8378, 11.6183], "the map zooms into the picked point");
+  assert.ok((lastView?.zoom ?? 0) >= 17, "the pick zoom is ≥ the FOV legibility zoom");
+});
+
+test("directional kind with a known bearing draws the FOV cone + a draggable rotation handle on the centre line", async () => {
+  await renderMiniMap({ coordinates: CAM, kind: "Bullet", direction: 90, directionKnown: true });
+  const paths = await leafletPaths();
+  const cones = conesFrom(paths);
+  assert.equal(cones.length, 1, "exactly one FOV cone for a directional kind");
+  assert.deepEqual(cones[0].latlngs[0], [44.8378, 11.6183], "the cone vertex sits on the camera position");
+  assert.equal(cones[0].opts.interactive, false, "the cone is decorative (clicks pass through to the map)");
+
+  const markers = await leafletMarkers();
+  const handle = handleFrom(markers);
+  assert.ok(handle, "a rotation handle marker exists");
+  assert.equal(handle.opts.draggable, true, "the handle is draggable");
+  assert.equal(handle.opts.bubblingMouseEvents, false, "a handle click never bubbles to the click-to-select map handler");
+  assert.equal(handle.opts.icon?.className, "fov-rotate-handle-wrap", "the handle uses the styled divIcon");
+  // The handle sits at the bearing's radius point on the cone centre line.
+  const expected = fov.fovBearingPoint(44.8378, 11.6183, 90);
+  assert.deepEqual(handle.latlng, expected, "the handle sits at the cone centre line, radius away");
+});
+
+test("dragging the rotation handle re-aims the cone and publishes the new bearing to setDirection", async () => {
+  const bearings = [];
+  await renderMiniMap({ coordinates: CAM, kind: "Bullet", direction: 90, directionKnown: true, setDirection: (b) => bearings.push(b) });
+  const handle = handleFrom(await leafletMarkers());
+  const cones = conesFrom(await leafletPaths());
+  const before = cones[0].latlngs;
+  // Drag the handle to the point at bearing 45 — the cone must follow.
+  const target = fov.fovBearingPoint(44.8378, 11.6183, 45);
+  handle.setLatLng(target);
+  handle.fire("drag", { target: handle });
+  assert.equal(bearings.at(-1), 45, "the dragged bearing is published to the form state");
+  assert.notDeepEqual(cones[0].latlngs, before, "the cone was re-aimed in place during the drag");
+  assert.deepEqual(handle.latlng, target, "the handle follows the drag position");
+});
+
+test("domes draw the 360° circle — no cone, no rotation handle", async () => {
+  await renderMiniMap({ coordinates: CAM, kind: "Fixed dome", direction: null, directionKnown: false });
+  const paths = await leafletPaths();
+  assert.equal(circlesFrom(paths).length, 1, "a dome gets exactly one circle");
+  assert.equal(conesFrom(paths).length, 0, "no cone for a dome");
+  assert.equal(handleFrom(await leafletMarkers()), undefined, "no rotation handle for a dome");
+  assert.equal(circlesFrom(paths)[0].opts.interactive, false, "the dome circle is decorative");
+});
+
+test("unknown direction draws no FOV geometry and no handle", async () => {
+  await renderMiniMap({ coordinates: CAM, kind: "Bullet", direction: null, directionKnown: false });
+  const paths = await leafletPaths();
+  assert.equal(conesFrom(paths).length, 0, "no cone without a known bearing");
+  assert.equal(circlesFrom(paths).length, 0, "no circle for a directional kind");
+  assert.equal(handleFrom(await leafletMarkers()), undefined, "no rotation handle without a bearing");
+});
+
+test("an external coordinate change moves the position marker and re-centres the map (deep link / manual entry)", async () => {
+  const { harness } = await renderHarness({});
+  const map = (await leafletMaps()).at(-1);
+  // Deep-link / manual entry: coordinates arrive from OUTSIDE the map.
+  await harness.update({ coordinates: CAM, kind: "Bullet", direction: null, directionKnown: false });
+  const markers = await leafletMarkers();
+  const position = markers.find((m) => m.opts?.interactive === false);
+  assert.deepEqual(position.latlng, [44.8378, 11.6183], "the position marker moved to the new coordinates");
+  assert.deepEqual(map.views.at(-1)?.center, [44.8378, 11.6183], "the map re-centred on the externally supplied position");
+  assert.ok(map.views.at(-1)?.zoom >= 17, "the map zoomed in to the pick zoom (above FOV_MIN_ZOOM)");
+});
+
+test("a bearing change re-aims the SAME cone in place — no layer rebuild, so a drag is never interrupted", async () => {
+  const { harness } = await renderHarness({ coordinates: CAM, kind: "Bullet", direction: 90, directionKnown: true });
+  const cone = conesFrom(await leafletPaths())[0];
+  const handleBefore = handleFrom(await leafletMarkers());
+  const latlngsBefore = cone.latlngs;
+  // Slider input / external bearing change: 90° → 180°.
+  await harness.update({ direction: 180 });
+  const conesAfter = conesFrom(await leafletPaths());
+  assert.equal(conesAfter.length, 1, "still exactly one cone");
+  assert.equal(conesAfter[0], cone, "the SAME polygon object was re-aimed in place (no rebuild)");
+  assert.deepEqual(cone.latlngs[0], [44.8378, 11.6183], "the vertex stays on the camera");
+  assert.notDeepEqual(cone.latlngs, latlngsBefore, "the arc moved to the new bearing");
+  const handleAfter = handleFrom(await leafletMarkers());
+  assert.equal(handleAfter, handleBefore, "the handle marker is preserved across the bearing change");
+  assert.deepEqual(handleAfter.latlng, fov.fovBearingPoint(44.8378, 11.6183, 180), "the handle moved to the new centre line");
+});

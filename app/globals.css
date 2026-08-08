@@ -577,7 +577,7 @@ button { cursor:pointer; }
 .report-section { display:grid; grid-template-columns:.8fr 1.1fr; gap:105px; padding:92px 0 100px; }
 .report-section>div>p:not(.eyebrow) { color:var(--intro-ink); font-size:var(--text-xl); line-height:1.6; }
 .report-rule { margin-top:32px; padding:var(--space-4); border-radius:var(--radius-md); background:var(--rule-bg); color:var(--rule-ink); font-size:var(--text-md); line-height:1.5; }
-.report-form { display:grid; gap:18px; padding:30px; border:1px solid var(--form-border); border-radius:var(--radius-lg); background:var(--form-bg); }
+.report-form { display:grid; gap:18px; padding:30px; border:1px solid var(--form-border); border-radius:var(--radius-lg); background:var(--card-bg); box-shadow:0 20px 45px rgba(25,46,52,.08); }
 .report-form label { display:grid; gap:var(--space-2); color:var(--ink-2); font-size:var(--text-sm); font-weight:800; }
 .report-form input, .report-form select, .report-form textarea { width:100%; border:1px solid var(--field-border); border-radius:var(--radius-sm); padding:11px 12px; outline:none; background:var(--white); color:var(--field-ink); font-size:var(--text-base); font-weight:400; }
 .report-form input:focus, .report-form select:focus, .report-form textarea:focus { border-color:var(--control-focus); outline:3px solid var(--focus); outline-offset:2px; }
@@ -595,6 +595,19 @@ button { cursor:pointer; }
 .coordinate-entry p { margin:0; color:var(--coordinate-copy); font-size:var(--text-sm); line-height:1.45; }
 .coordinate-fields { display:grid; grid-template-columns:1fr 1fr; gap:var(--space-3); }
 .coordinate-button { justify-self:start; padding:10px 13px; border-color:var(--coordinate-button-border); background:var(--card-bg); color:var(--coordinate-button-ink); }
+/* Report mini-map (t_ebbe0ea3): click-to-pick position + draggable FOV
+   cone inside step 1. Coherent-box: bordered rounded surface matching the
+   record mini-map; the cone and rotation handle use the --action accent. */
+.report-map-wrap { display:grid; gap:8px; }
+.report-minimap { height:280px; overflow:hidden; border:1px solid var(--form-border); border-radius:var(--radius-md); background:var(--map-surface); }
+.report-map-help { margin:0; color:var(--muted); font-size:var(--text-sm); line-height:1.5; }
+.report-minimap .fov-cone { pointer-events:none; }
+.report-minimap .fov-cone.active { stroke:var(--action); fill:var(--action); }
+.report-pick-marker { display:grid; place-items:center; width:28px; height:28px; }
+.report-pick-marker i { width:14px; height:14px; border-radius:50%; background:var(--action); border:3px solid var(--white); box-shadow:0 0 0 1px var(--action), 0 1px 4px rgba(0,0,0,.35); }
+.fov-rotate-handle-wrap { display:grid; place-items:center; }
+.fov-rotate-handle { width:18px; height:18px; border-radius:50%; background:var(--white); border:2px solid var(--action); box-shadow:0 1px 4px rgba(0,0,0,.3); cursor:grab; }
+.fov-rotate-handle:active { cursor:grabbing; }
 .report-metadata-fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
 .correction-section { width:var(--container-standard); margin:0 auto; display:grid; grid-template-columns:.8fr 1.1fr; gap:105px; padding:0 0 100px; }
 .correction-section>div>p:not(.eyebrow) { color:var(--intro-ink); font-size:var(--text-xl); line-height:1.6; }
@@ -606,9 +619,8 @@ button { cursor:pointer; }
 .correction-form .check-label { grid-template-columns:17px 1fr; align-items:start; gap:9px; font-size:var(--text-sm); line-height:1.4; font-weight:400; }
 /* Contribution forms: short, numbered groups make the next decision obvious
    without turning a simple form into a multi-page wizard. */
-.contribution-step { min-width:0; display:grid; gap:16px; margin:0; padding:18px; border:1px solid var(--line); border-left:3px solid var(--control-focus); border-radius:var(--radius-md); background:var(--white); }
+.contribution-step { min-width:0; display:grid; gap:16px; margin:0; padding:18px; border:1px solid var(--form-border); border-left:3px solid var(--control-focus); border-radius:var(--radius-md); background:var(--white); box-shadow:0 2px 10px rgba(25,46,52,.06); }
 .contribution-step legend { padding:0 5px; color:var(--heading); font-size:var(--text-md); font-weight:800; letter-spacing:-.01em; }
-.contribution-step-send { background:var(--surface-muted); }
 .contribution-step-send .button-primary { justify-self:start; }
 .records-section { width:var(--container-standard); margin:0 auto; padding:0 0 95px; }
 .records-heading { display:flex; justify-content:space-between; align-items:end; gap:30px; padding:68px 0 26px; border-top:1px solid var(--line); }
