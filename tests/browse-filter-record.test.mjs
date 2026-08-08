@@ -163,10 +163,18 @@ test("journey browse→filtri: kind filter and sort order drive the directory", 
 });
 
 test("journey browse→record: the directory card links to a resolvable record detail", async () => {
+  const rtl = await setupDom();
   await setUrlState("/directory");
   installDirectoryFetch();
   const DirectoryTool = await loadDirectoryTool();
   const { container } = await renderWithLocale(React.createElement(DirectoryTool));
+
+  // No synthetic seed (removed 2026-08-08): the cards appear only after
+  // the mocked fetch resolves — wait for them before counting the links.
+  await rtl.waitFor(
+    () => assert.ok(container.querySelectorAll("ul.record-list li").length >= 2, "the directory must show both records"),
+    { timeout: 5000 },
+  );
 
   const openLinks = [...container.querySelectorAll("a.text-button")].filter((a) =>
     /\/records\/\d+/.test(a.getAttribute("href") ?? ""),

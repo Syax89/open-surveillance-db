@@ -5,6 +5,7 @@ import {
   codeChallenge,
   isKnownOidcProvider,
   oidcProviderConfig,
+  publicOrigin,
   safeRedirectTarget,
 } from "../../../../../lib/oidc";
 import { authLimit } from "../../../../../lib/auth-route-helpers";
@@ -41,7 +42,7 @@ export async function GET(request: Request) {
     return Response.json({ error: "Unknown OIDC provider." }, { status: 404 });
   }
 
-  const config = oidcProviderConfig(env, provider, `${url.origin}/api/auth/oidc/${provider}/callback`);
+  const config = oidcProviderConfig(env, provider, `${publicOrigin(request)}/api/auth/oidc/${provider}/callback`);
   if (!config) {
     return Response.json(
       { error: "This sign-in method is not available yet." },

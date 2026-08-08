@@ -1,6 +1,6 @@
 # Privacy and safety by design
 
-This project concerns surveillance, so it must hold itself to a high privacy and safety standard. This document is product guidance, not legal advice; local legal review is required before any public launch.
+This project concerns surveillance, so it must hold itself to a high privacy and safety standard. This document is product guidance, not legal advice. OpenSurveillanceDB is a **personal, open and collaborative project** (not a company): the legal package (privacy notice, lawful-basis analysis, retention schedule, processor register) is finalised in [`docs/legal/`](legal/README.md) and reviewed by the project owner before public launch; where professional counsel is required (per-jurisdiction review before an EU-wide launch), that review is recorded in the version history.
 
 ## Data minimisation
 
@@ -31,7 +31,7 @@ Contributor accounts are optional, voluntary, and data-minimising (ADR 0013). **
 
 ## User rights and accountability
 
-The public service needs, before launch: a [privacy notice](legal/PRIVACY_NOTICE.md), [lawful-basis analysis](legal/LAWFUL_BASIS.md) for each operating jurisdiction, [retention schedule](legal/RETENTION_SCHEDULE.md), correction/removal path, data-access contact, and [processor/subprocessor register](legal/PROCESSOR_REGISTER.md). Records of moderation decisions must be protected from public exposure while sufficient transparency reporting is published in aggregate. Breach handling is defined in [BREACH_PROCEDURE.md](legal/BREACH_PROCEDURE.md); all pre-launch drafts are collected in the [LEGAL_DELIVERABLES_INDEX.md](legal/LEGAL_DELIVERABLES_INDEX.md).
+The public service has, in force: a [privacy notice](legal/PRIVACY_NOTICE.md), [lawful-basis analysis](legal/LAWFUL_BASIS.md) for each operating jurisdiction, [retention schedule](legal/RETENTION_SCHEDULE.md), correction/removal path, data-access contact, and [processor/subprocessor register](legal/PROCESSOR_REGISTER.md). Records of moderation decisions must be protected from public exposure while sufficient transparency reporting is published in aggregate. Breach handling is defined in [BREACH_PROCEDURE.md](legal/BREACH_PROCEDURE.md); all finalised documents are collected in the [LEGAL_DELIVERABLES_INDEX.md](legal/LEGAL_DELIVERABLES_INDEX.md).
 
 The correction/removal, erasure, and appeal paths are implemented and exercised as follows:
 
@@ -40,7 +40,7 @@ The correction/removal, erasure, and appeal paths are implemented and exercised 
 - **Appeals (ADR 0014).** Any authenticated contributor may contest a final moderation decision (`POST /api/appeals`). Appeals are decided by an independent senior moderator (the original decider is excluded), can be escalated to the administrator, and an upheld appeal returns the record to the moderation queue for a fresh review by a different reviewer. Appeal activity is internal workflow: it joins the append-only audit trail but is never published.
 - **Accountability.** Moderation decisions and appeals are recorded in an append-only audit log with reviewer pseudonyms (never raw emails) and are published only as aggregate transparency reporting.
 
-Remaining pre-launch items on the rights side: external counsel review of the notice and terms (LEGAL_DELIVERABLES_INDEX.md).
+Remaining items on the rights side: per-jurisdiction review of the notice and terms before an EU-wide launch (LEGAL_DELIVERABLES_INDEX.md); the current package is finalised for the pilot jurisdiction (Italy).
 
 ## Abuse prevention
 

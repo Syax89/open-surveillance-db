@@ -438,8 +438,16 @@ export async function getPublicCameraById(id: number, nowIso: string = new Date(
  * detail API must resolve it — while every LIST surface (directory, map,
  * search, GeoJSON) keeps the strict public predicate via getPublicCameraById
  * and listPublicCameras. Order: public predicate first (the common case),
- * then the withdrawn fallback. Same payload shape and same aggregate counts
- * as the public resolver — the banner contract never leaks attribution.
+ * then the withdrawn fallback.
+ *
+ * PRIVACY TOMBSTONE (security review 2026-08-08, P1): the withdrawn
+ * fallback returns a minimal tombstone payload — only the fields the
+ * banner contract needs (id, title, kind, status, lifecycle dates) — with
+ * address, coordinates, description, manufacturer, direction and
+ * observation metadata nulled. A legal-emergency hide (legal/en.ts) must
+ * actually withdraw the record: an anonymous caller iterating sequential
+ * ids must NOT recover the location or any identifying detail of a
+ * withdrawn record. The banner contract never leaks attribution.
  */
 export async function getCommunityRecordById(id: number, nowIso: string = new Date().toISOString()): Promise<PublicCameraRecord | null> {
   const d1 = await getD1();
@@ -449,6 +457,7 @@ export async function getCommunityRecordById(id: number, nowIso: string = new Da
     .prepare(`${baseSelect} WHERE id = ? AND ${publicPredicate}`)
     .bind(id, ...parameters)
     .first<PublicCameraRecord & { importBatchId?: number | null }>();
+  let withdrawn = false;
   if (!result) {
     // Withdrawn fallback (ADR §6.3): only hidden/removed — never pending/
     // rejected, which have no direct-link contract.
@@ -456,8 +465,42 @@ export async function getCommunityRecordById(id: number, nowIso: string = new Da
       .prepare(`${baseSelect} WHERE id = ? AND status IN ('hidden', 'removed')`)
       .bind(id)
       .first<PublicCameraRecord & { importBatchId?: number | null }>();
+    withdrawn = result !== null;
   }
   if (!result) return null;
+  if (withdrawn) {
+    // Privacy tombstone: keep ONLY the banner contract fields. Location,
+    // address, description, manufacturer, direction and observation
+    // metadata are stripped so a withdrawn record cannot be read back
+    // through the detail API.
+    return {
+      id: result.id,
+      title: result.title,
+      kind: result.kind,
+      status: result.status,
+      source: result.source,
+      updated: result.updated,
+      created_at: result.createdAt,
+      // Everything location-identifying is null:
+      manufacturer: null,
+      observedOn: null,
+      address: null,
+      latitude: null,
+      longitude: null,
+      direction: null,
+      description: null,
+      lastVerifiedAt: null,
+      reviewDueAt: null,
+      reviewIntervalMonths: null,
+      importBatch: null,
+      confirmationCount: 0,
+      usefulCount: 0,
+      confirmCount: 0,
+      goneCount: 0,
+      problemCount: 0,
+      privacyCount: 0,
+    } as unknown as PublicCameraRecord;
+  }
   const confirmationCount = await confirmationCountsFor([id]).then((map) => map.get(id) ?? 0);
   const actionCounts = await communityActionCountsFor([id]).then((map) => map.get(id) ?? { like: 0, confirm: 0, gone: 0, problem: 0, privacy: 0 });
   const withProvenance = await attachImportBatch(result);

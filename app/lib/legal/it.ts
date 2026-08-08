@@ -196,7 +196,7 @@ export const itLegal: LegalContent = {
           },
           {
             type: "paragraph",
-            text: "L'applicazione automatica delle regole di cancellazione e scadenza è un elemento di implementazione pre-lancio; fino ad allora il calendario è applicato dallo sweep automatico di conservazione.",
+            text: "Le regole di cancellazione e scadenza sono applicate automaticamente dallo sweep giornaliero di conservazione (vedi il calendario di conservazione nell'informativa privacy); le richieste di correzione e le voci di audit: 2 anni. Prove: legate al record. Log operativi: fino a 12 mesi (aggregato). Backup: ruotati dal fornitore (fino a 30 giorni di point-in-time recovery).",
           },
         ],
       },
@@ -335,7 +335,7 @@ export const itLegal: LegalContent = {
             items: [
               "**Verifica dell'email.** Dopo la registrazione devi verificare l'indirizzo email prima di poter inviare, modificare o verificare record; finché non lo fai, la tua sessione è in sola lettura. Le email di verifica e di reset della password vengono inviate tramite Cloudflare Email Routing senza contenuti di tracciamento. Un indirizzo email = un account; tienilo accessibile se perdi la password.",
               "**Passkey.** Se registri una passkey, il sito memorizza solo materiale di chiave pubblica; la chiave privata resta sul tuo dispositivo. **Nota del fornitore:** le passkey *sincronizzate* sono salvate nel cloud del fornitore del sistema operativo (Apple/Google/Microsoft) a tua scelta — il fornitore viene a sapere che hai un account qui, il sito non condivide nulla con loro e tu controlli la sincronizzazione. Conserva i 10 codici di recupero emessi alla registrazione in un luogo sicuro; senza di essi, un dispositivo smarrito può significare perdere l'accesso al metodo passkey (il percorso email+password resta comunque disponibile).",
-              "**OIDC tramite GitHub/Google — disclosure di tracciamento.** Accedendo con GitHub o Google, **GitHub o Google osserva che accedi a questo Servizio, e il tuo indirizzo IP**, a ogni accesso; si applicano i termini e l'informativa privacy del fornitore. **Non importiamo la tua email** dal fornitore (solo subject id + flag di verifica) e non uniamo mai gli account automaticamente in base alla corrispondenza dell'email — un conflitto richiede un'unione manuale e verificata. Questo metodo è **opt-in e dichiarato** (matrice dei rischi nella pagina di accesso); **non è ancora attivo** finché non supera il gate di attivazione OIDC (DPA + EU–US DPF).",
+              "**OIDC tramite GitHub/Google — disclosure di tracciamento.** Accedendo con GitHub o Google, **GitHub o Google osserva che accedi a questo Servizio, e il tuo indirizzo IP**, a ogni accesso; si applicano i termini e l'informativa privacy del fornitore. **Non importiamo la tua email** dal fornitore (solo subject id + flag di verifica) e non uniamo mai gli account automaticamente in base alla corrispondenza dell'email — un conflitto richiede un'unione manuale e verificata. Questo metodo è **opt-in e dichiarato** (matrice dei rischi nella pagina di accesso); i pulsanti sono mostrati solo quando l'operatore ha attivato il fornitore (credenziali configurate su questa installazione).",
               "Puoi aggiungere, cambiare o rimuovere i metodi in qualsiasi momento dalla pagina del tuo account; eliminando l'account vengono eliminati i dati di ogni metodo (informativa privacy § 7 R15, § 8).",
             ],
           },
@@ -593,7 +593,7 @@ export const itLegal: LegalContent = {
     intro:
       "OpenSurveillanceDB è un database civico di interesse pubblico. Questa dichiarazione descrive il nostro impegno per l'accessibilità, lo stato attuale di conformità e come segnalare una barriera.",
     versionNote:
-      "Versione 0.1 — 1 agosto 2026. Bozza — fase pre-lancio, progetto. La copia repository (docs/ACCESSIBILITY_STATEMENT.md) resta la versione canonica.",
+      "Versione 0.2 — 8 agosto 2026. In vigore (progetto personale open-source). La copia repository (docs/ACCESSIBILITY_STATEMENT.md) resta la versione canonica.",
     sections: [
       {
         heading: "1. Impegno",
@@ -609,7 +609,7 @@ export const itLegal: LegalContent = {
         blocks: [
           {
             type: "paragraph",
-            text: "**Parzialmente conforme.** Il progetto attuale implementa una base di accessibilità significativa, ma **non ha ancora superato test di accessibilità formali, automatici o manuali**, e permangono alcune limitazioni note (elencate sotto). Questa sezione sarà sostituita da una dichiarazione di conformità misurata (WCAG 2.2 A/AA, per criterio di successo) al completamento delle verifiche.",
+            text: "**Parzialmente conforme.** Il progetto implementa una base di accessibilità significativa ed esegue **controlli automatici di accessibilità (Lighthouse ≥ 0.95) su ogni pull request**; resta previsto un audit manuale completo di conformità WCAG 2.2 A/AA con utenti di tecnologie assistive. Le limitazioni note sono elencate sotto.",
           },
         ],
       },
@@ -637,10 +637,10 @@ export const itLegal: LegalContent = {
           {
             type: "list",
             items: [
-              "**Le attività sulla mappa non sono ancora del tutto equivalenti da tastiera.** L'alternativa a elenco testuale copre la navigazione; le interazioni di mappa rimanenti sono in fase di allineamento alla parità da tastiera.",
-              "**Nessun test manuale formale** con screen reader, zoom al 200%, verifica del contrasto o dispositivi a schermo piccolo è stato ancora eseguito; i controlli automatici e il piano di test manuale sono in programma.",
+              "**Le attività sulla mappa sono operabili da tastiera.** I marker della mappa sono focalizzabili e rispondono a Invio/Spazio (apertura/chiusura popup); l'alternativa a elenco testuale copre la navigazione e la ricerca dei record senza mappa.",
+              "**Nessun audit manuale di conformità ancora.** Un audit manuale completo con screen reader, zoom al 200%, verifica del contrasto e dispositivi a schermo piccolo non è stato ancora eseguito; i controlli automatici girano su ogni pull request e l'audit manuale è previsto.",
               "**Alcune stringhe visibili all'utente sono ancora definite inline** nei componenti, mentre è in corso l'esternalizzazione delle stringhe dell'interfaccia e la revisione della lingua pilota.",
-              "**La pagina dedicata di feedback (/feedback) non è ancora implementata.** Finché non esiste, le barriere possono essere segnalate tramite i canali alternativi sotto.",
+              "**La pagina dedicata di feedback (/feedback) non è ancora offerta.** Le barriere si segnalano tramite i canali della sezione 5.",
             ],
           },
         ],
@@ -650,7 +650,7 @@ export const itLegal: LegalContent = {
         blocks: [
           {
             type: "paragraph",
-            text: "Il progetto prevede un **percorso di feedback non sensibile all'usabilità**, così che chiunque possa segnalare una barriera dell'interfaccia **senza creare un account e senza fornire dati personali**. Quando sarà implementato, il percorso sarà disponibile su `/feedback` e chiederà solo:",
+            text: "Il progetto prevede **canali di feedback non sensibili all'usabilità**, così che chiunque possa segnalare una barriera dell'interfaccia **senza creare un account e senza fornire dati personali**. I canali chiedono solo:",
           },
           {
             type: "list",
@@ -663,7 +663,7 @@ export const itLegal: LegalContent = {
           },
           {
             type: "paragraph",
-            text: "Finché `/feedback` non è implementato, segnala le barriere di accessibilità tramite uno di questi canali:",
+            text: "Segnala le barriere di accessibilità tramite uno di questi canali:",
           },
           {
             type: "list",

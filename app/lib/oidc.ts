@@ -22,6 +22,29 @@
  * calls go through globalThis.fetch, which tests stub.
  */
 
+/**
+ * Build the PUBLIC origin for OIDC redirect URIs.
+ *
+ * The dev/pre-prod server runs behind a reverse proxy that terminates TLS
+ * and forwards plain HTTP to the vinext dev server (NPM -> LXC). In that
+ * setup `new URL(request.url).origin` yields `http://<host>`, but the
+ * provider (Google/GitHub) has registered the HTTPS callback — the
+ * mismatch answers `400 redirect_uri_mismatch` (reproduced live on
+ * osdb.syaxhome89.com, 2026-08-08). The standard proxy convention is
+ * `X-Forwarded-Proto`; when it says `https`, rebuild the origin with the
+ * HTTPS scheme and the request host. Fail-closed: anything other than the
+ * exact value `https` keeps the request origin (never trust an arbitrary
+ * proto string).
+ */
+export function publicOrigin(request: Request): string {
+  const url = new URL(request.url);
+  const forwardedProto = request.headers.get("X-Forwarded-Proto");
+  if (forwardedProto === "https") {
+    return `https://${url.host}`;
+  }
+  return url.origin;
+}
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------

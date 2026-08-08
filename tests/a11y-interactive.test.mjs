@@ -416,19 +416,18 @@ test("every register form control has an accessible name (wrapping label)", asyn
   assertControlsLabeled(form[0], "register");
 });
 
-test("register page carries the same social sign-up panel as login (GitHub + Google, same OIDC routes)", async () => {
+test("register page: OIDC buttons are fail-closed in SSR (server-gated on configured providers)", async () => {
   const { html } = await renderRoute("/register");
-  // The OIDC panel must be the same one the login page uses — same
-  // classes, same routes, so sign-up with GitHub/Google works today
-  // (the callback auto-creates the contributor when no account exists).
-  assert.match(html, /class="oidc-panel"/, "register must render the oidc-panel");
-  assert.match(html, /class="oidc-buttons"/, "register must render the oidc-buttons row");
-  const githubHref = /href="\/api\/auth\/oidc\/github\/start\?redirect_to=[^"]*"/;
-  const googleHref = /href="\/api\/auth\/oidc\/google\/start\?redirect_to=[^"]*"/;
-  assert.match(html, githubHref, "register must link the GitHub OIDC start route");
-  assert.match(html, googleHref, "register must link the Google OIDC start route");
-  // Per-method risk disclosure travels with the panel (P1-4 Vera design).
-  assert.match(html, /class="oidc-disclosure"/, "register must carry the OIDC disclosure");
+  // Design review 2026-08-08 (F1): the social buttons render ONLY after
+  // the client fetches GET /api/auth/oidc/providers and receives a
+  // non-empty list (credentials configured on this deployment). Server
+  // HTML must NOT contain the buttons — an unconfigured provider 503s
+  // mid-flow, so the SSR output never promises a sign-in method the
+  // deployment cannot honour. The interactive panel behaviour is covered
+  // in client-auth-methods.test.mjs (loginFormWithSocial).
+  assert.doesNotMatch(html, /class="oidc-panel"/, "SSR must not render the oidc-panel before provider discovery");
+  assert.doesNotMatch(html, /Continue with GitHub/, "SSR must not render the GitHub button");
+  assert.doesNotMatch(html, /Continue with Google/, "SSR must not render the Google button");
 });
 
 test("auth errors are announced through a live region (role=alert)", async () => {

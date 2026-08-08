@@ -1,12 +1,12 @@
 # Moderation service-level agreements (SLA)
 
-- **Status:** draft for pre-launch review
+- **Status:** in force — personal open-source project, 2026-08-08
 - **Owner:** Rosa (Legal & Privacy Officer / privacy contact) with the moderation team
 - **Implements:** ../MODERATION.md (community-driven model — photo redaction gate + legal-emergency admin actions + private corrections); review findings M1, M2, M3.
 - **Alignment:** response times are compatible with GDPR art. 12(3) (1-month substantive response).
 - **Community model (ADR 0021, 2026-08-05):** the normal flow has no human moderation — the SLAs below cover the **residual human surfaces only**: the photo redaction gate, legal-emergency admin actions, and the private correction path. The retired-flow SLAs (old S5/S6) are **removed**: the contrary-consensus mechanism of ADR 0021 § 6 replaces them.
 
-> **Disclaimer:** this document is product guidance / not legal advice. It is a draft for pre-launch review and requires external counsel review before launch.
+> **Disclaimer:** this document is product guidance / not legal advice. The document is in force for the pilot jurisdiction (Italy); per-jurisdiction review remains the documented precondition for an EU-wide launch.
 
 ---
 

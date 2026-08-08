@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMessages } from "../lib/use-messages";
@@ -24,6 +24,23 @@ export function RegisterPageBody() {
     displayName?: boolean;
     password?: boolean;
   }>({});
+
+  // Social sign-up availability (design review 2026-08-08, F1): the OIDC
+  // buttons render ONLY for providers whose credentials are configured on
+  // this deployment. null = still loading → panel hidden until the answer.
+  const [oidcProviders, setOidcProviders] = useState<string[] | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/auth/oidc/providers")
+      .then((response) => (response.ok ? response.json() : Promise.reject(new Error())))
+      .then((data: { providers?: string[] }) => {
+        if (!cancelled) setOidcProviders(Array.isArray(data.providers) ? data.providers : []);
+      })
+      .catch(() => { if (!cancelled) setOidcProviders([]); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const socialAvailable = Array.isArray(oidcProviders) && oidcProviders.length > 0;
 
   function clientValidation() {
     const emailInvalid = !email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
@@ -89,20 +106,26 @@ export function RegisterPageBody() {
           path. Email conflicts still redirect to /login?merge=… for the
           password proof (shared backend, unchanged).
         */}
-        <div className="oidc-panel">
-          <div className="oidc-buttons">
-            <a className="button detail-outline oidc-button" href={`/api/auth/oidc/github/start?redirect_to=${encodeURIComponent("/account")}`}>
-              {t.oidcGithub}
-            </a>
-            <a className="button detail-outline oidc-button" href={`/api/auth/oidc/google/start?redirect_to=${encodeURIComponent("/account")}`}>
-              {t.oidcGoogle}
-            </a>
+        {socialAvailable ? (
+          <div className="oidc-panel">
+            <div className="oidc-buttons">
+              {oidcProviders?.includes("github") ? (
+                <a className="button detail-outline oidc-button" href={`/api/auth/oidc/github/start?redirect_to=${encodeURIComponent("/account")}`}>
+                  {t.oidcGithub}
+                </a>
+              ) : null}
+              {oidcProviders?.includes("google") ? (
+                <a className="button detail-outline oidc-button" href={`/api/auth/oidc/google/start?redirect_to=${encodeURIComponent("/account")}`}>
+                  {t.oidcGoogle}
+                </a>
+              ) : null}
+            </div>
+            <p className="oidc-disclosure">
+              {t.oidcDisclosure}{" "}
+              <Link href="/privacy">{t.privacyNotice}</Link>.
+            </p>
           </div>
-          <p className="oidc-disclosure">
-            {t.oidcDisclosure}{" "}
-            <Link href="/privacy">{t.privacyNotice}</Link>.
-          </p>
-        </div>
+        ) : null}
 
         <form className="auth-form" onSubmit={onSubmit} noValidate>
           <label className="auth-field">

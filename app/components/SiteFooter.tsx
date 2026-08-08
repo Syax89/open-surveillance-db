@@ -70,6 +70,7 @@ export function SiteFooter() {
           <Link href="/segnala" aria-current={pageCurrent("/segnala")}>{t.toolReport}</Link>
           <Link href="/correggi" aria-current={pageCurrent("/correggi")}>{t.toolCorrection}</Link>
           <Link href="/regole" aria-current={pageCurrent("/regole")}>{t.rules}</Link>
+          <Link href="/moderazione" aria-current={pageCurrent("/moderazione")}>{t.moderation}</Link>
         </div>
         <div className="footer-link-group">
           <p className="footer-link-group-title">{t.projectGroup}</p>

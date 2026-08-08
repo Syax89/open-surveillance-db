@@ -193,7 +193,7 @@ export const enLegal: LegalContent = {
           },
           {
             type: "paragraph",
-            text: "Automated enforcement of the deletion and expiry rules is a pre-launch implementation item; until then the schedule is applied by the automated retention sweep.",
+            text: "Deletion and expiry rules are enforced automatically by the daily retention sweep (see the retention schedule in the privacy notice); correction requests and audit entries: 2 years. Evidence: tied to the record. Operational logs: up to 12 months (aggregate). Backups: rotated by the provider (up to 30 days point-in-time recovery).",
           },
         ],
       },
@@ -332,7 +332,7 @@ export const enLegal: LegalContent = {
             items: [
               "**Email verification.** After registration you must verify the email address before you can submit, edit or verify records; until then your session is read-only. Verification and password-reset emails are sent through Cloudflare Email Routing with no tracking content. One email address = one account; keep it accessible if you lose your password.",
               "**Passkeys.** If you enroll a passkey, the site stores only public-key material; the private key stays on your device. **Vendor note:** *synced* passkeys are backed up through the OS vendor's cloud (Apple/Google/Microsoft) at your choice — the vendor learns you have an account here, the site shares nothing with them, and you control sync. Keep the 10 recovery codes issued at enrollment in a safe place; without them, a lost device may mean losing access to the passkey method (the email+password path remains).",
-              "**OIDC via GitHub/Google — tracking disclosure.** Signing in with GitHub or Google means **GitHub or Google observes that you sign in to this Service, and your IP address**, at each login; the provider's own terms and privacy policy apply at sign-in. We **do not import your email** from the provider (subject id + verified flag only) and we never merge accounts automatically on an email match — a conflict requires a manual, verified merge. This method is **opt-in and disclosed** (risk matrix on the login page); it is **not yet active** until the OIDC activation gate (DPA + EU–US DPF) passes.",
+              "**OIDC via GitHub/Google — tracking disclosure.** Signing in with GitHub or Google means **GitHub or Google observes that you sign in to this Service, and your IP address**, at each login; the provider's own terms and privacy policy apply at sign-in. We **do not import your email** from the provider (subject id + verified flag only) and we never merge accounts automatically on an email match — a conflict requires a manual, verified merge. This method is **opt-in and disclosed** (risk matrix on the login page); the buttons are shown only when the operator has activated the provider (credentials configured on this deployment).",
               "You may add, change or remove methods from your account page at any time; deleting your account deletes the data of every method (privacy notice § 7 R15, § 8).",
             ],
           },
@@ -590,7 +590,7 @@ export const enLegal: LegalContent = {
     intro:
       "OpenSurveillanceDB is a public-interest civic database. This statement describes our accessibility commitment, our current compliance status, and how you can report a barrier.",
     versionNote:
-      "Version 0.1 — 1 August 2026. Draft — pre-launch, project stage. The repository copy (docs/ACCESSIBILITY_STATEMENT.md) remains canonical.",
+      "Version 0.2 — 8 August 2026. In force (personal open-source project). The repository copy (docs/ACCESSIBILITY_STATEMENT.md) remains canonical.",
     sections: [
       {
         heading: "1. Commitment",
@@ -606,7 +606,7 @@ export const enLegal: LegalContent = {
         blocks: [
           {
             type: "paragraph",
-            text: "**Partially compliant.** The current project implements a meaningful accessibility baseline, but it has **not yet passed formal automated or manual accessibility testing**, and some known limitations remain (listed below). This section will be replaced by a measured conformance statement (WCAG 2.2 A/AA, per success criterion) once the testing gates are complete.",
+            text: "**Partially compliant.** The project implements a meaningful accessibility baseline and runs **automated accessibility checks (Lighthouse ≥ 0.95) on every pull request**; a full WCAG 2.2 A/AA manual conformance audit by users of assistive technology remains planned. Known limitations are listed below.",
           },
         ],
       },
@@ -634,10 +634,10 @@ export const enLegal: LegalContent = {
           {
             type: "list",
             items: [
-              "**Map tasks are not yet fully keyboard-equivalent.** The text-list alternative covers browsing; the remaining map interactions are still being brought to keyboard parity.",
-              "**No formal manual testing** with screen readers, 200% zoom, contrast checking, or small-screen devices has been run yet; the automated checks and manual test plan are pending.",
+              "**Map tasks are keyboard-operable.** Map markers are focusable and respond to Enter/Space (popup open/close); the text-list alternative covers browsing and searching records without the map.",
+              "**No manual conformance audit yet.** A full manual audit with screen readers, 200% zoom, contrast checking and small-screen devices has not been run; automated checks run on every pull request and the manual audit is planned.",
               "**Some user-visible strings are still defined inline** in components while the interface-string externalisation and pilot-language review are in progress.",
-              "**The dedicated feedback page (/feedback) is not yet implemented.** Until it exists, barriers can be reported through the alternative channels below.",
+              "**The dedicated feedback page (/feedback) is not offered yet.** Barriers are reported through the channels in section 5.",
             ],
           },
         ],
@@ -647,7 +647,7 @@ export const enLegal: LegalContent = {
         blocks: [
           {
             type: "paragraph",
-            text: "The project provides a **non-sensitive usability-feedback route** so that anyone can report an interface barrier **without creating an account and without providing personal data**. When implemented, the route will be available at `/feedback` and will ask only for:",
+            text: "The project provides **non-sensitive usability-feedback channels** so that anyone can report an interface barrier **without creating an account and without providing personal data**. The channels ask only for:",
           },
           {
             type: "list",
@@ -660,7 +660,7 @@ export const enLegal: LegalContent = {
           },
           {
             type: "paragraph",
-            text: "Until `/feedback` is implemented, please report accessibility barriers through one of these channels:",
+            text: "Report accessibility barriers through one of these channels:",
           },
           {
             type: "list",

@@ -26,7 +26,6 @@ export default function robots(): MetadataRoute.Robots {
         disallow: [
           "/api/",
           "/moderation",
-          "/appelli",
           "/account",
           "/records/*/edit",
           "/register",

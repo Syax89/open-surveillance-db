@@ -37,8 +37,8 @@ import { isRecordPageStatus } from "./public-status";
  *    last consumer unmounts;
  *  - explicit states: loading (first fetch in flight), error (network or
  *    non-2xx on ANY page), empty (API answered but no public records);
- *  - on error the seed records remain visible (explicit demo seed for the
- *    home page); the caller decides how to surface the failure.
+ *  - on error the records stay empty and the caller decides how to
+ *    surface the failure (no synthetic seed filler, removed 2026-08-08).
  *
  * Server-side filters (F4, FRONTEND_PLAN § 3.3): the optional `filters`
  * option ({ kind, freshness }) forwards the URL filter dimensions to the
@@ -279,8 +279,6 @@ function resetCamerasCache() {
 }
 
 export type UsePublicCamerasOptions = {
-  /** Explicit demo seed rendered while loading or when the API is unreachable. */
-  seed?: Camera[];
   /** Fired once when the API returns a non-empty public payload. */
   onRecords?: (records: Camera[]) => void;
   /** Fired once when the API fetch fails (callers surface the notice). */
@@ -295,7 +293,7 @@ export type UsePublicCamerasOptions = {
 };
 
 export type UsePublicCamerasResult = {
-  /** Current display records (seed when the API is empty/unreachable). */
+  /** Current display records ([] until the API answers). */
   records: Camera[];
   /** Server total of public records (null until the first page answers). */
   total: number | null;
@@ -309,20 +307,16 @@ export type UsePublicCamerasResult = {
   reload: () => void;
 };
 
-export function usePublicCameras({ seed = [], onRecords, onError, filters }: UsePublicCamerasOptions = {}): UsePublicCamerasResult {
+export function usePublicCameras({ onRecords, onError, filters }: UsePublicCamerasOptions = {}): UsePublicCamerasResult {
   // Server-filtered walks re-run when the filter combo changes (each combo
   // is its own query). The shared full-list walk never re-runs for filters.
   const serverActive = hasServerFilters(filters);
   const filterKey = serverActive ? `${filters.kind ?? ""}|${filters.freshness ?? ""}` : "";
 
-  // A cached EMPTY payload is indistinguishable from "nothing loaded" at the
-  // cache level, so an empty cache keeps the seed visible (home contract:
-  // an empty API answer never blanks the demo directory). A server-filtered
-  // view NEVER starts from the shared cache: its first paint is the seed.
-  const [records, setRecords] = useState<Camera[]>(() => {
-    if (serverActive) return seed;
-    return cachedRecords === null ? seed : cachedRecords.length ? cachedRecords : seed;
-  });
+  // No demo seed (removed 2026-08-08, design review F1): records are always
+  // the real API payload, never synthetic filler. On API failure callers
+  // surface their own honest error state.
+  const [records, setRecords] = useState<Camera[]>(() => []);
   const [total, setTotal] = useState<number | null>(() => (serverActive ? null : cachedTotal));
   const [loading, setLoading] = useState(() => (serverActive ? true : cachedRecords === null));
   const [error, setError] = useState(false);
@@ -369,8 +363,8 @@ export function usePublicCameras({ seed = [], onRecords, onError, filters }: Use
           setRecords(fetched.records);
           onRecordsRef.current?.(fetched.records);
         } else {
-          // API answered with an empty public list: keep the seed and expose
-          // the empty state so callers can render an honest "no records".
+          // API answered with an empty public list: expose the empty state
+          // so callers can render an honest "no records".
           setEmpty(true);
         }
       })
@@ -378,7 +372,7 @@ export function usePublicCameras({ seed = [], onRecords, onError, filters }: Use
         if (cancelled) return;
         setLoading(false);
         setError(true);
-        // Records stay at the seed: a failed API must never blank the page.
+        // Records stay empty: callers surface their own error state.
         onErrorRef.current?.();
       });
     return () => {

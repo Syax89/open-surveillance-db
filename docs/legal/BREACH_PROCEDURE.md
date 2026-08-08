@@ -1,10 +1,10 @@
 # Personal data breach procedure (GDPR arts. 33-34)
 
-- **Status:** draft for pre-launch review
+- **Status:** in force — personal open-source project, 2026-08-08
 - **Owner:** Rosa (Legal & Privacy Officer / privacy contact); containment coordinated with Ada (CTO)
 - **Scope:** any incident that leads to accidental or unlawful destruction, loss, alteration, or unauthorised disclosure of, or access to, personal data held by OpenSurveillanceDB — including pending submissions, evidence, correction requests, and moderator identity attributes.
 
-> **Disclaimer:** this document is product guidance / not legal advice. It is a draft for pre-launch review and requires external counsel review before launch.
+> **Disclaimer:** this document is product guidance / not legal advice. The document is in force for the pilot jurisdiction (Italy); per-jurisdiction review remains the documented precondition for an EU-wide launch.
 
 ---
 

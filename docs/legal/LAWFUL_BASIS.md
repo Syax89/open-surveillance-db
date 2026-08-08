@@ -1,11 +1,11 @@
 # Lawful-basis assessment (outline)
 
-- **Status:** draft outline for pre-launch review (ADR 0002)
+- **Status:** in force — personal open-source project, 2026-08-08 (ADR 0002)
 - **Owner:** Rosa (Legal & Privacy Officer / privacy contact)
 - **Jurisdiction (primary):** European Union — GDPR (EU) 2016/679; Italy — D.Lgs. 196/2003 (Codice Privacy, as amended by D.Lgs. 101/2018)
 - **Documents this supports:** PRIVACY_NOTICE.md, PROCESSOR_REGISTER.md
 
-> **Disclaimer:** this document is product guidance / not legal advice. It is a draft for pre-launch review and requires external counsel review before launch.
+> **Disclaimer:** this document is product guidance / not legal advice. The document is in force for the pilot jurisdiction (Italy); per-jurisdiction review remains the documented precondition for an EU-wide launch.
 
 ---
 

@@ -290,8 +290,12 @@ test("record page: hidden record renders the direct-link banner with history anc
   assert.equal(historyLink.getAttribute("href"), "#record-timeline");
   // The status line still carries the safe localized label ("Hidden").
   assert.ok(screen.getByText("Hidden"));
-  // Reversal signals stay open: the widget is mounted even on hidden.
-  assert.ok(screen.getByRole("region", { name: "Community actions" }));
+  // Privacy tombstone (security review 2026-08-08): withdrawn records show
+  // ONLY the banner contract — no community actions, no location fact, no
+  // mini map (their payload carries null coordinates).
+  assert.equal(screen.queryByRole("region", { name: "Community actions" }), null);
+  assert.equal(screen.queryByText(/General location/), null);
+  assert.equal(screen.queryByText(/41\.9/), null);
   // No "view on map" for withdrawn records (it is not on any map).
   assert.equal(screen.queryByRole("link", { name: /View on map/ }), null);
 });

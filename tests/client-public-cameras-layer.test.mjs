@@ -154,7 +154,7 @@ test("layer: a legacy single-page payload (no nextOffset) is the complete list",
   assert.equal(calls.length, 1);
 });
 
-test("layer: a failure on a later page surfaces the error state and keeps the seed", async () => {
+test("layer: a failure on a later page surfaces the error state (no synthetic seed)", async () => {
   const { screen } = rtl;
   const calls = [];
   installFetchMock((input) => {
@@ -167,10 +167,11 @@ test("layer: a failure on a later page surfaces the error state and keeps the se
     return jsonResponse({ error: "unexpected route" }, { status: 404 });
   });
 
-  rtl.render(React.createElement(ListProbe, { seed: seedCameras }));
+  rtl.render(React.createElement(ListProbe));
   await rtl.waitFor(() => assert.equal(screen.getByTestId("error").textContent, "true"));
-  // A failed API must never blank the page: the seed stays visible.
-  assert.equal(screen.getByTestId("count").textContent, String(seedCameras.length));
+  // Honest failure state (seed removed 2026-08-08): records stay empty and
+  // the caller surfaces its own error UI — never synthetic filler.
+  assert.equal(screen.getByTestId("count").textContent, "0");
   assert.equal(screen.getByTestId("total").textContent, "null");
   assert.equal(calls.length, 2);
 });
