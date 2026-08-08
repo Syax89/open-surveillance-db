@@ -644,7 +644,7 @@ changes accumulate under `[Unreleased]`.
 ### Security
 
 - **Repository hygiene — zero secrets / credentials / personal infrastructure
-  references (template-clean, PR #3xx):** the production D1 `database_id`
+  references (template-clean, PR #383):** the production D1 `database_id`
   was removed from `wrangler.jsonc` (placeholder restored; the real id is
   injected at deploy time from the GitHub secret `D1_DATABASE_ID` by
   `.github/workflows/deploy.yml` — never committed). Added
