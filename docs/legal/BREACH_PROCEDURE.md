@@ -2,7 +2,7 @@
 
 - **Status:** in force — personal open-source project, 2026-08-08
 - **Owner:** Rosa (Legal & Privacy Officer / privacy contact); containment coordinated with Ada (CTO)
-- **Scope:** any incident that leads to accidental or unlawful destruction, loss, alteration, or unauthorised disclosure of, or access to, personal data held by OpenSurveillanceDB — including pending submissions, evidence, correction requests, and moderator identity attributes.
+- **Scope:** any incident that leads to accidental or unlawful destruction, loss, alteration, or unauthorised disclosure of, or access to, personal data held by OpenSurveillanceDB — including published/withdrawn submissions, correction requests, and contributor identity data.
 
 > **Disclaimer:** this document is product guidance / not legal advice. The document is in force for the pilot jurisdiction (Italy); per-jurisdiction review remains the documented precondition for an EU-wide launch.
 
@@ -10,20 +10,20 @@
 
 ## 1. Roles
 
-| Role | Person (pre-launch) | Duty |
+| Role | Person | Duty |
 |------|--------------------|----|
 | **Privacy contact / first responder** | Rosa (Legal & Privacy Officer) | Receive reports, run triage, decide notifications, own the breach register |
 | **Technical containment** | Ada (CTO) | Stop the leak, preserve evidence, analyse root cause |
 | **Communication** | Marie (docs) | Internal/external statements under privacy-contact direction |
 | **Escalation** | Angelina (CEO) | High-risk incidents: approval of data-subject notification, external communication |
-| **On-call** | Defined at launch (monitored mailbox + pager rotation) | Guarantee a response outside business hours once the service is public |
+| **On-call** | Monitored mailbox (`privacy@opensurveillancedb.org`, 24/7) + escalation to the roles above | Guarantee a response outside business hours |
 
 ## 2. Detection
 
 Sources of detection:
 
 - Cloudflare incident notification (per the Cloudflare DPA, art. 33(2) flow — processor notifies us without undue delay);
-- application/monitoring alerts (5xx spikes, unexpected 403/429 patterns, /moderation access anomalies once auth is wired);
+- application/monitoring alerts (5xx spikes, unexpected 403/429 patterns, /moderation access anomalies);
 - reports from users, moderators, or third parties (`privacy@opensurveillancedb.org` mailbox);
 - scheduled internal checks (logs review, moderation audit log review).
 
@@ -67,7 +67,7 @@ Impact factors: data category (location data, evidence, identities rank higher),
 - **When:** where the breach is likely to result in a **high risk** to rights and freedoms — communicate **without undue delay**, in clear and plain language.
 - **Content (art. 34(2)):** nature of the breach; the privacy contact to obtain more information; likely consequences; measures taken.
 - **Exceptions (art. 34(3)):** (a) data were encrypted/pseudonymised such that they are unintelligible; (b) subsequent measures eliminate the high risk; (c) disproportionate effort — in that case a public communication (e.g. site notice, press release) is required instead.
-- **Internal database leak vs. public dataset:** for the public dataset (mostly non-personal infrastructure data) art. 34 rarely applies; it applies to leaked pending submissions, evidence, or moderator identities.
+- **Internal database leak vs. public dataset:** for the public dataset (mostly non-personal infrastructure data) art. 34 rarely applies; it applies to leaked withdrawn submissions, correction requests, or contributor identity data.
 
 ## 6. Documentation (breach register)
 
@@ -91,7 +91,7 @@ Retention: **2 years** (aligned with the audit log, RETENTION_SCHEDULE.md R5/R9)
 - Review this procedure and the privacy notice if the incident reveals gaps; report lessons to the advisory circle (../GOVERNANCE.md).
 - Aggregate breach statistics (counts by severity, no incident detail) feed the quarterly transparency report.
 
-## 8. Communication templates (draft)
+## 8. Communication templates
 
 - **Internal alert:** `[BREACH] <severity> — <summary> — detected <timestamp> — owner <name>`.
 - **Garante notification:** structured per art. 33(3) — see 5.1.
@@ -100,4 +100,4 @@ Retention: **2 years** (aligned with the audit log, RETENTION_SCHEDULE.md R5/R9)
 
 ---
 
-*Pre-launch note: this procedure becomes operational once the on-call rotation exists (the monitored mailbox is active; see PRIVACY_NOTICE.md § 9 and ../GOVERNANCE.md "Before launch").*
+*Operational note: the on-call rotation is defined with the monitored mailbox (PRIVACY_NOTICE.md § 9 and ../GOVERNANCE.md); the procedure is operational as soon as a report is received.*

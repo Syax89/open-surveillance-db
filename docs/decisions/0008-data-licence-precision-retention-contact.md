@@ -8,7 +8,7 @@
   schedule), 0005 (processors and data residency), 0010 (pilot boundary)
 - **Related docs:** README, `docs/OPEN_SOURCE.md`, `docs/DATA_MODEL.md`,
   `docs/legal/PRIVACY_NOTICE.md`, `docs/legal/RETENTION_SCHEDULE.md`,
-  `docs/legal/REVIEW_POLICY_LEGALE_2026-07-31.md` (findings O1, O2, O4),
+  the 2026-07-31 legal review (findings O1, O2, O4),
   `docs/roadmap.md` (Wave A item 3)
 
 ## Context
@@ -23,7 +23,7 @@ decision:
 
 - `docs/OPEN_SOURCE.md` proposes **ODbL 1.0** for the database and exports but
   frames it as "the current proposal", pending a decision;
-- the Italian legal review (`REVIEW_POLICY_LEGALE_2026-07-31.md`, finding O2)
+- the 2026-07-31 legal review (finding O2)
   requires the CSV/GeoJSON exports to carry the ODbL attribution/share-alike
   notices (produced-work requirement), and clarifies that `demo` records fall
   inside the ODbL perimeter;

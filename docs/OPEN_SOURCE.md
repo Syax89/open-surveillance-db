@@ -10,7 +10,7 @@ Unless a document says otherwise, project documentation is proposed under [CC BY
 
 ## Database and exports
 
-The public database needs an explicit license before it contains real records. **Decided 2026-07-31 ([ADR 0008](decisions/0008-data-licence-precision-retention-contact.md)): the database and every export format are licensed under [ODbL 1.0](https://opendatacommons.org/licenses/odbl/), with clear attribution and share-alike notices.** This choice must still be checked against jurisdictional rules, source terms, and the final data model before public beta.
+The public database and every export format are licensed under [ODbL 1.0](https://opendatacommons.org/licenses/odbl/) (decision 2026-07-31, [ADR 0008](decisions/0008-data-licence-precision-retention-contact.md)), with clear attribution and share-alike notices. Imported sources keep their own licence and attribution; the ODbL licence applies to the project's own compilation (see "Imported public datasets" below).
 
 ## OpenStreetMap data
 
@@ -18,4 +18,4 @@ OpenStreetMap data is available under the [Open Database License](https://www.op
 
 ## Contributor promise
 
-Contributors must submit only material they are entitled to share. They grant the project the rights needed to publish accepted code, documentation, and data under the relevant project license. Records are text metadata (location, kind, notes) only: the photo upload feature was **removed entirely on 2026-08-08** (CEO decision) — no image is accepted or stored by the application, and the previous R2 photo objects were retained without deletion (see [PRIVACY_AND_SAFETY.md](PRIVACY_AND_SAFETY.md) and [TERMS_OF_USE.md](TERMS_OF_USE.md)).
+Contributors must submit only material they are entitled to share. They grant the project the rights needed to publish accepted code, documentation, and data under the relevant project license. Records are text metadata (location, kind, notes) only: the image-evidence feature was **removed entirely on 2026-08-08** (CEO decision) — no image is accepted or stored by the application, and the previous stored objects were retained without deletion (see [PRIVACY_AND_SAFETY.md](PRIVACY_AND_SAFETY.md) and [TERMS_OF_USE.md](TERMS_OF_USE.md)).

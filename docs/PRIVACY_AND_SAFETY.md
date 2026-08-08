@@ -1,19 +1,19 @@
 # Privacy and safety by design
 
-This project concerns surveillance, so it must hold itself to a high privacy and safety standard. This document is product guidance, not legal advice. OpenSurveillanceDB is a **personal, open and collaborative project** (not a company): the legal package (privacy notice, lawful-basis analysis, retention schedule, processor register) is finalised in [`docs/legal/`](legal/README.md) and reviewed by the project owner before public launch; where professional counsel is required (per-jurisdiction review before an EU-wide launch), that review is recorded in the version history.
+This project concerns surveillance, so it must hold itself to a high privacy and safety standard. This document is product guidance, not legal advice. OpenSurveillanceDB is a **personal, open and collaborative project** (not a company): the legal package (privacy notice, lawful-basis analysis, retention schedule, processor register) is in force in [`docs/legal/`](legal/README.md) and reflects the current implemented state of the codebase; per-jurisdiction review for an EU-wide launch is recorded in the version history.
 
 ## Data minimisation
 
 - Do not require a real name to browse public data.
 - Collect the minimum account and submission data needed to prevent abuse and run moderation.
-- Keep evidence private by default and delete it according to a published retention schedule.
+- Publish only what serves the public record, and delete or withdraw content according to a published retention schedule.
 - Avoid personal names, faces, plates, private interiors, and precise details that do not serve the public record.
 
 ## Location and media rules
 
 - Publish only public-facing, visible infrastructure after review.
 - Generalise locations when a precise point introduces unnecessary risk; **default publication precision is ~4 decimal places (~10 m, zone level), with the exact location kept in the private moderation record only** (decision 2026-07-31).
-- **No image uploads:** the photo feature was **removed entirely on 2026-08-08** (CEO decision). No image is accepted or stored; records are text metadata only. Existing R2 objects from the retired feature are **retained without deletion** (RETENTION_SCHEDULE.md R13, historical).
+- **No image submission:** the image-evidence feature was **removed entirely on 2026-08-08** (CEO decision). No image is accepted or stored; records are text metadata only. Existing objects from the retired feature are **retained without deletion** (RETENTION_SCHEDULE.md R13, historical).
 
 ## Contributor accounts and privacy
 
@@ -53,20 +53,19 @@ Remaining items on the rights side: per-jurisdiction review of the notice and te
 
 Public read responses carry a **bounded edge cache**: the camera list, bbox
 map layer and record detail use `public, s-maxage=300,
-stale-while-revalidate=600`; full CSV/GeoJSON exports use `s-maxage=3600`;
-approved photo bytes use `public, max-age=3600, immutable`. These windows
-keep the directory responsive without serving live feeds, but they mean a
-moderation decision (e.g. a privacy/safety removal) could otherwise leave a
-taken-down record served from the edge for up to the revalidation window.
+stale-while-revalidate=600`; full CSV/GeoJSON exports use `s-maxage=3600`.
+These windows keep the directory responsive without serving live feeds, but
+they mean a moderation decision (e.g. a privacy/safety removal) could
+otherwise leave a taken-down record served from the edge for up to the
+revalidation window.
 
 To close that gap, every cacheable public response carries a **Cache-Tag**
-(`cameras-list`, `cameras-bbox`, `cameras-export`, `camera-<id>`,
-`photo-<id>`), and the moderation write path (`PATCH /api/moderation`)
-purges the affected tags through the **Cloudflare Cache Purge API** after a
-successful camera or correction decision (fail-open: an API failure never
-fails the decision, and without `CACHE_PURGE_TOKEN`/`CACHE_PURGE_ZONE_ID`
-configured the purge is a documented no-op and the bounded cache window
-remains the guarantee).
+(`cameras-list`, `cameras-bbox`, `cameras-export`, `camera-<id>`), and the
+moderation write path (`PATCH /api/moderation`) purges the affected tags
+through the **Cloudflare Cache Purge API** after a successful camera or
+correction decision (fail-open: an API failure never fails the decision, and
+without `CACHE_PURGE_TOKEN`/`CACHE_PURGE_ZONE_ID` configured the purge is a
+documented no-op and the bounded cache window remains the guarantee).
 
 **Trade-off (documented).** With purge credentials configured, a takedown is
 served until the purge completes (typically < 1 s) plus any in-flight
@@ -74,8 +73,9 @@ stale-while-revalidate response already handed to a client; without
 credentials, the worst case is the revalidation window (up to ~15 min for
 list/bbox/record, 1 h for exports). This is a deliberate operational choice:
 the cache exists to keep the public directory responsive under load, and the
-purge hook exists so privacy decisions can override it. Photo-bytes purge is
-deferred to the F2/F3 photo write path (the tag is already emitted).
+purge hook exists so privacy decisions can override it. (The retired
+image-evidence feature no longer emits bytes or tags — the cache covers
+record data only.)
 
 ## Accessibility and inclusion
 

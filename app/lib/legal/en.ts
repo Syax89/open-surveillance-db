@@ -1,7 +1,7 @@
 /**
  * English legal content — PILOT LANGUAGE.
  *
- * Web adaptation of the legal drafts:
+ * Web adaptation of the legal documents:
  *   - docs/TERMS_OF_USE.md          → terms
  *   - docs/legal/PRIVACY_NOTICE.md  → privacy
  *   - docs/OPEN_SOURCE.md           → licenses
@@ -21,7 +21,7 @@ export const enLegal: LegalContent = {
     intro:
       "How OpenSurveillanceDB processes personal data, what we publish, what we never collect, and how you can exercise your rights under the GDPR.",
     versionNote:
-      "Version 0.6 — 5 August 2026. Updated for the community-driven model (ADR 0021): reports publish immediately from verified accounts; § 7 retention aligned with the retired review cycle; § 10 (cookies) unchanged. Re-synchronised with the merged canonical PRIVACY_NOTICE v0.11 (docs/legal/PRIVACY_NOTICE.md remains canonical): § 3 table aligned with the canonical disclosures (community-actions row added; moderation-audit purpose updated to \"historical appeals closed by migration\") and the public per-record event-history note added.",
+      "Version 0.7 — 8 August 2026. Current-state alignment (template-ready): re-synchronised with the canonical PRIVACY_NOTICE v0.13 (docs/legal/PRIVACY_NOTICE.md remains canonical). Community-driven model (ADR 0021): reports publish immediately from verified accounts; § 7 retention enforced by the daily retention sweep; § 3.1 multi-method authentication (email verification, passkeys, OIDC server-gated — ADR 0020); image evidence removed (2026-08-08).",
     sections: [
       {
         heading: "1. Who we are (controller)",
@@ -186,7 +186,11 @@ export const enLegal: LegalContent = {
           },
           {
             type: "paragraph",
-            text: "Deletion and expiry rules are enforced automatically by the daily retention sweep (see the retention schedule in the privacy notice); correction requests and audit entries: 2 years. Operational logs: up to 12 months (aggregate). Backups: rotated by the provider (up to 30 days point-in-time recovery).",
+            text: "The detailed rules remain in the repository retention schedule (docs/legal/RETENTION_SCHEDULE.md), including: community data (R14) — community actions follow the account (active → erasure; actions cast on other records are deleted with the contributor, ADR 0021 § 13, and the public lifecycle history keeps only aggregates); authentication-method data (R15, ADR 0020) — email-verification tokens 24 hours, reset tokens 3 hours (single-use, deleted on use); passkeys and recovery codes while the account is active, hard-deleted at account erasure — nothing survives to link the account to a provider or a device; failed-login counters (R16), per-IP registration-cap log (R17) and the transactional-email log (R18) swept by the retention cron; demo records (R12) purged by the retention cron outside development.",
+          },
+          {
+            type: "paragraph",
+            text: "The deletion and expiry rules are enforced automatically by the daily retention sweep (scheduled in `worker/index.ts`, daily at 03:00 UTC — RETENTION_SCHEDULE.md § 3): the cron deletes expired rows (R12/R16/R17/R18), archives audit entries at the 2-year mark (R4/R5/R9), and never changes record lifecycle status (community model, ADR 0021 § 2.2).",
           },
         ],
       },
@@ -231,7 +235,7 @@ export const enLegal: LegalContent = {
           },
           {
             type: "paragraph",
-            text: "This notice is reviewed at launch and then at least annually, or on any material change; the version history is kept in the repository.",
+            text: "This notice is reviewed at least annually, or on any material change; the version history is kept in the repository.",
           },
         ],
       },
@@ -277,14 +281,14 @@ export const enLegal: LegalContent = {
     intro:
       "These terms govern the use of OpenSurveillanceDB, the open, community-maintained database of visible public surveillance infrastructure. They apply to the web application, the public API, the data exports and related services (\"the Service\").",
     versionNote:
-      "Version 0.4 — 5 August 2026. Updated for the community-driven model (ADR 0021): § 5 describes immediate publication and community actions instead of the human review queue; § 6 replaces appeals with private corrections and the legal-emergency power. Re-synchronised with the merged canonical TERMS_OF_USE v0.7 (docs/TERMS_OF_USE.md remains canonical): § 3.7 authentication disclosure restored (email verification for write access, passkeys, OIDC — ADR 0020).",
+      "Version 0.5 — 8 August 2026. Current-state alignment (template-ready): re-synchronised with the canonical TERMS_OF_USE v0.8 (docs/TERMS_OF_USE.md remains canonical). § 3.7 authentication disclosure (email verification for write access, passkeys, OIDC — ADR 0020, server-gated); § 5 immediate publication and community actions; § 6 private corrections and the legal-emergency power; image evidence removed (2026-08-08).",
     sections: [
       {
         heading: "1. Who we are",
         blocks: [
           {
             type: "paragraph",
-            text: "**Controller / operator:** Simone Rondina (syax89) / OpenSurveillanceDB — Italy (final legal-entity wording to be confirmed at launch).",
+            text: "**Controller / operator:** Simone Rondina (syax89) / OpenSurveillanceDB — Italy.",
           },
           {
             type: "paragraph",
@@ -537,7 +541,7 @@ export const enLegal: LegalContent = {
           },
           {
             type: "note",
-            text: "This choice must still be checked against jurisdictional rules, source terms, and the final data model before public beta.",
+            text: "Imported sources keep their own licence and attribution; the ODbL licence applies to the project's own compilation (see section 6).",
           },
         ],
       },

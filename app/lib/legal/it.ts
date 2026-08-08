@@ -6,7 +6,7 @@
  * `tsc`, esattamente come il controllo di parità i18n (ADR 0007 —
  * l'inglese è la lingua pilota, l'italiano deve rispecchiarla).
  *
- * Adattamento web delle bozze legali:
+ * Adattamento web dei documenti legali:
  *   - docs/TERMS_OF_USE.md          → terms
  *   - docs/legal/PRIVACY_NOTICE.md  → privacy
  *   - docs/OPEN_SOURCE.md           → licenses
@@ -24,7 +24,7 @@ export const itLegal: LegalContent = {
     intro:
       "Come OpenSurveillanceDB tratta i dati personali, cosa pubblichiamo, cosa non raccogliamo mai e come puoi esercitare i tuoi diritti ai sensi del GDPR.",
     versionNote:
-      "Versione 0.6 — 5 agosto 2026. Aggiornata per il modello community-driven (ADR 0021): le segnalazioni vengono pubblicate subito da account verificati; § 7 conservazione allineata al ciclo di revisione ritirato; § 10 (cookie) invariato. Risincronizzata con la PRIVACY_NOTICE canonica v0.11 mergiata (docs/legal/PRIVACY_NOTICE.md resta la versione canonica): tabella § 3 allineata alle disclosure canoniche (riga azioni della community aggiunta; finalità dell'audit di moderazione aggiornata a \"ricorsi storici chiusi con la migrazione\") e aggiunta la nota sulla cronologia pubblica degli eventi per record.",
+      "Versione 0.7 — 8 agosto 2026. Allineamento allo stato attuale (template-ready): risincronizzata con la PRIVACY_NOTICE canonica v0.13 (docs/legal/PRIVACY_NOTICE.md resta la versione canonica). Modello community-driven (ADR 0021): le segnalazioni vengono pubblicate subito da account verificati; § 7 conservazione applicata dallo sweep giornaliero; § 3.1 autenticazione multi-metodo (verifica email, passkey, OIDC server-gated — ADR 0020); rimozione dell'evidenza fotografica (2026-08-08).",
     sections: [
       {
         heading: "1. Chi siamo (titolare del trattamento)",
@@ -189,7 +189,11 @@ export const itLegal: LegalContent = {
           },
           {
             type: "paragraph",
-            text: "Le regole di cancellazione e scadenza sono applicate automaticamente dallo sweep giornaliero di conservazione (vedi il calendario di conservazione nell'informativa privacy); le richieste di correzione e le voci di audit: 2 anni. Log operativi: fino a 12 mesi (aggregato). Backup: ruotati dal fornitore (fino a 30 giorni di point-in-time recovery).",
+            text: "Le regole dettagliate restano nel calendario di conservazione del repository (docs/legal/RETENTION_SCHEDULE.md), tra cui: dati della community (R14) — le azioni della community seguono l'account (attivo → cancellazione; le azioni su altri record vengono eliminate con il contributore, ADR 0021 § 13, e la cronologia pubblica del ciclo di vita conserva solo aggregati); dati dei metodi di autenticazione (R15, ADR 0020) — token di verifica email 24 ore, token di reset 3 ore (monouso, cancellati all'uso); passkey e codici di recupero finché l'account è attivo, cancellati definitivamente alla cancellazione dell'account — nulla sopravvive per collegare l'account a un provider o a un dispositivo; contatori di login falliti (R16), log del tetto di registrazione per IP (R17) e log email transazionali (R18) ripuliti dal cron di conservazione; record demo (R12) eliminati dal cron di conservazione fuori dall'ambiente di sviluppo.",
+          },
+          {
+            type: "paragraph",
+            text: "Le regole di cancellazione e scadenza sono applicate automaticamente dallo sweep giornaliero di conservazione (pianificato in `worker/index.ts`, ogni giorno alle 03:00 UTC — RETENTION_SCHEDULE.md § 3): il cron elimina le righe scadute (R12/R16/R17/R18), archivia le voci di audit al traguardo dei 2 anni (R4/R5/R9) e non cambia mai lo stato del ciclo di vita dei record (modello community, ADR 0021 § 2.2).",
           },
         ],
       },
@@ -234,7 +238,7 @@ export const itLegal: LegalContent = {
           },
           {
             type: "paragraph",
-            text: "Questa informativa è rivista al lancio e successivamente almeno ogni anno, o in occasione di modifiche sostanziali; la cronologia delle versioni è conservata nel repository.",
+            text: "Questa informativa è rivista almeno ogni anno, o in occasione di modifiche sostanziali; la cronologia delle versioni è conservata nel repository.",
           },
         ],
       },
@@ -280,14 +284,14 @@ export const itLegal: LegalContent = {
     intro:
       "Questi termini disciplinano l'uso di OpenSurveillanceDB, il database aperto e gestito dalla comunità delle infrastrutture di sorveglianza pubbliche e visibili. Si applicano all'applicazione web, all'API pubblica, alle esportazioni dei dati e ai servizi correlati (\"il Servizio\").",
     versionNote:
-      "Versione 0.4 — 5 agosto 2026. Aggiornati per il modello community-driven (ADR 0021): il § 5 descrive la pubblicazione immediata e le azioni della community al posto della coda di revisione umana; il § 6 sostituisce i ricorsi con le correzioni private e il potere di emergenza legale. Risincronizzati con la TERMS_OF_USE canonica v0.7 mergiata (docs/TERMS_OF_USE.md resta la versione canonica): ripristinata la disclosure di autenticazione § 3.7 (verifica email per l'accesso in scrittura, passkey, OIDC — ADR 0020).",
+      "Versione 0.5 — 8 agosto 2026. Allineamento allo stato attuale (template-ready): risincronizzati con la TERMS_OF_USE canonica v0.8 (docs/TERMS_OF_USE.md resta la versione canonica). § 3.7 disclosure di autenticazione (verifica email per l'accesso in scrittura, passkey, OIDC — ADR 0020, server-gated); § 5 pubblicazione immediata e azioni della community; § 6 correzioni private e potere di emergenza legale; rimozione dell'evidenza fotografica (2026-08-08).",
     sections: [
       {
         heading: "1. Chi siamo",
         blocks: [
           {
             type: "paragraph",
-            text: "**Titolare / gestore:** Simone Rondina (syax89) / OpenSurveillanceDB — Italia (la formulazione definitiva dell'entità giuridica sarà confermata al lancio).",
+            text: "**Titolare / gestore:** Simone Rondina (syax89) / OpenSurveillanceDB — Italia.",
           },
           {
             type: "paragraph",
@@ -540,7 +544,7 @@ export const itLegal: LegalContent = {
           },
           {
             type: "note",
-            text: "Questa scelta deve ancora essere verificata rispetto alle regole giurisdizionali, ai termini delle fonti e al modello dati definitivo prima della beta pubblica.",
+            text: "Le fonti importate mantengono la propria licenza e attribuzione; la licenza ODbL si applica alla compilazione del progetto (vedi sezione 6).",
           },
         ],
       },
