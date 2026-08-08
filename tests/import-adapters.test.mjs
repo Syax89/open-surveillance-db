@@ -728,6 +728,7 @@ test("licence-gate: wave-4 descriptors (NLOD, OGL 2.0, CC BY 4.0, ODbL) are impo
   assert.equal(isLicenceImportable("OGL-BC"), true);
   assert.equal(isLicenceImportable("CC BY 3.0 AU"), true);
   assert.equal(isLicenceImportable("PDDL"), true);
+  assert.equal(isLicenceImportable("CC BY 3.0"), true); // Denver Open Data Catalog
   assert.equal(isLicenceImportable("CC BY-SA 4.0"), false); // share-alike: escluso
   assert.equal(isLicenceImportable("CC BY-SA 2.0"), false);
 });
