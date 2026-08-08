@@ -103,7 +103,6 @@ export const en = {
   typeLabels: {
     camera: "Camera report",
     correction: "Correction",
-    photo: "Photo",
   },
   // Type filter chips (same look as the status chips; local state, never
   // in the URL — private page).
@@ -111,7 +110,6 @@ export const en = {
     all: "All types",
     camera: "Camera reports",
     correction: "Corrections",
-    photo: "Photos",
   },
   typeFilterLabel: "Filter by type",
   // Account summary strip: global counts (independent of the active
@@ -119,7 +117,6 @@ export const en = {
   stats: {
     camera: "Camera reports",
     correction: "Corrections",
-    photo: "Photos",
     inModeration: "In moderation",
   },
   statsGroupLabel: "Summary of your contributions",
@@ -316,7 +313,6 @@ export const it: Translation<typeof en> = {
   typeLabels: {
     camera: "Segnalazione",
     correction: "Correzione",
-    photo: "Foto",
   },
   // Chip filtro per tipo (stesso look dei chip di stato; stato locale, mai
   // in URL — pagina privata).
@@ -324,7 +320,6 @@ export const it: Translation<typeof en> = {
     all: "Tutti i tipi",
     camera: "Segnalazioni",
     correction: "Correzioni",
-    photo: "Foto",
   },
   typeFilterLabel: "Filtra per tipo",
   // Riga riepilogo account: conteggi globali (indipendenti dai filtri
@@ -332,7 +327,6 @@ export const it: Translation<typeof en> = {
   stats: {
     camera: "Segnalazioni",
     correction: "Correzioni",
-    photo: "Foto",
     inModeration: "In moderazione",
   },
   statsGroupLabel: "Riepilogo dei tuoi contributi",

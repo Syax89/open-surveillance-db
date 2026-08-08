@@ -180,10 +180,15 @@ High-risk records, sensitive facilities, disputes, and reversals require a
 second reviewer before publication or reinstatement. Emergency hiding does not
 require two reviewers, but it must be reviewed retrospectively.
 
-## Photos, redaction, and retention
+## Photos, redaction, and retention (removed)
 
-Photo upload remains **off** until the following pipeline is implemented and
-tested. The alpha may accept text-only reports first.
+Photo upload was **removed entirely on 2026-08-08** (CEO decision — "troppo
+rischioso e troppo esoso di spazio"): the intake pipeline, the quarantine /
+redaction / EXIF-stripping controls, the R2 object store and the moderation
+gate no longer exist. Records are **text metadata only**; existing R2
+objects from the retired feature are **retained without deletion**. The
+checklist below is retained as the historical pre-removal design (marked
+superseded).
 
 ### Required media controls before enabling uploads
 
@@ -308,18 +313,20 @@ owner and verifiable evidence:
 - [ ] Real reports are private by default; the public API, map, exports, search,
   caches, and logs cannot expose pending material.
 - [ ] Record, submission, evidence, decision, and correction objects are
-  separated with access controls and audit logging.
+  separated with access controls and audit logging. *(superseded — no
+  evidence/media objects exist after the photo removal)*
 - [ ] Provenance classes, confidence tiers, safe location precision, and
   staleness clocks are implemented and visible for public records.
 - [ ] At least two trained reviewers plus a privacy/safety escalation owner are
-  available for the published alpha hours.
+  available for the published alpha hours. *(superseded — no media review
+  surface after the photo removal)*
 - [ ] The moderation queue supports reason codes, recusal, second review for
   sensitive cases, and emergency hide/removal.
 - [ ] A public correction/removal/appeal channel is live and can meet the
   proposed urgent-response target.
-- [ ] Photo upload is disabled, or the complete quarantine, redaction, EXIF,
-  retention, and access-control workflow has passed a test using non-personal
-  test images.
+- [x] **Photo upload is removed (2026-08-08, CEO)** — the quarantine,
+  redaction, EXIF, retention, and access-control workflow was never enabled
+  in production; the feature was removed rather than gated.
 - [ ] Rate limits, abuse controls, MFA for privileged roles, backups, and an
   incident runbook have been tested.
 - [ ] Public privacy notice, retention schedule, moderation policy, contact

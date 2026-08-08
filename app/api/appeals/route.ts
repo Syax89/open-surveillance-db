@@ -108,7 +108,7 @@ export async function POST(request: Request) {
   // Session auth (ADR 0013): the contributor must hold a live session. The
   // cookie is HttpOnly + SameSite=Strict, and the state-changing request
   // must also pass the same-origin + double-submit CSRF checks, matching
-  // every other authenticated write route (cameras, corrections, photos).
+  // every other authenticated write route (cameras, corrections).
   // QA F1 (t_894e0cc3): session resolution must NEVER escape the handler.
   // A malformed cookie (parseCookies already degrades it to absent, see
   // csrf.ts) or any transient resolution error makes the caller anonymous:

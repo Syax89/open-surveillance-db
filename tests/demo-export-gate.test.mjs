@@ -16,7 +16,6 @@
 //   - JSON list API-> listPublicCamerasPage      (GET /api/cameras)
 // The two secondary public surfaces that duplicate the camera predicate
 // inline are gated the same way (same helper, same clause):
-//   - photo bytes  -> getPublicPhoto             (GET /api/photos/[id])
 //   - confirmation -> setConfirmation            (PUT /api/cameras/[id]/confirmation)
 // Tests run the REAL db layer (real SQL against in-memory D1 delivered by
 // the real Drizzle migrations), exactly like the deployed Workers runtime.
@@ -121,30 +120,6 @@ test("unset ENVIRONMENT excludes demo records from the by-id lookup and the JSON
 // Secondary public surfaces duplicating the camera predicate inline
 // ---------------------------------------------------------------------------
 
-test("unset ENVIRONMENT fails closed for photo bytes of a demo camera (GET /api/photos/[id])", async () => {
-  const { activeId, demoId } = await seedActiveAndDemo();
-  const photos = runtime.photos;
-
-  // Approved, redaction-confirmed photos on both cameras.
-  await db
-    .prepare(
-      "INSERT INTO photos (camera_id, contributor_id, submitter_key, storage_key, mime_type, width, height, size_bytes, status, exif_stripped, redaction_confirmed, created_at, updated_at) VALUES (?, NULL, 'seed', 'photos/verified.jpg', 'image/jpeg', 1, 1, 1, 'approved', 1, 1, '2026-08-01T00:00:00.000Z', '2026-08-01T00:00:00.000Z')",
-    )
-    .bind(activeId)
-    .run();
-  await db
-    .prepare(
-      "INSERT INTO photos (camera_id, contributor_id, submitter_key, storage_key, mime_type, width, height, size_bytes, status, exif_stripped, redaction_confirmed, created_at, updated_at) VALUES (?, NULL, 'seed', 'photos/demo.jpg', 'image/jpeg', 1, 1, 1, 'approved', 1, 1, '2026-08-01T00:00:00.000Z', '2026-08-01T00:00:00.000Z')",
-    )
-    .bind(demoId)
-    .run();
-
-  const activePhoto = await photos.getPublicPhoto(1);
-  assert.ok(activePhoto, "photos of active cameras stay public");
-  assert.equal(activePhoto.storageKey, "photos/verified.jpg");
-  assert.equal(await photos.getPublicPhoto(2), null, "a demo camera's photo must not be served in production");
-});
-
 test("unset ENVIRONMENT fails closed for the confirmation toggle on a demo record", async () => {
   const { demoId } = await seedActiveAndDemo();
 
@@ -159,21 +134,10 @@ test("unset ENVIRONMENT fails closed for the confirmation toggle on a demo recor
   assert.equal(result.kind, "camera_not_public", "no confirmation can be written on demo data in production");
 });
 
-test("ENVIRONMENT=development keeps photo bytes and confirmations on demo data public", async () => {
+test("ENVIRONMENT=development keeps demo confirmations public", async () => {
   runtime.env.ENVIRONMENT = "development";
   try {
-    const { activeId, demoId } = await seedActiveAndDemo();
-    const photos = runtime.photos;
-
-    await db
-      .prepare(
-        "INSERT INTO photos (camera_id, contributor_id, submitter_key, storage_key, mime_type, width, height, size_bytes, status, exif_stripped, redaction_confirmed, created_at, updated_at) VALUES (?, NULL, 'seed', 'photos/demo.jpg', 'image/jpeg', 1, 1, 1, 'approved', 1, 1, '2026-08-01T00:00:00.000Z', '2026-08-01T00:00:00.000Z')",
-      )
-      .bind(demoId)
-      .run();
-
-    const demoPhoto = await photos.getPublicPhoto(1);
-    assert.ok(demoPhoto, "the prototype demo photo stays visible in development");
+    const { demoId } = await seedActiveAndDemo();
 
     const confirm = await runtime.confirmations.setConfirmation({
       cameraId: demoId,
@@ -184,7 +148,6 @@ test("ENVIRONMENT=development keeps photo bytes and confirmations on demo data p
     // is decided by the later anti-gaming layers (level gate), never
     // camera_not_public — the gate is open for the prototype.
     assert.notEqual(confirm.kind, "camera_not_public", "demo confirmations must not be blocked in development");
-    void activeId;
   } finally {
     delete runtime.env.ENVIRONMENT;
   }
@@ -243,20 +206,9 @@ test("the demo gate is wired into publicCameraPredicate and reads ENVIRONMENT=de
   assert.match(csvExport, /listPublicCameras\(/, "the CSV export must read through the gated full list");
   assert.match(geojsonExport, /listPublicCameras\(/, "the GeoJSON export must read through the gated full list");
 
-  // The two secondary public surfaces duplicate the camera predicate inline,
-  // so they must reuse the SAME helper and gate clause (never a stale copy).
-  const photosSource = await readSource("db/photos.ts");
+  // The secondary public surface duplicates the camera predicate inline,
+  // so it must reuse the SAME helper and gate clause (never a stale copy).
   const confirmationsSource = await readSource("db/confirmations.ts");
-  assert.match(
-    photosSource,
-    /import\s*\{[^}]*demoRecordsPublic[^}]*\}\s*from\s*["']\.\/cameras["']/,
-    "db/photos.ts must reuse the shared demo gate helper",
-  );
-  assert.match(
-    photosSource,
-    /demoRecordsPublic\(\)\s*\?\s*["']\s*["']\s*:\s*["']\s*AND\s+c\.status\s+!=\s*['"]demo['"]\s*["']/,
-    "the photo predicate must append the demo gate clause (qualified c.status) outside development",
-  );
   assert.match(
     confirmationsSource,
     /import\s*\{[^}]*demoRecordsPublic[^}]*\}\s*from\s*["']\.\/cameras["']/,

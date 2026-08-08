@@ -6,7 +6,8 @@
 //      docs/legal/RETENTION_SCHEDULE.md) is machine-checkable so the
 //      documented values cannot drift unnoticed (community model: no
 //      time-based record retention; `active`/`hidden`/`removed` states;
-//      photo states 90/30 days; 30d session TTL).
+//      30d session TTL). Photo evidence retention (former R6/R13) was
+//      removed with the photo-upload feature (migration 0043).
 //   2. IMPLEMENTED RUNTIME CONTRACT — ADR 0021 § 2.2: no state transition on
 //      a timer. The pre-pivot 12-month review clock and the freshness sweep
 //      (runFreshnessSweep) are REMOVED from the code; the retention cron
@@ -189,7 +190,7 @@ test("the worker exposes a scheduled handler wired to the retention sweep", asyn
   );
 });
 
-test("wrangler.jsonc declares the daily cron trigger and the PHOTOS bucket binding", async () => {
+test("wrangler.jsonc declares the daily cron trigger and NO PHOTOS bucket binding (photo upload removed)", async () => {
   const wrangler = await readSource("wrangler.jsonc");
 
   assert.match(
@@ -197,15 +198,15 @@ test("wrangler.jsonc declares the daily cron trigger and the PHOTOS bucket bindi
     /"crons":\s*\["0 3 \* \* \*"\]/,
     "the retention sweep must run daily at 03:00 UTC",
   );
-  assert.match(
+  assert.doesNotMatch(
     wrangler,
     /"r2_buckets"/,
-    "the worker must bind the PHOTOS R2 bucket so evidence objects are purged",
+    "the R2 bucket binding must be gone: photo evidence upload was removed (CEO 2026-08-08)",
   );
-  assert.match(
+  assert.doesNotMatch(
     wrangler,
     /"binding":\s*"PHOTOS"/,
-    "the PHOTOS binding name must match worker/index.ts Env.PHOTOS",
+    "the PHOTOS binding must not exist without the photo feature",
   );
 });
 

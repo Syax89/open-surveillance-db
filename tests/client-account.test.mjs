@@ -82,13 +82,12 @@ const reworkContributionsFixture = {
   contributions: [
     { type: "camera", id: 41, title: "Published camera row", issueType: null, cameraId: null, status: "active", createdAt: "2026-02-01T08:00:00.000Z" },
     { type: "correction", id: 7, title: null, issueType: "inaccurate", cameraId: 41, status: "reviewed", createdAt: "2026-01-20T09:00:00.000Z" },
-    { type: "photo", id: 3, title: null, issueType: null, cameraId: 41, status: "approved", createdAt: "2026-01-10T09:00:00.000Z" },
   ],
-  pagination: { page: 1, pageSize: 25, total: 3, totalPages: 1, hasMore: false },
+  pagination: { page: 1, pageSize: 25, total: 2, totalPages: 1, hasMore: false },
   summary: {
-    total: 3,
-    byType: { camera: 1, correction: 1, photo: 1 },
-    byStatus: { active: 1, reviewed: 1, approved: 1 },
+    total: 2,
+    byType: { camera: 1, correction: 1 },
+    byStatus: { active: 1, reviewed: 1 },
   },
   level: { level: 1, verifiedCount: 1, threshold: 1, nextThreshold: 5 },
 };
@@ -258,10 +257,9 @@ test("account: summary strip + Published chip (rework 2026-08-08)", async () => 
 
   // The summary strip renders the global per-kind counts (independent of
   // filters) with visible labels next to each number.
-  assert.equal(screen.getAllByText("1", { selector: ".account-stat-value" }).length, 3);
+  assert.equal(screen.getAllByText("1", { selector: ".account-stat-value" }).length, 2);
   assert.ok(screen.getAllByText("Camera reports").length >= 2); // stat card + type chip
   assert.ok(screen.getAllByText("Corrections").length >= 2);
-  assert.ok(screen.getAllByText("Photos").length >= 2);
   // In-moderation card: 0 pending in this fixture, still rendered.
   assert.ok(screen.getAllByText("In moderation").length >= 2); // stat card + status chip
 
@@ -288,16 +286,12 @@ test("account: kind rows show icon tile, issue label, date and related-record li
   // Correction row: issue label (inaccurate) + link to the related camera.
   const correctionLink = screen.getByRole("link", { name: "Correction: Inaccurate information" });
   assert.equal(correctionLink.getAttribute("href"), "/records/41");
-  // Photo row: kind label, no issue, still linked to the camera.
-  const photoLink = screen.getByRole("link", { name: "Photo" });
-  assert.equal(photoLink.getAttribute("href"), "/records/41");
-  // Terminal statuses resolve to human labels (reviewed/approved) — the
-  // literal "Status" fallback must never appear.
+  // Terminal statuses resolve to human labels (reviewed) — the literal
+  // "Status" fallback must never appear.
   assert.ok(screen.getByText("Resolved"));
-  assert.ok(screen.getByText("Approved"));
   assert.equal(screen.queryByText("Status"), null);
   // Dates render for every row.
-  assert.ok(screen.getAllByRole("link").length >= 3);
+  assert.ok(screen.getAllByRole("link").length >= 2);
 });
 
 test("account: type filter refetches with ?type= (rework 2026-08-08)", async () => {

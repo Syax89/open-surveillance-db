@@ -89,16 +89,6 @@ const correctionContribution = {
   createdAt: "2026-07-30T09:00:00.000Z",
 };
 
-const photoContribution = {
-  type: "photo",
-  id: 5,
-  title: null,
-  issueType: null,
-  cameraId: 12,
-  status: "approved",
-  createdAt: "2026-07-29T09:00:00.000Z",
-};
-
 // ---------------------------------------------------------------------------
 // P1-P8 — route contract (mocked db layer)
 // ---------------------------------------------------------------------------
@@ -158,13 +148,13 @@ test("P6: contributions returns the pagination object, no-store and the caller's
   stub("findSessionByToken", async () => ({ ...session, contributor }));
   stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
   stub("listContributorContributions", async () => ({
-    contributions: [cameraContribution, correctionContribution, photoContribution],
+    contributions: [cameraContribution, correctionContribution],
     total: 7,
   }));
   stub("countVerifiedCameras", async () => 7);
   stub("summarizeContributorContributions", async () => ({
     total: 7,
-    byType: { camera: 3, correction: 2, photo: 2 },
+    byType: { camera: 3, correction: 2 },
     byStatus: { pending: 1, active: 5, reviewed: 1 },
   }));
   const { GET } = await contributionsRoute();
@@ -172,7 +162,7 @@ test("P6: contributions returns the pagination object, no-store and the caller's
   assert.equal(response.status, 200);
   assert.equal(response.headers.get("cache-control"), "no-store");
   const body = await responseBody(response);
-  assert.deepEqual(body.contributions, [cameraContribution, correctionContribution, photoContribution]);
+  assert.deepEqual(body.contributions, [cameraContribution, correctionContribution]);
   assert.deepEqual(body.pagination, { page: 1, pageSize: 25, total: 7, totalPages: 1, hasMore: false });
   // 7 verified -> L2 (threshold 5), next threshold 20.
   assert.deepEqual(body.level, { level: 2, verifiedCount: 7, threshold: 5, nextThreshold: 20 });
@@ -180,7 +170,7 @@ test("P6: contributions returns the pagination object, no-store and the caller's
   // active filters, present in the same response.
   assert.deepEqual(body.summary, {
     total: 7,
-    byType: { camera: 3, correction: 2, photo: 2 },
+    byType: { camera: 3, correction: 2 },
     byStatus: { pending: 1, active: 5, reviewed: 1 },
   });
   // The db layer was called with the caller's own id, not a foreign one.
@@ -194,7 +184,7 @@ test("P6b: pagination math across pages (hasMore, totalPages, offset)", async ()
   stub("countVerifiedCameras", async () => 7);
   stub("summarizeContributorContributions", async () => ({
     total: 7,
-    byType: { camera: 7, correction: 0, photo: 0 },
+    byType: { camera: 7, correction: 0 },
     byStatus: { active: 7 },
   }));
   const { GET } = await contributionsRoute();
@@ -215,7 +205,7 @@ test("P7: type/status filters are forwarded to the db layer after whitelist vali
   stub("countVerifiedCameras", async () => 0);
   stub("summarizeContributorContributions", async () => ({
     total: 0,
-    byType: { camera: 0, correction: 0, photo: 0 },
+    byType: { camera: 0, correction: 0 },
     byStatus: {},
   }));
   const { GET } = await contributionsRoute();
@@ -235,7 +225,7 @@ test("P7b: absent filters mean all types and all statuses", async () => {
   stub("countVerifiedCameras", async () => 0);
   stub("summarizeContributorContributions", async () => ({
     total: 0,
-    byType: { camera: 0, correction: 0, photo: 0 },
+    byType: { camera: 0, correction: 0 },
     byStatus: {},
   }));
   const { GET } = await contributionsRoute();
@@ -264,7 +254,7 @@ test("P8b: pageSize is capped at 100 by the route (F0 contract)", async () => {
   stub("countVerifiedCameras", async () => 0);
   stub("summarizeContributorContributions", async () => ({
     total: 0,
-    byType: { camera: 0, correction: 0, photo: 0 },
+    byType: { camera: 0, correction: 0 },
     byStatus: {},
   }));
   const { GET } = await contributionsRoute();
@@ -378,7 +368,7 @@ async function realDbFixture() {
 let contributorSeq = 0;
 
 // Raw INSERT of a contributor (email is unique per fixture) so the
-// cameras/correction_requests/photos contributor_id foreign keys resolve.
+// cameras/correction_requests contributor_id foreign keys resolve.
 async function insertContributor(db, overrides = {}) {
   contributorSeq += 1;
   const row = {
@@ -471,47 +461,6 @@ async function insertCorrection(db, overrides = {}) {
   return result.id;
 }
 
-async function insertPhoto(db, overrides = {}) {
-  const row = {
-    cameraId: null,
-    contributorId: null,
-    submitterKey: "contributor:7",
-    storageKey: "opaque-key",
-    mimeType: "image/jpeg",
-    width: 800,
-    height: 600,
-    sizeBytes: 1024,
-    status: "pending",
-    exifStripped: 1,
-    redactionConfirmed: 0,
-    createdAt: "2026-08-01T00:00:00.000Z",
-    updatedAt: "2026-08-01T00:00:00.000Z",
-    ...overrides,
-  };
-  const result = await db
-    .prepare(
-      `INSERT INTO photos (camera_id, contributor_id, submitter_key, storage_key, mime_type, width, height, size_bytes, status, exif_stripped, redaction_confirmed, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
-    )
-    .bind(
-      row.cameraId,
-      row.contributorId,
-      row.submitterKey,
-      row.storageKey,
-      row.mimeType,
-      row.width,
-      row.height,
-      row.sizeBytes,
-      row.status,
-      row.exifStripped,
-      row.redactionConfirmed,
-      row.createdAt,
-      row.updatedAt,
-    )
-    .first();
-  return result.id;
-}
-
 test("R1: countVerifiedCameras counts ONLY status='active' rows (real SQL)", async () => {
   const { db, auth } = await realDbFixture();
   const contributorId = await insertContributor(db);
@@ -527,7 +476,7 @@ test("R1: countVerifiedCameras counts ONLY status='active' rows (real SQL)", asy
   assert.equal(await auth.countVerifiedCameras(contributorId), 2, "only the two active rows of this contributor count");
 });
 
-test("R2: listContributorContributions returns the UNION of all three kinds, newest first", async () => {
+test("R2: listContributorContributions returns the UNION of all contribution kinds, newest first", async () => {
   const { db, auth } = await realDbFixture();
   const contributorId = await insertContributor(db);
   const camId = await insertCamera(db, {
@@ -542,22 +491,16 @@ test("R2: listContributorContributions returns the UNION of all three kinds, new
     createdAt: "2026-08-01T11:00:00.000Z",
     cameraId: camId,
   });
-  await insertPhoto(db, {
-    contributorId,
-    status: "approved",
-    createdAt: "2026-08-01T12:00:00.000Z",
-    cameraId: camId,
-  });
   const page = await auth.listContributorContributions(contributorId, { limit: 10, offset: 0 });
-  assert.equal(page.total, 3);
+  assert.equal(page.total, 2);
   assert.deepEqual(
     page.contributions.map((row) => row.type),
-    ["photo", "correction", "camera"],
+    ["correction", "camera"],
     "newest created_at first across kinds",
   );
-  assert.equal(page.contributions[0].status, "approved");
-  assert.equal(page.contributions[1].issueType, "inaccurate");
-  assert.equal(page.contributions[2].title, "Oldest active");
+  assert.equal(page.contributions[0].status, "pending");
+  assert.equal(page.contributions[0].issueType, "inaccurate");
+  assert.equal(page.contributions[1].title, "Oldest active");
 });
 
 test("R3: listContributorContributions filters by type and status, and paginates", async () => {
@@ -633,12 +576,11 @@ test("R7: summarizeContributorContributions returns global per-type/per-status c
   const camId = await insertCamera(db, { contributorId, status: "active", createdAt: "2026-08-01T10:00:00.000Z" });
   await insertCamera(db, { contributorId, status: "pending", createdAt: "2026-08-01T09:00:00.000Z" });
   await insertCorrection(db, { contributorId, status: "reviewed", createdAt: "2026-08-01T08:00:00.000Z", cameraId: camId });
-  await insertPhoto(db, { contributorId, status: "approved", createdAt: "2026-08-01T07:00:00.000Z", cameraId: camId });
   // Another contributor's rows must never leak into the summary.
   await insertCamera(db, { contributorId: otherId, status: "active", createdAt: "2026-08-01T06:00:00.000Z" });
 
   const summary = await auth.summarizeContributorContributions(contributorId);
-  assert.equal(summary.total, 4);
-  assert.deepEqual(summary.byType, { camera: 2, correction: 1, photo: 1 });
-  assert.deepEqual(summary.byStatus, { active: 1, pending: 1, reviewed: 1, approved: 1 });
+  assert.equal(summary.total, 3);
+  assert.deepEqual(summary.byType, { camera: 2, correction: 1 });
+  assert.deepEqual(summary.byStatus, { active: 1, pending: 1, reviewed: 1 });
 });

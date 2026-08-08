@@ -84,10 +84,6 @@ An open, non-commercial civic database for documenting **visible public surveill
   with `409` unless the contributor explicitly sends `duplicateConfirmed:
   true` (ADR 0019).
 - Local record lifecycle: verified → needs review → reverified or removed, with audit history.
-- Image upload for camera records with secure storage: size/MIME/dimension
-  caps, magic-byte verification, mandatory EXIF/XMP/IPTC stripping (fail-closed),
-  R2 storage with metadata kept only in D1, and a moderation/redaction gate
-  before a photo can be served for a public camera (PR #64).
 - Nearby-record warning and safe type/order filters shared by map and directory.
 - Bilingual interface (English and Italian), with a device-local language preference.
 - In-app bilingual project guide at `/guide`.

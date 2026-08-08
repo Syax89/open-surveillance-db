@@ -11,7 +11,6 @@
 //   - moderateCamera   : camera UPDATE + decision event + queue close
 //   - fileAppeal       : appeal INSERT + appeal-filed event
 //   - decideAppeal     : appeal UPDATE + decision event
-//   - moderatePhoto    : photo UPDATE + photo event
 //   - linkExternalIdentity : identity link + merge-request burn
 //   - applyPasswordReset   : hash rotate + session revoke + email verify
 //
@@ -32,7 +31,6 @@ let moderation;
 let appeals;
 let auth;
 let oidc;
-let photos;
 
 const CONTRIBUTOR_USER_ID = 6; // Demo Contributor (migration 0010 seed)
 const INTAKE = { id: 1, displayName: "Demo Intake Reviewer", role: "intake_reviewer", active: 1 };
@@ -42,7 +40,7 @@ const SENIOR = { id: 3, displayName: "Demo Senior Moderator", role: "senior_mode
 const NOW = "2026-08-02T08:00:00.000Z";
 
 beforeEach(async () => {
-  ({ env, cameras, moderation, appeals, auth, oidc, photos } = await loadDbRuntime());
+  ({ env, cameras, moderation, appeals, auth, oidc } = await loadDbRuntime());
   env.DB = new D1();
   await applyDrizzleMigrations(env.DB);
   // Migration 0017 removes the demo seed; this suite pins the workflow on the
@@ -179,26 +177,6 @@ test("decideAppeal (dismiss) rolls back the decision when the event INSERT fails
     .bind(filed.appeal.id)
     .first();
   assert.equal(row.status, "pending", "the appeal must stay pending when the decision batch rolls back");
-});
-
-test("moderatePhoto rolls back the photo UPDATE when the event INSERT fails", async () => {
-  await env.DB
-    .prepare(
-      `INSERT INTO photos (id, camera_id, contributor_id, storage_key, mime_type, width, height, size_bytes, status, exif_stripped, redaction_confirmed, created_at, updated_at)
-       VALUES (11, NULL, NULL, 'photos/fixture.jpg', 'image/jpeg', 64, 48, 128, 'pending', 1, 0, '2026-08-01T09:00:00.000Z', '2026-08-01T09:00:00.000Z')`,
-    )
-    .run();
-
-  env.DB = makeFailOnNthBatchStatement(env.DB, "moderation_events", 1);
-  await assert.rejects(
-    photos.moderatePhoto(11, "approve", true, "verified-public-infrastructure", "Subject visible", 2),
-    /simulated D1 batch failure/,
-  );
-
-  const photo = await env.DB.prepare("SELECT status FROM photos WHERE id = 11").first();
-  assert.equal(photo.status, "pending", "the photo UPDATE must roll back with the failed event");
-  const events = await env.DB.prepare("SELECT COUNT(*) AS n FROM moderation_events WHERE entity = 'photo'").first();
-  assert.equal(events.n, 0, "no photo event may survive a rolled-back decision");
 });
 
 test("linkExternalIdentity rolls back the identity link when the merge-request burn fails", async () => {

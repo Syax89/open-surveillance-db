@@ -8,7 +8,7 @@
 import assert from "node:assert/strict";
 import { after, afterEach, beforeEach, test } from "node:test";
 import { apiRequest, cleanupRouteTree, loadLibModule, loadRoute, loadTreeModule } from "./helpers/api-harness.mjs";
-import { callArgs, resetMockState, stub } from "./helpers/mock-state.mjs";
+import { resetMockState } from "./helpers/mock-state.mjs";
 
 after(async () => cleanupRouteTree());
 
@@ -276,43 +276,13 @@ test("abuse-alert state is observable and resettable", async () => {
 // ---------------------------------------------------------------------------
 // Route-level 429 enforcement (Wave B follow-up: public binary routes)
 // ---------------------------------------------------------------------------
-// GET /api/photos/[id] and GET /api/tiles/* previously had no rate limit at
-// all; both are public routes whose cost is dominated by egress/upstream
-// bytes. These tests run the real handlers through the shared harness and
-// assert the sliding window produces a 429 with Retry-After past the cap.
+// GET /api/tiles/* previously had no rate limit at all; its cost is dominated
+// by egress/upstream bytes. These tests run the real handler through the
+// shared harness and assert the sliding window produces a 429 with
+// Retry-After past the cap.
 
 const envMock = async () => (await loadTreeModule("cloudflare-workers.mjs")).env;
 const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-
-test("GET /api/photos/[id] answers 429 past the read threshold and blocks before storage", async () => {
-  const env = await envMock();
-  env.READ_RATE_LIMIT_MAX = "2";
-  try {
-    stub("readPublicPhotoBytes", async () => ({ bytes: new Uint8Array([0xff, 0xd8, 0xff]), mimeType: "image/jpeg" }));
-    const { GET } = await loadRoute("app/api/photos/[id]/route.mjs");
-
-    const first = await GET(apiRequest("/api/photos/11"));
-    assert.equal(first.status, 200);
-    const second = await GET(apiRequest("/api/photos/11"));
-    assert.equal(second.status, 200);
-
-    const blocked = await GET(apiRequest("/api/photos/11"));
-    assert.equal(blocked.status, 429);
-    assert.ok(Number(blocked.headers.get("retry-after")) >= 1);
-    assert.equal(await blocked.json().then((body) => body.error), "Too many requests. Please try again shortly.");
-
-    // The blocked call must never reach the storage boundary.
-    assert.equal(callArgs("readPublicPhotoBytes").length, 2, "the third request is throttled before touching storage");
-
-    // A different caller is unaffected by the same bucket.
-    const other = await GET(
-      new Request("https://osdb.test/api/photos/11", { headers: { "cf-connecting-ip": "203.0.113.99" } }),
-    );
-    assert.equal(other.status, 200);
-  } finally {
-    delete env.READ_RATE_LIMIT_MAX;
-  }
-});
 
 test("GET /api/tiles/* answers 429 past the tiles threshold, independently of the read bucket", async () => {
   const env = await envMock();
@@ -336,12 +306,6 @@ test("GET /api/tiles/* answers 429 past the tiles threshold, independently of th
     assert.ok(Number(blocked.headers.get("retry-after")) >= 1);
     assert.equal(blocked.headers.get("cache-control"), "no-store");
     assert.equal(upstreamCalls, 2, "the throttled request never reaches the upstream");
-
-    // The tile bucket is independent: the same caller still has fresh read
-    // budget (photos route shares the read bucket, not the tiles one).
-    const { GET: photoGet } = await loadRoute("app/api/photos/[id]/route.mjs");
-    stub("readPublicPhotoBytes", async () => ({ bytes: png, mimeType: "image/png" }));
-    assert.equal((await photoGet(apiRequest("/api/photos/11"))).status, 200);
   } finally {
     delete env.TILES_RATE_LIMIT_MAX;
   }

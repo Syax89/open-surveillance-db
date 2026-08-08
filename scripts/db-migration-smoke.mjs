@@ -48,8 +48,6 @@ const expectedTables = [
   // Auth roles + appeals (0010): role identities and the appeal trail.
   "users",
   "moderation_appeals",
-  // Photo evidence (0011): metadata only, image bytes live in R2.
-  "photos",
   // Per-email login lockout (0016, ADR 0016): brute-force counter keyed by
   // the SHA-256 of the normalised email — never the address itself.
   "login_attempts",
@@ -123,10 +121,6 @@ const expectedIndexes = [
   "users_contributor_id_unique",
   "moderation_appeals_status_idx",
   "moderation_appeals_entity_idx",
-  "photos_status_idx",
-  "photos_camera_idx",
-  // Pending-photo quota (0013): only 'pending' rows are indexed.
-  "photos_pending_submitter_idx",
   // F0 backend prereq (0019): composite public-directory indexes serving the
   // kind filter, the status+recency navigation and the freshness windows.
   "cameras_status_kind_idx",
@@ -151,9 +145,8 @@ const expectedIndexes = [
   // Community trust levels (0023): index-only level COUNT.
   "cameras_contributor_status_idx",
   // Community profile contributions list (0025): "my contributions" branches
-  // for cameras and photos ORDER BY created_at DESC on contributor_id.
+  // for cameras ORDER BY created_at DESC on contributor_id.
   "cameras_contributor_created_idx",
-  "photos_contributor_created_idx",
   // Multi-method auth — Fase A (0027): token hash is globally unique and the
   // (contributor_id) / (expires_at) indexes serve the per-account lookups and
   // the expiry sweep; passkey credential_id is globally unique per relying

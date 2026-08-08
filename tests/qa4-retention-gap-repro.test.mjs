@@ -76,16 +76,13 @@ async function seedFixtures() {
     "INSERT INTO email_send_log (contributor_id, kind, sent_at) VALUES (?, 'verify', ?)",
   ).bind(contributor.id, daysBefore(0)).run(); // 0 giorni fa → fresca, deve sopravvivere
 
-  // Una demo camera (come da scripts/demo-cameras.sql) con una foto di
-  // supporto: l'evidence segue il record (R6) anche nella purge R12.
-  const demo = await runtime.env.DB.prepare(
+  // Una demo camera (come da scripts/demo-cameras.sql): la purge R12 la
+  // elimina con il suo record.
+  await runtime.env.DB.prepare(
     "INSERT INTO cameras (title, kind, latitude, longitude, status, source, updated, description, created_at) VALUES (?, 'Fixed dome', 41.9, 12.49, 'demo', 'Prototype seed', 'Demo data', 'QA repro demo', ?) RETURNING id",
   )
     .bind("QA repro demo record", daysBefore(200))
-    .first();
-  await runtime.env.DB.prepare(
-    "INSERT INTO photos (camera_id, contributor_id, storage_key, mime_type, width, height, size_bytes, status, exif_stripped, redaction_confirmed, created_at, updated_at) VALUES (?, NULL, 'qa-repro-demo.jpg', 'image/jpeg', 100, 100, 1000, 'pending', 1, 0, ?, ?)",
-  ).bind(demo.id, daysBefore(200), daysBefore(200)).run();
+    .run();
 
   // Una sessione scaduta (R7, controllo positivo).
   await runtime.env.DB.prepare(
@@ -108,10 +105,9 @@ test("QA#4: sweep produzione — email_send_log e demo records vengono purgati, 
   assert.equal(await count("email_send_log", "sent_at < ?", daysBefore(30)), 0, "nessuna riga oltre la TTL sopravvive");
   assert.equal(summary.emailSendLogPurged, 2, "il contatore del summary riflette la sweep");
 
-  // Finding B: la demo camera è eliminata CON la sua evidence (R6).
+  // Finding B: la demo camera è eliminata (R12).
   assert.equal(await count("cameras", "status = 'demo'"), 0, "la demo record è purgata in produzione");
   assert.equal(summary.demoRecordsPurged, 1, "il contatore R12 riflette la purge");
-  assert.equal(await count("photos", "storage_key = 'qa-repro-demo.jpg'"), 0, "l'evidence della demo è eliminata con il record");
 
   // Controllo positivo R7: la sessione scaduta sparisce.
   assert.equal(await count("sessions"), 0);
@@ -129,7 +125,6 @@ test("QA#4: ENVIRONMENT=development — le demo records SOPRAVVIVONO (guard R12,
   const summary = await runRetentionSweep(NOW, {});
 
   assert.equal(await count("cameras", "status = 'demo'"), 1, "il seed illustrativo resta in development");
-  assert.equal(await count("photos", "storage_key = 'qa-repro-demo.jpg'"), 1, "anche la sua evidence resta");
   assert.equal(summary.demoRecordsPurged, 0, "nessuna purge R12 in development");
 
   // Le altre sweep NON sono condizionate dall'ambiente: email e sessioni

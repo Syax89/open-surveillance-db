@@ -9,10 +9,6 @@
  *   R2  rejected reports              → hard delete after 30 days (decision date)
  *   R4  resolved correction requests  → archived in the audit log, then
  *                                       deleted after 2 years (RESOLUTION date)
- *   R6  photo evidence                → deleted with its record; orphan
- *                                       pending photos after 90 days; rejected
- *                                       photos after 30 days (R13: anchored on
- *                                       the photo reject event)
  *   R7  sessions                      → delete expired / revoked rows
  *   R12 demo records                  → hard-deleted on every sweep outside
  *                                       ENVIRONMENT=development (the demo
@@ -80,15 +76,12 @@
  *    (audit event action='legal-hold' with no later 'legal-hold-release' —
  *    RETENTION_SCHEDULE.md §2). The hold convention is documented at
  *    HOLD_EXCLUSION_SQL below.
- *  - Destructive D1 work is done in `d1.batch(...)` transactions so a record,
- *    its queue items and its evidence are removed atomically; R2 (PHOTOS
- *    bucket) objects are deleted AFTER the D1 batch succeeds, best effort, so
- *    a bucket failure never orphanes the D1 rows (the objects stay reachable
- *    through the rows and the next run retries them).
+ *  - Destructive D1 work is done in `d1.batch(...)` transactions so a record
+ *    and its queue items are removed atomically.
  *  - Every per-record loop is isolated: a single record/chunk that fails is
  *    counted in `summary.failures` and skipped, so one bad row can never
  *    abort the whole sweep and block it forever (re-failing every day).
- *  - `now` is injectable for deterministic tests; `r2` (the PHOTOS bucket) is
+ *  - `now` is injectable for deterministic tests;
  *    injectable so tests can assert object deletion without a binding.
  */
 
@@ -106,8 +99,6 @@ export const PENDING_RETENTION_DAYS = 90;
 export const REJECTED_RETENTION_DAYS = 30;
 /** R4: resolved correction/takedown requests are kept 2 years. */
 export const CORRECTION_RETENTION_DAYS = 730;
-/** R6: pending photo never linked to a record expires with the pending window. */
-export const ORPHAN_PHOTO_RETENTION_DAYS = PENDING_RETENTION_DAYS;
 /** R16: a failed-login counter row is dead after 30 days of inactivity. */
 export const LOGIN_ATTEMPT_RETENTION_DAYS = 30;
 /** QA F5: per-IP registration log rows are dead after 30 days (specular to R16). */
@@ -134,8 +125,8 @@ export const LOGIN_ATTEMPT_SWEEP_MAX_ROUNDS = 100;
 
 /**
  * Cloudflare D1 caps bound parameters at 100 per query. Any `WHERE ... IN (?)`
- * built from user-collected ids must be chunked to this size (see the R6
- * photo deletion below).
+ * built from user-collected ids must be chunked to this size (see the R16
+ * login-attempt deletion below).
  */
 export const D1_MAX_BOUND_PARAMS = 100;
 
@@ -143,7 +134,6 @@ export type RetentionPolicy = {
   pendingDays: number;
   rejectedDays: number;
   correctionDays: number;
-  orphanPhotoDays: number;
   /** R16: failed-login counters (login_attempts) expire after this many days of inactivity. */
   loginAttemptDays: number;
   /** QA F5: per-IP registration log rows (registrations_ip_log) expire after this many days. */
@@ -158,16 +148,10 @@ export const DEFAULT_RETENTION_POLICY: RetentionPolicy = {
   pendingDays: PENDING_RETENTION_DAYS,
   rejectedDays: REJECTED_RETENTION_DAYS,
   correctionDays: CORRECTION_RETENTION_DAYS,
-  orphanPhotoDays: ORPHAN_PHOTO_RETENTION_DAYS,
   loginAttemptDays: LOGIN_ATTEMPT_RETENTION_DAYS,
   registrationsIpDays: REGISTRATION_IP_RETENTION_DAYS,
   emailSendLogDays: EMAIL_SEND_LOG_RETENTION_DAYS,
   moderationEventArchiveDays: MODERATION_EVENT_ARCHIVE_DAYS,
-};
-
-/** Minimal R2 surface the sweep needs (the real PHOTOS bucket satisfies it). */
-export type RetentionR2 = {
-  delete(key: string): Promise<unknown>;
 };
 
 // ---------------------------------------------------------------------------
@@ -183,12 +167,6 @@ export type RetentionSummary = {
   rejectedPurged: number;
   /** R4: resolved correction requests older than 2 years. */
   correctionsPurged: number;
-  /** R6: evidence deleted alongside its record + orphan/rejected photos. */
-  photosDeleted: number;
-  /** R6: PHOTOS bucket objects deleted (best effort). */
-  r2ObjectsDeleted: number;
-  /** R6: PHOTOS bucket objects the sweep FAILED to delete (orphaned after D1 rows were removed). */
-  r2ObjectsFailed: number;
   /** R7: expired/revoked session rows removed. */
   sessionsPurged: number;
   /** R15: expired email-verification token rows removed (24h TTL, cron sweep). */
@@ -211,7 +189,7 @@ export type RetentionSummary = {
   moderationEventsArchived: number;
   /** R5: archived moderation rows purged from the live append-only table. */
   moderationEventsPurged: number;
-  /** Records/chunks whose D1 or R2 step threw; the sweep skipped them and continued. */
+  /** Rows/chunks whose D1 step threw; the sweep skipped them and continued. */
   failures: number;
 };
 
@@ -263,67 +241,18 @@ const HOLD_EXCLUSION_SQL = `
   )`;
 
 /**
- * Delete the R2 objects for a set of storage keys, best effort: a bucket
- * failure must not abort the rest of the sweep. Keys whose object could not
- * be removed are counted so ops can follow up (the D1 rows are gone, so the
- * orphaned objects are unreachable either way).
- */
-async function deleteR2Objects(
-  r2: RetentionR2 | undefined,
-  storageKeys: string[],
-): Promise<{ deleted: number; failed: number }> {
-  if (!r2 || storageKeys.length === 0) return { deleted: 0, failed: 0 };
-  let deleted = 0;
-  let failed = 0;
-  for (const key of storageKeys) {
-    try {
-      await r2.delete(key);
-      deleted += 1;
-    } catch (error) {
-      failed += 1;
-      console.error(`Retention: failed to delete R2 object ${key}`, error);
-    }
-  }
-  return { deleted, failed };
-}
-
-/**
- * Select the storage keys of every photo of a record. The DELETE of the D1
- * rows happens inside the caller's `d1.batch(...)` so a record, its queue
- * items and its evidence are removed atomically (a failure rolls back all
- * three); the R2 objects are deleted AFTER the batch succeeds, best effort.
- */
-async function selectPhotosForCamera(
-  d1: D1,
-  cameraId: number,
-): Promise<{ id: number; storageKey: string }[]> {
-  const photos = await d1
-    .prepare("SELECT id, storage_key AS storageKey FROM photos WHERE camera_id = ?")
-    .bind(cameraId)
-    .all<{ id: number; storageKey: string }>();
-  return photos.results;
-}
-
-/**
- * Hard-delete a camera record, its evidence and its open queue items, in one
- * atomic batch. Returns the number of photo rows and R2 objects removed.
+ * Hard-delete a camera record and its open queue items, in one atomic batch.
+ * Returns whether the record was removed (the caller counts it).
  */
 async function purgeCameraRecord(
   d1: D1,
-  r2: RetentionR2 | undefined,
   cameraId: number,
   nowIso: string,
-): Promise<{ photoRows: number; r2Deleted: number; r2Failed: number }> {
-  const photos = await selectPhotosForCamera(d1, cameraId);
+): Promise<void> {
   await d1.batch([
-    ...(photos.length > 0
-      ? [d1.prepare("DELETE FROM photos WHERE camera_id = ?").bind(cameraId)]
-      : []),
     d1.prepare("UPDATE moderation_queue SET state = 'closed', updated_at = ? WHERE entity = 'camera' AND entity_id = ? AND state != 'closed'").bind(nowIso, cameraId),
     d1.prepare("DELETE FROM cameras WHERE id = ?").bind(cameraId),
   ]);
-  const { deleted, failed } = await deleteR2Objects(r2, photos.map((photo) => photo.storageKey));
-  return { photoRows: photos.length, r2Deleted: deleted, r2Failed: failed };
 }
 
 // ---------------------------------------------------------------------------
@@ -332,16 +261,14 @@ async function purgeCameraRecord(
 
 /**
  * Run the full retention sweep. `now` defaults to the current instant and is
- * injectable for deterministic tests; `r2` defaults to nothing (no object
- * deletion) so the pure-D1 contract is testable without a bucket binding.
+ * injectable for deterministic tests.
  */
 export async function runRetentionSweep(
   now: string = new Date().toISOString(),
-  options: { policy?: RetentionPolicy; r2?: RetentionR2 } = {},
+  options: { policy?: RetentionPolicy } = {},
 ): Promise<RetentionSummary> {
   const d1 = await getD1();
   const policy = options.policy ?? DEFAULT_RETENTION_POLICY;
-  const r2 = options.r2;
 
   const summary: RetentionSummary = {
     now,
@@ -349,9 +276,6 @@ export async function runRetentionSweep(
     pendingPurged: 0,
     rejectedPurged: 0,
     correctionsPurged: 0,
-    photosDeleted: 0,
-    r2ObjectsDeleted: 0,
-    r2ObjectsFailed: 0,
     sessionsPurged: 0,
     emailTokensPurged: 0,
     challengesPurged: 0,
@@ -387,10 +311,7 @@ export async function runRetentionSweep(
       .all<{ id: number }>();
     for (const { id } of demos.results) {
       try {
-        const { photoRows, r2Deleted, r2Failed } = await purgeCameraRecord(d1, r2, id, now);
-        summary.photosDeleted += photoRows;
-        summary.r2ObjectsDeleted += r2Deleted;
-        summary.r2ObjectsFailed += r2Failed;
+        await purgeCameraRecord(d1, id, now);
         summary.demoRecordsPurged += 1;
       } catch (error) {
         summary.failures += 1;
@@ -413,10 +334,7 @@ export async function runRetentionSweep(
     .all<{ id: number }>();
   for (const { id } of pending.results) {
     try {
-      const { photoRows, r2Deleted, r2Failed } = await purgeCameraRecord(d1, r2, id, now);
-      summary.photosDeleted += photoRows;
-      summary.r2ObjectsDeleted += r2Deleted;
-      summary.r2ObjectsFailed += r2Failed;
+      await purgeCameraRecord(d1, id, now);
       summary.pendingPurged += 1;
     } catch (error) {
       summary.failures += 1;
@@ -448,10 +366,7 @@ export async function runRetentionSweep(
     .all<{ id: number }>();
   for (const { id } of rejected.results) {
     try {
-      const { photoRows, r2Deleted, r2Failed } = await purgeCameraRecord(d1, r2, id, now);
-      summary.photosDeleted += photoRows;
-      summary.r2ObjectsDeleted += r2Deleted;
-      summary.r2ObjectsFailed += r2Failed;
+      await purgeCameraRecord(d1, id, now);
       summary.rejectedPurged += 1;
     } catch (error) {
       summary.failures += 1;
@@ -504,71 +419,6 @@ export async function runRetentionSweep(
     } catch (error) {
       summary.failures += 1;
       console.error(`Retention: R4 archive+delete failed for correction ${correction.id}`, error);
-    }
-  }
-
-  // --- R6: orphan pending photos (never linked to a record) and rejected
-  // photos (evidence a moderator refused) are removed from D1 and R2.
-  // NOTE (asymmetry, pinned by tests): the orphan query REQUIRES
-  // camera_id IS NULL — a pending photo linked to a record follows the record
-  // lifecycle (R1/R2/R3) and is never swept alone. The rejected query has NO
-  // camera_id filter: a rejected photo is removed 30 days after the reject
-  // decision even if it is still linked to a live record, because rejected
-  // evidence is never public and must not outlive its appeal window (R13).
-  const orphanPhotos = await d1
-    .prepare("SELECT id, storage_key AS storageKey FROM photos WHERE camera_id IS NULL AND status = 'pending' AND created_at < ?")
-    .bind(daysAgo(now, policy.orphanPhotoDays))
-    .all<{ id: number; storageKey: string }>();
-  // R13: rejected photos expire 30 days after the rejection decision, not at
-  // the next sweep — the decision date is the latest moderation event with
-  // entity='photo' AND action='reject'; legacy rows without an event fall
-  // back to created_at. Same anchor pattern as the camera R2 sweep above.
-  const rejectedPhotos = await d1
-    .prepare(
-      `SELECT p.id, p.storage_key AS storageKey
-      FROM photos p
-      LEFT JOIN (
-        SELECT entity_id, MAX(created_at) AS decided_at
-        FROM moderation_events
-        WHERE entity = 'photo' AND action = 'reject'
-        GROUP BY entity_id
-      ) e ON e.entity_id = p.id
-      WHERE p.status = 'rejected'
-        AND COALESCE(e.decided_at, p.created_at) < ?`,
-    )
-    .bind(daysAgo(now, policy.rejectedDays))
-    .all<{ id: number; storageKey: string }>();
-  const orphanAndRejected = [...orphanPhotos.results, ...rejectedPhotos.results];
-  if (orphanAndRejected.length > 0) {
-    // D1 caps bound parameters at 100 per query, so a single
-    // `DELETE ... WHERE id IN (?, ...)` breaks once more than 100 photos
-    // are pending removal (rejected evidence can pile up between runs).
-    // Delete in chunks of at most 100 ids, and delete each chunk's R2
-    // objects IMMEDIATELY after its D1 rows: if a later chunk fails, the
-    // rows of the earlier chunks are already gone, so their R2 objects must
-    // be gone too or they would be orphaned forever (the pre-fix code ran
-    // deleteR2Objects only after the whole loop, leaking the objects of
-    // every chunk deleted before the failing one). The failed chunk keeps
-    // its D1 rows, so its objects stay reachable and the next run retries.
-    const ids = orphanAndRejected.map((photo) => photo.id);
-    for (let offset = 0; offset < ids.length; offset += D1_MAX_BOUND_PARAMS) {
-      const chunk = orphanAndRejected.slice(offset, offset + D1_MAX_BOUND_PARAMS);
-      const chunkIds = chunk.map((photo) => photo.id);
-      const placeholders = chunkIds.map(() => "?").join(", ");
-      try {
-        await d1
-          .prepare(`DELETE FROM photos WHERE id IN (${placeholders})`)
-          .bind(...chunkIds)
-          .run();
-      } catch (error) {
-        summary.failures += 1;
-        console.error(`Retention: R6 chunk delete failed for ${chunkIds.length} photos`, error);
-        continue;
-      }
-      const { deleted, failed } = await deleteR2Objects(r2, chunk.map((photo) => photo.storageKey));
-      summary.photosDeleted += chunk.length;
-      summary.r2ObjectsDeleted += deleted;
-      summary.r2ObjectsFailed += failed;
     }
   }
 

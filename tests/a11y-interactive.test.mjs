@@ -16,7 +16,7 @@
  *   2. ModerationDashboard: native focusable controls only (no tabIndex →
  *      no involuntary focus trap), labelled action groups, label-for pairs
  *      on every decision control, aria-describedby on the note field,
- *      status/alert live regions, alt text on photo previews. The queue
+ *      status/alert live regions, alt text on queue previews. The queue
  *      itself is client-fetched, so the rendered contracts are asserted on
  *      the SSR shell AND on the component source (same pattern as the
  *      shared-layout source tests in rendered-html.test.mjs).
@@ -351,7 +351,7 @@ test("moderation action groups are labelled and queues are labelled lists", asyn
     "queue list shell must be labelled via listLabel",
   );
   const dashboard = await readFile(path.join(root, "app", "components", "ModerationDashboard.tsx"), "utf8");
-  for (const listLabel of ["t.pendingReports", "t.publishedRecords", "t.recordsNeedReview", "t.privateCorrections", "t.pendingPhotos"]) {
+  for (const listLabel of ["t.pendingReports", "t.publishedRecords", "t.recordsNeedReview", "t.privateCorrections", "t.editRequests"]) {
     assert.ok(
       dashboard.includes(`listLabel={${listLabel}}`),
       `queue section must pass its label: ${listLabel}`,
@@ -361,12 +361,10 @@ test("moderation action groups are labelled and queues are labelled lists", asyn
   assert.match(history, /aria-label=\{t\.recentDecisions\}/, "history list must be labelled");
 });
 
-test("moderation status/error feedback uses live regions and photo previews carry alt text", async () => {
+test("moderation status/error feedback uses live regions", async () => {
   const dashboard = await readFile(path.join(root, "app", "components", "ModerationDashboard.tsx"), "utf8");
   assert.match(dashboard, /role="status"/, "success notices must be announced (polite)");
   assert.match(dashboard, /role="alert"/, "errors must be announced (assertive)");
-  const photoItem = await readFile(path.join(root, "app", "components", "moderation", "PhotoQueueItem.tsx"), "utf8");
-  assert.match(photoItem, /<img[^>]*alt=/, "photo previews must have alt text");
 });
 
 // ---------------------------------------------------------------------------
@@ -633,9 +631,6 @@ test("every <img> in the public HTML carries alt text", async () => {
       assert.match(image[0], /\salt=/, `${route}: ${image[0].slice(0, 80)}… must have alt text`);
     }
   }
-  // Moderation photo previews (client-rendered) are checked in the source.
-  const photoItem = await readFile(path.join(root, "app", "components", "moderation", "PhotoQueueItem.tsx"), "utf8");
-  assert.match(photoItem, /<img[^>]*alt=\{`\$\{t\.photoEvidence\}/, "photo previews must carry alt text");
 });
 
 test("the footer legal disclosure has a visible keyboard focus and touch-sized target", async () => {

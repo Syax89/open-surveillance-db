@@ -113,21 +113,6 @@ test("GET /api/moderation returns the full queue shape from the database boundar
     publishedCameras: [],
     reviewCameras: [],
     correctionRequests: [],
-    photoReports: [
-      {
-        id: 21,
-        cameraId: null,
-        mimeType: "image/jpeg",
-        width: 64,
-        height: 48,
-        sizeBytes: 512,
-        status: "pending",
-        exifStripped: 1,
-        redactionConfirmed: 0,
-        createdAt: "2026-07-31T09:00:00.000Z",
-        updatedAt: "2026-07-31T09:00:00.000Z",
-      },
-    ],
     recentEvents: [eventFixture],
     reviewers: [{ id: 2, displayName: "Demo Record Reviewer", role: "record_reviewer", active: 1 }],
     queueItems: [queueFixture],
@@ -137,9 +122,6 @@ test("GET /api/moderation returns the full queue shape from the database boundar
   const response = await GET(authRequest("/api/moderation"));
   assert.equal(response.status, 200);
   const body = await responseBody(response);
-  assert.equal(body.photoReports.length, 1);
-  assert.equal(body.photoReports[0].status, "pending");
-  assert.equal(body.photoReports[0].storageKey, undefined, "the storage key must never leave the db layer");
   assert.deepEqual(body, queue);
 });
 
@@ -257,89 +239,6 @@ test("PATCH on a correction routes to moderateCorrection without publication fla
   assert.equal(body.entity, "correction");
   assert.equal(body.item.status, "reviewed");
   assert.deepEqual(callArgs("moderateCorrection")[0], [9, "approve", validReasonCode, "fixed", undefined, { actorId }]);
-});
-
-// ---------------------------------------------------------------------------
-// PATCH /api/moderation — photo decisions (redaction gate)
-// ---------------------------------------------------------------------------
-
-const photoItem = {
-  id: 21,
-  cameraId: null,
-  mimeType: "image/jpeg",
-  width: 64,
-  height: 48,
-  sizeBytes: 512,
-  status: "pending",
-  exifStripped: 1,
-  redactionConfirmed: 0,
-  createdAt: "2026-07-31T09:00:00.000Z",
-  updatedAt: "2026-07-31T09:00:00.000Z",
-};
-
-test("PATCH approve on a photo requires redaction confirmation and forwards it", async () => {
-  stub("moderatePhoto", async () => ({
-    kind: "ok",
-    item: { ...photoItem, status: "approved", redactionConfirmed: 1 },
-    event: { ...eventFixture, entity: "photo", entityId: 21, previousStatus: "pending", newStatus: "approved", action: "approve" },
-  }));
-  const { PATCH } = await route();
-  const response = await PATCH(
-    authRequest("/api/moderation", {
-      method: "PATCH",
-      body: { entity: "photo", id: 21, action: "approve", reasonCode: "verified-public-infrastructure", redactionConfirmed: true, actorId },
-    }),
-  );
-  assert.equal(response.status, 200);
-  const body = await responseBody(response);
-  assert.equal(body.entity, "photo");
-  assert.equal(body.item.status, "approved");
-  assert.equal(body.item.redactionConfirmed, 1);
-  assert.deepEqual(callArgs("moderatePhoto")[0], [21, "approve", true, "verified-public-infrastructure", null, actorId]);
-});
-
-test("PATCH approve on a photo without redaction confirmation is rejected before the db layer", async () => {
-  const { PATCH } = await route();
-  const response = await PATCH(
-    authRequest("/api/moderation", {
-      method: "PATCH",
-      body: { entity: "photo", id: 21, action: "approve", reasonCode: "verified-public-infrastructure", actorId },
-    }),
-  );
-  assert.equal(response.status, 400);
-  assert.equal(callArgs("moderatePhoto").length, 0, "no db write without redaction confirmation");
-});
-
-test("PATCH approve on a photo maps a redaction_required result to 400", async () => {
-  // The db layer can still answer redaction_required (e.g. the flag was not
-  // persisted); the route must surface that specific error, not a generic one.
-  stub("moderatePhoto", async () => ({ kind: "redaction_required" }));
-  const { PATCH } = await route();
-  const response = await PATCH(
-    authRequest("/api/moderation", {
-      method: "PATCH",
-      body: { entity: "photo", id: 21, action: "approve", reasonCode: "verified-public-infrastructure", redactionConfirmed: true, actorId },
-    }),
-  );
-  assert.equal(response.status, 400);
-  assert.match((await responseBody(response)).error, /redacted/);
-});
-
-test("PATCH reject on a photo forwards redactionConfirmed false and leaves it pending for metadata", async () => {
-  stub("moderatePhoto", async () => ({
-    kind: "ok",
-    item: { ...photoItem, status: "rejected" },
-    event: { ...eventFixture, entity: "photo", entityId: 21, previousStatus: "pending", newStatus: "rejected", action: "reject" },
-  }));
-  const { PATCH } = await route();
-  const response = await PATCH(
-    authRequest("/api/moderation", {
-      method: "PATCH",
-      body: { entity: "photo", id: 21, action: "reject", reasonCode: "privacy-or-safety-concern", redactionConfirmed: false, actorId },
-    }),
-  );
-  assert.equal(response.status, 200);
-  assert.deepEqual(callArgs("moderatePhoto")[0], [21, "reject", false, "privacy-or-safety-concern", null, actorId]);
 });
 
 // ---------------------------------------------------------------------------

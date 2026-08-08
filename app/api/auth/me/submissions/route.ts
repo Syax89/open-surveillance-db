@@ -11,7 +11,7 @@ import { urlTooLong } from "../../../../lib/input-limits";
  *
  * DEPRECATED (COMMUNITY_PLAN §2.3, C2): kept for backward compatibility but
  * superseded by GET /api/auth/me/contributions, which adds pagination
- * (F0 contract), correction/photo contribution kinds, a status filter and
+ * (F0 contract), correction contribution kinds, a status filter and
  * the caller's trust level in the meta. New clients should call
  * /api/auth/me/contributions instead.
  */

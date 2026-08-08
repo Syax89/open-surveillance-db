@@ -4,12 +4,14 @@
 
 OpenSurveillanceDB is **community-driven**: reports from verified contributor accounts are **published immediately** (`status = 'active'`), with no review queue and no human moderation in the normal flow (ADR 0021 § 1). Accuracy and freshness are maintained by the community through automatic, trust-weighted actions — `like`, `confirm`, `gone`, `problem`, `privacy` — that trigger record transitions at fixed thresholds (ADR 0021 § 3/§ 4). Every transition is recorded in the record's **public lifecycle history without attribution** (ADR 0021 § 7).
 
-The only residual human steps are:
+The only residual human step is the **legal-emergency admin hide/remove** —
+the only human write power over the record lifecycle (ADR 0021 § 8).
 
-1. the **photo redaction gate** — a photo is never public until a moderator approves it with confirmed redaction (`redaction_confirmed = 1`); this acts on the **photo's own status**, never on the record lifecycle (TERMS § 6.3);
-2. the **legal-emergency admin hide/remove** — the only human write power over the record lifecycle (ADR 0021 § 8).
-
-The retired human review cycle is not part of this model; the retired review tables were closed by migration and survive only as history (ADR 0021 § 7.3, migration plan).
+The retired human review cycle is not part of this model; the retired review
+tables were closed by migration and survive only as history (ADR 0021
+§ 7.3, migration plan). The photo upload feature (intake, photo moderation
+gate, public serving) was **removed entirely on 2026-08-08** (CEO decision)
+— see the "Photo upload (removed)" note below.
 
 ## Publication standard
 
@@ -27,7 +29,7 @@ OpenSurveillanceDB may publish a record only when it documents visible public su
 - Live video, stream URLs, credentials, network information, or control interfaces.
 - Detailed field-of-view or operational capability that could create a safety risk.
 - Sensitive facilities or locations where publication could materially increase risk.
-- Images containing identifiable people, vehicle plates, or private interiors unless safely redacted and necessary (the photo gate below).
+- Images containing identifiable people, vehicle plates, or private interiors (no image upload exists in the current model — records are text metadata only).
 - Unverifiable allegations about people or organisations.
 
 These exclusions bind every submitter (TERMS § 4); violations are handled by the community thresholds (hide/remove) or, in legal emergencies, by the administrator.
@@ -41,49 +43,17 @@ These exclusions bind every submitter (TERMS § 4); violations are handled by th
 
 Full mechanics: ADR 0021 § 3–§ 6; DATA_MODEL.md.
 
-## Photo moderation (residual human gate — photo status only)
+## Photo upload (removed 2026-08-08)
 
-Photo evidence (images attached to camera records) follows a dedicated fail-closed workflow (implemented in PR #64). The public can never see a photo that has not been individually approved with confirmed redaction. Photo statuses (`pending`/`approved`/`rejected`) are **photo-level states only** — they never change the record's own status.
-
-### Intake (automatic, at upload)
-
-- Only JPEG, PNG and WebP are accepted. The container is verified from magic bytes; the declared `Content-Type` is treated as a hint only, and a mismatch is rejected.
-- Server-side size and dimension caps are enforced before any storage: **10 MiB** and **4096 px per side** by default (`PHOTO_MAX_BYTES` / `PHOTO_MAX_DIMENSION`).
-- **EXIF/XMP/IPTC stripping is mandatory and fail-closed**: if the metadata walk cannot be completed safely, the upload is rejected (400). GPS/EXIF data never reaches storage.
-- Image bytes are stored in the private R2 bucket (`PHOTOS`) under an opaque key; D1 holds metadata only. The storage key is never exposed; photos are addressed by id only.
-- Every upload lands as `pending` with `exif_stripped = 1` and `redaction_confirmed = 0`. Uploads are rate-limited; attributed uploads additionally require same-origin + CSRF checks.
-
-### Moderation decision
-
-- Pending photos appear in the photo moderation surface as metadata only.
-- Moderators preview the bytes through the private, edge-gated route `GET /api/moderation/photos/[id]` (fail-closed auth gate; never cached). This is the only path that serves pending/rejected bytes.
-- **Approval requires the explicit `redaction_confirmed` flag: the API rejects an approval without it (fail closed).** Rejection requires only a reason code.
-- Every decision writes an append-only moderation event (entity `photo`, reason code, note, reviewer pseudonym) — the same audit log as legal-emergency actions (MODERATION_SLA.md § 5).
-
-### Publication criteria
-
-A photo becomes public only when **all** of the following hold:
-
-1. a moderator approved it (`status = approved`);
-2. `redaction_confirmed = 1` — the moderator confirmed the subject was redacted;
-3. the linked record is itself public (`active` status) — the record's own publication boundary.
-
-The public routes apply a double check (`listApprovedPhotosForCamera` + `getPublicPhoto`); anything else answers **404 fail-closed**, with no existence leak. Public responses use restrictive headers (`Content-Security-Policy: default-src 'none'; sandbox`).
-
-Before approving, the moderator verifies that the image:
-
-- documents the camera/infrastructure in the record (coherent with the record);
-- contains **no identifiable people, vehicle plates, or private interiors** — incidental content must be safely redacted in the image before approval (the general exclusion above applies);
-- contains no excluded operational detail (field-of-view capability, control surfaces, live-stream elements).
-
-### Visibility and retention
-
-- Pending and rejected photos are **never public** — any public request answers 404, regardless of the record.
-- **Rejected** photos are hard-deleted **30 days** after the rejection decision (D1 row and R2 bytes) — [RETENTION_SCHEDULE.md](legal/RETENTION_SCHEDULE.md) R13; they stay private for the whole window.
-- **Pending** photos: 90 days from upload when never linked to a record (orphaned); otherwise they follow the record (R13). **Approved** photos follow the **record's retention** (R13/R1) and are **hard-deleted immediately when the record is withdrawn** (`hidden`/`removed`) or deleted — the withdrawal removes the image bytes, not only the database row.
-- Deletion always removes both the D1 metadata row and the R2 object bytes; the moderation decision itself remains in the audit log (R5) without the image.
-
-Photo decisions have no review workflow: the community-driven model handles challenges through community actions or the private correction path (ADR 0021 § 7).
+The photo upload feature was **removed entirely** by CEO decision 2026-08-08
+("non lo voglio più, troppo rischioso e troppo esoso di spazio"): API routes
+(`/api/photos`), the `photos` D1 table (migration `0043`), the R2 binding
+(`PHOTOS`), the UI, the photo moderation surface, the photo-level lifecycle
+(`pending`/`approved`/`rejected`, `redaction_confirmed`) and its legal copy
+were all removed. **No new uploads are accepted.** Existing R2 objects were
+**retained — no deletion was performed** and the retention sweep no longer
+touches the bucket. The retired workflow is documented as history in
+`docs/decisions/0008` (R6/R13) and `docs/legal/RETENTION_SCHEDULE.md` R13.
 
 ## Legal-emergency admin actions (the only human write power over the record lifecycle)
 
@@ -102,8 +72,8 @@ ADR 0021 § 8: the **only** remaining human write action on a record is the admi
 
 ## Moderator safeguards (residual surfaces)
 
-- **Role separation on every protected route** (`requireRole`, ADR 0014/0009): photo approval and legal-emergency actions require a `moderator`/`admin` account; unknown or inactive identities get 401, callers below the required tier 403. The acting reviewer is derived server-side from the authenticated user's linked reviewer profile — never client-chosen.
-- **Append-only audit trail:** every photo decision and legal-emergency action writes a `moderation_events` entry (decision, reason code, timestamp, reviewer **pseudonym** — never the raw email, M4); the trail is internal and never public (aggregate transparency reports only; 2-year retention R5).
-- **Retrospective review:** legal-emergency hides/removals and photo decisions are reviewed retrospectively by the privacy/legal owner (MODERATION_SLA.md S4).
-- Separate moderation credentials from general contributor accounts; training for consistent redaction criteria and exclusion handling.
+- **Role separation on every protected route** (`requireRole`, ADR 0014/0009): legal-emergency actions require a `moderator`/`admin` account; unknown or inactive identities get 401, callers below the required tier 403. The acting reviewer is derived server-side from the authenticated user's linked reviewer profile — never client-chosen.
+- **Append-only audit trail:** every legal-emergency action writes a `moderation_events` entry (decision, reason code, timestamp, reviewer **pseudonym** — never the raw email, M4); the trail is internal and never public (aggregate transparency reports only; 2-year retention R5).
+- **Retrospective review:** legal-emergency hides/removals are reviewed retrospectively by the privacy/legal owner (MODERATION_SLA.md S4).
+- Separate moderation credentials from general contributor accounts; training for consistent exclusion criteria and legal-emergency handling.
 - **Jurisdiction playbook (M5):** before accepting records from a new jurisdiction, the first 2-3 operating jurisdictions (start: IT, DE) get a short legal playbook — minimum training for moderators, national rules for official-source records (e.g. Italy: D.Lgs. 196/2003, D.Lgs. 33/2013 transparency), and the Garante / supervisory authority contact. This outline is the template.

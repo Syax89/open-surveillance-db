@@ -36,7 +36,7 @@ import { deriveLevel } from "../app/lib/trust-levels";
  *      the INSERT ... SELECT ... itself, so the check and the write are one
  *      SQLite statement (QA F6 — no count-then-insert TOCTOU);
  *   5. IP-hash burst bucket lives in app/lib/confirm-ip-burst.ts (route
- *      layer, photos.submitter_key pattern — never the raw IP);
+ *      layer, same never-the-raw-IP rule);
  *   6. decay: confirmations older than the review window
  *      (`created_at >= cameras.last_verified_at`) do not count; a
  *      re-verified record renews them.

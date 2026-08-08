@@ -15,8 +15,6 @@ flowchart LR
   API --> Queue[Moderation queue /api/moderation]
   Queue --> Moderator[Moderator workspace]
   API --> Appeals[Appeals /api/appeals]
-  API --> Photos[(Photo storage: R2 PHOTOS + D1 metadata)]
-  Photos --> Queue
   Community[Community: verifications and contribution edits /api/cameras/*] --> API
 ```
 
@@ -45,12 +43,7 @@ protected route through `requireRole` in `app/lib/authz.ts` (ADR 0014):
 `contributor+` may file an appeal, and anonymous submissions stay possible
 by design. The moderation queue (`/api/moderation`) and appeals
 (`/api/appeals`) are separate protected surfaces with an append-only audit
-trail in `moderation_events`. Photo evidence is stored in R2 (`PHOTOS`
-bucket) with metadata-only rows in D1, goes through a moderation/redaction
-gate before any public exposure, and is served publicly only fail-closed:
-bytes are returned exclusively for approved photos with confirmed redaction
-linked to a currently public camera, everything else answers 404 with no
-existence leak. The database layer is designed for Cloudflare D1 and uses
+trail in `moderation_events`. The database layer is designed for Cloudflare D1 and uses
 Drizzle for schema migrations.
 
 The community system (ADR 0018) runs on the same prototype: contributors can
@@ -94,7 +87,11 @@ flowchart LR
   whether optional metadata may be included in a verified public record. The
   `publishManufacturer` and `publishObservedOn` choices default to false and
   are enforced independently at the public-data query boundary.
-- **Evidence storage:** separate from public records; least-privilege access; retention and deletion rules required. Photo uploads go to R2 (`PHOTOS` bucket) with metadata-only rows in D1; `storage_key` is never returned by any API and the moderator preview is served only under the `/api/moderation/*` auth gate. Public photo serving is strictly fail-closed: bytes are returned only for approved photos with confirmed redaction linked to a currently public camera; everything else answers 404 with no existence leak.
+- **Evidence storage:** photo upload was removed entirely on 2026-08-08
+  (CEO decision): no media intake exists in the current model — records are
+  text metadata only, so there is no evidence object store, no storage key
+  and no media serving surface to protect. Existing R2 objects from the
+  retired feature were retained (no deletion).
 - **Data export:** reviewed public data only, with a version and license notice.
 - **Observability:** aggregate service health and security events; avoid logging submitted personal data unnecessarily.
 
@@ -106,7 +103,7 @@ flowchart LR
 | Map | Leaflet + same-origin tile proxy (`/api/tiles` → OSM, policy-compliant) | Provider-compliant tiles or self-hosted vector/raster stack |
 | Database | Cloudflare D1 + Drizzle | Backups, migration discipline, access controls, retention plan |
 | API | Route handlers + JSON/GeoJSON | Versioning, rate limits, schema validation, documentation |
-| Media | Photo evidence intake: R2 object storage + D1 metadata, mandatory EXIF strip, moderation gate; public serving is fail-closed (approved + redaction-confirmed + publicly current camera only, 404 otherwise) | Isolated object storage, scanning/redaction, signed access |
+| Media | **None — photo upload removed (2026-08-08, CEO):** no image is accepted or stored; records are text metadata only (existing R2 objects retained, no deletion) | Not applicable — no media processing, storage or serving in the current model |
 | Identity | Contributor accounts (email+password, PBKDF2-SHA256, session tokens stored hashed, CSRF double-submit) and roles contributor/moderator/admin enforced via `requireRole` on protected routes — ADR 0013/0014 | Minimal accounts, anti-abuse controls, contributor privacy |
 
 ## Security design principles

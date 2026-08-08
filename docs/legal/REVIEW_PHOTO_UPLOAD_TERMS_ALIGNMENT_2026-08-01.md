@@ -1,5 +1,12 @@
 # Check-report — allineamento TERMS/PRIVACY all'upload foto attivo (PR #64)
 
+> **SUPERSEDED (2026-08-08):** la funzionalità di photo evidence upload è stata
+> **rimossa integralmente** per decisione del CEO ("troppo rischioso e troppo
+> esoso di spazio") — PR "remove photo upload" (migration `0043`, binding R2
+> `PHOTOS` rimosso, API/UI/db/legal allineati). Questo check-report resta come
+> record storico della coerenza al 2026-08-01; i documenti pubblici aggiornati
+> descrivono il sistema senza foto.
+
 **Autore:** Rosa (DPO / Legal & Privacy Officer)
 **Data:** 2026-08-01
 **Oggetto:** allineamento dei documenti pubblici (TERMS_OF_USE.md, PRIVACY_NOTICE.md, OPEN_SOURCE.md, bundle web `app/lib/legal/en|it.ts`) alla funzionalità di photo evidence upload attiva su `main` (STATUS gap #3, PR #64 — commit `3ead75e`).

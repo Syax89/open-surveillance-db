@@ -347,9 +347,9 @@ prima/dopo identici al pixel su tutte le route pubbliche, Lighthouse a11y
 **Radius** — consolidato dai valori esistenti:
 
 ```
---radius-xs:4px   (notice, offline-state, photo-moderate-note)
---radius-sm:6px   (form inputs, photo-list, legal-note, map-hint)
---radius-md:8px   (coordinate-entry, metadata-publication, photo-upload, map-record)
+--radius-xs:4px   (notice, offline-state)
+--radius-sm:6px   (form inputs, legal-note, map-hint)
+--radius-md:8px   (coordinate-entry, metadata-publication, map-record)
 --radius-lg:12px  (tool-card, report/correction-form, faq-item, confirm-dialog)
 --radius-xl:16px  (record-detail)
 --radius-2xl:22px (hero)
@@ -424,7 +424,7 @@ Regole:
   input; `#d6dbd3` per card form; `#e6b8ad` per zone danger/errori.
 - **Bordi accent (banner/alert):** bordo sinistro 3px semantico —
   verde `#43a979` (notice/legal-note), ambra `#c99127` (duplicate-alert),
-  `#c99a3a` (offline-state), `#c08a3e` (photo-moderate), `#c99127` (warning).
+  `#c99a3a` (offline-state), `#c99127` (warning).
 - **Radius:** la scala §3.4 — mai valori fuori scala nei componenti nuovi.
 - **Ombre:** la scala §3.5 — mai ombre per componenti inline (testo, dot,
   label).
@@ -469,7 +469,7 @@ Legenda: **[spec]** = sezione dedicata sotto · **[patt.]** = pattern condiviso
 | `SegnalaTool` | `/segnala` | tool-heading + ReportForm | [spec] 2.2 |
 | `CorreggiTool` | `/correggi` | tool-heading + CorrectionForm | [spec] 2.2 |
 | `PublicDirectory` | `/directory`, home | catalog (delega a DirectoryCatalog) / hub (sezione home) | [patt.] |
-| `ReportForm` | `/segnala` | form guidato + coordinate + foto | [patt.] |
+| `ReportForm` | `/segnala` | form guidato + coordinate | [patt.] |
 | `CorrectionForm` | `/correggi` | form correzione + duplicate alert | [patt.] |
 | `FiltersBar` | `/mappa`, `/directory`, home | filtri condivisi D4, varianti `inline`/`panel`/`bare` | **[spec] 6.3.3** |
 | `RecordCard` | directory, search, moderation | card record condivisa | [patt.] |
@@ -483,8 +483,8 @@ Legenda: **[spec]** = sezione dedicata sotto · **[patt.]** = pattern condiviso
 | `ConfirmDialog` | `/account` | alertdialog distruttivo accessibile (sostituisce `window.confirm`) | [patt.] |
 | `ModerationDashboard` | `/moderation` | dashboard privata | [patt.] |
 
-**Moderation (`moderation/`, 8 componenti + hook)**
-| `QueueSection`, `CameraQueueItem`, `CorrectionQueueItem`, `EditQueueItem`, `PhotoQueueItem`, `DecisionForm`, `HistorySection`, `CorrectionHistorySection`, `useModerationQueue` | `/moderation` | coda per sezioni, decisioni, storico | [patt.] — dot `pending` 🔒 (§6.3.2) |
+**Moderation (`moderation/`, 7 componenti + hook)**
+| `QueueSection`, `CameraQueueItem`, `CorrectionQueueItem`, `EditQueueItem`, `DecisionForm`, `HistorySection`, `CorrectionHistorySection`, `useModerationQueue` | `/moderation` | coda per sezioni, decisioni, storico | [patt.] — dot `pending` 🔒 (§6.3.2) |
 
 **Pagine info**
 | `InfoPage` | manifesto, guide, faq, contatti, accessibility | wrapper SSR free-form | [patt.] |

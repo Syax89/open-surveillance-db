@@ -57,8 +57,6 @@ The fields formerly listed as "planned for moderated storage" exist today in the
 - **Correction/takedown requests**: the [`correctionRequests`](#correctionrequests)
   table holds requests and their resolution state. These stay a private,
   human-reviewed channel (ADR 0021 §6.2) and never change the map automatically.
-- **Evidence references**: the [`photos`](#photos) table holds photo metadata
-  (bytes live in object storage, never in D1).
 - **Change history**: public, per-record revision history served by
   `GET /api/cameras/revisions`.
 
@@ -128,26 +126,15 @@ appropriate flag, exactly like any other verified contributor. The old appeal
 outcomes survive as historical `migration` events in the public per-record
 history, without attribution (ADR 0021 §7.3).
 
-### Photo pipeline (2026-08)
+### Photo pipeline (removed 2026-08-08)
 
-Photos are evidence, never public by default:
-
-```mermaid
-stateDiagram-v2
-  [*] --> pending: intake (POST /api/photos)
-  pending --> approved: moderator approves + confirms redaction
-  pending --> rejected: moderator rejects
-  approved --> [*]
-  rejected --> [*]
-```
-
-Intake is fail-closed: size/MIME/dimension limits, magic-byte container
-verification, mandatory EXIF/XMP/IPTC stripping, sanitised bytes in object
-storage (R2, `PHOTOS`) with metadata only in D1. A photo is served publicly
-only when it is `approved`, `redaction_confirmed` is set, and the linked
-camera is itself public (`active`/`demo` — photo moderation is the residual
-human surface of ADR 0021 §8, unchanged by the pivot). Pending or rejected
-evidence never leaks through the public routes.
+The photo upload feature was **removed entirely** (CEO decision 2026-08-08 —
+too risky and too storage-hungry): API routes, D1 table (`photos`, migration
+`0043`), R2 binding, UI, moderation surface, legal copy and tests were all
+removed. No new uploads are accepted; **existing R2 objects are retained — no
+deletion was performed and the sweep never touches the bucket**. The retired
+photo-level lifecycle (statuses, redaction gate, R13) is documented in
+`docs/decisions/0008` and the legal archive as history only.
 
 ## API endpoints
 
@@ -178,26 +165,23 @@ enforces same-origin + CSRF when a session is present.
 | `GET` | `/api/auth/me` | session | Current contributor profile (never the password hash) + the caller's own trust `level` (derived from the active contribution count, C2); `401` anonymous |
 | `PATCH` | `/api/auth/me` | session | Update the caller's public `displayName` (2–60 chars after trim, or null/empty to clear — same grammar as registration). Only the `displayName` key is accepted; any other key answers `400` with no partial effects. Returns the refreshed public profile, `no-store` |
 | `GET` | `/api/auth/me/submissions` | session | The contributor's own attributed reports (id, title, status, created_at); `401` anonymous. **Deprecated (C2)** — superseded by `/api/auth/me/contributions`, kept for backward compatibility |
-| `GET` | `/api/auth/me/contributions` | session | The contributor's own attributed contributions (camera reports, corrections, photo uploads), paginated (F0: `page`/`pageSize` default 25, max 100, `pagination` object) with optional `type`/`status` whitelist filters and the caller's trust `level` in the meta; `Cache-Control: no-store`; `401` anonymous, `400` cross-account/unknown filter, `503` db unavailable |
+| `GET` | `/api/auth/me/contributions` | session | The contributor's own attributed contributions (camera reports, corrections), paginated (F0: `page`/`pageSize` default 25, max 100, `pagination` object) with optional `type`/`status` whitelist filters and the caller's trust `level` in the meta; `Cache-Control: no-store`; `401` anonymous, `400` cross-account/unknown filter, `503` db unavailable |
 | `DELETE` | `/api/auth/account` | session | Account erasure (GDPR art. 17, RETENTION_SCHEDULE R7/R14): de-attributes every attributed report, deletes the contributor's community actions atomically (ADR 0021 §13), revokes all sessions, hard-deletes the contributor row; returns the count of de-attributed reports |
 | `POST` | `/api/appeals` | contributor+ | **Retired (ADR 0021 §7.3)** — the contrary-consensus mechanism replaces the appeal flow; pending appeals were closed by migration. Route kept for legacy history only; no new appeals are accepted in the community model |
 | `GET` | `/api/appeals` | moderator+ | Retired with the appeal flow (ADR 0021 §7.3); history preserved in `moderation_appeals` |
 | `PATCH` | `/api/appeals/:id` | moderator+ | Retired with the appeal flow (ADR 0021 §7.3) |
-| `GET` | `/api/moderation` | moderator+ | **Residual legal-emergency surface only (ADR 0021 §8):** the normal-flow moderation queue is retired; the route serves the remaining human write actions (legal-emergency hide/remove, photo redaction approval) |
-| `PATCH` | `/api/moderation` | moderator+ | Residual legal-emergency surface (ADR 0021 §8): photo `approve` (requires `redactionConfirmed: true`) / `reject`, and the administrator's legal-emergency camera `hide`/`remove` (mandatory reason code). Reviewer actions on the normal flow (`approve`, `reject`, `mark-stale`, `reverify`, `escalate`, correction associate/escalate) are retired with the queue; acting reviewer is derived server-side from the authenticated user's linked reviewer profile (ADR 0014) |
-| `GET` | `/api/moderation/photos/:id` | moderator+ (edge gate) | Moderator preview of a photo's bytes before deciding; pending/rejected photos are never served by the public route |
+| `GET` | `/api/moderation` | moderator+ | **Residual legal-emergency surface only (ADR 0021 §8):** the normal-flow moderation queue is retired; the route serves the remaining human write actions (legal-emergency hide/remove) |
+| `PATCH` | `/api/moderation` | moderator+ | Residual legal-emergency surface (ADR 0021 §8): the administrator's legal-emergency camera `hide`/`remove` (mandatory reason code). Reviewer actions on the normal flow (`approve`, `reject`, `mark-stale`, `reverify`, `escalate`, correction associate/escalate) are retired with the queue; acting reviewer is derived server-side from the authenticated user's linked reviewer profile (ADR 0014) |
 | `GET` | `/api/moderation/corrections` | moderator+ (edge gate) | Private correction-request history for one record (`cameraId` required positive integer): every request linked to the record (pending and resolved) with its decision events, contact detail and reviewer attribution. Never served by a public route; `400` missing/invalid id, `404` unknown record |
-| `POST` | `/api/photos` | public | Photo intake: raw image body, size/MIME/dimension caps, magic-byte verification, mandatory EXIF/XMP/IPTC strip, bytes → R2, metadata → D1. Returns photo metadata, never the storage key or bytes |
-| `GET` | `/api/photos?cameraId=N` | public | Approved, redaction-confirmed photos of a public camera (record-detail gallery); `404` when the camera is not public |
-| `GET` | `/api/photos/:id` | public | Serve one approved photo (bytes only when approved + redaction confirmed + linked camera public and current); otherwise fail-closed `404` |
 | `GET` | `/api/tiles/:z/:x/:y` | public | Same-origin OSMF-compliant tile proxy: stable User-Agent, Referer forwarded, server-side caching honouring upstream headers, strict zoom/x/y validation. Provider switchable via `TILE_PROVIDER_URL` / `TILE_PROVIDER_KEY` |
 | `GET` | `/api/locale` | public | Persist the interface locale and deep-link (ADR 0015): `?lang=it&next=/guide` sets the preference cookie server-side and redirects (`302`) to the same-site `next` path (open-redirect-safe), so a shared link SSR-renders in the forced language with no EN→IT flash |
 
 The POST routes are no longer prototype-only: they carry rate limiting, input
 limits, optional authenticated attribution with CSRF protection, and (for
-photos) the full intake pipeline described above. The reviewer interface is
-the `/api/moderation` queue gated by coarse roles; the worker edge Basic/Bearer
-gate remains the transport-level login for the moderation dashboard.
+cameras) the duplicate-confirmation gate described above. The reviewer
+interface is the `/api/moderation` queue gated by coarse roles; the worker
+edge Basic/Bearer gate remains the transport-level login for the moderation
+dashboard.
 
 ## Tables
 
@@ -281,9 +265,8 @@ Named moderators with the granular DATA_TRUST role: `displayName` (unique),
 `administrator`), `active`, `mfaEnabled`, `userId` → `users.id` (optional
 link). The moderation PATCH derives the acting reviewer server-side from the
 authenticated user's linked reviewer row. Under ADR 0021 §8.3 the role
-matrix stays defined for the residual legal-emergency surface (photo
-redaction approval, admin hide/remove); intake/record reviewers have no
-normal-flow duties anymore.
+matrix stays defined for the residual legal-emergency surface (admin
+hide/remove); intake/record reviewers have no normal-flow duties anymore.
 
 ### `moderationQueue`
 
@@ -295,7 +278,7 @@ Per-entity workflow state (one open row per entity): `entity` + `entityId`,
 state; this table tracks assignment, sensitivity, second review, and
 escalation. **Retired for the normal flow (ADR 0021 §7.3/§8):** open rows
 were closed by migration `0039`; the table survives only for the residual
-legal-emergency surface (admin hide/remove) and photo redaction approval.
+legal-emergency surface (admin hide/remove).
 
 ### `moderationAppeals`
 
@@ -320,17 +303,6 @@ Also records the community-layer internal events that have no public row
 blocked at the database layer (triggers in migration `0008`); the API exposes
 no way to mutate history. Full attribution stays internal; the public
 projection is the unattributed [`camera_lifecycle_events`](#cameralifecycleevents).
-
-### `photos`
-
-Photo evidence metadata (bytes live in R2 bucket `PHOTOS` under an opaque
-`storageKey` never exposed to clients). `cameraId`, `contributorId`,
-`submitterKey` (internal pending-quota bucket: `contributor:<id>` for
-authenticated uploads, `anon:<sha256(caller key)>` for anonymous ones; never
-exposed and only pending rows count), `mimeType`, `width`, `height`,
-`sizeBytes`, `status` (`pending` → `approved` | `rejected`), `exifStripped`
-(mandatory intake strip), `redactionConfirmed` (set by the moderator at
-approval time), timestamps.
 
 ### `cameraCommunityActions`
 

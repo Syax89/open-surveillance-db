@@ -5,7 +5,6 @@
 // checkRateLimit, using the real handlers against the mocked db boundary
 // (helpers/api-harness.mjs):
 //
-//   POST /api/photos             submit bucket    (POST_RATE_LIMIT_*)
 //   POST /api/cameras            submit bucket    (POST_RATE_LIMIT_*)
 //   POST /api/appeals            appeal bucket    (APPEAL_RATE_LIMIT_*)
 //   PATCH /api/moderation        moderate bucket  (MODERATION_RATE_LIMIT_*)
@@ -73,11 +72,11 @@ const DEFAULT_ENV = {
 
 beforeEach(async () => {
   resetMockState();
-  // Write gate (Fase E1): the submit routes (photos, cameras) require a
-  // VERIFIED contributor session. The rate limiter runs BEFORE the gate on
-  // both routes, so a burst is still 429 for any caller — but the first
-  // (under-limit) request must pass the gate to reach its normal handler
-  // path (415 image validation / 201 store). Default fixture: verified.
+  // Write gate (Fase E1): the submit route (cameras) requires a VERIFIED
+  // contributor session. The rate limiter runs BEFORE the gate, so a burst
+  // is still 429 for any caller — but the first (under-limit) request must
+  // pass the gate to reach its normal handler path (201 store). Default
+  // fixture: verified.
   stubContributorSession();
   if (!env) {
     env = await sharedEnv();
@@ -176,24 +175,14 @@ function identityHeaders(ip, xff) {
 }
 
 const build = {
-  photos: (ip, xff) =>
-    apiRequest("/api/photos", {
-      method: "POST",
-      headers: {
-        "content-type": "image/jpeg",
-        cookie: "osdb_session=raw-session-token-abc123; osdb_csrf=csrf-token-123",
-        "x-csrf-token": "csrf-token-123",
-        ...identityHeaders(ip, xff),
-      },
-    }),
-  cameras: (ip) =>
+  cameras: (ip, xff) =>
     apiRequest("/api/cameras", {
       method: "POST",
       body: { title: "Rate-limit test camera", kind: "Dome", latitude: 44.4, longitude: 12.2 },
       headers: {
         cookie: "osdb_session=raw-session-token-abc123; osdb_csrf=csrf-token-123",
         "x-csrf-token": "csrf-token-123",
-        ...identityHeaders(ip),
+        ...identityHeaders(ip, xff),
       },
     }),
   appeals: (ip) =>
@@ -232,7 +221,6 @@ const build = {
 };
 
 const routes = {
-  photos: () => loadRoute("app/api/photos/route.mjs"),
   cameras: () => loadRoute("app/api/cameras/route.mjs"),
   appeals: () => loadRoute("app/api/appeals/route.mjs"),
   moderation: () => loadRoute("app/api/moderation/route.mjs"),
@@ -289,26 +277,10 @@ async function waitForAlert(messages, timeoutMs = 1_000) {
 //    and the blocked request never reaches the database layer.
 // ---------------------------------------------------------------------------
 
-test("POST /api/photos rate-limits the submit family with 429 + Retry-After", async () => {
-  env.POST_RATE_LIMIT_MAX = "1";
-  env.POST_RATE_LIMIT_WINDOW_SECONDS = "60";
-  stub("pendingPhotoUsage", async () => ({ count: 0, bytes: 0 })); // photo quota (#123), route contract on main
-  const { POST } = await routes.photos();
-  const caller = "203.0.113.101";
-
-  const first = await POST(build.photos(caller));
-  assert.equal(first.status, 415, "the first request must pass the rate gate (and fail image validation)");
-
-  const blocked = await POST(build.photos(caller));
-  assertBlocked(blocked);
-  await assertErrorBody(blocked, /too many submissions/i);
-});
-
 test("POST /api/cameras rate-limits the submit family with 429 + Retry-After", async () => {
   env.POST_RATE_LIMIT_MAX = "1";
   env.POST_RATE_LIMIT_WINDOW_SECONDS = "60";
   stub("createCamera", async (input) => ({ id: 1, ...input }));
-  stub("linkPhotosToCamera", async () => 0);
   stub("findNearbyPublicCameras", async () => []);
   const { POST } = await routes.cameras();
   const caller = "203.0.113.102";
@@ -403,23 +375,11 @@ test("GET /api/cameras/revisions rate-limits the revisions family with 429 + Ret
 test("calls under the threshold are not rate-limited on any route family", async (t) => {
   const cases = [
     {
-      name: "POST /api/photos",
-      knob: "POST_RATE_LIMIT_MAX",
-      setup: () => {
-        stubContributorSession();
-        stub("pendingPhotoUsage", async () => ({ count: 0, bytes: 0 }));
-      },
-      handler: async () => (await routes.photos()).POST,
-      request: () => build.photos("203.0.113.111"),
-      expected: 415,
-    },
-    {
       name: "POST /api/cameras",
       knob: "POST_RATE_LIMIT_MAX",
       setup: () => {
         stubContributorSession();
         stub("createCamera", async (input) => ({ id: 1, ...input }));
-        stub("linkPhotosToCamera", async () => 0);
         stub("findNearbyPublicCameras", async () => []);
       },
       handler: async () => (await routes.cameras()).POST,
@@ -497,14 +457,15 @@ test("calls under the threshold are not rate-limited on any route family", async
 test("route families keep independent rate-limit windows", async () => {
   const caller = "203.0.113.200";
 
-  // Exhaust the submit family through POST /api/photos.
+  // Exhaust the submit family through POST /api/cameras.
   env.POST_RATE_LIMIT_MAX = "1";
   env.POST_RATE_LIMIT_WINDOW_SECONDS = "60";
-  stub("pendingPhotoUsage", async () => ({ count: 0, bytes: 0 })); // photo quota (#123), route contract on main
-  const photosRoute = await routes.photos();
-  const first = await photosRoute.POST(build.photos(caller));
+  stub("createCamera", async (input) => ({ id: 1, ...input }));
+  stub("findNearbyPublicCameras", async () => []);
+  const submitRoute = await routes.cameras();
+  const first = await submitRoute.POST(build.cameras(caller));
   assert.notEqual(first.status, 429, "the first submit must pass");
-  const submitBlocked = await photosRoute.POST(build.photos(caller));
+  const submitBlocked = await submitRoute.POST(build.cameras(caller));
   assertBlocked(submitBlocked, "the submit family must be exhausted for this caller");
 
   // The plain read family is untouched by the submit burst.
@@ -515,7 +476,7 @@ test("route families keep independent rate-limit windows", async () => {
   assert.equal(read.status, 200, "the read bucket must not be affected by the submit bucket");
 
   // The search family is untouched too (the task's canonical example: a
-  // photos burst must not starve search).
+  // submit burst must not starve search).
   stub("searchPublicCamerasNearPage", async () => ({ records: [], total: 0, nextOffset: null }));
   const searchRoute = await loadRoute("app/api/cameras/search/route.mjs");
   const search = await searchRoute.GET(build.search(caller));
@@ -543,7 +504,7 @@ test("route families keep independent rate-limit windows", async () => {
   const nearBlocked = await nearbyRoute.GET(build.nearby(caller));
   assertBlocked(nearBlocked, "the nearby family must be exhausted for this caller");
 
-  const freshSubmit = await photosRoute.POST(build.photos("203.0.113.201"));
+  const freshSubmit = await submitRoute.POST(build.cameras("203.0.113.201"));
   assert.notEqual(freshSubmit.status, 429, "a fresh submit caller must not inherit the nearby block");
 });
 
@@ -555,48 +516,51 @@ test("route families keep independent rate-limit windows", async () => {
 test("the caller key prefers the edge IP over X-Forwarded-For at the route layer", async () => {
   env.POST_RATE_LIMIT_MAX = "1";
   env.POST_RATE_LIMIT_WINDOW_SECONDS = "60";
-  stub("pendingPhotoUsage", async () => ({ count: 0, bytes: 0 })); // photo quota (#123), route contract on main
-  const { POST } = await routes.photos();
+  stub("createCamera", async (input) => ({ id: 1, ...input }));
+  stub("findNearbyPublicCameras", async () => []);
+  const { POST } = await routes.cameras();
 
   // Same edge IP with a different forwarded hop stays blocked: the edge IP
   // is authoritative when present.
   rateLimit.resetRateLimitState();
-  const edgeA1 = await POST(build.photos("1.1.1.1", "9.9.9.9, 10.0.0.1"));
+  const edgeA1 = await POST(build.cameras("1.1.1.1", "9.9.9.9, 10.0.0.1"));
   assert.notEqual(edgeA1.status, 429, "first request for edge IP 1.1.1.1 must pass");
-  const edgeA2 = await POST(build.photos("1.1.1.1", "8.8.8.8, 10.0.0.1"));
+  const edgeA2 = await POST(build.cameras("1.1.1.1", "8.8.8.8, 10.0.0.1"));
   assertBlocked(edgeA2, "a second request from the same edge IP must be blocked even with a different XFF");
-  const edgeB = await POST(build.photos("2.2.2.2", "9.9.9.9, 10.0.0.1"));
+  const edgeB = await POST(build.cameras("2.2.2.2", "9.9.9.9, 10.0.0.1"));
   assert.notEqual(edgeB.status, 429, "a different edge IP must have its own window");
 });
 
 test("without an edge IP the X-Forwarded-For header is NOT trusted (shared unknown key)", async () => {
   env.POST_RATE_LIMIT_MAX = "1";
   env.POST_RATE_LIMIT_WINDOW_SECONDS = "60";
-  stub("pendingPhotoUsage", async () => ({ count: 0, bytes: 0 })); // photo quota (#123), route contract on main
-  const { POST } = await routes.photos();
+  stub("createCamera", async (input) => ({ id: 1, ...input }));
+  stub("findNearbyPublicCameras", async () => []);
+  const { POST } = await routes.cameras();
 
   // QA F7 (t_894e0cc3): on a deployment without the Cloudflare edge the
   // X-Forwarded-For header is client-controlled, so a caller that only
   // sends it must NOT get a per-hop window — every such caller shares the
   // single "unknown" bucket (fail-closed), exactly like the no-header case.
-  const first = await POST(build.photos(undefined, "203.0.113.9, 10.0.0.1"));
+  const first = await POST(build.cameras(undefined, "203.0.113.9, 10.0.0.1"));
   assert.notEqual(first.status, 429, "the first request without an edge IP must pass");
-  const sameHop = await POST(build.photos(undefined, "203.0.113.9, 10.0.0.1"));
+  const sameHop = await POST(build.cameras(undefined, "203.0.113.9, 10.0.0.1"));
   assertBlocked(sameHop, "a second request must be blocked (shared unknown bucket)");
-  const otherHop = await POST(build.photos(undefined, "203.0.113.10, 10.0.0.1"));
+  const otherHop = await POST(build.cameras(undefined, "203.0.113.10, 10.0.0.1"));
   assertBlocked(otherHop, "a different X-Forwarded-For must NOT get its own window — the header is spoofable and must not reset the cap");
 });
 
 test("a request with no identity header degrades to the unknown key without crashing", async () => {
   env.POST_RATE_LIMIT_MAX = "1";
   env.POST_RATE_LIMIT_WINDOW_SECONDS = "60";
-  stub("pendingPhotoUsage", async () => ({ count: 0, bytes: 0 })); // photo quota (#123), route contract on main
-  const { POST } = await routes.photos();
+  stub("createCamera", async (input) => ({ id: 1, ...input }));
+  stub("findNearbyPublicCameras", async () => []);
+  const { POST } = await routes.cameras();
 
-  const first = await POST(build.photos());
+  const first = await POST(build.cameras());
   assert.notEqual(first.status, 429, "the first anonymous request must not be rate-limited");
-  assert.equal(first.status, 415, "it must reach the normal handler path (image validation), not crash");
-  const blocked = await POST(build.photos());
+  assert.equal(first.status, 201, "it must reach the normal handler path (store), not crash");
+  const blocked = await POST(build.cameras());
   assertBlocked(blocked, "the shared unknown key must hit the limit — but answer a clean 429, never a 500");
 });
 
@@ -612,16 +576,17 @@ test("a 429 is a clean 429 and the hashed abuse alert fires once per cooldown", 
   env.ABUSE_ALERT_SURGE_THRESHOLD = "1000"; // silence the aggregate surge alert
   env.ABUSE_ALERT_COOLDOWN_SECONDS = "300";
   const caller = "203.0.113.210";
-  stub("pendingPhotoUsage", async () => ({ count: 0, bytes: 0 })); // photo quota (#123), route contract on main
-  const { POST } = await routes.photos();
+  stub("createCamera", async (input) => ({ id: 1, ...input }));
+  stub("findNearbyPublicCameras", async () => []);
+  const { POST } = await routes.cameras();
 
   const messages = [];
   await captureErrors(async () => {
-    const first = await POST(build.photos(caller));
+    const first = await POST(build.cameras(caller));
     assert.notEqual(first.status, 429);
-    const blocked = await POST(build.photos(caller));
+    const blocked = await POST(build.cameras(caller));
     assertBlocked(blocked);
-    const again = await POST(build.photos(caller));
+    const again = await POST(build.cameras(caller));
     assertBlocked(again, "a repeated block within the cooldown must still answer 429, not 500");
     await waitForAlert(messages);
   }, messages);
@@ -632,7 +597,7 @@ test("a 429 is a clean 429 and the hashed abuse alert fires once per cooldown", 
   const payload = JSON.parse(serialized);
   assert.equal(payload.source, "open-surveillance-db");
   assert.equal(payload.event, "rate_limited");
-  assert.equal(payload.route, "/api/photos");
+  assert.equal(payload.route, "/api/cameras");
   assert.match(payload.callerHash, /^[0-9a-f]{64}$/, "the caller must be identified only by a SHA-256 hash");
   assert.ok(!serialized.includes(caller), "the alert must never carry the raw caller key");
   assert.ok(!serialized.includes("203.0.113"), "no part of the raw IP may leak into an alert");

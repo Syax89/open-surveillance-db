@@ -21,7 +21,7 @@ import { callerKey, checkRateLimit, limitsFor } from "../../../lib/rate-limit";
  * list, and fails closed with 404 for anything that is not publicly
  * current — a pending, stale, rejected or removed record is
  * indistinguishable from a missing id (no existence leak, same rule as the
- * photo route).
+ * write-route pattern).
  *
  * The id is parsed from the URL path (works identically under Next.js App
  * Router and the plain-Node route harness, which invokes handlers with a
@@ -42,7 +42,7 @@ export async function GET(request: Request) {
   const id = Number(idParam);
 
   // Public read route: metered per caller in the read-family bucket, same as
-  // the directory list and the photo bytes. Malformed ids above answered 404
+  // the directory list. Malformed ids above answered 404
   // without touching the database and are not counted.
   const key = callerKey(request, env);
   const limitOptions = limitsFor("read", env);

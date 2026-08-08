@@ -535,7 +535,7 @@ test("the account page never exposes a real email before login", async () => {
 // isolated unit suite in tests/worker-edge.test.mjs.
 
 const GATE_UNAVAILABLE_BODY = { error: "Moderation is unavailable." };
-const MODERATION_PATHS = ["/moderation", "/api/moderation", "/api/moderation/photos/1"];
+const MODERATION_PATHS = ["/moderation", "/api/moderation", "/api/moderation/corrections/1"];
 
 test("worker gate fails closed on every moderation path without credentials", async () => {
   for (const route of MODERATION_PATHS) {
@@ -559,7 +559,7 @@ test("worker gate rejects a wrong Basic credential with 401 + WWW-Authenticate",
 test("worker gate admits a correct Basic credential and forwards to the app handler", async () => {
   const env = { MODERATION_USER: "moderator", MODERATION_PASSWORD: "s3cret" };
   const correct = `Basic ${Buffer.from("moderator:s3cret").toString("base64")}`;
-  for (const route of ["/api/moderation", "/api/moderation/photos/1"]) {
+  for (const route of ["/api/moderation", "/api/moderation/corrections/1"]) {
     const { response } = await renderRoute(route, { env, headers: { authorization: correct } });
     // The gate passed: the response is the app handler's, never the gate's
     // (a gate denial would carry WWW-Authenticate and the plain "Unauthorized"

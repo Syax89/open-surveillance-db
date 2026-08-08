@@ -2,7 +2,7 @@
  * Client-side interaction tests for ModerationDashboard — QA t_61b90f6a.
  *
  * Covers, in jsdom with @testing-library/react + user-event:
- *   1. the queue renders camera/correction/photo rows from GET /api/moderation;
+ *   1. the queue renders camera/correction rows from GET /api/moderation;
  *   2. per-row action groups carry an accessible aria-label ("Decision for
  *      camera 1") and the approve/reject/hide buttons are disabled until a
  *      reason and an acting reviewer are selected;
@@ -58,7 +58,6 @@ const queueFixture = {
       createdAt: "2026-02-11T09:00:00.000Z",
     },
   ],
-  photoReports: [],
   recentEvents: [],
   reviewers: [
     { id: 2, displayName: "Fixture Reviewer", role: "moderator" },
@@ -70,7 +69,7 @@ const queueFixture = {
 
 const emptyQueue = {
   cameraReports: [], publishedCameras: [], reviewCameras: [], correctionRequests: [],
-  cameraEditRequests: [], photoReports: [], recentEvents: [], reviewers: [], queueItems: [],
+  cameraEditRequests: [], recentEvents: [], reviewers: [], queueItems: [],
 };
 
 test("moderation: renders the queue rows and accessible per-row action labels", async () => {

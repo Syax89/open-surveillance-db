@@ -114,6 +114,13 @@ RETENTION_SCHEDULE rules as follows:
 | R6 | photo evidence | tied to the record | deleted with the record; orphan `pending` photos after 90 days; `rejected` photos at the next run |
 | R7 | sessions | `expires_at` / `revoked_at` | delete expired or revoked rows |
 
+> **Superseded (2026-08-08, CEO decision — PR "remove photo upload"):** the
+> photo upload feature was removed entirely. R6/R13 no longer apply — the
+> `photos` table is dropped (migration `0043`), the retention sweep never
+> touches the bucket, and the existing R2 objects are retained without
+> deletion. See `../legal/RETENTION_SCHEDULE.md` R13 for the historical
+> record.
+
 Mechanics chosen:
 
 - **Published records past retention are flagged, not anonymised.** A record

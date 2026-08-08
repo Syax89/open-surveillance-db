@@ -482,29 +482,9 @@ test("eraseContributor de-attributes the reports, revokes all sessions, and hard
   });
   assert.equal(anonymous.contributorId, null);
 
-  // QA#3 F3: photo evidence attributed to the erased contributor must be
-  // de-attributed (SET NULL) exactly like reports — the photo row survives
-  // its R6/R13 lifecycle, the personal link is severed. Two photos: one
-  // attributed, one anonymous (must survive untouched).
-  const photoInsert = (contributorId, storageKey) =>
-    runtime.env.DB.prepare(
-      `INSERT INTO photos (camera_id, contributor_id, storage_key, mime_type, width, height, size_bytes, status, exif_stripped, redaction_confirmed, created_at, updated_at)
-       VALUES (?, ?, ?, 'image/jpeg', 100, 100, 1000, 'pending', 1, 0, ?, ?)`,
-    )
-      .bind(attributed.id, contributorId, storageKey, NOW, NOW)
-      .run();
-  photoInsert(profile.id, "photos/erased-photo-1");
-  photoInsert(null, "photos/anonymous-photo-1");
-  // A keeper photo (attributed to the SURVIVING contributor, not to the
-  // erased one) must survive untouched — `attributed.id` is the camera row
-  // id and numerically coincides with profile.id in this suite, so the
-  // keeper photo must be attributed to `keeper.id` to stay out of the count.
-  photoInsert(keeper.id, "photos/keeper-photo-1");
-
   const result = await auth.eraseContributor(profile.id);
   assert.equal(result.deleted, true);
   assert.equal(result.deattributedReports, 2, "both attributed reports are counted");
-  assert.equal(result.deattributedPhotos, 1, "QA#3 F3: the attributed photo is counted and severed");
 
   // Account and sessions are gone.
   assert.equal(await auth.getContributorById(profile.id), null);
@@ -522,24 +502,6 @@ test("eraseContributor de-attributes the reports, revokes all sessions, and hard
   assert.equal(other.contributorId, null);
   const all = await runtime.env.DB.prepare("SELECT COUNT(*) AS n FROM cameras").first();
   assert.equal(Number(all.n), 3, "no report row is deleted by erasure");
-
-  // QA#3 F3: photos survive with contributor_id NULL; the anonymous photo
-  // and the keeper photo are untouched (the erased account's link is gone,
-  // the evidence rows remain).
-  const erasedPhoto = await runtime.env.DB.prepare(
-    "SELECT contributor_id AS contributorId FROM photos WHERE storage_key = ?",
-  ).bind("photos/erased-photo-1").first();
-  assert.equal(erasedPhoto.contributorId, null, "the erased contributor's photo is de-attributed");
-  const anonymousPhoto = await runtime.env.DB.prepare(
-    "SELECT contributor_id AS contributorId FROM photos WHERE storage_key = ?",
-  ).bind("photos/anonymous-photo-1").first();
-  assert.equal(anonymousPhoto.contributorId, null, "anonymous photo untouched");
-  const keeperPhoto = await runtime.env.DB.prepare(
-    "SELECT contributor_id AS contributorId FROM photos WHERE storage_key = ?",
-  ).bind("photos/keeper-photo-1").first();
-  assert.equal(keeperPhoto.contributorId, keeper.id, "keeper photo stays attributed to the surviving contributor");
-  const photoCount = await runtime.env.DB.prepare("SELECT COUNT(*) AS n FROM photos").first();
-  assert.equal(Number(photoCount.n), 3, "no photo row is deleted by erasure (evidence survives)");
 
   // Every auth artifact of the erased contributor is hard-deleted
   // (P2-2: explicit DELETEs, the harness does not enforce FKs).

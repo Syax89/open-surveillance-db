@@ -628,128 +628,6 @@ test("POST /api/cameras maps malformed JSON bodies to 400", async () => {
   assert.equal(callArgs("createCamera").length, 0, "no db write for malformed JSON");
 });
 
-test("POST /api/cameras links uploaded photo ids to the new report", async () => {
-  stub("createCamera", async (input) => ({ id: 14, ...input }));
-  stub("linkPhotosToCamera", async () => 2);
-  stub("findNearbyPublicCameras", async () => []);
-  const { POST } = await camerasRoute();
-  const response = await POST(
-    sessionPost({
-      title: "With photo evidence",
-      kind: "Dome",
-      latitude: 45.0,
-      longitude: 9.0,
-      photoIds: [101, 102],
-    }),
-  );
-  assert.equal(response.status, 201);
-  const body = await responseBody(response);
-  assert.equal(body.record.id, 14);
-  assert.equal(body.linkedPhotos, 2);
-  // Verified contributor (Fase E1 default fixture) → the id is threaded into
-  // photo linking; anonymous uploads no longer exist.
-  assert.deepEqual(callArgs("linkPhotosToCamera")[0], [14, [101, 102], 7]);
-});
-
-test("POST /api/cameras passes the authenticated submitter's contributor id into photo linking", async () => {
-  // Ownership guard wiring (PR #64, Ada review): a photo attributed to a
-  // contributor at upload may only be linked by that same contributor. The
-  // route must forward the resolved contributor id so linkPhotosToCamera can
-  // enforce it — a session-carrying submitter with valid CSRF gets their id
-  // threaded through; with Fase E1 there is no anonymous path anymore — the
-  // default fixture already covers the verified contributor.
-  stub("findSessionByToken", async () => ({
-    tokenHash: "x",
-    csrfToken: "csrf-token-123",
-    contributor: { id: 7, email: "linus@osdb.test", displayName: "Linus" },
-  }));
-  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
-  stub("createCamera", async (input) => ({ id: 14, ...input }));
-  stub("linkPhotosToCamera", async () => 2);
-  stub("findNearbyPublicCameras", async () => []);
-  const { POST } = await camerasRoute();
-  const response = await POST(
-    new Request("https://osdb.test/api/cameras", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        origin: "https://osdb.test",
-        cookie: "osdb_session=raw-session-token-abc123; osdb_csrf=csrf-token-123",
-        "x-csrf-token": "csrf-token-123",
-      },
-      body: JSON.stringify({
-        title: "With photo evidence",
-        kind: "Dome",
-        latitude: 45.0,
-        longitude: 9.0,
-        photoIds: [101, 102],
-      }),
-    }),
-  );
-  assert.equal(response.status, 201);
-  assert.deepEqual(callArgs("linkPhotosToCamera")[0], [14, [101, 102], 7]);
-});
-
-test("POST /api/cameras rejects non-integer photo ids with 400", async () => {
-  stub("createCamera", async (input) => ({ id: 15, ...input }));
-  const { POST } = await camerasRoute();
-  const response = await POST(
-    sessionPost({
-        title: "Bad photo ids",
-        kind: "Dome",
-        latitude: 45.0,
-        longitude: 9.0,
-        photoIds: [101, "102"],
-      }),
-  );
-  assert.equal(response.status, 400);
-  assert.equal(callArgs("linkPhotosToCamera").length, 0, "no linking on invalid ids");
-});
-
-test("POST /api/cameras keeps photo linking best-effort when storage fails", async () => {
-  stub("createCamera", async (input) => ({ id: 16, ...input }));
-  stub("linkPhotosToCamera", async () => {
-    throw new Error("R2 unavailable");
-  });
-  stub("findNearbyPublicCameras", async () => []);
-  const { POST } = await camerasRoute();
-  const response = await POST(
-    sessionPost({
-        title: "Linking failure",
-        kind: "Dome",
-        latitude: 45.0,
-        longitude: 9.0,
-        photoIds: [101],
-      }),
-  );
-  assert.equal(response.status, 201, "a storage hiccup must never fail the report");
-  assert.equal((await responseBody(response)).linkedPhotos, 0);
-});
-
-test("POST /api/cameras accepts nonexistent photo ids best-effort with linkedPhotos 0", async () => {
-  // Photo id linking with ids that do not exist (audit t_0de37378 #6): the
-  // link is best-effort and silent — the report is still created (201), the
-  // db layer returns 0 for unmatched ids (no existence oracle, no throw).
-  stub("createCamera", async (input) => ({ id: 17, ...input }));
-  stub("linkPhotosToCamera", async () => 0);
-  stub("findNearbyPublicCameras", async () => []);
-  const { POST } = await camerasRoute();
-  const response = await POST(
-    sessionPost({
-        title: "Nonexistent photo ids",
-        kind: "Dome",
-        latitude: 45.0,
-        longitude: 9.0,
-        photoIds: [999_999, 999_998],
-      }),
-  );
-  assert.equal(response.status, 201);
-  const body = await responseBody(response);
-  assert.equal(body.record.id, 17);
-  assert.equal(body.linkedPhotos, 0, "unmatched photo ids must not fail the report");
-  assert.deepEqual(callArgs("linkPhotosToCamera")[0], [17, [999999, 999998], 7]);
-});
-
 test("POST /api/cameras rejects non-object JSON bodies", async () => {
   const { POST } = await camerasRoute();
   for (const body of ["42", "[1,2]", '"hello"']) {
@@ -971,7 +849,6 @@ test("POST rejects a high-strength duplicate with 409 and does NOT store the rec
   assert.ok(body.error, "the 409 must explain the gate");
   assert.deepEqual(body.possibleDuplicates, [duplicateFixture], "the 409 must carry the candidate list so the client can surface it");
   assert.equal(callArgs("createCamera").length, 0, "no db write for an unconfirmed duplicate");
-  assert.equal(callArgs("linkPhotosToCamera").length, 0, "no photo linking for an unconfirmed duplicate");
 });
 
 test("POST stores the report once the submitter explicitly confirms the duplicate is distinct", async () => {

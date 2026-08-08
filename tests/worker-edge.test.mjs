@@ -90,7 +90,7 @@ async function buildWorkerTree() {
   await writeFile(
     path.join(dbDir, "retention.mjs"),
     "export const __calls = [];\n" +
-      "export const DEFAULT_RETENTION_POLICY = { pendingDays: 90, rejectedDays: 30, correctionDays: 730, orphanPhotoDays: 90 };\n" +
+      "export const DEFAULT_RETENTION_POLICY = { pendingDays: 90, rejectedDays: 30, correctionDays: 730 };\n" +
       "export async function runRetentionSweep(...args) { __calls.push(args); return {}; }\n",
   );
   await writeFile(
@@ -154,7 +154,6 @@ function testEnv(overrides = {}) {
     ASSETS: {},
     DB: {},
     IMAGES: {},
-    PHOTOS: {},
     ...overrides,
   };
 }
@@ -203,8 +202,8 @@ test("forwards unknown-route 404 responses from the handler unchanged", async ()
 test("preserves security headers set by the app handler (pass-through, never stripped)", async () => {
   // The worker wraps every response with the global security headers
   // (t_6148aa6f, PR #83), but must never overwrite handler-set headers —
-  // e.g. the photo routes ship X-Content-Type-Options: nosniff + CSP
-  // sandbox on binary bodies, which are stricter and must survive.
+  // an app route may ship a stricter X-Content-Type-Options / CSP on its
+  // own response, which must survive.
   const { worker, app } = await loadWorker();
   const handler = app.default;
   const originalFetch = handler.fetch;
@@ -218,7 +217,7 @@ test("preserves security headers set by the app handler (pass-through, never str
       },
     });
   try {
-    const response = await worker.fetch(request("/api/photos/1"), testEnv(), ctx());
+    const response = await worker.fetch(request("/api/cameras/1"), testEnv(), ctx());
     assert.equal(response.status, 200);
     assert.equal(response.headers.get("x-content-type-options"), "nosniff");
     assert.equal(response.headers.get("content-security-policy"), "default-src 'none'; sandbox");
@@ -234,7 +233,7 @@ test("preserves security headers set by the app handler (pass-through, never str
 test("gate fails closed with no credentials configured (503, no-store, no handler call)", async () => {
   const { worker, app } = await loadWorker();
   const ctxObj = ctx();
-  for (const pathname of ["/moderation", "/api/moderation", "/api/moderation/photos/1"]) {
+  for (const pathname of ["/moderation", "/api/moderation", "/api/moderation/corrections/1"]) {
     const response = await worker.fetch(request(pathname), testEnv(), ctxObj);
     assert.equal(response.status, 503, `${pathname} must be 503 without credentials`);
     assert.deepEqual(JSON.parse(await response.text()), { error: "Moderation is unavailable." });
@@ -441,7 +440,7 @@ test("non-moderation paths are not gated, even with no credentials configured", 
 
 test("the moderation path predicate covers the API subtree, not lookalikes", async () => {
   const { worker, app } = await loadWorker();
-  const gated = ["/moderation", "/api/moderation", "/api/moderation/photos/1"];
+  const gated = ["/moderation", "/api/moderation", "/api/moderation/corrections/1"];
   const ungated = ["/moderation-help", "/api/moderation-extra", "/api/moderationx"];
   for (const pathname of gated) {
     const response = await worker.fetch(request(pathname), testEnv(), ctx());

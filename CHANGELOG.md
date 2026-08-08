@@ -422,6 +422,17 @@ changes accumulate under `[Unreleased]`.
   i18n; parità EN/IT garantita da `tsc` (0 errori); nessuna stringa
   pinnata nei test modificata. Report: `docs/design/riscrittura-pagine.md`.
 
+### Removed
+
+- **Photo evidence upload — removed entirely (CEO decision 2026-08-08,**
+  **"troppo rischioso e troppo esoso di spazio"):** `POST /api/photos` and
+  `GET /api/photos/[id]` routes, `db/photos.ts`, the `photos` D1 table
+  (migration `0043`), the R2 `PHOTOS` bucket binding, EXIF/metadata
+  stripping (`app/lib/image-metadata.ts`), the photo-upload UI in the
+  report form and moderation queue, photo quota/zip-bomb/ownership logic
+  and all related tests. The **existing R2 objects are retained** — no
+  bucket deletion was performed, only the code that read them is gone.
+
 ### Fixed
 
 - **UI /mappa, /directory, /correggi — removed the hardcoded two-record

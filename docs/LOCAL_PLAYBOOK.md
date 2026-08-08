@@ -20,9 +20,8 @@ on the public map, directory, `/api/cameras`, CSV/GeoJSON exports, or nearby sea
 
 The local prototype runs without Cloudflare, so `cf-connecting-ip` is never
 present and the per-caller buckets key on the first `x-forwarded-for` hop
-(`app/lib/rate-limit.ts` `callerKey`; the anonymous pending-photo quota
-derives from the same key via `app/lib/photo-quota.ts`). Any client can set
-that header, so rate limits and the anonymous quota are NOT a security
+(`app/lib/rate-limit.ts` `callerKey`). Any client can set
+that header, so rate limits are NOT a security
 boundary on a LAN deployment — treat them as development conveniences that
 show the 429 contract, not as abuse protection. The public service must sit
 behind Cloudflare (or an equivalent trusted edge that overwrites the

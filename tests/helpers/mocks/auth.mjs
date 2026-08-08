@@ -12,7 +12,7 @@ export const PBKDF2_ITERATIONS = 210_000;
 // Whitelists the contributions route validates against (C2). These are pure
 // data constants, mirrored verbatim so the route's whitelist checks run for
 // real in route-level tests.
-export const CONTRIBUTION_TYPES = ["camera", "correction", "photo"];
+export const CONTRIBUTION_TYPES = ["camera", "correction"];
 export const CONTRIBUTION_STATUSES = [
   "pending",
   "active",

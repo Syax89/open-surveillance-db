@@ -93,7 +93,7 @@ async function guardMutation(
     return Response.json({ error: "Invalid CSRF token. Refresh the page and try again." }, { status: 403, headers: NO_STORE_HEADERS });
   }
 
-  // IP-hash burst bucket (layer 4 anti-gaming, photos.submitter_key pattern):
+  // IP-hash burst bucket (layer 4 anti-gaming, never-the-raw-IP pattern):
   // keyed by the SHA-256 of the caller key — never the raw IP. The surge
   // alert below carries only the callerHash.
   const burst = await checkConfirmIpBurst(env, key);

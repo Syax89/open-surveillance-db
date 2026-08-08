@@ -71,7 +71,7 @@ processing; geographical extent. For OpenSurveillanceDB:
 | Factor (WP 243 rev.01) | Assessment at pilot and foreseeable public scale |
 |---|---|
 | Number of data subjects | Low — voluntary, pseudonymous contributors; no tracking of third parties. Published records concern infrastructure, not persons |
-| Volume of data | Low — structured records of camera locations; photo evidence private until moderation and retained max 12 months (R6) |
+| Volume of data | Low — structured records of camera locations; no photo data (photo upload removed 2026-08-08; existing R2 objects retained, no deletion) |
 | Duration | Bounded — retention schedule with fixed terms (R5–R7); no indefinite accumulation |
 | Geographical extent | Single pilot deployment, community-governed, non-commercial; no EU-wide or cross-border operation |
 

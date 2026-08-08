@@ -106,9 +106,9 @@ startup.
 | `0008_wave_b_reviewer_roles.sql` | reviewer roles, moderation queue, attributable audit events |
 | `0009_contributor_auth.sql` | contributor accounts and sessions (ADR 0013) |
 | `0010_auth_roles_appeals.sql` | auth roles, immutable audit trail, contributor appeals (ADR 0014) |
-| `0011_photo_uploads.sql` | photo evidence metadata (image bytes in R2) |
+| `0011_photo_uploads.sql` | photo evidence metadata — **feature removed 2026-08-08, table dropped by `0043`** |
 | `0012_moderation_events_entity_idx.sql` | audit-trail lookup index |
-| `0013_pending_photo_quota.sql` | per-caller pending-photo quota |
+| `0013_pending_photo_quota.sql` | per-caller pending-photo quota — **feature removed 2026-08-08, table dropped by `0043`** |
 | `0014_cameras_coordinates_idx.sql` | coordinate lookup index for proximity searches |
 | `0015_correction_camera_fk.sql` | `correction_requests.camera_id` → `cameras.id` FK |
 | `0016_login_lockout.sql` | per-email login lockout |

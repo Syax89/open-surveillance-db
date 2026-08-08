@@ -26,12 +26,6 @@
   "triggers": {
     "crons": ["0 3 * * *"]
   },
-  "r2_buckets": [
-    {
-      "binding": "PHOTOS",
-      "bucket_name": "opensurveillancedb-photos"
-    }
-  ],
   // Cloudflare Workers Rate Limiting bindings (audit #3 MEDIUM, t_dff3dadf):
   // the PRODUCTION enforcement point for the four critical public route
   // families — auth, write (submissions), read, tiles. Before this the

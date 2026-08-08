@@ -192,9 +192,6 @@ One-time setup before the first `deploy`:
 # D1 database: create it and copy the database_id into wrangler.jsonc
 npx wrangler d1 create osdb-production
 
-# R2 bucket backing the PHOTOS binding (must exist in the account)
-npx wrangler r2 bucket create opensurveillancedb-photos
-
 # Worker secrets (persist across deploys; never in source)
 npx wrangler secret put MODERATION_USER
 npx wrangler secret put MODERATION_PASSWORD
@@ -211,16 +208,8 @@ declares:
 | --- | --- | --- | --- |
 | `ASSETS` | Static assets | `dist/client` (production build output) | Serves the client bundle; image optimizer fetches assets through it (`worker/index.ts` `/_vinext/image`) |
 | `DB` | D1 database | `osdb-production` | All relational data (`db/*`) |
-| `PHOTOS` | R2 bucket | `opensurveillancedb-photos` | Photo evidence bytes: `db/photos.ts` stores EXIF-stripped images under `photos/<uuid>.<ext>` and reads them back for moderation preview / public serving. D1 stores metadata only — the bucket is the object store |
 | `IMAGES` | Cloudflare Images | (managed service, no resource to create) | On-the-fly image optimization (`worker/index.ts` `/_vinext/image`): resize/format/quality transforms via `env.IMAGES.input(...)` |
 | `EMAIL` | Email Service (`send_email`) | domain `opensurveillancedb.org`, sender `noreply@opensurveillancedb.org` | Transactional auth mail (`db/mailer.ts`): account verification and password reset (AUTH MULTI-METODO Fase A2, ADR 0020). Restricted with `allowed_sender_addresses` so even a compromised worker can only send from the noreply address |
-
-Create the R2 bucket before the first deploy (the binding in
-`wrangler.jsonc` is declarative; the bucket must exist in the account):
-
-```bash
-npx wrangler r2 bucket create opensurveillancedb-photos
-```
 
 The `IMAGES` binding targets the Cloudflare Images managed service and needs
 no explicit resource creation.
@@ -437,7 +426,7 @@ or client bundles (the secrets gate in CI rejects hardcoded credentials).
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `READ_RATE_LIMIT_MAX` / `READ_RATE_LIMIT_WINDOW_SECONDS` | 60 / 60 | Plain reads (`GET /api/cameras`, photo bytes `GET /api/photos/[id]`, photo list `GET /api/photos`) |
+| `READ_RATE_LIMIT_MAX` / `READ_RATE_LIMIT_WINDOW_SECONDS` | 60 / 60 | Plain reads (`GET /api/cameras`) |
 | `EXPORT_RATE_LIMIT_MAX` / `EXPORT_RATE_LIMIT_WINDOW_SECONDS` | 10 / 60 | Bulk exports (CSV/GeoJSON) |
 | `NEARBY_RATE_LIMIT_MAX` / `NEARBY_RATE_LIMIT_WINDOW_SECONDS` | 30 / 60 | Nearby search |
 | `REVISIONS_RATE_LIMIT_MAX` / `REVISIONS_RATE_LIMIT_WINDOW_SECONDS` | 30 / 60 | Public change history (`GET /api/cameras/revisions`) |
@@ -446,8 +435,6 @@ or client bundles (the secrets gate in CI rejects hardcoded credentials).
 | `APPEAL_RATE_LIMIT_MAX` / `APPEAL_RATE_LIMIT_WINDOW_SECONDS` | 20 / 60 | Appeal filing and review (`POST/GET /api/appeals`) — a distinct bucket from moderation so contributors contesting decisions and moderators reviewing them never starve the moderation queue |
 | `TILES_RATE_LIMIT_MAX` / `TILES_RATE_LIMIT_WINDOW_SECONDS` | 60 / 60 | Tile proxy (`GET /api/tiles/*`) — protects the OSMF upstream from per-caller scraping |
 | `POST_SUBMISSIONS_DISABLED` | `false` | Kill switch: reject new submissions with 503 |
-| `PHOTOS_MAX_PENDING_PER_CALLER` | 20 | Pending-photo count cap per caller bucket (authenticated: `contributor:<id>`; anonymous: `anon:<sha256(caller key)>`). `POST /api/photos` answers 429 when a caller is at the cap — a state quota distinct from the HTTP rate limit, bounding how much R2 storage and how many moderation-queue items one caller can accumulate while the queue catches up. Only `status = 'pending'` photos count; approved/rejected photos leave the cap as soon as a moderator decides them |
-| `PHOTOS_MAX_PENDING_BYTES` | 209715200 (200 MiB) | Pending R2 bytes cap per caller bucket, same semantics — bounds the storage volume even when the count is not the binding constraint |
 | `MAX_BODY_BYTES` | 32768 (32 KiB) | Max JSON request body; larger bodies answer 413 |
 | `ABUSE_ALERT_THRESHOLD` | 10 | Per-caller abuse events per window before an alert fires |
 | `ABUSE_ALERT_SURGE_THRESHOLD` | 50 | Route-wide events per window before a surge alert fires |
@@ -489,11 +476,11 @@ Input caps live in `app/lib/input-limits.ts`; alerts in
 key (never the raw IP) and never request bodies or query strings (see
 `docs/workstreams/OPS_OPEN.md` §Observability).
 
-### Media, tiles, and auth environment variables
+### Tiles, moderation, and auth environment variables
 
-The media/tile variables configure the photo upload pipeline and the
-same-origin tile proxy; the moderation/auth variables gate the moderation
-surface and contributor sessions. All are optional; the defaults below apply
+The tile variables configure the same-origin tile proxy; the
+moderation/auth variables gate the moderation surface and contributor
+sessions. All are optional; the defaults below apply
 when unset. Set them in the hosting platform's secret/environment store
 (`wrangler secret put` on Workers), never in source or client bundles.
 
@@ -518,7 +505,5 @@ The moderation gate **fails closed**: if neither the Basic pair nor the
 bearer token is configured, every `/moderation` and `/api/moderation*`
 request is denied with `503 Moderation is unavailable.` — see
 `worker/index.ts` and [ADR 0003](decisions/0003-moderation-access-control.md).
-The photo pipeline needs no additional variables beyond the `PHOTOS` R2
-bucket binding and the `IMAGES` binding declared in `wrangler.jsonc` (see
-"Cloudflare bindings" above): image size/dimension caps are tuned via the
-abuse-control variables in the previous table.
+The tile proxy needs no additional variables beyond `TILE_PROVIDER_URL` /
+`TILE_PROVIDER_KEY` above (see [OSM_INTEGRATION.md](OSM_INTEGRATION.md)).

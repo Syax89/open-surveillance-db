@@ -1,5 +1,12 @@
 # Check-report — R2 photo storage: PROCESSOR_REGISTER + PRIVACY_NOTICE § 5/§ 6
 
+> **SUPERSEDED (2026-08-08):** la funzionalità di photo evidence upload è stata
+> **rimossa integralmente** per decisione del CEO — il binding R2 `PHOTOS` non
+> esiste più (`wrangler.jsonc`), la tabella `photos` è dropata (migration
+> `0043`) e PROCESSOR_REGISTER/PRIVACY_NOTICE sono stati aggiornati alla
+> realtà senza foto. Gli oggetti R2 esistenti restano conservati (nessun
+> delete sul bucket); questo report resta come record storico al 2026-08-01.
+
 **Autore:** Rosa (DPO / Legal & Privacy Officer)
 **Data:** 2026-08-01
 **Oggetto:** allineamento di `docs/legal/PROCESSOR_REGISTER.md` e `docs/legal/PRIVACY_NOTICE.md` (§ 5 recipients, § 6 trasferimenti) al fatto che il bucket Cloudflare **R2 `PHOTOS`** è attivo su `main` (PR #64, STATUS gap #3).

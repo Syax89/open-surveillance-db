@@ -1,7 +1,7 @@
 /**
  * Nowrap 390px IT verification (t_e06f5c87, part 2).
  *
- * Checks the six white-space:nowrap rules in globals.css against long Italian
+ * Checks the five white-space:nowrap rules in globals.css against long Italian
  * text at a 390px viewport. For every rule we assert the hosting element does
  * not overflow its container and does not clip/truncate text unexpectedly:
  *   - document horizontal overflow (scrollWidth > innerWidth) is a FAIL
@@ -42,14 +42,6 @@ const RULES = [
     id: "directory-heading-text-button",
     selector: ".directory-tool-heading .text-button",
     page: "/directory",
-  },
-  {
-    // .photo-file-name — uploaded photo name in /segnala; has INTENTIONAL
-    // ellipsis (overflow:hidden + text-overflow:ellipsis + min-width:0).
-    id: "photo-file-name",
-    selector: ".photo-file-name",
-    page: "/segnala",
-    intentionalEllipsis: true,
   },
   {
     // .directory-tool .directory-controls > .text-button — "Azzera i filtri"
@@ -104,38 +96,6 @@ async function checkPage(browser, rule) {
     } catch {
       /* selector may vary; the dropdown may not open without JS app state */
     }
-  }
-
-  // photo-file-name renders only after a real upload (R2-backed POST); inject
-  // the exact ReportForm photo-list DOM (same classes/structure) to exercise
-  // the real CSS rule against a long Italian filename.
-  if (rule.id === "photo-file-name") {
-    await page.evaluate(() => {
-      const existing = document.querySelector(".photo-list");
-      if (existing) existing.remove();
-      const ul = document.createElement("ul");
-      ul.className = "photo-list";
-      ul.setAttribute("aria-label", "Foto");
-      const li = document.createElement("li");
-      const name = document.createElement("span");
-      name.className = "photo-file-name";
-      name.textContent =
-        "telecamera-con-sorveglianza-vicino-alla-scuola-elementare-di-via-romagna-2024-07-14_1530.jpg";
-      const meta = document.createElement("span");
-      meta.className = "search-count";
-      meta.textContent = "4032×3024 · image/jpeg";
-      li.append(name, meta);
-      ul.appendChild(li);
-      // Real layout: .photo-list sits inside .report-form (grid, definite
-      // width from .report-section container). Constrain the wrapper the
-      // same way (min(100% - 32px, 1120px)) so the flex shrink/ellipsis is
-      // exercised exactly as in production.
-      const wrapper = document.createElement("div");
-      wrapper.style.width = "min(100% - 32px, 1120px)";
-      wrapper.appendChild(ul);
-      (document.querySelector("form") ?? document.body).appendChild(wrapper);
-    });
-    await sleep(300);
   }
 
   const result = await page.evaluate(

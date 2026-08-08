@@ -24,9 +24,7 @@ import { urlTooLong } from "../../../lib/input-limits";
  *   - the contributor row is hard-deleted.
  *
  * The response carries the number of de-attributed reports (so the UI can
- * confirm what happened) and clears both session cookies. Since QA#3 F3 the
- * response also reports `deattributedPhotos` — the number of uploaded photo
- * rows whose contributor link was severed (SET NULL, same rule as reports).
+ * confirm what happened) and clears both session cookies.
  */
 export async function DELETE(request: Request) {
   if (urlTooLong(request)) {
@@ -54,9 +52,6 @@ export async function DELETE(request: Request) {
       {
         ok: true,
         deattributedReports: result.deattributedReports,
-        // QA#3 F3: photo attribution is severed like report attribution; the
-        // count lets the UI confirm the photos were de-attributed too.
-        deattributedPhotos: result.deattributedPhotos,
       },
       { headers: cookieHeaderInit(clearingCookieHeaders(env)) },
     );

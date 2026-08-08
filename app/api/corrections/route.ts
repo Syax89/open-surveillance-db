@@ -29,7 +29,7 @@ function cleanText(value: unknown, maxLength: number) {
  * app/lib/write-gate.ts). The per-IP `submit` rate bucket (default 5/60s)
  * bounds bursts and the dedupe (A5) lives in db/corrections.ts. Because
  * every request now carries cookies, the same-origin + CSRF double-submit
- * guards always apply (photos route pattern).
+ * guards always apply (write-route pattern).
  */
 export async function POST(request: Request) {
   // Input limits: reject absurdly long URLs before any parsing work.
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
   // share one single response body (anti-enumeration); a session created
   // before email verification is read-only and cannot write. Every request
   // now carries cookies, so the state change must pass same-origin + CSRF
-  // (photos route pattern).
+  // (write-route pattern).
   const gate = await requireVerifiedContributor(request);
   if (!gate.ok) return gate.response;
   if (!sameOrigin(request) || !csrfVerified(request, gate.session.csrfToken)) {

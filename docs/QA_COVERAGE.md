@@ -61,7 +61,6 @@ sotto soglia il job fallisce.
 | `app/api/auth/passkey/login/begin/route.ts` | 88.00 | 75.00 | 100.00 | 66/75 |
 | `app/api/cameras/[id]/confirmation/route.ts` | 89.29 | 89.58 | 100.00 | 175/196 |
 | `app/api/cameras/[id]/route.ts` | 89.67 | 91.67 | 100.00 | 191/213 |
-| `app/lib/image-metadata.ts` | 89.82 | 92.31 | 100.00 | 300/334 |
 | `app/lib/trust-levels.ts` | 89.86 | 100.00 | 66.67 | 62/69 |
 | `db/cameras.ts` | 90.13 | 87.80 | 85.71 | 475/527 |
 | `app/api/auth/oidc/merge/route.ts` | 90.27 | 86.21 | 100.00 | 102/113 |
@@ -75,12 +74,10 @@ sotto soglia il job fallisce.
 | `db/retention.ts` | 93.06 | 87.76 | 100.00 | 630/677 |
 | `app/api/auth/reset-password/request/route.ts` | 93.26 | 77.78 | 100.00 | 83/89 |
 | `app/api/auth/passkey/credentials/route.ts` | 93.67 | 82.14 | 100.00 | 74/79 |
-| `app/api/moderation/photos/[id]/route.ts` | 93.75 | 60.00 | 100.00 | 30/32 |
 | `app/api/cameras/[id]/edit/route.ts` | 93.90 | 85.71 | 100.00 | 77/82 |
 | `app/lib/public-status.ts` | 94.87 | 100.00 | 66.67 | 37/39 |
 | `app/api/cameras/route.ts` | 94.94 | 97.12 | 100.00 | 300/316 |
 | `app/api/auth/oidc/[provider]/start/route.ts` | 95.38 | 81.82 | 100.00 | 62/65 |
-| `app/api/photos/route.ts` | 95.39 | 92.86 | 100.00 | 207/217 |
 | `app/lib/confirm-ip-burst.ts` | 95.83 | 94.44 | 100.00 | 69/72 |
 | `db/community-settings.ts` | 95.88 | 88.89 | 100.00 | 93/97 |
 | `db/appeals.ts` | 95.89 | 78.33 | 100.00 | 280/292 |
@@ -98,7 +95,6 @@ sotto soglia il job fallisce.
 | `app/api/auth/login/route.ts` | 98.31 | 100.00 | 100.00 | 116/118 |
 | `app/api/auth/me/contributions/route.ts` | 98.32 | 93.75 | 100.00 | 117/119 |
 | `app/api/moderation/route.ts` | 98.39 | 91.95 | 100.00 | 366/372 |
-| `app/lib/photo-quota.ts` | 98.41 | 90.00 | 100.00 | 62/63 |
 | `app/api/auth/register/route.ts` | 98.72 | 96.15 | 100.00 | 154/156 |
 | `db/auth.ts` | 98.86 | 91.35 | 97.56 | 955/966 |
 | `app/lib/rate-limit.ts` | 99.10 | 100.00 | 100.00 | 332/335 |
@@ -106,7 +102,6 @@ sotto soglia il job fallisce.
 | `app/api/auth/logout/route.ts` | 100.00 | 91.67 | 100.00 | 40/40 |
 | `app/api/cameras/nearby/route.ts` | 100.00 | 100.00 | 100.00 | 72/72 |
 | `app/api/cameras/revisions/route.ts` | 100.00 | 94.12 | 100.00 | 58/58 |
-| `app/api/photos/[id]/route.ts` | 100.00 | 80.00 | 100.00 | 60/60 |
 | `app/lib/auth-route-helpers.ts` | 100.00 | 100.00 | 100.00 | 162/162 |
 | `app/lib/auth-session.ts` | 100.00 | 100.00 | 100.00 | 94/94 |
 | `app/lib/authz.ts` | 100.00 | 100.00 | 100.00 | 56/56 |
@@ -131,7 +126,6 @@ sotto soglia il job fallisce.
 | `db/mailer.ts` | 100.00 | 92.50 | 100.00 | 172/172 |
 | `db/oidc.ts` | 100.00 | 85.71 | 100.00 | 212/212 |
 | `db/passkeys.ts` | 100.00 | 92.31 | 100.00 | 221/221 |
-| `db/photos.ts` | 100.00 | 93.65 | 100.00 | 246/246 |
 | `db/users.ts` | 100.00 | 100.00 | 100.00 | 95/95 |
 
 ## Metodologia

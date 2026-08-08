@@ -100,10 +100,6 @@
   --summary-ink:rgb(83 103 113);
   --outline-ink:rgb(28 72 88);
   --metadata-bg:rgb(245 248 245);
-  --photo-border:rgb(221 227 220);
-  --photo-note-border:rgb(192 138 62);
-  --photo-note-bg:rgb(250 241 226);
-  --photo-note-ink:rgb(109 84 48);
   --footer-ink:rgb(88 104 112);
   --disabled-ink:rgb(154 167 165);
   --nearby-ink:rgb(82 107 116);
@@ -731,19 +727,6 @@ button { cursor:pointer; }
 .metadata-publication p { margin:0; color:var(--intro-ink); font-size:var(--text-sm); line-height:1.45; }
 .metadata-publication .check-label { display:grid; grid-template-columns:17px 1fr; align-items:start; gap:9px; color:var(--ink-2); font-size:var(--text-sm); font-weight:700; line-height:1.4; }
 .metadata-publication .check-label input { width:15px; height:15px; margin:1px 0 0; }
-.photo-upload { display:grid; gap:10px; margin:0; padding:15px; border:1px solid var(--form-border); border-radius:var(--radius-md); background:var(--metadata-bg); }
-.photo-upload legend { padding:0 4px; color:var(--ink-2); font-size:var(--text-sm); font-weight:800; }
-.photo-upload-row { display:flex; align-items:center; gap:var(--space-3); flex-wrap:wrap; }
-.photo-choose { position:relative; display:inline-flex; align-items:center; gap:7px; cursor:pointer; }
-.photo-choose input[type="file"] { position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:pointer; }
-.photo-list { display:grid; grid-template-columns:minmax(0,1fr); gap:7px; margin:0; padding:0; list-style:none; }
-.photo-list li { display:flex; align-items:center; gap:10px; padding:8px 10px; border:1px solid var(--photo-border); border-radius:var(--radius-sm); background:var(--white); }
-.photo-file-name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--ink-5); font-size:var(--text-md); font-weight:700; }
-.photo-preview-frame { margin-top:10px; max-width:260px; }
-.photo-preview-frame img { display:block; width:100%; height:auto; border:1px solid var(--field-border); border-radius:var(--radius-sm); background:var(--white); }
-.photo-moderate-note { margin:0; padding:12px 14px; border-left:3px solid var(--photo-note-border); background:var(--photo-note-bg); color:var(--photo-note-ink); border-radius:var(--radius-xs); font-size:var(--text-sm); line-height:1.5; }
-.photo-redaction-check { display:grid; grid-template-columns:17px 1fr; align-items:start; gap:9px; color:var(--ink-2); font-size:var(--text-sm); font-weight:700; line-height:1.4; }
-.photo-redaction-check input { width:15px; height:15px; margin:1px 0 0; }
 footer { padding:30px 0 44px; display:grid; grid-template-columns:1fr 1fr 1fr; align-items:end; gap:var(--space-6); border-top:1px solid var(--line); }
 footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-height:1.5; text-wrap:balance; }
 .footer-links { display:flex; justify-content:flex-end; gap:18px; color:var(--summary-ink); font-size:var(--text-sm); font-weight:800; }
@@ -1065,7 +1048,7 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
    visual (the OIDC panel already had one) so the three methods read as one
    consistent risk matrix on /login (ADR 0020 decision 6). */
 .auth-method-disclosure { margin:16px 0 0; }
-.check-label a, #photo-upload-help a { color:var(--action); font-weight:800; text-decoration:underline; text-underline-offset:3px; }
+.check-label a { color:var(--action); font-weight:800; text-decoration:underline; text-underline-offset:3px; }
 .record-detail-list { display:grid; grid-template-columns:repeat(2,1fr); gap:var(--space-5); margin:24px 0 34px; padding:24px 0; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
 .record-detail-list dt { margin-bottom:5px; color:var(--label); font-size:var(--text-2xs); text-transform:uppercase; letter-spacing:.1em; font-weight:800; }
 .record-detail-list dd { margin:0; color:var(--ink-5); font-size:var(--text-base); line-height:1.45; overflow-wrap:anywhere; }

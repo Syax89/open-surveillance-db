@@ -1,5 +1,10 @@
 # Check-report finale — coerenza TERMS_OF_USE v0.2 / PRIVACY_NOTICE vs. codice reale (STATUS gap #4)
 
+> **SUPERSEDED (2026-08-08):** la funzionalità di photo evidence upload è stata
+> **rimossa integralmente** per decisione del CEO — i riferimenti all'upload
+> (riga A2 e § 4.1/§ 5.5) non descrivono più il sistema. Questo check-report
+> resta come record storico dell'audit al commit `71c510b`.
+
 **Autore:** Rosa (DPO / Legal & Privacy Officer)
 **Data:** 2026-08-01
 **Oggetto:** review finale di coerenza tra i termini pubblici (TERMS_OF_USE.md v0.2, PRIVACY_NOTICE.md v0.3) e le pratiche implementate nel repo `Syax89/open-surveillance-db` @ main (commit 71c510b).

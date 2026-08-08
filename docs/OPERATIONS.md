@@ -368,10 +368,7 @@ gh variable set PROD_URL             # production hostname (e.g. osdb.example.or
 #    wrangler.jsonc (the workflow blocks the deploy while the placeholder is there)
 npx wrangler d1 create osdb-production   # output: database_id
 
-# 3. R2 bucket (the PHOTOS binding is declarative: the bucket must exist)
-npx wrangler r2 bucket create opensurveillancedb-photos
-
-# 4. Worker secrets (persist across deploys; never in code)
+# 3. Worker secrets (persist across deploys; never in code)
 npx wrangler secret put MODERATION_USER
 npx wrangler secret put MODERATION_PASSWORD
 npx wrangler secret put MODERATION_TOKEN      # optional, bearer alternative

@@ -6,8 +6,7 @@
 // over `camera_community_actions` filtered on action_type='confirm').
 // The route-level HTTP contract is covered separately in
 // tests/api-confirmations.test.mjs; this suite pins the six anti-gaming
-// layers at the database boundary, exactly like photo-pending-quota.test.mjs
-// pins the photo quota:
+// layers at the database boundary:
 //
 //   1. structural UNIQUE (SQL level + race -> exactly one row);
 //   2. level gate (>= 1 verified contribution, never pending) + self-verify;

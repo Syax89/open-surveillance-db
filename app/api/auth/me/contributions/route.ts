@@ -14,7 +14,7 @@ import {
 
 /**
  * GET /api/auth/me/contributions — the authenticated contributor's own
- * attributed contributions (camera reports, corrections, photo uploads),
+ * attributed contributions (camera reports, corrections),
  * paginated with the canonical F0 pagination contract
  * (page/pageSize default 25, hard max 100, `pagination` object) and the
  * trust level in the response meta.
