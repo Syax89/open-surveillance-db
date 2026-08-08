@@ -608,6 +608,10 @@ button { cursor:pointer; }
 .fov-rotate-handle-wrap { display:grid; place-items:center; }
 .fov-rotate-handle { width:18px; height:18px; border-radius:50%; background:var(--white); border:2px solid var(--action); box-shadow:0 1px 4px rgba(0,0,0,.3); cursor:grab; }
 .fov-rotate-handle:active { cursor:grabbing; }
+/* Edit-page position map (t_775c8400): the two manual coordinate inputs
+   below the map sit side by side; the inline error spans the full width. */
+.edit-coordinate-fields { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.edit-coordinate-error { color:var(--danger); font-size:var(--text-sm); }
 .report-metadata-fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
 .correction-section { width:var(--container-standard); margin:0 auto; display:grid; grid-template-columns:.8fr 1.1fr; gap:105px; padding:0 0 100px; }
 .correction-section>div>p:not(.eyebrow) { color:var(--intro-ink); font-size:var(--text-xl); line-height:1.6; }

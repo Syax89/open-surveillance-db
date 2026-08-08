@@ -51,6 +51,9 @@ const ownerRecordFixture = {
   description: "Fixture description.",
   status: "pending",
   updated: "2026-02-10T08:00:00.000Z",
+  // Stored position (t_775c8400): pre-fills the position map + inputs.
+  latitude: 41.90282,
+  longitude: 12.49642,
 };
 
 const activeRecordFixture = {
@@ -91,6 +94,11 @@ test("edit page: owner view pre-fills the form with the record fields (C6)", asy
   assert.equal(screen.getByDisplayValue("Illustrative street, Rome").value, "Illustrative street, Rome");
   assert.equal(screen.getByDisplayValue("Fixture observation notes.").value, "Fixture observation notes.");
   assert.equal(screen.getByDisplayValue("Fixture description.").value, "Fixture description.");
+  // Position (t_775c8400): the stored coordinates pre-fill the map's manual
+  // inputs at 5-decimal precision and the position section is labelled.
+  assert.equal(screen.getByDisplayValue("41.90282").value, "41.90282", "latitude input pre-fills from the owner view");
+  assert.equal(screen.getByDisplayValue("12.49642").value, "12.49642", "longitude input pre-fills from the owner view");
+  assert.ok(screen.getByText("Camera position"), "the position section is labelled");
   // Pending record: direct-edit label, no moderation notice.
   assert.ok(screen.getByRole("button", { name: "Save changes" }));
   assert.equal(screen.queryByText("Your changes will be reviewed by a moderator before they replace the current record."), null);
@@ -125,7 +133,71 @@ test("edit page: pending record PATCHes directly with CSRF + expectedUpdated and
   assert.equal(payload.title, "Updated Title");
   assert.equal(payload.kind, "Fixed dome");
   assert.equal(payload.expectedUpdated, ownerRecordFixture.updated);
+  // Position (t_775c8400): the payload always carries the coordinates — an
+  // unmoved position echoes the stored value, a moved one the new point.
+  assert.equal(payload.latitude, ownerRecordFixture.latitude, "the unchanged position is sent as-is");
+  assert.equal(payload.longitude, ownerRecordFixture.longitude, "the unchanged position is sent as-is");
   await waitFor(() => assert.ok(screen.getByText("Changes saved.")));
+});
+
+test("edit page: moving the position on the map updates the coordinate inputs and the PATCH payload (t_775c8400)", async () => {
+  const { screen, waitFor } = rtl;
+  const user = rtl.userEvent.setup();
+  const requests = [];
+  installFetchMock((input, init) => {
+    requests.push({ input, init });
+    if (input === "/api/cameras/41/edit") return jsonResponse({ record: ownerRecordFixture, editRequest: null });
+    if (input === "/api/cameras/41" && init.method === "PATCH") {
+      return jsonResponse({ record: { ...ownerRecordFixture }, changed: true });
+    }
+    return jsonResponse({ error: "unexpected route" }, { status: 404 });
+  });
+  document.cookie = "osdb_csrf=fixture-csrf-token; path=/";
+
+  await renderEditPage("41");
+  await waitFor(() => assert.ok(screen.queryByDisplayValue("Fixture Camera Report")));
+
+  // Type a new position into the manual coordinate fields — the same path
+  // a map click publishes to (setCoordinates).
+  const latInput = screen.getByDisplayValue("41.90282");
+  const lngInput = screen.getByDisplayValue("12.49642");
+  await user.clear(latInput);
+  await user.type(latInput, "41.90350");
+  await user.clear(lngInput);
+  await user.type(lngInput, "12.49700");
+
+  await user.click(screen.getByRole("button", { name: "Save changes" }));
+  await waitFor(() => assert.ok(requests.some((r) => r.input === "/api/cameras/41" && r.init.method === "PATCH")));
+  const patch = requests.find((r) => r.input === "/api/cameras/41" && r.init.method === "PATCH");
+  const payload = JSON.parse(patch.init.body);
+  assert.equal(payload.latitude, 41.9035, "the moved latitude reaches the PATCH payload");
+  assert.equal(payload.longitude, 12.497, "the moved longitude reaches the PATCH payload");
+});
+
+test("edit page: out-of-range coordinates fail client validation with an inline error and send nothing (t_775c8400)", async () => {
+  const { screen, waitFor } = rtl;
+  const user = rtl.userEvent.setup();
+  const requests = [];
+  installFetchMock((input, init) => {
+    requests.push({ input, init });
+    if (input === "/api/cameras/41/edit") return jsonResponse({ record: ownerRecordFixture, editRequest: null });
+    return jsonResponse({ error: "unexpected route" }, { status: 404 });
+  });
+  document.cookie = "osdb_csrf=fixture-csrf-token; path=/";
+
+  await renderEditPage("41");
+  await waitFor(() => assert.ok(screen.queryByDisplayValue("Fixture Camera Report")));
+
+  // One atomic change (jsdom's number-input sanitizer drops intermediate
+  // "95." keystrokes, so a per-character type would corrupt the value).
+  const latInput = screen.getByDisplayValue("41.90282");
+  rtl.fireEvent.change(latInput, { target: { value: "95.5" } });
+  await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+  await waitFor(() => assert.ok(screen.getByText("Enter valid coordinates (latitude −90 to 90, longitude −180 to 180).")));
+  assert.equal(requests.some((r) => r.input === "/api/cameras/41" && r.init.method === "PATCH"), false, "no PATCH with invalid coordinates");
+  const latInputAfter = screen.getByLabelText("Latitude");
+  assert.equal(latInputAfter.getAttribute("aria-invalid"), "true", "the latitude input is marked invalid");
 });
 
 test("edit page: active record shows the moderation notice and submits for review (C6)", async () => {

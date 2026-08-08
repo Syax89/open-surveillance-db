@@ -15,6 +15,8 @@ export const EDITABLE_EDIT_FIELDS = [
   "observedOn",
   "direction",
   "description",
+  "latitude",
+  "longitude",
 ];
 
 export const EDITABLE_EDIT_FIELD_LIMITS = {
@@ -26,6 +28,8 @@ export const EDITABLE_EDIT_FIELD_LIMITS = {
   observedOn: 10,
   direction: 3,
   description: 1000,
+  latitude: 20,
+  longitude: 20,
 };
 
 export const NEVER_EDITABLE_EDIT_FIELDS = [
@@ -37,8 +41,6 @@ export const NEVER_EDITABLE_EDIT_FIELDS = [
   "lastVerifiedAt",
   "reviewDueAt",
   "reviewIntervalMonths",
-  "latitude",
-  "longitude",
   "id",
   "createdAt",
   "updated",
@@ -86,6 +88,24 @@ export function parseEditableEditFields(value) {
         return { ok: false, error: 'Field "direction" must be an integer between 0 and 359, or null.', status: 422 };
       }
       fields.direction = raw;
+      continue;
+    }
+    // latitude/longitude (t_775c8400): position moves — must travel together,
+    // finite numbers in range, normalised to 5-decimal precision (mirror of
+    // db/camera-edits.ts parseEditableEditFields).
+    if (key === "latitude" || key === "longitude") {
+      if (raw === undefined) continue;
+      if ((body.latitude !== undefined) !== (body.longitude !== undefined)) {
+        return { ok: false, error: 'Fields "latitude" and "longitude" must be provided together.' };
+      }
+      if (typeof raw !== "number" || !Number.isFinite(raw)) {
+        return { ok: false, error: `Field "${key}" must be a number.`, status: 422 };
+      }
+      const [min, max] = key === "latitude" ? [-90, 90] : [-180, 180];
+      if (raw < min || raw > max) {
+        return { ok: false, error: `Field "${key}" must be between ${min} and ${max}.`, status: 422 };
+      }
+      fields[key] = Math.round(raw * 1e5) / 1e5;
       continue;
     }
     if (raw === undefined || raw === null) continue;

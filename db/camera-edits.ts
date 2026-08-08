@@ -19,10 +19,11 @@ import { recordModerationEvent } from "./moderation";
  *   - `removed` / `rejected` (terminal) -> `status_blocked` (409).
  *
  * Only the whitelist columns are ever touched (title, kind, address, notes,
- * manufacturer, observedOn, direction, description — same limits as POST
- * /api/cameras; direction is an integer bearing 0-359 or null, t_1b08fe12).
- * `status`, `contributor_id`, `source`, `publish_*`, `last_verified_at` /
- * `review_due_at` (freshness clock) are never editable: the parser rejects
+ * manufacturer, observedOn, direction, description, latitude, longitude —
+ * same limits as POST /api/cameras; direction is an integer bearing 0-359 or
+ * null, t_1b08fe12; latitude/longitude are 5-decimal coordinates in range,
+ * t_775c8400). `status`, `contributor_id`, `source`, `publish_*`,
+ * `last_verified_at` / `review_due_at` (freshness clock) are never editable: the parser rejects
  * them per-field with 400 before any write, so there are never partial
  * effects. A no-op edit (same content) answers `no_changes` and writes NO
  * event (anti-farming, ADR 0018 §3.5); a real pending edit records an
@@ -43,6 +44,11 @@ export const EDITABLE_EDIT_FIELD_LIMITS = {
   // real validation is integer-in-range in parseEditableEditFields.
   direction: 3,
   description: 1000,
+  // Position (t_775c8400): sanity bound only — the real validation is
+  // finite-number-in-range in parseEditableEditFields (lat [-90,90],
+  // lng [-180,180], normalised to 5-decimal precision on write).
+  latitude: 20,
+  longitude: 20,
 } as const;
 
 export type EditableEditField = keyof typeof EDITABLE_EDIT_FIELD_LIMITS;
@@ -58,8 +64,6 @@ export const NEVER_EDITABLE_EDIT_FIELDS = [
   "lastVerifiedAt",
   "reviewDueAt",
   "reviewIntervalMonths",
-  "latitude",
-  "longitude",
   "id",
   "createdAt",
   "updated",
@@ -76,6 +80,10 @@ export type EditableCameraFields = {
   /** Integer bearing 0-359 (clockwise from north), or null to clear (t_1b08fe12). */
   direction?: number | null;
   description?: string;
+  /** Position move (t_775c8400): finite 5-decimal coordinates in range,
+   * ALWAYS supplied together — latitude without longitude is rejected. */
+  latitude?: number;
+  longitude?: number;
 };
 
 export type ParsedEditPayload = {
@@ -280,6 +288,28 @@ export function parseEditableEditFields(value: unknown): ParseEditResult {
       fields.direction = raw;
       continue;
     }
+    // latitude/longitude (t_775c8400): position moves. The two MUST travel
+    // together (a half-move is a client bug, not a valid edit); each must be
+    // a finite number in range (lat [-90,90], lng [-180,180] — same bounds
+    // as POST /api/cameras). Values are normalised to 5-decimal precision
+    // (~1.1 m, the report-flow convention): the edit UI rounds the same way,
+    // so clicking the stored position produces no diff and imported
+    // high-precision rows never create phantom diffs from float noise.
+    if (field === "latitude" || field === "longitude") {
+      if (raw === undefined) continue;
+      if ((body.latitude !== undefined) !== (body.longitude !== undefined)) {
+        return { ok: false, error: 'Fields "latitude" and "longitude" must be provided together.' };
+      }
+      if (typeof raw !== "number" || !Number.isFinite(raw)) {
+        return { ok: false, error: `Field "${field}" must be a number.`, status: 422 };
+      }
+      const [min, max] = field === "latitude" ? [-90, 90] : [-180, 180];
+      if (raw < min || raw > max) {
+        return { ok: false, error: `Field "${field}" must be between ${min} and ${max}.`, status: 422 };
+      }
+      fields[field] = Math.round(raw * 1e5) / 1e5;
+      continue;
+    }
     // null / undefined: the client did not supply a value for this column.
     if (raw === undefined || raw === null) continue;
     if (typeof raw !== "string") {
@@ -379,6 +409,12 @@ function diffFields(row: CameraEditRow, fields: EditableCameraFields): EditableC
     diff.direction = fields.direction;
   }
   if (fields.description !== undefined && fields.description !== row.description) diff.description = fields.description;
+  // Position (t_775c8400): the supplied values are normalised to 5 decimals
+  // at parse time; the STORED value is rounded the same way before comparing,
+  // so imported high-precision rows (e.g. 44.493811532) never produce a
+  // phantom sub-metre move when the contributor edits only the title.
+  if (fields.latitude !== undefined && fields.latitude !== Math.round(row.latitude * 1e5) / 1e5) diff.latitude = fields.latitude;
+  if (fields.longitude !== undefined && fields.longitude !== Math.round(row.longitude * 1e5) / 1e5) diff.longitude = fields.longitude;
   return diff;
 }
 
@@ -507,8 +543,8 @@ export async function applyCameraEdit(input: {
     try {
       const inserted = await d1
         .prepare(
-          `INSERT INTO camera_edit_requests (camera_id, contributor_id, proposed_title, proposed_kind, proposed_address, proposed_notes, proposed_manufacturer, proposed_observed_on, proposed_direction, proposed_description, status, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
+          `INSERT INTO camera_edit_requests (camera_id, contributor_id, proposed_title, proposed_kind, proposed_address, proposed_notes, proposed_manufacturer, proposed_observed_on, proposed_direction, proposed_description, proposed_latitude, proposed_longitude, status, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
            RETURNING id`,
         )
         .bind(
@@ -525,6 +561,10 @@ export async function applyCameraEdit(input: {
           // "unchanged" on the published path (pre-existing convention).
           diff.direction ?? null,
           diff.description ?? null,
+          // Position move (t_775c8400): 5-decimal coordinates; NULL proposed
+          // = column unchanged (COALESCE keeps the stored value on apply).
+          diff.latitude ?? null,
+          diff.longitude ?? null,
           now,
           now,
         )
@@ -570,6 +610,8 @@ function sqlColumn(field: EditableEditField): string {
     case "observedOn": return "observed_on";
     case "direction": return "direction";
     case "description": return "description";
+    case "latitude": return "latitude";
+    case "longitude": return "longitude";
   }
 }
 

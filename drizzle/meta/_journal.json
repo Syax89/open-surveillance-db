@@ -309,6 +309,13 @@
       "when": 1786202109153,
       "tag": "0043_lucky_zaladane",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "6",
+      "when": 1786214297143,
+      "tag": "0044_camera_edit_requests_coordinates",
+      "breakpoints": true
     }
   ]
 }

@@ -8,6 +8,7 @@ import { useMessages } from "../../../lib/use-messages";
 import { SiteHeader } from "../../../components/SiteHeader";
 import { KIND_OPTIONS, isDomeKind } from "../../../lib/camera-kinds";
 import { formatDirection } from "../../../lib/compass";
+import { EditPositionMap } from "../../../components/EditPositionMap";
 
 /**
  * /records/[id]/edit — dedicated contribution edit page (COMMUNITY_PLAN §2.2,
@@ -66,6 +67,9 @@ type OwnerRecord = {
   updated: string;
   /** Field-of-view bearing 0-359 or NULL (domes/unknown), migration 0035 (t_f8b775ec). */
   direction: number | null;
+  /** Stored position (t_775c8400): the map can move it; 5-decimal precision. */
+  latitude: number;
+  longitude: number;
 };
 
 type EditRequest = { id: number; cameraId: number; status: "pending"; createdAt: string };
@@ -87,11 +91,17 @@ export default function RecordEditPage() {
 
   const [phase, setPhase] = useState<Phase>("loading");
   const [view, setView] = useState<EditView | null>(null);
-  const [values, setValues] = useState({ title: "", kind: "", manufacturer: "", observedOn: "", address: "", notes: "", description: "", direction: null as number | null });
+  const [values, setValues] = useState({ title: "", kind: "", manufacturer: "", observedOn: "", address: "", notes: "", description: "", direction: null as number | null, latitude: 0 as number, longitude: 0 as number });
   // Field-of-view direction (t_f8b775ec): mirrors the record's stored
   // bearing; directionKnown is true only when the record HAS one (so the
   // slider pre-fills) and resets when the contributor checks "non so".
   const [directionKnown, setDirectionKnown] = useState(false);
+  // Manual coordinate fields (t_775c8400): STRING state so mid-typing states
+  // ("-", empty) never blank the controlled input; the numeric values below
+  // stay the single source of truth for the map and the payload, updated
+  // whenever the string parses to a finite number.
+  const [manualLatitude, setManualLatitude] = useState("");
+  const [manualLongitude, setManualLongitude] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string | undefined>>({});
   const [serverError, setServerError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -121,8 +131,12 @@ export default function RecordEditPage() {
           notes: data.record.notes,
           description: data.record.description,
           direction: data.record.direction,
+          latitude: data.record.latitude,
+          longitude: data.record.longitude,
         });
         setDirectionKnown(data.record.direction !== null && typeof data.record.direction === "number" && Number.isFinite(data.record.direction));
+        setManualLatitude(Number(data.record.latitude).toFixed(5));
+        setManualLongitude(Number(data.record.longitude).toFixed(5));
         setPhase("ready");
       })
       .catch(() => { if (!cancelled) setPhase("error"); });
@@ -145,6 +159,28 @@ export default function RecordEditPage() {
     setFieldErrors((errors) => (errors[name] ? { ...errors, [name]: undefined } : errors));
   }
 
+  /** Position move (t_775c8400): map click and manual entry share this path. */
+  function setCoordinates(latitude: number, longitude: number) {
+    setValues((v) => ({ ...v, latitude, longitude }));
+    setManualLatitude(latitude.toFixed(5));
+    setManualLongitude(longitude.toFixed(5));
+    setFieldErrors((errors) => ({ ...errors, latitude: undefined, longitude: undefined }));
+  }
+
+  /** Manual coordinate keystroke: keep the string, publish the number when it parses. */
+  function handleManualCoordinate(field: "latitude" | "longitude", text: string) {
+    if (field === "latitude") {
+      setManualLatitude(text);
+      const n = Number(text);
+      if (Number.isFinite(n)) setValues((v) => ({ ...v, latitude: n }));
+    } else {
+      setManualLongitude(text);
+      const n = Number(text);
+      if (Number.isFinite(n)) setValues((v) => ({ ...v, longitude: n }));
+    }
+    setFieldErrors((errors) => ({ ...errors, latitude: undefined, longitude: undefined }));
+  }
+
   /** Client-side validation: required title + per-field max lengths (noValidate form). */
   function validate(): boolean {
     const errors: Record<string, string> = {};
@@ -157,6 +193,15 @@ export default function RecordEditPage() {
     }
     if (values.observedOn !== "" && !/^\d{4}-\d{2}-\d{2}$/.test(values.observedOn)) {
       errors.observedOn = t.editObservedOnInvalid;
+    }
+    // Position (t_775c8400): same bounds as the server — lat [-90,90],
+    // lng [-180,180]. The MANUAL strings are the source of truth here (the
+    // numeric values can be stale while the field is mid-edit).
+    const manualLat = Number(manualLatitude.trim());
+    const manualLng = Number(manualLongitude.trim());
+    if (!Number.isFinite(manualLat) || manualLat < -90 || manualLat > 90 ||
+        !Number.isFinite(manualLng) || manualLng < -180 || manualLng > 180) {
+      errors.latitude = t.editPositionInvalid;
     }
     setFieldErrors(errors);
     return Object.keys(errors).length === 0;
@@ -181,6 +226,11 @@ export default function RecordEditPage() {
       // the contributor specified one, null otherwise ("non so" clears /
       // leaves it unset; the server re-applies the dome rule on apply).
       direction: directionKnown && values.direction !== null ? values.direction : null,
+      // Position (t_775c8400): always sent (the map may have moved it); the
+      // server normalises to 5 decimals and diffs against the rounded stored
+      // value, so an unchanged position contributes no change.
+      latitude: values.latitude,
+      longitude: values.longitude,
       // Optimistic concurrency: the PATCH answers 409 when the record
       // changed since the page loaded (race), never a silent overwrite.
       expectedUpdated: record?.updated,
@@ -393,6 +443,54 @@ export default function RecordEditPage() {
                 ) : null}
               </fieldset>
             ) : null}
+
+            <fieldset className="direction-entry" aria-labelledby="edit-position-title">
+              <legend id="edit-position-title">{t.editPositionTitle}</legend>
+              <EditPositionMap
+                latitude={values.latitude}
+                longitude={values.longitude}
+                onPositionChange={setCoordinates}
+                kind={values.kind}
+                direction={values.direction}
+                directionKnown={directionKnown}
+                setDirection={(value) => setValues((v) => ({ ...v, direction: value }))}
+              />
+              <div className="edit-coordinate-fields">
+                <label className="auth-field">
+                  <span>{t.editLatitude}</span>
+                  <input
+                    name="latitude"
+                    type="number"
+                    inputMode="decimal"
+                    step="0.00001"
+                    min={-90}
+                    max={90}
+                    placeholder="44.49381"
+                    aria-invalid={fieldErrors.latitude ? true : undefined}
+                    aria-describedby={fieldErrors.latitude ? "edit-position-error" : undefined}
+                    value={manualLatitude}
+                    onChange={(event) => handleManualCoordinate("latitude", event.target.value)}
+                  />
+                </label>
+                <label className="auth-field">
+                  <span>{t.editLongitude}</span>
+                  <input
+                    name="longitude"
+                    type="number"
+                    inputMode="decimal"
+                    step="0.00001"
+                    min={-180}
+                    max={180}
+                    placeholder="11.34253"
+                    aria-invalid={fieldErrors.latitude ? true : undefined}
+                    aria-describedby={fieldErrors.latitude ? "edit-position-error" : undefined}
+                    value={manualLongitude}
+                    onChange={(event) => handleManualCoordinate("longitude", event.target.value)}
+                  />
+                </label>
+              </div>
+              {fieldErrors.latitude ? <small className="edit-coordinate-error" id="edit-position-error">{fieldErrors.latitude}</small> : null}
+            </fieldset>
 
             <div className="report-metadata-fields">
               <label className="auth-field">

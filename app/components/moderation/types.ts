@@ -67,6 +67,10 @@ export type EditRequestInQueue = {
   proposedManufacturer?: string | null;
   proposedObservedOn?: string | null;
   proposedDescription?: string | null;
+  // Proposed position (t_775c8400): 5-decimal coordinates, both set when the
+  // contributor moved the camera (null = column unchanged).
+  proposedLatitude?: number | null;
+  proposedLongitude?: number | null;
   currentTitle?: string | null;
   currentKind?: string | null;
   currentAddress?: string | null;
@@ -74,6 +78,8 @@ export type EditRequestInQueue = {
   currentManufacturer?: string | null;
   currentObservedOn?: string | null;
   currentDescription?: string | null;
+  currentLatitude?: number | null;
+  currentLongitude?: number | null;
   cameraStatus?: string | null;
 };
 

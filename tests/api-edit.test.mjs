@@ -373,7 +373,7 @@ test("E5 non-editable fields answer 400 per-field before any write", async (t) =
     ["publishObservedOn", { publishObservedOn: true }],
     ["lastVerifiedAt", { lastVerifiedAt: "2026-01-01T00:00:00.000Z" }],
     ["reviewDueAt", { reviewDueAt: "2026-01-01T00:00:00.000Z" }],
-    ["latitude", { latitude: 41.9 }],
+    ["id", { id: 9 }],
   ];
   for (const [field, body] of forbidden) {
     await t.test(field, async () => {
@@ -490,6 +490,49 @@ test("E5 direction: out-of-range or non-integer bearings answer 422 before any w
       assert.equal(callArgs("applyCameraEdit").length, 0, `${name}: no write before validation`);
     });
   }
+});
+
+test("E5 position: valid coordinates reach the db layer (normalised to 5 decimals)", async () => {
+  liveSession();
+  stub("applyCameraEdit", async () => ({ kind: "direct_applied", record: ownerView }));
+  const { PATCH } = await cameraEditRoute();
+  const response = await PATCH(authedPatch("/api/cameras/5", { latitude: 44.493811532, longitude: 12.342539001 }));
+  assert.equal(response.status, 200);
+  const [input] = callArgs("applyCameraEdit")[0];
+  assert.equal(input.fields.latitude, 44.49381, "latitude must be normalised to 5-decimal precision");
+  assert.equal(input.fields.longitude, 12.34254, "longitude must be normalised to 5-decimal precision");
+});
+
+test("E5 position: out-of-range or non-numeric coordinates answer 422 before any write", async (t) => {
+  const { PATCH } = await cameraEditRoute();
+  const cases = [
+    ["latitude above 90", { latitude: 91, longitude: 12.3 }],
+    ["latitude below -90", { latitude: -90.1, longitude: 12.3 }],
+    ["longitude above 180", { latitude: 44.1, longitude: 181 }],
+    ["longitude below -180", { latitude: 44.1, longitude: -180.5 }],
+    ["numeric string latitude", { latitude: "44.1", longitude: 12.3 }],
+    ["null latitude", { latitude: null, longitude: 12.3 }],
+  ];
+  for (const [name, body] of cases) {
+    await t.test(name, async () => {
+      liveSession();
+      const response = await PATCH(authedPatch("/api/cameras/5", body));
+      assert.equal(response.status, 422, `${name} must answer 422 (distinct from the 400 whitelist violations)`);
+      const errorBody = await responseBody(response);
+      assert.match(errorBody.error, /latitude|longitude/, `${name} error must name the field`);
+      assert.equal(callArgs("applyCameraEdit").length, 0, `${name}: no write before validation`);
+    });
+  }
+});
+
+test("E5 position: latitude without longitude (half-move) answers 400 and never reaches the db", async () => {
+  liveSession();
+  const { PATCH } = await cameraEditRoute();
+  const response = await PATCH(authedPatch("/api/cameras/5", { latitude: 44.1 }));
+  assert.equal(response.status, 400);
+  const body = await responseBody(response);
+  assert.match(body.error, /together/, "a half-move must be rejected with the together contract");
+  assert.equal(callArgs("applyCameraEdit").length, 0);
 });
 
 test("E9 malformed ids answer 404 and never reach the db layer", async (t) => {
@@ -671,6 +714,43 @@ test("E1 real SQL: owner pending edit updates the record and records an edit_app
   assert.equal(await moderationEventCount("camera", cameraId, "edit_applied"), 1);
 });
 
+test("E1 real SQL: owner pending edit moves the camera position (5-decimal precision preserved)", async () => {
+  await freshDb();
+  const ownerId = await insertContributor();
+  const cameraId = await insertCamera({ contributorId: ownerId, latitude: 44.1, longitude: 12.2 });
+
+  // The route parser normalises to 5 decimals BEFORE applyCameraEdit, so the
+  // db layer receives (and stores) the already-rounded values verbatim.
+  const result = await cameraEdits.applyCameraEdit({
+    cameraId, contributorId: ownerId,
+    fields: { latitude: 44.12346, longitude: 12.98765 },
+    now: NOW,
+  });
+  assert.equal(result.kind, "direct_applied");
+  assert.equal(result.record.latitude, 44.12346, "the applied edit must echo the stored latitude");
+  assert.equal(result.record.longitude, 12.98765, "the applied edit must echo the stored longitude");
+
+  const row = await db.prepare("SELECT latitude, longitude FROM cameras WHERE id = ?").bind(cameraId).first();
+  assert.equal(row.latitude, 44.12346);
+  assert.equal(row.longitude, 12.98765);
+});
+
+test("E1 real SQL: editing only the title never phantom-moves an imported high-precision position", async () => {
+  await freshDb();
+  const ownerId = await insertContributor();
+  // Imported rows carry full dataset precision (e.g. 6+ decimals).
+  const cameraId = await insertCamera({ contributorId: ownerId, latitude: 44.493811532, longitude: 12.342539001 });
+
+  const result = await cameraEdits.applyCameraEdit({
+    cameraId, contributorId: ownerId, fields: { title: "Renamed" }, now: NOW,
+  });
+  assert.equal(result.kind, "direct_applied");
+
+  const row = await db.prepare("SELECT latitude, longitude FROM cameras WHERE id = ?").bind(cameraId).first();
+  assert.equal(row.latitude, 44.493811532, "the raw stored latitude must survive a title-only edit");
+  assert.equal(row.longitude, 12.342539001, "the raw stored longitude must survive a title-only edit");
+});
+
 test("E1 real SQL: owner pending edit sets and clears the direction bearing", async () => {
   await freshDb();
   const ownerId = await insertContributor();
@@ -777,6 +857,71 @@ test("E3 real SQL: moderation queue exposes proposedDirection and currentDirecti
   assert.ok(pending, "the pending edit request must appear in the queue");
   assert.equal(pending.currentDirection, 45, "the queue shows the current bearing of the camera");
   assert.equal(pending.proposedDirection, 200, "the queue shows the proposed bearing of the edit");
+});
+
+test("E3 real SQL: published-record edit proposes coordinates and approve applies them", async () => {
+  await freshDb();
+  const ownerId = await insertContributor();
+  const cameraId = await insertCamera({
+    contributorId: ownerId, status: "active", kind: "PTZ",
+    latitude: 44.1, longitude: 12.2,
+    lastVerifiedAt: NOW, reviewDueAt: "2027-08-01T00:00:00.000Z",
+  });
+
+  const created = await cameraEdits.applyCameraEdit({
+    cameraId, contributorId: ownerId, fields: { latitude: 44.49381, longitude: 12.34254 }, now: NOW,
+  });
+  assert.equal(created.kind, "edit_request_created");
+
+  const request = await db
+    .prepare("SELECT proposed_latitude AS proposedLatitude, proposed_longitude AS proposedLongitude FROM camera_edit_requests WHERE id = ?")
+    .bind(created.editRequest.id)
+    .first();
+  assert.equal(request.proposedLatitude, 44.49381, "the diff must store the proposed latitude");
+  assert.equal(request.proposedLongitude, 12.34254, "the diff must store the proposed longitude");
+
+  const cameraBefore = await db.prepare("SELECT latitude, longitude FROM cameras WHERE id = ?").bind(cameraId).first();
+  assert.equal(cameraBefore.latitude, 44.1, "cameras must not be mutated until approval");
+  assert.equal(cameraBefore.longitude, 12.2, "cameras must not be mutated until approval");
+
+  db.exec(`
+    INSERT INTO users (id, email, display_name, role, active, mfa_enabled, created_at, updated_at) VALUES
+      (2, 'record@osdb.test', 'Demo Record Reviewer', 'moderator', 1, 0, '2026-08-01T00:00:00.000Z', '2026-08-01T00:00:00.000Z');
+    INSERT INTO reviewers (id, display_name, role, active, mfa_enabled, created_at, updated_at) VALUES
+      (2, 'Demo Record Reviewer', 'record_reviewer', 1, 0, '2026-07-31T00:00:00.000Z', '2026-07-31T00:00:00.000Z');
+  `);
+
+  const decided = await moderation.moderateCameraEdit(
+    created.editRequest.id, "approve", "verified-public-infrastructure", null,
+    { actorId: 2 },
+  );
+  assert.equal(decided.kind, "ok");
+  const camera = await db.prepare("SELECT latitude, longitude FROM cameras WHERE id = ?").bind(cameraId).first();
+  assert.equal(camera.latitude, 44.49381, "approve must apply the proposed latitude to the camera");
+  assert.equal(camera.longitude, 12.34254, "approve must apply the proposed longitude to the camera");
+});
+
+test("E3 real SQL: moderation queue exposes proposedLatitude/proposedLongitude (moderators see the move)", async () => {
+  await freshDb();
+  const ownerId = await insertContributor();
+  const cameraId = await insertCamera({
+    contributorId: ownerId, status: "active", kind: "PTZ",
+    latitude: 44.1, longitude: 12.2,
+    lastVerifiedAt: NOW, reviewDueAt: "2027-08-01T00:00:00.000Z",
+  });
+
+  const created = await cameraEdits.applyCameraEdit({
+    cameraId, contributorId: ownerId, fields: { latitude: 45.0, longitude: 13.0 }, now: NOW,
+  });
+  assert.equal(created.kind, "edit_request_created");
+
+  const queue = await moderation.listPendingModerationItems();
+  const pending = queue.cameraEditRequests.find((item) => item.id === created.editRequest.id);
+  assert.ok(pending, "the pending edit request must appear in the queue");
+  assert.equal(pending.currentLatitude, 44.1, "the queue shows the current latitude of the camera");
+  assert.equal(pending.currentLongitude, 12.2, "the queue shows the current longitude of the camera");
+  assert.equal(pending.proposedLatitude, 45, "the queue shows the proposed latitude of the edit");
+  assert.equal(pending.proposedLongitude, 13, "the queue shows the proposed longitude of the edit");
 });
 
 test("E3 real SQL: the dome rule is re-applied at moderation apply time (belt-and-braces)", async () => {

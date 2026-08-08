@@ -368,6 +368,11 @@ function ownerRecord(overrides = {}) {
     status: "pending",
     updated: "2026-02-10T08:00:00.000Z",
     direction: 45,
+    // Stored position (t_775c8400): the edit page now pre-fills the position
+    // map + manual coordinate inputs from these (EditPositionMap crashes on
+    // undefined lat/lng — `.toFixed(5)` on undefined).
+    latitude: 41.90282,
+    longitude: 12.49642,
     ...overrides,
   };
 }

@@ -44,6 +44,9 @@ export type PendingEditRequest = {
   // stores NULL, and applyCameraEdit drops it before the request is created).
   proposedDirection: number | null;
   proposedDescription: string | null;
+  // Proposed position (t_775c8400): 5-decimal coordinates or NULL (unchanged).
+  proposedLatitude: number | null;
+  proposedLongitude: number | null;
   currentTitle: string | null;
   currentKind: string | null;
   currentAddress: string | null;
@@ -52,6 +55,8 @@ export type PendingEditRequest = {
   currentObservedOn: string | null;
   currentDirection: number | null;
   currentDescription: string | null;
+  currentLatitude: number | null;
+  currentLongitude: number | null;
   cameraStatus: string | null;
 };
 
@@ -511,11 +516,14 @@ export async function listPendingModerationItems(): Promise<ModerationQueue> {
                   er.proposed_manufacturer AS proposedManufacturer, er.proposed_observed_on AS proposedObservedOn,
                   er.proposed_direction AS proposedDirection,
                   er.proposed_description AS proposedDescription,
+                  er.proposed_latitude AS proposedLatitude,
+                  er.proposed_longitude AS proposedLongitude,
                   er.created_at AS createdAt, er.updated_at AS updatedAt,
                   c.title AS currentTitle, c.kind AS currentKind, c.address AS currentAddress,
                   c.notes AS currentNotes, c.manufacturer AS currentManufacturer,
                   c.observed_on AS currentObservedOn, c.direction AS currentDirection,
                   c.description AS currentDescription,
+                  c.latitude AS currentLatitude, c.longitude AS currentLongitude,
                   c.status AS cameraStatus
            FROM camera_edit_requests er LEFT JOIN cameras c ON c.id = er.camera_id
            WHERE er.status = 'pending'
@@ -1466,10 +1474,12 @@ export async function moderateCameraEdit(
                ELSE COALESCE((SELECT proposed_direction FROM camera_edit_requests WHERE id = ?), direction)
              END,
              description = COALESCE((SELECT proposed_description FROM camera_edit_requests WHERE id = ?), description),
+             latitude = COALESCE((SELECT proposed_latitude FROM camera_edit_requests WHERE id = ?), latitude),
+             longitude = COALESCE((SELECT proposed_longitude FROM camera_edit_requests WHERE id = ?), longitude),
              updated = ?
            WHERE id = ?`,
         )
-        .bind(id, id, id, id, id, id, id, id, id, nowIso, current.cameraId),
+        .bind(id, id, id, id, id, id, id, id, id, id, id, nowIso, current.cameraId),
     );
   }
 

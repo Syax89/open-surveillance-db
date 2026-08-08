@@ -238,3 +238,52 @@ test("getCameraEditView answers not_found for an anonymous pending record", asyn
   const result = await cameraEdits.getCameraEditView(cameraId, anyContributorId);
   assert.equal(result.kind, "not_found", "an anonymous record has no owner to unlock the view");
 });
+
+// ---------------------------------------------------------------------------
+// Position edits (t_775c8400) — parse contract + 5-decimal normalisation
+// ---------------------------------------------------------------------------
+
+test("parseEditableEditFields normalises valid coordinates to 5 decimals", () => {
+  const parsed = cameraEdits.parseEditableEditFields({ latitude: 44.493811532, longitude: 12.342539001 });
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.payload.fields.latitude, 44.49381);
+  assert.equal(parsed.payload.fields.longitude, 12.34254);
+});
+
+test("parseEditableEditFields rejects out-of-range coordinates with 422 naming the field", () => {
+  for (const [name, body] of [
+    ["latitude above 90", { latitude: 90.1, longitude: 12.3 }],
+    ["latitude below -90", { latitude: -90.5, longitude: 12.3 }],
+    ["longitude above 180", { latitude: 44.1, longitude: 180.2 }],
+    ["longitude below -180", { latitude: 44.1, longitude: -181 }],
+    ["non-number latitude", { latitude: "44.1", longitude: 12.3 }],
+  ]) {
+    const parsed = cameraEdits.parseEditableEditFields(body);
+    assert.equal(parsed.ok, false, `${name} must be rejected`);
+    assert.equal(parsed.status, 422, `${name} must answer 422 (distinct from the 400 whitelist violations)`);
+    assert.match(parsed.error, /latitude|longitude/, `${name} error must name the field`);
+  }
+});
+
+test("parseEditableEditFields rejects a half-move (latitude without longitude)", () => {
+  const parsed = cameraEdits.parseEditableEditFields({ latitude: 44.1 });
+  assert.equal(parsed.ok, false);
+  assert.match(parsed.error, /together/, "a half-move must be rejected with the together contract");
+});
+
+test("applyCameraEdit pending: an unchanged position (within 5-decimal precision) is a no-op", async () => {
+  await freshDb();
+  const ownerId = await insertContributor();
+  // Stored at higher precision than the edit UI (imported-style row).
+  const cameraId = await insertCamera({ contributorId: ownerId, latitude: 44.493811532, longitude: 12.342539001 });
+
+  // The client always echoes the position it loaded; rounded to 5 decimals
+  // it equals the stored value, so the edit must be a no-op (anti-farming).
+  const result = await cameraEdits.applyCameraEdit({
+    cameraId, contributorId: ownerId,
+    fields: { latitude: 44.49381, longitude: 12.34254 },
+    now: NOW,
+  });
+  assert.equal(result.kind, "no_changes", "a 5-decimal-identical position must not produce a phantom move");
+  assert.equal(await moderationEventCount("camera", cameraId, "edit_applied"), 0);
+});
