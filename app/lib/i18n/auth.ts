@@ -91,11 +91,12 @@ export const en = {
   errorDisplayName: "The display name must be between 2 and 60 characters.",
   errorDisplayNameRateLimit: "Too many attempts. Please try again in a minute.",
   errorDisplayNameGeneric: "Could not save the display name. Please try again.",
-  // Multi-method auth (Fase E2 — Vera design): method selector on /login.
-  methodSelectorLabel: "Choose how to sign in",
+  // Multi-method auth (Fase E2 — Vera design): the three sign-in blocks on
+  // /login are ALL visible at once (CEO 2026-08-08), stacked in the order
+  // passkey → email + password → social. Each block carries its own submit.
   methodPassword: "Email + password",
   methodPasskey: "Passkey",
-  methodSocial: "Social sign-in",
+  methodSocialTitle: "Google",
   // Passkey login (Fase C).
   passkeyLogin: "Sign in with passkey",
   passkeyEmailOptional: "Account email (optional)",
@@ -321,11 +322,12 @@ export const it: Translation<typeof en> = {
   errorDisplayName: "Il nome visualizzato deve essere tra 2 e 60 caratteri.",
   errorDisplayNameRateLimit: "Troppi tentativi. Riprova tra un minuto.",
   errorDisplayNameGeneric: "Non è stato possibile salvare il nome visualizzato. Riprova.",
-  // Autenticazione multi-metodo (Fase E2 — design Vera): selettore su /login.
-  methodSelectorLabel: "Scegli come accedere",
+  // Autenticazione multi-metodo (Fase E2 — design Vera): i tre blocchi di
+  // accesso su /login sono TUTTI visibili insieme (CEO 2026-08-08), impilati
+  // nell'ordine passkey → email e password → social. Ogni blocco ha il suo submit.
   methodPassword: "Email e password",
   methodPasskey: "Passkey",
-  methodSocial: "Accesso tramite social",
+  methodSocialTitle: "Google",
   // Accesso con passkey (Fase C).
   passkeyLogin: "Accedi con passkey",
   passkeyEmailOptional: "Email dell'account (facoltativa)",
