@@ -1,5 +1,7 @@
 # Revisione legale/privacy — PRIVACY_AND_SAFETY.md, OPEN_SOURCE.md, MODERATION.md
 
+> **Nota 2026-08-08:** questo è uno snapshot storico della review del 2026-07-31. Il flusso di autenticazione citato come "ChatGPT sign-in / OpenAI" è stato **rimosso**: i provider di identità reali sono **GitHub / Google OIDC** (opt-in, server-gated; vedi PRIVACY_NOTICE § 3.1/§ 5/§ 6 e PROCESSOR_REGISTER.md PR5/PR6). Le conclusioni legali sui principi restano valide; i riferimenti al provider specifico vanno letti come storici.
+
 **Oggetto:** review policy in ottica pubblicazione e hosting test
 **Autore:** Rosa (DPO / Legal & Privacy Officer)
 **Data:** 2026-07-31

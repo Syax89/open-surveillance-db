@@ -18,7 +18,7 @@ Published camera records describe **infrastructure** (a camera, its kind, its pu
 1. reports and evidence submitted by contributors (may contain incidental personal data);
 2. contributor pseudonymous IDs and submission metadata;
 3. correction/takedown requests (requester contact details);
-4. moderation records and moderator identities (via ChatGPT sign-in);
+4. moderation records and moderator identities (verified contributor accounts — email + password, passkey, or OIDC via GitHub/Google);
 5. correspondence with the privacy contact.
 
 This assessment covers those operations. Where a record is republished from an official public source (`source: official`), the source's own legal regime (national transparency law) is checked per record.
@@ -33,7 +33,7 @@ This assessment covers those operations. Where a record is republished from an o
 | Publish records + exports (ODbL) | Generally **not personal data** (infrastructure) | 6(1)(f) / 6(1)(e) | Per-field opt-in for `manufacturer`/`observedOn`; least-specific location (**~4-decimal default**, decision 2026-07-31); no photo uploads (feature removed 2026-08-08) |
 | Handle correction/takedown requests | Requester contact data | 6(1)(c) + 6(1)(f) | Needed to comply with arts. 15-22; identity verification proportionate |
 | Security & abuse prevention | IP-level rate limiting (no logs retained), submissions metadata | 6(1)(f) | No behavioural advertising; rate limiting per H2 |
-| Moderator authentication | Email/name via ChatGPT sign-in | 6(1)(f) | Never logged, never stored; session-only (M4) |
+| OIDC contributor authentication (GitHub/Google, optional) | Subject id + display name + verified flag — never the email | 6(1)(f) | No email imported (RFC 2606 placeholder); stored only as the account link (provider + subject id) and the account display name; never logged; the provider observes the login + IP (disclosed) |
 
 ## 3. Lawful bases
 

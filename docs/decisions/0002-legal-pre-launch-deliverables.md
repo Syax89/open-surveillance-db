@@ -47,6 +47,9 @@ and added breach procedure (P2) and moderation SLA items (M1–M4).
    DPA, with emails/names never logged; OSMF is an independent controller, not
    a processor. Open item: confirm the SCC version applicable at DPA execution
    (new-generation SCCs announced for adoption in 2025) — see ADR 0005.
+   *Update 2026-08-08:* the OpenAI/ChatGPT moderator-auth plan was **retired**
+   before launch — identity providers are now **GitHub / Google OIDC** (opt-in,
+   server-gated; see ADR 0005, PROCESSOR_REGISTER.md PR5/PR6).
 5. **Breach procedure:** art. 33/34 workflow with a scenario table specific to
    this project and a 72-hour notification track.
 6. **Moderation SLA:** hide urgent reports ≤ 24 h; first response ≤ 48 h
