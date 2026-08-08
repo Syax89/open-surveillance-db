@@ -1,0 +1,11 @@
+{
+    "slug": "usa-new-orleans-traffic-cameras-2026",
+    "source_name": "City of New Orleans — Traffic Camera Locations (open data)",
+    "format": "socrata",
+    "license": "CC0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "attribution_text": "Fonte: City of New Orleans, Traffic Camera Locations (https://data.nola.gov/d/te2d-4txp), concesso con licenza CC0 1.0 (Public Domain Dedication).",
+    "source_url": "https://data.nola.gov/resource/te2d-4txp.json",
+    "max_records": 300,
+    "notes": "Scan catalog.csv (CEO 2026-08-08): 103 telecamere traffico/sicurezza New Orleans (Socrata API, the_geom Point, camloc, camid, function TFS, operational). Licenza CC0 verificata sulla pagina (logo CC0 + Public Domain Dedication). external_id nola:<camid>."
+}

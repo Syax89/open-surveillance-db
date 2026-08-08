@@ -1,0 +1,11 @@
+{
+    "slug": "usa-boulder-redlight-cameras-2026",
+    "source_name": "City of Boulder CO — Red Light Cameras (public view)",
+    "format": "arcgis-featureserver",
+    "license": "CC0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "attribution_text": "Fonte: City of Boulder Colorado, Red Light Cameras PUBLIC VIEW (https://bouldercolorado.gov/open-data), concesso con licenza CC0 1.0.",
+    "source_url": "https://services.arcgis.com/ePKBjXrBZ2vEEgWd/arcgis/rest/services/Red_Light_Cameras_PUBLIC_VIEW/FeatureServer/0",
+    "max_records": 60,
+    "notes": "Scan catalog.csv (CEO 2026-08-08): 13 red-light camera locations Boulder (ArcGIS, attrs Location/CameraType, count 13 verificato). Coordinate Web Mercator (EPSG:3857) → convertite (verificato: -11716806, 4868060 → 40.01, -105.25). Licenza CC0 (licenseInfo su ArcGIS). external_id boulder:<OBJECTID>."
+}
