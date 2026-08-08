@@ -31,7 +31,7 @@ Known gaps (relevant to every option below):
 4. **PBKDF2 iteration count is below the current OWASP recommendation** (210 k vs 600 k — see §8).
 5. **Passwords are not phishing-resistant.** Everything that relies on typing a secret into a lookalike page can be phished; passkeys (§3) are the only option here that structurally prevents that.
 
-Platform context: the app is a Next.js App Router app deployed on **Cloudflare Workers** (`nodejs_compat`), with **D1** (SQLite, no TTL support), **R2**, **Images** and **Assets** bindings. There is currently **no KV binding**. Any option that needs short-lived server state (WebAuthn challenges, magic-link tokens) must add KV or manage expiry in D1.
+Platform context: the app is a Next.js App Router app deployed on **Cloudflare Workers** (`nodejs_compat`), with **D1** (SQLite, no TTL support), **Images** and **Assets** bindings. There is currently **no KV binding** (and no R2 binding since the photo feature was removed, 2026-08-08). Any option that needs short-lived server state (WebAuthn challenges, magic-link tokens) must add KV or manage expiry in D1.
 
 ## 2. Evaluation criteria
 
