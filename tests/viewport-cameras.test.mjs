@@ -96,7 +96,7 @@ function installBboxMock(calls, { records = RECORDS, total } = {}) {
 }
 
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-const URLS = { API: "/api/cameras", LIMIT_500: "limit=500", BBOX: "bbox=" };
+const URLS = { API: "/api/cameras", WALK_LIMIT: "limit=2000", BBOX: "bbox=" };
 
 async function renderProbe(props) {
   return renderWithLocale(React.createElement(HookProbe, props));
@@ -111,7 +111,7 @@ test("the first fetch for a viewport is ONE bbox query — never a paginated wal
   await pause(300);
   assert.ok(calls.length >= 1, "the viewport must fetch");
   for (const url of calls) {
-    assert.ok(!url.includes(URLS.LIMIT_500), `never a full-list walk page: ${url}`);
+    assert.ok(!url.includes(URLS.WALK_LIMIT), `never a full-list walk page: ${url}`);
     assert.ok(url.includes(URLS.BBOX), `every map fetch carries a bbox: ${url}`);
     assert.ok(url.startsWith(URLS.API), `only the cameras API: ${url}`);
   }

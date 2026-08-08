@@ -139,7 +139,7 @@ test("layer: the home walk concatenates every page and exposes the server total"
   assert.equal(screen.getByTestId("count").textContent, "20");
   assert.equal(screen.getByTestId("total").textContent, "20");
   // The walk followed nextOffset: exactly one fetch per page, ordered.
-  assert.deepEqual(calls, ["/api/cameras?limit=500&offset=0", "/api/cameras?limit=500&offset=10"]);
+  assert.deepEqual(calls, ["/api/cameras?limit=2000&offset=0", "/api/cameras?limit=2000&offset=10"]);
 });
 
 test("layer: a walk over a dataset larger than the old MAX_PAGE_OFFSET collects every record (total 12284, t_e86c91c4)", async () => {
@@ -179,6 +179,76 @@ test("layer: a walk over a dataset larger than the old MAX_PAGE_OFFSET collects 
     calls.every((call) => Number(new URL(call, "https://osdb.test").searchParams.get("offset")) <= 12_000),
     "no fetch may ever request an offset beyond the last page",
   );
+});
+
+test("layer: a 429 mid-walk is retried after Retry-After and the walk completes (kanban t_e11080eb)", async () => {
+  // Regression for kanban t_e11080eb: /directory showed "0 public records
+  // found" while the map saw the points. Root cause: the walk pages through
+  // the WHOLE public set (31,926 records at the time), at limit=500 that is
+  // 64 serial requests — more than the shared anonymous read bucket (60/min
+  // on the container, callerKey "unknown" without a Cloudflare edge), so a
+  // page 429'd mid-walk and the FIRST 429 threw, failing the whole walk into
+  // the empty state. Fix: bigger pages (limit=2000 → 16 requests) AND a
+  // bounded 429 retry (Retry-After, max 2 attempts) so a transient burst
+  // recovers instead of blanking the directory.
+  const { screen } = rtl;
+  const calls = [];
+  let rateLimited = true;
+  installFetchMock((input) => {
+    if (typeof input === "string" && input.startsWith("/api/cameras?")) {
+      calls.push(input);
+      const offset = Number(new URL(input, "https://osdb.test").searchParams.get("offset") ?? 0);
+      if (rateLimited) {
+        // First page answers 429 with Retry-After, like the shared bucket
+        // would under concurrent traffic; the retry then succeeds.
+        rateLimited = false;
+        return jsonResponse({ error: "rate limited" }, { status: 429, headers: { "retry-after": "1" } });
+      }
+      const page = twoPageList.find((candidate) => candidate.offset === offset) ?? twoPageList[twoPageList.length - 1];
+      return jsonResponse({ records: page.records, total: page.total, nextOffset: page.nextOffset });
+    }
+    return jsonResponse({ error: "unexpected route" }, { status: 404 });
+  });
+
+  rtl.render(React.createElement(ListProbe));
+  // The retry sleeps Retry-After (1s) with real timers — wait with a
+  // generous timeout like the debounce tests (default 1000ms would fire
+  // while the walk is still sleeping).
+  const RETRY_WAIT = { timeout: 5000 };
+  await rtl.waitFor(() => assert.equal(screen.getByTestId("loading").textContent, "false"), RETRY_WAIT);
+  assert.equal(screen.getByTestId("error").textContent, "false", "the 429 must be retried, never surface the error state");
+  assert.equal(screen.getByTestId("count").textContent, "20", "the walk completes after the retry");
+  // offset=0 was fetched twice (the 429 + the successful retry), then the
+  // walk continued to the second page.
+  assert.equal(calls.filter((call) => call.includes("offset=0")).length, 2, "the rate-limited page is retried once");
+  assert.ok(calls.some((call) => call.includes("offset=10")), "the walk continues past the retried page");
+});
+
+test("layer: a persistent 429 exhausts the retry budget and surfaces the error state (kanban t_e11080eb)", async () => {
+  // Bounded retry: a genuinely exhausted shared bucket must surface the
+  // truthful error state quickly (callers render the load-error UI with a
+  // retry action), never freeze the directory for the whole Retry-After
+  // window nor silently show an empty list.
+  const { screen } = rtl;
+  const calls = [];
+  installFetchMock((input) => {
+    if (typeof input === "string" && input.startsWith("/api/cameras?")) {
+      calls.push(input);
+      return jsonResponse({ error: "rate limited" }, { status: 429, headers: { "retry-after": "1" } });
+    }
+    return jsonResponse({ error: "unexpected route" }, { status: 404 });
+  });
+
+  rtl.render(React.createElement(ListProbe));
+  // Three attempts = two 1s Retry-After sleeps before the error state
+  // settles; wait with a generous timeout (default 1000ms would fire while
+  // the walk is still sleeping between retries).
+  const RETRY_WAIT = { timeout: 10000 };
+  await rtl.waitFor(() => assert.equal(screen.getByTestId("error").textContent, "true"), RETRY_WAIT);
+  assert.equal(screen.getByTestId("count").textContent, "0", "records stay empty on failure");
+  // Initial attempt + WALK_RATE_LIMIT_RETRIES retries = 3 total fetches,
+  // then the walk gives up (no unbounded loop on a hostile server).
+  assert.equal(calls.length, 3, "exactly one initial attempt + 2 retries, then stop");
 });
 
 test("layer: a legacy single-page payload (no nextOffset) is the complete list", async () => {

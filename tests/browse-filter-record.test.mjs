@@ -138,6 +138,65 @@ test("journey browse→filtri: search narrows the directory and the live count f
   assert.match(emptyState?.textContent ?? "", /clear search|reset/i);
 });
 
+test("journey browse→filtri: a failed walk shows the LOAD-ERROR state with retry, never '0 public records found' (kanban t_e11080eb)", async () => {
+  // Regression for kanban t_e11080eb: /directory said "0 public records
+  // found" while /mappa showed the points. Root cause was a client walk
+  // dying on a 429 mid-flight (shared anonymous read bucket, 60/min, with a
+  // 64-page walk at limit=500 over the 31,926-record public set) — the
+  // failure surfaced as the EMPTY state, which is a lie: the records exist,
+  // the map proves it. The directory must render a truthful load-error
+  // state with a retry action instead. (The server-side fix — limit 2000 →
+  // 16-request walk — and the bounded 429 retry make the failure rare; this
+  // test pins the UI contract that even a persistent failure never reads as
+  // an empty dataset.)
+  const rtl = await setupDom();
+  await setUrlState("/directory");
+  // Reset the shared module cache: earlier tests in this file walked the
+  // list successfully and seeded `cachedRecords` — with a warm cache the
+  // walk never runs and the 429 mock below is never reached. The failing
+  // walk must run for the load-error state to render.
+  const camerasLayer = await loadDomModule("app/lib/use-public-cameras.mjs");
+  camerasLayer.__resetPublicCamerasCache();
+  installFetchMock((input) => {
+    if (String(input).startsWith("/api/cameras")) {
+      return jsonResponse({ error: "rate limited" }, { status: 429, headers: { "retry-after": "1" } });
+    }
+    return jsonResponse({ error: "not found" }, { status: 404 });
+  });
+
+  const DirectoryTool = await loadDirectoryTool();
+  const { container } = await renderWithLocale(React.createElement(DirectoryTool));
+
+  // The walk exhausts its bounded retry budget (initial + 2 retries), then
+  // the load-error state renders — NOT the empty state, and no record list.
+  const DEBOUNCE_WAIT = { timeout: 5000 };
+  await rtl.waitFor(() => {
+    const emptyState = container.querySelector(".empty-state");
+    assert.ok(emptyState, "the load-error state must render");
+    assert.match(emptyState?.textContent ?? "", /could not be loaded/i, "the failure must be described truthfully");
+    assert.doesNotMatch(emptyState?.textContent ?? "", /public records? found/i, "a load failure must NEVER read as an empty dataset");
+  }, DEBOUNCE_WAIT);
+  assert.equal(container.querySelectorAll("ul.record-list li").length, 0, "no fake records on a failed walk");
+
+  // The retry action exists and actually re-runs the walk (reload): with
+  // the mock then healthy, the directory recovers to the real list.
+  const retryButton = [...container.querySelectorAll("button")].find((button) =>
+    /try again|riprova/i.test(button.textContent ?? ""),
+  );
+  assert.ok(retryButton, "the load-error state must offer a retry action");
+  installFetchMock((input) => {
+    if (String(input).startsWith("/api/cameras")) {
+      return jsonResponse({ records: TWO_RECORDS, total: TWO_RECORDS.length, nextOffset: null });
+    }
+    return jsonResponse({ error: "not found" }, { status: 404 });
+  });
+  await rtl.userEvent.click(retryButton);
+  await rtl.waitFor(
+    () => assert.equal(container.querySelectorAll("ul.record-list li").length, 2, "retry must recover the real list"),
+    DEBOUNCE_WAIT,
+  );
+});
+
 test("journey browse→filtri: kind filter and sort order drive the directory", async () => {
   const rtl = await setupDom();
   await setUrlState("/directory");
