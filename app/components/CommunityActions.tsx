@@ -108,6 +108,7 @@ export function CommunityActions({
   counts: initialCounts,
   compact = false,
   bundle: bundleProp,
+  onCountsChange,
 }: {
   recordId: number;
   counts?: Partial<ActionCounts>;
@@ -120,6 +121,15 @@ export function CommunityActions({
    * context read. One widget, both mounts (D4).
    */
   bundle?: MessageBundle;
+  /**
+   * Server-confirmed counts reporter (BUG t_5bc23d61): called after every
+   * successful toggle with the authoritative counts (the PUT response, or
+   * the locally-decremented set after a DELETE). The map popup helper uses
+   * it to keep its per-record store so a remount from a stale payload
+   * never reverts a vote. Optional — the record page mount does not need
+   * it (its React tree keeps the widget alive).
+   */
+  onCountsChange?: (counts: ActionCounts) => void;
 }) {
   /**
    * Bundle resolution — two mounts, one widget:
@@ -219,12 +229,22 @@ export function CommunityActions({
         if (isActive) {
           // DELETE answers { action: null } without counts; removing MY
           // action reduces the distinct count of that action by exactly 1.
+          const nextCounts = { ...counts, [action]: Math.max(0, counts[action] - 1) };
           setMyAction(null);
-          setCounts((current) => ({ ...current, [action]: Math.max(0, current[action] - 1) }));
+          setCounts(nextCounts);
+          // BUG t_5bc23d61: report the server-confirmed (decremented)
+          // counts to the popup mount helper so a remount from the stale
+          // map payload cannot revert the visible count.
+          onCountsChange?.(nextCounts);
         } else {
           const body = (await response.json()) as { action: ActionType; counts?: ActionCounts };
           setMyAction(body.action);
-          if (body.counts) setCounts(body.counts);
+          if (body.counts) {
+            setCounts(body.counts);
+            // BUG t_5bc23d61: the PUT response is the ONLY authority for
+            // the aggregate counts — persist them across popup remounts.
+            onCountsChange?.(body.counts);
+          }
         }
         // A completed action closes the disclosure panel (the record state
         // is now visible on the toolbar / menu counts).
