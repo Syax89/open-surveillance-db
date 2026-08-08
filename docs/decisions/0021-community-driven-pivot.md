@@ -20,8 +20,8 @@
   duplicate confirmation gate — unchanged), 0020 (multi-method authentication —
   the verified-account write gate is **unchanged** and remains the identity
   choke-point for every community action)
-- **Related docs:** `docs/COMMUNITY_PLAN.md` (roadmap superseded for the
-  moderation model), `docs/DATA_MODEL.md` (status lifecycle diagrams),
+- **Related docs:** community plan (superseded by this ADR, archived),
+  `docs/DATA_MODEL.md` (status lifecycle diagrams),
   `docs/MODERATION.md`, `docs/TERMS_OF_USE.md`, `docs/legal/PRIVACY_NOTICE.md`,
   `docs/legal/RETENTION_SCHEDULE.md`
 
@@ -71,7 +71,7 @@ that the project depends on:
 
 ### 2. State model and transition matrix
 
-Four domain states; `demo` is the technical prototype marker and never part of
+Four domain states; `demo` is the development marker and never part of
 the community flow.
 
 | Status | Public? | Meaning |
@@ -79,7 +79,7 @@ the community flow.
 | `active` | Yes | Report is live and listed |
 | `hidden` | No (direct link with banner) | Present but withdrawn pending community/legal consensus — **reversible** |
 | `removed` | No (direct link with banner) | Community agrees it is no longer there (or admin legal removal) — **reversible** |
-| `demo` | Local prototype only | Fictional seed data, never in production |
+| `demo` | Development only | Fictional seed data, never in production |
 
 `hidden` is a **new** status: today hiding a record means `removed` (terminal,
 DATA_MODEL.md). The pivot separates "still there but withdrawn" (`hidden`,
@@ -417,8 +417,8 @@ utile", "confirm / confermo ancora presente", "no longer there / non c'è più",
   moderation" — accepted.
 - **Legal**: the controller remains accountable (art. 5(2)); automatic
   safeguards (privacy threshold, public history, erasure) are the control
-  mechanisms. PRIVACY_NOTICE, TERMS_OF_USE, MODERATION.md, DATA_MODEL.md and
-  COMMUNITY_PLAN.md must be updated (separate legal phase); the residual admin
+  mechanisms. PRIVACY_NOTICE, TERMS_OF_USE, MODERATION.md and DATA_MODEL.md
+  must be updated (separate legal phase); the residual admin
   emergency power is documented in MODERATION.md.
 - **Operations**: no reviewer duties in the normal flow; the admin emergency
   surface stays (ADR 0009 roles intact, unused); operators tune thresholds via

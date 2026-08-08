@@ -1,205 +1,141 @@
 # OpenSurveillanceDB
 
-An open, non-commercial civic database for documenting **visible public surveillance infrastructure**. The project helps people understand where cameras are installed in shared spaces; it does not provide video feeds, tracking tools, or advice on avoiding lawful surveillance.
+An open, non-commercial civic database that documents **visible public
+surveillance infrastructure**. OpenSurveillanceDB maps where cameras and
+automated surveillance systems are installed in shared spaces, so the public
+can understand what observes them.
 
-> Current state: deployed and publicly reachable (temporary domain behind a
-> CDN) with moderated community data, official open-data imports from 8+
-> European public sources, and a staging-grade stack. The map uses
-> OpenStreetMap; a full public launch on the project domain with final
-> legal review is still pending (see [docs/roadmap.md](docs/roadmap.md)).
+It is not a tool for watching, tracking or bypassing lawful surveillance: the
+project publishes **data about cameras, not feeds** — context, not profiles;
+transparency, not tracking.
 
-## Principles
+- Free to use, no ads, no profiling, no paid features.
+- Open source (AGPL-3.0-or-later); open data (ODbL 1.0) with licensing and
+  provenance recorded for every published record.
+- Privacy and safety by design: no private-home cameras, no live-feed links,
+  no operational details, no personal data in the public dataset.
+- Human and community moderation: verified community accounts publish
+  immediately; corrections and takedown requests are reviewed by a person.
 
-- Free to use, without ads, profiling, or paid features.
-- Open source: the software can be inspected, reused, and improved by the community.
-- Open data, with licensing and provenance recorded for every published record.
-- Privacy and safety by design: no private-home cameras, no sensitive operational details, and no live-feed links.
-- Human moderation before community submissions become public.
+## Features
 
-## What is implemented
+- **Interactive map** (`/mappa`): OpenStreetMap tiles served through a
+  same-origin proxy, viewport-first rendering, native grid aggregation at
+  national zoom, camera field-of-view cones/circles above zoom 16, a
+  keyboard-accessible marker popup with community actions.
+- **Public directory** (`/directory`): text equivalent of the map — search,
+  filters, A–Z index, CSV/GeoJSON exports, `?page=` pagination.
+- **Record pages** (`/records/[id]`): facts, location (address + coordinates),
+  community status, a small interactive position map, a public event timeline,
+  and an owner-only edit page.
+- **Community contributions** (`/segnala`, `/correggi`): verified accounts
+  submit cameras or corrections with map/coordinate location selection,
+  reverse-geocode address prefill and a server-enforced duplicate gate.
+  Community actions (useful / confirm / no longer there / problem / privacy)
+  drive automatic, trust-weighted state transitions (ADR 0021).
+- **Accounts and auth**: email+password with verification, passkeys
+  (WebAuthn), and GitHub/Google OIDC sign-in — server-gated on configured
+  providers; self-service erasure with de-attribution (GDPR art. 17).
+- **Public API**: `/api/cameras` (JSON/GeoJSON/CSV), search, nearby, per-record
+  actions and events, tile and geocode proxies — documented on the built-in
+  `/api-docs` page, with a fail-open worker cache for public reads.
+- **Import pipeline**: official open-data sources (city/regional/government
+  portals, OpenStreetMap) via `scripts/import/` — per-source adapters, a
+  fail-closed licence gate, cross-source dedup, idempotency and per-batch
+  attribution on the `/fonti` page.
+- **Bilingual interface**: English and Italian, with structural parity
+  enforced at compile time (ADR 0007).
 
-- Interactive OpenStreetMap-based map.
-- Searchable, map-equivalent public record directory and individual record pages.
-- Public API for reviewed records and GeoJSON export, plus `/api/cameras`
-  search, nearby and revision endpoints, a redesigned `/api-docs` page, and a
-  fail-open public cache layer (`X-OSDB-Cache`) for map reads (PR #343).
-- Import pipeline for official open-data sources (`scripts/import/`):
-  adapter per source, fail-closed licence gate, cross-source dedup,
-  idempotency, and per-batch attribution — see
-  [docs/data-sources/README.md](docs/data-sources/README.md) and the
-  [import README](scripts/import/README.md).
-- CSV and GeoJSON exports derived from the same reviewed public record list.
-- Locality/address/coordinate public search (`/api/cameras/search`) with truthful
-  empty states: coordinate pairs are parsed locally, other places are resolved
-  through a configurable geocoder, and a zero-result response describes the
-  searched area instead of claiming an absence of surveillance.
-- Data licensing decided: the public dataset and every export format (JSON,
-  CSV, GeoJSON) are under ODbL 1.0, and published coordinates are rounded to
-  ~4 decimal places by default (ADR 0008).
-- Submission form that stores new reports as `pending` for moderation.
-- Optional manufacturer and observation-date metadata at report intake. These
-  fields remain private while a report is `pending`. Approving the camera does
-  not disclose either value: a local moderator must separately opt in to
-  publishing each field after deciding it is accurate, safe, and suitable.
-- Report-location selection by map click or valid manual coordinates, using the
-  same non-blocking nearby-record check in either case.
-- Private correction/request-for-review form that creates a non-public moderation request.
-- Contributor accounts: email+password registration with email verification,
-  login/logout, and an account page listing the contributor's own submissions,
-  with PBKDF2-SHA256 password hashing, hashed opaque session cookies, and CSRF
-  protection. Social sign-in via OIDC (GitHub and Google) uses the same
-  panel and callback flow as login — the callback auto-creates the account
-  (ADR 0020).
-  A verified contributor account is required to submit reports or corrections
-  (ADR 0020); browsing the public data never requires an account.
-- Self-service account erasure with de-attribution (GDPR art. 17): deleting an
-  account detaches its submissions from the identity without unpublishing them
-  (ADR 0013).
-- Moderation dashboard at `/moderation` for reviewing pending reports and
-  requests, gated by `MODERATION_USER`/`MODERATION_PASSWORD` (Basic auth) or
-  `MODERATION_TOKEN` (bearer) environment credentials — fail-closed, returning
-  `503` when none are configured (ADR 0003).
-- Coarse authorization roles (`contributor`/`moderator`/`admin`) enforced on
-  every protected route via `requireRole`, with the acting reviewer derived
-  server-side from the authenticated user (ADR 0014).
-- Appeal workflow against moderation decisions: an independent senior moderator
-  (or the administrator, for escalations) reviews a contested decision; an
-  upheld appeal returns the record to the moderation queue for a fresh decision
-  (ADR 0014).
-- Community verifications: signed-in contributors can confirm a public camera
-  or withdraw their confirmation via `PUT`/`DELETE` on
-  `/api/cameras/[id]/confirmation`, and every public record payload carries
-  the aggregated `confirmationCount` (ADR 0018).
-- Community trust levels derived from the contributor's verified
-  contributions, with thresholds at 0/1/5/20/50 verified records (`L0`–`L4`),
-  exposed machine-readable through the profile endpoints (`/api/auth/me`,
-  `/api/auth/me/contributions`) (ADR 0018).
-- Two-track contribution editing: `PATCH /api/cameras/[id]` updates a
-  `pending` record directly, while edits to reviewed records become a
-  moderator-approved edit request — with a private, owner-only edit page at
-  `/records/[id]/edit` (ADR 0018).
-- A paginated list of the contributor's own contributions, trust level, and
-  pending edits on the `/account` page.
-- Pre-submit duplicate gate: `POST /api/cameras` rejects a likely duplicate
-  with `409` unless the contributor explicitly sends `duplicateConfirmed:
-  true` (ADR 0019).
-- Local record lifecycle: verified → needs review → reverified or removed, with audit history.
-- Nearby-record warning and safe type/order filters shared by map and directory.
-- Bilingual interface (English and Italian), with a device-local language preference.
-- In-app bilingual project guide at `/guide`.
-- Public information-site pages — `/manifesto`, `/regole`, `/privacy`,
-  `/termini`, `/licenze`, `/faq`, `/contatti`, `/moderazione` — linked from a
-  global site footer with ODbL and OSM attribution.
-- Draft accessibility statement and design for a non-sensitive usability-feedback route (see `docs/ACCESSIBILITY_STATEMENT.md` and ADR 0006).
-- Cloudflare D1-compatible data layer, with local demo records.
-
-The project is deliberately not a public registry yet. The code and draft
-policies are public, but accepting real-world reports still requires a public
-launch: independent legal review of the draft terms and privacy documents, real
-moderation staffing, and operational safeguards.
-
-## Read the project plan
-
-The documentation is part of the project and is intended to be discussed openly.
-
-- [Roadmap and current status](docs/roadmap.md)
-- [Site map and information architecture](docs/SITEMAP.md)
-- [Clean local setup and schema migrations](docs/DEVELOPMENT_SETUP.md)
-- [Local playbook and acceptance checks](docs/LOCAL_PLAYBOOK.md)
-- [Architecture](docs/ARCHITECTURE.md)
-- [Data model and API](docs/DATA_MODEL.md)
-- [Data dictionary (public fields)](docs/DATA_DICTIONARY.md)
-- [Export versioning policy](docs/EXPORT_VERSIONING.md)
-- [Moderation policy](docs/MODERATION.md)
-- [Terms of use](docs/TERMS_OF_USE.md)
-- [Pre-launch legal deliverables](docs/legal/README.md)
-- [Privacy and safety](docs/PRIVACY_AND_SAFETY.md)
-- [Accessibility statement](docs/ACCESSIBILITY_STATEMENT.md)
-- [Open-source and data licensing](docs/OPEN_SOURCE.md)
-- [Public data sources (censimento e licenze)](docs/data-sources/README.md)
-- [OpenStreetMap integration](docs/OSM_INTEGRATION.md)
-- [Deployment and operations](docs/DEPLOYMENT.md)
-- [Operations manual](docs/OPERATIONS.md)
-- [Local release checklist](docs/RELEASE_CHECKLIST.md)
-- [Decision records (ADR 0001–0021)](docs/decisions/)
-- [Changelog](CHANGELOG.md)
-- [Governance](GOVERNANCE.md)
-
-## Roles and contacts
-
-Initial project roles were named on 2026-07-31 as part of the Wave A pilot
-boundary (decision recorded in [GOVERNANCE.md](GOVERNANCE.md)):
-
-| Role | Owner(s) |
-| --- | --- |
-| Maintainers | Simone (syax89) and Ada (CTO). Ada is the sole merge authority: every merge into `main` is performed by Ada. |
-| Operations owner | Ken |
-| Data stewards | Linus and Grace |
-| Security contact | Ken — private reporting route in [SECURITY.md](SECURITY.md) |
-| Moderation contact | Grace |
-
-These are initial nominations for the pilot, not a claim that the full public
-governance structure already exists. Only public professional identities are
-listed, in line with the project's privacy-by-design approach.
-
-## Run locally
+## Quick start
 
 Requirements: Node.js 22.13 or newer.
 
 ```bash
 npm install
 npm run db:migrate   # apply the Drizzle schema migrations to a fresh local DB
-npm run dev
+npm run dev          # vinext dev server on http://localhost:3000
 ```
 
-Open `http://localhost:3000`. The database starts empty — no demo rows are
-inserted at runtime. For the two labelled illustrative pins used in manual
-checks, run the optional, separate demo seed:
+Open `http://localhost:3000`. The database starts empty — no rows are inserted
+at runtime. Two labelled illustrative pins for manual checks:
 
 ```bash
 npm run db:seed
 ```
 
-For a complete walkthrough of a clean local setup — prerequisites, schema
-migrations, synthetic fixtures, and a safe non-destructive reset — read
-[docs/DEVELOPMENT_SETUP.md](docs/DEVELOPMENT_SETUP.md).
-
-To start over with a clean local database, run `npm run db:reset`
-(non-destructive: it moves the local state aside under a timestamped backup,
-then re-applies the migrations). After changing the schema in `db/schema.ts`,
-regenerate a migration with `npm run db:generate` before running
-`db:migrate`.
-
-For local moderation testing, open `http://localhost:3000/moderation`. This
-route is intentionally not linked from the public site. Access is gated by
-the `MODERATION_USER`/`MODERATION_PASSWORD` (Basic auth) or `MODERATION_TOKEN`
-(bearer) environment variables and fails closed: with none configured, the
-dashboard and `/api/moderation` return `503`. Protected routes additionally
-enforce coarse roles via `requireRole` (see ADR 0003 and ADR 0014). The local
-DB no longer ships demo identities (`Demo *` reviewers): migration `0017`
-removes them from every fresh database. Local suites that need the demo
-identities seed them explicitly in their test setup; for a real alpha/prod
-deployment, provision real moderator/admin accounts instead (see
-[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) §Provisioning real accounts):
+Useful commands:
 
 ```bash
-PROVISION_ACCOUNTS='[{"email":"ada@example.org","displayName":"Ada","role":"admin","reviewerRole":"administrator"}]' npm run db:provision
+npm run db:reset      # non-destructive local reset (moves state aside, re-migrates)
+npm run db:generate   # regenerate a migration after changing db/schema.ts
+npm run test          # build + full test suite
+npm run lint
+npm run build         # production build (dist/)
+npm run db:provision  # provision real moderator/admin accounts
 ```
 
-For a complete fictional-data workflow—submission, approval/rejection/hiding,
-public-boundary checks, and a cautious reset approach—read the [local
-playbook](docs/LOCAL_PLAYBOOK.md).
+Local environment variables go in `.dev.vars` (copy `.env.example`, gitignored
+— see `worker-configuration.d.ts` for every variable). The local moderation
+surface lives at `http://localhost:3000/moderation` and fails closed (503)
+until credentials are configured (ADR 0003).
 
-To verify a production build:
+For a complete walkthrough — prerequisites, migrations, synthetic fixtures,
+safe reset — read [docs/DEVELOPMENT_SETUP.md](docs/DEVELOPMENT_SETUP.md).
 
-```bash
-npm run build
+## Project structure
+
+```
+app/        Next.js application (App Router): routes, components, i18n bundles,
+            API route handlers (app/api), SSR pages
+db/         Drizzle schema + data access layer (cameras, auth, moderation,
+            community actions, imports, geocoding)
+worker/     Cloudflare Worker entry (server runtime wiring)
+drizzle/    SQL migrations (numbered, applied with wrangler d1)
+scripts/    Tooling: import pipeline (scripts/import), DB helpers, preview
+            servers, benchmarks, coverage
+tests/      Node test suite (build + node --test), harnesses in tests/helpers
+docs/       Project documentation (see index below)
+ops/        Operator tooling (secrets vault helpers, etc.)
+public/     Static assets (favicon, etc.)
 ```
 
-## License
+## Documentation
 
-The application source code is offered under [GNU Affero General Public License v3.0 or later](LICENSE) (`AGPL-3.0-or-later`). Documentation is proposed under CC BY-SA 4.0; the public database and every export format are licensed under ODbL 1.0 (ADR 0008) — see [Open source and data licensing](docs/OPEN_SOURCE.md).
+- [docs/DEVELOPMENT_SETUP.md](docs/DEVELOPMENT_SETUP.md) — clean local setup, migrations, fixtures
+- [docs/LOCAL_PLAYBOOK.md](docs/LOCAL_PLAYBOOK.md) — end-to-end local workflow with fictional data
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — architecture and security boundaries
+- [docs/DATA_MODEL.md](docs/DATA_MODEL.md) — data model, status lifecycle (ADR 0021)
+- [docs/DATA_DICTIONARY.md](docs/DATA_DICTIONARY.md) — every public field
+- [docs/FRONTEND_DESIGN.md](docs/FRONTEND_DESIGN.md) + [docs/design/](docs/design/README.md) — design system (normative + current patterns)
+- [docs/roadmap.md](docs/roadmap.md) — current status and direction
+- [docs/decisions/](docs/decisions/README.md) — architecture decision records (ADR 0001–0021)
+- [docs/data-sources/](docs/data-sources/README.md) — public data sources, licences, import pipeline
+- [docs/OSM_INTEGRATION.md](docs/OSM_INTEGRATION.md) — tile proxy and geocoder
+- [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — deployment and operations
+- [docs/SITEMAP.md](docs/SITEMAP.md) — routes and information architecture
+- [docs/ACCESSIBILITY_STATEMENT.md](docs/ACCESSIBILITY_STATEMENT.md) — WCAG 2.2 AA conformance
+- [docs/legal/](docs/legal/README.md) — legal deliverables (privacy notice, terms, retention)
+- [CHANGELOG.md](CHANGELOG.md) — release history
+
+## Data sources and licensing
+
+The public dataset and every export format (JSON, CSV, GeoJSON) are licensed
+under **ODbL 1.0** (ADR 0008); published coordinates are rounded to ~4 decimal
+places (~10 m) by default. Records come from community reports and from
+official open-data imports (city, regional and government sources across
+Europe and North America), each with its own source licence and per-batch
+attribution. The full registry lives in
+[docs/data-sources/](docs/data-sources/README.md), and the live attribution
+table is on the `/fonti` page.
+
+Application source code: [GNU AGPL v3.0 or later](LICENSE).
+Documentation: CC BY-SA 4.0 (proposed). See
+[docs/OPEN_SOURCE.md](docs/OPEN_SOURCE.md).
 
 ## Contributing
 
-Contributions, criticism, translations, accessibility reviews, and local knowledge are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), and [SECURITY.md](SECURITY.md) before participating.
+Contributions, criticism, translations, accessibility reviews and local
+knowledge are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md),
+[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), [GOVERNANCE.md](GOVERNANCE.md) and
+[SECURITY.md](SECURITY.md) before participating. Material decisions are
+recorded as ADRs in [docs/decisions/](docs/decisions/README.md).

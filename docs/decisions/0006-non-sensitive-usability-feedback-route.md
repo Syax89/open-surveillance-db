@@ -3,19 +3,15 @@
 - **Status:** proposed (draft, awaiting implementation)
 - **Date:** 2026-07-31
 - **Author:** Marie (documentation)
-- **Related:** [roadmap.md](../roadmap.md) (Horizon 2), [PRODUCT_UX.md](../workstreams/PRODUCT_UX.md) (backlog item "Usability feedback route"), [ACCESSIBILITY_STATEMENT.md](../ACCESSIBILITY_STATEMENT.md)
+- **Related:** [ACCESSIBILITY_STATEMENT.md](../ACCESSIBILITY_STATEMENT.md)
 
 ## Context
 
-Horizon 2 of the future roadmap ("inclusive product maturity") requires "a
-clear accessibility statement and a non-sensitive usability-feedback route".
-The product workstream already lists a "Usability feedback route" with the
-outcome: *visitors can report an interface barrier without being forced to
-create an account* ([PRODUCT_UX.md](../workstreams/PRODUCT_UX.md#should-have-after-the-alpha-is-stable)).
-
-A usability-feedback route is also a requirement of the accessibility
-statement itself: EN 301 549 § 9.6 and the European accessibility-statement
-model require a stated mechanism for reporting accessibility problems.
+The accessibility statement (EN 301 549 § 9.6 and the European
+accessibility-statement model) requires a stated mechanism for reporting
+accessibility problems. This ADR records the chosen shape for that route: a
+non-sensitive usability-feedback page that lets a visitor report an interface
+barrier *without being forced to create an account*.
 
 Design constraints from existing policy:
 
@@ -52,7 +48,7 @@ tracking.
 
 Implementation phases:
 
-- **Local prototype (current):** the page may compose a `mailto:` message or
+- **Local development (current):** the page may compose a `mailto:` message or
   point to the public issue tracker; no server-side storage is required.
 - **Public launch:** a dedicated mailbox and minimal storage, with rate
   limiting (per IP, no retained logs) and retention aligned with

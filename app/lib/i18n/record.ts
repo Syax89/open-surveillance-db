@@ -20,7 +20,7 @@ export const en = {
   addedOn: "Added",
   lastVerification: "Last confirmation",
   // F4 (QA#6): the demo seed rows carry raw, language-neutral markers
-  // ("Prototype seed"/"Demo data" — test contract, see DATA_DICTIONARY);
+  // ("Development seed"/"Demo data" — test contract, see DATA_DICTIONARY);
   // the presentation shows these localized labels instead.
   demoSource: "Illustrative seed",
   demoUpdated: "Demo data",
@@ -176,7 +176,7 @@ export const it: Translation<typeof en> = {
   addedOn: "Aggiunta",
   lastVerification: "Ultima conferma",
   // F4 (QA#6): i record del seed demo hanno marcatori grezzi neutri
-  // ("Prototype seed"/"Demo data" — contratto di test, vedi DATA_DICTIONARY);
+  // ("Development seed"/"Demo data" — contratto di test, vedi DATA_DICTIONARY);
   // la presentazione mostra invece queste etichette localizzate.
   demoSource: "Seed illustrativo",
   demoUpdated: "Dato dimostrativo",

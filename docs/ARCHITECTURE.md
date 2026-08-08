@@ -1,8 +1,8 @@
 # Architecture
 
-Last reviewed: 2026-08-02
+Last reviewed: 2026-08-08
 
-## Current prototype
+## Current architecture
 
 ```mermaid
 flowchart LR
@@ -12,10 +12,9 @@ flowchart LR
   Browser --> Tiles[/api/tiles same-origin proxy/]
   Tiles --> OSM[OpenStreetMap raster tiles]
   Auth[Contributor accounts and sessions /api/auth/*] --> API
-  API --> Queue[Moderation queue /api/moderation]
-  Queue --> Moderator[Moderator workspace]
-  API --> Appeals[Appeals /api/appeals]
-  Community[Community: verifications and contribution edits /api/cameras/*] --> API
+  Community[Community actions and events /api/cameras/*] --> API
+  API --> Moderation[Residual local moderation /api/moderation]
+  Corrections[Private correction requests /api/corrections] --> API
 ```
 
 The front end is a React/Vinext application. Leaflet renders a map whose
@@ -24,92 +23,95 @@ tiles are served exclusively through the same-origin proxy
 directly): the route validates zoom/coordinates, forwards the upstream
 request with an identifying User-Agent and the end user's Referer, caches
 responses server-side, and honours the OSMF tile usage policy (see
-docs/OSM_INTEGRATION.md). The `/api/cameras` endpoint exposes only `verified`
-and `demo` records; submissions are created with `pending` status. `GET
-/api/cameras` accepts optional `kind` (bounded, parameterised equality) and
-`freshness` (whitelisted `7d`/`30d`/`90d` windows) filters shared by the
-JSON, GeoJSON, and CSV outputs; a freshness window matches only ISO
-verification timestamps, so illustrative demo labels and pre-backfill prose
-can never be presented as freshly verified.
+docs/OSM_INTEGRATION.md). The `/api/cameras` endpoint exposes only `active`
+and `demo` records (ADR 0021; the legacy `verified` status was retired by
+migration 0039 and public surfaces derive their whitelist from
+`PUBLIC_CAMERA_STATUSES` in `app/lib/public-status.ts`). Verified-account
+submissions are published as `active` immediately (community model, ADR
+0021); the legacy `pending` intake path survives only for the residual
+legal-emergency moderation flows. `GET /api/cameras` accepts optional `kind`
+(bounded, parameterised equality) and `freshness` (whitelisted
+`7d`/`30d`/`90d` windows) filters shared by the JSON, GeoJSON, and CSV
+outputs.
 
 Contributor accounts and sessions (ADR 0013) live under `/api/auth/*`:
-register, login, logout, `me`, `me/submissions`, and account erasure.
-Passwords are hashed with salted PBKDF2-HMAC-SHA256 (210,000 iterations);
-sessions are opaque 32-byte tokens stored only as their SHA-256, with a
-per-session CSRF token (double-submit) and rate-limited credential
-endpoints. Coarse roles — `contributor`, `moderator`, `admin` — gate every
-protected route through `requireRole` in `app/lib/authz.ts` (ADR 0014):
-`moderator+` reads/writes the moderation queue and appeals,
-`contributor+` may file an appeal, and anonymous submissions stay possible
-by design. The moderation queue (`/api/moderation`) and appeals
-(`/api/appeals`) are separate protected surfaces with an append-only audit
-trail in `moderation_events`. The database layer is designed for Cloudflare D1 and uses
-Drizzle for schema migrations.
+register, login, logout, `me`, `me/contributions`, passkey enrollment and
+login, OIDC start/callback, and account erasure. Passwords are hashed with
+salted PBKDF2-HMAC-SHA256 (210,000 iterations); sessions are opaque 32-byte
+tokens stored only as their SHA-256, with a per-session CSRF token
+(double-submit) and rate-limited credential endpoints. Coarse roles —
+`contributor`, `moderator`, `admin` — gate every protected route through
+`requireRole` in `app/lib/authz.ts` (ADR 0014). A **verified contributor
+account is required to submit reports or corrections** (ADR 0020 write gate);
+browsing the public data never requires an account.
 
-The community system (ADR 0018) runs on the same prototype: contributors can
-verify a public record (`PUT /api/cameras/[id]/confirmation`, with a
-structural anti-gaming layer — one active verification per (record,
-contributor), plus daily and per-record quotas), see their own verification
-state (`GET`, `DELETE` for the toggle), and edit records on two tracks
-(`PATCH /api/cameras/[id]`): pending records get a direct owner-only update,
-while published records never mutate `cameras` directly — the PATCH inserts
-a `camera_edit_requests` diff row plus a `moderation_queue` row (entity
-`camera_edit`) that a moderator applies or discards later. Trust levels
-(L0–L4) are derived server-side from the contributor's verified-contribution
-count and returned by the profile endpoints. Submissions additionally pass
-the pre-submit duplicate gate (ADR 0019): `POST /api/cameras` runs the
-nearby-duplicate check before storage and answers `409 Conflict` with
-`possibleDuplicates` when a `high`-strength candidate exists, unless the
-payload carries `duplicateConfirmed: true`.
+The community system (ADR 0021) runs on the same stack: verified contributors
+cast community actions (`useful` / `confirm` / `gone` / `problem` / `privacy`)
+via `PUT/DELETE /api/cameras/[id]/actions` (one active action per
+(record, contributor), anti-gaming quotas), trust-weighted thresholds trigger
+automatic state transitions (`active → hidden/removed`, reversible by
+contrary consensus), and every transition is recorded as an unattributed
+event in the public per-record timeline (`camera_lifecycle_events`, served by
+`/api/cameras/[id]/events`). Correction and takedown requests are a private,
+human-reviewed channel (`/api/corrections`, `correction_requests`). The
+moderation surface (`/api/moderation`) is a residual local tool for
+legal-emergency flows only (ADR 0021 §8), gated by
+`MODERATION_USER`/`MODERATION_PASSWORD`/`MODERATION_TOKEN` credentials —
+fail-closed, returning `503` when none are configured (ADR 0003). The appeal
+workflow (ADR 0014) is retired in the community model (ADR 0021 §7.3).
 
-## Required production shape
+Submissions pass the pre-submit duplicate gate (ADR 0019): `POST
+/api/cameras` runs the nearby-duplicate check before storage and answers
+`409 Conflict` with `possibleDuplicates` when a `high`-strength candidate
+exists, unless the payload carries `duplicateConfirmed: true`. Edits to
+published records go through the two-track `PATCH /api/cameras/[id]`:
+`pending` records get a direct owner-only update, published records become a
+moderator-approved edit request (`camera_edit_requests` + `moderation_queue`
+entity `camera_edit`). Trust levels (L0–L4) are derived server-side from the
+contributor's verified-contribution count (ADR 0021 §4).
 
-```mermaid
-flowchart LR
-  Visitor[Visitor / contributor] --> Edge[Web application + API]
-  Edge --> Auth[Identity and rate limiting]
-  Edge --> Database[(Primary database)]
-  Edge --> Queue[Moderation queue]
-  Queue --> Moderator[Moderator workspace]
-  Edge --> Storage[Private evidence storage]
-  Storage --> Redaction[Scan / redact pipeline]
-  Edge --> Tiles[Compliant map tile service]
-  Database --> Export[Versioned open-data exports]
-  Edge --> Monitor[Monitoring, backups, audit logs]
-```
+Public reads are cached in the worker with a fail-open Cache API wrapper
+(`app/lib/public-cache.ts`, `X-OSDB-Cache` header) and, on Cloudflare, served
+from D1 read replicas; only HTTP 200 responses are stored and the cache can
+never take a route down.
 
 ## Boundaries
 
-- **Public map:** reviewed, intentionally limited location and metadata only.
-- **Moderation system:** pending records, optional `manufacturer` and
-  `observedOn` metadata, reviewer notes, rationale, timestamps, and
-  appeals; never exposed as a public feed. A moderator decides separately
-  whether optional metadata may be included in a verified public record. The
-  `publishManufacturer` and `publishObservedOn` choices default to false and
-  are enforced independently at the public-data query boundary.
-- **Evidence storage:** photo upload was removed entirely on 2026-08-08
-  (CEO decision): no media intake exists in the current model — records are
-  text metadata only, so there is no evidence object store, no storage key
-  and no media serving surface to protect. Existing R2 objects from the
-  retired feature were retained (no deletion).
-- **Data export:** reviewed public data only, with a version and license notice.
-- **Observability:** aggregate service health and security events; avoid logging submitted personal data unnecessarily.
+- **Public map:** `active`/`demo` records with intentionally limited location
+  and metadata only. Withdrawn records (`hidden`/`removed`) are reachable by
+  direct link with an explicit banner, but never listed, and their detail
+  payload is a privacy tombstone (no address, coordinates, description or
+  manufacturer).
+- **Moderation/corrections:** pending intake, edit requests, correction
+  requests and audit trails are never exposed as a public feed.
+- **Evidence storage:** no media intake exists in the current model — records
+  are text metadata only (photo upload was removed entirely on 2026-08-08,
+  CEO decision), so there is no evidence object store, no storage key and no
+  media serving surface to protect. Existing R2 objects from the retired
+  feature were retained (no deletion).
+- **Data export:** public data only, with an ODbL 1.0 notice; coordinates
+  rounded to ~4 decimal places by default (ADR 0008).
+- **Observability:** aggregate service health and security events; avoid
+  logging submitted personal data unnecessarily.
 
 ## Technology choices
 
-| Concern | Prototype choice | Production requirement |
+| Concern | Current choice | Production notes |
 | --- | --- | --- |
-| UI | React + Vinext | Accessible, internationalised web UI |
-| Map | Leaflet + same-origin tile proxy (`/api/tiles` → OSM, policy-compliant) | Provider-compliant tiles or self-hosted vector/raster stack |
-| Database | Cloudflare D1 + Drizzle | Backups, migration discipline, access controls, retention plan |
-| API | Route handlers + JSON/GeoJSON | Versioning, rate limits, schema validation, documentation |
-| Media | **None — photo upload removed (2026-08-08, CEO):** no image is accepted or stored; records are text metadata only (existing R2 objects retained, no deletion) | Not applicable — no media processing, storage or serving in the current model |
-| Identity | Contributor accounts (email+password, PBKDF2-SHA256, session tokens stored hashed, CSRF double-submit) and roles contributor/moderator/admin enforced via `requireRole` on protected routes — ADR 0013/0014 | Minimal accounts, anti-abuse controls, contributor privacy |
+| UI | React + Vinext (Next.js App Router on Vite) | Accessible, internationalised web UI |
+| Map | Leaflet + same-origin tile proxy (`/api/tiles` → OSM, policy-compliant, configurable provider) | Provider-compliant tiles or self-hosted vector/raster stack |
+| Database | Cloudflare D1 + Drizzle (migrations in `drizzle/`) | Backups, migration discipline, access controls, retention plan |
+| API | Route handlers + JSON/GeoJSON/CSV | Versioning, rate limits (in-memory + edge binding), schema validation, `/api-docs` |
+| Media | **None — photo upload removed (2026-08-08, CEO):** records are text metadata only | Not applicable |
+| Identity | Contributor accounts (email+password, PBKDF2-SHA256, hashed session tokens, CSRF double-submit), passkeys (WebAuthn), GitHub/Google OIDC (server-gated), roles contributor/moderator/admin via `requireRole` — ADR 0013/0014/0020 | Minimal accounts, anti-abuse controls, contributor privacy |
 
 ## Security design principles
 
-- Default deny: pending records and evidence never reach public endpoints.
+- Default deny: non-public records and private requests never reach public
+  endpoints.
 - Minimise data: collect only fields necessary for a civic record.
-- Separate duties: contributors cannot approve their own reports; moderators have scoped roles.
-- Preserve accountability: log high-impact moderation and administrative changes.
+- Separate duties: contributors cannot approve their own edits; moderators
+  have scoped roles; the acting reviewer is derived server-side.
+- Preserve accountability: log high-impact moderation and administrative
+  changes.
 - Design for deletion and correction from the first production schema.

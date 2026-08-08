@@ -252,7 +252,7 @@ export function applyCameraFilters(records: Camera[], filters: CameraFilters, no
     // Import-origin filter (FASE C, t_4dbce318): "reports" keeps only
     // community reports (source 'Community report'), "imported" only rows
     // from public datasets (source 'import:<slug>'). Demo seed rows
-    // ("Prototype seed") match neither — they are illustrative, not a
+    // ("Development seed") match neither — they are illustrative, not a
     // community report, and only surface under "any".
     if (filters.origin === "reports" && camera.source !== "Community report") return false;
     if (filters.origin === "imported" && !camera.source.startsWith("import:")) return false;

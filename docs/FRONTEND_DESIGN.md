@@ -1,25 +1,19 @@
 # Frontend design system — documento unico vincolante
 
-Last reviewed: 2026-08-02
+Last reviewed: 2026-08-08
 Author: Vera (Designer UX/UI)
-Version: v2 (sostituisce la v1 del 2026-08-01)
+Version: v3 (sostituisce la v2 del 2026-08-02)
 Stato: **vincolante** — fonte di verità unica per UI/UX del frontend.
 
 Questo documento è il **riferimento normativo** del design system: definisce
 token, tipografia, layout, componenti, stati e regole che l'implementazione
 **deve** rispettare. Non è una visione: è il contratto.
 
-- Complementi: `docs/SITEMAP.md` (IA), `docs/workstreams/PRODUCT_UX.md`
-  (requisiti UX/accessibilità), audit di conformità codice vs doc (main
-  @`200f415`, 2026-08-02, archiviato in
-  `~/osdb-archive/docs-plans/design-audit.md`).
-- Se una sezione è marcata **[binding]** significa che il codice attuale
-  diverge e la voce è il target da implementare (gap tracciato nell'audit di
-  conformità). Se è **[implementato]** significa che è verificato sul
-  codice attuale.
-
-**Legenda stato:** ✅ implementato e verificato · 🔒 binding (da implementare /
-da allineare) · ⚠ parziale (vedi nota)
+- Complementi: `docs/SITEMAP.md` (IA),
+  `docs/design/README.md` (pattern attuali di mappa/popup/hero e contract di
+  performance, verificati sul codice).
+- Legenda stato: ✅ implementato e verificato · 🔒 binding (da implementare /
+  da allineare) · ⚠ parziale (vedi nota)
 
 ---
 
@@ -61,6 +55,8 @@ decorative, niente gradienti aggressivi.
 | `/guide` | Guida all'uso | PublicNav | ✅ |
 | `/manifesto` | Manifesto | PublicNav | ✅ |
 | `/regole` | Regole | PublicNav | ✅ |
+| `/fonti` | Attribuzione fonti importate (FASE C) | footer | ✅ |
+| `/api-docs` | Documentazione API pubblica | footer | ✅ |
 | `/moderazione` | URL compatibile → dettaglio pubblicazione in `/guide` | — | ✅ |
 | `/privacy` `/termini` `/licenze` | Pagine legali | PublicNav | ✅ |
 | `/faq` `/contatti` `/accessibility` | Info | PublicNav | ✅ |
@@ -104,7 +100,7 @@ h2 sezione (es. place-search) → h3 card.
 
 **Directory catalog mode (t_127492f1; redesign t_f13fcb1c):** la tool page
 usa `PublicDirectory variant="catalog"` con il layout browse-record
-"indice editoriale" (proposta vincente di `docs/design/browse-record-redesign.md`):
+"indice editoriale" (proposta vincente, documentata in `docs/design/README.md`):
 
 1. `.directory-tool-heading` = `.tool-heading` con il link "Use the map
    instead" allineato a destra (modifier: il layout flex vale SOLO per
@@ -163,39 +159,37 @@ blocco place-search + FiltersBar inline + count + griglia 2 colonne).
 
 ### 3.1 Colori
 
-Palette già in `:root` (globals.css) ✅, inclusi i token status/focus aggiunti
-in F4 (gap P1 G5 chiuso).
+Palette in `:root` (globals.css) ✅ — valori canonici scritti in `rgb(r g b)`
+moderno (tokenizzazione t_be89b99c: zero hex letterali nel sorgente). Il
+blocco sotto riporta i token core con l'equivalente hex per lettura:
 
 ```
-/* Core (✅ implementato in :root) */
---ink: #102332      /* testo principale */
---paper: #f5f3ec    /* sfondo pagina */
---line: #d8ddd6     /* bordi, separatori */
---navy: #09233a     /* hero, sfondi scuri */
---mint: #cbf7da     /* primary action bg */
+/* Core (✅ in :root) */
+--ink: rgb(16 35 50)        /* #102332 — testo principale */
+--muted: rgb(92 108 117)    /* #5c6c75 — testo secondario */
+--paper: rgb(245 243 236)   /* #f5f3ec — sfondo pagina */
+--line: rgb(216 221 214)    /* #d8ddd6 — bordi, separatori */
+--navy: rgb(9 35 58)        /* #09233a — hero, sfondi scuri */
+--mint: rgb(203 247 218)    /* #cbf7da — primary action bg */
+--card-bg: rgb(255 254 249) /* #fffef9 — superficie card */
+--focus: rgb(11 112 92)     /* #0b705c — focus ring */
+--action: rgb(10 112 93)    /* #0a705d — link/azioni primarie */
 
-/* Palette estesa (✅ in :root ma 0 usi — dead tokens, gap P1 G5) */
---navy-2: #123b55
---lime: #94e8a5
---coral: #e87b67
---sand: #ebe7da
-
-/* Semantic status (✅ in :root da F4; le classi hardcoded ora usano i token) */
---status-verified: #42a979
---status-community: #d3963e
---status-review: #d8715e
---status-demo: #6177ac      /* colore già usato da .osm-camera-marker.demo */
---status-pending: #8a979b   /* grigio-azzurro neutro, "in coda" (moderation) */
-
-/* Focus (✅ in :root da F4; i 23 hardcode di #0b705c sostituiti con var(--focus)) */
---focus: #0b705c
+/* Semantic status (✅ in :root; dot + label testuale, mai solo colore) */
+--status-verified: rgb(66 169 121)   /* verde */
+--status-community: rgb(211 150 62)  /* ambra */
+--status-review: rgb(216 113 94)     /* rosso revisione */
+--status-demo: rgb(97 119 172)       /* slate */
+--status-pending: rgb(138 151 155)   /* grigio-azzurro neutro */
 ```
 
-**Regola (P1 G5 — ✅ chiusa in F4):** nessun nuovo hardcode di colore dove
-esiste un token; i 23 hardcode di `#0b705c` sono stati sostituiti con
-`var(--focus)`. Debt residuo: i 4 dead tokens (`--navy-2`, `--lime`, `--coral`,
-`--sand`) vanno **usati o rimossi** nel prossimo refactor (tracciato
-nell'audit di conformità §3, `~/osdb-archive/docs-plans/design-audit.md`).
+**Regola:** nessun hardcode di colore dove esiste un token; i valori canonici
+vivono SOLO in `:root` di `app/globals.css` (scala ink `--ink-2…--ink-5`,
+`--text-*`, `--space-*`, `--radius-*`, `--container-*`, `--status-*`,
+`--danger-*`, `--notice-*`, `--hero-*`, `--visual-*`, `--map-*`,
+`--field-*`). Il pattern "coherent box" (card bianca + shadow + bordo visibile
++ rail di stato 3px + tint ~14% del colore di stato) è descritto in
+`docs/design/README.md`.
 
 **Verifica contrasto WCAG (tabella corretta rispetto alla v1):**
 
@@ -237,10 +231,14 @@ informazioni da soli** — sempre abbinati a label testuale localizzata
 
 | Ruolo | Selettore | Size | Line-height | Weight | Tracking | Stato |
 |-------|-----------|------|-------------|--------|----------|:---:|
-| Hero h1 | `.hero h1` | clamp(48px, 6vw, 82px) | .96 | **800** | -.075em | ✅ (F4) |
-| Record h1 | `.record-detail h1`, `.moderation-page>h1` | clamp(42px, 6vw, 70px) | .96 | **700** | -.07em | ✅ (F4) |
-| Tool h1 | `.tool-heading h1` | clamp(34px, 4.5vw, 52px) | 1.04 | **800** | -.06em | ✅ (F4, G1) |
+| Hero h1 | `.hero h1` | clamp(48px, 6vw, 82px) | 1.06 | **800** | -.075em | ✅ (F4 + t_c18b48f0) |
+| Record h1 | `.record-detail h1`, `.moderation-page>h1` | clamp(42px, 6vw, 70px) | 1.06 | **700** | -.07em | ✅ (F4 + t_c18b48f0) |
+| Tool h1 | `.tool-heading h1` | clamp(34px, 4.5vw, 52px) | 1.08 | **800** | -.06em | ✅ (F4, G1 + t_c18b48f0) |
 | Auth h1 | `.auth-card h1` | clamp(34px, 5vw, 54px) | 1.04 | 800 | -.06em | ✅ (F4) |
+
+Tutti gli h1 display (`hero`, `record-detail`, `tool-heading`, `auth-card`,
+`moderation-page`) portano `text-wrap:balance` + `overflow-wrap:anywhere`
+(fix layout IT t_c18b48f0: leading anti-collision sui titoli multiriga IT).
 | Section h2 | `.section-heading h2`, `.records-heading h2` | clamp(34px, 4vw, 53px) | 1 | **800** | -.065em | ✅ (F4) |
 | Moderation h2 | `.moderation-section h2` | clamp(28px, 3vw, 42px) | 1 | 800 | -.06em | ✅ (F4) |
 | Legal h2 | `.legal-section h2` | clamp(23px, 3vw, 32px) | 1.08 | **700** | -.05em | ✅ (F4) |
@@ -477,11 +475,14 @@ Legenda: **[spec]** = sezione dedicata sotto · **[patt.]** = pattern condiviso
 
 **Record, community, auth**
 | `RecordPageBody` (`app/records/[id]/RecordPageBody.tsx`) | `/records/[id]` | corpo client del dettaglio (loading/offline/error) | [patt.] |
-| `VerificationWidget` | `/records/[id]` | widget verifica + gate | [patt.] |
-| `StarConfirmButton` | `/records/[id]` | toggle verifica (aria-pressed, ≥44px) | [patt.] |
+| `CommunityActions` | `/records/[id]`, popup mappa | widget azioni community (varianti full/compact: useful/confirm + disclosure gone/problem/privacy con conferma privacy) | **[spec] 6.2.2** |
 | `LevelBadge` | `/account` | badge livello (label + dot; progresso SOLO testo, mai barra) | [patt.] |
 | `ConfirmDialog` | `/account` | alertdialog distruttivo accessibile (sostituisce `window.confirm`) | [patt.] |
-| `ModerationDashboard` | `/moderation` | dashboard privata | [patt.] |
+| `ModerationDashboard` | `/moderation` | dashboard privata (residuale, emergenza legale — ADR 0021 §8) | [patt.] |
+
+> Nota: `VerificationWidget`/`StarConfirmButton` (componenti pre-ADR 0021)
+> non sono più montati in nessuna superficie — il widget corrente è
+> `CommunityActions`; i file restano solo come riferimento storico.
 
 **Moderation (`moderation/`, 7 componenti + hook)**
 | `QueueSection`, `CameraQueueItem`, `CorrectionQueueItem`, `EditQueueItem`, `DecisionForm`, `HistorySection`, `CorrectionHistorySection`, `useModerationQueue` | `/moderation` | coda per sezioni, decisioni, storico | [patt.] — dot `pending` 🔒 (§6.3.2) |
@@ -532,17 +533,35 @@ pages l'header ridotto (§2.3).
 #### 6.2.2 Marker popup — `lib/map-popup.ts` + `.osm-popup*` ✅
 
 Popup costruito client-side come HTML string e bindato con `bindPopup`
-(t_702c10af, refactor t_b9666d09).
+(t_702c10af, refactor t_b9666d09, redesign t_b7728ad0). Anatomia corrente:
 
-- **Anatomia:** `.osm-popup` → h3 titolo (15px/800) · `.osm-popup-kind`
-  (12px `#60737d`) · `.osm-popup-status` (12px/700, dot + label da
-  `publicStatusLabel`) · `<dl>` (record id, coordinate 4 decimali) · address
-  opzionale · description opzionale · `.osm-popup-actions` (2 link:
-  `/records/[id]` e `/correggi?record=ID`, 12px/800 `#0a705d`).
-- **Sicurezza:** ogni campo è HTML-escaped (`escapeHtml`) — il popup resta
-  inerte; la label di stato viene SOLO dal helper pubblico, mai dal dato grezzo.
-- **Accessibilità:** dot `aria-hidden` + label testuale (WCAG 1.4.1);
-  i link del popup sono focusabili (Leaflet li integra nel tab order).
+1. **Header:** h3 titolo (15px/800) · `.osm-popup-kind` (12px `#60737d`) ·
+   `.osm-popup-status` (12px/700, dot + label da `publicStatusLabel`).
+2. **Facts:** `<dl>` denso a 2 colonne (record id, coordinate 4 decimali,
+   campo visivo testuale se direzionale) · address opzionale · description
+   opzionale.
+3. **Community toolbar:** nodo `div.osm-popup-community` (data-record-id) dove
+   il workspace monta il widget compatto `CommunityActions` su `popupopen`
+   (root React separata, smontata su `popupclose`): `Useful`/`Confirm` con
+   conteggi + trigger disclosure "Update/report" (gone/problem/privacy;
+   privacy richiede conferma esplicita prima del PUT).
+4. **Footer:** UN solo CTA `/records/[id]` (il link `/correggi` è stato
+   rimosso dal popup — le azioni Problema/Privacy del disclosure sono la
+   superficie di segnalazione a livello record).
+5. **Provenance:** `.osm-popup-provenance` in basso (testo piccolo): per gli
+   importati `Fonte: <ente> · <licenza> · Aggiunta: <data>`, per le
+   segnalazioni la label localizzata (FASE C, t_4dbce318).
+
+**Sicurezza:** ogni campo è HTML-escaped (`escapeHtml`) — il popup resta
+inerte; la label di stato viene SOLO dal helper pubblico, mai dal dato grezzo.
+
+**Accessibilità:** dot `aria-hidden` + label testuale (WCAG 1.4.1); il popup
+riceve `role="dialog"` + `aria-label` (titolo record) al `popupopen`; i marker
+sono focusabili e aprono con Enter/Spazio (keydown handler); opzioni
+`keepInView:true` + `autoPanPadding:[48,48]` su bindPopup e picker; larghezza
+via opzione Leaflet (`popupMaxWidth()`: 260 ≤ 520px viewport, altrimenti 300 —
+mai via CSS).
+
 - **Marker:** `.osm-camera-marker` 25px cerchio verde (`#1a7c60`) con
   punto interno mint; `.demo` = slate `#6177ac`; `.selected` = outline 6px
   `rgba(24,97,79,.22)`.
@@ -723,9 +742,8 @@ Sempre truthfull: "nessun record pubblicato trovato" — mai "non esiste".
 
 #### 6.3.7 Altri pattern ✅
 
-- `.notice` (verde, bordo-sx 3px), `.offline-state` (ambra), `.prototype-banner`
-  (giallo-verde, usato solo dal tool locale di moderazione — su /mappa il
-  banner è stato rimosso, feedback CEO 2026-08-02), `.duplicate-alert` (ambra).
+- `.notice` (verde, bordo-sx 3px), `.offline-state` (ambra),
+  `.duplicate-alert` (ambra).
 - `.auth-error` / `.auth-danger-zone` (rosso `#8a3b2c`).
 - `.faq-item`: disclosure nativa `<details>`, summary 17px/800, marker "+"/"–"
   in cerchio `#e3eee4`, focus outline offset -3px.
@@ -894,7 +912,7 @@ risultati; form coordinate a 1 colonna (≤480px).
 4. Non aggiungere classi CSS senza definirle. ✅ F4: `.tool-heading`,
    `.tool-section`, `.status-dot.demo`, `.status-dot.pending` definite;
    `.map-tool` definita come eccezione full-width di `/mappa`; le no-op
-   rimosse (`.filters-inline`, `.prototype-banner-compact`).
+   rimosse (`.filters-inline`, banner compatto legacy).
 5. Non usare `window.confirm` — usare `ConfirmDialog`.
 6. Non mettere la search due volte su `/mappa` (FiltersBar `hideSearch` +
    sidebar `GeocodeSearch`).

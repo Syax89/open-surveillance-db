@@ -30,7 +30,7 @@
 
 ## Context
 
-STATUS gap #2 asks for three things the local prototype still lacks:
+STATUS gap #2 asks for three things the initial implementation still lacks:
 
 1. **Distinct roles applied to all protected routes.** ADR 0009 introduced
    granular reviewer roles (`intake_reviewer` … `administrator`) enforced in
@@ -46,7 +46,7 @@ STATUS gap #2 asks for three things the local prototype still lacks:
 
 Real authentication (OIDC/MFA provisioning) remains a public-alpha ticket; the
 ChatGPT-plugin identity header (`oai-authenticated-user-email`) and the local
-prototype header (`x-osdb-user-email`) are the two identity paths, resolved
+development header (`x-osdb-user-email`) are the two identity paths, resolved
 against the new `users` table exactly like `app/chatgpt-auth.ts` documents.
 
 ## Decision
@@ -56,7 +56,7 @@ against the new `users` table exactly like `app/chatgpt-auth.ts` documents.
    `active`, `mfa_enabled`, timestamps. A moderator/admin user optionally links
    one `reviewers` row (`reviewers.user_id`) carrying the granular DATA_TRUST
    role. Migration 0009 seeds the five demo reviewer accounts plus a demo
-   contributor; all demo rows are local-prototype seed and are replaced by
+   contributor; all demo rows are development seed and are replaced by
    provisioned accounts before public alpha.
 2. **Coarse role gates every protected route (`app/lib/authz.ts`).**
    `requireRole(request, minimum)` resolves the caller from
@@ -119,10 +119,10 @@ against the new `users` table exactly like `app/chatgpt-auth.ts` documents.
 - A rejected/approved record can be contested and returned to the queue for a
   fresh review by an independent reviewer; a dismissed appeal changes nothing
   public.
-- Demo identities in the DB are prototype-only; provisioning real accounts is
+- Demo identities in the DB are development-only; provisioning real accounts is
   a public-alpha prerequisite, and the schema already carries the
   expectations (`mfa_enabled`, `active`).
-- The `x-osdb-user-email` header is a local-prototype trust path: it must be
+- The `x-osdb-user-email` header is a development trust path: it must be
   stripped or replaced at the edge in any deployment where the caller is not
   the authenticated platform itself.
 
@@ -151,7 +151,7 @@ future role-protected route) without a gate:
    with moderation credentials made appeals unreachable for contributors.
 3. **Inject server-side.** After a successful gate the worker sets
    `x-osdb-user-email` from `MODERATION_IDENTITY_EMAIL` (the `users.email`
-   the credential maps to; `admin@osdb.test` for the local prototype).
+   the credential maps to; `admin@osdb.test` for local development).
    Fail-closed: unset means no identity, so the route layer rejects the
    request (401) — a misconfigured host can never accidentally grant a role.
 4. `app/lib/authz.ts` keeps resolving identity from the same headers, which
@@ -171,6 +171,6 @@ credentials to log in*. They are bridged by email at provisioning time: a
 registered contributor is mapped onto a `users` row (`role = contributor`,
 `active = 1`) when the alpha auth provider is wired in, and a moderator/admin
 is provisioned as a `users` row with a linked `reviewers` profile. The
-prototype trust paths (`oai-authenticated-user-email` /
+The development trust paths (`oai-authenticated-user-email` /
 `x-osdb-user-email`) bypass `contributors` entirely by design: the demo
 identities are seed rows in `users`, never credential rows.

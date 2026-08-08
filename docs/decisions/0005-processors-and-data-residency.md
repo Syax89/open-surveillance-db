@@ -3,11 +3,11 @@
 - **Status:** proposed (draft, awaiting launch review)
 - **Date:** 2026-07-31
 - **Author:** Rosa (DPO / privacy)
-- **Updates:** ADR 0002-legal-pre-launch-deliverables, processors section (DPA version and EU–US DPF recorded here). **2026-08-08:** the identity-provider choice was updated — GitHub/Google OIDC (AUTH_OPTIONS.md §4a) replaced the ChatGPT sign-in scaffold; the register and PRIVACY_NOTICE were re-synced (PRIVACY_NOTICE § 3/§ 5/§ 6, PROCESSOR_REGISTER PR2 retired, PR5/PR6).
+- **Updates:** ADR 0002-legal-pre-launch-deliverables, processors section (DPA version and EU–US DPF recorded here). **2026-08-08:** the identity-provider choice was updated — GitHub/Google OIDC (research recorded in ADR 0020) replaced the ChatGPT sign-in scaffold; the register and PRIVACY_NOTICE were re-synced (PRIVACY_NOTICE § 3/§ 5/§ 6, PROCESSOR_REGISTER PR2 retired, PR5/PR6).
 
 ## Context
 
-The prototype runs on Cloudflare Workers with a D1 database (binding `DB`, per `worker/index.ts`). Contributor authentication is multi-method (ADR 0020): email + password, passkeys, and **OIDC via GitHub or Google** (opt-in, server-gated on configured credentials; `app/lib/oidc.ts`). GDPR art. 28 and Cap. V require documented processor arrangements and transfer assessment (review findings P5, M4).
+The project runs on Cloudflare Workers with a D1 database (binding `DB`, per `worker/index.ts`). Contributor authentication is multi-method (ADR 0020): email + password, passkeys, and **OIDC via GitHub or Google** (opt-in, server-gated on configured credentials; `app/lib/oidc.ts`). GDPR art. 28 and Cap. V require documented processor arrangements and transfer assessment (review findings P5, M4).
 
 ## Decision
 

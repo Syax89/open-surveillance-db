@@ -30,7 +30,7 @@ export type MapCamera = {
   /**
    * Import provenance (FASE C, t_4dbce318): the raw source value
    * ('import:<slug>' for imported rows, 'Community report' for reports,
-   * 'Prototype seed' for the offline demo seed). Present on real API
+   * 'Development seed' for the offline demo seed). Present on real API
    * records and the seed; the popup provenance line resolves it.
    */
   source?: string;

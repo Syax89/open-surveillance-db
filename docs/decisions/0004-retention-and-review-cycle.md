@@ -22,7 +22,7 @@ Adopt the retention schedule in `docs/legal/RETENTION_SCHEDULE.md`:
 - backups: accepted as provider-managed (**24 h hourly snapshots / 30 days PITR**); erasure responses disclose the backup rotation horizon;
 - `demo` records: purged before public launch.
 
-Individual rights (art. 17) override the schedule; **legal hold** suspends deletion while litigation, a complaint, or a supervisory-authority inquiry is pending; "deletion" is defined as irreversible deletion, with exclusion from future processing/exports as the fallback where backups make full erasure not yet technically feasible.
+Individual rights (art. 17) override the schedule; **legal hold** suspends deletion while litigation, a complaint, or a supervisory-authority inquiry is pending; "deletion" is defined as irreversible deletion, with exclusion from future processing/exports as the fallback where backups make full erasure technically infeasible at present.
 
 Enforcement is automated via a scheduled job (D1/Workers cron) to be implemented by ada (`db/retention.ts` + tests).
 

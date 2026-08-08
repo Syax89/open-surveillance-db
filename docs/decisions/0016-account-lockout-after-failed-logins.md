@@ -86,7 +86,7 @@ Two questions had to be answered:
   and the exponential cap (2 hours) prevents unbounded escalation. If this
   becomes a real abuse vector in production, options are a CAPTCHA before the
   counter increments or email-notification on lockout; both are out of scope
-  for the local prototype.
+  for local development.
 - **Register is untouched.** Account enumeration on /api/auth/register (the
   409 surface) is tracked separately (t_b1ec48a9); this ADR covers
   password brute force only.

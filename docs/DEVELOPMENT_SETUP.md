@@ -2,7 +2,7 @@
 
 This guide explains how to bring up a **clean local environment** from
 scratch, how the local database gets its schema and data, and how to reset it
-safely. It is written for contributors who want to reproduce the prototype on
+safely. It is written for contributors who want to reproduce the project on
 their own machine.
 
 Everything below was verified on 2026-08-02 against `main`
@@ -216,8 +216,8 @@ npm run db:seed
 
 | id | Title | Kind | Latitude | Longitude | Status | Source | `updated` |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Illustrative record A | Fixed dome | 41.9004 | 12.4936 | `demo` | `Prototype seed` | `Demo data` |
-| 2 | Illustrative record B | Traffic monitoring | 41.9047 | 12.5031 | `demo` | `Prototype seed` | `Demo data` |
+| 1 | Illustrative record A | Fixed dome | 41.9004 | 12.4936 | `demo` | `Development seed` | `Demo data` |
+| 2 | Illustrative record B | Traffic monitoring | 41.9047 | 12.5031 | `demo` | `Development seed` | `Demo data` |
 
 Their `description` fields state explicitly that they are not claims about
 real cameras. The seed is idempotent (`WHERE NOT EXISTS` guards), so
@@ -252,7 +252,7 @@ Real DB fixtures are only the two optional demo records above.
 ## 6. Reset
 
 Local state can include submitted fictional reports and their audit history.
-Treat it as data even in a prototype. The reset below is **non-destructive**
+Treat it as data even in local development. The reset below is **non-destructive**
 by design: nothing is deleted, the local database is moved aside so the next
 start recreates it from scratch.
 
@@ -336,7 +336,7 @@ journal/snapshot, which exposed local databases to migration drift.
 | `db:generate` produces nothing or an unexpected diff | `drizzle/meta/_journal.json`/snapshots are out of sync with the SQL files (hand-edited or restored from another branch) | Do not hand-edit the journal; regenerate from a clean checkout of the branch |
 | `Error [ERR_UNSUPPORTED_ESM_URL_SCHEME]: ... Received protocol 'cloudflare:'` | `npm start` (`vinext start`, plain Node) cannot load the Workers-runtime `cloudflare:` module | Use `npm run dev` (`vinext dev`, runs in workerd). See `docs/DEPLOYMENT.md` § Local LXC deployment |
 | `/moderation`, `/api/moderation`, `/api/appeals` return 503 | Fail-closed default: no moderation credentials configured | Set `MODERATION_USER`/`MODERATION_PASSWORD` (Basic auth) or `MODERATION_TOKEN` (bearer) in the environment, then restart |
-| Moderation/appeals API returns `401 Authentication required` after a successful Basic login | The gate passed but no server-side identity was injected | Set `MODERATION_IDENTITY_EMAIL` (e.g. `admin@osdb.test` for the prototype) — the worker only injects identity from that setting (ADR 0014) |
+| Moderation/appeals API returns `401 Authentication required` after a successful Basic login | The gate passed but no server-side identity was injected | Set `MODERATION_IDENTITY_EMAIL` (e.g. `admin@osdb.test` for local development) — the worker only injects identity from that setting (ADR 0014) |
 | Port 3000 already in use | Another instance is running | Stop it, or start with a different port (`npm run dev -- --port 3001`) |
 
 ## 8. Aggiungere una lingua (i18n)
@@ -392,5 +392,4 @@ le altre lingue la parità è garantita da `Translation<typeof en>` a
   Cloudflare Workers, and the LXC test host.
 - [Operations manual](OPERATIONS.md) — backup/restore drills and verified
   wrangler commands (appendice).
-- [Roadmap](roadmap.md) — consolidated development plan, workstreams and
-  ownership.
+- [Roadmap](roadmap.md) — consolidated development plan and ownership.

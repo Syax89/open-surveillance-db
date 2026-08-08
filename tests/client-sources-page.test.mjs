@@ -198,7 +198,7 @@ test("shared slug→source map: fetchImportSources + importSourceOf resolve read
     assert.equal(resolved?.licenseUrl, "https://example.invalid/licenses/cc0");
     // Community reports, the demo seed and unknown slugs carry no batch.
     assert.equal(importSourceOf({ source: "Community report" }, map), null);
-    assert.equal(importSourceOf({ source: "Prototype seed" }, map), null);
+    assert.equal(importSourceOf({ source: "Development seed" }, map), null);
     assert.equal(importSourceOf({ source: "import:unknown-slug" }, map), null);
   } finally {
     __resetImportSourcesCache();

@@ -35,7 +35,7 @@ the routes.
   `LegacyAnchorRedirect` client-side-redirects the legacy anchors
   (`/#map`, `/#records`, `/#report`, `/#correction`) to the tool routes.
 
-**Phase status (community system, roadmap `docs/COMMUNITY_PLAN.md`):**
+**Phase status (community system, ADR 0018 + ADR 0021):**
 
 - **C-ADR done** — ADR 0018 (verifications, trust levels, two-track editing,
   two identity layers) recorded before any code; the routes below are listed
@@ -108,7 +108,7 @@ the routes.
 ## i18n message bundles (conceptual mapping)
 
 Interface strings live in **per-domain bundles** under `app/lib/i18n/`
-(PR #80; see [`docs/REFACTOR_I18N.md`](REFACTOR_I18N.md)). The mapping from
+(PR #80). The mapping from
 concept to bundle is conceptual, not one-bundle-per-route: surfaces that
 share copy share a bundle. There is deliberately **no** monolithic `info`
 or `legal` bundle — legal content is a separate typed layer
@@ -125,7 +125,7 @@ or `legal` bundle — legal content is a separate typed layer
 | Correction | `/correggi` | `correction.ts` |
 | Home (hub) | `/` hero + orienting content | `home.ts` |
 | Record detail | `/records/[id]` | `record.ts` |
-| Verification widget | `/records/[id]` (aggregate count + personal toggle) | `community.ts` (shared vocabulary: levels, verifications) |
+| Community actions | `/records/[id]`, popup mappa (widget full/compact) | `community.ts` (shared vocabulary: actions, levels, statuses) |
 | Auth | `/login`, `/register`, `/account` | `auth.ts` |
 | Auth — email verification | `/verify-email?token=` (landing from the emailed link, P1-1) | `auth.ts` |
 | Auth — password reset | `/forgot-password`, `/reset-password?token=` (P1-3) | `auth.ts` |
@@ -221,7 +221,7 @@ proposed).
   `FiltersBar` (`bare`, con `extraControls` per il toggle luogo), `EmptyState`,
   `RecordCard` (righe contestuali in `.directory-tool .record-list`). Since
   t_127492f1/t_f13fcb1c the page is a **browse catalog** ("indice editoriale",
-  `docs/design/browse-record-redesign.md`): tool heading (with "Use the map
+  `docs/design/README.md`): tool heading (with "Use the map
   instead" action) → controls (search full-width + type/freshness/sort/reset +
   toggle luogo) → collapsible place-search panel (card) → visible results
   header (h2 + count + CSV/GeoJSON buttons) → active-filter chips → A–Z index
@@ -648,7 +648,7 @@ export default async function PrivacyPage() {
    client hook `useMessages()` in a page. Legal pages use the
    `app/lib/legal/` layer with the same en/it parity rule. Add
    `nav`/`footer` keys in the relevant domain (see
-   `docs/REFACTOR_I18N.md`).
+   `docs/DEVELOPMENT_SETUP.md` §8 for the bundle layout).
 4. **Content sources** are the docs referenced in the page-by-page spec;
    pages summarise/adapt them, they do not duplicate the raw markdown
    wholesale.
@@ -685,7 +685,7 @@ Notes:
 - Each per-domain file pairs the page's `en` pilot object with its `it`
   counterpart, type-checked by `Translation<typeof en>` inside the same
   file; `app/lib/i18n/index.ts` assembles the full `messages` shape (see
-  `docs/REFACTOR_I18N.md`).
+  `docs/DEVELOPMENT_SETUP.md` §8).
 - The legal layer is **separate** from the main bundle: `app/lib/legal/`
   has its own `en.ts` / `it.ts` / `types.ts` / `index.ts` and its own
   `LegalContent` type (inline markup support).
@@ -706,9 +706,9 @@ Notes:
 | `/licenze`    | `docs/OPEN_SOURCE.md`, `LICENSE`                         |
 | `/faq`        | README, `docs/MODERATION.md`, `docs/PRIVACY_AND_SAFETY.md` |
 | `/contatti`   | `GOVERNANCE.md` (owners/roles), `docs/legal/PRIVACY_NOTICE.md` (correction/removal contact), `SECURITY.md` (security route only) |
-| `/records/[id]` (verification widget, C5) | `docs/COMMUNITY_PLAN.md` §4 (verification model), ADR 0018, `docs/MODERATION.md` (status meanings) |
-| `/account` (contributions section, C5) | `docs/COMMUNITY_PLAN.md` §2.3 (profile API), ADR 0018, `docs/DATA_MODEL.md` |
-| `/records/[id]/edit` (C6) | `docs/COMMUNITY_PLAN.md` §2.2 (two-track editing), ADR 0018, `docs/MODERATION.md` (edit moderation) |
+| `/records/[id]` (verification widget, C5) | ADR 0018 (community verifications), ADR 0021 (community model), `docs/MODERATION.md` (status meanings) |
+| `/account` (contributions section, C5) | ADR 0018/0021 (own contributions), `docs/DATA_MODEL.md` |
+| `/records/[id]/edit` (C6) | ADR 0018/0021 (two-track editing), `docs/MODERATION.md` (edit moderation) |
 
 ## QA verification (completed, PR #72)
 

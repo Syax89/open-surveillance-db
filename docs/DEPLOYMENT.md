@@ -1,11 +1,11 @@
 # Deployment and operations plan
 
-## Provisioning real accounts (pre-alpha)
+## Provisioning real accounts
 
-The migrations seed **demo identities** for the local prototype (`Demo *`
+The migrations used to seed **demo identities** for local development (`Demo *`
 reviewers in `drizzle/0008_wave_b_reviewer_roles.sql`, six `@osdb.test` demo
 users in `drizzle/0010_auth_roles_appeals.sql`). They are removed by the
-**last** migration, `drizzle/0017_remove_demo_seed.sql`, which runs on every
+migration `drizzle/0017_remove_demo_seed.sql`, which runs on every
 fresh database — so a fresh DB has **zero demo identities** (verified by
 `npm run db:smoke`). Demo accounts must never be the moderation/admin
 identities of a public environment.
@@ -411,7 +411,7 @@ the hosting platform's secret/environment store, never in source.
 | --- | --- | --- |
 | `MODERATION_USER` / `MODERATION_PASSWORD` | unset | Basic auth for the moderation gate (fails closed: 503 without any credential) |
 | `MODERATION_TOKEN` | unset | Bearer token alternative for the same gate (API automation) |
-| `MODERATION_IDENTITY_EMAIL` | unset | `users.email` injected as `x-osdb-user-email` after the gate succeeds. Local prototype: `admin@osdb.test`. Unset = gate passes with NO identity → protected routes reject with 401 (fail closed) |
+| `MODERATION_IDENTITY_EMAIL` | unset | `users.email` injected as `x-osdb-user-email` after the gate succeeds. Local development: `admin@osdb.test`. Unset = gate passes with NO identity → protected routes reject with 401 (fail closed) |
 | `TRUST_PLATFORM_HEADERS` | `false` | `true` only in a real ChatGPT-plugin deployment, where the platform gateway (not arbitrary clients) sits in front of the worker: passes `oai-authenticated-user-email` through instead of stripping it. Never set for direct-Internet or LAN deployments |
 
 ## Environment variables
@@ -475,7 +475,7 @@ for it.
 Input caps live in `app/lib/input-limits.ts`; alerts in
 `app/lib/abuse-alerts.ts`. Alerts carry only a SHA-256 hash of the caller
 key (never the raw IP) and never request bodies or query strings (see
-`docs/workstreams/OPS_OPEN.md` §Observability).
+`docs/OPERATIONS.md` §Observability).
 
 ### Tiles, moderation, and auth environment variables
 
@@ -489,15 +489,15 @@ when unset. Set them in the hosting platform's secret/environment store
 | --- | --- | --- |
 | `TILE_PROVIDER_URL` | `https://tile.openstreetmap.org` | Upstream tile base URL for `/api/tiles/{z}/{x}/{y}.png` (no trailing slash; a trailing `/` is tolerated). See [OSM_INTEGRATION.md](OSM_INTEGRATION.md) for the provider decision matrix |
 | `TILE_PROVIDER_KEY` | unset | API key appended as `?key=…` for tile providers that require one (MapTiler, Stadia Maps, …). Never commit it; set it as a Worker secret |
-| `MODERATION_USER` / `MODERATION_PASSWORD` | unset | HTTP Basic auth pair that unlocks `/moderation` and `/api/moderation*` at the worker edge. Both must be set together. Single shared identity (prototype / single-operator deploys); ignored when `MODERATION_OPERATORS` is configured |
+| `MODERATION_USER` / `MODERATION_PASSWORD` | unset | HTTP Basic auth pair that unlocks `/moderation` and `/api/moderation*` at the worker edge. Both must be set together. Single shared identity (development / single-operator deploys); ignored when `MODERATION_OPERATORS` is configured |
 | `MODERATION_TOKEN` | unset | Alternative bearer token for the same gate (API automation). At least one credential method (Basic pair or bearer) must be configured |
 | `MODERATION_OPERATORS` | unset | Per-operator moderation credentials (QA#3 F5): a JSON array of `{"user","password","email"}` objects. When set, Basic auth validates ONLY against this list and each operator's actions are attributed to their OWN `email` (`x-osdb-user-email`), instead of the shared `MODERATION_IDENTITY_EMAIL`. Malformed JSON fails closed (503). Set as a Worker secret, never in `wrangler.jsonc` |
 | `MODERATION_DEMO_ACTOR_SELECTOR` | unset (OFF) | Demo actor selector (QA#3 F5): the moderation route honours a client-supplied `actorId` ONLY when BOTH this is `"true"` AND `ENVIRONMENT=development`. Two keys so a production deploy with `ENVIRONMENT` accidentally left at development still cannot let an admin forge the audit trail |
 | `AUTH_SESSION_TTL_DAYS` | `30` | Contributor session lifetime in days (ADR 0013); TTL is computed as `days × 86400` seconds. The SAME value drives the DB `expires_at` and the cookie `Max-Age`, so the two can never diverge (audit t_5ca60ab2, P2) |
-| `AUTH_COOKIE_SECURE` | unset → `Secure` (fail-closed) | `Secure` cookie attribute (QA#3 F2). Fail-closed default: `Secure` is set unless `ENVIRONMENT=development` (plain-HTTP LAN prototype). `AUTH_COOKIE_SECURE=true` forces it on; `AUTH_COOKIE_SECURE=false` forces it off (local prototype only). Production with the var unset is `Secure` — no deploy flag to forget |
+| `AUTH_COOKIE_SECURE` | unset → `Secure` (fail-closed) | `Secure` cookie attribute (QA#3 F2). Fail-closed default: `Secure` is set unless `ENVIRONMENT=development` (plain-HTTP LAN development). `AUTH_COOKIE_SECURE=true` forces it on; `AUTH_COOKIE_SECURE=false` forces it off (local development only). Production with the var unset is `Secure` — no deploy flag to forget |
 | `AUTH_RATE_LIMIT_MAX` / `AUTH_RATE_LIMIT_WINDOW_SECONDS` | `10` / `60` | Per-key rate limit on `/api/auth/login` and `/api/auth/register` |
 | `REGISTER_IP_RATE_LIMIT_MAX` / `REGISTER_IP_RATE_LIMIT_WINDOW_SECONDS` | `5` / `86400` | Per-IP registration cap: at most `REGISTER_IP_RATE_LIMIT_MAX` successful registrations per caller IP per rolling window. The stored key is a non-invertible hash of the caller IP (`registrationIpHash`) |
-| `REGISTRATION_IP_HMAC_KEY` | unset → truncated SHA-256 | Keyed-HMAC secret for the per-IP registration log (QA#3 F4): when set, `registrations_ip_log.ip_hash` is HMAC-SHA256(key, callerKey) truncated to 128 bits instead of plain SHA-256, so a database leak cannot be dictionary-attacked offline (the IPv4 space is 2^32). **Production must set this** (deploy checklist); unset = truncated-SHA-256 fallback for the local prototype / tests |
+| `REGISTRATION_IP_HMAC_KEY` | unset → truncated SHA-256 | Keyed-HMAC secret for the per-IP registration log (QA#3 F4): when set, `registrations_ip_log.ip_hash` is HMAC-SHA256(key, callerKey) truncated to 128 bits instead of plain SHA-256, so a database leak cannot be dictionary-attacked offline (the IPv4 space is 2^32). **Production must set this** (deploy checklist); unset = truncated-SHA-256 fallback for the local development / tests |
 | `VERIFY_BASE_URL` | unset (fail-closed) | Public site base URL used to build verification / password-reset action links (e.g. `https://opensurveillancedb.org`). Unset → the mailer answers `missing_config` and auth routes return 503; set it in `.dev.vars` locally and as a secret/var in production |
 | `MAILER_FROM` | `noreply@opensurveillancedb.org` | Sender address for transactional auth mail. Must be in the `EMAIL` binding's `allowed_sender_addresses` (or the provider rejects with `E_SENDER_NOT_VERIFIED`) |
 | `EMAIL_SEND_LIMIT_MAX` / `EMAIL_SEND_LIMIT_WINDOW_SECONDS` | `3` / `3600` | Re-send budget per contributor for auth emails (ADR 0020): at most `EMAIL_SEND_LIMIT_MAX` sends per `EMAIL_SEND_LIMIT_WINDOW_SECONDS` seconds, enforced in D1 via `email_send_log` |

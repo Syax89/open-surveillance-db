@@ -1,21 +1,17 @@
 # Data dictionary
 
-Status: current for main (2026-08-01). This document describes
-every public field exposed by the prototype so that a contributor can
-understand the public dataset from documentation alone (Horizon 3 exit gate in
-[roadmap.md](roadmap.md)). It is a *lightweight* companion to the
-[data model and API reference](DATA_MODEL.md): it does not replace that
-document, it spells out each field, its allowed values, and its visibility
-rules per output format.
-
-For how future, versioned releases of the dataset will be published and cited,
-see [Export versioning policy](EXPORT_VERSIONING.md).
+Status: current for main (2026-08-08). This document describes
+every public field exposed by the project so that a contributor can
+understand the public dataset from documentation alone. It is a *lightweight*
+companion to the [data model and API reference](DATA_MODEL.md): it does not
+replace that document, it spells out each field, its allowed values, and its
+visibility rules per output format.
 
 ## Public data boundary
 
-The public dataset contains **only** camera records with status `verified`
-(real, reviewed) or `demo` (clearly labelled illustrative content). Everything
-else — pending submissions, corrections, moderation events, evidence,
+The public dataset contains **only** camera records with status `active`
+(real, community-published) or `demo` (clearly labelled illustrative content).
+Everything else — pending submissions, corrections, moderation events,
 reviewer notes — is private and must never appear in map, directory, JSON,
 CSV, or GeoJSON output. See [DATA_MODEL.md](DATA_MODEL.md) and
 [PRIVACY_AND_SAFETY.md](PRIVACY_AND_SAFETY.md) for the full boundary rules.
@@ -102,8 +98,8 @@ some fields entirely (marked `—`).
 | `latitude` | ✓ | ✓ | — (in geometry) | number | WGS84 latitude of publicly visible infrastructure; rounded/generalised where precision would be unsafe. In GeoJSON it lives in the feature geometry, not the properties. |
 | `longitude` | ✓ | ✓ | — (in geometry) | number | WGS84 longitude; same precision rule as latitude. GeoJSON geometry is `[longitude, latitude]`. |
 | `direction` | ✓ | ✓ | ✓ | integer \| null | Field-of-view compass bearing in degrees 0-359 (clockwise from north) for DIRECTIONAL cameras; `null` for non-directional / unknown (kanban `t_1b08fe12`, migration 0035). A dome camera (canonical kind `Fixed dome`) always carries `null` — the map renders domes circular, never a triangle. Out-of-range or non-integer values are rejected with `422` on input. |
-| `status` | ✓ | ✓ | ✓ | string | `verified` (reviewed, real) or `demo` (fictional, clearly labelled). No other status can be present in a public output. |
-| `source` | ✓ | ✓ | ✓ | string | Provenance label. In the prototype the observed values are `Prototype seed` (illustrative demo records) and `Community report` (submitted and later approved). Future provenance classes are defined in [workstreams/DATA_TRUST.md](workstreams/DATA_TRUST.md). |
+| `status` | ✓ | ✓ | ✓ | string | `active` (live, community-published) or `demo` (clearly labelled illustrative content). No other status can be present in a public output. |
+| `source` | ✓ | ✓ | ✓ | string | Provenance label. Observed values: `Community report` (submitted and published by a verified contributor) and `import:<slug>` (imported dataset, slug from the [import registry](data-sources/README.md)). The optional local seed uses `Development seed`. |
 | `updated` | ✓ | ✓ | ✓ | string | Last public verification date (ISO 8601) — every code path that touches `cameras.updated` writes a comparable ISO timestamp (P1-2); the descriptive text of a moderation action lives in `moderation_events.note`, never in this column. Freshness windows (`7d`/`30d`/`90d`) match only ISO values: the seeded demo records deliberately carry the literal label `Demo data` (illustrative pins are excluded from freshness windows by the client gate). Migration `0007_directory_freshness_backfill` converted the pre-existing prose labels of verified records into comparable ISO timestamps. |
 | `description` | ✓ | ✓ | ✓ | string | Brief factual context written or reviewed by a moderator; no sensitive operational detail. |
 | `createdAt` | ✓ | — | — | string | Submission/creation timestamp (ISO). Not exported in CSV/GeoJSON. |
@@ -160,7 +156,7 @@ alter a public record automatically.
 
 ## Community verifications, trust levels and contribution profile (C1/C2)
 
-The community layer (ADR 0018, COMMUNITY_PLAN §2–§4) adds two private,
+The community layer (ADR 0018, community model of ADR 0021) adds two private,
 authenticated surfaces on top of the public dataset, plus the aggregate
 `confirmationCount` on public record payloads described above. All
 community endpoints are personal data: they answer `Cache-Control: no-store`
@@ -174,7 +170,7 @@ documented location. It is **not** a vote or a rating: one verification per
 account per record (UNIQUE `(camera_id, contributor_id)` at the database
 level), a level gate (≥ 1 published contribution), a self-verification ban,
 daily per-account and per-record quotas, and an IP-hash burst bucket are the
-anti-gaming layers (COMMUNITY_PLAN §4.2).
+anti-gaming layers (ADR 0018).
 
 | Method | Behaviour | Responses |
 | --- | --- | --- |
@@ -243,7 +239,7 @@ recomputed from a COUNT over the `(contributor_id, status)` index, so it can
 never go stale when a moderation decision flips a record's status, and
 account erasure recalculates it by de-attributing records. No endpoint
 exposes anyone else's or a global level, and no leaderboard/ranking exists
-(COMMUNITY_PLAN §3.1, §5.2). Display labels ("New contributor", "Trusted
+(ADR 0018). Display labels ("New contributor", "Trusted
 contributor", "Experienced contributor") are a frontend/i18n concern
 (`community.ts` bundle), never a backend constant.
 
@@ -256,13 +252,12 @@ any public output:
 - `correction_requests.*` — full correction requests (only the opaque
   `referenceId` is returned to the requester).
 - `moderation_events.*` — reviewer actions, reason codes, notes, and actor
-  identifiers. Only aggregate statistics may become public later
-  ([workstreams/DATA_TRUST.md](workstreams/DATA_TRUST.md)).
-- Pending reports in any state other than `verified`/`demo` (`pending`,
+  identifiers. Only aggregate statistics may become public later.
+- Pending reports in any state other than `active`/`demo` (`pending`,
   `needs_review`, `rejected`, `removed`).
-- `appeals.*` — appeals against moderation decisions and their reasons; only
-  moderators can list them, and no appeal content is ever serialised in a
-  public response.
+- `appeals.*` — the appeal workflow was retired with the community pivot
+  (ADR 0021 §7.3); historical appeal rows are private and never serialised in
+  a public response.
 - `moderation_queue.*` — the internal moderation queue: assignees,
   sensitivity flags, escalation reasons, and reviewer notes.
 - `sessions.*` and auth tokens — contributor sessions, session tokens, and
@@ -275,8 +270,7 @@ any public output:
   for the signed-in caller.
 - Trust levels of other contributors (or global levels) — `level` is served
   only to the caller for their own profile; no endpoint exposes anyone
-  else's level and no leaderboard/ranking exists (COMMUNITY_PLAN §3.1,
-  §5.2).
+  else's level and no leaderboard/ranking exists (ADR 0018).
 
 ## Related policies
 
@@ -284,4 +278,3 @@ any public output:
 - [Moderation policy](MODERATION.md) — what a review decides and records.
 - [Privacy and safety](PRIVACY_AND_SAFETY.md) — data minimisation and boundary rules.
 - [Open source and data licensing](OPEN_SOURCE.md) — dataset licence.
-- [Export versioning policy](EXPORT_VERSIONING.md) — how future releases will be versioned.

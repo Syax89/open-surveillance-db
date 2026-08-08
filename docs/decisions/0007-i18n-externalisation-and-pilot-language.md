@@ -7,7 +7,7 @@
 
 ## Context
 
-The prototype UI grew bilingual (English + Italian) by duplicating inline
+The UI grew bilingual (English + Italian) in the early builds by duplicating inline
 dictionaries per page (`page.tsx`, `guide/page.tsx`, `records/[id]/page.tsx`,
 `ModerationDashboard.tsx`, plus ad-hoc ternaries in `SurveillanceMap.tsx` and
 `LocaleProvider.tsx`). Consequences:
@@ -70,7 +70,8 @@ interface strings with English plus the pilot-area language.
 - Wording reviews happen in one place per domain (EN pilot + IT parity
   side by side); a future pilot-area language (e.g. IT for the pilot
   jurisdiction) already ships as the `it` counterparts across the domain
-  files. See `docs/REFACTOR_I18N.md` for the per-domain layout.
+  files. See `app/lib/i18n/` for the per-domain layout (structure documented
+  in docs/DEVELOPMENT_SETUP.md §8).
 - Trade-off: namespaces repeat a few common words (e.g. `exploreMap`) instead
   of sharing a global key set — acceptable for now, keeps each page's bundle
   self-contained and reviewable; revisit only if a third language lands.

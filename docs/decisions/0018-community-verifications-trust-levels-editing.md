@@ -4,24 +4,26 @@
 - **Date:** 2026-08-01
 - **Author:** Marie (Documentation), recording the consolidated community-system
   decisions from the project opinions (data #813, CTO #817, legal #818,
-  docs #816, backend #822, QA #821, copy #814, design #815) as consolidated in
-  [`docs/COMMUNITY_PLAN.md`](../COMMUNITY_PLAN.md)
+  docs #816, backend #822, QA #821, copy #814, design #815), superseded by
+  the community-driven model in [ADR 0021](0021-community-driven-pivot.md)
 - **Related ADRs:** 0001 (public data boundary), 0008 (data licence,
   precision, retention), 0009 (reviewer roles and moderation queue),
   0013 (contributor accounts and sessions), 0014 (auth roles and appeals)
-- **Related docs:** `docs/COMMUNITY_PLAN.md` (consolidated roadmap),
-  `docs/SITEMAP.md` (routes listed before code), `docs/DATA_MODEL.md`,
-  `docs/MODERATION.md`, `docs/legal/PRIVACY_NOTICE.md`,
-  `docs/legal/RETENTION_SCHEDULE.md`, `docs/TERMS_OF_USE.md`
+- **Related docs:** `docs/roadmap.md` (current state), `docs/SITEMAP.md`
+  (routes listed before code), `docs/DATA_MODEL.md`, `docs/MODERATION.md`,
+  `docs/legal/PRIVACY_NOTICE.md`, `docs/legal/RETENTION_SCHEDULE.md`,
+  `docs/TERMS_OF_USE.md`
 
 ## Context
 
 The community system — a personal contributions profile, derived trust
-levels, and per-record verifications — is the next feature wave after the
+levels, and per-record verifications — was the next feature wave after the
 frontend route split. Nine project opinions (data, CTO, backend, QA, legal,
-copy, docs, design, auth research) were consolidated into
-`docs/COMMUNITY_PLAN.md`, which fixes the architecture, the data model, the
-legal basis and the acceptance criteria. The CTO opinion (#817) makes one
+copy, docs, design, auth research) were consolidated into the then-current
+community plan (archived outside the repository), which fixed the
+architecture, the data model, the legal basis and the acceptance criteria
+at the time; the community-driven model adopted later is recorded in
+ADR 0021. The CTO opinion (#817) made one
 binding prerequisite: **the separation of the two existing identity layers and
 the editing/verification model must be recorded in an ADR before any code
 touches the schema.** This ADR is that record. It does not decide new
@@ -268,6 +270,6 @@ verification is required for write access** (read-only sessions until
 verified — [ADR 0020](0020-multi-method-authentication.md) decision 2).
 
 The **level gate for confirmations is unchanged**: L1 still means "at least
-one verified contribution" (COMMUNITY_PLAN.md § 3.2), never email
+one verified contribution" (community plan § 3.2, archived), never email
 verification — the two gates are separate. Write access (submissions, edits,
 verifications) is the one gated on email verification.
