@@ -156,3 +156,45 @@ test("fov constants: aperture 60, radius 30-40 m, zoom threshold 16", () => {
   assert.equal(fieldOfView.FOV_MIN_ZOOM, 16);
   assert.equal(fieldOfView.fovCircleRadiusMeters(), fieldOfView.FOV_RADIUS_METERS, "dome circle uses the same radius as the wedge");
 });
+
+// ---------------------------------------------------------------------------
+// fovBearingPoint / fovBearingFromPoint — report mini-map rotation handle
+// (kanban t_ebbe0ea3): the handle sits on the cone's centre line at the
+// bearing's radius point, and dragging it to a new spot re-aims the cone at
+// the bearing camera→handle. The pair must be exact inverses.
+// ---------------------------------------------------------------------------
+
+test("fovBearingPoint: point at bearing 0 is due north of the camera, bearing 90 due east, at ~35 m", () => {
+  const cam = { lat: 41.9, lng: 12.49 };
+  const north = fieldOfView.fovBearingPoint(cam.lat, cam.lng, 0);
+  assert.ok(north[0] > cam.lat, "bearing 0 increases latitude (north)");
+  assert.ok(Math.abs(north[1] - cam.lng) < 1e-9, "bearing 0 keeps longitude");
+  const east = fieldOfView.fovBearingPoint(cam.lat, cam.lng, 90);
+  assert.ok(Math.abs(east[0] - cam.lat) < 1e-9, "bearing 90 keeps latitude");
+  assert.ok(east[1] > cam.lng, "bearing 90 increases longitude (east)");
+  const latRad = cam.lat * (Math.PI / 180);
+  const metersPerDegLng = 111_320 * Math.cos(latRad);
+  const dist = Math.hypot((north[0] - cam.lat) * 111_320, (north[1] - cam.lng) * metersPerDegLng);
+  assert.ok(Math.abs(dist - fieldOfView.FOV_RADIUS_METERS) < 0.5, `distance is the FOV radius (~35 m), got ${dist.toFixed(2)} m`);
+});
+
+test("fovBearingFromPoint: cardinal bearings from the camera to a point", () => {
+  const cam = { lat: 41.9, lng: 12.49 };
+  const latRad = cam.lat * (Math.PI / 180);
+  const metersPerDegLng = 111_320 * Math.cos(latRad);
+  const dLatDeg = 30 / 111_320;
+  const dLngDeg = 30 / metersPerDegLng;
+  assert.equal(fieldOfView.fovBearingFromPoint(cam.lat, cam.lng, cam.lat + dLatDeg, cam.lng), 0, "due north → 0");
+  assert.equal(fieldOfView.fovBearingFromPoint(cam.lat, cam.lng, cam.lat, cam.lng + dLngDeg), 90, "due east → 90");
+  assert.equal(fieldOfView.fovBearingFromPoint(cam.lat, cam.lng, cam.lat - dLatDeg, cam.lng), 180, "due south → 180");
+  assert.equal(fieldOfView.fovBearingFromPoint(cam.lat, cam.lng, cam.lat, cam.lng - dLngDeg), 270, "due west → 270");
+});
+
+test("fovBearingPoint ⇄ fovBearingFromPoint are exact inverses (round-trip identity)", () => {
+  const cam = { lat: 44.8378, lng: 11.6183 };
+  for (const bearing of [0, 45, 90, 135, 200, 270, 359]) {
+    const point = fieldOfView.fovBearingPoint(cam.lat, cam.lng, bearing);
+    const roundTrip = fieldOfView.fovBearingFromPoint(cam.lat, cam.lng, point[0], point[1]);
+    assert.equal(roundTrip, bearing, `round-trip ${bearing}° → ${roundTrip}°`);
+  }
+});

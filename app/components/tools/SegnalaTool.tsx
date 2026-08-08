@@ -54,6 +54,7 @@ export function SegnalaTool({ initialCoordinates = null }: Props) {
           duplicateConfirmed={report.duplicateConfirmed}
           setDuplicateConfirmed={report.setDuplicateConfirmed}
           selectManualCoordinates={report.selectManualCoordinates}
+          onSelectCoordinates={report.selectCoordinates}
           submitReport={report.submitReport}
           kind={report.kind}
           setKind={report.setKind}

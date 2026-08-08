@@ -26,6 +26,12 @@ export const en = {
   stepObservation: "2. What you observed",
   stepEvidence: "3. Confirm and publish",
   selectedPoint: "Selected point",
+  // Report mini-map (t_ebbe0ea3): click to pick the position, drag the
+  // cone's rotation handle to aim the field of view. The manual coordinate
+  // fields below stay as the accessible fallback.
+  mapAria: "Map — click to choose the camera position",
+  mapHelp:
+    "Click the map to choose the camera position. For directional cameras, drag the round handle on the cone to set the viewing direction.",
   manualCoordinatesTitle: "Or enter coordinates",
   manualCoordinatesHelp:
     "Use decimal degrees. Latitude must be between -90 and 90; longitude between -180 and 180. A comma is accepted as the decimal separator.",
@@ -128,6 +134,12 @@ export const it: Translation<typeof en> = {
   stepObservation: "2. Cosa hai osservato",
   stepEvidence: "3. Conferma e pubblicazione",
   selectedPoint: "Punto selezionato",
+  // Mini-mappa del modulo (t_ebbe0ea3): click per scegliere la posizione e
+  // trascina la maniglia sul cono per orientare il campo visivo. I campi
+  // manuali qui sotto restano come fallback accessibile.
+  mapAria: "Mappa — clicca per scegliere la posizione della telecamera",
+  mapHelp:
+    "Clicca sulla mappa per scegliere la posizione della telecamera. Per le telecamere direzionali, trascina la maniglia sul cono per impostare la direzione di visuale.",
   manualCoordinatesTitle: "Oppure inserisci le coordinate",
   manualCoordinatesHelp:
     "Usa gradi decimali. La latitudine deve essere tra -90 e 90; la longitudine tra -180 e 180. La virgola è accettata come separatore decimale.",

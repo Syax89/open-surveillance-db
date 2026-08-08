@@ -334,6 +334,14 @@ export function map(el, opts) {
       item.__map = m;
       (item && item.__isPath ? paths : markers).push(item);
     },
+    // Report mini-map (t_ebbe0ea3): the FOV shape is rebuilt via
+    // map.removeLayer + re-add when position/kind/known-ness changes.
+    removeLayer: (item) => {
+      const list = item && item.__isPath ? paths : markers;
+      const index = list.indexOf(item);
+      if (index !== -1) list.splice(index, 1);
+      return m;
+    },
     // Map-click picker (t_6abb96ac): map.openPopup records the popup
     // content + position so tests can assert the report-picker popup
     // (coordinates + /segnala deep link) that a map click opens.
@@ -463,6 +471,13 @@ export function marker(latlng, opts) {
     setPopupContent: (html) => { m.popupHtml = html; return m; },
     setTooltipContent: () => m,
     getLatLng: () => latlng,
+    // Report mini-map (t_ebbe0ea3): the rotation-handle marker is dragged —
+    // setLatLng moves it (updating the recorded latlng so getLatLng reads
+    // the new spot) and fire dispatches the registered handlers like the
+    // map stub, so a handle "drag" event re-aims the cone in the test.
+    setLatLng: (next) => { latlng = next; m.latlng = next; return m; },
+    fire: (event, data) => { (m.events[event] ??= []).push(data); for (const handler of m.handlers[event] ?? []) handler(data); return m; },
+    remove: () => {},
     // Grid badges set an aria-label on the real element (t_26ce96f3); the
     // stub records the attribute so the contract stays assertable. The
     // reconcile badge-count update queries the badge text node — the stub
@@ -470,6 +485,7 @@ export function marker(latlng, opts) {
     // refresh), which is harmless for assertions.
     getElement: () => ({ setAttribute: (key, value) => { m.elementAttrs ??= {}; m.elementAttrs[key] = value; }, querySelector: () => null }),
     handlers: {},
+    events: {},
     addTo: (layer) => { layer.addLayer(m); return m; },
     // Real Leaflet API: setIcon replaces the marker icon in place. The
     // recorded opts.icon must follow so tests asserting marker html read
@@ -484,7 +500,7 @@ export function marker(latlng, opts) {
 // the layerGroup's addLayer into the right array. getElement mirrors the
 // real Path API (the component never calls it, but the contract stays).
 export function polygon(latlngs, opts) {
-  const p = { latlngs, opts, __isPath: true, getElement: () => null, addTo: (layer) => { layer.addLayer(p); return p; } };
+  const p = { latlngs, opts, __isPath: true, getElement: () => null, addTo: (layer) => { layer.addLayer(p); return p; }, setLatLngs: (next) => { p.latlngs = next; return p; } };
   return p;
 }
 export function circle(latlng, opts) {

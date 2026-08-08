@@ -47,6 +47,46 @@ export const METERS_PER_DEGREE_LAT = 111_320;
  * Returns [latitude, longitude] pairs in the order Leaflet expects
  * (L.polygon([[lat,lng], …])).
  */
+/**
+ * Point at `bearingDegrees` (clockwise from north), `radiusMeters` from the
+ * camera position — the endpoint on the wedge's centre line. Shared by
+ * fovPolygonPoints (arc points) and the report mini-map (t_ebbe0ea3), which
+ * places the rotation handle at this point so the cone can be re-aimed by
+ * dragging it.
+ */
+export function fovBearingPoint(
+  latitude: number,
+  longitude: number,
+  bearingDegrees: number,
+  radiusMeters: number = FOV_RADIUS_METERS,
+): [number, number] {
+  const latRad = (latitude * Math.PI) / 180;
+  // Metres per degree of longitude shrinks with cos(latitude).
+  const metersPerDegreeLng = METERS_PER_DEGREE_LAT * Math.cos(latRad);
+  const bearing = (bearingDegrees * Math.PI) / 180;
+  const dLat = (radiusMeters * Math.cos(bearing)) / METERS_PER_DEGREE_LAT;
+  const dLng = (radiusMeters * Math.sin(bearing)) / metersPerDegreeLng;
+  return [latitude + dLat, longitude + dLng];
+}
+
+/**
+ * Bearing (0-359, clockwise from north) from the camera position to an
+ * arbitrary point — the inverse of fovBearingPoint. Used by the report
+ * mini-map drag handle (t_ebbe0ea3): dragging the handle to a new spot
+ * re-aims the cone at the bearing camera→handle. Rounded to the nearest
+ * integer degree (the form's direction field stores integer bearings).
+ */
+export function fovBearingFromPoint(latitude: number, longitude: number, pointLatitude: number, pointLongitude: number): number {
+  const latRad = (latitude * Math.PI) / 180;
+  // Equirectangular offsets in degrees, longitude scaled by cos(latitude)
+  // so the atan2 matches the cone geometry of fovBearingPoint exactly
+  // (a round-trip camera→fovBearingPoint→fovBearingFromPoint is identity).
+  const dLat = pointLatitude - latitude;
+  const dLng = (pointLongitude - longitude) * Math.cos(latRad);
+  const bearingDegrees = (Math.atan2(dLng, dLat) * 180) / Math.PI;
+  return (Math.round(bearingDegrees) % 360 + 360) % 360;
+}
+
 export function fovPolygonPoints(
   latitude: number,
   longitude: number,
@@ -54,18 +94,11 @@ export function fovPolygonPoints(
   radiusMeters: number = FOV_RADIUS_METERS,
   openingDegrees: number = FOV_OPENING_DEGREES,
 ): [number, number][] {
-  const latRad = (latitude * Math.PI) / 180;
-  // Metres per degree of longitude shrinks with cos(latitude).
-  const metersPerDegreeLng = METERS_PER_DEGREE_LAT * Math.cos(latRad);
   const startBearing = ((directionDegrees - openingDegrees / 2) % 360 + 360) % 360;
   const endBearing = ((directionDegrees + openingDegrees / 2) % 360 + 360) % 360;
 
-  const pointAt = (bearingDegrees: number): [number, number] => {
-    const bearing = (bearingDegrees * Math.PI) / 180;
-    const dLat = (radiusMeters * Math.cos(bearing)) / METERS_PER_DEGREE_LAT;
-    const dLng = (radiusMeters * Math.sin(bearing)) / metersPerDegreeLng;
-    return [latitude + dLat, longitude + dLng];
-  };
+  const pointAt = (bearingDegrees: number): [number, number] =>
+    fovBearingPoint(latitude, longitude, bearingDegrees, radiusMeters);
 
   const points: [number, number][] = [[latitude, longitude]];
   if (startBearing <= endBearing) {
