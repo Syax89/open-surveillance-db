@@ -6,7 +6,7 @@
  * adds the soft burst flag: N accounts (or N toggles) from the same caller
  * key inside a short window trip the bucket and the route answers 429 plus a
  * surge alert. The bucket key is the SHA-256 hash of the rate-limit caller
- * key (`photos.submitter_key` pattern) — NEVER the raw IP, so an alert or a
+ * key (the same never-the-raw-IP rule as the abuse-alert callerHash) — NEVER the raw IP, so an alert or a
  * log line cannot be used to track an individual visitor (the route passes
  * the RAW caller key to recordRateLimitBlock, which hashes it again for the
  * alert payload). NAT/CGNAT: soft flag, not ban.
@@ -17,7 +17,7 @@
  * scope of app/lib/rate-limit.ts).
  *
  * Dependency-free of `cloudflare:workers` (the env value is passed in), like
- * photo-quota.ts, so the harness can transpile and unit-test it in Node.
+ * the harness can transpile and unit-test it in Node.
  */
 
 import { sha256Hex } from "./abuse-alerts";

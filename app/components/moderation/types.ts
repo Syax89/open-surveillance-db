@@ -77,20 +77,6 @@ export type EditRequestInQueue = {
   cameraStatus?: string | null;
 };
 
-export type PhotoInQueue = {
-  id: number;
-  cameraId?: number | null;
-  mimeType: string;
-  width: number;
-  height: number;
-  sizeBytes: number;
-  status: string;
-  exifStripped: number;
-  redactionConfirmed: number;
-  createdAt?: string;
-  updatedAt?: string;
-};
-
 export type Reviewer = {
   id: number;
   displayName: string;
@@ -138,14 +124,13 @@ export type QueuePayload = {
   reviewCameras?: CameraInQueue[];
   correctionRequests?: CorrectionInQueue[];
   cameraEditRequests?: EditRequestInQueue[];
-  photoReports?: PhotoInQueue[];
   recentEvents?: ModerationEvent[];
   reviewers?: Reviewer[];
   queueItems?: QueueItem[];
   error?: string;
 };
 
-export type QueueEntity = "camera" | "correction" | "photo" | "camera_edit";
+export type QueueEntity = "camera" | "correction" | "camera_edit";
 export type ModerationAction = "approve" | "reject" | "hide" | "mark-stale" | "reverify" | "escalate" | "associate";
 export type ReasonCode = "verified-public-infrastructure" | "insufficient-evidence" | "duplicate" | "private-or-sensitive-location" | "inaccurate-or-outdated" | "privacy-or-safety-concern" | "requires-senior-review" | "other";
 
@@ -180,8 +165,6 @@ export type DecisionFormApi = {
   setCameraId: (key: string, value: string) => void;
   metadataChoices: (key: string) => { manufacturer: boolean; observedOn: boolean };
   setMetadataChoice: (key: string, field: "manufacturer" | "observedOn", value: boolean) => void;
-  redactionConfirmed: (key: string) => boolean;
-  setRedactionConfirmed: (key: string, value: boolean) => void;
   processing: string | null;
   actorId: string;
   decide: (entity: QueueEntity, id: number, action: ModerationAction) => void;

@@ -30,8 +30,6 @@ export const CACHE_TAGS = {
   export: "cameras-export",
   /** Single record detail, per record id. */
   record: (id: number) => `camera-${id}`,
-  /** Approved photo bytes (served immutable for 1 h), per photo id. */
-  photo: (id: number) => `photo-${id}`,
 } as const;
 
 const PURGE_API = "https://api.cloudflare.com/client/v4/zones";

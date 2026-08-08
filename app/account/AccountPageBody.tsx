@@ -47,7 +47,7 @@ type Contributor = {
 };
 
 type Contribution = {
-  type: "camera" | "correction" | "photo";
+  type: "camera" | "correction";
   id: number;
   title: string | null;
   issueType: string | null;
@@ -76,7 +76,7 @@ type ContributionsPage = {
  */
 type ContributionSummary = {
   total: number;
-  byType: Record<"camera" | "correction" | "photo", number>;
+  byType: Record<"camera" | "correction", number>;
   byStatus: Record<string, number>;
 };
 
@@ -98,7 +98,7 @@ type StatusFilter = (typeof STATUS_FILTERS)[number];
  * A camera contribution is editable by its owner when its status is not
  * terminal: pending → direct PATCH, verified/needs_review/stale → moderated
  * edit request (COMMUNITY_PLAN §2.2). removed/rejected are never editable
- * (409 server-side); corrections and photos have no edit page.
+ * (409 server-side); corrections have no edit page.
  */
 function isEditable(contribution: Contribution): boolean {
   return (
@@ -118,7 +118,7 @@ function readCsrfToken(): string | null {
 
 // ---------------------------------------------------------------------------
 // Contribution-kind icons (account rework 2026-08-08): inline SVGs, 18px,
-// stroke currentColor, aria-hidden — the three kinds are told apart by
+// stroke currentColor, aria-hidden — the two kinds are told apart by
 // SHAPE + the text label next to it, never by colour alone (WCAG 1.4.1;
 // colour stays reserved for the status rail/dot).
 // ---------------------------------------------------------------------------
@@ -152,17 +152,11 @@ function ContributionKindIcon({ kind }: { kind: Contribution["type"] }) {
       </svg>
     );
   }
-  return (
-    <svg {...common}>
-      <rect x="3" y="4" width="18" height="16" rx="2" />
-      <circle cx="9" cy="10" r="2" />
-      <path d="M4 17.5l5-5 4 4 3-3 4 4" />
-    </svg>
-  );
+  return null;
 }
 
 /** Local type filter keys — same rule as the status filters (private page). */
-const TYPE_FILTERS = ["all", "camera", "correction", "photo"] as const;
+const TYPE_FILTERS = ["all", "camera", "correction"] as const;
 type TypeFilter = (typeof TYPE_FILTERS)[number];
 
 /**
@@ -751,11 +745,6 @@ export default function AccountPageBody() {
                     <span className="account-stat-value" aria-label={`${community.stats.correction}: ${summary.byType.correction}`}>{summary.byType.correction}</span>
                     <span className="account-stat-label">{community.stats.correction}</span>
                   </div>
-                  <div className="account-stat">
-                    <span className="account-stat-icon"><ContributionKindIcon kind="photo" /></span>
-                    <span className="account-stat-value" aria-label={`${community.stats.photo}: ${summary.byType.photo}`}>{summary.byType.photo}</span>
-                    <span className="account-stat-label">{community.stats.photo}</span>
-                  </div>
                   <div className="account-stat" role="status">
                     <span className="account-stat-icon account-stat-icon-clock">
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -770,8 +759,8 @@ export default function AccountPageBody() {
               ) : null}
 
               {/* Type filter (account rework 2026-08-08): the API always
-                  supported type=camera|correction|photo; the UI now exposes
-                  it — the three kinds are filterable and never mixed
+                  supported type=camera|correction; the UI now exposes
+                  it — the two kinds are filterable and never mixed
                   silently. Same local-state rule as the status filters. */}
               <div
                 className="contributions-filters"
@@ -850,7 +839,7 @@ export default function AccountPageBody() {
                       const issueLabel = contribution.issueType
                         ? (correctionLabels[contribution.issueType as keyof typeof correctionLabels] as string | undefined)
                         : undefined;
-                      // correction/photo: link the related public record
+                      // correction: link the related public record
                       // when the camera still exists (cameraId set).
                       const relatedHref = contribution.cameraId != null
                         ? `/records/${contribution.cameraId}`

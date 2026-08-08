@@ -18,10 +18,10 @@ export const en = {
   removed: "Removed",
   rejected: "Rejected",
   // Terminal/lifecycle statuses used by moderation outcomes (2026-08-08):
-  // approving a correction sets "reviewed"; approving a photo sets
-  // "approved"; a camera that aged out of review is "stale" (kept for
-  // historical rows). Without these the account page fell back to the
-  // literal label "Status" on approved corrections/photos.
+  // approving a correction sets "reviewed"; a camera that aged out of
+  // review is "stale" (kept for historical rows). Without these the
+  // account page fell back to the literal label "Status" on approved
+  // corrections.
   reviewed: "Resolved",
   approved: "Approved",
   stale: "Stale",

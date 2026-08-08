@@ -6,7 +6,6 @@
  *
  *   POST   /api/cameras                      (record intake)
  *   POST   /api/corrections                  (correction/removal intake)
- *   POST   /api/photos                       (photo evidence upload)
  *   PUT/DELETE /api/cameras/[id]/confirmation (community verification toggle)
  *
  * Contract (Fase E1 spec, mirrored in Fase G QA matrix):

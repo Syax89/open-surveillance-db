@@ -11,20 +11,20 @@ export const en = {
   // Page-level chrome (/segnala).
   pageTitle: "Report a camera",
   pageIntro:
-    "Choose a location on the map or enter coordinates, then add only what you can observe from public space. Your report is published immediately; photos are optional, stored privately, and only published after review with confirmed redaction.",
+    "Choose a location on the map or enter coordinates, then add only what you can observe from public space. Your report is published immediately after review.",
   navigation: "Report navigation",
   homeAria: "OpenSurveillanceDB home",
   // Report section (extracted from the home page bundle in F1).
   contribute: "Contribute",
   reportTitle: "Help make public space legible.",
   reportIntro:
-    "Choose a location on the map or enter coordinates, then add only what you can observe from public space. Your report is published immediately; photos are optional, stored privately, and only published after review with confirmed redaction.",
+    "Choose a location on the map or enter coordinates, then add only what you can observe from public space. Your report is published immediately after review.",
   beforeSubmitting: "Before submitting",
   beforeSubmittingBody:
-    "Do not upload or describe people, licence plates, private homes, security weaknesses or sensitive locations.",
+    "Do not describe people, licence plates, private homes, security weaknesses or sensitive locations.",
   stepLocation: "1. Location",
   stepObservation: "2. What you observed",
-  stepEvidence: "3. Photo and publish",
+  stepEvidence: "3. Confirm and publish",
   selectedPoint: "Selected point",
   manualCoordinatesTitle: "Or enter coordinates",
   manualCoordinatesHelp:
@@ -80,25 +80,10 @@ export const en = {
     "I confirm this observation was made from public space and contains no personal data.",
   privacyNotice: "Privacy notice",
   termsOfUse: "Terms of use",
-  photoRedactionConfirm:
-    "I confirm that I have redacted (blurred or removed) any faces and licence plates in the photos.",
   reportArt13:
-    "The data you enter (location, notes, any photos) is processed by the controller Simone Rondina / OpenSurveillanceDB on the basis of legitimate interest (art. 6(1)(f) GDPR) to document public surveillance infrastructure. Full notice:",
+    "The data you enter (location, notes) is processed by the controller Simone Rondina / OpenSurveillanceDB on the basis of legitimate interest (art. 6(1)(f) GDPR) to document public surveillance infrastructure. Full notice:",
   reportArt13Rights: "You can exercise your GDPR rights (arts. 15-22) by writing to",
   privacyContact: "privacy@opensurveillancedb.org",
-  photoUploadTitle: "Photo evidence (optional)",
-  photoUploadHelp:
-    "JPEG, PNG or WebP up to 10 MB and 4096 px per side. Faces, licence plates and other personal data must be redacted before uploading; location and camera metadata (EXIF) is stripped automatically on upload.",
-  photoExifPrivacyNote: "EXIF metadata is stripped on upload — see the",
-  photoExifPrivacyLink: "privacy notice",
-  photoUploadLabel: "Choose photos",
-  photoUploading: "Uploading…",
-  photoUploadError: "The photo could not be uploaded.",
-  photoAdded: "Photo added — it will be reviewed by a moderator before any publication.",
-  photoRemove: "Remove",
-  photoMaxReached: "A report can include up to 5 photos.",
-  photoRedactionReminder:
-    "Redact faces and licence plates before uploading. Photos are never shown publicly without moderator approval and confirmed redaction.",
   sendModeration: "Publish report",
   positionSelected: "Position selected",
   nearbyCheckError: "Unable to check nearby records",
@@ -128,20 +113,20 @@ export const it: Translation<typeof en> = {
   // Chrome di pagina (/segnala).
   pageTitle: "Segnala una telecamera",
   pageIntro:
-    "Scegli una posizione sulla mappa o inserisci le coordinate, poi aggiungi solo ciò che puoi osservare dallo spazio pubblico. La tua segnalazione viene pubblicata subito; le foto sono facoltative, restano private e vengono pubblicate solo dopo revisione con redazione confermata.",
+    "Scegli una posizione sulla mappa o inserisci le coordinate, poi aggiungi solo ciò che puoi osservare dallo spazio pubblico. La tua segnalazione viene pubblicata dopo la revisione.",
   navigation: "Navigazione segnalazione",
   homeAria: "Pagina iniziale di OpenSurveillanceDB",
   // Sezione segnalazione (estratta dal bundle della home nella F1).
   contribute: "Contribuisci",
   reportTitle: "Rendi leggibile lo spazio pubblico.",
   reportIntro:
-    "Scegli una posizione sulla mappa o inserisci le coordinate, poi aggiungi solo ciò che puoi osservare dallo spazio pubblico. La tua segnalazione viene pubblicata subito; le foto sono facoltative, restano private e vengono pubblicate solo dopo revisione con redazione confermata.",
+    "Scegli una posizione sulla mappa o inserisci le coordinate, poi aggiungi solo ciò che puoi osservare dallo spazio pubblico. La tua segnalazione viene pubblicata dopo la revisione.",
   beforeSubmitting: "Prima di inviare",
   beforeSubmittingBody:
-    "Non caricare né descrivere persone, targhe, abitazioni private, debolezze di sicurezza o luoghi sensibili.",
+    "Non descrivere persone, targhe, abitazioni private, debolezze di sicurezza o luoghi sensibili.",
   stepLocation: "1. Posizione",
   stepObservation: "2. Cosa hai osservato",
-  stepEvidence: "3. Foto e pubblicazione",
+  stepEvidence: "3. Conferma e pubblicazione",
   selectedPoint: "Punto selezionato",
   manualCoordinatesTitle: "Oppure inserisci le coordinate",
   manualCoordinatesHelp:
@@ -197,24 +182,10 @@ export const it: Translation<typeof en> = {
     "Confermo che l'osservazione è stata fatta dallo spazio pubblico e non contiene dati personali.",
   privacyNotice: "Informativa privacy",
   termsOfUse: "Termini d'uso",
-  photoRedactionConfirm: "Confermo di aver oscurato volti e targhe nelle foto.",
   reportArt13:
-    "I dati che inserisci (posizione, note, eventuali foto) sono trattati dal titolare Simone Rondina / OpenSurveillanceDB su base di interesse legittimo (art. 6(1)(f) GDPR) per documentare infrastrutture di sorveglianza pubbliche. Informativa completa:",
+    "I dati che inserisci (posizione, note) sono trattati dal titolare Simone Rondina / OpenSurveillanceDB su base di interesse legittimo (art. 6(1)(f) GDPR) per documentare infrastrutture di sorveglianza pubbliche. Informativa completa:",
   reportArt13Rights: "Puoi esercitare i diritti previsti dagli artt. 15-22 GDPR scrivendo a",
   privacyContact: "privacy@opensurveillancedb.org",
-  photoUploadTitle: "Prova fotografica (facoltativa)",
-  photoUploadHelp:
-    "JPEG, PNG o WebP fino a 10 MB e 4096 px per lato. Volti, targhe e altri dati personali devono essere oscurati prima del caricamento; i metadati di posizione e della fotocamera (EXIF) vengono rimossi automaticamente all'upload.",
-  photoExifPrivacyNote: "I metadati EXIF vengono rimossi all'upload — vedi l'",
-  photoExifPrivacyLink: "informativa privacy",
-  photoUploadLabel: "Scegli le foto",
-  photoUploading: "Caricamento…",
-  photoUploadError: "La foto non può essere caricata.",
-  photoAdded: "Foto aggiunta — verrà esaminata da un moderatore prima di qualsiasi pubblicazione.",
-  photoRemove: "Rimuovi",
-  photoMaxReached: "Una segnalazione può includere fino a 5 foto.",
-  photoRedactionReminder:
-    "Oscura volti e targhe prima del caricamento. Le foto non vengono mai mostrate pubblicamente senza approvazione del moderatore e redazione confermata.",
   sendModeration: "Pubblica la segnalazione",
   positionSelected: "Posizione selezionata",
   nearbyCheckError: "Impossibile verificare i record vicini",

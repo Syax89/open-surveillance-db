@@ -12,7 +12,7 @@
 //     marked-stale | escalated — the record effect of an approval;
 //   - "Record id" (required on associate, optional on approve/reject): the
 //     record the request is linked to (re)association.
-// Both fields stay correction-only; camera/photo/edit rows render exactly
+// Both fields stay correction-only; camera/edit rows render exactly
 // the previous form.
 
 import { useMessages } from "../../lib/use-messages";
@@ -42,8 +42,6 @@ export function DecisionForm({ entity, id, allowedActions, api }: Props) {
   // recorded without associating the request to any record outcome.
   const approveLocked = isCorrection && !api.outcome(key);
   const associateLocked = isCorrection && !api.cameraId(key);
-  const photoApproveLocked = entity === "photo" && api.redactionConfirmed(key) !== true;
-
   return (
     <>
       <fieldset className="report-form" style={{ marginTop: 4, padding: 18 }}>
@@ -75,7 +73,7 @@ export function DecisionForm({ entity, id, allowedActions, api }: Props) {
         </label>
       </fieldset>
       <div className="record-list-actions" aria-label={`${t.decisionFor} ${entity} ${id}`}>
-        {allowedActions.map((action) => <button key={action} type="button" className={action === "approve" || action === "reverify" ? "button button-primary" : action === "hide" || action === "mark-stale" ? "button button-quiet" : "text-button"} disabled={disabled || (action === "approve" && (photoApproveLocked || approveLocked)) || (action === "associate" && associateLocked)} onClick={() => api.decide(entity, id, action)}>{busy ? t.saving : t.action[action]}</button>)}
+        {allowedActions.map((action) => <button key={action} type="button" className={action === "approve" || action === "reverify" ? "button button-primary" : action === "hide" || action === "mark-stale" ? "button button-quiet" : "text-button"} disabled={disabled || (action === "approve" && approveLocked) || (action === "associate" && associateLocked)} onClick={() => api.decide(entity, id, action)}>{busy ? t.saving : t.action[action]}</button>)}
       </div>
     </>
   );

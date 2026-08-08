@@ -85,12 +85,6 @@ export const itLegal: LegalContent = {
                 "Art. 6(1)(f) GDPR; token memorizzato solo come SHA-256, scade dopo 30 giorni o alla disconnessione",
               ],
               [
-                "Prove fotografiche (upload JPEG/PNG/WebP, fino a 10 MB / 4096 px)",
-                "Segnalante",
-                "Verifica del record",
-                "Art. 6(1)(f) GDPR; EXIF/XMP/IPTC rimossi al confine (fail-closed), byte in R2 con metadati solo in D1, conservate privatamente e legate al record; mai pubbliche finché un moderatore approva con redazione confermata",
-              ],
-              [
                 "Richiesta di correzione / rimozione (dati di contatto forniti dal richiedente, es. email)",
                 "Richiedente",
                 "Esercizio dei diritti, segnalazioni di danno",
@@ -136,7 +130,7 @@ export const itLegal: LegalContent = {
           },
           {
             type: "note",
-            text: "**Categorie particolari (art. 9 GDPR):** nessuna viene raccolta intenzionalmente. Le prove che catturano incidentalmente persone identificabili, targhe o interni privati vengono oscurate o eliminate.",
+            text: "**Categorie particolari (art. 9 GDPR):** nessuna viene raccolta intenzionalmente. I contenuti che catturano incidentalmente persone identificabili, targhe o interni privati vengono oscurati o eliminati.",
           },
           {
             type: "note",
@@ -155,7 +149,6 @@ export const itLegal: LegalContent = {
               "**Niente nomi, volti, targhe o dettagli operativi precisi.**",
               "**Niente coordinate oltre la precisione di zona:** le posizioni pubblicate sono arrotondate a **~4 decimali (~10 m)**; la posizione esatta resta nel database e non viene mai pubblicata.",
               "**Niente pubblicità comportamentale, niente tracciamento, nessuna vendita di dati**, nessuna libreria di analisi.",
-              "**Nessuna foto pubblicata senza moderazione e redazione confermata:** le foto caricate (JPEG/PNG/WebP, ≤10 MB / 4096 px) vengono private dei metadati EXIF/XMP/IPTC al confine (fail-closed — un contenitore che non può essere percorso in sicurezza viene rifiutato, mai memorizzato senza stripping), conservate con byte sanitizzati in R2 e metadati solo in D1, e **non sono mai pubbliche** finché un moderatore non le approva con `redaction_confirmed = 1`. La chiave di storage non viene mai esposta.",
               "Le segnalazioni vengono pubblicate subito da account verificati e fanno parte del dataset pubblico dal momento dell'invio. I contenuti che violano le regole vengono ritirati dalla community o per emergenza legale, e i contenuti ritirati non vengono mai ripubblicati.",
             ],
           },
@@ -192,11 +185,11 @@ export const itLegal: LegalContent = {
         blocks: [
           {
             type: "paragraph",
-            text: "Le segnalazioni vengono pubblicate subito e restano pubbliche finché la community continua a confermarle; i record ritirati dalla community o per emergenza legale sono esclusi dagli output pubblici e seguono il calendario di conservazione del repository (docs/legal/RETENTION_SCHEDULE.md). Richieste di correzione e voci di audit: 2 anni. Prove: legate al record. Log operativi: fino a 12 mesi (aggregati). Backup: ruotati dal fornitore (fino a 30 giorni di ripristino point-in-time).",
+            text: "Le segnalazioni vengono pubblicate subito e restano pubbliche finché la community continua a confermarle; i record ritirati dalla community o per emergenza legale sono esclusi dagli output pubblici e seguono il calendario di conservazione del repository (docs/legal/RETENTION_SCHEDULE.md). Richieste di correzione e voci di audit: 2 anni. Log operativi: fino a 12 mesi (aggregati). Backup: ruotati dal fornitore (fino a 30 giorni di ripristino point-in-time).",
           },
           {
             type: "paragraph",
-            text: "Le regole di cancellazione e scadenza sono applicate automaticamente dallo sweep giornaliero di conservazione (vedi il calendario di conservazione nell'informativa privacy); le richieste di correzione e le voci di audit: 2 anni. Prove: legate al record. Log operativi: fino a 12 mesi (aggregato). Backup: ruotati dal fornitore (fino a 30 giorni di point-in-time recovery).",
+            text: "Le regole di cancellazione e scadenza sono applicate automaticamente dallo sweep giornaliero di conservazione (vedi il calendario di conservazione nell'informativa privacy); le richieste di correzione e le voci di audit: 2 anni. Log operativi: fino a 12 mesi (aggregato). Backup: ruotati dal fornitore (fino a 30 giorni di point-in-time recovery).",
           },
         ],
       },
@@ -346,7 +339,7 @@ export const itLegal: LegalContent = {
         blocks: [
           {
             type: "paragraph",
-            text: "**Contenuti vietati.** Le esclusioni delle regole di pubblicazione si applicano a tutto ciò che invii, incluse segnalazioni, note ed eventuali futuri caricamenti di prove. In particolare, non inviare:",
+            text: "**Contenuti vietati.** Le esclusioni delle regole di pubblicazione si applicano a tutto ciò che invii, incluse segnalazioni e note. In particolare, non inviare:",
           },
           {
             type: "list",
@@ -355,7 +348,6 @@ export const itLegal: LegalContent = {
               "video in diretta, URL di streaming, credenziali, informazioni di rete o interfacce di controllo;",
               "dettagli sul campo visivo o sulle capacità operative che potrebbero creare un rischio per la sicurezza;",
               "impianti o luoghi sensibili la cui pubblicazione potrebbe aumentare materialmente il rischio;",
-              "immagini contenenti persone identificabili, targhe o interni privati, salvo che tu le abbia oscurate in modo sicuro **prima del caricamento** e che siano necessarie — il caricamento di prove fotografiche è **attivo** (sezione 5): le immagini vengono private dei metadati EXIF/XMP/IPTC al confine (fail-closed) e non vengono mai pubblicate finché un moderatore non le approva con redazione confermata;",
               "accuse non verificabili su persone o organizzazioni;",
               "contenuti che non hai il diritto di condividere.",
             ],
@@ -385,7 +377,6 @@ export const itLegal: LegalContent = {
               "**Cosa conservi e cosa concedi.** Conservi tutti i diritti che hai sul contenuto che invii. Con l'invio concedi al progetto una licenza non esclusiva, mondiale, esente da royalty per conservare, esaminare e pubblicare la segnalazione come parte del database aperto, reso disponibile con licenza **ODbL 1.0**, con attribuzione ai contributori secondo l'avviso ODbL. La pubblicazione avviene all'invio, non dopo un passaggio di approvazione.",
               "**Le tue dichiarazioni.** Inviando conferisci che: il contenuto è accurato al meglio delle tue conoscenze; hai il diritto di condividerlo; è conforme alla sezione 4; e hai l'età minima per usare il Servizio nella tua giurisdizione (in Italia, 14 anni).",
               "**Accuratezza della community.** I record ripubblicati da fonti pubbliche ufficiali seguono il proprio regime giuridico, verificato caso per caso; i record della community sono mantenuti accurati da conferme e segnalazioni sotto le soglie automatiche, non contro registri ufficiali.",
-              "**Prove fotografiche.** Le segnalazioni possono includere foto (JPEG, PNG o WebP, fino a **10 MB e 4096 px per lato**). Al caricamento, il servizio **rimuove i metadati EXIF/XMP/IPTC al confine** (fail-closed: se il contenitore non può essere percorso in sicurezza il caricamento viene rifiutato — mai memorizzato senza stripping), verifica il contenitore dai magic bytes (senza mai fidarsi del Content-Type dichiarato), conserva i byte sanitizzati nell'object storage (**R2**) con metadati solo nel database (**D1**), e tiene ogni foto **privata (`pending`) e mai pubblica** finché un moderatore non la approva con `redaction_confirmed = 1` — il moderatore deve confermare che il soggetto è stato oscurato. Le foto seguono la conservazione del record (cancellate col record; hard-delete immediato se il record viene ritirato). `storage_key` non viene mai esposto; i client interagiscono con le foto solo tramite id.",
             ],
           },
         ],
@@ -567,7 +558,7 @@ export const itLegal: LegalContent = {
         blocks: [
           {
             type: "paragraph",
-            text: "I contributori devono inviare solo materiale che hanno il diritto di condividere. Concedono al progetto i diritti necessari a pubblicare codice, documentazione e dati accettati con la licenza di progetto pertinente. Il caricamento di prove fotografiche è **attivo** (agosto 2026): le immagini vengono private dei metadati EXIF/XMP/IPTC al confine (fail-closed), conservate privatamente (byte in R2, metadati in D1), e mai pubblicate finché un moderatore non le approva con redazione confermata (vedi sezione 5 dei Termini).",
+            text: "I contributori devono inviare solo materiale che hanno il diritto di condividere. Concedono al progetto i diritti necessari a pubblicare codice, documentazione e dati accettati con la licenza di progetto pertinente. ",
           },
         ],
       },
@@ -668,7 +659,7 @@ export const itLegal: LegalContent = {
           {
             type: "list",
             items: [
-              "apri una segnalazione sul repository del progetto (contenuto pubblico e non sensibile — non includere dati personali, foto di persone o luoghi privati);",
+              "apri una segnalazione sul repository del progetto (contenuto pubblico e non sensibile — non includere dati personali o luoghi privati);",
               "usa il [modulo di correzione](/) nella pagina pubblica per problemi relativi a un record specifico;",
               "scrivi al contatto privacy indicato nell'[informativa sulla privacy](/privacy): [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org).",
             ],

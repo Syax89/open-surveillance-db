@@ -15,7 +15,6 @@ import { CorrectionHistorySection } from "./moderation/CorrectionHistorySection"
 import { CorrectionQueueItem } from "./moderation/CorrectionQueueItem";
 import { EditQueueItem } from "./moderation/EditQueueItem";
 import { HistorySection } from "./moderation/HistorySection";
-import { PhotoQueueItem } from "./moderation/PhotoQueueItem";
 import { QueueSection } from "./moderation/QueueSection";
 import { useModerationQueue } from "./moderation/useModerationQueue";
 
@@ -96,14 +95,6 @@ export function ModerationDashboard() {
         emptyTitle={t.noEditRequestsTitle} emptyText={t.noEditRequestsText}
         itemKey={(editRequest) => editRequest.id}
         renderItem={(editRequest) => <EditQueueItem editRequest={editRequest} queueBadge={q.queueBadge("camera_edit", editRequest.id)} api={q.decisionApi} readableDate={q.readableDate} />}
-      />
-
-      <QueueSection
-        id="photo-queue-title" eyebrow={t.photoEvidence} title={t.pendingPhotos} note={`${q.photos.length} ${t.pending}`}
-        listLabel={t.pendingPhotos} loading={q.loading} items={q.photos}
-        emptyTitle={t.noPhotosTitle} emptyText={t.noPhotosText}
-        itemKey={(photo) => photo.id}
-        renderItem={(photo) => <PhotoQueueItem photo={photo} api={q.decisionApi} readableDate={q.readableDate} />}
       />
 
       <HistorySection

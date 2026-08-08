@@ -6,12 +6,10 @@ import type { ReportCoordinates } from "./report-coordinates";
 
 export type NearbyCandidate = { id: number; title: string; kind: string; distanceMeters: number; similarity: number; matchStrength: "high" | "medium" | "low" };
 
-export type PhotoItem = { id: number; mimeType: string; width: number; height: number; name: string };
-
 /**
  * Report-flow state shared between the map (pick a position) and the
- * report form (manual coordinates, nearby-duplicate check, photo upload,
- * submit). The hook owns the flow's state; `notice` is page state (the
+ * report form (manual coordinates, nearby-duplicate check, submit).
+ * The hook owns the flow's state; `notice` is page state (the
  * map section displays it), so the page injects its setter. The page
  * reads `coordinates`/`selectCoordinates` from the hook to drive the map.
  *
@@ -57,9 +55,6 @@ export function useReportFlow({ setNotice, initialCoordinates = null }: { setNot
   const addressTouched = useRef(false);
   const reverseRequest = useRef<AbortController | null>(null);
   const nearbyRequest = useRef<AbortController | null>(null);
-  const [photos, setPhotos] = useState<PhotoItem[]>([]);
-  const [photoUploading, setPhotoUploading] = useState(false);
-  const photoInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => () => nearbyRequest.current?.abort(), []);
 
@@ -137,44 +132,6 @@ export function useReportFlow({ setNotice, initialCoordinates = null }: { setNot
     }
     await selectCoordinates(latitude, longitude);
   }
-  // Upload one photo to the private evidence store (POST /api/photos).
-  // The server strips EXIF/GPS and enforces MIME, size and dimension limits;
-  // the client-side checks below are convenience only, not a security gate.
-  async function uploadPhoto(file: File) {
-    if (photos.length >= 5) { setNotice(t.photoMaxReached); return; }
-    setPhotoUploading(true);
-    setNotice("");
-    try {
-      const response = await fetch("/api/photos", {
-        method: "POST",
-        headers: { "Content-Type": file.type || "application/octet-stream" },
-        body: file,
-      });
-      const data = await response.json() as { photo?: { id: number; mimeType: string; width: number; height: number }; error?: string };
-      if (!response.ok) throw new Error(data.error || t.photoUploadError);
-      if (!data.photo) throw new Error(t.photoUploadError);
-      setPhotos((items) => [...items, { id: data.photo!.id, mimeType: data.photo!.mimeType, width: data.photo!.width, height: data.photo!.height, name: file.name }]);
-      setNotice(t.photoAdded);
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : t.photoUploadError);
-    } finally {
-      setPhotoUploading(false);
-      if (photoInputRef.current) photoInputRef.current.value = "";
-    }
-  }
-
-  function onPhotoSelected(event: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(event.target.files ?? []);
-    for (const file of files) {
-      if (photos.length >= 5) { setNotice(t.photoMaxReached); break; }
-      void uploadPhoto(file);
-    }
-  }
-
-  function removePhoto(id: number) {
-    setPhotos((items) => items.filter((photo) => photo.id !== id));
-  }
-
   // Reverse-geocode prefill guard (CEO 2026-08-07): once the contributor
   // types, the address is theirs — later lookups must never overwrite it.
   // Defined here (not inline in the JSX) so the react-compiler eslint rule
@@ -219,7 +176,6 @@ export function useReportFlow({ setNotice, initialCoordinates = null }: { setNot
       direction: directionValue,
       ...(manufacturer ? { manufacturer } : {}),
       ...(observedOn ? { observedOn } : {}),
-      ...(photos.length > 0 ? { photoIds: photos.map((photo) => photo.id) } : {}),
       ...(duplicateConfirmed ? { duplicateConfirmed: true } : {}),
     };
     try {
@@ -252,7 +208,7 @@ export function useReportFlow({ setNotice, initialCoordinates = null }: { setNot
       }
       if (!response.ok) throw new Error(t.submitReportError);
       const duplicates = Array.isArray(data.possibleDuplicates) ? data.possibleDuplicates : [];
-      formElement.reset(); setCoordinates(null); setManualLatitude(""); setManualLongitude(""); setPhotos([]);
+      formElement.reset(); setCoordinates(null); setManualLatitude(""); setManualLongitude("");
       setDuplicateConfirmationRequired(false); setDuplicateConfirmed(false);
       setKind(""); setDirection(null); setDirectionKnown(false);
       setAddress(""); addressTouched.current = false; setReverseGeocoding(false);
@@ -260,5 +216,5 @@ export function useReportFlow({ setNotice, initialCoordinates = null }: { setNot
     } catch { setNotice(t.moderationUnavailable); }
   }
 
-  return { coordinates, setCoordinates, manualLatitude, setManualLatitude, manualLongitude, setManualLongitude, nearbyCandidates, nearbyLoading, nearbyError, selectCoordinates, selectManualCoordinates, photos, photoUploading, photoInputRef, onPhotoSelected, removePhoto, submitReport, duplicateConfirmationRequired, duplicateConfirmed, setDuplicateConfirmed, kind, setKind, direction, setDirection, directionKnown, setDirectionKnown, address, setAddress, handleAddressChange, reverseGeocoding };
+  return { coordinates, setCoordinates, manualLatitude, setManualLatitude, manualLongitude, setManualLongitude, nearbyCandidates, nearbyLoading, nearbyError, selectCoordinates, selectManualCoordinates, submitReport, duplicateConfirmationRequired, duplicateConfirmed, setDuplicateConfirmed, kind, setKind, direction, setDirection, directionKnown, setDirectionKnown, address, setAddress, handleAddressChange, reverseGeocoding };
 }
