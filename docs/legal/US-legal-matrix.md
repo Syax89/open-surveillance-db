@@ -21,7 +21,7 @@ automatico (solo il governo federale, 17 U.S.C. § 105).
 | Ohio | OHGO (1.159) | terms account OHGO: nessuna clausola riuso dati | ⚠️ DUBBIO |
 | N. Carolina | NCDOT (1.122) | terms: nessuna clausola riuso dati | ⚠️ DUBBIO |
 | Vermont / NH | ITS_Publish / NH511 | solo disclaimer, nessuna licenza | ⚠️ DUBBIO |
-| New York | Thruway gantries (70) | data.ny.gov: license=None nel metadata dataset | ⚠️ DUBBIO |
+| New York | Thruway gantries (70) | data.ny.gov: license=None nel metadata; ma Terms OPEN-NY risultano "least restrictive, no attribution/share-alike" (transcript subagent 2026-08-08) — **da verificare direttamente prima di pubblicare** | ⚠️ DUBBIO (promettente) |
 | Arkansas | iDriveAr (49) | **Terms of Use VIETANO esplicitamente** il riuso | ⛔ NO |
 | Illinois | IDOT (3.595) | CC BY-SA 2.0 — share-alike incompatibile con la matrice (regola unidirezionale) | ⛔ NO |
 | Michigan | Detroit (7.977) | CC BY-SA 4.0 + Mapillary-derived | ⛔ NO |
