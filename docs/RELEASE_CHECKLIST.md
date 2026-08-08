@@ -57,7 +57,8 @@ npm test          # build + API contract and publication-boundary tests
 - [ ] `npm test` passes (runtime API tests + publication-boundary tests).
 
 QA evidence from the latest E2E and navigation-test rounds is archived under
-[`docs/qa/`](qa/) (`QA_REPORT_auth-flow-e2e.md`, `QA_REPORT_navigation-pages.md`).
+`~/osdb-archive/qa-reports/qa/` (`QA_REPORT_auth-flow-e2e.md`,
+`QA_REPORT_navigation-pages.md`).
 
 ### 3. Review what changed
 

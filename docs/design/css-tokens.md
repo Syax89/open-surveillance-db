@@ -86,8 +86,8 @@ stesso build: 23 px di rumore). Maschera del solo pane tile (`.live-map`):
 y=30.5 frazionaria) mostra variazione di subpixel-AA anche tra capture dello
 stesso build — rumore del rasterizzatore, non CSS.
 
-Screenshot: `docs/design/screenshots/css-tokens/contact-before-after.png`
-(contact sheet 4 pagine, prima | dopo),
+Screenshot (archiviati in `~/osdb-archive/screenshots/design/css-tokens/`):
+`contact-before-after.png` (contact sheet 4 pagine, prima | dopo),
 `mappa-before-offline.png` / `mappa-after-offline.png`.
 
 ### 3. Suite di test
@@ -119,7 +119,7 @@ margine (0 < 40).
 
 - `app/globals.css` (unica modifica funzionale)
 - `docs/design/css-tokens.md` (questo report)
-- `docs/design/screenshots/css-tokens/` (screenshot prima/dopo)
+- `~/osdb-archive/screenshots/design/css-tokens/` (screenshot prima/dopo, archiviati)
 
 ## Rischi residui
 

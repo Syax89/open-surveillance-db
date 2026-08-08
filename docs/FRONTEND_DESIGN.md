@@ -10,11 +10,12 @@ token, tipografia, layout, componenti, stati e regole che l'implementazione
 **deve** rispettare. Non è una visione: è il contratto.
 
 - Complementi: `docs/SITEMAP.md` (IA), `docs/workstreams/PRODUCT_UX.md`
-  (requisiti UX/accessibilità), `docs/design-audit.md` (audit di conformità
-  codice vs doc, main @`200f415`, 2026-08-02).
+  (requisiti UX/accessibilità), audit di conformità codice vs doc (main
+  @`200f415`, 2026-08-02, archiviato in
+  `~/osdb-archive/docs-plans/design-audit.md`).
 - Se una sezione è marcata **[binding]** significa che il codice attuale
-  diverge e la voce è il target da implementare (gap tracciato in
-  `design-audit.md`). Se è **[implementato]** significa che è verificato sul
+  diverge e la voce è il target da implementare (gap tracciato nell'audit di
+  conformità). Se è **[implementato]** significa che è verificato sul
   codice attuale.
 
 **Legenda stato:** ✅ implementato e verificato · 🔒 binding (da implementare /
@@ -193,8 +194,8 @@ in F4 (gap P1 G5 chiuso).
 **Regola (P1 G5 — ✅ chiusa in F4):** nessun nuovo hardcode di colore dove
 esiste un token; i 23 hardcode di `#0b705c` sono stati sostituiti con
 `var(--focus)`. Debt residuo: i 4 dead tokens (`--navy-2`, `--lime`, `--coral`,
-`--sand`) vanno **usati o rimossi** nel prossimo refactor (tracciato in
-design-audit §3).
+`--sand`) vanno **usati o rimossi** nel prossimo refactor (tracciato
+nell'audit di conformità §3, `~/osdb-archive/docs-plans/design-audit.md`).
 
 **Verifica contrasto WCAG (tabella corretta rispetto alla v1):**
 
@@ -966,7 +967,7 @@ record, report, rules, status, types` (+ `index` aggregatore). Parità
 EN/IT type-checked. Nessun bundle nuovo richiesto (la v1 li prevedeva come
 "nuovi" — sono stati creati).
 
-## Appendice C: Stato di conformità vs `design-audit.md` (chiusura F4)
+## Appendice C: Stato di conformità dell'audit (chiusura F4)
 
 Stato al 2026-08-02: i gap code-side dell'audit F1 sono chiusi in F4. Restano
 binding solo D15 (scala `--space-*`/radius/shadow) e i debt tracciati sotto.

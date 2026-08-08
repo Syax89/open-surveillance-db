@@ -190,7 +190,8 @@ tiers below are ordered by operational commitment.
   without a software update.
 - [x] Public contact address published on legal/contact pages (policy
   "should"): `privacy@opensurveillancedb.org` decided and mailbox active
-  (TERMS_OF_USE.md); map/about wiring tracked in FRONTEND_PLAN.md.
+  (TERMS_OF_USE.md); map/about wiring tracked in the consolidated
+  roadmap (`docs/roadmap.md`).
 - [ ] Add Cloudflare rate limiting for `/api/tiles/*` before public launch
   as an abuse control (protects both our origin and the upstream).
 

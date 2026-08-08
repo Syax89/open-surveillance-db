@@ -4,7 +4,7 @@
 
 Design a clear, low-risk public experience for discovering reviewed information about visible public surveillance infrastructure. The product must support civic understanding, correction, and accountable data stewardship; it must not become a source of live feeds, operational intelligence, personal-data collection, or guidance for evading surveillance.
 
-This workstream turns the release gates in the [development plan](../DEVELOPMENT_PLAN.md) into user-facing requirements. It is a public-alpha plan, not a claim that the current local prototype is ready to receive real reports.
+This workstream turns the release gates in the [roadmap](../roadmap.md) into user-facing requirements. It is a public-alpha plan, not a claim that the current local prototype is ready to receive real reports.
 
 ## Public-alpha objectives
 
@@ -38,7 +38,8 @@ The first public alpha is a deliberately narrow pilot in one reviewed jurisdicti
 ## Target user journeys
 
 The four core journeys map to the public tool routes introduced by the
-frontend refactor (F1, `docs/FRONTEND_PLAN.md` §1.2): **Browse** → `/mappa`
+frontend refactor (F1, frontend plan §1.2, archived in
+`~/osdb-archive/docs-plans/FRONTEND_PLAN.md`): **Browse** → `/mappa`
 + `/directory`; **Search** → `/directory` (and `/mappa` filters); **Submit**
 → `/segnala`; **Correct** → `/correggi`. The home page is the hub that links
 the four tools; the map and the directory are separate pages, each with its
@@ -256,7 +257,7 @@ Public alpha may proceed only when the following can be demonstrated in a test e
   `auth.ts` (`loggedOutTitle`, `accountDeletedBody` translated as "logged
   in" instead of "logged out"; `createOne` as "Crealo") — a **human review
   of every Italian string** is required before the redesign ships
-  (`docs/FRONTEND_PLAN.md` §5.1).
+  (frontend plan §5.1, archived in `~/osdb-archive/docs-plans/FRONTEND_PLAN.md`).
 - **Conceptual mapping, not one file per route.** The user-facing domains
   (home, directory, report, moderation, auth, info, legal) map to the
   per-domain bundles in `app/lib/i18n/`; the table lives in

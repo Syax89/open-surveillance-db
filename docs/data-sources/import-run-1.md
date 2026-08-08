@@ -183,7 +183,8 @@ dry-run del runner.)
   `source="import:<slug>"`, `status="active"`, `last_verified_at=null`
   (badge «mai confermato», ADR 0021).
 - Mappa: preview Leaflet rigenerata con i dati finali
-  (`docs/data-sources/imports/preview-import-run-1.html`, 7 392 marker —
+  (archiviata in `~/osdb-archive/preview-imports/preview-import-run-1.html`,
+  7 392 marker —
   leggera differenza col totale runner perché la preview applica la sua dedup
   intra per layer). I punti sono nelle aree attese: varchi entro la cerchia
   milanese, siti EWZ/Stadtpolizei a Zurigo, nodi OSM su tutto il territorio
