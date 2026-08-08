@@ -130,10 +130,10 @@ export function ReportMiniMap({ coordinates, onSelect, kind, direction, directio
             icon: L.divIcon({
               className: "fov-rotate-handle-wrap",
               html: '<span class="fov-rotate-handle" aria-hidden="true"></span>',
-              // 32 px hit area (visible disc 18 px) — a usable touch target
-              // on a map handle without covering the cone.
-              iconSize: [32, 32],
-              iconAnchor: [16, 16],
+              // 44 px hit area (visible disc 18 px) — WCAG 2.5.8 touch
+              // target on a map handle without covering the cone.
+              iconSize: [44, 44],
+              iconAnchor: [22, 22],
             }),
           }).addTo(map);
           handleRef.current.on("drag", (event: import("leaflet").LeafletEvent) => {
