@@ -68,6 +68,11 @@ export const IMPORTABLE_LICENSES = new Set([
   // data.gov.au / data.qld.gov.au, attribution-only).
   "CC BY 3.0 AU",
   "CC-BY 3.0 AU",
+  // Generic CC BY 3.0 — Denver Open Data Catalog licensed under CC BY 3.0
+  // (denvergov.org/opendata, verified 2026-08-08: "The City and County of
+  // Denver Open Data Catalog provides open data licensed under the
+  // Creative Commons Attribution 3.0 license (CC BY 3.0)").
+  "CC BY 3.0",
   // Flemish open-data standard (Verkeerscentrum DATEX II v3 feed).
   "Vlaamse Open Data Licentie v1.0",
   // German open-data standard (dl-de-by-2.0) — attribution only, the same

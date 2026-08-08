@@ -2,10 +2,10 @@
     "slug": "usa-denver-halo-cameras-2026",
     "source_name": "Denver Police Department — HALO Cameras",
     "format": "arcgis-featureserver",
-    "license": "Denver Hub open license policy",
-    "license_url": "https://www.denvergov.org/opendata",
-    "attribution_text": "Fonte: City and County of Denver, Denver Open Data Hub — HALO Cameras (DPD) (https://services1.arcgis.com/zdB7qR0BtYrg0Xpl), concesso con licenza Denver Hub open data policy.",
+    "license": "CC BY 3.0",
+    "license_url": "https://creativecommons.org/licenses/by/3.0/",
+    "attribution_text": "Fonte: City and County of Denver, Denver Open Data Hub — HALO Cameras (DPD) (https://services1.arcgis.com/zdB7qR0BtYrg0Xpl), concesso con licenza CC BY 3.0 (Creative Commons Attribution 3.0 — policy ufficiale del Denver Open Data Catalog: 'provides open data licensed under the Creative Commons Attribution 3.0 license').",
     "source_url": "https://services1.arcgis.com/zdB7qR0BtYrg0Xpl/arcgis/rest/services/Halo_Cameras/FeatureServer/0",
     "max_records": 400,
-    "notes": "Scan catalog.csv + verifica diretta (CEO 2026-08-08): 259 telecamere HALO Denver PD (FeatureServer Web Mercator, attrs LOCATION; count 259 verificato). Licenza: Denver Hub open license policy — verificare testo esatto della policy prima dell'import (se CC0/CC-BY ok, se custom restrittiva NO). Da confermare con subagent legale. external_id denver-halo:<OBJECTID>."
+    "notes": "Scan catalog.csv + verifica diretta (CEO 2026-08-08): 259 telecamere HALO Denver PD (FeatureServer Web Mercator, attrs LOCATION; count 259 verificato). Licenza CONFERMATA: CC BY 3.0 esplicita nella policy Denver Open Data Catalog (denvergov.org/opendata, testo verificato 2026-08-08). external_id denver-halo:<OBJECTID>."
 }
