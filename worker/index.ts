@@ -360,6 +360,19 @@ function requireModerationAuth(request: Request, env: Env): { denied: Response |
  * at the Cloudflare zone level (or via a CF header rule) once the public
  * domain is active — see task t_6148aa6f.
  */
+/**
+ * Geolocation unblock for /mappa ONLY (t_18259daa, CEO: floating locate
+ * button above the zoom controls). The locate feature is fully client-side
+ * (the position never leaves the browser — privacy by design), but the
+ * browser refuses to even prompt unless the top-level document is allowed
+ * the geolocation feature. `geolocation=(self)` restricts it to THIS
+ * origin's own document — an embedded iframe can never inherit it. Every
+ * other route keeps the fully-denying policy; camera and microphone stay
+ * blocked everywhere, including /mappa.
+ */
+const MAP_PERMISSIONS_POLICY = "camera=(), microphone=(), geolocation=(self)";
+const MAP_ONLY_ROUTE = "/mappa";
+
 const SECURITY_HEADERS: ReadonlyArray<readonly [string, string]> = [
   ["X-Content-Type-Options", "nosniff"],
   ["X-Frame-Options", "DENY"],
@@ -382,13 +395,26 @@ const SECURITY_HEADERS: ReadonlyArray<readonly [string, string]> = [
   ],
 ];
 
-/** Return a copy of `response` carrying the global security headers. */
-function withSecurityHeaders(response: Response): Response {
+/**
+ * Return a copy of `response` carrying the global security headers. On the
+ * /mappa route the Permissions-Policy is relaxed to allow geolocation for
+ * the top-level document (locate button, t_18259daa); every other route
+ * keeps the fully-denying policy. The override still respects the
+ * "never overwrite" rule: a stricter policy already set by an app handler
+ * survives untouched.
+ */
+function withSecurityHeaders(response: Response, pathname?: string): Response {
   const headers = new Headers(response.headers);
+  // Never overwrite an existing header: app routes may set stricter
+  // values that must survive the middleware. The
+  // Permissions-Policy is special-cased below, so remember whether an app
+  // handler already shipped one BEFORE the defaults below fill it in.
+  const appSetPermissionsPolicy = headers.has("Permissions-Policy");
   for (const [name, value] of SECURITY_HEADERS) {
-    // Never overwrite an existing header: app routes may set stricter
-    // values set by an app route that must survive the middleware.
     if (!headers.has(name)) headers.set(name, value);
+  }
+  if (pathname === MAP_ONLY_ROUTE && !appSetPermissionsPolicy) {
+    headers.set("Permissions-Policy", MAP_PERMISSIONS_POLICY);
   }
   return new Response(response.body, {
     status: response.status,
@@ -441,7 +467,7 @@ const worker = {
 
     if (gatedPath(request.method, url.pathname)) {
       const gate = requireModerationAuth(gated, env);
-      if (gate.denied) return withSecurityHeaders(gate.denied);
+      if (gate.denied) return withSecurityHeaders(gate.denied, url.pathname);
       gated = injectIdentityAfterGate(gated, gate.identityEmail);
     }
 
@@ -454,10 +480,10 @@ const worker = {
           return result.response();
         },
       }, allowedWidths);
-      return withSecurityHeaders(optimized);
+      return withSecurityHeaders(optimized, url.pathname);
     }
 
-    return withSecurityHeaders(await handler.fetch(gated, env, ctx));
+    return withSecurityHeaders(await handler.fetch(gated, env, ctx), url.pathname);
   },
 
   /**

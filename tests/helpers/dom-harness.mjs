@@ -343,7 +343,23 @@ export function map(el, opts) {
   maps.push(m);
   return m;
 }
-export const control = { zoom: () => ({ addTo: () => {} }) };
+export const control = { zoom: () => ({ addTo: (map) => { (map.__controls ??= []).push({ kind: "zoom" }); } }) };
+// Custom controls (t_18259daa): the geolocate button is a real
+// L.Control.extend subclass. The stub mirrors the real addTo contract —
+// onAdd() returns a DOM node (jsdom), which is recorded on the map stub
+// (map.__controls) so tests can query the button; the real Leaflet appends
+// it to the corner container, the stub does not touch the document.
+export const Control = {
+  extend(proto) {
+    const Cls = function (options) { this.options = { ...(proto.options ?? {}), ...(options ?? {}) }; };
+    Cls.prototype.addTo = function (map) {
+      const container = typeof proto.onAdd === "function" ? proto.onAdd.call(this) : null;
+      (map.__controls ??= []).push({ kind: "geolocate", container, control: this });
+      return this;
+    };
+    return Cls;
+  },
+};
 export const tileLayer = (url, opts) => {
   const layer = { addTo: () => {} };
   // CSP-safe tile proxy contract (RecordMiniMap 2026-08-07): record the
