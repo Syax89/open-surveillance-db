@@ -568,7 +568,7 @@ test("combined kind+freshness filters are forwarded to the API on EVERY page of 
   for (const url of calls) {
     assert.equal(url.searchParams.get("kind"), "Bullet", "kind forwarded on every page");
     assert.equal(url.searchParams.get("freshness"), "7d", "freshness forwarded on every page");
-    assert.equal(url.searchParams.get("limit"), "500");
+    assert.equal(url.searchParams.get("limit"), "2000");
   }
   assert.equal(calls[0].searchParams.get("offset"), "0");
   assert.equal(calls[1].searchParams.get("offset"), "25");

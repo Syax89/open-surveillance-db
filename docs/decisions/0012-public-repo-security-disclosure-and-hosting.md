@@ -42,8 +42,8 @@ commitment". This ADR records the decision that makes those concrete.
    channels.
 
 3. **Hosting: local staging now, Cloudflare later.**
-   - Current environment: the LAN-only container **LXC 114 `osdb-test`**
-     (`192.168.1.201:3000`) is the permanent staging environment (already
+   - Current environment: the LAN-only test container
+     (`http://<lan-ip>:3000`) is the permanent staging environment (already
      documented in DEPLOYMENT.md).
    - Future production: **Cloudflare Workers + D1** remains the target;
      the domain **opensurveillancedb.org** will be registered when that

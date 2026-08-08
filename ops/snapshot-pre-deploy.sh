@@ -1,6 +1,6 @@
 #!/bin/bash
-# ops/snapshot-pre-deploy.sh — take a Proxmox snapshot of LXC 114 before a
-# deploy/update, to serve as the rollback base.
+# ops/snapshot-pre-deploy.sh — take a Proxmox snapshot of the test container
+# before a deploy/update, to serve as the rollback base.
 #
 # Usage:
 #   ops/snapshot-pre-deploy.sh [snapname]
@@ -9,10 +9,10 @@
 # Token decrypted at runtime from the local GPG vault, never hardcoded.
 set -uo pipefail
 
-PVE_HOST="${PVE_HOST:-192.168.1.77}"
+PVE_HOST="${PVE_HOST:-<pve-host>}"      # imposta PVE_HOST (o sostituisci il placeholder)
 PVE_NODE="${PVE_NODE:-pve}"
 VMID="${OSDB_VMID:-114}"
-TOKEN_SRC="${PVE_TOKEN_GPG:-/home/simone/.hermes/secrets/proxmox-token.gpg}"
+TOKEN_SRC="${PVE_TOKEN_GPG:-<secrets-dir>/proxmox-token.gpg}"   # imposta PVE_TOKEN_GPG
 
 ts() { date '+%Y-%m-%d %H:%M:%S'; }
 

@@ -22,8 +22,8 @@ Two Wave A requirements still lacked owners and an infrastructure decision:
    workstream leads.
 2. **Hosting and domain.** The project has a dual footprint: the
    repo-documented Cloudflare Workers/D1 deployment (ADR 0005, a future
-   precondition) and the always-on local test site on Proxmox container
-   **LXC 114 `osdb-test`** (192.168.1.201:3000, LAN-only, per
+   precondition) and the always-on local test site on a LAN-only Proxmox
+   container (http://<lan-ip>:3000, per
    `docs/DEPLOYMENT.md` § "Local LXC deployment (current)"). No canonical
    public domain is registered yet; OPS_OPEN.md requires an
    organisation-controlled, protected domain before public alpha.
@@ -50,10 +50,10 @@ this matter to the project team.
    The names are mirrored into GOVERNANCE.md and the execution board; this
    ADR is the authoritative decision record.
 
-2. **Pilot hosting: the project's own Proxmox infrastructure, container
-   LXC 114 `osdb-test`.** The always-on test site documented in
+2. **Pilot hosting: the project's own Proxmox infrastructure, test
+   container.** The always-on test site documented in
    `docs/DEPLOYMENT.md` becomes the pilot hosting target. The container stays
-   LAN-only (192.168.1.201), unprivileged, `onboot=1`, with the documented
+   LAN-only, unprivileged, `onboot=1`, with the documented
    systemd unit and update procedure. Data remains in the EU (Italy).
    The Cloudflare Workers/D1 deployment (ADR 0005) is **superseded as the
    pilot runtime** and returns to a future precondition; ADR 0005's processor
@@ -82,7 +82,7 @@ this matter to the project team.
   (source hosting) and OSMF (tiles) status is unchanged.
 - Operations work moves to the LXC environment: the backup/restore drill,
   monitoring, and incident procedures in `docs/OPERATIONS.md` are exercised
-  against LXC 114 (ops owner: ken), and `docs/DEPLOYMENT.md` keeps the LXC
+  against the test container (ops owner: ken), and `docs/DEPLOYMENT.md` keeps the LXC
   section as the current environment reference.
 - `opensurveillancedb.org` acquisition, DNS/TLS, and the public-alpha
   checklist (OPS_OPEN.md) must be complete before the domain is announced or

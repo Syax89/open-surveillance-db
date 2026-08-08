@@ -63,7 +63,7 @@ export function LoginPageBody() {
   function afterLogin() {
     // Hard navigation (2026-08-08): vinext dev fires the RSC request for
     // router.push() but the UI stays frozen on the login page — reproduced
-    // live on osdb.syaxhome89.com (passkey login: complete 200, /account
+    // live on the pre-prod domain (passkey login: complete 200, /account
     // RSC 200, no visual change until a manual reload). A full reload
     // guarantees the freshly-set session cookies are read by the SSR pass.
     hardNavigate(returnTo ?? "/account");

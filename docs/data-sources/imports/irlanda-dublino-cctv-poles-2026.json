@@ -1,0 +1,11 @@
+{
+    "slug": "irlanda-dublino-cctv-poles-2026",
+    "source_name": "Dublin City Council — Traffic Poles with CCTV",
+    "format": "geojson",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "attribution_text": "Fonte: Dublin City Council, Traffic Poles with CCTV (https://data.smartdublin.ie/dataset/dublin-city-council-traffic-poles-with-cctv), concesso con licenza CC BY 4.0 (dichiarata su data.gov.ie).",
+    "source_url": "https://data.smartdublin.ie/dataset/776b91ac-9822-454b-b9d8-16ae393981b3/resource/0286a017-8b00-43bd-a092-8116a1874070/download/dc-traffic-poles-with-cctv.geojson",
+    "max_records": 400,
+    "notes": "Scan catalog.csv + verifica diretta (CEO 2026-08-08): 241 pali con CCTV Dublino (GeoJSON WGS84, attrs ID/Road_1/Latitude/Longitude; count 241 verificato). Licenza CC BY (data.gov.ie, OK). Nuovo paese: Irlanda. external_id dcc-cctv:<ID>."
+}

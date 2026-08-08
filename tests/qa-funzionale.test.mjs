@@ -1,6 +1,6 @@
 // QA FUNZIONALE APPROFONDITO #1 (task t_894e0cc3) — test di riproduzione.
 //
-// Ogni test inquadra UN finding del report docs/qa/qa-funzionale-linus.md:
+// Ogni test inquadra UN finding del report QA funzionale (fuori repo):
 // file:riga del difetto, scenario di riproduzione, severità, fix proposto.
 // Convenzione red-before-green (stessa del malformed-json-routes): i test
 // ROSSI (che falliscono su main) documentano il bug; passano solo dopo il
@@ -599,7 +599,7 @@ test("F6c: INSERT e probe di classificazione girano nella STESSA d1.batch (snaps
 // ---------------------------------------------------------------------------
 // app/lib/rate-limit.ts:236-245: senza cf-connecting-ip il primo hop di
 // X-Forwarded-For era usato come identità del chiamante. Su una deployment NON
-// dietro l'edge Cloudflare (es. il prototype LXC 114 servito in HTTP diretto
+// dietro l'edge Cloudflare (es. il prototype servito in HTTP diretto
 // — worker/index.ts:211-214) l'header è interamente controllato dal client:
 // un account-farm poteva ruotare X-Forwarded-For a ogni richiesta e azzerare
 // TUTTI i cap per-IP — incluso il cap registrazione 5/24h (anti account-farm,

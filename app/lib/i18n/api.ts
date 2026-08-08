@@ -26,7 +26,7 @@ export const en = {
   queryParams: "Query parameters",
   endpointParamsNone: "None — the record id is the only input.",
   endpointParamsList:
-    "limit (page size, max 500) · offset (page start) · kind (Fixed dome, Bullet, PTZ, Traffic / licence plate reader, Other / unknown) · freshness (7d, 30d, 90d) · sort (useful, recent, confirmations).",
+    "limit (page size, max 2000) · offset (page start) · kind (Fixed dome, Bullet, PTZ, Traffic / licence plate reader, Other / unknown) · freshness (7d, 30d, 90d) · sort (useful, recent, confirmations).",
   endpointParamsBbox:
     "bbox=west,south,east,north (comma-separated) · kind · freshness. Returns the public cameras inside the viewport — this is what the interactive map uses.",
   endpointParamsExport:
@@ -97,7 +97,7 @@ export const it: Translation<typeof en> = {
   queryParams: "Parametri",
   endpointParamsNone: "Nessuno — l'id del record è l'unico input.",
   endpointParamsList:
-    "limit (dimensione pagina, max 500) · offset (inizio pagina) · kind (Fixed dome, Bullet, PTZ, Traffic / licence plate reader, Other / unknown) · freshness (7d, 30d, 90d) · sort (useful, recent, confirmations).",
+    "limit (dimensione pagina, max 2000) · offset (inizio pagina) · kind (Fixed dome, Bullet, PTZ, Traffic / licence plate reader, Other / unknown) · freshness (7d, 30d, 90d) · sort (useful, recent, confirmations).",
   endpointParamsBbox:
     "bbox=ovest,sud,est,nord (separati da virgola) · kind · freshness. Restituisce le telecamere pubbliche dentro il viewport — è ciò che usa la mappa interattiva.",
   endpointParamsExport:

@@ -75,7 +75,7 @@ local reset — see [DEVELOPMENT_SETUP.md](DEVELOPMENT_SETUP.md).
 5. Deploy production, monitor health and error rates, and record the release.
 6. Publish a concise changelog and data-export version where applicable.
 
-For the current local environment (LXC 114), a concrete step-by-step checklist
+For the current local environment (test container), a concrete step-by-step checklist
 with exact commands — build verification, changelog, tag, deploy, smoke tests,
 rollback — lives in [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md). The
 Operations manual ([OPERATIONS.md](OPERATIONS.md)) covers monitoring, backups,
@@ -183,14 +183,15 @@ Production target is Cloudflare Workers (see `wrangler.jsonc`). **Deploys run
 through CI only** (`.github/workflows/deploy.yml`, `workflow_dispatch` with a
 `dry-run`/`deploy` mode — see OPERATIONS.md §7): never run `wrangler deploy`
 manually against production. The workflow applies D1 migrations first, then
-uploads the Worker, and it refuses to run while `wrangler.jsonc` keeps the
-placeholder D1 `database_id`.
+uploads the Worker, and it refuses to run unless the GitHub secret
+`D1_DATABASE_ID` is set (injected at deploy time; never committed).
 
 One-time setup before the first `deploy`:
 
 ```bash
-# D1 database: create it and copy the database_id into wrangler.jsonc
+# D1 database: create it and store the database_id as a GitHub secret
 npx wrangler d1 create osdb-production
+gh secret set D1_DATABASE_ID
 
 # Worker secrets (persist across deploys; never in source)
 npx wrangler secret put MODERATION_USER
@@ -219,8 +220,8 @@ GitHub repository secrets used by the workflow:
 and `CLOUDFLARE_ACCOUNT_ID` (the `PROD_URL` variable is only used by the
 `ops-monitoring.yml` health-check workflow, not by deploys). `PROD_URL`
 (hostname only, no scheme — the workflow prepends `https://`) is set to
-`open-surveillance-db.simone-rondina.workers.dev` (workers.dev subdomain
-`simone-rondina`; no custom domain/route registered yet). Update it with
+`open-surveillance-db.<your-subdomain>.workers.dev` (workers.dev subdomain
+`<your-subdomain>`; no custom domain/route registered yet). Update it with
 `gh variable set PROD_URL <host>` whenever the public URL changes (see
 docs/OPERATIONS.md §3.2 and issue #203). The job
 targets the `production` GitHub Environment (add required reviewers for a
@@ -290,8 +291,8 @@ TTL ever changes.
 
 ## Local LXC deployment (current)
 
-The always-on test site lives on Proxmox container **114 `osdb-test`**
-(192.168.1.201:3000), reachable only on the LAN. This is the **current local
+The always-on test site lives on a LAN-only Proxmox container (the test
+host, reachable at `http://<lan-ip>:3000`). This is the **current local
 environment** and the reference for staging checks; the Cloudflare
 deployment remains a future precondition (see "Preconditions for a public
 environment" above).
@@ -301,7 +302,7 @@ environment" above).
 - Debian 13 template (`debian-13-standard_13.1-2_amd64.tar.zst`), unprivileged
   with `nesting=1`, 2 cores, 2048 MB RAM, 512 MB swap, rootfs 10 GB
   (`local-lvm:vm-114-disk-0`).
-- Network: `eth0` = 192.168.1.201/24, gateway 192.168.1.1, DNS 192.168.1.192.
+- Network: `eth0` = <lan-ip>/24, gateway <gateway-ip>, DNS <dns-ip>.
 - `onboot=1` (set via Proxmox API so the site comes back after a host reboot).
 - No SSH access: the deploy key was **not** injected at create time (verified
   from the `vzcreate` task log, 2026-07-31 — no `--ssh-public-keys` was passed)
@@ -379,12 +380,12 @@ Managed with `systemctl enable --now osdb-test.service`; logs via
 ### Verification
 
 ```bash
-curl -sS -o /dev/null -w '%{http_code}\n' http://192.168.1.201:3000/        # 200
-curl -sS http://192.168.1.201:3000/api/cameras                              # 200, only status demo/verified
-curl -sS "http://192.168.1.201:3000/api/cameras/nearby?latitude=41.9004&longitude=12.4936&radius=50"  # 200
-curl -sS -o /dev/null -w '%{http_code}\n' http://192.168.1.201:3000/guide    # 200
-curl -sS http://192.168.1.201:3000/api/moderation                            # 503 fail-closed (no creds)
-curl -sS http://192.168.1.201:3000/api/appeals                              # 503 fail-closed (no creds)
+curl -sS -o /dev/null -w '%{http_code}\n' http://<lan-ip>:3000/        # 200
+curl -sS http://<lan-ip>:3000/api/cameras                              # 200, only status demo/verified
+curl -sS "http://<lan-ip>:3000/api/cameras/nearby?latitude=41.9004&longitude=12.4936&radius=50"  # 200
+curl -sS -o /dev/null -w '%{http_code}\n' http://<lan-ip>:3000/guide    # 200
+curl -sS http://<lan-ip>:3000/api/moderation                            # 503 fail-closed (no creds)
+curl -sS http://<lan-ip>:3000/api/appeals                              # 503 fail-closed (no creds)
 ```
 
 Public API responses must expose only `demo`/`verified` records and never the

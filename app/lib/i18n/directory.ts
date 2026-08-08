@@ -140,6 +140,13 @@ export const en = {
   unknown: "Unknown",
   manufacturerLabel: "Manufacturer",
   observedOnLabel: "Observed on",
+  // Load failure (kanban t_e11080eb): the walk could not complete — a
+  // transient API error (rate limit, network) must NEVER masquerade as "0
+  // public records found". The directory shows this truthful error state
+  // with a retry action instead of the empty state.
+  loadErrorTitle: "The directory could not be loaded.",
+  loadErrorBody: "The public records are still there — this is a temporary problem while loading them. Try again, or explore the map.",
+  loadErrorRetry: "Try again",
 } as const;
 
 export const it: Translation<typeof en> = {
@@ -278,4 +285,11 @@ export const it: Translation<typeof en> = {
   unknown: "Sconosciuto",
   manufacturerLabel: "Produttore",
   observedOnLabel: "Data osservata",
+  // Errore di caricamento (kanban t_e11080eb): il walk non è riuscito — un
+  // errore API transitorio (rate limit, rete) non deve MAI mascherarsi da
+  // "0 record pubblici trovati". La directory mostra questo stato di errore
+  // veritiero con un'azione di riprova invece dello stato vuoto.
+  loadErrorTitle: "L'elenco non è stato caricato.",
+  loadErrorBody: "I record pubblici ci sono ancora — è un problema temporaneo di caricamento. Riprova oppure esplora la mappa.",
+  loadErrorRetry: "Riprova",
 };

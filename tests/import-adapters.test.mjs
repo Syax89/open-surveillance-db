@@ -1029,3 +1029,23 @@ test("nsw: parses fixed + red-light CSV rows into canonical staged rows", () => 
   assert.equal(staged[1].external_id, "nsw-cam:redlight:1");
   assert.equal(skipped.total, 1);
 });
+
+// -------------------------------------------------- wave 10 (nuovi paesi): Irlanda DCC
+
+import { parsePayload as dccParse } from "../scripts/import/adapters/irlanda-dublino-cctv-poles-2026.mjs";
+
+test("dcc: parses GeoJSON features into canonical staged rows", () => {
+  const { staged, skipped } = dccParse({
+    data: {
+      features: [
+        { properties: { ID: 2, Road_1: "Dorset St", Latitude: 53.356014, Longitude: -6.265284 }, geometry: { type: "Point", coordinates: [-6.265284, 53.356014] } },
+        { properties: { ID: 3, Road_1: "bad", Latitude: 0, Longitude: 0 }, geometry: null },
+      ],
+    },
+  });
+  assert.equal(staged.length, 1);
+  assert.equal(staged[0].title, "Dorset St");
+  assert.equal(staged[0].kind, "Traffic / licence plate reader");
+  assert.equal(staged[0].external_id, "dcc-cctv:2");
+  assert.equal(skipped.total, 1);
+});

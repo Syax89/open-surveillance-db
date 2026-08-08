@@ -18,6 +18,15 @@ export const DIRECTORY_PAGE_SIZE = 20;
 
 type Props = {
   filteredRecords: Camera[];
+  /**
+   * Load failure (kanban t_e11080eb): the public-list walk failed (429 on
+   * the shared read bucket, network). Render the truthful error state with
+   * retry instead of the empty state — "0 public records found" would be a
+   * lie while the map shows the same records.
+   */
+  loadError?: boolean;
+  /** Retry the failed walk. */
+  onRetryLoad?: () => void;
   cameraKinds: string[];
   search: string;
   setSearch: (value: string) => void;
@@ -65,7 +74,7 @@ type Props = {
  * Distance facts) and hides the index/pagination/chips, which only make
  * sense for the filtered list.
  */
-export function DirectoryCatalog({ filteredRecords, cameraKinds, search, setSearch, kindFilter, setKindFilter, freshnessFilter, setFreshnessFilter, sortOrder, setSortOrder, stateFilter, setStateFilter, originFilter, setOriginFilter, page = 1, setPage, showRecordOnMap, setCoordinates, onResetFilters, reportHref = "/segnala" }: Props) {
+export function DirectoryCatalog({ filteredRecords, loadError = false, onRetryLoad, cameraKinds, search, setSearch, kindFilter, setKindFilter, freshnessFilter, setFreshnessFilter, sortOrder, setSortOrder, stateFilter, setStateFilter, originFilter, setOriginFilter, page = 1, setPage, showRecordOnMap, setCoordinates, onResetFilters, reportHref = "/segnala" }: Props) {
   const t = useMessages().directory;
   const statuses = useMessages().status;
   const { locale } = useLocale();
@@ -119,10 +128,12 @@ export function DirectoryCatalog({ filteredRecords, cameraKinds, search, setSear
   const placeActive = place.placeResult?.status === "success";
   const placeDone = place.placeResult !== null && ["success", "empty", "not-found"].includes(place.placeResult.status);
   const placeRecords = placeActive && place.placeResult?.records ? place.placeResult.records : [];
-  const showList = placeActive || (!placeDone && filteredRecords.length > 0);
-  const countLabel = placeDone
-    ? t.placeResultsFound(placeActive ? placeRecords.length : 0)
-    : filteredRecords.length === 1 ? t.oneRecordFound : `${filteredRecords.length} ${t.recordsFound}`;
+  const showList = placeActive || (!placeDone && !loadError && filteredRecords.length > 0);
+  const countLabel = loadError
+    ? t.loadErrorTitle
+    : placeDone
+      ? t.placeResultsFound(placeActive ? placeRecords.length : 0)
+      : filteredRecords.length === 1 ? t.oneRecordFound : `${filteredRecords.length} ${t.recordsFound}`;
 
   // Pagination (t_f13fcb1c): client slice over the filtered memo — the walk
   // is already bounded by the server kind/freshness filters, and q/sort stay
@@ -269,7 +280,15 @@ export function DirectoryCatalog({ filteredRecords, cameraKinds, search, setSear
           <button type="button" className="text-button" onClick={place.clearPlaceSearch}>{t.placeClearResults} <span aria-hidden="true">→</span></button>
         </div>
       )}
-      {showList ? <ul className="record-list">{pageRecords.map((camera) => <li key={camera.id}><RecordCard camera={camera} statusLabel={publicStatusLabel(statuses, camera.status, t.unknown)} facts={placeActive ? [{ label: t.distance, value: formatDistance((camera as Camera & { distanceMeters: number }).distanceMeters) }, { label: t.location, value: formatLocation(camera.address, camera.latitude, camera.longitude) }, { label: t.lastVerification, value: camera.status === "demo" ? t.demoUpdated : formatPublicDate(camera.updated, locale) }] : mainFacts(camera)} actions={cardActions(camera)} /></li>)}</ul> : !placeDone && <EmptyState title={t.emptyTitle} body={t.emptyBody} action={<p className="empty-state-actions"><button type="button" className="text-button" onClick={() => setSearch("")}>{t.clearSearch} <span aria-hidden="true">→</span></button><a className="text-button" href={reportHref}>{t.submitObservation} <span aria-hidden="true">→</span></a></p>} />}
+      {loadError
+        ? (
+          // Load failure (kanban t_e11080eb): truthful error state with
+          // retry. The empty state ("0 public records found") would be a
+          // lie — the records exist, the map shows them; only the walk
+          // failed (429 on the shared read bucket, network).
+          <EmptyState title={t.loadErrorTitle} body={t.loadErrorBody} action={<p className="empty-state-actions"><button type="button" className="text-button" onClick={onRetryLoad}>{t.loadErrorRetry} <span aria-hidden="true">→</span></button><a className="text-button" href="/mappa">{t.useMapInstead} <span aria-hidden="true">↑</span></a></p>} />
+        )
+        : showList ? <ul className="record-list">{pageRecords.map((camera) => <li key={camera.id}><RecordCard camera={camera} statusLabel={publicStatusLabel(statuses, camera.status, t.unknown)} facts={placeActive ? [{ label: t.distance, value: formatDistance((camera as Camera & { distanceMeters: number }).distanceMeters) }, { label: t.location, value: formatLocation(camera.address, camera.latitude, camera.longitude) }, { label: t.lastVerification, value: camera.status === "demo" ? t.demoUpdated : formatPublicDate(camera.updated, locale) }] : mainFacts(camera)} actions={cardActions(camera)} /></li>)}</ul> : !placeDone && <EmptyState title={t.emptyTitle} body={t.emptyBody} action={<p className="empty-state-actions"><button type="button" className="text-button" onClick={() => setSearch("")}>{t.clearSearch} <span aria-hidden="true">→</span></button><a className="text-button" href={reportHref}>{t.submitObservation} <span aria-hidden="true">→</span></a></p>} />}
       {/* Pagination bar (t_f13fcb1c): only when the filtered set spans more
           than one page; Previous / "Showing X–Y of Z · Page N of M" / Next. */}
       {!placeActive && totalRecords > DIRECTORY_PAGE_SIZE && (

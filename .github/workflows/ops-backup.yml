@@ -9,7 +9,7 @@ name: Ops Backup D1
 # Guard fail-fast: i secrets Cloudflare (CLOUDFLARE_API_TOKEN/ACCOUNT_ID)
 # servono solo al backup del D1 remoto, che è operativo SOLO dopo il deploy
 # pubblico (ADR 0012, DEPLOYMENT.md). Fino ad allora il run si ferma qui con
-# errore chiaro: l'ambiente attivo è LXC 114 self-hosted e il suo backup è
+# errore chiaro: l'ambiente attivo è il test container self-hosted e il suo backup è
 # gestito da ops/backup-lxc114.sh (OPERATIONS.md §8).
 
 on:
@@ -53,7 +53,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           if [ -z "${CLOUDFLARE_API_TOKEN}" ] || [ -z "${CLOUDFLARE_ACCOUNT_ID}" ]; then
-            echo "::error::Secrets GitHub mancanti: CLOUDFLARE_API_TOKEN e CLOUDFLARE_ACCOUNT_ID devono essere configurati (gh secret set). Il backup D1 remoto è operativo solo dopo il deploy Cloudflare (ADR 0012): finché l'ambiente attivo è LXC 114 self-hosted, il backup è ops/backup-lxc114.sh (OPERATIONS.md §8)."
+            echo "::error::Secrets GitHub mancanti: CLOUDFLARE_API_TOKEN e CLOUDFLARE_ACCOUNT_ID devono essere configurati (gh secret set). Il backup D1 remoto è operativo solo dopo il deploy Cloudflare (ADR 0012): finché l'ambiente attivo è il test container self-hosted, il backup è ops/backup-lxc114.sh (OPERATIONS.md §8)."
             exit 1
           fi
           echo "Secrets Cloudflare: OK"

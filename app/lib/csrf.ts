@@ -97,7 +97,7 @@ export function readCookie(request: Request, name: string): string | null {
  * that does NOT forward X-Forwarded-Proto, so the worker sees
  * `http://<host>` while the browser's Origin is `https://<host>` — a
  * scheme comparison rejected every browser POST ("Cross-site request
- * rejected", reproduced live on osdb.syaxhome89.com). The host is the
+ * rejected", reproduced live on the pre-prod domain). The host is the
  * real cross-site discriminator: an attacker page on another origin
  * sends a different host and is rejected regardless of scheme. On the
  * Cloudflare deployment (no proxy) host + scheme both match anyway.

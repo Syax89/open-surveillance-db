@@ -133,6 +133,6 @@ exploit details.
 
 The repository is public with CI (lint, type-check, tests, build, gitleaks,
 npm audit). The always-on test site runs on a LAN-only container
-(`osdb-test`, LXC 114, see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)) and is
+(see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)) and is
 **not** exposed to the public internet. Do not treat it as a production
 service, and do not load real reports into it.

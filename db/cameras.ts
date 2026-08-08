@@ -193,7 +193,19 @@ export async function listPublicCameras(
 
 /** Default and hard-max page size for the public JSON list (audit t_2ee58c08, gap #1). */
 export const PUBLIC_CAMERAS_PAGE_DEFAULT_LIMIT = 500;
-export const PUBLIC_CAMERAS_PAGE_MAX_LIMIT = 500;
+/**
+ * Hard-max page size for the public JSON list (kanban t_e11080eb): raised
+ * from 500 to 2000 when the dataset grew past ~30k records. The /directory
+ * client walk (use-public-cameras.ts) pages through the WHOLE public set at
+ * this size; at 500/page a 31,926-record dataset needs 64 requests, which
+ * alone can exhaust the per-caller read rate limit (60/min) and blank the
+ * directory with 429s mid-walk. 2000/page → 16 requests, comfortably inside
+ * the budget even with concurrent map traffic. The per-page payload stays
+ * bounded (same ~10 m rounding and count queries as before; the counts
+ * helpers already chunk their IN (...) at 100 ids, so a bigger page is not
+ * a bigger single query).
+ */
+export const PUBLIC_CAMERAS_PAGE_MAX_LIMIT = 2000;
 
 export type PublicCameraListPage = {
   records: PublicCameraRecord[];

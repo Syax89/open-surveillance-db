@@ -2,8 +2,8 @@
 
 Status: operational draft for production rollout.
 References: `docs/DEPLOYMENT.md` (preconditions and release procedures), `docs/roadmap.md`.
-Last procedure verification: 2026-08-01 (Ken, CI/CD) — including the local
-LXC 114 operations drill (section 8 and appendix).
+Last procedure verification: 2026-08-01 — including the local
+operations drill (section 8 and appendix).
 
 This document satisfies the operability precondition of `DEPLOYMENT.md`:
 "Automated backups, restoration drill, monitoring, error alerting, and incident
@@ -123,17 +123,17 @@ CLOUDFLARE_API_TOKEN   token with "D1 - Edit" permission on the account
 CLOUDFLARE_ACCOUNT_ID  Cloudflare account id
 BACKUP_PASSPHRASE      passphrase for AES-256 encryption of dumps
 PROD_URL (variable)    production hostname (currently
-                       open-surveillance-db.simone-rondina.workers.dev —
-                       workers.dev subdomain `simone-rondina`, no custom
+                       open-surveillance-db.<your-subdomain>.workers.dev —
+                       workers.dev subdomain `<your-subdomain>`, no custom
                        domain yet; set via `gh variable set PROD_URL <host>`,
                        issue #203)
 ```
 
-> **Secrets status (2026-08-01, ken)**: `BACKUP_PASSPHRASE` configured (local
-> GPG vault `~/.hermes/secrets/osdb-backup-passphrase.gpg`, 384-bit entropy,
+> **Secrets status (2026-08-01)**: `BACKUP_PASSPHRASE` configured (local
+> GPG vault `<secrets-dir>/osdb-backup-passphrase.gpg`, 384-bit entropy,
 > `openssl rand -base64 48`). `CLOUDFLARE_API_TOKEN` and
 > `CLOUDFLARE_ACCOUNT_ID` are NOT configured and NOT needed while the
-> deployment is local (LXC 114, section 8): the remote D1 backup becomes
+> deployment is local (section 8): the remote D1 backup becomes
 > operational only after the public Cloudflare deployment (ADR 0012,
 > DEPLOYMENT.md). `ops-backup.yml` has a fail-fast guard that stops the run
 > with a clear error until those two secrets exist — never export to a
@@ -147,9 +147,9 @@ openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:$BACKUP_PASSPHRASE" \
 sha256sum -c d1-backup-<DATE>.sql.enc.sha256   # integrity check before restore
 ```
 
-Repo prerequisites: `wrangler.jsonc` must contain the real production D1
-`database_id` (the committed file contains the placeholder
-`00000000-0000-4000-8000-000000000000`, see DEPLOYMENT.md).
+Repo prerequisites: the real production D1 `database_id` is injected at
+deploy time from the GitHub secret `D1_DATABASE_ID` (wrangler.jsonc keeps
+the placeholder `00000000-0000-4000-8000-000000000000`, see DEPLOYMENT.md).
 
 ### 3.3 Post-backup integrity verification
 
@@ -320,10 +320,11 @@ Rules:
 
 Before the first production deploy, confirm (tick when done):
 
-- [ ] `wrangler.jsonc`: real production D1 `database_id`.
+- [ ] GitHub secret `D1_DATABASE_ID`: real production D1 `database_id`
+      (iniettato al deploy dal workflow, mai nel repo).
 - [ ] Migrations applied to the remote D1 (`wrangler d1 migrations apply ... --remote`).
 - [ ] GitHub secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
-      (public deploy phase only — not needed for the local LXC 114
+      (public deploy phase only — not needed for the local test
       environment, section 8), `BACKUP_PASSPHRASE` (configured); repository
       variable `PROD_URL`.
 - [ ] Cloudflare secrets: `MODERATION_USER`/`MODERATION_PASSWORD` or
@@ -364,9 +365,10 @@ gh secret set CLOUDFLARE_API_TOKEN   # permissions "Workers Scripts - Edit" + "D
 gh secret set CLOUDFLARE_ACCOUNT_ID
 gh variable set PROD_URL             # production hostname (e.g. osdb.example.org)
 
-# 2. Production D1: create the database and copy the database_id into
-#    wrangler.jsonc (the workflow blocks the deploy while the placeholder is there)
+# 2. Production D1: create the database and store the database_id as a
+#    GitHub secret (the workflow injects it at deploy; never commit it)
 npx wrangler d1 create osdb-production   # output: database_id
+gh secret set D1_DATABASE_ID
 
 # 3. Worker secrets (persist across deploys; never in code)
 npx wrangler secret put MODERATION_USER
@@ -392,11 +394,11 @@ data, worker rollback is not enough: D1 restore is required (§3.4).
 
 ---
 
-## 8. Local deployment operations (LXC 114, `osdb-test`)
+## 8. Local deployment operations (test container)
 
 This section documents the **tested** procedures for the currently active
-local environment: Proxmox container **114** `osdb-test`, IP
-`192.168.1.201:3000`, LAN only. It is the reference environment for staging
+local environment: a LAN-only test container reachable at
+`http://<lan-ip>:3000`. It is the reference environment for staging
 verifications (DEPLOYMENT.md §"Local LXC deployment").
 
 ### 8.0 Container access: via Proxmox API, not SSH
@@ -406,7 +408,7 @@ verifications (DEPLOYMENT.md §"Local LXC deployment").
   does not allow adding `ssh-public-keys`/`password` post-create.
 - All operations (snapshot, rollback, backup, stop/start) use the **Proxmox
   API token**, decrypted at runtime from the local GPG vault
-  (`~/.hermes/secrets/proxmox-token.gpg`) — never hardcoded in scripts.
+  (`<secrets-dir>/proxmox-token.gpg`, path configurabile con `PVE_TOKEN_GPG`) — never hardcoded in scripts.
 - Prerequisite on the machine running the scripts: `gpg` with the vault key,
   `curl`, `python3`.
 
@@ -418,7 +420,7 @@ Script: `ops/health-check.sh`
 # manual
 ops/health-check.sh
 # cron (workstation): every 5 minutes
-*/5 * * * * /home/simone/workspace/open-surveillance-db/ops/health-check.sh >> /home/simone/logs/osdb-health.log 2>&1
+*/5 * * * * <repo-path>/ops/health-check.sh >> <log-dir>/osdb-health.log 2>&1
 ```
 
 Verified routes (expected → meaning):
@@ -433,8 +435,8 @@ Verified routes (expected → meaning):
 
 Exit code 0 = all OK; exit code 1 = at least one route out of threshold. On
 failure the script creates the `/tmp/osdb-health-FAIL` marker (useful for a
-watchdog) and the log in `/home/simone/logs/osdb-health.log` reports the
-detail. The job is installed in Ken's workstation crontab (see above).
+watchdog) and the log in `<log-dir>/osdb-health.log` reports the
+detail. The job is installed in the operator workstation's crontab (see above).
 
 ### 8.2 Automated backup (vzdump → NAS storage)
 
@@ -444,12 +446,12 @@ Script: `ops/backup-lxc114.sh`
 # manual
 ops/backup-lxc114.sh
 # cron (workstation): every night at 02:30
-30 2 * * * /home/simone/workspace/open-surveillance-db/ops/backup-lxc114.sh >> /home/simone/logs/osdb-backup.log 2>&1
+30 2 * * * <repo-path>/ops/backup-lxc114.sh >> <log-dir>/osdb-backup.log 2>&1
 ```
 
 What it does (all via Proxmox API):
 
-1. Runs `vzdump` of container 114 in **snapshot mode** (no downtime) on the
+1. Runs `vzdump` of the test container in **snapshot mode** (no downtime) on the
    CIFS **NAS** storage (configured on pve: `content=images,backup`), `zstd`
    compression, `prune-backups=keep-last=7` (7-backup retention).
 2. Waits for task completion (poll up to 30 min) and checks
@@ -469,9 +471,9 @@ From the most recent vzdump archive on the NAS:
 
 ```bash
 # 1. find the archive on the NAS
-smbclient //192.168.1.194/NAS -U Simone -c 'cd dump; ls vzdump-lxc-114-*'
+smbclient //<nas-host>/<share> -U <username> -c 'cd dump; ls vzdump-lxc-<vmid>-*'
 # 2. extract the D1 sqlite (example)
-zstd -dc vzdump-lxc-114-<DATE>_<TIME>.tar.zst | tar -xf - -C /tmp \
+zstd -dc vzdump-lxc-<vmid>-<DATE>_<TIME>.tar.zst | tar -xf - -C /tmp \
   ./opt/open-surveillance-db/.wrangler/state/v3/d1/miniflare-D1DatabaseObject/<hash>.sqlite
 # 3. verify integrity
 python3 -c "import sqlite3;c=sqlite3.connect('<file>');print(c.execute('PRAGMA integrity_check').fetchone())"
@@ -507,7 +509,8 @@ Verified Proxmox rollback behaviour:
 ### 8.5 Security notes
 
 - No secrets in scripts: the Proxmox token is in the local GPG vault
-  (`~/.hermes/secrets/proxmox-token.gpg`, chmod 600), decrypted at runtime.
+  (`<secrets-dir>/proxmox-token.gpg`, chmod 600, path in `PVE_TOKEN_GPG`),
+  decrypted at runtime.
 - The vzdump archives contain the entire container rootfs (including D1 with
   possible correction requests): private NAS storage, restricted access,
   never on public channels.
@@ -534,10 +537,10 @@ All verifications executed on 2026-07-31 by Ken, locally, on `main`
 | 11 | workflow YAML | `python3 -c "yaml.safe_load(...)"` on `ops-monitoring.yml`, `ops-backup.yml` | both valid (`jobs: health-check`, `jobs: backup`) |
 | 12 | advisory | `GHSA-36p8-mvp6-cv38` (CVE-2026-0933, command injection in `wrangler pages deploy`) | **not applicable**: patched in 4.59.1, repo on 4.118.0 |
 
-### Appendix — local LXC 114 operations drill (2026-08-01, Ken)
+### Appendix — local operations drill (2026-08-01)
 
-All drills executed in the real environment (Ken's workstation → Proxmox
-192.168.1.77 → container 114 → NAS storage 192.168.1.194):
+All drills executed in the real environment (operator workstation → Proxmox
+host <pve-host> → test container → NAS storage <nas-host>):
 
 | # | Procedure | Command / script | Real outcome |
 |---|---|---|---|
