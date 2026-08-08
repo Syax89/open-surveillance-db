@@ -87,17 +87,31 @@ export function readCookie(request: Request, name: string): string | null {
 }
 
 /**
- * Same-origin check: when the request carries an `Origin` header it must
- * match the request URL's scheme + host exactly. Absent Origin (curl, tests,
- * same-origin GET navigation) passes; a cross-site browser POST always sends
- * Origin, so this reliably blocks those.
+ * Same-origin check: when the request carries an `Origin` header its HOST
+ * must match the request URL's host exactly. Absent Origin (curl, tests,
+ * same-origin GET navigation) passes; a cross-site browser POST always
+ * sends Origin, so this reliably blocks those.
+ *
+ * The scheme is deliberately NOT compared (2026-08-08): the pre-prod
+ * deployment sits behind a TLS-terminating reverse proxy (NPM -> LXC)
+ * that does NOT forward X-Forwarded-Proto, so the worker sees
+ * `http://<host>` while the browser's Origin is `https://<host>` — a
+ * scheme comparison rejected every browser POST ("Cross-site request
+ * rejected", reproduced live on osdb.syaxhome89.com). The host is the
+ * real cross-site discriminator: an attacker page on another origin
+ * sends a different host and is rejected regardless of scheme. On the
+ * Cloudflare deployment (no proxy) host + scheme both match anyway.
  */
 export function sameOrigin(request: Request): boolean {
   const origin = request.headers.get("origin");
   if (!origin) return true;
-  const url = new URL(request.url);
-  const expected = `${url.protocol}//${url.host}`;
-  return origin === expected;
+  try {
+    const originHost = new URL(origin).host;
+    const url = new URL(request.url);
+    return originHost === url.host;
+  } catch {
+    return false;
+  }
 }
 
 /**
