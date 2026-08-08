@@ -1,0 +1,11 @@
+{
+    "slug": "usa-ddot-traffic-cameras-2026",
+    "source_name": "District of Columbia — DDOT Traffic Cameras (open data)",
+    "format": "arcgis-featureserver",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "attribution_text": "Fonte: District of Columbia, DDOT open data — Traffic Cameras (https://maps2.dcgis.dc.gov), concesso con licenza CC BY 4.0.",
+    "source_url": "https://maps2.dcgis.dc.gov/dcgis/rest/services/DCGIS_DATA/Transportation_Sensors_WebMercator/MapServer/93",
+    "max_records": 600,
+    "notes": "Scan catalog.csv (CEO 2026-08-08): 314 telecamere traffico DC (layer 93 'Traffic Camera', attrs CAMERAID/CAMERATYPE/FACILITYID; layer 11 = CCTV scuole con 1.060, escluso perché telecamere interne edifici). Coordinate Web Mercator (EPSG:3857) → convertite. Licenza CC BY 4.0 dichiarata su open data DC. external_id ddot:<CAMERAID>."
+}

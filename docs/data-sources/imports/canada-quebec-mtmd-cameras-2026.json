@@ -1,0 +1,11 @@
+{
+    "slug": "canada-quebec-mtmd-cameras-2026",
+    "source_name": "Gouvernement du Québec — MTMD infos_cameras (réseau routier)",
+    "format": "wfs-geojson",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "attribution_text": "Fonte: Gouvernement du Québec, Ministère des Transports et de la Mobilité durable — caméras du réseau routier (https://www.donneesquebec.ca), concesso con licenza CC BY 4.0.",
+    "source_url": "https://ws.mapserver.transports.gouv.qc.ca/swtq?service=wfs&version=2.0.0&request=getfeature&typename=ms:infos_cameras&outputformat=geojson",
+    "max_records": 1000,
+    "notes": "Scan catalog.csv (CEO 2026-08-08): 675 telecamere autostradali Québec (WFS GeoJSON, campi DescriptionLocalisationFR/EN, NumeroRoute, NomRegionDiffusion, URL_FLUX_DONNEE). Coordinate in Web Mercator (EPSG:3857) → convertite con webMercatorToWgs84 (verificato: -8087109, 5672110 → ~46.8, -72.6). Licenza CC BY 4.0 dichiarata sul portale. external_id mtmd:<IDEcamera>."
+}

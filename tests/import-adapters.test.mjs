@@ -731,3 +731,116 @@ test("licence-gate: wave-4 descriptors (NLOD, OGL 2.0, CC BY 4.0, ODbL) are impo
   assert.equal(isLicenceImportable("CC BY-SA 4.0"), false); // share-alike: escluso
   assert.equal(isLicenceImportable("CC BY-SA 2.0"), false);
 });
+
+// -------------------------------------------------- wave 5 (catalog.csv 2026-08-08): BC / QC / DC / NOLA / Boulder / LU / SF
+
+import { parsePayload as drivebcParse } from "../scripts/import/adapters/canada-drivebc-highwaycams-2026.mjs";
+import { parsePayload as quebecParse } from "../scripts/import/adapters/canada-quebec-mtmd-cameras-2026.mjs";
+import { parsePayload as ddotParse } from "../scripts/import/adapters/usa-ddot-traffic-cameras-2026.mjs";
+import { parsePayload as nolaParse } from "../scripts/import/adapters/usa-new-orleans-traffic-cameras-2026.mjs";
+import { parsePayload as boulderParse } from "../scripts/import/adapters/usa-boulder-redlight-cameras-2026.mjs";
+import { parsePayload as citaParse } from "../scripts/import/adapters/lussemburgo-cita-cameras-2026.mjs";
+import { parsePayload as sfParse } from "../scripts/import/adapters/usa-san-francisco-enforcement-cameras-2026.mjs";
+import { webMercatorToWgs84 } from "../scripts/import/adapters/lib.mjs";
+
+test("webMercatorToWgs84 lands in Washington DC (-76.98, 38.89) for the DDOT anchor", () => {
+  const [lat, lon] = webMercatorToWgs84(-8575659.651078826, 4720480.913208556);
+  assert.ok(Math.abs(lat - 38.99) < 0.01, `lat ${lat}`);
+  assert.ok(Math.abs(lon - -77.04) < 0.02, `lon ${lon}`);
+});
+
+test("drivebc: parses webcams.csv rows into canonical staged rows", () => {
+  const { staged, skipped } = drivebcParse({
+    text: "links_bchighwaycam,links_imageDisplay,links_imageThumbnail,links_replayTheDay,id,highway_number,highway_locationDescription,camName,caption,credit,orientation,latitude,longitude\n" +
+      "https://images.drivebc.ca/bchighwaycam/pub/html/www/2.html,https://images.drivebc.ca/bchighwaycam/pub/cameras/2.jpg,https://images.drivebc.ca/bchighwaycam/pub/cameras/tn/2.jpg,https://images.drivebc.ca/ReplayTheDay/player.htm,2,5,Coquihalla,Coquihalla Great Bear Snowshed - N,,,N,49.596374,-121.159832\n" +
+      ",,,,,,,,bad,,,999,999\n",
+  });
+  assert.equal(staged.length, 1);
+  assert.equal(staged[0].title, "Coquihalla Great Bear Snowshed - N");
+  assert.equal(staged[0].kind, "Traffic / licence plate reader");
+  assert.equal(staged[0].latitude, 49.596374);
+  assert.equal(staged[0].external_id, "drivebc:2");
+  assert.equal(skipped.total, 1);
+});
+
+test("quebec: parses WFS GeoJSON (Web Mercator) into canonical staged rows", () => {
+  const { staged, skipped } = quebecParse({
+    data: [
+      { properties: { IDEcamera: "4057", NumeroCamera: "T2410101", DescriptionLocalisationFr: "Route 241 à la hauteur du boulevard de Bromont (Bromont)", NumeroRoute: "00241", NomRegionDiffusion: "Estrie" }, geometry: { type: "Point", coordinates: [-8087109.424082, 5672110.06649] } },
+      { properties: { IDEcamera: "x" }, geometry: null },
+    ],
+  });
+  assert.equal(staged.length, 1);
+  assert.equal(staged[0].title, "Route 241 à la hauteur du boulevard de Bromont (Bromont)");
+  assert.equal(staged[0].kind, "Traffic / licence plate reader");
+  assert.ok(Math.abs(staged[0].latitude - 45.32044) < 0.01, `lat ${staged[0].latitude}`);
+  assert.equal(staged[0].external_id, "mtmd:4057");
+  assert.equal(skipped.total, 1);
+});
+
+test("ddot: parses ArcGIS features (Web Mercator) into canonical staged rows", () => {
+  const { staged, skipped } = ddotParse({
+    data: [
+      { attributes: { CAMERAID: 84, CAMERATYPE: "CCTV", FACILITYID: "84", OBJECTID: 1 }, geometry: { x: -8575659.651078826, y: 4720480.913208556 } },
+      { attributes: { CAMERAID: 85, OBJECTID: 2 }, geometry: { x: 0, y: 0 } },
+    ],
+  });
+  assert.equal(staged.length, 1);
+  assert.equal(staged[0].title, "Traffic camera 84");
+  assert.equal(staged[0].kind, "Traffic / licence plate reader");
+  assert.ok(Math.abs(staged[0].longitude - -77.04) < 0.02, `lon ${staged[0].longitude}`);
+  assert.equal(staged[0].external_id, "ddot:84");
+  assert.equal(skipped.total, 1);
+});
+
+test("nola: parses Socrata rows (the_geom Point) into canonical staged rows", () => {
+  const { staged, skipped } = nolaParse({
+    data: [
+      { camid: "NO179", camloc: "5200 Bullard Ave", function: "TFS", operational: "Yes", the_geom: { type: "Point", coordinates: [-89.948880999256, 30.031396000519] } },
+      { camid: "x", the_geom: { type: "Point", coordinates: [0, 0] } },
+    ],
+  });
+  assert.equal(staged.length, 1);
+  assert.equal(staged[0].title, "5200 Bullard Ave");
+  assert.equal(staged[0].kind, "Traffic / licence plate reader");
+  assert.equal(staged[0].external_id, "nola:NO179");
+  assert.equal(skipped.total, 1);
+});
+
+test("boulder: parses ArcGIS features (Web Mercator) into canonical staged rows", () => {
+  const { staged } = boulderParse({
+    data: [{ attributes: { OBJECTID: 1, Location: "EB Arapahoe at 30th", CameraType: null }, geometry: { x: -11716806.292805046, y: 4868060.026341455 } }],
+  });
+  assert.equal(staged.length, 1);
+  assert.equal(staged[0].title, "EB Arapahoe at 30th");
+  assert.equal(staged[0].kind, "Traffic / licence plate reader");
+  assert.ok(Math.abs(staged[0].latitude - 40.014572) < 0.01, `lat ${staged[0].latitude}`);
+  assert.equal(staged[0].external_id, "boulder:1");
+});
+
+test("cita: parses KML placemarks into canonical staged rows", () => {
+  const { staged, skipped } = citaParse({
+    text: `<kml><Document><Folder><Placemark id="camera_3"><name>A6 - Camera 3</name><Point><coordinates>5.921276,49.636941,0</coordinates></Point></Placemark><Placemark id="camera_x"><Point><coordinates>200,49,0</coordinates></Point></Placemark></Folder></Document></kml>`,
+  });
+  assert.equal(staged.length, 1);
+  assert.equal(staged[0].title, "A6 - Camera 3");
+  assert.equal(staged[0].kind, "Traffic / licence plate reader");
+  assert.equal(staged[0].external_id, "cita:camera_3");
+  assert.equal(skipped.total, 1);
+});
+
+test("sf: parses red-light + speed rows into canonical staged rows", () => {
+  const { staged, skipped } = sfParse({
+    data: [
+      { site_id: "4th St at Harrison St", location: "4th St at Harrison St", point: { type: "Point", coordinates: [-122.399629446, 37.780796429] }, __src: "redlight" },
+      { site_id: "MTAF001", location: "NB 2510 FRANKLIN ST", point: { type: "Point", coordinates: [-122.425263, 37.797669] }, __src: "speed" },
+      { site_id: "bad", point: { type: "Point", coordinates: [200, 90] }, __src: "speed" },
+    ],
+  });
+  assert.equal(staged.length, 2);
+  assert.equal(staged[0].title, "4th St at Harrison St");
+  assert.equal(staged[0].kind, "Traffic / licence plate reader");
+  assert.equal(staged[0].external_id, "sf-red-light:4th St at Harrison St");
+  assert.equal(staged[1].external_id, "sf-speed:MTAF001");
+  assert.equal(skipped.total, 1);
+});

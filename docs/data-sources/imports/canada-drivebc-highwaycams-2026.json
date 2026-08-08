@@ -1,0 +1,11 @@
+{
+    "slug": "canada-drivebc-highwaycams-2026",
+    "source_name": "Province of British Columbia — DriveBC HighwayCams",
+    "format": "csv",
+    "license": "OGL-BC",
+    "license_url": "https://www2.gov.bc.ca/gov/content/governments/services-for-government/policies-procedures/shared-services-licence",
+    "attribution_text": "Fonte: Province of British Columbia, DriveBC HighwayCams (https://catalogue.data.gov.bc.ca/dataset/6b39a910-6c77-476f-ac96-7b4f18849b1c), concesso con licenza Open Government Licence - British Columbia.",
+    "source_url": "https://catalogue.data.gov.bc.ca/dataset/6b39a910-6c77-476f-ac96-7b4f18849b1c/resource/a9d52d85-8402-4ce7-b2ac-a2779837c48a/download/webcams.csv",
+    "max_records": 1500,
+    "notes": "Scan catalog.csv (CEO 2026-08-08): 1.034 telecamere autostradali BC (CSV con lat/lon, camName, highway_number, orientation, immagine live). Licenza OGL-BC verificata via CKAN API (package_show → license_title 'Open Government Licence - British Columbia'). external_id drivebc:<id>."
+}

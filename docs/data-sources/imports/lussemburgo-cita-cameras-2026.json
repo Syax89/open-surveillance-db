@@ -1,0 +1,11 @@
+{
+    "slug": "lussemburgo-cita-cameras-2026",
+    "source_name": "CITA Luxembourg — caméras du réseau autoroutier",
+    "format": "kml",
+    "license": "CC0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "attribution_text": "Fonte: CITA Luxembourg (Centre d'Ingénierie du Trafic), caméras du réseau autoroutier (https://www.cita.lu/kml/cameras.kml), concesso con licenza CC0 1.0.",
+    "source_url": "https://www.cita.lu/kml/cameras.kml",
+    "max_records": 200,
+    "notes": "Scan catalog.csv (CEO 2026-08-08): 71 telecamere autostrade Lussemburgo (KML con Placemark id=camera_N, name 'A6 - Camera 3', coordinates lon,lat). Licenza CC0 dichiarata sul sito CITA. external_id cita:<id>."
+}
