@@ -17,14 +17,24 @@ export const DEFAULT_MAX_BODY_BYTES = 32 * 1024; // 32 KiB
 export const DEFAULT_MAX_URL_CHARS = 4096;
 
 /**
- * Maximum accepted pagination `offset` on the public list/search routes.
+ * Maximum accepted pagination `offset` on the search/nearby routes.
+ *
+ * The list endpoint (GET /api/cameras) does NOT use this cap anymore
+ * (kanban t_e86c91c4): a fixed offset cap broke the legitimate client walk
+ * once the dataset grew past 10_000 records (the /directory walk requested
+ * offsets beyond 10_000 and got 400 → empty state). Pagination protection
+ * for the list lives at the db boundary instead (db/cameras.ts answers an
+ * empty page for offset >= total without running the SELECT, so a hostile
+ * `?offset=9007199254740991` can never force an astronomical SQL OFFSET on
+ * the D1 — review P2-4 preserved, but scaled to the real dataset size).
  *
  * `limit` is clamped to a hard cap (500 / 100), so a hostile client could
  * otherwise pass `?offset=9007199254740991` (MAX_SAFE_INTEGER — accepted by
  * the plain-integer validator) and force an astronomical SQL OFFSET on the
  * D1 on every request: a slow full scan that returns nothing (review P2-4).
- * 10_000 covers every legitimate deep-pagination pattern (500 records/page
- * × 20 pages) while rejecting abuse with a clean 400 BEFORE any db work.
+ * Search/nearby keep the fixed cap because their result sets are inherently
+ * bounded (proximity/locality queries) and deep pagination there is never
+ * legitimate.
  */
 export const MAX_PAGE_OFFSET = 10_000;
 

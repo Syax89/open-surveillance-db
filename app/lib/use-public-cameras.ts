@@ -110,7 +110,14 @@ async function walkPages(signal: AbortSignal): Promise<WalkResult> {
     const page = await fetchCamerasPage(offset, signal);
     collected.push(...page.records);
     total = page.total;
-    if (page.nextOffset === null || page.nextOffset <= offset) break;
+    // Stop when the server reports the list is exhausted (nextOffset null /
+    // non-advancing) OR when we have collected the server's own `total`
+    // (kanban t_e86c91c4): the walk must never request offsets beyond the
+    // dataset — a fixed API cap (MAX_PAGE_OFFSET = 10000) used to answer
+    // 400 there, failing the whole walk into an empty /directory. The
+    // `collected >= total` guard is the client-side mirror of the db
+    // boundary guard: it stops exactly at the last record, no more pages.
+    if (page.nextOffset === null || page.nextOffset <= offset || collected.length >= total) break;
     offset = page.nextOffset;
   }
   return { records: collected, total };
@@ -135,7 +142,11 @@ async function walkFilteredPages(filters: ServerCameraFilters, signal: AbortSign
     const page = await fetchCamerasPage(offset, signal, extraQuery);
     collected.push(...page.records);
     total = page.total;
-    if (page.nextOffset === null || page.nextOffset <= offset) break;
+    // Same exhaustion + total guards as walkPages (kanban t_e86c91c4): a
+    // filtered walk must also stop at the server-reported total, never
+    // requesting offsets past the dataset (a fixed API cap used to 400
+    // there and blank the filtered directory).
+    if (page.nextOffset === null || page.nextOffset <= offset || collected.length >= total) break;
     offset = page.nextOffset;
   }
   return { records: collected, total };

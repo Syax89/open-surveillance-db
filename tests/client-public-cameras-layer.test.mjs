@@ -142,6 +142,45 @@ test("layer: the home walk concatenates every page and exposes the server total"
   assert.deepEqual(calls, ["/api/cameras?limit=500&offset=0", "/api/cameras?limit=500&offset=10"]);
 });
 
+test("layer: a walk over a dataset larger than the old MAX_PAGE_OFFSET collects every record (total 12284, t_e86c91c4)", async () => {
+  // Regression for kanban t_e86c91c4: the /directory walk died with
+  // records=[] (empty state) once the dataset grew past 10000 records —
+  // the walk followed nextOffset past MAX_PAGE_OFFSET (10000) and the API
+  // answered 400, failing the whole walk. Two guards now fix it: the API
+  // (db boundary) pages past 10000, and the walk stops at the server's own
+  // `total` — it never requests an offset beyond the dataset, and it must
+  // collect ALL 12284 records (25 pages: 24×500 + 284).
+  const bigTotal = 12_284;
+  const pages = [];
+  for (let offset = 0; offset < bigTotal; offset += 500) {
+    const size = Math.min(500, bigTotal - offset);
+    const ids = Array.from({ length: size }, (_, index) => bigTotal - offset - index);
+    pages.push({
+      offset,
+      records: makeCameras(ids),
+      total: bigTotal,
+      nextOffset: offset + size < bigTotal ? offset + size : null,
+    });
+  }
+  assert.equal(pages.length, 25, "fixture sanity: 12284 records = 24 full pages + 284");
+
+  const { screen } = rtl;
+  const calls = pageMock(pages);
+
+  rtl.render(React.createElement(ListProbe, { seed: seedCameras }));
+  await rtl.waitFor(() => assert.equal(screen.getByTestId("loading").textContent, "false"));
+  assert.equal(screen.getByTestId("count").textContent, String(bigTotal), "the walk collected every public record");
+  assert.equal(screen.getByTestId("total").textContent, String(bigTotal), "the server total is never a first-page count");
+  assert.equal(screen.getByTestId("error").textContent, "false", "an offset past 10000 must not fail the walk");
+  assert.equal(calls.length, 25, "exactly one fetch per page, no runaway walk");
+  const lastOffset = Number(new URL(calls[calls.length - 1], "https://osdb.test").searchParams.get("offset"));
+  assert.equal(lastOffset, 12_000, "the last requested offset is inside the dataset (12000 < 12284)");
+  assert.ok(
+    calls.every((call) => Number(new URL(call, "https://osdb.test").searchParams.get("offset")) <= 12_000),
+    "no fetch may ever request an offset beyond the last page",
+  );
+});
+
 test("layer: a legacy single-page payload (no nextOffset) is the complete list", async () => {
   const { screen } = rtl;
   const calls = pageMock([{ records: pageOne }]);

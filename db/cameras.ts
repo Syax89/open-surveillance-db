@@ -246,6 +246,19 @@ export async function listPublicCamerasPage(
   const countResult = await d1.prepare(`SELECT COUNT(*) AS total ${query}`).bind(...parameters).first<{ total: number }>();
   const total = countResult?.total ?? 0;
 
+  // Pagination guard (kanban t_e86c91c4): an offset at/beyond the dataset
+  // total can never return records — answer an empty page WITHOUT running
+  // the SELECT, so a hostile ?offset=9007199254740991 cannot force an
+  // astronomical SQL OFFSET on the D1. The old transport cap
+  // (MAX_PAGE_OFFSET = 10000, app/lib/input-limits.ts, PR #250) rejected
+  // offsets past 10000 outright, which broke the legitimate client walk
+  // once the dataset grew past 10000 records (empty /directory); the db
+  // boundary knows the real total and stops pagination exactly where the
+  // data ends — no fixed cap for the dataset to outgrow.
+  if (offset >= total) {
+    return { records: [], total, nextOffset: null };
+  }
+
   // Sort ordering (ADR 0021 §10.1, kanban t_a9f23581 FASE 2): whitelist
   // approach — the route validates, the DB boundary never inlines raw strings.
   // Default (no sort filter present): ORDER BY id DESC (INVARIANT).
@@ -636,6 +649,12 @@ export async function listPublicCamerasInBboxPage(
   }
   const countResult = await d1.prepare(`SELECT COUNT(*) AS total ${query}`).bind(...parameters).first<{ total: number }>();
   const total = countResult?.total ?? 0;
+  // Same pagination guard as listPublicCamerasPage (kanban t_e86c91c4):
+  // an offset at/beyond the bbox total is an empty page answered WITHOUT
+  // the SELECT — no astronomical SQL OFFSET on the D1, no fixed cap.
+  if (offset >= total) {
+    return { records: [], total, nextOffset: null };
+  }
   const result = await d1
     .prepare(`SELECT id, title, kind, CASE WHEN publish_manufacturer = 1 THEN manufacturer ELSE NULL END AS manufacturer, CASE WHEN publish_observed_on = 1 THEN observed_on ELSE NULL END AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, latitude, longitude, direction, status, source, updated, description, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt ${query} ORDER BY id DESC LIMIT ? OFFSET ?`)
     .bind(...parameters, limit, offset)
