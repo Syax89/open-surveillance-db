@@ -2,10 +2,10 @@
     "slug": "usa-ny-thruway-gantries-2026",
     "source_name": "New York State Thruway Authority — Toll Gantries (E-ZPass)",
     "format": "socrata",
-    "license": "NY Open Data policy",
-    "license_url": "https://data.ny.gov",
-    "attribution_text": "Fonte: New York State, data.ny.gov — Thruway Toll Gantries (https://data.ny.gov/d/pfuu-4nqq), concesso con licenza NY Open Data policy (data.ny.gov terms of use).",
+    "license": "NY OPEN-NY Terms of Use",
+    "license_url": "https://data.ny.gov/dataset/OPEN-NY-Terms-Of-Use/77gx-ii52",
+    "attribution_text": "Fonte: New York State, data.ny.gov — Thruway Toll Gantries (https://data.ny.gov/d/pfuu-4nqq), concesso con licenza OPEN-NY Terms of Use (verificati direttamente, PDF 2013-03-08: 'least restrictive, no attribution, no share-alike, no pre-approval').",
     "source_url": "https://data.ny.gov/resource/pfuu-4nqq.json",
     "max_records": 150,
-    "notes": "Scan catalog.csv + verifica diretta (CEO 2026-08-08): 70 gantries E-ZPass NY Thruway (Socrata API, count 70 verificato, lat/lon dirette, name/road/type). NOTA: sono PORTALI A PEDAGGIO con telecamere tolling, non telecamere di traffico pubbliche — verificare se rientrano nello scope del progetto e la NY Open Data policy (data.ny.gov usa terms custom). Da confermare con subagent legale. external_id ny-thruway:<name>."
+    "notes": "Scan catalog.csv + verifica diretta (CEO 2026-08-08): 70 gantries E-ZPass NY Thruway (Socrata API, count 70 verificato, lat/lon dirette, name/road/type). Licenza CONFERMATA: OPEN-NY Terms of Use (PDF verificato: 'use it as you wish, subject to no other requirements' — nessuna attribuzione richiesta). Sono portali a pedaggio con telecamere LPR. external_id ny-thruway:<name>."
 }

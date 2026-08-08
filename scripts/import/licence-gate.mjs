@@ -69,6 +69,10 @@ export const IMPORTABLE_LICENSES = new Set([
   // Pennsylvania — PennDOT terms: redistribuzione esplicitamente
   // consentita con attribuzione (511PA). Verificato 2026-08-08.
   "PennDOT terms (redistribuzione consentita)",
+  // New York — OPEN-NY Terms of Use: "least restrictive, no
+  // attribution, no share-alike, no pre-approval" (PDF verificato
+  // 2026-08-08, data.ny.gov dataset 77gx-ii52).
+  "NY OPEN-NY Terms of Use",
   "ODC PDDL 1.0",
   // Australian CC-BY 3.0 (TfNSW live cameras, QLD state roads — both
   // data.gov.au / data.qld.gov.au, attribution-only).
