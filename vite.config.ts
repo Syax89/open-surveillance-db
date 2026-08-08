@@ -15,8 +15,9 @@ const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
  *
  * This middleware returns 404 for every path that can never be a client
  * module or a public route. It is intentionally a blacklist of the
- * server-only surface: /app (page/layout components) and /node_modules/.vite
- * (pre-bundle) must keep working as dev modules, so they are NOT blocked.
+ * server-only surface: /app (page/layout components), /node_modules
+ * (real npm deps + the .vite pre-bundle) and /api must keep working as
+ * dev modules / public routes, so they are NOT blocked.
  *
  * Production is unaffected: the built worker serves only dist/client
  * assets (wrangler.jsonc "assets"), so this guard exists purely for dev /
@@ -34,7 +35,6 @@ const BLOCKED_SOURCE_PREFIXES = [
   "/.claude/",
   "/.wrangler/",
   "/app/api/", // route handlers are server-only; never client modules
-  "/node_modules/", // only .vite pre-bundle is legit, handled below
 ];
 const BLOCKED_ROOT_FILES = [
   "/package.json",
@@ -57,7 +57,6 @@ const BLOCKED_ROOT_FILES = [
 const BLOCKED_EXTENSIONS = [".sql", ".sh", ".yml", ".yaml", ".toml", ".gpg", ".pem", ".key"];
 
 function isBlockedSourcePath(pathname: string): boolean {
-  if (pathname.startsWith("/node_modules/.vite/")) return false; // pre-bundle must load
   if (BLOCKED_ROOT_FILES.includes(pathname)) return true;
   if (BLOCKED_SOURCE_PREFIXES.some((prefix) => pathname.startsWith(prefix))) return true;
   // Any root-level file with a server-only extension (e.g. /x.sql).
