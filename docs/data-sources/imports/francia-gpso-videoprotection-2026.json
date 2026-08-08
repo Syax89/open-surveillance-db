@@ -1,0 +1,11 @@
+{
+  "slug": "francia-gpso-videoprotection-2026",
+  "source_name": "Territoire Grand Paris Seine Ouest — Vidéoprotection",
+  "format": "geojson",
+  "license": "Licence Ouverte 2.0",
+  "license_url": "https://www.etalab.gouv.fr/wp-content/uploads/2014/05/Licence_Ouverte.pdf",
+  "attribution_text": "Fonte: Territoire Grand Paris Seine Ouest (https://data.seineouest.fr/explore/dataset/videoprotection), concesso con Licence Ouverte (https://www.etalab.gouv.fr/wp-content/uploads/2014/05/Licence_Ouverte.pdf).",
+  "source_url": "https://data.seineouest.fr/api/explore/v2.1/catalog/datasets/videoprotection",
+  "max_records": 1000,
+  "notes": "Scan stato-per-stato FR (CEO 2026-08-08): videocamere di sorveglianza pubbliche del Territoire Grand Paris Seine Ouest (446 record), via API ODS v2.1 export GeoJSON. Dataset vivo (refresh lug 2026), coordinate esatte, campi nom/adresse/commune/type/etat. Licenza fr-lo = Licence Ouverte (attribution-only, stessa classe di CC-BY). external_id gpso-videoprotection:<nom>."
+}

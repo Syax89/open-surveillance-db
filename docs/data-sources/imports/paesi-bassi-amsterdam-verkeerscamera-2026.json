@@ -1,0 +1,11 @@
+{
+  "slug": "paesi-bassi-amsterdam-verkeerscamera-2026",
+  "source_name": "Gemeente Amsterdam — Verkeersinformatiesystemen (VIS), verkeerscamera's",
+  "format": "geojson",
+  "license": "CC BY 4.0",
+  "license_url": "https://creativecommons.org/licenses/by/4.0/",
+  "attribution_text": "Fonte: Gemeente Amsterdam, Datapunt (https://data.amsterdam.nl), concesso con CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/).",
+  "source_url": "https://api.data.amsterdam.nl/v1/verkeersinformatiesystemen/verkeersinformatiesystemen/",
+  "max_records": 1000,
+  "notes": "Scan stato-per-stato NL (CEO 2026-08-08): telecamere di traffico di Amsterdam dal dataset VIS (203 Verkeerscamera su ~600 oggetti; geometrie RD EPSG:28992 convertite a WGS84 con formula Rijksdriehoek). API HAL paginata live. Licenza CC BY 4.0 standard Datapunt. external_id ams-vis-camera:<objectnummer>."
+}

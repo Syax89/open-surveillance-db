@@ -480,3 +480,142 @@ test("licence-gate: dl-de-by-2.0 and Swiss open-use are importable; CC BY-NC is 
   assert.equal(isLicenceImportable("Open use. Attribution required (Kanton Bern)"), true);
   assert.equal(isLicenceImportable("CC BY-NC 4.0"), false);
 });
+
+// -------------------------------------------------- FR / ES / NL official sources
+
+import { parsePayload as gpsoParse } from "../scripts/import/adapters/francia-gpso-videoprotection-2026.mjs";
+import { parsePayload as pvppParse } from "../scripts/import/adapters/francia-pvpp-cameras-2026.mjs";
+import { parsePayload as agenParse } from "../scripts/import/adapters/francia-agen-cameras-2026.mjs";
+import { parsePayload as dgtParse } from "../scripts/import/adapters/spagna-dgt-camaras-2026.mjs";
+import { utm30ToWgs84, parsePayload as madridParse } from "../scripts/import/adapters/spagna-madrid-camaras-2026.mjs";
+import { parsePayload as bcnParse } from "../scripts/import/adapters/spagna-barcelona-cameras-2026.mjs";
+import { parsePayload as utrechtParse } from "../scripts/import/adapters/paesi-bassi-utrecht-cameraregister-2026.mjs";
+import { rdToWgs84, parsePayload as amsParse } from "../scripts/import/adapters/paesi-bassi-amsterdam-verkeerscamera-2026.mjs";
+
+test("gpso: parses ODS GeoJSON features into canonical staged rows", () => {
+  const { staged, skipped } = gpsoParse({
+    features: [
+      { geometry: { type: "Point", coordinates: [2.232061, 48.839062] }, properties: { nom: "Caméra 91", adresse: "1 Rue Test", commune: "Meudon", type: "fixe", etat: "en service" } },
+      { geometry: { type: "Point", coordinates: [2.23, 48.84] }, properties: { nom: null } },
+      { geometry: { type: "Polygon", coordinates: [] }, properties: {} },
+    ],
+  });
+  assert.equal(staged.length, 2);
+  assert.equal(staged[0].title, "Caméra 91");
+  assert.equal(staged[0].address, "1 Rue Test, Meudon");
+  assert.equal(staged[0].latitude, 48.839062);
+  assert.equal(skipped.total, 1);
+});
+
+test("pvpp: parses KML placemarks into canonical staged rows", () => {
+  const { staged } = pvppParse({
+    text: `<kml><Document>
+      <Placemark><name>B1</name><Point><coordinates>2.285098,48.837464,0</coordinates></Point></Placemark>
+      <Placemark><Point><coordinates>2.29,48.84,0</coordinates></Point></Placemark>
+    </Document></kml>`,
+  });
+  assert.equal(staged.length, 2);
+  assert.equal(staged[0].title, "B1");
+  assert.equal(staged[0].latitude, 48.837464);
+  assert.equal(staged[0].longitude, 2.285098);
+  assert.match(staged[0].external_id, /^pvpp-camera:/);
+});
+
+test("agen: parses CSV (lon,lat despite header) into canonical staged rows", () => {
+  const { staged, skipped } = agenParse({
+    text: "\uFEFFNom,Lien,Latitude,Longitude\nCaméra 129 - Place Esquirol bis,https://www.agen.fr/video-protection,0.6154632851324493,44.20325623833256\n,,\n",
+  });
+  assert.equal(staged.length, 1);
+  assert.equal(staged[0].title, "Caméra 129 - Place Esquirol bis");
+  assert.equal(staged[0].latitude, 44.203256); // header inverted, file stores lon,lat
+  assert.equal(staged[0].longitude, 0.615463);
+  assert.equal(skipped.total, 1); // empty row has no coordinates
+});
+
+test("dgt: parses DATEX2 camera devices into canonical staged rows", () => {
+  const { staged, skipped } = dgtParse({
+    text: `<d2:payload><ns2:device xsi:type="fse:ExtendedDevice" id="176130" version="2">
+      <ns2:typeOfDevice>camera</ns2:typeOfDevice>
+      <ns2:pointLocation><loc:supplementaryPositionalDescription>
+        <loc:roadInformation><loc:roadDestination>PORTUGAL</loc:roadDestination><loc:roadName>A-62</loc:roadName></loc:roadInformation>
+      </loc:supplementaryPositionalDescription>
+      <loc:tpegPointLocation><loc:point><loc:pointCoordinates><loc:latitude>42.2624</loc:latitude><loc:longitude>-3.9403</loc:longitude></loc:pointCoordinates></loc:point></loc:tpegPointLocation></ns2:pointLocation>
+      <fse:deviceUrl>https://etraffic.dgt.es/camarasEtraffic/176130.jpg</fse:deviceUrl></ns2:device>
+      <ns2:device><ns2:typeOfDevice>other</ns2:typeOfDevice></ns2:device>
+    </d2:payload>`,
+  });
+  assert.equal(staged.length, 1); // "other" device skipped
+  assert.equal(staged[0].title, "Cámara A-62");
+  assert.equal(staged[0].latitude, 42.2624);
+  assert.equal(staged[0].longitude, -3.9403);
+  assert.equal(staged[0].kind, "Traffic / licence plate reader");
+  assert.equal(staged[0].external_id, "dgt-camara:176130");
+  assert.equal(skipped.total, 1);
+});
+
+test("madrid: utm30ToWgs84 lands in Madrid (40.48, -3.69) for C/Pedro Rico", () => {
+  const { lat, lon } = utm30ToWgs84(441555.75, 4481256.59); // C/Pedro Rico 213 sample
+  assert.ok(Math.abs(lat - 40.48) < 0.01, `lat ${lat}`);
+  assert.ok(Math.abs(lon - -3.69) < 0.05, `lon ${lon}`);
+});
+
+test("madrid: parses ZBEDEP CSV (lat/lon) and ZBE CSV (utm) rows", () => {
+  const { staged } = madridParse({
+    parts: [
+      { dataset: "ZBEDEP", text: "gis_x;gis_y;fecha_alta;distrito;barrio;calle;num_finca;tipo_elemento;codigo;num_puerta;id_camara;longitud;latitud;direccion\n439654;4473220;2018-11-30;01 CENTRO;01-02 EMBAJADORES;CAPITAN SALAZAR MARTINEZ, CALLE, DEL;1;Cámaras;Camara Entrada;1;1.1;-3.7111951;40.4074126;C" },
+      { dataset: "ZBE", text: "id;\"lugar_infr\";utm_x;utm_y\n1;\"C PEDRO RICO 213\";441555.75;4481256.59" },
+    ],
+  });
+  assert.equal(staged.length, 2);
+  assert.equal(staged[0].latitude, 40.407413);
+  assert.equal(staged[0].longitude, -3.711195);
+  assert.match(staged[0].external_id, /^madrid-camara:/);
+  // second row converted from UTM → WGS84, lands in Madrid (C/Pedro Rico)
+  assert.ok(Math.abs(staged[1].latitude - 40.48) < 0.01, `lat ${staged[1].latitude}`);
+});
+
+test("barcelona: parses CKAN CSV rows into canonical staged rows", () => {
+  const { staged, skipped } = bcnParse({
+    text: "Id_Cam_Seguretat,Codi_Cam_Seguretat,Tipus_Cam_Seguretat,Num_Cam_Seguretat,Codi_Suport,Codi_Districte,Nom_Districte,Codi_Barri,Nom_Barri,X_ETRS89,Y_ETRS89,Longitud,Latitud,Data_Alta\n417105,CIM Ronda,Càmera mòbil,,Mastil,3, Sants-Montjuïc,12,la Marina,427000,4574000,2.121082,41.339963,2024-02-01\n417106,,Càmera fixa,5,,3, Sants-Montjuïc,12,la Marina,,,,abc,41.5,\n",
+  });
+  assert.equal(staged.length, 1); // non-numeric lat skipped
+  assert.equal(staged[0].latitude, 41.339963);
+  assert.equal(staged[0].longitude, 2.121082);
+  assert.equal(skipped.total, 1);
+});
+
+test("utrecht: null buffer → empty result (network fetch is live-only)", async () => {
+  const { staged, skipped } = await utrechtParse({ buf: null });
+  assert.equal(staged.length, 0);
+  assert.equal(skipped.total, 0);
+});
+
+test("ams: rdToWgs84 lands in Amsterdam (52.37, 4.90) for the centre", () => {
+  // Stadhouderskade VIS sample (120997, 485841) → ~52.364, 4.893
+  const { lat, lon } = rdToWgs84(120997, 485841);
+  assert.ok(Math.abs(lat - 52.364) < 0.005, `lat ${lat}`);
+  assert.ok(Math.abs(lon - 4.893) < 0.005, `lon ${lon}`);
+});
+
+test("ams: parses VIS camera items (RD → WGS84) into canonical staged rows", () => {
+  const { staged, skipped } = amsParse({
+    items: [
+      { id: "1", objectnummer: "ANPR-06005-A", objectSoort: "Verkeerscamera", standplaats: "Stadhouderskade", geometrie: { type: "Point", coordinates: [120997, 485841] } },
+      { id: "2", objectnummer: "DRIP-1", objectSoort: "Informatiepaneel", geometrie: { type: "Point", coordinates: [121000, 485800] } },
+      { id: "3", objectnummer: "X", objectSoort: "Verkeerscamera", geometrie: { type: "LineString", coordinates: [] } },
+    ],
+  });
+  assert.equal(staged.length, 1); // only camera + Point
+  assert.equal(staged[0].title, "Verkeerscamera ANPR-06005-A");
+  assert.equal(staged[0].address, "Stadhouderskade");
+  assert.equal(staged[0].kind, "Traffic / licence plate reader");
+  assert.ok(Math.abs(staged[0].latitude - 52.364) < 0.005, `lat ${staged[0].latitude}`);
+  assert.equal(skipped.total, 2); // DRIP (non-camera) + LineString
+});
+
+test("licence-gate: FR (Licence Ouverte), ES (CC-BY), NL (CC0) descriptors are importable", () => {
+  assert.equal(isLicenceImportable("Licence Ouverte 2.0"), true);
+  assert.equal(isLicenceImportable("CC-BY"), true);
+  assert.equal(isLicenceImportable("CC0 1.0"), true);
+  assert.equal(isLicenceImportable("CC BY 4.0"), true);
+});

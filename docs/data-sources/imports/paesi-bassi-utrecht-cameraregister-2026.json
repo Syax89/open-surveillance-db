@@ -1,0 +1,11 @@
+{
+  "slug": "paesi-bassi-utrecht-cameraregister-2026",
+  "source_name": "Gemeente Utrecht — Cameraregister Utrecht",
+  "format": "xlsx",
+  "license": "CC0 1.0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "attribution_text": "Fonte: Gemeente Utrecht, open data (https://data.overheid.nl/dataset/utrecht-cameraregister-utrecht), concesso con CC0 1.0 (https://creativecommons.org/publicdomain/zero/1.0/).",
+  "source_url": "https://open.utrecht.nl/sites/default/files/open-data/cameraregister-utrecht-20251028.xlsx",
+  "max_records": 1000,
+  "notes": "Scan stato-per-stato NL (CEO 2026-08-08): registro ufficiale delle telecamere di Utrecht (~368, XLSX 2025-10): OOV, trasporto pubblico, ponti, milieuzone, private — con lat/lon. Licenza CC-0 dichiarata sul portale (Public Domain). external_id utrecht-camera:<Naam>."
+}

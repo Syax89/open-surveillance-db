@@ -1,0 +1,11 @@
+{
+  "slug": "francia-agen-cameras-2026",
+  "source_name": "Ville d'Agen — Caméra de vidéo protection",
+  "format": "csv",
+  "license": "ODbL 1.0",
+  "license_url": "https://opendatacommons.org/licenses/odbl/1-0/",
+  "attribution_text": "Fonte: Ville d'Agen, data.gouv.fr (https://www.data.gouv.fr/datasets/camera-de-video-protection), concesso con ODbL 1.0 (https://opendatacommons.org/licenses/odbl/1-0/).",
+  "source_url": "https://static.data.gouv.fr/resources/camera-de-video-protection/20251103-161529/agen-cameras-videoprotection-2025-11.csv",
+  "max_records": 500,
+  "notes": "Scan stato-per-stato FR (CEO 2026-08-08): videocamere pubbliche comunali di Agen (~130 record), CSV con coordinate dirette, refresh nov 2025. Licenza ODbL 1.0 dichiarata sul portale. NOTA formato: header dice Latitude,Longitude ma il file memorizza lon,lat — il parse scambia correttamente le colonne. external_id agen-camera:<nom>."
+}

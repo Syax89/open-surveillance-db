@@ -50,6 +50,10 @@ export const IMPORTABLE_LICENSES = new Set([
   // Swiss OGD standard — free use with mandatory attribution
   // (opendata.swiss terms; verified for Kanton Bern VIDEO, CEO 2026-08-07).
   "Open use. Attribution required (Kanton Bern)",
+  // Generic CC-BY without version — NAP DGT España declares exactly
+  // "Creative Commons Attribution" (no version) on its dataset page
+  // (verified CEO 2026-08-08); attribution-only, same class as CC BY 4.0.
+  "CC-BY",
   // No explicit licence but a statutory open-data basis (art. 52 CAD) —
   // only after the legal review has confirmed the specific source.
   "Open data (art. 52 CAD)",

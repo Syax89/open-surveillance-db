@@ -1,0 +1,11 @@
+{
+  "slug": "spagna-madrid-camaras-2026",
+  "source_name": "Ayuntamiento de Madrid — Cámaras de videovigilancia vía pública (ZBEDEP + ZBE)",
+  "format": "csv",
+  "license": "CC BY 4.0",
+  "license_url": "https://creativecommons.org/licenses/by/4.0/",
+  "attribution_text": "Fonte: Ayuntamiento de Madrid, Portal de Datos Abiertos (https://datos.madrid.es), concesso con CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/).",
+  "source_url": "https://datos.madrid.es/api/3/action/package_search?q=300229&rows=1",
+  "max_records": 1000,
+  "notes": "Scan stato-per-stato ES (CEO 2026-08-08): telecamere di videosorveglianza in via pubblica di Madrid — dataset 300229-0 ZBEDEP Distrito Centro (115, CSV con longitud;latitud) + 300654-0 Zona de Bajas Emisiones (463, CSV con utm_x/utm_y ETRS89 UTM30N, convertite a WGS84 nel parse). Licenza cc-by = CC BY 4.0. external_id madrid-camara:<id>."
+}
