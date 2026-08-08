@@ -204,7 +204,7 @@ test("login: passkey sign-in runs begin -> getCredential -> complete and redirec
   assert.equal(body.response.response.authenticatorData, client.bytesToBase64Url(new Uint8Array([3, 4])));
 
   const nav = await getNavState();
-  await waitFor(() => assert.deepEqual(nav.pushed, ["/account"]));
+  await waitFor(() => assert.deepEqual(window.__locationAssigns, ["/account"]));
 });
 
 test("login: an optional passkey email narrows the begin payload", async () => {
@@ -263,7 +263,7 @@ test("login: ?merge= shows the merge form and POSTs token + email + password", a
   });
 
   const nav = await getNavState();
-  await waitFor(() => assert.deepEqual(nav.pushed, ["/account"]));
+  await waitFor(() => assert.deepEqual(window.__locationAssigns, ["/account"]));
 });
 
 test("login: a 410 from the merge route drops merge mode and announces the expired link", async () => {
@@ -354,7 +354,7 @@ test("login: ?returnTo= redirects back to the tool after a successful password l
   await user.click(screen.getByRole("button", { name: "Log in" }));
 
   const nav = await getNavState();
-  await waitFor(() => assert.deepEqual(nav.pushed, ["/segnala"]));
+  await waitFor(() => assert.deepEqual(window.__locationAssigns, ["/segnala"]));
 });
 
 test("login: ?returnTo= is ignored for off-site targets (same-site only)", async () => {
@@ -372,5 +372,5 @@ test("login: ?returnTo= is ignored for off-site targets (same-site only)", async
   await user.click(screen.getByRole("button", { name: "Log in" }));
 
   const nav = await getNavState();
-  await waitFor(() => assert.deepEqual(nav.pushed, ["/account"]), "off-site returnTo must fall back to /account");
+  await waitFor(() => assert.deepEqual(window.__locationAssigns, ["/account"]), "off-site returnTo must fall back to /account");
 });

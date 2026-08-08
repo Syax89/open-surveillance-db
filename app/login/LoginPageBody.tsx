@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useMessages } from "../lib/use-messages";
 import { PublicNav } from "../components/PublicNav";
 import { browserSupportsWebAuthn, getCredential } from "../lib/webauthn-client";
+import { hardNavigate } from "../lib/navigate";
 
 /**
  * /login — multi-method sign-in (Fase E2, design Vera).
@@ -60,8 +61,12 @@ export function LoginPageBody() {
   const [returnTo] = useState<string | null>(() => safeReturnTo(searchParams.get("returnTo")));
 
   function afterLogin() {
-    router.push(returnTo ?? "/account");
-    router.refresh();
+    // Hard navigation (2026-08-08): vinext dev fires the RSC request for
+    // router.push() but the UI stays frozen on the login page — reproduced
+    // live on osdb.syaxhome89.com (passkey login: complete 200, /account
+    // RSC 200, no visual change until a manual reload). A full reload
+    // guarantees the freshly-set session cookies are read by the SSR pass.
+    hardNavigate(returnTo ?? "/account");
   }
 
   // Email + password panel state.

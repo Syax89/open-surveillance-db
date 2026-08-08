@@ -72,7 +72,7 @@ test("login: valid submit POSTs to /api/auth/login and redirects to /account", a
   assert.deepEqual(body, { email: "contributor@example.test", password: "Correct-Horse-Battery1" });
 
   const nav = await getNavState();
-  await waitFor(() => assert.deepEqual(nav.pushed, ["/account"]));
+  await waitFor(() => assert.deepEqual(window.__locationAssigns, ["/account"]));
 });
 
 test("login: 401 surfaces the invalid-credentials error in role=alert", async () => {
@@ -205,7 +205,7 @@ test("register: valid submit POSTs to /api/auth/register and redirects", async (
   });
 
   const nav = await getNavState();
-  await waitFor(() => assert.deepEqual(nav.pushed, ["/account"]));
+  await waitFor(() => assert.deepEqual(window.__locationAssigns, ["/account"]));
 });
 
 test("register: blank displayName is omitted from the payload", async () => {

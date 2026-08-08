@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useMessages } from "../lib/use-messages";
 import { PublicNav } from "../components/PublicNav";
 import { passwordRuleFailures } from "../lib/password-policy";
+import { hardNavigate } from "../lib/navigate";
 
 export function RegisterPageBody() {
   const bundle = useMessages();
@@ -73,8 +74,10 @@ export function RegisterPageBody() {
         }),
       });
       if (response.ok) {
-        router.push("/account");
-        router.refresh();
+        // Hard navigation (2026-08-08): same vinext dev freeze as login —
+        // router.push + refresh leaves the UI on the register page; a full
+        // reload guarantees the fresh session cookies reach the SSR pass.
+        hardNavigate("/account");
         return;
       }
       if (response.status === 409) setError(t.errorEmailTaken);
