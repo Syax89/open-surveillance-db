@@ -2,13 +2,13 @@
 
 > Documento consolidato (2026-08-08): sostituisce `STATUS.md`, `DEVELOPMENT_PLAN.md`,
 > `EXECUTION_BOARD.md`, `FRONTEND_PLAN.md`, `NEXT_SPRINT.md`, `FUTURE_ROADMAP.md`
-> (archiviati in `~/osdb-archive/docs-plans/` sul disco dell'operatore).
+> (archiviati fuori dal repo, sul disco dell'operatore).
 
 ## Stato attuale (verificato sul container, 2026-08-08)
 
 **Produzione**: app SSR + map-first, DB D1, worker cache letture pubbliche,
-deploy automatico a ogni merge su `main` (container LXC 192.168.1.201:3000,
-dominio pubblico temporaneo `osdb.syaxhome89.com` dietro CDN).
+deploy automatico a ogni merge su `main` (container di test LAN,
+dominio pubblico temporaneo di pre-produzione dietro CDN).
 
 ### Funzionalità live
 - **Mappa interattiva** (tile OSM via proxy same-origin, cache ≥7gg, provider
@@ -72,8 +72,8 @@ Il progetto non scambia qualità di revisione, privacy o apertura per velocità.
 
 ## Prossimi passi (priorità)
 
-1. **HTTPS pubblico stabile**: fix reverse proxy NPM (LXC 103,
-   192.168.1.216:81) — serve `proxy_pass` su tutti i path, mai root statica
+1. **HTTPS pubblico stabile**: fix reverse proxy NPM (container proxy LAN,
+   porta 81) — serve `proxy_pass` su tutti i path, mai root statica
    per `/node_modules/`; poi valutare DNS-only su Cloudflare. PR #350
    (no-store + dedupe) già mergiata.
 2. **Import stato-per-stato**: lanciare gli import OSM AT/CH/DE + fonti

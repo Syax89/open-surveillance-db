@@ -74,7 +74,7 @@ sqlite3 <d1-path> "SELECT slug, status, import_date, updated_at,
 # 2) Pagina — /fonti deve mostrare la fonte in testa alla tabella
 #    (la lista ordina per import_date DESC) e la riga «Last updated»
 #    aggiornata al commit più recente.
-curl -s https://osdb.syaxhome89.com/fonti | grep -oE 'Last updated: [^<]+'
+curl -s https://<your-host>/fonti | grep -oE 'Last updated: [^<]+'
 #    atteso: la data dell'ultimo commit (o «Ultimo aggiornamento» in IT).
 ```
 

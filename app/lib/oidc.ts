@@ -27,7 +27,7 @@
  *
  * Priority (fail-closed):
  *   1. `OIDC_PUBLIC_ORIGIN` env — the explicit public origin of this
- *      deployment (e.g. https://osdb.syaxhome89.com). Deterministic: a
+ *      deployment (e.g. https://pre-prod.example.org). Deterministic: a
  *      reverse proxy that does not forward X-Forwarded-Proto (verified:
  *      NPM -> LXC on 2026-08-08) cannot break the redirect.
  *   2. `X-Forwarded-Proto: https` — standard proxy convention: rebuild
@@ -39,7 +39,7 @@
  * Without (1)/(2) the dev/pre-prod server behind a TLS-terminating proxy
  * would emit `http://<host>` while the provider registered the HTTPS
  * callback — the mismatch answers `400 redirect_uri_mismatch` (reproduced
- * live on osdb.syaxhome89.com, 2026-08-08).
+ * live on the pre-prod domain, 2026-08-08).
  */
 export function publicOrigin(request: Request, env?: unknown): string {
   const url = new URL(request.url);

@@ -9,7 +9,7 @@
 # pasting a secret into a shell history line that ends up in a log.
 #
 # Vault layout (same convention as ops/snapshot-pre-deploy.sh):
-#   ~/.hermes/secrets/oidc-<provider>.env.gpg
+#   ~/.secrets/oidc-<provider>.env.gpg
 #   plaintext inside:  CLIENT_ID=... and CLIENT_SECRET=... (two lines)
 #
 # Usage:
@@ -19,12 +19,13 @@
 #   ops/oidc-secrets.sh deploy <github|google>     pipe into `wrangler secret put` (production)
 #
 # Environment:
-#   OIDC_VAULT_DIR   vault directory (default ~/.hermes/secrets)
+#   OIDC_VAULT_DIR   vault directory (default ~/.secrets; set it if your
+#                    vault lives elsewhere)
 #   OIDC_GPG_KEY     recipient override (default: the vault's default key;
 #                    gpg -d works with any key that can decrypt the file)
 set -uo pipefail
 
-VAULT_DIR="${OIDC_VAULT_DIR:-$HOME/.hermes/secrets}"
+VAULT_DIR="${OIDC_VAULT_DIR:-$HOME/.secrets}"
 PROVIDERS="github google"
 
 ts() { date '+%Y-%m-%d %H:%M:%S'; }

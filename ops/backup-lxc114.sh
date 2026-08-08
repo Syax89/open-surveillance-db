@@ -1,5 +1,5 @@
 #!/bin/bash
-# ops/backup-lxc114.sh — automated backup of LXC 114 (osdb-test) to the NAS.
+# ops/backup-lxc114.sh — automated backup of the test container to NAS storage.
 #
 # Runs a Proxmox vzdump (snapshot mode, zstd) of the container onto the
 # configured CIFS storage "NAS", then verifies the produced archive is
@@ -8,19 +8,19 @@
 # .wrangler/state/v3/d1/miniflare-D1DatabaseObject/<hash>.sqlite).
 #
 # The Proxmox API token is NOT hardcoded: it is decrypted at runtime from
-# the local GPG vault (~/.hermes/secrets/proxmox-token.gpg). The vault file
+# the local GPG vault (path in PVE_TOKEN_GPG, see below). The vault file
 # must exist on the machine that runs this script.
 #
 # Install (cron, daily 02:30):
-#   30 2 * * * /path/to/repo/ops/backup-lxc114.sh >> /home/simone/logs/osdb-backup.log 2>&1
+#   30 2 * * * /path/to/repo/ops/backup-lxc114.sh >> <log-dir>/osdb-backup.log 2>&1
 set -uo pipefail
 
-PVE_HOST="${PVE_HOST:-192.168.1.77}"
+PVE_HOST="${PVE_HOST:-<pve-host>}"      # imposta PVE_HOST (o sostituisci il placeholder)
 PVE_NODE="${PVE_NODE:-pve}"
 VMID="${OSDB_VMID:-114}"
 STORAGE="${OSDB_BACKUP_STORAGE:-NAS}"
-TOKEN_SRC="${PVE_TOKEN_GPG:-/home/simone/.hermes/secrets/proxmox-token.gpg}"
-LOG="${OSDB_BACKUP_LOG:-/home/simone/logs/osdb-backup.log}"
+TOKEN_SRC="${PVE_TOKEN_GPG:-<secrets-dir>/proxmox-token.gpg}"   # imposta PVE_TOKEN_GPG
+LOG="${OSDB_BACKUP_LOG:-<log-dir>/osdb-backup.log}"   # imposta OSDB_BACKUP_LOG
 KEEP="${OSDB_BACKUP_KEEP:-7}"
 
 ts() { date '+%Y-%m-%d %H:%M:%S'; }

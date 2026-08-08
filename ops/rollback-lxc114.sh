@@ -1,5 +1,5 @@
 #!/bin/bash
-# ops/rollback-lxc114.sh — roll back LXC 114 to a previous snapshot.
+# ops/rollback-lxc114.sh — roll back the test container to a previous snapshot.
 #
 # Usage:
 #   ops/rollback-lxc114.sh <snapname>
@@ -11,11 +11,11 @@
 # Token decrypted at runtime from the local GPG vault, never hardcoded.
 set -uo pipefail
 
-PVE_HOST="${PVE_HOST:-192.168.1.77}"
+PVE_HOST="${PVE_HOST:-<pve-host>}"      # imposta PVE_HOST (o sostituisci il placeholder)
 PVE_NODE="${PVE_NODE:-pve}"
 VMID="${OSDB_VMID:-114}"
-BASE_URL="${OSDB_BASE_URL:-http://192.168.1.201:3000}"
-TOKEN_SRC="${PVE_TOKEN_GPG:-/home/simone/.hermes/secrets/proxmox-token.gpg}"
+BASE_URL="${OSDB_BASE_URL:-http://<lan-ip>:3000}"   # imposta OSDB_BASE_URL
+TOKEN_SRC="${PVE_TOKEN_GPG:-<secrets-dir>/proxmox-token.gpg}"   # imposta PVE_TOKEN_GPG
 HEALTH_CHECK="$(cd "$(dirname "$0")" && pwd)/health-check.sh"
 
 ts() { date '+%Y-%m-%d %H:%M:%S'; }

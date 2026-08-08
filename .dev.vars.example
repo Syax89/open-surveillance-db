@@ -1,0 +1,38 @@
+# .dev.vars.example — copia in `.dev.vars` (ignorato da git) e compila con i
+# tuoi valori. Il file `.dev.vars` NON va MAI committato. Ogni variabile è
+# opzionale; i default fail-closed sono documentati in docs/DEPLOYMENT.md
+# (sezioni "Identity and access-control" e "Abuse-control environment").
+
+# --- Moderation gate (worker edge; fail-closed: senza credenziali 503) ---
+# MODERATION_USER=admin
+# MODERATION_PASSWORD=change-me
+# MODERATION_TOKEN=tok-change-me            # alternativa bearer
+# MODERATION_IDENTITY_EMAIL=admin@example.org
+# MODERATION_OPERATORS=
+# MODERATION_DEMO_ACTOR_SELECTOR=
+
+# --- OIDC social login (opzionale; provider senza credenziali = 503) ---
+# OIDC_GOOGLE_CLIENT_ID=
+# OIDC_GOOGLE_CLIENT_SECRET=
+# OIDC_GITHUB_CLIENT_ID=
+# OIDC_GITHUB_CLIENT_SECRET=
+# OIDC_PUBLIC_ORIGIN=https://your-host.example.org
+
+# --- WebAuthn passkey (rp.id DEVE coincidere col dominio servito) ---
+# WEBAUTHN_RP_ID=localhost
+# WEBAUTHN_ORIGIN=http://localhost:3000
+
+# --- Registration / anti-abuso ---
+# REGISTRATION_IP_HMAC_KEY=change-me-32-bytes-minimum
+
+# --- Tile proxy (opzionale; default: tile OSM pubbliche) ---
+# TILE_PROVIDER_URL=https://tile.openstreetmap.org
+# TILE_PROVIDER_KEY=
+
+# --- Geocoder (opzionale; default: Nominatim pubblico) ---
+# GEOCODER_BASE_URL=
+
+# --- Altro ---
+# ENVIRONMENT=development
+# TRUST_PLATFORM_HEADERS=false
+# NEXT_PUBLIC_SITE_URL=http://localhost:3000

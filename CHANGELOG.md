@@ -119,8 +119,8 @@ changes accumulate under `[Unreleased]`.
   register, retention schedule, breach procedure, moderation SLA, and
   supporting ADRs (0004, 0005).
 - Operations manual with environment matrix, monitoring, backup, and rollback
-  workflows (docs/OPERATIONS.md), and the local test deployment procedure on
-  Proxmox LXC 114 (docs/DEPLOYMENT.md).
+  workflows (docs/OPERATIONS.md), and the local test deployment procedure
+  (docs/DEPLOYMENT.md).
 - Safe category and verification-freshness filters in the public directory:
   `GET /api/cameras` accepts a bounded `kind` and a whitelisted `freshness`
   window (`7d`/`30d`/`90d`) shared by JSON, GeoJSON, and CSV. Verification
@@ -170,9 +170,9 @@ changes accumulate under `[Unreleased]`.
   community-vs-commercial-vs-self-hosted decision matrix
   ([#55](https://github.com/Syax89/open-surveillance-db/pull/55),
   [docs/OSM_INTEGRATION.md](docs/OSM_INTEGRATION.md)).
-- Local operations for the LXC 114 test deployment:
+- Local operations for the test deployment:
   `ops/health-check.sh` (5-route health probe, fail-closed moderation check),
-  `ops/backup-lxc114.sh` (vzdump snapshot to NAS, zstd, keep-last 7, D1
+  `ops/backup-lxc114.sh` (vzdump snapshot to NAS storage, zstd, keep-last 7, D1
   included and integrity-checked), `ops/snapshot-pre-deploy.sh`, and
   `ops/rollback-lxc114.sh` (rollback + explicit restart + health check),
   with the live drill recorded in `docs/OPERATIONS.md`
@@ -642,6 +642,26 @@ changes accumulate under `[Unreleased]`.
   freshness, state-transition and status-leak-boundary suites.
 
 ### Security
+
+- **Repository hygiene — zero secrets / credentials / personal infrastructure
+  references (template-clean, PR #3xx):** the production D1 `database_id`
+  was removed from `wrangler.jsonc` (placeholder restored; the real id is
+  injected at deploy time from the GitHub secret `D1_DATABASE_ID` by
+  `.github/workflows/deploy.yml` — never committed). Added
+  `.env.example` and `.dev.vars.example` documenting every env variable
+  with non-sensitive placeholders; `.gitignore` now covers `.env*`,
+  `.dev.vars*`, `*.key/*.gpg/*.p12/*.pfx/*.p8/*.jks/*.keystore/*.kdbx`,
+  backup/editor files and the maintainer's local tooling dirs
+  (`/.claude/`, `/.vscode/`, `/.idea/`). Docs, ops scripts and configs no
+  longer reference private LAN IPs, the internal pre-prod domain
+  (`syaxhome89.com`) or the local container by id (`LXC 114`/`osdb-test`)
+  — replaced with generic placeholders (`<lan-ip>`, `<your-host>`,
+  `<secrets-dir>`); `ops/oidc-secrets.sh` vault default is now the generic
+  `~/.secrets` (override via `OIDC_VAULT_DIR`). Dev-only
+  `.claude/launch.json` removed; `tests/qa-funzionale-linus.test.mjs`
+  renamed `qa-funzionale.test.mjs` (no personal names in filenames).
+  Historical note: the real D1 `database_id` and the pre-prod domain are
+  present in past commits (pre-cleanup) — history was NOT rewritten.
 
 - **Rate limiting — Cloudflare Workers Rate Limiting binding (audit #3,
   MEDIUM, t_dff3dadf):** the four critical public route families (auth,

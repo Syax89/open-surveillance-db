@@ -1,12 +1,12 @@
 #!/bin/bash
-# ops/health-check.sh — periodic health check for the local LXC 114 deploy.
+# ops/health-check.sh — periodic health check for the local test deployment.
 #
-# Verifies the key HTTP routes of the local test site (192.168.1.201:3000)
+# Verifies the key HTTP routes of the local test site (<lan-ip>:3000)
 # and exits non-zero when any check fails. Designed to run from cron on the
 # workstation that can reach the LAN IP.
 #
 # Install (cron):
-#   */5 * * * * /path/to/repo/ops/health-check.sh >> /home/simone/logs/osdb-health.log 2>&1
+#   */5 * * * * /path/to/repo/ops/health-check.sh >> <log-dir>/osdb-health.log 2>&1
 #
 # Routes and expected codes (mirrors docs/DEPLOYMENT.md "Verification"):
 #   /                       -> 200  (homepage + asset bundle)
@@ -16,8 +16,8 @@
 #   /api/moderation         -> 503  (fail-closed without credentials, NEVER 200)
 set -uo pipefail
 
-BASE="${OSDB_BASE_URL:-http://192.168.1.201:3000}"
-LOG="${OSDB_HEALTH_LOG:-/home/simone/logs/osdb-health.log}"
+BASE="${OSDB_BASE_URL:-http://<lan-ip>:3000}"   # imposta OSDB_BASE_URL
+LOG="${OSDB_HEALTH_LOG:-<log-dir>/osdb-health.log}"   # imposta OSDB_HEALTH_LOG
 FAIL_MARKER="${OSDB_FAIL_MARKER:-/tmp/osdb-health-FAIL}"
 
 # route|expected_code
