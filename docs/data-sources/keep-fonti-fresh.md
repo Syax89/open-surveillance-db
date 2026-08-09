@@ -143,3 +143,23 @@ in order of value:
   column); run reports no longer live in
   `docs/data-sources/imports/reports/` (removed by the docs-cleanup #352)
   but in the `import_batches.report` (JSON) DB column.
+
+## 8. Reverse-geocode status (note 2026-08-09, data/import audit t_8a0445a4)
+
+The backfill `scripts/reverse-geocode-backfill.mjs` (CEO 2026-08-07) has been
+**run** and is **still completing** — verified on the local test D1
+(LXC osdb-test, `.wrangler/state/v3/d1/miniflare-D1DatabaseObject/db.sqlite`):
+
+- public records (`status IN ('active','demo')`): **32.470**
+- with `address` populated: **13.926** (~43%)
+- without `address`: **18.544** (still to resolve)
+- `geocode_reverse_cache` rows: **7.118** (keys rounded to 4 decimals)
+
+The run is idempotent with checkpoint-flush (100 records): restarting
+`node scripts/reverse-geocode-backfill.mjs` resumes from where it stopped
+(`WHERE address IS NULL` + cache), ~1.05 s per live fetch. The default
+**`--local`** target is the local D1 `osdb-production` (binding `DB` in
+wrangler.jsonc); verified the command resolves the populated DB when local
+state exists (dry-run with `--limit 2` on the LXC: 2 candidates found, no
+writes). On a machine without local state (`no such table: cameras`) it only
+means that D1 was never populated — not a bug.

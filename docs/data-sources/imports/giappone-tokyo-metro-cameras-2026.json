@@ -1,11 +1,11 @@
 {
-    "slug": "giappone-tokyo-metro-cameras-2026",
-    "source_name": "Tokyo Metropolitan Government — River / Sea / Port live cameras",
-    "format": "csv",
-    "license": "CC BY 4.0",
-    "license_url": "https://catalog.data.metro.tokyo.lg.jp/",
-    "attribution_text": "Fonte: Tokyo Metropolitan Government Open Data Catalog (https://catalog.data.metro.tokyo.lg.jp/), concesso con licenza CC BY 4.0.",
-    "source_url": "https://catalog.data.metro.tokyo.lg.jp/dataset/t000014d0000000028",
-    "max_records": 300,
-    "notes": "Cron ricerca stato-per-stato (2026-08-09): 3 CSV ufficiali TMG — river monitoring (106, UTF-8, 緯度/経度), sea camera (21, Shift-JIS), Izu-Ogasawara port (17, Shift-JIS, lat/lon combinato). Totale 144 con coordinate. NUOVO PAESE: Giappone. external_id tmg-cam:<set>:<番号>."
+ "slug": "giappone-tokyo-metro-cameras-2026",
+ "source_name": "Tokyo Metropolitan Government — River / Sea / Port live cameras",
+ "format": "csv",
+ "license": "CC BY 4.0",
+ "license_url": "https://catalog.data.metro.tokyo.lg.jp/",
+ "attribution_text": "Fonte: Tokyo Metropolitan Government Open Data Catalog (https://catalog.data.metro.tokyo.lg.jp/), concesso con licenza CC BY 4.0.",
+ "source_url": "https://catalog.data.metro.tokyo.lg.jp/dataset/t000014d0000000028",
+ "max_records": 300,
+ "notes": "Cron ricerca stato-per-stato (2026-08-09): 3 CSV ufficiali TMG — river monitoring (106, UTF-8, 緯度/経度), sea camera (21, Shift-JIS), Izu-Ogasawara port (17, Shift-JIS, lat/lon combinato). Totale 144 con coordinate. NUOVO PAESE: Giappone. external_id tmg-cam:<set>:<番号>. Nota PM 2026-08-09: licenza CC BY 4.0 dichiarata compatibile a priori, da verificare su fonte primaria (catalog.data.metro.tokyo.lg.jp)."
 }

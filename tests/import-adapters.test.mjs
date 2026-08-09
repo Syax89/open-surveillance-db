@@ -735,6 +735,17 @@ test("licence-gate: wave-4 descriptors (NLOD, OGL 2.0, CC BY 4.0, ODbL) are impo
   assert.equal(isLicenceImportable("CC BY-SA 2.0"), false);
 });
 
+test("licence-gate: PM decisions 2026-08-09 (t_8a0445a4) — King County removed, Denver blocked until confirmed", () => {
+  // King County: no-sale clause incompatible with ODbL §3.6 → source REMOVED (125 cameras), string out of allowlist.
+  assert.equal(isLicenceImportable("King County GIS Terms (copy/distribute permitted; sale prohibited)"), false);
+  // Denver HALO: no explicit license on the dataset → descriptor updated, batch NOT importable until confirmed.
+  assert.equal(isLicenceImportable("No explicit license — disclaimer (to be confirmed)"), false);
+  // The generic CC BY 3.0 class stays importable (other sources may declare it).
+  assert.equal(isLicenceImportable("CC BY 3.0"), true);
+  // Thailandia ODC: kept ONLY for Nakhon Ratchasima (government-filtered), Phetchaburi removed.
+  assert.equal(isLicenceImportable("Open Data Common (ODC)"), true);
+});
+
 // -------------------------------------------------- wave 5 (catalog.csv 2026-08-08): BC / QC / DC / NOLA / Boulder / LU / SF
 
 import { parsePayload as drivebcParse } from "../scripts/import/adapters/canada-drivebc-highwaycams-2026.mjs";
@@ -1057,7 +1068,6 @@ test("dcc: parses GeoJSON features into canonical staged rows", () => {
 import { parsePayload as ohioParse } from "../scripts/import/adapters/usa-ohio-ohgo-cameras-2026.mjs";
 import { parsePayload as kytcParse } from "../scripts/import/adapters/usa-kentucky-kytc-cameras-2026.mjs";
 import { parsePayload as ne511Parse } from "../scripts/import/adapters/usa-new-england-511-cameras-2026.mjs";
-import { parsePayload as kingcoParse } from "../scripts/import/adapters/usa-kingcounty-traffic-cameras-2026.mjs";
 import { parsePayload as wellingtonParse } from "../scripts/import/adapters/nuova-zelanda-wellington-cctv-2026.mjs";
 import { lcc2926ToWgs84, nztm2193ToWgs84 } from "../scripts/import/adapters/lib.mjs";
 
@@ -1114,19 +1124,6 @@ test("ne511: parses C2C XML (microdegrees) for VT/NH/ME into staged rows", () =>
   assert.equal(skipped.total, 1);
 });
 
-test("kingco: parses ArcGIS features (EPSG:2926) into canonical staged rows", () => {
-  const { staged, skipped } = kingcoParse({
-    data: [
-      { attributes: { OBJECTID: 1, AssetID: 23, Location: "[WSDOT] 116th Ave. N.E.", CamRegion: "North" }, geometry: { x: 1307383.0233, y: 262401.6072 } },
-      { attributes: { OBJECTID: 2 }, geometry: null },
-    ],
-  });
-  assert.equal(staged.length, 1);
-  assert.equal(staged[0].external_id, "kingco-cam:23");
-  assert.equal(staged[0].kind, "Traffic / licence plate reader");
-  assert.equal(skipped.total, 1);
-});
-
 test("wellington: parses ArcGIS features (EPSG:2193) into canonical staged rows", () => {
   const { staged, skipped } = wellingtonParse({
     data: [
@@ -1145,7 +1142,6 @@ test("wellington: parses ArcGIS features (EPSG:2193) into canonical staged rows"
 
 import { parsePayload as tokyoParse } from "../scripts/import/adapters/giappone-tokyo-metro-cameras-2026.mjs";
 import { parsePayload as nkrParse } from "../scripts/import/adapters/tailandia-nakhon-ratchasima-cctv-2026.mjs";
-import { parsePayload as pbrParse } from "../scripts/import/adapters/tailandia-phetchaburi-cctv-2026.mjs";
 
 test("tokyo: parses river CSV (UTF-8) with 緯度/経度 into staged rows", () => {
   const { staged, skipped } = tokyoParse({
@@ -1170,24 +1166,22 @@ test("tokyo: parses Izu CSV (Shift-JIS, lat/lon combinato) into staged rows", ()
   assert.equal(staged[0].external_id, "tmg-cam:izu:1");
 });
 
-test("nkr: parses Thai police CSV (stripped headers, quoted fields) into staged rows", () => {
+test("nkr: parses Thai police CSV and keeps ONLY government cameras (categoria 'ราชการ')", () => {
   const { staged, skipped } = nkrParse({
-    data: "รายการข้อมูล, สถานะกล้อง,ชื่อจุดติดตั้ง, ชื่อสถานที่, ละติจูด, ลองจิจูด, หน่วยงาน\nพิกัดจุดติดตั้งกล้อง cctv,ใช้ได้,ที่พักสายตรวจ,ตู้ยามบะใหญ่,14.5596019,101.9763107,สภ. อุดมทรัพย์\nพิกัดจุดติดตั้งกล้อง cctv,ใช้ได้,\"campo, con virgola\",test,0,0,สภ. x\n",
+    data: "รายการข้อมูล, สถานะกล้อง,ชื่อจุดติดตั้ง, ชื่อสถานที่, ประเภทสถานที่, ละติจูด, ลองจิจูด, หน่วยงาน\nพิกัดจุดติดตั้งกล้อง cctv,ใช้ได้,ที่พักสายตรวจ,ตู้ยามบะใหญ่,ราชการ,14.5596019,101.9763107,สภ. อุดมทรัพย์\nพิกัดจุดติดตั้งกล้อง cctv,ใช้ได้,ร้านทอง,เอกชน,เอกชน,14.55,101.97,ร้านทอง x\nพิกัดจุดติดตั้งกล้อง cctv,ใช้ได้,\"campo, con virgola\",test,ราชการ,0,0,สภ. x\n",
   });
   assert.equal(staged.length, 1);
   assert.equal(staged[0].title, "ที่พักสายตรวจ");
   assert.equal(staged[0].external_id, "nkr-cctv:0");
-  assert.equal(skipped.total, 1);
+  assert.equal(skipped.total, 2); // 1 private + 1 zero coords
 });
 
-test("pbr: parses Phetchaburi CSV (Latitude/Longitude) into staged rows", () => {
-  const { staged, skipped } = pbrParse({
-    data: "หน่วยในสังกัด,สถานที่ติดตั้งกล้อง ,Latitude,Longitude,ชื่อหน่วยงาน,ยี่ห้อกล้องCCTV,การใช้งานกล้อง\nสภ.ท่าไม้รวก,ห้อง one stop service,12.81886323,99.8022351,สภ.ท่าไม้รวก,HIKVISION,อื่นๆ\nสภ.x,test,0,0,สภ.x,-\n",
+test("nkr: fails closed when the category column is missing (privacy filter impossible)", () => {
+  const { staged, skipped } = nkrParse({
+    data: "รายการข้อมูล, สถานะกล้อง,ชื่อจุดติดตั้ง, ชื่อสถานที่, ละติจูด, ลองจิจูด, หน่วยงาน\nพิกัดจุดติดตั้งกล้อง cctv,ใช้ได้,ที่พักสายตรวจ,ตู้ยามบะใหญ่,14.5596019,101.9763107,สภ. อุดมทรัพย์\n",
   });
-  assert.equal(staged.length, 1);
-  assert.equal(staged[0].title, "ห้อง one stop service");
-  assert.equal(staged[0].external_id, "pbr-cctv:0");
-  assert.equal(skipped.total, 1);
+  assert.equal(staged.length, 0);
+  assert.equal(skipped.reasons["no category column (cannot filter government cameras)"], 1);
 });
 
 // -------------------------------------------------- wave 13: Brasile BH + Giappone Ichikawa

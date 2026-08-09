@@ -71,7 +71,13 @@ export function parsePayload({ data } = {}) {
   const titleCol = Object.keys(idx).find((k) => k.includes("ชื่อจุดติดตั้ง"));
   const placeCol = Object.keys(idx).find((k) => k.includes("ชื่อสถานที่"));
   const orgCol = Object.keys(idx).find((k) => k.includes("หน่วยงาน"));
+  const catCol = Object.keys(idx).find((k) => k.includes("ประเภทสถานที่"));
   if (!latCol || !lonCol) { recordSkip("no lat/lon columns"); return { staged, skipped, checksum: null }; }
+  // PM decision 2026-08-09 (kanban t_8a0445a4): keep ONLY government/public
+  // cameras (categoria 'ราชการ'). The dataset exposes the category column;
+  // if it ever disappears, refuse the whole batch (fail-closed) rather than
+  // importing private cameras with precise coordinates (privacy risk).
+  if (!catCol) { recordSkip("no category column (cannot filter government cameras)"); return { staged, skipped, checksum: null }; }
 
   let idxNum = 0;
   for (let i = 1; i < lines.length; i++) {
@@ -79,6 +85,8 @@ export function parsePayload({ data } = {}) {
     if (!line.trim()) continue;
     const cells = parseRow(line);
     const at = (col) => (col !== undefined && cells[idx[col]] !== undefined ? cells[idx[col]].trim() : "");
+    const category = at(catCol);
+    if (category !== "ราชการ") { recordSkip("non-government category"); continue; }
     const lat = Number.parseFloat(at(latCol));
     const lon = Number.parseFloat(at(lonCol));
     if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180 || (lat === 0 && lon === 0)) {

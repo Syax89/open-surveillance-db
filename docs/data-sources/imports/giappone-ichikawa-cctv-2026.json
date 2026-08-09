@@ -1,11 +1,11 @@
 {
-    "slug": "giappone-ichikawa-cctv-2026",
-    "source_name": "Ichikawa City — Street CCTV cameras",
-    "format": "csv",
-    "license": "CC BY 4.0",
-    "license_url": "https://www.geospatial.jp/ckan/dataset/d3f93bb3-6703-40f2-b631-a82cdbb0b0f5",
-    "attribution_text": "Fonte: Ichikawa City via G-Spatial (https://www.geospatial.jp/ckan/dataset/d3f93bb3-6703-40f2-b631-a82cdbb0b0f5), concesso con licenza CC BY 4.0.",
-    "source_url": "https://www.geospatial.jp/ckan/dataset/d3f93bb3-6703-40f2-b631-a82cdbb0b0f5/resource/1671dbac-f7a7-4de0-8626-0b515ac63e6a/download/bouhannkamera.csv",
-    "max_records": 500,
-    "notes": "Cron ricerca stato-per-stato (2026-08-09): 240 righe CSV (cp932), 緯度/経度, 分類 '街頭防犯カメラ'. Giappone. external_id ichikawa-cctv:<管理番号>."
+ "slug": "giappone-ichikawa-cctv-2026",
+ "source_name": "Ichikawa City — Street CCTV cameras",
+ "format": "csv",
+ "license": "CC BY 4.0",
+ "license_url": "https://www.geospatial.jp/ckan/dataset/d3f93bb3-6703-40f2-b631-a82cdbb0b0f5",
+ "attribution_text": "Fonte: Ichikawa City via G-Spatial (https://www.geospatial.jp/ckan/dataset/d3f93bb3-6703-40f2-b631-a82cdbb0b0f5), concesso con licenza CC BY 4.0.",
+ "source_url": "https://www.geospatial.jp/ckan/dataset/d3f93bb3-6703-40f2-b631-a82cdbb0b0f5/resource/1671dbac-f7a7-4de0-8626-0b515ac63e6a/download/bouhannkamera.csv",
+ "max_records": 500,
+ "notes": "Cron ricerca stato-per-stato (2026-08-09): 240 righe CSV (cp932), 緯度/経度, 分類 '街頭防犯カメラ'. Giappone. external_id ichikawa-cctv:<管理番号>. Nota PM 2026-08-09: licenza CC BY 4.0 dichiarata compatibile a priori, da verificare su fonte primaria (geospatial.jp)."
 }

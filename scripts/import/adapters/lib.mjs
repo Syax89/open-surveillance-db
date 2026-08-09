@@ -141,8 +141,10 @@ export function lcc2248ToWgs84(x, y) {
 /**
  * EPSG:2926 (NAD83 / Washington State Plane North, Lambert Conformal
  * Conic, US survey feet) → WGS84. Usato da King County traffic cameras
- * (wkid 2926). Parametri: lat_0=47, lat_1=48.73333..., lat_2=47.5,
- * lon_0=-120.83333, x_0=500000 ftUS, y_0=0.
+ * (wkid 2926; fonte RIMOSSA 2026-08-09 per decisione PM — la funzione
+ * resta per eventuali fonti future WA, es. WSDOT). Parametri:
+ * lat_0=47, lat_1=48.73333..., lat_2=47.5, lon_0=-120.83333,
+ * x_0=500000 ftUS, y_0=0.
  * Validato 2026-08-09 vs coordinate note: 116th Ave NE / NE 124th St →
  * ~47.71/-122.20 (King County, WA).
  */
