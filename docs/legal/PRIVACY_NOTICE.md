@@ -2,7 +2,7 @@
 
 - **Status:** in force — personal open-source project (controller: Simone Rondina, syax89 — not a company); finalised 2026-08-08 and aligned with the current implementation.
 - **Legal basis:** GDPR art. 13 (data collected from data subjects) and art. 14 (data not obtained from the data subject, e.g. records sourced from official public sources); D.Lgs. 196/2003 (Codice Privacy, IT) as primary jurisdiction.
-- **Version:** 0.14 (2026-08-09) — legal-audit alignment: § 5 adds the Nominatim geocoding processor (PR6); § 7 documents the legacy `pending`/`rejected` hard-delete rules (R19/R20); § 10 Cookie section added; OIDC processor references corrected to PR4/PR5; special-category note reworded to the text-only model (image evidence removed).
+- **Version:** 0.15 (2026-08-09) — API access credentials (ADR 0023, write-auth epic): § 3 adds the "API access credentials" category (hash-only storage, throttled last-used, per-key limits, retention R21); new § 3.2 describes API keys (write-only, show-once, revocation); § 7 adds R21 (90-day sweep after revocation/expiry); § 8 extends account erasure to API keys.
 - **Decisions applied:** controller entity **Simone Rondina (syax89) / OpenSurveillanceDB — Italy** (2026-07-31); data licence **ODbL 1.0**; published coordinates rounded to **~4 decimal places (~10 m)**; privacy contact `privacy@opensurveillancedb.org` (dedicated, monitored mailbox, active).
 
 > **Disclaimer:** this document is product guidance / not legal advice. It is in force for the pilot jurisdiction (Italy); per-jurisdiction review remains documented for an EU-wide launch.
@@ -36,6 +36,7 @@ OpenSurveillanceDB publishes a public-interest map of **visible, public surveill
 | Passkey credential (credential_id, COSE public key, sign counter) | Contributor's device (WebAuthn enrollment, optional method) | Passwordless, phishing-resistant login | art. 6(1)(f); public-key material only — no secret ever stored server-side; anti-replay counter; **synced passkeys** are backed up through the OS vendor's cloud (Apple/Google/Microsoft) at the user's choice (§ 3.1); hard-deleted at account erasure (R15) |
 | Recovery codes (10, hashed) | The project (issued at passkey enrollment) | Regain access after device loss | art. 6(1)(f); stored only hashed, single-use, replaced on re-enrollment; deleted at account erasure (R15) |
 | OIDC identity attributes (provider, `external_sub`, display name, verified flag — **never the email**) | GitHub / Google (identity provider — **only if the contributor chooses that method**, § 3.1; buttons are shown only when the operator has configured the provider, PROCESSOR_REGISTER.md PR4/PR5) | Login via GitHub/Google; account linking to the contributor | art. 6(1)(f); no email imported; the provider observes the login and the IP (§ 3.1/§ 5/§ 6) |
+| API access credentials (API keys — SHA-256 hash only, 10-character display prefix, scope list, created/expiry/revocation timestamps, throttled last-used timestamp) | Contributor (verified account — issued from the account page) | Authenticate programmatic **write access** (submit / confirm / edit / action) without a browser session | art. 6(1)(f); **raw key never stored** — shown exactly once at creation (ADR 0023); SHA-256 of the full key, constant-time compare; metadata-only in API responses; per-key **and** per-IP rate limits; max 5 active keys; see § 3.2 and RETENTION_SCHEDULE.md R21 |
 
 **Records from official public sources (art. 14(2)(f)):** where a record is republished from an official public source (`source: official`), the data was not obtained from the data subject. The source categories are: public registers and transparency portals of public administrations (e.g. in Italy, D.Lgs. 33/2013 datasets), published public-authority documents, and other publicly accessible official sources. Such records are checked per record under the source's own legal regime (see LAWFUL_BASIS.md § 3.2).
 
@@ -85,6 +86,35 @@ You can change or add methods from your account page; deleting the account
 deletes the data of every method (verification tokens, passkeys, recovery
 codes, OIDC link) as described in § 7 (R15) and § 8.
 
+### 3.2 API keys — write access for scripts and tools (ADR 0023)
+
+Verified contributors can issue **personal API keys** (up to **5 active** at a
+time) from their account page to authenticate programmatic **write access** —
+`submit` (reports and corrections), `confirm`, `edit`, `action` — without a
+browser session. Read access stays **keyless** (no key, no registration —
+unchanged promise of the public read API).
+
+- **Hash only.** Only the **SHA-256 hash** of the full key is stored (unique
+  index, constant-time comparison); the raw key (`osdb_` + 32 random bytes,
+  base64url) is shown **exactly once** at creation and can never be recovered
+  — treat it like a password. A 10-character display prefix lets you recognise
+  a key in the account list without exposing it.
+- **Metadata only.** The key-management API exposes `name`, prefix, scopes,
+  creation/expiry/revocation timestamps and a **throttled last-used timestamp**
+  (updated at most every 5 minutes) — never the hash, never the raw key.
+- **Lifecycle.** Keys expire after **365 days by default** (optional custom
+  expiry at creation) and can be **revoked instantly** from the account page;
+  revocation is a soft revoke that stops authentication immediately, with no
+  grace period.
+- **Per-key limits.** Each key is rate-limited **individually**, additively to
+  the per-IP limits — one script cannot exhaust the shared budget, and a key
+  can never exercise more than its scope.
+- **Erasure (art. 17).** Account erasure hard-deletes **all** keys of the
+  account in the same atomic batch (`eraseContributor`); revoked or expired
+  keys are swept from storage after **90 days** (RETENTION_SCHEDULE.md R21).
+- **Not a tracking device.** API keys are write-only credentials for a
+  verified account — never used for profiling, never published, never logged.
+
 ## 4. What we do NOT collect or publish (negative scope)
 
 - **No video, live streams, credentials, network information, or control interfaces** — the project documents the *existence* of visible surveillance infrastructure, never its output or access.
@@ -95,6 +125,7 @@ codes, OIDC link) as described in § 7 (R15) and § 8.
 - **No email imported from OIDC providers.** Even when you sign in with GitHub or Google, we never import or store the email from the provider — the account email always comes from you directly (only the provider's subject id and verified flag are stored; § 3).
 - **No image submission.** Image evidence was removed entirely on 2026-08-08 (CEO decision — "troppo rischioso e troppo esoso di spazio"): no image is accepted or stored by the application; records are text metadata only. Existing objects from the retired feature are **retained without deletion** (../PRIVACY_AND_SAFETY.md; ../MODERATION.md).
 - **Reports are published immediately** from verified accounts and are part of the public dataset from the moment they are submitted. Content that violates the rules is withdrawn by the community or by a legal emergency, and withdrawn content is never re-published (ADR 0021).
+- **No raw API-key material at rest, in transit beyond TLS, or in logs.** API keys are stored as **SHA-256 hashes only**; the raw key exists once, in the single creation response, and is never logged, never accepted in URLs, and never present in cacheable responses (§ 3.2; SECURITY.md scope).
 
 This negative scope strengthens the reasonable expectations of data subjects and is a material input to the art. 6(1)(f) balancing test (LAWFUL_BASIS.md § 3.1).
 
@@ -117,9 +148,9 @@ This negative scope strengthens the reasonable expectations of data subjects and
 
 Reports are published immediately and stay public while the community keeps confirming them; records withdrawn by the community or by a legal emergency are excluded from public outputs and follow the repository retention schedule (RETENTION_SCHEDULE.md). Correction requests and audit entries: **2 years**. Operational logs: up to **12 months** (aggregate). Backups: rotated by the provider (up to **30 days** point-in-time recovery).
 
-The detailed rules remain in the repository retention schedule (RETENTION_SCHEDULE.md), including: **community data (R14)** — community actions follow the account (active → erasure; actions cast on other records are deleted with the contributor, ADR 0021 § 13, and the public lifecycle history keeps only aggregates); **authentication-method data (R15, ADR 0020)** — email-verification tokens 24 hours, reset tokens 3 hours (single-use, deleted on use); passkeys and recovery codes while the account is active, **hard-deleted at account erasure** — nothing survives to link the account to a provider or a device; **failed-login counters (R16)**, per-IP registration-cap log (R17) and the transactional-email log (R18) swept by the retention cron; **demo records (R12)** purged by the retention cron outside development; **legacy `pending` submissions (R19)** hard-deleted 90 days after submission and **legacy `rejected` records (R20)** hard-deleted 30 days after the rejection decision — both skipped while an appeal is open or a legal hold is active (published records are never deleted on a timer, ADR 0021 § 2.2).
+The detailed rules remain in the repository retention schedule (RETENTION_SCHEDULE.md), including: **community data (R14)** — community actions follow the account (active → erasure; actions cast on other records are deleted with the contributor, ADR 0021 § 13, and the public lifecycle history keeps only aggregates); **authentication-method data (R15, ADR 0020)** — email-verification tokens 24 hours, reset tokens 3 hours (single-use, deleted on use); passkeys and recovery codes while the account is active, **hard-deleted at account erasure** — nothing survives to link the account to a provider or a device; **failed-login counters (R16)**, per-IP registration-cap log (R17) and the transactional-email log (R18) swept by the retention cron; **demo records (R12)** purged by the retention cron outside development; **legacy `pending` submissions (R19)** hard-deleted 90 days after submission and **legacy `rejected` records (R20)** hard-deleted 30 days after the rejection decision — both skipped while an appeal is open or a legal hold is active (published records are never deleted on a timer, ADR 0021 § 2.2); **API-key data (R21, ADR 0023)** — key hashes and metadata are kept **while the account is active**; **revoked or expired keys are hard-deleted 90 days after revocation/expiry** (swept by the retention cron); account erasure hard-deletes **all** keys of the account (art. 17); backups contain hashes only.
 
-The deletion and expiry rules are **enforced automatically by the daily retention sweep** (scheduled in `worker/index.ts`, daily at 03:00 UTC — RETENTION_SCHEDULE.md § 3): the cron deletes expired rows (R12/R16/R17/R18), hard-deletes legacy `pending` submissions 90 days after submission (**R19**) and legacy `rejected` records 30 days after the decision (**R20**, both skipped while an appeal is open or a legal hold is active), archives audit entries at the 2-year mark (R4/R5/R9), and never changes record lifecycle status of published records (community model, ADR 0021 § 2.2).
+The deletion and expiry rules are **enforced automatically by the daily retention sweep** (scheduled in `worker/index.ts`, daily at 03:00 UTC — RETENTION_SCHEDULE.md § 3): the cron deletes expired rows (R12/R16/R17/R18), hard-deletes legacy `pending` submissions 90 days after submission (**R19**) and legacy `rejected` records 30 days after the decision (**R20**, both skipped while an appeal is open or a legal hold is active), **hard-deletes revoked/expired API keys 90 days after revocation/expiry (R21)**, archives audit entries at the 2-year mark (R4/R5/R9), and never changes record lifecycle status of published records (community model, ADR 0021 § 2.2).
 
 ## 8. Your rights (GDPR arts. 15–22)
 
@@ -127,7 +158,7 @@ You may request, free of charge:
 
 - **Access** (art. 15) — confirmation and copy of your data.
 - **Rectification** (art. 16) — correction of inaccurate data: you may correct your display name, profile settings, and your own submissions; inaccurate record data can be corrected through the private correction path (see TERMS § 6 — corrections are private and never change the map automatically).
-- **Erasure** (art. 17) — deletion, subject to the exceptions in art. 17(3) and the retention schedule. **Account erasure covers the account, sessions and your community actions** (ADR 0021 § 13): your actions on other records are deleted atomically with the account (art. 17); the record history survives without the link to you, in aggregates only. See RETENTION_SCHEDULE.md R7/R14.
+- **Erasure** (art. 17) — deletion, subject to the exceptions in art. 17(3) and the retention schedule. **Account erasure covers the account, sessions, your community actions and your API keys** (ADR 0021 § 13; RETENTION_SCHEDULE.md R21): your actions on other records are deleted atomically with the account (art. 17); the record history survives without the link to you, in aggregates only. See RETENTION_SCHEDULE.md R7/R14/R21.
 - **Restriction** (art. 18) and **objection** (art. 21).
 - **Portability** (art. 20) — where technically applicable.
 - No automated decision-making, including profiling, is performed (art. 22). Trust levels are derived automatically from verified contributions, but they are informative indicators with transparent, non-discriminatory criteria — they do not produce legal or similarly significant effects (ADR 0018/0021).

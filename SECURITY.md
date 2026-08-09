@@ -12,6 +12,11 @@ surveillance infrastructure. This policy covers vulnerabilities that could:
 
 - expose contributor identities, pending submissions, evidence, or moderation data;
 - expose database credentials or hosting secrets;
+- expose or forge **API-key credential material** (raw keys, key hashes, or
+  key metadata) or permit unauthorized key-authenticated writes (ADR 0023 —
+  the raw key is shown **once** at creation and never stored, logged, or
+  accepted in URLs; only its SHA-256 hash is at rest, compared in constant
+  time; per-key rate limits are additive to per-IP);
 - permit unauthorized changes to published records or to the moderation queue;
 - break the fail-closed behaviour of the moderation endpoints;
 - break the public-data boundary (private fields such as `notes`, pending
@@ -19,8 +24,11 @@ surveillance infrastructure. This policy covers vulnerabilities that could:
 
 The project is **privacy and safety by design**: if a finding touches personal
 data (pending submissions, evidence, correction requests, moderator identity
-attributes), it is also a personal-data incident and is handled under
-[docs/legal/BREACH_PROCEDURE.md](docs/legal/BREACH_PROCEDURE.md).
+attributes, **API-key hashes or credentials**), it is also a personal-data
+incident and is handled under
+[docs/legal/BREACH_PROCEDURE.md](docs/legal/BREACH_PROCEDURE.md). A suspected
+API-key compromise should be reported through the private route below so the
+key can be revoked immediately (instant revocation, TERMS § 3.8).
 
 ## Reporting a vulnerability
 
