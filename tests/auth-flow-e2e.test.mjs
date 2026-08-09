@@ -143,6 +143,16 @@ beforeEach(async () => {
   // appeal threshold knobs so a test that lowers them cannot leak.
   delete env.APPEAL_APPELLANT_RATE_LIMIT_MAX;
   delete env.APPEAL_APPELLANT_RATE_LIMIT_WINDOW_SECONDS;
+  // POST /api/appeals is auth-bucketed too (audit 2026-08-09, P2): this file
+  // hammers /api/appeals plus the auth routes, and the e2e requests carry no
+  // cf-connecting-ip, so every call lands on the shared "unknown" key. Raise
+  // the per-caller auth ceiling and wipe the in-memory counters exactly like
+  // auth-verify-e2e / qa-multiauth-write-gate-e2e do — otherwise the 10/min
+  // auth default trips mid-file and the erasure/lockout tests die with 429.
+  env.AUTH_RATE_LIMIT_MAX = "1000000";
+  env.AUTH_RATE_LIMIT_WINDOW_SECONDS = "60";
+  const rateLimit = await loadE2EModule("app/lib/rate-limit.mjs");
+  rateLimit.resetRateLimitState();
   // The route modules are cached in the shared tree; reload the recorder each
   // test so coverage stays cumulative while handlers stay stateless.
   const load = async (name, path) => recorder(name, await loadE2ERoute(path));
