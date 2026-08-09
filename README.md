@@ -1,7 +1,22 @@
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="public/logo-dark.svg">
+  <img alt="OpenSurveillanceDB logo" src="public/favicon.svg" width="88">
+</picture>
+
 # OpenSurveillanceDB
 
-An open, non-commercial civic database that documents **visible public
-surveillance infrastructure**. OpenSurveillanceDB maps where cameras and
+*An open, non-commercial civic database of visible public surveillance infrastructure.*
+
+[![CI](https://github.com/Syax89/open-surveillance-db/actions/workflows/ci.yml/badge.svg)](https://github.com/Syax89/open-surveillance-db/actions/workflows/ci.yml)
+[![License: AGPL-3.0-or-later](https://img.shields.io/badge/License-AGPL--3.0--or--later-0a705d.svg)](LICENSE)
+[![Data license: ODbL 1.0](https://img.shields.io/badge/Data%20license-ODbL%201.0-09233a.svg)](docs/data-sources/README.md)
+
+![OpenSurveillanceDB banner](public/og.png)
+
+## About
+
+OpenSurveillanceDB is an open, non-commercial civic database that documents
+**visible public surveillance infrastructure**. It maps where cameras and
 automated surveillance systems are installed in shared spaces, so the public
 can understand what observes them.
 
@@ -9,13 +24,51 @@ It is not a tool for watching, tracking or bypassing lawful surveillance: the
 project publishes **data about cameras, not feeds** — context, not profiles;
 transparency, not tracking.
 
-- Free to use, no ads, no profiling, no paid features.
-- Open source (AGPL-3.0-or-later); open data (ODbL 1.0) with licensing and
-  provenance recorded for every published record.
-- Privacy and safety by design: no private-home cameras, no live-feed links,
-  no operational details, no personal data in the public dataset.
-- Human and community moderation: verified community accounts publish
-  immediately; corrections and takedown requests are reviewed by a person.
+## Mission
+
+> Help people understand the systems around them.
+
+The project maps visible camera infrastructure in shared spaces, so the public
+can see what is installed nearby. It documents public-facing equipment only.
+It is not a tool for watching, tracking or bypassing lawful surveillance.
+
+| What we document | What we do not collect | What the data cannot prove |
+| --- | --- | --- |
+| Visible camera infrastructure, approximate location, type, source and a community status. | Camera feeds, credentials, private-home details, operational weaknesses, faces, licence plates or other personal data. | An absent record does not show that an area is free of surveillance. It only shows that no record is currently published there. |
+
+## Principles
+
+Five commitments shape every decision in this project, from the data model to
+the community actions.
+
+- **Free to use** — no ads, no profiling, no paid features. The database and
+  the software are public goods.
+- **Open source** — the software can be inspected, reused and improved by the
+  community.
+- **Open data with provenance** — licensing and provenance are recorded for
+  every published record, so journalism, research and civic use can rely on
+  them.
+- **Privacy and safety by design** — no private-home cameras, no sensitive
+  operational details, no live-feed links. Faces and licence plates are
+  removed before publication.
+- **Community accuracy first** — reports are published immediately from
+  verified accounts. The community keeps the directory accurate: confirming
+  what is still there, flagging what is gone, and withdrawing what is
+  problematic — under automatic, transparent thresholds.
+
+## What we deliberately do not do
+
+The boundaries are as important as the mission. OpenSurveillanceDB will never
+become any of the following:
+
+- **No camera feeds** — we document equipment, not footage. No live or
+  recorded feed is ever linked or displayed.
+- **No tracking tools** — the data cannot be used to watch, follow or profile
+  people in public space.
+- **No evasion advice** — the project does not help anyone avoid lawful
+  surveillance and does not publish operational weaknesses.
+- **No private property** — cameras that surveil private homes, and details of
+  private life, are out of scope.
 
 ## Features
 
@@ -96,7 +149,7 @@ scripts/    Tooling: import pipeline (scripts/import), DB helpers, preview
 tests/      Node test suite (build + node --test), harnesses in tests/helpers
 docs/       Project documentation (see index below)
 ops/        Operator tooling (secrets vault helpers, etc.)
-public/     Static assets (favicon, etc.)
+public/     Static assets (logo, favicon, og image)
 ```
 
 ## Documentation
