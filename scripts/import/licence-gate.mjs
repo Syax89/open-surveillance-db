@@ -89,6 +89,10 @@ export const IMPORTABLE_LICENSES = new Set([
   // use/reproduce/redistribute with attribution, no NC clause.
   "Tri-State Developer Agreement",
   "ODC PDDL 1.0",
+  // Thailandia — Thai GD Catalog: "Open Data Common" (ODC) dichiarata
+  // sui portali provinciali gdcatalog.go.th (Nakhon Ratchasima,
+  // Phetchaburi), verificato cron 2026-08-09.
+  "Open Data Common (ODC)",
   // Australian CC-BY 3.0 (TfNSW live cameras, QLD state roads — both
   // data.gov.au / data.qld.gov.au, attribution-only).
   "CC BY 3.0 AU",
