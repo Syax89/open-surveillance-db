@@ -61,7 +61,7 @@ export function DirectoryTool() {
   // a shared read bucket, network). The directory MUST surface this as a
   // truthful error state with retry — never as "0 public records found"
   // (the empty state would lie: the records exist, the map shows them).
-  const { records, error, reload } = usePublicCameras({
+  const { records, loading, error, reload } = usePublicCameras({
     filters: serverFilters,
   });
 
@@ -99,6 +99,7 @@ export function DirectoryTool() {
         <PublicDirectory
           variant="catalog"
           filteredRecords={filteredRecords}
+          loading={loading}
           loadError={error}
           onRetryLoad={reload}
           cameraKinds={cameraKinds}

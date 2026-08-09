@@ -884,8 +884,6 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
   .directory-tool .record-list .record-list-card .record-list-actions { align-items:flex-start; }
   /* Results header (t_f13fcb1c, ex .directory-meta): stack on narrow screens. */
   .directory-results { align-items:flex-start; flex-direction:column; gap:var(--space-3); }
-  /* A–Z index scrolls horizontally on narrow screens (no wrap). */
-  .alpha-index ul { flex-wrap:nowrap; overflow-x:auto; padding-bottom:4px; }
   .directory-pagination { justify-content:center; }
   .record-detail { width:min(100% - 32px,760px);margin:24px auto 60px;padding:30px 23px }
   .record-detail-facts { grid-template-columns:1fr }
@@ -981,7 +979,7 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
    aria-current. ≥44px targets. */
 .alpha-index { margin-top:18px; }
 .alpha-index ul { display:flex; flex-wrap:wrap; gap:4px; margin:0; padding:0; list-style:none; }
-.alpha-index-link { min-width:34px; min-height:44px; display:inline-grid; place-items:center; padding:0 6px; border:0; border-bottom:2px solid transparent; background:transparent; color:var(--action); font-size:var(--text-md); font-weight:800; }
+.alpha-index-link { min-width:44px; min-height:44px; display:inline-grid; place-items:center; padding:0 6px; border:0; border-bottom:2px solid transparent; background:transparent; color:var(--action); font-size:var(--text-md); font-weight:800; }
 .alpha-index-link:hover { border-bottom-color:var(--control-focus); }
 .alpha-index-link.is-current { border-bottom-color:var(--action); color:var(--ink); }
 .alpha-index-link.is-muted { color:var(--disabled-ink); font-weight:700; cursor:default; }
@@ -1037,6 +1035,14 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
   .directory-tool .place-search-toggle { grid-column:1/-1; justify-self:start }
 }
 @media (max-width:700px) {
+  /* A–Z index scrolls horizontally on narrow screens instead of wrapping.
+     This rule USED to live in the earlier max-width:700px block (was line
+     888) — i.e. BEFORE the base `.alpha-index ul` declaration (line ~983), with
+     identical specificity (0,1,1), so the base always won and the intent
+     never applied: measured live 2026-08-09, the index wrapped to 236px of
+     vertical space at 390×844 and pushed the list further under the fold.
+     Declared here (after the base rule) it finally takes effect. */
+  .alpha-index ul { flex-wrap:nowrap; overflow-x:auto; overscroll-behavior-x:contain; padding-bottom:4px; }
   .filter-controls-row { grid-template-columns:minmax(0,1fr) !important }
   .map-card .filters-panel .filter-controls-row { grid-template-columns:minmax(0,1fr) }
   .record-search { grid-column:auto }
@@ -1443,7 +1449,7 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 .map-list-empty { margin:0; padding:18px 16px; color:var(--supporting); font-size:var(--text-md); line-height:1.5; }
 /* Geocode autocomplete dropdown: the ARIA listbox lives in the map's top
    control area, so the left rail can remain a pure points list. */
-.geocode-dropdown { position:absolute; top:100%; left:16px; right:16px; z-index:30; margin-top:6px; border:1px solid var(--map-input-border); border-radius:var(--radius-lg); background:var(--white); box-shadow:0 14px 30px rgba(25,46,52,.16); overflow:hidden; }
+.geocode-dropdown { position:absolute; top:100%; left:16px; right:16px; z-index:1000; margin-top:6px; border:1px solid var(--map-input-border); border-radius:var(--radius-lg); background:var(--white); box-shadow:0 14px 30px rgba(25,46,52,.16); overflow:hidden; }
 .geocode-dropdown ul { list-style:none; margin:0; padding:6px; max-height:264px; overflow-y:auto; }
 .geocode-option { display:flex; align-items:baseline; justify-content:space-between; gap:10px; padding:9px 10px; border-radius:var(--radius-md); cursor:pointer; color:var(--ink-5); font-size:var(--text-md); line-height:1.4; }
 .geocode-option.is-active, .geocode-option:hover { background:var(--map-hover-bg); }

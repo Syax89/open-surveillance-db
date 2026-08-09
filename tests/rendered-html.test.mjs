@@ -192,7 +192,15 @@ test("server-rendered /mappa provides the map region and /directory the text-lis
   // map" button / record-ID markup contract is exercised with real
   // (mocked) records post-hydration in tests/client-tools.test.mjs
   // ("DirectoryTool" suite).
-  assert.match(directory.html, /class="empty-state"/, "the SSR shell shows the truthful empty state before hydration");
+  //
+  // That honest state is the LOADING note, not the empty state (audit
+  // 2026-08-09): the walk is in flight and the records exist, so "No
+  // published record matches that search" would be a lie. Measured live on
+  // the container: the empty state was visible for the first ~400ms of every
+  // page load, then flipped to "40036 public records found". Same contract
+  // as the /records/[id] SSR shell (browse-filter-record, e2e-journeys).
+  assert.match(directory.html, /class="loading-note"[^>]*role="status"/, "the SSR shell announces the loading state, not a false empty state");
+  assert.doesNotMatch(directory.html, /class="empty-state"/, "the empty state must not claim zero records while the walk is still in flight");
   // CEO 2026-08-08: the [+] report shortcut renders in the SSR shell too —
   // it does not depend on hydration or on the export row.
   assert.match(directory.html, /class="add-button"[^>]*href="\/segnala"/, "the [+] report shortcut links /segnala from the SSR header");

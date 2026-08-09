@@ -18,6 +18,8 @@ export const DIRECTORY_PAGE_SIZE = 20;
 
 type Props = {
   filteredRecords: Camera[];
+  /** True during the initial walk, before any records arrive. */
+  loading?: boolean;
   /**
    * Load failure (kanban t_e11080eb): the public-list walk failed (429 on
    * the shared read bucket, network). Render the truthful error state with
@@ -74,7 +76,7 @@ type Props = {
  * Distance facts) and hides the index/pagination/chips, which only make
  * sense for the filtered list.
  */
-export function DirectoryCatalog({ filteredRecords, loadError = false, onRetryLoad, cameraKinds, search, setSearch, kindFilter, setKindFilter, freshnessFilter, setFreshnessFilter, sortOrder, setSortOrder, stateFilter, setStateFilter, originFilter, setOriginFilter, page = 1, setPage, showRecordOnMap, setCoordinates, onResetFilters, reportHref = "/segnala" }: Props) {
+export function DirectoryCatalog({ filteredRecords, loading, loadError, onRetryLoad, cameraKinds, search, setSearch, kindFilter, setKindFilter, freshnessFilter, setFreshnessFilter, sortOrder, setSortOrder, stateFilter, setStateFilter, originFilter, setOriginFilter, page = 1, setPage, showRecordOnMap, setCoordinates, onResetFilters, reportHref }: Props) {
   const t = useMessages().directory;
   const statuses = useMessages().status;
   const { locale } = useLocale();
@@ -280,7 +282,14 @@ export function DirectoryCatalog({ filteredRecords, loadError = false, onRetryLo
           <button type="button" className="text-button" onClick={place.clearPlaceSearch}>{t.placeClearResults} <span aria-hidden="true">→</span></button>
         </div>
       )}
-      {loadError
+      {loading && filteredRecords.length === 0
+        ? (
+          // Loading state: show a truthful note during the initial walk
+          // instead of the empty state ("0 public records found" is a lie
+          // for 400ms until the first page arrives — audit 2026-08-09).
+          <p className="loading-note" role="status">{t.loading}</p>
+        )
+        : loadError
         ? (
           // Load failure (kanban t_e11080eb): truthful error state with
           // retry. The empty state ("0 public records found") would be a
