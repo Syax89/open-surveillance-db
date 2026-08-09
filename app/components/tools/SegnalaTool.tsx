@@ -70,6 +70,7 @@ export function SegnalaTool({ initialCoordinates = null }: Props) {
           setAddress={report.handleAddressChange}
           reverseGeocoding={report.reverseGeocoding}
           showHeading={false}
+          layout="tool"
         />
       </WriteGateWall>
       {notice && <p className="notice" role="status">{notice}</p>}

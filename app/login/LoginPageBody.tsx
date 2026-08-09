@@ -252,7 +252,7 @@ export function LoginPageBody() {
     <main id="main-content" className="record-page">
       <PublicNav navLabel={t.navigation} homeLabel={t.homeAria} />
 
-      <article className="record-detail auth-card">
+      <article className="record-detail auth-card auth-login-card">
         <p className="eyebrow"><span /> {mergeMode ? t.mergeTitle : t.loginTitle}</p>
         <h1>{mergeMode ? t.mergeTitle : t.loginTitle}</h1>
 

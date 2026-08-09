@@ -917,7 +917,7 @@ test("DirectoryTool Show on map pushes /mappa?focus=ID through the navigation st
 // /segnala — SegnalaTool
 // ---------------------------------------------------------------------------
 
-test("SegnalaTool renders the report form with the report bundle", async () => {
+test("SegnalaTool renders the report form in its one-column tool layout", async () => {
   const { screen } = rtl;
   await renderWithLocale(React.createElement(SegnalaTool));
 
@@ -928,6 +928,16 @@ test("SegnalaTool renders the report form with the report bundle", async () => {
   assert.ok(screen.getByLabelText("Camera type"), "kind select");
   assert.ok(screen.getByRole("checkbox"), "privacy/safety consent checkbox");
   assert.ok(screen.getByRole("button", { name: /Publish report/ }), "submit button");
+
+  // /segnala selects its own stacked layout instead of changing ReportForm's
+  // default embedding. Guidance stays first in DOM/focus order, above the form.
+  const reportSection = document.querySelector(".report-section--tool");
+  assert.ok(reportSection, "the tool selects the scoped one-column layout");
+  const context = reportSection.querySelector(":scope > div");
+  const form = reportSection.querySelector("form.report-form");
+  assert.ok(context?.querySelector(".report-rule"), "the guidance remains before the form");
+  assert.ok(form, "the report form remains the single editable surface");
+  assert.ok(context.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING, "guidance precedes fields in DOM order");
 });
 
 test("SegnalaTool refuses a submit without a position with a guidance notice", async () => {
