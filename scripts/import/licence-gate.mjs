@@ -27,6 +27,10 @@ export const IMPORTABLE_LICENSES = new Set([
   // — stessa classe attribution-only, verificato cron 2026-08-09).
   "CC BY 4.0 (NZ)",
   "CC-BY 4.0",
+  // CC BY senza versione esplicita (metadata CKAN brasiliano
+  // "Creative Commons Attribution" — Belo Horizonte BHTRANS,
+  // attribuzione-only, verificato cron 2026-08-09).
+  "CC BY",
   // CC BY 3.0 Italia (Comune di Milano — open data CKAN dichiara 'cc-by'
   // senza versione; la 3.0 IT è quella storica del portale, da confermare
   // con l'ente prima del primo import in produzione). Permissiva, solo
