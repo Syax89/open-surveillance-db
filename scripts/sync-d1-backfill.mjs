@@ -75,7 +75,6 @@ const TABLES = [
   "passkeys",
   "recovery_codes",
   "correction_requests",
-  "photos",
 ];
 
 const Q = String.fromCharCode(39);
@@ -166,8 +165,12 @@ if (DRY) {
 const files = Array.from({ length: fileIdx }, (_, i) =>
   path.join(OUT_DIR, `part-${String(i).padStart(4, "0")}.sql`),
 );
+// PITFALL (audit ops 2026-08-09): un file fallito dopo 3 tentativi deve
+// contare UNA volta — prima `fails++` girava dentro il loop dei retry, quindi
+// 1 file fallito = 3 fail riportati. Ora `fails` conta i FILE falliti.
 let fails = 0;
 for (const f of files) {
+  let failed = false;
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
       const out = execFileSync(
@@ -175,17 +178,65 @@ for (const f of files) {
         ["wrangler", "d1", "execute", "osdb-production", "--remote", "--file", f],
         { cwd: process.cwd(), encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
       );
-      if (!out.includes("ERROR")) break;
-      fails++;
+      if (!out.includes("ERROR")) {
+        failed = false;
+        break;
+      }
+      failed = true;
       console.error(`FAIL ${path.basename(f)} (tentativo ${attempt}): ${out.match(/ERROR[^\n]*/)?.[0] ?? ""}`);
-      await new Promise((res) => setTimeout(res, 3000));
     } catch (e) {
-      fails++;
+      failed = true;
       console.error(`FAIL ${path.basename(f)} (tentativo ${attempt}): ${String(e.message).slice(0, 200)}`);
-      await new Promise((res) => setTimeout(res, 3000));
     }
+    await new Promise((res) => setTimeout(res, 3000));
   }
+  if (failed) fails++;
 }
 
-console.log(fails === 0 ? `sync OK: ${fileIdx} chunk applicati` : `sync CON ERRORI: ${fails} chunk falliti`);
+// ---- Final smoke: conteggi remoti vs locali (audit ops 2026-08-09). ----
+// Dopo l'apply verifica che i conteggi del D1 remoto combacino con quelli
+// del DB locale per le tabelle sincronizzate. La UNION ALL è costruita dalle
+// stesse TABLES: se una tabella non esiste sul remoto (es. migrazione
+// pendente) il comando fallisce e viene riportato come warning, non come
+// errore del sync (gli INSERT OR IGNORE avrebbero già fallito prima).
+const localCounts = {};
+for (const t of TABLES) {
+  try {
+    localCounts[t] = db.prepare(`SELECT COUNT(*) n FROM "${t}"`).get().n;
+  } catch {
+    localCounts[t] = undefined;
+  }
+}
+const countSql = TABLES.map((t) => `SELECT '${t}' t, COUNT(*) n FROM "${t}"`).join(" UNION ALL ");
+try {
+  const out = execFileSync(
+    "npx",
+    ["wrangler", "d1", "execute", "osdb-production", "--remote", "--command", countSql, "--json"],
+    { cwd: process.cwd(), encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
+  );
+  let rows = [];
+  try {
+    const parsed = JSON.parse(out);
+    rows = Array.isArray(parsed) ? parsed : parsed?.[0]?.results ?? parsed?.results ?? [];
+  } catch {
+    rows = [];
+  }
+  if (rows.length === 0) {
+    console.log("smoke: conteggi remoti non parsabili (output raw sotto)");
+    console.log(out.slice(0, 500));
+  } else {
+    for (const r of rows) {
+      const t = String(r.t ?? "");
+      const n = Number(r.n ?? -1);
+      const local = localCounts[t] ?? "?";
+      console.log(
+        n === local ? `smoke: ${t} remoto=${n} OK` : `smoke: ${t} remoto=${n} DIVERGE (locale ${local})`,
+      );
+    }
+  }
+} catch (e) {
+  console.warn(`smoke: impossibile leggere i conteggi remoti: ${String(e.message).slice(0, 200)}`);
+}
+
+console.log(fails === 0 ? `sync OK: ${fileIdx} chunk applicati` : `sync CON ERRORI: ${fails} file falliti (su ${fileIdx})`);
 process.exit(fails === 0 ? 0 : 1);

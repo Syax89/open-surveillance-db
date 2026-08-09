@@ -53,6 +53,11 @@ const BLOCKED_ROOT_FILES = [
   "/CODE_OF_CONDUCT.md",
   "/AGENTS.md",
   "/CLAUDE.md",
+  // Tooling config files (audit ops 2026-08-09): never client modules, and
+  // the generic *.config.* / .mjs / .cjs root pattern below covers future ones.
+  "/eslint.config.mjs",
+  "/postcss.config.mjs",
+  "/lighthouserc.cjs",
 ];
 const BLOCKED_EXTENSIONS = [".sql", ".sh", ".yml", ".yaml", ".toml", ".gpg", ".pem", ".key"];
 
@@ -61,7 +66,15 @@ function isBlockedSourcePath(pathname: string): boolean {
   if (BLOCKED_SOURCE_PREFIXES.some((prefix) => pathname.startsWith(prefix))) return true;
   // Any root-level file with a server-only extension (e.g. /x.sql).
   const segments = pathname.split("/").filter(Boolean);
-  if (segments.length === 1 && BLOCKED_EXTENSIONS.some((ext) => pathname.endsWith(ext))) return true;
+  if (segments.length === 1) {
+    if (BLOCKED_EXTENSIONS.some((ext) => pathname.endsWith(ext))) return true;
+    // Root-level tooling: `*.config.*` (eslint.config.mjs, postcss.config.mjs,
+    // drizzle.config.ts) and `.mjs`/`.cjs` (lighthouserc.cjs) are never client
+    // modules — audit ops 2026-08-09 found eslint.config.mjs / postcss.config.mjs
+    // / lighthouserc.cjs served 200 on the pre-prod dev server.
+    if (/\.config\.[a-z0-9]+$/i.test(pathname)) return true;
+    if (/\.(mjs|cjs)$/i.test(pathname)) return true;
+  }
   return false;
 }
 

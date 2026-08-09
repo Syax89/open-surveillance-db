@@ -122,22 +122,67 @@ GitHub prerequisites (set once, never hardcoded in workflows):
 CLOUDFLARE_API_TOKEN   token with "D1 - Edit" permission on the account
 CLOUDFLARE_ACCOUNT_ID  Cloudflare account id
 BACKUP_PASSPHRASE      passphrase for AES-256 encryption of dumps
-PROD_URL (variable)    production hostname (currently
-                       open-surveillance-db.<your-subdomain>.workers.dev —
-                       workers.dev subdomain `<your-subdomain>`, no custom
-                       domain yet; set via `gh variable set PROD_URL <host>`,
-                       issue #203)
+D1_DATABASE_ID         real production D1 database_id (UUID; injected into
+                       wrangler.jsonc at run time — the repo keeps the
+                       placeholder 00000000-0000-4000-8000-000000000000).
+                       Without it BOTH deploy.yml and ops-backup.yml stop
+                       with a fail-fast error (never export against a
+                       placeholder DB).
+ENABLE_CF_BACKUP (var) "true" to arm the nightly backup job (see below)
+ENABLE_RESTORE_DRILL (var)
+                       "true" to arm the quarterly restore drill (see §3.4)
+PROD_URL (variable)    production hostname checked by ops-monitoring.yml
+                       (hostname only, no scheme — the workflow prepends
+                       https://). Current value verified 2026-08-09:
+                       open-surveillance-db.simone-rondina.workers.dev
+                       (the deployed Cloudflare worker answers 200; the
+                       NPM→LXC host osdb.syaxhome89.com currently answers
+                       403 from anonymous clients because the container's
+                       vite allowedHosts guard rejects it — see
+                       DEPLOYMENT.md §Local LXC deployment). Set via
+                       `gh variable set PROD_URL <host>`, issue #203.
+PROD_URL_ALT (variable, optional)
+                       second hostname for the dual health check in
+                       ops-monitoring.yml (both must pass).
 ```
 
-> **Secrets status (2026-08-01)**: `BACKUP_PASSPHRASE` configured (local
-> GPG vault `<secrets-dir>/osdb-backup-passphrase.gpg`, 384-bit entropy,
-> `openssl rand -base64 48`). `CLOUDFLARE_API_TOKEN` and
-> `CLOUDFLARE_ACCOUNT_ID` are NOT configured and NOT needed while the
-> deployment is local (section 8): the remote D1 backup becomes
-> operational only after the public Cloudflare deployment (ADR 0012,
-> DEPLOYMENT.md). `ops-backup.yml` has a fail-fast guard that stops the run
-> with a clear error until those two secrets exist — never export to a
-> non-existent account. Pre-launch checklist: section 6.
+> **Secrets status (2026-08-09, ops audit)**: `BACKUP_PASSPHRASE`,
+> `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` configured. `ENABLE_CF_BACKUP`
+> and `ENABLE_RESTORE_DRILL` NOT set → the nightly backup and the quarterly
+> drill are skipped by design until the vars are armed. `D1_DATABASE_ID`
+> NOT set as a GitHub secret yet: the value exists in the local GPG vault
+> (`<secrets-dir>/cloudflare-d1-database-id.gpg`, 36 chars = UUID) and the
+> read-only export below was executed with it, but the GitHub secret must
+> be created by an operator:
+>
+> ```bash
+> # operator step (needs the vault value, never commit it):
+> gh secret set D1_DATABASE_ID
+> # arm the nightly backup only AFTER D1_DATABASE_ID exists:
+> gh variable set ENABLE_CF_BACKUP true
+> ```
+>
+> Until `ENABLE_CF_BACKUP=true`, the scheduled backup job shows as
+> "skipped" in Actions (by design, not red) and the local container backup
+> (`ops/backup-lxc114.sh`, section 8) remains the active backup path.
+
+**Read-only export test (2026-08-09, verified)**: a manual
+`wrangler d1 export osdb-production --remote` executed from a worktree with
+the vault-injected `database_id` succeeds and produces a full schema+data
+dump (35.7 MB, `cameras` rows present) — proving the export side of the
+backup pipeline works with the current credentials. Command used (read-only,
+never touch the remote):
+
+```bash
+# inject the real database_id from the vault into a TEMP config only
+DBID=$(gpg -d --batch --quiet <secrets-dir>/cloudflare-d1-database-id.gpg | tr -d '\n')
+sed "s/00000000-0000-4000-8000-000000000000/$DBID/" wrangler.jsonc > /tmp/wrangler-export.jsonc
+CLOUDFLARE_API_TOKEN="$(gpg -d --batch --quiet <secrets-dir>/cloudflare-api-token.gpg | tr -d '\n')" \
+CLOUDFLARE_ACCOUNT_ID="$(gpg -d --batch --quiet <secrets-dir>/cloudflare-account-id.gpg | tr -d '\n')" \
+  npx wrangler d1 export osdb-production --remote --config=/tmp/wrangler-export.jsonc \
+  --output=/tmp/osdb-export.sql
+rm -f /tmp/wrangler-export.jsonc
+```
 
 Decrypting a backup for a restore drill:
 
@@ -147,9 +192,11 @@ openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:$BACKUP_PASSPHRASE" \
 sha256sum -c d1-backup-<DATE>.sql.enc.sha256   # integrity check before restore
 ```
 
-Repo prerequisites: the real production D1 `database_id` is injected at
-deploy time from the GitHub secret `D1_DATABASE_ID` (wrangler.jsonc keeps
-the placeholder `00000000-0000-4000-8000-000000000000`, see DEPLOYMENT.md).
+The real production D1 `database_id` is injected at deploy/backup time from
+the GitHub secret `D1_DATABASE_ID` (wrangler.jsonc keeps the placeholder
+`00000000-0000-4000-8000-000000000000`, see DEPLOYMENT.md); the workflow
+`ops-backup.yml` has its own inject step (fail-fast) since the 2026-08-09
+audit — the backup must never export against a placeholder DB.
 
 ### 3.3 Post-backup integrity verification
 
@@ -401,16 +448,23 @@ local environment: a LAN-only test container reachable at
 `http://<lan-ip>:3000`. It is the reference environment for staging
 verifications (DEPLOYMENT.md §"Local LXC deployment").
 
-### 8.0 Container access: via Proxmox API, not SSH
+### 8.0 Container access: Proxmox API for lifecycle ops, SSH for code deploys
 
 - The deploy key documented in DEPLOYMENT.md **was never injected** at
-  `vzcreate` (verified on the 2026-07-31 17:01 task log) and the API schema
-  does not allow adding `ssh-public-keys`/`password` post-create.
-- All operations (snapshot, rollback, backup, stop/start) use the **Proxmox
-  API token**, decrypted at runtime from the local GPG vault
+  `vzcreate` (verified on the 2026-07-31 17:01 task log), but it **was**
+  added post-create via the Proxmox API (`lxc-inject-sshkey.py`:
+  `PUT .../lxc/<vmid>/config` with `ssh-public-keys` + fresh digest, then
+  reboot) — the operator workstation connects as `root@<lan-ip>` with the
+  injected key (verified 2026-08-09; the Hermes sync cron
+  `osdb-sync-d1.sh` uses the same SSH path).
+- Lifecycle operations (snapshot, rollback, backup, stop/start) use the
+  **Proxmox API token**, decrypted at runtime from the local GPG vault
   (`<secrets-dir>/proxmox-token.gpg`, path configurabile con `PVE_TOKEN_GPG`) — never hardcoded in scripts.
+- Code deploys/updates use SSH (`git fetch && git reset --hard origin/main`
+  on the container — RELEASE_CHECKLIST.md §6), always after taking the
+  pre-deploy snapshot (§8.4).
 - Prerequisite on the machine running the scripts: `gpg` with the vault key,
-  `curl`, `python3`.
+  `curl`, `python3`, and the SSH key for `root@<lan-ip>`.
 
 ### 8.1 Periodic health check (monitoring)
 
@@ -419,8 +473,21 @@ Script: `ops/health-check.sh`
 ```bash
 # manual
 ops/health-check.sh
-# cron (workstation): every 5 minutes
-*/5 * * * * <repo-path>/ops/health-check.sh >> <log-dir>/osdb-health.log 2>&1
+# cron (workstation): every 5 minutes — OSDB_BASE_URL MUST be set, the
+# script has no LAN-IP default (audit ops 2026-08-09: the previous cron
+# entry without it resolved <lan-ip> to nothing → every check 000/FAIL)
+*/5 * * * * OSDB_BASE_URL=http://<lan-ip>:3000 \
+  OSDB_HEALTH_LOG=<log-dir>/osdb-health.log \
+  <repo-path>/ops/health-check.sh >> <log-dir>/osdb-health.log 2>&1
+# alerting (audit ops 2026-08-09): on failure the script opens (or reuses)
+# a GitHub issue "ops: health check FAILED" — same channel as
+# .github/workflows/ops-monitoring.yml. Enable with OSDB_GH_ALERT=1:
+*/5 * * * * OSDB_BASE_URL=http://<lan-ip>:3000 \
+  OSDB_HEALTH_LOG=<log-dir>/osdb-health.log OSDB_GH_ALERT=1 \
+  OSDB_GH_REPO=Syax89/open-surveillance-db \
+  <repo-path>/ops/health-check.sh >> <log-dir>/osdb-health.log 2>&1
+# (requires `gh` authenticated on the workstation; without OSDB_GH_ALERT=1
+# the behaviour is unchanged: log + /tmp/osdb-health-FAIL marker only)
 ```
 
 Verified routes (expected → meaning):
@@ -514,6 +581,73 @@ Verified Proxmox rollback behaviour:
 - The vzdump archives contain the entire container rootfs (including D1 with
   possible correction requests): private NAS storage, restricted access,
   never on public channels.
+
+### 8.6 Container → D1 production data sync (backfill)
+
+Script: `scripts/sync-d1-backfill.mjs` (Hermes cron wrapper:
+`osdb-sync-d1.sh` on the operator workstation).
+
+Purpose: one-way sync of the container's LOCAL miniflare D1 (the source of
+truth for imported camera data) to the REMOTE Cloudflare D1
+(`osdb-production`). Remote rows are never overwritten: every statement is
+`INSERT OR IGNORE`, so only ids missing on the remote are added. Deletes are
+NOT propagated (a camera removed locally stays on the remote; the
+moderation flow owns removals).
+
+Constraints (learned the hard way, documented in the script header):
+
+- D1 remote limits: max SQL statement 100 KB, max row 2 MB → statements are
+  chunked (10 rows/stmt, 20 stmts/file; `import_batches.report/notes` are
+  truncated to 40 KB each and use 1 row/stmt).
+- FK order matters: contributors → import_batches → cameras → lifecycle →
+  community_actions → settings → passkeys → recovery → correction_requests.
+- `geocode_reverse_cache` is deliberately excluded (regenerable cache).
+- The local DB is auto-detected as the 64-hex `*.sqlite` in
+  `.wrangler/state/v3/d1/miniflare-D1DatabaseObject` — a stale `db.sqlite`
+  in the same directory is ignored (pitfall 2026-08-09: it silently
+  synced an old DB).
+- **`photos` is NOT in the table list** — the table was dropped by
+  migration 0043 (audit ops 2026-08-09).
+
+Runbook (never run the backfill without evidence; it writes to production):
+
+```bash
+# read-only preview: dumps the local DB into chunk files, NO remote write
+node scripts/sync-d1-backfill.mjs --dry-run
+# real sync (requires CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID in env;
+# usually executed by the Hermes cron wrapper, which decrypts them from the
+# local GPG vault and copies them to the container):
+node scripts/sync-d1-backfill.mjs
+```
+
+Exit code: 0 = all chunk files applied; 1 = at least one file failed after
+3 retries (the count is per FILE, not per attempt — audit ops 2026-08-09).
+Final smoke: after the apply the script compares remote vs local row counts
+for every synced table and prints `smoke: <t> remoto=N OK|DIVERGE`.
+
+### 8.7 Log rotation (wrangler.log)
+
+The systemd unit sets `WRANGLER_LOG_PATH=.wrangler/wrangler.log`
+(DEPLOYMENT.md §systemd unit). The file grows unbounded — add a logrotate
+config on the container (or truncate at every restart):
+
+```bash
+# /etc/logrotate.d/osdb-wrangler  (container)
+/opt/open-surveillance-db/.wrangler/wrangler.log {
+  daily
+  rotate 7
+  compress
+  missingok
+  notifempty
+  copytruncate
+}
+```
+
+`copytruncate` keeps the running process writing to the same inode without
+a restart. Alternatively add `ExecStartPre=/usr/bin/truncate -s 0
+/opt/open-surveillance-db/.wrangler/wrangler.log` to the unit so every
+service restart resets the log (logrotate is preferred for a long-running
+service).
 
 ---
 

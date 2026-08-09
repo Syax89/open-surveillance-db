@@ -18,7 +18,9 @@ LAN.
   PR flow; releases are tagged `v*`, CI builds from the tag).
 - A machine with Node.js `>= 22.13` for the verification steps.
 - SSH root access to the test container (`root@<lan-ip>`, deploy key
-  injected at container creation; password login disabled).
+  injected post-create via the Proxmox API — `lxc-inject-sshkey.py`,
+  see [DEPLOYMENT.md](DEPLOYMENT.md#local-lxc-deployment-current);
+  password login disabled).
 - The site is reachable on the LAN: `http://<lan-ip>:3000`.
 
 ## Checklist
@@ -99,6 +101,8 @@ git push origin v0.1.0            # CI builds from the tag
 ### 6. Deploy to the test container
 
 ```bash
+# 0. MANDATORY (ops audit 2026-08-09): rollback base before any update
+ops/snapshot-pre-deploy.sh          # default name pre-deploy-YYYYMMDD-HHMMSS
 ssh root@<lan-ip>
 cd /opt/open-surveillance-db
 git fetch origin && git reset --hard origin/main
@@ -108,6 +112,9 @@ systemctl status osdb-test.service --no-pager    # active (running)
 journalctl -u osdb-test.service -n 50 --no-pager # no startup errors
 ```
 
+- [ ] Pre-deploy snapshot exists (`pre-deploy-*`), see
+      [DEPLOYMENT.md](DEPLOYMENT.md#local-lxc-deployment-current) and
+      [OPERATIONS.md](OPERATIONS.md#84-rollback-pre-deploy-snapshot).
 - [ ] Service is `active (running)` after the restart.
 - [ ] `journalctl` shows a clean startup (no `ERR_UNSUPPORTED_ESM_URL_SCHEME`
       or crash loop).
@@ -145,10 +152,15 @@ curl -sS http://<lan-ip>:3000/api/cameras | grep -c '"notes"'                   
 
 ## Rollback (local environment)
 
-The local site tracks `origin/main`; rolling back is a redeploy of a previous
-good commit:
+Two options; prefer the pre-deploy snapshot (fastest, full filesystem
+restore) when one was taken before the bad deploy:
 
 ```bash
+# Option 1 — Proxmox snapshot rollback (rollback base taken before deploy)
+ops/rollback-lxc114.sh pre-deploy-YYYYMMDD-HHMMSS
+# (stop→rollback→start→wait→health check are handled by the script)
+
+# Option 2 — redeploy of a previous good commit (the local site tracks origin/main)
 ssh root@<lan-ip>
 cd /opt/open-surveillance-db
 git fetch origin
@@ -157,7 +169,8 @@ npm ci
 systemctl restart osdb-test.service
 ```
 
-- [ ] Previous good commit identified (from the release record in step 8).
+- [ ] Previous good commit identified (from the release record in step 8),
+      or pre-deploy snapshot name recorded from step 6.
 - [ ] Service is `active (running)` and smoke tests (step 7) pass again.
 
 For the Cloudflare Workers deployment the rollback procedure is the
