@@ -57,10 +57,12 @@ scope).
 
 **(c) Large-scale processing of special categories (art. 9) or criminal
 conviction data (art. 10).** Special categories are **not** intentionally
-collected (PRIVACY_NOTICE § 3); evidence that incidentally captures people,
-plates, or private interiors is redacted or deleted on the spot
-(MODERATION.md, RETENTION_SCHEDULE.md R6). No criminal-conviction data is
-processed.
+collected (PRIVACY_NOTICE § 3); records are **text metadata only** (image
+evidence removed 2026-08-08 — no media upload exists), and report text that
+carries incidental personal data (e.g. a name or a plate in the description)
+violates the content rules and is handled by community moderation and
+corrections (MODERATION.md, RETENTION_SCHEDULE.md R6). No criminal-conviction
+data is processed.
 
 ### "Large scale" factors (EDPB Guidelines on DPOs, WP 243 rev.01)
 
@@ -72,7 +74,7 @@ processing; geographical extent. For OpenSurveillanceDB:
 |---|---|
 | Number of data subjects | Low — voluntary, pseudonymous contributors; no tracking of third parties. Published records concern infrastructure, not persons |
 | Volume of data | Low — structured records of camera locations; no image data (image evidence removed 2026-08-08; existing objects retained, no deletion) |
-| Duration | Bounded — retention schedule with fixed terms (R5–R7); no indefinite accumulation |
+| Duration | Bounded — retention schedule with fixed terms (e.g. R19/R20 for legacy `pending`/`rejected` hard deletes); no indefinite accumulation |
 | Geographical extent | Single pilot deployment, community-governed, non-commercial; no EU-wide or cross-border operation |
 
 None of the factors is satisfied; the processing cannot be described as

@@ -60,7 +60,7 @@ Material decisions are recorded as Architecture Decision Records (ADRs) in
 | [0013](docs/decisions/0013-contributor-accounts-and-sessions.md) | Contributor accounts and sessions |
 | [0014](docs/decisions/0014-auth-roles-appeals.md) | Coarse auth roles, route-level authorization, and contributor appeals |
 
-## Before launch
+## Launch status
 
 Initial maintainers and the moderation contact are now named above (2026-07-31).
 The launch prerequisites that earlier versions of this section listed as still
@@ -81,6 +81,6 @@ open have since been implemented:
   bilingual `/contatti` page publishes the named roles, the data controller, the
   correction e-mail, and the security advisory route.
 
-Still open before launch: **conflict-of-interest rules** for maintainers and
-moderators. This document is a starting proposal, not a claim that the full
-public governance structure already exists.
+Tracking (non-blocking): **conflict-of-interest rules** for maintainers and
+moderators are not yet codified. This document is a starting proposal, not a
+claim that the full public governance structure already exists.

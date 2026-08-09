@@ -22,7 +22,7 @@ This folder is the **single canonical location** for the legal deliverables
 | [RETENTION_SCHEDULE.md](RETENTION_SCHEDULE.md) | In force (implemented — enforced by the daily retention cron) | Storage limitation, deletion terms per data category, operational logs, legal hold, deletion definition |
 | [PRIVACY_NOTICE.md](PRIVACY_NOTICE.md) | In force | Art. 13/14 information, rights (12–22), negative scope, contact, response times |
 | [LAWFUL_BASIS.md](LAWFUL_BASIS.md) | In force | Art. 6 bases per processing category, balancing test, 6(1)(e) for official sources |
-| [PROCESSOR_REGISTER.md](PROCESSOR_REGISTER.md) | In force | Art. 30 register: Cloudflare, GitHub/Google OIDC (PR5/PR6), OSM; DPA version, SCC, EU–US DPF |
+| [PROCESSOR_REGISTER.md](PROCESSOR_REGISTER.md) | In force | Art. 30 register: Cloudflare, GitHub/Google OIDC (PR4/PR5), Nominatim geocoding (PR6), OSM; DPA version, SCC, EU–US DPF |
 | [BREACH_PROCEDURE.md](BREACH_PROCEDURE.md) | In force | Art. 33/34 notification procedure, scenario table |
 | [MODERATION_SLA.md](MODERATION_SLA.md) | In force (implemented) | Response targets, appeals, audit log, moderator privacy |
 | [DPO_EXCLUSION.md](DPO_EXCLUSION.md) | In force | GDPR art. 37 assessment: no mandatory DPO (art. 37(1) N/A), voluntary DPO declined (art. 37(4)), accountability (arts. 5(2), 24), review triggers |
@@ -47,7 +47,7 @@ are product/UX deliverables; they are linked here only for discoverability.
   mandatory email verification for write access, optional passkeys
   (WebAuthn), optional OIDC via GitHub/Google (server-gated: buttons are
   shown only when the operator configured the provider; see PRIVACY_NOTICE.md
-  § 3.1 and PROCESSOR_REGISTER.md PR5/PR6).
+  § 3.1 and PROCESSOR_REGISTER.md PR4/PR5).
 - **Community-driven model (ADR 0021):** implemented — immediate publication
   from verified accounts, community actions with automatic thresholds,
   public per-record history without attribution, private corrections, and the

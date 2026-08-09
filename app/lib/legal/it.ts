@@ -24,7 +24,7 @@ export const itLegal: LegalContent = {
     intro:
       "Come OpenSurveillanceDB tratta i dati personali, cosa pubblichiamo, cosa non raccogliamo mai e come puoi esercitare i tuoi diritti ai sensi del GDPR.",
     versionNote:
-      "Versione 0.7 — 8 agosto 2026. Allineamento allo stato attuale (template-ready): risincronizzata con la PRIVACY_NOTICE canonica v0.13 (docs/legal/PRIVACY_NOTICE.md resta la versione canonica). Modello community-driven (ADR 0021): le segnalazioni vengono pubblicate subito da account verificati; § 7 conservazione applicata dallo sweep giornaliero; § 3.1 autenticazione multi-metodo (verifica email, passkey, OIDC server-gated — ADR 0020); rimozione dell'evidenza fotografica (2026-08-08).",
+      "Versione 0.8 — 9 agosto 2026. Allineamento da audit legale: risincronizzata con la PRIVACY_NOTICE canonica v0.14 (docs/legal/PRIVACY_NOTICE.md resta la versione canonica). § 5 aggiunge il processore di geocoding Nominatim (PR6); § 7 documenta le regole di cancellazione definitiva delle segnalazioni legacy `pending`/`rejected` (R19/R20); § 10 sezione Cookie; riferimenti ai processori OIDC corretti a PR4/PR5; nota sulle categorie particolari riformulata per il modello solo-testo (rimozione dell'evidenza fotografica).",
     sections: [
       {
         heading: "1. Chi siamo (titolare del trattamento)",
@@ -130,7 +130,7 @@ export const itLegal: LegalContent = {
           },
           {
             type: "note",
-            text: "**Categorie particolari (art. 9 GDPR):** nessuna viene raccolta intenzionalmente. I contenuti che catturano incidentalmente persone identificabili, targhe o interni privati vengono oscurati o eliminati.",
+            text: "**Categorie particolari (art. 9 GDPR):** nessuna viene raccolta intenzionalmente. I record sono **solo metadati testuali** — la funzione di evidenza fotografica è stata rimossa (2026-08-08, tabella `photos` eliminata dalla migrazione 0043), quindi non esiste alcun caricamento di media. Il testo delle segnalazioni che contiene incidentalmente dati personali (ad es. un nome o una targa nella descrizione) viola le regole sui contenuti ed è gestito dalla moderazione e dalle correzioni della community.",
           },
           {
             type: "note",
@@ -161,6 +161,7 @@ export const itLegal: LegalContent = {
             type: "list",
             items: [
               "**Cloudflare, Inc.** — hosting e database (Workers + D1). Responsabile del trattamento (art. 28) ai sensi del Cloudflare Data Processing Addendum (DPA v6.3, giugno 2025) che incorpora le **clausole contrattuali standard UE (2021/914)**; Cloudflare è certificato ai sensi dell'**EU–US Data Privacy Framework**. D1 è configurato con residenza dati UE.",
+              "**OpenStreetMap Foundation (Nominatim — nominatim.openstreetmap.org, responsabile PR6).** Geocoding per il flusso di segnalazione e le pagine dei record: ricerca in avanti per nome di luogo (`GET /api/geocode`, fino a 5 suggerimenti) e inversa coordinate→indirizzo (`GET /api/geocode/reverse`, precompilazione del modulo di segnalazione). Viene inviata solo la query stessa — stringhe di testo libero per luoghi/indirizzi e coordinate arrotondate a ~4 decimali (~11 m); la risposta (indirizzo visualizzato) è memorizzata nella cache D1 (`geocode_reverse_cache`). **Nessun dato personale, nessun dato dell'account, nessun profiling, i dati del richiedente non vengono mai inviati né registrati.** L'uso rispetta la policy Nominatim: max **1 req/s**, User-Agent identificativo, cache-first.",
               "**GitHub, Inc. / Google LLC (fornitori di identità OIDC — facoltativi, solo se scegli questo metodo).** Sono **titolari autonomi dei propri servizi di autenticazione** (le loro privacy policy si applicano al momento dell'accesso); nessun dato di OpenSurveillanceDB viene inviato a loro — riceviamo solo gli attributi di identità elencati nel § 3 (provider, subject id, nome visualizzato, flag di verifica; mai l'email). Il fornitore osserva l'accesso e il tuo IP. Mai pubblicati, mai registrati.",
               "**La pubblicazione stessa:** i record pubblicati diventano parte di un dataset pubblico con licenza ODbL 1.0 e possono essere scaricati o esportati (JSON/CSV/GeoJSON). Le copie già scaricate non possono essere richiamate; i record ritirati sono esclusi dalle esportazioni future.",
               "Nessun altro destinatario; niente pubblicità comportamentale; nessuna libreria di analisi.",
@@ -193,7 +194,7 @@ export const itLegal: LegalContent = {
           },
           {
             type: "paragraph",
-            text: "Le regole di cancellazione e scadenza sono applicate automaticamente dallo sweep giornaliero di conservazione (pianificato in `worker/index.ts`, ogni giorno alle 03:00 UTC — RETENTION_SCHEDULE.md § 3): il cron elimina le righe scadute (R12/R16/R17/R18), archivia le voci di audit al traguardo dei 2 anni (R4/R5/R9) e non cambia mai lo stato del ciclo di vita dei record (modello community, ADR 0021 § 2.2).",
+            text: "Le regole di cancellazione e scadenza sono applicate automaticamente dallo sweep giornaliero di conservazione (pianificato in `worker/index.ts`, ogni giorno alle 03:00 UTC — RETENTION_SCHEDULE.md § 3): il cron elimina le righe scadute (R12/R16/R17/R18), cancella definitivamente le segnalazioni legacy `pending` 90 giorni dopo l'invio (**R19**) e i record legacy `rejected` 30 giorni dopo la decisione (**R20**, entrambi saltati se è aperto un ricorso o è attivo un legal hold), archivia le voci di audit al traguardo dei 2 anni (R4/R5/R9) e non cambia mai lo stato del ciclo di vita dei record pubblicati (modello community, ADR 0021 § 2.2).",
           },
         ],
       },

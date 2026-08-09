@@ -21,7 +21,7 @@ export const enLegal: LegalContent = {
     intro:
       "How OpenSurveillanceDB processes personal data, what we publish, what we never collect, and how you can exercise your rights under the GDPR.",
     versionNote:
-      "Version 0.7 — 8 August 2026. Current-state alignment (template-ready): re-synchronised with the canonical PRIVACY_NOTICE v0.13 (docs/legal/PRIVACY_NOTICE.md remains canonical). Community-driven model (ADR 0021): reports publish immediately from verified accounts; § 7 retention enforced by the daily retention sweep; § 3.1 multi-method authentication (email verification, passkeys, OIDC server-gated — ADR 0020); image evidence removed (2026-08-08).",
+      "Version 0.8 — 9 August 2026. Legal-audit alignment: re-synchronised with the canonical PRIVACY_NOTICE v0.14 (docs/legal/PRIVACY_NOTICE.md remains canonical). § 5 adds the Nominatim geocoding processor (PR6); § 7 documents the legacy `pending`/`rejected` hard-delete rules (R19/R20); § 10 Cookie section; OIDC processor references corrected to PR4/PR5; special-category note reworded to the text-only model (image evidence removed).",
     sections: [
       {
         heading: "1. Who we are (controller)",
@@ -127,7 +127,7 @@ export const enLegal: LegalContent = {
           },
           {
             type: "note",
-            text: "**Special categories (Art. 9 GDPR):** none are intentionally collected. Content that incidentally captures identifiable people, plates or private interiors is redacted or deleted.",
+            text: "**Special categories (Art. 9 GDPR):** none are intentionally collected. Records are **text metadata only** — the image-evidence feature was removed (2026-08-08, `photos` table dropped by migration 0043), so there is no media upload at all. Report text that carries incidental personal data (e.g. a name or a plate in the description) violates the content rules and is handled by community moderation and corrections.",
           },
           {
             type: "note",
@@ -158,6 +158,7 @@ export const enLegal: LegalContent = {
             type: "list",
             items: [
               "**Cloudflare, Inc.** — hosting and database (Workers + D1). Processor (Art. 28) under the Cloudflare Data Processing Addendum (DPA v6.3, June 2025) incorporating **EU Standard Contractual Clauses (2021/914)**; Cloudflare is certified under the **EU–US Data Privacy Framework**. D1 is configured for EU residency.",
+              "**OpenStreetMap Foundation (Nominatim — nominatim.openstreetmap.org, processor PR6).** Geocoding for the report flow and record pages: forward place-name search (`GET /api/geocode`, up to 5 suggestions) and reverse coordinate→address (`GET /api/geocode/reverse`, report-form prefill). Only the query itself is sent — free-text place/address strings and coordinates rounded to ~4 decimals (~11 m); the reply (display address) is stored in the D1 cache (`geocode_reverse_cache`). **No personal data, no account data, no profiling, requestor data never sent or logged.** Usage respects the Nominatim policy: max **1 req/s**, identifying User-Agent, cache-first.",
               "**GitHub, Inc. / Google LLC (OIDC identity providers — optional, only if you choose that method).** They are **independent controllers of their own authentication services** (their privacy policies apply at sign-in); no OpenSurveillanceDB data is sent to them — we only receive the identity attributes listed in § 3 (provider, subject id, display name, verified flag; never the email). The provider observes the sign-in and your IP. Never published, never logged.",
               "**Publication itself:** published records become part of a public dataset licensed ODbL 1.0 and may be downloaded or exported (JSON/CSV/GeoJSON). Copies already downloaded cannot be recalled; withdrawn records are excluded from future exports.",
               "No other recipients; no behavioural advertising; no analytics libraries.",
@@ -190,7 +191,7 @@ export const enLegal: LegalContent = {
           },
           {
             type: "paragraph",
-            text: "The deletion and expiry rules are enforced automatically by the daily retention sweep (scheduled in `worker/index.ts`, daily at 03:00 UTC — RETENTION_SCHEDULE.md § 3): the cron deletes expired rows (R12/R16/R17/R18), archives audit entries at the 2-year mark (R4/R5/R9), and never changes record lifecycle status (community model, ADR 0021 § 2.2).",
+            text: "The deletion and expiry rules are enforced automatically by the daily retention sweep (scheduled in `worker/index.ts`, daily at 03:00 UTC — RETENTION_SCHEDULE.md § 3): the cron deletes expired rows (R12/R16/R17/R18), hard-deletes legacy `pending` submissions 90 days after submission (**R19**) and legacy `rejected` records 30 days after the decision (**R20**, both skipped while an appeal is open or a legal hold is active), archives audit entries at the 2-year mark (R4/R5/R9), and never changes record lifecycle status of published records (community model, ADR 0021 § 2.2).",
           },
         ],
       },
