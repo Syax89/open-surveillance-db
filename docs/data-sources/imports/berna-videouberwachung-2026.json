@@ -1,11 +1,11 @@
 {
-  "slug": "berna-videouberwachung-2026",
-  "source_name": "Kanton Bern — Amt für Geoinformation (Videoüberwachung im öffentlichen Raum)",
-  "format": "geoparquet",
-  "license": "Open use. Attribution required (Kanton Bern)",
-  "license_url": "https://opendata.swiss/de/terms-of-use/",
-  "attribution_text": "Fonte: Kanton Bern, Geoportal (https://www.be.ch/geoportal), dataset \"Videoüberwachung im öffentlichen Raum\" — freie Nutzung mit Quellenangabe (Nutzungsbestimmung kantonale Geodaten, 24.03.2021).",
-  "source_url": "https://geofiles.be.ch/geoportal/pub/download/VIDEO/video_video.parquet",
-  "max_records": 200,
-  "notes": "Scan stato-per-stato CH (CEO 2026-08-07): dataset ufficiale del Canton Berna con le telecamere di videosorveglianza nello spazio pubblico (ospedali, Kantonspolizei, SID...). GeoParquet ZSTD letto con hyparquet+fzstd (pure JS); coordinate CH1903+/LV95 (EPSG:2056) convertite in WGS84 con la formula ufficiale swisstopo. 76 record. Licenza: 'Freie Nutzung. Quellenangabe ist Pflicht' = standard OGD svizzero (equivalente CC-BY, matrice compatibile). external_id be-video:<objectid>."
+ "slug": "berna-videouberwachung-2026",
+ "source_name": "Kanton Bern — Amt für Geoinformation (Videoüberwachung im öffentlichen Raum)",
+ "format": "geoparquet",
+ "license": "Open use. Attribution required (Kanton Bern)",
+ "license_url": "https://opendata.swiss/de/terms-of-use/",
+ "attribution_text": "Fonte: Kanton Bern, Geoportal (https://www.be.ch/geoportal), dataset \"Videoüberwachung im öffentlichen Raum\" — freie Nutzung mit Quellenangabe (Nutzungsbestimmung kantonale Geodaten, 24.03.2021).",
+ "source_url": "https://geofiles.be.ch/geoportal/pub/download/VIDEO/video_video.parquet",
+ "max_records": 200,
+ "notes": "Scan stato-per-stato CH (CEO 2026-08-07): dataset ufficiale del Canton Berna con le telecamere di videosorveglianza nello spazio pubblico (ospedali, Kantonspolizei, SID...). GeoParquet ZSTD letto con hyparquet+fzstd (pure JS); coordinate CH1903+/LV95 (EPSG:2056) convertite in WGS84 con la formula ufficiale swisstopo. 76 record. Licenza: 'Freie Nutzung. Quellenangabe ist Pflicht' = standard OGD svizzero (equivalente CC-BY, matrice compatibile). external_id be-video:<objectid>. Nota PM 2026-08-09: PDF ufficiale del dataset datato 20.01.2026 (verificato)."
 }

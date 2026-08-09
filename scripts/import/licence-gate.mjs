@@ -86,25 +86,31 @@ export const IMPORTABLE_LICENSES = new Set([
   "public domain (ODOT)",
   // Kentucky — KYTC: CC0 1.0 dichiarato su maps.kytc.ky.gov (2026-08-09).
   "CC0 1.0",
-  // King County WA — terms espliciti: copy/distribute/use permitted,
-  // sale requires written agreement (2026-08-09).
-  "King County GIS Terms (copy/distribute permitted; sale prohibited)",
   // New England 511 (VT/NH/ME) — Tri-State Developer Agreement:
   // use/reproduce/redistribute with attribution, no NC clause.
   "Tri-State Developer Agreement",
   "ODC PDDL 1.0",
   // Thailandia — Thai GD Catalog: "Open Data Common" (ODC) dichiarata
-  // sui portali provinciali gdcatalog.go.th (Nakhon Ratchasima,
-  // Phetchaburi), verificato cron 2026-08-09.
+  // sul portale provinciale gdcatalog.go.th (Nakhon Ratchasima),
+  // verificato cron 2026-08-09. ATTENZIONE: "Open Data Common" NON è una
+  // licenza valida della famiglia Open Data Commons (ODbL/ODC-By/ODC-PDDL)
+  // — stringa ambigua. DECISIONE PM 2026-08-09 (kanban t_8a0445a4):
+  // mantenuta SOLO per Nakhon Ratchasima, dove l'adapter filtra le sole
+  // camere pubbliche/governative (categoria 'ราชการ', 3.476 righe) per
+  // ragioni di privacy; il 2° dataset Phetchaburi è stato RIMOSSO dal
+  // dataset pubblico (batch non importato/rollback). Il mapping alla DGA
+  // Open Government License resta un'opzione aperta (matrice § 3.9.3).
   "Open Data Common (ODC)",
   // Australian CC-BY 3.0 (TfNSW live cameras, QLD state roads — both
   // data.gov.au / data.qld.gov.au, attribution-only).
   "CC BY 3.0 AU",
   "CC-BY 3.0 AU",
-  // Generic CC BY 3.0 — Denver Open Data Catalog licensed under CC BY 3.0
-  // (denvergov.org/opendata, verified 2026-08-08: "The City and County of
-  // Denver Open Data Catalog provides open data licensed under the
-  // Creative Commons Attribution 3.0 license (CC BY 3.0)").
+  // Generic CC BY 3.0 — classe attribution-only. DECISIONE PM 2026-08-09
+  // (kanban t_8a0445a4): il dataset Denver HALO NON espone licenza
+  // esplicita (solo disclaimer del catalogo) → campo licenza del
+  // descrittore corretto a "No explicit license — disclaimer (to be
+  // confirmed)" e batch NON importabile finché confermato; la stringa
+  // generica resta in allowlist per altre fonti CC BY 3.0.
   "CC BY 3.0",
   // Flemish open-data standard (Verkeerscentrum DATEX II v3 feed).
   "Vlaamse Open Data Licentie v1.0",

@@ -1,11 +1,11 @@
 {
-    "slug": "usa-denver-halo-cameras-2026",
-    "source_name": "Denver Police Department — HALO Cameras",
-    "format": "arcgis-featureserver",
-    "license": "CC BY 3.0",
-    "license_url": "https://creativecommons.org/licenses/by/3.0/",
-    "attribution_text": "Fonte: City and County of Denver, Denver Open Data Hub — HALO Cameras (DPD) (https://services1.arcgis.com/zdB7qR0BtYrg0Xpl), concesso con licenza CC BY 3.0 (Creative Commons Attribution 3.0 — policy ufficiale del Denver Open Data Catalog: 'provides open data licensed under the Creative Commons Attribution 3.0 license').",
-    "source_url": "https://services1.arcgis.com/zdB7qR0BtYrg0Xpl/arcgis/rest/services/Halo_Cameras/FeatureServer/0",
-    "max_records": 400,
-    "notes": "Scan catalog.csv + verifica diretta (CEO 2026-08-08): 259 telecamere HALO Denver PD (FeatureServer Web Mercator, attrs LOCATION; count 259 verificato). Licenza CONFERMATA: CC BY 3.0 esplicita nella policy Denver Open Data Catalog (denvergov.org/opendata, testo verificato 2026-08-08). external_id denver-halo:<OBJECTID>."
+ "slug": "usa-denver-halo-cameras-2026",
+ "source_name": "Denver Police Department — HALO Cameras",
+ "format": "arcgis-featureserver",
+ "license": "No explicit license — disclaimer (to be confirmed)",
+ "license_url": "https://denvergov.org/opendata",
+ "attribution_text": "Fonte: City and County of Denver, Denver Open Data Hub — HALO Cameras (DPD) (https://services1.arcgis.com/zdB7qR0BtYrg0Xpl). Nessuna licenza esplicita sul dataset (solo disclaimer del catalogo) — da confermare con l'ente prima dell'import.",
+ "source_url": "https://services1.arcgis.com/zdB7qR0BtYrg0Xpl/arcgis/rest/services/Halo_Cameras/FeatureServer/0",
+ "max_records": 400,
+ "notes": "Scan catalog.csv + verifica diretta (CEO 2026-08-08): 259 telecamere HALO Denver PD (FeatureServer Web Mercator, attrs LOCATION; count 259 verificato). DECISIONE PM 2026-08-09 (kanban t_8a0445a4): la policy del catalogo Denver Open Data Catalog dichiara CC BY 3.0 ma il dataset specifico NON espone licenza esplicita → campo licenza corretto a 'No explicit license — disclaimer (to be confirmed)' e batch NON importabile finché confermato (fail-closed sul gate). external_id denver-halo:<OBJECTID>."
 }
