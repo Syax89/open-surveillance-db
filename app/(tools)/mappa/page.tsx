@@ -16,6 +16,12 @@ export async function generateMetadata(): Promise<Metadata> {
     alternates: { canonical: "/mappa" },
     openGraph: { title: t.pageTitle, description: t.pageIntro, images: ["/og.png"] },
     twitter: { card: "summary_large_image", title: t.pageTitle, description: t.pageIntro, images: ["/og.png"] },
+    // Issue #410: cross-document View Transitions — /mappa and /directory
+    // are two views of the same explorer, and switching between them is
+    // the only navigation that opts into the same-origin transition (the
+    // meta must be present on BOTH sides). Scoped here, not in the root
+    // layout: navigating anywhere else keeps a plain navigation.
+    other: { "view-transition": "same-origin" },
   };
 }
 
