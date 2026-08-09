@@ -104,9 +104,10 @@ test("login: one tile makes email+password primary, then passkey and OIDC altern
 
   // One visual login tile, no radio selector or nested coherent-box cards.
   assert.equal(screen.queryByRole("radio"), null);
-  const tiles = document.querySelectorAll("article.auth-card");
-  assert.equal(tiles.length, 1, "the existing auth card is the one login tile");
+  const tiles = document.querySelectorAll("article.auth-login-card");
+  assert.equal(tiles.length, 1, "the explicit outer login card is the one login tile");
   const tile = tiles[0];
+  assert.equal(tile.classList.contains("auth-card"), true, "the login card retains the shared auth surface");
   assert.equal(tile.querySelectorAll(".auth-method-card").length, 0, "no nested method cards");
 
   // Email + password is the first, clear primary section. The localized "or"

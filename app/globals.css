@@ -605,6 +605,14 @@ button { cursor:pointer; }
 .founder-signature { margin:34px 0 0; color:var(--ink-2); font-size:var(--text-md); font-weight:700; }
 .founder-signature cite { font-style:normal; }
 .report-section { display:grid; grid-template-columns:.8fr 1.1fr; gap:105px; padding:92px 0 100px; }
+/* /segnala has a page-level heading and a long, task-focused form. On desktop
+   the split editorial/form grid made the work feel disconnected. This is
+   deliberately a scoped variant: guide/contact/legacy ReportForm embeddings
+   keep their own two-column composition. */
+.report-section.report-section--tool { grid-template-columns:minmax(0,1fr); gap:30px; max-width:920px; margin:0 auto; padding:42px 0 92px; }
+.report-section--tool > div { display:grid; gap:var(--space-3); max-width:760px; }
+.report-section--tool .report-rule { margin-top:0; }
+.report-section--tool .report-form { width:100%; padding:clamp(24px,4vw,38px); }
 .report-section>div>p:not(.eyebrow) { color:var(--intro-ink); font-size:var(--text-xl); line-height:1.6; }
 .report-rule { margin-top:32px; padding:var(--space-4); border-radius:var(--radius-md); background:var(--rule-bg); color:var(--rule-ink); font-size:var(--text-md); line-height:1.5; }
 .report-form { display:grid; gap:18px; padding:30px; border:1px solid var(--form-border); border-radius:var(--radius-lg); background:var(--card-bg); box-shadow:0 20px 45px rgba(25,46,52,.08); }
@@ -1167,6 +1175,12 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 .oidc-button { justify-content:center; width:100%; }
 .oidc-disclosure { margin:14px 0 0; padding:12px 14px; border:1px solid var(--field-border); border-radius:var(--radius-md); background:var(--card-bg); color:var(--ink-4); font-size:var(--text-sm); line-height:1.55; }
 .oidc-disclosure a { color:var(--focus); font-weight:800; text-decoration:underline; text-underline-offset:3px; }
+/* The login has one outer card. Method risk copy must remain visible, but it
+   is supporting text—not another surface inside that card. Keep the semantic
+   separators above; flatten just these inner disclosure boxes. */
+.auth-login-card .auth-method-disclosure,
+.auth-login-card .oidc-disclosure { padding:0; border:0; border-radius:0; background:transparent; }
+.auth-login-card .auth-method-disclosure { color:var(--muted); }
 .passkey-list { margin:18px 0 10px; }
 .passkey-kind { display:inline-flex; align-items:center; gap:8px; }
 .passkey-row .status-dot { margin-left:0; }
