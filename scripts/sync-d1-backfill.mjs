@@ -64,6 +64,18 @@ const DB_PATH =
 const OUT_DIR = arg("dir", "/tmp/backfill-chunks");
 const DRY = args.includes("--dry-run");
 
+// D1 is the authoritative database as of 2026-08-09. This historical
+// container → D1 importer remains available only for controlled recovery,
+// never as an implicit replication path. A dry-run is safe and still useful
+// for forensic comparison; a real write needs an explicit operator escape
+// hatch so a resumed cron cannot silently overwrite the chosen topology.
+if (!DRY && !args.includes("--allow-legacy-container-to-d1")) {
+  console.error(
+    "Refusing legacy container-to-D1 sync: D1 is authoritative. Use --dry-run for inspection or --allow-legacy-container-to-d1 only for an approved recovery.",
+  );
+  process.exit(64);
+}
+
 // ---- Tables in FK-safe order (geocode_reverse_cache excluded on purpose). ----
 const TABLES = [
   "contributors",

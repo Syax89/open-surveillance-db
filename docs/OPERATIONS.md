@@ -18,7 +18,8 @@ runbook". Every procedure listed here has been executed at least once locally
 |---|---|---|---|
 | development | local (`wrangler dev`) | local | demo data, no real data |
 | staging | Workers (preview/`--env staging`) | staging D1 | synthetic data only (DEPLOYMENT.md §release constraint) |
-| production | Workers (`open-surveillance-db`) | D1 `osdb-production` (remote) | only environment with real data |
+| production | Workers (`open-surveillance-db`) | D1 `osdb-production` (remote) | **sole authority for real data** |
+| LAN operational container | `vinext dev` / workerd | D1 `osdb-production` (remote binding) | mirrors the authoritative runtime; never a local data source |
 
 Cross-cutting rules:
 
@@ -583,48 +584,41 @@ Verified Proxmox rollback behaviour:
   possible correction requests): private NAS storage, restricted access,
   never on public channels.
 
-### 8.6 Container → D1 production data sync (backfill)
+### 8.6 D1-authoritative container operation
 
-Script: `scripts/sync-d1-backfill.mjs` (scheduled sync wrapper:
-`osdb-sync-d1.sh` on the operator workstation).
+**D1 `osdb-production` is the sole authority for real data** (ADR 0022). The
+LAN container connects to that binding directly; its Miniflare SQLite state is
+disposable local test state, never a replication source. This removes the
+nightly divergence window and avoids pretending that two independent SQLite
+databases can atomically dual-write.
 
-Purpose: one-way sync of the container's LOCAL miniflare D1 (the source of
-truth for imported camera data) to the REMOTE Cloudflare D1
-(`osdb-production`). Remote rows are never overwritten: every statement is
-`INSERT OR IGNORE`, so only ids missing on the remote are added. Deletes are
-NOT propagated (a camera removed locally stays on the remote; the
-moderation flow owns removals).
+The historical script `scripts/sync-d1-backfill.mjs` is now recovery-only. A
+normal invocation fails closed; a real local-to-D1 write requires the explicit
+`--allow-legacy-container-to-d1` escape hatch and a separately approved
+recovery run. The old scheduled job remains **paused** pending explicit removal
+approval.
 
-Constraints (learned the hard way, documented in the script header):
+Container deploy procedure:
 
-- D1 remote limits: max SQL statement 100 KB, max row 2 MB → statements are
-  chunked (10 rows/stmt, 20 stmts/file; `import_batches.report/notes` are
-  truncated to 40 KB each and use 1 row/stmt).
-- FK order matters: contributors → import_batches → cameras → lifecycle →
-  community_actions → settings → passkeys → recovery → correction_requests.
-- `geocode_reverse_cache` is deliberately excluded (regenerable cache).
-- The local DB is auto-detected as the 64-hex `*.sqlite` in
-  `.wrangler/state/v3/d1/miniflare-D1DatabaseObject` — a stale `db.sqlite`
-  in the same directory is ignored (pitfall 2026-08-09: it silently
-  synced an old DB).
-- **`photos` is NOT in the table list** — the table was dropped by
-  migration 0043 (audit ops 2026-08-09).
+1. Take the standard pre-deploy Proxmox snapshot.
+2. Inspect `git status --porcelain` before reset; preserve the LXC-only real
+   `database_id` without printing it.
+3. Fetch/reset to the verified `origin/main`, install dependencies, and restore
+   the local real ID into `wrangler.jsonc`.
+4. Run `node scripts/enable-d1-authoritative.mjs --config wrangler.jsonc`, then
+   repeat it with `--check`. The helper refuses the committed placeholder and
+   never prints the ID.
+5. Install the versioned systemd templates
+   `ops/osdb-test-d1-authoritative-start.sh` and
+   `ops/osdb-test-d1-authoritative.conf`. Supply the dedicated, least-privilege
+   Cloudflare credential through `LoadCredentialEncrypted`; never put it in
+   `.dev.vars`, a systemd plaintext `Environment=`, or source control.
+6. Restart the service and verify `GET /api/cameras?limit=1` returns `200`.
+   A `503` means the remote D1 binding is not healthy; roll back the container
+   configuration/snapshot, never copy old local SQLite data into D1.
 
-Runbook (never run the backfill without evidence; it writes to production):
-
-```bash
-# read-only preview: dumps the local DB into chunk files, NO remote write
-node scripts/sync-d1-backfill.mjs --dry-run
-# real sync (requires CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID in env;
-# usually executed by the scheduled sync wrapper, which decrypts them from the
-# local GPG vault and copies them to the container):
-node scripts/sync-d1-backfill.mjs
-```
-
-Exit code: 0 = all chunk files applied; 1 = at least one file failed after
-3 retries (the count is per FILE, not per attempt — audit ops 2026-08-09).
-Final smoke: after the apply the script compares remote vs local row counts
-for every synced table and prints `smoke: <t> remoto=N OK|DIVERGE`.
+Forensic comparison is still allowed with
+`node scripts/sync-d1-backfill.mjs --dry-run`; it does not touch remote D1.
 
 ### 8.7 Log rotation (wrangler.log)
 

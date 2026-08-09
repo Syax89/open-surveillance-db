@@ -57,10 +57,10 @@
     {
       "binding": "DB",
       "database_name": "osdb-production",
-      // Template pulito: qui resta il placeholder. Il database_id reale
-      // del D1 di produzione vive SOLO nel secret GitHub D1_DATABASE_ID e
-      // viene iniettato al deploy da .github/workflows/deploy.yml — mai
-      // committato (vedi docs/OPERATIONS.md §7.2).
+      // Clean template: the production D1 ID stays a placeholder here. The
+      // real ID is injected by CI, while the operational LXC preserves it in
+      // its uncommitted config and enables `remote: true` only through
+      // scripts/enable-d1-authoritative.mjs (ADR 0022). Never commit either.
       "database_id": "00000000-0000-4000-8000-000000000000",
       "migrations_dir": "drizzle"
     }
