@@ -47,8 +47,17 @@ const SERVER_RENDERED_INFO_ROUTES = new Set([
 function readStoredLocale(): Locale {
   if (typeof window === "undefined") return DEFAULT_LOCALE;
   const savedLocale = window.localStorage.getItem(storageKey);
-  // Registry-driven: unknown/absent values resolve to the pilot language.
-  return resolveLocale(savedLocale);
+  if (savedLocale !== null) return resolveLocale(savedLocale);
+  // Cookie fallback (F6 qa#8, audit 2026-08-09): when the user arrives via
+  // /api/locale?lang=it&next=/mappa, the SSR renders Italian (reads the cookie)
+  // but the client would hydrate English (localStorage empty) without this.
+  // Same read pattern as popup-actions.tsx standalone roots.
+  const match = document.cookie
+    .split("; ")
+    .find((part) => part.startsWith(`${LOCALE_COOKIE}=`));
+  return match
+    ? resolveLocale(decodeURIComponent(match.slice(LOCALE_COOKIE.length + 1)))
+    : resolveLocale(null);
 }
 
 function subscribeToLocale(callback: () => void) {

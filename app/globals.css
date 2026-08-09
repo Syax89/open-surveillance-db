@@ -1369,7 +1369,7 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 .map-explorer-search .map-list-search input { width:100%; min-height:44px; box-sizing:border-box; padding:9px 11px; border:1px solid var(--map-input-border); border-radius:var(--radius-md); background:var(--white); color:var(--ink-5); font-size:var(--text-md); }
 .map-explorer-search .geocode-dropdown { left:0; right:0; }
 .map-card .filters-panel { padding:10px 18px; border-bottom:1px solid var(--line); background:var(--card-bg); }
-.map-card .filters-panel .filter-controls-row > .text-button { grid-column:auto; align-self:end; min-height:40px; display:inline-flex; align-items:center; white-space:nowrap; }
+.map-card .filters-panel .filter-controls-row > .text-button { grid-column:auto; align-self:end; min-height:44px; display:inline-flex; align-items:center; white-space:nowrap; }
 /* FIX /mappa (CEO feedback 2026-08-02): the panel FiltersBar row is its own
    4-column grid on DESKTOP — kind / freshness / sort / reset on ONE line, the
    reset button right-aligned in the last (auto) column instead of wrapping
@@ -1460,16 +1460,21 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 /* Pixel-grid aggregation badges (t_26ce96f3, CEO 2026-08-05): at low zoom /
    high density ONE badge divIcon per 48px screen cell replaces thousands of
    DOM markers. The badge is a circular count pill with the project's action
-   colour, readable at 30px, with a visible focus ring (the marker is an
-   interactive Leaflet marker: role=button + tabindex). The count text is
+/* Grid badge (t_f8b775ec): marker count pill on aggregated cells; clicking
+   zooms toward the centroid. The badge itself is 44×44px (WCAG 2.5.5 AAA
+   touch target, audit 2026-08-09), centred on a 48px cell (GRID_CELL_PX) —
+   the 4px margin prevents overlap at high density. The count is
    the badge's only content; tooltip + aria-label carry the same message.
-   The 30px iconSize + 15px anchor keep the pill centred on the cell
+   The 44px iconSize + 22px anchor keep the pill centred on the cell
    centroid so a click targets the centroid exactly. */
+.leaflet-marker-icon.osm-grid-badge-wrap {
+  width:44px !important; height:44px !important;
+}
 .osm-grid-badge {
   display:flex; align-items:center; justify-content:center;
-  width:30px; height:30px; border-radius:50%;
+  width:44px; height:44px; border-radius:50%;
   background:var(--action); color:var(--white);
-  font-size:var(--text-sm); font-weight:800; line-height:1;
+  font-size:var(--text-md); font-weight:800; line-height:1;
   box-shadow:0 1px 4px rgb(10 30 40 / .35);
   border:2px solid var(--white);
 }

@@ -100,8 +100,8 @@ function buildGridBadgeIcon(L: LeafletModule, count: number) {
   return L.divIcon({
     className: "osm-grid-badge-wrap",
     html: `<span class="osm-grid-badge" aria-hidden="true">${count}</span>`,
-    iconSize: [30, 30],
-    iconAnchor: [15, 15],
+    iconSize: [44, 44],
+    iconAnchor: [22, 22],
   });
 }
 
@@ -330,7 +330,7 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
       // autoPanPadding as the marker popup, so a picker near the map edge
       // never renders cut off.
       keepInView: true,
-      autoPanPadding: [48, 48],
+      autoPanPadding: [60, 48],
     });
   }, []);
 
@@ -749,7 +749,7 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
           // the map bounds; autoPanPadding gives the view margin so the
           // balloon never sits flush against an edge.
           keepInView: true,
-          autoPanPadding: [48, 48],
+          autoPanPadding: [60, 48],
         });
         // Keyboard accessibility (P2-9, review 2026-08-07): Leaflet markers
         // are focusable (role=button, tabindex) but had no keydown handler
