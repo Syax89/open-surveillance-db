@@ -1,0 +1,11 @@
+{
+    "slug": "tailandia-phetchaburi-cctv-2026",
+    "source_name": "Phetchaburi Province — CCTV camera registry (police + municipalities)",
+    "format": "csv",
+    "license": "Open Data Common (ODC)",
+    "license_url": "https://phetchaburi.gdcatalog.go.th/dataset/cctv",
+    "attribution_text": "Fonte: Phetchaburi Provincial Government via Thai GD Catalog (https://phetchaburi.gdcatalog.go.th/), licenza Open Data Common (ODC).",
+    "source_url": "https://phetchaburi.gdcatalog.go.th/dataset/6640561f-2d47-42d3-8d55-fa6e01a21b54/resource/126b3683-60e9-40c1-8cf5-33d2aee74eee/download/cctv.csv",
+    "max_records": 2000,
+    "notes": "Cron ricerca stato-per-stato (2026-08-09): registro CCTV provinciale (ตำรวจภูธร/เทศบาล), 636 righe con Latitude/Longitude, include modelli (Hikvision ecc.) e uso. Thailandia. external_id pbr-cctv:<idx>."
+}

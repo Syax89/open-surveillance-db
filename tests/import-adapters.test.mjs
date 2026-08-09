@@ -1140,3 +1140,52 @@ test("wellington: parses ArcGIS features (EPSG:2193) into canonical staged rows"
   assert.equal(staged[0].external_id, "wcc-cctv:1");
   assert.equal(skipped.total, 1);
 });
+
+// -------------------------------------------------- wave 12 (cron discovery): Giappone Tokyo + Thailandia
+
+import { parsePayload as tokyoParse } from "../scripts/import/adapters/giappone-tokyo-metro-cameras-2026.mjs";
+import { parsePayload as nkrParse } from "../scripts/import/adapters/tailandia-nakhon-ratchasima-cctv-2026.mjs";
+import { parsePayload as pbrParse } from "../scripts/import/adapters/tailandia-phetchaburi-cctv-2026.mjs";
+
+test("tokyo: parses river CSV (UTF-8) with 緯度/経度 into staged rows", () => {
+  const { staged, skipped } = tokyoParse({
+    data: [
+      { __set: "river", text: "番号,観測所名（映像監視局）,河川名,URL（動画）,緯度,経度\n1,飯田橋,神田川,https://youtu.be/x,35.70286194,139.749895\n2,test,川,https://youtu.be/y,0,0\n" },
+    ],
+  });
+  assert.equal(staged.length, 1);
+  assert.equal(staged[0].title, "飯田橋");
+  assert.equal(staged[0].external_id, "tmg-cam:river:1");
+  assert.equal(skipped.total, 1);
+});
+
+test("tokyo: parses Izu CSV (Shift-JIS, lat/lon combinato) into staged rows", () => {
+  const { staged } = tokyoParse({
+    data: [
+      { __set: "izu", text: "項番,名称,設置場所,撮影方向,緯度経度,動画リンク\n1,元町港,大島_元町港船客待合所 1F,岸壁方面,\"34.751877197231124,139.3523663219215\",https://youtube.com/live/x\n" },
+    ],
+  });
+  assert.equal(staged.length, 1);
+  assert.equal(staged[0].latitude, 34.751877);
+  assert.equal(staged[0].external_id, "tmg-cam:izu:1");
+});
+
+test("nkr: parses Thai police CSV (stripped headers, quoted fields) into staged rows", () => {
+  const { staged, skipped } = nkrParse({
+    data: "รายการข้อมูล, สถานะกล้อง,ชื่อจุดติดตั้ง, ชื่อสถานที่, ละติจูด, ลองจิจูด, หน่วยงาน\nพิกัดจุดติดตั้งกล้อง cctv,ใช้ได้,ที่พักสายตรวจ,ตู้ยามบะใหญ่,14.5596019,101.9763107,สภ. อุดมทรัพย์\nพิกัดจุดติดตั้งกล้อง cctv,ใช้ได้,\"campo, con virgola\",test,0,0,สภ. x\n",
+  });
+  assert.equal(staged.length, 1);
+  assert.equal(staged[0].title, "ที่พักสายตรวจ");
+  assert.equal(staged[0].external_id, "nkr-cctv:0");
+  assert.equal(skipped.total, 1);
+});
+
+test("pbr: parses Phetchaburi CSV (Latitude/Longitude) into staged rows", () => {
+  const { staged, skipped } = pbrParse({
+    data: "หน่วยในสังกัด,สถานที่ติดตั้งกล้อง ,Latitude,Longitude,ชื่อหน่วยงาน,ยี่ห้อกล้องCCTV,การใช้งานกล้อง\nสภ.ท่าไม้รวก,ห้อง one stop service,12.81886323,99.8022351,สภ.ท่าไม้รวก,HIKVISION,อื่นๆ\nสภ.x,test,0,0,สภ.x,-\n",
+  });
+  assert.equal(staged.length, 1);
+  assert.equal(staged[0].title, "ห้อง one stop service");
+  assert.equal(staged[0].external_id, "pbr-cctv:0");
+  assert.equal(skipped.total, 1);
+});

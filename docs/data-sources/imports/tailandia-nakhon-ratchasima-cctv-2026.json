@@ -1,0 +1,11 @@
+{
+    "slug": "tailandia-nakhon-ratchasima-cctv-2026",
+    "source_name": "Nakhon Ratchasima Provincial Police — CCTV locations",
+    "format": "csv",
+    "license": "Open Data Common (ODC)",
+    "license_url": "https://nakhonratchasima.gdcatalog.go.th/dataset/dataset_16_0043",
+    "attribution_text": "Fonte: Nakhon Ratchasima Provincial Police via Thai GD Catalog (https://nakhonratchasima.gdcatalog.go.th/), licenza Open Data Common (ODC).",
+    "source_url": "https://nakhonratchasima.gdcatalog.go.th/dataset/321a5bc5-03cc-437b-bf5b-c6c6d936d284/resource/daad6a09-58f6-4918-9331-7d9555b888ec/download/cctv_camera_locations__.csv",
+    "max_records": 20000,
+    "notes": "Cron ricerca stato-per-stato (2026-08-09): dataset ufficiale polizia provinciale (ตำรวจภูธรจังหวัดนครราชสีมา), 11.481 righe CSV, 11.464 con lat/lon (ละติจูด/ลองจิจูด), nomi colonna con spazi → strip. NUOVO PAESE: Thailandia. external_id nkr-cctv:<idx>."
+}
