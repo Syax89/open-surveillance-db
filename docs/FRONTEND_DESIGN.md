@@ -125,9 +125,14 @@ uses `PublicDirectory variant="catalog"` with the browse-record
 5. `.filter-chips` — active-filter chips (type/freshness/q), one-shot
    removal, target ≥44px (Google Maps/CKAN pattern).
 6. `.alpha-index` — A–Z alphabetical index (Wikipedia AllPages pattern):
-   only the letters present in the filtered set; click → first-occurrence
-   page + focus on the results header; `aria-current` on the letters of the
-   current page. Visible only with alphabetical sort.
+   ALL 26 letters render — the ones present in the filtered set are jump
+   links (click → first-occurrence page + focus on the results header),
+   the absent ones are muted `aria-hidden` placeholders (`is-muted`);
+   `aria-current` on the letters of the current page. Visible only with
+   alphabetical sort. Responsive (issue #408): one-row equal-share bar
+   ≥1024px (`li` flex:1, ~40px-wide targets at the 1180px container, 44px
+   tall), wrapped 44px targets at 701–1023px (touch-first tablets),
+   one-line horizontal scroll ≤700px.
 7. `.directory-tool .record-list` in a SINGLE column of **visible cards**
    (fix t_d089a17e: `title | meta line | actions` on 3 columns inside a
    `#fffef9`/`--line` border/radius container with a 3px status bar — the
