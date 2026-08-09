@@ -3,7 +3,7 @@ import { ForgotPasswordBody } from "./ForgotPasswordBody";
 import { getServerMessages } from "../lib/server-i18n";
 
 /**
- * /forgot-password — password-reset request page (P1-3 Vera design).
+ * /forgot-password — password-reset request page (P1-3 design review).
  *
  * Purely client-side (like /login): the form posts the email to
  * POST /api/auth/reset-password/request, which answers a GENERIC success

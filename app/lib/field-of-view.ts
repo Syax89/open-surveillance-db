@@ -1,5 +1,5 @@
 /**
- * Field-of-view geometry for the map layer (kanban t_f8b775ec, design Vera).
+ * Field-of-view geometry for the map layer (kanban t_f8b775ec, design review).
  *
  * The map draws the camera's field of view with native Leaflet only:
  *
@@ -12,7 +12,7 @@
  *     circle rendered as a native L.circle with the same radius.
  *   - Cameras with no direction (NULL / unknown) draw nothing.
  *
- * Performance (PM directive — ZERO new libraries, viewport culling stays):
+ * Performance (project directive — ZERO new libraries, viewport culling stays):
  * the cones/circles are drawn only above FOV_MIN_ZOOM and only for records
  * already inside the current viewport (recordsInBounds, same culling as
  * the markers), so the DOM never materialises the full dataset's geometry.

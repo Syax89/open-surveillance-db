@@ -10,8 +10,8 @@ import { useRouter } from "next/navigation";
  * Before the F1/F2 route split the four public tools lived on the home page
  * as anchor sections (#map, #records, #report, #correction). Bookmarks and
  * shared links still point at those fragments, but a URL fragment NEVER
- * reaches the server — a 302 redirect cannot work (CTO correction to Vera's
- * D8, t_f24c3227, docs/FRONTEND_PLAN.md §1.2). This component runs once on
+ * reaches the server — a 302 redirect cannot work (maintainer correction to
+ * the D8 design, t_f24c3227, docs/FRONTEND_PLAN.md §1.2). This component runs once on
  * mount, reads `location.hash` and `router.replace()`s to the matching tool
  * route.
  *

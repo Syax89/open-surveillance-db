@@ -4,7 +4,7 @@ import { LoginPageBody } from "./LoginPageBody";
 import { getServerMessages } from "../lib/server-i18n";
 
 /**
- * /login — multi-method sign-in (Fase E2, design Vera).
+ * /login — multi-method sign-in (Fase E2, design review).
  *
  * Thin server shell (pattern /account and /forgot-password): the interactive
  * body is the client component LoginPageBody ("use client", same file family

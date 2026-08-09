@@ -3,7 +3,7 @@ import Link from "next/link";
 /**
  * MapTeaser — static map preview for the home hub (F2, t_52dcb95e).
  *
- * The hub must stay SSR-pure (criterion Grace: no JS, no client data
+ * The hub must stay SSR-pure (review criterion: no JS, no client data
  * dependency, zero Leaflet instances on the home). This is a purely
  * decorative preview: a CSS grid that echoes the map tiles plus a few
  * static markers — no leaflet import, no map instance, no JS. The CTA is

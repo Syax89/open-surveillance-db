@@ -6,7 +6,7 @@ import { useMessages } from "../lib/use-messages";
 import { fetchSessionMe } from "../lib/session-fetch";
 
 /**
- * WriteGateWall (P1-2 Vera design) — the login wall for the public write
+ * WriteGateWall (P1-2 design review) — the login wall for the public write
  * tools (/segnala, /correggi). The write gate (Fase E1, ADR 0020 d.1)
  * requires a VERIFIED contributor session for every public write; this
  * component gates the form itself instead of letting an anonymous visitor

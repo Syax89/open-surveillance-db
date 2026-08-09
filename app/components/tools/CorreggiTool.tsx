@@ -12,7 +12,7 @@ import { WriteGateWall } from "../WriteGateWall";
  * pre-selects the related record and announces it with an aria-live region.
  * Noindex is set by the page's metadata (robots).
  *
- * P1-2 (Vera design): the form is gated by WriteGateWall — the write gate
+ * P1-2 (design review): the form is gated by WriteGateWall — the write gate
  * (Fase E1, ADR 0020 d.1) requires a verified contributor, so anonymous and
  * unverified visitors get the bilingual login/verify wall instead of a form
  * that would fail with the raw server "Authentication required." string.

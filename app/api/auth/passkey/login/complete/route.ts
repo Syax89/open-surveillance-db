@@ -80,7 +80,7 @@ export async function POST(request: Request) {
 
     const response = payload.response as unknown as AuthenticationResponseJSON;
 
-    // 2. Challenge userHandle binding (P3-3, review-ada-2): when /begin was
+    // 2. Challenge userHandle binding (P3-3, review round 2): when /begin was
     //    email-narrowed it stored the target userHandle on the challenge;
     //    the assertion must echo the SAME handle — the double-check the 0028
     //    migration promised but nothing enforced. The compare only runs when

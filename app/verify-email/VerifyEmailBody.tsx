@@ -7,7 +7,7 @@ import { useMessages } from "../lib/use-messages";
 import { PublicNav } from "../components/PublicNav";
 
 /**
- * /verify-email body (P1-1 Vera design) — consumes the single-use token from
+ * /verify-email body (P1-1 design review) — consumes the single-use token from
  * the emailed link against GET /api/auth/verify-email and renders a real
  * outcome page instead of raw JSON:
  *

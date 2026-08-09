@@ -194,7 +194,7 @@ export function useReportFlow({ setNotice, initialCoordinates = null }: { setNot
         setNotice(t.duplicateConfirmNotice);
         return;
       }
-      // P1-2 (Vera design): the write gate answers 401 (no session) and 403
+      // P1-2 (design review): the write gate answers 401 (no session) and 403
       // (session, unverified email) with a single canonical body. The login
       // wall covers the common case; these map the mid-form session death to
       // localized guidance instead of the raw server string or the dev text.

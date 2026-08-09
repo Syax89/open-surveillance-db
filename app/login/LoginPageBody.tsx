@@ -9,7 +9,7 @@ import { browserSupportsWebAuthn, getCredential } from "../lib/webauthn-client";
 import { hardNavigate } from "../lib/navigate";
 
 /**
- * /login — multi-method sign-in (Fase E2, design Vera).
+ * /login — multi-method sign-in (Fase E2, design review).
  *
  * Three methods, ALL visible at once as stacked coherent-box cards in the
  * order the CEO asked for (2026-08-08: passkey, email + password, Google):
@@ -55,7 +55,7 @@ export function LoginPageBody() {
 
   const [mergeToken, setMergeToken] = useState<string | null>(() => searchParams.get("merge"));
   const [oidcError] = useState<boolean>(() => searchParams.get("oidc_error") === "1");
-  // Login-wall return (P1-2 Vera design): /login?returnTo=/segnala (or
+  // Login-wall return (P1-2 design review): /login?returnTo=/segnala (or
   // /correggi) lands the contributor back on the tool after a successful
   // sign-in instead of always dumping them on /account.
   const [returnTo] = useState<string | null>(() => safeReturnTo(searchParams.get("returnTo")));
@@ -224,7 +224,7 @@ export function LoginPageBody() {
         // merge mode and fall back to the normal login, announcing why.
         // Also strip ?merge= from the address bar (router.replace, no
         // scroll jump) so the stale token stops being re-submittable or
-        // shareable in the URL — ada review PR #242.
+        // shareable in the URL — review PR #242.
         setMergeToken(null);
         setError(t.mergeErrorExpired);
         const cleanParams = new URLSearchParams(searchParams.toString());
@@ -383,7 +383,7 @@ export function LoginPageBody() {
                   <button className="button button-primary" type="submit" disabled={submitting}>
                     {submitting ? t.loading : t.login}
                   </button>
-                  {/* Per-method risk disclosure (P1-4 Vera design — the risk
+                  {/* Per-method risk disclosure (P1-4 design review — the risk
                       matrix is per-method, ADR 0020 d.6): the password method
                       declares its PII + phishing surface, exactly like the
                       passkey and OIDC panels below. */}

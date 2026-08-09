@@ -5,7 +5,7 @@ import { getServerMessages } from "../lib/server-i18n";
 
 /**
  * /reset-password — consume the single-use reset token from the email
- * (P1-3 Vera design). Reads ?token= and posts the new password to
+ * (P1-3 design review). Reads ?token= and posts the new password to
  * POST /api/auth/reset-password/confirm; renders success / invalid / expired
  * outcomes instead of raw JSON. The reset email (app/lib/mailer.ts
  * sendPasswordResetEmail) has always pointed here — the page simply did not

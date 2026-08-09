@@ -8,7 +8,7 @@ import { PublicNav } from "../components/PublicNav";
 import { passwordRuleFailures } from "../lib/password-policy";
 
 /**
- * /reset-password body (P1-3 Vera design).
+ * /reset-password body (P1-3 design review).
  *
  * Reads the single-use token from ?token= and posts the new password to
  * POST /api/auth/reset-password/confirm, mapping the one-shot outcomes:

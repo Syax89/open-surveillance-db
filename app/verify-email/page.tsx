@@ -4,7 +4,7 @@ import { VerifyEmailBody } from "./VerifyEmailBody";
 import { getServerMessages } from "../lib/server-i18n";
 
 /**
- * /verify-email — email-verification landing page (P1-1 Vera design).
+ * /verify-email — email-verification landing page (P1-1 design review).
  *
  * The verification email used to link straight to GET /api/auth/verify-email
  * (raw JSON in the browser). This page is the human landing: it reads the

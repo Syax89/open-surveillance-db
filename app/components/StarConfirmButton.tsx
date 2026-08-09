@@ -3,7 +3,7 @@
 import { useMessages } from "../lib/use-messages";
 
 /**
- * Community verification toggle (COMMUNITY_PLAN §6.3 C2/C9 — Vera's design,
+ * Community verification toggle (COMMUNITY_PLAN §6.3 C2/C9 — design review,
  * task C5).
  *
  * A single native button: inline SVG star (decorative), the aggregate

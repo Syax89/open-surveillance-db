@@ -1,5 +1,5 @@
 /**
- * Canonical camera kinds (kanban t_f8b775ec, design Vera).
+ * Canonical camera kinds (kanban t_f8b775ec, design review).
  *
  * The DB stores canonical English kind values ("Fixed dome", "Bullet", …);
  * every UI renders the localized label and submits the canonical value.

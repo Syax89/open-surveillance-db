@@ -88,7 +88,7 @@ module.exports = {
         // asserted — a +100 KB bundle regression or a doubled LCP passed
         // the gate silently. These thresholds are WARN (non-blocking) on
         // purpose: the current mobile-4x baseline is perf 65-77 / LCP
-        // 4.1-7.1 s (docs/qa/qa-infra-ken.md F5), so error thresholds
+        // 4.1-7.1 s (QA infrastructure findings, F5), so error thresholds
         // would turn the whole job red before the perf work lands. Once
         // the baseline stabilizes, promote to ["error", ...] in the same
         // keys. numberOfRuns stays 1 (t_2f6e49a0): 3 runs would triple the

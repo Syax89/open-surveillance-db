@@ -43,7 +43,7 @@
   //   The values mirror the CURRENT per-family defaults (ROUTE_LIMIT_DEFAULTS
   //   in app/lib/rate-limit.ts; the env knobs are ignored for these four
   //   families while a binding is present). Final thresholds pending sign-off
-  //   by Ada (t_dff3dadf). period must be 10 or 60; all defaults are 60s.
+  //   by the maintainer (t_dff3dadf). period must be 10 or 60; all defaults are 60s.
   // - Local dev / tests: bindings absent from env -> in-memory fallback
   //   (documented in docs/DEVELOPMENT_SETUP.md and app/lib/rate-limit.ts).
   "ratelimits": [

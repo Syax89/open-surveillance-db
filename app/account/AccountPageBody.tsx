@@ -228,7 +228,7 @@ export default function AccountPageBody() {
   const [removingId, setRemovingId] = useState<number | null>(null);
   const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null);
 
-  // Email-verification banner (P1-1 Vera design): the profile read exposes
+  // Email-verification banner (P1-1 design review): the profile read exposes
   // contributor.emailVerifiedAt; when it is null the page explains the write
   // gate (Fase E1) and offers a resend. Same session contract as the
   // /verify-email page: POST /api/auth/verify-email/resend.
@@ -624,7 +624,7 @@ export default function AccountPageBody() {
 
         {!loading && !loggedOut && contributor ? (
           <>
-            {/* Email-verification banner (P1-1 Vera design): until
+            {/* Email-verification banner (P1-1 design review): until
                 emailVerifiedAt is set the write gate (Fase E1) refuses every
                 public write, so the account page must say so and offer the
                 resend — the register→verify→write flow was a dead end.

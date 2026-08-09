@@ -63,7 +63,7 @@ function csrfToken(): string | null {
   return match ? decodeURIComponent(match.slice("osdb_csrf=".length)) : null;
 }
 
-/** Inline 16px icons (redesign t_b7728ad0) — no icon library (PM
+/** Inline 16px icons (redesign t_b7728ad0) — no icon library (project
  * directive: ZERO new libraries). Stroke-only, currentColor, aria-hidden. */
 function ToolbarIcon({ name }: { name: "useful" | "confirm" | "more" }) {
   const common = {

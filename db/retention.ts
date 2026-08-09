@@ -20,13 +20,13 @@
  *                                       challenge rows (10-min TTL) purged
  *                                       on expiry — the cron enforces the
  *                                       sweep the 0027/0028 migrations
- *                                       promised (review-ada-2 P3-1)
+ *                                       promised (review round 2 P3-1)
  *   R16 login_attempts                → stale failed-login counters
  *                                       (window_start older than 30 days)
  *                                       purged with a BOUNDED sweep; an
  *                                       active lock (locked_until in the
  *                                       future) is never touched (audit
- *                                       finding 5 / review-ada P3-10)
+ *                                       finding 5 / review round P3-10)
  *   R17 registrations_ip_log          → per-IP registration-cap rows older
  *                                       than 30 days purged (QA F5,
  *                                       t_894e0cc3 — the 24h cap COUNT only
@@ -432,7 +432,7 @@ export async function runRetentionSweep(
   // --- R15 (ADR 0020): expired auth-method rows are garbage collection too.
   // The 0027/0028 migrations promised an expiry sweep served by the
   // `expires_at` index; the cron is where that promise is enforced
-  // (review-ada-2 P3-1). Email-verification tokens die 24h after issue
+  // (review round 2 P3-1). Email-verification tokens die 24h after issue
   // (R15: "deleted on use or expiry"); WebAuthn challenges after 10 minutes.
   // Both tables are TTL-bounded and small, so a single bounded DELETE is
   // enough — no chunking needed (the R7 session sweep follows the same
@@ -453,7 +453,7 @@ export async function runRetentionSweep(
   // small, but the guarantee must not depend on traffic).
   summary.challengesPurged = await sweepExpiredWebAuthnChallenges(now);
 
-  // --- R16 (audit finding 5 / review-ada P3-10): stale failed-login counters
+  // --- R16 (audit finding 5 / review round P3-10): stale failed-login counters
   // are dead rows after LOGIN_ATTEMPT_RETENTION_DAYS of inactivity. The anchor
   // is `window_start`: recordFailedLogin (db/auth.ts) re-anchors it on every
   // new failure window and on every lock trip, and clearLoginAttempts deletes
