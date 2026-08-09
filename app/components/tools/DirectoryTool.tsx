@@ -13,6 +13,12 @@ import {
   serverFiltersFrom,
   useCameraFilters,
 } from "../../lib/use-camera-filters";
+import {
+  camerasToCsv,
+  camerasToGeoJson,
+  downloadTextFile,
+  exportFileName,
+} from "../../lib/directory-export";
 import { PublicDirectory } from "../home/PublicDirectory";
 import { ExploreViewSwitch } from "../ExploreViewSwitch";
 
@@ -38,7 +44,8 @@ import { ExploreViewSwitch } from "../ExploreViewSwitch";
  * the CSV/GeoJSON downloads are small text links in the data-actions footer
  * below, on the same row as the data policy link (CEO 2026-08-08: "in basso
  * e più piccoli, sulla riga di 'Read the data policy'") — filter-aware via
- * exportHref(), no buttons in the results header.
+ * client-side generation from the visible set (issue #409, t_c319c619), no
+ * buttons in the results header.
  *
  * Data walk vs server-side pagination (kanban t_b6cbb655, P2 audit
  * 2026-08-09 — DOCUMENTED, deliberately NOT changed): the tool reads the
@@ -77,15 +84,43 @@ export function DirectoryTool() {
     router.push(mapHrefWithFocus(filters, id));
   }
 
-  // Export links (t_127492f1): the API applies the server-side filters
-  // (kind + freshness — the same params the list fetch already sends);
-  // q and sort are client-side, so the export hint (directory-export-hint)
-  // says exactly what the download contains.
+  // Export links (issue #409, t_c319c619): the CSV/GeoJSON downloads are
+  // generated IN THE BROWSER from `filteredRecords` — the exact set the user
+  // is looking at, after EVERY active filter (q, type, freshness, state,
+  // origin) and the current sort order. The API cannot express the
+  // client-side dimensions (?state=, ?origin=, ?q=, ?sort= have no SQL
+  // counterpart), so a server href alone would still download the whole
+  // kind/freshness match; serialising the walked records costs zero extra
+  // fetches and gives the export exactly the visible set. The filename
+  // reflects the active filters (osdb-traffic-confirmed.geojson, AC3).
+  //
+  // Fallback contract: while the walk is loading or failed (error), the
+  // browser follows the plain server href (kind + freshness — the same
+  // server-side filters the list fetch already sent), so a transient
+  // failure never dead-ends the download; the export hint below states what
+  // the download contains in each case.
   function exportHref(format: "csv" | "geojson"): string {
     const params = new URLSearchParams({ format });
     if (serverFilters.kind) params.set("kind", serverFilters.kind);
     if (serverFilters.freshness) params.set("freshness", serverFilters.freshness);
     return `/api/cameras?${params.toString()}`;
+  }
+
+  function downloadExport(format: "csv" | "geojson") {
+    const content = format === "csv" ? camerasToCsv(filteredRecords) : JSON.stringify(camerasToGeoJson(filteredRecords));
+    const mime = format === "csv" ? "text/csv;charset=utf-8" : "application/geo+json";
+    downloadTextFile(content, exportFileName(filters, format), mime);
+  }
+
+  // onClick guard: only intercept once the walked records are available
+  // (loading/error fall through to the server href). Matches the aria
+  // described-by hint, which states the download contents for both paths.
+  function exportOnClick(format: "csv" | "geojson") {
+    return (event: React.MouseEvent<HTMLAnchorElement>) => {
+      if (error || loading) return;
+      event.preventDefault();
+      downloadExport(format);
+    };
   }
 
   return (
@@ -131,9 +166,9 @@ export function DirectoryTool() {
           the same row as the data policy link, same font (no buttons). The
           data policy link keeps the guide/regole pattern (merge #229 × #231). */}
       <div className="data-actions">
-        <a href={exportHref("csv")} aria-describedby="directory-export-hint">{t.exportCsv}</a>
+        <a href={exportHref("csv")} onClick={exportOnClick("csv")} download={error || loading ? undefined : exportFileName(filters, "csv")} aria-describedby="directory-export-hint">{t.exportCsv}</a>
         <span aria-hidden="true">·</span>
-        <a href={exportHref("geojson")} aria-describedby="directory-export-hint">{t.exportGeoJson}</a>
+        <a href={exportHref("geojson")} onClick={exportOnClick("geojson")} download={error || loading ? undefined : exportFileName(filters, "geojson")} aria-describedby="directory-export-hint">{t.exportGeoJson}</a>
         <span aria-hidden="true">·</span>
         <a href="/guide">{t.readDataPolicy}</a>
         <p className="sr-only" id="directory-export-hint">{t.exportHint}</p>
