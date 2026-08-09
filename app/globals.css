@@ -221,6 +221,28 @@ button { cursor:pointer; }
 .explore-view-switch a { min-height:44px; display:inline-flex; align-items:center; padding:0 12px; border-radius:var(--radius-sm); color:var(--nav-ink); font-size:var(--text-sm); font-weight:800; text-decoration:none; }
 .explore-view-switch a[aria-current="page"] { background:var(--heading); color:var(--white); }
 .explore-view-switch a:focus-visible { outline:3px solid var(--focus); outline-offset:2px; }
+/* Map ↔ Directory view switch (issue #410): cross-document View
+   Transitions. /mappa (1440px workspace) and /directory (1180px readable
+   catalog) keep their DELIBERATE widths (R2: the list stays readable, the
+   map stays wide) — the browser crossfades the old page out to the paper
+   background, then fades the new page in, so the ~260px width shift
+   happens while both pages are transparent and is never perceived as a
+   jump. The switch itself is a shared element (view-transition-name) that
+   stays anchored while the content swaps. Browsers without the API fall
+   back to a plain navigation (no JS, no polyfill, no layout change);
+   prefers-reduced-motion disables the animation entirely (WCAG 2.3.3). */
+@keyframes osdb-vt-out { to { opacity:0; } }
+@keyframes osdb-vt-in { from { opacity:0; } }
+@media (prefers-reduced-motion: no-preference) {
+  .explore-view-switch { view-transition-name:explore-view-switch; }
+  ::view-transition-old(root) { animation:osdb-vt-out .14s ease-in both; }
+  ::view-transition-new(root) { animation:osdb-vt-in .22s ease-out both; animation-delay:.14s; }
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) { animation:none !important; }
+}
 .nav-shell { width:var(--container-wide); margin:0 auto; padding:22px 0; display:flex; align-items:center; justify-content:space-between; gap:var(--space-6); }
 .brand { display:inline-flex; align-items:center; gap:10px; font-weight:800; letter-spacing:-.04em; font-size:19px; }
 .brand-mark { display:grid; place-items:center; width:29px; height:29px; border-radius:var(--radius-round); background:var(--ink); color:var(--mint); font-size:var(--text-4xl); line-height:1; }
@@ -389,8 +411,8 @@ button { cursor:pointer; }
    appears only for directional kinds (never for domes). */
 .direction-entry { display:grid; gap:var(--space-2); margin:0; padding:16px 18px; border:1px solid var(--field-border); border-radius:var(--radius-sm); background:var(--surface-muted); }
 .direction-entry legend { padding:0 5px; color:var(--notice-ink); font-size:var(--text-md); font-weight:800; }
-.direction-entry .check-label { display:grid; grid-template-columns:26px 1fr; align-items:center; gap:9px; font-size:var(--text-sm); line-height:1.4; font-weight:400; color:var(--ink-2); }
-.direction-entry .check-label input { width:24px; height:24px; }
+.direction-entry .check-label { display:grid; grid-template-columns:26px 1fr; align-items:start; gap:9px; font-size:var(--text-sm); line-height:1.4; font-weight:400; color:var(--ink-2); }
+.direction-entry .check-label input { width:24px; height:24px; margin-top:3px; }
 .direction-controls { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
 .direction-arrow { display:inline-grid; place-items:center; width:34px; height:34px; border-radius:var(--radius-round); background:var(--white); border:1px solid var(--field-border); color:var(--focus); font-size:var(--text-lg); font-weight:800; transition:transform .1s ease; }
 .direction-slider-row { display:grid; gap:6px; flex:1; min-width:200px; }
@@ -583,12 +605,13 @@ button { cursor:pointer; }
 .report-form input, .report-form select, .report-form textarea { width:100%; border:1px solid var(--field-border); border-radius:var(--radius-sm); padding:11px 12px; outline:none; background:var(--white); color:var(--field-ink); font-size:var(--text-base); font-weight:400; }
 .report-form input:focus, .report-form select:focus, .report-form textarea:focus { border-color:var(--control-focus); outline:3px solid var(--focus); outline-offset:2px; }
 .report-form textarea { resize:vertical; }
-.report-form .check-label { grid-template-columns:26px 1fr; align-items:center; gap:9px; font-size:var(--text-sm); line-height:1.4; font-weight:400; }
-.check-label input { width:24px; height:24px; }
+.report-form .check-label { grid-template-columns:26px 1fr; align-items:start; gap:9px; font-size:var(--text-sm); line-height:1.4; font-weight:400; }
+.check-label input { width:24px; height:24px; margin-top:3px; }
+.correction-form .check-label input { width:24px; height:24px; margin-top:3px; }
 .legal-microcopy { margin:2px 0 0; color:var(--muted); font-size:var(--text-sm); line-height:1.5; }
 .legal-microcopy a { color:var(--action); font-weight:700; text-decoration:underline; text-underline-offset:3px; }
 .check-redaction { display:grid; margin-top:14px; }
-.check-redaction input { width:24px; height:24px; }
+.check-redaction input { width:24px; height:24px; margin-top:3px; }
 /* One-tap location on /segnala. It is intentionally a normal 44px button,
    not a huge native-looking control: 24px is enough for checkbox AA, while
    a location action needs the same comfortable target as every other button.
@@ -630,7 +653,7 @@ button { cursor:pointer; }
 .correction-form input, .correction-form select, .correction-form textarea { width:100%; border:1px solid var(--field-border); border-radius:var(--radius-sm); padding:11px 12px; outline:none; background:var(--white); color:var(--field-ink); font-size:var(--text-base); font-weight:400; }
 .correction-form input:focus, .correction-form select:focus, .correction-form textarea:focus { border-color:var(--control-focus); outline:3px solid var(--focus); outline-offset:2px; }
 .correction-form textarea { resize:vertical; }
-.correction-form .check-label { grid-template-columns:26px 1fr; align-items:center; gap:9px; font-size:var(--text-sm); line-height:1.4; font-weight:400; }
+.correction-form .check-label { grid-template-columns:26px 1fr; align-items:start; gap:9px; font-size:var(--text-sm); line-height:1.4; font-weight:400; }
 /* Contribution forms: short, numbered groups make the next decision obvious
    without turning a simple form into a multi-page wizard. */
 .contribution-step { min-width:0; display:grid; gap:16px; margin:0; padding:18px; border:1px solid var(--form-border); border-left:3px solid var(--control-focus); border-radius:var(--radius-md); background:var(--white); box-shadow:0 2px 10px rgba(25,46,52,.06); }
@@ -772,8 +795,8 @@ button { cursor:pointer; }
 .metadata-publication { display:grid; gap:10px; margin:0; padding:15px; border:1px solid var(--form-border); border-radius:var(--radius-md); background:var(--metadata-bg); }
 .metadata-publication legend { padding:0 4px; color:var(--ink-2); font-size:var(--text-sm); font-weight:800; }
 .metadata-publication p { margin:0; color:var(--intro-ink); font-size:var(--text-sm); line-height:1.45; }
-.metadata-publication .check-label { display:grid; grid-template-columns:26px 1fr; align-items:center; gap:9px; color:var(--ink-2); font-size:var(--text-sm); font-weight:700; line-height:1.4; }
-.metadata-publication .check-label input { width:24px; height:24px; }
+.metadata-publication .check-label { display:grid; grid-template-columns:26px 1fr; align-items:start; gap:9px; color:var(--ink-2); font-size:var(--text-sm); font-weight:700; line-height:1.4; }
+.metadata-publication .check-label input { width:24px; height:24px; margin-top:3px; }
 footer { padding:30px 0 44px; display:grid; grid-template-columns:1fr 1fr 1fr; align-items:end; gap:var(--space-6); border-top:1px solid var(--line); }
 footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-height:1.5; text-wrap:balance; }
 .footer-links { display:flex; justify-content:flex-end; gap:18px; color:var(--summary-ink); font-size:var(--text-sm); font-weight:800; }
@@ -1028,8 +1051,8 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 .duplicate-alert p { margin:5px 0 0 !important; color:inherit !important; font-size:var(--text-md) !important; line-height:1.48 !important; }
 .duplicate-alert ul { display:grid; gap:5px; margin:10px 0 0; padding-left:18px; }
 .duplicate-alert a { color:var(--duplicate-link); font-weight:800; text-decoration:underline; text-underline-offset:2px; }
-.duplicate-alert .check-label { display:grid; grid-template-columns:26px 1fr; align-items:center; gap:9px; margin-top:12px; font-size:var(--text-sm); line-height:1.4; font-weight:400; }
-.duplicate-alert .check-label input { width:24px; height:24px; }
+.duplicate-alert .check-label { display:grid; grid-template-columns:26px 1fr; align-items:start; gap:9px; margin-top:12px; font-size:var(--text-sm); line-height:1.4; font-weight:400; }
+.duplicate-alert .check-label input { width:24px; height:24px; margin-top:3px; }
 .duplicate-strength { font-weight:700; }
 .duplicate-guidance { margin-top:10px; }
 .duplicate-guidance .text-button { font-size:var(--text-md); }
