@@ -523,6 +523,66 @@ test("per-record cap: 5 distinct contributors, 6th blocked", async () => {
 });
 
 // ---------------------------------------------------------------------------
+// 15b. per-record cap on action SWITCH (PR #405 regression)
+//      the UPDATE branch must enforce the destination bucket's cap too:
+//      the old bare UPDATE let an existing row bypass perRecordCap entirely
+//      (like → confirm → gone → …), each switch unguarded.
+// ---------------------------------------------------------------------------
+
+test("per-record cap applies to switch: switching into a full bucket is blocked", async () => {
+  const cameraId = await insertCamera();
+  for (let i = 0; i < 5; i += 1) {
+    const contributorId = await insertContributor();
+    const result = await setCommunityAction(cameraId, contributorId, "like", NOW);
+    assert.equal(result.kind, "ok");
+  }
+
+  // The switcher already owns a row on the same camera with a DIFFERENT type
+  // (gone), so the INSERT conflicts and the UPDATE branch is exercised. The
+  // caller is NOT counted in the destination bucket (row still 'gone'), so the
+  // 'like' bucket sits at exactly 5/5 → the switch must be refused.
+  const switcher = await insertContributor();
+  const seeded = await setCommunityAction(cameraId, switcher, "gone", NOW);
+  assert.equal(seeded.kind, "ok", "seeding the switcher's gone row must succeed");
+
+  const blocked = await setCommunityAction(cameraId, switcher, "like", NOW);
+  assert.equal(blocked.kind, "per_record_cap_exceeded");
+  assert.ok(blocked.retryAfterSeconds >= 1);
+
+  // The row must be untouched — the switch must NOT have happened.
+  const row = await db
+    .prepare("SELECT action_type AS actionType FROM camera_community_actions WHERE camera_id = ? AND contributor_id = ?")
+    .bind(cameraId, switcher)
+    .first();
+  assert.equal(row.actionType, "gone");
+});
+
+test("switch into a bucket with space succeeds (switched)", async () => {
+  const cameraId = await insertCamera();
+  for (let i = 0; i < 4; i += 1) {
+    const contributorId = await insertContributor();
+    const result = await setCommunityAction(cameraId, contributorId, "like", NOW);
+    assert.equal(result.kind, "ok");
+  }
+
+  // The 'like' bucket is at 4/5, so the switch must pass the UPDATE predicate.
+  const switcher = await insertContributor();
+  const seeded = await setCommunityAction(cameraId, switcher, "gone", NOW);
+  assert.equal(seeded.kind, "ok", "seeding the switcher's gone row must succeed");
+
+  const switched = await setCommunityAction(cameraId, switcher, "like", NOW);
+  assert.equal(switched.kind, "switched");
+  assert.equal(switched.actionType, "like");
+  assert.equal(switched.switchedFrom, "gone");
+
+  const row = await db
+    .prepare("SELECT action_type AS actionType FROM camera_community_actions WHERE camera_id = ? AND contributor_id = ?")
+    .bind(cameraId, switcher)
+    .first();
+  assert.equal(row.actionType, "like");
+});
+
+// ---------------------------------------------------------------------------
 // 16. self-action: like/confirm on own → self_action; gone on own → ok
 // ---------------------------------------------------------------------------
 
