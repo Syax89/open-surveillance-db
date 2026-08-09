@@ -1,0 +1,11 @@
+{
+    "slug": "usa-new-england-511-cameras-2026",
+    "source_name": "New England 511 (NE Compass C2C) — CCTV VT/NH/ME",
+    "format": "c2c-xml",
+    "license": "Tri-State Developer Agreement",
+    "license_url": "https://nec-por.ne-compass.com/DeveloperPortal/Home/Terms",
+    "attribution_text": "Fonte: New England Compass (MaineDOT/NHDOT/VTrans) 511 C2C feed — concessione non esclusiva di uso, riproduzione e redistribuzione con attribuzione (Tri-State Developer Agreement).",
+    "source_url": "https://nec-por.ne-compass.com/NEC.XmlDataPortal/api/c2c?networks=Vermont&dataTypes=cctvStatusData",
+    "max_records": 700,
+    "notes": "Cron ricerca stato-per-stato (2026-08-09): feed C2C ufficiali 511 per Vermont (89), New Hampshire (182), Maine (218) — lat/lon in microdegrees, licenza Tri-State Developer Agreement (use/reproduce/redistribute con attribuzione, niente NC). external_id ne511:<net>:<id>."
+}

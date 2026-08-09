@@ -73,6 +73,17 @@ export const IMPORTABLE_LICENSES = new Set([
   // attribution, no share-alike, no pre-approval" (PDF verificato
   // 2026-08-08, data.ny.gov dataset 77gx-ii52).
   "NY OPEN-NY Terms of Use",
+  // Ohio — ODOT: "the data from ODOT is considered public domain and
+  // therefore freely available to anyone" (publicapi.ohgo.com, 2026-08-09).
+  "public domain (ODOT)",
+  // Kentucky — KYTC: CC0 1.0 dichiarato su maps.kytc.ky.gov (2026-08-09).
+  "CC0 1.0",
+  // King County WA — terms espliciti: copy/distribute/use permitted,
+  // sale requires written agreement (2026-08-09).
+  "King County GIS Terms (copy/distribute permitted; sale prohibited)",
+  // New England 511 (VT/NH/ME) — Tri-State Developer Agreement:
+  // use/reproduce/redistribute with attribution, no NC clause.
+  "Tri-State Developer Agreement",
   "ODC PDDL 1.0",
   // Australian CC-BY 3.0 (TfNSW live cameras, QLD state roads — both
   // data.gov.au / data.qld.gov.au, attribution-only).

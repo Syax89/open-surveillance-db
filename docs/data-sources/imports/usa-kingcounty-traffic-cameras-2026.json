@@ -1,0 +1,11 @@
+{
+    "slug": "usa-kingcounty-traffic-cameras-2026",
+    "source_name": "King County (WA) — Traffic Cameras",
+    "format": "arcgis",
+    "license": "King County GIS Terms (copy/distribute permitted; sale prohibited)",
+    "license_url": "https://kingcounty.gov/en/dept/kcit/data-information-services/gis-center/about/terms-conditions-copyrights",
+    "attribution_text": "Fonte: King County GIS Center, traffic cameras (https://kingcounty.gov/en/dept/kcit/data-information-services/gis-center) — permesso esplicito di copia, distribuzione e uso; la vendita richiede accordo scritto.",
+    "source_url": "https://services.arcgis.com/Ej0PsM5Aw677QF1W/arcgis/rest/services/TRAFFICCAMERA_POINT_2029/FeatureServer/0",
+    "max_records": 300,
+    "notes": "Cron ricerca stato-per-stato (2026-08-09): King County item 488167659ce544f3a525d0eb0bb9301c — licenseInfo esplicita (copy/distribute/use permitted, sale requires written agreement), 125 camere (returnCountOnly verificato), EPSG:2926 (WA State Plane North ftUS). external_id kingco-cam:<AssetID>."
+}
