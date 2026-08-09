@@ -25,6 +25,14 @@
 # --- Registration / anti-abuso ---
 # REGISTRATION_IP_HMAC_KEY=change-me-32-bytes-minimum
 
+# --- Rate limiting dietro reverse proxy (container/LXC, NON Cloudflare) ---
+# Senza il bordo Cloudflare (cf-connecting-ip) e senza TRUST_XFF tutti i
+# client condividono UN solo bucket "unknown" (fail-closed, QA F7): il rate
+# limit perde ogni granularita' per-IP. SOLO dietro un proxy affidabile che
+# SOVRASCRIVE X-Forwarded-For (mai il valore client — es. NPM con
+# `proxy_set_header X-Forwarded-For $remote_addr`) impostare:
+# TRUST_XFF=true
+
 # --- Tile proxy (opzionale; default: tile OSM pubbliche) ---
 # TILE_PROVIDER_URL=https://tile.openstreetmap.org
 # TILE_PROVIDER_KEY=

@@ -441,6 +441,7 @@ or client bundles (the secrets gate in CI rejects hardcoded credentials).
 | `ABUSE_ALERT_SURGE_THRESHOLD` | 50 | Route-wide events per window before a surge alert fires |
 | `ABUSE_ALERT_COOLDOWN_SECONDS` | 300 | Minimum seconds between two alerts for the same key/route |
 | `ABUSE_ALERT_WEBHOOK_URL` | unset | Optional JSON webhook; without it alerts go to the server log |
+| `TRUST_XFF` | `false` | Per-caller rate-limit keying behind a **trusted** reverse proxy. See "Caller identity without the Cloudflare edge" below |
 
 The limiter (`app/lib/rate-limit.ts`) has **two backends**, selected per
 route family at runtime:
@@ -471,6 +472,39 @@ abstraction is uniform, so adding a binding is a one-line change per family
 (see `BUCKET_BINDING` in `app/lib/rate-limit.ts` and the `ratelimits` block
 in `wrangler.jsonc`); migrate them before launch if the threat model calls
 for it.
+
+### Caller identity without the Cloudflare edge
+
+The per-caller buckets above are keyed by `callerKey()` in `app/lib/rate-limit.ts`:
+
+1. **Cloudflare deployments** — the edge-provided `cf-connecting-ip` header
+   is always present and authoritative; every caller gets its own bucket.
+   Nothing to configure.
+2. **Container / reverse-proxy deployments (e.g. the LXC prototype behind
+   Nginx Proxy Manager)** — there is no Cloudflare edge, and `X-Forwarded-For`
+   is **entirely client-controlled**. By default `callerKey()` refuses to
+   trust it (QA F7, audit t_894e0cc3): every client shares ONE global
+   `"unknown"` bucket, so the rate limits still bound the route *as a whole*
+   (fail-closed) but lose per-caller granularity. This is the deliberate,
+   secure default — trusting a spoofable header would let an account farm
+   rotate it per request and reset every per-IP cap.
+
+   To restore per-client caps on such a deployment, the operator must BOTH:
+
+   - configure the trusted proxy to **overwrite** `X-Forwarded-For` with the
+     real peer address (never append the client-supplied value) — for NPM:
+     `proxy_set_header X-Forwarded-For $remote_addr;`
+   - set `TRUST_XFF=true` in the environment (`.dev.vars` on the container).
+
+   `TRUST_XFF` is an explicit operator declaration that the deployment sits
+   behind a proxy which sanitises the header. It must never be set when the
+   worker is directly reachable by clients (or behind a proxy that forwards
+   the client value), because the header then becomes the attacker's own
+   identity switch. There is no automatic proxy whitelist: without the edge
+   there is no reliable signal of who the direct peer is, so the opt-in is a
+   boolean the operator sets knowingly (the same reasoning applies to
+   `TRUST_PLATFORM_HEADERS`, above). On Cloudflare, the knob is irrelevant —
+   `cf-connecting-ip` wins over XFF regardless.
 
 Input caps live in `app/lib/input-limits.ts`; alerts in
 `app/lib/abuse-alerts.ts`. Alerts carry only a SHA-256 hash of the caller
