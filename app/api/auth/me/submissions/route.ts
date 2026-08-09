@@ -29,7 +29,12 @@ export async function GET(request: Request) {
       return Response.json({ error: "Not authenticated." }, { status: 401 });
     }
     const submissions = await listContributorSubmissions(resolved.contributor.id);
-    return Response.json({ submissions });
+    // Personal data: never edge-cache (same contract as the successor
+    // /api/auth/me/contributions; audit 2026-08-09, P2).
+    return Response.json(
+      { submissions },
+      { headers: { "Cache-Control": "no-store" } },
+    );
   } catch (error) {
     console.error("GET /api/auth/me/submissions failed", error);
     return Response.json({ error: "Unable to list your submissions" }, { status: 503 });
