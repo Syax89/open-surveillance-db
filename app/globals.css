@@ -981,7 +981,7 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
    aria-current. ≥44px targets. */
 .alpha-index { margin-top:18px; }
 .alpha-index ul { display:flex; flex-wrap:wrap; gap:4px; margin:0; padding:0; list-style:none; }
-.alpha-index-link { min-width:34px; min-height:44px; display:inline-grid; place-items:center; padding:0 6px; border:0; border-bottom:2px solid transparent; background:transparent; color:var(--action); font-size:var(--text-md); font-weight:800; }
+.alpha-index-link { min-width:44px; min-height:44px; display:inline-grid; place-items:center; padding:0 6px; border:0; border-bottom:2px solid transparent; background:transparent; color:var(--action); font-size:var(--text-md); font-weight:800; }
 .alpha-index-link:hover { border-bottom-color:var(--control-focus); }
 .alpha-index-link.is-current { border-bottom-color:var(--action); color:var(--ink); }
 .alpha-index-link.is-muted { color:var(--disabled-ink); font-weight:700; cursor:default; }
