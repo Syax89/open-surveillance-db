@@ -31,12 +31,14 @@ export const en = {
   searchHelp:
     "Search the records as you type, or press Enter to search around a place.",
   filters: "Filters",
-  // Catalog mode: data export of the filtered set. The API applies the
-  // server-side filters (kind + freshness); q and sort are client-side, so
-  // the hint below says exactly what the export contains.
+  // Catalog mode: data export of the filtered set (issue #409). The
+  // downloads are generated client-side from the exact visible records, so
+  // EVERY active filter applies (search, type, freshness, state, origin)
+  // plus the sort order; the hint below says exactly what the export
+  // contains.
   exportCsv: "Download CSV",
   exportGeoJson: "Download GeoJSON",
-  exportHint: "Exports apply the current type and freshness filters.",
+  exportHint: "Exports include the records shown by the current search and filters.",
   // Catalog mode (CEO 2026-08-08): the small circular [+] in the results
   // header top-right — a direct shortcut to the report form (/segnala).
   reportCamera: "Report a camera",
@@ -173,12 +175,14 @@ export const it: Translation<typeof en> = {
   searchHelp:
     "Cerca i record mentre scrivi, oppure premi Invio per cercare intorno a un luogo.",
   filters: "Filtri",
-  // Modalità catalogo: export dei dati filtrati. L'API applica i filtri
-  // server (tipo + aggiornamento); q e ordinamento restano client, quindi
-  // il suggerimento dichiara esattamente cosa contiene l'export.
+  // Modalità catalogo: export dei dati filtrati (issue #409). I download
+  // sono generati client-side dall'insieme esatto dei record visibili, quindi
+  // applicano TUTTI i filtri attivi (ricerca, tipo, aggiornamento, stato,
+  // origine) più l'ordinamento; il suggerimento dichiara esattamente cosa
+  // contiene l'export.
   exportCsv: "Scarica CSV",
   exportGeoJson: "Scarica GeoJSON",
-  exportHint: "Gli export applicano i filtri di tipo e aggiornamento correnti.",
+  exportHint: "Gli export includono i record mostrati da ricerca e filtri correnti.",
   // Modalità catalogo (CEO 2026-08-08): il piccolo [+] circolare nell'header
   // dei risultati in alto a destra — scorciatoia diretta al modulo di
   // segnalazione (/segnala).
