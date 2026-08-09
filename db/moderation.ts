@@ -1603,10 +1603,10 @@ async function buildCorrectionOutcomeStatements(
   if (outcome === "marked-stale") {
     // A credible correction sends a verified record back to needs_review while
     // it is reassessed (DATA_TRUST SLA).
-    if (record.status !== "active" && record.status !== "verified") return [];
+    if (record.status !== "active") return [];
     return [
       d1
-        .prepare("UPDATE cameras SET status = 'needs_review', updated = ? WHERE id = ? AND status IN ('active','verified')")
+        .prepare("UPDATE cameras SET status = 'needs_review', updated = ? WHERE id = ? AND status = 'active'")
         .bind(nowIso, cameraId),
       buildGuardedEventStatement(
         d1,

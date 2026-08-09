@@ -463,12 +463,43 @@ export async function setCommunityAction(input: {
   const existing = batch[1].results?.[0] as { actionType?: string } | undefined;
   if (existing) {
     if (existing.actionType === actionType) return { kind: "duplicate" };
-    // Switch: different actionType — UPDATE the row
+    // Switch: different actionType — UPDATE the row.
+    //
+    // The per-record cap MUST be enforced here too. The INSERT above (A) is the
+    // only statement that carried the quota predicates, so a caller who already
+    // owns a row on this camera used to bypass `perRecordCap` entirely by
+    // switching action type (like → confirm → gone → …), each switch an
+    // unguarded UPDATE. The cap is per (camera, action_type), and the caller is
+    // NOT yet counted in the destination bucket, so the same predicate the
+    // INSERT uses applies unchanged — enforced atomically inside the UPDATE,
+    // with RETURNING to detect the refusal.
+    //
+    // The daily quota is deliberately NOT re-checked: the row already exists
+    // and was counted when it was inserted, so a switch consumes no new daily
+    // allowance.
     const oldType = existing.actionType;
-    await d1
-      .prepare("UPDATE camera_community_actions SET action_type = ?, weight = ?, updated_at = ? WHERE camera_id = ? AND contributor_id = ?")
-      .bind(actionType, weight, input.now, input.cameraId, input.contributorId)
-      .run();
+    const switched = await d1
+      .prepare(
+        `UPDATE camera_community_actions SET action_type = ?, weight = ?, updated_at = ?
+         WHERE camera_id = ? AND contributor_id = ?
+           AND (SELECT COUNT(DISTINCT contributor_id) FROM camera_community_actions WHERE camera_id = ? AND action_type = ? AND created_at >= ?) < ?
+         RETURNING id`,
+      )
+      .bind(
+        actionType,
+        weight,
+        input.now,
+        input.cameraId,
+        input.contributorId,
+        input.cameraId,
+        actionType,
+        windowStart,
+        perRecordCap,
+      )
+      .all<{ id: number }>();
+    if ((switched.results?.length ?? 0) === 0) {
+      return { kind: "per_record_cap_exceeded", retryAfterSeconds: windowRetryAfterSeconds(windowStartMs, nowMs) };
+    }
 
     // Log action-changed in moderation_events (internal, not public)
     try {
@@ -606,19 +637,28 @@ async function appendActionLifecycleEvent(input: {
 export async function likeWeightSumsFor(cameraIds: number[]): Promise<Map<number, number>> {
   if (cameraIds.length === 0) return new Map();
   const d1 = await getD1();
+  // Chunks are independent (disjoint id sets, read-only GROUP BY) → issued in
+  // parallel instead of one serialized await per chunk.
   const results = new Map<number, number>();
+  const chunks: number[][] = [];
   for (let offset = 0; offset < cameraIds.length; offset += 100) {
-    const chunk = cameraIds.slice(offset, offset + 100);
-    const placeholders = chunk.map(() => "?").join(", ");
-    const rows = await d1
-      .prepare(
-        `SELECT camera_id AS cameraId, COALESCE(SUM(weight), 0) AS sum
+    chunks.push(cameraIds.slice(offset, offset + 100));
+  }
+  const chunkRows = await Promise.all(
+    chunks.map((chunk) => {
+      const placeholders = chunk.map(() => "?").join(", ");
+      return d1
+        .prepare(
+          `SELECT camera_id AS cameraId, COALESCE(SUM(weight), 0) AS sum
          FROM camera_community_actions
          WHERE camera_id IN (${placeholders}) AND action_type = 'like'
          GROUP BY camera_id`,
-      )
-      .bind(...chunk)
-      .all<{ cameraId: number; sum: number }>();
+        )
+        .bind(...chunk)
+        .all<{ cameraId: number; sum: number }>();
+    }),
+  );
+  for (const rows of chunkRows) {
     for (const row of rows.results) results.set(row.cameraId, row.sum);
   }
   return results;
@@ -634,19 +674,27 @@ export async function communityActionCountsFor(cameraIds: number[]): Promise<Map
   if (cameraIds.length === 0) return new Map();
   const d1 = await getD1();
   const results = new Map<number, CommunityActionCounts>();
-  // D1 caps bound parameters at 100; chunk the IDs
+  // D1 caps bound parameters at 100; chunk the IDs. Chunks are independent
+  // (disjoint id sets, read-only GROUP BY) → issued in parallel.
+  const chunks: number[][] = [];
   for (let offset = 0; offset < cameraIds.length; offset += 100) {
-    const chunk = cameraIds.slice(offset, offset + 100);
-    const placeholders = chunk.map(() => "?").join(", ");
-    const rows = await d1
-      .prepare(
-        `SELECT camera_id AS cameraId, action_type AS actionType, COUNT(DISTINCT contributor_id) AS count
+    chunks.push(cameraIds.slice(offset, offset + 100));
+  }
+  const chunkRows = await Promise.all(
+    chunks.map((chunk) => {
+      const placeholders = chunk.map(() => "?").join(", ");
+      return d1
+        .prepare(
+          `SELECT camera_id AS cameraId, action_type AS actionType, COUNT(DISTINCT contributor_id) AS count
          FROM camera_community_actions
          WHERE camera_id IN (${placeholders})
          GROUP BY camera_id, action_type`,
-      )
-      .bind(...chunk)
-      .all<{ cameraId: number; actionType: string; count: number }>();
+        )
+        .bind(...chunk)
+        .all<{ cameraId: number; actionType: string; count: number }>();
+    }),
+  );
+  for (const rows of chunkRows) {
     for (const row of rows.results) {
       let entry = results.get(row.cameraId);
       if (!entry) {

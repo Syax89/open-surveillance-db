@@ -292,9 +292,12 @@ export async function listPublicCamerasPage(
   // Community-verification counts (ADR 0018 §2.3): one GROUP BY IN query for
   // the whole page — never an N+1 per record. The counts are decayed (only
   // confirmations at/after last_verified_at count).
-  const confirmationCounts = ids.length > 0 ? await confirmationCountsFor(ids) : new Map<number, number>();
   // Community-action counts (ADR 0021 §10.2): COUNT DISTINCT, never weights.
-  const actionCounts = ids.length > 0 ? await communityActionCountsFor(ids) : new Map<number, CommunityActionCounts>();
+  // The two aggregates are independent reads → ONE parallel wave instead of
+  // two serialized ones (each is itself chunk-parallel, see confirmations.ts).
+  const [confirmationCounts, actionCounts] = ids.length > 0
+    ? await Promise.all([confirmationCountsFor(ids), communityActionCountsFor(ids)])
+    : [new Map<number, number>(), new Map<number, CommunityActionCounts>()];
   const records = result.results.map((record) => ({
     ...record,
     latitude: roundPublicCoordinate(record.latitude),
@@ -439,10 +442,13 @@ export async function getPublicCameraById(id: number, nowIso: string = new Date(
     .bind(id, ...parameters)
     .first<PublicCameraRecord & { importBatchId?: number | null }>();
   if (!result) return null;
-  // Decayed community-verification count (ADR 0018 §2.3), aggregate only.
-  const confirmationCount = await confirmationCountsFor([id]).then((map) => map.get(id) ?? 0);
-  // Community-action counts (ADR 0021 §10.2): COUNT DISTINCT, never weights.
-  const actionCounts = await communityActionCountsFor([id]).then((map) => map.get(id) ?? { like: 0, confirm: 0, gone: 0, problem: 0, privacy: 0 });
+  // Decayed community-verification count (ADR 0018 §2.3), aggregate only, and
+  // the action counts (ADR 0021 §10.2: COUNT DISTINCT, never weights).
+  // Independent reads → one parallel wave.
+  const [confirmationCount, actionCounts] = await Promise.all([
+    confirmationCountsFor([id]).then((map) => map.get(id) ?? 0),
+    communityActionCountsFor([id]).then((map) => map.get(id) ?? { like: 0, confirm: 0, gone: 0, problem: 0, privacy: 0 }),
+  ]);
   const withProvenance = await attachImportBatch(result);
   return {
     ...withProvenance,
@@ -526,8 +532,11 @@ export async function getCommunityRecordById(id: number, nowIso: string = new Da
       privacyCount: 0,
     } as unknown as PublicCameraRecord;
   }
-  const confirmationCount = await confirmationCountsFor([id]).then((map) => map.get(id) ?? 0);
-  const actionCounts = await communityActionCountsFor([id]).then((map) => map.get(id) ?? { like: 0, confirm: 0, gone: 0, problem: 0, privacy: 0 });
+  // Independent reads → one parallel wave.
+  const [confirmationCount, actionCounts] = await Promise.all([
+    confirmationCountsFor([id]).then((map) => map.get(id) ?? 0),
+    communityActionCountsFor([id]).then((map) => map.get(id) ?? { like: 0, confirm: 0, gone: 0, problem: 0, privacy: 0 }),
+  ]);
   const withProvenance = await attachImportBatch(result);
   return {
     ...withProvenance,
@@ -674,9 +683,11 @@ export async function listPublicCamerasInBboxPage(
   const ids = result.results.map((record) => record.id);
   // Community-verification counts (ADR 0018 §2.3): one GROUP BY IN query for
   // the whole page — never an N+1 per record.
-  const confirmationCounts = ids.length > 0 ? await confirmationCountsFor(ids) : new Map<number, number>();
   // Community-action counts (ADR 0021 §10.2): COUNT DISTINCT, never weights.
-  const actionCounts = ids.length > 0 ? await communityActionCountsFor(ids) : new Map<number, CommunityActionCounts>();
+  // Independent reads → one parallel wave (see listPublicCamerasPage).
+  const [confirmationCounts, actionCounts] = ids.length > 0
+    ? await Promise.all([confirmationCountsFor(ids), communityActionCountsFor(ids)])
+    : [new Map<number, number>(), new Map<number, CommunityActionCounts>()];
   const records = result.results.map((record) => ({
     ...record,
     latitude: roundPublicCoordinate(record.latitude),
