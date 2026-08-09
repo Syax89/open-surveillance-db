@@ -112,8 +112,6 @@ Your use of the Service is governed by the privacy notice (PRIVACY_NOTICE.md), t
 
 ## 15. Implementation state
 
-## 15. Implementation state
-
 - [x] Privacy contact decided (2026-07-31) and mailbox active (2026-08-01): `privacy@opensurveillancedb.org` (PRIVACY_NOTICE.md § 1/§ 9).
 - [x] Controller entity: **Simone Rondina (syax89) / OpenSurveillanceDB — Italy** (PRIVACY_NOTICE.md § 1).
 - [x] **Community-driven model reflected (ADR 0021):** § 2/§ 3/§ 4/§ 5/§ 6/§ 8/§ 9/§ 11/§ 14 describe the implemented model — immediate publication, community actions with automatic thresholds, public per-record history without attribution, private corrections, legal emergency as the only human write power over the record lifecycle.
