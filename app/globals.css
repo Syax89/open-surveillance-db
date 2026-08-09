@@ -214,6 +214,12 @@ button { cursor:pointer; }
    the records-heading action row no longer exists on the tool page. The
    modifier keeps /segnala and /correggi headers untouched. */
 .directory-tool { padding-top:6px; }
+/* The directory is the map's alternate explorer view, so their desktop
+   workspaces share the same outer edge. Keep the inherited tool-section
+   width below the map's desktop breakpoint: mobile sizing stays unchanged. */
+@media (min-width:769px) {
+  .tool-section.directory-tool { width:min(1440px, calc(100% - 32px)); }
+}
 .directory-explorer-card { overflow:hidden; border:1px solid var(--line); border-radius:var(--radius-xl); background:var(--card-bg); box-shadow:0 20px 45px rgba(25,46,52,.08); }
 .directory-explorer-toolbar { display:flex; align-items:center; justify-content:space-between; gap:var(--space-4); padding:10px 18px; border-bottom:1px solid var(--line); background:var(--card-bg); }
 .directory-explorer-toolbar > p { margin:0; color:var(--label); font-size:var(--text-xs); font-weight:800; letter-spacing:.1em; text-transform:uppercase; }
@@ -224,22 +230,19 @@ button { cursor:pointer; }
 .explore-view-switch a { min-height:44px; display:inline-flex; align-items:center; padding:0 12px; border-radius:var(--radius-sm); color:var(--nav-ink); font-size:var(--text-sm); font-weight:800; text-decoration:none; }
 .explore-view-switch a[aria-current="page"] { background:var(--heading); color:var(--white); }
 .explore-view-switch a:focus-visible { outline:3px solid var(--focus); outline-offset:2px; }
-/* Map ↔ Directory view switch (issue #410): cross-document View
-   Transitions. /mappa (1440px workspace) and /directory (1180px readable
-   catalog) keep their DELIBERATE widths (R2: the list stays readable, the
-   map stays wide) — the browser crossfades the old page out to the paper
-   background, then fades the new page in, so the ~260px width shift
-   happens while both pages are transparent and is never perceived as a
-   jump. The switch itself is a shared element (view-transition-name) that
-   stays anchored while the content swaps. Browsers without the API fall
-   back to a plain navigation (no JS, no polyfill, no layout change);
-   prefers-reduced-motion disables the animation entirely (WCAG 2.3.3). */
-@keyframes osdb-vt-out { to { opacity:0; } }
-@keyframes osdb-vt-in { from { opacity:0; } }
+/* Map ↔ Directory view switch: the two explorer routes opt in to browser
+   cross-document View Transitions. The named switch remains a shared element
+   while both document roots crossfade continuously; the small opposing
+   vertical motion gives the swap direction without exposing a blank frame.
+   Browsers without the API simply navigate normally, and reduced-motion
+   users receive no transition animation. */
+@view-transition { navigation:auto; }
+@keyframes osdb-vt-out { from { opacity:1; transform:translateY(0); } to { opacity:0; transform:translateY(-4px); } }
+@keyframes osdb-vt-in { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
 @media (prefers-reduced-motion: no-preference) {
   .explore-view-switch { view-transition-name:explore-view-switch; }
-  ::view-transition-old(root) { animation:osdb-vt-out .14s ease-in both; }
-  ::view-transition-new(root) { animation:osdb-vt-in .22s ease-out both; animation-delay:.14s; }
+  ::view-transition-old(root) { animation:osdb-vt-out .18s ease-in both; }
+  ::view-transition-new(root) { animation:osdb-vt-in .18s ease-out both; }
 }
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-group(*),
@@ -1011,15 +1014,22 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 .filter-chip { display:inline-flex; align-items:center; gap:8px; min-height:44px; padding:0 16px; border:1px solid var(--line); border-radius:var(--radius-full); background:var(--card-bg); color:var(--ink); font-size:var(--text-sm); font-weight:800; }
 .filter-chip:hover { border-color:var(--control-focus); }
 .filter-chip span { color:var(--muted); }
-/* Alphabetical index (t_f13fcb1c): the Wikipedia AllPages jump bar — only
-   the letters present in the filtered set; the current page's letters get
-   aria-current. ≥44px targets. */
-.alpha-index { margin-top:18px; }
-.alpha-index ul { display:flex; flex-wrap:wrap; gap:4px; margin:0; padding:0; list-style:none; }
-.alpha-index-link { min-width:44px; min-height:44px; display:inline-grid; place-items:center; padding:0 6px; border:0; border-bottom:2px solid transparent; background:transparent; color:var(--action); font-size:var(--text-md); font-weight:800; }
+/* Alphabetical index: a compact single-row rail. Touch-first widths retain
+   36px targets and intentionally scroll horizontally; desktop distributes
+   all 26 letters across the available workspace without wrapping. */
+.alpha-index { max-width:100%; margin-top:18px; overflow-x:auto; overscroll-behavior-x:contain; padding-bottom:4px; }
+.alpha-index ul { display:flex; flex-wrap:nowrap; width:max-content; gap:4px; margin:0; padding:0; list-style:none; }
+.alpha-index li { flex:0 0 36px; min-width:36px; }
+.alpha-index-link { width:36px; min-width:36px; min-height:36px; display:inline-grid; place-items:center; padding:0; border:0; border-bottom:2px solid transparent; background:transparent; color:var(--action); font-size:var(--text-md); font-weight:800; }
 .alpha-index-link:hover { border-bottom-color:var(--control-focus); }
 .alpha-index-link.is-current { border-bottom-color:var(--action); color:var(--ink); }
 .alpha-index-link.is-muted { color:var(--disabled-ink); font-weight:700; cursor:default; }
+@media (min-width:1024px) {
+  .alpha-index { overflow-x:visible; padding-bottom:0; }
+  .alpha-index ul { width:100%; gap:0; }
+  .alpha-index li { flex:1 1 0; min-width:24px; }
+  .alpha-index-link { width:100%; min-width:24px; }
+}
 /* Pagination bar (t_f13fcb1c): Previous / "Showing X–Y of Z · Page N of M" /
    Next — only when the filtered set spans more than one page. */
 .directory-pagination { display:flex; align-items:center; justify-content:space-between; gap:var(--space-4); flex-wrap:wrap; margin-top:26px; padding-top:18px; border-top:1px solid var(--line); }
@@ -1072,14 +1082,6 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
   .directory-tool .place-search-toggle { grid-column:1/-1; justify-self:start }
 }
 @media (max-width:700px) {
-  /* A–Z index scrolls horizontally on narrow screens instead of wrapping.
-     This rule USED to live in the earlier max-width:700px block (was line
-     888) — i.e. BEFORE the base `.alpha-index ul` declaration (line ~983), with
-     identical specificity (0,1,1), so the base always won and the intent
-     never applied: measured live 2026-08-09, the index wrapped to 236px of
-     vertical space at 390×844 and pushed the list further under the fold.
-     Declared here (after the base rule) it finally takes effect. */
-  .alpha-index ul { flex-wrap:nowrap; overflow-x:auto; overscroll-behavior-x:contain; padding-bottom:4px; }
   .filter-controls-row { grid-template-columns:minmax(0,1fr) !important }
   .map-card .filters-panel .filter-controls-row { grid-template-columns:minmax(0,1fr) }
   .record-search { grid-column:auto }
@@ -1087,22 +1089,6 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
   .directory-tool .directory-controls .record-search label,
   .directory-tool .directory-controls .record-search p,
   .directory-tool .directory-controls .record-search input { grid-column:1; grid-row:auto; }
-}
-@media (min-width:1024px) {
-  /* A–Z index on desktop (issue #408): the bar returns to its canonical
-     single-row jump-bar form (Wikipedia AllPages). With the base 44px
-     min-width + 4px gaps the 26 letters need 1244px — wider than the
-     1130px container at 1280×800 — so the row wrapped to 2 lines (92px
-     tall) and pushed the record list 48px further under the fold.
-     Links now share the row equally (li flex:1 1 0 + min-width:0, the
-     button fills its li via width:100%): ~39.6px wide at the 1280
-     container, ~33.7px at the 1024 one — pointer-first widths, still
-     ≥ WCAG 2.5.8 AA (24×24px) with the 44px min-height untouched.
-     Touch-first tablets (701–1023px) keep the base wrap with
-     full 44px targets; ≤700px keeps the horizontal-scroll bar. */
-  .alpha-index ul { flex-wrap:nowrap; }
-  .alpha-index li { flex:1 1 0; min-width:0; }
-  .alpha-index-link { min-width:0; width:100%; }
 }
 @media (max-width:820px) {
   .filters-disclosure { border:1px solid var(--line); border-radius:var(--radius-md); background:var(--card-bg); }
@@ -1475,7 +1461,7 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
    .loading-note / .notice insets below). */
 .map-card .search-count { margin:10px 18px 0; }
 .map-card .live-map-workspace { border:0; border-radius:0; box-shadow:none; }
-.map-card .map-split { grid-template-columns:320px 1fr; height:clamp(620px, calc(100svh - 300px), 1500px); min-height:620px; }
+.map-card .map-split { grid-template-columns:320px 1fr; height:clamp(700px, calc(100svh - 240px), 1500px); min-height:700px; }
 .map-card .map-panel .map-region, .map-card .map-panel .live-map { height:100%; min-height:560px; }
 .map-card .map-panel .map-fallback { height:100%; min-height:560px; }
 .map-card .loading-note, .map-card .notice { margin-left:18px; margin-right:18px; }
