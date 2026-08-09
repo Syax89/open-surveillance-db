@@ -233,6 +233,13 @@ test("POST rejects a session with a wrong or missing CSRF token", async () => {
 
 test("POST rejects malformed payloads with 400 and never touches the db layer", async () => {
   stubContributorSession();
+  // The loop fires 11 POSTs; the pre-session authLimit (audit 2026-08-09)
+  // would otherwise trip the default 10/min auth bucket on the 11th and
+  // answer 429 instead of 400. Pin a generous ceiling, like every other
+  // loop test on a metered route.
+  const envModule = await loadTreeModule("cloudflare-workers.mjs");
+  const previous = envModule.env.AUTH_RATE_LIMIT_MAX;
+  envModule.env.AUTH_RATE_LIMIT_MAX = "1000000";
   const { POST } = await appealsRoute();
   const cases = [
     { name: "entity missing", body: { ...validPayload, entity: undefined } },
@@ -247,10 +254,15 @@ test("POST rejects malformed payloads with 400 and never touches the db layer", 
     { name: "reason too long", body: { ...validPayload, reason: "x".repeat(1501) } },
     { name: "payload not an object", body: [1, 2, 3] },
   ];
-  for (const { name, body } of cases) {
-    const response = await POST(sessionRequest("/api/appeals", { method: "POST", body }));
-    assert.equal(response.status, 400, name);
-    assert.equal(callArgs("fileAppeal").length, 0, name);
+  try {
+    for (const { name, body } of cases) {
+      const response = await POST(sessionRequest("/api/appeals", { method: "POST", body }));
+      assert.equal(response.status, 400, name);
+      assert.equal(callArgs("fileAppeal").length, 0, name);
+    }
+  } finally {
+    if (previous === undefined) delete envModule.env.AUTH_RATE_LIMIT_MAX;
+    else envModule.env.AUTH_RATE_LIMIT_MAX = previous;
   }
 });
 
@@ -306,6 +318,34 @@ test("POST answers 429 past the appeal bucket and records the block", async () =
     assert.equal(callArgs("fileAppeal").length, 1, "the throttled call never reaches the db layer");
   } finally {
     envModule.env.APPEAL_RATE_LIMIT_MAX = previous;
+  }
+});
+
+test("POST answers 429 past the auth bucket BEFORE session resolution (anonymous backstop)", async () => {
+  // Audit 2026-08-09 (P2): an anonymous POST reached resolveOptionalContributor
+  // with no bucket in the way — the 401 path was free to hammer. authLimit
+  // now runs first; the throttled request must never touch session lookup.
+  const envModule = await loadTreeModule("cloudflare-workers.mjs");
+  const previous = envModule.env.AUTH_RATE_LIMIT_MAX;
+  envModule.env.AUTH_RATE_LIMIT_MAX = "1";
+  let lookups = 0;
+  stub("findSessionByToken", async () => {
+    lookups += 1;
+    return null;
+  });
+  try {
+    const { POST } = await appealsRoute();
+    const first = await POST(sessionRequest("/api/appeals", { method: "POST", body: validPayload }));
+    assert.equal(first.status, 401, "the first call passes the 1/min auth cap and fails auth (no session)");
+    assert.equal(lookups, 1, "the first request resolves the (absent) session");
+
+    const blocked = await POST(sessionRequest("/api/appeals", { method: "POST", body: validPayload }));
+    assert.equal(blocked.status, 429);
+    assert.ok(Number(blocked.headers.get("retry-after")) >= 1);
+    assert.equal(lookups, 1, "the throttled request must never reach session resolution");
+    assert.equal(callArgs("fileAppeal").length, 0, "the throttled request must never reach the db layer");
+  } finally {
+    envModule.env.AUTH_RATE_LIMIT_MAX = previous;
   }
 });
 
