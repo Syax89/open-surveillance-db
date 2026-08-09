@@ -16,6 +16,9 @@ export async function generateMetadata(): Promise<Metadata> {
     alternates: { canonical: "/directory" },
     openGraph: { title: t.pageTitle, description: t.pageIntro, images: ["/og.png"] },
     twitter: { card: "summary_large_image", title: t.pageTitle, description: t.pageIntro, images: ["/og.png"] },
+    // Issue #410: cross-document View Transitions — same as /mappa; the
+    // meta must be present on BOTH sides of the switch to animate.
+    other: { "view-transition": "same-origin" },
   };
 }
 
