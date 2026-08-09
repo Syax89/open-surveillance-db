@@ -482,6 +482,32 @@ test("POST /api/appeals is not gated: filing reaches the handler without moderat
   assert.equal(app.__calls[0].method, "POST");
 });
 
+test("POST /api/appeals/ (trailing slash) is normalised: filing still reaches the handler ungated", async () => {
+  const { worker, app } = await loadWorker();
+  // Audit 2026-08-09 (P2): the identity exception was an exact match on
+  // "/api/appeals", so a trailing slash made the filing route fall into the
+  // gated branch and fail closed with 503 for contributors. The pathname is
+  // normalised (trailing slash stripped) before the gate match.
+  const response = await worker.fetch(
+    request("/api/appeals/", { method: "POST" }),
+    testEnv(),
+    ctx(),
+  );
+  assert.notEqual(response.status, 503, "trailing-slash POST must not fail closed on missing moderation creds");
+  assert.equal(response.status, 200);
+  assert.equal(await response.text(), "handler-ok");
+  assert.equal(app.__calls.length, 1);
+  assert.equal(app.__calls[0].url, "https://osdb.test/api/appeals/");
+  assert.equal(app.__calls[0].method, "POST");
+});
+
+test("GET /api/appeals/ (trailing slash) stays gated after normalisation", async () => {
+  const { worker, app } = await loadWorker();
+  const noCreds = await worker.fetch(request("/api/appeals/"), testEnv(), ctx());
+  assert.equal(noCreds.status, 503, "the moderator list with a trailing slash must fail closed without moderation credentials");
+  assert.equal(app.__calls.length, 0, "the app handler must never run when the gate denies");
+});
+
 test("POST /api/appeals strips client-supplied identity headers like every other path", async () => {
   const { worker, app } = await loadWorker();
   const response = await worker.fetch(

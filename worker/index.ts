@@ -461,11 +461,22 @@ const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
+    // Normalise a trailing slash on the pathname BEFORE the edge-gate match
+    // (audit 2026-08-09, P2): the identity exception for POST /api/appeals
+    // is an exact match on "/api/appeals", so "/api/appeals/" (trailing
+    // slash) fell into the gated branch and failed closed with 503 for the
+    // very contributors the route exists for. Everything else (image route,
+    // security headers) keeps the ORIGINAL pathname.
+    const gatedPathname =
+      url.pathname.length > 1 && url.pathname.endsWith("/")
+        ? url.pathname.slice(0, -1)
+        : url.pathname;
+
     // 1. Identity sanitisation runs on EVERY path before any gate: the edge
     //    is the single identity authority and never trusts the caller.
     let gated = stripIdentityHeaders(request, env);
 
-    if (gatedPath(request.method, url.pathname)) {
+    if (gatedPath(request.method, gatedPathname)) {
       const gate = requireModerationAuth(gated, env);
       if (gate.denied) return withSecurityHeaders(gate.denied, url.pathname);
       gated = injectIdentityAfterGate(gated, gate.identityEmail);

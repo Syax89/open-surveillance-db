@@ -6,6 +6,7 @@ import {
   appealStatuses,
 } from "../../../db/appeals";
 import { requireRole } from "../../lib/authz";
+import { authLimit } from "../../lib/auth-route-helpers";
 import { getUserByContributorId, roleAtLeast } from "../../../db/users";
 import { malformedSessionCookieGuard, resolveOptionalContributor } from "../../lib/auth-session";
 import { csrfVerified, sameOrigin } from "../../lib/csrf";
@@ -119,6 +120,15 @@ export async function POST(request: Request) {
   // 400 (clear cookies) instead of a silent 401.
   const malformed = malformedSessionCookieGuard(request);
   if (malformed) return malformed;
+
+  // Metered BEFORE any session work (audit 2026-08-09, P2): an anonymous
+  // POST used to reach resolveOptionalContributor without ever hitting a
+  // bucket — an attacker could hammer the session lookup / the 401 path
+  // freely. The auth bucket (10/min per caller) bounds EVERY caller,
+  // authenticated or not, up front; appealLimit below keeps bounding the
+  // authenticated filing path with its dedicated appeal bucket.
+  const authBlocked = await authLimit(request, env, "/api/appeals");
+  if (authBlocked) return authBlocked;
 
   let session = null;
   try {

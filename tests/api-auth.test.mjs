@@ -794,6 +794,11 @@ test("me/submissions lists only the contributor's attributed reports", async () 
   assert.equal(response.status, 200);
   assert.deepEqual((await responseBody(response)).submissions, submissions);
   assert.deepEqual(callArgs("listContributorSubmissions")[0], [7]);
+  assert.equal(
+    response.headers.get("cache-control"),
+    "no-store",
+    "personal data must never be edge-cached (audit 2026-08-09, P2)",
+  );
 });
 
 test("me/submissions returns 401 without a session", async () => {
