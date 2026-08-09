@@ -102,6 +102,13 @@ const DB_MODULES = [
   // from ./cameras and the token primitives from ./auth, both already in
   // this tree, so the real PKCE/merge SQL runs against the same binding.
   { source: "db/oidc.ts", output: "db/oidc.mjs" },
+  // db/api-keys.ts (per-contributor write API keys, EPIC api-keys — T2/T3,
+  // decisions D1-D13) imports getD1 from ./cameras and the crypto helpers
+  // randomBase64Url/sha256Hex from ./auth — both already in this tree — so
+  // the real mint helpers (mintRawKey/derivePrefix) and the countActiveKeys
+  // SQL run against the same binding (db-api-keys-crypto.test.mjs, and T5
+  // CRUD once the migration 0045 exists).
+  { source: "db/api-keys.ts", output: "db/api-keys.mjs" },
 ];
 
 let builtTreePromise = null;
@@ -142,6 +149,18 @@ async function buildTree() {
     await mkdir(path.dirname(path.join(tree, output)), { recursive: true });
     await writeFile(path.join(tree, output), rewritten);
   }
+
+  // db/api-keys.ts re-exports the apiKeys table from ./schema for its public
+  // surface, but the REAL db/schema.ts imports "drizzle-orm" (table builder),
+  // which cannot resolve from os.tmpdir() — no node_modules in the walk-up
+  // path. No DB-layer function touches the table object at runtime (all
+  // api-keys SQL is raw via getD1()), so a placeholder keeps the re-export
+  // resolvable while mintRawKey/derivePrefix/countActiveKeys run against the
+  // real bindings (same injectable-env pattern as cloudflare-workers.mjs).
+  await writeFile(
+    path.join(tree, "db", "schema.mjs"),
+    "// Runtime-harness stand-in for db/schema.ts (see buildTree): keeps the\n// db/api-keys.ts re-export resolvable; the real schema imports drizzle-orm,\n// which the tmp tree cannot reach. No runtime code reads this object.\nexport const apiKeys = {};\n",
+  );
   return tree;
 }
 
@@ -165,7 +184,8 @@ export async function loadDbRuntime() {
   const communitySettings = await import(pathToFileURL(path.join(tree, "db/community-settings.mjs")).href);
   const communityActions = await import(pathToFileURL(path.join(tree, "db/community-actions.mjs")).href);
   const importSources = await import(pathToFileURL(path.join(tree, "db/import-sources.mjs")).href);
-  return { env: envModule.env, cameras, corrections, moderation, auth, users, appeals, retention, confirmations, cameraEdits, passkeys, mailer, emailTemplates, oidc, communitySettings, communityActions, importSources };
+  const apiKeys = await import(pathToFileURL(path.join(tree, "db/api-keys.mjs")).href);
+  return { env: envModule.env, cameras, corrections, moderation, auth, users, appeals, retention, confirmations, cameraEdits, passkeys, mailer, emailTemplates, oidc, communitySettings, communityActions, importSources, apiKeys };
 }
 
 // Replays the real Drizzle migration files (drizzle/0000-*.sql ... 0017-*.sql)

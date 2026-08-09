@@ -1,4 +1,5 @@
 import { getD1 } from "./cameras";
+import { randomBase64Url } from "./auth";
 
 /**
  * Per-contributor private write API keys (EPIC api-keys, decisions D1-D13
@@ -46,6 +47,47 @@ export const API_KEY_SCOPES: readonly ApiKeyScope[] = [
   "edit",
   "action",
 ];
+
+// ---------------------------------------------------------------------------
+// Raw-key crypto helpers (T3, decisions D2/D3)
+//
+// The raw key is reveal-once: `osdb_` + 32 random bytes base64url (D2) exists
+// in exactly one API response (the mint POST) and is NEVER stored — only its
+// SHA-256 hex (D3, sha256Hex from ./auth) and the display-only prefix go to
+// the database. Everything here is WebCrypto via the existing db/auth.ts
+// helpers (randomBase64Url → crypto.getRandomValues, sha256Hex →
+// crypto.subtle.digest); node:crypto is never used.
+// ---------------------------------------------------------------------------
+
+/** Raw-key prefix (D2): `osdb_` + 32 random bytes base64url. */
+export const API_KEY_PREFIX = "osdb_";
+
+/** Display-only `key_prefix` length in chars (D2): "osdb_" + 5 random chars. */
+export const API_KEY_PREFIX_LENGTH = 10;
+
+/** Random bytes in the raw key body (D2): 32 bytes ≈ 43 unpadded base64url chars. */
+const API_KEY_RAW_BYTES = 32;
+
+/**
+ * Mint a fresh raw API key (D2). WebCrypto only — reuses randomBase64Url
+ * from db/auth.ts (crypto.getRandomValues), never node:crypto.
+ *
+ * The caller must surface the raw value exactly once (the mint response,
+ * Cache-Control: no-store) and persist only sha256Hex(rawKey) — see
+ * derivePrefix for the display handle.
+ */
+export function mintRawKey(): string {
+  return `${API_KEY_PREFIX}${randomBase64Url(API_KEY_RAW_BYTES)}`;
+}
+
+/**
+ * Display-only handle for a raw key (D2): the first 10 chars. Never
+ * authenticates anything — key resolution goes through the full SHA-256 hex
+ * (D3, sha256Hex), so a leaked prefix alone cannot be replayed.
+ */
+export function derivePrefix(rawKey: string): string {
+  return rawKey.slice(0, API_KEY_PREFIX_LENGTH);
+}
 
 /**
  * Count the contributor's ACTIVE keys (D5 cap, API_KEYS_MAX_PER_CONTRIBUTOR):
