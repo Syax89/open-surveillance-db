@@ -316,7 +316,7 @@ button { cursor:pointer; }
 .signal { position:absolute; width:18px; height:18px; border-radius:var(--radius-round); background:var(--amber); box-shadow:0 0 0 7px rgba(248,184,78,.15),0 0 23px rgba(248,184,78,.8); }
 .signal i { position:absolute; width:0; height:0; border-top:88px solid rgba(248,184,78,.18); border-right:145px solid transparent; transform-origin:top left; left:9px; top:9px; }
 .signal b { position:absolute; inset:4px; background:var(--signal-core); border-radius:var(--radius-round); }
-.signal-one { right:24%;top:28%; }
+.signal-one { right:18%;top:38%; }
 .signal-two { right:65%;top:63%; }
 .signal-three { right:10%;top:74%; }
 .visual-label { position:absolute; right:50px; bottom:55px; border-left:2px solid var(--mint); padding-left:14px; color:var(--visual-label); font-size:var(--text-md); line-height:1.45; font-weight:700; }
@@ -335,7 +335,7 @@ button { cursor:pointer; }
 .teaser-pin-three { left:38%; top:62%; }
 .teaser-pin-four { left:70%; top:56%; }
 .teaser-pin-five { left:12%; top:70%; }
-.tool-cards { width:var(--container-standard); margin:0 auto; padding:44px 0 0; }
+.tool-cards { width:var(--container-standard); margin:0 auto; padding:100px 0 0; }
 .tool-cards-heading .eyebrow { margin-bottom:0; color:var(--eyebrow); }
 .tool-cards-grid { margin-top:26px; display:grid; grid-template-columns:1fr 1fr; gap:var(--space-4); }
 .tool-card { display:flex; flex-direction:column; gap:7px; padding:24px 24px 26px; border:1px solid var(--line); border-radius:var(--radius-lg); background:var(--card-bg); transition:transform .2s ease, border-color .2s ease; }
@@ -465,7 +465,7 @@ button { cursor:pointer; }
 .notice { margin:16px 0 0; padding:12px 15px; border-left:3px solid var(--notice-accent); background:var(--notice-success-bg); color:var(--notice-ink); border-radius:var(--radius-xs); font-size:var(--text-md); }
 .offline-state { margin:16px 0 0; padding:12px 15px; border-left:3px solid var(--offline-accent); background:var(--offline-bg); color:var(--offline-ink); border-radius:var(--radius-xs); font-size:var(--text-md); }
 .offline-state .text-button { color:var(--offline-ink); text-decoration:underline; }
-.principles { display:grid; grid-template-columns:.85fr 1.15fr; gap:90px; padding:85px 0; border-top:1px solid var(--line); }
+.principles { display:grid; grid-template-columns:.85fr 1.15fr; gap:70px; padding:72px 0; border-top:1px solid var(--line); }
 .guide-overview { width:var(--container-standard); margin:0 auto; display:grid; grid-template-columns:.85fr 1.15fr; gap:90px; padding:0 0 72px; }
 .guide-overview h2 { max-width:390px; margin:0; color:var(--ink); font-size:var(--text-section); letter-spacing:-.065em; line-height:1; font-weight:800; text-wrap:balance; }
 .guide-overview ul { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin:0; padding:0; list-style:none; }
@@ -560,7 +560,7 @@ button { cursor:pointer; }
 .correction-section.guide-section-anchor { grid-template-columns:1fr; gap:28px; padding-bottom:64px; }
 .principles-intro>p:not(.eyebrow) { max-width:440px; color:var(--ink-3); font-size:var(--text-2xl); line-height:1.6; text-wrap:balance; }
 .principles-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:var(--space-4); }
-.principles-grid article { min-height:228px; padding:22px; background:var(--surface-muted); border-radius:var(--radius-lg); }
+.principles-grid article { padding:22px; background:var(--surface-muted); border-radius:var(--radius-lg); }
 .principles-grid article:nth-child(2) { background:var(--principle-surface-2) }
 .principles-grid article:nth-child(3) { background:var(--principle-surface-3) }
 .principles-grid span { color:var(--icon-ink); font-size:var(--text-xs); font-weight:800; letter-spacing:.1em; }
@@ -857,7 +857,7 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
      lands directly under .visual-label (right:26px;bottom:28px below),
      the amber dot overlapping the caption text. Move it up into the
      otherwise-empty upper-right area, clear of both signal-one
-     (right:24%;top:28%) and the label. */
+     (right:18%;top:38% in the base rule) and the label. */
   .signal-three { right:20%;top:18%; }
   .map-teaser { grid-template-columns:1fr; gap:30px; padding:64px 0 24px }
   .map-teaser-visual { min-height:210px }
@@ -1369,7 +1369,7 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 .map-explorer-search .map-list-search input { width:100%; min-height:44px; box-sizing:border-box; padding:9px 11px; border:1px solid var(--map-input-border); border-radius:var(--radius-md); background:var(--white); color:var(--ink-5); font-size:var(--text-md); }
 .map-explorer-search .geocode-dropdown { left:0; right:0; }
 .map-card .filters-panel { padding:10px 18px; border-bottom:1px solid var(--line); background:var(--card-bg); }
-.map-card .filters-panel .filter-controls-row > .text-button { grid-column:auto; align-self:end; min-height:40px; display:inline-flex; align-items:center; white-space:nowrap; }
+.map-card .filters-panel .filter-controls-row > .text-button { grid-column:auto; align-self:end; min-height:44px; display:inline-flex; align-items:center; white-space:nowrap; }
 /* FIX /mappa (CEO feedback 2026-08-02): the panel FiltersBar row is its own
    4-column grid on DESKTOP — kind / freshness / sort / reset on ONE line, the
    reset button right-aligned in the last (auto) column instead of wrapping
@@ -1460,16 +1460,21 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 /* Pixel-grid aggregation badges (t_26ce96f3, CEO 2026-08-05): at low zoom /
    high density ONE badge divIcon per 48px screen cell replaces thousands of
    DOM markers. The badge is a circular count pill with the project's action
-   colour, readable at 30px, with a visible focus ring (the marker is an
-   interactive Leaflet marker: role=button + tabindex). The count text is
+/* Grid badge (t_f8b775ec): marker count pill on aggregated cells; clicking
+   zooms toward the centroid. The badge itself is 44×44px (WCAG 2.5.5 AAA
+   touch target, audit 2026-08-09), centred on a 48px cell (GRID_CELL_PX) —
+   the 4px margin prevents overlap at high density. The count is
    the badge's only content; tooltip + aria-label carry the same message.
-   The 30px iconSize + 15px anchor keep the pill centred on the cell
+   The 44px iconSize + 22px anchor keep the pill centred on the cell
    centroid so a click targets the centroid exactly. */
+.leaflet-marker-icon.osm-grid-badge-wrap {
+  width:44px !important; height:44px !important;
+}
 .osm-grid-badge {
   display:flex; align-items:center; justify-content:center;
-  width:30px; height:30px; border-radius:50%;
+  width:44px; height:44px; border-radius:50%;
   background:var(--action); color:var(--white);
-  font-size:var(--text-sm); font-weight:800; line-height:1;
+  font-size:var(--text-md); font-weight:800; line-height:1;
   box-shadow:0 1px 4px rgb(10 30 40 / .35);
   border:2px solid var(--white);
 }

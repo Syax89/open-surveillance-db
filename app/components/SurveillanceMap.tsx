@@ -5,6 +5,7 @@ import { isPublicStatus } from "../lib/public-status";
 import { BOUNDS_DEBOUNCE_MS, escapeHtml, type ViewportBounds } from "../lib/map-viewport";
 import { markersForViewport } from "../lib/map-grid";
 import { useMessages } from "../lib/use-messages";
+import { useLatest } from "../lib/hooks/use-latest";
 import { isDomeKind } from "../lib/camera-kinds";
 import { FOV_MIN_ZOOM, fovCircleRadiusMeters, fovPolygonPoints } from "../lib/field-of-view";
 import { formatDirection } from "../lib/compass";
@@ -99,8 +100,8 @@ function buildGridBadgeIcon(L: LeafletModule, count: number) {
   return L.divIcon({
     className: "osm-grid-badge-wrap",
     html: `<span class="osm-grid-badge" aria-hidden="true">${count}</span>`,
-    iconSize: [30, 30],
-    iconAnchor: [15, 15],
+    iconSize: [44, 44],
+    iconAnchor: [22, 22],
   });
 }
 
@@ -185,17 +186,17 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
   // changes) must not touch the marker/popup bookkeeping.
   const badgesRef = useRef<Map<string, import("leaflet").Marker>>(new Map());
   const leafletRef = useRef<LeafletModule | null>(null);
-  const onPickRef = useRef(onPick);
-  const focusLocationRef = useRef(focusLocation);
-  const selectedIdRef = useRef(selectedId);
+  const onPickRef = useLatest(onPick);
+  const focusLocationRef = useLatest(focusLocation);
+  const selectedIdRef = useLatest(selectedId);
   const prevSelectedIdRef = useRef(selectedId);
-  const onBoundsChangeRef = useRef(onBoundsChange);
-  const popupHtmlForRef = useRef(popupHtmlFor);
+  const onBoundsChangeRef = useLatest(onBoundsChange);
+  const popupHtmlForRef = useLatest(popupHtmlFor);
   const pickPopupHtmlRef = useRef<(latitude: number, longitude: number) => string>(() => "");
   // Latest cameras for the popupopen handler: the map-creation effect runs
   // once and would otherwise close over the FIRST camera list (same pattern
   // as popupHtmlForRef — the popup mount needs the CURRENT counts).
-  const camerasRef = useRef(cameras);
+  const camerasRef = useLatest(cameras);
   const boundsTimerRef = useRef<number | null>(null);
   // Popup lifecycle (t_33b82720): WHICH record's popup is currently open.
   // Updated by the popupopen/popupclose handlers and read by the marker
@@ -212,29 +213,6 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
   // record is visible again ("pan keeps the selected popup", Leaflet
   // native behaviour).
   const rebuildingRef = useRef(false);
-
-  useEffect(() => {
-    onPickRef.current = onPick;
-  }, [onPick]);
-
-  useEffect(() => {
-    focusLocationRef.current = focusLocation;
-  }, [focusLocation]);
-
-  useEffect(() => {
-    selectedIdRef.current = selectedId;
-  }, [selectedId]);
-
-  useEffect(() => {
-    onBoundsChangeRef.current = onBoundsChange;
-  }, [onBoundsChange]);
-
-  useEffect(() => {
-    popupHtmlForRef.current = popupHtmlFor;
-  }, [popupHtmlFor]);
-  useEffect(() => {
-    camerasRef.current = cameras;
-  }, [cameras]);
 
   // Geolocation toggle (t_18259daa, CEO): the floating button above the
   // zoom controls turns ON/OFF the user's own position. ON → ask the
@@ -352,7 +330,7 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
       // autoPanPadding as the marker popup, so a picker near the map edge
       // never renders cut off.
       keepInView: true,
-      autoPanPadding: [48, 48],
+      autoPanPadding: [60, 48],
     });
   }, []);
 
@@ -771,7 +749,7 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
           // the map bounds; autoPanPadding gives the view margin so the
           // balloon never sits flush against an edge.
           keepInView: true,
-          autoPanPadding: [48, 48],
+          autoPanPadding: [60, 48],
         });
         // Keyboard accessibility (P2-9, review 2026-08-07): Leaflet markers
         // are focusable (role=button, tabindex) but had no keydown handler
