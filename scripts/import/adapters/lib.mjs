@@ -229,6 +229,39 @@ export function nztm2193ToWgs84(x, y) {
   return [Number((lat * 180 / Math.PI).toFixed(6)), Number((lon * 180 / Math.PI).toFixed(6))];
 }
 
+/**
+ * EPSG:31983 (SIRGAS 2000 / UTM zone 23S) → WGS84. Usato da Belo
+ * Horizonte BHTRANS (GEOMETRIA "POINT (easting northing)"). GRS80,
+ * k0=0.9996, lon0=-45, x0=500000, y0=10000000.
+ * Validato 2026-08-09: 611367, 7798693 → -19.9049/-43.9360 (Belo
+ * Horizonte centro, Av. Cristiano Machado ~-19.90/-43.94).
+ */
+export function utm23sToWgs84(e, n) {
+  const a = 6378137.0;
+  const f = 1 / 298.257222101;
+  const e2 = f * (2 - f);
+  const k0 = 0.9996;
+  const lon0 = (-45 * Math.PI) / 180;
+  const E = e - 500000.0;
+  const N = n - 10000000.0;
+  const ep2 = e2 / (1 - e2);
+  const M = N / k0;
+  const mu = M / (a * (1 - e2 / 4 - 3 * e2 ** 2 / 64 - 5 * e2 ** 3 / 256));
+  const e1 = (1 - Math.sqrt(1 - e2)) / (1 + Math.sqrt(1 - e2));
+  const phi1 = mu
+    + (3 * e1 / 2 - 27 * e1 ** 3 / 32) * Math.sin(2 * mu)
+    + (21 * e1 ** 2 / 16 - 55 * e1 ** 4 / 32) * Math.sin(4 * mu)
+    + (151 * e1 ** 3 / 96) * Math.sin(6 * mu);
+  const c1 = ep2 * Math.cos(phi1) ** 2;
+  const t1 = Math.tan(phi1) ** 2;
+  const N1 = a / Math.sqrt(1 - e2 * Math.sin(phi1) ** 2);
+  const R1 = a * (1 - e2) / (1 - e2 * Math.sin(phi1) ** 2) ** 1.5;
+  const D = E / (N1 * k0);
+  const lat = phi1 - (N1 * Math.tan(phi1) / R1) * (D ** 2 / 2 - (5 + 3 * t1 + 10 * c1 - 4 * c1 ** 2 - 9 * ep2) * D ** 4 / 24 + (61 + 90 * t1 + 298 * c1 + 45 * t1 ** 2 - 252 * ep2 - 3 * c1 ** 2) * D ** 6 / 720);
+  const lon = lon0 + (D - (1 + 2 * t1 + c1) * D ** 3 / 6 + (5 - 2 * c1 + 28 * t1 - 3 * c1 ** 2 + 8 * ep2 + 24 * t1 ** 2) * D ** 5 / 120) / Math.cos(phi1);
+  return [Number((lat * 180 / Math.PI).toFixed(6)), Number((lon * 180 / Math.PI).toFixed(6))];
+}
+
 export function parseDirection(value) {
   if (value === null || value === undefined) return null;
   const text = String(value).trim().toLocaleLowerCase();
