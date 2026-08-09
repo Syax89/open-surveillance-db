@@ -221,6 +221,28 @@ button { cursor:pointer; }
 .explore-view-switch a { min-height:44px; display:inline-flex; align-items:center; padding:0 12px; border-radius:var(--radius-sm); color:var(--nav-ink); font-size:var(--text-sm); font-weight:800; text-decoration:none; }
 .explore-view-switch a[aria-current="page"] { background:var(--heading); color:var(--white); }
 .explore-view-switch a:focus-visible { outline:3px solid var(--focus); outline-offset:2px; }
+/* Map ↔ Directory view switch (issue #410): cross-document View
+   Transitions. /mappa (1440px workspace) and /directory (1180px readable
+   catalog) keep their DELIBERATE widths (R2: the list stays readable, the
+   map stays wide) — the browser crossfades the old page out to the paper
+   background, then fades the new page in, so the ~260px width shift
+   happens while both pages are transparent and is never perceived as a
+   jump. The switch itself is a shared element (view-transition-name) that
+   stays anchored while the content swaps. Browsers without the API fall
+   back to a plain navigation (no JS, no polyfill, no layout change);
+   prefers-reduced-motion disables the animation entirely (WCAG 2.3.3). */
+@keyframes osdb-vt-out { to { opacity:0; } }
+@keyframes osdb-vt-in { from { opacity:0; } }
+@media (prefers-reduced-motion: no-preference) {
+  .explore-view-switch { view-transition-name:explore-view-switch; }
+  ::view-transition-old(root) { animation:osdb-vt-out .14s ease-in both; }
+  ::view-transition-new(root) { animation:osdb-vt-in .22s ease-out both; animation-delay:.14s; }
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) { animation:none !important; }
+}
 .nav-shell { width:var(--container-wide); margin:0 auto; padding:22px 0; display:flex; align-items:center; justify-content:space-between; gap:var(--space-6); }
 .brand { display:inline-flex; align-items:center; gap:10px; font-weight:800; letter-spacing:-.04em; font-size:19px; }
 .brand-mark { display:grid; place-items:center; width:29px; height:29px; border-radius:var(--radius-round); background:var(--ink); color:var(--mint); font-size:var(--text-4xl); line-height:1; }
