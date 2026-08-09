@@ -220,8 +220,13 @@ GitHub repository secrets used by the workflow:
 and `CLOUDFLARE_ACCOUNT_ID` (the `PROD_URL` variable is only used by the
 `ops-monitoring.yml` health-check workflow, not by deploys). `PROD_URL`
 (hostname only, no scheme — the workflow prepends `https://`) is set to
-`open-surveillance-db.<your-subdomain>.workers.dev` (workers.dev subdomain
-`<your-subdomain>`; no custom domain/route registered yet). Update it with
+`open-surveillance-db.simone-rondina.workers.dev` (verified 2026-08-09:
+the deployed worker answers 200). The NPM→LXC public hostname
+`osdb.syaxhome89.com` is the alternate; it can be added as the optional
+`PROD_URL_ALT` repository variable for the dual health check once the
+container accepts the host (see `ALLOWED_HOSTS` note in §Local LXC
+deployment — without it the host answers 403, so adding it as PROD_URL_ALT
+today would make the monitoring check fail). Update with
 `gh variable set PROD_URL <host>` whenever the public URL changes (see
 docs/OPERATIONS.md §3.2 and issue #203). The job
 targets the `production` GitHub Environment (add required reviewers for a
@@ -304,12 +309,16 @@ environment" above).
   (`local-lvm:vm-114-disk-0`).
 - Network: `eth0` = <lan-ip>/24, gateway <gateway-ip>, DNS <dns-ip>.
 - `onboot=1` (set via Proxmox API so the site comes back after a host reboot).
-- No SSH access: the deploy key was **not** injected at create time (verified
-  from the `vzcreate` task log, 2026-07-31 — no `--ssh-public-keys` was passed)
-  and `ssh-public-keys`/`password` cannot be set post-create (API schema
-  rejects them). All container operations (snapshot, rollback, backup,
-  stop/start) are performed via the Proxmox API token, see
-  `docs/OPERATIONS.md` §8.
+- SSH access: the deploy key was **not** injected at create time (verified
+  from the `vzcreate` task log, 2026-07-31 — no `--ssh-public-keys` was
+  passed), but it **was** added post-create via the Proxmox API
+  (`ops`-side helper `lxc-inject-sshkey.py`: `PUT .../lxc/<vmid>/config`
+  with `ssh-public-keys` + fresh digest, then reboot — verified working,
+  the operator workstation connects as `root@<lan-ip>` with the injected
+  key). Snapshot/rollback/backup/stop-start operations are performed via
+  the Proxmox API token (`docs/OPERATIONS.md` §8); code deploys use SSH
+  (`git fetch && git reset --hard origin/main` on the container, see
+  below and RELEASE_CHECKLIST.md).
 
 ### Application
 
@@ -326,8 +335,28 @@ environment" above).
 
 - Updates are applied with `git fetch && git reset --hard origin/main`, then
   `npm ci`, then `systemctl restart osdb-test.service`.
+- **Mandatory pre-deploy step (ops audit 2026-08-09): before every update
+  take the Proxmox snapshot rollback base with
+  `ops/snapshot-pre-deploy.sh`** (default name
+  `pre-deploy-YYYYMMDD-HHMMSS`); on problems roll back with
+  `ops/rollback-lxc114.sh <snapname>`. The snapshot is the only full
+  rollback base for the container (OPERATIONS.md §8.4). The full deploy
+  sequence is: snapshot → SSH update → `npm ci` → restart → health check
+  (RELEASE_CHECKLIST.md §6-7).
+- `ALLOWED_HOSTS` must be in the systemd unit's `Environment=` (or the
+  shell that starts the service): the vite dev server rejects any Host
+  header not in `server.allowedHosts`, and the public NPM→LXC hostname
+  (`osdb.syaxhome89.com`) is only accepted when
+  `ALLOWED_HOSTS=.syaxhome89.com` reaches the process. The value lives in
+  `.dev.vars` too, but only the systemd `Environment=` line guarantees it
+  reaches the vite config evaluation on a clean start (verified
+  2026-08-09: without it the public host answers 403 "Blocked request.
+  This host is not allowed").
 - No `.env` file is needed: the only production metadata variable
   (`NEXT_PUBLIC_SITE_URL`) stays unset on purpose for the test site.
+- Log rotation: the unit sets `WRANGLER_LOG_PATH=.wrangler/wrangler.log`,
+  which grows unbounded — add the logrotate config from OPERATIONS.md §8.7
+  on the container (or truncate at every restart).
 
 ### Runtime choice: `vinext dev`, not `vinext start`
 
