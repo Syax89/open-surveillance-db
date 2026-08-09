@@ -884,8 +884,6 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
   .directory-tool .record-list .record-list-card .record-list-actions { align-items:flex-start; }
   /* Results header (t_f13fcb1c, ex .directory-meta): stack on narrow screens. */
   .directory-results { align-items:flex-start; flex-direction:column; gap:var(--space-3); }
-  /* A–Z index scrolls horizontally on narrow screens (no wrap). */
-  .alpha-index ul { flex-wrap:nowrap; overflow-x:auto; padding-bottom:4px; }
   .directory-pagination { justify-content:center; }
   .record-detail { width:min(100% - 32px,760px);margin:24px auto 60px;padding:30px 23px }
   .record-detail-facts { grid-template-columns:1fr }
@@ -1037,6 +1035,14 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
   .directory-tool .place-search-toggle { grid-column:1/-1; justify-self:start }
 }
 @media (max-width:700px) {
+  /* A–Z index scrolls horizontally on narrow screens instead of wrapping.
+     This rule USED to live in the earlier max-width:700px block (was line
+     888) — i.e. BEFORE the base `.alpha-index ul` declaration (line ~983), with
+     identical specificity (0,1,1), so the base always won and the intent
+     never applied: measured live 2026-08-09, the index wrapped to 236px of
+     vertical space at 390×844 and pushed the list further under the fold.
+     Declared here (after the base rule) it finally takes effect. */
+  .alpha-index ul { flex-wrap:nowrap; overflow-x:auto; overscroll-behavior-x:contain; padding-bottom:4px; }
   .filter-controls-row { grid-template-columns:minmax(0,1fr) !important }
   .map-card .filters-panel .filter-controls-row { grid-template-columns:minmax(0,1fr) }
   .record-search { grid-column:auto }
