@@ -1,0 +1,11 @@
+{
+    "slug": "brasile-bh-bhtrans-cameras-2026",
+    "source_name": "Belo Horizonte (BHTRANS) — Fiscalização Eletrônica",
+    "format": "csv",
+    "license": "CC BY",
+    "license_url": "http://www.opendefinition.org/licenses/cc-by",
+    "attribution_text": "Fonte: Prefeitura de Belo Horizonte, dados.pbh.gov.br — Fiscalização Eletrônica (https://dados.pbh.gov.br/dataset/7ce7b0b8-0a5b-4736-9b63-8bfd5da6cfe4), concesso con licenza Creative Commons Attribution.",
+    "source_url": "https://dados.pbh.gov.br/api/3/action/package_show?id=7ce7b0b8-0a5b-4736-9b63-8bfd5da6cfe4",
+    "max_records": 1000,
+    "notes": "Cron ricerca stato-per-stato (2026-08-09): BHTRANS 506 righe CSV (CKAN), GEOMETRIA 'POINT (easting northing)' UTM 23S (EPSG:31983) → utm23sToWgs84; 332 dispositivi con coordinate. NUOVO PAESE: Brasile. external_id bh-bhtrans:<ID_FISCALIZACAO_ELETRONICA>."
+}

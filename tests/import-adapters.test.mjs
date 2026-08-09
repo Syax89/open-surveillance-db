@@ -1189,3 +1189,35 @@ test("pbr: parses Phetchaburi CSV (Latitude/Longitude) into staged rows", () => 
   assert.equal(staged[0].external_id, "pbr-cctv:0");
   assert.equal(skipped.total, 1);
 });
+
+// -------------------------------------------------- wave 13: Brasile BH + Giappone Ichikawa
+
+import { parsePayload as bhParse } from "../scripts/import/adapters/brasile-bh-bhtrans-cameras-2026.mjs";
+import { parsePayload as ichikawaParse } from "../scripts/import/adapters/giappone-ichikawa-cctv-2026.mjs";
+import { utm23sToWgs84 } from "../scripts/import/adapters/lib.mjs";
+
+test("utm23sToWgs84 lands in Belo Horizonte (~-19.90, -43.94)", () => {
+  const [lat, lon] = utm23sToWgs84(611367.363251832, 7798693.4598023);
+  assert.ok(Math.abs(lat - -19.904872) < 0.001, `lat ${lat}`);
+  assert.ok(Math.abs(lon - -43.936041) < 0.001, `lon ${lon}`);
+});
+
+test("bhtrans: parses CSV with GEOMETRIA POINT (UTM 23S) into staged rows", () => {
+  const { staged, skipped } = bhParse({
+    data: 'ID_FISCALIZACAO_ELETRONICA,DESC_LOC_CONTROLADOR_TRANSITO,DESC_TIPO_CONTROLADOR_TRANSITO,VELOCIDADE_REGULAMENTAR,GEOMETRIA\n262,Av. Cristiano Machado 1320,Controlador Eletrônico de Velocidade,60,"POINT (611367.363251832 7798693.4598023)"\n263,test,,,POINT (0 0)\n',
+  });
+  assert.equal(staged.length, 1);
+  assert.equal(staged[0].title, "Av. Cristiano Machado 1320");
+  assert.equal(staged[0].external_id, "bh-bhtrans:262");
+  assert.equal(skipped.total, 1);
+});
+
+test("ichikawa: parses CSV (Shift-JIS 緯度/経度) into staged rows", () => {
+  const { staged, skipped } = ichikawaParse({
+    data: "itemID,緯度,経度,住所,分類,設置施設名称,管理番号\n237,35.731853055555554,139.906921,市川2-31-20,街頭防犯カメラ,エスポワール市川,21\n238,0,0,x,街頭防犯カメラ,x,22\n",
+  });
+  assert.equal(staged.length, 1);
+  assert.equal(staged[0].title, "エスポワール市川");
+  assert.equal(staged[0].external_id, "ichikawa-cctv:21");
+  assert.equal(skipped.total, 1);
+});
