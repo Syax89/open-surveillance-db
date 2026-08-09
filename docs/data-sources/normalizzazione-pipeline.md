@@ -2,7 +2,7 @@
 
 - **Status:** draft (design phase — kanban t_74e02c5a, FONTI PUBBLICHE #3)
 - **Date:** 2026-08-04
-- **Author:** Ken (DevSecOps / CI)
+- **Author:** Simone Rondina (project owner)
 - **Scope:** design only, no implementation. This document is the blueprint the
   implementation phases will follow.
 - **Inputs (in progress, same workstream):**
@@ -229,7 +229,7 @@ title+address+kind):
 Rationale for the thresholds (vs the interactive gate, ADR 0019): the
 interactive gate uses `≤ 25 m` = high because a human confirms; a batch import
 has no human in the loop, so the *auto-skip* band is tighter (`< 10 m` same
-kind — the task's explicit requirement "prossimità spaziale <10m + tipo") and
+kind — the task's explicit requirement "spatial proximity < 10 m + kind") and
 everything ambiguous goes to the **review list** in the batch report for a
 human/operator pass, not to the database. The `< 10 m` figure is also the
 resolution of the public coordinate rounding (ADR 0008 ≈ 10 m): two raw points
@@ -279,7 +279,7 @@ later phase flips it per source without a redesign.
   immediately — exactly the ADR 0021 publication model for community reports
   (§ 1: no pending queue). There is no moderation step for imports either.
 - `last_verified_at` stays **NULL** → the existing UI badge "never confirmed"
-  (ADR 0021 § 9.1) is the "importato, mai confermato" indicator. No schema
+  (ADR 0021 § 9.1) is the "imported, never confirmed" indicator. No schema
   change, no new status, no new transition: the community validates imported
   cameras with the **same** `confirm` / `gone` / `problem` / `privacy`
   actions (camera_community_actions), and a `confirm` refreshes
@@ -390,8 +390,8 @@ CREATE INDEX `cameras_import_batch_idx` ON `cameras` (`import_batch_id`);
 ### 6.4 Attribution surfaces (later phase)
 
 - `/licenze` page: new section listing `import_batches` (source_name, license
-  + link, source_url, import_date, counts) — the "pattern di attribuzione nel
-  sito" required by #2.
+  + link, source_url, import_date, counts) — the "attribution pattern on the
+  site" required by #2.
 - Exports (`/api/cameras?format=csv|geojson`): `source` column already present
   → imported rows carry `import:<slug>` automatically; the ODbL notice stays.
   For OSM-derived rows the notice must add "© OpenStreetMap contributors"

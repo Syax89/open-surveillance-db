@@ -101,6 +101,7 @@ public/     Static assets (favicon, etc.)
 
 ## Documentation
 
+- [docs/DOCUMENTATION_INDEX.md](docs/DOCUMENTATION_INDEX.md) — complete inventory of the documentation (purpose, status, language)
 - [docs/DEVELOPMENT_SETUP.md](docs/DEVELOPMENT_SETUP.md) — clean local setup, migrations, fixtures
 - [docs/LOCAL_PLAYBOOK.md](docs/LOCAL_PLAYBOOK.md) — end-to-end local workflow with fictional data
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — architecture and security boundaries
@@ -139,3 +140,11 @@ knowledge are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md),
 [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), [GOVERNANCE.md](GOVERNANCE.md) and
 [SECURITY.md](SECURITY.md) before participating. Material decisions are
 recorded as ADRs in [docs/decisions/](docs/decisions/README.md).
+
+## Project and contact
+
+OpenSurveillanceDB is a **personal open-source project** owned and
+maintained by **Simone Rondina** (GitHub:
+[Syax89](https://github.com/Syax89)). For any concern — privacy,
+data-protection, security disclosure, corrections or anything else — write
+to **privacy@opensurveillancedb.org**.

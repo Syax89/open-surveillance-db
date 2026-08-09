@@ -2,7 +2,7 @@
 
 - **Status:** accepted
 - **Date:** 2026-08-01
-- **Author:** Ada (architecture / database)
+- **Author:** Simone Rondina (project owner)
 - **Updates:** ADR 0003-moderation-access-control (route-level coarse roles and
   server-derived reviewer identity sit in front of the worker Basic/Bearer
   gate); ADR 0009-reviewer-roles-moderation-queue (the named-reviewer matrix

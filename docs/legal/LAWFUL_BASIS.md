@@ -1,7 +1,7 @@
 # Lawful-basis assessment (outline)
 
 - **Status:** in force — personal open-source project, 2026-08-08 (ADR 0002)
-- **Owner:** Rosa (Legal & Privacy Officer / privacy contact)
+- **Owner:** Simone Rondina (project owner / privacy contact)
 - **Jurisdiction (primary):** European Union — GDPR (EU) 2016/679; Italy — D.Lgs. 196/2003 (Codice Privacy, as amended by D.Lgs. 101/2018)
 - **Documents this supports:** PRIVACY_NOTICE.md, PROCESSOR_REGISTER.md
 

@@ -1,7 +1,7 @@
 # Moderation service-level agreements (SLA)
 
 - **Status:** in force — personal open-source project, 2026-08-08
-- **Owner:** Rosa (Legal & Privacy Officer / privacy contact) with the moderation team
+- **Owner:** Simone Rondina (project owner / privacy contact)
 - **Implements:** ../MODERATION.md (community-driven model — legal-emergency admin actions + private corrections); review findings M1, M2, M3.
 - **Alignment:** response times are compatible with GDPR art. 12(3) (1-month substantive response).
 - **Community model (ADR 0021, 2026-08-05):** the normal flow has no human moderation — the SLAs below cover the **residual human surfaces only**: legal-emergency admin actions and the private correction path. The retired-flow SLAs (old S5/S6) are **removed**: the contrary-consensus mechanism of ADR 0021 § 6 replaces them. **Image evidence removed (2026-08-08, CEO):** the image redaction gate no longer exists — the moderation surface is legal-emergency + corrections only.
@@ -54,7 +54,7 @@ Retention: 2 years (RETENTION_SCHEDULE.md R5). The log is internal — never exp
 ## 6. Measurement and reporting
 
 - The tooling tracks: time-to-first-response and time-to-decision for corrections, hide/remove latency and retrospective-review turnaround for legal emergencies.
-- A quarterly transparency report (aggregate: volumes, decisions by reason code, median response times, review turnaround) is published by Marie per ../OPEN_SOURCE.md.
+- A quarterly transparency report (aggregate: volumes, decisions by reason code, median response times, review turnaround) is published by the project owner per ../OPEN_SOURCE.md.
 - Missed targets are reviewed in the next moderation meeting with corrective actions; persistent misses escalate to the advisory circle (../GOVERNANCE.md).
 
 ## 7. Exceptions

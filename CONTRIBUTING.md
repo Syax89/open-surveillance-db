@@ -13,7 +13,7 @@ Thank you for helping build a public-interest tool. Contributions are welcome fr
 
 ```bash
 npm install
-cp .dev.vars.example .dev.vars   # compila i placeholder (nessun segreto nel repo)
+cp .dev.vars.example .dev.vars   # fill in the placeholders (no secrets in the repo)
 npm run dev
 npm run build
 ```

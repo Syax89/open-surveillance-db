@@ -1,520 +1,519 @@
-# Censimento fonti pubbliche — telecamere di videosorveglianza
+# Census of public sources — surveillance cameras
 
-**Worker:** Grace (QA Automation Engineer)
-**Data verifica:** 2026-08-04 (verifiche dirette su API/portali, vedi § 2)
-**Task:** FONTI PUBBLICHE #1 — Censimento (`t_3edaf673`)
-**Stato:** pronto per review (Ada/CTO + Rosa/DPO per i casi licenza marcati)
-**Dipendenze:** [README.md](README.md) (indice workstream); la matrice di compatibilità licenze è in
-[licenze-compatibilita.md](licenze-compatibilita.md) (FONTI #2, Marie) — questo documento applica i verdetti
-per-fonte e **non** duplica la matrice.
+**Worker:** project owner (Simone Rondina)
+**Verification date:** 2026-08-04 (direct checks on APIs/portals, see § 2)
+**Task:** PUBLIC SOURCES #1 — Census (`t_3edaf673`)
+**Status:** ready for review (technical + privacy/legal review for the flagged licence cases)
+**Dependencies:** [README.md](README.md) (workstream index); the licence-compatibility matrix is in
+[licenze-compatibilita.md](licenze-compatibilita.md) (SOURCES #2) — this document applies the verdicts
+per source and does **not** duplicate the matrix.
 
-> Il database di progetto è rilasciato sotto **ODbL 1.0** (ADR 0008). Per ogni fonte è indicato il
-> verdetto di compatibilità secondo la regola unidirezionale permissiva→share-alike di
-> `licenze-compatibilita.md` § 2. I casi «da verificare con legale» richiedono l'ok di Rosa (DPO)
-> prima di qualsiasi import (vincolo operativo del README del workstream).
+> The project database is released under **ODbL 1.0** (ADR 0008). For each source the compatibility
+> verdict is given according to the one-way permissive→share-alike rule of
+> `licenze-compatibilita.md` § 2. Cases marked «to be verified with legal» require privacy/legal
+> approval before any import (operational constraint of the workstream README).
 
 ---
 
-## 1. Sintesi esecutiva
+## 1. Executive summary
 
-**Esito:** censite e valutate **26 fonti** (10 italiane, 12 EU/CH/UK, 2 aggregatori europei, 2 progetti civici/ricerca).
-**Verificate via API diretta** (non solo scheda portale): 20 su 26 — coordinate, campi e licenze letti
-direttamente dai dataset. **Top 5 per qualità/fattibilità:** Zürich (CC0), Milano (CC BY, GeoJSON),
+**Outcome:** **26 sources** surveyed and evaluated (10 Italian, 12 EU/CH/UK, 2 European aggregators, 2 civic/research projects).
+**Verified via direct API** (not just the portal page): 20 of 26 — coordinates, fields and licences read
+directly from the datasets. **Top 5 by quality/feasibility:** Zürich (CC0), Milan (CC BY, GeoJSON),
 Madrid (CC BY 4.0), OpenStreetMap `surveillance=*` (ODbL), Amsterdam (CC0/WFS).
 
-### Tabella ranking
+### Ranking table
 
-| # | Fonte | Paese | Formato | Licenza (verificata) | Lat/Lon | Aggiorn. | Score |
-|---|-------|-------|---------|----------------------|:-------:|----------|------:|
+| # | Source | Country | Format | Licence (verified) | Lat/Lon | Updated | Score |
+|---|-------|---------|--------|--------------------|:-------:|---------|------:|
 | 1 | Zürich — Videokameras Stadtverwaltung | CH | CSV/GPKG/SHP/JSON/WFS/WMS | **CC0** | ✅ | 2026-07 (portal) | **10** |
-| 2 | Milano — Varchi Area C + Area B | IT | GeoJSON/SHP/CSV | CC BY (3.0 IT, da confermare) | ✅ | 2026-05/07 | **9** |
-| 3 | Madrid — videovigilanza + tráfico + ZBE + carteles + foto-rojo | ES | CSV/KML/XLS/Geo | **CC BY 4.0** | ✅ (KML/Geo) | 2026-06/07 | **9** |
-| 4 | OpenStreetMap — `surveillance=*` | GLO | Overpass / estratti Geofabrik | **ODbL 1.0** (identica al nostro DB) | ✅ | live (crowdsourced) | **9** |
-| 5 | Amsterdam — Cameragebieden + mappa privacy | NL | WFS/CSV/GeoJSON | **CC0 / Public Domain** | ✅ | live (WFS) | **8.5** |
-| 6 | Francia — Vidéoprotection implantation (Min. Interno) | FR | KML/ODS (+SHP storico) | **Licence Ouverte 2.0 (fr-lo)** | ✅ (KML) | snapshot 2018-11 | **8** |
-| 7 | UK — Runnymede CCTV Cameras | UK | **WFS live** + CSV/SHP/XLS/WMS | **OGL v3** | ✅ | 2026-04 | **8** |
-| 8 | UK — TfL JamCams (Londra) | UK | API JSON (882 punti) | OGL (v2 base, registrazione) | ✅ | live | **8** |
+| 2 | Milan — Area C + Area B gates | IT | GeoJSON/SHP/CSV | CC BY (3.0 IT, to confirm) | ✅ | 2026-05/07 | **9** |
+| 3 | Madrid — videovigilancia + traffico + ZBE + carteles + foto-rojo | ES | CSV/KML/XLS/Geo | **CC BY 4.0** | ✅ (KML/Geo) | 2026-06/07 | **9** |
+| 4 | OpenStreetMap — `surveillance=*` | GLO | Overpass / Geofabrik extracts | **ODbL 1.0** (identical to our DB) | ✅ | live (crowdsourced) | **9** |
+| 5 | Amsterdam — Cameragebieden + privacy map | NL | WFS/CSV/GeoJSON | **CC0 / Public Domain** | ✅ | live (WFS) | **8.5** |
+| 6 | France — Vidéoprotection implantation (Min. Intérieur) | FR | KML/ODS (+historical SHP) | **Licence Ouverte 2.0 (fr-lo)** | ✅ (KML) | snapshot 2018-11 | **8** |
+| 7 | UK — Runnymede CCTV Cameras | UK | **Live WFS** + CSV/SHP/XLS/WMS | **OGL v3** | ✅ | 2026-04 | **8** |
+| 8 | UK — TfL JamCams (London) | UK | JSON API (882 points) | OGL (v2 base, registration) | ✅ | live | **8** |
 | 9 | UK — Plymouth CCTV Cameras | UK | GeoJSON/CSV | **OGL v3** | ✅ | 2024-12 | **8** |
-| 10 | Bologna — Elenco varchi | IT | GeoJSON/CSV/API Opendatasoft | CC BY 4.0 (da confermare su portale) | ✅ | live (dati passaggi 15') | **7.5** |
+| 10 | Bologna — list of gates | IT | GeoJSON/CSV/Opendatasoft API | CC BY 4.0 (to confirm on portal) | ✅ | live (passage data 15') | **7.5** |
 | 11 | UK — York CCTV Cameras | UK | CSV/KML/GeoJSON | **OGL-UK-3.0** | ✅ | 2020-02 | **7** |
-| 12 | Roma — RSM ZTL varchi (ArcGIS) | IT | Feature Service (GeoJSON/CSV) | non dichiarata (⚠️) | ✅ | vari per dataset | **7** |
-| 13 | Barcellona — Inventari càmeres de seguretat | ES | (API catalog) | **CC BY 4.0** | ⚠️ da verificare | n/d | **7** |
-| 14 | Bern — Videoüberwachung öffentlicher Raum | CH | GPKG/PARQUET | da verificare (OGD Bern) | ✅ | 2026-07 | **7** |
-| 15 | Ginevra — Infomobilité caméras de trafic | CH | WFS/GML/KML/SHP/CSV | da verificare (CC BY atteso) | ✅ | 2026-07 | **7** |
-| 16 | UK — Leicester CCTV Cameras | UK | API Opendatasoft (csv/geojson/parquet…) | **non dichiarata** (⚠️) | ✅ | 2026-06 | **6.5** |
-| 17 | Torino — Perimetro, varchi e orari ZTL | IT | XML (feed 5T) | CC BY | ✅ (varchi) | 2021-05 (metadati) | **6** |
-| 18 | MIT — Lista dispositivi rilevamento velocità (velox) | IT | JSON (4106 record) | non dichiarata (⚠️) | ❌ | 2025-10+ (aggiornata) | **6** |
-| 19 | dati.gov.it (catalogo nazionale) | IT | DCAT-AP / SPARQL / UI | per-dataset (IODL/CC BY) | dipende | live | **5.5** |
-| 20 | data.europa.eu (aggregatore EU) | EU | DCAT-AP EU / UI | per-dataset | dipende | live | **5.5** |
-| 21 | Parigi — Emplacements caméras (BO 2019) | FR | (dataset storico) | **notspecified** (⚠️) | ✅ | 2019 | **5** |
-| 22 | Surveillance under Surveillance | GLO | viewer (dati OSM) | ODbL (riusa OSM) | ✅ | live | **5** |
-| 23 | Ministero dell'Interno — finanziamenti videosorveglianza | IT | pagina/PDF (non dataset) | n/a (amministrazione trasparente) | ❌ | n/d | **4** |
-| 24 | Regione Toscana — monitoraggio traffico | IT | KMZ/SHP/TIF | **CC BY-SA** (⚠️ incompatibile) | ❌ (non telecamere) | n/d | **4** |
-| 25 | Atlas of Surveillance (EFF) | US | CSV | da verificare (EFF) | ❌ (agency-level) | 2026 | **4** |
-| 26 | Roma — dati.comune.roma.it (portale) | IT | portale custom | per-dataset | dipende | live | **4** |
+| 12 | Rome — RSM ZTL gates (ArcGIS) | IT | Feature Service (GeoJSON/CSV) | undeclared (⚠️) | ✅ | varies per dataset | **7** |
+| 13 | Barcelona — Inventari càmeres de seguretat | ES | (catalog API) | **CC BY 4.0** | ⚠️ to verify | n/d | **7** |
+| 14 | Bern — Videoüberwachung öffentlicher Raum | CH | GPKG/PARQUET | to verify (OGD Bern) | ✅ | 2026-07 | **7** |
+| 15 | Geneva — Infomobilité caméras de trafic | CH | WFS/GML/KML/SHP/CSV | to verify (CC BY expected) | ✅ | 2026-07 | **7** |
+| 16 | UK — Leicester CCTV Cameras | UK | Opendatasoft API (csv/geojson/parquet…) | **undeclared** (⚠️) | ✅ | 2026-06 | **6.5** |
+| 17 | Turin — ZTL perimeter, gates and hours | IT | XML (5T feed) | CC BY | ✅ (gates) | 2021-05 (metadata) | **6** |
+| 18 | MIT — speed-detection device list (velox) | IT | JSON (4106 records) | undeclared (⚠️) | ❌ | 2025-10+ (updated) | **6** |
+| 19 | dati.gov.it (national catalogue) | IT | DCAT-AP / SPARQL / UI | per-dataset (IODL/CC BY) | depends | live | **5.5** |
+| 20 | data.europa.eu (EU aggregator) | EU | DCAT-AP EU / UI | per-dataset | depends | live | **5.5** |
+| 21 | Paris — Emplacements caméras (BO 2019) | FR | (historical dataset) | **notspecified** (⚠️) | ✅ | 2019 | **5** |
+| 22 | Surveillance under Surveillance | GLO | viewer (OSM data) | ODbL (reuses OSM) | ✅ | live | **5** |
+| 23 | Ministero dell'Interno — videosurveillance funding | IT | page/PDF (not a dataset) | n/a (amministrazione trasparente) | ❌ | n/d | **4** |
+| 24 | Regione Toscana — traffic monitoring | IT | KMZ/SHP/TIF | **CC BY-SA** (⚠️ incompatible) | ❌ (not cameras) | n/d | **4** |
+| 25 | Atlas of Surveillance (EFF) | US | CSV | to verify (EFF) | ❌ (agency-level) | 2026 | **4** |
+| 26 | Rome — dati.comune.roma.it (portal) | IT | custom portal | per-dataset | depends | live | **4** |
 
-**Score** = media pesata di: licenza riutilizzabile (30%), formato machine-readable/API (20%), presenza
-coordinate (20%), aggiornamento (15%), qualità/copertura (15%). È un giudizio di *fattibilità QA/import*,
-non un parere legale.
+**Score** = weighted average of: reusable licence (30%), machine-readable format/API (20%), coordinates
+present (20%), freshness (15%), quality/coverage (15%). It is a *QA/import feasibility* judgement,
+not a legal opinion.
 
 ---
 
-## 2. Metodologia
+## 2. Methodology
 
-- Verifiche eseguite il **2026-08-04** con chiamate dirette agli endpoint (non solo pagine web):
-  - **API CKAN** `package_search`/`package_show` su: dati.comune.milano.it, aperto.comune.torino.it,
+- Checks run on **2026-08-04** with direct calls to the endpoints (not just web pages):
+  - **CKAN API** `package_search`/`package_show` on: dati.comune.milano.it, aperto.comune.torino.it,
     datos.madrid.es, data.gov.uk, data.stadt-zuerich.ch, opendata.swiss, opendata-ajuntament.barcelona.cat;
-  - **API Opendatasoft** (`/api/explore/v2.1`) su Bologna;
-  - **API REST ArcGIS** (sharing REST + FeatureService) su Roma Servizi per la Mobilità;
-  - **API REST** su TfL (`/Place/Type/JamCam`), MIT (`/dispositivi/data`), data.gouv.fr (`/api/1/datasets`),
+  - **Opendatasoft API** (`/api/explore/v2.1`) on Bologna;
+  - **ArcGIS REST API** (sharing REST + FeatureService) on Rome Servizi per la Mobilità;
+  - **REST API** on TfL (`/Place/Type/JamCam`), MIT (`/dispositivi/data`), data.gouv.fr (`/api/1/datasets`),
     Amsterdam (`/v1/wfs/…cameratoezicht`), dati.gov.it (UI), Taginfo/Overpass (OSM);
-  - **Download dei dati campione** (GeoJSON/CSV/KML/XML) per verificare i campi reali, non solo il catalogo.
-- **Affidabilità delle affermazioni:** le licenze e i campi riportati sono quelli letti dall'API/risorsa alla
-  data di verifica. Dove la verifica diretta non è riuscita (403, bot-block, endpoint non pubblico) o il
-  campo non è esposto, è marcato **«da verificare»/«non dichiarata»** e NON è stato inventato nulla.
-- Limite noto: alcuni portali (dati.gov.it, data.europa.eu, govdata.de, dati.comune.roma.it) espongono
-  ricerca JS-rendered o API non documentate; per questi la scheda documenta l'accesso via UI e il valore
-  di aggregazione, non un dataset puntuale.
+  - **Sample data downloads** (GeoJSON/CSV/KML/XML) to verify the real fields, not just the catalogue.
+- **Reliability of claims:** the licences and fields reported are those read from the API/resource at
+  the verification date. Where the direct check failed (403, bot-block, non-public endpoint) or the
+  field is not exposed, it is marked **«to verify»/«undeclared»** and nothing was invented.
+- Known limitation: some portals (dati.gov.it, data.europa.eu, govdata.de, dati.comune.roma.it) expose
+  JS-rendered search or undocumented APIs; for these the sheet documents UI access and the aggregation
+  value, not a specific dataset.
 
 ---
 
-## 3. Schede dettagliate
+## 3. Detailed sheets
 
-> Legenda campi scheda: **URL** risorse/API principali · **Formato** · **Campi** (verificati sul dato reale) ·
-> **Licenza** (esatta, come letta) · **Aggiornamento** · **Copertura** · **Qualità** · **Compatibilità ODbL**
-> (verdetto secondo `licenze-compatibilita.md`) · **Note QA**.
+> Sheet field legend: **URL** main resources/APIs · **Format** · **Fields** (verified on real data) ·
+> **Licence** (exact, as read) · **Freshness** · **Coverage** · **Quality** · **ODbL compatibility**
+> (verdict per `licenze-compatibilita.md`) · **QA notes**.
 
 ### 3.1 Zürich — Aktuelle Auflistung von Videokameras der Stadtverwaltung Zürich (⭐ TOP)
 
-- **Ente:** Stadt Zürich (Open Data Zürich) — dataset tabellare `prd_stez_liste_videokameras_stadtverwaltung` + variante geodati `geo_aktuelle_auflistung_von_videokameras…`.
+- **Authority:** Stadt Zürich (Open Data Zürich) — tabular dataset `prd_stez_liste_videokameras_stadtverwaltung` + geodata variant `geo_aktuelle_auflistung_von_videokameras…`.
 - **URL:** https://data.stadt-zuerich.ch/dataset/prd_stez_liste_videokameras_stadtverwaltung · WFS:
-  `https://www.ogd.stadt-zuerich.ch/wfs/geoportal/Aktuelle_Auflistung_von_Videokameras_der_Stadtverwaltung_Zuerich?SERVICE=WFS&REQUEST=GetCapabilities` · CSV diretto: `…/download/liste_videokameras_stadtverwaltung.csv`
-- **Formato:** CSV, DXF, GPKG, JSON, SHP, WFS, WMS, WMTS.
-- **Campi (verificati sul CSV):** `standort_beschreibung`, `adresse_beschreibung`, **`lat`, `lon`**,
+  `https://www.ogd.stadt-zuerich.ch/wfs/geoportal/Aktuelle_Auflistung_von_Videokameras_der_Stadtverwaltung_Zuerich?SERVICE=WFS&REQUEST=GetCapabilities` · direct CSV: `…/download/liste_videokameras_stadtverwaltung.csv`
+- **Format:** CSV, DXF, GPKG, JSON, SHP, WFS, WMS, WMTS.
+- **Fields (verified on the CSV):** `standort_beschreibung`, `adresse_beschreibung`, **`lat`, `lon`**,
   `anzahl_kameras_aussen`, `anzahl_kameras_innen`, `anzahl_kameras_gsa`, `bereich_detail_beschreibung`,
-  `aufbewahrungsdauer` (durata retention!), `verantwortliche_da` (responsabile trattamento),
-  `rechtsgrundlage_url` (base giuridica). ✅ **Il dataset più ricco del censimento.**
-- **Licenza:** **CC0 1.0** (`license_id: cc-zero`, `http://www.opendefinition.org/licenses/cc-zero`).
-- **Aggiornamento:** metadati 2026-07 (portale); dataset «aktuell» (lista corrente).
-- **Copertura:** telecamere della città di Zurigo (amministrazione), esterno/interno/aree sensibili.
-- **Qualità:** eccellente — coordinate esplicite, conteggi per sito, retention e base legale per record.
-- **Compatibilità ODbL:** ✅ importabile **senza obblighi** (CC0 → § 3.3 matrice); buona pratica citare la fonte.
-- **Note QA:** l'endpoint WFS con typename esatto restituisce 500 con parametri errati — usare GetCapabilities
-  per scoprire il typename; il CSV diretto è affidabile. Da verificare: eventuale contenuto di terzi nel dataset
-  (cautela CC0, matrice § 3.3).
+  `aufbewahrungsdauer` (retention period!), `verantwortliche_da` (data controller),
+  `rechtsgrundlage_url` (legal basis). ✅ **The richest dataset in the census.**
+- **Licence:** **CC0 1.0** (`license_id: cc-zero`, `http://www.opendefinition.org/licenses/cc-zero`).
+- **Freshness:** metadata 2026-07 (portal); «aktuell» dataset (current list).
+- **Coverage:** City of Zürich cameras (administration), external/internal/sensitive areas.
+- **Quality:** excellent — explicit coordinates, per-site counts, retention and legal basis per record.
+- **ODbL compatibility:** ✅ importable **with no obligations** (CC0 → § 3.3 matrix); good practice to cite the source.
+- **QA notes:** the WFS endpoint with the exact typename returns 500 with wrong parameters — use GetCapabilities
+  to discover the typename; the direct CSV is reliable. To verify: any third-party content in the dataset
+  (CC0 caution, matrix § 3.3).
 
-### 3.2 Milano — Varchi Area C e Area B (telecamere)
+### 3.2 Milan — Area C and Area B gates (cameras)
 
-- **Ente:** Comune di Milano — portale Open Data (CKAN).
+- **Authority:** Comune di Milano — Open Data portal (CKAN).
 - **URL:** Area C https://dati.comune.milano.it/it/dataset/ds82_infogeo_varchi_elettronici_localizzazione_ ·
   Area B https://dati.comune.milano.it/dataset/ds959-varchi-areab
-- **Formato:** GeoJSON, SHP (zip), CSV per entrambi.
-- **Campi Area C (verificati su GeoJSON):** `id_amat`, `label` (nome varco), Point [lon, lat] (CRS84).
-  Campi Area B: `id`, `nome`, `stato` (varco attivo/non attivo), geometria punto.
-- **Licenza:** `cc-by` (Creative Commons Attribution — link opendefinition); il portale milanese adotta
-  storicamente **CC BY 3.0 IT** — **confermare la versione** in fase di import (pagina HTML dietro
-  bot-block 403 per gli agenti, API CKAN pulita).
-- **Aggiornamento:** Area C `metadata_modified` 2026-07-22; Area B 2026-05-08.
-- **Copertura:** varchi telematici Area C (cerchia Bastioni + TPL) e Area B (accessi ZTL) — telecamere di
-  controllo accessi attive.
-- **Qualità:** alta — coordinate pulite, aggiornate, doppio formato vettoriale.
-- **Compatibilità ODbL:** ✅ importabile **con attribuzione** (CC BY → § 3.2 matrice; indicare modifiche).
-- **Note QA:** il dataset descrive i **varchi** (punti di controllo accesso), non tutte le telecamere comunali;
-  per l'import mappare `label`→nome varco e mantenere `id_amat` come id sorgente.
+- **Format:** GeoJSON, SHP (zip), CSV for both.
+- **Area C fields (verified on GeoJSON):** `id_amat`, `label` (gate name), Point [lon, lat] (CRS84).
+  Area B fields: `id`, `nome`, `stato` (gate active/inactive), point geometry.
+- **Licence:** `cc-by` (Creative Commons Attribution — opendefinition link); the Milan portal historically
+  adopts **CC BY 3.0 IT** — **confirm the version** at import time (HTML page behind bot-block 403 for agents,
+  CKAN API clean).
+- **Freshness:** Area C `metadata_modified` 2026-07-22; Area B 2026-05-08.
+- **Coverage:** Area C electronic gates (Bastions ring + public transport) and Area B (ZTL access) — active access-control cameras.
+- **Quality:** high — clean, fresh coordinates, dual vector format.
+- **ODbL compatibility:** ✅ importable **with attribution** (CC BY → § 3.2 matrix; indicate modifications).
+- **QA notes:** the dataset describes the **gates** (access-control points), not all municipal cameras;
+  for the import map `label`→gate name and keep `id_amat` as the source id.
 
-### 3.3 Madrid — telecamere (5 dataset complementari)
+### 3.3 Madrid — cameras (5 complementary datasets)
 
-- **Ente:** Ayuntamiento de Madrid — portal de datos abiertos (CKAN), tutti **CC BY 4.0**.
-- **URL/dataset:**
-  - Cámaras de videovigilancia en la vía pública: https://datos.madrid.es/portal/site/egob (dataset `300429-0-camaras-videovigilancia`) — CSV/XLS/PDF, aggiornato 2026-07-24;
-  - Carteles informativos de zonas de videovigilancia: `300244-0-carteles-videovigilancia` (cartelli segnaletici!);
-  - Tráfico. Cámaras: `202088-0-trafico-camaras` — **KML** con punti + link immagini live (`informo.madrid.es`);
+- **Authority:** Ayuntamiento de Madrid — datos abiertos portal (CKAN), all **CC BY 4.0**.
+- **URL/datasets:**
+  - Cámaras de videovigilancia en la vía pública: https://datos.madrid.es/portal/site/egob (dataset `300429-0-camaras-videovigilancia`) — CSV/XLS/PDF, updated 2026-07-24;
+  - Carteles informativos de zonas de videovigilancia: `300244-0-carteles-videovigilancia` (signage panels!);
+  - Tráfico. Cámaras: `202088-0-trafico-camaras` — **KML** with points + live image links (`informo.madrid.es`);
   - Tráfico: Madrid ZBE. Cámaras: `300654-0-circulacion-camaras-trafico` — CSV/XLSX/ZIP, 2026-07-31;
   - ZBEDEP Distrito Centro. Cámaras y calles: `300229-0-trafico-madrid-central` — CSV/Geo/KMZ/ZIP, 2026-07-31;
-  - Semáforos con control foto-rojo: `205193-0-semaforos-foto-rojo` (semafori con fotored!).
-- **Campi videovigilancia (verificati su CSV):** `ID Cámara`, `Tipo` (DOMO/FIJA…), `Ubicación` (testo),
-  `Resolución`, `Zoom Óptico`, `Año Adquisición`. ⚠️ **il CSV tabellare NON ha lat/lon** — le coordinate
-  sono nei formati geografici dei dataset tráfico (KML/Geo) e nella vista mappa del portale.
-- **Licenza:** **CC BY 4.0** (`license_id` verificato su CKAN).
-- **Aggiornamento:** 2026-06/07/08 (dataset attivi, alcuni con aggiornamento mensile).
-- **Copertura:** vía pública Madrid (centinaia di camere), rete tráfico, ZBE/ZBEDEP, cartelli, fotored.
-- **Qualità:** alta per i dataset geografici; il CSV videovigilanza richiede geocodifica della `Ubicación`.
-- **Compatibilità ODbL:** ✅ importabile **con attribuzione** (CC BY 4.0 → § 3.2).
-- **Note QA:** verificare l'encoding del CSV (Latin-1, header con caratteri mojibake se letto come UTF-8).
+  - Semáforos con control foto-rojo: `205193-0-semaforos-foto-rojo` (red-light cameras!).
+- **Videovigilancia fields (verified on CSV):** `ID Cámara`, `Tipo` (DOMO/FIJA…), `Ubicación` (text),
+  `Resolución`, `Zoom Óptico`, `Año Adquisición`. ⚠️ **the tabular CSV has NO lat/lon** — the coordinates
+  are in the geographical formats of the tráfico datasets (KML/Geo) and in the portal map view.
+- **Licence:** **CC BY 4.0** (`license_id` verified on CKAN).
+- **Freshness:** 2026-06/07/08 (active datasets, some updated monthly).
+- **Coverage:** Madrid vía pública (hundreds of cameras), traffic network, ZBE/ZBEDEP, signage, red-light.
+- **Quality:** high for the geographic datasets; the videovigilancia CSV requires geocoding the `Ubicación`.
+- **ODbL compatibility:** ✅ importable **with attribution** (CC BY 4.0 → § 3.2).
+- **QA notes:** verify the CSV encoding (Latin-1; header shows mojibake characters if read as UTF-8).
 
-### 3.4 OpenStreetMap — tag `surveillance=*`
+### 3.4 OpenStreetMap — `surveillance=*` tag
 
-- **Ente:** comunità OSM (dati collaborativi).
+- **Authority:** OSM community (collaborative data).
 - **URL:** wiki https://wiki.openstreetmap.org/wiki/Key:surveillance · Taginfo
   https://taginfo.openstreetmap.org/keys/surveillance · Overpass https://overpass-api.de ·
-  estratti: https://download.geofabrik.de
-- **Formato:** estratti OSM (PBF/GeoJSON via Overpass/Geofabrik), API Overpass.
-- **Campi:** tag `surveillance=indoor|outdoor|public`, namespace `surveillance:*`
+  extracts: https://download.geofabrik.de
+- **Format:** OSM extracts (PBF/GeoJSON via Overpass/Geofabrik), Overpass API.
+- **Fields:** tag `surveillance=indoor|outdoor|public`, `surveillance:*` namespace
   (`camera:type`, `camera:mount`, `camera:direction`, `camera:angle`, `operator`, `operator:wikidata`,
-  `recording`, `source`, `start_date`…), geometria punto/way/area.
-- **Licenza:** **ODbL 1.0** — identica al nostro DB (ADR 0008).
-- **Aggiornamento:** continuo (crowdsourced); qualità disomogenea, densità molto variabile (forte in
-  DE/NL/CH, parziale in IT).
-- **Copertura:** globale; tag de facto con valori standardizzati.
-- **Qualità:** buona dove mappato; serve **filtro** (solo `surveillance=public`/outdoor di interesse civico,
-  niente indoor privato) e dedupe con altre fonti.
-- **Compatibilità ODbL:** ✅ importabile (stessa licenza → § 3.4 matrice); attribuzione
-  «© OpenStreetMap contributors» + link; per l'import **non usare l'API OSM** per download di massa
-  (policy) → estratto Geofabrik/Planet o Overpass con cautela.
-- **Note QA:** l'istanza pubblica Overpass rate-limita le query grandi (verificato: bbox Italia intera →
-  risposta sospetta/limiti); usare bbox per città o estratti regionali. I conteggi Taginfo vanno letti live.
+  `recording`, `source`, `start_date`…), point/way/area geometry.
+- **Licence:** **ODbL 1.0** — identical to our DB (ADR 0008).
+- **Freshness:** continuous (crowdsourced); uneven quality, very variable density (strong in
+  DE/NL/CH, partial in IT).
+- **Coverage:** global; de facto tag with standardised values.
+- **Quality:** good where mapped; needs **filtering** (only `surveillance=public`/outdoor of civic interest,
+  no private indoor) and dedup against other sources.
+- **ODbL compatibility:** ✅ importable (same licence → § 3.4 matrix); attribution
+  «© OpenStreetMap contributors» + link; for the import **do not use the OSM API** for bulk downloads
+  (policy) → Geofabrik/Planet extract or Overpass with caution.
+- **QA notes:** the public Overpass instance rate-limits large queries (verified: whole-Italy bbox →
+  suspicious response/limits); use per-city bboxes or regional extracts. Taginfo counts must be read live.
 
-### 3.5 Amsterdam — Cameragebieden e mappa privacy
+### 3.5 Amsterdam — Cameragebieden and privacy map
 
-- **Ente:** Gemeente Amsterdam.
-- **URL:** https://data.overheid.nl/en/dataset/tqdi9wr-xugg2a (Cameragebieden) · mappa puntuale
-  https://maps.amsterdam.nl/privacy/ («Persoonsgevoelige dataverwerking in de openbare ruimte», con
-  dataset GeoJSON scaricabili).
-- **Formato:** WFS (`https://api.data.amsterdam.nl/v1/wfs/overlastgebieden/?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature&TYPENAMES=cameratoezicht&OUTPUTFORMAT=csv`), CSV, HTML.
-- **Campi WFS (verificati):** `id`, `geometry` (multipoligono, SRID 28992/RD), `type`, `typering`, `soort`,
-  `url`, `oov_naam`, `oov_code`, `geldigheid_periode`, `geldigheid_specificatie` (periodo di validità della
-  decisione del sindaco).
-- **Licenza:** **Pubblico dominio (CC0 / Public Domain Mark 1.0)** — verificato su data.overheid.nl.
-- **Aggiornamento:** WFS live (dati gestionali).
-- **Copertura:** zone di cameratoezicht (poligoni) di Amsterdam + dataset puntuali della mappa privacy.
-- **Qualità:** alta (zone ufficiali con base decisionale); per punti camera usare la mappa privacy (GeoJSON lnglat).
-- **Compatibilità ODbL:** ✅ importabile **senza obblighi** (CC0 → § 3.3).
-- **Note QA:** il WFS restituisce geometrie in **RD New (EPSG:28992)** — serve reproiezione in WGS84;
-  `OUTPUTFORMAT=csv` restituisce WKT, comodo per il QA.
+- **Authority:** Gemeente Amsterdam.
+- **URL:** https://data.overheid.nl/en/dataset/tqdi9wr-xugg2a (Cameragebieden) · point map
+  https://maps.amsterdam.nl/privacy/ («Persoonsgevoelige dataverwerking in de openbare ruimte», with
+  downloadable GeoJSON datasets).
+- **Format:** WFS (`https://api.data.amsterdam.nl/v1/wfs/overlastgebieden/?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature&TYPENAMES=cameratoezicht&OUTPUTFORMAT=csv`), CSV, HTML.
+- **WFS fields (verified):** `id`, `geometry` (multipolygon, SRID 28992/RD), `type`, `typering`, `soort`,
+  `url`, `oov_naam`, `oov_code`, `geldigheid_periode`, `geldigheid_specificatie` (validity period of the
+  mayor's decision).
+- **Licence:** **Public domain (CC0 / Public Domain Mark 1.0)** — verified on data.overheid.nl.
+- **Freshness:** live WFS (operational data).
+- **Coverage:** Amsterdam cameratoezicht zones (polygons) + point datasets from the privacy map.
+- **Quality:** high (official zones with decision basis); for camera points use the privacy map (lnglat GeoJSON).
+- **ODbL compatibility:** ✅ importable **with no obligations** (CC0 → § 3.3).
+- **QA notes:** the WFS returns geometries in **RD New (EPSG:28992)** — needs reprojection to WGS84;
+  `OUTPUTFORMAT=csv` returns WKT, convenient for QA.
 
-### 3.6 Francia — Vidéoprotection, implantation des caméras (Ministero dell'Interno)
+### 3.6 France — Vidéoprotection, implantation des caméras (Ministère de l'Intérieur)
 
-- **Ente:** Ministère de l'Intérieur (dataset nazionale PVPP).
-- **URL:** https://www.data.gouv.fr/fr/datasets/videoprotection-implantation-des-cameras-kml-ods/ (versione
-  KML+ODS del Min. Intérieur) · variante storica SHP/PDF: `…/videoprotection-implantation-des-cameras/`.
-- **Formato:** **KML** (cartografico) + **ODS** (elenco); versione storica SHP+PDF (2014).
-- **Campi KML:** punti camera con denominazione/indirizzo; ODS: elenco caméras PVPP.
-- **Licenza:** **Licence Ouverte 2.0 (`fr-lo`)** — permissiva (equivalente IODL/CC BY, attribuzione).
-- **Aggiornamento:** ⚠️ snapshot **2018-11-15** per la versione KML/ODS; la variante fork risale al 2014.
-  Dataset nazionale non più aggiornato con continuità.
-- **Copertura:** Francia (camere di videosorveglianza su strade pubbliche).
-- **Qualità:** buona come snapshot storico; da valutare il rischio obsolescenza (molte installazioni dal 2018).
-- **Compatibilità ODbL:** ✅ importabile **con attribuzione** (Licence Ouverte 2.0 — permissiva; trattarla
-  come CC BY/IODL, matrice § 3.1/3.2; conferma legale consigliata).
-- **Note QA:** verificare la versione esatta (2014 vs 2018) e l'encoding; non ci sono campi gestore/direzione.
+- **Authority:** Ministère de l'Intérieur (national PVPP dataset).
+- **URL:** https://www.data.gouv.fr/fr/datasets/videoprotection-implantation-des-cameras-kml-ods/ (KML+ODS
+  version from Min. Intérieur) · historical SHP/PDF variant: `…/videoprotection-implantation-des-cameras/`.
+- **Format:** **KML** (cartographic) + **ODS** (list); historical version SHP+PDF (2014).
+- **KML fields:** camera points with name/address; ODS: PVPP camera list.
+- **Licence:** **Licence Ouverte 2.0 (`fr-lo`)** — permissive (equivalent to IODL/CC BY, attribution).
+- **Freshness:** ⚠️ snapshot **2018-11-15** for the KML/ODS version; the fork variant dates to 2014.
+  National dataset no longer updated continuously.
+- **Coverage:** France (videosurveillance cameras on public roads).
+- **Quality:** good as a historical snapshot; obsolescence risk to assess (many installations since 2018).
+- **ODbL compatibility:** ✅ importable **with attribution** (Licence Ouverte 2.0 — permissive; treat it
+  like CC BY/IODL, matrix § 3.1/3.2; legal confirmation recommended).
+- **QA notes:** verify the exact version (2014 vs 2018) and the encoding; no operator/direction fields.
 
-### 3.7 UK — Runnymede CCTV Cameras (WFS live)
+### 3.7 UK — Runnymede CCTV Cameras (live WFS)
 
-- **Ente:** Runnymede Borough Council (data.gov.uk).
+- **Authority:** Runnymede Borough Council (data.gov.uk).
 - **URL:** https://data.gov.uk/dataset/cctv-cameras3 · WFS:
   `https://maps.runnymede.gov.uk/geoserver/wfs?service=WFS&request=GetFeature&typeName=community:cctv_cameras&outputFormat=csv`
-  (anche SHP zip, XLS; WMS per la base).
-- **Formato:** **WFS live** + CSV/SHP/XLS/WMS.
-- **Campi:** geometria punto + attributi CCTV (da GetCapabilities; verificare in import).
-- **Licenza:** **OGL v3** (`uk-ogl`, link nationalarchives v3).
-- **Aggiornamento:** `metadata_modified` 2026-04-30.
-- **Copertura:** telecamere CCTV del distretto di Runnymede.
-- **Qualità:** alta — servizio WFS attivo, multi-formato.
-- **Compatibilità ODbL:** ✅ importabile **con attribuzione** (OGL — permissiva, attribuzione + link;
-  matrice § 3.1/3.2 per analogia; conferma legale consigliata per la prima importazione OGL).
+  (also SHP zip, XLS; WMS for the basemap).
+- **Format:** **live WFS** + CSV/SHP/XLS/WMS.
+- **Fields:** point geometry + CCTV attributes (from GetCapabilities; verify at import).
+- **Licence:** **OGL v3** (`uk-ogl`, nationalarchives v3 link).
+- **Freshness:** `metadata_modified` 2026-04-30.
+- **Coverage:** CCTV cameras of the Runnymede district.
+- **Quality:** high — active WFS service, multi-format.
+- **ODbL compatibility:** ✅ importable **with attribution** (OGL — permissive, attribution + link;
+  matrix § 3.1/3.2 by analogy; legal confirmation recommended for the first OGL import).
 
-### 3.8 UK — TfL JamCams (Londra)
+### 3.8 UK — TfL JamCams (London)
 
-- **Ente:** Transport for London (API Unified).
-- **URL:** `https://api.tfl.gov.uk/Place/Type/JamCam` (JSON) — 882 camere (verificato).
-- **Formato:** API JSON REST pubblica (senza chiave per uso leggero).
-- **Campi (verificati):** `commonName` (nome posizione), `lat`, `lon`, plus metadata (id, url immagine).
-- **Licenza:** OGL (base v2.0; **i termini TfL richiedono registrazione** per il riuso pieno — odimpact
-  caso TfL; confermare su api-portal.tfl.gov.uk).
-- **Aggiornamento:** live.
-- **Copertura:** rete stradale di Londra (traffic cameras pubbliche).
-- **Qualità:** alta per copertura e API; nessun campo tipo/gestore oltre al nome.
-- **Compatibilità ODbL:** ✅ con attribuzione (OGL) — **prima dell'import** verificare i termini di
-  registrazione TfL (non è un semplice download).
-- **Note QA:** per volumi alti è richiesta una chiave API (registrazione); il dato è «traffic cameras»,
-  non videosorveglianza di sicurezza — rilevante per lo scope del progetto.
+- **Authority:** Transport for London (Unified API).
+- **URL:** `https://api.tfl.gov.uk/Place/Type/JamCam` (JSON) — 882 cameras (verified).
+- **Format:** public JSON REST API (no key for light use).
+- **Fields (verified):** `commonName` (location name), `lat`, `lon`, plus metadata (id, image URL).
+- **Licence:** OGL (base v2.0; **TfL terms require registration** for full reuse — odimpact
+  TfL case; confirm on api-portal.tfl.gov.uk).
+- **Freshness:** live.
+- **Coverage:** London road network (public traffic cameras).
+- **Quality:** high for coverage and API; no type/operator field beyond the name.
+- **ODbL compatibility:** ✅ with attribution (OGL) — **before import** verify the TfL
+  registration terms (not a plain download).
+- **QA notes:** a high-volume use requires an API key (registration); the data is «traffic cameras»,
+  not security videosurveillance — relevant to the project scope.
 
 ### 3.9 UK — Plymouth CCTV Cameras
 
-- **Ente:** Plymouth City Council.
+- **Authority:** Plymouth City Council.
 - **URL:** https://data.gov.uk/dataset/cctv-locations-in-plymouth
-- **Formato:** GeoJSON + 5 CSV (CCTV, car parking, help points, traffic, redeployable cameras).
-- **Campi:** geometria punto; per CSV: denominazione/località (verificare in import).
-- **Licenza:** **OGL v3** (`uk-ogl`).
-- **Aggiornamento:** 2024-12-02.
-- **Copertura:** telecamere CCTV di Plymouth (incluse quelle riconfigurabili).
-- **Qualità:** buona; dataset del 2016 (rilasciato 2016, metadati 2024) — verificare l'attualità sul campo.
-- **Compatibilità ODbL:** ✅ con attribuzione (OGL v3).
+- **Format:** GeoJSON + 5 CSVs (CCTV, car parking, help points, traffic, redeployable cameras).
+- **Fields:** point geometry; for CSVs: name/locality (verify at import).
+- **Licence:** **OGL v3** (`uk-ogl`).
+- **Freshness:** 2024-12-02.
+- **Coverage:** Plymouth CCTV cameras (including redeployable ones).
+- **Quality:** good; 2016 dataset (released 2016, metadata 2024) — verify currency on the ground.
+- **ODbL compatibility:** ✅ with attribution (OGL v3).
 
-### 3.10 Bologna — Elenco varchi (telecamere Sirio/ZTL)
+### 3.10 Bologna — gate list (Sirio/ZTL cameras)
 
-- **Ente:** Comune di Bologna — Open Data (Opendatasoft).
+- **Authority:** Comune di Bologna — Open Data (Opendatasoft).
 - **URL:** https://opendata.comune.bologna.it/explore/dataset/varchi-bologna/ · API:
   `https://opendata.comune.bologna.it/api/explore/v2.1/catalog/datasets/varchi-bologna/exports/geojson`
-- **Formato:** GeoJSON/CSV/JSON + API Opendatasoft (export multipli).
-- **Campi (verificati su GeoJSON):** `identificativo_varco`, `attivo` (S/N), `nome_varco`, `descrizione`
-  (indirizzo), `direzione`, `tipologia_varco` (ZTL…), `inizio_attivita`, link `dati_totali`/`dati_20xx`
-  (passaggi per varco, cadenza 15'), geometria **Point [lon,lat]**.
-- **Licenza:** **CC BY 4.0** per convenzione del portale bolognese — **da confermare** sulla pagina dataset
-  (l'API non espone `license` nei metas; verificare in import).
-- **Aggiornamento:** dataset varchi stabile; i dati passaggi sono aggiornati (cadenza 15').
-- **Copertura:** tutti i varchi telematici ZTL di Bologna (sistema Sirio).
-- **Qualità:** alta — coordinate pulite, tipologia e direzione per varco, collegamento ai flussi.
-- **Compatibilità ODbL:** ✅ con attribuzione (CC BY 4.0 attesa → § 3.2); confermare licenza prima dell'import.
+- **Format:** GeoJSON/CSV/JSON + Opendatasoft API (multiple exports).
+- **Fields (verified on GeoJSON):** `identificativo_varco`, `attivo` (Y/N), `nome_varco`, `descrizione`
+  (address), `direzione`, `tipologia_varco` (ZTL…), `inizio_attivita`, links `dati_totali`/`dati_20xx`
+  (per-gate passages, 15' cadence), geometry **Point [lon,lat]**.
+- **Licence:** **CC BY 4.0** by convention of the Bologna portal — **to confirm** on the dataset page
+  (the API does not expose `license` in the metas; verify at import).
+- **Freshness:** gates dataset stable; passage data updated (15' cadence).
+- **Coverage:** all Bologna ZTL electronic gates (Sirio system).
+- **Quality:** high — clean coordinates, type and direction per gate, link to the flows.
+- **ODbL compatibility:** ✅ with attribution (CC BY 4.0 expected → § 3.2); confirm licence before import.
 
 ### 3.11 UK — York CCTV Cameras
 
-- **Ente:** City of York Council.
+- **Authority:** City of York Council.
 - **URL:** https://data.gov.uk/dataset/cctv-cameras4
-- **Formato:** CSV/KML/GeoJSON (ArcGIS Open Data).
-- **Campi:** geometria punto + attributi CCTV.
-- **Licenza:** **OGL-UK-3.0**.
-- **Aggiornamento:** 2020-02-13 (⚠️ datato).
-- **Copertura:** CCTV di York.
-- **Qualità:** media (posizioni del 2020, da riconfermare).
-- **Compatibilità ODbL:** ✅ con attribuzione (OGL v3).
+- **Format:** CSV/KML/GeoJSON (ArcGIS Open Data).
+- **Fields:** point geometry + CCTV attributes.
+- **Licence:** **OGL-UK-3.0**.
+- **Freshness:** 2020-02-13 (⚠️ dated).
+- **Coverage:** York CCTV.
+- **Quality:** medium (2020 positions, to reconfirm).
+- **ODbL compatibility:** ✅ with attribution (OGL v3).
 
-### 3.12 Roma — Roma Servizi per la Mobilità, ZTL varchi (ArcGIS)
+### 3.12 Rome — Roma Servizi per la Mobilità, ZTL gates (ArcGIS)
 
-- **Ente:** Roma Servizi per la Mobilità S.r.l. (società del Comune di Roma).
-- **URL:** https://data-rsm.opendata.arcgis.com/ (es. dataset «ZTL Testaccio - varchi di ingresso»,
-  `41037e0a9f06431ba39304fe42b3f371`; altri varchi ZTL/Fascia Verde).
-- **Formato:** **Feature Service ArcGIS** (GeoJSON/CSV via REST: `?f=geojson`), portale ArcGIS Hub.
-- **Campi:** geometria punto dei varchi + attributi (nome via, direzione — da GetFeature).
-- **Licenza:** **non dichiarata esplicitamente** sul portale (`licenseInfo` vuoto) ⚠️ — **da verificare con
-  legale** prima dell'import (matrice § 3.6 custom/nessuna licenza; art. 52 CAD come possibile base).
-- **Aggiornamento:** variabile per dataset (alcuni attivi).
-- **Copertura:** varchi ZTL di Roma (centro storico, Testaccio, Fascia Verde…).
-- **Qualità:** buona (posizioni ufficiali della società di mobilità); terze parti la riusano (es. romaztl.altervista.org con CC BY 3.0 IT — sito non ufficiale).
-- **Compatibilità ODbL:** ⚠️ caso per caso — chiarire licenza/termini con RSM prima dell'import.
+- **Authority:** Roma Servizi per la Mobilità S.r.l. (company of the City of Rome).
+- **URL:** https://data-rsm.opendata.arcgis.com/ (e.g. dataset «ZTL Testaccio - varchi di ingresso»,
+  `41037e0a9f06431ba39304fe42b3f371`; other ZTL/Fascia Verde gates).
+- **Format:** **ArcGIS Feature Service** (GeoJSON/CSV via REST: `?f=geojson`), ArcGIS Hub portal.
+- **Fields:** point geometry of the gates + attributes (street name, direction — from GetFeature).
+- **Licence:** **not explicitly declared** on the portal (`licenseInfo` empty) ⚠️ — **to verify with
+  legal** before import (matrix § 3.6 custom/no licence; art. 52 CAD as a possible basis).
+- **Freshness:** varies per dataset (some active).
+- **Coverage:** Rome ZTL gates (historic centre, Testaccio, Fascia Verde…).
+- **Quality:** good (official positions from the mobility company); third parties reuse it (e.g. romaztl.altervista.org with CC BY 3.0 IT — unofficial site).
+- **ODbL compatibility:** ⚠️ case by case — clarify licence/terms with RSM before import.
 
-### 3.13 Barcellona — Inventari de càmeres de seguretat
+### 3.13 Barcelona — Inventari de càmeres de seguretat
 
-- **Ente:** Ajuntament de Barcelona.
-- **URL:** https://opendata-ajuntament.barcelona.cat (dataset `infraestructures-inventari-cameres` +
+- **Authority:** Ajuntament de Barcelona.
+- **URL:** https://opendata-ajuntament.barcelona.cat (datasets `infraestructures-inventari-cameres` +
   `infraestructures-tipologia-suports-cameres`).
-- **Formato:** API CKAN del portale (`/data/api/3/action/…`); risorse da verificare.
-- **Campi:** inventario camere di sicurezza dell'infrastruttura (tipologia supporti in dataset separato).
-- **Licenza:** **CC BY 4.0** (verificato su CKAN).
-- **Aggiornamento:** n/d (verificare in import).
-- **Copertura:** infrastruttura comunale di Barcellona.
-- **Qualità:** media (inventario tecnico; verificare presenza coordinate).
-- **Compatibilità ODbL:** ✅ con attribuzione (CC BY 4.0 → § 3.2).
+- **Format:** portal CKAN API (`/data/api/3/action/…`); resources to verify.
+- **Fields:** security-camera inventory of the infrastructure (support typology in a separate dataset).
+- **Licence:** **CC BY 4.0** (verified on CKAN).
+- **Freshness:** n/d (verify at import).
+- **Coverage:** Barcelona municipal infrastructure.
+- **Quality:** medium (technical inventory; verify presence of coordinates).
+- **ODbL compatibility:** ✅ with attribution (CC BY 4.0 → § 3.2).
 
 ### 3.14 Bern — Videoüberwachung im öffentlichen Raum
 
-- **Ente:** Canton Berna / Stadt Bern (geofiles.be.ch).
-- **URL:** https://opendata.swiss/it/dataset/videouberwachung-im-offentlichen-raum (risorse:
+- **Authority:** Canton Bern / Stadt Bern (geofiles.be.ch).
+- **URL:** https://opendata.swiss/it/dataset/videouberwachung-im-offentlichen-raum (resources:
   `https://geofiles.be.ch/geoportal/pub/download/VIDEO/video.gpkg.zip`, `…video_video.parquet`).
-- **Formato:** GPKG, PARQUET (download diretti).
-- **Campi:** geometrie camere + attributi (da verificare sul GPKG).
-- **Licenza:** **da verificare** — la scheda opendata.swiss non espone license nell'API; OGD Bern adotta
-  tipicamente CC BY 4.0 o termini OGD con attribuzione. ⚠️ verificare prima dell'import.
-- **Aggiornamento:** 2026-07 (metadati).
-- **Copertura:** videosorveglianza nello spazio pubblico (Berna).
-- **Qualità:** alta (GeoPackage moderno) — licenza da chiarire.
-- **Compatibilità ODbL:** ⚠️ da verificare con legale (attesa permissiva con attribuzione).
+- **Format:** GPKG, PARQUET (direct downloads).
+- **Fields:** camera geometries + attributes (to verify on the GPKG).
+- **Licence:** **to verify** — the opendata.swiss sheet does not expose the licence in the API; OGD Bern typically
+  adopts CC BY 4.0 or OGD terms with attribution. ⚠️ verify before import.
+- **Freshness:** 2026-07 (metadata).
+- **Coverage:** videosurveillance in public space (Bern).
+- **Quality:** high (modern GeoPackage) — licence to clarify.
+- **ODbL compatibility:** ⚠️ to verify with legal (permissive with attribution expected).
 
-### 3.15 Ginevra — Infomobilité, caméras de surveillance du trafic
+### 3.15 Geneva — Infomobilité, caméras de surveillance du trafic
 
-- **Ente:** Canton Ginevra (SITG/opendata.swiss).
+- **Authority:** Canton Geneva (SITG/opendata.swiss).
 - **URL:** opendata.swiss (dataset «Infomobilité - Caméras de surveillance du trafic»).
-- **Formato:** API/CSV/GML/KML/SHP/WFS/WMS/ZIP.
-- **Campi:** camere di sorveglianza del traffico (geometrie + attributi da verificare).
-- **Licenza:** **da verificare** — Ginevra usa tipicamente licenze permissive con attribuzione (CC BY 4.0
-  o OGL CH). ⚠️ confermare.
-- **Aggiornamento:** 2026-07 (metadati).
-- **Copertura:** rete stradale cantonale (traffic cameras).
-- **Compatibilità ODbL:** ⚠️ da verificare con legale (attesa permissiva con attribuzione).
+- **Format:** API/CSV/GML/KML/SHP/WFS/WMS/ZIP.
+- **Fields:** traffic-surveillance cameras (geometries + attributes to verify).
+- **Licence:** **to verify** — Geneva typically uses permissive licences with attribution (CC BY 4.0
+  or OGL CH). ⚠️ confirm.
+- **Freshness:** 2026-07 (metadata).
+- **Coverage:** cantonal road network (traffic cameras).
+- **ODbL compatibility:** ⚠️ to verify with legal (permissive with attribution expected).
 
 ### 3.16 UK — Leicester CCTV Cameras
 
-- **Ente:** Leicester City Council (data.leicester.gov.uk, Opendatasoft).
+- **Authority:** Leicester City Council (data.leicester.gov.uk, Opendatasoft).
 - **URL:** https://data.gov.uk/dataset/cctv-cameras6 · API:
-  `https://data.leicester.gov.uk/api/explore/v2.1/catalog/datasets/cctv-cameras/exports/geojson` (anche
+  `https://data.leicester.gov.uk/api/explore/v2.1/catalog/datasets/cctv-cameras/exports/geojson` (also
   csv/json/parquet/gpx/kml/shp/xlsx/ov2…).
-- **Formato:** API Opendatasoft multi-export.
-- **Campi:** geometria punto + attributi CCTV (da verificare).
-- **Licenza:** ⚠️ **non dichiarata** su data.gov.uk — verificare sulla scheda data.leicester.gov.uk.
-- **Aggiornamento:** 2026-06-17 (metadati).
-- **Copertura:** CCTV di Leicester.
-- **Qualità:** alta (API ricca) — licenza da chiarire (matrice § 3.6/3.7).
+- **Format:** Opendatasoft multi-export API.
+- **Fields:** point geometry + CCTV attributes (to verify).
+- **Licence:** ⚠️ **undeclared** on data.gov.uk — verify on the data.leicester.gov.uk sheet.
+- **Freshness:** 2026-06-17 (metadata).
+- **Coverage:** Leicester CCTV.
+- **Quality:** high (rich API) — licence to clarify (matrix § 3.6/3.7).
 
-### 3.17 Torino — Perimetro, varchi e orari ZTL
+### 3.17 Turin — ZTL perimeter, gates and hours
 
-- **Ente:** Città di Torino (portale aperto.comune.torino.it + feed 5T).
+- **Authority:** Città di Torino (aperto.comune.torino.it portal + 5T feed).
 - **URL:** https://aperto.comune.torino.it (dataset «Perimetro, varchi e orari ZTL») · feed:
   `http://opendata.5t.torino.it/get_access_control` (XML).
-- **Formato:** XML (feed 5T access control).
-- **Campi:** varchi ZTL con posizione e orari (da parsare il feed).
-- **Licenza:** **CC BY** (CKAN).
-- **Aggiornamento:** metadati 2021-05-28 ⚠️; il feed 5T è attivo ma **403 per agenti/bot** (verificato) —
-  potrebbe richiedere UA browser o whitelist.
-- **Copertura:** varchi ZTL di Torino.
-- **Qualità:** media (formato XML, aggiornamento dei metadati datato, accesso al feed limitato).
-- **Compatibilità ODbL:** ✅ con attribuzione (CC BY → § 3.2).
+- **Format:** XML (5T access-control feed).
+- **Fields:** ZTL gates with position and hours (parse the feed).
+- **Licence:** **CC BY** (CKAN).
+- **Freshness:** metadata 2021-05-28 ⚠️; the 5T feed is active but **403 for agents/bots** (verified) —
+  may require a browser UA or whitelist.
+- **Coverage:** Turin ZTL gates.
+- **Quality:** medium (XML format, dated metadata, limited feed access).
+- **ODbL compatibility:** ✅ with attribution (CC BY → § 3.2).
 
-### 3.18 Italia — MIT, lista nazionale dispositivi di rilevamento della velocità (velox)
+### 3.18 Italy — MIT, national speed-detection device list (velox)
 
-- **Ente:** Ministero delle Infrastrutture e dei Trasporti (art. 1 co. 3-4 DL, decreto 305/2025).
-- **URL:** https://velox.mit.gov.it/dispositivi · dati: `https://velox.mit.gov.it/dispositivi/data` (JSON,
+- **Authority:** Ministero delle Infrastrutture e dei Trasporti (art. 1 co. 3-4 DL, decree 305/2025).
+- **URL:** https://velox.mit.gov.it/dispositivi · data: `https://velox.mit.gov.it/dispositivi/data` (JSON,
   DataTables).
-- **Formato:** JSON (4106 record, verificato).
-- **Campi (verificati):** `codice_accertatore`, `denominazione_accertatore`, `codice_catastale_accertatore`,
+- **Format:** JSON (4106 records, verified).
+- **Fields (verified):** `codice_accertatore`, `denominazione_accertatore`, `codice_catastale_accertatore`,
   `n_decreto`, `data_decreto`, `tipo_dispositivo` (Mobile/Fisso), `marca_dispositivo`, `modello_dispositivo`,
   `versione_dispositivo`, `matricola_dispositivo`, `note`, `data_primo_inserimento`.
-  ⚠️ **NON contiene lat/lon** — è un registro di dispositivi approvati per ente accertatore, non posizioni.
-- **Licenza:** **non dichiarata** sul portale ⚠️ — da verificare (matrice § 3.6; possibile base art. 52 CAD).
-- **Aggiornamento:** elenco attivo (online dal 2025-11-28, aggiornamenti previsti dal decreto 305/2025).
-- **Copertura:** nazionale — autovelox, tutor, dispositivi approvati.
-- **Qualità:** alta come registro ufficiale; **non georeferenziato** → serve geocodifica/join con altre fonti
-  per la mappa.
-- **Compatibilità ODbL:** ⚠️ da verificare con legale (licenza non dichiarata; riuso comunque nell'interesse
-  pubblico, ma formalizzare).
+  ⚠️ **Contains NO lat/lon** — it is a register of approved devices per enforcement authority, not positions.
+- **Licence:** **undeclared** on the portal ⚠️ — to verify (matrix § 3.6; possible basis art. 52 CAD).
+- **Freshness:** active list (online since 2025-11-28, updates scheduled by decree 305/2025).
+- **Coverage:** national — speed cameras, tutor, approved devices.
+- **Quality:** high as an official register; **not georeferenced** → geocoding/join with other sources needed
+  for the map.
+- **ODbL compatibility:** ⚠️ to verify with legal (undeclared licence; reuse still in the public
+  interest, but formalise it).
 
-### 3.19 Italia — dati.gov.it (catalogo nazionale)
+### 3.19 Italy — dati.gov.it (national catalogue)
 
-- **Ente:** AgID/DPCM (catalogo nazionale DCAT-AP IT).
-- **URL:** https://dati.gov.it (ricerca «videosorveglianza», «telecamere», «varchi») · SPARQL client
+- **Authority:** AgID/DPCM (national DCAT-AP IT catalogue).
+- **URL:** https://dati.gov.it (search «videosorveglianza», «telecamere», «varchi») · SPARQL client
   https://dati.gov.it/sviluppatori/sparqlclient
-- **Formato:** catalogo aggregato (DCAT-AP IT), API/SPARQL; ricerca UI JS-rendered (API pubblica non
-  documentata — verificato 404 sui path CKAN standard).
-- **Campi:** per-dataset (aggregato dai portali regionali/comunali).
-- **Licenza:** per-dataset (IODL 2.0 / CC BY / altro).
-- **Aggiornamento:** live (harvesting).
-- **Copertura:** Italia — utile per **scoprire** dataset locali (es. «impianti di videosorveglianza» di
-  comuni/regioni), poi si importa dalla fonte primaria.
-- **Qualità:** variabile; usare come indice, non come fonte primaria.
-- **Compatibilità ODbL:** per-dataset, secondo la matrice (IODL 2.0/CC BY ✅ con attribuzione).
+- **Format:** aggregated catalogue (DCAT-AP IT), API/SPARQL; JS-rendered UI search (public API
+  undocumented — verified 404 on standard CKAN paths).
+- **Fields:** per-dataset (aggregated from regional/municipal portals).
+- **Licence:** per-dataset (IODL 2.0 / CC BY / other).
+- **Freshness:** live (harvesting).
+- **Coverage:** Italy — useful to **discover** local datasets (e.g. municipal/regional «videosurveillance
+  systems»), then import from the primary source.
+- **Quality:** variable; use as an index, not a primary source.
+- **ODbL compatibility:** per-dataset, per the matrix (IODL 2.0/CC BY ✅ with attribution).
 
-### 3.20 Europa — data.europa.eu (aggregatore EU)
+### 3.20 Europe — data.europa.eu (EU aggregator)
 
-- **Ente:** Publications Office UE (DCAT-AP EU).
-- **URL:** https://data.europa.eu (ricerca «video surveillance», «camera», «videosorveglianza»).
-- **Formato:** catalogo aggregato (DCAT-AP EU); API hub documentata ma con parametri non banali
-  (400 su query semplici durante la verifica — usare la UI o l'API con parametri corretti).
-- **Campi:** per-dataset.
-- **Licenza:** per-dataset.
-- **Aggiornamento:** live.
-- **Copertura:** EU — aggregatore dei portali nazionali già coperti dalle schede (FR, UK, ES, NL, CH no —
-  CH non è EU).
-- **Qualità:** variabile; come dati.gov.it, è un **indice**, non una fonte primaria.
+- **Authority:** Publications Office EU (DCAT-AP EU).
+- **URL:** https://data.europa.eu (search «video surveillance», «camera», «videosorveglianza»).
+- **Format:** aggregated catalogue (DCAT-AP EU); documented API hub but with non-trivial parameters
+  (400 on simple queries during the check — use the UI or the API with correct parameters).
+- **Fields:** per-dataset.
+- **Licence:** per-dataset.
+- **Freshness:** live.
+- **Coverage:** EU — aggregator of the national portals already covered by the sheets (FR, UK, ES, NL, CH not —
+  CH is not in the EU).
+- **Quality:** variable; like dati.gov.it, it is an **index**, not a primary source.
 
-### 3.21 Parigi — Emplacements d'implantation de caméras de vidéoprotection (BO 2019)
+### 3.21 Paris — Emplacements d'implantation de caméras de vidéoprotection (BO 2019)
 
-- **Ente:** Ville de Paris.
+- **Authority:** Ville de Paris.
 - **URL:** https://www.data.gouv.fr/fr/datasets/emplacements-dimplantation-de-cameras-de-videoprotection-bo-ville-de-paris-du-01-02-2019/
-- **Formato:** dataset storico (BO del 01/02/2019).
-- **Campi:** emplacements caméras (posizioni).
-- **Licenza:** **notspecified** ⚠️ (non riutilizzabile senza chiarimento — matrice § 3.6).
-- **Aggiornamento:** 2019 (storico).
-- **Qualità:** bassa per riuso (licenza non chiara + datato).
-- **Compatibilità ODbL:** ⚠️ NO senza chiarimento.
+- **Format:** historical dataset (BO of 01/02/2019).
+- **Fields:** camera emplacements (positions).
+- **Licence:** **notspecified** ⚠️ (not reusable without clarification — matrix § 3.6).
+- **Freshness:** 2019 (historical).
+- **Quality:** low for reuse (unclear licence + dated).
+- **ODbL compatibility:** ⚠️ NO without clarification.
 
-### 3.22 Surveillance under Surveillance (progetto civico)
+### 3.22 Surveillance under Surveillance (civic project)
 
-- **Ente:** progetto accademico/civico (sunders.uber.space).
+- **Authority:** academic/civic project (sunders.uber.space).
 - **URL:** https://sunders.uber.space/
-- **Formato:** viewer web; **dati = OSM** (tag `surveillance`) non visualizzati sulla mappa standard;
-  contributi via account OSM.
-- **Campi:** stessi di OSM (vedi 3.4), con focus camere + guardie, Europa occidentale.
-- **Licenza:** ODbL (dati OSM); asset/codice sotto licenze varie (CC BY-SA/MIT/GPL).
-- **Aggiornamento:** live (su dati OSM).
-- **Qualità:** buona come **fonte di ispirazione/verifica incrociata**; il dato primario resta OSM (3.4).
-- **Compatibilità ODbL:** ✅ (stessa licenza OSM).
+- **Format:** web viewer; **data = OSM** (`surveillance` tag) not shown on the standard map;
+  contributions via OSM accounts.
+- **Fields:** same as OSM (see 3.4), with focus on cameras + guards, Western Europe.
+- **Licence:** ODbL (OSM data); assets/code under various licences (CC BY-SA/MIT/GPL).
+- **Freshness:** live (on OSM data).
+- **Quality:** good as **inspiration/cross-check source**; the primary data remains OSM (3.4).
+- **ODbL compatibility:** ✅ (same OSM licence).
 
-### 3.23 Italia — Ministero dell'Interno, «Sistemi di videosorveglianza in favore dei comuni»
+### 3.23 Italy — Ministero dell'Interno, «Sistemi di videosorveglianza in favore dei comuni»
 
-- **Ente:** Ministero dell'Interno (amministrazione trasparente).
+- **Authority:** Ministero dell'Interno (amministrazione trasparente).
 - **URL:** https://www.interno.gov.it/it/amministrazione-trasparente/altri-contenuti-dati-ulteriori/sistemi-videosorveglianza-favore-dei-comuni
-- **Formato:** pagina/PDF di programma (finanziamenti ex DL 14/2017 sicurezza città).
-- **Campi:** progetti finanziati (non georeferenziati).
-- **Licenza:** n/a (pubblicazione istituzionale).
-- **Copertura:** Italia (programmi di finanziamento impianti).
-- **Qualità:** bassa per il DB (nessuna posizione); utile solo come **contesto** (quali comuni hanno ricevuto
-  fondi → dove cercare impianti).
-- **Compatibilità ODbL:** n/a.
+- **Format:** programme page/PDF (funding under DL 14/2017 safe cities).
+- **Fields:** funded projects (not georeferenced).
+- **Licence:** n/a (institutional publication).
+- **Coverage:** Italy (system-funding programmes).
+- **Quality:** low for the DB (no positions); useful only as **context** (which municipalities received
+  funds → where to look for systems).
+- **ODbL compatibility:** n/a.
 
-### 3.24 Regione Toscana — monitoraggio dati di traffico
+### 3.24 Regione Toscana — traffic data monitoring
 
-- **Ente:** Regione Toscana.
+- **Authority:** Regione Toscana.
 - **URL:** https://dati.toscana.it (dataset «Sistema di monitoraggio dati di traffico sulle strade regionali»).
-- **Formato:** KMZ/SHP/TIF.
-- **Campi:** dati di traffico (non telecamere).
-- **Licenza:** **CC BY-SA** ⚠️ — **incompatibile con ODbL** senza permesso (matrice § 3.5).
-- **Aggiornamento:** n/d.
-- **Qualità:** bassa per il nostro scope.
-- **Compatibilità ODbL:** ❌ di norma NO.
+- **Format:** KMZ/SHP/TIF.
+- **Fields:** traffic data (not cameras).
+- **Licence:** **CC BY-SA** ⚠️ — **incompatible with ODbL** without permission (matrix § 3.5).
+- **Freshness:** n/d.
+- **Quality:** low for our scope.
+- **ODbL compatibility:** ❌ normally NO.
 
-### 3.25 Atlas of Surveillance (EFF) — progetto civico USA
+### 3.25 Atlas of Surveillance (EFF) — US civic project
 
-- **Ente:** Electronic Frontier Foundation + ricercatori.
-- **URL:** https://www.atlasofsurveillance.org/data-library (download CSV: `https://atlasofsurveillance.org/download.csv`).
-- **Formato:** CSV.
-- **Campi (verificati su header):** `AOSNUMBER`, `City`, `County`, `State`, `Agency`, `Type of LEA`,
-  `Technology` (ALPR, cameras, drones…), `Vendor`, `Link 1..3`, date… — **nessuna coordinata**, livello ente.
-- **Licenza:** da verificare sul sito (dati di ricerca EFF); ⚠️ non assumere CC0.
-- **Aggiornamento:** dataset vivo (2026).
-- **Copertura:** USA (polizia locale/federale) — **fuori scope EU/IT** del censimento, utile solo come
-  riferimento metodologico.
-- **Compatibilità ODbL:** da verificare con legale; rilevanza bassa (no coordinate, no EU).
+- **Authority:** Electronic Frontier Foundation + researchers.
+- **URL:** https://www.atlasofsurveillance.org/data-library (CSV download: `https://atlasofsurveillance.org/download.csv`).
+- **Format:** CSV.
+- **Fields (verified on header):** `AOSNUMBER`, `City`, `County`, `State`, `Agency`, `Type of LEA`,
+  `Technology` (ALPR, cameras, drones…), `Vendor`, `Link 1..3`, dates… — **no coordinates**, agency level.
+- **Licence:** to verify on the site (EFF research data); ⚠️ do not assume CC0.
+- **Freshness:** live dataset (2026).
+- **Coverage:** USA (local/federal police) — **outside the EU/IT census scope**, useful only as a
+  methodological reference.
+- **ODbL compatibility:** to verify with legal; low relevance (no coordinates, no EU).
 
-### 3.26 Roma — dati.comune.roma.it (portale Open Data Roma Capitale)
+### 3.26 Rome — dati.comune.roma.it (Open Data Roma Capitale portal)
 
-- **Ente:** Roma Capitale.
+- **Authority:** Roma Capitale.
 - **URL:** https://dati.comune.roma.it
-- **Formato:** portale custom (Apache, tema Designers Italia); API CKAN **non esposta** sui path standard
-  (verificato: `/api/3/action/*` → HTML). Contiene comunque dataset ZTL (perimetro, orari, varchi) —
-  documentato dal monitoraggio docs.italia; accesso machine-readable da verificare dataset per dataset.
-- **Campi/licenza:** per-dataset (da estrarre via UI o harvesting dati.gov.it).
-- **Aggiornamento:** live.
-- **Qualità:** media; per i varchi ZTL la fonte machine-readable migliore è RSM ArcGIS (3.12).
-- **Compatibilità ODbL:** per-dataset.
+- **Format:** custom portal (Apache, Designers Italia theme); CKAN API **not exposed** on standard paths
+  (verified: `/api/3/action/*` → HTML). It still contains ZTL datasets (perimeter, hours, gates) —
+  documented by the docs.italia monitoring; machine-readable access to verify dataset by dataset.
+- **Fields/licence:** per-dataset (to extract via UI or dati.gov.it harvesting).
+- **Freshness:** live.
+- **Quality:** medium; for ZTL gates the best machine-readable source is RSM ArcGIS (3.12).
+- **ODbL compatibility:** per-dataset.
 
 ---
 
-## 4. Fonti valutate e scartate / limitate
+## 4. Sources evaluated and discarded / limited
 
-| Fonte | Motivo scarto/limite |
+| Source | Reason for discard/limitation |
 |---|---|
-| govdata.de (DE) | API CKAN non esposta (404 sui path standard); ricerca UI JS. Non bloccante: la Germania ha pochi dataset camera pubblici a livello federale; rivalutare con accesso UI. |
-| dados.gov.pt (PT) | API CKAN non esposta (404); copertura irrilevante al momento della verifica. |
-| data.gov.be (BE) | API instabile (503) durante la verifica; riprovare in fase di import. |
-| dati.comune.genova.it / opendata.comune.napoli.it | Timeout/404 sui path CKAN; da rivalutare con accesso browser (Genova ha dataset «telecamere» storici). |
-| dati.comune.fi.it / dati.comune.venezia.it | Dominio/endpoint non risolti o API assente (Firenze/Venezia usano piattaforme diverse); da rivalutare via UI. |
-| Regione Lombardia (dati.lombardia.it) | Piattaforma Socrata (non CKAN): API SODA da mappare in fase 2; non verificato in questa tornata. |
-| Wikimapia / Google Maps | Non licenziabili, scraping vietato. |
-| Portali «mappa autovelox» commerciali | Dati derivati, licenza incerta, ridondanti rispetto a velox.mit.gov.it. |
+| govdata.de (DE) | CKAN API not exposed (404 on standard paths); JS UI search. Not blocking: Germany has few public camera datasets at federal level; re-evaluate with UI access. |
+| dados.gov.pt (PT) | CKAN API not exposed (404); negligible coverage at verification time. |
+| data.gov.be (BE) | Unstable API (503) during the check; retry at import time. |
+| dati.comune.genova.it / opendata.comune.napoli.it | Timeout/404 on CKAN paths; re-evaluate with browser access (Genova has historical «telecamere» datasets). |
+| dati.comune.fi.it / dati.comune.venezia.it | Domain/endpoint unresolved or no API (Florence/Venice use different platforms); re-evaluate via UI. |
+| Regione Lombardia (dati.lombardia.it) | Socrata platform (not CKAN): SODA API to map in phase 2; not verified in this round. |
+| Wikimapia / Google Maps | Not licensable, scraping forbidden. |
+| Commercial «speed-camera map» portals | Derived data, uncertain licence, redundant vs velox.mit.gov.it. |
 
-## 5. Raccomandazioni per l'import (QA/feasibility)
+## 5. Import recommendations (QA/feasibility)
 
-1. **Priorità immediata (licenza pulita + coordinate):** Zürich (CC0) → Milano (CC BY) → Madrid (CC BY 4.0,
-   dataset geografici) → OSM `surveillance=*` (ODbL, estratto Geofabrik IT) → Amsterdam (CC0).
-2. **Seconda ondata (licenza permissiva, da confermare):** Bologna (CC BY 4.0 attesa), UK Runnymede/Plymouth/
-   York (OGL v3), Francia Min. Interno (Licence Ouverte 2.0, snapshot 2018), TfL (OGL + registrazione).
-3. **Casi da portare a Rosa/DPO prima di toccare i dati:** RSM Roma (licenza non dichiarata), MIT velox
-   (licenza non dichiarata), Leicester (licenza non dichiarata), Bern/Ginevra (licenza da verificare),
-   Parigi BO 2019 (notspecified), Barcellona (verificare presenza coordinate nel dataset).
-4. **Non importare:** CC BY-SA (Toscana) e qualsiasi dataset share-alike senza permesso (matrice § 3.5).
-5. **Norme tecniche di import:**
-   - Attribuzione per-fonte nella pagina `/licenze` + campo `source` nel record + header esportazioni
-     (vincolo README workstream; `app/lib/data-license.ts`).
-   - Riproiezione: Amsterdam è in **EPSG:28992** (RD New) → WGS84; verificare SRID per ogni fonte.
-   - Encoding: Madrid CSV in Latin-1; Zürich CSV con BOM UTF-8.
-   - Dedupe/merge: OSM è la base di integrazione (stessa licenza); le fonti comunali vanno matchate su
-     `operator`/indirizzo/vicinanza (es. varchi Milano ↔ nodi OSM).
-   - Non usare l'API OSM per bulk; usare estratti Geofabrik/Planet (policy OSMF).
-6. **Prossimo task (FONTI #3, normalizzazione-pipeline.md):** definire schema normalizzato (id sorgente,
-   tipo, gestore, direzione, data verifica) e job di refresh (cadenza consigliata: mensile per le fonti
-   statiche, live per WFS/API).
+1. **Immediate priority (clean licence + coordinates):** Zürich (CC0) → Milan (CC BY) → Madrid (CC BY 4.0,
+   geographic datasets) → OSM `surveillance=*` (ODbL, Geofabrik IT extract) → Amsterdam (CC0).
+2. **Second wave (permissive licence, to confirm):** Bologna (CC BY 4.0 expected), UK Runnymede/Plymouth/
+   York (OGL v3), France Min. Intérieur (Licence Ouverte 2.0, 2018 snapshot), TfL (OGL + registration).
+3. **Cases to bring to the privacy/legal review before touching the data:** RSM Rome (undeclared licence), MIT velox
+   (undeclared licence), Leicester (undeclared licence), Bern/Geneva (licence to verify),
+   Paris BO 2019 (notspecified), Barcelona (verify coordinate presence in the dataset).
+4. **Do not import:** CC BY-SA (Tuscany) and any share-alike dataset without permission (matrix § 3.5).
+5. **Import technical rules:**
+   - Per-source attribution on the `/licenze` page + `source` field in the record + export headers
+     (workstream README constraint; `app/lib/data-license.ts`).
+   - Reprojection: Amsterdam is in **EPSG:28992** (RD New) → WGS84; verify the SRID for every source.
+   - Encoding: Madrid CSV in Latin-1; Zürich CSV with UTF-8 BOM.
+   - Dedup/merge: OSM is the integration base (same licence); municipal sources must be matched on
+     `operator`/address/proximity (e.g. Milan gates ↔ OSM nodes).
+   - Do not use the OSM API for bulk; use Geofabrik/Planet extracts (OSMF policy).
+6. **Next task (SOURCES #3, normalizzazione-pipeline.md):** define the normalised schema (source id,
+   type, operator, direction, verification date) and the refresh job (recommended cadence: monthly for
+   static sources, live for WFS/API).
 
 ---
 
-## 6. Appendice — anomalie QA rilevate durante la verifica (2026-08-04)
+## 6. Appendix — QA anomalies found during the check (2026-08-04)
 
-- **velox.mit.gov.it**: dataset senza coordinate (solo registro per accertatore); licenza non dichiarata.
-- **Madrid videovigilancia CSV**: nessun lat/lon nel file tabellare (solo `Ubicación` testuale) — le
-  coordinate sono nei dataset tráfico (KML/Geo).
-- **Milano**: pagina HTML dietro bot-block 403 per agenti non-browser; API CKAN regolare.
-- **Torino 5T**: feed XML `get_access_control` risponde 403 a User-Agent non-browser.
-- **dati.gov.it / data.europa.eu**: API di ricerca non documentate / risposte 400-404 sui path standard;
-  usare UI o SPARQL.
-- **Overpass pubblico**: rate-limit/limiti su bbox grandi (Italia intera) — usare bbox cittadini o estratti.
-- **opendata.swiss**: le licenze non sono esposte nel campo `license_title` dell'API CKAN (vanno lette
-  dalla scheda/DCAT) — causa dei «da verificare» su Bern/Ginevra.
-- **TfL**: endpoint swagger/docs instabile (Cloudflare 530); API `Place/Type/JamCam` stabile.
+- **velox.mit.gov.it**: dataset without coordinates (only per-authority register); undeclared licence.
+- **Madrid videovigilancia CSV**: no lat/lon in the tabular file (only textual `Ubicación`) — the
+  coordinates are in the tráfico datasets (KML/Geo).
+- **Milan**: HTML page behind bot-block 403 for non-browser agents; CKAN API fine.
+- **Turin 5T**: `get_access_control` XML feed answers 403 to non-browser User-Agents.
+- **dati.gov.it / data.europa.eu**: undocumented search APIs / 400-404 responses on standard paths;
+  use the UI or SPARQL.
+- **Public Overpass**: rate limits/limits on large bboxes (whole Italy) — use city bboxes or extracts.
+- **opendata.swiss**: licences are not exposed in the `license_title` field of the CKAN API (they must
+  be read from the sheet/DCAT) — cause of the «to verify» marks on Bern/Geneva.
+- **TfL**: swagger/docs endpoint unstable (Cloudflare 530); `Place/Type/JamCam` API stable.

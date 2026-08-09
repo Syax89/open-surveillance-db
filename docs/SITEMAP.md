@@ -145,7 +145,7 @@ or `legal` bundle — legal content is a separate typed layer
 
 | Route          | Page                  | Purpose                                             | In home nav | In footer | Status |
 |----------------|-----------------------|-----------------------------------------------------|:---:|:---:|--------|
-| `/`            | Home (hub)            | Hero con ricerca directory + contenuto orientativo; static map teaser (`MapTeaser`) + four tool cards (`ToolCards`) | ✓ (brand) | ✓ (brand) | implemented |
+| `/`            | Home (hub)            | Hero with directory search + orienting content; static map teaser (`MapTeaser`) + four tool cards (`ToolCards`) | ✓ (brand) | ✓ (brand) | implemented |
 | `/mappa`       | Map                   | Interactive map (Leaflet) + viewport-synced sidebar list (t_702c10af), marker popups, filters, export, text fallback | ✓ (F3) | ✓ (F3) | implemented (F1, t_03c0fa15 / PR #158; redesign t_702c10af) |
 | `/directory`   | Directory             | Searchable text directory with filters, sort, count, pagination | ✓ (F3) | ✓ (F3) | implemented (F1, t_03c0fa15 / PR #158) |
 | `/segnala`     | Report a camera       | Guided private submission form (`noindex`)          | ✓ (F3, CTA) | ✓ (F3) | implemented (F1, t_03c0fa15 / PR #158) |
@@ -185,7 +185,7 @@ proposed).
 
 - **Purpose:** the orienting entry point. Short hero + links to the four
   tool pages; the full tool surfaces live on their own routes since F1.
-- **Content:** hero con ricerca diretta nella directory, static map teaser (`MapTeaser`, a static preview with
+- **Content:** hero with direct directory search, static map teaser (`MapTeaser`, a static preview with
   no Leaflet instance), four tool cards (`ToolCards`: `/mappa`,
   `/directory`, `/segnala`, `/correggi`), and a short principles section
   (kept short; the full manifesto lives at `/manifesto`). The old anchor
@@ -218,12 +218,12 @@ proposed).
   pagination.
 - **Content:** `app/(tools)/directory/page.tsx` + `DirectoryTool`
   (`app/components/tools/DirectoryTool.tsx`, `"use client"`), reusing
-  `FiltersBar` (`bare`, con `extraControls` per il toggle luogo), `EmptyState`,
-  `RecordCard` (righe contestuali in `.directory-tool .record-list`). Since
-  t_127492f1/t_f13fcb1c the page is a **browse catalog** ("indice editoriale",
+  `FiltersBar` (`bare`, with `extraControls` for the place toggle), `EmptyState`,
+  `RecordCard` (contextual rows in `.directory-tool .record-list`). Since
+  t_127492f1/t_f13fcb1c the page is a **browse catalog** ("editorial index",
   `docs/design/README.md`): tool heading (with "Use the map
   instead" action) → controls (search full-width + type/freshness/sort/reset +
-  toggle luogo) → collapsible place-search panel (card) → visible results
+  toggle place) → collapsible place-search panel (card) → visible results
   header (h2 + count + CSV/GeoJSON buttons) → active-filter chips → A–Z index
   → one-column flat rows → pagination (Showing X–Y of Z · Page N of M).
   Bundle: `directory.ts`.
@@ -311,7 +311,7 @@ proposed).
 - **Nav/footer:** never linked from public navigation (account surface).
 - **Auth:** auth-gated (contributor session, ADR 0013); anonymous → 401.
 
-### `/verify-email` — Email verification landing (implemented, P1-1 Vera)
+### `/verify-email` — Email verification landing (implemented, P1-1)
 
 - **Purpose:** the human landing for the verification link emailed at
   registration. Previously the link pointed at GET /api/auth/verify-email
@@ -325,7 +325,7 @@ proposed).
 - **SEO/privacy:** `robots: noindex, nofollow` (one-shot auth outcome,
   never indexed).
 
-### `/forgot-password` — Password reset request (implemented, P1-3 Vera)
+### `/forgot-password` — Password reset request (implemented, P1-3)
 
 - **Purpose:** request a reset link; mirrors the anti-enumeration contract
   of POST /api/auth/reset-password/request (every well-formed email gets
@@ -335,7 +335,7 @@ proposed).
   /login.
 - **SEO/privacy:** `robots: noindex, nofollow`.
 
-### `/reset-password` — Consume the reset token (implemented, P1-3 Vera)
+### `/reset-password` — Consume the reset token (implemented, P1-3)
 
 - **Purpose:** the landing for the reset link emailed by
   sendPasswordResetEmail (which has always pointed here — the page simply

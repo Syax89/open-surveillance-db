@@ -2,7 +2,7 @@
 
 - **Status:** accepted
 - **Date:** 2026-08-01
-- **Author:** Linus (Backend) on decision of the CEO (Simone)
+- **Author:** Simone Rondina (project owner), on decision of the CEO
 - **Updates:** ADR 0009-reviewer-roles-moderation-queue (the reviewer roles stay
   separate from the contributor role introduced here; a contributor is a
   *reporter*, not a reviewer).
@@ -58,7 +58,7 @@ Two questions had to be answered before writing code:
 
 4. **Anonymous submissions remain possible, by design.** `cameras.contributor_id`
    is `NULL` unless the logged-in contributor submitted the report. The
-   requirement "solo i contributori autenticati possono inviare segnalazioni"
+   requirement "only authenticated contributors may submit reports"
    is interpreted as *attribution*: a live session adds the contributor's id
    to the report; its absence just means the report is anonymous. Requiring
    an account to report would contradict the project's public-observation

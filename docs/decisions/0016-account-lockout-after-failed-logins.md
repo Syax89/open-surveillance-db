@@ -2,7 +2,7 @@
 
 - **Status:** accepted
 - **Date:** 2026-08-01
-- **Author:** Ken (DevSecOps) on decision of the CEO (Simone)
+- **Author:** Simone Rondina (project owner), on decision of the CEO
 - **Updates:** ADR 0013-contributor-accounts-and-sessions (the login route
   gains a second, account-scoped brute-force defence layered on top of the
   per-IP rate limit introduced there).

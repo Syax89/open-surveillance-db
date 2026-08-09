@@ -14,7 +14,7 @@ changes accumulate under `[Unreleased]`.
 
 ### Added
 
-- **Explorer UX (PR #326):** switch Mappa↔Directory con filtri condivisi, ricerca luogo sopra la mappa, pannello punti map-first collassato, legenda, filtri in disclosure, guida con overview, footer a gruppi, redirect `/moderazione` → `/guide`.
+- **Explorer UX (PR #326):** Mappa↔Directory switch with shared filters, place search above the map, collapsed map-first points panel, legend, filters in disclosure, guide with overview, grouped footer, `/moderazione` → `/guide` redirect.
 
 - **Auth — mailer Cloudflare (Fase A2, t_4c398006, ADR 0020 decision 2):**
   transactional email infrastructure for account verification and password
@@ -210,26 +210,26 @@ changes accumulate under `[Unreleased]`.
   pilot + IT type-checked parity, registered in `index.ts` (COMMUNITY_PLAN
   §6, ADR 0007)
   ([#172](https://github.com/Syax89/open-surveillance-db/pull/172)).
-- Backend community verifications (C1, ADR 0018): migrazioni D1 0020-0023
+- Backend community verifications (C1, ADR 0018): D1 migrations 0020-0023
   (`camera_confirmations`, `camera_edit_requests`,
-  `correction_requests.contributor_id`, index livelli), API conferme
-  PUT/DELETE/GET `/api/cameras/[id]/confirmation`, `confirmationCount` nei
-  payload pubblici (GROUP BY IN, no N+1), anti-gaming 6 strati (quota D1
-  20/40, per-record 5, IP-hash burst, decay su `last_verified_at`), erasure
-  estesa art. 17 (ADR 0018, C1).
+  `correction_requests.contributor_id`, level index), confirmation API
+  PUT/DELETE/GET `/api/cameras/[id]/confirmation`, `confirmationCount` in the
+  public payloads (GROUP BY IN, no N+1), 6-layer anti-gaming (D1 quota
+  20/40, per-record 5, IP-hash burst, decay on `last_verified_at`), erasure
+  extended art. 17 (ADR 0018, C1).
 - Report intake C4 (COMMUNITY_PLAN §2.4): `issue_type` whitelist
-  (`inaccurate|missing|removal|abuse|other`), dedupe one-open-report per
-  (submitter, target) con indici unici parziali (migrazione 0024, 409 su
-  duplicato o target già rimosso), attribuzione opzionale al contributor
-  (`contributor_id`, sessione + CSRF quando presente), anonimo sempre
-  possibile e rate-limitato per IP (bucket `submit` 5/60s).
-- Community profile contributions (C2, ADR 0018): migrazione D1 0025
-  (index `(contributor_id, created_at DESC)` su cameras e photos),
-  `GET /api/auth/me/contributions` paginato (contratto F0, filtri whitelist,
-  `Cache-Control: no-store`, solo dati propri), `deriveLevel` puro
-  (L0=0/L1=1/L2=5/L3=20/L4=50, solo `status='verified'` conta) e `level` nel
-  meta di `/api/auth/me` e della lista contributi; `me/submissions` deprecato
-  (backward-compat).
+  (`inaccurate|missing|removal|abuse|other`), one-open-report dedupe per
+  (submitter, target) with partial unique indexes (migration 0024, 409 on
+  duplicate or already-removed target), optional contributor attribution
+  (`contributor_id`, session + CSRF when present), anonymous always
+  possible and IP rate-limited (bucket `submit` 5/60s).
+- Community profile contributions (C2, ADR 0018): D1 migration 0025
+  (index `(contributor_id, created_at DESC)` on cameras and photos),
+  paginated `GET /api/auth/me/contributions` (F0 contract, whitelist
+  filters, `Cache-Control: no-store`, own data only), pure `deriveLevel`
+  (L0=0/L1=1/L2=5/L3=20/L4=50, only `status='verified'` counts) and
+  `level` in the `/api/auth/me` meta and the contributions list;
+  `me/submissions` deprecated (backward-compat).
 - Community documentation (C-docs, COMMUNITY_PLAN §6.4): `/guide` extended
   with four community sections (account — why and how, email+password today,
   re-aligned with the final login choice; editing your contribution — owner
@@ -289,79 +289,80 @@ changes accumulate under `[Unreleased]`.
 
 ### Changed
 
-- **Docs/legal — allineamento follow-up ADR 0021 (t_499df642):**
-  `docs/legal/RETENTION_SCHEDULE.md` (R1–R3 riscritte sul modello community:
-  niente retention a tempo per i record, stati `active`/`hidden`/`removed`
-  reversibili senza cancellazione automatica, copertura esplicita di
-  hidden/removed, R13 foto sul retention del record, R14 community actions
-  con erasure atomica, § 3 enforcement senza sweep di freshness),
-  `docs/legal/LAWFUL_BASIS.md` (§ 3.1 LIA con i safeguards reali del modello
-  nuovo — verified-account gate ADR 0020, soglia privacy ≥ 1 → hidden,
-  storia pubblica senza attribuzione, erasure su azioni, correzioni private;
-  § 3.1.1 riscritto per le community actions, conclusione 6(1)(f) invariata
-  a fortiori, balancing test aggiornato art. 5(2)),
-  `docs/MODERATION.md` (riscritto sul modello residuo: photo redaction gate
-  + legal-emergency admin hide/remove; rimosso il flusso review/appeals/edit),
-  `docs/legal/MODERATION_SLA.md` (SLA residue S2/S3 allineate alle
-  dichiarazioni inline 48h/14gg di TERMS/PRIVACY; S4 retrospective review;
-  rimosse S5/S6) e `docs/COMMUNITY_PLAN.md` (marcata **superseded** per il
-  moderation model — ADR 0021; sezioni § 2.2/§ 4/§ 5.2/§ 5.3 archiviate,
-  restano attuali § 1 auth e § 3 trust levels). Fix copy residuo in canonica
-  (PRIVACY_NOTICE § 3.1 / TERMS_OF_USE § 3.7: "submit, edit or verify
-  records" → "submit reports or act on records (community actions)") e
-  armonizzazione del potere umano residuo (PRIVACY § 3 vs TERMS § 6.3: il
-  photo-approval agisce sullo stato FOTO, non sul lifecycle del record).
-  Parity EN/IT invariata (documenti canonici in inglese; le traduzioni
-  pubbliche restano nel bundle `app/lib/legal/`, allineato separatamente).
+- **Docs/legal — ADR 0021 alignment follow-up (t_499df642):**
+  `docs/legal/RETENTION_SCHEDULE.md` (R1–R3 rewritten on the community model:
+  no time-based retention for records, `active`/`hidden`/`removed` states
+  reversible without automatic deletion, explicit coverage of
+  hidden/removed, R13 photos on the record retention, R14 community actions
+  with atomic erasure, § 3 enforcement without the freshness sweep),
+  `docs/legal/LAWFUL_BASIS.md` (§ 3.1 LIA with the real safeguards of the new
+  model — ADR 0020 verified-account gate, privacy threshold ≥ 1 → hidden,
+  public history without attribution, erasure on actions, private corrections;
+  § 3.1.1 rewritten for community actions, 6(1)(f) conclusion unchanged
+  a fortiori, balancing test updated art. 5(2)),
+  `docs/MODERATION.md` (rewritten on the residual model: photo redaction gate
+  + legal-emergency admin hide/remove; removed the review/appeals/edit flow),
+  `docs/legal/MODERATION_SLA.md` (residual SLAs S2/S3 aligned with the
+  inline 48h/14d statements of TERMS/PRIVACY; S4 retrospective review;
+  removed S5/S6) and `docs/COMMUNITY_PLAN.md` (marked **superseded** for the
+  moderation model — ADR 0021; sections § 2.2/§ 4/§ 5.2/§ 5.3 archived,
+  § 1 auth and § 3 trust levels remain current). Residual copy fix in the
+  canonical docs (PRIVACY_NOTICE § 3.1 / TERMS_OF_USE § 3.7: "submit, edit
+  or verify records" → "submit reports or act on records (community
+  actions)") and harmonisation of the residual human power (PRIVACY § 3 vs
+  TERMS § 6.3: photo-approval acts on the PHOTO state, not the record
+  lifecycle). EN/IT parity unchanged (canonical documents in English; the
+  public translations stay in the `app/lib/legal/` bundle, aligned
+  separately).
 
-- **Docs/legal — canonica allineata al pivot community ADR 0021 (t_29c29f92):**
-  `docs/legal/PRIVACY_NOTICE.md` (v0.10 → **v0.11**) e `docs/TERMS_OF_USE.md`
-  (v0.6 → **v0.7**) riscritte sul modello community-driven già applicato ai
-  bundle runtime (`app/lib/legal/en.ts`/`it.ts`, 0.6/0.4): pubblicazione
-  immediata da account verificati, azioni community con soglie automatiche,
-  cronologia pubblica per record senza attribuzione, correzioni private,
-  emergenza legale come unico potere umano, retention § 7 senza il ciclo
-  pending/12-mesi. Version history aggiornata. **Nota versioning:** la
-  canonica e i bundle runtime restano su due schemi distinti (0.11/0.7 vs
-  0.6/0.4) finché non si unifica il versioning — i bundle dichiarano la
-  copia repository come canonica, da qui l'allineamento.
+- **Docs/legal — canonical docs aligned with the ADR 0021 community pivot (t_29c29f92):**
+  `docs/legal/PRIVACY_NOTICE.md` (v0.10 → **v0.11**) and `docs/TERMS_OF_USE.md`
+  (v0.6 → **v0.7**) rewritten on the community-driven model already applied to
+  the runtime bundles (`app/lib/legal/en.ts`/`it.ts`, 0.6/0.4): immediate
+  publication from verified accounts, community actions with automatic
+  thresholds, public per-record history without attribution, private
+  corrections, legal emergency as the only human power, § 7 retention without
+  the pending/12-month cycle. Version history updated. **Versioning note:** the
+  canonical docs and the runtime bundles remain on two distinct schemes
+  (0.11/0.7 vs 0.6/0.4) until versioning is unified — the bundles declare the
+  repository copy as canonical, hence the alignment.
 
-- **Auth — login bloccato finché l'email non è verificata (t_6dc1c96f, CEO
-  feedback 2026-08-03, option (a)):** `POST /api/auth/login` ora risponde 401
-  (stesso corpo generico "Invalid credentials." di email sconosciuta /
-  password errata) quando `email_verified_at` è NULL — "finché non è attivato
-  non è possibile fare login". Il gate gira DOPO la verifica PBKDF2 (nessun
-  timing oracle) e non tocca il contatore lockout (una password corretta non
-  è un tentativo fallito: nessun lockout-DoS per il proprietario). La
-  sessione read-only aperta da register (Fase B) resta l'unica sessione che un
-  account non verificato può avere — alimenta il banner /account e il resend
-  di verifica. Il messaggio "verifica la tua email" è copy statico su /login
-  (`auth.loginVerifyHint`, EN/IT, mostrato a tutti): l'API non rivela mai
-  l'esistenza dell'account (anti-enumeration intatta). Test: api-auth
-  (nuovo caso unverified-401), auth-verify-e2e (register → login 401 →
+- **Auth — login blocked until the email is verified (t_6dc1c96f, CEO
+  feedback 2026-08-03, option (a)):** `POST /api/auth/login` now answers 401
+  (same generic "Invalid credentials." body as unknown email /
+  wrong password) when `email_verified_at` is NULL — "login is not possible
+  until the account is activated". The gate runs AFTER the PBKDF2 check (no
+  timing oracle) and does not touch the lockout counter (a correct password
+  is not a failed attempt: no lockout-DoS for the owner). The read-only
+  session opened by register (Phase B) remains the only session an
+  unverified account can have — it feeds the /account banner and the
+  verification resend. The "verify your email" message is static copy on
+  /login (`auth.loginVerifyHint`, EN/IT, shown to everyone): the API never
+  reveals the account's existence (anti-enumeration intact). Tests: api-auth
+  (new unverified-401 case), auth-verify-e2e (register → login 401 →
   verify → login 200).
 
-- **Auth — verification gate esteso a TUTTI i metodi di login (finding
-  review-ada PR #262 P2, t_f940482b):** `POST /api/auth/passkey/login/complete`
-  apriva una sessione (createSession) senza controllare `email_verified_at`,
-  e `POST /api/auth/recovery` idem col riscatto di un recovery code — un
-  account NON verificato (sessione read-only di register) poteva iscriversi
-  una passkey e ri-autenticarsi, by-passando il gate di login della decisione
-  CEO (a). Ora il gate è un **choke-point unico** (`sessionGate` in
-  app/lib/auth-route-helpers.ts) applicato da login (password),
-  passkey/login/complete e recovery: 401 generico (stesso body degli altri
-  fallimenti, anti-enumeration), dopo la piena verifica della credenziale
-  (PBKDF2 / asserzione WebAuthn / consume del codice), **nessun lockout,
-  nessuna sessione**. L'enrollment passkey pre-verifica resta **permesso e
-  documentato** (register/begin): la passkey è inerte finché l'email non è
-  verificata, e il recovery code valido riscattato da un account non
-  verificato è consumato ma non apre sessioni. OIDC intatto (account nati
-  verified dal flag provider). Test: api-passkey (unit — asserzione WebAuthn
-  reale firmata via webauthn-fixtures: unverified → 401 no createSession,
-  verified → 200; recovery unverified → 401), qa-multiauth-write-gate-e2e
-  (register → enroll passkey → login passkey 401 → verify → login passkey
+- **Auth — verification gate extended to ALL login methods (finding
+  review PR #262 P2, t_f940482b):** `POST /api/auth/passkey/login/complete`
+  opened a session (createSession) without checking `email_verified_at`,
+  and `POST /api/auth/recovery` did the same when redeeming a recovery
+  code — an UNVERIFIED account (register's read-only session) could enroll
+  a passkey and re-authenticate, bypassing the CEO decision (a) login gate.
+  Now the gate is a single **choke-point** (`sessionGate` in
+  app/lib/auth-route-helpers.ts) applied by login (password),
+  passkey/login/complete and recovery: generic 401 (same body as the other
+  failures, anti-enumeration), after the full credential verification
+  (PBKDF2 / WebAuthn assertion / code redemption), **no lockout,
+  no session**. Pre-verification passkey enrollment remains **allowed and
+  documented** (register/begin): the passkey is inert until the email is
+  verified, and a valid recovery code redeemed by an unverified account is
+  consumed but opens no session. OIDC intact (accounts born verified from
+  the provider flag). Tests: api-passkey (unit — real signed WebAuthn
+  assertion via webauthn-fixtures: unverified → 401 no createSession,
+  verified → 200; unverified recovery → 401), qa-multiauth-write-gate-e2e
+  (register → enroll passkey → passkey login 401 → verify → passkey login
   200 → write 201; recovery 401 → verify → 200 → write 201). ADR 0020
-  decision 2 aggiornata.
+  decision 2 updated.
 
 - Header mobile menu boundary moved from 700px to 768px and the auth entry
   point moved INSIDE the menu (t_94b3726d, CEO live feedback 2026-08-02):
@@ -379,11 +380,11 @@ changes accumulate under `[Unreleased]`.
   tests/header-mobile-menu-contract.test.mjs (new CSS viewport contract),
   tests/client-auth-nav-links.test.mjs (in-menu placement + aria-current).
 - **BREAKING** `POST /api/corrections` (C4, COMMUNITY_PLAN §2.4): `issueType`
-  è ora una whitelist (`inaccurate|missing|removal|abuse|other`) — le
-  categorie free-text storiche ("Inaccurate location/details", "Privacy
-  concern", ...) rispondono 400; `removal`/`abuse` non accettano MAI
-  free-text, anche se il messaggio contiene la parola. I client esistenti
-  devono usare i valori whitelist.
+  is now a whitelist (`inaccurate|missing|removal|abuse|other`) — the
+  historical free-text categories ("Inaccurate location/details", "Privacy
+  concern", ...) answer 400; `removal`/`abuse` NEVER accept
+  free-text, even if the message contains the word. Existing clients
+  must use the whitelist values.
 - Production build audited; TypeScript and lint issues fixed as part of the
   build pipeline (docs/DEPLOYMENT.md added).
 - Local deployment documentation aligned with the actual runtime: `vinext dev`
@@ -401,31 +402,31 @@ changes accumulate under `[Unreleased]`.
   connection drops, a status notice explains that the last loaded records
   are still shown and offers a retry (F-i18n).
 - Microcopy standardized: uniform API-reachability error pattern
-  ("non raggiungibile in questo momento / controlla la connessione /
-  riprova"), explicit rate-limit retry window ("Riprova tra un minuto"),
-  and moderation decisions confirm with "Decisione salvata" plus a summary
+  ("not reachable right now / check your connection / try again"), an
+  explicit rate-limit retry window ("Try again in a minute"),
+  and moderation decisions confirm with "Decision saved" plus a summary
   of entity, action and reason (F-i18n).
 - i18n mapping documented: per-domain bundles kept, with a conceptual
   route→bundle table in `docs/SITEMAP.md` and `docs/REFACTOR_I18N.md`
   (no monolithic info/legal bundles; legal stays in `app/lib/legal/`).
-- **Copy — riscrittura migliorativa pagine informative (t_faa06594, CEO
-  2026-08-04 «riscriviamo meglio le pagine»):** pass qualitativo sui
-  bundle `home` (hero+hub), `guide`, `rules`, `manifesto`, `faq`,
-  `contact` (EN+IT) — frasi più corte, zero ripetizioni entro pagina,
-  IT naturale senza calchi («Aperto di default», «fin dalla
-  progettazione», «dati pubblici» al posto di «output pubblici»,
-  «community di OpenStreetMap» al posto di «contributori»), EN
-  britannico pulito (em-dash spaziato in `guide.geoJsonBody`, compound
-  modifier «community-maintained», niente Oxford comma), rimozione del
-  riferimento interno «(ADR 0020)» dalla guida pubblica e degli
-  obiettivi di risposta duplicati in `/contatti`. Zero nuove chiavi
-  i18n; parità EN/IT garantita da `tsc` (0 errori); nessuna stringa
-  pinnata nei test modificata. Report: `docs/design/riscrittura-pagine.md`.
+- **Copy — improvement rewrite of the info pages (t_faa06594, CEO
+  2026-08-04 «let's rewrite the pages better»):** qualitative pass on the
+  `home` (hero+hub), `guide`, `rules`, `manifesto`, `faq`,
+  `contact` bundles (EN+IT) — shorter sentences, zero in-page repetition,
+  natural IT without calques («Aperto di default», «fin dalla
+  progettazione», «dati pubblici» instead of «output pubblici»,
+  «community di OpenStreetMap» instead of «contributori»), clean British
+  EN (spaced em-dash in `guide.geoJsonBody`, compound
+  modifier «community-maintained», no Oxford comma), removal of the
+  internal «(ADR 0020)» reference from the public guide and of the
+  duplicated response targets in `/contatti`. Zero new i18n
+  keys; EN/IT parity guaranteed by `tsc` (0 errors); no pinned
+  test strings modified. Report: `docs/design/riscrittura-pagine.md`.
 
 ### Removed
 
 - **Photo evidence upload — removed entirely (CEO decision 2026-08-08,**
-  **"troppo rischioso e troppo esoso di spazio"):** `POST /api/photos` and
+  **"too risky and too space-hungry"):** `POST /api/photos` and
   `GET /api/photos/[id]` routes, `db/photos.ts`, the `photos` D1 table
   (migration `0043`), the R2 `PHOTOS` bucket binding, EXIF/metadata
   stripping (`app/lib/image-metadata.ts`), the photo-upload UI in the
@@ -480,7 +481,7 @@ changes accumulate under `[Unreleased]`.
   `aria-hidden`, so this is a visual-only fix.
 
 - **UI /directory — record rows now render as visible cards with a status
-  rail (t_d089a17e, Vera design, CEO feedback 2026-08-03):** the catalog
+  rail (t_d089a17e, CEO feedback 2026-08-03):** the catalog
   rows blended into the paper background (transparent bg on `--paper`,
   hairline only) and read as random boxes. Every row is now a real card
   (`#fffef9` bg, 1px `var(--line)` border, `radius-lg`, 3px left rail)
@@ -500,7 +501,7 @@ changes accumulate under `[Unreleased]`.
   `tests/client-tools.test.mjs`; rendered-html/a11y suites green unchanged
   (RecordCard markup byte-identical).
 
-- Audit finding MEDIUM #2 (t_6b61fc3f, Ada): `PATCH /api/moderation` accepted
+- Audit finding MEDIUM #2 (t_6b61fc3f): `PATCH /api/moderation` accepted
   a client-supplied `actorId` for admin-role callers ("stepping in for the
   demo actor selector"), letting an admin write moderation events as ANOTHER
   reviewer and corrupt the append-only audit trail in production. The acting
@@ -518,7 +519,7 @@ changes accumulate under `[Unreleased]`.
   event lands on the server-derived reviewer, never the spoofed id.
 
 - P1-1 reset-password/request binary account-existence oracle (t_11b6a22d,
-  Ada security review): the 3/h reset budget branch answered `429 Too many
+  security review): the 3/h reset budget branch answered `429 Too many
   reset emails` ONLY for registered addresses, while unknown addresses always
   get `200 { sent: true }` — 4 POSTs against a known address (3 delivered
   mails + 1 429) were enough to confirm the account exists, violating the
@@ -528,32 +529,32 @@ changes accumulate under `[Unreleased]`.
   per contributor (only the response is now indistinguishable). Test updated
   in `tests/api-auth.test.mjs` to pin the 200 instead of the old 429.
 
-- `/mappa` CEO feedback 2026-08-02 (t_9e8642a0): (1) il banner "Prototype
-  mode" sopra la mappa è stato RIMOSSO — la pagina parte direttamente con la
-  card della mappa, la mappa non è più presentata come prototipo (la
-  veridicità resta in pageIntro e nelle note in-lista; chiavi i18n
-  `map.prototypeMode/prototypeBanner` e CSS `.map-layout .prototype-banner`
-  rimossi); (2) il contatore "X public records found" su /mappa era a 2px dal
-  bordo sinistro della card — ora ha lo stesso inset di 18px della riga
-  filtri (`.map-card .search-count`); (3) il bottone "Reset filters" della
-  variante panel finiva da solo su una seconda riga della griglia a 3 colonne
-  — ora `.map-card .filters-panel` è una griglia a 4 colonne
-  (kind/freshness/sort/reset su UNA riga, bottone allineato a destra
-  nell'ultima colonna auto; override responsive ≤980px/≤700px coerenti); (4)
-  la riga download GeoJSON/CSV è stata SPOSTATA da /mappa a /directory
-  (`.data-actions` da `MapPanel` a `DirectoryTool`, nuove chiavi
-  `directory.downloadGeoJson/downloadCsv/readDataPolicy` EN/IT; il tool mappa
-  non ha più il footer export). Regressione a11y intercettata dal gate
-  Lighthouse (t_9e8642a0): la griglia 4-colonne dichiarata DOPO le media
-  query responsive vinceva su mobile (stessa specificità, ultima regola) —
-  su ≤980px i filtri restavano su 4 colonne strette (kind-filter ~30px,
-  target-size WCAG 2.5.8 FAIL, accessibility 0.93) — ora la regola desktop è
-  scoped a `@media (min-width:981px)` così gli override ≤980px/≤700px
-  tornano a vincere; contrasto `.map-record-meta` #60737d→#546d78 (4.64:1 su
-  `.map-record.selected` #e4efe6, era 4.18 < 4.5:1). Test: asserzioni
-  aggiornate e nuove in
-  `tests/client-tools.test.mjs` (banner assente su /mappa, download presenti
-  solo su /directory), docs `FRONTEND_DESIGN.md` §6.2.6/§6.3.7 aggiornati.
+- `/mappa` CEO feedback 2026-08-02 (t_9e8642a0): (1) the "Prototype
+  mode" banner above the map was REMOVED — the page starts directly with the
+  map card, the map is no longer presented as a prototype (the
+  truthfulness stays in pageIntro and the in-list notes; i18n keys
+  `map.prototypeMode/prototypeBanner` and CSS `.map-layout .prototype-banner`
+  removed); (2) the "X public records found" counter on /mappa was 2px from the
+  card's left edge — it now has the same 18px inset as the filters
+  row (`.map-card .search-count`); (3) the "Reset filters" button of the
+  panel variant ended up alone on a second row of the 3-column grid
+  — now `.map-card .filters-panel` is a 4-column grid
+  (kind/freshness/sort/reset on ONE row, button aligned right
+  in the last auto column; coherent ≤980px/≤700px responsive overrides); (4)
+  the GeoJSON/CSV download row was MOVED from /mappa to /directory
+  (`.data-actions` from `MapPanel` to `DirectoryTool`, new keys
+  `directory.downloadGeoJson/downloadCsv/readDataPolicy` EN/IT; the map tool
+  no longer has the export footer). a11y regression caught by the Lighthouse
+  gate (t_9e8642a0): the 4-column grid declared AFTER the responsive media
+  queries won on mobile (same specificity, last rule) —
+  at ≤980px the filters stayed in 4 narrow columns (kind-filter ~30px,
+  WCAG 2.5.8 target-size FAIL, accessibility 0.93) — now the desktop rule is
+  scoped to `@media (min-width:981px)` so the ≤980px/≤700px overrides
+  win again; `.map-record-meta` contrast #60737d→#546d78 (4.64:1 on
+  `.map-record.selected` #e4efe6, was 4.18 < 4.5:1). Tests: updated and new
+  assertions in
+  `tests/client-tools.test.mjs` (banner absent on /mappa, downloads present
+  only on /directory), docs `FRONTEND_DESIGN.md` §6.2.6/§6.3.7 updated.
 
 - P1-1 `confirmationCountsFor()` D1 bound-parameter cap (t_b2d59dfc): a
   public camera page with more than 100 records used to build a single
@@ -624,8 +625,8 @@ changes accumulate under `[Unreleased]`.
   retention sweep — D1-only — could never collect). The storage key is a
   fresh UUID per attempt, so retries are idempotent: a failed attempt
   leaves no object behind and the retry stores exactly one.
-- ADR 0008 demo purge gate (audit CTO #7, R12, t_d7a4b99b): the guarantee
-  "demo mai esportati" (ADR 0008 decision 1 / retention schedule R12)
+- ADR 0008 demo purge gate (audit #7, R12, t_d7a4b99b): the guarantee
+  "demo never exported" (ADR 0008 decision 1 / retention schedule R12)
   previously rested on the manual pre-launch purge alone — a forgotten R12
   run would have served `status='demo'` prototype records to the public.
   Every public read surface now excludes demo records unless the
@@ -658,8 +659,8 @@ changes accumulate under `[Unreleased]`.
   (`<lan-ip>`, `<your-host>`, `<secrets-dir>`); `ops/oidc-secrets.sh`
   vault default is now the generic
   `~/.secrets` (override via `OIDC_VAULT_DIR`). Dev-only
-  `.claude/launch.json` removed; `tests/qa-funzionale-linus.test.mjs`
-  renamed `qa-funzionale.test.mjs` (no personal names in filenames).
+  `.claude/launch.json` removed; the funzionale QA test was renamed
+  `qa-funzionale.test.mjs` (no personal names in filenames).
   Historical note: the real D1 `database_id` and the pre-prod domain are
   present in past commits (pre-cleanup) — history was NOT rewritten.
 
@@ -674,27 +675,27 @@ changes accumulate under `[Unreleased]`.
   in-memory sliding window only when a binding is absent — local dev, the
   test suite, staging without the binding (documented in
   `docs/DEVELOPMENT_SETUP.md` §2.2). Binding thresholds mirror the current
-  per-family defaults (pending Ada sign-off); the env knobs remain the
+  per-family defaults (pending final sign-off); the env knobs remain the
   source of truth for the fallback and the unbound families. New
   `tests/rate-limit-binding.test.mjs` pins the selection logic and the
   429/Retry-After contract on both backends.
 
-- **Per-IP registration cap (P3-4, decisione CEO 2026-08-03, t_0941036b):**
-  max 5 tentativi di registrazione / 24h rolling per IP, enforced come
-  *stato quota* su D1 (`registrations_ip_log`, migration 0032) accanto al
-  bucket `auth` in-memory — che da solo non può reggere una finestra di 24h
-  tra isolate. Il 5° tentativo nella finestra risponde **429** con body
-  generico anti-enumeration + `Retry-After` (di fatto ≤ 4 account/IP/giorno;
-  un account-farm non può nemmeno sondare l'endpoint). L'attempt viene
-  riservato e contato in **un unico batch D1** (atomico, niente race), e
-  **rollbackato su ogni uscita non-201** (tentativi falliti non consumano
-  budget; il contratto no-write dei body malformati resta). Chiave =
-  **SHA-256 del caller key** (`cf-connecting-ip`), mai l'IP raw (privacy by
-  design, pattern `photos.submitter_key`). Finestra rolling → reset
-  automatico dopo 24h senza job di cleanup. Knob env
+- **Per-IP registration cap (P3-4, CEO decision 2026-08-03, t_0941036b):**
+  max 5 registration attempts / 24h rolling per IP, enforced as a
+  *quota state* on D1 (`registrations_ip_log`, migration 0032) alongside the
+  in-memory `auth` bucket — which alone cannot hold a 24h window
+  across isolates. The 5th attempt in the window answers **429** with a
+  generic anti-enumeration body + `Retry-After` (effectively ≤ 4
+  accounts/IP/day; an account farm cannot even probe the endpoint). The
+  attempt is reserved and counted in **a single atomic D1 batch** (no race),
+  and **rolled back on every non-201 exit** (failed attempts do not consume
+  budget; the no-write contract for malformed bodies remains). Key =
+  **SHA-256 of the caller key** (`cf-connecting-ip`), never the raw IP
+  (privacy by design, `photos.submitter_key` pattern). Rolling window →
+  automatic reset after 24h with no cleanup job. Env knobs
   `REGISTER_IP_RATE_LIMIT_MAX`/`_WINDOW_SECONDS` (default 5/86400).
-  Documentato in `docs/COMMUNITY_PLAN.md` §3.3; suite E2E dedicata
-  `tests/registration-ip-cap.test.mjs` (4 ok, 5a/6a 429, reset 24h, per-IP,
+  Documented in `docs/COMMUNITY_PLAN.md` §3.3; dedicated E2E suite
+  `tests/registration-ip-cap.test.mjs` (4 ok, 5a/6a 429, 24h reset, per-IP,
   hash-only, rollback, knob).
 
 - Moderation access control implemented and documented

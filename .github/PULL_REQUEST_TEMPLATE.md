@@ -1,87 +1,87 @@
 # Pull request
 
-> Template per la review di una PR (usato anche da Ada, CTO, come checklist
-> di review). Le PR che toccano UI/UX/componenti frontend sono soggette alla
-> sezione **Design compliance** — la source of truth del design system è
+> Template for PR review (also used by Ada, CTO, as the review checklist).
+> PRs touching UI/UX/frontend components are subject to the **Design
+> compliance** section — the design-system source of truth is
 > [`docs/FRONTEND_DESIGN.md`](../docs/FRONTEND_DESIGN.md) (v2, 2026-08-02).
 
 ## 1. Summary
 
-<!-- Cosa cambia e perché. Una o due frasi. Collega il task kanban. -->
+<!-- What changes and why. One or two sentences. Link the kanban task. -->
 
 ## 2. Test plan
 
-<!-- Cosa hai verificato e come (comandi, pagine, casi). Per UI: dev server +
-     browser; per API: curl/test. Nessuna modifica UI/UX va merged senza
-     verifica reale di rendering. -->
+<!-- What you verified and how (commands, pages, cases). For UI: dev server +
+     browser; for API: curl/test. No UI/UX change is merged without real
+     rendering verification. -->
 
 - [ ] Build: `npm run build` ✅
 - [ ] Type-check: `npx tsc --noEmit` ✅
 - [ ] Lint: `npm run lint` ✅
 - [ ] Test: `npm test` ✅
 
-## 3. Checklist di review
+## 3. Review checklist
 
-### Funzionale e dati
+### Functional and data
 
-- [ ] Il comportamento dichiarato nel summary è verificabile e verificato.
-- [ ] Nessun dato non-pubblico (`pending`, reviewer, account, evidence) è
-      esposto in UI, API, export o log (fail-closed).
-- [ ] Gli empty state sono truthfull: mai "nessuna telecamera esiste" —
-      solo "nessun record pubblicato trovato" (+ azione). La mappa non
-      sparisce mai con filtri a 0 risultati (`FRONTEND_DESIGN` D5).
-- [ ] I redirect legacy (`/#map`, `/#records`) restano client-side
-      (`LegacyAnchorRedirect`) — non tornare a un 302 server-side (D8).
+- [ ] The behaviour declared in the summary is verifiable and verified.
+- [ ] No non-public data (`pending`, reviewer, account, evidence) is
+      exposed in UI, API, export or logs (fail-closed).
+- [ ] Empty states are truthful: never "no camera exists" — only
+      "no published record found" (+ action). The map never disappears
+      with filters at 0 results (`FRONTEND_DESIGN` D5).
+- [ ] Legacy redirects (`/#map`, `/#records`) stay client-side
+      (`LegacyAnchorRedirect`) — do not go back to a server-side 302 (D8).
 
-### Codice e architettura (review Ada)
+### Code and architecture (Ada review)
 
-- [ ] Commit convenzionali (`feat|fix|docs|test|refactor(scope):`), uno scope
+- [ ] Conventional commits (`feat|fix|docs|test|refactor(scope):`), one scope
       per PR.
-- [ ] Commenti CSS/TSX spiegano il *perché*, citano task/decisione
-      (convenzione della codebase).
-- [ ] Pattern condivisi riusati, non duplicati: `FiltersBar`, `RecordCard`,
+- [ ] CSS/TSX comments explain the *why* and cite task/decision
+      (codebase convention).
+- [ ] Shared patterns are reused, not duplicated: `FiltersBar`, `RecordCard`,
       `EmptyState`, `PublicNav`, `ConfirmDialog`, status dot (§6.3).
-- [ ] i18n: bundle per dominio, nessuna stringa hardcodata, parità
-      type-checked (`Translation<typeof en>`).
+- [ ] i18n: per-domain bundles, no hardcoded strings, type-checked parity
+      (`Translation<typeof en>`).
 
 ### Design compliance (source: `docs/FRONTEND_DESIGN.md`)
 
-- [ ] **Token:** nessun nuovo hardcode di colore dove esiste un token; i
-      focus ring usano `var(--focus)` (mai `#0b705c` letterale); gli status
-      usano `--status-*`. Palette invariata (§3.1, Don't #10).
-- [ ] **Tipografia:** la scala §3.2 è rispettata (body 16px/1.5 esplicito;
-      h1/h2/h3 con i pesi 800/700 della scala). Niente font nuovi.
-- [ ] **Classi CSS:** ogni `className` introdotto è definito in
-      `app/globals.css` — zero classi usate-ma-mai-definite e zero no-op
-      (Don't #4). Nessuna regola nuova fuori da globals.css.
-- [ ] **Stato mai solo colore (WCAG 1.4.1):** status dot sempre abbinati a
-      label testuale localizzata (D7).
-- [ ] **Contrasto:** testo normale ≥ 4.5:1; i grigi secondari stanno nella
-      tabella §3.1 (≥ 4.5:1). Nessun grigio sotto soglia su testo piccolo.
-- [ ] **Focus:** `:focus-visible` visibile con `var(--focus)`; navigazione
-      da tastiera provata; nessun focus trap (D10).
-- [ ] **Touch target:** controlli ≥ 44×44px dove practical (WCAG 2.5.8);
-      niente target < 24px.
-- [ ] **Header/nav:** `PublicNav` a 6 link su tutte le pubbliche con
-      `aria-current`; header contestuali solo su auth/record/moderation/error
-      (D11, §2.3). Error pages: header ridotto voluto, nessun leak di
-      path/errore (D14).
-- [ ] **Responsive/mobile:** la mappa mobile usa il pannello sopra la mappa
-      (≤768px), mai bottom-sheet (D12); a 320px e zoom 200% non c'è scroll
-      orizzontale sui task core.
-- [ ] **Tono:** sobrio, civic-tech — niente estetica "poliziesca",
-      allarmismo, gradienti aggressivi, skeleton/spinner animati (Don't #1/#8).
-- [ ] **Reduced motion:** `prefers-reduced-motion` rispettato (Don't #11).
-- [ ] **Modifiche al design system** (token, scala, pattern, componenti
-      nuovi) sono documentate in `FRONTEND_DESIGN.md` nella stessa PR —
-      il documento è vincolante e va aggiornato prima del merge.
+- [ ] **Tokens:** no new colour hardcode where a token exists; focus rings
+      use `var(--focus)` (never literal `#0b705c`); statuses use
+      `--status-*`. Palette unchanged (§3.1, Don't #10).
+- [ ] **Typography:** the §3.2 scale is respected (body 16px/1.5 explicit;
+      h1/h2/h3 with the 800/700 weights of the scale). No new fonts.
+- [ ] **CSS classes:** every introduced `className` is defined in
+      `app/globals.css` — zero used-but-never-defined classes and zero no-ops
+      (Don't #4). No new rules outside globals.css.
+- [ ] **State never colour-only (WCAG 1.4.1):** status dots always paired with
+      a localised text label (D7).
+- [ ] **Contrast:** normal text ≥ 4.5:1; secondary greys stay in the §3.1
+      table (≥ 4.5:1). No grey below threshold on small text.
+- [ ] **Focus:** visible `:focus-visible` with `var(--focus)`; keyboard
+      navigation tested; no focus trap (D10).
+- [ ] **Touch targets:** controls ≥ 44×44px where practical (WCAG 2.5.8);
+      nothing below 24px.
+- [ ] **Header/nav:** `PublicNav` with 6 links on every public page with
+      `aria-current`; contextual headers only on auth/record/moderation/error
+      (D11, §2.3). Error pages: intentionally reduced header, no
+      path/error leak (D14).
+- [ ] **Responsive/mobile:** the mobile map uses the panel above the map
+      (≤768px), never a bottom-sheet (D12); at 320px and 200% zoom there is
+      no horizontal scroll on core tasks.
+- [ ] **Tone:** sober, civic-tech — no "police-aesthetic", alarmism,
+      aggressive gradients, animated skeleton/spinners (Don't #1/#8).
+- [ ] **Reduced motion:** `prefers-reduced-motion` respected (Don't #11).
+- [ ] **Design-system changes** (tokens, scale, patterns, new components) are
+      documented in `FRONTEND_DESIGN.md` in the same PR — the document is
+      binding and must be updated before merge.
 
-### Documentazione
+### Documentation
 
-- [ ] Documentazione aggiornata se comportamento/decisione/dato cambia
-      (`docs/STATUS.md`, `docs/FRONTEND_DESIGN.md`, SITEMAP, ADR).
-- [ ] Changelog aggiornato per le PR user-facing.
+- [ ] Documentation updated if behaviour/decision/data changes
+      (`docs/STATUS.md`, `docs/FRONTEND_DESIGN.md`, SITEMAP, ADRs).
+- [ ] Changelog updated for user-facing PRs.
 
-## 4. Esito
+## 4. Outcome
 
-<!-- A cura del reviewer: approve / changes-requested + note brevi. -->
+<!-- By the reviewer: approve / changes-requested + short notes. -->
