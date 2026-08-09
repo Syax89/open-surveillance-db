@@ -747,3 +747,85 @@ test("the QA fixtures never leak into public HTML (fictional data only)", async 
   assert.doesNotMatch(html, /s3cret/);
   assert.doesNotMatch(html, /Basic /);
 });
+
+// ---------------------------------------------------------------------------
+// 6bis. API-keys dialogs (epic api-keys T18): roles/aria, native buttons,
+// no --status-* token touch. The token guard (line ~224) still pins the
+// global --status-* values; these tests pin the DIALOG contracts.
+// ---------------------------------------------------------------------------
+
+test("api keys: create dialog is a modal dialog with native scope pill buttons (aria-pressed, never checkboxes)", async () => {
+  const rtl = await setupDom();
+  const { ApiKeyCreateDialog } = await loadDomModule("app/components/ApiKeyCreateDialog.mjs");
+  const { container } = rtl.render(await wrapWithLocale(React.createElement(
+    ApiKeyCreateDialog,
+    { open: true, busy: false, error: null, onCreate: () => {}, onCancel: () => {} },
+  )));
+
+  const dialog = container.querySelector('[role="dialog"]');
+  assert.ok(dialog, "the create surface must be a dialog");
+  assert.equal(dialog.getAttribute("aria-modal"), "true");
+  assert.ok(dialog.getAttribute("aria-labelledby"), "aria-labelledby must point at the title");
+  assert.ok(dialog.getAttribute("aria-describedby"), "aria-describedby must point at the body");
+
+  // Scope selector: NATIVE BUTTONS with aria-pressed — the checkboxes that
+  // failed WCAG 2.5.8 (#413) must never come back.
+  assert.equal(container.querySelectorAll('input[type="checkbox"]').length, 0, "scope selector must never use checkboxes");
+  const pills = [...container.querySelectorAll('button[aria-pressed]')];
+  assert.ok(pills.length >= 4, `expected the four scope pills, got ${pills.length}`);
+  for (const pill of pills) {
+    assert.ok(pill.textContent.trim().length > 0, "every scope pill must have a visible label");
+  }
+  // All four scopes default to selected (D4: default = all at mint).
+  assert.equal(pills.filter((p) => p.getAttribute("aria-pressed") === "true").length, pills.length);
+
+  // The name field is labelled and the actions are native buttons.
+  const nameInput = container.querySelector("#api-key-name");
+  assert.ok(nameInput, "the name input must exist");
+  const label = container.querySelector('label[for="api-key-name"]');
+  assert.ok(label && label.textContent.trim().length > 0, "the name input must have a visible label");
+  assert.ok(container.querySelector('button[type="button"].button-primary'), "the create action must be a native button");
+  rtl.cleanup();
+});
+
+test("api keys: reveal dialog is an alertdialog that ignores Escape (closing = key lost)", async () => {
+  const rtl = await setupDom();
+  const { ApiKeyRevealDialog } = await loadDomModule("app/components/ApiKeyRevealDialog.mjs");
+  let closed = false;
+  const { container } = rtl.render(await wrapWithLocale(React.createElement(
+    ApiKeyRevealDialog,
+    { open: true, keyValue: "osdb_FixtureRawKey", onClose: () => { closed = true; } },
+  )));
+
+  const dialog = container.querySelector('[role="alertdialog"]');
+  assert.ok(dialog, "the reveal surface must be an alertdialog");
+  assert.equal(dialog.getAttribute("aria-modal"), "true");
+  assert.ok(dialog.getAttribute("aria-labelledby"), "aria-labelledby must point at the title");
+  assert.ok(dialog.getAttribute("aria-describedby"), "aria-describedby must point at the body");
+
+  // The raw key is present as selectable code text (show-once discipline).
+  assert.ok(container.querySelector("code.api-key-raw"), "the raw key must be rendered as monospace text");
+
+  // Escape must NOT dismiss (RecoveryCodesDialog precedent): only the
+  // explicit "I saved it" acknowledgment closes.
+  rtl.fireEvent.keyDown(dialog, { key: "Escape" });
+  assert.equal(closed, false, "Escape must not close the reveal dialog");
+  assert.ok(container.querySelector('[role="alertdialog"]'), "the dialog must still be open after Escape");
+
+  const saved = container.querySelector('button[type="button"]');
+  assert.ok(saved, "the only close path is a native button");
+  rtl.cleanup();
+});
+
+test("api keys: the .api-key-* CSS block introduces no new design tokens", async () => {
+  // ZERO new tokens (ADR rule): the block may only REFERENCE the existing
+  // --* variables, never define new ones. The global --status-* guard above
+  // stays untouched.
+  const css = await readFile(path.join(root, "app", "globals.css"), "utf8");
+  const block = css.match(/\/\* API keys[\s\S]*?\n\/\* P1-1/);
+  assert.ok(block, "the .api-key-* block must exist between passkeys and the verification banner");
+  const definitions = block[0].match(/--[a-z0-9-]+\s*:/g) ?? [];
+  assert.deepEqual(definitions, [], `the api-key block must not define tokens, found: ${definitions.join(", ")}`);
+  // It may reference existing tokens.
+  assert.match(block[0], /var\(--/);
+});

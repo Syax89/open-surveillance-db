@@ -99,13 +99,14 @@ const passkeyFixture = {
   ],
 };
 
-function routeHandler({ me = profileFixture, contributions = contributionsFixture, passkeys = [] } = {}) {
+function routeHandler({ me = profileFixture, contributions = contributionsFixture, passkeys = [], keys = [] } = {}) {
   return (input) => {
     if (input === "/api/auth/me") return jsonResponse(me, { status: me === null ? 401 : 200 });
     if (typeof input === "string" && input.startsWith("/api/auth/me/contributions")) {
       return jsonResponse(contributions);
     }
     if (input === "/api/auth/passkey/credentials") return jsonResponse({ credentials: passkeys });
+    if (input === "/api/auth/keys") return jsonResponse({ keys });
     return jsonResponse({ error: "unexpected route" }, { status: 404 });
   };
 }
@@ -201,7 +202,8 @@ test("account: level badge at L4 omits the progress line (no next threshold)", a
 test("account: local status filter refetches with ?status= and keeps the URL clean", async () => {
   const { screen, waitFor } = rtl;
   const requests = [];
-  installFetchMock((input) => {
+  installFetchMock((input, init) => {
+      if (String(input) === "/api/auth/keys" && (init?.method ?? "GET") === "GET") return jsonResponse({ keys: [] });
     requests.push(input);
     if (input === "/api/auth/me") return jsonResponse(profileFixture);
     if (typeof input === "string" && input.startsWith("/api/auth/me/contributions")) {
@@ -245,7 +247,8 @@ test("account: local status filter refetches with ?status= and keeps the URL cle
 test("account: summary strip + Published status control (rework 2026-08-08)", async () => {
   const { screen, waitFor } = rtl;
   const requests = [];
-  installFetchMock((input) => {
+  installFetchMock((input, init) => {
+      if (String(input) === "/api/auth/keys" && (init?.method ?? "GET") === "GET") return jsonResponse({ keys: [] });
     requests.push(input);
     if (input === "/api/auth/me") return jsonResponse(profileFixture);
     if (typeof input === "string" && input.startsWith("/api/auth/me/contributions")) {
@@ -307,7 +310,8 @@ test("account: kind rows show icon tile, issue label, date and related-record li
 test("account: type filter refetches with ?type= (rework 2026-08-08)", async () => {
   const { screen, waitFor } = rtl;
   const requests = [];
-  installFetchMock((input) => {
+  installFetchMock((input, init) => {
+      if (String(input) === "/api/auth/keys" && (init?.method ?? "GET") === "GET") return jsonResponse({ keys: [] });
     requests.push(input);
     if (input === "/api/auth/me") return jsonResponse(profileFixture);
     if (typeof input === "string" && input.startsWith("/api/auth/me/contributions")) {
@@ -352,7 +356,8 @@ test("account: empty states — no contributions vs. filter without matches", as
 
   // Filter with no matches (total > 0, but the selected status is empty).
   const { screen: screen2 } = rtl;
-  installFetchMock((input) => {
+  installFetchMock((input, init) => {
+      if (String(input) === "/api/auth/keys" && (init?.method ?? "GET") === "GET") return jsonResponse({ keys: [] });
     if (input === "/api/auth/me") return jsonResponse(profileFixture);
     if (typeof input === "string" && input.startsWith("/api/auth/me/contributions")) {
       const url = new URL(input, "https://osdb.test");
@@ -386,7 +391,8 @@ test("account: pagination next/previous drive page= and the indicator carries ar
     pagination: { page: 2, pageSize: 25, total: 25, totalPages: 2, hasMore: false },
     level: profileFixture.level,
   };
-  installFetchMock((input) => {
+  installFetchMock((input, init) => {
+      if (String(input) === "/api/auth/keys" && (init?.method ?? "GET") === "GET") return jsonResponse({ keys: [] });
     if (input === "/api/auth/me") return jsonResponse(profileFixture);
     if (typeof input === "string" && input.startsWith("/api/auth/me/contributions")) {
       const url = new URL(input, "https://osdb.test");
@@ -413,7 +419,8 @@ test("account: pagination next/previous drive page= and the indicator carries ar
 
 test("account: contributions error renders the honest alert, list is not blanked", async () => {
   const { screen, waitFor } = rtl;
-  installFetchMock((input) => {
+  installFetchMock((input, init) => {
+      if (String(input) === "/api/auth/keys" && (init?.method ?? "GET") === "GET") return jsonResponse({ keys: [] });
     if (input === "/api/auth/me") return jsonResponse(profileFixture);
     if (typeof input === "string" && input.startsWith("/api/auth/me/contributions")) {
       return jsonResponse({ error: "boom" }, { status: 503 });
@@ -437,6 +444,7 @@ test("account: cancelling the delete confirm sends no DELETE", async () => {
   const user = rtl.userEvent.setup();
   const requests = [];
   installFetchMock((input, init) => {
+      if (String(input) === "/api/auth/keys" && (init?.method ?? "GET") === "GET") return jsonResponse({ keys: [] });
     requests.push({ input, init });
     if (input === "/api/auth/me") return jsonResponse(profileFixture);
     if (typeof input === "string" && input.startsWith("/api/auth/me/contributions")) {
@@ -467,6 +475,7 @@ test("account: confirming erasure DELETEs /api/auth/account with CSRF and shows 
   const user = rtl.userEvent.setup();
   const requests = [];
   installFetchMock((input, init) => {
+      if (String(input) === "/api/auth/keys" && (init?.method ?? "GET") === "GET") return jsonResponse({ keys: [] });
     requests.push({ input, init });
     if (input === "/api/auth/me") return jsonResponse(profileFixture);
     if (typeof input === "string" && input.startsWith("/api/auth/me/contributions")) {
@@ -500,6 +509,7 @@ test("account: display name inline edit — save PATCHes /api/auth/me with CSRF 
   const user = rtl.userEvent.setup();
   const requests = [];
   installFetchMock((input, init) => {
+      if (String(input) === "/api/auth/keys" && (init?.method ?? "GET") === "GET") return jsonResponse({ keys: [] });
     requests.push({ input, init });
     if (input === "/api/auth/me" && init.method === "PATCH") {
       return jsonResponse({
@@ -532,6 +542,7 @@ test("account: display name inline edit — invalid 1-char name marks aria-inval
   const user = rtl.userEvent.setup();
   const requests = [];
   installFetchMock((input, init) => {
+      if (String(input) === "/api/auth/keys" && (init?.method ?? "GET") === "GET") return jsonResponse({ keys: [] });
     requests.push({ input, init });
     return routeHandler()(input);
   });
@@ -555,6 +566,7 @@ test("account: display name inline edit — 429 maps to the localized rate-limit
   const { screen, waitFor } = rtl;
   const user = rtl.userEvent.setup();
   installFetchMock((input, init) => {
+      if (String(input) === "/api/auth/keys" && (init?.method ?? "GET") === "GET") return jsonResponse({ keys: [] });
     if (input === "/api/auth/me" && init.method === "PATCH") {
       return jsonResponse({ error: "Too many requests" }, { status: 429 });
     }
@@ -616,6 +628,7 @@ test("account: enrolling a passkey runs begin -> create -> complete and shows th
   const user = rtl.userEvent.setup();
   const requests = [];
   installFetchMock((input, init) => {
+      if (String(input) === "/api/auth/keys" && (init?.method ?? "GET") === "GET") return jsonResponse({ keys: [] });
     requests.push({ input, init });
     if (input === "/api/auth/me") return jsonResponse(profileFixture);
     if (typeof input === "string" && input.startsWith("/api/auth/me/contributions")) {
@@ -684,6 +697,7 @@ test("account: enrolling a passkey in a browser without WebAuthn shows an explan
   clearWebAuthnGlobals();
   const requests = [];
   installFetchMock((input, init) => {
+      if (String(input) === "/api/auth/keys" && (init?.method ?? "GET") === "GET") return jsonResponse({ keys: [] });
     requests.push({ input, init });
     if (input === "/api/auth/me") return jsonResponse(profileFixture);
     if (typeof input === "string" && input.startsWith("/api/auth/me/contributions")) {
@@ -717,6 +731,7 @@ test("account: cancelling the passkey remove confirm sends no DELETE", async () 
   const user = rtl.userEvent.setup();
   const requests = [];
   installFetchMock((input, init) => {
+      if (String(input) === "/api/auth/keys" && (init?.method ?? "GET") === "GET") return jsonResponse({ keys: [] });
     requests.push({ input, init });
     if (input === "/api/auth/me") return jsonResponse(profileFixture);
     if (typeof input === "string" && input.startsWith("/api/auth/me/contributions")) {
@@ -751,6 +766,7 @@ test("account: confirming the passkey remove DELETEs /api/auth/passkey/credentia
   const user = rtl.userEvent.setup();
   const requests = [];
   installFetchMock((input, init) => {
+      if (String(input) === "/api/auth/keys" && (init?.method ?? "GET") === "GET") return jsonResponse({ keys: [] });
     requests.push({ input, init });
     if (input === "/api/auth/me") return jsonResponse(profileFixture);
     if (typeof input === "string" && input.startsWith("/api/auth/me/contributions")) {
@@ -786,7 +802,8 @@ test("account: confirming the passkey remove DELETEs /api/auth/passkey/credentia
 test("account: a 409 on enroll completion shows the already-enrolled error, no recovery dialog", async () => {
   const { screen, waitFor } = rtl;
   const user = rtl.userEvent.setup();
-  installFetchMock((input) => {
+  installFetchMock((input, init) => {
+      if (String(input) === "/api/auth/keys" && (init?.method ?? "GET") === "GET") return jsonResponse({ keys: [] });
     if (input === "/api/auth/me") return jsonResponse(profileFixture);
     if (typeof input === "string" && input.startsWith("/api/auth/me/contributions")) {
       return jsonResponse(contributionsFixture);
@@ -822,7 +839,8 @@ test("account: a 409 on enroll completion shows the already-enrolled error, no r
 test("account: a 403 on enroll begin (expired CSRF) shows the actionable security-token error, not cross-site", async () => {
   const { screen, waitFor } = rtl;
   const user = rtl.userEvent.setup();
-  installFetchMock((input) => {
+  installFetchMock((input, init) => {
+      if (String(input) === "/api/auth/keys" && (init?.method ?? "GET") === "GET") return jsonResponse({ keys: [] });
     if (input === "/api/auth/me") return jsonResponse(profileFixture);
     if (typeof input === "string" && input.startsWith("/api/auth/me/contributions")) {
       return jsonResponse(contributionsFixture);
@@ -853,6 +871,7 @@ test("account: an unverified contributor sees the verification banner with a wor
   const user = rtl.userEvent.setup();
   const requests = [];
   installFetchMock((input, init) => {
+      if (String(input) === "/api/auth/keys" && (init?.method ?? "GET") === "GET") return jsonResponse({ keys: [] });
     const url = String(input);
     requests.push({ url, method: init?.method ?? "GET" });
     if (url === "/api/auth/me") {
@@ -888,7 +907,8 @@ test("account: an unverified contributor sees the verification banner with a wor
 
 test("account: a verified contributor sees the done line instead of the banner", async () => {
   const { screen, waitFor } = rtl;
-  installFetchMock((input) => {
+  installFetchMock((input, init) => {
+      if (String(input) === "/api/auth/keys" && (init?.method ?? "GET") === "GET") return jsonResponse({ keys: [] });
     if (input === "/api/auth/me") return jsonResponse(profileFixture);
     if (typeof input === "string" && input.startsWith("/api/auth/me/contributions")) {
       return jsonResponse(contributionsFixture);
@@ -901,4 +921,301 @@ test("account: a verified contributor sees the done line instead of the banner",
   await waitFor(() => assert.ok(screen.queryAllByText("Fixture Contributor").length >= 1));
   assert.ok(screen.getByText("Email verified — you can contribute."));
   assert.equal(screen.queryByRole("heading", { name: "Verify your email to contribute" }), null);
+});
+
+// ---------------------------------------------------------------------------
+// API keys (epic api-keys T18, plan §3.1/§3.5): the /account panel between
+// passkeys and the danger zone. Contract: GET /api/auth/keys (metadata
+// only), POST /api/auth/keys (201 with raw key once), DELETE
+// /api/auth/keys/[id] (soft revoke). Fixtures are fictitious.
+// ---------------------------------------------------------------------------
+
+const apiKeysFixture = [
+  {
+    id: 11,
+    name: "Nightly sync script",
+    keyPrefix: "osdb_AbC1dE",
+    scopes: ["submit", "action"],
+    createdAt: "2026-01-15T10:00:00.000Z",
+    lastUsedAt: "2026-02-20T08:00:00.000Z",
+    expiresAt: "2027-01-15T10:00:00.000Z",
+    revokedAt: null,
+  },
+  {
+    id: 12,
+    name: "Old integration",
+    keyPrefix: "osdb_XyZ9qR",
+    scopes: ["submit"],
+    createdAt: "2025-11-02T09:00:00.000Z",
+    lastUsedAt: null,
+    expiresAt: "2026-11-02T09:00:00.000Z",
+    revokedAt: "2026-03-01T12:00:00.000Z",
+  },
+];
+
+function accountHandler({ me = profileFixture, contributions = contributionsFixture, passkeys = [], keys = [] } = {}) {
+  return (input, init) => {
+    if (input === "/api/auth/me") return jsonResponse(me, { status: me === null ? 401 : 200 });
+    if (typeof input === "string" && input.startsWith("/api/auth/me/contributions")) {
+      return jsonResponse(contributions);
+    }
+    if (input === "/api/auth/passkey/credentials") return jsonResponse({ credentials: passkeys });
+    if (input === "/api/auth/keys" && (init?.method ?? "GET") === "GET") return jsonResponse({ keys });
+    return jsonResponse({ error: "unexpected route" }, { status: 404 });
+  };
+}
+
+test("account: api keys — empty state offers create + docs link", async () => {
+  const { screen, waitFor } = rtl;
+  installFetchMock(accountHandler());
+
+  await renderWithLocale(React.createElement(AccountPage));
+  await waitFor(() => assert.ok(screen.getByRole("heading", { name: "API keys" })));
+
+  assert.ok(screen.getByText("No API keys yet"));
+  assert.ok(screen.getByRole("button", { name: "Create API key" }));
+  const docsLink = screen.getByRole("link", { name: "Read the API documentation" });
+  assert.equal(docsLink.getAttribute("href"), "/api-docs");
+});
+
+test("account: api keys — rows render name, prefix, meta, scope badges and status", async () => {
+  const { screen, waitFor } = rtl;
+  installFetchMock(accountHandler({ keys: apiKeysFixture }));
+
+  await renderWithLocale(React.createElement(AccountPage));
+  await waitFor(() => assert.ok(screen.getByRole("heading", { name: "API keys" })));
+
+  // Active row: name + prefix chip + both scope labels + Active + Revoke.
+  assert.ok(screen.getByText("Nightly sync script"));
+  assert.ok(screen.getByText("osdb_AbC1dE…"));
+  assert.ok(screen.getByText("Submit reports and corrections"));
+  assert.ok(screen.getByText("Community actions"));
+  assert.ok(screen.getByText("Active"));
+  assert.ok(screen.getByRole("button", { name: "Revoke" }));
+  // Meta: created date + last used (formatPublicDate long-form).
+  assert.ok(screen.getByText("Created"));
+  assert.ok(screen.getByText("Last used"));
+  // Revoked row: muted, label Revoked, NO revoke action.
+  assert.ok(screen.getByText("Old integration"));
+  assert.ok(screen.getByText("Revoked"));
+  assert.ok(screen.getByText("Never used"));
+  assert.equal(screen.getAllByRole("button", { name: "Revoke" }).length, 1);
+});
+
+test("account: api keys — create dialog validates name (required, max 60)", async () => {
+  const { screen, waitFor } = rtl;
+  const user = rtl.userEvent.setup();
+  const requests = [];
+  installFetchMock((input, init) => {
+    requests.push({ input, init });
+    if (input === "/api/auth/me") return jsonResponse(profileFixture);
+    if (typeof input === "string" && input.startsWith("/api/auth/me/contributions")) {
+      return jsonResponse(contributionsFixture);
+    }
+    if (input === "/api/auth/passkey/credentials") return jsonResponse({ credentials: [] });
+    if (String(input) === "/api/auth/keys" && (init?.method ?? "GET") === "GET") return jsonResponse({ keys: [] });
+    return jsonResponse({ error: "unexpected route" }, { status: 404 });
+  });
+
+  await renderWithLocale(React.createElement(AccountPage));
+  await waitFor(() => assert.ok(screen.getByRole("heading", { name: "API keys" })));
+  await user.click(screen.getByRole("button", { name: "Create API key" }));
+
+  const dialog = await screen.findByRole("dialog");
+  assert.ok(dialog.getAttribute("aria-modal") === "true");
+  assert.ok(screen.getByRole("heading", { name: "Create an API key" }));
+
+  const nameInput = screen.getByLabelText("Key name");
+  // Empty name: the create button is disabled until valid.
+  const createButton = screen.getByRole("button", { name: "Create key" });
+  assert.equal(createButton.disabled, true);
+  await user.type(nameInput, "x");
+  assert.equal(createButton.disabled, false);
+  await user.clear(nameInput);
+  assert.equal(createButton.disabled, true);
+
+  // Too-long name (61 chars) surfaces the localized error and stays disabled.
+  await user.type(nameInput, "a".repeat(61));
+  assert.ok(screen.getByText("The name must be 60 characters or fewer."));
+  assert.equal(nameInput.getAttribute("aria-invalid"), "true");
+  assert.equal(createButton.disabled, true);
+});
+
+test("account: api keys — create success POSTs with CSRF, reveals raw key once, refetches on close", async () => {
+  const { screen, waitFor, within } = rtl;
+  const user = rtl.userEvent.setup();
+  const requests = [];
+  installFetchMock((input, init) => {
+    requests.push({ input, init });
+    if (input === "/api/auth/me") return jsonResponse(profileFixture);
+    if (typeof input === "string" && input.startsWith("/api/auth/me/contributions")) {
+      return jsonResponse(contributionsFixture);
+    }
+    if (input === "/api/auth/passkey/credentials") return jsonResponse({ credentials: [] });
+    if (String(input) === "/api/auth/keys" && (init?.method ?? "GET") === "GET") {
+      return jsonResponse({ keys: requests.some((r) => r.init?.method === "POST") ? [{ id: 21, name: "My script", keyPrefix: "osdb_NewKey", scopes: ["submit", "edit"], createdAt: "2026-08-09T10:00:00.000Z", lastUsedAt: null, expiresAt: "2027-08-09T10:00:00.000Z", revokedAt: null }] : [] });
+    }
+    if (input === "/api/auth/keys" && init?.method === "POST") {
+      return jsonResponse({
+        id: 21, name: "My script", keyPrefix: "osdb_NewKey",
+        key: "osdb_RawKeyValue123", scopes: ["submit", "edit"],
+        createdAt: "2026-08-09T10:00:00.000Z", expiresAt: "2027-08-09T10:00:00.000Z",
+      }, { status: 201 });
+    }
+    return jsonResponse({ error: "unexpected route" }, { status: 404 });
+  });
+  document.cookie = "osdb_csrf=fixture-csrf-token; path=/";
+
+  await renderWithLocale(React.createElement(AccountPage));
+  await waitFor(() => assert.ok(screen.getByRole("heading", { name: "API keys" })));
+  await user.click(screen.getByRole("button", { name: "Create API key" }));
+
+  // Default scope set = all four (D4); the user narrows to submit+edit.
+  const dialog = await screen.findByRole("dialog");
+  await user.type(screen.getByLabelText("Key name"), "My script");
+  await user.click(within(dialog).getByRole("button", { name: "Community actions" }));
+  await user.click(within(dialog).getByRole("button", { name: "Confirm cameras" }));
+  await user.click(screen.getByRole("button", { name: "Create key" }));
+
+  // POST carries name + narrowed scopes + CSRF echo.
+  await waitFor(() => assert.ok(requests.some((r) => r.input === "/api/auth/keys" && r.init?.method === "POST")));
+  const post = requests.find((r) => r.input === "/api/auth/keys" && r.init?.method === "POST");
+  assert.equal(post.init.headers["x-csrf-token"], "fixture-csrf-token");
+  assert.deepEqual(JSON.parse(post.init.body), { name: "My script", scopes: ["submit", "edit"] });
+
+  // Reveal-once dialog: alertdialog with the raw key, "I saved it" only close.
+  const reveal = await screen.findByRole("alertdialog");
+  assert.ok(reveal.getAttribute("aria-modal") === "true");
+  assert.ok(within(reveal).getByText("osdb_RawKeyValue123"));
+  assert.ok(within(reveal).getByRole("button", { name: "I saved it" }));
+
+  // Closing refetches the list: the new row appears (no second raw key shown).
+  await user.click(within(reveal).getByRole("button", { name: "I saved it" }));
+  await waitFor(() => assert.ok(screen.getByText("My script")));
+  assert.equal(screen.queryByText("osdb_RawKeyValue123"), null);
+  assert.equal(screen.queryByRole("alertdialog"), null);
+});
+
+test("account: api keys — 409 maps to the localized limit error inside the dialog", async () => {
+  const { screen, waitFor, within } = rtl;
+  const user = rtl.userEvent.setup();
+  installFetchMock((input, init) => {
+    if (input === "/api/auth/me") return jsonResponse(profileFixture);
+    if (typeof input === "string" && input.startsWith("/api/auth/me/contributions")) {
+      return jsonResponse(contributionsFixture);
+    }
+    if (input === "/api/auth/passkey/credentials") return jsonResponse({ credentials: [] });
+    if (String(input) === "/api/auth/keys" && (init?.method ?? "GET") === "GET") return jsonResponse({ keys: [] });
+    if (input === "/api/auth/keys" && init?.method === "POST") {
+      return jsonResponse({ error: "limit" }, { status: 409 });
+    }
+    return jsonResponse({ error: "unexpected route" }, { status: 404 });
+  });
+  document.cookie = "osdb_csrf=fixture-csrf-token; path=/";
+
+  await renderWithLocale(React.createElement(AccountPage));
+  await waitFor(() => assert.ok(screen.getByRole("heading", { name: "API keys" })));
+  await user.click(screen.getByRole("button", { name: "Create API key" }));
+  const dialog = await screen.findByRole("dialog");
+  await user.type(screen.getByLabelText("Key name"), "Fifth key");
+  await user.click(screen.getByRole("button", { name: "Create key" }));
+
+  await waitFor(() => assert.ok(within(dialog).getByRole("alert")));
+  assert.ok(within(dialog).getByText("You already have 5 API keys. Revoke one before creating another."));
+  // The dialog stays open so the user can act on the limit.
+  assert.ok(screen.getByRole("dialog"));
+});
+
+test("account: api keys — revoke cancel sends no DELETE; confirm DELETEs with CSRF and flips the row", async () => {
+  const { screen, waitFor, within } = rtl;
+  const user = rtl.userEvent.setup();
+  const requests = [];
+  installFetchMock((input, init) => {
+    requests.push({ input, init });
+    if (input === "/api/auth/me") return jsonResponse(profileFixture);
+    if (typeof input === "string" && input.startsWith("/api/auth/me/contributions")) {
+      return jsonResponse(contributionsFixture);
+    }
+    if (input === "/api/auth/passkey/credentials") return jsonResponse({ credentials: [] });
+    if (String(input) === "/api/auth/keys" && (init?.method ?? "GET") === "GET") {
+      return jsonResponse({ keys: requests.some((r) => r.init?.method === "DELETE") ? [{ ...apiKeysFixture[0], revokedAt: "2026-08-09T12:00:00.000Z" }] : [apiKeysFixture[0]] });
+    }
+    if (input === "/api/auth/keys/11" && init?.method === "DELETE") {
+      return jsonResponse({ ok: true });
+    }
+    return jsonResponse({ error: "unexpected route" }, { status: 404 });
+  });
+  document.cookie = "osdb_csrf=fixture-csrf-token; path=/";
+
+  await renderWithLocale(React.createElement(AccountPage));
+  await waitFor(() => assert.ok(screen.getByRole("heading", { name: "API keys" })));
+
+  // Cancel: confirm dialog opens, no DELETE is sent.
+  await user.click(screen.getByRole("button", { name: "Revoke" }));
+  const confirm = await screen.findByRole("alertdialog");
+  assert.ok(screen.getByRole("heading", { name: "Revoke this key?" }));
+  await user.click(within(confirm).getByRole("button", { name: "Cancel" }));
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.equal(requests.some((r) => String(r.input).startsWith("/api/auth/keys/") && r.init?.method === "DELETE"), false);
+  assert.ok(screen.getByRole("button", { name: "Revoke" }));
+
+  // Confirm: DELETE with CSRF, row flips to Revoked.
+  await user.click(screen.getByRole("button", { name: "Revoke" }));
+  const confirm2 = await screen.findByRole("alertdialog");
+  await user.click(within(confirm2).getByRole("button", { name: "Revoke" }));
+  await waitFor(() => assert.ok(requests.some((r) => r.input === "/api/auth/keys/11" && r.init?.method === "DELETE")));
+  const del = requests.find((r) => r.input === "/api/auth/keys/11" && r.init?.method === "DELETE");
+  assert.equal(del.init.headers["x-csrf-token"], "fixture-csrf-token");
+  await waitFor(() => assert.ok(screen.getByText("Revoked")));
+  assert.equal(screen.queryByRole("button", { name: "Revoke" }), null);
+});
+
+test("account: api keys — a 401 from the list flips the page to logged-out", async () => {
+  const { screen, waitFor } = rtl;
+  installFetchMock((input) => {
+    if (input === "/api/auth/me") return jsonResponse(profileFixture);
+    if (typeof input === "string" && input.startsWith("/api/auth/me/contributions")) {
+      return jsonResponse(contributionsFixture);
+    }
+    if (input === "/api/auth/passkey/credentials") return jsonResponse({ credentials: [] });
+    if (input === "/api/auth/keys") return jsonResponse({ error: "unauthorized" }, { status: 401 });
+    return jsonResponse({ error: "unexpected route" }, { status: 404 });
+  });
+
+  await renderWithLocale(React.createElement(AccountPage));
+  await waitFor(() => assert.ok(screen.queryByText("Not logged in")));
+  assert.ok(screen.getByText("Log in to see your profile and your attributed reports."));
+});
+
+test("account: api keys — without the Clipboard API the reveal dialog hides the copy button", async () => {
+  const { screen, waitFor, within } = rtl;
+  const user = rtl.userEvent.setup();
+  installFetchMock((input, init) => {
+    if (input === "/api/auth/me") return jsonResponse(profileFixture);
+    if (typeof input === "string" && input.startsWith("/api/auth/me/contributions")) {
+      return jsonResponse(contributionsFixture);
+    }
+    if (input === "/api/auth/passkey/credentials") return jsonResponse({ credentials: [] });
+    if (String(input) === "/api/auth/keys" && (init?.method ?? "GET") === "GET") return jsonResponse({ keys: [] });
+    if (input === "/api/auth/keys" && init?.method === "POST") {
+      return jsonResponse({
+        id: 31, name: "No clipboard", keyPrefix: "osdb_NoClip",
+        key: "osdb_ClipboardAbsent123", scopes: ["submit"],
+        createdAt: "2026-08-09T10:00:00.000Z", expiresAt: "2027-08-09T10:00:00.000Z",
+      }, { status: 201 });
+    }
+    return jsonResponse({ error: "unexpected route" }, { status: 404 });
+  });
+  // jsdom has no navigator.clipboard — the reveal dialog must degrade.
+  await renderWithLocale(React.createElement(AccountPage));
+  await waitFor(() => assert.ok(screen.getByRole("heading", { name: "API keys" })));
+  await user.click(screen.getByRole("button", { name: "Create API key" }));
+  const dialog = await screen.findByRole("dialog");
+  await user.type(screen.getByLabelText("Key name"), "No clipboard");
+  await user.click(screen.getByRole("button", { name: "Create key" }));
+
+  const reveal = await screen.findByRole("alertdialog");
+  assert.equal(within(reveal).queryByRole("button", { name: "Copy key" }), null);
+  assert.ok(within(reveal).getByText("osdb_ClipboardAbsent123"));
+  assert.ok(within(reveal).getByRole("button", { name: "I saved it" }));
 });

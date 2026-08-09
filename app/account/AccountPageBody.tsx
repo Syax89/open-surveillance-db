@@ -12,6 +12,7 @@ import { RecoveryCodesDialog } from "../components/RecoveryCodesDialog";
 import { LevelBadge } from "../components/LevelBadge";
 import type { TrustLevelMeta } from "../lib/trust-levels";
 import { browserSupportsWebAuthn, createCredential } from "../lib/webauthn-client";
+import { ApiKeysSection } from "./ApiKeysSection";
 
 /**
  * /account — extended contributor profile (COMMUNITY_PLAN §2.3, C5 + C6).
@@ -983,6 +984,13 @@ export default function AccountPageBody() {
                 <small className="auth-method-hint">{t.passkeyAddHelp}</small>
               </div>
             </details>
+
+            {/* API keys (api-keys epic T18): between passkeys and the danger
+                zone, per the plan §3.1. NOT a <details> — the key list
+                status must be visible at a glance. The section owns its
+                fetch (useApiKeys); a session loss flips the page to the
+                logged-out state like the other account fetches. */}
+            <ApiKeysSection onSessionLost={() => setContributor(null)} />
 
             {error ? <p className="auth-error" role="alert">{error}</p> : null}
 

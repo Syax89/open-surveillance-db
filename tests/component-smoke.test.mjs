@@ -96,6 +96,21 @@ const MODERATION_COMPONENTS = [
 ];
 
 /**
+ * Componenti attesi dal pannello API keys di /account (epic api-keys T18,
+ * piano §3.2): la sezione tra passkeys e danger zone è un orchestratore
+ * sottile che possiede lo stato (useApiKeys) e compone lista, dialog di
+ * creazione (pill scope aria-pressed, MAI checkbox) e dialog reveal-once
+ * (alertdialog, no Escape, copy once).
+ */
+const ACCOUNT_COMPONENTS = [
+  { name: "ApiKeysSection", file: "app/account/ApiKeysSection.tsx" },
+  { name: "ApiKeyList", file: "app/account/ApiKeyList.tsx" },
+  { name: "ApiKeyRow", file: "app/account/ApiKeyRow.tsx" },
+  { name: "ApiKeyCreateDialog", file: "app/components/ApiKeyCreateDialog.tsx" },
+  { name: "ApiKeyRevealDialog", file: "app/components/ApiKeyRevealDialog.tsx" },
+];
+
+/**
  * Deviazioni note dal target ~150, con baseline pinnata: il file NON deve
  * crescere oltre il numero di righe registrato al momento del pin. Qualsiasi
  * nuovo file oltre il target NON registrato qui fa fallire il test.
@@ -286,4 +301,49 @@ test("refactor moderation: DecisionForm e' importato dalle card che lo usano", a
       `atteso import di DecisionForm in ${file}`,
     );
   }
+});
+
+test("refactor account api-keys: i componenti del pannello esistono nei path previsti (T18)", async () => {
+  for (const { name, file } of ACCOUNT_COMPONENTS) {
+    const full = path.join(root, file);
+    await assert.doesNotReject(access(full), `atteso ${file} (componente ${name})`);
+  }
+});
+
+test("refactor account api-keys: nessun componente supera il target ~150 (T18)", async () => {
+  for (const { name, file } of ACCOUNT_COMPONENTS) {
+    const source = await readFile(path.join(root, file), "utf8");
+    const lines = countLines(source);
+    const deviation = KNOWN_DEVIATIONS.get(file);
+    if (deviation) {
+      assert.ok(
+        lines <= deviation.baselineLines,
+        `${name} (${file}): ${lines} righe > baseline registrata ${deviation.baselineLines} — la deviazione e' cresciuta (${deviation.reason})`,
+      );
+      console.log(`   [deviazione registrata] ${file}: ${lines} righe (> target ${MAX_COMPONENT_LINES}) — ${deviation.reason}`);
+    } else {
+      assert.ok(
+        lines <= MAX_COMPONENT_LINES,
+        `${name} (${file}): ${lines} righe > ${MAX_COMPONENT_LINES} (obiettivo refactor) — registrare in KNOWN_DEVIATIONS solo con baseline + motivo`,
+      );
+    }
+  }
+});
+
+test("refactor account api-keys: la sezione e' un orchestratore sottile che compone i dialog (T18)", async () => {
+  const source = await readFile(path.join(root, "app", "account", "ApiKeysSection.tsx"), "utf8");
+  // La sezione possiede lo stato (useApiKeys) e compone i dialog, non li
+  // definisce inline: import attesi verso lista + dialog.
+  for (const base of ["ApiKeyList", "ApiKeyCreateDialog", "ApiKeyRevealDialog", "ConfirmDialog"]) {
+    assert.match(
+      source,
+      new RegExp(`from\\s+["'].*${base}["']`),
+      `atteso import di ${base} in ApiKeysSection.tsx`,
+    );
+  }
+  // Il dialog di creazione usa pill scope native con aria-pressed: MAI
+  // checkbox (WCAG 2.5.8 issue #413 precedent).
+  const createDialog = await readFile(path.join(root, "app", "components", "ApiKeyCreateDialog.tsx"), "utf8");
+  assert.doesNotMatch(createDialog, /<input[^>]*type=["']checkbox["']/, "scope pill buttons, never checkboxes");
+  assert.match(createDialog, /aria-pressed=/, "scope pills carry aria-pressed");
 });
