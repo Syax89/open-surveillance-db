@@ -100,6 +100,13 @@ const expectedTables = [
   // db/reverse-geocode.ts + scripts/reverse-geocode-backfill.mjs; fresh DB
   // is empty by design (cache fills on demand / backfill).
   "geocode_reverse_cache",
+  // Per-contributor write API keys (0045, EPIC api-keys — ADR 0022, D1-D13):
+  // only the SHA-256 hex of the raw key is stored (never the key itself),
+  // `key_prefix` is the display-only 10-char handle, `scopes` is the
+  // code-validated JSON whitelist, `revoked_at`/`expires_at` kill a key even
+  // if its hash leaks. FK → contributors ON DELETE CASCADE (erasure, art.
+  // 17). A fresh DB must contain ZERO keys (created only via the mint POST).
+  "api_keys",
 ];
 // Indexes declared by the migrations.
 const expectedIndexes = [
@@ -194,6 +201,14 @@ const expectedIndexes = [
   // key (the PRIMARY KEY covers (lat, lng); the lng index serves sweeps
   // ordered by longitude, e.g. proximity windows during the backfill).
   "geocode_reverse_cache_lng_idx",
+  // Write API keys (0045, EPIC api-keys — D3/D5/D9): key_hash UNIQUE is the
+  // point lookup for every authenticated request (hash the Bearer, resolve);
+  // (contributor_id) serves the "my keys" list, cap-5 COUNT and the erasure
+  // cascade; (revoked_at, expires_at) serves the R21 retention sweep and the
+  // gate liveness predicate.
+  "api_keys_key_hash_unique",
+  "api_keys_contributor_idx",
+  "api_keys_liveness_idx",
 ];
 // Tables that are not application schema but legitimately appear in a local
 // D1 database. Anything outside this set is an unexpected schema change.
