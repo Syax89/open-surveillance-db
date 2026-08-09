@@ -409,7 +409,7 @@ verifications (DEPLOYMENT.md §"Local LXC deployment").
   does not allow adding `ssh-public-keys`/`password` post-create.
 - All operations (snapshot, rollback, backup, stop/start) use the **Proxmox
   API token**, decrypted at runtime from the local GPG vault
-  (`<secrets-dir>/proxmox-token.gpg`, path configurabile con `PVE_TOKEN_GPG`) — never hardcoded in scripts.
+  (`<secrets-dir>/proxmox-token.gpg`, path configurable via `PVE_TOKEN_GPG`) — never hardcoded in scripts.
 - Prerequisite on the machine running the scripts: `gpg` with the vault key,
   `curl`, `python3`.
 

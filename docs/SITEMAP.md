@@ -145,7 +145,7 @@ or `legal` bundle — legal content is a separate typed layer
 
 | Route          | Page                  | Purpose                                             | In home nav | In footer | Status |
 |----------------|-----------------------|-----------------------------------------------------|:---:|:---:|--------|
-| `/`            | Home (hub)            | Hero con ricerca directory + contenuto orientativo; static map teaser (`MapTeaser`) + four tool cards (`ToolCards`) | ✓ (brand) | ✓ (brand) | implemented |
+| `/`            | Home (hub)            | Hero with directory search + orienting content; static map teaser (`MapTeaser`) + four tool cards (`ToolCards`) | ✓ (brand) | ✓ (brand) | implemented |
 | `/mappa`       | Map                   | Interactive map (Leaflet) + viewport-synced sidebar list (t_702c10af), marker popups, filters, export, text fallback | ✓ (F3) | ✓ (F3) | implemented (F1, t_03c0fa15 / PR #158; redesign t_702c10af) |
 | `/directory`   | Directory             | Searchable text directory with filters, sort, count, pagination | ✓ (F3) | ✓ (F3) | implemented (F1, t_03c0fa15 / PR #158) |
 | `/segnala`     | Report a camera       | Guided private submission form (`noindex`)          | ✓ (F3, CTA) | ✓ (F3) | implemented (F1, t_03c0fa15 / PR #158) |
