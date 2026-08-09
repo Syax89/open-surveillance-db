@@ -83,6 +83,9 @@ test("reverse geocoding prefill: address input is controlled, shows the resolvin
   assert.equal(addressInput.value, "Via Roma 12", "the address input is controlled by the flow state");
   assert.equal(addressInput.getAttribute("placeholder"), "Resolving address…", "while the reverse lookup runs the placeholder says so");
   assert.equal(addressInput.getAttribute("aria-busy"), "true", "the input is marked busy during the lookup");
+  const status = container.querySelector(".report-form [role='status']");
+  assert.ok(status, "the reverse lookup is announced through a live region next to the field");
+  assert.ok(status.textContent.includes("Resolving address"), "the live region carries the resolving message");
 });
 
 test("reverse geocoding prefill: normal placeholder when idle, the flow marks user typing as touched", async () => {
@@ -102,6 +105,7 @@ test("reverse geocoding prefill: normal placeholder when idle, the flow marks us
   const addressInput = container.querySelector("input[name='address']");
   assert.equal(addressInput.getAttribute("placeholder"), "Street and city (optional)", "idle placeholder is the standard one");
   assert.equal(addressInput.getAttribute("aria-busy"), null, "not busy when idle");
+  assert.equal(container.querySelector(".report-form [role='status']"), null, "no live-region announcement when idle");
 
   // Simulate a keystroke: the flow marks the field touched so later
   // lookups never overwrite it.

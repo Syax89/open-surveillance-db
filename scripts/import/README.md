@@ -1,9 +1,9 @@
-# Import pipeline — FASE A infrastructure (scripts/import/)
+# Import pipeline — Phase A infrastructure (scripts/import/)
 
 Idempotent one-shot import runner for public camera datasets. Blueprint:
-`docs/data-sources/normalizzazione-pipeline.md` (FONTI PUBBLICHE #3,
-kanban t_6030d390). This directory is the FASE A common framework; the
-per-source adapters (FASE B, kanban t_c338e9df) live in
+`docs/data-sources/normalizzazione-pipeline.md` (PUBLIC SOURCES #3,
+kanban t_6030d390). This directory is the Phase A common framework; the
+per-source adapters (Phase B, kanban t_c338e9df) live in
 `scripts/import/adapters/` and plug into the contract below.
 
 ## Layout
@@ -13,7 +13,7 @@ per-source adapters (FASE B, kanban t_c338e9df) live in
 | `cli.mjs` | Operator CLI (`npm run import:run`, `import:rollback`) |
 | `runner.mjs` | The one-shot idempotent pipeline: descriptor → licence gate → batch → adapter → validate → dedup → chunked D1 writes → commit |
 | `rollback.mjs` | Whole-batch removal (only rows the batch itself inserted) |
-| `adapters.mjs` | Adapter loader (FASE B per-slug modules) + the `fixture` adapter for tests/offline staging |
+| `adapters.mjs` | Adapter loader (Phase B per-slug modules) + the `fixture` adapter for tests/offline staging |
 | `descriptor.mjs` | Descriptor load + structural validation (`docs/data-sources/imports/<slug>.json`) |
 | `normalize.mjs` | RAW row → canonical staged row (used by the fixture adapter; real adapters normalise themselves) |
 | `validate.mjs` | Hard minimums: coordinates, title/kind/external_id, direction range, record cap |
@@ -24,7 +24,7 @@ per-source adapters (FASE B, kanban t_c338e9df) live in
 | `licence-gate.mjs` | `--apply` hard gate: importable licences per the compatibility matrix |
 | `local-d1.mjs` | Local SQLite D1-compatible surface for offline runs (`--d1-path`) |
 
-## Adapter contract (shared with FASE B)
+## Adapter contract (shared with Phase B)
 
 An adapter is a per-source module at `scripts/import/adapters/<slug>.mjs`:
 

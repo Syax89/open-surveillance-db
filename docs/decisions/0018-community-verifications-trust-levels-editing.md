@@ -2,7 +2,7 @@
 
 - **Status:** accepted
 - **Date:** 2026-08-01
-- **Author:** Marie (Documentation), recording the consolidated community-system
+- **Author:** Simone Rondina (project owner), recording the consolidated community-system
   decisions from the project opinions (data #813, CTO #817, legal #818,
   docs #816, backend #822, QA #821, copy #814, design #815), superseded by
   the community-driven model in [ADR 0021](0021-community-driven-pivot.md)
@@ -224,8 +224,7 @@ Two facts shape everything below:
   frozen: "trust levels / livelli di fiducia", "verifications / verifiche",
   "confirmation / conferma" — never stars, badges, upvotes, tiers, rank, XP.
 - **Legal docs**: PRIVACY_NOTICE v0.8, TERMS_OF_USE v0.4, RETENTION_SCHEDULE
-  R14, LAWFUL_BASIS LIA §3.1, MODERATION.md edit section (C-legal phase,
-  Rosa).
+  R14, LAWFUL_BASIS LIA §3.1, MODERATION.md edit section (C-legal phase).
 - **Security posture**: community endpoints are browser-session-only (CSRF
   double-submit, same-origin); edge strips `x-osdb-user-email` / platform
   headers on these routes so moderation identity can never be spoofed into
@@ -256,7 +255,7 @@ Two facts shape everything below:
   identification risk and a documented product non-goal.
 - **Email verification as the confirm gate**: impossible (no mailer, ADR
   0013); replaced by the level ≥ 1 gate.
-- **`confidence_score` (weighted, Nora) in alpha**: rejected — v2, out of
+- **`confidence_score` (weighted) in alpha**: rejected — v2, out of
   alpha; no confidence column in the schema now.
 - **Profile as new `/profile` page**: rejected — `/account` is extended
   (design #815), keeping one account surface.

@@ -1,7 +1,7 @@
 # Personal data breach procedure (GDPR arts. 33-34)
 
 - **Status:** in force — personal open-source project, 2026-08-08
-- **Owner:** Rosa (Legal & Privacy Officer / privacy contact); containment coordinated with Ada (CTO)
+- **Owner:** Simone Rondina (project owner / privacy contact); containment coordinated with the project owner
 - **Scope:** any incident that leads to accidental or unlawful destruction, loss, alteration, or unauthorised disclosure of, or access to, personal data held by OpenSurveillanceDB — including published/withdrawn submissions, correction requests, and contributor identity data.
 
 > **Disclaimer:** this document is product guidance / not legal advice. The document is in force for the pilot jurisdiction (Italy); per-jurisdiction review remains the documented precondition for an EU-wide launch.
@@ -12,10 +12,10 @@
 
 | Role | Person | Duty |
 |------|--------------------|----|
-| **Privacy contact / first responder** | Rosa (Legal & Privacy Officer) | Receive reports, run triage, decide notifications, own the breach register |
-| **Technical containment** | Ada (CTO) | Stop the leak, preserve evidence, analyse root cause |
-| **Communication** | Marie (docs) | Internal/external statements under privacy-contact direction |
-| **Escalation** | Angelina (CEO) | High-risk incidents: approval of data-subject notification, external communication |
+| **Privacy contact / first responder** | Simone Rondina (project owner) | Receive reports, run triage, decide notifications, own the breach register |
+| **Technical containment** | Simone Rondina (project owner) | Stop the leak, preserve evidence, analyse root cause |
+| **Communication** | Simone Rondina (project owner) | Internal/external statements under privacy-contact direction |
+| **Escalation** | Simone Rondina (project owner) | High-risk incidents: approval of data-subject notification, external communication |
 | **On-call** | Monitored mailbox (`privacy@opensurveillancedb.org`, 24/7) + escalation to the roles above | Guarantee a response outside business hours |
 
 ## 2. Detection
@@ -49,7 +49,7 @@ Impact factors: data category (location data, evidence, identities rank higher),
 
 ## 4. Containment and recovery
 
-- Ada (CTO) leads: revoke/rotate credentials, take the affected route offline (e.g. disable the endpoint, apply auth — see H1/H2 mitigations), preserve logs and database state **before** remediation (Time Travel PITR can serve as evidence snapshot and rollback point), stop further exposure.
+- The project owner leads: revoke/rotate credentials, take the affected route offline (e.g. disable the endpoint, apply auth — see H1/H2 mitigations), preserve logs and database state **before** remediation (Time Travel PITR can serve as evidence snapshot and rollback point), stop further exposure.
 - For published-data incidents: hide affected records immediately (MODERATION_SLA.md emergency flow) pending review.
 - Communicate internally on a need-to-know basis; no public statements without the privacy contact.
 
@@ -87,7 +87,7 @@ Retention: **2 years** (aligned with the audit log, RETENTION_SCHEDULE.md R5/R9)
 
 ## 7. Post-incident review
 
-- Root-cause analysis with Ada; corrective actions tracked as tasks (this kanban board) with owners and deadlines.
+- Root-cause analysis; corrective actions tracked as tasks (this kanban board) with owners and deadlines.
 - Review this procedure and the privacy notice if the incident reveals gaps; report lessons to the advisory circle (../GOVERNANCE.md).
 - Aggregate breach statistics (counts by severity, no incident detail) feed the quarterly transparency report.
 
@@ -96,7 +96,7 @@ Retention: **2 years** (aligned with the audit log, RETENTION_SCHEDULE.md R5/R9)
 - **Internal alert:** `[BREACH] <severity> — <summary> — detected <timestamp> — owner <name>`.
 - **Garante notification:** structured per art. 33(3) — see 5.1.
 - **Data-subject notice:** plain-language email/page: what happened, what data, what we are doing, what they can do, contact.
-- **Public statement (only via Marie under privacy-contact direction):** factual, no speculation, no victim blaming, no unverified details.
+- **Public statement (only via the privacy contact):** factual, no speculation, no victim blaming, no unverified details.
 
 ---
 

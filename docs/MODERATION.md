@@ -46,7 +46,7 @@ Full mechanics: ADR 0021 § 3–§ 6; DATA_MODEL.md.
 ## Photo upload (removed 2026-08-08)
 
 The photo upload feature was **removed entirely** by CEO decision 2026-08-08
-("non lo voglio più, troppo rischioso e troppo esoso di spazio"): API routes
+("I no longer want it — too risky and too space-hungry"): API routes
 (`/api/photos`), the `photos` D1 table (migration `0043`), the R2 binding
 (`PHOTOS`), the UI, the photo moderation surface, the photo-level lifecycle
 (`pending`/`approved`/`rejected`, `redaction_confirmed`) and its legal copy

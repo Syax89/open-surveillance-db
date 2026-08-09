@@ -2,7 +2,7 @@
 
 - **Status:** accepted
 - **Date:** 2026-07-31
-- **Author:** Ada (architecture / database)
+- **Author:** Simone Rondina (project owner)
 - **Updates:** ADR 0001-public-data-boundary (interface strings are presentation-only and never affect API data).
 
 ## Context

@@ -16,9 +16,9 @@ in CI/deploy):
 
 ```bash
 PROVISION_ACCOUNTS='[
-  {"email":"ada@example.org","displayName":"Ada","role":"admin","reviewerRole":"administrator"},
-  {"email":"linus@example.org","displayName":"Linus","role":"moderator","reviewerRole":"record_reviewer"},
-  {"email":"grace@example.org","displayName":"Grace","role":"moderator","reviewerRole":"intake_reviewer"}
+  {"email":"alice@example.org","displayName":"Alice","role":"admin","reviewerRole":"administrator"},
+  {"email":"bob@example.org","displayName":"Bob","role":"moderator","reviewerRole":"record_reviewer"},
+  {"email":"carol@example.org","displayName":"Carol","role":"moderator","reviewerRole":"intake_reviewer"}
 ]' npm run db:provision            # local D1 (default)
 PROVISION_ACCOUNTS='[...]' npm run db:provision -- --remote   # alpha/prod D1
 ```
@@ -484,7 +484,7 @@ route family at runtime:
   `${PREFIX}_RATE_LIMIT_*` env knobs are **ignored** for these four families
   while a binding is present. `simple.period` accepts only 10 or 60 seconds;
   all current defaults are 60 s windows. The thresholds in `wrangler.jsonc`
-  mirror `ROUTE_LIMIT_DEFAULTS` (pending final sign-off by Ada, t_dff3dadf).
+  mirror `ROUTE_LIMIT_DEFAULTS` (pending final sign-off, t_dff3dadf).
   Locality note: limits are enforced per Cloudflare location (per
   datacenter), not globally — the documented platform behaviour, still a
   strict improvement over per-isolate buckets.

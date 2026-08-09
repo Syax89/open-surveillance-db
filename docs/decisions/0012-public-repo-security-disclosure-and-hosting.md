@@ -2,7 +2,7 @@
 
 - **Status:** accepted
 - **Date:** 2026-07-31
-- **Author:** Ken (DevSecOps) on decision of the CEO (Simone)
+- **Author:** Simone Rondina (project owner), on decision of the CEO
 - **Updates:** ADR 0002-legal-pre-launch-deliverables (contact address and
   disclosure commitments are now concrete, not placeholder).
 

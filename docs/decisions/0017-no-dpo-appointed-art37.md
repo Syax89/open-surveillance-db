@@ -4,7 +4,7 @@
   on board task t_06c4dc33 — if the CEO opts for a voluntary DPO, this ADR and the
   affected documents are revised
 - **Date:** 2026-08-01
-- **Author:** Rosa (Legal & Privacy Officer / privacy contact), recording the
+- **Author:** Simone Rondina (project owner), recording the
   GDPR art. 37 assessment
 - **Decision owner:** CEO
 - **Related ADRs:** 0008 (data licence, precision, retention, contact), 0011
@@ -56,7 +56,7 @@ reasons above; the decision is recorded here for accountability (art. 5(2),
 art. 24 GDPR).
 
 - The privacy/legal function continues to operate as the **privacy contact /
-  data-protection contact**: Rosa (Legal & Privacy Officer), reachable at
+  data-protection contact**: Simone Rondina (project owner), reachable at
   `privacy@opensurveillancedb.org` (PRIVACY_NOTICE § 1), with the rights,
   retention, breach, and processor procedures documented in `docs/legal/`.
 - All "DPO" references in **live** documents are replaced with the functional
@@ -64,7 +64,7 @@ art. 24 GDPR).
   Officer"). Archived records (ADRs 0004/0005/0008/0010/0011 and the review
   reports of 2026-07-31 / 2026-08-01) are historical and are left unchanged.
 - GOVERNANCE.md now names a **Privacy / legal contact (data-protection
-  contact): Rosa** — closing the governance gap that the audit flagged in
+  contact): Simone Rondina** — closing the governance gap that the audit flagged in
   parallel.
 - A **voluntary DPO (art. 37(4))** was considered and deliberately **not**
   taken: it would add a formally published role with supervisory-authority

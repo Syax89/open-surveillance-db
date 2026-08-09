@@ -55,6 +55,7 @@
   --map-surface:rgb(249 250 247);
   --map-canvas:rgb(216 222 210);
   --map-fallback-bg:rgb(244 241 232);
+  --map-tile-bg:rgb(232 236 233);
   --ink-2:rgb(67 89 99);
   --map-hint-ink:rgb(59 86 96);
   --marker:rgb(26 124 96);
@@ -733,7 +734,7 @@ button { cursor:pointer; }
    of the camera position + field of view. Same coherent-box family as the
    facts list — bordered, rounded, card bg. Non-interactive, so no zoom
    controls; the height keeps the ~35 m FOV cone legible. */
-.record-minimap { height:280px; margin:0 0 32px; border:1px solid var(--line); border-radius:var(--radius-lg); overflow:hidden; background:var(--map-tile-bg, #e8ece9); }
+.record-minimap { height:280px; margin:0 0 32px; border:1px solid var(--line); border-radius:var(--radius-lg); overflow:hidden; background:var(--map-tile-bg); }
 .record-minimap .fov-cone { pointer-events:none; }
 .record-minimap .fov-cone.active { stroke:var(--action); fill:var(--action); }
 .record-detail-actions { display:flex; gap:var(--space-3); flex-wrap:wrap; }
@@ -944,10 +945,10 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 .map-card .filters-panel .filter-controls-row { grid-template-columns:repeat(3, minmax(180px, 260px)); }
 /* Reset + place-search toggle align with the selects (same end edge, ≥44px
    target — WCAG 2.5.8). */
-.directory-tool .filter-controls-row > .text-button { grid-column:auto; align-self:end; min-height:40px; display:inline-flex; align-items:center; white-space:nowrap; margin-bottom:2px; }
+.directory-tool .filter-controls-row > .text-button { grid-column:auto; align-self:end; min-height:44px; display:inline-flex; align-items:center; white-space:nowrap; margin-bottom:2px; }
 .record-filter { max-width:260px; }
 .record-filter label { display:block; margin-bottom:5px; color:var(--ink-2); font-size:var(--text-xs); font-weight:800; }
-.record-filter select { width:100%; min-height:40px; border:1px solid var(--field-border); border-radius:var(--radius-md); padding:8px 11px; background:var(--white); color:var(--field-ink); font-size:var(--text-md); }
+.record-filter select { width:100%; min-height:44px; border:1px solid var(--field-border); border-radius:var(--radius-md); padding:8px 11px; background:var(--white); color:var(--field-ink); font-size:var(--text-md); }
 .record-filter select:focus { border-color:var(--control-focus); outline:3px solid var(--focus); outline-offset:2px; }
 /* /directory catalog (t_f13fcb1c): the VISIBLE results header between the
    controls and the list — h2 + count (role=status, historical id) on the

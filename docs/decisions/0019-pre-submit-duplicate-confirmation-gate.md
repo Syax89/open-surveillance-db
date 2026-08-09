@@ -2,7 +2,7 @@
 
 - **Status:** accepted
 - **Date:** 2026-08-02
-- **Author:** Linus (Backend/API)
+- **Author:** Simone Rondina (project owner)
 - **Related ADRs:** 0001 (public data boundary), 0008 (data licence,
   precision, retention), 0013 (contributor accounts and sessions),
   0018 (community verifications, trust levels and contribution editing)
@@ -106,7 +106,7 @@ rejected reports.
   client interaction tests for the checkbox flow and the implicit-submit
   guard.
 - **Review**: the UX choice (confirmation over hard block) and the threshold
-  (`high` only) are the two points Ada should weigh before merge.
+  (`high` only) are the two points to weigh before merge.
 
 ## Alternatives
 

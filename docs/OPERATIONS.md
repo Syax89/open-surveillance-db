@@ -276,12 +276,13 @@ scheduled it.
 
 | Role | Person | Task |
 |---|---|---|
-| On-call / first responder | Ken (CI/CD) | verify alert, initial triage |
-| Tech lead / decisions | Ada (CTO) | authorises rollback, restore, communication |
-| QA | Grace | post-mitigation verification on staging |
-| Maintainer / communication | Ada | public announcement if needed |
+| On-call / first responder | Simone Rondina (project owner) | verify alert, initial triage |
+| Tech lead / decisions | Simone Rondina (project owner) | authorises rollback, restore, communication |
+| QA | Simone Rondina (project owner) | post-mitigation verification on staging |
+| Maintainer / communication | Simone Rondina (project owner) | public announcement if needed |
 
-Escalation: Ken → Ada → (S1) immediate involvement of both roles.
+Escalation: the project owner covers all roles; (S1) immediate involvement
+of the on-call and tech-lead roles.
 
 ### 4.3 Phases
 
@@ -368,7 +369,7 @@ Rules:
 Before the first production deploy, confirm (tick when done):
 
 - [ ] GitHub secret `D1_DATABASE_ID`: real production D1 `database_id`
-      (iniettato al deploy dal workflow, mai nel repo).
+      (injected at deploy time by the workflow, never stored in the repo).
 - [ ] Migrations applied to the remote D1 (`wrangler d1 migrations apply ... --remote`).
 - [ ] GitHub secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
       (public deploy phase only — not needed for the local test
@@ -459,7 +460,7 @@ verifications (DEPLOYMENT.md §"Local LXC deployment").
   `osdb-sync-d1.sh` uses the same SSH path).
 - Lifecycle operations (snapshot, rollback, backup, stop/start) use the
   **Proxmox API token**, decrypted at runtime from the local GPG vault
-  (`<secrets-dir>/proxmox-token.gpg`, path configurabile con `PVE_TOKEN_GPG`) — never hardcoded in scripts.
+  (`<secrets-dir>/proxmox-token.gpg`, path configurable via `PVE_TOKEN_GPG`) — never hardcoded in scripts.
 - Code deploys/updates use SSH (`git fetch && git reset --hard origin/main`
   on the container — RELEASE_CHECKLIST.md §6), always after taking the
   pre-deploy snapshot (§8.4).
@@ -653,7 +654,7 @@ service).
 
 ## Appendix: verified commands
 
-All verifications executed on 2026-07-31 by Ken, locally, on `main`
+All verifications executed on 2026-07-31 by the project owner, locally, on `main`
 (commit 09f847d), Node 22, wrangler 4.118.0 (reproducible `npm ci`).
 
 | # | Procedure | Command | Real outcome |

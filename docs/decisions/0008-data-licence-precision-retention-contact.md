@@ -2,7 +2,7 @@
 
 - **Status:** accepted (CEO decision, 2026-07-31)
 - **Date:** 2026-07-31
-- **Author:** Rosa (DPO / privacy), recording the CEO decision
+- **Author:** Simone Rondina (project owner), recording the CEO decision
 - **Decision owner:** CEO
 - **Related ADRs:** 0002 (legal pre-launch deliverables), 0004 (retention
   schedule), 0005 (processors and data residency), 0010 (pilot boundary)
@@ -83,14 +83,14 @@ this matter to the project team.
 
 ## Consequences
 
-- **Implementation (ada):** ODbL notices in CSV/GeoJSON exports (O2) and the
+- **Implementation:** ODbL notices in CSV/GeoJSON exports (O2) and the
   SPDX short-form licence in `package.json` (O1) become pre-launch
   requirements; coordinate rounding to 4 decimals becomes the default in the
   intake/publication pipeline.
-- **Docs (marie):** the placeholders in the legal drafts are replaced with
+- **Documentation:** the placeholders in the legal drafts are replaced with
   `privacy@opensurveillancedb.org`; `docs/OPEN_SOURCE.md` and `docs/DATA_MODEL.md`
   are updated from "proposal"/"where necessary" to the decided defaults.
-- **Ops (ken):** the mailbox must be provisioned (TLD to be confirmed at
+- **Operations:** the mailbox must be provisioned (TLD to be confirmed at
   launch) and its operator named before the address is published; the
   retention cron job required by ADR 0004 remains a launch precondition.
 - **Review:** the 12-month cycle stays an initial value and must be revisited

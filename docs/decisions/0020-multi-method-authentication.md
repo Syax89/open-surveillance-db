@@ -2,9 +2,9 @@
 
 - **Status:** accepted
 - **Date:** 2026-08-02
-- **Author:** Ada (CTO / Architecture)
-- **Decision owner:** CEO (Simone) — the AUTH MULTI-METODO roadmap (phases A–G)
-  was commissioned by the CEO and is recorded here by Ada
+- **Author:** Simone Rondina (project owner)
+- **Decision owner:** CEO (Simone) — the AUTH MULTI-METHOD roadmap (phases A–G)
+  was commissioned by the CEO and is recorded here by the project owner
 - **Updates:** ADR 0013 (contributor accounts and sessions — the single
   email+password method is extended to three methods; the email+password
   baseline and its session/CSRF design are unchanged)
@@ -27,7 +27,7 @@ a verified contributor account for every submission.
 It explicitly deferred **email verification and password reset** because no
 outbound mailer existed.
 
-The auth-options research (Ken, t_530958a2; archived) scored passkeys, third-party
+The auth-options research (t_530958a2; archived) scored passkeys, third-party
 OIDC, self-hosted OIDC, magic links, TOTP and session hardening. Its
 recommendation was: harden the session stack and add opt-in TOTP first, add
 passkeys next, and treat **third-party OIDC as "not recommended"** because of
@@ -80,8 +80,8 @@ conclusion for three reasons:
   TTL: reset links die after 3 h** (`RESET_TOKEN_TTL_MS`) — the reset path is
   the higher-stakes target for a stolen link, so its window is intentionally
   tighter than the 24 h verification window. **Login gate
-  (t_6dc1c96f, option (a) — "finché non è attivato non è possibile fare
-  login"):** `POST /api/auth/login` refuses an account whose
+  (t_6dc1c96f, option (a) — "login is not possible until the account is
+  activated"):** `POST /api/auth/login` refuses an account whose
   `email_verified_at` is NULL with the **same generic 401** as unknown email
   / wrong password, so the response never reveals account existence
   (anti-enumeration, ADR 0013). The gate runs **after** the PBKDF2 check

@@ -13,18 +13,23 @@ OpenSurveillanceDB is intended to be a community-governed public-interest projec
 
 ## Named owners
 
-Initial owners were named by the CEO on 2026-07-31 as part of the Wave A pilot boundary work (execution board, item 4). These are the named, reachable owners for the pilot; where a responsibility is shared, every owner remains accountable.
+The project is a **personal open-source project** owned and maintained by
+**Simone Rondina** (GitHub: [Syax89](https://github.com/Syax89)). All
+owner and contact responsibilities below are held by the project owner;
+every other role is filled by community contributors under the published
+policies.
 
 | Role | Owner(s) |
 | --- | --- |
-| Maintainers | Simone (syax89) and Ada (CTO). Ada is the sole merge authority: every merge into `main` is performed by Ada. |
-| Operations owner | Ken |
-| Data stewards | Linus and Grace |
-| Security contact | Ken — private reporting route in [SECURITY.md](SECURITY.md) |
-| Moderation contact | Grace |
-| Privacy / legal contact (data-protection contact) | Rosa (Legal & Privacy Officer) |
+| Maintainers (code, releases, infrastructure changes) | Simone Rondina (Syax89) — sole merge authority into `main` |
+| Operations owner | Simone Rondina (Syax89) |
+| Data stewards | Simone Rondina (Syax89) |
+| Security contact | Simone Rondina (Syax89) — private reporting route in [SECURITY.md](SECURITY.md) |
+| Moderation contact | Simone Rondina (Syax89) |
+| Privacy / legal contact (data-protection contact) | Simone Rondina (Syax89) — `privacy@opensurveillancedb.org` |
 
-These are initial nominations for the pilot, not a claim that the full public governance structure already exists.
+These are the initial nominations for the pilot, not a claim that the full
+public governance structure already exists.
 
 ## Decision making
 
