@@ -95,14 +95,15 @@ declare module "cloudflare:workers" {
     ENVIRONMENT?: string;
     /** Email Service binding (wrangler.jsonc `send_email`, name EMAIL). */
     EMAIL?: SendEmail;
-    /** Rate-limiter bindings for the four critical public route families
-     * (auth, write, read, tiles). Optional: when absent the route layer
+    /** Rate-limiter bindings for the five critical public route families
+     * (auth, write, read, tiles, geocode). Optional: when absent the route layer
      * falls back to the in-memory per-isolate limiter (local dev / tests —
      * never the public API). See app/lib/rate-limit.ts. */
     AUTH_LIMITER?: RateLimit;
     WRITE_LIMITER?: RateLimit;
     READ_LIMITER?: RateLimit;
     TILES_LIMITER?: RateLimit;
+    GEOCODE_LIMITER?: RateLimit;
     IMAGES: {
       input(stream: ReadableStream): {
         transform(options: Record<string, unknown>): {

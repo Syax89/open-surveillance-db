@@ -133,6 +133,8 @@ export const en = {
   pageOf: (page: number, totalPages: number) => `Page ${page} of ${totalPages}`,
   contributionsNavigation: "Contributions navigation",
   contributionStatusFilter: "Filter contributions by status",
+  contributionFilters: "Filter contributions",
+  clearContributionFilters: "Clear filters",
   // Anonymous verification gate (C5): the record detail shows the toggle
   // but disables it with this explanatory copy — the server answers 401
   // without a session, so the button never pretends to work.
@@ -343,6 +345,8 @@ export const it: Translation<typeof en> = {
   pageOf: (page: number, totalPages: number) => `Pagina ${page} di ${totalPages}`,
   contributionsNavigation: "Navigazione contributi",
   contributionStatusFilter: "Filtra i contributi per stato",
+  contributionFilters: "Filtra contributi",
+  clearContributionFilters: "Azzera filtri",
   // Gate anonimo delle verifiche (C5): il dettaglio record mostra il toggle
   // ma lo disabilita con questo copy esplicativo — il server risponde 401
   // senza sessione, quindi il bottone non finge mai di funzionare.

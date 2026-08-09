@@ -473,6 +473,12 @@ export default function AccountPageBody() {
     setPage(1);
   }
 
+  function clearContributionFilters() {
+    setFilter("all");
+    setTypeFilter("all");
+    setPage(1);
+  }
+
   function goToPage(next: number) {
     if (pagination && next >= 1 && next <= pagination.totalPages) setPage(next);
   }
@@ -758,49 +764,46 @@ export default function AccountPageBody() {
                 </div>
               ) : null}
 
-              {/* Type filter (account rework 2026-08-08): the API always
-                  supported type=camera|correction; the UI now exposes
-                  it — the two kinds are filterable and never mixed
-                  silently. Same local-state rule as the status filters. */}
-              <div
-                className="contributions-filters"
-                role="group"
-                aria-label={community.typeFilterLabel}
-              >
-                {TYPE_FILTERS.map((key) => (
-                  <button
-                    key={key}
-                    type="button"
-                    className={`filter-chip${typeFilter === key ? " active" : ""}`}
-                    aria-pressed={typeFilter === key}
-                    onClick={() => selectTypeFilter(key)}
+              {/* The contribution query remains local to the private profile,
+                  but one native fieldset replaces two dense rows of chips:
+                  both dimensions stay explicit, compact and keyboard-native. */}
+              <fieldset className="contributions-filter-bar">
+                <legend>{community.contributionFilters}</legend>
+                <div className="contribution-filter-field">
+                  <label htmlFor="contribution-type-filter">{community.typeFilterLabel}</label>
+                  <select
+                    id="contribution-type-filter"
+                    value={typeFilter}
+                    onChange={(event) => selectTypeFilter(event.target.value as TypeFilter)}
                   >
-                    {community.typeFilters[key]}
-                  </button>
-                ))}
-              </div>
-
-              {/* Local status filters (never in the URL — private page). */}
-              <div
-                className="contributions-filters"
-                role="group"
-                aria-label={community.contributionStatusFilter}
-              >
-                {STATUS_FILTERS.map((key) => (
-                  <button
-                    key={key}
-                    type="button"
-                    className={`filter-chip${filter === key ? " active" : ""}`}
-                    aria-pressed={filter === key}
-                    onClick={() => selectFilter(key)}
+                    {TYPE_FILTERS.map((key) => (
+                      <option key={key} value={key}>{community.typeFilters[key]}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="contribution-filter-field">
+                  <label htmlFor="contribution-status-filter">{community.contributionStatusFilter}</label>
+                  <select
+                    id="contribution-status-filter"
+                    value={filter}
+                    onChange={(event) => selectFilter(event.target.value as StatusFilter)}
                   >
-                    {community.statusFilters[key]}
-                    {summary && key !== "all" && summary.byStatus[key] !== undefined ? (
-                      <span className="filter-chip-count">{summary.byStatus[key]}</span>
-                    ) : null}
+                    {STATUS_FILTERS.map((key) => {
+                      const count = key === "all" ? undefined : summary?.byStatus[key];
+                      return (
+                        <option key={key} value={key}>
+                          {`${community.statusFilters[key]}${count === undefined ? "" : ` (${count})`}`}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+                {filter !== "all" || typeFilter !== "all" ? (
+                  <button className="text-button contribution-filter-reset" type="button" onClick={clearContributionFilters}>
+                    {community.clearContributionFilters}
                   </button>
-                ))}
-              </div>
+                ) : null}
+              </fieldset>
 
               {contributionsError ? (
                 <p className="auth-error" role="alert">{community.errorLoadContributions}</p>

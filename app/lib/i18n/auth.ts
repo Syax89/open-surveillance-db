@@ -91,12 +91,14 @@ export const en = {
   errorDisplayName: "The display name must be between 2 and 60 characters.",
   errorDisplayNameRateLimit: "Too many attempts. Please try again in a minute.",
   errorDisplayNameGeneric: "Could not save the display name. Please try again.",
-  // Multi-method auth (Fase E2 — design review): the three sign-in blocks on
-  // /login are ALL visible at once (CEO 2026-08-08), stacked in the order
-  // passkey → email + password → social. Each block carries its own submit.
+  // Multi-method auth (Fase E2 — single-tile login): email + password is the
+  // primary flow. Passkey and configured OIDC providers remain visible below
+  // a localized divider as alternatives within the same auth card.
   methodPassword: "Email + password",
   methodPasskey: "Passkey",
-  methodSocialTitle: "Google",
+  methodSocialTitle: "Sign in with a provider",
+  loginOr: "or",
+  loginAlternatives: "Other ways to sign in",
   // Passkey login (Fase C).
   passkeyLogin: "Sign in with passkey",
   passkeyEmailOptional: "Account email (optional)",
@@ -322,12 +324,14 @@ export const it: Translation<typeof en> = {
   errorDisplayName: "Il nome visualizzato deve essere tra 2 e 60 caratteri.",
   errorDisplayNameRateLimit: "Troppi tentativi. Riprova tra un minuto.",
   errorDisplayNameGeneric: "Non è stato possibile salvare il nome visualizzato. Riprova.",
-  // Autenticazione multi-metodo (Fase E2 — design review): i tre blocchi di
-  // accesso su /login sono TUTTI visibili insieme (CEO 2026-08-08), impilati
-  // nell'ordine passkey → email e password → social. Ogni blocco ha il suo submit.
+  // Autenticazione multi-metodo (Fase E2 — login in una sola tile): email e
+  // password sono il flusso principale. Passkey e fornitori OIDC configurati
+  // restano visibili sotto un divisore localizzato come alternative nella stessa card.
   methodPassword: "Email e password",
   methodPasskey: "Passkey",
-  methodSocialTitle: "Google",
+  methodSocialTitle: "Accedi con un provider esterno",
+  loginOr: "oppure",
+  loginAlternatives: "Altri modi per accedere",
   // Accesso con passkey (Fase C).
   passkeyLogin: "Accedi con passkey",
   passkeyEmailOptional: "Email dell'account (facoltativa)",

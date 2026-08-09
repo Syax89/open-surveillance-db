@@ -48,6 +48,8 @@ export const en = {
   unknown: "Unknown",
   apiUnavailable:
     "The public API is temporarily unreachable, so the map is showing illustrative records.",
+  apiRateLimited: (seconds: number) =>
+    `The map is temporarily pausing new data requests to respect the service limit. It will retry in about ${seconds} seconds; already loaded points remain available.`,
   // Truthful empty state (never a silent map).
   emptyTitle: "No published record matches those filters.",
   emptyBody:
@@ -74,6 +76,8 @@ export const en = {
   geocodeNoResults: (query: string) => `No results for “${query}”`,
   geocodeAttribution: "Places © OpenStreetMap contributors",
   geocodeUnavailable: "Place search is temporarily unavailable.",
+  geocodeRateLimited: (seconds: number) =>
+    `Place search has reached its short request limit. Try again in about ${seconds} seconds; filtering the points already on the map still works.`,
   listTitle: "Points in the current view",
   listMapSyncHelp: "The list updates as you move or zoom the map: zoom in to narrow it, zoom out to widen it.",
   listCount: (visible: number, total: number) =>
@@ -155,6 +159,8 @@ export const it: Translation<typeof en> = {
   unknown: "Sconosciuto",
   apiUnavailable:
     "L'API pubblica è temporaneamente non raggiungibile: la mappa mostra record illustrativi.",
+  apiRateLimited: (seconds: number) =>
+    `La mappa mette temporaneamente in pausa le nuove richieste dati per rispettare il limite del servizio. Riproverà tra circa ${seconds} secondi; i punti già caricati restano disponibili.`,
   // Stato vuoto truthful (mai una mappa muta).
   emptyTitle: "Nessun record pubblicato corrisponde a questi filtri.",
   emptyBody:
@@ -181,6 +187,8 @@ export const it: Translation<typeof en> = {
   geocodeNoResults: (query: string) => `Nessun risultato per “${query}”`,
   geocodeAttribution: "Luoghi © OpenStreetMap contributors",
   geocodeUnavailable: "La ricerca dei luoghi non è al momento disponibile.",
+  geocodeRateLimited: (seconds: number) =>
+    `La ricerca dei luoghi ha raggiunto il limite temporaneo di richieste. Riprova tra circa ${seconds} secondi; puoi comunque filtrare i punti già presenti sulla mappa.`,
   listTitle: "Punti nella vista corrente",
   listMapSyncHelp:
     "L'elenco si aggiorna mentre muovi o zoomi la mappa: ingrandendo si restringe, rimpicciolendo si allarga.",

@@ -67,7 +67,7 @@ export function MappaTool() {
   // Viewport-bounded data layer (t_bb310428): only the records inside the
   // current map bounds are requested; the merged store feeds the same
   // filter/list pipeline as before.
-  const { records, loading } = useViewportCameras({
+  const { records, loading, error: viewportError } = useViewportCameras({
     bounds: viewportBounds,
     filters: serverFiltersFrom(filters),
     // ?focus= deep link: the hook resolves the record even when it is
@@ -85,6 +85,7 @@ export function MappaTool() {
     // next[0].id. It only commits a pending focus from the URL.
     onRecords: () => setSelectedId((current) => (filters.focus !== null ? filters.focus : current)),
     onError: () => setNotice(t.apiUnavailable),
+    onRateLimited: (seconds) => setNotice(t.apiRateLimited(seconds)),
   });
 
   const filteredRecords = useMemo(() => applyCameraFilters(records, filters), [records, filters]);
@@ -198,7 +199,7 @@ export function MappaTool() {
               the sidebar unconditionally. When no record matches the
               filters the sidebar shows the truthful in-list note; the map itself never
               disappears. */}
-          <MapPanel filteredRecords={filteredRecords} visibleRecords={visibleRecords} selectedId={selectedId} onSelect={setSelectedId} onPick={() => {}} coordinates={explorerFocusLocation} selectedCamera={selectedCamera} loading={loading} notice={notice} directoryHref={directoryHref} onBoundsChange={handleBoundsChange} />
+          <MapPanel filteredRecords={filteredRecords} visibleRecords={visibleRecords} selectedId={selectedId} onSelect={setSelectedId} onPick={() => {}} coordinates={explorerFocusLocation} selectedCamera={selectedCamera} loading={loading} notice={viewportError ? notice : ""} directoryHref={directoryHref} onBoundsChange={handleBoundsChange} />
         </div>
       </div>
     </section>

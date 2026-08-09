@@ -75,6 +75,7 @@ const FERRARA_SUGGESTIONS = {
 let rtl;
 let MappaTool;
 let GeocodeSearch;
+let __resetGeocodePending;
 let useCameraFilters;
 let __resetPublicCamerasCache;
 
@@ -93,7 +94,9 @@ const installGeocodeCountingMock = () => installFetchMock((input) => {
 before(async () => {
   rtl = await setupDom();
   MappaTool = (await loadDomModule("app/components/tools/MappaTool.mjs")).MappaTool;
-  GeocodeSearch = (await loadDomModule("app/components/home/GeocodeSearch.mjs")).GeocodeSearch;
+  const geocodeMod = await loadDomModule("app/components/home/GeocodeSearch.mjs");
+  GeocodeSearch = geocodeMod.GeocodeSearch;
+  __resetGeocodePending = geocodeMod.__resetGeocodePending;
   useCameraFilters = (await loadDomModule("app/lib/use-camera-filters.mjs")).useCameraFilters;
   const camerasMod = await loadDomModule("app/lib/use-public-cameras.mjs");
   __resetPublicCamerasCache = camerasMod.__resetPublicCamerasCache;
@@ -102,6 +105,8 @@ before(async () => {
 
 afterEach(async () => {
   geocodeFetches = 0;
+  __resetGeocodePending();
+  installGeocodeCountingMock();
   rtl?.cleanup();
   __resetPublicCamerasCache();
   // Reset the navigation stub INCLUDING failReplace (a test that flips it
@@ -184,6 +189,38 @@ test("t_3c4b188e: failReplace + clear commits the URL via the pure-history path 
   assert.equal(geocodeFetches, 1, "clearing the search must NOT fire another geocode fetch (empty branch aborts)");
   assert.ok(screen.getByRole("combobox", { name: /Filter the points in the current view or search a place/ }), "the tree is still alive after clearing");
   assert.equal(nav.replaced.length, 0, "router.replace never succeeded (failReplace) — the fallback path wrote the URL");
+});
+
+test("a geocode 429 announces Retry-After and suppresses new autocomplete traffic during the cooldown", async () => {
+  let calls = 0;
+  installFetchMock((input) => {
+    if (String(input).startsWith("/api/geocode")) {
+      calls += 1;
+      return new Response(JSON.stringify({ error: "Too many place searches" }), {
+        status: 429,
+        headers: { "Content-Type": "application/json", "Retry-After": "60" },
+      });
+    }
+    return jsonResponse(fakeCamerasPayload(POPUP_RECORDS));
+  });
+  const { screen, waitFor } = rtl;
+  const user = rtl.userEvent.setup();
+  await renderWithLocale(React.createElement(GeocodeSearch, {
+    search: "", onSearchChange: () => {}, onPlaceSelect: () => {},
+  }));
+
+  const input = screen.getByRole("combobox", { name: /Filter the points in the current view or search a place/ });
+  await user.type(input, "Ferrara");
+  await waitFor(
+    () => assert.ok(screen.getByText(/Place search has reached its short request limit/)),
+    { timeout: 5_000 },
+  );
+  assert.equal(calls, 1, "the first completed autocomplete is the one that receives 429");
+
+  await user.type(input, "x");
+  await new Promise((resolve) => setTimeout(resolve, 350));
+  assert.equal(calls, 1, "typing during Retry-After still filters locally but must not make another upstream request");
+  assert.equal(input.value, "Ferrarax", "the local input remains editable during the cooldown");
 });
 
 // ---------------------------------------------------------------------------

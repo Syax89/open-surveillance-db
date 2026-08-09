@@ -217,10 +217,27 @@ export async function GET(request: Request) {
     );
   }
 
-  // Per-caller geocode bucket (default 30/min, GEOCODE_RATE_LIMIT_* knobs).
-  // Metering happens before the cache lookup so a caller cannot use cache
-  // hits to dodge the throttle: bulk scraping of fresh queries would
-  // otherwise hammer the community geocoder past its usage policy.
+  const cache = geocodeCache();
+  // Cache key = the exact request URL (same pattern as the tile proxy); a
+  // plain Request built from the URL is the stable, portable cache key.
+  const cacheKey = new Request(request.url);
+  if (cache) {
+    try {
+      const cached = await cache.match(cacheKey);
+      if (cached) {
+        const headers = new Headers(cached.headers);
+        headers.set("X-Geocode-Cache", "hit");
+        return new Response(cached.body, { status: cached.status, headers });
+      }
+    } catch (error) {
+      console.error("geocode cache lookup failed", error);
+    }
+  }
+
+  // Only a cache MISS can reach the upstream geocoder, so only misses spend
+  // the caller's geocode budget. This preserves the anti-abuse bound for new
+  // searches while allowing an already-cached place to remain usable after a
+  // user has explored the map heavily.
   const key = callerKey(request, env);
   const limitOptions = geocodeLimits(env);
   const limit = await checkRateLimit(env, "geocode", key, limitOptions);
@@ -241,23 +258,6 @@ export async function GET(request: Request) {
         },
       },
     );
-  }
-
-  const cache = geocodeCache();
-  // Cache key = the exact request URL (same pattern as the tile proxy); a
-  // plain Request built from the URL is the stable, portable cache key.
-  const cacheKey = new Request(request.url);
-  if (cache) {
-    try {
-      const cached = await cache.match(cacheKey);
-      if (cached) {
-        const headers = new Headers(cached.headers);
-        headers.set("X-Geocode-Cache", "hit");
-        return new Response(cached.body, { status: cached.status, headers });
-      }
-    } catch (error) {
-      console.error("geocode cache lookup failed", error);
-    }
   }
 
   let upstream: Response;

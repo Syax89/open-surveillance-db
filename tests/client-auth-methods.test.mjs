@@ -1,13 +1,13 @@
 /**
  * Client-side interaction tests for the multi-method /login (Fase E2 —
- * design review): the three sign-in blocks (passkey, email + password,
- * Google) always visible with no selector, the passkey ceremony flow, the
- * OIDC provider links with the privacy disclosure, the manual merge form
- * (?merge=) and the OIDC failure marker (?oidc_error=1).
+ * design review): one login tile with email + password as the primary flow
+ * and passkey / configured OIDC alternatives below it, the passkey ceremony
+ * flow, the OIDC provider links with the privacy disclosure, the manual merge
+ * form (?merge=) and the OIDC failure marker (?oidc_error=1).
  *
  * Covers, in jsdom with @testing-library/react + user-event:
- *   1. the three method blocks are stacked and ALL visible at once (CEO
- *      2026-08-08: passkey, email + password, Google — no radio selector);
+ *   1. one tile with the email + password primary section followed by
+ *      passkey and OIDC alternatives (no nested method cards or selector);
  *   2. the OIDC provider links point at the /start routes and the Fase D
  *      privacy disclosure (tracking + DPF transfer) is rendered;
  *   3. a browser without WebAuthn gets an explanatory error instead of a
@@ -98,30 +98,53 @@ function fakeAssertionCredential() {
   };
 }
 
-test("login: passkey, email+password and Google are all visible at once (no selector)", async () => {
+test("login: one tile makes email+password primary, then passkey and OIDC alternatives", async () => {
   const { screen, waitFor } = rtl;
   await loginFormWithSocial();
 
-  // CEO 2026-08-08: no radio group — the three method blocks are stacked
-  // and ALL visible immediately, in the order passkey → email → google.
+  // One visual login tile, no radio selector or nested coherent-box cards.
   assert.equal(screen.queryByRole("radio"), null);
-  assert.ok(screen.getByRole("heading", { name: "Passkey" }));
+  const tiles = document.querySelectorAll("article.auth-card");
+  assert.equal(tiles.length, 1, "the existing auth card is the one login tile");
+  const tile = tiles[0];
+  assert.equal(tile.querySelectorAll(".auth-method-card").length, 0, "no nested method cards");
+
+  // Email + password is the first, clear primary section. The localized "or"
+  // divider and alternatives group follow it in keyboard/DOM order.
+  const primary = tile.querySelector(".auth-primary");
+  const divider = tile.querySelector(".auth-divider");
+  const alternatives = tile.querySelector(".auth-alternatives");
+  assert.ok(primary, "the password form has a primary section");
+  assert.ok(divider, "a visible alternative-method divider is rendered");
+  assert.ok(alternatives, "passkey and OIDC share an alternatives group");
+  assert.equal(divider.textContent?.trim(), "or");
+
+  const sections = Array.from(tile.children);
+  assert.ok(sections.indexOf(primary) < sections.indexOf(divider));
+  assert.ok(sections.indexOf(divider) < sections.indexOf(alternatives));
+
+  assert.ok(screen.getByRole("heading", { name: "Email + password", level: 2 }));
+  assert.ok(primary.querySelector('input[name="email"]'));
+  assert.ok(primary.querySelector('input[name="password"]'));
+  assert.ok(screen.getByRole("button", { name: "Log in" }));
+
+  assert.ok(screen.getByRole("heading", { name: "Other ways to sign in", level: 2 }));
+  const passkeyHeading = screen.getByRole("heading", { name: "Passkey", level: 3 });
+  assert.ok(alternatives.contains(passkeyHeading));
   assert.ok(screen.getByRole("button", { name: "Sign in with passkey" }));
   assert.ok(screen.getByLabelText(/Account email \(optional\)/));
 
-  assert.ok(screen.getByRole("heading", { name: "Email + password" }));
-  assert.ok(screen.getByLabelText("Email"));
-  assert.ok(screen.getByRole("button", { name: "Log in" }));
-
-  // The Google card appears once provider discovery resolves.
+  // The configured OIDC alternative appears only after provider discovery.
   await waitFor(() => assert.ok(screen.getByRole("link", { name: "Continue with GitHub" })));
+  const socialHeading = screen.getByRole("heading", { name: "Sign in with a provider", level: 3 });
+  assert.ok(alternatives.contains(socialHeading));
   assert.ok(screen.getByRole("link", { name: "Continue with Google" }));
 });
 
 test("login: OIDC providers link to the /start routes and declare the privacy risk", async () => {
   const { screen, waitFor } = rtl;
   await loginFormWithSocial();
-  // The Google card appears only after provider discovery resolves.
+  // The configured OIDC alternative appears only after provider discovery resolves.
   await waitFor(() => assert.ok(screen.getByRole("link", { name: "Continue with Google" })));
 
   const github = screen.getByRole("link", { name: "Continue with GitHub" });
@@ -281,7 +304,7 @@ test("login: a 410 from the merge route drops merge mode and announces the expir
 
   const alert = await screen.findByRole("alert");
   assert.match(alert.textContent ?? "", /no longer valid/i);
-  // The normal login (the three method cards + password form) is back.
+  // The normal single-tile login (primary password form + alternatives) is back.
   await waitFor(() => assert.ok(screen.getByRole("heading", { name: "Email + password" })));
   assert.ok(screen.getByRole("button", { name: "Log in" }));
   // The stale ?merge= token is stripped from the address bar via

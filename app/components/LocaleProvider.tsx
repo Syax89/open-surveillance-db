@@ -38,6 +38,7 @@ const SERVER_RENDERED_INFO_ROUTES = new Set([
   "/regole",
   "/faq",
   "/contatti",
+  "/contribuisci",
   "/moderazione",
   "/privacy",
   "/termini",

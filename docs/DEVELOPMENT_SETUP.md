@@ -62,9 +62,9 @@ The rate limiter (`app/lib/rate-limit.ts`) has two backends, selected per
 route family at runtime:
 
 - **Cloudflare Workers Rate Limiting binding** (`AUTH_LIMITER` /
-  `WRITE_LIMITER` / `READ_LIMITER` / `TILES_LIMITER`, declared in
-  `wrangler.jsonc` `ratelimits`) — the production backend for the four
-  critical public families (auth, write, read, tiles; audit #3, MEDIUM).
+  `WRITE_LIMITER` / `READ_LIMITER` / `TILES_LIMITER` / `GEOCODE_LIMITER`, declared in
+  `wrangler.jsonc` `ratelimits`) — the production backend for the five
+  critical public families (auth, write, read, tiles, geocode; audit #3, MEDIUM).
 - **In-memory sliding window** — the fallback, used whenever the binding is
   absent from `env`.
 
@@ -76,7 +76,7 @@ verify this by lowering a knob, e.g. `AUTH_RATE_LIMIT_MAX=1` in `.dev.vars`
 and hammering `/api/auth/login`: the second request from the same caller
 answers `429` with `Retry-After`. The env knobs
 (`*_RATE_LIMIT_MAX` / `*_RATE_LIMIT_WINDOW_SECONDS`) are the source of truth
-for the in-memory backend; in production the four bound families are enforced
+for the in-memory backend; in production the five bound families are enforced
 by the binding's `simple.limit` / `simple.period` in `wrangler.jsonc`
 instead (see `docs/DEPLOYMENT.md`).
 

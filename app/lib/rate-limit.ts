@@ -4,8 +4,8 @@
  * Two backends, selected per route family at runtime:
  *
  * 1. Cloudflare Workers Rate Limiting binding (`ratelimits` in
- *    wrangler.jsonc) — the PRODUCTION backend for the four critical public
- *    families (auth, submit/write, read, tiles). The binding's counters are
+ *    wrangler.jsonc) — the PRODUCTION backend for the five critical public
+ *    families (auth, submit/write, read, tiles, geocode). The binding's counters are
  *    enforced by Cloudflare edge infrastructure shared across worker
  *    isolates, so a caller cannot spread a burst across isolates to bypass
  *    the limit — that per-isolate in-memory bucket was audit finding #3
@@ -164,7 +164,7 @@ export interface RateLimitBinding {
 
 /**
  * Route families that get a production rate-limiter binding (audit #3,
- * MEDIUM, t_dff3dadf): auth, write (submissions), read and tiles are the
+ * MEDIUM, t_dff3dadf): auth, write (submissions), read, tiles and geocode are the
  * public surfaces a determined caller could otherwise spread across
  * isolates. The binding names map to the `ratelimits` entries in
  * wrangler.jsonc; every other family keeps the in-memory fallback (see the
@@ -176,6 +176,7 @@ const BUCKET_BINDING: Partial<Record<string, string>> = {
   submit: "WRITE_LIMITER",
   read: "READ_LIMITER",
   tiles: "TILES_LIMITER",
+  geocode: "GEOCODE_LIMITER",
 };
 
 /** Resolve the rate-limiter binding configured for a bucket, if any. */

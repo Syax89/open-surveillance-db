@@ -294,13 +294,13 @@ The reset email copy and the `/forgot-password` confirmation both tell
 the user the reset link expires in 3 hours — keep them in sync when the
 TTL ever changes.
 
-## Local LXC deployment (current)
+## Local LXC deployment (D1-authoritative operational runtime)
 
-The always-on test site lives on a LAN-only Proxmox container (the test
-host, reachable at `http://<lan-ip>:3000`). This is the **current local
-environment** and the reference for staging checks; the Cloudflare
-deployment remains a future precondition (see "Preconditions for a public
-environment" above).
+The always-on LAN container is an operational verification runtime. It connects
+to the same authoritative D1 binding as the Worker for every DB-backed request;
+it is **not** a local database source and must never queue writes for a later
+container-to-D1 synchronization. Isolated developer/test installs remain local
+by default (ADR 0022).
 
 ### Container
 
@@ -333,8 +333,11 @@ environment" above).
   npm run build   # verify the production build once at setup time
   ```
 
-- Updates are applied with `git fetch && git reset --hard origin/main`, then
-  `npm ci`, then `systemctl restart osdb-test.service`.
+- Updates are applied from verified `origin/main`: inspect local modifications,
+  take the pre-deploy snapshot, preserve the LXC-only real `database_id`, then
+  reset, run `npm ci`, and run
+  `node scripts/enable-d1-authoritative.mjs --config wrangler.jsonc` followed by
+  `--check` before restarting `osdb-test.service`.
 - **Mandatory pre-deploy step (ops audit 2026-08-09): before every update
   take the Proxmox snapshot rollback base with
   `ops/snapshot-pre-deploy.sh`** (default name
@@ -376,6 +379,29 @@ local run (`npm run dev`). On a single-tenant LAN test box the difference
 (dev-server overhead, no production bundle) is acceptable; this is
 documented in the systemd unit and revisited whenever the Workers deployment
 is activated.
+
+### D1-authoritative binding and credential
+
+The committed `wrangler.jsonc` deliberately has a placeholder database ID and
+no `remote: true`: this protects isolated local development. On LXC 114, the
+deploy procedure preserves the locally configured real ID, then runs:
+
+```bash
+node scripts/enable-d1-authoritative.mjs --config wrangler.jsonc
+node scripts/enable-d1-authoritative.mjs --config wrangler.jsonc --check
+```
+
+The helper is idempotent, refuses the placeholder, and never prints the ID.
+Do not edit the committed config to point every developer at production D1.
+
+Remote bindings need a Cloudflare API credential. Install the versioned
+`ops/osdb-test-d1-authoritative-start.sh` as
+`/usr/local/libexec/osdb-test-d1-authoritative-start` and
+`ops/osdb-test-d1-authoritative.conf` as the `d1-authoritative.conf` service
+drop-in. Create its **dedicated least-privilege** credential on the LXC with
+`systemd-creds encrypt --with-key=host`, then reference it through
+`LoadCredentialEncrypted`. The token must never go in `.dev.vars`,
+`wrangler.jsonc`, Git, shell history, or a plaintext unit file.
 
 ### systemd unit (`/etc/systemd/system/osdb-test.service`)
 
@@ -463,7 +489,8 @@ or client bundles (the secrets gate in CI rejects hardcoded credentials).
 | `POST_RATE_LIMIT_MAX` / `POST_RATE_LIMIT_WINDOW_SECONDS` | 5 / 60 | Submissions (cameras + corrections) |
 | `MODERATION_RATE_LIMIT_MAX` / `MODERATION_RATE_LIMIT_WINDOW_SECONDS` | 30 / 60 | Moderation API (second layer over edge auth), including appeal decisions (`PATCH /api/appeals/[id]`) |
 | `APPEAL_RATE_LIMIT_MAX` / `APPEAL_RATE_LIMIT_WINDOW_SECONDS` | 20 / 60 | Appeal filing and review (`POST/GET /api/appeals`) — a distinct bucket from moderation so contributors contesting decisions and moderators reviewing them never starve the moderation queue |
-| `TILES_RATE_LIMIT_MAX` / `TILES_RATE_LIMIT_WINDOW_SECONDS` | 60 / 60 | Tile proxy (`GET /api/tiles/*`) — protects the OSMF upstream from per-caller scraping |
+| `TILES_RATE_LIMIT_MAX` / `TILES_RATE_LIMIT_WINDOW_SECONDS` | 240 / 60 | Tile proxy (`GET /api/tiles/*`) — protects the OSMF upstream from per-caller scraping |
+| `GEOCODE_RATE_LIMIT_MAX` / `GEOCODE_RATE_LIMIT_WINDOW_SECONDS` | 30 / 60 | Place autocomplete (`GET /api/geocode`) — protects the geocoding upstream from cache-miss bursts |
 | `POST_SUBMISSIONS_DISABLED` | `false` | Kill switch: reject new submissions with 503 |
 | `MAX_BODY_BYTES` | 32768 (32 KiB) | Max JSON request body; larger bodies answer 413 |
 | `ABUSE_ALERT_THRESHOLD` | 10 | Per-caller abuse events per window before an alert fires |
@@ -476,13 +503,13 @@ The limiter (`app/lib/rate-limit.ts`) has **two backends**, selected per
 route family at runtime:
 
 - **Cloudflare Workers Rate Limiting binding** — the PRODUCTION backend for
-  the four critical public families: **auth, write (submissions), read and
-  tiles**. Declared in `wrangler.jsonc` under `ratelimits`, the binding's
+  the five critical public families: **auth, write (submissions), read,
+  tiles and geocode**. Declared in `wrangler.jsonc` under `ratelimits`, the binding's
   counters are enforced by Cloudflare edge infrastructure shared across
   worker isolates, so a caller cannot spread a burst across isolates to
   bypass the ceiling (that per-isolate in-memory bucket was audit #3, MEDIUM).
   The binding enforces its own `simple.limit` / `simple.period`; the
-  `${PREFIX}_RATE_LIMIT_*` env knobs are **ignored** for these four families
+  `${PREFIX}_RATE_LIMIT_*` env knobs are **ignored** for these five families
   while a binding is present. `simple.period` accepts only 10 or 60 seconds;
   all current defaults are 60 s windows. The thresholds in `wrangler.jsonc`
   mirror `ROUTE_LIMIT_DEFAULTS` (pending final sign-off, t_dff3dadf).
@@ -496,7 +523,7 @@ route family at runtime:
   with the number of isolates, so it must never be the production backend.
 
 Every other route family (export, nearby, revisions, moderate, appeal,
-geocode, search, confirm, edit) keeps the in-memory fallback for now — the
+search, confirm, edit) keeps the in-memory fallback for now — the
 abstraction is uniform, so adding a binding is a one-line change per family
 (see `BUCKET_BINDING` in `app/lib/rate-limit.ts` and the `ratelimits` block
 in `wrangler.jsonc`); migrate them before launch if the threat model calls

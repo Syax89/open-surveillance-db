@@ -17,7 +17,7 @@
 import assert from "node:assert/strict";
 import test, { afterEach, before } from "node:test";
 import {
-  setupDom, loadDomModule, renderWithLocale, React,
+  setupDom, loadDomModule, renderWithLocale, setNavState, getNavState, React,
 } from "./helpers/dom-harness.mjs";
 
 let rtl;
@@ -130,4 +130,20 @@ test("locale: language selection group is labelled for AT", async () => {
 
   const group = screen.getByLabelText("Language selection");
   assert.equal(group.className, "locale-toggle");
+});
+
+test("locale: switching on /contribuisci refreshes its server-rendered content", async () => {
+  const { screen } = rtl;
+  const user = rtl.userEvent.setup();
+  window.localStorage.clear();
+  await setNavState({ url: "/contribuisci", refreshed: 0 });
+
+  await renderWithLocale(React.createElement(LocaleToggle));
+  await user.click(screen.getByText("IT"));
+
+  assert.equal(
+    (await getNavState()).refreshed,
+    1,
+    "the support page is server-rendered, so its Italian content needs router.refresh()",
+  );
 });

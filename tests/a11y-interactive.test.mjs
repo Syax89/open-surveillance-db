@@ -402,9 +402,9 @@ function assertControlsLabeled(html, where) {
 
 test("every login form control has an accessible name (wrapping label)", async () => {
   const { html } = await renderRoute("/login");
-  const form = html.match(/<form class="auth-form"[\s\S]*?<\/form>/);
-  assert.ok(form, "login form must render");
-  assertControlsLabeled(form[0], "login");
+  const forms = [...html.matchAll(/<form class="auth-form"[\s\S]*?<\/form>/g)].map((match) => match[0]);
+  assert.equal(forms.length, 2, "normal login renders independent password and passkey forms");
+  forms.forEach((form, index) => assertControlsLabeled(form, `login form ${index + 1}`));
 });
 
 test("every register form control has an accessible name (wrapping label)", async () => {
@@ -502,11 +502,15 @@ test("the trust-level badge is never colour-only: label + dot, progress is a tex
   assert.match(badge, /badgeKeyForLevel/, "the badge key must come from trust-levels.ts");
 });
 
-test("profile contributions: local filters use aria-pressed, the counter is role=status, pagination carries aria-current (C5)", async () => {
+test("profile contributions: local filters use labelled native controls, the counter is role=status, pagination carries aria-current (C5)", async () => {
   const account = await readFile(path.join(root, "app", "account", "AccountPageBody.tsx"), "utf8");
-  // Local status filters (never in the URL — private page).
-  assert.match(account, /aria-pressed=\{filter === key\}/, "filter chips must expose aria-pressed");
-  assert.match(account, /role="group"\s+aria-label=\{community\.contributionStatusFilter\}/, "the filter group must be labelled");
+  // Local filters stay out of the URL but have a native fieldset/legend and
+  // individually associated labels (selects are easier to scan than chips).
+  assert.match(account, /<fieldset className="contributions-filter-bar">/, "the filter toolbar must have native group semantics");
+  assert.match(account, /<legend>\{community\.contributionFilters\}<\/legend>/, "the filter toolbar must have a visible legend");
+  assert.match(account, /htmlFor="contribution-type-filter"/, "the type select needs an associated label");
+  assert.match(account, /htmlFor="contribution-status-filter"/, "the status select needs an associated label");
+  assert.doesNotMatch(account, /className=\{`filter-chip/, "the crowded chip rows must not return");
   // Polite total counter.
   assert.match(account, /role="status"/, "the contribution total must be announced politely");
   // Pagination marks the current page.

@@ -23,7 +23,7 @@ interface Env {
   /**
    * Cloudflare Workers Rate Limiting bindings (wrangler.jsonc `ratelimits`,
    * audit #3 MEDIUM, t_dff3dadf): the production enforcement point for the
-   * four critical public route families (auth, write, read, tiles). Optional:
+   * five critical public route families (auth, write, read, tiles, geocode). Optional:
    * when a binding is absent the route layer falls back to the in-memory
    * per-isolate limiter (local dev / tests — never the public API). The
    * routes read them structurally from env; this interface documents the
@@ -33,6 +33,7 @@ interface Env {
   WRITE_LIMITER?: RateLimiterBinding;
   READ_LIMITER?: RateLimiterBinding;
   TILES_LIMITER?: RateLimiterBinding;
+  GEOCODE_LIMITER?: RateLimiterBinding;
   /** Cloudflare Email Service binding (send_email in wrangler.jsonc). */
   EMAIL?: SendEmail;
   /**
