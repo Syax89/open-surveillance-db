@@ -154,6 +154,17 @@ test("PublicNav renders AuthNavLinks inside the mobile menu container (#main-lin
   assert.doesNotMatch(source, /trailing=/, "no top-bar trailing slot anymore");
 });
 
+test("mobile viewport: the root cannot pan sideways and the brand SVG stays inside its circular mark", async () => {
+  const source = await css();
+  const brandMark = await readFile(path.join(root, "app", "components", "BrandMark.tsx"), "utf8");
+
+  assert.match(source, /html\s*\{[^}]*overflow-x:\s*clip[^}]*overscroll-behavior-x:\s*none/, "the scroll root must reject horizontal viewport drift");
+  assert.match(source, /body\s*\{[^}]*min-width:\s*0/, "the page body must allow flex descendants to shrink instead of widening the viewport");
+  assert.match(source, /\.brand-mark\s*\{[^}]*overflow:\s*hidden/, "the circular mark must clip only its own artwork");
+  assert.match(source, /\.brand-mark\s*>\s*svg\s*\{[^}]*display:\s*block[^}]*width:\s*100%[^}]*height:\s*100%[^}]*min-width:\s*0/, "the logo SVG must size to the mark instead of keeping a larger intrinsic box");
+  assert.doesNotMatch(brandMark, /\swidth="29"|\sheight="29"/, "BrandMark must not hardcode dimensions that exceed the mobile mark");
+});
+
 test("SiteHeader no longer exposes the trailing slot (auth moved into the menu)", async () => {
   const source = await readFile(path.join(root, "app", "components", "SiteHeader.tsx"), "utf8");
   assert.doesNotMatch(source, /trailing/, "the trailing slot must be gone — auth lives inside .nav-links");

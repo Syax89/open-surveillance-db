@@ -171,6 +171,7 @@ const state = {
   pushed: [],
   replaced: [],
   replaceCalls: [],
+  refreshed: 0,
   // t_b1e192e1: when true, router.replace throws a TypeError mimicking the
   // vinext RSC navigation error ("Cannot read properties of undefined
   // (reading 'digest')") — tests use it to prove applyFilters' hardened
@@ -245,7 +246,7 @@ export const useRouter = () => ({
     state.history[state.historyIndex] = parseUrl(p);
     applyUrl(state.history[state.historyIndex]);
   },
-  refresh: () => {},
+  refresh: () => { state.refreshed += 1; },
   back: __goBack,
   forward: __goForward,
 });

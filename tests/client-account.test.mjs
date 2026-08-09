@@ -8,7 +8,7 @@
  *   2. the contributions list renders rows with links to /records/[id], the
  *      localized status label and an "Edit contribution" link for editable
  *      camera rows only (owner-only: every row is the caller's own);
- *   3. local status filters: clicking a filter chip refetches with
+ *   3. local status filters: selecting a labelled control refetches with
  *      ?status= and re-renders the list (filter state stays out of the
  *      URL — private page);
  *   4. the polite total counter (role="status") announces the count;
@@ -222,7 +222,7 @@ test("account: local status filter refetches with ?status= and keeps the URL cle
   await waitFor(() => assert.ok(screen.queryByText("Fixture camera report")));
 
   const user = rtl.userEvent.setup();
-  await user.click(screen.getByRole("button", { name: "In moderation" }));
+  await user.selectOptions(screen.getByLabelText("Filter contributions by status"), "pending");
 
   await waitFor(() => assert.ok(screen.queryByText("Another fixture report")));
   assert.equal(screen.queryByText("Fixture camera report"), null);
@@ -230,9 +230,19 @@ test("account: local status filter refetches with ?status= and keeps the URL cle
   // itself never changed.
   assert.ok(requests.some((r) => typeof r === "string" && r.includes("status=pending")));
   assert.equal(window.location.search, "");
+
+  // A visible reset returns to the unfiltered first page without putting
+  // private filter state in the browser URL.
+  const requestsBeforeReset = requests.length;
+  await user.click(screen.getByRole("button", { name: "Clear filters" }));
+  await waitFor(() => assert.equal(screen.getByLabelText("Filter contributions by status").value, "all"));
+  assert.ok(
+    requests.slice(requestsBeforeReset).some((r) => typeof r === "string" && !r.includes("status=")),
+    "clearing the status filter must reload the unfiltered first page",
+  );
 });
 
-test("account: summary strip + Published chip (rework 2026-08-08)", async () => {
+test("account: summary strip + Published status control (rework 2026-08-08)", async () => {
   const { screen, waitFor } = rtl;
   const requests = [];
   installFetchMock((input) => {
@@ -258,19 +268,19 @@ test("account: summary strip + Published chip (rework 2026-08-08)", async () => 
   // The summary strip renders the global per-kind counts (independent of
   // filters) with visible labels next to each number.
   assert.equal(screen.getAllByText("1", { selector: ".account-stat-value" }).length, 2);
-  assert.ok(screen.getAllByText("Camera reports").length >= 2); // stat card + type chip
+  assert.ok(screen.getAllByText("Camera reports").length >= 2); // stat card + type option
   assert.ok(screen.getAllByText("Corrections").length >= 2);
   // In-moderation card: 0 pending in this fixture, still rendered.
-  assert.ok(screen.getAllByText("In moderation").length >= 2); // stat card + status chip
+  assert.ok(screen.getAllByText("In moderation").length >= 2); // stat card + status option
 
-  // The "Published" chip exists and refetches with ?status=active — the
+  // The "Published" control exists and refetches with ?status=active — the
   // post-0039 domain status is now filterable (P0 fix).
   const user = rtl.userEvent.setup();
-  const publishedChip = screen.getByRole("button", { name: /Published/ });
-  await user.click(publishedChip);
+  const statusFilter = screen.getByLabelText("Filter contributions by status");
+  await user.selectOptions(statusFilter, "active");
   assert.ok(requests.some((r) => typeof r === "string" && r.includes("status=active")));
-  // Chip counters come from the summary.
-  assert.ok(screen.getByRole("button", { name: /Published/ }));
+  // The status option carries its summary count.
+  assert.ok(screen.getByRole("option", { name: "Published (1)" }));
 });
 
 test("account: kind rows show icon tile, issue label, date and related-record link (rework)", async () => {
@@ -318,7 +328,7 @@ test("account: type filter refetches with ?type= (rework 2026-08-08)", async () 
   await waitFor(() => assert.ok(screen.queryByText("Published camera row")));
 
   const user = rtl.userEvent.setup();
-  await user.click(screen.getByRole("button", { name: "Corrections" }));
+  await user.selectOptions(screen.getByLabelText("Filter by type"), "correction");
 
   await waitFor(() => assert.ok(screen.queryByText("Correction: Inaccurate information")));
   assert.equal(screen.queryByText("Published camera row"), null);
@@ -360,7 +370,7 @@ test("account: empty states — no contributions vs. filter without matches", as
   await renderWithLocale(React.createElement(AccountPage));
   await waitFor(() => assert.ok(screen2.queryByText("Fixture camera report")));
   const user = rtl.userEvent.setup();
-  await user.click(screen2.getByRole("button", { name: "Removed" }));
+  await user.selectOptions(screen2.getByLabelText("Filter contributions by status"), "removed");
   await waitFor(() => assert.ok(screen2.queryByText("No contributions match this filter.")));
 });
 
