@@ -2,7 +2,7 @@
 
 - **Status:** accepted
 - **Date:** 2026-07-31
-- **Author:** Ada (architecture / database)
+- **Author:** Simone Rondina (project owner)
 - **Updates:** ADR 0003-moderation-access-control (named reviewer attribution and
   append-only audit replace the single generic "Local moderator" actor in the
   local development deployment); ADR 0004-retention-and-review-cycle (queue workflow state is

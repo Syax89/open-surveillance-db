@@ -1,77 +1,77 @@
-# Frontend design system — documento unico vincolante
+# Frontend design system — single binding document
 
 Last reviewed: 2026-08-08
-Author: Vera (Designer UX/UI)
-Version: v3 (sostituisce la v2 del 2026-08-02)
-Stato: **vincolante** — fonte di verità unica per UI/UX del frontend.
+Author: Simone Rondina (project owner)
+Version: v3 (replaces v2 of 2026-08-02)
+Status: **binding** — single source of truth for frontend UI/UX.
 
-Questo documento è il **riferimento normativo** del design system: definisce
-token, tipografia, layout, componenti, stati e regole che l'implementazione
-**deve** rispettare. Non è una visione: è il contratto.
+This document is the **normative reference** of the design system: it defines
+the tokens, typography, layout, components, states and rules that the
+implementation **must** respect. It is not a vision: it is the contract.
 
-- Complementi: `docs/SITEMAP.md` (IA),
-  `docs/design/README.md` (pattern attuali di mappa/popup/hero e contract di
-  performance, verificati sul codice).
-- Legenda stato: ✅ implementato e verificato · 🔒 binding (da implementare /
-  da allineare) · ⚠ parziale (vedi nota)
-
----
-
-## 1. Principi di design
-
-1. **La home è un hub, non un tool.** `/` orienta: missione, teaser mappa,
-   quattro card tool, principi. Non ospita più i tool interattivi (F1–F4
-   completati: i tool sono route proprie).
-2. **Una rotta, un job.** Ogni tool ha la sua route, il suo `h1`, il suo
-   header. Navigazione esplicita, mai per scroll.
-3. **Stato in URL, non in memoria.** Filtri, ricerca, ordinamento vivono nei
-   query param: condivisibili, bookmarkable, SSR-renderable (F4 ✅).
-4. **Un solo design system.** Header, footer, palette, tipografia, spaziature
-   e componenti base sono condivisi ovunque.
-5. **Navigazione bidirezionale.** Da ogni tool si torna alla home e agli altri
-   tool. Niente vicoli ciechi.
-
-Il progetto documenta infrastrutture di sorveglianza pubblica: il design deve
-trasmettere **chiarezza, fiducia, sobrietà** — mai allarmismo né estetica
-"poliziesca". Riferimento morale: civic-tech open data (OpenStreetMap,
-Wikidata), non dashboard di security. Niente effetti vistosi, niente animation
-decorative, niente gradienti aggressivi.
+- Complements: `docs/SITEMAP.md` (IA),
+  `docs/design/README.md` (current map/popup/hero patterns and performance
+  contracts, verified on the code).
+- State legend: ✅ implemented and verified · 🔒 binding (to implement /
+  to align) · ⚠ partial (see note)
 
 ---
 
-## 2. Architettura delle pagine
+## 1. Design principles
 
-### 2.1 Route map (stato reale — tutte le route esistono)
+1. **The home is a hub, not a tool.** `/` orientates: mission, map teaser,
+   four tool cards, principles. It no longer hosts the interactive tools
+   (F1–F4 completed: the tools are their own routes).
+2. **One route, one job.** Each tool has its own route, its own `h1`, its
+   own header. Explicit navigation, never by scroll.
+3. **State in the URL, not in memory.** Filters, search and sorting live in
+   the query params: shareable, bookmarkable, SSR-renderable (F4 ✅).
+4. **One design system.** Header, footer, palette, typography, spacing and
+   base components are shared everywhere.
+5. **Two-way navigation.** From every tool you can return to the home and
+   to the other tools. No dead ends.
 
-| Route | Pagina | Nav | Stato |
-|-------|--------|:---:|-------|
-| `/` | Home hub (Hero + MapTeaser + ToolCards + principi) | PublicNav | ✅ |
-| `/mappa` | Mappa interattiva integrata (sidebar + mappa, h1 sr-only) | PublicNav | ✅ |
-| `/directory` | Directory testuale (ricerca + filtri + griglia) | PublicNav | ✅ |
-| `/segnala` | Form segnalazione guidato (`?lat=&lng=` deep link) | PublicNav | ✅ |
-| `/correggi` | Form correzione (`?record=ID` prefill) | PublicNav | ✅ |
-| `/records/[id]` | Dettaglio record (scheda + verification widget) | contestuale (`nav-record-actions`) | ✅ |
-| `/records/[id]/edit` | Modifica contributo (privato) | contestuale | ✅ |
-| `/guide` | Guida all'uso | PublicNav | ✅ |
+The project documents public surveillance infrastructure: the design must
+convey **clarity, trust, sobriety** — never alarmism nor a "police"
+aesthetic. Moral reference: civic-tech open data (OpenStreetMap,
+Wikidata), not security dashboards. No flashy effects, no decorative
+animation, no aggressive gradients.
+
+---
+
+## 2. Page architecture
+
+### 2.1 Route map (real state — all routes exist)
+
+| Route | Page | Nav | State |
+|-------|------|:---:|-------|
+| `/` | Home hub (Hero + MapTeaser + ToolCards + principles) | PublicNav | ✅ |
+| `/mappa` | Integrated interactive map (sidebar + map, sr-only h1) | PublicNav | ✅ |
+| `/directory` | Text directory (search + filters + grid) | PublicNav | ✅ |
+| `/segnala` | Guided report form (`?lat=&lng=` deep link) | PublicNav | ✅ |
+| `/correggi` | Correction form (`?record=ID` prefill) | PublicNav | ✅ |
+| `/records/[id]` | Record detail (card + verification widget) | contextual (`nav-record-actions`) | ✅ |
+| `/records/[id]/edit` | Contribution edit (private) | contextual | ✅ |
+| `/guide` | Usage guide | PublicNav | ✅ |
 | `/manifesto` | Manifesto | PublicNav | ✅ |
-| `/regole` | Regole | PublicNav | ✅ |
-| `/fonti` | Attribuzione fonti importate (FASE C) | footer | ✅ |
-| `/api-docs` | Documentazione API pubblica | footer | ✅ |
-| `/moderazione` | URL compatibile → dettaglio pubblicazione in `/guide` | — | ✅ |
-| `/privacy` `/termini` `/licenze` | Pagine legali | PublicNav | ✅ |
+| `/regole` | Rules | PublicNav | ✅ |
+| `/fonti` | Imported-source attribution (Phase C) | footer | ✅ |
+| `/api-docs` | Public API documentation | footer | ✅ |
+| `/moderazione` | Compatible URL → publication details in `/guide` | — | ✅ |
+| `/privacy` `/termini` `/licenze` | Legal pages | PublicNav | ✅ |
 | `/faq` `/contatti` `/accessibility` | Info | PublicNav | ✅ |
-| `/moderation` | Dashboard moderatori (privata, `requireRole`) | contestuale (`nav-actions`) | ✅ |
-| `/account` `/login` `/register` | Auth/account | contestuale | ✅ |
-| 404 (`not-found.tsx`) / 500 (`error.tsx`) | Error pages custom | **ridotto: 1 link** (eccezione §2.3) | ✅ |
+| `/moderation` | Moderator dashboard (private, `requireRole`) | contextual (`nav-actions`) | ✅ |
+| `/account` `/login` `/register` | Auth/account | contextual | ✅ |
+| 404 (`not-found.tsx`) / 500 (`error.tsx`) | Custom error pages | **reduced: 1 link** (exception §2.3) | ✅ |
 
 ### 2.2 Tool pages (route group `app/(tools)/`)
 
-Le quattro pagine tool condividono il layout `ToolLayout` (PublicNav + `main#main-content`).
+The four tool pages share the `ToolLayout` (PublicNav + `main#main-content`).
 
-**Intestazione di pagina (✅ implementato in F4 — gap P1 G1 chiuso):** le classi
-`.tool-heading` e `.tool-section` sono definite in globals.css (h1 800,
-clamp(34px,4.5vw,52px), padding 48/96px; `/mappa` resta full-width senza header
-visibile via `.tool-section.map-tool`). Regole:
+**Page heading (✅ implemented in F4 — gap P1 G1 closed):** the classes
+`.tool-heading` and `.tool-section` are defined in globals.css (h1 800,
+clamp(34px,4.5vw,52px), padding 48/96px; `/mappa` stays full-width without a
+visible header via `.tool-section.map-tool`). Rules:
 
 ```
 .tool-section { width:min(1180px, calc(100% - 48px)); margin:0 auto; padding:48px 0 96px; }
@@ -85,160 +85,162 @@ visibile via `.tool-section.map-tool`). Regole:
 .tool-heading p:not(.eyebrow) { margin:18px 0 0; max-width:600px; color:#5e707a; font-size:16px; line-height:1.55; }
 ```
 
-Eccezione documentata: `/mappa` NON ha header visibile (t_11e38eab) — l'h1
-resta `sr-only` per la gerarchia documentale e `aria-labelledby` della
-sezione. La pagina parte direttamente con la mappa.
+Documented exception: `/mappa` has NO visible header (t_11e38eab) — the h1
+stays `sr-only` for the document hierarchy and `aria-labelledby` of the
+section. The page starts directly with the map.
 
-**Un solo header di pagina per tool page (F5, P1-5):** `/directory`, `/segnala`
-e `/correggi` rendono `.tool-heading` (eyebrow + h1 + intro) come UNICO header;
-i componenti di sezione incorporati (`PublicDirectory`, `ReportForm`,
-`CorrectionForm`) ricevono `showHeading={false}` e NON ripetono il blocco
-eyebrow+h2+intro. Le sezioni mantengono i contenuti funzionali non-duplicati:
-link "Use the map instead" (directory), report-rule "Before submitting"
-(segnala) e "Urgent concern" (correggi). Gerarchia heading: h1 tool →
-h2 sezione (es. place-search) → h3 card.
+**One page heading per tool page (F5, P1-5):** `/directory`, `/segnala`
+and `/correggi` render `.tool-heading` (eyebrow + h1 + intro) as the ONLY
+header; the embedded section components (`PublicDirectory`, `ReportForm`,
+`CorrectionForm`) receive `showHeading={false}` and do NOT repeat the
+eyebrow+h2+intro block. The sections keep their non-duplicated functional
+content: the "Use the map instead" link (directory), the "Before
+submitting" report rule (segnala) and "Urgent concern" (correggi). Heading
+hierarchy: tool h1 → section h2 (e.g. place-search) → card h3.
 
-**Directory catalog mode (t_127492f1; redesign t_f13fcb1c):** la tool page
-usa `PublicDirectory variant="catalog"` con il layout browse-record
-"indice editoriale" (proposta vincente, documentata in `docs/design/README.md`):
+**Directory catalog mode (t_127492f1; redesign t_f13fcb1c):** the tool page
+uses `PublicDirectory variant="catalog"` with the browse-record
+"editorial index" layout (winning proposal, documented in
+`docs/design/README.md`):
 
-1. `.directory-tool-heading` = `.tool-heading` con il link "Use the map
-   instead" allineato a destra (modifier: il layout flex vale SOLO per
-   /directory, /segnala e /correggi restano invariati).
-2. `FiltersBar variant="bare"` — la stessa griglia controlli (search + type +
-   freshness + sort + reset, ids storici `record-*`) SENZA il counter, in una
-   griglia a DUE righe pulite: search a tutta larghezza, poi type/freshness/
-   sort/reset + il toggle "Search near a place" (`extraControls`, FiltersBar)
-   nella seconda riga — un solo cluster di ricerca per pagina.
-3. `.place-search` come pannello collassabile a CARD contenuta
-   (`.place-search-closed` = `display:none` finché il trigger non lo apre —
-   mai l'attributo `hidden`, vietato dal contratto pages-render; l'input è
-   finalmente stilizzato come gli altri input — audit V1). Un solo input di
-   ricerca visibile alla volta; la ricerca per luogo è una *modalità*, non
-   una feature sorella (principio già stabilito da /mappa con `hideSearch`).
-4. `.directory-results` — header risultati VISIBILE: h2 "Directory results"
-   (chiave `resultsRegion`, niente più h2 sr-only) + count (`role=status`, id
-   `record-search-count`) + export CSV/GeoJSON come bottoni secondari
-   (`.export-button`, restano `<a role=link>` per i contratti).
-5. `.filter-chips` — chips dei filtri attivi (type/freshness/q), rimozione
-   one-shot, target ≥44px (pattern Google Maps/CKAN).
-6. `.alpha-index` — indice alfabetico A–Z (pattern Wikipedia AllPages): solo
-   le lettere presenti nel set filtrato; click → pagina della prima
-   occorrenza + focus sull'header risultati; `aria-current` sulle lettere
-   della pagina corrente. Visibile solo con sort alfabetico.
-7. `.directory-tool .record-list` a UNA colonna di **card visibili** (fix
-   t_d089a17e: `titolo | meta line | azioni` su 3 colonne dentro un
-   contenitore `#fffef9`/bordo `--line`/radius con barra di stato 3px —
-   la meta line è il `<dl>` di RecordCard renderizzato come riga
-   orizzontale di coppie dt/dd: etichette NON ripetute in griglia 3+1,
-   audit V7; la classe `record-list-card` resta byte-identica per le suite
-   a11y e il contratto rendered-html `<dt>Record ID</dt>`).
-8. `.directory-pagination` — paginazione "Previous / Showing X–Y of Z ·
-   Page N of M / Next", stato `?page=` in URL (6ª dimensione di
-   useCameraFilters, reset a 1 su ogni cambio filtro; /mappa parsa ma non
-   scrive mai page → URL invariati). Un solo flusso di risultati: una ricerca
-   luogo attiva sostituisce la lista (banner `.place-banner` con area + count
-   + clear, fact Distanza) e nasconde indice/chips/paginazione.
+1. `.directory-tool-heading` = `.tool-heading` with the "Use the map
+   instead" link aligned right (modifier: the flex layout applies ONLY to
+   /directory; /segnala and /correggi stay unchanged).
+2. `FiltersBar variant="bare"` — the same control grid (search + type +
+   freshness + sort + reset, historical ids `record-*`) WITHOUT the counter,
+   in a clean TWO-row grid: search full width, then type/freshness/
+   sort/reset + the "Search near a place" toggle (`extraControls`,
+   FiltersBar) in the second row — one search cluster per page.
+3. `.place-search` as a collapsible CONTAINED CARD panel
+   (`.place-search-closed` = `display:none` until the trigger opens it —
+   never the `hidden` attribute, forbidden by the pages-render contract;
+   the input is finally styled like the other inputs — V1 audit). Only one
+   visible search input at a time; place search is a *mode*, not a
+   sister feature (principle already established by /mappa with
+   `hideSearch`).
+4. `.directory-results` — VISIBLE results header: h2 "Directory results"
+   (key `resultsRegion`, no more sr-only h2) + count (`role=status`, id
+   `record-search-count`) + CSV/GeoJSON export as secondary buttons
+   (`.export-button`, still `<a role=link>` for the contracts).
+5. `.filter-chips` — active-filter chips (type/freshness/q), one-shot
+   removal, target ≥44px (Google Maps/CKAN pattern).
+6. `.alpha-index` — A–Z alphabetical index (Wikipedia AllPages pattern):
+   only the letters present in the filtered set; click → first-occurrence
+   page + focus on the results header; `aria-current` on the letters of the
+   current page. Visible only with alphabetical sort.
+7. `.directory-tool .record-list` in a SINGLE column of **visible cards**
+   (fix t_d089a17e: `title | meta line | actions` on 3 columns inside a
+   `#fffef9`/`--line` border/radius container with a 3px status bar — the
+   meta line is RecordCard's `<dl>` rendered as a horizontal row of dt/dd
+   pairs: labels NOT repeated in a 3+1 grid, V7 audit; the
+   `record-list-card` class stays byte-identical for the a11y suites and
+   the rendered-html `<dt>Record ID</dt>` contract).
+8. `.directory-pagination` — "Previous / Showing X–Y of Z · Page N of M /
+   Next" pagination, `?page=` state in the URL (6th dimension of
+   useCameraFilters, reset to 1 on every filter change; /mappa parses but
+   never writes page → unchanged URLs). One single results flow: an active
+   place search replaces the list (`.place-banner` with area + count +
+   clear, Distance fact) and hides index/chips/pagination.
 
-La home resta su `variant="hub"` (output byte-identico: records-heading +
-blocco place-search + FiltersBar inline + count + griglia 2 colonne).
+The home stays on `variant="hub"` (byte-identical output: records-heading +
+place-search block + inline FiltersBar + count + 2-column grid).
 
-### 2.3 Eccezioni header
+### 2.3 Header exceptions
 
-- **Error pages (404/500):** header ridotto a **1 link** (`nav-action` "Torna
-  alla home") + LocaleToggle. Il footer resta raggiungibile. Eccezione alla
-  regola "PublicNav a tre azioni" — voluta (un vicolo cieco non deve sembrare una
-  pagina rotta, ma non deve nemmeno offrire navigazione fuorviante).
-- **Record detail, auth, moderation:** header contestuale
-  (`nav-record-actions` / `nav-actions`) — azioni pertinenti al contesto
-  (torna al record, profilo, esci), non il set pubblico.
+- **Error pages (404/500):** header reduced to **1 link** (`nav-action`
+  "Back to home") + LocaleToggle. The footer stays reachable. Exception to
+  the "3-action PublicNav" rule — deliberate (a dead end should not look
+  like a broken page, but must not offer misleading navigation either).
+- **Record detail, auth, moderation:** contextual header
+  (`nav-record-actions` / `nav-actions`) — actions relevant to the context
+  (back to record, profile, logout), not the public set.
 
 ---
 
-## 3. Design token layer (vincolante)
+## 3. Design token layer (binding)
 
-### 3.1 Colori
+### 3.1 Colours
 
-Palette in `:root` (globals.css) ✅ — valori canonici scritti in `rgb(r g b)`
-moderno (tokenizzazione t_be89b99c: zero hex letterali nel sorgente). Il
-blocco sotto riporta i token core con l'equivalente hex per lettura:
+Palette in `:root` (globals.css) ✅ — canonical values written in modern
+`rgb(r g b)` (tokenisation t_be89b99c: zero literal hex in the source). The
+block below lists the core tokens with the hex equivalent for reading:
 
 ```
 /* Core (✅ in :root) */
---ink: rgb(16 35 50)        /* #102332 — testo principale */
---muted: rgb(92 108 117)    /* #5c6c75 — testo secondario */
---paper: rgb(245 243 236)   /* #f5f3ec — sfondo pagina */
---line: rgb(216 221 214)    /* #d8ddd6 — bordi, separatori */
---navy: rgb(9 35 58)        /* #09233a — hero, sfondi scuri */
+--ink: rgb(16 35 50)        /* #102332 — main text */
+--muted: rgb(92 108 117)    /* #5c6c75 — secondary text */
+--paper: rgb(245 243 236)   /* #f5f3ec — page background */
+--line: rgb(216 221 214)    /* #d8ddd6 — borders, separators */
+--navy: rgb(9 35 58)        /* #09233a — hero, dark backgrounds */
 --mint: rgb(203 247 218)    /* #cbf7da — primary action bg */
---card-bg: rgb(255 254 249) /* #fffef9 — superficie card */
+--card-bg: rgb(255 254 249) /* #fffef9 — card surface */
 --focus: rgb(11 112 92)     /* #0b705c — focus ring */
---action: rgb(10 112 93)    /* #0a705d — link/azioni primarie */
+--action: rgb(10 112 93)    /* #0a705d — links/primary actions */
 
-/* Semantic status (✅ in :root; dot + label testuale, mai solo colore) */
---status-verified: rgb(66 169 121)   /* verde */
---status-community: rgb(211 150 62)  /* ambra */
---status-review: rgb(216 113 94)     /* rosso revisione */
+/* Semantic status (✅ in :root; dot + text label, never colour alone) */
+--status-verified: rgb(66 169 121)   /* green */
+--status-community: rgb(211 150 62)  /* amber */
+--status-review: rgb(216 113 94)     /* review red */
 --status-demo: rgb(97 119 172)       /* slate */
---status-pending: rgb(138 151 155)   /* grigio-azzurro neutro */
+--status-pending: rgb(138 151 155)   /* neutral grey-blue */
 ```
 
-**Regola:** nessun hardcode di colore dove esiste un token; i valori canonici
-vivono SOLO in `:root` di `app/globals.css` (scala ink `--ink-2…--ink-5`,
+**Rule:** no colour hardcoding where a token exists; the canonical values
+live ONLY in `:root` of `app/globals.css` (ink scale `--ink-2…--ink-5`,
 `--text-*`, `--space-*`, `--radius-*`, `--container-*`, `--status-*`,
 `--danger-*`, `--notice-*`, `--hero-*`, `--visual-*`, `--map-*`,
-`--field-*`). Il pattern "coherent box" (card bianca + shadow + bordo visibile
-+ rail di stato 3px + tint ~14% del colore di stato) è descritto in
+`--field-*`). The "coherent box" pattern (white card + shadow + visible
+border + 3px status rail + ~14% tint of the status colour) is described in
 `docs/design/README.md`.
 
-**Verifica contrasto WCAG (tabella corretta rispetto alla v1):**
+**WCAG contrast check (table corrected vs v1):**
 
-| Token | Su sfondo | Ratio reale | Uso | AA? |
+| Token | On background | Real ratio | Use | AA? |
 |-------|-----------|-------------|-----|:---:|
-| `--ink` | `--paper` | 14.5:1 | testo corpo | ✓ AAA |
-| `--muted` #5c6c75 | `--paper` | **4.85:1** | testo secondario | ✅ (F4) |
+| `--ink` | `--paper` | 14.5:1 | body text | ✓ AAA |
+| `--muted` #5c6c75 | `--paper` | **4.85:1** | secondary text | ✅ (F4) |
 | `--focus` #0b705c | `--paper` | 4.8:1 | focus ring | ✓ |
-| `#405462` (nav-links) | `--paper` | 7.2:1 | link nav | ✓ AAA |
-| `#0b705c` (link/action) | `--paper` | 4.8:1 | link action | ✓ |
+| `#405462` (nav-links) | `--paper` | 7.2:1 | nav links | ✓ AAA |
+| `#0b705c` (link/action) | `--paper` | 4.8:1 | action links | ✓ |
 | `#fffef9` (card bg) | `--paper` | 1.02:1 | surface | n/a |
-| `--coral` | `--paper` | 3.1:1 | status dot only | ⚠ sempre con label |
-| `--amber` | `--paper` | 1.9:1 | status dot only | ⚠ sempre con label |
+| `--coral` | `--paper` | 3.1:1 | status dot only | ⚠ always with label |
+| `--amber` | `--paper` | 1.9:1 | status dot only | ⚠ always with label |
 
-**Contrasti sotto AA su testo piccolo (✅ chiuso in F4 — gap P2):** i 5 grigi
-sotto soglia sono stati sostituiti con `#5c6c75` (≈4.8:1 su paper) per testo
-11–12px e `#64737a` (≈4.8:1 su bianco) per testo su sfondo bianco.
+**Contrasts under AA on small text (✅ closed in F4 — gap P2):** the 5 greys
+below threshold were replaced with `#5c6c75` (≈4.8:1 on paper) for 11–12px
+text and `#64737a` (≈4.8:1 on white) for text on white backgrounds.
 
-| Coppia (pre-F4) | Ratio | Uso | Applicato (F4) |
+| Pair (pre-F4) | Ratio | Use | Applied (F4) |
 |----------------|:---:|-----|---------|
-| `#6f7e84` su paper | 3.79 | `.loading-note` 12px | `#5c6c75` |
-| `#6f7e84` su `#fffef9` | 4.16 | `.map-list-count` 11px | `#5c6c75` |
-| `#6f7e84` su `#fff` | 4.21 | `.geocode-option-type` 11px | `#64737a` |
-| `#6b7a80` su paper | 4.01 | `.footer-legal` 11px | `#5c6c75` |
-| `#8a979b` su `#fff` | 3.01 | `.geocode-attribution` 10px | `#64737a` |
-| `#60727f` (`--muted`) su paper | 4.49 | testo secondario | `#5c6c75` |
+| `#6f7e84` on paper | 3.79 | `.loading-note` 12px | `#5c6c75` |
+| `#6f7e84` on `#fffef9` | 4.16 | `.map-list-count` 11px | `#5c6c75` |
+| `#6f7e84` on `#fff` | 4.21 | `.geocode-option-type` 11px | `#64737a` |
+| `#6b7a80` on paper | 4.01 | `.footer-legal` 11px | `#5c6c75` |
+| `#8a979b` on `#fff` | 3.01 | `.geocode-attribution` 10px | `#64737a` |
+| `#60727f` (`--muted`) on paper | 4.49 | secondary text | `#5c6c75` |
 
-**Regola di accesso critica (D7):** gli status dot **non trasmettono mai
-informazioni da soli** — sempre abbinati a label testuale localizzata
-(`publicStatusLabel`). Il colore è ridondante, non esclusivo (WCAG 1.4.1).
+**Critical access rule (D7):** status dots **never convey information on
+their own** — always paired with a localised text label
+(`publicStatusLabel`). Colour is redundant, not exclusive (WCAG 1.4.1).
 
-### 3.2 Tipografia (type scale — corretta rispetto alla v1)
+### 3.2 Typography (type scale — corrected vs v1)
 
-- **Famiglia:** Arial, Helvetica, sans-serif (in `body`). Niente font
-  variabili o webfont: sobrietà e performance.
-- **Body:** **16px / 1.5 / 400** (v1 diceva 15px/1.6 — errato; il rendering
-  reale è 16/1.5). ✅ esplicito in CSS da F4 (`body { font-size:16px;
-  line-height:1.5; }`), non più default preflight.
+- **Family:** Arial, Helvetica, sans-serif (on `body`). No variable fonts
+  or webfonts: sobriety and performance.
+- **Body:** **16px / 1.5 / 400** (v1 said 15px/1.6 — wrong; the real
+  rendering is 16/1.5). ✅ explicit in CSS since F4 (`body { font-size:16px;
+  line-height:1.5; }`), no longer a preflight default.
 
-| Ruolo | Selettore | Size | Line-height | Weight | Tracking | Stato |
+| Role | Selector | Size | Line-height | Weight | Tracking | State |
 |-------|-----------|------|-------------|--------|----------|:---:|
 | Hero h1 | `.hero h1` | clamp(48px, 6vw, 82px) | 1.06 | **800** | -.075em | ✅ (F4 + t_c18b48f0) |
 | Record h1 | `.record-detail h1`, `.moderation-page>h1` | clamp(42px, 6vw, 70px) | 1.06 | **700** | -.07em | ✅ (F4 + t_c18b48f0) |
 | Tool h1 | `.tool-heading h1` | clamp(34px, 4.5vw, 52px) | 1.08 | **800** | -.06em | ✅ (F4, G1 + t_c18b48f0) |
 | Auth h1 | `.auth-card h1` | clamp(34px, 5vw, 54px) | 1.04 | 800 | -.06em | ✅ (F4) |
 
-Tutti gli h1 display (`hero`, `record-detail`, `tool-heading`, `auth-card`,
-`moderation-page`) portano `text-wrap:balance` + `overflow-wrap:anywhere`
-(fix layout IT t_c18b48f0: leading anti-collision sui titoli multiriga IT).
+All display h1s (`hero`, `record-detail`, `tool-heading`, `auth-card`,
+`moderation-page`) carry `text-wrap:balance` + `overflow-wrap:anywhere`
+(IT layout fix t_c18b48f0: anti-collision leading on multi-line IT titles).
 | Section h2 | `.section-heading h2`, `.records-heading h2` | clamp(34px, 4vw, 53px) | 1 | **800** | -.065em | ✅ (F4) |
 | Moderation h2 | `.moderation-section h2` | clamp(28px, 3vw, 42px) | 1 | 800 | -.06em | ✅ (F4) |
 | Legal h2 | `.legal-section h2` | clamp(23px, 3vw, 32px) | 1.08 | **700** | -.05em | ✅ (F4) |
@@ -250,15 +252,16 @@ Tutti gli h1 display (`hero`, `record-detail`, `tool-heading`, `auth-card`,
 | Card-topline | `.card-topline` | 11px | 1.4 | 800 | .09em up | ✅ |
 | Detail dt | `.record-detail-facts dt` | 10px | 1.4 | 800 | .1em up | ✅ |
 
-**✅ chiuso in F4 (P1 G3):** i pesi della scala (800/700) sono applicati per
-selettore in globals.css (una riga ciascuno). La gerarchia visiva "contrasti
-netti di peso (800 vs 400)" è parte del design system.
+**✅ closed in F4 (P1 G3):** the scale weights (800/700) are applied per
+selector in globals.css (one line each). The visual "sharp weight contrast
+(800 vs 400)" hierarchy is part of the design system.
 
-### 3.3 Spacing (scala 4px — ✅ implementato in F3, t_27bfa729)
+### 3.3 Spacing (4px scale — ✅ implemented in F3, t_27bfa729)
 
-I token `--space-1..24` sono in `:root` (globals.css) da F3. La codebase usa
-ancora ~60 valori ad hoc letterali, ma la scala sotto è la fonte canonica; il
-refactor CSS deve mappare i padding/margin residui sulla scala.
+The `--space-1..24` tokens are in `:root` (globals.css) since F3. The
+codebase still uses ~60 ad-hoc literal values, but the scale below is the
+canonical source; the CSS refactor must map the remaining paddings/margins
+onto the scale.
 
 ```
 --space-1: 4px    --space-2: 8px    --space-3: 12px   --space-4: 16px
@@ -266,83 +269,83 @@ refactor CSS deve mappare i padding/margin residui sulla scala.
 --space-12: 48px  --space-16: 64px  --space-20: 80px  --space-24: 96px
 ```
 
-Convenzioni d'uso:
-- padding interni card: `--space-4`/`--space-6` (16/24px);
-- gap tra card e griglie: `--space-4` (16px);
-- sezioni verticali: `--space-12`/`--space-16` (48/64px);
-- spaziature piccole (tra label e campo, tra dot e testo): `--space-1`/`--space-2` (4/8px);
-- touch target: padding ≥ `--space-3` su altezze da 44px.
+Usage conventions:
+- card internal padding: `--space-4`/`--space-6` (16/24px);
+- gaps between cards and grids: `--space-4` (16px);
+- vertical sections: `--space-12`/`--space-16` (48/64px);
+- small spacings (label↔field, dot↔text): `--space-1`/`--space-2` (4/8px);
+- touch target: padding ≥ `--space-3` on 44px-tall elements.
 
-### 3.4 Radius (scala — ✅ implementato in F3, t_27bfa729; outlier consolidati in F5, t_97442785)
+### 3.4 Radius (scale — ✅ implemented in F3, t_27bfa729; outliers consolidated in F5, t_97442785)
 
-Token `--radius-*` in `:root` da F3, consolidati dai valori esistenti. Gli
-outlier fuori scala (7/9/10/14/18px) sono stati migrati al token più vicino
-in F5 (P1-5/2-6, `globals.css` — unica eccezione: il reset `border-radius:0`
-del workspace dentro la map-card, intenzionale):
+`--radius-*` tokens in `:root` since F3, consolidated from the existing
+values. The out-of-scale outliers (7/9/10/14/18px) were migrated to the
+closest token in F5 (P1-5/2-6, `globals.css` — sole exception: the
+`border-radius:0` reset of the workspace inside the map-card, intentional):
 
 ```
 --radius-xs: 4px    /* notice, offline-state, legal-note */
---radius-sm: 6px    /* input di form (report/correction), map-hint */
---radius-md: 8px    /* skip-link, locale-toggle, search input, duplicate-alert, geocode-option (da 7px) */
---radius-lg: 12px   /* tool-card, button, nav-action, record-list-card, empty-state (da 9/10px) */
---radius-xl: 16px   /* record-detail, live-map-workspace, map-card, map-teaser (da 14/18px) */
+--radius-sm: 6px    /* form inputs (report/correction), map-hint */
+--radius-md: 8px    /* skip-link, locale-toggle, search input, duplicate-alert, geocode-option (from 7px) */
+--radius-lg: 12px   /* tool-card, button, nav-action, record-list-card, empty-state (from 9/10px) */
+--radius-xl: 16px   /* record-detail, live-map-workspace, map-card, map-teaser (from 14/18px) */
 --radius-2xl: 22px  /* hero */
 --radius-full: 999px/* pill: section-note, filter-chip */
 --radius-round: 50% /* status-dot, brand-mark */
 ```
 
-Consolidamento binding (eseguito in F5): i valori fuori scala (7, 9, 10,
-14, 18px) migrano al token più vicino (7→`--radius-md`, 9/10→`--radius-lg`,
-14→`--radius-xl`, 18→`--radius-xl` a seconda del contesto).
+Binding consolidation (done in F5): out-of-scale values (7, 9, 10, 14,
+18px) migrate to the closest token (7→`--radius-md`, 9/10→`--radius-lg`,
+14→`--radius-xl`, 18→`--radius-xl` depending on context).
 
-### 3.5 Ombre (scale — 🔒 binding, da implementare)
+### 3.5 Shadows (scale — 🔒 binding, to implement)
 
-| Token | Valore | Uso |
+| Token | Value | Use |
 |-------|--------|-----|
 | `--shadow-float` | `0 2px 12px rgba(30,48,40,.12)` | `.map-hint` |
-| `--shadow-menu` | `0 12px 24px rgba(30,45,45,.15)` | menu mobile `.nav-links` |
+| `--shadow-menu` | `0 12px 24px rgba(30,45,45,.15)` | mobile menu `.nav-links` |
 | `--shadow-popover` | `0 14px 30px rgba(25,46,52,.16)` | `.geocode-dropdown` |
 | `--shadow-card` | `0 20px 45px rgba(25,46,52,.08)` | `.map-card`, `.record-detail`, `.live-map-workspace` |
 | `--shadow-dialog` | `0 18px 50px rgba(14,42,53,.28)` | `.confirm-dialog` |
 
-Principio: ombre basse e diffuse, mai dure. Solo 5 livelli; niente ombre su
-testo, niente glow.
+Principle: low, diffuse shadows, never hard. Only 5 levels; no text
+shadows, no glow.
 
-### 3.6 Contenitori, griglia e breakpoint
+### 3.6 Containers, grid and breakpoints
 
-**Larghezze contenitore (✅ implementato):**
-- Standard: `min(1180px, calc(100% - 48px))` — pagine section, tool-section
-- Leggibile: `min(760px, calc(100% - 48px))` — record-detail, legal, FAQ
-- Largo: `min(1320px, calc(100% - 48px))` — nav-shell, hero
-- **Mappa: `min(1440px, calc(100% - 32px))`** (`.map-layout`) — aggiunto in v2
-  (non documentato in v1)
+**Container widths (✅ implemented):**
+- Standard: `min(1180px, calc(100% - 48px))` — section pages, tool-section
+- Readable: `min(760px, calc(100% - 48px))` — record-detail, legal, FAQ
+- Wide: `min(1320px, calc(100% - 48px))` — nav-shell, hero
+- **Map: `min(1440px, calc(100% - 32px))`** (`.map-layout`) — added in v2
+  (not documented in v1)
 - Mobile ≤700px: `min(100% - 32px, 1180px)`
 
-**Breakpoint (✅ implementato — v1 documentava solo 700/980/1320):**
+**Breakpoints (✅ implemented — v1 documented only 700/980/1320):**
 
 ```
-480px  — header compatto (brand ridotto, gap stretti) + nav wrap safety,
-        coordinate-fields e report-metadata-fields a 1 colonna
-700px  — tablet: griglie a 1 colonna, footer a 1 colonna
-768px  — header: menu mobile (hamburger + dropdown, t_94b3726d); mappa:
-        sidebar diventa pannello sopra la mappa (max-height 38vh)
-980px  — desktop: griglie a 2/3 colonne, hero 2 colonne
+480px  — compact header (reduced brand, tight gaps) + nav wrap safety,
+        coordinate-fields and report-metadata-fields at 1 column
+700px  — tablet: 1-column grids, 1-column footer
+768px  — header: mobile menu (hamburger + dropdown, t_94b3726d); map:
+        sidebar becomes a panel above the map (max-height 38vh)
+980px  — desktop: 2/3-column grids, 2-column hero
 1320px — wide: container max (nav-shell, hero)
 ```
 
-### 3.6 Token layer implementato (F3, t_27bfa729)
+### 3.6 Token layer implemented (F3, t_27bfa729)
 
-Implementato in `app/globals.css` (`:root`). I token rispecchiano ESATTAMENTE
-i valori preesistenti — nessun cambio di rendering (verificato: screenshot
-prima/dopo identici al pixel su tutte le route pubbliche, Lighthouse a11y
->= 0.95 su ogni route).
+Implemented in `app/globals.css` (`:root`). The tokens mirror EXACTLY the
+pre-existing values — no rendering change (verified: pixel-identical
+before/after screenshots on all public routes, Lighthouse a11y >= 0.95 on
+every route).
 
-**Spacing** — scala 4px (già in §3.4): `--space-1..24`
+**Spacing** — 4px scale (already in §3.4): `--space-1..24`
 (`--space-1:4px`, `--space-2:8px`, `--space-3:12px`, `--space-4:16px`,
 `--space-5:20px`, `--space-6:24px`, `--space-8:32px`, `--space-10:40px`,
 `--space-12:48px`, `--space-16:64px`, `--space-20:80px`, `--space-24:96px`).
 
-**Radius** — consolidato dai valori esistenti:
+**Radius** — consolidated from the existing values:
 
 ```
 --radius-xs:4px   (notice, offline-state)
@@ -355,12 +358,12 @@ prima/dopo identici al pixel su tutte le route pubbliche, Lighthouse a11y
 --radius-round:50% (dot, brand-mark, marker, faq summary ::before)
 ```
 
-I valori fuori scala esistenti (7px, 9px, 10px, 14px, 18px, 99px) sono stati
-consolidati sui token in F5 (t_97442785) — nessun letterale fuori scala
-resta in `globals.css` (unica eccezione: il reset `border-radius:0` della
-map-card).
+The existing out-of-scale values (7px, 9px, 10px, 14px, 18px, 99px) were
+consolidated onto the tokens in F5 (t_97442785) — no out-of-scale literal
+remains in `globals.css` (sole exception: the map-card's `border-radius:0`
+reset).
 
-**Type scale** — valori esistenti (F2 §3.3) come token:
+**Type scale** — existing values (F2 §3.3) as tokens:
 
 ```
 --text-2xs:10px   --text-xs:11px   --text-sm:12px   --text-md:13px
@@ -372,9 +375,10 @@ map-card).
 --text-auth:clamp(34px,5vw,54px)
 ```
 
-I valori 19px (brand) e 21px (hero-stats dt) restano letterali (fuori scala).
+The 19px (brand) and 21px (hero-stats dt) values remain literal
+(out-of-scale).
 
-**Container widths** (§3.4) come token:
+**Container widths** (§3.4) as tokens:
 
 ```
 --container-standard:min(1180px, calc(100% - 48px))
@@ -382,383 +386,387 @@ I valori 19px (brand) e 21px (hero-stats dt) restano letterali (fuori scala).
 --container-wide:min(1320px, calc(100% - 48px))
 ```
 
-**Palette** — completata con i token mancanti di §3.2: `--focus` (#0b705c),
-`--status-verified` (#42a979), `--status-community` (#d3963e),
-`--status-review` (#d8715e); le classi `.verified` / `.community-report` /
-`.needs-review` e i focus ring usano i token.
+**Palette** — completed with the missing tokens of §3.2: `--focus`
+(#0b705c), `--status-verified` (#42a979), `--status-community`
+(#d3963e), `--status-review` (#d8715e); the `.verified` /
+`.community-report` / `.needs-review` classes and the focus rings use the
+tokens.
 
 ---
 
 ## 4. Layout grid
 
-Il layout si basa su **CSS Grid**, mobile-first, con pattern per regione
-(✅ implementati — verificati nel CSS):
+The layout is based on **CSS Grid**, mobile-first, with per-region patterns
+(✅ implemented — verified in the CSS):
 
-| Regione | Griglia desktop | Griglia mobile (≤700px) |
+| Region | Desktop grid | Mobile grid (≤700px) |
 |---------|-----------------|-------------------------|
-| Hero | `1.02fr .98fr` | 1 colonna (≤980px) |
-| Map workspace (`.map-split`) | `340px 1fr`, height `calc(100vh - 300px)` min 540px | 1 colonna, sidebar sopra la mappa (≤768px) |
-| Map sidebar | colonna 340px, scroll interno `.map-list-scroll` | pannello max-height 38vh |
-| Tool cards | `1fr 1fr` (2 colonne) | 1 colonna |
-| Record list | `repeat(2, minmax(0,1fr))` | 1 colonna |
+| Hero | `1.02fr .98fr` | 1 column (≤980px) |
+| Map workspace (`.map-split`) | `340px 1fr`, height `calc(100vh - 300px)` min 540px | 1 column, sidebar above the map (≤768px) |
+| Map sidebar | 340px column, internal scroll `.map-list-scroll` | panel max-height 38vh |
+| Tool cards | `1fr 1fr` (2 columns) | 1 column |
+| Record list | `repeat(2, minmax(0,1fr))` | 1 column |
 | Directory controls | `1fr minmax(175px,.34fr) minmax(190px,.38fr)` | 1fr 1fr (≤980) → 1fr (≤700) |
-| Report/correction | `.8fr 1.1fr` | 1 colonna |
-| Principles | `.85fr 1.15fr`; grid interna `repeat(3,1fr)` | 1 colonna |
-| Record facts | `repeat(2,1fr)` | 1 colonna |
-| Footer | `auto 1fr auto` | 1 colonna |
-| Auth form | card max-width 560px | stessa |
+| Report/correction | `.8fr 1.1fr` | 1 column |
+| Principles | `.85fr 1.15fr`; inner grid `repeat(3,1fr)` | 1 column |
+| Record facts | `repeat(2,1fr)` | 1 column |
+| Footer | `auto 1fr auto` | 1 column |
+| Auth form | card max-width 560px | same |
 
-Regole:
-- Mai scroll orizzontale a 320px; tutte le griglie collassano a 1 colonna.
-- Le card in griglia usano `gap:16px` (`--space-4`).
-- Il workspace mappa è **un'unica card** (`.map-card`): FiltersBar come bordo
-  superiore, split sotto, export footer in coda.
+Rules:
+- Never horizontal scroll at 320px; all grids collapse to 1 column.
+- Grid cards use `gap:16px` (`--space-4`).
+- The map workspace is **a single card** (`.map-card`): FiltersBar as the
+  top border, split below, export footer at the end.
 
 ---
 
-## 5. Formattazione (bordi, radius, ombre)
+## 5. Formatting (borders, radius, shadows)
 
-- **Bordi:** `1px solid var(--line)` per card e separatori; `#cdd6ce` per
-  input; `#d6dbd3` per card form; `#e6b8ad` per zone danger/errori.
-- **Bordi accent (banner/alert):** bordo sinistro 3px semantico —
-  verde `#43a979` (notice/legal-note), ambra `#c99127` (duplicate-alert),
+- **Borders:** `1px solid var(--line)` for cards and separators; `#cdd6ce`
+  for inputs; `#d6dbd3` for form cards; `#e6b8ad` for danger/error zones.
+- **Accent borders (banner/alert):** semantic 3px left border —
+  green `#43a979` (notice/legal-note), amber `#c99127` (duplicate-alert),
   `#c99a3a` (offline-state), `#c99127` (warning).
-- **Radius:** la scala §3.4 — mai valori fuori scala nei componenti nuovi.
-- **Ombre:** la scala §3.5 — mai ombre per componenti inline (testo, dot,
-  label).
+- **Radius:** the §3.4 scale — never out-of-scale values in new components.
+- **Shadows:** the §3.5 scale — never shadows for inline components (text,
+  dots, labels).
 
 ---
 
-## 6. Componenti (design system)
+## 6. Components (design system)
 
-### 6.1 Registro componenti (42 file in `app/components/`)
+### 6.1 Component registry (42 files in `app/components/`)
 
-Legenda: **[spec]** = sezione dedicata sotto · **[patt.]** = pattern condiviso
-(§6.3) · **→** = pagina di uso.
+Legend: **[spec]** = dedicated section below · **[patt.]** = shared pattern
+(§6.3) · **→** = page of use.
 
 **Core / layout**
-| Componente | Dove | Note | Stato doc |
+| Component | Where | Notes | Doc state |
 |------------|------|------|:---:|
-| `PublicNav` | tutte le pubbliche | header condiviso a 3 azioni | **[spec] 6.2.1** |
-| `PublicNavLinks` | tutte le pubbliche | set nav unico, `aria-current="page"` | [spec] 6.2.1 |
-| `SiteHeader` | root shell pagine | nav-shell brand + children + LocaleToggle | [patt.] |
-| `SiteFooter` | root layout | footer globale raggruppato per compito; note legali espandibili | [patt.] |
-| `HomeNav` | `/` | island client del menu mobile (SSR-pure home) | [patt.] |
-| `ToolLayout` | route group `(tools)` | layout condiviso tool: PublicNav + main | [patt.] |
-| `ErrorPage` | 404/500 | shell error condivisa | **[spec] 6.2.5** |
-| `LegacyAnchorRedirect` | root layout | redirect client-side anchor legacy (`router.replace`) | [patt.] |
+| `PublicNav` | all public pages | shared 3-action header | **[spec] 6.2.1** |
+| `PublicNavLinks` | all public pages | single nav set, `aria-current="page"` | [spec] 6.2.1 |
+| `SiteHeader` | page root shell | nav-shell brand + children + LocaleToggle | [patt.] |
+| `SiteFooter` | root layout | global footer grouped by task; expandable legal notes | [patt.] |
+| `HomeNav` | `/` | client island of the mobile menu (SSR-pure home) | [patt.] |
+| `ToolLayout` | route group `(tools)` | shared tool layout: PublicNav + main | [patt.] |
+| `ErrorPage` | 404/500 | shared error shell | **[spec] 6.2.5** |
+| `LegacyAnchorRedirect` | root layout | legacy anchor client-side redirect (`router.replace`) | [patt.] |
 
 **Home hub**
-| `Hero` | `/` | hero scuro, ricerca directory, 2 CTA, stat | [patt.] |
-| `MapTeaser` | `/` | teaser **statico** (no Leaflet) — non è `SurveillanceMap` | [patt.] |
-| `ToolCards` | `/` | 4 card tool 2×2 | [patt.] |
+| `Hero` | `/` | dark hero, directory search, 2 CTAs, stat | [patt.] |
+| `MapTeaser` | `/` | **static** teaser (no Leaflet) — not `SurveillanceMap` | [patt.] |
+| `ToolCards` | `/` | 4 tool cards 2×2 | [patt.] |
 
-**Mappa (`/mappa`)**
-| `MappaTool` | `/mappa` | corpo pagina: h1 sr-only + map-layout + map-card | [spec] 6.2.6 |
-| `SurveillanceMap` | `/mappa` | mappa Leaflet lazy + fallback | [patt.] |
-| `MapPanel` | `/mappa` | orchestratore workspace: map + sidebar + popup + export | [patt.] |
-| `MapRecordList` | `/mappa` | **sidebar lista viewport-sync** | **[spec] 6.2.4** |
-| `GeocodeSearch` | `/mappa` | **combobox geocode con dropdown** | **[spec] 6.2.3** |
-| `lib/map-popup.ts` | `/mappa` | **builder HTML marker popup** (bindPopup) | **[spec] 6.2.2** |
+**Map (`/mappa`)**
+| `MappaTool` | `/mappa` | page body: sr-only h1 + map-layout + map-card | [spec] 6.2.6 |
+| `SurveillanceMap` | `/mappa` | lazy Leaflet map + fallback | [patt.] |
+| `MapPanel` | `/mappa` | workspace orchestrator: map + sidebar + popup + export | [patt.] |
+| `MapRecordList` | `/mappa` | **viewport-sync sidebar list** | **[spec] 6.2.4** |
+| `GeocodeSearch` | `/mappa` | **geocode combobox with dropdown** | **[spec] 6.2.3** |
+| `lib/map-popup.ts` | `/mappa` | **marker popup HTML builder** (bindPopup) | **[spec] 6.2.2** |
 
-**Directory e tool**
-| `DirectoryTool` | `/directory` | tool-heading (con link mappa) + PublicDirectory catalog | [spec] 2.2 |
-| `DirectoryCatalog` | `/directory` | **layout catalog**: FiltersBar bare + pannello luogo + header risultati + chips + indice A–Z + righe + paginazione `?page=` | **[spec] 2.2** |
+**Directory and tools**
+| `DirectoryTool` | `/directory` | tool-heading (with map link) + PublicDirectory catalog | [spec] 2.2 |
+| `DirectoryCatalog` | `/directory` | **catalog layout**: bare FiltersBar + place panel + results header + chips + A–Z index + rows + `?page=` pagination | **[spec] 2.2** |
 | `SegnalaTool` | `/segnala` | tool-heading + ReportForm | [spec] 2.2 |
 | `CorreggiTool` | `/correggi` | tool-heading + CorrectionForm | [spec] 2.2 |
-| `PublicDirectory` | `/directory`, home | catalog (delega a DirectoryCatalog) / hub (sezione home) | [patt.] |
-| `ReportForm` | `/segnala` | form guidato + coordinate | [patt.] |
-| `CorrectionForm` | `/correggi` | form correzione + duplicate alert | [patt.] |
-| `FiltersBar` | `/mappa`, `/directory`, home | filtri condivisi D4, varianti `inline`/`panel`/`bare` | **[spec] 6.3.3** |
-| `RecordCard` | directory, search, moderation | card record condivisa | [patt.] |
-| `EmptyState` | directory, mappa, moderation | empty state truthfull (heading h2\|h3) | [patt.] |
+| `PublicDirectory` | `/directory`, home | catalog (delegates to DirectoryCatalog) / hub (home section) | [patt.] |
+| `ReportForm` | `/segnala` | guided form + coordinates | [patt.] |
+| `CorrectionForm` | `/correggi` | correction form + duplicate alert | [patt.] |
+| `FiltersBar` | `/mappa`, `/directory`, home | shared D4 filters, `inline`/`panel`/`bare` variants | **[spec] 6.3.3** |
+| `RecordCard` | directory, search, moderation | shared record card | [patt.] |
+| `EmptyState` | directory, map, moderation | truthful empty state (h2\|h3 heading) | [patt.] |
 
 **Record, community, auth**
-| `RecordPageBody` (`app/records/[id]/RecordPageBody.tsx`) | `/records/[id]` | corpo client del dettaglio (loading/offline/error) | [patt.] |
-| `CommunityActions` | `/records/[id]`, popup mappa | widget azioni community (varianti full/compact: useful/confirm + disclosure gone/problem/privacy con conferma privacy) | **[spec] 6.2.2** |
-| `LevelBadge` | `/account` | badge livello (label + dot; progresso SOLO testo, mai barra) | [patt.] |
-| `ConfirmDialog` | `/account` | alertdialog distruttivo accessibile (sostituisce `window.confirm`) | [patt.] |
-| `ModerationDashboard` | `/moderation` | dashboard privata (residuale, emergenza legale — ADR 0021 §8) | [patt.] |
+| `RecordPageBody` (`app/records/[id]/RecordPageBody.tsx`) | `/records/[id]` | client detail body (loading/offline/error) | [patt.] |
+| `CommunityActions` | `/records/[id]`, map popup | community-actions widget (full/compact variants: useful/confirm + gone/problem/privacy disclosure with privacy confirmation) | **[spec] 6.2.2** |
+| `LevelBadge` | `/account` | level badge (label + dot; progress TEXT only, never a bar) | [patt.] |
+| `ConfirmDialog` | `/account` | accessible destructive alertdialog (replaces `window.confirm`) | [patt.] |
+| `ModerationDashboard` | `/moderation` | private dashboard (residual, legal emergency — ADR 0021 §8) | [patt.] |
 
-> Nota: `VerificationWidget`/`StarConfirmButton` (componenti pre-ADR 0021)
-> non sono più montati in nessuna superficie — il widget corrente è
-> `CommunityActions`; i file restano solo come riferimento storico.
+> Note: `VerificationWidget`/`StarConfirmButton` (pre-ADR 0021 components)
+> are no longer mounted on any surface — the current widget is
+> `CommunityActions`; the files remain only as historical reference.
 
-**Moderation (`moderation/`, 7 componenti + hook)**
-| `QueueSection`, `CameraQueueItem`, `CorrectionQueueItem`, `EditQueueItem`, `DecisionForm`, `HistorySection`, `CorrectionHistorySection`, `useModerationQueue` | `/moderation` | coda per sezioni, decisioni, storico | [patt.] — dot `pending` 🔒 (§6.3.2) |
+**Moderation (`moderation/`, 7 components + hook)**
+| `QueueSection`, `CameraQueueItem`, `CorrectionQueueItem`, `EditQueueItem`, `DecisionForm`, `HistorySection`, `CorrectionHistorySection`, `useModerationQueue` | `/moderation` | per-section queue, decisions, history | [patt.] — `pending` dot 🔒 (§6.3.2) |
 
-**Pagine info**
-| `InfoPage` | manifesto, guide, faq, contatti, accessibility | wrapper SSR free-form | [patt.] |
-| `LegalPage` | privacy, termini, licenze | wrapper SSR strutturato (tabelle, note) | [patt.] |
-| `LocaleToggle` | header | toggle EN/IT (in `LocaleProvider`) | [patt.] |
+**Info pages**
+| `InfoPage` | manifesto, guide, faq, contatti, accessibility | free-form SSR wrapper | [patt.] |
+| `LegalPage` | privacy, termini, licenze | structured SSR wrapper (tables, notes) | [patt.] |
+| `LocaleToggle` | header | EN/IT toggle (in `LocaleProvider`) | [patt.] |
 
-### 6.2 Specifiche componenti principali
+### 6.2 Main component specifications
 
-#### 6.2.1 Header condiviso — `PublicNav` (+ `PublicNavLinks`) ✅
+#### 6.2.1 Shared header — `PublicNav` (+ `PublicNavLinks`) ✅
 
-Unico header di TUTTE le pagine pubbliche (t_a72a3106).
+The single header of ALL public pages (t_a72a3106).
 
-- **Anatomia:** brand (mark 29px cerchio navy/mint + nome 19px/800/-.04em) ·
-  nav-links (3 link primari + **auth entry point**) · LocaleToggle ·
+- **Anatomy:** brand (29px navy/mint circle mark + 19px/800/-.04em name) ·
+  nav-links (3 primary links + **auth entry point**) · LocaleToggle ·
   menu button (mobile).
-- **Set link (ordine fisso):** Mappa `/mappa`, Directory `/directory`,
-  **Segnala CTA** `/segnala` (`.nav-action`). Guida, Regole e Manifesto
-  restano nel footer. Pagina corrente: `aria-current="page"`.
-- **Auth entry point (`AuthNavLinks`, t_65b778c5, fix mobile t_94b3726d):**
-  "Log in" `/login` + "Create account" `/register` (anonimo) o link account
-  `/account` (autenticato, aria-label sempre) — ULTIMO item di `.nav-links`,
-  con `aria-current` sulla rotta auth corrente. Stato da `GET /api/auth/me`;
-  stato iniziale/errore = nulla (nessun leak in SSR, fail-closed).
-- **Stile:** link 14px/700 `#405462`, hover `#16715e`; CTA con bordo
+- **Link set (fixed order):** Map `/mappa`, Directory `/directory`,
+  **Report CTA** `/segnala` (`.nav-action`). Guide, Rules and Manifesto
+  stay in the footer. Current page: `aria-current="page"`.
+- **Auth entry point (`AuthNavLinks`, t_65b778c5, mobile fix t_94b3726d):**
+  "Log in" `/login` + "Create account" `/register` (anonymous) or account
+  link `/account` (authenticated, always with aria-label) — LAST item of
+  `.nav-links`, with `aria-current` on the current auth route. State from
+  `GET /api/auth/me`; initial/error state = nothing (no SSR leak,
+  fail-closed).
+- **Style:** 14px/700 links `#405462`, hover `#16715e`; CTA with border
   `#b7c2bd`, radius `--radius-lg` (9px→binding), padding 11px 15px.
-- **Mobile (<768px):** `.menu-button` visibile; `.nav-links` pannello
-  assoluto con `--shadow-menu`, `aria-expanded` sul toggle, `.is-open`.
-  I link auth viaggiano NEL dropdown (separati da hairline), così la barra
-  superiore (brand + menu + LocaleToggle) non va mai a capo a 320/390px
-  (feedback CEO live). Regole scoped con `:has(.menu-button)` così gli
-  header contestuali (login/register/account/error) non collassano.
-- **≤480px:** header compatto — brand 13px/mark 24px, margini 12px, gap 6px
-  (fit a 320px); `flex-wrap:wrap` resta solo come safety net.
-- **Desktop (≥768px):** `.nav-links` riempie la shell (flex:1) e il cluster
-  auth è spinto a destra (`margin-left:auto`) accanto al LocaleToggle.
-- **Accessibilità:** landmark `nav` con `aria-label` localizzata; skip-link;
-  focus `:focus-visible` outline 3px `var(--focus)` offset 3px.
-- **Varianti brand:** home usa `brandHref="#top"` + `brandAs="anchor"`;
-  ogni altra pagina linka a `/`.
+- **Mobile (<768px):** `.menu-button` visible; `.nav-links` absolute panel
+  with `--shadow-menu`, `aria-expanded` on the toggle, `.is-open`.
+  Auth links travel IN the dropdown (separated by a hairline), so the top
+  bar (brand + menu + LocaleToggle) never wraps at 320/390px
+  (live CEO feedback). Rules scoped with `:has(.menu-button)` so the
+  contextual headers (login/register/account/error) do not collapse.
+- **≤480px:** compact header — brand 13px/mark 24px, margins 12px, gap 6px
+  (fits 320px); `flex-wrap:wrap` remains only as a safety net.
+- **Desktop (≥768px):** `.nav-links` fills the shell (flex:1) and the auth
+  cluster is pushed right (`margin-left:auto`) next to the LocaleToggle.
+- **Accessibility:** `nav` landmark with localised `aria-label`; skip-link;
+  `:focus-visible` outline 3px `var(--focus)` offset 3px.
+- **Brand variants:** home uses `brandHref="#top"` + `brandAs="anchor"`;
+  every other page links to `/`.
 
-**Regola:** set unico e stabile. Non reintrodurre set per-pagina. Le pagine
-funzionali (auth, record, moderation) usano l'header contestuale; le error
-pages l'header ridotto (§2.3).
+**Rule:** single, stable set. Do not reintroduce per-page sets. Functional
+pages (auth, record, moderation) use the contextual header; error pages the
+reduced header (§2.3).
 
 #### 6.2.2 Marker popup — `lib/map-popup.ts` + `.osm-popup*` ✅
 
-Popup costruito client-side come HTML string e bindato con `bindPopup`
-(t_702c10af, refactor t_b9666d09, redesign t_b7728ad0). Anatomia corrente:
+Popup built client-side as an HTML string and bound with `bindPopup`
+(t_702c10af, refactor t_b9666d09, redesign t_b7728ad0). Current anatomy:
 
-1. **Header:** h3 titolo (15px/800) · `.osm-popup-kind` (12px `#60737d`) ·
-   `.osm-popup-status` (12px/700, dot + label da `publicStatusLabel`).
-2. **Facts:** `<dl>` denso a 2 colonne (record id, coordinate 4 decimali,
-   campo visivo testuale se direzionale) · address opzionale · description
-   opzionale.
-3. **Community toolbar:** nodo `div.osm-popup-community` (data-record-id) dove
-   il workspace monta il widget compatto `CommunityActions` su `popupopen`
-   (root React separata, smontata su `popupclose`): `Useful`/`Confirm` con
-   conteggi + trigger disclosure "Update/report" (gone/problem/privacy;
-   privacy richiede conferma esplicita prima del PUT).
-4. **Footer:** UN solo CTA `/records/[id]` (il link `/correggi` è stato
-   rimosso dal popup — le azioni Problema/Privacy del disclosure sono la
-   superficie di segnalazione a livello record).
-5. **Provenance:** `.osm-popup-provenance` in basso (testo piccolo): per gli
-   importati `Fonte: <ente> · <licenza> · Aggiunta: <data>`, per le
-   segnalazioni la label localizzata (FASE C, t_4dbce318).
+1. **Header:** h3 title (15px/800) · `.osm-popup-kind` (12px `#60737d`) ·
+   `.osm-popup-status` (12px/700, dot + label from `publicStatusLabel`).
+2. **Facts:** dense 2-column `<dl>` (record id, 4-decimal coordinates,
+   textual field of view if directional) · optional address · optional
+   description.
+3. **Community toolbar:** `div.osm-popup-community` node (data-record-id)
+   where the workspace mounts the compact `CommunityActions` widget on
+   `popupopen` (separate React root, unmounted on `popupclose`):
+   `Useful`/`Confirm` with counts + "Update/report" disclosure trigger
+   (gone/problem/privacy; privacy requires explicit confirmation before the
+   PUT).
+4. **Footer:** ONE CTA `/records/[id]` (the `/correggi` link was removed
+   from the popup — the disclosure's Problem/Privacy actions are the
+   record-level reporting surface).
+5. **Provenance:** `.osm-popup-provenance` at the bottom (small text): for
+   imported records `Source: <authority> · <licence> · Added: <date>`, for
+   reports the localised label (Phase C, t_4dbce318).
 
-**Sicurezza:** ogni campo è HTML-escaped (`escapeHtml`) — il popup resta
-inerte; la label di stato viene SOLO dal helper pubblico, mai dal dato grezzo.
+**Security:** every field is HTML-escaped (`escapeHtml`) — the popup stays
+inert; the status label comes ONLY from the public helper, never from raw
+data.
 
-**Accessibilità:** dot `aria-hidden` + label testuale (WCAG 1.4.1); il popup
-riceve `role="dialog"` + `aria-label` (titolo record) al `popupopen`; i marker
-sono focusabili e aprono con Enter/Spazio (keydown handler); opzioni
-`keepInView:true` + `autoPanPadding:[48,48]` su bindPopup e picker; larghezza
-via opzione Leaflet (`popupMaxWidth()`: 260 ≤ 520px viewport, altrimenti 300 —
-mai via CSS).
+**Accessibility:** `aria-hidden` dot + text label (WCAG 1.4.1); the popup
+receives `role="dialog"` + `aria-label` (record title) on `popupopen`;
+markers are focusable and open with Enter/Space (keydown handler); options
+`keepInView:true` + `autoPanPadding:[48,48]` on bindPopup and picker; width
+via the Leaflet option (`popupMaxWidth()`: 260 for ≤520px viewports,
+otherwise 300 — never via CSS).
 
-- **Marker:** `.osm-camera-marker` 25px cerchio verde (`#1a7c60`) con
-  punto interno mint; `.demo` = slate `#6177ac`; `.selected` = outline 6px
+- **Marker:** `.osm-camera-marker` 25px green circle (`#1a7c60`) with an
+  inner mint dot; `.demo` = slate `#6177ac`; `.selected` = 6px outline
   `rgba(24,97,79,.22)`.
 
-#### 6.2.3 Dropdown geocode — `GeocodeSearch` ✅
+#### 6.2.3 Geocode dropdown — `GeocodeSearch` ✅
 
-Combobox ARIA sotto la search della sidebar mappa (t_b9666d09, debounce
-remount-proof t_b1e192e1).
+ARIA combobox under the map sidebar search (t_b9666d09, remount-proof
+debounce t_b1e192e1).
 
-- **Anatomia:** `.map-list-search` (position:relative) → input
+- **Anatomy:** `.map-list-search` (position:relative) → input
   `role="combobox"` + `.geocode-dropdown` (absolute, `top:100%`, z-index 30,
   `left/right:16px`, `--shadow-popover`, radius `--radius-lg`, bg `#fff`) →
-  `<ul role="listbox">` (max-height 264px, scroll) → footer attribuzione
-  Nominatim 10px.
+  `<ul role="listbox">` (max-height 264px, scroll) → 10px Nominatim
+  attribution footer.
 - **ARIA:** `aria-autocomplete="list"`, `aria-expanded`, `aria-controls`,
-  `aria-activedescendant` sull'opzione attiva; stato vuoto/errore annunciato
-  con `role="status"`.
-- **Interazione:** debounce 300ms, max 5 suggerimenti (proxy same-origin
-  `/api/geocode`, mai payload Nominatim grezzo — data minimization);
-  ArrowUp/Down muovono l'highlight, Enter seleziona, Escape chiude, click
-  fuori chiude; la selezione panna la mappa (zoom ≥15) e resetta il filtro
-  locale.
+  `aria-activedescendant` on the active option; empty/error state announced
+  with `role="status"`.
+- **Interaction:** 300ms debounce, max 5 suggestions (same-origin proxy
+  `/api/geocode`, never raw Nominatim payloads — data minimisation);
+  ArrowUp/Down move the highlight, Enter selects, Escape closes, outside
+  click closes; the selection pans the map (zoom ≥15) and resets the local
+  filter.
 - **Option:** `.geocode-option` 13px, `.is-active`/hover bg `#eef3ea`;
   `.geocode-option-name` 700 `#174e58`; `.geocode-option-type` 11px 🔒
-  contrasto (→ `#64737a`).
-- **Stati:** `.geocode-status` (idle/empty/error) 13px `#60737d`.
+  contrast (→ `#64737a`).
+- **States:** `.geocode-status` (idle/empty/error) 13px `#60737d`.
 
-#### 6.2.4 Sidebar viewport — `MapRecordList` ✅
+#### 6.2.4 Viewport sidebar — `MapRecordList` ✅
 
-Lista dei record **dentro il viewport corrente** della mappa (t_702c10af),
-con empty note truthfull in-lista (t_b9666d09).
+List of the records **inside the current map viewport** (t_702c10af),
+with a truthful in-list empty note (t_b9666d09).
 
-- **Anatomia:** `.map-list-header` (h2 13px `#174e58` + `.map-list-count`
-  11px `role="status"` "N di M in vista") → `.map-list-scroll` (flex:1,
+- **Anatomy:** `.map-list-header` (13px h2 `#174e58` + `.map-list-count`
+  11px `role="status"` "N of M in view") → `.map-list-scroll` (flex:1,
   `overflow-y:auto`, `overscroll-behavior:contain`) → `.map-record-list`
-  (`<ul>`) → item `.map-record` (button full-width).
-- **Item `.map-record`:** title 14px/800 `#174e58`, meta 12px `#60737d`;
-  hover bg `#eef3ea`; focus outline 3px `var(--focus)` offset 1px; **selected**
+  (`<ul>`) → item `.map-record` (full-width button).
+- **Item `.map-record`:** 14px/800 title `#174e58`, 12px meta `#60737d`;
+  hover bg `#eef3ea`; 3px `var(--focus)` outline offset 1px; **selected**
   border-left 3px `#1a7c60` + bg `#e4efe6`.
-- **Sync viewport:** il pan della mappa aggiorna la lista (solo punti in
-  vista); help sr-only `.sr-only` annuncia il sync ad AT.
-- **Empty note (D5, map-always-visible):** la mappa **non sparisce mai**; con
-  0 risultati la nota truthfull `.map-list-empty-note` (titolo 14px/800 +
-  body 13px + azione "Clear filters" `onReset`) vive DENTRO la lista.
-- **Mobile (≤768px):** sidebar = pannello sopra la mappa, max-height 38vh,
-  lista scroll max-height 30vh, bordo inferiore (non bottom-sheet — v2
-  corregge la v1).
+- **Viewport sync:** map pan updates the list (points in view only); an
+  sr-only `.sr-only` helper announces the sync to AT.
+- **Empty note (D5, map-always-visible):** the map **never disappears**;
+  with 0 results the truthful `.map-list-empty-note` (14px/800 title +
+  13px body + "Clear filters" `onReset` action) lives INSIDE the list.
+- **Mobile (≤768px):** sidebar = panel above the map, max-height 38vh,
+  list scroll max-height 30vh, bottom border (not a bottom-sheet — v2
+  corrects v1).
 
 #### 6.2.5 Error pages 404/500 — `ErrorPage` ✅
 
-Shell condivisa da `not-found.tsx` (404) ed `error.tsx` (500) (t_7eed4601).
+Shell shared by `not-found.tsx` (404) and `error.tsx` (500) (t_7eed4601).
 
-- **Anatomia:** `main#main-content.record-page` → `SiteHeader` ridotto
-  (1 link `nav-action` "Torna alla home" + LocaleToggle) → `article.record-detail`
-  (card `--shadow-card`, radius `--radius-xl`) → copia localizzata → CTA home
-  (`.button`) + (500) bottone retry `onRetry={reset}`.
-- **Document title (F5, P3-3 — WCAG 2.4.2):** ogni pagina di errore ha un
-  `<title>` proprio, non quello della home ereditato dal root layout:
+- **Anatomy:** `main#main-content.record-page` → reduced `SiteHeader`
+  (1 `nav-action` link "Back to home" + LocaleToggle) → `article.record-detail`
+  (card `--shadow-card`, radius `--radius-xl`) → localised copy → home CTA
+  (`.button`) + (500) retry button `onRetry={reset}`.
+- **Document title (F5, P3-3 — WCAG 2.4.2):** every error page has its own
+  `<title>`, not the home title inherited from the root layout:
   "Page not found — OpenSurveillanceDB" (404, `generateMetadata` in
-  `not-found.tsx`, SSR) e "Something went wrong — OpenSurveillanceDB" (500,
-  `document.title` in `ErrorPage` — `error.tsx` è un boundary client e non
-  può esportare metadata). Chiavi `errors.notFoundMetaTitle` /
+  `not-found.tsx`, SSR) and "Something went wrong — OpenSurveillanceDB"
+  (500, `document.title` in `ErrorPage` — `error.tsx` is a client boundary
+  and cannot export metadata). Keys `errors.notFoundMetaTitle` /
   `errors.serverErrorMetaTitle`.
-- **Privacy by design:** la pagina **non riporta mai** il path richiesto né il
-  messaggio d'errore (ADR 0002, fail-closed come il gate moderation).
-- **i18n:** client component voluto (error boundary) — copia da
-  `useMessages().errors`, cookie locale onorato, toggle funzionante.
-- **Header/footer raggiungibili:** un vicolo cieco non sembra rotto.
+- **Privacy by design:** the page **never reports** the requested path or
+  the error message (ADR 0002, fail-closed like the moderation gate).
+- **i18n:** deliberately a client component (error boundary) — copy from
+  `useMessages().errors`, locale cookie honoured, toggle works.
+- **Header/footer reachable:** a dead end does not look broken.
 
-#### 6.2.6 Workspace mappa — `MappaTool` + `MapPanel` ✅
+#### 6.2.6 Map workspace — `MappaTool` + `MapPanel` ✅
 
-- **Struttura:** `tool-section.map-tool` → h1 sr-only → `.map-layout`
-  (1440px) → `.map-card` (unica card: `FiltersBar variant="panel"` come
-  bordo superiore, `MapPanel` sotto). Il banner prototipo e il footer
-  `.data-actions` sono stati rimossi (feedback CEO 2026-08-02): la pagina
-  parte direttamente con la card, la riga download GeoJSON/CSV vive su
-  /directory.
-- **MapPanel:** `map-split` 340px sidebar + mappa full-height
-  (`calc(100vh - 300px)`, min 540px); mappa sempre renderizzata
-  (map-always-visible t_b9666d09); `?focus=ID` deep link panna sul record
-  (t_b9666d09); `issueHref="/correggi"`, `directoryHref="/directory"`.
-- **Filtri:** `FiltersBar panel` con `hideSearch` (la search vive nella
-  sidebar come `GeocodeSearch`, stesso stato `?q=`).
+- **Structure:** `tool-section.map-tool` → sr-only h1 → `.map-layout`
+  (1440px) → `.map-card` (single card: `FiltersBar variant="panel"` as the
+  top border, `MapPanel` below). The prototype banner and the `.data-actions`
+  footer were removed (CEO feedback 2026-08-02): the page starts directly
+  with the card; the GeoJSON/CSV download row lives on /directory.
+- **MapPanel:** `map-split` 340px sidebar + full-height map
+  (`calc(100vh - 300px)`, min 540px); map always rendered
+  (map-always-visible t_b9666d09); `?focus=ID` deep link pans to the
+  record (t_b9666d09); `issueHref="/correggi"`,
+  `directoryHref="/directory"`.
+- **Filters:** `FiltersBar panel` with `hideSearch` (the search lives in
+  the sidebar as `GeocodeSearch`, same `?q=` state).
 
-### 6.3 Pattern condivisi
+### 6.3 Shared patterns
 
-#### 6.3.1 Bottoni `.button` ✅
+#### 6.3.1 Buttons `.button` ✅
 
-| Variante | Stile | Hover | Disabled |
+| Variant | Style | Hover | Disabled |
 |----------|-------|-------|----------|
-| `.button-primary` | bg `--mint`, testo `#0e2a35` | bg `#b4edc7` | 🔒 opacity .55 + `cursor:wait` in submit |
-| `.button-quiet` | testo `#e7f4ee`, bordo `rgba(222,245,234,.42)` | (default) | — |
-| `.detail-outline` | testo `#1c4858`, bordo `#b7c2bd` | (default) | — |
-| `.button-danger` | bg `#8a3b2c`, testo bianco | bg `#a04432` | opacity .55 + `cursor:progress` |
+| `.button-primary` | bg `--mint`, text `#0e2a35` | bg `#b4edc7` | 🔒 opacity .55 + `cursor:wait` on submit |
+| `.button-quiet` | text `#e7f4ee`, border `rgba(222,245,234,.42)` | (default) | — |
+| `.detail-outline` | text `#1c4858`, border `#b7c2bd` | (default) | — |
+| `.button-danger` | bg `#8a3b2c`, white text | bg `#a04432` | opacity .55 + `cursor:progress` |
 
-Base: padding 13px 18px (≈47px di altezza ✅ WCAG 2.5.8), radius
-`--radius-lg`, font 14px/800, focus outline 3px `var(--focus)` offset 3px,
+Base: padding 13px 18px (≈47px tall ✅ WCAG 2.5.8), radius
+`--radius-lg`, 14px/800 font, 3px `var(--focus)` outline offset 3px,
 `transition transform .2s, background .2s`; hover `translateY(-2px)`.
-`.text-button`: link inline 13px/800 `#0a705d` con freccia.
+`.text-button`: inline link 13px/800 `#0a705d` with arrow.
 
 #### 6.3.2 Status dot `.status-dot` ⚠ (G2/P2 binding)
 
-Definite: `.verified` `#42a979`, `.community-report` `#d3963e`,
-`.needs-review` `#d8715e`. **Mancano (🔒 binding, una riga ciascuna):**
+Defined: `.verified` `#42a979`, `.community-report` `#d3963e`,
+`.needs-review` `#d8715e`. **Missing (🔒 binding, one line each):**
 
 ```
-.status-dot.demo { background:#6177ac; }    /* coerente con .osm-camera-marker.demo */
-.status-dot.pending { background:#8a979b; } /* moderation: in coda */
+.status-dot.demo { background:#6177ac; }    /* consistent with .osm-camera-marker.demo */
+.status-dot.pending { background:#8a979b; } /* moderation: in queue */
 ```
 
-Ogni dot è `aria-hidden` (o con label testuale accanto) — mai colore da solo.
+Every dot is `aria-hidden` (or has a text label next to it) — never colour
+alone.
 
-#### 6.3.3 Filtri condivisi — `FiltersBar` ✅
+#### 6.3.3 Shared filters — `FiltersBar` ✅
 
-Stesso componente su `/mappa` e `/directory` (D4, stato URL identico):
+Same component on `/mappa` and `/directory` (D4, identical URL state):
 
-| Filtro | Controllo | Query param |
+| Filter | Control | Query param |
 |--------|-----------|-------------|
-| Ricerca testuale | `<input type="search">` (nascosto su /mappa — vive in sidebar) | `?q=` |
-| Tipo camera | `<select>` | `?type=` |
+| Text search | `<input type="search">` (hidden on /mappa — lives in the sidebar) | `?q=` |
+| Camera type | `<select>` | `?type=` |
 | Freshness | `<select>` (all/7d/30d/90d) | `?freshness=` |
-| Ordinamento | `<select>` (alpha/position) | `?sort=` |
-| Pagina risultati (solo /directory, t_f13fcb1c) | paginazione "Prev/Next" | `?page=` |
-| Reset | `<button>` | rimuove i params |
+| Sort | `<select>` (alpha/position) | `?sort=` |
+| Results page (directory only, t_f13fcb1c) | "Prev/Next" pagination | `?page=` |
+| Reset | `<button>` | removes the params |
 
-**Varianti (t_127492f1; t_f13fcb1c):** `inline` (home: riga controlli +
-counter), `panel` (/mappa: bordo superiore della map-card, `hideSearch`),
-`bare` (/directory catalog: la stessa griglia controlli SENZA il counter —
-il counter vive nella `.directory-results` renderizzata da `PublicDirectory`
-catalog, accanto a export; il toggle luogo arriva via `extraControls`,
-renderizzato in fondo alla griglia accanto a Reset). Le varianti condividono
-ids (`record-search`, `record-kind-filter`, `record-freshness-filter`,
-`record-sort`, `record-search-count`), label e stato URL — solo la resa
-del counter cambia.
+**Variants (t_127492f1; t_f13fcb1c):** `inline` (home: control row +
+counter), `panel` (/mappa: top border of the map-card, `hideSearch`),
+`bare` (/directory catalog: the same control grid WITHOUT the counter — the
+counter lives in the `.directory-results` rendered by `PublicDirectory`
+catalog, next to export; the place toggle arrives via `extraControls`,
+rendered at the end of the grid next to Reset). The variants share ids
+(`record-search`, `record-kind-filter`, `record-freshness-filter`,
+`record-sort`, `record-search-count`), labels and URL state — only the
+counter rendering changes.
 
-Feedback immediato (contatore `role="status"`, niente bottone "applica"),
-reset sempre visibile, empty state truthfull, solo filtri a basso rischio
-(tipo/freshness/sort — mai stato, produttore, dati sensibili).
+Immediate feedback (`role="status"` counter, no "apply" button), reset
+always visible, truthful empty state, low-risk filters only
+(type/freshness/sort — never status, manufacturer, sensitive data).
 
-#### 6.3.4 Card record — `RecordCard` ✅
+#### 6.3.4 Record card — `RecordCard` ✅
 
 `.record-list-card`: min-height 270px, grid `auto 1fr auto`, gap 22px,
-padding 24px, bordo `--line`, radius `--radius-lg`, bg `#fffef9`;
-`.card-topline` + h3 + dl fatti (3 colonne) + azioni. Su ≤700px: dl 2
-colonne; azioni in colonna.
+padding 24px, `--line` border, radius `--radius-lg`, bg `#fffef9`;
+`.card-topline` + h3 + facts dl (3 columns) + actions. At ≤700px: dl 2
+columns; actions stacked.
 
-**Righe contestuali (t_127492f1, fix t_d089a17e):** in `.directory-tool
-.record-list` la stessa `RecordCard` resta una riga flat a 3 colonne
-`titolo | fatti | azioni` (titolo 17px), ma ogni riga è ora una **card
-visibile** — bg `#fffef9`, bordo 1px `--line`, radius `--radius-lg`,
-padding `16px 20px` — con una **barra di stato** a sinistra (3px) nel
-colore del token `--status-*` e una tint tenue (9% del token su
-`#fffef9`). Lo stile arriva dal contesto della lista, la classe
-dell'articolo resta byte-identica (`class="record-list-card"`,
-conteggiata dalle suite a11y). Il colore non è mai l'unico segnale: lo
-`status-dot` + la label testuale restano nella topline (WCAG 1.4.1), e i
-due colori di testo più chiari della card sono scuriti sulla superficie
-tintata per tenere ≥4.5:1 (vedi commento in globals.css). Home e
-moderation restano card; la home condivide la stessa barra di stato
-(scope `.records-section`). Le righe della sidebar /mappa
-(`.map-record`) usano la stessa logica: card bianca, rail 3px del token
-+ tint 8%, con status-dot + label nella riga (la selezione è passata dal
-bordo sinistro alla wash di sfondo per non competere con il rail).
+**Contextual rows (t_127492f1, fix t_d089a17e):** in `.directory-tool
+.record-list` the same `RecordCard` stays a flat 3-column row
+`title | facts | actions` (17px title), but every row is now a **visible
+card** — bg `#fffef9`, 1px `--line` border, radius `--radius-lg`,
+padding `16px 20px` — with a **status bar** on the left (3px) in the
+`--status-*` token colour and a soft tint (9% of the token on
+`#fffef9`). The style comes from the list context; the article class stays
+byte-identical (`class="record-list-card"`, counted by the a11y suites).
+Colour is never the only signal: the `status-dot` + text label remain in
+the topline (WCAG 1.4.1), and the two lighter text colours of the card are
+darkened on the tinted surface to keep ≥4.5:1 (see the globals.css
+comment). Home and moderation remain cards; the home shares the same status
+bar (scope `.records-section`). The /mappa sidebar rows
+(`.map-record`) use the same logic: white card, 3px token rail + 8% tint,
+with status-dot + label in the row (selection moved from the left border
+to a background wash so it does not compete with the rail).
 
-#### 6.3.5 Form ✅
+#### 6.3.5 Forms ✅
 
-`ReportForm`/`CorrectionForm`/auth: label visibile 12px/800 `#435963`, input
-full-width bordo `#cdd6ce` radius `--radius-sm` padding 11–13px, focus
-bordo `#3e9477` + outline 3px `var(--focus)` offset 2px; errori
-`role="alert"` associati al campo; submit con stato loading (disabled +
-testo "Invio…"); checkbox ≥15px con label `.check-label`.
+`ReportForm`/`CorrectionForm`/auth: visible 12px/800 label `#435963`, inputs
+full-width `#cdd6ce` border radius `--radius-sm` padding 11–13px, focus
+border `#3e9477` + 3px `var(--focus)` outline offset 2px; errors
+`role="alert"` associated with the field; submit with loading state
+(disabled + "Sending…" text); checkboxes ≥15px with `.check-label` label.
 
-#### 6.3.6 Stato vuoto — `EmptyState` ✅
+#### 6.3.6 Empty state — `EmptyState` ✅
 
-`.empty-state`: bordo tratteggiato `#b9c7bf`, bg `#eef4ea`, radius
-`--radius-lg`, h2/h3 20px, body 14px `#52656d`, azione (reset / link).
-Sempre truthfull: "nessun record pubblicato trovato" — mai "non esiste".
+`.empty-state`: dashed `#b9c7bf` border, bg `#eef4ea`, radius
+`--radius-lg`, 20px h2/h3, 14px `#52656d` body, action (reset / link).
+Always truthful: "no published records found" — never "does not exist".
 
-#### 6.3.7 Altri pattern ✅
+#### 6.3.7 Other patterns ✅
 
-- `.notice` (verde, bordo-sx 3px), `.offline-state` (ambra),
-  `.duplicate-alert` (ambra).
-- `.auth-error` / `.auth-danger-zone` (rosso `#8a3b2c`).
-- `.faq-item`: disclosure nativa `<details>`, summary 17px/800, marker "+"/"–"
-  in cerchio `#e3eee4`, focus outline offset -3px.
-- `.filter-chip`: pill `--radius-full`, 13px/700, `.active` bg `#0b705c`
-  testo bianco; 🔒 altezza 36px < 44px (WCAG 2.5.8 24px ok; binding: ≥44px
-  per i target principali).
+- `.notice` (green, 3px left border), `.offline-state` (amber),
+  `.duplicate-alert` (amber).
+- `.auth-error` / `.auth-danger-zone` (red `#8a3b2c`).
+- `.faq-item`: native `<details>` disclosure, 17px/800 summary, "+"/"–"
+  marker in a `#e3eee4` circle, focus outline offset -3px.
+- `.filter-chip`: `--radius-full` pill, 13px/700, `.active` bg `#0b705c`
+  white text; 🔒 36px height < 44px (WCAG 2.5.8 24px ok; binding: ≥44px
+  for the main targets).
 - `.confirm-button`: ≥44×44px, `aria-pressed`, disabled opacity .55.
-- `.level-badge`: label + dot verde; **progresso solo testo** (mai barra).
-- `.loading-note`: 12px (🔒 contrasto §3.1).
+- `.level-badge`: label + green dot; **progress as text only** (never a bar).
+- `.loading-note`: 12px (🔒 contrast §3.1).
 
 ---
 
-## 7. Stati dei componenti (hover / focus / disabled)
+## 7. Component states (hover / focus / disabled)
 
-### 7.1 Focus (baseline globale) ✅
+### 7.1 Focus (global baseline) ✅
 
 ```
 :where(a, button, input, select, textarea):focus-visible {
@@ -766,107 +774,108 @@ Sempre truthfull: "nessun record pubblicato trovato" — mai "non esiste".
 }
 ```
 
-Override documentati: offset 2px su input form, tool-card, confirm-button,
-filter-chip, locale-toggle (con `z-index:1` per non essere coperto);
-offset 1px su `.map-record`; offset **-3px** su `.faq-item summary`
-(resta dentro la card). `.sr-only a:focus` diventa badge fisso visibile.
+Documented overrides: offset 2px on form inputs, tool-card, confirm-button,
+filter-chip, locale-toggle (with `z-index:1` so it is not covered);
+offset 1px on `.map-record`; offset **-3px** on `.faq-item summary`
+(stays inside the card). `.sr-only a:focus` becomes a visible fixed badge.
 
-### 7.2 Matrice stati
+### 7.2 State matrix
 
-| Componente | Hover | Focus | Disabled / attivo |
+| Component | Hover | Focus | Disabled / active |
 |------------|-------|-------|-------------------|
-| `.button-primary` | bg `#b4edc7`, `translateY(-2px)` | outline 3px | disabled: opacity .55 |
-| `.button-danger` | bg `#a04432` | outline 3px | opacity .55, `cursor:progress` |
-| `.nav-links a` | color `#16715e` | outline 3px | `aria-current="page"` (attivo) |
-| `.tool-card` | `translateY(-2px)`, bordo `#9db8aa` | outline offset 2px | — |
-| `.map-record` | bg `#eef3ea` | outline offset 1px | `.selected`: border-sx 3px `#1a7c60`, bg `#e4efe6` |
-| `.geocode-option` | bg `#eef3ea` | — (input tiene il focus, `aria-activedescendant`) | `.is-active` bg `#eef3ea` |
-| `.filter-chip` | bordo `#3e9477`, color `#0b705c` | outline offset 2px | `.active`: bg `#0b705c`, testo bianco |
-| `.confirm-button` | bg `#f1f7f1`, bordo `#3e9477` | outline offset 2px | `[aria-pressed=true]`: bg `#eef4ea`, bordo `#43a979`; disabled opacity .55 `not-allowed` |
-| `.faq summary` | cursor pointer | outline offset -3px | `[open]`: marker "–" |
-| `.locale-toggle button` | (nessuno) | outline offset 2px + z-index | `.is-active`: bg `#174e58`, testo bianco |
-| `.button` (submit) | default | outline 3px | disabled + "Invio…" (testo), `cursor:wait` (moderation) |
-| `.menu-button` (mobile) | — | outline 3px | `aria-expanded` true → `.nav-links.is-open` |
+| `.button-primary` | bg `#b4edc7`, `translateY(-2px)` | 3px outline | disabled: opacity .55 |
+| `.button-danger` | bg `#a04432` | 3px outline | opacity .55, `cursor:progress` |
+| `.nav-links a` | colour `#16715e` | 3px outline | `aria-current="page"` (active) |
+| `.tool-card` | `translateY(-2px)`, border `#9db8aa` | outline offset 2px | — |
+| `.map-record` | bg `#eef3ea` | outline offset 1px | `.selected`: 3px left border `#1a7c60`, bg `#e4efe6` |
+| `.geocode-option` | bg `#eef3ea` | — (input keeps focus, `aria-activedescendant`) | `.is-active` bg `#eef3ea` |
+| `.filter-chip` | border `#3e9477`, colour `#0b705c` | outline offset 2px | `.active`: bg `#0b705c`, white text |
+| `.confirm-button` | bg `#f1f7f1`, border `#3e9477` | outline offset 2px | `[aria-pressed=true]`: bg `#eef4ea`, border `#43a979`; disabled opacity .55 `not-allowed` |
+| `.faq summary` | pointer cursor | outline offset -3px | `[open]`: "–" marker |
+| `.locale-toggle button` | (none) | outline offset 2px + z-index | `.is-active`: bg `#174e58`, white text |
+| `.button` (submit) | default | 3px outline | disabled + "Sending…" (text), `cursor:wait` (moderation) |
+| `.menu-button` (mobile) | — | 3px outline | `aria-expanded` true → `.nav-links.is-open` |
 
-Regole: niente `:hover` senza `:focus-visible` equivalente; niente
-`cursor:pointer` su elementi non interattivi; disabled mai solo opacità
-(accompagnato da `aria-disabled` o `disabled` nativo).
+Rules: no `:hover` without an equivalent `:focus-visible`; no
+`cursor:pointer` on non-interactive elements; disabled never by opacity
+alone (paired with `aria-disabled` or native `disabled`).
 
 ---
 
-## 8. Accessibilità (WCAG 2.2 AA)
+## 8. Accessibility (WCAG 2.2 AA)
 
-Baseline ✅ preservata: skip-link (focus-reveal), focus visible, landmark
-(`nav` con aria-label, `main#main-content`, `footer` contentinfo), un h1 per
-pagina, `prefers-reduced-motion`, sr-only, alternativa mappa (region
-aria-label + descrizione sr-only + link alla directory + fallback testuale),
-status non-colour, controlli nativi senza tabindex custom.
+Baseline ✅ preserved: skip-link (focus-reveal), visible focus, landmarks
+(`nav` with aria-label, `main#main-content`, `footer` contentinfo), one h1
+per page, `prefers-reduced-motion`, sr-only, map alternative (region
+aria-label + sr-only description + directory link + textual fallback),
+non-colour status, native controls without custom tabindex.
 
-Da rafforzare / verificare:
-- **Focus management:** `/directory` → `/mappa?focus=ID` deve portare il
-  focus al record (non in cima) — §6.2.6 già pan; verificare focus.
-- **Annuncio cambio pagina:** ogni pagina tool ha l'h1 come announce point
-  (su /mappa è sr-only ma presente).
-- **Filtri:** il cambio filtro annuncia il contatore via `role="status"`.
-- **Touch target:** `.button` ~47px ✅; 🔒 `.locale-toggle` ~25px e
-  `.filter-chip` 36px < 44px — binding: ≥44px (WCAG 2.5.8 24px è il minimo,
-  il target di prodotto è 44px); i controlli nativi (select) restano ok.
-- **Contrasto dark hero:** `#c9d7de`/`#f6f9f6` su `--navy` — verificato
+To strengthen / verify:
+- **Focus management:** `/directory` → `/mappa?focus=ID` must move the
+  focus to the record (not to the top) — §6.2.6 already pans; verify focus.
+- **Page-change announcement:** every tool page has the h1 as the announce
+  point (on /mappa it is sr-only but present).
+- **Filters:** a filter change announces the counter via `role="status"`.
+- **Touch target:** `.button` ~47px ✅; 🔒 `.locale-toggle` ~25px and
+  `.filter-chip` 36px < 44px — binding: ≥44px (WCAG 2.5.8 24px is the
+  minimum, the product target is 44px); native controls (select) stay ok.
+- **Dark hero contrast:** `#c9d7de`/`#f6f9f6` on `--navy` — verified
   ≥4.5:1 body, ≥3:1 large text ✅.
-- **200% zoom a 320px:** griglie a 1 colonna, niente scroll orizzontale ✅.
-- **Contrasti secondari:** 🔒 §3.1 (6 coppie da allineare).
+- **200% zoom at 320px:** 1-column grids, no horizontal scroll ✅.
+- **Secondary contrasts:** 🔒 §3.1 (6 pairs to align).
 
-Testing: mantenere `a11y-interactive.test.mjs`, `navigation-pages.test.mjs`,
-`pages-render.test.mjs`; manuale per ogni route: keyboard-only, NVDA +
-VoiceOver, zoom 200% a 320px, contrasto per stato.
+Testing: keep `a11y-interactive.test.mjs`, `navigation-pages.test.mjs`,
+`pages-render.test.mjs`; manual per route: keyboard-only, NVDA +
+VoiceOver, 200% zoom at 320px, per-state contrast.
 
 ---
 
 ## 9. Responsive
 
-### 9.1 Comportamento per breakpoint (corretto in v2)
+### 9.1 Behaviour per breakpoint (corrected in v2)
 
-| Componente | Mobile (<768px) | Tablet (768–980px) | Desktop (≥980px) |
+| Component | Mobile (<768px) | Tablet (768–980px) | Desktop (≥980px) |
 |------------|-----------------|--------------------|-------------------|
-| Nav header | menu hamburger (≤768, auth nel dropdown) | inline, wrap | inline |
-| Hero | 1 colonna, padding ridotto | 1 colonna | 2 colonne |
-| **Mappa** | **pannello sidebar sopra la mappa** (≤768px, 38vh) | sidebar + mappa | sidebar 340px + mappa |
-| Directory controls | 1 colonna (≤700) | 2 colonne (≤980) | 3 colonne |
-| Directory catalog (t_127492f1) | controlli 1 col; righe 1 col; meta in colonna (≤700) | controlli 2 col; righe 1 col | righe piatte full-width |
-| Record grid | 1 colonna | 1 colonna | 2 colonne |
-| Form | 1 colonna | 2 colonne | 2 colonne |
-| Footer | 1 colonna (≤700) | 2 colonne (≤980) | 3 colonne |
-| Record facts | 1 colonna | 2 colonne | 2 colonne |
+| Nav header | hamburger menu (≤768, auth in the dropdown) | inline, wrap | inline |
+| Hero | 1 column, reduced padding | 1 column | 2 columns |
+| **Map** | **sidebar panel above the map** (≤768px, 38vh) | sidebar + map | 340px sidebar + map |
+| Directory controls | 1 column (≤700) | 2 columns (≤980) | 3 columns |
+| Directory catalog (t_127492f1) | controls 1 col; rows 1 col; meta stacked (≤700) | controls 2 col; rows 1 col | flat full-width rows |
+| Record grid | 1 column | 1 column | 2 columns |
+| Form | 1 column | 2 columns | 2 columns |
+| Footer | 1 column (≤700) | 2 columns (≤980) | 3 columns |
+| Record facts | 1 column | 2 columns | 2 columns |
 
-Nota v2: la v1 prescriveva "bottom-sheet collassabile" per la mappa mobile;
-l'implementazione (e la scelta di design finale) è un **pannello sopra la
-mappa** (max-height 38vh, scroll interno, breakpoint 768px) — più semplice e
-non oscura la mappa per scelta dell'utente. Il bottom-sheet NON è più il
-pattern di riferimento.
+v2 note: v1 prescribed a "collapsible bottom-sheet" for the mobile map; the
+implementation (and the final design choice) is a **panel above the map**
+(max-height 38vh, internal scroll, 768px breakpoint) — simpler and it does
+not obscure the map by user choice. The bottom-sheet is NO LONGER the
+reference pattern.
 
-### 9.2 Principi
+### 9.2 Principles
 
-Mobile-first; niente scroll orizzontale a 320px; touch target ≥44px sui
-controlli principali; la mappa non è mai full-screen persistent che oscura i
-risultati; form coordinate a 1 colonna (≤480px).
+Mobile-first; no horizontal scroll at 320px; touch targets ≥44px on the
+main controls; the map is never a persistent full-screen that obscures the
+results; coordinate forms at 1 column (≤480px).
 
 ---
 
-## 10. Bilinguismo EN/IT
+## 10. EN/IT bilingualism
 
-- **Bundle per dominio** (✅ tutti esistenti): `auth, common, community,
+- **Per-domain bundles** (✅ all exist): `auth, common, community,
   contact, correction, directory, errors, faq, footer, guide, home,
   manifesto, map, moderation, moderazione, record, report, rules, status,
-  types` — parità type-checked (`Translation<typeof en>`).
-- **SSR locale:** cookie `opensurveillancedb-locale`, niente flash EN→IT
-  (ADR 0015); `<html lang>` dal root layout; `generateMetadata()` localizza
-  title/description/OG.
-- **URL language-neutral:** route slug neutri; deep-link con
+  types` — type-checked parity (`Translation<typeof en>`).
+- **SSR locale:** `opensurveillancedb-locale` cookie, no EN→IT flash
+  (ADR 0015); `<html lang>` from the root layout; `generateMetadata()`
+  localises title/description/OG.
+- **Language-neutral URLs:** neutral route slugs; deep links via
   `GET /api/locale?lang=it&next=/mappa`.
-- **Rotture di layout:** IT ~15-20% più lungo — `overflow-wrap:anywhere` su
-  `dd` di card e facts; nav a 3 azioni + auth che collassano nel menu mobile a
-  ≤768px (t_94b3726d; v1 diceva "fino a 5 link" — errato: il set è 6,
-  t_a72a3106); eyebrow uppercase con tracking .14em verificato su label IT.
+- **Layout breaks:** IT is ~15-20% longer — `overflow-wrap:anywhere` on
+  the `dd`s of cards and facts; 3-action nav + auth collapsing into the
+  mobile menu at ≤768px (t_94b3726d; v1 said "up to 5 links" — wrong: the
+  set is 6, t_a72a3106); eyebrow uppercase with .14em tracking verified on
+  IT labels.
 
 ---
 
@@ -874,94 +883,92 @@ risultati; form coordinate a 1 colonna (≤480px).
 
 ### Do
 
-1. Usa i token (§3) — mai hardcode di colore/radius/spacing nei componenti nuovi.
-2. Un `h1` per pagina; se la pagina parte con un tool visivo, l'h1 è
-   `sr-only` (documentato) ma presente.
-3. Status dot **sempre** con label testuale; mai colore come unico canale.
-4. Empty state truthfull + azione (reset / link a `/segnala`).
-5. Stato dei filtri in URL (`?q=`, `?type=`, `?freshness=`, `?sort=`).
-6. Contatori e cambi risultato in `aria-live`/`role="status"`; errori in
-   `role="alert"` associati al campo.
-7. Loading come testo + `aria-live` (niente spinner decorativi, niente
-   skeleton animati).
-8. Controlli nativi (`<button>`, `<input>`, `<select>`, `<a>`); niente
-   tabindex custom; DOM order = tab order.
-9. Focus visibile con `:focus-visible` e `var(--focus)`.
-10. Riusa i pattern condivisi (§6.3): `FiltersBar`, `RecordCard`,
-    `EmptyState`, bottoni, status dot. Non duplicare.
-11. Header condiviso `PublicNav` su tutte le pubbliche; mai set nav
-    per-pagina.
-12. La mappa **non sparisce mai** con filtri a 0 risultati: nota truthfull in
-    sidebar con "Clear filters" (t_b9666d09).
-13. Mappa mobile: pannello sopra la mappa (≤768px), non bottom-sheet.
-14. Contrasto ≥4.5:1 per testo normale; grigi secondari dalla tabella §3.1.
-15. Error pages: nessun leak di path/errore; header ridotto + footer
-    raggiungibile.
-16. i18n: bundle separati per dominio, parità type-checked; route slug
-    language-neutral.
-17. Commenti CSS che spiegano il *perché* (convenzione della codebase —
-    ogni blocco cita il task e la decisione).
+1. Use the tokens (§3) — never hardcode colour/radius/spacing in new components.
+2. One `h1` per page; if the page starts with a visual tool, the h1 is
+   `sr-only` (documented) but present.
+3. Status dot **always** with a text label; never colour as the only channel.
+4. Truthful empty state + action (reset / link to `/segnala`).
+5. Filter state in the URL (`?q=`, `?type=`, `?freshness=`, `?sort=`).
+6. Counters and result changes in `aria-live`/`role="status"`; errors in
+   `role="alert"` associated with the field.
+7. Loading as text + `aria-live` (no decorative spinners, no animated
+   skeletons).
+8. Native controls (`<button>`, `<input>`, `<select>`, `<a>`); no custom
+   tabindex; DOM order = tab order.
+9. Visible focus with `:focus-visible` and `var(--focus)`.
+10. Reuse the shared patterns (§6.3): `FiltersBar`, `RecordCard`,
+    `EmptyState`, buttons, status dots. Do not duplicate.
+11. Shared `PublicNav` header on all public pages; never per-page nav sets.
+12. The map **never disappears** with 0-result filters: truthful note in
+    the sidebar with "Clear filters" (t_b9666d09).
+13. Mobile map: panel above the map (≤768px), not a bottom-sheet.
+14. Contrast ≥4.5:1 for normal text; secondary greys from the §3.1 table.
+15. Error pages: no path/error leak; reduced header + reachable footer.
+16. i18n: separate per-domain bundles, type-checked parity; language-neutral
+    route slugs.
+17. CSS comments explaining the *why* (codebase convention — every block
+    cites the task and the decision).
 
 ### Don't
 
-1. Non usare estetica "poliziesca", allarmismo, gradienti aggressivi o
-   effetti vistosi — il progetto documenta sorveglianza, non la vende.
-2. Non trasmettere stato solo con colore (WCAG 1.4.1).
-3. Non scrivere "nessuna telecamera esiste" negli empty state — solo
-   "nessun record pubblicato trovato".
-4. Non aggiungere classi CSS senza definirle. ✅ F4: `.tool-heading`,
-   `.tool-section`, `.status-dot.demo`, `.status-dot.pending` definite;
-   `.map-tool` definita come eccezione full-width di `/mappa`; le no-op
-   rimosse (`.filters-inline`, banner compatto legacy).
-5. Non usare `window.confirm` — usare `ConfirmDialog`.
-6. Non mettere la search due volte su `/mappa` (FiltersBar `hideSearch` +
+1. No "police" aesthetic, alarmism, aggressive gradients or flashy
+   effects — the project documents surveillance, it does not sell it.
+2. No state conveyed by colour alone (WCAG 1.4.1).
+3. No "no camera exists" wording in empty states — only
+   "no published records found".
+4. No CSS classes without definitions. ✅ F4: `.tool-heading`,
+   `.tool-section`, `.status-dot.demo`, `.status-dot.pending` defined;
+   `.map-tool` defined as the full-width /mappa exception; no-ops
+   removed (`.filters-inline`, legacy compact banner).
+5. No `window.confirm` — use `ConfirmDialog`.
+6. No duplicated search on `/mappa` (FiltersBar `hideSearch` +
    sidebar `GeocodeSearch`).
-7. Non interrompere la mappa quando i filtri danno 0 risultati.
-8. Non introdurre skeleton/spinner animati per il loading.
-9. Non usare bottom-sheet per la mappa mobile (pattern superato).
-10. Non hardcodare `#0b705c` (24 occorrenze): usare `var(--focus)`.
-11. Non ignorare `prefers-reduced-motion`.
-12. Non usare header contestuali sulle pagine pubbliche (solo auth/record/
+7. Do not break the map when filters return 0 results.
+8. No animated skeleton/spinner for loading.
+9. No bottom-sheet for the mobile map (superseded pattern).
+10. Do not hardcode `#0b705c` (24 occurrences): use `var(--focus)`.
+11. Do not ignore `prefers-reduced-motion`.
+12. No contextual headers on public pages (only auth/record/
     moderation/error).
-13. Non scendere sotto AA sui grigi secondari (tabella §3.1).
-14. Non rompere i redirect legacy: gli anchor `/#map`, `/#records` restano
-    gestiti da `LegacyAnchorRedirect` (client-side, voluto: un fragment non
-    arriva al server — non tornare a un redirect 302 server-side).
-15. Non aggiungere icone decorative senza label/aria-hidden — le icone sono
-    sobrie e funzionali.
+13. Do not drop below AA on the secondary greys (§3.1 table).
+14. Do not break legacy redirects: the `/#map`, `/#records` anchors stay
+    handled by `LegacyAnchorRedirect` (client-side, deliberate: a fragment
+    never reaches the server — do not revert to a server-side 302).
+15. No decorative icons without a label/aria-hidden — icons are sober and
+    functional.
 
 ---
 
-## 12. Riepilogo delle decisioni di design
+## 12. Design decisions summary
 
-| # | Decisione | Stato |
+| # | Decision | State |
 |---|-----------|:---:|
-| D1 | La home è hub, non tool | ✅ |
-| D2 | 4 route tool separate: `/mappa`, `/directory`, `/segnala`, `/correggi` | ✅ |
-| D3 | Stato filtri in query param | ✅ |
-| D4 | Mappa e directory condividono gli stessi filtri (`FiltersBar`) | ✅ |
-| D5 | Empty state truthfull + azione; mappa mai nascosta | ✅ (empty mappa in-sidebar) |
-| D6 | Palette e tipografia consolidate, non cambiate | ✅ |
-| D7 | Status dot sempre con label testuale | ✅ |
-| D8 | Redirect legacy anchor **client-side** (`LegacyAnchorRedirect`) — non 302 (un fragment non arriva al server) | ✅ (v2 corregge la v1) |
-| D9 | Refactor incrementale in fasi (F1–F4 completate) | ✅ |
-| D10 | Touch target ≥44px, zoom 200% a 320px | ⚠ parziale (locale-toggle, filter-chip) |
-| D11 | Header unico `PublicNav` a 3 azioni su tutte le pubbliche | ✅ |
-| D12 | Mappa mobile: pannello sopra la mappa (≤768px), non bottom-sheet | ✅ (v2 corregge la v1) |
-| D13 | Container mappa `min(1440px, calc(100% - 32px))`; breakpoint 480/768 | ✅ |
-| D14 | Error pages custom 404/500 con header ridotto (eccezione 6-link) | ✅ |
-| D15 | Token layer esplicito: spacing 4px, radius, shadow, type scale | ⚠ radius ✅ (F5, outlier consolidati); spacing/type ✅ (F3); shadow 🔒 |
-| D16 | Pesi tipografici 800/700 applicati per selettore (F4) | ✅ |
-| D17 | Body 16px/1.5 esplicito in CSS (F4) | ✅ |
-| D18 | Contrasti secondari ≥4.5:1 (6 coppie allineate in F4) | ✅ |
-| D19 | `.tool-heading`/`.tool-section` definiti (h1 tool 800, clamp 34–52px) | ✅ |
-| D20 | `.status-dot.demo` / `.status-dot.pending` definiti | ✅ |
+| D1 | The home is a hub, not a tool | ✅ |
+| D2 | 4 separate tool routes: `/mappa`, `/directory`, `/segnala`, `/correggi` | ✅ |
+| D3 | Filter state in query params | ✅ |
+| D4 | Map and directory share the same filters (`FiltersBar`) | ✅ |
+| D5 | Truthful empty state + action; map never hidden | ✅ (in-sidebar empty map) |
+| D6 | Palette and typography consolidated, not changed | ✅ |
+| D7 | Status dot always with a text label | ✅ |
+| D8 | Legacy anchor redirect **client-side** (`LegacyAnchorRedirect`) — not 302 (a fragment never reaches the server) | ✅ (v2 corrects v1) |
+| D9 | Incremental refactor in phases (F1–F4 completed) | ✅ |
+| D10 | Touch targets ≥44px, 200% zoom at 320px | ⚠ partial (locale-toggle, filter-chip) |
+| D11 | Single 3-action `PublicNav` header on all public pages | ✅ |
+| D12 | Mobile map: panel above the map (≤768px), not a bottom-sheet | ✅ (v2 corrects v1) |
+| D13 | Map container `min(1440px, calc(100% - 32px))`; 480/768 breakpoints | ✅ |
+| D14 | Custom 404/500 error pages with reduced header (6-link exception) | ✅ |
+| D15 | Explicit token layer: 4px spacing, radius, shadow, type scale | ⚠ radius ✅ (F5, outliers consolidated); spacing/type ✅ (F3); shadow 🔒 |
+| D16 | 800/700 type weights applied per selector (F4) | ✅ |
+| D17 | Explicit 16px/1.5 body in CSS (F4) | ✅ |
+| D18 | Secondary contrasts ≥4.5:1 (6 pairs aligned in F4) | ✅ |
+| D19 | `.tool-heading`/`.tool-section` defined (800 tool h1, clamp 34–52px) | ✅ |
+| D20 | `.status-dot.demo` / `.status-dot.pending` defined | ✅ |
 
 ---
 
-## Appendice A: Componenti → route (aggiornata)
+## Appendix A: Components → routes (updated)
 
-| Componente | Route |
+| Component | Route |
 |------------|-------|
 | `Hero`, `MapTeaser`, `ToolCards` | `/` |
 | `MappaTool`, `MapPanel`, `SurveillanceMap`, `MapRecordList`, `GeocodeSearch`, `FiltersBar (panel)`, `lib/map-popup.ts` | `/mappa` |
@@ -973,42 +980,43 @@ risultati; form coordinate a 1 colonna (≤480px).
 | `InfoPage` | manifesto, guide, regole, faq, contatti, accessibility |
 | `LegalPage` | privacy, termini, licenze |
 | auth (in page) | login, register, account (+ `LevelBadge`, `ConfirmDialog`) |
-| `PublicNav`, `PublicNavLinks`, `ToolLayout`, `SiteFooter`, `LocaleProvider` | tutte |
+| `PublicNav`, `PublicNavLinks`, `ToolLayout`, `SiteFooter`, `LocaleProvider` | all |
 | `ErrorPage` | 404/500 |
 | `LegacyAnchorRedirect` | root layout |
 
-## Appendice B: Bundle i18n (stato reale)
+## Appendix B: i18n bundles (real state)
 
-Tutti esistenti: `auth, common, community, contact, correction, directory,
+All exist: `auth, common, community, contact, correction, directory,
 errors, faq, footer, guide, home, manifesto, map, moderation, moderazione,
-record, report, rules, status, types` (+ `index` aggregatore). Parità
-EN/IT type-checked. Nessun bundle nuovo richiesto (la v1 li prevedeva come
-"nuovi" — sono stati creati).
+record, report, rules, status, types` (+ `index` aggregator). EN/IT parity
+type-checked. No new bundle required (v1 listed them as "new" — they have
+been created).
 
-## Appendice C: Stato di conformità dell'audit (chiusura F4)
+## Appendix C: Audit conformance state (F4 closure)
 
-Stato al 2026-08-02: i gap code-side dell'audit F1 sono chiusi in F4. Restano
-binding solo D15 (scala `--space-*`/radius/shadow) e i debt tracciati sotto.
+State at 2026-08-02: the code-side gaps of the F1 audit are closed in F4.
+Only D15 (the `--space-*`/radius/shadow scale) and the debts tracked below
+remain binding.
 
-| Gap audit | Sezione doc | Stato F4 | Priorità |
+| Audit gap | Doc section | F4 state | Priority |
 |-----------|-------------|----------|:---:|
-| G1 `.tool-heading`/`.tool-section` mai definite | §2.2 (D19) | ✅ definite in globals.css | P1 |
-| G2 `.status-dot.demo` invisibile | §6.3.2 (D20) | ✅ definito (`--status-demo`) | P1 |
-| G3 pesi 800/700 non applicati | §3.2 (D16) | ✅ una riga per selettore | P1 |
-| G4 body 16px/1.5 non esplicito | §3.2 (D17) | ✅ regola esplicita | P1 |
-| G5 token `--focus`/`--status-*` mancanti, 5 dead | §3.1 | ✅ in `:root`, de-hardcodato (dead tokens: debt) | P1 |
-| P2 5 grigi sotto AA + `--muted` 4.49 | §3.1 (D18) | ✅ 6 valori sostituiti (≥4.5:1) | P2 |
-| P2 `.status-dot.pending` | §6.3.2 | ✅ definito (`--status-pending`) | P2 |
-| P2 redirect client-side | §12 D8 | ✅ doc allineato (niente codice) | — |
-| P2 mappa mobile panel | §9.1 D12 | ✅ doc allineato | — |
-| P3 breakpoint 480/768, container 1440 | §3.6 | ✅ doc allineato | — |
-| P3 6 classi no-op | §11 don't #4 | ✅ rimosse o definite | P3 |
-| P3 empty state directory senza link `/segnala` | §6.3.6 | ✅ azione reset + link (`submitObservation`) | P3 |
-| P3 error pages | §2.3 D14 | ✅ doc allineato | — |
-| P3 touch target locale-toggle/filter-chip | §8 | ✅ ≥44px | P3 |
-| 29 componenti non documentati | §6.1 | ✅ doc allineato (questo doc) | — |
+| G1 `.tool-heading`/`.tool-section` never defined | §2.2 (D19) | ✅ defined in globals.css | P1 |
+| G2 `.status-dot.demo` invisible | §6.3.2 (D20) | ✅ defined (`--status-demo`) | P1 |
+| G3 800/700 weights not applied | §3.2 (D16) | ✅ one line per selector | P1 |
+| G4 16px/1.5 body not explicit | §3.2 (D17) | ✅ explicit rule | P1 |
+| G5 `--focus`/`--status-*` tokens missing, 5 dead | §3.1 | ✅ in `:root`, de-hardcoded (dead tokens: debt) | P1 |
+| P2 5 greys under AA + `--muted` 4.49 | §3.1 (D18) | ✅ 6 values replaced (≥4.5:1) | P2 |
+| P2 `.status-dot.pending` | §6.3.2 | ✅ defined (`--status-pending`) | P2 |
+| P2 client-side redirect | §12 D8 | ✅ doc aligned (no code) | — |
+| P2 mobile map panel | §9.1 D12 | ✅ doc aligned | — |
+| P3 480/768 breakpoints, 1440 container | §3.6 | ✅ doc aligned | — |
+| P3 6 no-op classes | §11 don't #4 | ✅ removed or defined | P3 |
+| P3 directory empty state without `/segnala` link | §6.3.6 | ✅ reset action + link (`submitObservation`) | P3 |
+| P3 error pages | §2.3 D14 | ✅ doc aligned | — |
+| P3 locale-toggle/filter-chip touch target | §8 | ✅ ≥44px | P3 |
+| 29 undocumented components | §6.1 | ✅ doc aligned (this doc) | — |
 
-**Debt residuo (fuori scope F4):** D15 token layer — `--space-*`/`--radius-*`
-✅ implementati in F3 (t_27bfa729, PR #214), resta 🔒 solo `--shadow-*`; 4
-dead tokens; classe `.place-empty-actions` non definita (stessa resa inline);
-duplicazione h1/h2+intro su `/directory` (⚠ audit §2).
+**Residual debt (out of F4 scope):** D15 token layer — `--space-*`/`--radius-*`
+✅ implemented in F3 (t_27bfa729, PR #214), only `--shadow-*` remains 🔒; 4
+dead tokens; `.place-empty-actions` class undefined (same inline rendering);
+h1/h2+intro duplication on /directory (⚠ audit §2).

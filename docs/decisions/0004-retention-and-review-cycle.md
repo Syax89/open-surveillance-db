@@ -2,7 +2,7 @@
 
 - **Status:** proposed (draft, awaiting launch review)
 - **Date:** 2026-07-31
-- **Author:** Rosa (DPO / privacy)
+- **Author:** Simone Rondina (project owner)
 - **Supersedes/updates:** ADR 0002-legal-pre-launch-deliverables, retention-values section (see "Supersession note" below).
 
 ## Context
@@ -24,7 +24,7 @@ Adopt the retention schedule in `docs/legal/RETENTION_SCHEDULE.md`:
 
 Individual rights (art. 17) override the schedule; **legal hold** suspends deletion while litigation, a complaint, or a supervisory-authority inquiry is pending; "deletion" is defined as irreversible deletion, with exclusion from future processing/exports as the fallback where backups make full erasure technically infeasible at present.
 
-Enforcement is automated via a scheduled job (D1/Workers cron) to be implemented by ada (`db/retention.ts` + tests).
+Enforcement is automated via a scheduled job (D1/Workers cron) to be implemented by the project owner (`db/retention.ts` + tests).
 
 ## Supersession note
 

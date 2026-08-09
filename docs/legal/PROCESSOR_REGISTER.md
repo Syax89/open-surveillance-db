@@ -1,7 +1,7 @@
 # Processor / sub-processor register
 
 - **Status:** in force — personal open-source project, 2026-08-08 (ADR 0005)
-- **Owner:** Rosa (Legal & Privacy Officer / privacy contact)
+- **Owner:** Simone Rondina (project owner / privacy contact)
 - **Legal basis:** GDPR art. 28 (processors), Cap. V (transfers), art. 30 (records of processing activities)
 - **Review:** annually and on any provider change; additions require the privacy/legal owner's approval before onboarding.
 

@@ -2,7 +2,7 @@
 
 - **Status:** accepted (CEO decision, 2026-07-31)
 - **Date:** 2026-07-31
-- **Author:** Rosa (DPO / privacy), recording the CEO decision
+- **Author:** Simone Rondina (project owner), recording the CEO decision
 - **Decision owner:** CEO
 - **Related ADRs:** 0001 (public data boundary), 0002 (legal pre-launch
   deliverables), 0004 (retention schedule), 0005 (processors and data residency)

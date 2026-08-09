@@ -2,7 +2,7 @@
 
 - **Status:** proposed (draft, awaiting implementation)
 - **Date:** 2026-07-31
-- **Author:** Marie (documentation)
+- **Author:** Simone Rondina (project owner)
 - **Related:** [ACCESSIBILITY_STATEMENT.md](../ACCESSIBILITY_STATEMENT.md)
 
 ## Context

@@ -1,10 +1,10 @@
 # Roadmap
 
-Documento consolidato (2026-08-08): sostituisce i vecchi piani sprint
+Consolidated document (2026-08-08): replaces the old sprint plans
 (`STATUS.md`, `DEVELOPMENT_PLAN.md`, `EXECUTION_BOARD.md`, `FRONTEND_PLAN.md`,
-`NEXT_SPRINT.md`, `FUTURE_ROADMAP.md`), archiviati fuori dal repository. Per
-lo stato attuale fanno fede questo documento, il README e i documenti tecnici
-collegati.
+`NEXT_SPRINT.md`, `FUTURE_ROADMAP.md`), archived outside the repository.
+For the current state, this document, the README and the linked technical
+documents are authoritative.
 
 ## Current state
 

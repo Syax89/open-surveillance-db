@@ -2,7 +2,7 @@
 
 - **Status:** accepted (CEO decision, 2026-07-31)
 - **Date:** 2026-07-31
-- **Author:** Marie (Technical Writer), recording the CEO decision
+- **Author:** Simone Rondina (project owner), recording the CEO decision
 - **Decision owner:** CEO
 - **Related ADRs:** 0005 (processors and data residency), 0010 (pilot
   boundary), 0008 (data licence, precision, retention, contact)
@@ -38,12 +38,12 @@ this matter to the project team.
 
    | Responsibility | Owner(s) |
    | --- | --- |
-   | Maintainers (code, releases, infrastructure changes) | **Simone (syax89)** and **Ada (CTO)** |
-   | Merge authority | **Ada** (sole merge authority) |
-   | Operations (hosting, deployments, backups) | **Ken** |
-   | Data steward (data model, data quality, retention) | **Linus** and **Grace** |
-   | Security contact | **Ken** |
-   | Moderation contact | **Grace** |
+   | Maintainers (code, releases, infrastructure changes) | **Simone Rondina (Syax89)** |
+   | Merge authority | **Simone Rondina (Syax89)** (sole merge authority) |
+   | Operations (hosting, deployments, backups) | **Simone Rondina (Syax89)** |
+   | Data steward (data model, data quality, retention) | **Simone Rondina (Syax89)** |
+   | Security contact | **Simone Rondina (Syax89)** |
+   | Moderation contact | **Simone Rondina (Syax89)** |
 
    One person holds several roles initially, which the execution board
    explicitly allows; each responsibility now has a named, reachable owner.
@@ -75,14 +75,14 @@ this matter to the project team.
   decided (items 3 and 5 tracked on the execution board — item 3 in
   ADR 0008).
 - Governance changes flow through GOVERNANCE.md; merge authority rests with
-  Ada; role changes require a new documented decision in this log.
+  the project owner; role changes require a new documented decision in this log.
 - **Processor picture changes:** with the pilot self-hosted, Cloudflare is no
   longer the runtime processor; ADR 0005, `docs/legal/PROCESSOR_REGISTER.md`,
-  and PRIVACY_NOTICE.md must be revised (DPO, rosa) before launch. GitHub
+  and PRIVACY_NOTICE.md must be revised (DPO exclusion, privacy/legal) before launch. GitHub
   (source hosting) and OSMF (tiles) status is unchanged.
 - Operations work moves to the LXC environment: the backup/restore drill,
   monitoring, and incident procedures in `docs/OPERATIONS.md` are exercised
-  against the test container (ops owner: ken), and `docs/DEPLOYMENT.md` keeps the LXC
+  against the test container (ops owner: project owner), and `docs/DEPLOYMENT.md` keeps the LXC
   section as the current environment reference.
 - `opensurveillancedb.org` acquisition, DNS/TLS, and the public-alpha
   checklist (OPS_OPEN.md) must be complete before the domain is announced or

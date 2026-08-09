@@ -19,4 +19,8 @@ OpenSurveillanceDB is a collaboration space for people with different experience
 
 ## Reporting and enforcement
 
-Until a public contact is established, report concerns privately to the maintainers through the repository's security/contact channel. Reports will be handled discreetly, with proportionate action that may include content removal, a warning, temporary restriction, or removal from project spaces. Governance and reporting contacts must be published before public launch.
+Report concerns privately to the maintainers through the repository's
+security/contact channel (`privacy@opensurveillancedb.org`). Reports will
+be handled discreetly, with proportionate action that may include content
+removal, a warning, temporary restriction, or removal from project spaces.
+Governance and reporting contacts are published on the `/contatti` page.

@@ -1,5 +1,10 @@
 # Security policy
 
+The project is owned and maintained by **Simone Rondina** (GitHub:
+[Syax89](https://github.com/Syax89)). Report a vulnerability through the
+private route below, or write to `privacy@opensurveillancedb.org` for any
+security or privacy concern.
+
 ## Scope
 
 OpenSurveillanceDB is an open, non-commercial civic database of visible public

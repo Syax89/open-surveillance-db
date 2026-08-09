@@ -36,7 +36,7 @@ reviews or lost in chat threads.
 
 Status values follow the headers in each ADR: `proposed` (draft, pending
 review) and `accepted` (decision recorded; `CEO decision` marks decisions made
-by the CEO and recorded by a team member).
+by the CEO and recorded by the project owner).
 
 ## Process
 
@@ -49,9 +49,9 @@ by the CEO and recorded by a team member).
 3. **Review.** Open a PR with the ADR. Maintainers seek consensus
    ([GOVERNANCE.md](../../GOVERNANCE.md) § Decision making); privacy,
    security, and safety objections pause the decision until addressed.
-4. **Merge.** The PR is merged (Ada is the sole merge authority) and the
-   numbered file lands in `docs/decisions/`. The ADR is now part of the
-   project's recorded history.
+4. **Merge.** The PR is merged (the project owner is the sole merge
+   authority) and the numbered file lands in `docs/decisions/`. The ADR is
+   now part of the project's recorded history.
 
 ## Conventions
 

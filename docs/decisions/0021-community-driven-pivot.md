@@ -2,10 +2,8 @@
 
 - **Status:** accepted (CEO decision, 2026-08-04)
 - **Date:** 2026-08-04
-- **Author:** Grace (QA), recording the CEO decision of 2026-08-04
-- **Decision owner:** CEO (Simone) — 2026-08-04: "il sito diventa tutto in base a
-  segnalazioni: utenti aggiungono, segnalano telecamere che non ci sono più, danno
-  mi piace alle più utili — TUTTO SENZA moderazione manuale, SOLO utenti registrati"
+- **Author:** Simone Rondina (project owner), recording the CEO decision of 2026-08-04
+- **Decision owner:** CEO (Simone) — 2026-08-04: "the site becomes entirely report-driven: users add reports, flag cameras that are no longer there, and like the most useful ones — ALL WITHOUT manual moderation, ONLY registered users"
 - **Updates:** ADR 0001 (public data boundary — new reports publish immediately,
   the pending→verified human review queue is retired for the normal flow);
   ADR 0009 (reviewer roles and moderation queue — the queue survives only for

@@ -1,7 +1,7 @@
 # Terms of use
 
 - **Status:** in force — personal open-source project (controller: Simone Rondina, syax89 — not a company). The Service is live at the public URL; these terms are the applicable contract.
-- **Owner:** Rosa (Legal & Privacy Officer / privacy contact)
+- **Owner:** Simone Rondina (project owner / privacy contact)
 - **Version:** 0.8 (2026-08-08) — current-state alignment (template-ready): § 3.7 reflects the implemented multi-method auth (ADR 0020 — OIDC server-gated: buttons shown only when the operator configured the provider); § 5.5 reflects the image-evidence removal (2026-08-08); § 15 open items reflect the implemented retention sweep and OIDC activation.
 - **Decisions applied (2026-07-31, CEO — Wave A):** privacy contact `privacy@opensurveillancedb.org` (dedicated, monitored mailbox); published coordinates rounded to **~4 decimal places (~10 m)** (zone-level precision; exact location never published); community-driven publication model (ADR 0021, 2026-08-04).
 - **Scope:** the OpenSurveillanceDB web application, public API, data exports and related services ("the Service").

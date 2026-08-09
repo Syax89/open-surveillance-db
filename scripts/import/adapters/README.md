@@ -1,71 +1,72 @@
-# Import adapters — FASE B (kanban t_c338e9df)
+# Import adapters — Phase B (kanban t_c338e9df)
 
-Adapter per-sorgente del pipeline di import (blueprint:
-`docs/data-sources/normalizzazione-pipeline.md`). Ogni adapter è il *front
-half* source-specific: fetch + parse → righe staged nel nostro schema
-canonico. Il *runner* comune (batch D1, dedup Pass 2 completo, eventi,
-rollback) è la FASE A (`scripts/import/` + migrazione 0040); questi adapter
-sono ciò che il runner legge.
+Per-source adapters of the import pipeline (blueprint:
+`docs/data-sources/normalizzazione-pipeline.md`). Each adapter is the
+source-specific *front half*: fetch + parse → staged rows in our canonical
+schema. The shared *runner* (D1 batch, full Pass 2 dedup, events,
+rollback) is Phase A (`scripts/import/` + migration 0040); these adapters
+are what the runner reads.
 
-## Adapter attuali
+## Current adapters
 
-| Slug | Sorgente | Licenza | Formato |
+| Slug | Source | Licence | Format |
 | --- | --- | --- | --- |
-| `zurigo-videokameras-2026` | Stadt Zürich — Open Data | CC0 1.0 | CSV (per-sito) |
+| `zurigo-videokameras-2026` | Stadt Zürich — Open Data | CC0 1.0 | CSV (per-site) |
 | `milano-varchi-2026` | Comune di Milano — Open Data | CC BY 3.0 IT | GeoJSON (CKAN, Area C + B) |
-| `osm-surveillance-italia-2026` | OpenStreetMap | ODbL 1.0 (OSM) | Overpass API (bbox Italia a chunk) |
+| `osm-surveillance-italia-2026` | OpenStreetMap | ODbL 1.0 (OSM) | Overpass API (Italy bbox in chunks) |
 
-Descriptor: `docs/data-sources/imports/<slug>.json` (chiavi del design § 8.2).
+Descriptor: `docs/data-sources/imports/<slug>.json` (design § 8.2 keys).
 
-## Contract (interfaccia consumata dal runner FASE A)
+## Contract (interface consumed by the Phase A runner)
 
-Ogni modulo `.mjs` esporta:
+Each `.mjs` module exports:
 
-- `slug` (string) — slug del batch, deve combaciare con il descriptor.
-- `getDescriptor()` → oggetto descriptor (JSON parsato).
-- `fetchPayload()` → `{ ...payload grezzo, checksum }` (sha256 del payload,
-  design § 7.6). Retry/backoff e User-Agent di progetto già dentro.
+- `slug` (string) — batch slug, must match the descriptor.
+- `getDescriptor()` → descriptor object (parsed JSON).
+- `fetchPayload()` → `{ ...raw payload, checksum }` (sha256 of the payload,
+  design § 7.6). Retry/backoff and the project User-Agent are already inside.
 - `parsePayload(raw)` → `{ staged, skipped, checksum }`
-  - `staged`: array di righe **canonicali** (design § 2):
+  - `staged`: array of **canonical** rows (design § 2):
     `{ title, kind, latitude, longitude, direction, address, notes,
-      description, external_id }` — `source` (`import:<slug>`) e
-    `import_batch_id` sono runner-owned e NON vanno impostati qui.
-  - `skipped`: `{ total, reasons }` con conteggi per motivo (per il report).
-  - `checksum`: può essere `null` (il runner usa quello di `fetchPayload`).
+      description, external_id }` — `source` (`import:<slug>`) and
+    `import_batch_id` are runner-owned and must NOT be set here.
+  - `skipped`: `{ total, reasons }` with per-reason counts (for the report).
+  - `checksum`: may be `null` (the runner uses the one from `fetchPayload`).
 
-Regole già applicate dentro gli adapter (non duplicare nel runner):
+Rules already applied inside the adapters (do not duplicate in the runner):
 
-- coordinate validate al parse (lat/lon finite, niente `(0,0)` da stringhe
-  vuote — vedi `parseCoord`);
-- `kind` già canonico (mai la stringa sorgente); `direction` già int 0–359 o
-  `null`; cupole già con `direction = null` (invariante DOME_KIND);
-- `external_id` stabile e idempotente (id sorgente prefissato o hash
-  deterministico § 7.4);
-- gate privacy § 7.6 già applicati (no PII, operator solo se entità).
+- coordinates validated at parse (finite lat/lon, no `(0,0)` from empty
+  strings — see `parseCoord`);
+- `kind` already canonical (never the source string); `direction` already
+  int 0–359 or `null`; domes already with `direction = null`
+  (DOME_KIND invariant);
+- `external_id` stable and idempotent (prefixed source id or deterministic
+  hash § 7.4);
+- privacy gate § 7.6 already applied (no PII, operator only if an entity).
 
-## Uso
+## Usage
 
 ```bash
-# dry-run (default: nessuna scrittura) — stampa n totali/validi/invalidi,
-# dedup intra + cross vs D1 locale, review candidates; scrive report JSON.
+# dry-run (default: no writes) — prints n total/valid/invalid,
+# intra + cross dedup vs local D1, review candidates; writes report JSON.
 npm run import:dry-run -- --slug=zurigo-videokameras-2026
 npm run import:dry-run -- --slug=milano-varchi-2026 --out=/tmp/milano.json
 npm run import:dry-run -- --slug=osm-surveillance-italia-2026 --db=/path/to/d1.sqlite
 ```
 
-`--limit=N` taglia le righe staged (dry-run rapidi), `--db=` punta a un
-sqlite D1 (default: discovery automatica in `.wrangler/state`).
+`--limit=N` trims the staged rows (quick dry-runs), `--db=` points to a
+D1 sqlite (default: automatic discovery in `.wrangler/state`).
 
-> Il dry-run harness (`dry-run.mjs`) è uno strumento di sviluppo: la dedup
-> Pass 2 usa mirror locali di `textSimilarity`/`haversine` (le stesse formule
-> di `app/lib/duplicate-detection.ts`) per girare senza build TS. Il runner
-> FASE A userà i moduli veri.
+> The dry-run harness (`dry-run.mjs`) is a development tool: Pass 2 dedup
+> uses local mirrors of `textSimilarity`/`haversine` (the same formulas as
+> `app/lib/duplicate-detection.ts`) so it runs without a TS build. The
+> Phase A runner will use the real modules.
 
-## Test
+## Tests
 
 ```bash
 node --test tests/import-adapters.test.mjs
 ```
 
-Offline, con fixture: mapping campi, kind/direction, validazione, skip_if,
-idempotenza external_id, gate operator-PII.
+Offline, with fixtures: field mapping, kind/direction, validation, skip_if,
+external_id idempotency, operator-PII gate.

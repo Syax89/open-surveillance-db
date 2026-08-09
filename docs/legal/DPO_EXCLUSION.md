@@ -2,7 +2,7 @@
 
 - **Status:** in force — personal open-source project, 2026-08-08; decision recorded (2026-08-01) — no DPO appointed, exclusion documented
 - **Version:** 1.0 (2026-08-01)
-- **Owner:** Rosa (Legal & Privacy Officer / privacy contact)
+- **Owner:** Simone Rondina (project owner / privacy contact)
 - **Decision owner:** CEO (validation recorded on the governance board)
 - **Legal basis assessed:** GDPR art. 37(1)(a)/(b)/(c) and art. 37(4)
 - **Cross-references:** ADR 0017 (`docs/decisions/0017-no-dpo-appointed-art37.md`), PRIVACY_NOTICE.md § 1, GOVERNANCE.md (privacy / legal contact), LAWFUL_BASIS.md § 1, PROCESSOR_REGISTER.md, RETENTION_SCHEDULE.md, BREACH_PROCEDURE.md
@@ -110,8 +110,8 @@ Not appointing a DPO does not exempt the controller from accountability.
 The project discharges arts. 5(2) and 24 as follows:
 
 - **Functional role:** the privacy/legal function operates as the
-  **privacy contact / data-protection contact**: Rosa (Legal & Privacy
-  Officer), named in GOVERNANCE.md and reachable at
+  **privacy contact / data-protection contact**: Simone Rondina (project
+  owner), named in GOVERNANCE.md and reachable at
   `privacy@opensurveillancedb.org` (PRIVACY_NOTICE § 1; dedicated, monitored
   mailbox).
 - **Documented procedures:** rights of data subjects (arts. 12–22,
@@ -150,8 +150,9 @@ under art. 37(4) before the change takes effect:
    arrangement requires a named DPO or a different data-protection
    contact.
 
-Trigger owners: Rosa (privacy/legal) proposes the reassessment; the CEO
-decides; Ada (CTO) is consulted where processing architecture changes.
+Trigger owners: the privacy/legal function (project owner) proposes the
+reassessment; the CEO decides; technical review is consulted where
+processing architecture changes.
 
 ## 6. Conclusion
 

@@ -63,8 +63,8 @@ and are shown on the `/fonti` page — never reconstructed from the repo.
 ## Operational constraints
 
 - Every import must respect the **compatibility matrix** and the
-  recommendations of `licenze-compatibilita.md`; cases marked «da verificare
-  con legale» require legal approval before import.
+  recommendations of `licenze-compatibilita.md`; cases marked «to be
+  verified with legal» require legal approval before import.
 - The **licence gate** (`scripts/import/licence-gate.mjs`) is **fail-closed**:
   a licence not on the whitelist (CC0, ODbL, CC-BY/LO with attribution,
   dl-de-by-2.0, CH open-use, OGL/NLOD/PDDL equivalents) blocks the whole
@@ -73,8 +73,8 @@ and are shown on the `/fonti` page — never reconstructed from the repo.
   the column; `scripts/import/runner.mjs`) and per-record attribution is
   resolved via `cameras.import_batch_id` → `import_batches`
   (`db/import-sources.ts`). The `/fonti` page exposes committed batches; the
-  aggregated attribution lives in `/licenze` (section «Fonti dei dati
-  importati»), kept aligned with `app/lib/data-license.ts` and the export
+  aggregated attribution lives in `/licenze` (section «Imported data
+  sources»), kept aligned with `app/lib/data-license.ts` and the export
   headers.
 - Per-batch attribution is persisted by the runner in the database
   (`import_batches.attribution_text` + a `report` JSON with run counters) —

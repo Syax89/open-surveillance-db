@@ -2,9 +2,9 @@
 
 - **Status:** accepted
 - **Date:** 2026-08-01
-- **Author:** Ada (CTO / architecture)
-- **Decision owner:** Angelina (CEO) — review requested; see the kanban
-  handoff (t_9d67605d). This ADR records the CTO decision and the CEO can
+- **Author:** Simone Rondina (project owner)
+- **Decision owner:** CEO (Simone) — review requested; see the kanban
+  handoff (t_9d67605d). This ADR records the design decision and the CEO can
   veto or adjust it on review.
 - **PR:** #132
 - **Updates:** ADR 0007-i18n-externalisation-and-pilot-language (decision
