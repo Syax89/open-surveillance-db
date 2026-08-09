@@ -153,6 +153,30 @@ export async function GET(request: Request) {
     return Response.json({ error: "Request URI too long." }, { status: 414, headers: NO_STORE_HEADERS });
   }
 
+  // Metered (audit 2026-08-09, P2): the personal-state read used to run
+  // completely unmetered — an anonymous caller could enumerate every camera
+  // id through /api/cameras/[id]/actions with no bucket in the way. Uses the
+  // `read` bucket (60/min per caller), not the mutation-tight `action`
+  // bucket: the endpoint fires once per record page / popup open
+  // (CommunityActions), so 10/min would throttle legitimate map browsing
+  // while 60/min still bounds enumeration. Runs BEFORE the session
+  // resolution so the anonymous path is bounded too.
+  const key = callerKey(request, env);
+  const limitOptions = limitsFor("read", env);
+  const limit = await checkRateLimit(env, "read", key, limitOptions);
+  if (!limit.allowed) {
+    console.warn("GET /api/cameras/[id]/actions rate limited");
+    recordRateLimitBlock(env, {
+      route: "/api/cameras/[id]/actions",
+      key,
+      windowSeconds: limitOptions.windowSeconds,
+    });
+    return Response.json({ error: "Too many requests. Please try again shortly." }, {
+      status: 429,
+      headers: { ...NO_STORE_HEADERS, "Retry-After": String(limit.retryAfterSeconds) },
+    });
+  }
+
   const id = parseId(request);
   if (id === null) {
     return Response.json({ error: "Camera not found." }, { status: 404, headers: NO_STORE_HEADERS });

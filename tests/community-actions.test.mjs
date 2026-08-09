@@ -388,3 +388,36 @@ test("GET returns 503 when session lookup fails", async () => {
   const response = await GET(authed("GET", "/api/cameras/5/actions"));
   assert.equal(response.status, 503);
 });
+
+test("GET respects the read rate-limit bucket BEFORE session resolution (429 + Retry-After)", async () => {
+  // Audit 2026-08-09 (P2): the personal-state read was completely unmetered
+  // — an anonymous caller could enumerate camera ids with no bucket in the
+  // way. It now shares the read bucket (60/min); the throttled request must
+  // never reach session resolution or the db layer.
+  const previousMax = env.READ_RATE_LIMIT_MAX;
+  const previousWindow = env.READ_RATE_LIMIT_WINDOW_SECONDS;
+  env.READ_RATE_LIMIT_MAX = "1";
+  env.READ_RATE_LIMIT_WINDOW_SECONDS = "60";
+  let lookups = 0;
+  stub("findSessionByToken", async () => {
+    lookups += 1;
+    return null;
+  });
+  try {
+    const { GET } = await actionsRoute();
+    const first = await GET(sessionRequest("/api/cameras/5/actions"));
+    assert.equal(first.status, 200, "the first read within the window must be answered");
+    assert.deepEqual(await responseBody(first), { action: null });
+    assert.equal(lookups, 1, "the first request resolves the session");
+
+    const blocked = await GET(sessionRequest("/api/cameras/6/actions"));
+    assert.equal(blocked.status, 429);
+    assert.ok(Number(blocked.headers.get("retry-after")) > 0);
+    assert.equal(blocked.headers.get("cache-control"), "no-store");
+    assert.equal(lookups, 1, "the throttled request must never reach session resolution");
+    assert.equal(callArgs("getCommunityAction").length, 0, "the throttled request must never reach the db layer");
+  } finally {
+    env.READ_RATE_LIMIT_MAX = previousMax;
+    env.READ_RATE_LIMIT_WINDOW_SECONDS = previousWindow;
+  }
+});
