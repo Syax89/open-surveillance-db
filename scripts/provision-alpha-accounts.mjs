@@ -11,8 +11,8 @@
 //
 // Usage:
 //   PROVISION_ACCOUNTS='[
-//     {"email":"ada@example.org","displayName":"Ada","role":"admin","reviewerRole":"administrator","contributorId":1},
-//     {"email":"linus@example.org","displayName":"Linus","role":"moderator","reviewerRole":"record_reviewer"}
+//     {"email":"admin@example.org","displayName":"Admin","role":"admin","reviewerRole":"administrator","contributorId":1},
+//     {"email":"moderator@example.org","displayName":"Moderator","role":"moderator","reviewerRole":"record_reviewer"}
 //   ]' node scripts/provision-alpha-accounts.mjs [--remote]
 //
 //   --local   (default) apply against the local D1 database (.wrangler state)
@@ -68,7 +68,7 @@ if (!raw || !raw.trim()) {
   console.log(
     "PROVISION_ACCOUNTS not set — nothing to provision. Set it to a JSON array of\n" +
       '{"email","displayName","role","reviewerRole?"} objects, e.g.:\n' +
-      "  PROVISION_ACCOUNTS='[{\"email\":\"ada@example.org\",\"displayName\":\"Ada\"," +
+      "  PROVISION_ACCOUNTS='[{\"email\":\"admin@example.org\",\"displayName\":\"Admin\"," +
       '"role":"admin","reviewerRole":"administrator"}]\' ' +
       "node scripts/provision-alpha-accounts.mjs",
   );

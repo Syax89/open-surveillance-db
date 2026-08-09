@@ -57,7 +57,7 @@ export const en = {
   correctionSaved: "Private correction request saved with reference",
   correctionPrivate: "It is not displayed in the public directory.",
   correctionUnavailable: "The correction service is unavailable. Please try again later.",
-  // P1-2 (Vera design): the write gate answers 401 (no session) and 403
+  // P1-2 (design review): the write gate answers 401 (no session) and 403
   // (unverified email) with a single canonical body; these map the mid-form
   // session death to localized guidance instead of the raw server string.
   loginRequired:
@@ -116,7 +116,7 @@ export const it: Translation<typeof en> = {
   correctionSaved: "Richiesta privata di correzione salvata con riferimento",
   correctionPrivate: "Non viene mostrata nell'elenco pubblico.",
   correctionUnavailable: "Il servizio di correzione non è disponibile. Riprova più tardi.",
-  // P1-2 (design Vera): il write gate risponde 401 (nessuna sessione) e 403
+  // P1-2 (design review): il write gate risponde 401 (nessuna sessione) e 403
   // (email non verificata) con un body canonico unico; questi mappano la
   // sessione scaduta a metà modulo in indicazioni localizzate invece della
   // stringa grezza del server.

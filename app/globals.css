@@ -447,7 +447,7 @@ button { cursor:pointer; }
    fonte unica; il colore resta ridondante alla label (WCAG 1.4.1, D7). */
 .status-dot.demo { background:var(--status-demo); }
 .status-dot.pending { background:var(--status-pending); }
-/* P2 (review-vera-2): .status-dot.removed/.rejected erano usate (stato
+/* P2 (review round 2): .status-dot.removed/.rejected erano usate (stato
    contribuzione in /account) ma mai definite → dot trasparenti. Stessa
    convenzione delle altre: colore ridondante alla label (WCAG 1.4.1). */
 .status-dot.removed { background:var(--status-removed); }
@@ -1078,11 +1078,11 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 .auth-switch .button { text-decoration:none; }
 .auth-legal-links { margin:2px 0 0; color:var(--ink-4); font-size:var(--text-sm); line-height:1.6; }
 .auth-legal-links a { color:var(--focus); font-weight:800; text-decoration:underline; text-underline-offset:3px; }
-/* P1-3 (Vera design): "Forgot password?" row under the password field —
+/* P1-3 (design review): "Forgot password?" row under the password field —
    same quiet link language as the legal links, never a button-like CTA. */
 .auth-forgot { margin:0; text-align:right; }
 .auth-forgot a { color:var(--focus); font-weight:800; font-size:var(--text-sm); text-decoration:underline; text-underline-offset:3px; }
-/* P1-4 (Vera design): per-method risk disclosure. Reuses the oidc-disclosure
+/* P1-4 (design review): per-method risk disclosure. Reuses the oidc-disclosure
    visual (the OIDC panel already had one) so the three methods read as one
    consistent risk matrix on /login (ADR 0020 decision 6). */
 .auth-method-disclosure { margin:16px 0 0; }
@@ -1102,7 +1102,7 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 .auth-danger-zone .button:hover { background:var(--danger-bg); border-color:var(--danger-button-hover-border); }
 .auth-danger-zone .button:disabled { opacity:.55; cursor:progress; }
 
-/* Multi-method auth (Fase E2 — Vera design; CEO 2026-08-08): the three
+/* Multi-method auth (Fase E2 — design review; CEO 2026-08-08): the three
    sign-in blocks on /login are ALL visible at once, stacked in the order
    passkey → email + password → social. Each block is a coherent-box card
    (white bg + scoped darker border + soft shadow, same family as the
@@ -1127,7 +1127,7 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 .passkey-empty { margin:18px 0 10px; color:var(--muted); font-size:var(--text-base); }
 .passkey-added { margin:10px 0 0; color:var(--focus); font-weight:800; }
 .passkey-actions { display:grid; gap:8px; justify-items:start; margin-top:12px; }
-/* P1-1 (Vera design): /account email-verification banner + the done line.
+/* P1-1 (design review): /account email-verification banner + the done line.
    The banner is a distinct callout (write gate), not a generic notice —
    amber-tinted like other state callouts, label + resend button. */
 .verify-banner { margin:26px 0 6px; padding:18px 20px; border:1px solid var(--verify-border); border-radius:var(--radius-lg); background:var(--verify-bg); }
@@ -1136,7 +1136,7 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 .verify-banner-done { margin:26px 0 6px; color:var(--focus); font-weight:800; }
 .verify-actions { margin:16px 0 0; display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
 .verify-actions .auth-error { margin:0; }
-/* P1-2 (Vera design): the write-tool login wall (/segnala, /correggi).
+/* P1-2 (design review): the write-tool login wall (/segnala, /correggi).
    The h2 is the page-level heading inside the tool section; the body reuses
    the record-detail-summary rhythm and the auth-switch CTA row. */
 .write-gate-wall { margin:34px 0 10px; padding:28px 30px; border:1px solid var(--line); border-radius:var(--radius-lg); background:var(--card-bg); }
@@ -1247,7 +1247,7 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 .confirm-star { width:20px; height:20px; flex:none; color:var(--notice-border); }
 .confirm-count { white-space:nowrap; }
 .confirm-help { margin:10px 0 0; color:var(--muted); font-size:var(--text-md); line-height:1.5; }
-/* Profile trust-level badge (Vera C1): .card-topline label + dot, progress
+/* Profile trust-level badge (design review C1): .card-topline label + dot, progress
    line is TEXT ONLY — never a bar. */
 .level-badge { margin:0 0 30px; }
 .level-badge .card-topline { margin:0 0 6px; }

@@ -70,7 +70,7 @@ export function escapeHtml(value: string): string {
  * Build the action URL for a given kind from the VERIFY_BASE_URL env value.
  * Kept here (pure) so the route layer can render links without importing
  * the D1-backed mailer module. The token is encoded as a query parameter;
- * the links land on the client pages (P1-1/P1-3 Vera design) — /verify-email
+ * the links land on the client pages (P1-1/P1-3 design review) — /verify-email
  * and /reset-password — which consume the API client-side. (Previously the
  * verify link pointed at GET /api/auth/verify-email, i.e. raw JSON in the
  * browser, and the reset link at a route that does not exist.)

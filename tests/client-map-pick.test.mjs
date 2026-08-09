@@ -34,7 +34,7 @@ before(async () => {
   const camerasMod = await loadDomModule("app/lib/use-public-cameras.mjs");
   __resetPublicCamerasCache = camerasMod.__resetPublicCamerasCache;
   // Default fetch mock: empty public list (prototype seed keeps rendering).
-  // P1-2 (Vera design): SegnalaTool is gated by WriteGateWall, which checks
+  // P1-2 (design review): SegnalaTool is gated by WriteGateWall, which checks
   // /api/auth/me on mount — the default mock answers a VERIFIED contributor
   // so the /segnala deep-link tests exercise the form, not the wall.
   installFetchMock((input) => {

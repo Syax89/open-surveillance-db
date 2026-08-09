@@ -1,9 +1,9 @@
 /**
  * Component smoke tests — post-refactor structure (kanban t_14b1949c).
  *
- * Questa suite pina il CONTRATTO strutturale del refactor di Ada
- * (t_6104f386: app/page.tsx -> app/components/home/*) e di Linus
- * (t_04ad3e41: app/components/InfoPage.tsx condiviso):
+ * Questa suite pina il CONTRATTO strutturale del refactor della home
+ * (t_6104f386: app/page.tsx -> app/components/home/*) e del componente
+ * condiviso (t_04ad3e41: app/components/InfoPage.tsx):
  *
  *   1. i componenti estratti esistono nei path previsti;
  *   2. ogni componente rispetta l'obiettivo ~150 righe (refactor goal);
@@ -11,7 +11,7 @@
  *      importa i componenti estratti (non li definisce inline);
  *   4. le pagine informative usano il layout condiviso InfoPage.
  *
- * Il refactor moderation (t_c7460073, Ada) segue lo stesso contratto:
+ * Il refactor moderation (t_c7460073) segue lo stesso contratto:
  * ModerationDashboard.tsx resta un orchestratore sottile e importa i
  * componenti estratti da app/components/moderation/.
  *
@@ -47,7 +47,7 @@ function countLines(source) {
   return source.split("\n").length - (source.endsWith("\n") ? 1 : 0);
 }
 
-/** Componenti attesi dal refactor di Ada (home). */
+/** Componenti attesi dal refactor della home. */
 const HOME_COMPONENTS = [
   { name: "Hero", file: "app/components/home/Hero.tsx" },
   { name: "PublicDirectory", file: "app/components/home/PublicDirectory.tsx" },
@@ -81,7 +81,7 @@ const HOME_IMPORTS = [
 const HOME_ABSENT_IMPORTS = ["MapTeaser", "PublicDirectory", "ReportForm", "CorrectionForm", "MapPanel"];
 
 /**
- * Componenti attesi dal refactor moderation di Ada (t_c7460073):
+ * Componenti attesi dal refactor moderation (t_c7460073):
  * ModerationDashboard.tsx -> app/components/moderation/*. L'hook
  * useModerationQueue possiede stato/fetch/decide (pattern del refactor
  * home); le sezioni e le card sono presentazionali e ricevono l'API.
@@ -139,7 +139,7 @@ const KNOWN_DEVIATIONS = new Map([
   ["app/components/home/MapPanel.tsx", { baselineLines: 188, reason: "t_b7728ad0: redesign popup (report-issue link rimosso, provenance via options) + stato pointsCollapsed pannello punti mobile map-first; t_66766914: stato DETERMINISTICO expanded SSR/client + preferenza mobile applicata solo post-hydration in effect (fix mismatch hydration CEO) — blocchi isolati" }],
 ]);
 
-/** Componente condiviso atteso dal refactor di Linus. */
+/** Componente condiviso atteso dal refactor. */
 const INFO_PAGE_COMPONENT = { name: "InfoPage", file: "app/components/InfoPage.tsx" };
 
 /** Pagine informative che devono usare il layout condiviso InfoPage. */

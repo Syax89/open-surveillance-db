@@ -6,7 +6,7 @@ import { useMessages } from "../lib/use-messages";
 import { PublicNav } from "../components/PublicNav";
 
 /**
- * /forgot-password body (P1-3 Vera design).
+ * /forgot-password body (P1-3 design review).
  *
  * The request endpoint is anti-enumeration by design (POST
  * /api/auth/reset-password/request always answers 200 {sent:true} for a

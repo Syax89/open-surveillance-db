@@ -68,7 +68,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // P3-2 (review-ada-2): the challenge is bound to the contributor who
+    // P3-2 (review round 2): the challenge is bound to the contributor who
     // started the ceremony at /begin — only that session may complete it.
     // Without this check a register challenge started under session A could
     // be completed by session B, enrolling the passkey to B's account. The

@@ -48,8 +48,8 @@ const recoveryRoute = () => loadRoute("app/api/auth/recovery/route.mjs");
 
 const contributor = {
   id: 7,
-  email: "ada@example.org",
-  displayName: "Ada",
+  email: "contributor@example.org",
+  displayName: "Contributor",
   emailVerifiedAt: "2026-08-01T08:30:00.000Z",
   createdAt: "2026-08-01T08:00:00.000Z",
   updatedAt: "2026-08-01T08:00:00.000Z",
@@ -328,14 +328,14 @@ test("login/begin with a known email narrows the ceremony to that account's pass
   const response = await POST(
     apiRequest("/api/auth/passkey/login/begin", {
       method: "POST",
-      body: { email: "ada@example.org" },
+      body: { email: "contributor@example.org" },
     }),
   );
   assert.equal(response.status, 200);
   const body = await responseBody(response);
   // SimpleWebAuthn completes the entry with type "public-key".
   assert.deepEqual(body.options.allowCredentials, [{ id: "cred-1", type: "public-key" }]);
-  assert.deepEqual(callArgs("findContributorByEmail")[0], ["ada@example.org"], "email normalised before lookup");
+  assert.deepEqual(callArgs("findContributorByEmail")[0], ["contributor@example.org"], "email normalised before lookup");
   const [challengeArgs] = callArgs("createWebAuthnChallenge");
   const passkeyLib = await loadLibModule("passkey");
   assert.equal(challengeArgs[0].userHandle, passkeyLib.userHandleForContributor(7));
@@ -682,7 +682,7 @@ test("recovery redeems a single-use code and opens a session", async () => {
   const response = await POST(
     apiRequest("/api/auth/recovery", {
       method: "POST",
-      body: { email: "ada@example.org", code: "abcd-efgh-ijkl-mnop" },
+      body: { email: "contributor@example.org", code: "abcd-efgh-ijkl-mnop" },
     }),
   );
   assert.equal(response.status, 200);
@@ -709,7 +709,7 @@ test("recovery refuses to open a session for an UNVERIFIED account (t_f940482b)"
   const response = await POST(
     apiRequest("/api/auth/recovery", {
       method: "POST",
-      body: { email: "ada@example.org", code: "abcd-efgh-ijkl-mnop" },
+      body: { email: "contributor@example.org", code: "abcd-efgh-ijkl-mnop" },
     }),
   );
   assert.equal(response.status, 401);
@@ -735,7 +735,7 @@ test("recovery answers the same 401 for unknown email, wrong code and used code"
     const response = await POST(
       apiRequest("/api/auth/recovery", {
         method: "POST",
-        body: { email: "ada@example.org", code: "abcd-efgh-ijkl-mnop" },
+        body: { email: "contributor@example.org", code: "abcd-efgh-ijkl-mnop" },
       }),
     );
     assert.equal(response.status, 401, name);
@@ -746,7 +746,7 @@ test("recovery answers the same 401 for unknown email, wrong code and used code"
 
 test("recovery rejects a malformed payload", async () => {
   const { POST } = await recoveryRoute();
-  for (const body of [{}, { email: "ada@example.org" }, { email: "nope", code: "x" }, { email: "ada@example.org", code: "" }]) {
+  for (const body of [{}, { email: "contributor@example.org" }, { email: "nope", code: "x" }, { email: "contributor@example.org", code: "" }]) {
     const response = await POST(apiRequest("/api/auth/recovery", { method: "POST", body }));
     assert.equal(response.status, 401, JSON.stringify(body));
     assert.equal(callArgs("consumeRecoveryCode").length, 0, JSON.stringify(body));
@@ -792,7 +792,7 @@ test("userHandleForContributor/contributorIdFromUserHandle bind the stable numer
   // Foreign or malformed handles must fail the ceremony, not crash it.
   assert.equal(lib.contributorIdFromUserHandle("!!not-base64!!"), null);
   assert.equal(lib.contributorIdFromUserHandle(""), null);
-  assert.equal(lib.contributorIdFromUserHandle(lib.toBase64Url(new TextEncoder().encode("ada@example.org"))), null);
+  assert.equal(lib.contributorIdFromUserHandle(lib.toBase64Url(new TextEncoder().encode("contributor@example.org"))), null);
 });
 
 test("isCounterAdvancementOk tolerates 0->0 and rejects every other non-increase", async () => {

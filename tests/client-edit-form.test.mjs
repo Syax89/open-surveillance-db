@@ -220,7 +220,7 @@ test("edit page: active record shows the moderation notice and submits for revie
   await renderEditPage("42");
   await waitFor(() => assert.ok(screen.queryByDisplayValue("Fixture Published Camera")));
 
-  // Eva's notice + the review submit label.
+  // The review notice + the review submit label.
   assert.ok(screen.getByText("Your changes will be reviewed by a moderator before they replace the current record."));
   const submit = screen.getByRole("button", { name: "Save and submit for review" });
 

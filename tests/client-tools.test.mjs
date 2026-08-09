@@ -2,7 +2,8 @@
  * Client-side interaction tests for the F1 tool routes (route group (tools),
  * kanban t_03c0fa15): /mappa, /directory, /segnala, /correggi.
  *
- * Per-route contract (docs/FRONTEND_PLAN.md §5.3, criterio di approve Grace):
+ * Per-route contract (docs/FRONTEND_PLAN.md §5.3, criterio di approve del
+ * maintainer):
  * SSR smoke (pages-render.test.mjs) + i18n parity (i18n-pages.test.mjs) +
  * a11y contract (publication-boundaries.test.mjs) live in their own suites.
  * THIS suite is the jsdom interaction layer for the four tool bodies:
@@ -62,7 +63,7 @@ before(async () => {
   // Default fetch mock: the API answers with an empty public list, so the
   // tools keep their prototype seed (same as a healthy-but-empty DB) and no
   // test ever trips an unhandled ReferenceError on a missing fetch.
-  // P1-2 (Vera design): the write tools are gated by WriteGateWall, which
+  // P1-2 (design review): the write tools are gated by WriteGateWall, which
   // checks /api/auth/me on mount — the default mock answers a VERIFIED
   // contributor so the form tests exercise the form, not the wall (the wall
   // states get their own dedicated tests below).
@@ -356,7 +357,7 @@ const installRecordsMock = () => installFetchMock(() => jsonResponse(fakeCameras
 const installEmptyMock = () => installFetchMock(() => jsonResponse({ records: [], total: 0, nextOffset: null }));
 
 /**
- * P1-2 (Vera design): per-test fetch mocks for the SegnalaTool form tests
+ * P1-2 (design review): per-test fetch mocks for the SegnalaTool form tests
  * must answer /api/auth/me with a VERIFIED contributor (the WriteGateWall
  * gates the form on that check); anything else falls through to the given
  * handler. Without this the wall would see the records payload as an
@@ -1163,7 +1164,7 @@ test("ErrorPage sets a page-specific document.title for 404 and 500 (WCAG 2.4.2)
 });
 
 // ---------------------------------------------------------------------------
-// P1-2 (Vera design) — WriteGateWall on the write tools
+// P1-2 (design review) — WriteGateWall on the write tools
 // ---------------------------------------------------------------------------
 
 test("SegnalaTool preserves a map-picked point through the anonymous login wall", async () => {

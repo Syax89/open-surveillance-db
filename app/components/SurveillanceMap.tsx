@@ -137,7 +137,7 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
   // run again, leaving .leaflet-marker-pane empty while the sidebar shows
   // the same records (t_eb2e33a3 regression after #202).
   const [mapReady, setMapReady] = useState(false);
-  // Viewport culling (QA#5 F3, t_ab0d4c75 — PM directive: ZERO new
+  // Viewport culling (QA#5 F3, t_ab0d4c75 — project directive: ZERO new
   // libraries, no Leaflet.markercluster, no supercluster): only the records
   // inside the CURRENT map viewport (padded) get a marker. The full dataset
   // is never materialised as N DOM nodes — on a realistic civic DB
@@ -468,7 +468,7 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
         // geolocation dot + accuracy circle so the marker reconcile and the
         // FOV redraws never touch it.
         userLayerRef.current = L.layerGroup().addTo(map);
-        // A11y (t_f8b775ec, PM directive): the FOV geometry is purely
+        // A11y (t_f8b775ec, project directive): the FOV geometry is purely
         // decorative — the same information is available as TEXT inside the
         // marker popup (popupHtmlFor renders "Field of view: NE 45°" when a
         // direction exists). Marking the whole overlay pane aria-hidden
@@ -601,7 +601,7 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
   //  materialised. The sidebar list keeps its "never blank" contract
   //  (recordsInBounds(records, null) — text, cheap).
   //
-  //  PIXEL-GRID AGGREGATION — zero new libraries (PM directive): above the
+  //  PIXEL-GRID AGGREGATION — zero new libraries (project directive): above the
   //  density threshold (or below GRID_MAX_ZOOM) markersForViewport buckets
   //  the visible records into 48px screen cells; each cell renders ONE
   //  badge divIcon with the count, and clicking it zooms in 2 levels toward

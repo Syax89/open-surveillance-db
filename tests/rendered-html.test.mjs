@@ -249,7 +249,7 @@ test("global footer exposes every institutional page, the ODbL data licence and 
 
 test("collection points link to the privacy notice and terms (GDPR art. 13 short notice)", async () => {
   // F2 home hub: the report and correction forms moved to their own routes
-  // (/segnala, /correggi). P1-2 (Vera design): the forms are gated by
+  // (/segnala, /correggi). P1-2 (design review): the forms are gated by
   // WriteGateWall — the write gate (Fase E1) requires a verified contributor,
   // so the anonymous SSR shell renders the bilingual login wall, and the
   // forms (with their art. 13 mini-notice at the collection point) render
@@ -307,7 +307,7 @@ test("register page links to the privacy notice and terms next to the submit but
 });
 
 test("auth pages render the primary public nav (three links + mobile menu), not the backHome-only header", async () => {
-  // Vera's design (t_e0dcc292): the auth pages used to render SiteHeader
+  // design review (t_e0dcc292): the auth pages used to render SiteHeader
   // with a single "Back to the map" link; CEO feedback 2026-08-03 wants the
   // SAME PublicNav as the other public pages (PublicNavLinks 3 links +
   // AuthNavLinks) while the auth-card stays compact. End-to-end pin on the
@@ -554,7 +554,7 @@ test("contact page serves correction and security routes without a governance ro
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   assert.doesNotMatch(html, /Who we are/);
-  assert.doesNotMatch(html, /Simone \(syax89\) and Ada \(CTO\)/);
+  assert.doesNotMatch(html, /Roles and owners/);
 
   // Correction / removal contact (privacy contact + in-app form).
   assert.match(html, /Corrections and removal/);

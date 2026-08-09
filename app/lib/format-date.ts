@@ -2,7 +2,7 @@ import { DEFAULT_LOCALE, LOCALE_BCP47 } from "./i18n";
 import type { Locale } from "./i18n";
 
 /**
- * Shared date formatting for the public UI (P2, review-vera-2).
+ * Shared date formatting for the public UI (P2, review round 2).
  *
  * The API stores ISO-8601 timestamps (`record.updated`, revision
  * `createdAt`, …); the public pages used to render them raw. This helper

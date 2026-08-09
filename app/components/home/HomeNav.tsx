@@ -6,7 +6,7 @@ import { useMessages } from "../../lib/use-messages";
 /**
  * HomeNav — navigation shell of the home hub (F2, t_52dcb95e).
  *
- * The home page itself is an SSR-pure Server Component (criterion Grace: no
+ * The home page itself is an SSR-pure Server Component (review criterion: no
  * JS, no client data dependency), so the only interactive chrome — the
  * mobile menu toggle — lives in this small client island, exactly like the
  * other client islands the server pages already embed (SiteFooter,

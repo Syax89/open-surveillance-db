@@ -5,7 +5,7 @@
  * The structural EN/IT parity is a build gate (`Translation<typeof en>` in
  * types.ts) and is re-checked per-domain by navigation-pages.test.mjs; this
  * suite pins the SEMANTIC contract:
- *   1. Eva's golden strings EN/IT (frozen terminology, COMMUNITY_PLAN §6.1
+ *   1. The golden strings EN/IT (frozen terminology, COMMUNITY_PLAN §6.1
  *      + copy comment #814) are the exact values served to the UI;
  *   2. zero gamification jargon (stars / karma / XP / points / tiers / rank
  *      / upvotes / badges and their Italian equivalents) in the community
@@ -89,10 +89,10 @@ const FORBIDDEN = [
 ];
 
 // ---------------------------------------------------------------------------
-// 1. Golden strings (Eva, comment #814) — exact frozen values
+// 1. Golden strings (copy review, comment #814) — exact frozen values
 // ---------------------------------------------------------------------------
 
-test("community bundle exposes Eva's frozen EN/IT terminology", async () => {
+test("community bundle exposes the frozen EN/IT terminology", async () => {
   const mod = await transpileAndImport(path.join(i18nDir, "community.ts"));
   const { en, it } = mod;
 

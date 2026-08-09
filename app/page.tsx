@@ -13,7 +13,7 @@ import { getServerMessages } from "./lib/server-i18n";
  * their client components (MapPanel, PublicDirectory, ReportForm,
  * CorrectionForm) — this page imports none of them.
  *
- * SSR-pure contract (criterion Grace):
+ * SSR-pure contract (review criterion):
  *  - Server Component: the whole page renders server-side (getServerMessages,
  *    ADR 0015), works without JS and without a client data dependency;
  *  - zero Leaflet on the hub: the /mappa tool card IS the map entry point

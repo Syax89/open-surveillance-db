@@ -868,7 +868,7 @@ test("account: an unverified contributor sees the verification banner with a wor
 
   await renderWithLocale(React.createElement(AccountPage));
 
-  // P1-1 (Vera design): the banner explains the write gate and offers the
+  // P1-1 (design review): the banner explains the write gate and offers the
   // resend — the register→verify→write flow is no longer a dead end.
   await waitFor(() => assert.ok(screen.getByRole("heading", { name: "Verify your email to contribute" })));
   await user.click(screen.getByRole("button", { name: "Resend the email" }));

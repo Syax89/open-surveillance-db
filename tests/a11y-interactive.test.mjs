@@ -256,7 +256,7 @@ test("the skip link is the first focusable element on the page (before the nav s
 
 test("manual coordinates (keyboard path for map location picking) have labelled, described inputs", async () => {
   // F2 home hub: the report form moved to /segnala (the keyboard path for
-  // map location picking lives with the form). P1-2 (Vera design): the form
+  // map location picking lives with the form). P1-2 (design review): the form
   // is gated by WriteGateWall (verified contributor required by the write
   // gate), so the labelled inputs are asserted client-side with a verified
   // session — the anonymous SSR shell renders the login wall instead.

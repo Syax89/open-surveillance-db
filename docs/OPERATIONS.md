@@ -456,7 +456,7 @@ verifications (DEPLOYMENT.md §"Local LXC deployment").
   added post-create via the Proxmox API (`lxc-inject-sshkey.py`:
   `PUT .../lxc/<vmid>/config` with `ssh-public-keys` + fresh digest, then
   reboot) — the operator workstation connects as `root@<lan-ip>` with the
-  injected key (verified 2026-08-09; the Hermes sync cron
+  injected key (verified 2026-08-09; the scheduled sync cron
   `osdb-sync-d1.sh` uses the same SSH path).
 - Lifecycle operations (snapshot, rollback, backup, stop/start) use the
   **Proxmox API token**, decrypted at runtime from the local GPG vault
@@ -585,7 +585,7 @@ Verified Proxmox rollback behaviour:
 
 ### 8.6 Container → D1 production data sync (backfill)
 
-Script: `scripts/sync-d1-backfill.mjs` (Hermes cron wrapper:
+Script: `scripts/sync-d1-backfill.mjs` (scheduled sync wrapper:
 `osdb-sync-d1.sh` on the operator workstation).
 
 Purpose: one-way sync of the container's LOCAL miniflare D1 (the source of
@@ -616,7 +616,7 @@ Runbook (never run the backfill without evidence; it writes to production):
 # read-only preview: dumps the local DB into chunk files, NO remote write
 node scripts/sync-d1-backfill.mjs --dry-run
 # real sync (requires CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID in env;
-# usually executed by the Hermes cron wrapper, which decrypts them from the
+# usually executed by the scheduled sync wrapper, which decrypts them from the
 # local GPG vault and copies them to the container):
 node scripts/sync-d1-backfill.mjs
 ```

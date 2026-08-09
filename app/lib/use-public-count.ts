@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 /**
  * Public record count for the home hub stat (F2, t_52dcb95e).
  *
- * The hub is an SSR-pure orienteering page (criterion Grace: it must work
+ * The hub is an SSR-pure orienteering page (review criterion: it must work
  * without JS and without a client data dependency). The hero stat is a
  * progressive enhancement: the server renders a neutral placeholder and this
  * hook fetches the server `total` in a SINGLE lightweight request

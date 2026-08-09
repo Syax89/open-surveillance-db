@@ -21,7 +21,7 @@ type Props = {
  * useReportFlow promoted to its own route. Noindex is set by the page's
  * metadata (robots), so this form page is never indexed.
  *
- * P1-2 (Vera design): the form is gated by WriteGateWall — the write gate
+ * P1-2 (design review): the form is gated by WriteGateWall — the write gate
  * (Fase E1, ADR 0020 d.1) requires a verified contributor, so anonymous and
  * unverified visitors get the bilingual login/verify wall instead of a form
  * that would fail with a raw server error at submit.

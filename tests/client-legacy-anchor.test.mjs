@@ -4,7 +4,7 @@
  * routes.
  *
  * A URL fragment NEVER reaches the server, so a 302 cannot work (CTO
- * correction to Vera's D8, t_f24c3227, FRONTEND_PLAN.md §1.2); this client
+ * correction to D8, t_f24c3227, FRONTEND_PLAN.md §1.2); this client
  * component is the progressive enhancement that keeps old bookmarks and
  * shared links working. The SSR side of the contract (the server serves the
  * page 200 and never redirects for a fragment) is pinned in

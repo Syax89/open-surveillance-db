@@ -52,8 +52,8 @@ const session = {
 };
 const contributor = {
   id: 7,
-  email: "linus@osdb.test",
-  displayName: "Linus",
+  email: "contributor@osdb.test",
+  displayName: "Contributor",
   createdAt: "2026-07-01T00:00:00.000Z",
   updatedAt: "2026-07-01T00:00:00.000Z",
 };
@@ -160,7 +160,7 @@ test("requireVerifiedContributor resolves a verified contributor to the gate pay
   assert.equal(result.ok, true);
   if (!result.ok) return;
   assert.equal(result.contributor.id, 7);
-  assert.equal(result.contributor.email, "linus@osdb.test");
+  assert.equal(result.contributor.email, "contributor@osdb.test");
   assert.equal(result.contributor.emailVerifiedAt, "2026-08-01T00:00:00.000Z");
   assert.equal(result.contributor.authProvider, "password");
   assert.equal(result.session.csrfToken, "csrf-token-123");

@@ -179,7 +179,7 @@ test("fileAppeal on another contributor's attributed submission stays allowed (d
 
   // Standing cannot be verified for attributed submissions without a product
   // decision (option 1 of the audit: hard 403 + "not my submission" reason
-  // code, pending Ada/PM). Under the documented rule (option 2) the appeal is
+  // code, pending maintainer decision). Under the documented rule (option 2) the appeal is
   // filed and moderation evaluates the stated relevance; the per-appellant
   // threshold and the route's minimum reason length bound abuse.
   const result = await appeals.fileAppeal({

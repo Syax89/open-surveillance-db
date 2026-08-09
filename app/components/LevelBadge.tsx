@@ -4,7 +4,7 @@ import { badgeKeyForLevel } from "../lib/trust-levels";
 import { useMessages } from "../lib/use-messages";
 
 /**
- * Trust-level badge (COMMUNITY_PLAN §6.3 C1 — Vera's design).
+ * Trust-level badge (COMMUNITY_PLAN §6.3 C1 — design review).
  *
  * The UI shows exactly ONE badge at a time, chosen from the three public
  * badge keys (New / Trusted / Experienced contributor) via the frozen

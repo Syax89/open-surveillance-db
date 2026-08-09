@@ -5,7 +5,7 @@
  * this domain, `it` is type-checked against it via `Translation<typeof en>`
  * (see `./types.ts`), so a missing or extra key fails `tsc --noEmit`.
  *
- * Vocabulary frozen by the copy review (kanban comment #814, Eva) and
+ * Vocabulary frozen by the copy review (kanban comment #814) and
  * consolidated in docs/COMMUNITY_PLAN.md §6: trust levels / livelli di
  * fiducia, verifications / verifiche (NEVER "stars"), badges
  * New/Trusted/Experienced contributor, abuse reporting, contribution

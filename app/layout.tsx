@@ -81,7 +81,7 @@ export default async function RootLayout({
               #correction) redirect client-side to the tool routes. Mounted
               in the root layout so the redirect works from any page the
               bookmark lands on; SSR renders nothing (progressive
-              enhancement, CTO t_f24c3227). */}
+              enhancement, maintainer t_f24c3227). */}
           <LegacyAnchorRedirect />
           {children}
           <SiteFooter />

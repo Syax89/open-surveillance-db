@@ -42,7 +42,7 @@ const likeCounts = { like: 12, confirm: 0, gone: 0, problem: 0, privacy: 0 };
  * Default widget mock: the personal-state read answers `{ action: null }`
  * and the session probe answers 200 (signed in), unless overridden.
  */
-function widgetMock({ personal = null, me = { id: 7, displayName: "Ada" } } = {}) {
+function widgetMock({ personal = null, me = { id: 7, displayName: "Contributor" } } = {}) {
   return (input, init) => {
     const method = init?.method ?? "GET";
     if (input === "/api/auth/me") {
@@ -122,7 +122,7 @@ test("community actions: toggle on PUTs the action and renders the live counts",
   installFetchMock((input, init) => {
     const method = init?.method ?? "GET";
     calls.push({ input, method, body: init?.body });
-    if (input === "/api/auth/me") return jsonResponse({ id: 7, displayName: "Ada" });
+    if (input === "/api/auth/me") return jsonResponse({ id: 7, displayName: "Contributor" });
     if (input === "/api/cameras/7/actions" && method === "GET") return jsonResponse({ action: null });
     if (input === "/api/cameras/7/actions" && method === "PUT") {
       assert.equal(init.headers["x-csrf-token"], undefined); // no cookie in jsdom
@@ -158,7 +158,7 @@ test("community actions: toggle off DELETEs the action and the visible count dro
   installFetchMock((input, init) => {
     const method = init?.method ?? "GET";
     calls.push({ input, method });
-    if (input === "/api/auth/me") return jsonResponse({ id: 7, displayName: "Ada" });
+    if (input === "/api/auth/me") return jsonResponse({ id: 7, displayName: "Contributor" });
     if (input === "/api/cameras/7/actions" && method === "GET") return jsonResponse({ action: "like" });
     if (input === "/api/cameras/7/actions" && method === "DELETE") {
       return jsonResponse({ action: null });
@@ -189,7 +189,7 @@ test("community actions: switching action PUTs the new one and moves aria-presse
   const switchCounts = { like: 0, confirm: 2, gone: 0, problem: 0, privacy: 0 };
   installFetchMock((input, init) => {
     const method = init?.method ?? "GET";
-    if (input === "/api/auth/me") return jsonResponse({ id: 7, displayName: "Ada" });
+    if (input === "/api/auth/me") return jsonResponse({ id: 7, displayName: "Contributor" });
     if (input === "/api/cameras/7/actions" && method === "GET") return jsonResponse({ action: "like" });
     if (input === "/api/cameras/7/actions" && method === "PUT") {
       return jsonResponse({ action: "confirm", switchedFrom: "like", counts: switchCounts });
@@ -220,7 +220,7 @@ test("community actions: 403 self-action renders the alert, no optimistic state"
   const { screen } = rtl;
   installFetchMock((input, init) => {
     const method = init?.method ?? "GET";
-    if (input === "/api/auth/me") return jsonResponse({ id: 7, displayName: "Ada" });
+    if (input === "/api/auth/me") return jsonResponse({ id: 7, displayName: "Contributor" });
     if (input === "/api/cameras/7/actions" && method === "GET") return jsonResponse({ action: null });
     if (input === "/api/cameras/7/actions" && method === "PUT") {
       return jsonResponse({ error: "self" }, { status: 403 });
@@ -247,7 +247,7 @@ test("community actions: 409 duplicate — server state wins and the alert expla
   const { screen } = rtl;
   installFetchMock((input, init) => {
     const method = init?.method ?? "GET";
-    if (input === "/api/auth/me") return jsonResponse({ id: 7, displayName: "Ada" });
+    if (input === "/api/auth/me") return jsonResponse({ id: 7, displayName: "Contributor" });
     if (input === "/api/cameras/7/actions" && method === "GET") return jsonResponse({ action: null });
     if (input === "/api/cameras/7/actions" && method === "PUT") {
       return jsonResponse({ error: "duplicate" }, { status: 409 });
@@ -272,7 +272,7 @@ test("community actions: 401 mid-action returns the anonymous CTA and names the 
   const { screen } = rtl;
   installFetchMock((input, init) => {
     const method = init?.method ?? "GET";
-    if (input === "/api/auth/me") return jsonResponse({ id: 7, displayName: "Ada" });
+    if (input === "/api/auth/me") return jsonResponse({ id: 7, displayName: "Contributor" });
     if (input === "/api/cameras/7/actions" && method === "GET") return jsonResponse({ action: null });
     if (input === "/api/cameras/7/actions" && method === "PUT") {
       return jsonResponse({ error: "session" }, { status: 401 });
@@ -343,7 +343,7 @@ test("community actions: compact privacy action asks explicit confirmation befor
   let putCount = 0;
   const countingMock = (input, init) => {
     const method = init?.method ?? "GET";
-    if (input === "/api/auth/me") return jsonResponse({ id: 7, displayName: "Ada" });
+    if (input === "/api/auth/me") return jsonResponse({ id: 7, displayName: "Contributor" });
     if (input === "/api/cameras/7/actions") {
       if (method === "GET") return jsonResponse({ action: null });
       putCount += 1;

@@ -179,7 +179,7 @@ async function ssr(route) {
 
 test("journey segnala: the report tool renders on the SSR /segnala route (form is client-gated)", async () => {
   // F2 moved the report form off the home hub into the /segnala tool route
-  // (F1 route group). P1-2 (Vera design): the form is gated by WriteGateWall
+  // (F1 route group). P1-2 (design review): the form is gated by WriteGateWall
   // (the write gate requires a verified contributor), so the anonymous SSR
   // renders the tool heading + the wall's loading state — the form itself
   // mounts client-side after the verified-session check. The write journey

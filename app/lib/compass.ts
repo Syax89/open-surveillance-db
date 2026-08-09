@@ -1,6 +1,6 @@
 /**
  * Compass helpers for the camera field-of-view direction (kanban
- * t_f8b775ec, design Vera).
+ * t_f8b775ec, design review).
  *
  * Directions are stored as integer compass bearings 0-359 (clockwise from
  * north, see migration 0035). This module turns a bearing into the 16-wind

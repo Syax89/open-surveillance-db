@@ -248,8 +248,8 @@ Two facts shape everything below:
 - **Denormalised `contributors.contributor_level`** (with cache): rejected by
   CTO/backend/QA — invalidation on every status change in 5+ places; an
   indexed COUNT is free at these volumes.
-- **Direct PATCH also on `needs_review` / `stale`** (CTO position): rejected
-  by PM on the backend/legal position — those states already have published
+- **Direct PATCH also on `needs_review` / `stale`** (maintainer position): rejected
+  by the maintainer on the backend/legal position — those states already have published
   history under moderation, so edits must go through the human gate.
 - **Public leaderboard / ranking**: rejected (legal #818 + PRODUCT_UX.md) —
   identification risk and a documented product non-goal.

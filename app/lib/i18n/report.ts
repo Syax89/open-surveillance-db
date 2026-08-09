@@ -104,7 +104,7 @@ export const en = {
     "Report published — it is now visible in the directory and on the map.",
   reportSavedWithNearby:
     "Nearby records were found close to this position — the community will check whether this is a duplicate.",
-  // P1-2 (Vera design): the write gate (Fase E1) refuses submissions from
+  // P1-2 (design review): the write gate (Fase E1) refuses submissions from
   // anonymous (401) and unverified (403) sessions. The login wall gates the
   // form itself; these messages cover a session that dies mid-form.
   loginRequired:
@@ -212,7 +212,7 @@ export const it: Translation<typeof en> = {
     "Segnalazione pubblicata — ora è visibile nell'elenco e sulla mappa.",
   reportSavedWithNearby:
     "Trovati record pubblici vicino a questa posizione — la community verificherà se si tratta di un duplicato.",
-  // P1-2 (design Vera): il write gate (Fase E1) rifiuta gli invii da sessioni
+  // P1-2 (design review): il write gate (Fase E1) rifiuta gli invii da sessioni
   // anonime (401) e non verificate (403). Il login wall copre il modulo; questi
   // messaggi gestiscono una sessione che scade a modulo compilato.
   loginRequired:

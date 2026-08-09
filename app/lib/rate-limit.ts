@@ -15,7 +15,7 @@
  *    knobs below are IGNORED for the four bound families in production.
  *    They remain the source of truth for the in-memory fallback and for
  *    every unbound family. Default thresholds are mirrored in the binding
- *    config (pending final sign-off by Ada, audit t_dff3dadf).
+ *    config (pending final sign-off by the maintainer, audit t_dff3dadf).
  *
  * 2. In-memory sliding window — the LOCAL DEV / TEST fallback, used whenever
  *    the binding is absent from `env` (`npm run dev`, the route test

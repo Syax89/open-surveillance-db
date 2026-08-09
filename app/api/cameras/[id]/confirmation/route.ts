@@ -80,9 +80,9 @@ async function guardMutation(
     // response body (anti-enumeration, no-store). Raising the bar here is
     // part of the anti-gaming layer: an unverified account cannot mass-confirm
     // records, so a freshly registered (unverified) contributor cannot
-    // influence public verification counts. (Decision point flagged for Ada
-    // in the E1 PR: the email-verified requirement stacks on top of the
-    // existing level gate — ≥1 verified contribution — in db/confirmations.ts.)
+    // influence public verification counts. (Decision point flagged in the
+    // E1 PR: the email-verified requirement stacks on top of the existing
+    // level gate — ≥1 verified contribution — in db/confirmations.ts.)
     gate = await requireVerifiedContributor(request);
   } catch (error) {
     console.error("PUT/DELETE /api/cameras/[id]/confirmation session lookup failed", error);

@@ -7,7 +7,7 @@ import { usePublicCount } from "../../lib/use-public-count";
  * Home hero (F2 home hub, t_52dcb95e): headline, two CTAs and the
  * database stats.
  *
- * SSR-pure contract (criterion Grace): the hub must work without JS and
+ * SSR-pure contract (review criterion): the hub must work without JS and
  * without a client data dependency. The record count is a progressive
  * enhancement — the server renders a neutral placeholder and the
  * usePublicCount island (single fetch → server total) replaces it when JS

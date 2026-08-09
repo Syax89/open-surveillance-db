@@ -199,30 +199,30 @@ test("registrationIpHash without a key falls back to truncated SHA-256 (never th
 test("createContributor stores the normalised profile and never returns the hash", async () => {
   const { auth } = runtime;
   const profile = await auth.createContributor({
-    email: "Ada@Example.ORG",
-    displayName: "Ada",
+    email: "Contributor@Example.ORG",
+    displayName: "Contributor",
     password: "supersecret123",
   });
-  assert.equal(profile.email, "Ada@Example.ORG", "normalisation is the route's job; the db stores what it is given");
-  assert.equal(profile.displayName, "Ada");
+  assert.equal(profile.email, "Contributor@Example.ORG", "normalisation is the route's job; the db stores what it is given");
+  assert.equal(profile.displayName, "Contributor");
   assert.equal(profile.passwordHash, undefined, "the public profile must not leak the hash");
   assert.ok(profile.id >= 1);
 });
 
 test("the unique email index rejects duplicate registrations at the db layer", async () => {
   const { auth } = runtime;
-  await auth.createContributor({ email: "ada@example.org", displayName: "Ada", password: "supersecret123" });
+  await auth.createContributor({ email: "contributor@example.org", displayName: "Contributor", password: "supersecret123" });
   await assert.rejects(
-    auth.createContributor({ email: "ada@example.org", displayName: "Ada Two", password: "supersecret123" }),
+    auth.createContributor({ email: "contributor@example.org", displayName: "Contributor Two", password: "supersecret123" }),
     /UNIQUE constraint failed/i,
   );
 });
 
 test("findContributorByEmail returns the hash row; getContributorById never does", async () => {
   const { auth } = runtime;
-  const profile = await auth.createContributor({ email: "ada@example.org", displayName: "Ada", password: "supersecret123" });
+  const profile = await auth.createContributor({ email: "contributor@example.org", displayName: "Contributor", password: "supersecret123" });
 
-  const full = await auth.findContributorByEmail("ada@example.org");
+  const full = await auth.findContributorByEmail("contributor@example.org");
   assert.ok(full);
   assert.match(full.passwordHash, /^pbkdf2\$/);
   assert.equal(await auth.findContributorByEmail("missing@example.org"), null);
@@ -234,13 +234,13 @@ test("findContributorByEmail returns the hash row; getContributorById never does
 
 test("authenticateContributor verifies against the stored hash", async () => {
   const { auth } = runtime;
-  await auth.createContributor({ email: "ada@example.org", displayName: "Ada", password: "supersecret123" });
+  await auth.createContributor({ email: "contributor@example.org", displayName: "Contributor", password: "supersecret123" });
 
-  const profile = await auth.authenticateContributor("ada@example.org", "supersecret123");
-  assert.equal(profile.email, "ada@example.org");
+  const profile = await auth.authenticateContributor("contributor@example.org", "supersecret123");
+  assert.equal(profile.email, "contributor@example.org");
   assert.equal(profile.passwordHash, undefined);
 
-  assert.equal(await auth.authenticateContributor("ada@example.org", "wrong-password"), null);
+  assert.equal(await auth.authenticateContributor("contributor@example.org", "wrong-password"), null);
   assert.equal(await auth.authenticateContributor("missing@example.org", "supersecret123"), null);
 });
 
@@ -250,7 +250,7 @@ test("authenticateContributor verifies against the stored hash", async () => {
 
 test("getContributorVerification reports an unverified account (email_verified_at NULL)", async () => {
   const { auth } = runtime;
-  const profile = await auth.createContributor({ email: "linus@osdb.test", displayName: "Linus", password: "supersecret123" });
+  const profile = await auth.createContributor({ email: "contributor@osdb.test", displayName: "Contributor", password: "supersecret123" });
 
   const state = await auth.getContributorVerification(profile.id);
   assert.ok(state, "the account exists");
@@ -262,7 +262,7 @@ test("getContributorVerification reports an unverified account (email_verified_a
 
 test("getContributorVerification reports a verified account once email_verified_at is set", async () => {
   const { auth } = runtime;
-  const profile = await auth.createContributor({ email: "ada@example.org", displayName: "Ada", password: "supersecret123" });
+  const profile = await auth.createContributor({ email: "contributor@example.org", displayName: "Contributor", password: "supersecret123" });
   // Fase B/C/D set the column at the verification boundary; here we simulate
   // the post-verification state directly on the real schema.
   await runtime.env.DB
@@ -302,7 +302,7 @@ test("the write gate reads the same email_verified_at column the schema exposes"
 
 test("createSession stores only the token hash and honours the TTL", async () => {
   const { auth } = runtime;
-  const profile = await auth.createContributor({ email: "ada@example.org", displayName: "Ada", password: "supersecret123" });
+  const profile = await auth.createContributor({ email: "contributor@example.org", displayName: "Contributor", password: "supersecret123" });
   const { rawToken, csrfToken, session } = await auth.createSession(profile.id, { ttlDays: 7, now: NOW });
 
   assert.ok(rawToken.length >= 40, "raw token must be unpredictable");
@@ -313,7 +313,7 @@ test("createSession stores only the token hash and honours the TTL", async () =>
 
 test("findSessionByToken resolves live sessions and rejects dead ones", async () => {
   const { auth } = runtime;
-  const profile = await auth.createContributor({ email: "ada@example.org", displayName: "Ada", password: "supersecret123" });
+  const profile = await auth.createContributor({ email: "contributor@example.org", displayName: "Contributor", password: "supersecret123" });
   const { rawToken } = await auth.createSession(profile.id, { ttlDays: 7, now: NOW });
 
   const live = await auth.findSessionByToken(rawToken, "2026-08-02T00:00:00.000Z");
@@ -328,7 +328,7 @@ test("findSessionByToken resolves live sessions and rejects dead ones", async ()
 
 test("revokeSession kills a session permanently", async () => {
   const { auth } = runtime;
-  const profile = await auth.createContributor({ email: "ada@example.org", displayName: "Ada", password: "supersecret123" });
+  const profile = await auth.createContributor({ email: "contributor@example.org", displayName: "Contributor", password: "supersecret123" });
   const { rawToken } = await auth.createSession(profile.id, { ttlDays: 7, now: NOW });
 
   assert.equal(await auth.revokeSession(rawToken, "2026-08-02T00:00:00.000Z"), true);
@@ -342,7 +342,7 @@ test("revokeSession kills a session permanently", async () => {
 
 test("a session-identified submission is attributed and listed; anonymous ones are not", async () => {
   const { auth, cameras } = runtime;
-  const profile = await auth.createContributor({ email: "ada@example.org", displayName: "Ada", password: "supersecret123" });
+  const profile = await auth.createContributor({ email: "contributor@example.org", displayName: "Contributor", password: "supersecret123" });
   const { rawToken } = await auth.createSession(profile.id, { ttlDays: 7, now: NOW });
   const { contributor } = await auth.findSessionByToken(rawToken, NOW);
 
@@ -380,7 +380,7 @@ test("a session-identified submission is attributed and listed; anonymous ones a
 
 test("sessions are independent: revoking one never touches another", async () => {
   const { auth } = runtime;
-  const profile = await auth.createContributor({ email: "ada@example.org", displayName: "Ada", password: "supersecret123" });
+  const profile = await auth.createContributor({ email: "contributor@example.org", displayName: "Contributor", password: "supersecret123" });
   const first = await auth.createSession(profile.id, { ttlDays: 7, now: NOW });
   const second = await auth.createSession(profile.id, { ttlDays: 7, now: NOW });
 
@@ -563,16 +563,16 @@ const LOCKOUT_POLICY = {
 
 test("loginLockoutKey is a stable hash of the normalised email — never the address", async () => {
   const { auth } = runtime;
-  const key = await auth.loginLockoutKey("  Ada@Example.ORG ");
-  assert.equal(key, await auth.loginLockoutKey("ada@example.org"), "the key normalises the email");
+  const key = await auth.loginLockoutKey("  Contributor@Example.ORG ");
+  assert.equal(key, await auth.loginLockoutKey("contributor@example.org"), "the key normalises the email");
   assert.match(key, /^[0-9a-f]{64}$/, "the key is a SHA-256 hex digest");
-  assert.ok(!key.includes("ada"), "the raw email must not appear in the key");
-  assert.notEqual(key, await auth.loginLockoutKey("ada@other.example"));
+  assert.ok(!key.includes("contributor"), "the raw email must not appear in the key");
+  assert.notEqual(key, await auth.loginLockoutKey("contributor@other.example"));
 });
 
 test("recordFailedLogin trips the lockout at the threshold; getLoginLockout reports Retry-After", async () => {
   const { auth } = runtime;
-  const emailKey = await auth.loginLockoutKey("ada@example.org");
+  const emailKey = await auth.loginLockoutKey("contributor@example.org");
 
   assert.deepEqual(await auth.recordFailedLogin(emailKey, LOCKOUT_POLICY, NOW), {
     locked: false,
@@ -594,7 +594,7 @@ test("recordFailedLogin trips the lockout at the threshold; getLoginLockout repo
 
 test("a successful login clears the counter", async () => {
   const { auth } = runtime;
-  const emailKey = await auth.loginLockoutKey("ada@example.org");
+  const emailKey = await auth.loginLockoutKey("contributor@example.org");
   await auth.recordFailedLogin(emailKey, LOCKOUT_POLICY, NOW);
   await auth.recordFailedLogin(emailKey, LOCKOUT_POLICY, NOW);
 
@@ -612,7 +612,7 @@ test("a successful login clears the counter", async () => {
 
 test("the lockout expires after the duration", async () => {
   const { auth } = runtime;
-  const emailKey = await auth.loginLockoutKey("ada@example.org");
+  const emailKey = await auth.loginLockoutKey("contributor@example.org");
   for (let index = 0; index < 3; index += 1) {
     await auth.recordFailedLogin(emailKey, LOCKOUT_POLICY, NOW);
   }
@@ -627,7 +627,7 @@ test("the lockout expires after the duration", async () => {
 
 test("attempts from different callers count against the same email", async () => {
   const { auth } = runtime;
-  const emailKey = await auth.loginLockoutKey("ada@example.org");
+  const emailKey = await auth.loginLockoutKey("contributor@example.org");
   // The counter is keyed by the email hash only — there is no IP component,
   // so every caller hitting the same account shares one counter.
   await auth.recordFailedLogin(emailKey, LOCKOUT_POLICY, NOW);
@@ -645,7 +645,7 @@ test("attempts from different callers count against the same email", async () =>
 
 test("a stale counting window starts a fresh counter", async () => {
   const { auth } = runtime;
-  const emailKey = await auth.loginLockoutKey("ada@example.org");
+  const emailKey = await auth.loginLockoutKey("contributor@example.org");
   await auth.recordFailedLogin(emailKey, LOCKOUT_POLICY, "2026-08-01T00:00:00.000Z");
   await auth.recordFailedLogin(emailKey, LOCKOUT_POLICY, "2026-08-01T00:00:10.000Z");
   // 70s later the 60s window has rolled over: the counter restarts at 1.
@@ -659,7 +659,7 @@ test("a stale counting window starts a fresh counter", async () => {
 
 test("consecutive lockouts back off exponentially up to the cap", async () => {
   const { auth } = runtime;
-  const emailKey = await auth.loginLockoutKey("ada@example.org");
+  const emailKey = await auth.loginLockoutKey("contributor@example.org");
 
   // First lockout: 3 failures → locked for the base 60s.
   for (let index = 0; index < 3; index += 1) {
@@ -682,14 +682,14 @@ test("consecutive lockouts back off exponentially up to the cap", async () => {
 
 test("the lockout table stores only the email hash — never PII", async () => {
   const { auth } = runtime;
-  const emailKey = await auth.loginLockoutKey("ada@example.org");
+  const emailKey = await auth.loginLockoutKey("contributor@example.org");
   await auth.recordFailedLogin(emailKey, LOCKOUT_POLICY, NOW);
 
   const rows = await runtime.env.DB.prepare("SELECT * FROM login_attempts").all();
   assert.equal(rows.results.length, 1);
   const [attempt] = rows.results;
   assert.equal(attempt.email_key, emailKey);
-  assert.ok(!JSON.stringify(attempt).includes("ada@example.org"), "no raw email in the row");
+  assert.ok(!JSON.stringify(attempt).includes("contributor@example.org"), "no raw email in the row");
   assert.ok(!JSON.stringify(attempt).includes("@"), "no email-shaped value at all");
 });
 

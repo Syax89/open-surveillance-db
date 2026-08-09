@@ -246,7 +246,7 @@ test("a remount from a STALE payload after a successful vote must NOT revert the
   const nodeA = mountNode();
   installFetchMock((input, init) => {
     const method = init?.method ?? "GET";
-    if (input === "/api/auth/me") return jsonResponse({ id: 7, displayName: "Ada" });
+    if (input === "/api/auth/me") return jsonResponse({ id: 7, displayName: "Contributor" });
     if (input === "/api/cameras/42/actions") {
       if (method === "GET") return jsonResponse({ action: null });
       if (method === "PUT") {

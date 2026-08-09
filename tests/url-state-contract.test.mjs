@@ -4,7 +4,7 @@
  *
  * The five filter dimensions (q, type, freshness, sort, focus) live in the
  * URL and are the SINGLE source of truth for /mappa and /directory
- * (useCameraFilters, D4). This suite is the contract Grace asked for:
+ * (useCameraFilters, D4). This suite is the review contract:
  *
  *   1. parse/stringify: defaults, encoding round-trips, minimal serialization;
  *   2. invalid values → safe fallbacks, NEVER a 500 (lenient parse, page

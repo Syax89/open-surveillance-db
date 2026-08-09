@@ -91,7 +91,7 @@ export const en = {
   errorDisplayName: "The display name must be between 2 and 60 characters.",
   errorDisplayNameRateLimit: "Too many attempts. Please try again in a minute.",
   errorDisplayNameGeneric: "Could not save the display name. Please try again.",
-  // Multi-method auth (Fase E2 — Vera design): the three sign-in blocks on
+  // Multi-method auth (Fase E2 — design review): the three sign-in blocks on
   // /login are ALL visible at once (CEO 2026-08-08), stacked in the order
   // passkey → email + password → social. Each block carries its own submit.
   methodPassword: "Email + password",
@@ -154,7 +154,7 @@ export const en = {
   recoveryCopy: "Copy codes",
   recoveryCopied: "Copied.",
   recoverySaved: "I saved them",
-  // Email verification (Fase B UI — Vera design): /verify-email page and the
+  // Email verification (Fase B UI — design review): /verify-email page and the
   // /account banner. The verification link in the email now lands on a real
   // page (not raw JSON); the page consumes GET /api/auth/verify-email and
   // offers a resend when the token is dead.
@@ -207,7 +207,7 @@ export const en = {
     "This reset link has already been used or has expired. Request a new one.",
   resetGoToLogin: "Log in",
   resetRequestAnother: "Request a new link",
-  // Login wall on the write tools (P1-2 — Vera design): anonymous and
+  // Login wall on the write tools (P1-2 — design review): anonymous and
   // unverified states replace the form on /segnala and /correggi.
   wallLoginTitle: "Log in to contribute",
   wallLoginBody:
@@ -322,7 +322,7 @@ export const it: Translation<typeof en> = {
   errorDisplayName: "Il nome visualizzato deve essere tra 2 e 60 caratteri.",
   errorDisplayNameRateLimit: "Troppi tentativi. Riprova tra un minuto.",
   errorDisplayNameGeneric: "Non è stato possibile salvare il nome visualizzato. Riprova.",
-  // Autenticazione multi-metodo (Fase E2 — design Vera): i tre blocchi di
+  // Autenticazione multi-metodo (Fase E2 — design review): i tre blocchi di
   // accesso su /login sono TUTTI visibili insieme (CEO 2026-08-08), impilati
   // nell'ordine passkey → email e password → social. Ogni blocco ha il suo submit.
   methodPassword: "Email e password",
@@ -385,7 +385,7 @@ export const it: Translation<typeof en> = {
   recoveryCopy: "Copia i codici",
   recoveryCopied: "Copiati.",
   recoverySaved: "Li ho salvati",
-  // Verifica email (UI Fase B — design Vera): pagina /verify-email e banner
+  // Verifica email (UI Fase B — design review): pagina /verify-email e banner
   // su /account. Il link nella email ora atterra su una pagina vera (non JSON
   // grezzo); la pagina consuma GET /api/auth/verify-email e offre il re-invio
   // quando il token è morto.
@@ -438,7 +438,7 @@ export const it: Translation<typeof en> = {
     "Questo link di reset è già stato usato o è scaduto. Richiedine uno nuovo.",
   resetGoToLogin: "Accedi",
   resetRequestAnother: "Richiedi un nuovo link",
-  // Login wall sui tool di scrittura (P1-2 — design Vera): gli stati anonimo
+  // Login wall sui tool di scrittura (P1-2 — design review): gli stati anonimo
   // e non verificato sostituiscono il modulo su /segnala e /correggi.
   wallLoginTitle: "Accedi per contribuire",
   wallLoginBody:

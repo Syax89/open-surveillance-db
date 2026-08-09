@@ -2,8 +2,8 @@
  * Home hub QA suite (F2, kanban t_52dcb95e).
  *
  * The home is an orienteering hub (docs/FRONTEND_PLAN.md §1.2/2.4): hero +
- * static MapTeaser + four tool cards + shortened principles. Criterio Grace
- * (acceptance 7.2): the home MUST work without JS and without a client data
+ * static MapTeaser + four tool cards + shortened principles. Criterio di
+ * review (acceptance 7.2): the home MUST work without JS and without a client data
  * dependency — SSR-pure. This suite pins that contract on the real page:
  *
  *   1. SSR render of app/page.tsx completes with NO fetch at all — the
@@ -163,7 +163,7 @@ test("SSR render of the home hub completes without any fetch (no client data dep
   const LocaleProvider = localeMod.LocaleProvider;
 
   // Any fetch during the SSR render is a contract violation: the hub must
-  // render completely from the server bundle (criterion Grace).
+  // render completely from the server bundle (review criterion).
   let fetchCalled = false;
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async () => {
