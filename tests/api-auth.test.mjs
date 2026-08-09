@@ -56,8 +56,8 @@ const resetConfirmRoute = () => loadRoute("app/api/auth/reset-password/confirm/r
 
 const contributor = {
   id: 7,
-  email: "ada@example.org",
-  displayName: "Ada",
+  email: "contributor@example.org",
+  displayName: "Contributor",
   // Fase B: a fresh account is unverified — the write gate reads this same
   // column on every write (403 until set), and since t_6dc1c96f the login
   // route refuses sessions while it is null (generic 401).
@@ -123,7 +123,7 @@ test("register creates a contributor, mints a verification token, opens a sessio
   const response = await POST(
     apiRequest("/api/auth/register", {
       method: "POST",
-      body: { email: "  Ada@Example.ORG ", password: "Sup3rsecret!123", displayName: "  Ada  " },
+      body: { email: "  Contributor@Example.ORG ", password: "Sup3rsecret!123", displayName: "  Contributor  " },
     }),
   );
   assert.equal(response.status, 201);
@@ -132,7 +132,7 @@ test("register creates a contributor, mints a verification token, opens a sessio
 
   // The db layer received the normalised email and trimmed display name.
   const [createArgs] = callArgs("createContributor");
-  assert.deepEqual(createArgs, [{ email: "ada@example.org", displayName: "Ada", password: "Sup3rsecret!123" }]);
+  assert.deepEqual(createArgs, [{ email: "contributor@example.org", displayName: "Contributor", password: "Sup3rsecret!123" }]);
   // Fase B: a verification token is minted for the new account (purpose
   // 'verify') so the emailed link can prove mailbox control.
   const [tokenArgs] = callArgs("createVerificationToken");
@@ -142,7 +142,7 @@ test("register creates a contributor, mints a verification token, opens a sessio
   // The canonical mailer receives the minted token for THIS contributor.
   const [mailArgs] = callArgs("sendAuthEmail");
   assert.deepEqual(mailArgs[0].contributorId, contributor.id);
-  assert.equal(mailArgs[0].to, "ada@example.org");
+  assert.equal(mailArgs[0].to, "contributor@example.org");
   assert.equal(mailArgs[0].kind, "verify");
   assert.equal(mailArgs[0].rawToken, "verify-token-abc");
   assert.ok(typeof mailArgs[0].nowIso === "string" && mailArgs[0].nowIso.length > 0, "nowIso is an ISO timestamp");
@@ -208,7 +208,7 @@ async function sessionCookieWithEnv(envModule, envChanges) {
     const response = await POST(
       apiRequest("/api/auth/register", {
         method: "POST",
-        body: { email: "ada@example.org", password: "Sup3rsecret!123", displayName: "Ada" },
+        body: { email: "contributor@example.org", password: "Sup3rsecret!123", displayName: "Contributor" },
       }),
     );
     return findCookie(response, "osdb_session");
@@ -262,7 +262,7 @@ test("register reports sent:false when the mailer cannot deliver (provider error
   const response = await POST(
     apiRequest("/api/auth/register", {
       method: "POST",
-      body: { email: "ada@example.org", password: "Sup3rsecret!123", displayName: "Ada" },
+      body: { email: "contributor@example.org", password: "Sup3rsecret!123", displayName: "Contributor" },
     }),
   );
   assert.equal(response.status, 201);
@@ -287,7 +287,7 @@ test("register propagates AUTH_SESSION_TTL_DAYS to BOTH the DB session and the c
     const response = await POST(
       apiRequest("/api/auth/register", {
         method: "POST",
-        body: { email: "ada@example.org", password: "Sup3rsecret!123", displayName: "Ada" },
+        body: { email: "contributor@example.org", password: "Sup3rsecret!123", displayName: "Contributor" },
       }),
     );
     assert.equal(response.status, 201);
@@ -310,7 +310,7 @@ test("register answers 409 via the unique index, never pre-checking email existe
   const response = await POST(
     apiRequest("/api/auth/register", {
       method: "POST",
-      body: { email: "ada@example.org", password: "Sup3rsecret!123" },
+      body: { email: "contributor@example.org", password: "Sup3rsecret!123" },
     }),
   );
   assert.equal(response.status, 409);
@@ -325,7 +325,7 @@ test("register maps a unique-index race to 409 with the generic, non-distinct bo
   const response = await POST(
     apiRequest("/api/auth/register", {
       method: "POST",
-      body: { email: "ada@example.org", password: "Sup3rsecret!123" },
+      body: { email: "contributor@example.org", password: "Sup3rsecret!123" },
     }),
   );
   assert.equal(response.status, 409);
@@ -341,18 +341,18 @@ test("register rejects invalid payloads with 400 and never touches the db", asyn
     { name: "missing email", body: { password: "Sup3rsecret!123" } },
     { name: "malformed email", body: { email: "not-an-email", password: "Sup3rsecret!123" } },
     { name: "email too long", body: { email: `${"a".repeat(250)}@example.org`, password: "Sup3rsecret!123" } },
-    { name: "short password", body: { email: "ada@example.org", password: "short" } },
+    { name: "short password", body: { email: "contributor@example.org", password: "short" } },
     // Composition policy (CEO feedback 2026-08-03): each fixture is 10+ chars
     // and satisfies all classes but one, so exactly one rule fails.
-    { name: "password no uppercase", body: { email: "ada@example.org", password: "lowercase1!" } },
-    { name: "password no lowercase", body: { email: "ada@example.org", password: "UPPERCASE1!" } },
-    { name: "password no digit", body: { email: "ada@example.org", password: "Uppercase!" } },
-    { name: "password no special", body: { email: "ada@example.org", password: "Uppercase123" } },
-    { name: "numeric password", body: { email: "ada@example.org", password: 1234567890 } },
-    { name: "password too long", body: { email: "ada@example.org", password: "p".repeat(201) } },
-    { name: "display name too short", body: { email: "ada@example.org", password: "Sup3rsecret!123", displayName: "A" } },
-    { name: "display name too long", body: { email: "ada@example.org", password: "Sup3rsecret!123", displayName: "n".repeat(61) } },
-    { name: "display name not a string", body: { email: "ada@example.org", password: "Sup3rsecret!123", displayName: 42 } },
+    { name: "password no uppercase", body: { email: "contributor@example.org", password: "lowercase1!" } },
+    { name: "password no lowercase", body: { email: "contributor@example.org", password: "UPPERCASE1!" } },
+    { name: "password no digit", body: { email: "contributor@example.org", password: "Uppercase!" } },
+    { name: "password no special", body: { email: "contributor@example.org", password: "Uppercase123" } },
+    { name: "numeric password", body: { email: "contributor@example.org", password: 1234567890 } },
+    { name: "password too long", body: { email: "contributor@example.org", password: "p".repeat(201) } },
+    { name: "display name too short", body: { email: "contributor@example.org", password: "Sup3rsecret!123", displayName: "A" } },
+    { name: "display name too long", body: { email: "contributor@example.org", password: "Sup3rsecret!123", displayName: "n".repeat(61) } },
+    { name: "display name not a string", body: { email: "contributor@example.org", password: "Sup3rsecret!123", displayName: 42 } },
   ];
   for (const { name, body } of cases) {
     await t.test(name, async () => {
@@ -372,7 +372,7 @@ test("register rejects cross-origin requests", async () => {
     apiRequest("/api/auth/register", {
       method: "POST",
       headers: { origin: "https://evil.example" },
-      body: { email: "ada@example.org", password: "Sup3rsecret!123" },
+      body: { email: "contributor@example.org", password: "Sup3rsecret!123" },
     }),
   );
   assert.equal(response.status, 403);
@@ -382,7 +382,7 @@ test("register rejects cross-origin requests", async () => {
 test("register maps a syntactically invalid JSON body to 400 (not 500)", async () => {
   const { POST } = await registerRoute();
   const response = await POST(
-    apiRequest("/api/auth/register", { method: "POST", body: '{"email": "ada@example.org", broken' }),
+    apiRequest("/api/auth/register", { method: "POST", body: '{"email": "contributor@example.org", broken' }),
   );
   assert.equal(response.status, 400);
   assert.equal((await responseBody(response)).error, "Request body is not valid JSON.");
@@ -403,7 +403,7 @@ test("register respects the auth rate-limit bucket", async () => {
     const response = await POST(
       apiRequest("/api/auth/register", {
         method: "POST",
-        body: { email: "ada@example.org", password: "Sup3rsecret!123" },
+        body: { email: "contributor@example.org", password: "Sup3rsecret!123" },
       }),
     );
     assert.equal(response.status, 201, `request ${index + 1} must stay allowed`);
@@ -411,7 +411,7 @@ test("register respects the auth rate-limit bucket", async () => {
   const blocked = await POST(
     apiRequest("/api/auth/register", {
       method: "POST",
-      body: { email: "ada@example.org", password: "Sup3rsecret!123" },
+      body: { email: "contributor@example.org", password: "Sup3rsecret!123" },
     }),
   );
   assert.equal(blocked.status, 429);
@@ -426,7 +426,7 @@ test("register returns 500 when the database is unavailable", async () => {
   const response = await POST(
     apiRequest("/api/auth/register", {
       method: "POST",
-      body: { email: "ada@example.org", password: "Sup3rsecret!123" },
+      body: { email: "contributor@example.org", password: "Sup3rsecret!123" },
     }),
   );
   assert.equal(response.status, 500);
@@ -448,15 +448,15 @@ test("login authenticates, opens a session, and sets both cookies", async () => 
   const response = await POST(
     apiRequest("/api/auth/login", {
       method: "POST",
-      body: { email: "Ada@Example.ORG", password: "Sup3rsecret!123" },
+      body: { email: "Contributor@Example.ORG", password: "Sup3rsecret!123" },
     }),
   );
   assert.equal(response.status, 200);
   const body = await responseBody(response);
   assert.deepEqual(body.contributor, verifiedContributor);
-  assert.deepEqual(callArgs("authenticateContributor")[0], ["ada@example.org", "Sup3rsecret!123"]);
-  assert.deepEqual(callArgs("loginLockoutKey")[0], ["ada@example.org"], "the key derives from the normalised email");
-  assert.deepEqual(callArgs("clearLoginAttempts")[0], ["lockout:ada@example.org"], "a successful login clears the per-email counter");
+  assert.deepEqual(callArgs("authenticateContributor")[0], ["contributor@example.org", "Sup3rsecret!123"]);
+  assert.deepEqual(callArgs("loginLockoutKey")[0], ["contributor@example.org"], "the key derives from the normalised email");
+  assert.deepEqual(callArgs("clearLoginAttempts")[0], ["lockout:contributor@example.org"], "a successful login clears the per-email counter");
   assert.deepEqual(cookieNames(response).sort(), ["osdb_csrf", "osdb_session"]);
 });
 
@@ -471,7 +471,7 @@ test("login refuses a correct password on an UNVERIFIED account with the same ge
   const response = await POST(
     apiRequest("/api/auth/login", {
       method: "POST",
-      body: { email: "ada@example.org", password: "supersecret123" },
+      body: { email: "contributor@example.org", password: "supersecret123" },
     }),
   );
   assert.equal(response.status, 401);
@@ -499,13 +499,13 @@ test("login answers the same generic 401 for unknown email and wrong password", 
       const response = await POST(
         apiRequest("/api/auth/login", {
           method: "POST",
-          body: { email: "ada@example.org", password: "wrong-password-123" },
+          body: { email: "contributor@example.org", password: "wrong-password-123" },
         }),
       );
       assert.equal(response.status, 401);
       assert.equal((await responseBody(response)).error, "Invalid credentials.");
       assert.equal(callArgs("createSession").length, 0);
-      assert.deepEqual(callArgs("recordFailedLogin")[0][0], "lockout:ada@example.org", "the failure is recorded under the email key");
+      assert.deepEqual(callArgs("recordFailedLogin")[0][0], "lockout:contributor@example.org", "the failure is recorded under the email key");
     });
   }
 });
@@ -519,12 +519,12 @@ test("login records the failed attempt under the email-derived hash key — neve
   const response = await POST(
     apiRequest("/api/auth/login", {
       method: "POST",
-      body: { email: "Ada@Example.ORG", password: "wrong-password-123" },
+      body: { email: "Contributor@Example.ORG", password: "wrong-password-123" },
     }),
   );
   assert.equal(response.status, 401);
   const [key, policy] = callArgs("recordFailedLogin")[0];
-  assert.equal(key, "sha256:ada@example.org");
+  assert.equal(key, "sha256:contributor@example.org");
   assert.equal(policy.maxAttempts, 5, "the default policy applies when no env knobs are set");
   assert.equal(policy.windowSeconds, 900);
 });
@@ -536,7 +536,7 @@ test("login answers 429 with Retry-After while the account is locked, before any
   const response = await POST(
     apiRequest("/api/auth/login", {
       method: "POST",
-      body: { email: "ada@example.org", password: "Sup3rsecret!123" },
+      body: { email: "contributor@example.org", password: "Sup3rsecret!123" },
     }),
   );
   assert.equal(response.status, 429);
@@ -558,7 +558,7 @@ test("login answers 429 when the failed attempt trips the lockout", async () => 
   const response = await POST(
     apiRequest("/api/auth/login", {
       method: "POST",
-      body: { email: "ada@example.org", password: "wrong-password-123" },
+      body: { email: "contributor@example.org", password: "wrong-password-123" },
     }),
   );
   assert.equal(response.status, 429);
@@ -577,21 +577,21 @@ test("failed logins from different client IPs share the same email key", async (
       apiRequest("/api/auth/login", {
         method: "POST",
         headers: { "cf-connecting-ip": ip },
-        body: { email: "ada@example.org", password: "wrong-password-123" },
+        body: { email: "contributor@example.org", password: "wrong-password-123" },
       }),
     );
     assert.equal(response.status, 401, `attempt from ${ip} must stay allowed (per-IP bucket) but fail auth`);
   }
   const keys = callArgs("recordFailedLogin").map(([key]) => key);
-  assert.deepEqual(keys, ["lockout:ada@example.org", "lockout:ada@example.org", "lockout:ada@example.org"], "every IP counts against the same email key");
+  assert.deepEqual(keys, ["lockout:contributor@example.org", "lockout:contributor@example.org", "lockout:contributor@example.org"], "every IP counts against the same email key");
 });
 
 test("login rejects malformed credentials with 401 (not 400) to avoid probing", async (t) => {
   const { POST } = await loginRoute();
   const cases = [
-    { name: "missing password", body: { email: "ada@example.org" } },
+    { name: "missing password", body: { email: "contributor@example.org" } },
     { name: "malformed email", body: { email: "nope", password: "Sup3rsecret!123" } },
-    { name: "short password", body: { email: "ada@example.org", password: "short" } },
+    { name: "short password", body: { email: "contributor@example.org", password: "short" } },
   ];
   for (const { name, body } of cases) {
     await t.test(name, async () => {
@@ -608,7 +608,7 @@ test("login rejects cross-origin requests", async () => {
     apiRequest("/api/auth/login", {
       method: "POST",
       headers: { origin: "https://evil.example" },
-      body: { email: "ada@example.org", password: "Sup3rsecret!123" },
+      body: { email: "contributor@example.org", password: "Sup3rsecret!123" },
     }),
   );
   assert.equal(response.status, 403);
@@ -618,7 +618,7 @@ test("login rejects cross-origin requests", async () => {
 test("login maps a syntactically invalid JSON body to 400 (not 500)", async () => {
   const { POST } = await loginRoute();
   const response = await POST(
-    apiRequest("/api/auth/login", { method: "POST", body: '{"email": "ada@example.org", broken' }),
+    apiRequest("/api/auth/login", { method: "POST", body: '{"email": "contributor@example.org", broken' }),
   );
   assert.equal(response.status, 400);
   assert.equal((await responseBody(response)).error, "Request body is not valid JSON.");
@@ -1142,7 +1142,7 @@ test("reset request mints a reset token for a known email and never echoes it", 
   const response = await POST(
     apiRequest("/api/auth/reset-password/request", {
       method: "POST",
-      body: { email: "Ada@Example.ORG" },
+      body: { email: "Contributor@Example.ORG" },
     }),
   );
   assert.equal(response.status, 200);
@@ -1165,7 +1165,7 @@ test("reset request keeps answering 200 {sent:true} past the 3/h budget (no toke
   const response = await POST(
     apiRequest("/api/auth/reset-password/request", {
       method: "POST",
-      body: { email: "ada@example.org" },
+      body: { email: "contributor@example.org" },
     }),
   );
   // Anti-enumeration (P1-1): an exhausted budget MUST NOT answer differently

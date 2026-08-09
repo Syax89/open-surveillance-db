@@ -129,7 +129,7 @@ test("displayName is HTML-escaped in the rendered body (no markup injection)", (
 
 test("buildAuthActionUrl encodes the token and strips trailing slashes from the base", () => {
   const { emailTemplates } = runtime;
-  // P1-1/P1-3 (Vera design): the links land on the /verify-email and
+  // P1-1/P1-3 (design review): the links land on the /verify-email and
   // /reset-password UI pages — never on a raw JSON API route.
   assert.equal(
     emailTemplates.buildAuthActionUrl("verify", "abc/def+", "https://opensurveillancedb.org/"),

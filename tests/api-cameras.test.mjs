@@ -19,7 +19,7 @@ const session = {
   expiresAt: "2026-09-01T00:00:00.000Z",
   revokedAt: null,
 };
-const contributor = { id: 7, email: "linus@osdb.test", displayName: "Linus", createdAt: "2026-07-01T00:00:00.000Z", updatedAt: "2026-07-01T00:00:00.000Z" };
+const contributor = { id: 7, email: "contributor@osdb.test", displayName: "Contributor", createdAt: "2026-07-01T00:00:00.000Z", updatedAt: "2026-07-01T00:00:00.000Z" };
 
 // POST with a verified session cookie + CSRF (the default for intake tests —
 // the gate itself has its own suite, tests/write-gate.test.mjs).

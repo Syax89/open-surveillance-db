@@ -46,8 +46,8 @@ const resetConfirmRoute = () => loadRoute("app/api/auth/reset-password/confirm/r
 
 const contributor = {
   id: 7,
-  email: "ada@example.org",
-  displayName: "Ada",
+  email: "contributor@example.org",
+  displayName: "Contributor",
   createdAt: "2026-08-01T08:00:00.000Z",
   updatedAt: "2026-08-01T08:00:00.000Z",
 };
@@ -116,7 +116,7 @@ test("414 guard: recovery answers 414 for an absurd URL before sameOrigin", asyn
     apiRequest(absurdUrl("/api/auth/recovery"), {
       method: "POST",
       headers: evilOrigin(),
-      body: { email: "ada@example.org", code: "abcd-efgh-ijkl-mnop" },
+      body: { email: "contributor@example.org", code: "abcd-efgh-ijkl-mnop" },
     }),
   );
   assert.equal(response.status, 414);
@@ -150,7 +150,7 @@ test("414 guard: reset-password/request answers 414 for an absurd URL", async ()
     apiRequest(absurdUrl("/api/auth/reset-password/request"), {
       method: "POST",
       headers: evilOrigin(),
-      body: { email: "ada@example.org" },
+      body: { email: "contributor@example.org" },
     }),
   );
   assert.equal(response.status, 414);
@@ -204,12 +204,12 @@ test("429 bucket: recovery trips the auth bucket with Retry-After", async () => 
   const { POST } = await recoveryRoute();
   for (let index = 0; index < 10; index += 1) {
     const response = await POST(
-      apiRequest("/api/auth/recovery", { method: "POST", body: { email: "ada@example.org", code: "abcd-efgh-ijkl-mnop" } }),
+      apiRequest("/api/auth/recovery", { method: "POST", body: { email: "contributor@example.org", code: "abcd-efgh-ijkl-mnop" } }),
     );
     assert.notEqual(response.status, 429, `request ${index + 1} must stay allowed (401 for bad code)`);
   }
   const blocked = await POST(
-    apiRequest("/api/auth/recovery", { method: "POST", body: { email: "ada@example.org", code: "abcd-efgh-ijkl-mnop" } }),
+    apiRequest("/api/auth/recovery", { method: "POST", body: { email: "contributor@example.org", code: "abcd-efgh-ijkl-mnop" } }),
   );
   assert.equal(blocked.status, 429);
   assert.ok(Number(blocked.headers.get("retry-after")) > 0);
@@ -299,7 +299,7 @@ test("403 guard: recovery rejects cross-origin before any db work", async () => 
     apiRequest("/api/auth/recovery", {
       method: "POST",
       headers: evilOrigin(),
-      body: { email: "ada@example.org", code: "abcd-efgh-ijkl-mnop" },
+      body: { email: "contributor@example.org", code: "abcd-efgh-ijkl-mnop" },
     }),
   );
   assert.equal(response.status, 403);
@@ -349,7 +349,7 @@ test("500: recovery returns 500 when the db is unavailable", async () => {
   });
   const { POST } = await recoveryRoute();
   const response = await POST(
-    apiRequest("/api/auth/recovery", { method: "POST", body: { email: "ada@example.org", code: "abcd-efgh-ijkl-mnop" } }),
+    apiRequest("/api/auth/recovery", { method: "POST", body: { email: "contributor@example.org", code: "abcd-efgh-ijkl-mnop" } }),
   );
   assert.equal(response.status, 500);
   assert.equal((await responseBody(response)).error, "Unable to redeem recovery code");
@@ -389,7 +389,7 @@ test("503: reset-password/request returns 503 (no-store) when the db is unavaila
   });
   const { POST } = await resetRequestRoute();
   const response = await POST(
-    apiRequest("/api/auth/reset-password/request", { method: "POST", body: { email: "ada@example.org" } }),
+    apiRequest("/api/auth/reset-password/request", { method: "POST", body: { email: "contributor@example.org" } }),
   );
   assert.equal(response.status, 503);
   assert.equal((await responseBody(response)).error, "Unable to request a password reset");

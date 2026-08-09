@@ -1,4 +1,4 @@
-// Unit tests for the field-of-view helpers (kanban t_f8b775ec, design Vera):
+// Unit tests for the field-of-view helpers (kanban t_f8b775ec, design review):
 //   - app/lib/field-of-view.ts — trig cone geometry (L.polygon points),
 //     circle radius, zoom threshold;
 //   - app/lib/compass.ts — 16-wind compass + "NE 45°" display form;

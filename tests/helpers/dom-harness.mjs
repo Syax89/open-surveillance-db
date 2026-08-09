@@ -57,7 +57,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 // the explicit isolation contract — the interaction tests load them by
 // these exact paths.
 const PAGES = [
-  // P1-1/P1-3 (Vera design): the auth-ux pages are loaded as their client
+  // P1-1/P1-3 (design review): the auth-ux pages are loaded as their client
   // BODY components (like /account) — the page.tsx shells import
   // getServerMessages (next/headers), which the DOM harness stubs cannot
   // resolve; the shells are covered by pages-render.test.mjs instead.
@@ -87,7 +87,7 @@ const PAGES = [
   { source: "app/components/tools/DirectoryTool.tsx", relative: "app/components/tools/DirectoryTool.mjs" },
   { source: "app/components/tools/SegnalaTool.tsx", relative: "app/components/tools/SegnalaTool.mjs" },
   { source: "app/components/tools/CorreggiTool.tsx", relative: "app/components/tools/CorreggiTool.mjs" },
-  // P1-2 (Vera design): the write-tool login wall gates the /segnala and
+  // P1-2 (design review): the write-tool login wall gates the /segnala and
   // /correggi forms behind the verified-contributor session check.
   { source: "app/components/WriteGateWall.tsx", relative: "app/components/WriteGateWall.mjs" },
 ];

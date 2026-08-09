@@ -1,5 +1,5 @@
 /**
- * Client-side interaction tests for the P1-1/P1-3 auth UX pages (Vera design):
+ * Client-side interaction tests for the P1-1/P1-3 auth UX pages (design review):
  *
  *   /verify-email  — consumes the single-use token from the emailed link
  *                    against GET /api/auth/verify-email and renders a real

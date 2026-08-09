@@ -11,7 +11,7 @@
 //   R4  resolved correction requests purged after CORRECTION_RETENTION_DAYS
 //   R7  expired / revoked sessions purged
 //   R15 expired email-verification tokens + lapsed WebAuthn challenges
-//       purged by the cron sweep (review-ada-2 P3-1)
+//       purged by the cron sweep (review round 2 P3-1)
 //   R16 stale failed-login counters (login_attempts) purged after
 //       LOGIN_ATTEMPT_RETENTION_DAYS of inactivity; rows under an ACTIVE lock
 //       are never swept; >100 stale rows drain across multiple bounded rounds
@@ -448,7 +448,7 @@ test("R7: expired and revoked sessions are purged, live ones survive", async () 
 });
 
 // ---------------------------------------------------------------------------
-// R15 — expired auth-method rows (review-ada-2 P3-1)
+// R15 — expired auth-method rows (review round 2 P3-1)
 // ---------------------------------------------------------------------------
 
 test("R15: expired email-verification tokens are purged, live ones survive (P3-1)", async () => {
@@ -474,7 +474,7 @@ test("R15: lapsed WebAuthn challenges are swept by the cron (P3-1)", async () =>
 });
 
 // ---------------------------------------------------------------------------
-// R16 — stale failed-login counters (audit finding 5 / review-ada P3-10)
+// R16 — stale failed-login counters (audit finding 5 / review round P3-10)
 // ---------------------------------------------------------------------------
 
 test("R16: stale login_attempts rows are purged after 30 days, fresh ones survive", async () => {

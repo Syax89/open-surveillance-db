@@ -1,6 +1,6 @@
 /**
  * Client-side interaction tests for the multi-method /login (Fase E2 —
- * Vera design): the three sign-in blocks (passkey, email + password,
+ * design review): the three sign-in blocks (passkey, email + password,
  * Google) always visible with no selector, the passkey ceremony flow, the
  * OIDC provider links with the privacy disclosure, the manual merge form
  * (?merge=) and the OIDC failure marker (?oidc_error=1).
@@ -302,7 +302,7 @@ test("login: ?oidc_error=1 announces the provider failure", async () => {
 });
 
 // ---------------------------------------------------------------------------
-// P1-3 + P1-4 (Vera design): forgot-password entry + per-method risk matrix
+// P1-3 + P1-4 (design review): forgot-password entry + per-method risk matrix
 // ---------------------------------------------------------------------------
 
 test("login: the password panel links 'Forgot password?' to /forgot-password", async () => {

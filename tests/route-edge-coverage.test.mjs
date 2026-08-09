@@ -117,7 +117,7 @@ test("login answers 414 for absurdly long URIs before any work", async () => {
   const { POST } = await loginRoute();
   const response = await POST(apiRequest(`/api/auth/login?${"a".repeat(5000)}`, {
     method: "POST",
-    body: { email: "ada@example.org", password: "supersecret123" },
+    body: { email: "contributor@example.org", password: "supersecret123" },
   }));
   assert.equal(response.status, 414);
   assert.equal(callArgs("authenticateContributor").length, 0);
@@ -138,14 +138,14 @@ test("login answers 429 past the auth bucket (brute-force backstop)", async () =
     const { POST } = await loginRoute();
     const allowed = await POST(apiRequest("/api/auth/login", {
       method: "POST",
-      body: { email: "ada@example.org", password: "wrong-password-123" },
+      body: { email: "contributor@example.org", password: "wrong-password-123" },
     }));
     assert.equal(allowed.status, 401, "the first attempt fits the 1/min cap");
     assert.equal(callArgs("authenticateContributor").length, 1);
 
     const blocked = await POST(apiRequest("/api/auth/login", {
       method: "POST",
-      body: { email: "ada@example.org", password: "wrong-password-123" },
+      body: { email: "contributor@example.org", password: "wrong-password-123" },
     }));
     assert.equal(blocked.status, 429);
     assert.ok(Number(blocked.headers.get("retry-after")) >= 1);
@@ -160,8 +160,8 @@ test("login answers 401 for non-string credential fields without probing", async
   const cases = [
     { name: "email number", body: { email: 42, password: "supersecret123" } },
     { name: "email array", body: { email: ["a@b.org"], password: "supersecret123" } },
-    { name: "password number", body: { email: "ada@example.org", password: 1234567890 } },
-    { name: "password array", body: { email: "ada@example.org", password: ["x".repeat(12)] } },
+    { name: "password number", body: { email: "contributor@example.org", password: 1234567890 } },
+    { name: "password array", body: { email: "contributor@example.org", password: ["x".repeat(12)] } },
   ];
   for (const { name, body } of cases) {
     await t.test(name, async () => {
@@ -174,7 +174,7 @@ test("login answers 401 for non-string credential fields without probing", async
 
 test("login answers 413 when the body exceeds the byte cap", async () => {
   const { POST } = await loginRoute();
-  const oversized = { email: "ada@example.org", password: "x".repeat(40_000) };
+  const oversized = { email: "contributor@example.org", password: "x".repeat(40_000) };
   const response = await POST(apiRequest("/api/auth/login", { method: "POST", body: oversized }));
   assert.equal(response.status, 413);
   assert.equal(callArgs("authenticateContributor").length, 0);
@@ -189,7 +189,7 @@ test("login answers 500 when the db layer fails unexpectedly", async () => {
   const { POST } = await loginRoute();
   const response = await POST(apiRequest("/api/auth/login", {
     method: "POST",
-    body: { email: "ada@example.org", password: "supersecret123" },
+    body: { email: "contributor@example.org", password: "supersecret123" },
   }));
   assert.equal(response.status, 500);
   assert.equal((await responseBody(response)).error, "Unable to log in");

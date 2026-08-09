@@ -66,7 +66,7 @@ const KNOWN_ROUTES = new Set([
   "/mappa", "/directory", "/segnala", "/correggi",
   // 4° voce nav pubblica (t_c9c200a8): support/contribute page.
   "/contribuisci",
-  // Auth UX (P1-1/P1-3 Vera design): verification landing, forgot-password
+  // Auth UX (P1-1/P1-3 design review): verification landing, forgot-password
   // and reset-password pages linked from /login and the emailed links.
   "/verify-email", "/forgot-password", "/reset-password",
   "/api/cameras", "/api/cameras?format=geojson", "/api/cameras?format=csv",
@@ -330,7 +330,7 @@ for (const page of PAGES) {
 }
 
 test("auth pages render the primary public nav (three links + mobile menu), not the backHome-only header", async () => {
-  // Vera's design (t_e0dcc292): every auth page used to render SiteHeader
+  // design review (t_e0dcc292): every auth page used to render SiteHeader
   // with a single "Back to the map" link; the CEO feedback wants the SAME
   // PublicNav as the other public pages (PublicNavLinks 3 links + AuthNavLinks)
   // while the auth-card stays compact. This pins the new contract so a

@@ -35,8 +35,8 @@ const meRoute = () => loadRoute("app/api/auth/me/route.mjs");
 
 const contributor = {
   id: 7,
-  email: "ada@example.org",
-  displayName: "Ada",
+  email: "contributor@example.org",
+  displayName: "Contributor",
   createdAt: "2026-08-01T08:00:00.000Z",
   updatedAt: "2026-08-01T08:00:00.000Z",
 };

@@ -1,6 +1,6 @@
 /**
  * Client-side interaction tests for the camera field-of-view direction
- * feature (kanban t_f8b775ec, design Vera):
+ * feature (kanban t_f8b775ec, design review):
  *
  *   MAP (SurveillanceMap, leaflet stub):
  *   1. a directional camera with a stored direction draws a cone polygon

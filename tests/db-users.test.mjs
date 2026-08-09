@@ -84,12 +84,12 @@ async function insertReviewer(userId, overrides = {}) {
 
 test("getUserByEmail resolves a seeded user and returns null for a missing email", async () => {
   await freshDb();
-  const id = await insertUser({ email: "ada@example.org", displayName: "Ada" });
+  const id = await insertUser({ email: "contributor@example.org", displayName: "Contributor" });
 
-  const found = await users.getUserByEmail("ada@example.org");
+  const found = await users.getUserByEmail("contributor@example.org");
   assert.ok(found);
   assert.equal(found.id, id);
-  assert.equal(found.displayName, "Ada");
+  assert.equal(found.displayName, "Contributor");
   assert.equal(found.role, "contributor");
   assert.equal(found.active, 1);
 
