@@ -12,7 +12,7 @@
 | [RETENTION_SCHEDULE.md](RETENTION_SCHEDULE.md) | P1, M3 — retention values (community model: no time-based record retention for `active`/`hidden`/`removed`; 2-year audit; backups, operational logs; R14 community actions), legal hold, deletion definition; **enforced by the daily retention cron** | In force | Simone Rondina |
 | [PRIVACY_NOTICE.md](PRIVACY_NOTICE.md) | P6, M4 — purposes, bases, rights (arts. 12–22), negative scope, contact, 1-month response, identity verification | In force | Simone Rondina |
 | [LAWFUL_BASIS.md](LAWFUL_BASIS.md) | P3 — art. 6(1)(f) + LIA balancing test, 6(1)(e) for official sources, IT jurisdiction (D.Lgs. 196/2003) | In force | Simone Rondina |
-| [PROCESSOR_REGISTER.md](PROCESSOR_REGISTER.md) | P5, M4 — Cloudflare (DPA v6.3 + SCC + EU residency + EU–US DPF; **Workers + D1 + Email Routing**), GitHub/Google OIDC (PR5/PR6 — server-gated, no email imported), OSM | In force | Simone Rondina |
+| [PROCESSOR_REGISTER.md](PROCESSOR_REGISTER.md) | P5, M4 — Cloudflare (DPA v6.3 + SCC + EU residency + EU–US DPF; **Workers + D1 + Email Routing**), GitHub/Google OIDC (PR4/PR5 — server-gated, no email imported), Nominatim geocoding (PR6), OSM | In force | Simone Rondina |
 | [BREACH_PROCEDURE.md](BREACH_PROCEDURE.md) | P2 — arts. 33/34, roles, triage, 72-h notification, data-subject notification, register | In force | Simone Rondina |
 | [MODERATION_SLA.md](MODERATION_SLA.md) | M1, M2, M3 — 24 h emergency hide, 48 h first response, 14-day decision, 30-day hide review | In force | Simone Rondina |
 | [DPO_EXCLUSION.md](DPO_EXCLUSION.md) | Gap 7, P6 — GDPR art. 37 assessment: art. 37(1) N/A, voluntary DPO declined (art. 37(4)), accountability (arts. 5(2), 24), review triggers | In force | Simone Rondina |

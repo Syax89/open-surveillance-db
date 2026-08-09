@@ -2,7 +2,7 @@
 
 - **Status:** in force — personal open-source project (controller: Simone Rondina, syax89 — not a company); finalised 2026-08-08 and aligned with the current implementation.
 - **Legal basis:** GDPR art. 13 (data collected from data subjects) and art. 14 (data not obtained from the data subject, e.g. records sourced from official public sources); D.Lgs. 196/2003 (Codice Privacy, IT) as primary jurisdiction.
-- **Version:** 0.13 (2026-08-08) — current-state alignment (template-ready): version history consolidated; all references reflect the implemented system (community-driven model ADR 0021, multi-method auth ADR 0020, image submission removed, retention sweep enforced by the daily cron).
+- **Version:** 0.14 (2026-08-09) — legal-audit alignment: § 5 adds the Nominatim geocoding processor (PR6); § 7 documents the legacy `pending`/`rejected` hard-delete rules (R19/R20); § 10 Cookie section added; OIDC processor references corrected to PR4/PR5; special-category note reworded to the text-only model (image evidence removed).
 - **Decisions applied:** controller entity **Simone Rondina (syax89) / OpenSurveillanceDB — Italy** (2026-07-31); data licence **ODbL 1.0**; published coordinates rounded to **~4 decimal places (~10 m)**; privacy contact `privacy@opensurveillancedb.org` (dedicated, monitored mailbox, active).
 
 > **Disclaimer:** this document is product guidance / not legal advice. It is in force for the pilot jurisdiction (Italy); per-jurisdiction review remains documented for an EU-wide launch.
@@ -35,7 +35,7 @@ OpenSurveillanceDB publishes a public-interest map of **visible, public surveill
 | Email-verification token (SHA-256 hash of a single-use token, 24 h TTL) | The project (verification email sent through Cloudflare Email Routing) | Prove ownership of the email; unlock write access | art. 6(1)(f); stored only as SHA-256, single-use, deleted after use or after 24 h (RETENTION_SCHEDULE.md R15); re-send rate-limited (3/h) |
 | Passkey credential (credential_id, COSE public key, sign counter) | Contributor's device (WebAuthn enrollment, optional method) | Passwordless, phishing-resistant login | art. 6(1)(f); public-key material only — no secret ever stored server-side; anti-replay counter; **synced passkeys** are backed up through the OS vendor's cloud (Apple/Google/Microsoft) at the user's choice (§ 3.1); hard-deleted at account erasure (R15) |
 | Recovery codes (10, hashed) | The project (issued at passkey enrollment) | Regain access after device loss | art. 6(1)(f); stored only hashed, single-use, replaced on re-enrollment; deleted at account erasure (R15) |
-| OIDC identity attributes (provider, `external_sub`, display name, verified flag — **never the email**) | GitHub / Google (identity provider — **only if the contributor chooses that method**, § 3.1; buttons are shown only when the operator has configured the provider, PROCESSOR_REGISTER.md PR5/PR6) | Login via GitHub/Google; account linking to the contributor | art. 6(1)(f); no email imported; the provider observes the login and the IP (§ 3.1/§ 5/§ 6) |
+| OIDC identity attributes (provider, `external_sub`, display name, verified flag — **never the email**) | GitHub / Google (identity provider — **only if the contributor chooses that method**, § 3.1; buttons are shown only when the operator has configured the provider, PROCESSOR_REGISTER.md PR4/PR5) | Login via GitHub/Google; account linking to the contributor | art. 6(1)(f); no email imported; the provider observes the login and the IP (§ 3.1/§ 5/§ 6) |
 
 **Records from official public sources (art. 14(2)(f)):** where a record is republished from an official public source (`source: official`), the data was not obtained from the data subject. The source categories are: public registers and transparency portals of public administrations (e.g. in Italy, D.Lgs. 33/2013 datasets), published public-authority documents, and other publicly accessible official sources. Such records are checked per record under the source's own legal regime (see LAWFUL_BASIS.md § 3.2).
 
@@ -43,7 +43,7 @@ OpenSurveillanceDB publishes a public-interest map of **visible, public surveill
 
 **Voluntary provision (art. 13(2)(e)):** providing data for a report is **voluntary** — it is neither a statutory nor a contractual requirement. The only consequence of not providing it is that the report cannot be processed (or, for optional fields, that the record will carry less detail). There is no obligation to provide data, and no penalty for declining.
 
-**Special categories (art. 9 GDPR):** none are intentionally collected. Content that incidentally captures identifiable people, plates, or private interiors is redacted or deleted (../MODERATION.md; RETENTION_SCHEDULE.md R6).
+**Special categories (art. 9 GDPR):** none are intentionally collected. Records are **text metadata only** — the image-evidence feature was removed (2026-08-08, `photos` table dropped by migration 0043), so there is no media upload at all. Report text that carries incidental personal data (e.g. a name or a plate in the description) violates the content rules and is handled by community moderation and corrections (../MODERATION.md; RETENTION_SCHEDULE.md R6; TERMS § 4).
 
 **Children:** the service is addressed to adults. In Italy, submitting a report requires the age of consent for information-society services (14 years, art. 2-quinquies D.Lgs. 196/2003); other jurisdictions apply their own age thresholds.
 
@@ -79,7 +79,7 @@ write gate — anonymous → 401, unverified → 403). What each implies:
    import your email** from the provider — we only store the provider's
    subject id and verified flag, so the provider is never a source of your
    contact details. The buttons are shown **only when the operator has
-   configured the provider** on the deployment (server-gated, PROCESSOR_REGISTER.md PR5/PR6); a risk matrix is shown on the login page.
+   configured the provider** on the deployment (server-gated, PROCESSOR_REGISTER.md PR4/PR5); a risk matrix is shown on the login page.
 
 You can change or add methods from your account page; deleting the account
 deletes the data of every method (verification tokens, passkeys, recovery
@@ -101,6 +101,7 @@ This negative scope strengthens the reasonable expectations of data subjects and
 ## 5. Recipients and transfers
 
 - **Cloudflare, Inc.** — hosting, database **and transactional email** (Workers + D1 + **Email Routing** for account verification/password-reset emails). Processor (art. 28) under the Cloudflare Data Processing Addendum (**DPA v6.3, June 2025**) incorporating **EU Standard Contractual Clauses (2021/914)**; Cloudflare is certified under the **EU–US Data Privacy Framework** (additional transfer ground). D1 configured for EU residency (`weur` location hint). **Email Routing** carries only the recipient address and the tokenised verification/reset link, with **zero tracking pixels/links**. See PROCESSOR_REGISTER.md.
+- **OpenStreetMap Foundation (Nominatim — nominatim.openstreetmap.org, processor PR6).** Geocoding for the report flow and record pages: forward place-name search (`GET /api/geocode`, up to 5 suggestions) and reverse coordinate→address (`GET /api/geocode/reverse`, report-form prefill). Only the query itself is sent — free-text place/address strings and coordinates rounded to ~4 decimals (~11 m); the reply (display address) is stored in the D1 cache (`geocode_reverse_cache`, migration 0041). **No personal data, no account data, no profiling, requestor data never sent or logged.** Usage respects the Nominatim policy: max **1 req/s**, identifying User-Agent, cache-first so a repeated position never re-queries the network (PROCESSOR_REGISTER.md PR6).
 - **GitHub, Inc. / Google LLC (OIDC identity providers — optional, only if you choose that method; buttons shown only when the operator has configured the provider).** If you sign in with GitHub or Google, those providers authenticate you and we receive only the subject id and verified flag (**no email**). **Tracking disclosure:** the provider observes the sign-in and your IP. The provider's own terms and privacy policy apply at sign-in. They are **independent controllers of their own authentication services** — no OpenSurveillanceDB data is sent to them; we only receive the identity attributes listed in § 3. Never published, never logged.
 - **Publication itself:** published records become part of a public dataset licensed ODbL 1.0 and may be downloaded/exported (JSON/CSV/GeoJSON). This is the purpose of the service, disclosed here. Copies already downloaded cannot be recalled; withdrawn records are excluded from future exports.
 - No other recipients; no behavioural advertising; no analytics libraries.
@@ -108,7 +109,7 @@ This negative scope strengthens the reasonable expectations of data subjects and
 ## 6. International data transfers (Cap. V GDPR)
 
 - Cloudflare: transfers covered by the Cloudflare DPA incorporating **EU Standard Contractual Clauses (2021/914)**; supplementary measures assessed for US processing (encryption in transit, EU residency for D1). Full assessment in PROCESSOR_REGISTER.md.
-- **OIDC (GitHub/Google, active where configured):** the identity exchange happens with US-based providers; covered by their DPAs (SCCs) and **EU–US Data Privacy Framework** certification (PROCESSOR_REGISTER.md PR5/PR6). The residual exposure is the provider's own observation of the login event and the caller's IP — disclosed at § 3.1/§ 5 and on the login page.
+- **OIDC (GitHub/Google, active where configured):** the identity exchange happens with US-based providers; covered by their DPAs (SCCs) and **EU–US Data Privacy Framework** certification (PROCESSOR_REGISTER.md PR4/PR5). The residual exposure is the provider's own observation of the login event and the caller's IP — disclosed at § 3.1/§ 5 and on the login page.
 - **Passkey sync (vendor note):** if you use a *synced* passkey, your credential is backed up through the OS vendor's cloud (Apple/Google/Microsoft). The site performs no transfer of your data to those vendors — only your device's sync service moves the credential at your choice, and you can disable sync at any time (§ 3.1).
 - OIDC sign-in (GitHub/Google, if you choose that method): identity attributes (provider, subject id, verified flag) are exchanged with the provider's services at sign-in; the flow is governed by the provider's terms and privacy policy.
 
@@ -116,9 +117,9 @@ This negative scope strengthens the reasonable expectations of data subjects and
 
 Reports are published immediately and stay public while the community keeps confirming them; records withdrawn by the community or by a legal emergency are excluded from public outputs and follow the repository retention schedule (RETENTION_SCHEDULE.md). Correction requests and audit entries: **2 years**. Operational logs: up to **12 months** (aggregate). Backups: rotated by the provider (up to **30 days** point-in-time recovery).
 
-The detailed rules remain in the repository retention schedule (RETENTION_SCHEDULE.md), including: **community data (R14)** — community actions follow the account (active → erasure; actions cast on other records are deleted with the contributor, ADR 0021 § 13, and the public lifecycle history keeps only aggregates); **authentication-method data (R15, ADR 0020)** — email-verification tokens 24 hours, reset tokens 3 hours (single-use, deleted on use); passkeys and recovery codes while the account is active, **hard-deleted at account erasure** — nothing survives to link the account to a provider or a device; **failed-login counters (R16)**, per-IP registration-cap log (R17) and the transactional-email log (R18) swept by the retention cron; **demo records (R12)** purged by the retention cron outside development.
+The detailed rules remain in the repository retention schedule (RETENTION_SCHEDULE.md), including: **community data (R14)** — community actions follow the account (active → erasure; actions cast on other records are deleted with the contributor, ADR 0021 § 13, and the public lifecycle history keeps only aggregates); **authentication-method data (R15, ADR 0020)** — email-verification tokens 24 hours, reset tokens 3 hours (single-use, deleted on use); passkeys and recovery codes while the account is active, **hard-deleted at account erasure** — nothing survives to link the account to a provider or a device; **failed-login counters (R16)**, per-IP registration-cap log (R17) and the transactional-email log (R18) swept by the retention cron; **demo records (R12)** purged by the retention cron outside development; **legacy `pending` submissions (R19)** hard-deleted 90 days after submission and **legacy `rejected` records (R20)** hard-deleted 30 days after the rejection decision — both skipped while an appeal is open or a legal hold is active (published records are never deleted on a timer, ADR 0021 § 2.2).
 
-The deletion and expiry rules are **enforced automatically by the daily retention sweep** (scheduled in `worker/index.ts`, daily at 03:00 UTC — RETENTION_SCHEDULE.md § 3): the cron deletes expired rows (R12/R16/R17/R18), archives audit entries at the 2-year mark (R4/R5/R9), and never changes record lifecycle status (community model, ADR 0021 § 2.2).
+The deletion and expiry rules are **enforced automatically by the daily retention sweep** (scheduled in `worker/index.ts`, daily at 03:00 UTC — RETENTION_SCHEDULE.md § 3): the cron deletes expired rows (R12/R16/R17/R18), hard-deletes legacy `pending` submissions 90 days after submission (**R19**) and legacy `rejected` records 30 days after the decision (**R20**, both skipped while an appeal is open or a legal hold is active), archives audit entries at the 2-year mark (R4/R5/R9), and never changes record lifecycle status of published records (community model, ADR 0021 § 2.2).
 
 ## 8. Your rights (GDPR arts. 15–22)
 
@@ -141,3 +142,20 @@ You may request, free of charge:
 
 - Privacy contact: `privacy@opensurveillancedb.org` — first response within 48 h, substantive response within 14 days.
 - This notice is reviewed at least annually, or on any material change; the version history is kept in the repository.
+
+## 10. Cookies
+
+OpenSurveillanceDB uses a single functional cookie:
+
+- **`opensurveillancedb-locale`** — remembers the language you selected on this device/browser (Italian or English). It is set **only when you change the language**; it is never used to track you.
+  - **Type:** functional — strictly necessary to provide the language preference you explicitly requested.
+  - **Purpose:** persist your interface language.
+  - **Duration:** 1 year (`max-age=31536000`).
+  - **Content:** none of your data — a plain language code (`it` / `en`).
+  - **Properties:** `SameSite=Lax`, `path=/`, not readable cross-site (no tracking or session surface).
+  - **Legal basis:** art. 122 D.Lgs. 196/2003 (transposing art. 5(3) of Directive 2002/58/EC as amended by 2009/136/EC) — consent is **not** required for cookies strictly necessary to provide a service explicitly requested by the user, so no consent banner is shown.
+  - **Managing it:** you can delete it at any time from your browser settings; without it the interface defaults to the pilot language (English) on this device.
+
+The same preference is mirrored in your browser's `localStorage` for multi-tab synchronisation. `localStorage` is a browser storage technology, not a cookie, and is never transmitted to our servers.
+
+> **Commitment:** if the redesign or any future feature introduces cookies that are not strictly necessary (analytics, advertising, profiling), we will ask for your explicit consent through a banner **before** installing them, in accordance with art. 122 D.Lgs. 196/2003.

@@ -15,7 +15,7 @@ Published camera records describe **infrastructure** (a camera, its kind, its pu
 
 **The GDPR does apply** to the operational pipeline that supports it, which processes personal data:
 
-1. reports and evidence submitted by contributors (may contain incidental personal data);
+1. reports and record evidence (text metadata only — no images, feature removed 2026-08-08) submitted by contributors (may contain incidental personal data);
 2. contributor pseudonymous IDs and submission metadata;
 3. correction/takedown requests (requester contact details);
 4. moderation records and moderator identities (verified contributor accounts — email + password, passkey, or OIDC via GitHub/Google);
@@ -27,12 +27,12 @@ This assessment covers those operations. Where a record is republished from an o
 
 | Operation | Personal data involved | Basis | Necessity / safeguards |
 |-----------|----------------------|-------|------------------------|
-| Collect & store reports | Location, description, optional metadata, notes, pseudonymous ID | 6(1)(f) | Needed to run a community-sourced civic map; pseudonymous IDs; published immediately from verified accounts (ADR 0021); no time-based record retention |
+| Collect & store reports | Location, description, optional metadata, notes, pseudonymous ID | 6(1)(f) | Needed to run a community-sourced civic map; pseudonymous IDs; published immediately from verified accounts (ADR 0021); no time-based retention for published records (legacy `pending`/`rejected` rows are hard-deleted on a timer — R19/R20) |
 | Community actions on records (like/confirm/gone/problem/privacy) | Action type, weight snapshot, timestamp | 6(1)(f) | Verified-account gate (ADR 0020); one action per user per record; aggregates only in public payloads (ADR 0021 § 3/§ 7); erasure covers actions (§ 13) |
 | Residual human moderation (legal-emergency hide/remove) | Decision, reviewer pseudonym | 6(1)(f) | Legal-emergency actions single-person, reviewed retrospectively (ADR 0021 § 8); audit log pseudonymous; never public |
 | Publish records + exports (ODbL) | Generally **not personal data** (infrastructure) | 6(1)(f) / 6(1)(e) | Per-field opt-in for `manufacturer`/`observedOn`; least-specific location (**~4-decimal default**, decision 2026-07-31); no image data (feature removed 2026-08-08) |
 | Handle correction/takedown requests | Requester contact data | 6(1)(c) + 6(1)(f) | Needed to comply with arts. 15-22; identity verification proportionate |
-| Security & abuse prevention | IP-level rate limiting (no logs retained), submissions metadata | 6(1)(f) | No behavioural advertising; rate limiting per H2 |
+| Security & abuse prevention | Per-caller rate limiting (in-worker counters, **no persistent logs**), submissions metadata | 6(1)(f) | No behavioural advertising; route-level limits in `app/lib/rate-limit.ts`; the registration-cap and failed-login logs retain only SHA-256 hashes for 30 days (R16/R17) |
 | OIDC contributor authentication (GitHub/Google, optional) | Subject id + display name + verified flag — never the email | 6(1)(f) | No email imported (RFC 2606 placeholder); stored only as the account link (provider + subject id) and the account display name; never logged; the provider observes the login + IP (disclosed) |
 
 ## 3. Lawful bases
@@ -89,7 +89,7 @@ Art. 6(1)(e) applies where processing is necessary for a task carried out in the
 
 ### 3.4 Special categories (art. 9)
 
-Not intentionally collected. Incidental capture in evidence (faces, plates, interiors) is prevented by policy (../MODERATION.md) and enforced by redaction/deletion (RETENTION_SCHEDULE.md R6). If a future feature collects such data, a separate art. 9 assessment is required before implementation.
+Not intentionally collected. Records are **text metadata only** (image evidence removed 2026-08-08 — no media upload exists); report text that carries incidental personal data (e.g. a name or a plate in the description) violates the content rules and is handled by community moderation and corrections (../MODERATION.md; RETENTION_SCHEDULE.md R6; TERMS § 4). If a future feature collects such data, a separate art. 9 assessment is required before implementation.
 
 ## 4. Jurisdiction note — Italy (D.Lgs. 196/2003)
 
