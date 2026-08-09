@@ -420,8 +420,45 @@ test("returns 502, no-store and no cache when the upstream exceeds the fetch tim
 });
 
 // ---------------------------------------------------------------------------
-// Rate limiting (per-caller bucket, before the cache — same as the tile proxy)
+// Rate limiting (per-caller bucket on cache MISS only)
 // ---------------------------------------------------------------------------
+
+test("serves a geocode cache hit without consuming the caller's miss budget", async () => {
+  const store = new Map();
+  globalThis.caches = {
+    default: {
+      async match(request) {
+        return store.get(request.url)?.clone() ?? null;
+      },
+      async put(request, response) {
+        store.set(request.url, response.clone());
+      },
+      async delete() {},
+    },
+  };
+  let upstreamCalls = 0;
+  stubFetch(async () => {
+    upstreamCalls += 1;
+    return upstreamResponse([nominatimResult]);
+  });
+  const { GET } = await geocodeRoute();
+  const { env } = await loadTreeModule("cloudflare-workers.mjs");
+  env.GEOCODE_RATE_LIMIT_MAX = "1";
+  env.GEOCODE_RATE_LIMIT_WINDOW_SECONDS = "60";
+  const headers = { "cf-connecting-ip": "203.0.113.44" };
+
+  const first = await GET(apiRequest("/api/geocode?q=Ferrara", { headers }));
+  assert.equal(first.status, 200);
+  assert.equal(first.headers.get("x-geocode-cache"), "miss");
+
+  const cached = await GET(apiRequest("/api/geocode?q=Ferrara", { headers }));
+  assert.equal(cached.status, 200, "a repeat query must be served even after the miss budget is exhausted");
+  assert.equal(cached.headers.get("x-geocode-cache"), "hit");
+  assert.equal(upstreamCalls, 1, "a cache hit must not touch Nominatim");
+
+  const newMiss = await GET(apiRequest("/api/geocode?q=Modena", { headers }));
+  assert.equal(newMiss.status, 429, "only a new cache miss is blocked after the caller exhausts its budget");
+});
 
 test("answers 429 with Retry-After when the per-caller geocode bucket is exhausted", async () => {
   let upstreamCalls = 0;

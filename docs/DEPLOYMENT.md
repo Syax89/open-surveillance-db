@@ -463,7 +463,8 @@ or client bundles (the secrets gate in CI rejects hardcoded credentials).
 | `POST_RATE_LIMIT_MAX` / `POST_RATE_LIMIT_WINDOW_SECONDS` | 5 / 60 | Submissions (cameras + corrections) |
 | `MODERATION_RATE_LIMIT_MAX` / `MODERATION_RATE_LIMIT_WINDOW_SECONDS` | 30 / 60 | Moderation API (second layer over edge auth), including appeal decisions (`PATCH /api/appeals/[id]`) |
 | `APPEAL_RATE_LIMIT_MAX` / `APPEAL_RATE_LIMIT_WINDOW_SECONDS` | 20 / 60 | Appeal filing and review (`POST/GET /api/appeals`) — a distinct bucket from moderation so contributors contesting decisions and moderators reviewing them never starve the moderation queue |
-| `TILES_RATE_LIMIT_MAX` / `TILES_RATE_LIMIT_WINDOW_SECONDS` | 60 / 60 | Tile proxy (`GET /api/tiles/*`) — protects the OSMF upstream from per-caller scraping |
+| `TILES_RATE_LIMIT_MAX` / `TILES_RATE_LIMIT_WINDOW_SECONDS` | 240 / 60 | Tile proxy (`GET /api/tiles/*`) — protects the OSMF upstream from per-caller scraping |
+| `GEOCODE_RATE_LIMIT_MAX` / `GEOCODE_RATE_LIMIT_WINDOW_SECONDS` | 30 / 60 | Place autocomplete (`GET /api/geocode`) — protects the geocoding upstream from cache-miss bursts |
 | `POST_SUBMISSIONS_DISABLED` | `false` | Kill switch: reject new submissions with 503 |
 | `MAX_BODY_BYTES` | 32768 (32 KiB) | Max JSON request body; larger bodies answer 413 |
 | `ABUSE_ALERT_THRESHOLD` | 10 | Per-caller abuse events per window before an alert fires |
@@ -476,13 +477,13 @@ The limiter (`app/lib/rate-limit.ts`) has **two backends**, selected per
 route family at runtime:
 
 - **Cloudflare Workers Rate Limiting binding** — the PRODUCTION backend for
-  the four critical public families: **auth, write (submissions), read and
-  tiles**. Declared in `wrangler.jsonc` under `ratelimits`, the binding's
+  the five critical public families: **auth, write (submissions), read,
+  tiles and geocode**. Declared in `wrangler.jsonc` under `ratelimits`, the binding's
   counters are enforced by Cloudflare edge infrastructure shared across
   worker isolates, so a caller cannot spread a burst across isolates to
   bypass the ceiling (that per-isolate in-memory bucket was audit #3, MEDIUM).
   The binding enforces its own `simple.limit` / `simple.period`; the
-  `${PREFIX}_RATE_LIMIT_*` env knobs are **ignored** for these four families
+  `${PREFIX}_RATE_LIMIT_*` env knobs are **ignored** for these five families
   while a binding is present. `simple.period` accepts only 10 or 60 seconds;
   all current defaults are 60 s windows. The thresholds in `wrangler.jsonc`
   mirror `ROUTE_LIMIT_DEFAULTS` (pending final sign-off, t_dff3dadf).
@@ -496,7 +497,7 @@ route family at runtime:
   with the number of isolates, so it must never be the production backend.
 
 Every other route family (export, nearby, revisions, moderate, appeal,
-geocode, search, confirm, edit) keeps the in-memory fallback for now — the
+search, confirm, edit) keeps the in-memory fallback for now — the
 abstraction is uniform, so adding a binding is a one-line change per family
 (see `BUCKET_BINDING` in `app/lib/rate-limit.ts` and the `ratelimits` block
 in `wrangler.jsonc`); migrate them before launch if the threat model calls

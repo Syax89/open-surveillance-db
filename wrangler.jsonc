@@ -27,8 +27,8 @@
     "crons": ["0 3 * * *"]
   },
   // Cloudflare Workers Rate Limiting bindings (audit #3 MEDIUM, t_dff3dadf):
-  // the PRODUCTION enforcement point for the four critical public route
-  // families — auth, write (submissions), read, tiles. Before this the
+  // the PRODUCTION enforcement point for the five critical public route
+  // families — auth, write (submissions), read, tiles, geocode. Before this the
   // buckets were per-isolate in-memory (app/lib/rate-limit.ts): on a
   // multi-isolate deployment a caller could spread a burst across isolates
   // to bypass the ceiling. The binding's counters are enforced by Cloudflare
@@ -37,7 +37,7 @@
   // - namespace_id: a SELF-DEFINED positive integer (string), unique per
   //   Cloudflare account — no API resource to create (see Cloudflare docs
   //   "Rate Limiting binding"). Bindings sharing an id share counters; these
-  //   four ids are dedicated to this worker. Change them only if they
+  //   five ids are dedicated to this worker. Change them only if they
   //   collide with an existing binding on the account.
   // - simple.limit / simple.period: the effective thresholds in production.
   //   The values mirror the CURRENT per-family defaults (ROUTE_LIMIT_DEFAULTS
@@ -50,7 +50,8 @@
     { "name": "AUTH_LIMITER", "namespace_id": "1201", "simple": { "limit": 10, "period": 60 } },
     { "name": "WRITE_LIMITER", "namespace_id": "1202", "simple": { "limit": 5, "period": 60 } },
     { "name": "READ_LIMITER", "namespace_id": "1203", "simple": { "limit": 60, "period": 60 } },
-    { "name": "TILES_LIMITER", "namespace_id": "1204", "simple": { "limit": 240, "period": 60 } }
+    { "name": "TILES_LIMITER", "namespace_id": "1204", "simple": { "limit": 240, "period": 60 } },
+    { "name": "GEOCODE_LIMITER", "namespace_id": "1205", "simple": { "limit": 30, "period": 60 } }
   ],
   "d1_databases": [
     {

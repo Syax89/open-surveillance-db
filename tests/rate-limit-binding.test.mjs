@@ -2,7 +2,7 @@
 //
 // app/lib/rate-limit.ts selects its backend per route family at runtime:
 //   - a Cloudflare Workers Rate Limiting binding (env.AUTH_LIMITER /
-//     WRITE_LIMITER / READ_LIMITER / TILES_LIMITER, configured in
+//     WRITE_LIMITER / READ_LIMITER / TILES_LIMITER / GEOCODE_LIMITER, configured in
 //     wrangler.jsonc `ratelimits`) when present — the production backend,
 //     enforced by Cloudflare edge infrastructure shared across worker
 //     isolates so a caller cannot spread a burst across isolates to bypass
@@ -44,7 +44,7 @@ async function sharedEnv() {
   return import(pathToFileURL(path.join(tree, "cloudflare-workers.mjs"))).then((m) => m.env);
 }
 
-const BINDING_KEYS = ["AUTH_LIMITER", "WRITE_LIMITER", "READ_LIMITER", "TILES_LIMITER"];
+const BINDING_KEYS = ["AUTH_LIMITER", "WRITE_LIMITER", "READ_LIMITER", "TILES_LIMITER", "GEOCODE_LIMITER"];
 
 beforeEach(async () => {
   resetMockState();
@@ -80,26 +80,28 @@ function bindingThat(success) {
 // 1. Bucket -> binding resolution
 // ---------------------------------------------------------------------------
 
-test("only auth, submit, read and tiles buckets resolve a rate-limiter binding", () => {
+test("only auth, submit, read, tiles and geocode buckets resolve a rate-limiter binding", () => {
   const { binding } = bindingThat(true);
   const fullEnv = {
     AUTH_LIMITER: binding,
     WRITE_LIMITER: binding,
     READ_LIMITER: binding,
     TILES_LIMITER: binding,
+    GEOCODE_LIMITER: binding,
   };
   assert.equal(rateLimit.rateLimitBindingFor(fullEnv, "auth"), binding);
   assert.equal(rateLimit.rateLimitBindingFor(fullEnv, "submit"), binding);
   assert.equal(rateLimit.rateLimitBindingFor(fullEnv, "read"), binding);
   assert.equal(rateLimit.rateLimitBindingFor(fullEnv, "tiles"), binding);
+  assert.equal(rateLimit.rateLimitBindingFor(fullEnv, "geocode"), binding);
 
-  // Every other family stays on the in-memory fallback: binding the four
+  // Every other family stays on the in-memory fallback: binding the five
   // critical public surfaces is the audit #3 scope; the rest are documented
   // follow-ups for the public launch. session (QA#2 F3 — GET /api/auth/me
   // reads) is deliberately unbound too: it is a per-caller personal read,
   // not a credential-guessing or data-exfiltration surface, and its
   // generous default (120/min) is a scraper bound, not a security gate.
-  for (const bucket of ["export", "nearby", "revisions", "moderate", "appeal", "geocode", "confirm", "edit", "search", "session"]) {
+  for (const bucket of ["export", "nearby", "revisions", "moderate", "appeal", "confirm", "edit", "search", "session"]) {
     assert.equal(
       rateLimit.rateLimitBindingFor(fullEnv, bucket),
       undefined,
@@ -199,5 +201,16 @@ test("route layer honours the binding: the first tile request answers 429 when t
   assert.ok(
     Number.parseInt(response.headers.get("Retry-After") ?? "0", 10) >= 1,
     "the 429 must carry a positive Retry-After",
+  );
+});
+
+test("route layer honours the geocode binding on a cache miss", async () => {
+  env.GEOCODE_LIMITER = bindingThat(false).binding;
+  const { GET } = await loadRoute("app/api/geocode/route.mjs");
+  const response = await GET(apiRequest("/api/geocode?q=Ferrara"));
+  assert.equal(response.status, 429, "a geocode cache miss must surface the shared binding's block");
+  assert.ok(
+    Number.parseInt(response.headers.get("Retry-After") ?? "0", 10) >= 1,
+    "the geocode 429 must carry a positive Retry-After",
   );
 });

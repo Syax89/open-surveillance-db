@@ -67,12 +67,29 @@ export const VIEWPORT_FETCH_DEBOUNCE_MS = 150;
 export const VIEWPORT_QUANTIZE_DECIMALS = 3;
 /** A pan is covered (no fetch) when it stays inside a loaded bbox padded by this factor. */
 export const VIEWPORT_COVER_PADDING = 0.15;
+/** One server-directed retry is enough; never turn a 429 into a request loop. */
+export const VIEWPORT_RATE_LIMIT_AUTO_RETRIES = 1;
+/** A malformed intermediary header must not freeze the map for an unbounded time. */
+const MAX_RETRY_AFTER_SECONDS = 120;
 
 type ViewportPage = {
   records: Camera[];
   total: number;
   nextOffset: number | null;
 };
+
+class ViewportRateLimitError extends Error {
+  constructor(readonly retryAfterSeconds: number) {
+    super("Viewport request rate limited");
+    this.name = "ViewportRateLimitError";
+  }
+}
+
+function retryAfterSeconds(response: Response): number {
+  const parsed = Number.parseInt(response.headers.get("Retry-After") ?? "", 10);
+  if (!Number.isFinite(parsed) || parsed < 1) return 1;
+  return Math.min(parsed, MAX_RETRY_AFTER_SECONDS);
+}
 
 type CacheEntry = {
   bounds: ViewportBounds;
@@ -193,6 +210,7 @@ export function viewportQuery(bounds: ViewportBounds, filters: ServerCameraFilte
  */
 async function fetchViewportPage(bounds: ViewportBounds, filters: ServerCameraFilters, signal: AbortSignal): Promise<ViewportPage> {
   const first = await fetch(viewportQuery(bounds, filters, 0), { signal });
+  if (first.status === 429) throw new ViewportRateLimitError(retryAfterSeconds(first));
   if (!first.ok) throw new Error(`HTTP ${first.status}`);
   const data = (await first.json()) as Partial<ViewportPage>;
   if (!Array.isArray(data.records)) throw new Error("Malformed bbox payload");
@@ -203,6 +221,7 @@ async function fetchViewportPage(bounds: ViewportBounds, filters: ServerCameraFi
   // as the directory walk: a server that fails to advance must not loop).
   while (nextOffset !== null && nextOffset > 0) {
     const page = await fetch(viewportQuery(bounds, filters, nextOffset), { signal });
+    if (page.status === 429) throw new ViewportRateLimitError(retryAfterSeconds(page));
     if (!page.ok) throw new Error(`HTTP ${page.status}`);
     const body = (await page.json()) as Partial<ViewportPage>;
     if (!Array.isArray(body.records) || body.records.length === 0) break;
@@ -250,6 +269,8 @@ export type UseViewportCamerasOptions = {
   onRecords?: (records: Camera[]) => void;
   /** Fired once when the API fetch fails (callers surface the notice). */
   onError?: () => void;
+  /** Fired when the API requests a bounded cooldown through Retry-After. */
+  onRateLimited?: (retryAfterSeconds: number) => void;
 };
 
 export type UseViewportCamerasResult = {
@@ -261,13 +282,15 @@ export type UseViewportCamerasResult = {
   loading: boolean;
   /** The API fetch failed (network error or non-2xx response). */
   error: boolean;
+  /** Server-directed wait for the current rate-limit cooldown, if any. */
+  retryAfterSeconds: number | null;
   /** The API answered but no public record exists at all. */
   empty: boolean;
   /** Drop the caches and refetch the current viewport (error-state recovery). */
   reload: () => void;
 };
 
-export function useViewportCameras({ bounds, filters, focusId, onRecords, onError }: UseViewportCamerasOptions = {}): UseViewportCamerasResult {
+export function useViewportCameras({ bounds, filters, focusId, onRecords, onError, onRateLimited }: UseViewportCamerasOptions = {}): UseViewportCamerasResult {
   const filterKey = filterKeyOf(filters ?? {});
   const filtersRef = useRef<ServerCameraFilters>(filters ?? {});
   useEffect(() => { filtersRef.current = filters ?? {}; });
@@ -282,11 +305,15 @@ export function useViewportCameras({ bounds, filters, focusId, onRecords, onErro
   useEffect(() => { onRecordsRef.current = onRecords; });
   const onErrorRef = useRef(onError);
   useEffect(() => { onErrorRef.current = onError; });
+  const onRateLimitedRef = useRef(onRateLimited);
+  useEffect(() => { onRateLimitedRef.current = onRateLimited; });
 
   const [records, setRecords] = useState<Camera[]>([]);
   const [total, setTotal] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [retryAfter, setRetryAfter] = useState<number | null>(null);
+  const [rateLimitCooldown, setRateLimitCooldown] = useState<{ until: number; retry: boolean } | null>(null);
   const [empty, setEmpty] = useState(false);
   const [attempt, setAttempt] = useState(0);
 
@@ -311,6 +338,9 @@ export function useViewportCameras({ bounds, filters, focusId, onRecords, onErro
   const mergedKeysRef = useRef<Set<string>>(new Set());
   // The first non-empty payload fires onRecords exactly once per load/reload.
   const notifiedRef = useRef(false);
+  // A 429 may receive one automatic recovery attempt after Retry-After;
+  // repeated 429s remain visible states rather than becoming a retry loop.
+  const rateLimitRetriesRef = useRef(0);
 
   const boundsKey = bounds ? bboxCacheKey(bounds, filterKey) : null;
 
@@ -318,6 +348,14 @@ export function useViewportCameras({ bounds, filters, focusId, onRecords, onErro
   // the viewport or the server filters change.
   useEffect(() => {
     if (boundsRef.current == null) return; // no viewport yet — the map emits its first bounds right after creation
+    if (rateLimitCooldown !== null) {
+      const wait = Math.max(0, rateLimitCooldown.until - Date.now());
+      const cooldownTimer = window.setTimeout(() => {
+        setRateLimitCooldown(null);
+        if (rateLimitCooldown.retry) setAttempt((value) => value + 1);
+      }, wait);
+      return () => window.clearTimeout(cooldownTimer);
+    }
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
       const currentBounds = boundsRef.current!;
@@ -361,6 +399,8 @@ export function useViewportCameras({ bounds, filters, focusId, onRecords, onErro
         if (controller.signal.aborted) return;
         setLoading(false);
         setError(false);
+        setRetryAfter(null);
+        rateLimitRetriesRef.current = 0;
         if (page.total === 0 && page.records.length === 0) setEmpty(true);
         setTotal(page.total);
         if (!mergedKeysRef.current.has(key)) {
@@ -373,10 +413,19 @@ export function useViewportCameras({ bounds, filters, focusId, onRecords, onErro
             queueMicrotask(() => onRecordsRef.current?.(merged));
           }
         }
-      })().catch(() => {
+      })().catch((failure: unknown) => {
         if (controller.signal.aborted) return;
         setLoading(false);
         setError(true);
+        if (failure instanceof ViewportRateLimitError) {
+          const retry = rateLimitRetriesRef.current < VIEWPORT_RATE_LIMIT_AUTO_RETRIES;
+          if (retry) rateLimitRetriesRef.current += 1;
+          setRetryAfter(failure.retryAfterSeconds);
+          setRateLimitCooldown({ until: Date.now() + (failure.retryAfterSeconds * 1_000), retry });
+          onRateLimitedRef.current?.(failure.retryAfterSeconds);
+          return;
+        }
+        setRetryAfter(null);
         onErrorRef.current?.();
       });
     }, VIEWPORT_FETCH_DEBOUNCE_MS);
@@ -388,7 +437,7 @@ export function useViewportCameras({ bounds, filters, focusId, onRecords, onErro
     // cache cell does not refetch) and on the semantic filter combo — never
     // on the `bounds`/`filters` object identities (unstable; see the same
     // pattern in use-public-cameras, PR #165 review blocker t_6e9c812d).
-  }, [boundsKey, filterKey, attempt]);
+  }, [boundsKey, filterKey, attempt, rateLimitCooldown]);
 
   // Focus resolution: ?focus=ID must render even when the record lies
   // outside every loaded bbox. Merged WITHOUT onRecords — a deep link must
@@ -409,11 +458,15 @@ export function useViewportCameras({ bounds, filters, focusId, onRecords, onErro
     total,
     loading,
     error,
+    retryAfterSeconds: retryAfter,
     empty,
     reload: () => {
       __resetViewportCamerasCache();
       mergedKeysRef.current.clear();
       notifiedRef.current = false;
+      rateLimitRetriesRef.current = 0;
+      setRetryAfter(null);
+      setRateLimitCooldown(null);
       setError(false);
       setLoading(true);
       setAttempt((value) => value + 1);

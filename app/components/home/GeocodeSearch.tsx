@@ -62,6 +62,22 @@ const GEOCODE_INPUT_ID = "map-list-search";
  */
 type PendingGeocode = { timer: ReturnType<typeof setTimeout> | null; controller: AbortController | null };
 const pendingGeocodeByInput = new Map<string, PendingGeocode>();
+// The cooldown is module-level for the same reason as the pending debounce:
+// remounting the input must not let a user bypass the server's Retry-After.
+const geocodeCooldownUntilByInput = new Map<string, number>();
+
+function retryAfterSeconds(response: Response): number {
+  const parsed = Number.parseInt(response.headers.get("Retry-After") ?? "", 10);
+  return Number.isFinite(parsed) && parsed >= 1 ? Math.min(parsed, 120) : 1;
+}
+
+function cooldownRemainingSeconds(inputId: string): number {
+  const until = geocodeCooldownUntilByInput.get(inputId) ?? 0;
+  const remaining = Math.ceil((until - Date.now()) / 1_000);
+  if (remaining > 0) return remaining;
+  geocodeCooldownUntilByInput.delete(inputId);
+  return 0;
+}
 
 function pendingGeocodeFor(inputId: string): PendingGeocode {
   let entry = pendingGeocodeByInput.get(inputId);
@@ -77,11 +93,15 @@ function pendingGeocodeFor(inputId: string): PendingGeocode {
  * test's fetch mock). */
 export function __resetGeocodePending(inputId = GEOCODE_INPUT_ID): void {
   const entry = pendingGeocodeByInput.get(inputId);
-  if (!entry) return;
+  if (!entry) {
+    geocodeCooldownUntilByInput.delete(inputId);
+    return;
+  }
   if (entry.timer !== null) clearTimeout(entry.timer);
   entry.timer = null;
   entry.controller?.abort();
   entry.controller = null;
+  geocodeCooldownUntilByInput.delete(inputId);
 }
 
 /**
@@ -111,8 +131,9 @@ export function GeocodeSearch({ search, onSearchChange, onPlaceSelect }: Props) 
   // edits originating here from external changes (reset, deep link,
   // back/forward), which must still sync the input.
   const [draft, setDraft] = useState(search);
-  const [status, setStatus] = useState<"idle" | "results" | "empty" | "error">("idle");
+  const [status, setStatus] = useState<"idle" | "results" | "empty" | "error" | "rate-limited">("idle");
   const [results, setResults] = useState<GeocodeSuggestion[]>([]);
+  const [retryAfter, setRetryAfter] = useState<number | null>(null);
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const [lastQuery, setLastQuery] = useState("");
@@ -172,8 +193,18 @@ export function GeocodeSearch({ search, onSearchChange, onPlaceSelect }: Props) 
     const trimmed = query.trim();
     if (!trimmed) {
       setResults([]);
+      setRetryAfter(null);
       setStatus("idle");
       setOpen(false);
+      setActiveIndex(-1);
+      return;
+    }
+    const cooldown = cooldownRemainingSeconds(GEOCODE_INPUT_ID);
+    if (cooldown > 0) {
+      setResults([]);
+      setRetryAfter(cooldown);
+      setStatus("rate-limited");
+      setOpen(true);
       setActiveIndex(-1);
       return;
     }
@@ -182,11 +213,23 @@ export function GeocodeSearch({ search, onSearchChange, onPlaceSelect }: Props) 
     const params = new URLSearchParams({ q: trimmed, limit: String(GEOCODE_LIMIT), lang: locale });
     fetch(`/api/geocode?${params.toString()}`, { signal: controller.signal })
       .then(async (response) => {
+        if (response.status === 429) {
+          const seconds = retryAfterSeconds(response);
+          geocodeCooldownUntilByInput.set(GEOCODE_INPUT_ID, Date.now() + (seconds * 1_000));
+          if (controller.signal.aborted) return;
+          setResults([]);
+          setRetryAfter(seconds);
+          setStatus("rate-limited");
+          setOpen(true);
+          setActiveIndex(-1);
+          return;
+        }
         if (!response.ok) throw new Error(`geocode HTTP ${response.status}`);
         const data = (await response.json()) as { results?: GeocodeSuggestion[] };
         if (controller.signal.aborted) return;
         const next = data.results ?? [];
         setResults(next);
+        setRetryAfter(null);
         setStatus(next.length > 0 ? "results" : "empty");
         setOpen(true);
         setActiveIndex(-1);
@@ -198,6 +241,7 @@ export function GeocodeSearch({ search, onSearchChange, onPlaceSelect }: Props) 
         // dropdown with an honest note when the user is looking at it.
         console.error("geocode autocomplete failed", error);
         setResults([]);
+        setRetryAfter(null);
         setStatus("error");
         setOpen(true);
         setActiveIndex(-1);
@@ -228,6 +272,7 @@ export function GeocodeSearch({ search, onSearchChange, onPlaceSelect }: Props) 
       }
       pending.controller?.abort();
       setResults([]);
+      setRetryAfter(null);
       setStatus("idle");
       setOpen(false);
       setActiveIndex(-1);
@@ -274,7 +319,7 @@ export function GeocodeSearch({ search, onSearchChange, onPlaceSelect }: Props) 
   }, [open, results, activeIndex, selectSuggestion, closeDropdown]);
 
   const showSuggestionOptions = open && status === "results";
-  const showSuggestionStatus = open && (status === "empty" || status === "error");
+  const showSuggestionStatus = open && (status === "empty" || status === "error" || status === "rate-limited");
 
   return (
     <div className="map-list-search" ref={searchWrapRef}>
@@ -325,7 +370,11 @@ export function GeocodeSearch({ search, onSearchChange, onPlaceSelect }: Props) 
           )}
           {showSuggestionStatus && (
             <p className="geocode-status" role="status">
-              {status === "empty" ? t.geocodeNoResults(lastQuery) : t.geocodeUnavailable}
+              {status === "empty"
+                ? t.geocodeNoResults(lastQuery)
+                : status === "rate-limited"
+                  ? t.geocodeRateLimited(retryAfter ?? 1)
+                  : t.geocodeUnavailable}
             </p>
           )}
           <p className="geocode-attribution">{t.geocodeAttribution}</p>

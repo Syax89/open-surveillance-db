@@ -4,7 +4,7 @@
 
 import assert from "node:assert/strict";
 import { after, beforeEach, test } from "node:test";
-import { apiRequest, cleanupRouteTree, loadRoute, responseBody } from "./helpers/api-harness.mjs";
+import { apiRequest, cleanupRouteTree, loadRoute, loadTreeModule, responseBody } from "./helpers/api-harness.mjs";
 import { callArgs, resetMockState, stub } from "./helpers/mock-state.mjs";
 
 // Session fixture (ADR 0013 double-submit CSRF): the write gate (Fase E1)
@@ -95,6 +95,51 @@ test("GET /api/cameras returns the public list as JSON by default", async () => 
   assert.deepEqual(await responseBody(response), { records: [cameraFixture], total: 1, nextOffset: null });
   assert.deepEqual(callArgs("listPublicCamerasPage")[0], [{}, { limit: 500, offset: 0 }], "the default page is the first 500 records");
   assert.equal(callArgs("getPublicCameraFacets").length, 0, "facets are OPT-IN (QA#5 F2): the default JSON list never pays for the two full-set aggregates");
+});
+
+test("GET /api/cameras serves a public-cache hit before spending the read rate-limit budget", async () => {
+  const store = new Map();
+  globalThis.caches = {
+    default: {
+      async match(request) {
+        return store.get(request.url)?.clone() ?? null;
+      },
+      async put(request, response) {
+        store.set(request.url, response.clone());
+      },
+      async delete() {},
+    },
+  };
+  const { env: workerEnv } = await loadTreeModule("cloudflare-workers.mjs");
+  let rateLimitCalls = 0;
+  workerEnv.READ_LIMITER = {
+    async limit() {
+      rateLimitCalls += 1;
+      return { success: rateLimitCalls === 1 };
+    },
+  };
+  stub("listPublicCamerasInBboxPage", async () => ({ records: [cameraFixture], total: 1, nextOffset: null }));
+  try {
+    const { GET } = await camerasRoute();
+    const headers = { "cf-connecting-ip": "203.0.113.45" };
+    const url = "/api/cameras?bbox=12.4,41.8,12.6,42.0";
+
+    const first = await GET(apiRequest(url, { headers }));
+    assert.equal(first.status, 200);
+    assert.equal(first.headers.get("x-osdb-cache"), "miss");
+    assert.equal(callArgs("listPublicCamerasInBboxPage").length, 1);
+
+    const cached = await GET(apiRequest(url, { headers }));
+    assert.equal(cached.status, 200, "a cached viewport must not be blocked after its original miss consumed the budget");
+    assert.equal(cached.headers.get("x-osdb-cache"), "hit");
+    assert.equal(callArgs("listPublicCamerasInBboxPage").length, 1, "a cache hit must not query the database again");
+
+    const newViewport = await GET(apiRequest("/api/cameras?bbox=12.7,41.8,12.9,42.0", { headers }));
+    assert.equal(newViewport.status, 429, "a new uncached viewport remains bounded by the read budget");
+  } finally {
+    delete workerEnv.READ_LIMITER;
+    delete globalThis.caches;
+  }
 });
 
 test("GET /api/cameras?facets=1 includes the facets for the filter UI (opt-in, QA#5 F2)", async () => {

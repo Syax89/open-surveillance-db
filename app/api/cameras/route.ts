@@ -97,8 +97,16 @@ export async function GET(request: Request) {
     return Response.json({ error: "Request URI too long." }, { status: 414 });
   }
 
+  // DB-lightening (CEO 2026-08-07): the worker itself caches the public
+  // read responses (bounded, query-string-keyed, fail-open) so repeat
+  // views of the map/directory don't re-query D1 — on the container there
+  // is no CDN in front, so the edge Cache-Control headers alone never
+  // spared the database. Cache hits must also bypass the read/export bucket:
+  // they do not execute a D1 query or upstream call, while uncached requests
+  // remain rate-limited inside the cache-miss callback below.
+  return withPublicCache(request, 300, async () => {
   // Rate limits: plain reads share a generous bucket, bulk exports (CSV and
-  // GeoJSON) get a stricter one so anomalous export traffic is throttled.
+  // GeoJSON) get a stricter one so anomalous cache misses stay throttled.
   const format = new URL(request.url).searchParams.get("format");
   const kind: RouteKind = format === "csv" || format === "geojson" ? "export" : "read";
   const key = callerKey(request, env);
@@ -116,14 +124,6 @@ export async function GET(request: Request) {
       headers: { "Retry-After": String(limit.retryAfterSeconds) },
     });
   }
-
-  // DB-lightening (CEO 2026-08-07): the worker itself caches the public
-  // read responses (bounded, query-string-keyed, fail-open) so repeat
-  // views of the map/directory don't re-query D1 — on the container there
-  // is no CDN in front, so the edge Cache-Control headers alone never
-  // spared the database. The 429 path above stays uncached by design
-  // (rate limits must be re-evaluated per request).
-  return withPublicCache(request, 300, async () => {
   try {
     const params = new URL(request.url).searchParams;
     const kindFilter = cleanText(params.get("kind"), 60);

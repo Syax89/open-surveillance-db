@@ -57,6 +57,7 @@ function HookProbe({ bounds, filters, focusId, onRecords }) {
     "data-records": JSON.stringify(state.records.map((r) => r.id)),
     "data-loading": String(state.loading),
     "data-error": String(state.error),
+    "data-retry-after": String(state.retryAfterSeconds ?? ""),
     "data-empty": String(state.empty),
     "data-total": String(state.total ?? ""),
   }, React.createElement("button", { onClick: state.reload, "data-testid": "reload" }, "Reload"));
@@ -216,6 +217,33 @@ test("reload() drops every cache and refetches the current viewport (error recov
   reload.click();
   await pause(300);
   assert.equal(calls.length, first + 1, "after reload() the same viewport fetches again (cache dropped)");
+});
+
+test("a rate-limited viewport waits for Retry-After and retries once instead of leaving the map stuck", async () => {
+  let attempts = 0;
+  installFetchMock((input) => {
+    const url = String(input);
+    if (!url.includes("bbox=")) return jsonResponse({ error: "unexpected request" }, { status: 404 });
+    attempts += 1;
+    if (attempts === 1) {
+      return new Response(JSON.stringify({ error: "Too many requests" }), {
+        status: 429,
+        headers: { "Content-Type": "application/json", "Retry-After": "1" },
+      });
+    }
+    return jsonResponse({ records: RECORDS, total: RECORDS.length, nextOffset: null });
+  });
+  await renderProbe({ bounds: ROME, filters: {} });
+
+  await pause(300);
+  const probe = rtl.screen.getByTestId("probe");
+  assert.equal(probe.getAttribute("data-error"), "true", "the initial 429 is surfaced as a temporary map state");
+  assert.equal(probe.getAttribute("data-retry-after"), "1", "the hook exposes the server retry window");
+
+  await pause(1_300);
+  assert.equal(attempts, 2, "the hook performs exactly one delayed retry after the server window");
+  assert.equal(probe.getAttribute("data-error"), "false", "a successful retry clears the temporary error state");
+  assert.equal(probe.getAttribute("data-records"), JSON.stringify(RECORDS.map((record) => record.id)));
 });
 
 test("viewportQuery builds the bbox URL with the bounded limit and forwards kind/freshness", () => {
