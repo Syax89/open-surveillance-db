@@ -67,6 +67,44 @@ test("report form renders no photo-redaction confirmation checkbox", async () =>
   assert.equal(redaction, null, "the photo-upload fieldset (and its redaction gate) must not exist");
 });
 
+test("report form exposes a one-tap geolocation button only when the browser supports it", async () => {
+  let clicks = 0;
+  const supported = await renderWithLocale(React.createElement(ReportForm, reportFormProps({
+    geolocationAvailable: true,
+    requestMyPosition: () => { clicks += 1; },
+  })));
+  const button = supported.getByRole("button", { name: "Use my position" });
+  assert.equal(button.getAttribute("type"), "button", "location must never accidentally submit the report");
+  assert.equal(button.classList.contains("report-geolocate-button"), true, "the action has its own 44px styling hook");
+  rtl.fireEvent.click(button);
+  assert.equal(clicks, 1, "one tap calls the supplied location request once");
+
+  supported.unmount();
+  const refused = await renderWithLocale(React.createElement(ReportForm, reportFormProps({
+    geolocationAvailable: true,
+    geolocationNotice: "Location permission was refused. Choose the point on the map, or type the coordinates below.",
+  })));
+  const status = refused.getByRole("status");
+  assert.equal(status.classList.contains("report-geolocate-notice"), true, "a refusal is visible next to its triggering control, not after the full form");
+  assert.match(status.textContent, /Location permission was refused/);
+
+  refused.unmount();
+  const unsupported = await renderWithLocale(React.createElement(ReportForm, reportFormProps({
+    geolocationAvailable: false,
+  })));
+  assert.equal(unsupported.queryByRole("button", { name: "Use my position" }), null, "manual/map fallbacks stay uncluttered when geolocation is unavailable");
+});
+
+test("report form announces an in-progress location lookup without allowing a duplicate request", async () => {
+  const view = await renderWithLocale(React.createElement(ReportForm, reportFormProps({
+    geolocationAvailable: true,
+    geolocating: true,
+  })));
+  const button = view.getByRole("button", { name: "Finding your position…" });
+  assert.equal(button.disabled, true, "the same request cannot be started twice");
+  assert.equal(button.getAttribute("aria-busy"), "true", "assistive technology hears the pending state");
+});
+
 test("reverse geocoding prefill: address input is controlled, shows the resolving placeholder while the lookup runs", async () => {
   const view = await renderWithLocale(
     React.createElement(ReportForm, {
@@ -212,5 +250,77 @@ test("useReportFlow: a geocoder failure leaves the address empty and never block
     assert.ok(container.textContent.includes("(empty)"), "a failed lookup leaves the field empty");
   } finally {
     globalThis.fetch = originalFetch;
+  }
+});
+
+test("useReportFlow: one-tap location requests high accuracy, rounds before lookup, and reuses the normal coordinate path", async () => {
+  let flow = null;
+  let callbacks = null;
+  const originalFetch = globalThis.fetch;
+  const originalGeolocation = Object.getOwnPropertyDescriptor(navigator, "geolocation");
+  const fetchCalls = [];
+  Object.defineProperty(navigator, "geolocation", {
+    configurable: true,
+    value: {
+      getCurrentPosition: (success, error, options) => { callbacks = { success, error, options }; },
+    },
+  });
+  globalThis.fetch = async (url) => {
+    fetchCalls.push(String(url));
+    if (String(url).startsWith("/api/geocode/reverse")) {
+      return new Response(JSON.stringify({ address: "Via Roma 12, Ferrara" }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+    return new Response(JSON.stringify({ records: [] }), { status: 200, headers: { "Content-Type": "application/json" } });
+  };
+  function Harness() {
+    flow = useReportFlow({ setNotice: () => {} });
+    return React.createElement("p", null, flow.coordinates ? `${flow.coordinates.latitude},${flow.coordinates.longitude}` : "(empty)");
+  }
+  try {
+    await renderWithLocale(React.createElement(Harness));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.equal(flow.geolocationAvailable, true, "the browser capability is exposed only after hydration");
+
+    flow.requestMyPosition();
+    assert.ok(callbacks, "one tap calls the browser geolocation API");
+    assert.deepEqual(callbacks.options, { enableHighAccuracy: true, timeout: 10_000, maximumAge: 60_000 });
+    callbacks.success({ coords: { latitude: 44.83784, longitude: 11.61826 } });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    assert.deepEqual(flow.coordinates, { latitude: 44.8378, longitude: 11.6183 }, "device precision is rounded to the documented ~11m report location");
+    assert.ok(fetchCalls.some((url) => url.startsWith("/api/geocode/reverse?lat=44.8378&lng=11.6183")), "reverse geocoding gets the rounded position");
+    assert.ok(fetchCalls.some((url) => url.includes("/api/cameras/nearby?latitude=44.8378&longitude=11.6183")), "the existing duplicate check receives the same rounded point");
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalGeolocation) Object.defineProperty(navigator, "geolocation", originalGeolocation);
+    else delete navigator.geolocation;
+  }
+});
+
+test("useReportFlow: a refused browser permission leaves the map/manual fallbacks available", async () => {
+  let flow = null;
+  let callbacks = null;
+  const originalGeolocation = Object.getOwnPropertyDescriptor(navigator, "geolocation");
+  Object.defineProperty(navigator, "geolocation", {
+    configurable: true,
+    value: {
+      getCurrentPosition: (success, error) => { callbacks = { success, error }; },
+    },
+  });
+  function Harness() {
+    flow = useReportFlow({ setNotice: () => {} });
+    return React.createElement("p", null, flow.geolocationNotice);
+  }
+  try {
+    await renderWithLocale(React.createElement(Harness));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    flow.requestMyPosition();
+    callbacks.error({ code: 1 });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.equal(flow.geolocating, false, "the form is usable again after a refusal");
+    assert.equal(flow.geolocationNotice, "Location permission was refused. Choose the point on the map, or type the coordinates below.");
+  } finally {
+    if (originalGeolocation) Object.defineProperty(navigator, "geolocation", originalGeolocation);
+    else delete navigator.geolocation;
   }
 });

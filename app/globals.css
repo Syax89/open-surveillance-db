@@ -588,7 +588,16 @@ button { cursor:pointer; }
 .legal-microcopy { margin:2px 0 0; color:var(--muted); font-size:var(--text-sm); line-height:1.5; }
 .legal-microcopy a { color:var(--action); font-weight:700; text-decoration:underline; text-underline-offset:3px; }
 .check-redaction { display:grid; margin-top:14px; }
-.check-redaction input { width:15px; height:15px; margin-top:1px; }
+.check-redaction input { width:24px; height:24px; }
+/* One-tap location on /segnala. It is intentionally a normal 44px button,
+   not a huge native-looking control: 24px is enough for checkbox AA, while
+   a location action needs the same comfortable target as every other button.
+   The button only appears after hydration when the browser exposes
+   navigator.geolocation; the mini-map + manual coordinates stay available
+   in every environment. */
+.report-geolocate-button { min-height:44px; justify-self:start; }
+.report-geolocate-button:disabled { cursor:progress; opacity:.7; transform:none; }
+.report-geolocate-notice { margin:0; color:var(--danger); font-size:var(--text-sm); line-height:1.45; }
 .coordinate-readout { margin-top:18px; padding:13px 15px; border-radius:var(--radius-md); background:var(--coordinate-bg); color:var(--coordinate-ink); font-size:var(--text-sm); line-height:1.5; }
 .coordinate-readout b { color:var(--coordinate-strong); }
 .coordinate-entry { display:grid; gap:var(--space-3); margin:0; padding:var(--space-4); border:1px solid var(--coordinate-border); border-radius:var(--radius-md); background:var(--coordinate-entry-bg); }
@@ -909,6 +918,7 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
   .correction-section { padding-top:0 }
   .report-form, .correction-form { padding:20px }
   .contribution-step { padding:15px; }
+  .report-geolocate-button { width:100%; justify-content:center; }
   footer { grid-template-columns:1fr;align-items:start;gap:18px }
   .footer-links { justify-content:flex-start;flex-wrap:wrap }
   .brand { font-size:var(--text-2xl) }

@@ -21,8 +21,9 @@ domain on every merge to `main`. The interface is bilingual (EN/IT).
 - **Public directory** (`/directory`): search, safe type/freshness filters,
   A–Z index, CSV/GeoJSON exports, `?page=` pagination — the text equivalent
   of the map.
-- **Reports** (`/segnala`): position from map click or manual coordinates,
-  reverse-geocode address prefill, optional manufacturer/observation-date
+- **Reports** (`/segnala`): position from an optional one-tap device location,
+  map click or manual coordinates; reverse-geocode address prefill receives
+  coordinates rounded to ~11 m, plus optional manufacturer/observation-date
   metadata, server-enforced duplicate gate (ADR 0019), immediate publication
   from verified accounts (ADR 0021).
 - **Corrections / takedown requests** (`/correggi`): private, human-reviewed

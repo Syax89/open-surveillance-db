@@ -38,6 +38,17 @@ export const en = {
   latitude: "Latitude",
   longitude: "Longitude",
   useCoordinates: "Use these coordinates",
+  // One-tap geolocation (CEO 2026-08-09): the primary way to set a position
+  // on a phone, standing in front of the camera. The map and the manual
+  // fields stay as the alternatives when the device or the user says no.
+  useMyPosition: "Use my position",
+  locatingPosition: "Finding your position…",
+  geolocationDenied:
+    "Location permission was refused. Choose the point on the map, or type the coordinates below.",
+  geolocationTimeout:
+    "Your position took too long to arrive. Try again, choose the point on the map, or type the coordinates below.",
+  geolocationUnavailable:
+    "Your device could not provide a position. Choose the point on the map, or type the coordinates below.",
   checkingNearby: "Checking nearby public records…",
   possibleDuplicate: "Possible duplicate nearby",
   duplicateBody:
@@ -146,6 +157,14 @@ export const it: Translation<typeof en> = {
   latitude: "Latitudine",
   longitude: "Longitudine",
   useCoordinates: "Usa queste coordinate",
+  useMyPosition: "Usa la mia posizione",
+  locatingPosition: "Ricerca della posizione…",
+  geolocationDenied:
+    "Permesso di localizzazione negato. Scegli il punto sulla mappa, oppure inserisci le coordinate qui sotto.",
+  geolocationTimeout:
+    "La posizione ha richiesto troppo tempo. Riprova, scegli il punto sulla mappa, oppure inserisci le coordinate qui sotto.",
+  geolocationUnavailable:
+    "Il dispositivo non ha fornito una posizione. Scegli il punto sulla mappa, oppure inserisci le coordinate qui sotto.",
   checkingNearby: "Verifica dei record pubblici vicini…",
   possibleDuplicate: "Possibile duplicato nelle vicinanze",
   duplicateBody:

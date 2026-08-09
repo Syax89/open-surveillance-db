@@ -41,7 +41,7 @@ real-rendering checks (`.github/workflows/lighthouse.yml`; local check:
   their popup with Enter/Space, Leaflet controls are focusable, and the
   geocode search is an ARIA combobox; the text directory remains the full
   keyboard alternative for browsing.
-- Report-location selection by map click **or** validated manual coordinates.
+- Report-location selection by an optional one-tap device location (with browser permission), map click **or** validated manual coordinates; map/manual alternatives remain available.
 - English/Italian interface with a device-local language preference; the
   language choice does not affect API data.
 - An in-app bilingual guide at `/guide` explaining data states and the

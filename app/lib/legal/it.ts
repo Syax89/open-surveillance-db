@@ -619,7 +619,7 @@ export const itLegal: LegalContent = {
               "Stati di focus da tastiera visibili e un ordine di focus logico.",
               "Supporto di `prefers-reduced-motion` (animazioni ridotte su richiesta).",
               "Una directory testuale ricercabile e pagine di dettaglio dei record che funzionano **senza interazione con la mappa**; mappa e directory presentano gli stessi campi pubblici.",
-              "Selezione della posizione della segnalazione tramite clic sulla mappa **o** coordinate manuali validate.",
+              "Selezione della posizione della segnalazione tramite richiesta esplicita della posizione del dispositivo (con permesso del browser), clic sulla mappa **o** coordinate manuali validate; le alternative mappa/manuale restano disponibili.",
               "Un'interfaccia in inglese/italiano con preferenza di lingua locale al dispositivo; la scelta della lingua non influisce sui dati API.",
               "Una guida in-app bilingue su [/guide](/guide) che spiega gli stati dei dati e il flusso di pubblicazione.",
               "Lo stato delle informazioni non è mai comunicato solo con il colore (vengono usati testo ed etichette con icone).",

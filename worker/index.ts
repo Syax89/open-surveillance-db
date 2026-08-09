@@ -361,17 +361,18 @@ function requireModerationAuth(request: Request, env: Env): { denied: Response |
  * domain is active — see task t_6148aa6f.
  */
 /**
- * Geolocation unblock for /mappa ONLY (t_18259daa, CEO: floating locate
- * button above the zoom controls). The locate feature is fully client-side
- * (the position never leaves the browser — privacy by design), but the
- * browser refuses to even prompt unless the top-level document is allowed
- * the geolocation feature. `geolocation=(self)` restricts it to THIS
- * origin's own document — an embedded iframe can never inherit it. Every
- * other route keeps the fully-denying policy; camera and microphone stay
- * blocked everywhere, including /mappa.
+ * Geolocation unblock for /mappa and /segnala (t_18259daa + CEO 2026-08-09
+ * one-tap report location). On /mappa the locate feature is fully
+ * client-side (the position never leaves the browser). On /segnala, an
+ * explicit one-tap action feeds the selected point into the same report flow
+ * as a map click: an explicit user action plus the browser permission gate
+ * the lookup, and the UI still exposes map/manual alternatives. `geolocation=(self)` restricts the
+ * feature to THIS origin's own document — an embedded iframe can never
+ * inherit it. Every other route keeps the fully-denying policy; camera and
+ * microphone stay blocked everywhere.
  */
-const MAP_PERMISSIONS_POLICY = "camera=(), microphone=(), geolocation=(self)";
-const MAP_ONLY_ROUTE = "/mappa";
+const GEOLOCATION_PERMISSIONS_POLICY = "camera=(), microphone=(), geolocation=(self)";
+const GEOLOCATION_ROUTES = new Set(["/mappa", "/segnala"]);
 
 const SECURITY_HEADERS: ReadonlyArray<readonly [string, string]> = [
   ["X-Content-Type-Options", "nosniff"],
@@ -397,11 +398,10 @@ const SECURITY_HEADERS: ReadonlyArray<readonly [string, string]> = [
 
 /**
  * Return a copy of `response` carrying the global security headers. On the
- * /mappa route the Permissions-Policy is relaxed to allow geolocation for
- * the top-level document (locate button, t_18259daa); every other route
- * keeps the fully-denying policy. The override still respects the
- * "never overwrite" rule: a stricter policy already set by an app handler
- * survives untouched.
+ * /mappa and /segnala routes the Permissions-Policy is relaxed to allow
+ * geolocation for the top-level document; every other route keeps the
+ * fully-denying policy. The override still respects the "never overwrite"
+ * rule: a stricter policy already set by an app handler survives untouched.
  */
 function withSecurityHeaders(response: Response, pathname?: string): Response {
   const headers = new Headers(response.headers);
@@ -413,8 +413,8 @@ function withSecurityHeaders(response: Response, pathname?: string): Response {
   for (const [name, value] of SECURITY_HEADERS) {
     if (!headers.has(name)) headers.set(name, value);
   }
-  if (pathname === MAP_ONLY_ROUTE && !appSetPermissionsPolicy) {
-    headers.set("Permissions-Policy", MAP_PERMISSIONS_POLICY);
+  if (pathname && GEOLOCATION_ROUTES.has(pathname) && !appSetPermissionsPolicy) {
+    headers.set("Permissions-Policy", GEOLOCATION_PERMISSIONS_POLICY);
   }
   return new Response(response.body, {
     status: response.status,
