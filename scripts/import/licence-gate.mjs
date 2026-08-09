@@ -22,6 +22,10 @@ export const IMPORTABLE_LICENSES = new Set([
   "IODL 2.0",
   // Creative Commons Attribution — attribution only.
   "CC BY 4.0",
+  // CC BY 4.0 variante Neozelandese (Wellington City Council CCTV,
+  // licenseInfo "New Zealand Creative Commons Attribute License 4.0"
+  // — stessa classe attribution-only, verificato cron 2026-08-09).
+  "CC BY 4.0 (NZ)",
   "CC-BY 4.0",
   // CC BY 3.0 Italia (Comune di Milano — open data CKAN dichiara 'cc-by'
   // senza versione; la 3.0 IT è quella storica del portale, da confermare
