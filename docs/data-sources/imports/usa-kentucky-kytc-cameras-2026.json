@@ -1,0 +1,11 @@
+{
+    "slug": "usa-kentucky-kytc-cameras-2026",
+    "source_name": "Kentucky Transportation Cabinet — Traffic Cameras (Ky_WebCams)",
+    "format": "arcgis",
+    "license": "CC0 1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "attribution_text": "Fonte: Kentucky Transportation Cabinet, traffic cameras (https://maps.kytc.ky.gov/trafficcameras/), pubblicato con licenza CC0 1.0 (public domain).",
+    "source_url": "https://kygisserver.ky.gov/arcgis/rest/services/WGS84WM_Services/Ky_WebCams_WGS84WM/MapServer/0",
+    "max_records": 400,
+    "notes": "Cron ricerca stato-per-stato (2026-08-09): KYTC official MapServer (WGS84 Web Mercator), 226 camere (returnCountOnly verificato), CC0 dichiarato su maps.kytc.ky.gov/trafficcameras/. external_id kytc-cam:<OBJECTID>."
+}

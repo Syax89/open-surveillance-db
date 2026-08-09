@@ -138,6 +138,97 @@ export function lcc2248ToWgs84(x, y) {
   return [Number((phi * 180 / Math.PI).toFixed(6)), Number((lon * 180 / Math.PI).toFixed(6))];
 }
 
+/**
+ * EPSG:2926 (NAD83 / Washington State Plane North, Lambert Conformal
+ * Conic, US survey feet) → WGS84. Usato da King County traffic cameras
+ * (wkid 2926). Parametri: lat_0=47, lat_1=48.73333..., lat_2=47.5,
+ * lon_0=-120.83333, x_0=500000 ftUS, y_0=0.
+ * Validato 2026-08-09 vs coordinate note: 116th Ave NE / NE 124th St →
+ * ~47.71/-122.20 (King County, WA).
+ */
+export function lcc2926ToWgs84(x, y) {
+  const a = 6378137.0;
+  const f = 1 / 298.257222101;
+  const e = Math.sqrt(2 * f - f * f);
+  const lat0 = (47.0 * Math.PI) / 180;
+  const lat1 = (48.73333333333333 * Math.PI) / 180;
+  const lat2 = (47.5 * Math.PI) / 180;
+  const lon0 = (-120.8333333333333 * Math.PI) / 180;
+  const X0 = 500000.0001016001;
+  const Y0 = 0.0;
+  const FT2M = 1200.0 / 3937.0;
+  const X = x * FT2M;
+  const Y = y * FT2M;
+  const m = (phi) => Math.cos(phi) / Math.sqrt(1 - e * e * Math.sin(phi) ** 2);
+  const t = (phi) => Math.tan(Math.PI / 4 - phi / 2) / ((1 - e * Math.sin(phi)) / (1 + e * Math.sin(phi))) ** (e / 2);
+  const m1 = m(lat1), m2 = m(lat2), t0 = t(lat0), t1 = t(lat1), t2 = t(lat2);
+  const n = (Math.log(m1) - Math.log(m2)) / (Math.log(t1) - Math.log(t2));
+  const F = m1 / (n * t1 ** n);
+  const rho0 = a * F * t0 ** n;
+  const dx = X - X0, dy = rho0 - Y;
+  const rho = Math.hypot(dx, dy) * Math.sign(n);
+  const theta = Math.atan2(dx, dy);
+  const tt = (rho / (a * F)) ** (1 / n);
+  let phi = Math.PI / 2 - 2 * Math.atan(tt);
+  for (let i = 0; i < 8; i++) {
+    const s = Math.sin(phi);
+    phi = Math.PI / 2 - 2 * Math.atan(tt * ((1 - e * s) / (1 + e * s)) ** (e / 2));
+  }
+  const lon = lon0 + theta / n;
+  return [Number((phi * 180 / Math.PI).toFixed(6)), Number((lon * 180 / Math.PI).toFixed(6))];
+}
+
+/**
+ * EPSG:2193 (NZGD2000 / New Zealand Transverse Mercator 2000) → WGS84.
+ * Usato da Wellington City Council CCTV (wkid 2193).
+ * Parametri: lon_0=173, k=0.9996, x_0=1600000, y_0=10000000, GRS80.
+ * Validato 2026-08-09: Wakefield/Blair St (1749339, 5427234) →
+ * ~-41.291/174.779 (Wellington).
+ */
+export function nztm2193ToWgs84(x, y) {
+  const a = 6378137.0;
+  const f = 1 / 298.257222101;
+  const e = Math.sqrt(2 * f - f * f);
+  const k0 = 0.9996;
+  const lon0 = (173.0 * Math.PI) / 180;
+  const X0 = 1600000.0;
+  const Y0 = 10000000.0;
+  const E = x - X0;
+  const N = y - Y0;
+  const ep2 = (e * e) / (1 - e * e);
+  const m = N / k0;
+  const mu = m / (a * (1 - e * e / 4 - 3 * e ** 4 / 64 - 5 * e ** 6 / 256));
+  const e1 = (1 - Math.sqrt(1 - e * e)) / (1 + Math.sqrt(1 - e * e));
+  let phi = mu
+    + (3 * e1 / 2 - 27 * e1 ** 3 / 32) * Math.sin(2 * mu)
+    + (21 * e1 ** 2 / 16 - 55 * e1 ** 4 / 32) * Math.sin(4 * mu)
+    + (151 * e1 ** 3 / 96) * Math.sin(6 * mu)
+    + (1097 * e1 ** 4 / 512) * Math.sin(8 * mu);
+  for (let i = 0; i < 5; i++) {
+    const s = Math.sin(phi);
+    const c = Math.cos(phi);
+    const t2 = Math.tan(phi) ** 2;
+    const n2 = ep2 * c * c;
+    const r = a * (1 - e * e) / (1 - e * e * s * s) ** 1.5;
+    const M = a * ((1 - e * e / 4 - 3 * e ** 4 / 64 - 5 * e ** 6 / 256) * phi
+      - (3 * e * e / 8 + 3 * e ** 4 / 32 + 45 * e ** 6 / 1024) * Math.sin(2 * phi)
+      + (15 * e ** 4 / 256 + 45 * e ** 6 / 1024) * Math.sin(4 * phi)
+      - (35 * e ** 6 / 3072) * Math.sin(6 * phi));
+    const d = (N - k0 * M) / (k0 * r);
+    phi = phi - (d * (1 + d * d * (t2 - n2) / 2 + d ** 3 * (5 + 3 * t2 + 10 * n2 - 4 * n2 * n2 - 9 * ep2) / 24)) / (1 + t2 - n2);
+  }
+  const s = Math.sin(phi);
+  const c = Math.cos(phi);
+  const t2 = Math.tan(phi) ** 2;
+  const n2 = ep2 * c * c;
+  const rn = a / Math.sqrt(1 - e * e * s * s);
+  const rm = rn * (1 - e * e) / (1 - e * e * s * s);
+  const T = t2, C = n2, A = (E / (k0 * rn));
+  const lon = lon0 + (A - (1 + 2 * T + C) * A ** 3 / 6 + (5 - 2 * C + 28 * T - 3 * C * C + 8 * ep2 + 24 * T * T) * A ** 5 / 120) / c;
+  const lat = phi - (rm * Math.tan(phi) / rn) * (A * A / 2 - (5 + 3 * T + 10 * C - 4 * C * C - 9 * ep2) * A ** 4 / 24 + (61 + 90 * T + 298 * C + 45 * T * T - 252 * ep2 - 3 * C * C) * A ** 6 / 720);
+  return [Number((lat * 180 / Math.PI).toFixed(6)), Number((lon * 180 / Math.PI).toFixed(6))];
+}
+
 export function parseDirection(value) {
   if (value === null || value === undefined) return null;
   const text = String(value).trim().toLocaleLowerCase();

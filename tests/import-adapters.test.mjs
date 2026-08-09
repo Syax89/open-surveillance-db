@@ -1050,3 +1050,92 @@ test("dcc: parses GeoJSON features into canonical staged rows", () => {
   assert.equal(staged[0].external_id, "dcc-cctv:2");
   assert.equal(skipped.total, 1);
 });
+
+// -------------------------------------------------- wave 11 (cron discovery): OH, KY, NE511, KingCo, Wellington NZ
+
+import { parsePayload as ohioParse } from "../scripts/import/adapters/usa-ohio-ohgo-cameras-2026.mjs";
+import { parsePayload as kytcParse } from "../scripts/import/adapters/usa-kentucky-kytc-cameras-2026.mjs";
+import { parsePayload as ne511Parse } from "../scripts/import/adapters/usa-new-england-511-cameras-2026.mjs";
+import { parsePayload as kingcoParse } from "../scripts/import/adapters/usa-kingcounty-traffic-cameras-2026.mjs";
+import { parsePayload as wellingtonParse } from "../scripts/import/adapters/nuova-zelanda-wellington-cctv-2026.mjs";
+import { lcc2926ToWgs84, nztm2193ToWgs84 } from "../scripts/import/adapters/lib.mjs";
+
+test("lcc2926ToWgs84 lands in King County (~47.71, -122.19)", () => {
+  const [lat, lon] = lcc2926ToWgs84(1307383.0233, 262401.6072);
+  assert.ok(Math.abs(lat - 47.711339) < 0.001, `lat ${lat}`);
+  assert.ok(Math.abs(lon - -122.186165) < 0.001, `lon ${lon}`);
+});
+
+test("nztm2193ToWgs84 lands in Wellington (~-41.29, 174.78)", () => {
+  const [lat, lon] = nztm2193ToWgs84(1749339.4537, 5427234.9352);
+  assert.ok(Math.abs(lat - -41.292629) < 0.001, `lat ${lat}`);
+  assert.ok(Math.abs(lon - 174.783576) < 0.001, `lon ${lon}`);
+});
+
+test("ohio: parses OHGO API camera sites (WGS84) into canonical staged rows", () => {
+  const { staged, skipped } = ohioParse({
+    data: [
+      { Id: "00000000000001", Latitude: 41.50557, Longitude: -82.84921, Location: "SR-2 at S Lightner Rd" },
+      { Id: "x", Latitude: 0, Longitude: 0 },
+    ],
+  });
+  assert.equal(staged.length, 1);
+  assert.equal(staged[0].title, "SR-2 at S Lightner Rd");
+  assert.equal(staged[0].kind, "Traffic / licence plate reader");
+  assert.equal(staged[0].external_id, "ohio-ohgo:00000000000001");
+  assert.equal(skipped.total, 1);
+});
+
+test("kytc: parses ArcGIS features (Web Mercator) into canonical staged rows", () => {
+  const { staged, skipped } = kytcParse({
+    data: [
+      { attributes: { OBJECTID: 1, description: "I-65 just South of I-265", district: "6", county: "Jefferson" }, geometry: { x: -9554547.69, y: 4628309.87 } },
+      { attributes: { OBJECTID: 2 }, geometry: { x: 0, y: 0 } },
+    ],
+  });
+  assert.equal(staged.length, 1);
+  assert.equal(staged[0].external_id, "kytc-cam:1");
+  assert.equal(staged[0].kind, "Traffic / licence plate reader");
+  assert.equal(skipped.total, 1);
+});
+
+test("ne511: parses C2C XML (microdegrees) for VT/NH/ME into staged rows", () => {
+  const { staged, skipped } = ne511Parse({
+    data: [
+      { __net: "Vermont", text: '<status xmlns="http://its.gov/c2c_icd"><cctvStatusData><net id="Vermont"><cctvStatus id="VT-78 EB ALBURGH" netId="Vermont"><name>Alburgh CCTV</name><lat>44975151</lat><lon>-73227072</lon><status>Device Offline</status><equipLoc><roadway>VT-78</roadway><direction>East</direction></equipLoc></cctvStatus></net></cctvStatusData></status>' },
+      { __net: "Maine", text: '<cctvStatus id="ME-1" netId="Maine"><name>Portland</name><lat>0</lat><lon>0</lon></cctvStatus>' },
+    ],
+  });
+  assert.equal(staged.length, 1);
+  assert.equal(staged[0].title, "Alburgh CCTV");
+  assert.equal(staged[0].latitude, 44.975151);
+  assert.equal(staged[0].external_id, "ne511:Vermont:VT-78 EB ALBURGH");
+  assert.equal(skipped.total, 1);
+});
+
+test("kingco: parses ArcGIS features (EPSG:2926) into canonical staged rows", () => {
+  const { staged, skipped } = kingcoParse({
+    data: [
+      { attributes: { OBJECTID: 1, AssetID: 23, Location: "[WSDOT] 116th Ave. N.E.", CamRegion: "North" }, geometry: { x: 1307383.0233, y: 262401.6072 } },
+      { attributes: { OBJECTID: 2 }, geometry: null },
+    ],
+  });
+  assert.equal(staged.length, 1);
+  assert.equal(staged[0].external_id, "kingco-cam:23");
+  assert.equal(staged[0].kind, "Traffic / licence plate reader");
+  assert.equal(skipped.total, 1);
+});
+
+test("wellington: parses ArcGIS features (EPSG:2193) into canonical staged rows", () => {
+  const { staged, skipped } = wellingtonParse({
+    data: [
+      { attributes: { OBJECTID: 1, Camera_Name: "Wakefield/Blair (Chaffers New World Car park)" }, geometry: { x: 1749339.4537, y: 5427234.9352 } },
+      { attributes: { OBJECTID: 2 }, geometry: null },
+    ],
+  });
+  assert.equal(staged.length, 1);
+  assert.equal(staged[0].title, "Wakefield/Blair (Chaffers New World Car park)");
+  assert.equal(staged[0].kind, "Other / unknown");
+  assert.equal(staged[0].external_id, "wcc-cctv:1");
+  assert.equal(skipped.total, 1);
+});

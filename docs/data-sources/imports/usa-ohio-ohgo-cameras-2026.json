@@ -1,0 +1,11 @@
+{
+    "slug": "usa-ohio-ohgo-cameras-2026",
+    "source_name": "Ohio DOT — OHGO Cameras",
+    "format": "json",
+    "license": "public domain (ODOT)",
+    "license_url": "https://publicapi.ohgo.com/",
+    "attribution_text": "Fonte: Ohio Department of Transportation, OHGO API (https://api.ohgo.com/cameras) — 'the data from ODOT is considered public domain and therefore freely available to anyone'.",
+    "source_url": "https://api.ohgo.com/cameras",
+    "max_records": 2000,
+    "notes": "Cron ricerca stato-per-stato (2026-08-09): ODOT OHGO public API, 1.159 siti camera con Latitude/Longitude (verificato via API diretta), endpoint pubblico senza key. Licenza: public domain dichiarato su publicapi.ohgo.com. external_id ohio-ohgo:<Id>."
+}
