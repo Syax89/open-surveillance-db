@@ -65,7 +65,11 @@ export async function reverseGeocode(
     return { address: cached.address, cached: true };
   }
 
-  const address = await fetchReverseAddress(latitude, longitude);
+  // Privacy boundary: use the same rounded key for the upstream request, not
+  // merely for the cache. Browser/device coordinates can be sub-metre; an
+  // approximate public-infrastructure address needs ~11m precision and the
+  // published privacy notice promises Nominatim never sees more than that.
+  const address = await fetchReverseAddress(latKey, lngKey);
   if (!address) return null;
 
   await db

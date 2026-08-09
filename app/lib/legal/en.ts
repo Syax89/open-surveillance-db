@@ -616,7 +616,7 @@ export const enLegal: LegalContent = {
               "Visible keyboard focus states and a logical focus order.",
               "Support for `prefers-reduced-motion` (animations reduced when requested).",
               "A searchable text directory and record-detail pages that work **without map interaction**; map and directory present the same public fields.",
-              "Report-location selection by map click **or** validated manual coordinates.",
+              "Report-location selection by an explicit device-location request (when browser permission is granted), map click **or** validated manual coordinates; map/manual alternatives remain available.",
               "An English/Italian interface with a device-local language preference; the language choice does not affect API data.",
               "A bilingual in-app guide at [/guide](/guide) explaining data states and the publication workflow.",
               "Status information is never conveyed by colour alone (text and icon labels are used).",

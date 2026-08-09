@@ -55,8 +55,37 @@ export function useReportFlow({ setNotice, initialCoordinates = null }: { setNot
   const addressTouched = useRef(false);
   const reverseRequest = useRef<AbortController | null>(null);
   const nearbyRequest = useRef<AbortController | null>(null);
+  // One-tap geolocation (CEO 2026-08-09): the contributor is standing in
+  // front of the camera on a phone — the fastest correct position is the
+  // device's own. `geolocationAvailable` starts FALSE on purpose so the SSR
+  // markup never contains the button (navigator does not exist on the
+  // server): a deterministic initial state plus a post-hydration effect is
+  // the same fail-closed pattern the OIDC panel uses, and it keeps SSR and
+  // the first client render byte-identical.
+  const [geolocationAvailable, setGeolocationAvailable] = useState(false);
+  const [geolocating, setGeolocating] = useState(false);
+  // Unlike generic form notices (rendered after the entire form), a declined
+  // browser permission must remain adjacent to the button that caused it.
+  const [geolocationNotice, setGeolocationNotice] = useState("");
+  // getCurrentPosition has no AbortSignal. Incrementing this token on an
+  // unmount or a future request makes late callbacks harmless instead of
+  // updating state after the form has gone away.
+  const geolocationRequest = useRef(0);
 
-  useEffect(() => () => nearbyRequest.current?.abort(), []);
+  useEffect(() => () => {
+    nearbyRequest.current?.abort();
+    geolocationRequest.current += 1;
+  }, []);
+  useEffect(() => {
+    let cancelled = false;
+    // Deliberately defer the state write: react-compiler forbids synchronous
+    // setState in an effect, and this retains the deterministic false → true
+    // post-hydration transition.
+    void Promise.resolve().then(() => {
+      if (!cancelled) setGeolocationAvailable(typeof navigator !== "undefined" && typeof navigator.geolocation?.getCurrentPosition === "function");
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   // Deep link (?lat=&lng=, t_6abb96ac): when the form opens with a URL
   // position, run the same nearby check a map click would, once, so the
@@ -132,6 +161,49 @@ export function useReportFlow({ setNotice, initialCoordinates = null }: { setNot
     }
     await selectCoordinates(latitude, longitude);
   }
+  /**
+   * One-tap geolocation: resolve the device position and feed it through the
+   * SAME `selectCoordinates` path a map click uses, so the coordinate
+   * readout, the manual fields, the reverse-geocode prefill and the
+   * duplicate check all behave identically. A failure never blocks the
+   * flow — it explains itself in the notice and leaves the map and the
+   * manual fields as the alternatives.
+   */
+  function requestMyPosition() {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setGeolocationNotice(t.geolocationUnavailable);
+      return;
+    }
+    const request = geolocationRequest.current + 1;
+    geolocationRequest.current = request;
+    setGeolocationNotice("");
+    setGeolocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        if (request !== geolocationRequest.current) return;
+        setGeolocating(false);
+        // A browser fixes a person's device much more precisely than this
+        // public-infrastructure report needs. Round before *any* follow-up
+        // call, so reverse geocoding/duplicate lookup receive the same
+        // ~11m precision documented for the report flow.
+        const latitude = Math.round(position.coords.latitude * 10_000) / 10_000;
+        const longitude = Math.round(position.coords.longitude * 10_000) / 10_000;
+        void selectCoordinates(latitude, longitude);
+      },
+      (error) => {
+        if (request !== geolocationRequest.current) return;
+        setGeolocating(false);
+        // 1 PERMISSION_DENIED, 3 TIMEOUT, everything else = unavailable.
+        if (error.code === 1) setGeolocationNotice(t.geolocationDenied);
+        else if (error.code === 3) setGeolocationNotice(t.geolocationTimeout);
+        else setGeolocationNotice(t.geolocationUnavailable);
+      },
+      // High accuracy matters here (a camera is a street-level object); a
+      // 60s cached fix is fine and saves battery on repeat taps.
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
+    );
+  }
+
   // Reverse-geocode prefill guard (CEO 2026-08-07): once the contributor
   // types, the address is theirs — later lookups must never overwrite it.
   // Defined here (not inline in the JSX) so the react-compiler eslint rule
@@ -216,5 +288,5 @@ export function useReportFlow({ setNotice, initialCoordinates = null }: { setNot
     } catch { setNotice(t.moderationUnavailable); }
   }
 
-  return { coordinates, setCoordinates, manualLatitude, setManualLatitude, manualLongitude, setManualLongitude, nearbyCandidates, nearbyLoading, nearbyError, selectCoordinates, selectManualCoordinates, submitReport, duplicateConfirmationRequired, duplicateConfirmed, setDuplicateConfirmed, kind, setKind, direction, setDirection, directionKnown, setDirectionKnown, address, setAddress, handleAddressChange, reverseGeocoding };
+  return { coordinates, setCoordinates, manualLatitude, setManualLatitude, manualLongitude, setManualLongitude, nearbyCandidates, nearbyLoading, nearbyError, selectCoordinates, selectManualCoordinates, geolocationAvailable, geolocating, geolocationNotice, requestMyPosition, submitReport, duplicateConfirmationRequired, duplicateConfirmed, setDuplicateConfirmed, kind, setKind, direction, setDirection, directionKnown, setDirectionKnown, address, setAddress, handleAddressChange, reverseGeocoding };
 }

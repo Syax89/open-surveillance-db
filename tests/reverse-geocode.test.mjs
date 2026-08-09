@@ -61,13 +61,18 @@ beforeEach(async () => {
 after(async () => cleanupRouteTree());
 
 test("cache miss: live lookup + the address is persisted under the rounded key", async () => {
-  stubFetch(() => nominatimReply("Via Roma 12, Ferrara, Italia"));
+  let upstreamUrl = "";
+  stubFetch((url) => {
+    upstreamUrl = url;
+    return nominatimReply("Via Roma 12, Ferrara, Italia");
+  });
   const db = await freshDb();
 
   const result = await reverseGeocode.reverseGeocode(db, 41.90282, 12.49638);
   assert.equal(result?.address, "Via Roma 12, Ferrara, Italia");
   assert.equal(result?.cached, false);
   assert.equal(fetchCalls, 1, "one live upstream call on a miss");
+  assert.match(upstreamUrl, /\/reverse\?lat=41\.9028&lon=12\.4964&/, "Nominatim receives only the documented rounded coordinate");
 
   // The reply is stored under the ROUNDED key (4 decimals).
   const row = await db.prepare("SELECT lat, lng, address FROM geocode_reverse_cache").first();

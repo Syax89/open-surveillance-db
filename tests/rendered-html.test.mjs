@@ -630,18 +630,19 @@ test("security headers reach HTML pages, API errors, 404s and the moderation gat
   }
 });
 
-test("the /mappa route allows geolocation=(self) for the locate button (t_18259daa)", async () => {
-  // The CEO asked for a floating locate button above the zoom controls on
-  // /mappa. The browser refuses to even prompt for the position unless the
-  // top-level document is allowed the geolocation feature, so the edge
-  // relaxes Permissions-Policy to `geolocation=(self)` on THIS route only.
-  // Privacy contract: the position stays client-side (never sent to the
-  // server), and camera/microphone remain blocked even on /mappa.
-  const { response } = await renderRoute("/mappa");
-  const pp = response.headers.get("permissions-policy") ?? "";
-  assert.match(pp, /geolocation=\(self\)/, "/mappa: geolocation allowed for the top-level document");
-  assert.match(pp, /camera=\(\)/, "/mappa: camera must stay denied");
-  assert.match(pp, /microphone=\(\)/, "/mappa: microphone must stay denied");
+test("the /mappa and /segnala routes allow geolocation=(self) for explicit location actions", async () => {
+  // The browser refuses to even prompt for a position unless the top-level
+  // document is allowed the geolocation feature. /mappa uses it for its
+  // client-only locate control; /segnala uses it only after an explicit
+  // one-tap request, then routes the rounded point through the report flow.
+  // Camera and microphone remain blocked on both routes.
+  for (const route of ["/mappa", "/segnala"]) {
+    const { response } = await renderRoute(route);
+    const pp = response.headers.get("permissions-policy") ?? "";
+    assert.match(pp, /geolocation=\(self\)/, `${route}: geolocation allowed for the top-level document`);
+    assert.match(pp, /camera=\(\)/, `${route}: camera must stay denied`);
+    assert.match(pp, /microphone=\(\)/, `${route}: microphone must stay denied`);
+  }
 });
 
 test("security headers do not overwrite a stricter app-level CSP", async () => {
