@@ -148,19 +148,31 @@ export async function confirmationCountsFor(cameraIds: number[]): Promise<Map<nu
   // whole endpoint. Query in chunks of at most 100 ids and merge the GROUP
   // BY results into one Map (same pattern as the correction-history events
   // in db/moderation.ts).
+  // The chunks are INDEPENDENT (disjoint id sets, read-only GROUP BY), so they
+  // are issued in parallel: a 2000-record page went from 20 serialized D1
+  // round-trips to one wave. Sequential awaits inside the loop were the
+  // dominant latency cost on large pages (40 round-trips per page counting
+  // communityActionCountsFor, 200 at the 10k bbox cap).
   const counts = new Map<number, number>();
+  const chunks: number[][] = [];
   for (let offset = 0; offset < cameraIds.length; offset += 100) {
-    const chunk = cameraIds.slice(offset, offset + 100);
-    const placeholders = chunk.map(() => "?").join(", ");
-    const result = await d1
-      .prepare(
-        `SELECT cc.camera_id AS cameraId, COUNT(*) AS count
+    chunks.push(cameraIds.slice(offset, offset + 100));
+  }
+  const chunkResults = await Promise.all(
+    chunks.map((chunk) => {
+      const placeholders = chunk.map(() => "?").join(", ");
+      return d1
+        .prepare(
+          `SELECT cc.camera_id AS cameraId, COUNT(*) AS count
          FROM camera_community_actions cc JOIN cameras c ON c.id = cc.camera_id
          WHERE cc.action_type = 'confirm' AND cc.camera_id IN (${placeholders}) AND (c.last_verified_at IS NULL OR cc.created_at >= c.last_verified_at)
          GROUP BY cc.camera_id`,
-      )
-      .bind(...chunk)
-      .all<{ cameraId: number; count: number }>();
+        )
+        .bind(...chunk)
+        .all<{ cameraId: number; count: number }>();
+    }),
+  );
+  for (const result of chunkResults) {
     for (const row of result.results) counts.set(row.cameraId, row.count);
   }
   return counts;

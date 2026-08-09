@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 import { listContributorSubmissions } from "../../../../../db/auth";
 import { resolveOptionalContributor } from "../../../../lib/auth-session";
-import { authLimit } from "../../../../lib/auth-route-helpers";
+import { sessionLimit } from "../../../../lib/auth-route-helpers";
 import { urlTooLong } from "../../../../lib/input-limits";
 
 /**
@@ -20,7 +20,10 @@ export async function GET(request: Request) {
     return Response.json({ error: "Request URI too long." }, { status: 414 });
   }
 
-  const blocked = await authLimit(request, env, "/api/auth/me/submissions");
+  // Session READ bucket (120/min), not the auth mutation bucket: this list is
+  // refetched on filter/page changes, and authLimit (10/min) 429'd a user
+  // after ~10 interactions. Mirrors GET /api/auth/me/contributions.
+  const blocked = await sessionLimit(request, env, "/api/auth/me/submissions");
   if (blocked) return blocked;
 
   try {
