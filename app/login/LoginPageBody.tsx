@@ -11,21 +11,22 @@ import { hardNavigate } from "../lib/navigate";
 /**
  * /login — multi-method sign-in (Fase E2, design review).
  *
- * Three methods, ALL visible at once as stacked coherent-box cards in the
- * order the CEO asked for (2026-08-08: passkey, email + password, Google):
- *  1. Passkey — WebAuthn ceremony client-side: POST /login/begin (optional
+ * Email + password is the primary sign-in flow. Passkey and configured OIDC
+ * providers remain visible as compact alternatives in the same auth card:
+ *  1. Email + password — the original form, unchanged behaviour.
+ *  2. Passkey — WebAuthn ceremony client-side: POST /login/begin (optional
  *     email narrows the ceremony to that account, anti-enumeration server
  *     side), navigator.credentials.get(), POST /login/complete. A cancelled
  *     ceremony (NotAllowedError) is a silent abort, not an error.
- *  2. Email + password — the original form, unchanged behaviour.
- *  3. Google (OIDC, Fase D / ADR 0020 decision 4) — plain GET navigations
- *     to the /start routes (302 to the provider). The disclosure note below
- *     the buttons IS the privacy requirement: the provider tracking surface
- *     and the EU-US DPF transfer are declared on the login page
+ *  3. Configured OIDC providers (Fase D / ADR 0020 decision 4) — plain GET
+ *     navigations to the /start routes (302 to the provider). The disclosure
+ *     below the buttons IS the privacy requirement: the provider tracking
+ *     surface and the EU-US DPF transfer are declared on the login page
  *     (AUTH_OPTIONS.md §4a).
  *
- * Every card carries its own submit — there is no selector, so all three
- * options are immediately visible without any interaction.
+ * All methods stay immediately available without a selector. The outer auth
+ * card is the only visual tile; semantic sections preserve the heading and
+ * keyboard order without introducing nested cards.
  *
  * The OIDC callback can land back here with two query markers:
  *  - ?merge=<token>  — the provider's VERIFIED email collides with an
@@ -302,10 +303,77 @@ export function LoginPageBody() {
           <>
             <p className="record-detail-summary">{t.anonymousNote}</p>
 
-            <div className="auth-methods">
-              {/* 1. Passkey — always visible, first in the CEO's order. */}
-              <section className="auth-method-card" aria-labelledby="auth-method-passkey-title">
-                <h2 id="auth-method-passkey-title">{t.methodPasskey}</h2>
+            {/* Email + password is the primary, immediately available sign-in flow. */}
+            <section className="auth-primary" aria-labelledby="auth-method-password-title">
+              <h2 id="auth-method-password-title">{t.methodPassword}</h2>
+              <form className="auth-form" onSubmit={onSubmit} noValidate>
+                <label className="auth-field">
+                  <span>{t.email}</span>
+                  <input
+                    type="email"
+                    name="email"
+                    autoComplete="email"
+                    required
+                    aria-invalid={fieldErrors.email || undefined}
+                    value={email}
+                    onChange={(event) => {
+                      setEmail(event.target.value);
+                      if (fieldErrors.email) setFieldErrors((f) => ({ ...f, email: undefined }));
+                    }}
+                  />
+                </label>
+                <label className="auth-field">
+                  <span>{t.password}</span>
+                  <input
+                    type="password"
+                    name="password"
+                    autoComplete="current-password"
+                    required
+                    minLength={10}
+                    aria-invalid={fieldErrors.password || undefined}
+                    value={password}
+                    onChange={(event) => {
+                      setPassword(event.target.value);
+                      if (fieldErrors.password) setFieldErrors((f) => ({ ...f, password: undefined }));
+                    }}
+                  />
+                </label>
+                <p className="auth-forgot">
+                  <Link href="/forgot-password">{t.forgotPassword}</Link>
+                </p>
+                {/* Static verification note (t_6dc1c96f, CEO feedback
+                    2026-08-03): login is blocked until the email is verified
+                    and the API answers the same generic 401 for every
+                    failure (anti-enumeration). This copy is shown to
+                    everyone, so it explains in advance why a correct
+                    password can be rejected right after registering —
+                    without ever revealing account existence. */}
+                <p className="record-detail-summary">{t.loginVerifyHint}</p>
+                {error ? <p className="auth-error" role="alert">{error}</p> : null}
+                <button className="button button-primary" type="submit" disabled={submitting}>
+                  {submitting ? t.loading : t.login}
+                </button>
+                {/* Per-method risk disclosure (P1-4 design review — the risk
+                    matrix is per-method, ADR 0020 d.6): the password method
+                    declares its PII + phishing surface, exactly like the
+                    passkey and OIDC alternatives below. */}
+                <p className="oidc-disclosure auth-method-disclosure">
+                  <span className="sr-only">{t.methodDisclosureLabel}: </span>
+                  {t.passwordDisclosure}
+                </p>
+              </form>
+            </section>
+
+            <div className="auth-divider" role="separator" aria-label={t.loginOr}>
+              <span aria-hidden="true">{t.loginOr}</span>
+            </div>
+
+            <section className="auth-alternatives" aria-labelledby="auth-alternatives-title">
+              <h2 id="auth-alternatives-title" className="auth-alternatives-title">{t.loginAlternatives}</h2>
+
+              {/* Passkey — always available without making it a nested card. */}
+              <section className="auth-alternative" aria-labelledby="auth-method-passkey-title">
+                <h3 id="auth-method-passkey-title">{t.methodPasskey}</h3>
                 <form className="auth-form" onSubmit={onPasskeyLogin} noValidate>
                   <label className="auth-field">
                     <span>{t.passkeyEmailOptional}</span>
@@ -333,75 +401,13 @@ export function LoginPageBody() {
                 </form>
               </section>
 
-              {/* 2. Email + password — always visible. */}
-              <section className="auth-method-card" aria-labelledby="auth-method-password-title">
-                <h2 id="auth-method-password-title">{t.methodPassword}</h2>
-                <form className="auth-form" onSubmit={onSubmit} noValidate>
-                  <label className="auth-field">
-                    <span>{t.email}</span>
-                    <input
-                      type="email"
-                      name="email"
-                      autoComplete="email"
-                      required
-                      aria-invalid={fieldErrors.email || undefined}
-                      value={email}
-                      onChange={(event) => {
-                        setEmail(event.target.value);
-                        if (fieldErrors.email) setFieldErrors((f) => ({ ...f, email: undefined }));
-                      }}
-                    />
-                  </label>
-                  <label className="auth-field">
-                    <span>{t.password}</span>
-                    <input
-                      type="password"
-                      name="password"
-                      autoComplete="current-password"
-                      required
-                      minLength={10}
-                      aria-invalid={fieldErrors.password || undefined}
-                      value={password}
-                      onChange={(event) => {
-                        setPassword(event.target.value);
-                        if (fieldErrors.password) setFieldErrors((f) => ({ ...f, password: undefined }));
-                      }}
-                    />
-                  </label>
-                  <p className="auth-forgot">
-                    <Link href="/forgot-password">{t.forgotPassword}</Link>
-                  </p>
-                  {/* Static verification note (t_6dc1c96f, CEO feedback
-                      2026-08-03): login is blocked until the email is verified
-                      and the API answers the same generic 401 for every
-                      failure (anti-enumeration). This copy is shown to
-                      everyone, so it explains in advance why a correct
-                      password can be rejected right after registering —
-                      without ever revealing account existence. */}
-                  <p className="record-detail-summary">{t.loginVerifyHint}</p>
-                  {error ? <p className="auth-error" role="alert">{error}</p> : null}
-                  <button className="button button-primary" type="submit" disabled={submitting}>
-                    {submitting ? t.loading : t.login}
-                  </button>
-                  {/* Per-method risk disclosure (P1-4 design review — the risk
-                      matrix is per-method, ADR 0020 d.6): the password method
-                      declares its PII + phishing surface, exactly like the
-                      passkey and OIDC panels below. */}
-                  <p className="oidc-disclosure auth-method-disclosure">
-                    <span className="sr-only">{t.methodDisclosureLabel}: </span>
-                    {t.passwordDisclosure}
-                  </p>
-                </form>
-              </section>
-
-              {/* 3. Google (OIDC) — server-gated on configured providers
-                  (design review 2026-08-08, F1): the card renders only after
-                  GET /api/auth/oidc/providers answers a non-empty list. In
-                  SSR the social card is absent (fail-closed); it appears
-                  client-side once the discovery resolves. */}
+              {/* Configured OIDC providers render only after GET
+                  /api/auth/oidc/providers answers a non-empty list. In SSR
+                  this alternative is absent (fail-closed); it appears
+                  client-side once discovery resolves. */}
               {socialAvailable ? (
-                <section className="auth-method-card" aria-labelledby="auth-method-social-title">
-                  <h2 id="auth-method-social-title">{t.methodSocialTitle}</h2>
+                <section className="auth-alternative" aria-labelledby="auth-method-social-title">
+                  <h3 id="auth-method-social-title">{t.methodSocialTitle}</h3>
                   <div className="oidc-panel">
                     <div className="oidc-buttons">
                       {oidcProviders?.includes("github") ? (
@@ -422,7 +428,7 @@ export function LoginPageBody() {
                   </div>
                 </section>
               ) : null}
-            </div>
+            </section>
 
             <p className="auth-switch">
               {t.noAccount}{" "}

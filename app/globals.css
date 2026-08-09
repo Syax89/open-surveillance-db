@@ -1157,19 +1157,21 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 .auth-danger-zone .button:hover { background:var(--danger-bg); border-color:var(--danger-button-hover-border); }
 .auth-danger-zone .button:disabled { opacity:.55; cursor:progress; }
 
-/* Multi-method auth (Fase E2 — design review; CEO 2026-08-08): the three
-   sign-in blocks on /login are ALL visible at once, stacked in the order
-   passkey → email + password → social. Each block is a coherent-box card
-   (white bg + scoped darker border + soft shadow, same family as the
-   record-list cards — the accepted #269 pattern); passkey management +
-   recovery codes on /account keep the hint style below. */
-.auth-methods { display:grid; gap:18px; margin:26px 0 6px; }
-.auth-method-card { padding:24px 26px 26px; border:1px solid var(--card-border); border-radius:var(--radius-lg); background:var(--white); box-shadow:0 1px 2px rgba(16,35,50,.05), 0 6px 16px rgba(16,35,50,.06); }
-.auth-method-card h2 { margin:0 0 4px; color:var(--ink); font-size:var(--text-3xl); letter-spacing:-.035em; line-height:1.15; font-weight:800; }
-.auth-method-card .auth-form { margin:18px 0 0; }
-.auth-method-card .oidc-panel { margin:18px 0 0; }
-.auth-method-card .record-detail-summary { margin:12px 0; color:var(--muted); font-size:var(--text-md); line-height:1.5; }
-.auth-method-hint { margin:0; color:var(--muted); font-size:var(--text-sm); line-height:1.5; }
+/* Single-tile multi-method login: the outer .auth-card remains the only
+   bordered surface. Email + password is the primary section; a localized
+   divider introduces compact, semantic alternatives without nested cards. */
+.auth-primary h2, .auth-alternatives-title { margin:0; color:var(--ink); font-size:var(--text-3xl); letter-spacing:-.035em; line-height:1.15; font-weight:800; }
+.auth-primary .auth-form { margin:18px 0 0; }
+.auth-primary .record-detail-summary { margin:12px 0; color:var(--muted); font-size:var(--text-md); line-height:1.5; }
+.auth-divider { display:flex; align-items:center; gap:var(--space-3); margin:30px 0 22px; color:var(--muted); font-size:var(--text-sm); font-weight:800; line-height:1; }
+.auth-divider::before, .auth-divider::after { content:""; flex:1; height:1px; background:var(--line); }
+.auth-divider span { flex:none; }
+.auth-alternatives { display:grid; gap:var(--space-4); }
+.auth-alternative { padding-top:var(--space-4); border-top:1px solid var(--line); }
+.auth-alternative h3 { margin:0; color:var(--ink); font-size:var(--text-xl); letter-spacing:-.02em; line-height:1.2; font-weight:800; }
+.auth-alternative .auth-form { gap:14px; margin:14px 0 0; }
+.auth-alternative .oidc-panel { margin:14px 0 0; }
+.auth-alternative .auth-method-disclosure { margin-top:12px; }
 .oidc-panel { margin:30px 0 8px; }
 .oidc-buttons { display:grid; gap:10px; }
 .oidc-button { justify-content:center; width:100%; }
