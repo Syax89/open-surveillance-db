@@ -1,169 +1,69 @@
-# SurveillanceMap.tsx — Refactoring Plan
+# SurveillanceMap.tsx — refactoring analysis
 
-## Current State (post-commit 44e8991)
+## Current state (verified 2026-08-09)
 
-- **929 lines** (was 951)
-- **10 useEffect** (was 16, -37%)
-- **✅ useLatest applied** — 6 manual ref-sync useEffect eliminated
+- **929 lines**, **10 `useEffect`** (was 951 / 16)
+- `useLatest()` applied and live — it replaced six hand-written
+  `useRef(value)` + `useEffect(() => { ref.current = value }, [value])` pairs.
+  That is the only extraction currently in the codebase.
 
-## Remaining Complexity
+## What was attempted and reverted
 
-### God Component Anti-patterns Still Present
+A first pass extracted four more hooks (`useLeafletMap`, `useGeolocation`,
+`useMarkerLayer`, `useFOVLayer`). **They were removed again**, because they were
+written from the shape of the original effects rather than from the real APIs
+they had to call. Concretely, the extracted code:
 
-1. **Two monster useEffect**
-   - Line ~631-842: **211 lines** — marker population + reconciliation
-   - Line ~395-574: **179 lines** — map creation + 5 event handlers + custom control
+- mounted the popup widget into `.osm-popup-actions-mount` — that selector does
+  not exist. The real mount node is `.osm-popup-community`, emitted by
+  `app/lib/map-popup.ts` with a `data-record-id` attribute.
+- styled field-of-view geometry with `.osm-fov-circle` / `.osm-fov-wedge` —
+  neither exists in `globals.css`. The real classes are `.fov-cone` plus the
+  record status (`.fov-cone.verified`, …), and the colour comes from CSS, never
+  from JS.
+- built the marker class as `status-${camera.status}`, dropping the
+  `isPublicStatus()` whitelist that exists as defence in depth so a non-public
+  status can never style a marker.
+- looked the map container up with `document.getElementById("surveillance-map")`
+  — there is no such id; the component owns a React ref on `.live-map`.
+- left `npx tsc --noEmit` **red** (`use-marker-layer.ts`: `originalEvent` does
+  not exist on `LeafletEvent`), against a green baseline.
 
-2. **Mixed concerns**
-   - Leaflet imperative DOM (outside React tree)
-   - React widget mount inside Leaflet popup
-   - Custom controls with inline event listeners
-   - Geolocation with direct `aria-pressed` DOM writes
+None of the four was imported anywhere, so the running app was unaffected — they
+were dead code carrying a type regression. Lesson: an extraction must be written
+against the selectors, helper signatures and guards actually present in the
+file, and it is only finished when it is *imported* and the suite is green.
 
-3. **Business logic inline**
-   - 70 lines of geolocation (should be `useGeolocation()`)
-   - Grid aggregation mixed with marker rendering
-   - Popup HTML generation inline
+## Where the complexity actually is
 
-## Extraction-Ready Hooks (Already Created)
+Two effects hold most of it:
 
-Located in `app/lib/hooks/`:
+| Lines | Effect | Responsibilities |
+|---|---|---|
+| ~211 | marker population | desired-set computation, badge/marker reconcile, popup restore intent, widget remount |
+| ~179 | map creation | lazy Leaflet import, tile layer, 3 layer groups, custom geolocate control, 5 event handlers, cleanup |
 
-### 1. `useLatest.ts` ✅ **APPLIED**
-- **22 lines**
-- Eliminates stale-closure bugs
-- Replace `useRef(value) + useEffect sync` pattern
+Both are heavily commented with the reasoning behind specific behaviours
+(popup lifecycle, restore-vs-filter classification, grid aggregation). Those
+comments encode contracts that are enforced by tests — read them before moving
+any of that logic.
 
-### 2. `useGeolocation.ts` ⏳ **READY**
-- **108 lines**
-- Manages user position layer + accuracy circle
-- Handles geolocation API + errors + button state
-- **Dependencies**: `mapRef`, `leafletRef`, `userLayerRef`, `geoButtonRef`, `geoActiveRef`
+## Preconditions for a real extraction
 
-### 3. `useLeafletMap.ts` ⏳ **READY**
-- **192 lines**
-- Map creation + tile layer
-- Layer groups (markers, FOV, user location)
-- Custom controls (zoom, geolocate button)
-- Viewport bounds sync (debounced)
-- **Extracts**: 180-line map creation useEffect
+The component is functional; this is optimisation, not a bug fix. Before
+touching the two big effects:
 
-### 4. `useMarkerLayer.ts` ⏳ **READY**
-- **226 lines**
-- Marker population from `markersForViewport()`
-- Reconciliation: diff existing vs desired, keep/add/remove
-- Grid badges vs individual markers
-- Popup lifecycle + React widget mount
-- **Extracts**: 211-line marker population useEffect
+1. `npm test` green as a baseline (2261 pass at the time of writing) and
+   `npx tsc --noEmit` exit 0.
+2. Coverage for the behaviours the comments describe: one popup per marker
+   click, zero popups on pan/zoom, open popup survives a rebuild, grid badge
+   click zooms instead of opening the picker, `?focus=` deep link opens once.
+3. Extract one effect at a time, import it immediately, and re-run types +
+   suite before the next one. An unimported hook proves nothing.
 
-### 5. `useFOVLayer.ts` ⏳ **READY**
-- **79 lines**
-- Field-of-view cones (directional cameras)
-- Field-of-view circles (domes)
-- Performance contract: only above z12, only in viewport
-- **Extracts**: 35-line FOV useEffect
+## Cheaper wins that do not require this refactor
 
-## Refactoring Strategy
-
-### Phase 1: Conservative (✅ DONE)
-- Apply `useLatest` to eliminate ref-sync hell
-- **Risk**: minimal (no logic changes)
-- **Gain**: -6 useEffect, cleaner code
-
-### Phase 2: Extract Self-Contained Logic (NEXT)
-**Pre-requisites**: Test coverage for critical paths
-1. Extract `useGeolocation` (self-contained, 70 lines)
-2. Extract `useFOVLayer` (simple, read-only, 35 lines)
-3. Verify both in isolation
-
-**Risk**: low (both are side-effect only, no shared state)  
-**Gain**: -2 useEffect, -105 lines from main component
-
-### Phase 3: Extract Map Creation (REQUIRES TESTS)
-**Pre-requisites**: Integration tests for map lifecycle
-1. Extract `useLeafletMap` (complex: creates map + controls + events)
-2. Verify map creation, controls, bounds sync
-3. Test cleanup on unmount
-
-**Risk**: medium (touches initialization path)  
-**Gain**: -1 useEffect (180 lines), isolates Leaflet setup
-
-### Phase 4: Extract Marker Layer (HIGH RISK)
-**Pre-requisites**: Full test suite + visual regression tests
-1. Extract `useMarkerLayer` (211 lines, highest complexity)
-2. Verify reconciliation logic (keep markers with open popups)
-3. Verify grid aggregation
-4. Verify popup widget mount/unmount
-5. Test edge cases: viewport changes, filter changes, selection changes
-
-**Risk**: high (core UX logic, many edge cases)  
-**Gain**: -1 useEffect (211 lines), biggest complexity reduction
-
-### Phase 5: Final Cleanup
-1. Simplify component to pure orchestration (~150 lines)
-2. Document hook contracts
-3. Add integration tests for hook interactions
-
-## Testing Requirements (Before Phase 3+)
-
-### Unit Tests Needed
-- [ ] `useLatest`: ref updates without effect retriggering
-- [ ] `useGeolocation`: position fetch, error handling, button state
-- [ ] `useFOVLayer`: geometry rendering, zoom threshold, viewport filtering
-
-### Integration Tests Needed
-- [ ] Map creation + initial viewport
-- [ ] Marker population from empty → 100 cameras
-- [ ] Marker reconciliation: keep open popup on rebuild
-- [ ] Grid aggregation: switch between badges and individual markers
-- [ ] Selection: marker icon change + popup open + pan into view
-- [ ] Geolocation: button toggle, layer clear, pan to position
-
-### Visual Regression Tests Needed
-- [ ] Marker styles (status colors, selected state)
-- [ ] Grid badge appearance
-- [ ] FOV geometry (cones, circles)
-- [ ] Popup layout + widget mount
-- [ ] Mobile responsive behavior
-
-## Migration Path (When Ready)
-
-1. **Create `SurveillanceMap.new.tsx`** using all 5 hooks
-2. **A/B test** in development (feature flag)
-3. **Monitor** for regressions (popup behavior, selection, grid)
-4. **Replace** original when stable
-5. **Delete** hooks if unified component is better
-
-## Estimated Effort
-
-- **Phase 2** (geolocation + FOV): 2-4 hours + tests
-- **Phase 3** (map creation): 4-6 hours + tests
-- **Phase 4** (marker layer): 8-12 hours + tests (highest risk)
-- **Phase 5** (cleanup): 2-3 hours
-
-**Total**: ~20-30 hours with comprehensive test coverage
-
-## Decision: Proceed or Defer?
-
-**Defer if**:
-- Current component works reliably in production
-- No active bugs in map behavior
-- Team velocity prioritizes new features over refactoring
-
-**Proceed if**:
-- Map bugs are frequent (popup lifecycle, selection state)
-- New map features are blocked by complexity
-- Onboarding new developers is slowed by 929-line file
-- Test coverage is already strong
-
-## Notes
-
-- Hooks are **extraction-ready**, not experimental
-- `useMarkerLayer` is the **highest-value target** (211 lines, highest complexity)
-- Current component is **functional** — refactoring is optimization, not bug fix
-- Risk increases with each phase — stop if tests reveal edge cases
-
----
-
-**Author**: Refactoring audit 2026-08-09  
-**Status**: Phase 1 complete, Phase 2+ deferred pending test coverage
+- The reconcile already diffs instead of calling `clearLayers()`; do not
+  regress that for readability.
+- Marker/FOV work is already viewport- and zoom-gated. Any change here must be
+  benchmarked against the real dataset (40k records), not a fixture.
