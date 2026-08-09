@@ -926,3 +926,70 @@ export const registrationIpLog = sqliteTable(
     index("registrations_ip_log_ip_created_idx").on(table.ipHash, table.createdAt),
   ],
 );
+
+/**
+ * Per-contributor private write API keys (EPIC api-keys, decisions D1-D13
+ * approved 2026-08-09 — docs/decisions/ADR 0022, migration 0045).
+ *
+ * Authenticate the write API for scripts and tools without a browser
+ * session. Read API stays keyless by design (D1).
+ *
+ * Security properties (D2/D3), following the same rules as db/auth.ts:
+ *  - The raw key (`osdb_` + 32 random bytes base64url, D2) is NEVER stored:
+ *    only its SHA-256 hex (`key_hash`, globally UNIQUE — D3) plus the first
+ *    10 chars (`key_prefix`) for display. A database leak cannot replay a
+ *    key, and the raw value exists in exactly one API response (the mint
+ *    POST, reveal-once, Cache-Control: no-store).
+ *  - `scopes` is the JSON array of write scopes the key grants (D4):
+ *    `["submit","confirm","edit","action"]` — family-level, default all
+ *    four at mint, code-validated whitelist (never free-form).
+ *  - Soft revoke via `revoked_at` (DELETE endpoint); a revoked key is dead
+ *    even if its hash is known. `expires_at` is optional (NULL = never,
+ *    default +365d at mint, D6); expired keys answer 401.
+ *  - `last_used_at` is throttled (updated at most every 5 minutes, D7) and
+ *    ISO-8601 UTC TEXT like every other timestamp in this project (never
+ *    SQLite `datetime('now')`).
+ *  - The `contributor_id` FK is ON DELETE CASCADE (account erasure removes
+ *    the keys — art. 17, D9); the erasure batch in db/auth.ts mirrors the
+ *    delete because the test harness does not enforce foreign keys (same
+ *    rule as `sessions` and `camera_community_actions`).
+ *
+ * Declared here so drizzle-kit generate never re-emits it (convention
+ * 0012/0014: hand-written migration + schema declaration together).
+ */
+export const apiKeys = sqliteTable(
+  "api_keys",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    contributorId: integer("contributor_id")
+      .notNull()
+      .references(() => contributors.id, { onDelete: "cascade" }),
+    // User label, 1..60 chars (code-validated at mint).
+    name: text("name").notNull(),
+    // First 10 chars of the raw key — display only, never authenticates.
+    keyPrefix: text("key_prefix").notNull(),
+    // SHA-256 hex of the full raw key (D3). UNIQUE via api_keys_key_hash_unique.
+    keyHash: text("key_hash").notNull(),
+    // JSON array ["submit","confirm","edit","action"] (D4, code-validated).
+    scopes: text("scopes").notNull(),
+    createdAt: text("created_at").notNull(),
+    // Throttled (≥5 min, D7); NULL until the key is first used.
+    lastUsedAt: text("last_used_at"),
+    // NULL = never; default +365d at mint (D6). Expired → 401.
+    expiresAt: text("expires_at"),
+    // Soft revoke (D9). NULL = active.
+    revokedAt: text("revoked_at"),
+  },
+  (table) => [
+    // Lookup key for every authenticated request: hash the presented Bearer
+    // token and point-lookup by key_hash (constant-time compare in code).
+    uniqueIndex("api_keys_key_hash_unique").on(table.keyHash),
+    // "My keys" list, cap-5 COUNT and erasure all filter on contributor_id.
+    index("api_keys_contributor_idx").on(table.contributorId),
+    // R21 retention sweep (90d after revoked/expired) filters on
+    // (revoked_at, expires_at); the liveness predicate in the gate
+    // (revoked_at IS NULL AND (expires_at IS NULL OR expires_at > ?))
+    // also reads it.
+    index("api_keys_liveness_idx").on(table.revokedAt, table.expiresAt),
+  ],
+);
