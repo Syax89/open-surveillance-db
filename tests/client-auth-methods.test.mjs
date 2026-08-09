@@ -136,7 +136,7 @@ test("login: one tile makes email+password primary, then passkey and OIDC altern
 
   // The configured OIDC alternative appears only after provider discovery.
   await waitFor(() => assert.ok(screen.getByRole("link", { name: "Continue with GitHub" })));
-  const socialHeading = screen.getByRole("heading", { name: "Google", level: 3 });
+  const socialHeading = screen.getByRole("heading", { name: "Sign in with a provider", level: 3 });
   assert.ok(alternatives.contains(socialHeading));
   assert.ok(screen.getByRole("link", { name: "Continue with Google" }));
 });

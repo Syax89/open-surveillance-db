@@ -96,7 +96,7 @@ export const en = {
   // a localized divider as alternatives within the same auth card.
   methodPassword: "Email + password",
   methodPasskey: "Passkey",
-  methodSocialTitle: "Google",
+  methodSocialTitle: "Sign in with a provider",
   loginOr: "or",
   loginAlternatives: "Other ways to sign in",
   // Passkey login (Fase C).
@@ -329,7 +329,7 @@ export const it: Translation<typeof en> = {
   // restano visibili sotto un divisore localizzato come alternative nella stessa card.
   methodPassword: "Email e password",
   methodPasskey: "Passkey",
-  methodSocialTitle: "Google",
+  methodSocialTitle: "Accedi con un provider esterno",
   loginOr: "oppure",
   loginAlternatives: "Altri modi per accedere",
   // Accesso con passkey (Fase C).

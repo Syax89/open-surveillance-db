@@ -402,9 +402,9 @@ function assertControlsLabeled(html, where) {
 
 test("every login form control has an accessible name (wrapping label)", async () => {
   const { html } = await renderRoute("/login");
-  const form = html.match(/<form class="auth-form"[\s\S]*?<\/form>/);
-  assert.ok(form, "login form must render");
-  assertControlsLabeled(form[0], "login");
+  const forms = [...html.matchAll(/<form class="auth-form"[\s\S]*?<\/form>/g)].map((match) => match[0]);
+  assert.equal(forms.length, 2, "normal login renders independent password and passkey forms");
+  forms.forEach((form, index) => assertControlsLabeled(form, `login form ${index + 1}`));
 });
 
 test("every register form control has an accessible name (wrapping label)", async () => {
