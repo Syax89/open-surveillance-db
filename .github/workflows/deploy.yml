@@ -10,7 +10,7 @@ name: Deploy Cloudflare
 #   push:
 #     tags: ["v*"]
 #
-# (decisione tag-only vs push su main: da confermare con Ada).
+# (decisione tag-only vs push su main: da confermare con il maintainer).
 #
 # Modalità:
 #   dry-run (default) — verifica migrazioni pendenti e bundle del worker

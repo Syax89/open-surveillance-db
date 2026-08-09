@@ -1,6 +1,7 @@
 # Pull request
 
-> Template for PR review (also used by Ada, CTO, as the review checklist).
+> Template for PR review (also used as the review checklist by the project
+> maintainer).
 > PRs touching UI/UX/frontend components are subject to the **Design
 > compliance** section — the design-system source of truth is
 > [`docs/FRONTEND_DESIGN.md`](../docs/FRONTEND_DESIGN.md) (v2, 2026-08-02).
@@ -33,7 +34,7 @@
 - [ ] Legacy redirects (`/#map`, `/#records`) stay client-side
       (`LegacyAnchorRedirect`) — do not go back to a server-side 302 (D8).
 
-### Code and architecture (Ada review)
+### Code and architecture (maintainer review)
 
 - [ ] Conventional commits (`feat|fix|docs|test|refactor(scope):`), one scope
       per PR.

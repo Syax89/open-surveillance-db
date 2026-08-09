@@ -28,7 +28,7 @@ npm run build
 
 Every change (code or docs) goes through a branch + PR and is reviewed before
 merge. Fill the [PR template](.github/PULL_REQUEST_TEMPLATE.md) — it is also
-the review checklist used by the CTO.
+the review checklist used by the project maintainer.
 
 PRs that touch UI, UX, or frontend components must additionally pass the
 **Design compliance** section of the template. The binding source of truth is
