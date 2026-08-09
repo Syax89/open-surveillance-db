@@ -6,11 +6,15 @@ name: Ops Backup D1
 # GitHub privato del run. La passphrase vive SOLO in secrets.BACKUP_PASSPHRASE.
 # Questo workflow non esegue mai deploy e non tocca il worker in produzione.
 #
-# Guard fail-fast: i secrets Cloudflare (CLOUDFLARE_API_TOKEN/ACCOUNT_ID)
-# servono solo al backup del D1 remoto, che è operativo SOLO dopo il deploy
-# pubblico (ADR 0012, DEPLOYMENT.md). Fino ad allora il run si ferma qui con
-# errore chiaro: l'ambiente attivo è il test container self-hosted e il suo backup è
-# gestito da ops/backup-lxc114.sh (OPERATIONS.md §8).
+# Guard fail-fast: i secrets Cloudflare (CLOUDFLARE_API_TOKEN/ACCOUNT_ID) e il
+# database_id reale (D1_DATABASE_ID, iniettato da secret GitHub come in
+# deploy.yml) servono solo al backup del D1 remoto, che è operativo SOLO dopo
+# il deploy pubblico (ADR 0012, DEPLOYMENT.md). Fino ad allora il run si ferma
+# qui con errore chiaro: l'ambiente attivo è il test container self-hosted e
+# il suo backup è gestito da ops/backup-lxc114.sh (OPERATIONS.md §8).
+#
+# Attivazione: `gh variable set ENABLE_CF_BACKUP true` (vedi OPERATIONS.md §3.2);
+# il job notturno salta finché la variabile non è "true".
 
 on:
   schedule:
@@ -57,6 +61,18 @@ jobs:
             exit 1
           fi
           echo "Secrets Cloudflare: OK"
+
+      - name: Inject D1 database_id from GitHub secret (fail-fast, mai export su DB placeholder)
+        env:
+          D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
+        run: |
+          if [ -z "${D1_DATABASE_ID}" ]; then
+            echo "::error::Secret GitHub D1_DATABASE_ID mancante. Prima di attivare il backup remoto (ENABLE_CF_BACKUP=true):"
+            echo "  gh secret set D1_DATABASE_ID"
+            exit 1
+          fi
+          sed -i "s/00000000-0000-4000-8000-000000000000/${D1_DATABASE_ID}/" wrangler.jsonc
+          echo "database_id: iniettato dal secret GitHub (mai committato)"
 
       - name: Export D1 remoto (schema + dati)
         id: export

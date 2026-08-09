@@ -3,7 +3,9 @@ name: Ops Monitoring
 # Health check periodico dell'ambiente di produzione (docs/OPERATIONS.md §2).
 # Su failure apre una issue GitHub: canale di alerting primario.
 # Nessun segreto in questo file; l'URL di produzione arriva da una
-# repository variable (PROD_URL), non hardcoded.
+# repository variable (PROD_URL), non hardcoded. PROD_URL_ALT (opzionale)
+# abilita il dual-check su una seconda URL (audit ops 2026-08-09: l'ambiente
+# attivo è passato da workers.dev a osdb.syaxhome89.com via NPM→LXC).
 
 # GITHUB_TOKEN: scope minimo = checkout (contents: read) + apertura issue
 # (issues: write). Senza questo blocco il token default e' read-only e lo
@@ -37,6 +39,7 @@ jobs:
         shell: bash
         env:
           PROD_URL: ${{ vars.PROD_URL }}
+          PROD_URL_ALT: ${{ vars.PROD_URL_ALT }}
         run: |
           set -u
           if [ -z "${PROD_URL:-}" ]; then
@@ -44,21 +47,32 @@ jobs:
             exit 2
           fi
           fail=0
-          for path in "/" "/api/cameras"; do
-            code=$(curl -sS -o /tmp/hc_body -w '%{http_code}' --max-time 20 "https://${PROD_URL}${path}" || echo 000)
-            echo "GET ${path} -> ${code}"
-            if [ "$code" != "200" ]; then
-              echo "::error::health check FAILED su ${path} (HTTP ${code})"
+          # Audit ops 2026-08-09: l'ambiente attivo è NPM→LXC su
+          # osdb.syaxhome89.com (non più workers.dev). Il check gira su PROD_URL
+          # (primaria) e, se configurata, anche su PROD_URL_ALT (dual-check):
+          # entrambe devono passare o il run fallisce e apre l'issue.
+          hosts=("$PROD_URL")
+          if [ -n "${PROD_URL_ALT:-}" ]; then
+            hosts+=("$PROD_URL_ALT")
+          fi
+          for host in "${hosts[@]}"; do
+            echo "== host ${host} =="
+            for path in "/" "/api/cameras"; do
+              code=$(curl -sS -o /tmp/hc_body -w '%{http_code}' --max-time 20 "https://${host}${path}" || echo 000)
+              echo "GET ${path} -> ${code}"
+              if [ "$code" != "200" ]; then
+                echo "::error::health check FAILED su ${host}${path} (HTTP ${code})"
+                fail=1
+              fi
+            done
+            # Fail-closed: la moderazione NON deve mai rispondere 200 senza auth
+            code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "https://${host}/api/moderation" || echo 000)
+            echo "GET /api/moderation -> ${code}"
+            if [ "$code" = "200" ]; then
+              echo "::error::gate moderazione APERTO senza credenziali (fail-closed violato) su ${host}"
               fail=1
             fi
           done
-          # Fail-closed: la moderazione NON deve mai rispondere 200 senza auth
-          code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "https://${PROD_URL}/api/moderation" || echo 000)
-          echo "GET /api/moderation -> ${code}"
-          if [ "$code" = "200" ]; then
-            echo "::error::gate moderazione APERTO senza credenziali (fail-closed violato)"
-            fail=1
-          fi
           echo "status=$fail" >> "$GITHUB_OUTPUT"
           exit "$fail"
 
