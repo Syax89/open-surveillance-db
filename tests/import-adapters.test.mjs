@@ -641,6 +641,7 @@ test("licence-gate: FR (Licence Ouverte), ES (CC-BY), NL (CC0) descriptors are i
   assert.equal(isLicenceImportable("CC-BY"), true);
   assert.equal(isLicenceImportable("CC0 1.0"), true);
   assert.equal(isLicenceImportable("CC BY 4.0"), true);
+  assert.equal(isLicenceImportable("CC BY 4.0 (NZ)"), true); // Wellington WCC
 });
 
 // -------------------------------------------------- wave 4 (catalog.csv 2026-08-08): NO / UK / FI / US-NY
