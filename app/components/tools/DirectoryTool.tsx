@@ -39,6 +39,18 @@ import { ExploreViewSwitch } from "../ExploreViewSwitch";
  * below, on the same row as the data policy link (CEO 2026-08-08: "in basso
  * e più piccoli, sulla riga di 'Read the data policy'") — filter-aware via
  * exportHref(), no buttons in the results header.
+ *
+ * Data walk vs server-side pagination (kanban t_b6cbb655, P2 audit
+ * 2026-08-09 — DOCUMENTED, deliberately NOT changed): the tool reads the
+ * WHOLE public list through usePublicCameras (module-cached walk) while the
+ * visible list is sliced client-side to 20 rows. Server-side limit/offset
+ * pagination would break the catalog semantics the page depends on — the
+ * A–Z index, the client-side q/sort dimensions and the results count all
+ * need the full filtered set, and the walk is already rate-limit-safe since
+ * #386: PAGE_LIMIT 2000 → ~17 requests for a 32k dataset (was 64 at
+ * limit 500, over the 60/min read bucket). Do not "optimise" this into
+ * server-side pagination without a dataset that genuinely exceeds the walk
+ * (see use-public-cameras.ts pagination contract).
  */
 export function DirectoryTool() {
   const t = useMessages().directory;
