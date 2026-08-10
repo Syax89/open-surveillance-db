@@ -1,6 +1,6 @@
 // Runtime API tests for the /api/auth/keys family — mint a private write API
-// key and list the caller's own keys (EPIC api-keys, T7 + T8, plan
-// §1.3/§5.3, decisions D2/D4/D5/D6/D13).
+// key, list the caller's own keys and soft-revoke one of them (EPIC
+// api-keys, T7 + T8 + T9, plan §1.3/§5.3, AC5, decisions D2/D4/D5/D6/D9/D13).
 //
 // Contract under test (guard order, from the route docblock / spec §1.3):
 //   POST: urlTooLong (414) -> authLimit (429 with Retry-After) ->
@@ -14,6 +14,14 @@
 //   listApiKeysForContributor -> 200 { keys: [...] } metadata only (id,
 //   name, keyPrefix, scopes, createdAt, lastUsedAt, expiresAt, revokedAt),
 //   never the hash/raw key, + Cache-Control: no-store.
+//   DELETE /api/auth/keys/[id]: urlTooLong (414) -> authLimit (429, auth
+//   mutation bucket 10/min) -> malformed-cookie (400) ->
+//   requireVerifiedContributor (401 anon / 403 unverified, canonical body)
+//   -> sameOrigin + csrfVerified (403) -> strict id parse (404) ->
+//   revokeApiKey (owner-scoped UPDATE ... WHERE id AND contributor_id AND
+//   revoked_at IS NULL) -> 200 { ok: true }, or the SAME 404 body for an
+//   unknown / non-own / already-revoked key (no existence oracle), always
+//   + Cache-Control: no-store.
 //
 // The raw `key` must appear in EXACTLY the POST mint response (reveal-once,
 // D2/P1-2): never in error bodies, never in the list, never stored (the db
@@ -23,8 +31,8 @@
 // db/api-keys is mocked (tests/helpers/mocks/api-keys.mjs); pure helpers
 // (csrf, authLimit + the real rate-limit module, the scope whitelist, the
 // D5 env-knob default) run for real. The db boundary (createApiKey,
-// countApiKeysForContributor, listApiKeysForContributor) is covered for
-// real in tests/db-api-keys-crud.test.mjs.
+// countApiKeysForContributor, listApiKeysForContributor, revokeApiKey) is
+// covered for real in tests/db-api-keys-crud.test.mjs.
 
 import assert from "node:assert/strict";
 import { after, beforeEach, test } from "node:test";
@@ -48,6 +56,7 @@ beforeEach(async () => {
 after(async () => cleanupRouteTree());
 
 const keysRoute = () => loadRoute("app/api/auth/keys/route.mjs");
+const keyIdRoute = () => loadRoute("app/api/auth/keys/[id]/route.mjs");
 
 const contributor = {
   id: 7,
@@ -608,5 +617,202 @@ test("503: a failing list maps to the generic error, no-store", async () => {
   const response = await GET(authedGet());
   assert.equal(response.status, 503);
   assert.equal((await responseBody(response)).error, "Unable to list the API keys");
+  assert.equal(response.headers.get("cache-control"), "no-store");
+});
+
+// ---------------------------------------------------------------------------
+// DELETE /api/auth/keys/[id] — soft revoke, owner-only, 404 fail-closed
+// (T9, plan §1.3, AC5, D9)
+// ---------------------------------------------------------------------------
+//
+// Contract: urlTooLong 414 -> authLimit 429 (auth mutation bucket, 10/min)
+// -> malformed-cookie 400 -> requireVerifiedContributor 401 anon / 403
+// unverified (canonical body) -> sameOrigin + csrfVerified 403 -> strict id
+// parse 404 -> revokeApiKey(id, contributorId) (owner-scoped UPDATE) ->
+// 200 { ok: true }, or the SAME 404 body for unknown / non-own /
+// already-revoked (no existence oracle, idempotent), always no-store.
+
+function authedDelete(id, { headers = {} } = {}) {
+  return apiRequest(`/api/auth/keys/${id}`, {
+    method: "DELETE",
+    headers: {
+      cookie: "osdb_session=raw-session-token-abc123; osdb_csrf=csrf-token-123",
+      "x-csrf-token": "csrf-token-123",
+      ...headers,
+    },
+  });
+}
+
+test("414: DELETE answers 414 for an absurd URL before any auth work", async () => {
+  liveSession();
+  const { DELETE: revoke } = await keyIdRoute();
+  const response = await revoke(
+    apiRequest(absurdUrl("/api/auth/keys/42"), {
+      method: "DELETE",
+      headers: evilOrigin({ cookie: "osdb_session=raw-session-token-abc123" }),
+    }),
+  );
+  assert.equal(response.status, 414);
+  assert.equal((await responseBody(response)).error, "Request URI too long.");
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.equal(callArgs("revokeApiKey").length, 0);
+});
+
+test("429: the auth mutation bucket trips with Retry-After before the session read", async () => {
+  const { DELETE: revoke } = await keyIdRoute();
+  // Auth mutation bucket default is 10/min (same as the mint, NOT the
+  // session-read 120/min): 10 requests stay allowed (401 without session),
+  // the 11th is blocked.
+  for (let index = 0; index < 10; index += 1) {
+    const response = await revoke(apiRequest("/api/auth/keys/42", { method: "DELETE" }));
+    assert.notEqual(response.status, 429, `request ${index + 1} must stay allowed (401 without session)`);
+  }
+  const blocked = await revoke(apiRequest("/api/auth/keys/42", { method: "DELETE" }));
+  assert.equal(blocked.status, 429);
+  assert.equal((await responseBody(blocked)).error, "Too many requests. Please try again shortly.");
+  assert.ok(Number(blocked.headers.get("retry-after")) > 0);
+  assert.equal(callArgs("revokeApiKey").length, 0, "rate limit short-circuits before the revoke");
+});
+
+test("429 wins over the malformed-cookie 400: authLimit runs first (spec guard order)", async () => {
+  const { DELETE: revoke } = await keyIdRoute();
+  const malformedCookie = { cookie: "osdb_session=%E0%A4%A" };
+  for (let index = 0; index < 10; index += 1) {
+    const response = await revoke(
+      apiRequest("/api/auth/keys/42", { method: "DELETE", headers: malformedCookie }),
+    );
+    assert.equal(response.status, 400, `request ${index + 1} must stay allowed (malformed cookie 400)`);
+  }
+  const blocked = await revoke(
+    apiRequest("/api/auth/keys/42", { method: "DELETE", headers: malformedCookie }),
+  );
+  assert.equal(blocked.status, 429);
+  assert.ok(Number(blocked.headers.get("retry-after")) > 0);
+});
+
+test("400: a present-but-undecodable session cookie answers the clean malformed message", async () => {
+  liveSession();
+  const { DELETE: revoke } = await keyIdRoute();
+  const response = await revoke(
+    apiRequest("/api/auth/keys/42", {
+      method: "DELETE",
+      headers: { cookie: "osdb_session=%E0%A4%A" },
+    }),
+  );
+  assert.equal(response.status, 400);
+  assert.equal(
+    (await responseBody(response)).error,
+    "Malformed session cookie. Clear cookies and log in again.",
+  );
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.equal(callArgs("revokeApiKey").length, 0);
+});
+
+test("401: anonymous DELETE answers the canonical write-gate body, never touches the db", async () => {
+  const { DELETE: revoke } = await keyIdRoute();
+  const response = await revoke(apiRequest("/api/auth/keys/42", { method: "DELETE" }));
+  assert.equal(response.status, 401);
+  assert.equal((await responseBody(response)).error, "Authentication required.");
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.equal(callArgs("revokeApiKey").length, 0);
+});
+
+test("403: an unverified contributor cannot revoke (same canonical body)", async () => {
+  liveSession({ verified: false });
+  const { DELETE: revoke } = await keyIdRoute();
+  const response = await revoke(authedDelete(42));
+  assert.equal(response.status, 403);
+  assert.equal((await responseBody(response)).error, "Authentication required.");
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.equal(callArgs("revokeApiKey").length, 0);
+});
+
+test("403: cross-origin DELETE is rejected after the gate resolves, before any db work", async () => {
+  liveSession();
+  const { DELETE: revoke } = await keyIdRoute();
+  const response = await revoke(authedDelete(42, { headers: evilOrigin() }));
+  assert.equal(response.status, 403);
+  assert.equal((await responseBody(response)).error, "Cross-origin request rejected.");
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  // The session WAS resolved (gate runs before sameOrigin) but the revoke
+  // is never reached — the state change is refused before the UPDATE.
+  assert.ok(callArgs("findSessionByToken").length > 0, "gate resolves the session first");
+  assert.equal(callArgs("revokeApiKey").length, 0);
+});
+
+test("403: a wrong CSRF token is rejected (same-origin, bad double-submit)", async () => {
+  liveSession();
+  const { DELETE: revoke } = await keyIdRoute();
+  const response = await revoke(authedDelete(42, { headers: { "x-csrf-token": "wrong-token" } }));
+  assert.equal(response.status, 403);
+  assert.equal((await responseBody(response)).error, "Cross-origin request rejected.");
+  assert.equal(callArgs("revokeApiKey").length, 0);
+});
+
+test("404: a non-numeric or zero id answers the uniform 404 before any db work", async (t) => {
+  const { DELETE: revoke } = await keyIdRoute();
+  for (const bad of ["abc", "0", "-1", "1e3", "0x10", "42/evil", ""]) {
+    await t.test(`id=${bad}`, async () => {
+      // beforeEach resets the mock state before EVERY subtest, so the
+      // session stub must be registered here, not at the parent level.
+      liveSession();
+      const response = await revoke(authedDelete(bad));
+      assert.equal(response.status, 404);
+      assert.equal((await responseBody(response)).error, "API key not found.");
+      assert.equal(response.headers.get("cache-control"), "no-store");
+      assert.equal(callArgs("revokeApiKey").length, 0, "no db call for a malformed id");
+    });
+  }
+});
+
+test("404: unknown, non-own and already-revoked ids answer THE SAME body (no existence oracle)", async () => {
+  liveSession();
+  // The route cannot distinguish the three dead outcomes — revokeApiKey
+  // returns false for all of them (the owner-scoped UPDATE changes no row),
+  // so all three MUST produce byte-identical responses.
+  stub("revokeApiKey", async () => false);
+  const { DELETE: revoke } = await keyIdRoute();
+
+  const unknown = await revoke(authedDelete(999999));
+  const nonOwn = await revoke(authedDelete(42)); // another contributor's key
+  const alreadyRevoked = await revoke(authedDelete(41));
+
+  // A Response body can be consumed once — read each before comparing.
+  const unknownBody = await responseBody(unknown);
+  assert.equal(unknown.status, 404);
+  assert.equal(nonOwn.status, 404);
+  assert.equal(alreadyRevoked.status, 404);
+  assert.deepEqual(await responseBody(nonOwn), unknownBody, "non-own is indistinguishable from unknown");
+  assert.deepEqual(await responseBody(alreadyRevoked), unknownBody, "already-revoked is indistinguishable from unknown");
+  assert.equal(unknown.headers.get("cache-control"), "no-store");
+
+  // Every id reached the db layer as (id, own contributorId) — the owner
+  // scope is enforced in the UPDATE, never in the route.
+  assert.deepEqual(callArgs("revokeApiKey").map(([id]) => id), [999999, 42, 41]);
+  assert.deepEqual(callArgs("revokeApiKey")[0], [999999, 7]);
+});
+
+test("200: soft-revokes an own active key — { ok: true }, no-store, owner-scoped UPDATE", async () => {
+  liveSession();
+  stub("revokeApiKey", async () => true);
+  const { DELETE: revoke } = await keyIdRoute();
+  const response = await revoke(authedDelete(42));
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.deepEqual(await responseBody(response), { ok: true });
+  // The db layer receives exactly (id, own contributorId): the route never
+  // passes a foreign contributor id — ownership lives in the UPDATE's WHERE.
+  assert.deepEqual(callArgs("revokeApiKey"), [[42, 7]]);
+});
+
+test("500: a failing revoke maps to the generic error, no-store", async () => {
+  liveSession();
+  stub("revokeApiKey", async () => {
+    throw new Error("Database binding unavailable");
+  });
+  const { DELETE: revoke } = await keyIdRoute();
+  const response = await revoke(authedDelete(42));
+  assert.equal(response.status, 500);
+  assert.equal((await responseBody(response)).error, "Unable to revoke the API key");
   assert.equal(response.headers.get("cache-control"), "no-store");
 });
