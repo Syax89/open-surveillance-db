@@ -1156,6 +1156,8 @@ test("account: api keys — revoke cancel sends no DELETE; confirm DELETEs with 
 
   await renderWithLocale(React.createElement(AccountPage));
   await waitFor(() => assert.ok(screen.getByRole("heading", { name: "API keys" })));
+  // The heading exists during loading too — wait for the settled list.
+  await waitFor(() => assert.ok(screen.getByText("Nightly sync script")));
 
   // Cancel: confirm dialog opens, no DELETE is sent.
   await user.click(screen.getByRole("button", { name: "Revoke" }));
