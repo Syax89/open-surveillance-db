@@ -428,6 +428,9 @@ test("eraseContributor de-attributes the reports, revokes all sessions, and hard
     db.prepare(
       "INSERT INTO oidc_merge_requests (token_hash, provider, external_sub, contributor_id, email_verified, created_at, expires_at) VALUES (?, 'github', ?, ?, 0, ?, ?)",
     ).bind(`merge-hash-${suffix}`, `sub-${suffix}`, contributorId, createdAt, expiresAt).run();
+    db.prepare(
+      "INSERT INTO api_keys (contributor_id, name, key_prefix, key_hash, scopes, created_at, last_used_at, expires_at, revoked_at) VALUES (?, 'erasure test', ?, ?, '[\"submit\"]', ?, NULL, NULL, NULL)",
+    ).bind(contributorId, `key-prefix-${suffix}`, `key-hash-${suffix}`, createdAt).run();
   };
   seedAuthArtifacts(profile.id, "erased");
   seedAuthArtifacts(keeper.id, "keeper");
@@ -437,7 +440,7 @@ test("eraseContributor de-attributes the reports, revokes all sessions, and hard
     "INSERT INTO webauthn_challenges (challenge_hash, kind, contributor_id, user_handle, created_at, expires_at) VALUES ('challenge-hash-anonymous', 'login', NULL, NULL, ?, ?)",
   ).bind(NOW, "2026-08-02T00:00:00.000Z").run();
 
-  const artifactTables = ["passkeys", "recovery_codes", "email_verification_tokens", "email_send_log", "webauthn_challenges", "oidc_merge_requests"];
+  const artifactTables = ["passkeys", "recovery_codes", "email_verification_tokens", "email_send_log", "webauthn_challenges", "oidc_merge_requests", "api_keys"];
 
   // This suite owns the erasure contract, so it models the no-FK
   // environment the explicit DELETEs exist for (P2-2, t_adfc121b): with

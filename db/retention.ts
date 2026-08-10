@@ -35,6 +35,10 @@
  *   R18 email_send_log                → mail-budget rows older than 24 hours
  *                                       purged (QA F5, t_894e0cc3 — the 3/h
  *                                       budget only needs the last hour)
+ *   R21 api_keys                      → dead keys purged 90 days after
+ *                                       revoked_at / expires_at (EPIC
+ *                                       api-keys, D9 — reads the liveness
+ *                                       index, one bounded DELETE)
  *   R5  moderation_events             → 2-YEAR ARCHIVAL PATH (QA#3 F6,
  *                                       t_97e552bf): rows older than
  *                                       MODERATION_EVENT_ARCHIVE_DAYS are
@@ -106,6 +110,15 @@ export const REGISTRATION_IP_RETENTION_DAYS = 30;
 /** QA F5: email send-log rows are dead after 24 hours (the 3/h mail budget only needs the last hour). */
 export const EMAIL_SEND_LOG_RETENTION_DAYS = 1;
 /**
+ * R21 (EPIC api-keys, D9): an API key row is dead after it is soft-revoked
+ * (`revoked_at`) or hard-expired (`expires_at`), and the metadata row is
+ * purged 90 days after it died. The key is the contributor's own data
+ * (art. 17) and the gate rejects dead rows forever (no un-revoke, no
+ * renewal) — a dead hash can never authenticate again, so the row is pure
+ * garbage collection once the window elapses.
+ */
+export const API_KEY_RETENTION_DAYS = 90;
+/**
  * R5 (QA#3 F6): moderation decisions are archived after 2 years — the same
  * legal window as R4 correction requests (CORRECTION_RETENTION_DAYS, the
  * RETENTION_SCHEDULE "2 years" default). The sweep copies the row to
@@ -140,6 +153,8 @@ export type RetentionPolicy = {
   registrationsIpDays: number;
   /** QA F5: email send-log rows (email_send_log) expire after this many days. */
   emailSendLogDays: number;
+  /** R21: API keys (api_keys) are purged 90 days after revoked_at / expires_at (EPIC api-keys, D9). */
+  apiKeyDays: number;
   /** R5 (QA#3 F6): moderation decisions are archived after this many days. */
   moderationEventArchiveDays: number;
 };
@@ -151,6 +166,7 @@ export const DEFAULT_RETENTION_POLICY: RetentionPolicy = {
   loginAttemptDays: LOGIN_ATTEMPT_RETENTION_DAYS,
   registrationsIpDays: REGISTRATION_IP_RETENTION_DAYS,
   emailSendLogDays: EMAIL_SEND_LOG_RETENTION_DAYS,
+  apiKeyDays: API_KEY_RETENTION_DAYS,
   moderationEventArchiveDays: MODERATION_EVENT_ARCHIVE_DAYS,
 };
 
@@ -185,6 +201,8 @@ export type RetentionSummary = {
    */
   demoRecordsPurged: number;
   emailSendLogPurged: number;
+  /** R21: dead API-key rows purged 90 days after revoked_at / expires_at (EPIC api-keys, D9). */
+  apiKeysPurged: number;
   /** R5 (QA#3 F6): moderation decisions archived to `moderation_events_archive` (anonymized). */
   moderationEventsArchived: number;
   /** R5: archived moderation rows purged from the live append-only table. */
@@ -283,6 +301,7 @@ export async function runRetentionSweep(
     registrationIpLogPurged: 0,
     demoRecordsPurged: 0,
     emailSendLogPurged: 0,
+    apiKeysPurged: 0,
     moderationEventsArchived: 0,
     moderationEventsPurged: 0,
     failures: 0,
@@ -529,6 +548,28 @@ export async function runRetentionSweep(
     .bind(emailSendLogCutoff)
     .run()) as { meta: { changes: number } };
   summary.emailSendLogPurged = emailSendLogPurged.meta.changes;
+
+  // --- R21 (EPIC api-keys, D9): dead API-key rows are garbage collection
+  // after 90 days. A key dies at soft-revoke (`revoked_at` — permanent,
+  // there is no un-revoke, and the gate rejects the row forever) or at hard
+  // expiry (`expires_at`, NULL = never) — whichever came first. The row is
+  // metadata-only (SHA-256 hash, display prefix, scopes), but it is still
+  // the contributor's own data (art. 17) and, once dead, the liveness index
+  // can never serve it again. The predicate reads `api_keys_liveness_idx`
+  // (revoked_at, expires_at) as ONE bounded DELETE — the table is capped
+  // per contributor at mint (D5) and shrinks with account erasure, so
+  // (unlike login_attempts) it cannot be flooded; a broken sweep is logged
+  // by the scheduled handler and retried next run (R17 pattern).
+  const apiKeyCutoff = daysAgo(now, policy.apiKeyDays);
+  const apiKeysPurged = (await d1
+    .prepare(
+      `DELETE FROM api_keys
+       WHERE (revoked_at IS NOT NULL AND revoked_at < ?)
+          OR (expires_at IS NOT NULL AND expires_at < ?)`,
+    )
+    .bind(apiKeyCutoff, apiKeyCutoff)
+    .run()) as { meta: { changes: number } };
+  summary.apiKeysPurged = apiKeysPurged.meta.changes;
 
   // --- R5 (QA#3 F6): moderation decisions older than the 2-year window are
   // ARCHIVED then purged. The live table is append-only by design (migration

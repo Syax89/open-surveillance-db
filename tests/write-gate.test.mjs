@@ -175,6 +175,206 @@ test("requireVerifiedContributor accepts the injectable clock", async () => {
 });
 
 // ---------------------------------------------------------------------------
+// requireWriteAuth (EPIC api-keys T11, plan §1.4) — dual-path gate:
+//   Authorization header present → API-key path (Bearer, uniform 401 on
+//   invalid/revoked/expired, 403 on scope mismatch, no CSRF, session null);
+//   no header → EXACT existing session path (authMethod "session").
+// The bearer chain (parseBearerToken → sha256Hex → findApiKeyByHash →
+// touchApiKeyLastUsed) is exercised through the real app/lib/api-key-auth.ts
+// with the db boundary mocked, so the gate's branching is tested end-to-end
+// while the db hash/liveness SQL stays covered by api-key-auth.test.mjs.
+// ---------------------------------------------------------------------------
+
+const apiKey = {
+  id: 41,
+  contributorId: 7,
+  name: "ci",
+  keyPrefix: "osdb_AbCde",
+  keyHash: "hash",
+  scopes: JSON.stringify(["submit", "confirm"]),
+  createdAt: "2026-08-01T00:00:00.000Z",
+  lastUsedAt: null,
+  expiresAt: null,
+  revokedAt: null,
+};
+const keyContributor = {
+  id: 7,
+  email: "contributor@osdb.test",
+  displayName: "Contributor",
+  emailVerifiedAt: "2026-08-01T00:00:00.000Z",
+  authProvider: "password",
+};
+
+/** Resolve a live key whose scopes / owner-verification can be overridden. */
+function liveKey({ scopes = ["submit", "confirm"], emailVerifiedAt = keyContributor.emailVerifiedAt } = {}) {
+  stub("sha256Hex", async (token) => `hash-of-${token}`);
+  stub("findApiKeyByHash", async () => ({
+    key: { ...apiKey, scopes: JSON.stringify(scopes) },
+    contributor: { ...keyContributor, emailVerifiedAt },
+  }));
+  stub("touchApiKeyLastUsed", async () => true);
+}
+
+function bearerRequest(path, { method = "POST", headers = {} } = {}) {
+  return apiRequest(path, { method, headers: { authorization: "Bearer osdb_test-key-123", ...headers } });
+}
+
+test("requireWriteAuth resolves a valid Bearer key with the required scope (api_key path, session null)", async () => {
+  liveKey();
+  const { requireWriteAuth } = await writeGate();
+  const result = await requireWriteAuth(bearerRequest("/api/cameras"), "submit");
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.authMethod, "api_key");
+  assert.equal(result.session, null);
+  assert.equal(result.apiKeyId, 41);
+  assert.equal(result.contributor.id, 7);
+  assert.equal(result.contributor.emailVerifiedAt, keyContributor.emailVerifiedAt);
+  assert.equal(callArgs("findSessionByToken").length, 0, "the session store must never be consulted on the key path");
+  assert.equal(callArgs("touchApiKeyLastUsed").length, 1, "a successful key resolution touches last_used (throttled in the db layer)");
+});
+
+test("requireWriteAuth answers 401 (canonical WRITE_GATE_ERROR, no-store) for an invalid/revoked/expired key", async () => {
+  // findApiKeyByHash -> null collapses unknown/revoked/expired (D6/D9): the
+  // gate must not distinguish them, and must not fall through to a session.
+  stub("sha256Hex", async () => "hash");
+  stub("findApiKeyByHash", async () => null);
+  const { requireWriteAuth, WRITE_GATE_ERROR } = await writeGate();
+  const result = await requireWriteAuth(bearerRequest("/api/cameras"), "submit");
+  assert.equal(result.ok, false);
+  assert.equal(result.response.status, 401);
+  assert.deepEqual(await responseBody(result.response), { error: WRITE_GATE_ERROR });
+  assert.equal(result.response.headers.get("cache-control"), "no-store");
+  assert.equal(callArgs("findSessionByToken").length, 0, "fail-closed: a dead key must never fall through to the session");
+});
+
+test("requireWriteAuth answers 403 (canonical WRITE_GATE_ERROR, no-store) when the key lacks the required scope", async () => {
+  liveKey({ scopes: ["confirm", "action"] });
+  const { requireWriteAuth, WRITE_GATE_ERROR } = await writeGate();
+  const result = await requireWriteAuth(bearerRequest("/api/cameras"), "submit");
+  assert.equal(result.ok, false);
+  assert.equal(result.response.status, 403);
+  assert.deepEqual(await responseBody(result.response), { error: WRITE_GATE_ERROR });
+  assert.equal(result.response.headers.get("cache-control"), "no-store");
+});
+
+test("requireWriteAuth fails closed: a malformed Authorization header never falls through to a live verified session (401)", async () => {
+  // QA matrix / T10 contract: a request carrying ANY Authorization header is
+  // committed to the key path — a Basic credential (or a broken Bearer) is a
+  // client bug and must be answered 401 even when a valid session cookie is
+  // also present, never silently downgraded to the session.
+  liveSession();
+  verified();
+  const { requireWriteAuth, WRITE_GATE_ERROR } = await writeGate();
+  const result = await requireWriteAuth(
+    apiRequest("/api/cameras", { method: "POST", headers: { authorization: "Basic dXNlcjpwYXNz" } }),
+    "submit",
+  );
+  assert.equal(result.ok, false);
+  assert.equal(result.response.status, 401);
+  assert.deepEqual(await responseBody(result.response), { error: WRITE_GATE_ERROR });
+  assert.equal(callArgs("findSessionByToken").length, 0, "fail-closed: the session must not be consulted when an Authorization header is present");
+  assert.equal(callArgs("sha256Hex").length, 0, "the parser rejects a non-Bearer scheme before any hashing");
+});
+
+test("requireWriteAuth refuses a live key whose owner is NOT email-verified (403, D10 gate decision)", async () => {
+  liveKey({ emailVerifiedAt: null });
+  const { requireWriteAuth, WRITE_GATE_ERROR } = await writeGate();
+  const result = await requireWriteAuth(bearerRequest("/api/cameras"), "submit");
+  assert.equal(result.ok, false);
+  assert.equal(result.response.status, 403);
+  assert.deepEqual(await responseBody(result.response), { error: WRITE_GATE_ERROR });
+});
+
+test("requireWriteAuth treats a corrupt scopes column as NO granted scopes (403 fail-closed)", async () => {
+  stub("sha256Hex", async () => "hash");
+  stub("findApiKeyByHash", async () => ({
+    key: { ...apiKey, scopes: "not-json" },
+    contributor: { ...keyContributor },
+  }));
+  stub("touchApiKeyLastUsed", async () => true);
+  const { requireWriteAuth, WRITE_GATE_ERROR } = await writeGate();
+  const result = await requireWriteAuth(bearerRequest("/api/cameras"), "submit");
+  assert.equal(result.ok, false);
+  assert.equal(result.response.status, 403);
+  assert.deepEqual(await responseBody(result.response), { error: WRITE_GATE_ERROR });
+});
+
+test("requireWriteAuth without an Authorization header keeps the exact session path (authMethod session)", async () => {
+  liveSession();
+  verified();
+  const { requireWriteAuth } = await writeGate();
+  const result = await requireWriteAuth(sessionRequest("/api/cameras"), "submit");
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.authMethod, "session");
+  assert.equal(result.apiKeyId, null);
+  assert.equal(result.session.csrfToken, "csrf-token-123", "handlers keep the double-submit CSRF on the session branch");
+  assert.equal(result.contributor.id, 7);
+});
+
+test("requireWriteAuth without an Authorization header answers the same denials as requireVerifiedContributor (401 anonymous, 403 unverified, 400 malformed cookie)", async (t) => {
+  const { requireWriteAuth, WRITE_GATE_ERROR } = await writeGate();
+  await t.test("anonymous -> 401", async () => {
+    const result = await requireWriteAuth(gateRequest("/api/cameras"), "submit");
+    assert.equal(result.ok, false);
+    assert.equal(result.response.status, 401);
+    assert.deepEqual(await responseBody(result.response), { error: WRITE_GATE_ERROR });
+  });
+  await t.test("live session, unverified -> 403", async () => {
+    liveSession();
+    unverified();
+    const result = await requireWriteAuth(sessionRequest("/api/cameras"), "submit");
+    assert.equal(result.ok, false);
+    assert.equal(result.response.status, 403);
+    assert.deepEqual(await responseBody(result.response), { error: WRITE_GATE_ERROR });
+  });
+  await t.test("erased account -> 401 (same body)", async () => {
+    liveSession();
+    erased();
+    const result = await requireWriteAuth(sessionRequest("/api/cameras"), "submit");
+    assert.equal(result.ok, false);
+    assert.equal(result.response.status, 401);
+  });
+  await t.test("malformed session cookie -> 400", async () => {
+    const result = await requireWriteAuth(
+      apiRequest("/api/cameras", { method: "POST", headers: { cookie: "osdb_session=%E0%A4%A" } }),
+      "submit",
+    );
+    assert.equal(result.ok, false);
+    assert.equal(result.response.status, 400);
+  });
+});
+
+test("anti-enumeration across auth methods: key-path 401/403 share the ONE canonical body with session-path 401/403", async () => {
+  const { requireWriteAuth } = await writeGate();
+
+  // 401: anonymous session path.
+  const anonymous401 = await requireWriteAuth(gateRequest("/api/cameras"), "submit");
+  // 401: dead key path.
+  stub("sha256Hex", async () => "hash");
+  stub("findApiKeyByHash", async () => null);
+  const deadKey401 = await requireWriteAuth(bearerRequest("/api/cameras"), "submit");
+
+  // 403: unverified session path.
+  liveSession();
+  unverified();
+  const unverified403 = await requireWriteAuth(sessionRequest("/api/cameras"), "submit");
+  // 403: live key without the scope.
+  stub("sha256Hex", async () => "hash");
+  stub("findApiKeyByHash", async () => ({
+    key: { ...apiKey, scopes: JSON.stringify(["confirm"]) },
+    contributor: { ...keyContributor },
+  }));
+  stub("touchApiKeyLastUsed", async () => true);
+  const scopeMismatch403 = await requireWriteAuth(bearerRequest("/api/cameras"), "submit");
+
+  assert.deepEqual(await responseBody(deadKey401.response), await responseBody(anonymous401.response));
+  assert.deepEqual(await responseBody(scopeMismatch403.response), await responseBody(unverified403.response));
+  assert.notEqual(anonymous401.response.status, unverified403.response.status, "status codes stay the only distinguisher");
+});
+
+// ---------------------------------------------------------------------------
 // Enforcement per route — 401 anonymous, 403 unverified, single uniform body
 // ---------------------------------------------------------------------------
 

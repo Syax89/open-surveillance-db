@@ -1265,12 +1265,13 @@ export type ErasureResult = {
  *
  * Auth artifacts are hard-deleted explicitly, in the same batch: passkeys,
  * recovery codes, email-verification tokens, the transactional-email send
- * log, WebAuthn ceremony challenges and pending OIDC merge requests are the
- * contributor's own data (art. 17), and each of those tables declares
- * ON DELETE CASCADE on `contributors.id` — mirrored here because the test
- * harness does not enforce foreign keys (P2-2, t_adfc121b; same rule as
- * `sessions` and `camera_community_actions`). `oidc_states` is NOT included:
- * it is pre-auth state with no contributor link.
+ * log, WebAuthn ceremony challenges, pending OIDC merge requests and API
+ * keys (EPIC api-keys, D9) are the contributor's own data (art. 17), and
+ * each of those tables declares ON DELETE CASCADE on `contributors.id` —
+ * mirrored here because the test harness does not enforce foreign keys
+ * (P2-2, t_adfc121b; same rule as `sessions` and `camera_community_actions`).
+ * `oidc_states` is NOT included: it is pre-auth state with no contributor
+ * link.
  *
  * Returns the number of reports de-attributed, community actions deleted
  * (ADR 0021 §13.1) and correction reports de-attributed (for the erasure
@@ -1351,6 +1352,12 @@ export async function eraseContributor(contributorId: number): Promise<ErasureRe
     // account — own data, hard-deleted (an unmergeable account must not
     // leave a live token behind).
     d1.prepare("DELETE FROM oidc_merge_requests WHERE contributor_id = ?").bind(contributorId),
+    // API keys (EPIC api-keys, D9): the contributor's private write keys are
+    // their own data (art. 17) — SHA-256 hashes and display prefixes are
+    // hard-deleted so no ceremony or gate can ever resolve them after
+    // erasure. Mirrors the ON DELETE CASCADE on api_keys.contributor_id
+    // (same no-FK harness rule as the rows above).
+    d1.prepare("DELETE FROM api_keys WHERE contributor_id = ?").bind(contributorId),
     // Explicit session revocation, mirroring logout: after erasure no
     // session of this contributor may resolve, in every environment
     // (real D1 would cascade on contributor delete, but the test harness
