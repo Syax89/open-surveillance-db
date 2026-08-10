@@ -159,14 +159,16 @@ const INFO_ROUTES = {
     en: ["A public database, built with care."],
     noEn: ["A public database, built with care."],
   },
-  // Public API docs (CEO 2026-08-07): /api-docs is a static InfoPage
-  // explaining the read-only API, its endpoints and the per-caller limits.
-  // Marker: the redesigned layout (cards + badges) still carries the same
-  // limit values and the read-only callout.
+  // Public API docs (CEO 2026-08-07; write-API guide t_10e3585e): /api-docs
+  // is a static InfoPage explaining the keyless read API and the
+  // private-key write API (ADR 0023) — Bearer auth, per-endpoint required
+  // scope, key lifecycle and security rules. Markers: the keyless-read
+  // callout, the write section and the lifecycle/security headings flip
+  // with the locale; EN strings must never survive in the IT rendering.
   "/api-docs": {
-    it: ["API pubblica", "60 richieste / minuto", "Export CSV / GeoJSON", "Tile della mappa", "Di sola lettura per design"],
-    en: ["Public API", "60 requests / minute", "CSV / GeoJSON exports", "Map tiles", "Read-only by design"],
-    noEn: ["Public API", "60 requests / minute", "CSV / GeoJSON exports", "Map tiles", "Read-only by design"],
+    it: ["API pubblica", "60 richieste / minuto", "Export CSV / GeoJSON", "Tile della mappa", "Senza chiavi per design in lettura", "Chiavi API", "Endpoint di scrittura", "Ciclo di vita delle chiavi", "Mai negli URL"],
+    en: ["Public API", "60 requests / minute", "CSV / GeoJSON exports", "Map tiles", "Keyless by design for reading", "API keys", "Write endpoints", "Key lifecycle", "Never in URLs"],
+    noEn: ["Public API", "CSV / GeoJSON exports", "Map tiles", "Keyless by design", "API keys", "Write endpoints", "Key lifecycle", "Never in URLs", "Read-only by design"],
   },
   // Support/contribute page (CEO 2026-08-08, t_c9c200a8): the two external
   // CTA cards are language-neutral brand names (Buy Me a Coffee / GitHub),

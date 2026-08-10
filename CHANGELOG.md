@@ -289,6 +289,19 @@ changes accumulate under `[Unreleased]`.
 
 ### Changed
 
+- **Docs — /api-docs write-API + API-keys guide (t_10e3585e, ADR 0023):**
+  the public documentation page now covers the private write keys of the
+  api-keys epic: Bearer authentication (`Authorization: Bearer osdb_…`),
+  the per-endpoint required scope (`submit`/`confirm`/`edit`/`action`),
+  the key lifecycle (create in /account, reveal-once at creation, 365-day
+  default expiry, instant revoke, 5-key cap), the security rules (keys
+  never in query strings — rejected 400 by ADR 0023; never logged or
+  committed; SHA-256 hash-only storage) and the canonical write error
+  codes. The outdated "read-only by design" claim was removed: reading
+  stays keyless, writing requires a verified account with a private key.
+  EN/IT bundles in parity (`tsc`-checked), `/api-docs` i18n markers
+  updated.
+
 - **API — PATCH /api/cameras/[id] write gate (EPIC api-keys T17, ADR 0023
   D4/D10/D12):** the community edit route moved from `resolveOptionalContributor`
   to the unified `requireWriteAuth('edit')` gate — editing now requires a
