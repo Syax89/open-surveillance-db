@@ -123,6 +123,28 @@ export async function countApiKeysForContributor(
 export const countActiveKeys = countApiKeysForContributor;
 
 // ---------------------------------------------------------------------------
+// D5/D13 env knobs (EnvLike pattern — code defaults + optional env override,
+// same shape as limitsFor in app/lib/rate-limit.ts; no wrangler `vars` block)
+// ---------------------------------------------------------------------------
+
+/** D5 default: max ACTIVE keys per contributor (env knob API_KEYS_MAX_PER_CONTRIBUTOR). */
+export const API_KEYS_MAX_PER_CONTRIBUTOR_DEFAULT = 5;
+
+/**
+ * Effective cap of ACTIVE keys per contributor (D5). The mint endpoint
+ * answers 409 once `countApiKeysForContributor` reaches this number; a
+ * revoked or expired key frees its slot immediately (see
+ * countApiKeysForContributor). The parameter is `unknown` (cast internally)
+ * for the same reason as `limitsFor` in rate-limit.ts: Cloudflare's `Env`
+ * has no string index signature, and this module must stay runnable in
+ * plain Node.
+ */
+export function apiKeysMaxPerContributor(env: unknown): number {
+  const value = Number((env as { [key: string]: unknown }).API_KEYS_MAX_PER_CONTRIBUTOR);
+  return Number.isFinite(value) && value > 0 ? value : API_KEYS_MAX_PER_CONTRIBUTOR_DEFAULT;
+}
+
+// ---------------------------------------------------------------------------
 // CRUD layer (T5, plan §1.2/§5.3, decisions D2-D7/D9)
 //
 // Raw key handling discipline: `createApiKey` is the ONLY place a raw key is

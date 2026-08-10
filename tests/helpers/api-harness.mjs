@@ -53,6 +53,10 @@ const ROUTES = [
   { source: "app/api/auth/me/submissions/route.ts", output: "app/api/auth/me/submissions/route.mjs" },
   { source: "app/api/auth/me/contributions/route.ts", output: "app/api/auth/me/contributions/route.mjs" },
   { source: "app/api/auth/account/route.ts", output: "app/api/auth/account/route.mjs" },
+  // Private write API keys (EPIC api-keys, T7): POST /api/auth/keys mints a
+  // key (raw key reveal-once); GET and DELETE /api/auth/keys/[id] follow in
+  // T8/T9 on the same path family.
+  { source: "app/api/auth/keys/route.ts", output: "app/api/auth/keys/route.mjs" },
   // Multi-method auth Fase C (t_36989e06): passkey ceremonies, recovery
   // codes and passkey management. The [id]-less credentials route exports
   // GET (list) + DELETE (remove).
@@ -148,7 +152,7 @@ async function buildTree() {
   const mocksDir = path.join(root, "tests", "helpers", "mocks");
   const mockStateUrl = pathToFileURL(path.join(root, "tests", "helpers", "mock-state.mjs")).href;
   await mkdir(path.join(tree, "db"), { recursive: true });
-  for (const mockName of ["cameras", "camera-edits", "corrections", "geocode", "reverse-geocode", "moderation", "auth", "users", "appeals", "confirmations", "passkeys", "oidc", "mailer", "community-actions", "import-sources"]) {
+  for (const mockName of ["cameras", "camera-edits", "corrections", "geocode", "reverse-geocode", "moderation", "auth", "users", "appeals", "confirmations", "passkeys", "oidc", "mailer", "community-actions", "import-sources", "api-keys"]) {
     const source = await readFile(path.join(mocksDir, `${mockName}.mjs`), "utf8");
     await writeFile(
       path.join(tree, "db", `${mockName}.mjs`),
