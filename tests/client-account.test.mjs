@@ -995,9 +995,10 @@ test("account: api keys — rows render name, prefix, meta, scope badges and sta
   assert.ok(screen.getByText("Community actions"));
   assert.ok(screen.getByText("Active"));
   assert.ok(screen.getByRole("button", { name: "Revoke" }));
-  // Meta: created date + last used (formatPublicDate long-form).
-  assert.ok(screen.getByText("Created"));
-  assert.ok(screen.getByText("Last used"));
+  // Meta: created date + last used (formatPublicDate long-form). Both rows
+  // carry their own <dl> labels, so the labels are expected twice.
+  assert.ok(screen.getAllByText("Created").length === 2);
+  assert.ok(screen.getAllByText("Last used").length === 2);
   // Revoked row: muted, label Revoked, NO revoke action.
   assert.ok(screen.getByText("Old integration"));
   assert.ok(screen.getByText("Revoked"));
