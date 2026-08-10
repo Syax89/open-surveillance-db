@@ -318,9 +318,20 @@ test("journey edit: immediate publication → owner edit goes to re-moderation, 
   // 1. register → two contributors (owner + outsider).
   const owner = await registerContributor();
   const outsider = await registerContributor();
-  // Write gate (Fase E1): a fresh register is read-only — verify the owner's
-  // account so the submit below passes the gate (verify-email is Fase B; the
-  // journey simulates the verified state on the column the gate reads).
+
+  // D10 behavior change (EPIC api-keys T17): the edit gate now requires a
+  // VERIFIED contributor on the SESSION path too. A fresh register is
+  // read-only, so the owner's PATCH answers the canonical 403 WRITE_GATE_ERROR
+  // BEFORE any db work — even for an id that would 404, the gate runs first.
+  const unverifiedEdit = await cameraEditRoute.PATCH(editPatch("/api/cameras/1", {
+    title: "Blocked before verification",
+  }, owner));
+  assert.equal(unverifiedEdit.status, 403, "an unverified session cannot edit (D10)");
+  assert.equal((await responseBody(unverifiedEdit)).error, "Authentication required.");
+
+  // Write gate (Fase E1): verify the owner's account so the submit below
+  // passes the gate (verify-email is Fase B; the journey simulates the
+  // verified state on the column the gate reads).
   await markVerifiedByEmail(owner.email);
   const me = await meRoute.GET(apiRequest("/api/auth/me", { headers: { cookie: owner.cookies } }));
   const { contributor } = await responseBody(me);

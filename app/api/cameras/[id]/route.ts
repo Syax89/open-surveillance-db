@@ -2,12 +2,12 @@ import { env } from "cloudflare:workers";
 import { applyCameraEdit, parseEditableEditFields } from "../../../../db/camera-edits";
 import { getCommunityRecordById } from "../../../../db/cameras";
 import { recordRateLimitBlock } from "../../../lib/abuse-alerts";
-import { resolveOptionalContributor } from "../../../lib/auth-session";
 import { CACHE_TAGS } from "../../../lib/cache-purge";
 import { withPublicCache } from "../../../lib/public-cache";
 import { csrfVerified, sameOrigin } from "../../../lib/csrf";
 import { BodyReadError, readJsonBody, urlTooLong } from "../../../lib/input-limits";
-import { callerKey, checkRateLimit, limitsFor } from "../../../lib/rate-limit";
+import { callerKey, checkRateLimit, checkRateLimitForKeyAuth, limitsFor } from "../../../lib/rate-limit";
+import { requireWriteAuth } from "../../../lib/write-gate";
 
 /**
  * GET /api/cameras/[id] — one public record (FRONTEND_PLAN § 3.2.1).
@@ -105,6 +105,17 @@ function parseId(request: Request): number | null {
 /**
  * PATCH /api/cameras/[id] — community contribution editing (ADR 0018 §4, C3).
  *
+ * Write gate (EPIC api-keys T17, ADR 0023 D4/D10/D12): the PATCH requires a
+ * VERIFIED contributor, authenticated EITHER by a verified session cookie OR
+ * by a private write API key carrying the `edit` scope (`Authorization:
+ * Bearer *** — anonymous (401), unverified (403) and scope-mismatch (403)
+ * share ONE canonical body, anti-enumeration). D10 behavior change: the
+ * session path now requires email-verified status too — an owner edit from
+ * an unverified session answers 403 instead of succeeding (flagged in the
+ * CHANGELOG). Ownership stays server-side: `cameras.contributor_id ===
+ * gate.contributor.id`, where the key path attributes to the key OWNER
+ * (never anonymous).
+ *
  * Two-track behaviour, decided in db/camera-edits.ts (applyCameraEdit):
  *
  *   - `pending` records: direct owner-only UPDATE. The ownership check is
@@ -126,18 +137,16 @@ function parseId(request: Request): number | null {
  * The body is validated against the editable whitelist BEFORE any write:
  * non-editable fields (status, contributor_id, source, publish_*, freshness
  * clock, coordinates) answer 400 per-field with no partial effects. Guards
- * run in the fixed order (same as the confirmation toggle): urlTooLong ->
- * sameOrigin -> edit rate-limit bucket (5/min) -> session (401) -> CSRF (403)
- * -> strict id parse (404). A moderator/admin who is not the owner gets 403
- * on published records — they act only through the moderation endpoints.
+ * run in the fixed order (wave 2 — EPIC api-keys T16/T17): urlTooLong ->
+ * per-IP edit bucket (5/min) -> write gate (dual-path, 401/403) ->
+ * session-only: same-origin + CSRF (403) -> additive per-key bucket (429,
+ * no-op for session) -> strict id parse (404). A moderator/admin who is not
+ * the owner gets 403 on published records — they act only through the
+ * moderation endpoints.
  */
 export async function PATCH(request: Request) {
   if (urlTooLong(request)) {
     return Response.json({ error: "Request URI too long." }, { status: 414, headers: NO_STORE_HEADERS });
-  }
-
-  if (!sameOrigin(request)) {
-    return Response.json({ error: "Cross-origin request rejected." }, { status: 403, headers: NO_STORE_HEADERS });
   }
 
   const key = callerKey(request, env);
@@ -156,18 +165,51 @@ export async function PATCH(request: Request) {
     });
   }
 
-  let resolved;
+  let gate;
   try {
-    resolved = await resolveOptionalContributor(request);
+    // Write gate (multi-method auth Fase E1 + EPIC api-keys T17): editing
+    // requires a VERIFIED contributor, authenticated EITHER by a verified
+    // session cookie OR by a private write API key carrying the `edit` scope
+    // (`Authorization: Bearer *** D4). Anonymous (401), unverified (403) and
+    // scope-mismatch (403) share ONE single response body (anti-enumeration,
+    // no-store). D10: the session branch ALSO requires email-verified status
+    // — previously a logged-in-but-unverified session could edit.
+    gate = await requireWriteAuth(request, "edit");
   } catch (error) {
     console.error("PATCH /api/cameras/[id] session lookup failed", error);
     return Response.json({ error: "Database unavailable" }, { status: 503, headers: NO_STORE_HEADERS });
   }
-  if (!resolved) {
-    return Response.json({ error: "Not authenticated." }, { status: 401, headers: NO_STORE_HEADERS });
+  if (!gate.ok) return gate.response;
+
+  // Session-only extras (T17 wave 2): CSRF/same-origin apply ONLY on the
+  // session branch. A machine client holding a secret bearer credential
+  // carries no ambient authority from a browser origin (no CSRF), and its
+  // edit volume is already bounded by the additive per-key `key:<id>`
+  // bucket below.
+  if (gate.authMethod === "session") {
+    if (!sameOrigin(request) || !csrfVerified(request, gate.session.csrfToken)) {
+      return Response.json({ error: "Cross-site request rejected. Refresh the page and try again." }, { status: 403, headers: NO_STORE_HEADERS });
+    }
   }
-  if (!csrfVerified(request, resolved.session.csrfToken)) {
-    return Response.json({ error: "Invalid CSRF token. Refresh the page and try again." }, { status: 403, headers: NO_STORE_HEADERS });
+
+  // Additive per-key rate limit (D8/T12, plan §1.6): a key-authenticated
+  // request is fail-closed double-counted — it must pass BOTH the per-IP
+  // bucket above AND its own `key:<apiKeyId>` bucket; a block on either
+  // answers 429 (same body as the per-IP block, Retry-After included).
+  // Session callers have no per-key bucket (the pre-gate per-IP check is the
+  // whole story), so this check is a no-op for them.
+  const keyLimit = await checkRateLimitForKeyAuth(env, "edit", request, limitOptions, gate);
+  if (!keyLimit.allowed) {
+    console.warn("PATCH /api/cameras/[id] rate limited (per-key bucket)");
+    recordRateLimitBlock(env, {
+      route: "/api/cameras/[id]",
+      key: keyLimit.key,
+      windowSeconds: limitOptions.windowSeconds,
+    });
+    return Response.json({ error: "Too many requests. Please try again shortly." }, {
+      status: 429,
+      headers: { ...NO_STORE_HEADERS, "Retry-After": String(keyLimit.retryAfterSeconds) },
+    });
   }
 
   const id = parseId(request);
@@ -197,7 +239,7 @@ export async function PATCH(request: Request) {
   try {
     const result = await applyCameraEdit({
       cameraId: id,
-      contributorId: resolved.contributor.id,
+      contributorId: gate.contributor.id,
       fields: parsed.payload.fields,
       expectedUpdated: parsed.payload.expectedUpdated,
       now: new Date().toISOString(),

@@ -8,8 +8,13 @@
  *     - removed/rejected: 409; non-owner on published: 403; anonymous
  *       records / non-owner on pending: 404 fail-closed; no-op: 200
  *       "no changes" with NO event (anti-farming); race: 409 (expectedUpdated
- *       precondition); whitelist violations: 400 per-field before any write;
- *       CSRF + same-origin + edit bucket (5/min); erasure de-attributes.
+ *     precondition); whitelist violations: 400 per-field before any write;
+ *     CSRF + same-origin + edit bucket (5/min); erasure de-attributes.
+ *     Write gate (EPIC api-keys T17, ADR 0023 D4/D10/D12): verified session
+ *     cookie OR private write API key with `edit` scope (Bearer) — anonymous
+ *     401, unverified session 403 (D10 behavior change), scope-mismatch 403,
+ *     one canonical body; CSRF/same-origin conditional on the session branch;
+ *     additive per-key bucket for key callers (D8).
  *
  * Two layers, mirroring the C1 verification suites:
  *   - Part 1 (mocked db/camera-edits): pins the HTTP contract — guard order,
@@ -130,13 +135,18 @@ function liveSession() {
 // Part 1 — route contract (mocked db/camera-edits)
 // ---------------------------------------------------------------------------
 
-test("E1 guard order: anonymous answers 401 before any db work", async () => {
+test("E1 guard order: anonymous answers the uniform 401 before any db work (T17)", async () => {
   const { PATCH } = await cameraEditRoute();
   const response = await PATCH(apiRequest("/api/cameras/5", {
     method: "PATCH",
     body: { title: "New title" },
   }));
   assert.equal(response.status, 401);
+  // Canonical WRITE_GATE_ERROR body (anti-enumeration, ADR 0023 D4): the
+  // anonymous caller can never distinguish "no session" from "account exists
+  // but unverified" by the payload.
+  assert.equal((await responseBody(response)).error, "Authentication required.");
+  assert.equal(response.headers.get("cache-control"), "no-store");
   assert.equal(callArgs("applyCameraEdit").length, 0);
 });
 
@@ -163,15 +173,44 @@ test("E1 guard order: missing/wrong CSRF answers 403", async (t) => {
   });
 });
 
-test("E1 guard order: cross-origin rejected before any db work", async () => {
+test("E1 guard order: cross-origin rejected for session callers; anonymous callers hit the gate first (T17)", async (t) => {
   const { PATCH } = await cameraEditRoute();
-  const response = await PATCH(apiRequest("/api/cameras/5", {
-    method: "PATCH",
-    headers: { origin: "https://evil.test" },
-    body: { title: "New title" },
-  }));
+  await t.test("cross-origin with a live session", async () => {
+    liveSession();
+    const response = await PATCH(sessionRequest("/api/cameras/5", {
+      method: "PATCH",
+      headers: { "x-csrf-token": "csrf-token-123", origin: "https://evil.test" },
+      body: { title: "New title" },
+    }));
+    assert.equal(response.status, 403);
+    assert.equal((await responseBody(response)).error, "Cross-site request rejected. Refresh the page and try again.");
+    assert.equal(callArgs("applyCameraEdit").length, 0);
+  });
+  await t.test("cross-origin without a session answers the uniform 401 (gate before origin)", async () => {
+    const response = await PATCH(apiRequest("/api/cameras/5", {
+      method: "PATCH",
+      headers: { origin: "https://evil.test" },
+      body: { title: "New title" },
+    }));
+    assert.equal(response.status, 401);
+    assert.equal((await responseBody(response)).error, "Authentication required.");
+    assert.equal(callArgs("applyCameraEdit").length, 0);
+  });
+});
+
+test("D10: an unverified session answers 403 canonical and never reaches the db (T17)", async () => {
+  // Behavior change (ADR 0023 D10): the edit gate moved from
+  // resolveOptionalContributor to requireWriteAuth('edit'), so the SESSION
+  // branch now requires email-verified status too. A signed-in-but-unverified
+  // contributor used to be able to edit; it now answers the canonical 403
+  // (same body as a scope-mismatch — anti-enumeration).
+  stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: null, authProvider: "password" }));
+  const { PATCH } = await cameraEditRoute();
+  const response = await PATCH(authedPatch("/api/cameras/5", { title: "New title" }));
   assert.equal(response.status, 403);
-  assert.equal((await responseBody(response)).error, "Cross-origin request rejected.");
+  assert.equal((await responseBody(response)).error, "Authentication required.");
+  assert.equal(response.headers.get("cache-control"), "no-store");
   assert.equal(callArgs("applyCameraEdit").length, 0);
 });
 
@@ -583,6 +622,190 @@ test("E6 CSRF: a wrong token on a valid body answers 403 and never reaches the d
   }));
   assert.equal(response.status, 403);
   assert.equal(callArgs("applyCameraEdit").length, 0);
+});
+
+// ---------------------------------------------------------------------------
+// PATCH — write API keys (EPIC api-keys T17)
+// ---------------------------------------------------------------------------
+// The edit route gates on requireWriteAuth(request, "edit"), so a machine
+// client authenticates with `Authorization: Bearer *** (D4 `edit` scope)
+// instead of a session cookie. The session-only extras (same-origin + CSRF)
+// are skipped on the key path: a machine client holding a secret bearer
+// credential carries no ambient browser authority, and its edit volume is
+// bounded by the additive per-key `key:<id>` bucket (D8/T12). The bearer
+// chain (sha256Hex -> findApiKeyByHash -> touchApiKeyLastUsed) is exercised
+// with the db boundary mocked, exactly as in tests/write-gate.test.mjs and
+// tests/community-actions.test.mjs.
+
+const apiKey = {
+  id: 41,
+  contributorId: 7,
+  name: "ci",
+  keyPrefix: "osdb_AbCde",
+  keyHash: "hash",
+  scopes: JSON.stringify(["submit", "edit"]),
+  createdAt: "2026-08-01T00:00:00.000Z",
+  lastUsedAt: null,
+  expiresAt: null,
+  revokedAt: null,
+};
+const keyContributor = {
+  id: 7,
+  email: "contributor@osdb.test",
+  displayName: "Contributor",
+  emailVerifiedAt: "2026-08-01T00:00:00.000Z",
+  authProvider: "password",
+};
+
+/** Resolve a live key whose scopes / owner-verification can be overridden. */
+function liveKey({ scopes = ["submit", "edit"], emailVerifiedAt = keyContributor.emailVerifiedAt } = {}) {
+  stub("sha256Hex", async (token) => `hash-of-${token}`);
+  stub("findApiKeyByHash", async () => ({
+    key: { ...apiKey, scopes: JSON.stringify(scopes) },
+    contributor: { ...keyContributor, emailVerifiedAt },
+  }));
+  stub("touchApiKeyLastUsed", async () => true);
+}
+
+/** PATCH /api/cameras/[id] authenticating with a Bearer key. */
+function bearerPatch(pathAndQuery, body, { headers = {}, ...rest } = {}) {
+  return apiRequest(pathAndQuery, {
+    method: "PATCH",
+    headers: { authorization: "Bearer osdb_test-key-123", ...headers },
+    body,
+    ...rest,
+  });
+}
+
+test("PATCH with a valid Bearer key (edit scope) applies the edit under the key owner (T17)", async () => {
+  liveKey();
+  stub("applyCameraEdit", async () => ({ kind: "direct_applied", record: ownerView }));
+  const { PATCH } = await cameraEditRoute();
+  const response = await PATCH(bearerPatch("/api/cameras/5", { title: "New title" }));
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await responseBody(response), { record: ownerView, changed: true });
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  const [input] = callArgs("applyCameraEdit")[0];
+  assert.equal(input.cameraId, 5);
+  assert.equal(input.contributorId, 7, "attribution is the key owner, never anonymous");
+  assert.deepEqual(input.fields, { title: "New title" });
+  assert.equal(callArgs("findSessionByToken").length, 0, "the session store must never be consulted on the key path");
+  assert.equal(callArgs("touchApiKeyLastUsed").length, 1, "a successful key resolution touches last_used (throttled in the db layer)");
+});
+
+test("PATCH with a valid Bearer key on a published record answers 202 with the editRequest (T17)", async () => {
+  liveKey();
+  stub("applyCameraEdit", async () => ({
+    kind: "edit_request_created",
+    editRequest: { id: 12, cameraId: 5, status: "pending", createdAt: "2026-08-01T12:00:00.000Z" },
+  }));
+  const { PATCH } = await cameraEditRoute();
+  const response = await PATCH(bearerPatch("/api/cameras/5", { title: "New title" }));
+  assert.equal(response.status, 202);
+  assert.equal((await responseBody(response)).editRequest.cameraId, 5);
+  assert.equal(callArgs("applyCameraEdit")[0][0].contributorId, 7);
+});
+
+test("key path skips same-origin and CSRF (T17 conditional guards)", async () => {
+  // The CSRF/same-origin check is conditional on authMethod === "session": a
+  // machine client holding a secret bearer credential carries no ambient
+  // browser authority. So a key-authenticated request must sail through a
+  // cross-site Origin and a missing X-CSRF-Token — neither session-branch
+  // 403 may surface.
+  liveKey();
+  stub("applyCameraEdit", async () => ({ kind: "direct_applied", record: ownerView }));
+  const { PATCH } = await cameraEditRoute();
+
+  const response = await PATCH(
+    bearerPatch("/api/cameras/5", { title: "New title" }, {
+      origin: "https://evil.example",
+      referer: "https://evil.example/phish",
+    }),
+  );
+  assert.equal(response.status, 200, "a key request with a cross-site Origin and no CSRF token must pass");
+  assert.equal(callArgs("applyCameraEdit").length, 1);
+});
+
+test("PATCH rejects a key without the edit scope (403 canonical, no write)", async () => {
+  liveKey({ scopes: ["submit", "confirm"] });
+  stub("applyCameraEdit", async () => ({ kind: "direct_applied", record: ownerView }));
+  const { PATCH } = await cameraEditRoute();
+  const response = await PATCH(bearerPatch("/api/cameras/5", { title: "New title" }));
+
+  assert.equal(response.status, 403);
+  assert.equal((await responseBody(response)).error, "Authentication required.");
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.equal(callArgs("applyCameraEdit").length, 0, "no write on scope mismatch");
+});
+
+test("PATCH rejects an invalid/revoked/expired key (401 canonical, no session fallback)", async () => {
+  // findApiKeyByHash -> null collapses unknown/revoked/expired (D6/D9): the
+  // route must answer the uniform 401 even when a verified session cookie is
+  // ALSO present — fail-closed, never a silent downgrade to the session.
+  stub("sha256Hex", async () => "hash");
+  stub("findApiKeyByHash", async () => null);
+  stub("applyCameraEdit", async () => ({ kind: "direct_applied", record: ownerView }));
+  const { PATCH } = await cameraEditRoute();
+  const response = await PATCH(
+    bearerPatch("/api/cameras/5", { title: "New title" }, {
+      cookie: "osdb_session=raw-session-token-abc123; osdb_csrf=csrf-token-123",
+      "x-csrf-token": "csrf-token-123",
+    }),
+  );
+
+  assert.equal(response.status, 401);
+  assert.equal((await responseBody(response)).error, "Authentication required.");
+  assert.equal(callArgs("findSessionByToken").length, 0, "fail-closed: a dead key must never fall through to the session");
+  assert.equal(callArgs("applyCameraEdit").length, 0);
+});
+
+test("key-authenticated requests are double-counted against their key:<id> bucket (D8/T17)", async () => {
+  // The additive per-key check runs AFTER the gate on top of the per-IP
+  // check: a key caller must pass BOTH buckets. Each request rotates its
+  // cf-connecting-ip so the per-IP bucket never trips; once the key's own
+  // budget (EDIT_RATE_LIMIT_MAX=1) is spent the next request answers 429
+  // with Retry-After even though the per-IP bucket still has room.
+  liveKey();
+  stub("applyCameraEdit", async () => ({ kind: "direct_applied", record: ownerView }));
+  env.EDIT_RATE_LIMIT_MAX = "1";
+  env.EDIT_RATE_LIMIT_WINDOW_SECONDS = "60";
+  const { PATCH } = await cameraEditRoute();
+
+  const first = await PATCH(
+    bearerPatch("/api/cameras/5", { title: "One" }, { "cf-connecting-ip": "203.0.113.10" }),
+  );
+  assert.equal(first.status, 200, "first request passes both buckets");
+  assert.equal(callArgs("applyCameraEdit").length, 1);
+
+  const second = await PATCH(
+    bearerPatch("/api/cameras/6", { title: "Two" }, { "cf-connecting-ip": "203.0.113.11" }),
+  );
+  assert.equal(second.status, 429, "the key's own budget is spent -> 429 despite a fresh IP");
+  assert.ok(Number(second.headers.get("retry-after")) > 0, "Retry-After is present");
+  assert.equal((await responseBody(second)).error, "Too many requests. Please try again shortly.");
+  assert.equal(callArgs("applyCameraEdit").length, 1, "no write on the blocked request");
+});
+
+test("session requests consume ONLY the per-IP bucket (no per-key double-count, D8)", async () => {
+  // Session/anonymous callers have no additive per-key bucket: the pre-gate
+  // per-IP check is the whole story. With the edit per-IP budget set to 1
+  // per caller, a session caller rotating IPs passes every request — a
+  // (wrong) shared per-key bucket would have blocked the second one.
+  liveSession();
+  stub("applyCameraEdit", async () => ({ kind: "direct_applied", record: ownerView }));
+  env.EDIT_RATE_LIMIT_MAX = "1";
+  env.EDIT_RATE_LIMIT_WINDOW_SECONDS = "60";
+  const { PATCH } = await cameraEditRoute();
+
+  const first = await PATCH(
+    authedPatch("/api/cameras/5", { title: "One" }, { headers: { "cf-connecting-ip": "203.0.113.20" } }),
+  );
+  assert.equal(first.status, 200);
+  const second = await PATCH(
+    authedPatch("/api/cameras/6", { title: "Two" }, { headers: { "cf-connecting-ip": "203.0.113.21" } }),
+  );
+  assert.equal(second.status, 200, "a session caller on a fresh IP is never double-counted against a per-key bucket");
 });
 
 test("route answers 503 when the db layer is unavailable", async () => {
