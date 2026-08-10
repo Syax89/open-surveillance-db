@@ -1,13 +1,14 @@
 import { env } from "cloudflare:workers";
 import { createCamera, DOME_KIND, findNearbyPublicCameras, freshnessWindows, getPublicCameraFacets, listPublicCameras, listPublicCamerasInBbox, listPublicCamerasInBboxPage, listPublicCamerasPage, PUBLIC_CAMERAS_BBOX_DEFAULT_LIMIT, PUBLIC_CAMERAS_BBOX_MAX_LIMIT, PUBLIC_CAMERAS_PAGE_DEFAULT_LIMIT, PUBLIC_CAMERAS_PAGE_MAX_LIMIT, PUBLIC_CAMERA_SORT_OPTIONS, type FreshnessWindow, type PublicCameraFacets, type PublicCameraFilters } from "../../../db/cameras";
 import { requiresDuplicateConfirmation } from "../../lib/duplicate-detection";
-import { requireVerifiedContributor } from "../../lib/write-gate";
+import { requireWriteAuth } from "../../lib/write-gate";
 import { csrfVerified, sameOrigin } from "../../lib/csrf";
 import { DATA_LICENSE_ID, DATA_LICENSE_NOTICE } from "../../lib/data-license";
 import { isRecord } from "../../lib/guards";
 import {
   callerKey,
   checkRateLimit,
+  checkRateLimitForKeyAuth,
   limitsFor,
   submissionLimits,
   submissionsDisabled,
@@ -276,18 +277,49 @@ export async function POST(request: Request) {
   }
 
   try {
-    // Write gate (multi-method auth Fase E1): every report now requires a
-    // VERIFIED contributor. Anonymous (401) and unverified (403) share one
-    // single response body (anti-enumeration); a session created before
-    // email verification is read-only and cannot write. Attribution is no
-    // longer optional: every stored report carries the verified contributor.
-    const gate = await requireVerifiedContributor(request);
+    // Write gate (multi-method auth Fase E1 + EPIC api-keys T13): every
+    // report requires a VERIFIED contributor, authenticated EITHER by a
+    // verified session cookie OR by a private write API key carrying the
+    // `submit` scope (`Authorization: Bearer osdb_*`, D4). Anonymous (401),
+    // unverified (403) and scope-mismatch (403) share ONE single response
+    // body (anti-enumeration); a session created before email verification
+    // is read-only and cannot write. Attribution is no longer optional:
+    // every stored report carries the verified contributor.
+    const gate = await requireWriteAuth(request, "submit");
     if (!gate.ok) return gate.response;
-    if (!sameOrigin(request) || !csrfVerified(request, gate.session.csrfToken)) {
+
+    // CSRF/same-origin ONLY on the session branch (plan §1.4, T13): a
+    // machine client holding a secret bearer credential carries no ambient
+    // authority from a browser origin, so the double-submit echo would be
+    // dead weight on the key path. Session requests keep the same-origin +
+    // X-CSRF-Token echo exactly as before.
+    if (gate.authMethod === "session" && (!sameOrigin(request) || !csrfVerified(request, gate.session.csrfToken))) {
       return Response.json(
         { error: "Cross-site request rejected. Refresh the page and try again." },
         { status: 403 },
       );
+    }
+
+    // Additive per-key rate limit (D8/T12, plan §1.6): a key-authenticated
+    // request is fail-closed double-counted — it must pass BOTH the per-IP
+    // bucket above AND its own `key:<apiKeyId>` bucket; a block on either
+    // answers 429 (same body as the per-IP block, Retry-After included).
+    // Session callers have no per-key bucket (the pre-gate per-IP check is
+    // the whole story), so this check is a no-op for them. The recorded
+    // block uses the EFFECTIVE key (key:<id>), never the raw IP, for a
+    // key-authenticated caller.
+    const keyLimit = await checkRateLimitForKeyAuth(env, "submit", request, limitOptions, gate);
+    if (!keyLimit.allowed) {
+      console.warn("POST /api/cameras rate limited (per-key bucket)");
+      recordRateLimitBlock(env, {
+        route: "/api/cameras",
+        key: keyLimit.key,
+        windowSeconds: limitOptions.windowSeconds,
+      });
+      return Response.json({ error: "Too many submissions. Please try again shortly." }, {
+        status: 429,
+        headers: { "Retry-After": String(keyLimit.retryAfterSeconds) },
+      });
     }
 
     const payload: unknown = await readJsonBody(request, env);
