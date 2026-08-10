@@ -1446,9 +1446,9 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 /* Passkey disclosure: native <details> with the section heading as the
    summary — keyboard/focus for free, no JS. */
 .passkeys-disclosure { margin-top:22px; border-top:1px solid var(--line); }
-.passkeys-disclosure summary { display:flex; align-items:center; gap:10px; padding:14px 2px; cursor:pointer; list-style:none; }
+.passkeys-disclosure summary { display:flex; align-items:baseline; gap:10px; padding:14px 2px; cursor:pointer; list-style:none; }
 .passkeys-disclosure summary::-webkit-details-marker { display:none; }
-.passkeys-disclosure summary::before { content:"▸"; color:var(--ink-4); font-size:var(--text-sm); transition:transform .15s ease; }
+.passkeys-disclosure summary::before { content:"▸"; color:var(--ink-4); font-size:var(--text-sm); transition:transform .15s ease; align-self:center; }
 .passkeys-disclosure[open] summary::before { transform:rotate(90deg); }
 .passkeys-disclosure summary h2 { margin:0; font-size:var(--text-2xl); }
 .passkeys-summary-count { color:var(--muted); font-size:var(--text-md); font-weight:700; }
