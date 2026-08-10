@@ -2,11 +2,11 @@
 
 - **Status:** in force — personal open-source project (controller: Simone Rondina, syax89 — not a company). The Service is live at the public URL; these terms are the applicable contract.
 - **Owner:** Simone Rondina (project owner / privacy contact)
-- **Version:** 0.8 (2026-08-08) — current-state alignment (template-ready): § 3.7 reflects the implemented multi-method auth (ADR 0020 — OIDC server-gated: buttons shown only when the operator configured the provider); § 5.5 reflects the image-evidence removal (2026-08-08); § 15 open items reflect the implemented retention sweep and OIDC activation.
+- **Version:** 0.9 (2026-08-09) — API keys (ADR 0023, write-auth epic): new § 3.8 (personal, non-transferable, verified-account-only, instant revocation) and § 4.5 (key misuse); § 9 references the hash-only storage and R21; § 15 tracks the legal package.
 - **Decisions applied (2026-07-31, CEO — Wave A):** privacy contact `privacy@opensurveillancedb.org` (dedicated, monitored mailbox); published coordinates rounded to **~4 decimal places (~10 m)** (zone-level precision; exact location never published); community-driven publication model (ADR 0021, 2026-08-04).
 - **Scope:** the OpenSurveillanceDB web application, public API, data exports and related services ("the Service").
 - **Legal framework:** Regulation (EU) 2016/679 (GDPR); D.Lgs. 196/2003 (Codice Privacy, IT, as amended by D.Lgs. 101/2018); mandatory consumer-protection provisions of the user's country of residence continue to apply where the user is a consumer.
-- **Related documents:** [PRIVACY_AND_SAFETY.md](PRIVACY_AND_SAFETY.md), [MODERATION.md](MODERATION.md), [OPEN_SOURCE.md](OPEN_SOURCE.md), [GOVERNANCE.md](../GOVERNANCE.md), ADR 0021; legal deliverables: PRIVACY_NOTICE.md, LAWFUL_BASIS.md, RETENTION_SCHEDULE.md, MODERATION_SLA.md, BREACH_PROCEDURE.md (in `docs/legal/`).
+- **Related documents:** [PRIVACY_AND_SAFETY.md](PRIVACY_AND_SAFETY.md), [MODERATION.md](MODERATION.md), [OPEN_SOURCE.md](OPEN_SOURCE.md), [GOVERNANCE.md](../GOVERNANCE.md), ADR 0021, ADR 0023 (API keys — write auth); legal deliverables: PRIVACY_NOTICE.md, LAWFUL_BASIS.md, RETENTION_SCHEDULE.md, MODERATION_SLA.md, BREACH_PROCEDURE.md (in `docs/legal/`).
 
 ---
 
@@ -34,6 +34,14 @@
    - **Passkeys.** If you enroll a passkey, the site stores only public-key material; the private key stays on your device. **Vendor note:** *synced* passkeys are backed up through the OS vendor's cloud (Apple/Google/Microsoft) at your choice — the vendor learns you have an account here, the site shares nothing with them, and you control sync. Keep the 10 recovery codes issued at enrollment in a safe place; without them, a lost device may mean losing access to the passkey method (the email+password path remains).
    - **OIDC via GitHub/Google — tracking disclosure.** Signing in with GitHub or Google means **GitHub or Google observes that you sign in to this Service, and your IP address**, at each login; the provider's own terms and privacy policy apply at sign-in. We **do not import your email** from the provider (subject id + verified flag only) and we never merge accounts automatically on an email match — a conflict requires a manual, verified merge. This method is **opt-in and disclosed** (risk matrix on the login page); the buttons are shown only when the operator has activated the provider (credentials configured on this deployment, PROCESSOR_REGISTER.md PR4/PR5).
    - You may add, change or remove methods from your account page at any time; deleting your account deletes the data of every method (PRIVACY_NOTICE.md § 7 R15, § 8).
+8. **API keys — write access for scripts and tools (ADR 0023).** Verified contributors can issue **personal API keys** (up to 5 active) from the account page to authenticate programmatic write access (submit, confirm, edit, action) without a browser session. Read access stays **keyless** — no key, no registration. The rules:
+   - **Verified-account only.** Only verified contributor accounts can mint or hold API keys; keys inherit the account's verification state. Key-authenticated requests are never granted more than the contributor could do in a verified session — and a key can exercise only the scopes it was issued with (default: all four).
+   - **Personal and non-transferable.** A key is bound to your account. You may not share it, publish it, commit it to a public repository, embed it in client-side code, or let anyone else use it — treat it exactly like a password.
+   - **Shown once.** The raw key is displayed a single time at creation and is never stored server-side (only its SHA-256 hash is kept — PRIVACY_NOTICE.md § 3.2); the project cannot recover it. If you lose it, revoke it and issue a new one.
+   - **Expiry.** Keys expire after **365 days by default** (optional custom expiry at creation); expired keys stop authenticating.
+   - **Revocation.** You can revoke any of your keys **instantly** from the account page; revocation takes effect immediately. The project may also revoke a key where necessary to protect the Service, other users or data subjects (e.g. suspected misuse or compromise), with notice where proportionate and possible.
+   - **Limits.** Keys are subject to per-key and per-IP rate limits and to the cap of 5 active keys; exceeding them may lead to suspension or revocation (§ 4.5).
+   - **Account deletion** revokes and hard-deletes all keys of the account in the same erasure batch (art. 17; RETENTION_SCHEDULE.md R21).
 
 ## 4. What you may not do
 
@@ -48,6 +56,7 @@
 2. **Do not include unnecessary personal data.** Reports and notes must not contain personal data that does not serve the public record (data minimisation, PRIVACY_AND_SAFETY.md; LAWFUL_BASIS.md § 3.1).
 3. **No abuse:** do not exceed the applicable rate limits, do not scrape the Service beyond reasonable personal use, do not attempt to access non-public records (withdrawn records, correction requests — ADR 0021), and do not circumvent access controls or use the Service to harass or facilitate harm.
 4. **No commercial resale of the Service itself.** Reuse of the *data* under ODbL 1.0 (including commercial reuse) remains permitted; this clause concerns reselling the Service as a product.
+5. **No API-key misuse.** API keys are personal and non-transferable (§ 3.8): do not share them, do not publish or commit them to public repositories, do not embed them in client-side code, do not use a revoked, expired or suspended key, and do not circumvent or exceed the per-key or per-IP rate limits. If you suspect a key has been compromised, revoke it immediately and report the incident through the security route (SECURITY.md); the project may revoke keys suspected of misuse (§ 3.8).
 
 ## 5. Reports and publication
 
@@ -80,7 +89,7 @@
 
 ## 9. Privacy
 
-Your use of the Service is governed by the privacy notice (PRIVACY_NOTICE.md), the lawful-basis assessment (LAWFUL_BASIS.md), the retention schedule (RETENTION_SCHEDULE.md), and the breach procedure (BREACH_PROCEDURE.md). Key points: no tracking, no behavioural advertising; reports are public as soon as they are published and private correction requests stay private; your GDPR rights are exercisable via `privacy@opensurveillancedb.org` within the statutory timelines (art. 12(3) GDPR). **How you authenticate** is described in § 3.7 and PRIVACY_NOTICE.md § 3.1: email verification before write access, passkeys with a vendor note on sync, and OIDC with a tracking disclosure — each method's data is processed per PRIVACY_NOTICE.md § 3 and deleted on account erasure (§ 7 R15).
+Your use of the Service is governed by the privacy notice (PRIVACY_NOTICE.md), the lawful-basis assessment (LAWFUL_BASIS.md), the retention schedule (RETENTION_SCHEDULE.md), and the breach procedure (BREACH_PROCEDURE.md). Key points: no tracking, no behavioural advertising; reports are public as soon as they are published and private correction requests stay private; your GDPR rights are exercisable via `privacy@opensurveillancedb.org` within the statutory timelines (art. 12(3) GDPR). **How you authenticate** is described in § 3.7/§ 3.8 and PRIVACY_NOTICE.md § 3.1/§ 3.2: email verification before write access, passkeys with a vendor note on sync, OIDC with a tracking disclosure, and API keys — stored as **SHA-256 hashes only** (the raw key appears once at creation), metadata-only in API responses, never logged, and swept 90 days after revocation/expiry (RETENTION_SCHEDULE.md R21). Each method's data is processed per PRIVACY_NOTICE.md § 3 and deleted on account erasure (§ 7 R15/R21).
 
 ## 10. Availability and limitation of liability
 
@@ -122,6 +131,7 @@ Your use of the Service is governed by the privacy notice (PRIVACY_NOTICE.md), t
 - [x] **Multi-method auth (ADR 0020):** implemented — email verification enforced for write access (read-only sessions until verified), passkeys with 10 recovery codes and the email+password fallback, OIDC via GitHub/Google **server-gated** (buttons shown only when the operator configured the provider; erasure covers the new auth data, RETENTION_SCHEDULE.md R15).
 - [x] **Acceptance mechanics (clickwrap):** implemented — the submission and correction forms require an explicit consent checkbox (with links to `/privacy` and `/termini`) before the record or correction can be sent (`ReportForm.tsx`, `CorrectionForm.tsx`); general browse terms apply to the rest of the site.
 - [x] **ADR:** the adoption of these terms and the inbound data-licensing model (submission → ODbL at publication) are recorded in ADR 0008 (data licence) and ADR 0021 (community-driven model, which cites these terms).
+- [x] **API-key legal package (ADR 0023 / write-auth epic):** § 3.8 (verified-account requirement, personal and non-transferable keys, show-once, 365-day default expiry, instant revocation) and § 4.5 (key misuse) added; PRIVACY_NOTICE.md § 3.2/§ 4/§ 7 and RETENTION_SCHEDULE.md R21 describe hash-only storage, per-key + per-IP limits, and the 90-day post-revocation/expiry sweep. In force with the legal PR; feature implementation is tracked by the write-auth epic tasks.
 
 ---
 
