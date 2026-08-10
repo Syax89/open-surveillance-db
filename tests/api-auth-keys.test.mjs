@@ -3,12 +3,14 @@
 // api-keys, T7 + T8 + T9, plan §1.3/§5.3, AC5, decisions D2/D4/D5/D6/D9/D13).
 //
 // Contract under test (guard order, from the route docblock / spec §1.3):
-//   POST: urlTooLong (414) -> authLimit (429 with Retry-After) ->
+//   POST: urlTooLong (414) -> query-string credential rejection (400,
+//   ADR 0023) -> authLimit (429 with Retry-After) ->
 //   malformed-cookie (400) -> requireVerifiedContributor (401 anon / 403
 //   unverified, canonical body) -> sameOrigin + csrfVerified (403) -> body
-//   validation (400) -> cap count (409) -> createApiKey -> 201 { id, name,
-//   key, keyPrefix, scopes, createdAt, expiresAt } + Cache-Control:
-//   no-store.
+//   validation (400) -> createApiKey with the atomic D5 cap guard (the
+//   conditional INSERT enforces the cap in ONE statement) -> 409 when the
+//   guard refuses / 201 { id, name, key, keyPrefix, scopes, createdAt,
+//   expiresAt } + Cache-Control: no-store.
 //   GET: urlTooLong (414) -> sessionLimit (429 with Retry-After, session
 //   bucket 120/min) -> resolveOptionalContributor (401 anon) ->
 //   listApiKeysForContributor -> 200 { keys: [...] } metadata only (id,
@@ -31,7 +33,7 @@
 // db/api-keys is mocked (tests/helpers/mocks/api-keys.mjs); pure helpers
 // (csrf, authLimit + the real rate-limit module, the scope whitelist, the
 // D5 env-knob default) run for real. The db boundary (createApiKey,
-// countApiKeysForContributor, listApiKeysForContributor, revokeApiKey) is
+// listApiKeysForContributor, revokeApiKey) is
 // covered for real in tests/db-api-keys-crud.test.mjs.
 
 import assert from "node:assert/strict";
@@ -359,27 +361,71 @@ test("413: an oversized body is rejected before any db work", async () => {
 });
 
 // ---------------------------------------------------------------------------
+// 5b. Query-string credentials: rejected before any auth (ADR 0023).
+// ---------------------------------------------------------------------------
+
+test("400: POST mint rejects credentials in the query string before any auth work", async () => {
+  liveSession(); // must NOT be reached
+  const { POST } = await keysRoute();
+  const response = await POST(
+    apiRequest("/api/auth/keys?api_key=osdb_secret-value", { method: "POST", body: { name: "x" } }),
+  );
+  assert.equal(response.status, 400);
+  assert.equal((await responseBody(response)).error, "API credentials in the query string are not accepted.");
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.equal(callArgs("findSessionByToken").length, 0, "rejection happens before the session read");
+  assert.equal(callArgs("createApiKey").length, 0);
+});
+
+test("400: GET list rejects credentials in the query string before the session read", async () => {
+  liveSession(); // must NOT be reached
+  const { GET } = await keysRoute();
+  const response = await GET(apiRequest("/api/auth/keys?key=osdb_secret-value", { method: "GET" }));
+  assert.equal(response.status, 400);
+  assert.equal((await responseBody(response)).error, "API credentials in the query string are not accepted.");
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.equal(callArgs("listApiKeysForContributor").length, 0);
+});
+
+test("400: DELETE rejects credentials in the query string before any auth work", async () => {
+  liveSession(); // must NOT be reached
+  const { DELETE: revoke } = await keyIdRoute();
+  const response = await revoke(apiRequest("/api/auth/keys/42?apiKey=osdb_secret-value", { method: "DELETE" }));
+  assert.equal(response.status, 400);
+  assert.equal((await responseBody(response)).error, "API credentials in the query string are not accepted.");
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.equal(callArgs("revokeApiKey").length, 0);
+});
+
+// ---------------------------------------------------------------------------
 // 6. Cap D5: at the limit the mint answers 409, no key is created.
 // ---------------------------------------------------------------------------
 
-test("409: the mint refuses once the contributor is at the cap (5 by default)", async () => {
+test("409: the mint refuses when the atomic cap guard refuses the insert (5 by default)", async () => {
   liveSession();
-  stub("countApiKeysForContributor", async () => 5);
+  // The cap is enforced atomically in the db layer: createApiKey returns
+  // null when the conditional INSERT matched no row (cap reached), which
+  // the route maps to the uniform 409. There is no separable COUNT-then-
+  // INSERT in the route anymore.
+  stub("createApiKey", async () => null);
   const { POST } = await keysRoute();
   const response = await POST(authedPost({ name: "sixth" }));
   assert.equal(response.status, 409);
   const body = await responseBody(response);
   assert.equal(body.error, "API key limit reached. Revoke an existing key before creating a new one.");
   assert.equal(response.headers.get("cache-control"), "no-store");
-  assert.equal(callArgs("createApiKey").length, 0, "no key is created at the cap");
   // The 409 body carries no key material (P0-2).
   assert.deepEqual(Object.keys(body), ["error"]);
+  // The guard receives the env cap (default 5) with the mint inputs.
+  assert.deepEqual(callArgs("createApiKey")[0], [
+    { contributorId: 7, name: "sixth", scopes: SCOPES_ALL, expiresAt: undefined, maxActive: 5 },
+  ]);
 });
 
-test("409: a revoked/expired key frees its slot — the count is over active keys only", async () => {
+test("201: a revoked/expired key frees its slot — the atomic guard counts active keys only", async () => {
   liveSession();
-  // 5 rows exist but one is revoked/expired -> count 4 < cap -> mint succeeds.
-  stub("countApiKeysForContributor", async () => 4);
+  // The db layer's conditional INSERT re-counts ACTIVE keys in the same
+  // statement, so a revoked/expired row does not block a fresh mint.
   stubMint({ name: "slot freed" });
   const { POST } = await keysRoute();
   const response = await POST(authedPost({ name: "slot freed" }));
@@ -392,7 +438,6 @@ test("409: a revoked/expired key frees its slot — the count is over active key
 
 test("201: mints a key, reveals the raw key once and never exposes the hash", async () => {
   liveSession();
-  stub("countApiKeysForContributor", async () => 0);
   const { rawKey, key } = stubMint({ name: "  CI deploy  " });
   const { POST } = await keysRoute();
 
@@ -412,16 +457,15 @@ test("201: mints a key, reveals the raw key once and never exposes the hash", as
   assert.equal("keyHash" in body, false, "the hash is never exposed (D3)");
   assert.equal("lastUsedAt" in body, false, "metadata-only surface keeps the shape tight");
 
-  // The db layer receives the parsed inputs, including the trimmed name.
+  // The db layer receives the parsed inputs, including the trimmed name and
+  // the atomic cap guard's max (env default 5).
   assert.deepEqual(callArgs("createApiKey")[0], [
-    { contributorId: 7, name: "CI deploy", scopes: SCOPES_ALL, expiresAt: undefined },
+    { contributorId: 7, name: "CI deploy", scopes: SCOPES_ALL, expiresAt: undefined, maxActive: 5 },
   ]);
-  assert.deepEqual(callArgs("countApiKeysForContributor")[0], [7]);
 });
 
 test("201: a narrowed scope subset and an explicit expiry are passed through", async () => {
   liveSession();
-  stub("countApiKeysForContributor", async () => 0);
   stubMint({ name: "submit only", scopes: ["submit"], expiresAt: "2026-09-01T00:00:00.000Z" });
   const { POST } = await keysRoute();
 
@@ -433,13 +477,12 @@ test("201: a narrowed scope subset and an explicit expiry are passed through", a
   assert.deepEqual(body.scopes, ["submit"]);
   assert.equal(body.expiresAt, "2026-09-01T00:00:00.000Z");
   assert.deepEqual(callArgs("createApiKey")[0], [
-    { contributorId: 7, name: "submit only", scopes: ["submit"], expiresAt: "2026-09-01T00:00:00.000Z" },
+    { contributorId: 7, name: "submit only", scopes: ["submit"], expiresAt: "2026-09-01T00:00:00.000Z", maxActive: 5 },
   ]);
 });
 
 test("201: an explicit null expiry means never and is passed through", async () => {
   liveSession();
-  stub("countApiKeysForContributor", async () => 0);
   stubMint({ name: "never", expiresAt: null });
   const { POST } = await keysRoute();
 
@@ -447,7 +490,7 @@ test("201: an explicit null expiry means never and is passed through", async () 
   assert.equal(response.status, 201);
   assert.equal((await responseBody(response)).expiresAt, null);
   assert.deepEqual(callArgs("createApiKey")[0], [
-    { contributorId: 7, name: "never", scopes: SCOPES_ALL, expiresAt: null },
+    { contributorId: 7, name: "never", scopes: SCOPES_ALL, expiresAt: null, maxActive: 5 },
   ]);
 });
 
@@ -455,21 +498,8 @@ test("201: an explicit null expiry means never and is passed through", async () 
 // 8. db failures -> 500, never a crash, never key material.
 // ---------------------------------------------------------------------------
 
-test("500: a failing cap count maps to the generic mint error", async () => {
-  liveSession();
-  stub("countApiKeysForContributor", async () => {
-    throw new Error("Database binding unavailable");
-  });
-  const { POST } = await keysRoute();
-  const response = await POST(authedPost({ name: "x" }));
-  assert.equal(response.status, 500);
-  assert.equal((await responseBody(response)).error, "Unable to create the API key");
-  assert.equal(response.headers.get("cache-control"), "no-store");
-});
-
 test("500: a failing createApiKey maps to the generic mint error", async () => {
   liveSession();
-  stub("countApiKeysForContributor", async () => 0);
   stub("createApiKey", async () => {
     throw new Error("Database binding unavailable");
   });

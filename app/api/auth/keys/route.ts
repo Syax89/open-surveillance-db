@@ -2,13 +2,13 @@ import { env } from "cloudflare:workers";
 import {
   API_KEY_SCOPES,
   apiKeysMaxPerContributor,
-  countApiKeysForContributor,
   createApiKey,
   listApiKeysForContributor,
   type ApiKeyScope,
 } from "../../../../db/api-keys";
 import { authLimit, sessionLimit } from "../../../lib/auth-route-helpers";
 import { malformedSessionCookieGuard, resolveOptionalContributor } from "../../../lib/auth-session";
+import { rejectQueryCredentials } from "../../../lib/api-key-auth";
 import { csrfVerified, sameOrigin } from "../../../lib/csrf";
 import { isRecord } from "../../../lib/guards";
 import { BodyReadError, readJsonBody, urlTooLong } from "../../../lib/input-limits";
@@ -28,28 +28,37 @@ const NO_STORE_HEADERS = { "Cache-Control": "no-store" };
  * browser.
  *
  * Guard order (spec §1.3): urlTooLong (project-wide transport guard, 414) →
- * authLimit (shared auth-mutation bucket, 429) → malformed-cookie 400 (QA
- * F1: a present-but-undecodable session cookie is a client bug, not an
- * anonymous caller) → requireVerifiedContributor (write gate: 401 anonymous
- * / 403 unverified, single canonical body, anti-enumeration) → sameOrigin +
- * csrfVerified (the state change carries a live session, so it must echo the
- * session's X-CSRF-Token; same-origin first).
+ * query-string credential rejection (ADR 0023, 400 — a credential smuggled
+ * in the URL never even reaches auth) → authLimit (shared auth-mutation
+ * bucket, 429) → malformed-cookie 400 (QA F1: a present-but-undecodable
+ * session cookie is a client bug, not an anonymous caller) →
+ * requireVerifiedContributor (write gate: 401 anonymous / 403 unverified,
+ * single canonical body, anti-enumeration) → sameOrigin + csrfVerified (the
+ * state change carries a live session, so it must echo the session's
+ * X-CSRF-Token; same-origin first).
  *
  * Body `{ name, scopes?, expiresAt? }`:
  *   - name: 1..60 chars after trim (required);
  *   - scopes: non-empty subset of the D4 whitelist, defaults to all four;
  *   - expiresAt: ISO-8601 UTC, default +365d (D6), explicit null = never.
  *
- * Cap D5: `countApiKeysForContributor` against `apiKeysMaxPerContributor`
- * (env knob API_KEYS_MAX_PER_CONTRIBUTOR, default 5); at the cap the mint
- * answers 409 and no key is created. A revoked/expired key frees its slot
- * immediately.
+ * Cap D5: `createApiKey` is called with `maxActive:
+ * apiKeysMaxPerContributor(env)` (env knob API_KEYS_MAX_PER_CONTRIBUTOR,
+ * default 5), so the cap is enforced ATOMICALLY inside the conditional
+ * INSERT — there is no separable COUNT-then-INSERT race. When the atomic
+ * guard refuses (cap reached) the mint answers 409 and no key is created;
+ * a revoked/expired key frees its slot immediately.
  */
 export async function POST(request: Request) {
   // Transport guard: reject absurdly long URLs before any auth or parsing.
   if (urlTooLong(request)) {
     return Response.json({ error: "Request URI too long." }, { status: 414, headers: NO_STORE_HEADERS });
   }
+
+  // Query-string credential guard (ADR 0023): a key in the URL would leak
+  // into proxy/access logs and Referer headers — reject before any auth.
+  const queryRejection = rejectQueryCredentials(request);
+  if (queryRejection) return queryRejection;
 
   // Shared auth-mutation rate limit (default 10/min per caller, AUTH_LIMITER
   // binding in production; in-memory fallback in dev/tests). This is a
@@ -129,9 +138,18 @@ export async function POST(request: Request) {
       expiresAt = null;
     }
 
-    // Cap D5: at the cap the mint answers 409 and no key is created.
-    const active = await countApiKeysForContributor(gate.contributor.id);
-    if (active >= apiKeysMaxPerContributor(env)) {
+    // Cap D5 (atomic): the db layer enforces the cap inside the SAME SQL
+    // statement that inserts (createApiKey's `maxActive` guard re-counts the
+    // contributor's active keys in the conditional INSERT). A `null` return
+    // means the guard refused — answer the uniform 409, no key is created.
+    const minted = await createApiKey({
+      contributorId: gate.contributor.id,
+      name,
+      scopes,
+      expiresAt,
+      maxActive: apiKeysMaxPerContributor(env),
+    });
+    if (minted === null) {
       return Response.json(
         { error: "API key limit reached. Revoke an existing key before creating a new one." },
         { status: 409, headers: NO_STORE_HEADERS },
@@ -140,12 +158,7 @@ export async function POST(request: Request) {
 
     // Reveal-once: the raw key exists in exactly this response (D2/P1-2).
     // createApiKey persists only the SHA-256 hex and the display prefix.
-    const { rawKey, key } = await createApiKey({
-      contributorId: gate.contributor.id,
-      name,
-      scopes,
-      expiresAt,
-    });
+    const { rawKey, key } = minted;
 
     return Response.json(
       {
@@ -185,7 +198,9 @@ export async function POST(request: Request) {
  * account page can show the full lifecycle; the list is newest first.
  *
  * Guard order (spec §1.3): urlTooLong (project-wide transport guard, 414)
- * → sessionLimit (shared session-read bucket, 429 — this is a READ of the
+ * → query-string credential rejection (ADR 0023, 400 — a credential
+ * smuggled in the URL is rejected before any auth or rate limiting) →
+ * sessionLimit (shared session-read bucket, 429 — this is a READ of the
  * caller's own data, refetched on every account-page render, so it uses
  * the generous 120/min session bucket, not the auth-mutation 10/min) →
  * resolveOptionalContributor (401 anonymous; own data only, no
@@ -200,6 +215,11 @@ export async function GET(request: Request) {
   if (urlTooLong(request)) {
     return Response.json({ error: "Request URI too long." }, { status: 414, headers: NO_STORE_HEADERS });
   }
+
+  // Query-string credential guard (ADR 0023): a key in the URL would leak
+  // into proxy/access logs and Referer headers — reject before any auth.
+  const queryRejection = rejectQueryCredentials(request);
+  if (queryRejection) return queryRejection;
 
   // Session READ bucket (120/min per caller), not the auth mutation bucket:
   // the account page refetches this list on every open/reveal/revoke, and

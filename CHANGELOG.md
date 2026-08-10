@@ -661,6 +661,27 @@ changes accumulate under `[Unreleased]`.
 
 ### Security
 
+- **API keys — write-auth hardening (P1 audit, EPIC api-keys, ADR 0023):** three
+  fixes, one atomic PR:
+  1. **Atomic per-account cap (D5):** the mint route no longer runs a separable
+     `COUNT` then `INSERT` — `createApiKey` enforces the cap inside ONE
+     conditional SQL statement (`maxActive` guard: the active-key count and
+     the insert share the same statement), so concurrent mints can never
+     overshoot `API_KEYS_MAX_PER_CONTRIBUTOR`. Overflow still answers 409.
+  2. **Expiry by instant, canonical UTC storage (D6/D7):** client-supplied
+     `expiresAt` offsets are normalised to ISO-8601 UTC Z at mint, and every
+     liveness/count comparison now judges the instant (`Date.parse` /
+     `julianday`), never string order — an offset expiry that is temporally
+     past but sorts after `now` is dead; an unparseable stored expiry is
+     treated as expired (fail-closed).
+  3. **Query-string credentials rejected (400, no-store, before
+     authentication):** the write gate (`requireWriteAuth`) and the
+     `/api/auth/keys` handlers reject any request carrying a credential-named
+     query param (`api_key`/`apiKey`/`key`, case-insensitive) with ONE generic
+     400 — the value is never reflected or logged, `Authorization: Bearer`
+     keeps working, and unrelated token flows (email verify / OIDC / password
+     reset) are untouched.
+
 - **Repository hygiene — zero secrets / credentials / personal infrastructure
   references (template-clean, PR #383):** the production D1 `database_id`
   was removed from `wrangler.jsonc` (placeholder restored; the real id is

@@ -28,6 +28,14 @@
  *
  * No personal data is written by this module beyond the throttled
  * `last_used_at` touch (D7) of the presented key's own row.
+ *
+ * Query-string credential guard (ADR 0023): `rejectQueryCredentials` answers
+ * a generic 400 BEFORE any authentication work when the request URL carries
+ * an unambiguous credential parameter (`api_key`/`apikey`/`key`,
+ * case-insensitive) — a key smuggled in the URL would leak into proxy/access
+ * logs and Referer headers. The body never echoes the value (anti-logging,
+ * anti-enumeration); the write gate and the /api/auth/keys handlers call it
+ * first.
  */
 
 import { findApiKeyByHash, touchApiKeyLastUsed, type ApiKey, type ApiKeyContributor } from "../../db/api-keys";
@@ -38,6 +46,40 @@ export type ApiKeyAuthResult = {
   apiKey: ApiKey;
   contributor: ApiKeyContributor;
 };
+
+/**
+ * Unambiguous query-parameter names that carry credentials (ADR 0023),
+ * lowercase for the case-insensitive match. `apiKey` lowercases to `apikey`
+ * (the JS camelCase spelling is covered by the same entry). Deliberately
+ * small: only names that are unambiguous credential carriers are rejected,
+ * so unrelated query params on the same URL never trip the guard.
+ */
+const QUERY_CREDENTIAL_NAMES = new Set(["api_key", "apikey", "key"]); // case-insensitive; apiKey lowercases to apikey
+
+/**
+ * Reject credentials smuggled in the query string BEFORE any authentication
+ * work (ADR 0023): returns a generic 400 `Response` (Cache-Control:
+ * no-store) when the request URL carries a credential-named query param, or
+ * null to let the request proceed.
+ *
+ * Only NAMES are inspected (`params.keys()` — values are never read,
+ * reflected or logged), and every rejected name answers the SAME generic
+ * body (anti-enumeration: a caller cannot learn which param tripped the
+ * guard, and the credential value never leaks into a response).
+ */
+export function rejectQueryCredentials(request: Request): Response | null {
+  const params = new URL(request.url).searchParams;
+  for (const name of params.keys()) {
+    // iterate NAMES only, never the values
+    if (QUERY_CREDENTIAL_NAMES.has(name.toLowerCase())) {
+      return Response.json(
+        { error: "API credentials in the query string are not accepted." },
+        { status: 400, headers: { "Cache-Control": "no-store" } },
+      );
+    }
+  }
+  return null;
+}
 
 /**
  * Parse the `Authorization` header as exactly one `Bearer <token>`

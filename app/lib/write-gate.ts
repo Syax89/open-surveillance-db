@@ -54,11 +54,17 @@
  *
  * Responses are `Cache-Control: no-store`: they are per-request auth
  * outcomes and must never be cached by an edge or browser.
+ *
+ * Query-string credential guard (ADR 0023): `requireWriteAuth` rejects any
+ * request whose URL carries a credential-named query param (`api_key` /
+ * `apikey` / `key`, case-insensitive) with a generic 400 BEFORE touching
+ * either auth path — a key in the URL would leak into proxy/access logs and
+ * Referer headers, so the write never even starts.
  */
 
 import { getContributorVerification } from "../../db/auth";
 import { API_KEY_SCOPES, type ApiKeyScope } from "../../db/api-keys";
-import { resolveApiKeyContributor } from "./api-key-auth";
+import { rejectQueryCredentials, resolveApiKeyContributor } from "./api-key-auth";
 import {
   malformedSessionCookieGuard,
   resolveOptionalContributor,
@@ -150,6 +156,13 @@ export async function requireWriteAuth(
   scope: ApiKeyScope,
   now: string = new Date().toISOString(),
 ): Promise<WriteAuthResult> {
+  // Query-string credential guard (ADR 0023): a credential smuggled as a
+  // query param would leak into proxy/access logs and Referer headers, so
+  // reject it BEFORE any authentication work — before the Authorization
+  // branch, before any session read, before any hashing.
+  const queryRejection = rejectQueryCredentials(request);
+  if (queryRejection) return { ok: false, response: queryRejection };
+
   // Bearer present → API-key path (fail-closed: a machine client that
   // believed it was authenticating must never silently fall through to a
   // session, so ANY present Authorization header — even a malformed one —
