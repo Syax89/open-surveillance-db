@@ -15,6 +15,8 @@
 //   R16 stale failed-login counters (login_attempts) purged after
 //       LOGIN_ATTEMPT_RETENTION_DAYS of inactivity; rows under an ACTIVE lock
 //       are never swept; >100 stale rows drain across multiple bounded rounds
+//   R21 dead API keys (api_keys) purged 90 days after revoked_at / expires_at
+//       (EPIC api-keys, D9)
 //   atomicity: purgeCameraRecord closes the camera's queue items and deletes
 //       the camera in one d1.batch (regression: rows were deleted before the
 //       batch). Photo evidence (former R6/R13) was removed with the photo
@@ -178,6 +180,25 @@ async function insertLoginAttempt({ emailKey, windowStart, lockedUntil = null })
   )
     .bind(emailKey, windowStart, lockedUntil)
     .run();
+}
+
+// An API key row (migration 0045, EPIC api-keys). `contributor_id` FKs to
+// contributors (FK enforcement is ON in the D1 adapter), so a throwaway
+// contributor is created like insertSession does. The R21 sweep anchors on
+// revoked_at / expires_at: a dead key is purged 90 days after it died.
+async function insertApiKey({ revokedAt = null, expiresAt = null }) {
+  await runtime.env.DB.prepare(
+    "INSERT INTO contributors (email, password_hash, created_at, updated_at) VALUES (?, 'x', ?, ?)",
+  )
+    .bind(`apikey-contrib-${Math.random()}@example.com`, NOW, NOW)
+    .run();
+  const { lastRowId } = await runtime.env.DB.prepare(
+    `INSERT INTO api_keys (contributor_id, name, key_prefix, key_hash, scopes, created_at, last_used_at, expires_at, revoked_at)
+     VALUES ((SELECT id FROM contributors ORDER BY id DESC LIMIT 1), 'test key', 'osdb_test', ?, '["submit"]', ?, NULL, ?, ?)`,
+  )
+    .bind(`apikey-hash-${Math.random()}`, NOW, expiresAt, revokedAt)
+    .run();
+  return lastRowId;
 }
 
 async function count(table, where = "1=1", ...args) {
@@ -527,6 +548,48 @@ test("R16: the bounded sweep drains >100 stale rows across multiple rounds in on
 
   assert.equal(summary.loginAttemptsPurged, 250, "every stale row across batches is purged");
   assert.equal(await count("login_attempts"), 1, "only the fresh row survives");
+});
+
+// ---------------------------------------------------------------------------
+// R21 — dead API keys (EPIC api-keys, D9)
+// ---------------------------------------------------------------------------
+
+test("R21: keys revoked more than 90 days ago are purged, live ones survive", async () => {
+  await insertApiKey({ revokedAt: daysBefore(91) }); // revoked >90d ago → purged
+  await insertApiKey({ revokedAt: daysBefore(90) }); // exactly 90d → survives (strict <)
+  await insertApiKey({ revokedAt: daysBefore(1) }); // recently revoked → survives
+  await insertApiKey({ revokedAt: null, expiresAt: null }); // active, never expires → survives
+
+  const summary = await runtime.retention.runRetentionSweep(NOW);
+
+  assert.equal(summary.apiKeysPurged, 1, "only the key revoked past the 90-day cutoff is removed");
+  assert.equal(await count("api_keys"), 3);
+  assert.equal(
+    await count("api_keys", "revoked_at IS NOT NULL"),
+    2,
+    "recently revoked keys stay visible on the account page until the window elapses",
+  );
+});
+
+test("R21: keys expired more than 90 days ago are purged even without a revocation", async () => {
+  await insertApiKey({ revokedAt: null, expiresAt: daysBefore(91) }); // expired >90d ago → purged
+  await insertApiKey({ revokedAt: null, expiresAt: daysBefore(10) }); // recently expired → survives
+  await insertApiKey({ revokedAt: null, expiresAt: daysAfter(10) }); // still live → survives
+  await insertApiKey({ revokedAt: null, expiresAt: null }); // never expires → survives
+
+  const summary = await runtime.retention.runRetentionSweep(NOW);
+
+  assert.equal(summary.apiKeysPurged, 1);
+  assert.equal(await count("api_keys"), 3);
+});
+
+test("R21: a key revoked long ago is purged even when its expiry is still in the future", async () => {
+  await insertApiKey({ revokedAt: daysBefore(91), expiresAt: daysAfter(365) }); // dead since revoke, expires later
+
+  const summary = await runtime.retention.runRetentionSweep(NOW);
+
+  assert.equal(summary.apiKeysPurged, 1, "revocation is permanent — the row is dead at revoke time (D9)");
+  assert.equal(await count("api_keys"), 0);
 });
 
 // ---------------------------------------------------------------------------

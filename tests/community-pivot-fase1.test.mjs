@@ -344,7 +344,12 @@ test("0039: public-history backfill from moderation_events, no attribution", asy
 // ---------------------------------------------------------------------------
 
 test("eraseContributor deletes the contributor's community actions of every type", async () => {
-  await applyMigrationsUpTo(db, 39);
+  // The erasure batch is the CURRENT GDPR contract (ADR 0021 §13.1): it now
+  // also hard-deletes the contributor's api_keys rows (EPIC api-keys, D9,
+  // migration 0045 — purely additive), so this test's schema snapshot must
+  // reach 0045 even though the FASE-1 pivot semantics it pins live in
+  // 0036-0039.
+  await applyMigrationsUpTo(db, 45);
 
   const erased = await insertContributor({ id: 50 });
   const other = await insertContributor({ id: 51 });
