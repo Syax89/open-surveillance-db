@@ -6,9 +6,9 @@
 // db/confirmations is mocked (see tests/helpers/mocks/confirmations.mjs); the
 // real anti-gaming state quota is covered separately by tests/anti-gaming.test.mjs
 // against an in-memory D1. This suite pins the HTTP contract: guard order
-// (same-origin, session, CSRF, per-caller confirm bucket, IP-hash burst),
-// the 404/403/409/429/503 mappings and the no-store cache header. All
-// fixtures are fictional.
+// (write gate, same-origin/CSRF and IP-hash burst on the session branch only,
+// per-caller confirm bucket, additive per-key bucket), the 404/403/409/429/503
+// mappings and the no-store cache header. All fixtures are fictional.
 
 import assert from "node:assert/strict";
 import { after, beforeEach, test } from "node:test";
@@ -117,7 +117,7 @@ test("PUT rejects a live session with a missing or wrong CSRF token", async (t) 
   stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
     const response = await PUT(sessionRequest("/api/cameras/5/confirmation", { method: "PUT" }));
     assert.equal(response.status, 403);
-    assert.equal((await responseBody(response)).error, "Invalid CSRF token. Refresh the page and try again.");
+    assert.equal((await responseBody(response)).error, "Cross-site request rejected. Refresh the page and try again.");
     assert.equal(callArgs("setConfirmation").length, 0);
   });
   await t.test("wrong header", async () => {
@@ -134,17 +134,36 @@ test("PUT rejects a live session with a missing or wrong CSRF token", async (t) 
   });
 });
 
-test("PUT rejects cross-origin requests", async () => {
+test("PUT rejects cross-origin session requests; anonymous callers hit the gate first (401)", async (t) => {
   const { PUT } = await confirmationRoute();
-  const response = await PUT(
-    apiRequest("/api/cameras/5/confirmation", {
-      method: "PUT",
-      headers: { origin: "https://evil.test" },
-    }),
-  );
-  assert.equal(response.status, 403);
-  assert.equal((await responseBody(response)).error, "Cross-origin request rejected.");
-  assert.equal(callArgs("setConfirmation").length, 0);
+  await t.test("cross-origin with a live session", async () => {
+    stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
+    const response = await PUT(
+      apiRequest("/api/cameras/5/confirmation", {
+        method: "PUT",
+        headers: {
+          cookie: "osdb_session=raw-session-token-abc123; osdb_csrf=csrf-token-123",
+          "x-csrf-token": "csrf-token-123",
+          origin: "https://evil.test",
+        },
+      }),
+    );
+    assert.equal(response.status, 403);
+    assert.equal((await responseBody(response)).error, "Cross-site request rejected. Refresh the page and try again.");
+    assert.equal(callArgs("setConfirmation").length, 0);
+  });
+  await t.test("cross-origin without a session answers the uniform 401 (gate before origin)", async () => {
+    const response = await PUT(
+      apiRequest("/api/cameras/5/confirmation", {
+        method: "PUT",
+        headers: { origin: "https://evil.test" },
+      }),
+    );
+    assert.equal(response.status, 401);
+    assert.equal((await responseBody(response)).error, "Authentication required.");
+    assert.equal(callArgs("setConfirmation").length, 0);
+  });
 });
 
 test("PUT maps camera_not_public to 404 and malformed ids never touch the db", async (t) => {
@@ -324,7 +343,7 @@ test("DELETE answers 404 when no verification exists", async () => {
   assert.equal((await responseBody(response)).error, "No verification found.");
 });
 
-test("DELETE shares the guard order: 401 anonymous, 403 CSRF, 403 cross-origin", async (t) => {
+test("DELETE shares the guard order: 401 anonymous, 403 CSRF, 403 cross-origin session", async (t) => {
   const { DELETE } = await confirmationRoute();
   await t.test("anonymous", async () => {
     const response = await DELETE(apiRequest("/api/cameras/5/confirmation", { method: "DELETE" }));
@@ -338,11 +357,17 @@ test("DELETE shares the guard order: 401 anonymous, 403 CSRF, 403 cross-origin",
     assert.equal(response.status, 403);
     assert.equal(callArgs("removeConfirmation").length, 0);
   });
-  await t.test("cross-origin", async () => {
+  await t.test("cross-origin with a live session", async () => {
+    stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
     const response = await DELETE(
       apiRequest("/api/cameras/5/confirmation", {
         method: "DELETE",
-        headers: { origin: "https://evil.test" },
+        headers: {
+          cookie: "osdb_session=raw-session-token-abc123; osdb_csrf=csrf-token-123",
+          "x-csrf-token": "csrf-token-123",
+          origin: "https://evil.test",
+        },
       }),
     );
     assert.equal(response.status, 403);
@@ -401,4 +426,193 @@ test("GET returns 503 when the session lookup fails", async () => {
   const { GET } = await confirmationRoute();
   const response = await GET(sessionRequest("/api/cameras/5/confirmation"));
   assert.equal(response.status, 503);
+});
+
+// ---------------------------------------------------------------------------
+// PUT/DELETE — write API keys (EPIC api-keys T15)
+// ---------------------------------------------------------------------------
+// The toggle gates on requireWriteAuth(request, "confirm"), so a machine
+// client authenticates with `Authorization: Bearer *** (D4 `confirm`
+// scope) instead of a session cookie. The session-only extras (same-origin +
+// CSRF, IP-hash burst) are skipped on the key path: a machine client
+// holding a secret bearer credential carries no ambient browser authority,
+// and its toggle volume is bounded by the additive per-key `key:<id>`
+// bucket (D8/T12) — the bucket that covers machine clients. The bearer
+// chain (sha256Hex → findApiKeyByHash → touchApiKeyLastUsed) is exercised
+// with the db boundary mocked, exactly as in tests/write-gate.test.mjs.
+
+const apiKey = {
+  id: 41,
+  contributorId: 7,
+  name: "ci",
+  keyPrefix: "osdb_AbCde",
+  keyHash: "hash",
+  scopes: JSON.stringify(["submit", "confirm"]),
+  createdAt: "2026-08-01T00:00:00.000Z",
+  lastUsedAt: null,
+  expiresAt: null,
+  revokedAt: null,
+};
+const keyContributor = {
+  id: 7,
+  email: "contributor@osdb.test",
+  displayName: "Contributor",
+  emailVerifiedAt: "2026-08-01T00:00:00.000Z",
+  authProvider: "password",
+};
+
+/** Resolve a live key whose scopes / owner-verification can be overridden. */
+function liveKey({ scopes = ["submit", "confirm"], emailVerifiedAt = keyContributor.emailVerifiedAt } = {}) {
+  stub("sha256Hex", async (token) => `hash-of-${token}`);
+  stub("findApiKeyByHash", async () => ({
+    key: { ...apiKey, scopes: JSON.stringify(scopes) },
+    contributor: { ...keyContributor, emailVerifiedAt },
+  }));
+  stub("touchApiKeyLastUsed", async () => true);
+}
+
+/** PUT/DELETE /api/cameras/[id]/confirmation authenticating with a Bearer key. */
+function bearerToggle(method, pathAndQuery, headers = {}) {
+  return apiRequest(pathAndQuery, {
+    method,
+    headers: { authorization: "Bearer osdb_test-key-123", ...headers },
+  });
+}
+
+test("PUT with a valid Bearer key (confirm scope) toggles on under the key owner (T15)", async () => {
+  liveKey();
+  stub("setConfirmation", async () => ({ kind: "ok", count: 4 }));
+  const { PUT } = await confirmationRoute();
+  const response = await PUT(bearerToggle("PUT", "/api/cameras/5/confirmation"));
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await responseBody(response), { confirmed: true, count: 4 });
+  assert.equal(callArgs("setConfirmation")[0][0].contributorId, 7, "attribution is the key owner, never anonymous");
+  assert.equal(callArgs("findSessionByToken").length, 0, "the session store must never be consulted on the key path");
+  assert.equal(callArgs("touchApiKeyLastUsed").length, 1, "a successful key resolution touches last_used (throttled in the db layer)");
+});
+
+test("DELETE with a valid Bearer key (confirm scope) toggles off (T15)", async () => {
+  liveKey();
+  stub("removeConfirmation", async () => ({ kind: "ok", count: 2 }));
+  const { DELETE } = await confirmationRoute();
+  const response = await DELETE(bearerToggle("DELETE", "/api/cameras/5/confirmation"));
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await responseBody(response), { confirmed: false, count: 2 });
+  assert.equal(callArgs("removeConfirmation")[0][0].contributorId, 7);
+  assert.equal(callArgs("findSessionByToken").length, 0);
+});
+
+test("key path skips same-origin, CSRF AND the IP-hash burst bucket (T15 conditional guards)", async () => {
+  // The CSRF/same-origin check is conditional on authMethod === "session"
+  // and checkConfirmIpBurst runs on the session branch ONLY: a machine
+  // client holding a secret bearer credential carries no ambient browser
+  // authority, and its toggle volume is bounded by the per-key bucket. So a
+  // key-authenticated request must sail through a cross-site Origin, a
+  // missing X-CSRF-Token, and a burst max of 1 even on its second call from
+  // the same caller — none of the session-branch 403/429s may surface.
+  liveKey();
+  stub("setConfirmation", async () => ({ kind: "ok", count: 1 }));
+  env.CONFIRM_IP_BURST_MAX = "1";
+  env.CONFIRM_IP_BURST_WINDOW_SECONDS = "60";
+  const { PUT } = await confirmationRoute();
+
+  const first = await PUT(
+    bearerToggle("PUT", "/api/cameras/5/confirmation", {
+      origin: "https://evil.example",
+      referer: "https://evil.example/phish",
+    }),
+  );
+  assert.equal(first.status, 200, "the first key request passes the burst max of 1");
+  const second = await PUT(bearerToggle("PUT", "/api/cameras/6/confirmation"));
+  assert.equal(second.status, 200, "the second key request from the same caller must NOT trip the burst bucket");
+  assert.equal(callArgs("setConfirmation").length, 2);
+  assert.equal(
+    abuseAlerts.getAbuseAlertState().trackedCallers,
+    0,
+    "no surge alert: the burst bucket is never consulted on the key path",
+  );
+});
+
+test("PUT rejects a key without the confirm scope (403 canonical, no write)", async () => {
+  liveKey({ scopes: ["submit", "action"] });
+  stub("setConfirmation", async () => ({ kind: "ok", count: 1 }));
+  const { PUT } = await confirmationRoute();
+  const response = await PUT(bearerToggle("PUT", "/api/cameras/5/confirmation"));
+
+  assert.equal(response.status, 403);
+  assert.equal((await responseBody(response)).error, "Authentication required.");
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.equal(callArgs("setConfirmation").length, 0, "no write on scope mismatch");
+});
+
+test("PUT rejects an invalid/revoked/expired key (401 canonical, no session fallback)", async () => {
+  // findApiKeyByHash -> null collapses unknown/revoked/expired (D6/D9): the
+  // route must answer the uniform 401 even when a verified session cookie is
+  // ALSO present — fail-closed, never a silent downgrade to the session.
+  stub("sha256Hex", async () => "hash");
+  stub("findApiKeyByHash", async () => null);
+  stub("setConfirmation", async () => ({ kind: "ok", count: 1 }));
+  const { PUT } = await confirmationRoute();
+  const response = await PUT(
+    bearerToggle("PUT", "/api/cameras/5/confirmation", {
+      cookie: "osdb_session=raw-session-token-abc123; osdb_csrf=csrf-token-123",
+      "x-csrf-token": "csrf-token-123",
+    }),
+  );
+
+  assert.equal(response.status, 401);
+  assert.equal((await responseBody(response)).error, "Authentication required.");
+  assert.equal(callArgs("findSessionByToken").length, 0, "fail-closed: a dead key must never fall through to the session");
+  assert.equal(callArgs("setConfirmation").length, 0);
+});
+
+test("key-authenticated requests are double-counted against their key:<id> bucket (D8/T15)", async () => {
+  // The additive per-key check runs AFTER the gate on top of the per-IP
+  // check: a key caller must pass BOTH buckets. Each request rotates its
+  // cf-connecting-ip so the per-IP bucket never trips; once the key's own
+  // budget (CONFIRM_RATE_LIMIT_MAX=1) is spent the next request answers 429
+  // with Retry-After even though the per-IP bucket still has room.
+  liveKey();
+  stub("setConfirmation", async () => ({ kind: "ok", count: 1 }));
+  env.CONFIRM_RATE_LIMIT_MAX = "1";
+  env.CONFIRM_RATE_LIMIT_WINDOW_SECONDS = "60";
+  const { PUT } = await confirmationRoute();
+
+  const first = await PUT(
+    bearerToggle("PUT", "/api/cameras/5/confirmation", { "cf-connecting-ip": "203.0.113.10" }),
+  );
+  assert.equal(first.status, 200, "first request passes both buckets");
+  assert.equal(callArgs("setConfirmation").length, 1);
+
+  const second = await PUT(
+    bearerToggle("PUT", "/api/cameras/6/confirmation", { "cf-connecting-ip": "203.0.113.11" }),
+  );
+  assert.equal(second.status, 429, "the key's own budget is spent -> 429 despite a fresh IP");
+  assert.ok(Number(second.headers.get("retry-after")) > 0, "Retry-After is present");
+  assert.equal((await responseBody(second)).error, "Too many requests. Please try again shortly.");
+  assert.equal(callArgs("setConfirmation").length, 1, "no write on the blocked request");
+});
+
+test("session requests consume ONLY the per-IP bucket (no per-key double-count, D8)", async () => {
+  // Session/anonymous callers have no additive per-key bucket: the pre-gate
+  // per-IP check is the whole story. With the confirm per-IP budget set to 1
+  // per caller, a session caller rotating IPs passes every request — a
+  // (wrong) shared per-key bucket would have blocked the second one.
+  stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
+  stub("setConfirmation", async () => ({ kind: "ok", count: 1 }));
+  env.CONFIRM_RATE_LIMIT_MAX = "1";
+  env.CONFIRM_RATE_LIMIT_WINDOW_SECONDS = "60";
+  const { PUT } = await confirmationRoute();
+
+  const first = await PUT(
+    authedToggle("PUT", "/api/cameras/5/confirmation", { headers: { "cf-connecting-ip": "203.0.113.20" } }),
+  );
+  assert.equal(first.status, 200);
+  const second = await PUT(
+    authedToggle("PUT", "/api/cameras/6/confirmation", { headers: { "cf-connecting-ip": "203.0.113.21" } }),
+  );
+  assert.equal(second.status, 200, "a session caller on a fresh IP is never double-counted against a per-key bucket");
 });
