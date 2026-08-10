@@ -98,7 +98,7 @@ test("PUT rejects missing or wrong CSRF token", async (t) => {
     stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
     const response = await PUT(sessionRequest("/api/cameras/5/actions", { method: "PUT", body: { action: "like" } }));
     assert.equal(response.status, 403);
-    assert.equal((await responseBody(response)).error, "Invalid CSRF token. Refresh the page and try again.");
+    assert.equal((await responseBody(response)).error, "Cross-site request rejected. Refresh the page and try again.");
     assert.equal(callArgs("setCommunityAction").length, 0);
   });
   await t.test("wrong header", async () => {
@@ -116,18 +116,38 @@ test("PUT rejects missing or wrong CSRF token", async (t) => {
   });
 });
 
-test("PUT rejects cross-origin requests", async () => {
+test("PUT rejects cross-origin session requests; anonymous callers hit the gate first (401)", async (t) => {
   const { PUT } = await actionsRoute();
-  const response = await PUT(
-    apiRequest("/api/cameras/5/actions", {
-      method: "PUT",
-      headers: { origin: "https://evil.test" },
-      body: { action: "like" },
-    }),
-  );
-  assert.equal(response.status, 403);
-  assert.equal((await responseBody(response)).error, "Cross-origin request rejected.");
-  assert.equal(callArgs("setCommunityAction").length, 0);
+  await t.test("cross-origin with a live session", async () => {
+    stub("findSessionByToken", async () => ({ ...sessionFixture, contributor }));
+    stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
+    const response = await PUT(
+      apiRequest("/api/cameras/5/actions", {
+        method: "PUT",
+        headers: {
+          cookie: "osdb_session=raw-session-token-abc123; osdb_csrf=csrf-token-123",
+          "x-csrf-token": "csrf-token-123",
+          origin: "https://evil.test",
+        },
+        body: { action: "like" },
+      }),
+    );
+    assert.equal(response.status, 403);
+    assert.equal((await responseBody(response)).error, "Cross-site request rejected. Refresh the page and try again.");
+    assert.equal(callArgs("setCommunityAction").length, 0);
+  });
+  await t.test("cross-origin without a session answers the uniform 401 (gate before origin)", async () => {
+    const response = await PUT(
+      apiRequest("/api/cameras/5/actions", {
+        method: "PUT",
+        headers: { origin: "https://evil.test" },
+        body: { action: "like" },
+      }),
+    );
+    assert.equal(response.status, 401);
+    assert.equal((await responseBody(response)).error, "Authentication required.");
+    assert.equal(callArgs("setCommunityAction").length, 0);
+  });
 });
 
 test("PUT answers 414 when URL is too long", async () => {
@@ -300,16 +320,36 @@ test("DELETE rejects missing CSRF token", async () => {
   assert.equal(callArgs("removeCommunityAction").length, 0);
 });
 
-test("DELETE rejects cross-origin requests", async () => {
+test("DELETE rejects cross-origin session requests; anonymous callers hit the gate first (401)", async (t) => {
   const { DELETE: del } = await actionsRoute();
-  const response = await del(
-    apiRequest("/api/cameras/5/actions", {
-      method: "DELETE",
-      headers: { origin: "https://evil.test" },
-    }),
-  );
-  assert.equal(response.status, 403);
-  assert.equal(callArgs("removeCommunityAction").length, 0);
+  await t.test("cross-origin with a live session", async () => {
+    stub("findSessionByToken", async () => ({ ...sessionFixture, contributor }));
+    stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
+    const response = await del(
+      apiRequest("/api/cameras/5/actions", {
+        method: "DELETE",
+        headers: {
+          cookie: "osdb_session=raw-session-token-abc123; osdb_csrf=csrf-token-123",
+          "x-csrf-token": "csrf-token-123",
+          origin: "https://evil.test",
+        },
+      }),
+    );
+    assert.equal(response.status, 403);
+    assert.equal((await responseBody(response)).error, "Cross-site request rejected. Refresh the page and try again.");
+    assert.equal(callArgs("removeCommunityAction").length, 0);
+  });
+  await t.test("cross-origin without a session answers the uniform 401 (gate before origin)", async () => {
+    const response = await del(
+      apiRequest("/api/cameras/5/actions", {
+        method: "DELETE",
+        headers: { origin: "https://evil.test" },
+      }),
+    );
+    assert.equal(response.status, 401);
+    assert.equal((await responseBody(response)).error, "Authentication required.");
+    assert.equal(callArgs("removeCommunityAction").length, 0);
+  });
 });
 
 test("DELETE returns {action:null} with no-store on success", async () => {
@@ -420,4 +460,185 @@ test("GET respects the read rate-limit bucket BEFORE session resolution (429 + R
     env.READ_RATE_LIMIT_MAX = previousMax;
     env.READ_RATE_LIMIT_WINDOW_SECONDS = previousWindow;
   }
+});
+
+// ---------------------------------------------------------------------------
+// PUT/DELETE — write API keys (EPIC api-keys T16)
+// ---------------------------------------------------------------------------
+// The toggle gates on requireWriteAuth(request, "action"), so a machine
+// client authenticates with `Authorization: Bearer *** (D4 `action`
+// scope) instead of a session cookie. The session-only extras (same-origin +
+// CSRF) are skipped on the key path: a machine client holding a secret
+// bearer credential carries no ambient browser authority, and its toggle
+// volume is bounded by the additive per-key `key:<id>` bucket (D8/T12). The
+// bearer chain (sha256Hex -> findApiKeyByHash -> touchApiKeyLastUsed) is
+// exercised with the db boundary mocked, exactly as in tests/write-gate.test.mjs.
+
+const apiKey = {
+  id: 41,
+  contributorId: 7,
+  name: "ci",
+  keyPrefix: "osdb_AbCde",
+  keyHash: "hash",
+  scopes: JSON.stringify(["submit", "action"]),
+  createdAt: "2026-08-01T00:00:00.000Z",
+  lastUsedAt: null,
+  expiresAt: null,
+  revokedAt: null,
+};
+const keyContributor = {
+  id: 7,
+  email: "contributor@osdb.test",
+  displayName: "Contributor",
+  emailVerifiedAt: "2026-08-01T00:00:00.000Z",
+  authProvider: "password",
+};
+
+/** Resolve a live key whose scopes / owner-verification can be overridden. */
+function liveKey({ scopes = ["submit", "action"], emailVerifiedAt = keyContributor.emailVerifiedAt } = {}) {
+  stub("sha256Hex", async (token) => `hash-of-${token}`);
+  stub("findApiKeyByHash", async () => ({
+    key: { ...apiKey, scopes: JSON.stringify(scopes) },
+    contributor: { ...keyContributor, emailVerifiedAt },
+  }));
+  stub("touchApiKeyLastUsed", async () => true);
+}
+
+/** PUT/DELETE /api/cameras/[id]/actions authenticating with a Bearer key. */
+function bearerAction(method, pathAndQuery, { headers = {}, body, ...rest } = {}) {
+  return apiRequest(pathAndQuery, {
+    method,
+    headers: { authorization: "Bearer osdb_test-key-123", ...headers },
+    body,
+    ...rest,
+  });
+}
+
+test("PUT with a valid Bearer key (action scope) applies the action under the key owner (T16)", async () => {
+  liveKey();
+  stub("setCommunityAction", async () => ({ kind: "ok", actionType: "like", counts: { like: 3, confirm: 0, gone: 0, problem: 0, privacy: 0 } }));
+  const { PUT } = await actionsRoute();
+  const response = await PUT(bearerAction("PUT", "/api/cameras/5/actions", { body: { action: "like" } }));
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await responseBody(response), { action: "like", counts: { like: 3, confirm: 0, gone: 0, problem: 0, privacy: 0 } });
+  assert.equal(callArgs("setCommunityAction")[0][0].contributorId, 7, "attribution is the key owner, never anonymous");
+  assert.equal(callArgs("findSessionByToken").length, 0, "the session store must never be consulted on the key path");
+  assert.equal(callArgs("touchApiKeyLastUsed").length, 1, "a successful key resolution touches last_used (throttled in the db layer)");
+});
+
+test("DELETE with a valid Bearer key (action scope) removes the action (T16)", async () => {
+  liveKey();
+  stub("removeCommunityAction", async () => ({ kind: "ok" }));
+  const { DELETE: del } = await actionsRoute();
+  const response = await del(bearerAction("DELETE", "/api/cameras/5/actions"));
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await responseBody(response), { action: null });
+  assert.equal(callArgs("removeCommunityAction")[0][0].contributorId, 7);
+  assert.equal(callArgs("findSessionByToken").length, 0);
+});
+
+test("key path skips same-origin and CSRF (T16 conditional guards)", async () => {
+  // The CSRF/same-origin check is conditional on authMethod === "session": a
+  // machine client holding a secret bearer credential carries no ambient
+  // browser authority. So a key-authenticated request must sail through a
+  // cross-site Origin and a missing X-CSRF-Token — neither session-branch
+  // 403 may surface.
+  liveKey();
+  stub("setCommunityAction", async () => ({ kind: "ok", actionType: "gone", counts: { like: 0, confirm: 0, gone: 1, problem: 0, privacy: 0 } }));
+  const { PUT } = await actionsRoute();
+
+  const response = await PUT(
+    bearerAction("PUT", "/api/cameras/5/actions", {
+      origin: "https://evil.example",
+      referer: "https://evil.example/phish",
+      body: { action: "gone" },
+    }),
+  );
+  assert.equal(response.status, 200, "a key request with a cross-site Origin and no CSRF token must pass");
+  assert.equal(callArgs("setCommunityAction").length, 1);
+});
+
+test("PUT rejects a key without the action scope (403 canonical, no write)", async () => {
+  liveKey({ scopes: ["submit", "confirm"] });
+  stub("setCommunityAction", async () => ({ kind: "ok", actionType: "like", counts: {} }));
+  const { PUT } = await actionsRoute();
+  const response = await PUT(bearerAction("PUT", "/api/cameras/5/actions", { body: { action: "like" } }));
+
+  assert.equal(response.status, 403);
+  assert.equal((await responseBody(response)).error, "Authentication required.");
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.equal(callArgs("setCommunityAction").length, 0, "no write on scope mismatch");
+});
+
+test("PUT rejects an invalid/revoked/expired key (401 canonical, no session fallback)", async () => {
+  // findApiKeyByHash -> null collapses unknown/revoked/expired (D6/D9): the
+  // route must answer the uniform 401 even when a verified session cookie is
+  // ALSO present — fail-closed, never a silent downgrade to the session.
+  stub("sha256Hex", async () => "hash");
+  stub("findApiKeyByHash", async () => null);
+  stub("setCommunityAction", async () => ({ kind: "ok", actionType: "like", counts: {} }));
+  const { PUT } = await actionsRoute();
+  const response = await PUT(
+    bearerAction("PUT", "/api/cameras/5/actions", {
+      cookie: "osdb_session=raw-session-token-abc123; osdb_csrf=csrf-token-123",
+      "x-csrf-token": "csrf-token-123",
+      body: { action: "like" },
+    }),
+  );
+
+  assert.equal(response.status, 401);
+  assert.equal((await responseBody(response)).error, "Authentication required.");
+  assert.equal(callArgs("findSessionByToken").length, 0, "fail-closed: a dead key must never fall through to the session");
+  assert.equal(callArgs("setCommunityAction").length, 0);
+});
+
+test("key-authenticated requests are double-counted against their key:<id> bucket (D8/T16)", async () => {
+  // The additive per-key check runs AFTER the gate on top of the per-IP
+  // check: a key caller must pass BOTH buckets. Each request rotates its
+  // cf-connecting-ip so the per-IP bucket never trips; once the key's own
+  // budget (ACTION_RATE_LIMIT_MAX=1) is spent the next request answers 429
+  // with Retry-After even though the per-IP bucket still has room.
+  liveKey();
+  stub("setCommunityAction", async () => ({ kind: "ok", actionType: "like", counts: { like: 1, confirm: 0, gone: 0, problem: 0, privacy: 0 } }));
+  env.ACTION_RATE_LIMIT_MAX = "1";
+  env.ACTION_RATE_LIMIT_WINDOW_SECONDS = "60";
+  const { PUT } = await actionsRoute();
+
+  const first = await PUT(
+    bearerAction("PUT", "/api/cameras/5/actions", { "cf-connecting-ip": "203.0.113.10", body: { action: "like" } }),
+  );
+  assert.equal(first.status, 200, "first request passes both buckets");
+  assert.equal(callArgs("setCommunityAction").length, 1);
+
+  const second = await PUT(
+    bearerAction("PUT", "/api/cameras/6/actions", { "cf-connecting-ip": "203.0.113.11", body: { action: "like" } }),
+  );
+  assert.equal(second.status, 429, "the key's own budget is spent -> 429 despite a fresh IP");
+  assert.ok(Number(second.headers.get("retry-after")) > 0, "Retry-After is present");
+  assert.equal((await responseBody(second)).error, "Too many requests. Please try again shortly.");
+  assert.equal(callArgs("setCommunityAction").length, 1, "no write on the blocked request");
+});
+
+test("session requests consume ONLY the per-IP bucket (no per-key double-count, D8)", async () => {
+  // Session/anonymous callers have no additive per-key bucket: the pre-gate
+  // per-IP check is the whole story. With the action per-IP budget set to 1
+  // per caller, a session caller rotating IPs passes every request — a
+  // (wrong) shared per-key bucket would have blocked the second one.
+  stub("findSessionByToken", async () => ({ ...sessionFixture, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
+  stub("setCommunityAction", async () => ({ kind: "ok", actionType: "like", counts: { like: 1, confirm: 0, gone: 0, problem: 0, privacy: 0 } }));
+  env.ACTION_RATE_LIMIT_MAX = "1";
+  env.ACTION_RATE_LIMIT_WINDOW_SECONDS = "60";
+  const { PUT } = await actionsRoute();
+
+  const first = await PUT(
+    authed("PUT", "/api/cameras/5/actions", { headers: { "cf-connecting-ip": "203.0.113.20" }, body: { action: "like" } }),
+  );
+  assert.equal(first.status, 200);
+  const second = await PUT(
+    authed("PUT", "/api/cameras/6/actions", { headers: { "cf-connecting-ip": "203.0.113.21" }, body: { action: "like" } }),
+  );
+  assert.equal(second.status, 200, "a session caller on a fresh IP is never double-counted against a per-key bucket");
 });
