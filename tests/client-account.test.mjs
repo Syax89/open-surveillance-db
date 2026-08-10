@@ -945,7 +945,7 @@ const apiKeysFixture = [
     id: 12,
     name: "Old integration",
     keyPrefix: "osdb_XyZ9qR",
-    scopes: ["submit"],
+    scopes: ["edit"],
     createdAt: "2025-11-02T09:00:00.000Z",
     lastUsedAt: null,
     expiresAt: "2026-11-02T09:00:00.000Z",
