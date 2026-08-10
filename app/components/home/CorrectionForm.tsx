@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useMessages } from "../../lib/use-messages";
 import type { Camera } from "../../lib/records";
+import { Art13Notice } from "../Art13Notice";
 
 type Props = {
   /** Public records: the "related record" select is fed from these. */
@@ -75,7 +76,7 @@ export function CorrectionForm({ records, defaultRecordId = null, showHeading = 
           <legend>{t.stepContact}</legend>
           <label>{t.contactEmail}<input type="email" name="contact" maxLength={180} placeholder={t.contactPlaceholder} /></label>
           <label className="check-label"><input type="checkbox" required aria-describedby="correction-art13-note" /> <span>{t.correctionConsent} <a href="/privacy">{t.privacyNotice}</a> · <a href="/termini">{t.termsOfUse}</a></span></label>
-          <p className="legal-microcopy" id="correction-art13-note">{t.correctionArt13} <a href="/privacy">{t.privacyNotice}</a>. {t.correctionArt13Rights} <a href="mailto:privacy@opensurveillancedb.org">{t.privacyContact}</a>.</p>
+          <Art13Notice id="correction-art13-note" label={t.privacyDetails}>{t.correctionArt13} <a href="/privacy">{t.privacyNotice}</a>. {t.correctionArt13Rights} <a href="mailto:privacy@opensurveillancedb.org">{t.privacyContact}</a>.</Art13Notice>
           <button className="button button-primary" type="submit">{t.sendPrivateRequest} <span aria-hidden="true">→</span></button>
         </fieldset>
         {correctionNotice && <p className="notice" role="status">{correctionNotice}</p>}
