@@ -36,12 +36,16 @@ jobs:
         run: npx tsc --noEmit
 
       - name: Test (build + node --test suite)
-        run: npm test
+        # Serialize node --test: the jsdom suites (client-account, client-edit-*)
+        # OOM the 7GB runner when several run in parallel (default concurrency
+        # = availableParallelism, 4 on ubuntu-latest) — SIGKILL on the largest
+        # processes (api-keys epic T18, run 31380300635).
+        run: npm run build && node --test --test-concurrency=1 "tests/*.test.mjs"
 
   coverage:
     name: Coverage (soglia righe)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
 
     steps:
       - name: Checkout
