@@ -1,23 +1,30 @@
-// Runtime API tests for POST /api/auth/keys — mint a private write API key
-// (EPIC api-keys, T7, plan §1.3/§5.3, decisions D2/D4/D5/D6/D13).
+// Runtime API tests for the /api/auth/keys family — mint a private write API
+// key and list the caller's own keys (EPIC api-keys, T7 + T8, plan
+// §1.3/§5.3, decisions D2/D4/D5/D6/D13).
 //
 // Contract under test (guard order, from the route docblock / spec §1.3):
-//   urlTooLong (414) -> authLimit (429 with Retry-After) -> malformed-cookie
-//   (400) -> requireVerifiedContributor (401 anon / 403 unverified, canonical
-//   body) -> sameOrigin + csrfVerified (403) -> body validation (400) ->
-//   cap count (409) -> createApiKey -> 201 { id, name, key, keyPrefix,
-//   scopes, createdAt, expiresAt } + Cache-Control: no-store.
+//   POST: urlTooLong (414) -> authLimit (429 with Retry-After) ->
+//   malformed-cookie (400) -> requireVerifiedContributor (401 anon / 403
+//   unverified, canonical body) -> sameOrigin + csrfVerified (403) -> body
+//   validation (400) -> cap count (409) -> createApiKey -> 201 { id, name,
+//   key, keyPrefix, scopes, createdAt, expiresAt } + Cache-Control:
+//   no-store.
+//   GET: urlTooLong (414) -> sessionLimit (429 with Retry-After, session
+//   bucket 120/min) -> resolveOptionalContributor (401 anon) ->
+//   listApiKeysForContributor -> 200 { keys: [...] } metadata only (id,
+//   name, keyPrefix, scopes, createdAt, lastUsedAt, expiresAt, revokedAt),
+//   never the hash/raw key, + Cache-Control: no-store.
 //
-// The raw `key` must appear in EXACTLY this response (reveal-once, D2/P1-2):
-// never in error bodies, never stored (the db layer keeps only the SHA-256 —
-// covered for real in tests/db-api-keys-crud.test.mjs), and the response
-// must be uncacheable.
+// The raw `key` must appear in EXACTLY the POST mint response (reveal-once,
+// D2/P1-2): never in error bodies, never in the list, never stored (the db
+// layer keeps only the SHA-256 — covered for real in
+// tests/db-api-keys-crud.test.mjs), and the response must be uncacheable.
 //
 // db/api-keys is mocked (tests/helpers/mocks/api-keys.mjs); pure helpers
 // (csrf, authLimit + the real rate-limit module, the scope whitelist, the
 // D5 env-knob default) run for real. The db boundary (createApiKey,
-// countApiKeysForContributor) is covered for real in
-// tests/db-api-keys-crud.test.mjs.
+// countApiKeysForContributor, listApiKeysForContributor) is covered for
+// real in tests/db-api-keys-crud.test.mjs.
 
 import assert from "node:assert/strict";
 import { after, beforeEach, test } from "node:test";
@@ -461,5 +468,145 @@ test("500: a failing createApiKey maps to the generic mint error", async () => {
   const response = await POST(authedPost({ name: "x" }));
   assert.equal(response.status, 500);
   assert.equal((await responseBody(response)).error, "Unable to create the API key");
+  assert.equal(response.headers.get("cache-control"), "no-store");
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/auth/keys — list the caller's own keys, metadata only (T8, D2/D3)
+// ---------------------------------------------------------------------------
+//
+// Contract: urlTooLong 414 -> sessionLimit 429 (session bucket, 120/min) ->
+// resolveOptionalContributor 401 anonymous -> listApiKeysForContributor ->
+// 200 { keys: [...] } metadata only, never the hash/raw key, no-store.
+
+function authedGet({ headers = {} } = {}) {
+  return apiRequest("/api/auth/keys", {
+    method: "GET",
+    headers: {
+      cookie: "osdb_session=raw-session-token-abc123; osdb_csrf=csrf-token-123",
+      ...headers,
+    },
+  });
+}
+
+// A listApiKeysForContributor stub result: metadata only, scopes as the JSON
+// text the db layer stores (parsed back to an array in the response).
+function stubList(rows = []) {
+  stub("listApiKeysForContributor", async () => rows);
+}
+
+const KEY_ROWS = [
+  {
+    id: 42,
+    contributorId: 7,
+    name: "CI deploy",
+    keyPrefix: "osdb_AbCdE",
+    scopes: JSON.stringify(SCOPES_ALL),
+    createdAt: "2026-08-01T00:00:00.000Z",
+    lastUsedAt: "2026-08-05T10:00:00.000Z",
+    expiresAt: "2027-08-01T00:00:00.000Z",
+    revokedAt: null,
+  },
+  {
+    id: 41,
+    contributorId: 7,
+    name: "old revoked",
+    keyPrefix: "osdb_12abC",
+    scopes: JSON.stringify(["submit"]),
+    createdAt: "2026-07-01T00:00:00.000Z",
+    lastUsedAt: null,
+    expiresAt: null,
+    revokedAt: "2026-07-20T00:00:00.000Z",
+  },
+];
+
+test("414: GET answers 414 for an absurd URL before any auth work", async () => {
+  liveSession();
+  const { GET } = await keysRoute();
+  const response = await GET(apiRequest(absurdUrl("/api/auth/keys"), { method: "GET" }));
+  assert.equal(response.status, 414);
+  assert.equal((await responseBody(response)).error, "Request URI too long.");
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.equal(callArgs("listApiKeysForContributor").length, 0);
+});
+
+test("429: the session bucket trips with Retry-After before the session read", async () => {
+  const { GET } = await keysRoute();
+  // Session bucket default is 120/min (not the auth 10/min): 120 requests
+  // stay allowed (401 without session), the 121st is blocked.
+  for (let index = 0; index < 120; index += 1) {
+    const response = await GET(apiRequest("/api/auth/keys", { method: "GET" }));
+    assert.notEqual(response.status, 429, `request ${index + 1} must stay allowed (401 without session)`);
+  }
+  const blocked = await GET(apiRequest("/api/auth/keys", { method: "GET" }));
+  assert.equal(blocked.status, 429);
+  assert.equal((await responseBody(blocked)).error, "Too many requests. Please try again shortly.");
+  assert.ok(Number(blocked.headers.get("retry-after")) > 0);
+  assert.equal(callArgs("listApiKeysForContributor").length, 0, "rate limit short-circuits before the list");
+});
+
+test("401: anonymous GET answers the canonical body and never touches the db", async () => {
+  const { GET } = await keysRoute();
+  const response = await GET(apiRequest("/api/auth/keys", { method: "GET" }));
+  assert.equal(response.status, 401);
+  assert.equal((await responseBody(response)).error, "Not authenticated.");
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.equal(callArgs("listApiKeysForContributor").length, 0);
+});
+
+test("200: an empty list answers { keys: [] } with no-store", async () => {
+  liveSession();
+  stubList([]);
+  const { GET } = await keysRoute();
+  const response = await GET(authedGet());
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.deepEqual(await responseBody(response), { keys: [] });
+  assert.deepEqual(callArgs("listApiKeysForContributor")[0], [7], "own keys only");
+});
+
+test("200: lists metadata only — never the hash or raw key, scopes parsed, revoked visible", async () => {
+  liveSession();
+  stubList(KEY_ROWS);
+  const { GET } = await keysRoute();
+  const response = await GET(authedGet());
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  const body = await responseBody(response);
+  assert.deepEqual(body.keys, [
+    {
+      id: 42,
+      name: "CI deploy",
+      keyPrefix: "osdb_AbCdE",
+      scopes: SCOPES_ALL,
+      createdAt: "2026-08-01T00:00:00.000Z",
+      lastUsedAt: "2026-08-05T10:00:00.000Z",
+      expiresAt: "2027-08-01T00:00:00.000Z",
+      revokedAt: null,
+    },
+    {
+      id: 41,
+      name: "old revoked",
+      keyPrefix: "osdb_12abC",
+      scopes: ["submit"],
+      createdAt: "2026-07-01T00:00:00.000Z",
+      lastUsedAt: null,
+      expiresAt: null,
+      revokedAt: "2026-07-20T00:00:00.000Z",
+    },
+  ]);
+  assert.equal("keyHash" in body.keys[0], false, "the hash is never exposed (D3)");
+  assert.equal("key" in body.keys[0], false, "the raw key is never exposed (D2)");
+});
+
+test("503: a failing list maps to the generic error, no-store", async () => {
+  liveSession();
+  stub("listApiKeysForContributor", async () => {
+    throw new Error("Database binding unavailable");
+  });
+  const { GET } = await keysRoute();
+  const response = await GET(authedGet());
+  assert.equal(response.status, 503);
+  assert.equal((await responseBody(response)).error, "Unable to list the API keys");
   assert.equal(response.headers.get("cache-control"), "no-store");
 });

@@ -4,10 +4,11 @@ import {
   apiKeysMaxPerContributor,
   countApiKeysForContributor,
   createApiKey,
+  listApiKeysForContributor,
   type ApiKeyScope,
 } from "../../../../db/api-keys";
-import { authLimit } from "../../../lib/auth-route-helpers";
-import { malformedSessionCookieGuard } from "../../../lib/auth-session";
+import { authLimit, sessionLimit } from "../../../lib/auth-route-helpers";
+import { malformedSessionCookieGuard, resolveOptionalContributor } from "../../../lib/auth-session";
 import { csrfVerified, sameOrigin } from "../../../lib/csrf";
 import { isRecord } from "../../../lib/guards";
 import { BodyReadError, readJsonBody, urlTooLong } from "../../../lib/input-limits";
@@ -168,5 +169,71 @@ export async function POST(request: Request) {
       { error: "Unable to create the API key" },
       { status: 500, headers: NO_STORE_HEADERS },
     );
+  }
+}
+
+/**
+ * GET /api/auth/keys — list the caller's own API keys, metadata only (EPIC
+ * api-keys, T8, plan §1.3, decisions D2/D3).
+ *
+ * Contract: `200 { keys: [...] }` where every entry is
+ * `{ id, name, keyPrefix, scopes, createdAt, lastUsedAt, expiresAt,
+ * revokedAt }`. The SHA-256 hash (D3) and the raw key (D2) are NEVER
+ * exposed here — the hash is not even selected from the db layer
+ * (`ApiKeyListItem` omits it), and the raw key exists only in the mint
+ * response (reveal-once, P1-2). Revoked/expired rows stay visible so the
+ * account page can show the full lifecycle; the list is newest first.
+ *
+ * Guard order (spec §1.3): urlTooLong (project-wide transport guard, 414)
+ * → sessionLimit (shared session-read bucket, 429 — this is a READ of the
+ * caller's own data, refetched on every account-page render, so it uses
+ * the generous 120/min session bucket, not the auth-mutation 10/min) →
+ * resolveOptionalContributor (401 anonymous; own data only, no
+ * cross-account path). No CSRF: a GET carries no state change and no
+ * ambient authority is echoed.
+ *
+ * Response is `Cache-Control: no-store` (P0-2): personal data must never
+ * be edge-cached, and this surface lists credential handles.
+ */
+export async function GET(request: Request) {
+  // Transport guard: reject absurdly long URLs before any auth or parsing.
+  if (urlTooLong(request)) {
+    return Response.json({ error: "Request URI too long." }, { status: 414, headers: NO_STORE_HEADERS });
+  }
+
+  // Session READ bucket (120/min per caller), not the auth mutation bucket:
+  // the account page refetches this list on every open/reveal/revoke, and
+  // authLimit (10/min) would 429 a user managing keys quickly. Mirrors
+  // GET /api/auth/me/contributions.
+  const blocked = await sessionLimit(request, env, "/api/auth/keys");
+  if (blocked) return blocked;
+
+  try {
+    // Own data only: anonymous callers answer 401 and never touch the db.
+    const resolved = await resolveOptionalContributor(request);
+    if (!resolved) {
+      return Response.json({ error: "Not authenticated." }, { status: 401, headers: NO_STORE_HEADERS });
+    }
+
+    // Metadata only: `listApiKeysForContributor` selects no hash (D2/D3) and
+    // returns revoked/expired rows for the lifecycle view, newest first.
+    const rows = await listApiKeysForContributor(resolved.contributor.id);
+    const keys = rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      keyPrefix: row.keyPrefix,
+      // scopes is stored as JSON text; the API shape is an array (same
+      // contract as the mint response).
+      scopes: JSON.parse(row.scopes) as string[],
+      createdAt: row.createdAt,
+      lastUsedAt: row.lastUsedAt,
+      expiresAt: row.expiresAt,
+      revokedAt: row.revokedAt,
+    }));
+
+    return Response.json({ keys }, { headers: NO_STORE_HEADERS });
+  } catch (error) {
+    console.error("GET /api/auth/keys failed", error);
+    return Response.json({ error: "Unable to list the API keys" }, { status: 503, headers: NO_STORE_HEADERS });
   }
 }
