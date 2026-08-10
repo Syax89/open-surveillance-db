@@ -109,6 +109,12 @@ const DB_MODULES = [
   // SQL run against the same binding (db-api-keys-crypto.test.mjs, and T5
   // CRUD once the migration 0045 exists).
   { source: "db/api-keys.ts", output: "db/api-keys.mjs" },
+  // app/lib/api-key-auth.ts (EPIC api-keys, T10 — pure Bearer-key auth
+  // bridge, plan §1.4) imports sha256Hex from ./auth and
+  // findApiKeyByHash/touchApiKeyLastUsed from ./api-keys — both already in
+  // this tree — so the real hash → lookup → liveness → throttled-touch
+  // chain runs against the same in-memory D1 (api-key-auth.test.mjs).
+  { source: "app/lib/api-key-auth.ts", output: "app/lib/api-key-auth.mjs" },
 ];
 
 let builtTreePromise = null;
@@ -185,7 +191,8 @@ export async function loadDbRuntime() {
   const communityActions = await import(pathToFileURL(path.join(tree, "db/community-actions.mjs")).href);
   const importSources = await import(pathToFileURL(path.join(tree, "db/import-sources.mjs")).href);
   const apiKeys = await import(pathToFileURL(path.join(tree, "db/api-keys.mjs")).href);
-  return { env: envModule.env, cameras, corrections, moderation, auth, users, appeals, retention, confirmations, cameraEdits, passkeys, mailer, emailTemplates, oidc, communitySettings, communityActions, importSources, apiKeys };
+  const apiKeyAuth = await import(pathToFileURL(path.join(tree, "app/lib/api-key-auth.mjs")).href);
+  return { env: envModule.env, cameras, corrections, moderation, auth, users, appeals, retention, confirmations, cameraEdits, passkeys, mailer, emailTemplates, oidc, communitySettings, communityActions, importSources, apiKeys, apiKeyAuth };
 }
 
 // Replays the real Drizzle migration files (drizzle/0000-*.sql ... 0017-*.sql)
