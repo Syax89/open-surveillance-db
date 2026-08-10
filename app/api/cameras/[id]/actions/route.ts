@@ -7,10 +7,10 @@ import {
 } from "../../../../../db/community-actions";
 import { recordRateLimitBlock } from "../../../../lib/abuse-alerts";
 import { resolveOptionalContributor } from "../../../../lib/auth-session";
-import { requireVerifiedContributor } from "../../../../lib/write-gate";
+import { requireWriteAuth } from "../../../../lib/write-gate";
 import { csrfVerified, sameOrigin } from "../../../../lib/csrf";
 import { BodyReadError, readJsonBody, urlTooLong } from "../../../../lib/input-limits";
-import { callerKey, checkRateLimit, limitsFor } from "../../../../lib/rate-limit";
+import { callerKey, checkRateLimit, checkRateLimitForKeyAuth, limitsFor } from "../../../../lib/rate-limit";
 
 /**
  * Community actions toggle (ADR 0021 §3.2, kanban t_a9f23581 FASE 2):
@@ -23,8 +23,10 @@ import { callerKey, checkRateLimit, limitsFor } from "../../../../lib/rate-limit
  * normative source is the ADR — implemented as PUT, documented in the PR).
  *
  * All three are `Cache-Control: no-store` (personal data). The write gate
- * (requireVerifiedContributor) applies to PUT and DELETE; GET is open to
- * anonymous callers (returns `{action:null}`).
+ * (requireWriteAuth, scope `action` — ADR 0023 D4/D12) applies to PUT and
+ * DELETE: a verified session cookie OR a private write API key carrying the
+ * `action` scope (Bearer). GET is open to anonymous callers (returns
+ * `{action:null}`).
  */
 
 const NO_STORE_HEADERS = { "Cache-Control": "no-store" };
@@ -36,15 +38,17 @@ function parseId(request: Request): number | null {
   return Number(idParam);
 }
 
+/**
+ * Shared PUT/DELETE guards in the fixed order (ADR 0021 §3.2, wave 2 — EPIC
+ * api-keys T16): urlTooLong -> per-IP action bucket -> write gate (dual-path,
+ * 401/403) -> session-only: same-origin + CSRF (403) -> additive per-key
+ * bucket (429, no-op for session) -> strict id parse (404).
+ */
 async function guardMutation(
   request: Request,
 ): Promise<{ id: number; contributorId: number } | Response> {
   if (urlTooLong(request)) {
     return Response.json({ error: "Request URI too long." }, { status: 414, headers: NO_STORE_HEADERS });
-  }
-
-  if (!sameOrigin(request)) {
-    return Response.json({ error: "Cross-origin request rejected." }, { status: 403, headers: NO_STORE_HEADERS });
   }
 
   const key = callerKey(request, env);
@@ -65,14 +69,48 @@ async function guardMutation(
 
   let gate;
   try {
-    gate = await requireVerifiedContributor(request);
+    // Write gate (multi-method auth Fase E1 + EPIC api-keys T16): the toggle
+    // requires a VERIFIED contributor, authenticated EITHER by a verified
+    // session cookie OR by a private write API key carrying the `action`
+    // scope (`Authorization: Bearer *** D4). Anonymous (401), unverified
+    // (403) and scope-mismatch (403) share ONE single response body
+    // (anti-enumeration, no-store).
+    gate = await requireWriteAuth(request, "action");
   } catch (error) {
     console.error("PUT/DELETE /api/cameras/[id]/actions session lookup failed", error);
     return Response.json({ error: "Database unavailable" }, { status: 503, headers: NO_STORE_HEADERS });
   }
   if (!gate.ok) return gate.response;
-  if (!csrfVerified(request, gate.session.csrfToken)) {
-    return Response.json({ error: "Invalid CSRF token. Refresh the page and try again." }, { status: 403, headers: NO_STORE_HEADERS });
+
+  // Session-only extras (T16 wave 2): CSRF/same-origin apply ONLY on the
+  // session branch. A machine client holding a secret bearer credential
+  // carries no ambient authority from a browser origin (no CSRF), and its
+  // toggle volume is already bounded by the additive per-key `key:<id>`
+  // bucket below.
+  if (gate.authMethod === "session") {
+    if (!sameOrigin(request) || !csrfVerified(request, gate.session.csrfToken)) {
+      return Response.json({ error: "Cross-site request rejected. Refresh the page and try again." }, { status: 403, headers: NO_STORE_HEADERS });
+    }
+  }
+
+  // Additive per-key rate limit (D8/T12, plan §1.6): a key-authenticated
+  // request is fail-closed double-counted — it must pass BOTH the per-IP
+  // bucket above AND its own `key:<apiKeyId>` bucket; a block on either
+  // answers 429 (same body as the per-IP block, Retry-After included).
+  // Session callers have no per-key bucket (the pre-gate per-IP check is the
+  // whole story), so this check is a no-op for them.
+  const keyLimit = await checkRateLimitForKeyAuth(env, "action", request, limitOptions, gate);
+  if (!keyLimit.allowed) {
+    console.warn("PUT/DELETE /api/cameras/[id]/actions rate limited (per-key bucket)");
+    recordRateLimitBlock(env, {
+      route: "/api/cameras/[id]/actions",
+      key: keyLimit.key,
+      windowSeconds: limitOptions.windowSeconds,
+    });
+    return Response.json({ error: "Too many requests. Please try again shortly." }, {
+      status: 429,
+      headers: { ...NO_STORE_HEADERS, "Retry-After": String(keyLimit.retryAfterSeconds) },
+    });
   }
 
   const id = parseId(request);
