@@ -625,6 +625,14 @@ button { cursor:pointer; }
 .correction-form .check-label input { width:24px; height:24px; margin-top:3px; }
 .legal-microcopy { margin:2px 0 0; color:var(--muted); font-size:var(--text-sm); line-height:1.5; }
 .legal-microcopy a { color:var(--action); font-weight:700; text-decoration:underline; text-underline-offset:3px; }
+/* GDPR art. 13 mini-notice as a collapsible (issue #431): compact by
+   default — just the localized label — one click expands the full text.
+   Same disclosure idiom as the faq items / filters disclosure. */
+.art13-disclosure { margin:2px 0 0; }
+.art13-disclosure summary { cursor:pointer; color:var(--action); font-size:var(--text-sm); font-weight:700; text-decoration:underline; text-underline-offset:3px; list-style:none; }
+.art13-disclosure summary::-webkit-details-marker { display:none; }
+.art13-disclosure summary:focus-visible { outline:3px solid var(--focus); outline-offset:2px; border-radius:var(--radius-md); }
+.art13-disclosure .legal-microcopy { margin-top:4px; }
 .check-redaction { display:grid; margin-top:14px; }
 .check-redaction input { width:24px; height:24px; margin-top:3px; }
 /* One-tap location on /segnala. It is intentionally a normal 44px button,

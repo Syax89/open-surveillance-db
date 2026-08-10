@@ -96,6 +96,7 @@ export const en = {
   reportConsent:
     "I confirm this observation was made from public space and contains no personal data.",
   privacyNotice: "Privacy notice",
+  privacyDetails: "Privacy details",
   termsOfUse: "Terms of use",
   reportArt13:
     "The data you enter (location, notes) is processed by the controller Simone Rondina / OpenSurveillanceDB on the basis of legitimate interest (art. 6(1)(f) GDPR) to document public surveillance infrastructure. Full notice:",
@@ -212,6 +213,7 @@ export const it: Translation<typeof en> = {
   reportConsent:
     "Confermo che l'osservazione è stata fatta dallo spazio pubblico e non contiene dati personali.",
   privacyNotice: "Informativa privacy",
+  privacyDetails: "Dettagli privacy",
   termsOfUse: "Termini d'uso",
   reportArt13:
     "I dati che inserisci (posizione, note) sono trattati dal titolare Simone Rondina / OpenSurveillanceDB su base di interesse legittimo (art. 6(1)(f) GDPR) per documentare infrastrutture di sorveglianza pubbliche. Informativa completa:",

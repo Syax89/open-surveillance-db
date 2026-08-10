@@ -7,6 +7,7 @@ import { useMessages } from "../lib/use-messages";
 import { PublicNav } from "../components/PublicNav";
 import { passwordRuleFailures } from "../lib/password-policy";
 import { hardNavigate } from "../lib/navigate";
+import { Art13Notice } from "../components/Art13Notice";
 
 export function RegisterPageBody() {
   const bundle = useMessages();
@@ -202,7 +203,7 @@ export function RegisterPageBody() {
             <span aria-hidden="true"> · </span>
             <Link href="/termini">{t.termsOfUse}</Link>
           </p>
-          <p className="legal-microcopy" id="register-art13-note">{t.registerArt13} <Link href="/privacy">{t.privacyNotice}</Link>. {t.registerArt13Rights} <a href="mailto:privacy@opensurveillancedb.org">{t.privacyContact}</a>.</p>
+          <Art13Notice id="register-art13-note" label={t.privacyDetails}>{t.registerArt13} <Link href="/privacy">{t.privacyNotice}</Link>. {t.registerArt13Rights} <a href="mailto:privacy@opensurveillancedb.org">{t.privacyContact}</a>.</Art13Notice>
         </form>
 
         <p className="auth-switch">

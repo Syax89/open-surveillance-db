@@ -39,6 +39,7 @@ export const en = {
   anonymousNote:
     "A free account is required to report a camera, and it lets you track your own reports.",
   privacyNotice: "Privacy notice",
+  privacyDetails: "Privacy details",
   termsOfUse: "Terms of use",
   registerArt13:
     "Your account data (email, optional display name) is processed by the controller Simone Rondina / OpenSurveillanceDB on the basis of legitimate interest (art. 6(1)(f) GDPR) to provide contributor accounts. Full notice:",
@@ -331,6 +332,7 @@ export const it: Translation<typeof en> = {
   anonymousNote:
     "Per segnalare una telecamera serve un account gratuito, che ti permette anche di tenere traccia delle tue segnalazioni.",
   privacyNotice: "Informativa privacy",
+  privacyDetails: "Dettagli privacy",
   termsOfUse: "Termini d’uso",
   registerArt13:
     "I dati del tuo account (email, eventuale nome visualizzato) sono trattati dal titolare Simone Rondina / OpenSurveillanceDB su base di interesse legittimo (art. 6(1)(f) GDPR) per fornire gli account dei contributori. Informativa completa:",
