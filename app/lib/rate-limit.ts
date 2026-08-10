@@ -294,6 +294,88 @@ export function callerKey(request: Request, env?: unknown): string {
 }
 
 /**
+ * Structural shape of the write-gate success result (T11) needed to select
+ * the effective rate-limit key. Declared locally on purpose: rate-limit.ts
+ * must stay runnable in plain Node with zero imports from the gate/db
+ * modules, and this module only reads `authMethod` / `apiKeyId` anyway. The
+ * gate's `ok: true` branches are structurally assignable to it.
+ */
+export type CallerKeyGate = {
+  authMethod?: string;
+  apiKeyId?: number | null;
+} | null | undefined;
+
+/**
+ * Effective rate-limit key for a request (EPIC api-keys, D8/T12):
+ * `key:<apiKeyId>` when the request authenticated with a write API key,
+ * otherwise the per-IP `callerKey(request, env)`.
+ *
+ * The `key:` prefix lives in the same namespace as the per-IP keys, so a
+ * key-authenticated request is counted against BOTH buckets — its own
+ * per-key bucket (`submit|key:7` / `submit:key:7` on the binding) AND the
+ * per-IP bucket of the machine it comes from. A key cannot exhaust the
+ * shared per-IP budget, and rotating IPs cannot reset the key's own counter.
+ *
+ * Fail-safe fallback: an `api_key` gate WITHOUT a numeric `apiKeyId`
+ * (unreachable from the real gate, which always sets it on success) degrades
+ * to the per-IP key rather than fabricating a `key:undefined` bucket.
+ */
+export function callerKeyFor(
+  request: Request,
+  env: unknown,
+  gate?: CallerKeyGate,
+): string {
+  if (gate?.authMethod === "api_key" && typeof gate.apiKeyId === "number") {
+    return `key:${gate.apiKeyId}`;
+  }
+  return callerKey(request, env);
+}
+
+/** Decision of the additive per-key check, plus the effective key to record. */
+export type RateLimitCallerDecision =
+  | { allowed: true; retryAfterSeconds: 0; key: string }
+  | { allowed: false; retryAfterSeconds: number; key: string };
+
+/**
+ * Additive per-key rate-limit check (EPIC api-keys, D8/T12): run AFTER the
+ * write gate resolves a request (T11), on top of the per-IP check that
+ * already ran before the gate. A key-authenticated request is fail-closed
+ * double-counted — it must pass BOTH the per-IP bucket (pre-gate, unchanged)
+ * and its own `key:<id>` bucket (here); a block on either answers 429.
+ *
+ * Session/anonymous callers have no additive per-key bucket: the pre-gate
+ * per-IP check is the whole story, so this helper reports allowed with the
+ * per-IP key (running the IP bucket again here would double-count every
+ * session request). Routes can therefore call it uniformly after the gate
+ * and use the returned `key` — the effective key — when recording the block:
+ *
+ *   recordRateLimitBlock(env, { route, key: decision.key, windowSeconds });
+ *
+ * `now` is injectable for deterministic tests (same convention as
+ * checkRateLimit).
+ */
+export async function checkRateLimitForKeyAuth(
+  env: unknown,
+  bucket: string,
+  request: Request,
+  options: RateLimitOptions,
+  gate: CallerKeyGate,
+  now: number = Date.now(),
+): Promise<RateLimitCallerDecision> {
+  const effectiveKey = callerKeyFor(request, env, gate);
+  if (effectiveKey === callerKey(request, env)) {
+    // Session/anonymous: no per-key bucket; the pre-gate per-IP check
+    // already accounted for this caller.
+    return { allowed: true, retryAfterSeconds: 0, key: effectiveKey };
+  }
+  const decision = await checkRateLimit(env, bucket, effectiveKey, options, now);
+  if (!decision.allowed) {
+    return { allowed: false, retryAfterSeconds: decision.retryAfterSeconds, key: effectiveKey };
+  }
+  return { allowed: true, retryAfterSeconds: 0, key: effectiveKey };
+}
+
+/**
  * Environment knobs for endpoint rate limits.
  *
  * The parameter is `unknown` (cast internally) on purpose: Cloudflare's `Env`
