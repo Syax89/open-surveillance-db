@@ -340,3 +340,23 @@ test("touchApiKeyLastUsed compares ISO-8601 UTC TEXT like-for-like (D7)", async 
     "one minute later is throttled even though the strings differ",
   );
 });
+
+// ---------------------------------------------------------------------------
+// apiKeysMaxPerContributor — D5 cap env knob (D13 EnvLike pattern)
+// ---------------------------------------------------------------------------
+
+test("apiKeysMaxPerContributor defaults to 5 and honours the env override (D5/D13)", async () => {
+  const { apiKeys } = runtime;
+
+  assert.equal(apiKeys.API_KEYS_MAX_PER_CONTRIBUTOR_DEFAULT, 5);
+  assert.equal(apiKeys.apiKeysMaxPerContributor({}), 5, "no knob in env -> default");
+  assert.equal(apiKeys.apiKeysMaxPerContributor({ API_KEYS_MAX_PER_CONTRIBUTOR: "3" }), 3);
+  assert.equal(apiKeys.apiKeysMaxPerContributor({ API_KEYS_MAX_PER_CONTRIBUTOR: "12" }), 12);
+
+  // Fail-closed on garbage: non-numeric, zero and negative values all fall
+  // back to the default (a 0 cap would make the feature unusable; a negative
+  // cap would be meaningless).
+  assert.equal(apiKeys.apiKeysMaxPerContributor({ API_KEYS_MAX_PER_CONTRIBUTOR: "abc" }), 5);
+  assert.equal(apiKeys.apiKeysMaxPerContributor({ API_KEYS_MAX_PER_CONTRIBUTOR: "0" }), 5);
+  assert.equal(apiKeys.apiKeysMaxPerContributor({ API_KEYS_MAX_PER_CONTRIBUTOR: "-2" }), 5);
+});
