@@ -156,6 +156,67 @@ export const en = {
   recoveryCopy: "Copy codes",
   recoveryCopied: "Copied.",
   recoverySaved: "I saved them",
+  // API keys (epic api-keys, T19 — write API authentication). The /account
+  // section sits between passkeys and the danger zone. Private keys unlock
+  // WRITE access only: the public read API stays keyless, so reading never
+  // needs a key. The raw key is shown exactly once, at creation.
+  apiKeysSection: "API keys",
+  apiKeysHint:
+    "Private keys let scripts and tools write to the API without a browser session. Reading never needs a key.",
+  apiKeyCreate: "Create API key",
+  apiKeyNameLabel: "Key name",
+  apiKeyNameHelp:
+    "A short label so you can recognise the key, e.g. \u201cNightly sync script\u201d.",
+  apiKeyNameRequired: "Give the key a name.",
+  apiKeyNameTooLong: "The name must be 60 characters or fewer.",
+  apiKeyScopeLabel: "Permissions",
+  apiKeyScopeHelp:
+    "Choose what this key may do. You can narrow the permissions; you cannot add more later.",
+  apiKeyScopeSubmitLabel: "Submit reports and corrections",
+  apiKeyScopeSubmitGrant: "Lets scripts publish camera reports and corrections.",
+  apiKeyScopeConfirmLabel: "Confirm cameras",
+  apiKeyScopeConfirmGrant: "Lets scripts mark cameras as confirmed.",
+  apiKeyScopeEditLabel: "Edit cameras",
+  apiKeyScopeEditGrant: "Lets scripts update camera details through the edit endpoint.",
+  apiKeyScopeActionLabel: "Community actions",
+  apiKeyScopeActionGrant:
+    "Lets scripts cast community actions (useful, gone, problem, privacy).",
+  apiKeyCreatedLabel: "Created",
+  apiKeyLastUsedLabel: "Last used",
+  apiKeyLastUsedNever: "Never used",
+  apiKeyScopesLabel: "Permissions",
+  apiKeyStatusLabel: "Status",
+  apiKeyStatusActive: "Active",
+  apiKeyStatusRevoked: "Revoked",
+  apiKeyRevoke: "Revoke",
+  apiKeyRevokeConfirm: "Revoke this key?",
+  apiKeyRevokeConfirmBody:
+    "Scripts using this key will immediately fail with a 401. This cannot be undone — create a new key if you need to.",
+  apiKeyRevokeCancel: "Cancel",
+  apiKeyRevokeBusy: "Revoking…",
+  apiKeyRevoked: "Revoked",
+  apiKeyEmptyTitle: "No API keys yet",
+  apiKeyEmptyBody:
+    "Create a key to let your scripts submit reports and corrections without logging in.",
+  apiKeyDocsLink: "Read the API documentation",
+  apiKeyCreateTitle: "Create an API key",
+  apiKeyCreateBody:
+    "The key is shown only once, when it is created. Copy it immediately — it is not stored on our servers.",
+  apiKeyCreateSubmit: "Create key",
+  apiKeyCreateCancel: "Cancel",
+  apiKeyCreateBusy: "Creating…",
+  apiKeyRevealTitle: "Your API key",
+  apiKeyRevealBody:
+    "Copy it now — this is the only time the full key is shown. Anyone with this key can write to the API on your behalf.",
+  apiKeyRevealCopy: "Copy key",
+  apiKeyRevealCopied: "Copied.",
+  apiKeyRevealSaved: "I saved it",
+  apiKeyErrorList: "Unable to load your API keys. Please try again.",
+  apiKeyErrorCreate: "Unable to create the key. Please try again.",
+  apiKeyErrorRevoke: "Unable to revoke the key. Please try again.",
+  apiKeyErrorLimit: "You already have 5 API keys. Revoke one before creating another.",
+  apiKeyErrorSession: "Your session has expired. Log in again and retry.",
+  apiKeyErrorCsrf: "Your security token expired. Refresh the page and try again.",
   // Email verification (Fase B UI — design review): /verify-email page and the
   // /account banner. The verification link in the email now lands on a real
   // page (not raw JSON); the page consumes GET /api/auth/verify-email and
@@ -389,6 +450,69 @@ export const it: Translation<typeof en> = {
   recoveryCopy: "Copia i codici",
   recoveryCopied: "Copiati.",
   recoverySaved: "Li ho salvati",
+  // Chiavi API (epic api-keys, T19 — autenticazione delle API di scrittura).
+  // La sezione su /account sta tra passkey e danger zone. Le chiavi private
+  // sbloccano SOLO la scrittura: l'API pubblica di lettura resta senza
+  // chiave, quindi leggere non ne richiede mai una. La chiave grezza viene
+  // mostrata una sola volta, alla creazione.
+  apiKeysSection: "Chiavi API",
+  apiKeysHint:
+    "Le chiavi private permettono a script e strumenti di scrivere nell'API senza una sessione del browser. La lettura non richiede mai una chiave.",
+  apiKeyCreate: "Crea una chiave API",
+  apiKeyNameLabel: "Nome della chiave",
+  apiKeyNameHelp:
+    "Un'etichetta breve per riconoscere la chiave, es. \u201cScript di sincronizzazione notturno\u201d.",
+  apiKeyNameRequired: "Dai un nome alla chiave.",
+  apiKeyNameTooLong: "Il nome deve essere di 60 caratteri o meno.",
+  apiKeyScopeLabel: "Permessi",
+  apiKeyScopeHelp:
+    "Scegli cosa può fare questa chiave. Puoi restringere i permessi; non potrai aggiungerne altri in seguito.",
+  apiKeyScopeSubmitLabel: "Invia segnalazioni e correzioni",
+  apiKeyScopeSubmitGrant: "Consente agli script di pubblicare segnalazioni e correzioni.",
+  apiKeyScopeConfirmLabel: "Conferma le telecamere",
+  apiKeyScopeConfirmGrant: "Consente agli script di confermare le telecamere.",
+  apiKeyScopeEditLabel: "Modifica le telecamere",
+  apiKeyScopeEditGrant:
+    "Consente agli script di aggiornare i dettagli delle telecamere tramite l'endpoint di modifica.",
+  apiKeyScopeActionLabel: "Azioni della community",
+  apiKeyScopeActionGrant:
+    "Consente agli script di esprimere azioni della community (utile, non c'è più, problema, privacy).",
+  apiKeyCreatedLabel: "Creata",
+  apiKeyLastUsedLabel: "Ultimo uso",
+  apiKeyLastUsedNever: "Mai usata",
+  apiKeyScopesLabel: "Permessi",
+  apiKeyStatusLabel: "Stato",
+  apiKeyStatusActive: "Attiva",
+  apiKeyStatusRevoked: "Revocata",
+  apiKeyRevoke: "Revoca",
+  apiKeyRevokeConfirm: "Revocare questa chiave?",
+  apiKeyRevokeConfirmBody:
+    "Gli script che usano questa chiave riceveranno subito un errore 401. Non si può annullare: se ti serve, crea una nuova chiave.",
+  apiKeyRevokeCancel: "Annulla",
+  apiKeyRevokeBusy: "Revoca in corso…",
+  apiKeyRevoked: "Revocata",
+  apiKeyEmptyTitle: "Nessuna chiave API",
+  apiKeyEmptyBody:
+    "Crea una chiave per permettere ai tuoi script di inviare segnalazioni e correzioni senza accedere al sito.",
+  apiKeyDocsLink: "Leggi la documentazione dell'API",
+  apiKeyCreateTitle: "Crea una chiave API",
+  apiKeyCreateBody:
+    "La chiave viene mostrata una sola volta, al momento della creazione. Copiala subito: non è conservata sui nostri server.",
+  apiKeyCreateSubmit: "Crea la chiave",
+  apiKeyCreateCancel: "Annulla",
+  apiKeyCreateBusy: "Creazione in corso…",
+  apiKeyRevealTitle: "La tua chiave API",
+  apiKeyRevealBody:
+    "Copiala ora: è l'unica volta in cui viene mostrata per intero. Chi ha questa chiave può scrivere nell'API a tuo nome.",
+  apiKeyRevealCopy: "Copia la chiave",
+  apiKeyRevealCopied: "Copiata.",
+  apiKeyRevealSaved: "L'ho salvata",
+  apiKeyErrorList: "Impossibile caricare le tue chiavi API. Riprova.",
+  apiKeyErrorCreate: "Impossibile creare la chiave. Riprova.",
+  apiKeyErrorRevoke: "Impossibile revocare la chiave. Riprova.",
+  apiKeyErrorLimit: "Hai già 5 chiavi API. Revocane una prima di crearne un'altra.",
+  apiKeyErrorSession: "La sessione è scaduta. Accedi di nuovo e riprova.",
+  apiKeyErrorCsrf: "Il token di sicurezza è scaduto. Ricarica la pagina e riprova.",
   // Verifica email (UI Fase B — design review): pagina /verify-email e banner
   // su /account. Il link nella email ora atterra su una pagina vera (non JSON
   // grezzo); la pagina consuma GET /api/auth/verify-email e offre il re-invio

@@ -70,6 +70,12 @@ const PAGES = [
   { source: "app/forgot-password/ForgotPasswordBody.tsx", relative: "app/forgot-password/ForgotPasswordBody.mjs" },
   { source: "app/reset-password/ResetPasswordBody.tsx", relative: "app/reset-password/ResetPasswordBody.mjs" },
   { source: "app/account/AccountPageBody.tsx", relative: "app/account/AccountPageBody.mjs" },
+  // api-keys epic T18: the account key panel is split into section + list +
+  // row (same isolation contract as AccountPageBody — app/account is not
+  // part of the app/lib + app/components recursive walk).
+  { source: "app/account/ApiKeysSection.tsx", relative: "app/account/ApiKeysSection.mjs" },
+  { source: "app/account/ApiKeyList.tsx", relative: "app/account/ApiKeyList.mjs" },
+  { source: "app/account/ApiKeyRow.tsx", relative: "app/account/ApiKeyRow.mjs" },
   { source: "app/records/[id]/RecordPageBody.tsx", relative: "app/records/[id]/RecordPageBody.mjs" },
   { source: "app/records/[id]/edit/page.tsx", relative: "app/records/[id]/edit/page.mjs" },
   // C5 community components: the verification toggle and the trust-level

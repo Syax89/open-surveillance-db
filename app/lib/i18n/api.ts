@@ -58,6 +58,43 @@ export const en = {
     geocodeReverse: { method: "GET", path: "/api/geocode/reverse?lat=&lng=", example: "/api/geocode/reverse?lat=47.4123&lng=8.5709", description: "Closest address for a position — the same lookup that fills the address field in the report form." },
     tiles: { method: "GET", path: "/api/tiles/{z}/{x}/{y}.png", example: "/api/tiles/14/8570/5694.png", description: "OpenStreetMap raster tiles, proxied and cached. Use them to build your own map over the camera data." },
   },
+  // API keys (epic api-keys, T19): the write API. The read endpoints above
+  // stay keyless — private keys unlock WRITE access only.
+  keysTitle: "API keys",
+  keysIntro:
+    "The endpoints above are read-only and never need a key. Verified contributors can create private keys to write: submit reports and corrections, confirm cameras, edit records and cast community actions from scripts.",
+  keysNote:
+    "Private keys unlock write access to the API — treat them like a password: never share them or commit them to public repositories.",
+  authHeaderTitle: "Authentication",
+  authHeaderIntro:
+    "Send the key in the Authorization header of the request. A key stays valid until it expires or until you revoke it from your account.",
+  authHeaderExample:
+    'curl -X POST /api/cameras -H "Authorization: Bearer osdb_…" -H "Content-Type: application/json" -d \'{ "title": "…" }\'',
+  keysCreateCta: "Create your API keys from your account.",
+  scopesTitle: "Permissions",
+  scopesIntro:
+    "Each key is scoped: you choose what it may do, and you can revoke it at any time from your account.",
+  scopes: {
+    submit: { name: "Submit", grants: "Publish camera reports and corrections." },
+    confirm: { name: "Confirm", grants: "Mark cameras as confirmed." },
+    edit: { name: "Edit", grants: "Update camera details (owner edits and edit requests)." },
+    action: { name: "Community actions", grants: "Cast community actions: useful, gone, problem, privacy." },
+  },
+  errorsTitle: "Error responses",
+  errorsIntro:
+    "Write requests fail with a clear status code and a single canonical response shape. Read endpoints keep returning 404 for records that are not publicly current.",
+  errors: {
+    "400": "Malformed request: a missing or invalid field.",
+    "401": "Missing, invalid, expired or revoked key.",
+    "403": "The key is valid but does not include the required permission.",
+    "404": "Unknown key or record — the API never reveals whether an identifier exists.",
+    "409": "Limit reached: too many active keys (max 5) or a conflicting state.",
+    "429": "Rate limit exceeded — per key and per IP address.",
+    "503": "Service temporarily unavailable.",
+  },
+  keysLimitsTitle: "Key rate limits",
+  keysLimitsIntro:
+    "Each key is limited on its own, on top of the per-IP limits above: one script cannot exhaust the shared budget of every other caller from the same address.",
   limitsTitle: "Rate limits",
   limitsIntro:
     "Every endpoint is limited per caller (IP address) over a 60-second window. Limits protect the service and the upstream providers (OpenStreetMap); generous for interactive use, tight for scrapers.",
@@ -129,6 +166,44 @@ export const it: Translation<typeof en> = {
     geocodeReverse: { method: "GET", path: "/api/geocode/reverse?lat=&lng=", example: "/api/geocode/reverse?lat=47.4123&lng=8.5709", description: "Indirizzo più vicino a una posizione — la stessa ricerca che compila il campo indirizzo nel modulo di segnalazione." },
     tiles: { method: "GET", path: "/api/tiles/{z}/{x}/{y}.png", example: "/api/tiles/14/8570/5694.png", description: "Tile raster di OpenStreetMap, servite dal proxy con cache. Usale per costruire la tua mappa sopra i dati delle telecamere." },
   },
+  // Chiavi API (epic api-keys, T19): le API di scrittura. Gli endpoint di
+  // lettura qui sopra restano senza chiave — le chiavi private sbloccano
+  // SOLO la scrittura.
+  keysTitle: "Chiavi API",
+  keysIntro:
+    "Gli endpoint qui sopra sono di sola lettura e non richiedono mai una chiave. Chi ha un account verificato può creare chiavi private per scrivere: inviare segnalazioni e correzioni, confermare le telecamere, modificare i record ed esprimere azioni della community dagli script.",
+  keysNote:
+    "Le chiavi private sbloccano l'accesso in scrittura all'API — trattale come una password: non condividerle mai e non salvarle nei repository pubblici.",
+  authHeaderTitle: "Autenticazione",
+  authHeaderIntro:
+    "Invia la chiave nell'header Authorization della richiesta. La chiave resta valida fino alla scadenza o finché non la revochi dal tuo account.",
+  authHeaderExample:
+    'curl -X POST /api/cameras -H "Authorization: Bearer osdb_…" -H "Content-Type: application/json" -d \'{ "title": "…" }\'',
+  keysCreateCta: "Crea le tue chiavi API dal tuo account.",
+  scopesTitle: "Permessi",
+  scopesIntro:
+    "Ogni chiave ha permessi limitati: scegli cosa può fare e puoi revocarla in qualsiasi momento dal tuo account.",
+  scopes: {
+    submit: { name: "Invia", grants: "Pubblica segnalazioni e correzioni." },
+    confirm: { name: "Conferma", grants: "Conferma le telecamere." },
+    edit: { name: "Modifica", grants: "Aggiorna i dettagli delle telecamere (modifiche del proprietario e richieste di modifica)." },
+    action: { name: "Azioni della community", grants: "Esprimi azioni della community: utile, non c'è più, problema, privacy." },
+  },
+  errorsTitle: "Risposte di errore",
+  errorsIntro:
+    "Le richieste di scrittura falliscono con un codice di stato chiaro e una forma di risposta canonica unica. Gli endpoint di lettura continuano a rispondere 404 per i record non più pubblici.",
+  errors: {
+    "400": "Richiesta malformata: campo mancante o non valido.",
+    "401": "Chiave mancante, non valida, scaduta o revocata.",
+    "403": "La chiave è valida ma non include il permesso richiesto.",
+    "404": "Chiave o record sconosciuto — l'API non rivela mai se un identificatore esiste.",
+    "409": "Limite raggiunto: troppe chiavi attive (max 5) o stato in conflitto.",
+    "429": "Limite di velocità superato — per chiave e per indirizzo IP.",
+    "503": "Servizio temporaneamente non disponibile.",
+  },
+  keysLimitsTitle: "Limiti delle chiavi",
+  keysLimitsIntro:
+    "Ogni chiave ha un proprio limite, in aggiunta ai limiti per IP qui sopra: uno script non può esaurire il budget condiviso degli altri chiamanti dello stesso indirizzo.",
   limitsTitle: "Limiti di velocità",
   limitsIntro:
     "Ogni endpoint è limitato per chiamante (indirizzo IP) su una finestra di 60 secondi. I limiti proteggono il servizio e i provider upstream (OpenStreetMap); generosi per l'uso interattivo, stretti per gli scraper.",

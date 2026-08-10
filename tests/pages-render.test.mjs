@@ -55,6 +55,12 @@ const EXTRA_SOURCES = [
   { source: "app/verify-email/VerifyEmailBody.tsx", relative: "app/verify-email/VerifyEmailBody.mjs" },
   { source: "app/forgot-password/ForgotPasswordBody.tsx", relative: "app/forgot-password/ForgotPasswordBody.mjs" },
   { source: "app/reset-password/ResetPasswordBody.tsx", relative: "app/reset-password/ResetPasswordBody.mjs" },
+  // api-keys epic T18: the account key panel is split into section + list +
+  // row (same isolation contract as AccountPageBody — app/account is not
+  // part of the app/lib + app/components recursive walk).
+  { source: "app/account/ApiKeysSection.tsx", relative: "app/account/ApiKeysSection.mjs" },
+  { source: "app/account/ApiKeyList.tsx", relative: "app/account/ApiKeyList.mjs" },
+  { source: "app/account/ApiKeyRow.tsx", relative: "app/account/ApiKeyRow.mjs" },
 ];
 
 // Le route del repo (pagine + API) note al momento del test: usate per

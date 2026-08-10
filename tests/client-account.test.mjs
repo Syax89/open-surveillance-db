@@ -99,13 +99,14 @@ const passkeyFixture = {
   ],
 };
 
-function routeHandler({ me = profileFixture, contributions = contributionsFixture, passkeys = [] } = {}) {
+function routeHandler({ me = profileFixture, contributions = contributionsFixture, passkeys = [], keys = [] } = {}) {
   return (input) => {
     if (input === "/api/auth/me") return jsonResponse(me, { status: me === null ? 401 : 200 });
     if (typeof input === "string" && input.startsWith("/api/auth/me/contributions")) {
       return jsonResponse(contributions);
     }
     if (input === "/api/auth/passkey/credentials") return jsonResponse({ credentials: passkeys });
+    if (input === "/api/auth/keys") return jsonResponse({ keys });
     return jsonResponse({ error: "unexpected route" }, { status: 404 });
   };
 }
@@ -201,7 +202,8 @@ test("account: level badge at L4 omits the progress line (no next threshold)", a
 test("account: local status filter refetches with ?status= and keeps the URL clean", async () => {
   const { screen, waitFor } = rtl;
   const requests = [];
-  installFetchMock((input) => {
+  installFetchMock((input, init) => {
+      if (String(input) === "/api/auth/keys" && (init?.method ?? "GET") === "GET") return jsonResponse({ keys: [] });
     requests.push(input);
     if (input === "/api/auth/me") return jsonResponse(profileFixture);
     if (typeof input === "string" && input.startsWith("/api/auth/me/contributions")) {
@@ -245,7 +247,8 @@ test("account: local status filter refetches with ?status= and keeps the URL cle
 test("account: summary strip + Published status control (rework 2026-08-08)", async () => {
   const { screen, waitFor } = rtl;
   const requests = [];
-  installFetchMock((input) => {
+  installFetchMock((input, init) => {
+      if (String(input) === "/api/auth/keys" && (init?.method ?? "GET") === "GET") return jsonResponse({ keys: [] });
     requests.push(input);
     if (input === "/api/auth/me") return jsonResponse(profileFixture);
     if (typeof input === "string" && input.startsWith("/api/auth/me/contributions")) {
@@ -307,7 +310,8 @@ test("account: kind rows show icon tile, issue label, date and related-record li
 test("account: type filter refetches with ?type= (rework 2026-08-08)", async () => {
   const { screen, waitFor } = rtl;
   const requests = [];
-  installFetchMock((input) => {
+  installFetchMock((input, init) => {
+      if (String(input) === "/api/auth/keys" && (init?.method ?? "GET") === "GET") return jsonResponse({ keys: [] });
     requests.push(input);
     if (input === "/api/auth/me") return jsonResponse(profileFixture);
     if (typeof input === "string" && input.startsWith("/api/auth/me/contributions")) {
@@ -352,7 +356,8 @@ test("account: empty states — no contributions vs. filter without matches", as
 
   // Filter with no matches (total > 0, but the selected status is empty).
   const { screen: screen2 } = rtl;
-  installFetchMock((input) => {
+  installFetchMock((input, init) => {
+      if (String(input) === "/api/auth/keys" && (init?.method ?? "GET") === "GET") return jsonResponse({ keys: [] });
     if (input === "/api/auth/me") return jsonResponse(profileFixture);
     if (typeof input === "string" && input.startsWith("/api/auth/me/contributions")) {
       const url = new URL(input, "https://osdb.test");
@@ -386,7 +391,8 @@ test("account: pagination next/previous drive page= and the indicator carries ar
     pagination: { page: 2, pageSize: 25, total: 25, totalPages: 2, hasMore: false },
     level: profileFixture.level,
   };
-  installFetchMock((input) => {
+  installFetchMock((input, init) => {
+      if (String(input) === "/api/auth/keys" && (init?.method ?? "GET") === "GET") return jsonResponse({ keys: [] });
     if (input === "/api/auth/me") return jsonResponse(profileFixture);
     if (typeof input === "string" && input.startsWith("/api/auth/me/contributions")) {
       const url = new URL(input, "https://osdb.test");
@@ -413,7 +419,8 @@ test("account: pagination next/previous drive page= and the indicator carries ar
 
 test("account: contributions error renders the honest alert, list is not blanked", async () => {
   const { screen, waitFor } = rtl;
-  installFetchMock((input) => {
+  installFetchMock((input, init) => {
+      if (String(input) === "/api/auth/keys" && (init?.method ?? "GET") === "GET") return jsonResponse({ keys: [] });
     if (input === "/api/auth/me") return jsonResponse(profileFixture);
     if (typeof input === "string" && input.startsWith("/api/auth/me/contributions")) {
       return jsonResponse({ error: "boom" }, { status: 503 });
@@ -437,6 +444,7 @@ test("account: cancelling the delete confirm sends no DELETE", async () => {
   const user = rtl.userEvent.setup();
   const requests = [];
   installFetchMock((input, init) => {
+      if (String(input) === "/api/auth/keys" && (init?.method ?? "GET") === "GET") return jsonResponse({ keys: [] });
     requests.push({ input, init });
     if (input === "/api/auth/me") return jsonResponse(profileFixture);
     if (typeof input === "string" && input.startsWith("/api/auth/me/contributions")) {
@@ -467,6 +475,7 @@ test("account: confirming erasure DELETEs /api/auth/account with CSRF and shows 
   const user = rtl.userEvent.setup();
   const requests = [];
   installFetchMock((input, init) => {
+      if (String(input) === "/api/auth/keys" && (init?.method ?? "GET") === "GET") return jsonResponse({ keys: [] });
     requests.push({ input, init });
     if (input === "/api/auth/me") return jsonResponse(profileFixture);
     if (typeof input === "string" && input.startsWith("/api/auth/me/contributions")) {
@@ -500,6 +509,7 @@ test("account: display name inline edit — save PATCHes /api/auth/me with CSRF 
   const user = rtl.userEvent.setup();
   const requests = [];
   installFetchMock((input, init) => {
+      if (String(input) === "/api/auth/keys" && (init?.method ?? "GET") === "GET") return jsonResponse({ keys: [] });
     requests.push({ input, init });
     if (input === "/api/auth/me" && init.method === "PATCH") {
       return jsonResponse({
@@ -532,6 +542,7 @@ test("account: display name inline edit — invalid 1-char name marks aria-inval
   const user = rtl.userEvent.setup();
   const requests = [];
   installFetchMock((input, init) => {
+      if (String(input) === "/api/auth/keys" && (init?.method ?? "GET") === "GET") return jsonResponse({ keys: [] });
     requests.push({ input, init });
     return routeHandler()(input);
   });
@@ -555,6 +566,7 @@ test("account: display name inline edit — 429 maps to the localized rate-limit
   const { screen, waitFor } = rtl;
   const user = rtl.userEvent.setup();
   installFetchMock((input, init) => {
+      if (String(input) === "/api/auth/keys" && (init?.method ?? "GET") === "GET") return jsonResponse({ keys: [] });
     if (input === "/api/auth/me" && init.method === "PATCH") {
       return jsonResponse({ error: "Too many requests" }, { status: 429 });
     }
@@ -616,6 +628,7 @@ test("account: enrolling a passkey runs begin -> create -> complete and shows th
   const user = rtl.userEvent.setup();
   const requests = [];
   installFetchMock((input, init) => {
+      if (String(input) === "/api/auth/keys" && (init?.method ?? "GET") === "GET") return jsonResponse({ keys: [] });
     requests.push({ input, init });
     if (input === "/api/auth/me") return jsonResponse(profileFixture);
     if (typeof input === "string" && input.startsWith("/api/auth/me/contributions")) {
@@ -684,6 +697,7 @@ test("account: enrolling a passkey in a browser without WebAuthn shows an explan
   clearWebAuthnGlobals();
   const requests = [];
   installFetchMock((input, init) => {
+      if (String(input) === "/api/auth/keys" && (init?.method ?? "GET") === "GET") return jsonResponse({ keys: [] });
     requests.push({ input, init });
     if (input === "/api/auth/me") return jsonResponse(profileFixture);
     if (typeof input === "string" && input.startsWith("/api/auth/me/contributions")) {
@@ -717,6 +731,7 @@ test("account: cancelling the passkey remove confirm sends no DELETE", async () 
   const user = rtl.userEvent.setup();
   const requests = [];
   installFetchMock((input, init) => {
+      if (String(input) === "/api/auth/keys" && (init?.method ?? "GET") === "GET") return jsonResponse({ keys: [] });
     requests.push({ input, init });
     if (input === "/api/auth/me") return jsonResponse(profileFixture);
     if (typeof input === "string" && input.startsWith("/api/auth/me/contributions")) {
@@ -751,6 +766,7 @@ test("account: confirming the passkey remove DELETEs /api/auth/passkey/credentia
   const user = rtl.userEvent.setup();
   const requests = [];
   installFetchMock((input, init) => {
+      if (String(input) === "/api/auth/keys" && (init?.method ?? "GET") === "GET") return jsonResponse({ keys: [] });
     requests.push({ input, init });
     if (input === "/api/auth/me") return jsonResponse(profileFixture);
     if (typeof input === "string" && input.startsWith("/api/auth/me/contributions")) {
@@ -786,7 +802,8 @@ test("account: confirming the passkey remove DELETEs /api/auth/passkey/credentia
 test("account: a 409 on enroll completion shows the already-enrolled error, no recovery dialog", async () => {
   const { screen, waitFor } = rtl;
   const user = rtl.userEvent.setup();
-  installFetchMock((input) => {
+  installFetchMock((input, init) => {
+      if (String(input) === "/api/auth/keys" && (init?.method ?? "GET") === "GET") return jsonResponse({ keys: [] });
     if (input === "/api/auth/me") return jsonResponse(profileFixture);
     if (typeof input === "string" && input.startsWith("/api/auth/me/contributions")) {
       return jsonResponse(contributionsFixture);
@@ -822,7 +839,8 @@ test("account: a 409 on enroll completion shows the already-enrolled error, no r
 test("account: a 403 on enroll begin (expired CSRF) shows the actionable security-token error, not cross-site", async () => {
   const { screen, waitFor } = rtl;
   const user = rtl.userEvent.setup();
-  installFetchMock((input) => {
+  installFetchMock((input, init) => {
+      if (String(input) === "/api/auth/keys" && (init?.method ?? "GET") === "GET") return jsonResponse({ keys: [] });
     if (input === "/api/auth/me") return jsonResponse(profileFixture);
     if (typeof input === "string" && input.startsWith("/api/auth/me/contributions")) {
       return jsonResponse(contributionsFixture);
@@ -853,6 +871,7 @@ test("account: an unverified contributor sees the verification banner with a wor
   const user = rtl.userEvent.setup();
   const requests = [];
   installFetchMock((input, init) => {
+      if (String(input) === "/api/auth/keys" && (init?.method ?? "GET") === "GET") return jsonResponse({ keys: [] });
     const url = String(input);
     requests.push({ url, method: init?.method ?? "GET" });
     if (url === "/api/auth/me") {
@@ -888,7 +907,8 @@ test("account: an unverified contributor sees the verification banner with a wor
 
 test("account: a verified contributor sees the done line instead of the banner", async () => {
   const { screen, waitFor } = rtl;
-  installFetchMock((input) => {
+  installFetchMock((input, init) => {
+      if (String(input) === "/api/auth/keys" && (init?.method ?? "GET") === "GET") return jsonResponse({ keys: [] });
     if (input === "/api/auth/me") return jsonResponse(profileFixture);
     if (typeof input === "string" && input.startsWith("/api/auth/me/contributions")) {
       return jsonResponse(contributionsFixture);
@@ -902,3 +922,4 @@ test("account: a verified contributor sees the done line instead of the banner",
   assert.ok(screen.getByText("Email verified — you can contribute."));
   assert.equal(screen.queryByRole("heading", { name: "Verify your email to contribute" }), null);
 });
+

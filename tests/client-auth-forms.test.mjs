@@ -151,7 +151,16 @@ test("login: submit button disables and shows loading while pending", async () =
   await waitFor(() => assert.equal(button.disabled, true));
   assert.equal(button.textContent, "Loading…");
 
-  resolveFetch(jsonResponse({}, { status: 200 }));
+  // Resolve the pending login fetch inside act() so the success-path commit
+  // (finally -> setSubmitting(false)) is flushed deterministically. Without
+  // act, the update is scheduled from a promise continuation OUTSIDE the act
+  // environment and can outlive waitFor's default 1s budget on a loaded CI
+  // runner — flaky in CI run 31402203993 (button stayed disabled with
+  // "Loading…" for the whole waitFor window, while the same code passed the
+  // Coverage job of the same run). Same pattern as map-popup-reconcile.
+  await rtl.act(async () => {
+    resolveFetch(jsonResponse({}, { status: 200 }));
+  });
   await waitFor(() => assert.equal(button.disabled, false));
   assert.equal(button.textContent, "Log in");
 });
