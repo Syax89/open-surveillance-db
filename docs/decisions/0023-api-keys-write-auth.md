@@ -73,12 +73,17 @@ machinery as every other per-account row (R-rules, art. 17 erasure batch).
    `submit` (cameras + corrections), `confirm`, `edit`, `action`. Default at
    mint = all four; a client may narrow. Whitelist is validated in code, never
    free-form; stored as JSON text in `scopes` (D4).
-5. **Cap — 5 active keys per contributor**, server-enforced (count before
-   insert, 409 on overflow), env knob `API_KEYS_MAX_PER_CONTRIBUTOR`
-   (default 5) (D5).
+5. **Cap — 5 active keys per contributor**, server-enforced **atomically inside
+   the INSERT** (the active-key count and the insert are one conditional SQL
+   statement, so concurrent mints cannot overshoot a stale count; 409 on
+   overflow), env knob `API_KEYS_MAX_PER_CONTRIBUTOR` (default 5) (D5).
 6. **Expiry.** Optional `expires_at` at mint; default 365 days
-   (`API_KEYS_DEFAULT_TTL_DAYS`). An expired key answers **401** on every
-   write, uniformly (D6).
+   (`API_KEYS_DEFAULT_TTL_DAYS`). Expiries are stored as **canonical ISO-8601
+   UTC TEXT** (any client-supplied offset is normalised at mint), and
+   liveness is judged by the **instant** (`Date.parse`/`julianday`), never by
+   string order — a key whose offset-bearing expiry is temporally past is
+   dead even when its raw string sorts after `now`. An expired key answers
+   **401** on every write, uniformly (D6).
 7. **`last_used_at` throttled** — updated at most once per 5 minutes per key,
    stored as ISO-8601 UTC TEXT with like-for-like string comparisons; never
    SQLite `datetime('now')` (D7).
@@ -120,8 +125,10 @@ machinery as every other per-account row (R-rules, art. 17 erasure batch).
   `key_hash` unique, `scopes` JSON text, `created_at`, `last_used_at`,
   `expires_at`, `revoked_at`), unique index on `key_hash`, indexes on
   `contributor_id` and `(revoked_at, expires_at)`.
-- **DB layer `db/api-keys.ts`**: `createApiKey` (returns the raw key once),
-  `findApiKeyByHash` (JOIN contributors, liveness check), `listApiKeysForContributor`,
+- **DB layer `db/api-keys.ts`**: `createApiKey` (returns the raw key once;
+  the D5 cap is enforced atomically via the `maxActive` conditional-INSERT
+  guard), `findApiKeyByHash` (JOIN contributors, liveness check by
+  instant), `listApiKeysForContributor`,
   `revokeApiKey` (soft, owner-only), `countApiKeysForContributor`,
   `touchApiKeyLastUsed` (throttled ≥ 5 min).
 - **Endpoints** (session + CSRF, auth-family rate limit): `POST /api/auth/keys`
@@ -148,7 +155,10 @@ machinery as every other per-account row (R-rules, art. 17 erasure batch).
   filename). FK cascade on contributor deletion is exercised by the harness.
 - **Security posture:** hash-only at rest (a D1 dump yields no usable keys);
   raw key exists only in the 201 response; Bearer headers never logged; keys
-  in URLs rejected (400); no-store on key-authenticated responses; uniform
+  in URLs rejected (400, no-store, before authentication, for the query
+  names `api_key`/`apiKey`/`key` — case-insensitive — on the write-auth and
+  key-management surfaces; the value is never reflected or logged); no-store
+  on key-authenticated responses; uniform
   401/403 bodies (no enumeration); instant per-key revocation; `last_used_at`
   as an anomaly signal. CSRF is skipped only on the Bearer path — there is no
   ambient authority to abuse, and CORS stays closed.

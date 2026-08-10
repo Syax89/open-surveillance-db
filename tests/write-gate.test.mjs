@@ -286,6 +286,72 @@ test("requireWriteAuth refuses a live key whose owner is NOT email-verified (403
   assert.deepEqual(await responseBody(result.response), { error: WRITE_GATE_ERROR });
 });
 
+test("requireWriteAuth rejects credentials in the query string BEFORE any auth work (400, no-store, never reflects the value)", async () => {
+  // ADR 0023: keys in URLs are rejected. A credential smuggled as a query
+  // param would leak into proxy/access logs and Referer headers — the gate
+  // must answer a generic 400 (no value echo, no auth attempt, no session
+  // read) so the write never even starts.
+  liveSession(); // must NOT be reached
+  const secret = "osdb_super-secret-value-123";
+  const { requireWriteAuth } = await writeGate();
+  const result = await requireWriteAuth(
+    apiRequest(`/api/cameras?api_key=${encodeURIComponent(secret)}`, { method: "POST" }),
+    "submit",
+  );
+  assert.equal(result.ok, false);
+  assert.equal(result.response.status, 400);
+  assert.equal(result.response.headers.get("cache-control"), "no-store");
+  const body = await responseBody(result.response);
+  assert.equal(body.error, "API credentials in the query string are not accepted.");
+  assert.equal(JSON.stringify(body).includes(secret), false, "the credential value is never reflected");
+  assert.equal(callArgs("findSessionByToken").length, 0, "rejection happens before any auth (no session read)");
+  assert.equal(callArgs("sha256Hex").length, 0, "rejection happens before any key hashing");
+});
+
+test("requireWriteAuth rejects every unambiguous credential name case-insensitively (api_key, apiKey, key)", async (t) => {
+  const { requireWriteAuth } = await writeGate();
+  for (const name of ["api_key", "apiKey", "key", "API_KEY", "ApiKey", "KEY"]) {
+    await t.test(name, async () => {
+      const result = await requireWriteAuth(
+        apiRequest(`/api/cameras?${name}=osdb_secret`, { method: "POST" }),
+        "submit",
+      );
+      assert.equal(result.ok, false);
+      assert.equal(result.response.status, 400);
+      assert.equal(result.response.headers.get("cache-control"), "no-store");
+    });
+  }
+});
+
+test("requireWriteAuth still resolves a Bearer key when the URL carries a NON-credential query param", async () => {
+  // The rejection is scoped to unambiguous credential names only: unrelated
+  // query params on the same URL must not trip it, and the Bearer path
+  // keeps working end-to-end.
+  liveKey();
+  const { requireWriteAuth } = await writeGate();
+  const result = await requireWriteAuth(
+    bearerRequest("/api/cameras?utm_source=script&kind=traffic"),
+    "submit",
+  );
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.authMethod, "api_key");
+  assert.equal(result.apiKeyId, 41);
+});
+
+test("requireWriteAuth does NOT reject unrelated query params on the session path", async () => {
+  liveSession();
+  verified();
+  const { requireWriteAuth } = await writeGate();
+  const result = await requireWriteAuth(
+    sessionRequest("/api/cameras?format=json"),
+    "submit",
+  );
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.authMethod, "session");
+});
+
 test("requireWriteAuth treats a corrupt scopes column as NO granted scopes (403 fail-closed)", async () => {
   stub("sha256Hex", async () => "hash");
   stub("findApiKeyByHash", async () => ({

@@ -152,6 +152,73 @@ test("createApiKey honours explicit expiry: never (null) or ISO-8601", async () 
   );
 });
 
+test("createApiKey canonicalises any offset ISO expiry to UTC (D7: ISO-8601 UTC TEXT storage)", async () => {
+  const { apiKeys } = runtime;
+  const contributor = await createContributor();
+
+  // An offset-bearing ISO string describes the same instant as its UTC Z
+  // form; the STORED value must be the canonical UTC TEXT (D7), never the
+  // raw offset string, so every later string/epoch comparison is stable.
+  const offset = await apiKeys.createApiKey({
+    contributorId: contributor.id,
+    name: "offset expiry",
+    expiresAt: "2026-09-01T12:00:00+02:00", // = 2026-09-01T10:00:00.000Z
+  });
+  assert.equal(offset.key.expiresAt, "2026-09-01T10:00:00.000Z", "offset is normalised to UTC Z");
+
+  // The default +365d expiry and an explicit null are already canonical.
+  const never = await apiKeys.createApiKey({
+    contributorId: contributor.id,
+    name: "never",
+    expiresAt: null,
+  });
+  assert.equal(never.key.expiresAt, null);
+});
+
+test("an offset ISO expiry that is temporally expired but lexicographically misleading is dead (epoch check, D6)", async () => {
+  const { apiKeys } = runtime;
+  const contributor = await createContributor();
+  const { rawKey, key } = await apiKeys.createApiKey({
+    contributorId: contributor.id,
+    name: "tz-deceit",
+    // 2026-08-02T00:00:00+02:00 IS 2026-08-01T22:00:00Z — already expired at
+    // 23:00Z — but as a string it sorts AFTER "2026-08-01T23:00:00.000Z"
+    // (position 9: '2' > '1'). A lexicographic liveness check would keep the
+    // key alive for another hour past its true end of life.
+    expiresAt: "2026-08-02T00:00:00+02:00",
+    now: "2026-08-01T00:00:00.000Z",
+  });
+  assert.equal(key.expiresAt, "2026-08-01T22:00:00.000Z", "canonical UTC storage first");
+
+  const hash = await runtime.auth.sha256Hex(rawKey);
+  assert.notEqual(
+    await apiKeys.findApiKeyByHash(hash, "2026-08-01T21:59:00.000Z"),
+    null,
+    "live one minute before the instant",
+  );
+  assert.equal(
+    await apiKeys.findApiKeyByHash(hash, "2026-08-01T23:00:00.000Z"),
+    null,
+    "dead one hour after the instant despite the deceiving offset string",
+  );
+});
+
+test("a future offset expiry is canonicalised to UTC and stays live (D6)", async () => {
+  const { apiKeys } = runtime;
+  const contributor = await createContributor();
+  const { rawKey, key } = await apiKeys.createApiKey({
+    contributorId: contributor.id,
+    name: "future-tz",
+    expiresAt: "2026-10-01T12:00:00+02:00", // = 2026-10-01T10:00:00.000Z
+    now: "2026-08-01T00:00:00.000Z",
+  });
+  assert.equal(key.expiresAt, "2026-10-01T10:00:00.000Z", "stored as canonical UTC");
+  assert.ok(
+    await apiKeys.findApiKeyByHash(await runtime.auth.sha256Hex(rawKey), "2026-09-01T00:00:00.000Z"),
+    "a valid future key resolves",
+  );
+});
+
 // ---------------------------------------------------------------------------
 // findApiKeyByHash — resolve + liveness (D3/D6/D9, JOIN contributors)
 // ---------------------------------------------------------------------------
@@ -299,6 +366,65 @@ test("countApiKeysForContributor counts only ACTIVE keys; deprecated alias still
   await apiKeys.createApiKey({ contributorId: other.id, name: "x" });
   assert.equal(await apiKeys.countApiKeysForContributor(contributor.id, now), 1);
   assert.equal(a.rawKey.length > 0, true);
+});
+
+test("D5 cap is ATOMIC: parallel mints with maxActive 3 persist at most 3 rows (no COUNT/INSERT race)", async () => {
+  const { apiKeys } = runtime;
+  const contributor = await createContributor();
+  const maxActive = 3;
+
+  // Six mints race for a cap of 3. The db layer must enforce the cap inside
+  // the SAME SQL statement that inserts (a separate COUNT-then-INSERT lets
+  // concurrent requests all see a stale count and overshoot). On the
+  // pre-fix code every one of the six mints succeeds (no cap at the db
+  // boundary) and the persisted count is 6 — this assertion fails there.
+  const results = await Promise.all(
+    Array.from({ length: 6 }, (_, index) =>
+      apiKeys.createApiKey({
+        contributorId: contributor.id,
+        name: `race-${index}`,
+        maxActive,
+        now: "2026-08-01T00:00:00.000Z",
+      }),
+    ),
+  );
+
+  const minted = results.filter((result) => result !== null);
+  const refused = results.filter((result) => result === null);
+  assert.equal(minted.length, maxActive, "exactly the cap of mints succeeds");
+  assert.equal(refused.length, 6 - maxActive, "the overflow attempts answer null (the route maps it to 409)");
+
+  const rows = await apiKeys.listApiKeysForContributor(contributor.id);
+  assert.equal(rows.length, maxActive, "the persisted count NEVER exceeds the cap");
+  assert.equal(await apiKeys.countApiKeysForContributor(contributor.id), maxActive);
+});
+
+test("countApiKeysForContributor judges expiry by time, not by string (legacy offset rows, D7)", async () => {
+  const { apiKeys } = runtime;
+  const contributor = await createContributor();
+
+  // A legacy row written before canonicalisation holds the raw offset text.
+  // It is temporally expired at 23:00Z even though the string sorts AFTER
+  // "2026-08-01T23:00:00.000Z"; the count must treat it as expired (frees
+  // the slot). The pre-fix lexicographic `expires_at > ?` comparison counts
+  // it as active — this assertion fails there.
+  await runtime.env.DB.prepare(
+    `INSERT INTO api_keys (contributor_id, name, key_prefix, key_hash, scopes, created_at, last_used_at, expires_at, revoked_at)
+     VALUES (?, 'legacy', 'osdb_legacy', ?, '["submit"]', '2026-08-01T00:00:00.000Z', NULL, '2026-08-02T00:00:00+02:00', NULL)`,
+  )
+    .bind(contributor.id, "0".repeat(64))
+    .run();
+
+  assert.equal(
+    await apiKeys.countApiKeysForContributor(contributor.id, "2026-08-01T23:00:00.000Z"),
+    0,
+    "temporally expired despite the deceiving offset string",
+  );
+  assert.equal(
+    await apiKeys.countApiKeysForContributor(contributor.id, "2026-08-01T21:00:00.000Z"),
+    1,
+    "still active before the true instant",
+  );
 });
 
 // ---------------------------------------------------------------------------

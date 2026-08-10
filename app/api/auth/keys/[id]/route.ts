@@ -2,6 +2,7 @@ import { env } from "cloudflare:workers";
 import { revokeApiKey } from "../../../../../db/api-keys";
 import { authLimit } from "../../../../lib/auth-route-helpers";
 import { malformedSessionCookieGuard } from "../../../../lib/auth-session";
+import { rejectQueryCredentials } from "../../../../lib/api-key-auth";
 import { csrfVerified, sameOrigin } from "../../../../lib/csrf";
 import { urlTooLong } from "../../../../lib/input-limits";
 import { requireVerifiedContributor } from "../../../../lib/write-gate";
@@ -36,12 +37,14 @@ function parseId(request: Request): number | null {
  * the account page maps to "already revoked".
  *
  * Guard order (spec §1.3, same as the mint POST): urlTooLong (project-wide
- * transport guard, 414) → authLimit (shared auth-mutation bucket, 429 —
- * revoking a credential is a state change, so it uses the same 10/min
- * bucket as minting, not the session-read one) → malformed-cookie 400 (QA
- * F1: a present-but-undecodable session cookie is a client bug, not an
- * anonymous caller) → requireVerifiedContributor (write gate: 401 anonymous
- * / 403 unverified, single canonical body, anti-enumeration) → sameOrigin +
+ * transport guard, 414) → query-string credential rejection (ADR 0023, 400
+ * — a credential smuggled in the URL never even reaches auth) → authLimit
+ * (shared auth-mutation bucket, 429 — revoking a credential is a state
+ * change, so it uses the same 10/min bucket as minting, not the
+ * session-read one) → malformed-cookie 400 (QA F1: a
+ * present-but-undecodable session cookie is a client bug, not an anonymous
+ * caller) → requireVerifiedContributor (write gate: 401 anonymous / 403
+ * unverified, single canonical body, anti-enumeration) → sameOrigin +
  * csrfVerified (the state change carries a live session, so it must echo
  * the session's X-CSRF-Token; same-origin first) → strict id parse (404).
  *
@@ -56,6 +59,11 @@ export async function DELETE(request: Request) {
   if (urlTooLong(request)) {
     return Response.json({ error: "Request URI too long." }, { status: 414, headers: NO_STORE_HEADERS });
   }
+
+  // Query-string credential guard (ADR 0023): a key in the URL would leak
+  // into proxy/access logs and Referer headers — reject before any auth.
+  const queryRejection = rejectQueryCredentials(request);
+  if (queryRejection) return queryRejection;
 
   // Shared auth-mutation rate limit (default 10/min per caller, AUTH_LIMITER
   // binding in production; in-memory fallback in dev/tests). Revoking a key

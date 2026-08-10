@@ -218,6 +218,30 @@ test("expired key is dead (D6): resolves before expiry, null after", async () =>
   );
 });
 
+test("an offset ISO expiry that is temporally expired but lexicographically misleading is dead at the bridge (D6, epoch check)", async () => {
+  const { apiKeyAuth } = runtime;
+  const contributor = await createContributor();
+  const { rawKey } = await createKey(contributor.id, {
+    // 2026-08-02T00:00:00+02:00 IS 2026-08-01T22:00:00Z. At 23:00Z the key is
+    // temporally expired, but the raw string sorts AFTER
+    // "2026-08-01T23:00:00.000Z" (position 9: '2' > '1'), so a lexicographic
+    // liveness comparison would keep it alive for another hour. The bridge
+    // must judge by the instant, not the string.
+    expiresAt: "2026-08-02T00:00:00+02:00",
+  });
+
+  assert.notEqual(
+    await apiKeyAuth.resolveApiKeyContributor(bearerRequest(rawKey), "2026-08-01T21:59:00.000Z"),
+    null,
+    "live one minute before the true instant",
+  );
+  assert.equal(
+    await apiKeyAuth.resolveApiKeyContributor(bearerRequest(rawKey), "2026-08-01T23:00:00.000Z"),
+    null,
+    "dead one hour after the true instant despite the deceiving offset string",
+  );
+});
+
 test("revoked key is dead (D9): resolves before revoke, null after", async () => {
   const { apiKeyAuth, apiKeys } = runtime;
   const contributor = await createContributor();

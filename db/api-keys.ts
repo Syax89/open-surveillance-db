@@ -91,13 +91,14 @@ export function derivePrefix(rawKey: string): string {
 
 /**
  * Count the contributor's ACTIVE keys (D5 cap, API_KEYS_MAX_PER_CONTRIBUTOR):
- * rows that are neither revoked nor expired. The mint endpoint answers 409
- * once the count reaches the cap, so the cap is enforced at the DB boundary
- * and a revoked/expired key frees its slot immediately.
+ * rows that are neither revoked nor expired. The mint endpoint enforces the
+ * cap atomically inside `createApiKey` (see its `maxActive` guard), and a
+ * revoked/expired key frees its slot immediately.
  *
  * `now` is injectable for deterministic tests (same pattern as
- * listPublicCameras); the ISO-8601 UTC TEXT comparison is like-for-like with
- * the stored timestamps (never SQLite `datetime('now')`, D7).
+ * listPublicCameras). Liveness is judged by the INSTANT, not the string:
+ * `julianday` parses ISO-8601 with offsets (legacy rows holding raw offset
+ * text are judged correctly), and NULL expirations never expire (D6/D7).
  */
 export async function countApiKeysForContributor(
   contributorId: number,
@@ -108,7 +109,7 @@ export async function countApiKeysForContributor(
     .prepare(
       `SELECT COUNT(*) AS n FROM api_keys
        WHERE contributor_id = ? AND revoked_at IS NULL
-         AND (expires_at IS NULL OR expires_at > ?)`,
+         AND (expires_at IS NULL OR julianday(expires_at) > julianday(?))`,
     )
     .bind(contributorId, now)
     .first<{ n: number }>();
@@ -168,10 +169,18 @@ export type CreateApiKeyInput = {
   /** Scope subset (D4); defaults to the full whitelist when omitted. */
   scopes?: readonly ApiKeyScope[];
   /**
-   * ISO-8601 UTC expiry. Omitted → `now` + API_KEY_DEFAULT_TTL_DAYS (D6);
-   * explicit `null` → never expires. Anything else must parse as ISO-8601.
+   * ISO-8601 expiry. Omitted → `now` + API_KEY_DEFAULT_TTL_DAYS (D6);
+   * explicit `null` → never expires. Anything else must parse as ISO-8601
+   * (any offset is canonicalised to UTC Z before storage, D7).
    */
   expiresAt?: string | null;
+  /**
+   * D5 cap: when provided, the INSERT becomes one atomic conditional
+   * statement (the COUNT and the INSERT are the same SQL) so concurrent
+   * mints can never overshoot the cap. The result is `null` when the
+   * atomic guard refused (cap reached); the route maps that to 409.
+   */
+  maxActive?: number;
   /** Injectable for deterministic tests (project convention). */
   now?: string;
 };
@@ -203,12 +212,21 @@ export type ApiKeyWithContributor = {
  * Defensive validation happens here too (whitelist scopes, name 1..60,
  * parseable expiry) because the db boundary never trusts its caller; the
  * mint endpoint runs the same checks first for a friendly 400.
+ *
+ * When `maxActive` is provided, the D5 cap is enforced ATOMICALLY inside
+ * the INSERT: the conditional statement re-counts the contributor's ACTIVE
+ * keys (revoked/expired excluded) in the same SQL that inserts, so two
+ * concurrent mints can never both pass a stale count and overshoot. A
+ * revoked or expired key frees its slot immediately. `null` is returned
+ * when the atomic guard refuses (cap reached) — the caller maps that to
+ * 409. Without `maxActive` the plain INSERT runs and a missing row throws
+ * (current behaviour unchanged).
  */
 export async function createApiKey(
   input: CreateApiKeyInput,
-): Promise<{ rawKey: string; key: ApiKey }> {
+): Promise<{ rawKey: string; key: ApiKey } | null> {
   const d1 = await getD1();
-  const now = input.now ?? new Date().toISOString();
+  const now = new Date(Date.parse(input.now ?? new Date().toISOString())).toISOString();
 
   const name = input.name.trim();
   if (name.length < 1 || name.length > 60) {
@@ -223,28 +241,74 @@ export async function createApiKey(
     }
   }
 
-  const expiresAt =
-    input.expiresAt === undefined
-      ? new Date(Date.parse(now) + API_KEY_DEFAULT_TTL_DAYS * 24 * 60 * 60 * 1000).toISOString()
-      : input.expiresAt;
-  if (expiresAt !== null && Number.isNaN(Date.parse(expiresAt))) {
-    throw new Error("expiresAt must be ISO-8601 UTC or null");
+  // Canonicalise the expiry BEFORE storing: `undefined` → `now` + 365d (D6),
+  // explicit `null` → never, anything else must parse as ISO-8601 (any
+  // offset is normalised to UTC Z, D7 — stored TEXT comparisons stay stable).
+  let expiresAt: string | null;
+  if (input.expiresAt === undefined) {
+    expiresAt = new Date(Date.parse(now) + API_KEY_DEFAULT_TTL_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  } else if (input.expiresAt === null) {
+    expiresAt = null;
+  } else {
+    const parsed = Date.parse(input.expiresAt);
+    if (Number.isNaN(parsed)) {
+      throw new Error("expiresAt must be ISO-8601 UTC or null");
+    }
+    expiresAt = new Date(parsed).toISOString();
   }
 
   const rawKey = mintRawKey();
   const keyHash = await sha256Hex(rawKey);
   const keyPrefix = derivePrefix(rawKey);
-  const key = await d1
-    .prepare(
-      `INSERT INTO api_keys (contributor_id, name, key_prefix, key_hash, scopes, created_at, last_used_at, expires_at, revoked_at)
-       VALUES (?, ?, ?, ?, ?, ?, NULL, ?, NULL)
-       RETURNING id, contributor_id AS contributorId, name, key_prefix AS keyPrefix, key_hash AS keyHash,
-                 scopes, created_at AS createdAt, last_used_at AS lastUsedAt,
-                 expires_at AS expiresAt, revoked_at AS revokedAt`,
-    )
-    .bind(input.contributorId, name, keyPrefix, keyHash, JSON.stringify([...scopes]), now, expiresAt)
-    .first<ApiKey>();
-  if (!key) throw new Error("API key could not be created");
+  const scopesJson = JSON.stringify([...scopes]);
+
+  const key =
+    input.maxActive === undefined
+      ? await d1
+          .prepare(
+            `INSERT INTO api_keys (contributor_id, name, key_prefix, key_hash, scopes, created_at, last_used_at, expires_at, revoked_at)
+             VALUES (?, ?, ?, ?, ?, ?, NULL, ?, NULL)
+             RETURNING id, contributor_id AS contributorId, name, key_prefix AS keyPrefix, key_hash AS keyHash,
+                       scopes, created_at AS createdAt, last_used_at AS lastUsedAt,
+                       expires_at AS expiresAt, revoked_at AS revokedAt`,
+          )
+          .bind(input.contributorId, name, keyPrefix, keyHash, scopesJson, now, expiresAt)
+          .first<ApiKey>()
+      : // D5 atomic cap: the COUNT of the contributor's active keys and the
+        // INSERT are ONE statement, so no separable COUNT-then-INSERT race can
+        // overshoot the cap (never in-memory locks). julianday judges expiry
+        // by the instant, same as countApiKeysForContributor.
+        await d1
+          .prepare(
+            `INSERT INTO api_keys (contributor_id, name, key_prefix, key_hash, scopes, created_at, last_used_at, expires_at, revoked_at)
+             SELECT ?, ?, ?, ?, ?, ?, NULL, ?, NULL
+             WHERE (SELECT COUNT(*) FROM api_keys
+                    WHERE contributor_id = ? AND revoked_at IS NULL
+                      AND (expires_at IS NULL OR julianday(expires_at) > julianday(?))) < ?
+             RETURNING id, contributor_id AS contributorId, name, key_prefix AS keyPrefix, key_hash AS keyHash,
+                       scopes, created_at AS createdAt, last_used_at AS lastUsedAt,
+                       expires_at AS expiresAt, revoked_at AS revokedAt`,
+          )
+          .bind(
+            input.contributorId,
+            name,
+            keyPrefix,
+            keyHash,
+            scopesJson,
+            now,
+            expiresAt,
+            input.contributorId,
+            now,
+            input.maxActive,
+          )
+          .first<ApiKey>();
+
+  if (!key) {
+    // With the atomic guard, no returned row means the cap refused the
+    // insert; without it a missing row is a genuine failure.
+    if (input.maxActive !== undefined) return null;
+    throw new Error("API key could not be created");
+  }
   return { rawKey, key };
 }
 
@@ -290,7 +354,12 @@ export async function findApiKeyByHash(
     }>();
   if (!row) return null;
   if (row.revokedAt !== null) return null;
-  if (row.expiresAt !== null && row.expiresAt <= now) return null;
+  // Liveness judged by the INSTANT (D6/D7): an offset-bearing stored expiry
+  // that is temporally expired must be dead even when its raw string sorts
+  // AFTER `now`. An unparseable stored expiry is treated as EXPIRED
+  // (fail-closed — a corrupt row never widens access).
+  const expires = row.expiresAt === null ? Number.POSITIVE_INFINITY : Date.parse(row.expiresAt);
+  if (Number.isNaN(expires) || expires <= Date.parse(now)) return null;
   return {
     key: {
       id: row.id,
@@ -350,11 +419,12 @@ export async function revokeApiKey(
   now: string = new Date().toISOString(),
 ): Promise<boolean> {
   const d1 = await getD1();
+  const revokedAt = new Date(Date.parse(now)).toISOString();
   const result = await d1
     .prepare(
       "UPDATE api_keys SET revoked_at = ? WHERE id = ? AND contributor_id = ? AND revoked_at IS NULL",
     )
-    .bind(now, id, contributorId)
+    .bind(revokedAt, id, contributorId)
     .run() as { meta: { changes: number } };
   return result.meta.changes > 0;
 }
@@ -371,13 +441,16 @@ export async function touchApiKeyLastUsed(
   at: string = new Date().toISOString(),
 ): Promise<boolean> {
   const d1 = await getD1();
-  const threshold = new Date(Date.parse(at) - API_KEY_LAST_USED_THROTTLE_MS).toISOString();
+  // Canonicalise the instant to UTC Z before comparing (D7): an offset
+  // variant of the same instant must throttle exactly like its Z form.
+  const atCanonical = new Date(Date.parse(at)).toISOString();
+  const threshold = new Date(Date.parse(atCanonical) - API_KEY_LAST_USED_THROTTLE_MS).toISOString();
   const result = await d1
     .prepare(
       `UPDATE api_keys SET last_used_at = ?
-       WHERE id = ? AND (last_used_at IS NULL OR last_used_at <= ?)`,
+       WHERE id = ? AND (last_used_at IS NULL OR julianday(last_used_at) <= julianday(?))`,
     )
-    .bind(at, id, threshold)
+    .bind(atCanonical, id, threshold)
     .run() as { meta: { changes: number } };
   return result.meta.changes > 0;
 }
