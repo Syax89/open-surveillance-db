@@ -143,6 +143,15 @@ const REAL_DB_MODULES = [
   // from it for the record-detail provenance, so the e2e tree must resolve
   // it (the /api/import-sources route imports it directly too).
   { source: "db/import-sources.ts", output: "db/import-sources.mjs" },
+  // db/api-keys.ts (per-contributor write API keys, EPIC api-keys — T2/T3,
+  // T5): the unified write gate (app/lib/write-gate.ts, T11) now resolves
+  // bearer credentials through app/lib/api-key-auth.ts → findApiKeyByHash /
+  // touchApiKeyLastUsed, and the route handlers (T13+) call the gate, so the
+  // real api-keys module must exist in the tree for those imports to resolve.
+  // It imports getD1 from ./cameras and the WebCrypto helpers from ./auth —
+  // both already compiled above — and re-exports the apiKeys table from
+  // ./schema, which the schema placeholder below keeps resolvable.
+  { source: "db/api-keys.ts", output: "db/api-keys.mjs" },
 ];
 
 let builtTreePromise = null;
@@ -211,6 +220,18 @@ async function buildTree() {
     const rewritten = rewriteSpecifiers(transpile(path.join(root, source)), workersMockUrl);
     await writeFile(path.join(tree, output), rewritten);
   }
+
+  // db/api-keys.ts re-exports the apiKeys table from ./schema for its public
+  // surface, but the REAL db/schema.ts imports "drizzle-orm" (table builder),
+  // which cannot resolve from os.tmpdir() — no node_modules in the walk-up
+  // path (the api-harness handles this by symlinking; the e2e tree relies on
+  // the same placeholder the db-runtime-harness uses). No DB-layer function
+  // touches the table object at runtime (all api-keys SQL is raw via
+  // getD1()), so a placeholder keeps the re-export resolvable.
+  await writeFile(
+    path.join(tree, "db", "schema.mjs"),
+    "// E2E-harness stand-in for db/schema.ts (see buildTree): keeps the\n// db/api-keys.ts re-export resolvable; the real schema imports drizzle-orm,\n// which the tmp tree cannot reach. No runtime code reads this object.\nexport const apiKeys = {};\n",
+  );
 
   // 4. Network-free geocode mock (the search route imports db/geocode; the
   //    real module would call Nominatim). Coordinate queries never invoke it.
