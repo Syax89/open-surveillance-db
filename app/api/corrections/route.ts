@@ -4,11 +4,11 @@ import {
   createCorrectionRequest,
 } from "../../../db/corrections";
 import { recordRateLimitBlock } from "../../lib/abuse-alerts";
-import { requireVerifiedContributor } from "../../lib/write-gate";
+import { requireWriteAuth } from "../../lib/write-gate";
 import { csrfVerified, sameOrigin } from "../../lib/csrf";
 import { isRecord } from "../../lib/guards";
 import { BodyReadError, readJsonBody, urlTooLong } from "../../lib/input-limits";
-import { callerKey, checkRateLimit, submissionLimits, submissionsDisabled } from "../../lib/rate-limit";
+import { callerKey, checkRateLimit, checkRateLimitForKeyAuth, submissionLimits, submissionsDisabled } from "../../lib/rate-limit";
 
 function cleanText(value: unknown, maxLength: number) {
   return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
@@ -23,13 +23,17 @@ function cleanText(value: unknown, maxLength: number) {
  * it answers 400 — free text is NEVER accepted for `removal`/`abuse`, even
  * when the message body contains the word (A2).
  *
- * Write gate (multi-method auth Fase E1): the reporter must be a VERIFIED
- * contributor — anonymous reports are refused with 401 and unverified
- * accounts with 403 (single uniform response body, anti-enumeration; see
- * app/lib/write-gate.ts). The per-IP `submit` rate bucket (default 5/60s)
- * bounds bursts and the dedupe (A5) lives in db/corrections.ts. Because
- * every request now carries cookies, the same-origin + CSRF double-submit
- * guards always apply (write-route pattern).
+ * Write gate (multi-method auth Fase E1 + EPIC api-keys T14): every
+ * correction/removal request requires a VERIFIED contributor, authenticated
+ * EITHER by a verified session cookie OR by a private write API key carrying
+ * the `submit` scope (`Authorization: Bearer *** D4). Anonymous (401),
+ * unverified (403) and scope-mismatch (403) share ONE single response body
+ * (anti-enumeration; see app/lib/write-gate.ts). The per-IP `submit` rate
+ * bucket (default 5/60s) bounds bursts and the dedupe (A5) lives in
+ * db/corrections.ts. CSRF/same-origin apply ONLY on the session branch (a
+ * machine client holding a secret bearer credential carries no ambient
+ * browser authority); a key-authenticated request is additionally
+ * fail-closed double-counted against its own `key:<id>` bucket (D8/T12).
  */
 export async function POST(request: Request) {
   // Input limits: reject absurdly long URLs before any parsing work.
@@ -58,16 +62,48 @@ export async function POST(request: Request) {
     });
   }
 
-  // Write gate (multi-method auth Fase E1): a correction/removal request
-  // requires a VERIFIED contributor. Anonymous (401) and unverified (403)
-  // share one single response body (anti-enumeration); a session created
-  // before email verification is read-only and cannot write. Every request
-  // now carries cookies, so the state change must pass same-origin + CSRF
-  // (write-route pattern).
-  const gate = await requireVerifiedContributor(request);
+  // Write gate (multi-method auth Fase E1 + EPIC api-keys T14): a
+  // correction/removal request requires a VERIFIED contributor,
+  // authenticated EITHER by a verified session cookie OR by a private write
+  // API key carrying the `submit` scope (`Authorization: Bearer *** D4).
+  // Anonymous (401), unverified (403) and scope-mismatch (403) share ONE
+  // single response body (anti-enumeration); a session created before email
+  // verification is read-only and cannot write.
+  const gate = await requireWriteAuth(request, "submit");
   if (!gate.ok) return gate.response;
-  if (!sameOrigin(request) || !csrfVerified(request, gate.session.csrfToken)) {
-    return Response.json({ error: "Cross-origin request rejected." }, { status: 403 });
+
+  // CSRF/same-origin ONLY on the session branch (plan §1.4, T14): a machine
+  // client holding a secret bearer credential carries no ambient authority
+  // from a browser origin, so the double-submit echo would be dead weight on
+  // the key path. Session requests keep the same-origin + X-CSRF-Token echo
+  // exactly as before.
+  if (gate.authMethod === "session" && (!sameOrigin(request) || !csrfVerified(request, gate.session.csrfToken))) {
+    return Response.json(
+      { error: "Cross-site request rejected. Refresh the page and try again." },
+      { status: 403 },
+    );
+  }
+
+  // Additive per-key rate limit (D8/T12, plan §1.6): a key-authenticated
+  // request is fail-closed double-counted — it must pass BOTH the per-IP
+  // bucket above AND its own `key:<apiKeyId>` bucket; a block on either
+  // answers 429 (same body as the per-IP block, Retry-After included).
+  // Session callers have no per-key bucket (the pre-gate per-IP check is
+  // the whole story), so this check is a no-op for them. The recorded block
+  // uses the EFFECTIVE key (key:<id>), never the raw IP, for a
+  // key-authenticated caller.
+  const keyLimit = await checkRateLimitForKeyAuth(env, "submit", request, limitOptions, gate);
+  if (!keyLimit.allowed) {
+    console.warn("POST /api/corrections rate limited (per-key bucket)");
+    recordRateLimitBlock(env, {
+      route: "/api/corrections",
+      key: keyLimit.key,
+      windowSeconds: limitOptions.windowSeconds,
+    });
+    return Response.json({ error: "Too many requests. Please try again shortly." }, {
+      status: 429,
+      headers: { "Retry-After": String(keyLimit.retryAfterSeconds) },
+    });
   }
 
   try {
