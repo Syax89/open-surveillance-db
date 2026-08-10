@@ -971,8 +971,9 @@ test("account: api keys — empty state offers create + docs link", async () => 
 
   await renderWithLocale(React.createElement(AccountPage));
   await waitFor(() => assert.ok(screen.getByRole("heading", { name: "API keys" })));
+  // The heading exists during loading too — wait for the settled list.
+  await waitFor(() => assert.ok(screen.getByText("No API keys yet")));
 
-  assert.ok(screen.getByText("No API keys yet"));
   assert.ok(screen.getByRole("button", { name: "Create API key" }));
   const docsLink = screen.getByRole("link", { name: "Read the API documentation" });
   assert.equal(docsLink.getAttribute("href"), "/api-docs");
@@ -984,6 +985,8 @@ test("account: api keys — rows render name, prefix, meta, scope badges and sta
 
   await renderWithLocale(React.createElement(AccountPage));
   await waitFor(() => assert.ok(screen.getByRole("heading", { name: "API keys" })));
+  // The heading exists during loading too — wait for the settled list.
+  await waitFor(() => assert.ok(screen.getByText("Nightly sync script")));
 
   // Active row: name + prefix chip + both scope labels + Active + Revoke.
   assert.ok(screen.getByText("Nightly sync script"));
@@ -1019,7 +1022,8 @@ test("account: api keys — create dialog validates name (required, max 60)", as
 
   await renderWithLocale(React.createElement(AccountPage));
   await waitFor(() => assert.ok(screen.getByRole("heading", { name: "API keys" })));
-  await user.click(screen.getByRole("button", { name: "Create API key" }));
+  // The heading exists during loading too — wait for the empty-state CTA.
+  await user.click(await screen.findByRole("button", { name: "Create API key" }));
 
   const dialog = await screen.findByRole("dialog");
   assert.ok(dialog.getAttribute("aria-modal") === "true");
@@ -1068,7 +1072,8 @@ test("account: api keys — create success POSTs with CSRF, reveals raw key once
 
   await renderWithLocale(React.createElement(AccountPage));
   await waitFor(() => assert.ok(screen.getByRole("heading", { name: "API keys" })));
-  await user.click(screen.getByRole("button", { name: "Create API key" }));
+  // The heading exists during loading too — wait for the empty-state CTA.
+  await user.click(await screen.findByRole("button", { name: "Create API key" }));
 
   // Default scope set = all four (D4); the user narrows to submit+edit.
   const dialog = await screen.findByRole("dialog");
@@ -1115,7 +1120,8 @@ test("account: api keys — 409 maps to the localized limit error inside the dia
 
   await renderWithLocale(React.createElement(AccountPage));
   await waitFor(() => assert.ok(screen.getByRole("heading", { name: "API keys" })));
-  await user.click(screen.getByRole("button", { name: "Create API key" }));
+  // The heading exists during loading too — wait for the empty-state CTA.
+  await user.click(await screen.findByRole("button", { name: "Create API key" }));
   const dialog = await screen.findByRole("dialog");
   await user.type(screen.getByLabelText("Key name"), "Fifth key");
   await user.click(screen.getByRole("button", { name: "Create key" }));
@@ -1209,7 +1215,8 @@ test("account: api keys — without the Clipboard API the reveal dialog hides th
   // jsdom has no navigator.clipboard — the reveal dialog must degrade.
   await renderWithLocale(React.createElement(AccountPage));
   await waitFor(() => assert.ok(screen.getByRole("heading", { name: "API keys" })));
-  await user.click(screen.getByRole("button", { name: "Create API key" }));
+  // The heading exists during loading too — wait for the empty-state CTA.
+  await user.click(await screen.findByRole("button", { name: "Create API key" }));
   const dialog = await screen.findByRole("dialog");
   await user.type(screen.getByLabelText("Key name"), "No clipboard");
   await user.click(screen.getByRole("button", { name: "Create key" }));
