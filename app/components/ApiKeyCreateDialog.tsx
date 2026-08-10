@@ -4,7 +4,10 @@
 // focus in on open / back to trigger on close, Tab trapped, Escape cancels
 // (nothing is destroyed here — unlike the reveal dialog). Name field with
 // aria-invalid; scope PILL BUTTONS with aria-pressed, NEVER checkboxes
-// (WCAG 2.5.8 issue #413). The caller owns the fetch (useApiKeys.createKey).
+// (WCAG 2.5.8 issue #413). Optional expiry select (F2): 30/90/365 days or
+// Never — the API accepts an ISO expiresAt (default +365d, null=never),
+// so the dialog lets the user pick before minting. The caller owns the
+// fetch (useApiKeys.createKey).
 
 import { useEffect, useRef, useState } from "react";
 import { useMessages } from "../lib/use-messages";
@@ -15,16 +18,25 @@ type Props = {
   open: boolean;
   busy: boolean;
   error: ApiKeyErrorKind | null;
-  onCreate: (name: string, scopes: ApiKeyScope[]) => void;
+  onCreate: (name: string, scopes: ApiKeyScope[], expiresAt: string | null) => void;
   onCancel: () => void;
 };
 
 const MAX_NAME_LENGTH = 60;
+const EXPIRY_DAYS: ReadonlyArray<30 | 90 | 365> = [30, 90, 365];
+type ExpiryChoice = "never" | `${(typeof EXPIRY_DAYS)[number]}`;
+
+/** Compute the ISO expiry for a chosen duration (null = never). */
+function expiryIso(expiry: ExpiryChoice): string | null {
+  if (expiry === "never") return null;
+  return new Date(Date.now() + Number(expiry) * 86_400_000).toISOString();
+}
 
 export function ApiKeyCreateDialog({ open, busy, error, onCreate, onCancel }: Props) {
   const t = useMessages().auth;
   const [name, setName] = useState("");
   const [scopes, setScopes] = useState<ApiKeyScope[]>([...API_KEY_SCOPES]);
+  const [expiry, setExpiry] = useState<ExpiryChoice>("365");
   const [touched, setTouched] = useState(false);
   const nameRef = useRef<HTMLInputElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
@@ -41,7 +53,7 @@ export function ApiKeyCreateDialog({ open, busy, error, onCreate, onCancel }: Pr
     if (!open) return;
     previousFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     // Reset on open (deferred — react-hooks/set-state-in-effect).
-    Promise.resolve().then(() => { setName(""); setScopes([...API_KEY_SCOPES]); setTouched(false); });
+    Promise.resolve().then(() => { setName(""); setScopes([...API_KEY_SCOPES]); setExpiry("365"); setTouched(false); });
     nameRef.current?.focus();
     return () => { previousFocus.current?.focus(); previousFocus.current = null; };
   }, [open]);
@@ -65,7 +77,7 @@ export function ApiKeyCreateDialog({ open, busy, error, onCreate, onCancel }: Pr
   function submit() {
     setTouched(true);
     if (!valid) return;
-    onCreate(trimmed, scopes);
+    onCreate(trimmed, scopes, expiryIso(expiry));
   }
 
   if (!open) return null;
@@ -99,6 +111,23 @@ export function ApiKeyCreateDialog({ open, busy, error, onCreate, onCancel }: Pr
           <small id="api-key-name-help">{t.apiKeyNameHelp}</small>
           {nameInvalid ? <p className="auth-error" role="alert">{t.apiKeyNameRequired}</p> : null}
           {!nameInvalid && nameTooLong ? <p className="auth-error" role="alert">{t.apiKeyNameTooLong}</p> : null}
+        </div>
+
+        <div className="auth-field">
+          <label htmlFor="api-key-expiry">{t.apiKeyExpiryLabel}</label>
+          <select
+            id="api-key-expiry"
+            value={expiry}
+            onChange={(event) => setExpiry(event.target.value as ExpiryChoice)}
+          >
+            {EXPIRY_DAYS.map((days) => (
+              <option key={days} value={days}>
+                {days === 30 ? t.apiKeyExpiry30 : days === 90 ? t.apiKeyExpiry90 : t.apiKeyExpiry365}
+              </option>
+            ))}
+            <option value="never">{t.apiKeyExpiresNever}</option>
+          </select>
+          <small id="api-key-expiry-help">{t.apiKeyExpiryHelp}</small>
         </div>
 
         <fieldset className="api-key-scope-fieldset">

@@ -8,7 +8,9 @@
 // Contract (plan §1.3, D1–D9):
 //   GET    /api/auth/keys        → metadata only, never hash/raw
 //   POST   /api/auth/keys        → 201 { id, name, key, keyPrefix, scopes,
-//                                   createdAt, expiresAt } — raw key ONLY here
+//                                   createdAt, expiresAt } — raw key ONLY
+//                                   here; body accepts an optional ISO
+//                                   expiresAt (default +365d, null=never)
 //   DELETE /api/auth/keys/[id]   → soft revoke (idempotent, 404 non-own)
 // Write-only keys (D1): the read API stays keyless, so this UI never
 // mentions read scopes.
@@ -110,7 +112,8 @@ export function useApiKeys(onUnauthorized?: () => void) {
   async function createKey(
     name: string,
     scopes: ApiKeyScope[],
-  ): Promise<{ ok: true; key: string; id: number } | { ok: false; error: ApiKeyErrorKind }> {
+    expiresAt: string | null,
+  ): Promise<{ ok: true; key: string; id: number; expiresAt: string | null } | { ok: false; error: ApiKeyErrorKind }> {
     const csrfToken = readCsrfToken();
     try {
       const response = await fetch("/api/auth/keys", {
@@ -119,7 +122,7 @@ export function useApiKeys(onUnauthorized?: () => void) {
           "content-type": "application/json",
           ...(csrfToken ? { "x-csrf-token": csrfToken } : {}),
         },
-        body: JSON.stringify({ name, scopes }),
+        body: JSON.stringify({ name, scopes, expiresAt }),
       });
       if (response.status === 401) {
         onUnauthorizedRef.current?.();
@@ -140,7 +143,7 @@ export function useApiKeys(onUnauthorized?: () => void) {
         revokedAt: null,
       };
       setKeys((current) => [...current, created]);
-      return { ok: true, key: body.key, id: body.id };
+      return { ok: true, key: body.key, id: body.id, expiresAt: body.expiresAt };
     } catch {
       return { ok: false, error: "create" };
     }

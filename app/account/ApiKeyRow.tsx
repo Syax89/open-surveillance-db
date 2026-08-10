@@ -6,6 +6,10 @@
 //  - name + monospace key-prefix chip (the ONLY key material shown — the
 //    GET payload is metadata only, D3/P1-2);
 //  - Created, "Last used"/"Never used";
+//  - Expires — the key's expiry date (or "Never"/"Mai" when it does not
+//    expire), shown next to Last used (F2: expiry was invisible in the UI
+//    even though the model/API/docs carry expiresAt — default +365d, null
+//    = never);
 //  - scope badges (one per granted write scope, D4 family);
 //  - status dot + label "Active"/"Revoked" — colour never alone (WCAG
 //    1.4.1), the label carries the meaning;
@@ -29,6 +33,7 @@ export function ApiKeyRow({ apiKey, t, locale, revoking, onRevoke }: Props) {
   const revoked = apiKey.revokedAt !== null;
   const created = formatPublicDate(apiKey.createdAt, locale);
   const lastUsed = apiKey.lastUsedAt ? formatPublicDate(apiKey.lastUsedAt, locale) : t.apiKeyLastUsedNever;
+  const expires = apiKey.expiresAt ? formatPublicDate(apiKey.expiresAt, locale) : t.apiKeyExpiresNever;
 
   return (
     <li className={`api-key-row${revoked ? " api-key-row-revoked" : ""}`}>
@@ -46,6 +51,10 @@ export function ApiKeyRow({ apiKey, t, locale, revoking, onRevoke }: Props) {
         <div>
           <dt>{t.apiKeyLastUsedLabel}</dt>
           <dd>{lastUsed}</dd>
+        </div>
+        <div>
+          <dt>{t.apiKeyExpiresLabel}</dt>
+          <dd>{expires}</dd>
         </div>
       </dl>
       <div className="api-key-row-scopes" aria-label={t.apiKeyScopesLabel}>
