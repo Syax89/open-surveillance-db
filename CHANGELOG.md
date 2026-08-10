@@ -289,6 +289,23 @@ changes accumulate under `[Unreleased]`.
 
 ### Changed
 
+- **API — PATCH /api/cameras/[id] write gate (EPIC api-keys T17, ADR 0023
+  D4/D10/D12):** the community edit route moved from `resolveOptionalContributor`
+  to the unified `requireWriteAuth('edit')` gate — editing now requires a
+  VERIFIED contributor, authenticated by a verified session cookie OR a
+  private write API key carrying the `edit` scope (`Authorization: Bearer`).
+  **Behavior change (D10):** an owner edit from an UNVERIFIED session now
+  answers 403 instead of succeeding — anonymous (401), unverified (403) and
+  scope-mismatch (403) share one canonical `WRITE_GATE_ERROR` body
+  (anti-enumeration). Guard order aligned with the confirmation/actions
+  routes: per-IP edit bucket → gate → session-only same-origin + CSRF →
+  additive per-key bucket (key callers double-counted, D8) → strict id
+  parse. Ownership check unchanged (`cameras.contributor_id ===
+  contributor.id`, key path attributes to the key owner). Tests: api-edit
+  (D10 unverified-session 403 + full Bearer suite: valid edit scope,
+  scope-mismatch 403, dead-key 401 no session fallback, key path skips
+  CSRF/same-origin, per-key double-count).
+
 - **Docs/legal — ADR 0021 alignment follow-up (t_499df642):**
   `docs/legal/RETENTION_SCHEDULE.md` (R1–R3 rewritten on the community model:
   no time-based retention for records, `active`/`hidden`/`removed` states
