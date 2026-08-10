@@ -1215,10 +1215,10 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
    the paper prefix chip and 6.08:1 on the surface-muted scope badge.
    Status remains dot + label (WCAG 1.4.1); revoked rows expose no actions. */
 .api-key-row-revoked .api-key-name,
-.api-key-row-revoked .api-key-prefix,
 .api-key-row-revoked .api-key-row-meta dt,
 .api-key-row-revoked .api-key-row-meta dd,
 .api-key-row-revoked .api-key-status { color: var(--ink-3); }
+.api-key-row-revoked .api-key-prefix,
 .api-key-row-revoked .api-key-scope-badge { color: var(--ink-2); }
 .api-key-row-revoked .text-button { display:none; }
 .api-key-empty { margin:18px 0 10px; padding:22px 24px; border:1px dashed var(--card-border); border-radius:var(--radius-lg); background:var(--notice-bg); }
