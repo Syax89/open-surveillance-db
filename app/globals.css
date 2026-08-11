@@ -1427,10 +1427,13 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
    PR #354 (user UX choices, kept verbatim): dashboard widens to 1120px,
    each section is its own bordered workspace, profile columns 1.35/.65. */
 .account-dashboard { max-width:1120px; }
-.account-profile-grid { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(220px,.65fr); gap:28px; align-items:start; }
+.account-profile-grid { display:grid; grid-template-columns:minmax(0,1fr); gap:28px; align-items:start; }
 .account-identity { min-width:0; }
 .account-logout { margin-top:18px; }
-.account-trust { min-width:240px; }
+/* Trust badge above the identity tile (issue #435): the badge leads the
+   dashboard; the profile grid below is the single identity column. */
+.account-trust--top { margin:2px 0 0; }
+.account-trust--top .level-badge { margin:0 0 18px; }
 /* Bordered workspaces (PR #354): the main sections become readable
    cards on the paper, the danger zone stays full-width and the verify
    banner keeps its own treatment. */
@@ -1494,7 +1497,7 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
   .account-dashboard > section:not(.verify-banner):not(.auth-danger-zone),
   .account-dashboard > details.passkeys-disclosure { padding:18px; }
   .account-profile-grid { grid-template-columns:1fr; gap:18px; }
-  .account-trust { min-width:0; }
+  .account-trust--top .level-badge { margin-bottom:14px; }
   .account-stats { grid-template-columns:repeat(2,1fr); }
   .contributions-filter-bar { grid-template-columns:1fr; }
   .contribution-filter-reset { justify-self:start; }

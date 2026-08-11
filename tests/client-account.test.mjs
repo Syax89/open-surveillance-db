@@ -164,6 +164,16 @@ test("account: renders profile, trust-level badge and the contributions list", a
   assert.ok(screen.getByText("4 live contributions to reach the next trust level"));
   // No numeric points anywhere (badge text only).
   assert.equal(screen.queryByText(/^[0-9]+ points?$/i), null);
+  // Issue #435: the trust badge leads the dashboard — it must sit ABOVE the
+  // profile/identity section in the DOM (and on screen).
+  const badge = document.querySelector(".account-trust--top .level-badge");
+  const profileGrid = document.querySelector(".account-profile-grid");
+  assert.ok(badge, "the trust badge renders in the top position");
+  assert.ok(profileGrid, "the profile grid renders below");
+  assert.ok(
+    badge.compareDocumentPosition(profileGrid) & Node.DOCUMENT_POSITION_FOLLOWING,
+    "the badge precedes the identity tile in document order",
+  );
 
   // The contributions list loads in its own effect cycle after the profile
   // (two fetch rounds), so wait for it rather than asserting immediately.
