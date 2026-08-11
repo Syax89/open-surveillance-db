@@ -64,7 +64,7 @@ const ROUTES = [
   { source: "app/api/auth/logout/route.ts", output: "app/api/auth/logout/route.mjs" },
   // Email verification + password reset (multi-method auth Fase B): real
   // SQL against the in-memory D1 — register→verify flips email_verified_at,
-  // resend honours the 3/h budget, reset rotates the hash and revokes
+  // resend honours the 1-per-5-min budget, reset rotates the hash and revokes
   // sessions (tests/auth-verify-e2e.test.mjs).
   { source: "app/api/auth/verify-email/route.ts", output: "app/api/auth/verify-email/route.mjs" },
   { source: "app/api/auth/verify-email/resend/route.ts", output: "app/api/auth/verify-email/resend/route.mjs" },

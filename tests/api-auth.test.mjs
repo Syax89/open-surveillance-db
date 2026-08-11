@@ -116,8 +116,10 @@ test("register creates a contributor, mints a verification token, opens a sessio
   stub("createContributor", async () => contributor);
   stub("createVerificationToken", async () => ({ rawToken: "verify-token-abc", expiresAt: "2026-08-02T08:00:00.000Z" }));
   stub("createSession", async () => newSession);
-  // The canonical mailer (db/mailer.ts sendAuthEmail) is invoked with the
-  // minted token; the provider accepts, so sent:true.
+  // The canonical mailer (db/mailer.ts): the ATOMIC reservation admits the
+  // send (issue #440), then sendAuthEmail is invoked with the minted token
+  // and the reservation id; the provider accepts, so sent:true.
+  stub("reserveAuthEmail", async () => ({ ok: true, reservationId: 42 }));
   stub("sendAuthEmail", async () => ({ ok: true, messageId: "m1" }));
   const { POST } = await registerRoute();
   const response = await POST(
@@ -133,19 +135,24 @@ test("register creates a contributor, mints a verification token, opens a sessio
   // The db layer received the normalised email and trimmed display name.
   const [createArgs] = callArgs("createContributor");
   assert.deepEqual(createArgs, [{ email: "contributor@example.org", displayName: "Contributor", password: "Sup3rsecret!123" }]);
-  // Fase B: a verification token is minted for the new account (purpose
-  // 'verify') so the emailed link can prove mailbox control.
+  // Fase B: the mail slot is reserved BEFORE the token is minted, so a
+  // blocked request never creates a token it cannot mail.
+  const [reserveArgs] = callArgs("reserveAuthEmail");
+  assert.deepEqual(reserveArgs.slice(0, 2), [contributor.id, "verify"]);
+  // A verification token is minted for the new account (purpose 'verify')
+  // so the emailed link can prove mailbox control.
   const [tokenArgs] = callArgs("createVerificationToken");
   assert.equal(tokenArgs[0], contributor.id);
   assert.equal(tokenArgs[1], "verify");
   assert.ok(typeof tokenArgs[2] === "string" && tokenArgs[2].length > 0, "token created_at is an ISO timestamp");
-  // The canonical mailer receives the minted token for THIS contributor.
+  // The canonical mailer receives the minted token for THIS contributor,
+  // settled against the exact reservation the route was granted.
   const [mailArgs] = callArgs("sendAuthEmail");
   assert.deepEqual(mailArgs[0].contributorId, contributor.id);
+  assert.equal(mailArgs[0].reservationId, 42);
   assert.equal(mailArgs[0].to, "contributor@example.org");
   assert.equal(mailArgs[0].kind, "verify");
   assert.equal(mailArgs[0].rawToken, "verify-token-abc");
-  assert.ok(typeof mailArgs[0].nowIso === "string" && mailArgs[0].nowIso.length > 0, "nowIso is an ISO timestamp");
   // The DB TTL follows the same env knob as the cookie (sessionTtlSeconds):
   // default 30 days = 2592000 s, so expires_at and Max-Age can never diverge
   // (audit t_5ca60ab2, P2).
@@ -180,6 +187,36 @@ test("register creates a contributor, mints a verification token, opens a sessio
   assert.match(csrfCookie, /SameSite=Strict/);
 });
 
+test("register does NOT release the reservation when a post-send step (createSession) throws — a delivered email keeps its send-log row", async () => {
+  stub("createContributor", async () => contributor);
+  stub("createVerificationToken", async () => ({ rawToken: "verify-token-abc", expiresAt: "2026-08-02T08:00:00.000Z" }));
+  // The provider ACCEPTS the email: the reservation row becomes the
+  // permanent send-log row (issue #440).
+  stub("reserveAuthEmail", async () => ({ ok: true, reservationId: 42 }));
+  stub("sendAuthEmail", async () => ({ ok: true, messageId: "m1" }));
+  // ...but session creation then fails. The route must answer 500 WITHOUT
+  // deleting the send-log row: sendAuthEmail settled the reservation (kept
+  // on success) and the route cleared it the moment sendAuthEmail returned,
+  // so the catch's rollback must NOT fire — otherwise the quota would be
+  // weakened by every delivered email whose session step throws.
+  stub("createSession", async () => {
+    throw new Error("session insert failed");
+  });
+  const { POST } = await registerRoute();
+  const response = await POST(
+    apiRequest("/api/auth/register", {
+      method: "POST",
+      body: { email: "contributor@example.org", password: "Sup3rsecret!123" },
+    }),
+  );
+  assert.equal(response.status, 500);
+  assert.equal(
+    callArgs("releaseEmailReservation").length,
+    0,
+    "a delivered email's send-log row is never deleted by a later route failure",
+  );
+});
+
 // ---------------------------------------------------------------------------
 // Cookie Secure policy (QA#3 F2, t_63e0d13c) — secure-by-default
 // ---------------------------------------------------------------------------
@@ -203,6 +240,7 @@ async function sessionCookieWithEnv(envModule, envChanges) {
     stub("createContributor", async () => contributor);
     stub("createVerificationToken", async () => ({ rawToken: "verify-token-abc", expiresAt: "2026-08-02T08:00:00.000Z" }));
     stub("createSession", async () => newSession);
+    stub("reserveAuthEmail", async () => ({ ok: true, reservationId: 42 }));
     stub("sendAuthEmail", async () => ({ ok: true, messageId: "m1" }));
     const { POST } = await registerRoute();
     const response = await POST(
@@ -250,8 +288,11 @@ test("register reports sent:false when the mailer cannot deliver (provider error
   stub("createContributor", async () => contributor);
   stub("createVerificationToken", async () => ({ rawToken: "verify-token-abc", expiresAt: "2026-08-02T08:00:00.000Z" }));
   stub("createSession", async () => newSession);
-  // Mail must never break registration: a provider rejection still answers
-  // 201, but sent:false — the user can re-send from the session.
+  // The atomic reservation admits the send (issue #440)...
+  stub("reserveAuthEmail", async () => ({ ok: true, reservationId: 42 }));
+  // ...then the provider rejects. Mail must never break registration: a
+  // provider rejection still answers 201, but sent:false — the user can
+  // re-send from the session.
   stub("sendAuthEmail", async () => ({
     ok: false,
     reason: "provider",
@@ -282,6 +323,7 @@ test("register propagates AUTH_SESSION_TTL_DAYS to BOTH the DB session and the c
     stub("createContributor", async () => contributor);
     stub("createVerificationToken", async () => ({ rawToken: "verify-token-abc", expiresAt: "2026-08-02T08:00:00.000Z" }));
     stub("createSession", async () => newSession);
+    stub("reserveAuthEmail", async () => ({ ok: true, reservationId: 42 }));
     stub("sendAuthEmail", async () => ({ ok: true, messageId: "m1" }));
     const { POST } = await registerRoute();
     const response = await POST(
@@ -397,6 +439,7 @@ test("register respects the auth rate-limit bucket", async () => {
   stub("createContributor", async () => contributor);
   stub("createVerificationToken", async () => ({ rawToken: "verify-token-abc", expiresAt: "2026-08-02T08:00:00.000Z" }));
   stub("createSession", async () => newSession);
+  stub("reserveAuthEmail", async () => ({ ok: true, reservationId: 42 }));
   stub("sendAuthEmail", async () => ({ ok: true, messageId: "m1" }));
   const { POST } = await registerRoute();
   for (let index = 0; index < 10; index += 1) {
@@ -430,6 +473,36 @@ test("register returns 500 when the database is unavailable", async () => {
     }),
   );
   assert.equal(response.status, 500);
+});
+
+test("register releases the EXACT reservation when createVerificationToken throws after a successful admission — and never sends mail", async () => {
+  stub("createContributor", async () => contributor);
+  // The ATOMIC admission grants the slot (issue #440)...
+  stub("reserveAuthEmail", async () => ({ ok: true, reservationId: 42 }));
+  // ...then the token mint throws: the route must roll the EXACT reservation
+  // back (reservationId + contributorId + kind) so the failed attempt does
+  // not burn the budget, and it must NOT reach the mailer (no token exists).
+  stub("createVerificationToken", async () => {
+    throw new Error("token mint failed");
+  });
+  stub("releaseEmailReservation", async () => {});
+  const { POST } = await registerRoute();
+  const response = await POST(
+    apiRequest("/api/auth/register", {
+      method: "POST",
+      body: { email: "contributor@example.org", password: "Sup3rsecret!123" },
+    }),
+  );
+  // Behaviour mapping: a mint failure before any mail is sent is a 500
+  // (mail is best-effort, but this never got as far as the mailer).
+  assert.equal(response.status, 500);
+  assert.equal((await responseBody(response)).error, "Unable to create account");
+  assert.deepEqual(
+    callArgs("releaseEmailReservation")[0],
+    [42, 7, "verify"],
+    "the exact granted reservation is released, scoped to contributor + kind",
+  );
+  assert.equal(callArgs("sendAuthEmail").length, 0, "no mail is sent when the mint fails");
 });
 
 // ---------------------------------------------------------------------------
@@ -1081,8 +1154,8 @@ test("resend on an already-verified account is a no-op success", async () => {
 
 test("resend mints a fresh verify token and sends it through the canonical mailer", async () => {
   stub("findSessionByToken", async () => ({ ...session, contributor }));
-  // Budget pre-flight (email_send_log): allowed.
-  stub("canSendAuthEmail", async () => ({ allowed: true, retryAfterSeconds: 0 }));
+  // ATOMIC budget admission (email_send_log reservation, issue #440): allowed.
+  stub("reserveAuthEmail", async () => ({ ok: true, reservationId: 77 }));
   stub("createVerificationToken", async () => ({ rawToken: "resend-token-456", expiresAt: "2026-08-02T09:00:00.000Z" }));
   // The canonical mailer accepts the email.
   stub("sendAuthEmail", async () => ({ ok: true, messageId: "m1" }));
@@ -1096,28 +1169,95 @@ test("resend mints a fresh verify token and sends it through the canonical maile
   // Fail-closed: the raw token is NEVER echoed in the API response — it
   // lives only in the mail channel (P1-1: devLink echo removed).
   assert.ok(!("devLink" in body), "no raw token in the response");
-  // The new token is minted for the caller's own account, purpose 'verify',
-  // and handed to the canonical mailer.
+  // The budget is reserved BEFORE the token is minted (a blocked request
+  // must not revoke the previous link), then the new token is minted for
+  // the caller's own account, purpose 'verify', and settled against the
+  // exact reservation by the canonical mailer.
+  const [reserveArgs] = callArgs("reserveAuthEmail");
+  assert.deepEqual(reserveArgs.slice(0, 2), [7, "verify"]);
   const [tokenArgs] = callArgs("createVerificationToken");
   assert.deepEqual(tokenArgs.slice(0, 2), [7, "verify"]);
   const [mailArgs] = callArgs("sendAuthEmail");
   assert.deepEqual(mailArgs[0].contributorId, 7);
+  assert.equal(mailArgs[0].reservationId, 77);
   assert.equal(mailArgs[0].kind, "verify");
   assert.equal(mailArgs[0].rawToken, "resend-token-456");
 });
 
-test("resend honours the 3/h budget: the 4th email answers 429 with Retry-After", async () => {
+test("resend answers 429 with Retry-After when the atomic reservation is rate_limited — no token minted", async () => {
   stub("findSessionByToken", async () => ({ ...session, contributor }));
-  // Budget pre-flight: the email_send_log window is exhausted (3 sends).
-  stub("canSendAuthEmail", async () => ({ allowed: false, retryAfterSeconds: 3600 }));
+  // ATOMIC admission refused: the email_send_log window is exhausted
+  // (1 per 5 minutes, issue #440).
+  stub("reserveAuthEmail", async () => ({ ok: false, reason: "rate_limited", retryAfterSeconds: 300 }));
   const { POST } = await resendRoute();
   const response = await POST(
     sessionRequest("/api/auth/verify-email/resend", "raw-session-token-abc123", { method: "POST" }),
   );
   assert.equal(response.status, 429);
-  assert.equal(response.headers.get("retry-after"), "3600");
+  assert.equal(response.headers.get("retry-after"), "300");
   assert.equal(callArgs("createVerificationToken").length, 0, "no token minted past the budget");
   assert.equal(callArgs("sendAuthEmail").length, 0, "no mail sent past the budget");
+});
+
+test("resend releases the EXACT reservation when createVerificationToken throws after a successful admission — and never sends mail", async () => {
+  stub("findSessionByToken", async () => ({ ...session, contributor }));
+  // The ATOMIC admission grants the slot (issue #440)...
+  stub("reserveAuthEmail", async () => ({ ok: true, reservationId: 77 }));
+  // ...then the token mint throws: the route must roll the EXACT reservation
+  // back (reservationId + contributorId + kind) so the failed attempt does
+  // not burn the budget, and it must NOT reach the mailer (no token exists).
+  stub("createVerificationToken", async () => {
+    throw new Error("token mint failed");
+  });
+  stub("releaseEmailReservation", async () => {});
+  const { POST } = await resendRoute();
+  const response = await POST(
+    sessionRequest("/api/auth/verify-email/resend", "raw-session-token-abc123", { method: "POST" }),
+  );
+  // Behaviour mapping: the mint failure is a server-side 503, honest error.
+  assert.equal(response.status, 503);
+  assert.equal((await responseBody(response)).error, "Unable to resend the verification email");
+  assert.deepEqual(
+    callArgs("releaseEmailReservation")[0],
+    [77, 7, "verify"],
+    "the exact granted reservation is released, scoped to contributor + kind",
+  );
+  assert.equal(callArgs("sendAuthEmail").length, 0, "no mail is sent when the mint fails");
+});
+
+test("resend answers 503 on a provider failure and logs only the fixed generic event (no provider payload / recipient echo)", async () => {
+  stub("findSessionByToken", async () => ({ ...session, contributor }));
+  stub("reserveAuthEmail", async () => ({ ok: true, reservationId: 77 }));
+  stub("createVerificationToken", async () => ({ rawToken: "resend-token-456", expiresAt: "2026-08-02T09:00:00.000Z" }));
+  // Ambiguous provider outcome (E_UNKNOWN): sendAuthEmail may have kept the
+  // reservation — the route must not claim the mail was definitely not
+  // delivered, and must answer an honest 503. The provider `message` is
+  // crafted to contain the recipient address: it must NEVER reach the log.
+  const providerMessage = "recipient contributor@example.org rejected by relay 2606:4700::1234";
+  stub("sendAuthEmail", async () => ({ ok: false, reason: "provider", code: "E_UNKNOWN", message: providerMessage }));
+  const originalError = console.error;
+  const logEvents = [];
+  console.error = (...args) => logEvents.push(args.map(String).join(" "));
+  try {
+    const { POST } = await resendRoute();
+    const response = await POST(
+      sessionRequest("/api/auth/verify-email/resend", "raw-session-token-abc123", { method: "POST" }),
+    );
+    assert.equal(response.status, 503);
+    assert.equal((await responseBody(response)).error, "Unable to resend the verification email");
+    // Privacy: the log line is a fixed generic event — the provider result
+    // (with its message) is never logged, so a provider error cannot echo
+    // an email address or any other data into the application logs.
+    assert.equal(logEvents.length, 1, "exactly one error event is logged");
+    assert.equal(
+      logEvents[0],
+      "POST /api/auth/verify-email/resend mail failed: verification email not confirmed delivered",
+      "the log event is the fixed generic string",
+    );
+    assert.ok(!logEvents[0].includes("contributor@example.org"), "the provider message / recipient never reaches the log");
+  } finally {
+    console.error = originalError;
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -1140,7 +1280,8 @@ test("reset request answers 200 {sent:true} for an UNKNOWN email (anti-enumerati
 
 test("reset request mints a reset token for a known email and never echoes it", async () => {
   stub("findContributorByEmail", async () => contributor);
-  stub("canSendAuthEmail", async () => ({ allowed: true, retryAfterSeconds: 0 }));
+  // ATOMIC budget admission (issue #440): allowed — reservation 88.
+  stub("reserveAuthEmail", async () => ({ ok: true, reservationId: 88 }));
   stub("createVerificationToken", async () => ({ rawToken: "reset-token-789", expiresAt: "2026-08-02T10:00:00.000Z" }));
   stub("sendAuthEmail", async () => ({ ok: true, messageId: "m1" }));
   const { POST } = await resetRequestRoute();
@@ -1155,17 +1296,23 @@ test("reset request mints a reset token for a known email and never echoes it", 
   // Anti-enumeration: the success body is identical to the unknown-email one,
   // and the token NEVER appears in the response (it goes only in the mail).
   assert.deepEqual(body, { sent: true });
+  // The budget is reserved BEFORE the token is minted (issue #440: a losing
+  // concurrent request must not revoke the winning reset link).
+  const [reserveArgs] = callArgs("reserveAuthEmail");
+  assert.deepEqual(reserveArgs.slice(0, 2), [7, "reset"]);
   assert.deepEqual(callArgs("createVerificationToken")[0].slice(0, 2), [7, "reset"]);
-  // The reset link is handed to the canonical mailer (kind 'reset').
+  // The reset link is handed to the canonical mailer (kind 'reset'), settled
+  // against the exact reservation.
   const [mailArgs] = callArgs("sendAuthEmail");
   assert.deepEqual(mailArgs[0].contributorId, 7);
+  assert.equal(mailArgs[0].reservationId, 88);
   assert.equal(mailArgs[0].kind, "reset");
   assert.equal(mailArgs[0].rawToken, "reset-token-789");
 });
 
-test("reset request keeps answering 200 {sent:true} past the 3/h budget (no token, no mail)", async () => {
+test("reset request keeps answering 200 {sent:true} when the atomic reservation is rate_limited (no token, no mail)", async () => {
   stub("findContributorByEmail", async () => contributor);
-  stub("canSendAuthEmail", async () => ({ allowed: false, retryAfterSeconds: 3600 }));
+  stub("reserveAuthEmail", async () => ({ ok: false, reason: "rate_limited", retryAfterSeconds: 300 }));
   const { POST } = await resetRequestRoute();
   const response = await POST(
     apiRequest("/api/auth/reset-password/request", {
@@ -1176,11 +1323,44 @@ test("reset request keeps answering 200 {sent:true} past the 3/h budget (no toke
   // Anti-enumeration (P1-1): an exhausted budget MUST NOT answer differently
   // from an unknown address — a 429 here is reachable only for registered
   // emails and is a binary existence oracle. Same generic body, no token
-  // minted, no mail sent (the budget still caps real sends at 3/h).
+  // minted, no mail sent (the atomic reservation still caps real sends at
+  // 1 per 5 minutes, issue #440).
   assert.equal(response.status, 200);
   assert.deepEqual((await responseBody(response)), { sent: true });
   assert.equal(callArgs("createVerificationToken").length, 0, "no token minted past the budget");
   assert.equal(callArgs("sendAuthEmail").length, 0, "no mail sent past the budget");
+});
+
+test("reset request releases the EXACT reservation when createVerificationToken throws after a successful admission — and never sends mail", async () => {
+  stub("findContributorByEmail", async () => contributor);
+  // The ATOMIC admission grants the slot (issue #440)...
+  stub("reserveAuthEmail", async () => ({ ok: true, reservationId: 88 }));
+  // ...then the token mint throws: the route must roll the EXACT reservation
+  // back (reservationId + contributorId + kind) so the failed attempt does
+  // not burn the budget, and it must NOT reach the mailer (no token exists).
+  stub("createVerificationToken", async () => {
+    throw new Error("token mint failed");
+  });
+  stub("releaseEmailReservation", async () => {});
+  const { POST } = await resetRequestRoute();
+  const response = await POST(
+    apiRequest("/api/auth/reset-password/request", {
+      method: "POST",
+      body: { email: "contributor@example.org" },
+    }),
+  );
+  // Behaviour mapping: the reset endpoint stays honest — a mint failure is
+  // a real 503 (NOT the generic 200), because the address is already known
+  // to the caller here; the anti-enumeration 200 covers only the budget
+  // branch and unknown addresses.
+  assert.equal(response.status, 503);
+  assert.equal((await responseBody(response)).error, "Unable to request a password reset");
+  assert.deepEqual(
+    callArgs("releaseEmailReservation")[0],
+    [88, 7, "reset"],
+    "the exact granted reservation is released, scoped to contributor + kind",
+  );
+  assert.equal(callArgs("sendAuthEmail").length, 0, "no mail is sent when the mint fails");
 });
 
 // ---------------------------------------------------------------------------

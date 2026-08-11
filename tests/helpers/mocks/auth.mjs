@@ -128,5 +128,3 @@ export const TOKEN_TTL_MS_BY_PURPOSE = {
   verify: VERIFICATION_TOKEN_TTL_MS,
   reset: RESET_TOKEN_TTL_MS,
 };
-export const VERIFICATION_SEND_LIMIT = 3;
-export const VERIFICATION_SEND_WINDOW_MS = 60 * 60 * 1000;

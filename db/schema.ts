@@ -264,9 +264,11 @@ export const contributors = sqliteTable(
  *
  * `purpose` (migration 0031) separates the two flows sharing this table:
  * 'verify' — email verification at registration (Fase B); 'reset' — the
- * password-reset link (Fase B). Each purpose gets its own 3/h send limit
- * and its own consume semantics (a reset link never re-verifies the email
- * address by itself; the reset-confirm handler does).
+ * password-reset link (Fase B). The send budget is the SHARED
+ * 1-email-per-5-minutes atomic `email_send_log` reservation (issue #440,
+ * db/mailer.ts — one budget across verify and reset, not per-purpose); each
+ * purpose keeps its own consume semantics (a reset link never re-verifies
+ * the email address by itself; the reset-confirm handler does).
  */
 export const emailVerificationTokens = sqliteTable(
   "email_verification_tokens",
@@ -875,14 +877,19 @@ export const cameraEditRequests = sqliteTable(
 
 /**
  * Outbound transactional-email send log (AUTH MULTI-METODO Fase A2, migration
- * 0029). Exists ONLY to enforce the 3-emails-per-contributor-per-hour
- * re-send limit for account verification and password reset (ADR 0020
- * decision 2). Privacy by design: the row stores NO content, NO recipient
- * address (the address already lives on `contributors.email`) and NO IP —
- * a leak of this table reveals nothing beyond "account X was emailed for
- * kind Y at time T". `kind` is 'verify' | 'reset'; the rate-limit window
- * counts rows newer than now - 1h for the contributor. Rows cascade-delete
- * with the account (ADR 0013 erasure).
+ * 0029). Exists ONLY to enforce the 1-email-per-5-minutes-per-contributor
+ * re-send limit for account verification and password reset (issue #440,
+ * ADR 0020 decision 2). Admission is ATOMIC: `reserveAuthEmail` runs one
+ * INSERT ... SELECT ... WHERE (count < limit) RETURNING id statement, so
+ * concurrent sends cannot race past a stale count; the reserved row doubles
+ * as the send-log row (kept when the provider accepts, deleted by id on a
+ * deterministic pre-delivery failure). Privacy by design: the row stores NO
+ * content, NO recipient address (the address already lives on
+ * `contributors.email`) and NO IP — a leak of this table reveals nothing
+ * beyond "account X was emailed for kind Y at time T". `kind` is
+ * 'verify' | 'reset'; the rate-limit window counts rows newer than
+ * now - 5 min for the contributor. Rows cascade-delete with the account
+ * (ADR 0013 erasure) and age out via retention R18 (24 h).
  * Declared here so drizzle-kit generate never re-emits it (convention
  * 0012/0014: hand-written migration + schema declaration together).
  */

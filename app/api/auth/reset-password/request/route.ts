@@ -9,7 +9,7 @@ import { authLimit } from "../../../../lib/auth-route-helpers";
 import { sameOrigin } from "../../../../lib/csrf";
 import { isRecord } from "../../../../lib/guards";
 import { BodyReadError, readJsonBody, urlTooLong } from "../../../../lib/input-limits";
-import { canSendAuthEmail, sendAuthEmail } from "../../../../../db/mailer";
+import { releaseEmailReservation, reserveAuthEmail, sendAuthEmail } from "../../../../../db/mailer";
 
 /**
  * POST /api/auth/reset-password/request — start a password reset
@@ -21,14 +21,21 @@ import { canSendAuthEmail, sendAuthEmail } from "../../../../../db/mailer";
  * reset token is created and the mailer invoked); unknown addresses consume
  * the same request path and cost the same response.
  *
- * Budget: 3 auth emails per hour per CONTRIBUTOR, counted over
- * `email_send_log` rows (canonical mailer budget, ADR 0020 decision 2 — the
- * log row is written ONLY after the provider accepted the email, so a
- * failed send never consumes the budget). Past the budget the route keeps
- * answering the generic 200 `{ sent: true }` WITHOUT minting a token or
- * sending mail — a 429 here would be reachable only for registered addresses
- * and turn the route into a binary existence oracle. The per-IP `auth`
- * bucket bounds raw request volume regardless of the address.
+ * Budget: 1 email per 5 minutes per CONTRIBUTOR (issue #440, ADR 0020
+ * decision 2 — canonical mailer budget, shared with verification sends).
+ * Admission is ATOMIC: `reserveAuthEmail` INSERTs the `email_send_log` row
+ * only while the in-window count is below the limit (INSERT ... SELECT ...
+ * WHERE ... < ? RETURNING id), so concurrent requests cannot race past a
+ * stale count. The reservation runs BEFORE any token work. Past the budget
+ * the route keeps answering the generic 200 `{ sent: true }` WITHOUT
+ * minting a token or sending mail — a 429 here would be reachable only for
+ * registered addresses and turn the route into a binary existence oracle.
+ * The per-IP `auth` bucket bounds raw request volume regardless of the
+ * address. The reservation row is kept when the provider accepts the email
+ * and rolled back on a deterministic pre-delivery failure (missing config,
+ * provider rejection, mint error), so deterministic failures never burn the
+ * budget (an ambiguous provider outcome keeps the short reservation to avoid
+ * a duplicate-mail burst — see db/mailer.ts).
  *
  * The link goes to the client-side reset page (Fase E2 UI), which calls
  * POST /api/auth/reset-password/confirm with the token + new password.
@@ -59,12 +66,13 @@ export async function POST(request: Request) {
     if (!contributor) return ok();
 
     const now = new Date().toISOString();
-    // Pre-flight budget check BEFORE minting: a blocked request must not
-    // revoke the previous link by creating a token it will never mail.
-    // sendAuthEmail re-checks inside (authoritative), so this is only the
-    // fast path for known accounts.
-    const decision = await canSendAuthEmail(contributor.id, now, env);
-    if (!decision.allowed) {
+    // ATOMIC budget admission BEFORE minting: the reservation INSERT lands
+    // only while the in-window count is below the limit (INSERT ... SELECT
+    // ... WHERE ... < ? RETURNING id — one statement, no race). Only a
+    // request that holds a reservation mints, so a losing concurrent
+    // request cannot revoke the winning reset link.
+    const reservation = await reserveAuthEmail(contributor.id, "reset", now, env);
+    if (!reservation.ok) {
       // Budget exhausted: still answer the generic success (anti-enumeration).
       // A 429 here would be reachable only for registered addresses (unknown
       // emails always get 200 { sent: true }), turning the route into a binary
@@ -73,18 +81,35 @@ export async function POST(request: Request) {
       return ok();
     }
 
-    const { rawToken } = await createVerificationToken(contributor.id, "reset", now);
-    // Mail result is deliberately swallowed: the reset endpoint is public
-    // and must answer `{ sent: true }` even if the provider rejects — the
-    // response can never reveal whether the address is registered.
-    await sendAuthEmail({
-      contributorId: contributor.id,
-      to: contributor.email,
-      kind: "reset",
-      rawToken,
-      nowIso: now,
-    });
-    return ok();
+    try {
+      const { rawToken } = await createVerificationToken(contributor.id, "reset", now);
+      // Mail result is deliberately swallowed: the reset endpoint is public
+      // and must answer `{ sent: true }` even if the provider rejects — the
+      // response can never reveal whether the address is registered.
+      // sendAuthEmail released the exact reservation on a deterministic
+      // pre-delivery failure, so the budget is not burned by failed sends.
+      await sendAuthEmail({
+        reservationId: reservation.reservationId,
+        contributorId: contributor.id,
+        to: contributor.email,
+        kind: "reset",
+        rawToken,
+      });
+      return ok();
+    } catch (error) {
+      // Token mint or render threw after the reservation: roll the exact
+      // reservation back so the failed attempt does not burn the budget.
+      // Scoped to this contributor + kind, so it can never touch another
+      // account's send row.
+      await releaseEmailReservation(reservation.reservationId, contributor.id, "reset");
+      if (error instanceof BodyReadError) {
+        // Malformed body: same generic success — the reset request is public
+        // and must not reveal anything about the address.
+        return ok();
+      }
+      console.error("POST /api/auth/reset-password/request failed", error);
+      return Response.json({ error: "Unable to request a password reset" }, { status: 503, headers: NO_STORE_HEADERS });
+    }
   } catch (error) {
     if (error instanceof BodyReadError) {
       // Malformed body: same generic success — the reset request is public

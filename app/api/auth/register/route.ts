@@ -22,7 +22,7 @@ import { isRecord } from "../../../lib/guards";
 import { BodyReadError, readJsonBody, urlTooLong } from "../../../lib/input-limits";
 import { recordRateLimitBlock } from "../../../lib/abuse-alerts";
 import { callerKey, registrationIpLimits } from "../../../lib/rate-limit";
-import { sendAuthEmail } from "../../../../db/mailer";
+import { releaseEmailReservation, reserveAuthEmail, sendAuthEmail } from "../../../../db/mailer";
 
 /**
  * POST /api/auth/register — create a contributor account and open a
@@ -32,12 +32,22 @@ import { sendAuthEmail } from "../../../../db/mailer";
  *   1. the contributor is created with `email_verified_at = NULL`;
  *   2. a single-use, 24h verification token is minted (hash-only in D1) and
  *      emailed via the Cloudflare `send_email` binding (canonical mailer
- *      db/mailer.ts, ADR 0020 — render → rate-limit → send → log);
+ *      db/mailer.ts, ADR 0020 — atomic reservation → render → send → settle);
  *   3. a session is opened exactly as before — but it is READ-ONLY until
  *      `email_verified_at` is set: the write gate (Fase E1) refuses every
  *      state-changing write for unverified accounts (403). GET /api/auth/me
  *      exposes `contributor.emailVerifiedAt` so the client can show the
  *      "verify your email" state.
+ *
+ * The mailer budget (1 email per 5 minutes per contributor, issue #440 —
+ * shared with resend and password reset) is admitted ATOMICALLY BEFORE the
+ * token is minted: `reserveAuthEmail` INSERTs the `email_send_log` row only
+ * while the in-window count is below the limit, and a fresh account (zero
+ * rows) always wins its slot. The reservation row is kept when the provider
+ * accepts the email and rolled back on a deterministic pre-delivery failure,
+ * so a deterministic failure never burns the budget (an ambiguous provider
+ * outcome keeps the short reservation to avoid a duplicate-mail burst — see
+ * db/mailer.ts).
  *
  * Mail is best-effort and NEVER fails registration: a mail outage still
  * returns 201 (the user can re-send from the session via
@@ -106,6 +116,15 @@ export async function POST(request: Request) {
     );
   }
 
+  // Reservation of the verification-email slot, tracked across the try so an
+  // early failure (token mint / session) rolls it back and does not burn the
+  // mail budget (issue #440). sendAuthEmail settles the reservation itself
+  // (kept on success, released on a deterministic failure, retained on an
+  // ambiguous provider outcome) and the id is cleared the moment it returns,
+  // so the catch below covers ONLY token-mint / pre-send exceptions and can
+  // never delete the send-log row of an email the provider already accepted.
+  let mailReservation: { reservationId: number; contributorId: number; kind: "verify" } | null = null;
+
   try {
     const payload: unknown = await readJsonBody(request, env);
     if (!isRecord(payload)) {
@@ -148,18 +167,47 @@ export async function POST(request: Request) {
       throw error;
     }
 
-    // Verification link (Fase B): mint + mail through the canonical mailer.
-    // The raw token lives only in the email (hash-only in D1); the mailer
-    // swallows send failures so a mail outage never breaks registration.
+    // Verification link (Fase B): ATOMIC budget admission → mint → mail.
+    // The reservation INSERT lands only while the in-window count is below
+    // the limit (INSERT ... SELECT ... WHERE ... < ? RETURNING id, one
+    // statement — no race with concurrent sends for the same contributor)
+    // and runs BEFORE the token is minted, so a blocked request never
+    // creates a token it cannot mail. The raw token lives only in the email
+    // (hash-only in D1); the mailer swallows send failures so a mail outage
+    // never breaks registration.
     const now = new Date().toISOString();
-    const { rawToken } = await createVerificationToken(contributor.id, "verify", now);
-    const mail = await sendAuthEmail({
-      contributorId: contributor.id,
-      to: contributor.email,
-      kind: "verify",
-      rawToken,
-      nowIso: now,
-    });
+    const reservation = await reserveAuthEmail(contributor.id, "verify", now, env);
+    let verification;
+    if (reservation.ok) {
+      mailReservation = {
+        reservationId: reservation.reservationId,
+        contributorId: contributor.id,
+        kind: "verify",
+      };
+      const { rawToken } = await createVerificationToken(contributor.id, "verify", now);
+      try {
+        const mail = await sendAuthEmail({
+          reservationId: reservation.reservationId,
+          contributorId: contributor.id,
+          to: contributor.email,
+          kind: "verify",
+          rawToken,
+        });
+        // sent = the provider accepted the email (and the reservation row is
+        // now the permanent send-log row).
+        verification = { sent: mail.ok };
+      } finally {
+        // sendAuthEmail settled the reservation (kept on success, released on
+        // a deterministic failure, retained on an ambiguous outcome) — the
+        // route must not touch it again, even if createSession below throws.
+        mailReservation = null;
+      }
+    } else {
+      // A fresh account cannot normally lose the window (zero rows); if it
+      // ever does (pre-existing rows for a re-registered email), register
+      // still succeeds without mail — the user can resend from the session.
+      verification = { sent: false };
+    }
 
     const { rawToken: sessionRawToken, csrfToken } = await createSession(contributor.id, {
       // The DB expires_at must match the cookie Max-Age exactly: both derive
@@ -168,15 +216,27 @@ export async function POST(request: Request) {
       // cookie is gone, or expire sessions the client still holds).
       ttlSeconds: sessionTtlSeconds(env),
     });
-    // sent = the provider accepted the email. No devLink, ever: the token is
-    // only in the mail channel, so a misconfigured deployment (missing EMAIL
-    // binding / VERIFY_BASE_URL) cannot leak it through the API.
-    const verification = { sent: mail.ok };
+    // No devLink, ever: the token is only in the mail channel, so a
+    // misconfigured deployment (missing EMAIL binding / VERIFY_BASE_URL)
+    // cannot leak it through the API.
     return Response.json(
       { contributor, verification },
       { status: 201, headers: cookieHeaderInit(sessionCookieHeaders(sessionRawToken, csrfToken, env)) },
     );
   } catch (error) {
+    // An exception after the reservation (token mint / session failure)
+    // must roll the exact mail reservation back so the budget is not burned.
+    // By this point the id is non-null ONLY for token-mint / pre-send
+    // exceptions: sendAuthEmail settled (and the route cleared) the
+    // reservation the moment it returned, so a delivered email's send-log
+    // row is never deleted here.
+    if (mailReservation) {
+      await releaseEmailReservation(
+        mailReservation.reservationId,
+        mailReservation.contributorId,
+        mailReservation.kind,
+      );
+    }
     if (error instanceof BodyReadError) {
       console.warn("POST /api/auth/register payload rejected: body too large or not valid JSON");
       await rollbackAttempt();

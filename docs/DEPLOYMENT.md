@@ -283,9 +283,13 @@ mailer code path is identical in dev and prod.
 Email templates live in `app/lib/email-templates.ts` and are **zero
 tracking by contract**: no `<img>`/pixels, no remote assets, no links
 beyond the single action URL, plain-text alternative always present —
-asserted by `tests/mailer.test.mjs`. The send rate limit (3 emails/h per
-contributor, ADR 0020) is enforced in D1 via `email_send_log` (migration
-0029) and is durable across worker isolates.
+asserted by `tests/mailer.test.mjs`. The send rate limit (1 email per
+5 minutes per contributor, issue #440, ADR 0020) is enforced in D1 via
+atomic `email_send_log` reservations (INSERT ... SELECT ... WHERE count <
+limit RETURNING id) and is durable across worker isolates; a deterministic
+pre-delivery failure releases its reservation, a crash or ambiguous provider
+outcome may keep it until it ages out of the window (bounded over-count,
+documented in RETENTION_SCHEDULE.md R18).
 
 **Token TTLs are per-purpose** (`db/auth.ts`, ADR 0020): verification
 links expire after **24 h** (`VERIFICATION_TOKEN_TTL_MS`), password-reset
@@ -590,7 +594,7 @@ when unset. Set them in the hosting platform's secret/environment store
 | `REGISTRATION_IP_HMAC_KEY` | unset → truncated SHA-256 | Keyed-HMAC secret for the per-IP registration log (QA#3 F4): when set, `registrations_ip_log.ip_hash` is HMAC-SHA256(key, callerKey) truncated to 128 bits instead of plain SHA-256, so a database leak cannot be dictionary-attacked offline (the IPv4 space is 2^32). **Production must set this** (deploy checklist); unset = truncated-SHA-256 fallback for the local development / tests |
 | `VERIFY_BASE_URL` | unset (fail-closed) | Public site base URL used to build verification / password-reset action links (e.g. `https://opensurveillancedb.org`). Unset → the mailer answers `missing_config` and auth routes return 503; set it in `.dev.vars` locally and as a secret/var in production |
 | `MAILER_FROM` | `noreply@opensurveillancedb.org` | Sender address for transactional auth mail. Must be in the `EMAIL` binding's `allowed_sender_addresses` (or the provider rejects with `E_SENDER_NOT_VERIFIED`) |
-| `EMAIL_SEND_LIMIT_MAX` / `EMAIL_SEND_LIMIT_WINDOW_SECONDS` | `3` / `3600` | Re-send budget per contributor for auth emails (ADR 0020): at most `EMAIL_SEND_LIMIT_MAX` sends per `EMAIL_SEND_LIMIT_WINDOW_SECONDS` seconds, enforced in D1 via `email_send_log` |
+| `EMAIL_SEND_LIMIT_MAX` / `EMAIL_SEND_LIMIT_WINDOW_SECONDS` | `1` / `300` | Shared atomic reservation budget for auth emails (issue #440, ADR 0020): at most `EMAIL_SEND_LIMIT_MAX` sends per contributor per `EMAIL_SEND_LIMIT_WINDOW_SECONDS` seconds, enforced in D1 via atomic `email_send_log` reservations (INSERT ... SELECT ... WHERE count < limit RETURNING id). One budget covers verification, re-send and password-reset sends |
 
 The moderation gate **fails closed**: if neither the Basic pair nor the
 bearer token is configured, every `/moderation` and `/api/moderation*`

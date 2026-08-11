@@ -3,7 +3,7 @@ import { createVerificationToken } from "../../../../../db/auth";
 import { resolveOptionalContributor } from "../../../../lib/auth-session";
 import { authLimit } from "../../../../lib/auth-route-helpers";
 import { sameOrigin } from "../../../../lib/csrf";
-import { canSendAuthEmail, sendAuthEmail } from "../../../../../db/mailer";
+import { releaseEmailReservation, reserveAuthEmail, sendAuthEmail } from "../../../../../db/mailer";
 import { urlTooLong } from "../../../../lib/input-limits";
 
 /**
@@ -15,18 +15,25 @@ import { urlTooLong } from "../../../../lib/input-limits";
  * account is already verified the endpoint answers 200 with
  * `verified: true` and sends nothing (idempotent no-op, no error).
  *
- * Send budget: 3 auth emails per hour per contributor, counted over
- * `email_send_log` rows (the canonical mailer budget, ADR 0020 decision 2 —
- * the log row is written ONLY after the provider accepted the email, so a
- * failed send never consumes the budget and register's own email counts as
- * the first send). The 4th attempt answers 429 with Retry-After before any
- * token or mail work happens, so a blocked request never mints a new token
- * (which would revoke the previous, still-valid link). Creating the new
- * token atomically revokes every older unused verify token for the account,
- * so only the newest link works.
+ * Send budget: 1 email per 5 minutes per contributor (issue #440, ADR 0020
+ * decision 2 — the canonical mailer budget). Admission is ATOMIC:
+ * `reserveAuthEmail` INSERTs the `email_send_log` row only while the
+ * in-window count is below the limit (INSERT ... SELECT ... WHERE ... < ?
+ * RETURNING id), so concurrent resends cannot race past a stale count.
+ * The reservation runs BEFORE any token work: a blocked request answers
+ * 429 with Retry-After and NEVER mints a new token, so it cannot revoke
+ * the previous, still-valid link (creating a new token atomically revokes
+ * every older unused verify token for the account — only the newest link
+ * works, and only the request that won the window gets to mint one). The
+ * reservation row is kept when the provider accepts the email and rolled
+ * back on a deterministic pre-delivery failure (missing config, provider
+ * rejection, mint error), so deterministic failures never burn the budget
+ * (an ambiguous provider outcome keeps the short reservation to avoid a
+ * duplicate-mail burst — see db/mailer.ts).
  *
  * Guard order mirrors the other auth mutations: urlTooLong -> sameOrigin ->
- * auth rate-limit -> session (401) -> budget (429) -> token+mail.
+ * auth rate-limit -> session (401) -> atomic budget reservation (429) ->
+ * token+mail.
  */
 export async function POST(request: Request) {
   if (urlTooLong(request)) {
@@ -51,47 +58,67 @@ export async function POST(request: Request) {
     }
 
     const now = new Date().toISOString();
-    // Pre-flight budget check BEFORE minting: a blocked request must not
-    // revoke the previous link by creating a token it will never mail.
-    // sendAuthEmail re-checks inside (authoritative), so this is only the
-    // fast 429 path — the canonical check still gates the provider call.
-    const decision = await canSendAuthEmail(resolved.contributor.id, now, env);
-    if (!decision.allowed) {
+    // ATOMIC budget admission BEFORE minting: the reservation INSERT lands
+    // only while the in-window count is below the limit (INSERT ... SELECT
+    // ... WHERE ... < ? RETURNING id — one statement, no race), so a
+    // blocked or losing concurrent request can never revoke the winning
+    // link by creating a token it will never mail. Only a request that
+    // holds a reservation mints.
+    const reservation = await reserveAuthEmail(resolved.contributor.id, "verify", now, env);
+    if (!reservation.ok) {
       return Response.json(
         { error: "Too many verification emails. Please try again later." },
-        { status: 429, headers: { ...NO_STORE_HEADERS, "Retry-After": String(decision.retryAfterSeconds) } },
+        { status: 429, headers: { ...NO_STORE_HEADERS, "Retry-After": String(reservation.retryAfterSeconds) } },
       );
     }
 
-    const { rawToken } = await createVerificationToken(resolved.contributor.id, "verify", now);
-    const mail = await sendAuthEmail({
-      contributorId: resolved.contributor.id,
-      to: resolved.contributor.email,
-      kind: "verify",
-      rawToken,
-      nowIso: now,
-    });
+    try {
+      const { rawToken } = await createVerificationToken(resolved.contributor.id, "verify", now);
+      const mail = await sendAuthEmail({
+        reservationId: reservation.reservationId,
+        contributorId: resolved.contributor.id,
+        to: resolved.contributor.email,
+        kind: "verify",
+        rawToken,
+      });
 
-    if (!mail.ok && mail.reason === "rate_limited") {
-      // A concurrent request won the window between the pre-flight and the
-      // send. Answer 429 like the pre-flight would have.
-      return Response.json(
-        { error: "Too many verification emails. Please try again later." },
-        { status: 429, headers: { ...NO_STORE_HEADERS, "Retry-After": String(mail.retryAfterSeconds) } },
-      );
-    }
-    if (!mail.ok) {
-      // missing_config (VERIFY_BASE_URL unset) or provider rejection: the
-      // email did not go out. Honest failure — the raw token is NEVER
-      // echoed; the user can retry once the deployment is fixed.
-      console.error("POST /api/auth/verify-email/resend mail failed", mail);
-      return Response.json(
-        { error: "Unable to resend the verification email" },
-        { status: 503, headers: NO_STORE_HEADERS },
-      );
-    }
+      if (!mail.ok && mail.reason === "rate_limited") {
+        // Defensive: the reservation vanished between reserve and send
+        // (unreachable through this route). Answer 429 like the gate would.
+        return Response.json(
+          { error: "Too many verification emails. Please try again later." },
+          { status: 429, headers: { ...NO_STORE_HEADERS, "Retry-After": String(mail.retryAfterSeconds) } },
+        );
+      }
+      if (!mail.ok) {
+        // missing_config (VERIFY_BASE_URL unset) or provider rejection: the
+        // email may not have gone out. sendAuthEmail released the exact
+        // reservation only on a DEFINITIVE pre-delivery failure; an
+        // ambiguous provider outcome (E_UNKNOWN or any unrecognised code)
+        // deliberately KEEPS it — the provider may have accepted the email
+        // (response lost) and releasing it would let a retry duplicate it
+        // (the short over-count ages out of the window, see db/mailer.ts).
+        // Honest failure — the raw token is NEVER echoed; the user can
+        // retry once the deployment is fixed. Fixed generic log event only:
+        // a provider error must not echo the recipient address or any other
+        // data into the application logs.
+        console.error("POST /api/auth/verify-email/resend mail failed: verification email not confirmed delivered");
+        return Response.json(
+          { error: "Unable to resend the verification email" },
+          { status: 503, headers: NO_STORE_HEADERS },
+        );
+      }
 
-    return Response.json({ sent: true }, { headers: NO_STORE_HEADERS });
+      return Response.json({ sent: true }, { headers: NO_STORE_HEADERS });
+    } catch (error) {
+      // Token mint or render threw after the reservation: roll the exact
+      // reservation back so the failed attempt does not burn the budget.
+      // Scoped to this contributor + kind, so it can never touch another
+      // account's send row.
+      await releaseEmailReservation(reservation.reservationId, resolved.contributor.id, "verify");
+      console.error("POST /api/auth/verify-email/resend failed", error);
+      return Response.json({ error: "Unable to resend the verification email" }, { status: 503, headers: NO_STORE_HEADERS });
+    }
   } catch (error) {
     console.error("POST /api/auth/verify-email/resend failed", error);
     return Response.json({ error: "Unable to resend the verification email" }, { status: 503, headers: NO_STORE_HEADERS });

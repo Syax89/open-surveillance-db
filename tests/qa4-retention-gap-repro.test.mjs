@@ -3,11 +3,11 @@
 // (t_a852d1a4).
 //
 // Finding candidato A: `email_send_log` (migration 0029, ADR 0020 rate-limit
-// 3/h) non aveva NESSUNA sweep nel retention cron: le righe vivevano per
-// sempre finché l'account non veniva cancellato (l'unico DELETE era la
-// cascade di db/auth.ts deleteAccount). Ogni email inviata = 1 riga; un
-// contributore attivo che usa il limite 3/h accumula ~90 righe/mese di puro
-// garbage (il rate-limit conta solo la finestra 1h).
+// 1 per 5 min — issue #440) non aveva NESSUNA sweep nel retention cron: le
+// righe vivevano per sempre finché l'account non veniva cancellato (l'unico
+// DELETE era la cascade di db/auth.ts deleteAccount). Ogni email inviata =
+// 1 riga; un contributore attivo che usa il limite accumula righe di puro
+// garbage (il rate-limit conta solo la finestra 5 min).
 //
 // Finding candidato B: R12 (`demo` records, RETENTION_SCHEDULE.md "Purged
 // before public launch") NON aveva alcuna implementazione nel retention

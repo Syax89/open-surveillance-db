@@ -50,7 +50,15 @@ interface Env {
   VERIFY_BASE_URL?: string;
   /** Sender address override for the EMAIL binding (default noreply@opensurveillancedb.org). */
   MAILER_FROM?: string;
-  /** Re-send rate limit for auth emails: max sends per contributor per window. */
+  /**
+   * Re-send rate limit for auth emails (issue #440, ADR 0020 decision 2):
+   * max sends per contributor per rolling window, enforced ATOMICALLY in D1
+   * via email_send_log reservations. Default 1 per 5 minutes
+   * (EMAIL_SEND_LIMIT_MAX=1, EMAIL_SEND_LIMIT_WINDOW_SECONDS=300); these
+   * two overrides tune the same per-contributor window (e.g. staging or a
+   * temporarily raised ceiling) and apply to verification, resend and
+   * password-reset sends alike.
+   */
   EMAIL_SEND_LIMIT_MAX?: string;
   EMAIL_SEND_LIMIT_WINDOW_SECONDS?: string;
   /** Moderation access control. At least one credential must be configured. */

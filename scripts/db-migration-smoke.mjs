@@ -171,8 +171,9 @@ const expectedIndexes = [
   "webauthn_challenges_challenge_hash_unique",
   "webauthn_challenges_expires_idx",
   "webauthn_challenges_contributor_idx",
-  // Mailer send log (0029): the 3/h rate-limit COUNT is a
-  // `WHERE contributor_id = ? AND sent_at >= ?` range scan.
+  // Mailer send log (0029): the 1-per-5-minutes rate-limit window is a
+  // `WHERE contributor_id = ? AND sent_at >= ?` range scan (atomic
+  // INSERT ... SELECT ... RETURNING reservation, issue #440).
   "email_send_log_contributor_idx",
   "email_send_log_sent_at_idx",
   // OIDC external login — Fase D (0030): state hash is globally unique
