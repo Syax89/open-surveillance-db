@@ -9,9 +9,11 @@
 //    .account-section-header + the "Create API key" action;
 //  - useApiKeys owns list/create/revoke + CSRF echo (model
 //    useModerationQueue);
-//  - create opens ApiKeyCreateDialog (scope pill buttons, aria-pressed);
-//  - a successful mint hands the RAW key to ApiKeyRevealDialog — the
-//    once-only display (P1-2); the list refetches when it closes;
+//  - create opens ApiKeyCreateDialog (scope pill buttons, aria-pressed +
+//    optional expiry select — the POST carries an ISO expiresAt);
+//  - a successful mint hands the RAW key + its expiry to
+//    ApiKeyRevealDialog — the once-only display (P1-2) states when the key
+//    stops working (F2); the list refetches when it closes;
 //  - revoke reuses the shared ConfirmDialog (DELETE + CSRF, row flips to
 //    Revoked; 404 = already revoked).
 
@@ -36,13 +38,13 @@ export function ApiKeysSection({ onSessionLost }: Props) {
   const [createOpen, setCreateOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<ApiKeyErrorKind | null>(null);
-  const [revealKey, setRevealKey] = useState<string | null>(null);
+  const [revealKey, setRevealKey] = useState<{ key: string; expiresAt: string | null } | null>(null);
   const [confirmRevoke, setConfirmRevoke] = useState<ApiKey | null>(null);
 
-  async function onCreate(name: string, scopes: ApiKeyScope[]) {
+  async function onCreate(name: string, scopes: ApiKeyScope[], expiresAt: string | null) {
     setCreating(true);
     setCreateError(null);
-    const result = await createKey(name, scopes);
+    const result = await createKey(name, scopes, expiresAt);
     setCreating(false);
     if (!result.ok) {
       setCreateError(result.error);
@@ -50,7 +52,7 @@ export function ApiKeysSection({ onSessionLost }: Props) {
     }
     // Raw key exists only here: hand it to the once-only reveal dialog.
     setCreateOpen(false);
-    setRevealKey(result.key);
+    setRevealKey({ key: result.key, expiresAt: result.expiresAt });
   }
 
   async function onRevokeConfirmed() {
@@ -101,13 +103,14 @@ export function ApiKeysSection({ onSessionLost }: Props) {
         open={createOpen}
         busy={creating}
         error={createError}
-        onCreate={(name, scopes) => void onCreate(name, scopes)}
+        onCreate={(name, scopes, expiresAt) => void onCreate(name, scopes, expiresAt)}
         onCancel={() => setCreateOpen(false)}
       />
 
       <ApiKeyRevealDialog
         open={revealKey !== null}
-        keyValue={revealKey ?? ""}
+        keyValue={revealKey?.key ?? ""}
+        expiresAt={revealKey?.expiresAt ?? null}
         onClose={() => {
           setRevealKey(null);
           // The server holds the new key now: refetch so the list shows it.

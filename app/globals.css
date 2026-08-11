@@ -1122,8 +1122,8 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 .auth-card h1 { font-size:var(--text-auth); font-weight:800; text-wrap:balance; overflow-wrap:anywhere; }
 .auth-form { display:grid; gap:18px; margin:30px 0 8px; }
 .auth-field { display:grid; gap:var(--space-2); color:var(--ink-2); font-size:var(--text-sm); font-weight:800; }
-.auth-field input { width:100%; border:1px solid var(--field-border); border-radius:var(--radius-md); padding:12px 13px; background:var(--white); color:var(--field-ink); font-size:var(--text-lg); font-weight:400; }
-.auth-field input:focus { border-color:var(--control-focus); outline:3px solid var(--focus); outline-offset:2px; }
+.auth-field input, .auth-field select { width:100%; border:1px solid var(--field-border); border-radius:var(--radius-md); padding:12px 13px; background:var(--white); color:var(--field-ink); font-size:var(--text-lg); font-weight:400; }
+.auth-field input:focus, .auth-field select:focus { border-color:var(--control-focus); outline:3px solid var(--focus); outline-offset:2px; }
 .auth-field small { color:var(--muted); font-size:var(--text-sm); font-weight:400; line-height:1.45; }
 /* Password policy (CEO feedback 2026-08-03): visible requirements list under
    the password field on /register and /reset-password. Reads as muted helper
@@ -1216,7 +1216,18 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 .api-key-scope-badge { padding:4px 10px; border:1px solid var(--card-border); border-radius:var(--radius-full); background:var(--surface-muted); color:var(--tint-ink); font-size:var(--text-xs); font-weight:800; }
 .api-key-status { display:inline-flex; align-items:center; gap:8px; color:var(--ink-2); font-size:var(--text-sm); font-weight:800; }
 .api-key-row .text-button { margin-left:auto; }
-.api-key-row-revoked { opacity:.62; }
+/* Revoked rows: muted but ALWAYS readable — explicit tokens, never
+   opacity on the whole row (opacity:.62 dropped composite contrast to
+   2.4–3.4:1 on the row surface, WCAG AA FAIL). Every revoked token stays
+   ≥4.5:1 on its own surface: ink-3 = 5.10:1 on card-bg, ink-2 = 6.64:1 on
+   the paper prefix chip and 6.08:1 on the surface-muted scope badge.
+   Status remains dot + label (WCAG 1.4.1); revoked rows expose no actions. */
+.api-key-row-revoked .api-key-name,
+.api-key-row-revoked .api-key-row-meta dt,
+.api-key-row-revoked .api-key-row-meta dd,
+.api-key-row-revoked .api-key-status { color: var(--ink-3); }
+.api-key-row-revoked .api-key-prefix,
+.api-key-row-revoked .api-key-scope-badge { color: var(--ink-2); }
 .api-key-row-revoked .text-button { display:none; }
 .api-key-empty { margin:18px 0 10px; padding:22px 24px; border:1px dashed var(--card-border); border-radius:var(--radius-lg); background:var(--notice-bg); }
 .api-key-empty h3 { margin:0 0 8px; font-size:var(--text-2xl); letter-spacing:-.03em; font-weight:800; }
@@ -1239,7 +1250,9 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 /* Reveal dialog: the raw key as selectable monospace text (P1-2 — shown
    exactly once). */
 .api-key-reveal-dialog { max-width:560px; }
-.api-key-raw { display:block; margin:0 0 18px; padding:13px 14px; border:1px solid var(--field-border); border-radius:var(--radius-md); background:var(--paper); color:var(--heading); font-family:"SFMono-Regular", Consolas, "Liberation Mono", monospace; font-size:var(--text-md); letter-spacing:.02em; overflow-wrap:anywhere; }
+.api-key-raw { display:block; margin:0 0 8px; padding:13px 14px; border:1px solid var(--field-border); border-radius:var(--radius-md); background:var(--paper); color:var(--heading); font-family:"SFMono-Regular", Consolas, "Liberation Mono", monospace; font-size:var(--text-md); letter-spacing:.02em; overflow-wrap:anywhere; }
+.api-key-reveal-expiry { margin:0 0 18px; color:var(--ink-3); font-size:var(--text-sm); line-height:1.45; }
+.api-key-reveal-expiry strong { color:var(--ink-2); font-weight:800; }
 .api-key-copied { margin:-12px 0 0; color:var(--focus); font-size:var(--text-sm); font-weight:800; }
 @media (max-width:520px) {
   .api-key-scope-pills { grid-template-columns:1fr; }

@@ -8,6 +8,9 @@
 //  - role="alertdialog" + aria-modal + labelledby/describedby;
 //  - focus moves in on open, returns to the trigger on close;
 //  - Tab trapped in the action ring;
+//  - F2: the reveal states the key's expiry (date or "Never"/"Mai") —
+//    the moment the raw key exists is the one time the user can note
+//    when it stops working;
 //  - DELIBERATE DEVIATION from ConfirmDialog: Escape and overlay clicks do
 //    NOT dismiss. Closing here means the key is lost forever — the only
 //    close is the explicit "I saved it" acknowledgment (same rule as the
@@ -17,16 +20,20 @@
 //    selectable text); a role="status" node announces "Copied.".
 
 import { useEffect, useRef, useState } from "react";
+import { useLocale } from "./LocaleProvider";
 import { useMessages } from "../lib/use-messages";
+import { formatPublicDate } from "../lib/format-date";
 
 type Props = {
   open: boolean;
   keyValue: string;
+  expiresAt: string | null;
   onClose: () => void;
 };
 
-export function ApiKeyRevealDialog({ open, keyValue, onClose }: Props) {
+export function ApiKeyRevealDialog({ open, keyValue, expiresAt, onClose }: Props) {
   const t = useMessages().auth;
+  const { locale } = useLocale();
   const copyRef = useRef<HTMLButtonElement>(null);
   const savedRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -98,6 +105,10 @@ export function ApiKeyRevealDialog({ open, keyValue, onClose }: Props) {
         <code className="api-key-raw" aria-label={t.apiKeyRevealTitle}>
           {keyValue}
         </code>
+        <p className="api-key-reveal-expiry">
+          {t.apiKeyExpiresLabel}:{" "}
+          <strong>{expiresAt ? formatPublicDate(expiresAt, locale) : t.apiKeyExpiresNever}</strong>
+        </p>
         <div className="confirm-dialog-actions recovery-dialog-actions">
           {canCopy ? (
             <button ref={copyRef} type="button" className="button detail-outline" onClick={() => void onCopy()}>

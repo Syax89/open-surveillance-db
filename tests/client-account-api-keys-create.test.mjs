@@ -61,11 +61,14 @@ test("account: api keys — create success POSTs with CSRF, reveals raw key once
   await user.click(within(dialog).getByRole("button", { name: "Confirm cameras" }));
   await user.click(screen.getByRole("button", { name: "Create key" }));
 
-  // POST carries name + narrowed scopes + CSRF echo.
+  // POST carries name + narrowed scopes + ISO expiry (default select = 365d) + CSRF echo.
   await waitFor(() => assert.ok(requests.some((r) => r.input === "/api/auth/keys" && r.init?.method === "POST")));
   const post = requests.find((r) => r.input === "/api/auth/keys" && r.init?.method === "POST");
+  const postBody = JSON.parse(post.init.body);
   assert.equal(post.init.headers["x-csrf-token"], "fixture-csrf-token");
-  assert.deepEqual(JSON.parse(post.init.body), { name: "My script", scopes: ["submit", "edit"] });
+  assert.equal(postBody.name, "My script");
+  assert.deepEqual(postBody.scopes, ["submit", "edit"]);
+  assert.ok(typeof postBody.expiresAt === "string" && !Number.isNaN(Date.parse(postBody.expiresAt)), "POST carries an ISO expiry");
 
   // Reveal-once dialog: alertdialog with the raw key, "I saved it" only close.
   const reveal = await screen.findByRole("alertdialog");
