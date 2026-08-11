@@ -27,7 +27,7 @@
 import assert from "node:assert/strict";
 import test, { afterEach, before } from "node:test";
 import {
-  setupDom, loadDomPage, installFetchMock, jsonResponse, renderWithLocale, setNavState, React,
+  setupDom, loadDomPage, installFetchMock, jsonResponse, renderWithLocale, setNavState, leafletMaps, React,
 } from "./helpers/dom-harness.mjs";
 
 let rtl;
@@ -326,4 +326,28 @@ test("edit page: client validation marks the empty title aria-invalid and sends 
   await waitFor(() => assert.equal(titleInput.getAttribute("aria-invalid"), "true"));
   assert.ok(screen.getByText("The record title is required."));
   assert.equal(requests.some((r) => r.input === "/api/cameras/41" && r.init.method === "PATCH"), false);
+});
+
+test("edit page: a map position move refreshes the address via reverse geocode (issue #434)", async () => {
+  const { screen, waitFor } = rtl;
+  const reverseCalls = [];
+  installFetchMock((input) => {
+    if (input === "/api/cameras/41/edit") return jsonResponse({ record: ownerRecordFixture, editRequest: null });
+    if (typeof input === "string" && input.startsWith("/api/geocode/reverse?")) {
+      reverseCalls.push(input);
+      return jsonResponse({ address: "Refreshed street from the geocoder" });
+    }
+    return jsonResponse({ error: "unexpected route" }, { status: 404 });
+  });
+
+  await renderEditPage("41");
+  await waitFor(() => assert.ok(screen.queryByDisplayValue("Fixture Camera Report")));
+
+  // Position move on the map (click path) → reverse geocode → address field
+  // updates (the contributor has not typed their own address).
+  const map = (await leafletMaps()).at(-1);
+  map.fire("click", { latlng: { lat: 44.837812345, lng: 11.618312345 } });
+
+  await waitFor(() => assert.equal(reverseCalls.length, 1, "the reverse geocode fires after a position move"));
+  await waitFor(() => assert.ok(screen.queryByDisplayValue("Refreshed street from the geocoder"), "the address field is refreshed from the geocoder"));
 });
