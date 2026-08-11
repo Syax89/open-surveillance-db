@@ -41,6 +41,18 @@ export const en = {
   reportCta: "Report a camera",
   searchDirectory: "Search the directory",
   searchDirectoryPlaceholder: "Search by name, type or address",
+  // Hero address autocomplete (issue #439): the hero search field is
+  // progressively enhanced with the shared PlaceAutocomplete primitive.
+  // The copy is home-scoped — the /segnala address search keeps its own
+  // report-bundle wording.
+  searchDirectoryHelp:
+    "Type to search places; the arrow keys move through the suggestions and Enter selects one. You can also type any name or type and submit directly.",
+  searchSuggestionsLabel: "Address suggestions",
+  searchNoResults: (query: string) => `No places found for “${query}”.`,
+  searchRateLimited: (seconds: number) =>
+    `Too many searches. Try again in ${seconds} second${seconds === 1 ? "" : "s"}.`,
+  searchUnavailable: "Address search is unavailable right now.",
+  searchAttribution: "Places © OpenStreetMap contributors",
   statsLabel: "Database statistics",
   publicRecords: "public records",
   browseFreely: "No account",
@@ -105,6 +117,14 @@ export const it: Translation<typeof en> = {
   reportCta: "Segnala una telecamera",
   searchDirectory: "Cerca nell'elenco",
   searchDirectoryPlaceholder: "Cerca per nome, tipo o indirizzo",
+  searchDirectoryHelp:
+    "Digita per cercare luoghi; le frecce si spostano tra i suggerimenti e Invio seleziona uno. Puoi anche digitare qualsiasi nome o tipo e inviare direttamente.",
+  searchSuggestionsLabel: "Suggerimenti di indirizzi",
+  searchNoResults: (query: string) => `Nessun luogo trovato per “${query}”.`,
+  searchRateLimited: (seconds: number) =>
+    `Troppe ricerche. Riprova tra ${seconds} second${seconds === 1 ? "o" : "i"}.`,
+  searchUnavailable: "La ricerca indirizzi non è disponibile al momento.",
+  searchAttribution: "Luoghi © contributori OpenStreetMap",
   statsLabel: "Statistiche del database",
   publicRecords: "record pubblici",
   browseFreely: "Senza account",

@@ -318,12 +318,21 @@ button { cursor:pointer; }
    break for unbreakable tokens (e.g. "OpenSurveillanceDB"). */
 .hero h1 { margin:0; max-width:590px; font-size:var(--text-hero); line-height:1.06; letter-spacing:-.075em; font-weight:800; text-wrap:balance; overflow-wrap:anywhere; }
 .hero-intro { max-width:525px; margin:28px 0; color:var(--hero-intro-ink); font-size:var(--text-3xl); line-height:1.58; text-wrap:balance; }
-.hero-search { display:flex; max-width:525px; margin:0 0 16px; border:1px solid rgba(222,245,234,.42); border-radius:var(--radius-lg); background:rgba(255,255,255,.08); overflow:hidden; }
+/* Hero search (issue #439): full-width inside the hero-copy column (the
+   old 525px cap is gone — width:100% fills the column, which is itself
+   capped at 640px by .hero-copy). The autocomplete dropdown is absolutely
+   positioned under the input (.hero-search-autocomplete is the positioning
+   context), so the form must NOT clip it: overflow:hidden moved off, and
+   the submit button keeps the rounded right corners that the clipping used
+   to provide. */
+.hero-search { display:flex; width:100%; max-width:none; margin:0 0 16px; border:1px solid rgba(222,245,234,.42); border-radius:var(--radius-lg); background:rgba(255,255,255,.08); }
+.hero-search-autocomplete { position:relative; flex:1 1 auto; min-width:0; display:flex; }
 .hero-search input { min-width:0; flex:1; border:0; padding:13px 15px; background:transparent; color:var(--hero-ink); font-size:var(--text-base); }
 .hero-search input::placeholder { color:var(--hero-stat-ink); opacity:1; }
 .hero-search input:focus-visible { outline:3px solid var(--mint); outline-offset:-3px; }
-.hero-search button { flex:none; border:0; border-left:1px solid rgba(222,245,234,.32); padding:0 16px; background:var(--mint); color:var(--button-ink); font-size:var(--text-base); font-weight:800; }
+.hero-search button { flex:none; border:0; border-left:1px solid rgba(222,245,234,.32); padding:0 16px; background:var(--mint); color:var(--button-ink); font-size:var(--text-base); font-weight:800; border-radius:0 var(--radius-lg) var(--radius-lg) 0; }
 .hero-search button:hover { background:var(--mint-hover); }
+.hero-search .geocode-dropdown { left:0; right:0; }
 .hero-actions { display:flex; align-items:center; gap:var(--space-3); flex-wrap:wrap; }
 .button { border:1px solid transparent; padding:13px 18px; border-radius:var(--radius-lg); display:inline-flex; align-items:center; gap:13px; font-size:var(--text-base); font-weight:800; transition:transform .2s ease, background .2s ease; }
 .button:hover { transform:translateY(-2px); }
@@ -914,7 +923,13 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
   .hero h1 { font-size:clamp(36px, 10.2vw, 49px) }
   .hero-intro { font-size:var(--text-xl) }
   .hero-search { flex-direction:column; background:transparent; overflow:visible; border:0; gap:8px; }
-  .hero-search input { min-height:48px; border:1px solid rgba(222,245,234,.42); border-radius:var(--radius-lg); background:rgba(255,255,255,.08); }
+  /* Mobile stack (issue #439): the autocomplete wrapper becomes a full-width
+     block and the dropdown leaves its absolute positioning to sit in normal
+     flow — directly below the input and above the submit button (which is
+     the next flex item). Desktop absolute behavior stays unchanged. */
+  .hero-search-autocomplete { display:block; width:100%; flex:none; }
+  .hero-search input { box-sizing:border-box; width:100%; min-height:48px; border:1px solid rgba(222,245,234,.42); border-radius:var(--radius-lg); background:rgba(255,255,255,.08); }
+  .hero-search .geocode-dropdown { position:static; left:auto; right:auto; }
   .hero-search button { min-height:44px; border:0; border-radius:var(--radius-lg); }
   .hero-stats { margin-top:48px;gap:18px }
   /* .hero-visual min-height rules removed with t_7cafab72 — the visual is
