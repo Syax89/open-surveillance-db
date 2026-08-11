@@ -155,9 +155,27 @@ const INFO_ROUTES = {
     noEn: ["What we publish, and how you can help."],
   },
   "/guide": {
-    it: ["Guida al progetto", "Un database pubblico, costruito con attenzione."],
-    en: ["A public database, built with care."],
-    noEn: ["A public database, built with care."],
+    it: [
+      "Guida al progetto", "Un database pubblico, costruito con attenzione.",
+      // Corrected publication model (guide current-state rewrite): an edit
+      // to a public record becomes a private proposal, and only the proposal
+      // is private — the IT page must render the Italian copy, not the EN.
+      "Un aggiornamento a un record già pubblico diventa una proposta privata",
+      "La proposta resta privata",
+    ],
+    en: [
+      "A public database, built with care.",
+      "An update to an already public record becomes a private proposal",
+    ],
+    noEn: [
+      "A public database, built with care.",
+      // The obsolete claims and their replacement must never leak into the
+      // Italian rendering in English.
+      "An update to an already public record becomes a private proposal",
+      "Updates become proposals",
+      "The proposal stays private",
+      "Not immediately public",
+    ],
   },
   // Public API docs (CEO 2026-08-07; write-API guide t_10e3585e): /api-docs
   // is a static InfoPage explaining the keyless read API and the
@@ -231,10 +249,18 @@ const INFO_ROUTES = {
     // removed when embedded. P1-2: the WriteGateWall gates the form behind
     // the verified-session check, so the SSR shell renders the tool heading
     // + the wall's localized "checking" note (the form content is client-
-    // gated and never leaks into the static markup).
-    it: ["Segnala una telecamera", "Verifica in corso…"],
-    en: ["Report a camera", "Checking…"],
-    noEn: ["Report a camera", "Checking…"],
+    // gated and never leaks into the static markup). The pageIntro sentence
+    // (immediate publication — guide current-state rewrite) is part of the
+    // SSR tool heading, so it flips with the locale like the h1.
+    it: ["Segnala una telecamera", "Verifica in corso…", "La tua segnalazione viene pubblicata subito."],
+    en: ["Report a camera", "Checking…", "Your report is published immediately."],
+    noEn: [
+      "Report a camera", "Checking…",
+      // The corrected EN sentence and the old "reviewed before publication"
+      // claim must not appear on the Italian page.
+      "Your report is published immediately.",
+      "published immediately after review",
+    ],
   },
   "/correggi": {
     it: ["Correggi un record", "Verifica in corso…"],

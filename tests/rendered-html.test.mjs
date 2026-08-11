@@ -498,6 +498,36 @@ test("guide contains the detailed publication model and the legacy URL redirects
   assert.match(legacy.html, /id="guide-publication-details"/);
 });
 
+test("guide and report pages state the corrected publication model (EN SSR)", async () => {
+  // Copy truth regression (guide current-state rewrite): the guide and the
+  // report page used to claim ordinary reports were reviewed before
+  // publication and that edits to published records were "reviewed before
+  // they appear in public data". The product truth — a report from a
+  // verified account is published immediately, and an edit becomes a
+  // private proposal that never overwrites the published record — must be
+  // what the public EN pages actually render.
+  const [guide, report] = await Promise.all([renderRoute("/guide"), renderRoute("/segnala")]);
+
+  assert.equal(guide.response.status, 200);
+  // Corrected edit copy: proposal model, published version stays visible.
+  assert.match(guide.html, /An update to an already public record becomes a private proposal/);
+  assert.match(guide.html, /published version stays visible until a moderator applies or discards it/);
+  assert.match(guide.html, /Updates become proposals/);
+  assert.match(guide.html, /The proposal stays private/);
+  assert.match(guide.html, /The published record keeps appearing in the map, the directory and the exports/);
+  // Obsolete claims must not come back on the rendered page.
+  assert.doesNotMatch(guide.html, /reviewed before they appear in public data/);
+  assert.doesNotMatch(guide.html, /stay private while they are reviewed/);
+  assert.doesNotMatch(guide.html, /Not immediately public/);
+  assert.doesNotMatch(guide.html, /does not appear in the map, directory or exports right away/);
+
+  assert.equal(report.response.status, 200);
+  // The report page intro states immediate publication (no review queue).
+  assert.match(report.html, /Your report is published immediately\./);
+  assert.doesNotMatch(report.html, /published immediately after review/);
+  assert.doesNotMatch(report.html, /published after review/);
+});
+
 test("starter preview skeleton stays removed from the template", async () => {
   const [page, layout, packageJson, publicFiles, commonBundle] = await Promise.all([
     readFile(path.join(root, "app", "page.tsx"), "utf8"),
