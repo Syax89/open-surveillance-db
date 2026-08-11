@@ -208,6 +208,50 @@ test("the hub SSR markup carries hero, the four tool cards and NO map teaser (re
   assert.match(html, /href="\/manifesto">Read the manifesto/, "principles link → /manifesto");
 });
 
+test("the hero search form is full-width with no 525px cap and the dropdown is not clipped (issue #439 CSS contract)", async () => {
+  const css = readFileSync(path.join(root, "app", "globals.css"), "utf8");
+  const heroSearchRule = css.match(/\.hero-search\s*\{[^}]*\}/)?.[0];
+  assert.ok(heroSearchRule, "expected a .hero-search CSS rule");
+  assert.match(heroSearchRule, /width:\s*100%/, "hero search must fill the hero-copy column");
+  assert.doesNotMatch(heroSearchRule, /max-width:\s*525px/, "the old 525px cap must be gone");
+  assert.doesNotMatch(heroSearchRule, /overflow:\s*hidden/, "the form must not clip the autocomplete dropdown");
+  assert.ok(css.match(/\.hero-search-autocomplete\s*\{[^}]*position:\s*relative[^}]*\}/), "the autocomplete wrapper must be the dropdown positioning context");
+  const dropdownRule = css.match(/\.hero-search \.geocode-dropdown\s*\{[^}]*\}/)?.[0];
+  assert.ok(dropdownRule, "expected a .hero-search .geocode-dropdown rule");
+  assert.match(dropdownRule, /left:\s*0;?\s*right:\s*0/, "dropdown must span the input width");
+
+  // Mobile (max-width:700px) contract: the hero search stacks — the
+  // autocomplete wrapper goes full-width block, the input is box-sizing
+  // width:100%, and the dropdown leaves absolute positioning to sit in
+  // normal flow below the input and above the submit button. Desktop
+  // absolute behavior (asserted above) stays unchanged. The file holds
+  // several max-width:700px blocks; pick the one with the hero rules.
+  let mobile = null;
+  let searchFrom = 0;
+  while (true) {
+    const start = css.indexOf("@media (max-width:700px) {", searchFrom);
+    if (start === -1) break;
+    const block = css.slice(start, css.indexOf("\n}", start));
+    if (block.includes("hero-search-autocomplete")) {
+      mobile = block;
+      break;
+    }
+    searchFrom = start + 1;
+  }
+  assert.ok(mobile, "expected the max-width:700px hero-search mobile block");
+  const autocompleteMobile = mobile.match(/\.hero-search-autocomplete\s*\{[^}]*\}/)?.[0];
+  assert.ok(autocompleteMobile, "expected a mobile .hero-search-autocomplete rule");
+  assert.match(autocompleteMobile, /display:\s*block/, "mobile wrapper must be block (full-width stack)");
+  assert.match(autocompleteMobile, /width:\s*100%/, "mobile wrapper must fill the column");
+  const inputMobile = mobile.match(/\.hero-search input\s*\{[^}]*\}/)?.[0];
+  assert.ok(inputMobile, "expected a mobile .hero-search input rule");
+  assert.match(inputMobile, /box-sizing:\s*border-box/, "mobile input must be box-sizing border-box");
+  assert.match(inputMobile, /width:\s*100%/, "mobile input must be full width");
+  const dropdownMobile = mobile.match(/\.hero-search \.geocode-dropdown\s*\{[^}]*\}/)?.[0];
+  assert.ok(dropdownMobile, "expected a mobile .hero-search .geocode-dropdown rule");
+  assert.match(dropdownMobile, /position:\s*static/, "mobile dropdown must be static, in normal flow below the input");
+});
+
 test("the four tool cards link the correct tool routes", async () => {
   const html = await runSsrHome();
   for (const href of ["/mappa", "/directory", "/segnala", "/correggi"]) {
