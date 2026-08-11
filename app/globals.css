@@ -553,7 +553,29 @@ button { cursor:pointer; }
 .api-desc { margin:0; color:var(--ink-3); font-size:var(--text-sm); line-height:1.55; }
 .api-params { margin:0; color:var(--ink-2); font-size:var(--text-xs); line-height:1.5; }
 .api-params span { color:var(--icon-ink); font-weight:800; }
-.api-example { display:block; margin-top:auto; padding:9px 12px; border-radius:var(--radius-sm); background:var(--surface-muted); color:var(--field-ink); font-size:var(--text-xs); overflow-x:auto; }
+.api-example,
+.api-endpoint-detail {
+  display:block;
+  margin:0;
+  margin-top:auto;
+  padding:9px 12px;
+  border-radius:var(--radius-sm);
+  background:var(--surface-muted);
+  color:var(--field-ink);
+  font-size:var(--text-xs);
+  line-height:1.5;
+  overflow-x:auto;
+}
+/* Endpoint-card unification (api-endpoint-card-unification): the write
+   required-scope row reuses the base .api-example terminal/detail panel
+   above (the shared rule also resets the <p> default margins — a <code>
+   has none), so read examples and write rows render as one format: same
+   muted surface, same bottom alignment (margin-top:auto in the
+   flex-column .api-card), long code keeps its contained horizontal scroll.
+   The write <p> only adds what the base panel does not provide — its own
+   ink color and the bold label. */
+.api-endpoint-detail { color:var(--ink-2); }
+.api-endpoint-detail span { color:var(--icon-ink); font-weight:800; }
 .api-limit-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:var(--space-4); }
 .api-limit-card { display:flex; flex-direction:column; gap:8px; padding:20px 22px; border:1px solid var(--line); border-radius:var(--radius-lg); background:var(--card-bg); }
 .api-limit-name { margin:0; color:var(--ink); font-size:var(--text-md); font-weight:800; line-height:1.35; }

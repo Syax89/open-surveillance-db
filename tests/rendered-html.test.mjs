@@ -582,6 +582,74 @@ test("contact page serves correction and security routes without a governance ro
   assert.match(html, /href="\/contatti"/);
 });
 
+test("/api-docs read and write endpoint cards share one endpoint-card format", async () => {
+  // api-endpoint-card-unification: the 11 keyless read endpoint cards and
+  // the 5 write endpoint cards must use the SAME endpoint-card class and
+  // the SAME terminal/detail panel, so the two grids read as one format.
+  // The permission/lifecycle/security/error cards keep the plain .api-card.
+  const { response, html } = await renderRoute("/api-docs");
+  assert.equal(response.status, 200);
+
+  // Exactly 16 endpoint cards (11 read + 5 write) share the endpoint-card
+  // class; nothing else on the page does.
+  const endpointCards = (html.match(/class="api-card api-endpoint-card"/g) ?? []).length;
+  assert.equal(endpointCards, 16, "expected exactly 11 read + 5 write endpoint cards to share the endpoint-card class");
+
+  // Anchor each grid to its stable section id, not to the first
+  // .api-card-grid on the page: the read grid sits between the read
+  // section (aria-labelledby="api-endpoints-title") and the API-keys
+  // heading (id="api-keys-title"); the write grid between the write
+  // headings' ids.
+  const readGrid = html.slice(
+    html.indexOf('aria-labelledby="api-endpoints-title"'),
+    html.indexOf('id="api-keys-title"'),
+  );
+  const writeGrid = html.slice(
+    html.indexOf('id="api-write-endpoints-title"'),
+    html.indexOf('id="api-scopes-title"'),
+  );
+
+  // Read grid: 11 cards, each keeping the accessible <code> example in the
+  // shared terminal/detail panel (the auth-header example elsewhere has no
+  // aria-label and is not counted).
+  const readExamples = (readGrid.match(/class="api-example"[^>]*aria-label="Try it"/g) ?? []).length;
+  assert.equal(readExamples, 11, "expected all 11 read endpoint cards to keep their API example in the detail panel");
+
+  // Write grid: the 5 cards must render the exact `Requires scope:` label
+  // panel, each bound to its expected scope in card order. Matching the
+  // full rendered markup (label span + scope value) means descriptive copy
+  // alone can never make a broken scope panel pass. React's SSR inserts
+  // <!-- --> markers at text/expression boundaries, so the rendered panel
+  // is `<span>Requires scope<!-- -->:</span> <!-- -->Submit</p>`.
+  const writeScopePanels = [
+    ...writeGrid.matchAll(
+      /<p class="api-endpoint-detail"><span>Requires scope<!-- -->:<\/span> <!-- -->([^<]+)<\/p>/g,
+    ),
+  ].map((match) => match[1]);
+  assert.deepEqual(
+    writeScopePanels,
+    ["Submit", "Submit", "Confirm", "Community actions", "Edit"],
+    "each write card must render the exact `Requires scope:` detail panel bound to its scope, in card order",
+  );
+
+  // Semantic content is preserved. (React escapes & as &amp; in SSR HTML.)
+  for (const example of [
+    "/api/cameras?kind=Fixed%20dome&amp;limit=20",
+    "/api/cameras?bbox=8.5,47.3,8.6,47.5",
+    "/api/cameras?format=geojson",
+    "/api/cameras?format=csv",
+    "/api/cameras/1",
+    "/api/cameras/search?q=zurich",
+    "/api/cameras/nearby?latitude=47.41&amp;longitude=8.57&amp;radius=200",
+    "/api/cameras/revisions?cameraId=1",
+    "/api/geocode?q=zurich+hb",
+    "/api/geocode/reverse?lat=47.4123&amp;lng=8.5709",
+    "/api/tiles/14/8570/5694.png",
+  ]) {
+    assert.ok(readGrid.includes(example), `read example ${example} must stay on its card`);
+  }
+});
+
 // ---------------------------------------------------------------------------
 // Global security headers (kanban t_6148aa6f, P2 gap from audit t_a07443bd).
 // The worker edge (worker/index.ts) applies them to EVERY response; these
