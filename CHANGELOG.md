@@ -26,11 +26,17 @@ changes accumulate under `[Unreleased]`.
   contract** (no pixels/remote assets/links beyond the action URL, asserted
   in `tests/mailer.test.mjs`); `db/mailer.ts` send layer with fail-closed
   `VERIFY_BASE_URL` (missing → 503, never a broken link) and a durable
-  **3 emails/h per contributor** re-send limit enforced in D1 via the new
-  `email_send_log` table (migration 0029 — stores only contributor_id,
-  kind and sent_at: no content, no recipient address, no IP). The routes
-  that consume the mailer land in Fase B; this PR ships the mailer itself
-  plus schema, harness, docs (DEPLOYMENT.md) and 16 tests.
+  **1 email per 5 minutes (300 s) per contributor** send budget enforced
+  in D1 via the new `email_send_log` table (migration 0029 — stores only
+  contributor_id, kind and sent_at: no content, no recipient address, no
+  IP). ONE SHARED atomic reservation covers registration verification,
+  re-send and password reset (issue #440, ADR 0020): a single
+  `INSERT ... SELECT ... WHERE count < limit RETURNING id` statement
+  admits at most one concurrent send per contributor across all three
+  purposes — a losing request answers 429 with Retry-After and never
+  mints a token. The routes that consume the mailer land in Fase B; this
+  PR ships the mailer itself plus schema, harness, docs (DEPLOYMENT.md)
+  and 16 tests.
 
 - **Docs/GDPR — AUTH MULTI-METODO Fase F (t_c9fc674b, ADR 0020):** new
   [ADR 0020](docs/decisions/0020-multi-method-authentication.md)
@@ -549,15 +555,17 @@ changes accumulate under `[Unreleased]`.
   event lands on the server-derived reviewer, never the spoofed id.
 
 - P1-1 reset-password/request binary account-existence oracle (t_11b6a22d,
-  security review): the 3/h reset budget branch answered `429 Too many
-  reset emails` ONLY for registered addresses, while unknown addresses always
-  get `200 { sent: true }` — 4 POSTs against a known address (3 delivered
-  mails + 1 429) were enough to confirm the account exists, violating the
-  route's own anti-enumeration contract (docstring). The budget-exhausted
-  branch now answers the same generic `ok()` 200 `{ sent: true }` WITHOUT
-  minting a token or sending mail; the budget still caps real emails at 3/h
-  per contributor (only the response is now indistinguishable). Test updated
-  in `tests/api-auth.test.mjs` to pin the 200 instead of the old 429.
+  security review): the (then 3/h) reset budget branch answered `429 Too
+  many reset emails` ONLY for registered addresses, while unknown addresses
+  always get `200 { sent: true }` — 4 POSTs against a known address (3
+  delivered mails + 1 429) were enough to confirm the account exists,
+  violating the route's own anti-enumeration contract (docstring). The
+  budget-exhausted branch now answers the same generic `ok()` 200
+  `{ sent: true }` WITHOUT minting a token or sending mail; real emails
+  still consume the shared atomic reservation budget — now 1 per 5 minutes
+  per contributor across verification, re-send and password reset (issue
+  #440) — so only the response is indistinguishable. Test updated in
+  `tests/api-auth.test.mjs` to pin the 200 instead of the old 429.
 
 - `/mappa` CEO feedback 2026-08-02 (t_9e8642a0): (1) the "Prototype
   mode" banner above the map was REMOVED — the page starts directly with the

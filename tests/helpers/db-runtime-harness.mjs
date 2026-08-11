@@ -64,7 +64,8 @@ const DB_MODULES = [
   { source: "db/auth.ts", output: "db/auth.mjs" },
   // db/mailer.ts (transactional mailer, AUTH MULTI-METODO Fase A2) imports
   // getD1 from ./cameras and the pure templates from app/lib/email-templates;
-  // the 3/h re-send rate limit runs real SQL against the same in-memory D1.
+  // the 1-per-5-minutes atomic re-send rate limit (issue #440) runs real
+  // SQL against the same in-memory D1.
   { source: "db/mailer.ts", output: "db/mailer.mjs" },
   { source: "app/lib/email-templates.ts", output: "app/lib/email-templates.mjs" },
   // app/lib/email-templates.ts imports the locale registry from

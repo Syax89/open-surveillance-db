@@ -10,7 +10,9 @@
 //   2. GET /api/auth/verify-email consumes the token once: 200, the account
 //      flips to verified (me reflects it), and reusing the link answers 410;
 //   3. POST /api/auth/verify-email/resend mints a fresh token (the OLD link
-//      is revoked → 410) and honours the 3/h budget (4th send → 429);
+//      is revoked → 410) and honours the 1-per-5-min budget atomically
+//      (issue #440: a resend inside the window answers 429; concurrent
+//      resends — exactly one wins and only it mints);
 //   4. reset: the request endpoint never leaks the token (anti-enumeration),
 //      the confirm endpoint rotates the password, revokes every live session
 //      (the pre-reset cookie dies) and verifies the address; the NEW password
@@ -181,34 +183,143 @@ test("login is blocked with the generic 401 until the email is verified, then wo
   assert.ok(login.headers.getSetCookie().some((cookie) => cookie.startsWith("osdb_session=")), "a session cookie is issued");
 });
 
-test("resend revokes the old link and honours the 3/h budget", async () => {
-  const email = `resend-e2e-${crypto.randomUUID()}@example.org`;
-  const { rawToken: firstToken, session } = await registerAndExtract(email); // send #1
+test("resend revokes the old link (explicit 3-per-window override) and honours the budget", async () => {
+  // Default policy (issue #440) is 1 email per 5 minutes; this test needs
+  // three sequential sends to prove revocation, so it tunes the SAME
+  // per-contributor window via the documented EMAIL_SEND_LIMIT_* overrides.
+  // The override is restored in a finally: the shared env mock is a module
+  // singleton, so a failing assertion must not leak 3/600 into the tests
+  // that follow. Any PRE-EXISTING values are saved and restored exactly
+  // (delete only if they were absent before) — never assume the shared env
+  // began unset.
+  const hadMax = "EMAIL_SEND_LIMIT_MAX" in env;
+  const hadWindow = "EMAIL_SEND_LIMIT_WINDOW_SECONDS" in env;
+  const prevMax = env.EMAIL_SEND_LIMIT_MAX;
+  const prevWindow = env.EMAIL_SEND_LIMIT_WINDOW_SECONDS;
+  env.EMAIL_SEND_LIMIT_MAX = "3";
+  env.EMAIL_SEND_LIMIT_WINDOW_SECONDS = "600";
+  try {
+    const email = `resend-e2e-${crypto.randomUUID()}@example.org`;
+    const { rawToken: firstToken, session } = await registerAndExtract(email); // send #1
 
-  const resendOne = await resendRoute.POST(withSession("/api/auth/verify-email/resend", session, { method: "POST" }));
-  assert.equal(resendOne.status, 200);
-  assert.equal((await responseBody(resendOne)).sent, true);
-  const secondToken = mailToken(); // send #2
-  assert.ok(secondToken && secondToken !== firstToken, "resend mints a fresh token");
+    const resendOne = await resendRoute.POST(withSession("/api/auth/verify-email/resend", session, { method: "POST" }));
+    assert.equal(resendOne.status, 200);
+    assert.equal((await responseBody(resendOne)).sent, true);
+    const secondToken = mailToken(); // send #2
+    assert.ok(secondToken && secondToken !== firstToken, "resend mints a fresh token");
 
-  const resendTwo = await resendRoute.POST(withSession("/api/auth/verify-email/resend", session, { method: "POST" }));
-  assert.equal(resendTwo.status, 200); // send #3
-  const thirdToken = mailToken();
-  assert.ok(thirdToken && thirdToken !== secondToken, "resend mints a fresh token every time");
+    const resendTwo = await resendRoute.POST(withSession("/api/auth/verify-email/resend", session, { method: "POST" }));
+    assert.equal(resendTwo.status, 200); // send #3
+    const thirdToken = mailToken();
+    assert.ok(thirdToken && thirdToken !== secondToken, "resend mints a fresh token every time");
 
-  // The 4th send is blocked: register + 2 resends already used the 3/h budget.
+    // The 4th send is blocked: register + 2 resends already used the window.
+    const blocked = await resendRoute.POST(withSession("/api/auth/verify-email/resend", session, { method: "POST" }));
+    assert.equal(blocked.status, 429);
+    assert.ok(Number(blocked.headers.get("retry-after")) > 0);
+
+    // Every older link is Gone — each re-send revokes ALL previous unused
+    // tokens of the same purpose, so only the newest (third) link verifies.
+    const stale = await verifyEmailRoute.GET(apiRequest(`/api/auth/verify-email?token=${encodeURIComponent(firstToken)}`));
+    assert.equal(stale.status, 410, "a re-send revokes every older unused link");
+    const staleTwo = await verifyEmailRoute.GET(apiRequest(`/api/auth/verify-email?token=${encodeURIComponent(secondToken)}`));
+    assert.equal(staleTwo.status, 410, "the second link is revoked by the third send");
+    const fresh = await verifyEmailRoute.GET(apiRequest(`/api/auth/verify-email?token=${encodeURIComponent(thirdToken)}`));
+    assert.equal(fresh.status, 200, "only the newest link verifies");
+  } finally {
+    if (hadMax) env.EMAIL_SEND_LIMIT_MAX = prevMax;
+    else delete env.EMAIL_SEND_LIMIT_MAX;
+    if (hadWindow) env.EMAIL_SEND_LIMIT_WINDOW_SECONDS = prevWindow;
+    else delete env.EMAIL_SEND_LIMIT_WINDOW_SECONDS;
+  }
+});
+
+test("default policy (issue #440): a resend within 5 minutes of register answers 429 with Retry-After, and the register link still verifies", async () => {
+  const email = `resend-default-${crypto.randomUUID()}@example.org`;
+  const { rawToken, session } = await registerAndExtract(email); // send #1 consumes the single slot
+
   const blocked = await resendRoute.POST(withSession("/api/auth/verify-email/resend", session, { method: "POST" }));
-  assert.equal(blocked.status, 429);
-  assert.ok(Number(blocked.headers.get("retry-after")) > 0);
+  assert.equal(blocked.status, 429, "the 2nd send inside the 5-minute window is blocked");
+  const retryAfter = Number(blocked.headers.get("retry-after"));
+  assert.ok(retryAfter > 0 && retryAfter <= 300, `Retry-After within the 300s window, got ${retryAfter}`);
 
-  // Every older link is Gone — each re-send revokes ALL previous unused
-  // tokens of the same purpose, so only the newest (third) link verifies.
-  const stale = await verifyEmailRoute.GET(apiRequest(`/api/auth/verify-email?token=${encodeURIComponent(firstToken)}`));
-  assert.equal(stale.status, 410, "a re-send revokes every older unused link");
-  const staleTwo = await verifyEmailRoute.GET(apiRequest(`/api/auth/verify-email?token=${encodeURIComponent(secondToken)}`));
-  assert.equal(staleTwo.status, 410, "the second link is revoked by the third send");
-  const fresh = await verifyEmailRoute.GET(apiRequest(`/api/auth/verify-email?token=${encodeURIComponent(thirdToken)}`));
-  assert.equal(fresh.status, 200, "only the newest link verifies");
+  // The blocked resend minted nothing, so the register link is untouched.
+  const tokenRows = (await env.DB.prepare("SELECT COUNT(*) AS n FROM email_verification_tokens").first()).n;
+  assert.equal(tokenRows, 1, "the 429 must not mint a second token");
+  const verify = await verifyEmailRoute.GET(apiRequest(`/api/auth/verify-email?token=${encodeURIComponent(rawToken)}`));
+  assert.equal(verify.status, 200, "the register link still verifies after the blocked resend");
+});
+
+test("CONCURRENCY (issue #440): 8 parallel resends — exactly one wins the window, mints a usable token, and the losers do not invalidate it", async () => {
+  const email = `resend-race-${crypto.randomUUID()}@example.org`;
+  // Register with the EMAIL binding failing: registration still succeeds
+  // (verification.sent=false) and the send reservation is RELEASED, so the
+  // window is EMPTY when the 8 resends race (fresh account, zero rows).
+  // The binding swap is restored in a finally: the shared env mock is a
+  // module singleton, so a failing assertion must not leave the broken
+  // binding installed for the tests that follow.
+  const workingBinding = env.EMAIL;
+  env.EMAIL = {
+    send: async () => {
+      const error = new Error("binding down");
+      error.code = "E_SENDER_NOT_VERIFIED";
+      throw error;
+    },
+  };
+  try {
+    const reg = await registerRoute.POST(apiRequest("/api/auth/register", {
+      method: "POST",
+      body: { email, displayName: "QA Race", password: "Sup3rsecret!123" },
+    }));
+    assert.equal(reg.status, 201);
+    assert.equal((await responseBody(reg)).verification.sent, false, "mail failure released the reservation");
+    // Restore the working binding BEFORE the resends: the winner must be
+    // able to deliver mail (mailToken() below reads the capture).
+    env.EMAIL = workingBinding;
+    const session = sessionCookie(reg);
+
+    // 8 simultaneous resends against an EMPTY window: the ATOMIC reservation
+    // (INSERT ... SELECT ... WHERE count < limit RETURNING id) admits exactly
+    // ONE of them; the other 7 must answer 429 WITHOUT minting a token (which
+    // would revoke the winner's link).
+    const results = await Promise.all(
+      Array.from({ length: 8 }, () =>
+        resendRoute.POST(withSession("/api/auth/verify-email/resend", session, { method: "POST" })),
+      ),
+    );
+    const statuses = results.map((r) => r.status);
+    const okCount = statuses.filter((s) => s === 200).length;
+    const blockedCount = statuses.filter((s) => s === 429).length;
+    assert.equal(okCount, 1, `exactly one resend wins the window (got ${okCount})`);
+    assert.equal(blockedCount, 7, "the 7 losers answer 429");
+
+    // Only the winning resend minted: the register token was revoked (used_at
+    // set, row kept) and exactly ONE new token exists — the winner's. The
+    // losers never got to mint, so they could not invalidate the delivered
+    // link: had they minted, there would be 2+N token rows.
+    const contributorRow = await env.DB.prepare("SELECT id FROM contributors WHERE email = ?").bind(email).first();
+    const tokenRows = (
+      await env.DB.prepare("SELECT COUNT(*) AS n FROM email_verification_tokens WHERE contributor_id = ?")
+        .bind(contributorRow.id)
+        .first()
+    ).n;
+    assert.equal(tokenRows, 2, "register token (revoked) + exactly ONE winner token — the 7 losers minted nothing");
+
+    const winnerToken = mailToken(-1); // last captured message is the winner's
+    assert.ok(winnerToken, "the winning resend delivered a mail");
+    const verify = await verifyEmailRoute.GET(apiRequest(`/api/auth/verify-email?token=${encodeURIComponent(winnerToken)}`));
+    assert.equal(verify.status, 200, "the winning link verifies — losers did not invalidate it");
+
+    // Exactly one send-log row for the window (the winner's reservation).
+    const logRows = (
+      await env.DB.prepare("SELECT COUNT(*) AS n FROM email_send_log WHERE contributor_id = ?")
+        .bind(contributorRow.id)
+        .first()
+    ).n;
+    assert.equal(logRows, 1, "exactly one reservation/send row is retained");
+  } finally {
+    env.EMAIL = workingBinding;
+  }
 });
 
 test("resend without a session is 401", async () => {

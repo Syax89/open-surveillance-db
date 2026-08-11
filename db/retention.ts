@@ -33,8 +33,10 @@
  *                                       reads the window; unsalted SHA-256
  *                                       caller keys must not accumulate)
  *   R18 email_send_log                → mail-budget rows older than 24 hours
- *                                       purged (QA F5, t_894e0cc3 — the 3/h
- *                                       budget only needs the last hour)
+ *                                       purged (QA F5, t_894e0cc3 — the
+ *                                       1-per-5-min budget needs only its
+ *                                       window; a 24h floor keeps the sweep
+ *                                       conservative)
  *   R21 api_keys                      → dead keys purged 90 days after
  *                                       revoked_at / expires_at (EPIC
  *                                       api-keys, D9 — reads the liveness
@@ -107,7 +109,7 @@ export const CORRECTION_RETENTION_DAYS = 730;
 export const LOGIN_ATTEMPT_RETENTION_DAYS = 30;
 /** QA F5: per-IP registration log rows are dead after 30 days (specular to R16). */
 export const REGISTRATION_IP_RETENTION_DAYS = 30;
-/** QA F5: email send-log rows are dead after 24 hours (the 3/h mail budget only needs the last hour). */
+/** QA F5: email send-log rows are dead after 24 hours (the 1-per-5-min mail budget needs only its window; a 24h floor keeps the sweep conservative). */
 export const EMAIL_SEND_LOG_RETENTION_DAYS = 1;
 /**
  * R21 (EPIC api-keys, D9): an API key row is dead after it is soft-revoked
@@ -525,16 +527,16 @@ export async function runRetentionSweep(
 
   // --- QA F5: registrations_ip_log (per-IP registration cap state) and
   // email_send_log (mail budget state) are dead rows after their window.
-  // The cap COUNT and the mail budget COUNT only read rows inside their
-  // window (24h / 1h); older rows are inert yet accumulate forever, and the
-  // registration log additionally stores unsalted SHA-256 caller keys that
-  // the project's data-minimisation policy should not keep indefinitely.
+  // The cap COUNT and the mail budget admission only read rows inside their
+  // window (24h / 5 min); older rows are inert yet accumulate forever, and
+  // the registration log additionally stores unsalted SHA-256 caller keys
+  // that the project's data-minimisation policy should not keep indefinitely.
   // REGISTRATION_IP_RETENTION_DAYS (30) is specular to R16; the mail log is
-  // purged after EMAIL_SEND_LOG_RETENTION_DAYS (1) — the budget needs only
-  // the last hour, a 24h floor keeps the sweep conservative. Both tables are
-  // TTL-bounded and small, so a single bounded DELETE per table is enough
-  // (same pattern as the R7/R15 sweeps); a broken sweep is logged by the
-  // scheduled handler and retried next run.
+  // purged after EMAIL_SEND_LOG_RETENTION_DAYS (1) — the 5-minute budget
+  // needs only its window, a 24h floor keeps the sweep conservative. Both
+  // tables are TTL-bounded and small, so a single bounded DELETE per table
+  // is enough (same pattern as the R7/R15 sweeps); a broken sweep is logged
+  // by the scheduled handler and retried next run.
   const registrationIpLogCutoff = daysAgo(now, policy.registrationsIpDays);
   const registrationIpPurged = (await d1
     .prepare("DELETE FROM registrations_ip_log WHERE created_at < ?")

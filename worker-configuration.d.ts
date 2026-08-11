@@ -143,8 +143,14 @@ declare module "cloudflare:workers" {
     // which MUST stay in the binding's allowed_sender_addresses).
     VERIFY_BASE_URL?: string;
     MAILER_FROM?: string;
-    // Re-send rate limit for auth emails (ADR 0020): max sends per
-    // contributor inside the rolling window.
+    // Re-send rate limit for auth emails (issue #440, ADR 0020 decision 2):
+    // max sends per contributor inside the rolling window, enforced
+    // ATOMICALLY in D1 via email_send_log reservations (INSERT ... SELECT
+    // ... WHERE count < limit RETURNING id — no race between concurrent
+    // sends). Default 1 per 5 minutes (EMAIL_SEND_LIMIT_MAX=1,
+    // EMAIL_SEND_LIMIT_WINDOW_SECONDS=300); the overrides tune the same
+    // per-contributor window and apply to verification, resend and
+    // password-reset sends alike.
     EMAIL_SEND_LIMIT_MAX?: string;
     EMAIL_SEND_LIMIT_WINDOW_SECONDS?: string;
     // Moderation gate credentials (ADR 0002): HTTP Basic (USER/PASSWORD)

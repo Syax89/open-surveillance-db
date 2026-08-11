@@ -387,11 +387,12 @@ test("F4b: CACHE_PURGE_TIMEOUT_MS accorcia il bound del fetch purge (knob t_b6f0
 // F5 (P2) — registrations_ip_log / email_send_log: nessuna retention
 // ---------------------------------------------------------------------------
 // db/auth.ts:271-300 (recordRegistrationAttempt inserisce in
-// registrations_ip_log), db/mailer.ts:126-137 (recordEmailSend inserisce in
+// registrations_ip_log), db/mailer.ts (reserveAuthEmail inserisce in
 // email_send_log): entrambe le tabelle crescono senza limite — il count del
 // cap per-IP e del budget mail legge solo le righe dentro la finestra
-// (24h / 1h), le righe più vecchie non servono MAI più e non vengono mai
-// eliminate. Il retention sweep (db/retention.ts) copre R1-R16 e tocca solo
+// (24h / 5 min — issue #440), le righe più vecchie non servono MAI più e
+// non vengono mai eliminate. Il retention sweep (db/retention.ts) copre
+// R1-R16 e tocca solo
 // login_attempts tra le tabelle di auth; nessuna policy R-* documentata per
 // queste due (RETENTION_SCHEDULE.md non le menziona). In più le righe
 // registrations_ip_log conservano SHA-256 non salati di IP (brute-forcable

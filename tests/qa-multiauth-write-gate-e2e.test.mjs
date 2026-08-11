@@ -663,53 +663,74 @@ test("oidc: callback linked (email del provider verificata) apre una sessione ch
 });
 
 // ---------------------------------------------------------------------------
-// 4. Rate-limit mail 3/h in E2E COMPLETO (review P2-1): register + 2 resend
-//    reali → 429 sul 4° invio; il 429 NON consuma il token corrente
-//    (pre-flight prima del mint) → verify reale → write 201.
+// 4. Rate-limit mail in E2E COMPLETO (review P2-1): con un override esplicito
+//    (3 invii / finestra) register + 2 resend reali → 429 sul 4° invio; il
+//    429 NON consuma il token corrente (riserva atomica PRIMA del mint,
+//    issue #440) → verify reale → write 201.
 // ---------------------------------------------------------------------------
 
-test("email: budget mail 3/h esaurito con register+2 resend reali → 429 sul 4°, il link corrente resta valido e scrive", async () => {
-  const email = `qa-mail-budget-${crypto.randomUUID()}@example.org`;
-  const response = await registerRoute.POST(apiRequest("/api/auth/register", {
-    method: "POST",
-    body: { email, displayName: "QA Mail Budget", password: "Sup3rsecret!123" },
-  }));
-  assert.equal(response.status, 201); // invio #1
-  const body = await responseBody(response);
-  const headers = sessionHeaders(response);
-  assert.equal(body.verification.sent, true, "register reports the mail was accepted (no devLink, P1-1)");
-  const firstToken = mailToken();
+test("email: budget mail (override 3/600) esaurito con register+2 resend reali → 429 sul 4°, il link corrente resta valido e scrive", async () => {
+  // Default policy (issue #440) is 1 email per 5 minutes: this test needs a
+  // multi-send budget, so it tunes the SAME per-contributor window via the
+  // documented EMAIL_SEND_LIMIT_* overrides (worker/index.ts). The override
+  // is restored in a finally: the shared env mock is a module singleton, so
+  // a failing assertion must not leak 3/600 into the tests that follow. Any
+  // PRE-EXISTING values are saved and restored exactly (delete only if they
+  // were absent before) — never assume the shared env began unset.
+  const hadMax = "EMAIL_SEND_LIMIT_MAX" in env;
+  const hadWindow = "EMAIL_SEND_LIMIT_WINDOW_SECONDS" in env;
+  const prevMax = env.EMAIL_SEND_LIMIT_MAX;
+  const prevWindow = env.EMAIL_SEND_LIMIT_WINDOW_SECONDS;
+  env.EMAIL_SEND_LIMIT_MAX = "3";
+  env.EMAIL_SEND_LIMIT_WINDOW_SECONDS = "600";
+  try {
+    const email = `qa-mail-budget-${crypto.randomUUID()}@example.org`;
+    const response = await registerRoute.POST(apiRequest("/api/auth/register", {
+      method: "POST",
+      body: { email, displayName: "QA Mail Budget", password: "Sup3rsecret!123" },
+    }));
+    assert.equal(response.status, 201); // invio #1
+    const body = await responseBody(response);
+    const headers = sessionHeaders(response);
+    assert.equal(body.verification.sent, true, "register reports the mail was accepted (no devLink, P1-1)");
+    const firstToken = mailToken();
 
-  const resendOne = await resendRoute.POST(apiRequest("/api/auth/verify-email/resend", { method: "POST", headers }));
-  assert.equal(resendOne.status, 200); // invio #2
-  const secondToken = mailToken();
-  assert.ok(secondToken && secondToken !== firstToken, "resend mints a fresh token");
+    const resendOne = await resendRoute.POST(apiRequest("/api/auth/verify-email/resend", { method: "POST", headers }));
+    assert.equal(resendOne.status, 200); // invio #2
+    const secondToken = mailToken();
+    assert.ok(secondToken && secondToken !== firstToken, "resend mints a fresh token");
 
-  const resendTwo = await resendRoute.POST(apiRequest("/api/auth/verify-email/resend", { method: "POST", headers }));
-  assert.equal(resendTwo.status, 200); // invio #3
-  const thirdToken = mailToken();
-  assert.ok(thirdToken && thirdToken !== secondToken, "resend mints a fresh token every time");
+    const resendTwo = await resendRoute.POST(apiRequest("/api/auth/verify-email/resend", { method: "POST", headers }));
+    assert.equal(resendTwo.status, 200); // invio #3
+    const thirdToken = mailToken();
+    assert.ok(thirdToken && thirdToken !== secondToken, "resend mints a fresh token every time");
 
-  // 4° invio: il budget 3/h è esaurito → 429 con Retry-After, PRIMA di ogni
-  // mint/send (pre-flight): il link corrente non viene né consumato né
-  // revocato — il count in tabella resta a 3.
-  const blocked = await resendRoute.POST(apiRequest("/api/auth/verify-email/resend", { method: "POST", headers }));
-  assert.equal(blocked.status, 429, "the 4th send in the hour is blocked");
-  assert.ok(Number(blocked.headers.get("retry-after")) > 0);
-  const contributorRow = await env.DB.prepare("SELECT id FROM contributors WHERE email = ?").bind(email).first();
-  const tokenCount = await env.DB.prepare(
-    "SELECT COUNT(*) AS n FROM email_verification_tokens WHERE contributor_id = ?",
-  ).bind(contributorRow.id).first();
-  assert.equal(tokenCount.n, 3, "the 429 must not mint a 4th token (pre-flight quota gate)");
+    // 4° invio: il budget è esaurito → 429 con Retry-After, PRIMA di ogni
+    // mint/send (riserva atomica): il link corrente non viene né consumato né
+    // revocato — il count in tabella resta a 3.
+    const blocked = await resendRoute.POST(apiRequest("/api/auth/verify-email/resend", { method: "POST", headers }));
+    assert.equal(blocked.status, 429, "the 4th send in the window is blocked");
+    assert.ok(Number(blocked.headers.get("retry-after")) > 0);
+    const contributorRow = await env.DB.prepare("SELECT id FROM contributors WHERE email = ?").bind(email).first();
+    const tokenCount = await env.DB.prepare(
+      "SELECT COUNT(*) AS n FROM email_verification_tokens WHERE contributor_id = ?",
+    ).bind(contributorRow.id).first();
+    assert.equal(tokenCount.n, 3, "the 429 must not mint a 4th token (atomic reservation gates the mint)");
 
-  // Il link corrente (terzo) verifica ancora: il 429 non l'ha toccato.
-  const verify = await verifyEmailRoute.GET(apiRequest(`/api/auth/verify-email?token=${encodeURIComponent(thirdToken)}`));
-  assert.equal(verify.status, 200, "the current token stays valid after the 429");
+    // Il link corrente (terzo) verifica ancora: il 429 non l'ha toccato.
+    const verify = await verifyEmailRoute.GET(apiRequest(`/api/auth/verify-email?token=${encodeURIComponent(thirdToken)}`));
+    assert.equal(verify.status, 200, "the current token stays valid after the 429");
 
-  // E2E completo: la stessa sessione ora supera il write gate con una
-  // scrittura reale — il budget mail esaurito non blocca l'account.
-  const accepted = await camerasRoute.POST(writeWith(headers));
-  assert.equal(accepted.status, 201, "a verified session writes even after the mail budget is spent");
+    // E2E completo: la stessa sessione ora supera il write gate con una
+    // scrittura reale — il budget mail esaurito non blocca l'account.
+    const accepted = await camerasRoute.POST(writeWith(headers));
+    assert.equal(accepted.status, 201, "a verified session writes even after the mail budget is spent");
+  } finally {
+    if (hadMax) env.EMAIL_SEND_LIMIT_MAX = prevMax;
+    else delete env.EMAIL_SEND_LIMIT_MAX;
+    if (hadWindow) env.EMAIL_SEND_LIMIT_WINDOW_SECONDS = prevWindow;
+    else delete env.EMAIL_SEND_LIMIT_WINDOW_SECONDS;
+  }
 });
 
 // ---------------------------------------------------------------------------

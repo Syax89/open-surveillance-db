@@ -42,7 +42,7 @@ const ROUTES = [
   { source: "app/api/auth/logout/route.ts", output: "app/api/auth/logout/route.mjs" },
   // Email verification + password reset (multi-method auth Fase B): the
   // verify-email GET consumes the emailed single-use token; the resend POST
-  // (session-gated, 3/h budget) mints a fresh one; reset-password/request is
+  // (session-gated, 1-per-5-min budget) mints a fresh one; reset-password/request is
   // the public anti-enumeration entry; reset-password/confirm rotates the
   // hash and revokes sessions.
   { source: "app/api/auth/verify-email/route.ts", output: "app/api/auth/verify-email/route.mjs" },

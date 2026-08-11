@@ -72,8 +72,11 @@ conclusion for three reasons:
    feedback 2026-08-03 (t_6dc1c96f), for login itself.** `contributors.email_verified_at`
    is set by a single-use, **SHA-256-hashed** verification token emailed
    through Cloudflare Email Routing (`opensurveillancedb.org`, HTML + plain
-   templates, zero tracking), 24 h TTL, rate-limited re-send (3/h per
-   contributor). Sessions from unverified accounts are **read-only**: the
+   templates, zero tracking), 24 h TTL, rate-limited re-send (**1 email per
+   5 minutes per contributor**, issue #440 — enforced **atomically** in D1
+   via `email_send_log` reservations so concurrent sends cannot race past a
+   stale count; the same budget covers verification, resend and password
+   reset). Sessions from unverified accounts are **read-only**: the
    write gate (`resolveVerifiedContributor`) answers **401** for anonymous and
    **403** for not-yet-verified on write routes (Fase E1). Password reset uses
   the same mailer with the same single-use token discipline, but a **shorter

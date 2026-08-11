@@ -793,11 +793,14 @@ export async function getContributorVerification(
 //     the same purpose: only the newest link works, and replaying a stale
 //     link answers 410 Gone instead of silently re-verifying.
 //
-// Send throttling is a COUNT over rows created inside the window (per
-// contributor + purpose): each send creates exactly one row, so "3 sends per
-// hour" is a COUNT <= 3 — no separate counter table, and the count is immune
-// to tokens being consumed or revoked in between. Register, re-send and
-// reset-request all funnel through `countVerificationTokensSentSince`.
+// Send throttling is the SHARED 1-email-per-5-minutes budget of issue #440:
+// `reserveAuthEmail` (db/mailer.ts) admits every verification/reset send
+// ATOMICALLY against the `email_send_log` table (INSERT ... SELECT ...
+// WHERE count < limit RETURNING id), one budget shared by register, re-send
+// and reset-request — there is no per-purpose send counter anymore.
+// `countVerificationTokensSentSince` below is a non-admission diagnostic
+// token-count helper (tests/auth-d1.test.mjs); no route calls it for
+// admission.
 
 /** TTL for email-address verification links (registration + re-send). */
 export const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
@@ -809,9 +812,6 @@ export const TOKEN_TTL_MS_BY_PURPOSE: Record<EmailVerificationPurpose, number> =
   verify: VERIFICATION_TOKEN_TTL_MS,
   reset: RESET_TOKEN_TTL_MS,
 };
-/** Max emails (verify or reset, each with its own budget) per window. */
-export const VERIFICATION_SEND_LIMIT = 3;
-export const VERIFICATION_SEND_WINDOW_MS = 60 * 60 * 1000;
 
 export type EmailVerificationPurpose = "verify" | "reset";
 
@@ -903,9 +903,11 @@ export async function consumeVerificationToken(
 }
 
 /**
- * How many tokens of a purpose were CREATED for a contributor inside the
- * window ending at `now` — the send budget (default 3/h). Every send creates
- * a row, so this count is exact regardless of consumption/revocation.
+ * Diagnostic / token-count helper: how many tokens of a purpose were
+ * CREATED for a contributor since a timestamp. NOT the admission gate —
+ * the current send gate (issue #440) is the SHARED 1-email-per-5-minutes
+ * atomic `email_send_log` reservation in db/mailer.ts; no route calls this
+ * for admission. Retained for tests/auth-d1.test.mjs.
  */
 export async function countVerificationTokensSentSince(
   contributorId: number,
