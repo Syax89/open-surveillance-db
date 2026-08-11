@@ -106,7 +106,7 @@ export default async function ApiDocsPage() {
 
           <div className="api-card-grid">
             {endpointRows.map(({ item, params }) => (
-              <article className="api-card" key={item.path}>
+              <article className="api-card api-endpoint-card" key={item.path}>
                 <div className="api-card-topline">
                   <span className="api-method" aria-label={t.endpointMethod}>{item.method}</span>
                   <code className="api-path">{item.path}</code>
@@ -144,13 +144,13 @@ export default async function ApiDocsPage() {
           </div>
           <div className="api-card-grid">
             {writeRows.map((item) => (
-              <article className="api-card" key={item.path}>
+              <article className="api-card api-endpoint-card" key={item.path}>
                 <div className="api-card-topline">
                   <span className="api-method" aria-label={t.endpointMethod}>{item.method}</span>
                   <code className="api-path">{item.path}</code>
                 </div>
                 <p className="api-desc">{item.description}</p>
-                <p className="api-params">
+                <p className="api-endpoint-detail">
                   <span>{t.scopeRequiredLabel}:</span> {t.scopes[item.scope as keyof typeof t.scopes].name}
                 </p>
               </article>
