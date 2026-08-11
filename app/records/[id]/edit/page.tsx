@@ -109,6 +109,12 @@ export default function RecordEditPage() {
 
   const headingRef = useRef<HTMLHeadingElement>(null);
   const alertRef = useRef<HTMLParagraphElement>(null);
+  // Issue #434: when the POSITION moves on the map (click or drag) the
+  // address is refreshed via the reverse-geocode proxy — but only while the
+  // contributor has not typed their own address (their text always wins).
+  const addressTouchedRef = useRef(false);
+  const reverseRequestRef = useRef<AbortController | null>(null);
+  const [reverseGeocoding, setReverseGeocoding] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -165,6 +171,29 @@ export default function RecordEditPage() {
     setManualLatitude(latitude.toFixed(5));
     setManualLongitude(longitude.toFixed(5));
     setFieldErrors((errors) => ({ ...errors, latitude: undefined, longitude: undefined }));
+    // Issue #434: refresh the address from the new position unless the
+    // contributor typed one (D1 reverse-geocode cache makes repeats free).
+    reverseRequestRef.current?.abort();
+    if (addressTouchedRef.current) return;
+    const reverse = new AbortController();
+    reverseRequestRef.current = reverse;
+    setReverseGeocoding(true);
+    void (async () => {
+      try {
+        const params = new URLSearchParams({ lat: String(latitude), lng: String(longitude) });
+        const response = await fetch(`/api/geocode/reverse?${params}`, { signal: reverse.signal });
+        if (!response.ok) return;
+        const data = await response.json() as { address?: string | null };
+        if (!reverse.signal.aborted && typeof data.address === "string" && data.address && !addressTouchedRef.current) {
+          setValues((v) => ({ ...v, address: data.address as string }));
+        }
+      } catch {
+        // Lookup unavailable: the address field keeps its value — the
+        // contributor can type it; never block the edit on a geocoder.
+      } finally {
+        if (!reverse.signal.aborted) setReverseGeocoding(false);
+      }
+    })();
   }
 
   /** Manual coordinate keystroke: keep the string, publish the number when it parses. */
@@ -526,12 +555,17 @@ export default function RecordEditPage() {
               <input
                 name="address"
                 maxLength={FIELD_LIMITS.address}
-                placeholder={t.editAddressPlaceholder}
+                placeholder={reverseGeocoding ? t.editAddressResolving : t.editAddressPlaceholder}
                 aria-invalid={fieldErrors.address ? true : undefined}
+                aria-busy={reverseGeocoding || undefined}
                 aria-describedby={fieldErrors.address ? "edit-address-error" : undefined}
                 value={values.address}
-                onChange={(event) => setField("address", event.target.value)}
+                onChange={(event) => {
+                  addressTouchedRef.current = true;
+                  setField("address", event.target.value);
+                }}
               />
+              {reverseGeocoding ? <small className="edit-address-resolving" role="status">{t.editAddressResolving}</small> : null}
               {fieldErrors.address ? <small id="edit-address-error">{fieldErrors.address}</small> : null}
             </label>
 

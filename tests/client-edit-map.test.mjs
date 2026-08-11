@@ -106,7 +106,14 @@ function circlesFrom(paths) {
 }
 
 function handleFrom(markers) {
-  return markers.find((m) => m.opts?.draggable === true);
+  // The rotation handle carries the fov-rotate-handle-wrap icon; the
+  // position marker (issue #434) is also draggable but uses the
+  // report-pick-marker icon — filter on the icon class, not draggable.
+  return markers.find((m) => m.opts?.draggable === true && m.opts?.icon?.className === "fov-rotate-handle-wrap");
+}
+
+function positionMarkerFrom(markers) {
+  return markers.find((m) => m.opts?.icon?.className === "");
 }
 
 test("renders an interactive map with CSP-safe tiles, labelled surface and the help text visible", async () => {
@@ -137,6 +144,20 @@ test("a map click moves the position through onPositionChange (5-decimal roundin
   map.fire("click", { latlng: { lat: 44.837812345, lng: 11.618312345 } });
   assert.deepEqual(picked, [[44.83781, 11.61831]], "the click lat/lng reaches onPositionChange rounded to 5 decimals");
   assert.equal(map.popupHtml, undefined, "no popup is ever opened by a map click — click means position move only");
+});
+
+test("dragging the position marker moves the camera position (5-decimal rounding, no popup)", async () => {
+  const picked = [];
+  await renderEditMap({ onPositionChange: (lat, lng) => picked.push([lat, lng]) });
+  const marker = positionMarkerFrom(await leafletMarkers());
+  assert.ok(marker, "a position marker exists");
+  assert.equal(marker.opts.draggable, true, "the position marker is draggable (issue #434)");
+  assert.equal(marker.opts.bubblingMouseEvents, false, "a marker drag never bubbles to the click-to-move map handler");
+  const map = (await leafletMaps()).at(-1);
+  marker.setLatLng([44.837812345, 11.618312345]);
+  marker.fire("dragend", { target: marker });
+  assert.deepEqual(picked, [[44.83781, 11.61831]], "the dragend lat/lng reaches onPositionChange rounded to 5 decimals");
+  assert.equal(map.popupHtml, undefined, "a marker drag never opens a popup");
 });
 
 test("directional kind with a known bearing draws the FOV cone + a draggable rotation handle on the centre line", async () => {
@@ -195,7 +216,7 @@ test("an external coordinate change moves the position marker and re-centres the
   // Manual coordinate entry: a new position arrives from OUTSIDE the map.
   await harness.update({ latitude: 45.4642, longitude: 9.19, kind: "Bullet", direction: null, directionKnown: false });
   const markers = await leafletMarkers();
-  const position = markers.find((m) => m.opts?.interactive === false);
+  const position = positionMarkerFrom(markers);
   assert.deepEqual(position.latlng, [45.4642, 9.19], "the position marker moved to the new coordinates");
   assert.deepEqual(map.views.at(-1)?.center, [45.4642, 9.19], "the map re-centred on the externally supplied position");
   assert.ok(map.views.at(-1)?.zoom >= 17, "the map zoomed in to the pick zoom (above FOV_MIN_ZOOM)");

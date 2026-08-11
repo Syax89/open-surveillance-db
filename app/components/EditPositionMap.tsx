@@ -203,10 +203,14 @@ export function EditPositionMap({ latitude, longitude, onPositionChange, kind, d
         }).addTo(map);
         mapRef.current = map;
         const mapInstance = map;
-        // Position marker: decorative feedback, interactive false so clicks
-        // pass through to the click-to-move handler.
+        // Position marker (issue #434): draggable — a drag moves the
+        // camera position through the same path as a map click (rounded
+        // 5-decimal). bubblingMouseEvents false keeps a drag/click on the
+        // marker from also firing the map's click-to-move handler.
         positionMarkerRef.current = L.marker([startLat, startLng], {
-          interactive: false,
+          draggable: true,
+          interactive: true,
+          bubblingMouseEvents: false,
           icon: L.divIcon({
             className: "",
             html: '<span class="report-pick-marker" aria-hidden="true"><i></i></span>',
@@ -214,6 +218,19 @@ export function EditPositionMap({ latitude, longitude, onPositionChange, kind, d
             iconAnchor: [14, 14],
           }),
         }).addTo(map);
+        positionMarkerRef.current.on("dragend", (event: import("leaflet").LeafletEvent) => {
+          const target = event.target as import("leaflet").Marker;
+          const point = target.getLatLng();
+          if (!point) return;
+          const pointArr = point as unknown as [number, number];
+          const pointLat = typeof point.lat === "number" ? point.lat : pointArr[0];
+          const pointLng = typeof point.lng === "number" ? point.lng : pointArr[1];
+          selfPickedRef.current = true;
+          onPositionChangeRef.current(
+            Math.round(pointLat * 1e5) / 1e5,
+            Math.round(pointLng * 1e5) / 1e5,
+          );
+        });
         // Click = position change (CEO contract: never an unsolicited
         // popup). Rounded to 5-decimal precision — the report-flow
         // convention — so the stored position stays stable under float noise.
