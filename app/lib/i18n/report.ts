@@ -43,6 +43,18 @@ export const en = {
   // fields stay as the alternatives when the device or the user says no.
   useMyPosition: "Use my position",
   locatingPosition: "Finding your position…",
+  // Address search with autocomplete (issue #432): the /segnala location
+  // row pairs a debounced place search (same-origin /api/geocode proxy)
+  // with the one-tap geolocation button on its right.
+  addressSearchLabel: "Search an address",
+  addressSearchPlaceholder: "Street, square or place…",
+  addressSearchHelp:
+    "Type to search places; the arrow keys move through the suggestions and Enter selects one.",
+  addressSearchNoResults: (query: string) => `No places found for “${query}”.`,
+  addressSearchRateLimited: (seconds: number) =>
+    `Too many searches. Try again in ${seconds} second${seconds === 1 ? "" : "s"}.`,
+  addressSearchUnavailable: "Address search is unavailable right now.",
+  addressSearchAttribution: "Places © OpenStreetMap contributors",
   geolocationDenied:
     "Location permission was refused. Choose the point on the map, or type the coordinates below.",
   geolocationTimeout:
@@ -160,6 +172,18 @@ export const it: Translation<typeof en> = {
   useCoordinates: "Usa queste coordinate",
   useMyPosition: "Usa la mia posizione",
   locatingPosition: "Ricerca della posizione…",
+  // Ricerca indirizzo con autocompletamento (issue #432): la riga posizione
+  // di /segnala affianca la ricerca luoghi (proxy same-origin /api/geocode)
+  // al bottone di geolocalizzazione a destra.
+  addressSearchLabel: "Cerca un indirizzo",
+  addressSearchPlaceholder: "Via, piazza o luogo…",
+  addressSearchHelp:
+    "Digita per cercare luoghi; le frecce scorrono i suggerimenti e Invio seleziona.",
+  addressSearchNoResults: (query: string) => `Nessun luogo trovato per “${query}”.`,
+  addressSearchRateLimited: (seconds: number) =>
+    `Troppe ricerche. Riprova tra ${seconds} second${seconds === 1 ? "o" : "i"}.`,
+  addressSearchUnavailable: "La ricerca indirizzi non è disponibile al momento.",
+  addressSearchAttribution: "Luoghi © contributori OpenStreetMap",
   geolocationDenied:
     "Permesso di localizzazione negato. Scegli il punto sulla mappa, oppure inserisci le coordinate qui sotto.",
   geolocationTimeout:

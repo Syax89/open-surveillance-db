@@ -644,6 +644,16 @@ button { cursor:pointer; }
 .report-geolocate-button { min-height:44px; justify-self:start; }
 .report-geolocate-button:disabled { cursor:progress; opacity:.7; transform:none; }
 .report-geolocate-notice { margin:0; color:var(--danger); font-size:var(--text-sm); line-height:1.45; }
+/* Address search row (issue #432): /segnala step 1 pairs the debounced
+   place search (same-origin /api/geocode proxy) with the one-tap
+   geolocation button on its right. The search field carries the same
+   combobox styling as the /mappa sidebar search. */
+.report-locate-row { display:flex; align-items:flex-end; gap:10px; flex-wrap:wrap; }
+.report-locate-row .address-search { position:relative; flex:1 1 260px; min-width:0; }
+.report-locate-row .address-search label { display:block; margin-bottom:6px; color:var(--label); font-size:var(--text-2xs); text-transform:uppercase; letter-spacing:.1em; font-weight:800; }
+.report-locate-row .address-search input { width:100%; min-height:44px; box-sizing:border-box; padding:9px 11px; border:1px solid var(--map-input-border); border-radius:var(--radius-md); background:var(--white); color:var(--ink-5); font-size:var(--text-md); }
+.report-locate-row .address-search .geocode-dropdown { left:0; right:0; }
+.report-locate-row .report-geolocate-button { white-space:nowrap; padding:0 16px; font-size:var(--text-sm); justify-self:auto; }
 .coordinate-readout { margin-top:18px; padding:13px 15px; border-radius:var(--radius-md); background:var(--coordinate-bg); color:var(--coordinate-ink); font-size:var(--text-sm); line-height:1.5; }
 .coordinate-readout b { color:var(--coordinate-strong); }
 .coordinate-entry { display:grid; gap:var(--space-3); margin:0; padding:var(--space-4); border:1px solid var(--coordinate-border); border-radius:var(--radius-md); background:var(--coordinate-entry-bg); }
@@ -965,6 +975,8 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
   .report-form, .correction-form { padding:20px }
   .contribution-step { padding:15px; }
   .report-geolocate-button { width:100%; justify-content:center; }
+  .report-locate-row { flex-direction:column; align-items:stretch; }
+  .report-locate-row .report-geolocate-button { width:100%; justify-content:center; }
   footer { grid-template-columns:1fr;align-items:start;gap:18px }
   .footer-links { justify-content:flex-start;flex-wrap:wrap }
   .brand { font-size:var(--text-2xl) }
