@@ -86,23 +86,23 @@ export const en = {
     "Reports are linked to your account. You can edit your contributions, confirm records, flag problems and watch your trust level grow.",
   accountHowTitle: "How accounts work",
   accountHowBody:
-    "You register with an email address and a password, stored as a hash and never exposed. Email verification is required before you can publish or take part in community actions. You can also add a passkey or social sign-in (GitHub or Google) to the same account.",
+    "You register with an email address and a password, stored as a hash and never exposed. Email verification is required before you can publish or take part in community actions. You can also add a passkey or a social sign-in to the same account.",
   accountAnonymousTitle: "Browsing stays open",
   accountAnonymousBody:
     "You can explore the map, the directory and the exports without an account. Submitting a report, sending a correction or taking part in community actions requires a verified contributor account.",
   editEyebrow: "Editing a contribution",
   editTitle: "You can edit your own contributions.",
   editBody:
-    "Only the contributor who submitted a record can edit it. Changes to a published record are reviewed before they appear in public data.",
+    "Only the contributor who submitted a record can edit it. An update to an already public record becomes a private proposal: the published version stays visible until a moderator applies or discards it. For anything else, use the private correction form.",
   editOwnerTitle: "Owner only",
   editOwnerBody:
-    "You can edit a record only if you submitted it. Other people's records cannot be edited from the community pages.",
-  editRemoderationTitle: "Published changes are reviewed",
+    "You can edit a record only if you submitted it. Other people's records cannot be edited directly; report what needs to change through the private correction form.",
+  editRemoderationTitle: "Updates become proposals",
   editRemoderationBody:
-    "When a record is already public, an edit is checked before it replaces the record. Corrections and edits to published records stay private while they are reviewed.",
-  editNotImmediateTitle: "Not immediately public",
+    "When a record is already public, an edit never overwrites it: the change is saved as a private proposal, and a moderator applies or discards it. The current public version remains visible the whole time.",
+  editNotImmediateTitle: "The proposal stays private",
   editNotImmediateBody:
-    "An edited record does not appear in the map, directory or exports right away. It stays out of public outputs until the review is complete.",
+    "Only the proposed change is private while it is reviewed. The published record keeps appearing in the map, the directory and the exports until the proposal is decided.",
   verifyEyebrow: "Confirmations",
   verifyTitle: "What confirmations mean.",
   verifyBody:
@@ -230,23 +230,23 @@ export const it: Translation<typeof en> = {
     "Le tue segnalazioni sono collegate al tuo account. Puoi modificare i tuoi contributi, confermare record, segnalare problemi e vedere crescere il tuo livello di fiducia.",
   accountHowTitle: "Come funzionano gli account",
   accountHowBody:
-    "Ti registri con un indirizzo email e una password, salvata come hash e mai esposta. La verifica dell'email è richiesta prima di poter pubblicare o partecipare alle azioni della community. Puoi anche aggiungere una passkey o l'accesso social (GitHub o Google) allo stesso account.",
+    "Ti registri con un indirizzo email e una password, salvata come hash e mai esposta. La verifica dell'email è richiesta prima di poter pubblicare o partecipare alle azioni della community. Puoi anche aggiungere una passkey o un accesso social allo stesso account.",
   accountAnonymousTitle: "La consultazione resta aperta",
   accountAnonymousBody:
     "Puoi esplorare mappa, elenco ed esportazioni senza account. Inviare una segnalazione, una correzione o partecipare alle azioni della community richiede un account verificato.",
   editEyebrow: "Modificare un contributo",
   editTitle: "Puoi modificare i tuoi contributi.",
   editBody:
-    "Solo chi ha inviato un record può modificarlo. Le modifiche a un record già pubblicato vengono riviste prima di comparire nei dati pubblici.",
+    "Solo chi ha inviato un record può modificarlo. Un aggiornamento a un record già pubblico diventa una proposta privata: la versione pubblicata resta visibile finché un moderatore non applica o scarta la modifica. Per tutto il resto, usa il modulo privato di correzione.",
   editOwnerTitle: "Solo chi ha inviato",
   editOwnerBody:
-    "Puoi modificare un record solo se l'hai inviato tu. I record degli altri non sono modificabili dalle pagine community.",
-  editRemoderationTitle: "Le modifiche ai record pubblicati sono riviste",
+    "Puoi modificare un record solo se l'hai inviato tu. I record degli altri non sono modificabili direttamente; segnala ciò che va corretto tramite il modulo privato di correzione.",
+  editRemoderationTitle: "Gli aggiornamenti diventano proposte",
   editRemoderationBody:
-    "Quando un record è già pubblico, una modifica viene controllata prima di sostituire il record. Correzioni e modifiche ai record pubblicati restano private durante la revisione.",
-  editNotImmediateTitle: "Non subito pubblico",
+    "Quando un record è già pubblico, una modifica non lo sovrascrive mai: il cambiamento viene salvato come proposta privata e un moderatore la applica o la scarta. La versione pubblica attuale resta visibile per tutto il tempo.",
+  editNotImmediateTitle: "La proposta resta privata",
   editNotImmediateBody:
-    "Un record modificato non compare subito in mappa, elenco o esportazioni: resta fuori dai dati pubblici finché la revisione non è completata.",
+    "Solo la modifica proposta è privata mentre viene esaminata. Il record pubblicato continua a comparire in mappa, elenco ed esportazioni finché la proposta non viene decisa.",
   verifyEyebrow: "Conferme",
   verifyTitle: "Cosa significano le conferme.",
   verifyBody:

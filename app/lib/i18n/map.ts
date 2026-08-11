@@ -53,7 +53,7 @@ export const en = {
   // Truthful empty state (never a silent map).
   emptyTitle: "No published record matches those filters.",
   emptyBody:
-    "This does not mean that there are no cameras in the area. You can reset the filters, browse the directory, or submit a private observation for moderation.",
+    "This does not mean that there are no cameras in the area. You can reset the filters, browse the directory, or report a camera you observed from public space.",
   clearSearch: "Clear filters",
   offlineTitle: "You are offline",
   offlineBody: "Showing the last loaded records.",
@@ -164,7 +164,7 @@ export const it: Translation<typeof en> = {
   // Stato vuoto truthful (mai una mappa muta).
   emptyTitle: "Nessun record pubblicato corrisponde a questi filtri.",
   emptyBody:
-    "Questo non significa che nell'area non ci siano telecamere. Puoi azzerare i filtri, sfogliare l'elenco o inviare un'osservazione privata per la moderazione.",
+    "Questo non significa che nell'area non ci siano telecamere. Puoi azzerare i filtri, sfogliare l'elenco o segnalare una telecamera osservata dallo spazio pubblico.",
   clearSearch: "Azzera i filtri",
   offlineTitle: "Sei offline",
   offlineBody: "Mostriamo gli ultimi record caricati.",

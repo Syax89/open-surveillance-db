@@ -39,7 +39,7 @@ export const en = {
     "A confirmation is a personal check that a camera still exists at the documented location. Each account can keep one community action per record, so the counts reflect distinct people. Public pages show only aggregate counts and the record's public history — who confirmed or flagged a record is never shown.",
   qEdit: "Can I edit my contribution?",
   aEdit:
-    "Only the contributor who submitted a record can edit it. Once a record is published, an edit is reviewed before it appears in public data, so corrections and edits to published records stay private while they are checked.",
+    "Only the contributor who submitted a record can edit it. An update to an already public record becomes a private proposal: the published version stays visible until a moderator applies or discards it. If a record you did not submit needs a change, use the private correction form — it never alters public data on its own.",
   qLevels: "What are contributor levels?",
   aLevels:
     "Trust levels recognise accurate contributions: only live records count, with thresholds at 1, 5, 20 and 50 contributions. Levels are recognition, not a competition — no public ranking or leaderboard exists.",
@@ -89,7 +89,7 @@ export const it: Translation<typeof en> = {
     "Una conferma è un controllo personale che una telecamera esista ancora nella posizione documentata. Ogni account può mantenere una sola azione della community per record, quindi i conteggi riflettono persone distinte. Le pagine pubbliche mostrano solo conteggi aggregati e la cronologia pubblica del record: chi ha confermato o segnalato non viene mai mostrato.",
   qEdit: "Posso modificare il mio contributo?",
   aEdit:
-    "Solo chi ha inviato un record può modificarlo. Quando un record è pubblicato, una modifica viene rivista prima di comparire nei dati pubblici, quindi correzioni e modifiche ai record pubblicati restano private durante il controllo.",
+    "Solo chi ha inviato un record può modificarlo. Un aggiornamento a un record già pubblico diventa una proposta privata: la versione pubblicata resta visibile finché un moderatore non applica o scarta la modifica. Se va corretto un record che non hai inviato tu, usa il modulo privato di correzione: non modifica mai da solo i dati pubblici.",
   qLevels: "Cosa sono i livelli di contributor?",
   aLevels:
     "I livelli di fiducia riconoscono i contributi accurati: contano solo i record attivi, con soglie a 1, 5, 20 e 50 contributi. I livelli sono riconoscimento, non competizione: non esiste alcuna classifica pubblica.",

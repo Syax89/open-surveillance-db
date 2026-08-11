@@ -11,14 +11,14 @@ export const en = {
   // Page-level chrome (/segnala).
   pageTitle: "Report a camera",
   pageIntro:
-    "Choose a location on the map or enter coordinates, then add only what you can observe from public space. Your report is published immediately after review.",
+    "Choose a location on the map or enter coordinates, then add only what you can observe from public space. Your report is published immediately.",
   navigation: "Report navigation",
   homeAria: "OpenSurveillanceDB home",
   // Report section (extracted from the home page bundle in F1).
   contribute: "Contribute",
   reportTitle: "Help make public space legible.",
   reportIntro:
-    "Choose a location on the map or enter coordinates, then add only what you can observe from public space. Your report is published immediately after review.",
+    "Choose a location on the map or enter coordinates, then add only what you can observe from public space. Your report is published immediately.",
   beforeSubmitting: "Before submitting",
   beforeSubmittingBody:
     "Do not describe people, licence plates, private homes, security weaknesses or sensitive locations.",
@@ -143,14 +143,14 @@ export const it: Translation<typeof en> = {
   // Chrome di pagina (/segnala).
   pageTitle: "Segnala una telecamera",
   pageIntro:
-    "Scegli una posizione sulla mappa o inserisci le coordinate, poi aggiungi solo ciò che puoi osservare dallo spazio pubblico. La tua segnalazione viene pubblicata dopo la revisione.",
+    "Scegli una posizione sulla mappa o inserisci le coordinate, poi aggiungi solo ciò che puoi osservare dallo spazio pubblico. La tua segnalazione viene pubblicata subito.",
   navigation: "Navigazione segnalazione",
   homeAria: "Pagina iniziale di OpenSurveillanceDB",
   // Sezione segnalazione (estratta dal bundle della home nella F1).
   contribute: "Contribuisci",
   reportTitle: "Rendi leggibile lo spazio pubblico.",
   reportIntro:
-    "Scegli una posizione sulla mappa o inserisci le coordinate, poi aggiungi solo ciò che puoi osservare dallo spazio pubblico. La tua segnalazione viene pubblicata dopo la revisione.",
+    "Scegli una posizione sulla mappa o inserisci le coordinate, poi aggiungi solo ciò che puoi osservare dallo spazio pubblico. La tua segnalazione viene pubblicata subito.",
   beforeSubmitting: "Prima di inviare",
   beforeSubmittingBody:
     "Non descrivere persone, targhe, abitazioni private, debolezze di sicurezza o luoghi sensibili.",
