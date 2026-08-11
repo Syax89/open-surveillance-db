@@ -599,6 +599,19 @@ export default function AccountPageBody() {
         <p className="eyebrow"><span /> {t.accountTitle}</p>
         <h1>{t.accountTitle}</h1>
 
+        {/* Trust-level badge ABOVE the identity tile (issue #435): the
+            badge + textual progress line lead the dashboard; the
+            identity/membership grid follows below. */}
+        {!loading && !loggedOut && contributor && level ? (
+          <div className="account-trust account-trust--top">
+            <LevelBadge
+              level={level.level}
+              verifiedCount={level.verifiedCount}
+              nextThreshold={level.nextThreshold}
+            />
+          </div>
+        ) : null}
+
         {loading ? <p>{t.loading}</p> : null}
 
         {!loading && deleted ? (
@@ -714,15 +727,6 @@ export default function AccountPageBody() {
                 <button className="button detail-outline account-logout" type="button" onClick={() => void onLogout()}>
                   {t.logout}
                 </button>
-              </div>
-              <div className="account-trust">
-                {level ? (
-                  <LevelBadge
-                    level={level.level}
-                    verifiedCount={level.verifiedCount}
-                    nextThreshold={level.nextThreshold}
-                  />
-                ) : null}
               </div>
             </section>
 
