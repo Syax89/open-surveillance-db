@@ -30,6 +30,11 @@ export const en = {
   githubBody:
     "The whole project is open source: report an issue, suggest a feature or open a pull request. Every contribution is welcome.",
   githubCta: "View the repository",
+  dbReportEyebrow: "Report a public database",
+  dbReportTitle: "Know a public camera database?",
+  dbReportBody:
+    "A great way to contribute is reporting public surveillance-camera databases. Open an issue on GitHub describing the database, its licence and the integration request — it will be evaluated for inclusion.",
+  dbReportCta: "Open an issue",
   footnote:
     "OpenSurveillanceDB never sells data and shows no advertising. Any support — a coffee or a commit — helps keep it open and accurate.",
 } as const;
@@ -53,6 +58,11 @@ export const it: Translation<typeof en> = {
   githubBody:
     "L'intero progetto è open source: segnala un problema, proponi una funzione o apri una pull request. Ogni contributo è benvenuto.",
   githubCta: "Vai al repository",
+  dbReportEyebrow: "Segnala un database pubblico",
+  dbReportTitle: "Conosci un database pubblico di telecamere?",
+  dbReportBody:
+    "Un ottimo modo per contribuire è segnalare database pubblici di telecamere di sorveglianza. Apri un issue su GitHub indicando il database, la sua licenza e la richiesta di integrazione: verrà valutata per l'inclusione.",
+  dbReportCta: "Apri un issue",
   footnote:
     "OpenSurveillanceDB non vende dati e non mostra pubblicità. Qualsiasi supporto — un caffè o un commit — aiuta a mantenerlo aperto e accurato.",
 };

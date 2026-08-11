@@ -175,9 +175,9 @@ const INFO_ROUTES = {
   // so the parity markers are the surrounding copy — IT must never fall
   // back to the English article copy.
   "/contribuisci": {
-    it: ["Sostieni il progetto", "Mantieni aperto il database.", "Due modi per aiutare", "Offri un caffè", "Vai al repository", "non vende dati"],
-    en: ["Support the project", "Keep the database open.", "Two ways to help", "Buy a coffee", "View the repository", "never sells data"],
-    noEn: ["Keep the database open.", "Two ways to help", "Buy a coffee", "View the repository", "never sells data"],
+    it: ["Sostieni il progetto", "Mantieni aperto il database.", "Due modi per aiutare", "Offri un caffè", "Vai al repository", "non vende dati", "Segnala un database pubblico", "Apri un issue"],
+    en: ["Support the project", "Keep the database open.", "Two ways to help", "Buy a coffee", "View the repository", "never sells data", "Report a public database", "Open an issue"],
+    noEn: ["Keep the database open.", "Two ways to help", "Buy a coffee", "View the repository", "never sells data", "Report a public database", "Open an issue"],
   },
   // Private auth surface (C5): /account SSRs the client shell in the cookie
   // language — the h1 and the loading note are the parity markers (the

@@ -76,6 +76,22 @@ export default async function ContribuisciPage() {
           </div>
         </section>
 
+        <section className="contribuisci-section" aria-labelledby="contribuisci-db-title">
+          <div className="contribuisci-section-head">
+            <p className="eyebrow"><span /> {t.dbReportEyebrow}</p>
+            <h2 id="contribuisci-db-title">{t.dbReportTitle}</h2>
+            <p>{t.dbReportBody}</p>
+          </div>
+          <a
+            className="button detail-outline contribuisci-cta contribuisci-db-cta"
+            href="https://github.com/Syax89/open-surveillance-db/issues/new"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {t.dbReportCta} <span aria-hidden="true">↗</span>
+          </a>
+        </section>
+
         <p className="contribuisci-footnote">{t.footnote}</p>
       </div>
     </InfoPage>

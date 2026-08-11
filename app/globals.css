@@ -571,6 +571,7 @@ button { cursor:pointer; }
 .contribuisci-card h3 { margin:0; color:var(--ink); font-size:var(--text-xl); font-weight:800; letter-spacing:-.02em; }
 .contribuisci-card p { margin:0; color:var(--ink-3); font-size:var(--text-md); line-height:1.55; }
 .contribuisci-card .contribuisci-cta { margin-top:auto; align-self:flex-start; }
+.contribuisci-db-cta { margin-top:4px; }
 .contribuisci-footnote { margin:32px 0 0; padding:14px 18px; border:1px dashed var(--line); border-radius:var(--radius-md); color:var(--ink-2); font-size:var(--text-sm); line-height:1.5; }
 @media (max-width: 760px) {
   .contribuisci-grid { grid-template-columns:1fr; }
