@@ -1322,9 +1322,26 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 .display-name-saved { color:var(--focus); font-weight:800; }
 .display-name-edit { margin-left:10px; }
 
-/* Accessible destructive confirmation dialog (C6 — replaces window.confirm). */
-.confirm-dialog-backdrop { position:fixed; inset:0; z-index:50; display:flex; align-items:center; justify-content:center; padding:var(--space-5); background:rgba(14,42,53,.55); }
-.confirm-dialog { max-width:440px; width:100%; padding:24px 26px 26px; border:1px solid var(--danger-border); border-radius:var(--radius-lg); background:var(--card-bg); box-shadow:0 18px 50px rgba(14,42,53,.28); }
+/* Accessible destructive confirmation dialog (C6 — replaces window.confirm).
+   Shared shell: create, reveal, recovery-code and destructive confirmation
+   dialogs all mount .confirm-dialog-backdrop > .confirm-dialog, so the
+   mobile scroll contract lives HERE, once (never per-dialog):
+     - the fixed backdrop is a contained scroll container (overflow-y:auto +
+       overscroll-behavior:contain): it covers the viewport, so touches land
+       on it, and it never chains scroll to the page behind;
+     - the dialog uses margin:auto (safe flex centering: centered when it
+       fits, start-aligned + scrollable when it doesn't — the top is never
+       clipped by align-items:center), a viewport-safe max-height (svh) and
+       internal overflow-y:auto, so ALL scrolling stays inside the modal on
+       small viewports instead of moving the page behind it.
+   The DOCUMENT root lock (pinning the page behind the modal) is NOT CSS:
+   a CSS-only html/body overflow lock was proven inadequate on real
+   Chromium (a wheel over the scrollable create dialog still moved
+   document.scrollingElement.scrollTop). The shared useModalScrollLock hook
+   (app/lib/hooks) owns that lock — fixed-body + top-offset + exact restore,
+   ref-counted across every dialog instance. */
+.confirm-dialog-backdrop { position:fixed; inset:0; z-index:50; display:flex; align-items:center; justify-content:center; padding:var(--space-5); overflow-y:auto; overscroll-behavior:contain; background:rgba(14,42,53,.55); }
+.confirm-dialog { max-width:440px; width:100%; margin:auto; max-height:calc(100svh - var(--space-5) - var(--space-5)); overflow-y:auto; overscroll-behavior:contain; padding:24px 26px 26px; border:1px solid var(--danger-border); border-radius:var(--radius-lg); background:var(--card-bg); box-shadow:0 18px 50px rgba(14,42,53,.28); }
 .confirm-dialog h2 { margin:0 0 10px; color:var(--danger-ink); font-size:var(--text-3xl); }
 .confirm-dialog p { margin:0 0 20px; color:var(--dialog-ink); font-size:var(--text-base); line-height:1.55; }
 .confirm-dialog-actions { display:flex; gap:var(--space-3); justify-content:flex-end; flex-wrap:wrap; }

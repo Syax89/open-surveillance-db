@@ -22,6 +22,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocale } from "./LocaleProvider";
 import { useMessages } from "../lib/use-messages";
+import { useModalScrollLock } from "../lib/hooks/use-modal-scroll-lock";
 import { formatPublicDate } from "../lib/format-date";
 
 type Props = {
@@ -39,6 +40,8 @@ export function ApiKeyRevealDialog({ open, keyValue, expiresAt, onClose }: Props
   const dialogRef = useRef<HTMLDivElement>(null);
   const previousFocus = useRef<HTMLElement | null>(null);
   const [copied, setCopied] = useState(false);
+
+  useModalScrollLock(open);
 
   const canCopy =
     typeof navigator !== "undefined"
