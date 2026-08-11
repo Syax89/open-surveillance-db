@@ -152,7 +152,7 @@ const ACCOUNT_COMPONENTS = [
 const KNOWN_DEVIATIONS = new Map([
   ["app/components/moderation/useModerationQueue.tsx", { baselineLines: 170, reason: "H1 t_69891619: campi associazione correzione→esito record (outcome + record id, validazione, cleanup) + commento contratto server/client aggiornato (fix PR #187); +2 t_6424f961: lookup data registry-driven LOCALE_BCP47 (no ternario it-IT/en-US)" }],
   ["app/components/home/MapPanel.tsx", { baselineLines: 188, reason: "t_b7728ad0: redesign popup (report-issue link rimosso, provenance via options) + stato pointsCollapsed pannello punti mobile map-first; t_66766914: stato DETERMINISTICO expanded SSR/client + preferenza mobile applicata solo post-hydration in effect (fix mismatch hydration CEO) — blocchi isolati" }],
-  ["app/components/ApiKeyCreateDialog.tsx", { baselineLines: 179, reason: "t_7dce2869 F2: campo scadenza opzionale (select 30/90/365/mai + help i18n EN/IT) nel create dialog — scadenza chiave era invisibile in tutta la UI; blocchi isolati (label+select+small, stato expiry, expiryIso helper)" }],
+  ["app/components/ApiKeyCreateDialog.tsx", { baselineLines: 182, reason: "t_7dce2869 F2: campo scadenza opzionale (select 30/90/365/mai + help i18n EN/IT) nel create dialog — scadenza chiave era invisibile in tutta la UI; blocchi isolati (label+select+small, stato expiry, expiryIso helper); +3 righe fix mobile dialog: import + chiamata shared useModalScrollLock(open), la logica resta estratta in app/lib/hooks" }],
 ]);
 
 /** Componente condiviso atteso dal refactor. */

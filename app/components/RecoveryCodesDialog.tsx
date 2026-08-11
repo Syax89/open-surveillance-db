@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useModalScrollLock } from "../lib/hooks/use-modal-scroll-lock";
 
 /**
  * Accessible one-time recovery-codes dialog (Fase E2 — passkey enrollment).
@@ -49,6 +50,9 @@ export function RecoveryCodesDialog({
   const dialogRef = useRef<HTMLDivElement>(null);
   const previousFocus = useRef<HTMLElement | null>(null);
   const [copied, setCopied] = useState(false);
+
+  useModalScrollLock(open);
+
   // The copy action is a progressive enhancement: hide it entirely when
   // the Clipboard API is unavailable instead of failing on click. The
   // dialog only renders client-side (the codes are client state), so this

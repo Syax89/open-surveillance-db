@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { useModalScrollLock } from "../lib/hooks/use-modal-scroll-lock";
 
 /**
  * Accessible destructive-confirmation dialog (C6 deliverable 4).
@@ -38,6 +39,9 @@ export function ConfirmDialog({ open, title, body, confirmLabel, cancelLabel, bu
 
   // Move focus into the dialog when it opens and restore it on close.
   const previousFocus = useRef<HTMLElement | null>(null);
+
+  useModalScrollLock(open);
+
   useEffect(() => {
     if (open) {
       previousFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;

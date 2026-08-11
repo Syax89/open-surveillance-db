@@ -829,3 +829,169 @@ test("api keys: the .api-key-* CSS block introduces no new design tokens", async
   // It may reference existing tokens.
   assert.match(block[0], /var\(--/);
 });
+
+test("confirm dialogs: shared shell CSS owns the INTERNAL modal scroll; the useModalScrollLock hook owns the DOCUMENT lock (create/reveal/recovery/destructive)", async () => {
+  // Regression for the mobile bug where the tall API-key create modal could
+  // not be scrolled and swipe gestures moved the page behind it. JSDOM does
+  // not compute layout, so — like the token guards above — the contract is
+  // pinned on the shared shell CSS, the shared scroll-lock hook and the
+  // components that mount both.
+  //
+  // Division of labour (truthful code): CSS owns the modal's INTERNAL
+  // scrolling (the fixed backdrop + dialog are contained scroll containers);
+  // the DOCUMENT lock is the shared useModalScrollLock hook, NOT a CSS-only
+  // rule — a CSS-only html/body :has(.confirm-dialog-backdrop) overflow lock
+  // was proven inadequate on real Chromium (a native wheel over the
+  // scrollable create dialog still moved document.scrollingElement.scrollTop).
+  const css = await readFile(path.join(root, "app", "globals.css"), "utf8");
+  const hook = await readFile(path.join(root, "app", "lib", "hooks", "use-modal-scroll-lock.ts"), "utf8");
+
+  // The root lock must not be a CSS-only rule keyed on the backdrop: that
+  // lock is proven insufficient, and a rule in globals.css would silently
+  // fork the contract away from the hook.
+  assert.doesNotMatch(css, /(?:html|body):has\(\.confirm-dialog-backdrop\)\s*\{/, "no CSS-only document-lock rule keyed on the backdrop (proven inadequate on Chromium) — the hook owns the root lock");
+
+  // The hook owns the document lock: fixed-body pattern (mobile-safe),
+  // exact inline-style + scroll restore, reference counting.
+  assert.match(hook, /lockCount/, "the lock must be reference-counted (overlapping dialogs and the create→reveal transition share ONE lock)");
+  assert.match(hook, /releaseGeneration/, "a pending final release must be invalidated when another shared dialog opens in the same React commit");
+  assert.match(hook, /queueMicrotask/, "the final unlock must wait one microtask so create cleanup + reveal setup cannot briefly unlock the page");
+  assert.match(hook, /scrollingElement/, "the hook must read the document scroll position from the real scroller");
+  assert.match(hook, /position\s*=\s*"fixed"/, "the hook must pin the body with position:fixed — a fixed body cannot be wheel/touch-scrolled on any engine");
+  assert.match(hook, /body\.style\.top/, "the hook must offset the body by the captured scroll position (top:-scrollY) so the page stays visually in place");
+  assert.match(hook, /overflow\s*=\s*"hidden"/, "the hook must also overflow:hidden the root scrollers (belt-and-braces)");
+  assert.match(hook, /getAttribute\("style"\)/, "the hook must capture the exact prior inline styles before locking");
+  assert.match(hook, /(?:setAttribute\("style"\)|removeAttribute\("style"\))/, "the hook must restore the exact prior inline styles verbatim on release");
+  assert.match(hook, /scrollTop\s*=\s*savedScrollTop/, "the hook must restore the captured scroll position on release");
+
+  // Internal scrolling stays in CSS, on the shared shell (once, never
+  // per-dialog).
+  const backdrop = css.match(/\.confirm-dialog-backdrop\s*\{([^}]*)\}/);
+  assert.ok(backdrop, "the shared backdrop rule must exist");
+  assert.match(backdrop[1], /overflow-y:\s*auto/, "the fixed backdrop must be a scroll container (dialog taller than a phone viewport stays reachable)");
+  assert.match(backdrop[1], /overscroll-behavior:\s*contain/, "the backdrop must not chain scroll to the page behind (swipe must never move the document)");
+  assert.match(backdrop[1], /position:\s*fixed/, "the backdrop must keep covering the viewport so touches land on it, not on the page");
+
+  const dialog = css.match(/\.confirm-dialog\s*\{([^}]*)\}/);
+  assert.ok(dialog, "the shared dialog rule must exist");
+  assert.match(dialog[1], /margin:\s*auto/, "safe flex centering: centered when it fits, start-aligned + scrollable when it doesn't — never clipped by align-items:center");
+  assert.match(dialog[1], /max-height:\s*calc\(100svh/, "viewport-safe max-height (svh) so the dialog always fits inside the viewport");
+  assert.match(dialog[1], /overflow-y:\s*auto/, "all vertical scrolling stays inside the dialog on small viewports");
+  assert.match(dialog[1], /overscroll-behavior:\s*contain/, "scrolling to the dialog's end must not chain to the page behind");
+
+  // Deliberate scoping: the per-dialog variants may only resize the shell
+  // (max-width), never re-own height/scroll/background-lock — otherwise the
+  // contract forks per dialog and the mobile bug can silently return.
+  for (const variant of ["api-key-dialog", "api-key-reveal-dialog", "recovery-dialog"]) {
+    const rule = css.match(new RegExp(`\\.${variant}\\s*\\{([^}]*)\\}`));
+    assert.ok(rule, `expected the ${variant} variant rule`);
+    assert.doesNotMatch(rule[1], /max-height/, `${variant} must not redefine the viewport max-height`);
+    assert.doesNotMatch(rule[1], /overflow/, `${variant} must not redefine the internal scroll`);
+    assert.doesNotMatch(rule[1], /overscroll-behavior/, `${variant} must not redefine the background lock`);
+    assert.doesNotMatch(rule[1], /margin:/, `${variant} must not redefine the safe centering`);
+  }
+
+  // The contract only helps if every dialog mounts the shared shell AND the
+  // shared document lock.
+  const [create, reveal, recovery, confirm] = await Promise.all([
+    readFile(path.join(root, "app", "components", "ApiKeyCreateDialog.tsx"), "utf8"),
+    readFile(path.join(root, "app", "components", "ApiKeyRevealDialog.tsx"), "utf8"),
+    readFile(path.join(root, "app", "components", "RecoveryCodesDialog.tsx"), "utf8"),
+    readFile(path.join(root, "app", "components", "ConfirmDialog.tsx"), "utf8"),
+  ]);
+  for (const [name, source] of [["create", create], ["reveal", reveal], ["recovery", recovery], ["destructive confirm", confirm]]) {
+    assert.match(source, /className="confirm-dialog-backdrop"/, `${name} dialog must mount the shared backdrop`);
+    assert.match(source, /className="confirm-dialog/, `${name} dialog must mount the shared dialog shell`);
+    assert.match(source, /useModalScrollLock\(open\)/, `${name} dialog must share the ref-counted document-scroll lock while open`);
+  }
+});
+
+test("confirm dialogs: the scroll lock pins the page for the whole open lifetime, restores exactly on close, and is ref-counted across dialogs + the create→reveal transition", async () => {
+  // Live contract of app/lib/hooks/use-modal-scroll-lock.ts, exercised
+  // through the real shared-shell dialogs: while any confirmation modal is
+  // open the page behind it is pinned (fixed body + top offset + hidden
+  // root scrollers); when the LAST one closes, the exact prior inline
+  // styles and the captured scroll position come back; overlapping dialogs
+  // and the API-key create → reveal transition (both dialogs touch the
+  // lock in one commit) never drop the lock early.
+  const rtl = await setupDom();
+  const { ConfirmDialog } = await loadDomModule("app/components/ConfirmDialog.mjs");
+  const { ApiKeyCreateDialog } = await loadDomModule("app/components/ApiKeyCreateDialog.mjs");
+  const { ApiKeyRevealDialog } = await loadDomModule("app/components/ApiKeyRevealDialog.mjs");
+
+  // jsdom does not lay out or scroll: seed a document scroll position and
+  // prior inline styles on <html>/<body> so the preserve/restore contract
+  // is observable (the hook round-trips getAttribute("style") + scrollTop).
+  const scroller = document.scrollingElement ?? document.documentElement;
+  scroller.scrollTop = 350;
+  document.body.setAttribute("style", "background: rgb(7, 8, 9);");
+  document.documentElement.setAttribute("style", "color-scheme: light;");
+  const priorBodyStyle = document.body.getAttribute("style");
+  const priorHtmlStyle = document.documentElement.getAttribute("style");
+
+  const confirmProps = {
+    title: "Delete", body: "Really?", confirmLabel: "Delete", cancelLabel: "Cancel",
+    onConfirm: () => {}, onCancel: () => {},
+  };
+
+  // 1. Open → the page is pinned exactly as it was: fixed body, top offset
+  //    matching the captured scroll position, both root scrollers hidden.
+  const first = rtl.render(React.createElement(ConfirmDialog, { open: true, ...confirmProps }));
+  assert.equal(document.body.style.position, "fixed", "an open modal must pin the body (position:fixed)");
+  assert.equal(document.body.style.top, "-350px", "the body offset must keep the page visually in place");
+  assert.equal(document.body.style.left, "0px");
+  assert.equal(document.body.style.right, "0px");
+  assert.equal(document.body.style.width, "100%");
+  assert.equal(document.body.style.overflow, "hidden", "the body must be overflow:hidden while locked");
+  assert.equal(document.documentElement.style.overflow, "hidden", "the root scroller must be hidden while locked");
+
+  // 2. Ref-count: a second modal opening on top must keep the lock; closing
+  //    ONE of two open modals must NOT unlock the page.
+  const second = rtl.render(React.createElement(ConfirmDialog, { open: true, ...confirmProps }));
+  first.rerender(React.createElement(ConfirmDialog, { open: false, ...confirmProps }));
+  assert.equal(document.body.style.position, "fixed", "closing one of two open modals must keep the page locked");
+  assert.equal(document.body.style.top, "-350px", "the page must stay visually in place while another modal is open");
+
+  // 3. Closing the LAST modal restores the exact prior state.
+  second.rerender(React.createElement(ConfirmDialog, { open: false, ...confirmProps }));
+  await new Promise((resolve) => queueMicrotask(resolve));
+  assert.equal(document.body.style.position, "", "with no modal open the body must not stay fixed");
+  assert.equal(document.documentElement.style.overflow, "", "the root scroller must be released");
+  assert.equal(document.body.getAttribute("style"), priorBodyStyle, "the body's prior inline styles must be restored verbatim");
+  assert.equal(document.documentElement.getAttribute("style"), priorHtmlStyle, "the html's prior inline styles must be restored verbatim");
+  assert.equal(scroller.scrollTop, 350, "the captured scroll position must be restored");
+
+  // 4. API create → reveal transition (ApiKeysSection flips createOpen and
+  //    revealKey in one update): the lock must survive the commit — the
+  //    page stays pinned across the swap and unlocks only when the reveal
+  //    dialog closes.
+  const createProps = { busy: false, error: null, onCreate: () => {}, onCancel: () => {} };
+  const harness = (phase) => React.createElement(React.Fragment, null,
+    React.createElement(ApiKeyCreateDialog, { open: phase === "create", ...createProps }),
+    React.createElement(ApiKeyRevealDialog, { open: phase === "reveal", keyValue: "osdb_RawValue123", expiresAt: null, onClose: () => {} }),
+  );
+  const flow = rtl.render(await wrapWithLocale(harness("create")));
+  assert.equal(document.body.style.position, "fixed", "the create dialog must pin the page");
+  assert.equal(document.body.style.top, "-350px", "the page must stay visually in place from the moment the create dialog opens");
+  const transitionStyleObserver = new MutationObserver(() => {});
+  transitionStyleObserver.observe(document.body, {
+    attributes: true,
+    attributeFilter: ["style"],
+    attributeOldValue: true,
+  });
+  flow.rerender(await wrapWithLocale(harness("reveal")));
+  const transitionStyleMutations = transitionStyleObserver.takeRecords();
+  transitionStyleObserver.disconnect();
+  assert.equal(transitionStyleMutations.length, 0, "the create→reveal transition must not even momentarily restore/reapply the body styles between passive-effect cleanup and setup");
+  assert.equal(document.body.style.position, "fixed", "the create→reveal transition must not unlock the page");
+  assert.equal(document.body.style.top, "-350px", "the page must stay visually in place across the create→reveal transition");
+  assert.ok(rtl.screen.getByRole("alertdialog"), "the reveal dialog is the mounted modal after the transition");
+  flow.rerender(await wrapWithLocale(harness("closed")));
+  await new Promise((resolve) => queueMicrotask(resolve));
+  assert.equal(document.body.style.position, "", "closing the reveal dialog must release the lock");
+  assert.equal(document.body.getAttribute("style"), priorBodyStyle, "the body's prior inline styles must be restored verbatim after the flow");
+  assert.equal(document.documentElement.getAttribute("style"), priorHtmlStyle, "the html's prior inline styles must be restored verbatim after the flow");
+  assert.equal(scroller.scrollTop, 350, "the captured scroll position must be restored after the flow");
+
+  rtl.cleanup();
+});

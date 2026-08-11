@@ -11,6 +11,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useMessages } from "../lib/use-messages";
+import { useModalScrollLock } from "../lib/hooks/use-modal-scroll-lock";
 import { API_KEY_SCOPES, API_KEY_SCOPE_GRANTS, API_KEY_SCOPE_LABELS } from "../lib/useApiKeys";
 import type { ApiKeyErrorKind, ApiKeyScope } from "../lib/useApiKeys";
 
@@ -43,6 +44,8 @@ export function ApiKeyCreateDialog({ open, busy, error, onCreate, onCancel }: Pr
   const createRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const previousFocus = useRef<HTMLElement | null>(null);
+
+  useModalScrollLock(open);
 
   const trimmed = name.trim();
   const nameInvalid = touched && trimmed.length === 0;
