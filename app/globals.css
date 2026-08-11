@@ -1201,6 +1201,22 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 .auth-login-card .auth-method-disclosure,
 .auth-login-card .oidc-disclosure { padding:0; border:0; border-radius:0; background:transparent; }
 .auth-login-card .auth-method-disclosure { color:var(--muted); }
+/* /login compact on small viewports (issue #436): the whole flow — email/
+   password primary, divider, passkey/OIDC alternatives — fits without page
+   scroll on common phones (375-393px wide). Tighten ONLY spacing: tap
+   targets stay ≥44px, body text stays ≥16px, method disclosures remain
+   visible (they are required legal copy, never hidden). */
+@media (max-width:480px) {
+  .auth-card .auth-form { gap:14px; margin:16px 0 6px; }
+  .auth-primary .auth-form { margin:14px 0 0; }
+  .auth-primary .record-detail-summary { margin:8px 0; }
+  .auth-divider { margin:18px 0 14px; }
+  .auth-alternative .auth-form { gap:12px; margin:12px 0 0; }
+  .auth-alternative .oidc-panel { margin:12px 0 0; }
+  .auth-method-disclosure { margin:12px 0 0; }
+  .oidc-disclosure { margin:10px 0 0; padding:10px 12px; }
+  .auth-switch { margin:14px 0 0; }
+}
 .passkey-list { margin:18px 0 10px; }
 .passkey-kind { display:inline-flex; align-items:center; gap:8px; }
 .passkey-row .status-dot { margin-left:0; }
