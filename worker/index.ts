@@ -189,6 +189,22 @@ const PLATFORM_IDENTITY_HEADER = "oai-authenticated-user-email";
 const PLATFORM_FULL_NAME_HEADER = "oai-authenticated-user-full-name";
 const PLATFORM_FULL_NAME_ENCODING_HEADER = "oai-authenticated-user-full-name-encoding";
 
+const CANONICAL_HOST = "opensurveillancedb.org";
+const WWW_HOST = "www.opensurveillancedb.org";
+const PREPRODUCTION_HOST = "osdb.syaxhome89.com";
+
+function hostRedirect(request: Request, url: URL): Response | null {
+  const hostname = url.hostname.toLowerCase();
+  if (hostname !== CANONICAL_HOST && hostname !== WWW_HOST) return null;
+  if (hostname === WWW_HOST || url.protocol === "http:") {
+    const target = new URL(request.url);
+    target.protocol = "https:";
+    target.hostname = CANONICAL_HOST;
+    return Response.redirect(target.toString(), 308);
+  }
+  return null;
+}
+
 function safeEqual(expected: string, actual: string) {
   if (expected.length !== actual.length) return false;
   let difference = 0;
@@ -434,7 +450,7 @@ const SECURITY_HEADERS: ReadonlyArray<readonly [string, string]> = [
  * fully-denying policy. The override still respects the "never overwrite"
  * rule: a stricter policy already set by an app handler survives untouched.
  */
-function withSecurityHeaders(response: Response, pathname?: string): Response {
+function withSecurityHeaders(response: Response, pathname?: string, hostname?: string): Response {
   const headers = new Headers(response.headers);
   // Never overwrite an existing header: app routes may set stricter
   // values that must survive the middleware. The
@@ -446,6 +462,9 @@ function withSecurityHeaders(response: Response, pathname?: string): Response {
   }
   if (pathname && GEOLOCATION_ROUTES.has(pathname) && !appSetPermissionsPolicy) {
     headers.set("Permissions-Policy", GEOLOCATION_PERMISSIONS_POLICY);
+  }
+  if (hostname?.toLowerCase() === PREPRODUCTION_HOST) {
+    headers.set("X-Robots-Tag", "noindex, nofollow");
   }
   return new Response(response.body, {
     status: response.status,
@@ -492,6 +511,9 @@ const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
+    const redirect = hostRedirect(request, url);
+    if (redirect) return redirect;
+
     // Normalise a trailing slash on the pathname BEFORE the edge-gate match
     // (audit 2026-08-09, P2): the identity exception for POST /api/appeals
     // is an exact match on "/api/appeals", so "/api/appeals/" (trailing
@@ -523,7 +545,7 @@ const worker = {
 
     if (gatedPath(request.method, gatedPathname)) {
       const gate = requireModerationAuth(gated, env);
-      if (gate.denied) return withSecurityHeaders(gate.denied, url.pathname);
+      if (gate.denied) return withSecurityHeaders(gate.denied, url.pathname, url.hostname);
       gated = injectIdentityAfterGate(gated, gate.identityEmail);
     }
 
@@ -536,10 +558,10 @@ const worker = {
           return result.response();
         },
       }, allowedWidths);
-      return withSecurityHeaders(optimized, url.pathname);
+      return withSecurityHeaders(optimized, url.pathname, url.hostname);
     }
 
-    return withSecurityHeaders(await handler.fetch(gated, env, ctx), url.pathname);
+    return withSecurityHeaders(await handler.fetch(gated, env, ctx), url.pathname, url.hostname);
   },
 
   /**

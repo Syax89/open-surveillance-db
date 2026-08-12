@@ -95,6 +95,11 @@ jobs:
           echo "database_id: iniettato dal secret GitHub (mai committato)"
 
       - name: Build (dist/client per ASSETS + bundle server)
+        env:
+          # The production origin must be present while vinext generates the
+          # server bundle: metadataBase, canonical links, robots.txt and the
+          # sitemap all depend on this public, non-secret value.
+          NEXT_PUBLIC_SITE_URL: https://opensurveillancedb.org
         run: npm run build
 
       - name: Dry run D1 migrations (read-only, nessuna modifica remota)
