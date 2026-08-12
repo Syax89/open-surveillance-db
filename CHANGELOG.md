@@ -58,8 +58,12 @@ changes accumulate under `[Unreleased]`.
   telefono si perdeva ~30% della larghezza per tre rientri impilati
   (container pagina 16px/lato → card form 30px → card step 18px). Nella
   media query ≤700px le pagine form vanno near-full-width con padding
-  minimo delle card (scoped con `:has`, `/directory` e `/mappa` invariati):
-  su 390px il contenuto passa da ~262px a ~330px (+26%).
+  minimo delle card (scoped con `:has`, `/directory` e `/mappa` invariati).
+  Round 2: il selettore `.report-section--tool .report-form` (padding
+  `clamp(24px,4vw,38px)`) e la `width:min(100% - 32px)` del
+  `.report-section` annidato superavano l'override del round 1 → aggiunti
+  override con specificità corretta. Su 390px il campo indirizzo/mappa
+  passa da ~256px a **314px** (+23%).
 
 - **Explorer UX (PR #326):** Mappa↔Directory switch with shared filters, place search above the map, collapsed map-first points panel, legend, filters in disclosure, guide with overview, grouped footer, `/moderazione` → `/guide` redirect.
 
