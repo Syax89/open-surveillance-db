@@ -159,6 +159,29 @@ test("keyboard Enter on a focused marker opens its popup (no picker)", async () 
   assert.ok(!(await maps())[0].popupHtml, "no generic picker from the keyboard");
 });
 
+// 2026-08-12 production bug ("ogni tanto il balloon si apre senza i tasti
+// della community"): the popupopen handler returned early when the record
+// was momentarily absent from camerasRef (rebuild/filter transition), so
+// the balloon opened with an empty mount node and the widget never
+// mounted — it only appeared after a close/reopen. The widget must mount
+// whenever the popup has a community mount node, seeding zero counts when
+// the payload does not have the record yet.
+test("popup widget mounts even when the record is momentarily absent from cameras (no empty balloon)", async () => {
+  await renderMap(CAMERAS);
+  const map = (await maps())[0];
+  const div = document.createElement("div");
+  div.innerHTML = '<div class="osm-popup-community" data-record-id="999"></div>';
+  map.handlers.popupopen?.[0]?.({ popup: { getElement: () => div } });
+  // The widget render is deferred to a microtask (t_0b9f5a3c): wait for it.
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  const mountNode = div.querySelector(".osm-popup-community");
+  assert.ok(mountNode, "the popup mount node exists");
+  assert.ok(
+    mountNode.querySelector("button"),
+    "the community widget buttons are mounted even when the record is not in the payload (seed zero)",
+  );
+});
+
 // P1 (review 2026-08-07): the user CLOSING a popup then panning must stay
 // closed — the rebuild restore must not re-open what the user dismissed.
 test("a popup closed by the USER stays closed after a pan (no ghost reopen)", async () => {

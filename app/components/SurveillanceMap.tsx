@@ -485,15 +485,20 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
           if (!Number.isInteger(id) || id <= 0) return;
           activePopupIdRef.current = id;
           const camera = camerasRef.current.find((item) => item.id === id);
-          if (!camera) return;
           try {
-            mountPopupActions(node as HTMLElement, id, {
-              like: camera.usefulCount,
-              confirm: camera.confirmCount,
-              gone: camera.goneCount,
-              problem: camera.problemCount,
-              privacy: camera.privacyCount,
-            });
+            mountPopupActions(
+              node as HTMLElement,
+              id,
+              camera
+                ? {
+                    like: camera.usefulCount,
+                    confirm: camera.confirmCount,
+                    gone: camera.goneCount,
+                    problem: camera.problemCount,
+                    privacy: camera.privacyCount,
+                  }
+                : undefined,
+            );
           } catch (error) {
             console.error("popup action widget mount failed", error);
           }

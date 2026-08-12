@@ -28,6 +28,15 @@ changes accumulate under `[Unreleased]`.
   window. Confirmed live 2026-08-12: E_RECIPIENT_NOT_ALLOWED fires on the
   Workers Free plan for arbitrary recipients.
 
+- **Fix mappa — marker su /records/[id] e widget community nel balloon
+  (2026-08-12):** la mini-mappa della pagina record usava l'icona PNG
+  default di Leaflet, che non è bundle-ata nel build Workers (404 in
+  produzione): il marker era invisibile. Ora usa la stessa divIcon custom
+  di /mappa (`osm-camera-marker` + classe status). Inoltre il balloon
+  poteva aprirsi senza i tasti della community quando il record non era
+  momentaneamente nel payload della mappa (transizione filtri/rebuild):
+  il widget ora si monta sempre, con conteggi seed zero in quel caso.
+
 - **Explorer UX (PR #326):** Mappa↔Directory switch with shared filters, place search above the map, collapsed map-first points panel, legend, filters in disclosure, guide with overview, grouped footer, `/moderazione` → `/guide` redirect.
 
 - **Auth — mailer Cloudflare (Fase A2, t_4c398006, ADR 0020 decision 2):**
