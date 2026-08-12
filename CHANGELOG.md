@@ -14,6 +14,11 @@ changes accumulate under `[Unreleased]`.
 
 ### Added
 
+- **Production auth compatibility:** password hashing now uses 100,000 PBKDF2
+  iterations, the maximum accepted by Cloudflare Workers WebCrypto. Existing
+  hashes above that runtime ceiling remain stored but require the password-reset
+  flow; new registration and reset hashes are compatible with production.
+
 - **Explorer UX (PR #326):** Mappa↔Directory switch with shared filters, place search above the map, collapsed map-first points panel, legend, filters in disclosure, guide with overview, grouped footer, `/moderazione` → `/guide` redirect.
 
 - **Auth — mailer Cloudflare (Fase A2, t_4c398006, ADR 0020 decision 2):**
@@ -606,9 +611,9 @@ changes accumulate under `[Unreleased]`.
   on node:sqlite's higher SQLITE_MAX_VARIABLE_NUMBER.
 - `verifyPassword` now derives at the iteration count embedded in the stored
   hash instead of the current `PBKDF2_ITERATIONS` constant (t_fe668331, P1-2
-  security review): bumping the constant (e.g. 210k → 600k, AUTH_OPTIONS §8)
-  no longer invalidates every existing password and locks out all
-  contributors — each hash re-derives at its own stored count (ADR 0013),
+  security review): supported lower-count hashes remain verifiable when the
+  current cost changes, while hashes above the Cloudflare WebCrypto ceiling
+  require password reset (ADR 0013),
   with a constant fallback for legacy 3-part hashes that predate the embedded
   count. New bump-safety tests in `tests/auth-d1.test.mjs` cover hashes at
   different iteration counts and the legacy fallback.
