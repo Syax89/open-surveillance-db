@@ -719,6 +719,15 @@ button { cursor:pointer; }
 .correction-form input:focus, .correction-form select:focus, .correction-form textarea:focus { border-color:var(--control-focus); outline:3px solid var(--focus); outline-offset:2px; }
 .correction-form textarea { resize:vertical; }
 .correction-form .check-label { grid-template-columns:26px 1fr; align-items:start; gap:9px; font-size:var(--text-sm); line-height:1.4; font-weight:400; }
+/* Record-id field (CEO 2026-08-12): replaces the native <select> that
+   embedded EVERY public record (~37k options froze the browser). The
+   input inherits the .correction-form field styling; the status line
+   and the clear button sit under it. */
+.record-id-field { display:grid; gap:var(--space-2); }
+.record-id-status { margin:0; font-size:var(--text-sm); line-height:1.45; }
+.record-id-status--found { color:var(--ok-ink, var(--ink-2)); font-weight:700; }
+.record-id-status--error { color:var(--danger, #b3261e); }
+.record-id-clear { justify-self:start; margin-top:2px; padding:0; border:0; background:none; color:var(--link, var(--mint-dark, inherit)); font-size:var(--text-sm); font-weight:700; cursor:pointer; text-decoration:underline; }
 /* Contribution forms: short, numbered groups make the next decision obvious
    without turning a simple form into a multi-page wizard. */
 .contribution-step { min-width:0; display:grid; gap:16px; margin:0; padding:18px; border:1px solid var(--form-border); border-left:3px solid var(--control-focus); border-radius:var(--radius-md); background:var(--white); box-shadow:0 2px 10px rgba(25,46,52,.06); }
