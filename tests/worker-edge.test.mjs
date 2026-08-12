@@ -199,6 +199,32 @@ test("forwards unknown-route 404 responses from the handler unchanged", async ()
   assert.equal(app.__calls.length, 1);
 });
 
+test("canonical host redirects HTTP and www requests before the app handler", async () => {
+  const { worker, app } = await loadWorker();
+  const cases = [
+    ["http://opensurveillancedb.org/directory?page=2", "https://opensurveillancedb.org/directory?page=2"],
+    ["https://www.opensurveillancedb.org/faq", "https://opensurveillancedb.org/faq"],
+  ];
+  for (const [from, to] of cases) {
+    const response = await worker.fetch(new Request(from), testEnv(), ctx());
+    assert.equal(response.status, 308);
+    assert.equal(response.headers.get("location"), to);
+  }
+  assert.equal(app.__calls.length, 0, "redirected aliases must not reach the app handler");
+});
+
+test("canonical HTTPS reaches the app while pre-production responses stay noindex", async () => {
+  const { worker, app } = await loadWorker();
+  const production = await worker.fetch(new Request("https://opensurveillancedb.org/faq"), testEnv(), ctx());
+  assert.equal(production.status, 200);
+  assert.equal(production.headers.get("x-robots-tag"), null);
+
+  const staging = await worker.fetch(new Request("https://osdb.syaxhome89.com/faq"), testEnv(), ctx());
+  assert.equal(staging.status, 200);
+  assert.equal(staging.headers.get("x-robots-tag"), "noindex, nofollow");
+  assert.equal(app.__calls.length, 2);
+});
+
 // ---------------------------------------------------------------------------
 // Anti-scanner path catch-all (2026-08-12, CEO decision)
 // ---------------------------------------------------------------------------

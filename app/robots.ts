@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { publicUrl } from "./lib/site-url";
 
 /**
  * /robots.txt — crawl policy (F7 qa#5, t_ab0d4c75).
@@ -17,7 +18,6 @@ import type { MetadataRoute } from "next";
  * none indexable. Public info pages and /records stay indexable.
  */
 export default function robots(): MetadataRoute.Robots {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
   return {
     rules: [
       {
@@ -33,6 +33,6 @@ export default function robots(): MetadataRoute.Robots {
         ],
       },
     ],
-    sitemap: siteUrl ? `${siteUrl}/sitemap.xml` : undefined,
+    sitemap: publicUrl("/sitemap.xml") === "/sitemap.xml" ? undefined : publicUrl("/sitemap.xml"),
   };
 }

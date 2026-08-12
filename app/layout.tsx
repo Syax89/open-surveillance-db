@@ -3,6 +3,7 @@ import { LocaleProvider } from "./components/LocaleProvider";
 import { LegacyAnchorRedirect } from "./components/LegacyAnchorRedirect";
 import { SiteFooter } from "./components/SiteFooter";
 import { getServerLocale, getServerMessages } from "./lib/server-i18n";
+import { getConfiguredSiteUrl } from "./lib/site-url";
 import "./globals.css";
 
 /**
@@ -18,6 +19,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const bundle = await getServerMessages();
   const title = bundle.common.metaTitle;
   const description = bundle.common.metaDescription;
+  const siteUrl = getConfiguredSiteUrl();
   // F6 qa#5 (t_ab0d4c75): metadataBase is intentionally conditional — the
   // repo convention (docs/DEPLOYMENT.md "Environment variables") forbids an
   // absolute-URL fallback that would leak `localhost` into metadata on
@@ -27,9 +29,7 @@ export async function generateMetadata(): Promise<Metadata> {
   // asset is 1200x630 / ~163 KiB (from 1,626,075 B) — within the social
   // preview weight budget.
   return {
-    ...(process.env.NEXT_PUBLIC_SITE_URL
-      ? { metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL) }
-      : {}),
+    ...(siteUrl ? { metadataBase: siteUrl } : {}),
     title,
     description,
     openGraph: {
