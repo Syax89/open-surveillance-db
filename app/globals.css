@@ -1014,6 +1014,11 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
   .contribution-step { padding:15px; }
   .report-geolocate-button { width:100%; justify-content:center; }
   .report-locate-row { flex-direction:column; align-items:stretch; }
+  /* 2026-08-12: in column layout the wrapper's flex:1 1 260px (a MIN
+     WIDTH on desktop rows) becomes a 260px MIN-HEIGHT — a ~190px blank
+     gap between the address input and the geolocate button on mobile.
+     Reset the flex-basis so the wrapper hugs its content. */
+  .report-locate-row .address-search { flex:0 0 auto; width:100%; }
   .report-locate-row .report-geolocate-button { width:100%; justify-content:center; }
   footer { grid-template-columns:1fr;align-items:start;gap:18px }
   .footer-links { justify-content:flex-start;flex-wrap:wrap }

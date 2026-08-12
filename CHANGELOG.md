@@ -37,6 +37,12 @@ changes accumulate under `[Unreleased]`.
   momentaneamente nel payload della mappa (transizione filtri/rebuild):
   il widget ora si monta sempre, con conteggi seed zero in quel caso.
 
+- **Fix /segnala — spazio vuoto su mobile (2026-08-12):** in layout colonna
+  il wrapper `.address-search` manteneva `flex:1 1 260px` (larghezza minima
+  su desktop) che in colonna diventa **260px di altezza minima** → ~190px di
+  spazio bianco tra il campo indirizzo e il bottone "Use my position". La
+  media query mobile ora azzera il flex-basis (`flex:0 0 auto`).
+
 - **Explorer UX (PR #326):** Mappa↔Directory switch with shared filters, place search above the map, collapsed map-first points panel, legend, filters in disclosure, guide with overview, grouped footer, `/moderazione` → `/guide` redirect.
 
 - **Auth — mailer Cloudflare (Fase A2, t_4c398006, ADR 0020 decision 2):**
