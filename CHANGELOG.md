@@ -54,6 +54,13 @@ changes accumulate under `[Unreleased]`.
   `cameraId` (vuoto = segnalazione generale). `CorreggiTool` non scarica
   più l'intero dataset (niente più `usePublicCameras`).
 
+- **Fix /segnala — spazio laterale su mobile (2026-08-12, CEO):** su
+  telefono si perdeva ~30% della larghezza per tre rientri impilati
+  (container pagina 16px/lato → card form 30px → card step 18px). Nella
+  media query ≤700px le pagine form vanno near-full-width con padding
+  minimo delle card (scoped con `:has`, `/directory` e `/mappa` invariati):
+  su 390px il contenuto passa da ~262px a ~330px (+26%).
+
 - **Explorer UX (PR #326):** Mappa↔Directory switch with shared filters, place search above the map, collapsed map-first points panel, legend, filters in disclosure, guide with overview, grouped footer, `/moderazione` → `/guide` redirect.
 
 - **Auth — mailer Cloudflare (Fase A2, t_4c398006, ADR 0020 decision 2):**
