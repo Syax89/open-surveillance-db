@@ -19,6 +19,15 @@ changes accumulate under `[Unreleased]`.
   hashes above that runtime ceiling remain stored but require the password-reset
   flow; new registration and reset hashes are compatible with production.
 
+- **Mailer resilience:** the definitive non-delivery code list
+  (DEFINITIVE_NON_DELIVERY_CODES) now covers every provider rejection
+  documented by the Cloudflare send_email binding (E_RECIPIENT_NOT_ALLOWED,
+  E_SENDER_DOMAIN_NOT_AVAILABLE, E_DELIVERY_FAILED, header/payload validation
+  errors, ...): a deterministic pre-delivery rejection releases the email
+  budget immediately instead of blocking the contributor for the whole
+  window. Confirmed live 2026-08-12: E_RECIPIENT_NOT_ALLOWED fires on the
+  Workers Free plan for arbitrary recipients.
+
 - **Explorer UX (PR #326):** Mappa↔Directory switch with shared filters, place search above the map, collapsed map-first points panel, legend, filters in disclosure, guide with overview, grouped footer, `/moderazione` → `/guide` redirect.
 
 - **Auth — mailer Cloudflare (Fase A2, t_4c398006, ADR 0020 decision 2):**

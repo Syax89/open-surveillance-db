@@ -467,6 +467,42 @@ test("sendAuthEmail surfaces provider errors (code + message) and releases the e
   assert.equal(retry.ok, true);
 });
 
+test("sendAuthEmail releases the reservation on E_RECIPIENT_NOT_ALLOWED (definitive provider rejection)", async () => {
+  const { mailer } = runtime;
+  const contributorId = await seedContributor();
+  // Real-world production binding error observed 2026-08-12 before the
+  // sending domain was onboarded: the provider rejects arbitrary recipients
+  // with E_RECIPIENT_NOT_ALLOWED ("destination address is not a verified
+  // address"). It is a DEFINITIVE pre-delivery rejection: the message was
+  // never accepted, so the reservation must be released and the budget must
+  // stay usable instead of being blocked for the whole window.
+  runtime.env.EMAIL = {
+    send: async () => {
+      const error = new Error("destination address is not a verified address");
+      error.code = "E_RECIPIENT_NOT_ALLOWED";
+      throw error;
+    },
+  };
+
+  const reservation = await mailer.reserveAuthEmail(contributorId, "verify", NOW, runtime.env);
+  assert.equal(reservation.ok, true);
+  const result = await mailer.sendAuthEmail({
+    reservationId: reservation.reservationId,
+    contributorId,
+    to: "contributor@example.com",
+    kind: "verify",
+    rawToken: "token",
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, "provider");
+  assert.equal(result.code, "E_RECIPIENT_NOT_ALLOWED");
+  // The exact reservation row is deleted (no budget consumed)...
+  assert.equal(await logCount(), 0);
+  // ...so the next attempt can reserve again immediately.
+  const retry = await mailer.reserveAuthEmail(contributorId, "verify", NOW, runtime.env);
+  assert.equal(retry.ok, true);
+});
+
 test("sendAuthEmail KEEPS the reservation on an AMBIGUOUS provider outcome (E_UNKNOWN) until the window ages out", async () => {
   const { mailer } = runtime;
   const contributorId = await seedContributor();

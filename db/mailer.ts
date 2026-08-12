@@ -340,12 +340,33 @@ const DEFINITIVE_NON_DELIVERY_CODES = new Set([
   "E_BINDING_MISSING",
   // Provider rejected the message BEFORE delivery (documented in the
   // send_email binding contract, see the sendMail doc): misconfigured
-  // sender, quota exceeded, suppressed recipient, malformed payload.
+  // sender or destination, quota exceeded, suppressed recipient, malformed
+  // payload or headers, unavailable sending domain, undeliverable message.
+  // Empirically confirmed 2026-08-12 on the production binding:
+  // E_RECIPIENT_NOT_ALLOWED ("destination address is not a verified
+  // address") fires when the account has not onboarded the sending domain
+  // (Workers Free: arbitrary recipients are rejected; only verified
+  // destination addresses are allowed).
   "E_SENDER_NOT_VERIFIED",
+  "E_SENDER_DOMAIN_NOT_AVAILABLE",
+  "E_RECIPIENT_NOT_ALLOWED",
   "E_RATE_LIMIT_EXCEEDED",
   "E_DAILY_LIMIT_EXCEEDED",
   "E_RECIPIENT_SUPPRESSED",
   "E_VALIDATION_ERROR",
+  "E_DELIVERY_FAILED",
+  "E_FIELD_MISSING",
+  "E_TOO_MANY_RECIPIENTS",
+  "E_TOO_MANY_ATTACHMENTS",
+  "E_CONTENT_TOO_LARGE",
+  "E_HEADER_NOT_ALLOWED",
+  "E_HEADER_USE_API_FIELD",
+  "E_HEADER_VALUE_INVALID",
+  "E_HEADER_VALUE_TOO_LONG",
+  "E_HEADER_NAME_INVALID",
+  "E_HEADERS_TOO_LARGE",
+  "E_HEADERS_TOO_MANY",
+  "E_INTERNAL_SERVER_ERROR",
 ]);
 
 /**
@@ -355,10 +376,11 @@ const DEFINITIVE_NON_DELIVERY_CODES = new Set([
  *
  * The reservation row already exists (it is the admission). Settling:
  *   - success → the row stays — it IS the send-log row;
- *   - deterministic pre-delivery failure (missing VERIFY_BASE_URL, render
- *     error, provider rejection with a DEFINITIVE non-delivery code, or the
- *     reservation row vanished) → the exact reservation is rolled back, so
- *     a failed send never consumes the budget and the retry loop is honest;
+ *  - deterministic pre-delivery failure (missing VERIFY_BASE_URL, render
+ *    error, provider rejection with a DEFINITIVE non-delivery code — see
+ *    DEFINITIVE_NON_DELIVERY_CODES, or the reservation row vanished) → the
+ *    exact reservation is rolled back, so a failed send never consumes the
+ *    budget and the retry loop is honest;
  *   - AMBIGUOUS provider outcome (E_UNKNOWN or any unrecognised code) →
  *     the reservation is KEPT: the provider may have accepted the email
  *     (response lost), and releasing it would let a retry duplicate mail.
