@@ -168,7 +168,7 @@ test("report form carries the art. 13 mini-notice next to the consent checkbox",
 });
 
 test("correction form carries the art. 13 mini-notice (6(1)(c) + 6(1)(f) variant)", async () => {
-  const view = await renderWithLocale(React.createElement(CorrectionForm, { records: [] }));
+  const view = await renderWithLocale(React.createElement(CorrectionForm));
   const { container } = view;
 
   const notice = container.querySelector("#correction-art13-note");

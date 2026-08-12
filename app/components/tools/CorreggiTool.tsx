@@ -2,7 +2,6 @@
 
 import { useSearchParams } from "next/navigation";
 import { useMessages } from "../../lib/use-messages";
-import { usePublicCameras } from "../../lib/use-public-cameras";
 import { CorrectionForm } from "../home/CorrectionForm";
 import { WriteGateWall } from "../WriteGateWall";
 
@@ -27,13 +26,11 @@ export function CorreggiTool() {
   // contributor to find it a second time after authenticating.
   const returnTo = defaultRecordId === null ? "/correggi" : `/correggi?record=${defaultRecordId}`;
 
-  const { records } = usePublicCameras();
-
   return (
     <section className="tool-section correction-tool" aria-labelledby="correction-tool-title">
       <div className="tool-heading"><p className="eyebrow"><span /> {t.accountability}</p><h1 id="correction-tool-title">{t.pageTitle}</h1><p>{t.pageIntro}</p></div>
       <WriteGateWall returnTo={returnTo}>
-        <CorrectionForm records={records} defaultRecordId={defaultRecordId} showHeading={false} />
+        <CorrectionForm defaultRecordId={defaultRecordId} showHeading={false} />
       </WriteGateWall>
     </section>
   );

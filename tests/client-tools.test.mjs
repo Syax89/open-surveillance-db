@@ -1109,7 +1109,15 @@ test("CorreggiTool ?record=ID pre-selects the related record and announces it", 
   // records too, so the wall never resolves to a verified session and the
   // form (and its select) never renders. installSegnalaMock answers the
   // session check correctly and falls through to the cameras payload.
-  installSegnalaMock(() => jsonResponse(fakeCamerasPayload(POPUP_RECORDS)));
+  // The record picker is a record-id field (CEO 2026-08-12): the
+  // ?record=ID prefill is resolved by id via GET /api/cameras/[id] (the
+  // old native select with every record froze the browser at ~37k options).
+  installSegnalaMock((input) => {
+    if (String(input) === "/api/cameras/1") {
+      return jsonResponse({ record: { id: 1, title: "Illustrative record A", kind: "Fixed dome", status: "demo" } });
+    }
+    return jsonResponse(fakeCamerasPayload(POPUP_RECORDS));
+  });
   setNavState({ search: "record=1" });
   const { screen } = rtl;
   await renderWithLocale(React.createElement(CorreggiTool));
@@ -1117,12 +1125,14 @@ test("CorreggiTool ?record=ID pre-selects the related record and announces it", 
   // P1-2: the verified-session gate resolves before the form (and its
   // pre-selection announcement) renders.
   await screen.findByLabelText("Related public record");
-  await rtl.waitFor(() => assert.equal(screen.getByLabelText("Related public record").value, "1", "the select is pre-selected"));
-  assert.match(
-    screen.getByRole("status").textContent,
-    /Record 1 preselected: Illustrative record A\./,
-    "the prefill must be announced (aria-live)",
+  await rtl.waitFor(() => assert.equal(screen.getByLabelText("Related public record").value, "1", "the field shows the pre-selected record id"));
+  await rtl.waitFor(() =>
+    assert.ok(
+      screen.getByText(/Record 1 preselected: Illustrative record A\./),
+      "the prefill must be announced (aria-live)",
+    ),
   );
+  assert.equal(document.querySelector('input[name="cameraId"]')?.value, "1", "the hidden cameraId carries the pre-selected id");
 });
 
 test("CorreggiTool ignores an invalid ?record= value (no prefill, no announcement)", async () => {
@@ -1132,6 +1142,7 @@ test("CorreggiTool ignores an invalid ?record= value (no prefill, no announcemen
 
   await screen.findByLabelText("Related public record");
   assert.equal(screen.getByLabelText("Related public record").value, "", "no preselection for a non-numeric id");
+  assert.equal(document.querySelector('input[name="cameraId"]')?.value, "", "hidden cameraId stays empty");
   assert.ok(!screen.queryByRole("status"), "no announcement when nothing was pre-selected");
 });
 
@@ -1141,8 +1152,34 @@ test("CorreggiTool ignores an unknown ?record= id (no prefill, no announcement)"
   await renderWithLocale(React.createElement(CorreggiTool));
 
   await screen.findByLabelText("Related public record");
-  assert.equal(screen.getByLabelText("Related public record").value, "", "no preselection for an unknown id");
-  assert.ok(!screen.queryByRole("status"), "no announcement when nothing was pre-selected");
+  // The field keeps the typed id visible, but nothing is confirmed: the
+  // hidden cameraId stays empty and no preselection is announced.
+  assert.equal(screen.getByLabelText("Related public record").value, "999", "the typed id stays visible");
+  assert.equal(document.querySelector('input[name="cameraId"]')?.value, "", "hidden cameraId stays empty");
+  await rtl.waitFor(() => assert.ok(screen.getByText(/No public record with id 999/), "the id field reports the unknown id"));
+  assert.ok(!screen.queryByText(/preselected/), "no preselection announcement when nothing was pre-selected");
+});
+
+test("CorreggiTool record-id field resolves a typed id and fills cameraId", async () => {
+  installSegnalaMock((input) => {
+    const url = String(input);
+    if (url === "/api/cameras/7") {
+      return jsonResponse({ record: { id: 7, title: "Corso Italia corner", kind: "Bullet", status: "active" } });
+    }
+    return jsonResponse(fakeCamerasPayload(POPUP_RECORDS));
+  });
+  const { screen } = rtl;
+  const user = rtl.userEvent.setup();
+  await renderWithLocale(React.createElement(CorreggiTool));
+
+  const input = await screen.findByLabelText("Related public record");
+  await user.type(input, "7");
+  await rtl.waitFor(
+    () => assert.ok(screen.getByText(/Record 7 — Corso Italia corner/), "the resolved record is confirmed in the field status"),
+    { timeout: 3000 },
+  );
+  assert.equal(screen.getByLabelText("Related public record").value, "7", "the field keeps the typed id");
+  assert.equal(document.querySelector('input[name="cameraId"]')?.value, "7", "the hidden cameraId carries the chosen id");
 });
 
 // ---------------------------------------------------------------------------

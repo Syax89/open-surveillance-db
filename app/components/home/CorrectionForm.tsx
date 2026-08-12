@@ -2,12 +2,10 @@
 
 import { FormEvent, useState } from "react";
 import { useMessages } from "../../lib/use-messages";
-import type { Camera } from "../../lib/records";
 import { Art13Notice } from "../Art13Notice";
+import { RecordIdField } from "./RecordIdField";
 
 type Props = {
-  /** Public records: the "related record" select is fed from these. */
-  records: Camera[];
   /** ?record=ID prefill: the related record is preselected and announced. */
   defaultRecordId?: number | null;
   /**
@@ -26,10 +24,10 @@ type Props = {
  * `correction` i18n bundle. `?record=ID` (from the record detail page)
  * pre-selects the related record and announces it via an aria-live region.
  */
-export function CorrectionForm({ records, defaultRecordId = null, showHeading = true }: Props) {
+export function CorrectionForm({ defaultRecordId = null, showHeading = true }: Props) {
   const t = useMessages().correction;
   const [correctionNotice, setCorrectionNotice] = useState("");
-  const preselected = defaultRecordId ? records.find((camera) => camera.id === defaultRecordId) : undefined;
+  const [preselected, setPreselected] = useState<{ id: number; title: string } | null>(null);
 
   async function submitCorrection(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -65,7 +63,25 @@ export function CorrectionForm({ records, defaultRecordId = null, showHeading = 
         {preselected && <p className="notice" role="status">{t.recordPreselected(preselected.id, preselected.title)}</p>}
         <fieldset className="contribution-step">
           <legend>{t.stepRecord}</legend>
-          <label>{t.relatedRecord}<select name="cameraId" defaultValue={preselected ? String(preselected.id) : ""}><option value="">{t.noSpecificRecord}</option>{records.map((camera) => <option key={camera.id} value={camera.id}>{camera.id} — {camera.title}</option>)}</select></label>
+          {/* 2026-08-12: the related-record field is a record-ID search
+              field (CEO request), not a native <select> with every public
+              record as an <option> (~37k options froze the browser when
+              opened). The hidden input keeps the exact `cameraId` submit
+              contract ("" = no specific record / general concern). */}
+          <RecordIdField
+            inputId="correction-record-id"
+            name="cameraId"
+            initialRecordId={defaultRecordId}
+            onConfirmed={(id, title) => setPreselected({ id, title })}
+            copy={{
+              label: t.relatedRecord,
+              placeholder: t.recordIdPlaceholder,
+              help: t.recordIdHelp,
+              notFound: t.recordIdNotFound,
+              unavailable: t.recordIdUnavailable,
+              clear: t.recordIdClear,
+            }}
+          />
         </fieldset>
         <fieldset className="contribution-step">
           <legend>{t.stepIssue}</legend>

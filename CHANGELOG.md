@@ -43,6 +43,17 @@ changes accumulate under `[Unreleased]`.
   spazio bianco tra il campo indirizzo e il bottone "Use my position". La
   media query mobile ora azzera il flex-basis (`flex:0 0 auto`).
 
+- **Fix /correggi — campo record per id (2026-08-12, CEO):** il select
+  "Related public record" conteneva TUTTI i ~37k record come `<option>`
+  (la pagina scaricava l'intero dataset e il menu nativo si bloccava
+  all'apertura). Sostituito con un **campo di ricerca per id** (richiesta
+  esplicita: "un campo di ricerca per id piuttosto che un menu a discesa"):
+  l'utente digita l'id del record, il campo lo risolve via
+  `GET /api/cameras/[id]` con conferma visiva ("✓ Record 6745 — …") e
+  messaggi gentili per id inesistenti; il submit mantiene il contratto
+  `cameraId` (vuoto = segnalazione generale). `CorreggiTool` non scarica
+  più l'intero dataset (niente più `usePublicCameras`).
+
 - **Explorer UX (PR #326):** Mappa↔Directory switch with shared filters, place search above the map, collapsed map-first points panel, legend, filters in disclosure, guide with overview, grouped footer, `/moderazione` → `/guide` redirect.
 
 - **Auth — mailer Cloudflare (Fase A2, t_4c398006, ADR 0020 decision 2):**
