@@ -943,6 +943,15 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 @media (max-width:700px) {
   .hero, .map-section, .records-section, .principles, .guide-overview, .report-section, .correction-section, .moderation-page, footer, .tool-section, .founder-declaration { width:min(100% - 32px,1180px) }
   .tool-section { padding:40px 0 72px }
+  /* Matrioska fix (CEO 2026-08-12, /segnala mobile): the tool forms lost
+     ~30% of the viewport width to three stacked insets (page container →
+     form card → step card). On phones the form pages go near-full-width
+     with minimal card padding; the map and inputs get the space back.
+     Scoped with :has so only the form tool pages change — /directory and
+     /mappa keep their layout untouched. */
+  .tool-section:has(.report-form), .tool-section:has(.correction-form) { width:min(100% - 16px, 1180px); padding:28px 0 64px }
+  .report-form, .correction-form { padding:20px 12px; gap:14px }
+  .contribution-step { padding:12px 10px; gap:12px }
   .nav-actions, .nav-record-actions { gap:9px }
   .nav-record-actions .text-button { max-width:105px;text-align:right }
   .hero-copy { padding:52px 28px 39px }
