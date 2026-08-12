@@ -951,6 +951,15 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
      /mappa keep their layout untouched. */
   .tool-section:has(.report-form), .tool-section:has(.correction-form) { width:min(100% - 16px, 1180px); padding:28px 0 64px }
   .report-form, .correction-form { padding:20px 12px; gap:14px }
+  /* Specificity fix (CEO 2026-08-12 round 2): .report-section--tool
+     .report-form (2 classes) kept clamp(24px,4vw,38px) — 24px of padding
+     per side on phones. This 2-class rule wins on equal specificity by
+     coming later in the cascade. */
+  .report-section--tool .report-form { padding:20px 12px }
+  /* The nested .report-section still carries width:min(100% - 32px) from
+     the shared mobile rule — 16px of extra inset per side INSIDE the
+     now-wide tool-section. Inside a form tool-section it goes full-width. */
+  .tool-section:has(.report-form) .report-section { width:100% }
   .contribution-step { padding:12px 10px; gap:12px }
   .nav-actions, .nav-record-actions { gap:9px }
   .nav-record-actions .text-button { max-width:105px;text-align:right }
