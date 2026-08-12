@@ -33,7 +33,7 @@ export const en = {
   endpointParamsList:
     "limit (page size, max 2000) · offset (page start) · kind (Fixed dome, Bullet, PTZ, Traffic / licence plate reader, Other / unknown) · freshness (7d, 30d, 90d) · sort (useful, recent, confirmations).",
   endpointParamsBbox:
-    "bbox=west,south,east,north (comma-separated) · kind · freshness. Returns the public cameras inside the viewport — this is what the interactive map uses.",
+    "bbox=west,south,east,north (comma-separated) · kind · freshness · count=false. Returns the public cameras inside the viewport — this is what the interactive map uses. count=false skips the full-set COUNT scan and answers total: null (the client walks on nextOffset).",
   endpointParamsExport:
     "format=geojson or format=csv (default geojson). No pagination: the export is the full dataset. Exports are rate-limited more strictly.",
   endpointParamsRecord:
@@ -51,7 +51,7 @@ export const en = {
   endpointParamsTiles:
     "z (zoom 0-19) · x · y (tile coordinates). Raster tiles proxied from OpenStreetMap.",
   endpoints: {
-    list: { method: "GET", path: "/api/cameras", example: "/api/cameras?kind=Fixed%20dome&limit=20", description: "Paginated JSON list of all public cameras. The main entry point: filter by kind or freshness, sort, and page through the dataset." },
+    list: { method: "GET", path: "/api/cameras", example: "/api/cameras?kind=Fixed%20dome&limit=20", description: "Paginated JSON list of all public cameras. The main entry point: filter by kind or freshness, sort, and page through the dataset. Add count=false to skip the full-set COUNT (answers total: null, walks on nextOffset)." },
     bbox: { method: "GET", path: "/api/cameras?bbox=…", example: "/api/cameras?bbox=8.5,47.3,8.6,47.5", description: "All public cameras inside a map viewport, as GeoJSON. This is the endpoint the interactive map calls when you pan and zoom." },
     exportGeojson: { method: "GET", path: "/api/cameras?format=geojson", example: "/api/cameras?format=geojson", description: "The complete dataset as GeoJSON — one request, no pagination. Ideal for GIS tools and data analysis." },
     exportCsv: { method: "GET", path: "/api/cameras?format=csv", example: "/api/cameras?format=csv", description: "The complete dataset as CSV, ready for spreadsheets. Same content as the GeoJSON export, tabular shape." },
@@ -169,7 +169,7 @@ export const it: Translation<typeof en> = {
   endpointParamsList:
     "limit (dimensione pagina, max 2000) · offset (inizio pagina) · kind (Fixed dome, Bullet, PTZ, Traffic / licence plate reader, Other / unknown) · freshness (7d, 30d, 90d) · sort (useful, recent, confirmations).",
   endpointParamsBbox:
-    "bbox=ovest,sud,est,nord (separati da virgola) · kind · freshness. Restituisce le telecamere pubbliche dentro il viewport — è ciò che usa la mappa interattiva.",
+    "bbox=ovest,sud,est,nord (separati da virgola) · kind · freshness · count=false. Restituisce le telecamere pubbliche dentro il viewport — è ciò che usa la mappa interattiva. count=false salta la COUNT completa e risponde total: null (il client pagina su nextOffset).",
   endpointParamsExport:
     "format=geojson oppure format=csv (predefinito geojson). Niente paginazione: l'export è il dataset completo. Gli export hanno limiti più severi.",
   endpointParamsRecord:

@@ -197,6 +197,10 @@ export function viewportQuery(bounds: ViewportBounds, filters: ServerCameraFilte
   params.set("bbox", `${bounds.west},${bounds.south},${bounds.east},${bounds.north}`);
   params.set("limit", String(VIEWPORT_BBOX_LIMIT));
   params.set("offset", String(offset));
+  // count=false (D1 rows-read optimization, 2026-08-12): the map paginates
+  // on nextOffset alone; skipping the bbox COUNT scan on every pan keeps
+  // the free-plan D1 rows-read quota intact.
+  params.set("count", "false");
   if (filters.kind) params.set("kind", filters.kind);
   if (filters.freshness) params.set("freshness", filters.freshness);
   return `/api/cameras?${params.toString()}`;

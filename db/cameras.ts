@@ -209,8 +209,13 @@ export const PUBLIC_CAMERAS_PAGE_MAX_LIMIT = 2000;
 
 export type PublicCameraListPage = {
   records: PublicCameraRecord[];
-  /** Total number of records matching the filters, independent of the page. */
-  total: number;
+  /**
+   * Total number of records matching the filters, independent of the page.
+   * `null` when the caller opted out of the COUNT with `count: false` (the
+   * client walk never needs the exact total — `nextOffset` drives it, and
+   * the probe below computes it without scanning the whole table).
+   */
+  total: number | null;
   /** Offset of the next page, or null when the current page is the last one. */
   nextOffset: number | null;
 };
@@ -228,7 +233,7 @@ export type PublicCameraListPage = {
  */
 export async function listPublicCamerasPage(
   nowIsoOrFilters?: string | PublicCameraFilters,
-  options: { limit: number; offset: number } = { limit: PUBLIC_CAMERAS_PAGE_DEFAULT_LIMIT, offset: 0 },
+  options: { limit: number; offset: number; count?: boolean } = { limit: PUBLIC_CAMERAS_PAGE_DEFAULT_LIMIT, offset: 0 },
 ): Promise<PublicCameraListPage> {
   const d1 = await getD1();
   // Same dual first argument as listPublicCameras: an ISO boundary string
@@ -239,6 +244,12 @@ export async function listPublicCamerasPage(
   // trusts its caller with an unbounded page size.
   const limit = Math.min(Math.max(Math.trunc(options.limit) || PUBLIC_CAMERAS_PAGE_DEFAULT_LIMIT, 1), PUBLIC_CAMERAS_PAGE_MAX_LIMIT);
   const offset = Math.max(Math.trunc(options.offset) || 0, 0);
+  // `count: false` (D1 rows-read optimization, 2026-08-12): the client walk
+  // only needs `nextOffset` to stop — the exact `total` costs a full-set
+  // COUNT scan on EVERY page. When opted out, the page SELECT fetches
+  // limit+1 rows: one extra row answers "is there a next page?" with the
+  // same cost as the page itself, and `total` is reported as null.
+  const withCount = options.count !== false;
   const parameters: string[] = [];
   const { sql: publicPredicate, parameters: predicateParameters } = publicCameraPredicate(nowIso);
   parameters.push(...predicateParameters);
@@ -255,20 +266,23 @@ export async function listPublicCamerasPage(
     // anchored on last_verified_at, so no GLOB is needed and the composite
     // index stays usable.
   }
-  const countResult = await d1.prepare(`SELECT COUNT(*) AS total ${query}`).bind(...parameters).first<{ total: number }>();
-  const total = countResult?.total ?? 0;
+  let total: number | null = null;
+  if (withCount) {
+    const countResult = await d1.prepare(`SELECT COUNT(*) AS total ${query}`).bind(...parameters).first<{ total: number }>();
+    total = countResult?.total ?? 0;
 
-  // Pagination guard (kanban t_e86c91c4): an offset at/beyond the dataset
-  // total can never return records — answer an empty page WITHOUT running
-  // the SELECT, so a hostile ?offset=9007199254740991 cannot force an
-  // astronomical SQL OFFSET on the D1. The old transport cap
-  // (MAX_PAGE_OFFSET = 10000, app/lib/input-limits.ts, PR #250) rejected
-  // offsets past 10000 outright, which broke the legitimate client walk
-  // once the dataset grew past 10000 records (empty /directory); the db
-  // boundary knows the real total and stops pagination exactly where the
-  // data ends — no fixed cap for the dataset to outgrow.
-  if (offset >= total) {
-    return { records: [], total, nextOffset: null };
+    // Pagination guard (kanban t_e86c91c4): an offset at/beyond the dataset
+    // total can never return records — answer an empty page WITHOUT running
+    // the SELECT, so a hostile ?offset=9007199254740991 cannot force an
+    // astronomical SQL OFFSET on the D1. The old transport cap
+    // (MAX_PAGE_OFFSET = 10000, app/lib/input-limits.ts, PR #250) rejected
+    // offsets past 10000 outright, which broke the legitimate client walk
+    // once the dataset grew past 10000 records (empty /directory); the db
+    // boundary knows the real total and stops pagination exactly where the
+    // data ends — no fixed cap for the dataset to outgrow.
+    if (offset >= total) {
+      return { records: [], total, nextOffset: null };
+    }
   }
 
   // Sort ordering (ADR 0021 §10.1, kanban t_a9f23581 FASE 2): whitelist
@@ -284,10 +298,15 @@ export async function listPublicCamerasPage(
     orderBy = "ORDER BY last_verified_at IS NULL, last_verified_at DESC, id DESC";
   }
 
-  const result = await d1
+  // Probe fetch: limit+1 rows when counting is disabled (see `withCount`).
+  const fetched = await d1
     .prepare(`SELECT id, title, kind, CASE WHEN publish_manufacturer = 1 THEN manufacturer ELSE NULL END AS manufacturer, CASE WHEN publish_observed_on = 1 THEN observed_on ELSE NULL END AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, latitude, longitude, direction, status, source, updated, description, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt ${query} ${orderBy} LIMIT ? OFFSET ?`)
-    .bind(...parameters, limit, offset)
+    .bind(...parameters, withCount ? limit : limit + 1, offset)
     .all<PublicCameraRecord>();
+  const result = withCount ? fetched : { results: fetched.results.slice(0, limit) };
+  const nextOffset = withCount
+    ? (offset + result.results.length < (total ?? 0) ? offset + result.results.length : null)
+    : (fetched.results.length > limit ? offset + limit : null);
   const ids = result.results.map((record) => record.id);
   // Community-verification counts (ADR 0018 §2.3): one GROUP BY IN query for
   // the whole page — never an N+1 per record. The counts are decayed (only
@@ -309,7 +328,6 @@ export async function listPublicCamerasPage(
     problemCount: actionCounts.get(record.id)?.problem ?? 0,
     privacyCount: actionCounts.get(record.id)?.privacy ?? 0,
   }));
-  const nextOffset = offset + records.length < total ? offset + records.length : null;
   return { records, total, nextOffset };
 }
 export type NearbyPublicCameraRecord = PublicCameraRecord & { distanceMeters: number };
@@ -642,7 +660,7 @@ export const PUBLIC_CAMERAS_BBOX_MAX_LIMIT = 10_000;
 export async function listPublicCamerasInBboxPage(
   bbox: { west: number; south: number; east: number; north: number },
   nowIsoOrFilters?: string | PublicCameraFilters,
-  options: { limit: number; offset: number } = { limit: PUBLIC_CAMERAS_BBOX_DEFAULT_LIMIT, offset: 0 },
+  options: { limit: number; offset: number; count?: boolean } = { limit: PUBLIC_CAMERAS_BBOX_DEFAULT_LIMIT, offset: 0 },
 ): Promise<PublicCameraListPage> {
   const d1 = await getD1();
   // Same dual first argument as listPublicCamerasPage: an ISO boundary
@@ -653,6 +671,10 @@ export async function listPublicCamerasInBboxPage(
   // page is bounded by construction, never by the caller's politeness.
   const limit = Math.min(Math.max(Math.trunc(options.limit) || PUBLIC_CAMERAS_BBOX_DEFAULT_LIMIT, 1), PUBLIC_CAMERAS_BBOX_MAX_LIMIT);
   const offset = Math.max(Math.trunc(options.offset) || 0, 0);
+  // Same count-opt-out as listPublicCamerasPage (D1 rows-read optimization,
+  // 2026-08-12): the map walks bbox subsets with nextOffset; the COUNT scan
+  // is replaced by a limit+1 probe when `count: false`.
+  const withCount = options.count !== false;
   const parameters: (string | number)[] = [];
   const { sql: publicPredicate, parameters: predicateParameters } = publicCameraPredicate(nowIso);
   parameters.push(...predicateParameters);
@@ -668,18 +690,26 @@ export async function listPublicCamerasInBboxPage(
     query += " AND last_verified_at >= ?";
     parameters.push(freshnessCutoff(filters.freshness));
   }
-  const countResult = await d1.prepare(`SELECT COUNT(*) AS total ${query}`).bind(...parameters).first<{ total: number }>();
-  const total = countResult?.total ?? 0;
-  // Same pagination guard as listPublicCamerasPage (kanban t_e86c91c4):
-  // an offset at/beyond the bbox total is an empty page answered WITHOUT
-  // the SELECT — no astronomical SQL OFFSET on the D1, no fixed cap.
-  if (offset >= total) {
-    return { records: [], total, nextOffset: null };
+  let total: number | null = null;
+  if (withCount) {
+    const countResult = await d1.prepare(`SELECT COUNT(*) AS total ${query}`).bind(...parameters).first<{ total: number }>();
+    total = countResult?.total ?? 0;
+    // Same pagination guard as listPublicCamerasPage (kanban t_e86c91c4):
+    // an offset at/beyond the bbox total is an empty page answered WITHOUT
+    // the SELECT — no astronomical SQL OFFSET on the D1, no fixed cap.
+    if (offset >= total) {
+      return { records: [], total, nextOffset: null };
+    }
   }
-  const result = await d1
+  // Probe fetch: limit+1 rows when counting is disabled (see `withCount`).
+  const fetched = await d1
     .prepare(`SELECT id, title, kind, CASE WHEN publish_manufacturer = 1 THEN manufacturer ELSE NULL END AS manufacturer, CASE WHEN publish_observed_on = 1 THEN observed_on ELSE NULL END AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, latitude, longitude, direction, status, source, updated, description, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt ${query} ORDER BY id DESC LIMIT ? OFFSET ?`)
-    .bind(...parameters, limit, offset)
+    .bind(...parameters, withCount ? limit : limit + 1, offset)
     .all<PublicCameraRecord>();
+  const result = withCount ? fetched : { results: fetched.results.slice(0, limit) };
+  const nextOffset = withCount
+    ? (offset + result.results.length < (total ?? 0) ? offset + result.results.length : null)
+    : (fetched.results.length > limit ? offset + limit : null);
   const ids = result.results.map((record) => record.id);
   // Community-verification counts (ADR 0018 §2.3): one GROUP BY IN query for
   // the whole page — never an N+1 per record.
@@ -699,7 +729,6 @@ export async function listPublicCamerasInBboxPage(
     problemCount: actionCounts.get(record.id)?.problem ?? 0,
     privacyCount: actionCounts.get(record.id)?.privacy ?? 0,
   }));
-  const nextOffset = offset + records.length < total ? offset + records.length : null;
   return { records, total, nextOffset };
 }
 

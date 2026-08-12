@@ -257,4 +257,8 @@ test("viewportQuery builds the bbox URL with the bounded limit and forwards kind
   const plain = new URL(viewportQuery(ROME, {}), "http://example.test");
   assert.equal(plain.searchParams.get("kind"), null);
   assert.equal(plain.searchParams.get("freshness"), null);
+  // count=false opts the viewport out of the bbox COUNT scan (D1 rows-read
+  // optimization, 2026-08-12): the map paginates on nextOffset alone.
+  assert.equal(url.searchParams.get("count"), "false");
+  assert.equal(plain.searchParams.get("count"), "false");
 });
