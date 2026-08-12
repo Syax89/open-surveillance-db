@@ -52,11 +52,13 @@ Remaining items on the rights side: per-jurisdiction review of the notice and te
 
 ## Edge caching and moderation
 
-Public read responses carry a **bounded edge cache**: the camera list, bbox
-map layer and record detail use `public, s-maxage=300,
-stale-while-revalidate=600`; full CSV/GeoJSON exports use `s-maxage=3600`.
-These windows keep the directory responsive without serving live feeds, but
-they mean a moderation decision (e.g. a privacy/safety removal) could
+Public read responses carry a **bounded edge cache**: the camera list and bbox
+map layer use `public, s-maxage=900, stale-while-revalidate=1800` (15 minutes,
+raised 2026-08-12 to cut D1 rows-read on the free plan), the record detail
+uses `s-maxage=300`; full CSV/GeoJSON exports use `s-maxage=86400` (24 hours —
+safe because the moderation write path purges the export cache-tag on every
+decision). These windows keep the directory responsive without serving live
+feeds, but they mean a moderation decision (e.g. a privacy/safety removal) could
 otherwise leave a taken-down record served from the edge for up to the
 revalidation window.
 

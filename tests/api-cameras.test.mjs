@@ -90,11 +90,30 @@ test("GET /api/cameras returns the public list as JSON by default", async () => 
 
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type"), /application\/json/);
-  assert.equal(response.headers.get("cache-control"), "public, s-maxage=300, stale-while-revalidate=600", "the directory list is cached for a bounded window and revalidated after moderation decisions");
+  assert.equal(response.headers.get("cache-control"), "public, s-maxage=900, stale-while-revalidate=1800", "the directory list is cached for a bounded window and revalidated after moderation decisions");
   assert.equal(response.headers.get("cache-tag"), "cameras-list", "the list carries the shared list cache-tag for moderation purge");
   assert.deepEqual(await responseBody(response), { records: [cameraFixture], total: 1, nextOffset: null });
-  assert.deepEqual(callArgs("listPublicCamerasPage")[0], [{}, { limit: 500, offset: 0 }], "the default page is the first 500 records");
+  assert.deepEqual(callArgs("listPublicCamerasPage")[0], [{}, { limit: 500, offset: 0, count: true }], "the default page is the first 500 records");
   assert.equal(callArgs("getPublicCameraFacets").length, 0, "facets are OPT-IN (QA#5 F2): the default JSON list never pays for the two full-set aggregates");
+});
+
+test("GET /api/cameras?count=false skips the COUNT scan and forwards total null (D1 rows-read optimization 2026-08-12)", async () => {
+  stub("listPublicCamerasPage", async () => ({ records: [cameraFixture], total: null, nextOffset: null }));
+  const { GET } = await camerasRoute();
+  const response = await GET(apiRequest("/api/cameras?limit=25&count=false"));
+  assert.equal(response.status, 200);
+  assert.deepEqual(callArgs("listPublicCamerasPage")[0], [{}, { limit: 25, offset: 0, count: false }], "count=false reaches the db boundary");
+  assert.deepEqual(await responseBody(response), { records: [cameraFixture], total: null, nextOffset: null }, "the null total passes through");
+});
+
+test("GET /api/cameras?bbox=&count=false forwards the opt-out to the bbox page", async () => {
+  stub("listPublicCamerasInBboxPage", async () => ({ records: [], total: null, nextOffset: null }));
+  const { GET } = await camerasRoute();
+  const response = await GET(apiRequest("/api/cameras?bbox=12.4,41.8,12.6,42.0&count=false"));
+  assert.equal(response.status, 200);
+  const args = callArgs("listPublicCamerasInBboxPage")[0];
+  assert.deepEqual(args[2], { limit: 1000, offset: 0, count: false }, "the bbox page receives count:false");
+  assert.deepEqual(await responseBody(response), { records: [], total: null, nextOffset: null });
 });
 
 test("GET /api/cameras serves a public-cache hit before spending the read rate-limit budget", async () => {
@@ -162,7 +181,7 @@ test("GET /api/cameras?format=geojson emits lon/lat FeatureCollection with expor
     response.headers.get("content-disposition"),
     /filename=opensurveillancedb-cameras\.geojson/,
   );
-  assert.equal(response.headers.get("cache-control"), "public, s-maxage=3600", "export snapshots may be cached for a bounded window");
+  assert.equal(response.headers.get("cache-control"), "public, s-maxage=86400", "export snapshots may be cached for a long window (purged by moderation, D1 rows-read optimization 2026-08-12)");
   assert.equal(response.headers.get("cache-tag"), "cameras-export", "exports carry the shared export cache-tag for moderation purge");
   const body = await responseBody(response);
   assert.equal(body.type, "FeatureCollection");
@@ -227,7 +246,7 @@ test("GET /api/cameras?format=csv escapes quotes and neutralises spreadsheet for
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type"), /text\/csv; charset=utf-8/);
   assert.match(response.headers.get("content-disposition"), /filename=opensurveillancedb-cameras\.csv/);
-  assert.equal(response.headers.get("cache-control"), "public, s-maxage=3600", "export snapshots may be cached for a bounded window");
+  assert.equal(response.headers.get("cache-control"), "public, s-maxage=86400", "export snapshots may be cached for a long window (purged by moderation, D1 rows-read optimization 2026-08-12)");
   assert.equal(response.headers.get("cache-tag"), "cameras-export", "exports carry the shared export cache-tag for moderation purge");
   const csv = await responseBody(response);
   assert.match(csv, /^id,title,kind,manufacturer,observed_on,status,source,updated,description,address,latitude,longitude,direction\n/);
@@ -260,7 +279,7 @@ test("GET /api/cameras?kind= filters the public list by an exact, parameterised 
 
   assert.equal(response.status, 200);
   assert.deepEqual(await responseBody(response), { records: [cameraFixture], total: 1, nextOffset: null });
-  assert.deepEqual(callArgs("listPublicCamerasPage")[0], [{ kind: "Fixed dome" }, { limit: 500, offset: 0 }]);
+  assert.deepEqual(callArgs("listPublicCamerasPage")[0], [{ kind: "Fixed dome" }, { limit: 500, offset: 0, count: true }]);
 });
 
 test("GET /api/cameras trims and bounds the kind filter and ignores blank values", async () => {
@@ -269,13 +288,13 @@ test("GET /api/cameras trims and bounds the kind filter and ignores blank values
 
   const trimmed = await GET(apiRequest("/api/cameras?kind=%20%20PTZ%20%20"));
   assert.equal(trimmed.status, 200);
-  assert.deepEqual(callArgs("listPublicCamerasPage")[0], [{ kind: "PTZ" }, { limit: 500, offset: 0 }]);
+  assert.deepEqual(callArgs("listPublicCamerasPage")[0], [{ kind: "PTZ" }, { limit: 500, offset: 0, count: true }]);
 
   await GET(apiRequest("/api/cameras?kind=%20%20"));
-  assert.deepEqual(callArgs("listPublicCamerasPage")[1], [{}, { limit: 500, offset: 0 }], "a blank kind must not filter");
+  assert.deepEqual(callArgs("listPublicCamerasPage")[1], [{}, { limit: 500, offset: 0, count: true }], "a blank kind must not filter");
 
   await GET(apiRequest(`/api/cameras?kind=${"K".repeat(80)}`));
-  assert.deepEqual(callArgs("listPublicCamerasPage")[2], [{ kind: "K".repeat(60) }, { limit: 500, offset: 0 }], "the kind filter must be capped at the schema limit");
+  assert.deepEqual(callArgs("listPublicCamerasPage")[2], [{ kind: "K".repeat(60) }, { limit: 500, offset: 0, count: true }], "the kind filter must be capped at the schema limit");
 });
 
 test("GET /api/cameras?freshness= applies a whitelisted verification-freshness window", async () => {
@@ -284,10 +303,10 @@ test("GET /api/cameras?freshness= applies a whitelisted verification-freshness w
 
   const response = await GET(apiRequest("/api/cameras?freshness=7d"));
   assert.equal(response.status, 200);
-  assert.deepEqual(callArgs("listPublicCamerasPage")[0], [{ freshness: "7d" }, { limit: 500, offset: 0 }]);
+  assert.deepEqual(callArgs("listPublicCamerasPage")[0], [{ freshness: "7d" }, { limit: 500, offset: 0, count: true }]);
 
   await GET(apiRequest("/api/cameras?freshness=30d&kind=Dome"));
-  assert.deepEqual(callArgs("listPublicCamerasPage")[1], [{ kind: "Dome", freshness: "30d" }, { limit: 500, offset: 0 }]);
+  assert.deepEqual(callArgs("listPublicCamerasPage")[1], [{ kind: "Dome", freshness: "30d" }, { limit: 500, offset: 0, count: true }]);
 });
 
 test("GET /api/cameras treats freshness=all and an absent freshness as no filter", async () => {
@@ -295,10 +314,10 @@ test("GET /api/cameras treats freshness=all and an absent freshness as no filter
   const { GET } = await camerasRoute();
 
   await GET(apiRequest("/api/cameras?freshness=all"));
-  assert.deepEqual(callArgs("listPublicCamerasPage")[0], [{}, { limit: 500, offset: 0 }]);
+  assert.deepEqual(callArgs("listPublicCamerasPage")[0], [{}, { limit: 500, offset: 0, count: true }]);
 
   await GET(apiRequest("/api/cameras"));
-  assert.deepEqual(callArgs("listPublicCamerasPage")[1], [{}, { limit: 500, offset: 0 }]);
+  assert.deepEqual(callArgs("listPublicCamerasPage")[1], [{}, { limit: 500, offset: 0, count: true }]);
 });
 
 test("GET /api/cameras rejects freshness values outside the whitelist with 400", async (t) => {
@@ -332,7 +351,7 @@ test("GET /api/cameras forwards a valid ranking sort to the paginated query", as
   const { GET } = await camerasRoute();
   const response = await GET(apiRequest("/api/cameras?sort=useful"));
   assert.equal(response.status, 200);
-  assert.deepEqual(callArgs("listPublicCamerasPage")[0], [{ sort: "useful" }, { limit: 500, offset: 0 }]);
+  assert.deepEqual(callArgs("listPublicCamerasPage")[0], [{ sort: "useful" }, { limit: 500, offset: 0, count: true }]);
 });
 
 test("GET /api/cameras export formats honour the same safe filters", async () => {
@@ -355,7 +374,7 @@ test("GET /api/cameras forwards limit and offset to the paginated query and repo
   assert.deepEqual(body.records, [cameraFixture]);
   assert.equal(body.total, 1327);
   assert.equal(body.nextOffset, 525, "nextOffset is surfaced verbatim so clients can fetch the next page");
-  assert.deepEqual(callArgs("listPublicCamerasPage")[0], [{}, { limit: 25, offset: 500 }]);
+  assert.deepEqual(callArgs("listPublicCamerasPage")[0], [{}, { limit: 25, offset: 500, count: true }]);
 });
 
 test("GET /api/cameras clamps limit above the max and accepts a zero offset", async () => {
@@ -363,13 +382,13 @@ test("GET /api/cameras clamps limit above the max and accepts a zero offset", as
   const { GET } = await camerasRoute();
 
   await GET(apiRequest("/api/cameras?limit=999999"));
-  assert.deepEqual(callArgs("listPublicCamerasPage")[0], [{}, { limit: 2000, offset: 0 }], "an over-max limit is clamped to the maximum page (2000 since t_e11080eb)");
+  assert.deepEqual(callArgs("listPublicCamerasPage")[0], [{}, { limit: 2000, offset: 0, count: true }], "an over-max limit is clamped to the maximum page (2000 since t_e11080eb)");
 
   await GET(apiRequest("/api/cameras?limit=500&offset=0"));
-  assert.deepEqual(callArgs("listPublicCamerasPage")[1], [{}, { limit: 500, offset: 0 }], "offset 0 is valid");
+  assert.deepEqual(callArgs("listPublicCamerasPage")[1], [{}, { limit: 500, offset: 0, count: true }], "offset 0 is valid");
 
   await GET(apiRequest("/api/cameras?limit="));
-  assert.deepEqual(callArgs("listPublicCamerasPage")[2], [{}, { limit: 500, offset: 0 }], "a blank limit falls back to the default page size, like an absent one");
+  assert.deepEqual(callArgs("listPublicCamerasPage")[2], [{}, { limit: 500, offset: 0, count: true }], "a blank limit falls back to the default page size, like an absent one");
 });
 
 test("GET /api/cameras rejects invalid limit and offset values with 400", async (t) => {
@@ -405,7 +424,7 @@ test("GET /api/cameras accepts offsets beyond the old MAX_PAGE_OFFSET when the d
   const { GET } = await camerasRoute();
   const response = await GET(apiRequest("/api/cameras?offset=12000"));
   assert.equal(response.status, 200, "an offset past the old cap is accepted, not 400");
-  assert.deepEqual(callArgs("listPublicCamerasPage")[0], [{}, { limit: 500, offset: 12000 }]);
+  assert.deepEqual(callArgs("listPublicCamerasPage")[0], [{}, { limit: 500, offset: 12000, count: true }]);
 });
 
 test("GET /api/cameras forwards a MAX_SAFE_INTEGER offset to the db guard (anti-DoS at the boundary, not the route)", async () => {
@@ -417,7 +436,7 @@ test("GET /api/cameras forwards a MAX_SAFE_INTEGER offset to the db guard (anti-
   const { GET } = await camerasRoute();
   const response = await GET(apiRequest("/api/cameras?offset=9007199254740991"));
   assert.equal(response.status, 200);
-  assert.deepEqual(callArgs("listPublicCamerasPage")[0], [{}, { limit: 500, offset: 9007199254740991 }]);
+  assert.deepEqual(callArgs("listPublicCamerasPage")[0], [{}, { limit: 500, offset: 9007199254740991, count: true }]);
 });
 
 test("GET /api/cameras accepts an offset at the old MAX_PAGE_OFFSET boundary", async () => {
@@ -425,7 +444,7 @@ test("GET /api/cameras accepts an offset at the old MAX_PAGE_OFFSET boundary", a
   const { GET } = await camerasRoute();
   const response = await GET(apiRequest("/api/cameras?offset=10000"));
   assert.equal(response.status, 200, "offset == 10000 stays accepted (no cap regression)");
-  assert.deepEqual(callArgs("listPublicCamerasPage")[0], [{}, { limit: 500, offset: 10000 }]);
+  assert.deepEqual(callArgs("listPublicCamerasPage")[0], [{}, { limit: 500, offset: 10000, count: true }]);
 });
 
 test("GET /api/cameras export formats ignore pagination parameters entirely", async () => {
@@ -1252,7 +1271,7 @@ test("GET /api/cameras?format=geojson&bbox= returns only the points inside the b
   const response = await GET(apiRequest("/api/cameras?format=geojson&bbox=12.4,41.8,12.6,42.0"));
 
   assert.equal(response.status, 200);
-  assert.equal(response.headers.get("cache-control"), "public, s-maxage=300, stale-while-revalidate=600", "the map marker layer is cached like the list, never longer");
+  assert.equal(response.headers.get("cache-control"), "public, s-maxage=900, stale-while-revalidate=1800", "the map marker layer is cached like the list, never longer");
   assert.equal(response.headers.get("cache-tag"), "cameras-bbox", "the bbox layer carries the shared bbox cache-tag for moderation purge");
   assert.equal(response.headers.get("content-disposition"), null, "a bbox GeoJSON is a live map layer, not a download attachment");
   const body = await responseBody(response);
@@ -1271,7 +1290,7 @@ test("GET /api/cameras?bbox= returns the JSON viewport page (map data contract, 
   const response = await GET(apiRequest("/api/cameras?bbox=12.4,41.8,12.6,42.0"));
 
   assert.equal(response.status, 200);
-  assert.equal(response.headers.get("cache-control"), "public, s-maxage=300, stale-while-revalidate=600", "the viewport page is cached like the directory list");
+  assert.equal(response.headers.get("cache-control"), "public, s-maxage=900, stale-while-revalidate=1800", "the viewport page is cached like the directory list");
   assert.equal(response.headers.get("cache-tag"), "cameras-list", "the viewport page shares the list cache-tag for moderation purge");
   const body = await responseBody(response);
   assert.deepEqual(body.records, [cameraFixture]);
@@ -1281,7 +1300,7 @@ test("GET /api/cameras?bbox= returns the JSON viewport page (map data contract, 
   const args = callArgs("listPublicCamerasInBboxPage")[0];
   assert.deepEqual(args[0], { west: 12.4, south: 41.8, east: 12.6, north: 42.0 });
   assert.deepEqual(args[1], {}, "no kind/freshness filters are forwarded when none are present");
-  assert.deepEqual(args[2], { limit: 1000, offset: 0 }, "the default bbox page size is PUBLIC_CAMERAS_BBOX_DEFAULT_LIMIT");
+  assert.deepEqual(args[2], { limit: 1000, offset: 0, count: true }, "the default bbox page size is PUBLIC_CAMERAS_BBOX_DEFAULT_LIMIT");
 });
 
 test("GET /api/cameras?bbox= forwards kind/freshness filters and explicit limit/offset to the bbox page", async () => {
@@ -1293,7 +1312,7 @@ test("GET /api/cameras?bbox= forwards kind/freshness filters and explicit limit/
   const args = callArgs("listPublicCamerasInBboxPage")[0];
   assert.deepEqual(args[0], { west: 12.4, south: 41.8, east: 12.6, north: 42.0 });
   assert.deepEqual(args[1], { kind: "Dome", freshness: "30d" }, "F0 server-side filters apply to the viewport page too");
-  assert.deepEqual(args[2], { limit: 200, offset: 40 });
+  assert.deepEqual(args[2], { limit: 200, offset: 40, count: true });
 });
 
 test("GET /api/cameras?bbox=&limit= clamps the viewport page size to the bbox max and rejects bad offsets", async () => {
@@ -1302,7 +1321,7 @@ test("GET /api/cameras?bbox=&limit= clamps the viewport page size to the bbox ma
 
   const overMax = await GET(apiRequest("/api/cameras?bbox=12.4,41.8,12.6,42.0&limit=999999"));
   assert.equal(overMax.status, 200);
-  assert.deepEqual(callArgs("listPublicCamerasInBboxPage")[0][2], { limit: 10_000, offset: 0 }, "limit clamps to PUBLIC_CAMERAS_BBOX_MAX_LIMIT (never unbounded)");
+  assert.deepEqual(callArgs("listPublicCamerasInBboxPage")[0][2], { limit: 10_000, offset: 0, count: true }, "limit clamps to PUBLIC_CAMERAS_BBOX_MAX_LIMIT (never unbounded)");
 
   const badLimit = await GET(apiRequest("/api/cameras?bbox=12.4,41.8,12.6,42.0&limit=abc"));
   assert.equal(badLimit.status, 400);
@@ -1319,7 +1338,7 @@ test("GET /api/cameras?bbox= accepts offsets beyond the old MAX_PAGE_OFFSET (t_e
   const { GET } = await camerasRoute();
   const response = await GET(apiRequest("/api/cameras?bbox=12.4,41.8,12.6,42.0&offset=12000"));
   assert.equal(response.status, 200);
-  assert.deepEqual(callArgs("listPublicCamerasInBboxPage")[0][2], { limit: 1000, offset: 12000 });
+  assert.deepEqual(callArgs("listPublicCamerasInBboxPage")[0][2], { limit: 1000, offset: 12000, count: true });
 });
 
 test("GET /api/cameras bbox validation rejects malformed and inverted rectangles", async (t) => {

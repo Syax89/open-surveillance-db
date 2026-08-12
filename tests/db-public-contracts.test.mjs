@@ -237,6 +237,63 @@ test("listPublicCamerasPage returns exactly limit records, the true total and a 
   assert.equal(last.nextOffset, null, "the final page stops the walk");
 });
 
+test("listPublicCamerasPage count=false skips the COUNT and answers total null with a limit+1 probe (D1 rows-read optimization 2026-08-12)", async () => {
+  const { env, cameras } = await realDb();
+  await resetDb({ env, cameras });
+  const created = [];
+  for (let index = 0; index < 7; index += 1) {
+    created.push(await insertCamera(env, { title: `Probe ${index}` }));
+  }
+
+  // Mid-set page: the probe fetch (limit+1) sees a further row → nextOffset
+  // advertises the continuation, total is null (no COUNT scan was run).
+  const first = await cameras.listPublicCamerasPage(undefined, { limit: 3, offset: 0, count: false });
+  assert.equal(first.records.length, 3, "a page never exceeds its limit, even with the probe");
+  assert.equal(first.total, null, "count=false answers total null");
+  assert.equal(first.nextOffset, 3, "the probe detects a next page without a COUNT");
+
+  // Last page: the probe fetches 1 row past the end → nextOffset null.
+  const last = await cameras.listPublicCamerasPage(undefined, { limit: 3, offset: 6, count: false });
+  assert.equal(last.records.length, 1);
+  assert.equal(last.total, null);
+  assert.equal(last.nextOffset, null, "the final probe page stops the walk");
+
+  // A count=false walk through nextOffset collects every record, exactly
+  // like the counting walk (the client walk's exact behaviour).
+  const walked = [];
+  let offset = 0;
+  for (;;) {
+    const page = await cameras.listPublicCamerasPage(undefined, { limit: 3, offset, count: false });
+    walked.push(...page.records);
+    if (page.nextOffset === null) break;
+    offset = page.nextOffset;
+  }
+  assert.equal(new Set(walked.map((record) => record.id)).size, created.length, "the probe walk collects every record exactly once");
+});
+
+test("listPublicCamerasInBboxPage count=false answers total null with the probe (D1 rows-read optimization 2026-08-12)", async () => {
+  const { env, cameras } = await realDb();
+  await resetDb({ env, cameras });
+  const created = [];
+  for (let index = 0; index < 6; index += 1) {
+    created.push(await insertCamera(env, {
+      title: `Bbox probe ${index}`,
+      latitude: 41.9 + index * 0.001,
+      longitude: 12.49,
+    }));
+  }
+  const bbox = { west: 12.4, south: 41.8, east: 12.6, north: 42.1 };
+
+  const first = await cameras.listPublicCamerasInBboxPage(bbox, undefined, { limit: 4, offset: 0, count: false });
+  assert.equal(first.records.length, 4);
+  assert.equal(first.total, null);
+  assert.equal(first.nextOffset, 4, "the probe detects the remaining rows inside the box");
+
+  const last = await cameras.listPublicCamerasInBboxPage(bbox, undefined, { limit: 4, offset: 4, count: false });
+  assert.equal(last.records.length, 2);
+  assert.equal(last.nextOffset, null, "the final bbox probe page stops the walk");
+});
+
 test("listPublicCamerasPage pages are disjoint and cover the whole public set (zero records out of page)", async () => {
   const { env, cameras } = await realDb();
   await resetDb({ env, cameras });

@@ -165,8 +165,8 @@ test("JSON, GeoJSON, and CSV are all derived from the public camera list", async
   );
   assert.match(
     getHandler,
-    /listPublicCamerasPage\(filters,\s*\{\s*limit,\s*offset\s*\}\)/,
-    "the default JSON list must page through the dedicated paginated helper",
+    /listPublicCamerasPage\(filters,\s*\{\s*limit,\s*offset,\s*count:\s*withCount\s*\}\)/,
+    "the default JSON list must page through the dedicated paginated helper (count forwarded from the ?count= param)",
   );
   assert.match(
     getHandler,

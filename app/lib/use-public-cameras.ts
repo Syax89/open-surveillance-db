@@ -69,7 +69,7 @@ export type ServerCameraFilters = {
 
 type CamerasPage = {
   records: Camera[];
-  total: number;
+  total: number | null;
   nextOffset: number | null;
 };
 
@@ -120,9 +120,12 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
  * older fixtures keep working unchanged.
  */
 async function fetchCamerasPage(offset: number, signal: AbortSignal, extraQuery = ""): Promise<CamerasPage> {
-  const query = extraQuery ? `&${extraQuery}` : "";
+  // count=false (D1 rows-read optimization, 2026-08-12): the walk paginates
+  // on nextOffset alone; skipping the server COUNT scan on every page keeps
+  // the free-plan D1 rows-read quota intact. The API answers total: null.
+  const query = `count=false${extraQuery ? `&${extraQuery}` : ""}`;
   for (let attempt = 0; ; attempt += 1) {
-    const response = await fetch(`/api/cameras?limit=${PAGE_LIMIT}&offset=${offset}${query}`, { signal });
+    const response = await fetch(`/api/cameras?limit=${PAGE_LIMIT}&offset=${offset}${query ? `&${query}` : ""}`, { signal });
     if (response.status === 429 && attempt < WALK_RATE_LIMIT_RETRIES) {
       await sleep(retryDelaySeconds(response) * 1000, signal);
       continue;
@@ -135,7 +138,7 @@ async function fetchCamerasPage(offset: number, signal: AbortSignal, extraQuery 
       // server-side, but a non-public record that ever reaches the client
       // bundle is dropped before any component can display it.
       records: publicRecords(data.records),
-      total: typeof data.total === "number" ? data.total : data.records.length,
+      total: typeof data.total === "number" ? data.total : null,
       // `?? null` normalizes both the new contract (null on last page) and
       // the legacy shape (field absent) to "stop the walk".
       nextOffset: data.nextOffset ?? null,
@@ -145,7 +148,8 @@ async function fetchCamerasPage(offset: number, signal: AbortSignal, extraQuery 
 
 type WalkResult = {
   records: Camera[];
-  total: number;
+  /** Server total when known; null when the walk ran with count=false. */
+  total: number | null;
 };
 
 /**
@@ -159,7 +163,7 @@ type WalkResult = {
 async function walkPages(signal: AbortSignal): Promise<WalkResult> {
   const collected: Camera[] = [];
   let offset = 0;
-  let total = 0;
+  let total: number | null = null;
   for (;;) {
     const page = await fetchCamerasPage(offset, signal);
     collected.push(...page.records);
@@ -171,7 +175,9 @@ async function walkPages(signal: AbortSignal): Promise<WalkResult> {
     // 400 there, failing the whole walk into an empty /directory. The
     // `collected >= total` guard is the client-side mirror of the db
     // boundary guard: it stops exactly at the last record, no more pages.
-    if (page.nextOffset === null || page.nextOffset <= offset || collected.length >= total) break;
+    // With count=false the server answers total: null, so the guard only
+    // applies when a numeric total is present (nextOffset alone drives).
+    if (page.nextOffset === null || page.nextOffset <= offset || (typeof total === "number" && collected.length >= total)) break;
     offset = page.nextOffset;
   }
   return { records: collected, total };
@@ -184,14 +190,14 @@ async function walkPages(signal: AbortSignal): Promise<WalkResult> {
  * subset must never masquerade as the full public list for the home and
  * record pages. `total` comes from the server (never a first-page count).
  */
-async function walkFilteredPages(filters: ServerCameraFilters, signal: AbortSignal): Promise<{ records: Camera[]; total: number }> {
+async function walkFilteredPages(filters: ServerCameraFilters, signal: AbortSignal): Promise<{ records: Camera[]; total: number | null }> {
   const query = new URLSearchParams();
   if (filters.kind) query.set("kind", filters.kind);
   if (filters.freshness) query.set("freshness", filters.freshness);
   const extraQuery = query.toString();
   const collected: Camera[] = [];
   let offset = 0;
-  let total = 0;
+  let total: number | null = null;
   for (;;) {
     const page = await fetchCamerasPage(offset, signal, extraQuery);
     collected.push(...page.records);
@@ -199,8 +205,9 @@ async function walkFilteredPages(filters: ServerCameraFilters, signal: AbortSign
     // Same exhaustion + total guards as walkPages (kanban t_e86c91c4): a
     // filtered walk must also stop at the server-reported total, never
     // requesting offsets past the dataset (a fixed API cap used to 400
-    // there and blank the filtered directory).
-    if (page.nextOffset === null || page.nextOffset <= offset || collected.length >= total) break;
+    // there and blank the filtered directory). With count=false the total
+    // is null and nextOffset alone drives the walk.
+    if (page.nextOffset === null || page.nextOffset <= offset || (typeof total === "number" && collected.length >= total)) break;
     offset = page.nextOffset;
   }
   return { records: collected, total };
