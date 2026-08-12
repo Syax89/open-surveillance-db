@@ -49,7 +49,7 @@ test("hashPassword produces a self-describing PBKDF2 string and verifies", async
 
 test("verifyPassword rejects malformed stored hashes", async () => {
   const { auth } = runtime;
-  for (const bad of ["", "plaintext", "pbkdf2$210000$salt$hash$extra", "argon2$1$a$b", "pbkdf2$abc$salt$hash"]) {
+  for (const bad of ["", "plaintext", "pbkdf2$100000$salt$hash$extra", "argon2$1$a$b", "pbkdf2$abc$salt$hash"]) {
     assert.equal(await auth.verifyPassword("anything", bad), false, bad);
   }
 });
@@ -90,7 +90,7 @@ test("verifyPassword honours the stored iteration count — a constant bump neve
   // count different from the current code constant. It must verify using its
   // OWN embedded count — the pre-fix code derived at PBKDF2_ITERATIONS and
   // would have returned false here, invalidating every existing password.
-  const otherCount = auth.PBKDF2_ITERATIONS + 42_000;
+  const otherCount = auth.PBKDF2_ITERATIONS - 20_000;
   const olderHash = await pbkdf2HashAt(password, otherCount);
   assert.match(olderHash, new RegExp(`^pbkdf2\\$${otherCount}\\$`), "fixture embeds the older count");
   assert.equal(await auth.verifyPassword(password, olderHash), true, "old-count hash verifies");
@@ -101,6 +101,12 @@ test("verifyPassword honours the stored iteration count — a constant bump neve
   const currentHash = await auth.hashPassword(password);
   assert.equal(await auth.verifyPassword(password, currentHash), true);
   assert.notEqual(olderHash, currentHash);
+});
+
+test("verifyPassword rejects hashes above the Cloudflare WebCrypto ceiling", async () => {
+  const { auth } = runtime;
+  const unsupported = await pbkdf2HashAt("correct horse battery staple", auth.PBKDF2_ITERATIONS + 1);
+  assert.equal(await auth.verifyPassword("correct horse battery staple", unsupported), false);
 });
 
 test("verifyPassword falls back to the constant for legacy 3-part hashes", async () => {

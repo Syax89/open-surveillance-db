@@ -227,8 +227,9 @@ This stays a private, human-reviewed channel under the community pivot
 
 Public credential store (ADR 0013). `email` (lowercase, unique),
 `displayName` (optional public handle), `passwordHash`
-(`pbkdf2$<iterations>$<saltB64>$<hashB64>`, PBKDF2-SHA256 at 210,000
-iterations), timestamps. Anonymous submissions are no longer possible: every
+(`pbkdf2$<iterations>$<saltB64>$<hashB64>`, PBKDF2-SHA256 at 100,000
+iterations for new accounts; compatible legacy hashes retain their embedded count,
+while hashes above the Cloudflare ceiling require password reset), timestamps. Anonymous submissions are no longer possible: every
 write requires a verified contributor account (ADR 0020 write gate).
 
 ### `sessions`

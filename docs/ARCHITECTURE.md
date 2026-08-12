@@ -37,7 +37,8 @@ outputs.
 Contributor accounts and sessions (ADR 0013) live under `/api/auth/*`:
 register, login, logout, `me`, `me/contributions`, passkey enrollment and
 login, OIDC start/callback, and account erasure. Passwords are hashed with
-salted PBKDF2-HMAC-SHA256 (210,000 iterations); sessions are opaque 32-byte
+salted PBKDF2-HMAC-SHA256 (100,000 iterations for new accounts, the Cloudflare
+Workers WebCrypto ceiling); sessions are opaque 32-byte
 tokens stored only as their SHA-256, with a per-session CSRF token
 (double-submit) and rate-limited credential endpoints. Coarse roles —
 `contributor`, `moderator`, `admin` — gate every protected route through
