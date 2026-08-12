@@ -199,6 +199,83 @@ test("forwards unknown-route 404 responses from the handler unchanged", async ()
   assert.equal(app.__calls.length, 1);
 });
 
+// ---------------------------------------------------------------------------
+// Anti-scanner path catch-all (2026-08-12, CEO decision)
+// ---------------------------------------------------------------------------
+
+test("anti-scanner: blocks sensitive-config probes with 403 before the app handler", async () => {
+  const { worker, app } = await loadWorker();
+  const ctxObj = ctx();
+  const probes = [
+    "/.env",
+    "/web/.env",
+    "/.env.production",
+    "/openapi.json",
+    "/service_account.json",
+    "/appsettings.json",
+    "/firebase.json",
+    "/aws-config.js",
+    "/configuration.php.bak",
+    "/frontend_latest/91025.f69e356a1915f487.js",
+    "/telescope/requests",
+    "/server-info",
+    "/.hermes/config.yaml",
+    "/node_modules/vinext/dist/server/app-browser-state.js",
+    "/node_modules/.vite/deps/headers-DoKR6aCl.js",
+    "/classwithtostring.php",
+    "/8.php",
+    "/33.php",
+    "/gm.php",
+    "/ms-edit.php",
+    "/phpmyadmin/",
+    "/adminer.php",
+    "/wp-admin/install.php",
+    "/backup.sql",
+    "/data.log",
+    "/application.properties",
+    "/sa.json",
+    "/.git/config",
+    "/.svn/entries",
+  ];
+  for (const path of probes) {
+    const response = await worker.fetch(request(path), testEnv(), ctxObj);
+    assert.equal(response.status, 403, `${path} must be blocked with 403`);
+    assert.equal(response.headers.get("cache-control"), "no-store", `${path} must be no-store`);
+    assert.equal(app.__calls.length, 0, `${path} must not reach the app handler`);
+  }
+});
+
+test("anti-scanner: legitimate site paths are never blocked", async () => {
+  const { worker, app } = await loadWorker();
+  const ctxObj = ctx();
+  const legit = [
+    "/",
+    "/mappa",
+    "/segnala",
+    "/correggi",
+    "/api/cameras?limit=1",
+    "/api/cameras/1",
+    "/api/tiles/15/17520/12176.png",
+    "/api/tiles/3/5/2.png",
+    "/api/auth/me",
+    "/api/geocode?q=padova",
+    "/api/corrections",
+    "/assets/index-DzX5SSCE.css",
+    "/records/6745",
+  ];
+  for (const path of legit) {
+    const response = await worker.fetch(request(path), testEnv(), ctxObj);
+    assert.notEqual(response.status, 403, `${path} must not be blocked`);
+  }
+  assert.equal(app.__calls.length, legit.length, "every legit path must reach the app handler");
+  // Moderation paths are gated (503 fail-closed without credentials), never
+  // anti-scanner blocked — covered by the moderation gate tests below.
+  for (const path of ["/moderation", "/api/moderation/corrections/1"]) {
+    const response = await worker.fetch(request(path), testEnv(), ctxObj);
+    assert.equal(response.status, 503, `${path} must hit the moderation gate, not the scanner 403`);
+  }
+});
+
 test("preserves security headers set by the app handler (pass-through, never stripped)", async () => {
   // The worker wraps every response with the global security headers
   // (t_6148aa6f, PR #83), but must never overwrite handler-set headers —

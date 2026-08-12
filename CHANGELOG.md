@@ -14,6 +14,21 @@ changes accumulate under `[Unreleased]`.
 
 ### Added
 
+- **Anti-scanner edge gate (2026-08-12, CEO — "proteggiamo sto sito"):** un
+  bot scanner martellava il sito da ~500-600 richieste/ora (path sensibili:
+  `.env`, `openapi.json`, `node_modules`, `*.php`, `/.hermes/config.yaml`,
+  `service_account.json`…), attraversando l'intero router vinext e facendo
+  schizzare il p99 di CPU dei Worker (276-488 ms, cf. dashboard Grafana
+  osdb-overview). Il worker ora risponde **403 immediato prima del router,
+  dei rate-limit binding e di D1** a qualsiasi path inequivocabilmente
+  estraneo al sito (regex `SCANNER_PATH_PATTERN`, risposta no-store):
+  il costo di una probe scende da ~10 ms di CPU a ~0. Nulla sotto `/api`,
+  `/assets`, `/mappa`, `/segnala`, `/correggi`, `/moderation` o `/records`
+  può mai essere bloccato (coperto da test dedicati in
+  `tests/worker-edge.test.mjs`). Nota: il token Cloudflare API non ha
+  permessi sulle zone, quindi una WAF rule edge di Cloudflare non era
+  creabile via API — questa gate vive nel worker (si deploya con il repo).
+
 - **Production auth compatibility:** password hashing now uses 100,000 PBKDF2
   iterations, the maximum accepted by Cloudflare Workers WebCrypto. Existing
   hashes above that runtime ceiling remain stored but require the password-reset

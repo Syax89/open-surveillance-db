@@ -157,6 +157,28 @@ const identityPath = (method: string, pathname: string) =>
 const gatedPath = (method: string, pathname: string) =>
   moderationPath(pathname) || identityPath(method, pathname);
 
+/**
+ * Scanner / attack-path catch-all (2026-08-12, CEO decision "proteggiamo il
+ * sito"). Public probes for sensitive files, configs and admin panels
+ * (`.env`, `*.php`, `openapi.json`, `node_modules`, dotfiles, backup
+ * extensions…) are answered with a bare 403 BEFORE the app router, the
+ * rate-limit bindings and D1. Previously every probe crossed the full
+ * vinext routing pipeline (and API-shaped probes executed D1 queries): on
+ * 2026-08-11T22:00Z a scanner started hammering the site with ~500-600
+ * req/h (paths like /web/.env, /openapi.json, /.hermes/config.yaml,
+ * /configuration.php.bak…), which is what drove the Worker CPU p99 spikes
+ * (276-488 ms, cf. Grafana osdb-overview, 2026-08-12). This edge gate
+ * reduces the cost of a probe to a single regex test.
+ *
+ * Deliberately narrow: only unmistakably non-site paths are matched
+ * (nothing under /api, /assets, /mappa, /segnala, /correggi, /moderation
+ * or /records can ever hit it) so no legitimate route is affected — see
+ * tests/worker-edge.test.mjs "anti-scanner" for both sides of the fence.
+ */
+const SCANNER_PATH_PATTERN =
+  /(^|\/)(\.env|\.git|\.svn|\.hermes|node_modules|openapi\.json|service_account\.json|appsettings\.json|firebase\.json|aws-config|configuration\.php|frontend_latest|telescope|server-info|phpmyadmin|adminer|wp-admin|sa\.json|application\.properties|classwithtostring)|\.(php|bak|sql|log)$/i;
+
+
 // Identity headers (ADR 0014). The prototype header `x-osdb-user-email` and
 // the ChatGPT-plugin headers (`oai-*`) are trusted ONLY when set by this
 // edge after a real gate — never when supplied by the caller. The worker is
@@ -484,6 +506,20 @@ const worker = {
     // 1. Identity sanitisation runs on EVERY path before any gate: the edge
     //    is the single identity authority and never trusts the caller.
     let gated = stripIdentityHeaders(request, env);
+
+    // 1b. Scanner catch-all: sensitive-config probes die here with a bare
+    //    403, BEFORE the moderation gate, the rate-limit bindings and the
+    //    app router. Only unmistakably non-site paths match (see
+    //    SCANNER_PATH_PATTERN), so legitimate traffic is untouched.
+    if (SCANNER_PATH_PATTERN.test(url.pathname)) {
+      return withSecurityHeaders(
+        new Response("Forbidden", {
+          status: 403,
+          headers: { "Cache-Control": "no-store" },
+        }),
+        url.pathname,
+      );
+    }
 
     if (gatedPath(request.method, gatedPathname)) {
       const gate = requireModerationAuth(gated, env);
