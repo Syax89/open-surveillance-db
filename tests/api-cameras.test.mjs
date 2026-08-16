@@ -366,6 +366,22 @@ test("GET /api/cameras forwards a valid ranking sort to the paginated query", as
   assert.deepEqual(callArgs("listPublicCamerasPage")[0], [{ sort: "useful" }, { limit: 500, offset: 0, count: true }]);
 });
 
+test("GET /api/cameras?initial= seeks a single alphabetical initial server-side", async () => {
+  stub("listPublicCamerasPage", async () => ({ records: [cameraFixture], total: 1, nextOffset: null }));
+  const { GET } = await camerasRoute();
+  const response = await GET(apiRequest("/api/cameras?sort=alphabetical&initial=s&limit=20"));
+  assert.equal(response.status, 200);
+  assert.deepEqual(callArgs("listPublicCamerasPage")[0], [{ initial: "S", sort: "alphabetical" }, { limit: 20, offset: 0, count: true }]);
+});
+
+test("GET /api/cameras rejects an invalid alphabetical initial before querying", async () => {
+  const { GET } = await camerasRoute();
+  const response = await GET(apiRequest("/api/cameras?initial=SS"));
+  assert.equal(response.status, 400);
+  assert.match((await responseBody(response)).error, /initial must be one letter A-Z/);
+  assert.equal(callArgs("listPublicCamerasPage").length, 0);
+});
+
 test("GET /api/cameras export formats honour the same safe filters", async () => {
   stub("listPublicCameras", async () => [cameraFixture]);
   const { GET } = await camerasRoute();

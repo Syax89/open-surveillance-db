@@ -91,6 +91,8 @@ export type PublicCameraFilters = {
   kind?: string;
   freshness?: FreshnessWindow;
   q?: string;
+  /** A-Z directory seek: titles that start with this single ASCII letter. */
+  initial?: string;
   state?: "confirmed" | "never";
   origin?: "reports" | "imported";
   sort?: "alphabetical" | "useful" | "recent" | "confirmations";
@@ -279,6 +281,10 @@ export async function listPublicCamerasPage(
     query += " AND (title LIKE ? OR address LIKE ? OR kind LIKE ? OR source LIKE ?)";
     const needle = `%${filters.q}%`;
     parameters.push(needle, needle, needle, needle);
+  }
+  if (filters?.initial) {
+    query += " AND title COLLATE NOCASE LIKE ?";
+    parameters.push(`${filters.initial}%`);
   }
   if (filters?.state === "confirmed") query += " AND last_verified_at IS NOT NULL";
   if (filters?.state === "never") query += " AND last_verified_at IS NULL";

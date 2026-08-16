@@ -37,6 +37,8 @@ type Props = {
   page?: number;
   /** Optional (t_f13fcb1c): /directory pagination setter. */
   setPage?: (value: number) => void;
+  /** Server-side A-Z seek used by cursor pagination in the catalog. */
+  onInitialSeek?: (letter: string) => void;
   /** Keyboard path: select a record on the map and move focus to it. */
   showRecordOnMap: (id: number) => void;
   /** Place-search hit: focus the map / report position on the area. */
@@ -63,7 +65,7 @@ type Props = {
  * bundle; reused by the home page (hub mode) and /directory (catalog mode).
  * Location shows address AND coordinates (format-location, CEO 2026-08-07).
  */
-export function PublicDirectory({ filteredRecords, loading, loadError, onRetryLoad, cameraKinds, search, setSearch, kindFilter, setKindFilter, freshnessFilter, setFreshnessFilter, setFreshnessCutoff, sortOrder, setSortOrder, stateFilter, setStateFilter, originFilter, setOriginFilter, page, setPage, showRecordOnMap, setCoordinates, onResetFilters, mapHref = "#map", reportHref = "#report", showHeading = true, showMapLink = true, variant = "hub" }: Props) {
+export function PublicDirectory({ filteredRecords, loading, loadError, onRetryLoad, cameraKinds, search, setSearch, kindFilter, setKindFilter, freshnessFilter, setFreshnessFilter, setFreshnessCutoff, sortOrder, setSortOrder, stateFilter, setStateFilter, originFilter, setOriginFilter, page, setPage, onInitialSeek, showRecordOnMap, setCoordinates, onResetFilters, mapHref = "#map", reportHref = "#report", showHeading = true, showMapLink = true, variant = "hub" }: Props) {
   const t = useMessages().directory;
   const statuses = useMessages().status;
   const { locale } = useLocale();
@@ -110,6 +112,7 @@ export function PublicDirectory({ filteredRecords, loading, loadError, onRetryLo
         stateFilter={stateFilter} setStateFilter={setStateFilter} originFilter={originFilter} setOriginFilter={setOriginFilter}
         page={page}
         setPage={setPage}
+        onInitialSeek={onInitialSeek}
         showRecordOnMap={showRecordOnMap}
         setCoordinates={setCoordinates}
         onResetFilters={onResetFilters ?? resetFilters}

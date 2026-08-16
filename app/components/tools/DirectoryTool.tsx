@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMessages } from "../../lib/use-messages";
 import { usePublicCameras } from "../../lib/use-public-cameras";
@@ -64,7 +64,8 @@ export function DirectoryTool() {
   const t = useMessages().directory;
   const router = useRouter();
   const { filters, qInput, setQ, setType, setFreshness, setSort, setState, setOrigin, setPage, reset } = useCameraFilters();
-  const serverFilters = useMemo(() => serverFiltersFrom(filters), [filters]);
+  const [initial, setInitial] = useState<string | undefined>();
+  const serverFilters = useMemo(() => ({ ...serverFiltersFrom(filters), initial }), [filters, initial]);
   
   // Cursor pagination (160k+ records): when sort=alphabetical, use the new
   // cursor hook to load only 20 records per page instead of the full walk.
@@ -172,6 +173,10 @@ export function DirectoryTool() {
           setOriginFilter={setOrigin}
           page={filters.page}
           setPage={setPage}
+          onInitialSeek={(letter) => {
+            setInitial(letter);
+            setPage(1);
+          }}
           showRecordOnMap={showRecordOnMap}
           setCoordinates={() => {}}
           onResetFilters={reset}

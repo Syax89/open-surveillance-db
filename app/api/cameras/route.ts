@@ -129,6 +129,10 @@ export async function GET(request: Request) {
     const params = new URL(request.url).searchParams;
     const kindFilter = cleanText(params.get("kind"), 60);
     const queryFilter = cleanText(params.get("q"), 200);
+    const initial = params.get("initial")?.trim().toLocaleUpperCase() ?? "";
+    if (initial && !/^[A-Z]$/.test(initial)) {
+      return Response.json({ error: "initial must be one letter A-Z." }, { status: 400 });
+    }
     const freshness = params.get("freshness");
     if (freshness !== null && !freshnessWindows.includes(freshness as FreshnessWindow)) {
       return Response.json({ error: `Unknown freshness window. Use one of: ${freshnessWindows.join(", ")}.` }, { status: 400 });
@@ -154,6 +158,7 @@ export async function GET(request: Request) {
     const filters: PublicCameraFilters = {};
     if (kindFilter) filters.kind = kindFilter;
     if (queryFilter) filters.q = queryFilter;
+    if (initial) filters.initial = initial;
     if (freshness && freshness !== "all") filters.freshness = freshness as FreshnessWindow;
     if (sort) filters.sort = sort as "alphabetical" | "useful" | "recent" | "confirmations";
     if (state) filters.state = state;

@@ -25,6 +25,7 @@ export type ServerCameraFilters = {
   kind?: string;
   freshness?: "7d" | "30d" | "90d";
   q?: string;
+  initial?: string;
   state?: "confirmed" | "never";
   origin?: "reports" | "imported";
   sort?: "alphabetical" | "useful" | "recent" | "confirmations";
@@ -70,6 +71,7 @@ async function fetchCursorPage(
   if (filters.kind) query.set("kind", filters.kind);
   if (filters.freshness) query.set("freshness", filters.freshness);
   if (filters.q) query.set("q", filters.q);
+  if (filters.initial) query.set("initial", filters.initial);
   if (filters.state) query.set("state", filters.state);
   if (filters.origin) query.set("origin", filters.origin);
   if (filters.sort) query.set("sort", filters.sort);
@@ -149,7 +151,7 @@ export function usePublicCamerasPage({ page, limit = 20, filters = {} }: UsePubl
       cancelled = true;
       controller.abort();
     };
-  }, [page, limit, filters.kind, filters.freshness, filters.q, filters.state, filters.origin, filters.sort, attempt]);
+  }, [page, limit, filters.kind, filters.freshness, filters.q, filters.initial, filters.state, filters.origin, filters.sort, attempt]);
 
   const reload = () => setAttempt((prev) => prev + 1);
   const hasMore = total !== null && records.length > 0 && (page * limit < total);

@@ -48,6 +48,8 @@ type Props = {
   page?: number;
   /** Optional (t_f13fcb1c): pagination setter (writes ?page=). */
   setPage?: (value: number) => void;
+  /** Server-side A-Z seek used by cursor pagination. */
+  onInitialSeek?: (letter: string) => void;
   /** Keyboard path: select a record on the map and move focus to it. */
   showRecordOnMap: (id: number) => void;
   /** Place-search hit: focus the map / report position on the area. */
@@ -76,7 +78,7 @@ type Props = {
  * Distance facts) and hides the index/pagination/chips, which only make
  * sense for the filtered list.
  */
-export function DirectoryCatalog({ filteredRecords, loading, loadError, onRetryLoad, cameraKinds, search, setSearch, kindFilter, setKindFilter, freshnessFilter, setFreshnessFilter, sortOrder, setSortOrder, stateFilter, setStateFilter, originFilter, setOriginFilter, page = 1, setPage, showRecordOnMap, setCoordinates, onResetFilters, reportHref }: Props) {
+export function DirectoryCatalog({ filteredRecords, loading, loadError, onRetryLoad, cameraKinds, search, setSearch, kindFilter, setKindFilter, freshnessFilter, setFreshnessFilter, sortOrder, setSortOrder, stateFilter, setStateFilter, originFilter, setOriginFilter, page = 1, setPage, onInitialSeek, showRecordOnMap, setCoordinates, onResetFilters, reportHref }: Props) {
   const t = useMessages().directory;
   const statuses = useMessages().status;
   const { locale } = useLocale();
@@ -171,11 +173,14 @@ export function DirectoryCatalog({ filteredRecords, loading, loadError, onRetryL
   // reads as a real A–Z index. Hidden for positional sorting and while a
   // place search owns the results.
   const alphaIndex = useMemo(() => {
-    // With cursor pagination, filteredRecords contains only the current page (20 records),
-    // so building an A-Z index from it would show only letters of the current page.
-    // Disable the index when loading is true (placeholder for cursor detection).
-    // TODO: server-side /api/cameras/alpha-index endpoint for full-dataset index.
-    if (loading || sortOrder !== "alphabetical" || placeActive || filteredRecords.length === 0) return null;
+    if (loading || sortOrder !== "alphabetical" || placeActive) return null;
+    if (onInitialSeek) {
+      return Array.from({ length: 26 }, (_, index) => ({
+        letter: String.fromCharCode(65 + index),
+        page: 1,
+      }));
+    }
+    if (filteredRecords.length === 0) return null;
     const letters: Array<{ letter: string; page: number | null }> = [];
     for (let code = 65; code <= 90; code += 1) {
       const letter = String.fromCharCode(code);
@@ -183,7 +188,7 @@ export function DirectoryCatalog({ filteredRecords, loading, loadError, onRetryL
       letters.push({ letter, page: index === -1 ? null : Math.floor(index / DIRECTORY_PAGE_SIZE) + 1 });
     }
     return letters;
-  }, [filteredRecords, sortOrder, placeActive]);
+  }, [filteredRecords, sortOrder, placeActive, loading, onInitialSeek]);
 
   // Letters whose first record sits on the current page → aria-current.
   const currentPageLetters = useMemo(() => {
@@ -214,6 +219,11 @@ export function DirectoryCatalog({ filteredRecords, loading, loadError, onRetryL
   }
 
   function goToLetter(letter: string) {
+    if (onInitialSeek) {
+      onInitialSeek(letter);
+      requestAnimationFrame(moveToResults);
+      return;
+    }
     const hit = alphaIndex?.find((entry) => entry.letter === letter);
     if (!hit || hit.page === null) return;
     if (hit.page !== safePage) {

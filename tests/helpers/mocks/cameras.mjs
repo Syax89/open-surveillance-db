@@ -4,7 +4,7 @@
 import { makeMock } from "../mock-state.mjs";
 
 export const freshnessWindows = ["7d", "30d", "90d", "all"];
-export const PUBLIC_CAMERA_SORT_OPTIONS = ["useful", "recent", "confirmations"];
+export const PUBLIC_CAMERA_SORT_OPTIONS = ["alphabetical", "useful", "recent", "confirmations"];
 export const PUBLIC_CAMERAS_PAGE_DEFAULT_LIMIT = 500;
 export const PUBLIC_CAMERAS_PAGE_MAX_LIMIT = 2000;
 // Bbox JSON list bounds (kanban t_bb310428): mirror of db/cameras.ts — the
