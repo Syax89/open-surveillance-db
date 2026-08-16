@@ -419,6 +419,18 @@ import {
   buildQuery as esBuildQuery,
   parsePayload as esParse,
 } from "../scripts/import/adapters/osm-surveillance-spagna-2026.mjs";
+import {
+  buildQuery as inBuildQuery,
+  parsePayload as inParse,
+} from "../scripts/import/adapters/osm-surveillance-india-2026.mjs";
+import {
+  buildQuery as auBuildQuery,
+  parsePayload as auParse,
+} from "../scripts/import/adapters/osm-surveillance-australia-2026.mjs";
+import {
+  buildQuery as jpBuildQuery,
+  parsePayload as jpParse,
+} from "../scripts/import/adapters/osm-surveillance-giappone-2026.mjs";
 
 test("osm-factory: buildQuery targets the right ISO3166 admin area per country", () => {
   const at = atBuildQuery([46.5, 9.7, 46.6, 9.8], { timeout: 60 });
@@ -436,6 +448,12 @@ test("osm-factory: buildQuery targets the right ISO3166 admin area per country",
   assert.match(nl, /area\["ISO3166-1"="NL"\]\[admin_level=2\]->\.nl;/);
   const es = esBuildQuery([40.1, -3.1, 40.2, -3.0], { timeout: 60 });
   assert.match(es, /area\["ISO3166-1"="ES"\]\[admin_level=2\]->\.es;/);
+  const ind = inBuildQuery([21.1, 77.1, 21.2, 77.2], { timeout: 60 });
+  assert.match(ind, /area\["ISO3166-1"="IN"\]\[admin_level=2\]->\.in;/);
+  const au = auBuildQuery([-33.9, 151.1, -33.8, 151.2], { timeout: 60 });
+  assert.match(au, /area\["ISO3166-1"="AU"\]\[admin_level=2\]->\.au;/);
+  const jp = jpBuildQuery([35.6, 139.6, 35.7, 139.7], { timeout: 60 });
+  assert.match(jp, /area\["ISO3166-1"="JP"\]\[admin_level=2\]->\.jp;/);
 });
 
 test("osm-factory: parsePayload maps the same canonical rows for every country", () => {
@@ -454,7 +472,10 @@ test("osm-factory: parsePayload maps the same canonical rows for every country",
   const gb = gbParse(fixture);
   const nl = nlParse(fixture);
   const es = esParse(fixture);
-  for (const p of [at, de, fr, gb, nl, es]) {
+  const ind = inParse(fixture);
+  const au = auParse(fixture);
+  const jp = jpParse(fixture);
+  for (const p of [at, de, fr, gb, nl, es, ind, au, jp]) {
     assert.equal(p.staged.length, 3); // guard + indoor skipped
     assert.equal(p.skipped.reasons["surveillance:type=guard"], 1);
     assert.equal(p.skipped.reasons["surveillance=indoor"], 1);
