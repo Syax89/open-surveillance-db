@@ -7,8 +7,8 @@
   "attribution_text": "© OpenStreetMap contributors (https://www.openstreetmap.org/copyright)",
   "source_url": "https://overpass-api.de/api/interpreter",
   "overpass_query": "node/way[\"man_made\"=\"surveillance\"][\"surveillance\"~\"^(public|outdoor)$\"]",
-  "overpass_bbox_chunks": 36,
-  "overpass_timeout": 120,
+  "overpass_bbox_chunks": 80,
+  "overpass_timeout": 60,
   "overpass_sleep_ms": 3000,
   "overpass_instances": [
     "https://overpass-api.de/api/interpreter",
@@ -33,5 +33,5 @@
   "external_id_prefix": "osm:",
   "enrich": false,
   "max_records": 60000,
-  "notes": "Scan stato-per-stato (CEO 2026-08-07): Germania via factory OSM condivisa (osm-country-factory.mjs). Dataset più grande (~45k elementi): griglia 4×4=16 chunk per query Overpass piccole. Filtro surveillance public|outdoor, indoor/guard esclusi. Attribuzione: © OpenStreetMap contributors (ODbL 1.0)."
+  "notes": "Scan stato-per-stato (CEO 2026-08-07): Germania via factory OSM condivisa (osm-country-factory.mjs). Dataset più grande (~45k elementi): griglia 4×4=16 chunk per query Overpass piccole. Filtro surveillance public|outdoor, indoor/guard esclusi. Attribuzione: © OpenStreetMap contributors (ODbL 1.0). Grid 10x8 (chunk piccoli, timeout 60s, failover rapido 3 istanze — stabilità Overpass 2026-08-16)."
 }

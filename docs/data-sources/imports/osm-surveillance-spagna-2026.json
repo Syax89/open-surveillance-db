@@ -6,7 +6,7 @@
   "attribution_text": "© OpenStreetMap contributors (https://www.openstreetmap.org/copyright)",
   "source_url": "https://overpass-api.de/api/interpreter",
   "overpass_query": "node/way[\"man_made\"=\"surveillance\"][\"surveillance\"~\"^(public|outdoor)$\"]",
-  "overpass_timeout": 120,
+  "overpass_timeout": 60,
   "overpass_sleep_ms": 3000,
   "overpass_instances": [
     "https://overpass-api.de/api/interpreter",
@@ -31,7 +31,7 @@
   "external_id_prefix": "osm:",
   "enrich": false,
   "slug": "osm-surveillance-spagna-2026",
-  "overpass_bbox_chunks": 12,
+  "overpass_bbox_chunks": 48,
   "max_records": 15000,
-  "notes": "Query Overpass per bbox Spagna incl. Canarie a chunk (12 celle) — pattern factory OSM (Italia 2026). Filtro surveillance public|outdoor; camera:type->kind; ALPR->Traffic reader; guard->skip; operator->notes solo se entità pubblica. Attribuzione: © OpenStreetMap contributors."
+  "notes": "Query Overpass per bbox Spagna incl. Canarie a chunk (12 celle) — pattern factory OSM (Italia 2026). Filtro surveillance public|outdoor; camera:type->kind; ALPR->Traffic reader; guard->skip; operator->notes solo se entità pubblica. Attribuzione: © OpenStreetMap contributors. Grid 8x6 (chunk piccoli, timeout 60s, failover rapido 3 istanze — stabilità Overpass 2026-08-16)."
 }
