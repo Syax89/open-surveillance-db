@@ -15,5 +15,5 @@ export const { slug, getDescriptor, fetchPayload, parsePayload, chunkBbox, build
   iso3166: "NL",
   bbox: [3.2, 50.7, 7.3, 53.6], // [w, s, e, n]
   descriptorPath,
-  grid: { nx: 3, ny: 2 },
+  grid: { nx: 6, ny: 4 },
 });

@@ -71,7 +71,7 @@ export function createOsmCountryAdapter({
   }
 
   /** Run one chunk query against the first instance that answers. */
-  async function runChunkQuery(query, { instances, timeoutMs = 135000, attemptsPerInstance = 2 } = {}) {
+  async function runChunkQuery(query, { instances, timeoutMs = 75000, attemptsPerInstance = 1 } = {}) {
     let lastError;
     for (const instance of instances) {
       try {
