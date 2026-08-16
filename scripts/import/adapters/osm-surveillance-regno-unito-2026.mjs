@@ -1,7 +1,9 @@
 /**
  * Adapter OSM — Regno Unito (GB + NI) (wave 14, mega-check catalogo 2026-08-16).
  * Reuses the shared country factory; see osm-country-factory.mjs for the
- * full tag mapping and rate-limit etiquette (chunked Overpass, ODbL 1.0).
+ * full tag mapping. Source is a LOCAL FILE (Geofabrik PBF filtered extract,
+ * man_made=surveillance + surveillance=public|outdoor) — no Overpass calls;
+ * licence ODbL 1.0 (OSM) unchanged.
  */
 import { fileURLToPath } from "node:url";
 import { createOsmCountryAdapter } from "./osm-country-factory.mjs";
@@ -16,4 +18,5 @@ export const { slug, getDescriptor, fetchPayload, parsePayload, chunkBbox, build
   bbox: [-8.7, 49.8, 1.9, 60.9], // [w, s, e, n]
   descriptorPath,
   grid: { nx: 8, ny: 6 },
+  localSourcePath: "/opt/open-surveillance-db/.import-data/osm-surveillance-regno-unito-2026.elements.json",
 });

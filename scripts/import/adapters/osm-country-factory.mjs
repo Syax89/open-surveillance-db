@@ -17,6 +17,12 @@
  * camera:direction→direction, operator→notes only for public entities,
  * addr:*→address), external_id "osm:<type>/<id>" and the same hard
  * filters (surveillance=indoor, surveillance:type=guard skipped).
+ *
+ * Local-file mode: pass `localSourcePath` (path to a JSON file shaped
+ * {elements: [{type,id,lat,lon,tags} | {type,id,center:{lat,lon},tags}]},
+ * e.g. a Geofabrik PBF filtered extract). When set, fetchPayload ignores
+ * Overpass entirely and reads the file (JSON.parse + sha256 checksum of
+ * the file content); bbox/grid stay unused in this mode.
  */
 
 import { readFileSync } from "node:fs";
@@ -31,6 +37,7 @@ export function createOsmCountryAdapter({
   bbox,
   descriptorPath,
   grid = { nx: 3, ny: 2 },
+  localSourcePath = null,
 }) {
   function getDescriptor() {
     return JSON.parse(readFileSync(descriptorPath, "utf8"));
@@ -94,8 +101,36 @@ export function createOsmCountryAdapter({
     throw lastError ?? new Error("all Overpass instances failed");
   }
 
-  /** Fetch the whole dataset: chunked queries with throttle between chunks. */
+  /**
+   * Fetch the whole dataset. In local-file mode (localSourcePath set) reads
+   * the JSON extract from disk and returns {elements, checksum} without any
+   * network; otherwise the chunked Overpass path below.
+   */
   async function fetchPayload({ onChunk } = {}) {
+    if (localSourcePath) {
+      let raw;
+      try {
+        raw = readFileSync(localSourcePath, "utf8");
+      } catch (err) {
+        throw new Error(
+          `[${slug}] local OSM source file missing or unreadable: ${localSourcePath} (${err.code ?? err.message})`,
+          { cause: err },
+        );
+      }
+      let parsed;
+      try {
+        parsed = JSON.parse(raw);
+      } catch (err) {
+        throw new Error(
+          `[${slug}] local OSM source file is not valid JSON: ${localSourcePath} (${err.message})`,
+          { cause: err },
+        );
+      }
+      const elements = parsed.elements ?? [];
+      const checksum = createHash("sha256").update(raw).digest("hex");
+      return { elements, checksum };
+    }
+
     const descriptor = getDescriptor();
     const instances = descriptor.overpass_instances;
     const chunks = chunkBbox();
