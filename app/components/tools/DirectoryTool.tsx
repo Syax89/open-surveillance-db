@@ -86,7 +86,13 @@ export function DirectoryTool() {
   
   const { records, loading, error, reload } = usesCursor ? cursorPage : legacyWalk;
 
-  const filteredRecords = useMemo(() => applyCameraFilters(records, filters), [records, filters]);
+  // Client-side filters (legacy walk only): when using cursor pagination,
+  // ALL filters are server-side (q, type, freshness, state, origin) so
+  // applyCameraFilters would be redundant. For legacy walk, apply client filters.
+  const filteredRecords = useMemo(() => 
+    usesCursor ? records : applyCameraFilters(records, filters), 
+    [records, filters, usesCursor]
+  );
   const cameraKinds = useMemo(() => cameraKindsOf(records), [records]);
   const mapHref = useMemo(() => exploreMapHref(filters), [filters]);
   const directoryHref = useMemo(() => exploreDirectoryHref(filters), [filters]);
