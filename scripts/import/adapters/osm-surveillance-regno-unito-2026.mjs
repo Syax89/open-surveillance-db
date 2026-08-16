@@ -18,5 +18,4 @@ export const { slug, getDescriptor, fetchPayload, parsePayload, chunkBbox, build
   bbox: [-8.7, 49.8, 1.9, 60.9], // [w, s, e, n]
   descriptorPath,
   grid: { nx: 8, ny: 6 },
-  localSourcePath: "/opt/open-surveillance-db/.import-data/osm-surveillance-regno-unito-2026.elements.json",
 });

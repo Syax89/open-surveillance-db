@@ -18,5 +18,4 @@ export const { slug, getDescriptor, fetchPayload, parsePayload, chunkBbox, build
   bbox: [-18.5, 27.5, 4.5, 43.9], // [w, s, e, n]
   descriptorPath,
   grid: { nx: 8, ny: 6 },
-  localSourcePath: "/opt/open-surveillance-db/.import-data/osm-surveillance-spagna-2026.elements.json",
 });

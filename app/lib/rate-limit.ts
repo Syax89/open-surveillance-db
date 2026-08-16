@@ -61,7 +61,7 @@ export type RouteKind =
   | "action";
 
 const ROUTE_LIMIT_DEFAULTS: Record<RouteKind, RateLimitOptions> = {
-  read: { maxRequests: 60, windowSeconds: 60 },
+  read: { maxRequests: 300, windowSeconds: 60 },  // Raised 60→300 for 160k dataset, pan/zoom heavy
   export: { maxRequests: 10, windowSeconds: 60 },
   nearby: { maxRequests: 30, windowSeconds: 60 },
   revisions: { maxRequests: 30, windowSeconds: 60 },

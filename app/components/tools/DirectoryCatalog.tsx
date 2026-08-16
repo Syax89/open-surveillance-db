@@ -171,7 +171,11 @@ export function DirectoryCatalog({ filteredRecords, loading, loadError, onRetryL
   // reads as a real A–Z index. Hidden for positional sorting and while a
   // place search owns the results.
   const alphaIndex = useMemo(() => {
-    if (sortOrder !== "alphabetical" || placeActive || filteredRecords.length === 0) return null;
+    // With cursor pagination, filteredRecords contains only the current page (20 records),
+    // so building an A-Z index from it would show only letters of the current page.
+    // Disable the index when loading is true (placeholder for cursor detection).
+    // TODO: server-side /api/cameras/alpha-index endpoint for full-dataset index.
+    if (loading || sortOrder !== "alphabetical" || placeActive || filteredRecords.length === 0) return null;
     const letters: Array<{ letter: string; page: number | null }> = [];
     for (let code = 65; code <= 90; code += 1) {
       const letter = String.fromCharCode(code);

@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useMessages } from "../../lib/use-messages";
 import { usePublicCameras } from "../../lib/use-public-cameras";
+import { usePublicCamerasPage } from "../../lib/use-public-cameras-page";
 import {
   applyCameraFilters,
   cameraKindsOf,
@@ -64,15 +65,34 @@ export function DirectoryTool() {
   const router = useRouter();
   const { filters, qInput, setQ, setType, setFreshness, setSort, setState, setOrigin, setPage, reset } = useCameraFilters();
   const serverFilters = useMemo(() => serverFiltersFrom(filters), [filters]);
-  // Load failure (kanban t_e11080eb): the walk can fail transiently (429 on
-  // a shared read bucket, network). The directory MUST surface this as a
-  // truthful error state with retry — never as "0 public records found"
-  // (the empty state would lie: the records exist, the map shows them).
-  const { records, loading, error, reload } = usePublicCameras({
-    filters: serverFilters,
+  
+  // Cursor pagination (160k+ records): when sort=alphabetical, use the new
+  // cursor hook to load only 20 records per page instead of the full walk.
+  // With 160k+ dataset, the walk is unsustainable (80+ requests, 4+ MB, 16+ s).
+  // For other sorts (useful/recent/confirmations), keep the legacy walk.
+  const usesCursor = filters.sort === "alphabetical";
+  
+  // Legacy walk (map, other sorts, no filters)
+  const legacyWalk = usePublicCameras({
+    filters: usesCursor ? undefined : serverFilters,
   });
+  
+  // Cursor pagination (alphabetical + filters)
+  const cursorPage = usePublicCamerasPage({
+    page: filters.page,
+    limit: 20,
+    filters: usesCursor ? serverFilters : undefined,
+  });
+  
+  const { records, loading, error, reload } = usesCursor ? cursorPage : legacyWalk;
 
-  const filteredRecords = useMemo(() => applyCameraFilters(records, filters), [records, filters]);
+  // Client-side filters (legacy walk only): when using cursor pagination,
+  // ALL filters are server-side (q, type, freshness, state, origin) so
+  // applyCameraFilters would be redundant. For legacy walk, apply client filters.
+  const filteredRecords = useMemo(() => 
+    usesCursor ? records : applyCameraFilters(records, filters), 
+    [records, filters, usesCursor]
+  );
   const cameraKinds = useMemo(() => cameraKindsOf(records), [records]);
   const mapHref = useMemo(() => exploreMapHref(filters), [filters]);
   const directoryHref = useMemo(() => exploreDirectoryHref(filters), [filters]);

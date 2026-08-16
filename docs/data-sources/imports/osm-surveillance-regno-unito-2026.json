@@ -34,5 +34,5 @@
   "slug": "osm-surveillance-regno-unito-2026",
   "overpass_bbox_chunks": 48,
   "max_records": 20000,
-  "notes": "Dati da estratto Geofabrik (united-kingdom-latest.osm.pbf) filtrato localmente con osmium (man_made=surveillance, surveillance=public|outdoor) e importato da file locale — nessuna chiamata Overpass. Filtro surveillance public|outdoor; camera:type->kind; ALPR->Traffic reader; guard->skip; operator->notes solo se entità pubblica. Attribuzione: © OpenStreetMap contributors. Licenza ODbL 1.0 invariata."
+  "notes": "Query Overpass per bbox Regno Unito (GB + NI) a chunk (12 celle) — pattern factory OSM (Italia 2026). Filtro surveillance public|outdoor; camera:type->kind; ALPR->Traffic reader; guard->skip; operator->notes solo se entità pubblica. Attribuzione: © OpenStreetMap contributors. Grid 8x6 (chunk piccoli, timeout 60s, failover rapido 3 istanze — stabilità Overpass 2026-08-16)."
 }

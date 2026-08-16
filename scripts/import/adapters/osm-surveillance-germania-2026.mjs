@@ -22,5 +22,4 @@ export const { slug, getDescriptor, fetchPayload, parsePayload, chunkBbox, build
   bbox: [5.8, 47.2, 15.1, 55.1], // [w, s, e, n]
   descriptorPath,
   grid: { nx: 10, ny: 8 },
-  localSourcePath: "/opt/open-surveillance-db/.import-data/osm-surveillance-germania-2026.elements.json",
 });

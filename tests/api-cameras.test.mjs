@@ -161,6 +161,18 @@ test("GET /api/cameras serves a public-cache hit before spending the read rate-l
   }
 });
 
+test("GET /api/cameras?facets=kinds returns only the map kind facet", async () => {
+  stub("getPublicCameraKinds", async () => [{ kind: "PTZ", count: 3 }]);
+  stub("listPublicCamerasPage", async () => ({ records: [cameraFixture], total: 1, nextOffset: null }));
+  const { GET } = await camerasRoute();
+  const response = await GET(apiRequest("/api/cameras?facets=kinds"));
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await responseBody(response), { records: [cameraFixture], total: 1, nextOffset: null, facets: { kinds: [{ kind: "PTZ", count: 3 }] } });
+  assert.equal(callArgs("getPublicCameraKinds").length, 1);
+  assert.equal(callArgs("getPublicCameraFacets").length, 0, "the lightweight map request must not run freshness aggregates");
+});
+
 test("GET /api/cameras?facets=1 includes the facets for the filter UI (opt-in, QA#5 F2)", async () => {
   stub("listPublicCamerasPage", async () => ({ records: [cameraFixture], total: 1, nextOffset: null }));
   const { GET } = await camerasRoute();

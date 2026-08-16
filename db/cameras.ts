@@ -87,8 +87,17 @@ export async function getD1() {
 
 export const freshnessWindows = ["7d", "30d", "90d", "all"] as const;
 export type FreshnessWindow = (typeof freshnessWindows)[number];
-export type PublicCameraFilters = { kind?: string; freshness?: FreshnessWindow; sort?: "useful" | "recent" | "confirmations" };
-export const PUBLIC_CAMERA_SORT_OPTIONS = ["useful", "recent", "confirmations"] as const;
+export type PublicCameraFilters = {
+  kind?: string;
+  freshness?: FreshnessWindow;
+  q?: string;
+  state?: "confirmed" | "never";
+  origin?: "reports" | "imported";
+  sort?: "alphabetical" | "useful" | "recent" | "confirmations";
+  /** Cursor-based pagination for alphabetical sort: (title, id) of last record. */
+  after?: { title: string; id: number };
+};
+export const PUBLIC_CAMERA_SORT_OPTIONS = ["alphabetical", "useful", "recent", "confirmations"] as const;
 
 /**
  * Canonical stored kind value for dome cameras (kanban t_1b08fe12). A dome
@@ -266,6 +275,22 @@ export async function listPublicCamerasPage(
     // anchored on last_verified_at, so no GLOB is needed and the composite
     // index stays usable.
   }
+  if (filters?.q) {
+    query += " AND (title LIKE ? OR address LIKE ? OR kind LIKE ? OR source LIKE ?)";
+    const needle = `%${filters.q}%`;
+    parameters.push(needle, needle, needle, needle);
+  }
+  if (filters?.state === "confirmed") query += " AND last_verified_at IS NOT NULL";
+  if (filters?.state === "never") query += " AND last_verified_at IS NULL";
+  if (filters?.origin === "reports") query += " AND source = 'Community report'";
+  if (filters?.origin === "imported") query += " AND source LIKE 'import:%'";
+  
+  // Cursor-based pagination for alphabetical sort (keyset pagination).
+  if (filters?.after && filters.sort === "alphabetical") {
+    query += " AND (title COLLATE NOCASE > ? OR (title COLLATE NOCASE = ? AND id < ?))";
+    parameters.push(filters.after.title, filters.after.title, String(filters.after.id));
+  }
+  
   let total: number | null = null;
   if (withCount) {
     const countResult = await d1.prepare(`SELECT COUNT(*) AS total ${query}`).bind(...parameters).first<{ total: number }>();
@@ -296,6 +321,8 @@ export async function listPublicCamerasPage(
   } else if (filters?.sort === "confirmations") {
     // NULLS LAST: records never confirmed sort to the bottom (SQLite: IS NULL first).
     orderBy = "ORDER BY last_verified_at IS NULL, last_verified_at DESC, id DESC";
+  } else if (filters?.sort === "alphabetical") {
+    orderBy = "ORDER BY title COLLATE NOCASE ASC, id DESC";
   }
 
   // Probe fetch: limit+1 rows when counting is disabled (see `withCount`).
@@ -574,6 +601,17 @@ export type PublicCameraFacets = {
   freshness: { "7d": number; "30d": number; "90d": number; all: number };
 };
 
+/** Lightweight kind facet for the map filter bar. */
+export async function getPublicCameraKinds(nowIso: string = new Date().toISOString()): Promise<{ kind: string; count: number }[]> {
+  const d1 = await getD1();
+  const { sql: publicPredicate, parameters } = publicCameraPredicate(nowIso);
+  const result = await d1
+    .prepare(`SELECT kind, COUNT(*) AS count FROM cameras WHERE ${publicPredicate} GROUP BY kind ORDER BY count DESC, kind ASC`)
+    .bind(...parameters)
+    .all<{ kind: string; count: number }>();
+  return result.results;
+}
+
 /**
  * Facets for the directory/map filters (FRONTEND_PLAN § 3.2.2): the distinct
  * public `kind` values with their counts and the freshness-window counts.
@@ -633,6 +671,10 @@ export async function listPublicCamerasInBbox(
 /** Default and hard-max page size for the bbox JSON list (map viewport contract, kanban t_bb310428). */
 export const PUBLIC_CAMERAS_BBOX_DEFAULT_LIMIT = 1000;
 export const PUBLIC_CAMERAS_BBOX_MAX_LIMIT = 10_000;
+/** Decimation threshold: bbox with > this many records triggers sampling (perf optimization, 160k+ dataset). */
+export const BBOX_DECIMATION_THRESHOLD = 2000;
+/** Max bbox area in square degrees (perf: reject continental viewports, force zoom in). */
+export const BBOX_MAX_AREA_SQ_DEG = 50.0; // ~500km × 1100km at 45° latitude
 
 /**
  * Bounded JSON bbox contract for the interactive map (kanban t_bb310428 —
@@ -663,6 +705,13 @@ export async function listPublicCamerasInBboxPage(
   options: { limit: number; offset: number; count?: boolean } = { limit: PUBLIC_CAMERAS_BBOX_DEFAULT_LIMIT, offset: 0 },
 ): Promise<PublicCameraListPage> {
   const d1 = await getD1();
+  // Viewport size guard (perf, 160k+ dataset): reject bbox area > threshold.
+  // Area in square degrees: (north - south) × (east - west). Longitude
+  // degrees shrink with latitude, but for rejection a simple product suffices.
+  const bboxArea = (bbox.north - bbox.south) * (bbox.east - bbox.west);
+  if (bboxArea > BBOX_MAX_AREA_SQ_DEG) {
+    throw new Error(`Bbox area too large (${bboxArea.toFixed(2)} sq deg > ${BBOX_MAX_AREA_SQ_DEG}). Zoom in.`);
+  }
   // Same dual first argument as listPublicCamerasPage: an ISO boundary
   // string (freshness-reverification suite) or a filter object (route).
   const filters = typeof nowIsoOrFilters === "string" ? undefined : nowIsoOrFilters;
@@ -701,9 +750,18 @@ export async function listPublicCamerasInBboxPage(
       return { records: [], total, nextOffset: null };
     }
   }
+  
+  // Decimation (perf, 160k+ dataset): if bbox contains > threshold records,
+  // sample only every N-th row via ROWID modulo. The WHERE keeps the exact
+  // bbox boundary; decimation reduces DOM rendering cost without changing
+  // the visible coverage. Sampling factor scales with total: 2k→1, 4k→2, 8k→4.
+  const shouldDecimate = withCount && total !== null && total > BBOX_DECIMATION_THRESHOLD;
+  const decimationFactor = shouldDecimate ? Math.max(1, Math.floor(total / BBOX_DECIMATION_THRESHOLD)) : 1;
+  const decimationClause = shouldDecimate ? ` AND (ROWID % ${decimationFactor} = 0)` : "";
+  
   // Probe fetch: limit+1 rows when counting is disabled (see `withCount`).
   const fetched = await d1
-    .prepare(`SELECT id, title, kind, CASE WHEN publish_manufacturer = 1 THEN manufacturer ELSE NULL END AS manufacturer, CASE WHEN publish_observed_on = 1 THEN observed_on ELSE NULL END AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, latitude, longitude, direction, status, source, updated, description, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt ${query} ORDER BY id DESC LIMIT ? OFFSET ?`)
+    .prepare(`SELECT id, title, kind, CASE WHEN publish_manufacturer = 1 THEN manufacturer ELSE NULL END AS manufacturer, CASE WHEN publish_observed_on = 1 THEN observed_on ELSE NULL END AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, latitude, longitude, direction, status, source, updated, description, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt ${query}${decimationClause} ORDER BY id DESC LIMIT ? OFFSET ?`)
     .bind(...parameters, withCount ? limit : limit + 1, offset)
     .all<PublicCameraRecord>();
   const result = withCount ? fetched : { results: fetched.results.slice(0, limit) };

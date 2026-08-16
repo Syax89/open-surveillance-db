@@ -34,5 +34,5 @@
   "external_id_prefix": "osm:",
   "enrich": false,
   "max_records": 60000,
-  "notes": "Dati da estratto Geofabrik (germany-latest.osm.pbf) filtrato localmente con osmium (man_made=surveillance, surveillance=public|outdoor) e importato da file locale — nessuna chiamata Overpass. Dataset più grande (~45k elementi). Filtro surveillance public|outdoor, indoor/guard esclusi. Attribuzione: © OpenStreetMap contributors. Licenza ODbL 1.0 invariata."
+  "notes": "Scan stato-per-stato (CEO 2026-08-07): Germania via factory OSM condivisa (osm-country-factory.mjs). Dataset più grande (~45k elementi): griglia 4×4=16 chunk per query Overpass piccole. Filtro surveillance public|outdoor, indoor/guard esclusi. Attribuzione: © OpenStreetMap contributors (ODbL 1.0). Grid 10x8 (chunk piccoli, timeout 60s, failover rapido 3 istanze — stabilità Overpass 2026-08-16)."
 }

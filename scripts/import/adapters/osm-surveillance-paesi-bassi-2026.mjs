@@ -18,5 +18,4 @@ export const { slug, getDescriptor, fetchPayload, parsePayload, chunkBbox, build
   bbox: [3.2, 50.7, 7.3, 53.6], // [w, s, e, n]
   descriptorPath,
   grid: { nx: 6, ny: 4 },
-  localSourcePath: "/opt/open-surveillance-db/.import-data/osm-surveillance-paesi-bassi-2026.elements.json",
 });

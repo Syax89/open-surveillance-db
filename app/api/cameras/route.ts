@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { createCamera, DOME_KIND, findNearbyPublicCameras, freshnessWindows, getPublicCameraFacets, listPublicCameras, listPublicCamerasInBbox, listPublicCamerasInBboxPage, listPublicCamerasPage, PUBLIC_CAMERAS_BBOX_DEFAULT_LIMIT, PUBLIC_CAMERAS_BBOX_MAX_LIMIT, PUBLIC_CAMERAS_PAGE_DEFAULT_LIMIT, PUBLIC_CAMERAS_PAGE_MAX_LIMIT, PUBLIC_CAMERA_SORT_OPTIONS, type FreshnessWindow, type PublicCameraFacets, type PublicCameraFilters } from "../../../db/cameras";
+import { createCamera, DOME_KIND, findNearbyPublicCameras, freshnessWindows, getPublicCameraFacets, getPublicCameraKinds, listPublicCameras, listPublicCamerasInBbox, listPublicCamerasInBboxPage, listPublicCamerasPage, PUBLIC_CAMERAS_BBOX_DEFAULT_LIMIT, PUBLIC_CAMERAS_BBOX_MAX_LIMIT, PUBLIC_CAMERAS_PAGE_DEFAULT_LIMIT, PUBLIC_CAMERAS_PAGE_MAX_LIMIT, PUBLIC_CAMERA_SORT_OPTIONS, type FreshnessWindow, type PublicCameraFacets, type PublicCameraFilters } from "../../../db/cameras";
 import { requiresDuplicateConfirmation } from "../../lib/duplicate-detection";
 import { requireWriteAuth } from "../../lib/write-gate";
 import { csrfVerified, sameOrigin } from "../../lib/csrf";
@@ -128,18 +128,37 @@ export async function GET(request: Request) {
   try {
     const params = new URL(request.url).searchParams;
     const kindFilter = cleanText(params.get("kind"), 60);
+    const queryFilter = cleanText(params.get("q"), 200);
     const freshness = params.get("freshness");
     if (freshness !== null && !freshnessWindows.includes(freshness as FreshnessWindow)) {
       return Response.json({ error: `Unknown freshness window. Use one of: ${freshnessWindows.join(", ")}.` }, { status: 400 });
     }
     const sort = params.get("sort");
-    if (sort !== null && !PUBLIC_CAMERA_SORT_OPTIONS.includes(sort as "useful" | "recent" | "confirmations")) {
+    if (sort !== null && !PUBLIC_CAMERA_SORT_OPTIONS.includes(sort as "alphabetical" | "useful" | "recent" | "confirmations")) {
       return Response.json({ error: `Unknown sort option. Use one of: ${PUBLIC_CAMERA_SORT_OPTIONS.join(", ")}.` }, { status: 400 });
     }
+    const state = params.get("state");
+    if (state !== null && state !== "confirmed" && state !== "never") {
+      return Response.json({ error: "Unknown state filter." }, { status: 400 });
+    }
+    const origin = params.get("origin");
+    if (origin !== null && origin !== "reports" && origin !== "imported") {
+      return Response.json({ error: "Unknown origin filter." }, { status: 400 });
+    }
+    const afterTitle = cleanText(params.get("after_title"), 200);
+    const afterId = params.get("after_id");
+    const after =
+      afterTitle && afterId && /^\d+$/.test(afterId)
+        ? { title: afterTitle, id: parseInt(afterId, 10) }
+        : undefined;
     const filters: PublicCameraFilters = {};
     if (kindFilter) filters.kind = kindFilter;
+    if (queryFilter) filters.q = queryFilter;
     if (freshness && freshness !== "all") filters.freshness = freshness as FreshnessWindow;
-    if (sort) filters.sort = sort as "useful" | "recent" | "confirmations";
+    if (sort) filters.sort = sort as "alphabetical" | "useful" | "recent" | "confirmations";
+    if (state) filters.state = state;
+    if (origin) filters.origin = origin;
+    if (after) filters.after = after;
 
     // Map marker layer (FRONTEND_PLAN § 3.3): `bbox=west,south,east,north`
     // returns every public point inside the box as GeoJSON. Bounded 5-minute
@@ -241,8 +260,10 @@ export async function GET(request: Request) {
     // The filter UI that needs them requests them explicitly with
     // `?facets=1`; the default JSON payload stays lean. Nothing else in the
     // response shape changes (records/total/nextOffset are unchanged).
-    let facets: PublicCameraFacets | undefined;
-    if (params.get("facets") === "1") {
+    let facets: PublicCameraFacets | { kinds: { kind: string; count: number }[] } | undefined;
+    if (params.get("facets") === "kinds") {
+      facets = { kinds: await getPublicCameraKinds() };
+    } else if (params.get("facets") === "1") {
       facets = await getPublicCameraFacets();
     }
     const page = await listPublicCamerasPage(filters, { limit, offset, count: withCount });
