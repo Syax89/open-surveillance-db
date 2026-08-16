@@ -1,0 +1,36 @@
+{
+  "source_name": "OpenStreetMap contributors",
+  "format": "osm-overpass",
+  "license": "ODbL 1.0 (OSM)",
+  "license_url": "https://opendatacommons.org/licenses/odbl/1-0/",
+  "attribution_text": "© OpenStreetMap contributors (https://www.openstreetmap.org/copyright)",
+  "source_url": "https://overpass-api.de/api/interpreter",
+  "overpass_query": "node/way[\"man_made\"=\"surveillance\"][\"surveillance\"~\"^(public|outdoor)$\"]",
+  "overpass_timeout": 120,
+  "overpass_sleep_ms": 3000,
+  "overpass_instances": [
+    "https://overpass-api.de/api/interpreter",
+    "https://overpass.kumi.systems/api/interpreter"
+  ],
+  "kind_map": {
+    "dome": "Fixed dome",
+    "fixed": "Bullet",
+    "panning": "PTZ",
+    "alpr": "Traffic / licence plate reader",
+    "traffic": "Traffic / licence plate reader"
+  },
+  "surveillance_type_map": {
+    "alpr": "Traffic / licence plate reader",
+    "camera": null,
+    "guard": null
+  },
+  "skip_if": {
+    "surveillance": "indoor"
+  },
+  "external_id_prefix": "osm:",
+  "enrich": false,
+  "slug": "osm-surveillance-francia-2026",
+  "overpass_bbox_chunks": 24,
+  "max_records": 80000,
+  "notes": "Query Overpass per bbox Francia metropolitana a chunk (24 celle) — pattern factory OSM (Italia 2026). Filtro surveillance public|outdoor; camera:type->kind; ALPR->Traffic reader; guard->skip; operator->notes solo se entità pubblica. Attribuzione: © OpenStreetMap contributors."
+}
