@@ -432,6 +432,7 @@ import {
   parsePayload as jpParse,
 } from "../scripts/import/adapters/osm-surveillance-giappone-2026.mjs";
 import { parsePayload as qldParse } from "../scripts/import/adapters/australia-queensland-traffic-cameras-2026.mjs";
+import { parsePayload as sgParse } from "../scripts/import/adapters/singapore-lta-traffic-images-2026.mjs";
 
 test("osm-factory: buildQuery targets the right ISO3166 admin area per country", () => {
   const at = atBuildQuery([46.5, 9.7, 46.6, 9.8], { timeout: 60 });
@@ -527,6 +528,28 @@ test("qld-traffic: parses OpenDataSoft records (flat + nested fields) into canon
   assert.equal(staged[0].notes, "Region: Metropolitan — Direction: NorthEast — View of the intersection");
   assert.equal(staged[1].external_id, "qld-cam:flat-2");
   assert.equal(skipped.total, 2); // no coordinates + (0,0)
+});
+
+test("sg-lta: parses live traffic-images API response into canonical rows", () => {
+  const payload = {
+    items: [
+      {
+        cameras: [
+          { camera_id: "2701", image: "https://images.data.gov.sg/api/traffic-images/2026/08/16/190000_2701.jpg", location: { latitude: 1.447023728, longitude: 103.7716543 } },
+          { camera_id: "2702", image: "https://images.data.gov.sg/api/traffic-images/2026/08/16/190000_2702.jpg", location: { latitude: 1.448, longitude: 103.772 } },
+          { camera_id: "2703", location: null },
+          { camera_id: "2704", location: { latitude: 0, longitude: 0 } },
+        ],
+      },
+    ],
+  };
+  const { staged, skipped } = sgParse(payload);
+  assert.equal(staged.length, 2);
+  assert.equal(staged[0].external_id, "sg:2701");
+  assert.equal(staged[0].kind, "Traffic / licence plate reader");
+  assert.ok(Math.abs(staged[0].latitude - 1.447023728) < 1e-9);
+  assert.match(staged[0].notes, /^Live image: https:\/\/images/);
+  assert.equal(skipped.total, 2); // null location + (0,0)
 });
 
 test("osm-factory: localSourcePath mode reads a local JSON extract (no Overpass)", async () => {
@@ -773,6 +796,8 @@ test("licence-gate: FR (Licence Ouverte), ES (CC-BY), NL (CC0) descriptors are i
   assert.equal(isLicenceImportable("CC0 1.0"), true);
   assert.equal(isLicenceImportable("CC BY 4.0"), true);
   assert.equal(isLicenceImportable("CC BY 4.0 (NZ)"), true); // Wellington WCC
+  assert.equal(isLicenceImportable("Singapore Open Data Licence v1.0"), true);
+  assert.equal(isLicenceImportable("Singapore Open Data Licence"), true);
 });
 
 // -------------------------------------------------- wave 4 (catalog.csv 2026-08-08): NO / UK / FI / US-NY

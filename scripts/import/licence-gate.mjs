@@ -105,6 +105,11 @@ export const IMPORTABLE_LICENSES = new Set([
   // data.gov.au / data.qld.gov.au, attribution-only).
   "CC BY 3.0 AU",
   "CC-BY 3.0 AU",
+  // Singapore Open Data Licence (data.gov.sg, LTA traffic images) —
+  // permissive attribution-only government licence, same class as OGL
+  // (verified 2026-08-16 on data.gov.sg/datasets/d_6cdb6b…).
+  "Singapore Open Data Licence",
+  "Singapore Open Data Licence v1.0",
   // Generic CC BY 3.0 — classe attribution-only. DECISIONE PM 2026-08-09
   // (kanban t_8a0445a4): il dataset Denver HALO NON espone licenza
   // esplicita (solo disclaimer del catalogo) → campo licenza del
