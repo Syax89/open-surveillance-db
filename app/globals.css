@@ -329,8 +329,8 @@ button { cursor:pointer; }
   display: flex; 
   position: relative;
   left: -70px;
-  width: calc(100vw - 140px); 
-  max-width: calc(100vw - 140px); 
+  width: calc(100% + 140px); 
+  max-width: none;
   margin: 0 0 16px 0; 
   border: 1px solid rgba(222,245,234,.42); 
   border-radius: var(--radius-lg); 
