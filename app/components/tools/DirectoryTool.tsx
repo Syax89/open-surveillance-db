@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useMessages } from "../../lib/use-messages";
 import { usePublicCameras } from "../../lib/use-public-cameras";
+import { usePublicCamerasPage } from "../../lib/use-public-cameras-page";
 import {
   applyCameraFilters,
   cameraKindsOf,
@@ -64,13 +65,25 @@ export function DirectoryTool() {
   const router = useRouter();
   const { filters, qInput, setQ, setType, setFreshness, setSort, setState, setOrigin, setPage, reset } = useCameraFilters();
   const serverFilters = useMemo(() => serverFiltersFrom(filters), [filters]);
-  // Load failure (kanban t_e11080eb): the walk can fail transiently (429 on
-  // a shared read bucket, network). The directory MUST surface this as a
-  // truthful error state with retry — never as "0 public records found"
-  // (the empty state would lie: the records exist, the map shows them).
-  const { records, loading, error, reload } = usePublicCameras({
-    filters: serverFilters,
+  
+  // Cursor pagination (160k+ records): when sort=alphabetical AND server filters
+  // are active, use the new cursor hook to load only 20 records per page instead
+  // of the full walk. For other sorts and the map, keep the legacy walk.
+  const usesCursor = filters.sort === "alphabetical" && serverFilters && (serverFilters.kind || serverFilters.freshness || serverFilters.q || serverFilters.state || serverFilters.origin || serverFilters.sort);
+  
+  // Legacy walk (map, other sorts, no filters)
+  const legacyWalk = usePublicCameras({
+    filters: usesCursor ? undefined : serverFilters,
   });
+  
+  // Cursor pagination (alphabetical + filters)
+  const cursorPage = usePublicCamerasPage({
+    page: filters.page,
+    limit: 20,
+    filters: usesCursor ? serverFilters : undefined,
+  });
+  
+  const { records, loading, error, reload } = usesCursor ? cursorPage : legacyWalk;
 
   const filteredRecords = useMemo(() => applyCameraFilters(records, filters), [records, filters]);
   const cameraKinds = useMemo(() => cameraKindsOf(records), [records]);
