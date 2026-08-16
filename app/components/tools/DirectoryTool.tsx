@@ -66,10 +66,11 @@ export function DirectoryTool() {
   const { filters, qInput, setQ, setType, setFreshness, setSort, setState, setOrigin, setPage, reset } = useCameraFilters();
   const serverFilters = useMemo(() => serverFiltersFrom(filters), [filters]);
   
-  // Cursor pagination (160k+ records): when sort=alphabetical AND server filters
-  // are active, use the new cursor hook to load only 20 records per page instead
-  // of the full walk. For other sorts and the map, keep the legacy walk.
-  const usesCursor = filters.sort === "alphabetical" && serverFilters && (serverFilters.kind || serverFilters.freshness || serverFilters.q || serverFilters.state || serverFilters.origin || serverFilters.sort);
+  // Cursor pagination (160k+ records): when sort=alphabetical, use the new
+  // cursor hook to load only 20 records per page instead of the full walk.
+  // With 160k+ dataset, the walk is unsustainable (80+ requests, 4+ MB, 16+ s).
+  // For other sorts (useful/recent/confirmations), keep the legacy walk.
+  const usesCursor = filters.sort === "alphabetical";
   
   // Legacy walk (map, other sorts, no filters)
   const legacyWalk = usePublicCameras({
