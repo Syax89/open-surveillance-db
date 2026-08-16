@@ -325,7 +325,7 @@ button { cursor:pointer; }
    context), so the form must NOT clip it: overflow:hidden moved off, and
    the submit button keeps the rounded right corners that the clipping used
    to provide. */
-.hero-search { display:flex; width:100%; max-width:none; margin:0 0 16px; border:1px solid rgba(222,245,234,.42); border-radius:var(--radius-lg); background:rgba(255,255,255,.08); }
+.hero-search { display:flex; width:calc(100% + 70px); max-width:none; margin:0 0 16px -70px; border:1px solid rgba(222,245,234,.42); border-radius:var(--radius-lg); background:rgba(255,255,255,.08); }
 .hero-search-autocomplete { position:relative; flex:1 1 auto; min-width:0; display:flex; }
 .hero-search input { min-width:0; flex:1; border:0; padding:13px 15px; background:transparent; color:var(--hero-ink); font-size:var(--text-base); }
 .hero-search input::placeholder { color:var(--hero-stat-ink); opacity:1; }
