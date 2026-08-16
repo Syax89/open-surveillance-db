@@ -308,6 +308,8 @@ button { cursor:pointer; }
    hero ink keeps strong contrast over the gradient without any scrim. */
 .hero { width:var(--container-wide); margin:9px auto 0; min-height:590px; overflow:hidden; position:relative; border-radius:var(--radius-2xl); background:var(--navy); color:var(--hero-ink); }
 .hero-copy { position:relative; z-index:2; padding:78px 0 62px 70px; max-width:640px; }
+.hero-copy--intro { padding-bottom:0; }
+.hero-copy--details { padding-top:0; }
 .eyebrow { margin:0 0 18px; text-transform:uppercase; letter-spacing:.14em; font-size:var(--text-xs); font-weight:800; color:var(--eyebrow); }
 .eyebrow span { display:inline-block; width:7px; height:7px; margin-right:8px; vertical-align:1px; border-radius:var(--radius-round); background:var(--eyebrow-dot); }
 .hero .eyebrow { color:var(--hero-eyebrow); }
@@ -903,6 +905,8 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
      floor need adjusting here. */
   .hero { min-height:auto }
   .hero-copy { padding:64px 50px 50px }
+  .hero-copy--intro { padding-bottom:0; }
+  .hero-copy--details { padding-top:0; }
   .hero-search-row { margin-inline:50px; }
   /* t_7cafab72: below 980px the copy is full-width and the decorative
      .visual-label (aria-hidden, bottom-right of the background) would sit
@@ -962,6 +966,8 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
   .nav-actions, .nav-record-actions { gap:9px }
   .nav-record-actions .text-button { max-width:105px;text-align:right }
   .hero-copy { padding:52px 28px 39px }
+  .hero-copy--intro { padding-bottom:0; }
+  .hero-copy--details { padding-top:0; }
   .hero-search-row { margin-inline:28px; }
   /* IT layout stability (t_690ed55e): the IT hero headline is ~7% longer
      than EN and wrapped to an extra line at 390px, shifting the whole hero
