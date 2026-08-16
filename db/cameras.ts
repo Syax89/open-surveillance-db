@@ -87,8 +87,15 @@ export async function getD1() {
 
 export const freshnessWindows = ["7d", "30d", "90d", "all"] as const;
 export type FreshnessWindow = (typeof freshnessWindows)[number];
-export type PublicCameraFilters = { kind?: string; freshness?: FreshnessWindow; sort?: "useful" | "recent" | "confirmations" };
-export const PUBLIC_CAMERA_SORT_OPTIONS = ["useful", "recent", "confirmations"] as const;
+export type PublicCameraFilters = {
+  kind?: string;
+  freshness?: FreshnessWindow;
+  q?: string;
+  state?: "confirmed" | "never";
+  origin?: "reports" | "imported";
+  sort?: "alphabetical" | "useful" | "recent" | "confirmations";
+};
+export const PUBLIC_CAMERA_SORT_OPTIONS = ["alphabetical", "useful", "recent", "confirmations"] as const;
 
 /**
  * Canonical stored kind value for dome cameras (kanban t_1b08fe12). A dome
@@ -266,6 +273,15 @@ export async function listPublicCamerasPage(
     // anchored on last_verified_at, so no GLOB is needed and the composite
     // index stays usable.
   }
+  if (filters?.q) {
+    query += " AND (title LIKE ? OR address LIKE ? OR kind LIKE ? OR source LIKE ?)";
+    const needle = `%${filters.q}%`;
+    parameters.push(needle, needle, needle, needle);
+  }
+  if (filters?.state === "confirmed") query += " AND last_verified_at IS NOT NULL";
+  if (filters?.state === "never") query += " AND last_verified_at IS NULL";
+  if (filters?.origin === "reports") query += " AND source = 'Community report'";
+  if (filters?.origin === "imported") query += " AND source LIKE 'import:%'";
   let total: number | null = null;
   if (withCount) {
     const countResult = await d1.prepare(`SELECT COUNT(*) AS total ${query}`).bind(...parameters).first<{ total: number }>();
@@ -296,6 +312,8 @@ export async function listPublicCamerasPage(
   } else if (filters?.sort === "confirmations") {
     // NULLS LAST: records never confirmed sort to the bottom (SQLite: IS NULL first).
     orderBy = "ORDER BY last_verified_at IS NULL, last_verified_at DESC, id DESC";
+  } else if (filters?.sort === "alphabetical") {
+    orderBy = "ORDER BY title COLLATE NOCASE ASC, id DESC";
   }
 
   // Probe fetch: limit+1 rows when counting is disabled (see `withCount`).
@@ -573,6 +591,17 @@ export type PublicCameraFacets = {
   kinds: { kind: string; count: number }[];
   freshness: { "7d": number; "30d": number; "90d": number; all: number };
 };
+
+/** Lightweight kind facet for the map filter bar. */
+export async function getPublicCameraKinds(nowIso: string = new Date().toISOString()): Promise<{ kind: string; count: number }[]> {
+  const d1 = await getD1();
+  const { sql: publicPredicate, parameters } = publicCameraPredicate(nowIso);
+  const result = await d1
+    .prepare(`SELECT kind, COUNT(*) AS count FROM cameras WHERE ${publicPredicate} GROUP BY kind ORDER BY count DESC, kind ASC`)
+    .bind(...parameters)
+    .all<{ kind: string; count: number }>();
+  return result.results;
+}
 
 /**
  * Facets for the directory/map filters (FRONTEND_PLAN § 3.2.2): the distinct

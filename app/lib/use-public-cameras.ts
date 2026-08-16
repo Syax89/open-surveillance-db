@@ -65,6 +65,10 @@ const PAGE_LIMIT = 2000;
 export type ServerCameraFilters = {
   kind?: string;
   freshness?: "7d" | "30d" | "90d";
+  q?: string;
+  state?: "confirmed" | "never";
+  origin?: "reports" | "imported";
+  sort?: "alphabetical" | "useful" | "recent" | "confirmations";
 };
 
 type CamerasPage = {
@@ -194,6 +198,10 @@ async function walkFilteredPages(filters: ServerCameraFilters, signal: AbortSign
   const query = new URLSearchParams();
   if (filters.kind) query.set("kind", filters.kind);
   if (filters.freshness) query.set("freshness", filters.freshness);
+  if (filters.q) query.set("q", filters.q);
+  if (filters.state) query.set("state", filters.state);
+  if (filters.origin) query.set("origin", filters.origin);
+  if (filters.sort) query.set("sort", filters.sort);
   const extraQuery = query.toString();
   const collected: Camera[] = [];
   let offset = 0;
@@ -214,7 +222,7 @@ async function walkFilteredPages(filters: ServerCameraFilters, signal: AbortSign
 }
 
 function hasServerFilters(filters: ServerCameraFilters | undefined): filters is ServerCameraFilters {
-  return Boolean(filters && (filters.kind || filters.freshness));
+  return Boolean(filters && (filters.kind || filters.freshness || filters.q || filters.state || filters.origin || filters.sort));
 }
 
 let cachedRecords: Camera[] | null = null;

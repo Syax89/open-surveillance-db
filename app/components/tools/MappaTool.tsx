@@ -94,7 +94,7 @@ export function MappaTool() {
   const [facetsKinds, setFacetsKinds] = useState<string[] | null>(null);
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/cameras?facets=1&limit=1")
+    fetch("/api/cameras?facets=kinds&limit=1")
       .then((response) => (response.ok ? response.json() : null))
       .then((data) => {
         if (cancelled || !data || !Array.isArray(data.facets?.kinds)) return;
