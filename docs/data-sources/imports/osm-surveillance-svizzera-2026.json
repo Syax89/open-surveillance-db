@@ -5,7 +5,7 @@
   "license": "ODbL 1.0 (OSM)",
   "license_url": "https://opendatacommons.org/licenses/odbl/1-0/",
   "attribution_text": "© OpenStreetMap contributors (https://www.openstreetmap.org/copyright)",
-  "source_url": "https://overpass-api.de/api/interpreter",
+  "source_url": "https://download.geofabrik.de/europe/switzerland-latest.osm.pbf",
   "overpass_query": "node/way[\"man_made\"=\"surveillance\"][\"surveillance\"~\"^(public|outdoor)$\"]",
   "overpass_bbox_chunks": 6,
   "overpass_timeout": 120,
