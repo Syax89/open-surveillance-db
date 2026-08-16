@@ -1,0 +1,14 @@
+{
+  "source_name": "QLD Traffic (Dept of Transport and Main Roads) via Queensland OpenDataSoft",
+  "format": "opendatasoft-json",
+  "license": "CC BY 4.0",
+  "license_url": "https://creativecommons.org/licenses/by/4.0/",
+  "attribution_text": "© State of Queensland (Department of Transport and Main Roads) — QLD Traffic",
+  "source_url": "https://queensland.opendatasoft.com/explore/dataset/live-traffic-cameras-gold-coast/",
+  "local_source_path": "/opt/open-surveillance-db/.import-data/australia-queensland-traffic-cameras-2026.json",
+  "external_id_prefix": "qld-cam:",
+  "enrich": false,
+  "slug": "australia-queensland-traffic-cameras-2026",
+  "max_records": 1000,
+  "notes": "Mirror ufficiale del feed QLDTraffic su OpenDataSoft (publisher QLD Traffic / TMR), aggiornato HOURLY, ~140 camere con coordinate, immagine (href), regione e direzione. Licenza CC BY 4.0 verificata nei metadata ODS 2026-08-16. Scoperta: la API QLDTraffic nativa (api.qldtraffic.qld.gov.au/v1/webcams) richiede API key (401) mentre il mirror OpenDataSoft è pubblico."
+}
