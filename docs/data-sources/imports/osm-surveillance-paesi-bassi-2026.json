@@ -1,10 +1,11 @@
 {
   "source_name": "OpenStreetMap contributors",
-  "format": "osm-overpass",
+  "format": "osm-pbf-local",
   "license": "ODbL 1.0 (OSM)",
   "license_url": "https://opendatacommons.org/licenses/odbl/1-0/",
   "attribution_text": "© OpenStreetMap contributors (https://www.openstreetmap.org/copyright)",
-  "source_url": "https://overpass-api.de/api/interpreter",
+  "source_url": "https://download.geofabrik.de/europe/netherlands-latest.osm.pbf",
+  "local_source_path": "/opt/open-surveillance-db/.import-data/osm-surveillance-paesi-bassi-2026.elements.json",
   "overpass_query": "node/way[\"man_made\"=\"surveillance\"][\"surveillance\"~\"^(public|outdoor)$\"]",
   "overpass_timeout": 60,
   "overpass_sleep_ms": 3000,
@@ -33,5 +34,5 @@
   "slug": "osm-surveillance-paesi-bassi-2026",
   "overpass_bbox_chunks": 24,
   "max_records": 15000,
-  "notes": "Query Overpass per bbox Paesi Bassi a chunk (6 celle) — pattern factory OSM (Italia 2026). Filtro surveillance public|outdoor; camera:type->kind; ALPR->Traffic reader; guard->skip; operator->notes solo se entità pubblica. Attribuzione: © OpenStreetMap contributors. Grid 6x4 (chunk piccoli, timeout 60s, failover rapido 3 istanze — stabilità Overpass 2026-08-16)."
+  "notes": "Dati da estratto Geofabrik (netherlands-latest.osm.pbf) filtrato localmente con osmium (man_made=surveillance, surveillance=public|outdoor) e importato da file locale — nessuna chiamata Overpass. Filtro surveillance public|outdoor; camera:type->kind; ALPR->Traffic reader; guard->skip; operator->notes solo se entità pubblica. Attribuzione: © OpenStreetMap contributors. Licenza ODbL 1.0 invariata."
 }

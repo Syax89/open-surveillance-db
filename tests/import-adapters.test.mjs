@@ -387,6 +387,11 @@ test("osm: looksLikeEntityOperator heuristics", () => {
 
 // ------------------------------------------------------------- OSM country factory
 
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { createOsmCountryAdapter } from "../scripts/import/adapters/osm-country-factory.mjs";
 import {
   buildQuery as atBuildQuery,
   parsePayload as atParse,
@@ -461,6 +466,42 @@ test("osm-factory: parsePayload maps the same canonical rows for every country",
   const fixed = de.staged.find((r) => r.external_id === "osm:node/2");
   assert.equal(fixed.kind, "Bullet");
   assert.equal(fixed.direction, 90);
+});
+
+test("osm-factory: localSourcePath mode reads a local JSON extract (no Overpass)", async () => {
+  const tmpDir = mkdtempSync(join(tmpdir(), "osdb-osm-local-"));
+  const elementsPath = join(tmpDir, "elements.json");
+  try {
+    writeFileSync(
+      elementsPath,
+      JSON.stringify({
+        elements: [
+          { type: "node", id: 1, lat: 48.85, lon: 2.35, tags: { name: "Tour Eiffel", "camera:type": "dome", operator: "Ville de Paris", surveillance: "public" } },
+          { type: "way", id: 2, center: { lat: 48.86, lon: 2.36 }, tags: { surveillance: "outdoor", operator: "Préfecture de Police" } },
+        ],
+      }),
+    );
+    const descriptorPath = fileURLToPath(
+      new URL("../docs/data-sources/imports/osm-surveillance-francia-2026.json", import.meta.url),
+    );
+    const adapter = createOsmCountryAdapter({
+      slug: "test-local",
+      iso3166: "FR",
+      bbox: [-5.5, 41.2, 9.8, 51.2],
+      descriptorPath,
+      grid: { nx: 1, ny: 1 },
+      localSourcePath: elementsPath,
+    });
+    const { elements, checksum } = await adapter.fetchPayload();
+    assert.equal(elements.length, 2);
+    assert.match(checksum, /^[0-9a-f]{64}$/);
+    const { staged } = adapter.parsePayload({ elements });
+    assert.equal(staged.length, 2);
+    assert.ok(staged.some((r) => r.external_id === "osm:node/1"));
+    assert.ok(staged.some((r) => r.external_id === "osm:way/2"));
+  } finally {
+    rmSync(tmpDir, { recursive: true, force: true });
+  }
 });
 
 // ------------------------------------------------------------- Bern / Hamburg official

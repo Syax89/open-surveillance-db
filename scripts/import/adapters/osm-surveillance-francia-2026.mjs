@@ -1,7 +1,9 @@
 /**
  * Adapter OSM — Francia metropolitana (wave 14, mega-check catalogo 2026-08-16).
  * Reuses the shared country factory; see osm-country-factory.mjs for the
- * full tag mapping and rate-limit etiquette (chunked Overpass, ODbL 1.0).
+ * full tag mapping. Source is a LOCAL FILE (Geofabrik PBF filtered extract,
+ * man_made=surveillance + surveillance=public|outdoor) — no Overpass calls;
+ * licence ODbL 1.0 (OSM) unchanged.
  */
 import { fileURLToPath } from "node:url";
 import { createOsmCountryAdapter } from "./osm-country-factory.mjs";
@@ -16,4 +18,5 @@ export const { slug, getDescriptor, fetchPayload, parsePayload, chunkBbox, build
   bbox: [-5.5, 41.2, 9.8, 51.2], // [w, s, e, n]
   descriptorPath,
   grid: { nx: 12, ny: 8 },
+  localSourcePath: "/opt/open-surveillance-db/.import-data/osm-surveillance-francia-2026.elements.json",
 });
