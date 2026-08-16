@@ -7,12 +7,13 @@
   "attribution_text": "© OpenStreetMap contributors (https://www.openstreetmap.org/copyright)",
   "source_url": "https://overpass-api.de/api/interpreter",
   "overpass_query": "node/way[\"man_made\"=\"surveillance\"][\"surveillance\"~\"^(public|outdoor)$\"]",
-  "overpass_bbox_chunks": 16,
+  "overpass_bbox_chunks": 36,
   "overpass_timeout": 120,
   "overpass_sleep_ms": 3000,
   "overpass_instances": [
     "https://overpass-api.de/api/interpreter",
-    "https://overpass.kumi.systems/api/interpreter"
+    "https://overpass.kumi.systems/api/interpreter",
+    "https://overpass.private.coffee/api/interpreter"
   ],
   "kind_map": {
     "dome": "Fixed dome",
