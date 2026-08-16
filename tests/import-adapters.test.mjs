@@ -431,6 +431,7 @@ import {
   buildQuery as jpBuildQuery,
   parsePayload as jpParse,
 } from "../scripts/import/adapters/osm-surveillance-giappone-2026.mjs";
+import { parsePayload as qldParse } from "../scripts/import/adapters/australia-queensland-traffic-cameras-2026.mjs";
 
 test("osm-factory: buildQuery targets the right ISO3166 admin area per country", () => {
   const at = atBuildQuery([46.5, 9.7, 46.6, 9.8], { timeout: 60 });
@@ -487,6 +488,45 @@ test("osm-factory: parsePayload maps the same canonical rows for every country",
   const fixed = de.staged.find((r) => r.external_id === "osm:node/2");
   assert.equal(fixed.kind, "Bullet");
   assert.equal(fixed.direction, 90);
+});
+
+test("qld-traffic: parses OpenDataSoft records (flat + nested fields) into canonical rows", () => {
+  const payload = {
+    results: [
+      {
+        fields: {
+          id: 1,
+          title: "Archerfield",
+          region: "Metropolitan",
+          direction: "NorthEast",
+          view: "View of the intersection",
+          href: "https://cameras.qldtraffic.qld.gov.au/Metropolitan/Archerfield.jpg",
+          postcode: "4108",
+          geo_point_2d: { lat: -27.5551796, lon: 153.0086975 },
+        },
+      },
+      {
+        geo_point_2d: [42.1, -72.5],
+        id: "flat-2",
+        title: "Flat record",
+        region: "RegionX",
+      },
+      {
+        fields: { id: 3, title: "NoGeo", region: "R" },
+      },
+      {
+        fields: { id: 4, geo_point_2d: { lat: 0, lon: 0 }, title: "Zero" },
+      },
+    ],
+  };
+  const { staged, skipped } = qldParse(payload);
+  assert.equal(staged.length, 2);
+  assert.equal(staged[0].external_id, "qld-cam:1");
+  assert.equal(staged[0].kind, "Traffic / licence plate reader");
+  assert.ok(Math.abs(staged[0].latitude - -27.5551796) < 1e-9);
+  assert.equal(staged[0].notes, "Region: Metropolitan — Direction: NorthEast — View of the intersection");
+  assert.equal(staged[1].external_id, "qld-cam:flat-2");
+  assert.equal(skipped.total, 2); // no coordinates + (0,0)
 });
 
 test("osm-factory: localSourcePath mode reads a local JSON extract (no Overpass)", async () => {
