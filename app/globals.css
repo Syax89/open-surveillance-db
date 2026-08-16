@@ -318,24 +318,11 @@ button { cursor:pointer; }
    break for unbreakable tokens (e.g. "OpenSurveillanceDB"). */
 .hero h1 { margin:0; max-width:590px; font-size:var(--text-hero); line-height:1.06; letter-spacing:-.075em; font-weight:800; text-wrap:balance; overflow-wrap:anywhere; }
 .hero-intro { max-width:525px; margin:28px 0; color:var(--hero-intro-ink); font-size:var(--text-3xl); line-height:1.58; text-wrap:balance; }
-/* Hero search (issue #439): full-width inside the hero-copy column (the
-   old 525px cap is gone — width:100% fills the column, which is itself
-   capped at 640px by .hero-copy). The autocomplete dropdown is absolutely
-   positioned under the input (.hero-search-autocomplete is the positioning
-   context), so the form must NOT clip it: overflow:hidden moved off, and
-   the submit button keeps the rounded right corners that the clipping used
-   to provide. */
-.hero-search { 
-  display: flex; 
-  position: relative;
-  left: -70px;
-  width: calc(100% + 140px); 
-  max-width: none;
-  margin: 0 0 16px 0; 
-  border: 1px solid rgba(222,245,234,.42); 
-  border-radius: var(--radius-lg); 
-  background: rgba(255,255,255,.08); 
-}
+/* The search is a hero-level row, separate from the readable 640px copy
+   column. Its own side margins align with the copy while allowing the field
+   to use the full visible hero width without viewport-relative overflow. */
+.hero-search-row { position:relative; z-index:2; margin:0 70px 16px; }
+.hero-search { display:flex; width:100%; margin:0; border:1px solid rgba(222,245,234,.42); border-radius:var(--radius-lg); background:rgba(255,255,255,.08); }
 .hero-search-autocomplete { position:relative; flex:1 1 auto; min-width:0; display:flex; }
 .hero-search input { min-width:0; flex:1; border:0; padding:13px 15px; background:transparent; color:var(--hero-ink); font-size:var(--text-base); }
 .hero-search input::placeholder { color:var(--hero-stat-ink); opacity:1; }
@@ -916,6 +903,7 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
      floor need adjusting here. */
   .hero { min-height:auto }
   .hero-copy { padding:64px 50px 50px }
+  .hero-search-row { margin-inline:50px; }
   /* t_7cafab72: below 980px the copy is full-width and the decorative
      .visual-label (aria-hidden, bottom-right of the background) would sit
      on top of the trust note — hide it at these widths (it is pure
@@ -974,6 +962,7 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
   .nav-actions, .nav-record-actions { gap:9px }
   .nav-record-actions .text-button { max-width:105px;text-align:right }
   .hero-copy { padding:52px 28px 39px }
+  .hero-search-row { margin-inline:28px; }
   /* IT layout stability (t_690ed55e): the IT hero headline is ~7% longer
      than EN and wrapped to an extra line at 390px, shifting the whole hero
      block. Clamp keeps the 49px display size at the widest mobile end while
