@@ -15,8 +15,8 @@
  * <= east. Edges are inclusive.
  */
 
-/** Milliseconds to debounce moveend/zoomend before refreshing the list. */
-export const BOUNDS_DEBOUNCE_MS = 200;
+/** Milliseconds to debounce moveend/zoomend before refreshing the list (raised 200→500ms for 160k dataset). */
+export const BOUNDS_DEBOUNCE_MS = 500;
 
 /** Plain serialisable rectangle of the current map viewport. */
 export type ViewportBounds = {
