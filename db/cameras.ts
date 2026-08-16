@@ -756,7 +756,7 @@ export async function listPublicCamerasInBboxPage(
   // bbox boundary; decimation reduces DOM rendering cost without changing
   // the visible coverage. Sampling factor scales with total: 2k→1, 4k→2, 8k→4.
   const shouldDecimate = withCount && total !== null && total > BBOX_DECIMATION_THRESHOLD;
-  const decimationFactor = shouldDecimate ? Math.max(1, Math.floor(total / BBOX_DECIMATION_THRESHOLD)) : 1;
+  const decimationFactor = shouldDecimate ? Math.max(1, Math.floor((total ?? 0) / BBOX_DECIMATION_THRESHOLD)) : 1;
   const decimationClause = shouldDecimate ? ` AND (ROWID % ${decimationFactor} = 0)` : "";
   
   // Probe fetch: limit+1 rows when counting is disabled (see `withCount`).
