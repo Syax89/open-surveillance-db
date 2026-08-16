@@ -671,6 +671,10 @@ export async function listPublicCamerasInBbox(
 /** Default and hard-max page size for the bbox JSON list (map viewport contract, kanban t_bb310428). */
 export const PUBLIC_CAMERAS_BBOX_DEFAULT_LIMIT = 1000;
 export const PUBLIC_CAMERAS_BBOX_MAX_LIMIT = 10_000;
+/** Decimation threshold: bbox with > this many records triggers sampling (perf optimization, 160k+ dataset). */
+export const BBOX_DECIMATION_THRESHOLD = 2000;
+/** Max bbox area in square degrees (perf: reject continental viewports, force zoom in). */
+export const BBOX_MAX_AREA_SQ_DEG = 50.0; // ~500km × 1100km at 45° latitude
 
 /**
  * Bounded JSON bbox contract for the interactive map (kanban t_bb310428 —
@@ -701,6 +705,13 @@ export async function listPublicCamerasInBboxPage(
   options: { limit: number; offset: number; count?: boolean } = { limit: PUBLIC_CAMERAS_BBOX_DEFAULT_LIMIT, offset: 0 },
 ): Promise<PublicCameraListPage> {
   const d1 = await getD1();
+  // Viewport size guard (perf, 160k+ dataset): reject bbox area > threshold.
+  // Area in square degrees: (north - south) × (east - west). Longitude
+  // degrees shrink with latitude, but for rejection a simple product suffices.
+  const bboxArea = (bbox.north - bbox.south) * (bbox.east - bbox.west);
+  if (bboxArea > BBOX_MAX_AREA_SQ_DEG) {
+    throw new Error(`Bbox area too large (${bboxArea.toFixed(2)} sq deg > ${BBOX_MAX_AREA_SQ_DEG}). Zoom in.`);
+  }
   // Same dual first argument as listPublicCamerasPage: an ISO boundary
   // string (freshness-reverification suite) or a filter object (route).
   const filters = typeof nowIsoOrFilters === "string" ? undefined : nowIsoOrFilters;
@@ -739,9 +750,18 @@ export async function listPublicCamerasInBboxPage(
       return { records: [], total, nextOffset: null };
     }
   }
+  
+  // Decimation (perf, 160k+ dataset): if bbox contains > threshold records,
+  // sample only every N-th row via ROWID modulo. The WHERE keeps the exact
+  // bbox boundary; decimation reduces DOM rendering cost without changing
+  // the visible coverage. Sampling factor scales with total: 2k→1, 4k→2, 8k→4.
+  const shouldDecimate = withCount && total !== null && total > BBOX_DECIMATION_THRESHOLD;
+  const decimationFactor = shouldDecimate ? Math.max(1, Math.floor(total / BBOX_DECIMATION_THRESHOLD)) : 1;
+  const decimationClause = shouldDecimate ? ` AND (ROWID % ${decimationFactor} = 0)` : "";
+  
   // Probe fetch: limit+1 rows when counting is disabled (see `withCount`).
   const fetched = await d1
-    .prepare(`SELECT id, title, kind, CASE WHEN publish_manufacturer = 1 THEN manufacturer ELSE NULL END AS manufacturer, CASE WHEN publish_observed_on = 1 THEN observed_on ELSE NULL END AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, latitude, longitude, direction, status, source, updated, description, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt ${query} ORDER BY id DESC LIMIT ? OFFSET ?`)
+    .prepare(`SELECT id, title, kind, CASE WHEN publish_manufacturer = 1 THEN manufacturer ELSE NULL END AS manufacturer, CASE WHEN publish_observed_on = 1 THEN observed_on ELSE NULL END AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, latitude, longitude, direction, status, source, updated, description, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt ${query}${decimationClause} ORDER BY id DESC LIMIT ? OFFSET ?`)
     .bind(...parameters, withCount ? limit : limit + 1, offset)
     .all<PublicCameraRecord>();
   const result = withCount ? fetched : { results: fetched.results.slice(0, limit) };
