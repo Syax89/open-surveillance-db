@@ -126,10 +126,14 @@ export function usePublicCamerasPage({ page, limit = 20, filters = {} }: UsePubl
       return { records: [], total: currentTotal, nextCursor: null };
     };
 
+    // This effect owns the request lifecycle; reset its visible state before
+    // launching the replacement request so stale records are never presented
+    // as the result for a new page/filter key.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     setError(false);
     walkToPage()
-      .then(({ records: fetched, total: fetchedTotal, nextCursor }) => {
+      .then(({ records: fetched, total: fetchedTotal }) => {
         if (cancelled) return;
         setLoading(false);
         setRecords(fetched);
