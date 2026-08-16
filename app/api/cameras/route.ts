@@ -134,7 +134,7 @@ export async function GET(request: Request) {
       return Response.json({ error: `Unknown freshness window. Use one of: ${freshnessWindows.join(", ")}.` }, { status: 400 });
     }
     const sort = params.get("sort");
-    if (sort !== null && !PUBLIC_CAMERA_SORT_OPTIONS.includes(sort as "useful" | "recent" | "confirmations")) {
+    if (sort !== null && !PUBLIC_CAMERA_SORT_OPTIONS.includes(sort as "alphabetical" | "useful" | "recent" | "confirmations")) {
       return Response.json({ error: `Unknown sort option. Use one of: ${PUBLIC_CAMERA_SORT_OPTIONS.join(", ")}.` }, { status: 400 });
     }
     const state = params.get("state");
