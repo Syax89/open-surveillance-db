@@ -145,6 +145,12 @@ export async function GET(request: Request) {
     if (origin !== null && origin !== "reports" && origin !== "imported") {
       return Response.json({ error: "Unknown origin filter." }, { status: 400 });
     }
+    const afterTitle = cleanText(params.get("after_title"), 200);
+    const afterId = params.get("after_id");
+    const after =
+      afterTitle && afterId && /^\d+$/.test(afterId)
+        ? { title: afterTitle, id: parseInt(afterId, 10) }
+        : undefined;
     const filters: PublicCameraFilters = {};
     if (kindFilter) filters.kind = kindFilter;
     if (queryFilter) filters.q = queryFilter;
@@ -152,6 +158,7 @@ export async function GET(request: Request) {
     if (sort) filters.sort = sort as "alphabetical" | "useful" | "recent" | "confirmations";
     if (state) filters.state = state;
     if (origin) filters.origin = origin;
+    if (after) filters.after = after;
 
     // Map marker layer (FRONTEND_PLAN § 3.3): `bbox=west,south,east,north`
     // returns every public point inside the box as GeoJSON. Bounded 5-minute

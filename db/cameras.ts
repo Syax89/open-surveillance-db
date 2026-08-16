@@ -94,6 +94,8 @@ export type PublicCameraFilters = {
   state?: "confirmed" | "never";
   origin?: "reports" | "imported";
   sort?: "alphabetical" | "useful" | "recent" | "confirmations";
+  /** Cursor-based pagination for alphabetical sort: (title, id) of last record. */
+  after?: { title: string; id: number };
 };
 export const PUBLIC_CAMERA_SORT_OPTIONS = ["alphabetical", "useful", "recent", "confirmations"] as const;
 
@@ -282,6 +284,13 @@ export async function listPublicCamerasPage(
   if (filters?.state === "never") query += " AND last_verified_at IS NULL";
   if (filters?.origin === "reports") query += " AND source = 'Community report'";
   if (filters?.origin === "imported") query += " AND source LIKE 'import:%'";
+  
+  // Cursor-based pagination for alphabetical sort (keyset pagination).
+  if (filters?.after && filters.sort === "alphabetical") {
+    query += " AND (title COLLATE NOCASE > ? OR (title COLLATE NOCASE = ? AND id < ?))";
+    parameters.push(filters.after.title, filters.after.title, String(filters.after.id));
+  }
+  
   let total: number | null = null;
   if (withCount) {
     const countResult = await d1.prepare(`SELECT COUNT(*) AS total ${query}`).bind(...parameters).first<{ total: number }>();

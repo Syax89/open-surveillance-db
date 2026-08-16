@@ -221,8 +221,44 @@ async function walkFilteredPages(filters: ServerCameraFilters, signal: AbortSign
   return { records: collected, total };
 }
 
+/**
+ * Fetch one page via cursor (alphabetical sort only). The cursor avoids
+ * OFFSET scan on large datasets. Returns records + nextCursor for the next page.
+ */
+async function fetchCursorPage(
+  filters: ServerCameraFilters,
+  after: { title: string; id: number } | null,
+  limit: number,
+  signal: AbortSignal,
+): Promise<{ records: Camera[]; nextCursor: { title: string; id: number } | null; total: number | null }> {
+  const query = new URLSearchParams();
+  if (filters.kind) query.set("kind", filters.kind);
+  if (filters.freshness) query.set("freshness", filters.freshness);
+  if (filters.q) query.set("q", filters.q);
+  if (filters.state) query.set("state", filters.state);
+  if (filters.origin) query.set("origin", filters.origin);
+  if (filters.sort) query.set("sort", filters.sort);
+  if (after) {
+    query.set("after_title", after.title);
+    query.set("after_id", String(after.id));
+  }
+  query.set("limit", String(limit));
+  query.set("count", "true");
+  const response = await fetch(`/api/cameras?${query.toString()}`, { signal });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const data = (await response.json()) as Partial<CamerasPage>;
+  if (!Array.isArray(data.records)) throw new Error("Malformed /api/cameras payload");
+  const records = publicRecords(data.records);
+  const nextCursor = records.length > 0 ? { title: records[records.length - 1].title, id: records[records.length - 1].id } : null;
+  return { records, nextCursor, total: typeof data.total === "number" ? data.total : null };
+}
+
 function hasServerFilters(filters: ServerCameraFilters | undefined): filters is ServerCameraFilters {
   return Boolean(filters && (filters.kind || filters.freshness || filters.q || filters.state || filters.origin || filters.sort));
+}
+
+function usesCursorPagination(filters: ServerCameraFilters | undefined): boolean {
+  return Boolean(filters?.sort === "alphabetical" && hasServerFilters(filters));
 }
 
 let cachedRecords: Camera[] | null = null;
