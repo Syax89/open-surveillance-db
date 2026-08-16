@@ -398,6 +398,22 @@ import {
   buildQuery as deBuildQuery,
   parsePayload as deParse,
 } from "../scripts/import/adapters/osm-surveillance-germania-2026.mjs";
+import {
+  buildQuery as frBuildQuery,
+  parsePayload as frParse,
+} from "../scripts/import/adapters/osm-surveillance-francia-2026.mjs";
+import {
+  buildQuery as gbBuildQuery,
+  parsePayload as gbParse,
+} from "../scripts/import/adapters/osm-surveillance-regno-unito-2026.mjs";
+import {
+  buildQuery as nlBuildQuery,
+  parsePayload as nlParse,
+} from "../scripts/import/adapters/osm-surveillance-paesi-bassi-2026.mjs";
+import {
+  buildQuery as esBuildQuery,
+  parsePayload as esParse,
+} from "../scripts/import/adapters/osm-surveillance-spagna-2026.mjs";
 
 test("osm-factory: buildQuery targets the right ISO3166 admin area per country", () => {
   const at = atBuildQuery([46.5, 9.7, 46.6, 9.8], { timeout: 60 });
@@ -407,6 +423,14 @@ test("osm-factory: buildQuery targets the right ISO3166 admin area per country",
   assert.match(ch, /area\["ISO3166-1"="CH"\]\[admin_level=2\]->\.ch;/);
   const de = deBuildQuery([48.1, 8.1, 48.2, 8.2], { timeout: 60 });
   assert.match(de, /area\["ISO3166-1"="DE"\]\[admin_level=2\]->\.de;/);
+  const fr = frBuildQuery([46.5, 2.1, 46.6, 2.2], { timeout: 60 });
+  assert.match(fr, /area\["ISO3166-1"="FR"\]\[admin_level=2\]->\.fr;/);
+  const gb = gbBuildQuery([52.1, -1.1, 52.2, -1.0], { timeout: 60 });
+  assert.match(gb, /area\["ISO3166-1"="GB"\]\[admin_level=2\]->\.gb;/);
+  const nl = nlBuildQuery([52.1, 4.9, 52.2, 5.0], { timeout: 60 });
+  assert.match(nl, /area\["ISO3166-1"="NL"\]\[admin_level=2\]->\.nl;/);
+  const es = esBuildQuery([40.1, -3.1, 40.2, -3.0], { timeout: 60 });
+  assert.match(es, /area\["ISO3166-1"="ES"\]\[admin_level=2\]->\.es;/);
 });
 
 test("osm-factory: parsePayload maps the same canonical rows for every country", () => {
@@ -421,8 +445,15 @@ test("osm-factory: parsePayload maps the same canonical rows for every country",
   };
   const at = atParse(fixture);
   const de = deParse(fixture);
-  assert.equal(at.staged.length, 3); // guard + indoor skipped
-  assert.equal(de.staged.length, 3);
+  const fr = frParse(fixture);
+  const gb = gbParse(fixture);
+  const nl = nlParse(fixture);
+  const es = esParse(fixture);
+  for (const p of [at, de, fr, gb, nl, es]) {
+    assert.equal(p.staged.length, 3); // guard + indoor skipped
+    assert.equal(p.skipped.reasons["surveillance:type=guard"], 1);
+    assert.equal(p.skipped.reasons["surveillance=indoor"], 1);
+  }
   const dome = de.staged.find((r) => r.external_id === "osm:node/1");
   assert.equal(dome.kind, "Fixed dome");
   assert.equal(dome.direction, null); // dome invariant
@@ -430,8 +461,6 @@ test("osm-factory: parsePayload maps the same canonical rows for every country",
   const fixed = de.staged.find((r) => r.external_id === "osm:node/2");
   assert.equal(fixed.kind, "Bullet");
   assert.equal(fixed.direction, 90);
-  assert.equal(de.skipped.reasons["surveillance:type=guard"], 1);
-  assert.equal(de.skipped.reasons["surveillance=indoor"], 1);
 });
 
 // ------------------------------------------------------------- Bern / Hamburg official
