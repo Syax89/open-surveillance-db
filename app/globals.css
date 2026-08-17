@@ -322,8 +322,12 @@ button { cursor:pointer; }
 .hero-intro { max-width:525px; margin:28px 0; color:var(--hero-intro-ink); font-size:var(--text-3xl); line-height:1.58; text-wrap:balance; }
 /* The search is a hero-level row, separate from the readable 640px copy
    column. Its own side margins align with the copy while allowing the field
-   to use the full visible hero width without viewport-relative overflow. */
-.hero-search-row { position:relative; z-index:2; margin:0 70px 16px; }
+   to use the full visible hero width without viewport-relative overflow.
+   z-index:3 (above .hero-copy's 2): the absolute geocode dropdown inside
+   (z-index:1000) is trapped in this row's stacking context, so the row must
+   outrank the sibling .hero-copy--details ("Explore the map" CTA) or that
+   later-in-DOM sibling paints over the open dropdown. */
+.hero-search-row { position:relative; z-index:3; margin:0 70px 16px; }
 .hero-search { display:flex; width:100%; margin:0; border:1px solid rgba(222,245,234,.42); border-radius:var(--radius-lg); background:rgba(255,255,255,.08); }
 .hero-search-autocomplete { position:relative; flex:1 1 auto; min-width:0; display:flex; }
 .hero-search input { min-width:0; flex:1; border:0; padding:13px 15px; background:transparent; color:var(--hero-ink); font-size:var(--text-base); }
