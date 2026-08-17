@@ -406,6 +406,8 @@ export type UsePublicCamerasOptions = {
    * all-defaults keeps the shared cached walk (home/record-page behaviour).
    */
   filters?: ServerCameraFilters;
+  /** Keep hook order while suppressing the legacy full-list walk. */
+  enabled?: boolean;
 };
 
 export type UsePublicCamerasResult = {
@@ -423,7 +425,7 @@ export type UsePublicCamerasResult = {
   reload: () => void;
 };
 
-export function usePublicCameras({ onRecords, onError, filters }: UsePublicCamerasOptions = {}): UsePublicCamerasResult {
+export function usePublicCameras({ onRecords, onError, filters, enabled = true }: UsePublicCamerasOptions = {}): UsePublicCamerasResult {
   // Server-filtered walks re-run when the filter combo changes (each combo
   // is its own query). The shared full-list walk never re-runs for filters.
   const serverActive = hasServerFilters(filters);
@@ -461,6 +463,7 @@ export function usePublicCameras({ onRecords, onError, filters }: UsePublicCamer
   // so a consumer that mounts after the cache was populated settles in the
   // same microtask without a visible loading flash.
   useEffect(() => {
+    if (!enabled) return;
     let cancelled = false;
     // Filtered walks own their AbortController (aborted on unmount/filter
     // change); the shared walk keeps its module-level dedupe/abort contract.
@@ -504,7 +507,7 @@ export function usePublicCameras({ onRecords, onError, filters }: UsePublicCamer
     // (PR #165 review blocker t_6e9c812d: filters in the deps looped the
     // filtered walk forever — every setRecords re-rendered the tool, which
     // rebuilt the filters object and restarted the effect.)
-  }, [attempt, filterKey, serverActive]);
+  }, [attempt, filterKey, serverActive, enabled]);
 
   return {
     records,

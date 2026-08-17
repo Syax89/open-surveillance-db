@@ -75,6 +75,7 @@ export function DirectoryTool() {
   
   // Legacy walk (map, other sorts, no filters)
   const legacyWalk = usePublicCameras({
+    enabled: !usesCursor,
     filters: usesCursor ? undefined : serverFilters,
   });
   
