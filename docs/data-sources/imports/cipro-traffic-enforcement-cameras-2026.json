@@ -1,0 +1,11 @@
+{
+    "slug": "cipro-traffic-enforcement-cameras-2026",
+    "source_name": "Cyprus — Traffic Enforcement Cameras (CyNAP, traffic4cyprus.org.cy)",
+    "format": "datex2",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "attribution_text": "Fonte: Cyprus National Access Point (traffic4cyprus.org.cy) — Traffic Enforcement Cameras, DATEX II v3 (publisher: Ministry of Transport, Communications and Works), concesso con licenza CC BY 4.0.",
+    "source_url": "https://fixcyprus.cy/gnosis/open/api/nap/datasets/traffic_enforcement_cameras/",
+    "max_records": 150,
+    "notes": "Coda giurisdizioni pass v2 (cron 2026-08-18): 89 telecamere enforcement (speed/red-light), DATEX II v3 XML con coordinate WGS84 per camera (verificato live). Licenza CC BY 4.0 dichiarata sulla pagina dataset del NAP. external_id cy-enf:<identifier>."
+}
