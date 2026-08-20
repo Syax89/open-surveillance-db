@@ -134,6 +134,14 @@ interface ScheduledController {
   readonly scheduledTime: Date;
 }
 
+/**
+ * Every-minute keep-warm cron (wrangler.jsonc `triggers.crons`): wakes an
+ * isolate so the first visitor request after an idle gap does not pay a
+ * ~1s cold start. The tick itself is a deliberate no-op — nothing is swept
+ * on this schedule (the retention/OIDC sweeps stay on the 03:00 UTC cron).
+ */
+const WARMUP_CRON = "*/1 * * * *";
+
 // Image security config. SVG sources with .svg extension auto-skip the
 // optimization endpoint on the client side (served directly, no proxy).
 // To route SVGs through the optimizer (with security headers), create a
@@ -617,14 +625,20 @@ const worker = {
   },
 
   /**
-   * Scheduled retention sweep (ADR 0004 §3, ADR 0008 p.3 — cron binding in
-   * wrangler.jsonc, daily at 03:00 UTC). Runs the retention job from
-   * db/retention.ts and the OIDC expiry sweep from db/oidc.ts against the D1
-   * binding. Both sweeps must never break the request path: they
-   * run inside waitUntil and any failure is caught and logged so the worker
-   * stays healthy (the next run retries).
+   * Scheduled jobs (cron binding in wrangler.jsonc):
+   * - 03:00 UTC daily — retention sweep (ADR 0004 §3, ADR 0008 p.3): runs
+   *   the retention job from db/retention.ts and the OIDC expiry sweep from
+   *   db/oidc.ts against the D1 binding. Both sweeps must never break the
+   *   request path: they run inside waitUntil and any failure is caught
+   *   and logged so the worker stays healthy (the next run retries).
+   * - every minute — keep-warm tick (WARMUP_CRON): deliberate no-op that
+   *   keeps an isolate alive between visitors (cold starts were the slow
+   *   tail: ~1s on the first request after idle).
    */
   async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    if (controller.cron === WARMUP_CRON) {
+      return;
+    }
     const policy = DEFAULT_RETENTION_POLICY;
     ctx.waitUntil(
       runRetentionSweep(new Date().toISOString(), { policy })

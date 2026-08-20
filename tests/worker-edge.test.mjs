@@ -803,6 +803,22 @@ test("scheduled() keeps working when the OIDC expiry sweep throws (sweeps are is
   assert.equal(oidc.__calls.length, 1, "the OIDC sweep is wired and was attempted");
 });
 
+test("scheduled() keep-warm tick is a no-op: no sweep runs on the every-minute cron", async () => {
+  const { worker, retention, oidc } = await loadWorker();
+  const waitUntilCalls = [];
+  const ctxObj = {
+    waitUntil(promise) {
+      waitUntilCalls.push(promise);
+    },
+    passThroughOnException() {},
+  };
+  await worker.scheduled({ cron: "*/1 * * * *" }, testEnv(), ctxObj);
+
+  assert.equal(waitUntilCalls.length, 0, "the keep-warm tick must not schedule any work");
+  assert.equal(retention.__calls.length, 0, "retention sweep must NOT run on the keep-warm tick");
+  assert.equal(oidc.__calls.length, 0, "OIDC expiry sweep must NOT run on the keep-warm tick");
+});
+
 // Small helper: a no-op ExecutionContext shaped like the Worker API.
 function ctx() {
   return { waitUntil() {}, passThroughOnException() {} };
