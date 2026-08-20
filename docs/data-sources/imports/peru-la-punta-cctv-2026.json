@@ -1,0 +1,11 @@
+{
+    "slug": "peru-la-punta-cctv-2026",
+    "source_name": "Peru — Municipalidad Distrital de La Punta, cámaras de videovigilancia (datosabiertos.gob.pe)",
+    "format": "csv",
+    "license": "ODbL 1.0",
+    "license_url": "http://opendefinition.org/licenses/odc-by/",
+    "attribution_text": "Fonte: Municipalidad Distrital de La Punta via datosabiertos.gob.pe — Cámaras de Videovigilancia de Seguridad Ciudadana (https://www.datosabiertos.gob.pe/dataset/camaras-de-videovigilancia-de-seguridad-ciudadana-del-distrito-de-la-punta), concesso con licenza Open Data Commons Attribution License (ODbL).",
+    "source_url": "https://www.datosabiertos.gob.pe/sites/default/files/DATASET%20CAMARAS%20DE%20VIDEOVIGILANCIA.csv",
+    "max_records": 40,
+    "notes": "Coda giurisdizioni pass v2 (cron 2026-08-19): 25 telecamere municipali, CSV delimitatore ';' encoding windows-1252 con LATITUD/LONGITUD WGS84 (verificato first-hand 2026-08-20: 25 righe valide, FECHA_CORTE 2026-01-30). Licenza ODbL verificata nel pane Licencia della pagina dataset. external_id peru-la-punta:<NRO_REGISTRO>."
+}

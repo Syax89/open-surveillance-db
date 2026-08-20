@@ -1,0 +1,11 @@
+{
+    "slug": "serbia-subotica-videonadzor-2026",
+    "source_name": "Serbia — City of Subotica, general video surveillance (data.gov.rs)",
+    "format": "geojson",
+    "license": "Serbian Open Data License",
+    "license_url": "https://data.gov.rs/sr/terms/",
+    "attribution_text": "Fonte: Grad Subotica via data.gov.rs — video-nadzor (https://data.gov.rs/sr/datasets/video-nadzor/), concesso con licenza Serbian Open Data License (SODL).",
+    "source_url": "https://data.gov.rs/s/resources/video-nadzor/20220209-235811/subotica-videonadzorostalo-tac.geojson",
+    "max_records": 20,
+    "notes": "Coda giurisdizioni pass v1 (cron 2026-08-15): 7 punti di videosorveglianza generale, GeoJSON Point WGS84 (CRS84), 7/7 coordinate valide. Licenza SODL verificata sui terms data.gov.rs/sr/terms (riuso commerciale e non, copia, distribuzione, adattamento con attribuzione). Statico 2022. external_id subotica-videonadzor:<id>."
+}
