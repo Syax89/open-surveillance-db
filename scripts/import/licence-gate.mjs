@@ -140,6 +140,17 @@ export const IMPORTABLE_LICENSES = new Set([
   // "Creative Commons Attribution" (no version) on its dataset page
   // (verified CEO 2026-08-08); attribution-only, same class as CC BY 4.0.
   "CC-BY",
+  // Hong Kong — data.gov.hk Terms of Use: art. 8 grants browse/download/
+  // distribute/reproduce for commercial and non-commercial purposes,
+  // attribution required ("identify clearly the source of the Data and
+  // acknowledge the Government ownership of the IP rights"); no share-alike,
+  // no NC (verified 2026-08-21: portal terms page + OGD licence literature).
+  "data.gov.hk Terms of Use",
+  // Singapore — Singapore Open Data Licence v1.0: worldwide, perpetual,
+  // royalty-free, non-exclusive; use/copy/distribute/transmit/modify/adapt,
+  // commercial allowed; attribution required; no share-alike (verified
+  // 2026-08-21 on data.gov.sg/open-data-licence).
+  "Singapore Open Data Licence v1.0",
   // No explicit licence but a statutory open-data basis (art. 52 CAD) —
   // only after the legal review has confirmed the specific source.
   "Open data (art. 52 CAD)",

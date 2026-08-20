@@ -1,0 +1,11 @@
+{
+    "slug": "singapore-lta-road-cameras-2026",
+    "source_name": "Singapore — LTA Road Camera collection (data.gov.sg)",
+    "format": "geojson",
+    "license": "Singapore Open Data Licence v1.0",
+    "license_url": "https://data.gov.sg/open-data-licence",
+    "attribution_text": "Fonte: Land Transport Authority (Singapore) via data.gov.sg — LTA Road Camera (https://data.gov.sg/datasets/d_147f4906651f5b32925dfe6560296161/view), concesso con Singapore Open Data Licence v1.0.",
+    "source_url": "https://data.gov.sg/datasets/d_147f4906651f5b32925dfe6560296161/view",
+    "max_records": 400,
+    "notes": "Coda giurisdizioni pass v2 (2026-08-21, catalogo OK): ~254 camere stradali LTA (collezione Road Camera; il catalogo stimava 80 — conteggio reale dal payload 2026-08-21: 254). GeoJSON Point con Name/Description, coordinate esplicite. Download via poll-download data.gov.sg → blob S3 firmato. external_id sg-road:<Name>. Dataset annuale (2024), ricontrollare al prossimo refresh."
+}

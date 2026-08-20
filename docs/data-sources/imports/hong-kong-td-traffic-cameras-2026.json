@@ -1,0 +1,11 @@
+{
+    "slug": "hong-kong-td-traffic-cameras-2026",
+    "source_name": "Hong Kong — Transport Department, traffic snapshot cameras (CCTV)",
+    "format": "csv",
+    "license": "data.gov.hk Terms of Use",
+    "license_url": "https://data.gov.hk/en/terms-agreement",
+    "attribution_text": "Fonte: Hong Kong Transport Department via data.gov.hk — Traffic snapshot images / Traffic Camera Locations (https://data.gov.hk/en-data/dataset/hk-td-tis_2-traffic-snapshot-images), concesso con data.gov.hk Terms of Use.",
+    "source_url": "https://static.data.gov.hk/td/traffic-snapshot-images/code/Traffic_Camera_Locations_En.csv",
+    "max_records": 1500,
+    "notes": "Coda giurisdizioni pass v2 (2026-08-21, catalogo OK): ~1013 telecamere CCTV/detector su strade principali HK, CSV UTF-16LE tab-separated con coordinate WGS84 esplicite (escluse 0,0). Licenza data.gov.hk ToU verificata (riuso con attribuzione, no share-alike). external_id hk-td:<key>. Locations aggiornate ogni 2 minuti ma stabili; import di locations, non immagini."
+}
