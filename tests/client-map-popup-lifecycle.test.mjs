@@ -105,7 +105,9 @@ async function panTo(bounds) {
   __setBounds(bounds);
   const map = (await maps())[0];
   map.handlers["moveend zoomend"]?.[0]?.();
-  await new Promise((resolve) => setTimeout(resolve, 260)); // BOUNDS_DEBOUNCE_MS=200 + margin
+  // BOUNDS_DEBOUNCE_MS is 500 (map-viewport.ts) — wait past it + margin,
+  // otherwise the assertions race the debounced bounds→rebuild update.
+  await new Promise((resolve) => setTimeout(resolve, 600));
 }
 
 // ---------------------------------------------------------------------------
@@ -261,10 +263,15 @@ test("grid-badge click zooms in toward the cell with ZERO popups", async () => {
     latitude: 30 + (i % 40), longitude: -10 + (i % 50), source: "Community report",
   }));
   await renderMap(many);
+  const map = (await maps())[0];
+  // GRID_MAX_ZOOM is 12: at the stub default z13 every marker is individual.
+  // Zoom OUT to a grid zoom and let the debounced rebuild aggregate.
+  map.zoom = 11;
+  map.handlers["moveend zoomend"]?.[0]?.();
+  await new Promise((resolve) => setTimeout(resolve, 600)); // BOUNDS_DEBOUNCE_MS=500 + margin
   const list = await markers();
   const badges = list.filter((m) => m.opts?.icon?.html?.includes("osm-grid-badge"));
-  assert.ok(badges.length > 0, "260 visible records at zoom 13 must aggregate into grid badges");
-  const map = (await maps())[0];
+  assert.ok(badges.length > 0, "260 visible records at a grid zoom must aggregate into grid badges");
   const zoomBefore = map.zoom;
   // P0-1 (review 2026-08-07): the badge click must stop propagation like
   // the individual marker — otherwise the map click handler opens the

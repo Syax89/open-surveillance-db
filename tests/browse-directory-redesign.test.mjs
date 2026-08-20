@@ -17,6 +17,7 @@ import test from "node:test";
 import {
   React,
   installFetchMock,
+  installCamerasApiMock,
   jsonResponse,
   loadDomModule,
   renderWithLocale,
@@ -53,7 +54,7 @@ const FOUR_LETTERS = [
 ];
 
 function installRecords(records) {
-  installFetchMock(() => jsonResponse({ records, total: records.length, nextOffset: null }));
+  installCamerasApiMock(records);
 }
 
 const rows = (container) => container.querySelectorAll("ul.record-list li").length;
@@ -170,20 +171,23 @@ test("the A–Z index links the present letters and mutes the absent ones (aria-
 
   const index = container.querySelector("nav.alpha-index");
   assert.ok(index, "the alphabetical index renders in alphabetical order");
+  // Cursor mode (default sort, onInitialSeek): EVERY letter is a jump link
+  // — the seek is server-side, so an absent letter is still reachable (it
+  // just narrows to zero records), there are no muted placeholders.
   const linkLabels = [...index.querySelectorAll("button.alpha-index-link")].map((b) => b.getAttribute("aria-label"));
-  assert.deepEqual(linkLabels, [
-    "Jump to records starting with A",
-    "Jump to records starting with B",
-    "Jump to records starting with D",
-    "Jump to records starting with G",
-  ], "only the letters present in the set are jump links (A, B, D, G)");
+  assert.equal(linkLabels.length, 26, "all 26 letters are jump links in cursor mode (server-side seek)");
+  for (const letter of ["A", "B", "D", "G"]) {
+    assert.ok(
+      linkLabels.includes(`Jump to records starting with ${letter}`),
+      `letter ${letter} present in the set must be a link`,
+    );
+  }
 
-  // Absent letters are muted placeholders, not links (aria-hidden).
+  // No muted placeholders in cursor mode.
   const muted = [...index.querySelectorAll(".alpha-index-link.is-muted")];
-  assert.ok(muted.length > 0, "absent letters render as muted placeholders");
-  assert.ok(muted.every((span) => span.getAttribute("aria-hidden") === "true"), "muted letters are decorative (aria-hidden)");
+  assert.equal(muted.length, 0, "absent letters are NOT muted placeholders in cursor mode — they seek server-side");
 
-  // Single page → every present letter is on the current page (aria-current).
+  // Every present letter sits on the current page → aria-current.
   const current = [...index.querySelectorAll("button[aria-current='true']")];
   assert.equal(current.length, 4, "on a single page every present letter carries aria-current");
 });

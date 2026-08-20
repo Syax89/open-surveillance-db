@@ -48,6 +48,18 @@ type Props = {
   page?: number;
   /** Optional (t_f13fcb1c): pagination setter (writes ?page=). */
   setPage?: (value: number) => void;
+  /**
+   * Server-side total of the FILTERED set (cursor pagination): the cursor
+   * hook fetches one page at a time, so `filteredRecords` is only the
+   * current page — the count, page count and "Showing X–Y of Z" summary
+   * must come from the server total, never from the page length.
+   */
+  totalRecords?: number;
+  /**
+   * True when the server already paginated (cursor mode): records ARE the
+   * current page, so the legacy client-side slice must NOT run again.
+   */
+  serverPaginated?: boolean;
   /** Server-side A-Z seek used by cursor pagination. */
   onInitialSeek?: (letter: string) => void;
   /** Keyboard path: select a record on the map and move focus to it. */
@@ -78,7 +90,7 @@ type Props = {
  * Distance facts) and hides the index/pagination/chips, which only make
  * sense for the filtered list.
  */
-export function DirectoryCatalog({ filteredRecords, loading, loadError, onRetryLoad, cameraKinds, search, setSearch, kindFilter, setKindFilter, freshnessFilter, setFreshnessFilter, sortOrder, setSortOrder, stateFilter, setStateFilter, originFilter, setOriginFilter, page = 1, setPage, onInitialSeek, showRecordOnMap, setCoordinates, onResetFilters, reportHref }: Props) {
+export function DirectoryCatalog({ filteredRecords, loading, loadError, onRetryLoad, cameraKinds, search, setSearch, kindFilter, setKindFilter, freshnessFilter, setFreshnessFilter, sortOrder, setSortOrder, stateFilter, setStateFilter, originFilter, setOriginFilter, page = 1, setPage, totalRecords: serverTotalRecords, serverPaginated = false, onInitialSeek, showRecordOnMap, setCoordinates, onResetFilters, reportHref }: Props) {
   const t = useMessages().directory;
   const statuses = useMessages().status;
   const { locale } = useLocale();
@@ -137,19 +149,22 @@ export function DirectoryCatalog({ filteredRecords, loading, loadError, onRetryL
     ? t.loadErrorTitle
     : placeDone
       ? t.placeResultsFound(placeActive ? placeRecords.length : 0)
-      : filteredRecords.length === 1 ? t.oneRecordFound : `${filteredRecords.length} ${t.recordsFound}`;
+      : serverTotalRecords === 1 ? t.oneRecordFound : `${serverTotalRecords ?? filteredRecords.length} ${t.recordsFound}`;
 
-  // Pagination (t_f13fcb1c): client slice over the filtered memo — the walk
-  // is already bounded by the server kind/freshness filters, and q/sort stay
-  // client-side, so a slice gives bounded DOM + ?page= deep links without
-  // touching the API or the shared hooks. Lenient parse: a stale ?page=
-  // (narrowed filter set) clamps to the last real page, never a blank list.
-  const totalRecords = filteredRecords.length;
+  // Pagination: in cursor mode the server already paginated (records ARE
+  // the current page, total comes from the API) — the client slice must
+  // NOT run again. In legacy-walk mode the memo holds the whole filtered
+  // set and the slice gives bounded DOM + ?page= deep links (t_f13fcb1c).
+  // Lenient parse: a stale ?page= (narrowed filter set) clamps to the last
+  // real page, never a blank list.
+  const totalRecords = serverTotalRecords ?? filteredRecords.length;
   const pageCount = Math.max(1, Math.ceil(totalRecords / DIRECTORY_PAGE_SIZE));
   const safePage = Math.min(Math.max(1, page), pageCount);
   const pageRecords = placeActive
     ? placeRecords
-    : filteredRecords.slice((safePage - 1) * DIRECTORY_PAGE_SIZE, safePage * DIRECTORY_PAGE_SIZE);
+    : serverPaginated
+      ? filteredRecords
+      : filteredRecords.slice((safePage - 1) * DIRECTORY_PAGE_SIZE, safePage * DIRECTORY_PAGE_SIZE);
 
   // Active-filter chips: one per non-default dimension, one-shot removal
   // (calls the same URL setters as the controls — D4). Hidden while a place
@@ -191,17 +206,18 @@ export function DirectoryCatalog({ filteredRecords, loading, loadError, onRetryL
   }, [filteredRecords, sortOrder, placeActive, loading, onInitialSeek]);
 
   // Letters whose first record sits on the current page → aria-current.
+  // In cursor mode the records ARE the current page (no client slice).
   const currentPageLetters = useMemo(() => {
     if (!alphaIndex) return new Set<string>();
-    const start = (safePage - 1) * DIRECTORY_PAGE_SIZE;
-    const end = Math.min(start + DIRECTORY_PAGE_SIZE, totalRecords);
+    const start = serverPaginated ? 0 : (safePage - 1) * DIRECTORY_PAGE_SIZE;
+    const end = serverPaginated ? filteredRecords.length : Math.min(start + DIRECTORY_PAGE_SIZE, totalRecords);
     const set = new Set<string>();
     for (let i = start; i < end; i += 1) {
       const first = filteredRecords[i]?.title.trim().charAt(0).toLocaleUpperCase();
       if (first && /^[A-Z]$/.test(first)) set.add(first);
     }
     return set;
-  }, [alphaIndex, safePage, totalRecords, filteredRecords]);
+  }, [alphaIndex, safePage, totalRecords, filteredRecords, serverPaginated]);
 
   // Move the reading position to the results header after a page/index jump
   // (the header is above the list, so it never moves with the slice; the
@@ -239,7 +255,7 @@ export function DirectoryCatalog({ filteredRecords, loading, loadError, onRetryL
   return (
     <section className="records-section" id="records" aria-label={t.accessibleDirectory}>
       {offline && <div className="offline-state" role="status"><b>{t.offlineTitle}.</b> {t.offlineBody} <button type="button" className="text-button" onClick={() => window.location.reload()}>{t.offlineAction} <span aria-hidden="true">→</span></button></div>}
-      <FiltersBar variant="bare" showCommunitySort stateFilter={stateFilter} setStateFilter={setStateFilter} originFilter={originFilter} setOriginFilter={setOriginFilter} cameraKinds={cameraKinds} search={search} setSearch={(value) => { place.clearPlaceSearch(); setSearch(value); }} onSearchSubmit={() => { void place.searchByQuery(search); }} kindFilter={kindFilter} setKindFilter={setKindFilter} freshnessFilter={freshnessFilter} setFreshnessFilter={setFreshnessFilter} sortOrder={sortOrder} setSortOrder={setSortOrder} resultCount={filteredRecords.length} onReset={onResetFilters} />
+      <FiltersBar variant="bare" showCommunitySort stateFilter={stateFilter} setStateFilter={setStateFilter} originFilter={originFilter} setOriginFilter={setOriginFilter} cameraKinds={cameraKinds} search={search} setSearch={(value) => { place.clearPlaceSearch(); setSearch(value); }} onSearchSubmit={() => { void place.searchByQuery(search); }} kindFilter={kindFilter} setKindFilter={setKindFilter} freshnessFilter={freshnessFilter} setFreshnessFilter={setFreshnessFilter} sortOrder={sortOrder} setSortOrder={setSortOrder} resultCount={totalRecords} onReset={onResetFilters} />
       {place.placeResult?.status === "loading" && <p className="loading-note" role="status">{t.placeSearchLoading}</p>}
       {place.placeResult?.status === "error" && <p className="nearby-error" role="alert">{place.placeResult.message}</p>}
       {/* Visible results header (t_f13fcb1c): replaces the sr-only h2 with a

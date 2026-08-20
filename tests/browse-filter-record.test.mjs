@@ -32,6 +32,7 @@ import { Miniflare } from "miniflare";
 import {
   React,
   installFetchMock,
+  installCamerasApiMock,
   jsonResponse,
   loadDomModule,
   renderWithLocale,
@@ -74,12 +75,10 @@ const TWO_RECORDS = [
 ];
 
 function installDirectoryFetch() {
-  installFetchMock((input) => {
-    if (String(input).startsWith("/api/cameras")) {
-      return jsonResponse({ records: TWO_RECORDS, total: TWO_RECORDS.length, nextOffset: null });
-    }
-    return jsonResponse({ error: "not found" }, { status: 404 });
-  });
+  // The real API filters server-side (q/kind/state/origin/sort); the
+  // fixture emulates that contract so the client journey matches what the
+  // site does in production (cursor pagination default).
+  installCamerasApiMock(TWO_RECORDS);
 }
 
 async function loadDirectoryTool() {

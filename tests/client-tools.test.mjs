@@ -36,7 +36,7 @@
 import assert from "node:assert/strict";
 import test, { afterEach, before } from "node:test";
 import {
-  setupDom, loadDomModule, installFetchMock, jsonResponse, fakeCamerasPayload,
+  setupDom, loadDomModule, installFetchMock, jsonResponse, fakeCamerasPayload, installCamerasApiMock,
   leafletMarkers, resetLeafletMarkers,
   renderWithLocale, setNavState, getNavState, React,
 } from "./helpers/dom-harness.mjs";
@@ -353,7 +353,7 @@ const POPUP_RECORDS = [
   { id: 1, title: "Illustrative record A", kind: "Fixed dome", status: "demo", latitude: 41.9004, longitude: 12.4936, source: "Development seed", updated: "Demo data", description: "This marker demonstrates how a verified public record will be presented. It is not a claim about a real camera.", address: "Illustrative location, Rome" },
   { id: 2, title: "Illustrative record B", kind: "Traffic monitoring", status: "demo", latitude: 41.9047, longitude: 12.5031, source: "Development seed", updated: "Demo data", description: "The field of view is deliberately approximate and should never be treated as a record of live activity.", address: "Illustrative location, Rome" },
 ];
-const installRecordsMock = () => installFetchMock(() => jsonResponse(fakeCamerasPayload(POPUP_RECORDS)));
+const installRecordsMock = () => installCamerasApiMock(POPUP_RECORDS);
 const installEmptyMock = () => installFetchMock(() => jsonResponse({ records: [], total: 0, nextOffset: null }));
 
 /**

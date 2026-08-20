@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMessages } from "../../lib/use-messages";
 import { usePublicCameras } from "../../lib/use-public-cameras";
@@ -95,7 +95,24 @@ export function DirectoryTool() {
     usesCursor ? records : applyCameraFilters(records, filters), 
     [records, filters, usesCursor]
   );
-  const cameraKinds = useMemo(() => cameraKindsOf(records), [records]);
+  // Kind options: facets (full-dataset kinds, one cached request) while
+  // loading, falling back to the kinds seen in the loaded records. In
+  // cursor mode the records are only the current page, so WITHOUT facets
+  // the kind select would offer just the kinds of 20 alphabetical rows
+  // (same pattern as MappaTool).
+  const [facetsKinds, setFacetsKinds] = useState<string[] | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/cameras?facets=kinds&limit=1")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (cancelled || !data || !Array.isArray(data.facets?.kinds)) return;
+        setFacetsKinds(data.facets.kinds.map((item: { kind: string }) => item.kind).sort((a: string, b: string) => a.localeCompare(b)));
+      })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, []);
+  const cameraKinds = facetsKinds ?? cameraKindsOf(records);
   const mapHref = useMemo(() => exploreMapHref(filters), [filters]);
   const directoryHref = useMemo(() => exploreDirectoryHref(filters), [filters]);
 
@@ -174,6 +191,8 @@ export function DirectoryTool() {
           setOriginFilter={setOrigin}
           page={filters.page}
           setPage={setPage}
+          totalRecords={usesCursor ? (cursorPage.total ?? undefined) : undefined}
+          serverPaginated={usesCursor}
           onInitialSeek={(letter) => {
             setInitial(letter);
             setPage(1);
