@@ -135,17 +135,29 @@ jobs:
           # scavare nei log del run (OPERATIONS.md §5.1). Parsing difensivo:
           # prima --json, poi fallback sulla tabella testuale.
           npx wrangler versions list --json > versions.json 2>/dev/null || npx wrangler versions list > versions.txt 2>&1
+          # Robust parse: wrangler prints a "newer version available" notice
+          # (and sometimes a BOM) on STDOUT ahead of the JSON when an update
+          # exists — JSON.parse would throw on it. Parse from the first '['
+          # and treat a missing/unparseable reference as a WARNING, never a
+          # crash: the rollback target is a nice-to-have, the deploy is not
+          # blocked by it (the id still lands in the run log as a warning).
           PREV_ID=$(node -e '
             const fs = require("fs");
             let id = "";
             try {
-              const arr = JSON.parse(fs.readFileSync("versions.json", "utf8"));
-              if (Array.isArray(arr) && arr.length && arr[0].id) id = String(arr[0].id);
+              const raw = fs.readFileSync("versions.json", "utf8").replace(/^\uFEFF/, "");
+              const start = raw.indexOf("[");
+              if (start >= 0) {
+                const arr = JSON.parse(raw.slice(start));
+                if (Array.isArray(arr) && arr.length && arr[0].id) id = String(arr[0].id);
+              }
             } catch {}
             if (!id) {
-              const txt = fs.readFileSync("versions.txt", "utf8");
-              const m = txt.match(/^([0-9a-f]{32})\s/m);
-              if (m) id = m[1];
+              try {
+                const txt = fs.readFileSync("versions.txt", "utf8");
+                const m = txt.match(/^([0-9a-f]{32})\s/m);
+                if (m) id = m[1];
+              } catch {}
             }
             process.stdout.write(id);
           ')
