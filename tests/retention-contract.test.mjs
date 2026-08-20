@@ -208,6 +208,11 @@ test("wrangler.jsonc declares the daily cron trigger and NO PHOTOS bucket bindin
     /"binding":\s*"PHOTOS"/,
     "the PHOTOS binding must not exist without the photo feature",
   );
+  assert.match(
+    wrangler,
+    /"analytics_engine_datasets":\s*\[\s*\{\s*"binding":\s*"ANALYTICS",\s*"dataset":\s*"osdb_requests"/,
+    "the ANALYTICS binding must be declared under analytics_engine_datasets — the wrangler schema key. The old 'analytics' key was silently ignored by wrangler: the deployed worker had the keep-warm cron but NO analytics binding and the dataset stayed empty",
+  );
 });
 
 test("R15: the retention sweep purges expired email tokens and lapsed WebAuthn challenges (P3-1)", async () => {
