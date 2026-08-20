@@ -158,6 +158,19 @@ function testEnv(overrides = {}) {
   };
 }
 
+/** Capture-buffer mock of the Analytics Engine binding (dataset osdb_requests). */
+function analyticsMock() {
+  const calls = [];
+  return {
+    calls,
+    binding: {
+      writeDataPoint(event) {
+        calls.push(event);
+      },
+    },
+  };
+}
+
 const basic = (user, pass) => `Basic ${Buffer.from(`${user}:${pass}`).toString("base64")}`;
 const bearer = (token) => `Bearer ${token}`;
 
@@ -211,6 +224,58 @@ test("canonical host redirects HTTP and www requests before the app handler", as
     assert.equal(response.headers.get("location"), to);
   }
   assert.equal(app.__calls.length, 0, "redirected aliases must not reach the app handler");
+});
+
+test("analytics: one datapoint per API request with group, status class, endpoint and method", async () => {
+  const { worker } = await loadWorker();
+  const analytics = analyticsMock();
+  const response = await worker.fetch(
+    request("/api/cameras?format=geojson"),
+    testEnv({ ANALYTICS: analytics.binding }),
+    ctx(),
+  );
+
+  assert.equal(response.status, 200);
+  assert.equal(analytics.calls.length, 1);
+  assert.deepEqual(analytics.calls[0].blobs, ["api", "2xx", "/api/cameras", "GET"]);
+  assert.deepEqual(analytics.calls[0].doubles, [1]);
+});
+
+test("analytics: website traffic is logged as web without per-page breakdown", async () => {
+  const { worker } = await loadWorker();
+  const analytics = analyticsMock();
+  const response = await worker.fetch(
+    request("/directory?page=2"),
+    testEnv({ ANALYTICS: analytics.binding }),
+    ctx(),
+  );
+
+  assert.equal(response.status, 200);
+  assert.equal(analytics.calls.length, 1);
+  assert.deepEqual(analytics.calls[0].blobs.slice(0, 3), ["web", "2xx", "web"]);
+});
+
+test("analytics: 4xx (handler 404 and scanner 403) and 3xx (redirect) status classes are recorded", async () => {
+  const { worker } = await loadWorker();
+  const analytics = analyticsMock();
+  const env = testEnv({ ANALYTICS: analytics.binding });
+
+  await worker.fetch(request("/definitely-unknown/xyz"), env, ctx());
+  await worker.fetch(request("/openapi.json"), env, ctx());
+  await worker.fetch(new Request("http://www.opensurveillancedb.org/faq"), env, ctx());
+
+  assert.deepEqual(
+    analytics.calls.map((point) => point.blobs[1]),
+    ["4xx", "4xx", "3xx"],
+  );
+});
+
+test("analytics: absent binding is a no-op and never breaks the request path", async () => {
+  const { worker, app } = await loadWorker();
+  const response = await worker.fetch(request("/api/cameras?limit=1"), testEnv(), ctx());
+
+  assert.equal(response.status, 200);
+  assert.equal(app.__calls.length, 1);
 });
 
 test("canonical HTTPS reaches the app while pre-production responses stay noindex", async () => {
@@ -736,6 +801,22 @@ test("scheduled() keeps working when the OIDC expiry sweep throws (sweeps are is
   await Promise.allSettled(waitUntilCalls);
   assert.equal(retention.__calls.length, 1, "retention sweep must run even if the OIDC sweep fails");
   assert.equal(oidc.__calls.length, 1, "the OIDC sweep is wired and was attempted");
+});
+
+test("scheduled() keep-warm tick is a no-op: no sweep runs on the every-minute cron", async () => {
+  const { worker, retention, oidc } = await loadWorker();
+  const waitUntilCalls = [];
+  const ctxObj = {
+    waitUntil(promise) {
+      waitUntilCalls.push(promise);
+    },
+    passThroughOnException() {},
+  };
+  await worker.scheduled({ cron: "*/1 * * * *" }, testEnv(), ctxObj);
+
+  assert.equal(waitUntilCalls.length, 0, "the keep-warm tick must not schedule any work");
+  assert.equal(retention.__calls.length, 0, "retention sweep must NOT run on the keep-warm tick");
+  assert.equal(oidc.__calls.length, 0, "OIDC expiry sweep must NOT run on the keep-warm tick");
 });
 
 // Small helper: a no-op ExecutionContext shaped like the Worker API.

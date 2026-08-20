@@ -96,6 +96,6 @@ test("escapeHtml neutralises markup and quotes in record fields", () => {
 // BOUNDS_DEBOUNCE_MS
 // ---------------------------------------------------------------------------
 
-test("BOUNDS_DEBOUNCE_MS is 200ms (moveend/zoomend bursts commit one list update)", () => {
-  assert.equal(mapViewport.BOUNDS_DEBOUNCE_MS, 200);
+test("BOUNDS_DEBOUNCE_MS is 500ms (moveend/zoomend bursts commit one list update)", () => {
+  assert.equal(mapViewport.BOUNDS_DEBOUNCE_MS, 500);
 });

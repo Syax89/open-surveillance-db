@@ -10,6 +10,21 @@
     "binding": "ASSETS"
   },
   "images": { "binding": "IMAGES" },
+  // Request analytics (Workers Analytics Engine, dataset osdb_requests):
+  // one datapoint per request with path group (api|web), status class, API
+  // endpoint (query string stripped) and HTTP method — nothing else. No
+  // IPs, no user data, no query strings, and the website is counted only
+  // as "web" (no per-page tracking). Consumed by the local monitoring
+  // stack (Prometheus exporter + Grafana osdb-overview) via the Analytics
+  // Engine SQL API. Workers Paid includes 10M datapoints written / month —
+  // OSDB's traffic costs nothing extra. Local dev / tests: binding absent
+  // from env -> logging is a no-op (docs/DEVELOPMENT_SETUP.md).
+  "analytics": [
+    {
+      "binding": "ANALYTICS",
+      "dataset": "osdb_requests"
+    }
+  ],
   "send_email": [
     {
       "name": "EMAIL",
@@ -24,7 +39,14 @@
     }
   ],
   "triggers": {
-    "crons": ["0 3 * * *"]
+    // Retention sweep 03:00 UTC + every-minute keep-warm tick: the site has
+    // low traffic (~4k req/day) and the edge cache absorbs the API probes,
+    // so the worker used to sit idle for minutes between origin requests —
+    // every visitor paid a ~700-1000ms cold start (observed: wallTime p99
+    // 1.45s, warm origin 50-80ms). The every-minute cron wakes an isolate
+    // so the first request after idle is served warm. The tick itself is a
+    // no-op in the scheduled handler (see worker/index.ts WARMUP_CRON).
+    "crons": ["0 3 * * *", "*/1 * * * *"]
   },
   // Cloudflare Workers Rate Limiting bindings (audit #3 MEDIUM, t_dff3dadf):
   // the PRODUCTION enforcement point for the five critical public route

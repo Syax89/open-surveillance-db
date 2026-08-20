@@ -1,7 +1,7 @@
 /** Cloudflare Worker entry point for OpenSurveillanceDB. */
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
-import type { D1Database, Fetcher, SendEmail } from "cloudflare:workers";
+import type { AnalyticsEngineDataset, D1Database, Fetcher, SendEmail } from "cloudflare:workers";
 import { DEFAULT_RETENTION_POLICY, runRetentionSweep, type RetentionSummary } from "../db/retention";
 import { sweepOidcExpired } from "../db/oidc";
 
@@ -20,6 +20,13 @@ interface Env {
       };
     };
   };
+  /**
+   * Request analytics (wrangler.jsonc `analytics`, dataset osdb_requests):
+   * one datapoint per request — path group (api|web), status class, API
+   * endpoint path and HTTP method (see recordRequestAnalytics). Optional:
+   * absent in local dev / tests, where logging is a no-op.
+   */
+  ANALYTICS?: AnalyticsEngineDataset;
   /**
    * Cloudflare Workers Rate Limiting bindings (wrangler.jsonc `ratelimits`,
    * audit #3 MEDIUM, t_dff3dadf): the production enforcement point for the
@@ -126,6 +133,14 @@ interface ScheduledController {
   readonly cron: string;
   readonly scheduledTime: Date;
 }
+
+/**
+ * Every-minute keep-warm cron (wrangler.jsonc `triggers.crons`): wakes an
+ * isolate so the first visitor request after an idle gap does not pay a
+ * ~1s cold start. The tick itself is a deliberate no-op — nothing is swept
+ * on this schedule (the retention/OIDC sweeps stay on the 03:00 UTC cron).
+ */
+const WARMUP_CRON = "*/1 * * * *";
 
 // Image security config. SVG sources with .svg extension auto-skip the
 // optimization endpoint on the client side (served directly, no proxy).
@@ -507,12 +522,44 @@ function injectIdentityAfterGate(request: Request, identityEmail: string | null)
   return new Request(request, { headers });
 }
 
-const worker = {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    const url = new URL(request.url);
+/**
+ * Request analytics (Workers Analytics Engine, dataset osdb_requests).
+ * One datapoint per request, written AFTER the response is produced:
+ *   blob1 = path group ("api" | "web")
+ *   blob2 = status class ("2xx" | "3xx" | "4xx" | "5xx")
+ *   blob3 = API endpoint path, query string stripped ("web" for the site)
+ *   blob4 = HTTP method
+ *   double1 = 1 (event count; the monitor uses SUM(_sample_interval))
+ * Deliberately narrow: no IPs, no query strings, no user data, and the
+ * website is counted only as "web" without per-page breakdown (privacy —
+ * see PRIVACY_AND_SAFETY.md). The binding is optional (absent in local
+ * dev / tests): when missing the call is a no-op and can never break the
+ * request path.
+ */
+function recordRequestAnalytics(env: Env, url: URL, method: string, status: number): void {
+  try {
+    const analytics = env.ANALYTICS;
+    if (!analytics) return;
+    const pathname = url.pathname;
+    const isApi = pathname.startsWith("/api/");
+    analytics.writeDataPoint({
+      blobs: [isApi ? "api" : "web", `${Math.floor(status / 100)}xx`, isApi ? pathname : "web", method],
+      doubles: [1],
+    });
+  } catch {
+    // Analytics must never break the request path.
+  }
+}
 
-    const redirect = hostRedirect(request, url);
-    if (redirect) return redirect;
+/**
+ * Route one request through the worker pipeline (redirect, identity
+ * sanitisation, scanner gate, moderation gate, image optimisation, app
+ * router). Split from `fetch` so every response — including 3xx/4xx/5xx
+ * and thrown errors — can be recorded once in Analytics Engine.
+ */
+async function dispatch(request: Request, env: Env, ctx: ExecutionContext, url: URL): Promise<Response> {
+  const redirect = hostRedirect(request, url);
+  if (redirect) return redirect;
 
     // Normalise a trailing slash on the pathname BEFORE the edge-gate match
     // (audit 2026-08-09, P2): the identity exception for POST /api/appeals
@@ -562,17 +609,36 @@ const worker = {
     }
 
     return withSecurityHeaders(await handler.fetch(gated, env, ctx), url.pathname, url.hostname);
+}
+
+const worker = {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    const url = new URL(request.url);
+    try {
+      const response = await dispatch(request, env, ctx, url);
+      recordRequestAnalytics(env, url, request.method, response.status);
+      return response;
+    } catch (error) {
+      recordRequestAnalytics(env, url, request.method, 500);
+      throw error;
+    }
   },
 
   /**
-   * Scheduled retention sweep (ADR 0004 §3, ADR 0008 p.3 — cron binding in
-   * wrangler.jsonc, daily at 03:00 UTC). Runs the retention job from
-   * db/retention.ts and the OIDC expiry sweep from db/oidc.ts against the D1
-   * binding. Both sweeps must never break the request path: they
-   * run inside waitUntil and any failure is caught and logged so the worker
-   * stays healthy (the next run retries).
+   * Scheduled jobs (cron binding in wrangler.jsonc):
+   * - 03:00 UTC daily — retention sweep (ADR 0004 §3, ADR 0008 p.3): runs
+   *   the retention job from db/retention.ts and the OIDC expiry sweep from
+   *   db/oidc.ts against the D1 binding. Both sweeps must never break the
+   *   request path: they run inside waitUntil and any failure is caught
+   *   and logged so the worker stays healthy (the next run retries).
+   * - every minute — keep-warm tick (WARMUP_CRON): deliberate no-op that
+   *   keeps an isolate alive between visitors (cold starts were the slow
+   *   tail: ~1s on the first request after idle).
    */
   async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    if (controller.cron === WARMUP_CRON) {
+      return;
+    }
     const policy = DEFAULT_RETENTION_POLICY;
     ctx.waitUntil(
       runRetentionSweep(new Date().toISOString(), { policy })

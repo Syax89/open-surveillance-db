@@ -37,6 +37,10 @@ type Props = {
   page?: number;
   /** Optional (t_f13fcb1c): /directory pagination setter. */
   setPage?: (value: number) => void;
+  /** Server-side total of the filtered set (cursor pagination): pass-through to the catalog. */
+  totalRecords?: number;
+  /** True when the server already paginated (cursor mode): pass-through to the catalog. */
+  serverPaginated?: boolean;
   /** Server-side A-Z seek used by cursor pagination in the catalog. */
   onInitialSeek?: (letter: string) => void;
   /** Keyboard path: select a record on the map and move focus to it. */
@@ -65,7 +69,7 @@ type Props = {
  * bundle; reused by the home page (hub mode) and /directory (catalog mode).
  * Location shows address AND coordinates (format-location, CEO 2026-08-07).
  */
-export function PublicDirectory({ filteredRecords, loading, loadError, onRetryLoad, cameraKinds, search, setSearch, kindFilter, setKindFilter, freshnessFilter, setFreshnessFilter, setFreshnessCutoff, sortOrder, setSortOrder, stateFilter, setStateFilter, originFilter, setOriginFilter, page, setPage, onInitialSeek, showRecordOnMap, setCoordinates, onResetFilters, mapHref = "#map", reportHref = "#report", showHeading = true, showMapLink = true, variant = "hub" }: Props) {
+export function PublicDirectory({ filteredRecords, loading, loadError, onRetryLoad, cameraKinds, search, setSearch, kindFilter, setKindFilter, freshnessFilter, setFreshnessFilter, setFreshnessCutoff, sortOrder, setSortOrder, stateFilter, setStateFilter, originFilter, setOriginFilter, page, setPage, totalRecords, serverPaginated, onInitialSeek, showRecordOnMap, setCoordinates, onResetFilters, mapHref = "#map", reportHref = "#report", showHeading = true, showMapLink = true, variant = "hub" }: Props) {
   const t = useMessages().directory;
   const statuses = useMessages().status;
   const { locale } = useLocale();
@@ -112,6 +116,8 @@ export function PublicDirectory({ filteredRecords, loading, loadError, onRetryLo
         stateFilter={stateFilter} setStateFilter={setStateFilter} originFilter={originFilter} setOriginFilter={setOriginFilter}
         page={page}
         setPage={setPage}
+        totalRecords={totalRecords}
+        serverPaginated={serverPaginated}
         onInitialSeek={onInitialSeek}
         showRecordOnMap={showRecordOnMap}
         setCoordinates={setCoordinates}

@@ -195,8 +195,8 @@ test("wrangler.jsonc declares the daily cron trigger and NO PHOTOS bucket bindin
 
   assert.match(
     wrangler,
-    /"crons":\s*\["0 3 \* \* \*"\]/,
-    "the retention sweep must run daily at 03:00 UTC",
+    /"crons":\s*\["0 3 \* \* \*",\s*"\*\/1 \* \* \* \*"\]/,
+    "the retention sweep must run daily at 03:00 UTC and the every-minute keep-warm cron must be declared",
   );
   assert.doesNotMatch(
     wrangler,
