@@ -1353,3 +1353,22 @@ test("pasco: parses a real XLSX buffer (fflate mini-reader) into staged rows", a
   assert.match(staged[0].external_id, /^peru-pasco:CAMARA_1$/);
   assert.equal(skipped.total, 0);
 });
+
+// -------------------------------------------------- wave 15b: UK TfGM (geocoding lookup)
+
+import { parsePayload as tfgmParse } from "../scripts/import/adapters/regno-unito-tfgm-speed-cameras-2026.mjs";
+
+test("tfgm: parses the Fixed CSV using the committed geocode lookup", () => {
+  const csv = "Fixed Housing Locations List 08/02/2016,,,,\r\n,,,,\r\nDistrict,Camera Type,Location Description,Speed Limit MPH,\r\nBolton,Red Light,\"A579 Derby Street, Jct University Way, Bolton\",30,\r\nManchester,Speed,\"A34 Princess Street, Jct Whitworth Street, Manchester\",30,\r\nBolton,Speed,\"A666 St Peters Way, opp Rowena Street, Bolton\",30,\r\n";
+  const { staged, skipped } = tfgmParse({ text: csv });
+  assert.equal(staged.length, 2);
+  assert.equal(staged[0].title, "A579 Derby Street, Jct University Way, Bolton");
+  assert.equal(staged[0].kind, "Traffic / licence plate reader");
+  assert.equal(staged[0].latitude, 53.569005);
+  assert.equal(staged[0].longitude, -2.440552);
+  assert.match(staged[0].external_id, /^tfgm-fixed:bolton:1$/);
+  assert.match(staged[1].external_id, /^tfgm-fixed:manchester:2$/);
+  // la riga senza lookup (St Peters Way opp Rowena) viene skippata con motivo
+  assert.equal(skipped.total, 1);
+  assert.ok(Object.keys(skipped.reasons)[0].includes("no geocode"));
+});
