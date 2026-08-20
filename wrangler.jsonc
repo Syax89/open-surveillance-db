@@ -10,6 +10,21 @@
     "binding": "ASSETS"
   },
   "images": { "binding": "IMAGES" },
+  // Request analytics (Workers Analytics Engine, dataset osdb_requests):
+  // one datapoint per request with path group (api|web), status class, API
+  // endpoint (query string stripped) and HTTP method — nothing else. No
+  // IPs, no user data, no query strings, and the website is counted only
+  // as "web" (no per-page tracking). Consumed by the local monitoring
+  // stack (Prometheus exporter + Grafana osdb-overview) via the Analytics
+  // Engine SQL API. Workers Paid includes 10M datapoints written / month —
+  // OSDB's traffic costs nothing extra. Local dev / tests: binding absent
+  // from env -> logging is a no-op (docs/DEVELOPMENT_SETUP.md).
+  "analytics": [
+    {
+      "binding": "ANALYTICS",
+      "dataset": "osdb_requests"
+    }
+  ],
   "send_email": [
     {
       "name": "EMAIL",
