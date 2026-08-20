@@ -19,7 +19,7 @@
   // Engine SQL API. Workers Paid includes 10M datapoints written / month —
   // OSDB's traffic costs nothing extra. Local dev / tests: binding absent
   // from env -> logging is a no-op (docs/DEVELOPMENT_SETUP.md).
-  "analytics": [
+  "analytics_engine_datasets": [
     {
       "binding": "ANALYTICS",
       "dataset": "osdb_requests"
