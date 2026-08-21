@@ -68,6 +68,19 @@ export const IMPORTABLE_LICENSES = new Set([
   // Korea Open Government License — free use with attribution (KOGL Type 1).
   "KOGL Type 1",
   "KOGL",
+  // Serbia — Serbian Open Data License (SODL): terms page data.gov.rs/sr/terms
+  // explicitly permits commercial and non-commercial reuse, copying,
+  // distribution, third-party availability, adaptation and merging, with
+  // attribution and change marking (verified cron 2026-08-15, City of
+  // Subotica datasets). Same obligations class as CC-BY.
+  "Serbian Open Data License",
+  "SODL",
+  // Taiwan — Taiwan Open Government Data License v1 (data.gov.tw):
+  // attribution-only, same class as CC-BY (verified 2026-08-08; the source
+  // is geoblocked from our networks — added for future imports, network
+  // block is not a licence issue).
+  "TW OGL v1",
+  "Taiwan Open Government Data License v1",
   // Open Data Commons Public Domain Dedication — public domain,
   // no obligations (SF Socrata red-light/speed citation datasets).
   "PDDL",

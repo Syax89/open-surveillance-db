@@ -1,0 +1,11 @@
+{
+    "slug": "cipro-cctv-2026",
+    "source_name": "Cyprus — CCTV Cameras road network (CyNAP, traffic4cyprus.org.cy)",
+    "format": "datex2",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "attribution_text": "Fonte: Cyprus National Access Point (traffic4cyprus.org.cy) — CCTV Cameras, DATEX II v3 (publisher: Public Works Department, Ministry of Transport), concesso con licenza CC BY 4.0.",
+    "source_url": "https://fixcyprus.cy/gnosis/open/api/nap/datasets/its_sensors/CCTV/",
+    "max_records": 60,
+    "notes": "Coda giurisdizioni pass v2 (cron 2026-08-18): 26 siti CCTV sulla rete stradale, DATEX II v3 XML (measurementSiteRecord) con coordinate WGS84 per sito (verificato live). Licenza CC BY 4.0 dichiarata sulla pagina dataset del NAP. external_id cy-cctv:<identifier>."
+}

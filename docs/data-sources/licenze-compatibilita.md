@@ -175,6 +175,8 @@ aligned in the same PR.
 | `Tri-State Developer Agreement` | NE 511 VT/NH/ME (usa-new-england-511-cameras-2026) | use/reproduce/redistribute with attribution, no NC clause | Importable with attribution |
 | `Open use. Attribution required (Kanton Bern)` | Berna (berna-videouberwachung-2026) | opendata.swiss terms: free use with mandatory attribution | Importable with attribution |
 | `Open Data Common (ODC)` | Thailandia Nakhon Ratchasima (tailandia-nakhon-ratchasima-cctv-2026) | String declared by the portal; NOT a valid Open Data Commons family licence | ⚠️ § 3.9.3 (kept, government-only filter) |
+| `Serbian Open Data License` / `SODL` | Serbia — City of Subotica (serbia-subotica-*-2026) | terms page data.gov.rs/sr/terms: commercial and non-commercial reuse, copying, distribution, adaptation, merging, with attribution and change marking (verified cron 2026-08-15) | Importable with attribution |
+| `TW OGL v1` / `Taiwan Open Government Data License v1` | Taiwan (future, data.gov.tw) | Attribution-only, same obligations class as CC-BY (verified 2026-08-08; source geoblocked from our networks — network block, not licence) | Importable with attribution |
 
 #### 3.9.2 King County — «sale prohibited» vs criterion § 3.6 (no commercial restriction) — REMOVED
 
