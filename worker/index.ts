@@ -487,6 +487,35 @@ const OAUTH_PROTECTED_RESOURCE = {
 };
 
 /**
+ * OAuth Authorization Server metadata (RFC 8414 shape, 2026-08-22): the
+ * authMd check follows authorization_servers from the PRM and requires
+ * this document with an `agent_auth` block. All values are real OSDB
+ * facts — the registration method is email-verified account registration
+ * (register_uri /identity_endpoint) with the email verification link as
+ * the claim ceremony (claim_uri), issuing scoped API keys (credentials).
+ * Deliberately NO authorization/token/jwks endpoints: OSDB does not run
+ * an OAuth token flow, and publishing fake endpoints would be worse than
+ * omitting them — /auth.md states the credential model explicitly.
+ */
+const OAUTH_AUTHORIZATION_SERVER = {
+  issuer: "https://opensurveillancedb.org",
+  service_documentation: "https://opensurveillancedb.org/api-docs",
+  scopes_supported: ["submit", "confirm", "edit", "action"],
+  agent_auth: {
+    skill: "https://opensurveillancedb.org/auth.md",
+    register_uri: "https://opensurveillancedb.org/register",
+    identity_endpoint: "https://opensurveillancedb.org/api/auth/register",
+    claim_uri: "https://opensurveillancedb.org/api/auth/verify-email",
+    identity_types_supported: ["identity_assertion"],
+    credential_types_supported: ["api_key"],
+    identity_assertion: {
+      assertion_types_supported: ["verified_email"],
+      credential_types_supported: ["api_key"],
+    },
+  },
+};
+
+/**
  * Auth.md agent registration discovery (2026-08-22, isitagentready
  * `authMd`): a self-contained Markdown document at /auth.md telling AI
  * agents how to register for WRITE access to the API. OpenSurveillanceDB
@@ -806,6 +835,22 @@ async function dispatch(request: Request, env: Env, ctx: ExecutionContext, url: 
     if (gatedPathname === "/.well-known/oauth-protected-resource") {
       return withSecurityHeaders(
         new Response(JSON.stringify(OAUTH_PROTECTED_RESOURCE), {
+          headers: {
+            "Content-Type": "application/json; charset=utf-8",
+            "Cache-Control": "public, max-age=3600",
+          },
+        }),
+        url.pathname,
+        url.hostname,
+      );
+    }
+
+    // 1g. OAuth Authorization Server metadata (RFC 8414 shape): the authMd
+    //    check follows PRM.authorization_servers and requires the
+    //    agent_auth block — see OAUTH_AUTHORIZATION_SERVER.
+    if (gatedPathname === "/.well-known/oauth-authorization-server") {
+      return withSecurityHeaders(
+        new Response(JSON.stringify(OAUTH_AUTHORIZATION_SERVER), {
           headers: {
             "Content-Type": "application/json; charset=utf-8",
             "Cache-Control": "public, max-age=3600",
