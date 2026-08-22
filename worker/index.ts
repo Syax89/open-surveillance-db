@@ -464,6 +464,59 @@ const SECURITY_HEADERS: ReadonlyArray<readonly [string, string]> = [
 ];
 
 /**
+ * Auth.md agent registration discovery (2026-08-22, isitagentready
+ * `authMd`): a self-contained Markdown document at /auth.md telling AI
+ * agents how to register for WRITE access to the API. OpenSurveillanceDB
+ * does NOT run an OAuth authorization server — it issues its own scoped
+ * API keys — so the Auth.md spec's fallback path applies (no PRM / OAuth
+ * AS metadata is published, and the document explains the credential
+ * model itself). Served like the API catalog: before the app router,
+ * static, edge-cacheable.
+ */
+const AUTH_MD = `# auth.md — OpenSurveillanceDB Agent Registration
+
+OpenSurveillanceDB is an open database of publicly visible surveillance cameras with a documented JSON/GeoJSON API. This document tells AI agents, LLM crawlers and automation how to authenticate and register for write access.
+
+## Audience
+
+AI agents and automated clients that interact with the OpenSurveillanceDB API at https://opensurveillancedb.org/api/. Humans use the regular web UI; the machine-readable entry points are the API catalog (/.well-known/api-catalog), the OpenAPI specification (/openapi.json) and the human documentation (/api-docs).
+
+## Read API — no registration
+
+The read API is keyless and open: paginated lists, bbox queries, GeoJSON/CSV exports, per-record detail, search, nearby, revisions, geocoding and raster tiles. No credentials are needed.
+
+## Write API — registration and credentials
+
+The write API (publishing camera reports, corrections, community confirmations, actions and edits) requires a private API key.
+
+### Registration
+
+1. Create an account at https://opensurveillancedb.org/register (email verification) or sign in with Google/GitHub OIDC or a passkey.
+2. Open the account settings (https://opensurveillancedb.org/account) and create an API key.
+3. Each key carries a scope (\`submit\`, \`confirm\`, \`edit\`, \`action\`), an expiry and a monthly cap, is shown exactly once at creation, and can be revoked at any time.
+
+### Using credentials
+
+Send the key in the Authorization header:
+
+    Authorization: Bearer <key>
+
+- Credentials in the query string are rejected (HTTP 400) — header only.
+- Each endpoint requires the scope shown in its documentation (/api-docs).
+- Keys are stored hashed and never logged; a lost key cannot be recovered, only reissued.
+
+## No OAuth authorization server
+
+OpenSurveillanceDB does not run an OAuth authorization server: it issues its own scoped API keys, so no OAuth Authorization Server metadata is published and this document is self-contained. Token requests against OAuth endpoints are not supported.
+
+## Notes for agents
+
+- Respect the rate limits documented in /api-docs; bulk exports are metered separately.
+- The dataset is licensed ODbL 1.0 — see /api-docs for attribution requirements.
+- Do not probe account endpoints; create a real test account for integration testing.
+`;
+
+/**
  * RFC 8288 discovery links (2026-08-22, isitagentready `linkHeaders`):
  * every 2xx HTML document carries Link headers pointing to the RFC 9727
  * API catalog, the OpenAPI spec (service-desc) and the human docs page
@@ -664,6 +717,21 @@ async function dispatch(request: Request, env: Env, ctx: ExecutionContext, url: 
           headers: {
             "Content-Type": "application/json; charset=utf-8",
             "Cache-Control": "no-store",
+          },
+        }),
+        url.pathname,
+        url.hostname,
+      );
+    }
+
+    // 1e. Auth.md agent registration discovery (isitagentready `authMd`):
+    //    self-contained Markdown doc for AI agents — see AUTH_MD above.
+    if (gatedPathname === "/auth.md") {
+      return withSecurityHeaders(
+        new Response(AUTH_MD, {
+          headers: {
+            "Content-Type": "text/markdown; charset=utf-8",
+            "Cache-Control": "public, max-age=3600",
           },
         }),
         url.pathname,

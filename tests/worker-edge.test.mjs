@@ -439,6 +439,39 @@ test("health: /api/health answers ok without the app handler or D1", async () =>
   assert.equal(app.__calls.length, 0, "health must not reach the app handler");
 });
 
+test("auth.md: served as self-contained Markdown before the app handler", async () => {
+  const { worker, app } = await loadWorker();
+  const response = await worker.fetch(
+    new Request("https://opensurveillancedb.org/auth.md"),
+    testEnv(),
+    ctx(),
+  );
+
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type") ?? "", /^text\/markdown/);
+  assert.equal(app.__calls.length, 0, "auth.md must not reach the app handler");
+
+  const body = await response.text();
+  // The Auth.md spec: H1 heading that contains "auth.md".
+  assert.match(body, /^# auth\.md[ —-]/m, "H1 must contain auth.md");
+  // Self-contained registration info: audience, endpoint, methods, credentials.
+  assert.match(body, /## Audience/, "audience section");
+  assert.match(body, /https:\/\/opensurveillancedb\.org\/account/, "registration endpoint");
+  assert.match(body, /Authorization: Bearer <key>/, "credential use");
+  assert.match(body, /## No OAuth authorization server/, "honest no-OAuth statement");
+});
+
+test("auth.md: trailing-slash variant still answers and carries no Link header", async () => {
+  const { worker } = await loadWorker();
+  const response = await worker.fetch(
+    new Request("https://opensurveillancedb.org/auth.md/"),
+    testEnv(),
+    ctx(),
+  );
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("link"), null, "Markdown documents must not carry HTML Link headers");
+});
+
 test("rfc-8288: HTML documents carry discovery Link headers on the homepage", async () => {
   const { worker } = await loadWorker();
   const response = await worker.fetch(new Request("https://opensurveillancedb.org/"), testEnv(), ctx());

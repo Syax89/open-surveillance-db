@@ -14,6 +14,17 @@ changes accumulate under `[Unreleased]`.
 
 ### Added
 
+- **Auth.md agent registration (2026-08-22, isitagentready `authMd`):**
+  `/auth.md` servita dal worker come documento Markdown self-contained per
+  agenti AI: H1 `# auth.md`, audience, endpoint di registrazione
+  (`/account`, creazione API key), metodi supportati (Bearer con scope) e
+  uso delle credenziali. OSDB **non** ha un OAuth authorization server
+  (emette API key proprietarie), quindi si applica il percorso fallback
+  dello standard: nessuna PRM/OAuth AS metadata pubblicata, documento
+  onesto e autonomo. `Content-Type: text/markdown`, cache edge 1h, servita
+  prima del router (nessuna query D1). Test: `tests/worker-edge.test.mjs`
+  (auth.md ×2, 43/43).
+
 - **RFC 8288 Link headers (2026-08-22, isitagentready `linkHeaders`):** ogni
   documento HTML 2xx ora porta l'header `Link` con le relazioni registrate
   `api-catalog` (`/.well-known/api-catalog`), `service-desc`
