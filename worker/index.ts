@@ -464,6 +464,25 @@ const SECURITY_HEADERS: ReadonlyArray<readonly [string, string]> = [
 ];
 
 /**
+ * OAuth Protected Resource Metadata (RFC 9728, 2026-08-22): describes the
+ * resource server's bearer-credential requirements for the write API —
+ * the scopes an API key can carry and the header method. Published because
+ * the isitagentready authMd check requires the PRM document at
+ * /.well-known/oauth-protected-resource; the values are real OSDB facts
+ * (scopes from db/api-keys.ts, bearer header from app/lib/write-gate.ts).
+ * authorization_servers names this origin because key issuance happens
+ * here (account settings), NOT because an OAuth authorization server
+ * exists — /auth.md states that explicitly. No AS metadata document is
+ * published (there is no OAuth token endpoint to describe).
+ */
+const OAUTH_PROTECTED_RESOURCE = {
+  resource: ["https://opensurveillancedb.org/api/"],
+  authorization_servers: ["https://opensurveillancedb.org"],
+  scopes_supported: ["submit", "confirm", "edit", "action"],
+  bearer_methods_supported: ["header"],
+};
+
+/**
  * Auth.md agent registration discovery (2026-08-22, isitagentready
  * `authMd`): a self-contained Markdown document at /auth.md telling AI
  * agents how to register for WRITE access to the API. OpenSurveillanceDB
@@ -770,6 +789,21 @@ async function dispatch(request: Request, env: Env, ctx: ExecutionContext, url: 
         new Response(AUTH_MD, {
           headers: {
             "Content-Type": "text/markdown; charset=utf-8",
+            "Cache-Control": "public, max-age=3600",
+          },
+        }),
+        url.pathname,
+        url.hostname,
+      );
+    }
+
+    // 1f. OAuth Protected Resource Metadata (RFC 9728): required by the
+    //    authMd check alongside /auth.md — see OAUTH_PROTECTED_RESOURCE.
+    if (gatedPathname === "/.well-known/oauth-protected-resource") {
+      return withSecurityHeaders(
+        new Response(JSON.stringify(OAUTH_PROTECTED_RESOURCE), {
+          headers: {
+            "Content-Type": "application/json; charset=utf-8",
             "Cache-Control": "public, max-age=3600",
           },
         }),
