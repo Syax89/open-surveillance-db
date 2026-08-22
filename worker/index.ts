@@ -516,6 +516,111 @@ const OAUTH_AUTHORIZATION_SERVER = {
 };
 
 /**
+ * Markdown for Agents (2026-08-22, isitagentready `markdownNegotiation`):
+ * curated Markdown renderings of the main public pages, served when the
+ * client sends `Accept: text/markdown`. Summaries are honest — titles and
+ * section headings verified against the live pages — and link to the HTML
+ * originals. `Vary: Accept` keeps edge caches separate per variant; zero
+ * D1, zero app-router CPU, edge-cacheable 1h. Pages NOT in the map (and
+ * every API route) are never negotiated.
+ */
+const MARKDOWN_PAGES: Record<string, string> = {
+  "/": `# OpenSurveillanceDB
+
+Public data about public surveillance.
+
+OpenSurveillanceDB is an open database of publicly visible surveillance cameras: fixed CCTV, traffic cameras, license-plate readers and similar infrastructure that watches public space. Every record documents the camera — where it is, who appears to operate it, what it captures — and the public evidence for each claim.
+
+## What you can do
+
+- **Explore the map** — https://opensurveillancedb.org/mappa
+- **Search the directory** — https://opensurveillancedb.org/directory
+- **Report a camera** — https://opensurveillancedb.org/segnala
+- **Read the API documentation** — https://opensurveillancedb.org/api-docs
+- **Machine-readable discovery**: API catalog (/.well-known/api-catalog), OpenAPI specification (/openapi.json), agent registration (/auth.md).
+
+Visibility without surveillance: the database is public about public infrastructure, and deliberately does not publish live footage, tracking data, or private-home details. Faces and licence plates are stripped before anything is published.
+
+Human page: https://opensurveillancedb.org/
+`,
+  "/api-docs": `# Public API
+
+OpenSurveillanceDB exposes a documented public API for reading and (with a scoped API key) writing camera records.
+
+- **OpenAPI specification**: https://opensurveillancedb.org/openapi.json (OpenAPI 3.0.3)
+- **API catalog (RFC 9727)**: https://opensurveillancedb.org/.well-known/api-catalog
+- **Agent registration (Auth.md)**: https://opensurveillancedb.org/auth.md
+
+## Read endpoints (keyless)
+
+List, bbox queries, GeoJSON/CSV exports, per-record detail, search, nearby, revisions, geocoding, raster tiles, import sources — no credentials required.
+
+## Write endpoints (Bearer API key)
+
+Publishing camera reports, corrections, community confirmations, actions and edits require an API key with the matching scope: \`submit\`, \`confirm\`, \`edit\`, \`action\`. Keys are created in the account settings (https://opensurveillancedb.org/account), sent as \`Authorization: Bearer <key>\`, stored hashed, revocable.
+
+Full interactive documentation: https://opensurveillancedb.org/api-docs
+`,
+  "/guide": `# Guide — A public database, built with care.
+
+How OpenSurveillanceDB works, in one document.
+
+- **Find what you need** — search the directory, browse the map, export CSV/GeoJSON.
+- **Visibility without operational surveillance** — the database documents cameras; it is not a surveillance tool.
+- **From observation to public record** — contributions are evidence-based: each record cites its public source.
+- **The public publication model** — anything published stays public; the site is an archive, not a message board.
+- **Each status says what the record can support** — camera statuses reflect the strength of the evidence.
+- **Why create an account?** — accounts let you report, correct, confirm and edit; they are never required to read.
+- **You can edit your own contributions** — and correct others with evidence.
+- **What confirmations mean** — community confirmations verify that a camera is still present and accurate.
+
+Full guide: https://opensurveillancedb.org/guide
+`,
+  "/privacy": `# Privacy notice
+
+OpenSurveillanceDB's privacy notice (controller: see section 1 of the full notice).
+
+1. Who we are (controller)
+2. What the service does
+3. What personal data we process
+4. What we do NOT collect or publish
+5. Recipients and transfers
+6. International data transfers
+7. Retention
+8. Your rights (GDPR Articles 15–22)
+
+The database publishes information about cameras, not about people: faces and licence plates are stripped before publication. Full notice: https://opensurveillancedb.org/privacy
+`,
+  "/faq": `# FAQ — Clear answers about how the database works.
+
+Frequently asked questions about OpenSurveillanceDB: what the database contains, how cameras are documented, how to contribute, correct or remove a record, and how privacy is protected.
+
+Still have questions? https://opensurveillancedb.org/contatti
+`,
+  "/contatti": `# Contacts — Who runs this, and how to reach us.
+
+Who runs OpenSurveillanceDB and how to reach the maintainers.
+
+- **Corrections and removal** — how to request a correction or removal of a record.
+- **Reporting a security vulnerability** — responsible-disclosure contact for security issues.
+
+Full page: https://opensurveillancedb.org/contatti
+`,
+  "/manifesto": `# A manifesto for legible public space.
+
+What OpenSurveillanceDB stands for.
+
+- **Transparency is a condition of public space** — people deserve to know the surveillance systems around them.
+- **Help people understand the systems around them** — legibility, not fear.
+- **Free, open and safe by design** — open data, ODbL licensed, safety by design.
+- **What we deliberately do not do** — no live footage, no tracking, no private-home details.
+- **Open where it is safe to be open** — openness has limits where safety requires them.
+
+Full manifesto: https://opensurveillancedb.org/manifesto
+`,
+};
+
+/**
  * Auth.md agent registration discovery (2026-08-22, isitagentready
  * `authMd`): a self-contained Markdown document at /auth.md telling AI
  * agents how to register for WRITE access to the API. OpenSurveillanceDB
@@ -854,6 +959,24 @@ async function dispatch(request: Request, env: Env, ctx: ExecutionContext, url: 
           headers: {
             "Content-Type": "application/json; charset=utf-8",
             "Cache-Control": "public, max-age=3600",
+          },
+        }),
+        url.pathname,
+        url.hostname,
+      );
+    }
+
+    // 1h. Markdown for Agents: content negotiation — only when the client
+    //    explicitly asks for text/markdown AND the path has a curated
+    //    Markdown page. Vary: Accept keeps edge cache variants separate.
+    const accept = request.headers.get("accept") ?? "";
+    if (gatedPathname in MARKDOWN_PAGES && accept.includes("text/markdown")) {
+      return withSecurityHeaders(
+        new Response(MARKDOWN_PAGES[gatedPathname], {
+          headers: {
+            "Content-Type": "text/markdown; charset=utf-8",
+            "Cache-Control": "public, max-age=3600",
+            "Vary": "Accept",
           },
         }),
         url.pathname,
