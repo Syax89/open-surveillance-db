@@ -261,7 +261,7 @@ test("analytics: 4xx (handler 404 and scanner 403) and 3xx (redirect) status cla
   const env = testEnv({ ANALYTICS: analytics.binding });
 
   await worker.fetch(request("/definitely-unknown/xyz"), env, ctx());
-  await worker.fetch(request("/openapi.json"), env, ctx());
+  await worker.fetch(request("/service_account.json"), env, ctx());
   await worker.fetch(new Request("http://www.opensurveillancedb.org/faq"), env, ctx());
 
   assert.deepEqual(
@@ -301,7 +301,6 @@ test("anti-scanner: blocks sensitive-config probes with 403 before the app handl
     "/.env",
     "/web/.env",
     "/.env.production",
-    "/openapi.json",
     "/service_account.json",
     "/appsettings.json",
     "/firebase.json",
@@ -344,6 +343,7 @@ test("anti-scanner: legitimate site paths are never blocked", async () => {
     "/mappa",
     "/segnala",
     "/correggi",
+    "/openapi.json",
     "/api/cameras?limit=1",
     "/api/cameras/1",
     "/api/tiles/15/17520/12176.png",
@@ -365,6 +365,73 @@ test("anti-scanner: legitimate site paths are never blocked", async () => {
     const response = await worker.fetch(request(path), testEnv(), ctxObj);
     assert.equal(response.status, 503, `${path} must hit the moderation gate, not the scanner 403`);
   }
+});
+
+test("rfc-9727: /.well-known/api-catalog is served as linkset+json before the app handler", async () => {
+  const { worker, app } = await loadWorker();
+  const ctxObj = ctx();
+  const response = await worker.fetch(
+    new Request("https://opensurveillancedb.org/.well-known/api-catalog"),
+    testEnv(),
+    ctxObj,
+  );
+
+  assert.equal(response.status, 200);
+  assert.match(
+    response.headers.get("content-type") ?? "",
+    /^application\/linkset\+json/,
+    "content-type must be application/linkset+json",
+  );
+  assert.equal(app.__calls.length, 0, "the catalog must not reach the app handler");
+
+  const catalog = JSON.parse(await response.text());
+  assert.ok(Array.isArray(catalog.linkset), "linkset must be an array");
+  assert.equal(catalog.linkset.length, 1);
+  const entry = catalog.linkset[0];
+  assert.equal(entry.anchor, "https://opensurveillancedb.org/api/");
+  assert.equal(entry["service-desc"][0].href, "https://opensurveillancedb.org/openapi.json");
+  assert.equal(entry["service-desc"][0].type, "application/openapi+json");
+  assert.equal(entry["service-doc"][0].href, "https://opensurveillancedb.org/api-docs");
+  assert.equal(entry.status[0].href, "https://opensurveillancedb.org/api/health");
+});
+
+test("rfc-9727: trailing-slash variant of the catalog path still answers", async () => {
+  const { worker, app } = await loadWorker();
+  const response = await worker.fetch(
+    new Request("https://opensurveillancedb.org/.well-known/api-catalog/"),
+    testEnv(),
+    ctx(),
+  );
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type") ?? "", /^application\/linkset\+json/);
+  assert.equal(app.__calls.length, 0);
+});
+
+test("rfc-9727: catalog links are origin-derived so pre-production gets working URLs", async () => {
+  const { worker } = await loadWorker();
+  const response = await worker.fetch(
+    new Request("https://osdb.syaxhome89.com/.well-known/api-catalog"),
+    testEnv(),
+    ctx(),
+  );
+  assert.equal(response.status, 200);
+  const catalog = JSON.parse(await response.text());
+  const entry = catalog.linkset[0];
+  assert.ok(
+    entry["service-desc"][0].href.startsWith("https://osdb.syaxhome89.com/"),
+    "pre-production catalog must link to its own origin",
+  );
+});
+
+test("health: /api/health answers ok without the app handler or D1", async () => {
+  const { worker, app } = await loadWorker();
+  const response = await worker.fetch(request("/api/health"), testEnv(), ctx());
+
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type") ?? "", /^application\/json/);
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.deepEqual(JSON.parse(await response.text()), { status: "ok", service: "opensurveillancedb" });
+  assert.equal(app.__calls.length, 0, "health must not reach the app handler");
 });
 
 test("preserves security headers set by the app handler (pass-through, never stripped)", async () => {
