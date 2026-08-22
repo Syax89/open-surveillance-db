@@ -21,24 +21,55 @@
     }
   ],
   "tags": [
-    { "name": "Cameras", "description": "Camera records, lists, exports and revisions" },
-    { "name": "Write", "description": "Authenticated write endpoints (API keys)" },
-    { "name": "Geocoding", "description": "Place search and reverse geocoding" },
-    { "name": "Tiles", "description": "OpenStreetMap raster tiles" },
-    { "name": "System", "description": "Health and discovery" }
+    {
+      "name": "Cameras",
+      "description": "Camera records, lists, exports and revisions"
+    },
+    {
+      "name": "Write",
+      "description": "Authenticated write endpoints (API keys)"
+    },
+    {
+      "name": "Geocoding",
+      "description": "Place search and reverse geocoding"
+    },
+    {
+      "name": "Tiles",
+      "description": "OpenStreetMap raster tiles"
+    },
+    {
+      "name": "System",
+      "description": "Health and discovery"
+    }
   ],
+  "security": [],
   "paths": {
     "/api/health": {
       "get": {
-        "tags": ["System"],
+        "tags": [
+          "System"
+        ],
         "summary": "Liveness probe",
+        "operationId": "healthGet",
         "description": "Reports worker liveness without touching the database. Used by monitoring and by the RFC 9727 API catalog status relation.",
         "responses": {
           "200": {
             "description": "Worker is alive",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Health" }
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Worker error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
               }
             }
           }
@@ -47,29 +78,177 @@
     },
     "/api/cameras": {
       "get": {
-        "tags": ["Cameras"],
+        "tags": [
+          "Cameras"
+        ],
         "summary": "List public cameras (paginated JSON, GeoJSON or CSV)",
+        "operationId": "camerasList",
         "description": "Main entry point to the dataset. Default is a paginated JSON list. Add bbox=west,south,east,north for a GeoJSON viewport response (the map endpoint) or a paginated JSON page inside the box. Add format=geojson or format=csv for complete dataset snapshots (rate-limited in a stricter export bucket, no pagination). Pass count=false to skip the full-set COUNT (total answers null; walk pages with nextOffset).",
         "parameters": [
-          { "name": "kind", "in": "query", "required": false, "description": "Filter by camera kind (e.g. Fixed dome, PTZ).", "schema": { "type": "string", "maxLength": 60 } },
-          { "name": "q", "in": "query", "required": false, "description": "Free-text search across titles, addresses and kinds.", "schema": { "type": "string", "maxLength": 200 } },
-          { "name": "initial", "in": "query", "required": false, "description": "Alphabetical filter: first letter A-Z.", "schema": { "type": "string", "pattern": "^[A-Z]$" } },
-          { "name": "freshness", "in": "query", "required": false, "description": "Filter by freshness window.", "schema": { "type": "string", "enum": ["day", "week", "month", "year", "all"] } },
-          { "name": "sort", "in": "query", "required": false, "description": "Sort order.", "schema": { "type": "string", "enum": ["alphabetical", "useful", "recent", "confirmations"] } },
-          { "name": "state", "in": "query", "required": false, "description": "Verification state filter.", "schema": { "type": "string", "enum": ["confirmed", "never"] } },
-          { "name": "origin", "in": "query", "required": false, "description": "Record origin filter.", "schema": { "type": "string", "enum": ["reports", "imported"] } },
-          { "name": "bbox", "in": "query", "required": false, "description": "Viewport as four decimals: west,south,east,north (e.g. 8.5,47.3,8.6,47.5). Requires format=geojson or the default JSON list.", "schema": { "type": "string", "example": "8.5,47.3,8.6,47.5" } },
-          { "name": "format", "in": "query", "required": false, "description": "Response format. Omit for the paginated JSON list.", "schema": { "type": "string", "enum": ["json", "geojson", "csv"] } },
-          { "name": "limit", "in": "query", "required": false, "description": "Page size (clamped to the maximum).", "schema": { "type": "integer", "minimum": 1 } },
-          { "name": "offset", "in": "query", "required": false, "description": "Page offset, starts at 0.", "schema": { "type": "integer", "minimum": 0 } },
-          { "name": "count", "in": "query", "required": false, "description": "Set to false to skip the full-set COUNT: total answers null and pagination walks on nextOffset.", "schema": { "type": "string", "enum": ["false", "true"] } }
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "description": "Filter by camera kind (e.g. Fixed dome, PTZ).",
+            "schema": {
+              "type": "string",
+              "maxLength": 60
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "description": "Free-text search across titles, addresses and kinds.",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "initial",
+            "in": "query",
+            "required": false,
+            "description": "Alphabetical filter: first letter A-Z.",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z]$"
+            }
+          },
+          {
+            "name": "freshness",
+            "in": "query",
+            "required": false,
+            "description": "Filter by freshness window.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "day",
+                "week",
+                "month",
+                "year",
+                "all"
+              ]
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "description": "Sort order.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "alphabetical",
+                "useful",
+                "recent",
+                "confirmations"
+              ]
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "description": "Verification state filter.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "confirmed",
+                "never"
+              ]
+            }
+          },
+          {
+            "name": "origin",
+            "in": "query",
+            "required": false,
+            "description": "Record origin filter.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "reports",
+                "imported"
+              ]
+            }
+          },
+          {
+            "name": "bbox",
+            "in": "query",
+            "required": false,
+            "description": "Viewport as four decimals: west,south,east,north (e.g. 8.5,47.3,8.6,47.5). Requires format=geojson or the default JSON list.",
+            "schema": {
+              "type": "string",
+              "example": "8.5,47.3,8.6,47.5"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "description": "Response format. Omit for the paginated JSON list.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "json",
+                "geojson",
+                "csv"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Page size (clamped to the maximum).",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "description": "Page offset, starts at 0.",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "count",
+            "in": "query",
+            "required": false,
+            "description": "Set to false to skip the full-set COUNT: total answers null and pagination walks on nextOffset.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "false",
+                "true"
+              ]
+            }
+          }
         ],
         "responses": {
           "200": {
             "description": "Paginated JSON list (default / with bbox) — or GeoJSON FeatureCollection / CSV attachment when format is set.",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/CameraList" }
+                "schema": {
+                  "$ref": "#/components/schemas/CameraList"
+                }
+              },
+              "application/geo+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeatureCollection"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "type": "string",
+                  "description": "Complete dataset as CSV attachment (Content-Disposition: attachment)."
+                }
               }
             }
           },
@@ -77,7 +256,9 @@
             "description": "Invalid parameter (bad bbox, unknown sort/freshness/state/origin, invalid initial/limit/offset).",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Error" }
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
               }
             }
           },
@@ -85,49 +266,121 @@
             "description": "Rate limit exceeded.",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Error" }
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
               }
             }
           }
         }
       },
       "post": {
-        "tags": ["Write"],
+        "tags": [
+          "Write"
+        ],
         "summary": "Publish a new camera report",
+        "operationId": "camerasSubmit",
         "description": "Requires a private API key with scope `submit`. Authenticate with `Authorization: Bearer <key>`. CSRF-protected: an Origin header matching the site is required for browser callers.",
-        "security": [{ "bearerAuth": [] }],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/CameraSubmission" }
+              "schema": {
+                "$ref": "#/components/schemas/CameraSubmission"
+              }
             }
           }
         },
         "responses": {
-          "201": { "description": "Camera created" },
-          "400": { "description": "Validation error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
-          "401": { "description": "Missing or invalid API key", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
-          "403": { "description": "Key lacks the submit scope", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
-          "422": { "description": "Unprocessable input (e.g. invalid direction)", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
-          "429": { "description": "Rate limit exceeded", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+          "201": {
+            "description": "Camera created"
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Key lacks the submit scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable input (e.g. invalid direction)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
         }
       }
     },
     "/api/cameras/{id}": {
       "get": {
-        "tags": ["Cameras"],
+        "tags": [
+          "Cameras"
+        ],
         "summary": "One camera record",
+        "operationId": "cameraGet",
         "description": "Full public detail of a camera by numeric id: location, address, verification state, direction and change history references.",
         "parameters": [
-          { "name": "id", "in": "path", "required": true, "description": "Numeric camera id.", "schema": { "type": "integer", "minimum": 1 } }
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Numeric camera id.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
         ],
         "responses": {
           "200": {
             "description": "The camera record.",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Camera" }
+                "schema": {
+                  "$ref": "#/components/schemas/Camera"
+                }
               }
             }
           },
@@ -135,76 +388,227 @@
             "description": "Unknown id.",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Error" }
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
               }
             }
           }
         }
       },
       "patch": {
-        "tags": ["Write"],
+        "tags": [
+          "Write"
+        ],
         "summary": "Update camera details",
+        "operationId": "cameraPatch",
         "description": "Requires a private API key with scope `edit`. Owner edits and edit requests.",
-        "security": [{ "bearerAuth": [] }],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer", "minimum": 1 } }
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
         ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/CameraSubmission" }
+              "schema": {
+                "$ref": "#/components/schemas/CameraSubmission"
+              }
             }
           }
         },
         "responses": {
-          "200": { "description": "Camera updated" },
-          "400": { "description": "Validation error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
-          "401": { "description": "Missing or invalid API key", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
-          "403": { "description": "Key lacks the edit scope", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
-          "404": { "description": "Unknown id", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
-          "429": { "description": "Rate limit exceeded", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+          "200": {
+            "description": "Camera updated"
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Key lacks the edit scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
         }
       }
     },
     "/api/cameras/{id}/confirmation": {
       "put": {
-        "tags": ["Write"],
+        "tags": [
+          "Write"
+        ],
         "summary": "Confirm a camera (community confirmation)",
+        "operationId": "confirmationPut",
         "description": "Requires a private API key with scope `confirm`.",
-        "security": [{ "bearerAuth": [] }],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer", "minimum": 1 } }
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "Confirmation cast" },
-          "401": { "description": "Missing or invalid API key", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
-          "403": { "description": "Key lacks the confirm scope", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+          "200": {
+            "description": "Confirmation cast"
+          },
+          "401": {
+            "description": "Missing or invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Key lacks the confirm scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
         }
       },
       "delete": {
-        "tags": ["Write"],
+        "tags": [
+          "Write"
+        ],
         "summary": "Withdraw a community confirmation",
+        "operationId": "confirmationDelete",
         "description": "Requires a private API key with scope `confirm`.",
-        "security": [{ "bearerAuth": [] }],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer", "minimum": 1 } }
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "Confirmation withdrawn" },
-          "401": { "description": "Missing or invalid API key", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
-          "403": { "description": "Key lacks the confirm scope", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+          "200": {
+            "description": "Confirmation withdrawn"
+          },
+          "401": {
+            "description": "Missing or invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Key lacks the confirm scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
         }
       }
     },
     "/api/cameras/{id}/actions": {
       "put": {
-        "tags": ["Write"],
+        "tags": [
+          "Write"
+        ],
         "summary": "Cast a community action (useful / gone / problem / privacy)",
+        "operationId": "actionsPut",
         "description": "Requires a private API key with scope `action`.",
-        "security": [{ "bearerAuth": [] }],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer", "minimum": 1 } }
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
         ],
         "requestBody": {
           "required": true,
@@ -212,28 +616,82 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["action"],
+                "required": [
+                  "action"
+                ],
                 "properties": {
-                  "action": { "type": "string", "enum": ["useful", "gone", "problem", "privacy"] }
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "useful",
+                      "gone",
+                      "problem",
+                      "privacy"
+                    ]
+                  }
                 }
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "Action cast" },
-          "400": { "description": "Unknown action value", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
-          "401": { "description": "Missing or invalid API key", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
-          "403": { "description": "Key lacks the action scope", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+          "200": {
+            "description": "Action cast"
+          },
+          "400": {
+            "description": "Unknown action value",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Key lacks the action scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
         }
       },
       "delete": {
-        "tags": ["Write"],
+        "tags": [
+          "Write"
+        ],
         "summary": "Withdraw a community action",
+        "operationId": "actionsDelete",
         "description": "Requires a private API key with scope `action`.",
-        "security": [{ "bearerAuth": [] }],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer", "minimum": 1 } }
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
         ],
         "requestBody": {
           "required": true,
@@ -241,107 +699,302 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["action"],
+                "required": [
+                  "action"
+                ],
                 "properties": {
-                  "action": { "type": "string", "enum": ["useful", "gone", "problem", "privacy"] }
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "useful",
+                      "gone",
+                      "problem",
+                      "privacy"
+                    ]
+                  }
                 }
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "Action withdrawn" },
-          "401": { "description": "Missing or invalid API key", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
-          "403": { "description": "Key lacks the action scope", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+          "200": {
+            "description": "Action withdrawn"
+          },
+          "401": {
+            "description": "Missing or invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Key lacks the action scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
         }
       }
     },
     "/api/corrections": {
       "post": {
-        "tags": ["Write"],
+        "tags": [
+          "Write"
+        ],
         "summary": "Submit a correction or removal request",
+        "operationId": "correctionsSubmit",
         "description": "Requires a private API key with scope `submit`.",
-        "security": [{ "bearerAuth": [] }],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["cameraId", "reason"],
+                "required": [
+                  "cameraId",
+                  "reason"
+                ],
                 "properties": {
-                  "cameraId": { "type": "integer", "minimum": 1 },
-                  "reason": { "type": "string", "maxLength": 2000 },
-                  "description": { "type": "string", "maxLength": 2000 }
+                  "cameraId": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "reason": {
+                    "type": "string",
+                    "maxLength": 2000
+                  },
+                  "description": {
+                    "type": "string",
+                    "maxLength": 2000
+                  }
                 }
               }
             }
           }
         },
         "responses": {
-          "201": { "description": "Correction submitted" },
-          "400": { "description": "Validation error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
-          "401": { "description": "Missing or invalid API key", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
-          "403": { "description": "Key lacks the submit scope", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
-          "429": { "description": "Rate limit exceeded", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+          "201": {
+            "description": "Correction submitted"
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Key lacks the submit scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
         }
       }
     },
     "/api/cameras/search": {
       "get": {
-        "tags": ["Cameras"],
+        "tags": [
+          "Cameras"
+        ],
         "summary": "Text search across titles, addresses and kinds",
+        "operationId": "camerasSearch",
         "description": "Fast way to find a specific camera without scanning the map.",
         "parameters": [
-          { "name": "q", "in": "query", "required": true, "description": "Search query.", "schema": { "type": "string" } },
-          { "name": "limit", "in": "query", "required": false, "schema": { "type": "integer", "minimum": 1 } },
-          { "name": "offset", "in": "query", "required": false, "schema": { "type": "integer", "minimum": 0 } }
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "description": "Search query.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
         ],
         "responses": {
           "200": {
             "description": "Matching cameras.",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/CameraList" }
+                "schema": {
+                  "$ref": "#/components/schemas/CameraList"
+                }
               }
             }
           },
-          "400": { "description": "Missing or invalid q", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
-          "429": { "description": "Rate limit exceeded", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+          "400": {
+            "description": "Missing or invalid q",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
         }
       }
     },
     "/api/cameras/nearby": {
       "get": {
-        "tags": ["Cameras"],
+        "tags": [
+          "Cameras"
+        ],
         "summary": "Cameras near a position, sorted by distance",
+        "operationId": "camerasNearby",
         "description": "The duplicate check used by the report form.",
         "parameters": [
-          { "name": "latitude", "in": "query", "required": true, "schema": { "type": "number", "minimum": -90, "maximum": 90 } },
-          { "name": "longitude", "in": "query", "required": true, "schema": { "type": "number", "minimum": -180, "maximum": 180 } },
-          { "name": "radius", "in": "query", "required": false, "description": "Search radius in meters (default 200).", "schema": { "type": "number", "minimum": 1 } }
+          {
+            "name": "latitude",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90
+            }
+          },
+          {
+            "name": "longitude",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 180
+            }
+          },
+          {
+            "name": "radius",
+            "in": "query",
+            "required": false,
+            "description": "Search radius in meters (default 200).",
+            "schema": {
+              "type": "number",
+              "minimum": 1
+            }
+          }
         ],
         "responses": {
           "200": {
             "description": "Cameras sorted by distance.",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/CameraList" }
+                "schema": {
+                  "$ref": "#/components/schemas/CameraList"
+                }
               }
             }
           },
-          "400": { "description": "Missing or invalid coordinates", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
-          "429": { "description": "Rate limit exceeded", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+          "400": {
+            "description": "Missing or invalid coordinates",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
         }
       }
     },
     "/api/cameras/revisions": {
       "get": {
-        "tags": ["Cameras"],
+        "tags": [
+          "Cameras"
+        ],
         "summary": "Public change history of a record",
+        "operationId": "camerasRevisions",
         "description": "What changed on a camera, when, and by whom (anonymous or contributor).",
         "parameters": [
-          { "name": "cameraId", "in": "query", "required": true, "schema": { "type": "integer", "minimum": 1 } }
+          {
+            "name": "cameraId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
         ],
         "responses": {
           "200": {
@@ -353,29 +1006,70 @@
                   "items": {
                     "type": "object",
                     "properties": {
-                      "id": { "type": "integer" },
-                      "cameraId": { "type": "integer" },
-                      "changedAt": { "type": "string", "format": "date-time" },
-                      "changedBy": { "type": "string", "nullable": true },
-                      "summary": { "type": "string" }
+                      "id": {
+                        "type": "integer"
+                      },
+                      "cameraId": {
+                        "type": "integer"
+                      },
+                      "changedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "changedBy": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "summary": {
+                        "type": "string"
+                      }
                     }
                   }
                 }
               }
             }
           },
-          "400": { "description": "Missing or invalid cameraId", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
-          "429": { "description": "Rate limit exceeded", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+          "400": {
+            "description": "Missing or invalid cameraId",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
         }
       }
     },
     "/api/geocode": {
       "get": {
-        "tags": ["Geocoding"],
+        "tags": [
+          "Geocoding"
+        ],
         "summary": "Place autocomplete",
+        "operationId": "geocodeGet",
         "description": "Proxied to OpenStreetMap Nominatim. Results are cached, so repeat queries never hit the upstream.",
         "parameters": [
-          { "name": "q", "in": "query", "required": true, "description": "Place query.", "schema": { "type": "string" } }
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "description": "Place query.",
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "responses": {
           "200": {
@@ -387,28 +1081,73 @@
                   "items": {
                     "type": "object",
                     "properties": {
-                      "label": { "type": "string" },
-                      "latitude": { "type": "number" },
-                      "longitude": { "type": "number" }
+                      "label": {
+                        "type": "string"
+                      },
+                      "latitude": {
+                        "type": "number"
+                      },
+                      "longitude": {
+                        "type": "number"
+                      }
                     }
                   }
                 }
               }
             }
           },
-          "400": { "description": "Missing or invalid q", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
-          "429": { "description": "Rate limit exceeded", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+          "400": {
+            "description": "Missing or invalid q",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
         }
       }
     },
     "/api/geocode/reverse": {
       "get": {
-        "tags": ["Geocoding"],
+        "tags": [
+          "Geocoding"
+        ],
         "summary": "Closest address for a position",
+        "operationId": "geocodeReverse",
         "description": "The same lookup that fills the address field in the report form.",
         "parameters": [
-          { "name": "lat", "in": "query", "required": true, "schema": { "type": "number", "minimum": -90, "maximum": 90 } },
-          { "name": "lng", "in": "query", "required": true, "schema": { "type": "number", "minimum": -180, "maximum": 180 } }
+          {
+            "name": "lat",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90
+            }
+          },
+          {
+            "name": "lng",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 180
+            }
+          }
         ],
         "responses": {
           "200": {
@@ -418,46 +1157,114 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "address": { "type": "string" },
-                    "latitude": { "type": "number" },
-                    "longitude": { "type": "number" }
+                    "address": {
+                      "type": "string"
+                    },
+                    "latitude": {
+                      "type": "number"
+                    },
+                    "longitude": {
+                      "type": "number"
+                    }
                   }
                 }
               }
             }
           },
-          "400": { "description": "Missing or invalid coordinates", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
-          "429": { "description": "Rate limit exceeded", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+          "400": {
+            "description": "Missing or invalid coordinates",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
         }
       }
     },
     "/api/tiles/{z}/{x}/{y}.png": {
       "get": {
-        "tags": ["Tiles"],
+        "tags": [
+          "Tiles"
+        ],
         "summary": "OpenStreetMap raster tile",
+        "operationId": "tileGet",
         "description": "OSM raster tiles, proxied and cached. Use them to build your own map over the camera data.",
         "parameters": [
-          { "name": "z", "in": "path", "required": true, "description": "Zoom level 0-19.", "schema": { "type": "integer", "minimum": 0, "maximum": 19 } },
-          { "name": "x", "in": "path", "required": true, "schema": { "type": "integer", "minimum": 0 } },
-          { "name": "y", "in": "path", "required": true, "schema": { "type": "integer", "minimum": 0 } }
+          {
+            "name": "z",
+            "in": "path",
+            "required": true,
+            "description": "Zoom level 0-19.",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 19
+            }
+          },
+          {
+            "name": "x",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "y",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
         ],
         "responses": {
           "200": {
             "description": "PNG tile.",
             "content": {
               "image/png": {
-                "schema": { "type": "string", "format": "binary" }
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
               }
             }
           },
-          "404": { "description": "Unknown tile", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+          "404": {
+            "description": "Unknown tile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
         }
       }
     },
     "/api/import-sources": {
       "get": {
-        "tags": ["Cameras"],
+        "tags": [
+          "Cameras"
+        ],
         "summary": "Committed import batches (source attribution)",
+        "operationId": "importSourcesGet",
         "description": "Resolves an imported record's raw source ('import:<slug>') to readable attribution info: entity name, licence + link, dataset link. Serves only committed batches.",
         "responses": {
           "200": {
@@ -472,11 +1279,21 @@
                       "items": {
                         "type": "object",
                         "properties": {
-                          "slug": { "type": "string" },
-                          "sourceName": { "type": "string" },
-                          "sourceUrl": { "type": "string" },
-                          "license": { "type": "string" },
-                          "licenseUrl": { "type": "string" }
+                          "slug": {
+                            "type": "string"
+                          },
+                          "sourceName": {
+                            "type": "string"
+                          },
+                          "sourceUrl": {
+                            "type": "string"
+                          },
+                          "license": {
+                            "type": "string"
+                          },
+                          "licenseUrl": {
+                            "type": "string"
+                          }
                         }
                       }
                     }
@@ -485,8 +1302,26 @@
               }
             }
           },
-          "429": { "description": "Rate limit exceeded", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
-          "503": { "description": "Database unavailable", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Database unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
         }
       }
     }
@@ -503,19 +1338,55 @@
       "Camera": {
         "type": "object",
         "properties": {
-          "id": { "type": "integer" },
-          "title": { "type": "string" },
-          "kind": { "type": "string" },
-          "manufacturer": { "type": "string", "nullable": true },
-          "observedOn": { "type": "string", "format": "date", "nullable": true },
-          "status": { "type": "string" },
-          "source": { "type": "string" },
-          "updated": { "type": "string", "format": "date-time" },
-          "description": { "type": "string", "nullable": true },
-          "address": { "type": "string", "nullable": true },
-          "latitude": { "type": "number" },
-          "longitude": { "type": "number" },
-          "direction": { "type": "integer", "minimum": 0, "maximum": 359, "nullable": true, "description": "Compass bearing in degrees clockwise from north; null for non-directional or unknown. Domes are always null." }
+          "id": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "manufacturer": {
+            "type": "string",
+            "nullable": true
+          },
+          "observedOn": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "status": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "updated": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "address": {
+            "type": "string",
+            "nullable": true
+          },
+          "latitude": {
+            "type": "number"
+          },
+          "longitude": {
+            "type": "number"
+          },
+          "direction": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 359,
+            "nullable": true,
+            "description": "Compass bearing in degrees clockwise from north; null for non-directional or unknown. Domes are always null."
+          }
         }
       },
       "CameraList": {
@@ -523,7 +1394,9 @@
         "properties": {
           "records": {
             "type": "array",
-            "items": { "$ref": "#/components/schemas/Camera" }
+            "items": {
+              "$ref": "#/components/schemas/Camera"
+            }
           },
           "total": {
             "type": "integer",
@@ -541,29 +1414,52 @@
         "type": "object",
         "description": "GeoJSON FeatureCollection (RFC 7946) with ODbL foreign members.",
         "properties": {
-          "type": { "type": "string", "enum": ["FeatureCollection"] },
-          "license": { "type": "string" },
-          "attribution": { "type": "string" },
+          "type": {
+            "type": "string",
+            "enum": [
+              "FeatureCollection"
+            ]
+          },
+          "license": {
+            "type": "string"
+          },
+          "attribution": {
+            "type": "string"
+          },
           "features": {
             "type": "array",
             "items": {
               "type": "object",
               "properties": {
-                "type": { "type": "string", "enum": ["Feature"] },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "Feature"
+                  ]
+                },
                 "geometry": {
                   "type": "object",
                   "properties": {
-                    "type": { "type": "string", "enum": ["Point"] },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "Point"
+                      ]
+                    },
                     "coordinates": {
                       "type": "array",
                       "minItems": 2,
                       "maxItems": 2,
-                      "items": { "type": "number" },
+                      "items": {
+                        "type": "number"
+                      },
                       "description": "[longitude, latitude]"
                     }
                   }
                 },
-                "properties": { "$ref": "#/components/schemas/Camera" }
+                "properties": {
+                  "$ref": "#/components/schemas/Camera"
+                }
               }
             }
           }
@@ -573,28 +1469,72 @@
         "type": "object",
         "description": "Fields accepted by the write API. The full validation rules mirror the site forms.",
         "properties": {
-          "title": { "type": "string", "maxLength": 200 },
-          "kind": { "type": "string", "maxLength": 60 },
-          "manufacturer": { "type": "string", "maxLength": 100 },
-          "observedOn": { "type": "string", "format": "date" },
-          "description": { "type": "string", "maxLength": 2000 },
-          "address": { "type": "string", "maxLength": 300 },
-          "latitude": { "type": "number", "minimum": -90, "maximum": 90 },
-          "longitude": { "type": "number", "minimum": -180, "maximum": 180 },
-          "direction": { "type": "integer", "minimum": 0, "maximum": 359, "description": "Ignored (normalised to null) for dome kinds." }
+          "title": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "kind": {
+            "type": "string",
+            "maxLength": 60
+          },
+          "manufacturer": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "observedOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "address": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "latitude": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90
+          },
+          "longitude": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180
+          },
+          "direction": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 359,
+            "description": "Ignored (normalised to null) for dome kinds."
+          }
         }
       },
       "Health": {
         "type": "object",
         "properties": {
-          "status": { "type": "string", "enum": ["ok"] },
-          "service": { "type": "string", "enum": ["opensurveillancedb"] }
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok"
+            ]
+          },
+          "service": {
+            "type": "string",
+            "enum": [
+              "opensurveillancedb"
+            ]
+          }
         }
       },
       "Error": {
         "type": "object",
         "properties": {
-          "error": { "type": "string", "description": "Human-readable error message." }
+          "error": {
+            "type": "string",
+            "description": "Human-readable error message."
+          }
         }
       }
     }
