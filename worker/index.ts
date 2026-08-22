@@ -602,7 +602,9 @@ async function dispatch(request: Request, env: Env, ctx: ExecutionContext, url: 
     //    the app router: static JSON, no D1, edge-cacheable. Links are
     //    origin-derived so the pre-production host answers with its own
     //    working URLs (the www alias is already 308'd to the apex above).
-    if (url.pathname === "/.well-known/api-catalog") {
+    //    Matched on the normalised path (gatedPathname) so a trailing slash
+    //    variant still answers.
+    if (gatedPathname === "/.well-known/api-catalog") {
       const base = `https://${url.hostname}`;
       const catalog = {
         linkset: [
@@ -631,7 +633,7 @@ async function dispatch(request: Request, env: Env, ctx: ExecutionContext, url: 
     // 1d. Liveness probe (status relation of the API catalog + monitoring):
     //    answers WITHOUT touching D1 or the app router — it reports worker
     //    liveness, not data health, and is deliberately no-store.
-    if (url.pathname === "/api/health") {
+    if (gatedPathname === "/api/health") {
       return withSecurityHeaders(
         new Response(JSON.stringify({ status: "ok", service: "opensurveillancedb" }), {
           headers: {

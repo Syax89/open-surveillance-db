@@ -395,6 +395,18 @@ test("rfc-9727: /.well-known/api-catalog is served as linkset+json before the ap
   assert.equal(entry.status[0].href, "https://opensurveillancedb.org/api/health");
 });
 
+test("rfc-9727: trailing-slash variant of the catalog path still answers", async () => {
+  const { worker, app } = await loadWorker();
+  const response = await worker.fetch(
+    new Request("https://opensurveillancedb.org/.well-known/api-catalog/"),
+    testEnv(),
+    ctx(),
+  );
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type") ?? "", /^application\/linkset\+json/);
+  assert.equal(app.__calls.length, 0);
+});
+
 test("rfc-9727: catalog links are origin-derived so pre-production gets working URLs", async () => {
   const { worker } = await loadWorker();
   const response = await worker.fetch(
