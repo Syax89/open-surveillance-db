@@ -14,6 +14,20 @@ changes accumulate under `[Unreleased]`.
 
 ### Added
 
+- **RFC 9727 API catalog (2026-08-22, "ottimizzare per i bot AI"):**
+  `/.well-known/api-catalog` è servita con `Content-Type: application/linkset+json`
+  dal worker (prima del router vinext, nessuna query D1) e punta a
+  `service-desc` (`/openapi.json`), `service-doc` (`/api-docs`) e `status`
+  (`/api/health`). La spec OpenAPI 3.0.3 dell'API pubblica (lettura keyless +
+  scrittura con chiavi Bearer e scope) vive in `public/openapi.json` ed è
+  servita come asset statico; per questo `openapi.json` è stato **rimosso**
+  dalla regex anti-scanner (ora è un path legittimo del sito, e una probe
+  costa un fetch da ASSETS cachato, non più lavoro del router). Aggiunto
+  anche il liveness probe `/api/health` (`{"status":"ok"}`), no-store, senza
+  toccare D1. I link del catalog sono origin-derived, così la pre-prod
+  risponde con i propri URL. Test: `tests/worker-edge.test.mjs`
+  (rfc-9727 + health + openapi.json nei path legittimi).
+
 - **Anti-scanner edge gate (2026-08-12, CEO — "proteggiamo sto sito"):** un
   bot scanner martellava il sito da ~500-600 richieste/ora (path sensibili:
   `.env`, `openapi.json`, `node_modules`, `*.php`, `/.hermes/config.yaml`,

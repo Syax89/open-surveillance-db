@@ -175,7 +175,7 @@ const gatedPath = (method: string, pathname: string) =>
 /**
  * Scanner / attack-path catch-all (2026-08-12, CEO decision "proteggiamo il
  * sito"). Public probes for sensitive files, configs and admin panels
- * (`.env`, `*.php`, `openapi.json`, `node_modules`, dotfiles, backup
+ * (`.env`, `*.php`, `node_modules`, dotfiles, backup
  * extensions…) are answered with a bare 403 BEFORE the app router, the
  * rate-limit bindings and D1. Previously every probe crossed the full
  * vinext routing pipeline (and API-shaped probes executed D1 queries): on
@@ -189,9 +189,14 @@ const gatedPath = (method: string, pathname: string) =>
  * (nothing under /api, /assets, /mappa, /segnala, /correggi, /moderation
  * or /records can ever hit it) so no legitimate route is affected — see
  * tests/worker-edge.test.mjs "anti-scanner" for both sides of the fence.
+ *
+ * 2026-08-22: `openapi.json` was REMOVED from the blocklist — the file is
+ * now served deliberately (public/openapi.json, RFC 9727 API catalog
+ * service-desc). The spec answers from the static ASSETS, not the router
+ * pipeline, so a probe costs a CDN-cached asset fetch instead of D1 work.
  */
 const SCANNER_PATH_PATTERN =
-  /(^|\/)(\.env|\.git|\.svn|\.hermes|node_modules|openapi\.json|service_account\.json|appsettings\.json|firebase\.json|aws-config|configuration\.php|frontend_latest|telescope|server-info|phpmyadmin|adminer|wp-admin|sa\.json|application\.properties|classwithtostring)|\.(php|bak|sql|log)$/i;
+  /(^|\/)(\.env|\.git|\.svn|\.hermes|node_modules|service_account\.json|appsettings\.json|firebase\.json|aws-config|configuration\.php|frontend_latest|telescope|server-info|phpmyadmin|adminer|wp-admin|sa\.json|application\.properties|classwithtostring)|\.(php|bak|sql|log)$/i;
 
 
 // Identity headers (ADR 0014). The prototype header `x-osdb-user-email` and
@@ -587,6 +592,55 @@ async function dispatch(request: Request, env: Env, ctx: ExecutionContext, url: 
           headers: { "Cache-Control": "no-store" },
         }),
         url.pathname,
+      );
+    }
+
+    // 1c. RFC 9727 API catalog (2026-08-22, AI-bot / automated discovery):
+    //    /.well-known/api-catalog tells LLM crawlers and API-discovery
+    //    tools where the OpenAPI spec (service-desc), the human docs page
+    //    (service-doc) and the health probe (status) live. Served BEFORE
+    //    the app router: static JSON, no D1, edge-cacheable. Links are
+    //    origin-derived so the pre-production host answers with its own
+    //    working URLs (the www alias is already 308'd to the apex above).
+    if (url.pathname === "/.well-known/api-catalog") {
+      const base = `https://${url.hostname}`;
+      const catalog = {
+        linkset: [
+          {
+            anchor: `${base}/api/`,
+            "service-desc": [
+              { href: `${base}/openapi.json`, type: "application/openapi+json" },
+            ],
+            "service-doc": [{ href: `${base}/api-docs` }],
+            status: [{ href: `${base}/api/health` }],
+          },
+        ],
+      };
+      return withSecurityHeaders(
+        new Response(JSON.stringify(catalog), {
+          headers: {
+            "Content-Type": "application/linkset+json; charset=utf-8",
+            "Cache-Control": "public, max-age=3600",
+          },
+        }),
+        url.pathname,
+        url.hostname,
+      );
+    }
+
+    // 1d. Liveness probe (status relation of the API catalog + monitoring):
+    //    answers WITHOUT touching D1 or the app router — it reports worker
+    //    liveness, not data health, and is deliberately no-store.
+    if (url.pathname === "/api/health") {
+      return withSecurityHeaders(
+        new Response(JSON.stringify({ status: "ok", service: "opensurveillancedb" }), {
+          headers: {
+            "Content-Type": "application/json; charset=utf-8",
+            "Cache-Control": "no-store",
+          },
+        }),
+        url.pathname,
+        url.hostname,
       );
     }
 
