@@ -476,6 +476,26 @@ test("auth.md: trailing-slash variant still answers and carries no Link header",
   assert.equal(response.headers.get("link"), null, "Markdown documents must not carry HTML Link headers");
 });
 
+test("rfc-9728: oauth-protected-resource metadata is served with real OSDB facts", async () => {
+  const { worker, app } = await loadWorker();
+  const response = await worker.fetch(
+    new Request("https://opensurveillancedb.org/.well-known/oauth-protected-resource"),
+    testEnv(),
+    ctx(),
+  );
+
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type") ?? "", /^application\/json/);
+  assert.equal(app.__calls.length, 0, "PRM must not reach the app handler");
+
+  const prm = JSON.parse(await response.text());
+  assert.ok(prm.resource.includes("https://opensurveillancedb.org/api/"), "resource");
+  assert.deepEqual(prm.authorization_servers, ["https://opensurveillancedb.org"], "authorization_servers");
+  assert.ok(Array.isArray(prm.scopes_supported) && prm.scopes_supported.length > 0, "scopes_supported must be non-empty");
+  assert.ok(prm.scopes_supported.includes("submit") && prm.scopes_supported.includes("action"), "real scopes");
+  assert.deepEqual(prm.bearer_methods_supported, ["header"], "bearer method header");
+});
+
 test("rfc-8288: HTML documents carry discovery Link headers on the homepage", async () => {
   const { worker } = await loadWorker();
   const response = await worker.fetch(new Request("https://opensurveillancedb.org/"), testEnv(), ctx());
