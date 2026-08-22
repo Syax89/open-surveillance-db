@@ -464,6 +464,21 @@ const SECURITY_HEADERS: ReadonlyArray<readonly [string, string]> = [
 ];
 
 /**
+ * RFC 8288 discovery links (2026-08-22, isitagentready `linkHeaders`):
+ * every 2xx HTML document carries Link headers pointing to the RFC 9727
+ * API catalog, the OpenAPI spec (service-desc) and the human docs page
+ * (service-doc), so an AI agent that lands on ANY page can discover the
+ * machine-readable API. Relative references resolve against the request
+ * URI per RFC 8288 §3.2. Never added to API/JSON responses, errors or
+ * redirects.
+ */
+const API_LINK_HEADER = [
+  `</.well-known/api-catalog>; rel="api-catalog"`,
+  `</openapi.json>; rel="service-desc"; type="application/openapi+json"`,
+  `</api-docs>; rel="service-doc"`,
+].join(", ");
+
+/**
  * Return a copy of `response` carrying the global security headers. On the
  * /mappa and /segnala routes the Permissions-Policy is relaxed to allow
  * geolocation for the top-level document; every other route keeps the
@@ -479,6 +494,16 @@ function withSecurityHeaders(response: Response, pathname?: string, hostname?: s
   const appSetPermissionsPolicy = headers.has("Permissions-Policy");
   for (const [name, value] of SECURITY_HEADERS) {
     if (!headers.has(name)) headers.set(name, value);
+  }
+  // RFC 8288 discovery links on HTML documents only (2xx, text/html), and
+  // never clobbering a Link an app route already set.
+  if (
+    response.status >= 200 &&
+    response.status < 300 &&
+    (response.headers.get("content-type") ?? "").startsWith("text/html") &&
+    !headers.has("Link")
+  ) {
+    headers.set("Link", API_LINK_HEADER);
   }
   if (pathname && GEOLOCATION_ROUTES.has(pathname) && !appSetPermissionsPolicy) {
     headers.set("Permissions-Policy", GEOLOCATION_PERMISSIONS_POLICY);

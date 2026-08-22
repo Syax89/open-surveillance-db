@@ -37,6 +37,11 @@ export default {
     if (url.pathname.startsWith("/definitely-unknown")) {
       return new Response("Not Found", { status: 404, headers: { "content-type": "text/plain" } });
     }
+    if (url.pathname === "/") {
+      // The homepage (and every page in production) is an HTML document:
+      // the RFC 8288 Link-header tests need a realistic content-type.
+      return new Response("<html><head><title>osdb</title></head><body>ok</body></html>", { status: 200, headers: { "content-type": "text/html; charset=utf-8" } });
+    }
     return new Response("handler-ok", { status: 200, headers: { "content-type": "text/plain" } });
   },
 };
@@ -432,6 +437,55 @@ test("health: /api/health answers ok without the app handler or D1", async () =>
   assert.equal(response.headers.get("cache-control"), "no-store");
   assert.deepEqual(JSON.parse(await response.text()), { status: "ok", service: "opensurveillancedb" });
   assert.equal(app.__calls.length, 0, "health must not reach the app handler");
+});
+
+test("rfc-8288: HTML documents carry discovery Link headers on the homepage", async () => {
+  const { worker } = await loadWorker();
+  const response = await worker.fetch(new Request("https://opensurveillancedb.org/"), testEnv(), ctx());
+
+  assert.equal(response.status, 200);
+  const link = response.headers.get("link");
+  assert.ok(link, "homepage must carry a Link header");
+  assert.match(link ?? "", /<\/\.well-known\/api-catalog>;\s*rel="api-catalog"/, "api-catalog relation");
+  assert.match(link ?? "", /<\/openapi\.json>;\s*rel="service-desc"/, "service-desc relation");
+  assert.match(link ?? "", /<\/api-docs>;\s*rel="service-doc"/, "service-doc relation");
+});
+
+test("rfc-8288: Link headers are NOT added to API/JSON, errors or redirects", async () => {
+  const { worker } = await loadWorker();
+
+  // API route (mock answers text/plain, not an HTML document).
+  const api = await worker.fetch(request("/api/cameras?limit=1"), testEnv(), ctx());
+  assert.equal(api.status, 200);
+  assert.equal(api.headers.get("link"), null, "API responses must not carry Link headers");
+
+  // Scanner 403.
+  const blocked = await worker.fetch(request("/.env"), testEnv(), ctx());
+  assert.equal(blocked.status, 403);
+  assert.equal(blocked.headers.get("link"), null, "403 responses must not carry Link headers");
+
+  // www redirect (3xx).
+  const redirect = await worker.fetch(new Request("http://www.opensurveillancedb.org/"), testEnv(), ctx());
+  assert.equal(redirect.status, 308);
+  assert.equal(redirect.headers.get("link"), null, "redirects must not carry Link headers");
+});
+
+test("rfc-8288: an app-set Link header survives (never overwritten)", async () => {
+  const { worker, app } = await loadWorker();
+  const handler = app.default;
+  const originalFetch = handler.fetch;
+  handler.fetch = async () =>
+    new Response("<html>custom</html>", {
+      status: 200,
+      headers: { "content-type": "text/html", link: `</custom.json>; rel="describedby"` },
+    });
+  try {
+    const response = await worker.fetch(request("/mappa"), testEnv(), ctx());
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("link"), `</custom.json>; rel="describedby"`);
+  } finally {
+    handler.fetch = originalFetch;
+  }
 });
 
 test("preserves security headers set by the app handler (pass-through, never stripped)", async () => {

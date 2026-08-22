@@ -14,6 +14,15 @@ changes accumulate under `[Unreleased]`.
 
 ### Added
 
+- **RFC 8288 Link headers (2026-08-22, isitagentready `linkHeaders`):** ogni
+  documento HTML 2xx ora porta l'header `Link` con le relazioni registrate
+  `api-catalog` (`/.well-known/api-catalog`), `service-desc`
+  (`/openapi.json`, type `application/openapi+json`) e `service-doc`
+  (`/api-docs`), così un agente AI che atterra su QUALSIASI pagina scopre
+  l'API machine-readable (RFC 9727 §3). Mai aggiunto a risposte API/JSON,
+  errori o redirect; un `Link` già impostato dall'app non viene mai
+  sovrascritto. Test: `tests/worker-edge.test.mjs` (rfc-8288 ×3, 41/41).
+
 - **RFC 9727 API catalog (2026-08-22, "ottimizzare per i bot AI"):**
   `/.well-known/api-catalog` è servita con `Content-Type: application/linkset+json`
   dal worker (prima del router vinext, nessuna query D1) e punta a
