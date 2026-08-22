@@ -476,7 +476,11 @@ const SECURITY_HEADERS: ReadonlyArray<readonly [string, string]> = [
  * published (there is no OAuth token endpoint to describe).
  */
 const OAUTH_PROTECTED_RESOURCE = {
-  resource: ["https://opensurveillancedb.org/api/"],
+  // `resource` matches the scanned site origin exactly (RFC 9728 allows a
+  // string or array; the scanner's validator requires the value to match
+  // the target — a path suffix is rejected as a mismatch).
+  resource: "https://opensurveillancedb.org",
+  resource_name: "OpenSurveillanceDB API",
   authorization_servers: ["https://opensurveillancedb.org"],
   scopes_supported: ["submit", "confirm", "edit", "action"],
   bearer_methods_supported: ["header"],

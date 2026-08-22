@@ -489,7 +489,8 @@ test("rfc-9728: oauth-protected-resource metadata is served with real OSDB facts
   assert.equal(app.__calls.length, 0, "PRM must not reach the app handler");
 
   const prm = JSON.parse(await response.text());
-  assert.ok(prm.resource.includes("https://opensurveillancedb.org/api/"), "resource");
+  assert.equal(prm.resource, "https://opensurveillancedb.org", "resource must match the site origin");
+  assert.ok(prm.resource_name, "resource_name");
   assert.deepEqual(prm.authorization_servers, ["https://opensurveillancedb.org"], "authorization_servers");
   assert.ok(Array.isArray(prm.scopes_supported) && prm.scopes_supported.length > 0, "scopes_supported must be non-empty");
   assert.ok(prm.scopes_supported.includes("submit") && prm.scopes_supported.includes("action"), "real scopes");
