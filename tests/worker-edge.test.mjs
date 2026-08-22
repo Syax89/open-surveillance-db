@@ -520,6 +520,72 @@ test("auth-md: oauth-authorization-server metadata carries an honest agent_auth 
   assert.equal(as.token_endpoint, undefined, "no fake OAuth token endpoint");
 });
 
+test("markdown-negotiation: homepage answers text/markdown when asked", async () => {
+  const { worker, app } = await loadWorker();
+  const response = await worker.fetch(
+    new Request("https://opensurveillancedb.org/", {
+      headers: { Accept: "text/markdown, text/plain, */*" },
+    }),
+    testEnv(),
+    ctx(),
+  );
+
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type") ?? "", /^text\/markdown/);
+  assert.match(response.headers.get("vary") ?? "", /accept/i, "Vary: Accept required for content negotiation");
+  assert.equal(app.__calls.length, 0, "markdown must not reach the app handler");
+  const body = await response.text();
+  assert.match(body, /^# OpenSurveillanceDB/m, "H1");
+  assert.match(body, /Public data about public surveillance\./, "real tagline");
+});
+
+test("markdown-negotiation: browsers still get HTML, APIs never negotiate", async () => {
+  const { worker, app } = await loadWorker();
+  // Browser Accept header: no text/markdown -> app HTML path.
+  const html = await worker.fetch(
+    new Request("https://opensurveillancedb.org/", {
+      headers: { Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" },
+    }),
+    testEnv(),
+    ctx(),
+  );
+  assert.notEqual((html.headers.get("content-type") ?? "").split(";")[0], "text/markdown");
+  assert.ok(app.__calls.length > 0, "browser request must reach the app handler");
+  // API route with Accept: text/markdown -> still JSON, never negotiated.
+  app.__calls.length = 0;
+  const api = await worker.fetch(
+    new Request("https://opensurveillancedb.org/api/health", {
+      headers: { Accept: "text/markdown" },
+    }),
+    testEnv(),
+    ctx(),
+  );
+  assert.equal(api.status, 200);
+  assert.match(api.headers.get("content-type") ?? "", /^application\/json/);
+  assert.equal(app.__calls.length, 0, "health stays in the dispatch");
+});
+
+test("markdown-negotiation: other public pages and trailing slashes work", async () => {
+  const { worker, app } = await loadWorker();
+  for (const p of ["/api-docs", "/guide/", "/privacy?lang=it", "/faq", "/contatti", "/manifesto"]) {
+    const response = await worker.fetch(
+      new Request(`https://opensurveillancedb.org${p}`, { headers: { Accept: "text/markdown" } }),
+      testEnv(),
+      ctx(),
+    );
+    assert.equal(response.status, 200, `${p} -> 200`);
+    assert.match(response.headers.get("content-type") ?? "", /^text\/markdown/, `${p} content-type`);
+  }
+  assert.equal(app.__calls.length, 0, "no app handler for negotiated pages");
+  // Unknown path with Accept: text/markdown must NOT be negotiated -> app 404 path.
+  const unknown = await worker.fetch(
+    new Request("https://opensurveillancedb.org/definitely-not-a-page", { headers: { Accept: "text/markdown" } }),
+    testEnv(),
+    ctx(),
+  );
+  assert.notEqual((unknown.headers.get("content-type") ?? "").split(";")[0], "text/markdown");
+});
+
 test("rfc-8288: HTML documents carry discovery Link headers on the homepage", async () => {
   const { worker } = await loadWorker();
   const response = await worker.fetch(new Request("https://opensurveillancedb.org/"), testEnv(), ctx());
