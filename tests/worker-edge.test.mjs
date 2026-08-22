@@ -497,6 +497,29 @@ test("rfc-9728: oauth-protected-resource metadata is served with real OSDB facts
   assert.deepEqual(prm.bearer_methods_supported, ["header"], "bearer method header");
 });
 
+test("auth-md: oauth-authorization-server metadata carries an honest agent_auth block", async () => {
+  const { worker, app } = await loadWorker();
+  const response = await worker.fetch(
+    new Request("https://opensurveillancedb.org/.well-known/oauth-authorization-server"),
+    testEnv(),
+    ctx(),
+  );
+
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type") ?? "", /^application\/json/);
+  assert.equal(app.__calls.length, 0, "AS metadata must not reach the app handler");
+
+  const as = JSON.parse(await response.text());
+  assert.equal(as.issuer, "https://opensurveillancedb.org", "issuer must match the PRM authorization server");
+  assert.ok(as.agent_auth, "agent_auth block");
+  assert.equal(as.agent_auth.skill, "https://opensurveillancedb.org/auth.md", "skill");
+  assert.ok(as.agent_auth.register_uri, "register_uri");
+  assert.ok(as.agent_auth.identity_types_supported.length > 0, "at least one identity type");
+  assert.ok(as.agent_auth.credential_types_supported.length > 0, "credential types");
+  assert.ok(as.agent_auth.identity_assertion.assertion_types_supported.includes("verified_email"), "verified-email flow");
+  assert.equal(as.token_endpoint, undefined, "no fake OAuth token endpoint");
+});
+
 test("rfc-8288: HTML documents carry discovery Link headers on the homepage", async () => {
   const { worker } = await loadWorker();
   const response = await worker.fetch(new Request("https://opensurveillancedb.org/"), testEnv(), ctx());
