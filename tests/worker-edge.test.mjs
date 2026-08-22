@@ -454,10 +454,14 @@ test("auth.md: served as self-contained Markdown before the app handler", async 
   const body = await response.text();
   // The Auth.md spec: H1 heading that contains "auth.md".
   assert.match(body, /^# auth\.md[ —-]/m, "H1 must contain auth.md");
-  // Self-contained registration info: audience, endpoint, methods, credentials.
-  assert.match(body, /## Audience/, "audience section");
-  assert.match(body, /https:\/\/opensurveillancedb\.org\/account/, "registration endpoint");
-  assert.match(body, /Authorization: Bearer <key>/, "credential use");
+  // Protocol registration markers (the scanner detects these): agent
+  // address, register-a-credential phrasing, real HTTP registration
+  // endpoints in fenced http blocks, and a credential-use example.
+  assert.match(body, /You are an agent\./, "agent address marker");
+  assert.match(body, /register a credential/, "register-a-credential marker");
+  assert.match(body, /POST \/api\/auth\/register HTTP\/1\.1/, "registration endpoint block");
+  assert.match(body, /POST \/api\/auth\/keys HTTP\/1\.1/, "credential provisioning endpoint block");
+  assert.match(body, /Authorization: Bearer <api key from Step 3>/, "credential use");
   assert.match(body, /## No OAuth authorization server/, "honest no-OAuth statement");
 });
 

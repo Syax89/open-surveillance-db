@@ -475,35 +475,74 @@ const SECURITY_HEADERS: ReadonlyArray<readonly [string, string]> = [
  */
 const AUTH_MD = `# auth.md — OpenSurveillanceDB Agent Registration
 
-OpenSurveillanceDB is an open database of publicly visible surveillance cameras with a documented JSON/GeoJSON API. This document tells AI agents, LLM crawlers and automation how to authenticate and register for write access.
+Not an agent? You might be looking for https://opensurveillancedb.org/api-docs.
 
-## Audience
+You are an agent. This document tells you how to register a credential for the **OpenSurveillanceDB write API** — publishing camera reports, corrections, community confirmations, actions and edits. Read access to the API is keyless and needs no registration. Follow the steps in order; do not skip ahead.
 
-AI agents and automated clients that interact with the OpenSurveillanceDB API at https://opensurveillancedb.org/api/. Humans use the regular web UI; the machine-readable entry points are the API catalog (/.well-known/api-catalog), the OpenAPI specification (/openapi.json) and the human documentation (/api-docs).
+Endpoints live at \`https://opensurveillancedb.org\`. The machine-readable API surface is the API catalog (/.well-known/api-catalog), the OpenAPI specification (/openapi.json) and the human documentation (/api-docs).
 
-## Read API — no registration
+## Step 1 — Register an account
 
-The read API is keyless and open: paginated lists, bbox queries, GeoJSON/CSV exports, per-record detail, search, nearby, revisions, geocoding and raster tiles. No credentials are needed.
+\`\`\`http
+POST /api/auth/register HTTP/1.1
+Host: opensurveillancedb.org
+Content-Type: application/json
 
-## Write API — registration and credentials
+{"email": "agent@example.com", "password": "<12+ character password>"}
+\`\`\`
 
-The write API (publishing camera reports, corrections, community confirmations, actions and edits) requires a private API key.
+A verification email is sent to the address (one per five minutes per address). Complete the link inside it before Step 3.
 
-### Registration
+## Step 2 — Sign in to create an API key
 
-1. Create an account at https://opensurveillancedb.org/register (email verification) or sign in with Google/GitHub OIDC or a passkey.
-2. Open the account settings (https://opensurveillancedb.org/account) and create an API key.
-3. Each key carries a scope (\`submit\`, \`confirm\`, \`edit\`, \`action\`), an expiry and a monthly cap, is shown exactly once at creation, and can be revoked at any time.
+\`\`\`http
+POST /api/auth/login HTTP/1.1
+Host: opensurveillancedb.org
+Content-Type: application/json
 
-### Using credentials
+{"email": "agent@example.com", "password": "<password>"}
+\`\`\`
 
-Send the key in the Authorization header:
+The response sets a session cookie. Keep that cookie for Step 3; it is the proof of the verified account and is never a credential for the data API.
 
-    Authorization: Bearer <key>
+## Step 3 — Create an API key
+
+\`\`\`http
+POST /api/auth/keys HTTP/1.1
+Host: opensurveillancedb.org
+Content-Type: application/json
+Cookie: <session cookie from Step 2>
+
+{"name": "my-agent", "scopes": ["submit", "confirm", "edit", "action"], "expiresAt": "2027-01-01T00:00:00.000Z"}
+\`\`\`
+
+- \`scopes\`: non-empty subset of \`submit\`, \`confirm\`, \`edit\`, \`action\` — one line each below.
+- \`expiresAt\`: ISO-8601 UTC; default one year, explicit null = never.
+- The key is shown **exactly once** in the response — store it; it cannot be recovered, only reissued.
+
+Scopes:
+
+- \`submit\` — publish camera reports and corrections.
+- \`confirm\` — cast or withdraw community confirmations.
+- \`edit\` — update camera details.
+- \`action\` — cast or withdraw community actions.
+
+## Step 4 — Use the credential
+
+Send the key as a bearer credential in the Authorization header on every write request:
+
+\`\`\`http
+POST /api/cameras HTTP/1.1
+Host: opensurveillancedb.org
+Content-Type: application/json
+Authorization: Bearer <api key from Step 3>
+
+{"title": "Example camera", "latitude": 47.41, "longitude": 8.57, "kind": "Fixed dome"}
+\`\`\`
 
 - Credentials in the query string are rejected (HTTP 400) — header only.
 - Each endpoint requires the scope shown in its documentation (/api-docs).
-- Keys are stored hashed and never logged; a lost key cannot be recovered, only reissued.
+- Keys are stored hashed and never logged; revoke a key from the account settings (https://opensurveillancedb.org/account) at any time.
 
 ## No OAuth authorization server
 
