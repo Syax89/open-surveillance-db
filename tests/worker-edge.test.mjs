@@ -586,6 +586,36 @@ test("markdown-negotiation: other public pages and trailing slashes work", async
   assert.notEqual((unknown.headers.get("content-type") ?? "").split(";")[0], "text/markdown");
 });
 
+test("dns-aid: agent index document lists only real services", async () => {
+  const { worker, app } = await loadWorker();
+  const response = await worker.fetch(
+    new Request("https://opensurveillancedb.org/.well-known/agent-index.json"),
+    testEnv(),
+    ctx(),
+  );
+
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type") ?? "", /^application\/json/);
+  assert.equal(app.__calls.length, 0, "agent index must not reach the app handler");
+  const index = await response.json();
+  assert.equal(index.index, "https://opensurveillancedb.org/.well-known/agent-index.json");
+  assert.equal(index.organization, "OpenSurveillanceDB");
+  assert.ok(Array.isArray(index.agent_services) && index.agent_services.length >= 3, "at least the 3 real services");
+  const urls = [
+    index.agent_services[0].api_catalog,
+    index.agent_services[0].openapi,
+    index.agent_services[1].auth_md,
+    index.agent_services[1].oauth_authorization_server,
+    index.agent_services[1].oauth_protected_resource,
+  ];
+  for (const u of urls) {
+    assert.match(u, /^https:\/\/opensurveillancedb\.org\//, `${u} absolute and on-origin`);
+  }
+  assert.ok(index.agent_services[2].pages.length >= 7, "markdown pages listed");
+  // Honesty: the auth service states there is no OAuth token flow.
+  assert.match(index.agent_services[1].description, /No OAuth token flow exists/);
+});
+
 test("rfc-8288: HTML documents carry discovery Link headers on the homepage", async () => {
   const { worker } = await loadWorker();
   const response = await worker.fetch(new Request("https://opensurveillancedb.org/"), testEnv(), ctx());

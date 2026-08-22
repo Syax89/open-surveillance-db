@@ -516,6 +516,44 @@ const OAUTH_AUTHORIZATION_SERVER = {
 };
 
 /**
+ * Agent index document (DNS-AID, draft-mozleywilliams-dnsop-dnsaid):
+ * the organization-level registry of agent services, pointed to by the
+ * `_index._agents.opensurveillancedb.org` SVCB/HTTPS records. Only real
+ * services — every URL below answers 200.
+ */
+const AGENT_INDEX = {
+  index: "https://opensurveillancedb.org/.well-known/agent-index.json",
+  organization: "OpenSurveillanceDB",
+  description:
+    "Open database of publicly visible surveillance cameras: fixed CCTV, traffic cameras, license-plate readers and similar infrastructure that watches public space.",
+  agent_services: [
+    {
+      name: "OpenSurveillanceDB API",
+      type: "web-api",
+      description: "Read and write access to the camera database. Read endpoints are keyless; write endpoints require a scoped Bearer API key.",
+      api_catalog: "https://opensurveillancedb.org/.well-known/api-catalog",
+      openapi: "https://opensurveillancedb.org/openapi.json",
+      documentation: "https://opensurveillancedb.org/api-docs",
+      authentication: "https://opensurveillancedb.org/auth.md",
+    },
+    {
+      name: "Agent registration",
+      type: "auth",
+      description: "Register a credential for write access: /api/auth/register (email + verification), /api/auth/keys (scoped API key). No OAuth token flow exists.",
+      auth_md: "https://opensurveillancedb.org/auth.md",
+      oauth_authorization_server: "https://opensurveillancedb.org/.well-known/oauth-authorization-server",
+      oauth_protected_resource: "https://opensurveillancedb.org/.well-known/oauth-protected-resource",
+    },
+    {
+      name: "Markdown content",
+      type: "content",
+      description: "The main public pages are served as Markdown to agents via Accept: text/markdown content negotiation.",
+      pages: ["https://opensurveillancedb.org/", "https://opensurveillancedb.org/api-docs", "https://opensurveillancedb.org/guide", "https://opensurveillancedb.org/privacy", "https://opensurveillancedb.org/faq", "https://opensurveillancedb.org/contatti", "https://opensurveillancedb.org/manifesto"],
+    },
+  ],
+};
+
+/**
  * Markdown for Agents (2026-08-22, isitagentready `markdownNegotiation`):
  * curated Markdown renderings of the main public pages, served when the
  * client sends `Accept: text/markdown`. Summaries are honest — titles and
@@ -977,6 +1015,22 @@ async function dispatch(request: Request, env: Env, ctx: ExecutionContext, url: 
             "Content-Type": "text/markdown; charset=utf-8",
             "Cache-Control": "public, max-age=3600",
             "Vary": "Accept",
+          },
+        }),
+        url.pathname,
+        url.hostname,
+      );
+    }
+
+    // 1i. DNS-AID agent index (draft-mozleywilliams-dnsop-dnsaid): the
+    //    organization registry of agent services referenced by the
+    //    `_index._agents` SVCB/HTTPS records. Zero D1, cacheable 1h.
+    if (gatedPathname === "/.well-known/agent-index.json") {
+      return withSecurityHeaders(
+        new Response(JSON.stringify(AGENT_INDEX), {
+          headers: {
+            "Content-Type": "application/json; charset=utf-8",
+            "Cache-Control": "public, max-age=3600",
           },
         }),
         url.pathname,
