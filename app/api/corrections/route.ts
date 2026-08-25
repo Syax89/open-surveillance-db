@@ -3,6 +3,8 @@ import {
   CORRECTION_ISSUE_TYPES,
   createCorrectionRequest,
 } from "../../../db/corrections";
+import { mailerFromAddress, sendMail } from "../../../db/mailer";
+import { renderUrgentReportEmail } from "../../lib/email-templates-urgent";
 import { recordRateLimitBlock } from "../../lib/abuse-alerts";
 import { requireWriteAuth } from "../../lib/write-gate";
 import { csrfVerified, sameOrigin } from "../../lib/csrf";
@@ -134,6 +136,22 @@ export async function POST(request: Request) {
     if (result.kind === "already_removed") {
       return Response.json({ error: "This record has already been removed following a previous report." }, { status: 409 });
     }
+    // Issue #438: forward the persisted report to the privacy mailbox so
+    // urgent removal/safety cases reach a human without a moderation login.
+    // Deliberately awaited and fail-open: a mail problem NEVER fails the
+    // intake (the request of record lives in D1 and the moderation queue),
+    // it is only logged.
+    try {
+      const to = typeof env.URGENT_REPORT_TO === "string" && env.URGENT_REPORT_TO.length > 0 ? env.URGENT_REPORT_TO : "privacy@opensurveillancedb.org";
+      const mailResult = await sendMail({
+        to,
+        from: mailerFromAddress(env),
+        ...renderUrgentReportEmail({ referenceId: result.correction.id, issueType, recordId: cameraId, message, contact }),
+      });
+      if (!mailResult.ok) console.warn(`urgent report #${result.correction.id}: mail not sent (${mailResult.code})`);
+    } catch (mailError) {
+      console.warn(`urgent report #${result.correction.id}: notification failed`, mailError);
+    }
     return Response.json({ referenceId: result.correction.id }, { status: 201 });
   } catch (error) {
     if (error instanceof BodyReadError) {
@@ -144,3 +162,4 @@ export async function POST(request: Request) {
     return Response.json({ error: "Unable to save correction request" }, { status: 500 });
   }
 }
+
