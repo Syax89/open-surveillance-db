@@ -48,6 +48,12 @@ const ROME = { south: 41.8, north: 42.0, west: 12.3, east: 12.7 };
 const INSIDE = { south: 41.895, north: 41.905, west: 12.49, east: 12.50 };
 // Far away (Milan) — no fixtures.
 const MILAN = { south: 45.4, north: 45.5, west: 9.1, east: 9.3 };
+// Regional overview: 4° × 3° = 12 sq deg — larger than the overview cap
+// but still below the server's 50 sq deg continental threshold.
+const REGIONAL_OVERVIEW = { south: 39, north: 42, west: 10, east: 14 };
+// Still below the 50 sq deg continental server cap, but a later zoom-out
+// stage — it must replace REGIONAL_OVERVIEW rather than produce a second call.
+const WIDER_OVERVIEW = { south: 37, north: 42, west: 8, east: 16 };
 
 /** Wrap the hook in a tiny component that exposes its state for assertions. */
 function HookProbe({ bounds, filters, focusId, onRecords }) {
@@ -119,6 +125,13 @@ test("the first fetch for a viewport is ONE bbox query — never a paginated wal
   }
 });
 
+test("small bboxes keep the count-free probe while regional overviews let the server decimate", () => {
+  const small = new URL(viewportQuery(ROME, {}), "https://example.test");
+  const overview = new URL(viewportQuery(REGIONAL_OVERVIEW, {}), "https://example.test");
+  assert.equal(small.searchParams.get("count"), "false", "street/city views avoid an unnecessary COUNT");
+  assert.equal(overview.searchParams.has("count"), false, "overview views use the existing count + decimation contract");
+});
+
 test("a continental viewport fetches ONCE after the long zoom-out debounce (no flood, no walk)", async () => {
   const calls = [];
   // The server answers continental viewports with a decimated sample.
@@ -136,6 +149,37 @@ test("a continental viewport fetches ONCE after the long zoom-out debounce (no f
   assert.equal(probe.getAttribute("data-decimated"), "true", "the decimated flag reaches the UI (sample notice)");
   assert.equal(probe.getAttribute("data-loading"), "false", "the state settles after the sample lands");
   assert.equal(probe.getAttribute("data-error"), "false", "a decimated sample is not an error");
+});
+
+test("an expanding regional viewport gets the long zoom-out debounce before the continental cap", async () => {
+  const calls = [];
+  installBboxMock(calls);
+  const view = await renderProbe({ bounds: ROME, filters: {} });
+  await pause(300);
+  assert.equal(calls.length, 1, "the initial small viewport is still prompt");
+
+  await view.rerender(await wrapWithLocale(React.createElement(HookProbe, { bounds: REGIONAL_OVERVIEW, filters: {} })));
+  await pause(300);
+  assert.equal(calls.length, 1, "a zoom-out below 50 sq deg must not start a request mid-gesture");
+  await pause(800);
+  assert.equal(calls.length, 2, "after the gesture settles the latest regional bbox fetches once");
+});
+
+test("successive zoom-out stages collapse to the final bbox instead of issuing one request per step", async () => {
+  const calls = [];
+  installBboxMock(calls);
+  const view = await renderProbe({ bounds: ROME, filters: {} });
+  await pause(300);
+  assert.equal(calls.length, 1);
+
+  await view.rerender(await wrapWithLocale(React.createElement(HookProbe, { bounds: REGIONAL_OVERVIEW, filters: {} })));
+  await pause(100);
+  await view.rerender(await wrapWithLocale(React.createElement(HookProbe, { bounds: WIDER_OVERVIEW, filters: {} })));
+  await pause(300);
+  assert.equal(calls.length, 1, "neither intermediate nor final bbox starts while the burst is active");
+  await pause(800);
+  assert.equal(calls.length, 2, "only the final bbox is fetched after quiet time");
+  assert.match(calls[1], /bbox=8%2C37%2C16%2C42/, "the emitted request is the final zoom-out viewport");
 });
 
 test("a repeated request for the same bbox is served from the module cache (zero network)", async () => {

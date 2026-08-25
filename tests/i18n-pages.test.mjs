@@ -184,8 +184,8 @@ const INFO_ROUTES = {
   // callout, the write section and the lifecycle/security headings flip
   // with the locale; EN strings must never survive in the IT rendering.
   "/api-docs": {
-    it: ["API pubblica", "60 richieste / minuto", "Export CSV / GeoJSON", "Tile della mappa", "Senza chiavi per design in lettura", "Chiavi API", "Endpoint di scrittura", "Ciclo di vita delle chiavi", "Mai negli URL"],
-    en: ["Public API", "60 requests / minute", "CSV / GeoJSON exports", "Map tiles", "Keyless by design for reading", "API keys", "Write endpoints", "Key lifecycle", "Never in URLs"],
+    it: ["API pubblica", "300 richieste / minuto", "Export CSV / GeoJSON", "Tile della mappa", "Senza chiavi per design in lettura", "Chiavi API", "Endpoint di scrittura", "Ciclo di vita delle chiavi", "Mai negli URL"],
+    en: ["Public API", "300 requests / minute", "CSV / GeoJSON exports", "Map tiles", "Keyless by design for reading", "API keys", "Write endpoints", "Key lifecycle", "Never in URLs"],
     noEn: ["Public API", "CSV / GeoJSON exports", "Map tiles", "Keyless by design", "API keys", "Write endpoints", "Key lifecycle", "Never in URLs", "Read-only by design"],
   },
   // Support/contribute page (CEO 2026-08-08, t_c9c200a8): the two external

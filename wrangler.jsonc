@@ -71,8 +71,8 @@
   "ratelimits": [
     { "name": "AUTH_LIMITER", "namespace_id": "1201", "simple": { "limit": 10, "period": 60 } },
     { "name": "WRITE_LIMITER", "namespace_id": "1202", "simple": { "limit": 5, "period": 60 } },
-    { "name": "READ_LIMITER", "namespace_id": "1203", "simple": { "limit": 60, "period": 60 } },
-    { "name": "TILES_LIMITER", "namespace_id": "1204", "simple": { "limit": 240, "period": 60 } },
+    { "name": "READ_LIMITER", "namespace_id": "1203", "simple": { "limit": 300, "period": 60 } },
+    { "name": "TILES_LIMITER", "namespace_id": "1204", "simple": { "limit": 480, "period": 60 } },
     { "name": "GEOCODE_LIMITER", "namespace_id": "1205", "simple": { "limit": 30, "period": 60 } }
   ],
   "d1_databases": [

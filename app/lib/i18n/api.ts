@@ -132,12 +132,12 @@ export const en = {
   limitsIntro:
     "Every endpoint is limited per caller (IP address) over a 60-second window. Limits protect the service and the upstream providers (OpenStreetMap); generous for interactive use, tight for scrapers.",
   limits: {
-    read: { name: "List, bbox, record, search", requests: "60 requests / minute" },
+    read: { name: "List, bbox, record, search", requests: "300 requests / minute" },
     export: { name: "CSV / GeoJSON exports", requests: "10 requests / minute" },
     nearby: { name: "Nearby (duplicate check)", requests: "30 requests / minute" },
     revisions: { name: "Change history", requests: "30 requests / minute" },
     geocode: { name: "Geocoding (forward + reverse)", requests: "30 requests / minute" },
-    tiles: { name: "Map tiles", requests: "240 requests / minute" },
+    tiles: { name: "Map tiles", requests: "480 requests / minute" },
   },
   licenseTitle: "Licence and attribution",
   licenseBody:
@@ -269,12 +269,12 @@ export const it: Translation<typeof en> = {
   limitsIntro:
     "Ogni endpoint è limitato per chiamante (indirizzo IP) su una finestra di 60 secondi. I limiti proteggono il servizio e i provider upstream (OpenStreetMap); generosi per l'uso interattivo, stretti per gli scraper.",
   limits: {
-    read: { name: "Lista, bbox, record, ricerca", requests: "60 richieste / minuto" },
+    read: { name: "Lista, bbox, record, ricerca", requests: "300 richieste / minuto" },
     export: { name: "Export CSV / GeoJSON", requests: "10 richieste / minuto" },
     nearby: { name: "Vicine (controllo duplicati)", requests: "30 richieste / minuto" },
     revisions: { name: "Storico modifiche", requests: "30 richieste / minuto" },
     geocode: { name: "Geocoding (forward + reverse)", requests: "30 richieste / minuto" },
-    tiles: { name: "Tile della mappa", requests: "240 richieste / minuto" },
+    tiles: { name: "Tile della mappa", requests: "480 richieste / minuto" },
   },
   licenseTitle: "Licenza e attribuzione",
   licenseBody:

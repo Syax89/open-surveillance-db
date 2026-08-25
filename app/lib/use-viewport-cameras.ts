@@ -59,6 +59,12 @@ import type { ServerCameraFilters } from "./use-public-cameras";
 
 /** The client asks for the whole visible set in ONE request (bounded server-side). */
 export const VIEWPORT_BBOX_LIMIT = 10_000;
+/**
+ * Above this geographic area the map is in overview mode: let the existing
+ * server count/decimation contract cap the payload rather than allow a bbox
+ * page walk. Street/city views keep the cheaper count=false probe.
+ */
+export const VIEWPORT_OVERVIEW_AREA_SQ_DEG = 1;
 /** Cache TTL: aligned with the API's 5-minute Cache-Control window. */
 export const VIEWPORT_CACHE_TTL_MS = 300_000;
 /** Coalesce moveend bursts (the map already debounces at BOUNDS_DEBOUNCE_MS). */
@@ -213,10 +219,10 @@ export function viewportQuery(bounds: ViewportBounds, filters: ServerCameraFilte
   params.set("bbox", `${bounds.west},${bounds.south},${bounds.east},${bounds.north}`);
   params.set("limit", String(VIEWPORT_BBOX_LIMIT));
   params.set("offset", String(offset));
-  // count=false (D1 rows-read optimization, 2026-08-12): the map paginates
-  // on nextOffset alone; skipping the bbox COUNT scan on every pan keeps
-  // the free-plan D1 rows-read quota intact.
-  params.set("count", "false");
+  // Street/city views use the limit+1 probe to avoid a COUNT. At overview
+  // scale, omitting count=false activates the existing bounded server-side
+  // decimation contract — one sample response, never a client page walk.
+  if (boxArea(bounds) <= VIEWPORT_OVERVIEW_AREA_SQ_DEG) params.set("count", "false");
   if (filters.kind) params.set("kind", filters.kind);
   if (filters.freshness) params.set("freshness", filters.freshness);
   return `/api/cameras?${params.toString()}`;
@@ -368,6 +374,10 @@ export function useViewportCameras({ bounds, filters, focusId, onRecords, onErro
   // A 429 may receive one automatic recovery attempt after Retry-After;
   // repeated 429s remain visible states rather than becoming a retry loop.
   const rateLimitRetriesRef = useRef(0);
+  // Tracks the last emitted viewport area. A zoom step grows area by roughly
+  // 4×, while a same-level pan only shifts it slightly: the ratio avoids
+  // delaying ordinary pans but coalesces every stage of a zoom-out gesture.
+  const previousViewportAreaRef = useRef<number | null>(null);
 
   const boundsKey = bounds ? bboxCacheKey(bounds, filterKey) : null;
 
@@ -384,9 +394,16 @@ export function useViewportCameras({ bounds, filters, focusId, onRecords, onErro
       return () => window.clearTimeout(cooldownTimer);
     }
     const controller = new AbortController();
-    // Continental viewports get the long debounce: a zoom-out gesture sweeps
-    // many oversized bboxes — one sample per SETTLED viewport, not per step.
-    const debounceMs = boxArea(boundsRef.current ?? { south: 0, north: 0, west: 0, east: 0 }) > VIEWPORT_MAX_AREA_SQ_DEG
+    const currentBounds = boundsRef.current!;
+    const currentArea = boxArea(currentBounds);
+    const previousArea = previousViewportAreaRef.current;
+    previousViewportAreaRef.current = currentArea;
+    // Every zoom-out stage gets the long debounce, not just the point where
+    // the bbox reaches the continental server cap. Abort happens too late to
+    // save a request already sent to the Worker; delaying its start makes the
+    // latest settled viewport win instead.
+    const zoomingOut = previousArea !== null && currentArea > previousArea * 1.25;
+    const debounceMs = zoomingOut || currentArea > VIEWPORT_MAX_AREA_SQ_DEG
       ? VIEWPORT_ZOOMOUT_DEBOUNCE_MS
       : VIEWPORT_FETCH_DEBOUNCE_MS;
     const timer = window.setTimeout(() => {

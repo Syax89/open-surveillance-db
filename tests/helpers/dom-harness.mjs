@@ -393,7 +393,10 @@ export const tileLayer = (url, opts) => {
   if (url) {
     layer.url = url;
     const mapStub = maps[maps.length - 1];
-    if (mapStub) (mapStub.tileLayers ??= []).push(url);
+    if (mapStub) {
+      (mapStub.tileLayers ??= []).push(url);
+      (mapStub.tileLayerOptions ??= []).push({ url, opts });
+    }
   }
   return layer;
 };
