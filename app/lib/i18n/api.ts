@@ -137,7 +137,7 @@ export const en = {
     nearby: { name: "Nearby (duplicate check)", requests: "30 requests / minute" },
     revisions: { name: "Change history", requests: "30 requests / minute" },
     geocode: { name: "Geocoding (forward + reverse)", requests: "30 requests / minute" },
-    tiles: { name: "Map tiles", requests: "240 requests / minute" },
+    tiles: { name: "Map tiles", requests: "480 requests / minute" },
   },
   licenseTitle: "Licence and attribution",
   licenseBody:
@@ -274,7 +274,7 @@ export const it: Translation<typeof en> = {
     nearby: { name: "Vicine (controllo duplicati)", requests: "30 richieste / minuto" },
     revisions: { name: "Storico modifiche", requests: "30 richieste / minuto" },
     geocode: { name: "Geocoding (forward + reverse)", requests: "30 richieste / minuto" },
-    tiles: { name: "Tile della mappa", requests: "240 richieste / minuto" },
+    tiles: { name: "Tile della mappa", requests: "480 richieste / minuto" },
   },
   licenseTitle: "Licenza e attribuzione",
   licenseBody:
