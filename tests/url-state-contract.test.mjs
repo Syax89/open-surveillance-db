@@ -34,7 +34,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  setupDom, loadDomModule, installFetchMock, jsonResponse,
+  setupDom, loadDomModule, installFetchMock, jsonResponse, camerasApiResponse, installCamerasApiMock,
   renderWithLocale, wrapWithLocale, setNavState, getNavState, React,
 } from "./helpers/dom-harness.mjs";
 
@@ -100,24 +100,17 @@ const apiCameras = [
   makeCamera(3, { kind: "Dome", title: "Dome camera 3", lastVerifiedAt: "2026-05-01T00:00:00.000Z" }),
 ];
 
-/** F0 server-side filter mock: kind (exact) + freshness (on lastVerifiedAt). */
+/**
+ * Server-side filter mock for /api/cameras: the REAL API filters
+ * q/kind/freshness/state/origin/sort server-side (db/cameras.ts) and the
+ * directory default (sort=alphabetical) uses cursor pagination, so the
+ * fixture emulates that contract through camerasApiResponse.
+ */
 function installApiMock(calls = []) {
   installFetchMock((input) => {
     const url = new URL(String(input), "https://osdb.test");
-    if (url.pathname !== "/api/cameras") return jsonResponse({ records: [], total: 0, nextOffset: null });
     calls.push(url);
-    let records = apiCameras;
-    const kind = url.searchParams.get("kind");
-    if (kind) records = records.filter((camera) => camera.kind === kind);
-    const freshness = url.searchParams.get("freshness");
-    if (freshness && freshness !== "all") {
-      const cutoff = Date.now() - Number.parseInt(freshness, 10) * 24 * 60 * 60 * 1000;
-      records = records.filter((camera) => new Date(camera.lastVerifiedAt).getTime() >= cutoff);
-    }
-    const offset = Number(url.searchParams.get("offset") ?? 0);
-    const limit = Number(url.searchParams.get("limit") ?? 500);
-    const page = records.slice(offset, offset + limit);
-    return jsonResponse({ records: page, total: records.length, nextOffset: offset + page.length < records.length ? offset + page.length : null });
+    return camerasApiResponse(url, apiCameras);
   });
   return calls;
 }
@@ -404,7 +397,7 @@ test("origin filter (?origin=, FASE C): the select narrows the directory to impo
     makeCamera(2, { kind: "Bullet", title: "Imported bullet", source: "import:fixture-zurigo-2026" }),
     makeCamera(3, { kind: "Dome", title: "Imported dome", source: "import:fixture-osm-2026" }),
   ];
-  installFetchMock(() => jsonResponse({ records: mixed, total: mixed.length, nextOffset: null }));
+  installCamerasApiMock(mixed);
   await renderWithLocale(React.createElement(DirectoryTool));
   await rtl.waitFor(() => assert.ok(screen.getByRole("heading", { name: "Community dome" })));
 

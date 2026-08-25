@@ -165,13 +165,13 @@ test("JSON, GeoJSON, and CSV are all derived from the public camera list", async
   );
   assert.match(
     getHandler,
-    /listPublicCamerasPage\(filters,\s*\{\s*limit,\s*offset\s*\}\)/,
-    "the default JSON list must page through the dedicated paginated helper",
+    /listPublicCamerasPage\(filters,\s*\{\s*limit,\s*offset,\s*count:\s*withCount\s*\}\)/,
+    "the default JSON list must page through the dedicated paginated helper (count forwarded from the ?count= param)",
   );
   assert.match(
     getHandler,
-    /facets.*getPublicCameraFacets\(\)/,
-    "the facets are OPT-IN (QA#5 F2): getPublicCameraFacets must only run behind the ?facets=1 gate",
+    /facets.*(getPublicCameraFacets|getPublicCameraKinds)\(\)/,
+    "facets must stay opt-in: full facets only behind ?facets=1 and the map may request kinds alone",
   );
   assert.match(
     getHandler,

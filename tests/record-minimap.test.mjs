@@ -63,6 +63,19 @@ test("mini map renders an interactive Leaflet map with the marker at the record 
   assert.ok(markers.some((m) => m.latlng?.[0] === 41.9028 && m.latlng?.[1] === 12.4964), "the record marker is placed at the coordinates");
 });
 
+test("the marker uses the custom divIcon (osm-camera-marker), never Leaflet's unshipped default PNG", async () => {
+  await renderMiniMap({ status: "active" });
+  const markers = await leafletMarkers();
+  const m = markers.find((mk) => mk.latlng?.[0] === 41.9028 && mk.latlng?.[1] === 12.4964);
+  assert.ok(m, "the record marker exists");
+  const icon = m.opts?.icon;
+  assert.ok(icon, "the marker carries an explicit icon option");
+  const html = String(icon.html ?? "");
+  assert.match(html, /osm-camera-marker/, "the icon is the custom divIcon, not the default PNG (404 in the Workers build)");
+  assert.match(html, /active/, "the public status class is applied to the marker (same colouring as /mappa)");
+  assert.ok(!html.includes("marker-icon.png"), "never references Leaflet's default PNG icon");
+});
+
 test("mini map is interactive: pan/zoom enabled, tiles served by the CSP-safe /api/tiles proxy", async () => {
   const { screen } = rtl;
   await renderMiniMap({});

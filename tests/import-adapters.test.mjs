@@ -387,6 +387,11 @@ test("osm: looksLikeEntityOperator heuristics", () => {
 
 // ------------------------------------------------------------- OSM country factory
 
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { createOsmCountryAdapter } from "../scripts/import/adapters/osm-country-factory.mjs";
 import {
   buildQuery as atBuildQuery,
   parsePayload as atParse,
@@ -398,6 +403,36 @@ import {
   buildQuery as deBuildQuery,
   parsePayload as deParse,
 } from "../scripts/import/adapters/osm-surveillance-germania-2026.mjs";
+import {
+  buildQuery as frBuildQuery,
+  parsePayload as frParse,
+} from "../scripts/import/adapters/osm-surveillance-francia-2026.mjs";
+import {
+  buildQuery as gbBuildQuery,
+  parsePayload as gbParse,
+} from "../scripts/import/adapters/osm-surveillance-regno-unito-2026.mjs";
+import {
+  buildQuery as nlBuildQuery,
+  parsePayload as nlParse,
+} from "../scripts/import/adapters/osm-surveillance-paesi-bassi-2026.mjs";
+import {
+  buildQuery as esBuildQuery,
+  parsePayload as esParse,
+} from "../scripts/import/adapters/osm-surveillance-spagna-2026.mjs";
+import {
+  buildQuery as inBuildQuery,
+  parsePayload as inParse,
+} from "../scripts/import/adapters/osm-surveillance-india-2026.mjs";
+import {
+  buildQuery as auBuildQuery,
+  parsePayload as auParse,
+} from "../scripts/import/adapters/osm-surveillance-australia-2026.mjs";
+import {
+  buildQuery as jpBuildQuery,
+  parsePayload as jpParse,
+} from "../scripts/import/adapters/osm-surveillance-giappone-2026.mjs";
+import { parsePayload as qldParse } from "../scripts/import/adapters/australia-queensland-traffic-cameras-2026.mjs";
+import { parsePayload as sgParse } from "../scripts/import/adapters/singapore-lta-traffic-images-2026.mjs";
 
 test("osm-factory: buildQuery targets the right ISO3166 admin area per country", () => {
   const at = atBuildQuery([46.5, 9.7, 46.6, 9.8], { timeout: 60 });
@@ -407,6 +442,20 @@ test("osm-factory: buildQuery targets the right ISO3166 admin area per country",
   assert.match(ch, /area\["ISO3166-1"="CH"\]\[admin_level=2\]->\.ch;/);
   const de = deBuildQuery([48.1, 8.1, 48.2, 8.2], { timeout: 60 });
   assert.match(de, /area\["ISO3166-1"="DE"\]\[admin_level=2\]->\.de;/);
+  const fr = frBuildQuery([46.5, 2.1, 46.6, 2.2], { timeout: 60 });
+  assert.match(fr, /area\["ISO3166-1"="FR"\]\[admin_level=2\]->\.fr;/);
+  const gb = gbBuildQuery([52.1, -1.1, 52.2, -1.0], { timeout: 60 });
+  assert.match(gb, /area\["ISO3166-1"="GB"\]\[admin_level=2\]->\.gb;/);
+  const nl = nlBuildQuery([52.1, 4.9, 52.2, 5.0], { timeout: 60 });
+  assert.match(nl, /area\["ISO3166-1"="NL"\]\[admin_level=2\]->\.nl;/);
+  const es = esBuildQuery([40.1, -3.1, 40.2, -3.0], { timeout: 60 });
+  assert.match(es, /area\["ISO3166-1"="ES"\]\[admin_level=2\]->\.es;/);
+  const ind = inBuildQuery([21.1, 77.1, 21.2, 77.2], { timeout: 60 });
+  assert.match(ind, /area\["ISO3166-1"="IN"\]\[admin_level=2\]->\.in;/);
+  const au = auBuildQuery([-33.9, 151.1, -33.8, 151.2], { timeout: 60 });
+  assert.match(au, /area\["ISO3166-1"="AU"\]\[admin_level=2\]->\.au;/);
+  const jp = jpBuildQuery([35.6, 139.6, 35.7, 139.7], { timeout: 60 });
+  assert.match(jp, /area\["ISO3166-1"="JP"\]\[admin_level=2\]->\.jp;/);
 });
 
 test("osm-factory: parsePayload maps the same canonical rows for every country", () => {
@@ -421,8 +470,18 @@ test("osm-factory: parsePayload maps the same canonical rows for every country",
   };
   const at = atParse(fixture);
   const de = deParse(fixture);
-  assert.equal(at.staged.length, 3); // guard + indoor skipped
-  assert.equal(de.staged.length, 3);
+  const fr = frParse(fixture);
+  const gb = gbParse(fixture);
+  const nl = nlParse(fixture);
+  const es = esParse(fixture);
+  const ind = inParse(fixture);
+  const au = auParse(fixture);
+  const jp = jpParse(fixture);
+  for (const p of [at, de, fr, gb, nl, es, ind, au, jp]) {
+    assert.equal(p.staged.length, 3); // guard + indoor skipped
+    assert.equal(p.skipped.reasons["surveillance:type=guard"], 1);
+    assert.equal(p.skipped.reasons["surveillance=indoor"], 1);
+  }
   const dome = de.staged.find((r) => r.external_id === "osm:node/1");
   assert.equal(dome.kind, "Fixed dome");
   assert.equal(dome.direction, null); // dome invariant
@@ -430,8 +489,103 @@ test("osm-factory: parsePayload maps the same canonical rows for every country",
   const fixed = de.staged.find((r) => r.external_id === "osm:node/2");
   assert.equal(fixed.kind, "Bullet");
   assert.equal(fixed.direction, 90);
-  assert.equal(de.skipped.reasons["surveillance:type=guard"], 1);
-  assert.equal(de.skipped.reasons["surveillance=indoor"], 1);
+});
+
+test("qld-traffic: parses OpenDataSoft records (flat + nested fields) into canonical rows", () => {
+  const payload = {
+    results: [
+      {
+        fields: {
+          id: 1,
+          title: "Archerfield",
+          region: "Metropolitan",
+          direction: "NorthEast",
+          view: "View of the intersection",
+          href: "https://cameras.qldtraffic.qld.gov.au/Metropolitan/Archerfield.jpg",
+          postcode: "4108",
+          geo_point_2d: { lat: -27.5551796, lon: 153.0086975 },
+        },
+      },
+      {
+        geo_point_2d: [42.1, -72.5],
+        id: "flat-2",
+        title: "Flat record",
+        region: "RegionX",
+      },
+      {
+        fields: { id: 3, title: "NoGeo", region: "R" },
+      },
+      {
+        fields: { id: 4, geo_point_2d: { lat: 0, lon: 0 }, title: "Zero" },
+      },
+    ],
+  };
+  const { staged, skipped } = qldParse(payload);
+  assert.equal(staged.length, 2);
+  assert.equal(staged[0].external_id, "qld-cam:1");
+  assert.equal(staged[0].kind, "Traffic / licence plate reader");
+  assert.ok(Math.abs(staged[0].latitude - -27.5551796) < 1e-9);
+  assert.equal(staged[0].notes, "Region: Metropolitan — Direction: NorthEast — View of the intersection");
+  assert.equal(staged[1].external_id, "qld-cam:flat-2");
+  assert.equal(skipped.total, 2); // no coordinates + (0,0)
+});
+
+test("sg-lta: parses live traffic-images API response into canonical rows", () => {
+  const payload = {
+    items: [
+      {
+        cameras: [
+          { camera_id: "2701", image: "https://images.data.gov.sg/api/traffic-images/2026/08/16/190000_2701.jpg", location: { latitude: 1.447023728, longitude: 103.7716543 } },
+          { camera_id: "2702", image: "https://images.data.gov.sg/api/traffic-images/2026/08/16/190000_2702.jpg", location: { latitude: 1.448, longitude: 103.772 } },
+          { camera_id: "2703", location: null },
+          { camera_id: "2704", location: { latitude: 0, longitude: 0 } },
+        ],
+      },
+    ],
+  };
+  const { staged, skipped } = sgParse(payload);
+  assert.equal(staged.length, 2);
+  assert.equal(staged[0].external_id, "sg:2701");
+  assert.equal(staged[0].kind, "Traffic / licence plate reader");
+  assert.ok(Math.abs(staged[0].latitude - 1.447023728) < 1e-9);
+  assert.match(staged[0].notes, /^Live image: https:\/\/images/);
+  assert.equal(skipped.total, 2); // null location + (0,0)
+});
+
+test("osm-factory: localSourcePath mode reads a local JSON extract (no Overpass)", async () => {
+  const tmpDir = mkdtempSync(join(tmpdir(), "osdb-osm-local-"));
+  const elementsPath = join(tmpDir, "elements.json");
+  try {
+    writeFileSync(
+      elementsPath,
+      JSON.stringify({
+        elements: [
+          { type: "node", id: 1, lat: 48.85, lon: 2.35, tags: { name: "Tour Eiffel", "camera:type": "dome", operator: "Ville de Paris", surveillance: "public" } },
+          { type: "way", id: 2, center: { lat: 48.86, lon: 2.36 }, tags: { surveillance: "outdoor", operator: "Préfecture de Police" } },
+        ],
+      }),
+    );
+    const descriptorPath = fileURLToPath(
+      new URL("../docs/data-sources/imports/osm-surveillance-francia-2026.json", import.meta.url),
+    );
+    const adapter = createOsmCountryAdapter({
+      slug: "test-local",
+      iso3166: "FR",
+      bbox: [-5.5, 41.2, 9.8, 51.2],
+      descriptorPath,
+      grid: { nx: 1, ny: 1 },
+      localSourcePath: elementsPath,
+    });
+    const { elements, checksum } = await adapter.fetchPayload();
+    assert.equal(elements.length, 2);
+    assert.match(checksum, /^[0-9a-f]{64}$/);
+    const { staged } = adapter.parsePayload({ elements });
+    assert.equal(staged.length, 2);
+    assert.ok(staged.some((r) => r.external_id === "osm:node/1"));
+    assert.ok(staged.some((r) => r.external_id === "osm:way/2"));
+  } finally {
+    rmSync(tmpDir, { recursive: true, force: true });
+  }
 });
 
 // ------------------------------------------------------------- Bern / Hamburg official
@@ -642,6 +796,8 @@ test("licence-gate: FR (Licence Ouverte), ES (CC-BY), NL (CC0) descriptors are i
   assert.equal(isLicenceImportable("CC0 1.0"), true);
   assert.equal(isLicenceImportable("CC BY 4.0"), true);
   assert.equal(isLicenceImportable("CC BY 4.0 (NZ)"), true); // Wellington WCC
+  assert.equal(isLicenceImportable("Singapore Open Data Licence v1.0"), true);
+  assert.equal(isLicenceImportable("Singapore Open Data Licence"), true);
 });
 
 // -------------------------------------------------- wave 4 (catalog.csv 2026-08-08): NO / UK / FI / US-NY

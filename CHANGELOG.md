@@ -14,6 +14,106 @@ changes accumulate under `[Unreleased]`.
 
 ### Added
 
+- **Auth.md agent registration (2026-08-22, isitagentready `authMd`):**
+  `/auth.md` servita dal worker come documento Markdown self-contained per
+  agenti AI: H1 `# auth.md`, audience, endpoint di registrazione
+  (`/account`, creazione API key), metodi supportati (Bearer con scope) e
+  uso delle credenziali. OSDB **non** ha un OAuth authorization server
+  (emette API key proprietarie), quindi si applica il percorso fallback
+  dello standard: nessuna PRM/OAuth AS metadata pubblicata, documento
+  onesto e autonomo. `Content-Type: text/markdown`, cache edge 1h, servita
+  prima del router (nessuna query D1). Test: `tests/worker-edge.test.mjs`
+  (auth.md ×2, 43/43).
+
+- **RFC 8288 Link headers (2026-08-22, isitagentready `linkHeaders`):** ogni
+  documento HTML 2xx ora porta l'header `Link` con le relazioni registrate
+  `api-catalog` (`/.well-known/api-catalog`), `service-desc`
+  (`/openapi.json`, type `application/openapi+json`) e `service-doc`
+  (`/api-docs`), così un agente AI che atterra su QUALSIASI pagina scopre
+  l'API machine-readable (RFC 9727 §3). Mai aggiunto a risposte API/JSON,
+  errori o redirect; un `Link` già impostato dall'app non viene mai
+  sovrascritto. Test: `tests/worker-edge.test.mjs` (rfc-8288 ×3, 41/41).
+
+- **RFC 9727 API catalog (2026-08-22, "ottimizzare per i bot AI"):**
+  `/.well-known/api-catalog` è servita con `Content-Type: application/linkset+json`
+  dal worker (prima del router vinext, nessuna query D1) e punta a
+  `service-desc` (`/openapi.json`), `service-doc` (`/api-docs`) e `status`
+  (`/api/health`). La spec OpenAPI 3.0.3 dell'API pubblica (lettura keyless +
+  scrittura con chiavi Bearer e scope) vive in `public/openapi.json` ed è
+  servita come asset statico; per questo `openapi.json` è stato **rimosso**
+  dalla regex anti-scanner (ora è un path legittimo del sito, e una probe
+  costa un fetch da ASSETS cachato, non più lavoro del router). Aggiunto
+  anche il liveness probe `/api/health` (`{"status":"ok"}`), no-store, senza
+  toccare D1. I link del catalog sono origin-derived, così la pre-prod
+  risponde con i propri URL. Test: `tests/worker-edge.test.mjs`
+  (rfc-9727 + health + openapi.json nei path legittimi).
+
+- **Anti-scanner edge gate (2026-08-12, CEO — "proteggiamo sto sito"):** un
+  bot scanner martellava il sito da ~500-600 richieste/ora (path sensibili:
+  `.env`, `openapi.json`, `node_modules`, `*.php`, `/.hermes/config.yaml`,
+  `service_account.json`…), attraversando l'intero router vinext e facendo
+  schizzare il p99 di CPU dei Worker (276-488 ms, cf. dashboard Grafana
+  osdb-overview). Il worker ora risponde **403 immediato prima del router,
+  dei rate-limit binding e di D1** a qualsiasi path inequivocabilmente
+  estraneo al sito (regex `SCANNER_PATH_PATTERN`, risposta no-store):
+  il costo di una probe scende da ~10 ms di CPU a ~0. Nulla sotto `/api`,
+  `/assets`, `/mappa`, `/segnala`, `/correggi`, `/moderation` o `/records`
+  può mai essere bloccato (coperto da test dedicati in
+  `tests/worker-edge.test.mjs`). Nota: il token Cloudflare API non ha
+  permessi sulle zone, quindi una WAF rule edge di Cloudflare non era
+  creabile via API — questa gate vive nel worker (si deploya con il repo).
+
+- **Production auth compatibility:** password hashing now uses 100,000 PBKDF2
+  iterations, the maximum accepted by Cloudflare Workers WebCrypto. Existing
+  hashes above that runtime ceiling remain stored but require the password-reset
+  flow; new registration and reset hashes are compatible with production.
+
+- **Mailer resilience:** the definitive non-delivery code list
+  (DEFINITIVE_NON_DELIVERY_CODES) now covers every provider rejection
+  documented by the Cloudflare send_email binding (E_RECIPIENT_NOT_ALLOWED,
+  E_SENDER_DOMAIN_NOT_AVAILABLE, E_DELIVERY_FAILED, header/payload validation
+  errors, ...): a deterministic pre-delivery rejection releases the email
+  budget immediately instead of blocking the contributor for the whole
+  window. Confirmed live 2026-08-12: E_RECIPIENT_NOT_ALLOWED fires on the
+  Workers Free plan for arbitrary recipients.
+
+- **Fix mappa — marker su /records/[id] e widget community nel balloon
+  (2026-08-12):** la mini-mappa della pagina record usava l'icona PNG
+  default di Leaflet, che non è bundle-ata nel build Workers (404 in
+  produzione): il marker era invisibile. Ora usa la stessa divIcon custom
+  di /mappa (`osm-camera-marker` + classe status). Inoltre il balloon
+  poteva aprirsi senza i tasti della community quando il record non era
+  momentaneamente nel payload della mappa (transizione filtri/rebuild):
+  il widget ora si monta sempre, con conteggi seed zero in quel caso.
+
+- **Fix /segnala — spazio vuoto su mobile (2026-08-12):** in layout colonna
+  il wrapper `.address-search` manteneva `flex:1 1 260px` (larghezza minima
+  su desktop) che in colonna diventa **260px di altezza minima** → ~190px di
+  spazio bianco tra il campo indirizzo e il bottone "Use my position". La
+  media query mobile ora azzera il flex-basis (`flex:0 0 auto`).
+
+- **Fix /correggi — campo record per id (2026-08-12, CEO):** il select
+  "Related public record" conteneva TUTTI i ~37k record come `<option>`
+  (la pagina scaricava l'intero dataset e il menu nativo si bloccava
+  all'apertura). Sostituito con un **campo di ricerca per id** (richiesta
+  esplicita: "un campo di ricerca per id piuttosto che un menu a discesa"):
+  l'utente digita l'id del record, il campo lo risolve via
+  `GET /api/cameras/[id]` con conferma visiva ("✓ Record 6745 — …") e
+  messaggi gentili per id inesistenti; il submit mantiene il contratto
+  `cameraId` (vuoto = segnalazione generale). `CorreggiTool` non scarica
+  più l'intero dataset (niente più `usePublicCameras`).
+
+- **Fix /segnala — spazio laterale su mobile (2026-08-12, CEO):** su
+  telefono si perdeva ~30% della larghezza per tre rientri impilati
+  (container pagina 16px/lato → card form 30px → card step 18px). Nella
+  media query ≤700px le pagine form vanno near-full-width con padding
+  minimo delle card (scoped con `:has`, `/directory` e `/mappa` invariati).
+  Round 2: il selettore `.report-section--tool .report-form` (padding
+  `clamp(24px,4vw,38px)`) e la `width:min(100% - 32px)` del
+  `.report-section` annidato superavano l'override del round 1 → aggiunti
+  override con specificità corretta. Su 390px il campo indirizzo/mappa
+  passa da ~256px a **314px** (+23%).
+
 - **Explorer UX (PR #326):** Mappa↔Directory switch with shared filters, place search above the map, collapsed map-first points panel, legend, filters in disclosure, guide with overview, grouped footer, `/moderazione` → `/guide` redirect.
 
 - **Auth — mailer Cloudflare (Fase A2, t_4c398006, ADR 0020 decision 2):**
@@ -606,9 +706,9 @@ changes accumulate under `[Unreleased]`.
   on node:sqlite's higher SQLITE_MAX_VARIABLE_NUMBER.
 - `verifyPassword` now derives at the iteration count embedded in the stored
   hash instead of the current `PBKDF2_ITERATIONS` constant (t_fe668331, P1-2
-  security review): bumping the constant (e.g. 210k → 600k, AUTH_OPTIONS §8)
-  no longer invalidates every existing password and locks out all
-  contributors — each hash re-derives at its own stored count (ADR 0013),
+  security review): supported lower-count hashes remain verifiable when the
+  current cost changes, while hashes above the Cloudflare WebCrypto ceiling
+  require password reset (ADR 0013),
   with a constant fallback for legacy 3-part hashes that predate the embedded
   count. New bump-safety tests in `tests/auth-d1.test.mjs` cover hashes at
   different iteration counts and the legacy fallback.

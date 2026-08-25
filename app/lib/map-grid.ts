@@ -35,9 +35,9 @@ import { recordsInBounds, type ViewportBounds } from "./map-viewport";
 /** Screen-pixel size of one aggregation cell (Web Mercator world px). */
 export const GRID_CELL_PX = 48;
 /** Zoom at or above which markers are ALWAYS individual (street level). */
-export const GRID_MAX_ZOOM = 14;
+export const GRID_MAX_ZOOM = 12;
 /** Visible-record count at or below which markers are individual even at low zoom. */
-export const MAX_INDIVIDUAL_MARKERS = 250;
+export const MAX_INDIVIDUAL_MARKERS = 150;
 
 export type GridCell = {
   /** Cell coordinates in world-pixel units (floor of projected px / cellPx). */

@@ -30,12 +30,14 @@ Two questions had to be answered before writing code:
 ## Decision
 
 1. **Email + password, PBKDF2-SHA256.** Passwords are hashed with salted
-   PBKDF2-HMAC-SHA256 at 210,000 iterations (OWASP 2023 recommendation). The
-   iteration count is embedded in the stored value
-   (`pbkdf2$<iterations>$<saltB64>$<hashB64>`) so it can be raised later
-   without a migration. Emails are normalised (trim + lowercase) and stored
-   under a unique index. No plaintext password ever leaves the TLS connection,
-   and the hash format never appears in API responses.
+   PBKDF2-HMAC-SHA256 at **100,000 iterations for new accounts**, the maximum
+   accepted by Cloudflare Workers' WebCrypto runtime. The iteration count is
+   embedded in the stored value (`pbkdf2$<iterations>$<saltB64>$<hashB64>`).
+   Hashes above the runtime ceiling are rejected and the account must use the
+   password-reset flow to obtain a compatible hash. Emails are normalised (trim
+   + lowercase) and stored under a unique index. No plaintext password ever
+   leaves the TLS connection, and the hash format never appears in API
+   responses.
 
 2. **Session = opaque random token, stored hashed.** The browser cookie
    (`osdb_session`, 32 random bytes base64url) is only ever stored as its
@@ -68,9 +70,8 @@ Two questions had to be answered before writing code:
 5. **What a contributor can do.** Register (`/register`), log in/out
    (`/login`, `/account`), see their profile and the list of reports they
    submitted (`/api/auth/me`, `/api/auth/me/submissions`). Display name is
-   optional and purely cosmetic. There is no email verification and no
-   password reset yet: both need an outbound mailer (new dependency) and are
-   tracked as follow-up work.
+   optional and purely cosmetic. Email verification and password reset are
+   implemented by ADR 0020 through the Cloudflare Email Service mailer.
 
 ## Consequences
 
@@ -80,9 +81,9 @@ Two questions had to be answered before writing code:
 - Report attribution is opt-in by construction: submit while logged in and
   the report is linked; log out first and it is anonymous. Nothing retro-
   attributing anonymous reports is possible (their `contributor_id` is NULL).
-- Password hashing is deliberately slow (210k PBKDF2 iterations ≈ tens of ms
-  per login) — acceptable for a low-traffic civic site, and the cost is
-  confined to login/register, not page views.
+- Password hashing is deliberately slow (100k PBKDF2 iterations, the maximum
+  Cloudflare Workers WebCrypto accepts) — acceptable for a low-traffic civic
+  site, and the cost is confined to login/register, not page views.
 - The `Secure` cookie flag must be enabled at the same time HTTPS is
   introduced; until then, session cookies travel in cleartext on the LAN
   staging host (unchanged from ADR 0012: staging is non-production).

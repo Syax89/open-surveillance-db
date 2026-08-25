@@ -1,7 +1,7 @@
 /** Cloudflare Worker entry point for OpenSurveillanceDB. */
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
-import type { D1Database, Fetcher, SendEmail } from "cloudflare:workers";
+import type { AnalyticsEngineDataset, D1Database, Fetcher, SendEmail } from "cloudflare:workers";
 import { DEFAULT_RETENTION_POLICY, runRetentionSweep, type RetentionSummary } from "../db/retention";
 import { sweepOidcExpired } from "../db/oidc";
 
@@ -20,6 +20,13 @@ interface Env {
       };
     };
   };
+  /**
+   * Request analytics (wrangler.jsonc `analytics`, dataset osdb_requests):
+   * one datapoint per request — path group (api|web), status class, API
+   * endpoint path and HTTP method (see recordRequestAnalytics). Optional:
+   * absent in local dev / tests, where logging is a no-op.
+   */
+  ANALYTICS?: AnalyticsEngineDataset;
   /**
    * Cloudflare Workers Rate Limiting bindings (wrangler.jsonc `ratelimits`,
    * audit #3 MEDIUM, t_dff3dadf): the production enforcement point for the
@@ -127,6 +134,14 @@ interface ScheduledController {
   readonly scheduledTime: Date;
 }
 
+/**
+ * Every-minute keep-warm cron (wrangler.jsonc `triggers.crons`): wakes an
+ * isolate so the first visitor request after an idle gap does not pay a
+ * ~1s cold start. The tick itself is a deliberate no-op — nothing is swept
+ * on this schedule (the retention/OIDC sweeps stay on the 03:00 UTC cron).
+ */
+const WARMUP_CRON = "*/1 * * * *";
+
 // Image security config. SVG sources with .svg extension auto-skip the
 // optimization endpoint on the client side (served directly, no proxy).
 // To route SVGs through the optimizer (with security headers), create a
@@ -157,6 +172,33 @@ const identityPath = (method: string, pathname: string) =>
 const gatedPath = (method: string, pathname: string) =>
   moderationPath(pathname) || identityPath(method, pathname);
 
+/**
+ * Scanner / attack-path catch-all (2026-08-12, CEO decision "proteggiamo il
+ * sito"). Public probes for sensitive files, configs and admin panels
+ * (`.env`, `*.php`, `node_modules`, dotfiles, backup
+ * extensions…) are answered with a bare 403 BEFORE the app router, the
+ * rate-limit bindings and D1. Previously every probe crossed the full
+ * vinext routing pipeline (and API-shaped probes executed D1 queries): on
+ * 2026-08-11T22:00Z a scanner started hammering the site with ~500-600
+ * req/h (paths like /web/.env, /openapi.json, /.hermes/config.yaml,
+ * /configuration.php.bak…), which is what drove the Worker CPU p99 spikes
+ * (276-488 ms, cf. Grafana osdb-overview, 2026-08-12). This edge gate
+ * reduces the cost of a probe to a single regex test.
+ *
+ * Deliberately narrow: only unmistakably non-site paths are matched
+ * (nothing under /api, /assets, /mappa, /segnala, /correggi, /moderation
+ * or /records can ever hit it) so no legitimate route is affected — see
+ * tests/worker-edge.test.mjs "anti-scanner" for both sides of the fence.
+ *
+ * 2026-08-22: `openapi.json` was REMOVED from the blocklist — the file is
+ * now served deliberately (public/openapi.json, RFC 9727 API catalog
+ * service-desc). The spec answers from the static ASSETS, not the router
+ * pipeline, so a probe costs a CDN-cached asset fetch instead of D1 work.
+ */
+const SCANNER_PATH_PATTERN =
+  /(^|\/)(\.env|\.git|\.svn|\.hermes|node_modules|service_account\.json|appsettings\.json|firebase\.json|aws-config|configuration\.php|frontend_latest|telescope|server-info|phpmyadmin|adminer|wp-admin|sa\.json|application\.properties|classwithtostring)|\.(php|bak|sql|log)$/i;
+
+
 // Identity headers (ADR 0014). The prototype header `x-osdb-user-email` and
 // the ChatGPT-plugin headers (`oai-*`) are trusted ONLY when set by this
 // edge after a real gate — never when supplied by the caller. The worker is
@@ -166,6 +208,22 @@ const PROTOTYPE_IDENTITY_HEADER = "x-osdb-user-email";
 const PLATFORM_IDENTITY_HEADER = "oai-authenticated-user-email";
 const PLATFORM_FULL_NAME_HEADER = "oai-authenticated-user-full-name";
 const PLATFORM_FULL_NAME_ENCODING_HEADER = "oai-authenticated-user-full-name-encoding";
+
+const CANONICAL_HOST = "opensurveillancedb.org";
+const WWW_HOST = "www.opensurveillancedb.org";
+const PREPRODUCTION_HOST = "osdb.syaxhome89.com";
+
+function hostRedirect(request: Request, url: URL): Response | null {
+  const hostname = url.hostname.toLowerCase();
+  if (hostname !== CANONICAL_HOST && hostname !== WWW_HOST) return null;
+  if (hostname === WWW_HOST || url.protocol === "http:") {
+    const target = new URL(request.url);
+    target.protocol = "https:";
+    target.hostname = CANONICAL_HOST;
+    return Response.redirect(target.toString(), 308);
+  }
+  return null;
+}
 
 function safeEqual(expected: string, actual: string) {
   if (expected.length !== actual.length) return false;
@@ -406,13 +464,315 @@ const SECURITY_HEADERS: ReadonlyArray<readonly [string, string]> = [
 ];
 
 /**
+ * OAuth Protected Resource Metadata (RFC 9728, 2026-08-22): describes the
+ * resource server's bearer-credential requirements for the write API —
+ * the scopes an API key can carry and the header method. Published because
+ * the isitagentready authMd check requires the PRM document at
+ * /.well-known/oauth-protected-resource; the values are real OSDB facts
+ * (scopes from db/api-keys.ts, bearer header from app/lib/write-gate.ts).
+ * authorization_servers names this origin because key issuance happens
+ * here (account settings), NOT because an OAuth authorization server
+ * exists — /auth.md states that explicitly. No AS metadata document is
+ * published (there is no OAuth token endpoint to describe).
+ */
+const OAUTH_PROTECTED_RESOURCE = {
+  // `resource` matches the scanned site origin exactly (RFC 9728 allows a
+  // string or array; the scanner's validator requires the value to match
+  // the target — a path suffix is rejected as a mismatch).
+  resource: "https://opensurveillancedb.org",
+  resource_name: "OpenSurveillanceDB API",
+  authorization_servers: ["https://opensurveillancedb.org"],
+  scopes_supported: ["submit", "confirm", "edit", "action"],
+  bearer_methods_supported: ["header"],
+};
+
+/**
+ * OAuth Authorization Server metadata (RFC 8414 shape, 2026-08-22): the
+ * authMd check follows authorization_servers from the PRM and requires
+ * this document with an `agent_auth` block. All values are real OSDB
+ * facts — the registration method is email-verified account registration
+ * (register_uri /identity_endpoint) with the email verification link as
+ * the claim ceremony (claim_uri), issuing scoped API keys (credentials).
+ * Deliberately NO authorization/token/jwks endpoints: OSDB does not run
+ * an OAuth token flow, and publishing fake endpoints would be worse than
+ * omitting them — /auth.md states the credential model explicitly.
+ */
+const OAUTH_AUTHORIZATION_SERVER = {
+  issuer: "https://opensurveillancedb.org",
+  service_documentation: "https://opensurveillancedb.org/api-docs",
+  scopes_supported: ["submit", "confirm", "edit", "action"],
+  agent_auth: {
+    skill: "https://opensurveillancedb.org/auth.md",
+    register_uri: "https://opensurveillancedb.org/register",
+    identity_endpoint: "https://opensurveillancedb.org/api/auth/register",
+    claim_uri: "https://opensurveillancedb.org/api/auth/verify-email",
+    identity_types_supported: ["identity_assertion"],
+    credential_types_supported: ["api_key"],
+    identity_assertion: {
+      assertion_types_supported: ["verified_email"],
+      credential_types_supported: ["api_key"],
+    },
+  },
+};
+
+/**
+ * Agent index document (DNS-AID, draft-mozleywilliams-dnsop-dnsaid):
+ * the organization-level registry of agent services, pointed to by the
+ * `_index._agents.opensurveillancedb.org` SVCB/HTTPS records. Only real
+ * services — every URL below answers 200.
+ */
+const AGENT_INDEX = {
+  index: "https://opensurveillancedb.org/.well-known/agent-index.json",
+  organization: "OpenSurveillanceDB",
+  description:
+    "Open database of publicly visible surveillance cameras: fixed CCTV, traffic cameras, license-plate readers and similar infrastructure that watches public space.",
+  agent_services: [
+    {
+      name: "OpenSurveillanceDB API",
+      type: "web-api",
+      description: "Read and write access to the camera database. Read endpoints are keyless; write endpoints require a scoped Bearer API key.",
+      api_catalog: "https://opensurveillancedb.org/.well-known/api-catalog",
+      openapi: "https://opensurveillancedb.org/openapi.json",
+      documentation: "https://opensurveillancedb.org/api-docs",
+      authentication: "https://opensurveillancedb.org/auth.md",
+    },
+    {
+      name: "Agent registration",
+      type: "auth",
+      description: "Register a credential for write access: /api/auth/register (email + verification), /api/auth/keys (scoped API key). No OAuth token flow exists.",
+      auth_md: "https://opensurveillancedb.org/auth.md",
+      oauth_authorization_server: "https://opensurveillancedb.org/.well-known/oauth-authorization-server",
+      oauth_protected_resource: "https://opensurveillancedb.org/.well-known/oauth-protected-resource",
+    },
+    {
+      name: "Markdown content",
+      type: "content",
+      description: "The main public pages are served as Markdown to agents via Accept: text/markdown content negotiation.",
+      pages: ["https://opensurveillancedb.org/", "https://opensurveillancedb.org/api-docs", "https://opensurveillancedb.org/guide", "https://opensurveillancedb.org/privacy", "https://opensurveillancedb.org/faq", "https://opensurveillancedb.org/contatti", "https://opensurveillancedb.org/manifesto"],
+    },
+  ],
+};
+
+/**
+ * Markdown for Agents (2026-08-22, isitagentready `markdownNegotiation`):
+ * curated Markdown renderings of the main public pages, served when the
+ * client sends `Accept: text/markdown`. Summaries are honest — titles and
+ * section headings verified against the live pages — and link to the HTML
+ * originals. `Vary: Accept` keeps edge caches separate per variant; zero
+ * D1, zero app-router CPU, edge-cacheable 1h. Pages NOT in the map (and
+ * every API route) are never negotiated.
+ */
+const MARKDOWN_PAGES: Record<string, string> = {
+  "/": `# OpenSurveillanceDB
+
+Public data about public surveillance.
+
+OpenSurveillanceDB is an open database of publicly visible surveillance cameras: fixed CCTV, traffic cameras, license-plate readers and similar infrastructure that watches public space. Every record documents the camera — where it is, who appears to operate it, what it captures — and the public evidence for each claim.
+
+## What you can do
+
+- **Explore the map** — https://opensurveillancedb.org/mappa
+- **Search the directory** — https://opensurveillancedb.org/directory
+- **Report a camera** — https://opensurveillancedb.org/segnala
+- **Read the API documentation** — https://opensurveillancedb.org/api-docs
+- **Machine-readable discovery**: API catalog (/.well-known/api-catalog), OpenAPI specification (/openapi.json), agent registration (/auth.md).
+
+Visibility without surveillance: the database is public about public infrastructure, and deliberately does not publish live footage, tracking data, or private-home details. Faces and licence plates are stripped before anything is published.
+
+Human page: https://opensurveillancedb.org/
+`,
+  "/api-docs": `# Public API
+
+OpenSurveillanceDB exposes a documented public API for reading and (with a scoped API key) writing camera records.
+
+- **OpenAPI specification**: https://opensurveillancedb.org/openapi.json (OpenAPI 3.0.3)
+- **API catalog (RFC 9727)**: https://opensurveillancedb.org/.well-known/api-catalog
+- **Agent registration (Auth.md)**: https://opensurveillancedb.org/auth.md
+
+## Read endpoints (keyless)
+
+List, bbox queries, GeoJSON/CSV exports, per-record detail, search, nearby, revisions, geocoding, raster tiles, import sources — no credentials required.
+
+## Write endpoints (Bearer API key)
+
+Publishing camera reports, corrections, community confirmations, actions and edits require an API key with the matching scope: \`submit\`, \`confirm\`, \`edit\`, \`action\`. Keys are created in the account settings (https://opensurveillancedb.org/account), sent as \`Authorization: Bearer <key>\`, stored hashed, revocable.
+
+Full interactive documentation: https://opensurveillancedb.org/api-docs
+`,
+  "/guide": `# Guide — A public database, built with care.
+
+How OpenSurveillanceDB works, in one document.
+
+- **Find what you need** — search the directory, browse the map, export CSV/GeoJSON.
+- **Visibility without operational surveillance** — the database documents cameras; it is not a surveillance tool.
+- **From observation to public record** — contributions are evidence-based: each record cites its public source.
+- **The public publication model** — anything published stays public; the site is an archive, not a message board.
+- **Each status says what the record can support** — camera statuses reflect the strength of the evidence.
+- **Why create an account?** — accounts let you report, correct, confirm and edit; they are never required to read.
+- **You can edit your own contributions** — and correct others with evidence.
+- **What confirmations mean** — community confirmations verify that a camera is still present and accurate.
+
+Full guide: https://opensurveillancedb.org/guide
+`,
+  "/privacy": `# Privacy notice
+
+OpenSurveillanceDB's privacy notice (controller: see section 1 of the full notice).
+
+1. Who we are (controller)
+2. What the service does
+3. What personal data we process
+4. What we do NOT collect or publish
+5. Recipients and transfers
+6. International data transfers
+7. Retention
+8. Your rights (GDPR Articles 15–22)
+
+The database publishes information about cameras, not about people: faces and licence plates are stripped before publication. Full notice: https://opensurveillancedb.org/privacy
+`,
+  "/faq": `# FAQ — Clear answers about how the database works.
+
+Frequently asked questions about OpenSurveillanceDB: what the database contains, how cameras are documented, how to contribute, correct or remove a record, and how privacy is protected.
+
+Still have questions? https://opensurveillancedb.org/contatti
+`,
+  "/contatti": `# Contacts — Who runs this, and how to reach us.
+
+Who runs OpenSurveillanceDB and how to reach the maintainers.
+
+- **Corrections and removal** — how to request a correction or removal of a record.
+- **Reporting a security vulnerability** — responsible-disclosure contact for security issues.
+
+Full page: https://opensurveillancedb.org/contatti
+`,
+  "/manifesto": `# A manifesto for legible public space.
+
+What OpenSurveillanceDB stands for.
+
+- **Transparency is a condition of public space** — people deserve to know the surveillance systems around them.
+- **Help people understand the systems around them** — legibility, not fear.
+- **Free, open and safe by design** — open data, ODbL licensed, safety by design.
+- **What we deliberately do not do** — no live footage, no tracking, no private-home details.
+- **Open where it is safe to be open** — openness has limits where safety requires them.
+
+Full manifesto: https://opensurveillancedb.org/manifesto
+`,
+};
+
+/**
+ * Auth.md agent registration discovery (2026-08-22, isitagentready
+ * `authMd`): a self-contained Markdown document at /auth.md telling AI
+ * agents how to register for WRITE access to the API. OpenSurveillanceDB
+ * does NOT run an OAuth authorization server — it issues its own scoped
+ * API keys — so the Auth.md spec's fallback path applies (no PRM / OAuth
+ * AS metadata is published, and the document explains the credential
+ * model itself). Served like the API catalog: before the app router,
+ * static, edge-cacheable.
+ */
+const AUTH_MD = `# auth.md — OpenSurveillanceDB Agent Registration
+
+Not an agent? You might be looking for https://opensurveillancedb.org/api-docs.
+
+You are an agent. This document tells you how to register a credential for the **OpenSurveillanceDB write API** — publishing camera reports, corrections, community confirmations, actions and edits. Read access to the API is keyless and needs no registration. Follow the steps in order; do not skip ahead.
+
+Endpoints live at \`https://opensurveillancedb.org\`. The machine-readable API surface is the API catalog (/.well-known/api-catalog), the OpenAPI specification (/openapi.json) and the human documentation (/api-docs).
+
+## Step 1 — Register an account
+
+\`\`\`http
+POST /api/auth/register HTTP/1.1
+Host: opensurveillancedb.org
+Content-Type: application/json
+
+{"email": "agent@example.com", "password": "<12+ character password>"}
+\`\`\`
+
+A verification email is sent to the address (one per five minutes per address). Complete the link inside it before Step 3.
+
+## Step 2 — Sign in to create an API key
+
+\`\`\`http
+POST /api/auth/login HTTP/1.1
+Host: opensurveillancedb.org
+Content-Type: application/json
+
+{"email": "agent@example.com", "password": "<password>"}
+\`\`\`
+
+The response sets a session cookie. Keep that cookie for Step 3; it is the proof of the verified account and is never a credential for the data API.
+
+## Step 3 — Create an API key
+
+\`\`\`http
+POST /api/auth/keys HTTP/1.1
+Host: opensurveillancedb.org
+Content-Type: application/json
+Cookie: <session cookie from Step 2>
+
+{"name": "my-agent", "scopes": ["submit", "confirm", "edit", "action"], "expiresAt": "2027-01-01T00:00:00.000Z"}
+\`\`\`
+
+- \`scopes\`: non-empty subset of \`submit\`, \`confirm\`, \`edit\`, \`action\` — one line each below.
+- \`expiresAt\`: ISO-8601 UTC; default one year, explicit null = never.
+- The key is shown **exactly once** in the response — store it; it cannot be recovered, only reissued.
+
+Scopes:
+
+- \`submit\` — publish camera reports and corrections.
+- \`confirm\` — cast or withdraw community confirmations.
+- \`edit\` — update camera details.
+- \`action\` — cast or withdraw community actions.
+
+## Step 4 — Use the credential
+
+Send the key as a bearer credential in the Authorization header on every write request:
+
+\`\`\`http
+POST /api/cameras HTTP/1.1
+Host: opensurveillancedb.org
+Content-Type: application/json
+Authorization: Bearer <api key from Step 3>
+
+{"title": "Example camera", "latitude": 47.41, "longitude": 8.57, "kind": "Fixed dome"}
+\`\`\`
+
+- Credentials in the query string are rejected (HTTP 400) — header only.
+- Each endpoint requires the scope shown in its documentation (/api-docs).
+- Keys are stored hashed and never logged; revoke a key from the account settings (https://opensurveillancedb.org/account) at any time.
+
+## No OAuth authorization server
+
+OpenSurveillanceDB does not run an OAuth authorization server: it issues its own scoped API keys, so no OAuth Authorization Server metadata is published and this document is self-contained. Token requests against OAuth endpoints are not supported.
+
+## Notes for agents
+
+- Respect the rate limits documented in /api-docs; bulk exports are metered separately.
+- The dataset is licensed ODbL 1.0 — see /api-docs for attribution requirements.
+- Do not probe account endpoints; create a real test account for integration testing.
+`;
+
+/**
+ * RFC 8288 discovery links (2026-08-22, isitagentready `linkHeaders`):
+ * every 2xx HTML document carries Link headers pointing to the RFC 9727
+ * API catalog, the OpenAPI spec (service-desc) and the human docs page
+ * (service-doc), so an AI agent that lands on ANY page can discover the
+ * machine-readable API. Relative references resolve against the request
+ * URI per RFC 8288 §3.2. Never added to API/JSON responses, errors or
+ * redirects.
+ */
+const API_LINK_HEADER = [
+  `</.well-known/api-catalog>; rel="api-catalog"`,
+  `</openapi.json>; rel="service-desc"; type="application/openapi+json"`,
+  `</api-docs>; rel="service-doc"`,
+].join(", ");
+
+/**
  * Return a copy of `response` carrying the global security headers. On the
  * /mappa and /segnala routes the Permissions-Policy is relaxed to allow
  * geolocation for the top-level document; every other route keeps the
  * fully-denying policy. The override still respects the "never overwrite"
  * rule: a stricter policy already set by an app handler survives untouched.
  */
-function withSecurityHeaders(response: Response, pathname?: string): Response {
+function withSecurityHeaders(response: Response, pathname?: string, hostname?: string): Response {
   const headers = new Headers(response.headers);
   // Never overwrite an existing header: app routes may set stricter
   // values that must survive the middleware. The
@@ -422,8 +782,21 @@ function withSecurityHeaders(response: Response, pathname?: string): Response {
   for (const [name, value] of SECURITY_HEADERS) {
     if (!headers.has(name)) headers.set(name, value);
   }
+  // RFC 8288 discovery links on HTML documents only (2xx, text/html), and
+  // never clobbering a Link an app route already set.
+  if (
+    response.status >= 200 &&
+    response.status < 300 &&
+    (response.headers.get("content-type") ?? "").startsWith("text/html") &&
+    !headers.has("Link")
+  ) {
+    headers.set("Link", API_LINK_HEADER);
+  }
   if (pathname && GEOLOCATION_ROUTES.has(pathname) && !appSetPermissionsPolicy) {
     headers.set("Permissions-Policy", GEOLOCATION_PERMISSIONS_POLICY);
+  }
+  if (hostname?.toLowerCase() === PREPRODUCTION_HOST) {
+    headers.set("X-Robots-Tag", "noindex, nofollow");
   }
   return new Response(response.body, {
     status: response.status,
@@ -466,9 +839,55 @@ function injectIdentityAfterGate(request: Request, identityEmail: string | null)
   return new Request(request, { headers });
 }
 
-const worker = {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    const url = new URL(request.url);
+/**
+ * Request analytics (Workers Analytics Engine, dataset osdb_requests).
+ * One datapoint per request, written AFTER the response is produced:
+ *   blob1 = path group ("api" | "web")
+ *   blob2 = status class ("2xx" | "3xx" | "4xx" | "5xx")
+ *   blob3 = API endpoint path, query string stripped ("web" for the site;
+ *           tile coordinates normalize to /api/tiles/[z]/[x]/[y])
+ *   blob4 = HTTP method
+ *   blob5 = exact HTTP status (low-cardinality, e.g. "200" or "429")
+ *   double1 = 1 (event count; the monitor uses SUM(_sample_interval))
+ * Deliberately narrow: no IPs, no query strings, no user data, and the
+ * website is counted only as "web" without per-page breakdown (privacy —
+ * see PRIVACY_AND_SAFETY.md). The binding is optional (absent in local
+ * dev / tests): when missing the call is a no-op and can never break the
+ * request path.
+ */
+function analyticsEndpoint(pathname: string, isApi: boolean): string {
+  if (!isApi) return "web";
+  // Tile coordinates are high-cardinality and never contain user data. Group
+  // their numeric route shape so Analytics/Grafana can count cache misses and
+  // exact 429s as one endpoint instead of one series per tile.
+  if (/^\/api\/tiles\/\d+\/\d+\/\d+(?:\.png)?$/.test(pathname)) return "/api/tiles/[z]/[x]/[y]";
+  return pathname;
+}
+
+function recordRequestAnalytics(env: Env, url: URL, method: string, status: number): void {
+  try {
+    const analytics = env.ANALYTICS;
+    if (!analytics) return;
+    const pathname = url.pathname;
+    const isApi = pathname.startsWith("/api/");
+    analytics.writeDataPoint({
+      blobs: [isApi ? "api" : "web", `${Math.floor(status / 100)}xx`, analyticsEndpoint(pathname, isApi), method, String(status)],
+      doubles: [1],
+    });
+  } catch {
+    // Analytics must never break the request path.
+  }
+}
+
+/**
+ * Route one request through the worker pipeline (redirect, identity
+ * sanitisation, scanner gate, moderation gate, image optimisation, app
+ * router). Split from `fetch` so every response — including 3xx/4xx/5xx
+ * and thrown errors — can be recorded once in Analytics Engine.
+ */
+async function dispatch(request: Request, env: Env, ctx: ExecutionContext, url: URL): Promise<Response> {
+  const redirect = hostRedirect(request, url);
+  if (redirect) return redirect;
 
     // Normalise a trailing slash on the pathname BEFORE the edge-gate match
     // (audit 2026-08-09, P2): the identity exception for POST /api/appeals
@@ -485,9 +904,154 @@ const worker = {
     //    is the single identity authority and never trusts the caller.
     let gated = stripIdentityHeaders(request, env);
 
+    // 1b. Scanner catch-all: sensitive-config probes die here with a bare
+    //    403, BEFORE the moderation gate, the rate-limit bindings and the
+    //    app router. Only unmistakably non-site paths match (see
+    //    SCANNER_PATH_PATTERN), so legitimate traffic is untouched.
+    if (SCANNER_PATH_PATTERN.test(url.pathname)) {
+      return withSecurityHeaders(
+        new Response("Forbidden", {
+          status: 403,
+          headers: { "Cache-Control": "no-store" },
+        }),
+        url.pathname,
+      );
+    }
+
+    // 1c. RFC 9727 API catalog (2026-08-22, AI-bot / automated discovery):
+    //    /.well-known/api-catalog tells LLM crawlers and API-discovery
+    //    tools where the OpenAPI spec (service-desc), the human docs page
+    //    (service-doc) and the health probe (status) live. Served BEFORE
+    //    the app router: static JSON, no D1, edge-cacheable. Links are
+    //    origin-derived so the pre-production host answers with its own
+    //    working URLs (the www alias is already 308'd to the apex above).
+    //    Matched on the normalised path (gatedPathname) so a trailing slash
+    //    variant still answers.
+    if (gatedPathname === "/.well-known/api-catalog") {
+      const base = `https://${url.hostname}`;
+      const catalog = {
+        linkset: [
+          {
+            anchor: `${base}/api/`,
+            "service-desc": [
+              { href: `${base}/openapi.json`, type: "application/openapi+json" },
+            ],
+            "service-doc": [{ href: `${base}/api-docs` }],
+            status: [{ href: `${base}/api/health` }],
+          },
+        ],
+      };
+      return withSecurityHeaders(
+        new Response(JSON.stringify(catalog), {
+          headers: {
+            "Content-Type": "application/linkset+json; charset=utf-8",
+            "Cache-Control": "public, max-age=3600",
+          },
+        }),
+        url.pathname,
+        url.hostname,
+      );
+    }
+
+    // 1d. Liveness probe (status relation of the API catalog + monitoring):
+    //    answers WITHOUT touching D1 or the app router — it reports worker
+    //    liveness, not data health, and is deliberately no-store.
+    if (gatedPathname === "/api/health") {
+      return withSecurityHeaders(
+        new Response(JSON.stringify({ status: "ok", service: "opensurveillancedb" }), {
+          headers: {
+            "Content-Type": "application/json; charset=utf-8",
+            "Cache-Control": "no-store",
+          },
+        }),
+        url.pathname,
+        url.hostname,
+      );
+    }
+
+    // 1e. Auth.md agent registration discovery (isitagentready `authMd`):
+    //    self-contained Markdown doc for AI agents — see AUTH_MD above.
+    if (gatedPathname === "/auth.md") {
+      return withSecurityHeaders(
+        new Response(AUTH_MD, {
+          headers: {
+            "Content-Type": "text/markdown; charset=utf-8",
+            "Cache-Control": "public, max-age=3600",
+          },
+        }),
+        url.pathname,
+        url.hostname,
+      );
+    }
+
+    // 1f. OAuth Protected Resource Metadata (RFC 9728): required by the
+    //    authMd check alongside /auth.md — see OAUTH_PROTECTED_RESOURCE.
+    if (gatedPathname === "/.well-known/oauth-protected-resource") {
+      return withSecurityHeaders(
+        new Response(JSON.stringify(OAUTH_PROTECTED_RESOURCE), {
+          headers: {
+            "Content-Type": "application/json; charset=utf-8",
+            "Cache-Control": "public, max-age=3600",
+          },
+        }),
+        url.pathname,
+        url.hostname,
+      );
+    }
+
+    // 1g. OAuth Authorization Server metadata (RFC 8414 shape): the authMd
+    //    check follows PRM.authorization_servers and requires the
+    //    agent_auth block — see OAUTH_AUTHORIZATION_SERVER.
+    if (gatedPathname === "/.well-known/oauth-authorization-server") {
+      return withSecurityHeaders(
+        new Response(JSON.stringify(OAUTH_AUTHORIZATION_SERVER), {
+          headers: {
+            "Content-Type": "application/json; charset=utf-8",
+            "Cache-Control": "public, max-age=3600",
+          },
+        }),
+        url.pathname,
+        url.hostname,
+      );
+    }
+
+    // 1h. Markdown for Agents: content negotiation — only when the client
+    //    explicitly asks for text/markdown AND the path has a curated
+    //    Markdown page. Vary: Accept keeps edge cache variants separate.
+    const accept = request.headers.get("accept") ?? "";
+    if (gatedPathname in MARKDOWN_PAGES && accept.includes("text/markdown")) {
+      return withSecurityHeaders(
+        new Response(MARKDOWN_PAGES[gatedPathname], {
+          headers: {
+            "Content-Type": "text/markdown; charset=utf-8",
+            "Cache-Control": "public, max-age=3600",
+            "Vary": "Accept",
+          },
+        }),
+        url.pathname,
+        url.hostname,
+      );
+    }
+
+    // 1i. DNS-AID agent index (draft-mozleywilliams-dnsop-dnsaid): the
+    //    organization registry of agent services referenced by the
+    //    `_index._agents` SVCB/HTTPS records. Zero D1, cacheable 1h.
+    if (gatedPathname === "/.well-known/agent-index.json") {
+      return withSecurityHeaders(
+        new Response(JSON.stringify(AGENT_INDEX), {
+          headers: {
+            "Content-Type": "application/json; charset=utf-8",
+            "Cache-Control": "public, max-age=3600",
+          },
+        }),
+        url.pathname,
+        url.hostname,
+      );
+    }
+
     if (gatedPath(request.method, gatedPathname)) {
       const gate = requireModerationAuth(gated, env);
-      if (gate.denied) return withSecurityHeaders(gate.denied, url.pathname);
+      if (gate.denied) return withSecurityHeaders(gate.denied, url.pathname, url.hostname);
       gated = injectIdentityAfterGate(gated, gate.identityEmail);
     }
 
@@ -500,21 +1064,40 @@ const worker = {
           return result.response();
         },
       }, allowedWidths);
-      return withSecurityHeaders(optimized, url.pathname);
+      return withSecurityHeaders(optimized, url.pathname, url.hostname);
     }
 
-    return withSecurityHeaders(await handler.fetch(gated, env, ctx), url.pathname);
+    return withSecurityHeaders(await handler.fetch(gated, env, ctx), url.pathname, url.hostname);
+}
+
+const worker = {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    const url = new URL(request.url);
+    try {
+      const response = await dispatch(request, env, ctx, url);
+      recordRequestAnalytics(env, url, request.method, response.status);
+      return response;
+    } catch (error) {
+      recordRequestAnalytics(env, url, request.method, 500);
+      throw error;
+    }
   },
 
   /**
-   * Scheduled retention sweep (ADR 0004 §3, ADR 0008 p.3 — cron binding in
-   * wrangler.jsonc, daily at 03:00 UTC). Runs the retention job from
-   * db/retention.ts and the OIDC expiry sweep from db/oidc.ts against the D1
-   * binding. Both sweeps must never break the request path: they
-   * run inside waitUntil and any failure is caught and logged so the worker
-   * stays healthy (the next run retries).
+   * Scheduled jobs (cron binding in wrangler.jsonc):
+   * - 03:00 UTC daily — retention sweep (ADR 0004 §3, ADR 0008 p.3): runs
+   *   the retention job from db/retention.ts and the OIDC expiry sweep from
+   *   db/oidc.ts against the D1 binding. Both sweeps must never break the
+   *   request path: they run inside waitUntil and any failure is caught
+   *   and logged so the worker stays healthy (the next run retries).
+   * - every minute — keep-warm tick (WARMUP_CRON): deliberate no-op that
+   *   keeps an isolate alive between visitors (cold starts were the slow
+   *   tail: ~1s on the first request after idle).
    */
   async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    if (controller.cron === WARMUP_CRON) {
+      return;
+    }
     const policy = DEFAULT_RETENTION_POLICY;
     ctx.waitUntil(
       runRetentionSweep(new Date().toISOString(), { policy })

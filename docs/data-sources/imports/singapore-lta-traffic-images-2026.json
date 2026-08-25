@@ -1,0 +1,13 @@
+{
+  "source_name": "Land Transport Authority (LTA) — Traffic Images API",
+  "format": "lta-traffic-images-json",
+  "license": "Singapore Open Data Licence v1.0",
+  "license_url": "https://data.gov.sg/open-data-licence",
+  "attribution_text": "Land Transport Authority, Singapore (data.gov.sg)",
+  "source_url": "https://api.data.gov.sg/v1/transport/traffic-images",
+  "external_id_prefix": "sg:",
+  "enrich": false,
+  "slug": "singapore-lta-traffic-images-2026",
+  "max_records": 100,
+  "notes": "API live LTA: ~8 camere attive con coordinate (la collection statica da ~80 cam è stata decommissionata — redirect a questa API, verificato 2026-08-16). Licenza Singapore Open Data Licence v1.0 aggiunta al gate 2026-08-16."
+}

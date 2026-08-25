@@ -1,0 +1,29 @@
+{
+  "source_name": "OpenStreetMap contributors",
+  "format": "osm-pbf-local",
+  "license": "ODbL 1.0 (OSM)",
+  "license_url": "https://opendatacommons.org/licenses/odbl/1-0/",
+  "attribution_text": "© OpenStreetMap contributors (https://www.openstreetmap.org/copyright)",
+  "source_url": "https://download.geofabrik.de/asia/india-latest.osm.pbf",
+  "local_source_path": "/opt/open-surveillance-db/.import-data/osm-surveillance-india-2026.elements.json",
+  "kind_map": {
+    "dome": "Fixed dome",
+    "fixed": "Bullet",
+    "panning": "PTZ",
+    "alpr": "Traffic / licence plate reader",
+    "traffic": "Traffic / licence plate reader"
+  },
+  "surveillance_type_map": {
+    "alpr": "Traffic / licence plate reader",
+    "camera": null,
+    "guard": null
+  },
+  "skip_if": {
+    "surveillance": "indoor"
+  },
+  "external_id_prefix": "osm:",
+  "enrich": false,
+  "slug": "osm-surveillance-india-2026",
+  "max_records": 20000,
+  "notes": "Dati da estratto Geofabrik (india-latest.osm.pbf) filtrato localmente con osmium (man_made=surveillance, surveillance=public|outdoor) e importato da file locale — niente Overpass. Licenza ODbL 1.0 invariata."
+}

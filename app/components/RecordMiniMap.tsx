@@ -30,12 +30,15 @@ export function RecordMiniMap({
   kind,
   direction,
   title,
+  status = "",
 }: {
   latitude: number;
   longitude: number;
   kind: string;
   direction?: number | null;
   title: string;
+  /** Public record status (marker colouring, same classes as /mappa). */
+  status?: string;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const t = useMessages().record;
@@ -62,7 +65,20 @@ export function RecordMiniMap({
           maxZoom: 19,
           attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>',
         }).addTo(map);
-        L.marker([latitude, longitude], { title }).addTo(map);
+        // Custom divIcon, NOT Leaflet's default PNG icon: the default image
+        // (marker-icon.png) is not bundled in the Workers build (404 in
+        // production — the marker was invisible on /records/[id]). Same
+        // marker visual as /mappa (buildMarkerIcon) so the record page and
+        // the map agree on what a camera looks like.
+        L.marker([latitude, longitude], {
+          icon: L.divIcon({
+            className: "",
+            html: `<span class="osm-camera-marker ${status}" aria-hidden="true"><i></i></span>`,
+            iconSize: [28, 28],
+            iconAnchor: [14, 14],
+          }),
+          title,
+        }).addTo(map);
 
         // Field of view: same rules as the main map (field-of-view.ts) —
         // domes get a 360° circle, directional kinds with a bearing get the

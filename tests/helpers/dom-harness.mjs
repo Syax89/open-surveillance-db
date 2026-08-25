@@ -280,8 +280,18 @@ export const __maps = maps;
 // __resetMarkers ALSO restores these bounds (t_b9666d09): the geocode
 // autocomplete tests shrink the viewport to assert the pan landing, and a
 // stale narrow viewport leaking into the NEXT test would silently filter
-// the list (a record outside the leftover bounds disappears) — every test
-// must start from the whole-world viewport.
+// The default viewport mirrors the real map's initial view (Roma, zoom 13 —
+// SurveillanceMap setView [41.9028, 12.4964] 13). Tests that need a wider
+// viewport call leaflet.__setBounds(...) explicitly. The viewport-area cap
+// (use-viewport-cameras VIEWPORT_MAX_AREA_SQ_DEG) skips fetches for
+// continental viewports, so a whole-world default would starve the mocks.
+const romeViewport = {
+  getSouth: () => 41.8,
+  getNorth: () => 42.0,
+  getWest: () => 12.3,
+  getEast: () => 12.7,
+  contains: () => true,
+};
 const wholeWorldBounds = {
   getSouth: () => -90,
   getNorth: () => 90,
@@ -289,9 +299,9 @@ const wholeWorldBounds = {
   getEast: () => 180,
   contains: () => true,
 };
-let currentBounds = wholeWorldBounds;
+let currentBounds = romeViewport;
 export const __setBounds = (b) => { currentBounds = b; };
-export const __resetMarkers = () => { markers.length = 0; maps.length = 0; paths.length = 0; currentBounds = wholeWorldBounds; };
+export const __resetMarkers = () => { markers.length = 0; maps.length = 0; paths.length = 0; currentBounds = romeViewport; };
 export function map(el, opts) {
   const m = {
     // Map options recorded (RecordMiniMap 2026-08-07): the read-only mini
@@ -383,7 +393,10 @@ export const tileLayer = (url, opts) => {
   if (url) {
     layer.url = url;
     const mapStub = maps[maps.length - 1];
-    if (mapStub) (mapStub.tileLayers ??= []).push(url);
+    if (mapStub) {
+      (mapStub.tileLayers ??= []).push(url);
+      (mapStub.tileLayerOptions ??= []).push({ url, opts });
+    }
   }
   return layer;
 };
@@ -853,6 +866,105 @@ export function clearFetchMock() {
 // records only (verified/demo), never internal states.
 export function fakeCamerasPayload(cameras) {
   return { records: cameras };
+}
+
+/**
+ * Server-side-faithful emulation of GET /api/cameras (db/cameras.ts +
+ * app/api/cameras/route.ts): applies the SAME query-param filters the real
+ * API applies, so component tests exercise the current contract (cursor
+ * pagination is the directory default; filters are server-side):
+ *   kind (exact), freshness (lastVerifiedAt >= now − Nd), q
+ *   (title/address/kind/source LIKE), initial (title NOCASE LIKE 'x%'),
+ *   state (confirmed = lastVerifiedAt non-null; never = null), origin
+ *   (reports = source 'Community report'; imported = source LIKE 'import:%'),
+ *   bbox (west,south,east,north) and sort=alphabetical (title NOCASE asc,
+ *   id desc) — with keyset pagination (after_title/after_id) for the cursor
+ *   hook, offset pagination for the legacy walk and count=true/false for
+ *   the total field.
+ */
+export function camerasApiResponse(input, records) {
+  const url = new URL(String(input), "https://osdb.test");
+  if (url.pathname !== "/api/cameras") {
+    return jsonResponse({ records: [], total: 0, nextOffset: null });
+  }
+  const p = url.searchParams;
+  // Facets are dataset-wide (the client calls /api/cameras?facets=kinds&limit=1
+  // to populate the kind select — MappaTool/DirectoryTool).
+  if (p.get("facets") === "kinds") {
+    const kinds = [...new Set(records.map((c) => c.kind).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+    return jsonResponse({ facets: { kinds: kinds.map((kind) => ({ kind })) } });
+  }
+  let rows = records.slice();
+
+  const kind = p.get("kind");
+  if (kind) rows = rows.filter((c) => c.kind === kind);
+  const freshness = p.get("freshness");
+  if (freshness && freshness !== "all") {
+    const days = Number.parseInt(freshness, 10);
+    const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+    rows = rows.filter((c) => new Date(c.lastVerifiedAt ?? 0).getTime() >= cutoff);
+  }
+  const q = p.get("q");
+  if (q) {
+    const needle = q.toLowerCase();
+    rows = rows.filter((c) =>
+      [c.title, c.address, c.kind, c.source].some((v) => String(v ?? "").toLowerCase().includes(needle)),
+    );
+  }
+  const initial = p.get("initial");
+  if (initial) {
+    rows = rows.filter((c) => String(c.title ?? "").toLowerCase().startsWith(initial.toLowerCase()));
+  }
+  const state = p.get("state");
+  if (state === "confirmed") rows = rows.filter((c) => Boolean(c.lastVerifiedAt));
+  if (state === "never") rows = rows.filter((c) => !c.lastVerifiedAt);
+  const origin = p.get("origin");
+  if (origin === "reports") rows = rows.filter((c) => c.source === "Community report");
+  if (origin === "imported") rows = rows.filter((c) => String(c.source ?? "").startsWith("import:"));
+  const bbox = p.get("bbox");
+  if (bbox) {
+    const [west, south, east, north] = bbox.split(",").map(Number);
+    rows = rows.filter(
+      (c) => c.longitude >= west && c.longitude <= east && c.latitude >= south && c.latitude <= north,
+    );
+  }
+  if (p.get("sort") === "alphabetical") {
+    rows.sort((a, b) => {
+      const ta = String(a.title ?? "").toLowerCase();
+      const tb = String(b.title ?? "").toLowerCase();
+      return ta < tb ? -1 : ta > tb ? 1 : b.id - a.id;
+    });
+  }
+  const afterTitle = p.get("after_title");
+  const afterId = p.get("after_id");
+  if (afterTitle !== null && afterId !== null) {
+    const cursorTitle = afterTitle.toLowerCase();
+    const cursorId = Number(afterId);
+    rows = rows.filter((c) => {
+      const ct = String(c.title ?? "").toLowerCase();
+      return ct > cursorTitle || (ct === cursorTitle && c.id < cursorId);
+    });
+  }
+
+  const withCount = p.get("count") !== "false";
+  const total = withCount ? rows.length : null;
+  const limit = Number(p.get("limit") ?? 500);
+  const offset = Number(p.get("offset") ?? 0);
+  const page = rows.slice(offset, offset + limit);
+  const nextOffset = withCount
+    ? offset + page.length < rows.length
+      ? offset + page.length
+      : null
+    : page.length === limit
+      ? offset + limit
+      : null;
+  return jsonResponse({ records: page, total, nextOffset });
+}
+
+/** Install a fetch mock that answers GET /api/cameras with server-side
+ * filtering over `records` (see camerasApiResponse). */
+export function installCamerasApiMock(records) {
+  installFetchMock((input) => camerasApiResponse(input, records));
 }
 
 // ---------------------------------------------------------------------------

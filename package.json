@@ -35,11 +35,13 @@
   },
   "dependencies": {
     "@simplewebauthn/server": "^13.3.2",
+    "@types/leaflet.markercluster": "^1.5.6",
     "drizzle-orm": "0.45.2",
     "fflate": "^0.8.3",
     "fzstd": "^0.1.1",
     "hyparquet": "^1.28.1",
     "leaflet": "^1.9.4",
+    "leaflet.markercluster": "^1.5.3",
     "next": "^16.2.12",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"

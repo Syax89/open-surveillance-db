@@ -5,9 +5,10 @@ import { getD1 } from "./cameras";
  *
  * Security properties:
  *  - Passwords are stored as salted PBKDF2-SHA256 hashes
- *    (`pbkdf2$<iterations>$<saltB64>$<hashB64>`, 210,000 iterations per the
- *    OWASP recommendation for PBKDF2-HMAC-SHA256). The iteration count is
- *    embedded in the hash so it can be raised without a migration.
+ *    (`pbkdf2$<iterations>$<saltB64>$<hashB64>`). New hashes use 100,000
+ *    iterations, the Cloudflare Workers WebCrypto ceiling. The iteration
+ *    count is embedded in the hash so compatible costs can be raised without
+ *    a migration; hashes above the runtime ceiling require password reset.
  *  - Only the SHA-256 of the raw session token is stored: a database leak
  *    cannot replay live sessions, and the raw token (32 random bytes,
  *    base64url) is the only thing the browser cookie carries.
@@ -22,7 +23,11 @@ import { getD1 } from "./cameras";
 // Crypto helpers (WebCrypto — available in Cloudflare Workers and Node 22+)
 // ---------------------------------------------------------------------------
 
-export const PBKDF2_ITERATIONS = 210_000;
+// Cloudflare Workers' WebCrypto rejects PBKDF2 iteration counts above 100,000.
+// Stored iteration counts above this limit cannot be derived by Cloudflare's
+// WebCrypto runtime; those accounts must use password reset to obtain a new
+// compatible hash.
+export const PBKDF2_ITERATIONS = 100_000;
 const PBKDF2_HASH = "SHA-256";
 const PBKDF2_KEY_LENGTH = 32; // 256 bits
 const SALT_BYTES = 16;
@@ -77,11 +82,10 @@ function constantTimeEqual(first: string, second: string): boolean {
  * Derive the PBKDF2-SHA256 key for a password/salt pair at the given
  * iteration count.
  *
- * The count is honoured as-is — hashing always passes the current
- * PBKDF2_ITERATIONS constant, while verification passes the count embedded
- * in the stored hash (ADR 0013). Raising the constant therefore never
- * invalidates existing hashes: each one re-derives at its own stored count
- * until a rehash-on-login upgrades it (AUTH_OPTIONS §8).
+ * Hashing always passes the current PBKDF2_ITERATIONS constant. Verification
+ * accepts a stored count only when the runtime can support it; counts up to
+ * that ceiling are taken from the hash (ADR 0013), while higher counts fail
+ * closed and must be replaced through password reset.
  */
 async function derivePasswordKey(
   password: string,
@@ -124,11 +128,21 @@ export async function verifyPassword(password: string, stored: string): Promise<
 
   if (parts.length === 4) {
     // Current format (ADR 0013): `pbkdf2$<iterations>$<saltB64>$<hashB64>`.
-    // The embedded count drives the derivation, so a bump of
-    // PBKDF2_ITERATIONS verifies old hashes at their own (lower) count
-    // instead of locking every contributor out.
+    // The embedded count drives the derivation when it is within the
+    // Cloudflare-supported ceiling; higher counts are rejected below.
     const parsed = Number(parts[1]);
     if (!Number.isInteger(parsed) || parsed < 1) return false;
+    if (parsed > PBKDF2_ITERATIONS) {
+      // Legacy hashes created above Cloudflare's WebCrypto ceiling cannot be
+      // verified here. Still pay the same dummy cost as an unknown email so
+      // the reset-required state does not become a timing oracle.
+      try {
+        await payDummyPasswordCost(password);
+      } catch {
+        // A malformed legacy row remains a failed credential either way.
+      }
+      return false;
+    }
     iterations = parsed;
     salt = base64UrlToBytes(parts[2]);
     expected = parts[3];
@@ -158,13 +172,18 @@ export async function verifyPassword(password: string, stored: string): Promise<
  *
  * QA#3 F1 (t_63e0d13c): the login response body is anti-enumeration (one
  * generic 401), but the response TIME was not — an unknown email returned
- * immediately while a registered email paid 210 000 PBKDF2 iterations
+ * immediately while a registered email paid the current PBKDF2 cost
  * (~50-150 ms). authenticateContributor and the lockout branch of the login
  * route both call verifyPasswordDummy on the fast paths so the response time
  * no longer reveals whether the email exists.
  */
 const DUMMY_PASSWORD_HASH =
-  "pbkdf2$210000$WlpaWlpaWlpaWlpaWlpaWg$zU4WhYARxiSZk8T4hHTDxIt0TKfuJ3ZGBFxf6wvNosY";
+  "pbkdf2$100000$WlpaWlpaWlpaWlpaWlpaWg$zU4WhYARxiSZk8T4hHTDxIt0TKfuJ3ZGBFxf6wvNosY";
+
+async function payDummyPasswordCost(password: string): Promise<void> {
+  const parts = DUMMY_PASSWORD_HASH.split("$");
+  await derivePasswordKey(password, base64UrlToBytes(parts[2]), Number(parts[1]));
+}
 
 /**
  * Pay the full PBKDF2 derivation cost against the dummy hash and return
@@ -174,10 +193,9 @@ const DUMMY_PASSWORD_HASH =
  */
 export async function verifyPasswordDummy(password: string): Promise<boolean> {
   try {
-    const parts = DUMMY_PASSWORD_HASH.split("$");
     // Derive at the DUMMY hash's own (fixed) iteration count, exactly like a
     // real verify would — the comparison result is discarded on purpose.
-    await derivePasswordKey(password, base64UrlToBytes(parts[2]), Number(parts[1]));
+    await payDummyPasswordCost(password);
   } catch {
     // Derivation never fails for a string password; swallow so the fast path
     // stays uniform (a throwing caller would reintroduce a timing signal).
@@ -950,8 +968,7 @@ export async function markContributorEmailVerified(
 
 /**
  * Rotate a contributor's password hash (password reset confirm, Fase B).
- * The PBKDF2 hash embeds its own iteration count, so a newer constant never
- * locks the account out on the next login (ADR 0013).
+ * The new hash uses the current Cloudflare-compatible iteration count.
  */
 export async function resetContributorPassword(
   contributorId: number,

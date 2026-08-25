@@ -113,10 +113,11 @@ test("environment overrides tune the per-route limits", () => {
     rateLimit.limitsFor("tiles", { TILES_RATE_LIMIT_MAX: "120", TILES_RATE_LIMIT_WINDOW_SECONDS: "30" }),
     { maxRequests: 120, windowSeconds: 30 },
   );
-  // Invalid or missing overrides fall back to the defaults.
+  // Invalid or missing overrides fall back to the defaults (read is 300/min
+  // since the 160k-record dataset — pan/zoom heavy directory browsing).
   assert.deepEqual(
     rateLimit.limitsFor("read", { READ_RATE_LIMIT_MAX: "-3", READ_RATE_LIMIT_WINDOW_SECONDS: "0" }),
-    { maxRequests: 60, windowSeconds: 60 },
+    { maxRequests: 300, windowSeconds: 60 },
   );
   assert.equal(rateLimit.submissionLimits({ POST_RATE_LIMIT_MAX: "4" }).maxRequests, 4);
   assert.equal(rateLimit.submissionsDisabled({ POST_SUBMISSIONS_DISABLED: "true" }), true);

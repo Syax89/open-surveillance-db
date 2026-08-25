@@ -105,7 +105,9 @@ async function panTo(bounds) {
   __setBounds(bounds);
   const map = (await maps())[0];
   map.handlers["moveend zoomend"]?.[0]?.();
-  await new Promise((resolve) => setTimeout(resolve, 260)); // BOUNDS_DEBOUNCE_MS=200 + margin
+  // BOUNDS_DEBOUNCE_MS is 500 (map-viewport.ts) — wait past it + margin,
+  // otherwise the assertions race the debounced bounds→rebuild update.
+  await new Promise((resolve) => setTimeout(resolve, 600));
 }
 
 // ---------------------------------------------------------------------------
@@ -157,6 +159,29 @@ test("keyboard Enter on a focused marker opens its popup (no picker)", async () 
   assert.equal(m1.popupOpened, true, "Enter on a focused marker must open its popup");
   assert.equal(evt.__stopped, true, "the keydown must stop propagation to the map");
   assert.ok(!(await maps())[0].popupHtml, "no generic picker from the keyboard");
+});
+
+// 2026-08-12 production bug ("ogni tanto il balloon si apre senza i tasti
+// della community"): the popupopen handler returned early when the record
+// was momentarily absent from camerasRef (rebuild/filter transition), so
+// the balloon opened with an empty mount node and the widget never
+// mounted — it only appeared after a close/reopen. The widget must mount
+// whenever the popup has a community mount node, seeding zero counts when
+// the payload does not have the record yet.
+test("popup widget mounts even when the record is momentarily absent from cameras (no empty balloon)", async () => {
+  await renderMap(CAMERAS);
+  const map = (await maps())[0];
+  const div = document.createElement("div");
+  div.innerHTML = '<div class="osm-popup-community" data-record-id="999"></div>';
+  map.handlers.popupopen?.[0]?.({ popup: { getElement: () => div } });
+  // The widget render is deferred to a microtask (t_0b9f5a3c): wait for it.
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  const mountNode = div.querySelector(".osm-popup-community");
+  assert.ok(mountNode, "the popup mount node exists");
+  assert.ok(
+    mountNode.querySelector("button"),
+    "the community widget buttons are mounted even when the record is not in the payload (seed zero)",
+  );
 });
 
 // P1 (review 2026-08-07): the user CLOSING a popup then panning must stay
@@ -237,11 +262,20 @@ test("grid-badge click zooms in toward the cell with ZERO popups", async () => {
     id: i + 1, title: `Fixture camera ${i}`, kind: "bullet", status: "active",
     latitude: 30 + (i % 40), longitude: -10 + (i % 50), source: "Community report",
   }));
+  // The 260 fixtures span lat 30-69 / lng -10..39: the default stub viewport
+  // is Rome-sized now (mirrors the real initial view), so widen it for the
+  // continental grid aggregation.
+  __setBounds(wholeWorld);
   await renderMap(many);
+  const map = (await maps())[0];
+  // GRID_MAX_ZOOM is 12: at the stub default z13 every marker is individual.
+  // Zoom OUT to a grid zoom and let the debounced rebuild aggregate.
+  map.zoom = 11;
+  map.handlers["moveend zoomend"]?.[0]?.();
+  await new Promise((resolve) => setTimeout(resolve, 600)); // BOUNDS_DEBOUNCE_MS=500 + margin
   const list = await markers();
   const badges = list.filter((m) => m.opts?.icon?.html?.includes("osm-grid-badge"));
-  assert.ok(badges.length > 0, "260 visible records at zoom 13 must aggregate into grid badges");
-  const map = (await maps())[0];
+  assert.ok(badges.length > 0, "260 visible records at a grid zoom must aggregate into grid badges");
   const zoomBefore = map.zoom;
   // P0-1 (review 2026-08-07): the badge click must stop propagation like
   // the individual marker — otherwise the map click handler opens the

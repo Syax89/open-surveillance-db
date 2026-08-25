@@ -195,8 +195,8 @@ test("wrangler.jsonc declares the daily cron trigger and NO PHOTOS bucket bindin
 
   assert.match(
     wrangler,
-    /"crons":\s*\["0 3 \* \* \*"\]/,
-    "the retention sweep must run daily at 03:00 UTC",
+    /"crons":\s*\["0 3 \* \* \*",\s*"\*\/1 \* \* \* \*"\]/,
+    "the retention sweep must run daily at 03:00 UTC and the every-minute keep-warm cron must be declared",
   );
   assert.doesNotMatch(
     wrangler,
@@ -207,6 +207,11 @@ test("wrangler.jsonc declares the daily cron trigger and NO PHOTOS bucket bindin
     wrangler,
     /"binding":\s*"PHOTOS"/,
     "the PHOTOS binding must not exist without the photo feature",
+  );
+  assert.match(
+    wrangler,
+    /"analytics_engine_datasets":\s*\[\s*\{\s*"binding":\s*"ANALYTICS",\s*"dataset":\s*"osdb_requests"/,
+    "the ANALYTICS binding must be declared under analytics_engine_datasets — the wrangler schema key. The old 'analytics' key was silently ignored by wrangler: the deployed worker had the keep-warm cron but NO analytics binding and the dataset stayed empty",
   );
 });
 

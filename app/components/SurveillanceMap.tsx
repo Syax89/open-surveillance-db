@@ -433,6 +433,14 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
         // with the TILE_PROVIDER_URL environment variable, no rebuild needed.
         L.tileLayer("/api/tiles/{z}/{x}/{y}.png", {
           maxZoom: 19,
+          // The default desktop GridLayer eagerly updates during pan/zoom and
+          // keeps two extra tile rings (roughly 80 tiles on a 1400×900 view).
+          // This is a same-origin, rate-limited proxy: wait for the gesture
+          // to settle, skip intermediate smooth-zoom levels, and retain one
+          // ring for a smooth pan without the request burst.
+          updateWhenIdle: true,
+          updateWhenZooming: false,
+          keepBuffer: 1,
           attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a> &middot; <a href="https://www.openstreetmap.org/fixthemap">Fix the map</a>',
         }).addTo(map);
         markersRef.current = L.layerGroup().addTo(map);
@@ -485,15 +493,20 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
           if (!Number.isInteger(id) || id <= 0) return;
           activePopupIdRef.current = id;
           const camera = camerasRef.current.find((item) => item.id === id);
-          if (!camera) return;
           try {
-            mountPopupActions(node as HTMLElement, id, {
-              like: camera.usefulCount,
-              confirm: camera.confirmCount,
-              gone: camera.goneCount,
-              problem: camera.problemCount,
-              privacy: camera.privacyCount,
-            });
+            mountPopupActions(
+              node as HTMLElement,
+              id,
+              camera
+                ? {
+                    like: camera.usefulCount,
+                    confirm: camera.confirmCount,
+                    gone: camera.goneCount,
+                    problem: camera.problemCount,
+                    privacy: camera.privacyCount,
+                  }
+                : undefined,
+            );
           } catch (error) {
             console.error("popup action widget mount failed", error);
           }

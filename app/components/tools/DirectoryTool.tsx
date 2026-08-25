@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMessages } from "../../lib/use-messages";
 import { usePublicCameras } from "../../lib/use-public-cameras";
+import { usePublicCamerasPage } from "../../lib/use-public-cameras-page";
 import {
   applyCameraFilters,
   cameraKindsOf,
@@ -63,17 +64,55 @@ export function DirectoryTool() {
   const t = useMessages().directory;
   const router = useRouter();
   const { filters, qInput, setQ, setType, setFreshness, setSort, setState, setOrigin, setPage, reset } = useCameraFilters();
-  const serverFilters = useMemo(() => serverFiltersFrom(filters), [filters]);
-  // Load failure (kanban t_e11080eb): the walk can fail transiently (429 on
-  // a shared read bucket, network). The directory MUST surface this as a
-  // truthful error state with retry — never as "0 public records found"
-  // (the empty state would lie: the records exist, the map shows them).
-  const { records, loading, error, reload } = usePublicCameras({
-    filters: serverFilters,
+  const [initial, setInitial] = useState<string | undefined>();
+  const serverFilters = useMemo(() => ({ ...serverFiltersFrom(filters), initial }), [filters, initial]);
+  
+  // Cursor pagination (160k+ records): when sort=alphabetical, use the new
+  // cursor hook to load only 20 records per page instead of the full walk.
+  // With 160k+ dataset, the walk is unsustainable (80+ requests, 4+ MB, 16+ s).
+  // For other sorts (useful/recent/confirmations), keep the legacy walk.
+  const usesCursor = filters.sort === "alphabetical";
+  
+  // Legacy walk (map, other sorts, no filters)
+  const legacyWalk = usePublicCameras({
+    enabled: !usesCursor,
+    filters: usesCursor ? undefined : serverFilters,
   });
+  
+  // Cursor pagination (alphabetical + filters)
+  const cursorPage = usePublicCamerasPage({
+    page: filters.page,
+    limit: 20,
+    filters: usesCursor ? serverFilters : undefined,
+  });
+  
+  const { records, loading, error, reload } = usesCursor ? cursorPage : legacyWalk;
 
-  const filteredRecords = useMemo(() => applyCameraFilters(records, filters), [records, filters]);
-  const cameraKinds = useMemo(() => cameraKindsOf(records), [records]);
+  // Client-side filters (legacy walk only): when using cursor pagination,
+  // ALL filters are server-side (q, type, freshness, state, origin) so
+  // applyCameraFilters would be redundant. For legacy walk, apply client filters.
+  const filteredRecords = useMemo(() => 
+    usesCursor ? records : applyCameraFilters(records, filters), 
+    [records, filters, usesCursor]
+  );
+  // Kind options: facets (full-dataset kinds, one cached request) while
+  // loading, falling back to the kinds seen in the loaded records. In
+  // cursor mode the records are only the current page, so WITHOUT facets
+  // the kind select would offer just the kinds of 20 alphabetical rows
+  // (same pattern as MappaTool).
+  const [facetsKinds, setFacetsKinds] = useState<string[] | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/cameras?facets=kinds&limit=1")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (cancelled || !data || !Array.isArray(data.facets?.kinds)) return;
+        setFacetsKinds(data.facets.kinds.map((item: { kind: string }) => item.kind).sort((a: string, b: string) => a.localeCompare(b)));
+      })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, []);
+  const cameraKinds = facetsKinds ?? cameraKindsOf(records);
   const mapHref = useMemo(() => exploreMapHref(filters), [filters]);
   const directoryHref = useMemo(() => exploreDirectoryHref(filters), [filters]);
 
@@ -152,6 +191,12 @@ export function DirectoryTool() {
           setOriginFilter={setOrigin}
           page={filters.page}
           setPage={setPage}
+          totalRecords={usesCursor ? (cursorPage.total ?? undefined) : undefined}
+          serverPaginated={usesCursor}
+          onInitialSeek={(letter) => {
+            setInitial(letter);
+            setPage(1);
+          }}
           showRecordOnMap={showRecordOnMap}
           setCoordinates={() => {}}
           onResetFilters={reset}

@@ -20,6 +20,7 @@ import test from "node:test";
 import {
   React,
   installFetchMock,
+  installCamerasApiMock,
   jsonResponse,
   loadDomModule,
   renderWithLocale,
@@ -46,7 +47,7 @@ const SIX_RECORDS = [
 ];
 
 function installRecords(records) {
-  installFetchMock(() => jsonResponse({ records, total: records.length, nextOffset: null }));
+  installCamerasApiMock(records);
 }
 
 /** 500 on every request: the walk fails and the tool surfaces the truthful

@@ -37,6 +37,11 @@ export default {
     if (url.pathname.startsWith("/definitely-unknown")) {
       return new Response("Not Found", { status: 404, headers: { "content-type": "text/plain" } });
     }
+    if (url.pathname === "/") {
+      // The homepage (and every page in production) is an HTML document:
+      // the RFC 8288 Link-header tests need a realistic content-type.
+      return new Response("<html><head><title>osdb</title></head><body>ok</body></html>", { status: 200, headers: { "content-type": "text/html; charset=utf-8" } });
+    }
     return new Response("handler-ok", { status: 200, headers: { "content-type": "text/plain" } });
   },
 };
@@ -158,6 +163,19 @@ function testEnv(overrides = {}) {
   };
 }
 
+/** Capture-buffer mock of the Analytics Engine binding (dataset osdb_requests). */
+function analyticsMock() {
+  const calls = [];
+  return {
+    calls,
+    binding: {
+      writeDataPoint(event) {
+        calls.push(event);
+      },
+    },
+  };
+}
+
 const basic = (user, pass) => `Basic ${Buffer.from(`${user}:${pass}`).toString("base64")}`;
 const bearer = (token) => `Bearer ${token}`;
 
@@ -197,6 +215,472 @@ test("forwards unknown-route 404 responses from the handler unchanged", async ()
   assert.equal(response.status, 404);
   assert.equal(await response.text(), "Not Found");
   assert.equal(app.__calls.length, 1);
+});
+
+test("canonical host redirects HTTP and www requests before the app handler", async () => {
+  const { worker, app } = await loadWorker();
+  const cases = [
+    ["http://opensurveillancedb.org/directory?page=2", "https://opensurveillancedb.org/directory?page=2"],
+    ["https://www.opensurveillancedb.org/faq", "https://opensurveillancedb.org/faq"],
+  ];
+  for (const [from, to] of cases) {
+    const response = await worker.fetch(new Request(from), testEnv(), ctx());
+    assert.equal(response.status, 308);
+    assert.equal(response.headers.get("location"), to);
+  }
+  assert.equal(app.__calls.length, 0, "redirected aliases must not reach the app handler");
+});
+
+test("analytics: one datapoint per API request with class, normalized endpoint, method and exact status", async () => {
+  const { worker } = await loadWorker();
+  const analytics = analyticsMock();
+  const response = await worker.fetch(
+    request("/api/cameras?format=geojson"),
+    testEnv({ ANALYTICS: analytics.binding }),
+    ctx(),
+  );
+
+  assert.equal(response.status, 200);
+  assert.equal(analytics.calls.length, 1);
+  assert.deepEqual(analytics.calls[0].blobs, ["api", "2xx", "/api/cameras", "GET", "200"]);
+  assert.deepEqual(analytics.calls[0].doubles, [1]);
+});
+
+test("analytics: valid tile coordinates collapse to one low-cardinality endpoint", async () => {
+  const { worker } = await loadWorker();
+  const analytics = analyticsMock();
+  const response = await worker.fetch(
+    request("/api/tiles/8/129/84.png"),
+    testEnv({ ANALYTICS: analytics.binding }),
+    ctx(),
+  );
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(analytics.calls[0].blobs, ["api", "2xx", "/api/tiles/[z]/[x]/[y]", "GET", "200"]);
+});
+
+test("analytics: website traffic is logged as web without per-page breakdown", async () => {
+  const { worker } = await loadWorker();
+  const analytics = analyticsMock();
+  const response = await worker.fetch(
+    request("/directory?page=2"),
+    testEnv({ ANALYTICS: analytics.binding }),
+    ctx(),
+  );
+
+  assert.equal(response.status, 200);
+  assert.equal(analytics.calls.length, 1);
+  assert.deepEqual(analytics.calls[0].blobs.slice(0, 3), ["web", "2xx", "web"]);
+});
+
+test("analytics: 4xx (handler 404 and scanner 403) and 3xx (redirect) status classes are recorded", async () => {
+  const { worker } = await loadWorker();
+  const analytics = analyticsMock();
+  const env = testEnv({ ANALYTICS: analytics.binding });
+
+  await worker.fetch(request("/definitely-unknown/xyz"), env, ctx());
+  await worker.fetch(request("/service_account.json"), env, ctx());
+  await worker.fetch(new Request("http://www.opensurveillancedb.org/faq"), env, ctx());
+
+  assert.deepEqual(
+    analytics.calls.map((point) => point.blobs[1]),
+    ["4xx", "4xx", "3xx"],
+  );
+  assert.deepEqual(
+    analytics.calls.map((point) => point.blobs[4]),
+    ["404", "403", "308"],
+    "exact status distinguishes route blocks from ordinary client errors",
+  );
+});
+
+test("analytics: absent binding is a no-op and never breaks the request path", async () => {
+  const { worker, app } = await loadWorker();
+  const response = await worker.fetch(request("/api/cameras?limit=1"), testEnv(), ctx());
+
+  assert.equal(response.status, 200);
+  assert.equal(app.__calls.length, 1);
+});
+
+test("canonical HTTPS reaches the app while pre-production responses stay noindex", async () => {
+  const { worker, app } = await loadWorker();
+  const production = await worker.fetch(new Request("https://opensurveillancedb.org/faq"), testEnv(), ctx());
+  assert.equal(production.status, 200);
+  assert.equal(production.headers.get("x-robots-tag"), null);
+
+  const staging = await worker.fetch(new Request("https://osdb.syaxhome89.com/faq"), testEnv(), ctx());
+  assert.equal(staging.status, 200);
+  assert.equal(staging.headers.get("x-robots-tag"), "noindex, nofollow");
+  assert.equal(app.__calls.length, 2);
+});
+
+// ---------------------------------------------------------------------------
+// Anti-scanner path catch-all (2026-08-12, CEO decision)
+// ---------------------------------------------------------------------------
+
+test("anti-scanner: blocks sensitive-config probes with 403 before the app handler", async () => {
+  const { worker, app } = await loadWorker();
+  const ctxObj = ctx();
+  const probes = [
+    "/.env",
+    "/web/.env",
+    "/.env.production",
+    "/service_account.json",
+    "/appsettings.json",
+    "/firebase.json",
+    "/aws-config.js",
+    "/configuration.php.bak",
+    "/frontend_latest/91025.f69e356a1915f487.js",
+    "/telescope/requests",
+    "/server-info",
+    "/.hermes/config.yaml",
+    "/node_modules/vinext/dist/server/app-browser-state.js",
+    "/node_modules/.vite/deps/headers-DoKR6aCl.js",
+    "/classwithtostring.php",
+    "/8.php",
+    "/33.php",
+    "/gm.php",
+    "/ms-edit.php",
+    "/phpmyadmin/",
+    "/adminer.php",
+    "/wp-admin/install.php",
+    "/backup.sql",
+    "/data.log",
+    "/application.properties",
+    "/sa.json",
+    "/.git/config",
+    "/.svn/entries",
+  ];
+  for (const path of probes) {
+    const response = await worker.fetch(request(path), testEnv(), ctxObj);
+    assert.equal(response.status, 403, `${path} must be blocked with 403`);
+    assert.equal(response.headers.get("cache-control"), "no-store", `${path} must be no-store`);
+    assert.equal(app.__calls.length, 0, `${path} must not reach the app handler`);
+  }
+});
+
+test("anti-scanner: legitimate site paths are never blocked", async () => {
+  const { worker, app } = await loadWorker();
+  const ctxObj = ctx();
+  const legit = [
+    "/",
+    "/mappa",
+    "/segnala",
+    "/correggi",
+    "/openapi.json",
+    "/api/cameras?limit=1",
+    "/api/cameras/1",
+    "/api/tiles/15/17520/12176.png",
+    "/api/tiles/3/5/2.png",
+    "/api/auth/me",
+    "/api/geocode?q=padova",
+    "/api/corrections",
+    "/assets/index-DzX5SSCE.css",
+    "/records/6745",
+  ];
+  for (const path of legit) {
+    const response = await worker.fetch(request(path), testEnv(), ctxObj);
+    assert.notEqual(response.status, 403, `${path} must not be blocked`);
+  }
+  assert.equal(app.__calls.length, legit.length, "every legit path must reach the app handler");
+  // Moderation paths are gated (503 fail-closed without credentials), never
+  // anti-scanner blocked — covered by the moderation gate tests below.
+  for (const path of ["/moderation", "/api/moderation/corrections/1"]) {
+    const response = await worker.fetch(request(path), testEnv(), ctxObj);
+    assert.equal(response.status, 503, `${path} must hit the moderation gate, not the scanner 403`);
+  }
+});
+
+test("rfc-9727: /.well-known/api-catalog is served as linkset+json before the app handler", async () => {
+  const { worker, app } = await loadWorker();
+  const ctxObj = ctx();
+  const response = await worker.fetch(
+    new Request("https://opensurveillancedb.org/.well-known/api-catalog"),
+    testEnv(),
+    ctxObj,
+  );
+
+  assert.equal(response.status, 200);
+  assert.match(
+    response.headers.get("content-type") ?? "",
+    /^application\/linkset\+json/,
+    "content-type must be application/linkset+json",
+  );
+  assert.equal(app.__calls.length, 0, "the catalog must not reach the app handler");
+
+  const catalog = JSON.parse(await response.text());
+  assert.ok(Array.isArray(catalog.linkset), "linkset must be an array");
+  assert.equal(catalog.linkset.length, 1);
+  const entry = catalog.linkset[0];
+  assert.equal(entry.anchor, "https://opensurveillancedb.org/api/");
+  assert.equal(entry["service-desc"][0].href, "https://opensurveillancedb.org/openapi.json");
+  assert.equal(entry["service-desc"][0].type, "application/openapi+json");
+  assert.equal(entry["service-doc"][0].href, "https://opensurveillancedb.org/api-docs");
+  assert.equal(entry.status[0].href, "https://opensurveillancedb.org/api/health");
+});
+
+test("rfc-9727: trailing-slash variant of the catalog path still answers", async () => {
+  const { worker, app } = await loadWorker();
+  const response = await worker.fetch(
+    new Request("https://opensurveillancedb.org/.well-known/api-catalog/"),
+    testEnv(),
+    ctx(),
+  );
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type") ?? "", /^application\/linkset\+json/);
+  assert.equal(app.__calls.length, 0);
+});
+
+test("rfc-9727: catalog links are origin-derived so pre-production gets working URLs", async () => {
+  const { worker } = await loadWorker();
+  const response = await worker.fetch(
+    new Request("https://osdb.syaxhome89.com/.well-known/api-catalog"),
+    testEnv(),
+    ctx(),
+  );
+  assert.equal(response.status, 200);
+  const catalog = JSON.parse(await response.text());
+  const entry = catalog.linkset[0];
+  assert.ok(
+    entry["service-desc"][0].href.startsWith("https://osdb.syaxhome89.com/"),
+    "pre-production catalog must link to its own origin",
+  );
+});
+
+test("health: /api/health answers ok without the app handler or D1", async () => {
+  const { worker, app } = await loadWorker();
+  const response = await worker.fetch(request("/api/health"), testEnv(), ctx());
+
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type") ?? "", /^application\/json/);
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.deepEqual(JSON.parse(await response.text()), { status: "ok", service: "opensurveillancedb" });
+  assert.equal(app.__calls.length, 0, "health must not reach the app handler");
+});
+
+test("auth.md: served as self-contained Markdown before the app handler", async () => {
+  const { worker, app } = await loadWorker();
+  const response = await worker.fetch(
+    new Request("https://opensurveillancedb.org/auth.md"),
+    testEnv(),
+    ctx(),
+  );
+
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type") ?? "", /^text\/markdown/);
+  assert.equal(app.__calls.length, 0, "auth.md must not reach the app handler");
+
+  const body = await response.text();
+  // The Auth.md spec: H1 heading that contains "auth.md".
+  assert.match(body, /^# auth\.md[ —-]/m, "H1 must contain auth.md");
+  // Protocol registration markers (the scanner detects these): agent
+  // address, register-a-credential phrasing, real HTTP registration
+  // endpoints in fenced http blocks, and a credential-use example.
+  assert.match(body, /You are an agent\./, "agent address marker");
+  assert.match(body, /register a credential/, "register-a-credential marker");
+  assert.match(body, /POST \/api\/auth\/register HTTP\/1\.1/, "registration endpoint block");
+  assert.match(body, /POST \/api\/auth\/keys HTTP\/1\.1/, "credential provisioning endpoint block");
+  assert.match(body, /Authorization: Bearer <api key from Step 3>/, "credential use");
+  assert.match(body, /## No OAuth authorization server/, "honest no-OAuth statement");
+});
+
+test("auth.md: trailing-slash variant still answers and carries no Link header", async () => {
+  const { worker } = await loadWorker();
+  const response = await worker.fetch(
+    new Request("https://opensurveillancedb.org/auth.md/"),
+    testEnv(),
+    ctx(),
+  );
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("link"), null, "Markdown documents must not carry HTML Link headers");
+});
+
+test("rfc-9728: oauth-protected-resource metadata is served with real OSDB facts", async () => {
+  const { worker, app } = await loadWorker();
+  const response = await worker.fetch(
+    new Request("https://opensurveillancedb.org/.well-known/oauth-protected-resource"),
+    testEnv(),
+    ctx(),
+  );
+
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type") ?? "", /^application\/json/);
+  assert.equal(app.__calls.length, 0, "PRM must not reach the app handler");
+
+  const prm = JSON.parse(await response.text());
+  assert.equal(prm.resource, "https://opensurveillancedb.org", "resource must match the site origin");
+  assert.ok(prm.resource_name, "resource_name");
+  assert.deepEqual(prm.authorization_servers, ["https://opensurveillancedb.org"], "authorization_servers");
+  assert.ok(Array.isArray(prm.scopes_supported) && prm.scopes_supported.length > 0, "scopes_supported must be non-empty");
+  assert.ok(prm.scopes_supported.includes("submit") && prm.scopes_supported.includes("action"), "real scopes");
+  assert.deepEqual(prm.bearer_methods_supported, ["header"], "bearer method header");
+});
+
+test("auth-md: oauth-authorization-server metadata carries an honest agent_auth block", async () => {
+  const { worker, app } = await loadWorker();
+  const response = await worker.fetch(
+    new Request("https://opensurveillancedb.org/.well-known/oauth-authorization-server"),
+    testEnv(),
+    ctx(),
+  );
+
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type") ?? "", /^application\/json/);
+  assert.equal(app.__calls.length, 0, "AS metadata must not reach the app handler");
+
+  const as = JSON.parse(await response.text());
+  assert.equal(as.issuer, "https://opensurveillancedb.org", "issuer must match the PRM authorization server");
+  assert.ok(as.agent_auth, "agent_auth block");
+  assert.equal(as.agent_auth.skill, "https://opensurveillancedb.org/auth.md", "skill");
+  assert.ok(as.agent_auth.register_uri, "register_uri");
+  assert.ok(as.agent_auth.identity_types_supported.length > 0, "at least one identity type");
+  assert.ok(as.agent_auth.credential_types_supported.length > 0, "credential types");
+  assert.ok(as.agent_auth.identity_assertion.assertion_types_supported.includes("verified_email"), "verified-email flow");
+  assert.equal(as.token_endpoint, undefined, "no fake OAuth token endpoint");
+});
+
+test("markdown-negotiation: homepage answers text/markdown when asked", async () => {
+  const { worker, app } = await loadWorker();
+  const response = await worker.fetch(
+    new Request("https://opensurveillancedb.org/", {
+      headers: { Accept: "text/markdown, text/plain, */*" },
+    }),
+    testEnv(),
+    ctx(),
+  );
+
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type") ?? "", /^text\/markdown/);
+  assert.match(response.headers.get("vary") ?? "", /accept/i, "Vary: Accept required for content negotiation");
+  assert.equal(app.__calls.length, 0, "markdown must not reach the app handler");
+  const body = await response.text();
+  assert.match(body, /^# OpenSurveillanceDB/m, "H1");
+  assert.match(body, /Public data about public surveillance\./, "real tagline");
+});
+
+test("markdown-negotiation: browsers still get HTML, APIs never negotiate", async () => {
+  const { worker, app } = await loadWorker();
+  // Browser Accept header: no text/markdown -> app HTML path.
+  const html = await worker.fetch(
+    new Request("https://opensurveillancedb.org/", {
+      headers: { Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" },
+    }),
+    testEnv(),
+    ctx(),
+  );
+  assert.notEqual((html.headers.get("content-type") ?? "").split(";")[0], "text/markdown");
+  assert.ok(app.__calls.length > 0, "browser request must reach the app handler");
+  // API route with Accept: text/markdown -> still JSON, never negotiated.
+  app.__calls.length = 0;
+  const api = await worker.fetch(
+    new Request("https://opensurveillancedb.org/api/health", {
+      headers: { Accept: "text/markdown" },
+    }),
+    testEnv(),
+    ctx(),
+  );
+  assert.equal(api.status, 200);
+  assert.match(api.headers.get("content-type") ?? "", /^application\/json/);
+  assert.equal(app.__calls.length, 0, "health stays in the dispatch");
+});
+
+test("markdown-negotiation: other public pages and trailing slashes work", async () => {
+  const { worker, app } = await loadWorker();
+  for (const p of ["/api-docs", "/guide/", "/privacy?lang=it", "/faq", "/contatti", "/manifesto"]) {
+    const response = await worker.fetch(
+      new Request(`https://opensurveillancedb.org${p}`, { headers: { Accept: "text/markdown" } }),
+      testEnv(),
+      ctx(),
+    );
+    assert.equal(response.status, 200, `${p} -> 200`);
+    assert.match(response.headers.get("content-type") ?? "", /^text\/markdown/, `${p} content-type`);
+  }
+  assert.equal(app.__calls.length, 0, "no app handler for negotiated pages");
+  // Unknown path with Accept: text/markdown must NOT be negotiated -> app 404 path.
+  const unknown = await worker.fetch(
+    new Request("https://opensurveillancedb.org/definitely-not-a-page", { headers: { Accept: "text/markdown" } }),
+    testEnv(),
+    ctx(),
+  );
+  assert.notEqual((unknown.headers.get("content-type") ?? "").split(";")[0], "text/markdown");
+});
+
+test("dns-aid: agent index document lists only real services", async () => {
+  const { worker, app } = await loadWorker();
+  const response = await worker.fetch(
+    new Request("https://opensurveillancedb.org/.well-known/agent-index.json"),
+    testEnv(),
+    ctx(),
+  );
+
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type") ?? "", /^application\/json/);
+  assert.equal(app.__calls.length, 0, "agent index must not reach the app handler");
+  const index = await response.json();
+  assert.equal(index.index, "https://opensurveillancedb.org/.well-known/agent-index.json");
+  assert.equal(index.organization, "OpenSurveillanceDB");
+  assert.ok(Array.isArray(index.agent_services) && index.agent_services.length >= 3, "at least the 3 real services");
+  const urls = [
+    index.agent_services[0].api_catalog,
+    index.agent_services[0].openapi,
+    index.agent_services[1].auth_md,
+    index.agent_services[1].oauth_authorization_server,
+    index.agent_services[1].oauth_protected_resource,
+  ];
+  for (const u of urls) {
+    assert.match(u, /^https:\/\/opensurveillancedb\.org\//, `${u} absolute and on-origin`);
+  }
+  assert.ok(index.agent_services[2].pages.length >= 7, "markdown pages listed");
+  // Honesty: the auth service states there is no OAuth token flow.
+  assert.match(index.agent_services[1].description, /No OAuth token flow exists/);
+});
+
+test("rfc-8288: HTML documents carry discovery Link headers on the homepage", async () => {
+  const { worker } = await loadWorker();
+  const response = await worker.fetch(new Request("https://opensurveillancedb.org/"), testEnv(), ctx());
+
+  assert.equal(response.status, 200);
+  const link = response.headers.get("link");
+  assert.ok(link, "homepage must carry a Link header");
+  assert.match(link ?? "", /<\/\.well-known\/api-catalog>;\s*rel="api-catalog"/, "api-catalog relation");
+  assert.match(link ?? "", /<\/openapi\.json>;\s*rel="service-desc"/, "service-desc relation");
+  assert.match(link ?? "", /<\/api-docs>;\s*rel="service-doc"/, "service-doc relation");
+});
+
+test("rfc-8288: Link headers are NOT added to API/JSON, errors or redirects", async () => {
+  const { worker } = await loadWorker();
+
+  // API route (mock answers text/plain, not an HTML document).
+  const api = await worker.fetch(request("/api/cameras?limit=1"), testEnv(), ctx());
+  assert.equal(api.status, 200);
+  assert.equal(api.headers.get("link"), null, "API responses must not carry Link headers");
+
+  // Scanner 403.
+  const blocked = await worker.fetch(request("/.env"), testEnv(), ctx());
+  assert.equal(blocked.status, 403);
+  assert.equal(blocked.headers.get("link"), null, "403 responses must not carry Link headers");
+
+  // www redirect (3xx).
+  const redirect = await worker.fetch(new Request("http://www.opensurveillancedb.org/"), testEnv(), ctx());
+  assert.equal(redirect.status, 308);
+  assert.equal(redirect.headers.get("link"), null, "redirects must not carry Link headers");
+});
+
+test("rfc-8288: an app-set Link header survives (never overwritten)", async () => {
+  const { worker, app } = await loadWorker();
+  const handler = app.default;
+  const originalFetch = handler.fetch;
+  handler.fetch = async () =>
+    new Response("<html>custom</html>", {
+      status: 200,
+      headers: { "content-type": "text/html", link: `</custom.json>; rel="describedby"` },
+    });
+  try {
+    const response = await worker.fetch(request("/mappa"), testEnv(), ctx());
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("link"), `</custom.json>; rel="describedby"`);
+  } finally {
+    handler.fetch = originalFetch;
+  }
 });
 
 test("preserves security headers set by the app handler (pass-through, never stripped)", async () => {
@@ -633,6 +1117,22 @@ test("scheduled() keeps working when the OIDC expiry sweep throws (sweeps are is
   await Promise.allSettled(waitUntilCalls);
   assert.equal(retention.__calls.length, 1, "retention sweep must run even if the OIDC sweep fails");
   assert.equal(oidc.__calls.length, 1, "the OIDC sweep is wired and was attempted");
+});
+
+test("scheduled() keep-warm tick is a no-op: no sweep runs on the every-minute cron", async () => {
+  const { worker, retention, oidc } = await loadWorker();
+  const waitUntilCalls = [];
+  const ctxObj = {
+    waitUntil(promise) {
+      waitUntilCalls.push(promise);
+    },
+    passThroughOnException() {},
+  };
+  await worker.scheduled({ cron: "*/1 * * * *" }, testEnv(), ctxObj);
+
+  assert.equal(waitUntilCalls.length, 0, "the keep-warm tick must not schedule any work");
+  assert.equal(retention.__calls.length, 0, "retention sweep must NOT run on the keep-warm tick");
+  assert.equal(oidc.__calls.length, 0, "OIDC expiry sweep must NOT run on the keep-warm tick");
 });
 
 // Small helper: a no-op ExecutionContext shaped like the Worker API.

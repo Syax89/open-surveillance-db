@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 import { env } from "cloudflare:workers";
 import { publicCameraPredicate } from "../db/cameras";
+import { publicUrl } from "./lib/site-url";
 
 /**
  * /sitemap.xml — discovery channel for the public record pages (F7 qa#5,
@@ -20,14 +21,13 @@ import { publicCameraPredicate } from "../db/cameras";
  */
 export const dynamic = "force-dynamic";
 
-// Public, indexable static routes (mirror of public/robots.txt allowlist —
-// auth/moderation/account/edit routes are excluded there and here).
+// Public, indexable static routes. Submission forms, authentication,
+// moderation, account and edit surfaces are intentionally excluded even when
+// their paths are reachable to a crawler.
 const STATIC_ROUTES = [
   "",
   "/directory",
   "/mappa",
-  "/segnala",
-  "/correggi",
   "/guide",
   "/faq",
   "/contatti",
@@ -37,7 +37,6 @@ const STATIC_ROUTES = [
   "/privacy",
   "/regole",
   "/termini",
-  "/moderazione",
   "/accessibility",
   "/api-docs",
   "/contribuisci",
@@ -50,13 +49,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // status whitelist; the ADR 0008 demo gate is baked into the predicate
   // via demoRecordsPublic() (fail-closed outside ENVIRONMENT=development).
   const { results } = await env.DB.prepare(
-    `SELECT id FROM cameras WHERE ${sql} ORDER BY id DESC`,
+    `SELECT id, updated FROM cameras WHERE ${sql} ORDER BY id DESC`,
   )
     .bind(...parameters)
-    .all<{ id: number }>();
+    .all<{ id: number; updated: string }>();
 
   const entries: MetadataRoute.Sitemap = STATIC_ROUTES.map((route) => ({
-    url: route === "" ? "/" : route,
+    url: publicUrl(route === "" ? "/" : route),
     // Static pages change rarely; records get lastmod from the row.
     changeFrequency: route === "" ? "daily" : "weekly",
     priority: route === "" || route === "/directory" ? 0.9 : 0.6,
@@ -64,7 +63,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   for (const row of results) {
     entries.push({
-      url: `/records/${row.id}`,
+      url: publicUrl(`/records/${row.id}`),
+      lastModified: row.updated,
       changeFrequency: "monthly",
       priority: 0.7,
     });

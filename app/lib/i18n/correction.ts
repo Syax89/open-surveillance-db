@@ -31,6 +31,15 @@ export const en = {
   noSpecificRecord: "No specific record / general concern",
   needsReview: "What needs review?",
   selectOne: "Select one",
+  // Record-id field (CEO 2026-08-12: "un campo di ricerca per id piuttosto
+  // che un menu a discesa"): the related-record field is a plain id input
+  // instead of a native <select> with ALL records as options (the
+  // ~37k-option menu froze the browser).
+  recordIdPlaceholder: "Record id (es. 6745)",
+  recordIdHelp: "Type the public record id shown on its page; a confirmation line appears when the record exists.",
+  recordIdNotFound: (id: number) => `No public record with id ${id}.`,
+  recordIdUnavailable: "Record lookup is unavailable right now.",
+  recordIdClear: "Clear selection",
   // C4: the select maps 1:1 to the backend issue_type whitelist
   // (inaccurate|missing|removal|abuse|other) — see db/corrections.ts
   // CORRECTION_ISSUE_TYPES. Free text is never accepted for removal/abuse.
@@ -94,6 +103,11 @@ export const it: Translation<typeof en> = {
   noSpecificRecord: "Nessun record specifico / segnalazione generale",
   needsReview: "Cosa deve essere rivisto?",
   selectOne: "Seleziona un'opzione",
+  recordIdPlaceholder: "Id del record (es. 6745)",
+  recordIdHelp: "Digita l'id del record pubblico mostrato nella sua pagina; appare una conferma quando il record esiste.",
+  recordIdNotFound: (id: number) => `Nessun record pubblico con id ${id}.`,
+  recordIdUnavailable: "La ricerca del record non è disponibile al momento.",
+  recordIdClear: "Azzera la selezione",
   inaccurate: "Informazione inesatta",
   missing: "Non più presente",
   removal: "Richiesta di rimozione",

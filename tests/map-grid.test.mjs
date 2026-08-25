@@ -90,7 +90,8 @@ test("shouldUseGrid: individual markers when the visible set is small", () => {
 test("shouldUseGrid: grid aggregation only for dense, low-zoom views", () => {
   assert.equal(shouldUseGrid(MAX_INDIVIDUAL_MARKERS + 1, 5), true);
   assert.equal(shouldUseGrid(7_374, 5), true, "the real national view aggregates");
-  assert.equal(shouldUseGrid(7_374, 13), true, "still too dense at z13");
+  assert.equal(shouldUseGrid(7_374, 11), true, "still too dense at z11");
+  assert.equal(shouldUseGrid(7_374, GRID_MAX_ZOOM), false, "street-level zoom (GRID_MAX_ZOOM) renders individuals even when dense");
 });
 
 // ---------------------------------------------------------------------------
@@ -257,8 +258,8 @@ test("markersForViewport: culling respects the viewport (records outside bounds 
 // Constants (documented thresholds — keep the component/tests in lockstep)
 // ---------------------------------------------------------------------------
 
-test("grid constants: 48px cells, individual above z14 or under 250 visible", () => {
+test("grid constants: 48px cells, individual from street-level zoom (z12) or under 150 visible", () => {
   assert.equal(GRID_CELL_PX, 48, "one badge per 48px screen box");
-  assert.equal(GRID_MAX_ZOOM, 14, "street-level zoom renders individuals");
-  assert.equal(MAX_INDIVIDUAL_MARKERS, 250, "cheap views skip aggregation");
+  assert.equal(GRID_MAX_ZOOM, 12, "street-level zoom renders individuals");
+  assert.equal(MAX_INDIVIDUAL_MARKERS, 150, "cheap views skip aggregation");
 });

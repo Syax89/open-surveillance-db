@@ -209,6 +209,10 @@ export function serverFiltersFrom(filters: CameraFilters): ServerCameraFilters {
   const server: ServerCameraFilters = {};
   if (filters.type && filters.type !== "all") server.kind = filters.type;
   if (filters.freshness !== "all") server.freshness = filters.freshness;
+  if (filters.q.trim()) server.q = filters.q.trim();
+  if (filters.state !== "all") server.state = filters.state;
+  if (filters.origin !== "all") server.origin = filters.origin;
+  if (filters.sort !== "position") server.sort = filters.sort;
   return server;
 }
 

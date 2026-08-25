@@ -87,8 +87,19 @@ export async function getD1() {
 
 export const freshnessWindows = ["7d", "30d", "90d", "all"] as const;
 export type FreshnessWindow = (typeof freshnessWindows)[number];
-export type PublicCameraFilters = { kind?: string; freshness?: FreshnessWindow; sort?: "useful" | "recent" | "confirmations" };
-export const PUBLIC_CAMERA_SORT_OPTIONS = ["useful", "recent", "confirmations"] as const;
+export type PublicCameraFilters = {
+  kind?: string;
+  freshness?: FreshnessWindow;
+  q?: string;
+  /** A-Z directory seek: titles that start with this single ASCII letter. */
+  initial?: string;
+  state?: "confirmed" | "never";
+  origin?: "reports" | "imported";
+  sort?: "alphabetical" | "useful" | "recent" | "confirmations";
+  /** Cursor-based pagination for alphabetical sort: (title, id) of last record. */
+  after?: { title: string; id: number };
+};
+export const PUBLIC_CAMERA_SORT_OPTIONS = ["alphabetical", "useful", "recent", "confirmations"] as const;
 
 /**
  * Canonical stored kind value for dome cameras (kanban t_1b08fe12). A dome
@@ -209,10 +220,23 @@ export const PUBLIC_CAMERAS_PAGE_MAX_LIMIT = 2000;
 
 export type PublicCameraListPage = {
   records: PublicCameraRecord[];
-  /** Total number of records matching the filters, independent of the page. */
-  total: number;
+  /**
+   * Total number of records matching the filters, independent of the page.
+   * `null` when the caller opted out of the COUNT with `count: false` (the
+   * client walk never needs the exact total — `nextOffset` drives it, and
+   * the probe below computes it without scanning the whole table).
+   */
+  total: number | null;
   /** Offset of the next page, or null when the current page is the last one. */
   nextOffset: number | null;
+  /**
+   * True when the page is a DECIMATED SAMPLE (bbox area over
+   * BBOX_MAX_AREA_SQ_DEG): a deterministic subset (ROWID modulo) of the
+   * records inside the box, ~BBOX_DECIMATION_THRESHOLD points, with
+   * nextOffset ALWAYS null — the client shows the coverage in one request
+   * and zooms in for the full detail.
+   */
+  decimated?: boolean;
 };
 
 /**
@@ -228,7 +252,7 @@ export type PublicCameraListPage = {
  */
 export async function listPublicCamerasPage(
   nowIsoOrFilters?: string | PublicCameraFilters,
-  options: { limit: number; offset: number } = { limit: PUBLIC_CAMERAS_PAGE_DEFAULT_LIMIT, offset: 0 },
+  options: { limit: number; offset: number; count?: boolean } = { limit: PUBLIC_CAMERAS_PAGE_DEFAULT_LIMIT, offset: 0 },
 ): Promise<PublicCameraListPage> {
   const d1 = await getD1();
   // Same dual first argument as listPublicCameras: an ISO boundary string
@@ -239,6 +263,12 @@ export async function listPublicCamerasPage(
   // trusts its caller with an unbounded page size.
   const limit = Math.min(Math.max(Math.trunc(options.limit) || PUBLIC_CAMERAS_PAGE_DEFAULT_LIMIT, 1), PUBLIC_CAMERAS_PAGE_MAX_LIMIT);
   const offset = Math.max(Math.trunc(options.offset) || 0, 0);
+  // `count: false` (D1 rows-read optimization, 2026-08-12): the client walk
+  // only needs `nextOffset` to stop — the exact `total` costs a full-set
+  // COUNT scan on EVERY page. When opted out, the page SELECT fetches
+  // limit+1 rows: one extra row answers "is there a next page?" with the
+  // same cost as the page itself, and `total` is reported as null.
+  const withCount = options.count !== false;
   const parameters: string[] = [];
   const { sql: publicPredicate, parameters: predicateParameters } = publicCameraPredicate(nowIso);
   parameters.push(...predicateParameters);
@@ -255,20 +285,43 @@ export async function listPublicCamerasPage(
     // anchored on last_verified_at, so no GLOB is needed and the composite
     // index stays usable.
   }
-  const countResult = await d1.prepare(`SELECT COUNT(*) AS total ${query}`).bind(...parameters).first<{ total: number }>();
-  const total = countResult?.total ?? 0;
+  if (filters?.q) {
+    query += " AND (title LIKE ? OR address LIKE ? OR kind LIKE ? OR source LIKE ?)";
+    const needle = `%${filters.q}%`;
+    parameters.push(needle, needle, needle, needle);
+  }
+  if (filters?.initial) {
+    query += " AND title COLLATE NOCASE LIKE ?";
+    parameters.push(`${filters.initial}%`);
+  }
+  if (filters?.state === "confirmed") query += " AND last_verified_at IS NOT NULL";
+  if (filters?.state === "never") query += " AND last_verified_at IS NULL";
+  if (filters?.origin === "reports") query += " AND source = 'Community report'";
+  if (filters?.origin === "imported") query += " AND source LIKE 'import:%'";
+  
+  // Cursor-based pagination for alphabetical sort (keyset pagination).
+  if (filters?.after && filters.sort === "alphabetical") {
+    query += " AND (title COLLATE NOCASE > ? OR (title COLLATE NOCASE = ? AND id < ?))";
+    parameters.push(filters.after.title, filters.after.title, String(filters.after.id));
+  }
+  
+  let total: number | null = null;
+  if (withCount) {
+    const countResult = await d1.prepare(`SELECT COUNT(*) AS total ${query}`).bind(...parameters).first<{ total: number }>();
+    total = countResult?.total ?? 0;
 
-  // Pagination guard (kanban t_e86c91c4): an offset at/beyond the dataset
-  // total can never return records — answer an empty page WITHOUT running
-  // the SELECT, so a hostile ?offset=9007199254740991 cannot force an
-  // astronomical SQL OFFSET on the D1. The old transport cap
-  // (MAX_PAGE_OFFSET = 10000, app/lib/input-limits.ts, PR #250) rejected
-  // offsets past 10000 outright, which broke the legitimate client walk
-  // once the dataset grew past 10000 records (empty /directory); the db
-  // boundary knows the real total and stops pagination exactly where the
-  // data ends — no fixed cap for the dataset to outgrow.
-  if (offset >= total) {
-    return { records: [], total, nextOffset: null };
+    // Pagination guard (kanban t_e86c91c4): an offset at/beyond the dataset
+    // total can never return records — answer an empty page WITHOUT running
+    // the SELECT, so a hostile ?offset=9007199254740991 cannot force an
+    // astronomical SQL OFFSET on the D1. The old transport cap
+    // (MAX_PAGE_OFFSET = 10000, app/lib/input-limits.ts, PR #250) rejected
+    // offsets past 10000 outright, which broke the legitimate client walk
+    // once the dataset grew past 10000 records (empty /directory); the db
+    // boundary knows the real total and stops pagination exactly where the
+    // data ends — no fixed cap for the dataset to outgrow.
+    if (offset >= total) {
+      return { records: [], total, nextOffset: null };
+    }
   }
 
   // Sort ordering (ADR 0021 §10.1, kanban t_a9f23581 FASE 2): whitelist
@@ -282,12 +335,19 @@ export async function listPublicCamerasPage(
   } else if (filters?.sort === "confirmations") {
     // NULLS LAST: records never confirmed sort to the bottom (SQLite: IS NULL first).
     orderBy = "ORDER BY last_verified_at IS NULL, last_verified_at DESC, id DESC";
+  } else if (filters?.sort === "alphabetical") {
+    orderBy = "ORDER BY title COLLATE NOCASE ASC, id DESC";
   }
 
-  const result = await d1
+  // Probe fetch: limit+1 rows when counting is disabled (see `withCount`).
+  const fetched = await d1
     .prepare(`SELECT id, title, kind, CASE WHEN publish_manufacturer = 1 THEN manufacturer ELSE NULL END AS manufacturer, CASE WHEN publish_observed_on = 1 THEN observed_on ELSE NULL END AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, latitude, longitude, direction, status, source, updated, description, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt ${query} ${orderBy} LIMIT ? OFFSET ?`)
-    .bind(...parameters, limit, offset)
+    .bind(...parameters, withCount ? limit : limit + 1, offset)
     .all<PublicCameraRecord>();
+  const result = withCount ? fetched : { results: fetched.results.slice(0, limit) };
+  const nextOffset = withCount
+    ? (offset + result.results.length < (total ?? 0) ? offset + result.results.length : null)
+    : (fetched.results.length > limit ? offset + limit : null);
   const ids = result.results.map((record) => record.id);
   // Community-verification counts (ADR 0018 §2.3): one GROUP BY IN query for
   // the whole page — never an N+1 per record. The counts are decayed (only
@@ -309,7 +369,6 @@ export async function listPublicCamerasPage(
     problemCount: actionCounts.get(record.id)?.problem ?? 0,
     privacyCount: actionCounts.get(record.id)?.privacy ?? 0,
   }));
-  const nextOffset = offset + records.length < total ? offset + records.length : null;
   return { records, total, nextOffset };
 }
 export type NearbyPublicCameraRecord = PublicCameraRecord & { distanceMeters: number };
@@ -556,6 +615,17 @@ export type PublicCameraFacets = {
   freshness: { "7d": number; "30d": number; "90d": number; all: number };
 };
 
+/** Lightweight kind facet for the map filter bar. */
+export async function getPublicCameraKinds(nowIso: string = new Date().toISOString()): Promise<{ kind: string; count: number }[]> {
+  const d1 = await getD1();
+  const { sql: publicPredicate, parameters } = publicCameraPredicate(nowIso);
+  const result = await d1
+    .prepare(`SELECT kind, COUNT(*) AS count FROM cameras WHERE ${publicPredicate} GROUP BY kind ORDER BY count DESC, kind ASC`)
+    .bind(...parameters)
+    .all<{ kind: string; count: number }>();
+  return result.results;
+}
+
 /**
  * Facets for the directory/map filters (FRONTEND_PLAN § 3.2.2): the distinct
  * public `kind` values with their counts and the freshness-window counts.
@@ -615,6 +685,10 @@ export async function listPublicCamerasInBbox(
 /** Default and hard-max page size for the bbox JSON list (map viewport contract, kanban t_bb310428). */
 export const PUBLIC_CAMERAS_BBOX_DEFAULT_LIMIT = 1000;
 export const PUBLIC_CAMERAS_BBOX_MAX_LIMIT = 10_000;
+/** Decimation threshold: bbox with > this many records triggers sampling (perf optimization, 160k+ dataset). */
+export const BBOX_DECIMATION_THRESHOLD = 2000;
+/** Max bbox area in square degrees (perf: reject continental viewports, force zoom in). */
+export const BBOX_MAX_AREA_SQ_DEG = 50.0; // ~500km × 1100km at 45° latitude
 
 /**
  * Bounded JSON bbox contract for the interactive map (kanban t_bb310428 —
@@ -642,9 +716,16 @@ export const PUBLIC_CAMERAS_BBOX_MAX_LIMIT = 10_000;
 export async function listPublicCamerasInBboxPage(
   bbox: { west: number; south: number; east: number; north: number },
   nowIsoOrFilters?: string | PublicCameraFilters,
-  options: { limit: number; offset: number } = { limit: PUBLIC_CAMERAS_BBOX_DEFAULT_LIMIT, offset: 0 },
+  options: { limit: number; offset: number; count?: boolean } = { limit: PUBLIC_CAMERAS_BBOX_DEFAULT_LIMIT, offset: 0 },
 ): Promise<PublicCameraListPage> {
   const d1 = await getD1();
+  // Viewport size guard (perf, 160k+ dataset): a continental viewport
+  // (> BBOX_MAX_AREA_SQ_DEG) answers a DECIMATED SAMPLE instead of a
+  // rejection — the map still shows coverage in ONE request. The sample is
+  // deterministic (ROWID modulo), so repeated requests return the same
+  // points, and nextOffset stays null (the walk never starts).
+  const bboxArea = (bbox.north - bbox.south) * (bbox.east - bbox.west);
+  const forceDecimation = bboxArea > BBOX_MAX_AREA_SQ_DEG;
   // Same dual first argument as listPublicCamerasPage: an ISO boundary
   // string (freshness-reverification suite) or a filter object (route).
   const filters = typeof nowIsoOrFilters === "string" ? undefined : nowIsoOrFilters;
@@ -653,6 +734,10 @@ export async function listPublicCamerasInBboxPage(
   // page is bounded by construction, never by the caller's politeness.
   const limit = Math.min(Math.max(Math.trunc(options.limit) || PUBLIC_CAMERAS_BBOX_DEFAULT_LIMIT, 1), PUBLIC_CAMERAS_BBOX_MAX_LIMIT);
   const offset = Math.max(Math.trunc(options.offset) || 0, 0);
+  // Same count-opt-out as listPublicCamerasPage (D1 rows-read optimization,
+  // 2026-08-12): the map walks bbox subsets with nextOffset; the COUNT scan
+  // is replaced by a limit+1 probe when `count: false`.
+  const withCount = options.count !== false;
   const parameters: (string | number)[] = [];
   const { sql: publicPredicate, parameters: predicateParameters } = publicCameraPredicate(nowIso);
   parameters.push(...predicateParameters);
@@ -668,18 +753,50 @@ export async function listPublicCamerasInBboxPage(
     query += " AND last_verified_at >= ?";
     parameters.push(freshnessCutoff(filters.freshness));
   }
-  const countResult = await d1.prepare(`SELECT COUNT(*) AS total ${query}`).bind(...parameters).first<{ total: number }>();
-  const total = countResult?.total ?? 0;
-  // Same pagination guard as listPublicCamerasPage (kanban t_e86c91c4):
-  // an offset at/beyond the bbox total is an empty page answered WITHOUT
-  // the SELECT — no astronomical SQL OFFSET on the D1, no fixed cap.
-  if (offset >= total) {
-    return { records: [], total, nextOffset: null };
+  let total: number | null = null;
+  // The decimation factor needs the real total: a continental viewport
+  // pays for the COUNT even when the caller opted out (one query, bounded
+  // by the 15-minute edge cache — never a per-pan scan).
+  if (withCount || forceDecimation) {
+    const countResult = await d1.prepare(`SELECT COUNT(*) AS total ${query}`).bind(...parameters).first<{ total: number }>();
+    total = countResult?.total ?? 0;
+    // Same pagination guard as listPublicCamerasPage (kanban t_e86c91c4):
+    // an offset at/beyond the bbox total is an empty page answered WITHOUT
+    // the SELECT — no astronomical SQL OFFSET on the D1, no fixed cap.
+    // Skipped for decimated samples: the walk never starts, offset is 0.
+    if (!forceDecimation && offset >= total) {
+      return { records: [], total, nextOffset: null };
+    }
   }
-  const result = await d1
-    .prepare(`SELECT id, title, kind, CASE WHEN publish_manufacturer = 1 THEN manufacturer ELSE NULL END AS manufacturer, CASE WHEN publish_observed_on = 1 THEN observed_on ELSE NULL END AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, latitude, longitude, direction, status, source, updated, description, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt ${query} ORDER BY id DESC LIMIT ? OFFSET ?`)
-    .bind(...parameters, limit, offset)
+  
+  // Decimation (perf, 160k+ dataset): if bbox contains > threshold records,
+  // sample only every N-th row via ROWID modulo. The WHERE keeps the exact
+  // bbox boundary; decimation reduces DOM rendering cost without changing
+  // the visible coverage. Sampling factor scales with total: 2k→1, 4k→2, 8k→4.
+  // Continental viewports (forceDecimation) ALWAYS sample: the map shows
+  // ~threshold points in one request, and the walk never starts.
+  const shouldDecimate = total !== null && (forceDecimation || total > BBOX_DECIMATION_THRESHOLD);
+  const decimationFactor = shouldDecimate ? Math.max(1, Math.floor((total ?? 0) / BBOX_DECIMATION_THRESHOLD)) : 1;
+  const decimationClause = shouldDecimate ? ` AND (ROWID % ${decimationFactor} = 0)` : "";
+  
+  // Probe fetch: limit+1 rows when counting is disabled (see `withCount`).
+  // Decimated samples fetch the WHOLE sample in one pass: the probe limit
+  // (limit+1) would truncate it — the sample target is ~total/factor rows.
+  const fetchLimit = shouldDecimate
+    ? Math.max(limit, Math.ceil((total ?? 0) / decimationFactor))
+    : (withCount ? limit : limit + 1);
+  const fetched = await d1
+    .prepare(`SELECT id, title, kind, CASE WHEN publish_manufacturer = 1 THEN manufacturer ELSE NULL END AS manufacturer, CASE WHEN publish_observed_on = 1 THEN observed_on ELSE NULL END AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, latitude, longitude, direction, status, source, updated, description, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt ${query}${decimationClause} ORDER BY id DESC LIMIT ? OFFSET ?`)
+    .bind(...parameters, fetchLimit, offset)
     .all<PublicCameraRecord>();
+  const result = withCount || shouldDecimate ? fetched : { results: fetched.results.slice(0, limit) };
+  // Decimated samples never walk: nextOffset is always null — the client
+  // shows the sample in one request and zooms in for the full detail.
+  const nextOffset = shouldDecimate
+    ? null
+    : (withCount
+        ? (offset + result.results.length < (total ?? 0) ? offset + result.results.length : null)
+        : (fetched.results.length > limit ? offset + limit : null));
   const ids = result.results.map((record) => record.id);
   // Community-verification counts (ADR 0018 §2.3): one GROUP BY IN query for
   // the whole page — never an N+1 per record.
@@ -699,8 +816,7 @@ export async function listPublicCamerasInBboxPage(
     problemCount: actionCounts.get(record.id)?.problem ?? 0,
     privacyCount: actionCounts.get(record.id)?.privacy ?? 0,
   }));
-  const nextOffset = offset + records.length < total ? offset + records.length : null;
-  return { records, total, nextOffset };
+  return { records, total, nextOffset, decimated: shouldDecimate };
 }
 
 /** Default and hard-max page size for search/nearby (FRONTEND_PLAN § 3.2.3). */

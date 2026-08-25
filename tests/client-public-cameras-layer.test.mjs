@@ -138,8 +138,13 @@ test("layer: the home walk concatenates every page and exposes the server total"
   await rtl.waitFor(() => assert.equal(screen.getByTestId("loading").textContent, "false"));
   assert.equal(screen.getByTestId("count").textContent, "20");
   assert.equal(screen.getByTestId("total").textContent, "20");
-  // The walk followed nextOffset: exactly one fetch per page, ordered.
-  assert.deepEqual(calls, ["/api/cameras?limit=2000&offset=0", "/api/cameras?limit=2000&offset=10"]);
+  // The walk followed nextOffset: exactly one fetch per page, ordered. The
+  // count=false param opts the walk out of the per-page COUNT scan (D1
+  // rows-read optimization, 2026-08-12).
+  assert.deepEqual(calls, [
+    "/api/cameras?limit=2000&offset=0&count=false",
+    "/api/cameras?limit=2000&offset=10&count=false",
+  ]);
 });
 
 test("layer: a walk over a dataset larger than the old MAX_PAGE_OFFSET collects every record (total 12284, t_e86c91c4)", async () => {

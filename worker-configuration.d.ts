@@ -78,6 +78,22 @@ declare module "cloudflare:workers" {
     limit(args: { key: string }): Promise<{ success: boolean }>;
   }
 
+  /**
+   * Cloudflare Workers Analytics Engine binding (wrangler.jsonc
+   * `analytics`). `writeDataPoint` queues one event for the dataset:
+   * blobs (strings) and doubles (numbers) land in blob1..N / double1..N,
+   * flushed when the request completes. The binding is optional in code
+   * (absent in local dev / tests -> no-op).
+   */
+  export interface AnalyticsEngineDataset {
+    writeDataPoint(event: {
+      blobs?: string[];
+      doubles?: number[];
+      indexes?: string[];
+      timestamp?: number | Date;
+    }): void;
+  }
+
   export interface Env {
     ASSETS: Fetcher;
     DB: D1Database;
@@ -111,6 +127,10 @@ declare module "cloudflare:workers" {
         };
       };
     };
+    /** Request analytics binding (wrangler.jsonc `analytics`, dataset
+     * osdb_requests). Optional: absent in local dev / tests, where
+     * logging is a no-op (see worker/index.ts recordRequestAnalytics). */
+    ANALYTICS?: AnalyticsEngineDataset;
     /** Tile proxy upstream (see docs/OSM_INTEGRATION.md). Optional: defaults
      * to the canonical community server https://tile.openstreetmap.org. */
     TILE_PROVIDER_URL?: string;

@@ -143,7 +143,9 @@ async function panTo(bounds) {
   __setBounds(bounds);
   const map = (await maps())[0];
   map.handlers["moveend zoomend"]?.[0]?.();
-  await new Promise((resolve) => setTimeout(resolve, 260)); // BOUNDS_DEBOUNCE_MS=200 + margin
+  // BOUNDS_DEBOUNCE_MS is 500 (map-viewport.ts) — wait past it + margin,
+  // otherwise the assertions race the debounced bounds→rebuild update.
+  await new Promise((resolve) => setTimeout(resolve, 600));
 }
 
 // ---------------------------------------------------------------------------
