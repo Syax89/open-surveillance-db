@@ -1,0 +1,11 @@
+{
+    "slug": "serbia-subotica-semafori-2026",
+    "source_name": "Serbia — City of Subotica, cameras on vertical traffic signals (data.gov.rs)",
+    "format": "geojson",
+    "license": "Serbian Open Data License",
+    "license_url": "https://data.gov.rs/sr/terms/",
+    "attribution_text": "Fonte: Grad Subotica via data.gov.rs — video-nadzor-na-vertikalnoj-signalizatsiji (https://data.gov.rs/sr/datasets/video-nadzor-na-vertikalnoj-signalizatsiji/), concesso con licenza Serbian Open Data License (SODL).",
+    "source_url": "https://data.gov.rs/s/resources/video-nadzor-na-vertikalnoj-signalizatsiji/20220210-000146/subotica-videonadzorsemafori-tac.geojson",
+    "max_records": 20,
+    "notes": "Coda giurisdizioni pass v1 (cron 2026-08-15): 8 telecamere su semafori verticali (violazioni velocità/rosso), GeoJSON Point WGS84 (CRS84), 8/8 coordinate valide. Licenza SODL verificata sui terms data.gov.rs/sr/terms. Statico 2022. Nessun ID nel dataset → external_id subotica-semafori:<indice> (dataset statico, stabile)."
+}

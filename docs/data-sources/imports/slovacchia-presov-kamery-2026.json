@@ -1,0 +1,11 @@
+{
+    "slug": "slovacchia-presov-kamery-2026",
+    "source_name": "Slovakia — Mesto Prešov camera-system geodata (KML)",
+    "format": "kml",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "attribution_text": "Fonte: Mesto Prešov via data.gov.sk — monitorovacie zariadenia kamerového systému (KML), concesso con licenza CC BY 4.0.",
+    "source_url": "https://egov.presov.sk/GeoDataKatalog/monitor_zariadenia.kml",
+    "max_records": 60,
+    "notes": "Coda giurisdizioni pass v1 (cron 2026-08-15): 37 telecamere del sistema municipale di videosorveglianza (KML con Placemark, coordinate WGS84, C_ZAR come id; verificato 37/37 punti validi). Licenza CC BY 4.0 assegnata dal catalogo nazionale. Nota: la distribuzione SHP ha 81 record senza .prj (CRS non interpretabile) — si importa la sola KML verificata. external_id presov:<C_ZAR>."
+}

@@ -1371,3 +1371,141 @@ test("ichikawa: parses CSV (Shift-JIS 緯度/経度) into staged rows", () => {
   assert.equal(staged[0].external_id, "ichikawa-cctv:21");
   assert.equal(skipped.total, 1);
 });
+
+// -------------------------------------------------- wave 15 (coda giurisdizioni v2):
+// Cipro (DATEX II v3), Slovacchia Prešov (KML), Serbia Subotica (GeoJSON),
+// Perù La Punta (CSV) / Pasco (XLSX)
+
+import { parsePayload as cyEnfParse } from "../scripts/import/adapters/cipro-traffic-enforcement-cameras-2026.mjs";
+import { parsePayload as cyCctvParse } from "../scripts/import/adapters/cipro-cctv-2026.mjs";
+import { parsePayload as presovParse } from "../scripts/import/adapters/slovacchia-presov-kamery-2026.mjs";
+import { parsePayload as sub1Parse } from "../scripts/import/adapters/serbia-subotica-videonadzor-2026.mjs";
+import { parsePayload as sub2Parse } from "../scripts/import/adapters/serbia-subotica-semafori-2026.mjs";
+import { parsePayload as lapuntaParse } from "../scripts/import/adapters/peru-la-punta-cctv-2026.mjs";
+import { parsePayload as pascoParse } from "../scripts/import/adapters/peru-pasco-cctv-2026.mjs";
+
+test("gate: SODL / TW OGL v1 importable, CC BY-SA still never", () => {
+  assert.equal(isLicenceImportable("Serbian Open Data License"), true);
+  assert.equal(isLicenceImportable("SODL"), true);
+  assert.equal(isLicenceImportable("TW OGL v1"), true);
+  assert.equal(isLicenceImportable("Taiwan Open Government Data License v1"), true);
+  assert.equal(isLicenceImportable("CC BY-SA 4.0"), false);
+  assert.equal(isLicenceImportable("CC BY-SA 2.0"), false);
+});
+
+test("cipro enforcement: parses DATEX II v3 trafficEquipment XML into staged rows", () => {
+  const xml = `<?xml version='1.0'?><TrafficEquipmentPublication xmlns="http://datex2.eu/schema/3/trafficEquipment" xmlns:common="http://datex2.eu/schema/3/common" xmlns:location="http://datex2.eu/schema/3/locationReferencing">
+<trafficEquipment><common:versionedIdentifier><common:identifier>30</common:identifier><common:version>1</common:version></common:versionedIdentifier><equipmentType>trafficEnforcementCamera</equipmentType><equipmentName><common:value>11201 - Strovolou Ave NB @ Machaira St</common:value><common:lang>en</common:lang></equipmentName><equipmentAddress><common:addressLineText><common:value>Lefkosia</common:value><common:lang>en</common:lang></common:addressLineText></equipmentAddress><location:location><location:pointByCoordinates><location:pointCoordinates><common:latitude>35.134</common:latitude><common:longitude>33.32992</common:longitude></location:pointCoordinates></location:pointByCoordinates></location:location></trafficEquipment>
+<trafficEquipment><common:versionedIdentifier><common:identifier>31</common:identifier><common:version>1</common:version></common:versionedIdentifier><equipmentType>trafficEnforcementCamera</equipmentType><equipmentName><common:value>Bad coords</common:value></equipmentName><location:location><location:pointByCoordinates><location:pointCoordinates><common:latitude>abc</common:latitude><common:longitude>33.3</common:longitude></location:pointCoordinates></location:pointByCoordinates></location:location></trafficEquipment>
+</TrafficEquipmentPublication>`;
+  const { staged, skipped } = cyEnfParse({ text: xml });
+  assert.equal(staged.length, 1);
+  assert.equal(staged[0].title, "11201 - Strovolou Ave NB @ Machaira St");
+  assert.equal(staged[0].address, "Lefkosia");
+  assert.equal(staged[0].kind, "Traffic / licence plate reader");
+  assert.equal(staged[0].latitude, 35.134);
+  assert.equal(staged[0].longitude, 33.32992);
+  assert.equal(staged[0].external_id, "cy-enf:30");
+  assert.equal(skipped.total, 1);
+});
+
+test("cipro cctv: parses DATEX II v3 measurementSiteRecord XML into staged rows", () => {
+  const xml = `<?xml version='1.0'?><MeasurementSiteTablePublication xmlns="http://datex2.eu/schema/3/measurementSiteTable" xmlns:common="http://datex2.eu/schema/3/common" xmlns:location="http://datex2.eu/schema/3/locationReferencing">
+<measurementSiteRecord><common:versionedIdentifier><common:identifier>2022</common:identifier><common:version>1</common:version></common:versionedIdentifier><measurementSiteName><common:value>A3 - Kalo Chorio Roundabout</common:value><common:lang>en</common:lang></measurementSiteName><measurementEquipmentTypeUsed><measurementEquipmentTypeEnum>CCTV</measurementEquipmentTypeEnum></measurementEquipmentTypeUsed><measurementSiteRecordExtension><systemSubtype>PTZ</systemSubtype></measurementSiteRecordExtension><location:location><location:pointByCoordinates><location:pointCoordinates><common:latitude>34.907584199999995</common:latitude><common:longitude>33.5674694</common:longitude></location:pointCoordinates></location:pointByCoordinates></location:location></measurementSiteRecord>
+</MeasurementSiteTablePublication>`;
+  const { staged, skipped } = cyCctvParse({ text: xml });
+  assert.equal(staged.length, 1);
+  assert.equal(staged[0].title, "A3 - Kalo Chorio Roundabout");
+  assert.equal(staged[0].kind, "Other / unknown");
+  assert.equal(staged[0].notes, "CyNAP CCTV — PTZ");
+  assert.equal(staged[0].latitude, 34.907584);
+  assert.equal(staged[0].longitude, 33.567469);
+  assert.equal(staged[0].external_id, "cy-cctv:2022");
+  assert.equal(skipped.total, 0);
+});
+
+test("presov: parses KML placemarks (ExtendedData) into staged rows", () => {
+  const kml = `<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://earth.google.com/kml/2.2"><Document>
+<Placemark><name>1</name><description><![CDATA[<p>I_ZAR: 61<br/>C_ZAR: 1<br/>N_C_AREAL: Centrum mesta a okolie<br/>ZAR_UMIEST: na stĺpe VO - hotel SENÁTOR<br/>MON_ZONA: okolie parku, pešia zóna na ul. Hlavná<br/>GMRotation: 0.0]]></description><Point><coordinates>21.2404369563,48.9969264799,0.00000</coordinates></Point></Placemark>
+<Placemark><name>9</name><description><![CDATA[<p>I_ZAR: 62<br/>C_ZAR: 9<br/>N_C_AREAL: Centrum mesta a okolie<br/>ZAR_UMIEST: xyz<br/>MON_ZONA: abc]]></description><Point><coordinates>bad,48.9,0</coordinates></Point></Placemark>
+</Document></kml>`;
+  const { staged, skipped } = presovParse({ text: kml });
+  assert.equal(staged.length, 1);
+  assert.equal(staged[0].title, "Prešov camera 1");
+  assert.equal(staged[0].address, "na stĺpe VO - hotel SENÁTOR");
+  assert.equal(staged[0].latitude, 48.996926);
+  assert.equal(staged[0].longitude, 21.240437);
+  assert.equal(staged[0].external_id, "presov:1");
+  assert.equal(skipped.total, 1);
+});
+
+test("subotica videonadzor: parses GeoJSON points into staged rows", () => {
+  const data = {
+    type: "FeatureCollection",
+    features: [
+      { type: "Feature", properties: { id: 0 }, geometry: { type: "Point", coordinates: [19.633342436595075, 46.113430964433533] } },
+      { type: "Feature", properties: { id: 1 }, geometry: { type: "Point", coordinates: [0, 0] } },
+    ],
+  };
+  const { staged, skipped } = sub1Parse({ data });
+  assert.equal(staged.length, 1);
+  assert.equal(staged[0].title, "Subotica camera 0");
+  assert.equal(staged[0].kind, "Other / unknown");
+  assert.equal(staged[0].latitude, 46.113431);
+  assert.equal(staged[0].external_id, "subotica-videonadzor:0");
+  assert.equal(skipped.total, 1);
+});
+
+test("subotica semafori: parses GeoJSON points (Prekrsaji → notes) into staged rows", () => {
+  const data = {
+    type: "FeatureCollection",
+    features: [
+      { type: "Feature", properties: { Prekrsaji: "Crveno, brzina" }, geometry: { type: "Point", coordinates: [19.66991593785923, 46.099481648561792] } },
+      { type: "Feature", properties: { Prekrsaji: "Crveno" }, geometry: { type: "Point", coordinates: [19.6, 46.1] } },
+    ],
+  };
+  const { staged, skipped } = sub2Parse({ data });
+  assert.equal(staged.length, 2);
+  assert.equal(staged[0].title, "Subotica traffic camera 1");
+  assert.equal(staged[0].kind, "Traffic / licence plate reader");
+  assert.equal(staged[0].notes, "Violazioni: Crveno, brzina");
+  assert.equal(staged[0].external_id, "subotica-semafori:0");
+  assert.equal(staged[1].external_id, "subotica-semafori:1");
+  assert.equal(skipped.total, 0);
+});
+
+test("la punta: parses semicolon CSV (windows-1252) into staged rows", () => {
+  const csv = "NRO_REGISTRO;FECHA_CORTE;DEPARTAMENTO;PROVINCIA;DISTRITO;UBIGEO;GOBIERNO_LOCAL;UBICACION;MARCA;MODELO;ALTURA;LATITUD;LONGITUD;CONDICIÓN;CONECTIVIDAD\r\n;;;;;;;;;;;;;;\r\n1;20260130;CALLAO;PROV. CONST. DEL CALLAO;LA PUNTA;70105;MUNICIPALIDAD DISTRITAL DE LA PUNTA;Medina y Tovar (BASE);DAHUA;PTZ;9;-12.0745053;-77.1638321;Operativa;Cable Utp\r\n2;20260130;CALLAO;PROV. CONST. DEL CALLAO;LA PUNTA;70105;MUNICIPALIDAD DISTRITAL DE LA PUNTA;Bad;DAHUA;PTZ;9;0;0;Operativa;Cable Utp\r\n";
+  const { staged, skipped } = lapuntaParse({ text: csv });
+  assert.equal(staged.length, 1);
+  assert.equal(staged[0].title, "Medina y Tovar (BASE)");
+  assert.equal(staged[0].address, "Medina y Tovar (BASE)");
+  assert.equal(staged[0].latitude, -12.074505);
+  assert.equal(staged[0].longitude, -77.163832);
+  assert.equal(staged[0].external_id, "peru-la-punta:1");
+  assert.equal(skipped.total, 1);
+});
+
+test("pasco: parses a real XLSX buffer (fflate mini-reader) into staged rows", async () => {
+  const { zipSync, strToU8 } = await import("fflate");
+  const sheetXml = `<?xml version="1.0"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+    <sheetData>
+      <row r="1"></row>
+      <row r="2"><c r="A2"><v>NUMERO</v></c><c r="B2"><v>DISTRITO</v></c><c r="C2"><v>UBICACIÓN</v></c><c r="D2"><v>TIPO</v></c><c r="E2"><v>LATITUD</v></c><c r="F2"><v>LONGITUD</v></c></row>
+      <row r="3"><c r="A3"><v>CAMARA 1</v></c><c r="B3"><v>CHAUPIMARCA</v></c><c r="C3"><v>JR. LIMA CON EL PASAJE TARMA</v></c><c r="D3"><v>CAMARA</v></c><c r="E3"><v>-10.6851</v></c><c r="F3"><v>-76.2573</v></c></row>
+    </sheetData></worksheet>`;
+  const buf = Buffer.from(
+    zipSync({
+      "xl/worksheets/sheet1.xml": strToU8(sheetXml),
+      "[Content_Types].xml": strToU8(`<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>`),
+    })
+  );
+  const { staged, skipped } = await pascoParse({ buf });
+  assert.equal(staged.length, 1);
+  assert.equal(staged[0].title, "JR. LIMA CON EL PASAJE TARMA");
+  assert.equal(staged[0].latitude, -10.6851);
+  assert.equal(staged[0].longitude, -76.2573);
+  assert.equal(staged[0].notes, "Distrito: CHAUPIMARCA · Tipo: CAMARA");
+  assert.match(staged[0].external_id, /^peru-pasco:CAMARA_1$/);
+  assert.equal(skipped.total, 0);
+});

@@ -1,0 +1,11 @@
+{
+    "slug": "peru-pasco-cctv-2026",
+    "source_name": "Peru — Municipalidad Provincial de Pasco (HMPP), lista de cámaras de video vigilancia (datosabiertos.gob.pe)",
+    "format": "xlsx",
+    "license": "ODbL 1.0",
+    "license_url": "http://opendefinition.org/licenses/odc-by/",
+    "attribution_text": "Fonte: Municipalidad Provincial de Pasco (HMPP) via datosabiertos.gob.pe — Lista de Cámaras de Video Vigilancia (https://datosabiertos.gob.pe/dataset/lista-de-camaras-de-video-vigilancia-hmpp), concesso con licenza Open Data Commons Attribution License (ODbL).",
+    "source_url": "https://www.datosabiertos.gob.pe/sites/default/files/Dataset_Lista_de_Camaras_de_Video_Vigilancia.xlsx",
+    "max_records": 60,
+    "notes": "Coda giurisdizioni pass v2 (cron 2026-08-19): 45 telecamere municipali (distretto Chaupimarca, Cerro de Pasco), XLSX con colonne NUMERO/DISTRITO/UBICACIÓN/TIPO/LATITUD/LONGITUD (verificato first-hand 2026-08-20: 45 righe valide, coordinate ~ -10.68/-76.25). Licenza ODbL verificata nel pane Licencia della pagina dataset. Statico 2023 (infrastruttura fissa). external_id peru-pasco:<NUMERO>."
+}
