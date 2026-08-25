@@ -63,6 +63,19 @@ export const VIEWPORT_BBOX_LIMIT = 10_000;
 export const VIEWPORT_CACHE_TTL_MS = 300_000;
 /** Coalesce moveend bursts (the map already debounces at BOUNDS_DEBOUNCE_MS). */
 export const VIEWPORT_FETCH_DEBOUNCE_MS = 150;
+/**
+ * Debounce for continental viewports (area over the server decimation cap):
+ * a zoom-OUT gesture sweeps many oversized bboxes in quick succession — each
+ * one would fetch a sample the user never stops to look at. Waiting until
+ * the gesture settles (~0.8 s of quiet) turns a whole zoom-out into ONE
+ * request instead of one per zoom step.
+ */
+export const VIEWPORT_ZOOMOUT_DEBOUNCE_MS = 800;
+/**
+ * Server-side decimation cap (db/cameras.ts BBOX_MAX_AREA_SQ_DEG): viewports
+ * over this area answer a decimated sample and get the long debounce.
+ */
+export const VIEWPORT_MAX_AREA_SQ_DEG = 50;
 /** Cache-cell quantization (~110 m at the equator — tiny pans hit the cache). */
 export const VIEWPORT_QUANTIZE_DECIMALS = 3;
 /** A pan is covered (no fetch) when it stays inside a loaded bbox padded by this factor. */
@@ -371,6 +384,11 @@ export function useViewportCameras({ bounds, filters, focusId, onRecords, onErro
       return () => window.clearTimeout(cooldownTimer);
     }
     const controller = new AbortController();
+    // Continental viewports get the long debounce: a zoom-out gesture sweeps
+    // many oversized bboxes — one sample per SETTLED viewport, not per step.
+    const debounceMs = boxArea(boundsRef.current ?? { south: 0, north: 0, west: 0, east: 0 }) > VIEWPORT_MAX_AREA_SQ_DEG
+      ? VIEWPORT_ZOOMOUT_DEBOUNCE_MS
+      : VIEWPORT_FETCH_DEBOUNCE_MS;
     const timer = window.setTimeout(() => {
       const currentBounds = boundsRef.current!;
       const key = bboxCacheKey(currentBounds, filterKey);
@@ -444,7 +462,7 @@ export function useViewportCameras({ bounds, filters, focusId, onRecords, onErro
         setRetryAfter(null);
         onErrorRef.current?.();
       });
-    }, VIEWPORT_FETCH_DEBOUNCE_MS);
+    }, debounceMs);
     return () => {
       window.clearTimeout(timer);
       controller.abort();

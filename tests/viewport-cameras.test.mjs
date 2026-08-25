@@ -119,15 +119,19 @@ test("the first fetch for a viewport is ONE bbox query — never a paginated wal
   }
 });
 
-test("a continental viewport fetches ONCE and surfaces the decimated sample (no walk, no flood)", async () => {
+test("a continental viewport fetches ONCE after the long zoom-out debounce (no flood, no walk)", async () => {
   const calls = [];
   // The server answers continental viewports with a decimated sample.
   installBboxMock(calls, { decimated: true });
   // -120,60,120,-60... west,south,east,north: 240° × 120° = 28800 sq deg.
   const WORLD = { south: -60, north: 60, west: -120, east: 120 };
   const view = await renderProbe({ bounds: WORLD, filters: {} });
+  // Continental viewports use the LONG debounce (800 ms): a zoom-out gesture
+  // sweeping many oversized bboxes settles into ONE request, not one per step.
   await pause(300);
-  assert.equal(calls.length, 1, "the whole continent arrives in ONE request — never a walk");
+  assert.equal(calls.length, 0, "mid-gesture: no request leaves the client yet");
+  await pause(800);
+  assert.equal(calls.length, 1, "the settled viewport fetches exactly ONE sample — never a walk");
   const probe = rtl.screen.getByTestId("probe");
   assert.equal(probe.getAttribute("data-decimated"), "true", "the decimated flag reaches the UI (sample notice)");
   assert.equal(probe.getAttribute("data-loading"), "false", "the state settles after the sample lands");
