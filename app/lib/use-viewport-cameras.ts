@@ -76,6 +76,8 @@ type ViewportPage = {
   records: Camera[];
   total: number;
   nextOffset: number | null;
+  /** True when the server answered a decimated sample (continental viewport). */
+  decimated?: boolean;
 };
 
 class ViewportRateLimitError extends Error {
@@ -97,6 +99,7 @@ type CacheEntry = {
   records: Camera[];
   total: number;
   fetchedAt: number;
+  decimated?: boolean;
 };
 
 // Module-level caches (one per page load; __resetViewportCamerasCache drops
@@ -219,8 +222,12 @@ async function fetchViewportPage(bounds: ViewportBounds, filters: ServerCameraFi
   const data = (await first.json()) as Partial<ViewportPage>;
   if (!Array.isArray(data.records)) throw new Error("Malformed bbox payload");
   const collected = publicRecords(data.records);
+  const decimated = data.decimated === true;
   let total = typeof data.total === "number" ? data.total : collected.length;
   let nextOffset: number | null = data.nextOffset ?? null;
+  // A decimated sample (continental viewport) never walks: the server
+  // answers ~threshold points with nextOffset null — one request, done.
+  if (decimated) nextOffset = null;
   // Page through the bbox subset ONLY while it keeps advancing (same guard
   // as the directory walk: a server that fails to advance must not loop).
   while (nextOffset !== null && nextOffset > 0) {
@@ -234,7 +241,7 @@ async function fetchViewportPage(bounds: ViewportBounds, filters: ServerCameraFi
     nextOffset = body.nextOffset ?? null;
     total = typeof body.total === "number" ? body.total : total;
   }
-  return { records: collected, total, nextOffset: null };
+  return { records: collected, total, nextOffset: null, decimated };
 }
 
 /** Resolve ONE record for a ?focus= deep link (dedicated endpoint, 1 request). */
@@ -282,6 +289,8 @@ export type UseViewportCamerasResult = {
   records: Camera[];
   /** Bbox-scoped server total of the latest response (null until the first answer). */
   total: number | null;
+  /** True when the latest response is a decimated sample (continental viewport). */
+  decimated: boolean;
   /** True while the FIRST payload is in flight (no markers to show yet). */
   loading: boolean;
   /** The API fetch failed (network error or non-2xx response). */
@@ -314,6 +323,7 @@ export function useViewportCameras({ bounds, filters, focusId, onRecords, onErro
 
   const [records, setRecords] = useState<Camera[]>([]);
   const [total, setTotal] = useState<number | null>(null);
+  const [decimated, setDecimated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [retryAfter, setRetryAfter] = useState<number | null>(null);
@@ -376,6 +386,7 @@ export function useViewportCameras({ bounds, filters, focusId, onRecords, onErro
             if (covering) {
               setLoading(false);
               setError(false);
+              setDecimated(false);
               if (covering.records.length > 0) setEmpty(false);
               setTotal(covering.total);
               commitRecords(covering.records);
@@ -387,7 +398,7 @@ export function useViewportCameras({ bounds, filters, focusId, onRecords, onErro
         let page: ViewportPage;
         const cached = bboxCache.get(key);
         if (cached && cached.fetchedAt + VIEWPORT_CACHE_TTL_MS > Date.now()) {
-          page = { records: cached.records, total: cached.total, nextOffset: null };
+          page = { records: cached.records, total: cached.total, nextOffset: null, decimated: cached.decimated };
         } else if (inFlight.has(key)) {
           page = await inFlight.get(key)!;
         } else {
@@ -398,13 +409,14 @@ export function useViewportCameras({ bounds, filters, focusId, onRecords, onErro
           } finally {
             inFlight.delete(key);
           }
-          bboxCache.set(key, { bounds: currentBounds, filterKey, records: page.records, total: page.total, fetchedAt: Date.now() });
+          bboxCache.set(key, { bounds: currentBounds, filterKey, records: page.records, total: page.total, fetchedAt: Date.now(), decimated: page.decimated });
         }
         if (controller.signal.aborted) return;
         setLoading(false);
         setError(false);
         setRetryAfter(null);
         rateLimitRetriesRef.current = 0;
+        setDecimated(page.decimated === true);
         if (page.total === 0 && page.records.length === 0) setEmpty(true);
         setTotal(page.total);
         if (!mergedKeysRef.current.has(key)) {
@@ -460,6 +472,7 @@ export function useViewportCameras({ bounds, filters, focusId, onRecords, onErro
   return {
     records,
     total,
+    decimated,
     loading,
     error,
     retryAfterSeconds: retryAfter,

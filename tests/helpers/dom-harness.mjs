@@ -280,8 +280,18 @@ export const __maps = maps;
 // __resetMarkers ALSO restores these bounds (t_b9666d09): the geocode
 // autocomplete tests shrink the viewport to assert the pan landing, and a
 // stale narrow viewport leaking into the NEXT test would silently filter
-// the list (a record outside the leftover bounds disappears) — every test
-// must start from the whole-world viewport.
+// The default viewport mirrors the real map's initial view (Roma, zoom 13 —
+// SurveillanceMap setView [41.9028, 12.4964] 13). Tests that need a wider
+// viewport call leaflet.__setBounds(...) explicitly. The viewport-area cap
+// (use-viewport-cameras VIEWPORT_MAX_AREA_SQ_DEG) skips fetches for
+// continental viewports, so a whole-world default would starve the mocks.
+const romeViewport = {
+  getSouth: () => 41.8,
+  getNorth: () => 42.0,
+  getWest: () => 12.3,
+  getEast: () => 12.7,
+  contains: () => true,
+};
 const wholeWorldBounds = {
   getSouth: () => -90,
   getNorth: () => 90,
@@ -289,9 +299,9 @@ const wholeWorldBounds = {
   getEast: () => 180,
   contains: () => true,
 };
-let currentBounds = wholeWorldBounds;
+let currentBounds = romeViewport;
 export const __setBounds = (b) => { currentBounds = b; };
-export const __resetMarkers = () => { markers.length = 0; maps.length = 0; paths.length = 0; currentBounds = wholeWorldBounds; };
+export const __resetMarkers = () => { markers.length = 0; maps.length = 0; paths.length = 0; currentBounds = romeViewport; };
 export function map(el, opts) {
   const m = {
     // Map options recorded (RecordMiniMap 2026-08-07): the read-only mini

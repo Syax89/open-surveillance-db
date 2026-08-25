@@ -229,6 +229,14 @@ export type PublicCameraListPage = {
   total: number | null;
   /** Offset of the next page, or null when the current page is the last one. */
   nextOffset: number | null;
+  /**
+   * True when the page is a DECIMATED SAMPLE (bbox area over
+   * BBOX_MAX_AREA_SQ_DEG): a deterministic subset (ROWID modulo) of the
+   * records inside the box, ~BBOX_DECIMATION_THRESHOLD points, with
+   * nextOffset ALWAYS null — the client shows the coverage in one request
+   * and zooms in for the full detail.
+   */
+  decimated?: boolean;
 };
 
 /**
@@ -711,13 +719,13 @@ export async function listPublicCamerasInBboxPage(
   options: { limit: number; offset: number; count?: boolean } = { limit: PUBLIC_CAMERAS_BBOX_DEFAULT_LIMIT, offset: 0 },
 ): Promise<PublicCameraListPage> {
   const d1 = await getD1();
-  // Viewport size guard (perf, 160k+ dataset): reject bbox area > threshold.
-  // Area in square degrees: (north - south) × (east - west). Longitude
-  // degrees shrink with latitude, but for rejection a simple product suffices.
+  // Viewport size guard (perf, 160k+ dataset): a continental viewport
+  // (> BBOX_MAX_AREA_SQ_DEG) answers a DECIMATED SAMPLE instead of a
+  // rejection — the map still shows coverage in ONE request. The sample is
+  // deterministic (ROWID modulo), so repeated requests return the same
+  // points, and nextOffset stays null (the walk never starts).
   const bboxArea = (bbox.north - bbox.south) * (bbox.east - bbox.west);
-  if (bboxArea > BBOX_MAX_AREA_SQ_DEG) {
-    throw new Error(`Bbox area too large (${bboxArea.toFixed(2)} sq deg > ${BBOX_MAX_AREA_SQ_DEG}). Zoom in.`);
-  }
+  const forceDecimation = bboxArea > BBOX_MAX_AREA_SQ_DEG;
   // Same dual first argument as listPublicCamerasPage: an ISO boundary
   // string (freshness-reverification suite) or a filter object (route).
   const filters = typeof nowIsoOrFilters === "string" ? undefined : nowIsoOrFilters;
@@ -746,13 +754,17 @@ export async function listPublicCamerasInBboxPage(
     parameters.push(freshnessCutoff(filters.freshness));
   }
   let total: number | null = null;
-  if (withCount) {
+  // The decimation factor needs the real total: a continental viewport
+  // pays for the COUNT even when the caller opted out (one query, bounded
+  // by the 15-minute edge cache — never a per-pan scan).
+  if (withCount || forceDecimation) {
     const countResult = await d1.prepare(`SELECT COUNT(*) AS total ${query}`).bind(...parameters).first<{ total: number }>();
     total = countResult?.total ?? 0;
     // Same pagination guard as listPublicCamerasPage (kanban t_e86c91c4):
     // an offset at/beyond the bbox total is an empty page answered WITHOUT
     // the SELECT — no astronomical SQL OFFSET on the D1, no fixed cap.
-    if (offset >= total) {
+    // Skipped for decimated samples: the walk never starts, offset is 0.
+    if (!forceDecimation && offset >= total) {
       return { records: [], total, nextOffset: null };
     }
   }
@@ -761,19 +773,30 @@ export async function listPublicCamerasInBboxPage(
   // sample only every N-th row via ROWID modulo. The WHERE keeps the exact
   // bbox boundary; decimation reduces DOM rendering cost without changing
   // the visible coverage. Sampling factor scales with total: 2k→1, 4k→2, 8k→4.
-  const shouldDecimate = withCount && total !== null && total > BBOX_DECIMATION_THRESHOLD;
+  // Continental viewports (forceDecimation) ALWAYS sample: the map shows
+  // ~threshold points in one request, and the walk never starts.
+  const shouldDecimate = total !== null && (forceDecimation || total > BBOX_DECIMATION_THRESHOLD);
   const decimationFactor = shouldDecimate ? Math.max(1, Math.floor((total ?? 0) / BBOX_DECIMATION_THRESHOLD)) : 1;
   const decimationClause = shouldDecimate ? ` AND (ROWID % ${decimationFactor} = 0)` : "";
   
   // Probe fetch: limit+1 rows when counting is disabled (see `withCount`).
+  // Decimated samples fetch the WHOLE sample in one pass: the probe limit
+  // (limit+1) would truncate it — the sample target is ~total/factor rows.
+  const fetchLimit = shouldDecimate
+    ? Math.max(limit, Math.ceil((total ?? 0) / decimationFactor))
+    : (withCount ? limit : limit + 1);
   const fetched = await d1
     .prepare(`SELECT id, title, kind, CASE WHEN publish_manufacturer = 1 THEN manufacturer ELSE NULL END AS manufacturer, CASE WHEN publish_observed_on = 1 THEN observed_on ELSE NULL END AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, latitude, longitude, direction, status, source, updated, description, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt ${query}${decimationClause} ORDER BY id DESC LIMIT ? OFFSET ?`)
-    .bind(...parameters, withCount ? limit : limit + 1, offset)
+    .bind(...parameters, fetchLimit, offset)
     .all<PublicCameraRecord>();
-  const result = withCount ? fetched : { results: fetched.results.slice(0, limit) };
-  const nextOffset = withCount
-    ? (offset + result.results.length < (total ?? 0) ? offset + result.results.length : null)
-    : (fetched.results.length > limit ? offset + limit : null);
+  const result = withCount || shouldDecimate ? fetched : { results: fetched.results.slice(0, limit) };
+  // Decimated samples never walk: nextOffset is always null — the client
+  // shows the sample in one request and zooms in for the full detail.
+  const nextOffset = shouldDecimate
+    ? null
+    : (withCount
+        ? (offset + result.results.length < (total ?? 0) ? offset + result.results.length : null)
+        : (fetched.results.length > limit ? offset + limit : null));
   const ids = result.results.map((record) => record.id);
   // Community-verification counts (ADR 0018 §2.3): one GROUP BY IN query for
   // the whole page — never an N+1 per record.
@@ -793,7 +816,7 @@ export async function listPublicCamerasInBboxPage(
     problemCount: actionCounts.get(record.id)?.problem ?? 0,
     privacyCount: actionCounts.get(record.id)?.privacy ?? 0,
   }));
-  return { records, total, nextOffset };
+  return { records, total, nextOffset, decimated: shouldDecimate };
 }
 
 /** Default and hard-max page size for search/nearby (FRONTEND_PLAN § 3.2.3). */

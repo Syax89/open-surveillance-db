@@ -262,6 +262,10 @@ test("grid-badge click zooms in toward the cell with ZERO popups", async () => {
     id: i + 1, title: `Fixture camera ${i}`, kind: "bullet", status: "active",
     latitude: 30 + (i % 40), longitude: -10 + (i % 50), source: "Community report",
   }));
+  // The 260 fixtures span lat 30-69 / lng -10..39: the default stub viewport
+  // is Rome-sized now (mirrors the real initial view), so widen it for the
+  // continental grid aggregation.
+  __setBounds(wholeWorld);
   await renderMap(many);
   const map = (await maps())[0];
   // GRID_MAX_ZOOM is 12: at the stub default z13 every marker is individual.

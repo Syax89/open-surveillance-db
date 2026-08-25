@@ -366,6 +366,32 @@ test("listPublicCamerasInBboxPage answers an empty page for offset >= total (t_e
   assert.equal(beyond.nextOffset, null);
 });
 
+test("listPublicCamerasInBboxPage decimates continental viewports (sample, no walk; count=false still gets the total)", async () => {
+  const { env, cameras } = await realDb();
+  await resetDb({ env, cameras });
+  for (let index = 0; index < 6; index += 1) {
+    await insertCamera(env, { title: `Continental ${index}`, latitude: 41.9 + index * 0.001, longitude: 12.49 });
+  }
+  // 60° × 60° = 3600 sq deg > BBOX_MAX_AREA_SQ_DEG (50): a continental
+  // viewport must answer a decimated sample — the map shows coverage in ONE
+  // request instead of erroring (the old guard threw → the route answered a
+  // misleading 503 "Database unavailable").
+  const continental = { west: -30, south: 10, east: 30, north: 70 };
+  const sample = await cameras.listPublicCamerasInBboxPage(continental, undefined, { limit: 4, offset: 0, count: false });
+  assert.equal(sample.decimated, true, "continental viewports are flagged as samples");
+  assert.equal(sample.total, 6, "the sample still reports the real total (the COUNT runs for the factor)");
+  assert.equal(sample.nextOffset, null, "a decimated sample never starts a walk");
+  assert.equal(sample.records.length, 6, "below the decimation threshold the factor is 1: every point is kept");
+
+  // A normal viewport with count=false keeps the probe contract unchanged:
+  // no COUNT, null total, nextOffset drives the walk.
+  const small = { west: 12.4, south: 41.8, east: 12.6, north: 42.1 };
+  const normal = await cameras.listPublicCamerasInBboxPage(small, undefined, { limit: 4, offset: 0, count: false });
+  assert.equal(normal.decimated, false, "small viewports are not flagged");
+  assert.equal(normal.total, null, "count=false still skips the COUNT for normal viewports");
+  assert.equal(normal.nextOffset, 4, "the probe still drives the walk");
+});
+
 test("listPublicCamerasPage applies the same public boundary, filters and coordinate rounding as the full list", async () => {
   const { env, cameras } = await realDb();
   await resetDb({ env, cameras });

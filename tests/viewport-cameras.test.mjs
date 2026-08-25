@@ -57,6 +57,7 @@ function HookProbe({ bounds, filters, focusId, onRecords }) {
     "data-records": JSON.stringify(state.records.map((r) => r.id)),
     "data-loading": String(state.loading),
     "data-error": String(state.error),
+    "data-decimated": String(state.decimated),
     "data-retry-after": String(state.retryAfterSeconds ?? ""),
     "data-empty": String(state.empty),
     "data-total": String(state.total ?? ""),
@@ -78,7 +79,7 @@ afterEach(() => {
 });
 
 /** Records the request URLs; answers every ?bbox= with the full fixture list. */
-function installBboxMock(calls, { records = RECORDS, total } = {}) {
+function installBboxMock(calls, { records = RECORDS, total, decimated } = {}) {
   installFetchMock((input) => {
     const url = String(input);
     calls.push(url);
@@ -90,7 +91,7 @@ function installBboxMock(calls, { records = RECORDS, total } = {}) {
       return jsonResponse(record ? { record } : { error: "not found" }, { status: record ? 200 : 404 });
     }
     if (u.searchParams.has("bbox")) {
-      return jsonResponse({ records, total: total ?? records.length, nextOffset: null });
+      return jsonResponse({ records, total: total ?? records.length, nextOffset: null, decimated });
     }
     return jsonResponse({ records: [], total: 0, nextOffset: null });
   });
@@ -116,6 +117,21 @@ test("the first fetch for a viewport is ONE bbox query — never a paginated wal
     assert.ok(url.includes(URLS.BBOX), `every map fetch carries a bbox: ${url}`);
     assert.ok(url.startsWith(URLS.API), `only the cameras API: ${url}`);
   }
+});
+
+test("a continental viewport fetches ONCE and surfaces the decimated sample (no walk, no flood)", async () => {
+  const calls = [];
+  // The server answers continental viewports with a decimated sample.
+  installBboxMock(calls, { decimated: true });
+  // -120,60,120,-60... west,south,east,north: 240° × 120° = 28800 sq deg.
+  const WORLD = { south: -60, north: 60, west: -120, east: 120 };
+  const view = await renderProbe({ bounds: WORLD, filters: {} });
+  await pause(300);
+  assert.equal(calls.length, 1, "the whole continent arrives in ONE request — never a walk");
+  const probe = rtl.screen.getByTestId("probe");
+  assert.equal(probe.getAttribute("data-decimated"), "true", "the decimated flag reaches the UI (sample notice)");
+  assert.equal(probe.getAttribute("data-loading"), "false", "the state settles after the sample lands");
+  assert.equal(probe.getAttribute("data-error"), "false", "a decimated sample is not an error");
 });
 
 test("a repeated request for the same bbox is served from the module cache (zero network)", async () => {

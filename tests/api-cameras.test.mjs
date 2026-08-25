@@ -116,6 +116,21 @@ test("GET /api/cameras?bbox=&count=false forwards the opt-out to the bbox page",
   assert.deepEqual(await responseBody(response), { records: [], total: null, nextOffset: null });
 });
 
+test("GET /api/cameras?bbox= with a continental area reaches the db layer (decimated server-side, never a 503)", async () => {
+  stub("listPublicCamerasInBboxPage", async () => ({ records: [], total: 1234, nextOffset: null, decimated: true }));
+  const { GET } = await camerasRoute();
+  // -15,-10,15,10 = 600 sq deg: the route forwards it — the db answers a
+  // decimated sample. The old catch-all turned the db guard's throw into a
+  // misleading 503 "Database unavailable" (an outage-looking error for a
+  // legitimate map viewport).
+  const response = await GET(apiRequest("/api/cameras?bbox=-15,-10,15,10"));
+  assert.equal(response.status, 200);
+  const body = await responseBody(response);
+  assert.deepEqual(body, { records: [], total: 1234, nextOffset: null, decimated: true }, "the decimated sample passes through");
+  const args = callArgs("listPublicCamerasInBboxPage")[0];
+  assert.deepEqual(args[0], { west: -15, south: -10, east: 15, north: 10 }, "the continental bbox reaches the db boundary");
+});
+
 test("GET /api/cameras serves a public-cache hit before spending the read rate-limit budget", async () => {
   const store = new Map();
   globalThis.caches = {
