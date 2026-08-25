@@ -1,0 +1,1141 @@
+{
+"generated": "2026-08-20",
+"source": "Nominatim (street-level) + Overpass (junction)",
+"results": [
+{
+"key": "Bolton|A579 Derby Street, Jct University Way, Bolton",
+"lat": 53.5690051,
+"lon": -2.4405521
+},
+{
+"key": "Bolton|A579 Trinity Street, Jct Manchester Road, Bolton",
+"lat": 53.5747677,
+"lon": -2.4244375
+},
+{
+"key": "Bolton|A6027 De Havilland Way, Jct Mansell Way, Horwich, Bolton",
+"lat": 53.5798599,
+"lon": -2.5307893
+},
+{
+"key": "Bolton|A673 Chorley New Road, Jct Tudor Avenue, Bolton",
+"lat": 53.5981295,
+"lon": -2.5500739
+},
+{
+"key": "Bolton|A579 Newbrook Road, North of Firs Road, Bolton",
+"lat": 53.5380203,
+"lon": -2.4719045
+},
+{
+"key": "Bolton|A579 Newbrook Road, South of Firs Road, Bolton",
+"lat": 53.5380203,
+"lon": -2.4719045
+},
+{
+"key": "Bolton|A58 Bury Road, West of Torridon Road, Bolton",
+"lat": 53.5799572,
+"lon": -2.4106379
+},
+{
+"key": "Bolton|A58 Crompton Way, East of Seymour Road, Bolton",
+"lat": 53.5807855,
+"lon": -2.3991616
+},
+{
+"key": "Bolton|A6 Chorley Road, South East of Wimberry Hill Road, Bolton",
+"lat": 53.6089322,
+"lon": -2.6033432
+},
+{
+"key": "Bolton|A6 Manchester Road, South East of Blackrod Bypass Road, Bolton",
+"lat": 53.5397945,
+"lon": -2.3753133
+},
+{
+"key": "Bolton|A6 Manchester Road, South East of Blackrod Bypass Road, Bolton",
+"lat": 53.5397945,
+"lon": -2.3753133
+},
+{
+"key": "Bolton|A666 Blackburn Road, North West of Longworth Road, Bolton",
+"lat": 53.6397892,
+"lon": -2.4486628
+},
+{
+"key": "Bolton|A666 Manchester Road, Teak Drive, Bolton",
+"lat": 53.5397945,
+"lon": -2.3753133
+},
+{
+"key": "Bolton|A673 Chorley New Road, East of Somerset Road, Bolton",
+"lat": 53.5981295,
+"lon": -2.5500739
+},
+{
+"key": "Bolton|A673 Chorley New Road, jct of Lindsay Street, Bolton",
+"lat": 53.5981295,
+"lon": -2.5500739
+},
+{
+"key": "Bolton|A676 Wigan Road, near to Hythe Street, Bolton",
+"lat": 53.5635333,
+"lon": -2.4722352
+},
+{
+"key": "Bury|A56 Bury New Road, Jct Fairfax Road, Prestwich",
+"lat": 53.5409782,
+"lon": -2.2898832
+},
+{
+"key": "Bury|A56 Bury New Road, Jct Hilton Lane, Prestwich",
+"lat": 53.5409782,
+"lon": -2.2898832
+},
+{
+"key": "Bury|A56 Bury New Road, Jct Moss Lane, Whitefield",
+"lat": 53.549497,
+"lon": -2.2948256
+},
+{
+"key": "Bury|A56 Manchester Road, Jct Parkhills Road, Bury",
+"lat": 53.5909534,
+"lon": -2.3000333
+},
+{
+"key": "Bury|A58 Angouleme Way, Jct Knowsley Street, Bury",
+"lat": 53.5907722,
+"lon": -2.3009294
+},
+{
+"key": "Bury|A58 Bury & Bolton Road, Starling Road, Bury",
+"lat": 53.5816063,
+"lon": -2.3395663
+},
+{
+"key": "Bury|A58 Rochdale Road, Jct Heywood Street, Bury",
+"lat": 53.5924697,
+"lon": -2.279394
+},
+{
+"key": "Bury|A56 Peel Way, East of jct with Bolton Street, Bury",
+"lat": 53.5946697,
+"lon": -2.303721
+},
+{
+"key": "Bury|A56 Peel Way, West of jct of Walmersley Road, Bury",
+"lat": 53.5946697,
+"lon": -2.303721
+},
+{
+"key": "Bury|A58 Bolton Road, Powell Street, Bury",
+"lat": 53.5926597,
+"lon": -2.3118823
+},
+{
+"key": "Bury|A665 Bolton Road, Jct Monton Street, Radcliffe",
+"lat": 53.5891242,
+"lon": -2.3187
+},
+{
+"key": "Manchester|A34 Kingsway, Jct Parrs Wood Lane, Manchester",
+"lat": 53.4357706,
+"lon": -2.2066679
+},
+{
+"key": "Manchester|A34 Kingsway, Parrs Wood Lane, Manchester",
+"lat": 53.4089806,
+"lon": -2.2205152
+},
+{
+"key": "Manchester|A34 Oxford Road, Jct Charles Street, Manchester",
+"lat": 53.4693638,
+"lon": -2.2363968
+},
+{
+"key": "Manchester|A34 Oxford Road, Jct Hulme Street, Manchester",
+"lat": 53.4693638,
+"lon": -2.2363968
+},
+{
+"key": "Manchester|A34 Oxford St, Jct Whitworth Street, Manchester",
+"lat": 53.4772445,
+"lon": -2.2436055
+},
+{
+"key": "Manchester|A34 Princess Street, Jct Whitworth Street, Manchester",
+"lat": 53.4729026,
+"lon": -2.2361862
+},
+{
+"key": "Manchester|A5103 Princess Road near Merseybank Avenue, Manchester",
+"lat": 53.4273762,
+"lon": -2.2531754
+},
+{
+"key": "Manchester|A5103 Princess Road, Jct Wilbraham Road, Manchester",
+"lat": 53.4273762,
+"lon": -2.2531754
+},
+{
+"key": "Manchester|A56 Great Ducie Street, Jct Trinity Way, Manchester",
+"lat": 53.4915918,
+"lon": -2.2485721
+},
+{
+"key": "Manchester|A6010 Queens Road, Jct Cheetham Hill Road, Manchester",
+"lat": 53.4984858,
+"lon": -2.2143388
+},
+{
+"key": "Manchester|A6010 Wilbraham Road, Jct Withington Road, Manchester",
+"lat": 53.4426078,
+"lon": -2.2752406
+},
+{
+"key": "Manchester|A6104 Victoria Avenue, Jct Rochdale Road, Manchester",
+"lat": 53.4597094,
+"lon": -2.203417
+},
+{
+"key": "Manchester|A635 Ashton Old Road, Jct Widnes Street, Manchester",
+"lat": 53.4744891,
+"lon": -2.2012774
+},
+{
+"key": "Manchester|A664 Rochdale Road, Jct Queens Road, Manchester",
+"lat": 53.4914141,
+"lon": -2.227211
+},
+{
+"key": "Manchester|B5093 Mosley Road, Jct Wilmslow Road, Manchester",
+"lat": 53.449772,
+"lon": -2.3458172
+},
+{
+"key": "Manchester|Dale Street, Jct Newton Street, Manchester",
+"lat": 53.4802946,
+"lon": -2.2324259
+},
+{
+"key": "Manchester|A34 Kingsway, Northbank Gardens, Manchester",
+"lat": 53.4089806,
+"lon": -2.2205152
+},
+{
+"key": "Manchester|A34 Upper Brook Street, Blackstock St, Manchester",
+"lat": 53.4664205,
+"lon": -2.2286104
+},
+{
+"key": "Manchester|A5103 Princess Rd, Near Craigmore Avenue, Manchester",
+"lat": 53.4539202,
+"lon": -2.2450176
+},
+{
+"key": "Manchester|A5103 Princess Road, near Nell Lane, Manchester",
+"lat": 53.4273762,
+"lon": -2.2531754
+},
+{
+"key": "Manchester|A5103 Princess Road, North of Craigmore Avenue, Manchester",
+"lat": 53.4273762,
+"lon": -2.2531754
+},
+{
+"key": "Manchester|A5103 Princess Road, North of Mauldeth Road West, Manchester",
+"lat": 53.4273762,
+"lon": -2.2531754
+},
+{
+"key": "Manchester|A5145 Edge Lane, near Alderfield Road, Manchester",
+"lat": 53.4411075,
+"lon": -2.2844449
+},
+{
+"key": "Manchester|A5145 Edge Lane, near Ryebank Road, Manchester",
+"lat": 53.4411075,
+"lon": -2.2844449
+},
+{
+"key": "Manchester|A57 Hyde Road, near Devonshire Street, Manchester",
+"lat": 53.4615913,
+"lon": -2.1734947
+},
+{
+"key": "Manchester|A576 Middleton Road, North of Brooklands Road, Manchester",
+"lat": 53.5297901,
+"lon": -2.2462512
+},
+{
+"key": "Manchester|A6 Stockport Road, Longden Road, Manchester",
+"lat": 53.4664748,
+"lon": -2.2165689
+},
+{
+"key": "Manchester|A6 Stockport Road, Longden Road, Manchester",
+"lat": 53.4664748,
+"lon": -2.2165689
+},
+{
+"key": "Manchester|A6010 Wilmslow Road, opposite jct Brighton Grove, Manchester",
+"lat": 53.4330941,
+"lon": -2.228885
+},
+{
+"key": "Manchester|A6104 Victoria Avenue East, East of Colmore Drive, Manchester",
+"lat": 53.5323895,
+"lon": -2.2079309
+},
+{
+"key": "Manchester|A62 Oldham Road, Northeast of Beckford Street, Manchester",
+"lat": 53.5011055,
+"lon": -2.1949757
+},
+{
+"key": "Manchester|A663 Broadway, Annersley Road, Manchester",
+"lat": 53.5201492,
+"lon": -2.1670364
+},
+{
+"key": "Manchester|A663 Broadway, Barlea Avenue, Manchester",
+"lat": 53.5201492,
+"lon": -2.1670364
+},
+{
+"key": "Manchester|A664 Rochdale Road, Kerr Street, Manchester",
+"lat": 53.5000766,
+"lon": -2.2195225
+},
+{
+"key": "Manchester|A664 Rochdale Road, near Queens Park (inbound), Manchester",
+"lat": 53.4914141,
+"lon": -2.227211
+},
+{
+"key": "Manchester|A665 Cheetham Hill Road, North of Knowsley Street, Manchester",
+"lat": 53.5008656,
+"lon": -2.2361193
+},
+{
+"key": "Manchester|Alexandra Road, Adscombe Street, Manchester",
+"lat": 53.4591266,
+"lon": -2.2523427
+},
+{
+"key": "Manchester|B5166 Sale Road, near Brenchley Drive, Manchester",
+"lat": 53.458749,
+"lon": -2.258839
+},
+{
+"key": "Manchester|B5166 Sale Road, near Daine Avenue, Manchester",
+"lat": 53.458749,
+"lon": -2.258839
+},
+{
+"key": "Manchester|B5167 Palatine Road, Chretien Road, Manchester",
+"lat": 53.4306831,
+"lon": -2.2315121
+},
+{
+"key": "Manchester|Errwood Road, near to Westdean Crescent, Manchester",
+"lat": 53.4379157,
+"lon": -2.1935321
+},
+{
+"key": "Manchester|Errwood Road, near Watford Road, Manchester",
+"lat": 53.4379157,
+"lon": -2.1935321
+},
+{
+"key": "Manchester|Fernclough Road, Hemmington Drive, Manchester",
+"lat": 53.508662,
+"lon": -2.2162025
+},
+{
+"key": "Manchester|St Mary's Road, Joyce Street, Manchester",
+"lat": 53.5102135,
+"lon": -2.1824702
+},
+{
+"key": "Manchester|St Mary's Road, Merridale Road, Manchester",
+"lat": 53.5102135,
+"lon": -2.1824702
+},
+{
+"key": "Manchester|A5103 Princess Road, near Mauldeth Road, Manchester",
+"lat": 53.4273762,
+"lon": -2.2531754
+},
+{
+"key": "Manchester|A6010 Alan Turing Way, Jct Ashton New Road, Manchester",
+"lat": 53.4815074,
+"lon": -2.1951727
+},
+{
+"key": "Manchester|A6010 Pottery Lane, Jct Hyde Road, Manchester",
+"lat": 53.4721158,
+"lon": -2.1941612
+},
+{
+"key": "Oldham|A6048 Featherstall Road North, Jct Middleton Road, Oldham",
+"lat": 53.5444924,
+"lon": -2.1285718
+},
+{
+"key": "Oldham|A62 Bottom O'th Moor, Jct Shaw Road, Oldham",
+"lat": 53.5438533,
+"lon": -2.0986418
+},
+{
+"key": "Oldham|A627 Ashton Road, Jct Chamber Road, Oldham",
+"lat": 53.5060261,
+"lon": -2.131437
+},
+{
+"key": "Oldham|A663 Broadway, Jct Middleton Road, Chadderton",
+"lat": 53.524919,
+"lon": -2.1631522
+},
+{
+"key": "Oldham|A671 Rochdale Road, Jct High Barn Street, Oldham",
+"lat": 53.5471807,
+"lon": -2.1200868
+},
+{
+"key": "Oldham|A6048 Featherstall Road North, near Westhulme Street, Chadderton, Oldham",
+"lat": 53.547414,
+"lon": -2.1270715
+},
+{
+"key": "Oldham|A62 Huddersfield Road, East of Brideoak Road, Oldham",
+"lat": 53.5467084,
+"lon": -2.0902737
+},
+{
+"key": "Oldham|A62 Manchester Road, North of Drury Lane, Oldham",
+"lat": 53.5467084,
+"lon": -2.0902737
+},
+{
+"key": "Oldham|A62 Oldham Road, near Derby Street, Failsworth",
+"lat": 53.5058992,
+"lon": -2.1700423
+},
+{
+"key": "Oldham|A62 Oldham Road, near Queen Street, Failsworth",
+"lat": 53.5058992,
+"lon": -2.1700423
+},
+{
+"key": "Oldham|A62 Oldham Road, North of Brown Street, Oldham",
+"lat": 53.5467084,
+"lon": -2.0902737
+},
+{
+"key": "Oldham|A627 Ashton Road, South of Coal Pit Lane, Oldham",
+"lat": 53.5060261,
+"lon": -2.131437
+},
+{
+"key": "Oldham|A663 Broadway, near Eustace Street, Oldham",
+"lat": 53.5224133,
+"lon": -2.1651971
+},
+{
+"key": "Oldham|A663 Broadway, near Fold Green, Chadderton",
+"lat": 53.524919,
+"lon": -2.1631522
+},
+{
+"key": "Oldham|A663 Milnrow Road, near Dunwood Park Court, Oldham",
+"lat": 53.5867417,
+"lon": -2.0882556
+},
+{
+"key": "Oldham|A663, Broadway, near Netherhey Lane, Oldham",
+"lat": 53.5224133,
+"lon": -2.1651971
+},
+{
+"key": "Oldham|A663, Broadway, Near Park View, Oldham",
+"lat": 53.524919,
+"lon": -2.1631522
+},
+{
+"key": "Oldham|A669 Middleton Road, West of Packwood Chase, Chadderton",
+"lat": 53.5457201,
+"lon": -2.1440363
+},
+{
+"key": "Oldham|A669 Oldham Road, near to jct with Mildred Avenue, Oldham",
+"lat": 53.5034412,
+"lon": -2.1784795
+},
+{
+"key": "Oldham|A672 Ripponden Road, North of Radcliffe Road, Oldham",
+"lat": 53.5477917,
+"lon": -2.0893902
+},
+{
+"key": "Oldham|A672 Ripponden Road, North of Turf Pit Lane, Oldham",
+"lat": 53.5477917,
+"lon": -2.0893902
+},
+{
+"key": "Oldham|B6194 Abbeyhills Road, near Alt Lane, Oldham",
+"lat": 53.5286397,
+"lon": -2.0837559
+},
+{
+"key": "Oldham|B6194 Higginshaw Lane, North of Milne Street, Oldham",
+"lat": 53.5423664,
+"lon": -2.1118553
+},
+{
+"key": "Oldham|B6194 Shaw Road, North of Sidney Street, Oldham",
+"lat": 53.5445263,
+"lon": -2.0973087
+},
+{
+"key": "Oldham|B6195 Middleton Road, near Stottfield, Oldham",
+"lat": 53.5456828,
+"lon": -2.1408635
+},
+{
+"key": "Oldham|High Street, Burton Street",
+"lat": 53.5458479,
+"lon": -2.008182
+},
+{
+"key": "Oldham|Lees Road, Wellyhole Street, Oldham",
+"lat": 53.5393858,
+"lon": -2.0875342
+},
+{
+"key": "Rochdale|A664 Albert Royds Street, Jct Milnrow Road, Rochdale",
+"lat": 53.6275345,
+"lon": -2.139137
+},
+{
+"key": "Rochdale|A664 Rochdale Road, Jct Stanycliffe Lane, Middleton",
+"lat": 53.5643142,
+"lon": -2.1843282
+},
+{
+"key": "Rochdale|A669 Oldham Road, Jct Townley Street, Middleton",
+"lat": 53.5511729,
+"lon": -2.1737026
+},
+{
+"key": "Rochdale|A58 Bolton Road, Manley Road, Rochdale",
+"lat": 53.6025251,
+"lon": -2.185295
+},
+{
+"key": "Rochdale|A58 Bury New Road, Heywood, Rochdale",
+"lat": 53.593262,
+"lon": -2.2383905
+},
+{
+"key": "Rochdale|A664 Albert Royds Street, North of Reservoir Street, Northbound, Rochdale",
+"lat": 53.6275417,
+"lon": -2.138956
+},
+{
+"key": "Rochdale|A664 Albert Royds Street, North of Reservoir Street, Southbound, Rochdale",
+"lat": 53.6275417,
+"lon": -2.138956
+},
+{
+"key": "Rochdale|A664 Rochdale Road, near Hill Bank Street, Rochdale",
+"lat": 53.5902651,
+"lon": -2.1241124
+},
+{
+"key": "Salford|A5063 Albion Way, Jct Liverpool Street, Salford",
+"lat": 53.4828548,
+"lon": -2.2772474
+},
+{
+"key": "Salford|A5063 Trafford Road, Regent Road Roundabout, Salford",
+"lat": 53.472603,
+"lon": -2.2823357
+},
+{
+"key": "Salford|A57 Liverpool Road, Jct to Peel Green Road, Salford",
+"lat": 53.4280384,
+"lon": -2.4357839
+},
+{
+"key": "Salford|A580 East Lancs Road, app to Mosley Common Road, Salford",
+"lat": 53.5085803,
+"lon": -2.4025332
+},
+{
+"key": "Salford|A580 East Lancs Road, app to Walkden Road, Salford",
+"lat": 53.5085803,
+"lon": -2.4025332
+},
+{
+"key": "Salford|A580 East Lancs Road, app to Walkden Road, Salford",
+"lat": 53.5085803,
+"lon": -2.4025332
+},
+{
+"key": "Salford|A5185 Lancaster Road, North Radcliffe Park Road, Salford",
+"lat": 53.4898041,
+"lon": -2.3201983
+},
+{
+"key": "Salford|A56 Bury New Road, North of New Hall Road, Salford",
+"lat": 53.5021627,
+"lon": -2.2581789
+},
+{
+"key": "Salford|A57 Liverpool Rd, Argosy Drive, Salford",
+"lat": 53.4777811,
+"lon": -2.3667709
+},
+{
+"key": "Salford|A575 Bolton Road, North of Thorpe Street, Walkden, Salford",
+"lat": 53.524459,
+"lon": -2.3989415
+},
+{
+"key": "Salford|A576 Eccles Old Road, Weaste Lane, Salford",
+"lat": 53.491101,
+"lon": -2.3109725
+},
+{
+"key": "Salford|A6 Broad Street, at Slip Road to Charles Street, Salford",
+"lat": 53.4973255,
+"lon": -2.3005668
+},
+{
+"key": "Salford|A580 East Lancs Road, app to Moorside Road, Swinton",
+"lat": 53.5085803,
+"lon": -2.4025332
+},
+{
+"key": "Salford|A580 East Lancs Road, app to Worsley Road, Swinton",
+"lat": 53.5085803,
+"lon": -2.4025332
+},
+{
+"key": "Stockport|A34 Kingsway, Jct Gatley Road, Stockport",
+"lat": 53.3906131,
+"lon": -2.2262543
+},
+{
+"key": "Stockport|A34 Kingsway, Jct Gatley Road, Stockport",
+"lat": 53.3906131,
+"lon": -2.2262543
+},
+{
+"key": "Stockport|A523 Macclesfield Road, Jct Dean Lane, Hazel Grove, Stockport",
+"lat": 53.3753444,
+"lon": -2.113772
+},
+{
+"key": "Stockport|A523 Macclesfield Road, Jct Mill Lane, Hazel Grove, Stockport",
+"lat": 53.3753444,
+"lon": -2.113772
+},
+{
+"key": "Stockport|A560 Hyde Road, Jct George Lane, Stockport",
+"lat": 53.4311573,
+"lon": -2.0897759
+},
+{
+"key": "Stockport|A6 Buxton Road, Jct Kennerley Road, Stockport",
+"lat": 53.3666804,
+"lon": -2.0837245
+},
+{
+"key": "Stockport|A6 Buxton Road, Jct Macclesfield Road, Hazel Grove, Stockport",
+"lat": 53.3744809,
+"lon": -2.1106286
+},
+{
+"key": "Stockport|A626 St Marys Way, Jct Hall Street, Stockport",
+"lat": 53.4029714,
+"lon": -2.149771
+},
+{
+"key": "Stockport|Higher Hillgate, Jct Longshut Lane, Stockport",
+"lat": 53.4029063,
+"lon": -2.1536288
+},
+{
+"key": "Stockport|A34 Kingsway, Adj Etchells Road Underbridge, Northbound, Cheadle Hulme, Stockport",
+"lat": 53.3970613,
+"lon": -2.2264167
+},
+{
+"key": "Stockport|A34 Kingsway, Adj Etchells Road Underbridge, Southbound, Cheadle Hulme, Stockport",
+"lat": 53.3970613,
+"lon": -2.2264167
+},
+{
+"key": "Stockport|A34 Kingsway, South of Lynton Road , Stockport",
+"lat": 53.3963787,
+"lon": -2.2266329
+},
+{
+"key": "Stockport|A34 Kingsway, Stanley Road, Cheadle, Stockport",
+"lat": 53.3970613,
+"lon": -2.2264167
+},
+{
+"key": "Stockport|A560 Brinksway, near Northgate Road, Stockport",
+"lat": 53.4066563,
+"lon": -2.174467
+},
+{
+"key": "Stockport|A560 Hyde Road, near Wyecroft Close, Stockport",
+"lat": 53.4311573,
+"lon": -2.0897759
+},
+{
+"key": "Stockport|A560 Stockport Road, near Elm Road South, Stockport",
+"lat": 53.4031222,
+"lon": -2.1868688
+},
+{
+"key": "Stockport|A560 Stockport Road, near Parkway, Stockport",
+"lat": 53.4031222,
+"lon": -2.1868688
+},
+{
+"key": "Stockport|A6 Buxton Road near Alma Road, Stockport",
+"lat": 53.3666804,
+"lon": -2.0837245
+},
+{
+"key": "Stockport|A6 Buxton Road, near Alderdale Drive, Stockport",
+"lat": 53.3666804,
+"lon": -2.0837245
+},
+{
+"key": "Stockport|A6 Buxton Road, near Mile End Lane, Stockport",
+"lat": 53.3666804,
+"lon": -2.0837245
+},
+{
+"key": "Stockport|A6 Buxton Road, near Southwood Road, Stockport",
+"lat": 53.3666804,
+"lon": -2.0837245
+},
+{
+"key": "Stockport|A6 Buxton Road, near Woodsmoor Lane, Stockport",
+"lat": 53.3666804,
+"lon": -2.0837245
+},
+{
+"key": "Stockport|A6 Wellington Road North, Glenfield Road, Northbound, Stockport",
+"lat": 53.4285631,
+"lon": -2.1780197
+},
+{
+"key": "Stockport|A6 Wellington Road North, Glenfield Road, Southbound, Stockport",
+"lat": 53.4285631,
+"lon": -2.1780197
+},
+{
+"key": "Stockport|B6104 Stockport Road West, near The Drive, Stockport",
+"lat": 53.4213443,
+"lon": -2.1214314
+},
+{
+"key": "Stockport|B6197 Reddish Road, near Coniston Road, Stockport",
+"lat": 53.4313111,
+"lon": -2.1554776
+},
+{
+"key": "Stockport|Brinnington Rise, near St Paul's School, Stockport",
+"lat": 53.4196358,
+"lon": -2.1417326
+},
+{
+"key": "Stockport|A6 Wellington Road North, Jct Heaton Lane, Stockport",
+"lat": 53.4285631,
+"lon": -2.1780197
+},
+{
+"key": "Tameside|A6017 Denton Road, Jct Stamford Road, Tameside",
+"lat": 53.4491971,
+"lon": -2.1091421
+},
+{
+"key": "Tameside|A627 Clark Way, M67 slip Road, Hyde",
+"lat": 53.4520127,
+"lon": -2.0759527
+},
+{
+"key": "Tameside|A627 King Street, Jct Astley Street, Dukinfield",
+"lat": 53.4753464,
+"lon": -2.0919266
+},
+{
+"key": "Tameside|A627 Oldham Road, Jct Wilshaw Lane, Ashton-Under-Lyne",
+"lat": 53.5011649,
+"lon": -2.1047065
+},
+{
+"key": "Tameside|A635 Manchester Road, Jct Ashton Hill Lane, Tameside",
+"lat": 53.4807902,
+"lon": -2.1651347
+},
+{
+"key": "Tameside|A635 Manchester Road, Jct Ashton Hill Lane, Tameside",
+"lat": 53.4807902,
+"lon": -2.1651347
+},
+{
+"key": "Tameside|Ashton Road, Jct Bennet Street, Hyde",
+"lat": 53.4643855,
+"lon": -2.0768568
+},
+{
+"key": "Tameside|Ashton Road, Jct Talbot Road, Hyde",
+"lat": 53.4643855,
+"lon": -2.0768568
+},
+{
+"key": "Tameside|A6017 Stockport Road, Wynne Grove, Tameside",
+"lat": 53.4375813,
+"lon": -2.0702045
+},
+{
+"key": "Tameside|A6018 Mottram Road, South East of Taylor Street, Stalybridge",
+"lat": 53.4514779,
+"lon": -2.064927
+},
+{
+"key": "Tameside|A627 Dukinfield Road, South of Dunkirk Lane, Hyde",
+"lat": 53.4580895,
+"lon": -2.0880369
+},
+{
+"key": "Tameside|A627 King Street, South of Pickford Lane, Dukinfield",
+"lat": 53.4753464,
+"lon": -2.0919266
+},
+{
+"key": "Tameside|A627 Oldham Road, Tree House Avenue, Tameside",
+"lat": 53.5011649,
+"lon": -2.1047065
+},
+{
+"key": "Tameside|A635 Wakefield Road, north of Souracre Fold, Tameside",
+"lat": 53.4870758,
+"lon": -2.0516467
+},
+{
+"key": "Tameside|B6175 High Street, East of James Street, Stalybridge",
+"lat": 53.48094,
+"lon": -2.0605185
+},
+{
+"key": "Tameside|B6175 High Street, Hobhill, Stalybridge",
+"lat": 53.4787432,
+"lon": -2.0682631
+},
+{
+"key": "Tameside|B6175 Huddersfield Road, Crowswood Drive, Tameside",
+"lat": 53.5282147,
+"lon": -2.024929
+},
+{
+"key": "Tameside|B6458 Stockport Road, Kensington Gardens, Hyde",
+"lat": 53.4375813,
+"lon": -2.0702045
+},
+{
+"key": "Trafford|A5145 Edge Lane, Jct Chester Road, Stretford",
+"lat": 53.4448621,
+"lon": -2.2989076
+},
+{
+"key": "Trafford|A5181 Barton Road, Jct Kingsway, Stretford",
+"lat": 53.444323,
+"lon": -2.3133734
+},
+{
+"key": "Trafford|A56 Cross St, Jct Dane Road, Sale",
+"lat": 53.4308417,
+"lon": -2.3193234
+},
+{
+"key": "Trafford|A56 Manchester Road, Woodcote Road, Trafford",
+"lat": 53.4303902,
+"lon": -2.4113416
+},
+{
+"key": "Trafford|A56 Washway Road, Jct Sibson Road, Sale",
+"lat": 53.4250369,
+"lon": -2.3259004
+},
+{
+"key": "Trafford|B5217 Seymour Grove, Jct Kings Road, Stretford",
+"lat": 53.4596681,
+"lon": -2.2757435
+},
+{
+"key": "Trafford|Chester Road, White City Way",
+"lat": 53.4622522,
+"lon": -2.2817533
+},
+{
+"key": "Trafford|Derbyshire Lane, Jct A5181 Park Road, Stretford",
+"lat": 53.4505464,
+"lon": -2.3164279
+},
+{
+"key": "Trafford|Junction of Chester Road, Kingsway",
+"lat": 53.3886741,
+"lon": -2.3493327
+},
+{
+"key": "Trafford|A5067 Talbot Road, near jct Warwick Road, Trafford",
+"lat": 53.4523485,
+"lon": -2.3000396
+},
+{
+"key": "Trafford|A538 Hale Road, near High Elm Road, Hale Barns",
+"lat": 53.3636082,
+"lon": -2.2982701
+},
+{
+"key": "Trafford|A56 Chester Road, near Cavendish Road, Stretford",
+"lat": 53.4452065,
+"lon": -2.308059
+},
+{
+"key": "Trafford|A56 Chester Road, near Cavendish Road, Stretford",
+"lat": 53.4452065,
+"lon": -2.308059
+},
+{
+"key": "Trafford|A56 Cross Street, near Elm Grove, Sale",
+"lat": 53.427541,
+"lon": -2.3231281
+},
+{
+"key": "Trafford|A56 Dunham Road, near Bow Green Road, Altrincham",
+"lat": 53.3796438,
+"lon": -2.3756574
+},
+{
+"key": "Trafford|A56 Dunham Road, near St Margarets Road, Altrincham",
+"lat": 53.3796438,
+"lon": -2.3756574
+},
+{
+"key": "Trafford|A56 Washway Road, South of Oakfield, Sale",
+"lat": 53.4250369,
+"lon": -2.3259004
+},
+{
+"key": "Trafford|A56 Washway Road, South of Selsey Street, Sale",
+"lat": 53.4250369,
+"lon": -2.3259004
+},
+{
+"key": "Trafford|A6144 Carrington Lane, near jct of Isherwood Road, Carrington",
+"lat": 53.4296384,
+"lon": -2.3486287
+},
+{
+"key": "Trafford|A6144 Manchester Road, Near to the Addison Road junction, Carrington",
+"lat": 53.4303902,
+"lon": -2.4113416
+},
+{
+"key": "Trafford|A6144 Marsland Road, near Lyme Grove, Sale",
+"lat": 53.4186094,
+"lon": -2.3074711
+},
+{
+"key": "Trafford|Barton Road, opp Edale Road, Stretford",
+"lat": 53.4599755,
+"lon": -2.3582133
+},
+{
+"key": "Trafford|Manor Avenue, near Plymouth Road, Sale",
+"lat": 53.4269379,
+"lon": -2.353764
+},
+{
+"key": "Wigan|A49 Chapel Lane, Jct Queen Street, Wigan",
+"lat": 53.5419482,
+"lon": -2.6303333
+},
+{
+"key": "Wigan|A49 Riverway, Jct Darlington Street, Wigan",
+"lat": 53.5436722,
+"lon": -2.6285163
+},
+{
+"key": "Wigan|A49 Riverway, Jct Rodney Street, Wigan",
+"lat": 53.5436722,
+"lon": -2.6285163
+},
+{
+"key": "Wigan|A579 Atherleigh Way, Jct Kirkhall Lane, Leigh",
+"lat": 53.5008922,
+"lon": -2.5250041
+},
+{
+"key": "Wigan|A579 Bolton Road, junction High Street, Atherton",
+"lat": 53.525451,
+"lon": -2.4873779
+},
+{
+"key": "Wigan|A580 East Lancs Road, Jct Atherleigh Way, Wigan",
+"lat": 53.5046027,
+"lon": -2.433455
+},
+{
+"key": "Wigan|Junction of Atherleigh Way, St.Helens Road",
+"lat": 53.4834729,
+"lon": -2.534057
+},
+{
+"key": "Wigan|A49 Wallgate, West of Haig Street, Wigan",
+"lat": 53.5404955,
+"lon": -2.6505215
+},
+{
+"key": "Wigan|A49 Warrington Road, near Stephens Way, Wigan",
+"lat": 53.4655985,
+"lon": -2.6006874
+},
+{
+"key": "Wigan|A49 Wigan Road, jct with Landgate Ind Est, Wigan",
+"lat": 53.5391316,
+"lon": -2.5694527
+},
+{
+"key": "Wigan|A49 Wigan Road, North West of Nicol Road, Ashton in Makerfield, Wigan",
+"lat": 53.5072182,
+"lon": -2.6957205
+},
+{
+"key": "Wigan|A572 Manchester Road, East of Marsland Green Lane, Astley",
+"lat": 53.5022923,
+"lon": -2.4483394
+},
+{
+"key": "Wigan|A572 St Helens Road, North East of New Barn Lane, Leigh",
+"lat": 53.4786974,
+"lon": -2.5400946
+},
+{
+"key": "Wigan|A577 Atherton Road, near Hawthorn Avenue, Wigan",
+"lat": 53.5303977,
+"lon": -2.5705169
+},
+{
+"key": "Wigan|A577 Orrell Road, Heyes Road, Orrell, Wigan",
+"lat": 53.5374264,
+"lon": -2.6899491
+},
+{
+"key": "Wigan|A58 Bolton Road, Riding Lane, Wigan",
+"lat": 53.562882,
+"lon": -2.563087
+},
+{
+"key": "Wigan|A58 Liverpool Road, South of Longton Street, Wigan",
+"lat": 53.5265475,
+"lon": -2.5899772
+},
+{
+"key": "Wigan|B5206 Shevington Lane, near Shevington High School, Wigan",
+"lat": 53.5739049,
+"lon": -2.6906755
+},
+{
+"key": "Wigan|B5207 Bryn Road, near Industrial Estate, Ashton In Makerfield, Wigan",
+"lat": 53.5016821,
+"lon": -2.6327702
+},
+{
+"key": "Wigan|B5328 Whelley, North of St Stephen's Avenue, Wigan",
+"lat": 53.5447021,
+"lon": -2.6109699
+},
+{
+"key": "Wigan|Spencer Road West, East of Gidlow Lane, Wigan",
+"lat": 53.560449,
+"lon": -2.6437821
+},
+{
+"key": "Wigan|Spring Road, North of motorway bridge, opps Latham Lane, Wigan",
+"lat": 53.549866,
+"lon": -2.6952324
+},
+{
+"key": "Manchester|A6104 Victoria Ave EB fm Beadham Dr to Plant Hill Rd Mcr",
+"lat": 53.5326148,
+"lon": -2.2087491
+},
+{
+"key": "Manchester|A6104 Victoria Ave WB fm Plant Hill Rd to Beadham Dr Mcr",
+"lat": 53.5326148,
+"lon": -2.2087491
+},
+{
+"key": "Salford|A580 East Lancs Road outside Moorside High School, Swinton",
+"lat": 53.5030591,
+"lon": -2.3164061
+},
+{
+"key": "Salford|A580 East Lancs Road outside Moorside High School, Swinton",
+"lat": 53.5030591,
+"lon": -2.3164061
+},
+{
+"key": "Salford|A580 East Lancs Road app to Mosley Common Road, Salford",
+"lat": 53.511585,
+"lon": -2.3932683
+},
+{
+"key": "Stockport|A523 Macclesfield Road Northbound, near Chatsworth Road, Hazel Grove, Stockport",
+"lat": 53.3753444,
+"lon": -2.113772
+},
+{
+"key": "Stockport|A523 Macclesfield Road Soutbound, near Chatsworth Road, Hazel Grove, Stockport",
+"lat": 53.3753444,
+"lon": -2.113772
+},
+{
+"key": "Tameside|A635 Manchester Road Eastbound, Lord Sheldon Way, Tameside",
+"lat": 53.4548161,
+"lon": -2.0949234
+},
+{
+"key": "Tameside|A635 Manchester Road Westbound, Moss Way, Tameside",
+"lat": 53.4548161,
+"lon": -2.0949234
+},
+{
+"key": "Tameside|B6175 Huddersfield Road Near St Pauls School, Stalybridge",
+"lat": 53.4836196,
+"lon": -2.0509927
+},
+{
+"key": "Trafford|A560 Shaftsbury Avenue, Jct Thorley Lane, Trafford",
+"lat": 53.3917688,
+"lon": -2.3274415
+},
+{
+"key": "Bolton|A666 St Peters Way, near to Burnden Road, Bolton",
+"lat": 53.5701772,
+"lon": -2.4151194
+}
+]
+}

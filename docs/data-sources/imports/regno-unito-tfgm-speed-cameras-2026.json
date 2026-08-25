@@ -1,0 +1,11 @@
+{
+    "slug": "regno-unito-tfgm-speed-cameras-2026",
+    "source_name": "United Kingdom — TfGM Speed Camera Locations, Greater Manchester (fixed)",
+    "format": "csv + geocode lookup",
+    "license": "OGL 3.0",
+    "license_url": "https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/",
+    "attribution_text": "Fonte: Transport for Greater Manchester via data.gov.uk — Speed Camera Locations in Greater Manchester (Fixed), concesso con licenza Open Government Licence v3.0. Coordinate geocodificate (street-level) da OpenStreetMap/Nominatim, 2026-08-20.",
+    "source_url": "https://www.data.gov.uk/dataset/c428ea7f-af17-451c-8657-8e15621490ab/speed-camera-locations-in-greater-manchester",
+    "max_records": 250,
+    "notes": "Verifica 2026-08-20: 231 telecamere FISSE (76 Red Light + 146 Speed + 2 Average Speed + 7 Speed&Red Light) su 10 borough. I CSV Mobile/Community Concern sono zone 'may park' (buffer, non posizioni) → NON importati. OGL 3.0 nel gate. CSV senza coordinate → geocoding Nominatim street-level pre-calcolato e committato (tfgm-lookup-2026.json). external_id tfgm-fixed:<district>:<seq>."
+}
