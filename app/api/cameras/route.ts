@@ -215,7 +215,7 @@ export async function GET(request: Request) {
       const withCount = params.get("count") !== "false";
       const page = await listPublicCamerasInBboxPage({ west, south, east, north }, filters, { limit: bboxLimit, offset: bboxOffset, count: withCount });
       return Response.json(
-        { records: page.records, total: page.total, nextOffset: page.nextOffset },
+        { records: page.records, total: page.total, nextOffset: page.nextOffset, decimated: page.decimated },
         { headers: { "Cache-Control": "public, s-maxage=900, stale-while-revalidate=1800", "Cache-Tag": CACHE_TAGS.list } },
       );
     }
