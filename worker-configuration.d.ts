@@ -163,6 +163,9 @@ declare module "cloudflare:workers" {
     // which MUST stay in the binding's allowed_sender_addresses).
     VERIFY_BASE_URL?: string;
     MAILER_FROM?: string;
+    // URGENT_REPORT_TO overrides the /correggi urgent-report notification
+    // recipient (issue #438; default privacy@opensurveillancedb.org).
+    URGENT_REPORT_TO?: string;
     // Re-send rate limit for auth emails (issue #440, ADR 0020 decision 2):
     // max sends per contributor inside the rolling window, enforced
     // ATOMICALLY in D1 via email_send_log reservations (INSERT ... SELECT
