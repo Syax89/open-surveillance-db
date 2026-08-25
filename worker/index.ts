@@ -57,6 +57,8 @@ interface Env {
   VERIFY_BASE_URL?: string;
   /** Sender address override for the EMAIL binding (default noreply@opensurveillancedb.org). */
   MAILER_FROM?: string;
+  /** Recipient override for urgent /correggi report notifications (issue #438; default privacy@opensurveillancedb.org). */
+  URGENT_REPORT_TO?: string;
   /**
    * Re-send rate limit for auth emails (issue #440, ADR 0020 decision 2):
    * max sends per contributor per rolling window, enforced ATOMICALLY in D1
