@@ -231,7 +231,7 @@ test("canonical host redirects HTTP and www requests before the app handler", as
   assert.equal(app.__calls.length, 0, "redirected aliases must not reach the app handler");
 });
 
-test("analytics: one datapoint per API request with group, status class, endpoint and method", async () => {
+test("analytics: one datapoint per API request with class, normalized endpoint, method and exact status", async () => {
   const { worker } = await loadWorker();
   const analytics = analyticsMock();
   const response = await worker.fetch(
@@ -242,8 +242,21 @@ test("analytics: one datapoint per API request with group, status class, endpoin
 
   assert.equal(response.status, 200);
   assert.equal(analytics.calls.length, 1);
-  assert.deepEqual(analytics.calls[0].blobs, ["api", "2xx", "/api/cameras", "GET"]);
+  assert.deepEqual(analytics.calls[0].blobs, ["api", "2xx", "/api/cameras", "GET", "200"]);
   assert.deepEqual(analytics.calls[0].doubles, [1]);
+});
+
+test("analytics: valid tile coordinates collapse to one low-cardinality endpoint", async () => {
+  const { worker } = await loadWorker();
+  const analytics = analyticsMock();
+  const response = await worker.fetch(
+    request("/api/tiles/8/129/84.png"),
+    testEnv({ ANALYTICS: analytics.binding }),
+    ctx(),
+  );
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(analytics.calls[0].blobs, ["api", "2xx", "/api/tiles/[z]/[x]/[y]", "GET", "200"]);
 });
 
 test("analytics: website traffic is logged as web without per-page breakdown", async () => {
@@ -272,6 +285,11 @@ test("analytics: 4xx (handler 404 and scanner 403) and 3xx (redirect) status cla
   assert.deepEqual(
     analytics.calls.map((point) => point.blobs[1]),
     ["4xx", "4xx", "3xx"],
+  );
+  assert.deepEqual(
+    analytics.calls.map((point) => point.blobs[4]),
+    ["404", "403", "308"],
+    "exact status distinguishes route blocks from ordinary client errors",
   );
 });
 

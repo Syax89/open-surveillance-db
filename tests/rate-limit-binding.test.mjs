@@ -22,8 +22,9 @@
 // All fixtures are fictional; no personal data is used.
 
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { after, afterEach, beforeEach, test } from "node:test";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 import {
   apiRequest,
@@ -45,6 +46,7 @@ async function sharedEnv() {
 }
 
 const BINDING_KEYS = ["AUTH_LIMITER", "WRITE_LIMITER", "READ_LIMITER", "TILES_LIMITER", "GEOCODE_LIMITER"];
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 beforeEach(async () => {
   resetMockState();
@@ -115,6 +117,15 @@ test("only auth, submit, read, tiles and geocode buckets resolve a rate-limiter 
     rateLimit.rateLimitBindingFor({ AUTH_LIMITER: { notALimiter: true } }, "auth"),
     undefined,
     "a binding without a limit() function must not resolve",
+  );
+});
+
+test("production READ_LIMITER matches the 300/min interactive-map contract", async () => {
+  const wrangler = await readFile(path.join(REPO_ROOT, "wrangler.jsonc"), "utf8");
+  assert.match(
+    wrangler,
+    /"name": "READ_LIMITER", "namespace_id": "1203", "simple": \{ "limit": 300, "period": 60 \}/,
+    "the deployed binding must not silently fall back to the obsolete 60/min cap",
   );
 });
 

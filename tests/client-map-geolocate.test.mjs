@@ -85,6 +85,16 @@ test("geolocate button stacks ABOVE the zoom control (added last, same corner)",
   assert.ok(button.querySelector("svg"), "the button carries a decorative icon");
 });
 
+test("base tiles wait for map idle and avoid intermediate zoom requests", async () => {
+  await renderMap();
+  const [map] = await leafletMaps();
+  const tile = map.tileLayerOptions?.find((entry) => entry.url === "/api/tiles/{z}/{x}/{y}.png");
+  assert.ok(tile, "the map must keep using the same-origin tile proxy");
+  assert.equal(tile.opts.updateWhenIdle, true, "panning must wait until the gesture settles");
+  assert.equal(tile.opts.updateWhenZooming, false, "smooth zoom must not load every intermediate level");
+  assert.equal(tile.opts.keepBuffer, 1, "one buffer ring keeps panning smooth without the default 80-tile burst");
+});
+
 test("click asks geolocation, pans/zooms to the position and draws dot + accuracy circle", async () => {
   const view = await renderMap();
   const maps = await leafletMaps();
