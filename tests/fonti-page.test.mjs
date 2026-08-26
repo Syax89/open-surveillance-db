@@ -198,7 +198,7 @@ test("GET /licenze: general mention of imported datasets links /fonti (CEO route
   }
 });
 
-test("GET /sitemap.xml includes the canonical absolute /fonti URL", async () => {
+test("GET /sitemap.xml index lists the static sitemap, which includes /fonti", async () => {
   const mf = new Miniflare({
     modules: await workerModules(),
     compatibilityDate: "2026-01-01",
@@ -211,12 +211,20 @@ test("GET /sitemap.xml includes the canonical absolute /fonti URL", async () => 
     // The sitemap queries cameras with the shared public predicate; the
     // minimal table carries exactly the columns the predicate references.
     await d1.prepare("CREATE TABLE cameras (id integer PRIMARY KEY AUTOINCREMENT NOT NULL, status text NOT NULL, review_due_at text, updated text NOT NULL)").run();
-    const response = await mf.dispatchFetch("http://localhost/sitemap.xml", {
+    const index = await mf.dispatchFetch("http://localhost/sitemap.xml", {
       headers: { accept: "application/xml" },
     });
-    const body = await response.text();
-    assert.equal(response.status, 200);
-    assert.ok(body.includes("<loc>https://opensurveillancedb.org/fonti</loc>"), "sitemap.xml must list the canonical absolute /fonti URL");
+    const indexBody = await index.text();
+    assert.equal(index.status, 200);
+    assert.match(indexBody, /<sitemapindex/, "sitemap.xml must be a sitemap index");
+    assert.ok(
+      indexBody.includes("<loc>https://opensurveillancedb.org/sitemap/static.xml</loc>"),
+      "the index must list the static-routes sitemap",
+    );
+    const staticSitemap = await mf.dispatchFetch("http://localhost/sitemap/static.xml");
+    const staticBody = await staticSitemap.text();
+    assert.equal(staticSitemap.status, 200);
+    assert.ok(staticBody.includes("<loc>https://opensurveillancedb.org/fonti</loc>"), "static sitemap must list the canonical absolute /fonti URL");
   } finally {
     await mf.dispose();
   }

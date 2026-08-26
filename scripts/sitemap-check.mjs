@@ -94,11 +94,18 @@ for (const url of ["http://localhost/sitemap.xml", "http://localhost/robots.txt"
   const body = await res.text();
   console.log(`--- ${url} -> ${res.status} (${body.length} B)`);
   if (url.includes("sitemap")) {
-    const urls = [...body.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
-    console.log(`  entries: ${urls.length}`);
-    console.log(`  sample: ${urls.slice(0, 5).join(", ")}`);
-    const records = urls.filter((u) => u.includes("/records/"));
-    console.log(`  /records entries: ${records.length} (${records.slice(0, 5).join(", ")})`);
+    const sitemaps = [...body.matchAll(/<sitemap>\s*<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
+    console.log(`  index entries: ${sitemaps.length} (${sitemaps.slice(0, 6).join(", ")}${sitemaps.length > 6 ? ", …" : ""})`);
+    // Follow the first record chunk and the static sitemap.
+    const chunkUrl = sitemaps.find((s) => /\/sitemap\/\d+\.xml$/.test(s));
+    for (const follow of [chunkUrl, sitemaps[0]].filter(Boolean)) {
+      const chunk = await mf.dispatchFetch(new URL(follow, "http://localhost").toString());
+      const chunkBody = await chunk.text();
+      const urls = [...chunkBody.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
+      console.log(`  -> ${follow} -> ${chunk.status} (${chunkBody.length} B, ${urls.length} entries)`);
+      const records = urls.filter((u) => u.includes("/records/"));
+      if (records.length) console.log(`     /records entries: ${records.length} (${records.slice(0, 5).join(", ")})`);
+    }
   } else {
     console.log(`  body: ${body.slice(0, 200).replace(/\n/g, " ")}`);
   }
