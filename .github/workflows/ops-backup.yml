@@ -20,7 +20,15 @@ on:
   schedule:
     - cron: "0 2 * * *" # ogni giorno 02:00 UTC — backup D1 (gated su vars.ENABLE_CF_BACKUP, F10)
     - cron: "0 3 1 */3 *" # trimestrale 03:00 UTC — restore drill (gated su vars.ENABLE_RESTORE_DRILL + ENABLE_CF_BACKUP, F10)
-  workflow_dispatch: {} # esecuzione manuale (drill)
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "backup = export+cifra+upload; drill = backup + restore drill su D1 temporaneo (scrive su D1: consuma quota righe)"
+        type: choice
+        options:
+          - backup
+          - drill
+        default: backup
 
 concurrency:
   group: ops-backup
@@ -90,8 +98,14 @@ jobs:
       - name: Verifica struttura (3 tabelle attese)
         run: |
           f="${{ steps.export.outputs.file }}"
+          # Regressione 2026-08-01/03: il dump riproduce il testo originale di
+          # sqlite_master e le migrazioni drizzle creano le tabelle fra
+          # backtick (CREATE TABLE <backtick>cameras<backtick> (), quindi il
+          # vecchio grep "CREATE TABLE cameras " non poteva MAI matchare e il
+          # job era rosso a ogni tentativo. Pattern tollerante a quoting e
+          # spazi variabili.
           for t in cameras correction_requests moderation_events; do
-            if grep -q "CREATE TABLE ${t} " "$f"; then
+            if grep -qE "CREATE TABLE [\"'\`]?${t}[\"'\`]? *\(" "$f"; then
               echo "OK tabella ${t}"
             else
               echo "::error::tabella ${t} MANCANTE nel dump ${f}"
@@ -154,15 +168,19 @@ jobs:
     name: Restore drill (D1 temporaneo, F10 qa#5)
     # F10 (t_ab0d4c75): il restore non era MAI stato esercitato. Il drill
     # scarica l'ultimo backup cifrato, lo applica a un D1 temporaneo e fa
-    # smoke sui conteggi. Manuale (workflow_dispatch) oppure trimestrale,
-    # ma solo se il backup CF è attivo E il drill è esplicitamente abilitato
-    # (vars.ENABLE_RESTORE_DRILL == "true") — niente run rossi per design.
+    # smoke sui conteggi. Manuale (workflow_dispatch, mode=drill) oppure solo
+    # al cron trimestrale (03:00 del 1° del mese ogni 3), e solo se il backup
+    # CF è attivo E il drill è abilitato (vars.ENABLE_RESTORE_DRILL == "true").
+    # `needs: backup`: senza dipendenza il drill partiva in parallelo e non
+    # trovava l'artifact del run ("Nessun artifact d1-backup-* disponibile").
+    # Il gate su github.event.schedule evita il drill a OGNI run notturno.
+    needs: backup
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
       actions: read
       contents: read
-    if: ${{ github.event_name == 'workflow_dispatch' || (vars.ENABLE_CF_BACKUP == 'true' && vars.ENABLE_RESTORE_DRILL == 'true') }}
+    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.mode == 'drill') || (github.event.schedule == '0 3 1 */3 *' && vars.ENABLE_CF_BACKUP == 'true' && vars.ENABLE_RESTORE_DRILL == 'true') }}
 
     steps:
       - name: Checkout
