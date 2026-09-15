@@ -1528,3 +1528,77 @@ test("tfgm: parses the Fixed CSV using the committed geocode lookup", () => {
   assert.equal(skipped.total, 1);
   assert.ok(Object.keys(skipped.reasons)[0].includes("no geocode"));
 });
+
+// -------------------------------------------------- wave 16: Hong Kong + Singapore road cameras
+
+import { parsePayload as hkTdParse } from "../scripts/import/adapters/hong-kong-td-traffic-cameras-2026.mjs";
+import { parsePayload as hkRlcParse } from "../scripts/import/adapters/hong-kong-rlc-junctions-2026.mjs";
+import { parsePayload as sgRoadParse } from "../scripts/import/adapters/singapore-lta-road-cameras-2026.mjs";
+
+test("wave-16 licence-gate: data.gov.hk Terms of Use è importabile", () => {
+  // Hong Kong TD (traffic snapshot + RLC junctions): art. 8 ToU, attribution-only.
+  assert.equal(isLicenceImportable("data.gov.hk Terms of Use"), true);
+  // Singapore LTA Road Camera: stessa classe (attribution-only).
+  assert.equal(isLicenceImportable("Singapore Open Data Licence v1.0"), true);
+});
+
+test("hk-td: parses the UTF-16 tab-separated camera locations into canonical rows", () => {
+  const header = "Key\tRegion\tDistrict\tDescription\tLatitude\tLongitude\tURL";
+  const rows = [
+    "TC01\tHong Kong Island\tCentral\tCentral ferry pier [RLC]\t22.288900\t114.161000\thttps://static.example/tc01.jpg",
+    "TC02\tKowloon\tWong Tai Sin\tWong Tai Sin junction\t22.341500\t114.197000\t",
+    "TC03\tNew Territories\tSha Tin\tCoordinates missing\t0\t0\thttps://static.example/tc03.jpg",
+  ];
+  const { staged, skipped } = hkTdParse({ text: `\uFEFF${[header, ...rows].join("\r\n")}` });
+  assert.equal(staged.length, 2);
+  assert.equal(staged[0].title, "Central ferry pier"); // suffisso [RLC] rimosso
+  assert.equal(staged[0].external_id, "hk-td:TC01");
+  assert.equal(staged[0].kind, "Traffic / licence plate reader");
+  assert.equal(staged[0].latitude, 22.2889);
+  assert.equal(staged[0].longitude, 114.161);
+  assert.equal(staged[0].direction, null);
+  assert.equal(staged[0].notes, "Hong Kong Island / Central");
+  assert.equal(staged[0].description, "Snapshot: https://static.example/tc01.jpg");
+  assert.equal(staged[1].title, "Wong Tai Sin junction");
+  assert.equal(skipped.total, 1); // (0,0) → out of range
+});
+
+test("hk-rlc: parses the geocoded JSONL and skips junctions without coordinates (fail-closed)", () => {
+  const text = [
+    '{"no":"1","name":"Des Voeux Road Central / Pedder Street","lat":22.2821,"lon":114.1552,"display":"Pedder Street, Hong Kong"}',
+    '{"no":"2","name":"Nathan Road / Dundas Street","lat":null,"lon":null,"display":null}',
+    "not-json",
+    '{"no":"3","name":"","lat":22.32,"lon":114.17}',
+  ].join("\n");
+  const { staged, skipped } = hkRlcParse({ text });
+  assert.equal(staged.length, 1);
+  assert.equal(staged[0].title, "Red light camera junction: Des Voeux Road Central / Pedder Street");
+  assert.equal(staged[0].external_id, "hk-rlc:1");
+  assert.equal(staged[0].description, "Nominatim: Pedder Street, Hong Kong");
+  assert.equal(staged[0].latitude, 22.2821);
+  assert.equal(staged[0].longitude, 114.1552);
+  assert.equal(skipped.total, 3); // coordinate assenti + riga non-JSON + nome mancante
+});
+
+test("sg-road: parses the LTA Road Camera GeoJSON into canonical rows", () => {
+  const payload = {
+    type: "FeatureCollection",
+    features: [
+      { type: "Feature", properties: { Name: "Woodlands Ave 3", Description: "LTA camera at Woodlands Ave 3" }, geometry: { type: "Point", coordinates: [103.7946, 1.4374] } },
+      { type: "Feature", properties: { Name: "Not a point" }, geometry: { type: "LineString", coordinates: [[103.8, 1.4], [103.81, 1.41]] } },
+      { type: "Feature", properties: { Name: "Zero island" }, geometry: { type: "Point", coordinates: [0, 0] } },
+      { type: "Feature", properties: { Description: "unnamed camera" }, geometry: { type: "Point", coordinates: [103.8, 1.35] } },
+    ],
+  };
+  const { staged, skipped } = sgRoadParse({ text: JSON.stringify(payload) });
+  assert.equal(staged.length, 2);
+  assert.equal(staged[0].external_id, "sg-road:Woodlands Ave 3");
+  assert.equal(staged[0].title, "Woodlands Ave 3");
+  assert.equal(staged[0].kind, "Traffic / licence plate reader");
+  assert.equal(staged[0].latitude, 1.4374);
+  assert.equal(staged[0].longitude, 103.7946);
+  assert.equal(staged[0].notes, "LTA camera at Woodlands Ave 3");
+  assert.equal(staged[1].title, "Singapore road camera 2"); // fallback se Name manca
+  assert.equal(staged[1].external_id, "sg-road:2");
+  assert.equal(skipped.total, 2); // LineString + (0,0)
+});

@@ -1,0 +1,11 @@
+{
+    "slug": "hong-kong-rlc-junctions-2026",
+    "source_name": "Hong Kong — Junctions with Red Light Camera System installed (TD)",
+    "format": "geojson",
+    "license": "data.gov.hk Terms of Use",
+    "license_url": "https://data.gov.hk/en/terms-agreement",
+    "attribution_text": "Fonte: Hong Kong Transport Department via data.gov.hk — Junctions with Red Light Camera System installed (https://data.gov.hk/en-data/dataset/hk-td-tis_25-junctions-with-rlc), concesso con data.gov.hk Terms of Use.",
+    "source_url": "https://www.td.gov.hk/datagovhk_td/junctions-with-rlc/resources/junctions_with_rlc.csv",
+    "max_records": 300,
+    "notes": "Coda giurisdizioni pass v2 (2026-08-21, catalogo OK): 232 giunzioni con sistema Red Light Camera. Il dataset NON ha coordinate: geocodificate via Nominatim (1 req/s, UA ufficiale OpenSurveillanceDB-import; script payloads/geocode-hk-rlc.py) e importate con payload JSONL. Giunzioni senza hit geocodifica SKIP con motivo documentato (fail-closed: nessuna coordinata inventata). external_id hk-rlc:<No.>. Aggiornato 'as and when major update'."
+}
