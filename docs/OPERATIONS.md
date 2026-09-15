@@ -274,8 +274,12 @@ scheduled it.
 - The backup workflow saves only **encrypted** artifacts (AES-256-CBC,
   passphrase in `secrets.BACKUP_PASSPHRASE`): an unencrypted artifact on the
   public repo would amount to a data leak.
-- GitHub artifacts with finite retention (30 days) are the acceptable minimum;
-  for long retention use private R2 or company storage (always encrypted).
+- Retention is deliberately bounded and matches RETENTION_SCHEDULE.md R10:
+  encrypted GitHub artifacts for 30 days **and** the encrypted off-site copy in
+  R2 expiring after 30 days (object lifecycle rule `expire-d1-backups` on the
+  `d1-backups/` prefix). **No long-term backup copy is kept** — extending that
+  window means updating R10, the processor register and the privacy notice in
+  the same PR.
 - Additional remote backups (NAS/object) must use an encrypted channel and
   restricted access.
 
