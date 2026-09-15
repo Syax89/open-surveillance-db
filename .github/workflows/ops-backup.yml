@@ -98,14 +98,16 @@ jobs:
       - name: Verifica struttura (3 tabelle attese)
         run: |
           f="${{ steps.export.outputs.file }}"
-          # Regressione 2026-08-01/03: il dump riproduce il testo originale di
-          # sqlite_master e le migrazioni drizzle creano le tabelle fra
-          # backtick (CREATE TABLE <backtick>cameras<backtick> (), quindi il
-          # vecchio grep "CREATE TABLE cameras " non poteva MAI matchare e il
-          # job era rosso a ogni tentativo. Pattern tollerante a quoting e
-          # spazi variabili.
+          # Il dump riproduce il testo di sqlite_master, che NON e' uniforme:
+          # le tabelle create dalle migrazioni drizzle hanno i backtick
+          # (CREATE TABLE `cameras` (), mentre correction_requests - ricreata
+          # con uno statement IF NOT EXISTS e rinominata dalla 0015 - compare
+          # come CREATE TABLE IF NOT EXISTS "correction_requests" (.
+          # Il vecchio grep "CREATE TABLE cameras " non poteva matchare nulla
+          # (job rosso dal 2026-08-01). Pattern tollerante a IF NOT EXISTS,
+          # quoting e spazi, verificato contro il dump reale di produzione.
           for t in cameras correction_requests moderation_events; do
-            if grep -qE "CREATE TABLE [\"'\`]?${t}[\"'\`]? *\(" "$f"; then
+            if grep -qE "CREATE TABLE (IF NOT EXISTS )?[\"'\`]?${t}[\"'\`]?[[:space:]]*\(" "$f"; then
               echo "OK tabella ${t}"
             else
               echo "::error::tabella ${t} MANCANTE nel dump ${f}"
