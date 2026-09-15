@@ -107,7 +107,11 @@ function main() {
     console.error(`# attenzione: tabelle nei dati assenti dallo schema: ${unknown.join(", ")}`);
   }
   const out = [...head];
-  for (const t of [...ordered, ...cycles]) out.push(...byTable.get(t));
+  // push riga per riga: lo spread di ~160k argomenti manda in RangeError
+  // (Maximum call stack size exceeded) — successo nel run 34975382804.
+  for (const t of [...ordered, ...cycles]) {
+    for (const line of byTable.get(t)) out.push(line);
+  }
   process.stdout.write(out.join("\n"));
   console.error(`# riordinate ${byTable.size} tabelle (${ordered.length} in ordine topologico)`);
 }
