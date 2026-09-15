@@ -123,6 +123,14 @@ export const IMPORTABLE_LICENSES = new Set([
   // (verified 2026-08-16 on data.gov.sg/datasets/d_6cdb6b…).
   "Singapore Open Data Licence",
   "Singapore Open Data Licence v1.0",
+  // Hong Kong — data.gov.hk Terms of Use (TD traffic snapshot cameras +
+  // junctions with RLC): art. 8 grants browse/download/distribute/reproduce
+  // for commercial and non-commercial purposes, free of charge; attribution
+  // required ("identify clearly the source of the Data and acknowledge the
+  // Government ownership of the intellectual property rights"); no
+  // share-alike, no NC (verified 2026-08-21: portal terms page + OGD licence
+  // literature).
+  "data.gov.hk Terms of Use",
   // Generic CC BY 3.0 — classe attribution-only. DECISIONE PM 2026-08-09
   // (kanban t_8a0445a4): il dataset Denver HALO NON espone licenza
   // esplicita (solo disclaimer del catalogo) → campo licenza del

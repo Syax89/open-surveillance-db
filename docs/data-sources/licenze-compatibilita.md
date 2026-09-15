@@ -41,6 +41,8 @@ Method rule: every legal statement is checked against the source cited in § 9; 
 | **KOGL Type 1** (Korea, ITS) | ✅ Yes, with attribution | Attribution + licence link | No | Importable |
 | **PDDL** (Open Data Commons Public Domain, San Francisco) | ✅ Yes, public domain | No obligations | No | Importable |
 | **CC BY 3.0 AU** (Australia, TfNSW/QLD) | ✅ Yes, with attribution | Attribution + licence link | No | Importable |
+| **data.gov.hk Terms of Use** (Hong Kong, TD) | ✅ Yes, with attribution | Attribution + acknowledgement of Government IP | No | Importable |
+| **Singapore Open Data Licence v1.0** (LTA) | ✅ Yes, with attribution | Attribution + licence link | No | Importable |
 | **Vlaamse Open Data Licentie v1.0** (Belgium) | ✅ Yes, with attribution | Attribution + licence link | No | Importable |
 | **King County GIS Terms** (copy/distribute permitted; **sale prohibited**) | ❌ REMOVED 2026-08-09 | Sale requires a written agreement — incompatible with § 3.6 (no commercial restriction) | — | **Removed** (PM decision, § 3.9.2) |
 | **«Open Data Common» (ODC)** (Thailandia, gdcatalog.go.th) | ⚠️ Ambiguous string | Not a valid Open Data Commons family licence; kept ONLY for Nakhon Ratchasima with government-camera filter | ? | **Restricted** (§ 3.9.3) |
@@ -177,6 +179,8 @@ aligned in the same PR.
 | `Open Data Common (ODC)` | Thailandia Nakhon Ratchasima (tailandia-nakhon-ratchasima-cctv-2026) | String declared by the portal; NOT a valid Open Data Commons family licence | ⚠️ § 3.9.3 (kept, government-only filter) |
 | `Serbian Open Data License` / `SODL` | Serbia — City of Subotica (serbia-subotica-*-2026) | terms page data.gov.rs/sr/terms: commercial and non-commercial reuse, copying, distribution, adaptation, merging, with attribution and change marking (verified cron 2026-08-15) | Importable with attribution |
 | `TW OGL v1` / `Taiwan Open Government Data License v1` | Taiwan (future, data.gov.tw) | Attribution-only, same obligations class as CC-BY (verified 2026-08-08; source geoblocked from our networks — network block, not licence) | Importable with attribution |
+| `data.gov.hk Terms of Use` | Hong Kong TD traffic snapshot + RLC (hong-kong-td-traffic-cameras-2026, hong-kong-rlc-junctions-2026) | Art. 8: browse/download/distribute/reproduce for commercial and non-commercial purposes, free of charge; attribution required («identify clearly the source of the Data and acknowledge the Government ownership of the intellectual property rights»); no share-alike, no NC (verified 2026-08-21: portal terms-and-conditions + OGD licence literature) | Importable with attribution |
+| `Singapore Open Data Licence v1.0` | LTA Road Camera (singapore-lta-road-cameras-2026) | Worldwide, perpetual, royalty-free, non-exclusive; use/access/download/copy/distribute/transmit/modify/adapt, commercial or non-commercial; attribution required; no share-alike (verified 2026-08-21 on data.gov.sg/open-data-licence) | Importable with attribution |
 
 #### 3.9.2 King County — «sale prohibited» vs criterion § 3.6 (no commercial restriction) — REMOVED
 
