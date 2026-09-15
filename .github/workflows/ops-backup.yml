@@ -257,6 +257,11 @@ jobs:
         run: |
           stamp=$(date +%s)
           db="osdb-restore-drill-${stamp}"
+          # Cleanup SEMPRE, anche se lo step fallisce a metà: nel primo run del
+          # drill (34969640324) un errore prima del delete ha lasciato un D1
+          # temporaneo appeso.
+          cleanup() { npx wrangler d1 delete "$db" --config=wrangler-drill.jsonc --yes || echo "::warning::Cleanup D1 temporaneo fallito: ${db}"; }
+          trap cleanup EXIT
           create_out=$(npx wrangler d1 create "$db" 2>&1)
           db_id=$(echo "$create_out" | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' | head -1)
           if [ -z "$db_id" ]; then
@@ -264,18 +269,15 @@ jobs:
             exit 1
           fi
           echo "D1 temporaneo: ${db} (${db_id})"
-          # Config temporanea con il binding del drill (il file committato resta intatto)
-          DB_NAME="$db" DB_ID="$db_id" node -e '
-            const fs = require("fs");
-            const cfg = JSON.parse(fs.readFileSync("wrangler.jsonc", "utf8"));
-            cfg.d1_databases.push({ binding: "DB_DRILL", database_name: process.env.DB_NAME, database_id: process.env.DB_ID });
-            fs.writeFileSync("wrangler-drill.jsonc", JSON.stringify(cfg, null, 2));
-          '
+          # Config MINIMA per il drill (il file committato resta intatto).
+          # NON parsare wrangler.jsonc con JSON.parse: e' JSONC (commenti) e il
+          # drill moriva con "Expected double-quoted property name" prima di
+          # arrivare al restore.
+          printf '{\n  "name": "osdb-restore-drill",\n  "compatibility_date": "2026-01-01",\n  "d1_databases": [\n    { "binding": "DB_DRILL", "database_name": "%s", "database_id": "%s" }\n  ]\n}\n' "$db" "$db_id" > wrangler-drill.jsonc
+          node -e 'JSON.parse(require("fs").readFileSync("wrangler-drill.jsonc","utf8"))' || { echo "::error::wrangler-drill.jsonc non valido"; exit 1; }
           npx wrangler d1 execute "$db" --remote --config=wrangler-drill.jsonc --file=restore.sql --yes
           echo "--- Smoke conteggi (D1 temporaneo) ---"
           npx wrangler d1 execute "$db" --remote --config=wrangler-drill.jsonc \
             --command="SELECT 'cameras' t, COUNT(*) n FROM cameras UNION ALL SELECT 'correction_requests', COUNT(*) FROM correction_requests UNION ALL SELECT 'moderation_events', COUNT(*) FROM moderation_events;" \
             --json | tee drill-counts.json
           echo "RESTORE DRILL OK: dump applicato e conteggi verificati su D1 temporaneo."
-          npx wrangler d1 delete "$db" --config=wrangler-drill.jsonc --yes \
-            || echo "::warning::Cleanup D1 temporaneo fallito: ${db}"
