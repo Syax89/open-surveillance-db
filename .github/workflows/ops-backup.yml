@@ -104,6 +104,26 @@ jobs:
           echo "stamp=${stamp}" >> "$GITHUB_OUTPUT"
           ls -la "d1-backup-${stamp}.schema.sql" "d1-backup-${stamp}.data.sql"
 
+      - name: Riordina i dati per le foreign key (genitori prima dei figli)
+        # L'export ordina le tabelle alfabeticamente: i figli finiscono prima
+        # dei genitori e l'import remoto (che committa a batch, quindi il
+        # PRAGMA defer_foreign_keys in testa al dump non basta) muore con
+        # "FOREIGN KEY constraint failed" — drill 34973331544. Con l'ordine
+        # topologico il file dati si applica dopo lo schema senza violazioni.
+        run: |
+          stamp="${{ steps.export.outputs.stamp }}"
+          f="d1-backup-${stamp}.data.sql"
+          before=$(grep -c '^INSERT INTO' "$f")
+          node scripts/ops/reorder-d1-data.mjs "d1-backup-${stamp}.schema.sql" "$f" > "${f}.ordered"
+          after=$(grep -c '^INSERT INTO' "${f}.ordered")
+          if [ "$before" != "$after" ]; then
+            echo "::error::riordino ha perso statement ($before -> $after): backup abortito"
+            exit 1
+          fi
+          mv "${f}.ordered" "$f"
+          echo "statement preservati: ${after}"
+          echo "ordine tabelle: $(grep -o '^INSERT INTO [^ (]*' "$f" | sed 's/.*INTO //' | tr -d '\"' | uniq | tr '\n' ' ')"
+
       - name: Verifica struttura (3 tabelle attese) + dati presenti
         run: |
           stamp="${{ steps.export.outputs.stamp }}"

@@ -220,10 +220,26 @@ schema change. Two patterns, depending on the state of the destination DB:
 
 **Pattern A — full restore on a pristine D1 (disaster recovery).**
 
+Since 2026-09-15 each backup is **two encrypted files** — `d1-backup-<DATE>.schema.sql.enc`
+and `d1-backup-<DATE>.data.sql.enc` — not a single dump: the single dump is NOT
+restorable on D1 (its per-table order puts child rows before their parent
+table, and the remote import commits in batches so `PRAGMA defer_foreign_keys`
+does not cover batch boundaries → `no such table: main.contributors` /
+`FOREIGN KEY constraint failed`).
+
 ```bash
-# 1. Destination DB: empty (new D1 database, or reset)
-# 2. Ingest the dump (schema + data):
-npx wrangler d1 execute osdb-production --remote --file=d1-backup-<DATE>.sql
+# 1. Decrypt both files and verify the checksums
+sha256sum -c d1-backup-<DATE>.schema.sql.enc.sha256
+sha256sum -c d1-backup-<DATE>.data.sql.enc.sha256
+openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:${BACKUP_PASSPHRASE}" \
+  -in d1-backup-<DATE>.schema.sql.enc -out restore.schema.sql
+openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:${BACKUP_PASSPHRASE}" \
+  -in d1-backup-<DATE>.data.sql.enc -out restore.data.sql
+# 2. Apply in TWO passes, in this order (schema first: every table must exist
+#    before the rows; the data file is already in FK-safe order, written by
+#    scripts/ops/reorder-d1-data.mjs during the backup)
+npx wrangler d1 execute osdb-production --remote --file=restore.schema.sql --yes
+npx wrangler d1 execute osdb-production --remote --file=restore.data.sql --yes
 # 3. Verify structure: the 3 tables must exist
 npx wrangler d1 execute osdb-production --remote \
   --command="SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name;"
@@ -231,16 +247,18 @@ npx wrangler d1 execute osdb-production --remote \
 #    (section 3.3)
 ```
 
+With an older single dump (or a data file exported elsewhere) the FK order can
+be fixed before applying it: `node scripts/ops/reorder-d1-data.mjs schema.sql data.sql > data-ordered.sql`.
+
 **Pattern B — re-import on an existing D1 (data rollback, no reset).**
 
-A full dump on a DB that already has the tables fails with
+A schema pass on a DB that already has the tables fails with
 `table already exists` (verified). To reload data only:
 
 ```bash
-# 1. Export the data-only backup (from the backup or export --no-schema)
-npx wrangler d1 export osdb-production --remote --no-schema --output=d1-data-$(date +%F).sql
-# 2. Reload the data on the existing DB
-npx wrangler d1 execute osdb-production --remote --file=d1-data-<DATE>.sql
+# 1. Decrypt the data-only file of the desired backup (Pattern A, step 1)
+# 2. Reload the data on the existing DB (order already FK-safe)
+npx wrangler d1 execute osdb-production --remote --file=restore.data.sql --yes
 # 3. Verify counts as in Pattern A
 ```
 
