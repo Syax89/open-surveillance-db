@@ -72,6 +72,29 @@ test("splitInserts: INSERT multi-riga -> errore (fail-closed, niente dump corrot
   );
 });
 
+test("CLI: regge un dump grande (150k INSERT) senza RangeError sullo spread", () => {
+  const dir = mkdtempSync(join(tmpdir(), "osdb-reorder-big-"));
+  const schemaPath = join(dir, "schema.sql");
+  const dataPath = join(dir, "data.sql");
+  writeFileSync(schemaPath, SCHEMA);
+  const rows = [];
+  rows.push('INSERT INTO `camera_lifecycle_events` (id,camera_id) VALUES(1,10);');
+  for (let i = 0; i < 150_000; i++) {
+    rows.push(`INSERT INTO "contributors" (id,email) VALUES(${i},'u${i}@example.org');`);
+  }
+  rows.push("INSERT INTO `cameras` (id,title,contributor_id) VALUES(10,'A',7);");
+  writeFileSync(dataPath, rows.join("\n") + "\n");
+
+  const out = execFileSync("node", [SCRIPT, schemaPath, dataPath], {
+    encoding: "utf8",
+    maxBuffer: 64 * 1024 * 1024,
+  });
+  const lines = out.split("\n").filter((l) => l.startsWith("INSERT"));
+  assert.equal(lines.length, 150_002); // nessuno statement perso
+  // i genitori restano prima dei figli anche su dump grandi
+  assert.ok(out.indexOf('INSERT INTO "contributors"') < out.indexOf("INSERT INTO `cameras`"));
+});
+
 test("CLI: il file in output mette contributors prima di cameras e camera_lifecycle_events", () => {
   const dir = mkdtempSync(join(tmpdir(), "osdb-reorder-"));
   const schemaPath = join(dir, "schema.sql");
