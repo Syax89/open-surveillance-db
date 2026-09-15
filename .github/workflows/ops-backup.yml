@@ -89,15 +89,26 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           stamp=$(date +%F)
+          # Due file, non un dump unico: il dump singolo NON e' ripristinabile
+          # su D1. Il suo ordine e' per-tabella (schema di A, dati di A, schema
+          # di B, ...) e l'import remoto committa a batch: una tabella figlia
+          # con FK verso una tabella creata piu' avanti fa fallire il restore
+          # ("no such table: main.contributors", drill 34971483131) e il
+          # PRAGMA defer_foreign_keys non copre i confini di batch.
+          # Schema e dati separati si ripristinano in due passi (schema prima,
+          # dati poi) — provato in locale.
           npx wrangler d1 export osdb-production --remote \
-            --output="d1-backup-${stamp}.sql"
+            --no-data --output="d1-backup-${stamp}.schema.sql"
+          npx wrangler d1 export osdb-production --remote \
+            --no-schema --output="d1-backup-${stamp}.data.sql"
           echo "stamp=${stamp}" >> "$GITHUB_OUTPUT"
-          echo "file=d1-backup-${stamp}.sql" >> "$GITHUB_OUTPUT"
-          ls -la "d1-backup-${stamp}.sql"
+          ls -la "d1-backup-${stamp}.schema.sql" "d1-backup-${stamp}.data.sql"
 
-      - name: Verifica struttura (3 tabelle attese)
+      - name: Verifica struttura (3 tabelle attese) + dati presenti
         run: |
-          f="${{ steps.export.outputs.file }}"
+          stamp="${{ steps.export.outputs.stamp }}"
+          s="d1-backup-${stamp}.schema.sql"
+          d="d1-backup-${stamp}.data.sql"
           # Il dump riproduce il testo di sqlite_master, che NON e' uniforme:
           # le tabelle create dalle migrazioni drizzle hanno i backtick
           # (CREATE TABLE `cameras` (), mentre correction_requests - ricreata
@@ -107,13 +118,19 @@ jobs:
           # (job rosso dal 2026-08-01). Pattern tollerante a IF NOT EXISTS,
           # quoting e spazi, verificato contro il dump reale di produzione.
           for t in cameras correction_requests moderation_events; do
-            if grep -qE "CREATE TABLE (IF NOT EXISTS )?[\"'\`]?${t}[\"'\`]?[[:space:]]*\(" "$f"; then
+            if grep -qE "CREATE TABLE (IF NOT EXISTS )?[\"'\`]?${t}[\"'\`]?[[:space:]]*\(" "$s"; then
               echo "OK tabella ${t}"
             else
-              echo "::error::tabella ${t} MANCANTE nel dump ${f}"
+              echo "::error::tabella ${t} MANCANTE nello schema ${s}"
               exit 1
             fi
           done
+          if grep -qE "^INSERT INTO [\"'\`]?cameras[\"'\`]? " "$d"; then
+            echo "OK dati presenti (INSERT INTO cameras nel file dati)"
+          else
+            echo "::error::nessun INSERT INTO cameras in ${d}: il backup conterrebbe solo lo schema"
+            exit 1
+          fi
 
       - name: Baseline conteggi (per il drill di restore)
         env:
@@ -124,21 +141,23 @@ jobs:
             --command="SELECT 'cameras' t, COUNT(*) n FROM cameras UNION ALL SELECT 'correction_requests', COUNT(*) FROM correction_requests UNION ALL SELECT 'moderation_events', COUNT(*) FROM moderation_events;" \
             --json | tee d1-counts.json
 
-      - name: Cifra il dump (AES-256, passphrase da secret)
+      - name: Cifra i dump (AES-256, passphrase da secret)
         env:
           BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
         run: |
-          f="${{ steps.export.outputs.file }}"
+          stamp="${{ steps.export.outputs.stamp }}"
           if [ -z "${BACKUP_PASSPHRASE:-}" ]; then
             echo "::error::secret BACKUP_PASSPHRASE non configurato: il dump NON verrà cifrato, abort."
             exit 1
           fi
-          openssl enc -aes-256-cbc -salt -pbkdf2 \
-            -pass "pass:${BACKUP_PASSPHRASE}" \
-            -in "$f" -out "${f}.enc"
-          sha256sum "${f}.enc" > "${f}.enc.sha256"
-          rm -f "$f" # mai l'artifact in chiaro
-          ls -la "${f}.enc"*
+          for f in "d1-backup-${stamp}.schema.sql" "d1-backup-${stamp}.data.sql"; do
+            openssl enc -aes-256-cbc -salt -pbkdf2 \
+              -pass "pass:${BACKUP_PASSPHRASE}" \
+              -in "$f" -out "${f}.enc"
+            sha256sum "${f}.enc" > "${f}.enc.sha256"
+            rm -f "$f" # mai l'artifact in chiaro
+          done
+          ls -la d1-backup-*.enc*
 
       - name: Upload artifact privato del run (solo cifrato)
         uses: actions/upload-artifact@v4
@@ -161,17 +180,20 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          f="${{ steps.export.outputs.file }}"
+          stamp="${{ steps.export.outputs.stamp }}"
           # --remote OBBLIGATORIO su ogni comando r2: senza, wrangler v4
           # scrive nel simulatore LOCALE del runner e stampa comunque
           # "Upload complete" (falso verde: il backup non arrivava mai su R2).
-          npx wrangler r2 object put "opensurveillancedb-photos/d1-backups/${f}.enc" --file="${f}.enc" --remote
-          npx wrangler r2 object put "opensurveillancedb-photos/d1-backups/${f}.enc.sha256" --file="${f}.enc.sha256" --remote
+          for f in "d1-backup-${stamp}.schema.sql" "d1-backup-${stamp}.data.sql"; do
+            npx wrangler r2 object put "opensurveillancedb-photos/d1-backups/${f}.enc" --file="${f}.enc" --remote
+            npx wrangler r2 object put "opensurveillancedb-photos/d1-backups/${f}.enc.sha256" --file="${f}.enc.sha256" --remote
+          done
           # Verifica reale (non la dichiarazione di wrangler): rileggi da R2
           # l'oggetto piccolo e confrontalo con quello locale.
-          npx wrangler r2 object get "opensurveillancedb-photos/d1-backups/${f}.enc.sha256" --file=/tmp/r2-check.sha256 --remote
-          if cmp -s "${f}.enc.sha256" /tmp/r2-check.sha256; then
-            echo "R2 verificato: opensurveillancedb-photos/d1-backups/${f}.enc.sha256 identico alla copia locale"
+          chk="d1-backup-${stamp}.schema.sql.enc.sha256"
+          npx wrangler r2 object get "opensurveillancedb-photos/d1-backups/${chk}" --file=/tmp/r2-check.sha256 --remote
+          if cmp -s "${chk}" /tmp/r2-check.sha256; then
+            echo "R2 verificato: opensurveillancedb-photos/d1-backups/${chk} identico alla copia locale"
           else
             echo "::error::copia off-site su R2 NON verificata (oggetto assente o diverso)"
             exit 1
@@ -241,14 +263,19 @@ jobs:
           unzip -o backup.zip
           ls -la d1-backup-*.enc
 
-      - name: Decifra il dump (AES-256) + verifica sha256
+      - name: Decifra i dump (AES-256) + verifica sha256
         env:
           BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
         run: |
-          enc=$(ls d1-backup-*.enc | head -1)
-          sha256sum -c "${enc}.sha256"
-          openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:${BACKUP_PASSPHRASE}" -in "$enc" -out restore.sql
-          echo "Decifrato: restore.sql ($(wc -l < restore.sql) righe)"
+          # Due file: schema e dati, da ripristinare in quest'ordine.
+          for enc in d1-backup-*.schema.sql.enc d1-backup-*.data.sql.enc; do
+            sha256sum -c "${enc}.sha256"
+          done
+          openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:${BACKUP_PASSPHRASE}" \
+            -in "$(ls d1-backup-*.schema.sql.enc)" -out restore.schema.sql
+          openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:${BACKUP_PASSPHRASE}" \
+            -in "$(ls d1-backup-*.data.sql.enc)" -out restore.data.sql
+          echo "Decifrato: restore.schema.sql ($(wc -l < restore.schema.sql) righe), restore.data.sql ($(wc -l < restore.data.sql) righe)"
 
       - name: Crea D1 temporaneo + applica dump + smoke conteggi + cleanup
         env:
@@ -260,7 +287,7 @@ jobs:
           # Cleanup SEMPRE, anche se lo step fallisce a metà: nel primo run del
           # drill (34969640324) un errore prima del delete ha lasciato un D1
           # temporaneo appeso.
-          cleanup() { npx wrangler d1 delete "$db" --config=wrangler-drill.jsonc --yes || echo "::warning::Cleanup D1 temporaneo fallito: ${db}"; }
+          cleanup() { npx wrangler d1 delete "$db" --config=wrangler-drill.jsonc -y || echo "::warning::Cleanup D1 temporaneo fallito: ${db}"; }
           trap cleanup EXIT
           create_out=$(npx wrangler d1 create "$db" 2>&1)
           db_id=$(echo "$create_out" | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' | head -1)
@@ -275,7 +302,14 @@ jobs:
           # arrivare al restore.
           printf '{\n  "name": "osdb-restore-drill",\n  "compatibility_date": "2026-01-01",\n  "d1_databases": [\n    { "binding": "DB_DRILL", "database_name": "%s", "database_id": "%s" }\n  ]\n}\n' "$db" "$db_id" > wrangler-drill.jsonc
           node -e 'JSON.parse(require("fs").readFileSync("wrangler-drill.jsonc","utf8"))' || { echo "::error::wrangler-drill.jsonc non valido"; exit 1; }
-          npx wrangler d1 execute "$db" --remote --config=wrangler-drill.jsonc --file=restore.sql --yes
+          # Restore in DUE passi: prima tutto lo schema (così ogni tabella
+          # esiste), poi i dati. Il dump unico falliva con "no such table:
+          # main.contributors" perché l'ordine per-tabella mette i dati di una
+          # figlia prima della creazione del padre.
+          echo "--- Passo 1/2: schema"
+          npx wrangler d1 execute "$db" --remote --config=wrangler-drill.jsonc --file=restore.schema.sql --yes
+          echo "--- Passo 2/2: dati"
+          npx wrangler d1 execute "$db" --remote --config=wrangler-drill.jsonc --file=restore.data.sql --yes
           echo "--- Smoke conteggi (D1 temporaneo) ---"
           npx wrangler d1 execute "$db" --remote --config=wrangler-drill.jsonc \
             --command="SELECT 'cameras' t, COUNT(*) n FROM cameras UNION ALL SELECT 'correction_requests', COUNT(*) FROM correction_requests UNION ALL SELECT 'moderation_events', COUNT(*) FROM moderation_events;" \
