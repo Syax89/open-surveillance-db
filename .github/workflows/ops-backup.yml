@@ -162,9 +162,20 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           f="${{ steps.export.outputs.file }}"
-          npx wrangler r2 object put "opensurveillancedb-photos/d1-backups/${f}.enc" --file="${f}.enc"
-          npx wrangler r2 object put "opensurveillancedb-photos/d1-backups/${f}.enc.sha256" --file="${f}.enc.sha256"
-          echo "R2 aggiornato: opensurveillancedb-photos/d1-backups/ (off-site copy OK)"
+          # --remote OBBLIGATORIO su ogni comando r2: senza, wrangler v4
+          # scrive nel simulatore LOCALE del runner e stampa comunque
+          # "Upload complete" (falso verde: il backup non arrivava mai su R2).
+          npx wrangler r2 object put "opensurveillancedb-photos/d1-backups/${f}.enc" --file="${f}.enc" --remote
+          npx wrangler r2 object put "opensurveillancedb-photos/d1-backups/${f}.enc.sha256" --file="${f}.enc.sha256" --remote
+          # Verifica reale (non la dichiarazione di wrangler): rileggi da R2
+          # l'oggetto piccolo e confrontalo con quello locale.
+          npx wrangler r2 object get "opensurveillancedb-photos/d1-backups/${f}.enc.sha256" --file=/tmp/r2-check.sha256 --remote
+          if cmp -s "${f}.enc.sha256" /tmp/r2-check.sha256; then
+            echo "R2 verificato: opensurveillancedb-photos/d1-backups/${f}.enc.sha256 identico alla copia locale"
+          else
+            echo "::error::copia off-site su R2 NON verificata (oggetto assente o diverso)"
+            exit 1
+          fi
 
   restore-drill:
     name: Restore drill (D1 temporaneo, F10 qa#5)
