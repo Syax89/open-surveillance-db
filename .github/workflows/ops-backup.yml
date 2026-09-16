@@ -208,16 +208,21 @@ jobs:
             npx wrangler r2 object put "opensurveillancedb-photos/d1-backups/${f}.enc" --file="${f}.enc" --remote
             npx wrangler r2 object put "opensurveillancedb-photos/d1-backups/${f}.enc.sha256" --file="${f}.enc.sha256" --remote
           done
-          # Verifica reale (non la dichiarazione di wrangler): rileggi da R2
-          # l'oggetto piccolo e confrontalo con quello locale.
-          chk="d1-backup-${stamp}.schema.sql.enc.sha256"
-          npx wrangler r2 object get "opensurveillancedb-photos/d1-backups/${chk}" --file=/tmp/r2-check.sha256 --remote
-          if cmp -s "${chk}" /tmp/r2-check.sha256; then
-            echo "R2 verificato: opensurveillancedb-photos/d1-backups/${chk} identico alla copia locale"
-          else
-            echo "::error::copia off-site su R2 NON verificata (oggetto assente o diverso)"
-            exit 1
-          fi
+          # Verifica reale (non la dichiarazione di wrangler): riscarica da R2
+          # OGNI oggetto caricato e confrontalo con la copia locale.
+          # Prima verificava solo il .sha256 dello schema — cioè il file più
+          # piccolo del backup (17 KB su 134 MB): il file dati, quello che
+          # conta, non era mai riletto.
+          for f in "d1-backup-${stamp}.schema.sql" "d1-backup-${stamp}.data.sql"; do
+            npx wrangler r2 object get "opensurveillancedb-photos/d1-backups/${f}.enc" --file="/tmp/r2-check.enc" --remote
+            npx wrangler r2 object get "opensurveillancedb-photos/d1-backups/${f}.enc.sha256" --file="/tmp/r2-check.sha256" --remote
+            if cmp -s "${f}.enc" /tmp/r2-check.enc && cmp -s "${f}.enc.sha256" /tmp/r2-check.sha256; then
+              echo "R2 verificato: opensurveillancedb-photos/d1-backups/${f}.enc (+ .sha256) identico alla copia locale"
+            else
+              echo "::error::copia off-site su R2 NON verificata (oggetto assente o diverso): ${f}.enc"
+              exit 1
+            fi
+          done
 
   restore-drill:
     name: Restore drill (D1 temporaneo, F10 qa#5)

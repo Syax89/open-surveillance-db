@@ -185,12 +185,16 @@ CLOUDFLARE_ACCOUNT_ID="$(gpg -d --batch --quiet <secrets-dir>/cloudflare-account
 rm -f /tmp/wrangler-export.jsonc
 ```
 
-Decrypting a backup for a restore drill:
+Decrypting a backup for a restore drill (since the 2026-09-15 fix each backup
+is **two** files — schema and data):
 
 ```bash
-openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:$BACKUP_PASSPHRASE" \
-  -in d1-backup-<DATE>.sql.enc -out d1-backup-<DATE>.sql
-sha256sum -c d1-backup-<DATE>.sql.enc.sha256   # integrity check before restore
+for k in schema data; do
+  sha256sum -c "d1-backup-<DATE>.$k.sql.enc.sha256"   # integrity check before restore
+  openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:$BACKUP_PASSPHRASE" \
+    -in "d1-backup-<DATE>.$k.sql.enc" -out "restore.$k.sql"
+done
+# then apply in two passes: schema first, data second (section 3.4)
 ```
 
 The real production D1 `database_id` is injected at deploy/backup time from
@@ -212,6 +216,13 @@ npx wrangler d1 execute osdb-production --remote \
 
 The day's counts are recorded in the run report: they serve as the baseline
 for the restore drill (section 3.4, step 4).
+
+The off-site copy is verified the same way — by **reading it back**: after the
+upload, the job re-downloads **every** object it wrote to R2 (both `.enc`
+files and their `.sha256`) and compares each one byte-for-byte with the local
+file; any mismatch fails the run. The `Upload complete` line printed by
+wrangler is *not* a verification — it was a false green when `--remote` was
+missing.
 
 ### 3.4 Restore drill (procedure verified locally)
 
