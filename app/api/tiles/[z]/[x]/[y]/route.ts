@@ -160,10 +160,12 @@ export async function GET(request: Request, context: { params: Promise<TileParam
   // edge and consume no upstream capacity, so they do not consume the
   // bucket: an interactive pan/zoom burst re-fetching tiles already in the
   // cache can never 429 the map into a patchwork. The dedicated threshold
-  // is 240/min (wrangler.jsonc TILES_LIMITER + ROUTE_LIMIT_DEFAULTS.tiles):
+  // is 1200/min (wrangler.jsonc TILES_LIMITER + ROUTE_LIMIT_DEFAULTS.tiles):
   // a full viewport is ~24 tiles at z13-19, so ~10 zoom steps/min stay
-  // comfortably inside, while a scraper probing fresh coordinates still
-  // hits the ceiling on real upstream traffic.
+  // comfortably inside — and because the bucket is keyed per caller IP, the
+  // headroom also covers several people behind one NAT — while a scraper
+  // probing fresh coordinates still hits the ceiling on real upstream
+  // traffic.
   const cache = tileCache();
   // The Cache API matches on URL + method, and the incoming Request object is
   // sometimes a wrapped runtime object that workerd's cache cannot serialise

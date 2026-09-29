@@ -83,8 +83,11 @@ Why a proxy instead of direct browser → tile server:
   `TILE_PROVIDER_URL` (and optionally `TILE_PROVIDER_KEY`) and the whole app
   follows — no rebuild, no release (policy "should" list).
 - **Abuse surface**: the endpoint validates zoom/x/y strictly, so it cannot
-  be used to scrape arbitrary paths or drive bulk downloads (§4). If it is
-  ever abused, one Cloudflare rate-limit rule protects the upstream.
+  be used to scrape arbitrary paths or drive bulk downloads (§4). The
+  per-caller bucket (1200 cache misses/min, `TILES_LIMITER`) protects the
+  upstream; measured against this site's own traffic, a heavy interactive
+  minute peaks around 300-400 misses, and the bucket is keyed per caller IP
+  — so the ceiling also leaves room for several people behind one NAT.
 
 The proxy keeps the map degradation contract: if the worker or the upstream
 is unreachable, `SurveillanceMap` flips to the visible text alternative with
@@ -97,6 +100,8 @@ and the map-fallback tests).
 | --- | --- | --- |
 | `TILE_PROVIDER_URL` | `https://tile.openstreetmap.org` | Upstream base URL (no trailing slash). Trailing `/` is tolerated. |
 | `TILE_PROVIDER_KEY` | unset | API key appended as `?key=…` for providers that require one (MapTiler, Stadia Maps, …). Never commit it; set it as a Worker secret/var. |
+| `TILES_RATE_LIMIT_MAX` | `1200` | Max tile requests per caller per window on cache **misses** (in-memory fallback: in production the `TILES_LIMITER` Cloudflare rate-limit binding in `wrangler.jsonc` governs — keep the two values mirrored). |
+| `TILES_RATE_LIMIT_WINDOW_SECONDS` | `60` | Rate-limit window (in-memory fallback; also drives the `Retry-After` value). |
 
 Behaviour notes:
 
