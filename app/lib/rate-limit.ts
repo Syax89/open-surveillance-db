@@ -89,12 +89,15 @@ const ROUTE_LIMIT_DEFAULTS: Record<RouteKind, RateLimitOptions> = {
   // upstream (the OSMF community tile service) — a cache miss is exactly
   // the request that fetches upstream, so the tiles route meters AFTER the
   // edge-cache lookup and cache hits never consume the bucket. The
-  // interactive threshold is 480/min: a full desktop viewport is ~24 tiles
-  // at z13-19 and a zoom sweep loads 2-3 levels (~48-72 tiles), so even a
-  // fast Italia→mondo exploration stays inside one bucket while a scraper
-  // probing fresh coordinates still hits the ceiling on real upstream
-  // traffic. The binding mirrors this value (wrangler.jsonc).
-  tiles: { maxRequests: 480, windowSeconds: 60 },
+  // interactive threshold is 1200/min: a full desktop viewport is ~24 tiles
+  // at z13-19 and a zoom sweep loads 2-3 levels (~48-72 tiles); a fast
+  // pan/zoom minute on fresh coordinates measured on this site peaks around
+  // 300-400 misses, and the bucket is keyed per caller IP — so headroom must
+  // also cover several people behind one NAT (office, carrier CGNAT) sharing
+  // a single bucket. 1200/min (~20/s) is 3-4× a heavy interactive minute
+  // while a scraper probing fresh coordinates still hits the ceiling on real
+  // upstream traffic. The binding mirrors this value (wrangler.jsonc).
+  tiles: { maxRequests: 1200, windowSeconds: 60 },
   // Geocode autocomplete proxy (GET /api/geocode): every debounced
   // keystroke in the /mappa sidebar may hit the external Nominatim
   // geocoder, whose community usage policy is far stricter than our own

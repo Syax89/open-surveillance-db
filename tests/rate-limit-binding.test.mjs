@@ -129,11 +129,11 @@ test("production READ_LIMITER matches the 300/min interactive-map contract", asy
   );
 });
 
-test("production TILES_LIMITER matches the 480/min interactive-map contract", async () => {
+test("production TILES_LIMITER matches the 1200/min interactive-map contract", async () => {
   const wrangler = await readFile(path.join(REPO_ROOT, "wrangler.jsonc"), "utf8");
   assert.match(
     wrangler,
-    /"name": "TILES_LIMITER", "namespace_id": "1204", "simple": \{ "limit": 480, "period": 60 \}/,
+    /"name": "TILES_LIMITER", "namespace_id": "1204", "simple": \{ "limit": 1200, "period": 60 \}/,
     "the deployed tile binding must mirror ROUTE_LIMIT_DEFAULTS.tiles",
   );
 });
