@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMessages } from "../lib/use-messages";
+import { readCsrfToken } from "../lib/csrf";
 import { useLocale } from "../components/LocaleProvider";
 import { formatPublicDate } from "../lib/format-date";
 import { PublicNav } from "../components/PublicNav";
@@ -107,14 +108,6 @@ function isEditable(contribution: Contribution): boolean {
     && contribution.status !== "removed"
     && contribution.status !== "rejected"
   );
-}
-
-/** Read the script-readable CSRF cookie so mutations can echo it back. */
-function readCsrfToken(): string | null {
-  if (typeof document === "undefined") return null;
-  const match = document.cookie.split(";").map((part) => part.trim())
-    .find((part) => part.startsWith("osdb_csrf="));
-  return match ? decodeURIComponent(match.slice("osdb_csrf=".length)) : null;
 }
 
 // ---------------------------------------------------------------------------

@@ -123,6 +123,22 @@ export function csrfVerified(request: Request, expected: string): boolean {
   return typeof header === "string" && header.length > 0 && constantTimeEqual(header, expected);
 }
 
+/**
+ * Browser-side counterpart of `csrfVerified`: read the per-session CSRF
+ * token from the script-readable `osdb_csrf` cookie (see
+ * `buildSessionCookies` — it is set WITHOUT `HttpOnly` on purpose), so a
+ * client mutation can echo it back through the `CSRF_HEADER` the server
+ * checks. Dependency-free and SSR-safe: there is no `document` on the
+ * server, and a missing cookie reads as `null` (no token → no header).
+ */
+export function readCsrfToken(): string | null {
+  if (typeof document === "undefined") return null;
+  const prefix = `${CSRF_COOKIE}=`;
+  const match = document.cookie.split(";").map((part) => part.trim())
+    .find((part) => part.startsWith(prefix));
+  return match ? decodeURIComponent(match.slice(prefix.length)) : null;
+}
+
 function cookieAttributes(options: {
   maxAgeSeconds: number;
   secure: boolean;

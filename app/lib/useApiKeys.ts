@@ -16,6 +16,7 @@
 // mentions read scopes.
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { readCsrfToken } from "./csrf";
 
 export type ApiKeyScope = "submit" | "confirm" | "edit" | "action";
 
@@ -53,14 +54,6 @@ export const API_KEY_SCOPE_GRANTS: Record<ApiKeyScope, string> = {
   edit: "apiKeyScopeEditGrant",
   action: "apiKeyScopeActionGrant",
 };
-
-/** Read the script-readable CSRF cookie so mutations can echo it back. */
-function readCsrfToken(): string | null {
-  if (typeof document === "undefined") return null;
-  const match = document.cookie.split(";").map((part) => part.trim())
-    .find((part) => part.startsWith("osdb_csrf="));
-  return match ? decodeURIComponent(match.slice("osdb_csrf=".length)) : null;
-}
 
 function parseKeysList(body: unknown): ApiKey[] {
   if (Array.isArray(body)) return body as ApiKey[];

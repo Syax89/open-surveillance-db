@@ -8,6 +8,7 @@ import { useMessages } from "../../../lib/use-messages";
 import { SiteHeader } from "../../../components/SiteHeader";
 import { KIND_OPTIONS, isDomeKind } from "../../../lib/camera-kinds";
 import { formatDirection } from "../../../lib/compass";
+import { readCsrfToken } from "../../../lib/csrf";
 import { EditPositionMap } from "../../../components/EditPositionMap";
 
 /**
@@ -34,14 +35,6 @@ import { EditPositionMap } from "../../../components/EditPositionMap";
  * duplicate native UI). All strings come from record.ts (form) and
  * community.ts (moderation notice / statuses) — zero hardcoded copy.
  */
-
-/** Read the script-readable CSRF cookie so mutations can echo it back. */
-function readCsrfToken(): string | null {
-  if (typeof document === "undefined") return null;
-  const match = document.cookie.split(";").map((part) => part.trim())
-    .find((part) => part.startsWith("osdb_csrf="));
-  return match ? decodeURIComponent(match.slice("osdb_csrf=".length)) : null;
-}
 
 /** Editable whitelist mirrors EDITABLE_EDIT_FIELD_LIMITS in db/camera-edits.ts. */
 const FIELD_LIMITS: Record<string, number> = {
