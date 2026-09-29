@@ -936,10 +936,11 @@
             "name": "radius",
             "in": "query",
             "required": false,
-            "description": "Search radius in meters (default 200).",
+            "description": "Search radius in meters (10–500, default 75).",
             "schema": {
               "type": "number",
-              "minimum": 1
+              "minimum": 10,
+              "maximum": 500
             }
           }
         ],
