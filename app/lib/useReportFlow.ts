@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useMessages } from "./use-messages";
+import { readCsrfToken } from "./csrf";
 import type { ReportCoordinates } from "./report-coordinates";
 
 export type NearbyCandidate = { id: number; title: string; kind: string; distanceMeters: number; similarity: number; matchStrength: "high" | "medium" | "low" };
@@ -251,7 +252,12 @@ export function useReportFlow({ setNotice, initialCoordinates = null }: { setNot
       ...(duplicateConfirmed ? { duplicateConfirmed: true } : {}),
     };
     try {
-      const response = await fetch("/api/cameras", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      // Session writes must echo the per-session CSRF token (ADR 0013,
+      // plan §1.4): the browser carries the ambient session cookie, so the
+      // double-submit header is what the server's same-origin + token gate
+      // verifies. Missing cookie → no header (behaviour unchanged).
+      const csrfToken = readCsrfToken();
+      const response = await fetch("/api/cameras", { method: "POST", headers: { "Content-Type": "application/json", ...(csrfToken ? { "x-csrf-token": csrfToken } : {}) }, body: JSON.stringify(payload) });
       const data = await response.json() as { possibleDuplicates?: NearbyCandidate[]; error?: string };
       // Horizon 1 gate: a 409 with candidates means the server refused to
       // store the report until the contributor confirms it is a distinct

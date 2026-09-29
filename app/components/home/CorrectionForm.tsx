@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useMessages } from "../../lib/use-messages";
+import { readCsrfToken } from "../../lib/csrf";
 import { Art13Notice } from "../Art13Notice";
 import { RecordIdField } from "./RecordIdField";
 
@@ -38,7 +39,12 @@ export function CorrectionForm({ defaultRecordId = null, showHeading = true }: P
     const form = new FormData(formElement);
     const payload = { cameraId: String(form.get("cameraId") || ""), issueType: String(form.get("issueType") || ""), message: String(form.get("message") || ""), contact: String(form.get("contact") || "") };
     try {
-      const response = await fetch("/api/corrections", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      // Session writes must echo the per-session CSRF token (ADR 0013,
+      // plan §1.4): the browser carries the ambient session cookie, so the
+      // double-submit header is what the server's same-origin + token gate
+      // verifies. Missing cookie → no header (behaviour unchanged).
+      const csrfToken = readCsrfToken();
+      const response = await fetch("/api/corrections", { method: "POST", headers: { "Content-Type": "application/json", ...(csrfToken ? { "x-csrf-token": csrfToken } : {}) }, body: JSON.stringify(payload) });
       // P1-2 (design review): the write gate answers 401 (no session) and 403
       // (unverified email) with a single canonical EN body; surface the
       // localized guidance instead of the raw server string ("Authentication
