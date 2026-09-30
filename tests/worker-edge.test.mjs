@@ -416,8 +416,9 @@ test("page-post-guard: malformed multipart POST to / answers 400 and never reach
   assert.equal(response.headers.get("cache-control"), "no-store");
   assert.match(response.headers.get("content-type") ?? "", /^application\/json/, "the body is JSON");
   const body = JSON.parse(await response.text());
-  assert.equal(typeof body.error, "string", "the body carries a short english sentence");
-  assert.ok(body.error.length > 0, "the error message is non-empty");
+  // The 400 body message is part of the API contract: pin it exactly. The
+  // gate is total, so the message must not narrow itself to "page requests".
+  assert.equal(body.error, "Multipart form data is not accepted.", "the 400 body message is pinned");
   assert.equal(app.__calls.length, 0, "the app router must never see the malformed multipart body");
 });
 

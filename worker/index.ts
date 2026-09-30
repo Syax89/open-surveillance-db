@@ -1079,7 +1079,7 @@ async function dispatch(request: Request, env: Env, ctx: ExecutionContext, url: 
     ) {
       return withSecurityHeaders(
         Response.json(
-          { error: "Multipart form data is not accepted on page requests." },
+          { error: "Multipart form data is not accepted." },
           { status: 400, headers: { "Cache-Control": "no-store" } },
         ),
         url.pathname,
