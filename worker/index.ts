@@ -1057,6 +1057,28 @@ async function dispatch(request: Request, env: Env, ctx: ExecutionContext, url: 
       gated = injectIdentityAfterGate(gated, gate.identityEmail);
     }
 
+    // 1j. Pages are not form endpoints: a multipart/form-data body on a
+    //    non-API page POST is what bot scanners send, and the Next/OpenNext
+    //    router cannot parse it -> it throws -> 500. Refuse it early and
+    //    cheaply with 400. /api/* multipart uploads stay untouched, and a
+    //    real server action carries a `next-action` header, so it is never
+    //    blocked here.
+    if (
+      request.method === "POST" &&
+      !url.pathname.startsWith("/api/") &&
+      (request.headers.get("content-type") ?? "").startsWith("multipart/form-data") &&
+      !request.headers.has("next-action")
+    ) {
+      return withSecurityHeaders(
+        Response.json(
+          { error: "Multipart form data is not accepted on page requests." },
+          { status: 400, headers: { "Cache-Control": "no-store" } },
+        ),
+        url.pathname,
+        url.hostname,
+      );
+    }
+
     if (url.pathname === "/_vinext/image") {
       const allowedWidths = [...DEFAULT_DEVICE_SIZES, ...DEFAULT_IMAGE_SIZES];
       const optimized = await handleImageOptimization(gated, {
