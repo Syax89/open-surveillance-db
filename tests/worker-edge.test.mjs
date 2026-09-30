@@ -179,8 +179,8 @@ function analyticsMock() {
 const basic = (user, pass) => `Basic ${Buffer.from(`${user}:${pass}`).toString("base64")}`;
 const bearer = (token) => `Bearer ${token}`;
 
-function request(pathAndQuery, { method = "GET", headers = {} } = {}) {
-  return new Request(`https://osdb.test${pathAndQuery}`, { method, headers });
+function request(pathAndQuery, { method = "GET", headers = {}, body } = {}) {
+  return new Request(`https://osdb.test${pathAndQuery}`, { method, headers, body });
 }
 
 beforeEach(async () => {
@@ -388,6 +388,153 @@ test("anti-scanner: legitimate site paths are never blocked", async () => {
     const response = await worker.fetch(request(path), testEnv(), ctxObj);
     assert.equal(response.status, 503, `${path} must hit the moderation gate, not the scanner 403`);
   }
+});
+
+// ---------------------------------------------------------------------------
+// Multipart POSTs: refuse them on EVERY path before the app router
+// (fix/page-post-400). No endpoint in this app is a multipart endpoint: the
+// vendored vinext router reads a multipart body in its progressive-action
+// pass BEFORE route matching — on any pathname, page or /api — and a
+// malformed body makes that parse throw -> 500. There is no
+// `request.formData()` under app/, no upload route, no multipart in the
+// client, and the app has no server actions (`"use server"` -> 0), so a
+// multipart POST is refused at the edge everywhere. The legitimate JSON write
+// path under /api/* must stay open.
+// ---------------------------------------------------------------------------
+
+const MULTIPART = { "content-type": "multipart/form-data; boundary=XX" };
+
+test("page-post-guard: malformed multipart POST to / answers 400 and never reaches the app router", async () => {
+  const { worker, app } = await loadWorker();
+  const response = await worker.fetch(
+    request("/", { method: "POST", headers: MULTIPART, body: "garbage-not-a-valid-multipart" }),
+    testEnv(),
+    ctx(),
+  );
+
+  assert.equal(response.status, 400, "a malformed multipart page POST must be refused at the edge");
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.match(response.headers.get("content-type") ?? "", /^application\/json/, "the body is JSON");
+  const body = JSON.parse(await response.text());
+  // The 400 body message is part of the API contract: pin it exactly. The
+  // gate is total, so the message must not narrow itself to "page requests".
+  assert.equal(body.error, "Multipart form data is not accepted.", "the 400 body message is pinned");
+  assert.equal(app.__calls.length, 0, "the app router must never see the malformed multipart body");
+});
+
+test("page-post-guard: a normal URL-encoded page POST still passes through unchanged", async () => {
+  const { worker, app } = await loadWorker();
+  const response = await worker.fetch(
+    request("/", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+    }),
+    testEnv(),
+    ctx(),
+  );
+
+  assert.equal(response.status, 200, "non-multipart page POSTs are untouched by the gate");
+  assert.equal(app.__calls.length, 1);
+  assert.equal(app.__calls[0].url, "https://osdb.test/");
+  assert.equal(app.__calls[0].method, "POST");
+});
+
+test("page-post-guard: multipart POST to /api/cameras is refused (400) and never reaches the app handler", async () => {
+  const { worker, app } = await loadWorker();
+  const response = await worker.fetch(
+    request("/api/cameras", { method: "POST", headers: MULTIPART, body: "garbage" }),
+    testEnv(),
+    ctx(),
+  );
+
+  assert.equal(
+    response.status,
+    400,
+    "multipart on an API path must also be refused: the router reads the body on every path",
+  );
+  assert.equal(app.__calls.length, 0, "the app handler must never see the malformed multipart body");
+});
+
+test("page-post-guard: a Next-Action header does not exempt a multipart POST (400)", async () => {
+  const { worker, app } = await loadWorker();
+  const response = await worker.fetch(
+    request("/", { method: "POST", headers: { ...MULTIPART, "next-action": "x" }, body: "garbage" }),
+    testEnv(),
+    ctx(),
+  );
+
+  assert.equal(
+    response.status,
+    400,
+    "the app has no server actions, so next-action must not bypass the gate",
+  );
+  assert.equal(app.__calls.length, 0, "the app router must never see the malformed multipart body");
+});
+
+test("page-post-guard: the scanner gate still wins (multipart POST to /.env is 403, not 400)", async () => {
+  const { worker, app } = await loadWorker();
+  const response = await worker.fetch(
+    request("/.env", { method: "POST", headers: MULTIPART, body: "garbage" }),
+    testEnv(),
+    ctx(),
+  );
+
+  assert.equal(response.status, 403, "the scanner catch-all runs before the multipart gate");
+  assert.equal(app.__calls.length, 0);
+});
+
+test("page-post-guard: the gate matches any multipart boundary, not just the fixture's own", async () => {
+  const { worker, app } = await loadWorker();
+  const response = await worker.fetch(
+    request("/", {
+      method: "POST",
+      headers: { "content-type": "multipart/form-data; boundary=abc123XYZ" },
+      body: "garbage",
+    }),
+    testEnv(),
+    ctx(),
+  );
+
+  assert.equal(
+    response.status,
+    400,
+    "the content-type test must be a prefix match, not an exact match on one boundary",
+  );
+  assert.equal(app.__calls.length, 0, "the app router must never see the malformed multipart body");
+});
+
+test("page-post-guard: multipart POST to a second page path (/correggi) is refused (400)", async () => {
+  const { worker, app } = await loadWorker();
+  const response = await worker.fetch(
+    request("/correggi", { method: "POST", headers: MULTIPART, body: "garbage" }),
+    testEnv(),
+    ctx(),
+  );
+
+  assert.equal(
+    response.status,
+    400,
+    "the gate must cover every page path, not just the homepage",
+  );
+  assert.equal(app.__calls.length, 0, "the app router must never see the malformed multipart body");
+});
+
+test("page-post-guard: a JSON POST to /api/cameras still reaches the app handler", async () => {
+  const { worker, app } = await loadWorker();
+  const response = await worker.fetch(
+    request("/api/cameras", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ title: "x" }),
+    }),
+    testEnv(),
+    ctx(),
+  );
+
+  assert.equal(response.status, 200, "the legitimate JSON write path under /api/* must stay open");
+  assert.equal(app.__calls.length, 1);
+  assert.equal(app.__calls[0].url, "https://osdb.test/api/cameras");
+  assert.equal(app.__calls[0].method, "POST");
 });
 
 test("rfc-9727: /.well-known/api-catalog is served as linkset+json before the app handler", async () => {

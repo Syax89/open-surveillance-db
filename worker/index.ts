@@ -1057,6 +1057,36 @@ async function dispatch(request: Request, env: Env, ctx: ExecutionContext, url: 
       gated = injectIdentityAfterGate(gated, gate.identityEmail);
     }
 
+    // 1j. Multipart POSTs are refused at the edge — on EVERY path. The
+    //    vendored vinext router runs its progressive-action pass BEFORE route
+    //    matching: it reads the body (actionId + contentType) for a request on
+    //    any pathname, and a malformed multipart body makes that parse throw
+    //    -> HTTP 500 (this is the defect the earlier /api-scoped gate left
+    //    reachable on /api/*). No endpoint in this app accepts a multipart
+    //    body: pages AND API routes take JSON only — verified, there is no
+    //    `request.formData()` anywhere under app/, no upload route, no
+    //    multipart in the client (useReportFlow / CorrectionForm read the DOM
+    //    with FormData but POST application/json), and nothing multipart in
+    //    the OpenAPI spec / docs. The app also has no server actions
+    //    (`"use server"` -> 0 hits), so the old `next-action` exemption
+    //    protected nothing real and was a trivial bypass (Next-Action: 1 +
+    //    malformed multipart -> 500). Therefore multipart POSTs are refused
+    //    here, and this MUST be revisited if a real multipart upload feature
+    //    is ever added.
+    if (
+      request.method === "POST" &&
+      (request.headers.get("content-type") ?? "").startsWith("multipart/form-data")
+    ) {
+      return withSecurityHeaders(
+        Response.json(
+          { error: "Multipart form data is not accepted." },
+          { status: 400, headers: { "Cache-Control": "no-store" } },
+        ),
+        url.pathname,
+        url.hostname,
+      );
+    }
+
     if (url.pathname === "/_vinext/image") {
       const allowedWidths = [...DEFAULT_DEVICE_SIZES, ...DEFAULT_IMAGE_SIZES];
       const optimized = await handleImageOptimization(gated, {

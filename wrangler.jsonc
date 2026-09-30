@@ -10,6 +10,13 @@
     "binding": "ASSETS"
   },
   "images": { "binding": "IMAGES" },
+  // Workers Logs (osservabilità): abilita la raccolta dei log del Worker
+  // sulla piattaforma Cloudflare, così gli errori di runtime (per esempio le
+  // POST multipart malformate sulle pagine, fix/page-post-400) restano
+  // interrogabili nel dashboard invece di vivere solo nello stdout
+  // dell'isolate. I log non contengono dati personali (vedi
+  // PRIVACY_AND_SAFETY.md); il costo rientra nei limiti di Workers Logs.
+  "observability": { "enabled": true },
   // Request analytics (Workers Analytics Engine, dataset osdb_requests):
   // one datapoint per request with path group (api|web), status class, API
   // endpoint (query string stripped) and HTTP method — nothing else. No
