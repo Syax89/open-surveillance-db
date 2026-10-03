@@ -165,7 +165,7 @@
 
   /* Container widths (F2 §3.4) */
   --container-standard:min(1180px, calc(100% - 48px));
-  --container-readable:min(760px, calc(100% - 48px));
+  --container-readable:min(900px, calc(100% - 48px));
   --container-wide:min(1320px, calc(100% - 48px));
 }
 * { box-sizing:border-box; }
@@ -524,7 +524,7 @@ button { cursor:pointer; }
 .guide-overview { padding-bottom:48px; }
 .guide-overview, .guide-principles, .report-section.guide-publication-section, .guide-publication-details, .records-section.guide-section-anchor, .correction-section.guide-section-anchor { width:var(--container-readable); }
 .guide-overview { grid-template-columns:1fr; gap:28px; }
-.guide-overview h2 { max-width:560px; }
+.guide-overview h2 { max-width:660px; }
 .guide-principles { gap:60px; padding:56px 0; border-top:0; }
 .guide-principles { grid-template-columns:1fr; gap:28px; }
 .guide-principles .principles-intro>p:not(.eyebrow) { max-width:640px; }
@@ -841,9 +841,9 @@ button { cursor:pointer; }
 .record-page { min-height:100vh; background:var(--paper); }
 .record-detail { width:var(--container-readable); margin:45px auto 100px; padding:50px; border:1px solid var(--line); border-radius:var(--radius-xl); background:var(--card-bg); box-shadow:0 20px 45px rgba(25,46,52,.08); }
 .record-detail .card-topline { margin:0 0 22px; }
-.record-detail h1 { max-width:620px; margin:0; font-size:var(--text-display); letter-spacing:-.07em; line-height:1.06; font-weight:700; text-wrap:balance; overflow-wrap:anywhere; }
+.record-detail h1 { max-width:740px; margin:0; font-size:var(--text-display); letter-spacing:-.07em; line-height:1.06; font-weight:700; text-wrap:balance; overflow-wrap:anywhere; }
 .record-detail-kind { margin:18px 0 0; color:var(--record-kind); font-size:var(--text-3xl); font-weight:800; }
-.record-detail-summary { max-width:620px; margin:30px 0; color:var(--summary-ink); font-size:var(--text-2xl); line-height:1.6; }
+.record-detail-summary { max-width:740px; margin:30px 0; color:var(--summary-ink); font-size:var(--text-2xl); line-height:1.6; }
 .record-detail-facts { display:grid; grid-template-columns:repeat(2,1fr); gap:var(--space-5); margin:32px 0; padding:25px 0; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
 .record-detail-facts dt { margin-bottom:5px; color:var(--label); font-size:var(--text-2xs); text-transform:uppercase; letter-spacing:.1em; font-weight:800; }
 .record-detail-facts dd { margin:0; color:var(--ink-5); font-size:var(--text-base); line-height:1.45; overflow-wrap:anywhere; }
