@@ -147,3 +147,70 @@ test("locale: switching on /contribuisci refreshes its server-rendered content",
     "the support page is server-rendered, so its Italian content needs router.refresh()",
   );
 });
+
+/*
+ * SSR-route regression matrix (t_61b90f6a follow-up). LocaleToggle needs
+ * router.refresh() (to re-fetch the Server Component text after the cookie
+ * write) for every route in SERVER_RENDERED_INFO_ROUTES. A GUI QA sweep
+ * found 10 of them stuck in the pre-toggle language (cookie updated, visible
+ * text didn't) until they were added to the allowlist. These tests pin the
+ * refresh + cookie half of that contract for the WHOLE allowlist, in BOTH
+ * switch directions — they drive the real LocaleToggle and the existing
+ * navigation harness, and reuse the same i18n wiring (no duplicated
+ * helpers). The list below is deliberately a literal mirror of the
+ * allowlist: deleting a route from the source then fails that route's test
+ * instead of silently dropping its coverage.
+ */
+const SERVER_RENDERED_ROUTES = [
+  // newly covered by the 10-route fix (were stuck in the stale language)
+  "/", "/accessibility", "/account", "/api-docs", "/fonti",
+  "/forgot-password", "/login", "/register", "/reset-password",
+  "/verify-email", "/moderation",
+  // pre-existing allowlist entries (regression guard for the same contract)
+  "/guide", "/manifesto", "/regole", "/faq", "/contatti",
+  "/contribuisci", "/privacy", "/termini", "/licenze",
+];
+
+async function expectRefreshAndCookieOn(route) {
+  const { screen } = rtl;
+  const user = rtl.userEvent.setup();
+  // localStorage wins over the (persisted) cookie in readStoredLocale, so
+  // seed the locale explicitly to make every route test start in English.
+  window.localStorage.setItem("opensurveillancedb-locale", "en");
+  await setNavState({ url: route, refreshed: 0 });
+
+  await renderWithLocale(React.createElement(LocaleToggle));
+  assert.equal(screen.getByText("EN").getAttribute("aria-pressed"), "true");
+
+  // EN → IT: refresh the server-rendered route and persist the cookie.
+  await user.click(screen.getByText("IT"));
+  assert.equal(
+    (await getNavState()).refreshed,
+    1,
+    `${route}: switching to IT must router.refresh() the server-rendered route`,
+  );
+  assert.match(
+    document.cookie,
+    /(?:^|;\s*)opensurveillancedb-locale=it(?:;|$)/,
+    `${route}: the locale cookie must persist IT for the next server request`,
+  );
+
+  // IT → EN: both directions refresh and persist.
+  await user.click(screen.getByText("EN"));
+  assert.equal(
+    (await getNavState()).refreshed,
+    2,
+    `${route}: switching back to EN must router.refresh() again`,
+  );
+  assert.match(
+    document.cookie,
+    /(?:^|;\s*)opensurveillancedb-locale=en(?:;|$)/,
+    `${route}: the locale cookie must persist EN for the next server request`,
+  );
+}
+
+for (const route of SERVER_RENDERED_ROUTES) {
+  test(`locale: toggling on ${route} refreshes the SSR route and persists the cookie (both directions)`, async () => {
+    await expectRefreshAndCookieOn(route);
+  });
+}

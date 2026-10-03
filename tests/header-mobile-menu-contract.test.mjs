@@ -23,8 +23,10 @@
  *   4. the dropdown rules are scoped with :has(.menu-button) so the
  *      auth/record shells (login/register/account/error — no hamburger)
  *      keep their inline "back home" row;
- *   5. ≤480px: tighter .nav-shell gap to help the compact bar fit 320px;
- *      flex-wrap stays only as a safety net (never clips).
+ *   5. ≤480px: tighter .nav-shell gap to help the compact bar fit 320px,
+ *      with the shell margin matching the 16px content gutter
+ *      (min(100% - 32px) — was 24px); flex-wrap stays only as a safety
+ *      net (never clips).
  *
  * The DOM-level half of the contract (auth links inside #main-links, with
  * aria-current) lives in tests/client-auth-nav-links.test.mjs (PublicNav
@@ -130,12 +132,13 @@ test("header nav: ≤480px compacts the top bar (320/390 fit) with wrap only as 
   const blocks = mediaBlocks(await css());
   const b480 = blocks.find((b) => b.width === 480);
   assert.ok(b480, "expected the (max-width:480px) block");
-  // The hamburger header gets 12px side margins + 6px gaps so brand + menu
-  // button + LocaleToggle fit ONE line at 320px (t_94b3726d).
+  // The hamburger header matches the 16px content gutter + 6px gaps so the
+  // bar aligns with the ≤700px content sections (t_94b3726d; margin was
+  // 12px/24px, now 16px/32px to share the page edge).
   assert.match(
     b480.body,
-    /\.nav-shell:has\(\.menu-button\)\s*\{\s*width:\s*min\(100%\s*-\s*24px[^}]*gap:\s*6px/,
-    "≤480px must compact the hamburger header shell (12px margins, 6px gaps)",
+    /\.nav-shell:has\(\.menu-button\)\s*\{\s*width:\s*min\(100%\s*-\s*32px[^}]*gap:\s*6px/,
+    "≤480px must align the hamburger header shell with the 16px content gutter (100% - 32px, 6px gaps)",
   );
   assert.match(b480.body, /\.nav-shell:has\(\.menu-button\)\s*\.brand\s*\{\s*font-size:\s*13px/, "≤480px must shrink the brand text (hamburger header only)");
   assert.match(b480.body, /\.nav-shell:has\(\.menu-button\)\s*\.brand-mark\s*\{\s*width:\s*24px/, "≤480px must shrink the brand mark");

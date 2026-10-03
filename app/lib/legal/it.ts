@@ -280,8 +280,8 @@ export const itLegal: LegalContent = {
   },
 
   terms: {
-    eyebrow: "Legale · Termini di utilizzo",
-    title: "Termini di utilizzo",
+    eyebrow: "Legale · Termini d'uso",
+    title: "Termini d'uso",
     intro:
       "Questi termini disciplinano l'uso di OpenSurveillanceDB, il database aperto e gestito dalla comunità delle infrastrutture di sorveglianza pubbliche e visibili. Si applicano all'applicazione web, all'API pubblica, alle esportazioni dei dati e ai servizi correlati (\"il Servizio\").",
     versionNote:
@@ -308,7 +308,7 @@ export const itLegal: LegalContent = {
             ordered: true,
             items: [
               "OpenSurveillanceDB è un **progetto di trasparenza civica non commerciale, governato dalla comunità**, che documenta le **infrastrutture di sorveglianza pubbliche e visibili** (ad esempio telecamere installate in strade, piazze, esterni di stazioni). È gratuito: niente pubblicità, niente profilazione comportamentale, nessuna vendita di dati.",
-              "Usando il Servizio accetti questi termini. Se **invi una segnalazione**, accetti inoltre gli obblighi di invio di cui alla sezione 5.",
+              "Usando il Servizio accetti questi termini. Se **invii una segnalazione**, accetti inoltre gli obblighi di invio di cui alla sezione 5.",
               "Il Servizio non fornisce flussi video, strumenti di tracciamento, accesso a telecamere private né consigli su come eludere la sorveglianza legittima.",
             ],
           },

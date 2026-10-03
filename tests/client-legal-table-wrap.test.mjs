@@ -57,6 +57,11 @@ test("LegalTableWrap renders a plain wrapper when the table fits (no tab stop)",
   assert.equal(wrap.getAttribute("role"), null, "a fitting table is not a region");
   assert.equal(wrap.getAttribute("aria-label"), null);
   assert.ok(wrap.querySelector("table.legal-table"), "the table stays inside the wrapper");
+  assert.equal(
+    view.container.querySelector(".legal-table-scroll-hint"),
+    null,
+    "a fitting table must not show the scroll hint",
+  );
 });
 
 test("LegalTableWrap makes an overflowing table a labelled focusable region", async () => {
@@ -78,6 +83,14 @@ test("LegalTableWrap makes an overflowing table a labelled focusable region", as
     wrap.getAttribute("aria-label"),
     "the region carries a localized accessible name",
   );
+
+  // The visible hint reuses the same localized string as the accessible
+  // name, and lives outside the focusable region.
+  const hint = view.container.querySelector(".legal-table-scroll-hint");
+  assert.ok(hint, "an overflowing table shows the scroll hint");
+  assert.equal(hint.textContent, wrap.getAttribute("aria-label"));
+  assert.equal(hint.textContent, "Table — scroll horizontally for more columns");
+  assert.equal(wrap.contains(hint), false, "the hint sits outside the focusable region");
 });
 
 test("LegalTableWrap drops the tab stop when the table stops overflowing", async () => {
@@ -95,4 +108,9 @@ test("LegalTableWrap drops the tab stop when the table stops overflowing", async
   window.dispatchEvent(new Event("resize"));
   await rtl.waitFor(() => assert.equal(wrap.getAttribute("tabindex"), null));
   assert.equal(wrap.getAttribute("role"), null);
+  assert.equal(
+    view.container.querySelector(".legal-table-scroll-hint"),
+    null,
+    "the hint disappears with the overflow",
+  );
 });
