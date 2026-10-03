@@ -175,7 +175,7 @@
 html { scroll-behavior:smooth; overflow-x:clip; overscroll-behavior-x:none; }
 /* F4 (G4): body esplicito 16px/1.5 — non lasciare il default preflight
    (FRONTEND_DESIGN §3.2; l'audit F1 aveva rilevato 15px/1.6 nel doc). */
-body { min-width:0; margin:0; overflow-x:clip; background:var(--paper); color:var(--ink); font-family:Arial, Helvetica, sans-serif; font-size:16px; line-height:1.5; }
+body { min-width:0; margin:0; overflow-x:clip; background:var(--paper); color:var(--ink); font-family:ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; font-size:16px; line-height:1.5; }
 a { color:inherit; text-decoration:none; }
 button, input, select, textarea { font:inherit; }
 button { cursor:pointer; }
@@ -445,7 +445,7 @@ button { cursor:pointer; }
 .direction-slider-row label { font-size:var(--text-sm); font-weight:800; color:var(--ink-2); }
 .direction-slider-row input[type="range"] { width:100%; border:0; padding:0; background:transparent; accent-color:var(--focus); }
 .direction-output { font-size:var(--text-md); font-weight:800; color:var(--focus); font-variant-numeric:tabular-nums; }
-.leaflet-container { font-family:Arial, Helvetica, sans-serif; }
+.leaflet-container { font-family:ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; }
 .leaflet-control-attribution { font-size:var(--text-2xs) !important; }
 /* Geolocation button (t_18259daa, CEO): a floating Leaflet control stacked
    ABOVE the zoom buttons ("sopra i tasti aumenta/diminuisci zoom"). The
@@ -659,7 +659,7 @@ button { cursor:pointer; }
 .report-rule { margin-top:32px; padding:var(--space-4); border-radius:var(--radius-md); background:var(--rule-bg); color:var(--rule-ink); font-size:var(--text-md); line-height:1.5; }
 .report-form { display:grid; gap:18px; padding:30px; border:1px solid var(--form-border); border-radius:var(--radius-lg); background:var(--card-bg); box-shadow:0 20px 45px rgba(25,46,52,.08); }
 .report-form label { display:grid; gap:var(--space-2); color:var(--ink-2); font-size:var(--text-sm); font-weight:800; }
-.report-form input, .report-form select, .report-form textarea { width:100%; border:1px solid var(--field-border); border-radius:var(--radius-sm); padding:11px 12px; outline:none; background:var(--white); color:var(--field-ink); font-size:var(--text-base); font-weight:400; }
+.report-form input, .report-form select, .report-form textarea { width:100%; border:1.5px solid rgb(195 206 199); border-radius:var(--radius-sm); padding:11px 12px; outline:none; background:var(--white); color:var(--field-ink); font-size:var(--text-base); font-weight:400; }
 .report-form input:focus, .report-form select:focus, .report-form textarea:focus { border-color:var(--control-focus); outline:3px solid var(--focus); outline-offset:2px; }
 .report-form textarea { resize:vertical; }
 .report-form .check-label { grid-template-columns:26px 1fr; align-items:start; gap:9px; font-size:var(--text-sm); line-height:1.4; font-weight:400; }
@@ -725,7 +725,7 @@ button { cursor:pointer; }
 .correction-section>div>p:not(.eyebrow) { color:var(--intro-ink); font-size:var(--text-xl); line-height:1.6; }
 .correction-form { display:grid; gap:18px; padding:30px; border:1px solid var(--form-border); border-radius:var(--radius-lg); background:var(--form-bg); }
 .correction-form label { display:grid; gap:var(--space-2); color:var(--ink-2); font-size:var(--text-sm); font-weight:800; }
-.correction-form input, .correction-form select, .correction-form textarea { width:100%; border:1px solid var(--field-border); border-radius:var(--radius-sm); padding:11px 12px; outline:none; background:var(--white); color:var(--field-ink); font-size:var(--text-base); font-weight:400; }
+.correction-form input, .correction-form select, .correction-form textarea { width:100%; border:1.5px solid rgb(195 206 199); border-radius:var(--radius-sm); padding:11px 12px; outline:none; background:var(--white); color:var(--field-ink); font-size:var(--text-base); font-weight:400; }
 .correction-form input:focus, .correction-form select:focus, .correction-form textarea:focus { border-color:var(--control-focus); outline:3px solid var(--focus); outline-offset:2px; }
 .correction-form textarea { resize:vertical; }
 .correction-form .check-label { grid-template-columns:26px 1fr; align-items:start; gap:9px; font-size:var(--text-sm); line-height:1.4; font-weight:400; }
