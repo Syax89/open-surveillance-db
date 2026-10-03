@@ -1460,19 +1460,23 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 .legal-note { margin:18px 0; padding:14px 16px; border:1px solid var(--notice-outline); border-left:3px solid var(--notice-border); border-radius:var(--radius-sm); background:var(--notice-bg); color:var(--notice-copy); font-size:var(--text-md); line-height:1.55; }
 .legal-note strong { color:var(--notice-ink); }
 .legal-table-wrap { margin:18px 0; overflow-x:auto; border:1px solid var(--line); border-radius:var(--radius-lg); }
-/* Desktop breakout (≥1180px, matches --container-standard — a meaningful
-   breakpoint already used by the design system, not a magic number): the
-   table lives inside the 760px readable column (.record-detail,
-   FRONTEND_DESIGN §3.6 "Readable" — correct for prose) but structured data
-   benefits from more room. Symmetric negative margin bleeds the wrap wider
-   while staying centered, since .record-detail itself is margin:auto-
-   centered (no vw/transform tricks needed — same bleed idiom as
-   .directory-controls elsewhere in this file). Fixed px (not %) keeps the
-   result stable at ultra-wide viewports. 1180px threshold (not 1100px)
-   verified by measurement: leaves ≥50px clearance from the viewport edge
-   at the breakpoint boundary — 1100px left only 4px, too tight. */
+/* Desktop breakout (≥1180px): the table lives inside the readable column
+   (.record-detail, FRONTEND_DESIGN §3.6 "Readable" — correct for prose)
+   but structured data benefits from more room.
+   P1 fix (GUI QA sweep, t_UXW2): the original fixed negative-margin bleed
+   (margin:18px -210px) was calibrated against --container-readable:760px.
+   A later, independent change widened that token to 900px, which silently
+   shrank record-detail's own auto-margin and pushed the wrap to a NEGATIVE
+   x position at 1180–1240px viewports — permanent text clipping (first
+   column cut off), confirmed by measurement. A fixed-px margin is coupled
+   to the parent's width and breaks again the next time any ancestor
+   width changes. This version centers on the VIEWPORT directly instead
+   (left:50% + translateX(-50%) cancels the parent's own width/position
+   algebraically — verified: final x = V/2 - W/2 regardless of the
+   parent's width or offset), so it cannot clip no matter what the
+   readable column's width is set to in the future. */
 @media (min-width:1180px) {
-  .legal-table-wrap { margin:18px -210px; }
+  .legal-table-wrap { width:min(1180px, calc(100vw - 48px)); margin:18px 0; position:relative; left:50%; transform:translateX(-50%); }
 }
 .legal-table { width:100%; border-collapse:collapse; background:var(--card-bg); font-size:var(--text-md); }
 .legal-table caption { padding:12px 14px; text-align:left; font-size:var(--text-sm); font-weight:800; text-transform:uppercase; letter-spacing:.08em; color:var(--label); border-bottom:1px solid var(--line); }
