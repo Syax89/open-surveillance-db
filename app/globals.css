@@ -1461,16 +1461,18 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 .legal-note { margin:18px 0; padding:14px 16px; border:1px solid var(--notice-outline); border-left:3px solid var(--notice-border); border-radius:var(--radius-sm); background:var(--notice-bg); color:var(--notice-copy); font-size:var(--text-md); line-height:1.55; }
 .legal-note strong { color:var(--notice-ink); }
 .legal-table-wrap { margin:18px 0; overflow-x:auto; border:1px solid var(--line); border-radius:var(--radius-lg); }
-/* Desktop breakout (≥1100px): the table lives inside the 760px readable
-   column (.record-detail, FRONTEND_DESIGN §3.6 "Readable" — correct for
-   prose) but structured data benefits from more room. Symmetric negative
-   margin bleeds the wrap wider while staying centered on the same axis,
-   since .record-detail itself is margin:auto-centered (no vw/transform
-   tricks needed — same bleed idiom as .directory-controls elsewhere in
-   this file). Fixed px (not %) keeps the result stable at ultra-wide
-   viewports; gated to 1100px so narrower desktops keep today's safe
-   width with margin to spare. */
-@media (min-width:1100px) {
+/* Desktop breakout (≥1180px, matches --container-standard — a meaningful
+   breakpoint already used by the design system, not a magic number): the
+   table lives inside the 760px readable column (.record-detail,
+   FRONTEND_DESIGN §3.6 "Readable" — correct for prose) but structured data
+   benefits from more room. Symmetric negative margin bleeds the wrap wider
+   while staying centered, since .record-detail itself is margin:auto-
+   centered (no vw/transform tricks needed — same bleed idiom as
+   .directory-controls elsewhere in this file). Fixed px (not %) keeps the
+   result stable at ultra-wide viewports. 1180px threshold (not 1100px)
+   verified by measurement: leaves ≥50px clearance from the viewport edge
+   at the breakpoint boundary — 1100px left only 4px, too tight. */
+@media (min-width:1180px) {
   .legal-table-wrap { margin:18px -210px; }
 }
 .legal-table { width:100%; border-collapse:collapse; background:var(--card-bg); font-size:var(--text-md); }
