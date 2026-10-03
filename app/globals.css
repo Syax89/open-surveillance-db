@@ -1471,7 +1471,7 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
    viewports; gated to 1100px so narrower desktops keep today's safe
    width with margin to spare. */
 @media (min-width:1100px) {
-  .legal-table-wrap { margin:18px -140px; }
+  .legal-table-wrap { margin:18px -210px; }
 }
 .legal-table { width:100%; border-collapse:collapse; background:var(--card-bg); font-size:var(--text-md); }
 .legal-table caption { padding:12px 14px; text-align:left; font-size:var(--text-sm); font-weight:800; text-transform:uppercase; letter-spacing:.08em; color:var(--label); border-bottom:1px solid var(--line); }
