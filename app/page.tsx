@@ -2,6 +2,10 @@ import type { Metadata } from "next";
 import { HomeNav } from "./components/home/HomeNav";
 import { Hero } from "./components/home/Hero";
 import { ToolCards, type ToolCard } from "./components/home/ToolCards";
+import { MapIcon } from "./components/icons/MapIcon";
+import { DirectoryIcon } from "./components/icons/DirectoryIcon";
+import { ReportIcon } from "./components/icons/ReportIcon";
+import { CorrectionIcon } from "./components/icons/CorrectionIcon";
 import { getServerMessages } from "./lib/server-i18n";
 
 /**
@@ -40,10 +44,10 @@ export default async function HomePage() {
   const t = bundle.home;
 
   const tools: ToolCard[] = [
-    { href: "/mappa", icon: "◉", title: t.toolMapTitle, body: t.toolMapBody },
-    { href: "/directory", icon: "▤", title: t.toolDirectoryTitle, body: t.toolDirectoryBody },
-    { href: "/segnala", icon: "✎", title: t.toolReportTitle, body: t.toolReportBody },
-    { href: "/correggi", icon: "↻", title: t.toolCorrectionTitle, body: t.toolCorrectionBody },
+    { href: "/mappa", icon: <MapIcon />, title: t.toolMapTitle, body: t.toolMapBody },
+    { href: "/directory", icon: <DirectoryIcon />, title: t.toolDirectoryTitle, body: t.toolDirectoryBody },
+    { href: "/segnala", icon: <ReportIcon />, title: t.toolReportTitle, body: t.toolReportBody },
+    { href: "/correggi", icon: <CorrectionIcon />, title: t.toolCorrectionTitle, body: t.toolCorrectionBody },
   ];
 
   return (

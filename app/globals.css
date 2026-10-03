@@ -385,6 +385,7 @@ button { cursor:pointer; }
 .tool-card:hover { transform:translateY(-2px); border-color:var(--card-hover-border); }
 .tool-card:focus-visible { outline:3px solid var(--focus); outline-offset:2px; }
 .tool-card-icon { display:grid; place-items:center; width:38px; height:38px; border-radius:var(--radius-lg); background:var(--surface-muted); color:var(--icon-ink); font-size:var(--text-3xl); line-height:1; }
+.tool-card-icon svg { width:20px; height:20px; }
 .tool-card-title { font-size:var(--text-3xl); font-weight:800; letter-spacing:-.03em; color:var(--ink); text-wrap:balance; }
 .tool-card-body { margin:0; color:var(--ink-3); font-size:var(--text-base); line-height:1.55; text-wrap:balance; }
 .map-section, .principles, .report-section, footer { width:var(--container-standard); margin-left:auto; margin-right:auto; }
@@ -1822,7 +1823,7 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
   .map-list-toggle svg { transition:transform .12s ease; }
   .map-list-toggle.is-open svg { transform:rotate(180deg); }
   .map-list-toggle:focus-visible { outline:3px solid var(--focus); outline-offset:2px; }
-  .map-list-scroll { max-height:32vh; }
+  .map-list-scroll { max-height:45vh; }
   .map-list-scroll.is-collapsed { display:none; }
   /* Leaflet zoom control: ≥44px touch targets (WCAG 2.5.8), and the
      attribution strip kept clear of the zoom stack / markers. */

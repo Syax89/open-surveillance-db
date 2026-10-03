@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 /**
  * ToolCards — the four public tools of the home hub (F2, t_52dcb95e).
@@ -10,7 +11,7 @@ import Link from "next/link";
  */
 export type ToolCard = {
   href: string;
-  icon: string;
+  icon: ReactNode;
   title: string;
   body: string;
 };
@@ -30,7 +31,7 @@ export function ToolCards({ heading, cards }: ToolCardsProps) {
       <div className="tool-cards-grid">
         {cards.map((card) => (
           <Link key={card.href} className="tool-card" href={card.href}>
-            <span className="tool-card-icon" aria-hidden="true">{card.icon}</span>
+            <span className="tool-card-icon">{card.icon}</span>
             <span className="tool-card-title">{card.title}</span>
             <span className="tool-card-body">{card.body}</span>
           </Link>
