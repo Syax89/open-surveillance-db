@@ -1381,7 +1381,7 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 /* P1-2 (design review): the write-tool login wall (/segnala, /correggi).
    The h2 is the page-level heading inside the tool section; the body reuses
    the record-detail-summary rhythm and the auth-switch CTA row. */
-.write-gate-wall { margin:34px 0 10px; padding:28px 30px; border:1px solid var(--line); border-radius:var(--radius-lg); background:var(--card-bg); }
+.write-gate-wall { max-width:640px; margin:34px 0 10px; padding:28px 30px; border:1px solid var(--line); border-radius:var(--radius-lg); background:var(--card-bg); }
 .write-gate-wall h2 { margin:0 0 10px; color:var(--heading); font-size:var(--text-4xl); font-weight:800; letter-spacing:-.02em; }
 .write-gate-wall .record-detail-summary { margin:0 0 6px; }
 .write-gate-wall .auth-switch { margin-top:16px; }
