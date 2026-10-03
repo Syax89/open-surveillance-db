@@ -180,7 +180,7 @@ a { color:inherit; text-decoration:none; }
 button, input, select, textarea { font:inherit; }
 button { cursor:pointer; }
 :where(a, button, input, select, textarea):focus-visible { outline:3px solid var(--focus); outline-offset:3px; }
-.skip-link { position:fixed; z-index:2000; top:10px; left:10px; transform:translateY(-160%); padding:11px 14px; border-radius:var(--radius-md); background:var(--card-bg); color:var(--button-ink); box-shadow:0 3px 16px rgba(0,0,0,.2); font-size:var(--text-base); font-weight:800; }
+.skip-link { position:fixed; z-index:2000; top:10px; left:10px; transform:translateY(-160%); padding:12px 16px; border-radius:var(--radius-md); background:var(--card-bg); color:var(--button-ink); box-shadow:0 3px 16px rgba(0,0,0,.2); font-size:var(--text-base); font-weight:800; min-height:44px; }
 .skip-link:focus { transform:translateY(0); }
 .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
 /* F2 (a11y H2, t_793479ed): a link inside .sr-only stays in the tab order but
@@ -276,7 +276,7 @@ button { cursor:pointer; }
      degradation, never clipping). Scoped to the hamburger header so the
      auth/record shells keep their margins. */
   .nav-shell:has(.menu-button) { width:min(100% - 24px,1180px); gap:6px }
-  .nav-shell:has(.menu-button) .brand { font-size:13px; gap:7px }
+  .nav-shell:has(.menu-button) .brand { font-size:13px; gap:7px; min-height:44px; }
   .nav-shell:has(.menu-button) .brand-mark { width:24px; height:24px; font-size:var(--text-3xl) }
   .nav-shell { flex-wrap:wrap; row-gap:var(--space-3) }
   .nav-record-actions, .nav-actions { flex:1;justify-content:space-between }
@@ -301,7 +301,7 @@ button { cursor:pointer; }
 .nav-links a:not(.nav-action) { color:var(--nav-ink); }
 .nav-links a:hover, .footer-links a:hover { color:var(--link-hover); }
 .nav-action { border:1px solid var(--control-border); padding:11px 15px; border-radius:var(--radius-lg); color:var(--ink); }
-.menu-button { display:none; border:0; background:transparent; font-weight:700; }
+.menu-button { display:none; border:0; background:transparent; font-weight:700; min-height:44px; padding:10px 12px; }
 /* Hero (t_7cafab72): the CSS visual is now a full-bleed BACKGROUND of the
    section (CEO 2026-08-08: "l'immagine di destra è troppo grande, la metterei
    sullo sfondo e sopra la parte che ora si trova a sinistra"). Single column:
@@ -508,7 +508,7 @@ button { cursor:pointer; }
 .camera-card dl { margin:30px 0 21px; display:grid; gap:var(--space-4); }
 .camera-card dt { color:var(--label); margin-bottom:3px; font-size:var(--text-2xs); text-transform:uppercase; letter-spacing:.1em; font-weight:800; }
 .camera-card dd { margin:0; color:var(--ink-5); font-size:var(--text-md); line-height:1.35; }
-.text-button { padding:0; border:0; background:transparent; color:var(--action); font-size:var(--text-md); font-weight:800; }
+.text-button { padding:10px 12px; border:0; background:transparent; color:var(--action); font-size:var(--text-md); font-weight:800; min-height:44px; display:inline-flex; align-items:center; }
 .text-button span { margin-left:7px; }
 .notice { margin:16px 0 0; padding:12px 15px; border-left:3px solid var(--notice-accent); background:var(--notice-success-bg); color:var(--notice-ink); border-radius:var(--radius-xs); font-size:var(--text-md); }
 .offline-state { margin:16px 0 0; padding:12px 15px; border-left:3px solid var(--offline-accent); background:var(--offline-bg); color:var(--offline-ink); border-radius:var(--radius-xs); font-size:var(--text-md); }
@@ -892,7 +892,7 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 .site-footer .footer-links { display:grid; grid-template-columns:repeat(4,minmax(112px,1fr)); align-self:start; gap:24px 26px; max-width:720px; }
 .site-footer .footer-link-group { display:grid; align-content:start; gap:8px; min-width:0; }
 .site-footer .footer-link-group-title, .site-footer .footer-policy-group summary { margin:0 0 2px; color:var(--label); font-size:var(--text-2xs); font-weight:800; line-height:1.35; letter-spacing:.1em; text-transform:uppercase; }
-.site-footer .footer-links a { width:fit-content; max-width:100%; color:var(--nav-ink); font-size:var(--text-sm); line-height:1.45; overflow-wrap:anywhere; }
+.site-footer .footer-links a { width:fit-content; max-width:100%; color:var(--nav-ink); font-size:var(--text-sm); line-height:1.45; overflow-wrap:anywhere; min-height:44px; display:inline-flex; align-items:center; }
 .site-footer .footer-policy-group summary { display:inline-flex; align-items:center; gap:6px; min-height:44px; padding:0 4px; border-radius:var(--radius-sm); width:fit-content; cursor:pointer; list-style:none; }
 .site-footer .footer-policy-group summary::-webkit-details-marker { display:none; }
 .site-footer .footer-policy-group summary:focus-visible { outline:3px solid var(--focus); outline-offset:2px; }
