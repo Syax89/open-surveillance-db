@@ -1909,7 +1909,7 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
    Colour is never the only signal (WCAG 1.4.1) — the label always
    accompanies the dot. */
 .status-dot.active { background:var(--status-verified); }
-.status-dot.hidden { background:var(--offline-accent); }
+.status-dot.hidden { background:var(--status-pending); }
 
 /* Community status badge (ADR §9.1): informational freshness line under
    the topline — a neutral "never confirmed" / "confirmed N times ·

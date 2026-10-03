@@ -33,16 +33,26 @@ const localeChangeEvent = "opensurveillancedb-locale-change";
  * The cookie write happens in setLocale below; the refresh here.
  */
 const SERVER_RENDERED_INFO_ROUTES = new Set([
+  "/",
   "/guide",
   "/manifesto",
   "/regole",
   "/faq",
   "/contatti",
   "/contribuisci",
-  "/moderazione",
+  "/moderation",
   "/privacy",
   "/termini",
   "/licenze",
+  "/accessibility",
+  "/account",
+  "/api-docs",
+  "/fonti",
+  "/forgot-password",
+  "/login",
+  "/register",
+  "/reset-password",
+  "/verify-email",
 ]);
 
 function readStoredLocale(): Locale {
