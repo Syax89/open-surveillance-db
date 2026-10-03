@@ -181,6 +181,7 @@ block below lists the core tokens with the hex equivalent for reading:
 --card-bg: rgb(255 254 249) /* #fffef9 — card surface */
 --focus: rgb(11 112 92)     /* #0b705c — focus ring */
 --action: rgb(10 112 93)    /* #0a705d — links/primary actions */
+--accent: rgb(40 125 78)    /* #287d4e — brand accent (primary button); hover rgb(32 103 64) */
 
 /* Semantic status (✅ in :root; dot + text label, never colour alone) */
 --status-verified: rgb(66 169 121)   /* green */
@@ -230,8 +231,10 @@ their own** — always paired with a localised text label
 
 ### 3.2 Typography (type scale — corrected vs v1)
 
-- **Family:** Arial, Helvetica, sans-serif (on `body`). No variable fonts
-  or webfonts: sobriety and performance.
+- **Family:** `system-ui` first — `ui-sans-serif, system-ui, -apple-system,
+  BlinkMacSystemFont, "Segoe UI", Arial, sans-serif` (on `body`). No variable
+  fonts or webfonts: sobriety and performance. *(v1 alternative: a plain
+  `Arial, Helvetica, sans-serif` stack.)*
 - **Body:** **16px / 1.5 / 400** (v1 said 15px/1.6 — wrong; the real
   rendering is 16/1.5). ✅ explicit in CSS since F4 (`body { font-size:16px;
   line-height:1.5; }`), no longer a preflight default.
@@ -292,9 +295,9 @@ closest token in F5 (P1-5/2-6, `globals.css` — sole exception: the
 --radius-xs: 4px    /* notice, offline-state, legal-note */
 --radius-sm: 6px    /* form inputs (report/correction), map-hint */
 --radius-md: 8px    /* skip-link, locale-toggle, search input, duplicate-alert, geocode-option (from 7px) */
---radius-lg: 12px   /* tool-card, button, nav-action, record-list-card, empty-state (from 9/10px) */
---radius-xl: 16px   /* record-detail, live-map-workspace, map-card, map-teaser (from 14/18px) */
---radius-2xl: 22px  /* hero */
+--radius-lg: 16px   /* tool-card, button, nav-action, record-list-card, empty-state (v1 alternative: 12px) */
+--radius-xl: 24px   /* record-detail, live-map-workspace, map-card, map-teaser (v1 alternative: 16px) */
+--radius-2xl: 28px  /* hero (v1 alternative: 22px) */
 --radius-full: 999px/* pill: section-note, filter-chip */
 --radius-round: 50% /* status-dot, brand-mark */
 ```
@@ -320,11 +323,16 @@ shadows, no glow.
 
 **Container widths (✅ implemented):**
 - Standard: `min(1180px, calc(100% - 48px))` — section pages, tool-section
-- Readable: `min(760px, calc(100% - 48px))` — record-detail, legal, FAQ
+- Readable: `min(900px, calc(100% - 48px))` — record-detail, legal, FAQ,
+  AND the shared auth / form-tool visible surfaces (`/login`, `/account`,
+  `/segnala`, `/correggi`): one 900px card column. Prose inside it caps at
+  `max-width:740px` (`.record-detail h1`, `.record-detail-summary`).
+  *(v1 alternative: a 760px readable column.)*
 - Wide: `min(1320px, calc(100% - 48px))` — nav-shell, hero
-- **Map: `min(1440px, calc(100% - 32px))`** (`.map-layout`) — added in v2
-  (not documented in v1)
-- Mobile ≤700px: `min(100% - 32px, 1180px)`
+- **Map / directory explorer workspaces stay wide on purpose** (not part of
+  the 900px readable column): `.map-layout` / `.directory-tool` use
+  `min(1440px, calc(100% - 32px))` (added in v2, not documented in v1)
+- Mobile ≤700px: `min(100% - 32px, 1180px)` (compact footer unchanged)
 
 **Breakpoints (✅ implemented — v1 documented only 700/980/1320):**
 
@@ -356,9 +364,9 @@ every route).
 --radius-xs:4px   (notice, offline-state)
 --radius-sm:6px   (form inputs, legal-note, map-hint)
 --radius-md:8px   (coordinate-entry, metadata-publication, map-record)
---radius-lg:12px  (tool-card, report/correction-form, faq-item, confirm-dialog)
---radius-xl:16px  (record-detail)
---radius-2xl:22px (hero)
+--radius-lg:16px  (tool-card, report/correction-form, faq-item, confirm-dialog)
+--radius-xl:24px  (record-detail)
+--radius-2xl:28px (hero)
 --radius-full:999px (filter-chip pill, section-note)
 --radius-round:50% (dot, brand-mark, marker, faq summary ::before)
 ```
@@ -387,11 +395,12 @@ The 19px (brand) and 21px (hero-stats dt) values remain literal
 
 ```
 --container-standard:min(1180px, calc(100% - 48px))
---container-readable:min(760px, calc(100% - 48px))
+--container-readable:min(900px, calc(100% - 48px))
 --container-wide:min(1320px, calc(100% - 48px))
 ```
 
-**Palette** — completed with the missing tokens of §3.2: `--focus`
+**Palette** — completed with the missing tokens of §3.2: `--accent`
+(#287d4e, brand accent; hover rgb(32 103 64)), `--focus`
 (#0b705c), `--status-verified` (#42a979), `--status-community`
 (#d3963e), `--status-review` (#d8715e); the `.verified` /
 `.community-report` / `.needs-review` classes and the focus rings use the
@@ -416,7 +425,7 @@ The layout is based on **CSS Grid**, mobile-first, with per-region patterns
 | Principles | `.85fr 1.15fr`; inner grid `repeat(3,1fr)` | 1 column |
 | Record facts | `repeat(2,1fr)` | 1 column |
 | Footer | `auto 1fr auto` | 1 column |
-| Auth form | card max-width 560px | same |
+| Auth form | card = shared 900px readable column | same |
 
 Rules:
 - Never horizontal scroll at 320px; all grids collapse to 1 column.

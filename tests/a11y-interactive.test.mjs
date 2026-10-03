@@ -188,7 +188,7 @@ test("every directory record card carries a status dot + text label (status is n
 
 test("the status accent is a visible card container + token rail (static guard on globals.css)", async () => {
   // t_d089a17e (CEO feedback 2026-08-03): the /directory rows must read as
-  // cards (bg + border + radius) with a 3px status rail built from the
+  // cards (bg + border + radius) with a 5px status rail built from the
   // --status-* tokens + a precomputed tenue tint; the /mappa sidebar rows
   // follow the same logic. Colour is paired with the dot+label (asserted
   // above), so the CSS never relies on colour alone. No global token
@@ -201,8 +201,8 @@ test("the status accent is a visible card container + token rail (static guard o
   const css = await readFile(path.join(root, "app", "globals.css"), "utf8");
   assert.match(
     css,
-    /\.directory-tool \.record-list \.record-list-card \{[^}]*border:1px solid var\(--card-border\)[^}]*border-left-width:3px[^}]*border-radius:var\(--radius-lg\)[^}]*background:var\(--white\)/,
-    "the /directory row is a visible card container (white bg, darker border, radius, 3px left rail)",
+    /\.directory-tool \.record-list \.record-list-card \{[^}]*border:1px solid var\(--card-border\)[^}]*border-left-width:5px[^}]*border-radius:var\(--radius-lg\)[^}]*background:var\(--white\)/,
+    "the /directory row is a visible card container (white bg, darker border, radius, 5px left rail)",
   );
   assert.match(
     css,

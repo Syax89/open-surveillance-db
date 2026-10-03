@@ -120,7 +120,7 @@ const INFO_ROUTES = {
     noEn: ["Privacy notice", "Controller", "Terms of use", "Licences"],
   },
   "/termini": {
-    it: ["Termini di utilizzo", "Titolare / gestore", "ODbL 1.0", "privacy@opensurveillancedb.org"],
+    it: ["Termini d'uso", "Titolare / gestore", "ODbL 1.0", "privacy@opensurveillancedb.org"],
     en: ["Terms of use", "Controller / operator", "Licences"],
     noEn: ["Terms of use", "Privacy notice", "Licences"],
   },
