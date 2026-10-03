@@ -351,17 +351,21 @@ button { cursor:pointer; }
 .hero-trust-note { max-width:525px; margin:26px 0 0; color:var(--hero-stat-ink); font-size:var(--text-sm); line-height:1.5; }
 .hero-trust-note a { color:var(--mint); font-weight:800; text-decoration:underline; text-decoration-thickness:1px; text-underline-offset:3px; }
 .hero-trust-note a:hover { color:var(--mint-hover); }
-.hero-visual { position:absolute; inset:0; z-index:0; overflow:hidden; isolation:isolate; background:radial-gradient(circle at 75% 20%, var(--visual-mid) 0, var(--visual-blue) 24%, transparent 46%),linear-gradient(135deg,var(--visual-deep),var(--visual-deeper)); }
-.hero-grid { position:absolute; inset:-20%; opacity:.6; background-image:linear-gradient(rgba(161,222,208,.11) 1px, transparent 1px),linear-gradient(90deg, rgba(161,222,208,.11) 1px, transparent 1px); background-size:42px 42px; transform:rotate(-24deg) scale(1.2); }
-.hero-orbit { position:absolute; border:1px solid rgba(166,237,210,.2); border-radius:var(--radius-round); }
-.orbit-one { width:430px; height:430px; right:-100px; top:70px; }
-.orbit-two { width:650px; height:650px; right:-220px; top:-35px; }
-.signal { position:absolute; width:18px; height:18px; border-radius:var(--radius-round); background:var(--amber); box-shadow:0 0 0 7px rgba(248,184,78,.15),0 0 23px rgba(248,184,78,.8); }
-.signal i { position:absolute; width:0; height:0; border-top:88px solid rgba(248,184,78,.18); border-right:145px solid transparent; transform-origin:top left; left:9px; top:9px; }
-.signal b { position:absolute; inset:4px; background:var(--signal-core); border-radius:var(--radius-round); }
-.signal-one { right:18%;top:38%; }
-.signal-two { right:65%;top:63%; }
-.signal-three { right:10%;top:74%; }
+.hero-visual { position:absolute; inset:0; z-index:0; overflow:hidden; isolation:isolate; background:linear-gradient(135deg,rgb(9 35 58),rgb(16 35 50) 45%,rgb(20 45 62)); }
+/* Community map pattern: subtle topographic lines + organic shapes */
+.hero-map-pattern { position:absolute; inset:0; opacity:.15; background-image:
+  radial-gradient(circle at 25% 30%, rgba(203,247,218,.3) 0, transparent 28%),
+  radial-gradient(circle at 75% 60%, rgba(203,247,218,.2) 0, transparent 35%),
+  radial-gradient(circle at 50% 80%, rgba(161,222,208,.25) 0, transparent 22%);
+  background-size:100% 100%; }
+/* Map dots: camera locations scattered (civic data points, not surveillance signals) */
+.hero-map-dots { position:absolute; inset:0; background-image:
+  radial-gradient(circle, rgb(203 247 218) 2px, transparent 2px),
+  radial-gradient(circle, rgb(161 222 208) 3px, transparent 3px),
+  radial-gradient(circle, rgb(242 153 74) 2px, transparent 2px);
+  background-size:180px 220px, 240px 280px, 320px 200px;
+  background-position:20% 25%, 65% 55%, 85% 75%;
+  opacity:.4; }
 .visual-label { position:absolute; right:50px; bottom:55px; border-left:2px solid var(--mint); padding-left:14px; color:var(--visual-label); font-size:var(--text-md); line-height:1.45; font-weight:700; }
 /* Home hub (F2, t_52dcb95e): static MapTeaser + four tool cards. No Leaflet
    on the hub — the teaser visual is a decorative CSS grid with static pins
@@ -996,12 +1000,6 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
   .hero-stats { margin-top:48px;gap:18px }
   /* .hero-visual min-height rules removed with t_7cafab72 — the visual is
      the absolute inset:0 background and takes its size from the section. */
-  /* Fix: on narrow screens .signal-three (right:10%;top:74%, base rule)
-     lands directly under .visual-label (right:26px;bottom:28px below),
-     the amber dot overlapping the caption text. Move it up into the
-     otherwise-empty upper-right area, clear of both signal-one
-     (right:18%;top:38% in the base rule) and the label. */
-  .signal-three { right:20%;top:18%; }
   .map-teaser { grid-template-columns:1fr; gap:30px; padding:64px 0 24px }
   .map-teaser-visual { min-height:210px }
   .tool-cards-grid { grid-template-columns:1fr }

@@ -39,7 +39,11 @@ export function Hero() {
         <p className="hero-trust-note">{t.trustNote} <a href="/fonti">{t.sourcesLink} <span aria-hidden="true">→</span></a></p>
         {total !== null && <p className="sr-only" role="status">{total} {t.publicRecords}</p>}
       </div>
-      <div className="hero-visual" aria-hidden="true"><div className="hero-grid" /><div className="hero-orbit orbit-one" /><div className="hero-orbit orbit-two" /><div className="signal signal-one"><i /><b /></div><div className="signal signal-two"><i /><b /></div><div className="signal signal-three"><i /><b /></div><div className="visual-label">{t.visualLabelFirst}<br />{t.visualLabelSecond}</div></div>
+      <div className="hero-visual" aria-hidden="true">
+        <div className="hero-map-pattern" />
+        <div className="hero-map-dots" />
+        <div className="visual-label">{t.visualLabelFirst}<br />{t.visualLabelSecond}</div>
+      </div>
     </section>
 
   );
