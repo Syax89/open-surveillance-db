@@ -892,7 +892,7 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 .site-footer .footer-links { display:grid; grid-template-columns:repeat(4,minmax(112px,1fr)); align-self:start; gap:24px 26px; max-width:720px; }
 .site-footer .footer-link-group { display:grid; align-content:start; gap:8px; min-width:0; }
 .site-footer .footer-link-group-title, .site-footer .footer-policy-group summary { margin:0 0 2px; color:var(--label); font-size:var(--text-2xs); font-weight:800; line-height:1.35; letter-spacing:.1em; text-transform:uppercase; }
-.site-footer .footer-links a { width:fit-content; max-width:100%; color:var(--nav-ink); font-size:var(--text-sm); line-height:1.45; overflow-wrap:anywhere; padding:8px 12px; }
+.site-footer .footer-links a { width:fit-content; max-width:100%; color:var(--nav-ink); font-size:var(--text-sm); line-height:1.45; overflow-wrap:anywhere; }
 .site-footer .footer-policy-group summary { display:inline-flex; align-items:center; gap:6px; min-height:44px; padding:0 4px; border-radius:var(--radius-sm); width:fit-content; cursor:pointer; list-style:none; }
 .site-footer .footer-policy-group summary::-webkit-details-marker { display:none; }
 .site-footer .footer-policy-group summary:focus-visible { outline:3px solid var(--focus); outline-offset:2px; }
