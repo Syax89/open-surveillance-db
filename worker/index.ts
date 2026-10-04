@@ -1,6 +1,7 @@
 /** Cloudflare Worker entry point for OpenSurveillanceDB. */
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
+import { isOpenRedirectShaped } from "vinext/server/request-pipeline";
 import type { AnalyticsEngineDataset, D1Database, Fetcher, SendEmail } from "cloudflare:workers";
 import { DEFAULT_RETENTION_POLICY, runRetentionSweep, type RetentionSummary } from "../db/retention";
 import { sweepOidcExpired } from "../db/oidc";
@@ -151,7 +152,7 @@ const WARMUP_CRON = "*/1 * * * *";
 // reads that option at build time) and uncomment below:
 // const imageConfig: ImageConfig = { dangerouslyAllowSVG: true };
 
-// Moderation access control (see docs/decisions/0002-moderation-access-control.md):
+// Moderation access control (see docs/decisions/0003-moderation-access-control.md):
 // the moderation dashboard and its API are gated at the worker edge with
 // HTTP Basic auth (MODERATION_USER / MODERATION_PASSWORD) and/or a bearer
 // token (MODERATION_TOKEN). The gate FAILS CLOSED: without any configured
@@ -173,6 +174,36 @@ const identityPath = (method: string, pathname: string) =>
 
 const gatedPath = (method: string, pathname: string) =>
   moderationPath(pathname) || identityPath(method, pathname);
+
+// Mirror Vinext request normalization: decode segments, normalize dots/slashes,
+// then strip one .rsc suffix. app-rsc-route-matching.js decodes segments again;
+// never repeat suffix/dot normalization after that second, tolerant decode.
+const GATE_PATH_DELIMITER_PATTERN = /([/#?\\]|%(2f|23|3f|5c))/gi;
+
+function normalizeGatePath(pathname: string): string {
+  // Protocol-relative shapes stay untouched: the router's own guard rejects
+  // them (native 404) before routing, and so they must not land in this gate.
+  if (isOpenRedirectShaped(pathname)) return pathname;
+  const segments: string[] = [];
+  // No `new URL(...)`: it decides `%2e` is a dot segment, which would shift a
+  // double-encoded path. Malformed percent-encoding throws (dispatch -> 400).
+  for (const rawSegment of pathname.split("/")) {
+    const segment = decodeURIComponent(rawSegment).replace(GATE_PATH_DELIMITER_PATTERN, (char) => encodeURIComponent(char));
+    if (segment === "" || segment === ".") continue;
+    if (segment === "..") segments.pop();
+    else segments.push(segment);
+  }
+  let key = `/${segments.join("/")}`;
+  if (key.endsWith(".rsc")) key = key.slice(0, -4);
+  if (key.length > 1 && key.endsWith("/")) key = key.slice(0, -1);
+  return key.split("/").map((segment) => {
+    try {
+      return decodeURIComponent(segment).replace(GATE_PATH_DELIMITER_PATTERN, (char) => encodeURIComponent(char));
+    } catch {
+      return segment;
+    }
+  }).join("/");
+}
 
 /**
  * Scanner / attack-path catch-all (2026-08-12, CEO decision "proteggiamo il
@@ -321,7 +352,7 @@ function matchBasicOperator(
 }
 
 /**
- * The moderation gate (ADR 0002 / ADR 0014, QA#3 F5). Returns the denial
+ * The moderation gate (ADR 0003 / ADR 0014, QA#3 F5). Returns the denial
  * response when the request must not pass, plus the SERVER-CHOSEN identity
  * email the worker injects as `x-osdb-user-email` after a successful gate.
  *
@@ -891,12 +922,8 @@ async function dispatch(request: Request, env: Env, ctx: ExecutionContext, url: 
   const redirect = hostRedirect(request, url);
   if (redirect) return redirect;
 
-    // Normalise a trailing slash on the pathname BEFORE the edge-gate match
-    // (audit 2026-08-09, P2): the identity exception for POST /api/appeals
-    // is an exact match on "/api/appeals", so "/api/appeals/" (trailing
-    // slash) fell into the gated branch and failed closed with 503 for the
-    // very contributors the route exists for. Everything else (image route,
-    // security headers) keeps the ORIGINAL pathname.
+    // Preserve the discovery routes' trailing-slash key. The auth gate uses
+    // full router normalization below, without changing the admitted Request.
     const gatedPathname =
       url.pathname.length > 1 && url.pathname.endsWith("/")
         ? url.pathname.slice(0, -1)
@@ -1051,13 +1078,29 @@ async function dispatch(request: Request, env: Env, ctx: ExecutionContext, url: 
       );
     }
 
-    if (gatedPath(request.method, gatedPathname)) {
+    // 1j. Moderation / appeals auth gate (ADR 0003 / ADR 0014). Matched on the
+    //    path the ROUTER will route to, not the raw one (audit 2026-10-04, P1):
+    //    /moderation.rsc, /moderation//, /%6doderation and the /api/* aliases
+    //    all reach a gated route, so they must fail closed here too.
+    let gateTarget: string;
+    try {
+      gateTarget = normalizeGatePath(url.pathname);
+    } catch {
+      // Malformed percent-encoding: the router answers its own plain-text 400
+      // ("Bad Request") after decoding; the edge refuses earlier, same way.
+      return withSecurityHeaders(
+        new Response("Bad Request", { status: 400, headers: { "Cache-Control": "no-store" } }),
+        url.pathname,
+        url.hostname,
+      );
+    }
+    if (gatedPath(request.method, gateTarget)) {
       const gate = requireModerationAuth(gated, env);
       if (gate.denied) return withSecurityHeaders(gate.denied, url.pathname, url.hostname);
       gated = injectIdentityAfterGate(gated, gate.identityEmail);
     }
 
-    // 1j. Multipart POSTs are refused at the edge — on EVERY path. The
+    // 1k. Multipart POSTs are refused at the edge — on EVERY path. The
     //    vendored vinext router runs its progressive-action pass BEFORE route
     //    matching: it reads the body (actionId + contentType) for a request on
     //    any pathname, and a malformed multipart body makes that parse throw
