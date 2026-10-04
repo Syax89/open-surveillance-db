@@ -987,7 +987,7 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
   .nav-record-actions .text-button { max-width:105px;text-align:right }
   .hero-copy { padding:52px 28px 39px }
   .hero-copy--intro { padding-bottom:0; }
-  .hero-copy--details { padding-top:0; }
+  .hero-copy--details { padding-top:0; max-width:none; }
   .hero-search-row { margin-inline:28px; }
   /* IT layout stability (t_690ed55e): the IT hero headline is ~7% longer
      than EN and wrapped to an extra line at 390px, shifting the whole hero
@@ -1005,9 +1005,7 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
   .hero-search input { box-sizing:border-box; width:100%; min-height:48px; border:1px solid rgba(222,245,234,.42); border-radius:var(--radius-lg); background:rgba(255,255,255,.08); }
   .hero-search .geocode-dropdown { position:static; left:auto; right:auto; }
   .hero-search button { min-height:44px; border:0; border-radius:var(--radius-lg); }
-  /* CTA row compatta (controllo visivo osdb-mobile 2026-10): full-width in
-     colonna così i due bottoni allineano la search bar sopra invece di
-     restare shrink-to-fit e andare a capo con un vuoto enorme a destra. */
+  /* CTA row: stack the two hero buttons full-width so both match the search bar above. */
   .hero-actions { flex-direction:column; align-items:stretch; }
   .hero-actions .button { justify-content:center; }
   .hero-stats { margin-top:48px;gap:18px }
@@ -1035,9 +1033,11 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
   .directory-tool .directory-explorer-card .records-section { padding:0 16px 24px; }
   .directory-tool .directory-explorer-card .directory-controls { margin:0 -16px; padding:14px 16px; }
   .directory-tool .record-list .record-list-card { grid-template-columns:1fr; gap:var(--space-3); padding:var(--space-4) var(--space-5); }
-  .directory-tool .record-list .record-list-card .record-list-actions { align-items:flex-start; gap:var(--space-2); }
-  /* Results header (t_f13fcb1c, ex .directory-meta): stack on narrow screens. */
-  .directory-results { align-items:flex-start; flex-direction:column; gap:var(--space-3); }
+  .directory-tool .record-list .record-list-card .record-list-actions { align-items:center; flex-direction:row; flex-wrap:wrap; justify-content:flex-start; gap:var(--space-2); }
+  /* Results header (t_f13fcb1c, ex .directory-meta): heading and add (+)
+     action share ONE row. The .directory-tool scope is required to outrank
+     the later base rule whose align-items:flex-end split them. */
+  .directory-tool .directory-results { align-items:center; flex-direction:row; flex-wrap:nowrap; gap:var(--space-3); }
   .directory-pagination { justify-content:center; }
   .record-detail { width:min(100% - 32px,760px);margin:24px auto 60px;padding:30px 23px }
   /* Narrow cards: smaller title so long first words still fit; desktop is unchanged. */

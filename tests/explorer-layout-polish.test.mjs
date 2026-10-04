@@ -149,6 +149,41 @@ test("desktop map viewport has a materially taller floor while mobile overrides 
   }), "mobile retains its existing viewport-driven map height and map-first layout");
 });
 
+test("≤700px /directory header and card actions compact onto one row without losing wrap or 44px targets", () => {
+  // The mobile overrides live in the ≤700px block that also carries .hero-actions.
+  const mobile = mediaBlocks(css, "max-width", "700px").find((block) => block.includes(".hero-actions"));
+  assert.ok(mobile, "expected the ≤700px block carrying the hero and directory mobile overrides");
+
+  // Hero CTAs stay a full-width column; the details CTA drops the desktop 640px cap.
+  const heroActions = ruleBlock(mobile, ".hero-actions");
+  assert.equal(compact(declaration(heroActions, "flex-direction")), "column");
+  assert.equal(compact(declaration(heroActions, "align-items")), "stretch");
+  assert.equal(compact(declaration(ruleBlock(mobile, ".hero-actions .button"), "justify-content")), "center");
+
+  const details = ruleBlock(mobile, ".hero-copy--details");
+  assert.equal(compact(declaration(details, "padding-top")), "0");
+  assert.equal(compact(declaration(details, "max-width")), "none", "the mobile CTA must not stay capped at the desktop 640px");
+
+  // Card action links sit on one 8px-gap row and wrap when 320px runs out.
+  const actions = ruleBlock(mobile, ".directory-tool .record-list .record-list-card .record-list-actions");
+  assert.equal(compact(declaration(actions, "flex-direction")), "row");
+  assert.equal(compact(declaration(actions, "flex-wrap")), "wrap");
+  assert.equal(compact(declaration(actions, "align-items")), "center");
+  assert.equal(compact(declaration(actions, "justify-content")), "flex-start");
+  assert.equal(compact(declaration(actions, "gap")), "var(--space-2)");
+
+  // The heading override is scoped (2 classes) so it outranks the later base
+  // rule whose align-items:flex-end split the heading from the + action.
+  const heading = ruleBlock(mobile, ".directory-tool .directory-results");
+  assert.equal(compact(declaration(heading, "flex-direction")), "row");
+  assert.equal(compact(declaration(heading, "flex-wrap")), "nowrap");
+  assert.equal(compact(declaration(heading, "align-items")), "center");
+  assert.match(css, /\.directory-results\s*\{\s*display:flex;[^}]*align-items:flex-end/, "the later base .directory-results rule ends its row at flex-end — the reason the override is scoped");
+
+  // Touch targets stay ≥44px; they now wrap instead of shrinking.
+  assert.equal(pixelValue(declaration(ruleBlock(css, ".directory-tool .record-list .record-list-card .text-button"), "min-height")), 44);
+});
+
 test("cross-document explorer transitions opt in and crossfade continuously with reduced-motion safety", () => {
   const transition = ruleBlock(css, "@view-transition");
   assert.equal(declaration(transition, "navigation"), "auto", "cross-document navigation is explicitly opted in");
