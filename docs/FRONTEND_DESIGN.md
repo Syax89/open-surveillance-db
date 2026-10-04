@@ -648,7 +648,7 @@ Shell shared by `not-found.tsx` (404) and `error.tsx` (500) (t_7eed4601).
   and cannot export metadata). Keys `errors.notFoundMetaTitle` /
   `errors.serverErrorMetaTitle`.
 - **Privacy by design:** the page **never reports** the requested path or
-  the error message (ADR 0002, fail-closed like the moderation gate).
+  the error message (ADR 0003, fail-closed like the moderation gate).
 - **i18n:** deliberately a client component (error boundary) — copy from
   `useMessages().errors`, locale cookie honoured, toggle works.
 - **Header/footer reachable:** a dead end does not look broken.
