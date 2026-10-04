@@ -622,3 +622,60 @@ test("PATCH rejects an anonymous foreign-Origin caller with 401 (guard runs afte
   assert.equal(response.status, 401, "the role gate precedes the same-origin guard");
   assert.equal(callArgs("decideAppeal").length, 0);
 });
+
+test("same-origin guard runs before rate limiting so a foreign PATCH cannot spend the decider's bucket", async () => {
+  // Regression pin: with the guard AFTER the moderation bucket check, a
+  // foreign-Origin PATCH still returns 403 but consumes the decider's real
+  // bucket, so the very next legitimate same-caller decision is throttled to
+  // 429. Correct order (auth -> sameOrigin -> rate limit) keeps the failed
+  // cross-site attempt free: the first legitimate call has the full 1/min and
+  // the second — same identity and IP — is throttled without deciding.
+  stubIdentity(moderatorUser);
+  stub("getReviewerByUserId", async () => seniorReviewer);
+  stub("decideAppeal", async () => ({ kind: "ok", appeal: appealFixture, event: eventFixture }));
+  const { PATCH } = await appealItemRoute();
+  const envModule = await loadTreeModule("cloudflare-workers.mjs");
+  const previousMax = envModule.env.MODERATION_RATE_LIMIT_MAX;
+  const previousWindow = envModule.env.MODERATION_RATE_LIMIT_WINDOW_SECONDS;
+  envModule.env.MODERATION_RATE_LIMIT_MAX = "1";
+  envModule.env.MODERATION_RATE_LIMIT_WINDOW_SECONDS = "60";
+  rateLimit.resetRateLimitState();
+  const caller = { "cf-connecting-ip": "203.0.113.9" };
+  try {
+    const foreign = asModerator("/api/appeals/1", {
+      method: "PATCH",
+      headers: { ...caller, origin: "https://other.test" },
+      body: validDecisionPayload,
+    });
+    const rejected = await PATCH(foreign);
+    assert.equal(rejected.status, 403);
+    assert.equal(
+      (await responseBody(rejected)).error,
+      "Cross-site request rejected. Refresh the page and try again.",
+    );
+    assert.equal(foreign.bodyUsed, false);
+    assert.equal(callArgs("decideAppeal").length, 0, "the cross-site attempt never spends the decision");
+
+    const first = await PATCH(asModerator("/api/appeals/1", {
+      method: "PATCH",
+      headers: { ...caller, origin: "https://osdb.test" },
+      body: validDecisionPayload,
+    }));
+    assert.equal(first.status, 200, "the same caller still has the full 1/min bucket");
+    assert.equal(callArgs("decideAppeal").length, 1);
+
+    const second = await PATCH(asModerator("/api/appeals/1", {
+      method: "PATCH",
+      headers: { ...caller, origin: "https://osdb.test" },
+      body: validDecisionPayload,
+    }));
+    assert.equal(second.status, 429, "the bucket is real: the next same-caller PATCH is throttled");
+    assert.equal(callArgs("decideAppeal").length, 1, "the throttled call never reaches the decision");
+  } finally {
+    if (previousMax === undefined) delete envModule.env.MODERATION_RATE_LIMIT_MAX;
+    else envModule.env.MODERATION_RATE_LIMIT_MAX = previousMax;
+    if (previousWindow === undefined) delete envModule.env.MODERATION_RATE_LIMIT_WINDOW_SECONDS;
+    else envModule.env.MODERATION_RATE_LIMIT_WINDOW_SECONDS = previousWindow;
+    rateLimit.resetRateLimitState();
+  }
+});

@@ -941,3 +941,63 @@ test("PATCH does not purge when the decision did not succeed", async () => {
     globalThis.fetch = originalFetch;
   }
 });
+
+test("same-origin guard runs before rate limiting so a foreign PATCH cannot spend the caller's bucket", async () => {
+  // Regression pin: with the guard AFTER moderationLimit, a foreign-Origin
+  // PATCH still returns 403 but consumes the caller's real bucket, so the very
+  // next legitimate same-caller decision is throttled to 429. Correct order
+  // (auth -> sameOrigin -> rate limit) keeps the failed cross-site attempt
+  // free: the first legitimate call has the full 1/min and the second — same
+  // identity and IP — is throttled without reaching the decision.
+  stub("moderateCamera", async () => okResult());
+  const { PATCH } = await route();
+  const env = (await loadTreeModule("cloudflare-workers.mjs")).env;
+  const rateLimit = await loadTreeModule("app/lib/rate-limit.mjs");
+  const previousMax = env.MODERATION_RATE_LIMIT_MAX;
+  const previousWindow = env.MODERATION_RATE_LIMIT_WINDOW_SECONDS;
+  env.MODERATION_RATE_LIMIT_MAX = "1";
+  env.MODERATION_RATE_LIMIT_WINDOW_SECONDS = "60";
+  rateLimit.resetRateLimitState();
+  const caller = { "cf-connecting-ip": "203.0.113.9" };
+  try {
+    const foreign = authRequest("/api/moderation", {
+      method: "PATCH",
+      headers: { ...caller, origin: "https://other.test" },
+      body: validDecisionBody,
+    });
+    const rejected = await PATCH(foreign);
+    assert.equal(rejected.status, 403);
+    assert.equal(
+      (await responseBody(rejected)).error,
+      "Cross-site request rejected. Refresh the page and try again.",
+    );
+    assert.equal(foreign.bodyUsed, false);
+    assert.equal(callArgs("moderateCamera").length, 0, "the cross-site attempt never spends the decision");
+
+    const first = await PATCH(
+      authRequest("/api/moderation", {
+        method: "PATCH",
+        headers: { ...caller, origin: "https://osdb.test" },
+        body: validDecisionBody,
+      }),
+    );
+    assert.equal(first.status, 200, "the same caller still has the full 1/min bucket");
+    assert.equal(callArgs("moderateCamera").length, 1);
+
+    const second = await PATCH(
+      authRequest("/api/moderation", {
+        method: "PATCH",
+        headers: { ...caller, origin: "https://osdb.test" },
+        body: validDecisionBody,
+      }),
+    );
+    assert.equal(second.status, 429, "the bucket is real: the next same-caller PATCH is throttled");
+    assert.equal(callArgs("moderateCamera").length, 1, "the throttled call never reaches the decision");
+  } finally {
+    if (previousMax === undefined) delete env.MODERATION_RATE_LIMIT_MAX;
+    else env.MODERATION_RATE_LIMIT_MAX = previousMax;
+    if (previousWindow === undefined) delete env.MODERATION_RATE_LIMIT_WINDOW_SECONDS;
+    else env.MODERATION_RATE_LIMIT_WINDOW_SECONDS = previousWindow;
+    rateLimit.resetRateLimitState();
+  }
+});
