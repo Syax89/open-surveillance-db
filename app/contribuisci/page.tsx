@@ -42,8 +42,10 @@ export default async function ContribuisciPage() {
       <div className="contribuisci-page">
         <section className="contribuisci-section" aria-labelledby="contribuisci-ways-title">
           <div className="contribuisci-section-head">
-            <p className="eyebrow"><span /> {t.waysEyebrow}</p>
-            <h2 id="contribuisci-ways-title">{t.waysTitle}</h2>
+            <div>
+              <p className="eyebrow"><span /> {t.waysEyebrow}</p>
+              <h2 id="contribuisci-ways-title">{t.waysTitle}</h2>
+            </div>
             <p>{t.waysIntro}</p>
           </div>
 
@@ -78,8 +80,10 @@ export default async function ContribuisciPage() {
 
         <section className="contribuisci-section" aria-labelledby="contribuisci-db-title">
           <div className="contribuisci-section-head">
-            <p className="eyebrow"><span /> {t.dbReportEyebrow}</p>
-            <h2 id="contribuisci-db-title">{t.dbReportTitle}</h2>
+            <div>
+              <p className="eyebrow"><span /> {t.dbReportEyebrow}</p>
+              <h2 id="contribuisci-db-title">{t.dbReportTitle}</h2>
+            </div>
             <p>{t.dbReportBody}</p>
           </div>
           <a
