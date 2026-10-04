@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 import { decideAppeal, type AppealDecision, appealDecisions } from "../../../../db/appeals";
 import { requireRole } from "../../../lib/authz";
+import { CSRF_REJECTED_ERROR, sameOrigin } from "../../../lib/csrf";
 import { isRecord } from "../../../lib/guards";
 import { BodyReadError, readJsonBody, urlTooLong } from "../../../lib/input-limits";
 import { recordRateLimitBlock } from "../../../lib/abuse-alerts";
@@ -49,6 +50,18 @@ export async function PATCH(request: Request) {
 
   const auth = await requireRole(request, "moderator");
   if (!auth.ok) return auth.response;
+
+  // Same-origin guard: the decider is edge-authenticated (Basic/bearer gate or
+  // platform header), NOT a contributor osdb_session, so there is no CSRF token
+  // to echo. The shared sameOrigin helper still blocks a cross-site browser
+  // PATCH (which always carries a foreign Origin) before any rate-limit, body
+  // parse, reviewer lookup or write runs.
+  if (!sameOrigin(request)) {
+    return Response.json(
+      { error: CSRF_REJECTED_ERROR },
+      { status: 403, headers: { "Cache-Control": "no-store" } },
+    );
+  }
 
   // The decider acts with the moderation bucket (second layer over the
   // edge gate): only authenticated moderators reach this point, and the

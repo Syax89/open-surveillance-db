@@ -20,6 +20,27 @@ export const SESSION_COOKIE = "osdb_session";
 export const CSRF_COOKIE = "osdb_csrf";
 export const CSRF_HEADER = "x-csrf-token";
 
+/**
+ * The single body every route answers when the session-branch gate
+ * (`sameOrigin && csrfVerified`) rejects a write. It is a 403, exactly like
+ * the DOMAIN refusals (write gate: unverified session, self-action,
+ * self-verify, not-owner), so clients cannot tell the two apart by status
+ * alone — they must read this marker to show the right advice. Kept here as
+ * the one literal the routes and the clients share.
+ */
+export const CSRF_REJECTED_ERROR = "Cross-site request rejected. Refresh the page and try again.";
+
+/**
+ * True ONLY for the CSRF/same-origin rejection: 403 with EXACTLY the marker
+ * body. Anything else (another 403, another status, a non-object or null
+ * body) is a domain refusal and must keep its own message.
+ */
+export function isCsrfRejection(status: number, body: unknown): boolean {
+  if (status !== 403) return false;
+  if (typeof body !== "object" || body === null) return false;
+  return (body as { error?: unknown }).error === CSRF_REJECTED_ERROR;
+}
+
 /** Constant-time string comparison (same technique as the edge auth gate). */
 export function constantTimeEqual(first: string, second: string): boolean {
   if (first.length !== second.length) return false;

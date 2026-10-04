@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useMessages } from "./use-messages";
-import { readCsrfToken } from "./csrf";
+import { isCsrfRejection, readCsrfToken } from "./csrf";
 import type { ReportCoordinates } from "./report-coordinates";
 
 export type NearbyCandidate = { id: number; title: string; kind: string; distanceMeters: number; similarity: number; matchStrength: "high" | "medium" | "low" };
@@ -24,7 +24,9 @@ export type NearbyCandidate = { id: number; title: string; kind: string; distanc
  * under the ~150-line refactor target.
  */
 export function useReportFlow({ setNotice, initialCoordinates = null }: { setNotice: (notice: string) => void; initialCoordinates?: ReportCoordinates | null }) {
-  const t = useMessages().report;
+  const bundle = useMessages();
+  const t = bundle.report;
+  const common = bundle.common;
   const [coordinates, setCoordinates] = useState<{ latitude: number; longitude: number } | null>(initialCoordinates);
   const [manualLatitude, setManualLatitude] = useState(initialCoordinates ? initialCoordinates.latitude.toFixed(5) : "");
   const [manualLongitude, setManualLongitude] = useState(initialCoordinates ? initialCoordinates.longitude.toFixed(5) : "");
@@ -281,7 +283,9 @@ export function useReportFlow({ setNotice, initialCoordinates = null }: { setNot
         return;
       }
       if (response.status === 403) {
-        setNotice(t.verifyRequired);
+        // Domain refusal (unverified email / write gate) vs CSRF rejection
+        // (expired token): same status, different advice — the body decides.
+        setNotice(isCsrfRejection(response.status, data) ? common.csrfExpired : t.verifyRequired);
         return;
       }
       if (!response.ok) throw new Error(t.submitReportError);

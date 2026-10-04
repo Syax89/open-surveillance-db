@@ -2,7 +2,7 @@ import { env } from "cloudflare:workers";
 import { createCamera, DOME_KIND, findNearbyPublicCameras, freshnessWindows, getPublicCameraFacets, getPublicCameraKinds, listPublicCameras, listPublicCamerasInBbox, listPublicCamerasInBboxPage, listPublicCamerasPage, PUBLIC_CAMERAS_BBOX_DEFAULT_LIMIT, PUBLIC_CAMERAS_BBOX_MAX_LIMIT, PUBLIC_CAMERAS_PAGE_DEFAULT_LIMIT, PUBLIC_CAMERAS_PAGE_MAX_LIMIT, PUBLIC_CAMERA_SORT_OPTIONS, type FreshnessWindow, type PublicCameraFacets, type PublicCameraFilters } from "../../../db/cameras";
 import { requiresDuplicateConfirmation } from "../../lib/duplicate-detection";
 import { requireWriteAuth } from "../../lib/write-gate";
-import { csrfVerified, sameOrigin } from "../../lib/csrf";
+import { CSRF_REJECTED_ERROR, csrfVerified, sameOrigin } from "../../lib/csrf";
 import { DATA_LICENSE_ID, DATA_LICENSE_NOTICE } from "../../lib/data-license";
 import { isRecord } from "../../lib/guards";
 import {
@@ -330,7 +330,7 @@ export async function POST(request: Request) {
     // X-CSRF-Token echo exactly as before.
     if (gate.authMethod === "session" && (!sameOrigin(request) || !csrfVerified(request, gate.session.csrfToken))) {
       return Response.json(
-        { error: "Cross-site request rejected. Refresh the page and try again." },
+        { error: CSRF_REJECTED_ERROR },
         { status: 403 },
       );
     }

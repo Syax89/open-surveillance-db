@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useMessages } from "../../lib/use-messages";
-import { readCsrfToken } from "../../lib/csrf";
+import { isCsrfRejection, readCsrfToken } from "../../lib/csrf";
 import { Art13Notice } from "../Art13Notice";
 import { RecordIdField } from "./RecordIdField";
 
@@ -26,7 +26,9 @@ type Props = {
  * pre-selects the related record and announces it via an aria-live region.
  */
 export function CorrectionForm({ defaultRecordId = null, showHeading = true }: Props) {
-  const t = useMessages().correction;
+  const bundle = useMessages();
+  const t = bundle.correction;
+  const common = bundle.common;
   const [correctionNotice, setCorrectionNotice] = useState("");
   const [preselected, setPreselected] = useState<{ id: number; title: string } | null>(null);
 
@@ -51,7 +53,14 @@ export function CorrectionForm({ defaultRecordId = null, showHeading = true }: P
       // required."). The login wall covers the common case; this maps the
       // mid-form session death.
       if (response.status === 401) { setCorrectionNotice(t.loginRequired); return; }
-      if (response.status === 403) { setCorrectionNotice(t.verifyRequired); return; }
+      // A 403 is either the write gate's domain refusal (unverified email)
+      // or the CSRF/same-origin rejection (expired token): only the body
+      // tells them apart, so the copy follows the marker, not the status.
+      if (response.status === 403) {
+        const body = await response.json().catch(() => null);
+        setCorrectionNotice(isCsrfRejection(response.status, body) ? common.csrfExpired : t.verifyRequired);
+        return;
+      }
       const data = await response.json() as { referenceId?: number; error?: string };
       if (!response.ok) throw new Error(data.error || t.saveRequestError);
       formElement.reset();

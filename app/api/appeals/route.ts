@@ -9,7 +9,7 @@ import { requireRole } from "../../lib/authz";
 import { authLimit } from "../../lib/auth-route-helpers";
 import { getUserByContributorId, roleAtLeast } from "../../../db/users";
 import { malformedSessionCookieGuard, resolveOptionalContributor } from "../../lib/auth-session";
-import { csrfVerified, sameOrigin } from "../../lib/csrf";
+import { CSRF_REJECTED_ERROR, csrfVerified, sameOrigin } from "../../lib/csrf";
 import { isRecord } from "../../lib/guards";
 import { BodyReadError, readJsonBody, urlTooLong } from "../../lib/input-limits";
 import { recordRateLimitBlock } from "../../lib/abuse-alerts";
@@ -144,7 +144,7 @@ export async function POST(request: Request) {
   }
   if (!sameOrigin(request) || !csrfVerified(request, session.session.csrfToken)) {
     return Response.json(
-      { error: "Cross-site request rejected. Refresh the page and try again." },
+      { error: CSRF_REJECTED_ERROR },
       { status: 403 },
     );
   }
