@@ -8,7 +8,7 @@ import { useMessages } from "../../../lib/use-messages";
 import { SiteHeader } from "../../../components/SiteHeader";
 import { KIND_OPTIONS, isDomeKind } from "../../../lib/camera-kinds";
 import { formatDirection } from "../../../lib/compass";
-import { readCsrfToken } from "../../../lib/csrf";
+import { isCsrfRejection, readCsrfToken } from "../../../lib/csrf";
 import { EditPositionMap } from "../../../components/EditPositionMap";
 
 /**
@@ -80,6 +80,7 @@ export default function RecordEditPage() {
   const bundle = useMessages();
   const t = bundle.record;
   const community = bundle.community;
+  const common = bundle.common;
   const recordId = Number(params.id);
 
   const [phase, setPhase] = useState<Phase>("loading");
@@ -281,7 +282,9 @@ export default function RecordEditPage() {
         else if (message.includes("changed since")) { setServerError(community.errorEditRace); }
         else { setServerError(community.editBlockedRemoved); }
       } else if (response.status === 403) {
-        setServerError(community.errorEditNotOwner);
+        // 403 is either the not-owner gate or the CSRF/same-origin rejection
+        // (expired token): only the body marker tells them apart.
+        setServerError(isCsrfRejection(response.status, body) ? common.csrfExpired : community.errorEditNotOwner);
       } else if (response.status === 429) {
         setServerError(community.errorEditRateLimit);
       } else if (response.status === 404) {

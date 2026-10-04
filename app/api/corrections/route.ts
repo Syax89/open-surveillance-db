@@ -7,7 +7,7 @@ import { mailerFromAddress, sendMail } from "../../../db/mailer";
 import { renderUrgentReportEmail } from "../../lib/email-templates-urgent";
 import { recordRateLimitBlock } from "../../lib/abuse-alerts";
 import { requireWriteAuth } from "../../lib/write-gate";
-import { csrfVerified, sameOrigin } from "../../lib/csrf";
+import { CSRF_REJECTED_ERROR, csrfVerified, sameOrigin } from "../../lib/csrf";
 import { isRecord } from "../../lib/guards";
 import { BodyReadError, readJsonBody, urlTooLong } from "../../lib/input-limits";
 import { callerKey, checkRateLimit, checkRateLimitForKeyAuth, submissionLimits, submissionsDisabled } from "../../lib/rate-limit";
@@ -81,7 +81,7 @@ export async function POST(request: Request) {
   // exactly as before.
   if (gate.authMethod === "session" && (!sameOrigin(request) || !csrfVerified(request, gate.session.csrfToken))) {
     return Response.json(
-      { error: "Cross-site request rejected. Refresh the page and try again." },
+      { error: CSRF_REJECTED_ERROR },
       { status: 403 },
     );
   }

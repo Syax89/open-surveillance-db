@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { StarConfirmButton } from "./StarConfirmButton";
 import { useMessages } from "../lib/use-messages";
+import { isCsrfRejection, readCsrfToken } from "../lib/csrf";
 import type { TrustLevelMeta } from "../lib/trust-levels";
 
 /**
@@ -66,12 +67,7 @@ export function VerificationWidget({
     if (verificationGate !== "level" || level === null || level.level < 1) return;
     // CSRF double-submit: echo the script-readable cookie (same pattern as
     // /account mutations). The server also enforces same-origin + bucket.
-    let csrfToken: string | null = null;
-    if (typeof document !== "undefined") {
-      const match = document.cookie.split(";").map((part) => part.trim())
-        .find((part) => part.startsWith("osdb_csrf="));
-      csrfToken = match ? decodeURIComponent(match.slice("osdb_csrf=".length)) : null;
-    }
+    const csrfToken = readCsrfToken();
     setToggleBusy(true);
     setConfirmError(null);
     const method = confirmed ? "DELETE" : "PUT";
@@ -86,8 +82,11 @@ export function VerificationWidget({
         setConfirmCount(body.count);
       } else if (response.status === 403) {
         // Server fail-closed gate (self-verify or level): surface the exact
-        // reason; the toggle stays disabled for this session.
-        setConfirmError(community.errorSelfVerify);
+        // reason — unless the body marks a CSRF/same-origin rejection (an
+        // expired token), which asks for a refresh instead. The toggle stays
+        // disabled for this session either way.
+        const body = await response.json().catch(() => null);
+        setConfirmError(isCsrfRejection(response.status, body) ? bundle.common.csrfExpired : community.errorSelfVerify);
         setVerificationGate("error");
       } else if (response.status === 409) {
         setConfirmError(community.errorAlreadyVerified);

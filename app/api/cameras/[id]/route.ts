@@ -4,7 +4,7 @@ import { getCommunityRecordById } from "../../../../db/cameras";
 import { recordRateLimitBlock } from "../../../lib/abuse-alerts";
 import { CACHE_TAGS } from "../../../lib/cache-purge";
 import { withPublicCache } from "../../../lib/public-cache";
-import { csrfVerified, sameOrigin } from "../../../lib/csrf";
+import { CSRF_REJECTED_ERROR, csrfVerified, sameOrigin } from "../../../lib/csrf";
 import { BodyReadError, readJsonBody, urlTooLong } from "../../../lib/input-limits";
 import { callerKey, checkRateLimit, checkRateLimitForKeyAuth, limitsFor } from "../../../lib/rate-limit";
 import { requireWriteAuth } from "../../../lib/write-gate";
@@ -188,7 +188,7 @@ export async function PATCH(request: Request) {
   // bucket below.
   if (gate.authMethod === "session") {
     if (!sameOrigin(request) || !csrfVerified(request, gate.session.csrfToken)) {
-      return Response.json({ error: "Cross-site request rejected. Refresh the page and try again." }, { status: 403, headers: NO_STORE_HEADERS });
+      return Response.json({ error: CSRF_REJECTED_ERROR }, { status: 403, headers: NO_STORE_HEADERS });
     }
   }
 
