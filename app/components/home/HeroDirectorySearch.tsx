@@ -22,7 +22,7 @@ import { PlaceAutocomplete } from "./PlaceAutocomplete";
 export function HeroDirectorySearch() {
   const t = useMessages().home;
   return (
-    <form className="hero-search" id="hero-directory-search" action="/directory" role="search">
+    <form className="hero-search" action="/directory" role="search">
       <PlaceAutocomplete
         inputId="hero-search"
         name="q"
@@ -41,7 +41,7 @@ export function HeroDirectorySearch() {
           attribution: t.searchAttribution,
         }}
       />
-      <button type="submit">{t.searchDirectory} <span aria-hidden="true">→</span></button>
+      <button type="submit" aria-label={t.searchDirectory}><span className="hero-search-submit-label">{t.searchDirectory}</span> <span aria-hidden="true">→</span></button>
     </form>
   );
 }

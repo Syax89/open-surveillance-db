@@ -252,46 +252,57 @@ test("the hero search form is full-width with no 525px cap and the dropdown is n
   assert.match(dropdownMobile, /position:\s*static/, "mobile dropdown must be static, in normal flow below the input");
 });
 
-test("the mobile hero submit is a native form-associated button that submits the real hero search", async () => {
+test("the hero search's compact in-form arrow submit is the sole native submitter of the real hero search", async () => {
   const html = await runSsrHome();
   const { window } = await setupDom();
-  // Mount the REAL SSR markup into a container. The mobile CTA is display:none
-  // on desktop; this pins the DOM contract jsdom resolves from the
-  // form="hero-directory-search" association, i.e. the button submits the
-  // existing .hero-search form without any JS layout code.
+  // Mount the REAL SSR markup into a container and pin the DOM contract: the
+  // hero search carries exactly ONE submit — the compact in-form arrow button —
+  // and no external submit lives in the .hero-actions row below.
   const container = window.document.createElement("div");
   container.innerHTML = html;
   window.document.body.appendChild(container);
   try {
     const form = container.querySelector("form.hero-search");
     assert.ok(form, "expected the hero search form in the SSR markup");
-    assert.equal(form.id, "hero-directory-search", "the form must carry the association id");
     assert.equal(form.method, "get", "the hero search form must stay a GET form");
     assert.equal(form.getAttribute("action"), "/directory", "the hero search form must target /directory");
 
     const input = form.querySelector('input[name="q"]');
     assert.ok(input, "expected the q input inside the hero search form");
 
-    const submit = container.querySelector(".hero-actions .hero-directory-submit-mobile");
-    assert.ok(submit, "expected the mobile hero submit button inside .hero-actions");
-    assert.equal(submit.getAttribute("form"), "hero-directory-search", "the button associates with the form by id");
-    assert.equal(submit.form, form, "the external button.form must resolve to the real .hero-search form");
-    assert.equal(submit.type, "submit", "the mobile CTA is a native submit button");
+    const submits = form.querySelectorAll('button[type="submit"]');
+    assert.equal(submits.length, 1, "the hero search carries exactly one submit button, inside the form");
+    const submit = submits[0];
+    assert.equal(container.querySelectorAll('.hero-actions button[type="submit"]').length, 0, "no submit button lives in the .hero-actions row");
 
-    // Clicking the native submit button fires one cancelable submit on the
-    // associated form, carrying the typed query and this button as submitter.
+    const label = submit.getAttribute("aria-label");
+    assert.ok(label && label.trim().length > 0, "the submit button must carry a meaningful accessible name");
+    assert.equal(label, "Search the directory", "the aria-label is the localized directory-search label");
+
+    const labelSpan = submit.querySelector(".hero-search-submit-label");
+    assert.ok(labelSpan, "expected the visible desktop label span");
+    assert.equal(labelSpan.textContent.trim(), "Search the directory", "the desktop label span carries the localized text");
+    const arrow = submit.querySelector('span[aria-hidden="true"]');
+    assert.ok(arrow, "expected the decorative arrow glyph");
+    assert.equal(arrow.textContent.trim(), "→", "the arrow glyph stays aria-hidden decoration");
+
+    assert.equal(submit.form, form, "the in-form submit resolves to the real .hero-search form");
+
+    // Clicking the native submit fires one cancelable submit on the form,
+    // carrying the typed query and this button as the actual submitter.
     let captured = null;
     form.addEventListener("submit", (event) => { event.preventDefault(); captured = event; }, { once: true });
     input.value = "torino";
     submit.click();
-    assert.ok(captured, "clicking the mobile submit must dispatch a submit event on the hero form");
+    assert.ok(captured, "clicking the in-form submit must dispatch a submit event on the hero form");
     assert.equal(captured.defaultPrevented, true, "the submit must be prevented so the no-JS GET navigation is testable");
-    assert.equal(captured.submitter, submit, "the external button must be the submit event's submitter");
+    assert.equal(captured.submitter, submit, "the in-form button must be the submit event's submitter");
     assert.equal(new window.FormData(form, captured.submitter).get("q"), "torino", "the submit carries the typed query");
 
-    // The row keeps exactly one map link — the submit button must not duplicate it.
-    const mapLinks = container.querySelectorAll('.hero-actions a[href="/mappa"]');
-    assert.equal(mapLinks.length, 1, "expected exactly one map link inside .hero-actions");
+    // The row keeps exactly one map and one report link — the in-form submit
+    // must not duplicate either CTA.
+    assert.equal(container.querySelectorAll('.hero-actions a[href="/mappa"]').length, 1, "expected exactly one map link inside .hero-actions");
+    assert.equal(container.querySelectorAll('.hero-actions a[href="/segnala"]').length, 1, "expected exactly one report link inside .hero-actions");
   } finally {
     container.remove();
   }

@@ -154,17 +154,31 @@ test("≤700px /directory header and card actions compact onto one row without l
   const mobile = mediaBlocks(css, "max-width", "700px").find((block) => block.includes(".hero-actions"));
   assert.ok(mobile, "expected the ≤700px block carrying the hero and directory mobile overrides");
 
-  // Hero CTAs: below the input the form-associated directory submit and the
-  // map link share a two-column row, while the report link spans both tracks.
-  // The desktop in-form submit is hidden on mobile; the details CTA drops the
-  // desktop 640px cap.
+  // Hero CTAs: the map and report links fill the existing two-column row. The
+  // separate external directory submit CTA is gone — the search now carries a
+  // compact in-form arrow submit, so the report link no longer spans both tracks.
   const heroActions = ruleBlock(mobile, ".hero-actions");
   assert.equal(compact(declaration(heroActions, "display")), "grid");
   assert.equal(compact(declaration(heroActions, "grid-template-columns")), "repeat(2,minmax(0,1fr))");
-  assert.equal(compact(declaration(ruleBlock(mobile, ".hero-actions .button-quiet"), "grid-column")), "1/-1");
-  assert.equal(compact(declaration(ruleBlock(mobile, ".hero-actions .hero-directory-submit-mobile"), "display")), "inline-flex");
-  assert.equal(compact(declaration(ruleBlock(mobile, '.hero-search > button[type="submit"]'), "display")), "none");
   assert.equal(compact(declaration(ruleBlock(mobile, ".hero-actions .button"), "justify-content")), "center");
+  assert.doesNotMatch(mobile, /\.hero-actions \.button-quiet\s*\{/, "the report link no longer spans both tracks");
+  assert.doesNotMatch(css, /hero-directory-submit-mobile/, "the external directory submit CTA must be gone");
+
+  // Mobile search row: the input fills the first grid track and the compact
+  // in-form arrow submit occupies the fixed 48px second track; the visible
+  // desktop label span is hidden on mobile while the button keeps its
+  // accessible name, and the static dropdown stays as wide as input+arrow.
+  const search = ruleBlock(mobile, ".hero-search");
+  assert.equal(compact(declaration(search, "display")), "grid");
+  assert.equal(compact(declaration(search, "grid-template-columns")), "minmax(0,1fr)48px");
+  const submit = ruleBlock(mobile, '.hero-search > button[type="submit"]');
+  assert.equal(compact(declaration(submit, "display")), "flex");
+  assert.equal(pixelValue(declaration(submit, "width")), 48);
+  assert.equal(pixelValue(declaration(submit, "min-height")), 48);
+  assert.equal(compact(declaration(ruleBlock(mobile, ".hero-search-submit-label"), "display")), "none");
+  const dropdown = ruleBlock(mobile, ".hero-search .geocode-dropdown");
+  assert.equal(compact(declaration(dropdown, "position")), "static");
+  assert.equal(compact(declaration(dropdown, "width")), "calc(100%+48px)");
 
   const details = ruleBlock(mobile, ".hero-copy--details");
   assert.equal(compact(declaration(details, "padding-top")), "0");

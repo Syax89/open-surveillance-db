@@ -34,8 +34,7 @@ export function Hero() {
         <HeroDirectorySearch />
       </div>
       <div className="hero-copy hero-copy--details">
-        {/* Mobile-only native submit button for the hero search (form="hero-directory-search"). */}
-        <div className="hero-actions"><button type="submit" form="hero-directory-search" className="button hero-directory-submit-mobile">{t.searchDirectory} <span aria-hidden="true">→</span></button><a className="button button-primary" href="/mappa">{t.exploreTheMap} <span aria-hidden="true">→</span></a><a className="button button-quiet" href="/segnala">{t.reportCta} <span aria-hidden="true">→</span></a></div>
+        <div className="hero-actions"><a className="button button-primary" href="/mappa">{t.exploreTheMap} <span aria-hidden="true">→</span></a><a className="button button-quiet" href="/segnala">{t.reportCta} <span aria-hidden="true">→</span></a></div>
         <dl className="hero-stats" aria-label={t.statsLabel}><div><dt>{total ?? "—"}</dt><dd>{t.publicRecords}</dd></div><div><dt>{t.browseFreely}</dt><dd>{t.browseFreelyDetail}</dd></div><div><dt>{t.openData}</dt><dd>{t.openDataDetail}</dd></div></dl>
         <p className="hero-trust-note">{t.trustNote} <a href="/fonti">{t.sourcesLink} <span aria-hidden="true">→</span></a></p>
         {total !== null && <p className="sr-only" role="status">{total} {t.publicRecords}</p>}
