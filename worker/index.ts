@@ -804,8 +804,14 @@ const API_LINK_HEADER = [
  * geolocation for the top-level document; every other route keeps the
  * fully-denying policy. The override still respects the "never overwrite"
  * rule: a stricter policy already set by an app handler survives untouched.
+ *
+ * `privatePolicy` (passed from dispatch's already-computed gatedPath
+ * classification) marks a response on a moderation / moderator-facing appeals
+ * surface: those are private and must never be publicly cacheable, so any
+ * app- or proxy-supplied public/max-age policy is overridden with a hard
+ * no-store. Body, status, statusText and every other header are left alone.
  */
-function withSecurityHeaders(response: Response, pathname?: string, hostname?: string): Response {
+function withSecurityHeaders(response: Response, pathname?: string, hostname?: string, privatePolicy = false): Response {
   const headers = new Headers(response.headers);
   // Never overwrite an existing header: app routes may set stricter
   // values that must survive the middleware. The
@@ -831,6 +837,10 @@ function withSecurityHeaders(response: Response, pathname?: string, hostname?: s
   if (hostname?.toLowerCase() === PREPRODUCTION_HOST) {
     headers.set("X-Robots-Tag", "noindex, nofollow");
   }
+  // Private (gated moderation / appeals) surfaces: override any app-supplied
+  // public/max-age policy with a hard no-store. This is the one header the
+  // middleware may overwrite, and only on these surfaces.
+  if (privatePolicy) headers.set("Cache-Control", "no-store");
   return new Response(response.body, {
     status: response.status,
     statusText: response.statusText,
@@ -1094,7 +1104,11 @@ async function dispatch(request: Request, env: Env, ctx: ExecutionContext, url: 
         url.hostname,
       );
     }
-    if (gatedPath(request.method, gateTarget)) {
+    // Reuse the same normalized target + method classification for the
+    // private-cache policy on the app response below: an admitted moderation /
+    // appeals response is private and must never be publicly cacheable.
+    const routedThroughGate = gatedPath(request.method, gateTarget);
+    if (routedThroughGate) {
       const gate = requireModerationAuth(gated, env);
       if (gate.denied) return withSecurityHeaders(gate.denied, url.pathname, url.hostname);
       gated = injectIdentityAfterGate(gated, gate.identityEmail);
@@ -1142,7 +1156,7 @@ async function dispatch(request: Request, env: Env, ctx: ExecutionContext, url: 
       return withSecurityHeaders(optimized, url.pathname, url.hostname);
     }
 
-    return withSecurityHeaders(await handler.fetch(gated, env, ctx), url.pathname, url.hostname);
+    return withSecurityHeaders(await handler.fetch(gated, env, ctx), url.pathname, url.hostname, routedThroughGate);
 }
 
 const worker = {
