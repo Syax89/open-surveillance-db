@@ -533,3 +533,92 @@ test("PATCH answers 500 when the db layer throws unexpectedly", async () => {
   assert.equal(response.status, 500);
   assert.equal((await responseBody(response)).error, "Unable to record the appeal decision");
 });
+
+// ---------------------------------------------------------------------------
+// PATCH /api/appeals/[id] — same-origin guard (CSRF defence in depth)
+// ---------------------------------------------------------------------------
+//
+// The decider is edge-authenticated (Basic/bearer gate or platform header), so
+// there is no contributor osdb_session and no CSRF token to echo. The shared
+// sameOrigin helper is the only write-origin defence: it blocks a cross-site
+// browser PATCH (which always carries a foreign Origin) while the
+// TLS-terminating proxy's `http://<host>` Origin and an absent Origin pass.
+// The literal below is written out independently of the production constant so
+// a change to CSRF_REJECTED_ERROR cannot silently move the wire contract.
+
+const validDecisionPayload = { decision: "uphold", note: "Evidence supports a public street" };
+
+test("PATCH rejects a foreign/malformed Origin with 403 before any decision work", async (t) => {
+  const { PATCH } = await appealItemRoute();
+  const cases = [
+    { name: "cross-site host", origin: "https://other.test" },
+    { name: "malformed origin", origin: "not a valid origin" },
+    { name: "literal null (sandboxed/opaque origin)", origin: "null" },
+    { name: "same host, different port", origin: "https://osdb.test:8443" },
+  ];
+  for (const { name, origin } of cases) {
+    await t.test(name, async () => {
+      stubIdentity(moderatorUser);
+      // A valid payload makes the removed guard observable: without the guard
+      // these requests would reach the reviewer lookup and db layer.
+      const request = asModerator("/api/appeals/1", {
+        method: "PATCH",
+        headers: { origin },
+        body: validDecisionPayload,
+      });
+      const response = await PATCH(request);
+      assert.equal(response.status, 403, name);
+      assert.equal(
+        (await responseBody(response)).error,
+        "Cross-site request rejected. Refresh the page and try again.",
+        name,
+      );
+      assert.equal(response.headers.get("cache-control"), "no-store", name);
+      assert.equal(request.bodyUsed, false, "the guard runs before the body is read");
+      assert.equal(callArgs("decideAppeal").length, 0, name);
+      assert.equal(callArgs("getReviewerByUserId").length, 0, name);
+    });
+  }
+});
+
+test("PATCH accepts same-host and absent Origins for an authenticated moderator", async (t) => {
+  const { PATCH } = await appealItemRoute();
+  const decided = { ...appealFixture, status: "upheld", deciderName: "Demo Senior Moderator" };
+  const cases = [
+    { name: "same-origin https", headers: { origin: "https://osdb.test" } },
+    { name: "same host, http scheme (TLS-terminating proxy)", headers: { origin: "http://osdb.test" } },
+    { name: "no Origin header at all", headers: {} },
+  ];
+  for (const { name, headers } of cases) {
+    await t.test(name, async () => {
+      stubIdentity(moderatorUser);
+      stub("getReviewerByUserId", async () => seniorReviewer);
+      stub("decideAppeal", async () => ({ kind: "ok", appeal: decided, event: eventFixture }));
+      // No contributor csrf cookie or X-CSRF-Token header is sent: this route
+      // never requires one, the same-origin check is the whole write defence.
+      const response = await PATCH(
+        asModerator("/api/appeals/1", { method: "PATCH", headers, body: validDecisionPayload }),
+      );
+      assert.equal(response.status, 200, name);
+      assert.equal(callArgs("decideAppeal").length, 1, name);
+      // Attribution is unchanged: the decider acts as their own server-derived
+      // reviewer (the senior moderator, id 3).
+      assert.deepEqual(
+        callArgs("decideAppeal")[0][0].reviewer,
+        { id: 3, displayName: "Demo Senior Moderator", role: "senior_moderator", active: 1 },
+        name,
+      );
+    });
+  }
+});
+
+test("PATCH rejects an anonymous foreign-Origin caller with 401 (guard runs after role auth)", async () => {
+  const { PATCH } = await appealItemRoute();
+  const response = await PATCH(anonymous("/api/appeals/1", {
+    method: "PATCH",
+    headers: { origin: "https://other.test" },
+    body: validDecisionPayload,
+  }));
+  assert.equal(response.status, 401, "the role gate precedes the same-origin guard");
+  assert.equal(callArgs("decideAppeal").length, 0);
+});

@@ -734,6 +734,98 @@ test("PATCH in development still forces a moderator to their own reviewer", asyn
 });
 
 // ---------------------------------------------------------------------------
+// PATCH /api/moderation — same-origin guard (CSRF defence in depth)
+// ---------------------------------------------------------------------------
+//
+// The moderator decision is edge-authenticated (Basic/bearer gate or platform
+// header), so there is no contributor osdb_session and no CSRF token to echo.
+// The shared sameOrigin helper is the only write-origin defence: it blocks a
+// cross-site browser PATCH (which always carries a foreign Origin) while the
+// TLS-terminating proxy's `http://<host>` Origin and an absent Origin pass.
+// The literal below is written out independently of the production constant so
+// a change to CSRF_REJECTED_ERROR cannot silently move the wire contract.
+
+const validDecisionBody = {
+  entity: "camera",
+  id: 5,
+  action: "approve",
+  reasonCode: validReasonCode,
+  actorId,
+};
+
+test("PATCH rejects a foreign/malformed Origin with 403 before any decision work", async (t) => {
+  const { PATCH } = await route();
+  const cases = [
+    { name: "cross-site host", origin: "https://other.test" },
+    { name: "malformed origin", origin: "not a valid origin" },
+    { name: "literal null (sandboxed/opaque origin)", origin: "null" },
+    { name: "same host, different port", origin: "https://osdb.test:8443" },
+  ];
+  for (const { name, origin } of cases) {
+    await t.test(name, async () => {
+      // A valid payload makes the removed guard observable: without the guard
+      // these requests would reach the db layer and return 200.
+      const request = authRequest("/api/moderation", {
+        method: "PATCH",
+        headers: { origin },
+        body: validDecisionBody,
+      });
+      const response = await PATCH(request);
+      assert.equal(response.status, 403, name);
+      assert.equal(
+        (await responseBody(response)).error,
+        "Cross-site request rejected. Refresh the page and try again.",
+        name,
+      );
+      assert.equal(response.headers.get("cache-control"), "no-store", name);
+      assert.equal(request.bodyUsed, false, "the guard runs before the body is read");
+      assert.equal(callArgs("moderateCamera").length, 0, name);
+      assert.equal(callArgs("moderateCameraEdit").length, 0, name);
+      assert.equal(callArgs("moderateCorrection").length, 0, name);
+      assert.equal(callArgs("getReviewerByUserId").length, 0, name);
+    });
+  }
+});
+
+test("PATCH accepts same-host and absent Origins for an authenticated moderator", async (t) => {
+  const { PATCH } = await route();
+  const cases = [
+    { name: "same-origin https", headers: { origin: "https://osdb.test" } },
+    { name: "same host, http scheme (TLS-terminating proxy)", headers: { origin: "http://osdb.test" } },
+    { name: "no Origin header at all", headers: {} },
+  ];
+  for (const { name, headers } of cases) {
+    await t.test(name, async () => {
+      stub("moderateCamera", async () => okResult());
+      // No contributor csrf cookie or X-CSRF-Token header is sent: this route
+      // never requires one, the same-origin check is the whole write defence.
+      const response = await PATCH(
+        authRequest("/api/moderation", { method: "PATCH", headers, body: validDecisionBody }),
+      );
+      assert.equal(response.status, 200, name);
+      assert.equal((await responseBody(response)).kind, "ok", name);
+      assert.equal(callArgs("moderateCamera").length, 1, name);
+      // Attribution is unchanged: the moderator acts as their own server-derived
+      // reviewer (id 2), never a client-supplied actor id.
+      assert.deepEqual(callArgs("moderateCamera")[0][5], { actorId }, name);
+    });
+  }
+});
+
+test("PATCH rejects an anonymous foreign-Origin caller with 401 (guard runs after role auth)", async () => {
+  const { PATCH } = await route();
+  const response = await PATCH(
+    publicRequest("/api/moderation", {
+      method: "PATCH",
+      headers: { origin: "https://other.test" },
+      body: validDecisionBody,
+    }),
+  );
+  assert.equal(response.status, 401, "the role gate precedes the same-origin guard");
+  assert.equal(callArgs("moderateCamera").length, 0);
+});
+
+// ---------------------------------------------------------------------------
 // PATCH /api/moderation — edge-cache purge (follow-up F0, t_ae600b90)
 // ---------------------------------------------------------------------------
 
