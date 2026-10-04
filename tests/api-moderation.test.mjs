@@ -734,6 +734,98 @@ test("PATCH in development still forces a moderator to their own reviewer", asyn
 });
 
 // ---------------------------------------------------------------------------
+// PATCH /api/moderation — same-origin guard (CSRF defence in depth)
+// ---------------------------------------------------------------------------
+//
+// The moderator decision is edge-authenticated (Basic/bearer gate or platform
+// header), so there is no contributor osdb_session and no CSRF token to echo.
+// The shared sameOrigin helper is the only write-origin defence: it blocks a
+// cross-site browser PATCH (which always carries a foreign Origin) while the
+// TLS-terminating proxy's `http://<host>` Origin and an absent Origin pass.
+// The literal below is written out independently of the production constant so
+// a change to CSRF_REJECTED_ERROR cannot silently move the wire contract.
+
+const validDecisionBody = {
+  entity: "camera",
+  id: 5,
+  action: "approve",
+  reasonCode: validReasonCode,
+  actorId,
+};
+
+test("PATCH rejects a foreign/malformed Origin with 403 before any decision work", async (t) => {
+  const { PATCH } = await route();
+  const cases = [
+    { name: "cross-site host", origin: "https://other.test" },
+    { name: "malformed origin", origin: "not a valid origin" },
+    { name: "literal null (sandboxed/opaque origin)", origin: "null" },
+    { name: "same host, different port", origin: "https://osdb.test:8443" },
+  ];
+  for (const { name, origin } of cases) {
+    await t.test(name, async () => {
+      // A valid payload makes the removed guard observable: without the guard
+      // these requests would reach the db layer and return 200.
+      const request = authRequest("/api/moderation", {
+        method: "PATCH",
+        headers: { origin },
+        body: validDecisionBody,
+      });
+      const response = await PATCH(request);
+      assert.equal(response.status, 403, name);
+      assert.equal(
+        (await responseBody(response)).error,
+        "Cross-site request rejected. Refresh the page and try again.",
+        name,
+      );
+      assert.equal(response.headers.get("cache-control"), "no-store", name);
+      assert.equal(request.bodyUsed, false, "the guard runs before the body is read");
+      assert.equal(callArgs("moderateCamera").length, 0, name);
+      assert.equal(callArgs("moderateCameraEdit").length, 0, name);
+      assert.equal(callArgs("moderateCorrection").length, 0, name);
+      assert.equal(callArgs("getReviewerByUserId").length, 0, name);
+    });
+  }
+});
+
+test("PATCH accepts same-host and absent Origins for an authenticated moderator", async (t) => {
+  const { PATCH } = await route();
+  const cases = [
+    { name: "same-origin https", headers: { origin: "https://osdb.test" } },
+    { name: "same host, http scheme (TLS-terminating proxy)", headers: { origin: "http://osdb.test" } },
+    { name: "no Origin header at all", headers: {} },
+  ];
+  for (const { name, headers } of cases) {
+    await t.test(name, async () => {
+      stub("moderateCamera", async () => okResult());
+      // No contributor csrf cookie or X-CSRF-Token header is sent: this route
+      // never requires one, the same-origin check is the whole write defence.
+      const response = await PATCH(
+        authRequest("/api/moderation", { method: "PATCH", headers, body: validDecisionBody }),
+      );
+      assert.equal(response.status, 200, name);
+      assert.equal((await responseBody(response)).kind, "ok", name);
+      assert.equal(callArgs("moderateCamera").length, 1, name);
+      // Attribution is unchanged: the moderator acts as their own server-derived
+      // reviewer (id 2), never a client-supplied actor id.
+      assert.deepEqual(callArgs("moderateCamera")[0][5], { actorId }, name);
+    });
+  }
+});
+
+test("PATCH rejects an anonymous foreign-Origin caller with 401 (guard runs after role auth)", async () => {
+  const { PATCH } = await route();
+  const response = await PATCH(
+    publicRequest("/api/moderation", {
+      method: "PATCH",
+      headers: { origin: "https://other.test" },
+      body: validDecisionBody,
+    }),
+  );
+  assert.equal(response.status, 401, "the role gate precedes the same-origin guard");
+  assert.equal(callArgs("moderateCamera").length, 0);
+});
+
+// ---------------------------------------------------------------------------
 // PATCH /api/moderation — edge-cache purge (follow-up F0, t_ae600b90)
 // ---------------------------------------------------------------------------
 
@@ -847,5 +939,65 @@ test("PATCH does not purge when the decision did not succeed", async () => {
     delete env.CACHE_PURGE_TOKEN;
     delete env.CACHE_PURGE_ZONE_ID;
     globalThis.fetch = originalFetch;
+  }
+});
+
+test("same-origin guard runs before rate limiting so a foreign PATCH cannot spend the caller's bucket", async () => {
+  // Regression pin: with the guard AFTER moderationLimit, a foreign-Origin
+  // PATCH still returns 403 but consumes the caller's real bucket, so the very
+  // next legitimate same-caller decision is throttled to 429. Correct order
+  // (auth -> sameOrigin -> rate limit) keeps the failed cross-site attempt
+  // free: the first legitimate call has the full 1/min and the second — same
+  // identity and IP — is throttled without reaching the decision.
+  stub("moderateCamera", async () => okResult());
+  const { PATCH } = await route();
+  const env = (await loadTreeModule("cloudflare-workers.mjs")).env;
+  const rateLimit = await loadTreeModule("app/lib/rate-limit.mjs");
+  const previousMax = env.MODERATION_RATE_LIMIT_MAX;
+  const previousWindow = env.MODERATION_RATE_LIMIT_WINDOW_SECONDS;
+  env.MODERATION_RATE_LIMIT_MAX = "1";
+  env.MODERATION_RATE_LIMIT_WINDOW_SECONDS = "60";
+  rateLimit.resetRateLimitState();
+  const caller = { "cf-connecting-ip": "203.0.113.9" };
+  try {
+    const foreign = authRequest("/api/moderation", {
+      method: "PATCH",
+      headers: { ...caller, origin: "https://other.test" },
+      body: validDecisionBody,
+    });
+    const rejected = await PATCH(foreign);
+    assert.equal(rejected.status, 403);
+    assert.equal(
+      (await responseBody(rejected)).error,
+      "Cross-site request rejected. Refresh the page and try again.",
+    );
+    assert.equal(foreign.bodyUsed, false);
+    assert.equal(callArgs("moderateCamera").length, 0, "the cross-site attempt never spends the decision");
+
+    const first = await PATCH(
+      authRequest("/api/moderation", {
+        method: "PATCH",
+        headers: { ...caller, origin: "https://osdb.test" },
+        body: validDecisionBody,
+      }),
+    );
+    assert.equal(first.status, 200, "the same caller still has the full 1/min bucket");
+    assert.equal(callArgs("moderateCamera").length, 1);
+
+    const second = await PATCH(
+      authRequest("/api/moderation", {
+        method: "PATCH",
+        headers: { ...caller, origin: "https://osdb.test" },
+        body: validDecisionBody,
+      }),
+    );
+    assert.equal(second.status, 429, "the bucket is real: the next same-caller PATCH is throttled");
+    assert.equal(callArgs("moderateCamera").length, 1, "the throttled call never reaches the decision");
+  } finally {
+    if (previousMax === undefined) delete env.MODERATION_RATE_LIMIT_MAX;
+    else env.MODERATION_RATE_LIMIT_MAX = previousMax;
+    if (previousWindow === undefined) delete env.MODERATION_RATE_LIMIT_WINDOW_SECONDS;
+    else env.MODERATION_RATE_LIMIT_WINDOW_SECONDS = previousWindow;
+    rateLimit.resetRateLimitState();
   }
 });

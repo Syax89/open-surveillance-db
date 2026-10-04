@@ -4,6 +4,7 @@ import { useContext, useEffect, useId, useRef, useState } from "react";
 import { LocaleContext } from "../components/LocaleProvider";
 import { messages } from "../lib/i18n";
 import type { MessageBundle } from "../lib/i18n";
+import { isCsrfRejection, readCsrfToken } from "../lib/csrf";
 
 /**
  * Community action widget (ADR 0021 §3, FASE 3 UI) — the five-action
@@ -53,15 +54,6 @@ export type ActionType = (typeof ACTION_ORDER)[number];
 const TOOLBAR_ACTIONS: readonly ActionType[] = ["like", "confirm"];
 /** The actions behind the disclosure trigger. */
 const MENU_ACTIONS: readonly ActionType[] = ["gone", "problem", "privacy"];
-
-function csrfToken(): string | null {
-  if (typeof document === "undefined") return null;
-  const match = document.cookie
-    .split(";")
-    .map((part) => part.trim())
-    .find((part) => part.startsWith("osdb_csrf="));
-  return match ? decodeURIComponent(match.slice("osdb_csrf=".length)) : null;
-}
 
 /** Inline 16px icons (redesign t_b7728ad0) — no icon library (project
  * directive: ZERO new libraries). Stroke-only, currentColor, aria-hidden. */
@@ -217,7 +209,7 @@ export function CommunityActions({
     if (authState !== "signed-in" || busyAction !== null) return;
     setBusyAction(action);
     setError(null);
-    const token = csrfToken();
+    const token = readCsrfToken();
     const isActive = myAction === action;
     try {
       const response = await fetch(`/api/cameras/${recordId}/actions`, {
@@ -256,7 +248,10 @@ export function CommunityActions({
         setAuthState("anonymous");
         setError(actions.errorSessionEnded);
       } else if (response.status === 403) {
-        setError(actions.errorSelfAction);
+        // Same status, two very different reasons: the CSRF/same-origin
+        // rejection (expired token → refresh) versus the self-action gate.
+        const body = await response.json().catch(() => null);
+        setError(isCsrfRejection(response.status, body) ? bundle.common.csrfExpired : actions.errorSelfAction);
       } else if (response.status === 409) {
         setMyAction(action);
         setError(actions.errorDuplicate);

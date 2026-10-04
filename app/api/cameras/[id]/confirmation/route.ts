@@ -8,7 +8,7 @@ import { recordRateLimitBlock } from "../../../../lib/abuse-alerts";
 import { resolveOptionalContributor } from "../../../../lib/auth-session";
 import { requireWriteAuth } from "../../../../lib/write-gate";
 import { checkConfirmIpBurst, confirmIpBurstLimits } from "../../../../lib/confirm-ip-burst";
-import { csrfVerified, sameOrigin } from "../../../../lib/csrf";
+import { CSRF_REJECTED_ERROR, csrfVerified, sameOrigin } from "../../../../lib/csrf";
 import { urlTooLong } from "../../../../lib/input-limits";
 import { callerKey, checkRateLimit, checkRateLimitForKeyAuth, limitsFor } from "../../../../lib/rate-limit";
 
@@ -100,7 +100,7 @@ async function guardMutation(
   // dead weight on the key path.
   if (gate.authMethod === "session") {
     if (!sameOrigin(request) || !csrfVerified(request, gate.session.csrfToken)) {
-      return Response.json({ error: "Cross-site request rejected. Refresh the page and try again." }, { status: 403, headers: NO_STORE_HEADERS });
+      return Response.json({ error: CSRF_REJECTED_ERROR }, { status: 403, headers: NO_STORE_HEADERS });
     }
 
     // IP-hash burst bucket (layer 4 anti-gaming, never-the-raw-IP pattern):

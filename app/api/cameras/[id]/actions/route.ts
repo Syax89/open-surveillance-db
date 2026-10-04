@@ -8,7 +8,7 @@ import {
 import { recordRateLimitBlock } from "../../../../lib/abuse-alerts";
 import { resolveOptionalContributor } from "../../../../lib/auth-session";
 import { requireWriteAuth } from "../../../../lib/write-gate";
-import { csrfVerified, sameOrigin } from "../../../../lib/csrf";
+import { CSRF_REJECTED_ERROR, csrfVerified, sameOrigin } from "../../../../lib/csrf";
 import { BodyReadError, readJsonBody, urlTooLong } from "../../../../lib/input-limits";
 import { callerKey, checkRateLimit, checkRateLimitForKeyAuth, limitsFor } from "../../../../lib/rate-limit";
 
@@ -89,7 +89,7 @@ async function guardMutation(
   // bucket below.
   if (gate.authMethod === "session") {
     if (!sameOrigin(request) || !csrfVerified(request, gate.session.csrfToken)) {
-      return Response.json({ error: "Cross-site request rejected. Refresh the page and try again." }, { status: 403, headers: NO_STORE_HEADERS });
+      return Response.json({ error: CSRF_REJECTED_ERROR }, { status: 403, headers: NO_STORE_HEADERS });
     }
   }
 

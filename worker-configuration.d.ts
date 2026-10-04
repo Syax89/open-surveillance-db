@@ -176,7 +176,7 @@ declare module "cloudflare:workers" {
     // password-reset sends alike.
     EMAIL_SEND_LIMIT_MAX?: string;
     EMAIL_SEND_LIMIT_WINDOW_SECONDS?: string;
-    // Moderation gate credentials (ADR 0002): HTTP Basic (USER/PASSWORD)
+    // Moderation gate credentials (ADR 0003): HTTP Basic (USER/PASSWORD)
     // and/or bearer token; at least one must be configured (fail-closed).
     MODERATION_USER?: string;
     MODERATION_PASSWORD?: string;

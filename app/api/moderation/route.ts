@@ -18,6 +18,7 @@ import {
 import { recordRateLimitBlock } from "../../lib/abuse-alerts";
 import { requireRole } from "../../lib/authz";
 import { cameraPurgeTags, purgeCacheTags } from "../../lib/cache-purge";
+import { CSRF_REJECTED_ERROR, sameOrigin } from "../../lib/csrf";
 import { isRecord } from "../../lib/guards";
 import { BodyReadError, readJsonBody, urlTooLong } from "../../lib/input-limits";
 import { callerKey, checkRateLimit, limitsFor } from "../../lib/rate-limit";
@@ -335,6 +336,18 @@ export async function PATCH(request: Request) {
   // cannot be forged by impersonation (audit finding t_6b61fc3f).
   const auth = await requireRole(request, "moderator");
   if (!auth.ok) return auth.response;
+
+  // Same-origin guard: a moderator's decision is edge-authenticated (Basic/
+  // bearer gate or platform header), NOT a contributor osdb_session, so there
+  // is no CSRF token to echo. The shared sameOrigin helper still blocks a
+  // cross-site browser PATCH (which always carries a foreign Origin) before
+  // any rate-limit, body parse, reviewer lookup or write runs.
+  if (!sameOrigin(request)) {
+    return Response.json(
+      { error: CSRF_REJECTED_ERROR },
+      { status: 403, headers: { "Cache-Control": "no-store" } },
+    );
+  }
 
   const blocked = await moderationLimit(request);
   if (blocked) return blocked;

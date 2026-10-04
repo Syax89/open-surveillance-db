@@ -32,6 +32,12 @@ export const en = {
   toolRules: "Rules",
   toolContact: "Contact",
   toolHome: "Home",
+  // A session write rejected for an EXPIRED/missing CSRF token is a 403 with
+  // the very same shape as the domain refusals (write gate, self-action,
+  // self-verify, not-owner): the clients read the body marker and show this
+  // copy so the contributor is told to refresh instead of receiving advice
+  // that does not apply. Same wording as auth.passkeyCsrfExpired.
+  csrfExpired: "Your security token expired. Refresh the page and try again.",
 } as const;
 
 export const it: Translation<typeof en> = {
@@ -60,4 +66,6 @@ export const it: Translation<typeof en> = {
   toolRules: "Regole",
   toolContact: "Contatti",
   toolHome: "Home",
+  // Vedi `en.csrfExpired`: stessa formulazione di auth.passkeyCsrfExpired.
+  csrfExpired: "Il token di sicurezza è scaduto. Ricarica la pagina e riprova.",
 };
