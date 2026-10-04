@@ -154,10 +154,16 @@ test("≤700px /directory header and card actions compact onto one row without l
   const mobile = mediaBlocks(css, "max-width", "700px").find((block) => block.includes(".hero-actions"));
   assert.ok(mobile, "expected the ≤700px block carrying the hero and directory mobile overrides");
 
-  // Hero CTAs stay a full-width column; the details CTA drops the desktop 640px cap.
+  // Hero CTAs: below the input the form-associated directory submit and the
+  // map link share a two-column row, while the report link spans both tracks.
+  // The desktop in-form submit is hidden on mobile; the details CTA drops the
+  // desktop 640px cap.
   const heroActions = ruleBlock(mobile, ".hero-actions");
-  assert.equal(compact(declaration(heroActions, "flex-direction")), "column");
-  assert.equal(compact(declaration(heroActions, "align-items")), "stretch");
+  assert.equal(compact(declaration(heroActions, "display")), "grid");
+  assert.equal(compact(declaration(heroActions, "grid-template-columns")), "repeat(2,minmax(0,1fr))");
+  assert.equal(compact(declaration(ruleBlock(mobile, ".hero-actions .button-quiet"), "grid-column")), "1/-1");
+  assert.equal(compact(declaration(ruleBlock(mobile, ".hero-actions .hero-directory-submit-mobile"), "display")), "inline-flex");
+  assert.equal(compact(declaration(ruleBlock(mobile, '.hero-search > button[type="submit"]'), "display")), "none");
   assert.equal(compact(declaration(ruleBlock(mobile, ".hero-actions .button"), "justify-content")), "center");
 
   const details = ruleBlock(mobile, ".hero-copy--details");

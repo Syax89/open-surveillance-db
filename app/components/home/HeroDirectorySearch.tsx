@@ -22,7 +22,7 @@ import { PlaceAutocomplete } from "./PlaceAutocomplete";
 export function HeroDirectorySearch() {
   const t = useMessages().home;
   return (
-    <form className="hero-search" action="/directory" role="search">
+    <form className="hero-search" id="hero-directory-search" action="/directory" role="search">
       <PlaceAutocomplete
         inputId="hero-search"
         name="q"

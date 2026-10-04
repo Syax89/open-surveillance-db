@@ -348,6 +348,9 @@ button { cursor:pointer; }
 .hero-search button:hover { background:var(--mint-hover); }
 .hero-search .geocode-dropdown { left:0; right:0; }
 .hero-actions { display:flex; align-items:center; gap:var(--space-3); flex-wrap:wrap; }
+/* Scoped desktop hiding: keep both classes so the later .button rule cannot expose it. */
+.hero-actions .hero-directory-submit-mobile { display:none; background:var(--mint); color:var(--button-ink); }
+.hero-actions .hero-directory-submit-mobile:hover { background:var(--mint-hover); }
 .button { border:1px solid transparent; padding:13px 18px; border-radius:var(--radius-lg); display:inline-flex; align-items:center; gap:13px; font-size:var(--text-base); font-weight:800; transition:transform .2s ease, background .2s ease; }
 .button:hover { transform:translateY(-2px); }
 .button-primary { color:var(--white); background:var(--accent); }
@@ -1004,10 +1007,11 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
   .hero-search-autocomplete { display:block; width:100%; flex:none; }
   .hero-search input { box-sizing:border-box; width:100%; min-height:48px; border:1px solid rgba(222,245,234,.42); border-radius:var(--radius-lg); background:rgba(255,255,255,.08); }
   .hero-search .geocode-dropdown { position:static; left:auto; right:auto; }
-  .hero-search button { min-height:44px; border:0; border-radius:var(--radius-lg); }
-  /* CTA row: stack the two hero buttons full-width so both match the search bar above. */
-  .hero-actions { flex-direction:column; align-items:stretch; }
-  .hero-actions .button { justify-content:center; }
+  .hero-search > button[type="submit"] { display:none; }
+  .hero-actions { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:var(--space-2); align-items:stretch; }
+  .hero-actions .hero-directory-submit-mobile { display:inline-flex; }
+  .hero-actions .button { width:100%; min-width:0; min-height:44px; justify-content:center; white-space:normal; text-align:center; overflow-wrap:anywhere; padding:11px 10px; gap:6px; }
+  .hero-actions .button-quiet { grid-column:1 / -1; }
   .hero-stats { margin-top:48px;gap:18px }
   /* .hero-visual min-height rules removed with t_7cafab72 — the visual is
      the absolute inset:0 background and takes its size from the section. */
