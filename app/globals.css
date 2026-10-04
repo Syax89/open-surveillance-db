@@ -1036,6 +1036,8 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
   .directory-results { align-items:flex-start; flex-direction:column; gap:var(--space-3); }
   .directory-pagination { justify-content:center; }
   .record-detail { width:min(100% - 32px,760px);margin:24px auto 60px;padding:30px 23px }
+  /* Narrow cards: smaller title so long first words still fit; desktop is unchanged. */
+  .record-detail h1 { font-size:clamp(36px,12vw,42px) }
   .record-detail-facts { grid-template-columns:1fr }
   .record-history-list li { flex-direction:column;align-items:flex-start;gap:4px }
   .principles { padding:68px 0 }
@@ -1479,7 +1481,7 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 .legal-note strong { color:var(--notice-ink); }
 /* position:relative contains absolutely-positioned .sr-only spans from the
    source table, so they cannot leak past this scroll box on narrow viewports. */
-.legal-table-wrap { margin:18px 0; overflow-x:auto; border:1px solid var(--line); border-radius:var(--radius-lg); position:relative; }
+.legal-table-wrap { margin:18px 0; overflow-x:auto; border:1px solid var(--line); border-radius:var(--radius-lg); position:relative; container-type:inline-size; }
 /* Desktop breakout (≥1180px): structured data gets more room than the
    readable prose column. Viewport-clamped width, re-centered via
    left:50% + translateX(-50%) on its already-centered ancestor. */
@@ -1488,7 +1490,9 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 }
 .legal-section .legal-table-scroll-hint { margin:6px 0 14px; color:var(--muted); font-size:var(--text-sm); line-height:1.5; }
 .legal-table { width:100%; border-collapse:collapse; background:var(--card-bg); font-size:var(--text-md); }
-.legal-table caption { padding:12px 14px; text-align:left; font-size:var(--text-sm); font-weight:800; text-transform:uppercase; letter-spacing:.08em; color:var(--label); border-bottom:1px solid var(--line); }
+/* Caption sized to the visible scroll-box width (inline-size container)
+   rather than the full table width, so it wraps inside the visible area. */
+.legal-table caption { width:100cqi; padding:12px 14px; text-align:left; font-size:var(--text-sm); font-weight:800; text-transform:uppercase; letter-spacing:.08em; color:var(--label); border-bottom:1px solid var(--line); }
 .legal-table th { padding:10px 12px; text-align:left; background:var(--table-head-bg); color:var(--table-head-ink); font-size:var(--text-xs); text-transform:uppercase; letter-spacing:.07em; }
 .legal-table td { padding:10px 12px; border-top:1px solid var(--table-line); color:var(--legal-ink); line-height:1.5; vertical-align:top; }
 /* FAQ (kanban t_dd306f21): accessible native disclosure widgets. */

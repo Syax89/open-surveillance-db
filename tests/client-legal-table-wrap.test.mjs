@@ -91,6 +91,12 @@ test("LegalTableWrap makes an overflowing table a labelled focusable region", as
   assert.equal(hint.textContent, wrap.getAttribute("aria-label"));
   assert.equal(hint.textContent, "Table — scroll horizontally for more columns");
   assert.equal(wrap.contains(hint), false, "the hint sits outside the focusable region");
+  // ... and BEFORE the scroll container, so it stays visible when the
+  // table's columns overflow off-screen.
+  assert.ok(
+    hint.compareDocumentPosition(wrap) & Node.DOCUMENT_POSITION_FOLLOWING,
+    "the hint must precede the scroll wrapper in document order",
+  );
 });
 
 test("LegalTableWrap drops the tab stop when the table stops overflowing", async () => {

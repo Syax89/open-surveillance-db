@@ -56,6 +56,13 @@ export function LegalTableWrap({ children }: { children: ReactNode }) {
 
   return (
     <>
+      {/*
+        Visible scroll clue when the table overflows: the hint precedes the
+        focusable region and reuses its localized accessible-name string.
+      */}
+      {overflowing ? (
+        <p className="legal-table-scroll-hint">{t.tableScrollAria}</p>
+      ) : null}
       <div
         ref={ref}
         className="legal-table-wrap"
@@ -65,16 +72,6 @@ export function LegalTableWrap({ children }: { children: ReactNode }) {
       >
         {children}
       </div>
-      {/*
-        Visible clue for the mobile issue: when the table overflows, the
-        remaining columns (and the caption) are off-screen and nothing tells
-        the reader that horizontal scrolling is possible. The hint lives
-        OUTSIDE the scroll container and reuses the SAME localized string as
-        the region's accessible name — no new translation key.
-      */}
-      {overflowing ? (
-        <p className="legal-table-scroll-hint">{t.tableScrollAria}</p>
-      ) : null}
     </>
   );
 }

@@ -199,6 +199,53 @@ test("the base legal-table-wrap is a positioned ancestor so .sr-only spans stay 
   );
 });
 
+test("legal table caption is contained by the inline-size query container", async () => {
+  const css = await cssPromise;
+  assert.match(
+    css,
+    /\.legal-table-wrap\s*\{[^}]*container-type:\s*inline-size/,
+    "the scroll wrapper is the inline-size query container for the caption",
+  );
+  assert.match(
+    css,
+    /\.legal-table caption\s*\{[^}]*width:\s*100cqi/,
+    "the caption matches the VISIBLE viewport, not the table's scroll width",
+  );
+  // Only containment was added: the caption keeps its typography and the
+  // table still fills (and overflows) the wrapper — scrollWidth is untouched.
+  assert.match(
+    css,
+    /\.legal-table caption\s*\{[^}]*text-transform:\s*uppercase/,
+    "the caption styling is unchanged",
+  );
+  assert.match(css, /\.legal-table\s*\{\s*width:\s*100%/, "the table still fills its wrapper");
+});
+
+test("≤700px: the shared record-detail title clamps so long first words fit", async () => {
+  const css = await cssPromise;
+  // Desktop is unchanged: the base title keeps the display token (42px).
+  assert.match(
+    css,
+    /\.record-detail h1\s*\{[^}]*font-size:\s*var\(--text-display\)/,
+    "the desktop record-detail title keeps --text-display",
+  );
+  const mobile = mediaBlocks(css, "max-width").find(
+    (b) => b.width === 700 && b.body.includes(".founder-declaration"),
+  );
+  assert.ok(mobile, "expected the (max-width:700px) shared-container block");
+  assert.match(
+    mobile.body,
+    /\.record-detail h1\s*\{\s*font-size:\s*clamp\(36px,\s*12vw,\s*42px\)\s*\}/,
+    "the narrow title clamps: 36px floor, 42px ceiling (375px stays 42px)",
+  );
+  // One rule is fixed, not the whole type scale.
+  assert.match(
+    css,
+    /--text-display:\s*clamp\(42px,\s*6vw,\s*70px\)/,
+    "the shared display token keeps its value — no global typography retune",
+  );
+});
+
 test("≤700px sources grid collapses to one column, declared after its base rule", async () => {
   const css = await cssPromise;
   const baseIdx = css.indexOf(".sources-methodology-grid { display:grid");
