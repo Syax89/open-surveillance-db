@@ -728,6 +728,36 @@ test("security headers reach HTML pages, API errors, 404s and the moderation gat
   }
 });
 
+test("production moderation gate follows both Vinext decoding phases", async () => {
+  const probes = [
+    ["/moderation", 503], ["/moderation.rsc", 503], ["/moderation//.rsc", 503],
+    ["/moderation.rsc/", 503], ["/%6doderation", 503], ["/%256doderation", 503],
+    ["/%256doderation.rsc", 503], ["/api//moderation", 503],
+    ["/%2561pi/moderation", 503], ["/api/%256doderation", 503],
+    ["/api//appeals", 503], ["/%2561pi/%2561ppeals", 503],
+    ["/moderation%zz", 400], ["//moderation", 404], ["//moderation/", 404],
+    ["/%2fmoderation", 404], ["/%5cmoderation", 404],
+    ["/%25256doderation", 404], ["/moderation%252ersc", 404],
+    ["/%252e%252e/moderation", 404], ["/api%2fmoderation", 404],
+    ["/api%252fmoderation", 404], ["/moderation.rsc.rsc", 404],
+  ];
+  for (const [route, status] of probes) {
+    const { response, html } = await renderRoute(route);
+    assert.equal(response.status, status, route);
+    assert.doesNotMatch(html, /Moderation dashboard|class="moderation-/i, route);
+    if (status === 503) {
+      assert.equal(html, '{"error":"Moderation is unavailable."}', route);
+      assert.match(response.headers.get("content-type") ?? "", /^application\/json\b/, route);
+      assert.equal(response.headers.get("cache-control"), "no-store", route);
+      assertSecurityHeaders(response, route);
+    } else if (status === 400) {
+      assert.equal(html, "Bad Request", route);
+      assert.equal(response.headers.get("cache-control"), "no-store", route);
+      assertSecurityHeaders(response, route);
+    }
+  }
+});
+
 test("the /mappa and /segnala routes allow geolocation=(self) for explicit location actions", async () => {
   // The browser refuses to even prompt for a position unless the top-level
   // document is allowed the geolocation feature. /mappa uses it for its

@@ -298,6 +298,7 @@ async function buildTree() {
       .replace(/from\s*["']\.\.\/db\/oidc["']/g, `from "${pathToFileURL(path.join(tree, "db", "oidc.mjs")).href}"`)
       .replace(/from\s*["']vinext\/server\/image-optimization["']/g, `from "${imageStubUrl}"`)
       .replace(/from\s*["']vinext\/server\/app-router-entry["']/g, `from "${routerStubUrl}"`)
+      .replace(/from\s*["']vinext\/server\/request-pipeline["']/g, `from "${import.meta.resolve("vinext/server/request-pipeline")}"`)
       .replace(/from\s*["']cloudflare:workers["']/g, `from "${workersMockUrl}"`);
     await writeFile(path.join(tree, "worker.mjs"), rewritten);
   }

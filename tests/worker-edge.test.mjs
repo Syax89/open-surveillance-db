@@ -125,7 +125,8 @@ async function buildWorkerTree() {
     .replace(
       /from\s*["']vinext\/server\/app-router-entry["']/g,
       `from "${pathToFileURL(path.join(mocksDir, "app-router-entry.mjs")).href}"`,
-    );
+    )
+    .replace(/from\s*["']vinext\/server\/request-pipeline["']/g, `from "${import.meta.resolve("vinext/server/request-pipeline")}"`);
 
   // The worker must not contain any leftover bare vinext/cloudflare import.
   const unresolved = [...rewritten.matchAll(/from\s*["'](?:vinext\/|cloudflare:)[^"']+["']/g)];
@@ -860,6 +861,169 @@ test("preserves security headers set by the app handler (pass-through, never str
 // ---------------------------------------------------------------------------
 // Moderation auth gate (Basic / Bearer), fail-closed
 // ---------------------------------------------------------------------------
+
+const MODERATION_ALIASES = [
+  "/moderation", "/moderation/", "/moderation.rsc?view=pending&_rsc=test",
+  "/moderation//.rsc", "/moderation.rsc/", "/moderation//", "/moderation%2ersc",
+  "/%6doderation", "/%256doderation", "/%256doderation.rsc",
+  "/api/moderation", "/api//moderation", "/api/%6doderation", "/%61pi/moderation",
+  "/%2561pi/moderation", "/api/%256doderation", "/api/moderation.rsc",
+  "/api///moderation//corrections/1.rsc",
+];
+const APPEALS_ALIASES = [
+  "/api/appeals", "/api/appeals/", "/api//appeals", "/%61pi/%61ppeals",
+  "/%2561pi/%2561ppeals", "/api/appeals.rsc", "/api/appeals.rsc/",
+  "/api/appeals//.rsc?_rsc=test",
+];
+
+function denialEnv(overrides = {}) {
+  const env = testEnv(overrides);
+  for (const binding of ["DB", "ASSETS", "IMAGES", "AUTH_LIMITER", "WRITE_LIMITER", "READ_LIMITER", "TILES_LIMITER", "GEOCODE_LIMITER"]) {
+    Object.defineProperty(env, binding, { get() { assert.fail(`denial touched ${binding}`); } });
+  }
+  return env;
+}
+
+async function assertGateDenial(response, status, route) {
+  assert.equal(response.status, status, route);
+  assert.equal(await response.text(), status === 503 ? '{"error":"Moderation is unavailable."}' : "Unauthorized", route);
+  assert.equal(response.headers.get("cache-control"), "no-store", route);
+  assert.equal(response.headers.get("www-authenticate"), status === 401 ? 'Basic realm="moderation", charset="UTF-8"' : null, route);
+  if (status === 503) assert.match(response.headers.get("content-type") ?? "", /^application\/json\b/, route);
+  assert.equal(response.headers.get("x-content-type-options"), "nosniff", route);
+  assert.equal(response.headers.get("x-frame-options"), "DENY", route);
+  assert.equal(response.headers.get("referrer-policy"), "strict-origin-when-cross-origin", route);
+  assert.equal(response.headers.get("permissions-policy"), "camera=(), microphone=(), geolocation=()", route);
+  assert.match(response.headers.get("content-security-policy") ?? "", /frame-ancestors 'none'/, route);
+}
+
+test("normalized moderation and appeals aliases deny before router or binding getters", async () => {
+  const { worker, app, image } = await loadWorker();
+  const basicConfig = { MODERATION_USER: "fixture", MODERATION_PASSWORD: "fixture-pass" };
+  const tokenConfig = { MODERATION_TOKEN: "fixture-token" };
+  const configs = [
+    [{}, undefined, 503], [{ MODERATION_USER: "fixture" }, undefined, 503],
+    [basicConfig, undefined, 401], [basicConfig, basic("fixture", "wrong"), 401],
+    [tokenConfig, undefined, 401], [tokenConfig, bearer("wrong"), 401],
+    [{ ...basicConfig, MODERATION_OPERATORS: "not-json" }, basic("fixture", "fixture-pass"), 503],
+    [{ ...tokenConfig, MODERATION_OPERATORS: '[{"user":"fixture"}]' }, bearer("fixture-token"), 503],
+    [{ MODERATION_OPERATORS: JSON.stringify([{ user: "alice", password: "alice-pass", email: "alice@osdb.test" }]) }, basic("alice", "wrong"), 401],
+  ];
+  for (const [config, authorization, status] of configs) {
+    const env = denialEnv(config);
+    for (const route of [...MODERATION_ALIASES, ...APPEALS_ALIASES]) {
+      const headers = authorization ? { authorization } : {};
+      const response = await worker.fetch(request(route, { headers }), env, ctx());
+      await assertGateDenial(response, status, route);
+    }
+  }
+  assert.equal(app.__calls.length, 0);
+  assert.equal(image.__calls.length, 0);
+});
+
+test("HEAD, RSC and prefetch headers cannot bypass normalized moderation gates", async () => {
+  const { worker, app } = await loadWorker();
+  const variants = [
+    { method: "HEAD" }, { headers: { RSC: "1", accept: "text/x-component" } },
+    { headers: { RSC: "1", "next-router-prefetch": "1", "next-router-segment-prefetch": "/_tree" } },
+  ];
+  for (const route of ["/%256doderation.rsc", "/api//moderation.rsc", "/%2561pi/appeals.rsc"]) {
+    for (const options of variants) {
+      await assertGateDenial(await worker.fetch(request(route, options), denialEnv(), ctx()), 503, route);
+      await assertGateDenial(await worker.fetch(request(route, options), denialEnv({ MODERATION_TOKEN: "fixture-token" }), ctx()), 401, route);
+    }
+  }
+  assert.equal(app.__calls.length, 0);
+});
+
+test("admitted aliases preserve URL, query, method and body with server-chosen identity", async () => {
+  const { worker, app } = await loadWorker();
+  const originalFetch = app.default.fetch;
+  let received;
+  app.default.fetch = async (req) => { received = req; return new Response("handler-ok"); };
+  const credentials = [
+    [{ MODERATION_USER: "fixture", MODERATION_PASSWORD: "fixture-pass", MODERATION_IDENTITY_EMAIL: "basic@osdb.test" }, basic("fixture", "fixture-pass"), "basic@osdb.test"],
+    [{ MODERATION_TOKEN: "fixture-token", MODERATION_IDENTITY_EMAIL: "bearer@osdb.test" }, bearer("fixture-token"), "bearer@osdb.test"],
+    [{ MODERATION_OPERATORS: JSON.stringify([{ user: "alice", password: "alice-pass", email: "alice@osdb.test" }]), MODERATION_IDENTITY_EMAIL: "shared@osdb.test" }, basic("alice", "alice-pass"), "alice@osdb.test"],
+    [{ MODERATION_TOKEN: "fixture-token" }, bearer("fixture-token"), null],
+  ];
+  try {
+    for (const [config, authorization, email] of credentials) {
+      for (const route of [...MODERATION_ALIASES, ...APPEALS_ALIASES]) {
+        const body = '{"decision":"fixture-only"}';
+        const req = request(route, { method: "PATCH", body, headers: {
+          authorization, "content-type": "application/json", "x-osdb-user-email": "spoof@osdb.test",
+          "oai-authenticated-user-email": "spoof@osdb.test", "oai-authenticated-user-full-name": "Spoof",
+          "oai-authenticated-user-full-name-encoding": "ascii",
+        } });
+        const response = await worker.fetch(req, testEnv(config), ctx());
+        assert.equal(response.status, 200, route);
+        assert.equal(received.url, req.url, route);
+        assert.equal(received.method, "PATCH", route);
+        assert.equal(await received.text(), body, route);
+        assert.equal(received.headers.get("authorization"), authorization, route);
+        assert.equal(received.headers.get("x-osdb-user-email"), email, route);
+        for (const header of ["oai-authenticated-user-email", "oai-authenticated-user-full-name", "oai-authenticated-user-full-name-encoding"]) {
+          assert.equal(received.headers.get(header), null, route);
+        }
+      }
+    }
+  } finally {
+    app.default.fetch = originalFetch;
+  }
+});
+
+test("contributor POST appeals aliases stay ungated while GET and PATCH remain gated", async () => {
+  const { worker, app } = await loadWorker();
+  for (const route of APPEALS_ALIASES) {
+    for (const method of ["GET", "PATCH"]) {
+      await assertGateDenial(await worker.fetch(request(route, { method }), denialEnv(), ctx()), 503, route);
+    }
+    const response = await worker.fetch(request(route, { method: "POST", headers: {
+      cookie: "osdb_session=fixture-only", "x-osdb-user-email": "spoof@osdb.test",
+      "oai-authenticated-user-email": "spoof@osdb.test",
+    } }), testEnv(), ctx());
+    assert.equal(response.status, 200, route);
+    const forwarded = app.__calls.at(-1);
+    assert.equal(forwarded.url, `https://osdb.test${route}`, route);
+    assert.equal(forwarded.method, "POST", route);
+    assert.equal(forwarded.headers.cookie, "osdb_session=fixture-only", route);
+    assert.equal(forwarded.headers["x-osdb-user-email"], undefined, route);
+    assert.equal(forwarded.headers["oai-authenticated-user-email"], undefined, route);
+  }
+  assert.equal(app.__calls.length, APPEALS_ALIASES.length);
+  await assertGateDenial(await worker.fetch(request("/%2561pi//appeals/1.rsc", { method: "POST" }), denialEnv(), ctx()), 503, "appeal subtree POST");
+});
+
+test("normalization does not gate lookalikes or reinterpret encoded suffixes, dots or delimiters", async () => {
+  const { worker, app } = await loadWorker();
+  const routes = [
+    "/moderation-help", "/api/moderation-extra", "/api/appeals-extra", "/Moderation", "/API/moderation",
+    "/%25256doderation", "/moderation%252ersc", "/moderation.rsc.rsc", "/%252e%252e/moderation",
+    "/api%2fmoderation", "/api%252fmoderation", "/api%5cmoderation", "/api%255cmoderation",
+    "/moderation%23", "/moderation%2523", "/moderation%3f", "/moderation%253f",
+    "/moderation%25zz", "/api/%25zz", "/moderation%2525",
+  ];
+  for (const route of routes) {
+    const response = await worker.fetch(request(route), testEnv(), ctx());
+    assert.equal(response.status, 200, `${route}: mock handler reached, not a routing-status assertion`);
+    assert.equal(app.__calls.at(-1).url, `https://osdb.test${route}`, route);
+  }
+  assert.equal(app.__calls.length, routes.length);
+});
+
+test("malformed first-phase percent decoding answers 400 before router or binding getters", async () => {
+  const { worker, app } = await loadWorker();
+  for (const route of ["/moderation%zz", "/api/%", "/moderation%C3", "/api/appeals%GG"]) {
+    const response = await worker.fetch(request(route), denialEnv(), ctx());
+    assert.equal(response.status, 400, route);
+    assert.equal(await response.text(), "Bad Request", route);
+    assert.equal(response.headers.get("cache-control"), "no-store", route);
+    assert.equal(response.headers.get("x-content-type-options"), "nosniff", route);
+    assert.equal(response.headers.get("x-frame-options"), "DENY", route);
+  }
+  assert.equal(app.__calls.length, 0);
+});
 
 test("gate fails closed with no credentials configured (503, no-store, no handler call)", async () => {
   const { worker, app } = await loadWorker();
