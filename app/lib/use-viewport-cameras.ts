@@ -151,6 +151,38 @@ function bboxExactKey(bounds: ViewportBounds): string {
   return `${bounds.south}|${bounds.north}|${bounds.west}|${bounds.east}`;
 }
 
+/**
+ * FULL request identity (B04/R3a): the semantic server-filter combo (kind/
+ * freshness/…) PLUS the exact geometry. The MERGE-dedupe and IN-FLIGHT maps
+ * must key on this — geometry alone would let a consumer with a different
+ * server filter skip (or join) a request for another filter's records, so a
+ * native filter change would never display the newly fetched data. The cache
+ * map keeps its own `bboxCacheKey` (also filter-scoped).
+ */
+function bboxRequestKey(bounds: ViewportBounds, filterKey: string): string {
+  return `${filterKey}|${bboxExactKey(bounds)}`;
+}
+
+/**
+ * The exact geometry key of a viewport (B04/B09/B10): the same key the fetch
+ * effect keys on, exposed so a caller can identify WHICH viewport a settlement
+ * belongs to (a place-search landing must wait for its OWN destination, never
+ * for an unrelated settled event).
+ */
+export function viewportGeometryKey(bounds: ViewportBounds): string {
+  return viewportRectangles(bounds).map(bboxExactKey).join("+");
+}
+
+/**
+ * The outcome of the last completed viewport resolution (B10/R3c): `key` is the
+ * exact geometry that settled, `status` distinguishes a real answer (`ok`,
+ * including an empty one) from a failed request (`error`), and `filterKey` is
+ * the server-filter combo of THAT request — so a caller never lets an older,
+ * different-filter settlement consume a newer intent for the same geometry.
+ * An ABORTED request never settles.
+ */
+export type ViewportSettlement = { key: string; status: "ok" | "error"; filterKey: string };
+
 function filterKeyOf(filters: ServerCameraFilters): string {
   return `${filters.kind ?? ""}|${filters.freshness ?? ""}`;
 }
@@ -332,6 +364,12 @@ export type UseViewportCamerasResult = {
   retryAfterSeconds: number | null;
   /** The API answered but no public record exists at all. */
   empty: boolean;
+  /**
+   * The last COMPLETED viewport resolution (B10): its exact geometry key and
+   * whether it was a real answer or a failure. Null until the first viewport
+   * settles. Aborted (superseded) requests never settle.
+   */
+  settled: ViewportSettlement | null;
   /** Drop the caches and refetch the current viewport (error-state recovery). */
   reload: () => void;
 };
@@ -363,6 +401,8 @@ export function useViewportCameras({ bounds, filters, focusId, onRecords, onErro
   const [rateLimitCooldown, setRateLimitCooldown] = useState<{ until: number; retry: boolean } | null>(null);
   const [empty, setEmpty] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  // B10: the last COMPLETED viewport resolution (exact geometry + outcome).
+  const [settled, setSettled] = useState<ViewportSettlement | null>(null);
 
   // Synchronous store mirror: the merge/notify logic runs OUTSIDE the React
   // state updater (updaters may be double-invoked in StrictMode and must
@@ -398,17 +438,21 @@ export function useViewportCameras({ bounds, filters, focusId, onRecords, onErro
   // re-runs whenever the requested geometry really changes — including two
   // rectangles that the quantized cache CELL would conflate. The cache map
   // below stays quantized, and reuse is gated on actual coverage.
-  const boundsKey = bounds ? viewportRectangles(bounds).map(bboxExactKey).join("+") : null;
+  const boundsKey = bounds ? viewportGeometryKey(bounds) : null;
 
-  // A deliberately NEW viewport/filter restarts the rate-limit budget (B05):
-  // the single auto-retry is per navigation attempt, so a terminal 429 on one
-  // viewport never freezes a later, deliberate navigation.
+  // A deliberately NEW navigation identity restarts the rate-limit budget
+  // (B05/R3d): the single auto-retry is per REQUEST identity — the exact
+  // geometry PLUS the semantic server-filter combo. A filter change on the same
+  // viewport is a deliberate new navigation and gets its own one-retry budget,
+  // while a single identity can never be driven to a third request by the
+  // cooldown. `reload()` keeps its explicit reset.
+  const requestIdentity = boundsKey === null ? null : `${filterKey}|${boundsKey}`;
   const retryBudgetKeyRef = useRef<string | null>(null);
   useEffect(() => {
-    if (boundsKey === retryBudgetKeyRef.current) return;
-    retryBudgetKeyRef.current = boundsKey;
+    if (requestIdentity === retryBudgetKeyRef.current) return;
+    retryBudgetKeyRef.current = requestIdentity;
     rateLimitRetriesRef.current = 0;
-  }, [boundsKey]);
+  }, [requestIdentity]);
 
   // Viewport fetch: debounced, cache/dedupe/containment-aware, aborted when
   // the viewport or the server filters change.
@@ -445,7 +489,10 @@ export function useViewportCameras({ bounds, filters, focusId, onRecords, onErro
       // cache cell (bboxA 0..0.1 vs bboxB 0.0001..0.1001) are different areas,
       // so B's payload must still merge even though the CACHE cell is shared
       // (B04 — otherwise the cell key silently swallows the new strip).
-      const liveMergeKeys = liveRectangles.map(bboxExactKey);
+      const liveMergeKeys = liveRectangles.map((rect) => bboxRequestKey(rect, filterKey));
+      // Geometry-only key for the SETTLEMENT (B10): the pending landing is
+      // geometry-based; the filter is matched separately via `filterKey`.
+      const liveGeometryKey = liveRectangles.map(bboxExactKey).join("+");
       // Resolve ONE rectangle through the module cache / in-flight dedupe /
       // network, recording the fetched rectangle (and completeness) in cache.
       // B04: the quantized cache cell is only REUSED when its entry actually
@@ -458,7 +505,7 @@ export function useViewportCameras({ bounds, filters, focusId, onRecords, onErro
         if (cached && cachedEntryCovers(cached, rect, filterKey, Date.now())) {
           return { records: cached.records, total: cached.total, nextOffset: null, decimated: cached.decimated };
         }
-        const flightKey = bboxExactKey(rect);
+        const flightKey = bboxRequestKey(rect, filterKey);
         if (inFlight.has(flightKey)) return inFlight.get(flightKey)!;
         const promise = fetchViewportPage(rect, filtersRef.current, controller.signal);
         inFlight.set(flightKey, promise);
@@ -479,19 +526,28 @@ export function useViewportCameras({ bounds, filters, focusId, onRecords, onErro
         //    request. (A warm module cache on a SECOND visit must also settle
         //    the loading/error/total states — never leave the map spinning.)
         if (liveRectangles.every((rect) => isCovered(rect, filterKey))) {
+          // Complete warm resolution: settle the SUCCESS state INDEPENDENTLY of
+          // the merge-dedupe. An already-merged geometry must not skip the state
+          // cleanup — a warm return has to clear a prior unrelated error /
+          // cooldown notice (B05/R3f) and any stale decimated flag. Only the
+          // RECORD merge stays deduped; the covering entry is always COMPLETE
+          // (B04), so the warm decimated flag is never stale.
+          let covering: CacheEntry | null = null;
           for (let i = 0; i < liveRectangles.length; i += 1) {
+            const entry = coveringEntry(liveRectangles[i], filterKey);
+            if (entry && !covering) covering = entry;
             if (mergedKeysRef.current.has(liveMergeKeys[i])) continue;
             mergedKeysRef.current.add(liveMergeKeys[i]);
-            const covering = coveringEntry(liveRectangles[i], filterKey);
-            if (covering) {
-              setLoading(false);
-              setError(false);
-              setDecimated(covering.decimated === true);
-              if (covering.records.length > 0) setEmpty(false);
-              setTotal(covering.total);
-              commitRecords(covering.records);
-            }
+            if (entry) commitRecords(entry.records);
           }
+          setLoading(false);
+          setError(false);
+          setRetryAfter(null);
+          rateLimitRetriesRef.current = 0;
+          setDecimated(covering ? covering.decimated === true : false);
+          if (covering && covering.records.length > 0) setEmpty(false);
+          if (covering) setTotal(covering.total);
+          setSettled({ key: liveGeometryKey, status: "ok", filterKey });
           return;
         }
         // 2) Resolve every rectangle (cache / in-flight dedupe / fetch).
@@ -519,10 +575,12 @@ export function useViewportCameras({ bounds, filters, focusId, onRecords, onErro
             queueMicrotask(() => onRecordsRef.current?.(merged));
           }
         }
+        setSettled({ key: liveGeometryKey, status: "ok", filterKey });
       })().catch((failure: unknown) => {
         if (controller.signal.aborted) return;
         setLoading(false);
         setError(true);
+        setSettled({ key: liveGeometryKey, status: "error", filterKey });
         if (failure instanceof ViewportRateLimitError) {
           const retry = rateLimitRetriesRef.current < VIEWPORT_RATE_LIMIT_AUTO_RETRIES;
           if (retry) rateLimitRetriesRef.current += 1;
@@ -572,6 +630,10 @@ export function useViewportCameras({ bounds, filters, focusId, onRecords, onErro
     error,
     retryAfterSeconds: retryAfter,
     empty,
+    // R3c: a settlement from a DIFFERENT server filter is not valid for the
+    // current request — expose null so an older response can never consume a
+    // newer same-geometry intent before the current-filter response arrives.
+    settled: settled && settled.filterKey === filterKey ? settled : null,
     reload: () => {
       __resetViewportCamerasCache();
       mergedKeysRef.current.clear();
@@ -579,6 +641,7 @@ export function useViewportCameras({ bounds, filters, focusId, onRecords, onErro
       rateLimitRetriesRef.current = 0;
       setRetryAfter(null);
       setRateLimitCooldown(null);
+      setSettled(null);
       setError(false);
       setLoading(true);
       setAttempt((value) => value + 1);

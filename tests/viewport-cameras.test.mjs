@@ -467,3 +467,126 @@ test("B05: a persistent 429 retries at most once, then stays terminal with no la
   await pause(2_000);
   assert.ok(attempts >= 3, "a deliberate new viewport is not blocked by the terminal state");
 });
+
+// ---------------------------------------------------------------------------
+// R3a — the MERGE and IN-FLIGHT dedupe must key on the FULL request identity
+// (semantic server filters + exact geometry), so a same-geometry filter change
+// (or two concurrent consumers with different filters) never shares a payload.
+// ---------------------------------------------------------------------------
+
+test("R3a: a same-geometry FILTER change still merges the newly fetched records", async () => {
+  const dome = { id: 11, title: "Dome fixture", kind: "Fixed dome", status: "active", latitude: 41.9, longitude: 12.5, source: "Community report" };
+  const bullet = { id: 12, title: "Bullet fixture", kind: "Bullet", status: "active", latitude: 41.9, longitude: 12.5, source: "Community report" };
+  installFetchMock((input) => {
+    const url = String(input);
+    if (!url.includes("bbox=")) return jsonResponse({ error: "unexpected" }, { status: 404 });
+    const kind = new URL(url, "https://example.test").searchParams.get("kind");
+    const rows = kind === "Bullet" ? [bullet] : kind === "Fixed dome" ? [dome] : [dome, bullet];
+    return jsonResponse({ records: rows, total: rows.length, nextOffset: null });
+  });
+
+  const view = await renderProbe({ bounds: ROME, filters: { kind: "Fixed dome" } });
+  await pause(400);
+  assert.deepEqual(JSON.parse(rtl.screen.getByTestId("probe").getAttribute("data-records")), [11]);
+
+  // Same viewport geometry, a DIFFERENT server filter: the new payload must
+  // still merge (the old geometry-only merge key silently skipped it).
+  await view.rerender(await wrapWithLocale(React.createElement(HookProbe, { bounds: ROME, filters: { kind: "Bullet" } })));
+  await pause(400);
+  const ids = JSON.parse(rtl.screen.getByTestId("probe").getAttribute("data-records")).sort((a, b) => a - b);
+  assert.ok(ids.includes(12), "the newly fetched Bullet record is merged despite the shared geometry");
+});
+
+test("R3a: two concurrent consumers of the same geometry with different filters never share a request", async () => {
+  function TwoProbe({ bounds }) {
+    const a = useViewportCameras({ bounds, filters: { kind: "Bullet" } });
+    const b = useViewportCameras({ bounds, filters: { kind: "Fixed dome" } });
+    return React.createElement("div", {
+      "data-testid": "two",
+      "data-a": a.records.map((r) => r.kind).join(","),
+      "data-b": b.records.map((r) => r.kind).join(","),
+    });
+  }
+  const calls = [];
+  installFetchMock((input) => {
+    const url = String(input);
+    if (!url.includes("bbox=")) return jsonResponse({ error: "unexpected" }, { status: 404 });
+    const kind = new URL(url, "https://example.test").searchParams.get("kind");
+    calls.push(kind);
+    const body = jsonResponse({ records: [{ id: kind === "Bullet" ? 1 : 2, title: kind, kind, status: "active", latitude: 0.05, longitude: 0.05, source: "Community report" }], total: 1, nextOffset: null });
+    return new Promise((resolve) => setTimeout(() => resolve(body), 150));
+  });
+  await renderWithLocale(React.createElement(TwoProbe, { bounds: { south: 0, north: 0.1, west: 0, east: 0.1 } }));
+  await pause(500);
+  const probe = rtl.screen.getByTestId("two");
+  assert.equal(probe.getAttribute("data-a"), "Bullet", "the Bullet consumer receives Bullet records");
+  assert.equal(probe.getAttribute("data-b"), "Fixed dome", "the Fixed-dome consumer receives its OWN records");
+  assert.deepEqual(calls.sort(), ["Bullet", "Fixed dome"], "one request per distinct semantic filter (never shared)");
+});
+
+// ---------------------------------------------------------------------------
+// B05/R3d — the single auto-retry budget is per REQUEST identity (exact
+// geometry + semantic server filters), not per geometry: a deliberate
+// same-geometry filter change gets its own budget, while one identity can
+// never be driven to a third request by the cooldown.
+// ---------------------------------------------------------------------------
+
+test("B05: a deliberate same-geometry FILTER change gets its own one-retry budget", async () => {
+  const calls = [];
+  installFetchMock((input) => {
+    const kind = new URL(String(input), "https://example.test").searchParams.get("kind");
+    calls.push(kind);
+    return new Response("{}", { status: 429, headers: { "Retry-After": "1" } });
+  });
+  const SMALL = { south: 0, north: 0.1, west: 0, east: 0.1 };
+  const view = await renderProbe({ bounds: SMALL, filters: { kind: "Bullet" } });
+  await pause(2_700);
+  assert.equal(calls.filter((k) => k === "Bullet").length, 2, "one identity = initial + exactly ONE retry (terminal)");
+
+  // Same viewport GEOMETRY, a DIFFERENT server filter: a deliberate new
+  // navigation gets its OWN one-retry budget.
+  await view.rerender(await wrapWithLocale(React.createElement(HookProbe, { bounds: SMALL, filters: { kind: "Fixed dome" } })));
+  await pause(2_700);
+  assert.equal(calls.filter((k) => k === "Fixed dome").length, 2, "the new filter gets its own retry budget");
+});
+
+// ---------------------------------------------------------------------------
+// B05/R3f — a complete warm return must settle the SUCCESS state even though
+// its records were already merged: a prior unrelated terminal 429's error and
+// cooldown notice (and any stale sample flag) are cleared on the warm hit.
+// ---------------------------------------------------------------------------
+
+test("B05: a complete warm return clears a prior unrelated rate-limit error and cooldown", async () => {
+  const calls = [];
+  const A = { south: 0, north: 0.1, west: 0, east: 0.1 };
+  const B = { south: 1, north: 1.1, west: 1, east: 1.1 };
+  installFetchMock((input) => {
+    const bbox = new URL(String(input), "https://example.test").searchParams.get("bbox");
+    calls.push(bbox);
+    if (bbox.startsWith("0,")) {
+      return jsonResponse({ records: [{ id: 1, title: "Warm fixture", kind: "Bullet", status: "active", latitude: 0.05, longitude: 0.05, source: "Community report" }], total: 1, nextOffset: null });
+    }
+    return new Response("{}", { status: 429, headers: { "Retry-After": "1" } });
+  });
+
+  const view = await renderProbe({ bounds: A, filters: {} });
+  await pause(700);
+  const probe = rtl.screen.getByTestId("probe");
+  assert.equal(probe.getAttribute("data-error"), "false", "the initial complete view resolves cleanly");
+
+  // A terminal 429 destination: initial + ONE retry, then a visible error.
+  await view.rerender(await wrapWithLocale(React.createElement(HookProbe, { bounds: B, filters: {} })));
+  await pause(3_500);
+  assert.equal(probe.getAttribute("data-error"), "true", "the 429 destination is a terminal visible error");
+  assert.equal(probe.getAttribute("data-retry-after"), "1", "its cooldown notice is exposed");
+
+  // Return EXACTLY to the warm complete viewport: no refetch, and the success
+  // state must be re-settled (the already-merged records must not skip it).
+  const prior = calls.length;
+  await view.rerender(await wrapWithLocale(React.createElement(HookProbe, { bounds: A, filters: {} })));
+  await pause(700);
+  assert.equal(calls.length, prior, "the complete warm view is served from the cache (no refetch)");
+  assert.equal(probe.getAttribute("data-error"), "false", "a complete successful warm resolution clears the prior unrelated error");
+  assert.equal(probe.getAttribute("data-retry-after"), "", "and the stale cooldown notice");
+  assert.equal(probe.getAttribute("data-decimated"), "false", "and no stale sample flag");
+});

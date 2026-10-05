@@ -646,24 +646,28 @@ test("MappaTool geocode autocomplete suggests places in a combobox; keyboard sel
   assert.deepEqual(lastFit.bounds, [[44.7198493, 11.5109915], [44.9637886, 11.8870544]], "the map frames the selected admin area");
   assert.equal(lastFit.opts?.maxZoom, 15, "the area framing stays readable (max zoom 15)");
 
-  // Simulate the pan landing (new viewport bounds) → the list follows the
-  // viewport and the first point in view is focused ("focus sul primo
-  // punto se presente"). The new bounds contain only record B, so the
-  // selection must move from A to B.
+  // R3b: the place-search landing is tied to the FRAMED destination. Emitting
+  // that exact destination viewport must NOT select anything here — the mock
+  // data has no record inside the Ferrara area, so the list is truthfully
+  // empty and no spurious popup/selection fires.
+  leaflet.__setBounds({ getSouth: () => 44.7198493, getNorth: () => 44.9637886, getWest: () => 11.5109915, getEast: () => 11.8870544, contains: () => false });
+  for (const handler of map.handlers["moveend zoomend"] ?? []) handler();
+  await waitFor(() => assert.ok(screen.getByText(/No documented points in the current view/)), { timeout: 3000 });
+  assert.ok(screen.queryByRole("button", { name: /Illustrative record/ }) === null, "no points are framed inside the selected area");
+
+  // An ordinary pan into record B's view follows the viewport and does NOT
+  // auto-select: the landing belongs to the framed destination, never to a
+  // later unrelated view (R3b).
   leaflet.__setBounds({
     getSouth: () => 41.9, getNorth: () => 41.95,
     getWest: () => 12.5, getEast: () => 12.52,
     contains: () => true,
   });
   for (const handler of map.handlers["moveend zoomend"] ?? []) handler();
-  // Wait for the pan to land AND the focus effect to select the first
-  // visible point: the list-update render and the onSelect(…[0].id) effect
-  // commit in sequence, so asserting outside the waitFor would race the
-  // second render (flaky in the full suite, deterministic alone).
   await waitFor(() => {
-    assert.ok(screen.getByText("Showing the only point in the current view"));
-    assert.equal(screen.getByRole("button", { name: /Illustrative record B/ }).getAttribute("aria-current"), "true", "the first visible point is focused after the pan");
+    assert.ok(screen.getByRole("button", { name: /Illustrative record B/ }), "the list follows the new viewport");
   }, { timeout: 3000 });
+  assert.equal(screen.getByRole("button", { name: /Illustrative record B/ }).getAttribute("aria-current"), null, "an ordinary pan never auto-selects a row");
   // The new bounds contain only record B — record A is OUTSIDE the new
   // viewport and must leave the list (the sidebar follows the map).
   assert.ok(screen.queryByRole("button", { name: /Illustrative record A/ }) === null, "records outside the new viewport leave the list");

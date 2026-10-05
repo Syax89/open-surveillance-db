@@ -62,6 +62,24 @@ type Props = {
    * box is never passed here — the point fallback (focusLocation) is used.
    */
   focusBounds?: ViewportBounds | null;
+  /**
+   * B09: a monotonic token that changes on EVERY explicit focus command (a
+   * place selection, including re-selecting an identical position). The focus
+   * effect keys on it so repeating the same place after a pan recentres the
+   * map instead of being a silent no-op — the coordinates alone are stable
+   * across such a repeat. Default 0 (no explicit re-command).
+   */
+  focusIntent?: number;
+  /**
+   * R2/B10: reported ONCE each time the map actually APPLIES a focus command
+   * (initial framing on readiness, or a place/?focus focus), with that
+   * command's intent token AND the RAW bounds captured IMMEDIATELY AFTER the
+   * fitBounds/setView (the real post-fit viewport). Only the shared framing
+   * path calls this — never a data arrival, a filter change or an ordinary pan
+   * — so a caller gets the EXACT destination instead of guessing it from a
+   * later debounced bounds report (which a user pan can retarget).
+   */
+  onFocusApplied?: (intent: number, geometry: ViewportBounds) => void;
   /** Where the sr-only "accessible directory" link points: home anchor (#records) or /directory. */
   directoryHref?: string;
   /**
@@ -134,7 +152,7 @@ function popupMaxWidth(): number {
   return window.innerWidth <= 520 ? 260 : 300;
 }
 
-export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLocation, focusBounds = null, directoryHref = "#records", onBoundsChange, popupHtmlFor }: Props) {
+export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLocation, focusBounds = null, focusIntent = 0, directoryHref = "#records", onBoundsChange, onFocusApplied, popupHtmlFor }: Props) {
   const [mapUnavailable, setMapUnavailable] = useState(false);
   const [offline, setOffline] = useState(false);
   // True once the lazy leaflet import has resolved and the layer group
@@ -195,6 +213,14 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
   const leafletRef = useRef<LeafletModule | null>(null);
   const onPickRef = useLatest(onPick);
   const focusLocationRef = useLatest(focusLocation);
+  const focusBoundsRef = useLatest(focusBounds);
+  const focusIntentRef = useLatest(focusIntent);
+  const onFocusAppliedRef = useLatest(onFocusApplied);
+  // R1/R2: the last focus command this map actually APPLIED. Keyed by the
+  // commanded geometry + the intent token, so the createMap framing and the
+  // readiness effect (or two renders) never double-apply the SAME command,
+  // while a NEW intent (a repeat of an identical place) still re-frames.
+  const appliedFocusRef = useRef<string | null>(null);
   const selectedIdRef = useLatest(selectedId);
   const prevSelectedIdRef = useRef(selectedId);
   const onBoundsChangeRef = useLatest(onBoundsChange);
@@ -377,6 +403,42 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
     ));
   }, []);
 
+  // Shared focus framing (R1/B01, R2/B10): apply the CURRENT focus command —
+  // an administrative AREA via fitBounds (capped readable) or a point via
+  // setView — then report the RESULTING geometry through onFocusApplied. This
+  // is the ONLY place framing happens, so it runs both from createMap (a focus
+  // already present BEFORE the lazy Leaflet import resolves) and from the
+  // readiness/change effect below. appliedFocusRef keyed by command+intent
+  // guarantees each command is applied exactly once (no duplicate deep-link
+  // framing) while a repeated identical place (new intent) re-frames.
+  const applyFocus = useCallback((map: import("leaflet").Map) => {
+    const area = focusBoundsRef.current;
+    const point = focusLocationRef.current;
+    if ((!area && !point) || !map) return;
+    const command = area
+      ? `b:${area.south},${area.north},${area.west},${area.east}`
+      : `p:${point!.latitude},${point!.longitude}`;
+    const token = `${command}|${focusIntentRef.current}`;
+    if (appliedFocusRef.current === token) return;
+    appliedFocusRef.current = token;
+    if (area) {
+      map.fitBounds([[area.south, area.west], [area.north, area.east]], { animate: false, maxZoom: 15 });
+    } else {
+      map.setView([point!.latitude, point!.longitude], Math.max(map.getZoom(), 15), { animate: false });
+    }
+    // Capture the ACTUAL post-fit viewport IMMEDIATELY (R3b): the caller ties
+    // the landing to this exact geometry, not to a later debounced report that
+    // a user pan could have retargeted.
+    const after = map.getBounds();
+    onFocusAppliedRef.current?.(focusIntentRef.current, {
+      south: after.getSouth(),
+      north: after.getNorth(),
+      west: after.getWest(),
+      east: after.getEast(),
+    });
+    // The useLatest refs are stable references; listed to satisfy exhaustive-deps.
+  }, [focusBoundsRef, focusIntentRef, focusLocationRef, onFocusAppliedRef]);
+
   useEffect(() => {
     let disposed = false;
     const badges = badgesRef.current;
@@ -544,8 +606,10 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
           if (boundsTimerRef.current !== null) window.clearTimeout(boundsTimerRef.current);
           boundsTimerRef.current = window.setTimeout(emitBounds, BOUNDS_DEBOUNCE_MS);
         });
-        const initialFocus = focusLocationRef.current;
-        if (initialFocus) map.setView([initialFocus.latitude, initialFocus.longitude], 15, { animate: false });
+        // The initial viewport (Rome) is emitted below, then the readiness-aware
+        // focus effect (which depends on `mapReady`) applies any focus that was
+        // already present — including a valid area that arrived BEFORE the lazy
+        // Leaflet import resolved (R1). Framing lives in ONE place (applyFocus).
         window.setTimeout(() => map.invalidateSize(), 100);
         // Initial viewport: the sidebar list must match the first frame.
         emitBounds();
@@ -576,6 +640,15 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
   // decision reads it) — NOT on the selection. Rebuilding every marker on
   // each selection change would recreate N Leaflet DOM nodes per click; the
   // selection is applied by the dedicated effect below.
+  //
+  // B06: `selectedId` IS a dependency. The reconcile already materialises the
+  // selected record as an individual marker even when the rest of the view is
+  // aggregated (the selected-overlay block) — but only when the effect re-runs.
+  // Selecting an AGGREGATED sidebar row changes only `selectedId`, so without
+  // this dependency the marker was never created and the selection effect
+  // found nothing (0 markers / no popup). The reconcile is a DIFF (no
+  // clearLayers), so a selection re-run touches no DOM node that did not
+  // actually change and keeps identity/popup state.
   //
   // `mapReady` guards the first run: leaflet is imported lazily, so at
   // mount `leafletRef.current` is null and the effect must no-op; once the
@@ -688,15 +761,29 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
             title: t.gridBadgeTooltip(spec.count),
           });
           badge.bindTooltip(t.gridBadgeTooltip(spec.count), { direction: "top", offset: [0, -16] });
+          const zoomToBadge = () => {
+            const map = mapRef.current;
+            if (!map) return;
+            map.setView([spec.lat, spec.lng], map.getZoom() + 2, { animate: true });
+          };
           badge.on("click", (event) => {
             // P0 popup contract: a grid badge is NOT empty map space — stop
             // the click from bubbling to the map handler, which would open
             // the coordinate picker OVER the zoom animation (review
             // 2026-08-07, P0-1). Same pattern as the individual marker.
             L.DomEvent.stopPropagation(event);
-            const map = mapRef.current;
-            if (!map) return;
-            map.setView([spec.lat, spec.lng], map.getZoom() + 2, { animate: true });
+            zoomToBadge();
+          });
+          // B07: the badge is a focusable role=button Leaflet marker, so
+          // Enter/Space must run the SAME zoom action as a click. Stop the key
+          // event's propagation + default so the map's empty-click report
+          // shortcut never fires from bubbling and the page does not scroll.
+          badge.on("keydown", (event) => {
+            const key = event.originalEvent?.key;
+            if (key !== "Enter" && key !== " ") return;
+            L.DomEvent.stopPropagation(event);
+            event.originalEvent?.preventDefault?.();
+            zoomToBadge();
           });
           badge.addTo(layer);
           badge.getElement?.()?.setAttribute?.("aria-label", t.gridBadgeLabel(spec.count));
@@ -850,7 +937,7 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
     } finally {
       rebuildingRef.current = false;
     }
-  }, [cameras, onSelect, mapReady, viewportBounds, mapZoom, t]);
+  }, [cameras, onSelect, mapReady, viewportBounds, mapZoom, t, selectedId]);
 
   // Field-of-view layer (t_f8b775ec): draw the camera's field of view with
   // native Leaflet only — a ~60°/35 m wedge (L.polygon, points computed by
@@ -938,17 +1025,17 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
   const boundsEast = focusBounds?.east;
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
-    // B01: an administrative place selection frames the AREA. fitBounds caps
-    // the zoom at 15 so a small-but-valid box stays readable; a record
-    // ?focus= deep link and a point/address keep the point + zoom fallback.
-    if (boundsSouth !== undefined && boundsNorth !== undefined && boundsWest !== undefined && boundsEast !== undefined) {
-      map.fitBounds([[boundsSouth, boundsWest], [boundsNorth, boundsEast]], { animate: false, maxZoom: 15 });
-      return;
-    }
-    if (focusLat === undefined || focusLng === undefined) return;
-    map.setView([focusLat, focusLng], Math.max(map.getZoom(), 15), { animate: false });
-  }, [focusLat, focusLng, boundsSouth, boundsNorth, boundsWest, boundsEast]);
+    // R1: not ready yet (lazy Leaflet import in flight) — the effect re-runs
+    // when `mapReady` flips, and `applyFocus` (the shared framing root) then
+    // applies the focus that was already present BEFORE readiness, so a valid
+    // area is never silently degraded to its centroid.
+    if (!map || !mapReady) return;
+    applyFocus(map);
+    // B01: an administrative place selection frames the AREA (fitBounds,
+    // capped at zoom 15); a record ?focus= deep link and a point/address keep
+    // the point + zoom fallback. B09: `focusIntent` is a dependency so
+    // repeating an identical place (same coordinates) still re-frames.
+  }, [focusLat, focusLng, boundsSouth, boundsNorth, boundsWest, boundsEast, focusIntent, mapReady, applyFocus]);
   const label = t.mapLabel;
   const description = t.mapDescription;
   const directoryLink = t.mapDirectoryLink;

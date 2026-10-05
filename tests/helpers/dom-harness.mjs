@@ -322,9 +322,18 @@ export function map(el, opts) {
     // Place-search area framing (B01): fitBounds records every call so a test
     // can assert a city/province/region selection frames the AREA rather than
     // dropping a centroid point (and that a small/invalid box never reaches
-    // it — the point fallback is a setView instead).
+    // it — the point fallback is a setView instead). Real Leaflet applies the
+    // new view synchronously, so the stub also updates the reported bounds
+    // (getBounds after fitBounds reflects the fitted rectangle).
     fitBoundsCalls: [],
-    fitBounds: (bounds, opts) => { m.fitBoundsCalls.push({ bounds, opts }); return m; },
+    fitBounds: (bounds, opts) => {
+      m.fitBoundsCalls.push({ bounds, opts });
+      if (Array.isArray(bounds) && bounds.length === 2) {
+        const [[south, west], [north, east]] = bounds;
+        currentBounds = { getSouth: () => south, getNorth: () => north, getWest: () => west, getEast: () => east, contains: () => true };
+      }
+      return m;
+    },
     on: (event, handler) => { (m.handlers[event] ??= []).push(handler); return m; },
     // P0 t_bb310428: the coordinate picker is registered ONLY while the
     // "Add here" mode is active — off() removes the handler so tests can
@@ -334,7 +343,8 @@ export function map(el, opts) {
     invalidateSize: () => {},
     getZoom: () => m.zoom,
     getBounds: () => currentBounds,
-    panTo: () => m,
+    panTo: (latlng) => { m.panCalls.push(latlng); return m; },
+    panCalls: [],
     handlers: {},
     // P0 t_bb310428 (strict popup lifecycle instrumentation): fire() mirrors
     // Leaflet's event dispatch — it records the event in the stub log AND
