@@ -149,6 +149,61 @@ test("desktop map viewport has a materially taller floor while mobile overrides 
   }), "mobile retains its existing viewport-driven map height and map-first layout");
 });
 
+test("≤700px /directory header and card actions compact onto one row without losing wrap or 44px targets", () => {
+  // The mobile overrides live in the ≤700px block that also carries .hero-actions.
+  const mobile = mediaBlocks(css, "max-width", "700px").find((block) => block.includes(".hero-actions"));
+  assert.ok(mobile, "expected the ≤700px block carrying the hero and directory mobile overrides");
+
+  // Hero CTAs: the map and report links fill the existing two-column row. The
+  // separate external directory submit CTA is gone — the search now carries a
+  // compact in-form arrow submit, so the report link no longer spans both tracks.
+  const heroActions = ruleBlock(mobile, ".hero-actions");
+  assert.equal(compact(declaration(heroActions, "display")), "grid");
+  assert.equal(compact(declaration(heroActions, "grid-template-columns")), "repeat(2,minmax(0,1fr))");
+  assert.equal(compact(declaration(ruleBlock(mobile, ".hero-actions .button"), "justify-content")), "center");
+  assert.doesNotMatch(mobile, /\.hero-actions \.button-quiet\s*\{/, "the report link no longer spans both tracks");
+  assert.doesNotMatch(css, /hero-directory-submit-mobile/, "the external directory submit CTA must be gone");
+
+  // Mobile search row: the input fills the first grid track and the compact
+  // in-form arrow submit occupies the fixed 48px second track; the visible
+  // desktop label span is hidden on mobile while the button keeps its
+  // accessible name, and the static dropdown stays as wide as input+arrow.
+  const search = ruleBlock(mobile, ".hero-search");
+  assert.equal(compact(declaration(search, "display")), "grid");
+  assert.equal(compact(declaration(search, "grid-template-columns")), "minmax(0,1fr)48px");
+  const submit = ruleBlock(mobile, '.hero-search > button[type="submit"]');
+  assert.equal(compact(declaration(submit, "display")), "flex");
+  assert.equal(pixelValue(declaration(submit, "width")), 48);
+  assert.equal(pixelValue(declaration(submit, "min-height")), 48);
+  assert.equal(compact(declaration(ruleBlock(mobile, ".hero-search-submit-label"), "display")), "none");
+  const dropdown = ruleBlock(mobile, ".hero-search .geocode-dropdown");
+  assert.equal(compact(declaration(dropdown, "position")), "static");
+  assert.equal(compact(declaration(dropdown, "width")), "calc(100%+48px)");
+
+  const details = ruleBlock(mobile, ".hero-copy--details");
+  assert.equal(compact(declaration(details, "padding-top")), "0");
+  assert.equal(compact(declaration(details, "max-width")), "none", "the mobile CTA must not stay capped at the desktop 640px");
+
+  // Card action links sit on one 8px-gap row and wrap when 320px runs out.
+  const actions = ruleBlock(mobile, ".directory-tool .record-list .record-list-card .record-list-actions");
+  assert.equal(compact(declaration(actions, "flex-direction")), "row");
+  assert.equal(compact(declaration(actions, "flex-wrap")), "wrap");
+  assert.equal(compact(declaration(actions, "align-items")), "center");
+  assert.equal(compact(declaration(actions, "justify-content")), "flex-start");
+  assert.equal(compact(declaration(actions, "gap")), "var(--space-2)");
+
+  // The heading override is scoped (2 classes) so it outranks the later base
+  // rule whose align-items:flex-end split the heading from the + action.
+  const heading = ruleBlock(mobile, ".directory-tool .directory-results");
+  assert.equal(compact(declaration(heading, "flex-direction")), "row");
+  assert.equal(compact(declaration(heading, "flex-wrap")), "nowrap");
+  assert.equal(compact(declaration(heading, "align-items")), "center");
+  assert.match(css, /\.directory-results\s*\{\s*display:flex;[^}]*align-items:flex-end/, "the later base .directory-results rule ends its row at flex-end — the reason the override is scoped");
+
+  // Touch targets stay ≥44px; they now wrap instead of shrinking.
+  assert.equal(pixelValue(declaration(ruleBlock(css, ".directory-tool .record-list .record-list-card .text-button"), "min-height")), 44);
+});
+
 test("cross-document explorer transitions opt in and crossfade continuously with reduced-motion safety", () => {
   const transition = ruleBlock(css, "@view-transition");
   assert.equal(declaration(transition, "navigation"), "auto", "cross-document navigation is explicitly opted in");

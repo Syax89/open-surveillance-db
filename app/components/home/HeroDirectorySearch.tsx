@@ -41,7 +41,7 @@ export function HeroDirectorySearch() {
           attribution: t.searchAttribution,
         }}
       />
-      <button type="submit">{t.searchDirectory} <span aria-hidden="true">→</span></button>
+      <button type="submit" aria-label={t.searchDirectory}><span className="hero-search-submit-label">{t.searchDirectory}</span> <span aria-hidden="true">→</span></button>
     </form>
   );
 }
