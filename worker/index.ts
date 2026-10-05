@@ -805,7 +805,7 @@ const API_LINK_HEADER = [
  * fully-denying policy. The override still respects the "never overwrite"
  * rule: a stricter policy already set by an app handler survives untouched.
  */
-function withSecurityHeaders(response: Response, pathname?: string, hostname?: string): Response {
+function withSecurityHeaders(response: Response, pathname?: string, hostname?: string, privatePolicy = false): Response {
   const headers = new Headers(response.headers);
   // Never overwrite an existing header: app routes may set stricter
   // values that must survive the middleware. The
@@ -831,6 +831,8 @@ function withSecurityHeaders(response: Response, pathname?: string, hostname?: s
   if (hostname?.toLowerCase() === PREPRODUCTION_HOST) {
     headers.set("X-Robots-Tag", "noindex, nofollow");
   }
+  // Private (gated) surfaces must never be publicly cacheable.
+  if (privatePolicy) headers.set("Cache-Control", "no-store");
   return new Response(response.body, {
     status: response.status,
     statusText: response.statusText,
@@ -1094,7 +1096,8 @@ async function dispatch(request: Request, env: Env, ctx: ExecutionContext, url: 
         url.hostname,
       );
     }
-    if (gatedPath(request.method, gateTarget)) {
+    const routedThroughGate = gatedPath(request.method, gateTarget);
+    if (routedThroughGate) {
       const gate = requireModerationAuth(gated, env);
       if (gate.denied) return withSecurityHeaders(gate.denied, url.pathname, url.hostname);
       gated = injectIdentityAfterGate(gated, gate.identityEmail);
@@ -1142,7 +1145,7 @@ async function dispatch(request: Request, env: Env, ctx: ExecutionContext, url: 
       return withSecurityHeaders(optimized, url.pathname, url.hostname);
     }
 
-    return withSecurityHeaders(await handler.fetch(gated, env, ctx), url.pathname, url.hostname);
+    return withSecurityHeaders(await handler.fetch(gated, env, ctx), url.pathname, url.hostname, routedThroughGate);
 }
 
 const worker = {

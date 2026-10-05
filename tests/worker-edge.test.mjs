@@ -995,6 +995,91 @@ test("contributor POST appeals aliases stay ungated while GET and PATCH remain g
   await assertGateDenial(await worker.fetch(request("/%2561pi//appeals/1.rsc", { method: "POST" }), denialEnv(), ctx()), 503, "appeal subtree POST");
 });
 
+// ---------------------------------------------------------------------------
+// Private-cache policy for gated moderation / appeals surfaces
+// (fix/private-moderation-cache): an admitted route response is private and must
+// never be publicly cacheable, so the override forces a hard no-store.
+// ---------------------------------------------------------------------------
+
+const PRIVATE_CACHE_AUTH = basic("fixture", "fixture-pass");
+const PRIVATE_CACHE_CONFIG = {
+  MODERATION_USER: "fixture",
+  MODERATION_PASSWORD: "fixture-pass",
+  MODERATION_IDENTITY_EMAIL: "moderator@osdb.test",
+};
+const PUBLIC_APP_CACHE = "public, max-age=300, s-maxage=600";
+
+test("private-cache: admitted moderation/appeals aliases drop any app policy for no-store", async () => {
+  const { worker, app } = await loadWorker();
+  const originalFetch = app.default.fetch;
+  const body = '{"queue":"fixture-only"}';
+  const variants = [
+    { req: {}, res: { status: 200, statusText: "OK", headers: { "content-type": "application/json; charset=utf-8", "cache-control": PUBLIC_APP_CACHE, "x-osdb-fixture": "kept" } } },
+    { req: { method: "HEAD" }, res: { status: 200, statusText: "OK", headers: {} } },
+    { req: { headers: { rsc: "1", accept: "text/x-component" } }, res: { status: 302, statusText: "Moved", headers: { "cache-control": "no-store", location: "/moderation" } } },
+    { req: { method: "PATCH", headers: { "content-type": "application/json" }, body }, res: { status: 500, statusText: "Internal Server Error", headers: {} } },
+  ];
+  let current;
+  app.default.fetch = async () => current;
+  try {
+    for (const route of [...MODERATION_ALIASES, ...APPEALS_ALIASES]) {
+      for (const { req, res } of variants) {
+        current = new Response(body, res);
+        const response = await worker.fetch(
+          request(route, { ...req, headers: { authorization: PRIVATE_CACHE_AUTH, ...req.headers } }),
+          testEnv(PRIVATE_CACHE_CONFIG),
+          ctx(),
+        );
+        const label = `${route} ${req.method ?? "GET"} ${res.status}`;
+        assert.equal(response.headers.get("cache-control"), "no-store", label);
+        assert.equal(response.status, res.status, label);
+        assert.equal(response.statusText, res.statusText, label);
+        for (const [name, value] of Object.entries(res.headers)) {
+          if (name !== "cache-control") assert.equal(response.headers.get(name), value, `${label} ${name}`);
+        }
+        assert.equal(await response.text(), body, label);
+        assert.equal(response.headers.get("x-content-type-options"), "nosniff", label);
+        assert.equal(response.headers.get("x-frame-options"), "DENY", label);
+        assert.match(response.headers.get("content-security-policy") ?? "", /frame-ancestors 'none'/, label);
+      }
+    }
+  } finally {
+    app.default.fetch = originalFetch;
+  }
+});
+
+test("private-cache: public caches, ungated lookalikes and contributor POST appeals keep their policy", async () => {
+  const { worker, app } = await loadWorker();
+  const originalFetch = app.default.fetch;
+  app.default.fetch = async (forwarded) => {
+    app.__calls.push({ method: forwarded.method, headers: Object.fromEntries(forwarded.headers.entries()) });
+    return forwarded.method === "POST"
+      ? new Response("filed", { status: 201, headers: { "cache-control": PUBLIC_APP_CACHE } })
+      : new Response("public-ok", { status: 200, headers: { "cache-control": PUBLIC_APP_CACHE, "x-osdb-fixture": "kept" } });
+  };
+  try {
+    for (const route of ["/api/cameras?limit=1", "/api/cameras/1", "/assets/index-abc.css", "/records/6745", "/moderation-help", "/api/moderation-extra", "/api/appeals-extra"]) {
+      const response = await worker.fetch(request(route), testEnv(), ctx());
+      assert.equal(response.headers.get("cache-control"), PUBLIC_APP_CACHE, route);
+      assert.equal(response.headers.get("x-osdb-fixture"), "kept", route);
+    }
+    for (const [route, expected] of [["/.well-known/api-catalog", "public, max-age=3600"], ["/auth.md", "public, max-age=3600"]]) {
+      const response = await worker.fetch(request(route), testEnv(), ctx());
+      assert.equal(response.headers.get("cache-control"), expected, route);
+    }
+    for (const route of APPEALS_ALIASES) {
+      const response = await worker.fetch(request(route, { method: "POST", headers: { "x-osdb-user-email": "spoof@osdb.test" } }), testEnv(), ctx());
+      assert.equal(response.status, 201, route);
+      assert.equal(response.headers.get("cache-control"), PUBLIC_APP_CACHE, route);
+      const forwarded = app.__calls.at(-1);
+      assert.equal(forwarded.method, "POST", route);
+      assert.equal(forwarded.headers["x-osdb-user-email"], undefined, route);
+    }
+  } finally {
+    app.default.fetch = originalFetch;
+  }
+});
+
 test("normalization does not gate lookalikes or reinterpret encoded suffixes, dots or delimiters", async () => {
   const { worker, app } = await loadWorker();
   const routes = [
