@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { isPublicStatus } from "../lib/public-status";
-import { BOUNDS_DEBOUNCE_MS, escapeHtml, type ViewportBounds } from "../lib/map-viewport";
+import { BOUNDS_DEBOUNCE_MS, escapeHtml, longitudeInCopy, viewportCenterLongitude, type ViewportBounds } from "../lib/map-viewport";
 import { markersForViewport } from "../lib/map-grid";
 import { useMessages } from "../lib/use-messages";
 import { useLatest } from "../lib/hooks/use-latest";
@@ -55,6 +55,13 @@ type Props = {
   onSelect: (id: number) => void;
   onPick: (latitude: number, longitude: number) => void;
   focusLocation?: MapLocation | null;
+  /**
+   * B01: a validated administrative bounding box (geocoder place selection).
+   * When present the map frames the AREA with fitBounds (capped at zoom 15
+   * so it stays readable) instead of the centroid point; a small / invalid
+   * box is never passed here — the point fallback (focusLocation) is used.
+   */
+  focusBounds?: ViewportBounds | null;
   /** Where the sr-only "accessible directory" link points: home anchor (#records) or /directory. */
   directoryHref?: string;
   /**
@@ -127,7 +134,7 @@ function popupMaxWidth(): number {
   return window.innerWidth <= 520 ? 260 : 300;
 }
 
-export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLocation, directoryHref = "#records", onBoundsChange, popupHtmlFor }: Props) {
+export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLocation, focusBounds = null, directoryHref = "#records", onBoundsChange, popupHtmlFor }: Props) {
   const [mapUnavailable, setMapUnavailable] = useState(false);
   const [offline, setOffline] = useState(false);
   // True once the lazy leaflet import has resolved and the layer group
@@ -623,6 +630,12 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
     const L = leafletRef.current; const layer = markersRef.current; if (!L || !layer || !mapReady) return;
     rebuildingRef.current = true;
     try {
+      // B03: the world COPY the map is showing. Geometry is placed on that
+      // copy, so a dateline-crossing view (raw 170..190) renders records from
+      // BOTH sides near the centre instead of one side projecting off the
+      // visible copy (Leaflet projects longitude linearly, no wrap).
+      const centerLng = viewportBounds ? viewportCenterLongitude(viewportBounds) : 0;
+      const positionOf = (camera: MapCamera): [number, number] => [camera.latitude, longitudeInCopy(camera.longitude, centerLng)];
       // 1) Desired set: grid badges (keyed by 48px cell) + individual
       //    markers (keyed by record id) + the selected-overlay marker.
       const desiredBadges = new Map<string, { lat: number; lng: number; count: number }>();
@@ -631,7 +644,7 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
       // classify popup-close reasons (out-of-view vs filter vs grid cell).
       let visible: MapCamera[] = [];
       if (viewportBounds) {
-        const viewport = markersForViewport(cameras, viewportBounds, mapZoom);
+        const viewport = markersForViewport(cameras, viewportBounds, mapZoom, centerLng);
         visible = viewport.visible;
         const { cells, individual } = viewport;
         cells.forEach((cell) => desiredBadges.set(`${cell.x}:${cell.y}`, { lat: cell.centroidLat, lng: cell.centroidLng, count: cell.count }));
@@ -659,6 +672,9 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
       for (const [key, spec] of desiredBadges) {
         const existing = badges.get(key);
         if (existing) {
+          // B03: keep a retained badge on the visible world copy (a pan across
+          // the dateline moves it without a count change).
+          existing.setLatLng?.([spec.lat, spec.lng]);
           const el = existing.getElement?.();
           const text = el?.querySelector?.(".osm-grid-badge")?.textContent;
           if (text !== String(spec.count)) {
@@ -716,7 +732,11 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
             // own when the record reappears (P1-5/P1-6, review 2026-08-07).
             if (activePopupIdRef.current === id) activePopupIdRef.current = null;
           }
-        } else if (entry.camera !== camera) {
+        } else {
+          // B03: keep the retained marker on the visible world copy — a pan
+          // across the dateline moves it even when the record is unchanged.
+          entry.marker.setLatLng?.(positionOf(camera));
+          if (entry.camera === camera) continue;
           // Kept marker with refreshed data: update IN PLACE. An open popup
           // keeps its DOM — setPopupContent swaps the content without
           // closing, so no popupclose/popupopen churn (P0 t_bb310428). The
@@ -750,7 +770,7 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
       for (const [id, camera] of desiredMarkers) {
         if (byId.has(id)) continue;
         const isSelected = camera.id === selectedIdRef.current;
-        const marker = L.marker([camera.latitude, camera.longitude], { icon: buildMarkerIcon(L, camera, isSelected), title: camera.title });
+        const marker = L.marker(positionOf(camera), { icon: buildMarkerIcon(L, camera, isSelected), title: camera.title });
         marker.bindTooltip(`${camera.title}<br/><small>${camera.kind}</small>`, { direction: "top", offset: [0, -12] });
         marker.bindPopup(popupHtmlForRef.current ? popupHtmlForRef.current(camera) : defaultPopupHtml(camera), {
           maxWidth: popupMaxWidth(),
@@ -851,12 +871,14 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
     // records before the first bounds, and only for the records that are
     // actually rendered individually (at FOV_MIN_ZOOM=16 the grid is
     // inactive by construction: GRID_MAX_ZOOM=14 < 16).
-    const { visible } = markersForViewport(cameras, viewportBounds, mapZoom);
+    const centerLng = viewportBounds ? viewportCenterLongitude(viewportBounds) : 0;
+    const { visible } = markersForViewport(cameras, viewportBounds, mapZoom, centerLng);
     visible.forEach((camera) => {
+      const lng = longitudeInCopy(camera.longitude, centerLng);
       if (isDomeKind(camera.kind)) {
         // Dome: 360° vision — a circle around the marker (same radius as the
         // wedge, so both render at the same visual scale).
-        L.circle([camera.latitude, camera.longitude], {
+        L.circle([camera.latitude, lng], {
           radius: fovCircleRadiusMeters(),
           className: `fov-cone fov-circle ${camera.status}`,
           interactive: false,
@@ -867,7 +889,7 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
       } else if (typeof camera.direction === "number" && Number.isFinite(camera.direction)) {
         // Directional camera with a known bearing: the cone points TOWARDS
         // the direction the camera looks (vertex on the marker).
-        const points = fovPolygonPoints(camera.latitude, camera.longitude, camera.direction);
+        const points = fovPolygonPoints(camera.latitude, lng, camera.direction);
         L.polygon(points, {
           className: `fov-cone ${camera.status}`,
           interactive: false,
@@ -910,14 +932,23 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
 
   const focusLat = focusLocation?.latitude;
   const focusLng = focusLocation?.longitude;
+  const boundsSouth = focusBounds?.south;
+  const boundsNorth = focusBounds?.north;
+  const boundsWest = focusBounds?.west;
+  const boundsEast = focusBounds?.east;
   useEffect(() => {
-    if (focusLat === undefined || focusLng === undefined || !mapRef.current) return;
-    mapRef.current.setView(
-      [focusLat, focusLng],
-      Math.max(mapRef.current.getZoom(), 15),
-      { animate: false },
-    );
-  }, [focusLat, focusLng]);
+    const map = mapRef.current;
+    if (!map) return;
+    // B01: an administrative place selection frames the AREA. fitBounds caps
+    // the zoom at 15 so a small-but-valid box stays readable; a record
+    // ?focus= deep link and a point/address keep the point + zoom fallback.
+    if (boundsSouth !== undefined && boundsNorth !== undefined && boundsWest !== undefined && boundsEast !== undefined) {
+      map.fitBounds([[boundsSouth, boundsWest], [boundsNorth, boundsEast]], { animate: false, maxZoom: 15 });
+      return;
+    }
+    if (focusLat === undefined || focusLng === undefined) return;
+    map.setView([focusLat, focusLng], Math.max(map.getZoom(), 15), { animate: false });
+  }, [focusLat, focusLng, boundsSouth, boundsNorth, boundsWest, boundsEast]);
   const label = t.mapLabel;
   const description = t.mapDescription;
   const directoryLink = t.mapDirectoryLink;

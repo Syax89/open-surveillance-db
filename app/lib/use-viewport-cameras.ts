@@ -54,7 +54,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { publicRecords, type Camera } from "./records";
-import type { ViewportBounds } from "./map-viewport";
+import { viewportRectangles, type ViewportBounds } from "./map-viewport";
 import type { ServerCameraFilters } from "./use-public-cameras";
 
 /** The client asks for the whole visible set in ONE request (bounded server-side). */
@@ -84,8 +84,6 @@ export const VIEWPORT_ZOOMOUT_DEBOUNCE_MS = 800;
 export const VIEWPORT_MAX_AREA_SQ_DEG = 50;
 /** Cache-cell quantization (~110 m at the equator — tiny pans hit the cache). */
 export const VIEWPORT_QUANTIZE_DECIMALS = 3;
-/** A pan is covered (no fetch) when it stays inside a loaded bbox padded by this factor. */
-export const VIEWPORT_COVER_PADDING = 0.15;
 /** One server-directed retry is enough; never turn a 429 into a request loop. */
 export const VIEWPORT_RATE_LIMIT_AUTO_RETRIES = 1;
 /** A malformed intermediary header must not freeze the map for an unbounded time. */
@@ -119,6 +117,13 @@ type CacheEntry = {
   total: number;
   fetchedAt: number;
   decimated?: boolean;
+  /**
+   * True only for a COMPLETE response (every record in the box). A decimated
+   * sample is cached — so panning back over it is still cheap — but must
+   * NEVER cover a subsequent detail fetch (B04): an incomplete sample cannot
+   * erase the decimated flag or suppress city detail.
+   */
+  complete: boolean;
 };
 
 // Module-level caches (one per page load; __resetViewportCamerasCache drops
@@ -134,25 +139,24 @@ function bboxCacheKey(bounds: ViewportBounds, filterKey: string): string {
   return `${filterKey}|${q(bounds.south)}|${q(bounds.north)}|${q(bounds.west)}|${q(bounds.east)}`;
 }
 
+/**
+ * Exact (non-quantized) geometry key (B04). The fetch effect depends on THIS
+ * — not on the quantized cache cell — so two rectangles that round to the
+ * same cell but are NOT identical (bboxA 0..0.1 vs bboxB 0.0001..0.1001) still
+ * trigger a fresh coverage decision instead of silently reusing a payload the
+ * cell never fetched. The cache MAP stays quantized (shares storage); the
+ * REUSE decision is coverage-based (see `cachedEntryCovers`).
+ */
+function bboxExactKey(bounds: ViewportBounds): string {
+  return `${bounds.south}|${bounds.north}|${bounds.west}|${bounds.east}`;
+}
+
 function filterKeyOf(filters: ServerCameraFilters): string {
   return `${filters.kind ?? ""}|${filters.freshness ?? ""}`;
 }
 
-/** Expand a rectangle by a relative padding (for the containment skip). */
-function paddedBounds(bounds: ViewportBounds, factor: number): ViewportBounds {
-  const latPad = (bounds.north - bounds.south) * factor;
-  const lngPad = (bounds.east - bounds.west) * factor;
-  return {
-    south: bounds.south - latPad,
-    north: bounds.north + latPad,
-    west: bounds.west - lngPad,
-    east: bounds.east + lngPad,
-  };
-}
-
-/** True when `inner` is fully inside `outer` (non-antimeridian rectangles). */
+/** True when `inner` is fully inside `outer` (normalized rectangles: west<east). */
 function containsBounds(outer: ViewportBounds, inner: ViewportBounds): boolean {
-  if (outer.west >= outer.east || inner.west >= inner.east) return false; // antimeridian — never covered by the simple path
   return (
     inner.south >= outer.south &&
     inner.north <= outer.north &&
@@ -161,25 +165,35 @@ function containsBounds(outer: ViewportBounds, inner: ViewportBounds): boolean {
   );
 }
 
-/** Is the requested rectangle already covered by a fresh cached bbox (same filters)? */
+/**
+ * True when a fresh, COMPLETE cached bbox contains the requested rectangle.
+ * The containment uses the rectangle that was ACTUALLY fetched — no virtual
+ * padding (B04): the old 15% padding claimed a strip the server never sent,
+ * so a small pan into that strip was silently treated as covered. An
+ * incomplete (decimated) sample never covers — it only holds a few points.
+ */
+function cachedEntryCovers(entry: CacheEntry, bounds: ViewportBounds, filterKey: string, now: number): boolean {
+  if (!entry.complete) return false;
+  if (entry.fetchedAt + VIEWPORT_CACHE_TTL_MS < now) return false;
+  if (entry.filterKey !== filterKey) return false;
+  return containsBounds(entry.bounds, bounds);
+}
+
+/** Is the requested rectangle already covered by a fresh COMPLETE cached bbox (same filters)? */
 function isCovered(bounds: ViewportBounds, filterKey: string): boolean {
   const now = Date.now();
   for (const entry of bboxCache.values()) {
-    if (entry.fetchedAt + VIEWPORT_CACHE_TTL_MS < now) continue;
-    if (entry.filterKey !== filterKey) continue;
-    if (containsBounds(paddedBounds(entry.bounds, VIEWPORT_COVER_PADDING), bounds)) return true;
+    if (cachedEntryCovers(entry, bounds, filterKey, now)) return true;
   }
   return false;
 }
 
-/** The fresh cached bbox that covers the requested rectangle, or null. */
+/** The fresh COMPLETE cached bbox that covers the requested rectangle, or null. */
 function coveringEntry(bounds: ViewportBounds, filterKey: string): CacheEntry | null {
   const now = Date.now();
   let best: CacheEntry | null = null;
   for (const entry of bboxCache.values()) {
-    if (entry.fetchedAt + VIEWPORT_CACHE_TTL_MS < now) continue;
-    if (entry.filterKey !== filterKey) continue;
-    if (!containsBounds(paddedBounds(entry.bounds, VIEWPORT_COVER_PADDING), bounds)) continue;
+    if (!cachedEntryCovers(entry, bounds, filterKey, now)) continue;
     // Prefer the SMALLEST covering box (tightest fit — most precise).
     if (!best || boxArea(entry.bounds) < boxArea(best.bounds)) best = entry;
   }
@@ -379,7 +393,22 @@ export function useViewportCameras({ bounds, filters, focusId, onRecords, onErro
   // delaying ordinary pans but coalesces every stage of a zoom-out gesture.
   const previousViewportAreaRef = useRef<number | null>(null);
 
-  const boundsKey = bounds ? bboxCacheKey(bounds, filterKey) : null;
+  // Exact-geometry key for the CURRENT viewport (B04): one key per
+  // SERVER-VALID geographic rectangle (B03) at FULL precision, so the effect
+  // re-runs whenever the requested geometry really changes — including two
+  // rectangles that the quantized cache CELL would conflate. The cache map
+  // below stays quantized, and reuse is gated on actual coverage.
+  const boundsKey = bounds ? viewportRectangles(bounds).map(bboxExactKey).join("+") : null;
+
+  // A deliberately NEW viewport/filter restarts the rate-limit budget (B05):
+  // the single auto-retry is per navigation attempt, so a terminal 429 on one
+  // viewport never freezes a later, deliberate navigation.
+  const retryBudgetKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (boundsKey === retryBudgetKeyRef.current) return;
+    retryBudgetKeyRef.current = boundsKey;
+    rateLimitRetriesRef.current = 0;
+  }, [boundsKey]);
 
   // Viewport fetch: debounced, cache/dedupe/containment-aware, aborted when
   // the viewport or the server filters change.
@@ -395,7 +424,10 @@ export function useViewportCameras({ bounds, filters, focusId, onRecords, onErro
     }
     const controller = new AbortController();
     const currentBounds = boundsRef.current!;
-    const currentArea = boxArea(currentBounds);
+    // Normalize the RAW Leaflet viewport into server-valid rectangles ONCE and
+    // use the same geometry for containment, cache keys and every bbox fetch.
+    const currentRectangles = viewportRectangles(currentBounds);
+    const currentArea = currentRectangles.reduce((sum, rect) => sum + boxArea(rect), 0);
     const previousArea = previousViewportAreaRef.current;
     previousViewportAreaRef.current = currentArea;
     // Every zoom-out stage gets the long debounce, not just the point where
@@ -407,21 +439,54 @@ export function useViewportCameras({ bounds, filters, focusId, onRecords, onErro
       ? VIEWPORT_ZOOMOUT_DEBOUNCE_MS
       : VIEWPORT_FETCH_DEBOUNCE_MS;
     const timer = window.setTimeout(() => {
-      const currentBounds = boundsRef.current!;
-      const key = bboxCacheKey(currentBounds, filterKey);
+      const liveRectangles = viewportRectangles(boundsRef.current!);
+      const liveKeys = liveRectangles.map((rect) => bboxCacheKey(rect, filterKey));
+      // Merge-dedupe uses the EXACT geometry: two rects that share a quantized
+      // cache cell (bboxA 0..0.1 vs bboxB 0.0001..0.1001) are different areas,
+      // so B's payload must still merge even though the CACHE cell is shared
+      // (B04 — otherwise the cell key silently swallows the new strip).
+      const liveMergeKeys = liveRectangles.map(bboxExactKey);
+      // Resolve ONE rectangle through the module cache / in-flight dedupe /
+      // network, recording the fetched rectangle (and completeness) in cache.
+      // B04: the quantized cache cell is only REUSED when its entry actually
+      // COVERS this rectangle — a same-cell entry fetched for different
+      // geometry is never handed out, and the in-flight dedupe is keyed on the
+      // exact rectangle so a concurrent consumer of other geometry never joins
+      // the wrong request.
+      const resolveRectangle = async (rect: ViewportBounds, key: string): Promise<ViewportPage> => {
+        const cached = bboxCache.get(key);
+        if (cached && cachedEntryCovers(cached, rect, filterKey, Date.now())) {
+          return { records: cached.records, total: cached.total, nextOffset: null, decimated: cached.decimated };
+        }
+        const flightKey = bboxExactKey(rect);
+        if (inFlight.has(flightKey)) return inFlight.get(flightKey)!;
+        const promise = fetchViewportPage(rect, filtersRef.current, controller.signal);
+        inFlight.set(flightKey, promise);
+        let page: ViewportPage;
+        try {
+          page = await promise;
+        } finally {
+          inFlight.delete(flightKey);
+        }
+        if (!controller.signal.aborted) {
+          bboxCache.set(key, { bounds: rect, filterKey, records: page.records, total: page.total, fetchedAt: Date.now(), decimated: page.decimated, complete: page.decimated !== true });
+        }
+        return page;
+      };
       (async () => {
-        // 1) Containment: the requested rectangle is already inside a fresh
-        //    cached bbox → the store already has every record; no request.
-        //    (A warm module cache on a SECOND visit must also settle the
-        //    loading/error/total states — never leave the map spinning.)
-        if (isCovered(currentBounds, filterKey)) {
-          if (!mergedKeysRef.current.has(key)) {
-            mergedKeysRef.current.add(key);
-            const covering = coveringEntry(currentBounds, filterKey);
+        // 1) Containment: EVERY requested rectangle is already inside a fresh
+        //    COMPLETE cached bbox → the store already has every record; no
+        //    request. (A warm module cache on a SECOND visit must also settle
+        //    the loading/error/total states — never leave the map spinning.)
+        if (liveRectangles.every((rect) => isCovered(rect, filterKey))) {
+          for (let i = 0; i < liveRectangles.length; i += 1) {
+            if (mergedKeysRef.current.has(liveMergeKeys[i])) continue;
+            mergedKeysRef.current.add(liveMergeKeys[i]);
+            const covering = coveringEntry(liveRectangles[i], filterKey);
             if (covering) {
               setLoading(false);
               setError(false);
-              setDecimated(false);
+              setDecimated(covering.decimated === true);
               if (covering.records.length > 0) setEmpty(false);
               setTotal(covering.total);
               commitRecords(covering.records);
@@ -429,34 +494,24 @@ export function useViewportCameras({ bounds, filters, focusId, onRecords, onErro
           }
           return;
         }
-        // 2) In-flight dedupe + module cache (shared across consumers).
-        let page: ViewportPage;
-        const cached = bboxCache.get(key);
-        if (cached && cached.fetchedAt + VIEWPORT_CACHE_TTL_MS > Date.now()) {
-          page = { records: cached.records, total: cached.total, nextOffset: null, decimated: cached.decimated };
-        } else if (inFlight.has(key)) {
-          page = await inFlight.get(key)!;
-        } else {
-          const promise = fetchViewportPage(currentBounds, filtersRef.current, controller.signal);
-          inFlight.set(key, promise);
-          try {
-            page = await promise;
-          } finally {
-            inFlight.delete(key);
-          }
-          bboxCache.set(key, { bounds: currentBounds, filterKey, records: page.records, total: page.total, fetchedAt: Date.now(), decimated: page.decimated });
+        // 2) Resolve every rectangle (cache / in-flight dedupe / fetch).
+        const pages: ViewportPage[] = [];
+        for (let i = 0; i < liveRectangles.length; i += 1) {
+          pages.push(await resolveRectangle(liveRectangles[i], liveKeys[i]));
         }
         if (controller.signal.aborted) return;
         setLoading(false);
         setError(false);
         setRetryAfter(null);
         rateLimitRetriesRef.current = 0;
-        setDecimated(page.decimated === true);
-        if (page.total === 0 && page.records.length === 0) setEmpty(true);
-        setTotal(page.total);
-        if (!mergedKeysRef.current.has(key)) {
-          mergedKeysRef.current.add(key);
-          const merged = commitRecords(page.records);
+        setDecimated(pages.some((page) => page.decimated === true));
+        const combinedTotal = pages.reduce((sum, page) => sum + page.total, 0);
+        if (combinedTotal === 0 && !pages.some((page) => page.records.length > 0)) setEmpty(true);
+        setTotal(combinedTotal);
+        for (let i = 0; i < liveRectangles.length; i += 1) {
+          if (mergedKeysRef.current.has(liveMergeKeys[i])) continue;
+          mergedKeysRef.current.add(liveMergeKeys[i]);
+          const merged = commitRecords(pages[i].records);
           // The first non-empty payload fires onRecords ONCE (initial
           // selection); later pans/merges must not steal the selection.
           if (!notifiedRef.current && merged.length > 0) {
@@ -472,7 +527,12 @@ export function useViewportCameras({ bounds, filters, focusId, onRecords, onErro
           const retry = rateLimitRetriesRef.current < VIEWPORT_RATE_LIMIT_AUTO_RETRIES;
           if (retry) rateLimitRetriesRef.current += 1;
           setRetryAfter(failure.retryAfterSeconds);
-          setRateLimitCooldown({ until: Date.now() + (failure.retryAfterSeconds * 1_000), retry });
+          // B05: only an ALLOWED retry arms a cooldown that reopens this
+          // effect. Once the budget is spent the 429 is TERMINAL — leaving
+          // the cooldown null means the same viewport cannot schedule a
+          // third request; reload() or a deliberately new viewport/filter
+          // (which resets the budget above) recovers.
+          setRateLimitCooldown(retry ? { until: Date.now() + (failure.retryAfterSeconds * 1_000), retry } : null);
           onRateLimitedRef.current?.(failure.retryAfterSeconds);
           return;
         }

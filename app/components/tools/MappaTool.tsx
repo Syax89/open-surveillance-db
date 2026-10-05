@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMessages } from "../../lib/use-messages";
 import { useViewportCameras } from "../../lib/use-viewport-cameras";
-import { recordsInBounds } from "../../lib/map-viewport";
+import { geocodeBounds, recordsInBounds } from "../../lib/map-viewport";
 import type { ViewportBounds } from "../../lib/map-viewport";
 import {
   applyCameraFilters,
@@ -61,6 +61,11 @@ export function MappaTool() {
   const [viewportBounds, setViewportBounds] = useState<ViewportBounds | null>(null);
   const [notice, setNotice] = useState("");
   const [placeFocus, setPlaceFocus] = useState<{ latitude: number; longitude: number } | null>(null);
+  // B01: the geocoder's administrative bounding box (validated) lets a
+  // city/province/region selection frame the AREA with fitBounds instead of
+  // a single centroid point. Null for a point/address (or an invalid box) →
+  // the map keeps the point + zoom fallback.
+  const [placeBounds, setPlaceBounds] = useState<ViewportBounds | null>(null);
   const placeFocusRef = useRef<{ latitude: number; longitude: number } | null>(null);
   const viewportAtSelectionRef = useRef<ViewportBounds | null>(null);
 
@@ -128,6 +133,10 @@ export function MappaTool() {
   // the popup that follows is intended.
   const handlePlaceSelect = useCallback((result: GeocodeSuggestion) => {
     setPlaceFocus({ latitude: result.lat, longitude: result.lng });
+    // B01: validate the Nominatim box ([south,north,west,east] strings); a
+    // city/province/region frames the area, a point/address (or an inverted,
+    // non-numeric, out-of-world or sub-100 m box) falls back to the point.
+    setPlaceBounds(geocodeBounds(result.boundingbox));
     placeFocusRef.current = { latitude: result.lat, longitude: result.lng };
     viewportAtSelectionRef.current = viewportBounds;
     setQ("");
@@ -194,12 +203,12 @@ export function MappaTool() {
           <div className="map-explorer-search">
             <GeocodeSearch search={qInput} onSearchChange={setQ} onPlaceSelect={handlePlaceSelect} />
           </div>
-          <FiltersBar variant="panel" hideSearch showCommunitySort stateFilter={filters.state} setStateFilter={setState} originFilter={filters.origin} setOriginFilter={setOrigin} cameraKinds={cameraKinds} search={qInput} setSearch={setQ} kindFilter={filters.type} setKindFilter={setType} freshnessFilter={filters.freshness} setFreshnessFilter={setFreshness} sortOrder={filters.sort} setSortOrder={setSort} resultCount={filteredRecords.length} onReset={reset} />
+          <FiltersBar variant="panel" hideSearch showCommunitySort stateFilter={filters.state} setStateFilter={setState} originFilter={filters.origin} setOriginFilter={setOrigin} cameraKinds={cameraKinds} search={qInput} setSearch={setQ} kindFilter={filters.type} setKindFilter={setType} freshnessFilter={filters.freshness} setFreshnessFilter={setFreshness} sortOrder={filters.sort} setSortOrder={setSort} resultCount={visibleRecords.length} onReset={reset} />
           {/* Map-always-visible (t_b9666d09): MapPanel renders the map AND
               the sidebar unconditionally. When no record matches the
               filters the sidebar shows the truthful in-list note; the map itself never
               disappears. */}
-          <MapPanel filteredRecords={filteredRecords} visibleRecords={visibleRecords} selectedId={selectedId} onSelect={setSelectedId} onPick={() => {}} coordinates={explorerFocusLocation} selectedCamera={selectedCamera} loading={loading} notice={decimated ? t.viewportDecimated : (viewportError ? notice : "")} directoryHref={directoryHref} onBoundsChange={handleBoundsChange} />
+          <MapPanel filteredRecords={filteredRecords} visibleRecords={visibleRecords} selectedId={selectedId} onSelect={setSelectedId} onPick={() => {}} coordinates={explorerFocusLocation} focusBounds={placeBounds} selectedCamera={selectedCamera} loading={loading} notice={decimated ? t.viewportDecimated : (viewportError ? notice : "")} directoryHref={directoryHref} onBoundsChange={handleBoundsChange} />
         </div>
       </div>
     </section>

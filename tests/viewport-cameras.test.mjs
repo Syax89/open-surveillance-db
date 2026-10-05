@@ -310,6 +310,40 @@ test("a rate-limited viewport waits for Retry-After and retries once instead of 
   assert.equal(probe.getAttribute("data-records"), JSON.stringify(RECORDS.map((record) => record.id)));
 });
 
+// ---------------------------------------------------------------------------
+// B04 — two rectangles that round to the SAME quantized cache cell are not
+// conflated: the second area still fetches (and merges) the records only it
+// contains. Mirrors the controller's real-hook quantization probe.
+// ---------------------------------------------------------------------------
+
+test("B04: two rectangles sharing a quantized cell are NOT conflated (no unfetched strip)", async () => {
+  const calls = [];
+  const dateline = [
+    { id: 1, title: "Fixture A", kind: "bullet", status: "active", latitude: 0.05, longitude: 0.05, source: "Community report" },
+    { id: 2, title: "Fixture B", kind: "bullet", status: "active", latitude: 0.05, longitude: 0.10005, source: "Community report" },
+  ];
+  installFetchMock((input) => {
+    const url = new URL(String(input), "https://example.test");
+    const bbox = url.searchParams.get("bbox");
+    calls.push(bbox);
+    const [w, s, e, n] = bbox.split(",").map(Number);
+    const rows = dateline.filter((r) => r.longitude >= w && r.longitude <= e && r.latitude >= s && r.latitude <= n);
+    return jsonResponse({ records: rows, total: null, nextOffset: null, decimated: false });
+  });
+  // Both rectangles quantize (3 decimals) to the same cache cell, but B
+  // extends to a strip A never fetched (record 2 at 0.10005 belongs to B).
+  const A = { south: 0, north: 0.1, west: 0, east: 0.1 };
+  const B = { south: 0, north: 0.1, west: 0.0001, east: 0.1001 };
+  const view = await renderProbe({ bounds: A, filters: {} });
+  await pause(400);
+  await view.rerender(await wrapWithLocale(React.createElement(HookProbe, { bounds: B, filters: {} })));
+  await pause(400);
+  const probe = rtl.screen.getByTestId("probe");
+  const ids = JSON.parse(probe.getAttribute("data-records")).sort((a, b) => a - b);
+  assert.deepEqual(ids, [1, 2], "the record only inside the second rectangle must appear (cell key never covers unfetched geometry)");
+  assert.equal(calls.length, 2, "the second geometry performs exactly one new request");
+});
+
 test("viewportQuery builds the bbox URL with the bounded limit and forwards kind/freshness", () => {
   const url = new URL(viewportQuery(ROME, { kind: "bullet", freshness: "30d" }), "http://example.test");
   // URLSearchParams serialises the whole-number east/north without a
@@ -325,4 +359,111 @@ test("viewportQuery builds the bbox URL with the bounded limit and forwards kind
   // optimization, 2026-08-12): the map paginates on nextOffset alone.
   assert.equal(url.searchParams.get("count"), "false");
   assert.equal(plain.searchParams.get("count"), "false");
+});
+
+// ---------------------------------------------------------------------------
+// B03 — the raw Leaflet viewport is normalized to the server's geographic
+// contract, so a world / antimeridian view never produces a 400-shaped bbox.
+// ---------------------------------------------------------------------------
+
+const bboxesOf = (calls) =>
+  calls
+    .filter((url) => url.includes("bbox="))
+    .map((url) => new URL(url, "http://example.test").searchParams.get("bbox"))
+    .map((bbox) => bbox.split(",").map(Number));
+
+test("B03: a view wider than the world fetches the whole domain (server-valid bbox, no over-±180)", async () => {
+  const calls = [];
+  installBboxMock(calls);
+  // The measured z2 desktop bounds: Leaflet longitudes far outside ±180,
+  // which the API rejects (west<east within world bounds).
+  const WORLD_RAW = { south: -65.3668, north: 85.0511, west: -224.29687500000003, east: 249.25781250000003 };
+  await renderProbe({ bounds: WORLD_RAW, filters: {} });
+  await pause(1_100); // continental area → the long zoom-out debounce
+  assert.ok(calls.length >= 1, "the world view still fetches");
+  const bboxes = bboxesOf(calls);
+  assert.ok(bboxes.length >= 1);
+  for (const [west, south, east, north] of bboxes) {
+    assert.ok(west >= -180 && east <= 180 && west < east && south < north, `server-valid bbox: ${west},${south},${east},${north}`);
+  }
+  assert.deepEqual(bboxes.at(-1), [-180, -65.3668, 180, 85.0511], "the whole world is requested as the full domain");
+  const probe = rtl.screen.getByTestId("probe");
+  assert.equal(probe.getAttribute("data-error"), "false", "the normalized request is not an API failure");
+});
+
+test("B03: an antimeridian wrap fetches BOTH halves so neither dateline side is lost", async () => {
+  const calls = [];
+  installBboxMock(calls);
+  // 170°E..190°E — the unwrapped Leaflet form that crosses ±180.
+  await renderProbe({ bounds: { south: -1, north: 1, west: 170, east: 190 }, filters: {} });
+  await pause(500);
+  const bboxes = bboxesOf(calls).map((bbox) => bbox.join(",")).sort();
+  assert.deepEqual(bboxes, ["-180,-1,-170,1", "170,-1,180,1"], "two geographic rectangles, each west<east");
+});
+
+// ---------------------------------------------------------------------------
+// B04 — only a COMPLETE, actually-fetched area may cover a later fetch.
+// ---------------------------------------------------------------------------
+
+test("B04: a decimated sample never covers a contained detail fetch, and never erases the sample flag", async () => {
+  const calls = [];
+  installBboxMock(calls, { decimated: true });
+  const view = await renderProbe({ bounds: REGIONAL_OVERVIEW, filters: {} });
+  await pause(400);
+  const first = calls.length;
+  assert.ok(first >= 1, "the overview fetched once");
+  const probe = rtl.screen.getByTestId("probe");
+  assert.equal(probe.getAttribute("data-decimated"), "true", "the overview is flagged as a sample");
+
+  // A city view fully INSIDE the sampled overview: the sample holds only a
+  // few points and must NOT be treated as coverage of the detail.
+  await view.rerender(await wrapWithLocale(React.createElement(HookProbe, { bounds: INSIDE, filters: {} })));
+  await pause(400);
+  assert.equal(calls.length, first + 1, "the sample does not cover the detail fetch");
+  assert.equal(probe.getAttribute("data-decimated"), "true", "an incomplete sample cannot erase the decimated flag");
+});
+
+test("B04: containment uses the area actually fetched — no virtual padding strip", async () => {
+  const calls = [];
+  installBboxMock(calls);
+  const view = await renderProbe({ bounds: { south: 0, north: 0.1, west: 0, east: 0.1 }, filters: {} });
+  await pause(400);
+  const first = calls.length;
+  assert.ok(first >= 1);
+
+  // This pan starts inside the old 15% padding but reaches into a strip the
+  // server never sent — it must NOT be treated as a cache hit.
+  await view.rerender(await wrapWithLocale(React.createElement(HookProbe, { bounds: { south: 0, north: 0.1, west: 0.01, east: 0.11 }, filters: {} })));
+  await pause(400);
+  assert.equal(calls.length, first + 1, "the unfetched strip forces a new request");
+});
+
+// ---------------------------------------------------------------------------
+// B05 — a persistent 429 is bounded to the single auto-retry.
+// ---------------------------------------------------------------------------
+
+test("B05: a persistent 429 retries at most once, then stays terminal with no latent loop", async () => {
+  let attempts = 0;
+  installFetchMock((input) => {
+    if (!String(input).includes("bbox=")) return jsonResponse({ error: "unexpected request" }, { status: 404 });
+    attempts += 1;
+    return new Response(JSON.stringify({ error: "Too many requests" }), {
+      status: 429,
+      headers: { "Content-Type": "application/json", "Retry-After": "1" },
+    });
+  });
+  const view = await renderProbe({ bounds: ROME, filters: {} });
+  await pause(2_600);
+  assert.equal(attempts, 2, "initial attempt + exactly ONE auto retry (never a third)");
+  const probe = rtl.screen.getByTestId("probe");
+  assert.equal(probe.getAttribute("data-error"), "true", "the exhausted 429 stays a visible error state");
+
+  // No latent loop once the retry budget is spent.
+  await pause(1_800);
+  assert.equal(attempts, 2, "the cooldown expiry does not schedule another request");
+
+  // A deliberately NEW viewport restarts the budget — never frozen forever.
+  await view.rerender(await wrapWithLocale(React.createElement(HookProbe, { bounds: MILAN, filters: {} })));
+  await pause(2_000);
+  assert.ok(attempts >= 3, "a deliberate new viewport is not blocked by the terminal state");
 });

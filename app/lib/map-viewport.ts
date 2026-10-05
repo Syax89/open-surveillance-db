@@ -26,25 +26,134 @@ export type ViewportBounds = {
   east: number;
 };
 
+/** Longitude domain served by the API (server contract: west<east, within world). */
+const WORLD_WEST = -180;
+const WORLD_EAST = 180;
+
+function clamp(value: number, min: number, max: number): number {
+  return value < min ? min : value > max ? max : value;
+}
+
+/**
+ * Normalize a RAW Leaflet viewport rectangle into one or two SERVER-VALID
+ * geographic rectangles (each with west < east inside [-180, 180]).
+ *
+ * Leaflet can emit longitudes outside ±180 while panning around the globe
+ * (a world view reported e.g. west=-224, east=249) or a rectangle that wraps
+ * the antimeridian (west > east). The bbox API only accepts a plain
+ * geographic rectangle (`west<east` within world bounds) and answers 400
+ * otherwise — so the raw viewport is normalized HERE, once, and the SAME
+ * result drives fetching, list visibility and marker aggregation (no
+ * divergent per-consumer geometry).
+ *
+ *  - a span of 360° or more is the whole world (single [-180, 180] rect);
+ *  - a narrow wrap is split into the two geographic halves, so neither side
+ *    of the dateline is lost and no rectangle ever inverts west/east.
+ */
+export function viewportRectangles(bounds: ViewportBounds): ViewportBounds[] {
+  const south = clamp(Math.min(bounds.south, bounds.north), -90, 90);
+  const north = clamp(Math.max(bounds.south, bounds.north), -90, 90);
+  // Raw span, tolerant of Leaflet's unwrapped (east > 180) and wrapped
+  // (west > east) forms.
+  let width = bounds.east - bounds.west;
+  if (width < 0) width += 360;
+  if (!Number.isFinite(width) || width >= 360) {
+    return [{ south, north, west: WORLD_WEST, east: WORLD_EAST }];
+  }
+  // Fast path: already a valid geographic rectangle. Returned VERBATIM (no
+  // re-projection) so boundary values stay exact and edges stay inclusive.
+  if (bounds.west >= WORLD_WEST && bounds.east <= WORLD_EAST && bounds.west < bounds.east) {
+    return [{ south, north, west: bounds.west, east: bounds.east }];
+  }
+  const normalize = (value: number) =>
+    value >= WORLD_WEST && value < WORLD_EAST
+      ? value
+      : ((((value + 180) % 360) + 360) % 360) - 180;
+  const west = normalize(bounds.west);
+  const east = west + width;
+  if (east <= WORLD_EAST) {
+    return [{ south, north, west, east }];
+  }
+  // Crosses the antimeridian: two geographic rectangles, each west<east.
+  return [
+    { south, north, west, east: WORLD_EAST },
+    { south, north, west: WORLD_WEST, east: east - 360 },
+  ];
+}
+
 /**
  * Records whose coordinates fall inside the viewport rectangle. A null
  * bounds (viewport not emitted yet) keeps every record — the list must
  * never go blank while the map is still initialising.
+ *
+ * The raw viewport is normalized through `viewportRectangles` first, so the
+ * SAME predicate tolerates Leaflet longitudes outside ±180 and the
+ * antimeridian wrap that the fetch layer normalizes for the API.
  */
 export function recordsInBounds<T extends { latitude: number; longitude: number }>(
   records: readonly T[],
   bounds: ViewportBounds | null,
 ): T[] {
   if (!bounds) return [...records];
-  const { south, north, west, east } = bounds;
-  const crossesAntimeridian = west > east;
-  return records.filter((record) => {
-    if (record.latitude < south || record.latitude > north) return false;
-    if (crossesAntimeridian) {
-      return record.longitude >= west || record.longitude <= east;
-    }
-    return record.longitude >= west && record.longitude <= east;
-  });
+  const rectangles = viewportRectangles(bounds);
+  return records.filter((record) =>
+    rectangles.some((rect) =>
+      record.latitude >= rect.south &&
+      record.latitude <= rect.north &&
+      record.longitude >= rect.west &&
+      record.longitude <= rect.east,
+    ),
+  );
+}
+
+/**
+ * Minimum side (degrees) for a geocoder bounding box to be framed as an
+ * AREA. Nominatim returns a box for every hit; a point/address box is
+ * sub-100 m and would fitBounds to an unreadable street zoom, so those keep
+ * the practical point + zoom fallback instead.
+ */
+export const MIN_GEOCODE_BBOX_SPAN_DEG = 0.02;
+
+/**
+ * Longitude of the viewport centre in Leaflet's UNWRAPPED frame (the same
+ * frame `getBounds()` reports). For a dateline-crossing view (raw
+ * west=170/east=190 or west=-190/east=-170) this is ≈180 / ≈-180, i.e. the
+ * centre of the world COPY the map is actually showing — the reference used
+ * to place geometry on the visible copy.
+ */
+export function viewportCenterLongitude(bounds: ViewportBounds): number {
+  let width = bounds.east - bounds.west;
+  if (width < 0) width += 360;
+  return bounds.west + width / 2;
+}
+
+/**
+ * Shift a longitude into the world copy nearest `referenceLng` (B03). Leaflet
+ * projects longitudes LINEARLY, so a camera stored at -179 renders near the
+ * far-west edge of the world while a dateline-crossing view (raw 170..190)
+ * shows the copy around +180: without this shift a record IS in the viewport
+ * (list + visibility) but its marker/badge projects OFF the visible copy.
+ * Native world-copy maths, no projection rewrite.
+ */
+export function longitudeInCopy(lng: number, referenceLng: number): number {
+  return lng + 360 * Math.round((referenceLng - lng) / 360);
+}
+
+/**
+ * Validate a Nominatim bounding box — `[south, north, west, east]` strings,
+ * the geocoder proxy's minimized shape — into a usable `ViewportBounds`, or
+ * null when it must NOT be trusted as an area: non-array, non-numeric,
+ * inverted (south>=north or west>=east), outside world bounds, or too small
+ * to be a city/province/region. The caller falls back to the point.
+ */
+export function geocodeBounds(boundingbox: readonly unknown[] | null | undefined): ViewportBounds | null {
+  if (!Array.isArray(boundingbox) || boundingbox.length !== 4) return null;
+  const [south, north, west, east] = boundingbox.map((value) => Number(value));
+  if (![south, north, west, east].every((value) => Number.isFinite(value))) return null;
+  if (south >= north || west >= east) return null;
+  if (south < -90 || north > 90 || west < -180 || east > 180) return null;
+  if (north - south < MIN_GEOCODE_BBOX_SPAN_DEG || east - west < MIN_GEOCODE_BBOX_SPAN_DEG) return null;
+  return { south, north, west, east };
 }
 
 /**
