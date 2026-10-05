@@ -60,9 +60,14 @@ export type PendingEditRequest = {
   cameraStatus: string | null;
 };
 
+/** Keyset cursor for the published page (published FIFO `created_at ASC, id ASC`). */
+export type PublishedCamerasCursor = { createdAt: string; id: number };
+
 export type ModerationQueue = {
   cameraReports: PendingCameraReport[];
   publishedCameras: ModerationCameraRecord[];
+  /** Next published page cursor, or null on the last page. */
+  publishedNextCursor: PublishedCamerasCursor | null;
   reviewCameras: ModerationCameraRecord[];
   staleCameras: ModerationCameraRecord[];
   correctionRequests: PendingCorrectionRequest[];
@@ -466,12 +471,21 @@ function synthesizedQueueItem(
   };
 }
 
-export async function listPendingModerationItems(): Promise<ModerationQueue> {
+/** Published page size; the probe row makes the SELECT fetch PAGE_SIZE + 1. */
+const PUBLISHED_CAMERAS_PAGE_SIZE = 20;
+
+export async function listPendingModerationItems(
+  publishedAfter?: PublishedCamerasCursor,
+): Promise<ModerationQueue> {
   const d1 = await getModerationD1();
-  // ADR 0021 § 2.2: no timer-driven status transition. The lazy freshness
-  // sweep was retired with the pre-pivot review cycle — the queue lists
-  // exactly what the records say, and transitions come only from community
-  // actions (db/community-actions.ts) or admin-legal decisions.
+  // Published keyset predicate: compare both ordering keys (tie-safe) using
+  // bound VALUES only — the cursor row need not still exist or stay active.
+  const publishedAfterClause = publishedAfter
+    ? " AND (created_at > ? OR (created_at = ? AND id > ?))"
+    : "";
+  const publishedAfterParameters: (string | number)[] = publishedAfter
+    ? [publishedAfter.createdAt, publishedAfter.createdAt, publishedAfter.id]
+    : [];
   const [cameraReports, publishedCameras, reviewCameras, staleCameras, correctionRequests, cameraEditRequests, recentEvents, reviewers, openQueueItems] =
     await Promise.all([
       d1
@@ -480,11 +494,14 @@ export async function listPendingModerationItems(): Promise<ModerationQueue> {
         )
         .bind("pending")
         .all<PendingCameraReport>(),
+      // Published (active) records: keyset-paginated with a limit+1 probe.
+      // ponytail: the FIFO ORDER BY may scan/sort the active set; add a
+      // (status, created_at, id) index only if measured query cost warrants it.
       d1
         .prepare(
-          `SELECT ${cameraColumns} FROM cameras WHERE status = ? ORDER BY created_at ASC, id ASC`,
+          `SELECT ${cameraColumns} FROM cameras WHERE status = ?${publishedAfterClause} ORDER BY created_at ASC, id ASC LIMIT ?`,
         )
-        .bind("active")
+        .bind("active", ...publishedAfterParameters, PUBLISHED_CAMERAS_PAGE_SIZE + 1)
         .all<CameraRecord>(),
       d1
         .prepare(
@@ -545,6 +562,18 @@ export async function listPendingModerationItems(): Promise<ModerationQueue> {
   const queueByKey = new Map(
     openQueueItems.results.map((item) => [`${item.entity}:${item.entityId}`, item]),
   );
+
+  // Probe row proves a further page; the cursor comes from the LAST EMITTED row.
+  const publishedHasNext = publishedCameras.results.length > PUBLISHED_CAMERAS_PAGE_SIZE;
+  const publishedPage = publishedHasNext
+    ? publishedCameras.results.slice(0, PUBLISHED_CAMERAS_PAGE_SIZE)
+    : publishedCameras.results;
+  const publishedLast = publishedPage[publishedPage.length - 1];
+  const publishedNextCursor: PublishedCamerasCursor | null =
+    publishedHasNext && publishedLast
+      ? { createdAt: publishedLast.createdAt, id: publishedLast.id }
+      : null;
+
   const queueItems: ModerationQueueItem[] = [
     ...cameraReports.results.map((camera) =>
       queueByKey.get(`camera:${camera.id}`) ?? synthesizedQueueItem("camera", camera.id, camera.createdAt),
@@ -567,7 +596,8 @@ export async function listPendingModerationItems(): Promise<ModerationQueue> {
 
   return {
     cameraReports: cameraReports.results,
-    publishedCameras: publishedCameras.results,
+    publishedCameras: publishedPage,
+    publishedNextCursor,
     reviewCameras: reviewCameras.results,
     staleCameras: staleCameras.results,
     correctionRequests: correctionRequests.results,
