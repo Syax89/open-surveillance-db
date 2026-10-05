@@ -3,18 +3,25 @@
 // Moderation queue state hook — extracted from the ModerationDashboard
 // monolith (kanban t_c7460073): owns fetch, decision state, formatters.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocale } from "../LocaleProvider";
 import { useMessages } from "../../lib/use-messages";
 import { LOCALE_BCP47 } from "../../lib/i18n";
-import type { CameraInQueue, CorrectionInQueue, DecisionFormApi, EditRequestInQueue, ModerationAction, ModerationEvent, QueueEntity, QueueItem, QueuePayload, ReasonCode, Reviewer } from "./types";
+import type { CameraInQueue, CorrectionInQueue, DecisionFormApi, EditRequestInQueue, ModerationAction, ModerationEvent, PublishedCursor, QueueEntity, QueueItem, QueuePayload, ReasonCode, Reviewer } from "./types";
 
 export function useModerationQueue() {
   const { locale } = useLocale();
-  const t = useMessages().moderation;
+  const messages = useMessages();
+  const t = messages.moderation;
+  const community = messages.community;
 
   const [cameras, setCameras] = useState<CameraInQueue[]>([]);
   const [publishedCameras, setPublishedCameras] = useState<CameraInQueue[]>([]);
+  // Published-page cursor state; history holds the cursor of each page we came
+  // FROM (null = first page) so "previous" needs no total count.
+  const [publishedNextCursor, setPublishedNextCursor] = useState<PublishedCursor | null>(null);
+  const [publishedHistory, setPublishedHistory] = useState<(PublishedCursor | null)[]>([]);
+  const [publishedLoading, setPublishedLoading] = useState(false);
   const [reviewCameras, setReviewCameras] = useState<CameraInQueue[]>([]);
   const [corrections, setCorrections] = useState<CorrectionInQueue[]>([]);
   const [editRequests, setEditRequests] = useState<EditRequestInQueue[]>([]);
@@ -31,7 +38,16 @@ export function useModerationQueue() {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState<string | null>(null);
   const [message, setMessage] = useState("");
+  // PATCH/decision error (existing alert); queue-load failures are tracked
+  // separately (queueError) so a rejected decision is never offered a page retry.
   const [error, setError] = useState("");
+  const [queueError, setQueueError] = useState("");
+
+  // Current page cursor (ref, so a decision-triggered refresh targets the page
+  // shown NOW) plus a request generation that suppresses superseded responses.
+  const publishedCursorRef = useRef<PublishedCursor | null>(null);
+  const generationRef = useRef(0);
+  const controllerRef = useRef<AbortController | null>(null);
 
   function readableDate(value?: string) {
     if (!value) return t.timeUnavailable;
@@ -47,28 +63,82 @@ export function useModerationQueue() {
   function readableOutcome(outcome?: string) { return outcome && outcome in t.outcomeLabels ? t.outcomeLabels[outcome as keyof typeof t.outcomeLabels] : outcome ?? t.unavailable; }
 
   const loadQueue = useCallback(() => {
+    const generation = (generationRef.current += 1);
+    controllerRef.current?.abort();
     const controller = new AbortController();
-    fetch("/api/moderation", { signal: controller.signal })
+    controllerRef.current = controller;
+
+    const cursor = publishedCursorRef.current;
+    const params = new URLSearchParams();
+    if (cursor) {
+      params.set("published_after_created_at", cursor.createdAt);
+      params.set("published_after_id", String(cursor.id));
+    }
+    const query = params.toString();
+    const url = query ? `/api/moderation?${query}` : "/api/moderation";
+
+    fetch(url, { signal: controller.signal })
       .then(async (response) => {
         const data = await response.json() as QueuePayload;
+        if (generation !== generationRef.current) return;
         if (!response.ok) throw new Error(data.error || t.loadError);
         setCameras(Array.isArray(data.cameraReports) ? data.cameraReports : []);
         setPublishedCameras(Array.isArray(data.publishedCameras) ? data.publishedCameras : []);
+        setPublishedNextCursor(data.publishedNextCursor ?? null);
         setReviewCameras(Array.isArray(data.reviewCameras) ? data.reviewCameras : []);
         setCorrections(Array.isArray(data.correctionRequests) ? data.correctionRequests : []);
         setEditRequests(Array.isArray(data.cameraEditRequests) ? data.cameraEditRequests : []);
         setRecentEvents(Array.isArray(data.recentEvents) ? data.recentEvents : []);
         setReviewers(Array.isArray(data.reviewers) ? data.reviewers : []);
         setQueueItems(Array.isArray(data.queueItems) ? data.queueItems : []);
+        setQueueError("");
       })
       .catch((reason: unknown) => {
-        if (reason instanceof Error && reason.name !== "AbortError") setError(reason.message);
+        if (generation !== generationRef.current) return;
+        if (reason instanceof Error && reason.name !== "AbortError") setQueueError(reason.message);
       })
-      .finally(() => setLoading(false));
-    return () => controller.abort();
+      .finally(() => {
+        if (generation !== generationRef.current) return;
+        setLoading(false);
+        setPublishedLoading(false);
+      });
   }, [t.loadError]);
 
-  useEffect(() => loadQueue(), [loadQueue]);
+  useEffect(() => {
+    loadQueue();
+    return () => {
+      generationRef.current += 1;
+      controllerRef.current?.abort();
+    };
+  }, [loadQueue]);
+
+  /** Move the published section one page forward/backward (no prefetching). */
+  function goToPublishedPage(direction: "next" | "previous") {
+    if (publishedLoading) return;
+    if (direction === "previous") {
+      if (publishedHistory.length === 0) return;
+      const previous = publishedHistory[publishedHistory.length - 1];
+      setPublishedHistory(publishedHistory.slice(0, -1));
+      publishedCursorRef.current = previous;
+    } else {
+      if (!publishedNextCursor) return;
+      const next = publishedNextCursor;
+      setPublishedHistory([...publishedHistory, publishedCursorRef.current]);
+      publishedCursorRef.current = next;
+    }
+    // Clear the old page so no rendered state describes stale cards mid-fetch.
+    setPublishedCameras([]);
+    setPublishedNextCursor(null);
+    setPublishedLoading(true);
+    loadQueue();
+  }
+
+  /** Retry the CURRENT cursor after a queue-load failure (busy-guarded). */
+  function retryQueueLoad() {
+    if (publishedLoading) return;
+    setPublishedLoading(true);
+    loadQueue();
+  }
 
   const total = cameras.length + corrections.length + editRequests.length;
   const summary = useMemo(() => t.awaiting(total), [t, total]);
@@ -131,6 +201,8 @@ export function useModerationQueue() {
       setCameraIds((items) => { const next = { ...items }; delete next[key]; return next; });
       setMetadataPublication((items) => { const next = { ...items }; delete next[key]; return next; });
       setMessage(`${entity === "camera" ? t.cameraReport : entity === "camera_edit" ? t.editRequest : t.correctionRequest} #${id} ${t.decisionSaved}: ${actionLabel(action)}. ${t.reason}: ${readableReason(reasonCode)}.`);
+      // Refresh in place (loadQueue reads the current cursor ref).
+      setPublishedLoading(true);
       loadQueue();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : t.saveError);
@@ -154,9 +226,20 @@ export function useModerationQueue() {
   };
 
   return {
-    loading, message, error, summary,
+    loading, message, error, queueError, summary,
     cameras, publishedCameras, reviewCameras, corrections, editRequests, recentEvents, reviewers,
     actorId, setActorId,
+    publishedPagination: {
+      previousLabel: community.previousPage,
+      nextLabel: community.nextPage,
+      loading: publishedLoading,
+      hasPrevious: publishedHistory.length > 0,
+      hasNext: publishedNextCursor !== null,
+      failed: queueError !== "",
+      onPrevious: () => goToPublishedPage("previous"),
+      onNext: () => goToPublishedPage("next"),
+      onRetry: retryQueueLoad,
+    },
     queueBadge, readableDate, readableAction, readableReason, readableStatus, readableOutcome,
     decisionApi,
   };

@@ -124,9 +124,14 @@ export type ModerationEvent = {
   timestamp?: string;
 };
 
+/** Published-page cursor, passed back verbatim via the GET query string. */
+export type PublishedCursor = { createdAt: string; id: number };
+
 export type QueuePayload = {
   cameraReports?: CameraInQueue[];
   publishedCameras?: CameraInQueue[];
+  /** Next published page cursor, or null/absent on the last page. */
+  publishedNextCursor?: PublishedCursor | null;
   reviewCameras?: CameraInQueue[];
   correctionRequests?: CorrectionInQueue[];
   cameraEditRequests?: EditRequestInQueue[];

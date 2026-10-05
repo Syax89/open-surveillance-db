@@ -19,7 +19,8 @@ import { QueueSection } from "./moderation/QueueSection";
 import { useModerationQueue } from "./moderation/useModerationQueue";
 
 export function ModerationDashboard() {
-  const t = useMessages().moderation;
+  const messages = useMessages();
+  const t = messages.moderation;
   const q = useModerationQueue();
 
   return <main id="main-content">
@@ -34,6 +35,7 @@ export function ModerationDashboard() {
       <div className="prototype-banner" role="note"><b>{t.localTool}</b> {t.localWarning}</div>
       {q.message && <p className="notice" role="status">{q.message}</p>}
       {q.error && <p className="notice" role="alert">{q.error}</p>}
+      {q.queueError && <p className="notice" role="alert">{q.queueError}</p>}
       {q.loading ? <p className="loading-note" aria-live="polite">{t.loading}</p> : <p className="search-count" aria-live="polite">{q.summary}</p>}
 
       <section className="moderation-section" aria-labelledby="actor-selector-title">
@@ -59,10 +61,17 @@ export function ModerationDashboard() {
 
       <QueueSection
         id="published-cameras-title" eyebrow={t.lifecycle} title={t.publishedRecords} note={`${q.publishedCameras.length} ${t.verified}`}
-        listLabel={t.publishedRecords} loading={q.loading} items={q.publishedCameras}
+        listLabel={t.publishedRecords} loading={q.loading || q.publishedPagination.loading || q.publishedPagination.failed} items={q.publishedCameras}
         emptyTitle={t.noPublishedTitle} emptyText={t.noPublishedText}
         itemKey={(camera) => camera.id}
         renderItem={(camera) => <CameraQueueItem camera={camera} variant="published" queueBadge={q.queueBadge("camera", camera.id)} api={q.decisionApi} readableDate={q.readableDate} />}
+        footer={(q.publishedCameras.length > 0 || q.publishedPagination.hasPrevious || q.publishedPagination.hasNext || q.publishedPagination.failed) && (
+          <nav className="directory-pagination" aria-label={t.publishedRecords} aria-busy={q.publishedPagination.loading}>
+            <button type="button" className="pagination-button" disabled={!q.publishedPagination.hasPrevious || q.publishedPagination.loading} onClick={q.publishedPagination.onPrevious}><span aria-hidden="true">←</span> {q.publishedPagination.previousLabel}</button>
+            {q.publishedPagination.failed && <button type="button" className="pagination-button" disabled={q.publishedPagination.loading} onClick={q.publishedPagination.onRetry}>{messages.errors.tryAgain}</button>}
+            <button type="button" className="pagination-button" disabled={!q.publishedPagination.hasNext || q.publishedPagination.loading} onClick={q.publishedPagination.onNext}>{q.publishedPagination.nextLabel} <span aria-hidden="true">→</span></button>
+          </nav>
+        )}
       />
 
       <QueueSection
