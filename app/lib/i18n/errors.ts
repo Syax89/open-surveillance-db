@@ -30,6 +30,15 @@ export const en = {
   // sets the same titles client-side via document.title.
   notFoundMetaTitle: "Page not found — OpenSurveillanceDB",
   serverErrorMetaTitle: "Something went wrong — OpenSurveillanceDB",
+  // 401/503 — protected-surface gate denial, rendered by the worker edge
+  // itself (worker/index.ts renderGateUnavailablePage), not by ErrorPage:
+  // the gate must fail closed before any app/React code runs, so this
+  // copy is plain data imported into the edge bundle. The eyebrow is the
+  // live numeric status (401 or 503), not a fixed string like 404/500.
+  serviceUnavailableTitle: "This area is temporarily unavailable",
+  serviceUnavailableSummary:
+    "This part of the site is not reachable right now. Please try again later, or head back to the homepage.",
+  serviceUnavailableMetaTitle: "Service unavailable — OpenSurveillanceDB",
 } as const;
 
 export const it: Translation<typeof en> = {
@@ -52,4 +61,9 @@ export const it: Translation<typeof en> = {
   // imposta gli stessi titoli lato client via document.title.
   notFoundMetaTitle: "Pagina non trovata — OpenSurveillanceDB",
   serverErrorMetaTitle: "Qualcosa è andato storto — OpenSurveillanceDB",
+  // 401/503 — diniego del gate su una superficie protetta: vedi `en.serviceUnavailableTitle`.
+  serviceUnavailableTitle: "Questa sezione è temporaneamente non disponibile",
+  serviceUnavailableSummary:
+    "Questa parte del sito non è raggiungibile in questo momento. Riprova più tardi, oppure torna alla home.",
+  serviceUnavailableMetaTitle: "Servizio non disponibile — OpenSurveillanceDB",
 };

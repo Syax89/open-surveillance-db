@@ -109,6 +109,21 @@ async function buildWorkerTree() {
       "}\n",
   );
 
+  // The worker imports the (pure, side-effect-free) gate-denial page copy
+  // from app/lib/i18n/{common,errors,types}: compile the real files so the
+  // HTML-shell test exercises the actual copy, not a hand-maintained mock.
+  // Their only cross-import is `import type { Translation } from "./types"`,
+  // which transpileModule erases — no further rewriting needed.
+  const i18nDir = path.join(tree, "app", "lib", "i18n");
+  await mkdir(i18nDir, { recursive: true });
+  for (const name of ["common", "errors", "types"]) {
+    const compiled = ts.transpileModule(
+      await readFile(path.join(root, "app", "lib", "i18n", `${name}.ts`), "utf8"),
+      { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ESNext, moduleResolution: ts.ModuleResolutionKind.Bundler } },
+    ).outputText;
+    await writeFile(path.join(i18nDir, `${name}.mjs`), compiled);
+  }
+
   const rewritten = compiled
     .replace(
       /from\s*["']\.\.\/db\/retention["']/g,
@@ -117,6 +132,18 @@ async function buildWorkerTree() {
     .replace(
       /from\s*["']\.\.\/db\/oidc["']/g,
       `from "${pathToFileURL(path.join(dbDir, "oidc.mjs")).href}"`,
+    )
+    .replace(
+      /from\s*["']\.\.\/app\/lib\/i18n\/common["']/g,
+      `from "${pathToFileURL(path.join(i18nDir, "common.mjs")).href}"`,
+    )
+    .replace(
+      /from\s*["']\.\.\/app\/lib\/i18n\/errors["']/g,
+      `from "${pathToFileURL(path.join(i18nDir, "errors.mjs")).href}"`,
+    )
+    .replace(
+      /from\s*["']\.\.\/app\/lib\/i18n\/types["']/g,
+      `from "${pathToFileURL(path.join(i18nDir, "types.mjs")).href}"`,
     )
     .replace(
       /from\s*["']vinext\/server\/image-optimization["']/g,
@@ -919,6 +946,54 @@ test("normalized moderation and appeals aliases deny before router or binding ge
   }
   assert.equal(app.__calls.length, 0);
   assert.equal(image.__calls.length, 0);
+});
+
+test("moderation page denial renders the shared HTML shell, only for /moderation with Accept: text/html", async () => {
+  const { worker, app } = await loadWorker();
+  const htmlHeaders = { accept: "text/html,application/xhtml+xml" };
+
+  // 503 (not configured) + text/html -> the site shell, not the JSON body.
+  let response = await worker.fetch(request("/moderation", { headers: htmlHeaders }), denialEnv(), ctx());
+  assert.equal(response.status, 503);
+  assert.equal(response.headers.get("content-type"), "text/html; charset=utf-8");
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  let body = await response.text();
+  assert.match(body, /^<!DOCTYPE html>/);
+  assert.match(body, /<p class="eyebrow"><span><\/span> 503<\/p>/);
+  assert.match(body, /href="\/app\/globals\.css"/);
+  assert.match(body, /lang="en"/);
+  assert.match(body, /Back to the homepage/);
+
+  // 401 (wrong Basic credential) + text/html -> same shell, now 401, and
+  // WWW-Authenticate must survive (RFC 7235 — a human who mistyped the
+  // password still gets the browser's native re-auth prompt, same as the
+  // untouched JSON path).
+  response = await worker.fetch(
+    request("/moderation", { headers: { ...htmlHeaders, authorization: basic("fixture", "wrong") } }),
+    denialEnv({ MODERATION_USER: "fixture", MODERATION_PASSWORD: "fixture-pass" }),
+    ctx(),
+  );
+  assert.equal(response.status, 401);
+  assert.equal(response.headers.get("www-authenticate"), 'Basic realm="moderation", charset="UTF-8"');
+  assert.match(await response.text(), /<p class="eyebrow"><span><\/span> 401<\/p>/);
+
+  // Locale cookie selects the Italian copy, same markup shape.
+  response = await worker.fetch(
+    request("/moderation", { headers: { ...htmlHeaders, cookie: "opensurveillancedb-locale=it" } }),
+    denialEnv(),
+    ctx(),
+  );
+  body = await response.text();
+  assert.match(body, /lang="it"/);
+  assert.match(body, /Torna alla home/);
+
+  // /api/moderation keeps the plain JSON contract even with Accept: text/html.
+  await assertGateDenial(await worker.fetch(request("/api/moderation", { headers: htmlHeaders }), denialEnv(), ctx()), 503, "/api/moderation");
+
+  // /moderation without Accept: text/html keeps the existing JSON contract (no fixture breakage).
+  await assertGateDenial(await worker.fetch(request("/moderation", {}), denialEnv(), ctx()), 503, "/moderation");
+
+  assert.equal(app.__calls.length, 0);
 });
 
 test("HEAD, RSC and prefetch headers cannot bypass normalized moderation gates", async () => {
