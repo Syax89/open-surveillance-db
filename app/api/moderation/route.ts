@@ -23,6 +23,7 @@ import { isRecord } from "../../lib/guards";
 import { BodyReadError, readJsonBody, urlTooLong } from "../../lib/input-limits";
 import { callerKey, checkRateLimit, limitsFor } from "../../lib/rate-limit";
 import { getReviewerByUserId } from "../../../db/users";
+import type { PublishedCamerasCursor } from "../../../db/moderation";
 
 // Mirror of the db layer allowlist (db/moderation.ts correctionOutcomes). Kept
 // inline so the route validates without importing a runtime value the test
@@ -295,6 +296,42 @@ function moderationResponse(
   }
 }
 
+/**
+ * Published keyset cursor validation. `createdAt` is an OPAQUE stored key:
+ * never Date-parsed, trimmed or re-serialised here — only shape (non-empty,
+ * <=100 chars, no C0/C1 control chars) is checked; SQL binding makes it safe.
+ * `id` must be a canonical positive integer safe for JS.
+ */
+const PUBLISHED_CURSOR_MAX_CREATED_AT_CHARS = 100;
+const PUBLISHED_CURSOR_ID_PATTERN = /^[1-9][0-9]*$/;
+const PUBLISHED_CURSOR_CONTROL_CHARS = /[\u0000-\u001f\u007f-\u009f]/;
+
+type ParsedPublishedCursor =
+  | { ok: true; cursor: PublishedCamerasCursor | undefined }
+  | { ok: false };
+
+function parsePublishedCursor(request: Request): ParsedPublishedCursor {
+  const params = new URL(request.url).searchParams;
+  const createdAtValues = params.getAll("published_after_created_at");
+  const idValues = params.getAll("published_after_id");
+  if (createdAtValues.length === 0 && idValues.length === 0) return { ok: true, cursor: undefined };
+  // Require exactly one of each: incomplete or duplicated pairs are rejected.
+  if (createdAtValues.length !== 1 || idValues.length !== 1) return { ok: false };
+  const createdAt = createdAtValues[0];
+  if (
+    createdAt.length === 0 ||
+    createdAt.length > PUBLISHED_CURSOR_MAX_CREATED_AT_CHARS ||
+    PUBLISHED_CURSOR_CONTROL_CHARS.test(createdAt)
+  ) {
+    return { ok: false };
+  }
+  const rawId = idValues[0];
+  if (!PUBLISHED_CURSOR_ID_PATTERN.test(rawId)) return { ok: false };
+  const id = Number(rawId);
+  if (!Number.isSafeInteger(id)) return { ok: false };
+  return { ok: true, cursor: { createdAt, id } };
+}
+
 export async function GET(request: Request) {
   // Input limits: reject absurdly long URLs before any query parsing work.
   if (urlTooLong(request)) {
@@ -306,11 +343,21 @@ export async function GET(request: Request) {
   const auth = await requireRole(request, "moderator");
   if (!auth.ok) return auth.response;
 
+  // Validate the published cursor BETWEEN the role gate and the rate limit, so
+  // a malformed pair answers 400 without a queue query or spending the bucket.
+  const parsedCursor = parsePublishedCursor(request);
+  if (!parsedCursor.ok) {
+    return Response.json(
+      { error: "Provide a valid published pagination cursor." },
+      { status: 400 },
+    );
+  }
+
   const blocked = await moderationLimit(request);
   if (blocked) return blocked;
 
   try {
-    return Response.json(await listPendingModerationItems());
+    return Response.json(await listPendingModerationItems(parsedCursor.cursor));
   } catch (error) {
     console.error("GET /api/moderation failed", error);
     return Response.json(

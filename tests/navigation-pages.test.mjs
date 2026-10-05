@@ -172,7 +172,13 @@ test("legacy anchor URLs are served 200 HTML — the fragment never reaches the 
 test("moderation gate fails closed without credentials", async () => {
   const { response, html } = await renderRoute("/moderation");
   assert.equal(response.status, 503);
-  assert.match(html, /Moderation is unavailable/);
+  // /moderation is a human page route (Accept: text/html by default here):
+  // the gate denial renders the shared site shell, not the plain JSON body
+  // (worker/index.ts renderGateUnavailablePage) — see tests/worker-edge.test.mjs
+  // for the exhaustive status/locale/content-type coverage of that shell.
+  assert.match(html, /^<!DOCTYPE html>/);
+  assert.match(html, /<p class="eyebrow"><span><\/span> 503<\/p>/);
+  assert.doesNotMatch(html, /Moderation dashboard|class="moderation-/i);
 });
 
 test("moderation renders 200 HTML when credentials are configured", async () => {
@@ -542,7 +548,14 @@ test("worker gate fails closed on every moderation path without credentials", as
     const { response, html } = await renderRoute(route);
     assert.equal(response.status, 503, `${route} must be 503 without credentials`);
     assert.equal(response.headers.get("cache-control"), "no-store");
-    assert.deepEqual(JSON.parse(html), GATE_UNAVAILABLE_BODY, `${route} must carry the gate JSON body`);
+    if (route === "/moderation") {
+      // Human page route: shared HTML shell, not the API JSON body (see
+      // tests/worker-edge.test.mjs for exhaustive coverage of that shell).
+      assert.match(html, /^<!DOCTYPE html>/, route);
+      assert.match(html, /<p class="eyebrow"><span><\/span> 503<\/p>/, route);
+    } else {
+      assert.deepEqual(JSON.parse(html), GATE_UNAVAILABLE_BODY, `${route} must carry the gate JSON body`);
+    }
   }
 });
 

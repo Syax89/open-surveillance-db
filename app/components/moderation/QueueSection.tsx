@@ -24,14 +24,19 @@ type Props<T> = {
   renderItem: (item: T) => ReactNode;
   /** Stable React key per item (preserves the monolith's id-based keys). */
   itemKey: (item: T) => string | number;
+  /** Optional footer rendered after the record list (e.g. pagination nav). */
+  footer?: ReactNode;
+  /** True when an empty list is a LATER page (has history), not global emptiness. */
+  hasHistory?: boolean;
 };
 
-export function QueueSection<T>({ id, eyebrow, title, note, listLabel, loading, items, emptyTitle, emptyText, renderItem, itemKey }: Props<T>) {
+export function QueueSection<T>({ id, eyebrow, title, note, listLabel, loading, items, emptyTitle, emptyText, renderItem, itemKey, footer, hasHistory }: Props<T>) {
   return (
     <section className="moderation-section" aria-labelledby={id}>
       <div className="section-heading"><div><p className="eyebrow"><span /> {eyebrow}</p><h2 id={id}>{title}</h2></div><p className="section-note">{note}</p></div>
-      {!loading && items.length === 0 && <div className="empty-state"><h3>{emptyTitle}</h3><p>{emptyText}</p></div>}
+      {!loading && items.length === 0 && !hasHistory && <div className="empty-state"><h3>{emptyTitle}</h3><p>{emptyText}</p></div>}
       {items.length > 0 && <ul className="moderation-list" aria-label={listLabel}>{items.map((item) => <li key={itemKey(item)}>{renderItem(item)}</li>)}</ul>}
+      {footer}
     </section>
   );
 }

@@ -729,6 +729,13 @@ test("security headers reach HTML pages, API errors, 404s and the moderation gat
 });
 
 test("production moderation gate follows both Vinext decoding phases", async () => {
+  // The first 7 entries below all normalize to the /moderation PAGE route
+  // (worker/index.ts normalizeGatePath); everything else that expects 503
+  // normalizes to an /api/* alias and keeps the plain JSON contract.
+  const MODERATION_PAGE_ALIASES = [
+    "/moderation", "/moderation.rsc", "/moderation//.rsc",
+    "/moderation.rsc/", "/%6doderation", "/%256doderation", "/%256doderation.rsc",
+  ];
   const probes = [
     ["/moderation", 503], ["/moderation.rsc", 503], ["/moderation//.rsc", 503],
     ["/moderation.rsc/", 503], ["/%6doderation", 503], ["/%256doderation", 503],
@@ -746,8 +753,17 @@ test("production moderation gate follows both Vinext decoding phases", async () 
     assert.equal(response.status, status, route);
     assert.doesNotMatch(html, /Moderation dashboard|class="moderation-/i, route);
     if (status === 503) {
-      assert.equal(html, '{"error":"Moderation is unavailable."}', route);
-      assert.match(response.headers.get("content-type") ?? "", /^application\/json\b/, route);
+      // These aliases all normalize to the /moderation PAGE route (not
+      // /api/*): the gate denial renders the shared HTML shell there (see
+      // tests/worker-edge.test.mjs for exhaustive shell coverage), while
+      // the API aliases below keep the plain JSON body unchanged.
+      if (MODERATION_PAGE_ALIASES.includes(route)) {
+        assert.match(html, /^<!DOCTYPE html>/, route);
+        assert.match(html, /<p class="eyebrow"><span><\/span> 503<\/p>/, route);
+      } else {
+        assert.equal(html, '{"error":"Moderation is unavailable."}', route);
+        assert.match(response.headers.get("content-type") ?? "", /^application\/json\b/, route);
+      }
       assert.equal(response.headers.get("cache-control"), "no-store", route);
       assertSecurityHeaders(response, route);
     } else if (status === 400) {

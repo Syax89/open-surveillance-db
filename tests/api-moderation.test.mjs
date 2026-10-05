@@ -136,6 +136,128 @@ test("GET /api/moderation returns 503 when the queue is unavailable", async () =
 });
 
 // ---------------------------------------------------------------------------
+// GET /api/moderation — published keyset pagination (published_after_*)
+// ---------------------------------------------------------------------------
+
+const emptyPublishedQueue = { publishedCameras: [], publishedNextCursor: null };
+
+test("GET /api/moderation defaults to the first published page (cursor argument absent)", async () => {
+  stub("listPendingModerationItems", async () => emptyPublishedQueue);
+  const { GET } = await route();
+  const response = await GET(authRequest("/api/moderation"));
+  assert.equal(response.status, 200);
+  const calls = callArgs("listPendingModerationItems");
+  assert.equal(calls.length, 1);
+  assert.deepEqual(calls[0], [undefined], "no cursor = first page");
+});
+
+test("GET /api/moderation forwards a valid published cursor to the db boundary", async () => {
+  stub("listPendingModerationItems", async () => emptyPublishedQueue);
+  const { GET } = await route();
+  const createdAt = "2026-03-01T00:14:00.000Z";
+  const response = await GET(
+    authRequest(
+      `/api/moderation?published_after_created_at=${encodeURIComponent(createdAt)}&published_after_id=42`,
+    ),
+  );
+  assert.equal(response.status, 200);
+  const calls = callArgs("listPendingModerationItems");
+  assert.equal(calls.length, 1);
+  assert.deepEqual(calls[0], [{ createdAt, id: 42 }]);
+});
+
+test("GET /api/moderation treats the timestamp as opaque bytes and binds SQL-looking text", async () => {
+  stub("listPendingModerationItems", async () => emptyPublishedQueue);
+  const { GET } = await route();
+  // A SQL-looking value and a whitespace-padded value are both forwarded
+  // VERBATIM (no trim, normalise or re-serialise) — parameter binding is what
+  // makes them safe, not sanitisation.
+  const opaqueValues = ["2026-03-01'; DROP TABLE cameras; --", "  2026-03-01T00:14:00.000Z  "];
+  for (const createdAt of opaqueValues) {
+    const response = await GET(
+      authRequest(
+        `/api/moderation?published_after_created_at=${encodeURIComponent(createdAt)}&published_after_id=7`,
+      ),
+    );
+    assert.equal(response.status, 200, createdAt);
+    assert.deepEqual(
+      callArgs("listPendingModerationItems").at(-1),
+      [{ createdAt, id: 7 }],
+      "the exact stored bytes must reach the db layer unchanged",
+    );
+  }
+});
+
+test("GET /api/moderation rejects malformed/incomplete/duplicated/unsafe cursors with 400 and no queue query", async (t) => {
+  const { GET } = await route();
+  const cases = [
+    { name: "id without createdAt", query: "published_after_id=5" },
+    { name: "createdAt without id", query: "published_after_created_at=2026-03-01" },
+    { name: "duplicated id", query: "published_after_created_at=a&published_after_id=5&published_after_id=6" },
+    { name: "duplicated createdAt", query: "published_after_created_at=a&published_after_created_at=b&published_after_id=5" },
+    { name: "empty createdAt", query: "published_after_created_at=&published_after_id=5" },
+    { name: "control character in createdAt", query: `published_after_created_at=${encodeURIComponent("a\u0000b")}&published_after_id=5` },
+    { name: "C1 control character in createdAt", query: `published_after_created_at=${encodeURIComponent("a\u0085b")}&published_after_id=5` },
+    { name: "createdAt over 100 chars", query: `published_after_created_at=${"a".repeat(101)}&published_after_id=5` },
+    { name: "id zero", query: "published_after_created_at=a&published_after_id=0" },
+    { name: "id negative", query: "published_after_created_at=a&published_after_id=-1" },
+    { name: "id fractional", query: "published_after_created_at=a&published_after_id=1.5" },
+    { name: "id leading zero", query: "published_after_created_at=a&published_after_id=05" },
+    { name: "id exponent", query: "published_after_created_at=a&published_after_id=1e3" },
+    { name: "id signed", query: "published_after_created_at=a&published_after_id=%2B5" },
+    { name: "id with space", query: "published_after_created_at=a&published_after_id=%205" },
+    { name: "id non-numeric", query: "published_after_created_at=a&published_after_id=abc" },
+    { name: "id empty", query: "published_after_created_at=a&published_after_id=" },
+    { name: "id unsafe integer", query: "published_after_created_at=a&published_after_id=9007199254740993" },
+  ];
+  for (const { name, query } of cases) {
+    await t.test(name, async () => {
+      // Stub the db boundary so a validation regression surfaces as a recorded
+      // call (not a 503), keeping the "no queue query" assertion honest.
+      stub("listPendingModerationItems", async () => emptyPublishedQueue);
+      const response = await GET(authRequest(`/api/moderation?${query}`));
+      assert.equal(response.status, 400, name);
+      assert.equal(callArgs("listPendingModerationItems").length, 0, name);
+    });
+  }
+});
+
+test("GET /api/moderation validates the cursor before consuming the rate-limit bucket", async () => {
+  stub("listPendingModerationItems", async () => emptyPublishedQueue);
+  const { GET } = await route();
+  const env = (await loadTreeModule("cloudflare-workers.mjs")).env;
+  const rateLimit = await loadTreeModule("app/lib/rate-limit.mjs");
+  const previousMax = env.MODERATION_RATE_LIMIT_MAX;
+  const previousWindow = env.MODERATION_RATE_LIMIT_WINDOW_SECONDS;
+  env.MODERATION_RATE_LIMIT_MAX = "1";
+  env.MODERATION_RATE_LIMIT_WINDOW_SECONDS = "60";
+  rateLimit.resetRateLimitState();
+  const caller = { "cf-connecting-ip": "203.0.113.7" };
+  try {
+    const malformed = authRequest("/api/moderation?published_after_id=5", { headers: caller });
+    assert.equal((await GET(malformed)).status, 400);
+    const second = await GET(authRequest("/api/moderation?published_after_id=5", { headers: caller }));
+    assert.equal(second.status, 400, "validation runs before the rate limit: not throttled");
+    const valid = await GET(authRequest("/api/moderation", { headers: caller }));
+    assert.equal(valid.status, 200, "the malformed requests never spent the caller's bucket");
+    assert.equal(callArgs("listPendingModerationItems").length, 1);
+  } finally {
+    if (previousMax === undefined) delete env.MODERATION_RATE_LIMIT_MAX;
+    else env.MODERATION_RATE_LIMIT_MAX = previousMax;
+    if (previousWindow === undefined) delete env.MODERATION_RATE_LIMIT_WINDOW_SECONDS;
+    else env.MODERATION_RATE_LIMIT_WINDOW_SECONDS = previousWindow;
+    rateLimit.resetRateLimitState();
+  }
+});
+
+test("GET /api/moderation role gate precedes cursor validation", async () => {
+  const { GET } = await route();
+  const response = await GET(publicRequest("/api/moderation?published_after_id=5"));
+  assert.equal(response.status, 401);
+  assert.equal(callArgs("listPendingModerationItems").length, 0);
+});
+
+// ---------------------------------------------------------------------------
 // PATCH /api/moderation — valid decisions
 // ---------------------------------------------------------------------------
 
