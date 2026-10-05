@@ -296,6 +296,13 @@ async function buildTree() {
       // stubbed as before.
       .replace(/from\s*["']\.\.\/db\/retention["']/g, `from "${pathToFileURL(path.join(tree, "db", "retention.mjs")).href}"`)
       .replace(/from\s*["']\.\.\/db\/oidc["']/g, `from "${pathToFileURL(path.join(tree, "db", "oidc.mjs")).href}"`)
+      // Same rebasing for the gate-denial page copy (worker/index.ts
+      // renderGateUnavailablePage): app/lib/i18n/*.ts is already compiled
+      // into the tree by walkLib above, just not at a path a bare ../
+      // specifier from tree-root worker.mjs can reach.
+      .replace(/from\s*["']\.\.\/app\/lib\/i18n\/common["']/g, `from "${pathToFileURL(path.join(tree, "app", "lib", "i18n", "common.mjs")).href}"`)
+      .replace(/from\s*["']\.\.\/app\/lib\/i18n\/errors["']/g, `from "${pathToFileURL(path.join(tree, "app", "lib", "i18n", "errors.mjs")).href}"`)
+      .replace(/from\s*["']\.\.\/app\/lib\/i18n\/types["']/g, `from "${pathToFileURL(path.join(tree, "app", "lib", "i18n", "types.mjs")).href}"`)
       .replace(/from\s*["']vinext\/server\/image-optimization["']/g, `from "${imageStubUrl}"`)
       .replace(/from\s*["']vinext\/server\/app-router-entry["']/g, `from "${routerStubUrl}"`)
       .replace(/from\s*["']vinext\/server\/request-pipeline["']/g, `from "${import.meta.resolve("vinext/server/request-pipeline")}"`)
