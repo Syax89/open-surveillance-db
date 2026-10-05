@@ -660,3 +660,94 @@ test("moderation: retry reports aria-busy and disables its controls until the pa
   assert.equal(publishedNav(screen).getAttribute("aria-busy"), "false");
   assert.equal(screen.queryByRole("button", { name: "Try again" }), null);
 });
+
+// ---------------------------------------------------------------------------
+// Three P2 fixes: truthful busy on every loadQueue, truthful empty copy on a
+// later empty page, and a reentrant-safe pagination gate.
+// ---------------------------------------------------------------------------
+
+test("moderation: a locale-driven queue reload reports published aria-busy until it settles", async () => {
+  const { screen, waitFor } = rtl;
+  const user = rtl.userEvent.setup();
+  let moderationGets = 0;
+  const { response, release, started } = gatedJsonResponse(pageOnePayload());
+  installFetchMock((input, init) => {
+    const url = String(input);
+    if (url.startsWith("/api/moderation") && init?.method === "PATCH") return nativeJson({}, { status: 200 });
+    moderationGets += 1;
+    // The mount load resolves at once; the locale-triggered reload is held open.
+    return moderationGets === 1 ? nativeJson(pageOnePayload()) : response;
+  });
+
+  await renderWithLocale(React.createElement(ModerationDashboard));
+  await waitFor(() => assert.ok(screen.queryByText("Published 100")));
+
+  // Capture the live nodes before switching locale changes the visible labels.
+  const nav = publishedNav(screen);
+  const previous = previousButton(screen);
+  const next = nextButton(screen);
+
+  // Changing locale changes t.loadError, so loadQueue's identity changes and the
+  // mount effect re-runs — a trigger the page-nav/retry callers do not cover.
+  await user.click(screen.getByRole("button", { name: "IT" }));
+  await started;
+  assert.equal(nav.getAttribute("aria-busy"), "true", "the effect-driven reload must report busy");
+  assert.equal(previous.disabled, true);
+  assert.equal(next.disabled, true);
+
+  release();
+  await waitFor(() => assert.equal(nav.getAttribute("aria-busy"), "false"));
+});
+
+test("moderation: an empty later page shows no empty-state copy and still goes back", async () => {
+  const { screen, waitFor } = rtl;
+  window.localStorage.removeItem("opensurveillancedb-locale"); document.cookie = "opensurveillancedb-locale=; path=/; max-age=0"; document.cookie = "opensurveillancedb-locale=; path=/; max-age=0"; // the locale test above leaves IT stored (localStorage + cookie)
+  const user = rtl.userEvent.setup();
+  installFetchMock((input, init) => {
+    const url = String(input);
+    if (url.startsWith("/api/moderation") && init?.method === "PATCH") return nativeJson({}, { status: 200 });
+    if (queryParamsOf(url).get("published_after_id") === "20") {
+      // A later page emptied by a concurrent deletion mid-walk: no rows, no next.
+      return nativeJson({ ...paginationBase, publishedCameras: [], publishedNextCursor: null });
+    }
+    return nativeJson(pageOnePayload());
+  });
+
+  await renderWithLocale(React.createElement(ModerationDashboard));
+  await waitFor(() => assert.ok(screen.queryByText("Published 100")));
+
+  await user.click(nextButton(screen));
+  await waitFor(() => assert.equal(previousButton(screen).disabled, false));
+
+  // Empty later page: no false "no records at all" copy, Previous still works.
+  assert.equal(screen.queryByText("No verified records are available locally."), null);
+  assert.equal(screen.queryByText("Published 100"), null);
+  assert.equal(previousButton(screen).disabled, false);
+
+  await user.click(previousButton(screen));
+  await waitFor(() => assert.ok(screen.queryByText("Published 100")));
+});
+
+test("moderation: two synchronous Next clicks collapse to a single request", async () => {
+  const { screen, waitFor } = rtl;
+  window.localStorage.removeItem("opensurveillancedb-locale"); document.cookie = "opensurveillancedb-locale=; path=/; max-age=0";
+  const requests = [];
+  installFetchMock((input, init) => {
+    const url = String(input);
+    if (url.startsWith("/api/moderation") && init?.method === "PATCH") return nativeJson({}, { status: 200 });
+    requests.push(url);
+    if (queryParamsOf(url).get("published_after_id") === "20") return nativeJson(pageTwoPayload());
+    return nativeJson(pageOnePayload());
+  });
+
+  await renderWithLocale(React.createElement(ModerationDashboard));
+  await waitFor(() => assert.ok(screen.queryByText("Published 100")));
+
+  const next = nextButton(screen);
+  // Two clicks in one synchronous frame, before the first response resolves.
+  rtl.act(() => { next.click(); next.click(); });
+  await waitFor(() => assert.ok(screen.queryByText("Fresh 121")));
+
+  const pageTwoRequests = requests.filter((url) => queryParamsOf(url).get("published_after_id") === "20");
+  assert.equal(pageTwoRequests.length, 1, "the synchronous in-flight gate must collapse the double click to one request");
+});

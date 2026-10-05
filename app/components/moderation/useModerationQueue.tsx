@@ -17,8 +17,7 @@ export function useModerationQueue() {
   const [publishedHistory, setPublishedHistory] = useState<(PublishedCursor | null)[]>([]); const [publishedLoading, setPublishedLoading] = useState(false);
   const [reviewCameras, setReviewCameras] = useState<CameraInQueue[]>([]); const [corrections, setCorrections] = useState<CorrectionInQueue[]>([]);
   const [editRequests, setEditRequests] = useState<EditRequestInQueue[]>([]); const [recentEvents, setRecentEvents] = useState<ModerationEvent[]>([]);
-  const [reviewers, setReviewers] = useState<Reviewer[]>([]); const [queueItems, setQueueItems] = useState<QueueItem[]>([]);
-  const [actorId, setActorId] = useState("");
+  const [reviewers, setReviewers] = useState<Reviewer[]>([]); const [queueItems, setQueueItems] = useState<QueueItem[]>([]); const [actorId, setActorId] = useState("");
   const [reasons, setReasons] = useState<Record<string, string>>({}); const [notes, setNotes] = useState<Record<string, string>>({});
   // Correction-only decision fields (H1, t_69891619): outcome + linked record id.
   const [outcomes, setOutcomes] = useState<Record<string, string>>({}); const [cameraIds, setCameraIds] = useState<Record<string, string>>({});
@@ -27,10 +26,9 @@ export function useModerationQueue() {
   const [message, setMessage] = useState("");
   // PATCH/decision error (its own alert) vs queue-load failure, kept separate so a rejected decision is never offered a page retry.
   const [error, setError] = useState(""); const [queueError, setQueueError] = useState("");
-  // Current page cursor (ref so a decision refresh targets the page shown NOW) + request generation.
-  const publishedCursorRef = useRef<PublishedCursor | null>(null);
-  const generationRef = useRef(0);
-  const controllerRef = useRef<AbortController | null>(null);
+  // Current page cursor (ref so a decision refresh targets the page shown NOW) + request generation + synchronous in-flight gate.
+  const publishedCursorRef = useRef<PublishedCursor | null>(null); const generationRef = useRef(0);
+  const controllerRef = useRef<AbortController | null>(null); const inFlightRef = useRef(false);
 
   function readableDate(value?: string) {
     if (!value) return t.timeUnavailable; const date = new Date(value);
@@ -45,7 +43,8 @@ export function useModerationQueue() {
   function readableOutcome(outcome?: string) { return outcome && outcome in t.outcomeLabels ? t.outcomeLabels[outcome as keyof typeof t.outcomeLabels] : outcome ?? t.unavailable; }
 
   const loadQueue = useCallback(() => {
-    const generation = (generationRef.current += 1); controllerRef.current?.abort();
+    // Flip the busy flag here so EVERY trigger (mount, locale-driven effect re-run, decision refresh, page nav) is truthful.
+    setPublishedLoading(true); const generation = (generationRef.current += 1); controllerRef.current?.abort();
     const controller = new AbortController(); controllerRef.current = controller;
     const cursor = publishedCursorRef.current; const params = new URLSearchParams();
     if (cursor) { params.set("published_after_created_at", cursor.createdAt); params.set("published_after_id", String(cursor.id)); }
@@ -65,18 +64,19 @@ export function useModerationQueue() {
         if (generation !== generationRef.current) return; if (reason instanceof Error && reason.name !== "AbortError") setQueueError(reason.message);
       })
       .finally(() => {
-        if (generation !== generationRef.current) return; setLoading(false); setPublishedLoading(false);
+        if (generation !== generationRef.current) return; inFlightRef.current = false; setLoading(false); setPublishedLoading(false);
       });
   }, [t.loadError]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loadQueue also runs from event handlers; the busy flag must flip synchronously before the async fetch and settles in loadQueue's finally.
     loadQueue();
     return () => { generationRef.current += 1; controllerRef.current?.abort(); };
   }, [loadQueue]);
 
   /** Move the published section one page forward/backward (no prefetching). */
   function goToPublishedPage(direction: "next" | "previous") {
-    if (publishedLoading) return;
+    if (inFlightRef.current || publishedLoading) return;
     if (direction === "previous") {
       if (publishedHistory.length === 0) return;
       const previous = publishedHistory[publishedHistory.length - 1]; setPublishedHistory(publishedHistory.slice(0, -1)); publishedCursorRef.current = previous;
@@ -84,15 +84,14 @@ export function useModerationQueue() {
       if (!publishedNextCursor) return;
       const next = publishedNextCursor; setPublishedHistory([...publishedHistory, publishedCursorRef.current]); publishedCursorRef.current = next;
     }
-    setPublishedCameras([]); setPublishedNextCursor(null); setPublishedLoading(true);
+    inFlightRef.current = true; setPublishedCameras([]); setPublishedNextCursor(null); setPublishedLoading(true);
     loadQueue();
   }
 
   /** Retry the CURRENT cursor after a queue-load failure (busy-guarded). */
-  function retryQueueLoad() { if (publishedLoading) return; setPublishedLoading(true); loadQueue(); }
+  function retryQueueLoad() { if (inFlightRef.current || publishedLoading) return; inFlightRef.current = true; setPublishedLoading(true); loadQueue(); }
 
-  const total = cameras.length + corrections.length + editRequests.length;
-  const summary = useMemo(() => t.awaiting(total), [t, total]);
+  const total = cameras.length + corrections.length + editRequests.length; const summary = useMemo(() => t.awaiting(total), [t, total]);
   const queueByKey = useMemo(() => new Map(queueItems.map((item) => [`${item.entity}-${item.entityId}`, item])), [queueItems]);
 
   function queueBadge(entity: QueueEntity, id: number) {

@@ -62,7 +62,7 @@ export function ModerationDashboard() {
       <QueueSection
         id="published-cameras-title" eyebrow={t.lifecycle} title={t.publishedRecords} note={`${q.publishedCameras.length} ${t.verified}`}
         listLabel={t.publishedRecords} loading={q.loading || q.publishedPagination.loading || q.publishedPagination.failed} items={q.publishedCameras}
-        emptyTitle={t.noPublishedTitle} emptyText={t.noPublishedText}
+        emptyTitle={t.noPublishedTitle} emptyText={t.noPublishedText} hasHistory={q.publishedPagination.hasPrevious}
         itemKey={(camera) => camera.id}
         renderItem={(camera) => <CameraQueueItem camera={camera} variant="published" queueBadge={q.queueBadge("camera", camera.id)} api={q.decisionApi} readableDate={q.readableDate} />}
         footer={(q.publishedCameras.length > 0 || q.publishedPagination.hasPrevious || q.publishedPagination.hasNext || q.publishedPagination.failed) && (
