@@ -344,6 +344,14 @@ export function GeocodeSearch({ search, onSearchChange, onPlaceSelect }: Props) 
         aria-describedby="map-list-help"
       />
       <p id="map-list-help" className="sr-only">{t.listSearchHelp}</p>
+      {/* Always-visible caption for sighted users: the SAME field both filters
+          the visible points and suggests OpenStreetMap places, and picking a
+          suggestion pans the map and CLEARS the typed filter. Today that
+          caveat only lived in the sr-only listSearchHelp above (invisible);
+          this is additive, short and distinct in wording — the sr-only help
+          stays exactly as-is, still wired via aria-describedby. No toggle,
+          no tooltip: plain visible text. */}
+      <p className="map-list-search-hint">{t.listSearchCaption}</p>
       {open && (
         <div className="geocode-dropdown">
           {showSuggestionOptions && (
