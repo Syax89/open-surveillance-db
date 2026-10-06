@@ -36,6 +36,10 @@ export const en = {
   mapLegendList: "Open the side rail to browse the points in the current view.",
   mapLegendAdd: "Click an empty place on the map to report a camera there.",
   mapLegendReport: "Report a camera",
+  // Shareable viewport (?lat&lng&zoom): the "Copy link" toolbar button copies
+  // the current URL (which carries the map's view) and confirms briefly.
+  copyLink: "Copy link",
+  copyLinkCopied: "Copied!",
   pickTitle: "New report",
   pickCoordinates: "Coordinates",
   pickReportHere: "Report a camera here",
@@ -158,6 +162,11 @@ export const it: Translation<typeof en> = {
   mapLegendList: "Apri la barra laterale per sfogliare i punti nella vista corrente.",
   mapLegendAdd: "Clicca uno spazio vuoto della mappa per segnalare una telecamera in quel punto.",
   mapLegendReport: "Segnala una telecamera",
+  // Viewport condivisibile (?lat&lng&zoom): il pulsante "Copia link" copia
+  // l'URL corrente (che porta con sé la vista della mappa) e conferma
+  // brevemente.
+  copyLink: "Copia link",
+  copyLinkCopied: "Copiato!",
   pickTitle: "Nuova segnalazione",
   pickCoordinates: "Coordinate",
   pickReportHere: "Segnala una telecamera qui",

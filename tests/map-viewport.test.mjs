@@ -153,6 +153,52 @@ test("geocodeBounds rejects inverted, non-numeric, out-of-world and tiny boxes",
   assert.equal(mapViewport.geocodeBounds(null), null, "absent box");
 });
 
+// ---------------------------------------------------------------------------
+// parseMapView / stringifyMapView (shareable ?lat&lng&zoom viewport)
+// ---------------------------------------------------------------------------
+
+test("parseMapView reads a valid ?lat&lng&zoom deep link", () => {
+  assert.deepEqual(
+    mapViewport.parseMapView(new URLSearchParams("lat=45.4&lng=12.3&zoom=14")),
+    { lat: 45.4, lng: 12.3, zoom: 14 },
+  );
+  // Boundary values are inclusive.
+  assert.deepEqual(mapViewport.parseMapView(new URLSearchParams("lat=-90&lng=-180&zoom=0")), { lat: -90, lng: -180, zoom: 0 });
+  assert.deepEqual(mapViewport.parseMapView(new URLSearchParams("lat=90&lng=180&zoom=19")), { lat: 90, lng: 180, zoom: 19 });
+  assert.deepEqual(mapViewport.parseMapView(new URLSearchParams("lat=0&lng=0&zoom=2")), { lat: 0, lng: 0, zoom: 2 });
+});
+
+test("parseMapView is lenient: missing, empty, non-numeric or out-of-range → null (never throws)", () => {
+  assert.equal(mapViewport.parseMapView(new URLSearchParams("")), null, "missing all three");
+  assert.equal(mapViewport.parseMapView(new URLSearchParams("lat=45.4&lng=12.3")), null, "missing zoom");
+  assert.equal(mapViewport.parseMapView(new URLSearchParams("lat=45.4&zoom=14")), null, "missing lng");
+  assert.equal(mapViewport.parseMapView(new URLSearchParams("lat=&lng=&zoom=")), null, "empty strings are present-but-invalid (Number('') is 0 — must not sneak through)");
+  assert.equal(mapViewport.parseMapView(new URLSearchParams("lat=abc&lng=12.3&zoom=14")), null, "non-numeric lat");
+  assert.equal(mapViewport.parseMapView(new URLSearchParams("lat=91&lng=12.3&zoom=14")), null, "lat above the pole");
+  assert.equal(mapViewport.parseMapView(new URLSearchParams("lat=-91&lng=12.3&zoom=14")), null, "lat below the pole");
+  assert.equal(mapViewport.parseMapView(new URLSearchParams("lat=45&lng=181&zoom=14")), null, "lng beyond the world");
+  assert.equal(mapViewport.parseMapView(new URLSearchParams("lat=45&lng=12&zoom=20")), null, "zoom above the Leaflet max (19)");
+  assert.equal(mapViewport.parseMapView(new URLSearchParams("lat=45&lng=12&zoom=-1")), null, "negative zoom");
+  // It must ignore unknown params and never throw on a garbage query.
+  assert.equal(mapViewport.parseMapView(new URLSearchParams("q=foo&type=dome&lat=NaN")), null);
+});
+
+test("stringifyMapView: 6-decimal lat/lng + integer zoom, round-trips through parseMapView", () => {
+  assert.equal(
+    mapViewport.stringifyMapView({ lat: 41.9028, lng: 12.4964, zoom: 13 }),
+    "lat=41.902800&lng=12.496400&zoom=13",
+  );
+  assert.equal(
+    mapViewport.stringifyMapView({ lat: 12.3456789, lng: -45.9876543, zoom: 17 }),
+    "lat=12.345679&lng=-45.987654&zoom=17",
+    "6 decimals are rounded, not truncated",
+  );
+  // Round-trip: what we write is exactly what we can read back.
+  const view = { lat: 45.464200, lng: 9.190000, zoom: 14 };
+  assert.deepEqual(mapViewport.parseMapView(new URLSearchParams(mapViewport.stringifyMapView(view))), view);
+});
+
+
 
 
 test("escapeHtml neutralises markup and quotes in record fields", () => {

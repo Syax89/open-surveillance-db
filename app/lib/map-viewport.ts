@@ -157,6 +157,57 @@ export function geocodeBounds(boundingbox: readonly unknown[] | null | undefined
 }
 
 /**
+ * Shareable map view (?lat&lng&zoom, t_702c10af follow-up): a plain
+ * serialisable centre + integer zoom, read once from the /mappa URL on the
+ * initial load and written back (debounced) on every pan/zoom so the URL is
+ * always a permalink to what the map is showing.
+ */
+export type MapView = {
+  lat: number;
+  lng: number;
+  zoom: number;
+};
+
+/**
+ * Leaflet's largest zoom in this repo (the tile layer's maxZoom in
+ * SurveillanceMap is 19), i.e. the inclusive upper bound of a valid zoom.
+ */
+export const MAP_MAX_ZOOM = 19;
+
+/**
+ * Lenient parse of the viewport deep link (same contract as
+ * `parseCameraFilters`): reads `lat`, `lng`, `zoom` and returns the view, or
+ * null when ANY of them is missing, empty, non-numeric, or out of range
+ * (lat ∈ [-90, 90], lng ∈ [-180, 180], zoom ∈ [0, 19]). Never throws — a
+ * malformed deep link renders the default Rome view instead of a 500.
+ */
+export function parseMapView(searchParams: URLSearchParams): MapView | null {
+  const latRaw = searchParams.get("lat");
+  const lngRaw = searchParams.get("lng");
+  const zoomRaw = searchParams.get("zoom");
+  // Empty string is a present-but-invalid param (`?lat=`): Number("") is 0,
+  // which would silently pass as a valid coordinate — reject it explicitly.
+  if (!latRaw || !lngRaw || !zoomRaw) return null;
+  const lat = Number(latRaw);
+  const lng = Number(lngRaw);
+  const zoom = Number(zoomRaw);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || !Number.isFinite(zoom)) return null;
+  if (lat < -90 || lat > 90) return null;
+  if (lng < -180 || lng > 180) return null;
+  if (zoom < 0 || zoom > MAP_MAX_ZOOM) return null;
+  return { lat, lng, zoom };
+}
+
+/**
+ * Serialize a viewport for the URL: `lat=<6 decimals>&lng=<6 decimals>&
+ * zoom=<integer>`. Six decimals keep the URL short while staying sub-metre
+ * precise (≈0.11 m at the equator); zoom is always an integer in Leaflet.
+ */
+export function stringifyMapView(view: MapView): string {
+  return `lat=${view.lat.toFixed(6)}&lng=${view.lng.toFixed(6)}&zoom=${Math.round(view.zoom)}`;
+}
+
+/**
  * HTML-escape a string for safe interpolation into marker popup markup.
  * Popup content mixes public record fields (title, kind, address,
  * description) with trusted UI strings; without escaping a record field

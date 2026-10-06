@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useMessages } from "../../lib/use-messages";
 import { useViewportCameras, viewportGeometryKey } from "../../lib/use-viewport-cameras";
-import { geocodeBounds, recordsInBounds } from "../../lib/map-viewport";
-import type { ViewportBounds } from "../../lib/map-viewport";
+import { geocodeBounds, parseMapView, recordsInBounds, stringifyMapView } from "../../lib/map-viewport";
+import type { MapView, ViewportBounds } from "../../lib/map-viewport";
 import {
   applyCameraFilters,
   cameraKindsOf,
@@ -57,6 +58,16 @@ import { ExploreViewSwitch } from "../ExploreViewSwitch";
 export function MappaTool() {
   const t = useMessages().map;
   const { filters, qInput, setQ, setType, setFreshness, setSort, setState, setOrigin, reset } = useCameraFilters();
+  // Shareable viewport (?lat&lng&zoom): the map reads the initial view ONCE at
+  // creation. The lazy useState captures the FIRST URL — later pan/zoom is
+  // mirrored back into the URL by handleViewChange (below), never re-applied.
+  // Not gated on ?focus=: a ?focus=ID deep link still wins, because the
+  // existing focus-apply effect pans/zooms the map to the record as soon as it
+  // resolves (see SurveillanceMap's applyFocus — one shared framing root).
+  const searchParams = useSearchParams();
+  const [initialView] = useState<MapView | null>(() => parseMapView(searchParams));
+  const [copied, setCopied] = useState(false);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(() => filters.focus ?? null);
   const [viewportBounds, setViewportBounds] = useState<ViewportBounds | null>(null);
   const [notice, setNotice] = useState("");
@@ -144,6 +155,53 @@ export function MappaTool() {
     if (pending && pending.targetKey !== null && viewportGeometryKey(bounds) !== pending.targetKey) {
       placePendingRef.current = null;
       setPlacePendingToken((value) => value + 1);
+    }
+  }, []);
+
+  // Shareable viewport (?lat&lng&zoom): the map's debounced pan/zoom report.
+  // Writes the URL with a PURE window.history.replaceState — mirroring
+  // useCameraFilters' via="history" path and for the SAME documented reason
+  // (t_3c4b188e): an RSC router.replace can throw the vinext "digest" error
+  // and force a full reload that would remount the map. Every OTHER query
+  // param (q/type/freshness/sort/state/origin/focus/page) is preserved by
+  // taking window.location.search, deleting ONLY our own lat/lng/zoom, then
+  // appending the serialized view — the same principle as useCameraFilters'
+  // hrefFor (which deletes only ITS OWN params and leaves the rest).
+  const handleViewChange = useCallback((view: MapView) => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    params.delete("lat");
+    params.delete("lng");
+    params.delete("zoom");
+    const base = params.toString();
+    const viewQuery = stringifyMapView(view);
+    const query = base ? `${base}&${viewQuery}` : viewQuery;
+    window.history.replaceState(null, "", `${window.location.pathname}?${query}`);
+  }, []);
+
+  // Copy link (reuses the exact clipboard contract of RecoveryCodesDialog /
+  // ApiKeyRevealDialog): feature-detect the Clipboard API (hide the button
+  // entirely when absent), await writeText(window.location.href), flip a
+  // local `copied` flag and revert it after ~2s. Failures stay silent (the
+  // codes dialogs show no error — the button just stays as-is).
+  const canCopy = typeof navigator !== "undefined" && typeof navigator.clipboard?.writeText === "function";
+  const handleCopyLink = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setCopied(true);
+      if (copyTimerRef.current !== null) clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = setTimeout(() => {
+        copyTimerRef.current = null;
+        setCopied(false);
+      }, 2000);
+    } catch {
+      setCopied(false);
+    }
+  }, []);
+  useEffect(() => () => {
+    if (copyTimerRef.current !== null) {
+      clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = null;
     }
   }, []);
 
@@ -249,7 +307,14 @@ export function MappaTool() {
         <div className="map-card">
           <div className="map-explorer-toolbar">
             <p>{t.pageTitle}</p>
-            <ExploreViewSwitch active="map" mapHref={mapHref} directoryHref={directoryHref} />
+            <div className="map-explorer-actions">
+              {canCopy && (
+                <button type="button" className="text-button" onClick={handleCopyLink}>
+                  {copied ? t.copyLinkCopied : t.copyLink}
+                </button>
+              )}
+              <ExploreViewSwitch active="map" mapHref={mapHref} directoryHref={directoryHref} />
+            </div>
           </div>
           <div className="map-explorer-search">
             <GeocodeSearch search={qInput} onSearchChange={setQ} onPlaceSelect={handlePlaceSelect} />
@@ -259,7 +324,7 @@ export function MappaTool() {
               the sidebar unconditionally. When no record matches the
               filters the sidebar shows the truthful in-list note; the map itself never
               disappears. */}
-          <MapPanel filteredRecords={filteredRecords} visibleRecords={visibleRecords} selectedId={selectedId} onSelect={setSelectedId} onPick={() => {}} coordinates={explorerFocusLocation} focusBounds={placeBounds} focusIntent={focusIntent} onFocusApplied={handleFocusApplied} selectedCamera={selectedCamera} loading={loading} notice={decimated ? t.viewportDecimated : (viewportError ? notice : "")} directoryHref={directoryHref} onBoundsChange={handleBoundsChange} />
+          <MapPanel filteredRecords={filteredRecords} visibleRecords={visibleRecords} selectedId={selectedId} onSelect={setSelectedId} onPick={() => {}} coordinates={explorerFocusLocation} focusBounds={placeBounds} focusIntent={focusIntent} onFocusApplied={handleFocusApplied} initialView={initialView} onViewChange={handleViewChange} selectedCamera={selectedCamera} loading={loading} notice={decimated ? t.viewportDecimated : (viewportError ? notice : "")} directoryHref={directoryHref} onBoundsChange={handleBoundsChange} />
         </div>
       </div>
     </section>

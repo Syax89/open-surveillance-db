@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { isPublicStatus } from "../lib/public-status";
-import { BOUNDS_DEBOUNCE_MS, escapeHtml, longitudeInCopy, viewportCenterLongitude, type ViewportBounds } from "../lib/map-viewport";
+import { BOUNDS_DEBOUNCE_MS, escapeHtml, longitudeInCopy, viewportCenterLongitude, type MapView, type ViewportBounds } from "../lib/map-viewport";
 import { markersForViewport } from "../lib/map-grid";
 import { useMessages } from "../lib/use-messages";
 import { useLatest } from "../lib/hooks/use-latest";
@@ -80,7 +80,24 @@ type Props = {
    * later debounced bounds report (which a user pan can retarget).
    */
   onFocusApplied?: (intent: number, geometry: ViewportBounds) => void;
-  /** Where the sr-only "accessible directory" link points: home anchor (#records) or /directory. */
+  /**
+   * Shareable viewport (?lat&lng&zoom): read ONCE at map creation to set the
+   * initial centre + zoom (a deep link reproduces the exact view). Null /
+   * absent keeps the Rome/13 default. It is NOT re-applied on later changes —
+   * the map owns the view, and the parent mirrors it back through
+   * onViewChange.
+   */
+  initialView?: MapView | null;
+  /**
+   * Shareable viewport (?lat&lng&zoom): called with the current centre + zoom
+   * after moveend/zoomend (the SAME debounce as onBoundsChange), so the parent
+   * can mirror it into the URL. Not called for the initial emission — an
+   * initial load is not a pan/zoom.
+   */
+  onViewChange?: (view: MapView) => void;
+  /**
+   * Where the sr-only "accessible directory" link points: home anchor (#records) or /directory.
+   */
   directoryHref?: string;
   /**
    * Viewport→list sync (t_702c10af): called with the current bounds after
@@ -152,7 +169,7 @@ function popupMaxWidth(): number {
   return window.innerWidth <= 520 ? 260 : 300;
 }
 
-export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLocation, focusBounds = null, focusIntent = 0, directoryHref = "#records", onBoundsChange, onFocusApplied, popupHtmlFor }: Props) {
+export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLocation, focusBounds = null, focusIntent = 0, initialView = null, directoryHref = "#records", onBoundsChange, onViewChange, onFocusApplied, popupHtmlFor }: Props) {
   const [mapUnavailable, setMapUnavailable] = useState(false);
   const [offline, setOffline] = useState(false);
   // True once the lazy leaflet import has resolved and the layer group
@@ -224,6 +241,8 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
   const selectedIdRef = useLatest(selectedId);
   const prevSelectedIdRef = useRef(selectedId);
   const onBoundsChangeRef = useLatest(onBoundsChange);
+  const onViewChangeRef = useLatest(onViewChange);
+  const initialViewRef = useLatest(initialView);
   const popupHtmlForRef = useLatest(popupHtmlFor);
   const pickPopupHtmlRef = useRef<(latitude: number, longitude: number) => string>(() => "");
   // Latest cameras for the popupopen handler: the map-creation effect runs
@@ -387,12 +406,23 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
   // (the sidebar list) AND keep a local copy for marker culling (QA#5 F3).
   // Called debounced on moveend/zoomend and once after the map is created
   // so the list starts in sync with the initial view.
-  const emitBounds = useCallback(() => {
+  //
+  // `withView` (shareable ?lat&lng&zoom): report the centre + zoom too, so the
+  // parent can mirror them into the URL. ONLY the debounced moveend/zoomend
+  // path asks for it — the initial (non-debounced) emission must stay silent
+  // on the URL, both because an initial load isn't a pan/zoom and because a
+  // spurious initial history.replaceState would race the pure-history ?q=
+  // timing contract other suites assert (t_3c4b188e). ONE timer for both.
+  const emitBounds = useCallback((withView = false) => {
     const map = mapRef.current;
     if (!map) return;
     const bounds = map.getBounds();
     const next = { south: bounds.getSouth(), north: bounds.getNorth(), west: bounds.getWest(), east: bounds.getEast() };
     onBoundsChangeRef.current?.(next);
+    if (withView) {
+      const center = map.getCenter();
+      onViewChangeRef.current?.({ lat: center.lat, lng: center.lng, zoom: map.getZoom() });
+    }
     // Identity-guarded: a moveend burst during a pan emits the same
     // rectangle; skipping the state write avoids a pointless marker
     // rebuild (the culling effect keys on this object).
@@ -451,7 +481,14 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
         const L = await import("leaflet");
         if (disposed || !mapElement.current) return;
         leafletRef.current = L;
-        const map = L.map(mapElement.current, { zoomControl: false, scrollWheelZoom: true }).setView([41.9028, 12.4964], 13);
+        // Shareable viewport (?lat&lng&zoom, read ONCE here): a ?lat&lng&zoom
+        // deep link reproduces the exact view as the FIRST setView — Leaflet
+        // never paints a Rome/13 frame first — with the Rome/13 fallback when
+        // no valid view was supplied. Subsequent pan/zoom is owned by the map
+        // and mirrored back via onViewChange (no re-apply on prop change).
+        const start = initialViewRef.current;
+        const map = L.map(mapElement.current, { zoomControl: false, scrollWheelZoom: true })
+          .setView(start ? [start.lat, start.lng] : [41.9028, 12.4964], start ? start.zoom : 13);
         // Geolocation button (t_18259daa, CEO): a custom Leaflet control
         // that must render ABOVE the zoom buttons ("sopra i tasti
         // aumenta/diminuisci zoom"). Leaflet stacks same-corner controls
@@ -604,7 +641,7 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
           // below stays debounced at its usual cadence.
           setMapZoom(map.getZoom());
           if (boundsTimerRef.current !== null) window.clearTimeout(boundsTimerRef.current);
-          boundsTimerRef.current = window.setTimeout(emitBounds, BOUNDS_DEBOUNCE_MS);
+          boundsTimerRef.current = window.setTimeout(() => emitBounds(true), BOUNDS_DEBOUNCE_MS);
         });
         // The initial viewport (Rome) is emitted below, then the readiness-aware
         // focus effect (which depends on `mapReady`) applies any focus that was

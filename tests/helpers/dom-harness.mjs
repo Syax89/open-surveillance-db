@@ -343,6 +343,14 @@ export function map(el, opts) {
     invalidateSize: () => {},
     getZoom: () => m.zoom,
     getBounds: () => currentBounds,
+    // Shareable viewport (?lat&lng&zoom): the component reads the map centre
+    // to mirror it into the URL (SurveillanceMap.emitBounds → onViewChange).
+    // Real Leaflet's getCenter() is the centre of the current view, so derive
+    // it from the stub's current bounds — a faithful, additive stub method.
+    getCenter: () => ({
+      lat: (currentBounds.getSouth() + currentBounds.getNorth()) / 2,
+      lng: (currentBounds.getWest() + currentBounds.getEast()) / 2,
+    }),
     panTo: (latlng) => { m.panCalls.push(latlng); return m; },
     panCalls: [],
     handlers: {},

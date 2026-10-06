@@ -33,6 +33,13 @@ type Props = {
   focusIntent?: number;
   /** R2/B10: notified when the shared map APPLIES a focus command (intent + the exact post-fit geometry). */
   onFocusApplied?: (intent: number, geometry: ViewportBounds) => void;
+  /**
+   * Shareable viewport (?lat&lng&zoom): the initial view to reproduce, read
+   * once by the map at creation. Null keeps the default Rome view.
+   */
+  initialView?: { lat: number; lng: number; zoom: number } | null;
+  /** Shareable viewport: the map reports its current centre + zoom (debounced) so MappaTool can mirror it into the URL. */
+  onViewChange?: (view: { lat: number; lng: number; zoom: number }) => void;
   selectedCamera?: Camera;
   loading: boolean;
   /** Page-level status notice, displayed under the map. */
@@ -68,7 +75,7 @@ type Props = {
  * nothing never replaces the map with an empty state (the truthful "no
  * record matches" note lives inside the list).
  */
-export function MapPanel({ filteredRecords, visibleRecords, selectedId, onSelect, onPick, coordinates, focusBounds = null, focusIntent = 0, onFocusApplied, loading, notice, directoryHref = "/directory", onBoundsChange }: Props) {
+export function MapPanel({ filteredRecords, visibleRecords, selectedId, onSelect, onPick, coordinates, focusBounds = null, focusIntent = 0, onFocusApplied, initialView = null, onViewChange, loading, notice, directoryHref = "/directory", onBoundsChange }: Props) {
   const t = useMessages().map;
   const statuses = useMessages().status;
   const { locale } = useLocale();
@@ -100,7 +107,7 @@ export function MapPanel({ filteredRecords, visibleRecords, selectedId, onSelect
           <MapRecordList filteredRecords={filteredRecords} visibleRecords={visibleRecords} selectedId={selectedId} onSelect={onSelect} labels={t} statusLabel={(status) => publicStatusLabel(statuses, status, t.unknown)} collapsed={pointsCollapsed} onToggleCollapse={() => setPointsCollapsed((current) => !current)} />
         </aside>
         <div className="map-panel">
-          <SurveillanceMap cameras={filteredRecords} selectedId={selectedId} focusLocation={coordinates} focusBounds={focusBounds} focusIntent={focusIntent} onFocusApplied={onFocusApplied} onSelect={onSelect} onPick={onPick} directoryHref={directoryHref} onBoundsChange={onBoundsChange} popupHtmlFor={popupHtmlForCamera} />
+          <SurveillanceMap cameras={filteredRecords} selectedId={selectedId} focusLocation={coordinates} focusBounds={focusBounds} focusIntent={focusIntent} onFocusApplied={onFocusApplied} initialView={initialView} onViewChange={onViewChange} onSelect={onSelect} onPick={onPick} directoryHref={directoryHref} onBoundsChange={onBoundsChange} popupHtmlFor={popupHtmlForCamera} />
           <details className="map-legend">
             <summary>{t.mapLegendTitle}</summary>
             <div>
