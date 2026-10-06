@@ -184,7 +184,28 @@ export function MappaTool() {
   // entirely when absent), await writeText(window.location.href), flip a
   // local `copied` flag and revert it after ~2s. Failures stay silent (the
   // codes dialogs show no error — the button just stays as-is).
-  const canCopy = typeof navigator !== "undefined" && typeof navigator.clipboard?.writeText === "function";
+  //
+  // Hydration fix (production bug, HTTPS preprod): unlike the two dialogs
+  // above (which only ever render open — and therefore evaluate canCopy —
+  // AFTER a client-only user action, so SSR never emits their markup at
+  // all), this toolbar button is part of the page's initial server render.
+  // Reading `typeof navigator` directly in the render body made the SERVER
+  // (no navigator) and the CLIENT's first paint (real navigator.clipboard
+  // under a secure-context/HTTPS origin) disagree on whether the button
+  // exists — a textbook "server/client branch" hydration mismatch (see the
+  // React hydration error's own first bullet). canCopy must start IDENTICAL
+  // on both passes (false) and only flip to the real capability inside an
+  // effect, which never runs during SSR and always runs after hydration.
+  const [canCopy, setCanCopy] = useState(false);
+  useEffect(() => {
+    // Deferred out of the synchronous effect body (repo pattern —
+    // react-hooks/set-state-in-effect, same as RecoveryCodesDialog's
+    // mount reset): avoids a cascading render triggered from inside the
+    // effect itself.
+    Promise.resolve().then(() => {
+      setCanCopy(typeof navigator !== "undefined" && typeof navigator.clipboard?.writeText === "function");
+    });
+  }, []);
   const handleCopyLink = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(window.location.href);
