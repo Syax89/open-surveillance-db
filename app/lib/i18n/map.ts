@@ -47,7 +47,7 @@ export const en = {
   loadingRecords: "Loading the public record API…",
   unknown: "Unknown",
   apiUnavailable:
-    "The public API is temporarily unreachable, so the map is showing illustrative records.",
+    "The public API is temporarily unreachable; the points already loaded stay available.",
   apiRateLimited: (seconds: number) =>
     `The map is temporarily pausing new data requests to respect the service limit. It will retry in about ${seconds} seconds; already loaded points remain available.`,
   // Continental viewport: the API answers a decimated sample (one request).
@@ -86,9 +86,11 @@ export const en = {
   listCount: (visible: number, total: number) =>
     visible === 0
       ? "No points in the current view"
-      : visible === total
-        ? `Showing all ${visible} points in the current view`
-        : `Showing ${visible} of ${total} points in the current view`,
+      : visible === 1
+        ? "Showing the only point in the current view"
+        : visible === total
+          ? `Showing all ${visible} points in the current view`
+          : `Showing ${visible} of ${total} points in the current view`,
   listEmptyInView:
     "No documented points in the current view. Move the map or zoom out to explore more.",
   // Marker popup (t_702c10af): opens on marker click with the record info
@@ -161,7 +163,7 @@ export const it: Translation<typeof en> = {
   loadingRecords: "Caricamento dell'API dei record pubblici…",
   unknown: "Sconosciuto",
   apiUnavailable:
-    "L'API pubblica è temporaneamente non raggiungibile: la mappa mostra record illustrativi.",
+    "L'API pubblica è temporaneamente non raggiungibile: i punti già caricati restano disponibili.",
   apiRateLimited: (seconds: number) =>
     `La mappa mette temporaneamente in pausa le nuove richieste dati per rispettare il limite del servizio. Riproverà tra circa ${seconds} secondi; i punti già caricati restano disponibili.`,
   // Viewport continentale: l'API risponde un campione decimato (una richiesta).
@@ -201,9 +203,11 @@ export const it: Translation<typeof en> = {
   listCount: (visible: number, total: number) =>
     visible === 0
       ? "Nessun punto nella vista corrente"
-      : visible === total
-        ? `Mostrati tutti i ${visible} punti nella vista corrente`
-        : `Mostrati ${visible} di ${total} punti nella vista corrente`,
+      : visible === 1
+        ? "Mostrato l'unico punto nella vista corrente"
+        : visible === total
+          ? `Mostrati tutti i ${visible} punti nella vista corrente`
+          : `Mostrati ${visible} di ${total} punti nella vista corrente`,
   listEmptyInView:
     "Nessun punto documentato nella vista corrente. Sposta la mappa o rimpicciolisci per esplorare di più.",
   // Popup del segnaposto (t_702c10af): si apre al clic sul marker con le

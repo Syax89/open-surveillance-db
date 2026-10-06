@@ -113,18 +113,30 @@ export function FiltersBar({
   // Hydration-safe (same pattern as MapPanel pointsCollapsed, t_66766914):
   // the initial state is DETERMINISTIC (open on both server and first
   // client render — never reads window.matchMedia in an initializer). The
-  // media preference is applied only AFTER hydration in the effect below,
-  // and a manual toggle by the user always wins over a media-query change
-  // (filtersUserToggledRef), so the disclosure never flickers back.
+  // media preference is applied only AFTER hydration in the effect below.
+  //
+  // B02: a programmatic `open` change (the media-query sync) also fires a
+  // native `toggle` event, which used to be mistaken for a USER toggle — so
+  // after a mobile round trip the effect stopped syncing and the group stayed
+  // closed while the desktop CSS hides the summary (no way back). The
+  // `appliedOpenRef` distinguishes our own sync from the user's toggle, and a
+  // desktop apply ALWAYS opens (the summary is display:none there), so the
+  // group can never be stuck closed on desktop.
   const [filtersOpen, setFiltersOpen] = useState(true);
-  const filtersUserToggledRef = useRef(false);
+  const appliedOpenRef = useRef<boolean | null>(null);
+  const userPreferenceRef = useRef<boolean | null>(null);
   useEffect(() => {
     if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
     const media = window.matchMedia("(max-width: 820px)");
     const apply = () => {
-      // The user's own toggle always wins over a media-query change.
-      if (filtersUserToggledRef.current) return;
-      setFiltersOpen(!media.matches);
+      // Desktop: the summary is hidden by CSS → the group MUST be open (a
+      // manual mobile close never carries over to a desktop where it could not
+      // be reopened). Mobile: honour the user's manual preference, default
+      // closed.
+      if (!media.matches) userPreferenceRef.current = null;
+      const desired = media.matches ? (userPreferenceRef.current ?? false) : true;
+      appliedOpenRef.current = desired;
+      setFiltersOpen(desired);
     };
     apply(); // apply the compact preference only after hydration
     if (media.addEventListener) {
@@ -152,7 +164,17 @@ export function FiltersBar({
             <p id="record-search-help">{t.searchHelp}</p>
           </form>
         )}
-        <details className="filters-disclosure" open={filtersOpen} onToggle={(event) => { filtersUserToggledRef.current = true; setFiltersOpen(event.currentTarget.open); }}>
+        <details className="filters-disclosure" open={filtersOpen} onToggle={(event) => {
+          const next = event.currentTarget.open;
+          // A native toggle also fires for OUR programmatic `open` change;
+          // only a change that differs from the last applied value is a real
+          // user toggle, and the user's preference then wins within the
+          // current breakpoint (B02).
+          if (next === appliedOpenRef.current) return;
+          appliedOpenRef.current = next;
+          userPreferenceRef.current = next;
+          setFiltersOpen(next);
+        }}>
           <summary>{t.filters}</summary>
           <div className="filter-controls-row">
         <div className="record-filter">

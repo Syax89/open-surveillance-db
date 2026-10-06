@@ -56,20 +56,24 @@ export function MapRecordList({ filteredRecords, visibleRecords, selectedId, onS
     <>
       <div className="map-list-header">
         <h2 id="map-list-title">{labels.listTitle}</h2>
-        <p className="map-list-count" role="status">{labels.listCount(visibleRecords.length, filteredRecords.length)}</p>
+        {/* B08: the counter refers to the CURRENT VIEW, not the accumulated
+            store. Both values are the in-view count — the old denominator was
+            the union of every explored bbox, which does not belong to the
+            view (and `total` from the API is null under count=false). */}
+        <p className="map-list-count" role="status">{labels.listCount(visibleRecords.length, visibleRecords.length)}</p>
         {onToggleCollapse && (
           <button
             type="button"
             className={`map-list-toggle${collapsed ? "" : " is-open"}`}
             aria-expanded={!collapsed}
             aria-controls="map-list-scroll"
-            aria-label={`${labels.listTitle}: ${labels.listCount(visibleRecords.length, filteredRecords.length)}`}
+            aria-label={`${labels.listTitle}: ${labels.listCount(visibleRecords.length, visibleRecords.length)}`}
             onClick={onToggleCollapse}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <polyline points={collapsed ? "9 6 15 12 9 18" : "15 6 9 12 15 18"} />
             </svg>
-            <span className="sr-only">{collapsed ? labels.listTitle : `${labels.listTitle}: ${labels.listCount(visibleRecords.length, filteredRecords.length)}`}</span>
+            <span className="sr-only">{collapsed ? labels.listTitle : `${labels.listTitle}: ${labels.listCount(visibleRecords.length, visibleRecords.length)}`}</span>
           </button>
         )}
       </div>

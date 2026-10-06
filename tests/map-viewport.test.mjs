@@ -79,8 +79,81 @@ test("recordsInBounds returns a new array and handles an empty record list", () 
 });
 
 // ---------------------------------------------------------------------------
-// escapeHtml (popup content safety)
+// viewportRectangles (B03 — server-valid geometry from raw Leaflet bounds)
 // ---------------------------------------------------------------------------
+
+const serverValid = (rect) =>
+  rect.west < rect.east &&
+  rect.west >= -180 && rect.east <= 180 &&
+  rect.south >= -90 && rect.north <= 90 &&
+  rect.south < rect.north;
+
+test("viewportRectangles: a view wider than the world collapses to the whole domain", () => {
+  // The measured z2 desktop view: west=-224.2968…, east=249.2578… (span > 360°)
+  // used to be sent verbatim and rejected with a 400.
+  const rects = mapViewport.viewportRectangles({ south: -65.3668, north: 85.0511, west: -224.29687500000003, east: 249.25781250000003 });
+  assert.deepEqual(rects, [{ south: -65.3668, north: 85.0511, west: -180, east: 180 }]);
+  assert.ok(rects.every(serverValid), "the world rectangle satisfies the server contract (west<east, in world bounds)");
+});
+
+test("viewportRectangles: a narrow antimeridian wrap splits into two valid geographic rectangles", () => {
+  // Leaflet's wrapped form (west > east)…
+  assert.deepEqual(
+    mapViewport.viewportRectangles({ south: -10, north: 10, west: 170, east: -170 }),
+    [{ south: -10, north: 10, west: 170, east: 180 }, { south: -10, north: 10, west: -180, east: -170 }],
+  );
+  // …and the unwrapped form (east > 180) yield the SAME two rectangles — the
+  // other side of the dateline is never dropped.
+  assert.deepEqual(
+    mapViewport.viewportRectangles({ south: -10, north: 10, west: 170, east: 190 }),
+    [{ south: -10, north: 10, west: 170, east: 180 }, { south: -10, north: 10, west: -180, east: -170 }],
+  );
+  for (const rect of mapViewport.viewportRectangles({ south: -10, north: 10, west: 170, east: 190 })) {
+    assert.ok(serverValid(rect), "every split rectangle stays west<east inside the world");
+  }
+});
+
+test("viewportRectangles: an in-range rectangle is returned verbatim (inclusive edges stay exact)", () => {
+  const rects = mapViewport.viewportRectangles({ south: 41.8, north: 42.0, west: 12.3, east: 12.7 });
+  assert.deepEqual(rects, [{ south: 41.8, north: 42.0, west: 12.3, east: 12.7 }]);
+});
+
+test("recordsInBounds tolerates longitudes outside ±180 for list/marker visibility (B03 consistency)", () => {
+  const dateline = [
+    { id: 1, latitude: 0, longitude: -175 }, // 185°E — inside the 170..190 view
+    { id: 2, latitude: 0, longitude: 175 },  // 175°E — inside
+    { id: 3, latitude: 0, longitude: 0 },    // outside
+  ];
+  assert.deepEqual(
+    mapViewport.recordsInBounds(dateline, { south: -10, north: 10, west: 170, east: 190 }).map((record) => record.id),
+    [1, 2],
+    "a record on the far side of the dateline stays in the current view",
+  );
+});
+
+// ---------------------------------------------------------------------------
+// geocodeBounds (B01 — area framing gate)
+// ---------------------------------------------------------------------------
+
+test("geocodeBounds accepts a city/province/region box ([south,north,west,east])", () => {
+  assert.deepEqual(
+    mapViewport.geocodeBounds(["44.7198493", "44.9637886", "11.5109915", "11.8870544"]),
+    { south: 44.7198493, north: 44.9637886, west: 11.5109915, east: 11.8870544 },
+  );
+});
+
+test("geocodeBounds rejects inverted, non-numeric, out-of-world and tiny boxes", () => {
+  assert.equal(mapViewport.geocodeBounds(["45", "44", "11", "12"]), null, "inverted latitudes");
+  assert.equal(mapViewport.geocodeBounds(["44", "45", "12", "11"]), null, "inverted longitudes");
+  assert.equal(mapViewport.geocodeBounds(["44", "45", "11", "NaN"]), null, "non-numeric segment");
+  assert.equal(mapViewport.geocodeBounds(["44", "45", "11", "181"]), null, "longitude beyond the world");
+  assert.equal(mapViewport.geocodeBounds(["44", "45", "-181", "11"]), null, "longitude below the world");
+  assert.equal(mapViewport.geocodeBounds(["44.83", "44.84", "11.61", "11.63"]), null, "a sub-100 m point/road box falls back to the point");
+  assert.equal(mapViewport.geocodeBounds(["44", "45"]), null, "wrong arity");
+  assert.equal(mapViewport.geocodeBounds(null), null, "absent box");
+});
+
+
 
 test("escapeHtml neutralises markup and quotes in record fields", () => {
   assert.equal(

@@ -30,7 +30,7 @@
  * and renders whatever comes back.
  */
 
-import { recordsInBounds, type ViewportBounds } from "./map-viewport";
+import { longitudeInCopy, recordsInBounds, type ViewportBounds } from "./map-viewport";
 
 /** Screen-pixel size of one aggregation cell (Web Mercator world px). */
 export const GRID_CELL_PX = 48;
@@ -98,10 +98,16 @@ export function aggregateToGrid<T extends { id: number; latitude: number; longit
   records: readonly T[],
   zoom: number,
   cellPx: number = GRID_CELL_PX,
+  referenceLng?: number,
 ): GridCell[] {
   const cells = new Map<string, { x: number; y: number; count: number; sumX: number; sumY: number; ids: number[] }>();
   for (const record of records) {
-    const { x, y } = webMercatorProject(record.latitude, record.longitude, zoom);
+    // B03: project in the world copy the map shows — a longitude is shifted
+    // to the copy nearest `referenceLng` BEFORE projecting, so a cell that
+    // straddles the dateline aggregates instead of splitting across the
+    // world (its centroid then lands in the visible copy).
+    const lng = referenceLng === undefined ? record.longitude : longitudeInCopy(record.longitude, referenceLng);
+    const { x, y } = webMercatorProject(record.latitude, lng, zoom);
     const cx = Math.floor(x / cellPx);
     const cy = Math.floor(y / cellPx);
     const key = `${cx}:${cy}`;
@@ -150,13 +156,14 @@ export function markersForViewport<T extends { id: number; latitude: number; lon
   records: readonly T[],
   bounds: ViewportBounds | null,
   zoom: number,
+  referenceLng?: number,
 ): { visible: T[]; cells: GridCell[]; individual: T[] } {
   if (!bounds) return { visible: [], cells: [], individual: [] };
   const visible = recordsInBounds(records, bounds);
   if (!shouldUseGrid(visible.length, zoom)) {
     return { visible, cells: [], individual: visible };
   }
-  const cells = aggregateToGrid(visible, zoom);
+  const cells = aggregateToGrid(visible, zoom, GRID_CELL_PX, referenceLng);
   // Cells with a single member render as an individual marker (no "1"
   // badge): the click must open the record popup, not zoom into one point.
   const multiCells = cells.filter((cell) => cell.count > 1);

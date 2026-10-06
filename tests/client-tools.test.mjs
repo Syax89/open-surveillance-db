@@ -521,6 +521,46 @@ test("MappaTool zoom/pan updates the list to the points in the new viewport (deb
   installEmptyMock();
 });
 
+test("B08: the top and sidebar counters reflect the CURRENT VIEW, not the accumulated store", async () => {
+  // Two records in the initial Rome viewport and one far away (Milan): after
+  // panning to Milan the store holds all three, but the counters must show
+  // only the one point in the current view (the old counters accumulated the
+  // union of every explored bbox — the "328 found / 17 shown" defect).
+  const records = [
+    { id: 1, title: "Illustrative record A", kind: "Fixed dome", status: "demo", latitude: 41.9004, longitude: 12.4936, source: "Development seed", updated: "Demo data" },
+    { id: 2, title: "Illustrative record B", kind: "Traffic monitoring", status: "demo", latitude: 41.9047, longitude: 12.5031, source: "Development seed", updated: "Demo data" },
+    { id: 3, title: "Illustrative record C", kind: "Fixed dome", status: "demo", latitude: 45.4642, longitude: 9.19, source: "Development seed", updated: "Demo data" },
+  ];
+  installCamerasApiMock(records);
+  await resetLeafletMarkers();
+  const { screen, waitFor } = rtl;
+  const leaflet = await loadDomModule("node_modules/leaflet/index.mjs");
+  await renderWithLocale(React.createElement(MappaTool));
+
+  await waitFor(() => assert.ok(leaflet.__maps.length > 0));
+  const map = leaflet.__maps.at(-1);
+  await waitFor(() => {
+    assert.ok(screen.getByText("Showing all 2 points in the current view"));
+    assert.ok(screen.getByText("2 public records found"));
+  }, { timeout: 3000 });
+
+  // Pan to Milan (one record): the store keeps A + B + C, the view shows C.
+  leaflet.__setBounds({ getSouth: () => 45.4, getNorth: () => 45.5, getWest: () => 9.1, getEast: () => 9.3, contains: () => true });
+  for (const handler of map.handlers["moveend zoomend"] ?? []) handler();
+  await waitFor(() => {
+    assert.ok(screen.getByText("Showing the only point in the current view"), "the sidebar denominator is the current view, not the store");
+    assert.ok(screen.getByText("1 public record found"), "the top counter is the current view, not the accumulated 3");
+    assert.ok(screen.queryByText("3 public records found") === null, "the accumulated store is never presented as the view total");
+  }, { timeout: 3000 });
+
+  // Pan back out to a whole-world view: all three stored points are back in
+  // the view — the counter follows the view again (never a frozen total).
+  leaflet.__setBounds({ getSouth: () => -90, getNorth: () => 90, getWest: () => -180, getEast: () => 180, contains: () => true });
+  for (const handler of map.handlers["moveend zoomend"] ?? []) handler();
+  await waitFor(() => assert.ok(screen.getByText("Showing all 3 points in the current view")), { timeout: 3000 });
+  installEmptyMock();
+});
+
 // ---------------------------------------------------------------------------
 // /mappa — geocode autocomplete + map-always-visible (t_b9666d09)
 // ---------------------------------------------------------------------------
@@ -595,32 +635,39 @@ test("MappaTool geocode autocomplete suggests places in a combobox; keyboard sel
   assert.ok(historyReplaceCalls.length >= 2, "the ?q= commit + selection clear both went through history.replaceState");
   assert.ok(!historyReplaceCalls.at(-1).includes("q="), "selecting a place clears the local point filter");
 
-  // The map panned to the place: setView([lat,lng], zoom ≥ 15).
+  // The map framed the selected administrative AREA (B01): the Ferrara city
+  // suggestion carries a bounding box, so the map uses fitBounds (capped at
+  // zoom 15) instead of dropping a single centroid point.
   const leaflet = await loadDomModule("node_modules/leaflet/index.mjs");
   await waitFor(() => assert.ok(leaflet.__maps.length > 0));
   const map = leaflet.__maps.at(-1);
-  const lastView = map.views.at(-1);
-  assert.deepEqual(lastView.center, [44.838124, 11.619791], "the map pans to the selected place");
-  assert.ok(lastView.zoom >= 15, "the pan zooms to at least 15");
+  const lastFit = map.fitBoundsCalls.at(-1);
+  assert.ok(lastFit, "an area suggestion frames the map with fitBounds (B01)");
+  assert.deepEqual(lastFit.bounds, [[44.7198493, 11.5109915], [44.9637886, 11.8870544]], "the map frames the selected admin area");
+  assert.equal(lastFit.opts?.maxZoom, 15, "the area framing stays readable (max zoom 15)");
 
-  // Simulate the pan landing (new viewport bounds) → the list follows the
-  // viewport and the first point in view is focused ("focus sul primo
-  // punto se presente"). The new bounds contain only record B, so the
-  // selection must move from A to B.
+  // R3b: the place-search landing is tied to the FRAMED destination. Emitting
+  // that exact destination viewport must NOT select anything here — the mock
+  // data has no record inside the Ferrara area, so the list is truthfully
+  // empty and no spurious popup/selection fires.
+  leaflet.__setBounds({ getSouth: () => 44.7198493, getNorth: () => 44.9637886, getWest: () => 11.5109915, getEast: () => 11.8870544, contains: () => false });
+  for (const handler of map.handlers["moveend zoomend"] ?? []) handler();
+  await waitFor(() => assert.ok(screen.getByText(/No documented points in the current view/)), { timeout: 3000 });
+  assert.ok(screen.queryByRole("button", { name: /Illustrative record/ }) === null, "no points are framed inside the selected area");
+
+  // An ordinary pan into record B's view follows the viewport and does NOT
+  // auto-select: the landing belongs to the framed destination, never to a
+  // later unrelated view (R3b).
   leaflet.__setBounds({
     getSouth: () => 41.9, getNorth: () => 41.95,
     getWest: () => 12.5, getEast: () => 12.52,
     contains: () => true,
   });
   for (const handler of map.handlers["moveend zoomend"] ?? []) handler();
-  // Wait for the pan to land AND the focus effect to select the first
-  // visible point: the list-update render and the onSelect(…[0].id) effect
-  // commit in sequence, so asserting outside the waitFor would race the
-  // second render (flaky in the full suite, deterministic alone).
   await waitFor(() => {
-    assert.ok(screen.getByText("Showing 1 of 2 points in the current view"));
-    assert.equal(screen.getByRole("button", { name: /Illustrative record B/ }).getAttribute("aria-current"), "true", "the first visible point is focused after the pan");
+    assert.ok(screen.getByRole("button", { name: /Illustrative record B/ }), "the list follows the new viewport");
   }, { timeout: 3000 });
+  assert.equal(screen.getByRole("button", { name: /Illustrative record B/ }).getAttribute("aria-current"), null, "an ordinary pan never auto-selects a row");
   // The new bounds contain only record B — record A is OUTSIDE the new
   // viewport and must leave the list (the sidebar follows the map).
   assert.ok(screen.queryByRole("button", { name: /Illustrative record A/ }) === null, "records outside the new viewport leave the list");

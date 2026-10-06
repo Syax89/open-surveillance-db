@@ -23,6 +23,16 @@ type Props = {
   onPick: (latitude: number, longitude: number) => void;
   /** Position chosen from a deep link or place search: the map focuses it. */
   coordinates: { latitude: number; longitude: number } | null;
+  /**
+   * B01: the geocoder's validated administrative bounding box for a place
+   * selection — the map frames the AREA (fitBounds) instead of the point.
+   * Null for a point/address or a record ?focus deep link (point fallback).
+   */
+  focusBounds?: ViewportBounds | null;
+  /** B09: monotonic token for an explicit focus command (place re-selection). */
+  focusIntent?: number;
+  /** R2/B10: notified when the shared map APPLIES a focus command (intent + the exact post-fit geometry). */
+  onFocusApplied?: (intent: number, geometry: ViewportBounds) => void;
   selectedCamera?: Camera;
   loading: boolean;
   /** Page-level status notice, displayed under the map. */
@@ -58,7 +68,7 @@ type Props = {
  * nothing never replaces the map with an empty state (the truthful "no
  * record matches" note lives inside the list).
  */
-export function MapPanel({ filteredRecords, visibleRecords, selectedId, onSelect, onPick, coordinates, loading, notice, directoryHref = "/directory", onBoundsChange }: Props) {
+export function MapPanel({ filteredRecords, visibleRecords, selectedId, onSelect, onPick, coordinates, focusBounds = null, focusIntent = 0, onFocusApplied, loading, notice, directoryHref = "/directory", onBoundsChange }: Props) {
   const t = useMessages().map;
   const statuses = useMessages().status;
   const { locale } = useLocale();
@@ -90,7 +100,7 @@ export function MapPanel({ filteredRecords, visibleRecords, selectedId, onSelect
           <MapRecordList filteredRecords={filteredRecords} visibleRecords={visibleRecords} selectedId={selectedId} onSelect={onSelect} labels={t} statusLabel={(status) => publicStatusLabel(statuses, status, t.unknown)} collapsed={pointsCollapsed} onToggleCollapse={() => setPointsCollapsed((current) => !current)} />
         </aside>
         <div className="map-panel">
-          <SurveillanceMap cameras={filteredRecords} selectedId={selectedId} focusLocation={coordinates} onSelect={onSelect} onPick={onPick} directoryHref={directoryHref} onBoundsChange={onBoundsChange} popupHtmlFor={popupHtmlForCamera} />
+          <SurveillanceMap cameras={filteredRecords} selectedId={selectedId} focusLocation={coordinates} focusBounds={focusBounds} focusIntent={focusIntent} onFocusApplied={onFocusApplied} onSelect={onSelect} onPick={onPick} directoryHref={directoryHref} onBoundsChange={onBoundsChange} popupHtmlFor={popupHtmlForCamera} />
           <details className="map-legend">
             <summary>{t.mapLegendTitle}</summary>
             <div>

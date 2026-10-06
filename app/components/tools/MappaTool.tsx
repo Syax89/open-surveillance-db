@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMessages } from "../../lib/use-messages";
-import { useViewportCameras } from "../../lib/use-viewport-cameras";
-import { recordsInBounds } from "../../lib/map-viewport";
+import { useViewportCameras, viewportGeometryKey } from "../../lib/use-viewport-cameras";
+import { geocodeBounds, recordsInBounds } from "../../lib/map-viewport";
 import type { ViewportBounds } from "../../lib/map-viewport";
 import {
   applyCameraFilters,
@@ -61,13 +61,26 @@ export function MappaTool() {
   const [viewportBounds, setViewportBounds] = useState<ViewportBounds | null>(null);
   const [notice, setNotice] = useState("");
   const [placeFocus, setPlaceFocus] = useState<{ latitude: number; longitude: number } | null>(null);
-  const placeFocusRef = useRef<{ latitude: number; longitude: number } | null>(null);
-  const viewportAtSelectionRef = useRef<ViewportBounds | null>(null);
+  // B01: the geocoder's administrative bounding box (validated) lets a
+  // city/province/region selection frame the AREA with fitBounds instead of
+  // a single centroid point. Null for a point/address (or an invalid box) →
+  // the map keeps the point + zoom fallback.
+  const [placeBounds, setPlaceBounds] = useState<ViewportBounds | null>(null);
+  // B09: monotonic token for an explicit focus command (place selection),
+  // so re-selecting identical coordinates after a pan is not a no-op.
+  const [focusIntent, setFocusIntent] = useState(0);
+  const focusIntentCounterRef = useRef(0);
+  // R2/R3b: armed place-search landing. `intent` is the focus command token
+  // that armed it; `targetKey` is the EXACT destination geometry, captured from
+  // the shared map's onFocusApplied (the raw post-fit viewport), never guessed
+  // from a later bounds report. Null = nothing armed.
+  const placePendingRef = useRef<{ intent: number; targetKey: string | null } | null>(null);
+  const [placePendingToken, setPlacePendingToken] = useState(0);
 
   // Viewport-bounded data layer (t_bb310428): only the records inside the
   // current map bounds are requested; the merged store feeds the same
   // filter/list pipeline as before.
-  const { records, loading, error: viewportError, decimated } = useViewportCameras({
+  const { records, loading, error: viewportError, decimated, settled } = useViewportCameras({
     bounds: viewportBounds,
     filters: serverFiltersFrom(filters),
     // ?focus= deep link: the hook resolves the record even when it is
@@ -119,7 +132,20 @@ export function MappaTool() {
   const mapHref = useMemo(() => exploreMapHref(filters), [filters]);
   const directoryHref = useMemo(() => exploreDirectoryHref(filters), [filters]);
 
-  const handleBoundsChange = useCallback((bounds: ViewportBounds) => setViewportBounds(bounds), []);
+  // Viewport→list sync: the map's own bounds report (post-pan/post-fit moveend).
+  // R3e: a REAL bounds change that DEPARTS the armed destination cancels the
+  // interrupted place landing, so an ordinary pan away — and back — can never
+  // replay it. The report carries the map's LIVE geometry (never stale React
+  // state), so the focus's own post-fit report (== the captured target) does
+  // not cancel, and a same-place repeat / warm landing stays armed.
+  const handleBoundsChange = useCallback((bounds: ViewportBounds) => {
+    setViewportBounds(bounds);
+    const pending = placePendingRef.current;
+    if (pending && pending.targetKey !== null && viewportGeometryKey(bounds) !== pending.targetKey) {
+      placePendingRef.current = null;
+      setPlacePendingToken((value) => value + 1);
+    }
+  }, []);
 
   // Place-search selection (PR #326 UX — kept strictly): picking a place
   // pans the map there and, once the pan lands on the new bounds, selects
@@ -128,10 +154,34 @@ export function MappaTool() {
   // the popup that follows is intended.
   const handlePlaceSelect = useCallback((result: GeocodeSuggestion) => {
     setPlaceFocus({ latitude: result.lat, longitude: result.lng });
-    placeFocusRef.current = { latitude: result.lat, longitude: result.lng };
-    viewportAtSelectionRef.current = viewportBounds;
+    // B01: validate the Nominatim box ([south,north,west,east] strings); a
+    // city/province/region frames the area, a point/address (or an inverted,
+    // non-numeric, out-of-world or sub-100 m box) falls back to the point.
+    setPlaceBounds(geocodeBounds(result.boundingbox));
+    // B09/R2: every explicit selection is a NEW focus command.
+    focusIntentCounterRef.current += 1;
+    const intent = focusIntentCounterRef.current;
+    setFocusIntent(intent);
+    // B10: arm the landing tied to THIS intent. The destination geometry is
+    // resolved from the shared map's onFocusApplied (below), not from the next
+    // different bounds — so an identical same-view repeat and a focus that
+    // arrives before the lazy map is ready are both handled correctly.
+    placePendingRef.current = { intent, targetKey: null };
+    setPlacePendingToken((value) => value + 1);
     setQ("");
-  }, [viewportBounds, setQ]);
+  }, [setQ]);
+
+  // R2/R3b: the shared map APPLIED a focus command and hands back the EXACT
+  // post-fit geometry. Only the pending armed for THIS intent accepts it (a
+  // stale/superseded selection is ignored); the target is the captured
+  // geometry, so an ordinary user pan before the debounced report can never
+  // become the destination.
+  const handleFocusApplied = useCallback((intent: number, geometry: ViewportBounds) => {
+    const pending = placePendingRef.current;
+    if (!pending || pending.intent !== intent) return;
+    pending.targetKey = viewportGeometryKey(geometry);
+    setPlacePendingToken((value) => value + 1);
+  }, []);
 
   // Focus management: a ?focus=ID deep link (or back/forward onto one)
   // selects that record. When the filters hide the current selection the
@@ -158,19 +208,29 @@ export function MappaTool() {
     }
   }, [filters.focus, filteredRecords, selectedId]);
 
-  // Place-search selection landing: the pending flag is consumed only when
-  // the map emitted NEW bounds since the selection (the pan landed), then
-  // the first visible point is selected — one explicit popup, no churn.
+  // Place-search landing (B10/R2/R3b/R3c): the armed intent is consumed ONLY
+  // once the EXACT captured destination geometry has SETTLED for the CURRENT
+  // server filter (cache hit, empty answer or error) AND the map's current view
+  // still IS that destination. It is never guessed from a bounds report, so a
+  // same-place repeat is consumed, an ordinary pan before/after cannot retarget
+  // it, and an older different-filter settlement cannot consume a newer intent.
+  // An aborted (superseded) request never settles.
   useEffect(() => {
-    if (placeFocusRef.current === null) return;
-    if (viewportAtSelectionRef.current !== null && viewportAtSelectionRef.current === viewportBounds) return;
-    placeFocusRef.current = null;
-    viewportAtSelectionRef.current = null;
+    const pending = placePendingRef.current;
+    if (!pending || pending.targetKey === null) return;
+    if (!settled || settled.key !== pending.targetKey) return;
+    // The current view must still be the target: a settlement left over from
+    // the target must not select a row from a NEWER ordinary view.
+    if (!viewportBounds || viewportGeometryKey(viewportBounds) !== pending.targetKey) return;
+    placePendingRef.current = null;
+    // A failed search clears the intent WITHOUT selecting a point from the
+    // previous area — a later unrelated pan must stay quiet.
+    if (settled.status !== "ok") return;
     if (visibleRecords.length > 0 && !visibleRecords.some((camera) => camera.id === selectedId)) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- the map emitted new external bounds after a chosen place; selecting its first visible point keeps the marker/list pair synchronized.
       setSelectedId(visibleRecords[0].id);
     }
-  }, [viewportBounds, visibleRecords, selectedId]);
+  }, [placePendingToken, viewportBounds, settled, visibleRecords, selectedId]);
 
   const selectedCamera = useMemo(
     () => filteredRecords.find((camera) => camera.id === selectedId) ?? filteredRecords[0],
@@ -194,12 +254,12 @@ export function MappaTool() {
           <div className="map-explorer-search">
             <GeocodeSearch search={qInput} onSearchChange={setQ} onPlaceSelect={handlePlaceSelect} />
           </div>
-          <FiltersBar variant="panel" hideSearch showCommunitySort stateFilter={filters.state} setStateFilter={setState} originFilter={filters.origin} setOriginFilter={setOrigin} cameraKinds={cameraKinds} search={qInput} setSearch={setQ} kindFilter={filters.type} setKindFilter={setType} freshnessFilter={filters.freshness} setFreshnessFilter={setFreshness} sortOrder={filters.sort} setSortOrder={setSort} resultCount={filteredRecords.length} onReset={reset} />
+          <FiltersBar variant="panel" hideSearch showCommunitySort stateFilter={filters.state} setStateFilter={setState} originFilter={filters.origin} setOriginFilter={setOrigin} cameraKinds={cameraKinds} search={qInput} setSearch={setQ} kindFilter={filters.type} setKindFilter={setType} freshnessFilter={filters.freshness} setFreshnessFilter={setFreshness} sortOrder={filters.sort} setSortOrder={setSort} resultCount={visibleRecords.length} onReset={reset} />
           {/* Map-always-visible (t_b9666d09): MapPanel renders the map AND
               the sidebar unconditionally. When no record matches the
               filters the sidebar shows the truthful in-list note; the map itself never
               disappears. */}
-          <MapPanel filteredRecords={filteredRecords} visibleRecords={visibleRecords} selectedId={selectedId} onSelect={setSelectedId} onPick={() => {}} coordinates={explorerFocusLocation} selectedCamera={selectedCamera} loading={loading} notice={decimated ? t.viewportDecimated : (viewportError ? notice : "")} directoryHref={directoryHref} onBoundsChange={handleBoundsChange} />
+          <MapPanel filteredRecords={filteredRecords} visibleRecords={visibleRecords} selectedId={selectedId} onSelect={setSelectedId} onPick={() => {}} coordinates={explorerFocusLocation} focusBounds={placeBounds} focusIntent={focusIntent} onFocusApplied={handleFocusApplied} selectedCamera={selectedCamera} loading={loading} notice={decimated ? t.viewportDecimated : (viewportError ? notice : "")} directoryHref={directoryHref} onBoundsChange={handleBoundsChange} />
         </div>
       </div>
     </section>

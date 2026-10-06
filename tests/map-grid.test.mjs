@@ -149,8 +149,7 @@ test("aggregateToGrid: finer cells at higher zoom (same records, more cells)", (
   assert.ok(fine.length > coarse.length, "zoom-in splits cells");
 });
 
-test("aggregateToGrid: zooming into a cell centroid empties it (zoom-in contract)", () => {
-  // The badge click zooms +2 toward the centroid: at the new zoom the
+test("aggregateToGrid: zooming into a cell centroid empties it (zoom-in contract)", () => {  // The badge click zooms +2 toward the centroid: at the new zoom the
   // members must be split across MORE (smaller) cells, so the same cell
   // key no longer holds all of them.
   const records = makeRecords(700);
@@ -161,10 +160,26 @@ test("aggregateToGrid: zooming into a cell centroid empties it (zoom-in contract
   assert.ok(!surviving || surviving.count < biggest.count, "zooming splits the badge cell");
 });
 
+test("aggregateToGrid: a dateline referenceLng folds both sides into the visible copy (B03)", () => {
+  const straddle = [
+    { id: 1, latitude: 0, longitude: 179.8 },
+    { id: 2, latitude: 0, longitude: -179.8 },
+  ];
+  // Without a reference the two longitudes project to opposite ends of the
+  // world — the badge for -179.8 lands off the +180 copy the map shows.
+  const raw = aggregateToGrid(straddle, 8);
+  assert.equal(raw.length, 2, "raw projection splits the dateline pair across the world");
+  assert.ok(raw.some((cell) => cell.centroidLng < -170) && raw.some((cell) => cell.centroidLng > 170));
+  // With the visible copy's centre (≈180) both centroids stay on that copy.
+  const shifted = aggregateToGrid(straddle, 8, undefined, 180);
+  for (const cell of shifted) {
+    assert.ok(cell.centroidLng >= 170 && cell.centroidLng <= 190, `centroid on the visible copy (got ${cell.centroidLng})`);
+  }
+});
+
 // ---------------------------------------------------------------------------
 // markersForViewport (component-facing entry point)
 // ---------------------------------------------------------------------------
-
 test("markersForViewport: NULL bounds -> empty layer (viewport-first)", () => {
   const records = makeRecords(700);
   const result = markersForViewport(records, null, 5);
