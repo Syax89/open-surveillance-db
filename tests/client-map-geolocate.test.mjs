@@ -75,10 +75,12 @@ test("geolocate button stacks ABOVE the zoom control (added last, same corner)",
   const maps = await leafletMaps();
   const kinds = maps[0].__controls?.map((entry) => entry.kind) ?? [];
   // Leaflet renders bottom-corner controls with `flex-direction:
-  // column-reverse`, so the LAST control added appears on TOP. The zoom
-  // control is added first, then the geolocate control — the geolocate
-  // button therefore renders ABOVE the zoom buttons.
-  assert.deepEqual(kinds, ["zoom", "geolocate"]);
+  // column-reverse`, so the LAST control added in a corner appears on TOP.
+  // The zoom control is added first, then the geolocate control — the
+  // geolocate button therefore renders ABOVE the zoom buttons. (Batch C adds
+  // a native scale bar AFTERWARDS, but in the topleft corner, so it does not
+  // touch this bottomright stacking.)
+  assert.deepEqual(kinds, ["zoom", "geolocate", "scale"]);
   const { button } = geolocateButton(maps);
   assert.equal(button.getAttribute("aria-pressed"), "false");
   assert.equal(button.getAttribute("aria-label"), "Show my location");

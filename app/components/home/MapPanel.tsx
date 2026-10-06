@@ -121,6 +121,12 @@ export function MapPanel({ filteredRecords, visibleRecords, selectedId, onSelect
           </details>
         </div>
       </div>
+      {/* Always-visible hint (Batch C): the empty-click → report shortcut is
+          otherwise spelled out ONLY inside the collapsed-by-default
+          .map-legend. Rendered in normal flow OUTSIDE .live-map-workspace
+          (which is fixed-height + overflow:hidden, so a caption inside
+          .map-panel would be clipped). */}
+      <p className="map-click-hint">{t.mapClickHint}</p>
       {loading && <p className="loading-note">{t.loadingRecords}</p>}{notice && <p className="notice" role="status">{notice}</p>}
     </>
   );

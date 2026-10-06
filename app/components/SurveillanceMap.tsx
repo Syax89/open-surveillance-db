@@ -531,6 +531,13 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
         });
         L.control.zoom({ position: "bottomright" }).addTo(map);
         new GeoLocateControl().addTo(map);
+        // Native distance scale bar (Batch C, zero new dependency — Leaflet
+        // ships L.control.scale in the core package). "topleft" is the only
+        // corner with nothing else: .map-legend is CSS-absolute at the
+        // panel's bottom-left and bottomright already stacks the zoom +
+        // geolocate controls. imperial:false — this is a European/OSM-sourced
+        // public dataset, so metric only (no dual-unit clutter).
+        L.control.scale({ position: "topleft", imperial: false, maxWidth: 120 }).addTo(map);
         // Tiles are served through the same-origin tile proxy
         // (/api/tiles/{z}/{x}/{y}.png, see docs/OSM_INTEGRATION.md): the
         // client never hotlinks a tile server directly, the upstream request
