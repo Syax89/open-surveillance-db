@@ -174,6 +174,16 @@ test("server-rendered /mappa provides the map region and /directory the text-lis
   assert.match(map.html, /id="map-region"[^>]*role="region" aria-label="Interactive OpenStreetMap map"/);
   assert.match(map.html, /Go to the accessible directory/);
 
+  // Hydration regression (shareable-view Copy link button, fixed after a
+  // production SSR/client mismatch on HTTPS preprod): the clipboard
+  // capability is feature-detected in an EFFECT (client-only), never read
+  // directly in the render body, so the SSR HTML must NEVER contain the
+  // button -- the first client paint has to start identical (canCopy=false)
+  // or React throws a hydration error. This pins the server side of that
+  // contract; the client side (the button appearing once an effect runs
+  // under a real navigator.clipboard) is pinned in map-viewport-url.test.mjs.
+  assert.doesNotMatch(map.html, />Copy link</, "the Copy link button must NEVER be present in the server-rendered HTML (it is a client-only progressive enhancement, not a render-body navigator check)");
+
   // The text-list alternative itself is server-rendered on /directory: a
   // searchable directory with a result count and a per-record "Show on map"
   // keyboard path.
