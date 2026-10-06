@@ -392,7 +392,14 @@ export function map(el, opts) {
   maps.push(m);
   return m;
 }
-export const control = { zoom: () => ({ addTo: (map) => { (map.__controls ??= []).push({ kind: "zoom" }); } }) };
+export const control = {
+  zoom: () => ({ addTo: (map) => { (map.__controls ??= []).push({ kind: "zoom" }); } }),
+  // Native scale bar (Batch C): mirrors the zoom stub — records the control
+  // AND its options on the map, so a test can assert L.control.scale ran and
+  // with which position/units. Smallest possible additive extension, same
+  // spirit as the getCenter() addition from the Batch B hotfix.
+  scale: (options) => ({ addTo: (map) => { (map.__controls ??= []).push({ kind: "scale", options }); } }),
+};
 // Custom controls (t_18259daa): the geolocate button is a real
 // L.Control.extend subclass. The stub mirrors the real addTo contract —
 // onAdd() returns a DOM node (jsdom), which is recorded on the map stub

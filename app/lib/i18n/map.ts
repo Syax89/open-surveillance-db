@@ -36,6 +36,11 @@ export const en = {
   mapLegendList: "Open the side rail to browse the points in the current view.",
   mapLegendAdd: "Click an empty place on the map to report a camera there.",
   mapLegendReport: "Report a camera",
+  // Always-visible hint under the map (one line): the empty-click shortcut is
+  // otherwise explained ONLY inside the collapsed-by-default .map-legend, so
+  // a sighted user could miss it entirely. Deliberately SHORTER than
+  // mapLegendAdd — a hint, not the full legend entry.
+  mapClickHint: "Click an empty spot to start a camera report there.",
   // Shareable viewport (?lat&lng&zoom): the "Copy link" toolbar button copies
   // the current URL (which carries the map's view) and confirms briefly.
   copyLink: "Copy link",
@@ -162,6 +167,12 @@ export const it: Translation<typeof en> = {
   mapLegendList: "Apri la barra laterale per sfogliare i punti nella vista corrente.",
   mapLegendAdd: "Clicca uno spazio vuoto della mappa per segnalare una telecamera in quel punto.",
   mapLegendReport: "Segnala una telecamera",
+  // Suggerimento sempre visibile sotto la mappa (una riga): la scorciatoia
+  // del clic su spazio vuoto è altrimenti spiegata SOLO nella legenda
+  // compressa, quindi un utente vedente potrebbe non notarla. Testo
+  // volutamente PIÙ BREVE di mapLegendAdd — un suggerimento, non l'intera
+  // voce di legenda.
+  mapClickHint: "Clicca uno spazio vuoto per avviare lì una segnalazione.",
   // Viewport condivisibile (?lat&lng&zoom): il pulsante "Copia link" copia
   // l'URL corrente (che porta con sé la vista della mappa) e conferma
   // brevemente.

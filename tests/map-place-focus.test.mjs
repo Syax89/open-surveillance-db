@@ -462,3 +462,62 @@ test("R3e: an interrupted focus is cancelled and never replayed by an ordinary r
   assert.equal(ariaCurrent(screen, /Ferrara fixture/), null, "an interrupted focus is cancelled, never replayed by an ordinary return pan");
   assert.ok(!(await leafletMarkers()).some((m) => m.popupOpened), "no popup is replayed on the return pan");
 });
+
+// ---------------------------------------------------------------------------
+// Batch C — the empty-click → report shortcut is ALWAYS visible, and a native
+// Leaflet scale bar is added (zero new dependency).
+// ---------------------------------------------------------------------------
+
+test("Batch C: the empty-click hint is an always-visible paragraph OUTSIDE both the map container and the collapsed legend", async () => {
+  installPlaceMock();
+  await resetLeafletMarkers();
+  const mapBundle = await loadDomModule("app/lib/i18n/map.mjs");
+  const hint = mapBundle.en.mapClickHint;
+  assert.ok(hint.trim().length > 0, "the mapClickHint key carries text");
+
+  const { container } = await renderWithLocale(React.createElement(MappaTool));
+
+  // 1. Real, visible DOM text rendered from the new i18n key.
+  const node = rtl.screen.getByText(hint);
+  assert.equal(node.tagName, "P", "the hint is a real paragraph element");
+  assert.equal(node.className, "map-click-hint", "the hint uses the shared small-muted-caption class");
+  assert.notEqual(window.getComputedStyle(node).display, "none", "the hint is not display:none");
+  assert.equal(node.getAttribute("aria-hidden"), null, "the hint is not hidden from assistive tech");
+  assert.ok(!node.classList.contains("sr-only"), "the hint is not sr-only");
+
+  // 2. It is NOT inside the collapsed legend (today's only home for this text).
+  const legend = container.querySelector(".map-legend");
+  assert.ok(legend, "the legend still renders");
+  assert.ok(!legend.contains(node), "the hint is NOT a descendant of .map-legend");
+
+  // 3. It lives in normal flow OUTSIDE .live-map-workspace. That wrapper is
+  //    fixed-height + overflow:hidden, so a caption inside .map-panel would
+  //    be clipped; sitting next to the loading/notice paragraphs (same parent)
+  //    guarantees it is never clipped, at every viewport width.
+  const workspace = container.querySelector(".live-map-workspace");
+  assert.ok(workspace, "the map workspace renders");
+  assert.ok(!workspace.contains(node), "the hint is outside the overflow:hidden workspace");
+  assert.equal(node.parentElement, workspace.parentElement, "the hint is a sibling of the workspace in the normal document flow");
+
+  // 4. The legend is untouched: still a closed-by-default <details> keeping
+  //    its own (longer) click entry.
+  assert.equal(legend.tagName, "DETAILS", "the legend stays a <details>");
+  assert.equal(legend.hasAttribute("open"), false, "the legend stays collapsed by default");
+  assert.ok(legend.textContent.includes(mapBundle.en.mapLegendAdd), "the legend keeps its own click entry unchanged");
+});
+
+test("Batch C: createMap() adds a native Leaflet scale bar at topleft, metric only", async () => {
+  installPlaceMock();
+  await resetLeafletMarkers();
+  await renderWithLocale(React.createElement(MappaTool));
+  const map = await mapOf();
+
+  const scale = map.__controls?.find((entry) => entry.kind === "scale");
+  assert.ok(scale, "L.control.scale must be registered on the map");
+  assert.equal(scale.options?.position, "topleft", "the scale bar sits in the otherwise-empty topleft corner");
+  assert.equal(scale.options?.imperial, false, "metric only — no dual-unit clutter");
+  assert.equal(scale.options?.maxWidth, 120, "the bar is kept compact");
+  // Coexists with the existing controls (nothing replaced).
+  const kinds = map.__controls.map((entry) => entry.kind);
+  assert.deepEqual(kinds, ["zoom", "geolocate", "scale"], "zoom + geolocate + scale are all registered");
+});
