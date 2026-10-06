@@ -286,6 +286,56 @@ test("t_b1e192e1: an unmount before the 250ms debounce elapses does NOT cancel t
 });
 
 // ---------------------------------------------------------------------------
+// Usability: the dual-purpose caveat is ALWAYS VISIBLE, not only sr-only
+// ---------------------------------------------------------------------------
+
+test("the dual-purpose search field shows an always-visible caption next to the input, while the sr-only help stays untouched", async () => {
+  // Reported usability bug: the same field filters the visible points AND
+  // suggests places; picking a suggestion pans the map and CLEARS the typed
+  // filter. That caveat only existed in the sr-only listSearchHelp, so
+  // sighted users could silently lose a filter they were typing. Contract:
+  // the new caption is REAL visible DOM text adjacent to the input (no
+  // sr-only class, not display:none, no aria-hidden, no JS toggle), its
+  // wording differs from the sr-only help, and that help paragraph is
+  // unchanged and still the input's aria-describedby target.
+  const mapBundle = await loadDomModule("app/lib/i18n/map.mjs");
+  const caption = mapBundle.en.listSearchCaption;
+  const helpText = mapBundle.en.listSearchHelp;
+
+  const { container } = await renderWithLocale(React.createElement(GeocodeSearch, {
+    search: "", onSearchChange: () => {}, onPlaceSelect: () => {},
+  }));
+
+  const input = rtl.screen.getByRole("combobox", { name: /Filter the points in the current view or search a place/ });
+
+  // 1. The caption is real, visible DOM text rendered from the new i18n key.
+  const captionNode = rtl.screen.getByText(caption);
+  assert.equal(captionNode.tagName, "P", "the caption is a real paragraph element");
+  assert.ok(!captionNode.classList.contains("sr-only"), "the caption must NOT be sr-only");
+  assert.equal(captionNode.getAttribute("aria-hidden"), null, "the caption is not hidden from assistive tech");
+  assert.notEqual(window.getComputedStyle(captionNode).display, "none", "the caption must not be display:none");
+  assert.ok(caption.trim().length > 0, "the caption carries visible text");
+  // It states BOTH consequences explicitly: the map moves, the filter clears.
+  assert.match(caption.toLowerCase(), /mov/, "the caption says the map moves");
+  assert.match(caption.toLowerCase(), /clear|filter/, "the caption says the typed filter is cleared");
+
+  // 2. It sits NEXT TO the search input, inside the same wrapper.
+  const wrapper = container.querySelector(".map-list-search");
+  assert.ok(wrapper?.contains(input), "the input lives in the search wrapper");
+  assert.ok(wrapper?.contains(captionNode), "the caption lives in the same search wrapper, adjacent to the input");
+  assert.equal(input.parentElement, captionNode.parentElement, "caption and input share the immediate container");
+
+  // 3. The existing sr-only help is untouched and still wired.
+  const help = container.querySelector("#map-list-help");
+  assert.ok(help, "the sr-only help paragraph is still rendered");
+  assert.notEqual(help, captionNode, "the visible caption is a distinct node, not the help paragraph");
+  assert.ok(help.classList.contains("sr-only"), "the existing help stays sr-only");
+  assert.equal(input.getAttribute("aria-describedby"), "map-list-help", "the input still points at the sr-only help");
+  assert.equal(help.textContent, helpText, "the sr-only help text is unchanged");
+  assert.notEqual(caption, helpText, "the caption wording differs from the sr-only help (no duplication)");
+});
+
+// ---------------------------------------------------------------------------
 // LAYER 1: applyFilters no-op guard (URL churn)
 // ---------------------------------------------------------------------------
 

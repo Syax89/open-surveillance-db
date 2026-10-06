@@ -1673,6 +1673,10 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 .map-explorer-search .map-list-search label { display:block; margin-bottom:6px; color:var(--label); font-size:var(--text-2xs); text-transform:uppercase; letter-spacing:.1em; font-weight:800; }
 .map-explorer-search .map-list-search input { width:100%; min-height:44px; box-sizing:border-box; padding:9px 11px; border:1px solid var(--map-input-border); border-radius:var(--radius-md); background:var(--white); color:var(--ink-5); font-size:var(--text-md); }
 .map-explorer-search .geocode-dropdown { left:0; right:0; }
+/* Always-visible caption under the /mappa sidebar search: reuses the same
+   muted small-text tokens as the record-search help (.record-search p), which
+   does not reach this block because it is scoped to .record-search. */
+.map-explorer-search .map-list-search .map-list-search-hint { margin:6px 0 0; color:var(--muted); font-size:var(--text-sm); line-height:1.45; }
 .map-card .filters-panel { padding:10px 18px; border-bottom:1px solid var(--line); background:var(--card-bg); }
 .map-card .filters-panel .filter-controls-row > .text-button { grid-column:auto; align-self:end; min-height:44px; display:inline-flex; align-items:center; white-space:nowrap; }
 /* FIX /mappa (CEO feedback 2026-08-02): the panel FiltersBar row is its own

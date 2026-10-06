@@ -72,6 +72,12 @@ export const en = {
   listSearchPlaceholder: "Search a place or filter the points in view",
   listSearchHelp:
     "The list shows only the points inside the current map view. Searching filters those points by title, address or type and suggests matching places from OpenStreetMap below the field; picking a place moves the map there.",
+  // Always-visible caption under the search field (sighted users): picking a
+  // suggestion is destructive for the typed filter — a fact the sr-only
+  // listSearchHelp above never surfaces visually. Deliberately DISTINCT
+  // wording, so the two texts are not duplicates of each other.
+  listSearchCaption:
+    "Picking a place suggestion moves the map and clears the filter you typed.",
   // Geocode autocomplete dropdown (t_b9666d09): the listbox under the
   // sidebar search field. Attribution is required by the ODbL for
   // Nominatim-derived place data (see docs/OSM_INTEGRATION.md §8).
@@ -188,6 +194,12 @@ export const it: Translation<typeof en> = {
   listSearchPlaceholder: "Cerca un luogo o filtra i punti in vista",
   listSearchHelp:
     "L'elenco mostra solo i punti dentro la vista corrente della mappa. La ricerca filtra quei punti per titolo, indirizzo o tipo e suggerisce luoghi corrispondenti da OpenStreetMap sotto il campo; scegliendo un luogo la mappa si sposta lì.",
+  // Didascalia sempre visibile sotto il campo di ricerca (utenti vedenti):
+  // scegliere un suggerimento è distruttivo per il filtro digitato — un fatto
+  // che il solo listSearchHelp sr-only sopra non rende mai visibile. Testo
+  // volutamente DISTINTO, così i due testi non sono duplicati.
+  listSearchCaption:
+    "Scegliere un suggerimento di luogo sposta la mappa e azzera il filtro digitato.",
   // Menu a tendina del geocoding (t_b9666d09): la listbox sotto il campo di
   // ricerca della sidebar. L'attribuzione è richiesta da ODbL per i dati dei
   // luoghi derivati da Nominatim (vedi docs/OSM_INTEGRATION.md §8).
