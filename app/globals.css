@@ -1578,7 +1578,9 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
    the status rail reuses the --status-* tokens and the coherent-box
    pattern already accepted for records/map lists.
    PR #354 (user UX choices, kept verbatim): dashboard widens to 1120px,
-   each section is its own bordered workspace, profile columns 1.35/.65. */
+   each section is its own bordered workspace.
+   Single identity column (issue #435 moved the trust badge above the
+   grid, see .account-trust--top below) — NOT the original 1.35/.65 split. */
 .account-dashboard { max-width:1120px; }
 .account-profile-grid { display:grid; grid-template-columns:minmax(0,1fr); gap:28px; align-items:start; }
 .account-identity { min-width:0; }
@@ -1607,6 +1609,11 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
    reserved for status), big number + uppercase label, icons in muted
    tiles — the kind icons are SHAPE + text, never colour alone. */
 .account-stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin:0 0 18px; }
+/* 3 stats is always odd: in a 2-column row (auto-fit on narrow widths, or
+  the fixed repeat(2,1fr) below) the last one would sit alone with a dead
+  gap beside it — span it full-width instead. Self-correcting if a 4th
+  stat is ever added (nth-child(odd) stops matching). */
+.account-stats > :last-child:nth-child(odd) { grid-column:1 / -1; }
 .account-stat { display:flex; flex-direction:column; gap:6px; padding:16px 14px; border:1px solid var(--line); border-left:3px solid var(--line); border-radius:var(--radius-md); background:var(--card-bg); }
 .account-stat-icon { display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; border-radius:var(--radius-md); background:var(--surface-muted); color:var(--ink-4); }
 .account-stat-value { font-family:var(--heading); font-size:var(--text-4xl); font-weight:800; color:var(--ink); line-height:1; }
