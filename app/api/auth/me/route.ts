@@ -5,6 +5,7 @@ import { csrfVerified, sameOrigin } from "../../../lib/csrf";
 import { BodyReadError, readJsonBody, urlTooLong } from "../../../lib/input-limits";
 import { trustLevelMeta } from "../../../lib/trust-levels";
 import { countVerifiedCameras, updateContributorDisplayName } from "../../../../db/auth";
+import { getUserByEmail } from "../../../../db/users";
 
 /**
  * GET /api/auth/me — the current contributor profile, or 401 when anonymous.
@@ -17,6 +18,13 @@ import { countVerifiedCameras, updateContributorDisplayName } from "../../../../
  * line from this single call, without a second request. The level is
  * personal data, so the response stays `no-store` and no other endpoint
  * exposes it.
+ *
+ * Since ADR 0003 (2026-10 amendment) the response also carries `role`: the
+ * caller's coarse `users.role` (ADR 0014) when a row exists for their
+ * email, else null — lets the account page show the "Go to moderation"
+ * shortcut only to moderator+ accounts. A contributor with no linked
+ * `users` row (the common case) gets `role: null`, same as a plain
+ * contributor row — both render nothing extra.
  *
  * Rate limit: the SESSION bucket (QA#2 F3) — the public header and the
  * write gate call this endpoint on EVERY page view, so the auth mutation
@@ -40,10 +48,12 @@ export async function GET(request: Request) {
       return Response.json({ error: "Not authenticated." }, { status: 401, headers: NO_STORE_HEADERS });
     }
     const verifiedCount = await countVerifiedCameras(resolved.contributor.id);
+    const user = await getUserByEmail(resolved.contributor.email);
     return Response.json(
       {
         contributor: resolved.contributor,
         level: trustLevelMeta(verifiedCount),
+        role: user?.active === 1 ? user.role : null,
       },
       {
         // Personal data: never edge-cache.

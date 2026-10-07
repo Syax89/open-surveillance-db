@@ -296,6 +296,15 @@ async function buildTree() {
       // stubbed as before.
       .replace(/from\s*["']\.\.\/db\/retention["']/g, `from "${pathToFileURL(path.join(tree, "db", "retention.mjs")).href}"`)
       .replace(/from\s*["']\.\.\/db\/oidc["']/g, `from "${pathToFileURL(path.join(tree, "db", "oidc.mjs")).href}"`)
+      // Session-based moderator login (ADR 0003 2026-10 amendment): the gate
+      // reuses the SAME real db/auth.mjs and db/users.mjs already compiled
+      // into the tree for the route handlers (REAL_DB_MODULES above), and
+      // the already-walkLib-compiled app/lib/csrf.mjs — real SQL/logic, not
+      // a hand mock, so this suite exercises the actual session → role
+      // lookup end to end.
+      .replace(/from\s*["']\.\.\/db\/auth["']/g, `from "${pathToFileURL(path.join(tree, "db", "auth.mjs")).href}"`)
+      .replace(/from\s*["']\.\.\/db\/users["']/g, `from "${pathToFileURL(path.join(tree, "db", "users.mjs")).href}"`)
+      .replace(/from\s*["']\.\.\/app\/lib\/csrf["']/g, `from "${pathToFileURL(path.join(tree, "app", "lib", "csrf.mjs")).href}"`)
       // Same rebasing for the gate-denial page copy (worker/index.ts
       // renderGateUnavailablePage): app/lib/i18n/*.ts is already compiled
       // into the tree by walkLib above, just not at a path a bare ../

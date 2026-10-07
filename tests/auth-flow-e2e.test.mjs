@@ -514,6 +514,64 @@ test("auth gate: appeals are split — moderator surfaces gated, contributor fil
   assert.equal(await authed.text(), "handler-called");
 });
 
+test("auth gate: a real osdb_session cookie linked to a moderator account bypasses Basic auth (ADR 0003 2026-10 amendment)", async () => {
+  const { default: worker } = await loadE2EModule("worker.mjs");
+  const stub = await loadE2EModule("vinext-router-stub.mjs");
+  const auth = await loadE2EModule("db/auth.mjs");
+  const ctx = { waitUntil() {}, passThroughOnException() {} };
+  const envWithCreds = { MODERATION_USER: "moderator", MODERATION_PASSWORD: "s3cret" };
+
+  // Real contributor + real session (same helper the write-gate tests use),
+  // then link it to a moderator `users` row — exactly how a real deploy
+  // provisions a Google-login moderator: a `users` row whose email matches
+  // the contributor's.
+  const profile = await auth.createContributor({
+    email: "sessionmod@osdb.test",
+    displayName: "Session Moderator",
+    password: "supersecret123",
+  });
+  const { rawToken } = await auth.createSession(profile.id, { ttlDays: 7 });
+  const now = new Date().toISOString();
+  await env.DB.prepare(
+    "INSERT INTO users (email, display_name, role, active, mfa_enabled, created_at, updated_at) VALUES (?, ?, 'moderator', 1, 0, ?, ?)",
+  ).bind("sessionmod@osdb.test", "Session Moderator", now, now).run();
+
+  stub.resetLastRequest();
+  const response = await worker.fetch(
+    new Request("https://osdb.test/api/moderation", { headers: { Cookie: `osdb_session=${rawToken}` } }),
+    envWithCreds,
+    ctx,
+  );
+  assert.equal(response.status, 200);
+  assert.equal(await response.text(), "handler-called");
+  assert.equal(stub.lastRequest.headers.get("x-osdb-user-email"), "sessionmod@osdb.test");
+  // No Authorization header was ever sent: this really is the session path, not Basic.
+  assert.equal(stub.lastRequest.headers.get("authorization"), null);
+});
+
+test("auth gate: an ordinary contributor session (no linked moderator users row) does not bypass — same 503 as without the feature", async () => {
+  const { default: worker } = await loadE2EModule("worker.mjs");
+  const auth = await loadE2EModule("db/auth.mjs");
+  const ctx = { waitUntil() {}, passThroughOnException() {} };
+
+  // Most contributors are never provisioned as a moderator: no `users` row
+  // at all for this email. The gate must deny exactly like it would with no
+  // session feature at all — a live session must never widen the
+  // fail-closed floor when nothing is configured.
+  const profile = await auth.createContributor({
+    email: "plaincontrib@osdb.test",
+    displayName: "Plain Contributor",
+    password: "supersecret123",
+  });
+  const { rawToken } = await auth.createSession(profile.id, { ttlDays: 7 });
+  const response = await worker.fetch(
+    new Request("https://osdb.test/api/moderation", { headers: { Cookie: `osdb_session=${rawToken}` } }),
+    {},
+    ctx,
+  );
+  assert.equal(response.status, 503);
+});
+
 // ---------------------------------------------------------------------------
 // 2) Submit → pending → absent from public
 // ---------------------------------------------------------------------------
