@@ -35,6 +35,17 @@ export const en = {
   mapLegendFilters: "Use search and filters above the map to refine the results.",
   mapLegendList: "Open the side rail to browse the points in the current view.",
   mapLegendAdd: "Click an empty place on the map to report a camera there.",
+  // Field-of-view legend entry (usability Batch C2, P1#6): the shaded wedge/
+  // circle drawn around directional cameras (lib/field-of-view) carries the
+  // SAME fact the marker popup already states as "Field of view: NE 45°"
+  // (fovDirection) — surfacing it here lets a sighted user learn what the
+  // shape means without opening a popup first.
+  mapLegendFov: "A shaded cone or circle around a marker shows that camera's approximate field of view.",
+  // Grid-aggregation badge legend entry (usability Batch C2, P1#7): at low
+  // zoom the numbered .osm-grid-badge replaces individual markers. The badge
+  // itself already names its count (gridBadgeLabel/Tooltip/Zoom), but nothing
+  // told the user that zooming in splits one badge into separate cameras.
+  mapLegendGridBadge: "A numbered circle groups several cameras at this zoom level — zoom in to see them individually.",
   mapLegendReport: "Report a camera",
   // Always-visible hint under the map (one line): the empty-click shortcut is
   // otherwise explained ONLY inside the collapsed-by-default .map-legend, so
@@ -166,6 +177,18 @@ export const it: Translation<typeof en> = {
   mapLegendFilters: "Usa ricerca e filtri sopra la mappa per affinare i risultati.",
   mapLegendList: "Apri la barra laterale per sfogliare i punti nella vista corrente.",
   mapLegendAdd: "Clicca uno spazio vuoto della mappa per segnalare una telecamera in quel punto.",
+  // Voce di legenda del campo visivo (usabilità Batch C2, P1#6): il cuneo/
+  // cerchio ombreggiato attorno alle telecamere direzionali (lib/field-of-view)
+  // porta lo STESSO fatto che il popup del segnaposto già dichiara come
+  // "Campo visivo: NE 45°" (fovDirection) — esplicitarlo qui permette a un
+  // utente vedente di capire cosa significa la forma senza aprire un popup.
+  mapLegendFov: "Un cono o un cerchio ombreggiato attorno a un segnaposto mostra il campo visivo approssimativo di quella telecamera.",
+  // Voce di legenda del badge di aggregazione a griglia (usabilità Batch C2,
+  // P1#7): a zoom basso il badge numerato .osm-grid-badge sostituisce i singoli
+  // marker. Il badge stesso dichiara già il suo conteggio
+  // (gridBadgeLabel/Tooltip/Zoom), ma nulla diceva all'utente che ingrandendo
+  // un badge si separa in telecamere distinte.
+  mapLegendGridBadge: "Un cerchio numerato raggruppa più telecamere a questo livello di zoom — ingrandisci per vederle singolarmente.",
   mapLegendReport: "Segnala una telecamera",
   // Suggerimento sempre visibile sotto la mappa (una riga): la scorciatoia
   // del clic su spazio vuoto è altrimenti spiegata SOLO nella legenda

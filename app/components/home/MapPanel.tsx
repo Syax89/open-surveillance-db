@@ -116,6 +116,8 @@ export function MapPanel({ filteredRecords, visibleRecords, selectedId, onSelect
               <p>{t.mapLegendFilters}</p>
               <p>{t.mapLegendList}</p>
               <p>{t.mapLegendAdd}</p>
+              <p>{t.mapLegendFov}</p>
+              <p>{t.mapLegendGridBadge}</p>
               <a href="/segnala">{t.mapLegendReport} <span aria-hidden="true">→</span></a>
             </div>
           </details>
