@@ -613,6 +613,14 @@ button { cursor:pointer; }
 /* ============ Support page (/contribuisci, CEO 2026-08-08) ============ */
 .contribuisci-page { width:var(--container-standard); margin:0 auto; padding:8px 0 96px; }
 .contribuisci-section { padding:56px 0 0; border-top:1px solid var(--line); margin-top:56px; }
+/* The shared .record-detail hero card carries a fixed 100px margin-bottom
+   (globals.css ~L854), sized for pages with no structured content below it
+   (its own CTA row lives inside the card). /contribuisci's first section
+   has its own eyebrow+h2 header right after it, so that 100px plus this
+   section's own 56px top spacing read as an accidental gap, not breathing
+   room — :first-of-type below only zeroed the WRONG side (this section's
+   own margin-top); the real fix has to shrink the card's margin-bottom
+   instead (see the :has() rule on .record-detail in the hero section). */
 .contribuisci-section:first-of-type { border-top:0; margin-top:0; }
 .contribuisci-section-head { display:flex; align-items:end; justify-content:space-between; gap:var(--space-8); margin-bottom:30px; }
 .contribuisci-section-head h2 { margin:0; color:var(--ink); font-size:var(--text-section); letter-spacing:-.065em; line-height:1; font-weight:800; text-wrap:balance; }
@@ -852,6 +860,13 @@ button { cursor:pointer; }
 .empty-state p { max-width:570px; color:var(--ink-4); font-size:var(--text-base); line-height:1.5; }
 .record-page { min-height:100vh; background:var(--paper); }
 .record-detail { width:var(--container-readable); margin:45px auto 100px; padding:50px; border:1px solid var(--line); border-radius:var(--radius-xl); background:var(--card-bg); box-shadow:0 20px 45px rgba(25,46,52,.08); }
+/* /contribuisci only: its first child section has its own eyebrow+h2
+   header right under the hero, so the shared 100px margin-bottom above
+   (sized for pages whose CTA lives INSIDE the card, e.g. /faq) reads as a
+   stray empty band instead of intentional spacing. Shrink to match the
+   card's own 45px top margin -- visually symmetric, touches no other
+   InfoPage route (:has() scopes it to this one sibling). */
+.record-detail:has(+ .contribuisci-page) { margin-bottom:45px; }
 .record-detail .card-topline { margin:0 0 22px; }
 .record-detail h1 { max-width:740px; margin:0; font-size:var(--text-display); letter-spacing:-.07em; line-height:1.06; font-weight:700; text-wrap:balance; overflow-wrap:anywhere; }
 .record-detail-kind { margin:18px 0 0; color:var(--record-kind); font-size:var(--text-3xl); font-weight:800; }
