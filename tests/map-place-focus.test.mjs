@@ -521,3 +521,49 @@ test("Batch C: createMap() adds a native Leaflet scale bar at topleft, metric on
   const kinds = map.__controls.map((entry) => entry.kind);
   assert.deepEqual(kinds, ["zoom", "geolocate", "scale"], "zoom + geolocate + scale are all registered");
 });
+
+// ---------------------------------------------------------------------------
+// Batch C2 — the legend also explains the two map shapes a sighted user can
+// SEE but not otherwise decode: the FOV cone/circle (P1#6) and the numbered
+// aggregation badges (P1#7). Purely additive — the report link stays last.
+// ---------------------------------------------------------------------------
+
+test("Batch C2: the legend explains the FOV cone and the numbered aggregation badges, keeping the report link last", async () => {
+  installPlaceMock();
+  await resetLeafletMarkers();
+  const mapBundle = await loadDomModule("app/lib/i18n/map.mjs");
+  const { en, it } = mapBundle;
+  // Both new keys exist, carry text, and are translated in IT too.
+  for (const key of ["mapLegendFov", "mapLegendGridBadge"]) {
+    assert.ok(typeof en[key] === "string" && en[key].trim().length > 0, `EN ${key} carries text`);
+    assert.ok(typeof it[key] === "string" && it[key].trim().length > 0, `IT ${key} carries text`);
+  }
+
+  const { container } = await renderWithLocale(React.createElement(MappaTool));
+  const legend = container.querySelector(".map-legend");
+  assert.ok(legend, "the legend still renders");
+  assert.equal(legend.tagName, "DETAILS", "the legend stays a <details>");
+  assert.equal(legend.hasAttribute("open"), false, "the legend still starts collapsed");
+
+  // Open it exactly as a sighted user would, then read the rendered content.
+  await rtl.act(async () => { legend.open = true; });
+  assert.equal(legend.hasAttribute("open"), true, "the legend opens on demand");
+
+  const text = legend.textContent;
+  assert.ok(text.includes(en.mapLegendFov), "the legend explains the shaded FOV cone/circle");
+  assert.ok(text.includes(en.mapLegendGridBadge), "the legend explains the numbered aggregation badges");
+
+  // Both new lines are real <p> siblings of the 5 existing legend lines (same
+  // additive pattern), and nothing else in the legend content div changed.
+  const content = [...legend.children].find((el) => el.tagName === "DIV");
+  assert.ok(content, "the legend keeps its content div");
+  const paragraphs = [...content.querySelectorAll("p")].map((p) => p.textContent);
+  assert.ok(paragraphs.includes(en.mapLegendFov), "the FOV line is a real <p> in the legend content");
+  assert.ok(paragraphs.includes(en.mapLegendGridBadge), "the badge line is a real <p> in the legend content");
+  assert.equal(paragraphs.length, 7, "5 pre-existing legend lines + the 2 new ones");
+
+  // Position regression guard: inserting before it must not move the report link.
+  const last = content.lastElementChild;
+  assert.equal(last.tagName, "A", "the report link stays the LAST child of the legend content");
+  assert.equal(last.getAttribute("href"), "/segnala", "the last child is still the /segnala report link");
+});
