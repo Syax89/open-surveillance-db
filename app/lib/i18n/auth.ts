@@ -25,6 +25,9 @@ export const en = {
   login: "Log in",
   register: "Create account",
   logout: "Log out",
+  // Moderator/admin shortcut on the account page (ADR 0003 2026-10): shown
+  // only when GET /api/auth/me reports a coarse role of moderator+.
+  goToModeration: "Go to moderation",
   noAccount: "No account yet?",
   haveAccount: "Already have an account?",
   createOne: "Create one",
@@ -325,6 +328,7 @@ export const it: Translation<typeof en> = {
   login: "Accedi",
   register: "Crea account",
   logout: "Esci",
+  goToModeration: "Vai alla moderazione",
   noAccount: "Non hai ancora un account?",
   haveAccount: "Hai già un account?",
   createOne: "Crea un account",

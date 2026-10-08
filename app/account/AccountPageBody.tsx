@@ -13,6 +13,7 @@ import { RecoveryCodesDialog } from "../components/RecoveryCodesDialog";
 import { LevelBadge } from "../components/LevelBadge";
 import type { TrustLevelMeta } from "../lib/trust-levels";
 import { browserSupportsWebAuthn, createCredential } from "../lib/webauthn-client";
+import { ModerationShortcutLink } from "../components/moderation/ModerationShortcutLink";
 import { ApiKeysSection } from "./ApiKeysSection";
 
 /**
@@ -178,6 +179,10 @@ export default function AccountPageBody() {
   const router = useRouter();
   const [contributor, setContributor] = useState<Contributor | null>(null);
   const [level, setLevel] = useState<TrustLevelMeta | null>(null);
+  // Coarse users.role (ADR 0003 2026-10 amendment), from GET /api/auth/me:
+  // null for every plain contributor (no linked `users` row) — only
+  // "moderator"/"admin" unlocks the dashboard shortcut below.
+  const [role, setRole] = useState<string | null>(null);
   const [contributions, setContributions] = useState<Contribution[]>([]);
   const [pagination, setPagination] = useState<{ page: number; totalPages: number; hasMore: boolean; total: number } | null>(null);
   const [filter, setFilter] = useState<StatusFilter>("all");
@@ -256,12 +261,14 @@ export default function AccountPageBody() {
       .then(async (response) => {
         if (response.status === 401) {
           setContributor(null);
+          setRole(null);
           return;
         }
         if (!response.ok) throw new Error(t.errorGeneric);
         const body = await response.json();
         setContributor(body.contributor);
         setLevel(body.level ?? null);
+        setRole(body.role ?? null);
       })
       .catch((reason: unknown) => {
         if (reason instanceof Error && reason.name !== "AbortError") setError(t.errorGeneric);
@@ -488,6 +495,7 @@ export default function AccountPageBody() {
       if (response.ok) {
         setLoggedOut(true);
         setContributor(null);
+        setRole(null);
         router.refresh();
       } else if (response.status === 403) {
         setError(t.errorCrossOrigin);
@@ -564,6 +572,7 @@ export default function AccountPageBody() {
         setConfirmDelete(false);
         setDeleted(true);
         setContributor(null);
+        setRole(null);
         router.refresh();
       } else if (response.status === 403) {
         setConfirmDelete(false);
@@ -720,6 +729,7 @@ export default function AccountPageBody() {
                 <button className="button detail-outline account-logout" type="button" onClick={() => void onLogout()}>
                   {t.logout}
                 </button>
+                <ModerationShortcutLink role={role} label={t.goToModeration} />
               </div>
             </section>
 

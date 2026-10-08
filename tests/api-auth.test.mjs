@@ -35,6 +35,11 @@ beforeEach(async () => {
   // truncated-SHA-256 fallback — never a raw IP.
   stub("registrationIpHash", async (value) => createHash("sha256").update(value).digest("hex").slice(0, 32));
   stub("verifyPasswordDummy", async () => false);
+  // GET /api/auth/me now also resolves the caller's coarse users.role (ADR
+  // 0003 2026-10 amendment, "Go to moderation" account shortcut). Default:
+  // no linked `users` row — same as every ordinary contributor fixture in
+  // this file; a test that needs a moderator identity overrides this stub.
+  stub("getUserByEmail", async () => null);
   if (!rateLimit) rateLimit = await loadLibModule("rate-limit");
   rateLimit.resetRateLimitState();
 });

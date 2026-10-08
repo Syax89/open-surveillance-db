@@ -109,6 +109,35 @@ async function buildWorkerTree() {
       "}\n",
   );
 
+  // Session-based moderator login (ADR 0003 2026-10 amendment): the gate
+  // imports ../db/auth (findSessionByToken) and ../db/users
+  // (getUserByEmail/roleAtLeast) to check a live osdb_session cookie before
+  // falling through to Basic/bearer. Hand-written mocks (not the real SQL —
+  // that is exercised separately by the e2e harness, which already compiles
+  // the real db/auth.ts and db/users.ts) with configurable state so tests
+  // can simulate "no session" (default), "session but wrong role", and
+  // "valid moderator session" without touching D1.
+  await writeFile(
+    path.join(dbDir, "auth.mjs"),
+    "export const __state = { session: null, shouldThrow: false };\n" +
+      "export async function findSessionByToken(_token, _now) {\n" +
+      "  if (__state.shouldThrow) throw new Error(\"simulated D1 outage\");\n" +
+      "  return __state.session;\n" +
+      "}\n",
+  );
+  await writeFile(
+    path.join(dbDir, "users.mjs"),
+    "export const __state = { users: {} };\n" +
+      "const roleRank = { contributor: 1, moderator: 2, admin: 3 };\n" +
+      "export function roleAtLeast(role, minimum) { return roleRank[role] >= roleRank[minimum]; }\n" +
+      "export async function getUserByEmail(email) {\n" +
+      "  return __state.users[email] ?? null;\n" +
+      "}\n",
+  );
+  const csrfLibDir = path.join(tree, "app", "lib");
+  await mkdir(csrfLibDir, { recursive: true });
+  await writeFile(path.join(csrfLibDir, "csrf.mjs"), 'export const SESSION_COOKIE = "osdb_session";\n');
+
   // The worker imports the (pure, side-effect-free) gate-denial page copy
   // from app/lib/i18n/{common,errors,types}: compile the real files so the
   // HTML-shell test exercises the actual copy, not a hand-maintained mock.
@@ -132,6 +161,18 @@ async function buildWorkerTree() {
     .replace(
       /from\s*["']\.\.\/db\/oidc["']/g,
       `from "${pathToFileURL(path.join(dbDir, "oidc.mjs")).href}"`,
+    )
+    .replace(
+      /from\s*["']\.\.\/db\/auth["']/g,
+      `from "${pathToFileURL(path.join(dbDir, "auth.mjs")).href}"`,
+    )
+    .replace(
+      /from\s*["']\.\.\/db\/users["']/g,
+      `from "${pathToFileURL(path.join(dbDir, "users.mjs")).href}"`,
+    )
+    .replace(
+      /from\s*["']\.\.\/app\/lib\/csrf["']/g,
+      `from "${pathToFileURL(path.join(csrfLibDir, "csrf.mjs")).href}"`,
     )
     .replace(
       /from\s*["']\.\.\/app\/lib\/i18n\/common["']/g,
@@ -178,7 +219,9 @@ async function loadWorker() {
   const app = await import(pathToFileURL(path.join(tree, "mocks", "app-router-entry.mjs")).href);
   const retention = await import(pathToFileURL(path.join(tree, "db", "retention.mjs")).href);
   const oidc = await import(pathToFileURL(path.join(tree, "db", "oidc.mjs")).href);
-  return { worker: workerModule.default, image, app, retention, oidc };
+  const auth = await import(pathToFileURL(path.join(tree, "db", "auth.mjs")).href);
+  const users = await import(pathToFileURL(path.join(tree, "db", "users.mjs")).href);
+  return { worker: workerModule.default, image, app, retention, oidc, auth, users };
 }
 
 /** Minimal Env shaped by the worker's Env interface. */
@@ -212,11 +255,14 @@ function request(pathAndQuery, { method = "GET", headers = {}, body } = {}) {
 }
 
 beforeEach(async () => {
-  const { image, app, retention, oidc } = await loadWorker();
+  const { image, app, retention, oidc, auth, users } = await loadWorker();
   image.__calls.length = 0;
   app.__calls.length = 0;
   retention.__calls.length = 0;
   oidc.__calls.length = 0;
+  auth.__state.session = null;
+  auth.__state.shouldThrow = false;
+  users.__state.users = {};
 });
 
 // ---------------------------------------------------------------------------
@@ -1046,6 +1092,118 @@ test("admitted aliases preserve URL, query, method and body with server-chosen i
   } finally {
     app.default.fetch = originalFetch;
   }
+});
+
+// ---------------------------------------------------------------------------
+// Session-based moderator login (ADR 0003 2026-10 amendment): a live
+// osdb_session cookie whose contributor is linked to a moderator+ `users`
+// row grants the same pass as Basic/bearer, checked BEFORE them. Every
+// failure mode of this check must fall through to the UNCHANGED Basic/
+// bearer gate, never deny on its own.
+// ---------------------------------------------------------------------------
+
+const MINIMAL_BASIC_CONFIG = { MODERATION_USER: "fixture", MODERATION_PASSWORD: "fixture-pass" };
+const sessionCookie = (token) => `osdb_session=${token}`;
+
+test("valid moderator session bypasses Basic/bearer and injects the user's own email", async () => {
+  const { worker, app, auth, users } = await loadWorker();
+  auth.__state.session = { contributor: { email: "mod@osdb.test" } };
+  users.__state.users["mod@osdb.test"] = { email: "mod@osdb.test", role: "moderator", active: 1 };
+  const response = await worker.fetch(
+    request("/moderation", { headers: { cookie: sessionCookie("real-token") } }),
+    testEnv(MINIMAL_BASIC_CONFIG),
+    ctx(),
+  );
+  assert.equal(response.status, 200);
+  assert.equal(app.__calls.at(-1).headers["x-osdb-user-email"], "mod@osdb.test");
+});
+
+test("valid admin session also bypasses (role admin is above the moderator floor)", async () => {
+  const { worker, app, auth, users } = await loadWorker();
+  auth.__state.session = { contributor: { email: "admin@osdb.test" } };
+  users.__state.users["admin@osdb.test"] = { email: "admin@osdb.test", role: "admin", active: 1 };
+  const response = await worker.fetch(
+    request("/moderation", { headers: { cookie: sessionCookie("real-token") } }),
+    testEnv(MINIMAL_BASIC_CONFIG),
+    ctx(),
+  );
+  assert.equal(response.status, 200);
+  assert.equal(app.__calls.at(-1).headers["x-osdb-user-email"], "admin@osdb.test");
+});
+
+test("session fallback: every degraded case falls through to Basic/bearer, never denies on its own", async () => {
+  const { worker, auth, users } = await loadWorker();
+  const cases = [
+    ["no cookie at all", () => {}],
+    ["session cookie present but findSessionByToken finds nothing (dead/expired/revoked)", () => {
+      auth.__state.session = null;
+    }],
+    ["session valid but no linked users row", () => {
+      auth.__state.session = { contributor: { email: "ghost@osdb.test" } };
+    }],
+    ["session valid, users row exists but role is below moderator", () => {
+      auth.__state.session = { contributor: { email: "contrib@osdb.test" } };
+      users.__state.users["contrib@osdb.test"] = { email: "contrib@osdb.test", role: "contributor", active: 1 };
+    }],
+    ["session valid, moderator role but user inactive", () => {
+      auth.__state.session = { contributor: { email: "disabled@osdb.test" } };
+      users.__state.users["disabled@osdb.test"] = { email: "disabled@osdb.test", role: "moderator", active: 0 };
+    }],
+    ["findSessionByToken throws (simulated D1 outage)", () => {
+      auth.__state.shouldThrow = true;
+    }],
+  ];
+  for (const [label, setup] of cases) {
+    auth.__state.session = null;
+    auth.__state.shouldThrow = false;
+    users.__state.users = {};
+    setup();
+    // No Basic/bearer credential configured at all here: the request must
+    // still get the SAME 503 it would get with no session feature at all —
+    // the session check must never be the reason a request is denied.
+    const response = await worker.fetch(
+      request("/moderation", { headers: { cookie: sessionCookie("whatever") } }),
+      denialEnv(),
+      ctx(),
+    );
+    assert.equal(response.status, 503, label);
+  }
+});
+
+test("session check never runs when no Basic/bearer credential is configured (fail-closed floor unchanged)", async () => {
+  const { worker, auth, users } = await loadWorker();
+  auth.__state.session = { contributor: { email: "mod@osdb.test" } };
+  users.__state.users["mod@osdb.test"] = { email: "mod@osdb.test", role: "moderator", active: 1 };
+  // denialEnv() fails the test if the gate touches DB/ASSETS/etc for a
+  // request that must be denied without doing any work — a valid session
+  // must NOT rescue a host with zero MODERATION_* secrets configured.
+  const response = await worker.fetch(
+    request("/moderation", { headers: { cookie: sessionCookie("real-token") } }),
+    denialEnv(),
+    ctx(),
+  );
+  assert.equal(response.status, 503);
+});
+
+test("moderator session does not leak into the legacy identity headers it replaces", async () => {
+  const { worker, app, auth, users } = await loadWorker();
+  auth.__state.session = { contributor: { email: "mod@osdb.test" } };
+  users.__state.users["mod@osdb.test"] = { email: "mod@osdb.test", role: "moderator", active: 1 };
+  const response = await worker.fetch(
+    request("/moderation", {
+      headers: {
+        cookie: sessionCookie("real-token"),
+        "x-osdb-user-email": "spoof@osdb.test",
+        "oai-authenticated-user-email": "spoof@osdb.test",
+      },
+    }),
+    testEnv(MINIMAL_BASIC_CONFIG),
+    ctx(),
+  );
+  assert.equal(response.status, 200);
+  const forwarded = app.__calls.at(-1).headers;
+  assert.equal(forwarded["x-osdb-user-email"], "mod@osdb.test");
+  assert.equal(forwarded["oai-authenticated-user-email"], undefined);
 });
 
 test("contributor POST appeals aliases stay ungated while GET and PATCH remain gated", async () => {

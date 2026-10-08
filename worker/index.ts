@@ -5,6 +5,9 @@ import { isOpenRedirectShaped } from "vinext/server/request-pipeline";
 import type { AnalyticsEngineDataset, D1Database, Fetcher, SendEmail } from "cloudflare:workers";
 import { DEFAULT_RETENTION_POLICY, runRetentionSweep, type RetentionSummary } from "../db/retention";
 import { sweepOidcExpired } from "../db/oidc";
+import { findSessionByToken } from "../db/auth";
+import { getUserByEmail, roleAtLeast } from "../db/users";
+import { SESSION_COOKIE } from "../app/lib/csrf";
 import { en as gateCommonEn, it as gateCommonIt } from "../app/lib/i18n/common";
 import { en as gateErrorsEn, it as gateErrorsIt } from "../app/lib/i18n/errors";
 import { LOCALE_COOKIE, resolveLocale, type Locale, type Translation } from "../app/lib/i18n/types";
@@ -406,6 +409,43 @@ function matchBasicOperator(
 }
 
 /**
+ * Resolve a live `osdb_session` cookie (ADR 0013) to a moderator identity
+ * (ADR 0003 amendment 2026-10: real per-moderator login as the primary
+ * path, replacing the shared Basic secret). Every failure mode — no cookie,
+ * dead/expired/revoked session, no linked `users` row, inactive user, role
+ * below moderator, or a D1 error — returns null and falls through to the
+ * UNCHANGED Basic/bearer gate below. This is deliberate: a missing session
+ * is not a denial, it is "try the next credential", so a contributor
+ * browsing the site with an ordinary session never sees a 401/503 here —
+ * they just don't get the free pass and the legacy gate decides as before.
+ */
+async function moderatorEmailFromSession(request: Request): Promise<string | null> {
+  const cookieHeader = request.headers.get("Cookie") ?? "";
+  const match = cookieHeader
+    .split(";")
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(`${SESSION_COOKIE}=`));
+  if (!match) return null;
+  let token: string;
+  try {
+    token = decodeURIComponent(match.slice(SESSION_COOKIE.length + 1));
+  } catch {
+    return null;
+  }
+  if (!token) return null;
+  try {
+    const session = await findSessionByToken(token);
+    if (!session) return null;
+    const user = await getUserByEmail(session.contributor.email);
+    if (!user || user.active !== 1 || !roleAtLeast(user.role, "moderator")) return null;
+    return user.email;
+  } catch (error) {
+    console.error("Moderation session gate: lookup failed, falling back to Basic/bearer", error);
+    return null;
+  }
+}
+
+/**
  * The moderation gate (ADR 0003 / ADR 0014, QA#3 F5). Returns the denial
  * response when the request must not pass, plus the SERVER-CHOSEN identity
  * email the worker injects as `x-osdb-user-email` after a successful gate.
@@ -413,19 +453,25 @@ function matchBasicOperator(
  * Identity resolution order:
  *   1. Bearer token (`MODERATION_TOKEN`) → `MODERATION_IDENTITY_EMAIL`
  *      (a machine/ops identity, unchanged);
- *   2. Basic auth against `MODERATION_OPERATORS` (per-operator list) → the
+ *   2. A live `osdb_session` cookie whose contributor is linked to a
+ *      `users` row with role moderator+ (ADR 0003 amendment 2026-10) → that
+ *      user's own email, real per-moderator login via the site's existing
+ *      Google/password sign-in, no shared secret involved;
+ *   3. Basic auth against `MODERATION_OPERATORS` (per-operator list) → the
  *      matched operator's OWN email — each operator is now distinguishable
  *      in the append-only audit trail;
- *   3. legacy single Basic pair (`MODERATION_USER`/`MODERATION_PASSWORD`)
+ *   4. legacy single Basic pair (`MODERATION_USER`/`MODERATION_PASSWORD`)
  *      → `MODERATION_IDENTITY_EMAIL` (prototype / single-operator deploys).
  *
  * When `MODERATION_OPERATORS` is configured it is the ONLY Basic source of
  * truth: mixing in the legacy pair would reintroduce a shared identity that
  * all operators could impersonate, so the legacy pair is ignored in that
- * configuration. Fail-closed everywhere: no credentials → 503, wrong
- * credential → 401, malformed operator list → 503.
+ * configuration. The session check (2) never participates in that
+ * exclusivity rule — it is a separate identity path, not a Basic source.
+ * Fail-closed everywhere: no credentials → 503, wrong credential → 401,
+ * malformed operator list → 503.
  */
-function requireModerationAuth(request: Request, env: Env): { denied: Response | null; identityEmail: string | null } {
+async function requireModerationAuth(request: Request, env: Env): Promise<{ denied: Response | null; identityEmail: string | null }> {
   const operators = parseModerationOperators(env);
   if (env.MODERATION_OPERATORS !== undefined && env.MODERATION_OPERATORS !== "" && operators === null) {
     console.error("Moderation access control: MODERATION_OPERATORS is not a valid operator list; denying", request.url);
@@ -451,6 +497,10 @@ function requireModerationAuth(request: Request, env: Env): { denied: Response |
   const authorization = request.headers.get("Authorization") ?? "";
   if (env.MODERATION_TOKEN && safeEqual(`Bearer ${env.MODERATION_TOKEN}`, authorization)) {
     return { denied: null, identityEmail: env.MODERATION_IDENTITY_EMAIL ?? null };
+  }
+  const sessionEmail = await moderatorEmailFromSession(request);
+  if (sessionEmail) {
+    return { denied: null, identityEmail: sessionEmail };
   }
   if (operators !== null && operators.length > 0) {
     const operator = matchBasicOperator(authorization, operators);
@@ -1152,7 +1202,7 @@ async function dispatch(request: Request, env: Env, ctx: ExecutionContext, url: 
     }
     const routedThroughGate = gatedPath(request.method, gateTarget);
     if (routedThroughGate) {
-      const gate = requireModerationAuth(gated, env);
+      const gate = await requireModerationAuth(gated, env);
       if (gate.denied) {
         // Human page navigation (not /api/*, not a redirect/fetch client):
         // style the same denial with the site's existing shell instead of
