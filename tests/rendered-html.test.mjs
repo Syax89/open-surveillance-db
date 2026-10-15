@@ -816,6 +816,8 @@ test("worker edge source carries the global security headers (static guard)", as
     ["X-Frame-Options", "DENY"],
     ["Referrer-Policy", "strict-origin-when-cross-origin"],
     ["Permissions-Policy", "camera=()"],
+    ["Strict-Transport-Security", "includeSubDomains"],
+    ["Cross-Origin-Opener-Policy", "same-origin"],
     ["Content-Security-Policy", "default-src 'self'"],
   ]) {
     assert.ok(workerSource.includes(name), `worker/index.ts must define ${name}`);
