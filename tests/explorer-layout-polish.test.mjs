@@ -182,7 +182,7 @@ test("≤700px /directory header and card actions compact onto one row without l
 
   const details = ruleBlock(mobile, ".hero-copy--details");
   assert.equal(compact(declaration(details, "padding-top")), "0");
-  assert.equal(compact(declaration(details, "max-width")), "none", "the mobile CTA must not stay capped at the desktop 640px");
+  assert.equal(compact(declaration(details, "max-width")), "none", "the mobile CTA must not stay capped at the desktop 860px");
 
   // Card action links sit on one 8px-gap row and wrap when 320px runs out.
   const actions = ruleBlock(mobile, ".directory-tool .record-list .record-list-card .record-list-actions");
