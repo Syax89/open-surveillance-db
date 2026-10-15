@@ -2048,6 +2048,8 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 .community-privacy-confirm-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--space-2); }
 .community-privacy-confirm-actions .community-action { justify-content:center; text-align:center; }
 .osm-popup-community { margin:10px 0 0; border-top:1px solid var(--line); padding-top:10px; }
+.osm-popup-community .community-toolbar .community-action,
+.osm-popup-community .community-more-trigger { font-size:var(--text-xs); padding:8px 4px; }
 .osm-popup-community .community-actions { margin:0; padding:0; border-bottom:0; }
 .osm-popup-community .community-actions-compact .community-actions-cta { margin:8px 0 0; }
 .osm-popup-community .community-actions-compact .community-actions-cta a { font-size:var(--text-sm); }
