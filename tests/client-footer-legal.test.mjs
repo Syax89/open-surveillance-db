@@ -184,7 +184,10 @@ test("footer: contentinfo landmark with localized aria-label and labelled nav", 
     // Public tool routes (F3 t_2ca69725, FRONTEND_DESIGN §2.5).
     "/mappa", "/directory", "/segnala", "/correggi",
     // Institutional pages.
-    "/manifesto", "/regole", "/guide", "/privacy", "/termini", "/licenze", "/fonti", "/accessibility", "/faq", "/contatti", "/api-docs", "/moderazione",
+    "/manifesto", "/regole", "/guide", "/privacy", "/termini", "/licenze", "/fonti", "/accessibility", "/faq", "/contatti", "/api-docs",
+    // SEO fix 2026-10-15: links straight to the destination, not through
+    // the /moderazione compatibility redirect (kept for old backlinks only).
+    "/guide#guide-publication-details",
   ]) {
     assert.ok(
       internal.some((l) => l.href === expected),

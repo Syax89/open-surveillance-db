@@ -70,7 +70,18 @@ export function SiteFooter() {
           <Link href="/segnala" aria-current={pageCurrent("/segnala")}>{t.toolReport}</Link>
           <Link href="/correggi" aria-current={pageCurrent("/correggi")}>{t.toolCorrection}</Link>
           <Link href="/regole" aria-current={pageCurrent("/regole")}>{t.rules}</Link>
-          <Link href="/moderazione" aria-current={pageCurrent("/moderazione")}>{t.moderation}</Link>
+          {/* SEO fix (2026-10-15): link straight to the real destination
+              instead of through the /moderazione compatibility redirect.
+              That redirect exists for OLD external backlinks (see
+              docs/SITEMAP.md "/moderazione — legacy publication URL"), not
+              to be re-linked internally — every page's footer was sending
+              crawlers through an extra 308 hop on every single visit,
+              which Search Console flagged as a failing redirect page. */}
+          {/* No aria-current: this is a section anchor on /guide, not a
+              distinct page — pageCurrent("/guide") would double-mark it
+              alongside the real /guide footer link below when both are
+              visited, which is an a11y regression (two "current" items). */}
+          <Link href="/guide#guide-publication-details">{t.moderation}</Link>
         </div>
         <div className="footer-link-group">
           <p className="footer-link-group-title">{t.projectGroup}</p>
