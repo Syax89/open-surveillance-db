@@ -21,8 +21,20 @@ import RecordPageBody from "./RecordPageBody";
  */
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
+  const title = `Record #${id} — OpenSurveillanceDB`;
+  // SEO fix (2026-10-15): self-referencing canonical + a per-id description.
+  // No DB fetch here on purpose (see file header) — the description stays
+  // generic text but varies by id, enough to stop every /records/* page
+  // from sharing byte-identical <meta description>/og:description, which
+  // Search Console was flagging as "Discovered, currently not indexed" at
+  // scale (160k near-duplicate pages, zero canonical signal).
+  const description = `Public surveillance camera record #${id} on OpenSurveillanceDB, an open, community-maintained database.`;
   return {
-    title: `Record #${id} — OpenSurveillanceDB`,
+    title,
+    description,
+    alternates: { canonical: `/records/${id}` },
+    openGraph: { title, description, images: ["/og.png"] },
+    twitter: { card: "summary_large_image", title, description, images: ["/og.png"] },
   };
 }
 
