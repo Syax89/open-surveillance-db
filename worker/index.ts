@@ -559,10 +559,19 @@ async function requireModerationAuth(request: Request, env: Env): Promise<{ deni
  *   `base-uri 'self'`: baseline that blocks most reflected/XSS payloads at
  *   the header level.
  *
- * HSTS is deliberately NOT set here: the site is currently served over
- * plain HTTP (local test container). `Strict-Transport-Security` should be enabled
- * at the Cloudflare zone level (or via a CF header rule) once the public
- * domain is active — see task t_6148aa6f.
+ * HSTS + COOP (2026-10-15, closes t_6148aa6f): the public domain is live
+ * on HTTPS (hostRedirect already forces https:// and the www alias to the
+ * apex), so `Strict-Transport-Security` is safe to set here rather than at
+ * the CF zone level. `includeSubDomains` is safe too: www already 308s to
+ * the apex and the only other host, the preprod alias, lives on an
+ * entirely different domain (osdb.syaxhome89.com), not a subdomain of
+ * this one. `preload` is deliberately omitted — it is a long-lived
+ * browser-list commitment that is hard to reverse; add it later once HTTPS
+ * coverage has been stable for a while.
+ * `Cross-Origin-Opener-Policy: same-origin` is safe alongside the existing
+ * Google OIDC login: that flow is a full-page redirect (db/oidc.ts), never
+ * a `window.open` popup, so there is no `window.opener` relationship for
+ * COOP to break.
  */
 /**
  * Geolocation unblock for /mappa and /segnala (t_18259daa + CEO 2026-08-09
@@ -583,6 +592,8 @@ const SECURITY_HEADERS: ReadonlyArray<readonly [string, string]> = [
   ["X-Frame-Options", "DENY"],
   ["Referrer-Policy", "strict-origin-when-cross-origin"],
   ["Permissions-Policy", "camera=(), microphone=(), geolocation=()"],
+  ["Strict-Transport-Security", "max-age=63072000; includeSubDomains"],
+  ["Cross-Origin-Opener-Policy", "same-origin"],
   [
     "Content-Security-Policy",
     "default-src 'self'; " +
