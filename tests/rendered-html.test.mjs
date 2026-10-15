@@ -825,6 +825,38 @@ test("worker edge source carries the global security headers (static guard)", as
   }
 });
 
+test("rendered pages use a per-request CSP nonce instead of unsafe-inline", async () => {
+  // 2026-10-15: every page rendered through vinext's RSC pipeline (this is
+  // ALL of them — the dispatch() call site that reaches handler.fetch) gets
+  // a fresh nonce; every inline <script>/<style> vinext emits must carry
+  // that SAME nonce, and unsafe-inline must be gone from the egress CSP.
+  for (const route of ["/", "/guide", "/records/1", "/path-inesistente"]) {
+    const { response, html } = await renderRoute(route);
+    const csp = response.headers.get("content-security-policy") ?? "";
+    assert.ok(!csp.includes("unsafe-inline"), `${route}: CSP must not fall back to unsafe-inline`);
+    const nonceMatch = csp.match(/'nonce-([^']+)'/);
+    assert.ok(nonceMatch, `${route}: CSP must carry a nonce`);
+    const nonce = nonceMatch[1].replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const scriptTags = html.match(/<script\b[^>]*>/g) ?? [];
+    assert.ok(scriptTags.length > 0, `${route}: expected at least one inline <script>`);
+    for (const tag of scriptTags) {
+      assert.match(tag, new RegExp(`nonce="${nonce}"`), `${route}: every inline script must carry the egress nonce — got ${tag.slice(0, 80)}`);
+    }
+  }
+});
+
+test("two requests for the same route get two different CSP nonces", async () => {
+  // A fixed nonce would defeat the point (an attacker-injected inline
+  // script could reuse a known/leaked nonce). Two independent renders of
+  // the same route must never share a nonce.
+  const first = await renderRoute("/");
+  const second = await renderRoute("/");
+  const firstNonce = (first.response.headers.get("content-security-policy") ?? "").match(/'nonce-([^']+)'/)?.[1];
+  const secondNonce = (second.response.headers.get("content-security-policy") ?? "").match(/'nonce-([^']+)'/)?.[1];
+  assert.ok(firstNonce && secondNonce, "both responses must carry a nonce");
+  assert.notEqual(firstNonce, secondNonce, "the nonce must be fresh per request");
+});
+
 test("custom 404 page renders for unknown routes and malformed record ids (EN default)", async () => {
   // t_7eed4601: app/not-found.tsx is the custom 404 (design system, EN/IT,
   // homepage link). Next.js renders it for routes that do not exist AND for

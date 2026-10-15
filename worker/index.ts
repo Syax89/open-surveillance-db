@@ -612,6 +612,35 @@ const SECURITY_HEADERS: ReadonlyArray<readonly [string, string]> = [
 ];
 
 /**
+ * CSP nonce for the vinext-rendered page path only (see the call site in
+ * `dispatch()`). A random nonce per request lets that ONE path drop
+ * 'unsafe-inline' from script-src/style-src without touching the static
+ * fallback above, which every other response in this file still uses.
+ */
+function generateCspNonce(): string {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return btoa(String.fromCharCode(...bytes));
+}
+
+function buildCspWithNonce(nonce: string): string {
+  return (
+    "default-src 'self'; " +
+    `script-src 'self' 'nonce-${nonce}'; ` +
+    `style-src 'self' 'nonce-${nonce}'; ` +
+    "img-src 'self' data: blob:; " +
+    "font-src 'self'; " +
+    "connect-src 'self'; " +
+    "media-src 'self'; " +
+    "object-src 'none'; " +
+    "frame-ancestors 'none'; " +
+    "base-uri 'self'; " +
+    "form-action 'self'; " +
+    "worker-src 'self' blob:"
+  );
+}
+
+/**
  * OAuth Protected Resource Metadata (RFC 9728, 2026-08-22): describes the
  * resource server's bearer-credential requirements for the write API —
  * the scopes an API key can carry and the header method. Published because
@@ -1277,7 +1306,37 @@ async function dispatch(request: Request, env: Env, ctx: ExecutionContext, url: 
       return withSecurityHeaders(optimized, url.pathname, url.hostname);
     }
 
-    return withSecurityHeaders(await handler.fetch(gated, env, ctx), url.pathname, url.hostname, routedThroughGate);
+    // CSP nonce (2026-10-15): only this call site renders through vinext's
+    // own RSC pipeline, which is the ONLY place in the app that ever emits
+    // an inline <script>/<style> tag (grep for "<script" in this file: zero
+    // hits — every hand-built page above, incl. the gate-denial HTML, has
+    // none). vinext reads the nonce from the REQUEST's own CSP header
+    // (verified empirically against a Miniflare build of this worker: every
+    // inline <script> it emits came back carrying `nonce=`) and stamps the
+    // same nonce on every inline tag it controls (RSC bootstrap scripts,
+    // the font-preload `<style data-vinext-fonts>`). Setting the identical
+    // nonce on the egress CSP below replaces the static 'unsafe-inline'
+    // fallback (still used by every OTHER withSecurityHeaders call site in
+    // this file, none of which render through vinext) — withSecurityHeaders
+    // never overwrites a CSP that is already present, so this one wins over
+    // the static default for this response only. Every HTML page in this
+    // app answers `Cache-Control: no-store` (verified live), so a per-request
+    // nonce is safe: Cloudflare never caches an HTML response that could
+    // later be served to a different visitor with a stale nonce.
+    const nonce = generateCspNonce();
+    const renderHeaders = new Headers(gated.headers);
+    renderHeaders.set("Content-Security-Policy", buildCspWithNonce(nonce));
+    const rendered = await handler.fetch(new Request(gated, { headers: renderHeaders }), env, ctx);
+    const taggedHeaders = new Headers(rendered.headers);
+    // Never overwrite a CSP the app handler set on its own response — same
+    // "only add if missing" contract withSecurityHeaders enforces for every
+    // other header (see "preserves security headers set by the app handler"
+    // in tests/worker-edge.test.mjs).
+    if (!taggedHeaders.has("Content-Security-Policy")) {
+      taggedHeaders.set("Content-Security-Policy", buildCspWithNonce(nonce));
+    }
+    const tagged = new Response(rendered.body, { status: rendered.status, statusText: rendered.statusText, headers: taggedHeaders });
+    return withSecurityHeaders(tagged, url.pathname, url.hostname, routedThroughGate);
 }
 
 const worker = {
