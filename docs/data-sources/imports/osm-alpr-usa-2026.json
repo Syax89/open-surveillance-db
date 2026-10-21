@@ -1,6 +1,6 @@
 {
   "source_name": "OpenStreetMap ALPR surveillance (DeFlock-equivalent selection)",
-  "format": "osm-pbf-local",
+  "format": "osm-overpass",
   "license": "ODbL 1.0 (OSM)",
   "license_url": "https://opendatacommons.org/licenses/odbl/1-0/",
   "attribution_text": "© OpenStreetMap contributors (https://www.openstreetmap.org/copyright)",
@@ -12,12 +12,9 @@
   "surveillance_type_map": {
     "alpr": "Traffic / licence plate reader"
   },
-  "skip_if": {
-    "surveillance": "indoor"
-  },
   "external_id_prefix": "osm:",
   "enrich": false,
   "slug": "osm-alpr-usa-2026",
   "max_records": 250000,
-  "notes": "OpenStreetMap ALPR nodes/ways (man_made=surveillance + surveillance:type=ALPR, DeFlock-equivalent selection, plus an explicit surveillance=public|outdoor gate) from the national Geofabrik extract (us-latest.osm.pbf), converted to {elements:[...]} JSON and read from a local file — no Overpass, no network. Data © OpenStreetMap contributors, ODbL 1.0; Geofabrik hosts the extract only. Scope: the national extract snapshot, not a per-feature administrative-boundary proof. See docs/data-sources/osm-alpr-imports.md."
+  "notes": "OpenStreetMap ALPR nodes/ways (man_made=surveillance + surveillance:type=ALPR, DeFlock-equivalent selection, plus an explicit surveillance=public|outdoor gate). Transport: the national Geofabrik extract (us-latest.osm.pbf, hosted at source_url) converted offline by the operator to Overpass-shaped JSON ({elements:[...]}, `out center` geometry) at local_source_path; the adapter reads that file only — no Overpass call, no network. Scope: that national extract snapshot, not a per-feature administrative-boundary proof. Data © OpenStreetMap contributors, ODbL 1.0 (attribution, share-alike and availability obligations). See docs/data-sources/osm-alpr-imports.md."
 }
