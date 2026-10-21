@@ -1536,7 +1536,7 @@ import { parsePayload as hkRlcParse } from "../scripts/import/adapters/hong-kong
 import { parsePayload as sgRoadParse } from "../scripts/import/adapters/singapore-lta-road-cameras-2026.mjs";
 
 test("wave-16 licence-gate: data.gov.hk Terms of Use è importabile", () => {
-  // Hong Kong TD (traffic snapshot + RLC junctions): art. 8 ToU, attribution-only.
+  // Hong Kong TD (traffic snapshot + RLC junctions): ToU v1.2 (Use of Data), attribution-only.
   assert.equal(isLicenceImportable("data.gov.hk Terms of Use"), true);
   // Singapore LTA Road Camera: stessa classe (attribution-only).
   assert.equal(isLicenceImportable("Singapore Open Data Licence v1.0"), true);
@@ -1601,4 +1601,96 @@ test("sg-road: parses the LTA Road Camera GeoJSON into canonical rows", () => {
   assert.equal(staged[1].title, "Singapore road camera 2"); // fallback se Name manca
   assert.equal(staged[1].external_id, "sg-road:2");
   assert.equal(skipped.total, 2); // LineString + (0,0)
+});
+
+// -------------------------------------------------- wave 17: Nottingham CCTV (UK)
+
+import {
+  getDescriptor as nottinghamDescriptor,
+  parsePayload as nottinghamParse,
+} from "../scripts/import/adapters/regno-unito-nottingham-cctv-2026.mjs";
+import { getDescriptor as hkTdDescriptor } from "../scripts/import/adapters/hong-kong-td-traffic-cameras-2026.mjs";
+
+test("nottingham: parses ArcGIS features into canonical rows (geometry, not the swapped Lat/Long attributes)", () => {
+  // Fixture costruito a mano: la prima feature ha `Lat`/`Long` VOLUTAMENTE
+  // invertiti come nel sorgente reale (562/562 righe). La geometria resta
+  // l'unica fonte delle coordinate: x = longitudine, y = latitudine.
+  const data = [
+    {
+      // Public open space: attributi invertiti (Lat contiene la longitudine).
+      attributes: {
+        OBJECTID: 101,
+        Location: "Old Market Square",
+        Type: "Public Open Space (Fixed)",
+        ControlRm: "Nottingham Control Centre",
+        Lat: -1.1505,
+        Long: 52.9535,
+        CameraNum: "P-101",
+      },
+      geometry: { x: -1.1505, y: 52.9535 },
+    },
+    { attributes: { OBJECTID: 102, Location: "Mansfield Road / Forest Road", Type: "Traffic Control Cameras" }, geometry: { x: -1.1567, y: 52.9672 } },
+    { attributes: { OBJECTID: 103, Location: "Western Boulevard", Type: "SPEC Cameras" }, geometry: { x: -1.1901, y: 52.9498 } },
+    { attributes: { OBJECTID: 104, Location: "Clifton Bridge", Type: "Reployable - Camera Present" }, geometry: { x: -1.1663, y: 52.9291 } },
+    // Postazione senza camera (33 nel sorgente) → skip.
+    { attributes: { OBJECTID: 105, Location: "Beechdale Road", Type: "Redeployable - No Camera" }, geometry: { x: -1.17, y: 52.94 } },
+    // Edilizia sociale (16 nel sorgente) → fuori scope, skip fail-closed.
+    { attributes: { OBJECTID: 106, Location: "Bestwood Estate", Type: "NCH Housing" }, geometry: { x: -1.18, y: 52.95 } },
+    // Location vuota (88 righe nel sorgente) → titolo di fallback.
+    { attributes: { OBJECTID: 107, Location: "", Type: "Red Light Camera", CameraNum: "RLC-77" }, geometry: { x: -1.14, y: 52.96 } },
+    // Geometria assente.
+    { attributes: { OBJECTID: 108, Location: "No geometry", Type: "SPEC Cameras" }, geometry: null },
+    // Coordinate fuori dai limiti di Nottingham (lat/lon invertiti nel sorgente).
+    { attributes: { OBJECTID: 109, Location: "Elsewhere", Type: "ANPR - Number Plates" }, geometry: { x: 103.8, y: 1.35 } },
+  ];
+
+  const { staged, skipped } = nottinghamParse({ data });
+
+  assert.equal(staged.length, 5);
+  assert.equal(skipped.total, 4);
+  assert.equal(skipped.reasons["mounting position without camera"], 1);
+  assert.equal(skipped.reasons["housing estate camera excluded (scope, fail-closed)"], 1);
+  assert.equal(skipped.reasons["no point geometry"], 1);
+  assert.equal(skipped.reasons["coordinates outside Nottingham bounds"], 1);
+
+  // 1. coordinate dalla geometria, non dagli attributi Lat/Long invertiti.
+  assert.equal(staged[0].latitude, 52.9535);
+  assert.equal(staged[0].longitude, -1.1505);
+  assert.notEqual(staged[0].latitude, -1.1505); // se leggesse a.Lat sarebbe fuori range
+  assert.equal(staged[0].title, "Old Market Square");
+  assert.equal(staged[0].address, "Old Market Square");
+  assert.equal(staged[0].kind, "Other / unknown");
+  assert.equal(staged[0].notes, "Public Open Space (Fixed) · Nottingham Control Centre");
+  assert.equal(staged[0].direction, null);
+  assert.equal(staged[0].description, null);
+  assert.equal(staged[0].external_id, "nottingham-cctv:101");
+
+  // 2-3. Traffic Control Cameras + SPEC Cameras → kind traffic.
+  assert.equal(staged[1].title, "Mansfield Road / Forest Road");
+  assert.equal(staged[1].kind, "Traffic / licence plate reader");
+  assert.equal(staged[1].latitude, 52.9672);
+  assert.equal(staged[1].longitude, -1.1567);
+  assert.equal(staged[1].external_id, "nottingham-cctv:102");
+  assert.equal(staged[2].title, "Western Boulevard");
+  assert.equal(staged[2].kind, "Traffic / licence plate reader");
+  assert.equal(staged[2].external_id, "nottingham-cctv:103");
+
+  // 4. «Reployable - Camera Present» (typo nel sorgente) → Other / unknown.
+  assert.equal(staged[3].title, "Clifton Bridge");
+  assert.equal(staged[3].kind, "Other / unknown");
+  assert.equal(staged[3].external_id, "nottingham-cctv:104");
+
+  // 5. Location vuota → titolo di fallback su CameraNum.
+  assert.equal(staged[4].title, "Nottingham CCTV RLC-77");
+  assert.equal(staged[4].address, null);
+  assert.equal(staged[4].kind, "Traffic / licence plate reader");
+  assert.equal(staged[4].external_id, "nottingham-cctv:107");
+});
+
+test("nottingham descriptor: licenza OGL 3.0 nel gate + HK descriptor license_url corretto", () => {
+  assert.equal(isLicenceImportable(nottinghamDescriptor().license), true);
+  assert.equal(nottinghamDescriptor().license, "OGL 3.0");
+  assert.ok(nottinghamDescriptor().license_url.endsWith("/open-government-licence/version/3/"));
+  // Fix compliance 2026-10-21: il vecchio URL /en/terms-agreement risponde 404.
+  assert.ok(hkTdDescriptor().license_url.endsWith("/en/terms-and-conditions"));
 });

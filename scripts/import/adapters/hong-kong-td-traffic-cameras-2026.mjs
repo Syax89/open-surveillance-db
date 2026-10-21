@@ -5,7 +5,7 @@
  * Source: data.gov.hk dataset hk-td-tis_2-traffic-snapshot-images, resource
  * "Traffic Camera Locations (English)". ~1013 telecamere con key, region,
  * district, description, coordinate WGS84 e URL immagine.
- * Licence: data.gov.hk Terms of Use (https://data.gov.hk/en/terms-agreement)
+ * Licence: data.gov.hk Terms of Use (https://data.gov.hk/en/terms-and-conditions)
  * — reuse with attribution; verified OK in catalog.
  *
  * - Fetch: CSV UTF-16LE da static.data.gov.hk.

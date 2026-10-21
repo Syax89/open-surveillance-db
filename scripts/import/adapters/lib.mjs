@@ -429,12 +429,18 @@ export function sleep(ms) {
  * resultOffset/resultRecordCount). Ritorna l'array di feature grezze.
  * Il chiamante decide conversione coordinate/attributi (vedi
  * webMercatorToWgs84 per i layer in EPSG:3857).
+ *
+ * `outSR` (opzionale, es. 4326) aggiunge `&outSR=<valore>` alla query e fa
+ * reproiettare le geometrie lato server: per i layer in EPSG:27700
+ * (British National Grid) evita il datum shift OSGB36 di una conversione
+ * fatta in casa. Senza `outSR` la query resta identica a prima.
  */
-export async function fetchArcGisFeatures(fsUrl, { page = 200, headers = {} } = {}) {
+export async function fetchArcGisFeatures(fsUrl, { page = 200, outSR, headers = {} } = {}) {
   const all = [];
   let offset = 0;
+  const srParam = outSR == null ? "" : `&outSR=${outSR}`;
   for (;;) {
-    const url = `${fsUrl}/query?where=1%3D1&outFields=*&resultOffset=${offset}&resultRecordCount=${page}&f=json`;
+    const url = `${fsUrl}/query?where=1%3D1&outFields=*&resultOffset=${offset}&resultRecordCount=${page}${srParam}&f=json`;
     const res = await fetchWithRetry(url, { headers });
     const data = await res.json();
     if (data?.error) throw new Error(`ArcGIS error ${data.error.code}: ${data.error.message}`);
