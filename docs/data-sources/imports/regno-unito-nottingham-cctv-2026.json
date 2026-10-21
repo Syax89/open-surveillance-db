@@ -1,0 +1,11 @@
+{
+    "slug": "regno-unito-nottingham-cctv-2026",
+    "source_name": "Nottingham City Council — CCTV Cameras (CCTV and Traffic Control Cameras)",
+    "format": "arcgis",
+    "license": "OGL 3.0",
+    "license_url": "https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/",
+    "attribution_text": "Fonte: Nottingham City Council — CCTV Cameras (https://geoportal-nottmcitycouncil.opendata.arcgis.com/datasets/df2bf0314b184b449ff595df02e320cf_83/about), concesso con Open Government Licence v3.0. Contains OS data © Crown copyright and database right 2026.",
+    "source_url": "https://services.arcgis.com/yvqphKcf9bBSnjX1/arcgis/rest/services/CCTV_Cameras/FeatureServer/83",
+    "max_records": 700,
+    "notes": "Ricerca fonti 2026-10-21 (verificato first-hand: 562 righe scaricate con outSR=4326, licenza OGL v3 nell'item metadata, attribuzione OS obbligatoria). Esclusi in adapter: 'Redeployable - No Camera' (33 postazioni senza camera) e 'NCH Housing' (16, edilizia sociale — scope fail-closed). I campi attributo Lat/Long sono invertiti in tutte le 562 righe: usare solo la geometria. Dedup misurato sul DB di sviluppo 2026-10-21: 446 righe core → 301 insert netti (le altre entro 10 m dall'OSM UK)."
+}
