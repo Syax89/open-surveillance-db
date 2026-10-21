@@ -66,6 +66,9 @@ tests/ssr-snap15.tmp.mjs
 *.keystore
 *.kdbx
 
+# import source extracts (national Geofabrik snapshots) — MAI committare dati reali
+/.import-data/
+
 # backup / editor swap / temporanei
 *.bak
 *.orig

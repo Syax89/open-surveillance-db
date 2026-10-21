@@ -1,0 +1,23 @@
+{
+  "source_name": "OpenStreetMap ALPR surveillance (DeFlock-equivalent selection)",
+  "format": "osm-pbf-local",
+  "license": "ODbL 1.0 (OSM)",
+  "license_url": "https://opendatacommons.org/licenses/odbl/1-0/",
+  "attribution_text": "© OpenStreetMap contributors (https://www.openstreetmap.org/copyright)",
+  "source_url": "https://download.geofabrik.de/north-america/canada.html",
+  "local_source_path": ".import-data/osm-alpr-canada-2026.elements.json",
+  "kind_map": {
+    "alpr": "Traffic / licence plate reader"
+  },
+  "surveillance_type_map": {
+    "alpr": "Traffic / licence plate reader"
+  },
+  "skip_if": {
+    "surveillance": "indoor"
+  },
+  "external_id_prefix": "osm:",
+  "enrich": false,
+  "slug": "osm-alpr-canada-2026",
+  "max_records": 25000,
+  "notes": "OpenStreetMap ALPR nodes/ways (man_made=surveillance + surveillance:type=ALPR, DeFlock-equivalent selection, plus an explicit surveillance=public|outdoor gate) from the national Geofabrik extract (canada-latest.osm.pbf), converted to {elements:[...]} JSON and read from a local file — no Overpass, no network. Data © OpenStreetMap contributors, ODbL 1.0; Geofabrik hosts the extract only. Scope: the national extract snapshot, not a per-feature administrative-boundary proof. See docs/data-sources/osm-alpr-imports.md."
+}

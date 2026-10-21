@@ -9,6 +9,7 @@ their legal compatibility with the project database (ODbL 1.0, ADR 0008).
 | [licenze-compatibilita.md](licenze-compatibilita.md) | Licence compatibility matrix → import ODbL + attribution patterns for `/licenze` | updated 2026-08-08 |
 | [normalizzazione-pipeline.md](normalizzazione-pipeline.md) | Normalisation design and import pipeline | updated 2026-08-08 |
 | [keep-fonti-fresh.md](keep-fonti-fresh.md) | Runbook to keep `/fonti` aligned with imports (commit convention, verification, blocked-batch recovery) | new 2026-08-08 |
+| [osm-alpr-imports.md](osm-alpr-imports.md) | OSM ALPR (DeFlock-equivalent selection) imports for US/CA: source, gates, stored fields, licence/attribution | new 2026-08-16 |
 | [import registry](imports/) | One descriptor JSON per source (`docs/data-sources/imports/*.json`) | 47 descriptors |
 
 ## Import registry
