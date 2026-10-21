@@ -8,10 +8,14 @@
 //     become a title or a note), no free text/links/photos/contributors;
 //   - parity with the shared OSM normaliser on the same filtered tags;
 //   - the real runner load/parse path for `--source=<file>` (JSON string),
-//     dry-run + apply on a disposable in-memory D1, and idempotency.
+//     dry-run + apply on a disposable in-memory D1, and idempotency;
+//   - the default local-file fetch failing closed on a malformed extract
+//     (`{}`, `{elements:null}`, `[]`, scalars, bad JSON) instead of importing
+//     zero rows and committing an empty batch.
 
 import assert from "node:assert/strict";
 import { after, test } from "node:test";
+import { createHash } from "node:crypto";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -297,6 +301,63 @@ test("osm-alpr: local-file mode reads the extract and gates it (no Overpass)", a
   }
 });
 
+// ------------------------------------------- default local file: fail closed
+
+const MALFORMED_EXTRACTS = [
+  ["missing elements key", "{}"],
+  ["elements null", '{ "elements": null }'],
+  ["bare array", "[]"],
+  ["elements object", '{ "elements": { "0": { "type": "node" } } }'],
+  ["elements string", '{ "elements": "node/1" }'],
+  ["scalar document", "42"],
+  ["null document", "null"],
+  ["invalid json", '{ "elements": ['],
+];
+
+test("osm-alpr: a malformed default local extract is a hard error, never an empty import", async () => {
+  const tmpDir = mkdtempSync(join(tmpdir(), "osdb-alpr-malformed-"));
+  try {
+    for (const { slug } of ADAPTERS) {
+      const descriptorPath = fileURLToPath(
+        new URL(`../docs/data-sources/imports/${slug}.json`, import.meta.url),
+      );
+      for (const [label, body] of MALFORMED_EXTRACTS) {
+        const extractPath = join(tmpDir, `${slug}-${label.replace(/\W+/g, "-")}.json`);
+        writeFileSync(extractPath, body);
+        const adapter = createOsmAlprAdapter({ slug, descriptorPath, localSourcePath: extractPath });
+        // The raw shape is checked before any defaulting, so nothing slips through as [].
+        await assert.rejects(
+          () => adapter.fetchPayload(),
+          (err) => {
+            const expected = label === "invalid json"
+              ? /local OSM source file is not valid JSON/
+              : /must be an object with an "elements" array/;
+            assert.match(err.message, expected, `${slug} / ${label}: ${err.message}`);
+            assert.doesNotMatch(err.message, /https?:|overpass|HTTP \d/i);
+            return true;
+          },
+        );
+      }
+
+      // Control: an explicitly empty extract is valid — the difference is the key, not the count.
+      const emptyPath = join(tmpDir, `${slug}-empty.json`);
+      const emptyText = '{ "elements": [] }';
+      writeFileSync(emptyPath, emptyText);
+      const empty = createOsmAlprAdapter({ slug, descriptorPath, localSourcePath: emptyPath });
+      const fetched = await empty.fetchPayload();
+      assert.deepEqual(fetched.elements, [], `${slug}: explicit {elements: []} must be accepted`);
+      assert.equal(
+        fetched.checksum,
+        createHash("sha256").update(emptyText).digest("hex"),
+        `${slug}: checksum is the sha256 of the exact file text`,
+      );
+      assert.deepEqual(empty.parsePayload(fetched).staged, []);
+    }
+  } finally {
+    rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
 // --------------------------------------------------- runner: dry-run + apply
 
 const RUNNER_FIXTURE = {
@@ -408,5 +469,52 @@ test("osm-alpr: the canada adapter runs end-to-end through the runner (dry-run)"
     assert.equal(summary.report.errors.length, 0);
   } finally {
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("osm-alpr: an --apply run on a malformed default extract commits nothing (US and CA)", async () => {
+  const tmpDir = mkdtempSync(join(tmpdir(), "osdb-alpr-apply-"));
+  try {
+    for (const { slug } of ADAPTERS) {
+      const descriptorPath = fileURLToPath(
+        new URL(`../docs/data-sources/imports/${slug}.json`, import.meta.url),
+      );
+      await freshDb();
+
+      // `{}` used to be coerced to [] by the shared factory *before* validation:
+      // the run then "succeeded" with zero rows and committed an empty batch.
+      const malformedPath = join(tmpDir, `${slug}-malformed.json`);
+      writeFileSync(malformedPath, "{}");
+      const malformed = createOsmAlprAdapter({ slug, descriptorPath, localSourcePath: malformedPath });
+
+      await assert.rejects(
+        () => runImport(db, { slug, adapter: malformed, options: { apply: true } }),
+        /must be an object with an "elements" array/,
+        `${slug}: a malformed default extract must fail the run`,
+      );
+      assert.equal((await db.prepare("SELECT COUNT(*) AS n FROM cameras").all()).results[0].n, 0);
+      const batches = (await db.prepare("SELECT id, status, records_inserted FROM import_batches").all()).results;
+      assert.equal(batches.filter((row) => row.status === "committed").length, 0, `${slug}: nothing committed`);
+      assert.equal(batches.reduce((sum, row) => sum + (row.records_inserted ?? 0), 0), 0);
+      // The fetch happens before the runner's parse try/catch, so the batch stays
+      // `running` — never `committed`, and never a 0-row "success".
+      assert.deepEqual(batches.map((row) => row.status), ["running"], `${slug}: batch is not committed`);
+
+      // The same slug still imports once a valid extract is in place: the
+      // rejected run leaves no committed batch to wedge the slug, and the
+      // retry reuses the same batch row instead of piling up duplicates.
+      const goodPath = join(tmpDir, `${slug}-good.json`);
+      writeFileSync(goodPath, JSON.stringify(RUNNER_FIXTURE));
+      const good = createOsmAlprAdapter({ slug, descriptorPath, localSourcePath: goodPath });
+      const summary = await runImport(db, { slug, adapter: good, options: { apply: true } });
+      assert.equal(summary.committed, true);
+      assert.equal(summary.counts.inserted, 3);
+      assert.equal((await db.prepare("SELECT COUNT(*) AS n FROM cameras").all()).results[0].n, 3);
+      const afterRetry = (await db.prepare("SELECT id, status FROM import_batches").all()).results;
+      assert.deepEqual(afterRetry.map((row) => row.status), ["committed"]);
+      assert.deepEqual(afterRetry.map((row) => row.id), batches.map((row) => row.id)); // same batch row, reused
+    }
+  } finally {
+    rmSync(tmpDir, { recursive: true, force: true });
   }
 });

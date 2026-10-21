@@ -69,8 +69,8 @@ images.
 ## 3. What is stored
 
 Normalisation is the shared OSM country factory (unchanged) plus the shared
-runner: canonical kinds, `direction` as an integer 0–359, domes forced to
-`direction = NULL`, `external_id = "osm:<type>/<id>"`, ALPR rows always
+runner: canonical kinds, `direction` as an integer 0–359,
+`external_id = "osm:<type>/<id>"`, ALPR rows always
 `Traffic / licence plate reader` via the descriptor's `surveillance_type_map`.
 
 Forwarded tags are an explicit allowlist — `camera:direction`, `addr:street`,

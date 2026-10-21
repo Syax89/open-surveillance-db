@@ -9,8 +9,17 @@
  *
  * The gate runs inside `parsePayload`, so `--source=<file>`, fixtures and
  * direct calls are filtered exactly like the local-extract fetch path.
+ *
+ * File-mode fetch is owned here rather than shared: the common country factory
+ * coerces a missing `elements` key to `[]` *before* anything validates it, so
+ * `{}`, `{elements: null}`, a bare `[...]` or a scalar would arrive at the
+ * parser already indistinguishable from a legitimately empty extract. We read
+ * the configured local file ourselves and validate the RAW parsed document, so
+ * a malformed extract is a hard error instead of an empty-but-"successful" run.
  */
 
+import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { createOsmCountryAdapter } from "./osm-country-factory.mjs";
 
 /** Scopes we accept on top of DeFlock's selection: explicit public space only. */
@@ -82,6 +91,40 @@ function elementsOf(raw, slug) {
 export function createOsmAlprAdapter({ slug, descriptorPath, localSourcePath }) {
   const base = createOsmCountryAdapter({ slug, descriptorPath, localSourcePath });
 
+  /**
+   * Read the configured local extract and validate it strictly. The RAW parsed
+   * document goes through `elementsOf`, so the shape check happens before any
+   * defaulting: only an explicit `{elements: [...]}` is accepted, and the
+   * checksum is the SHA-256 of the exact file text that was read.
+   */
+  async function fetchPayload() {
+    if (!localSourcePath) {
+      throw new Error(
+        `[${slug}] ALPR source has no local extract configured (localSourcePath is required; there is no network fallback)`,
+      );
+    }
+    let raw;
+    try {
+      raw = readFileSync(localSourcePath, "utf8");
+    } catch (err) {
+      throw new Error(
+        `[${slug}] local OSM source file missing or unreadable: ${localSourcePath} (${err.code ?? err.message})`,
+        { cause: err },
+      );
+    }
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (err) {
+      throw new Error(
+        `[${slug}] local OSM source file is not valid JSON: ${localSourcePath} (${err.message})`,
+        { cause: err },
+      );
+    }
+    const elements = elementsOf(parsed, slug);
+    return { elements, checksum: createHash("sha256").update(raw).digest("hex") };
+  }
+
   function parsePayload(raw) {
     const skipped = { total: 0, reasons: {} };
     const accepted = [];
@@ -103,5 +146,5 @@ export function createOsmAlprAdapter({ slug, descriptorPath, localSourcePath }) 
     return { staged: parsed.staged ?? [], skipped, checksum: null };
   }
 
-  return { slug, getDescriptor: base.getDescriptor, fetchPayload: base.fetchPayload, parsePayload };
+  return { slug, getDescriptor: base.getDescriptor, fetchPayload, parsePayload };
 }
