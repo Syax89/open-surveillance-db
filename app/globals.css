@@ -989,6 +989,25 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
      content links by a hairline, as a full-width bottom row. */
   .nav-shell:has(.menu-button) .nav-links .auth-nav-links { margin-left:0; margin-top:2px; padding-top:14px; border-top:1px solid var(--line); justify-content:space-between }
   .nav-shell:has(.menu-button) .nav-action { text-align:center }
+  /* M06 (design review 2026-10-22 P2): inside the open menu the primary rows
+     were plain inline text (~254x18px) and "Log in" ~45x21px, while the menu
+     and locale buttons were already 44px. Each row now owns a ≥44px box and
+     a visible focus ring; the markup stays native anchors and the boxed CTA
+     keeps its .nav-action look (these rules only add a box, no redesign). */
+  .nav-shell:has(.menu-button) .nav-links > a:not(.nav-action) {
+    display:flex; align-items:center; min-height:44px; padding:6px 4px;
+    border-radius:var(--radius-md); text-decoration:none;
+  }
+  .nav-shell:has(.menu-button) .nav-links .nav-action {
+    display:flex; align-items:center; justify-content:center; min-height:44px;
+  }
+  .nav-shell:has(.menu-button) .nav-links .auth-nav-links a {
+    display:inline-flex; align-items:center; min-height:44px; padding:0 4px;
+    border-radius:var(--radius-md);
+  }
+  .nav-shell:has(.menu-button) .nav-links a:focus-visible {
+    outline:3px solid var(--focus); outline-offset:2px; border-radius:var(--radius-md);
+  }
 }
 @media (max-width:700px) {
   .hero, .map-section, .records-section, .principles, .guide-overview, .report-section, .correction-section, .moderation-page, footer, .tool-section, .tool-cards, .founder-declaration { width:min(100% - 32px,1180px) }
@@ -1951,6 +1970,11 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
      attribution strip kept clear of the zoom stack / markers. */
   .map-panel .leaflet-control-zoom { margin-bottom:48px; }
   .map-panel .leaflet-control-zoom a { width:44px; height:44px; line-height:44px; font-size:22px; }
+  /* M06: the record-page mini map is a real (pannable/zoomable) map too, but
+     its zoom buttons stayed at Leaflet's default 30px while /mappa's are
+     44px. Only the CONTROLS grow — the mini-map card keeps its 280px height
+     (the card is not the thing that was uncomfortable). */
+  .record-minimap .leaflet-control-zoom a { width:44px; height:44px; line-height:44px; font-size:22px; }
   .map-panel .leaflet-control-attribution { font-size:10px; padding:2px 6px; max-width:calc(100% - 60px); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   /* Marker popup on small screens (t_b7728ad0): the balloon must fit the
      viewport — cap its height and let the CONTENT scroll internally (the
