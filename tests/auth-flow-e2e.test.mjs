@@ -523,8 +523,9 @@ test("auth gate: a real osdb_session cookie linked to a moderator account bypass
 
   // Real contributor + real session (same helper the write-gate tests use),
   // then link it to a moderator `users` row — exactly how a real deploy
-  // provisions a Google-login moderator: a `users` row whose email matches
-  // the contributor's.
+  // provisions a Google-login moderator: a `users` row whose
+  // `contributor_id` column points at the contributor (ADR 0003 2026-10
+  // amendment). Email equality is never the bridge (audit P0).
   const profile = await auth.createContributor({
     email: "sessionmod@osdb.test",
     displayName: "Session Moderator",
@@ -533,8 +534,8 @@ test("auth gate: a real osdb_session cookie linked to a moderator account bypass
   const { rawToken } = await auth.createSession(profile.id, { ttlDays: 7 });
   const now = new Date().toISOString();
   await env.DB.prepare(
-    "INSERT INTO users (email, display_name, role, active, mfa_enabled, created_at, updated_at) VALUES (?, ?, 'moderator', 1, 0, ?, ?)",
-  ).bind("sessionmod@osdb.test", "Session Moderator", now, now).run();
+    "INSERT INTO users (email, display_name, role, active, mfa_enabled, contributor_id, created_at, updated_at) VALUES (?, ?, 'moderator', 1, 0, ?, ?, ?)",
+  ).bind("sessionmod@osdb.test", "Session Moderator", profile.id, now, now).run();
 
   stub.resetLastRequest();
   const response = await worker.fetch(
@@ -570,6 +571,51 @@ test("auth gate: an ordinary contributor session (no linked moderator users row)
     ctx,
   );
   assert.equal(response.status, 503);
+});
+
+test("auth gate: a contributor session with a matching moderator email but no users.contributor_id link is denied (audit P0)", async () => {
+  const { default: worker } = await loadE2EModule("worker.mjs");
+  const stub = await loadE2EModule("vinext-router-stub.mjs");
+  const auth = await loadE2EModule("db/auth.mjs");
+  const ctx = { waitUntil() {}, passThroughOnException() {} };
+
+  // Audit P0 (2026-10-22): any visitor can register with a moderator's email
+  // address — the session is issued immediately with `email_verified_at`
+  // NULL. Before the fix the gate resolved the role by email equality, so
+  // that registration inherited the moderator role. The ONLY acceptable
+  // bridge is the explicit `users.contributor_id` column, so a `users` row
+  // with role moderator/active but `contributor_id` NULL must grant nothing.
+  const profile = await auth.createContributor({
+    email: "unverifiedmod@osdb.test",
+    displayName: "Email Squatter",
+    password: "supersecret123",
+  });
+  const { rawToken } = await auth.createSession(profile.id, { ttlDays: 7 });
+  const now = new Date().toISOString();
+  await env.DB.prepare(
+    "INSERT INTO users (email, display_name, role, active, mfa_enabled, contributor_id, created_at, updated_at) VALUES (?, ?, 'moderator', 1, 0, NULL, ?, ?)",
+  ).bind("unverifiedmod@osdb.test", "Email Squatter", now, now).run();
+
+  // 1. No moderation credentials configured: the exploit attempt must get
+  //    the very same 503 as a host with nothing configured at all.
+  const noCreds = await worker.fetch(
+    new Request("https://osdb.test/api/moderation", { headers: { Cookie: `osdb_session=${rawToken}` } }),
+    {},
+    ctx,
+  );
+  assert.equal(noCreds.status, 503, "a matching email must not widen the fail-closed floor");
+
+  // 2. With Basic configured, the session must not stand in for the
+  //    credential either: the gate is left to Basic, which is absent → 401,
+  //    and the handler is never reached.
+  stub.resetLastRequest();
+  const denied = await worker.fetch(
+    new Request("https://osdb.test/api/moderation", { headers: { Cookie: `osdb_session=${rawToken}` } }),
+    { MODERATION_USER: "moderator", MODERATION_PASSWORD: "s3cret" },
+    ctx,
+  );
+  assert.equal(denied.status, 401, "a matching email must not pass the gate");
+  assert.equal(stub.lastRequest, null, "the handler must not be reached for an unlinked session");
 });
 
 // ---------------------------------------------------------------------------
