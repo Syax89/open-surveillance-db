@@ -301,7 +301,15 @@ const wholeWorldBounds = {
 };
 let currentBounds = romeViewport;
 export const __setBounds = (b) => { currentBounds = b; };
-export const __resetMarkers = () => { markers.length = 0; maps.length = 0; paths.length = 0; currentBounds = romeViewport; };
+export const __resetMarkers = () => { markers.length = 0; maps.length = 0; paths.length = 0; currentBounds = romeViewport; defaultMapSize = null; };
+// Default surface for maps created from now on (M01/R1): null keeps the
+// 800x600 desktop stub. Tests that must prove the unmeasurable-surface
+// branch pass { x: 0, y: 0 } and get a map whose getSize() reports 0x0,
+// exactly like Leaflet before the first layout.
+
+let defaultMapSize = null;
+export const __setDefaultMapSize = (size) => { defaultMapSize = size ?? null; };
+// ^ stub-scoped: tests reach it through loadDomModule("node_modules/leaflet/index.mjs")
 export function map(el, opts) {
   const m = {
     // Map options recorded (RecordMiniMap 2026-08-07): the read-only mini
@@ -346,7 +354,7 @@ export function map(el, opts) {
     // a settable box — tests shrink it to a 320px-phone map (286x340) and
     // assert the balloon still fits. getContainer mirrors Leaflet (the
     // component writes the measured popup height budget on it).
-    size: { x: 800, y: 600 },
+    size: { ...(defaultMapSize ?? { x: 800, y: 600 }) },
     container: el ?? null,
     getSize: () => ({ x: m.size.x, y: m.size.y }),
     getContainer: () => m.container,

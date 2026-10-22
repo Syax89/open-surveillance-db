@@ -261,12 +261,26 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
   // KEPT markers, not only to markers created afterwards. Only the balloon
   // already on screen is updated — a closed popup stays closed (no
   // auto-open on resize) and no selection/lifecycle state is touched.
-  const applyPopupFit = useCallback(() => {
-    const map = mapRef.current;
+  // R1 (controller browser pass): the FIRST fit must run against the map
+  // that was just created — the old zero-argument call fired BEFORE
+  // `mapRef.current = map`, so on a fresh load it no-oped and the vertical
+  // budget stayed unset until some later resize (the first balloon then
+  // rendered ~34px above the map with the close button unreachable). The map
+  // is now passed in for the creation-time fit.
+  const applyPopupFit = useCallback((target?: import("leaflet").Map | null) => {
+    const map = target ?? mapRef.current;
     if (!map) return;
     const geometry = measuredPopupGeometry(map);
     // Vertical budget for CSS (the CSS keeps the old svh rule as fallback).
-    map.getContainer?.()?.style?.setProperty?.("--osm-popup-max-height", `${geometry.maxHeight}px`);
+    // ONLY a MEASURED surface publishes it: from a 0x0 pre-layout map the
+    // helper returns its 360px fallback, which can EXCEED a phone map's real
+    // height (a 320x568 map is ~340px) and would clip the balloon. Leaving
+    // the variable unset there keeps the viewport-bounded CSS fallback
+    // (min(60svh, 100svh - 140px)) in charge until a real size exists.
+    const size = typeof map.getSize === "function" ? map.getSize() : null;
+    if (size && size.x > 0 && size.y > 0) {
+      map.getContainer?.()?.style?.setProperty?.("--osm-popup-max-height", `${geometry.maxHeight}px`);
+    }
     const byId = markersByIdRef.current;
     if (!byId) return;
     for (const entry of byId.values()) {
@@ -676,9 +690,15 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
         // fires "resize" after its own invalidateSize, so the balloon and its
         // autopan padding are re-derived here and handed to the KEPT markers
         // (see applyPopupFit — never an auto-open, never a lifecycle change).
-        map.on("resize", applyPopupFit);
-        applyPopupFit();
+        // Order matters (R1): the ref must be set BEFORE anything that reads
+        // it, and the initial fit must run with the real map object.
         mapRef.current = map;
+        // The listener ignores Leaflet's event object — passing it straight
+        // through would be mistaken for a map argument.
+        map.on("resize", () => applyPopupFit());
+        // R1: fit the freshly created map NOW, so the very first balloon (and
+        // the CSS height budget) already match the real surface.
+        applyPopupFit(map);
         // The layer group now exists: the marker-population effect can run
         // (it also depends on this flag, see the state declaration above).
         // Must be set AFTER markersRef so the effect never observes a ready
@@ -818,10 +838,23 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
         // rendered as an individual marker, even when the rest of the view
         // is aggregated into a grid cell — a ?focus=ID deep link must be
         // visible and its popup must open.
-        const selectedIdNow = selectedIdRef.current;
-        if (selectedIdNow !== null && !desiredMarkers.has(selectedIdNow)) {
-          const camera = visible.find((item) => item.id === selectedIdNow);
-          if (camera) desiredMarkers.set(selectedIdNow, camera);
+        //
+        // D1 (review A, pre-existing): the record whose popup is OPEN is
+        // pinned too. A tap runs `onSelect(id)` (parent state, committed
+        // later) + `openPopup()` (synchronous), so a reconcile fired in the
+        // settle window — the initial viewport/data arrival, or the debounced
+        // emitBounds after the popup's own autopan — saw a selectedIdRef that
+        // had not caught up yet, aggregated the view, removed the tapped
+        // marker and dropped the restore intent: the balloon vanished with no
+        // user action. Pinning the OPEN popup's record keeps its marker alive
+        // while the record is visible; it is NOT a pin for offscreen records —
+        // `visible` is the current viewport rectangle, so a real pan/zoom out
+        // of view still removes it and closes the popup (user action).
+        const pinned = [selectedIdRef.current, activePopupIdRef.current];
+        for (const pinnedId of pinned) {
+          if (pinnedId === null || desiredMarkers.has(pinnedId)) continue;
+          const camera = visible.find((item) => item.id === pinnedId);
+          if (camera) desiredMarkers.set(pinnedId, camera);
         }
       }
       // 2) Reconcile badges. Badges never carry popups, so removing/
@@ -976,6 +1009,7 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
           event.originalEvent?.preventDefault?.();
           onSelect(camera.id);
           if (!marker.isPopupOpen()) marker.openPopup();
+          activePopupIdRef.current = camera.id;
         });
         // Popup lifecycle (t_33b82720): stop the click from bubbling to the
         // map — Leaflet bubbles marker clicks by default, and the map click
@@ -989,6 +1023,11 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
           L.DomEvent.stopPropagation(event);
           onSelect(camera.id);
           if (!marker.isPopupOpen()) marker.openPopup();
+          // D1: record the OPEN popup synchronously, at the user action.
+          // The popupopen handler also sets this from the community mount
+          // node, but that mounts only when the popup carries the widget —
+          // the rebuild pin must not depend on the popup's HTML shape.
+          activePopupIdRef.current = camera.id;
         });
         marker.addTo(layer);
         byId.set(id, { marker, camera });

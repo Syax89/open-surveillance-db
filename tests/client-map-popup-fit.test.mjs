@@ -35,6 +35,11 @@ import {
 let rtl;
 let SurveillanceMap;
 let popupGeometryFor;
+/** Default surface for maps created next (stub-scoped, see dom-harness). */
+async function setDefaultMapSize(size) {
+  const stub = await loadDomModule("node_modules/leaflet/index.mjs");
+  stub.__setDefaultMapSize(size);
+}
 let POPUP_CHROME_X;
 
 // Worst-case Leaflet chrome around the content box: the default
@@ -53,9 +58,10 @@ before(async () => {
   installFetchMock(() => jsonResponse({ records: [], total: 0, nextOffset: null }));
 });
 
-afterEach(() => {
+afterEach(async () => {
   rtl?.cleanup();
   resetLeafletMarkers();
+  await setDefaultMapSize(null);
 });
 
 // ---------------------------------------------------------------------------
@@ -179,4 +185,148 @@ test("a map resize re-fits the kept markers that already exist", async () => {
     assert.equal(other.isPopupOpen(), false, "resize must never auto-open a closed popup");
     assert.equal(other.popupOpts.maxWidth, 260, "kept (closed) markers still receive the fresh width");
   }
+});
+
+// ---------------------------------------------------------------------------
+// 3) R1 (controller browser pass): the FIRST fit must happen at creation.
+// ---------------------------------------------------------------------------
+
+test("the map container receives the measured height budget at creation, without any resize", async () => {
+  // R1: the initial applyPopupFit() ran BEFORE mapRef.current = map, so it
+  // no-oped and --osm-popup-max-height stayed unset until some later resize;
+  // in a real browser that left the first balloon clipped above the map
+  // (top=70.48 vs map top=104.08, close button unreachable).
+  const view = await renderWithLocale(React.createElement(SurveillanceMap, {
+    cameras: [], selectedId: null, onSelect: () => {}, onPick: () => {},
+  }));
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  const liveMap = view.container.querySelector(".live-map");
+  assert.ok(liveMap, "the map element renders");
+  // No resize was fired: this must come from the creation-time fit.
+  // The stub surface is 800x600 → 0.6 * 600 = 360px (popupGeometryFor).
+  assert.equal(
+    liveMap.style.getPropertyValue("--osm-popup-max-height"),
+    "360px",
+    "the creation-time fit must publish the measured height budget",
+  );
+});
+
+test("an unmeasurable surface does not publish a budget that could exceed the real map", async () => {
+  // Before layout Leaflet can report 0x0. Writing the desktop FALLBACK
+  // (360px) as if it were measured could exceed a phone map's height and
+  // clip the balloon, so the variable must stay unset and let the CSS
+  // fallback (min(60svh, 100svh - 140px)) apply until a real size exists.
+  await setDefaultMapSize({ x: 0, y: 0 });
+  const view = await renderWithLocale(React.createElement(SurveillanceMap, {
+    cameras: [], selectedId: null, onSelect: () => {}, onPick: () => {},
+  }));
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  const liveMap = view.container.querySelector(".live-map");
+  assert.equal(
+    liveMap.style.getPropertyValue("--osm-popup-max-height"),
+    "",
+    "no budget is published from an unmeasurable surface",
+  );
+});
+
+// ---------------------------------------------------------------------------
+// 4) D1 (review A): a popup the user JUST opened survives the initial settle.
+// ---------------------------------------------------------------------------
+
+test("a just-opened popup survives a rebuild that aggregates the view (data arrival / resize settle)", async () => {
+  // D1 path (named in .audit/author-report.md): a marker tap calls
+  // onSelect(id) (parent state, committed later) + openPopup() (synchronous).
+  // A reconcile that runs in between — the initial viewport/data settle, or
+  // the debounced emitBounds after the popup's own autopan — reads a
+  // selectedIdRef that has NOT caught up yet, aggregates the view into grid
+  // cells, removes the tapped marker and drops the restore intent, so the
+  // balloon vanishes with no user action.
+  const FEW = [
+    { id: 1, title: "Via Example corner", kind: "bullet", status: "active", latitude: 41.9028, longitude: 12.4964, source: "Community report" },
+    { id: 2, title: "Piazza Fixture", kind: "dome", status: "active", latitude: 41.8958, longitude: 12.4823, source: "Community report" },
+  ];
+  // 200 records spread over the Rome view: over MAX_INDIVIDUAL_MARKERS (150)
+  // at zoom < GRID_MAX_ZOOM (12) → markersForViewport aggregates them.
+  // The tapped record stays IN THE STORE (id 1 is included): D1 is not about a
+  // record leaving the data, only about the view being aggregated while the
+  // selection has not been committed yet. NEIGHBOUR shares id 1's 48px cell,
+  // so at the aggregation zoom the tapped record is bucketed into a multi-
+  // record cell instead of staying individual — that is the removal path.
+  const NEIGHBOUR = { id: 3, title: "Same-cell neighbour", kind: "dome", status: "active", latitude: 41.9028, longitude: 12.4964, source: "Community report" };
+  const MANY = [...FEW, NEIGHBOUR, ...Array.from({ length: 200 }, (_, i) => ({
+    id: 100 + i,
+    title: `Fixture record ${i}`,
+    kind: "bullet",
+    status: "active",
+    latitude: 41.80 + (i % 20) * 0.01,
+    longitude: 12.40 + Math.floor(i / 20) * 0.01,
+    source: "Community report",
+  }))];
+
+  // selectedId stays null on purpose: it models the pre-commit lag window.
+  const view = await renderWithLocale(React.createElement(SurveillanceMap, {
+    cameras: FEW, selectedId: null, onSelect: () => {}, onPick: () => {},
+  }));
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  const maps = await leafletMaps();
+  const map = maps.at(-1);
+  const markers = await leafletMarkers();
+  const target = markers.find((item) => item.popupOpts && item.handlers.click?.length);
+  assert.ok(target, "the fixture records are materialised as individual markers");
+  target.handlers.click[0]({ originalEvent: {}, stopPropagation() {} });
+  assert.equal(target.isPopupOpen(), true, "the tap opens the popup");
+
+  // Data arrival + a zoom out that aggregates the view, with NO selection
+  // committed yet (the race window).
+  map.zoom = 10;
+  view.rerender(await wrapWithLocale(React.createElement(SurveillanceMap, {
+    cameras: MANY, selectedId: null, onSelect: () => {}, onPick: () => {},
+  })));
+  // The component registers `on("moveend zoomend")`; the stub keys handlers by
+  // the literal event string, so invoke it the way the other map suites do.
+  map.handlers["moveend zoomend"]?.[0]?.();
+  await new Promise((resolve) => setTimeout(resolve, 30));
+
+  const live = await leafletMarkers();
+  const stillThere = live.find((item) => item.popupOpts && item.isPopupOpen?.());
+  assert.ok(stillThere, "the popup the user just opened must survive the settle (no ghost close)");
+  assert.equal(stillThere.popupOpened, true, "the balloon stays open");
+});
+
+test("a popup closed by the user is never reopened by the settle", async () => {
+  const FEW = [
+    { id: 1, title: "Via Example corner", kind: "bullet", status: "active", latitude: 41.9028, longitude: 12.4964, source: "Community report" },
+    { id: 2, title: "Piazza Fixture", kind: "dome", status: "active", latitude: 41.8958, longitude: 12.4823, source: "Community report" },
+  ];
+  const NEIGHBOUR = { id: 3, title: "Same-cell neighbour", kind: "dome", status: "active", latitude: 41.9028, longitude: 12.4964, source: "Community report" };
+  const MANY = [...FEW, NEIGHBOUR, ...Array.from({ length: 200 }, (_, i) => ({
+    id: 100 + i, title: `Fixture record ${i}`, kind: "bullet", status: "active",
+    latitude: 41.80 + (i % 20) * 0.01, longitude: 12.40 + Math.floor(i / 20) * 0.01, source: "Community report",
+  }))];
+  const view = await renderWithLocale(React.createElement(SurveillanceMap, {
+    cameras: FEW, selectedId: null, onSelect: () => {}, onPick: () => {},
+  }));
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  const maps = await leafletMaps();
+  const map = maps.at(-1);
+  const markers = await leafletMarkers();
+  const target = markers.find((item) => item.popupOpts && item.handlers.click?.length);
+  target.handlers.click[0]({ originalEvent: {}, stopPropagation() {} });
+  assert.equal(target.isPopupOpen(), true);
+
+  // Explicit user close: popupclose with rebuildingRef false clears the intent.
+  target.popupOpened = false;
+  map.fire("popupclose", { marker: target });
+
+  map.zoom = 10;
+  view.rerender(await wrapWithLocale(React.createElement(SurveillanceMap, {
+    cameras: MANY, selectedId: null, onSelect: () => {}, onPick: () => {},
+  })));
+  // The component registers `on("moveend zoomend")`; the stub keys handlers by
+  // the literal event string, so invoke it the way the other map suites do.
+  map.handlers["moveend zoomend"]?.[0]?.();
+  await new Promise((resolve) => setTimeout(resolve, 30));
+
+  const live = await leafletMarkers();
+  assert.equal(live.filter((item) => item.isPopupOpen?.()).length, 0, "an explicit close is never undone by a rebuild");
 });
