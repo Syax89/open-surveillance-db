@@ -1853,8 +1853,9 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
    panel BELOW the map, starting collapsed to its header (count + toggle).
    The old sidebar-above-map order pushed the map ~600px down the page on a
    390px viewport (too much scroll before the primary function). The map
-   height is svh-based so it fills the real viewport (mobile URL bar) and
-   never exceeds it before interaction. */
+   height is MEASURED against the real remaining viewport space (M02,
+   useMapViewHeight → --osm-map-height) instead of a fixed svh constant, so
+   the zoom control and the points entry stay inside the first screen. */
 @media (max-width:768px) {
   .map-layout { width:min(100% - 32px,1180px); padding:2px 0 calc(56px + env(safe-area-inset-bottom)); }
   /* Filters: compact but readable — the panel keeps the 2-col grid so the
@@ -1865,16 +1866,33 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
      rule (shared with /directory and the home hub) otherwise wins over the
      unscoped 2-col rule at max-width:980px and silently collapses this
      panel back to 1 column, undoing the map-first intent above. */
-  .map-card .filters-panel { padding:10px 14px 12px; }
-  .map-card .filters-panel .filter-controls-row { grid-template-columns:minmax(0,1fr) minmax(0,1fr) !important; gap:10px 12px; }
-  .map-card .record-filter label { margin-bottom:4px; font-size:var(--text-2xs); letter-spacing:.06em; }
-  .map-card .record-filter select { padding:11px 10px; font-size:var(--text-md); min-height:44px; }
+  /* Map chrome compaction (M02, design review 2026-10-22): the explorer
+     toolbar + search block + filters slab above the map consumed ~250px on
+     a phone (map began at y=399 at 390px, y=449 at 320px). Only the
+     VERTICAL rhythm is tightened: the dual-purpose search caption stays
+     visible (it is the only warning that picking a place clears the typed
+     filter) and every touch target keeps its ≥44px box. */
+  .map-explorer-toolbar { padding:6px 14px; }
+  .map-explorer-search { padding:8px 14px; }
+  .map-explorer-search .map-list-search label { margin-bottom:2px; }
+  .map-explorer-search .map-list-search .map-list-search-hint { margin:4px 0 0; font-size:var(--text-xs); line-height:1.35; }
+  .map-card .filters-panel { padding:8px 14px 10px; }
+  .map-card .filters-panel .filter-controls-row { grid-template-columns:minmax(0,1fr) minmax(0,1fr) !important; gap:8px 10px; }
+  .map-card .record-filter label { margin-bottom:2px; font-size:var(--text-2xs); letter-spacing:.06em; }
+  .map-card .record-filter select { padding:10px; font-size:var(--text-md); min-height:44px; }
   /* MAP-FIRST: order puts the map before the sidebar in the single column
      (the DOM keeps sidebar-first for the desktop side-by-side layout). */
   .map-card .map-split { grid-template-columns:1fr; grid-template-rows:1fr auto; height:auto; min-height:0; }
   .map-card .map-split > .map-panel { order:-1; }
-  .map-card .map-panel .live-map { height:calc(100svh - 250px); min-height:340px; max-height:64svh; }
-  .map-card .map-panel .map-fallback { height:calc(100svh - 250px); min-height:340px; max-height:64svh; }
+  /* Map height (M02, design review 2026-10-22): the old
+     fixed-offset height guess (a svh constant) ignored the real chrome above the map (at
+     390x844 the map starts at y=399, at 320x568 at y=449), which pushed the
+     zoom control and the points toggle below the fold. The height now comes
+     from useMapViewHeight — the MEASURED offset of this surface inside the
+     current viewport, bounded to a useful minimum and leaving room for the
+     points entry. 70svh is only the pre-measure/SSR fallback (one frame). */
+  .map-card .map-panel .live-map { height:var(--osm-map-height, 70svh); min-height:340px; }
+  .map-card .map-panel .map-fallback { height:var(--osm-map-height, 70svh); min-height:340px; }
   .map-card .map-panel .map-region { height:auto; min-height:0; }
   /* Points panel below the map: starts collapsed (header only) — the map
      must be the first thing users see; the toggle expands it from the

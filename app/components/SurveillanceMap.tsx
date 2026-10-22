@@ -6,6 +6,7 @@ import { BOUNDS_DEBOUNCE_MS, escapeHtml, longitudeInCopy, viewportCenterLongitud
 import { markersForViewport } from "../lib/map-grid";
 import { useMessages } from "../lib/use-messages";
 import { useLatest } from "../lib/hooks/use-latest";
+import { useMapViewHeight } from "../lib/hooks/use-map-view-height";
 import { isDomeKind } from "../lib/camera-kinds";
 import { FOV_MIN_ZOOM, fovCircleRadiusMeters, fovPolygonPoints } from "../lib/field-of-view";
 import { formatDirection } from "../lib/compass";
@@ -222,6 +223,10 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
   // reconcile / FOV effects never touch it.
   const userLayerRef = useRef<import("leaflet").LayerGroup | null>(null);
   const mapElement = useRef<HTMLDivElement | null>(null);
+  // M02: the mobile map height is measured from this element's REAL offset
+  // (the fixed calc(100svh - 250px) guess pushed the zoom control and the
+  // points toggle below the fold). CSS keeps a fallback for the first frame.
+  useMapViewHeight(mapElement);
   const mapRef = useRef<import("leaflet").Map | null>(null);
   const markersRef = useRef<import("leaflet").LayerGroup | null>(null);
   const markersByIdRef = useRef<Map<number, MarkerEntry> | null>(null);
