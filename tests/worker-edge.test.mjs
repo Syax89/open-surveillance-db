@@ -111,12 +111,17 @@ async function buildWorkerTree() {
 
   // Session-based moderator login (ADR 0003 2026-10 amendment): the gate
   // imports ../db/auth (findSessionByToken) and ../db/users
-  // (getUserByEmail/roleAtLeast) to check a live osdb_session cookie before
-  // falling through to Basic/bearer. Hand-written mocks (not the real SQL —
-  // that is exercised separately by the e2e harness, which already compiles
-  // the real db/auth.ts and db/users.ts) with configurable state so tests
-  // can simulate "no session" (default), "session but wrong role", and
+  // (getUserByContributorId/roleAtLeast) to check a live osdb_session cookie
+  // before falling through to Basic/bearer. Hand-written mocks (not the real
+  // SQL — that is exercised separately by the e2e harness, which already
+  // compiles the real db/auth.ts and db/users.ts) with configurable state so
+  // tests can simulate "no session" (default), "session but wrong role", and
   // "valid moderator session" without touching D1.
+  //
+  // The users mock is keyed by the users row's `contributor_id` (the explicit
+  // ADR 0003 bridge), NOT by email: a contributor session must only ever
+  // resolve a role through `users.contributor_id`, never through email
+  // equality, so a mock keyed by email could not express that.
   await writeFile(
     path.join(dbDir, "auth.mjs"),
     "export const __state = { session: null, shouldThrow: false };\n" +
@@ -127,11 +132,11 @@ async function buildWorkerTree() {
   );
   await writeFile(
     path.join(dbDir, "users.mjs"),
-    "export const __state = { users: {} };\n" +
+    "export const __state = { usersByContributorId: {} };\n" +
       "const roleRank = { contributor: 1, moderator: 2, admin: 3 };\n" +
       "export function roleAtLeast(role, minimum) { return roleRank[role] >= roleRank[minimum]; }\n" +
-      "export async function getUserByEmail(email) {\n" +
-      "  return __state.users[email] ?? null;\n" +
+      "export async function getUserByContributorId(contributorId) {\n" +
+      "  return __state.usersByContributorId[contributorId] ?? null;\n" +
       "}\n",
   );
   const csrfLibDir = path.join(tree, "app", "lib");
@@ -262,7 +267,7 @@ beforeEach(async () => {
   oidc.__calls.length = 0;
   auth.__state.session = null;
   auth.__state.shouldThrow = false;
-  users.__state.users = {};
+  users.__state.usersByContributorId = {};
 });
 
 // ---------------------------------------------------------------------------
@@ -1097,7 +1102,8 @@ test("admitted aliases preserve URL, query, method and body with server-chosen i
 // ---------------------------------------------------------------------------
 // Session-based moderator login (ADR 0003 2026-10 amendment): a live
 // osdb_session cookie whose contributor is linked to a moderator+ `users`
-// row grants the same pass as Basic/bearer, checked BEFORE them. Every
+// row (`users.contributor_id` = the contributor's id) grants the same pass
+// as Basic/bearer, checked BEFORE them. Every
 // failure mode of this check must fall through to the UNCHANGED Basic/
 // bearer gate, never deny on its own.
 // ---------------------------------------------------------------------------
@@ -1107,8 +1113,8 @@ const sessionCookie = (token) => `osdb_session=${token}`;
 
 test("valid moderator session bypasses Basic/bearer and injects the user's own email", async () => {
   const { worker, app, auth, users } = await loadWorker();
-  auth.__state.session = { contributor: { email: "mod@osdb.test" } };
-  users.__state.users["mod@osdb.test"] = { email: "mod@osdb.test", role: "moderator", active: 1 };
+  auth.__state.session = { contributor: { id: 41, email: "mod@osdb.test" } };
+  users.__state.usersByContributorId[41] = { email: "mod@osdb.test", role: "moderator", active: 1 };
   const response = await worker.fetch(
     request("/moderation", { headers: { cookie: sessionCookie("real-token") } }),
     testEnv(MINIMAL_BASIC_CONFIG),
@@ -1120,8 +1126,8 @@ test("valid moderator session bypasses Basic/bearer and injects the user's own e
 
 test("valid admin session also bypasses (role admin is above the moderator floor)", async () => {
   const { worker, app, auth, users } = await loadWorker();
-  auth.__state.session = { contributor: { email: "admin@osdb.test" } };
-  users.__state.users["admin@osdb.test"] = { email: "admin@osdb.test", role: "admin", active: 1 };
+  auth.__state.session = { contributor: { id: 42, email: "admin@osdb.test" } };
+  users.__state.usersByContributorId[42] = { email: "admin@osdb.test", role: "admin", active: 1 };
   const response = await worker.fetch(
     request("/moderation", { headers: { cookie: sessionCookie("real-token") } }),
     testEnv(MINIMAL_BASIC_CONFIG),
@@ -1139,15 +1145,19 @@ test("session fallback: every degraded case falls through to Basic/bearer, never
       auth.__state.session = null;
     }],
     ["session valid but no linked users row", () => {
-      auth.__state.session = { contributor: { email: "ghost@osdb.test" } };
+      auth.__state.session = { contributor: { id: 43, email: "ghost@osdb.test" } };
     }],
     ["session valid, users row exists but role is below moderator", () => {
-      auth.__state.session = { contributor: { email: "contrib@osdb.test" } };
-      users.__state.users["contrib@osdb.test"] = { email: "contrib@osdb.test", role: "contributor", active: 1 };
+      auth.__state.session = { contributor: { id: 44, email: "contrib@osdb.test" } };
+      users.__state.usersByContributorId[44] = { email: "contrib@osdb.test", role: "contributor", active: 1 };
     }],
     ["session valid, moderator role but user inactive", () => {
-      auth.__state.session = { contributor: { email: "disabled@osdb.test" } };
-      users.__state.users["disabled@osdb.test"] = { email: "disabled@osdb.test", role: "moderator", active: 0 };
+      auth.__state.session = { contributor: { id: 45, email: "disabled@osdb.test" } };
+      users.__state.usersByContributorId[45] = { email: "disabled@osdb.test", role: "moderator", active: 0 };
+    }],
+    ["session valid, users row exists for another contributor (email matches nothing by itself)", () => {
+      auth.__state.session = { contributor: { id: 46, email: "mod@osdb.test" } };
+      users.__state.usersByContributorId[47] = { email: "mod@osdb.test", role: "moderator", active: 1 };
     }],
     ["findSessionByToken throws (simulated D1 outage)", () => {
       auth.__state.shouldThrow = true;
@@ -1156,7 +1166,7 @@ test("session fallback: every degraded case falls through to Basic/bearer, never
   for (const [label, setup] of cases) {
     auth.__state.session = null;
     auth.__state.shouldThrow = false;
-    users.__state.users = {};
+    users.__state.usersByContributorId = {};
     setup();
     // No Basic/bearer credential configured at all here: the request must
     // still get the SAME 503 it would get with no session feature at all —
@@ -1172,8 +1182,8 @@ test("session fallback: every degraded case falls through to Basic/bearer, never
 
 test("session check never runs when no Basic/bearer credential is configured (fail-closed floor unchanged)", async () => {
   const { worker, auth, users } = await loadWorker();
-  auth.__state.session = { contributor: { email: "mod@osdb.test" } };
-  users.__state.users["mod@osdb.test"] = { email: "mod@osdb.test", role: "moderator", active: 1 };
+  auth.__state.session = { contributor: { id: 41, email: "mod@osdb.test" } };
+  users.__state.usersByContributorId[41] = { email: "mod@osdb.test", role: "moderator", active: 1 };
   // denialEnv() fails the test if the gate touches DB/ASSETS/etc for a
   // request that must be denied without doing any work — a valid session
   // must NOT rescue a host with zero MODERATION_* secrets configured.
@@ -1187,8 +1197,8 @@ test("session check never runs when no Basic/bearer credential is configured (fa
 
 test("moderator session does not leak into the legacy identity headers it replaces", async () => {
   const { worker, app, auth, users } = await loadWorker();
-  auth.__state.session = { contributor: { email: "mod@osdb.test" } };
-  users.__state.users["mod@osdb.test"] = { email: "mod@osdb.test", role: "moderator", active: 1 };
+  auth.__state.session = { contributor: { id: 41, email: "mod@osdb.test" } };
+  users.__state.usersByContributorId[41] = { email: "mod@osdb.test", role: "moderator", active: 1 };
   const response = await worker.fetch(
     request("/moderation", {
       headers: {

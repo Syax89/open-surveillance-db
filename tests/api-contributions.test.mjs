@@ -32,10 +32,12 @@ let rateLimit;
 
 beforeEach(async () => {
   resetMockState();
-  // GET /api/auth/me now also resolves the caller's coarse users.role (ADR
-  // 0003 2026-10 amendment); default to no linked `users` row like every
-  // ordinary contributor fixture here.
-  stub("getUserByEmail", async () => null);
+  // GET /api/auth/me resolves the caller's coarse users.role (ADR 0003
+  // 2026-10 amendment) through the EXPLICIT `users.contributor_id` link
+  // (`getUserByContributorId`, audit P0 — email equality is never trusted);
+  // default to no linked `users` row like every ordinary contributor fixture
+  // here.
+  stub("getUserByContributorId", async () => null);
   if (!rateLimit) rateLimit = await loadLibModule("rate-limit");
   rateLimit.resetRateLimitState();
 });

@@ -63,7 +63,8 @@ identities and role separation are required.
 The "future" upgrade above is now partially live: `requireModerationAuth`
 (`worker/index.ts`) checks a live `osdb_session` cookie (ADR 0013) BEFORE
 falling through to Basic/bearer. When the session's contributor is linked to
-a `users` row (ADR 0014) with role `moderator` or `admin`, the gate passes
+a `users` row (ADR 0014) **via the explicit `users.contributor_id` column**
+with role `moderator` or `admin`, the gate passes
 and injects that user's own email — real per-moderator login through the
 site's existing Google/password sign-in, zero shared secret involved.
 
@@ -76,18 +77,28 @@ site's existing Google/password sign-in, zero shared secret involved.
   session is absent or expired.
 - **Every failure mode degrades to "try the next credential", never to a
   denial of its own**: no cookie, undecodable cookie, dead/expired/revoked
-  session, no linked `users` row, inactive user, role below moderator, or a
+  session, no `users` row linked to this contributor, inactive user, role
+  below moderator, or a
   D1 error during lookup — all of them fall through silently to Basic/
   bearer. A contributor's ordinary session browsing the public site never
   produces a 401/503 from this check; it just doesn't grant the free pass.
 - **Provisioning a moderator for this path** is a `users` row
-  (`role = 'moderator'` or `'admin'`, `active = 1`) whose `email` matches the
-  contributor's `contributors.email` — for an OIDC (Google) account that is
-  the non-routable placeholder `oidc.<provider>.<sub>@invalid` already
-  stored there (see `db/users.ts`, ADR 0014), not the real address.
-- **No new identity-spoofing surface.** The session lookup runs server-side
+  (`role = 'moderator'` or `'admin'`, `active = 1`) whose **`contributor_id`
+  column points at the contributor's `contributors.id`** — an explicit,
+  server-written link (`db/users.ts`, ADR 0014). Matching
+  `contributors.email` against `users.email` is **NEVER** accepted for
+  authorization: any visitor can register an arbitrary, unverified email
+  (e.g. a moderator's address) and would inherit that moderator's role. For
+  an OIDC (Google) account `contributors.email` holds the non-routable
+  placeholder `oidc.<provider>.<sub>@invalid` already
+  stored there, which is exactly why email equality can never be the bridge.
+- **No new identity-spoofing surface.** The identity comes from the opaque
+  session token plus the DB-level `contributor_id` link, and nothing else:
+  the session lookup runs server-side
   against D1 (`findSessionByToken`, the same function the contributor routes
   already use) — a client cannot forge the outcome by sending a header; the
   only client-controlled input is the opaque session token, already hashed
   and compared server-side exactly as ADR 0013 specifies for every other
-  session-authenticated route.
+  session-authenticated route. The role lookup then follows
+  `users.contributor_id` (`getUserByContributorId`), an explicit column, so
+  registering a matching email grants nothing.

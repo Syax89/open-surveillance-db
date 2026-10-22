@@ -6,7 +6,7 @@ import type { AnalyticsEngineDataset, D1Database, Fetcher, SendEmail } from "clo
 import { DEFAULT_RETENTION_POLICY, runRetentionSweep, type RetentionSummary } from "../db/retention";
 import { sweepOidcExpired } from "../db/oidc";
 import { findSessionByToken } from "../db/auth";
-import { getUserByEmail, roleAtLeast } from "../db/users";
+import { getUserByContributorId, roleAtLeast } from "../db/users";
 import { SESSION_COOKIE } from "../app/lib/csrf";
 import { en as gateCommonEn, it as gateCommonIt } from "../app/lib/i18n/common";
 import { en as gateErrorsEn, it as gateErrorsIt } from "../app/lib/i18n/errors";
@@ -412,12 +412,17 @@ function matchBasicOperator(
  * Resolve a live `osdb_session` cookie (ADR 0013) to a moderator identity
  * (ADR 0003 amendment 2026-10: real per-moderator login as the primary
  * path, replacing the shared Basic secret). Every failure mode — no cookie,
- * dead/expired/revoked session, no linked `users` row, inactive user, role
- * below moderator, or a D1 error — returns null and falls through to the
+ * dead/expired/revoked session, no `users` row linked to this contributor
+ * (`users.contributor_id`), inactive user, role below moderator, or a D1
+ * error — returns null and falls through to the
  * UNCHANGED Basic/bearer gate below. This is deliberate: a missing session
  * is not a denial, it is "try the next credential", so a contributor
  * browsing the site with an ordinary session never sees a 401/503 here —
  * they just don't get the free pass and the legacy gate decides as before.
+ *
+ * Email equality between `contributors` and `users` is NEVER trusted
+ * (spoofable attribution): any visitor can register an arbitrary, unverified
+ * email and would otherwise inherit that identity's role.
  */
 async function moderatorEmailFromSession(request: Request): Promise<string | null> {
   const cookieHeader = request.headers.get("Cookie") ?? "";
@@ -436,7 +441,7 @@ async function moderatorEmailFromSession(request: Request): Promise<string | nul
   try {
     const session = await findSessionByToken(token);
     if (!session) return null;
-    const user = await getUserByEmail(session.contributor.email);
+    const user = await getUserByContributorId(session.contributor.id);
     if (!user || user.active !== 1 || !roleAtLeast(user.role, "moderator")) return null;
     return user.email;
   } catch (error) {
@@ -454,7 +459,8 @@ async function moderatorEmailFromSession(request: Request): Promise<string | nul
  *   1. Bearer token (`MODERATION_TOKEN`) → `MODERATION_IDENTITY_EMAIL`
  *      (a machine/ops identity, unchanged);
  *   2. A live `osdb_session` cookie whose contributor is linked to a
- *      `users` row with role moderator+ (ADR 0003 amendment 2026-10) → that
+ *      `users` row via `users.contributor_id` with role moderator+ (ADR 0003
+ *      amendment 2026-10; email equality is never used) → that
  *      user's own email, real per-moderator login via the site's existing
  *      Google/password sign-in, no shared secret involved;
  *   3. Basic auth against `MODERATION_OPERATORS` (per-operator list) → the
