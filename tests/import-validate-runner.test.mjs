@@ -1,34 +1,12 @@
-// OPERATIONS-5 regression (P2 audit 2026-10-22) — the IMPORT RUNNER's row
-// validator must enforce the SAME dome direction invariant as the adapter
-// validator, and its (0,0) diagnostic must describe what the code actually
-// does.
+// OPERATIONS-5 regression (P2 audit 2026-10-22): the IMPORT RUNNER's
+// validateStagedRow (scripts/import/validate.mjs) must enforce the dome
+// invariant — a Fixed dome is never directional — and keep its (0,0)
+// diagnostic honest. This is a DIFFERENT contract from the adapter-side
+// validator in adapters/lib.mjs, which this suite never calls.
 //
-// Two contracts live in the pipeline and they are deliberately DIFFERENT:
-//   - scripts/import/adapters/lib.mjs:validateStagedRow(row, { allowOrigin })
-//     — the adapter / dry-run / preview-map front half (it owns the
-//     per-descriptor origin escape hatch and the DOME_KIND invariant);
-//   - scripts/import/validate.mjs:validateStagedRow(row) — the RUNNER's
-//     defensive gate (single argument, no options, fail-closed).
-// This suite exercises ONLY the runner's validator (plus one end-to-end run
-// through runImport), never the adapter one: no consolidation.
-//
-// The bug: the runner validated the direction RANGE for every kind, but not
-// the schema invariant "domes are never directional" (DOME_KIND → direction
-// IS NULL). A staged dome row carrying direction 0 or 359 — the two values a
-// source most often means as "no direction" / "wraps to 0" — passed the
-// runner, was counted as inserted and landed in D1 as a directional dome.
-// The adapter already rejects it, so the pipeline only caught it when the
-// adapter was the one staging the rows; an adapter (or a replayed staged
-// payload) that emitted it slipped through the runner's own gate.
-//
-// The (0,0) diagnostic also promised an escape hatch ("rejected unless the
-// descriptor whitelists origin") that the runner never implemented — the
-// runner has no allowOrigin parameter and always rejects the origin. The
-// message must say so.
-//
-// Fixtures are fictitious (example.invalid, made-up titles). No CLI run, no
-// network, no D1/Cloudflare call: the end-to-end case uses the in-memory
-// SQLite D1 adapter with the real migration SQL, like tests/import-pipeline.
+// Fixtures are fictitious (example.invalid, made-up titles). No CLI run and
+// no network: the end-to-end case uses the in-memory SQLite D1 adapter with
+// the real migration SQL.
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -149,8 +127,8 @@ test("runImport: staged dome rows with direction 0/359 are counted invalid and n
   const staged = [
     { title: "Valid bullet fixture", kind: "Bullet", latitude: 45.1, longitude: 9.1, direction: 120, external_id: "ok-bullet" },
     { title: "Valid ptz fixture", kind: "PTZ", latitude: 45.2, longitude: 9.2, direction: 0, external_id: "ok-ptz" },
-    { title: "Dome fixture north", kind: DOME_KIND, latitude: 45.3, longitude: 9.3, direction: 0, external_id: "bad-dome-0" },
-    { title: "Dome fixture wrap", kind: DOME_KIND, latitude: 45.4, longitude: 9.4, direction: 359, external_id: "bad-dome-359" },
+    { title: "Dome fixture 0", kind: DOME_KIND, latitude: 45.3, longitude: 9.3, direction: 0, external_id: "bad-dome-0" },
+    { title: "Dome fixture 359", kind: DOME_KIND, latitude: 45.4, longitude: 9.4, direction: 359, external_id: "bad-dome-359" },
   ];
   const adapter = {
     getDescriptor: async () => FIXTURE_DESCRIPTOR,

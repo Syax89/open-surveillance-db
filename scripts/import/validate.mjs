@@ -38,11 +38,8 @@ export function validateStagedRow(staged) {
     errors.push("external_id is required (idempotency key)");
   }
 
-  // Coordinates (design §7.1): finite, in range, and never the origin. The
-  // runner is fail-closed: (0,0) is an "unknown" placeholder here, and this
-  // gate has no origin escape hatch at all (unlike the adapter-side
-  // validateStagedRow in adapters/lib.mjs, whose `allowOrigin` belongs to the
-  // per-descriptor front half — a different contract, §7.1).
+  // Coordinates (design §7.1): finite, in range, and never the origin — this
+  // gate is fail-closed, it has no descriptor whitelist.
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
     errors.push("latitude/longitude must be finite numbers");
   } else {
@@ -53,12 +50,8 @@ export function validateStagedRow(staged) {
     errors.push("coordinates (0,0) look like an unknown placeholder — always rejected by the runner (fail-closed)");
   }
 
-  // Direction (design §7.3): integer 0-359 when present; domes are forced
-  // to NULL by the adapters (invariant), but validate the range anyway. The
-  // dome invariant is enforced here TOO — the adapters already reject it,
-  // and the runner never trusts its input: a dome carrying 0/359 (the two
-  // values a source means as "no direction"/"wraps to 0") would otherwise
-  // be counted as inserted and stored as a directional dome.
+  // Direction (design §7.3): integer 0-359 when present; the dome invariant
+  // applies here too — a dome is never directional, so direction must be null.
   if (staged.direction !== null && staged.direction !== undefined) {
     if (!Number.isInteger(staged.direction) || staged.direction < 0 || staged.direction > 359) {
       errors.push(`direction must be an integer 0-359, got ${JSON.stringify(staged.direction)}`);

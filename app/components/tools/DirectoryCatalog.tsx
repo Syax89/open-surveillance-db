@@ -149,11 +149,7 @@ export function DirectoryCatalog({ filteredRecords, loading, loadError, onRetryL
     ? t.loadErrorTitle
     : placeDone
       ? t.placeResultsFound(placeActive ? placeRecords.length : 0)
-      // Initial fetch in flight with no known server total yet: announce the
-      // loading state (same string as the loading note below) instead of the
-      // fallback count — "0 public records found" is a lie while the walk or
-      // the first cursor page is still running. A KNOWN total (0 included,
-      // from a settled fetch or a reload) keeps its count.
+      // No known total yet (first fetch in flight): announce loading, not a false zero.
       : loading && serverTotalRecords == null
         ? t.loading
         : serverTotalRecords === 1 ? t.oneRecordFound : `${serverTotalRecords ?? filteredRecords.length} ${t.recordsFound}`;

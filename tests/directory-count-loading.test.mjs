@@ -1,35 +1,13 @@
 /**
- * FRONTEND-4 regression (P2 audit 2026-10-22) — the /directory result count
- * must announce the LOADING state, never a false "0 public records found",
- * while the first data fetch is still in flight.
+ * FRONTEND-4 regression (P2 audit 2026-10-22): the /directory result count
+ * announces the loading state (the existing EN/IT directory.loading string)
+ * instead of a false "0 public records found" while the first fetch is in
+ * flight; known totals, the completed true zero, loadError and a completed
+ * place search keep their counts.
  *
- * The bug: DirectoryCatalog's countLabel (app/components/tools/DirectoryCatalog.tsx)
- * had no loading branch, so during the initial fetch it fell through to the
- * count fallback:
- *   - cursor mode (default sort=alphabetical, usePublicCamerasPage): the
- *     server total is `null` until the first page answers → `?? filteredRecords.length`
- *     → 0 → "0 public records found" while the list region already showed the
- *     truthful "Loading the directory…" note;
- *   - legacy walk mode (other sorts, usePublicCameras): records are [] until
- *     the walk settles → the same false zero.
- * The count is a role="status" region (aria-describedby target of the search
- * input), so AT users were told the directory was empty on every load.
- *
- * The fix contract pinned here (minimal, no redesign):
- *   - while loading AND no known server total → the existing `t.loading` string;
- *   - a KNOWN total keeps its count even while loading (0 and 1 included):
- *     "0 public records found" is legitimate only once the fetch has completed;
- *   - the legacy loaded-array count and the completed true-zero state are
- *     unchanged;
- *   - loadError still wins, and a completed place search
- *     (success / empty / not-found) still wins over the loading note.
- *
- * Client layer only, existing patterns (dom-harness + the REAL DirectoryTool /
- * DirectoryCatalog): jsdom, @testing-library, deterministic fetch mock. The
- * fetch mock is CONTROLLABLE (a deferred promise gated by release()) so the
- * initial loading state is observable deterministically instead of being
- * inferred from real-timer races. Fixtures are fictional demo records — no
- * personal data.
+ * Client layer: dom-harness with the real DirectoryTool/DirectoryCatalog and a
+ * deferred fetch, so the initial loading state is observable deterministically.
+ * Fixtures are fictional demo records.
  */
 import assert from "node:assert/strict";
 import test from "node:test";
@@ -58,6 +36,13 @@ let DirectoryTool;
 let DirectoryCatalog;
 let __resetPublicCamerasCache;
 
+// Saved once, before any mock install: teardown restores it so a leaked mock
+// can never bleed into the next test.
+const priorFetch = globalThis.fetch;
+// The gate of the last controllable fetch — afterEach releases it even if the
+// test threw before its own release() call.
+let pendingGate = null;
+
 test.before(async () => {
   rtl = await setupDom();
   __resetPublicCamerasCache = (await loadDomModule("app/lib/use-public-cameras.mjs")).__resetPublicCamerasCache;
@@ -66,7 +51,13 @@ test.before(async () => {
 });
 
 test.afterEach(async () => {
+  // Unmount first: the hook cleanup aborts the in-flight request, so releasing
+  // the gate below cannot land a state update on a mounted tree.
   rtl.cleanup();
+  const release = pendingGate;
+  pendingGate = null;
+  if (release) await rtl.act(async () => { release(); });
+  globalThis.fetch = priorFetch;
   __resetPublicCamerasCache();
   window.localStorage.clear();
   const nav = await loadDomModule("node_modules/next/navigation.mjs");
@@ -77,11 +68,11 @@ const counter = (container) => container.querySelector("#record-search-count");
 const text = (element) => (element?.textContent ?? "").trim();
 
 /**
- * Install a fetch mock whose /api/cameras LIST request stays PENDING until
- * the returned release() is called. This is the only deterministic way to
- * observe the initial loading state: the mocked API otherwise answers before
- * any assertion can run. Facets and the place-search proxy are answered
+ * Install a fetch mock whose /api/cameras LIST request stays PENDING until the
+ * returned release() runs. Facets and the place-search proxy answer
  * immediately (facets: empty; place search: `placeHandler`, default 404).
+ * The gate is ALSO released by afterEach, so a throwing test cannot leave it
+ * dangling.
  */
 function installPendingCamerasFetch(respond, placeHandler) {
   let release;
@@ -95,7 +86,9 @@ function installPendingCamerasFetch(respond, placeHandler) {
     if (url.startsWith("/api/cameras?")) return gate.then(() => respond(url));
     return jsonResponse({ error: "not found" }, { status: 404 });
   });
-  return () => release();
+  const releaseGate = () => release();
+  pendingGate = releaseGate;
+  return releaseGate;
 }
 
 const listPayload = (records, total = records.length) =>
