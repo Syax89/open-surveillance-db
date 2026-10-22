@@ -246,19 +246,25 @@ test("record page: imported record shows provenance next to the never-confirmed 
   assert.equal(sourceLink.getAttribute("href"), "https://example.invalid/fixture");
   const licenseLink = screen.getByRole("link", { name: "ODbL 1.0" });
   assert.equal(licenseLink.getAttribute("href"), "https://opendatacommons.org/licenses/odbl/1-0/");
-  // The Source fact shows the friendly dataset name, never the raw
-  // 'import:fixture-source-2026' internal slug. It appears twice by design:
-  // as the provenance link and as the "Source" fact row.
+  // The raw 'import:fixture-source-2026' internal slug is never rendered.
   assert.equal(screen.queryByText("import:fixture-source-2026"), null);
-  assert.ok(screen.getAllByText("Fixture Open Data (test)").length >= 2);
+  // M05 (design review 2026-10-22): the dataset name is stated ONCE — in the
+  // provenance line above (which keeps the source URL + licence attribution).
+  // The "Source" fact now states the origin ("Imported data") instead of
+  // repeating the full dataset name a second time.
+  assert.equal(screen.getAllByText("Fixture Open Data (test)").length, 1, "the source name is not duplicated in the facts");
+  const facts = document.querySelector(".record-detail-facts");
+  assert.match(facts?.textContent ?? "", /Imported data/, "the Source fact states the record is imported data");
+  assert.ok(!(facts?.textContent ?? "").includes("Fixture Open Data (test)"), "the facts do not repeat the dataset name");
   // Creation date fact (FASE C): the "Added" row renders the localized date.
   const expectedAdded = new Date("2026-03-01T00:00:00.000Z")
     .toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
   const addedDt = screen.getByText("Added");
   assert.equal(addedDt.tagName, "DT", "the Added fact row renders its label");
   // The fixture shares the same date for created/updated, so the date
-  // appears in both the Added and Last-confirmation rows.
+  // appears in both the Added and Last update rows (M03 label).
   assert.ok(screen.getAllByText(expectedAdded).length >= 2, "the Added row renders the localized creation date");
+  assert.equal(screen.getByText("Last update").tagName, "DT", "the update date keeps its own label");
 });
 
 test("record page: community report shows no import provenance line", async () => {

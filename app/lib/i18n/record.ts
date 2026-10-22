@@ -127,6 +127,10 @@ export const en = {
   // source dataset (linked) and its licence (linked), never the raw
   // "import:<slug>" internal value.
   importedFrom: "Imported from",
+  // M05 (design review 2026-10-22): the provenance line above already names
+  // the dataset and links its licence, so the facts row states the ORIGIN
+  // instead of repeating the full source name a second time.
+  importedData: "Imported data",
 
   // --- Hidden/removed banner (ADR 0021 §6.3, FASE 3 UI): a withdrawn
   // record stays reachable by direct link with an explicit banner; the
@@ -286,6 +290,8 @@ export const it: Translation<typeof en> = {
   // community — il dataset della fonte (linkato) e la sua licenza
   // (linkata), mai il valore interno grezzo "import:<slug>".
   importedFrom: "Importato da",
+  // Vedi en.importedData (M05).
+  importedData: "Dati importati",
 
   // --- Banner nascosto/rimosso (ADR 0021 §6.3, FASE 3 UI): un record
   // ritirato resta raggiungibile tramite link diretto con un banner

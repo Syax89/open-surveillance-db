@@ -896,6 +896,12 @@ button { cursor:pointer; }
   .record-detail-actions .button { width:100%; justify-content:center; white-space:normal; text-align:center; overflow-wrap:anywhere; padding:11px 10px; font-size:12.5px; }
 }
 .detail-outline { color:var(--outline-ink); border-color:var(--control-border); }
+/* M05: "← Back to directory" fits on ONE line from 360px up (the 105px mobile
+   cap made it wrap on every phone); 320px keeps the cap so the header cannot
+   overflow. Scoped to the public record shell like the title rules. */
+@media (min-width:360px) {
+  .record-page[data-surface="record"] .nav-record-actions .text-button { max-width:none; white-space:nowrap; text-align:left }
+}
 .record-detail-note { margin:28px 0 0; padding-top:20px; border-top:1px solid var(--line); color:var(--muted); font-size:var(--text-sm); line-height:1.5; }
 .moderation-page { width:var(--container-standard); margin:30px auto 100px; }
 .moderation-page>h1 { margin:0; font-size:var(--text-display); letter-spacing:-.07em; line-height:1.06; font-weight:700; text-wrap:balance; overflow-wrap:anywhere; }
@@ -1085,6 +1091,18 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
   /* Narrow cards: smaller title so long first words still fit; desktop is unchanged. */
   .record-detail h1 { font-size:clamp(36px,12vw,42px) }
   .record-detail-facts { grid-template-columns:1fr }
+  /* M05 (design review 2026-10-22 P2): the PUBLIC RECORD page is operational
+     content, not a hero — at 390px its 42px title took ~134px over three
+     lines and pushed the mini map to y=1005. Scoped to the record shell's
+     data-surface marker ONLY (InfoPage/SourcesPage/auth pages keep the
+     shared .record-detail tokens above, desktop included). */
+  .record-page[data-surface="record"] .record-detail { padding:22px 18px }
+  .record-page[data-surface="record"] .record-detail .card-topline { margin:0 0 12px }
+  .record-page[data-surface="record"] .record-detail h1 { font-size:clamp(26px,7.2vw,32px); line-height:1.16; letter-spacing:-.03em }
+  .record-page[data-surface="record"] .record-detail-kind { margin:10px 0 0; font-size:var(--text-xl) }
+  .record-page[data-surface="record"] .record-detail-summary { margin:16px 0; font-size:var(--text-lg); line-height:1.5 }
+  .record-page[data-surface="record"] .community-badge { margin:10px 0 0 }
+  .record-page[data-surface="record"] .record-detail-facts { gap:var(--space-3); margin:18px 0; padding:16px 0 }
   .record-history-list li { flex-direction:column;align-items:flex-start;gap:4px }
   .principles { padding:68px 0 }
   .guide-overview { padding-bottom:40px; }
