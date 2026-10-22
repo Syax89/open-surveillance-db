@@ -132,14 +132,23 @@ test("the open dropdown still fits 320x568", async () => {
 
   const container = ruleBlocks(dropdown, DROPDOWN)[0];
   assert.ok(container, "the dropdown container rule exists");
+  // Resolve the token instead of asserting the literal string: --space-4 is
+  // the accepted 16px panel padding, and the height budget below depends on
+  // the RESOLVED value.
   const padding = declaration(container, "padding");
-  assert.equal(padding, "var(--space-4)", "the panel padding stays the accepted token (16px)");
+  const space4 = await readSource("app/globals.css").then((source) => {
+    const match = source.match(/--space-4:\s*(\d+)px/);
+    assert.ok(match, "--space-4 must be a pixel token");
+    return Number(match[1]);
+  });
+  assert.equal(padding, "var(--space-4)", "the panel padding stays the accepted token");
+  assert.equal(space4, 16, "--space-4 resolves to 16px (the budget below uses it)");
   const gap = px(declaration(container, "gap"));
   assert.ok(gap <= 14, `the row gap stays modest (got ${gap}px)`);
 
   // Rows: 4 primary links + the auth row (login + create account side by side).
   const rows = 5;
-  const total = rows * 44 + (rows - 1) * gap + 16 * 2 /* padding */ + 2 /* borders */;
+  const total = rows * 44 + (rows - 1) * gap + space4 * 2 /* padding */ + 2 /* borders */;
   const dropdownTop = 62; // the panel is anchored at top:62px under the header row
   assert.ok(dropdownTop + total <= 568, `the open dropdown must fit 320x568 (needs ${dropdownTop + total}px)`);
 });

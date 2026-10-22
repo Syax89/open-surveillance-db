@@ -148,7 +148,9 @@ test("confirmed record: the confirmation wording stays on the badge, the update 
     new RegExp(`Last confirmed: ${longDate(VERIFIED, "en-GB")}`),
     "a real confirmation (lastVerifiedAt) keeps the confirmation wording",
   );
-  assert.doesNotMatch(factsText(en.container), /Last confirmed/i, "the facts row never claims a confirmation");
+  // The OLD wording this fix removed is "Last confirmation" (the badge above
+  // legitimately says "Last confirmed", so only the removed label is guarded).
+  assert.doesNotMatch(factsText(en.container), /Last confirmation/i, "the facts row never claims a confirmation");
 
   rtl.cleanup();
   window.localStorage.setItem("opensurveillancedb-locale", "it");
@@ -186,4 +188,46 @@ test("directory cards label the update date as an update, not a confirmation", a
   assert.match(text, /Last update/, "the card shows the update label for record.updated");
   assert.doesNotMatch(text, /Last confirmed/i, "a card never presents the update date as a community confirmation");
   assert.match(text, /Demo data/, "the demo card keeps its illustrative marker");
+});
+
+// ---------------------------------------------------------------------------
+// The home hub directory cards share the same label (review B gap)
+// ---------------------------------------------------------------------------
+
+function directoryProps(records) {
+  return {
+    filteredRecords: records,
+    cameraKinds: ["Fixed dome", "Bullet"],
+    search: "",
+    setSearch: () => {},
+    kindFilter: "all",
+    setKindFilter: () => {},
+    freshnessFilter: "any",
+    setFreshnessFilter: () => {},
+    sortOrder: "alphabetical",
+    setSortOrder: () => {},
+    showRecordOnMap: () => {},
+    setCoordinates: () => {},
+    showHeading: false,
+    showMapLink: false,
+  };
+}
+
+test("home hub directory cards label the update date as an update (EN + IT)", async () => {
+  const PublicDirectory = (await loadDomModule("app/components/home/PublicDirectory.mjs")).PublicDirectory;
+  installFetchMock(() => jsonResponse({ records: [], total: 0, nextOffset: null }));
+
+  const en = await renderWithLocale(React.createElement(PublicDirectory, directoryProps([{ ...BASE, id: 11, title: "Fixture hub card" }])));
+  await en.findByText("Fixture hub card");
+  const enText = en.container.querySelector("ul.record-list")?.textContent ?? "";
+  assert.match(enText, /Last update/, "the hub card shows the update label");
+  assert.doesNotMatch(enText, /Last confirmation/i, "the hub card never claims a confirmation");
+
+  rtl.cleanup();
+  window.localStorage.setItem("opensurveillancedb-locale", "it");
+  const it = await renderWithLocale(React.createElement(PublicDirectory, directoryProps([{ ...BASE, id: 12, title: "Scheda hub di prova" }])));
+  await it.findByText("Scheda hub di prova");
+  const itText = it.container.querySelector("ul.record-list")?.textContent ?? "";
+  assert.match(itText, /Ultimo aggiornamento/, "the Italian hub card shows the update label");
+  assert.doesNotMatch(itText, /Ultima conferma/i, "the Italian hub card never claims a confirmation");
 });
