@@ -131,9 +131,13 @@ export function usePublicCamerasPage({ page, limit = 20, filters = {} }: UsePubl
     // This effect owns the request lifecycle; reset its visible state before
     // launching the replacement request so stale records are never presented
     // as the result for a new page/filter key.
+    //
+    // Clear the stale page (not just flag it) so the pending note can show;
+    // `total` stays, a known total is still a true answer.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     setError(false);
+    setRecords((previous) => (previous.length === 0 ? previous : []));
     walkToPage()
       .then(({ records: fetched, total: fetchedTotal }) => {
         if (cancelled) return;
