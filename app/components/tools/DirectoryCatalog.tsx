@@ -320,7 +320,8 @@ export function DirectoryCatalog({ filteredRecords, loading, loadError, onRetryL
           // Loading state: show a truthful note during the initial walk
           // instead of the empty state ("0 public records found" is a lie
           // for 400ms until the first page arrives — audit 2026-08-09).
-          <p className="loading-note" role="status">{t.loading}</p>
+          // The dedicated class reserves the list area while pending only.
+          <p className="loading-note directory-list-loading" role="status">{t.loading}</p>
         )
         : loadError
         ? (

@@ -209,7 +209,7 @@ test("server-rendered /mappa provides the map region and /directory the text-lis
   // the container: the empty state was visible for the first ~400ms of every
   // page load, then flipped to "40036 public records found". Same contract
   // as the /records/[id] SSR shell (browse-filter-record, e2e-journeys).
-  assert.match(directory.html, /class="loading-note"[^>]*role="status"/, "the SSR shell announces the loading state, not a false empty state");
+  assert.match(directory.html, /class="loading-note directory-list-loading"[^>]*role="status"/, "the SSR shell announces the loading state with the reserved list note, not a false empty state");
   assert.doesNotMatch(directory.html, /class="empty-state"/, "the empty state must not claim zero records while the walk is still in flight");
   // CEO 2026-08-08: the [+] report shortcut renders in the SSR shell too —
   // it does not depend on hydration or on the export row.
