@@ -1053,14 +1053,33 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
      .record-list-card dl / actions rules above already handle the facts
      and the action row. */
   .directory-tool-heading { align-items:flex-start;flex-direction:column;gap:var(--space-3) }
-  .directory-tool .directory-explorer-card .records-section { padding:0 16px 24px; }
-  .directory-tool .directory-explorer-card .directory-controls { margin:0 -16px; padding:14px 16px; }
-  .directory-tool .record-list .record-list-card { grid-template-columns:1fr; gap:var(--space-3); padding:var(--space-4) var(--space-5); }
-  .directory-tool .record-list .record-list-card .record-list-actions { align-items:center; flex-direction:row; flex-wrap:wrap; justify-content:flex-start; gap:var(--space-2); }
+  /* Mobile density (M04, design review 2026-10-22 P2): at 390px the first
+     card began at y=560 (~304px tall) and at 320px at y=610 (~376px tall),
+     because toolbar + controls + results heading + A-Z rail preceded a card
+     carrying six loosely stacked facts. Compact ONLY this caller's vertical
+     rhythm — the records, the two native actions (≥44px) and the
+     filter/pagination contracts are untouched. */
+  .directory-tool .directory-explorer-card .records-section { padding:0 14px 20px; }
+  .directory-tool .directory-explorer-card .directory-controls { margin:0 -14px; padding:10px 14px; }
+  .directory-tool .record-list { margin-top:10px; gap:10px; }
+  .directory-tool .record-list .record-list-card { grid-template-columns:1fr; gap:10px; padding:12px 14px; }
+  .directory-tool .record-list .record-list-card .card-topline { margin:0 0 3px; }
+  .directory-tool .record-list .record-list-card h3 { font-size:var(--text-xl); line-height:1.2; }
+  .directory-tool .record-list .record-list-card .record-kind { margin:2px 0 0; }
+  /* Six facts in one wrapping line made the card tall: a compact two-column
+     grid keeps them all readable (label above value) in ~half the height. */
+  .directory-tool .record-list .record-list-card dl { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:4px 12px; }
+  .directory-tool .record-list .record-list-card dl > div { display:grid; align-items:baseline; gap:0; }
+  .directory-tool .record-list .record-list-card dt { font-size:var(--text-2xs); letter-spacing:.06em; }
+  .directory-tool .record-list .record-list-card dd { font-size:var(--text-sm); line-height:1.35; }
+  .directory-tool .record-list .record-list-card .record-list-actions { align-items:center; flex-direction:row; flex-wrap:wrap; justify-content:flex-start; gap:var(--space-2); margin-top:2px; }
   /* Results header (t_f13fcb1c, ex .directory-meta): heading and add (+)
      action share ONE row. The .directory-tool scope is required to outrank
-     the later base rule whose align-items:flex-end split them. */
+     the later base rule whose align-items:flex-end split them. The heading
+     also loses the desktop 24px/18px lead-in (M04). */
+  .directory-tool .directory-explorer-card .directory-results { margin-top:14px; padding-top:12px; }
   .directory-tool .directory-results { align-items:center; flex-direction:row; flex-wrap:nowrap; gap:var(--space-3); }
+  .directory-tool .directory-results-head h2 { font-size:var(--text-2xl); }
   .directory-pagination { justify-content:center; }
   .record-detail { width:min(100% - 32px,760px);margin:24px auto 60px;padding:30px 23px }
   /* Narrow cards: smaller title so long first words still fit; desktop is unchanged. */
