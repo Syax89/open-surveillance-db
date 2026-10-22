@@ -149,7 +149,10 @@ export function DirectoryCatalog({ filteredRecords, loading, loadError, onRetryL
     ? t.loadErrorTitle
     : placeDone
       ? t.placeResultsFound(placeActive ? placeRecords.length : 0)
-      : serverTotalRecords === 1 ? t.oneRecordFound : `${serverTotalRecords ?? filteredRecords.length} ${t.recordsFound}`;
+      // No known total yet (first fetch in flight): announce loading, not a false zero.
+      : loading && serverTotalRecords == null
+        ? t.loading
+        : serverTotalRecords === 1 ? t.oneRecordFound : `${serverTotalRecords ?? filteredRecords.length} ${t.recordsFound}`;
 
   // Pagination: in cursor mode the server already paginated (records ARE
   // the current page, total comes from the API) — the client slice must

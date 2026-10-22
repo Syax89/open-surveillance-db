@@ -12,7 +12,7 @@
 // `source`/`import_batch_id` are runner-owned and validated separately at
 // write time.
 
-import { CANONICAL_KINDS } from "./kinds.mjs";
+import { CANONICAL_KINDS, DOME_KIND } from "./kinds.mjs";
 
 /**
  * Validate one staged row. Returns { ok: boolean, errors: string[] }.
@@ -38,8 +38,8 @@ export function validateStagedRow(staged) {
     errors.push("external_id is required (idempotency key)");
   }
 
-  // Coordinates (design §7.1): finite, in range, and not (0,0) unless the
-  // descriptor whitelists the origin as "unknown".
+  // Coordinates (design §7.1): finite, in range, and never the origin — this
+  // gate is fail-closed, it has no descriptor whitelist.
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
     errors.push("latitude/longitude must be finite numbers");
   } else {
@@ -47,14 +47,17 @@ export function validateStagedRow(staged) {
     if (longitude < -180 || longitude > 180) errors.push(`longitude ${longitude} out of range [-180, 180]`);
   }
   if (Number.isFinite(latitude) && Number.isFinite(longitude) && latitude === 0 && longitude === 0) {
-    errors.push("coordinates (0,0) look like an unknown placeholder — rejected unless the descriptor whitelists origin");
+    errors.push("coordinates (0,0) look like an unknown placeholder — always rejected by the runner (fail-closed)");
   }
 
-  // Direction (design §7.3): integer 0-359 when present; domes are forced
-  // to NULL by the adapters (invariant), but validate the range anyway.
+  // Direction (design §7.3): integer 0-359 when present; the dome invariant
+  // applies here too — a dome is never directional, so direction must be null.
   if (staged.direction !== null && staged.direction !== undefined) {
     if (!Number.isInteger(staged.direction) || staged.direction < 0 || staged.direction > 359) {
       errors.push(`direction must be an integer 0-359, got ${JSON.stringify(staged.direction)}`);
+    }
+    if (kind === DOME_KIND) {
+      errors.push(`${DOME_KIND} is never directional — direction must be null, got ${JSON.stringify(staged.direction)}`);
     }
   }
 
