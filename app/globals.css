@@ -1902,8 +1902,8 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
      map stays usable). Leaflet's wrapper takes the cap; the content box
      becomes the scroll container so the close button (Leaflet's own,
      absolutely positioned) stays reachable. */
-  .osm-camera-popup .leaflet-popup-content-wrapper { max-height:min(60svh, calc(100svh - 140px)); }
-  .osm-camera-popup .leaflet-popup-content { max-height:min(60svh, calc(100svh - 140px)); overflow-y:auto; overscroll-behavior:contain; }
+  .osm-camera-popup .leaflet-popup-content-wrapper { max-height:var(--osm-popup-max-height, min(60svh, calc(100svh - 140px))); }
+  .osm-camera-popup .leaflet-popup-content { max-height:var(--osm-popup-max-height, min(60svh, calc(100svh - 140px))); overflow-y:auto; overscroll-behavior:contain; }
   /* Leaflet's own close rule (.leaflet-container a.leaflet-popup-close-button,
      0,2,1) would beat a plain .osm-camera-popup .leaflet-popup-close-button
      (0,2,0) — match the tag + container so the ≥44px touch target wins. */

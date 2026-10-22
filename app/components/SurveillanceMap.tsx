@@ -10,6 +10,7 @@ import { isDomeKind } from "../lib/camera-kinds";
 import { FOV_MIN_ZOOM, fovCircleRadiusMeters, fovPolygonPoints } from "../lib/field-of-view";
 import { formatDirection } from "../lib/compass";
 import { mountPopupActions, unmountPopupActions } from "../lib/popup-actions";
+import { popupGeometryFor, type PopupGeometry } from "../lib/map-popup";
 
 export type MapCamera = {
   id: number;
@@ -159,14 +160,16 @@ function defaultPopupHtml(camera: MapCamera): string {
   return `<div class="osm-popup"><h3>${escapeHtml(camera.title)}</h3><p class="osm-popup-kind">${escapeHtml(camera.kind)}${direction}</p></div>`;
 }
 
-// Mobile balloon sizing (CEO 2026-08-07): the popup must not swallow the
-// map on phones. Leaflet sets style.width inline from this option, so the
-// width is controlled here, not in CSS. 300px on desktop (unchanged),
-// 260px on ≤520px screens so a 360-414px phone still sees the map around
-// the balloon. Module-level pure function — safe for SSR (returns 300).
-function popupMaxWidth(): number {
-  if (typeof window === "undefined" || typeof window.innerWidth !== "number") return 300;
-  return window.innerWidth <= 520 ? 260 : 300;
+// Mobile balloon sizing (CEO 2026-08-07, corrected M01 2026-10-22): the
+// popup must not swallow the map on phones AND must never exceed the map
+// surface it is drawn on. The old helper read `window.innerWidth` (260px on
+// phones), which is a lie about the 320px phone: its map is only 286px wide,
+// so a 260px balloon plus the fixed [60, 48] autopan padding could never
+// fit — the balloon rendered clipped and the impossible autopan pushed the
+// selected marker out of view. The geometry now comes from the actual map
+// box through the ONE owner in lib/map-popup (popupGeometryFor).
+function measuredPopupGeometry(map: import("leaflet").Map | null): PopupGeometry {
+  return popupGeometryFor(typeof map?.getSize === "function" ? map.getSize() : null);
 }
 
 export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLocation, focusBounds = null, focusIntent = 0, initialView = null, directoryHref = "#records", onBoundsChange, onViewChange, onFocusApplied, popupHtmlFor }: Props) {
@@ -244,6 +247,33 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
   const onViewChangeRef = useLatest(onViewChange);
   const initialViewRef = useLatest(initialView);
   const popupHtmlForRef = useLatest(popupHtmlFor);
+  // Balloon geometry for the CURRENT map surface (M01). Read at popup-bind
+  // time AND re-applied on map resize, so kept markers never hold stale
+  // dimensions — one helper, one contract (lib/map-popup).
+  const popupGeometry = useCallback((): PopupGeometry => measuredPopupGeometry(mapRef.current), []);
+  // Re-fit every popup that already exists (M01): a map that changes size
+  // with a balloon open must hand the fresh width/padding/height to the
+  // KEPT markers, not only to markers created afterwards. Only the balloon
+  // already on screen is updated — a closed popup stays closed (no
+  // auto-open on resize) and no selection/lifecycle state is touched.
+  const applyPopupFit = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const geometry = measuredPopupGeometry(map);
+    // Vertical budget for CSS (the CSS keeps the old svh rule as fallback).
+    map.getContainer?.()?.style?.setProperty?.("--osm-popup-max-height", `${geometry.maxHeight}px`);
+    const byId = markersByIdRef.current;
+    if (!byId) return;
+    for (const entry of byId.values()) {
+      const popup = entry.marker.getPopup?.();
+      if (!popup?.options) continue;
+      popup.options.maxWidth = geometry.maxWidth;
+      popup.options.minWidth = geometry.minWidth;
+      popup.options.autoPanPadding = geometry.autoPanPadding;
+      popup.options.keepInView = true;
+      if (entry.marker.isPopupOpen?.()) popup.update?.();
+    }
+  }, []);
   const pickPopupHtmlRef = useRef<(latitude: number, longitude: number) => string>(() => "");
   // Latest cameras for the popupopen handler: the map-creation effect runs
   // once and would otherwise close over the FIRST camera list (same pattern
@@ -369,22 +399,25 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
   // after a drag, so panning/zooming stays silent. Reads the CURRENT
   // picker HTML and onPick through refs.
   const handleMapClick = useCallback((event: { latlng: { lat: number; lng: number } }) => {
-    // Mobile balloon (CEO 2026-08-07): on phones the popup must not
-    // swallow the map — maxWidth shrinks with the viewport (260px on
-    // ≤520px screens, 300px on desktop), minWidth stays 220 so the
-    // toolbar still fits.
+    // Balloon geometry (M01): the picker uses the SAME helper as the marker
+    // popups — width/padding derived from the actual map surface, so a tap
+    // near the edge of a 286px map still leaves the balloon and its ×
+    // reachable. Applying the fit first keeps both popup kinds consistent
+    // after a resize that happened while no popup was open.
+    applyPopupFit();
+    const geometry = popupGeometry();
     onPickRef.current(event.latlng.lat, event.latlng.lng);
     mapRef.current?.openPopup(pickPopupHtmlRef.current(event.latlng.lat, event.latlng.lng), event.latlng, {
-      maxWidth: popupMaxWidth(),
-      minWidth: 220,
+      maxWidth: geometry.maxWidth,
+      minWidth: geometry.minWidth,
       className: "osm-camera-popup",
       // Clipping fix (empirical review 2026-08-07): same keepInView /
       // autoPanPadding as the marker popup, so a picker near the map edge
       // never renders cut off.
       keepInView: true,
-      autoPanPadding: [60, 48],
+      autoPanPadding: geometry.autoPanPadding,
     });
-  }, []);
+  }, [applyPopupFit, popupGeometry]);
 
   // Offline state: the tiles cannot load and the records are the last ones
   // the browser received. The map stays visible (the markers are already on
@@ -633,6 +666,13 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
           // record is visible again.
           if (!rebuildingRef.current) activePopupIdRef.current = null;
         });
+        // Popup fit on resize (M01): the map box changes with rotation, the
+        // keyboard or the desktop breakpoint while a balloon is open. Leaflet
+        // fires "resize" after its own invalidateSize, so the balloon and its
+        // autopan padding are re-derived here and handed to the KEPT markers
+        // (see applyPopupFit — never an auto-open, never a lifecycle change).
+        map.on("resize", applyPopupFit);
+        applyPopupFit();
         mapRef.current = map;
         // The layer group now exists: the marker-population effect can run
         // (it also depends on this flag, see the state declaration above).
@@ -677,7 +717,7 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
       // the new map would render with an empty marker pane again.
       setMapReady(false);
     };
-  }, [emitBounds, handleMapClick]);
+  }, [emitBounds, handleMapClick, applyPopupFit]);
 
   // Marker population depends on the camera list, the click handler, the
   // viewport culling rectangle and the CURRENT ZOOM (the grid-vs-individual
@@ -747,6 +787,9 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
     const L = leafletRef.current; const layer = markersRef.current; if (!L || !layer || !mapReady) return;
     rebuildingRef.current = true;
     try {
+      // Balloon geometry for THIS surface (M01): read once per rebuild so
+      // every marker created here starts with dimensions that fit the map.
+      const geometry = measuredPopupGeometry(mapRef.current);
       // B03: the world COPY the map is showing. Geometry is placed on that
       // copy, so a dateline-crossing view (raw 170..190) renders records from
       // BOTH sides near the centre instead of one side projecting off the
@@ -904,8 +947,10 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
         const marker = L.marker(positionOf(camera), { icon: buildMarkerIcon(L, camera, isSelected), title: camera.title });
         marker.bindTooltip(`${camera.title}<br/><small>${camera.kind}</small>`, { direction: "top", offset: [0, -12] });
         marker.bindPopup(popupHtmlForRef.current ? popupHtmlForRef.current(camera) : defaultPopupHtml(camera), {
-          maxWidth: popupMaxWidth(),
-          minWidth: 220,
+          // Balloon geometry (M01): identical options to the coordinate
+          // picker — ONE helper, derived from the actual map surface.
+          maxWidth: geometry.maxWidth,
+          minWidth: geometry.minWidth,
           className: "osm-camera-popup",
           // Clipping fix (empirical review 2026-08-07): markers near the map
           // top opened a popup cut off above the container edge (title
@@ -913,7 +958,7 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
           // the map bounds; autoPanPadding gives the view margin so the
           // balloon never sits flush against an edge.
           keepInView: true,
-          autoPanPadding: [60, 48],
+          autoPanPadding: geometry.autoPanPadding,
         });
         // Keyboard accessibility (P2-9, review 2026-08-07): Leaflet markers
         // are focusable (role=button, tabindex) but had no keydown handler

@@ -341,6 +341,15 @@ export function map(el, opts) {
     off: (event, handler) => { const list = m.handlers[event]; if (list) { const i = list.indexOf(handler); if (i !== -1) list.splice(i, 1); } return m; },
     remove: () => {},
     invalidateSize: () => {},
+    // Map SURFACE (M01, mobile popup fit): the popup geometry is derived from
+    // the real map size (getSize) instead of the viewport, so the stub reports
+    // a settable box — tests shrink it to a 320px-phone map (286x340) and
+    // assert the balloon still fits. getContainer mirrors Leaflet (the
+    // component writes the measured popup height budget on it).
+    size: { x: 800, y: 600 },
+    container: el ?? null,
+    getSize: () => ({ x: m.size.x, y: m.size.y }),
+    getContainer: () => m.container,
     getZoom: () => m.zoom,
     getBounds: () => currentBounds,
     // Shareable viewport (?lat&lng&zoom): the component reads the map centre
@@ -486,7 +495,18 @@ export function marker(latlng, opts) {
     // Popup contract (t_702c10af): the bound HTML is recorded on the
     // marker so tests can assert the popup content (links, fields), and
     // openPopup() records that the balloon was requested.
-    bindPopup: (html, opts) => { m.popupHtml = html; m.popupOpts = opts; return m; },
+    // Real Leaflet keeps the popup options on the Popup instance
+    // (marker.getPopup().options) and re-reads them on every open/update, so
+    // a resize can re-fit the EXISTING balloon without recreating the marker
+    // (M01). popupOpts stays the same object for the menu of assertions that
+    // already read it.
+    bindPopup: (html, opts) => {
+      m.popupHtml = html;
+      m.popup = { options: opts ?? {}, update: () => { m.popupUpdates = (m.popupUpdates ?? 0) + 1; } };
+      m.popupOpts = m.popup.options;
+      return m;
+    },
+    getPopup: () => m.popup ?? null,
     // P0 t_bb310428 (strict popup lifecycle instrumentation): openPopup()
     // mirrors real Leaflet — it materialises the bound HTML into a popup
     // DOM node and dispatches "popupopen" on the map (recorded in

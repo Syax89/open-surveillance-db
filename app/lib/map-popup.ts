@@ -44,6 +44,85 @@ export type PopupLabels = {
 /** Status label helper compatible with publicStatusLabel's signature. */
 export type StatusLabels = Parameters<typeof publicStatusLabel>[0];
 
+// ---------------------------------------------------------------------------
+// Balloon geometry (M01, design review 2026-10-22 P1) — ONE sizing path.
+//
+// The popup width used to come from `window.innerWidth` (260px phones /
+// 300px desktop) with a fixed `autoPanPadding: [60, 48]`. On a 320px phone
+// the MAP is only 286px wide, so 286 - 2*60 = 166px could never hold the
+// balloon: the popup rendered clipped (outer ~291px, close button outside
+// the viewport) and the impossible autopan pushed the selected marker out
+// of the desired view. Sizing is now derived from the ACTUAL map surface,
+// with Leaflet's own non-content chrome accounted for:
+//
+//   outer balloon width = content width + POPUP_CHROME_X
+//   fits when           outer + 2 * autoPanPadding.x <= map width
+//
+// Heights follow the same rule (content height budget + padding + tip).
+// ---------------------------------------------------------------------------
+
+/**
+ * Horizontal Leaflet chrome that is NOT popup content: the default
+ * `.leaflet-popup-content` margins (24px right + 20px left) plus the 1px
+ * `.leaflet-popup-content-wrapper` padding on each side. The mobile rule
+ * tightens the margins to 14/14 (chrome 30), so 46 is the conservative
+ * budget — the balloon fits whichever media query applies.
+ */
+export const POPUP_CHROME_X = 46;
+/** The balloon tip (the 12px tail below the box). Vertical only. */
+export const POPUP_TIP_Y = 12;
+/** Accepted balloon widths (unchanged where they actually fit). */
+const CONTENT_MAX = 300;
+const CONTENT_MAX_NARROW = 260;
+/** Below this MAP width (not viewport) the narrow balloon is preferred. */
+const NARROW_SURFACE = 520;
+/** The community toolbar needs this much content width (accepted floor). */
+const CONTENT_MIN = 220;
+/** Absolute floor: a narrower surface than this cannot happen in the app. */
+const CONTENT_FLOOR = 120;
+/** Autopan breathing room: generous on desktop, reduced to what fits. */
+const PADDING_X_MAX = 60;
+const PADDING_Y_MAX = 48;
+const PADDING_MIN = 10;
+/** Vertical budget as a share of the map height (the rest shows the map). */
+const HEIGHT_SHARE = 0.6;
+/** Fallback height budget when the surface is not measurable (SSR). */
+const HEIGHT_FALLBACK = 360;
+
+/** Resolved balloon geometry for the CURRENT map surface. */
+export type PopupGeometry = {
+  /** Leaflet `maxWidth` (content box, before chrome). */
+  maxWidth: number;
+  /** Leaflet `minWidth` — never larger than `maxWidth`. */
+  minWidth: number;
+  /** Leaflet `autoPanPadding` [x, y] in px, always satisfiable by the map. */
+  autoPanPadding: [number, number];
+  /** Vertical budget for the balloon (written to CSS as --osm-popup-max-height). */
+  maxHeight: number;
+};
+
+/**
+ * Derive the balloon geometry from the REAL map box (`map.getSize()`), so
+ * the balloon and its autopan padding always fit the surface the user sees.
+ * Unmeasured surfaces (0x0 before layout, SSR) fall back to the accepted
+ * desktop geometry — never 0/NaN.
+ */
+export function popupGeometryFor(size: { x: number; y: number } | null | undefined): PopupGeometry {
+  const width = Math.round(size?.x ?? 0);
+  const height = Math.round(size?.y ?? 0);
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+    return { maxWidth: CONTENT_MAX, minWidth: CONTENT_MIN, autoPanPadding: [PADDING_X_MAX, PADDING_Y_MAX], maxHeight: HEIGHT_FALLBACK };
+  }
+  const preferred = width <= NARROW_SURFACE ? CONTENT_MAX_NARROW : CONTENT_MAX;
+  // Give the accepted padding when the preferred balloon still fits; shrink
+  // the padding (never below the minimum) and then the balloon on tiny maps.
+  const padX = Math.max(PADDING_MIN, Math.min(PADDING_X_MAX, Math.floor((width - POPUP_CHROME_X - preferred) / 2)));
+  const maxWidth = Math.max(CONTENT_FLOOR, Math.min(preferred, width - 2 * padX - POPUP_CHROME_X));
+  const padY = Math.min(PADDING_Y_MAX, Math.max(PADDING_MIN, Math.round(height * 0.08)));
+  const maxHeight = Math.max(160, Math.min(Math.round(height * HEIGHT_SHARE), height - 2 * padY - POPUP_TIP_Y));
+  return { maxWidth, minWidth: Math.min(CONTENT_MIN, maxWidth), autoPanPadding: [padX, padY], maxHeight };
+}
+
 /**
  * Resolved import provenance for one record (FASE C, t_4dbce318): the
  * readable entity + licence from the batch, never the raw slug. The map
