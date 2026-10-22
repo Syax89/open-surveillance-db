@@ -90,7 +90,9 @@ export const en = {
   originImported: "Imported data",
   oneRecordFound: "1 public record found",
   recordsFound: "public records found",
-  lastVerification: "Last confirmed",
+  // M03: the card shows `record.updated` (record update, not a community
+  // confirmation) — the label must say so.
+  lastUpdated: "Last update",
   showOnMap: "Show on map",
   openRecord: "Open record",
   emptyTitle: "No published record matches that search.",
@@ -236,7 +238,8 @@ export const it: Translation<typeof en> = {
   originImported: "Dati importati",
   oneRecordFound: "1 record pubblico trovato",
   recordsFound: "record pubblici trovati",
-  lastVerification: "Ultima conferma",
+  // Vedi en.lastUpdated (M03).
+  lastUpdated: "Ultimo aggiornamento",
   showOnMap: "Mostra sulla mappa",
   openRecord: "Apri record",
   emptyTitle: "Nessun record pubblicato corrisponde alla ricerca.",
