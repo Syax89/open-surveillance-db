@@ -165,9 +165,14 @@ test("A01 — three equal summary counters share one desktop row; the odd span i
   const narrowIcon = narrow.map((block) => ruleBlocks(block, ".account-dashboard .account-stat-icon")[0]).find(Boolean);
   assert.ok(narrowIcon, "the icon tile shrinks on narrow screens");
   assert.ok(firstPx(declaration(narrowIcon, "width")) <= 28);
-  assert.match(ruleBlock(baseCss, ".account-stat-label"), /overflow-wrap\s*:\s*anywhere/,
-    "the longest IT/EN label must break instead of leaving the panel");
   assert.match(ruleBlock(baseCss, ".account-stat"), /min-width\s*:\s*0/, "grid children may shrink");
+  const narrowLabel = narrow.map((block) => ruleBlocks(block, ".account-dashboard .account-stat-label")[0]).find(Boolean);
+  assert.ok(narrowLabel, "the 320px label sizing stays scoped to .account-dashboard");
+  assert.match(narrowLabel, /hyphens\s*:\s*auto/,
+    "hyphenation wins over mid-word breaking: at 320px the IT label split as SEGNALAZIO/NI");
+  assert.match(narrowLabel, /letter-spacing\s*:\s*\.02em/, "tighter tracking buys the room for one line");
+  assert.match(ruleBlock(baseCss, ".account-stat-label"), /overflow-wrap\s*:\s*anywhere/,
+    "the no-overflow safety net is kept on top of it");
 });
 
 test("A02 — the pager wraps at 320px and keeps full labels plus its states", () => {
@@ -270,12 +275,30 @@ test("A06 — contribution rows share one status column and stack compactly on m
     "the edit link no longer competes with the status for the same auto margin");
 
   const mobile = mediaBlocks(css, "(max-width:820px)");
+  const mobileList = mobile.map((block) => ruleBlocks(block, ".account-dashboard .contributions-list")[0]).find(Boolean);
+  assert.ok(mobileList, "the mobile list is declared in the account block");
+  assert.match(compact(declaration(mobileList, "display")), /^flex$/, "phones keep the flex column");
+  assert.match(mobileList, /flex-direction\s*:\s*column/);
   const mobileRow = mobile.map((block) => ruleBlocks(block, ".account-dashboard .contribution-row")[0]).find(Boolean);
   assert.ok(mobileRow, "the mobile row is declared in the account block");
-  assert.match(compact(declaration(mobileRow, "grid-template-areas")), /"iconmainmain""\.statusedit"/,
-    "icon + title/meta on the first line, status/edit aligned under the text on the second");
-  assert.doesNotMatch(css, /\.contribution-status\s*\{\s*margin-left\s*:\s*48px/,
-    "the icon-width gutter that stole text space is gone");
+  assert.match(compact(declaration(mobileRow, "display")), /^flex$/, "the mobile row is a flex line, not a grid");
+  assert.match(mobileRow, /flex-wrap\s*:\s*wrap/);
+  assert.match(mobileRow, /align-items\s*:\s*center/);
+  assert.equal(compact(declaration(
+    mobile.map((block) => ruleBlocks(block, ".account-dashboard .contribution-status")[0]).find(Boolean),
+    "margin-left",
+  )), "48px", "the status keeps its compact phone indent");
+  assert.equal(compact(declaration(
+    mobile.map((block) => ruleBlocks(block, ".account-dashboard .contributions-edit")[0]).find(Boolean),
+    "margin-left",
+  )), "auto", "the edit action stays pinned to the right edge of the panel");
+
+  // Rejected pattern (P1 regression, 2026-10-23): a three-track mobile grid let
+  // the `auto` edit track starve the status track to 0px at 320px.
+  assert.doesNotMatch(css, /grid-template-areas\s*:\s*["']icon main main/, "the broken mobile grid areas must stay deleted");
+  assert.doesNotMatch(mobileRow, /grid-template-(columns|areas|rows)/, "the phone row declares no grid tracks at all");
+  assert.doesNotMatch(css, /\.account-dashboard \.contribution-(status|main|kind-icon|s-edit)\s*\{[^}]*grid-area\s*:/,
+    "no leftover grid-area bindings for the removed mobile grid");
 
   // Workflow contracts: links, status semantics and the edit accessibility.
   assert.match(body, /<span className="contribution-kind-icon" aria-hidden="true">/);
