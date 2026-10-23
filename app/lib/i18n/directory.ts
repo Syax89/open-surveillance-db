@@ -46,6 +46,15 @@ export const en = {
   // chips, the alphabetical index and the pagination bar.
   activeFilters: "Active filters",
   removeFilter: (label: string) => `Remove filter: ${label}`,
+  // F1 (mobile usability 2026-10-23): the native filter disclosure summary
+  // states how many selections are active — the SAME count as the removable
+  // chips, so the closed disclosure still tells the truth. Singular/plural;
+  // an all-default state renders no count at all.
+  filtersActiveOne: "1 active filter",
+  filtersActiveMany: (count: number) => `${count} active filters`,
+  // F1: the chip of a non-default order names the ordering ("Order: Most
+  // useful") so it is never read as a restrictive filter.
+  filterOrder: (label: string) => `Order: ${label}`,
   alphaIndexTitle: "Alphabetical index",
   alphaIndexAria: (letter: string) => `Jump to records starting with ${letter}`,
   showingRecords: (from: number, to: number, total: number) => `Showing ${from}–${to} of ${total} records`,
@@ -193,6 +202,15 @@ export const it: Translation<typeof en> = {
   // filtri attivi, indice alfabetico e barra di paginazione.
   activeFilters: "Filtri attivi",
   removeFilter: (label: string) => `Rimuovi filtro: ${label}`,
+  // F1 (usabilità mobile 2026-10-23): il summary nativo dei filtri dichiara
+  // quante selezioni sono attive — lo STESSO conteggio delle chips
+  // rimovibili, così il disclosure chiuso resta veritiero. Singolare/plurale;
+  // lo stato tutto-predefinito non mostra alcun conteggio.
+  filtersActiveOne: "1 filtro attivo",
+  filtersActiveMany: (count: number) => `${count} filtri attivi`,
+  // F1: la chip di un ordinamento non predefinito dichiara l'ordinamento
+  // ("Ordine: Più utili"), così non viene letta come filtro restrittivo.
+  filterOrder: (label: string) => `Ordine: ${label}`,
   alphaIndexTitle: "Indice alfabetico",
   alphaIndexAria: (letter: string) => `Vai ai record che iniziano con ${letter}`,
   showingRecords: (from: number, to: number, total: number) => `Mostrando ${from}–${to} di ${total} record`,

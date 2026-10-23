@@ -892,6 +892,18 @@ button { cursor:pointer; }
 .record-minimap .fov-cone { pointer-events:none; }
 .record-minimap .fov-cone.active { stroke:var(--action); fill:var(--action); }
 .record-detail-actions { display:flex; gap:var(--space-3); flex-wrap:wrap; }
+/* F3 (mobile usability 2026-10-23): exactly ONE "View on map" action per
+   breakpoint. Phones get the same primary button right under the summary —
+   through the SUPPORTED /mappa?focus=<id> deep link, which opens that point —
+   while the accepted lower action keeps its own href and desktop geometry.
+   display:none takes the other variant out of the layout and out of the
+   accessibility tree, so exactly one map link is ever focusable/announced
+   (and withdrawn records render neither). */
+.record-map-early { display:none; }
+@media (max-width:700px) {
+  .record-map-early { display:inline-flex; margin:0 0 18px; }
+  .record-map-late { display:none; }
+}
 /* IT layout stability (t_690ed55e): the two action buttons must NEVER wrap
    to a second row in one language while staying on one row in the other.
    On narrow screens a fixed two-column grid (minmax(0,1fr)) splits the row
@@ -1227,6 +1239,29 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 .filter-chip { display:inline-flex; align-items:center; gap:8px; min-height:44px; padding:0 16px; border:1px solid var(--line); border-radius:var(--radius-full); background:var(--card-bg); color:var(--ink); font-size:var(--text-sm); font-weight:800; }
 .filter-chip:hover { border-color:var(--control-focus); }
 .filter-chip span { color:var(--muted); }
+/* F1 (mobile usability 2026-10-23): /directory keeps exactly ONE chips row per
+   breakpoint. Phones (≤700px) get the full selection — confirmation state,
+   origin and the non-default order chip included — because the native filter
+   disclosure starts CLOSED there, so the list state must be readable and
+   removable without opening it. From 701px up the accepted q/type/freshness
+   row renders unchanged, and an origin-only desktop filter adds no empty
+   margin block because that row is simply not rendered. Both rows are plain
+   .filter-chips siblings, so the visible one keeps the same geometry, and
+   display:none keeps the other out of the layout AND the accessibility tree
+   (no duplicated announced chips). */
+.filter-chips-mobile { display:none; }
+@media (max-width:700px) {
+  .filter-chips-mobile { display:flex; }
+  .filter-chips-desktop { display:none; }
+}
+/* F1: the active-selection count inside the native disclosure summary. The
+   summary itself only renders ≤820px (see .filters-disclosure > summary); the
+   count is phone-only (≤700px), so on every wider — desktop — layout it is
+   removed from display and from the accessibility tree. */
+.filters-summary-count { display:none; }
+@media (max-width:700px) {
+  .filters-summary-count { display:inline; }
+}
 /* Alphabetical index: a compact single-row rail. Touch-first widths retain
    36px targets and intentionally scroll horizontally; desktop distributes
    all 26 letters across the available workspace without wrapping. */
@@ -1250,6 +1285,17 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 .pagination-button:hover:not(:disabled) { border-color:var(--control-focus); }
 .pagination-button:disabled { opacity:.45; cursor:default; }
 .pagination-summary { margin:0; color:var(--muted); font-size:var(--text-sm); line-height:1.45; }
+/* F2 (mobile usability 2026-10-23): the /directory pager also renders above
+   the first card on phones, so a page change never needs a scroll through the
+   whole list. Same bar, same handlers, same "Showing X–Y of Z · Page N of M";
+   desktop keeps only the accepted bottom bar (the ≤700px block above already
+   centres .directory-pagination and its 44px buttons wrap safely at 320px in
+   IT and EN). No top border: it sits right under the chips / A–Z rail, not
+   after the list. */
+.directory-pagination-top { display:none; }
+@media (max-width:700px) {
+  .directory-pagination-top { display:flex; margin-top:14px; padding-top:0; border-top:0; }
+}
 /* Collapsible place-search panel (catalog, t_f13fcb1c): a contained card
    (border + radius + surface) so the form no longer bleeds into the results
    (audit V5) — scoped to .directory-tool, the home hub block stays
