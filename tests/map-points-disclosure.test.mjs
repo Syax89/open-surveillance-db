@@ -171,8 +171,8 @@ test("zero, one and many wording comes from the dictionaries in both locales", a
   // The dictionary owns the grammar: one compact string per state, no English
   // concatenation inside the component.
   const cases = [
-    { dict: en, many: "Show 10 points", one: "Show 1 point", zero: "Show 0 points", manyHide: "Hide 10 points" },
-    { dict: it, many: "Mostra 10 punti", one: "Mostra 1 punto", zero: "Mostra 0 punti", manyHide: "Nascondi 10 punti" },
+    { dict: en, many: "Show 10 points", one: "Show 1 point", zero: "Show 0 points", manyHide: "Hide 10 points", oneHide: "Hide 1 point", zeroHide: "Hide 0 points" },
+    { dict: it, many: "Mostra 10 punti", one: "Mostra 1 punto", zero: "Mostra 0 punti", manyHide: "Nascondi 10 punti", oneHide: "Nascondi 1 punto", zeroHide: "Nascondi 0 punti" },
   ];
   const many = Array.from({ length: 10 }, (_, index) => ({ id: 100 + index, title: `Fixture ${index}`, kind: "Bullet", status: "demo" }));
 
@@ -180,8 +180,11 @@ test("zero, one and many wording comes from the dictionaries in both locales", a
     assert.equal(item.dict.listShowCount(10), item.many);
     assert.equal(item.dict.listShowCount(1), item.one);
     assert.equal(item.dict.listShowCount(0), item.zero);
+    // Literal expectations: comparing the function to itself would pass even
+    // if the singular hide wording regressed (review A finding A2).
     assert.equal(item.dict.listHideCount(10), item.manyHide);
-    assert.equal(item.dict.listHideCount(1), item.dict.listHideCount(1), "singular hide label exists in the dictionary");
+    assert.equal(item.dict.listHideCount(1), item.oneHide);
+    assert.equal(item.dict.listHideCount(0), item.zeroHide);
     assert.ok(item.dict.listHideCount(1).length <= 20, "the compact label stays short enough for a 320px row");
 
     const manyView = await renderWithLocale(await element({ filteredRecords: many, visibleRecords: many, labels: labelsFor(item.dict) }));
@@ -205,6 +208,8 @@ test("zero, one and many wording comes from the dictionaries in both locales", a
   assert.equal(en.listShowCount(1), "Show 1 point");
   assert.equal(it.listShowCount(1), "Mostra 1 punto");
   assert.equal(it.listHideCount(0), "Nascondi 0 punti");
+  assert.equal(en.listHideCount(1), "Hide 1 point");
+  assert.equal(it.listHideCount(1), "Nascondi 1 punto");
 });
 
 test("without onToggleCollapse the original header text and shape is untouched", async () => {

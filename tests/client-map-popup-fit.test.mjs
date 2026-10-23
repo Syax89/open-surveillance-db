@@ -324,8 +324,10 @@ test("the resize callback (a Leaflet event, not a Map) re-fits the OPEN picker",
   const opensBefore = (map.events.popupopen ?? []).length;
 
   // The map grows (rotation / keyboard / desktop breakpoint) while the picker
-  // is open. Leaflet calls the listener with a RESIZE EVENT — passing it
-  // through as if it were a map would fall back to the unmeasured geometry.
+  // is open. Leaflet calls the listener with a RESIZE EVENT; the component
+  // ignores the payload and re-fits from the live map, so the real event shape
+  // must not knock the fit off (an optional-parameter callback would mistake
+  // the event for a Map).
   map.size = { x: 900, y: 700 };
   map.fire("resize", { type: "resize", target: map, oldSize: { x: 286, y: 340 }, newSize: { x: 900, y: 700 } });
 
@@ -365,6 +367,17 @@ test("the resize callback (a Leaflet event, not a Map) re-fits the OPEN picker",
       "the picker and the retained markers share the refreshed geometry",
     );
   }
+
+  // Review A finding C4: on the 900x700 surface both padding tuples are
+  // [60,48], so the assertions above cannot catch a swapped autoPanPadding*
+  // argument. Re-fit once on a NARROW surface, where the reserved right/bottom
+  // lanes ([60,60]) diverge from the generic padding ([10,27]).
+  map.size = { x: 286, y: 340 };
+  map.fire("resize", { type: "resize", target: map, oldSize: { x: 900, y: 700 }, newSize: { x: 286, y: 340 } });
+  const backToNarrow = popupGeometryFor({ x: 286, y: 340 });
+  assert.notDeepEqual(backToNarrow.autoPanPadding, backToNarrow.autoPanPaddingBottomRight, "the narrow surface distinguishes the two padding arguments");
+  assert.deepEqual(map.popup.options.autoPanPadding, backToNarrow.autoPanPadding, "the generic autopan padding is the x/y argument");
+  assert.deepEqual(map.popup.options.autoPanPaddingBottomRight, backToNarrow.autoPanPaddingBottomRight, "the reserved lanes stay on the BottomRight argument");
 });
 
 test("a picker the user closed is never reopened or updated by a resize", async () => {
