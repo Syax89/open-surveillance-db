@@ -215,7 +215,7 @@ test("MappaTool renders the map tool shell with the shared FiltersBar and the vi
   // DUAL-FUNCTION (t_b9666d09): it filters the viewport points AND suggests
   // places through the geocoder (combobox). The FiltersBar row keeps
   // kind/freshness/sort/reset — exactly ONE search control on the page.
-  assert.ok(screen.getByLabelText("Filter the points in the current view or search a place"), "place/point search above the map");
+  assert.ok(screen.getByLabelText("Filter points or find a place"), "place/point search above the map");
   assert.ok(screen.queryByLabelText("Search the public directory") === null, "no duplicated FiltersBar search on /mappa");
   assert.ok(screen.getByLabelText("Camera type"), "shared FiltersBar kind filter");
 
@@ -225,7 +225,7 @@ test("MappaTool renders the map tool shell with the shared FiltersBar and the vi
   await rtl.waitFor(() => {
     assert.ok(screen.getByRole("button", { name: /Illustrative record A/ }), "list row for record A");
     assert.ok(screen.getByRole("button", { name: /Illustrative record B/ }), "list row for record B");
-    assert.ok(screen.getByText("Showing all 2 points in the current view"), "aria-live count announces the visible points");
+    assert.ok(screen.getByText("Showing all 2 points in the current view", { selector: ".map-list-count" }), "aria-live count announces the visible points");
   });
 
   // Map-task alternative links point at the tool routes, not the home anchors.
@@ -286,7 +286,7 @@ test("MappaTool freshness filter keeps the map rendered and uses the global rese
   // The map region is still on the page (never replaced by an empty state).
   assert.ok(screen.getByRole("region", { name: "Interactive OpenStreetMap map" }), "the map stays rendered with zero matching records");
   // The explorer controls stay above the map; the sidebar is just the list.
-  assert.ok(screen.getByLabelText("Filter the points in the current view or search a place"), "the top search stays rendered");
+  assert.ok(screen.getByLabelText("Filter points or find a place"), "the top search stays rendered");
   assert.ok(screen.getByText("No published record matches those filters."), "truthful in-list empty note");
   assert.ok(screen.getByText(/This does not mean that there are no cameras/), "the note never implies an area has no surveillance");
   assert.ok(screen.getByRole("button", { name: /Reset filters/ }), "the top controls offer the reset action");
@@ -492,7 +492,7 @@ test("MappaTool zoom/pan updates the list to the points in the new viewport (deb
   await waitFor(() => assert.ok(leaflet.__maps.length > 0));
   const map = leaflet.__maps.at(-1);
   await waitFor(() => {
-    assert.ok(screen.getByText("Showing all 2 points in the current view"));
+    assert.ok(screen.getByText("Showing all 2 points in the current view", { selector: ".map-list-count" }));
     assert.ok(screen.getByRole("button", { name: /Illustrative record A/ }));
   });
 
@@ -505,7 +505,7 @@ test("MappaTool zoom/pan updates the list to the points in the new viewport (deb
     contains: () => false,
   });
   for (const handler of map.handlers["moveend zoomend"] ?? []) handler();
-  await waitFor(() => assert.ok(screen.getByText("No points in the current view")));
+  await waitFor(() => assert.ok(screen.getByText("No points in the current view", { selector: ".map-list-count" })));
   assert.ok(screen.queryByRole("button", { name: /Illustrative record A/ }) === null);
   assert.ok(screen.getByText(/No documented points in the current view/), "truthful in-view empty note");
 
@@ -516,7 +516,7 @@ test("MappaTool zoom/pan updates the list to the points in the new viewport (deb
     contains: () => true,
   });
   for (const handler of map.handlers["moveend zoomend"] ?? []) handler();
-  await waitFor(() => assert.ok(screen.getByText("Showing all 2 points in the current view")));
+  await waitFor(() => assert.ok(screen.getByText("Showing all 2 points in the current view", { selector: ".map-list-count" })));
   assert.ok(screen.getByRole("button", { name: /Illustrative record B/ }));
   installEmptyMock();
 });
@@ -540,7 +540,7 @@ test("B08: the top and sidebar counters reflect the CURRENT VIEW, not the accumu
   await waitFor(() => assert.ok(leaflet.__maps.length > 0));
   const map = leaflet.__maps.at(-1);
   await waitFor(() => {
-    assert.ok(screen.getByText("Showing all 2 points in the current view"));
+    assert.ok(screen.getByText("Showing all 2 points in the current view", { selector: ".map-list-count" }));
     assert.ok(screen.getByText("2 public records found"));
   }, { timeout: 3000 });
 
@@ -548,7 +548,7 @@ test("B08: the top and sidebar counters reflect the CURRENT VIEW, not the accumu
   leaflet.__setBounds({ getSouth: () => 45.4, getNorth: () => 45.5, getWest: () => 9.1, getEast: () => 9.3, contains: () => true });
   for (const handler of map.handlers["moveend zoomend"] ?? []) handler();
   await waitFor(() => {
-    assert.ok(screen.getByText("Showing the only point in the current view"), "the sidebar denominator is the current view, not the store");
+    assert.ok(screen.getByText("Showing the only point in the current view", { selector: ".map-list-count" }), "the sidebar denominator is the current view, not the store");
     assert.ok(screen.getByText("1 public record found"), "the top counter is the current view, not the accumulated 3");
     assert.ok(screen.queryByText("3 public records found") === null, "the accumulated store is never presented as the view total");
   }, { timeout: 3000 });
@@ -557,7 +557,7 @@ test("B08: the top and sidebar counters reflect the CURRENT VIEW, not the accumu
   // the view — the counter follows the view again (never a frozen total).
   leaflet.__setBounds({ getSouth: () => -90, getNorth: () => 90, getWest: () => -180, getEast: () => 180, contains: () => true });
   for (const handler of map.handlers["moveend zoomend"] ?? []) handler();
-  await waitFor(() => assert.ok(screen.getByText("Showing all 3 points in the current view")), { timeout: 3000 });
+  await waitFor(() => assert.ok(screen.getByText("Showing all 3 points in the current view", { selector: ".map-list-count" })), { timeout: 3000 });
   installEmptyMock();
 });
 
@@ -595,7 +595,7 @@ test("MappaTool geocode autocomplete suggests places in a combobox; keyboard sel
   };
   t.after(() => { window.history.replaceState = originalReplaceState; });
 
-  const input = screen.getByRole("combobox", { name: /Filter the points in the current view or search a place/ });
+  const input = screen.getByRole("combobox", { name: /Filter points or find a place/ });
   assert.equal(input.getAttribute("aria-expanded"), "false", "the combobox starts collapsed");
 
   // Typing a query that does not match any local point opens the geocode
@@ -712,7 +712,7 @@ test("MappaTool geocode dropdown closes on Escape and on click outside", async (
   const user = rtl.userEvent.setup();
   await renderWithLocale(React.createElement(MappaTool));
 
-  const input = screen.getByRole("combobox", { name: /Filter the points in the current view or search a place/ });
+  const input = screen.getByRole("combobox", { name: /Filter points or find a place/ });
   await user.type(input, "Ferrara");
   await waitFor(() => assert.ok(screen.getByRole("listbox", { name: "Place suggestions" })), { timeout: 5000 });
   assert.equal(input.getAttribute("aria-expanded"), "true");
@@ -762,7 +762,7 @@ test("MappaTool geocode autocomplete shows honest no-results and unavailable sta
   const { screen, waitFor } = rtl;
   const user = rtl.userEvent.setup();
   await renderWithLocale(React.createElement(MappaTool));
-  const input = screen.getByRole("combobox", { name: /Filter the points in the current view or search a place/ });
+  const input = screen.getByRole("combobox", { name: /Filter points or find a place/ });
 
   await user.type(input, "Xyzzy");
   await waitFor(() => assert.ok(screen.getByText("No results for “Xyzzy”")), { timeout: 5000 });
@@ -792,13 +792,13 @@ test("MappaTool text search with no matching record keeps the map rendered (in-l
 
   // A query that matches no local point empties ONLY the list (the map and
   // the sidebar stay); reset remains in the explorer controls above.
-  await user.type(screen.getByLabelText("Filter the points in the current view or search a place"), "no-such-camera");
+  await user.type(screen.getByLabelText("Filter points or find a place"), "no-such-camera");
   await rtl.waitFor(() => assert.ok(screen.getByText("No published record matches those filters.")), { timeout: 5000 });
 
   assert.ok(screen.getByRole("region", { name: "Interactive OpenStreetMap map" }), "the map stays rendered after a no-match search");
   assert.ok(screen.getByRole("button", { name: /Reset filters/ }), "the top controls offer the reset action");
 
-  fireEvent.change(screen.getByLabelText("Filter the points in the current view or search a place"), { target: { value: "" } });
+  fireEvent.change(screen.getByLabelText("Filter points or find a place"), { target: { value: "" } });
   await rtl.waitFor(() => assert.ok(screen.getByRole("button", { name: /Illustrative record A/ }), "clearing restores the records"), { timeout: 5000 });
 });
 

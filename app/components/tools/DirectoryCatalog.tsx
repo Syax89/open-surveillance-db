@@ -12,9 +12,18 @@ import { RecordCard } from "../RecordCard";
 import { FiltersBar } from "../FiltersBar";
 import { EmptyState } from "../EmptyState";
 import { usePlaceSearch } from "../../lib/usePlaceSearch";
+import { fetchImportSources, importSourceOf, type ImportSourceInfo } from "../../lib/import-sources";
 
 /** Records per page in the /directory catalog (t_f13fcb1c). */
 export const DIRECTORY_PAGE_SIZE = 20;
+
+/**
+ * One removable active-filter chip (F1, mobile usability 2026-10-23).
+ * `mobileOnly` chips (confirmation state, origin, non-default order) render
+ * only in the ≤700px row — on desktop the accepted q/type/freshness row is
+ * untouched, so e.g. an origin-only filter adds no empty margin block there.
+ */
+type FilterChip = { id: string; label: string; clear: () => void; mobileOnly?: boolean };
 
 type Props = {
   filteredRecords: Camera[];
@@ -99,6 +108,18 @@ export function DirectoryCatalog({ filteredRecords, loading, loadError, onRetryL
   // page — "the last loaded records"). SSR-safe: navigator is undefined on
   // the server, so the banner never appears in first paint.
   const [offline, setOffline] = useState(false);
+  // Import provenance (FASE C, t_4dbce318): the list API exposes the raw
+  // 'import:<slug>' value; the readable entity name comes from the SAME
+  // committed batches the map popup and /fonti use (lib/import-sources, one
+  // module-level single-flight cache — never one request per card). A failed
+  // endpoint keeps the truthful raw value, and the cancelled guard drops a
+  // late resolution that would write into an unmounted list.
+  const [sources, setSources] = useState<Map<string, ImportSourceInfo>>(new Map());
+  useEffect(() => {
+    let cancelled = false;
+    fetchImportSources().then((map) => { if (!cancelled) setSources(map); }).catch(() => undefined);
+    return () => { cancelled = true; };
+  }, []);
   // The results heading: pagination and the A–Z index move the reading
   // position here (focus follows for AT, scroll is CSS-reduced-motion aware).
   const resultsRef = useRef<HTMLHeadingElement | null>(null);
@@ -126,11 +147,28 @@ export function DirectoryCatalog({ filteredRecords, loading, loadError, onRetryL
   // optional manufacturer/observed-on stay on the detail page. F4 (QA#6):
   // demo records (status "demo") show the localized demo labels instead of
   // the raw seed markers ("Development seed"/"Demo data" — DATA_DICTIONARY).
+  // Source fact value: the localized demo label wins for the seed rows, then
+  // the READABLE batch attribution when it is known (imported rows only).
+  // Both values are in the markup: desktop keeps rendering the raw source
+  // exactly as before, the ≤700px card shows the readable one (globals.css).
+  // Nothing is guessed — an unknown/absent batch keeps the raw value.
+  function sourceValue(camera: Camera) {
+    if (camera.status === "demo") return t.demoSource;
+    const provenance = importSourceOf(camera, sources);
+    if (!provenance) return camera.source;
+    return (
+      <span className="record-source has-name">
+        <span className="record-source-raw">{camera.source}</span>
+        <span className="record-source-name">{provenance.sourceName}</span>
+      </span>
+    );
+  }
+
   function mainFacts(camera: Camera) {
     return [
       { label: t.recordId, value: camera.id },
-      { label: t.source, value: camera.status === "demo" ? t.demoSource : camera.source },
-      { label: t.lastVerification, value: camera.status === "demo" ? t.demoUpdated : formatPublicDate(camera.updated, locale) },
+      { label: t.source, value: sourceValue(camera) },
+      { label: t.lastUpdated, value: camera.status === "demo" ? t.demoUpdated : formatPublicDate(camera.updated, locale) },
       { label: t.location, value: formatLocation(camera.address, camera.latitude, camera.longitude) },
     ];
   }
@@ -170,10 +208,19 @@ export function DirectoryCatalog({ filteredRecords, loading, loadError, onRetryL
       : filteredRecords.slice((safePage - 1) * DIRECTORY_PAGE_SIZE, safePage * DIRECTORY_PAGE_SIZE);
 
   // Active-filter chips: one per non-default dimension, one-shot removal
-  // (calls the same URL setters as the controls — D4). Hidden while a place
-  // search owns the results (the place banner communicates that context).
+  // (calls the same URL setters as the controls — D4; every setter commits
+  // page: 1 through useCameraFilters, so the reset is never forked here).
+  // Hidden while a place search owns the results (the place banner
+  // communicates that context).
+  //
+  // F1 (mobile usability 2026-10-23): the desktop set stays exactly the
+  // accepted q/type/freshness chips. Confirmation state, origin and a
+  // non-default order are `mobileOnly` chips — on a phone the filter
+  // disclosure starts closed, so the list state must be visible (and
+  // removable) without opening it. The order chip names the ordering
+  // ("Order: …"): an order is a choice, never a restrictive filter.
   const activeFilters = useMemo(() => {
-    const chips: Array<{ id: string; label: string; clear: () => void }> = [];
+    const chips: FilterChip[] = [];
     if (kindFilter && kindFilter !== "all") chips.push({ id: `type-${kindFilter}`, label: kindFilter, clear: () => setKindFilter("all") });
     if (freshnessFilter && freshnessFilter !== "all") {
       const label = ({ "7d": t.freshness7d, "30d": t.freshness30d, "90d": t.freshness90d } as Record<string, string>)[freshnessFilter] ?? freshnessFilter;
@@ -181,8 +228,20 @@ export function DirectoryCatalog({ filteredRecords, loading, loadError, onRetryL
     }
     const q = search.trim();
     if (q) chips.push({ id: "q", label: q, clear: () => setSearch("") });
+    if (stateFilter && stateFilter !== "all" && setStateFilter) {
+      chips.push({ id: `state-${stateFilter}`, label: stateFilter === "confirmed" ? t.stateConfirmed : t.stateNever, clear: () => setStateFilter("all"), mobileOnly: true });
+    }
+    if (originFilter && originFilter !== "all" && setOriginFilter) {
+      chips.push({ id: `origin-${originFilter}`, label: originFilter === "reports" ? t.originReports : t.originImported, clear: () => setOriginFilter("all"), mobileOnly: true });
+    }
+    if (sortOrder !== "alphabetical") {
+      const orderLabel = ({ position: t.positionOrder, useful: t.sortUseful, recent: t.sortRecent, confirmations: t.sortConfirmations } as Record<string, string>)[sortOrder] ?? sortOrder;
+      chips.push({ id: `sort-${sortOrder}`, label: t.filterOrder(orderLabel), clear: () => setSortOrder("alphabetical"), mobileOnly: true });
+    }
     return chips;
-  }, [kindFilter, freshnessFilter, search, setKindFilter, setFreshnessFilter, setSearch, t]);
+  }, [kindFilter, freshnessFilter, search, stateFilter, setStateFilter, originFilter, setOriginFilter, sortOrder, setSortOrder, setKindFilter, setFreshnessFilter, setSearch, t]);
+  // The desktop row (also the only row from 701px up) keeps the accepted chips.
+  const desktopFilters = activeFilters.filter((chip) => !chip.mobileOnly);
 
   // Alphabetical index (Wikipedia AllPages pattern): ALL 26 letters are
   // shown — the ones present in the filtered set are jump links (to the page
@@ -255,10 +314,46 @@ export function DirectoryCatalog({ filteredRecords, loading, loadError, onRetryL
     }
   }
 
+  // Pagination bar (t_f13fcb1c): Previous / "Showing X–Y of Z · Page N of M" /
+  // Next. F2 (mobile usability 2026-10-23): the SAME bar also renders above
+  // the first card on phones, so changing page never requires scrolling the
+  // whole list. ONE renderer: paging math, ?page= commit, clamping, the
+  // disabled first/last bounds and the results-heading focus stay shared; the
+  // extra copy is display:none from 701px up (globals.css).
+  function pager(className: string) {
+    return (
+      <nav className={className} aria-label={t.resultsRegion}>
+        <button type="button" className="pagination-button" disabled={safePage <= 1} onClick={() => goToPage(safePage - 1)}><span aria-hidden="true">←</span> {t.previousPage}</button>
+        <p className="pagination-summary">{t.showingRecords((safePage - 1) * DIRECTORY_PAGE_SIZE + 1, Math.min(safePage * DIRECTORY_PAGE_SIZE, totalRecords), totalRecords)} · {t.pageOf(safePage, pageCount)}</p>
+        <button type="button" className="pagination-button" disabled={safePage >= pageCount} onClick={() => goToPage(safePage + 1)}>{t.nextPage} <span aria-hidden="true">→</span></button>
+      </nav>
+    );
+  }
+
+  // Chips row renderer (F1): the mobile row carries the full selection, the
+  // desktop row the accepted q/type/freshness set. Same markup, one row per
+  // breakpoint (CSS), so no chip is ever announced twice.
+  function chipList(chips: FilterChip[], className: string) {
+    return (
+      <ul className={`filter-chips ${className}`} aria-label={t.activeFilters}>
+        {chips.map((chip) => (
+          <li key={chip.id}>
+            <button type="button" className="filter-chip" onClick={chip.clear} aria-label={t.removeFilter(chip.label)}>{chip.label} <span aria-hidden="true">✕</span></button>
+          </li>
+        ))}
+      </ul>
+    );
+  }
+
+  // Shared gate for BOTH pagination rows: never for a one-page/empty set and
+  // never once a place flow completed — its empty and not-found results own
+  // the screen too, so there are no pages of a list that is not rendered.
+  const showPager = !placeDone && totalRecords > DIRECTORY_PAGE_SIZE;
+
   return (
     <section className="records-section" id="records" aria-label={t.accessibleDirectory}>
       {offline && <div className="offline-state" role="status"><b>{t.offlineTitle}.</b> {t.offlineBody} <button type="button" className="text-button" onClick={() => window.location.reload()}>{t.offlineAction} <span aria-hidden="true">→</span></button></div>}
-      <FiltersBar variant="bare" showCommunitySort stateFilter={stateFilter} setStateFilter={setStateFilter} originFilter={originFilter} setOriginFilter={setOriginFilter} cameraKinds={cameraKinds} search={search} setSearch={(value) => { place.clearPlaceSearch(); setSearch(value); }} onSearchSubmit={() => { void place.searchByQuery(search); }} kindFilter={kindFilter} setKindFilter={setKindFilter} freshnessFilter={freshnessFilter} setFreshnessFilter={setFreshnessFilter} sortOrder={sortOrder} setSortOrder={setSortOrder} resultCount={totalRecords} onReset={onResetFilters} />
+      <FiltersBar variant="bare" showCommunitySort stateFilter={stateFilter} setStateFilter={setStateFilter} originFilter={originFilter} setOriginFilter={setOriginFilter} activeFilterCount={placeActive ? 0 : activeFilters.length} cameraKinds={cameraKinds} search={search} setSearch={(value) => { place.clearPlaceSearch(); setSearch(value); }} onSearchSubmit={() => { void place.searchByQuery(search); }} kindFilter={kindFilter} setKindFilter={setKindFilter} freshnessFilter={freshnessFilter} setFreshnessFilter={setFreshnessFilter} sortOrder={sortOrder} setSortOrder={setSortOrder} resultCount={totalRecords} onReset={onResetFilters} />
       {place.placeResult?.status === "loading" && <p className="loading-note" role="status">{t.placeSearchLoading}</p>}
       {place.placeResult?.status === "error" && <p className="nearby-error" role="alert">{place.placeResult.message}</p>}
       {/* Visible results header (t_f13fcb1c): replaces the sr-only h2 with a
@@ -280,16 +375,15 @@ export function DirectoryCatalog({ filteredRecords, loading, loadError, onRetryL
         </div>
       </div>
       {/* Active-filter chips: the state of the list at a glance, removable
-          one at a time (Google Maps / CKAN pattern). */}
-      {!placeActive && activeFilters.length > 0 && (
-        <ul className="filter-chips" aria-label={t.activeFilters}>
-          {activeFilters.map((chip) => (
-            <li key={chip.id}>
-              <button type="button" className="filter-chip" onClick={chip.clear} aria-label={t.removeFilter(chip.label)}>{chip.label} <span aria-hidden="true">✕</span></button>
-            </li>
-          ))}
-        </ul>
-      )}
+          one at a time (Google Maps / CKAN pattern). F1 (mobile usability
+          2026-10-23): one row per breakpoint — phones get every active
+          selection (state/origin/order included, because the filter
+          disclosure starts closed there), from 701px up the accepted
+          q/type/freshness row renders exactly as before. Both rows are
+          gated by the same expressions, so the count in the filter summary
+          and the visible chips can never disagree. */}
+      {!placeActive && activeFilters.length > 0 && chipList(activeFilters, "filter-chips-mobile")}
+      {!placeActive && desktopFilters.length > 0 && chipList(desktopFilters, "filter-chips-desktop")}
       {/* Alphabetical index: jump bar over the filtered set (Wikipedia
           AllPages pattern), only in alphabetical order. */}
       {alphaIndex && (
@@ -315,6 +409,9 @@ export function DirectoryCatalog({ filteredRecords, loading, loadError, onRetryL
           <button type="button" className="text-button" onClick={place.clearPlaceSearch}>{t.placeClearResults} <span aria-hidden="true">→</span></button>
         </div>
       )}
+      {/* F2 (mobile usability 2026-10-23): the same pager above the first
+          card — phones only (display:none from 701px up). */}
+      {showPager && pager("directory-pagination directory-pagination-top")}
       {loading && filteredRecords.length === 0
         ? (
           // Loading state: show a truthful note during the initial walk
@@ -331,16 +428,11 @@ export function DirectoryCatalog({ filteredRecords, loading, loadError, onRetryL
           // failed (429 on the shared read bucket, network).
           <EmptyState title={t.loadErrorTitle} body={t.loadErrorBody} action={<p className="empty-state-actions"><button type="button" className="text-button" onClick={onRetryLoad}>{t.loadErrorRetry} <span aria-hidden="true">→</span></button><a className="text-button" href="/mappa">{t.useMapInstead} <span aria-hidden="true">↑</span></a></p>} />
         )
-        : showList ? <ul className="record-list">{pageRecords.map((camera) => <li key={camera.id}><RecordCard camera={camera} statusLabel={publicStatusLabel(statuses, camera.status, t.unknown)} facts={placeActive ? [{ label: t.distance, value: formatDistance((camera as Camera & { distanceMeters: number }).distanceMeters) }, { label: t.location, value: formatLocation(camera.address, camera.latitude, camera.longitude) }, { label: t.lastVerification, value: camera.status === "demo" ? t.demoUpdated : formatPublicDate(camera.updated, locale) }] : mainFacts(camera)} actions={cardActions(camera)} /></li>)}</ul> : !placeDone && <EmptyState title={t.emptyTitle} body={t.emptyBody} action={<p className="empty-state-actions"><button type="button" className="text-button" onClick={() => setSearch("")}>{t.clearSearch} <span aria-hidden="true">→</span></button><a className="text-button" href={reportHref}>{t.submitObservation} <span aria-hidden="true">→</span></a></p>} />}
+        : showList ? <ul className="record-list">{pageRecords.map((camera) => <li key={camera.id}><RecordCard camera={camera} statusLabel={publicStatusLabel(statuses, camera.status, t.unknown)} facts={placeActive ? [{ label: t.distance, value: formatDistance((camera as Camera & { distanceMeters: number }).distanceMeters) }, { label: t.location, value: formatLocation(camera.address, camera.latitude, camera.longitude) }, { label: t.lastUpdated, value: camera.status === "demo" ? t.demoUpdated : formatPublicDate(camera.updated, locale) }] : mainFacts(camera)} actions={cardActions(camera)} /></li>)}</ul> : !placeDone && <EmptyState title={t.emptyTitle} body={t.emptyBody} action={<p className="empty-state-actions"><button type="button" className="text-button" onClick={() => setSearch("")}>{t.clearSearch} <span aria-hidden="true">→</span></button><a className="text-button" href={reportHref}>{t.submitObservation} <span aria-hidden="true">→</span></a></p>} />}
       {/* Pagination bar (t_f13fcb1c): only when the filtered set spans more
-          than one page; Previous / "Showing X–Y of Z · Page N of M" / Next. */}
-      {!placeActive && totalRecords > DIRECTORY_PAGE_SIZE && (
-        <nav className="directory-pagination" aria-label={t.resultsRegion}>
-          <button type="button" className="pagination-button" disabled={safePage <= 1} onClick={() => goToPage(safePage - 1)}><span aria-hidden="true">←</span> {t.previousPage}</button>
-          <p className="pagination-summary">{t.showingRecords((safePage - 1) * DIRECTORY_PAGE_SIZE + 1, Math.min(safePage * DIRECTORY_PAGE_SIZE, totalRecords), totalRecords)} · {t.pageOf(safePage, pageCount)}</p>
-          <button type="button" className="pagination-button" disabled={safePage >= pageCount} onClick={() => goToPage(safePage + 1)}>{t.nextPage} <span aria-hidden="true">→</span></button>
-        </nav>
-      )}
+          than one page; Previous / "Showing X–Y of Z · Page N of M" / Next.
+          The bottom bar stays in place at every width. */}
+      {showPager && pager("directory-pagination")}
     </section>
   );
 }

@@ -16,9 +16,14 @@ export const en = {
   source: "Source",
   // Creation date (FASE C, t_4dbce318): `cameras.created_at` — when the
   // record entered the database (import or community report). The detail
-  // page shows it alongside provenance and the last confirmation.
+  // page shows it alongside provenance and the last update.
   addedOn: "Added",
-  lastVerification: "Last confirmation",
+  // M03 (design review 2026-10-22, P1): record.updated is the RECORD's last
+  // update (import/edits), never a community confirmation. Labelling it
+  // "Last confirmation" produced the contradiction "Never confirmed" +
+  // "Last confirmation: 8 August 2026" on imported records. Real
+  // confirmations keep their own label (lastConfirmed, from lastVerifiedAt).
+  lastUpdated: "Last update",
   // F4 (QA#6): the demo seed rows carry raw, language-neutral markers
   // ("Development seed"/"Demo data" — test contract, see DATA_DICTIONARY);
   // the presentation shows these localized labels instead.
@@ -122,6 +127,10 @@ export const en = {
   // source dataset (linked) and its licence (linked), never the raw
   // "import:<slug>" internal value.
   importedFrom: "Imported from",
+  // M05 (design review 2026-10-22): the provenance line above already names
+  // the dataset and links its licence, so the facts row states the ORIGIN
+  // instead of repeating the full source name a second time.
+  importedData: "Imported data",
 
   // --- Hidden/removed banner (ADR 0021 §6.3, FASE 3 UI): a withdrawn
   // record stays reachable by direct link with an explicit banner; the
@@ -174,8 +183,10 @@ export const it: Translation<typeof en> = {
   // Data di creazione (FASE C, t_4dbce318): `cameras.created_at` — quando
   // il record è entrato nel database (import o segnalazione). La pagina di
   // dettaglio la mostra accanto alla provenienza e all'ultima conferma.
+  // Vedi en.lastUpdated: `cameras.updated_at` è l'aggiornamento del RECORD,
+  // non una conferma della community (M03).
   addedOn: "Aggiunta",
-  lastVerification: "Ultima conferma",
+  lastUpdated: "Ultimo aggiornamento",
   // F4 (QA#6): i record del seed demo hanno marcatori grezzi neutri
   // ("Development seed"/"Demo data" — contratto di test, vedi DATA_DICTIONARY);
   // la presentazione mostra invece queste etichette localizzate.
@@ -279,6 +290,8 @@ export const it: Translation<typeof en> = {
   // community — il dataset della fonte (linkato) e la sua licenza
   // (linkata), mai il valore interno grezzo "import:<slug>".
   importedFrom: "Importato da",
+  // Vedi en.importedData (M05).
+  importedData: "Dati importati",
 
   // --- Banner nascosto/rimosso (ADR 0021 §6.3, FASE 3 UI): un record
   // ritirato resta raggiungibile tramite link diretto con un banner

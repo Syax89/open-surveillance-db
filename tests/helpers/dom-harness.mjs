@@ -301,7 +301,15 @@ const wholeWorldBounds = {
 };
 let currentBounds = romeViewport;
 export const __setBounds = (b) => { currentBounds = b; };
-export const __resetMarkers = () => { markers.length = 0; maps.length = 0; paths.length = 0; currentBounds = romeViewport; };
+export const __resetMarkers = () => { markers.length = 0; maps.length = 0; paths.length = 0; currentBounds = romeViewport; defaultMapSize = null; };
+// Default surface for maps created from now on (M01/R1): null keeps the
+// 800x600 desktop stub. Tests that must prove the unmeasurable-surface
+// branch pass { x: 0, y: 0 } and get a map whose getSize() reports 0x0,
+// exactly like Leaflet before the first layout.
+
+let defaultMapSize = null;
+export const __setDefaultMapSize = (size) => { defaultMapSize = size ?? null; };
+// ^ stub-scoped: tests reach it through loadDomModule("node_modules/leaflet/index.mjs")
 export function map(el, opts) {
   const m = {
     // Map options recorded (RecordMiniMap 2026-08-07): the read-only mini
@@ -341,6 +349,15 @@ export function map(el, opts) {
     off: (event, handler) => { const list = m.handlers[event]; if (list) { const i = list.indexOf(handler); if (i !== -1) list.splice(i, 1); } return m; },
     remove: () => {},
     invalidateSize: () => {},
+    // Map SURFACE (M01, mobile popup fit): the popup geometry is derived from
+    // the real map size (getSize) instead of the viewport, so the stub reports
+    // a settable box — tests shrink it to a 320px-phone map (286x340) and
+    // assert the balloon still fits. getContainer mirrors Leaflet (the
+    // component writes the measured popup height budget on it).
+    size: { ...(defaultMapSize ?? { x: 800, y: 600 }) },
+    container: el ?? null,
+    getSize: () => ({ x: m.size.x, y: m.size.y }),
+    getContainer: () => m.container,
     getZoom: () => m.zoom,
     getBounds: () => currentBounds,
     // Shareable viewport (?lat&lng&zoom): the component reads the map centre
@@ -386,8 +403,41 @@ export function map(el, opts) {
     // Map-click picker (t_6abb96ac): map.openPopup records the popup
     // content + position so tests can assert the report-picker popup
     // (coordinates + /segnala deep link) that a map click opens.
-    openPopup: (html, latlng, opts) => { m.popupHtml = html; m.popupLatLng = latlng; m.popupOpts = opts; return m; },
-    closePopup: () => { m.popupHtml = null; m.popupLatLng = null; return m; },
+    // M01 R4: it ALSO mirrors real Leaflet — the map owns ONE Popup instance
+    // (mutable .options, update(), isOpen(), getElement()) and dispatches
+    // popupopen/popupclose with it, so the resize re-fit of an open picker is
+    // exercised through the real event payload the component receives.
+    openPopup: (html, latlng, opts) => {
+      if (m.popup && m.popup.__open) {
+        m.popup.__open = false;
+        m.fire("popupclose", { popup: m.popup });
+      }
+      const content = document.createElement("div");
+      if (typeof html === "string") content.innerHTML = html;
+      const popup = {
+        options: { ...(opts ?? {}) },
+        updates: 0,
+        __open: true,
+        update: () => { popup.updates += 1; return popup; },
+        isOpen: () => popup.__open === true,
+        getElement: () => content,
+      };
+      m.popup = popup;
+      m.popupHtml = html;
+      m.popupLatLng = latlng;
+      m.popupOpts = popup.options;
+      m.fire("popupopen", { popup });
+      return m;
+    },
+    closePopup: () => {
+      if (m.popup && m.popup.__open) {
+        m.popup.__open = false;
+        m.fire("popupclose", { popup: m.popup });
+      }
+      m.popupHtml = null;
+      m.popupLatLng = null;
+      return m;
+    },
   };
   maps.push(m);
   return m;
@@ -486,7 +536,18 @@ export function marker(latlng, opts) {
     // Popup contract (t_702c10af): the bound HTML is recorded on the
     // marker so tests can assert the popup content (links, fields), and
     // openPopup() records that the balloon was requested.
-    bindPopup: (html, opts) => { m.popupHtml = html; m.popupOpts = opts; return m; },
+    // Real Leaflet keeps the popup options on the Popup instance
+    // (marker.getPopup().options) and re-reads them on every open/update, so
+    // a resize can re-fit the EXISTING balloon without recreating the marker
+    // (M01). popupOpts stays the same object for the menu of assertions that
+    // already read it.
+    bindPopup: (html, opts) => {
+      m.popupHtml = html;
+      m.popup = { options: opts ?? {}, update: () => { m.popupUpdates = (m.popupUpdates ?? 0) + 1; } };
+      m.popupOpts = m.popup.options;
+      return m;
+    },
+    getPopup: () => m.popup ?? null,
     // P0 t_bb310428 (strict popup lifecycle instrumentation): openPopup()
     // mirrors real Leaflet — it materialises the bound HTML into a popup
     // DOM node and dispatches "popupopen" on the map (recorded in

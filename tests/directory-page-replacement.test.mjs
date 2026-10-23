@@ -162,7 +162,7 @@ test("Next: the page-1 rows never stand in for the pending page-2 replacement (E
   const { container } = await renderTool();
   await settleFirstPage(container);
 
-  const nav = container.querySelector(".directory-pagination");
+  const nav = container.querySelector(".directory-pagination:not(.directory-pagination-top)");
   assert.match(nav?.textContent ?? "", /Page 1 of 2/);
   const [, next] = nav.querySelectorAll("button.pagination-button");
   await rtl.userEvent.click(next);
@@ -175,7 +175,7 @@ test("Next: the page-1 rows never stand in for the pending page-2 replacement (E
   // Known total preserved: the count keeps a real answer and the pagination
   // bar still announces where the replacement is going.
   assert.equal(text(counter(container)), "40 public records found", "the KNOWN server total survives the replacement request (never a false zero)");
-  assert.match(container.querySelector(".directory-pagination")?.textContent ?? "", /Page 2 of 2/, "the target page is announced while its rows load");
+  assert.match(container.querySelector(".directory-pagination:not(.directory-pagination-top)")?.textContent ?? "", /Page 2 of 2/, "the target page is announced while its rows load");
 
   // Settled page 2: the walk fetches page 1 (cursor) then page 2.
   await answerNextListRequest();
@@ -195,7 +195,7 @@ test("Next (IT): the pending replacement announces the Italian loading note", as
   const { container } = await renderTool();
   await settleFirstPage(container);
 
-  const [, next] = container.querySelector(".directory-pagination").querySelectorAll("button.pagination-button");
+  const [, next] = container.querySelector(".directory-pagination:not(.directory-pagination-top)").querySelectorAll("button.pagination-button");
   await rtl.userEvent.click(next);
 
   await rtl.waitFor(() => assert.equal(rows(container), 0, "the Italian page behaves identically"), { timeout: 5000 });
@@ -333,7 +333,7 @@ test("a settled replacement that FAILS renders the error state and keeps no stal
   const { container } = await renderTool();
   await settleFirstPage(container);
 
-  const [, next] = container.querySelector(".directory-pagination").querySelectorAll("button.pagination-button");
+  const [, next] = container.querySelector(".directory-pagination:not(.directory-pagination-top)").querySelectorAll("button.pagination-button");
   await rtl.userEvent.click(next);
   await rtl.waitFor(() => assert.equal(rows(container), 0), { timeout: 5000 });
 
