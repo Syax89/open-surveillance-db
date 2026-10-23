@@ -1595,10 +1595,15 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
    rows, passkey disclosure. Same design system — no new colour tokens;
    the status rail reuses the --status-* tokens and the coherent-box
    pattern already accepted for records/map lists.
-   PR #354 (user UX choices, kept verbatim): dashboard widens to 1120px,
-   each section is its own bordered workspace.
    Single identity column (issue #435 moved the trust badge above the
-   grid, see .account-trust--top below) — NOT the original 1.35/.65 split. */
+   grid, see .account-trust--top below) — NOT the original 1.35/.65 split.
+   WIDTH (layout polish 2026-10-23): this card is a .record-detail, whose
+   width is var(--container-readable) = min(900px, 100% - 48px) — that is
+   the ACTUAL outer width of the page (900px on desktop, shared with the
+   other auth/record routes). The 1120px cap below (PR #354) never applies
+   because it is wider than the width already imposed by .record-detail: it
+   is an inert safety cap, kept so this page can never open a second, wider
+   layout. Do not "fix" the mismatch by widening the account page. */
 .account-dashboard { max-width:1120px; }
 .account-profile-grid { display:grid; grid-template-columns:minmax(0,1fr); gap:28px; align-items:start; }
 .account-identity { min-width:0; }
@@ -1617,25 +1622,41 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 .account-dashboard > section.account-profile-grid { background:var(--card-bg); }
 .account-dashboard > section[aria-labelledby="contributions-title"] { background:var(--card-bg); }
 .account-dashboard .verify-banner { margin:18px 0 0; }
-.account-dashboard > details.passkeys-disclosure { max-width:720px; border-top:1px solid var(--line); }
+/* A04 (layout polish 2026-10-23): no local width cap — the passkey panel is a
+   dashboard panel like the others and must align with them (it used to stop
+   at 720px). Only this disclosure changes; no other auth route is widened. */
+.account-dashboard > details.passkeys-disclosure { border-top:1px solid var(--line); }
 .account-dashboard > details.passkeys-disclosure > summary { padding:0 0 6px; }
 .account-section-header { display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:14px; }
 .account-section-header h2 { margin:0; }
+/* A05 (layout polish 2026-10-23): ONE explicit heading scale for the four
+   dashboard sections. They nest differently — "Profile" is an h2 inside
+   .account-identity, "Your contributions" and "API keys" live inside
+   .account-section-header, "Passkeys" sits in the <summary> of the native
+   disclosure — so the only scoped way to reach all four is the stable id
+   each heading already carries (ids win over the structural
+   `.account-dashboard > section…` rules regardless of nesting depth).
+   The danger zone keeps its own danger-zone scale: it is a different thing. */
+.account-dashboard #profile-title,
+.account-dashboard #contributions-title,
+.account-dashboard #api-keys-title,
+.account-dashboard #passkeys-title { margin:0; color:var(--ink); font-size:var(--text-3xl); font-weight:800; letter-spacing:-.035em; line-height:1.2; }
 .account-section-actions { display:flex; gap:10px; flex-wrap:wrap; }
 .account-section-actions .button { padding:9px 14px; font-size:var(--text-md); }
-/* Summary strip: four coherent-box cards, neutral rail (colour stays
+/* Summary strip: coherent-box cards, neutral rail (colour stays
    reserved for status), big number + uppercase label, icons in muted
    tiles — the kind icons are SHAPE + text, never colour alone. */
-.account-stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin:0 0 18px; }
-/* 3 stats is always odd: in a 2-column row (auto-fit on narrow widths, or
-  the fixed repeat(2,1fr) below) the last one would sit alone with a dead
-  gap beside it — span it full-width instead. Self-correcting if a 4th
-  stat is ever added (nth-child(odd) stops matching). */
-.account-stats > :last-child:nth-child(odd) { grid-column:1 / -1; }
-.account-stat { display:flex; flex-direction:column; gap:6px; padding:16px 14px; border:1px solid var(--line); border-left:3px solid var(--line); border-radius:var(--radius-md); background:var(--card-bg); }
+/* A01 (layout polish 2026-10-23): three EQUAL counters share ONE row as soon
+   as the desktop has room. The previous `repeat(auto-fit,minmax(150px,1fr))`
+   plus an unconditional `:last-child:nth-child(odd) { grid-column:1/-1 }`
+   created a FOURTH implicit track, so the strip rendered as two small
+   counters and a full-row third one even on a wide desktop. The odd-last
+   span now lives only in the two-column block below, where it is needed. */
+.account-stats { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin:0 0 18px; }
+.account-stat { display:flex; flex-direction:column; gap:6px; min-width:0; padding:16px 14px; border:1px solid var(--line); border-left:3px solid var(--line); border-radius:var(--radius-md); background:var(--card-bg); }
 .account-stat-icon { display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; border-radius:var(--radius-md); background:var(--surface-muted); color:var(--ink-4); }
 .account-stat-value { font-family:var(--heading); font-size:var(--text-4xl); font-weight:800; color:var(--ink); line-height:1; }
-.account-stat-label { color:var(--label); font-size:var(--text-2xs); text-transform:uppercase; letter-spacing:.1em; font-weight:800; }
+.account-stat-label { color:var(--label); font-size:var(--text-2xs); text-transform:uppercase; letter-spacing:.1em; font-weight:800; overflow-wrap:anywhere; }
 /* Removable active-filter chips on /directory retain their shared control
    treatment; the account toolbar deliberately does not reuse this pattern. */
 /* Contribution rows: coherent box with a 3px status rail (same :has()
@@ -1659,6 +1680,28 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 .contribution-meta { color:var(--muted); font-size:var(--text-sm); }
 .contribution-status { display:flex; align-items:center; gap:6px; margin-left:auto; flex:none; color:var(--ink-2); font-size:var(--text-md); }
 .contribution-status .status-dot { flex:none; }
+/* A06 (layout polish 2026-10-23): STABLE columns. The row used to be a flex
+   line in which `.contribution-status` and `.contributions-edit` both relied
+   on `margin-left:auto`, so the status landed in a different place depending
+   on whether the row had an edit action. Now the list owns four shared
+   tracks (kind icon | title+meta | status | optional edit) and every row is
+   a `subgrid` of them: all statuses sit on one column and the empty 4th
+   track of a non-editable row simply stays empty. Scoped to
+   .account-dashboard at (0,2,0) specificity so it outranks the shared
+   `.auth-submissions li` shell without touching it, and it declares no
+   colour/border, so the :has() status rails keep working. */
+.account-dashboard .contributions-list { display:grid; grid-template-columns:auto minmax(0,1fr) max-content max-content; gap:10px 12px; }
+.account-dashboard .contribution-row { display:grid; grid-column:1 / -1; grid-template-columns:auto minmax(0,1fr) max-content max-content; grid-template-columns:subgrid; align-items:center; }
+.account-dashboard .contribution-status { margin-left:0; }
+.account-dashboard .contributions-edit { margin-left:0; justify-self:end; }
+/* A02 (layout polish 2026-10-23): the pager wraps natively instead of pushing
+   the next button out of the panel at 320px (IT "Precedente/Successiva" +
+   "Pagina 1 di 12", EN "Previous/Next" + "Page 1 of 12"). Full labels are
+   kept — no abbreviated label, no smaller type, no viewport clipping. The
+   disabled/aria-current states stay exactly as the component renders them. */
+.account-dashboard .contributions-pagination { flex-wrap:wrap; row-gap:10px; }
+.account-dashboard .contributions-pagination .button { flex:0 1 auto; min-width:0; justify-content:center; }
+.account-dashboard .contributions-pagination .page-indicator { overflow-wrap:anywhere; }
 /* Passkey disclosure: native <details> with the section heading as the
    summary — keyboard/focus for free, no JS. */
 .passkeys-disclosure { margin-top:22px; border-top:1px solid var(--line); }
@@ -1676,11 +1719,58 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
   .account-dashboard > details.passkeys-disclosure { padding:18px; }
   .account-profile-grid { grid-template-columns:1fr; gap:18px; }
   .account-trust--top .level-badge { margin-bottom:14px; }
-  .account-stats { grid-template-columns:repeat(2,1fr); }
+  .account-stats { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  /* A01: the odd third counter spans the row ONLY here, where the strip is
+     two columns wide (it would otherwise leave a dead gap beside it). On
+     desktop the strip is three equal tracks and nothing spans. */
+  .account-stats > :last-child:nth-child(odd) { grid-column:1 / -1; }
   .contributions-filter-bar { grid-template-columns:1fr; }
   .contribution-filter-reset { justify-self:start; }
-  .contribution-row { flex-wrap:wrap; }
-  .contribution-status { margin-left:48px; }
+  /* A06 mobile: compact two-line stacking — icon and title/meta on the first
+     line, status and the optional edit action on the second one, aligned
+     with the text column. The old `margin-left:48px` gutter (icon width) is
+     gone: it stole text space on the first line for no reason. */
+  .account-dashboard .contributions-list { display:flex; flex-direction:column; gap:10px; }
+  .account-dashboard .contribution-row { grid-template-columns:auto minmax(0,1fr) auto; grid-template-areas:"icon main main" ". status edit"; row-gap:6px; }
+  .account-dashboard .contribution-kind-icon { grid-area:icon; }
+  .account-dashboard .contribution-main { grid-area:main; }
+  .account-dashboard .contribution-status { grid-area:status; margin-left:0; }
+  .account-dashboard .contributions-edit { grid-area:edit; margin-left:0; justify-self:end; }
+}
+/* A02 at 320/360: full-label pager on two rows — previous/next share the
+   first row (equal, shrinkable tracks) and the page indicator takes its own
+   centred row, so a long "Pagina 12 di 12" can never push a button outside
+   the panel. Type size and labels are untouched. */
+@media (max-width:600px) {
+  .account-dashboard .contributions-pagination { gap:8px; }
+  .account-dashboard .contributions-pagination .button { flex:1 1 0; padding:9px 10px; }
+  .account-dashboard .contributions-pagination .page-indicator { order:2; flex:1 0 100%; text-align:center; }
+}
+/* A01 + A03 at 320/360: the two visible counters keep the native two-column
+   layout but shed the redundant padding/icon size so the longest IT/EN label
+   ("SEGNALAZIONI"/"IN MODERAZIONE", "REPORTS"/"IN MODERATION") stays inside
+   its panel instead of bleeding out of it. Deliberately NOT a stack of three
+   tall cards. overflow-wrap is the safety net on top of the compact sizing. */
+@media (max-width:480px) {
+  .account-dashboard .account-stats { gap:8px; }
+  .account-dashboard .account-stat { gap:4px; padding:10px 8px; }
+  .account-dashboard .account-stat-icon { width:28px; height:28px; }
+  .account-dashboard .account-stat-icon svg { width:15px; height:15px; }
+  .account-dashboard .account-stat-value { font-size:var(--text-3xl); }
+  .account-dashboard .account-stat-label { letter-spacing:.04em; line-height:1.3; }
+}
+/* A03 (layout polish 2026-10-23): the profile block was ~500px tall on a
+   phone because it stacked the shared 24px/34px margins, 24px padding and
+   20px row gap of .record-detail-list on top of the section padding. Compact
+   it — scoped to .account-dashboard, so /records and the other auth routes
+   keep the shared rhythm. Nothing is hidden: email verification, badge,
+   membership, logout and long names/emails stay in place and wrap. */
+@media (max-width:700px) {
+  .account-dashboard .record-detail-list { grid-template-columns:1fr; margin:8px 0 12px; padding:8px 0; gap:4px; }
+  .account-dashboard .record-detail-list dt { margin-bottom:2px; }
+  .account-dashboard .record-detail-list dt:not(:first-of-type) { margin-top:8px; }
+  .account-dashboard .record-detail-list dd { line-height:1.4; }
+  .account-dashboard .account-logout { margin-top:12px; }
 }
 
 /* ---- /mappa integrated layout (t_702c10af sidebar+fullscreen map;
