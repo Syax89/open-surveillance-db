@@ -335,6 +335,48 @@ test("F2: a one-page or empty set renders neither bar", async () => {
   assert.equal(pagers(empty.container).length, 0, "and none for an empty set");
 });
 
+/**
+ * A COMPLETED place flow owns the catalog even when it found nothing: "empty"
+ * and "not-found" are finished results (they consumed the query and render
+ * their own truthful zero), so no catalog pager may advertise pages of a list
+ * that is not on screen. Payloads are the canonical ones the place-search
+ * proxy serves (same shapes as tests/directory-count-loading.test.mjs).
+ */
+const PLACE_AREA = { kind: "place", displayName: "Fixture Town", latitude: 41.9, longitude: 12.49, radiusMeters: 2000, radiusLabel: "2 km" };
+
+const PLACE_ZERO_CASES = [
+  { label: "empty result (EN)", locale: "en", zeroCount: "0 public records found near this place", payload: () => jsonResponse({ area: PLACE_AREA, records: [] }) },
+  { label: "not-found place (EN)", locale: "en", zeroCount: "0 public records found near this place", payload: () => jsonResponse({ error: "not found" }, { status: 404 }) },
+  { label: "empty result (IT)", locale: "it", zeroCount: "0 record pubblici trovati vicino a questo luogo", payload: () => jsonResponse({ area: PLACE_AREA, records: [] }) },
+  { label: "not-found place (IT)", locale: "it", zeroCount: "0 record pubblici trovati vicino a questo luogo", payload: () => jsonResponse({ error: "not found" }, { status: 404 }) },
+];
+
+for (const placeCase of PLACE_ZERO_CASES) {
+  test(`F2: a completed ${placeCase.label} hides both pagers and clearing it restores the catalog`, async () => {
+    const { container } = await renderDirectory({
+      locale: placeCase.locale,
+      extraFetch: (input) => (input.startsWith("/api/cameras/search") ? placeCase.payload() : null),
+    });
+    await rtl.waitFor(() => assert.equal(rows(container), 20), { timeout: 5000 });
+    assert.equal(pagers(container).length, 2, "the 25-record catalog starts with both bars");
+
+    // Real form submit; the query matches the fixture titles ("Fixture record …").
+    await rtl.userEvent.type(container.querySelector("#record-search"), "Fixture{Enter}");
+    await rtl.waitFor(
+      () => assert.equal(text(container.querySelector("#record-search-count")), placeCase.zeroCount, "the completed place flow owns the count"),
+      { timeout: 5000 },
+    );
+
+    assert.equal(rows(container), 0, "the place flow renders no catalog rows");
+    assert.equal(pagers(container).length, 0, "and no catalog pager — there is no catalog list on screen");
+
+    // Clearing the typed query ends the place flow through its existing path.
+    await rtl.userEvent.clear(container.querySelector("#record-search"));
+    await rtl.waitFor(() => assert.equal(rows(container), 20, "the catalog list comes back"), { timeout: 5000 });
+    assert.equal(pagers(container).length, 2, "with both bars restored");
+  });
+}
+
 test("F2 (CSS): the top bar is phone-only, compact, wrapping and 44px", async () => {
   const css = await readSource("app/globals.css");
 

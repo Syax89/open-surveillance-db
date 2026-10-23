@@ -346,8 +346,9 @@ export function DirectoryCatalog({ filteredRecords, loading, loadError, onRetryL
   }
 
   // Shared gate for BOTH pagination rows: never for a one-page/empty set and
-  // never while a place search owns the results.
-  const showPager = !placeActive && totalRecords > DIRECTORY_PAGE_SIZE;
+  // never once a place flow completed — its empty and not-found results own
+  // the screen too, so there are no pages of a list that is not rendered.
+  const showPager = !placeDone && totalRecords > DIRECTORY_PAGE_SIZE;
 
   return (
     <section className="records-section" id="records" aria-label={t.accessibleDirectory}>
