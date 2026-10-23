@@ -225,7 +225,7 @@ test("MappaTool renders the map tool shell with the shared FiltersBar and the vi
   await rtl.waitFor(() => {
     assert.ok(screen.getByRole("button", { name: /Illustrative record A/ }), "list row for record A");
     assert.ok(screen.getByRole("button", { name: /Illustrative record B/ }), "list row for record B");
-    assert.ok(screen.getByText("Showing all 2 points in the current view"), "aria-live count announces the visible points");
+    assert.ok(screen.getByText("Showing all 2 points in the current view", { selector: ".map-list-count" }), "aria-live count announces the visible points");
   });
 
   // Map-task alternative links point at the tool routes, not the home anchors.
@@ -492,7 +492,7 @@ test("MappaTool zoom/pan updates the list to the points in the new viewport (deb
   await waitFor(() => assert.ok(leaflet.__maps.length > 0));
   const map = leaflet.__maps.at(-1);
   await waitFor(() => {
-    assert.ok(screen.getByText("Showing all 2 points in the current view"));
+    assert.ok(screen.getByText("Showing all 2 points in the current view", { selector: ".map-list-count" }));
     assert.ok(screen.getByRole("button", { name: /Illustrative record A/ }));
   });
 
@@ -505,7 +505,7 @@ test("MappaTool zoom/pan updates the list to the points in the new viewport (deb
     contains: () => false,
   });
   for (const handler of map.handlers["moveend zoomend"] ?? []) handler();
-  await waitFor(() => assert.ok(screen.getByText("No points in the current view")));
+  await waitFor(() => assert.ok(screen.getByText("No points in the current view", { selector: ".map-list-count" })));
   assert.ok(screen.queryByRole("button", { name: /Illustrative record A/ }) === null);
   assert.ok(screen.getByText(/No documented points in the current view/), "truthful in-view empty note");
 
@@ -516,7 +516,7 @@ test("MappaTool zoom/pan updates the list to the points in the new viewport (deb
     contains: () => true,
   });
   for (const handler of map.handlers["moveend zoomend"] ?? []) handler();
-  await waitFor(() => assert.ok(screen.getByText("Showing all 2 points in the current view")));
+  await waitFor(() => assert.ok(screen.getByText("Showing all 2 points in the current view", { selector: ".map-list-count" })));
   assert.ok(screen.getByRole("button", { name: /Illustrative record B/ }));
   installEmptyMock();
 });
@@ -540,7 +540,7 @@ test("B08: the top and sidebar counters reflect the CURRENT VIEW, not the accumu
   await waitFor(() => assert.ok(leaflet.__maps.length > 0));
   const map = leaflet.__maps.at(-1);
   await waitFor(() => {
-    assert.ok(screen.getByText("Showing all 2 points in the current view"));
+    assert.ok(screen.getByText("Showing all 2 points in the current view", { selector: ".map-list-count" }));
     assert.ok(screen.getByText("2 public records found"));
   }, { timeout: 3000 });
 
@@ -548,7 +548,7 @@ test("B08: the top and sidebar counters reflect the CURRENT VIEW, not the accumu
   leaflet.__setBounds({ getSouth: () => 45.4, getNorth: () => 45.5, getWest: () => 9.1, getEast: () => 9.3, contains: () => true });
   for (const handler of map.handlers["moveend zoomend"] ?? []) handler();
   await waitFor(() => {
-    assert.ok(screen.getByText("Showing the only point in the current view"), "the sidebar denominator is the current view, not the store");
+    assert.ok(screen.getByText("Showing the only point in the current view", { selector: ".map-list-count" }), "the sidebar denominator is the current view, not the store");
     assert.ok(screen.getByText("1 public record found"), "the top counter is the current view, not the accumulated 3");
     assert.ok(screen.queryByText("3 public records found") === null, "the accumulated store is never presented as the view total");
   }, { timeout: 3000 });
@@ -557,7 +557,7 @@ test("B08: the top and sidebar counters reflect the CURRENT VIEW, not the accumu
   // the view — the counter follows the view again (never a frozen total).
   leaflet.__setBounds({ getSouth: () => -90, getNorth: () => 90, getWest: () => -180, getEast: () => 180, contains: () => true });
   for (const handler of map.handlers["moveend zoomend"] ?? []) handler();
-  await waitFor(() => assert.ok(screen.getByText("Showing all 3 points in the current view")), { timeout: 3000 });
+  await waitFor(() => assert.ok(screen.getByText("Showing all 3 points in the current view", { selector: ".map-list-count" })), { timeout: 3000 });
   installEmptyMock();
 });
 

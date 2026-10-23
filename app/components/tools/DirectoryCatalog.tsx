@@ -12,6 +12,7 @@ import { RecordCard } from "../RecordCard";
 import { FiltersBar } from "../FiltersBar";
 import { EmptyState } from "../EmptyState";
 import { usePlaceSearch } from "../../lib/usePlaceSearch";
+import { fetchImportSources, importSourceOf, type ImportSourceInfo } from "../../lib/import-sources";
 
 /** Records per page in the /directory catalog (t_f13fcb1c). */
 export const DIRECTORY_PAGE_SIZE = 20;
@@ -99,6 +100,18 @@ export function DirectoryCatalog({ filteredRecords, loading, loadError, onRetryL
   // page — "the last loaded records"). SSR-safe: navigator is undefined on
   // the server, so the banner never appears in first paint.
   const [offline, setOffline] = useState(false);
+  // Import provenance (FASE C, t_4dbce318): the list API exposes the raw
+  // 'import:<slug>' value; the readable entity name comes from the SAME
+  // committed batches the map popup and /fonti use (lib/import-sources, one
+  // module-level single-flight cache — never one request per card). A failed
+  // endpoint keeps the truthful raw value, and the cancelled guard drops a
+  // late resolution that would write into an unmounted list.
+  const [sources, setSources] = useState<Map<string, ImportSourceInfo>>(new Map());
+  useEffect(() => {
+    let cancelled = false;
+    fetchImportSources().then((map) => { if (!cancelled) setSources(map); }).catch(() => undefined);
+    return () => { cancelled = true; };
+  }, []);
   // The results heading: pagination and the A–Z index move the reading
   // position here (focus follows for AT, scroll is CSS-reduced-motion aware).
   const resultsRef = useRef<HTMLHeadingElement | null>(null);
@@ -126,10 +139,27 @@ export function DirectoryCatalog({ filteredRecords, loading, loadError, onRetryL
   // optional manufacturer/observed-on stay on the detail page. F4 (QA#6):
   // demo records (status "demo") show the localized demo labels instead of
   // the raw seed markers ("Development seed"/"Demo data" — DATA_DICTIONARY).
+  // Source fact value: the localized demo label wins for the seed rows, then
+  // the READABLE batch attribution when it is known (imported rows only).
+  // Both values are in the markup: desktop keeps rendering the raw source
+  // exactly as before, the ≤700px card shows the readable one (globals.css).
+  // Nothing is guessed — an unknown/absent batch keeps the raw value.
+  function sourceValue(camera: Camera) {
+    if (camera.status === "demo") return t.demoSource;
+    const provenance = importSourceOf(camera, sources);
+    if (!provenance) return camera.source;
+    return (
+      <span className="record-source has-name">
+        <span className="record-source-raw">{camera.source}</span>
+        <span className="record-source-name">{provenance.sourceName}</span>
+      </span>
+    );
+  }
+
   function mainFacts(camera: Camera) {
     return [
       { label: t.recordId, value: camera.id },
-      { label: t.source, value: camera.status === "demo" ? t.demoSource : camera.source },
+      { label: t.source, value: sourceValue(camera) },
       { label: t.lastUpdated, value: camera.status === "demo" ? t.demoUpdated : formatPublicDate(camera.updated, locale) },
       { label: t.location, value: formatLocation(camera.address, camera.latitude, camera.longitude) },
     ];

@@ -23,6 +23,8 @@ let MapRecordList;
 const labels = {
   listTitle: "Points in the current view",
   listCount: (visible, total) => `Showing all ${visible} of ${total} points`,
+  listShowCount: (count) => `Show ${count} points`,
+  listHideCount: (count) => `Hide ${count} points`,
   listMapSyncHelp: "The list updates as you move or zoom the map.",
   listEmptyInView: "No documented points in the current view.",
   emptyTitle: "No published record matches those filters.",
@@ -61,7 +63,7 @@ test("map points panel: header keeps title + count and carries the disclosure to
   const view = await renderList();
   assert.ok(screen.getByRole("heading", { name: "Points in the current view" }));
   assert.ok(screen.getAllByText(/Showing all 2 of 2 points/).length >= 1);
-  const toggle = screen.getByRole("button", { name: /Points in the current view: Showing all 2 of 2 points/ });
+  const toggle = screen.getByRole("button", { name: "Hide 2 points" });
   assert.equal(toggle.getAttribute("aria-expanded"), "true", "expanded when the panel is open");
   assert.equal(toggle.getAttribute("aria-controls"), "map-list-scroll", "toggle names the list it controls");
   // The list is present and the records are reachable.
@@ -73,7 +75,7 @@ test("map points panel: collapsed flag hides the list and flips aria-expanded (t
   const { screen } = rtl;
   let toggled = 0;
   const view = await renderList({ collapsed: true, onToggleCollapse: () => { toggled += 1; } });
-  const toggle = screen.getByRole("button", { name: /Points in the current view/ });
+  const toggle = screen.getByRole("button", { name: "Show 2 points" });
   assert.equal(toggle.getAttribute("aria-expanded"), "false", "aria-expanded=false when collapsed");
   const scroll = view.container.querySelector(".map-list-scroll");
   assert.ok(scroll, "the list container stays in the DOM");
@@ -95,7 +97,7 @@ test("map points panel: no toggle is rendered without a handler (desktop/list-in
     labels,
     statusLabel: (status) => status,
   }));
-  assert.ok(!screen.queryByRole("button", { name: /Points in the current view/ }), "no toggle without onToggleCollapse");
+  assert.equal(view.container.querySelectorAll(".map-list-header button").length, 0, "no toggle without onToggleCollapse");
   assert.ok(view.container.querySelector(".map-list-scroll"), "the list still renders");
   assert.ok(screen.getByRole("button", { name: /Illustrative record A/ }));
 });

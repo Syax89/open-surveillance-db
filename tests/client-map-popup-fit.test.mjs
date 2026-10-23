@@ -283,7 +283,148 @@ test("an unmeasurable surface does not publish a budget that could exceed the re
 });
 
 // ---------------------------------------------------------------------------
-// 4) D1 (review A): a popup the user JUST opened survives the initial settle.
+// 4) R4: the map-owned coordinate picker is re-fitted on a REAL map resize.
+// ---------------------------------------------------------------------------
+
+/** Open the coordinate picker on the current surface (empty-map click). */
+async function openPicker(map, latlng = { lat: 41.9004, lng: 12.4936 }) {
+  const clickHandler = map.handlers.click?.[0];
+  assert.ok(clickHandler, "the map registers the coordinate-picker listener");
+  clickHandler({ latlng });
+}
+
+function pickerOptions(map) {
+  return {
+    maxWidth: map.popup.options.maxWidth,
+    minWidth: map.popup.options.minWidth,
+    autoPan: map.popup.options.autoPan,
+    autoPanPadding: map.popup.options.autoPanPadding,
+    autoPanPaddingBottomRight: map.popup.options.autoPanPaddingBottomRight,
+    keepInView: map.popup.options.keepInView,
+  };
+}
+
+test("the resize callback (a Leaflet event, not a Map) re-fits the OPEN picker", async () => {
+  await renderMapWithCameras(CAMERAS);
+  const map = (await leafletMaps()).at(-1);
+  map.size = { x: 286, y: 340 }; // the 320px phone map measured in the review
+  map.fire("resize");
+  await openPicker(map);
+
+  const narrow = popupGeometryFor({ x: 286, y: 340 });
+  assert.deepEqual(pickerOptions(map), {
+    maxWidth: narrow.maxWidth,
+    minWidth: narrow.minWidth,
+    autoPan: true,
+    autoPanPadding: narrow.autoPanPadding,
+    autoPanPaddingBottomRight: narrow.autoPanPaddingBottomRight,
+    keepInView: true,
+  }, "the freshly opened picker starts from the creation-time fit");
+  const updatesBefore = map.popup.updates;
+  const opensBefore = (map.events.popupopen ?? []).length;
+
+  // The map grows (rotation / keyboard / desktop breakpoint) while the picker
+  // is open. Leaflet calls the listener with a RESIZE EVENT — passing it
+  // through as if it were a map would fall back to the unmeasured geometry.
+  map.size = { x: 900, y: 700 };
+  map.fire("resize", { type: "resize", target: map, oldSize: { x: 286, y: 340 }, newSize: { x: 900, y: 700 } });
+
+  const wide = popupGeometryFor({ x: 900, y: 700 });
+  assert.equal(wide.maxWidth, 300, "the fixture really changed surface (desktop balloon)");
+  assert.deepEqual(pickerOptions(map), {
+    maxWidth: wide.maxWidth,
+    minWidth: wide.minWidth,
+    autoPan: true,
+    autoPanPadding: wide.autoPanPadding,
+    autoPanPaddingBottomRight: wide.autoPanPaddingBottomRight,
+    keepInView: true,
+  }, "every picker option (width, minWidth, autoPan + both paddings) is refreshed from the new surface");
+  assert.equal(map.popup.options.maxWidth, 300, "the balloon actually grew with the map");
+  assert.equal(map.popup.updates, updatesBefore + 1, "the open picker is re-laid out in place (one update)");
+  assert.equal(map.popup.isOpen(), true, "the picker stays open across the resize");
+  assert.equal((map.events.popupopen ?? []).length, opensBefore, "no reopen: the resize never opens a popup");
+  assert.deepEqual(map.popupLatLng, { lat: 41.9004, lng: 12.4936 }, "the picked position is untouched");
+
+  // The kept markers receive the SAME refreshed option set: one geometry path.
+  const markers = (await leafletMarkers()).filter((marker) => marker.popupOpts);
+  assert.ok(markers.length > 0, "the fixture creates camera markers");
+  for (const marker of markers) {
+    assert.deepEqual(
+      {
+        maxWidth: marker.popupOpts.maxWidth,
+        minWidth: marker.popupOpts.minWidth,
+        autoPanPadding: marker.popupOpts.autoPanPadding,
+        autoPanPaddingBottomRight: marker.popupOpts.autoPanPaddingBottomRight,
+      },
+      {
+        maxWidth: wide.maxWidth,
+        minWidth: wide.minWidth,
+        autoPanPadding: wide.autoPanPadding,
+        autoPanPaddingBottomRight: wide.autoPanPaddingBottomRight,
+      },
+      "the picker and the retained markers share the refreshed geometry",
+    );
+  }
+});
+
+test("a picker the user closed is never reopened or updated by a resize", async () => {
+  await renderMapWithCameras(CAMERAS);
+  const map = (await leafletMaps()).at(-1);
+  map.size = { x: 286, y: 340 };
+  map.fire("resize");
+  await openPicker(map);
+  const updatesBefore = map.popup.updates;
+  const opensBefore = (map.events.popupopen ?? []).length;
+
+  map.closePopup();
+  assert.equal(map.popup.isOpen(), false, "the picker is closed (× / outside click)");
+
+  map.size = { x: 900, y: 700 };
+  map.fire("resize", { type: "resize", target: map });
+
+  assert.equal(map.popup.isOpen(), false, "a closed picker stays closed");
+  assert.equal(map.popup.updates, updatesBefore, "a closed picker is never re-laid out");
+  assert.equal((map.events.popupopen ?? []).length, opensBefore, "no popup is opened by the resize");
+});
+
+test("a resize with no picker at all does nothing (never opens one)", async () => {
+  await renderMapWithCameras(CAMERAS);
+  const map = (await leafletMaps()).at(-1);
+  map.size = { x: 286, y: 340 };
+  assert.equal(map.popup, undefined, "no picker has been opened yet");
+
+  map.size = { x: 900, y: 700 };
+  map.fire("resize", { type: "resize", target: map });
+
+  assert.equal(map.popup, undefined, "a resize never creates a picker");
+  assert.equal(map.popupHtml, undefined, "no balloon is requested");
+  assert.equal((map.events.popupopen ?? []).length, 0, "zero popupopen events");
+});
+
+test("a marker popup opening later takes over: the picker is no longer tracked", async () => {
+  await renderMapWithCameras(CAMERAS);
+  const map = (await leafletMaps()).at(-1);
+  map.size = { x: 286, y: 340 };
+  map.fire("resize");
+  await openPicker(map);
+  const picker = map.popup;
+  const pickerUpdates = picker.updates;
+
+  // A marker tap opens the record balloon (the map keeps one popup at a time).
+  const marker = (await leafletMarkers()).find((item) => item.popupOpts && item.handlers.click?.length);
+  assert.ok(marker, "the fixture records are materialised as individual markers");
+  marker.handlers.click[0]({ originalEvent: {}, stopPropagation() {} });
+  assert.equal(marker.isPopupOpen(), true, "the marker popup opens");
+
+  map.size = { x: 900, y: 700 };
+  map.fire("resize", { type: "resize", target: map });
+
+  assert.equal(picker.updates, pickerUpdates, "the superseded picker is not updated any more");
+  assert.equal(marker.popupOpts.maxWidth, popupGeometryFor({ x: 900, y: 700 }).maxWidth, "the marker popup is the one that gets re-fitted");
+});
+
+// ---------------------------------------------------------------------------
+// 5) D1 (review A): a popup the user JUST opened survives the initial settle.
 // ---------------------------------------------------------------------------
 
 test("a just-opened popup survives a rebuild that aggregates the view (data arrival / resize settle)", async () => {

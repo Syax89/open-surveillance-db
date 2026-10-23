@@ -256,6 +256,13 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
   // time AND re-applied on map resize, so kept markers never hold stale
   // dimensions — one helper, one contract (lib/map-popup).
   const popupGeometry = useCallback((): PopupGeometry => measuredPopupGeometry(mapRef.current), []);
+  // The coordinate picker is opened by the MAP (Map.openPopup), not by a
+  // marker: it has no entry in markersByIdRef and Leaflet exposes no public
+  // Map.getPopup(), so its Popup instance is captured from the 'popupopen'
+  // payload (cleared on 'popupclose'). A real map resize then re-fits the
+  // balloon that is ALREADY open — a closed picker is never reopened and the
+  // selection/lifecycle is untouched.
+  const pickPopupRef = useRef<import("leaflet").Popup | null>(null);
   // Re-fit every popup that already exists (M01): a map that changes size
   // with a balloon open must hand the fresh width/padding/height to the
   // KEPT markers, not only to markers created afterwards. Only the balloon
@@ -281,6 +288,20 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
     if (size && size.x > 0 && size.y > 0) {
       map.getContainer?.()?.style?.setProperty?.("--osm-popup-max-height", `${geometry.maxHeight}px`);
     }
+    // The picker balloon shares ONE option set with the markers (width,
+    // minWidth, autopan padding + reserved lanes, keepInView). It is refreshed
+    // through the SAME path: only when it is still open, and update() re-lays
+    // it out in place (no close/reopen, no re-open of a dismissed picker).
+    const pickPopup = pickPopupRef.current;
+    if (pickPopup?.options && pickPopup.isOpen?.()) {
+      pickPopup.options.maxWidth = geometry.maxWidth;
+      pickPopup.options.minWidth = geometry.minWidth;
+      pickPopup.options.autoPan = true;
+      pickPopup.options.autoPanPadding = geometry.autoPanPadding;
+      pickPopup.options.autoPanPaddingBottomRight = geometry.autoPanPaddingBottomRight;
+      pickPopup.options.keepInView = true;
+      pickPopup.update?.();
+    }
     const byId = markersByIdRef.current;
     if (!byId) return;
     for (const entry of byId.values()) {
@@ -288,6 +309,7 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
       if (!popup?.options) continue;
       popup.options.maxWidth = geometry.maxWidth;
       popup.options.minWidth = geometry.minWidth;
+      popup.options.autoPan = true;
       popup.options.autoPanPadding = geometry.autoPanPadding;
       popup.options.autoPanPaddingBottomRight = geometry.autoPanPaddingBottomRight;
       popup.options.keepInView = true;
@@ -430,6 +452,9 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
     mapRef.current?.openPopup(pickPopupHtmlRef.current(event.latlng.lat, event.latlng.lng), event.latlng, {
       maxWidth: geometry.maxWidth,
       minWidth: geometry.minWidth,
+      // autoPan is Leaflet's default; declared so the creation-time fit and
+      // the resize re-fit (applyPopupFit) carry the SAME option set.
+      autoPan: true,
       className: "osm-camera-popup",
       // Clipping fix (empirical review 2026-08-07): same keepInView /
       // autoPanPadding as the marker popup, so a picker near the map edge
@@ -644,7 +669,7 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
         // Popup lifecycle (t_33b82720): the same handler tracks WHICH
         // record's popup is open (activePopupIdRef) so a marker rebuild can
         // restore exactly that popup — never a random one.
-        map.on("popupopen", (event: { popup?: { getElement?: () => HTMLElement | null } }) => {
+        map.on("popupopen", (event: { popup?: import("leaflet").Popup }) => {
           const content = event.popup?.getElement?.();
           // P2-9 (review 2026-08-07): the Leaflet popup is a plain div —
           // announce it as a dialog and label it with the record title (or
@@ -654,7 +679,16 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
           const heading = content?.querySelector?.("h3")?.textContent;
           if (heading) content?.setAttribute?.("aria-label", heading);
           const node = content?.querySelector?.(".osm-popup-community");
-          if (!node) return;
+          // M01 R4: no community mount node means the balloon belongs to the
+          // MAP (the coordinate picker). Track ITS Popup instance — the only
+          // handle on an open picker — so applyPopupFit can refresh the
+          // geometry on a real resize, exactly like the retained markers. A
+          // marker popup clears it: the map keeps one popup at a time.
+          if (!node) {
+            pickPopupRef.current = event.popup ?? null;
+            return;
+          }
+          pickPopupRef.current = null;
           const raw = node.getAttribute("data-record-id");
           const id = raw ? Number(raw) : NaN;
           if (!Number.isInteger(id) || id <= 0) return;
@@ -678,7 +712,10 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
             console.error("popup action widget mount failed", error);
           }
         });
-        map.on("popupclose", () => {
+        map.on("popupclose", (event?: { popup?: import("leaflet").Popup }) => {
+          // The picker was dismissed (× / click outside): forget the instance
+          // so a later resize never touches a closed balloon.
+          if (event?.popup && pickPopupRef.current === event.popup) pickPopupRef.current = null;
           unmountPopupActions();
           // The user closed the popup (close button / click outside): the
           // rebuild must not re-open it afterwards. A popup closed by the
@@ -735,7 +772,7 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
         window.clearTimeout(boundsTimerRef.current);
         boundsTimerRef.current = null;
       }
-      mapRef.current?.remove(); mapRef.current = null; markersRef.current = null; fovLayerRef.current = null; markersByIdRef.current = null;
+      mapRef.current?.remove(); mapRef.current = null; markersRef.current = null; fovLayerRef.current = null; markersByIdRef.current = null; pickPopupRef.current = null;
       userLayerRef.current = null; geoButtonRef.current = null; geoActiveRef.current = false;
       badges.clear();
       // Reset the ready flag so a StrictMode remount (or any future
@@ -991,6 +1028,7 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
           // picker — ONE helper, derived from the actual map surface.
           maxWidth: geometry.maxWidth,
           minWidth: geometry.minWidth,
+          autoPan: true,
           className: "osm-camera-popup",
           // Clipping fix (empirical review 2026-08-07): markers near the map
           // top opened a popup cut off above the container edge (title

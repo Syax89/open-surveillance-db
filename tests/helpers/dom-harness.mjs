@@ -403,8 +403,41 @@ export function map(el, opts) {
     // Map-click picker (t_6abb96ac): map.openPopup records the popup
     // content + position so tests can assert the report-picker popup
     // (coordinates + /segnala deep link) that a map click opens.
-    openPopup: (html, latlng, opts) => { m.popupHtml = html; m.popupLatLng = latlng; m.popupOpts = opts; return m; },
-    closePopup: () => { m.popupHtml = null; m.popupLatLng = null; return m; },
+    // M01 R4: it ALSO mirrors real Leaflet — the map owns ONE Popup instance
+    // (mutable .options, update(), isOpen(), getElement()) and dispatches
+    // popupopen/popupclose with it, so the resize re-fit of an open picker is
+    // exercised through the real event payload the component receives.
+    openPopup: (html, latlng, opts) => {
+      if (m.popup && m.popup.__open) {
+        m.popup.__open = false;
+        m.fire("popupclose", { popup: m.popup });
+      }
+      const content = document.createElement("div");
+      if (typeof html === "string") content.innerHTML = html;
+      const popup = {
+        options: { ...(opts ?? {}) },
+        updates: 0,
+        __open: true,
+        update: () => { popup.updates += 1; return popup; },
+        isOpen: () => popup.__open === true,
+        getElement: () => content,
+      };
+      m.popup = popup;
+      m.popupHtml = html;
+      m.popupLatLng = latlng;
+      m.popupOpts = popup.options;
+      m.fire("popupopen", { popup });
+      return m;
+    },
+    closePopup: () => {
+      if (m.popup && m.popup.__open) {
+        m.popup.__open = false;
+        m.fire("popupclose", { popup: m.popup });
+      }
+      m.popupHtml = null;
+      m.popupLatLng = null;
+      return m;
+    },
   };
   maps.push(m);
   return m;
