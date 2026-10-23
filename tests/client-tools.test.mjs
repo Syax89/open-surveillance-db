@@ -215,7 +215,7 @@ test("MappaTool renders the map tool shell with the shared FiltersBar and the vi
   // DUAL-FUNCTION (t_b9666d09): it filters the viewport points AND suggests
   // places through the geocoder (combobox). The FiltersBar row keeps
   // kind/freshness/sort/reset — exactly ONE search control on the page.
-  assert.ok(screen.getByLabelText("Filter the points in the current view or search a place"), "place/point search above the map");
+  assert.ok(screen.getByLabelText("Filter points or find a place"), "place/point search above the map");
   assert.ok(screen.queryByLabelText("Search the public directory") === null, "no duplicated FiltersBar search on /mappa");
   assert.ok(screen.getByLabelText("Camera type"), "shared FiltersBar kind filter");
 
@@ -286,7 +286,7 @@ test("MappaTool freshness filter keeps the map rendered and uses the global rese
   // The map region is still on the page (never replaced by an empty state).
   assert.ok(screen.getByRole("region", { name: "Interactive OpenStreetMap map" }), "the map stays rendered with zero matching records");
   // The explorer controls stay above the map; the sidebar is just the list.
-  assert.ok(screen.getByLabelText("Filter the points in the current view or search a place"), "the top search stays rendered");
+  assert.ok(screen.getByLabelText("Filter points or find a place"), "the top search stays rendered");
   assert.ok(screen.getByText("No published record matches those filters."), "truthful in-list empty note");
   assert.ok(screen.getByText(/This does not mean that there are no cameras/), "the note never implies an area has no surveillance");
   assert.ok(screen.getByRole("button", { name: /Reset filters/ }), "the top controls offer the reset action");
@@ -595,7 +595,7 @@ test("MappaTool geocode autocomplete suggests places in a combobox; keyboard sel
   };
   t.after(() => { window.history.replaceState = originalReplaceState; });
 
-  const input = screen.getByRole("combobox", { name: /Filter the points in the current view or search a place/ });
+  const input = screen.getByRole("combobox", { name: /Filter points or find a place/ });
   assert.equal(input.getAttribute("aria-expanded"), "false", "the combobox starts collapsed");
 
   // Typing a query that does not match any local point opens the geocode
@@ -712,7 +712,7 @@ test("MappaTool geocode dropdown closes on Escape and on click outside", async (
   const user = rtl.userEvent.setup();
   await renderWithLocale(React.createElement(MappaTool));
 
-  const input = screen.getByRole("combobox", { name: /Filter the points in the current view or search a place/ });
+  const input = screen.getByRole("combobox", { name: /Filter points or find a place/ });
   await user.type(input, "Ferrara");
   await waitFor(() => assert.ok(screen.getByRole("listbox", { name: "Place suggestions" })), { timeout: 5000 });
   assert.equal(input.getAttribute("aria-expanded"), "true");
@@ -762,7 +762,7 @@ test("MappaTool geocode autocomplete shows honest no-results and unavailable sta
   const { screen, waitFor } = rtl;
   const user = rtl.userEvent.setup();
   await renderWithLocale(React.createElement(MappaTool));
-  const input = screen.getByRole("combobox", { name: /Filter the points in the current view or search a place/ });
+  const input = screen.getByRole("combobox", { name: /Filter points or find a place/ });
 
   await user.type(input, "Xyzzy");
   await waitFor(() => assert.ok(screen.getByText("No results for “Xyzzy”")), { timeout: 5000 });
@@ -792,13 +792,13 @@ test("MappaTool text search with no matching record keeps the map rendered (in-l
 
   // A query that matches no local point empties ONLY the list (the map and
   // the sidebar stay); reset remains in the explorer controls above.
-  await user.type(screen.getByLabelText("Filter the points in the current view or search a place"), "no-such-camera");
+  await user.type(screen.getByLabelText("Filter points or find a place"), "no-such-camera");
   await rtl.waitFor(() => assert.ok(screen.getByText("No published record matches those filters.")), { timeout: 5000 });
 
   assert.ok(screen.getByRole("region", { name: "Interactive OpenStreetMap map" }), "the map stays rendered after a no-match search");
   assert.ok(screen.getByRole("button", { name: /Reset filters/ }), "the top controls offer the reset action");
 
-  fireEvent.change(screen.getByLabelText("Filter the points in the current view or search a place"), { target: { value: "" } });
+  fireEvent.change(screen.getByLabelText("Filter points or find a place"), { target: { value: "" } });
   await rtl.waitFor(() => assert.ok(screen.getByRole("button", { name: /Illustrative record A/ }), "clearing restores the records"), { timeout: 5000 });
 });
 

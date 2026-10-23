@@ -142,7 +142,7 @@ test("t_3c4b188e: typing never calls router.replace (pure history.replaceState c
     originalReplaceState(data, unused, url);
   };
   try {
-    const input = screen.getByRole("combobox", { name: /Filter the points in the current view or search a place/ });
+    const input = screen.getByRole("combobox", { name: /Filter points or find a place/ });
     await user.type(input, "Ferrara");
 
     // The 250ms geocode debounce fires the fetch; the 400ms ?q= debounce
@@ -158,7 +158,7 @@ test("t_3c4b188e: typing never calls router.replace (pure history.replaceState c
 
     // The tree is alive: the same combobox is still mounted, still holds
     // the typed draft, and the dropdown is open with suggestions.
-    const inputAfter = screen.getByRole("combobox", { name: /Filter the points in the current view or search a place/ });
+    const inputAfter = screen.getByRole("combobox", { name: /Filter points or find a place/ });
     assert.equal(inputAfter, input, "the combobox DOM node is the SAME node — the tree was not invalidated");
     assert.equal(inputAfter.value, "Ferrara", "the typed draft survives");
     assert.equal(inputAfter.getAttribute("aria-expanded"), "true", "the dropdown opened with suggestions");
@@ -177,7 +177,7 @@ test("t_3c4b188e: failReplace + clear commits the URL via the pure-history path 
   const user = rtl.userEvent.setup();
   await renderWithLocale(React.createElement(MappaTool));
 
-  const input = screen.getByRole("combobox", { name: /Filter the points in the current view or search a place/ });
+  const input = screen.getByRole("combobox", { name: /Filter points or find a place/ });
   await user.type(input, "Ferrara");
   await waitFor(() => assert.ok(geocodeFetches >= 1), { timeout: 5000 });
 
@@ -187,7 +187,7 @@ test("t_3c4b188e: failReplace + clear commits the URL via the pure-history path 
   await new Promise((resolve) => setTimeout(resolve, 400));
   const nav = await getNavState();
   assert.equal(geocodeFetches, 1, "clearing the search must NOT fire another geocode fetch (empty branch aborts)");
-  assert.ok(screen.getByRole("combobox", { name: /Filter the points in the current view or search a place/ }), "the tree is still alive after clearing");
+  assert.ok(screen.getByRole("combobox", { name: /Filter points or find a place/ }), "the tree is still alive after clearing");
   assert.equal(nav.replaced.length, 0, "router.replace never succeeded (failReplace) — the fallback path wrote the URL");
 });
 
@@ -209,7 +209,7 @@ test("a geocode 429 announces Retry-After and suppresses new autocomplete traffi
     search: "", onSearchChange: () => {}, onPlaceSelect: () => {},
   }));
 
-  const input = screen.getByRole("combobox", { name: /Filter the points in the current view or search a place/ });
+  const input = screen.getByRole("combobox", { name: /Filter points or find a place/ });
   await user.type(input, "Ferrara");
   await waitFor(
     () => assert.ok(screen.getByText(/Place search has reached its short request limit/)),
@@ -242,7 +242,7 @@ test("t_3c4b188e: the geocode dropdown appears BEFORE the ?q= commit re-filters 
   const user = rtl.userEvent.setup();
   await renderWithLocale(React.createElement(MappaTool));
 
-  const input = screen.getByRole("combobox", { name: /Filter the points in the current view or search a place/ });
+  const input = screen.getByRole("combobox", { name: /Filter points or find a place/ });
   await user.type(input, "Ferrara");
 
   // Phase 1: the dropdown opens (250ms) while the list is STILL unfiltered
@@ -272,7 +272,7 @@ test("t_b1e192e1: an unmount before the 250ms debounce elapses does NOT cancel t
   const first = await renderWithLocale(React.createElement(GeocodeSearch, {
     search: "", onSearchChange: () => {}, onPlaceSelect: () => {},
   }));
-  const input = screen.getByRole("combobox", { name: /Filter the points in the current view or search a place/ });
+  const input = screen.getByRole("combobox", { name: /Filter points or find a place/ });
   await user.type(input, "Ferrara");
   // Unmount BEFORE the 250ms debounce fires (user.type finishes in ms).
   first.unmount();
@@ -306,7 +306,7 @@ test("the dual-purpose search field shows an always-visible caption next to the 
     search: "", onSearchChange: () => {}, onPlaceSelect: () => {},
   }));
 
-  const input = rtl.screen.getByRole("combobox", { name: /Filter the points in the current view or search a place/ });
+  const input = rtl.screen.getByRole("combobox", { name: /Filter points or find a place/ });
 
   // 1. The caption is real, visible DOM text rendered from the new i18n key.
   const captionNode = rtl.screen.getByText(caption);

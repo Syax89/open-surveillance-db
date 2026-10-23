@@ -71,37 +71,58 @@ afterEach(async () => {
 test("popup geometry fits a 286px-wide 320px-phone map (balloon + padding)", () => {
   assert.equal(POPUP_CHROME_X, CHROME_X, "the exported chrome budget must cover Leaflet's content margin + wrapper padding");
   const geometry = popupGeometryFor({ x: 286, y: 340 });
-  // The OUTER balloon (content + chrome) plus the autopan padding on both
-  // sides must fit inside the map surface — this is exactly what failed.
+  // The OUTER balloon plus the left padding AND the reserved right control
+  // lane must fit inside the map surface — this is exactly what failed.
   const outer = geometry.maxWidth + POPUP_CHROME_X;
-  assert.ok(outer + geometry.autoPanPadding[0] * 2 <= 286, `outer ${outer} + padding ${geometry.autoPanPadding[0]} must fit the 286px map`);
+  const [right, bottom] = geometry.autoPanPaddingBottomRight;
+  assert.ok(outer + geometry.autoPanPadding[0] + right <= 286, `outer ${outer} + left ${geometry.autoPanPadding[0]} + right ${right} must fit the 286px map`);
+  assert.equal(right, 60, "the right control lane (44px target + margin + gap) is reserved on a narrow map");
+  assert.equal(bottom, 60, "the bottom help overlay lane is reserved on a narrow map");
+  assert.ok(bottom > geometry.autoPanPadding[1], "the bottom lane is the asymmetric part of the vertical padding");
   assert.ok(geometry.minWidth <= geometry.maxWidth, "minWidth may never exceed maxWidth (a 220px floor must not force overflow)");
   assert.equal(geometry.minWidth, geometry.maxWidth, "on the narrowest observed surface the balloon uses the whole width budget");
   assert.ok(geometry.autoPanPadding[1] < 48, "the fixed 48px vertical autopan padding is what made the pan impossible");
-  assert.ok(geometry.maxHeight + geometry.autoPanPadding[1] * 2 + TIP_Y <= 340, "the height budget plus padding plus tip must fit the map height");
+  assert.ok(geometry.maxHeight + geometry.autoPanPadding[1] + bottom + TIP_Y <= 340, "the height budget plus both paddings plus the tip must fit the map height");
 });
 
 test("popup geometry keeps the accepted phone/desktop widths where they fit", () => {
-  // 390px phone → ~358px map surface: the accepted 260px balloon still fits.
-  assert.deepEqual(
-    { maxWidth: popupGeometryFor({ x: 358, y: 520 }).maxWidth, minWidth: popupGeometryFor({ x: 358, y: 520 }).minWidth },
-    { maxWidth: 260, minWidth: 220 },
-  );
-  // Desktop surface (split workspace): unchanged 300px + the generous padding.
+  // 390px phone → ~358px map surface (real browser budget): the balloon and
+  // the reserved right lane still fit side by side.
+  const phone = popupGeometryFor({ x: 358, y: 520 });
+  assert.equal(phone.maxWidth, 358 - phone.autoPanPadding[0] - 60 - POPUP_CHROME_X, "the balloon shrinks by the reserved right lane");
+  assert.equal(phone.minWidth, 220, "the accepted floor still fits");
+  // Desktop surface (split workspace): unchanged 300px + the generous,
+  // still SYMMETRIC padding — no lane is reserved when there is room.
   const desktop = popupGeometryFor({ x: 900, y: 700 });
   assert.equal(desktop.maxWidth, 300, "desktop keeps the 300px balloon");
   assert.equal(desktop.minWidth, 220, "desktop keeps the 220px floor");
   assert.deepEqual(desktop.autoPanPadding, [60, 48], "desktop keeps the accepted autopan padding");
+  assert.deepEqual(desktop.autoPanPaddingBottomRight, desktop.autoPanPadding, "desktop stays symmetric");
+});
+
+test("an extra-small map keeps the floor and never produces a negative budget", () => {
+  // Below ~240px the reserved lane cannot fit next to the 120px content
+  // floor: the floor wins (the fit is unsatisfiable, as it was before this
+  // change) but every number must stay a usable positive pixel value.
+  for (const size of [{ x: 200, y: 200 }, { x: 160, y: 340 }, { x: 241, y: 300 }]) {
+    const geometry = popupGeometryFor(size);
+    assert.ok(geometry.maxWidth >= 120, "the 120px content floor survives");
+    assert.ok(geometry.maxHeight >= 160, "the height floor survives");
+    for (const value of [geometry.maxWidth, geometry.minWidth, geometry.maxHeight, ...geometry.autoPanPadding, ...geometry.autoPanPaddingBottomRight]) {
+      assert.ok(Number.isFinite(value) && value >= 0, `every geometry value is a real pixel value (${value})`);
+    }
+  }
 });
 
 test("popup geometry never trusts an unmeasured surface", () => {
   // SSR / pre-layout: getSize() can report 0x0. The fallback must be the
   // desktop balloon (never 0, never NaN) so a popup opened before the first
-  // layout still renders.
+  // layout still renders — with the SAME symmetric padding as before.
   for (const size of [{ x: 0, y: 0 }, undefined, null]) {
     const geometry = popupGeometryFor(size);
     assert.equal(geometry.maxWidth, 300);
     assert.equal(geometry.minWidth, 220);
+    assert.deepEqual(geometry.autoPanPaddingBottomRight, geometry.autoPanPadding, "an unmeasured surface reserves no lane");
     assert.ok(Number.isFinite(geometry.maxHeight) && geometry.maxHeight > 0);
   }
 });
@@ -138,7 +159,12 @@ test("marker and picker popups size themselves on the actual map surface", async
 
   const picker = map.popupOpts;
   assert.ok(picker, "the picker popup carries its options");
-  assert.ok(picker.maxWidth + CHROME_X + picker.autoPanPadding[0] * 2 <= 286, `picker balloon ${picker.maxWidth} must fit the 286px map`);
+  const pickerGeometry = popupGeometryFor({ x: 286, y: 340 });
+  assert.ok(
+    picker.maxWidth + CHROME_X + picker.autoPanPadding[0] + picker.autoPanPaddingBottomRight[0] <= 286,
+    `picker balloon ${picker.maxWidth} + left ${picker.autoPanPadding[0]} + reserved right ${picker.autoPanPaddingBottomRight[0]} must fit the 286px map`,
+  );
+  assert.deepEqual(picker.autoPanPaddingBottomRight, pickerGeometry.autoPanPaddingBottomRight, "the picker receives the reserved right/bottom lanes");
   assert.ok(picker.minWidth <= picker.maxWidth, "the picker minWidth may never exceed maxWidth");
   assert.equal(picker.keepInView, true, "keepInView stays");
 
@@ -146,10 +172,30 @@ test("marker and picker popups size themselves on the actual map surface", async
   const withPopup = markerList.find((item) => item.popupOpts);
   assert.ok(withPopup, "markers carry their bindPopup options in the stub");
   assert.deepEqual(
-    { maxWidth: withPopup.popupOpts.maxWidth, minWidth: withPopup.popupOpts.minWidth, autoPanPadding: withPopup.popupOpts.autoPanPadding },
-    { maxWidth: picker.maxWidth, minWidth: picker.minWidth, autoPanPadding: picker.autoPanPadding },
-    "marker and picker popups must share ONE sizing path",
+    {
+      maxWidth: withPopup.popupOpts.maxWidth,
+      minWidth: withPopup.popupOpts.minWidth,
+      autoPanPadding: withPopup.popupOpts.autoPanPadding,
+      autoPanPaddingBottomRight: withPopup.popupOpts.autoPanPaddingBottomRight,
+    },
+    {
+      maxWidth: picker.maxWidth,
+      minWidth: picker.minWidth,
+      autoPanPadding: picker.autoPanPadding,
+      autoPanPaddingBottomRight: picker.autoPanPaddingBottomRight,
+    },
+    "marker and picker popups must share ONE sizing path (both padding tuples included)",
   );
+});
+
+test("newly bound markers receive the reserved lanes before any resize", async () => {
+  await setDefaultMapSize({ x: 286, y: 340 });
+  await renderMapWithCameras(CAMERAS);
+  const markers = (await leafletMarkers()).filter((marker) => marker.popupOpts);
+  assert.ok(markers.length > 0, "the fixture creates camera markers");
+  for (const marker of markers) {
+    assert.deepEqual(marker.popupOpts.autoPanPaddingBottomRight, [60, 60], "bindPopup reserves the lanes without a later resize repairing it");
+  }
 });
 
 test("a map resize re-fits the kept markers that already exist", async () => {
@@ -162,7 +208,10 @@ test("a map resize re-fits the kept markers that already exist", async () => {
   const target = markers.find((item) => item.popupOpts && item.handlers.click?.length);
   assert.ok(target, "the fixture records must be materialised as individual markers");
   const before = target.popupOpts.maxWidth;
-  assert.equal(before, 220, "the narrow phone map shrinks the balloon to what fits");
+  const narrowGeometry = popupGeometryFor({ x: 286, y: 340 });
+  assert.equal(before, narrowGeometry.maxWidth, "the narrow phone map shrinks the balloon to what fits beside the control lane");
+  assert.ok(before < 220, `the reserved right lane makes the balloon (${before}px) narrower than the old symmetric 220px`);
+  assert.deepEqual(target.popupOpts.autoPanPaddingBottomRight, narrowGeometry.autoPanPaddingBottomRight, "the narrow surface reserves the right/bottom lanes");
 
   // Open one popup (user click) and keep a second one closed.
   target.handlers.click[0]({ originalEvent: {} , stopPropagation() {} });
@@ -172,8 +221,11 @@ test("a map resize re-fits the kept markers that already exist", async () => {
   // is open: the kept marker must receive FRESH dimensions and be re-fitted.
   map.size = { x: 358, y: 520 };
   map.fire("resize");
+  const wideGeometry = popupGeometryFor({ x: 358, y: 520 });
   assert.ok(target.popupOpts.maxWidth > before, `the kept marker must be re-sized (was ${before}, now ${target.popupOpts.maxWidth})`);
-  assert.equal(target.popupOpts.maxWidth, 260, "the re-fit uses the 390px-phone balloon width");
+  assert.equal(target.popupOpts.maxWidth, wideGeometry.maxWidth, "the re-fit uses the fresh geometry for the new surface");
+  assert.deepEqual(target.popupOpts.autoPanPadding, wideGeometry.autoPanPadding, "the re-fit updates the top-left padding too");
+  assert.deepEqual(target.popupOpts.autoPanPaddingBottomRight, wideGeometry.autoPanPaddingBottomRight, "the re-fit updates the right/bottom lanes too");
   assert.ok((target.popupUpdates ?? 0) >= 1, "the OPEN popup is re-fitted in place (no close/reopen)");
   assert.equal(target.isPopupOpen(), true, "the open popup stays open across the resize");
 
@@ -183,7 +235,8 @@ test("a map resize re-fits the kept markers that already exist", async () => {
   assert.ok(others.length > 0, "the fixture has another marker to check");
   for (const other of others) {
     assert.equal(other.isPopupOpen(), false, "resize must never auto-open a closed popup");
-    assert.equal(other.popupOpts.maxWidth, 260, "kept (closed) markers still receive the fresh width");
+    assert.equal(other.popupOpts.maxWidth, wideGeometry.maxWidth, "kept (closed) markers still receive the fresh width");
+    assert.deepEqual(other.popupOpts.autoPanPaddingBottomRight, wideGeometry.autoPanPaddingBottomRight, "kept (closed) markers receive the fresh lanes");
   }
 });
 

@@ -686,7 +686,7 @@ test("t_b1e192e1: typing in GeocodeSearch fires /api/geocode even under a forced
   leaflet.__resetMarkers();
   const view = await renderWithLocale(React.createElement(MappaTool));
 
-  const input = screen.getByRole("combobox", { name: /Filter the points in the current view or search a place/ });
+  const input = screen.getByRole("combobox", { name: /Filter points or find a place/ });
   // A single keystroke schedules the 250ms debounce...
   await user.type(input, "B");
   // ...and the tree is invalidated immediately (the vinext RSC navigation
@@ -719,7 +719,7 @@ test("t_3c4b188e: typing under a hostile router (failReplace) — the ?q= still 
     await setNavState({ failReplace: true, pathname: "/mappa" });
 
     await renderWithLocale(React.createElement(MappaTool));
-    const input = screen.getByRole("combobox", { name: /Filter the points in the current view or search a place/ });
+    const input = screen.getByRole("combobox", { name: /Filter points or find a place/ });
     await user.type(input, "Ferrara");
 
     // t_3c4b188e: the ?q= commit never calls router.replace at all — the

@@ -88,6 +88,12 @@ const PADDING_MIN = 10;
 const HEIGHT_SHARE = 0.6;
 /** Fallback height budget when the surface is not measurable (SSR). */
 const HEIGHT_FALLBACK = 360;
+/**
+ * Right/bottom lanes a narrow map must keep free for its own chrome: the
+ * right control column (44px target + 10px margin + gap) and the bottom help
+ * overlay. They are RESERVED, never overlapped.
+ */
+const LANE_RESERVED = 60;
 
 /** Resolved balloon geometry for the CURRENT map surface. */
 export type PopupGeometry = {
@@ -97,6 +103,12 @@ export type PopupGeometry = {
   minWidth: number;
   /** Leaflet `autoPanPadding` [x, y] in px, always satisfiable by the map. */
   autoPanPadding: [number, number];
+  /**
+   * Leaflet `autoPanPaddingBottomRight` [x, y]: on narrow maps the balloon
+   * also stays clear of the right control lane and the bottom help overlay,
+   * so an open popup is never painted under the zoom/scale controls.
+   */
+  autoPanPaddingBottomRight: [number, number];
   /** Vertical budget for the balloon (written to CSS as --osm-popup-max-height). */
   maxHeight: number;
 };
@@ -111,16 +123,22 @@ export function popupGeometryFor(size: { x: number; y: number } | null | undefin
   const width = Math.round(size?.x ?? 0);
   const height = Math.round(size?.y ?? 0);
   if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
-    return { maxWidth: CONTENT_MAX, minWidth: CONTENT_MIN, autoPanPadding: [PADDING_X_MAX, PADDING_Y_MAX], maxHeight: HEIGHT_FALLBACK };
+    return { maxWidth: CONTENT_MAX, minWidth: CONTENT_MIN, autoPanPadding: [PADDING_X_MAX, PADDING_Y_MAX], autoPanPaddingBottomRight: [PADDING_X_MAX, PADDING_Y_MAX], maxHeight: HEIGHT_FALLBACK };
   }
-  const preferred = width <= NARROW_SURFACE ? CONTENT_MAX_NARROW : CONTENT_MAX;
+  const narrow = width <= NARROW_SURFACE;
+  const preferred = narrow ? CONTENT_MAX_NARROW : CONTENT_MAX;
   // Give the accepted padding when the preferred balloon still fits; shrink
   // the padding (never below the minimum) and then the balloon on tiny maps.
   const padX = Math.max(PADDING_MIN, Math.min(PADDING_X_MAX, Math.floor((width - POPUP_CHROME_X - preferred) / 2)));
-  const maxWidth = Math.max(CONTENT_FLOOR, Math.min(preferred, width - 2 * padX - POPUP_CHROME_X));
   const padY = Math.min(PADDING_Y_MAX, Math.max(PADDING_MIN, Math.round(height * 0.08)));
-  const maxHeight = Math.max(160, Math.min(Math.round(height * HEIGHT_SHARE), height - 2 * padY - POPUP_TIP_Y));
-  return { maxWidth, minWidth: Math.min(CONTENT_MIN, maxWidth), autoPanPadding: [padX, padY], maxHeight };
+  // No z-index can lift a balloon above Leaflet's control corners (they are
+  // siblings of the whole map pane), so a narrow map RESERVES the right and
+  // bottom chrome lanes instead and shrinks the balloon to what is left.
+  const right = narrow ? Math.max(padX, Math.min(LANE_RESERVED, width - padX - POPUP_CHROME_X - CONTENT_FLOOR)) : padX;
+  const bottom = narrow ? Math.max(padY, LANE_RESERVED) : padY;
+  const maxWidth = Math.max(CONTENT_FLOOR, Math.min(preferred, width - padX - right - POPUP_CHROME_X));
+  const maxHeight = Math.max(160, Math.min(Math.round(height * HEIGHT_SHARE), height - padY - bottom - POPUP_TIP_Y));
+  return { maxWidth, minWidth: Math.min(CONTENT_MIN, maxWidth), autoPanPadding: [padX, padY], autoPanPaddingBottomRight: [right, bottom], maxHeight };
 }
 
 /**

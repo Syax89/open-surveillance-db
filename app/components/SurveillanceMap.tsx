@@ -289,6 +289,7 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
       popup.options.maxWidth = geometry.maxWidth;
       popup.options.minWidth = geometry.minWidth;
       popup.options.autoPanPadding = geometry.autoPanPadding;
+      popup.options.autoPanPaddingBottomRight = geometry.autoPanPaddingBottomRight;
       popup.options.keepInView = true;
       if (entry.marker.isPopupOpen?.()) popup.update?.();
     }
@@ -435,6 +436,7 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
       // never renders cut off.
       keepInView: true,
       autoPanPadding: geometry.autoPanPadding,
+      autoPanPaddingBottomRight: geometry.autoPanPaddingBottomRight,
     });
   }, [applyPopupFit, popupGeometry]);
 
@@ -997,6 +999,7 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
           // balloon never sits flush against an edge.
           keepInView: true,
           autoPanPadding: geometry.autoPanPadding,
+          autoPanPaddingBottomRight: geometry.autoPanPaddingBottomRight,
         });
         // Keyboard accessibility (P2-9, review 2026-08-07): Leaflet markers
         // are focusable (role=button, tabindex) but had no keydown handler

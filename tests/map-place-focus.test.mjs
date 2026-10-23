@@ -59,7 +59,7 @@ async function leaves() {
 
 /** Select a suggestion from the dropdown by typing `query` and clicking option `index`. */
 async function pickOption(screen, user, query, index) {
-  const input = screen.getByRole("combobox", { name: /Filter the points in the current view or search a place/ });
+  const input = screen.getByRole("combobox", { name: /Filter points or find a place/ });
   await user.clear(input);
   await user.type(input, query);
   const listbox = await rtl.waitFor(() => screen.getByRole("listbox", { name: "Place suggestions" }), { timeout: 5000 });
@@ -72,7 +72,7 @@ async function pickOption(screen, user, query, index) {
  * tests so the render/flush ordering matches the probe.
  */
 async function pickAppend(screen, user, query, index = 0) {
-  const input = screen.getByRole("combobox", { name: /Filter the points in the current view or search a place/ });
+  const input = screen.getByRole("combobox", { name: /Filter points or find a place/ });
   await user.type(input, query);
   const listbox = await rtl.waitFor(() => screen.getByRole("listbox", { name: "Place suggestions" }), { timeout: 5000 });
   await user.click(rtl.within(listbox).getAllByRole("option")[index]);
@@ -91,7 +91,7 @@ test("B01: selecting a city suggestion frames the administrative AREA with fitBo
   const user = rtl.userEvent.setup();
   await renderWithLocale(React.createElement(MappaTool));
 
-  const input = screen.getByRole("combobox", { name: /Filter the points in the current view or search a place/ });
+  const input = screen.getByRole("combobox", { name: /Filter points or find a place/ });
   await user.type(input, "Ferrara");
   const listbox = await waitFor(() => screen.getByRole("listbox", { name: "Place suggestions" }), { timeout: 5000 });
 
@@ -116,7 +116,7 @@ test("B01: a point/address suggestion (small box) keeps the point + zoom fallbac
   const user = rtl.userEvent.setup();
   await renderWithLocale(React.createElement(MappaTool));
 
-  const input = screen.getByRole("combobox", { name: /Filter the points in the current view or search a place/ });
+  const input = screen.getByRole("combobox", { name: /Filter points or find a place/ });
   await user.type(input, "Via");
   const listbox = await waitFor(() => screen.getByRole("listbox", { name: "Place suggestions" }), { timeout: 5000 });
 

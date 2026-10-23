@@ -88,7 +88,8 @@ export const en = {
   // the same-origin Nominatim geocoder (/api/geocode) in a dropdown below
   // the field. Selecting a suggestion pans the map to the place; the list
   // then follows the new viewport.
-  listSearchLabel: "Filter the points in the current view or search a place",
+  // Visible on a phone: short, both functions kept (help below has the rest).
+  listSearchLabel: "Filter points or find a place",
   listSearchPlaceholder: "Search a place or filter the points in view",
   listSearchHelp:
     "The list shows only the points inside the current map view. Searching filters those points by title, address or type and suggests matching places from OpenStreetMap below the field; picking a place moves the map there.",
@@ -233,7 +234,8 @@ export const it: Translation<typeof en> = {
   // luoghi tramite il geocoder Nominatim same-origin (/api/geocode) in un
   // menu a tendina sotto il campo. Selezionando un suggerimento la mappa si
   // sposta sul luogo; l'elenco segue poi la nuova vista.
-  listSearchLabel: "Filtra i punti nella vista corrente o cerca un luogo",
+  // Visibile su telefono: breve, entrambe le funzioni (il resto è in listSearchHelp).
+  listSearchLabel: "Filtra punti o cerca un luogo",
   listSearchPlaceholder: "Cerca un luogo o filtra i punti in vista",
   listSearchHelp:
     "L'elenco mostra solo i punti dentro la vista corrente della mappa. La ricerca filtra quei punti per titolo, indirizzo o tipo e suggerisce luoghi corrispondenti da OpenStreetMap sotto il campo; scegliendo un luogo la mappa si sposta lì.",
