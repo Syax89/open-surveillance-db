@@ -284,8 +284,8 @@ test("a generic empty-map click opens the report shortcut exactly once (PR #326 
   // A plain click on empty map space: the coordinate-picker shortcut opens
   // with the clicked position and the /segnala link (deliberate UX choice
   // of PR #326 — the legend explains it). The stub's map.openPopup records
-  // the picker HTML (marker openPopup is the only one that dispatches
-  // popupopen — the picker has no record id and no community widget).
+  // the picker HTML and dispatches popupopen with the map-owned Popup (no
+  // record id and no community widget, so nothing is mounted for it).
   map.handlers.click?.[0]?.({ latlng: { lat: 41.9, lng: 12.49 } });
 
   const counts = eventCounts(map);

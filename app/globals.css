@@ -815,6 +815,13 @@ button { cursor:pointer; }
 .directory-tool .record-list .record-list-card dl > div { display:inline-flex; gap:7px; align-items:baseline; }
 .directory-tool .record-list .record-list-card dt { margin:0; color:var(--muted); font-size:var(--text-xs); text-transform:uppercase; letter-spacing:.08em; font-weight:800; }
 .directory-tool .record-list .record-list-card dd { margin:0; color:var(--ink); font-size:var(--text-sm); line-height:1.4; overflow-wrap:anywhere; font-variant-numeric:tabular-nums; }
+/* Import provenance on a /directory card (source fact): the raw
+   'import:<slug>' value is what DESKTOP renders, byte-identical to before.
+   Only the <=700px card swaps in the readable entity name resolved from the
+   committed batches (app/lib/import-sources); when the batch is unknown the
+   .has-name wrapper is absent and the truthful raw value stays visible at
+   every width. */
+.directory-tool .record-list .record-list-card .record-source-name { display:none; }
 .directory-tool .record-list .record-list-card .record-list-actions { justify-content:flex-end; gap:var(--space-5); }
 .directory-tool .record-list .record-list-card .text-button { min-height:44px; display:inline-flex; align-items:center; }
 /* Status accent (t_d089a17e, CEO 2026-08-03; fix t_d52fde50 CEO feedback 2):
@@ -885,6 +892,18 @@ button { cursor:pointer; }
 .record-minimap .fov-cone { pointer-events:none; }
 .record-minimap .fov-cone.active { stroke:var(--action); fill:var(--action); }
 .record-detail-actions { display:flex; gap:var(--space-3); flex-wrap:wrap; }
+/* F3 (mobile usability 2026-10-23): exactly ONE "View on map" action per
+   breakpoint. Phones get the same primary button right under the summary —
+   through the SUPPORTED /mappa?focus=<id> deep link, which opens that point —
+   while the accepted lower action keeps its own href and desktop geometry.
+   display:none takes the other variant out of the layout and out of the
+   accessibility tree, so exactly one map link is ever focusable/announced
+   (and withdrawn records render neither). */
+.record-map-early { display:none; }
+@media (max-width:700px) {
+  .record-map-early { display:inline-flex; margin:0 0 18px; }
+  .record-map-late { display:none; }
+}
 /* IT layout stability (t_690ed55e): the two action buttons must NEVER wrap
    to a second row in one language while staying on one row in the other.
    On narrow screens a fixed two-column grid (minmax(0,1fr)) splits the row
@@ -896,6 +915,12 @@ button { cursor:pointer; }
   .record-detail-actions .button { width:100%; justify-content:center; white-space:normal; text-align:center; overflow-wrap:anywhere; padding:11px 10px; font-size:12.5px; }
 }
 .detail-outline { color:var(--outline-ink); border-color:var(--control-border); }
+/* M05: "← Back to directory" fits on ONE line from 360px up (the 105px mobile
+   cap made it wrap on every phone); 320px keeps the cap so the header cannot
+   overflow. Scoped to the public record shell like the title rules. */
+@media (min-width:360px) {
+  .record-page[data-surface="record"] .nav-record-actions .text-button { max-width:none; white-space:nowrap; text-align:left }
+}
 .record-detail-note { margin:28px 0 0; padding-top:20px; border-top:1px solid var(--line); color:var(--muted); font-size:var(--text-sm); line-height:1.5; }
 .moderation-page { width:var(--container-standard); margin:30px auto 100px; }
 .moderation-page>h1 { margin:0; font-size:var(--text-display); letter-spacing:-.07em; line-height:1.06; font-weight:700; text-wrap:balance; overflow-wrap:anywhere; }
@@ -983,6 +1008,25 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
      content links by a hairline, as a full-width bottom row. */
   .nav-shell:has(.menu-button) .nav-links .auth-nav-links { margin-left:0; margin-top:2px; padding-top:14px; border-top:1px solid var(--line); justify-content:space-between }
   .nav-shell:has(.menu-button) .nav-action { text-align:center }
+  /* M06 (design review 2026-10-22 P2): inside the open menu the primary rows
+     were plain inline text (~254x18px) and "Log in" ~45x21px, while the menu
+     and locale buttons were already 44px. Each row now owns a ≥44px box and
+     a visible focus ring; the markup stays native anchors and the boxed CTA
+     keeps its .nav-action look (these rules only add a box, no redesign). */
+  .nav-shell:has(.menu-button) .nav-links > a:not(.nav-action) {
+    display:flex; align-items:center; min-height:44px; padding:6px 4px;
+    border-radius:var(--radius-md); text-decoration:none;
+  }
+  .nav-shell:has(.menu-button) .nav-links .nav-action {
+    display:flex; align-items:center; justify-content:center; min-height:44px;
+  }
+  .nav-shell:has(.menu-button) .nav-links .auth-nav-links a {
+    display:inline-flex; align-items:center; min-height:44px; padding:0 4px;
+    border-radius:var(--radius-md);
+  }
+  .nav-shell:has(.menu-button) .nav-links a:focus-visible {
+    outline:3px solid var(--focus); outline-offset:2px; border-radius:var(--radius-md);
+  }
 }
 @media (max-width:700px) {
   .hero, .map-section, .records-section, .principles, .guide-overview, .report-section, .correction-section, .moderation-page, footer, .tool-section, .tool-cards, .founder-declaration { width:min(100% - 32px,1180px) }
@@ -1053,19 +1097,54 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
      .record-list-card dl / actions rules above already handle the facts
      and the action row. */
   .directory-tool-heading { align-items:flex-start;flex-direction:column;gap:var(--space-3) }
-  .directory-tool .directory-explorer-card .records-section { padding:0 16px 24px; }
-  .directory-tool .directory-explorer-card .directory-controls { margin:0 -16px; padding:14px 16px; }
-  .directory-tool .record-list .record-list-card { grid-template-columns:1fr; gap:var(--space-3); padding:var(--space-4) var(--space-5); }
-  .directory-tool .record-list .record-list-card .record-list-actions { align-items:center; flex-direction:row; flex-wrap:wrap; justify-content:flex-start; gap:var(--space-2); }
+  /* Mobile density (M04, design review 2026-10-22 P2): at 390px the first
+     card began at y=560 (~304px tall) and at 320px at y=610 (~376px tall),
+     because toolbar + controls + results heading + A-Z rail preceded a card
+     carrying six loosely stacked facts. Compact ONLY this caller's vertical
+     rhythm — the records, the two native actions (≥44px) and the
+     filter/pagination contracts are untouched. */
+  .directory-tool .directory-explorer-card .records-section { padding:0 14px 20px; }
+  .directory-tool .directory-explorer-card .directory-controls { margin:0 -14px; padding:10px 14px; }
+  .directory-tool .record-list { margin-top:10px; gap:10px; }
+  .directory-tool .record-list .record-list-card { grid-template-columns:1fr; gap:10px; padding:12px 14px; }
+  .directory-tool .record-list .record-list-card .card-topline { margin:0 0 3px; }
+  .directory-tool .record-list .record-list-card h3 { font-size:var(--text-xl); line-height:1.2; }
+  .directory-tool .record-list .record-list-card .record-kind { margin:2px 0 0; }
+  /* Six facts in one wrapping line made the card tall: a compact two-column
+     grid keeps them all readable (label above value) in ~half the height. */
+  .directory-tool .record-list .record-list-card dl { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:4px 12px; }
+  .directory-tool .record-list .record-list-card dl > div { display:grid; align-items:baseline; gap:0; }
+  .directory-tool .record-list .record-list-card dt { font-size:var(--text-2xs); letter-spacing:.06em; }
+  .directory-tool .record-list .record-list-card dd { font-size:var(--text-sm); line-height:1.35; }
+  /* Phone cards lead with the readable source ("Regione Lazio - Open Data",
+     not "import:regione-lazio-2026"): one value per width, never both. */
+  .directory-tool .record-list .record-list-card .record-source-name { display:inline; }
+  .directory-tool .record-list .record-list-card .record-source.has-name .record-source-raw { display:none; }
+  .directory-tool .record-list .record-list-card .record-list-actions { align-items:center; flex-direction:row; flex-wrap:wrap; justify-content:flex-start; gap:var(--space-2); margin-top:2px; }
   /* Results header (t_f13fcb1c, ex .directory-meta): heading and add (+)
      action share ONE row. The .directory-tool scope is required to outrank
-     the later base rule whose align-items:flex-end split them. */
+     the later base rule whose align-items:flex-end split them. The heading
+     also loses the desktop 24px/18px lead-in (M04). */
+  .directory-tool .directory-explorer-card .directory-results { margin-top:14px; padding-top:12px; }
   .directory-tool .directory-results { align-items:center; flex-direction:row; flex-wrap:nowrap; gap:var(--space-3); }
+  .directory-tool .directory-results-head h2 { font-size:var(--text-2xl); }
   .directory-pagination { justify-content:center; }
   .record-detail { width:min(100% - 32px,760px);margin:24px auto 60px;padding:30px 23px }
   /* Narrow cards: smaller title so long first words still fit; desktop is unchanged. */
   .record-detail h1 { font-size:clamp(36px,12vw,42px) }
   .record-detail-facts { grid-template-columns:1fr }
+  /* M05 (design review 2026-10-22 P2): the PUBLIC RECORD page is operational
+     content, not a hero — at 390px its 42px title took ~134px over three
+     lines and pushed the mini map to y=1005. Scoped to the record shell's
+     data-surface marker ONLY (InfoPage/SourcesPage/auth pages keep the
+     shared .record-detail tokens above, desktop included). */
+  .record-page[data-surface="record"] .record-detail { padding:22px 18px }
+  .record-page[data-surface="record"] .record-detail .card-topline { margin:0 0 12px }
+  .record-page[data-surface="record"] .record-detail h1 { font-size:clamp(26px,7.2vw,32px); line-height:1.16; letter-spacing:-.03em }
+  .record-page[data-surface="record"] .record-detail-kind { margin:10px 0 0; font-size:var(--text-xl) }
+  .record-page[data-surface="record"] .record-detail-summary { margin:16px 0; font-size:var(--text-lg); line-height:1.5 }
+  .record-page[data-surface="record"] .community-badge { margin:10px 0 0 }
+  .record-page[data-surface="record"] .record-detail-facts { gap:var(--space-3); margin:18px 0; padding:16px 0 }
   .record-history-list li { flex-direction:column;align-items:flex-start;gap:4px }
   .principles { padding:68px 0 }
   .guide-overview { padding-bottom:40px; }
@@ -1160,6 +1239,29 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 .filter-chip { display:inline-flex; align-items:center; gap:8px; min-height:44px; padding:0 16px; border:1px solid var(--line); border-radius:var(--radius-full); background:var(--card-bg); color:var(--ink); font-size:var(--text-sm); font-weight:800; }
 .filter-chip:hover { border-color:var(--control-focus); }
 .filter-chip span { color:var(--muted); }
+/* F1 (mobile usability 2026-10-23): /directory keeps exactly ONE chips row per
+   breakpoint. Phones (≤700px) get the full selection — confirmation state,
+   origin and the non-default order chip included — because the native filter
+   disclosure starts CLOSED there, so the list state must be readable and
+   removable without opening it. From 701px up the accepted q/type/freshness
+   row renders unchanged, and an origin-only desktop filter adds no empty
+   margin block because that row is simply not rendered. Both rows are plain
+   .filter-chips siblings, so the visible one keeps the same geometry, and
+   display:none keeps the other out of the layout AND the accessibility tree
+   (no duplicated announced chips). */
+.filter-chips-mobile { display:none; }
+@media (max-width:700px) {
+  .filter-chips-mobile { display:flex; }
+  .filter-chips-desktop { display:none; }
+}
+/* F1: the active-selection count inside the native disclosure summary. The
+   summary itself only renders ≤820px (see .filters-disclosure > summary); the
+   count is phone-only (≤700px), so on every wider — desktop — layout it is
+   removed from display and from the accessibility tree. */
+.filters-summary-count { display:none; }
+@media (max-width:700px) {
+  .filters-summary-count { display:inline; }
+}
 /* Alphabetical index: a compact single-row rail. Touch-first widths retain
    36px targets and intentionally scroll horizontally; desktop distributes
    all 26 letters across the available workspace without wrapping. */
@@ -1183,6 +1285,17 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 .pagination-button:hover:not(:disabled) { border-color:var(--control-focus); }
 .pagination-button:disabled { opacity:.45; cursor:default; }
 .pagination-summary { margin:0; color:var(--muted); font-size:var(--text-sm); line-height:1.45; }
+/* F2 (mobile usability 2026-10-23): the /directory pager also renders above
+   the first card on phones, so a page change never needs a scroll through the
+   whole list. Same bar, same handlers, same "Showing X–Y of Z · Page N of M";
+   desktop keeps only the accepted bottom bar (the ≤700px block above already
+   centres .directory-pagination and its 44px buttons wrap safely at 320px in
+   IT and EN). No top border: it sits right under the chips / A–Z rail, not
+   after the list. */
+.directory-pagination-top { display:none; }
+@media (max-width:700px) {
+  .directory-pagination-top { display:flex; margin-top:14px; padding-top:0; border-top:0; }
+}
 /* Collapsible place-search panel (catalog, t_f13fcb1c): a contained card
    (border + radius + surface) so the form no longer bleeds into the results
    (audit V5) — scoped to .directory-tool, the home hub block stays
@@ -1845,6 +1958,11 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 .map-list-header { display:flex; align-items:baseline; justify-content:space-between; gap:10px; padding:12px 16px 8px; }
 .map-list-header h2 { margin:0; font-size:var(--text-md); letter-spacing:-.02em; color:var(--heading); }
 .map-list-count { margin:0; color:var(--muted); font-size:var(--text-xs); }
+/* Points disclosure row (ID 2): the button carries ONE compact label
+   ("Show 10 points" / "Hide 10 points") for PHONES. The desktop header keeps
+   the h2 + count and the accepted 32px icon toggle, so only the ADDED label
+   is not painted at >=769px — the chevron svg stays exactly as before. */
+.map-list-toggle-state { display:none; }
 .map-list-scroll { flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; }
 .map-record-list { list-style:none; margin:0; padding:0 8px 12px; display:grid; gap:var(--space-2); }
 .map-record-list li { margin:0; }
@@ -1945,8 +2063,9 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
    panel BELOW the map, starting collapsed to its header (count + toggle).
    The old sidebar-above-map order pushed the map ~600px down the page on a
    390px viewport (too much scroll before the primary function). The map
-   height is svh-based so it fills the real viewport (mobile URL bar) and
-   never exceeds it before interaction. */
+   height is MEASURED against the real remaining viewport space (M02,
+   useMapViewHeight → --osm-map-height) instead of a fixed svh constant, so
+   the zoom control and the points entry stay inside the first screen. */
 @media (max-width:768px) {
   .map-layout { width:min(100% - 32px,1180px); padding:2px 0 calc(56px + env(safe-area-inset-bottom)); }
   /* Filters: compact but readable — the panel keeps the 2-col grid so the
@@ -1957,28 +2076,66 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
      rule (shared with /directory and the home hub) otherwise wins over the
      unscoped 2-col rule at max-width:980px and silently collapses this
      panel back to 1 column, undoing the map-first intent above. */
-  .map-card .filters-panel { padding:10px 14px 12px; }
-  .map-card .filters-panel .filter-controls-row { grid-template-columns:minmax(0,1fr) minmax(0,1fr) !important; gap:10px 12px; }
-  .map-card .record-filter label { margin-bottom:4px; font-size:var(--text-2xs); letter-spacing:.06em; }
-  .map-card .record-filter select { padding:11px 10px; font-size:var(--text-md); min-height:44px; }
+  /* Map chrome compaction (M02, design review 2026-10-22): the explorer
+     toolbar + search block + filters slab above the map consumed ~250px on
+     a phone (map began at y=399 at 390px, y=449 at 320px). Only the
+     VERTICAL rhythm is tightened: the dual-purpose search caption stays
+     visible (it is the only warning that picking a place clears the typed
+     filter) and every touch target keeps its ≥44px box. */
+  .map-explorer-toolbar { padding:6px 14px; }
+  /* The sr-only h1 already names the map. */
+  .map-explorer-toolbar>p { display:none; }
+  .map-explorer-actions { width:100%; justify-content:space-between; }
+  .map-explorer-search { padding:8px 14px; }
+  .map-explorer-search .map-list-search label { margin-bottom:2px; }
+  .map-explorer-search .map-list-search .map-list-search-hint { margin:4px 0 0; font-size:var(--text-xs); line-height:1.35; }
+  .map-card .filters-panel { padding:8px 14px 10px; }
+  .map-card .filters-panel .filter-controls-row { grid-template-columns:minmax(0,1fr) minmax(0,1fr) !important; gap:8px 10px; }
+  .map-card .record-filter label { margin-bottom:2px; font-size:var(--text-2xs); letter-spacing:.06em; }
+  .map-card .record-filter select { padding:10px; font-size:var(--text-md); min-height:44px; }
   /* MAP-FIRST: order puts the map before the sidebar in the single column
      (the DOM keeps sidebar-first for the desktop side-by-side layout). */
   .map-card .map-split { grid-template-columns:1fr; grid-template-rows:1fr auto; height:auto; min-height:0; }
   .map-card .map-split > .map-panel { order:-1; }
-  .map-card .map-panel .live-map { height:calc(100svh - 250px); min-height:340px; max-height:64svh; }
-  .map-card .map-panel .map-fallback { height:calc(100svh - 250px); min-height:340px; max-height:64svh; }
+  /* Map height (M02, design review 2026-10-22): the old
+     fixed-offset height guess (a svh constant) ignored the real chrome above the map (at
+     390x844 the map starts at y=399, at 320x568 at y=449), which pushed the
+     zoom control and the points toggle below the fold. The height now comes
+     from useMapViewHeight — the MEASURED offset of this surface inside the
+     current viewport, bounded to a useful minimum and leaving room for the
+     points entry. 70svh is only the pre-measure/SSR fallback (one frame). */
+  .map-card .map-panel .live-map { height:var(--osm-map-height, 70svh); min-height:340px; }
+  .map-card .map-panel .map-fallback { height:var(--osm-map-height, 70svh); min-height:340px; }
   .map-card .map-panel .map-region { height:auto; min-height:0; }
   /* Points panel below the map: starts collapsed (header only) — the map
      must be the first thing users see; the toggle expands it from the
      keyboard (button, aria-expanded, aria-controls). */
   .map-sidebar { border-right:0; border-top:1px solid var(--line); border-bottom:0; max-height:none; }
+  /* Points disclosure (ID 2, mobile polish): the ENTIRE visible header row is
+     ONE native button painting ONE compact label — "Mostra 10 punti" /
+     "Nascondi 10 punti" (dictionary-owned zero/one/many wording) — so the
+     touch target is the row (>=44px) instead of a 44px icon in the corner,
+     and the row is no taller than before. The verbose heading and the
+     current-view sentence stay in the DOM for the labelled sidebar
+     (h2#map-list-title), the role=status live region and the control's
+     aria-describedby, but are clipped so nothing is painted twice. Only a
+     header that OWNS a toggle loses its own padding; the icon-only rendering
+     (no handler) keeps the original geometry. Desktop keeps the h2 + count +
+     32px icon header (see the >=769px block). */
   .map-list-header { align-items:center; }
-  .map-list-toggle {
-    display:inline-flex; align-items:center; justify-content:center;
-    width:44px; height:44px; margin-left:auto; flex:none;
-    border:1px solid var(--control-border); border-radius:var(--radius-md);
-    background:var(--form-bg); color:var(--action); cursor:pointer;
+  .map-list-header.has-toggle { padding:0; }
+  .map-list-header.has-toggle h2,
+  .map-list-header.has-toggle .map-list-count {
+    position:absolute; width:1px; height:1px; padding:0; margin:-1px;
+    overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;
   }
+  .map-list-toggle {
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    width:100%; min-height:44px; margin:0; padding:12px 16px;
+    border:0; border-radius:0; background:none; color:var(--action);
+    font-size:var(--text-md); font-weight:700; text-align:left; cursor:pointer;
+  }
+  .map-list-toggle-state { display:inline-flex; align-items:center; white-space:nowrap; }
   .map-list-toggle svg { transition:transform .12s ease; }
   .map-list-toggle.is-open svg { transform:rotate(180deg); }
   .map-list-toggle:focus-visible { outline:3px solid var(--focus); outline-offset:2px; }
@@ -1988,33 +2145,46 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
      attribution strip kept clear of the zoom stack / markers. */
   .map-panel .leaflet-control-zoom { margin-bottom:48px; }
   .map-panel .leaflet-control-zoom a { width:44px; height:44px; line-height:44px; font-size:22px; }
+  /* M06: the record-page mini map is a real (pannable/zoomable) map too, but
+     its zoom buttons stayed at Leaflet's default 30px while /mappa's are
+     44px. Only the CONTROLS grow — the mini-map card keeps its 280px height
+     (the card is not the thing that was uncomfortable). */
+  .record-minimap .leaflet-control-zoom a { width:44px; height:44px; line-height:44px; font-size:22px; }
   .map-panel .leaflet-control-attribution { font-size:10px; padding:2px 6px; max-width:calc(100% - 60px); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   /* Marker popup on small screens (t_b7728ad0): the balloon must fit the
      viewport — cap its height and let the CONTENT scroll internally (the
      map stays usable). Leaflet's wrapper takes the cap; the content box
      becomes the scroll container so the close button (Leaflet's own,
      absolutely positioned) stays reachable. */
-  .osm-camera-popup .leaflet-popup-content-wrapper { max-height:min(60svh, calc(100svh - 140px)); }
-  .osm-camera-popup .leaflet-popup-content { max-height:min(60svh, calc(100svh - 140px)); overflow-y:auto; overscroll-behavior:contain; }
+  .osm-camera-popup .leaflet-popup-content-wrapper { max-height:var(--osm-popup-max-height, min(60svh, calc(100svh - 140px))); }
+  .osm-camera-popup .leaflet-popup-content { max-height:var(--osm-popup-max-height, min(60svh, calc(100svh - 140px))); overflow-y:auto; overscroll-behavior:contain; }
   /* Leaflet's own close rule (.leaflet-container a.leaflet-popup-close-button,
      0,2,1) would beat a plain .osm-camera-popup .leaflet-popup-close-button
      (0,2,0) — match the tag + container so the ≥44px touch target wins. */
   .leaflet-container .osm-camera-popup a.leaflet-popup-close-button { width:44px; height:44px; line-height:44px; font-size:22px; }
-  .osm-camera-popup .osm-popup-header { padding-right:34px; }
-  /* Mobile balloon density (CEO 2026-08-07): the popup already caps its
-     HEIGHT below; tighten the vertical rhythm so the balloon is smaller
-     overall and the map stays visible around it. Touch targets (44px
-     toolbar buttons) are NOT shrunk — WCAG 2.5.8. */
+  /* Mobile balloon density (CEO 2026-08-07): tighter content box margin so
+     the balloon is smaller overall and the map stays visible around it.
+     Touch targets (44px) are NOT shrunk — WCAG 2.5.8. */
   .osm-camera-popup .leaflet-popup-content { margin:10px 14px 12px; }
-  .osm-popup-header { margin:0 0 6px; }
-  .osm-camera-popup .osm-popup h3 { font-size:var(--text-base); line-height:1.3; }
-  .osm-popup-kind { margin:0 0 3px; font-size:var(--text-xs); }
-  .osm-popup-status { font-size:var(--text-xs); }
-  .osm-popup-facts { gap:4px 10px; margin:0 0 2px; }
-  .osm-popup-fact { gap:6px; }
-  .osm-popup-address, .osm-popup-description { margin:4px 0 0; font-size:var(--text-xs); }
-  .osm-popup-footer { margin:8px 0 0; padding-top:6px; }
-  .osm-popup-provenance { margin:6px 0 0; padding-top:6px; }
+  /* Mobile preview; full facts/actions stay on the record and desktop. */
+  .osm-camera-popup .osm-popup-facts,
+  .osm-camera-popup .osm-popup-address,
+  .osm-camera-popup .osm-popup-description,
+  .osm-camera-popup .osm-popup-community { display:none; }
+  /* Title on its own row, kind + status side by side; leaves the close button clear. */
+  .osm-camera-popup .osm-popup-header {
+    display:grid; grid-template-columns:minmax(0,1fr) auto;
+    align-items:baseline; gap:2px 10px; margin:0 0 6px; padding-right:34px;
+  }
+  .osm-camera-popup .osm-popup-header h3 { grid-column:1 / -1; }
+  .osm-camera-popup .osm-popup h3 { margin:0 0 2px; font-size:var(--text-base); line-height:1.3; }
+  /* Beat Leaflet paragraph margins (`p{margin:1.3em 0}`, 0,2,1) with 0,3,0. */
+  .osm-camera-popup .osm-popup .osm-popup-kind { margin:0; color:var(--supporting); font-size:var(--text-xs); }
+  .osm-camera-popup .osm-popup .osm-popup-status { margin:0; font-size:var(--text-xs); }
+  .osm-camera-popup .osm-popup .osm-popup-footer { margin:8px 0 0; padding-top:6px; }
+  .osm-camera-popup .osm-popup .osm-popup-footer a { display:inline-flex; align-items:center; min-height:44px; font-size:var(--text-sm); }
+  /* Attribution wraps: licence obligation, never clamped. */
+  .osm-camera-popup .osm-popup .osm-popup-provenance { margin:6px 0 0; padding-top:6px; overflow-wrap:break-word; }
   .community-actions-compact { margin:14px 0 2px; padding:0 0 14px; }
   .community-actions-cta { margin:8px 0 0; font-size:var(--text-sm); }
   /* Mobile toolbar (CEO 2026-08-07): at 260px the three toolbar buttons

@@ -88,7 +88,8 @@ export const en = {
   // the same-origin Nominatim geocoder (/api/geocode) in a dropdown below
   // the field. Selecting a suggestion pans the map to the place; the list
   // then follows the new viewport.
-  listSearchLabel: "Filter the points in the current view or search a place",
+  // Visible on a phone: short, both functions kept (help below has the rest).
+  listSearchLabel: "Filter points or find a place",
   listSearchPlaceholder: "Search a place or filter the points in view",
   listSearchHelp:
     "The list shows only the points inside the current map view. Searching filters those points by title, address or type and suggests matching places from OpenStreetMap below the field; picking a place moves the map there.",
@@ -108,6 +109,12 @@ export const en = {
   geocodeRateLimited: (seconds: number) =>
     `Place search has reached its short request limit. Try again in about ${seconds} seconds; filtering the points already on the map still works.`,
   listTitle: "Points in the current view",
+  // Points disclosure row (mobile, ID 2): the WHOLE header row is ONE button
+  // carrying ONE compact label — the verb plus the current in-view count. The
+  // zero/one/many wording is spelled here (dictionary function, never a
+  // concatenation in the component), so a 320px row stays one short line.
+  listShowCount: (count: number) => (count === 1 ? "Show 1 point" : `Show ${count} points`),
+  listHideCount: (count: number) => (count === 1 ? "Hide 1 point" : `Hide ${count} points`),
   listMapSyncHelp: "The list updates as you move or zoom the map: zoom in to narrow it, zoom out to widen it.",
   listCount: (visible: number, total: number) =>
     visible === 0
@@ -233,7 +240,8 @@ export const it: Translation<typeof en> = {
   // luoghi tramite il geocoder Nominatim same-origin (/api/geocode) in un
   // menu a tendina sotto il campo. Selezionando un suggerimento la mappa si
   // sposta sul luogo; l'elenco segue poi la nuova vista.
-  listSearchLabel: "Filtra i punti nella vista corrente o cerca un luogo",
+  // Visibile su telefono: breve, entrambe le funzioni (il resto è in listSearchHelp).
+  listSearchLabel: "Filtra punti o cerca un luogo",
   listSearchPlaceholder: "Cerca un luogo o filtra i punti in vista",
   listSearchHelp:
     "L'elenco mostra solo i punti dentro la vista corrente della mappa. La ricerca filtra quei punti per titolo, indirizzo o tipo e suggerisce luoghi corrispondenti da OpenStreetMap sotto il campo; scegliendo un luogo la mappa si sposta lì.",
@@ -253,6 +261,11 @@ export const it: Translation<typeof en> = {
   geocodeRateLimited: (seconds: number) =>
     `La ricerca dei luoghi ha raggiunto il limite temporaneo di richieste. Riprova tra circa ${seconds} secondi; puoi comunque filtrare i punti già presenti sulla mappa.`,
   listTitle: "Punti nella vista corrente",
+  // Riga di apertura dei punti (mobile, ID 2): l'INTERA riga di intestazione è
+  // un unico pulsante con UNA etichetta compatta (verbo + conteggio nella
+  // vista). Zero/uno/molti sono scritti qui, mai concatenati nel componente.
+  listShowCount: (count: number) => (count === 1 ? "Mostra 1 punto" : `Mostra ${count} punti`),
+  listHideCount: (count: number) => (count === 1 ? "Nascondi 1 punto" : `Nascondi ${count} punti`),
   listMapSyncHelp:
     "L'elenco si aggiorna mentre muovi o zoomi la mappa: ingrandendo si restringe, rimpicciolendo si allarga.",
   listCount: (visible: number, total: number) =>

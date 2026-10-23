@@ -55,7 +55,10 @@ test("login: valid submit POSTs to /api/auth/login and redirects to /account", a
   const user = makeUser();
   let capturedRequest = null;
   installFetchMock((input, init) => {
-    capturedRequest = { input, init };
+    // Only the login POST is captured: the mount-time OIDC discovery GET has
+    // no body and must not win the capturedRequest slot (a loaded full-suite
+    // run raced it and the body parse died on '"undefined" is not valid JSON').
+    if (String(input) === "/api/auth/login") capturedRequest = { input, init };
     return jsonResponse({}, { status: 200 });
   });
   await setNavState({ pushed: [] });
@@ -192,7 +195,10 @@ test("register: valid submit POSTs to /api/auth/register and redirects", async (
   const user = makeUser();
   let capturedRequest = null;
   installFetchMock((input, init) => {
-    capturedRequest = { input, init };
+    // Only the register POST is captured: the mount-time
+    // /api/auth/oidc/providers discovery GET has no body and must not win the
+    // capturedRequest slot (same race as the login test above).
+    if (String(input) === "/api/auth/register") capturedRequest = { input, init };
     return jsonResponse({}, { status: 200 });
   });
   await setNavState({ pushed: [] });
@@ -222,7 +228,10 @@ test("register: blank displayName is omitted from the payload", async () => {
   const user = makeUser();
   let capturedRequest = null;
   installFetchMock((input, init) => {
-    capturedRequest = { input, init };
+    // Only the register POST is captured: the mount-time
+    // /api/auth/oidc/providers discovery GET has no body and must not win the
+    // capturedRequest slot (same race as the login test above).
+    if (String(input) === "/api/auth/register") capturedRequest = { input, init };
     return jsonResponse({}, { status: 200 });
   });
 

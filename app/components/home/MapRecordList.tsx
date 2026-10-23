@@ -13,6 +13,13 @@ type Props = {
   labels: {
     listTitle: string;
     listCount: (visible: number, total: number) => string;
+    /**
+     * Localized compact disclosure label (verb + in-view count) painted as
+     * the ONE visible text of the mobile row control. Zero/one/many wording
+     * lives in the dictionary, never concatenated here.
+     */
+    listShowCount: (count: number) => string;
+    listHideCount: (count: number) => string;
     listMapSyncHelp: string;
     listEmptyInView: string;
     emptyTitle: string;
@@ -52,28 +59,44 @@ export function MapRecordList({ filteredRecords, visibleRecords, selectedId, onS
   // and carries an accessible disclosure toggle (aria-expanded, keyboard
   // reachable); the scrollable list itself is hidden while collapsed. On
   // desktop the flag is ignored — the sidebar column always shows the list.
+  // B08: the counter refers to the CURRENT VIEW, not the accumulated store —
+  // it is the in-view count on both sides (the old denominator was the union
+  // of every explored bbox). It is computed once so the heading, the live
+  // region and the disclosure label can never disagree.
+  const countLabel = labels.listCount(visibleRecords.length, visibleRecords.length);
+  // ONE compact label for the row control (mobile): verb + current in-view
+  // count, spelled by the dictionary. Desktop paints only the icon, so the
+  // label is hidden there by CSS (never removed from the accessible name).
+  const toggleLabel = (collapsed ? labels.listShowCount : labels.listHideCount)(visibleRecords.length);
   return (
     <>
-      <div className="map-list-header">
+      <div className={`map-list-header${onToggleCollapse ? " has-toggle" : ""}`}>
         <h2 id="map-list-title">{labels.listTitle}</h2>
-        {/* B08: the counter refers to the CURRENT VIEW, not the accumulated
-            store. Both values are the in-view count — the old denominator was
-            the union of every explored bbox, which does not belong to the
-            view (and `total` from the API is null under count=false). */}
-        <p className="map-list-count" role="status">{labels.listCount(visibleRecords.length, visibleRecords.length)}</p>
+        <p className="map-list-count" id="map-list-count" role="status">{countLabel}</p>
+        {/* Points disclosure (t_b7728ad0; ID 2 mobile polish): on a phone the
+            ENTIRE header row is ONE native button and it paints ONE compact
+            label ("Show 10 points" / "Hide 10 points", dictionary-owned, so a
+            320px row stays one line) — the touch target is the row, not a
+            44px icon in the corner. The verbose heading/count stay in the DOM
+            for the labelled sidebar, the role=status live region and the
+            accessible description; CSS clips them on phones. On desktop the
+            same button is the accepted 32px icon toggle: only the added
+            compact label is hidden there, the chevron is untouched. The
+            accessible name is exactly the visible label. */}
         {onToggleCollapse && (
           <button
             type="button"
             className={`map-list-toggle${collapsed ? "" : " is-open"}`}
             aria-expanded={!collapsed}
             aria-controls="map-list-scroll"
-            aria-label={`${labels.listTitle}: ${labels.listCount(visibleRecords.length, visibleRecords.length)}`}
+            aria-label={toggleLabel}
+            aria-describedby="map-list-count"
             onClick={onToggleCollapse}
           >
+            <span className="map-list-toggle-state">{toggleLabel}</span>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <polyline points={collapsed ? "9 6 15 12 9 18" : "15 6 9 12 15 18"} />
             </svg>
-            <span className="sr-only">{collapsed ? labels.listTitle : `${labels.listTitle}: ${labels.listCount(visibleRecords.length, visibleRecords.length)}`}</span>
           </button>
         )}
       </div>

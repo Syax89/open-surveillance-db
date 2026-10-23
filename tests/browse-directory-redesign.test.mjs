@@ -87,7 +87,7 @@ test("25 records render 20 rows on page 1; Next commits ?page=2 and renders the 
   assert.match(counter?.textContent ?? "", /25 public records found/, "the count reports the FILTERED total, not the page size");
 
   // Pagination bar: Previous disabled on page 1, summary "Showing 1–20 of 25".
-  const nav = container.querySelector(".directory-pagination");
+  const nav = container.querySelector(".directory-pagination:not(.directory-pagination-top)");
   assert.ok(nav, "the pagination bar renders only when the set spans pages");
   assert.match(nav.textContent ?? "", /Showing 1–20 of 25 records/);
   assert.match(nav.textContent ?? "", /Page 1 of 2/);
@@ -113,7 +113,7 @@ test("deep link /directory?page=2 renders the second page (URL is the source of 
   const { container } = await renderWithLocale(React.createElement(DirectoryTool));
 
   await rtl.waitFor(() => assert.equal(rows(container), 5, "a deep link to page 2 must render the last 5 records"));
-  const nav = container.querySelector(".directory-pagination");
+  const nav = container.querySelector(".directory-pagination:not(.directory-pagination-top)");
   assert.match(nav?.textContent ?? "", /Page 2 of 2/);
 });
 
@@ -130,7 +130,7 @@ test("a filter change resets the page to 1 (the ?page= param is dropped from the
   const lastReplace = navMod.__getNavState().replaceCalls.at(-1)?.href ?? "";
   assert.ok(lastReplace.includes("type=Fixed+dome"), "the kind filter commits ?type=Fixed dome");
   assert.ok(!lastReplace.includes("page="), "the filter change drops the stale ?page=");
-  const nav = container.querySelector(".directory-pagination");
+  const nav = container.querySelector(".directory-pagination:not(.directory-pagination-top)");
   assert.match(nav?.textContent ?? "", /Page 1 of 2/, "the paginated set restarts at page 1 after the filter change");
 });
 
@@ -148,7 +148,13 @@ test("active filters render as removable chips; a chip click clears that filter"
 
   await rtl.userEvent.selectOptions(container.querySelector("#record-kind-filter"), "Bullet");
   await rtl.waitFor(() => assert.equal(rows(container), 3));
-  const chips = container.querySelectorAll(".filter-chips .filter-chip");
+  // F1 (mobile usability 2026-10-23): /directory renders ONE chips row per
+  // breakpoint (CSS-hidden variants both exist in jsdom), so the contract is
+  // asserted on the row each breakpoint actually shows: the phone row carries
+  // the full selection, the desktop row the accepted q/type/freshness set.
+  assert.equal(container.querySelectorAll(".filter-chips-mobile .filter-chip").length, 1, "the phone row carries the kind chip");
+  assert.equal(container.querySelectorAll(".filter-chips-desktop .filter-chip").length, 1, "the desktop row carries the accepted kind chip");
+  const chips = container.querySelectorAll(".filter-chips-mobile .filter-chip");
   assert.equal(chips.length, 1, "one chip for the active kind filter");
   const chip = chips[0];
   assert.equal(chip.getAttribute("aria-label"), "Remove filter: Bullet", "the chip announces its one-shot removal");

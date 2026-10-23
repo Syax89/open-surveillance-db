@@ -47,6 +47,12 @@ export function FiltersBar({
   // classic control row).
   originFilter,
   setOriginFilter,
+  // F1 (mobile usability 2026-10-23): how many selections are active — the
+  // SAME count as the catalog's removable chips. Rendered inside the native
+  // disclosure summary, which only exists on compact layouts, so the closed
+  // filter group still states its state. Optional: the home page and /mappa
+  // never pass it, so their output stays byte-identical.
+  activeFilterCount = 0,
 }: {
   variant: "inline" | "panel" | "bare";
   cameraKinds: string[];
@@ -104,6 +110,11 @@ export function FiltersBar({
    * true to expose useful / recent / confirmations.
    */
   showCommunitySort?: boolean;
+  /**
+   * F1 (mobile usability 2026-10-23): active-selection count shown in the
+   * compact disclosure summary (synchronized with the /directory chips).
+   */
+  activeFilterCount?: number;
 }) {
   const t = useMessages().directory;
   // On constrained layouts the whole filter group becomes one short
@@ -175,7 +186,7 @@ export function FiltersBar({
           userPreferenceRef.current = next;
           setFiltersOpen(next);
         }}>
-          <summary>{t.filters}</summary>
+          <summary>{activeFilterCount > 0 ? <span>{t.filters}<span className="filters-summary-count"> · {activeFilterCount === 1 ? t.filtersActiveOne : t.filtersActiveMany(activeFilterCount)}</span></span> : t.filters}</summary>
           <div className="filter-controls-row">
         <div className="record-filter">
           <label htmlFor="record-kind-filter">{t.cameraType}</label>

@@ -23,6 +23,7 @@ let rtl;
 let SurveillanceMap;
 let SegnalaTool;
 let parseReportCoordinates;
+let popupGeometryFor;
 let __resetPublicCamerasCache;
 
 before(async () => {
@@ -31,6 +32,7 @@ before(async () => {
   SurveillanceMap = mapMod.SurveillanceMap;
   SegnalaTool = (await loadDomModule("app/components/tools/SegnalaTool.mjs")).SegnalaTool;
   parseReportCoordinates = (await loadDomModule("app/lib/report-coordinates.mjs")).parseReportCoordinates;
+  popupGeometryFor = (await loadDomModule("app/lib/map-popup.mjs")).popupGeometryFor;
   const camerasMod = await loadDomModule("app/lib/use-public-cameras.mjs");
   __resetPublicCamerasCache = camerasMod.__resetPublicCamerasCache;
   // Default fetch mock: empty public list (prototype seed keeps rendering).
@@ -91,43 +93,50 @@ test("map click opens a coordinate-picker shortcut with a report link", async ()
   assert.match(maps[0].popupHtml, /href="\/segnala\?lat=41\.90040&lng=12\.49360"/);
 });
 
-// Mobile balloon (CEO 2026-08-07): on phones the popup shrinks to 260px so
-// it does not swallow the map; desktop keeps 300px. Leaflet sets the width
-// inline from this option, so the maxWidth is the contract to assert.
-test("marker and picker popups use a 260px maxWidth on phone viewports (300px desktop)", async () => {
-  const realInnerWidth = Object.getOwnPropertyDescriptor(window, "innerWidth");
-  const setWidth = (value) => {
-    Object.defineProperty(window, "innerWidth", { configurable: true, get: () => value });
-  };
-  const { after } = await import("node:test");
-  after(() => {
-    if (realInnerWidth?.get) Object.defineProperty(window, "innerWidth", realInnerWidth);
-    else delete window.innerWidth;
-  });
-
-  // Phone viewport: marker + picker popups must both cap at 260px.
-  setWidth(390);
+// Mobile balloon (CEO 2026-08-07; M01 2026-10-22): on phones the popup
+// shrinks so it does not swallow the map, but the balloon and its autopan
+// padding must ALSO fit the map surface — the old viewport-based width put a
+// 260px balloon on a 286px map with 60px padding on each side, which can
+// never fit (clipped popup, lost marker). The contract now reads the map
+// box; the pure arithmetic is unit-tested in client-map-popup-fit.
+test("marker and picker popups size themselves on the map surface, not the viewport", async () => {
+  // A 390px phone renders a ~358px map: the balloon fits, but the right
+  // control lane and the bottom help overlay are reserved, so the width
+  // shrinks from the accepted 260px to what is left over.
   const CAMERAS = [
     { id: 1, title: "Via Roma corner", kind: "bullet", status: "active", latitude: 41.9028, longitude: 12.4964, source: "Community report" },
     { id: 2, title: "Piazza Venezia", kind: "dome", status: "active", latitude: 41.8958, longitude: 12.4823, source: "Community report" },
   ];
   await renderMapWithCameras(CAMERAS);
   const maps = await leafletMaps();
-  const clickHandler = maps[0].handlers.click?.[0];
+  const map = maps.at(-1);
+  map.size = { x: 358, y: 520 };
+  map.fire("resize");
+  const clickHandler = map.handlers.click?.[0];
   clickHandler({ latlng: { lat: 41.9004, lng: 12.4936 } });
-  assert.equal(maps[0].popupOpts?.maxWidth, 260, "the picker popup shrinks to 260px on a 390px viewport");
+  const phone = popupGeometryFor({ x: 358, y: 520 });
+  assert.equal(map.popupOpts?.maxWidth, phone.maxWidth, "the picker popup uses the geometry derived from the phone surface");
+  assert.ok(map.popupOpts.maxWidth < 260, "the reserved right lane costs the balloon some width");
+  assert.deepEqual(map.popupOpts?.autoPanPadding, [26, 42], "the top-left autopan padding is derived from the surface, not fixed at 60/48");
+  assert.deepEqual(map.popupOpts?.autoPanPaddingBottomRight, [60, 60], "the right control lane and bottom overlay are reserved on a narrow surface");
   const markerList = await leafletMarkers();
   const withPopup = markerList.find((m) => m.popupOpts);
   assert.ok(withPopup, "markers carry their bindPopup options in the stub");
-  assert.equal(withPopup.popupOpts.maxWidth, 260, "the marker popup shrinks to 260px on a phone");
+  assert.equal(withPopup.popupOpts.maxWidth, phone.maxWidth, "the marker popup uses the same phone balloon");
+  assert.deepEqual(withPopup.popupOpts.autoPanPaddingBottomRight, map.popupOpts.autoPanPaddingBottomRight, "the picker and the markers reserve the same lanes");
 
-  // Desktop viewport: unchanged 300px.
-  setWidth(1440);
+  // A wide desktop surface (split workspace): unchanged 300px balloon, and
+  // no lane is reserved — the padding stays symmetric.
   await renderMapWithCameras();
   const mapsDesktop = await leafletMaps();
-  const clickDesktop = mapsDesktop.at(-1).handlers.click?.[0];
+  const desktop = mapsDesktop.at(-1);
+  desktop.size = { x: 900, y: 700 };
+  desktop.fire("resize");
+  const clickDesktop = desktop.handlers.click?.[0];
   clickDesktop({ latlng: { lat: 41.9, lng: 12.49 } });
-  assert.equal(mapsDesktop.at(-1).popupOpts?.maxWidth, 300, "desktop keeps the 300px popup width");
+  assert.equal(desktop.popupOpts?.maxWidth, 300, "desktop keeps the 300px popup width");
+  assert.deepEqual(desktop.popupOpts?.autoPanPadding, [60, 48], "desktop keeps the accepted 60/48 autopan padding");
+  assert.deepEqual(desktop.popupOpts?.autoPanPaddingBottomRight, [60, 48], "desktop reserves no lane");
 });
 
 // ---------------------------------------------------------------------------
