@@ -1598,12 +1598,13 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
    Single identity column (issue #435 moved the trust badge above the
    grid, see .account-trust--top below) — NOT the original 1.35/.65 split.
    WIDTH (layout polish 2026-10-23): this card is a .record-detail, whose
-   width is var(--container-readable) = min(900px, 100% - 48px) — that is
-   the ACTUAL outer width of the page (900px on desktop, shared with the
-   other auth/record routes). The 1120px cap below (PR #354) never applies
-   because it is wider than the width already imposed by .record-detail: it
-   is an inert safety cap, kept so this page can never open a second, wider
-   layout. Do not "fix" the mismatch by widening the account page. */
+   width is var(--container-readable) = min(900px, 100% - 48px) — that is the
+   BINDING width of the page (900px on desktop, shared with the auth/record
+   routes). Both local caps are inert because .record-detail already fixes the
+   width: this 1120px cap (PR #354, .account-dashboard) and the nearest one,
+   .account-card { max-width:940px } in the auth block. They are kept as
+   safety caps so the page can never open a second, wider layout. Do not
+   "fix" the mismatch by widening the account page. */
 .account-dashboard { max-width:1120px; }
 .account-profile-grid { display:grid; grid-template-columns:minmax(0,1fr); gap:28px; align-items:start; }
 .account-identity { min-width:0; }
@@ -1695,9 +1696,12 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 .account-dashboard .contribution-status { margin-left:0; }
 .account-dashboard .contributions-edit { margin-left:0; justify-self:end; }
 /* A02 (layout polish 2026-10-23): the pager wraps natively instead of pushing
-   the next button out of the panel at 320px (IT "Precedente/Successiva" +
-   "Pagina 1 di 12", EN "Previous/Next" + "Page 1 of 12"). Full labels are
-   kept — no abbreviated label, no smaller type, no viewport clipping. The
+   the next button out of the panel at 320px. Real labels — IT
+   "Pagina precedente" / "Pagina successiva" + "Pagina 1 di 12", EN
+   "Previous page" / "Next page" + "Page 1 of 12". Measured at 320-390px:
+   both buttons stay on one row as equal shrinkable tracks and their own label
+   wraps onto two lines inside the button — no clipping, no abbreviated label,
+   no smaller type — while the page indicator takes the centred row below. The
    disabled/aria-current states stay exactly as the component renders them. */
 .account-dashboard .contributions-pagination { flex-wrap:wrap; row-gap:10px; }
 .account-dashboard .contributions-pagination .button { flex:0 1 auto; min-width:0; justify-content:center; }

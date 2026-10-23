@@ -192,6 +192,11 @@ test("A02 — the pager wraps at 320px and keeps full labels plus its states", (
   assert.doesNotMatch(baseCss, /\.page-indicator\s*\{[^}]*(white-space\s*:\s*nowrap|text-overflow)/,
     "no clipped or abbreviated page indicator");
   assert.match(body, /community\.pageOf\(page, pagination\.totalPages\)/, "the indicator stays a full localized label");
+  assert.match(css, /"Pagina precedente"/, "the comment cites the real IT label");
+  assert.match(css, /"Pagina successiva"/, "…for both directions");
+  assert.match(css, /"Previous page"/, "…and the real EN label");
+  assert.match(css, /"Next page"/);
+  assert.doesNotMatch(css, /"Precedente\/Successiva"|"Previous\/Next"/, "no shortened label is quoted as the UI text");
   assert.match(body, /disabled=\{page <= 1 \|\| contributionsLoading\}/, "previous keeps its disabled state");
   assert.match(body, /disabled=\{!pagination\.hasMore \|\| contributionsLoading\}/, "next keeps its disabled state");
   assert.match(body, /className="page-indicator" aria-current="page"/, "the current page stays announced");
@@ -239,8 +244,10 @@ test("A04 — the account keeps its 900px readable width and the passkey cap is 
   assert.doesNotMatch(css, /passkeys-disclosure\s*\{[^}]*max-width\s*:\s*720px/, "the 720px passkey cap must be removed");
   const dash = ruleBlock(baseCss, ".account-dashboard");
   assert.equal(compact(declaration(dash, "max-width")), "1120px", "no new width choice is introduced");
-  assert.match(css, /inert safety cap/, "the misleading 1120px rule is documented as inert");
-  assert.match(css, /ACTUAL outer width of the page/);
+  assert.match(css, /inert/, "the misleading 1120px rule is documented as inert");
+  assert.match(css, /BINDING width of the page/, "the comment names var(--container-readable) as the binding width");
+  assert.match(css, /\.account-card \{ max-width:940px \}/, "…and names the nearest inert cap too");
+  assert.equal(compact(declaration(ruleBlock(baseCss, ".account-card"), "max-width")), "940px");
 });
 
 test("A05 — one explicit heading scale reaches all four dashboard sections, danger zone stays distinct", () => {
