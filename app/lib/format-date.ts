@@ -1,5 +1,7 @@
-import { DEFAULT_LOCALE, LOCALE_BCP47 } from "./i18n";
-import type { Locale } from "./i18n";
+// Import the locale registry from ./i18n/types (constants only) — NOT from
+// ./i18n, whose index pulls every language's full message bundle into each
+// chunk that merely formats a date.
+import { DEFAULT_LOCALE, LOCALE_BCP47, type Locale } from "./i18n/types";
 
 /**
  * Shared date formatting for the public UI (P2, review round 2).
@@ -13,14 +15,29 @@ import type { Locale } from "./i18n";
  * The BCP 47 tag comes from the locale registry (LOCALE_BCP47 built from
  * SUPPORTED_LOCALES): no hardcoded it-IT/en-GB ternary, and a new
  * language gets its tag automatically.
+ *
+ * Performance: `Date#toLocaleDateString` builds a fresh Intl.DateTimeFormat
+ * on EVERY call (measured ~93 ms for 2,000 popups on a phone vs ~1 ms with a
+ * reused formatter). One formatter is cached per BCP 47 tag — the options
+ * are fixed, so the tag alone is the cache key.
  */
+const PUBLIC_DATE_OPTIONS: Intl.DateTimeFormatOptions = { day: "numeric", month: "long", year: "numeric" };
+const formatters = new Map<string, Intl.DateTimeFormat>();
+
+/** The cached long-date formatter for a locale (exported for the reuse test). */
+export function publicDateFormatter(locale: Locale): Intl.DateTimeFormat {
+  const tag = LOCALE_BCP47[locale] ?? LOCALE_BCP47[DEFAULT_LOCALE];
+  let formatter = formatters.get(tag);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat(tag, PUBLIC_DATE_OPTIONS);
+    formatters.set(tag, formatter);
+  }
+  return formatter;
+}
+
 export function formatPublicDate(value: string | null | undefined, locale: Locale): string {
   if (!value) return "";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString(LOCALE_BCP47[locale] ?? LOCALE_BCP47[DEFAULT_LOCALE], {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+  return publicDateFormatter(locale).format(date);
 }

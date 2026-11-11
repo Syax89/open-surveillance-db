@@ -590,3 +590,75 @@ test("B05: a complete warm return clears a prior unrelated rate-limit error and 
   assert.equal(probe.getAttribute("data-retry-after"), "", "and the stale cooldown notice");
   assert.equal(probe.getAttribute("data-decimated"), "false", "and no stale sample flag");
 });
+
+// ---------------------------------------------------------------------------
+// Perf regressions (profiling pass, 6.3k cameras): store identity on refetch
+// and the bounded bbox cache.
+// ---------------------------------------------------------------------------
+
+/** Answers every ?bbox= with FRESH parsed copies (a real JSON round-trip). */
+function installFreshCopyMock(calls, records = RECORDS) {
+  installFetchMock((input) => {
+    calls.push(String(input));
+    return jsonResponse({ records: records.map((record) => ({ ...record })), total: records.length, nextOffset: null });
+  });
+}
+
+test("a refetch of UNCHANGED records keeps the store array and every record identity", async () => {
+  const calls = [];
+  installFreshCopyMock(calls);
+  const seen = [];
+  function IdentityProbe({ bounds }) {
+    const state = useViewportCameras({ bounds, filters: {} });
+    seen.push(state.records);
+    return null;
+  }
+  const view = await renderWithLocale(React.createElement(IdentityProbe, { bounds: ROME }));
+  await pause(300);
+  const loaded = seen[seen.length - 1];
+  assert.equal(loaded.length, 3);
+  // An overlapping pan that is NOT covered → a new request, fresh objects.
+  const SHIFTED = { south: 41.81, north: 42.01, west: 12.31, east: 12.71 };
+  await view.rerender(await wrapWithLocale(React.createElement(IdentityProbe, { bounds: SHIFTED })));
+  await pause(300);
+  assert.equal(calls.length, 2, "the shifted viewport refetched");
+  assert.equal(seen[seen.length - 1], loaded, "unchanged payload: the previous store array is kept (no re-render cascade)");
+});
+
+test("the bbox cache evicts expired entries on insert and is capped (LRU)", async () => {
+  const { __viewportCacheKeys, VIEWPORT_CACHE_MAX_ENTRIES, VIEWPORT_CACHE_TTL_MS } = await loadDomModule("app/lib/use-viewport-cameras.mjs");
+  assert.equal(VIEWPORT_CACHE_MAX_ENTRIES, 30);
+  const calls = [];
+  installFreshCopyMock(calls, []);
+  // Distinct, non-overlapping, same-size small boxes (no zoom-out debounce).
+  const box = (i) => ({ south: 45.0, north: 45.1, west: 9 + i * 0.2, east: 9.1 + i * 0.2 });
+  const westKey = (i) => `|${(9 + i * 0.2).toFixed(3)}|`;
+  const view = await renderProbe({ bounds: box(0), filters: {} });
+  await pause(260);
+  assert.equal(__viewportCacheKeys().length, 1);
+
+  // Expiry: once the first entry is older than the TTL, the NEXT insert drops it.
+  const realNow = Date.now;
+  try {
+    Date.now = () => realNow() + VIEWPORT_CACHE_TTL_MS + 1_000;
+    await view.rerender(await wrapWithLocale(React.createElement(HookProbe, { bounds: box(1), filters: {} })));
+    await pause(260);
+  } finally {
+    Date.now = realNow;
+  }
+  assert.ok(!__viewportCacheKeys().some((key) => key.includes(westKey(0))), "the expired entry was evicted on insert");
+  assert.equal(__viewportCacheKeys().length, 1);
+
+  // Cap: well over the cap of distinct pans never grows the cache past it,
+  // and the LEAST recently used entries are the ones dropped.
+  const last = VIEWPORT_CACHE_MAX_ENTRIES + 5;
+  for (let i = 2; i <= last; i += 1) {
+    await view.rerender(await wrapWithLocale(React.createElement(HookProbe, { bounds: box(i), filters: {} })));
+    await pause(190);
+  }
+  const keys = __viewportCacheKeys();
+  assert.equal(calls.length, last + 1, "every distinct pan fetched");
+  assert.equal(keys.length, VIEWPORT_CACHE_MAX_ENTRIES, "the cache never exceeds its cap");
+  assert.ok(keys[keys.length - 1].includes(westKey(last)), "the newest bbox is kept");
+  assert.ok(!keys.some((key) => key.includes(westKey(1))), "the least recently used bbox was evicted");
+});

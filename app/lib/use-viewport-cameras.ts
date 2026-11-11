@@ -126,9 +126,46 @@ type CacheEntry = {
   complete: boolean;
 };
 
+/**
+ * Upper bound on cached bboxes (LRU). Without it every pan added an entry
+ * that was never evicted (each holds its parsed records): +17.8 MB of heap
+ * over 100 pans, and isCovered/coveringEntry scanned all of them per pan.
+ */
+export const VIEWPORT_CACHE_MAX_ENTRIES = 30;
+
 // Module-level caches (one per page load; __resetViewportCamerasCache drops
 // them for tests and error-state recovery).
 const bboxCache = new Map<string, CacheEntry>();
+
+/**
+ * Insert (or refresh) a cache entry: drop every expired entry, then evict the
+ * least-recently-used ones (Map insertion order; hits re-insert, see
+ * touchCacheEntry) until the cap holds.
+ */
+function cacheInsert(key: string, entry: CacheEntry): void {
+  const now = Date.now();
+  bboxCache.delete(key);
+  for (const [existingKey, existing] of bboxCache) {
+    if (existing.fetchedAt + VIEWPORT_CACHE_TTL_MS < now) bboxCache.delete(existingKey);
+  }
+  bboxCache.set(key, entry);
+  while (bboxCache.size > VIEWPORT_CACHE_MAX_ENTRIES) {
+    const oldest = bboxCache.keys().next().value;
+    if (oldest === undefined) break;
+    bboxCache.delete(oldest);
+  }
+}
+
+/** Mark a cache hit as most recently used (moves it to the LRU tail). */
+function touchCacheEntry(key: string, entry: CacheEntry): void {
+  bboxCache.delete(key);
+  bboxCache.set(key, entry);
+}
+
+/** Test-only: the cached bbox keys, least recently used first. */
+export function __viewportCacheKeys(): string[] {
+  return [...bboxCache.keys()];
+}
 const inFlight = new Map<string, Promise<ViewportPage>>();
 const focusWalks = new Map<number, Promise<Camera | null>>();
 
@@ -224,11 +261,17 @@ function isCovered(bounds: ViewportBounds, filterKey: string): boolean {
 function coveringEntry(bounds: ViewportBounds, filterKey: string): CacheEntry | null {
   const now = Date.now();
   let best: CacheEntry | null = null;
-  for (const entry of bboxCache.values()) {
+  let bestKey: string | null = null;
+  for (const [key, entry] of bboxCache) {
     if (!cachedEntryCovers(entry, bounds, filterKey, now)) continue;
     // Prefer the SMALLEST covering box (tightest fit — most precise).
-    if (!best || boxArea(entry.bounds) < boxArea(best.bounds)) best = entry;
+    if (!best || boxArea(entry.bounds) < boxArea(best.bounds)) {
+      best = entry;
+      bestKey = key;
+    }
   }
+  // A warm pan-back keeps the entry it reused alive in the LRU.
+  if (best && bestKey !== null) touchCacheEntry(bestKey, best);
   return best;
 }
 
@@ -237,11 +280,39 @@ function boxArea(bounds: ViewportBounds): number {
 }
 
 /**
+ * Field-level equality of two payloads for the SAME record id: every own
+ * field is compared with `===`, and a nested plain object (importBatch) one
+ * level deep. Every field is compared — not a hand-picked subset — so any
+ * value a consumer renders (popup, tooltip, icon, sidebar row) that changes
+ * still replaces the record.
+ */
+function sameValue(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return false;
+  const aKeys = Object.keys(a);
+  if (aKeys.length !== Object.keys(b).length) return false;
+  return aKeys.every((key) => (a as Record<string, unknown>)[key] === (b as Record<string, unknown>)[key]);
+}
+
+function sameRecord(a: Camera, b: Camera): boolean {
+  if (a === b) return true;
+  const aKeys = Object.keys(a) as (keyof Camera)[];
+  if (aKeys.length !== Object.keys(b).length) return false;
+  return aKeys.every((key) => sameValue(a[key], b[key]));
+}
+
+/**
  * Merge a fetched page into the store: id-deduped, first position kept,
  * newest payload wins for the fields (fresh community counts after a
  * moderation action).
+ *
+ * Identity contract (perf): a refetch parses FRESH objects for records the
+ * store already holds. When the payload is field-equal the EXISTING object
+ * is kept, and when nothing changed at all the previous array is returned —
+ * so React state stays put and the map reconcile (`entry.camera === camera`)
+ * skips every kept marker instead of rebuilding its icon/popup/tooltip.
  */
-function mergeRecords(current: Camera[], incoming: Camera[]): Camera[] {
+export function mergeRecords(current: Camera[], incoming: Camera[]): Camera[] {
   if (incoming.length === 0) return current;
   const index = new Map(current.map((record) => [record.id, record]));
   let changed = false;
@@ -250,7 +321,7 @@ function mergeRecords(current: Camera[], incoming: Camera[]): Camera[] {
     if (!existing) {
       index.set(record.id, record);
       changed = true;
-    } else if (existing !== record) {
+    } else if (!sameRecord(existing, record)) {
       index.set(record.id, record);
       changed = true;
     }
@@ -503,6 +574,7 @@ export function useViewportCameras({ bounds, filters, focusId, onRecords, onErro
       const resolveRectangle = async (rect: ViewportBounds, key: string): Promise<ViewportPage> => {
         const cached = bboxCache.get(key);
         if (cached && cachedEntryCovers(cached, rect, filterKey, Date.now())) {
+          touchCacheEntry(key, cached);
           return { records: cached.records, total: cached.total, nextOffset: null, decimated: cached.decimated };
         }
         const flightKey = bboxRequestKey(rect, filterKey);
@@ -516,7 +588,7 @@ export function useViewportCameras({ bounds, filters, focusId, onRecords, onErro
           inFlight.delete(flightKey);
         }
         if (!controller.signal.aborted) {
-          bboxCache.set(key, { bounds: rect, filterKey, records: page.records, total: page.total, fetchedAt: Date.now(), decimated: page.decimated, complete: page.decimated !== true });
+          cacheInsert(key, { bounds: rect, filterKey, records: page.records, total: page.total, fetchedAt: Date.now(), decimated: page.decimated, complete: page.decimated !== true });
         }
         return page;
       };
