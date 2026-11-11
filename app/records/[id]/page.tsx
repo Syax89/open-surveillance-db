@@ -1,15 +1,21 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { getCommunityRecordById } from "../../../db/cameras";
+import { resolveInitialRecord } from "../../lib/record-initial";
 import RecordPageBody from "./RecordPageBody";
 
 /**
  * /records/[id] — public record detail (F3 a11y H2, t_793479ed).
  *
- * Server shell: resolves the per-record <title> (2.4.2 Page Titled) without
- * fetching the record server-side — the detail body is client-rendered
- * (usePublicCamera walk), so the title is built from the route id. The body
- * (RecordPageBody) keeps the full client surface (loading/offline/error
- * states, verification widget, history).
+ * Server shell: resolves the per-record <title> (2.4.2 Page Titled) from
+ * the route id, and (LCP fix, 2026-11) resolves the record itself on the
+ * server through the same getCommunityRecordById read the
+ * GET /api/cameras/[id] route uses (public predicate + hidden/removed
+ * tombstone, ADR 0021 §6.3) — see app/lib/record-initial.ts. The seed is
+ * handed to RecordPageBody so the first HTML holds the h1, facts and
+ * community status; the body keeps the full client surface (offline/error
+ * states, community widget, timeline, reload). A server read failure
+ * passes no seed and the body falls back to the client fetch path.
  *
  * 404 guard (t_7eed4601): a malformed id (e.g. /records/abc) can never be
  * a real record, so the server shell rejects it with notFound() and the
@@ -23,7 +29,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const { id } = await params;
   const title = `Record #${id} — OpenSurveillanceDB`;
   // SEO fix (2026-10-15): self-referencing canonical + a per-id description.
-  // No DB fetch here on purpose (see file header) — the description stays
+  // No DB fetch in the metadata on purpose — the description stays
   // generic text but varies by id, enough to stop every /records/* page
   // from sharing byte-identical <meta description>/og:description, which
   // Search Console was flagging as "Discovered, currently not indexed" at
@@ -44,5 +50,10 @@ export default async function RecordPage({ params }: { params: Promise<{ id: str
   if (!Number.isInteger(recordId) || recordId <= 0) {
     notFound();
   }
-  return <RecordPageBody />;
+  // Same strict decimal grammar as the API route: "1e3"/"0x10" are integers
+  // to Number() but not public ids — no seed, the client path decides.
+  const initial = /^\d+$/.test(id) ? await resolveInitialRecord(recordId, (value) => getCommunityRecordById(value)) : undefined;
+  // key: a client navigation to another id remounts the body so the seed
+  // (and the hook state it initializes) never belongs to the previous id.
+  return <RecordPageBody key={recordId} id={recordId} initial={initial} />;
 }
