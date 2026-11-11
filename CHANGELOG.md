@@ -395,6 +395,35 @@ changes accumulate under `[Unreleased]`.
 
 ### Changed
 
+- **BREAKING (API clients) — GeoJSON bbox layer bounded (2026-11-11,
+  branch `claude/repo-analysis-a9hrio`):** `GET /api/cameras?bbox=…&format=geojson`
+  now honours the `kind` and `freshness` filters (they were silently
+  ignored), answers `400` when the box exceeds 50 square degrees
+  (`BBOX_MAX_AREA_SQ_DEG`) and returns at most 10,000 features
+  (`PUBLIC_CAMERAS_BBOX_GEOJSON_MAX_FEATURES`), flagging the cap with
+  `truncated: true | false` on the `FeatureCollection`. Previously a
+  world-sized box returned the whole dataset. Clients that request large
+  GeoJSON boxes must zoom in, split the box, or use the paginated JSON bbox
+  list. Documented in `/api-docs` and `docs/DATA_DICTIONARY.md`.
+
+- **Moderation queues paginated (2026-11-11):** every moderation dashboard
+  queue (pending, needs review, stale, corrections, edit requests,
+  validated/published) is now served in keyset pages of 20 (FIFO), with
+  per-queue totals ("N of M") and a "Load more" control per section;
+  `GET /api/moderation` accepts per-queue `<queue>_after_created_at` /
+  `<queue>_after_id` cursors and returns `queueNextCursors` /
+  `queueTotals`. Previously only the published list was bounded.
+
+- **Internal refactoring, no behaviour change (in progress):** splitting of
+  large modules (auth data layer, worker entry point, account page body)
+  and a shared rate-limit helper.
+
+- **Docs refresh (2026-11-11):** source registry in
+  `docs/data-sources/README.md` completed (70 descriptors), roadmap public
+  data coverage updated, hardcoded migration/table counts removed from
+  `docs/DEVELOPMENT_SETUP.md`, `docs/REFACTORING_MAP.md` figures recounted
+  and historical ones dated.
+
 - **Docs — /api-docs write-API + API-keys guide (t_10e3585e, ADR 0023):**
   the public documentation page now covers the private write keys of the
   api-keys epic: Bearer authentication (`Authorization: Bearer osdb_…`),
@@ -571,6 +600,22 @@ changes accumulate under `[Unreleased]`.
   bucket deletion was performed, only the code that read them is gone.
 
 ### Fixed
+
+- **Import — inserts and provenance events atomic (2026-11-11):** each
+  import chunk now writes the camera INSERTs and their `imported` lifecycle
+  events in a single transactional D1 batch (events resolved by
+  `(source, external_id)` and guarded by `NOT EXISTS`), so a failure can no
+  longer leave committed cameras without a provenance event, and re-runs /
+  `--force` refreshes never duplicate events.
+
+- **Map — field-of-view status whitelist (2026-11-11):** FOV shapes now pass
+  the record status through the same `isPublicStatus()` whitelist as markers
+  before using it as a CSS class.
+
+- **Test hygiene (2026-11-11):** the URL-contract test no longer skips
+  silently when `use-camera-filters` fails to load, and `npm test` defaults
+  `NEXT_PUBLIC_SITE_URL` to the production origin so canonical/sitemap tests
+  behave locally as in CI.
 
 - **UI /mappa, /directory, /correggi — removed the hardcoded two-record
   demo seed from every tool surface:** `MappaTool`, `DirectoryTool` and
@@ -781,6 +826,19 @@ changes accumulate under `[Unreleased]`.
   freshness, state-transition and status-leak-boundary suites.
 
 ### Security
+
+- **Auth rate limit honours `TRUST_XFF` (2026-11-11):** the auth/session
+  rate-limit buckets now receive the environment, so with `TRUST_XFF` enabled
+  behind a proxy callers are keyed by their forwarded IP instead of all
+  sharing the `unknown` bucket.
+
+- **CSRF required for session-authenticated moderator PATCHes (2026-11-11):**
+  `PATCH /api/moderation` and `PATCH /api/appeals/:id` now require the
+  per-session `X-CSRF-Token` when the moderator was authenticated by the
+  `osdb_session` cookie (the worker records the credential source in an
+  internal, client-stripped header). Fail-closed: only an explicit edge
+  (Basic/bearer) source skips the token; a missing or unknown source requires
+  it whenever a session cookie is present.
 
 - **API keys — write-auth hardening (P1 audit, EPIC api-keys, ADR 0023):** three
   fixes, one atomic PR:

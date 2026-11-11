@@ -10,7 +10,7 @@ their legal compatibility with the project database (ODbL 1.0, ADR 0008).
 | [normalizzazione-pipeline.md](normalizzazione-pipeline.md) | Normalisation design and import pipeline | updated 2026-08-08 |
 | [keep-fonti-fresh.md](keep-fonti-fresh.md) | Runbook to keep `/fonti` aligned with imports (commit convention, verification, blocked-batch recovery) | new 2026-08-08 |
 | [osm-alpr-imports.md](osm-alpr-imports.md) | OSM ALPR (DeFlock-equivalent selection) imports for US/CA: source, gates, stored fields, licence/attribution | new 2026-10-21 |
-| [import registry](imports/) | One descriptor JSON per source (`docs/data-sources/imports/*.json`) | 47 descriptors |
+| [import registry](imports/) | One descriptor JSON per source (`docs/data-sources/imports/*.json`) | 70 descriptors (2026-11-11) |
 
 ## Import registry
 
@@ -25,33 +25,56 @@ and are shown on the `/fonti` page — never reconstructed from the repo.
 | --- | --- | --- |
 | `amburgo-verkehrskameras-2026` | Freie und Hansestadt Hamburg — Verkehrskameras (Polizei Hamburg) | Datenlizenz Deutschland Namensnennung 2.0 (dl-de-by-2.0) |
 | `australia-nsw-speed-cameras-2026` | NSW (Australia) — Speed camera locations (TfNSW Open Data) | CC BY 3.0 AU |
+| `australia-queensland-traffic-cameras-2026` | QLD Traffic (Dept of Transport and Main Roads) via Queensland OpenDataSoft | CC BY 4.0 |
 | `berna-videouberwachung-2026` | Kanton Bern — Amt für Geoinformation (Videoüberwachung im öffentlichen Raum) | Open use. Attribution required (Kanton Bern) |
 | `brasile-bh-bhtrans-cameras-2026` | Belo Horizonte (BHTRANS) — Fiscalização Eletrônica | CC BY |
 | `canada-drivebc-highwaycams-2026` | Province of British Columbia — DriveBC HighwayCams | OGL-BC |
 | `canada-quebec-mtmd-cameras-2026` | Gouvernement du Québec — MTMD infos_cameras (réseau routier) | CC BY 4.0 |
+| `cipro-cctv-2026` | Cyprus — CCTV Cameras road network (CyNAP, traffic4cyprus.org.cy) | CC BY 4.0 |
+| `cipro-traffic-enforcement-cameras-2026` | Cyprus — Traffic Enforcement Cameras (CyNAP, traffic4cyprus.org.cy) | CC BY 4.0 |
 | `finlandia-fintraffic-weathercam-2026` | Fintraffic — Digitraffic weathercam stations (tie.digitraffic.fi) | CC BY 4.0 |
 | `francia-agen-cameras-2026` | Ville d'Agen — Caméra de vidéo protection | ODbL 1.0 |
 | `francia-gpso-videoprotection-2026` | Territoire Grand Paris Seine Ouest — Vidéoprotection | Licence Ouverte 2.0 |
 | `francia-pvpp-cameras-2026` | Ministère de l'Intérieur — Vidéoprotection, implantation des caméras (PVPP Paris) | Licence Ouverte 2.0 |
 | `giappone-ichikawa-cctv-2026` | Ichikawa City — Street CCTV cameras | CC BY 4.0 |
 | `giappone-tokyo-metro-cameras-2026` | Tokyo Metropolitan Government — River / Sea / Port live cameras | CC BY 4.0 |
+| `hong-kong-rlc-junctions-2026` | Hong Kong — Junctions with Red Light Camera System installed (TD) | data.gov.hk Terms of Use |
+| `hong-kong-td-traffic-cameras-2026` | Hong Kong — Transport Department, traffic snapshot cameras (CCTV) | data.gov.hk Terms of Use |
 | `irlanda-dublino-cctv-poles-2026` | Dublin City Council — Traffic Poles with CCTV | CC BY 4.0 |
 | `lussemburgo-cita-cameras-2026` | CITA Luxembourg — caméras du réseau autoroutier | CC0 |
 | `milano-varchi-2026` | Comune di Milano — Open Data (dati.comune.milano.it) | CC BY 3.0 IT |
 | `norvegia-nvdb-kamera-2026` | Statens vegvesen — NVDB vegobjekter type 163 (Kamera) | NLOD 2.0 |
 | `nuova-zelanda-wellington-cctv-2026` | Wellington City Council — CCTV City Safety Camera Locations | CC BY 4.0 (NZ) |
+| `osm-alpr-canada-2026` | OpenStreetMap ALPR surveillance (DeFlock-equivalent selection) | ODbL 1.0 (OSM) |
+| `osm-alpr-usa-2026` | OpenStreetMap ALPR surveillance (DeFlock-equivalent selection) | ODbL 1.0 (OSM) |
+| `osm-surveillance-australia-2026` | OpenStreetMap contributors | ODbL 1.0 (OSM) |
 | `osm-surveillance-austria-2026` | OpenStreetMap contributors | ODbL 1.0 (OSM) |
+| `osm-surveillance-francia-2026` | OpenStreetMap contributors | ODbL 1.0 (OSM) |
 | `osm-surveillance-germania-2026` | OpenStreetMap contributors | ODbL 1.0 (OSM) |
+| `osm-surveillance-giappone-2026` | OpenStreetMap contributors | ODbL 1.0 (OSM) |
+| `osm-surveillance-india-2026` | OpenStreetMap contributors | ODbL 1.0 (OSM) |
 | `osm-surveillance-italia-2026` | OpenStreetMap contributors | ODbL 1.0 (OSM) |
+| `osm-surveillance-paesi-bassi-2026` | OpenStreetMap contributors | ODbL 1.0 (OSM) |
+| `osm-surveillance-regno-unito-2026` | OpenStreetMap contributors | ODbL 1.0 (OSM) |
+| `osm-surveillance-spagna-2026` | OpenStreetMap contributors | ODbL 1.0 (OSM) |
 | `osm-surveillance-svizzera-2026` | OpenStreetMap contributors | ODbL 1.0 (OSM) |
 | `paesi-bassi-amsterdam-verkeerscamera-2026` | Gemeente Amsterdam — Verkeersinformatiesystemen (VIS), verkeerscamera's | CC BY 4.0 |
 | `paesi-bassi-utrecht-cameraregister-2026` | Gemeente Utrecht — Cameraregister Utrecht | CC0 1.0 |
+| `peru-la-punta-cctv-2026` | Peru — Municipalidad Distrital de La Punta, cámaras de videovigilancia (datosabiertos.gob.pe) | ODbL 1.0 |
+| `peru-pasco-cctv-2026` | Peru — Municipalidad Provincial de Pasco (HMPP), lista de cámaras de video vigilancia (datosabiertos.gob.pe) | ODbL 1.0 |
+| `regno-unito-nottingham-cctv-2026` | Nottingham City Council — CCTV Cameras (CCTV and Traffic Control Cameras) | OGL 3.0 |
 | `regno-unito-plymouth-cctv-2026` | Plymouth City Council — CCTV Traffic Cameras | OGL 3.0 |
+| `regno-unito-tfgm-speed-cameras-2026` | United Kingdom — TfGM Speed Camera Locations, Greater Manchester (fixed) | OGL 3.0 |
 | `regno-unito-tfl-jamcams-2026` | Transport for London — JamCams CCTV | OGL 2.0 |
+| `serbia-subotica-semafori-2026` | Serbia — City of Subotica, cameras on vertical traffic signals (data.gov.rs) | Serbian Open Data License |
+| `serbia-subotica-videonadzor-2026` | Serbia — City of Subotica, general video surveillance (data.gov.rs) | Serbian Open Data License |
+| `singapore-lta-road-cameras-2026` | Singapore — LTA Road Camera collection (data.gov.sg) | Singapore Open Data Licence v1.0 |
+| `singapore-lta-traffic-images-2026` | Land Transport Authority (LTA) — Traffic Images API | Singapore Open Data Licence v1.0 |
+| `slovacchia-presov-kamery-2026` | Slovakia — Mesto Prešov camera-system geodata (KML) | CC BY 4.0 |
 | `spagna-barcelona-cameras-2026` | Ajuntament de Barcelona — Inventari de càmeres de seguretat | CC BY 4.0 |
 | `spagna-dgt-camaras-2026` | Dirección General de Tráfico — Cámaras de tráfico red estatal (NAP) | CC-BY |
 | `spagna-madrid-camaras-2026` | Ayuntamiento de Madrid — Cámaras de videovigilancia vía pública (ZBEDEP + ZBE) | CC BY 4.0 |
-| `tailandia-nakhon-ratchasima-cctv-2026` | Nakhon Ratchasima Provincial Police — CCTV locations (government cameras only) | Open Data Common (ODC) |
+| `tailandia-nakhon-ratchasima-cctv-2026` | Nakhon Ratchasima Provincial Police — CCTV locations | Open Data Common (ODC) |
 | `ucraina-speed-cameras-2026` | Ukraine — Speed enforcement camera locations (data.gov.ua) | CC BY 4.0 |
 | `usa-baltimore-atves-cameras-2026` | City of Baltimore — ATVES Automated Enforcement Cameras | Maryland public domain + attribution |
 | `usa-baltimore-citiwatch-2026` | City of Baltimore — CitiWatch Camera Locations | Maryland public domain + attribution |
@@ -64,7 +87,7 @@ and are shown on the `/fonti` page — never reconstructed from the repo.
 | `usa-mndot-snowplow-cameras-2026` | Minnesota Department of Transportation — AVL Plow Cam Images | CC BY 4.0 |
 | `usa-new-england-511-cameras-2026` | New England 511 (NE Compass C2C) — CCTV VT/NH/ME | Tri-State Developer Agreement |
 | `usa-new-orleans-traffic-cameras-2026` | City of New Orleans — Traffic Camera Locations (open data) | CC0 |
-| `usa-ny-thruway-gantries-2026` | New York State Thruway Authority — Toll Gantries (E-ZPass) | NY Open Data policy |
+| `usa-ny-thruway-gantries-2026` | New York State Thruway Authority — Toll Gantries (E-ZPass) | NY OPEN-NY Terms of Use |
 | `usa-ohio-ohgo-cameras-2026` | Ohio DOT — OHGO Cameras | public domain (ODOT) |
 | `usa-penndot-traffic-cameras-2026` | Pennsylvania Department of Transportation — PennDOT Traffic Cameras | PennDOT terms (redistribuzione consentita) |
 | `usa-rochester-cameras-2026` | Rochester Police Department — Rochester Cameras (open data) | ODbL 1.0 |

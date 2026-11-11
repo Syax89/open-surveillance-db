@@ -23,6 +23,7 @@ CSV, or GeoJSON output. See [DATA_MODEL.md](DATA_MODEL.md) and
 | JSON | `GET /api/cameras` | `{ "records": [ … ], "total": N, "nextOffset": N \| null }` (paginated, see below) |
 | CSV | `GET /api/cameras?format=csv` | One header row, one record per row, newline-terminated (complete snapshot) |
 | GeoJSON | `GET /api/cameras?format=geojson` | `FeatureCollection` of `Point` features (complete snapshot) |
+| GeoJSON bbox layer | `GET /api/cameras?bbox=west,south,east,north&format=geojson` | `FeatureCollection` of `Point` features inside the box, plus `"truncated": true \| false` (bounded, see below) |
 | Nearby JSON | `GET /api/cameras/nearby?latitude=…&longitude=…&radius=…` | `{ "records": [ … ] }`, same fields plus `distanceMeters` |
 | Search JSON | `GET /api/cameras/search?q=…&lang=…` | `{ "query", "area": { "kind", "displayName"?, "latitude", "longitude", "radiusMeters", "radiusLabel" }, "count", "records" }` |
 | Revisions JSON | `GET /api/cameras/revisions?cameraId=N` | `{ "recordId", "revisions": [ { "id", "entityId", "previousStatus", "newStatus", "action", "createdAt" } ] }` |
@@ -37,6 +38,15 @@ offsets stable between requests. Invalid values (`limit=0`, negatives,
 decimals, non-numeric text) answer `400`; a blank `limit` falls back to the
 default. CSV and GeoJSON exports deliberately ignore pagination: they are
 complete snapshots for download, rate-limited in their own bucket.
+
+The GeoJSON bbox layer (`bbox=west,south,east,north&format=geojson`) is
+bounded (2026-11): it honours the same `kind` and `freshness` filters as the
+JSON list, answers `400` when the box exceeds **50 square degrees**
+(`BBOX_MAX_AREA_SQ_DEG` in `db/cameras.ts` — zoom in or use the paginated
+JSON bbox list instead), and returns at most **10,000 features**
+(`PUBLIC_CAMERAS_BBOX_GEOJSON_MAX_FEATURES`); `truncated: true` on the
+`FeatureCollection` signals that the cap was hit. Clients that previously
+requested continent- or world-sized GeoJSON boxes must now split them.
 
 Cache policy: the JSON list, the single-record route and the bbox/GeoJSON
 marker layer answer `Cache-Control: public, s-maxage=300,
