@@ -63,6 +63,18 @@ export type PendingEditRequest = {
 /** Keyset cursor for the published page (published FIFO `created_at ASC, id ASC`). */
 export type PublishedCamerasCursor = { createdAt: string; id: number };
 
+/**
+ * The paginated work queues besides `published`. Each one is keyset-paginated
+ * exactly like the published list (FIFO `created_at ASC, id ASC`, a limit+1
+ * probe, the cursor taken from the last emitted row).
+ */
+export const moderationPagedQueues = ["pending", "review", "stale", "corrections", "edits"] as const;
+export type ModerationPagedQueue = (typeof moderationPagedQueues)[number];
+/** Per-queue keyset cursors; an absent queue starts at its first page. */
+export type ModerationQueueCursors = Partial<Record<ModerationPagedQueue, PublishedCamerasCursor>>;
+/** Per-queue total row counts (whole queue, not the emitted page). */
+export type ModerationQueueTotals = Record<ModerationPagedQueue | "published", number>;
+
 export type ModerationQueue = {
   cameraReports: PendingCameraReport[];
   publishedCameras: ModerationCameraRecord[];
@@ -78,6 +90,10 @@ export type ModerationQueue = {
   recentEvents: ModerationEvent[];
   reviewers: Reviewer[];
   queueItems: ModerationQueueItem[];
+  /** Next-page cursor per paged queue, or null on its last page. */
+  queueNextCursors: Record<ModerationPagedQueue, PublishedCamerasCursor | null>;
+  /** COUNT(*) of every queue, so the dashboard can show "N of M". */
+  queueTotals: ModerationQueueTotals;
 };
 
 export type ModerationEntity = "camera" | "correction" | "camera_edit";
@@ -473,54 +489,89 @@ function synthesizedQueueItem(
 
 /** Published page size; the probe row makes the SELECT fetch PAGE_SIZE + 1. */
 const PUBLISHED_CAMERAS_PAGE_SIZE = 20;
+/** Default page size of every other moderation queue (same limit+1 probe). */
+export const MODERATION_QUEUE_PAGE_SIZE = 20;
 
+/** Tie-safe keyset predicate on (created_at, id), bound VALUES only. */
+function keysetClause(cursor: PublishedCamerasCursor | undefined, prefix = "") {
+  return cursor
+    ? {
+        sql: ` AND (${prefix}created_at > ? OR (${prefix}created_at = ? AND ${prefix}id > ?))`,
+        params: [cursor.createdAt, cursor.createdAt, cursor.id] as (string | number)[],
+      }
+    : { sql: "", params: [] as (string | number)[] };
+}
+
+/** Split a limit+1 probe result into the emitted page and its next cursor. */
+function pageOf<T extends { createdAt: string; id: number }>(
+  rows: T[],
+  pageSize: number,
+): { page: T[]; nextCursor: PublishedCamerasCursor | null } {
+  // Probe row proves a further page; the cursor comes from the LAST EMITTED row.
+  const hasNext = rows.length > pageSize;
+  const page = hasNext ? rows.slice(0, pageSize) : rows;
+  const last = page[page.length - 1];
+  return {
+    page,
+    nextCursor: hasNext && last ? { createdAt: last.createdAt, id: last.id } : null,
+  };
+}
+
+/**
+ * Every queue is bounded: each SELECT is keyset-paginated (FIFO
+ * `created_at ASC, id ASC`, page + 1 probe row) and the whole-queue sizes come
+ * from one COUNT round-trip. `publishedAfter` pages the published list (kept
+ * as the first argument for compatibility); `queueAfter` pages the others.
+ */
 export async function listPendingModerationItems(
   publishedAfter?: PublishedCamerasCursor,
+  queueAfter: ModerationQueueCursors = {},
 ): Promise<ModerationQueue> {
   const d1 = await getModerationD1();
-  // Published keyset predicate: compare both ordering keys (tie-safe) using
-  // bound VALUES only — the cursor row need not still exist or stay active.
-  const publishedAfterClause = publishedAfter
-    ? " AND (created_at > ? OR (created_at = ? AND id > ?))"
-    : "";
-  const publishedAfterParameters: (string | number)[] = publishedAfter
-    ? [publishedAfter.createdAt, publishedAfter.createdAt, publishedAfter.id]
-    : [];
-  const [cameraReports, publishedCameras, reviewCameras, staleCameras, correctionRequests, cameraEditRequests, recentEvents, reviewers, openQueueItems] =
+  // Keyset predicates compare both ordering keys (tie-safe) using bound
+  // VALUES only — the cursor row need not still exist or keep its status.
+  const publishedAfterClause = keysetClause(publishedAfter);
+  const pendingAfter = keysetClause(queueAfter.pending);
+  const reviewAfter = keysetClause(queueAfter.review);
+  const staleAfter = keysetClause(queueAfter.stale);
+  const correctionsAfter = keysetClause(queueAfter.corrections);
+  const editsAfter = keysetClause(queueAfter.edits, "er.");
+  const probe = MODERATION_QUEUE_PAGE_SIZE + 1;
+  const [cameraReports, publishedCameras, reviewCameras, staleCameras, correctionRequests, cameraEditRequests, recentEvents, reviewers, totalsRow] =
     await Promise.all([
       d1
         .prepare(
-          `SELECT ${cameraColumns} FROM cameras WHERE status = ? ORDER BY created_at ASC, id ASC`,
+          `SELECT ${cameraColumns} FROM cameras WHERE status = ?${pendingAfter.sql} ORDER BY created_at ASC, id ASC LIMIT ?`,
         )
-        .bind("pending")
+        .bind("pending", ...pendingAfter.params, probe)
         .all<PendingCameraReport>(),
       // Published (active) records: keyset-paginated with a limit+1 probe.
       // ponytail: the FIFO ORDER BY may scan/sort the active set; add a
       // (status, created_at, id) index only if measured query cost warrants it.
       d1
         .prepare(
-          `SELECT ${cameraColumns} FROM cameras WHERE status = ?${publishedAfterClause} ORDER BY created_at ASC, id ASC LIMIT ?`,
+          `SELECT ${cameraColumns} FROM cameras WHERE status = ?${publishedAfterClause.sql} ORDER BY created_at ASC, id ASC LIMIT ?`,
         )
-        .bind("active", ...publishedAfterParameters, PUBLISHED_CAMERAS_PAGE_SIZE + 1)
+        .bind("active", ...publishedAfterClause.params, PUBLISHED_CAMERAS_PAGE_SIZE + 1)
         .all<CameraRecord>(),
       d1
         .prepare(
-          `SELECT ${cameraColumns} FROM cameras WHERE status = ? ORDER BY created_at ASC, id ASC`,
+          `SELECT ${cameraColumns} FROM cameras WHERE status = ?${reviewAfter.sql} ORDER BY created_at ASC, id ASC LIMIT ?`,
         )
-        .bind("needs_review")
+        .bind("needs_review", ...reviewAfter.params, probe)
         .all<CameraRecord>(),
       d1
         .prepare(
-          `SELECT ${cameraColumns} FROM cameras WHERE status = ? ORDER BY created_at ASC, id ASC`,
+          `SELECT ${cameraColumns} FROM cameras WHERE status = ?${staleAfter.sql} ORDER BY created_at ASC, id ASC LIMIT ?`,
         )
-        .bind("stale")
+        .bind("stale", ...staleAfter.params, probe)
         .all<CameraRecord>(),
       // correction_requests rows expose outcome in the queue (null while pending).
       d1
         .prepare(
-          "SELECT id, camera_id AS cameraId, issue_type AS issueType, message, contact, status, outcome, created_at AS createdAt FROM correction_requests WHERE status = ? ORDER BY created_at ASC, id ASC",
+          `SELECT id, camera_id AS cameraId, issue_type AS issueType, message, contact, status, outcome, created_at AS createdAt FROM correction_requests WHERE status = ?${correctionsAfter.sql} ORDER BY created_at ASC, id ASC LIMIT ?`,
         )
-        .bind("pending")
+        .bind("pending", ...correctionsAfter.params, probe)
         .all<PendingCorrectionRequest>(),
       // Community edit requests (entity camera_edit): pending diff rows with
       // the camera's current values joined in, so the review UI diffs
@@ -543,9 +594,10 @@ export async function listPendingModerationItems(
                   c.latitude AS currentLatitude, c.longitude AS currentLongitude,
                   c.status AS cameraStatus
            FROM camera_edit_requests er LEFT JOIN cameras c ON c.id = er.camera_id
-           WHERE er.status = 'pending'
-           ORDER BY er.created_at ASC, er.id ASC`,
+           WHERE er.status = 'pending'${editsAfter.sql}
+           ORDER BY er.created_at ASC, er.id ASC LIMIT ?`,
         )
+        .bind(...editsAfter.params, probe)
         .all<PendingEditRequest>(),
       d1
         .prepare(
@@ -554,57 +606,101 @@ export async function listPendingModerationItems(
         .bind(50)
         .all<ModerationEvent>(),
       listReviewers(d1, true),
+      // Whole-queue totals in ONE round-trip. Every COUNT filters on an
+      // indexed status column (cameras status-leading composites,
+      // correction_requests_status_idx), so no queue is materialised.
       d1
-        .prepare(`SELECT ${queueSelect} ${queueJoin} WHERE q.state != 'closed' ORDER BY q.updated_at DESC`)
-        .all<ModerationQueueItem>(),
+        .prepare(
+          `SELECT
+             (SELECT COUNT(*) FROM cameras WHERE status = 'pending') AS pending,
+             (SELECT COUNT(*) FROM cameras WHERE status = 'active') AS published,
+             (SELECT COUNT(*) FROM cameras WHERE status = 'needs_review') AS review,
+             (SELECT COUNT(*) FROM cameras WHERE status = 'stale') AS stale,
+             (SELECT COUNT(*) FROM correction_requests WHERE status = 'pending') AS corrections,
+             (SELECT COUNT(*) FROM camera_edit_requests WHERE status = 'pending') AS edits`,
+        )
+        .first<ModerationQueueTotals>(),
     ]);
+
+  const published = pageOf(publishedCameras.results, PUBLISHED_CAMERAS_PAGE_SIZE);
+  const pending = pageOf(cameraReports.results, MODERATION_QUEUE_PAGE_SIZE);
+  const review = pageOf(reviewCameras.results, MODERATION_QUEUE_PAGE_SIZE);
+  const stale = pageOf(staleCameras.results, MODERATION_QUEUE_PAGE_SIZE);
+  const corrections = pageOf(correctionRequests.results, MODERATION_QUEUE_PAGE_SIZE);
+  const edits = pageOf(cameraEditRequests.results, MODERATION_QUEUE_PAGE_SIZE);
+
+  // Open queue rows ONLY for the emitted records (was: every non-closed row).
+  // json_each keeps it at three bound parameters whatever the page sizes
+  // (D1 caps a statement at 100), and the lookup rides the
+  // moderation_queue_open_unique (entity, entity_id) partial index.
+  const cameraIds = [...pending.page, ...review.page, ...stale.page].map((camera) => camera.id);
+  const correctionIds = corrections.page.map((correction) => correction.id);
+  const editIds = edits.page.map((editRequest) => editRequest.id);
+  const openQueueItems =
+    cameraIds.length + correctionIds.length + editIds.length === 0
+      ? { results: [] as ModerationQueueItem[] }
+      : await d1
+          .prepare(
+            `SELECT ${queueSelect} ${queueJoin} WHERE q.state != 'closed' AND (
+               (q.entity = 'camera' AND q.entity_id IN (SELECT value FROM json_each(?)))
+               OR (q.entity = 'correction' AND q.entity_id IN (SELECT value FROM json_each(?)))
+               OR (q.entity = 'camera_edit' AND q.entity_id IN (SELECT value FROM json_each(?))))
+             ORDER BY q.updated_at DESC`,
+          )
+          .bind(JSON.stringify(cameraIds), JSON.stringify(correctionIds), JSON.stringify(editIds))
+          .all<ModerationQueueItem>();
 
   const queueByKey = new Map(
     openQueueItems.results.map((item) => [`${item.entity}:${item.entityId}`, item]),
   );
 
-  // Probe row proves a further page; the cursor comes from the LAST EMITTED row.
-  const publishedHasNext = publishedCameras.results.length > PUBLISHED_CAMERAS_PAGE_SIZE;
-  const publishedPage = publishedHasNext
-    ? publishedCameras.results.slice(0, PUBLISHED_CAMERAS_PAGE_SIZE)
-    : publishedCameras.results;
-  const publishedLast = publishedPage[publishedPage.length - 1];
-  const publishedNextCursor: PublishedCamerasCursor | null =
-    publishedHasNext && publishedLast
-      ? { createdAt: publishedLast.createdAt, id: publishedLast.id }
-      : null;
-
   const queueItems: ModerationQueueItem[] = [
-    ...cameraReports.results.map((camera) =>
+    ...pending.page.map((camera) =>
       queueByKey.get(`camera:${camera.id}`) ?? synthesizedQueueItem("camera", camera.id, camera.createdAt),
     ),
-    ...reviewCameras.results.map((camera) =>
+    ...review.page.map((camera) =>
       queueByKey.get(`camera:${camera.id}`) ?? synthesizedQueueItem("camera", camera.id, camera.createdAt),
     ),
-    ...staleCameras.results.map((camera) =>
+    ...stale.page.map((camera) =>
       queueByKey.get(`camera:${camera.id}`) ?? synthesizedQueueItem("camera", camera.id, camera.createdAt),
     ),
-    ...correctionRequests.results.map((correction) =>
+    ...corrections.page.map((correction) =>
       queueByKey.get(`correction:${correction.id}`) ??
       synthesizedQueueItem("correction", correction.id, correction.createdAt),
     ),
-    ...cameraEditRequests.results.map((editRequest) =>
+    ...edits.page.map((editRequest) =>
       queueByKey.get(`camera_edit:${editRequest.id}`) ??
       synthesizedQueueItem("camera_edit", editRequest.id, editRequest.createdAt),
     ),
   ];
 
   return {
-    cameraReports: cameraReports.results,
-    publishedCameras: publishedPage,
-    publishedNextCursor,
-    reviewCameras: reviewCameras.results,
-    staleCameras: staleCameras.results,
-    correctionRequests: correctionRequests.results,
-    cameraEditRequests: cameraEditRequests.results,
+    cameraReports: pending.page,
+    publishedCameras: published.page,
+    publishedNextCursor: published.nextCursor,
+    reviewCameras: review.page,
+    staleCameras: stale.page,
+    correctionRequests: corrections.page,
+    cameraEditRequests: edits.page,
     recentEvents: recentEvents.results,
     reviewers: reviewers,
     queueItems,
+    queueNextCursors: {
+      pending: pending.nextCursor,
+      review: review.nextCursor,
+      stale: stale.nextCursor,
+      corrections: corrections.nextCursor,
+      edits: edits.nextCursor,
+    },
+    // Number() guards a driver handing COUNT(*) back as bigint/string.
+    queueTotals: {
+      pending: Number(totalsRow?.pending ?? 0),
+      published: Number(totalsRow?.published ?? 0),
+      review: Number(totalsRow?.review ?? 0),
+      stale: Number(totalsRow?.stale ?? 0),
+      corrections: Number(totalsRow?.corrections ?? 0),
+      edits: Number(totalsRow?.edits ?? 0),
+    },
   };
 }
 
