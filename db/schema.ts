@@ -68,6 +68,13 @@ export const cameras = sqliteTable(
     index("cameras_status_kind_idx").on(table.status, table.kind),
     index("cameras_status_updated_idx").on(table.status, sql`updated DESC`),
     index("cameras_status_last_verified_idx").on(table.status, sql`last_verified_at DESC`),
+    // Directory default alphabetical sort (migration 0046): the page query is
+    // `WHERE status = ? … ORDER BY title COLLATE NOCASE ASC, id DESC` (the
+    // shared predicate collapses to one status outside development), with the
+    // keyset cursor seeking on `title COLLATE NOCASE >= ?`. This index matches
+    // the ORDER BY exactly, so SQLite walks it in order instead of a full scan
+    // plus a temp B-tree sort on every request.
+    index("cameras_status_title_nocase_idx").on(table.status, sql`title COLLATE NOCASE`, sql`id DESC`),
     // Community trust levels (ADR 0018 §3, migration 0023): the level COUNT
     // is `WHERE contributor_id = ? AND status = 'verified'`, so
     // (contributor_id, status) turns it into an index-only seek. Declared

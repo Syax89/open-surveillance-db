@@ -108,7 +108,7 @@ test("both public SQL queries derive the status whitelist from the shared predic
   );
   assert.match(
     cameras,
-    /PUBLIC_CAMERA_STATUSES\.map/,
+    /PUBLIC_CAMERA_STATUSES(?:\.filter\([^)]*\))?\.map|statuses\s*=\s*PUBLIC_CAMERA_STATUSES\.filter\(/,
     "the predicate must generate its placeholders from the shared constant",
   );
 
@@ -132,7 +132,7 @@ test("both public SQL queries derive the status whitelist from the shared predic
 
   assert.match(
     cameras,
-    /parameters:\s*\[\.\.\.PUBLIC_CAMERA_STATUSES\b[^\]]*\]/,
+    /parameters:\s*\[\.\.\.(?:PUBLIC_CAMERA_STATUSES|statuses)\b[^\]]*\]/,
     "the predicate must bind the whitelisted statuses as parameters (never concatenated)",
   );
 
