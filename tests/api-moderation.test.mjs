@@ -1123,3 +1123,52 @@ test("same-origin guard runs before rate limiting so a foreign PATCH cannot spen
     rateLimit.resetRateLimitState();
   }
 });
+
+// ---------------------------------------------------------------------------
+// GET /api/moderation — bounded work queues (<queue>_after_* keyset cursors)
+// ---------------------------------------------------------------------------
+
+test("GET /api/moderation forwards per-queue cursors as the second db argument", async () => {
+  stub("listPendingModerationItems", async () => emptyPublishedQueue);
+  const { GET } = await route();
+  const createdAt = "2026-03-01T00:20:00.000Z";
+  const response = await GET(
+    authRequest(
+      `/api/moderation?pending_after_created_at=${encodeURIComponent(createdAt)}&pending_after_id=20` +
+        `&edits_after_created_at=${encodeURIComponent(createdAt)}&edits_after_id=9`,
+    ),
+  );
+  assert.equal(response.status, 200);
+  assert.deepEqual(callArgs("listPendingModerationItems"), [
+    [undefined, { pending: { createdAt, id: 20 }, edits: { createdAt, id: 9 } }],
+  ]);
+});
+
+test("GET /api/moderation accepts every bounded queue's cursor pair", async () => {
+  const { GET } = await route();
+  for (const queue of ["pending", "review", "stale", "corrections", "edits"]) {
+    stub("listPendingModerationItems", async () => emptyPublishedQueue);
+    const response = await GET(authRequest(`/api/moderation?${queue}_after_created_at=a&${queue}_after_id=3`));
+    assert.equal(response.status, 200, queue);
+    assert.deepEqual(callArgs("listPendingModerationItems").at(-1), [undefined, { [queue]: { createdAt: "a", id: 3 } }], queue);
+  }
+});
+
+test("GET /api/moderation rejects malformed queue cursors with 400 and no queue query", async (t) => {
+  const { GET } = await route();
+  const cases = [
+    { name: "stale id without createdAt", query: "stale_after_id=5" },
+    { name: "review createdAt without id", query: "review_after_created_at=a" },
+    { name: "pending duplicated id", query: "pending_after_created_at=a&pending_after_id=5&pending_after_id=6" },
+    { name: "corrections id zero", query: "corrections_after_created_at=a&corrections_after_id=0" },
+    { name: "edits control character", query: `edits_after_created_at=${encodeURIComponent("a\u0000b")}&edits_after_id=5` },
+  ];
+  for (const { name, query } of cases) {
+    await t.test(name, async () => {
+      stub("listPendingModerationItems", async () => emptyPublishedQueue);
+      const response = await GET(authRequest(`/api/moderation?${query}`));
+      assert.equal(response.status, 400, name);
+      assert.equal(callArgs("listPendingModerationItems").length, 0, name);
+    });
+  }
+});

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocale } from "../LocaleProvider";
 import { useMessages } from "../../lib/use-messages";
 import { LOCALE_BCP47 } from "../../lib/i18n";
+import { useBoundedQueues } from "./useBoundedQueues";
 import type { CameraInQueue, CorrectionInQueue, DecisionFormApi, EditRequestInQueue, ModerationAction, ModerationEvent, PublishedCursor, QueueEntity, QueueItem, QueuePayload, ReasonCode, Reviewer } from "./types";
 export function useModerationQueue() {
   const { locale } = useLocale();
@@ -22,13 +23,13 @@ export function useModerationQueue() {
   // Correction-only decision fields (H1, t_69891619): outcome + linked record id.
   const [outcomes, setOutcomes] = useState<Record<string, string>>({}); const [cameraIds, setCameraIds] = useState<Record<string, string>>({});
   const [metadataPublication, setMetadataPublication] = useState<Record<string, { manufacturer: boolean; observedOn: boolean }>>({});
-  const [loading, setLoading] = useState(true); const [processing, setProcessing] = useState<string | null>(null);
-  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(true); const [processing, setProcessing] = useState<string | null>(null); const [message, setMessage] = useState("");
   // PATCH/decision error (its own alert) vs queue-load failure, kept separate so a rejected decision is never offered a page retry.
   const [error, setError] = useState(""); const [queueError, setQueueError] = useState("");
   // Current page cursor (ref so a decision refresh targets the page shown NOW) + request generation + synchronous in-flight gate.
   const publishedCursorRef = useRef<PublishedCursor | null>(null); const generationRef = useRef(0);
   const controllerRef = useRef<AbortController | null>(null); const inFlightRef = useRef(false);
+  const bounded = useBoundedQueues({ generationRef, busyRef: inFlightRef, setters: { setCameras, setReviewCameras, setCorrections, setEditRequests, setQueueItems } }); const { invalidate: invalidateBounded, reset: resetBounded } = bounded; // one page per queue + totals; "load more" appends
 
   function readableDate(value?: string) {
     if (!value) return t.timeUnavailable; const date = new Date(value);
@@ -45,7 +46,7 @@ export function useModerationQueue() {
   const loadQueue = useCallback(() => {
     // Flip the busy flag here so EVERY trigger (mount, locale-driven effect re-run, decision refresh, page nav) is truthful.
     setPublishedLoading(true); const generation = (generationRef.current += 1); controllerRef.current?.abort();
-    const controller = new AbortController(); controllerRef.current = controller;
+    const controller = new AbortController(); controllerRef.current = controller; invalidateBounded(); // a full reload resets every bounded queue to page 1
     const cursor = publishedCursorRef.current; const params = new URLSearchParams();
     if (cursor) { params.set("published_after_created_at", cursor.createdAt); params.set("published_after_id", String(cursor.id)); }
     const query = params.toString(); const url = query ? `/api/moderation?${query}` : "/api/moderation";
@@ -58,7 +59,7 @@ export function useModerationQueue() {
         setPublishedNextCursor(data.publishedNextCursor ?? null); setReviewCameras(Array.isArray(data.reviewCameras) ? data.reviewCameras : []);
         setCorrections(Array.isArray(data.correctionRequests) ? data.correctionRequests : []); setEditRequests(Array.isArray(data.cameraEditRequests) ? data.cameraEditRequests : []);
         setRecentEvents(Array.isArray(data.recentEvents) ? data.recentEvents : []); setReviewers(Array.isArray(data.reviewers) ? data.reviewers : []);
-        setQueueItems(Array.isArray(data.queueItems) ? data.queueItems : []); setQueueError("");
+        setQueueItems(Array.isArray(data.queueItems) ? data.queueItems : []); setQueueError(""); resetBounded(data);
       })
       .catch((reason: unknown) => {
         if (generation !== generationRef.current) return; if (reason instanceof Error && reason.name !== "AbortError") setQueueError(reason.message);
@@ -66,13 +67,13 @@ export function useModerationQueue() {
       .finally(() => {
         if (generation !== generationRef.current) return; inFlightRef.current = false; setLoading(false); setPublishedLoading(false);
       });
-  }, [t.loadError]);
+  }, [t.loadError, invalidateBounded, resetBounded]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- loadQueue also runs from event handlers; the busy flag must flip synchronously before the async fetch and settles in loadQueue's finally.
     loadQueue();
-    return () => { generationRef.current += 1; controllerRef.current?.abort(); };
-  }, [loadQueue]);
+    return () => { generationRef.current += 1; controllerRef.current?.abort(); invalidateBounded(); };
+  }, [loadQueue, invalidateBounded]);
 
   /** Move the published section one page forward/backward (no prefetching). */
   function goToPublishedPage(direction: "next" | "previous") {
@@ -91,7 +92,7 @@ export function useModerationQueue() {
   /** Retry the CURRENT cursor after a queue-load failure (busy-guarded). */
   function retryQueueLoad() { if (inFlightRef.current || publishedLoading) return; inFlightRef.current = true; setPublishedLoading(true); loadQueue(); }
 
-  const total = cameras.length + corrections.length + editRequests.length; const summary = useMemo(() => t.awaiting(total), [t, total]);
+  const totals = bounded.totals; const total = (totals.pending ?? cameras.length) + (totals.corrections ?? corrections.length) + (totals.edits ?? editRequests.length); const summary = useMemo(() => t.awaiting(total), [t, total]);
   const queueByKey = useMemo(() => new Map(queueItems.map((item) => [`${item.entity}-${item.entityId}`, item])), [queueItems]);
 
   function queueBadge(entity: QueueEntity, id: number) {
@@ -157,7 +158,7 @@ export function useModerationQueue() {
   return {
     loading, message, error, queueError, summary,
     cameras, publishedCameras, reviewCameras, corrections, editRequests, recentEvents, reviewers,
-    actorId, setActorId,
+    actorId, setActorId, queuePaging: bounded.queuePaging, publishedTotal: totals.published ?? publishedCameras.length,
     publishedPagination: {
       previousLabel: community.previousPage, nextLabel: community.nextPage, loading: publishedLoading,
       hasPrevious: publishedHistory.length > 0, hasNext: publishedNextCursor !== null, failed: queueError !== "",
