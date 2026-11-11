@@ -1,11 +1,10 @@
 import { env } from "cloudflare:workers";
 import { decideAppeal, type AppealDecision, appealDecisions } from "../../../../db/appeals";
-import { requireRole } from "../../../lib/authz";
-import { CSRF_REJECTED_ERROR, sameOrigin } from "../../../lib/csrf";
+import { moderatorWriteGuard, requireRole } from "../../../lib/authz";
 import { isRecord } from "../../../lib/guards";
 import { BodyReadError, readJsonBody, urlTooLong } from "../../../lib/input-limits";
-import { recordRateLimitBlock } from "../../../lib/abuse-alerts";
-import { callerKey, checkRateLimit, limitsFor } from "../../../lib/rate-limit";
+import { limitsFor } from "../../../lib/rate-limit";
+import { rateLimitResponse } from "../../../lib/rate-limit-response";
 import { getReviewerByUserId } from "../../../../db/users";
 
 function parseAppealId(url: URL): number | null {
@@ -51,37 +50,27 @@ export async function PATCH(request: Request) {
   const auth = await requireRole(request, "moderator");
   if (!auth.ok) return auth.response;
 
-  // Same-origin guard: the decider is edge-authenticated (Basic/bearer gate or
-  // platform header), NOT a contributor osdb_session, so there is no CSRF token
-  // to echo. The shared sameOrigin helper still blocks a cross-site browser
-  // PATCH (which always carries a foreign Origin) before any rate-limit, body
-  // parse, reviewer lookup or write runs.
-  if (!sameOrigin(request)) {
-    return Response.json(
-      { error: CSRF_REJECTED_ERROR },
-      { status: 403, headers: { "Cache-Control": "no-store" } },
-    );
-  }
+  // Write-origin guard (before any rate-limit, body parse, reviewer lookup or
+  // write). The decider may be authenticated two ways at the edge: Basic/
+  // bearer (explicit credentials: same-origin check only) or their own
+  // osdb_session cookie (ambient authority the browser attaches by itself:
+  // the per-session X-CSRF-Token must also match, like every contributor
+  // write). The worker signals which one via `x-osdb-auth-source`.
+  const writeDenied = await moderatorWriteGuard(request);
+  if (writeDenied) return writeDenied;
 
   // The decider acts with the moderation bucket (second layer over the
   // edge gate): only authenticated moderators reach this point, and the
   // per-caller limit bounds a compromised or over-zealous account without
   // ever affecting public read traffic.
-  const key = callerKey(request, env);
-  const limitOptions = limitsFor("moderate", env);
-  const limit = await checkRateLimit(env, "moderate", key, limitOptions);
-  if (!limit.allowed) {
-    console.warn("PATCH /api/appeals/[id] rate limited");
-    recordRateLimitBlock(env, {
-      route: "/api/appeals/[id]",
-      key,
-      windowSeconds: limitOptions.windowSeconds,
-    });
-    return Response.json({ error: "Too many requests. Please try again shortly." }, {
-      status: 429,
-      headers: { "Retry-After": String(limit.retryAfterSeconds) },
-    });
-  }
+  const limited = await rateLimitResponse(request, {
+    bucket: "moderate",
+    route: "/api/appeals/[id]",
+    env,
+    limits: limitsFor("moderate", env),
+    log: "PATCH /api/appeals/[id] rate limited",
+  });
+  if (limited) return limited;
 
   const appealId = parseAppealId(new URL(request.url));
   if (appealId === null) {

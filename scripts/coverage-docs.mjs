@@ -38,7 +38,7 @@ const TREE_RE = /[\\/]\.coverage[\\/]trees[\\/]osdb-(routes|e2e|db-runtime|fresh
 
 // Harness tree layouts:
 //   routes      -> db/*.mjs are MOCKS (excluded), db-real/*.mjs real, app/** real
-//   e2e         -> db/*.mjs real except geocode.mjs (mock), app/** real, worker.mjs real
+//   e2e         -> db/*.mjs real except geocode.mjs (mock), app/** real, worker.mjs + worker/*.mjs real
 //   db-runtime  -> db/** + app/lib/** real
 //   freshness   -> db/** + app/lib/** real
 // cloudflare-workers.mjs is a mock in every tree; vinext-*-stub.mjs are stubs.
@@ -56,6 +56,7 @@ function mapToSource(url) {
   if (harness === "routes" && rel.startsWith("db/")) return null; // api mocks
 
   if (rel === "worker.mjs") return "worker/index.ts";
+  if (rel.startsWith("worker/")) return rel.replace(/\.mjs$/, ".ts"); // worker/index.ts sibling modules
   if (rel.startsWith("db-real/")) return `db/${rel.slice("db-real/".length).replace(/\.mjs$/, ".ts")}`;
   if (rel.startsWith("db/")) return `db/${rel.slice("db/".length).replace(/\.mjs$/, ".ts")}`;
   if (rel.startsWith("app/")) return rel.replace(/\.mjs$/, ".ts");

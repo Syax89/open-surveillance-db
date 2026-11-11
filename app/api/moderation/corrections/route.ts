@@ -1,9 +1,9 @@
 import { env } from "cloudflare:workers";
 import { listCorrectionHistoryForCamera } from "../../../../db/moderation";
-import { recordRateLimitBlock } from "../../../lib/abuse-alerts";
 import { requireRole } from "../../../lib/authz";
 import { urlTooLong } from "../../../lib/input-limits";
-import { callerKey, checkRateLimit, limitsFor } from "../../../lib/rate-limit";
+import { limitsFor } from "../../../lib/rate-limit";
+import { rateLimitResponse } from "../../../lib/rate-limit-response";
 
 /**
  * GET /api/moderation/corrections?cameraId=N — private correction-request
@@ -71,20 +71,11 @@ export async function GET(request: Request) {
  * emitted with a hashed caller identity only.
  */
 async function moderationLimit(request: Request) {
-  const key = callerKey(request, env);
-  const limitOptions = limitsFor("moderate", env);
-  const limit = await checkRateLimit(env, "moderate", key, limitOptions);
-  if (!limit.allowed) {
-    console.warn("GET /api/moderation/corrections rate limited");
-    recordRateLimitBlock(env, {
-      route: "/api/moderation/corrections",
-      key,
-      windowSeconds: limitOptions.windowSeconds,
-    });
-    return Response.json(
-      { error: "Too many requests. Please try again shortly." },
-      { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } },
-    );
-  }
-  return null;
+  return rateLimitResponse(request, {
+    bucket: "moderate",
+    route: "/api/moderation/corrections",
+    env,
+    limits: limitsFor("moderate", env),
+    log: "GET /api/moderation/corrections rate limited",
+  });
 }

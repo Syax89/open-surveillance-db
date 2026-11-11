@@ -108,6 +108,21 @@ const ACCOUNT_COMPONENTS = [
   { name: "ApiKeyRow", file: "app/account/ApiKeyRow.tsx" },
   { name: "ApiKeyCreateDialog", file: "app/components/ApiKeyCreateDialog.tsx" },
   { name: "ApiKeyRevealDialog", file: "app/components/ApiKeyRevealDialog.tsx" },
+  // Split di AccountPageBody (un componente per sezione): stesso contratto
+  // ~150 righe, nessuna deviazione registrata. Lo stato condiviso (profilo,
+  // livello, ruolo, logout/cancellazione) resta in AccountPageBody; gli hook
+  // useContributions/usePasskeys vivono in app/lib come useApiKeys.
+  { name: "VerifyEmailBanner", file: "app/account/VerifyEmailBanner.tsx" },
+  { name: "ProfileSection", file: "app/account/ProfileSection.tsx" },
+  { name: "DisplayNameField", file: "app/account/DisplayNameField.tsx" },
+  { name: "ContributionsSection", file: "app/account/ContributionsSection.tsx" },
+  { name: "ContributionStats", file: "app/account/ContributionStats.tsx" },
+  { name: "ContributionFilters", file: "app/account/ContributionFilters.tsx" },
+  { name: "ContributionList", file: "app/account/ContributionList.tsx" },
+  { name: "ContributionKindIcon", file: "app/account/ContributionKindIcon.tsx" },
+  { name: "PasskeysSection", file: "app/account/PasskeysSection.tsx" },
+  { name: "PasskeyDialogs", file: "app/account/PasskeyDialogs.tsx" },
+  { name: "DeleteAccountSection", file: "app/account/DeleteAccountSection.tsx" },
 ];
 
 /**
@@ -150,7 +165,7 @@ const ACCOUNT_COMPONENTS = [
  * aggiornata a 188.
  */
 const KNOWN_DEVIATIONS = new Map([
-  ["app/components/moderation/useModerationQueue.tsx", { baselineLines: 170, reason: "H1 t_69891619: campi associazione correzione→esito record (outcome + record id, validazione, cleanup) + commento contratto server/client aggiornato (fix PR #187); +2 t_6424f961: lookup data registry-driven LOCALE_BCP47 (no ternario it-IT/en-US)" }],
+  ["app/components/moderation/useModerationQueue.tsx", { baselineLines: 172, reason: "H1 t_69891619: campi associazione correzione→esito record (outcome + record id, validazione, cleanup) + commento contratto server/client aggiornato (fix PR #187); +2 t_6424f961: lookup data registry-driven LOCALE_BCP47 (no ternario it-IT/en-US); +1 X-CSRF-Token sul PATCH decisione (moderatore autenticato via osdb_session); +1 import useBoundedQueues (code di moderazione paginate)" }],
   ["app/components/home/MapPanel.tsx", { baselineLines: 188, reason: "t_b7728ad0: redesign popup (report-issue link rimosso, provenance via options) + stato pointsCollapsed pannello punti mobile map-first; t_66766914: stato DETERMINISTICO expanded SSR/client + preferenza mobile applicata solo post-hydration in effect (fix mismatch hydration CEO) — blocchi isolati" }],
   ["app/components/ApiKeyCreateDialog.tsx", { baselineLines: 182, reason: "t_7dce2869 F2: campo scadenza opzionale (select 30/90/365/mai + help i18n EN/IT) nel create dialog — scadenza chiave era invisibile in tutta la UI; blocchi isolati (label+select+small, stato expiry, expiryIso helper); +3 righe fix mobile dialog: import + chiamata shared useModalScrollLock(open), la logica resta estratta in app/lib/hooks" }],
   ["app/components/home/PublicDirectory.tsx", { baselineLines: 159, reason: "hub/catalog dual-variant: pass-through pagination cursor (totalRecords/serverPaginated) + fix hero search row (07b4540); blocchi isolati — il refactor del catalog vive in DirectoryCatalog" }],

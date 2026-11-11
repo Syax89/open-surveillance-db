@@ -1,12 +1,12 @@
 import { env } from "cloudflare:workers";
 import { applyCameraEdit, parseEditableEditFields } from "../../../../db/camera-edits";
 import { getCommunityRecordById } from "../../../../db/cameras";
-import { recordRateLimitBlock } from "../../../lib/abuse-alerts";
 import { CACHE_TAGS } from "../../../lib/cache-purge";
 import { withPublicCache } from "../../../lib/public-cache";
 import { CSRF_REJECTED_ERROR, csrfVerified, sameOrigin } from "../../../lib/csrf";
 import { BodyReadError, readJsonBody, urlTooLong } from "../../../lib/input-limits";
-import { callerKey, checkRateLimit, checkRateLimitForKeyAuth, limitsFor } from "../../../lib/rate-limit";
+import { limitsFor } from "../../../lib/rate-limit";
+import { rateLimitResponse } from "../../../lib/rate-limit-response";
 import { requireWriteAuth } from "../../../lib/write-gate";
 
 /**
@@ -44,21 +44,14 @@ export async function GET(request: Request) {
   // Public read route: metered per caller in the read-family bucket, same as
   // the directory list. Malformed ids above answered 404
   // without touching the database and are not counted.
-  const key = callerKey(request, env);
-  const limitOptions = limitsFor("read", env);
-  const limit = await checkRateLimit(env, "read", key, limitOptions);
-  if (!limit.allowed) {
-    console.warn(`GET /api/cameras/[id] rate limited for caller ${key}`);
-    recordRateLimitBlock(env, {
-      route: "/api/cameras/[id]",
-      key,
-      windowSeconds: limitOptions.windowSeconds,
-    });
-    return Response.json({ error: "Too many requests. Please try again shortly." }, {
-      status: 429,
-      headers: { "Retry-After": String(limit.retryAfterSeconds) },
-    });
-  }
+  const limited = await rateLimitResponse(request, {
+    bucket: "read",
+    route: "/api/cameras/[id]",
+    env,
+    limits: limitsFor("read", env),
+    log: (key) => `GET /api/cameras/[id] rate limited for caller ${key}`,
+  });
+  if (limited) return limited;
 
   // DB-lightening (CEO 2026-08-07): the record page deep-links here on
   // every visit — wrap the database read in the worker cache (fail-open)
@@ -149,21 +142,16 @@ export async function PATCH(request: Request) {
     return Response.json({ error: "Request URI too long." }, { status: 414, headers: NO_STORE_HEADERS });
   }
 
-  const key = callerKey(request, env);
   const limitOptions = limitsFor("edit", env);
-  const limit = await checkRateLimit(env, "edit", key, limitOptions);
-  if (!limit.allowed) {
-    console.warn("PATCH /api/cameras/[id] rate limited");
-    recordRateLimitBlock(env, {
-      route: "/api/cameras/[id]",
-      key,
-      windowSeconds: limitOptions.windowSeconds,
-    });
-    return Response.json({ error: "Too many requests. Please try again shortly." }, {
-      status: 429,
-      headers: { ...NO_STORE_HEADERS, "Retry-After": String(limit.retryAfterSeconds) },
-    });
-  }
+  const limited = await rateLimitResponse(request, {
+    bucket: "edit",
+    route: "/api/cameras/[id]",
+    env,
+    limits: limitOptions,
+    log: "PATCH /api/cameras/[id] rate limited",
+    headers: NO_STORE_HEADERS,
+  });
+  if (limited) return limited;
 
   let gate;
   try {
@@ -198,19 +186,16 @@ export async function PATCH(request: Request) {
   // answers 429 (same body as the per-IP block, Retry-After included).
   // Session callers have no per-key bucket (the pre-gate per-IP check is the
   // whole story), so this check is a no-op for them.
-  const keyLimit = await checkRateLimitForKeyAuth(env, "edit", request, limitOptions, gate);
-  if (!keyLimit.allowed) {
-    console.warn("PATCH /api/cameras/[id] rate limited (per-key bucket)");
-    recordRateLimitBlock(env, {
-      route: "/api/cameras/[id]",
-      key: keyLimit.key,
-      windowSeconds: limitOptions.windowSeconds,
-    });
-    return Response.json({ error: "Too many requests. Please try again shortly." }, {
-      status: 429,
-      headers: { ...NO_STORE_HEADERS, "Retry-After": String(keyLimit.retryAfterSeconds) },
-    });
-  }
+  const keyLimited = await rateLimitResponse(request, {
+    bucket: "edit",
+    route: "/api/cameras/[id]",
+    env,
+    limits: limitOptions,
+    apiKey: { gate },
+    log: "PATCH /api/cameras/[id] rate limited (per-key bucket)",
+    headers: NO_STORE_HEADERS,
+  });
+  if (keyLimited) return keyLimited;
 
   const id = parseId(request);
   if (id === null) {

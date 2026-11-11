@@ -6,8 +6,8 @@
  * transpile and import it in plain Node.
  */
 
-import { recordRateLimitBlock } from "./abuse-alerts";
-import { callerKey, checkRateLimit, limitsFor } from "./rate-limit";
+import { limitsFor } from "./rate-limit";
+import { rateLimitResponse } from "./rate-limit-response";
 import {
   isValidNewPassword,
   MAX_PASSWORD_LENGTH,
@@ -100,22 +100,16 @@ async function bucketLimit(
   route: string,
   bucket: "auth" | "session",
 ): Promise<Response | null> {
-  const key = callerKey(request);
-  const limitOptions = limitsFor(bucket, env);
-  const limit = await checkRateLimit(env, bucket, key, limitOptions);
-  if (!limit.allowed) {
-    console.warn(`${route} rate limited`);
-    recordRateLimitBlock(env, {
-      route,
-      key,
-      windowSeconds: limitOptions.windowSeconds,
-    });
-    return Response.json({ error: "Too many requests. Please try again shortly." }, {
-      status: 429,
-      headers: { "Retry-After": String(limit.retryAfterSeconds) },
-    });
-  }
-  return null;
+  // rateLimitResponse keys on callerKey(request, env), so TRUST_XFF is
+  // honoured behind a reverse proxy; without env every caller lacking
+  // cf-connecting-ip would share a single "unknown" bucket.
+  return rateLimitResponse(request, {
+    bucket,
+    route,
+    env,
+    limits: limitsFor(bucket, env),
+    log: `${route} rate limited`,
+  });
 }
 
 /**

@@ -250,14 +250,19 @@ test("locality search stays behind the public-list boundary and is rate-limited"
   assert.doesNotMatch(route, /console\.(?:log|info)\b/, "the search route must not log user queries");
   assert.match(route, /Cache-Control["']?\s*:\s*["']no-store["']/, "search responses must not be cached at the edge");
 
+  // The limiter block lives in the shared rate-limit-response helper; the
+  // route calls it with its own bucket and limits.
+  const limiterResponse = await readSource("app/lib/rate-limit-response.ts");
   assert.match(
     route,
-    /import\s*\{[^}]*\bcheckRateLimit\b[^}]*\}\s*from\s*["'][^"']*lib\/rate-limit["']/,
+    /import\s*\{[^}]*\brateLimitResponse\b[^}]*\}\s*from\s*["'][^"']*lib\/rate-limit-response["']/,
     "the search route must use the shared per-caller rate limiter",
   );
-  assert.match(route, /callerKey\(request(?:,\s*env)?\)/, "the rate limiter must be keyed on the caller identity");
-  assert.match(route, /status:\s*429/, "exceeding the limit must return 429");
-  assert.match(route, /Retry-After/, "the 429 response must include a retry window");
+  assert.match(route, /bucket:\s*["']search["'][\s\S]*limits:\s*searchLimits\(env\)/, "the search route must use its own bucket and limits");
+  assert.match(limiterResponse, /\bcheckRateLimit\(/, "the shared limiter response must use the per-caller rate limiter");
+  assert.match(limiterResponse, /callerKey\(request(?:,\s*env)?\)/, "the rate limiter must be keyed on the caller identity");
+  assert.match(limiterResponse, /status:\s*429/, "exceeding the limit must return 429");
+  assert.match(limiterResponse, /Retry-After/, "the 429 response must include a retry window");
   assert.match(limiter, /SEARCH_RATE_LIMIT_MAX/, "the search request limit must be configurable through environment");
   assert.match(limiter, /SEARCH_RATE_LIMIT_WINDOW_SECONDS/, "the search window must be configurable through environment");
 
@@ -595,7 +600,7 @@ test("the public JSON output never contains the private notes field", async () =
 });
 
 test("moderation is gated at the worker edge and fails closed", async () => {
-  const worker = await readSource("worker/index.ts");
+  const worker = await readSource("worker/gate.ts");
 
   assert.match(worker, /moderationPath\s*=\s*\(/, "the worker must recognise moderation paths");
   assert.match(worker, /MODERATION_USER/, "the worker must read the moderator username from environment");
@@ -613,14 +618,16 @@ test("public POST endpoints are rate-limited per caller and can be disabled", as
   const post = route.slice(postStart);
 
   assert.ok(postStart >= 0, "camera reports must have an explicit POST handler");
+  const limiterResponse = await readSource("app/lib/rate-limit-response.ts");
   assert.match(
     route,
-    /import\s*\{[^}]*\bcheckRateLimit\b[^}]*\}\s*from\s*["'][^"']*lib\/rate-limit["']/,
+    /import\s*\{[^}]*\brateLimitResponse\b[^}]*\}\s*from\s*["'][^"']*lib\/rate-limit-response["']/,
     "the POST handler must use the shared per-caller rate limiter",
   );
-  assert.match(route, /callerKey\(request(?:,\s*env)?\)/, "the rate limiter must be keyed on the caller identity");
-  assert.match(post, /status:\s*429/, "exceeding the limit must return 429");
-  assert.match(post, /Retry-After/, "the 429 response must include a retry window");
+  assert.match(post, /rateLimitResponse\(request,\s*\{\s*bucket:\s*["']submit["']/, "the POST handler must rate-limit the submit bucket");
+  assert.match(limiterResponse, /callerKey\(request(?:,\s*env)?\)/, "the rate limiter must be keyed on the caller identity");
+  assert.match(limiterResponse, /status:\s*429/, "exceeding the limit must return 429");
+  assert.match(limiterResponse, /Retry-After/, "the 429 response must include a retry window");
   assert.match(post, /submissionsDisabled\(env\)/, "submissions must be disableable through environment");
   assert.match(limiter, /new\s+Map<string,\s*number\[\]>/, "the limiter must keep per-key request timestamps");
   assert.match(limiter, /submit:\s*["']POST["']/, "the submission limit must read the POST_* prefix");
@@ -636,11 +643,13 @@ test("every public route family applies its own rate limit with 429 and Retry-Af
   const corrections = await readSource("app/api/corrections/route.ts");
   const moderation = await readSource("app/api/moderation/route.ts");
 
+  const limiterResponse = await readSource("app/lib/rate-limit-response.ts");
+  assert.match(limiterResponse, /callerKey\(request(?:,\s*env)?\)/, "the shared limiter must key on the caller identity");
+  assert.match(limiterResponse, /status:\s*429/, "the shared limiter must return 429");
+  assert.match(limiterResponse, /Retry-After/, "the shared limiter 429 must include a retry window");
   const hasRateLimiter = (source) =>
-    /import\s*\{[^}]*\bcheckRateLimit\b[^}]*\}\s*from\s*["'][^"']*lib\/rate-limit["']/.test(source) &&
-    /callerKey\(request(?:,\s*env)?\)/.test(source) &&
-    /status:\s*429/.test(source) &&
-    /Retry-After/.test(source);
+    /import\s*\{[^}]*\brateLimitResponse\b[^}]*\}\s*from\s*["'][^"']*lib\/rate-limit-response["']/.test(source) &&
+    /rateLimitResponse\(request,/.test(source);
 
   assert.ok(hasRateLimiter(cameras), "cameras GET+POST must be rate-limited");
   assert.ok(hasRateLimiter(nearby), "nearby search must be rate-limited");
@@ -658,6 +667,11 @@ test("every public route family applies its own rate limit with 429 and Retry-Af
   assert.match(nearby, /limitsFor\(\s*["']nearby["']/, "nearby must use its own bucket");
   assert.match(revisions, /limitsFor\(\s*["']revisions["']/, "revisions must use its own bucket");
   assert.match(moderation, /limitsFor\(\s*["']moderate["']/, "moderation must use its own bucket");
+  // The helper takes the bucket and the limits separately: pin both, so a
+  // mismatched `bucket:` cannot slip past a correct limitsFor(...) argument.
+  assert.match(nearby, /bucket:\s*["']nearby["']/, "nearby must rate-limit in its own bucket");
+  assert.match(revisions, /bucket:\s*["']revisions["']/, "revisions must rate-limit in its own bucket");
+  assert.match(moderation, /bucket:\s*["']moderate["']/, "moderation must rate-limit in its own bucket");
   assert.match(corrections, /submissionLimits\(env\)/, "corrections must share the submission bucket");
 });
 
@@ -699,15 +713,26 @@ test("every rate-limited route reports blocks to the hashed abuse-alert layer", 
     const source = await readSource(file);
     assert.match(
       source,
-      /recordRateLimitBlock\(env/,
-      `${file} must signal rate-limit blocks to the abuse-alert layer`,
+      /rateLimitResponse\(request,/,
+      `${file} must rate-limit through the shared helper`,
     );
-    assert.match(
+    assert.doesNotMatch(
       source,
-      /from\s*["'][^"']*lib\/abuse-alerts["']/,
-      `${file} must import the abuse-alert module`,
+      /recordBlock:\s*false/,
+      `${file} must not opt out of signalling rate-limit blocks`,
     );
   }
+  const limiterResponse = await readSource("app/lib/rate-limit-response.ts");
+  assert.match(
+    limiterResponse,
+    /recordRateLimitBlock\(env/,
+    "the shared limiter must signal rate-limit blocks to the abuse-alert layer",
+  );
+  assert.match(
+    limiterResponse,
+    /from\s*["'][^"']*\/abuse-alerts["']/,
+    "the shared limiter must import the abuse-alert module",
+  );
 
   const alerts = await readSource("app/lib/abuse-alerts.ts");
   assert.match(alerts, /sha256Hex/, "alerts must hash the caller identity");

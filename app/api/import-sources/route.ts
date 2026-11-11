@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 import { listCommittedImportBatches } from "../../../db/import-sources";
-import { callerKey, checkRateLimit, limitsFor } from "../../lib/rate-limit";
+import { limitsFor } from "../../lib/rate-limit";
+import { rateLimitResponse } from "../../lib/rate-limit-response";
 
 /**
  * GET /api/import-sources — committed import batches (slug → attribution
@@ -16,16 +17,15 @@ import { callerKey, checkRateLimit, limitsFor } from "../../lib/rate-limit";
  * only when an import lands).
  */
 export async function GET(request: Request) {
-  const key = callerKey(request, env);
-  const limitOptions = limitsFor("read", env);
-  const limit = await checkRateLimit(env, "read", key, limitOptions);
-  if (!limit.allowed) {
-    console.warn("GET /api/import-sources rate limited");
-    return Response.json({ error: "Too many requests. Please try again shortly." }, {
-      status: 429,
-      headers: { "Retry-After": String(limit.retryAfterSeconds) },
-    });
-  }
+  const limited = await rateLimitResponse(request, {
+    bucket: "read",
+    route: "/api/import-sources",
+    env,
+    limits: limitsFor("read", env),
+    log: "GET /api/import-sources rate limited",
+    recordBlock: false,
+  });
+  if (limited) return limited;
 
   try {
     const batches = await listCommittedImportBatches();

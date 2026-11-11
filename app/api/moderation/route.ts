@@ -15,15 +15,14 @@ import {
   type ModerationResult,
   moderationReasonCodes,
 } from "../../../db/moderation";
-import { recordRateLimitBlock } from "../../lib/abuse-alerts";
-import { requireRole } from "../../lib/authz";
+import { moderatorWriteGuard, requireRole } from "../../lib/authz";
 import { cameraPurgeTags, purgeCacheTags } from "../../lib/cache-purge";
-import { CSRF_REJECTED_ERROR, sameOrigin } from "../../lib/csrf";
 import { isRecord } from "../../lib/guards";
 import { BodyReadError, readJsonBody, urlTooLong } from "../../lib/input-limits";
-import { callerKey, checkRateLimit, limitsFor } from "../../lib/rate-limit";
+import { limitsFor } from "../../lib/rate-limit";
+import { rateLimitResponse } from "../../lib/rate-limit-response";
 import { getReviewerByUserId } from "../../../db/users";
-import type { PublishedCamerasCursor } from "../../../db/moderation";
+import type { ModerationQueueCursors, PublishedCamerasCursor } from "../../../db/moderation";
 
 // Mirror of the db layer allowlist (db/moderation.ts correctionOutcomes). Kept
 // inline so the route validates without importing a runtime value the test
@@ -235,22 +234,13 @@ function parseModerationRequest(value: unknown): ParsedModerationRequest {
  * signal is emitted with a hashed caller identity only.
  */
 async function moderationLimit(request: Request) {
-  const key = callerKey(request, env);
-  const limitOptions = limitsFor("moderate", env);
-  const limit = await checkRateLimit(env, "moderate", key, limitOptions);
-  if (!limit.allowed) {
-    console.warn("/api/moderation rate limited");
-    recordRateLimitBlock(env, {
-      route: "/api/moderation",
-      key,
-      windowSeconds: limitOptions.windowSeconds,
-    });
-    return Response.json({ error: "Too many requests. Please try again shortly." }, {
-      status: 429,
-      headers: { "Retry-After": String(limit.retryAfterSeconds) },
-    });
-  }
-  return null;
+  return rateLimitResponse(request, {
+    bucket: "moderate",
+    route: "/api/moderation",
+    env,
+    limits: limitsFor("moderate", env),
+    log: "/api/moderation rate limited",
+  });
 }
 
 /** Map the discriminated moderation result to an HTTP response with a stable body. */
@@ -310,10 +300,10 @@ type ParsedPublishedCursor =
   | { ok: true; cursor: PublishedCamerasCursor | undefined }
   | { ok: false };
 
-function parsePublishedCursor(request: Request): ParsedPublishedCursor {
-  const params = new URL(request.url).searchParams;
-  const createdAtValues = params.getAll("published_after_created_at");
-  const idValues = params.getAll("published_after_id");
+/** One `<prefix>_after_created_at` + `<prefix>_after_id` keyset pair. */
+function parseCursorPair(params: URLSearchParams, prefix: string): ParsedPublishedCursor {
+  const createdAtValues = params.getAll(`${prefix}_after_created_at`);
+  const idValues = params.getAll(`${prefix}_after_id`);
   if (createdAtValues.length === 0 && idValues.length === 0) return { ok: true, cursor: undefined };
   // Require exactly one of each: incomplete or duplicated pairs are rejected.
   if (createdAtValues.length !== 1 || idValues.length !== 1) return { ok: false };
@@ -330,6 +320,28 @@ function parsePublishedCursor(request: Request): ParsedPublishedCursor {
   const id = Number(rawId);
   if (!Number.isSafeInteger(id)) return { ok: false };
   return { ok: true, cursor: { createdAt, id } };
+}
+
+function parsePublishedCursor(request: Request): ParsedPublishedCursor {
+  return parseCursorPair(new URL(request.url).searchParams, "published");
+}
+
+// Mirror of db/moderation.ts moderationPagedQueues (inline for the same
+// reason as correctionOutcomeValues: the harness mocks the db module). Each
+// queue takes its own `<queue>_after_*` pair, validated like the published one.
+const pagedQueueNames = ["pending", "review", "stale", "corrections", "edits"] as const;
+
+function parseQueueCursors(
+  request: Request,
+): { ok: true; cursors: ModerationQueueCursors } | { ok: false } {
+  const params = new URL(request.url).searchParams;
+  const cursors: ModerationQueueCursors = {};
+  for (const queue of pagedQueueNames) {
+    const parsed = parseCursorPair(params, queue);
+    if (!parsed.ok) return { ok: false };
+    if (parsed.cursor) cursors[queue] = parsed.cursor;
+  }
+  return { ok: true, cursors };
 }
 
 export async function GET(request: Request) {
@@ -353,11 +365,26 @@ export async function GET(request: Request) {
     );
   }
 
+  const parsedQueueCursors = parseQueueCursors(request);
+  if (!parsedQueueCursors.ok) {
+    return Response.json(
+      { error: "Provide a valid queue pagination cursor." },
+      { status: 400 },
+    );
+  }
+
   const blocked = await moderationLimit(request);
   if (blocked) return blocked;
 
   try {
-    return Response.json(await listPendingModerationItems(parsedCursor.cursor));
+    // The queue cursors are only forwarded when present, so a first-page
+    // request keeps calling the db boundary with the published cursor alone.
+    const queueCursors = parsedQueueCursors.cursors;
+    return Response.json(
+      Object.keys(queueCursors).length > 0
+        ? await listPendingModerationItems(parsedCursor.cursor, queueCursors)
+        : await listPendingModerationItems(parsedCursor.cursor),
+    );
   } catch (error) {
     console.error("GET /api/moderation failed", error);
     return Response.json(
@@ -384,17 +411,14 @@ export async function PATCH(request: Request) {
   const auth = await requireRole(request, "moderator");
   if (!auth.ok) return auth.response;
 
-  // Same-origin guard: a moderator's decision is edge-authenticated (Basic/
-  // bearer gate or platform header), NOT a contributor osdb_session, so there
-  // is no CSRF token to echo. The shared sameOrigin helper still blocks a
-  // cross-site browser PATCH (which always carries a foreign Origin) before
-  // any rate-limit, body parse, reviewer lookup or write runs.
-  if (!sameOrigin(request)) {
-    return Response.json(
-      { error: CSRF_REJECTED_ERROR },
-      { status: 403, headers: { "Cache-Control": "no-store" } },
-    );
-  }
+  // Write-origin guard (before any rate-limit, body parse, reviewer lookup or
+  // write). The moderator may be authenticated two ways at the edge: Basic/
+  // bearer (explicit credentials: same-origin check only) or their own
+  // osdb_session cookie (ambient authority the browser attaches by itself:
+  // the per-session X-CSRF-Token must also match, like every contributor
+  // write). The worker signals which one via `x-osdb-auth-source`.
+  const writeDenied = await moderatorWriteGuard(request);
+  if (writeDenied) return writeDenied;
 
   const blocked = await moderationLimit(request);
   if (blocked) return blocked;

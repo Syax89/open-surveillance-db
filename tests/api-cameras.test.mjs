@@ -1320,7 +1320,60 @@ test("GET /api/cameras?format=geojson&bbox= returns only the points inside the b
   const body = await responseBody(response);
   assert.equal(body.type, "FeatureCollection");
   assert.equal(body.features.length, 1);
-  assert.deepEqual(callArgs("listPublicCamerasInBbox")[0], [{ west: 12.4, south: 41.8, east: 12.6, north: 42.0 }]);
+  assert.deepEqual(callArgs("listPublicCamerasInBbox")[0][0], { west: 12.4, south: 41.8, east: 12.6, north: 42.0 });
+});
+
+// GeoJSON bbox bounds (2026-11): the marker layer used to ignore kind /
+// freshness and answer EVERY row inside the box (a world bbox returned the
+// whole 160k+ dataset). It now honours the filters, rejects boxes over
+// BBOX_MAX_AREA_SQ_DEG with 400, and caps the features at
+// PUBLIC_CAMERAS_BBOX_GEOJSON_MAX_FEATURES with `truncated: true`.
+const GEOJSON_BBOX_MAX_FEATURES = 10_000; // mirror of db/cameras.ts
+
+test("GET /api/cameras?format=geojson&bbox= honours the kind and freshness filters", async () => {
+  stub("listPublicCamerasInBbox", async () => [cameraFixture]);
+  const { GET } = await camerasRoute();
+  const response = await GET(apiRequest("/api/cameras?format=geojson&bbox=12.4,41.8,12.6,42.0&kind=PTZ&freshness=30d"));
+  assert.equal(response.status, 200);
+  const [bbox, filters, options] = callArgs("listPublicCamerasInBbox")[0];
+  assert.deepEqual(bbox, { west: 12.4, south: 41.8, east: 12.6, north: 42.0 });
+  assert.equal(filters?.kind, "PTZ", "the kind filter must reach the db layer");
+  assert.equal(filters?.freshness, "30d", "the freshness filter must reach the db layer");
+  assert.equal(options?.limit, GEOJSON_BBOX_MAX_FEATURES + 1, "the route asks for one probe row past the cap");
+  const body = await responseBody(response);
+  assert.equal(body.truncated, false, "an under-cap layer is flagged as complete");
+});
+
+test("GET /api/cameras?format=geojson&bbox= rejects a box over BBOX_MAX_AREA_SQ_DEG without querying", async (t) => {
+  const { GET } = await camerasRoute();
+  for (const bbox of ["-180,-90,180,90", "0,0,10,10", "-10,40,0,45.1"]) {
+    await t.test(bbox, async () => {
+      resetMockState();
+      const response = await GET(apiRequest(`/api/cameras?format=geojson&bbox=${bbox}`));
+      assert.equal(response.status, 400, bbox);
+      const body = await responseBody(response);
+      assert.match(body.error, /area/i);
+      assert.equal(callArgs("listPublicCamerasInBbox").length, 0, "no query must run for an over-large box");
+    });
+  }
+  // A box exactly at the cap is still served.
+  resetMockState();
+  stub("listPublicCamerasInBbox", async () => []);
+  const atCap = await GET(apiRequest("/api/cameras?format=geojson&bbox=0,0,10,5"));
+  assert.equal(atCap.status, 200, "a 50 sq-deg box is at the cap, not over it");
+});
+
+test("GET /api/cameras?format=geojson&bbox= truncates at the row limit and flags it", async () => {
+  const rows = Array.from({ length: GEOJSON_BBOX_MAX_FEATURES + 1 }, (_, index) => ({ ...cameraFixture, id: index + 1 }));
+  stub("listPublicCamerasInBbox", async () => rows);
+  const { GET } = await camerasRoute();
+  const response = await GET(apiRequest("/api/cameras?format=geojson&bbox=12.4,41.8,12.6,42.0"));
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("cache-control"), "public, s-maxage=900, stale-while-revalidate=1800");
+  const body = await responseBody(response);
+  assert.equal(body.type, "FeatureCollection");
+  assert.equal(body.features.length, GEOJSON_BBOX_MAX_FEATURES, "the probe row is never served");
+  assert.equal(body.truncated, true, "a capped layer must say so");
 });
 
 test("GET /api/cameras?bbox= returns the JSON viewport page (map data contract, t_bb310428)", async () => {

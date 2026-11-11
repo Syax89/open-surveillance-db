@@ -52,15 +52,15 @@ export function ModerationDashboard() {
       </section>
 
       <QueueSection
-        id="pending-cameras-title" eyebrow={t.reports} title={t.pendingReports} note={`${q.cameras.length} ${t.pending}`}
-        listLabel={t.pendingReports} loading={q.loading} items={q.cameras}
+        id="pending-cameras-title" eyebrow={t.reports} title={t.pendingReports} note={`${q.queuePaging("pending", q.cameras.length).note} ${t.pending}`}
+        listLabel={t.pendingReports} loading={q.loading} items={q.cameras} paging={q.queuePaging("pending", q.cameras.length)}
         emptyTitle={t.noPendingTitle} emptyText={t.noPendingText}
         itemKey={(camera) => camera.id}
         renderItem={(camera) => <CameraQueueItem camera={camera} variant="pending" queueBadge={q.queueBadge("camera", camera.id)} api={q.decisionApi} readableDate={q.readableDate} />}
       />
 
       <QueueSection
-        id="published-cameras-title" eyebrow={t.lifecycle} title={t.publishedRecords} note={`${q.publishedCameras.length} ${t.verified}`}
+        id="published-cameras-title" eyebrow={t.lifecycle} title={t.publishedRecords} note={`${t.shownOf(q.publishedCameras.length, q.publishedTotal)} ${t.verified}`}
         listLabel={t.publishedRecords} loading={q.loading || q.publishedPagination.loading || q.publishedPagination.failed} items={q.publishedCameras}
         emptyTitle={t.noPublishedTitle} emptyText={t.noPublishedText} hasHistory={q.publishedPagination.hasPrevious}
         itemKey={(camera) => camera.id}
@@ -75,16 +75,16 @@ export function ModerationDashboard() {
       />
 
       <QueueSection
-        id="review-cameras-title" eyebrow={t.lifecycle} title={t.recordsNeedReview} note={`${q.reviewCameras.length} ${t.awaitingReview}`}
-        listLabel={t.recordsNeedReview} loading={q.loading} items={q.reviewCameras}
+        id="review-cameras-title" eyebrow={t.lifecycle} title={t.recordsNeedReview} note={`${q.queuePaging("review", q.reviewCameras.length).note} ${t.awaitingReview}`}
+        listLabel={t.recordsNeedReview} loading={q.loading} items={q.reviewCameras} paging={q.queuePaging("review", q.reviewCameras.length)}
         emptyTitle={t.noReviewTitle} emptyText={t.noReviewText}
         itemKey={(camera) => camera.id}
         renderItem={(camera) => <CameraQueueItem camera={camera} variant="review" queueBadge={q.queueBadge("camera", camera.id)} api={q.decisionApi} readableDate={q.readableDate} />}
       />
 
       <QueueSection
-        id="correction-requests-title" eyebrow={t.corrections} title={t.privateCorrections} note={`${q.corrections.length} ${t.pending}`}
-        listLabel={t.privateCorrections} loading={q.loading} items={q.corrections}
+        id="correction-requests-title" eyebrow={t.corrections} title={t.privateCorrections} note={`${q.queuePaging("corrections", q.corrections.length).note} ${t.pending}`}
+        listLabel={t.privateCorrections} loading={q.loading} items={q.corrections} paging={q.queuePaging("corrections", q.corrections.length)}
         emptyTitle={t.noCorrectionsTitle} emptyText={t.noCorrectionsText}
         itemKey={(correction) => correction.id}
         renderItem={(correction) => <CorrectionQueueItem correction={correction} queueBadge={q.queueBadge("correction", correction.id)} api={q.decisionApi} readableDate={q.readableDate} readableStatus={q.readableStatus} readableOutcome={q.readableOutcome} />}
@@ -99,8 +99,8 @@ export function ModerationDashboard() {
       />
 
       <QueueSection
-        id="edit-requests-title" eyebrow={t.editing} title={t.editRequests} note={`${q.editRequests.length} ${t.pending}`}
-        listLabel={t.editRequests} loading={q.loading} items={q.editRequests}
+        id="edit-requests-title" eyebrow={t.editing} title={t.editRequests} note={`${q.queuePaging("edits", q.editRequests.length).note} ${t.pending}`}
+        listLabel={t.editRequests} loading={q.loading} items={q.editRequests} paging={q.queuePaging("edits", q.editRequests.length)}
         emptyTitle={t.noEditRequestsTitle} emptyText={t.noEditRequestsText}
         itemKey={(editRequest) => editRequest.id}
         renderItem={(editRequest) => <EditQueueItem editRequest={editRequest} queueBadge={q.queueBadge("camera_edit", editRequest.id)} api={q.decisionApi} readableDate={q.readableDate} />}

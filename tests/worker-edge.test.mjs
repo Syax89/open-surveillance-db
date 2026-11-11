@@ -16,7 +16,7 @@
 // No personal data: all credentials are throwaway test strings.
 
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { beforeEach, test } from "node:test";
@@ -68,15 +68,20 @@ let treePromise = null;
 
 async function buildWorkerTree() {
   const tree = await mkdtemp(path.join(os.tmpdir(), "osdb-worker-"));
-  const source = await readFile(WORKER_SOURCE, "utf8");
-  const compiled = ts.transpileModule(source, {
-    compilerOptions: {
-      module: ts.ModuleKind.ESNext,
-      target: ts.ScriptTarget.ESNext,
-      moduleResolution: ts.ModuleResolutionKind.Bundler,
-    },
-    fileName: WORKER_SOURCE,
-  }).outputText;
+  // worker/index.ts is the entry; its sibling modules (worker/gate.ts,
+  // worker/security-headers.ts, ...) are compiled into tree/worker/*.mjs and
+  // the entry's `./x` imports are rewritten to them (see rewriteWorker).
+  const transpileWorker = async (sourcePath) =>
+    ts.transpileModule(await readFile(sourcePath, "utf8"), {
+      compilerOptions: {
+        module: ts.ModuleKind.ESNext,
+        target: ts.ScriptTarget.ESNext,
+        moduleResolution: ts.ModuleResolutionKind.Bundler,
+      },
+      fileName: sourcePath,
+    }).outputText;
+  const workerModuleDir = path.join(tree, "worker");
+  await mkdir(workerModuleDir, { recursive: true });
 
   const mocksDir = path.join(tree, "mocks");
   await mkdir(mocksDir, { recursive: true });
@@ -158,7 +163,12 @@ async function buildWorkerTree() {
     await writeFile(path.join(i18nDir, `${name}.mjs`), compiled);
   }
 
-  const rewritten = compiled
+  const rewriteWorker = (compiled) => compiled
+    // Sibling worker modules (worker/gate.ts → tree/worker/gate.mjs, ...).
+    .replace(
+      /from\s*["']\.\/([\w-]+)["']/g,
+      (_match, name) => `from "${pathToFileURL(path.join(workerModuleDir, `${name}.mjs`)).href}"`,
+    )
     .replace(
       /from\s*["']\.\.\/db\/retention["']/g,
       `from "${pathToFileURL(path.join(dbDir, "retention.mjs")).href}"`,
@@ -201,13 +211,21 @@ async function buildWorkerTree() {
     )
     .replace(/from\s*["']vinext\/server\/request-pipeline["']/g, `from "${import.meta.resolve("vinext/server/request-pipeline")}"`);
 
-  // The worker must not contain any leftover bare vinext/cloudflare import.
-  const unresolved = [...rewritten.matchAll(/from\s*["'](?:vinext\/|cloudflare:)[^"']+["']/g)];
-  if (unresolved.length > 0) {
-    throw new Error(`worker/index.ts still has unresolvable imports: ${unresolved.map((m) => m[0]).join(", ")}`);
-  }
+  const workerSourceDir = path.dirname(WORKER_SOURCE);
+  const workerFiles = (await readdir(workerSourceDir)).filter((name) => name.endsWith(".ts") && !name.endsWith(".d.ts"));
+  for (const name of workerFiles) {
+    const rewritten = rewriteWorker(await transpileWorker(path.join(workerSourceDir, name)));
 
-  await writeFile(path.join(tree, "worker.mjs"), rewritten);
+    // The worker must not contain any leftover bare vinext/cloudflare import
+    // nor an unrewritten relative one.
+    const unresolved = [...rewritten.matchAll(/from\s*["'](?:vinext\/|cloudflare:|\.)[^"']+["']/g)];
+    if (unresolved.length > 0) {
+      throw new Error(`worker/${name} still has unresolvable imports: ${unresolved.map((m) => m[0]).join(", ")}`);
+    }
+
+    const output = name === "index.ts" ? path.join(tree, "worker.mjs") : path.join(workerModuleDir, name.replace(/\.ts$/, ".mjs"));
+    await writeFile(output, rewritten);
+  }
   return tree;
 }
 
@@ -1214,6 +1232,51 @@ test("moderator session does not leak into the legacy identity headers it replac
   const forwarded = app.__calls.at(-1).headers;
   assert.equal(forwarded["x-osdb-user-email"], "mod@osdb.test");
   assert.equal(forwarded["oai-authenticated-user-email"], undefined);
+});
+
+// The route layer requires the CSRF double-submit token only when the
+// moderator identity came from the ambient osdb_session cookie, so the edge
+// must record the credential source and never let a client choose it.
+test("gate records the auth source (session vs edge) and strips a client-supplied one", async () => {
+  const { worker, app, auth, users } = await loadWorker();
+  auth.__state.session = { contributor: { id: 41, email: "mod@osdb.test" } };
+  users.__state.usersByContributorId[41] = { email: "mod@osdb.test", role: "moderator", active: 1 };
+  let response = await worker.fetch(
+    request("/api/moderation", {
+      method: "PATCH",
+      headers: { cookie: sessionCookie("real-token"), "x-osdb-auth-source": "edge" },
+    }),
+    testEnv(MINIMAL_BASIC_CONFIG),
+    ctx(),
+  );
+  assert.equal(response.status, 200);
+  assert.equal(app.__calls.at(-1).headers["x-osdb-auth-source"], "session");
+
+  auth.__state.session = null;
+  for (const [name, authorization, config] of [
+    ["basic", basic("fixture", "fixture-pass"), { ...MINIMAL_BASIC_CONFIG, MODERATION_IDENTITY_EMAIL: "ops@osdb.test" }],
+    ["bearer", bearer("fixture-token"), { MODERATION_TOKEN: "fixture-token", MODERATION_IDENTITY_EMAIL: "ops@osdb.test" }],
+  ]) {
+    response = await worker.fetch(
+      request("/api/appeals/1", {
+        method: "PATCH",
+        headers: { authorization, "x-osdb-auth-source": "session" },
+      }),
+      testEnv(config),
+      ctx(),
+    );
+    assert.equal(response.status, 200, name);
+    assert.equal(app.__calls.at(-1).headers["x-osdb-auth-source"], "edge", name);
+  }
+
+  // Ungated path: a client-supplied source never reaches the app.
+  response = await worker.fetch(
+    request("/api/appeals", { method: "POST", headers: { "x-osdb-auth-source": "session" } }),
+    testEnv(),
+    ctx(),
+  );
+  assert.equal(response.status, 200);
+  assert.equal(app.__calls.at(-1).headers["x-osdb-auth-source"], undefined);
 });
 
 test("contributor POST appeals aliases stay ungated while GET and PATCH remain gated", async () => {

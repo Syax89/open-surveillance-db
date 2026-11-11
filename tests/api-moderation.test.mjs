@@ -1123,3 +1123,192 @@ test("same-origin guard runs before rate limiting so a foreign PATCH cannot spen
     rateLimit.resetRateLimitState();
   }
 });
+
+// ---------------------------------------------------------------------------
+// PATCH /api/moderation — CSRF double-submit for session-authenticated
+// moderators
+// ---------------------------------------------------------------------------
+//
+// The worker gate accepts a moderator's own osdb_session cookie (ambient
+// authority) and marks the request `x-osdb-auth-source: session`. Such a
+// request must echo the per-session CSRF token like every contributor write;
+// Basic/bearer (`edge`) callers keep the same-origin check only.
+
+const moderatorSession = {
+  id: 9,
+  contributorId: 41,
+  tokenHash: "hash-of-moderator-token",
+  csrfToken: "moderator-csrf-token",
+  createdAt: "2026-08-01T00:00:00.000Z",
+  expiresAt: "2026-08-31T00:00:00.000Z",
+  revokedAt: null,
+};
+const sessionDecision = (headers = {}) =>
+  authRequest("/api/moderation", {
+    method: "PATCH",
+    headers: {
+      "x-osdb-auth-source": "session",
+      cookie: "osdb_session=moderator-raw-token; osdb_csrf=moderator-csrf-token",
+      ...headers,
+    },
+    body: { entity: "camera", id: 5, action: "approve", reasonCode: validReasonCode, actorId },
+  });
+const stubModeratorSession = () =>
+  stub("findSessionByToken", async (token) =>
+    token === "moderator-raw-token"
+      ? { ...moderatorSession, contributor: { id: 41, email: "mod@osdb.test", displayName: "Mod" } }
+      : null,
+  );
+
+test("PATCH by a session-authenticated moderator without a valid CSRF token is 403 before any write", async (t) => {
+  const { PATCH } = await route();
+  for (const [name, headers] of [
+    ["no token header", {}],
+    ["wrong token", { "x-csrf-token": "attacker-guess" }],
+    ["same-origin but no token", { origin: "https://osdb.test" }],
+  ]) {
+    await t.test(name, async () => {
+      resetMockState();
+      stubModeratorAuth();
+      stubModeratorSession();
+      stub("moderateCamera", async () => okResult());
+      const request = sessionDecision(headers);
+      const response = await PATCH(request);
+      assert.equal(response.status, 403, name);
+      assert.equal(
+        (await responseBody(response)).error,
+        "Cross-site request rejected. Refresh the page and try again.",
+      );
+      assert.equal(request.bodyUsed, false);
+      assert.equal(callArgs("moderateCamera").length, 0, name);
+      assert.equal(callArgs("getReviewerByUserId").length, 0, name);
+    });
+  }
+});
+
+test("PATCH by a session-authenticated moderator with a dead session is 403", async () => {
+  stub("findSessionByToken", async () => null);
+  stub("moderateCamera", async () => okResult());
+  const { PATCH } = await route();
+  const response = await PATCH(sessionDecision({ "x-csrf-token": "moderator-csrf-token" }));
+  assert.equal(response.status, 403);
+  assert.equal(callArgs("moderateCamera").length, 0);
+});
+
+test("PATCH by a session-authenticated moderator with the matching CSRF token succeeds", async () => {
+  stubModeratorSession();
+  stub("moderateCamera", async () => okResult({ ...cameraItem, status: "rejected" }));
+  const { PATCH } = await route();
+  const response = await PATCH(sessionDecision({ "x-csrf-token": "moderator-csrf-token", origin: "https://osdb.test" }));
+  assert.equal(response.status, 200);
+  assert.equal(callArgs("moderateCamera").length, 1);
+});
+
+test("PATCH by a Basic/bearer (edge) moderator needs no CSRF token", async (t) => {
+  const { PATCH } = await route();
+  for (const [name, headers] of [
+    ["edge source marker", { "x-osdb-auth-source": "edge" }],
+    ["no source marker", {}],
+  ]) {
+    await t.test(name, async () => {
+      resetMockState();
+      stubModeratorAuth();
+      stub("moderateCamera", async () => okResult());
+      const response = await PATCH(
+        authRequest("/api/moderation", {
+          method: "PATCH",
+          headers,
+          body: { entity: "camera", id: 5, action: "approve", reasonCode: validReasonCode, actorId },
+        }),
+      );
+      assert.equal(response.status, 200, name);
+      assert.equal(callArgs("moderateCamera").length, 1, name);
+      assert.equal(callArgs("findSessionByToken").length, 0, name);
+    });
+  }
+});
+
+test("PATCH with a cross-site Origin is 403 even with a valid session CSRF token", async () => {
+  stubModeratorSession();
+  stub("moderateCamera", async () => okResult());
+  const { PATCH } = await route();
+  for (const headers of [
+    { "x-csrf-token": "moderator-csrf-token", origin: "https://evil.test" },
+  ]) {
+    const response = await PATCH(sessionDecision(headers));
+    assert.equal(response.status, 403);
+  }
+  const edge = await PATCH(
+    authRequest("/api/moderation", {
+      method: "PATCH",
+      headers: { "x-osdb-auth-source": "edge", origin: "https://evil.test" },
+      body: { entity: "camera", id: 5, action: "approve", reasonCode: validReasonCode, actorId },
+    }),
+  );
+  assert.equal(edge.status, 403);
+  assert.equal(callArgs("moderateCamera").length, 0);
+});
+
+// GET /api/moderation — bounded work queues (<queue>_after_* keyset cursors)
+// ---------------------------------------------------------------------------
+
+test("GET /api/moderation forwards per-queue cursors as the second db argument", async () => {
+  stub("listPendingModerationItems", async () => emptyPublishedQueue);
+  const { GET } = await route();
+  const createdAt = "2026-03-01T00:20:00.000Z";
+  const response = await GET(
+    authRequest(
+      `/api/moderation?pending_after_created_at=${encodeURIComponent(createdAt)}&pending_after_id=20` +
+        `&edits_after_created_at=${encodeURIComponent(createdAt)}&edits_after_id=9`,
+    ),
+  );
+  assert.equal(response.status, 200);
+  assert.deepEqual(callArgs("listPendingModerationItems"), [
+    [undefined, { pending: { createdAt, id: 20 }, edits: { createdAt, id: 9 } }],
+  ]);
+});
+
+test("GET /api/moderation accepts every bounded queue's cursor pair", async () => {
+  const { GET } = await route();
+  for (const queue of ["pending", "review", "stale", "corrections", "edits"]) {
+    stub("listPendingModerationItems", async () => emptyPublishedQueue);
+    const response = await GET(authRequest(`/api/moderation?${queue}_after_created_at=a&${queue}_after_id=3`));
+    assert.equal(response.status, 200, queue);
+    assert.deepEqual(callArgs("listPendingModerationItems").at(-1), [undefined, { [queue]: { createdAt: "a", id: 3 } }], queue);
+  }
+});
+
+test("GET /api/moderation rejects malformed queue cursors with 400 and no queue query", async (t) => {
+  const { GET } = await route();
+  const cases = [
+    { name: "stale id without createdAt", query: "stale_after_id=5" },
+    { name: "review createdAt without id", query: "review_after_created_at=a" },
+    { name: "pending duplicated id", query: "pending_after_created_at=a&pending_after_id=5&pending_after_id=6" },
+    { name: "corrections id zero", query: "corrections_after_created_at=a&corrections_after_id=0" },
+    { name: "edits control character", query: `edits_after_created_at=${encodeURIComponent("a\u0000b")}&edits_after_id=5` },
+  ];
+  for (const { name, query } of cases) {
+    await t.test(name, async () => {
+      stub("listPendingModerationItems", async () => emptyPublishedQueue);
+      const response = await GET(authRequest(`/api/moderation?${query}`));
+      assert.equal(response.status, 400, name);
+      assert.equal(callArgs("listPendingModerationItems").length, 0, name);
+    });
+  }
+});
+
+test("PATCH with an osdb_session cookie but no auth-source marker fails closed (CSRF required)", async () => {
+  resetMockState();
+  stubModeratorAuth();
+  stubModeratorSession();
+  stub("moderateCamera", async () => okResult());
+  const { PATCH } = await route();
+  const withoutToken = await PATCH(sessionDecision({ "x-osdb-auth-source": "" }));
+  assert.equal(withoutToken.status, 403);
+  assert.equal(callArgs("moderateCamera").length, 0);
+  const withToken = await PATCH(
+    sessionDecision({ "x-osdb-auth-source": "", "x-csrf-token": "moderator-csrf-token" }),
+  );
+  assert.equal(withToken.status, 200);
+  assert.equal(callArgs("moderateCamera").length, 1);
+});

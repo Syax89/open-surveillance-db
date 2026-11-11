@@ -27,7 +27,7 @@ From a fresh clone:
 git clone https://github.com/Syax89/open-surveillance-db.git
 cd open-surveillance-db
 npm ci          # reproducible install from package-lock.json (Node >= 22.13)
-npm run db:migrate   # apply the Drizzle schema migrations (0000–0025)
+npm run db:migrate   # apply every Drizzle migration under drizzle/
 npm run dev     # vinext dev: Vite + workerd, serves on http://localhost:3000
 ```
 
@@ -155,7 +155,7 @@ The four database commands, at a glance:
 | Command | Purpose | Expected outcome |
 | --- | --- | --- |
 | `npm run db:generate` | Regenerate a migration after editing `db/schema.ts` | One new `drizzle/00NN_*.sql` (+ `drizzle/meta/` journal/snapshot update) with only your change |
-| `npm run db:migrate` | Apply pending Drizzle migrations to the local D1 database | Full schema on a fresh state (26 files: 13 tables, 0 rows); no-op when everything is already applied |
+| `npm run db:migrate` | Apply pending Drizzle migrations to the local D1 database | Full schema on a fresh state (every file in `drizzle/`, 0 rows); no-op when everything is already applied |
 | `npm run db:reset` | Start over non-destructively | `.wrangler/state` moved aside under a timestamped backup, then migrations applied to a fresh empty DB |
 | `npm run db:seed` (optional) | Insert the two labelled demo pins | 2 fictional `demo` records, idempotent — safe to re-run |
 
@@ -173,8 +173,10 @@ npm run dev
 Enter. In a non-interactive shell (CI) wrangler auto-confirms (verified output:
 `🤖 Using fallback value in non-interactive context: yes`).
 
-Verified result on a fresh state: all 26 migration files apply (`✅`),
-producing the 13 tables plus the `d1_migrations` bookkeeping table, and
+Verified result on a fresh state: every migration file in `drizzle/` applies
+(`✅`), producing the tables defined in `db/schema.ts` (plus
+`geocode_reverse_cache`, created only by migration 0041) and the
+`d1_migrations` bookkeeping table, and
 **zero demo rows**. There is no "seed on empty table" path anywhere in the
 runtime — see [section 5](#5-synthetic-fixtures).
 
@@ -238,7 +240,7 @@ the seed.
 `tests/helpers/` contains the test harness:
 
 - `db-runtime-harness.mjs` — transpiles the real DB modules and replays the
-  real migration files (`drizzle/0000-*.sql` … `0025-*.sql`) onto an
+  real migration files (every `drizzle/NNNN_*.sql`, sorted by filename) onto an
   in-memory D1 adapter, so the test suite exercises exactly what
   `npm run db:migrate` produces locally;
 - `mock-state.mjs` — shared mutable state for the mocked `db` modules;

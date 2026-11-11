@@ -1136,12 +1136,15 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
     const { visible } = markersForViewport(cameras, viewportBounds, mapZoom, centerLng);
     visible.forEach((camera) => {
       const lng = longitudeInCopy(camera.longitude, centerLng);
+      // Same whitelist as buildMarkerIcon: only public statuses may style a
+      // field-of-view shape.
+      const statusClass = isPublicStatus(camera.status) ? camera.status : "";
       if (isDomeKind(camera.kind)) {
         // Dome: 360° vision — a circle around the marker (same radius as the
         // wedge, so both render at the same visual scale).
         L.circle([camera.latitude, lng], {
           radius: fovCircleRadiusMeters(),
-          className: `fov-cone fov-circle ${camera.status}`,
+          className: `fov-cone fov-circle ${statusClass}`,
           interactive: false,
           weight: 1,
           opacity: 0.55,
@@ -1152,7 +1155,7 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
         // the direction the camera looks (vertex on the marker).
         const points = fovPolygonPoints(camera.latitude, lng, camera.direction);
         L.polygon(points, {
-          className: `fov-cone ${camera.status}`,
+          className: `fov-cone ${statusClass}`,
           interactive: false,
           weight: 1,
           opacity: 0.55,

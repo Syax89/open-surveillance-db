@@ -1283,7 +1283,7 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 .directory-pagination { display:flex; align-items:center; justify-content:space-between; gap:var(--space-4); flex-wrap:wrap; margin-top:26px; padding-top:18px; border-top:1px solid var(--line); }
 .pagination-button { min-height:44px; display:inline-flex; align-items:center; gap:7px; padding:0 16px; border:1px solid var(--field-border); border-radius:var(--radius-md); background:var(--card-bg); color:var(--action); font-size:var(--text-md); font-weight:800; }
 .pagination-button:hover:not(:disabled) { border-color:var(--control-focus); }
-.pagination-button:disabled { opacity:.45; cursor:default; }
+.pagination-button:disabled, .pagination-button[aria-disabled="true"] { opacity:.45; cursor:default; }
 .pagination-summary { margin:0; color:var(--muted); font-size:var(--text-sm); line-height:1.45; }
 /* F2 (mobile usability 2026-10-23): the /directory pager also renders above
    the first card on phones, so a page change never needs a scroll through the

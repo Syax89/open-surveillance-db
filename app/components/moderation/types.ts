@@ -138,8 +138,15 @@ export type QueuePayload = {
   recentEvents?: ModerationEvent[];
   reviewers?: Reviewer[];
   queueItems?: QueueItem[];
+  /** Next-page cursor per bounded queue (null/absent on its last page). */
+  queueNextCursors?: Partial<Record<PagedQueue, PublishedCursor | null>>;
+  /** Whole-queue COUNT per queue, for "N of M". */
+  queueTotals?: Partial<Record<PagedQueue | "published", number>>;
   error?: string;
 };
+
+/** Bounded queues the dashboard pages with "load more" (`<queue>_after_*` query pair). */
+export type PagedQueue = "pending" | "review" | "stale" | "corrections" | "edits";
 
 export type QueueEntity = "camera" | "correction" | "camera_edit";
 export type ModerationAction = "approve" | "reject" | "hide" | "mark-stale" | "reverify" | "escalate" | "associate";

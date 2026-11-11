@@ -1,20 +1,17 @@
 import { env } from "cloudflare:workers";
-import { createCamera, DOME_KIND, findNearbyPublicCameras, freshnessWindows, getPublicCameraFacets, getPublicCameraKinds, listPublicCameras, listPublicCamerasInBbox, listPublicCamerasInBboxPage, listPublicCamerasPage, PUBLIC_CAMERAS_BBOX_DEFAULT_LIMIT, PUBLIC_CAMERAS_BBOX_MAX_LIMIT, PUBLIC_CAMERAS_PAGE_DEFAULT_LIMIT, PUBLIC_CAMERAS_PAGE_MAX_LIMIT, PUBLIC_CAMERA_SORT_OPTIONS, type FreshnessWindow, type PublicCameraFacets, type PublicCameraFilters } from "../../../db/cameras";
+import { BBOX_MAX_AREA_SQ_DEG, createCamera, DOME_KIND, findNearbyPublicCameras, freshnessWindows, getPublicCameraFacets, getPublicCameraKinds, listPublicCameras, listPublicCamerasInBbox, listPublicCamerasInBboxPage, listPublicCamerasPage, PUBLIC_CAMERAS_BBOX_DEFAULT_LIMIT, PUBLIC_CAMERAS_BBOX_GEOJSON_MAX_FEATURES, PUBLIC_CAMERAS_BBOX_MAX_LIMIT, PUBLIC_CAMERAS_PAGE_DEFAULT_LIMIT, PUBLIC_CAMERAS_PAGE_MAX_LIMIT, PUBLIC_CAMERA_SORT_OPTIONS, type FreshnessWindow, type PublicCameraFacets, type PublicCameraFilters } from "../../../db/cameras";
 import { requiresDuplicateConfirmation } from "../../lib/duplicate-detection";
 import { requireWriteAuth } from "../../lib/write-gate";
 import { CSRF_REJECTED_ERROR, csrfVerified, sameOrigin } from "../../lib/csrf";
 import { DATA_LICENSE_ID, DATA_LICENSE_NOTICE } from "../../lib/data-license";
 import { isRecord } from "../../lib/guards";
 import {
-  callerKey,
-  checkRateLimit,
-  checkRateLimitForKeyAuth,
   limitsFor,
   submissionLimits,
   submissionsDisabled,
   type RouteKind,
 } from "../../lib/rate-limit";
-import { recordRateLimitBlock } from "../../lib/abuse-alerts";
+import { rateLimitResponse } from "../../lib/rate-limit-response";
 import { CACHE_TAGS } from "../../lib/cache-purge";
 import { withPublicCache } from "../../lib/public-cache";
 import {
@@ -110,21 +107,15 @@ export async function GET(request: Request) {
   // GeoJSON) get a stricter one so anomalous cache misses stay throttled.
   const format = new URL(request.url).searchParams.get("format");
   const kind: RouteKind = format === "csv" || format === "geojson" ? "export" : "read";
-  const key = callerKey(request, env);
   const limitOptions = limitsFor(kind, env);
-  const limit = await checkRateLimit(env, kind, key, limitOptions);
-  if (!limit.allowed) {
-    console.warn(`GET /api/cameras rate limited (${kind} bucket)`);
-    recordRateLimitBlock(env, {
-      route: "/api/cameras",
-      key,
-      windowSeconds: limitOptions.windowSeconds,
-    });
-    return Response.json({ error: "Too many requests. Please try again shortly." }, {
-      status: 429,
-      headers: { "Retry-After": String(limit.retryAfterSeconds) },
-    });
-  }
+  const limited = await rateLimitResponse(request, {
+    bucket: kind,
+    route: "/api/cameras",
+    env,
+    limits: limitOptions,
+    log: `GET /api/cameras rate limited (${kind} bucket)`,
+  });
+  if (limited) return limited;
   try {
     const params = new URL(request.url).searchParams;
     const kindFilter = cleanText(params.get("kind"), 60);
@@ -197,8 +188,52 @@ export async function GET(request: Request) {
         return Response.json({ error: "bbox must be a valid geographic rectangle: west<east and south<north within world bounds." }, { status: 400 });
       }
       if (format === "geojson") {
-        const records = await listPublicCamerasInBbox({ west, south, east, north });
-        return Response.json({ type: "FeatureCollection", license: DATA_LICENSE_ID, attribution: DATA_LICENSE_NOTICE, features: records.map((record) => ({ type: "Feature", geometry: { type: "Point", coordinates: [record.longitude, record.latitude] }, properties: { id: record.id, title: record.title, kind: record.kind, manufacturer: record.manufacturer, observedOn: record.observedOn, status: record.status, source: record.source, updated: record.updated, description: record.description, direction: record.direction } })) }, { headers: { "Cache-Control": "public, s-maxage=900, stale-while-revalidate=1800", "Cache-Tag": CACHE_TAGS.bbox } });
+        // GeoJSON bbox bounds (2026-11): this layer used to ignore kind /
+        // freshness and answer every row in the box — a world bbox returned
+        // the whole dataset. Unlike the JSON page (which decimates), the
+        // GeoJSON layer has no sampling contract, so an over-large box is
+        // rejected (BBOX_MAX_AREA_SQ_DEG: "reject continental viewports,
+        // force zoom in") and the features are capped at
+        // PUBLIC_CAMERAS_BBOX_GEOJSON_MAX_FEATURES, probed with one extra row
+        // so the collection can flag `truncated: true`.
+        if ((north - south) * (east - west) > BBOX_MAX_AREA_SQ_DEG) {
+          return Response.json(
+            { error: `bbox area must not exceed ${BBOX_MAX_AREA_SQ_DEG} square degrees for format=geojson; zoom in or use the JSON bbox list.` },
+            { status: 400 },
+          );
+        }
+        const rows = await listPublicCamerasInBbox(
+          { west, south, east, north },
+          { kind: filters.kind, freshness: filters.freshness },
+          { limit: PUBLIC_CAMERAS_BBOX_GEOJSON_MAX_FEATURES + 1 },
+        );
+        const truncated = rows.length > PUBLIC_CAMERAS_BBOX_GEOJSON_MAX_FEATURES;
+        const records = truncated ? rows.slice(0, PUBLIC_CAMERAS_BBOX_GEOJSON_MAX_FEATURES) : rows;
+        return Response.json(
+          {
+            type: "FeatureCollection",
+            license: DATA_LICENSE_ID,
+            attribution: DATA_LICENSE_NOTICE,
+            truncated,
+            features: records.map((record) => ({
+              type: "Feature",
+              geometry: { type: "Point", coordinates: [record.longitude, record.latitude] },
+              properties: {
+                id: record.id,
+                title: record.title,
+                kind: record.kind,
+                manufacturer: record.manufacturer,
+                observedOn: record.observedOn,
+                status: record.status,
+                source: record.source,
+                updated: record.updated,
+                description: record.description,
+                direction: record.direction,
+              },
+            })),
+          },
+          { headers: { "Cache-Control": "public, s-maxage=900, stale-while-revalidate=1800", "Cache-Tag": CACHE_TAGS.bbox } },
+        );
       }
       // JSON bbox contract (t_bb310428): the map viewport page. limit/offset
       // page through the bbox subset (bounded by PUBLIC_CAMERAS_BBOX_MAX_LIMIT
@@ -295,21 +330,16 @@ export async function POST(request: Request) {
     return Response.json({ error: "Submissions are temporarily disabled." }, { status: 503 });
   }
 
-  const key = callerKey(request, env);
   const limitOptions = submissionLimits(env);
-  const limit = await checkRateLimit(env, "submit", key, limitOptions);
-  if (!limit.allowed) {
-    console.warn("POST /api/cameras rate limited");
-    recordRateLimitBlock(env, {
-      route: "/api/cameras",
-      key,
-      windowSeconds: limitOptions.windowSeconds,
-    });
-    return Response.json({ error: "Too many submissions. Please try again shortly." }, {
-      status: 429,
-      headers: { "Retry-After": String(limit.retryAfterSeconds) },
-    });
-  }
+  const limited = await rateLimitResponse(request, {
+    bucket: "submit",
+    route: "/api/cameras",
+    env,
+    limits: limitOptions,
+    log: "POST /api/cameras rate limited",
+    error: "Too many submissions. Please try again shortly.",
+  });
+  if (limited) return limited;
 
   try {
     // Write gate (multi-method auth Fase E1 + EPIC api-keys T13): every
@@ -343,19 +373,16 @@ export async function POST(request: Request) {
     // the whole story), so this check is a no-op for them. The recorded
     // block uses the EFFECTIVE key (key:<id>), never the raw IP, for a
     // key-authenticated caller.
-    const keyLimit = await checkRateLimitForKeyAuth(env, "submit", request, limitOptions, gate);
-    if (!keyLimit.allowed) {
-      console.warn("POST /api/cameras rate limited (per-key bucket)");
-      recordRateLimitBlock(env, {
-        route: "/api/cameras",
-        key: keyLimit.key,
-        windowSeconds: limitOptions.windowSeconds,
-      });
-      return Response.json({ error: "Too many submissions. Please try again shortly." }, {
-        status: 429,
-        headers: { "Retry-After": String(keyLimit.retryAfterSeconds) },
-      });
-    }
+    const keyLimited = await rateLimitResponse(request, {
+      bucket: "submit",
+      route: "/api/cameras",
+      env,
+      limits: limitOptions,
+      apiKey: { gate },
+      log: "POST /api/cameras rate limited (per-key bucket)",
+      error: "Too many submissions. Please try again shortly.",
+    });
+    if (keyLimited) return keyLimited;
 
     const payload: unknown = await readJsonBody(request, env);
     if (!isRecord(payload)) return Response.json({ error: "A title, type, valid position and (when provided) a valid observation date are required." }, { status: 400 });
