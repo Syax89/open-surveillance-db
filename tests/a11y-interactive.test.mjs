@@ -58,6 +58,7 @@ import {
   setupDom,
   wrapWithLocale,
 } from "./helpers/dom-harness.mjs";
+import { readSiteCss } from "./helpers/site-css.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const serverDir = path.join(root, "dist", "server");
@@ -187,7 +188,7 @@ test("every directory record card carries a status dot + text label (status is n
   }
 });
 
-test("the status accent is a visible card container + token rail (static guard on globals.css)", async () => {
+test("the status accent is a visible card container + token rail (static guard on the site CSS)", async () => {
   // t_d089a17e (CEO feedback 2026-08-03): the /directory rows must read as
   // cards (bg + border + radius) with a 5px status rail built from the
   // --status-* tokens + a precomputed tenue tint; the /mappa sidebar rows
@@ -199,7 +200,8 @@ test("the status accent is a visible card container + token rail (static guard o
   // now white (--white) with a scoped darker border (--card-border =
   // #b9c7bf) + soft shadow, and the tints are 14% over white (see contrast
   // table in the PR). t_be89b99c: hex literals tokenized (same sRGB values).
-  const css = await readFile(path.join(root, "app", "globals.css"), "utf8");
+  // Perf 2026-11: the /mappa row rules live in app/styles/map.css.
+  const css = await readSiteCss(root);
   assert.match(
     css,
     /\.directory-tool \.record-list \.record-list-card \{[^}]*border:1px solid var\(--card-border\)[^}]*border-left-width:5px[^}]*border-radius:var\(--radius-lg\)[^}]*background:var\(--white\)/,

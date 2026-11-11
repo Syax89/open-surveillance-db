@@ -8,6 +8,7 @@ import { rateLimitResponse } from "../../lib/rate-limit-response";
 import { cachedPublicRecordResponse } from "../../lib/public-record-response";
 import { canonicalRecordApiRequest, requestOrigin, resolveCachedInitialRecord, type InitialRecordSeed } from "../../lib/record-initial";
 import RecordPageBody from "./RecordPageBody";
+import { MapStyles } from "../../components/MapStyles";
 
 /**
  * /records/[id] — public record detail (F3 a11y H2, t_793479ed).
@@ -64,7 +65,13 @@ export default async function RecordPage({ params }: { params: Promise<{ id: str
   const initial = /^\d+$/.test(id) ? await loadInitialRecord(recordId) : undefined;
   // key: a client navigation to another id remounts the body so the seed
   // (and the hook state it initializes) never belongs to the previous id.
-  return <RecordPageBody key={recordId} id={recordId} initial={initial} />;
+  return (
+    <>
+      {/* Record mini-map + popup-style community actions: route-scoped map stylesheet. */}
+      <MapStyles />
+      <RecordPageBody key={recordId} id={recordId} initial={initial} />
+    </>
+  );
 }
 
 /**

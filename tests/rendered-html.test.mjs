@@ -216,6 +216,24 @@ test("server-rendered /mappa provides the map region and /directory the text-lis
   assert.match(directory.html, /class="add-button"[^>]*href="\/segnala"/, "the [+] report shortcut links /segnala from the SSR header");
 });
 
+test("the Leaflet/map stylesheet is render-blocking only on map routes, after the global one (perf 2026-11)", async () => {
+  const stylesheets = (html) => [...html.matchAll(/<link[^>]*rel="stylesheet"[^>]*>/g)].map((match) => match[0].match(/href="([^"]+)"/)[1]);
+  for (const route of ["/mappa", "/segnala", "/records/1", "/records/1/edit"]) {
+    const { response, html } = await renderRoute(route);
+    assert.equal(response.status, 200, `${route} renders`);
+    const hrefs = stylesheets(html);
+    const globalIndex = hrefs.findIndex((href) => /^\/assets\/index-[\w-]+\.css$/.test(href));
+    const mapIndex = hrefs.findIndex((href) => /^\/assets\/map-[0-9a-f]{10}\.css$/.test(href));
+    assert.ok(globalIndex >= 0, `${route} links the global stylesheet`);
+    assert.ok(mapIndex > globalIndex, `${route} links the hashed map stylesheet AFTER the global one (cascade), got ${hrefs.join(", ")}`);
+  }
+  for (const route of ["/", "/faq", "/fonti", "/privacy", "/directory", "/correggi"]) {
+    const { html } = await renderRoute(route);
+    const hrefs = stylesheets(html);
+    assert.ok(!hrefs.some((href) => /\/assets\/map-/.test(href)), `${route} must not pay for the map stylesheet, got ${hrefs.join(", ")}`);
+  }
+});
+
 test("global footer exposes every institutional page, the ODbL data licence and OSM attribution", async () => {
   const { response, html } = await renderHomepage();
 

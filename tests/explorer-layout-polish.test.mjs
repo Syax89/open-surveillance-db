@@ -10,9 +10,12 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { readSiteCss } from "./helpers/site-css.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const css = await readFile(path.join(root, "app", "globals.css"), "utf8");
+// Perf 2026-11: the /mappa workspace rules moved to app/styles/map.css, which
+// the map route loads after app/globals.css — read both in cascade order.
+const css = await readSiteCss(root);
 // Perf 2026-11: the cross-document opt-in is route-scoped — it lives in a
 // static stylesheet linked only by the two explorer pages.
 const vtCss = await readFile(path.join(root, "public", "explorer-view-transition.css"), "utf8");
