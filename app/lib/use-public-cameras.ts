@@ -542,22 +542,38 @@ export type UsePublicCameraResult = {
  * module cache with usePublicCameras: after the home directory loaded, this
  * settles without any fetch; on a deep link it walks pages until the id
  * shows up (early exit, id DESC order) or the list is exhausted.
+ *
+ * Server seed (LCP fix): `initial` is the record the server shell already
+ * resolved through the same read as GET /api/cameras/[id]
+ * (app/lib/record-initial.ts). When present, the hook starts settled on it
+ * — no loading state, no fetch on mount (the API answer is edge-cached for
+ * the same window, so a mount refetch would only repeat it). `reload()`
+ * still drops the cache and fetches fresh. `undefined` (server read failed
+ * or not attempted) keeps the original client path unchanged.
  */
-export function usePublicCamera(id: number): UsePublicCameraResult {
-  const [record, setRecord] = useState<Camera | null>(() => cachedRecords === null
-    ? null
-    : cachedRecords.find((item) => item.id === id) ?? null);
+export function usePublicCamera(id: number, initial?: { record: Camera | null }): UsePublicCameraResult {
+  // The seed is captured once per mount (the page keys the body by id).
+  const [seededFor] = useState<number | null>(() => (initial !== undefined ? id : null));
+  const [record, setRecord] = useState<Camera | null>(() => initial !== undefined
+    ? initial.record
+    : cachedRecords === null
+      ? null
+      : cachedRecords.find((item) => item.id === id) ?? null);
   // Loading stays true when the warm cache does NOT contain the id: the
   // dedicated endpoint may still resolve a withdrawn record (direct-link
   // banner, ADR §6.3) — a flash of "not found" before the answer would be
   // a lie. Found-in-cache ids are instant, as before.
-  const [loading, setLoading] = useState(() => cachedRecords === null
-    ? true
-    : !cachedRecords.some((item) => item.id === id));
+  const [loading, setLoading] = useState(() => initial !== undefined
+    ? false
+    : cachedRecords === null
+      ? true
+      : !cachedRecords.some((item) => item.id === id));
   const [error, setError] = useState(false);
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
+    // Server-seeded mount: already settled, nothing to fetch until reload().
+    if (attempt === 0 && seededFor === id) return;
     let cancelled = false;
     ensureRecord(id)
       .then((found) => {
@@ -575,7 +591,7 @@ export function usePublicCamera(id: number): UsePublicCameraResult {
       cancelled = true;
       releaseRecord(id);
     };
-  }, [attempt, id]);
+  }, [attempt, id, seededFor]);
 
   return {
     record,
