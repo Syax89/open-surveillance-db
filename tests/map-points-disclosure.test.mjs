@@ -163,8 +163,12 @@ test("the visible count is visibleRecords.length, not the accumulated filtered s
   const filtered = [...CAMERAS, { id: 3, title: "Third", kind: "Bullet", status: "demo" }, { id: 4, title: "Fourth", kind: "Bullet", status: "demo" }];
   const view = await renderWithLocale(await element({ filteredRecords: filtered, visibleRecords: CAMERAS, labels: labelsFor(en, countCalls) }));
   assert.deepEqual(countCalls.at(-1), [2, 2], "the label is built from the in-view count on both sides");
-  assert.equal(view.container.querySelectorAll(".map-record").length, 2, "only in-view rows are listed");
   assert.equal(view.container.querySelector(".map-list-toggle-state").textContent, "Show 2 points");
+  // Perf cap: rows are rendered only while the panel is expanded.
+  assert.equal(view.container.querySelectorAll(".map-record").length, 0, "collapsed panel renders no rows");
+  view.unmount();
+  const open = await renderWithLocale(await element({ filteredRecords: filtered, visibleRecords: CAMERAS, collapsed: false }));
+  assert.equal(open.container.querySelectorAll(".map-record").length, 2, "only in-view rows are listed");
 });
 
 test("zero, one and many wording comes from the dictionaries in both locales", async () => {
@@ -201,8 +205,12 @@ test("zero, one and many wording comes from the dictionaries in both locales", a
     // Map-always-visible contract: the list container and its truthful note
     // stay mounted under the disclosure row.
     assert.ok(zeroView.container.querySelector(".map-list-scroll"), "the list container stays mounted");
-    assert.ok(zeroView.container.querySelector(".map-list-empty-title"), "the truthful empty note lives inside the list");
     zeroView.unmount();
+    // Expanded, the truthful empty note lives inside the list (collapsed
+    // renders no list content at all — perf cap).
+    const zeroOpen = await renderWithLocale(await element({ filteredRecords: [], visibleRecords: [], collapsed: false, labels: labelsFor(item.dict) }));
+    assert.ok(zeroOpen.container.querySelector(".map-list-empty-title"), "the truthful empty note lives inside the list");
+    zeroOpen.unmount();
   }
 
   assert.equal(en.listShowCount(1), "Show 1 point");

@@ -31,19 +31,24 @@ export function PublicNavLinks() {
   const t = homeByLocale[locale];
   const pathname = usePathname();
 
-  const links: Array<{ href: string; label: string; action?: boolean }> = [
+  // Prefetch budget (perf 2026-11): next/link prefetches every link in the
+  // viewport, so on short pages every visible nav + footer link fired an RSC
+  // request (up to 14 per view). Only the three primary task CTAs keep the
+  // default viewport prefetch; secondary links opt out (`prefetch: false`).
+  const links: Array<{ href: string; label: string; action?: boolean; prefetch?: false }> = [
     { href: "/mappa", label: t.exploreMap },
     { href: "/directory", label: t.browseRecords },
     { href: "/segnala", label: t.addCamera, action: true },
-    { href: "/contribuisci", label: t.contribuisci },
+    { href: "/contribuisci", label: t.contribuisci, prefetch: false },
   ];
 
   return (
     <>
-      {links.map(({ href, label, action }) => (
+      {links.map(({ href, label, action, prefetch }) => (
         <Link
           key={href}
           href={href}
+          prefetch={prefetch}
           className={action ? "nav-action" : undefined}
           aria-current={pathname === href ? "page" : undefined}
         >

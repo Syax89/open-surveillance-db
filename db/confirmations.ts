@@ -141,40 +141,24 @@ export async function verifiedContributionCount(contributorId: number): Promise<
 export async function confirmationCountsFor(cameraIds: number[]): Promise<Map<number, number>> {
   if (cameraIds.length === 0) return new Map();
   const d1 = await getD1();
-  // D1 caps bound parameters at 100 per query (same cap the retention sweep
-  // chunks against, db/retention.ts D1_MAX_BOUND_PARAMS). GET /api/cameras
-  // lists up to 500 public records per page, so a single IN (...) over every
-  // id on a page with >100 records used to blow past the cap and 503 the
-  // whole endpoint. Query in chunks of at most 100 ids and merge the GROUP
-  // BY results into one Map (same pattern as the correction-history events
-  // in db/moderation.ts).
-  // The chunks are INDEPENDENT (disjoint id sets, read-only GROUP BY), so they
-  // are issued in parallel: a 2000-record page went from 20 serialized D1
-  // round-trips to one wave. Sequential awaits inside the loop were the
-  // dominant latency cost on large pages (40 round-trips per page counting
-  // communityActionCountsFor, 200 at the 10k bbox cap).
+  // ONE statement per page, whatever its size (2026-11 perf pass): D1 caps a
+  // statement at 100 bound parameters, so the ids used to be chunked into
+  // IN (?, ?, …) groups of 100 — a 2000-record page cost 20 D1 round-trips
+  // here plus 20 in communityActionCountsFor. The id set now travels as ONE
+  // JSON array parameter expanded by json_each (same pattern as the open
+  // queue lookup in db/moderation.ts), so the cap never applies and the
+  // IN (subquery) still seeks camera_community_actions by camera_id.
   const counts = new Map<number, number>();
-  const chunks: number[][] = [];
-  for (let offset = 0; offset < cameraIds.length; offset += 100) {
-    chunks.push(cameraIds.slice(offset, offset + 100));
-  }
-  const chunkResults = await Promise.all(
-    chunks.map((chunk) => {
-      const placeholders = chunk.map(() => "?").join(", ");
-      return d1
-        .prepare(
-          `SELECT cc.camera_id AS cameraId, COUNT(*) AS count
+  const result = await d1
+    .prepare(
+      `SELECT cc.camera_id AS cameraId, COUNT(*) AS count
          FROM camera_community_actions cc JOIN cameras c ON c.id = cc.camera_id
-         WHERE cc.action_type = 'confirm' AND cc.camera_id IN (${placeholders}) AND (c.last_verified_at IS NULL OR cc.created_at >= c.last_verified_at)
+         WHERE cc.action_type = 'confirm' AND cc.camera_id IN (SELECT value FROM json_each(?)) AND (c.last_verified_at IS NULL OR cc.created_at >= c.last_verified_at)
          GROUP BY cc.camera_id`,
-        )
-        .bind(...chunk)
-        .all<{ cameraId: number; count: number }>();
-    }),
-  );
-  for (const result of chunkResults) {
-    for (const row of result.results) counts.set(row.cameraId, row.count);
-  }
+    )
+    .bind(JSON.stringify(cameraIds))
+    .all<{ cameraId: number; count: number }>();
+  for (const row of result.results) counts.set(row.cameraId, row.count);
   return counts;
 }
 

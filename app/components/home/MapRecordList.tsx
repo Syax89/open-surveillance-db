@@ -1,6 +1,17 @@
 "use client";
 
+import { memo, useEffect, useRef, useState } from "react";
 import type { Camera } from "../../lib/records";
+
+/**
+ * Render cap for the /mappa points list: at national zoom the viewport holds
+ * thousands of points, and one <li> per point (~6 DOM nodes each) made a
+ * small pan cost seconds of main-thread work on a phone. The list renders
+ * the first MAP_LIST_PAGE_SIZE rows in the existing order and a "Show more"
+ * button appends the next page. The heading count and the disclosure label
+ * still report the FULL in-view count.
+ */
+export const MAP_LIST_PAGE_SIZE = 50;
 
 type Props = {
   /** Records after the directory filters are applied (map markers). */
@@ -25,6 +36,10 @@ type Props = {
     emptyTitle: string;
     emptyBody: string;
     clearSearch: string;
+    /** "Show more" button label (next page size, remaining count). */
+    listShowMore: (next: number, remaining: number) => string;
+    /** Polite live summary of how many rows are listed out of the in-view total. */
+    listShownOf: (shown: number, total: number) => string;
   };
   /**
    * Whitelisted, localized status label for a camera status (t_d089a17e):
@@ -37,7 +52,8 @@ type Props = {
    * Mobile map-first panel (t_b7728ad0): whether the points list is
    * collapsed to its header (the map is the primary function on small
    * screens — the list starts compact with its count, expandable from
-   * the header toggle). Desktop ignores the flag entirely.
+   * the header toggle). Desktop collapses to the 44px rail (map-first).
+   * While collapsed the rows are NOT rendered (perf); the header stays.
    */
   collapsed?: boolean;
   /** Toggle handler for the mobile collapse (optional; renders the toggle). */
@@ -53,12 +69,12 @@ type Props = {
  * Extracted from MapPanel so the workspace stays a thin orchestrator
  * (~150-line contract, component-smoke.test.mjs).
  */
-export function MapRecordList({ filteredRecords, visibleRecords, selectedId, onSelect, labels, statusLabel, collapsed = false, onToggleCollapse }: Props) {
+function MapRecordListImpl({ filteredRecords, visibleRecords, selectedId, onSelect, labels, statusLabel, collapsed = false, onToggleCollapse }: Props) {
   // Mobile map-first (t_b7728ad0): the "Points in the current view" panel
   // starts compact below the map. The header stays visible (title + count)
   // and carries an accessible disclosure toggle (aria-expanded, keyboard
-  // reachable); the scrollable list itself is hidden while collapsed. On
-  // desktop the flag is ignored — the sidebar column always shows the list.
+  // reachable); the scrollable list itself is hidden while collapsed (CSS
+  // display:none at every size) and its rows are not rendered at all.
   // B08: the counter refers to the CURRENT VIEW, not the accumulated store —
   // it is the in-view count on both sides (the old denominator was the union
   // of every explored bbox). It is computed once so the heading, the live
@@ -102,7 +118,12 @@ export function MapRecordList({ filteredRecords, visibleRecords, selectedId, onS
       </div>
       <p id="map-list-sync-help" className="sr-only">{labels.listMapSyncHelp}</p>
       <div className={`map-list-scroll${collapsed ? " is-collapsed" : ""}`} id="map-list-scroll">
-        {filteredRecords.length === 0
+        {/* Collapsed (perf): the container stays mounted as the aria-controls
+            target, but NO rows are rendered — CSS already hid them
+            (display:none), so they were never in the accessibility tree,
+            only in the DOM cost. The heading + role=status count above
+            stay rendered and keep reporting the full in-view count. */}
+        {collapsed ? null : filteredRecords.length === 0
           // The map NEVER disappears (t_b9666d09): a filter that
           // matches nothing keeps the map and the sidebar rendered; the
           // truthful empty state moves INSIDE the list as a note with a
@@ -116,27 +137,96 @@ export function MapRecordList({ filteredRecords, visibleRecords, selectedId, onS
           : visibleRecords.length === 0
             ? <p className="map-list-empty">{labels.listEmptyInView}</p>
             : (
-              <ul className="map-record-list" aria-describedby="map-list-sync-help">
-                {visibleRecords.map((camera) => {
-                  const selected = camera.id === selectedId;
-                  return (
-                    <li key={camera.id}>
-                      <button
-                        type="button"
-                        className={`map-record${selected ? " selected" : ""}`}
-                        aria-current={selected ? "true" : undefined}
-                        onClick={() => onSelect(camera.id)}
-                      >
-                        <span className="map-record-status"><span className={`status-dot ${camera.status}`} /> {statusLabel(camera.status)}</span>
-                        <span className="map-record-title">{camera.title}</span>
-                        <span className="map-record-meta">{camera.kind}{camera.address ? ` · ${camera.address}` : ""}</span>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
+              <MapRecordItems visibleRecords={visibleRecords} selectedId={selectedId} onSelect={onSelect} labels={labels} statusLabel={statusLabel} />
             )}
       </div>
     </>
   );
 }
+
+type ItemsProps = Pick<Props, "visibleRecords" | "selectedId" | "onSelect" | "labels" | "statusLabel">;
+
+/**
+ * The capped rows + "Show more" control. Reset rule: the page count goes back
+ * to ONE page whenever the `visibleRecords` array identity changes — MappaTool
+ * memoizes it on (filteredRecords, viewportBounds), so a new identity means a
+ * new viewport, a filter change or newly loaded data; re-renders with the same
+ * set keep the expanded pages. The selected record (marker click) is always
+ * included: the limit grows to the page that holds it, so the map->list
+ * aria-current highlight never points at an unrendered row.
+ */
+function MapRecordItems({ visibleRecords, selectedId, onSelect, labels, statusLabel }: ItemsProps) {
+  const [paging, setPaging] = useState({ source: visibleRecords, pages: 1 });
+  const [announce, setAnnounce] = useState("");
+  const sourceChanged = paging.source !== visibleRecords;
+  const selectedIndex = selectedId === null ? -1 : visibleRecords.findIndex((camera) => camera.id === selectedId);
+  // Pages the selected row needs. Persisted (not just used for this render):
+  // otherwise selecting an earlier row afterwards would shrink the list back
+  // and make it jump (review nit on the perf pass).
+  const pages = Math.max(sourceChanged ? 1 : paging.pages, Math.ceil((selectedIndex + 1) / MAP_LIST_PAGE_SIZE));
+  if (sourceChanged || pages !== paging.pages) {
+    // Derived-state update during render (no effect flash of the old pages).
+    setPaging({ source: visibleRecords, pages });
+    if (sourceChanged) setAnnounce("");
+  }
+  const limit = pages * MAP_LIST_PAGE_SIZE;
+  const shown = visibleRecords.slice(0, limit);
+  const remaining = visibleRecords.length - shown.length;
+  const listRef = useRef<HTMLUListElement>(null);
+  // When the last page is appended the button unmounts: focus moves to the
+  // first newly appended row instead of falling back to <body>.
+  const focusRowRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (focusRowRef.current === null) return;
+    listRef.current?.querySelectorAll<HTMLButtonElement>(".map-record")[focusRowRef.current]?.focus();
+    focusRowRef.current = null;
+  });
+  const showMore = () => {
+    const nextPages = limit / MAP_LIST_PAGE_SIZE + 1;
+    const nextShown = Math.min(visibleRecords.length, nextPages * MAP_LIST_PAGE_SIZE);
+    if (nextShown >= visibleRecords.length) focusRowRef.current = shown.length;
+    setPaging({ source: visibleRecords, pages: nextPages });
+    setAnnounce(labels.listShownOf(nextShown, visibleRecords.length));
+  };
+  return (
+    <>
+      <ul ref={listRef} className="map-record-list" aria-describedby="map-list-sync-help">
+        {shown.map((camera) => {
+          const selected = camera.id === selectedId;
+          return (
+            <li key={camera.id}>
+              <button
+                type="button"
+                className={`map-record${selected ? " selected" : ""}`}
+                aria-current={selected ? "true" : undefined}
+                onClick={() => onSelect(camera.id)}
+              >
+                <span className="map-record-status"><span className={`status-dot ${camera.status}`} /> {statusLabel(camera.status)}</span>
+                <span className="map-record-title">{camera.title}</span>
+                <span className="map-record-meta">{camera.kind}{camera.address ? ` · ${camera.address}` : ""}</span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+      {/* Polite live region (like the other counters in the app): announces
+          the new listed count after "Show more"; empty until then. */}
+      <p className="sr-only" aria-live="polite">{announce}</p>
+      {remaining > 0 && (
+        <div className="map-list-more">
+          <p className="pagination-summary">{labels.listShownOf(shown.length, visibleRecords.length)}</p>
+          <button type="button" className="pagination-button" onClick={showMore}>
+            {labels.listShowMore(Math.min(MAP_LIST_PAGE_SIZE, remaining), remaining)}
+          </button>
+        </div>
+      )}
+    </>
+  );
+}
+
+/**
+ * Memoized (perf): MapPanel passes stable props (memoized statusLabel and
+ * toggle callbacks), so unrelated MapPanel/MappaTool state changes no longer
+ * re-render thousands of rows.
+ */
+export const MapRecordList = memo(MapRecordListImpl);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { isPublicStatus } from "../lib/public-status";
 import { BOUNDS_DEBOUNCE_MS, escapeHtml, longitudeInCopy, viewportCenterLongitude, type MapView, type ViewportBounds } from "../lib/map-viewport";
 import { markersForViewport } from "../lib/map-grid";
@@ -117,7 +117,12 @@ type Props = {
 };
 
 type LeafletModule = typeof import("leaflet");
-type MarkerEntry = { marker: import("leaflet").Marker; camera: MapCamera };
+/**
+ * `content` is the marker's LAZY popup content: Leaflet invokes it only when
+ * the popup is rendered (open / update), reading the entry's CURRENT camera,
+ * so no popup HTML is built for the hundreds of markers that are never opened.
+ */
+type MarkerEntry = { marker: import("leaflet").Marker; camera: MapCamera; content: () => string };
 
 function buildMarkerIcon(L: LeafletModule, camera: MapCamera, isSelected: boolean) {
   // Defense in depth: only whitelisted public statuses may style a
@@ -205,7 +210,13 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
   // street-unreadable zooms). Kept in state so the FOV effect re-runs when
   // the user zooms across the threshold even if the bounds object identity
   // does not change.
-  const [mapZoom, setMapZoom] = useState(13);
+  //
+  // Initialised from the INITIAL view (perf): the map's first setView runs
+  // before the moveend/zoomend listener exists, so a 13 default made a z6
+  // deep link render every record as an individual divIcon (grid off) and a
+  // z17 one show no cones until the first pan. createMap also re-syncs it
+  // from map.getZoom() right after creation.
+  const [mapZoom, setMapZoom] = useState(() => initialView?.zoom ?? 13);
   const t = useMessages().map;
   // Geolocation button (t_18259daa, CEO): a floating custom control stacked
   // ABOVE the zoom buttons shows the user's own position on the map. All
@@ -732,6 +743,9 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
         // Order matters (R1): the ref must be set BEFORE anything that reads
         // it, and the initial fit must run with the real map object.
         mapRef.current = map;
+        // Sync the zoom state with the view the map actually starts at (the
+        // setView above ran before the moveend/zoomend listener below exists).
+        setMapZoom(map.getZoom());
         // The listener ignores Leaflet's event object — passing it straight
         // through would be mistaken for a map argument.
         map.on("resize", () => applyPopupFit());
@@ -847,6 +861,15 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
   //  removed, and only they can close a popup — and that close is the
   //  rebuild path (rebuildingRef), so the active popup is restored when
   //  the record comes back into view.
+  // ONE viewport split per (cameras, bounds, zoom) change, shared by the
+  // marker reconcile and the field-of-view layer (it used to be computed
+  // twice per change). Viewport-first: null bounds -> empty.
+  const viewportCenterLng = viewportBounds ? viewportCenterLongitude(viewportBounds) : 0;
+  const viewport = useMemo(
+    () => markersForViewport(cameras, viewportBounds, mapZoom, viewportCenterLng),
+    [cameras, viewportBounds, mapZoom, viewportCenterLng],
+  );
+
   useEffect(() => {
     const L = leafletRef.current; const layer = markersRef.current; if (!L || !layer || !mapReady) return;
     rebuildingRef.current = true;
@@ -858,7 +881,7 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
       // copy, so a dateline-crossing view (raw 170..190) renders records from
       // BOTH sides near the centre instead of one side projecting off the
       // visible copy (Leaflet projects longitude linearly, no wrap).
-      const centerLng = viewportBounds ? viewportCenterLongitude(viewportBounds) : 0;
+      const centerLng = viewportCenterLng;
       const positionOf = (camera: MapCamera): [number, number] => [camera.latitude, longitudeInCopy(camera.longitude, centerLng)];
       // 1) Desired set: grid badges (keyed by 48px cell) + individual
       //    markers (keyed by record id) + the selected-overlay marker.
@@ -868,7 +891,6 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
       // classify popup-close reasons (out-of-view vs filter vs grid cell).
       let visible: MapCamera[] = [];
       if (viewportBounds) {
-        const viewport = markersForViewport(cameras, viewportBounds, mapZoom, centerLng);
         visible = viewport.visible;
         const { cells, individual } = viewport;
         cells.forEach((cell) => desiredBadges.set(`${cell.x}:${cell.y}`, { lat: cell.centroidLat, lng: cell.centroidLng, count: cell.count }));
@@ -965,6 +987,9 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
       // the visible set (viewport-arriving) separately from the cameras
       // prop (post-filter) to tell them apart.
       const visibleIds = new Set(visible.map((item) => item.id));
+      // Built lazily, only when a marker is actually removed (O(1) lookups
+      // instead of a cameras.some scan per removed marker).
+      let cameraIds: Set<number> | null = null;
       for (const [id, entry] of byId) {
         const camera = desiredMarkers.get(id);
         if (!camera) {
@@ -973,7 +998,8 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
           // rebuildingRef keeps activePopupIdRef so it is restored when the
           // record comes back INTO VIEW; but a filter-driven or grid-cell
           // removal must NOT survive (no auto-open on filter reset / zoom).
-          const stillInCameras = cameras.some((item) => item.id === id);
+          cameraIds ??= new Set(cameras.map((item) => item.id));
+          const stillInCameras = cameraIds.has(id);
           const stillVisible = visibleIds.has(id);
           layer.removeLayer(entry.marker);
           byId.delete(id);
@@ -995,11 +1021,24 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
           // this marker's popup is currently OPEN we must remount the
           // React root on the fresh node (P0-3, review 2026-08-07) — the
           // widget would otherwise vanish mid-view until close/reopen.
+          //
+          // Perf: the popup content is LAZY (entry.content reads entry.camera
+          // when Leaflet renders it), so a CLOSED popup needs no refresh — it
+          // picks the new data up on its next open. The tooltip and icon are
+          // only rebuilt when the fields they render actually changed.
+          const previous = entry.camera;
           entry.camera = camera;
-          entry.marker.setPopupContent(popupHtmlForRef.current ? popupHtmlForRef.current(camera) : defaultPopupHtml(camera));
-          entry.marker.setTooltipContent(`${camera.title}<br/><small>${camera.kind}</small>`);
-          entry.marker.setIcon(buildMarkerIcon(L, camera, camera.id === selectedIdRef.current));
-          if (activePopupIdRef.current === id) {
+          if (previous.title !== camera.title || previous.kind !== camera.kind) {
+            entry.marker.setTooltipContent(`${escapeHtml(camera.title)}<br/><small>${escapeHtml(camera.kind)}</small>`);
+          }
+          if (previous.status !== camera.status) {
+            entry.marker.setIcon(buildMarkerIcon(L, camera, camera.id === selectedIdRef.current));
+          }
+          if (entry.marker.isPopupOpen?.() || activePopupIdRef.current === id) {
+            // Popup.setContent (not Marker.setPopupContent, whose typings
+            // reject a function) keeps the content LAZY and re-renders the
+            // open balloon in place — no popupclose/popupopen churn.
+            entry.marker.getPopup()?.setContent(entry.content);
             const openElement = entry.marker.getPopup?.()?.getElement?.();
             const freshNode = openElement?.querySelector?.(".osm-popup-community");
             if (freshNode) {
@@ -1022,8 +1061,17 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
         if (byId.has(id)) continue;
         const isSelected = camera.id === selectedIdRef.current;
         const marker = L.marker(positionOf(camera), { icon: buildMarkerIcon(L, camera, isSelected), title: camera.title });
-        marker.bindTooltip(`${camera.title}<br/><small>${camera.kind}</small>`, { direction: "top", offset: [0, -12] });
-        marker.bindPopup(popupHtmlForRef.current ? popupHtmlForRef.current(camera) : defaultPopupHtml(camera), {
+        marker.bindTooltip(`${escapeHtml(camera.title)}<br/><small>${escapeHtml(camera.kind)}</small>`, { direction: "top", offset: [0, -12] });
+        // Lazy popup content (perf): Leaflet calls this only when the popup
+        // is rendered — the HTML (and its formatPublicDate) is never built for
+        // markers nobody opens. It reads the entry's CURRENT camera and the
+        // CURRENT popupHtmlFor, so a refreshed record / locale shows on open.
+        const entry: MarkerEntry = {
+          marker,
+          camera,
+          content: () => (popupHtmlForRef.current ? popupHtmlForRef.current(entry.camera) : defaultPopupHtml(entry.camera)),
+        };
+        marker.bindPopup(entry.content, {
           // Balloon geometry (M01): identical options to the coordinate
           // picker — ONE helper, derived from the actual map surface.
           maxWidth: geometry.maxWidth,
@@ -1071,7 +1119,7 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
           activePopupIdRef.current = camera.id;
         });
         marker.addTo(layer);
-        byId.set(id, { marker, camera });
+        byId.set(id, entry);
       }
       markersByIdRef.current = byId;
       // 4) Deep-link ?focus (t_26ce96f3, popup lifecycle t_33b82720): the
@@ -1111,7 +1159,7 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
     } finally {
       rebuildingRef.current = false;
     }
-  }, [cameras, onSelect, mapReady, viewportBounds, mapZoom, t, selectedId]);
+  }, [cameras, onSelect, mapReady, viewportBounds, viewport, viewportCenterLng, t, selectedId]);
 
   // Field-of-view layer (t_f8b775ec): draw the camera's field of view with
   // native Leaflet only — a ~60°/35 m wedge (L.polygon, points computed by
@@ -1132,8 +1180,8 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
     // records before the first bounds, and only for the records that are
     // actually rendered individually (at FOV_MIN_ZOOM=16 the grid is
     // inactive by construction: GRID_MAX_ZOOM=14 < 16).
-    const centerLng = viewportBounds ? viewportCenterLongitude(viewportBounds) : 0;
-    const { visible } = markersForViewport(cameras, viewportBounds, mapZoom, centerLng);
+    const centerLng = viewportCenterLng;
+    const { visible } = viewport;
     visible.forEach((camera) => {
       const lng = longitudeInCopy(camera.longitude, centerLng);
       // Same whitelist as buildMarkerIcon: only public statuses may style a
@@ -1163,7 +1211,7 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
         }).addTo(layer);
       }
     });
-  }, [cameras, mapReady, viewportBounds, mapZoom]);
+  }, [mapReady, mapZoom, viewport, viewportCenterLng]);
 
   // Selection: swap the `selected` class only on the previously and the
   // newly selected marker (two setIcon calls, no layer rebuild). When the

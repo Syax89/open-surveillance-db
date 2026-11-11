@@ -57,7 +57,7 @@ import test, { afterEach, before } from "node:test";
 import {
   setupDom, loadDomModule, installFetchMock, jsonResponse, fakeCamerasPayload,
   resetLeafletMarkers,
-  renderWithLocale, setNavState, getNavState, React,
+  renderWithLocale, setNavState, getNavState, React, expandMapPoints,
 } from "./helpers/dom-harness.mjs";
 
 const POPUP_RECORDS = [
@@ -134,6 +134,7 @@ test("t_3c4b188e: typing never calls router.replace (pure history.replaceState c
   const { screen, waitFor } = rtl;
   const user = rtl.userEvent.setup();
   await renderWithLocale(React.createElement(MappaTool));
+  await expandMapPoints();
 
   const historyReplaceCalls = [];
   const originalReplaceState = window.history.replaceState.bind(window.history);
@@ -176,6 +177,7 @@ test("t_3c4b188e: failReplace + clear commits the URL via the pure-history path 
   const { screen, waitFor } = rtl;
   const user = rtl.userEvent.setup();
   await renderWithLocale(React.createElement(MappaTool));
+  await expandMapPoints();
 
   const input = screen.getByRole("combobox", { name: /Filter points or find a place/ });
   await user.type(input, "Ferrara");
@@ -241,6 +243,7 @@ test("t_3c4b188e: the geocode dropdown appears BEFORE the ?q= commit re-filters 
   const { screen, waitFor } = rtl;
   const user = rtl.userEvent.setup();
   await renderWithLocale(React.createElement(MappaTool));
+  await expandMapPoints();
 
   const input = screen.getByRole("combobox", { name: /Filter points or find a place/ });
   await user.type(input, "Ferrara");

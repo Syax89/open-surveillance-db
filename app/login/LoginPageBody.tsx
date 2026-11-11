@@ -423,7 +423,7 @@ export function LoginPageBody() {
                     </div>
                     <p className="oidc-disclosure">
                       {t.oidcDisclosure}{" "}
-                      <Link href="/privacy">{t.privacyNotice}</Link>.
+                      <Link href="/privacy" prefetch={false}>{t.privacyNotice}</Link>.
                     </p>
                   </div>
                 </section>

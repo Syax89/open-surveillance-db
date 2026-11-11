@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useId, useState, type FormEvent, type ReactNode } from "react";
 import { useMessages } from "../lib/use-messages";
 
 /**
@@ -117,46 +117,25 @@ export function FiltersBar({
   activeFilterCount?: number;
 }) {
   const t = useMessages().directory;
-  // On constrained layouts the whole filter group becomes one short
-  // disclosure. The search always stays visible; a wide workspace opens the
-  // group again automatically.
+  // On constrained layouts (≤820px) the whole filter group becomes one short
+  // disclosure; the search always stays visible. On wider layouts the toggle
+  // is not rendered (display:none) and the controls are ALWAYS shown.
   //
-  // Hydration-safe (same pattern as MapPanel pointsCollapsed, t_66766914):
-  // the initial state is DETERMINISTIC (open on both server and first
-  // client render — never reads window.matchMedia in an initializer). The
-  // media preference is applied only AFTER hydration in the effect below.
-  //
-  // B02: a programmatic `open` change (the media-query sync) also fires a
-  // native `toggle` event, which used to be mistaken for a USER toggle — so
-  // after a mobile round trip the effect stopped syncing and the group stayed
-  // closed while the desktop CSS hides the summary (no way back). The
-  // `appliedOpenRef` distinguishes our own sync from the user's toggle, and a
-  // desktop apply ALWAYS opens (the summary is display:none there), so the
-  // group can never be stuck closed on desktop.
-  const [filtersOpen, setFiltersOpen] = useState(true);
-  const appliedOpenRef = useRef<boolean | null>(null);
-  const userPreferenceRef = useRef<boolean | null>(null);
-  useEffect(() => {
-    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
-    const media = window.matchMedia("(max-width: 820px)");
-    const apply = () => {
-      // Desktop: the summary is hidden by CSS → the group MUST be open (a
-      // manual mobile close never carries over to a desktop where it could not
-      // be reopened). Mobile: honour the user's manual preference, default
-      // closed.
-      if (!media.matches) userPreferenceRef.current = null;
-      const desired = media.matches ? (userPreferenceRef.current ?? false) : true;
-      appliedOpenRef.current = desired;
-      setFiltersOpen(desired);
-    };
-    apply(); // apply the compact preference only after hydration
-    if (media.addEventListener) {
-      media.addEventListener("change", apply);
-      return () => media.removeEventListener("change", apply);
-    }
-    media.addListener(apply); // legacy MediaQueryList (older Safari)
-    return () => media.removeListener(apply);
-  }, []);
+  // CLS fix (perf 2026-11): the breakpoint is decided by CSS alone, never by
+  // JS state. The server and the first client render emit the SAME markup
+  // (collapsed: aria-expanded="false", data-open="false") and no effect
+  // changes it after hydration, so nothing shrinks or jumps on either
+  // viewport. The old native <details open> + matchMedia effect rendered the
+  // group open on the server and closed it after hydration on mobile (CLS
+  // 0.15–0.23). A plain button + region is used instead of <details> because
+  // a closed <details> cannot be revealed by CSS in browsers without
+  // ::details-content (Safari < 18.4, Firefox < 143), which would shift the
+  // desktop layout there. Since desktop CSS ignores the state, a manual
+  // mobile close can never leave the controls unreachable on desktop (B02).
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const disclosureId = useId();
+  const toggleId = `${disclosureId}-toggle`;
+  const controlsId = `${disclosureId}-controls`;
   function submitSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     onSearchSubmit?.();
@@ -175,19 +154,12 @@ export function FiltersBar({
             <p id="record-search-help">{t.searchHelp}</p>
           </form>
         )}
-        <details className="filters-disclosure" open={filtersOpen} onToggle={(event) => {
-          const next = event.currentTarget.open;
-          // A native toggle also fires for OUR programmatic `open` change;
-          // only a change that differs from the last applied value is a real
-          // user toggle, and the user's preference then wins within the
-          // current breakpoint (B02).
-          if (next === appliedOpenRef.current) return;
-          appliedOpenRef.current = next;
-          userPreferenceRef.current = next;
-          setFiltersOpen(next);
-        }}>
-          <summary>{activeFilterCount > 0 ? <span>{t.filters}<span className="filters-summary-count"> · {activeFilterCount === 1 ? t.filtersActiveOne : t.filtersActiveMany(activeFilterCount)}</span></span> : t.filters}</summary>
-          <div className="filter-controls-row">
+        <div className="filters-disclosure" role="group" aria-labelledby={toggleId} data-open={filtersOpen ? "true" : "false"}>
+          <button type="button" id={toggleId} className="filters-disclosure-toggle" aria-expanded={filtersOpen} aria-controls={controlsId} onClick={() => setFiltersOpen((open) => !open)}>
+            {activeFilterCount > 0 ? <span>{t.filters}<span className="filters-summary-count"> · {activeFilterCount === 1 ? t.filtersActiveOne : t.filtersActiveMany(activeFilterCount)}</span></span> : <span>{t.filters}</span>}
+            <span className="filters-disclosure-icon" aria-hidden="true" />
+          </button>
+          <div className="filter-controls-row" id={controlsId}>
         <div className="record-filter">
           <label htmlFor="record-kind-filter">{t.cameraType}</label>
           <select id="record-kind-filter" value={kindFilter} onChange={(event) => setKindFilter(event.target.value)}>
@@ -239,7 +211,7 @@ export function FiltersBar({
         <button type="button" className="text-button" onClick={onReset}>{t.resetFilters} <span aria-hidden="true">→</span></button>
         {extraControls}
           </div>
-        </details>
+        </div>
       </div>
       {/* The result counter. "bare" (catalog) omits it: the counter lives in
           the .directory-meta row rendered by PublicDirectory (catalog) so it

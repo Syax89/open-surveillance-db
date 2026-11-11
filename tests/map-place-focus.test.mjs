@@ -15,7 +15,7 @@ import assert from "node:assert/strict";
 import test, { afterEach, before } from "node:test";
 import {
   setupDom, loadDomModule, installFetchMock, jsonResponse,
-  renderWithLocale, resetLeafletMarkers, leafletMarkers, setUrlState, React,
+  renderWithLocale, resetLeafletMarkers, leafletMarkers, setUrlState, React, expandMapPoints,
 } from "./helpers/dom-harness.mjs";
 
 let rtl;
@@ -90,6 +90,7 @@ test("B01: selecting a city suggestion frames the administrative AREA with fitBo
   const { screen, waitFor } = rtl;
   const user = rtl.userEvent.setup();
   await renderWithLocale(React.createElement(MappaTool));
+  await expandMapPoints();
 
   const input = screen.getByRole("combobox", { name: /Filter points or find a place/ });
   await user.type(input, "Ferrara");
@@ -115,6 +116,7 @@ test("B01: a point/address suggestion (small box) keeps the point + zoom fallbac
   const { screen, waitFor } = rtl;
   const user = rtl.userEvent.setup();
   await renderWithLocale(React.createElement(MappaTool));
+  await expandMapPoints();
 
   const input = screen.getByRole("combobox", { name: /Filter points or find a place/ });
   await user.type(input, "Via");
@@ -143,6 +145,7 @@ test("B09: re-selecting the same place after a pan recentres the map", async () 
   const { screen } = rtl;
   const user = rtl.userEvent.setup();
   await renderWithLocale(React.createElement(MappaTool));
+  await expandMapPoints();
 
   // First selection frames the city area.
   await pickOption(screen, user, "Ferrara", 0);
@@ -202,6 +205,7 @@ test("B10: a distant place opens at most one intended popup AFTER the destinatio
   const { screen } = rtl;
   const user = rtl.userEvent.setup();
   await renderWithLocale(React.createElement(MappaTool));
+  await expandMapPoints();
 
   // Rome data is loaded and NOTHING is auto-selected (popup policy).
   await rtl.waitFor(() => assert.ok(screen.getByRole("button", { name: /Rome fixture/ })), { timeout: 3000 });
@@ -237,6 +241,7 @@ test("B10: an empty destination search stays quiet and does not arm a later pan"
   const { screen } = rtl;
   const user = rtl.userEvent.setup();
   await renderWithLocale(React.createElement(MappaTool));
+  await expandMapPoints();
   await rtl.waitFor(() => assert.ok(screen.getByRole("button", { name: /Rome fixture/ })), { timeout: 3000 });
 
   await pickOption(screen, user, "Ferrara", 0);
@@ -306,6 +311,7 @@ async function mountMap({ regions, destinationError } = {}) {
   const { screen } = rtl;
   const user = rtl.userEvent.setup();
   await renderWithLocale(React.createElement(MappaTool));
+  await expandMapPoints();
   await rtl.waitFor(() => assert.ok(screen.getByRole("button", { name: /Rome fixture/ })), { timeout: 3000 });
   const leaflet = await leaves();
   const map = await mapOf();
@@ -424,6 +430,7 @@ test("R3c: a same-geometry place after a filter change is selected only after th
   const { screen } = rtl;
   const user = rtl.userEvent.setup();
   await renderWithLocale(React.createElement(MappaTool));
+  await expandMapPoints();
   await rtl.waitFor(() => assert.ok(screen.getByRole("button", { name: /Rome dome fixture/ })), { timeout: 3000 });
   const map = await mapOf();
 
@@ -477,6 +484,8 @@ test("Batch C: the empty-click hint is an always-visible paragraph OUTSIDE both 
 
   const { container } = await renderWithLocale(React.createElement(MappaTool));
 
+  await expandMapPoints();
+
   // 1. Real, visible DOM text rendered from the new i18n key.
   const node = rtl.screen.getByText(hint);
   assert.equal(node.tagName, "P", "the hint is a real paragraph element");
@@ -510,6 +519,7 @@ test("Batch C: createMap() adds a native Leaflet scale bar at topleft, metric on
   installPlaceMock();
   await resetLeafletMarkers();
   await renderWithLocale(React.createElement(MappaTool));
+  await expandMapPoints();
   const map = await mapOf();
 
   const scale = map.__controls?.find((entry) => entry.kind === "scale");
@@ -540,6 +550,8 @@ test("Batch C2: the legend explains the FOV cone and the numbered aggregation ba
   }
 
   const { container } = await renderWithLocale(React.createElement(MappaTool));
+
+  await expandMapPoints();
   const legend = container.querySelector(".map-legend");
   assert.ok(legend, "the legend still renders");
   assert.equal(legend.tagName, "DETAILS", "the legend stays a <details>");

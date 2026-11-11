@@ -637,30 +637,20 @@ async function appendActionLifecycleEvent(input: {
 export async function likeWeightSumsFor(cameraIds: number[]): Promise<Map<number, number>> {
   if (cameraIds.length === 0) return new Map();
   const d1 = await getD1();
-  // Chunks are independent (disjoint id sets, read-only GROUP BY) → issued in
-  // parallel instead of one serialized await per chunk.
+  // One statement whatever the id count: the ids travel as a single JSON
+  // array parameter (json_each), so D1's 100-bound-parameter cap never
+  // forces chunking (see confirmationCountsFor).
   const results = new Map<number, number>();
-  const chunks: number[][] = [];
-  for (let offset = 0; offset < cameraIds.length; offset += 100) {
-    chunks.push(cameraIds.slice(offset, offset + 100));
-  }
-  const chunkRows = await Promise.all(
-    chunks.map((chunk) => {
-      const placeholders = chunk.map(() => "?").join(", ");
-      return d1
-        .prepare(
-          `SELECT camera_id AS cameraId, COALESCE(SUM(weight), 0) AS sum
+  const rows = await d1
+    .prepare(
+      `SELECT camera_id AS cameraId, COALESCE(SUM(weight), 0) AS sum
          FROM camera_community_actions
-         WHERE camera_id IN (${placeholders}) AND action_type = 'like'
+         WHERE camera_id IN (SELECT value FROM json_each(?)) AND action_type = 'like'
          GROUP BY camera_id`,
-        )
-        .bind(...chunk)
-        .all<{ cameraId: number; sum: number }>();
-    }),
-  );
-  for (const rows of chunkRows) {
-    for (const row of rows.results) results.set(row.cameraId, row.sum);
-  }
+    )
+    .bind(JSON.stringify(cameraIds))
+    .all<{ cameraId: number; sum: number }>();
+  for (const row of rows.results) results.set(row.cameraId, row.sum);
   return results;
 }
 
@@ -674,36 +664,26 @@ export async function communityActionCountsFor(cameraIds: number[]): Promise<Map
   if (cameraIds.length === 0) return new Map();
   const d1 = await getD1();
   const results = new Map<number, CommunityActionCounts>();
-  // D1 caps bound parameters at 100; chunk the IDs. Chunks are independent
-  // (disjoint id sets, read-only GROUP BY) → issued in parallel.
-  const chunks: number[][] = [];
-  for (let offset = 0; offset < cameraIds.length; offset += 100) {
-    chunks.push(cameraIds.slice(offset, offset + 100));
-  }
-  const chunkRows = await Promise.all(
-    chunks.map((chunk) => {
-      const placeholders = chunk.map(() => "?").join(", ");
-      return d1
-        .prepare(
-          `SELECT camera_id AS cameraId, action_type AS actionType, COUNT(DISTINCT contributor_id) AS count
+  // One statement whatever the id count (was: one per 100-id chunk): the ids
+  // travel as a single JSON array parameter expanded by json_each, so D1's
+  // 100-bound-parameter cap never applies (see confirmationCountsFor).
+  const rows = await d1
+    .prepare(
+      `SELECT camera_id AS cameraId, action_type AS actionType, COUNT(DISTINCT contributor_id) AS count
          FROM camera_community_actions
-         WHERE camera_id IN (${placeholders})
+         WHERE camera_id IN (SELECT value FROM json_each(?))
          GROUP BY camera_id, action_type`,
-        )
-        .bind(...chunk)
-        .all<{ cameraId: number; actionType: string; count: number }>();
-    }),
-  );
-  for (const rows of chunkRows) {
-    for (const row of rows.results) {
-      let entry = results.get(row.cameraId);
-      if (!entry) {
-        entry = zeroCounts();
-        results.set(row.cameraId, entry);
-      }
-      if (row.actionType in entry) {
-        (entry as Record<string, number>)[row.actionType] = row.count;
-      }
+    )
+    .bind(JSON.stringify(cameraIds))
+    .all<{ cameraId: number; actionType: string; count: number }>();
+  for (const row of rows.results) {
+    let entry = results.get(row.cameraId);
+    if (!entry) {
+      entry = zeroCounts();
+      results.set(row.cameraId, entry);
+    }
+    if (row.actionType in entry) {
+      (entry as Record<string, number>)[row.actionType] = row.count;
     }
   }
   return results;
