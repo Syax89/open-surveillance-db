@@ -31,6 +31,7 @@ import { fileURLToPath } from "node:url";
 import { applyDrizzleMigrations } from "./helpers/db-runtime-harness.mjs";
 import { D1SqliteDatabase as D1 } from "./helpers/d1-sqlite.mjs";
 import { cleanupRouteTree, loadLib, loadTreeModule } from "./helpers/api-harness.mjs";
+import { readAccountPageSource } from "./helpers/account-sources.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const readSource = (relativePath) => readFile(path.join(root, relativePath), "utf8");
@@ -368,7 +369,7 @@ test("the record page labels via the safe helper and never appends a raw status"
 });
 
 test("the account page labels submission statuses from i18n with a neutral fallback", async () => {
-  const page = await readSource("app/account/AccountPageBody.tsx");
+  const page = await readAccountPageSource();
   assert.doesNotMatch(
     page,
     /statusLabels\s*[:=]/,

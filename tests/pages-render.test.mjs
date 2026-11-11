@@ -61,6 +61,19 @@ const EXTRA_SOURCES = [
   { source: "app/account/ApiKeysSection.tsx", relative: "app/account/ApiKeysSection.mjs" },
   { source: "app/account/ApiKeyList.tsx", relative: "app/account/ApiKeyList.mjs" },
   { source: "app/account/ApiKeyRow.tsx", relative: "app/account/ApiKeyRow.mjs" },
+  // AccountPageBody split (one component per section): same isolation
+  // contract as the API-key panel above.
+  { source: "app/account/VerifyEmailBanner.tsx", relative: "app/account/VerifyEmailBanner.mjs" },
+  { source: "app/account/ProfileSection.tsx", relative: "app/account/ProfileSection.mjs" },
+  { source: "app/account/DisplayNameField.tsx", relative: "app/account/DisplayNameField.mjs" },
+  { source: "app/account/ContributionsSection.tsx", relative: "app/account/ContributionsSection.mjs" },
+  { source: "app/account/ContributionStats.tsx", relative: "app/account/ContributionStats.mjs" },
+  { source: "app/account/ContributionFilters.tsx", relative: "app/account/ContributionFilters.mjs" },
+  { source: "app/account/ContributionList.tsx", relative: "app/account/ContributionList.mjs" },
+  { source: "app/account/ContributionKindIcon.tsx", relative: "app/account/ContributionKindIcon.mjs" },
+  { source: "app/account/PasskeysSection.tsx", relative: "app/account/PasskeysSection.mjs" },
+  { source: "app/account/PasskeyDialogs.tsx", relative: "app/account/PasskeyDialogs.mjs" },
+  { source: "app/account/DeleteAccountSection.tsx", relative: "app/account/DeleteAccountSection.mjs" },
 ];
 
 // Le route del repo (pagine + API) note al momento del test: usate per
