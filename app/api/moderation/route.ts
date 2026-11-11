@@ -16,9 +16,8 @@ import {
   moderationReasonCodes,
 } from "../../../db/moderation";
 import { recordRateLimitBlock } from "../../lib/abuse-alerts";
-import { requireRole } from "../../lib/authz";
+import { moderatorWriteGuard, requireRole } from "../../lib/authz";
 import { cameraPurgeTags, purgeCacheTags } from "../../lib/cache-purge";
-import { CSRF_REJECTED_ERROR, sameOrigin } from "../../lib/csrf";
 import { isRecord } from "../../lib/guards";
 import { BodyReadError, readJsonBody, urlTooLong } from "../../lib/input-limits";
 import { callerKey, checkRateLimit, limitsFor } from "../../lib/rate-limit";
@@ -384,17 +383,14 @@ export async function PATCH(request: Request) {
   const auth = await requireRole(request, "moderator");
   if (!auth.ok) return auth.response;
 
-  // Same-origin guard: a moderator's decision is edge-authenticated (Basic/
-  // bearer gate or platform header), NOT a contributor osdb_session, so there
-  // is no CSRF token to echo. The shared sameOrigin helper still blocks a
-  // cross-site browser PATCH (which always carries a foreign Origin) before
-  // any rate-limit, body parse, reviewer lookup or write runs.
-  if (!sameOrigin(request)) {
-    return Response.json(
-      { error: CSRF_REJECTED_ERROR },
-      { status: 403, headers: { "Cache-Control": "no-store" } },
-    );
-  }
+  // Write-origin guard (before any rate-limit, body parse, reviewer lookup or
+  // write). The moderator may be authenticated two ways at the edge: Basic/
+  // bearer (explicit credentials: same-origin check only) or their own
+  // osdb_session cookie (ambient authority the browser attaches by itself:
+  // the per-session X-CSRF-Token must also match, like every contributor
+  // write). The worker signals which one via `x-osdb-auth-source`.
+  const writeDenied = await moderatorWriteGuard(request);
+  if (writeDenied) return writeDenied;
 
   const blocked = await moderationLimit(request);
   if (blocked) return blocked;

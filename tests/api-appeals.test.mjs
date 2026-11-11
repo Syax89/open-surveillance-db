@@ -538,9 +538,10 @@ test("PATCH answers 500 when the db layer throws unexpectedly", async () => {
 // PATCH /api/appeals/[id] — same-origin guard (CSRF defence in depth)
 // ---------------------------------------------------------------------------
 //
-// The decider is edge-authenticated (Basic/bearer gate or platform header), so
-// there is no contributor osdb_session and no CSRF token to echo. The shared
-// sameOrigin helper is the only write-origin defence: it blocks a cross-site
+// These cases model a Basic/bearer (edge) decider: no osdb_session, no CSRF
+// token to echo (the session-authenticated decider, which MUST echo the token,
+// is covered at the end of this file). For them the shared sameOrigin helper
+// is the only write-origin defence: it blocks a cross-site
 // browser PATCH (which always carries a foreign Origin) while the
 // TLS-terminating proxy's `http://<host>` Origin and an absent Origin pass.
 // The literal below is written out independently of the production constant so
@@ -594,8 +595,8 @@ test("PATCH accepts same-host and absent Origins for an authenticated moderator"
       stubIdentity(moderatorUser);
       stub("getReviewerByUserId", async () => seniorReviewer);
       stub("decideAppeal", async () => ({ kind: "ok", appeal: decided, event: eventFixture }));
-      // No contributor csrf cookie or X-CSRF-Token header is sent: this route
-      // never requires one, the same-origin check is the whole write defence.
+      // No contributor csrf cookie or X-CSRF-Token header is sent: an edge
+      // (Basic/bearer) decider never needs one, same-origin is its write defence.
       const response = await PATCH(
         asModerator("/api/appeals/1", { method: "PATCH", headers, body: validDecisionPayload }),
       );
@@ -678,4 +679,96 @@ test("same-origin guard runs before rate limiting so a foreign PATCH cannot spen
     else envModule.env.MODERATION_RATE_LIMIT_WINDOW_SECONDS = previousWindow;
     rateLimit.resetRateLimitState();
   }
+});
+
+// ---------------------------------------------------------------------------
+// PATCH /api/appeals/[id] — CSRF double-submit for session-authenticated
+// deciders (worker marks `x-osdb-auth-source: session` when the moderator
+// identity came from their own osdb_session cookie)
+// ---------------------------------------------------------------------------
+
+const deciderSession = {
+  id: 9,
+  contributorId: 41,
+  tokenHash: "hash-of-decider-token",
+  csrfToken: "decider-csrf-token",
+  createdAt: "2026-08-01T00:00:00.000Z",
+  expiresAt: "2026-08-31T00:00:00.000Z",
+  revokedAt: null,
+};
+const sessionDecide = (headers = {}) =>
+  asModerator("/api/appeals/1", {
+    method: "PATCH",
+    headers: {
+      "x-osdb-auth-source": "session",
+      cookie: "osdb_session=decider-raw-token; osdb_csrf=decider-csrf-token",
+      ...headers,
+    },
+    body: validDecisionPayload,
+  });
+const stubDecider = () => {
+  stubIdentity(moderatorUser);
+  stub("getReviewerByUserId", async () => seniorReviewer);
+  stub("decideAppeal", async () => ({
+    kind: "ok",
+    appeal: { ...appealFixture, status: "upheld", deciderName: "Demo Senior Moderator" },
+    event: eventFixture,
+  }));
+  stub("findSessionByToken", async (token) =>
+    token === "decider-raw-token"
+      ? { ...deciderSession, contributor: { id: 41, email: "mod@osdb.test", displayName: "Mod" } }
+      : null,
+  );
+};
+
+test("PATCH by a session-authenticated decider without a valid CSRF token is 403", async (t) => {
+  const { PATCH } = await appealItemRoute();
+  for (const [name, headers] of [
+    ["no token header", {}],
+    ["wrong token", { "x-csrf-token": "attacker-guess" }],
+  ]) {
+    await t.test(name, async () => {
+      resetMockState();
+      stubDecider();
+      const request = sessionDecide(headers);
+      const response = await PATCH(request);
+      assert.equal(response.status, 403, name);
+      assert.equal(
+        (await responseBody(response)).error,
+        "Cross-site request rejected. Refresh the page and try again.",
+      );
+      assert.equal(request.bodyUsed, false);
+      assert.equal(callArgs("decideAppeal").length, 0, name);
+    });
+  }
+});
+
+test("PATCH by a session-authenticated decider with the matching CSRF token succeeds", async () => {
+  stubDecider();
+  const { PATCH } = await appealItemRoute();
+  const response = await PATCH(sessionDecide({ "x-csrf-token": "decider-csrf-token" }));
+  assert.equal(response.status, 200);
+  assert.equal(callArgs("decideAppeal").length, 1);
+});
+
+test("PATCH by a Basic/bearer (edge) decider needs no CSRF token", async () => {
+  stubDecider();
+  const { PATCH } = await appealItemRoute();
+  const response = await PATCH(
+    asModerator("/api/appeals/1", {
+      method: "PATCH",
+      headers: { "x-osdb-auth-source": "edge" },
+      body: validDecisionPayload,
+    }),
+  );
+  assert.equal(response.status, 200);
+  assert.equal(callArgs("findSessionByToken").length, 0);
+});
+
+test("PATCH by a session-authenticated decider with a cross-site Origin is 403 even with the token", async () => {
+  stubDecider();
+  const { PATCH } = await appealItemRoute();
+  const response = await PATCH(sessionDecide({ "x-csrf-token": "decider-csrf-token", origin: "https://evil.test" }));
+  assert.equal(response.status, 403);
+  assert.equal(callArgs("decideAppeal").length, 0);
 });

@@ -295,6 +295,13 @@ const SCANNER_PATH_PATTERN =
 // the single identity authority: it strips client-supplied values on every
 // path and re-injects the server-chosen identity where a gate succeeded.
 const PROTOTYPE_IDENTITY_HEADER = "x-osdb-user-email";
+// Which credential the moderation gate accepted (`session` | `edge`). Set
+// ONLY by this edge next to `x-osdb-user-email` (and stripped from every
+// client request like it): a moderator identity resolved from the ambient
+// `osdb_session` cookie must still pass the per-session CSRF double-submit
+// check at the route, while Basic/bearer (explicit credentials) need none.
+// Mirrored in app/lib/authz.ts (MODERATION_AUTH_SOURCE_HEADER).
+const MODERATION_AUTH_SOURCE_HEADER = "x-osdb-auth-source";
 const PLATFORM_IDENTITY_HEADER = "oai-authenticated-user-email";
 const PLATFORM_FULL_NAME_HEADER = "oai-authenticated-user-full-name";
 const PLATFORM_FULL_NAME_ENCODING_HEADER = "oai-authenticated-user-full-name-encoding";
@@ -477,7 +484,12 @@ async function moderatorEmailFromSession(request: Request): Promise<string | nul
  * Fail-closed everywhere: no credentials → 503, wrong credential → 401,
  * malformed operator list → 503.
  */
-async function requireModerationAuth(request: Request, env: Env): Promise<{ denied: Response | null; identityEmail: string | null }> {
+type ModerationAuthSource = "session" | "edge";
+
+async function requireModerationAuth(
+  request: Request,
+  env: Env,
+): Promise<{ denied: Response | null; identityEmail: string | null; source?: ModerationAuthSource }> {
   const operators = parseModerationOperators(env);
   if (env.MODERATION_OPERATORS !== undefined && env.MODERATION_OPERATORS !== "" && operators === null) {
     console.error("Moderation access control: MODERATION_OPERATORS is not a valid operator list; denying", request.url);
@@ -502,15 +514,15 @@ async function requireModerationAuth(request: Request, env: Env): Promise<{ deni
 
   const authorization = request.headers.get("Authorization") ?? "";
   if (env.MODERATION_TOKEN && safeEqual(`Bearer ${env.MODERATION_TOKEN}`, authorization)) {
-    return { denied: null, identityEmail: env.MODERATION_IDENTITY_EMAIL ?? null };
+    return { denied: null, identityEmail: env.MODERATION_IDENTITY_EMAIL ?? null, source: "edge" };
   }
   const sessionEmail = await moderatorEmailFromSession(request);
   if (sessionEmail) {
-    return { denied: null, identityEmail: sessionEmail };
+    return { denied: null, identityEmail: sessionEmail, source: "session" };
   }
   if (operators !== null && operators.length > 0) {
     const operator = matchBasicOperator(authorization, operators);
-    if (operator) return { denied: null, identityEmail: operator.email };
+    if (operator) return { denied: null, identityEmail: operator.email, source: "edge" };
     return {
       denied: new Response("Unauthorized", {
         status: 401,
@@ -525,7 +537,7 @@ async function requireModerationAuth(request: Request, env: Env): Promise<{ deni
   if (env.MODERATION_USER && env.MODERATION_PASSWORD) {
     const expected = `Basic ${btoa(`${env.MODERATION_USER}:${env.MODERATION_PASSWORD}`)}`;
     if (safeEqual(expected, authorization)) {
-      return { denied: null, identityEmail: env.MODERATION_IDENTITY_EMAIL ?? null };
+      return { denied: null, identityEmail: env.MODERATION_IDENTITY_EMAIL ?? null, source: "edge" };
     }
   }
   return {
@@ -1000,6 +1012,7 @@ function withSecurityHeaders(response: Response, pathname?: string, hostname?: s
 function stripIdentityHeaders(request: Request, env: Env): Request {
   const headers = new Headers(request.headers);
   headers.delete(PROTOTYPE_IDENTITY_HEADER);
+  headers.delete(MODERATION_AUTH_SOURCE_HEADER);
   const trustPlatform =
     env.TRUST_PLATFORM_HEADERS === "1" || env.TRUST_PLATFORM_HEADERS === "true";
   if (!trustPlatform) {
@@ -1016,11 +1029,21 @@ function stripIdentityHeaders(request: Request, env: Env): Request {
  * as `x-osdb-user-email` (QA#3 F5). Fail-closed: without a resolved identity
  * the request passes through anonymous and the route layer rejects it (401),
  * so a misconfigured host can never accidentally grant a role.
+ *
+ * Alongside it the edge records WHICH credential passed the gate as
+ * `x-osdb-auth-source` (`session` for the ambient osdb_session cookie,
+ * `edge` for Basic/bearer), so moderator write routes can require the CSRF
+ * token exactly when the identity came from the cookie.
  */
-function injectIdentityAfterGate(request: Request, identityEmail: string | null): Request {
+function injectIdentityAfterGate(
+  request: Request,
+  identityEmail: string | null,
+  source: ModerationAuthSource = "edge",
+): Request {
   if (!identityEmail) return request;
   const headers = new Headers(request.headers);
   headers.set(PROTOTYPE_IDENTITY_HEADER, identityEmail);
+  headers.set(MODERATION_AUTH_SOURCE_HEADER, source);
   return new Request(request, { headers });
 }
 
@@ -1267,7 +1290,7 @@ async function dispatch(request: Request, env: Env, ctx: ExecutionContext, url: 
         }
         return withSecurityHeaders(gate.denied, url.pathname, url.hostname);
       }
-      gated = injectIdentityAfterGate(gated, gate.identityEmail);
+      gated = injectIdentityAfterGate(gated, gate.identityEmail, gate.source);
     }
 
     // 1k. Multipart POSTs are refused at the edge — on EVERY path. The

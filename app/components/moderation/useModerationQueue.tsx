@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocale } from "../LocaleProvider";
 import { useMessages } from "../../lib/use-messages";
 import { LOCALE_BCP47 } from "../../lib/i18n";
+import { readCsrfToken } from "../../lib/csrf";
 import type { CameraInQueue, CorrectionInQueue, DecisionFormApi, EditRequestInQueue, ModerationAction, ModerationEvent, PublishedCursor, QueueEntity, QueueItem, QueuePayload, ReasonCode, Reviewer } from "./types";
 export function useModerationQueue() {
   const { locale } = useLocale();
@@ -115,8 +116,9 @@ export function useModerationQueue() {
     if (entity === "correction" && parsedCameraId !== null && (!Number.isInteger(parsedCameraId) || parsedCameraId < 1)) { setError(t.invalidRecordId); return; }
     setProcessing(key); setMessage(""); setError("");
     try {
+      const csrfToken = readCsrfToken();
       const response = await fetch("/api/moderation", {
-        method: "PATCH", headers: { "Content-Type": "application/json" },
+        method: "PATCH", headers: { "Content-Type": "application/json", ...(csrfToken ? { "x-csrf-token": csrfToken } : {}) },
         body: JSON.stringify({
           entity, id, action, reasonCode, actorId: actingAs,
           ...(note ? { note } : {}),
