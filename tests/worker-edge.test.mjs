@@ -1216,6 +1216,51 @@ test("moderator session does not leak into the legacy identity headers it replac
   assert.equal(forwarded["oai-authenticated-user-email"], undefined);
 });
 
+// The route layer requires the CSRF double-submit token only when the
+// moderator identity came from the ambient osdb_session cookie, so the edge
+// must record the credential source and never let a client choose it.
+test("gate records the auth source (session vs edge) and strips a client-supplied one", async () => {
+  const { worker, app, auth, users } = await loadWorker();
+  auth.__state.session = { contributor: { id: 41, email: "mod@osdb.test" } };
+  users.__state.usersByContributorId[41] = { email: "mod@osdb.test", role: "moderator", active: 1 };
+  let response = await worker.fetch(
+    request("/api/moderation", {
+      method: "PATCH",
+      headers: { cookie: sessionCookie("real-token"), "x-osdb-auth-source": "edge" },
+    }),
+    testEnv(MINIMAL_BASIC_CONFIG),
+    ctx(),
+  );
+  assert.equal(response.status, 200);
+  assert.equal(app.__calls.at(-1).headers["x-osdb-auth-source"], "session");
+
+  auth.__state.session = null;
+  for (const [name, authorization, config] of [
+    ["basic", basic("fixture", "fixture-pass"), { ...MINIMAL_BASIC_CONFIG, MODERATION_IDENTITY_EMAIL: "ops@osdb.test" }],
+    ["bearer", bearer("fixture-token"), { MODERATION_TOKEN: "fixture-token", MODERATION_IDENTITY_EMAIL: "ops@osdb.test" }],
+  ]) {
+    response = await worker.fetch(
+      request("/api/appeals/1", {
+        method: "PATCH",
+        headers: { authorization, "x-osdb-auth-source": "session" },
+      }),
+      testEnv(config),
+      ctx(),
+    );
+    assert.equal(response.status, 200, name);
+    assert.equal(app.__calls.at(-1).headers["x-osdb-auth-source"], "edge", name);
+  }
+
+  // Ungated path: a client-supplied source never reaches the app.
+  response = await worker.fetch(
+    request("/api/appeals", { method: "POST", headers: { "x-osdb-auth-source": "session" } }),
+    testEnv(),
+    ctx(),
+  );
+  assert.equal(response.status, 200);
+  assert.equal(app.__calls.at(-1).headers["x-osdb-auth-source"], undefined);
+});
+
 test("contributor POST appeals aliases stay ungated while GET and PATCH remain gated", async () => {
   const { worker, app } = await loadWorker();
   for (const route of APPEALS_ALIASES) {
