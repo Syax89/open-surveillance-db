@@ -73,7 +73,7 @@ export function DecisionForm({ entity, id, allowedActions, api }: Props) {
         </label>
       </fieldset>
       <div className="record-list-actions" aria-label={`${t.decisionFor} ${entity} ${id}`}>
-        {allowedActions.map((action) => <button key={action} type="button" className={action === "approve" || action === "reverify" ? "button button-primary" : action === "hide" || action === "mark-stale" ? "button button-quiet" : "text-button"} disabled={disabled || (action === "approve" && approveLocked) || (action === "associate" && associateLocked)} onClick={() => api.decide(entity, id, action)}>{busy ? t.saving : t.action[action]}</button>)}
+        {allowedActions.map((action) => <button key={action} type="button" className={action === "approve" || action === "reverify" ? "button button-primary" : action === "hide" || action === "mark-stale" ? "button button-quiet detail-outline" : "text-button"} disabled={disabled || (action === "approve" && approveLocked) || (action === "associate" && associateLocked)} onClick={() => api.decide(entity, id, action)}>{busy ? t.saving : t.action[action]}</button>)}
       </div>
     </>
   );

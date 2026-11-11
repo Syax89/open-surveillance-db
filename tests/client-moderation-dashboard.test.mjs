@@ -213,6 +213,10 @@ test("moderation: hide action available on a pending camera row", async () => {
   const cameraActions = screen.getByLabelText("Decision for camera 7");
   const hide = [...cameraActions.querySelectorAll("button")].find((button) => button.textContent === "Hide");
   assert.ok(hide, "Hide button present");
+  // button-quiet alone is the light-on-navy hero style: on the light queue
+  // card it renders near-white text. It must be paired with detail-outline
+  // (dark ink), like every other quiet button on a light surface.
+  assert.ok(hide.classList.contains("detail-outline"), "Hide uses the light-surface outline ink");
   await user.click(hide);
 
   await waitFor(() => assert.equal(patchRequests.length, 1));
