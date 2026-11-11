@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
-import { recordRateLimitBlock } from "../../lib/abuse-alerts";
 import { isLocale } from "../../lib/i18n/types";
-import { callerKey, checkRateLimit, geocodeLimits } from "../../lib/rate-limit";
+import { geocodeLimits } from "../../lib/rate-limit";
+import { rateLimitResponse } from "../../lib/rate-limit-response";
 import { maxQueryLength } from "../../lib/search";
 
 /**
@@ -238,27 +238,16 @@ export async function GET(request: Request) {
   // the caller's geocode budget. This preserves the anti-abuse bound for new
   // searches while allowing an already-cached place to remain usable after a
   // user has explored the map heavily.
-  const key = callerKey(request, env);
-  const limitOptions = geocodeLimits(env);
-  const limit = await checkRateLimit(env, "geocode", key, limitOptions);
-  if (!limit.allowed) {
-    console.warn("GET /api/geocode rate limited");
-    recordRateLimitBlock(env, {
-      route: "/api/geocode",
-      key,
-      windowSeconds: limitOptions.windowSeconds,
-    });
-    return Response.json(
-      { error: "Too many place searches. Please try again shortly." },
-      {
-        status: 429,
-        headers: {
-          "Retry-After": String(limit.retryAfterSeconds),
-          "Cache-Control": "no-store",
-        },
-      },
-    );
-  }
+  const limited = await rateLimitResponse(request, {
+    bucket: "geocode",
+    route: "/api/geocode",
+    env,
+    limits: geocodeLimits(env),
+    log: "GET /api/geocode rate limited",
+    error: "Too many place searches. Please try again shortly.",
+    headers: { "Cache-Control": "no-store" },
+  });
+  if (limited) return limited;
 
   let upstream: Response;
   try {

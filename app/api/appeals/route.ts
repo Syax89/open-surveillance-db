@@ -12,13 +12,11 @@ import { malformedSessionCookieGuard, resolveOptionalContributor } from "../../l
 import { CSRF_REJECTED_ERROR, csrfVerified, sameOrigin } from "../../lib/csrf";
 import { isRecord } from "../../lib/guards";
 import { BodyReadError, readJsonBody, urlTooLong } from "../../lib/input-limits";
-import { recordRateLimitBlock } from "../../lib/abuse-alerts";
 import {
   appealAppellantLimits,
-  callerKey,
-  checkRateLimit,
   limitsFor,
 } from "../../lib/rate-limit";
+import { rateLimitResponse } from "../../lib/rate-limit-response";
 
 const appealReasonMaxLength = 1500;
 // Standing floor (P3 appeal-ownership audit): an appeal must state why the
@@ -63,22 +61,13 @@ function parseAppealRequest(value: unknown): {
 }
 
 async function appealLimit(request: Request) {
-  const key = callerKey(request, env);
-  const limitOptions = limitsFor("appeal", env);
-  const limit = await checkRateLimit(env, "appeal", key, limitOptions);
-  if (!limit.allowed) {
-    console.warn("/api/appeals rate limited");
-    recordRateLimitBlock(env, {
-      route: "/api/appeals",
-      key,
-      windowSeconds: limitOptions.windowSeconds,
-    });
-    return Response.json({ error: "Too many requests. Please try again shortly." }, {
-      status: 429,
-      headers: { "Retry-After": String(limit.retryAfterSeconds) },
-    });
-  }
-  return null;
+  return rateLimitResponse(request, {
+    bucket: "appeal",
+    route: "/api/appeals",
+    env,
+    limits: limitsFor("appeal", env),
+    log: "/api/appeals rate limited",
+  });
 }
 
 /**

@@ -5,12 +5,12 @@ import {
   removeCommunityAction,
   setCommunityAction,
 } from "../../../../../db/community-actions";
-import { recordRateLimitBlock } from "../../../../lib/abuse-alerts";
 import { resolveOptionalContributor } from "../../../../lib/auth-session";
 import { requireWriteAuth } from "../../../../lib/write-gate";
 import { CSRF_REJECTED_ERROR, csrfVerified, sameOrigin } from "../../../../lib/csrf";
 import { BodyReadError, readJsonBody, urlTooLong } from "../../../../lib/input-limits";
-import { callerKey, checkRateLimit, checkRateLimitForKeyAuth, limitsFor } from "../../../../lib/rate-limit";
+import { limitsFor } from "../../../../lib/rate-limit";
+import { rateLimitResponse } from "../../../../lib/rate-limit-response";
 
 /**
  * Community actions toggle (ADR 0021 §3.2, kanban t_a9f23581 FASE 2):
@@ -51,21 +51,16 @@ async function guardMutation(
     return Response.json({ error: "Request URI too long." }, { status: 414, headers: NO_STORE_HEADERS });
   }
 
-  const key = callerKey(request, env);
   const limitOptions = limitsFor("action", env);
-  const limit = await checkRateLimit(env, "action", key, limitOptions);
-  if (!limit.allowed) {
-    console.warn("PUT/DELETE /api/cameras/[id]/actions rate limited");
-    recordRateLimitBlock(env, {
-      route: "/api/cameras/[id]/actions",
-      key,
-      windowSeconds: limitOptions.windowSeconds,
-    });
-    return Response.json({ error: "Too many requests. Please try again shortly." }, {
-      status: 429,
-      headers: { ...NO_STORE_HEADERS, "Retry-After": String(limit.retryAfterSeconds) },
-    });
-  }
+  const limited = await rateLimitResponse(request, {
+    bucket: "action",
+    route: "/api/cameras/[id]/actions",
+    env,
+    limits: limitOptions,
+    log: "PUT/DELETE /api/cameras/[id]/actions rate limited",
+    headers: NO_STORE_HEADERS,
+  });
+  if (limited) return limited;
 
   let gate;
   try {
@@ -99,19 +94,16 @@ async function guardMutation(
   // answers 429 (same body as the per-IP block, Retry-After included).
   // Session callers have no per-key bucket (the pre-gate per-IP check is the
   // whole story), so this check is a no-op for them.
-  const keyLimit = await checkRateLimitForKeyAuth(env, "action", request, limitOptions, gate);
-  if (!keyLimit.allowed) {
-    console.warn("PUT/DELETE /api/cameras/[id]/actions rate limited (per-key bucket)");
-    recordRateLimitBlock(env, {
-      route: "/api/cameras/[id]/actions",
-      key: keyLimit.key,
-      windowSeconds: limitOptions.windowSeconds,
-    });
-    return Response.json({ error: "Too many requests. Please try again shortly." }, {
-      status: 429,
-      headers: { ...NO_STORE_HEADERS, "Retry-After": String(keyLimit.retryAfterSeconds) },
-    });
-  }
+  const keyLimited = await rateLimitResponse(request, {
+    bucket: "action",
+    route: "/api/cameras/[id]/actions",
+    env,
+    limits: limitOptions,
+    apiKey: { gate },
+    log: "PUT/DELETE /api/cameras/[id]/actions rate limited (per-key bucket)",
+    headers: NO_STORE_HEADERS,
+  });
+  if (keyLimited) return keyLimited;
 
   const id = parseId(request);
   if (id === null) {
@@ -199,21 +191,15 @@ export async function GET(request: Request) {
   // (CommunityActions), so 10/min would throttle legitimate map browsing
   // while 60/min still bounds enumeration. Runs BEFORE the session
   // resolution so the anonymous path is bounded too.
-  const key = callerKey(request, env);
-  const limitOptions = limitsFor("read", env);
-  const limit = await checkRateLimit(env, "read", key, limitOptions);
-  if (!limit.allowed) {
-    console.warn("GET /api/cameras/[id]/actions rate limited");
-    recordRateLimitBlock(env, {
-      route: "/api/cameras/[id]/actions",
-      key,
-      windowSeconds: limitOptions.windowSeconds,
-    });
-    return Response.json({ error: "Too many requests. Please try again shortly." }, {
-      status: 429,
-      headers: { ...NO_STORE_HEADERS, "Retry-After": String(limit.retryAfterSeconds) },
-    });
-  }
+  const limited = await rateLimitResponse(request, {
+    bucket: "read",
+    route: "/api/cameras/[id]/actions",
+    env,
+    limits: limitsFor("read", env),
+    log: "GET /api/cameras/[id]/actions rate limited",
+    headers: NO_STORE_HEADERS,
+  });
+  if (limited) return limited;
 
   const id = parseId(request);
   if (id === null) {

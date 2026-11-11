@@ -3,7 +3,8 @@ import { searchPublicCamerasNearPage, SEARCH_PAGE_DEFAULT_LIMIT, SEARCH_PAGE_MAX
 import { likeWeightSumsFor } from "../../../../db/community-actions";
 import { resolvePlace } from "../../../../db/geocode";
 import { resolveLocale } from "../../../lib/i18n/types";
-import { callerKey, checkRateLimit, searchLimits } from "../../../lib/rate-limit";
+import { searchLimits } from "../../../lib/rate-limit";
+import { rateLimitResponse } from "../../../lib/rate-limit-response";
 import { MAX_PAGE_OFFSET } from "../../../lib/input-limits";
 import {
   coordinateRadiusMeters,
@@ -117,15 +118,16 @@ export async function GET(request: Request) {
     return Response.json({ error: `limit must be an integer between 1 and ${SEARCH_PAGE_MAX_LIMIT} and offset a non-negative integer up to ${MAX_PAGE_OFFSET}.` }, { status: 400 });
   }
 
-  const key = callerKey(request, env);
-  const rateLimit = await checkRateLimit(env, "search", key, searchLimits(env));
-  if (!rateLimit.allowed) {
-    console.warn(`GET /api/cameras/search rate limited for caller ${key}`);
-    return Response.json({ error: "Too many searches. Please try again shortly." }, {
-      status: 429,
-      headers: { "Retry-After": String(rateLimit.retryAfterSeconds) },
-    });
-  }
+  const limited = await rateLimitResponse(request, {
+    bucket: "search",
+    route: "/api/cameras/search",
+    env,
+    limits: searchLimits(env),
+    log: (key) => `GET /api/cameras/search rate limited for caller ${key}`,
+    error: "Too many searches. Please try again shortly.",
+    recordBlock: false,
+  });
+  if (limited) return limited;
 
   const coordinates = parseCoordinateQuery(query);
   if (coordinates) {

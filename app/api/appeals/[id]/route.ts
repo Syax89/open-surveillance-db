@@ -3,8 +3,8 @@ import { decideAppeal, type AppealDecision, appealDecisions } from "../../../../
 import { moderatorWriteGuard, requireRole } from "../../../lib/authz";
 import { isRecord } from "../../../lib/guards";
 import { BodyReadError, readJsonBody, urlTooLong } from "../../../lib/input-limits";
-import { recordRateLimitBlock } from "../../../lib/abuse-alerts";
-import { callerKey, checkRateLimit, limitsFor } from "../../../lib/rate-limit";
+import { limitsFor } from "../../../lib/rate-limit";
+import { rateLimitResponse } from "../../../lib/rate-limit-response";
 import { getReviewerByUserId } from "../../../../db/users";
 
 function parseAppealId(url: URL): number | null {
@@ -63,21 +63,14 @@ export async function PATCH(request: Request) {
   // edge gate): only authenticated moderators reach this point, and the
   // per-caller limit bounds a compromised or over-zealous account without
   // ever affecting public read traffic.
-  const key = callerKey(request, env);
-  const limitOptions = limitsFor("moderate", env);
-  const limit = await checkRateLimit(env, "moderate", key, limitOptions);
-  if (!limit.allowed) {
-    console.warn("PATCH /api/appeals/[id] rate limited");
-    recordRateLimitBlock(env, {
-      route: "/api/appeals/[id]",
-      key,
-      windowSeconds: limitOptions.windowSeconds,
-    });
-    return Response.json({ error: "Too many requests. Please try again shortly." }, {
-      status: 429,
-      headers: { "Retry-After": String(limit.retryAfterSeconds) },
-    });
-  }
+  const limited = await rateLimitResponse(request, {
+    bucket: "moderate",
+    route: "/api/appeals/[id]",
+    env,
+    limits: limitsFor("moderate", env),
+    log: "PATCH /api/appeals/[id] rate limited",
+  });
+  if (limited) return limited;
 
   const appealId = parseAppealId(new URL(request.url));
   if (appealId === null) {

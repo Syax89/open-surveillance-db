@@ -1,9 +1,9 @@
 import { env } from "cloudflare:workers";
 import { getPublicCameraById } from "../../../../db/cameras";
 import { listPublicCameraRevisions } from "../../../../db/moderation";
-import { recordRateLimitBlock } from "../../../lib/abuse-alerts";
 import { urlTooLong } from "../../../lib/input-limits";
-import { callerKey, checkRateLimit, limitsFor } from "../../../lib/rate-limit";
+import { limitsFor } from "../../../lib/rate-limit";
+import { rateLimitResponse } from "../../../lib/rate-limit-response";
 
 function parseCameraId(url: URL): number | null {
   const raw = url.searchParams.get("cameraId");
@@ -21,21 +21,14 @@ export async function GET(request: Request) {
   // Rate limits: the change summary is a public read that can be probed per
   // camera id, so it gets its own bucket independent of the plain read and
   // export buckets.
-  const key = callerKey(request, env);
-  const limitOptions = limitsFor("revisions", env);
-  const limit = await checkRateLimit(env, "revisions", key, limitOptions);
-  if (!limit.allowed) {
-    console.warn("GET /api/cameras/revisions rate limited");
-    recordRateLimitBlock(env, {
-      route: "/api/cameras/revisions",
-      key,
-      windowSeconds: limitOptions.windowSeconds,
-    });
-    return Response.json({ error: "Too many requests. Please try again shortly." }, {
-      status: 429,
-      headers: { "Retry-After": String(limit.retryAfterSeconds) },
-    });
-  }
+  const limited = await rateLimitResponse(request, {
+    bucket: "revisions",
+    route: "/api/cameras/revisions",
+    env,
+    limits: limitsFor("revisions", env),
+    log: "GET /api/cameras/revisions rate limited",
+  });
+  if (limited) return limited;
 
   const cameraId = parseCameraId(new URL(request.url));
   if (cameraId === null) {

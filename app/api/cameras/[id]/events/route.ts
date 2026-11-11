@@ -2,8 +2,8 @@ import { env } from "cloudflare:workers";
 import { getD1 } from "../../../../../db/cameras";
 import { CACHE_TAGS } from "../../../../lib/cache-purge";
 import { urlTooLong } from "../../../../lib/input-limits";
-import { callerKey, checkRateLimit, limitsFor } from "../../../../lib/rate-limit";
-import { recordRateLimitBlock } from "../../../../lib/abuse-alerts";
+import { limitsFor } from "../../../../lib/rate-limit";
+import { rateLimitResponse } from "../../../../lib/rate-limit-response";
 import { isRecordPageStatus } from "../../../../lib/public-status";
 
 /**
@@ -42,21 +42,14 @@ export async function GET(request: Request) {
     return Response.json({ error: "Request URI too long." }, { status: 414 });
   }
 
-  const key = callerKey(request, env);
-  const limitOptions = limitsFor("read", env);
-  const limit = await checkRateLimit(env, "read", key, limitOptions);
-  if (!limit.allowed) {
-    console.warn("GET /api/cameras/[id]/events rate limited");
-    recordRateLimitBlock(env, {
-      route: "/api/cameras/[id]/events",
-      key,
-      windowSeconds: limitOptions.windowSeconds,
-    });
-    return Response.json({ error: "Too many requests. Please try again shortly." }, {
-      status: 429,
-      headers: { "Retry-After": String(limit.retryAfterSeconds) },
-    });
-  }
+  const limited = await rateLimitResponse(request, {
+    bucket: "read",
+    route: "/api/cameras/[id]/events",
+    env,
+    limits: limitsFor("read", env),
+    log: "GET /api/cameras/[id]/events rate limited",
+  });
+  if (limited) return limited;
 
   const id = parseId(request);
   if (id === null) {
