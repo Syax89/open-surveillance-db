@@ -10,7 +10,8 @@ import { requireWriteAuth } from "../../../../lib/write-gate";
 import { checkConfirmIpBurst, confirmIpBurstLimits } from "../../../../lib/confirm-ip-burst";
 import { CSRF_REJECTED_ERROR, csrfVerified, sameOrigin } from "../../../../lib/csrf";
 import { urlTooLong } from "../../../../lib/input-limits";
-import { callerKey, checkRateLimit, checkRateLimitForKeyAuth, limitsFor } from "../../../../lib/rate-limit";
+import { callerKey, limitsFor } from "../../../../lib/rate-limit";
+import { rateLimitResponse } from "../../../../lib/rate-limit-response";
 
 /**
  * Community verifications toggle (ADR 0018 §2, C1):
@@ -56,21 +57,16 @@ async function guardMutation(
     return Response.json({ error: "Request URI too long." }, { status: 414, headers: NO_STORE_HEADERS });
   }
 
-  const key = callerKey(request, env);
   const limitOptions = limitsFor("confirm", env);
-  const limit = await checkRateLimit(env, "confirm", key, limitOptions);
-  if (!limit.allowed) {
-    console.warn("PUT/DELETE /api/cameras/[id]/confirmation rate limited");
-    recordRateLimitBlock(env, {
-      route: "/api/cameras/[id]/confirmation",
-      key,
-      windowSeconds: limitOptions.windowSeconds,
-    });
-    return Response.json({ error: "Too many requests. Please try again shortly." }, {
-      status: 429,
-      headers: { ...NO_STORE_HEADERS, "Retry-After": String(limit.retryAfterSeconds) },
-    });
-  }
+  const limited = await rateLimitResponse(request, {
+    bucket: "confirm",
+    route: "/api/cameras/[id]/confirmation",
+    env,
+    limits: limitOptions,
+    log: "PUT/DELETE /api/cameras/[id]/confirmation rate limited",
+    headers: NO_STORE_HEADERS,
+  });
+  if (limited) return limited;
 
   let gate;
   try {
@@ -106,6 +102,7 @@ async function guardMutation(
     // IP-hash burst bucket (layer 4 anti-gaming, never-the-raw-IP pattern):
     // keyed by the SHA-256 of the caller key — never the raw IP. The surge
     // alert below carries only the callerHash.
+    const key = callerKey(request, env);
     const burst = await checkConfirmIpBurst(env, key);
     if (!burst.allowed) {
       recordRateLimitBlock(env, {
@@ -128,19 +125,16 @@ async function guardMutation(
   // whole story), so this check is a no-op for them — and for machine
   // clients it is exactly the bucket that covers the burst the session
   // branch gets from checkConfirmIpBurst.
-  const keyLimit = await checkRateLimitForKeyAuth(env, "confirm", request, limitOptions, gate);
-  if (!keyLimit.allowed) {
-    console.warn("PUT/DELETE /api/cameras/[id]/confirmation rate limited (per-key bucket)");
-    recordRateLimitBlock(env, {
-      route: "/api/cameras/[id]/confirmation",
-      key: keyLimit.key,
-      windowSeconds: limitOptions.windowSeconds,
-    });
-    return Response.json({ error: "Too many requests. Please try again shortly." }, {
-      status: 429,
-      headers: { ...NO_STORE_HEADERS, "Retry-After": String(keyLimit.retryAfterSeconds) },
-    });
-  }
+  const keyLimited = await rateLimitResponse(request, {
+    bucket: "confirm",
+    route: "/api/cameras/[id]/confirmation",
+    env,
+    limits: limitOptions,
+    apiKey: { gate },
+    log: "PUT/DELETE /api/cameras/[id]/confirmation rate limited (per-key bucket)",
+    headers: NO_STORE_HEADERS,
+  });
+  if (keyLimited) return keyLimited;
 
   const id = parseId(request);
   if (id === null) {
@@ -212,21 +206,15 @@ export async function GET(request: Request) {
     return Response.json({ error: "Camera not found." }, { status: 404, headers: NO_STORE_HEADERS });
   }
 
-  const key = callerKey(request, env);
-  const limitOptions = limitsFor("confirm", env);
-  const limit = await checkRateLimit(env, "confirm", key, limitOptions);
-  if (!limit.allowed) {
-    console.warn("GET /api/cameras/[id]/confirmation rate limited");
-    recordRateLimitBlock(env, {
-      route: "/api/cameras/[id]/confirmation",
-      key,
-      windowSeconds: limitOptions.windowSeconds,
-    });
-    return Response.json({ error: "Too many requests. Please try again shortly." }, {
-      status: 429,
-      headers: { ...NO_STORE_HEADERS, "Retry-After": String(limit.retryAfterSeconds) },
-    });
-  }
+  const limited = await rateLimitResponse(request, {
+    bucket: "confirm",
+    route: "/api/cameras/[id]/confirmation",
+    env,
+    limits: limitsFor("confirm", env),
+    log: "GET /api/cameras/[id]/confirmation rate limited",
+    headers: NO_STORE_HEADERS,
+  });
+  if (limited) return limited;
 
   try {
     // Personal state: anonymous is fine (false). A live session resolves the

@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
-import { recordRateLimitBlock } from "../../../lib/abuse-alerts";
-import { callerKey, checkRateLimit, geocodeLimits } from "../../../lib/rate-limit";
+import { geocodeLimits } from "../../../lib/rate-limit";
+import { rateLimitResponse } from "../../../lib/rate-limit-response";
 import { reverseGeocode } from "../../../../db/reverse-geocode";
 
 /**
@@ -49,27 +49,16 @@ export async function GET(request: Request): Promise<Response> {
   }
 
   // Per-caller rate limit (same bucket as the forward geocode proxy).
-  const key = callerKey(request, env);
-  const limitOptions = geocodeLimits(env);
-  const limit = await checkRateLimit(env, "geocode", key, limitOptions);
-  if (!limit.allowed) {
-    console.warn("GET /api/geocode/reverse rate limited");
-    recordRateLimitBlock(env, {
-      route: "/api/geocode/reverse",
-      key,
-      windowSeconds: limitOptions.windowSeconds,
-    });
-    return Response.json(
-      { error: "Too many address lookups. Please try again shortly." },
-      {
-        status: 429,
-        headers: {
-          "Retry-After": String(limit.retryAfterSeconds),
-          "Cache-Control": "no-store",
-        },
-      },
-    );
-  }
+  const limited = await rateLimitResponse(request, {
+    bucket: "geocode",
+    route: "/api/geocode/reverse",
+    env,
+    limits: geocodeLimits(env),
+    log: "GET /api/geocode/reverse rate limited",
+    error: "Too many address lookups. Please try again shortly.",
+    headers: { "Cache-Control": "no-store" },
+  });
+  if (limited) return limited;
 
   if (!env.DB) {
     console.error("GET /api/geocode/reverse: database binding unavailable");

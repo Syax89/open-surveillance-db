@@ -5,12 +5,12 @@ import {
 } from "../../../db/corrections";
 import { mailerFromAddress, sendMail } from "../../../db/mailer";
 import { renderUrgentReportEmail } from "../../lib/email-templates-urgent";
-import { recordRateLimitBlock } from "../../lib/abuse-alerts";
 import { requireWriteAuth } from "../../lib/write-gate";
 import { CSRF_REJECTED_ERROR, csrfVerified, sameOrigin } from "../../lib/csrf";
 import { isRecord } from "../../lib/guards";
 import { BodyReadError, readJsonBody, urlTooLong } from "../../lib/input-limits";
-import { callerKey, checkRateLimit, checkRateLimitForKeyAuth, submissionLimits, submissionsDisabled } from "../../lib/rate-limit";
+import { submissionLimits, submissionsDisabled } from "../../lib/rate-limit";
+import { rateLimitResponse } from "../../lib/rate-limit-response";
 
 function cleanText(value: unknown, maxLength: number) {
   return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
@@ -48,21 +48,15 @@ export async function POST(request: Request) {
     return Response.json({ error: "Correction requests are temporarily disabled." }, { status: 503 });
   }
 
-  const key = callerKey(request, env);
   const limitOptions = submissionLimits(env);
-  const limit = await checkRateLimit(env, "submit", key, limitOptions);
-  if (!limit.allowed) {
-    console.warn("POST /api/corrections rate limited");
-    recordRateLimitBlock(env, {
-      route: "/api/corrections",
-      key,
-      windowSeconds: limitOptions.windowSeconds,
-    });
-    return Response.json({ error: "Too many requests. Please try again shortly." }, {
-      status: 429,
-      headers: { "Retry-After": String(limit.retryAfterSeconds) },
-    });
-  }
+  const limited = await rateLimitResponse(request, {
+    bucket: "submit",
+    route: "/api/corrections",
+    env,
+    limits: limitOptions,
+    log: "POST /api/corrections rate limited",
+  });
+  if (limited) return limited;
 
   // Write gate (multi-method auth Fase E1 + EPIC api-keys T14): a
   // correction/removal request requires a VERIFIED contributor,
@@ -94,19 +88,15 @@ export async function POST(request: Request) {
   // the whole story), so this check is a no-op for them. The recorded block
   // uses the EFFECTIVE key (key:<id>), never the raw IP, for a
   // key-authenticated caller.
-  const keyLimit = await checkRateLimitForKeyAuth(env, "submit", request, limitOptions, gate);
-  if (!keyLimit.allowed) {
-    console.warn("POST /api/corrections rate limited (per-key bucket)");
-    recordRateLimitBlock(env, {
-      route: "/api/corrections",
-      key: keyLimit.key,
-      windowSeconds: limitOptions.windowSeconds,
-    });
-    return Response.json({ error: "Too many requests. Please try again shortly." }, {
-      status: 429,
-      headers: { "Retry-After": String(keyLimit.retryAfterSeconds) },
-    });
-  }
+  const keyLimited = await rateLimitResponse(request, {
+    bucket: "submit",
+    route: "/api/corrections",
+    env,
+    limits: limitOptions,
+    apiKey: { gate },
+    log: "POST /api/corrections rate limited (per-key bucket)",
+  });
+  if (keyLimited) return keyLimited;
 
   try {
     const payload: unknown = await readJsonBody(request, env);

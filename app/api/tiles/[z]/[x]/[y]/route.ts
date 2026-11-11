@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
-import { recordRateLimitBlock } from "../../../../../lib/abuse-alerts";
-import { callerKey, checkRateLimit, limitsFor } from "../../../../../lib/rate-limit";
+import { limitsFor } from "../../../../../lib/rate-limit";
+import { rateLimitResponse } from "../../../../../lib/rate-limit-response";
 
 /**
  * Same-origin tile proxy (compliant with the OSMF tile usage policy).
@@ -185,24 +185,17 @@ export async function GET(request: Request, context: { params: Promise<TileParam
     }
   }
 
-  const key = callerKey(request, env);
-  const limitOptions = limitsFor("tiles", env);
-  const limit = await checkRateLimit(env, "tiles", key, limitOptions);
-  if (!limit.allowed) {
-    console.warn("GET /api/tiles/[z]/[x]/[y] rate limited");
-    recordRateLimitBlock(env, {
-      route: "/api/tiles/[z]/[x]/[y]",
-      key,
-      windowSeconds: limitOptions.windowSeconds,
-    });
-    return new Response("Too many tile requests. Please try again shortly.", {
-      status: 429,
-      headers: {
-        "Retry-After": String(limit.retryAfterSeconds),
-        "Cache-Control": "no-store",
-      },
-    });
-  }
+  const limited = await rateLimitResponse(request, {
+    bucket: "tiles",
+    route: "/api/tiles/[z]/[x]/[y]",
+    env,
+    limits: limitsFor("tiles", env),
+    log: "GET /api/tiles/[z]/[x]/[y] rate limited",
+    error: "Too many tile requests. Please try again shortly.",
+    plainText: true,
+    headers: { "Cache-Control": "no-store" },
+  });
+  if (limited) return limited;
 
   let upstream: Response;
   try {

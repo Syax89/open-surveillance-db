@@ -1,8 +1,8 @@
 import { env } from "cloudflare:workers";
 import { findNearbyPublicCamerasPage, NEARBY_PAGE_DEFAULT_LIMIT, NEARBY_PAGE_MAX_LIMIT } from "../../../../db/cameras";
-import { recordRateLimitBlock } from "../../../lib/abuse-alerts";
 import { MAX_PAGE_OFFSET, urlTooLong } from "../../../lib/input-limits";
-import { callerKey, checkRateLimit, limitsFor } from "../../../lib/rate-limit";
+import { limitsFor } from "../../../lib/rate-limit";
+import { rateLimitResponse } from "../../../lib/rate-limit-response";
 
 function readNumber(value: string | null) { if (value === null || value.trim() === "") return null; const number = Number(value); return Number.isFinite(number) ? number : null; }
 function readPageNumber(value: string | null, fallback: number, max: number): number | null {
@@ -30,21 +30,14 @@ export async function GET(request: Request) {
 
   // Rate limits: nearby search is public and cheap to hammer, so it gets its
   // own bucket independent of the plain read and export buckets.
-  const key = callerKey(request, env);
-  const limitOptions = limitsFor("nearby", env);
-  const rateLimit = await checkRateLimit(env, "nearby", key, limitOptions);
-  if (!rateLimit.allowed) {
-    console.warn("GET /api/cameras/nearby rate limited");
-    recordRateLimitBlock(env, {
-      route: "/api/cameras/nearby",
-      key,
-      windowSeconds: limitOptions.windowSeconds,
-    });
-    return Response.json({ error: "Too many requests. Please try again shortly." }, {
-      status: 429,
-      headers: { "Retry-After": String(rateLimit.retryAfterSeconds) },
-    });
-  }
+  const limited = await rateLimitResponse(request, {
+    bucket: "nearby",
+    route: "/api/cameras/nearby",
+    env,
+    limits: limitsFor("nearby", env),
+    log: "GET /api/cameras/nearby rate limited",
+  });
+  if (limited) return limited;
 
   const query = new URL(request.url).searchParams;
   const latitude = readNumber(query.get("latitude"));

@@ -15,12 +15,12 @@ import {
   type ModerationResult,
   moderationReasonCodes,
 } from "../../../db/moderation";
-import { recordRateLimitBlock } from "../../lib/abuse-alerts";
 import { moderatorWriteGuard, requireRole } from "../../lib/authz";
 import { cameraPurgeTags, purgeCacheTags } from "../../lib/cache-purge";
 import { isRecord } from "../../lib/guards";
 import { BodyReadError, readJsonBody, urlTooLong } from "../../lib/input-limits";
-import { callerKey, checkRateLimit, limitsFor } from "../../lib/rate-limit";
+import { limitsFor } from "../../lib/rate-limit";
+import { rateLimitResponse } from "../../lib/rate-limit-response";
 import { getReviewerByUserId } from "../../../db/users";
 import type { ModerationQueueCursors, PublishedCamerasCursor } from "../../../db/moderation";
 
@@ -234,22 +234,13 @@ function parseModerationRequest(value: unknown): ParsedModerationRequest {
  * signal is emitted with a hashed caller identity only.
  */
 async function moderationLimit(request: Request) {
-  const key = callerKey(request, env);
-  const limitOptions = limitsFor("moderate", env);
-  const limit = await checkRateLimit(env, "moderate", key, limitOptions);
-  if (!limit.allowed) {
-    console.warn("/api/moderation rate limited");
-    recordRateLimitBlock(env, {
-      route: "/api/moderation",
-      key,
-      windowSeconds: limitOptions.windowSeconds,
-    });
-    return Response.json({ error: "Too many requests. Please try again shortly." }, {
-      status: 429,
-      headers: { "Retry-After": String(limit.retryAfterSeconds) },
-    });
-  }
-  return null;
+  return rateLimitResponse(request, {
+    bucket: "moderate",
+    route: "/api/moderation",
+    env,
+    limits: limitsFor("moderate", env),
+    log: "/api/moderation rate limited",
+  });
 }
 
 /** Map the discriminated moderation result to an HTTP response with a stable body. */
