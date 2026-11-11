@@ -2,7 +2,8 @@
 
 import type { ReactNode } from "react";
 import { PublicNav } from "./PublicNav";
-import { useMessages } from "../lib/use-messages";
+import { useDomainMessages } from "../lib/use-domain-messages";
+import { commonByLocale } from "../lib/i18n/common";
 
 /**
  * Shared layout for the public tool routes (F1 route group (tools)):
@@ -20,7 +21,7 @@ import { useMessages } from "../lib/use-messages";
  * around every tool page; the pages themselves render only their tool body.
  */
 export function ToolLayout({ children }: { children: ReactNode }) {
-  const t = useMessages().common;
+  const t = useDomainMessages(commonByLocale);
   return (
     <main id="main-content" className="tool-layout">
       <PublicNav navLabel={t.toolNavigation} homeLabel={t.toolHomeAria} />

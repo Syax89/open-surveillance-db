@@ -1,6 +1,8 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { MappaTool } from "../../components/tools/MappaTool";
+import { ExplorerViewTransitionStyles } from "../../components/ExplorerViewTransitionStyles";
+import { MapStyles } from "../../components/MapStyles";
 import { getServerMessages } from "../../lib/server-i18n";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -37,8 +39,14 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function MappaPage() {
   const t = (await getServerMessages()).map;
   return (
-    <Suspense fallback={<p className="loading-note">{t.loading}</p>}>
-      <MappaTool />
-    </Suspense>
+    <>
+      {/* Route-scoped cross-document View Transition opt-in (map ↔ directory only). */}
+      <ExplorerViewTransitionStyles />
+      {/* Route-scoped Leaflet + map stylesheet (app/styles/map.css). */}
+      <MapStyles />
+      <Suspense fallback={<p className="loading-note">{t.loading}</p>}>
+        <MappaTool />
+      </Suspense>
+    </>
   );
 }

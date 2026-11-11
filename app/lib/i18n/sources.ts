@@ -10,7 +10,7 @@
  * CEO route decision (2026-08-05, kanban t_4dbce318) keeps it linked from
  * the footer, next to Licences.
  */
-import type { Translation } from "./types";
+import type { Locale, Translation } from "./types";
 
 export const en = {
   navigation: "Site navigation",
@@ -87,3 +87,10 @@ export const it: Translation<typeof en> = {
   lastUpdatedLabel: "Ultimo aggiornamento",
   descriptorsNote: "I descriptor di import nel repository (docs/data-sources/imports/) restano la versione canonica.",
 };
+
+/**
+ * This domain only, in every locale — what client components import (via
+ * `useDomainMessages`, app/lib/use-messages.ts) instead of the aggregated
+ * `messages` map, which would ship EVERY domain in BOTH locales.
+ */
+export const sourcesByLocale: Record<Locale, Translation<typeof en>> = { en, it };

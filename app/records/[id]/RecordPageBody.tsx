@@ -4,7 +4,10 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { LocaleToggle, useLocale } from "../../components/LocaleProvider";
-import { useMessages } from "../../lib/use-messages";
+import { useDomainMessages } from "../../lib/use-domain-messages";
+import { recordByLocale } from "../../lib/i18n/record";
+import { communityByLocale } from "../../lib/i18n/community";
+import { statusByLocale } from "../../lib/i18n/status";
 import { SiteHeader } from "../../components/SiteHeader";
 import { CommunityActions } from "../../components/CommunityActions";
 import { usePublicCamera } from "../../lib/use-public-cameras";
@@ -13,6 +16,7 @@ import { formatPublicDate } from "../../lib/format-date";
 import { formatDirection } from "../../lib/compass";
 import { formatLocation } from "../../lib/format-location";
 import { RecordMiniMap } from "../../components/RecordMiniMap";
+import type { InitialRecordSeed } from "../../lib/record-initial";
 
 /**
  * Public lifecycle event (ADR 0021 §7, FASE 3 UI): the unattributed event
@@ -31,16 +35,25 @@ function isWithdrawn(status: string): boolean {
   return status === "hidden" || status === "removed";
 }
 
-export default function RecordPageBody() {
+/**
+ * `initial` (LCP fix): the record the server shell resolved through the
+ * same public read as GET /api/cameras/[id] (app/lib/record-initial.ts).
+ * With a seed the first HTML renders the record (or the not-found state)
+ * directly and the hook skips its mount fetch; the timeline keeps its own
+ * loading note until the events arrive. `id` is the server-validated route id. Without one (server read failed)
+ * the page behaves exactly as before: loading shell → client fetch.
+ */
+export default function RecordPageBody({ id, initial }: { id?: number; initial?: InitialRecordSeed } = {}) {
   const params = useParams<{ id: string }>();
-  const bundle = useMessages();
   const { locale } = useLocale();
-  const t = bundle.record;
-  const community = bundle.community;
-  const statuses: Record<string, string> = bundle.status;
-  const recordId = Number(params.id);
+  const t = useDomainMessages(recordByLocale);
+  const community = useDomainMessages(communityByLocale);
+  const statuses: Record<string, string> = useDomainMessages(statusByLocale);
+  // The server shell passes the validated id so the seeded SSR render never
+  // depends on route params being available outside the client router.
+  const recordId = typeof id === "number" ? id : Number(params.id);
 
-  const { record, loading: camerasLoading, error: camerasError, reload } = usePublicCamera(recordId);
+  const { record, loading: camerasLoading, error: camerasError, reload } = usePublicCamera(recordId, initial);
   const [events, setEvents] = useState<LifecycleEvent[] | null>(null);
   const [eventsLoadedFor, setEventsLoadedFor] = useState<number | null>(null);
   const [offline, setOffline] = useState(false);
@@ -76,7 +89,9 @@ export default function RecordPageBody() {
   const recordStatus = record
     ? (isRecordPageStatus(record.status) ? statuses[record.status] : t.statusFallback)
     : "";
-  const loading = camerasLoading || eventsLoadedFor !== recordId;
+  // Seeded (server-rendered) pages do not hold the record behind the
+  // timeline fetch: the timeline section has its own loading note.
+  const loading = camerasLoading || (initial === undefined && eventsLoadedFor !== recordId);
 
   // Owner-only "Edit" link (C6): unchanged probe — the public record API is
   // attribution-free, so ownership is discovered with the dedicated owner

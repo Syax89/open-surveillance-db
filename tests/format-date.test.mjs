@@ -37,7 +37,7 @@ const SAMPLES = ["2026-01-05T10:00:00Z", "2025-12-31", "2024-02-29T23:59:59.000Z
 test("output is unchanged (same as Date#toLocaleDateString) for every locale", () => {
   for (const { code } of SUPPORTED_LOCALES) {
     for (const value of SAMPLES) {
-      const expected = new Date(value).toLocaleDateString(LOCALE_BCP47[code], { day: "numeric", month: "long", year: "numeric" });
+      const expected = new Date(value).toLocaleDateString(LOCALE_BCP47[code], { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
       assert.equal(formatPublicDate(value, code), expected, `${code} ${value}`);
     }
   }
@@ -45,6 +45,21 @@ test("output is unchanged (same as Date#toLocaleDateString) for every locale", (
   assert.equal(formatPublicDate("", "en"), "");
   assert.equal(formatPublicDate(null, "en"), "");
   assert.equal(formatPublicDate(undefined, "en"), "");
+});
+
+test("dates are formatted in UTC so the server render and the browser hydrate the same text", () => {
+  for (const { code } of SUPPORTED_LOCALES) {
+    assert.equal(publicDateFormatter(code).resolvedOptions().timeZone, "UTC", code);
+  }
+  // A date-only value and a late-UTC timestamp keep their UTC calendar day
+  // whatever the process time zone (Worker = UTC, visitor = anything).
+  assert.match(formatPublicDate("2026-03-05", "en"), /5/);
+  assert.match(formatPublicDate("2026-03-05T23:30:00Z", "en"), /5/);
+});
+
+test("the formatter pins timeZone UTC in source (CI runs in UTC, so the runtime check alone cannot catch a regression)", () => {
+  const source = readFileSync(new URL("../app/lib/format-date.ts", import.meta.url), "utf8");
+  assert.match(source, /PUBLIC_DATE_OPTIONS[^;]*timeZone:\s*"UTC"/);
 });
 
 test("one Intl.DateTimeFormat per locale is built and reused across calls", () => {

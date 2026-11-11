@@ -18,7 +18,8 @@
 //    Revoked; 404 = already revoked).
 
 import { useState } from "react";
-import { useMessages } from "../lib/use-messages";
+import { useDomainMessages } from "../lib/use-domain-messages";
+import { authByLocale } from "../lib/i18n/auth";
 import { useApiKeys } from "../lib/useApiKeys";
 import type { ApiKey, ApiKeyErrorKind, ApiKeyScope } from "../lib/useApiKeys";
 import { ApiKeyList } from "./ApiKeyList";
@@ -32,7 +33,7 @@ type Props = {
 };
 
 export function ApiKeysSection({ onSessionLost }: Props) {
-  const t = useMessages().auth;
+  const t = useDomainMessages(authByLocale);
   const { keys, loading, error, refresh, createKey, revokeKey, revokingId } = useApiKeys(onSessionLost);
 
   const [createOpen, setCreateOpen] = useState(false);

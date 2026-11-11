@@ -1,7 +1,8 @@
 "use client";
 
 import type { FormEvent } from "react";
-import { useMessages } from "../../lib/use-messages";
+import { useDomainMessages } from "../../lib/use-domain-messages";
+import { reportByLocale } from "../../lib/i18n/report";
 import { useReportFlow, type NearbyCandidate } from "../../lib/useReportFlow";
 import { KIND_OPTIONS, isDomeKind } from "../../lib/camera-kinds";
 import { formatDirection } from "../../lib/compass";
@@ -80,7 +81,7 @@ type Props = {
  * it for moderation. State and handlers come from `useReportFlow` via props.
  */
 export function ReportForm({ coordinates, manualLatitude, setManualLatitude, manualLongitude, setManualLongitude, nearbyCandidates, nearbyLoading, nearbyError, duplicateConfirmationRequired, duplicateConfirmed, setDuplicateConfirmed, selectManualCoordinates, submitReport, onSelectCoordinates, kind = "", setKind = () => {}, direction = null, setDirection = () => {}, directionKnown = false, setDirectionKnown = () => {}, address = "", setAddress = () => {}, reverseGeocoding = false, geolocationAvailable = false, geolocating = false, geolocationNotice = "", requestMyPosition = () => {}, showHeading = true, layout = "default" }: Props) {
-  const t = useMessages().report;
+  const t = useDomainMessages(reportByLocale);
   // Dome selection hides the direction field entirely (a dome's 360° vision
   // has no bearing — the backend stores NULL for domes as an invariant).
   // Switching TO a dome clears any bearing the contributor may have picked.

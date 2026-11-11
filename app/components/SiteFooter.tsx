@@ -7,13 +7,7 @@ import { BrandMark } from "./BrandMark";
 // Root-layout graph: import ONLY the footer domain (F5 qa#5, t_ab0d4c75)
 // so the ~150 KB two-locale dictionary never lands in the initial JS
 // chunk — the footer is rendered on every page, so it must stay cheap.
-import { en as footerEn, it as footerIt } from "../lib/i18n/footer";
-import type { Locale, Translation } from "../lib/i18n";
-
-const footerByLocale: Record<Locale, Translation<typeof footerEn>> = {
-  en: footerEn,
-  it: footerIt,
-};
+import { footerByLocale } from "../lib/i18n/footer";
 
 /**
  * Global site footer (landmark: contentinfo).

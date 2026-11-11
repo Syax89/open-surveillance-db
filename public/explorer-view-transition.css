@@ -1,0 +1,27 @@
+/* Map ↔ Directory view switch: the two explorer routes opt in to browser
+   cross-document View Transitions. The named switch remains a shared element
+   while both document roots crossfade continuously; the small opposing
+   vertical motion gives the swap direction without exposing a blank frame.
+   Browsers without the API simply navigate normally, and reduced-motion
+   users receive no transition animation.
+
+   Scope (perf 2026-11): this static stylesheet is linked ONLY by
+   app/components/ExplorerViewTransitionStyles.tsx, rendered by the /mappa
+   and /directory pages (React 19 hoists the precedence <link> into <head>),
+   so no other navigation opts in — cross-document transitions need BOTH
+   documents to opt in, matching the per-route `view-transition` meta. A
+   global `@view-transition` (formerly in app/globals.css) made every
+   same-origin navigation pay full-page snapshots; never move it back. */
+@view-transition { navigation:auto; }
+@keyframes osdb-vt-out { from { opacity:1; transform:translateY(0); } to { opacity:0; transform:translateY(-4px); } }
+@keyframes osdb-vt-in { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+@media (prefers-reduced-motion: no-preference) {
+  .explore-view-switch { view-transition-name:explore-view-switch; }
+  ::view-transition-old(root) { animation:osdb-vt-out .18s ease-in both; }
+  ::view-transition-new(root) { animation:osdb-vt-in .18s ease-out both; }
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) { animation:none !important; }
+}

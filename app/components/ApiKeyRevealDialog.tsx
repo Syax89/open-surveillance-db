@@ -21,7 +21,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useLocale } from "./LocaleProvider";
-import { useMessages } from "../lib/use-messages";
+import { useDomainMessages } from "../lib/use-domain-messages";
+import { authByLocale } from "../lib/i18n/auth";
 import { useModalScrollLock } from "../lib/hooks/use-modal-scroll-lock";
 import { formatPublicDate } from "../lib/format-date";
 
@@ -33,7 +34,7 @@ type Props = {
 };
 
 export function ApiKeyRevealDialog({ open, keyValue, expiresAt, onClose }: Props) {
-  const t = useMessages().auth;
+  const t = useDomainMessages(authByLocale);
   const { locale } = useLocale();
   const copyRef = useRef<HTMLButtonElement>(null);
   const savedRef = useRef<HTMLButtonElement>(null);

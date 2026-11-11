@@ -34,6 +34,7 @@ import { fileURLToPath } from "node:url";
 import {
   setupDom, loadDomModule, renderWithLocale, wrapWithLocale, React,
 } from "./helpers/dom-harness.mjs";
+import { GLOBAL_CSS, MAP_CSS, readSiteCss } from "./helpers/site-css.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const readSource = (relative) => readFile(path.join(root, relative), "utf8");
@@ -238,7 +239,7 @@ test("without onToggleCollapse the original header text and shape is untouched",
 });
 
 test("CSS: mobile row control + desktop icon control keep their own geometry", async () => {
-  const css = await readSource("app/globals.css");
+  const css = await readSiteCss(root); // globals + map.css, cascade order (perf 2026-11)
   const mediaBlocks = (feature, value) => {
     const matcher = new RegExp(`@media\\s*\\(\\s*${feature}\\s*:\\s*${value}\\s*\\)\\s*\\{`, "g");
     const blocks = [];
@@ -257,7 +258,10 @@ test("CSS: mobile row control + desktop icon control keep their own geometry", a
   };
   const mobile = mediaBlocks("max-width", "768px");
   const desktop = mediaBlocks("min-width", "769px");
-  const base = css.slice(0, css.indexOf("@media (max-width:768px)"));
+  // Base = each file's rules before its mobile block (the map rules moved to
+  // app/styles/map.css keep their own pre-mobile region).
+  const beforeMobile = (source) => source.slice(0, source.indexOf("@media (max-width:768px)"));
+  const base = [await readSource(GLOBAL_CSS), await readSource(MAP_CSS)].map(beforeMobile).join("\n");
 
   // Mobile: the button owns the row and paints the compact label.
   assert.match(mobile, /\.map-list-toggle \{[^}]*width:100%/, "the mobile button spans the header row");

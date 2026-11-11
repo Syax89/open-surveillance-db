@@ -1,8 +1,7 @@
 import { env } from "cloudflare:workers";
 import { applyCameraEdit, parseEditableEditFields } from "../../../../db/camera-edits";
 import { getCommunityRecordById } from "../../../../db/cameras";
-import { CACHE_TAGS } from "../../../lib/cache-purge";
-import { withPublicCache } from "../../../lib/public-cache";
+import { cachedPublicRecordResponse } from "../../../lib/public-record-response";
 import { CSRF_REJECTED_ERROR, csrfVerified, sameOrigin } from "../../../lib/csrf";
 import { BodyReadError, readJsonBody, urlTooLong } from "../../../lib/input-limits";
 import { limitsFor } from "../../../lib/rate-limit";
@@ -54,33 +53,13 @@ export async function GET(request: Request) {
   if (limited) return limited;
 
   // DB-lightening (CEO 2026-08-07): the record page deep-links here on
-  // every visit — wrap the database read in the worker cache (fail-open)
-  // so repeat views of the same record never re-query D1. The 404 path
-  // is NOT cached (it is deliberately indistinguishable from missing).
-  return withPublicCache(request, 300, async () => {
-  try {
-    // Record-page resolver (ADR 0021 §6.3, FASE 3 UI): public records AND
-    // hidden/removed ones (direct-link banner contract). List surfaces keep
-    // the strict public predicate — only this detail route resolves
-    // withdrawn records, and only with their banner-required fields.
-    const record = await getCommunityRecordById(id);
-    if (!record) {
-      // Fail closed, indistinguishable from "does not exist".
-      return Response.json({ error: "Camera not found." }, { status: 404 });
-    }
-    return Response.json({ record }, {
-      // Same bounded edge cache as the list: the record changes through
-      // moderation decisions, never live feeds, and revalidation converges
-      // after any decision within the window. The Cache-Tag lets the
-      // moderation write path purge this exact representation immediately
-      // (see app/lib/cache-purge.ts).
-      headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600", "Cache-Tag": CACHE_TAGS.record(id) },
-    });
-  } catch (error) {
-    console.error("GET /api/cameras/[id] failed", error);
-    return Response.json({ error: "Database unavailable" }, { status: 503 });
-  }
-  });
+  // every visit — the database read is wrapped in the worker cache
+  // (fail-open) so repeat views of the same record never re-query D1. The
+  // cached lookup is shared with the /records/[id] server shell
+  // (app/lib/public-record-response.ts): same key, headers and Cache-Tag.
+  // The 404 path is NOT cached (it is deliberately indistinguishable from
+  // missing).
+  return cachedPublicRecordResponse(request, id, (value) => getCommunityRecordById(value));
 }
 
 const NO_STORE_HEADERS = { "Cache-Control": "no-store" };

@@ -1,5 +1,7 @@
 import { env } from "cloudflare:workers";
 import { listCommittedImportBatches } from "../../../db/import-sources";
+import { CACHE_TAGS } from "../../lib/cache-purge";
+import { withPublicCache } from "../../lib/public-cache";
 import { limitsFor } from "../../lib/rate-limit";
 import { rateLimitResponse } from "../../lib/rate-limit-response";
 
@@ -15,6 +17,13 @@ import { rateLimitResponse } from "../../lib/rate-limit-response";
  * /fonti), public like every other camera read, metered in the read
  * family, and edge-cached like the record list (the batch list changes
  * only when an import lands).
+ *
+ * Worker cache (perf 2026-11): every map popup / directory mount reads
+ * this, so the database work is wrapped in withPublicCache (same contract
+ * as the camera reads) with its own Cache-Tag. The list changes only when
+ * an offline import is committed (scripts/import), never through a worker
+ * write path, so a short browser `max-age=60` is safe on top of the edge
+ * window.
  */
 export async function GET(request: Request) {
   const limited = await rateLimitResponse(request, {
@@ -27,6 +36,7 @@ export async function GET(request: Request) {
   });
   if (limited) return limited;
 
+  return withPublicCache(request, 300, async () => {
   try {
     const batches = await listCommittedImportBatches();
     const sources = batches.map(({ slug, sourceName, sourceUrl, license, licenseUrl }) => ({
@@ -37,10 +47,14 @@ export async function GET(request: Request) {
       licenseUrl,
     }));
     return Response.json({ sources }, {
-      headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" },
+      headers: {
+        "Cache-Control": "public, max-age=60, s-maxage=300, stale-while-revalidate=600",
+        "Cache-Tag": CACHE_TAGS.importSources,
+      },
     });
   } catch (error) {
     console.error("GET /api/import-sources failed", error);
     return Response.json({ error: "Database unavailable" }, { status: 503 });
   }
+  });
 }

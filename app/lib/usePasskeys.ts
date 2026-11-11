@@ -8,7 +8,8 @@
 // split); PasskeysSection and PasskeyDialogs consume the returned API.
 
 import { useCallback, useEffect, useState } from "react";
-import { useMessages } from "./use-messages";
+import { useDomainMessages } from "./use-domain-messages";
+import { authByLocale } from "./i18n/auth";
 import { readCsrfToken } from "./csrf";
 import { browserSupportsWebAuthn, createCredential } from "./webauthn-client";
 
@@ -28,7 +29,7 @@ export type PasskeysApi = ReturnType<typeof usePasskeys>;
  * @param onSessionLost a 401 flips the page to the logged-out state.
  */
 export function usePasskeys(contributor: object | null, onSessionLost: () => void) {
-  const t = useMessages().auth;
+  const t = useDomainMessages(authByLocale);
   const [passkeys, setPasskeys] = useState<Passkey[]>([]);
   const [passkeysLoading, setPasskeysLoading] = useState(true);
   const [passkeysError, setPasskeysError] = useState<string | null>(null);

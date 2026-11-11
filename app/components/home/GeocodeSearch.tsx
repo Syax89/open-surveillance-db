@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocale } from "../LocaleProvider";
-import { useMessages } from "../../lib/use-messages";
+import { useDomainMessages } from "../../lib/use-domain-messages";
+import { mapByLocale } from "../../lib/i18n/map";
 
 /**
  * One place suggestion returned by the same-origin geocode proxy
@@ -121,7 +122,7 @@ export function __resetGeocodePending(inputId = GEOCODE_INPUT_ID): void {
  * honest no-results / unavailable states are announced via role=status.
  */
 export function GeocodeSearch({ search, onSearchChange, onPlaceSelect }: Props) {
-  const t = useMessages().map;
+  const t = useDomainMessages(mapByLocale);
   const { locale } = useLocale();
 
   // The input shows `draft`: it mirrors the parent's `search` (URL ?q=)

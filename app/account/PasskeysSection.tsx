@@ -8,11 +8,12 @@
 // needed. State comes from usePasskeys (owned by the page, which also
 // renders the removal/recovery dialogs via PasskeyDialogs).
 
-import { useMessages } from "../lib/use-messages";
+import { useDomainMessages } from "../lib/use-domain-messages";
+import { authByLocale } from "../lib/i18n/auth";
 import type { PasskeysApi } from "../lib/usePasskeys";
 
 export function PasskeysSection({ api }: { api: PasskeysApi }) {
-  const t = useMessages().auth;
+  const t = useDomainMessages(authByLocale);
   const { passkeys, passkeysLoading, passkeysError, enrolling, enrollError, passkeyAdded, removingId, setConfirmRemove, onEnrollPasskey } = api;
 
   return (

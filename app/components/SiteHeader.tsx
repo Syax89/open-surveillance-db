@@ -7,13 +7,7 @@ import { LocaleToggle, useLocale } from "./LocaleProvider";
 import { BrandMark } from "./BrandMark";
 // Header lives on EVERY page: import only the `home` domain (F5 qa#5,
 // t_ab0d4c75) instead of the full dictionary via useMessages().
-import { en as homeEn, it as homeIt } from "../lib/i18n/home";
-import type { Locale, Translation } from "../lib/i18n";
-
-const homeByLocale: Record<Locale, Translation<typeof homeEn>> = {
-  en: homeEn,
-  it: homeIt,
-};
+import { homeByLocale } from "../lib/i18n/home";
 
 /**
  * Global site header (landmark: navigation) shared by every page.

@@ -35,6 +35,7 @@ let rtl;
 let useViewportCameras;
 let __resetViewportCamerasCache;
 let viewportQuery;
+let snapViewportRectangles;
 
 const RECORDS = [
   { id: 1, title: "Via Roma corner", kind: "bullet", status: "active", latitude: 41.9028, longitude: 12.4964, source: "Community report" },
@@ -76,6 +77,7 @@ before(async () => {
   useViewportCameras = mod.useViewportCameras;
   __resetViewportCamerasCache = mod.__resetViewportCamerasCache;
   viewportQuery = mod.viewportQuery;
+  snapViewportRectangles = mod.snapViewportRectangles;
 });
 
 afterEach(() => {
@@ -341,7 +343,10 @@ test("B04: two rectangles sharing a quantized cell are NOT conflated (no unfetch
   const probe = rtl.screen.getByTestId("probe");
   const ids = JSON.parse(probe.getAttribute("data-records")).sort((a, b) => a - b);
   assert.deepEqual(ids, [1, 2], "the record only inside the second rectangle must appear (cell key never covers unfetched geometry)");
-  assert.equal(calls.length, 2, "the second geometry performs exactly one new request");
+  // Grid snap: A requested its snapped box (0..0.125 on both axes), which
+  // really contains B and record 2 — so B is covered by geometry that WAS
+  // fetched, and needs no request of its own.
+  assert.deepEqual(calls, ["0,0,0.125,0.125"], "only A's snapped box was requested; it actually covers B");
 });
 
 test("viewportQuery builds the bbox URL with the bounded limit and forwards kind/freshness", () => {
@@ -386,7 +391,9 @@ test("B03: a view wider than the world fetches the whole domain (server-valid bb
   for (const [west, south, east, north] of bboxes) {
     assert.ok(west >= -180 && east <= 180 && west < east && south < north, `server-valid bbox: ${west},${south},${east},${north}`);
   }
-  assert.deepEqual(bboxes.at(-1), [-180, -65.3668, 180, 85.0511], "the whole world is requested as the full domain");
+  // Grid snap (lat step 16° for a 150° span) grows the latitude edges outward,
+  // clamped to the poles; longitude is the full domain.
+  assert.deepEqual(bboxes.at(-1), [-180, -80, 180, 90], "the whole world is requested as the full (snapped, clamped) domain");
   const probe = rtl.screen.getByTestId("probe");
   assert.equal(probe.getAttribute("data-error"), "false", "the normalized request is not an API failure");
 });
@@ -431,9 +438,10 @@ test("B04: containment uses the area actually fetched — no virtual padding str
   const first = calls.length;
   assert.ok(first >= 1);
 
-  // This pan starts inside the old 15% padding but reaches into a strip the
-  // server never sent — it must NOT be treated as a cache hit.
-  await view.rerender(await wrapWithLocale(React.createElement(HookProbe, { bounds: { south: 0, north: 0.1, west: 0.01, east: 0.11 }, filters: {} })));
+  // The first request fetched its snapped box (0..0.125). This pan reaches
+  // past that box into a strip the server never sent — it must NOT be
+  // treated as a cache hit.
+  await view.rerender(await wrapWithLocale(React.createElement(HookProbe, { bounds: { south: 0, north: 0.1, west: 0.06, east: 0.16 }, filters: {} })));
   await pause(400);
   assert.equal(calls.length, first + 1, "the unfetched strip forces a new request");
 });
@@ -632,7 +640,8 @@ test("the bbox cache evicts expired entries on insert and is capped (LRU)", asyn
   installFreshCopyMock(calls, []);
   // Distinct, non-overlapping, same-size small boxes (no zoom-out debounce).
   const box = (i) => ({ south: 45.0, north: 45.1, west: 9 + i * 0.2, east: 9.1 + i * 0.2 });
-  const westKey = (i) => `|${(9 + i * 0.2).toFixed(3)}|`;
+  // Cache keys carry the snapped (actually fetched) west edge.
+  const westKey = (i) => `|${snapViewportRectangles(box(i))[0].west}|`;
   const view = await renderProbe({ bounds: box(0), filters: {} });
   await pause(260);
   assert.equal(__viewportCacheKeys().length, 1);

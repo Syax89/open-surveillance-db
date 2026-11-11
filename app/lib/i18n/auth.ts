@@ -5,15 +5,19 @@
  * this domain, `it` is type-checked against it via `Translation<typeof en>`
  * (see `./types.ts`), so a missing or extra key fails `tsc --noEmit`.
  */
-import type { Translation } from "./types";
+import type { Locale, Translation } from "./types";
+import { en as authNavEn, it as authNavIt } from "./auth-nav";
 
 export const en = {
+  // Header auth links (accountAria, accountTitle, login, register) live in
+  // the tiny ./auth-nav fragment so the header on every route ships only
+  // those labels, not this whole domain; spread here so `auth.*` keeps the
+  // same keys for every other consumer.
+  ...authNavEn,
   navigation: "Main navigation",
   homeAria: "OpenSurveillanceDB home",
-  accountAria: "Your account",
   loginTitle: "Log in",
   registerTitle: "Create a contributor account",
-  accountTitle: "Your account",
   // F5 (QA#6): per-page metadata for the client auth pages (/login, /register).
   loginMetaDescription:
     "Log in to submit reports and corrections to the OpenSurveillanceDB public database.",
@@ -22,8 +26,6 @@ export const en = {
   email: "Email",
   password: "Password",
   displayName: "Display name (optional)",
-  login: "Log in",
-  register: "Create account",
   logout: "Log out",
   // Moderator/admin shortcut on the account page (ADR 0003 2026-10): shown
   // only when GET /api/auth/me reports a coarse role of moderator+.
@@ -311,12 +313,11 @@ export const en = {
 } as const;
 
 export const it: Translation<typeof en> = {
+  ...authNavIt,
   navigation: "Navigazione principale",
   homeAria: "Pagina iniziale di OpenSurveillanceDB",
-  accountAria: "Il tuo account",
   loginTitle: "Accedi",
   registerTitle: "Crea un account per contribuire",
-  accountTitle: "Il tuo account",
   // F5 (QA#6): metadata per pagina per le pagine auth client (/login, /register).
   loginMetaDescription:
     "Accedi per inviare segnalazioni e correzioni al database pubblico OpenSurveillanceDB.",
@@ -325,8 +326,6 @@ export const it: Translation<typeof en> = {
   email: "Email",
   password: "Password",
   displayName: "Nome visualizzato (facoltativo)",
-  login: "Accedi",
-  register: "Crea account",
   logout: "Esci",
   goToModeration: "Vai alla moderazione",
   noAccount: "Non hai ancora un account?",
@@ -611,3 +610,10 @@ export const it: Translation<typeof en> = {
   passkeyDisclosure:
     "Il controllo biometrico (impronta, volto o PIN) avviene sul tuo dispositivo. Se la passkey è sincronizzata tramite il cloud del fornitore (Apple, Google, Microsoft), quel fornitore può vedere che usi questo sito; le passkey legate al dispositivo non vengono mai sincronizzate.",
 };
+
+/**
+ * This domain only, in every locale — what client components import (via
+ * `useDomainMessages`, app/lib/use-messages.ts) instead of the aggregated
+ * `messages` map, which would ship EVERY domain in BOTH locales.
+ */
+export const authByLocale: Record<Locale, Translation<typeof en>> = { en, it };

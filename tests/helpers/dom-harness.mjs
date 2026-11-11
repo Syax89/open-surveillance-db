@@ -404,6 +404,14 @@ export function map(el, opts) {
       return m;
     },
     getPane: () => ({ setAttribute: (key, value) => { m.paneAttrs[key] = value; } }),
+    // Custom panes (canvas camera markers): recorded by name with their
+    // style + attributes so tests can assert z-order and aria-hidden.
+    panes: {},
+    createPane: (name) => {
+      const pane = { name, style: {}, attrs: {}, setAttribute: (key, value) => { pane.attrs[key] = value; } };
+      m.panes[name] = pane;
+      return pane;
+    },
     // Direct addLayer on the map (RecordMiniMap 2026-08-07): the read-only
     // mini map adds markers/geometry straight to the map, not via a
     // layerGroup — record into the same live-union arrays the groups use.
@@ -655,6 +663,35 @@ export function circle(latlng, opts) {
   return c;
 }
 export const divIcon = (opts) => opts;
+// Canvas camera markers (perf, dense z>=12 views): L.canvas returns a
+// recorded renderer; L.circleMarker records its latlng + style options into
+// the SAME markers array as divIcon markers (__isDot distinguishes them), so
+// existing marker-count / popupOpened assertions see every camera. A canvas
+// layer has no DOM element and (in the component) no bound popup. No
+// L.CircleMarker class is exported, so the component takes its documented
+// plain-circleMarker fallback here.
+export const __renderers = [];
+export const canvas = (opts) => { const r = { __isCanvas: true, options: { ...(opts ?? {}) } }; __renderers.push(r); return r; };
+export function circleMarker(latlng, opts) {
+  const c = {
+    latlng, opts, __isDot: true,
+    handlers: {}, events: {}, styleSets: 0,
+    bindTooltip: (html, tooltipOpts) => { c.tooltipHtml = html; c.tooltipOpts = tooltipOpts; return c; },
+    setTooltipContent: (html) => { c.tooltipHtml = html; return c; },
+    on: (event, handler) => { (c.handlers[event] ??= []).push(handler); return c; },
+    fire: (event, data) => { (c.events[event] ??= []).push(data); for (const handler of c.handlers[event] ?? []) handler(data); return c; },
+    getPopup: () => undefined,
+    isPopupOpen: () => false,
+    openPopup: () => c,
+    getLatLng: () => latlng,
+    setLatLng: (next) => { latlng = next; c.latlng = next; return c; },
+    setStyle: (style) => { c.opts = { ...c.opts, ...style }; c.styleSets += 1; return c; },
+    getElement: () => undefined,
+    addTo: (layer) => { layer.addLayer(c); return c; },
+    remove: () => {},
+  };
+  return c;
+}
 // Popup-lifecycle (t_33b82720): L.DomEvent.stopPropagation is called by the
 // marker click handler so a marker click NEVER bubbles to the map click
 // handler (which would open the generic coordinate picker over the marker

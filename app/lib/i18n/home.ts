@@ -12,7 +12,7 @@
  * hero (CTA → /mappa and /segnala), the static MapTeaser, the four tool
  * cards and the shortened principles block (link → /manifesto).
  */
-import type { Translation } from "./types";
+import type { Locale, Translation } from "./types";
 
 export const en = {
   mainNavigation: "Main navigation",
@@ -165,3 +165,10 @@ export const it: Translation<typeof en> = {
     "Le segnalazioni vengono pubblicate subito e la comunità le mantiene accurate: conferma ciò che c'è ancora, segnala ciò che non c'è più, marca ciò che è utile.",
   manifestoLink: "Leggi il manifesto",
 };
+
+/**
+ * This domain only, in every locale — what client components import (via
+ * `useDomainMessages`, app/lib/use-messages.ts) instead of the aggregated
+ * `messages` map, which would ship EVERY domain in BOTH locales.
+ */
+export const homeByLocale: Record<Locale, Translation<typeof en>> = { en, it };

@@ -7,7 +7,8 @@
 // the danger zone. Logout itself is page state (it flips the whole page),
 // so the handler comes from the parent.
 
-import { useMessages } from "../lib/use-messages";
+import { useDomainMessages } from "../lib/use-domain-messages";
+import { authByLocale } from "../lib/i18n/auth";
 import { ModerationShortcutLink } from "../components/moderation/ModerationShortcutLink";
 import { DisplayNameField } from "./DisplayNameField";
 import type { Contributor } from "./account-types";
@@ -21,7 +22,7 @@ type Props = {
 };
 
 export function ProfileSection({ contributor, role, onContributorUpdated, onLogout }: Props) {
-  const t = useMessages().auth;
+  const t = useDomainMessages(authByLocale);
   const memberSince = new Date(contributor.createdAt).toLocaleDateString();
 
   return (

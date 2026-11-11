@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { DirectoryTool } from "../../components/tools/DirectoryTool";
+import { ExplorerViewTransitionStyles } from "../../components/ExplorerViewTransitionStyles";
 import { getServerMessages } from "../../lib/server-i18n";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -36,8 +37,12 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function DirectoryPage() {
   const t = (await getServerMessages()).directory;
   return (
-    <Suspense fallback={<p className="loading-note">{t.loading}</p>}>
-      <DirectoryTool />
-    </Suspense>
+    <>
+      {/* Route-scoped cross-document View Transition opt-in (map ↔ directory only). */}
+      <ExplorerViewTransitionStyles />
+      <Suspense fallback={<p className="loading-note">{t.loading}</p>}>
+        <DirectoryTool />
+      </Suspense>
+    </>
   );
 }

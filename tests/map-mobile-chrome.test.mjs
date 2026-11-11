@@ -33,6 +33,7 @@ import { fileURLToPath } from "node:url";
 import {
   setupDom, loadDomModule, installFetchMock, jsonResponse, renderWithLocale, React,
 } from "./helpers/dom-harness.mjs";
+import { readSiteCss } from "./helpers/site-css.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const readSource = (relative) => readFile(path.join(root, relative), "utf8");
@@ -138,7 +139,7 @@ test("map height budget = viewport - measured offset - reserve, bounded to a use
 // ---------------------------------------------------------------------------
 
 test("mobile map height uses the measured variable, not calc(100svh - 250px)", async () => {
-  const css = await readSource("app/globals.css");
+  const css = await readSiteCss(root); // globals + map.css, cascade order (perf 2026-11)
   assert.doesNotMatch(css, /100svh\s*-\s*250px/, "the fixed offset guess must be gone");
 
   const mobile = mediaBlocks(css, "max-width", "768px");
@@ -151,7 +152,7 @@ test("mobile map height uses the measured variable, not calc(100svh - 250px)", a
 });
 
 test("mobile map chrome is compacted while the search caption stays visible", async () => {
-  const css = await readSource("app/globals.css");
+  const css = await readSiteCss(root); // globals + map.css, cascade order (perf 2026-11)
   const mobile = mediaBlocks(css, "max-width", "768px").join("\n");
 
   const toolbar = ruleBlocks(mobile, ".map-explorer-toolbar")[0];

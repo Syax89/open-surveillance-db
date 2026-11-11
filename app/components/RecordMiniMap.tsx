@@ -3,7 +3,8 @@
 import { useEffect, useRef } from "react";
 import { isDomeKind } from "../lib/camera-kinds";
 import { fovCircleRadiusMeters, fovPolygonPoints } from "../lib/field-of-view";
-import { useMessages } from "../lib/use-messages";
+import { useDomainMessages } from "../lib/use-domain-messages";
+import { recordByLocale } from "../lib/i18n/record";
 
 /**
  * Record-page mini map (CEO 2026-08-07): a small Leaflet map on
@@ -23,6 +24,13 @@ import { useMessages } from "../lib/use-messages";
  *
  * Hydration-safe: Leaflet is imported and mounted in an effect only
  * (same pattern as SurveillanceMap), so SSR emits just the container.
+ *
+ * Lazy (perf): the mini map sits below the facts list, so Leaflet (~43 KB
+ * gzip JS) is only imported once the container comes within 200px of the
+ * viewport (IntersectionObserver). Without IntersectionObserver it loads
+ * immediately. The container keeps its fixed CSS height and its
+ * role/label while empty, so there is no layout shift and screen readers
+ * see the same region before and after the map mounts.
  */
 export function RecordMiniMap({
   latitude,
@@ -41,15 +49,16 @@ export function RecordMiniMap({
   status?: string;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const t = useMessages().record;
+  const t = useDomainMessages(recordByLocale);
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
     let disposed = false;
     let map: import("leaflet").Map | null = null;
+    let observer: IntersectionObserver | null = null;
 
-    void import("leaflet")
+    const mount = () => void import("leaflet")
       .then((L) => {
         if (disposed || !containerRef.current) return;
         // Interactive mini map: pan + zoom allowed (CEO request). The
@@ -109,8 +118,21 @@ export function RecordMiniMap({
         // coordinates and direction — nothing else to do.
       });
 
+    if (typeof IntersectionObserver === "undefined") {
+      mount();
+    } else {
+      observer = new IntersectionObserver((entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return;
+        observer?.disconnect();
+        observer = null;
+        mount();
+      }, { rootMargin: "200px" });
+      observer.observe(container);
+    }
+
     return () => {
       disposed = true;
+      observer?.disconnect();
       map?.remove();
     };
   }, [latitude, longitude, kind, direction, title]);

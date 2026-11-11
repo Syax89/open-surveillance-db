@@ -218,3 +218,93 @@ test("GET returns 503 when the database is unavailable", async () => {
   assert.equal(response.status, 503);
   assert.equal((await responseBody(response)).error, "Database unavailable");
 });
+
+// ---------------------------------------------------------------------------
+// Worker public cache (app/lib/public-cache.ts, perf 2026-11): the timeline
+// is fetched on every record view, so it is wrapped in withPublicCache like
+// GET /api/cameras/[id]. The stored entry keeps the per-record Cache-Tag so
+// the moderation and community-action write paths purge it (no stale
+// timeline after an action). No browser max-age: a browser copy cannot be
+// purged and the record page refetches the timeline right after an action.
+// ---------------------------------------------------------------------------
+
+async function withPurgeConfigured(fn) {
+  const { env } = await loadTreeModule("cloudflare-workers.mjs");
+  env.CACHE_PURGE_TOKEN = "test-token";
+  env.CACHE_PURGE_ZONE_ID = "test-zone";
+  try {
+    await fn();
+  } finally {
+    delete env.CACHE_PURGE_TOKEN;
+    delete env.CACHE_PURGE_ZONE_ID;
+  }
+}
+
+function installFakeCache() {
+  const store = new Map();
+  globalThis.caches = {
+    default: {
+      async match(request) {
+        return store.get(request.url)?.clone() ?? null;
+      },
+      async put(request, response) {
+        store.set(request.url, response.clone());
+      },
+    },
+  };
+  return store;
+}
+
+test("GET serves repeat views from the worker public cache with the per-record Cache-Tag", async () => {
+  const store = installFakeCache();
+  try { await withPurgeConfigured(async () => {
+    const d1 = fakeD1({ camera: cameraRow("active") });
+    stub("getD1", async () => d1);
+    const { GET } = await route();
+
+    const first = await GET(apiRequest("/api/cameras/3/events"));
+    assert.equal(first.status, 200);
+    assert.equal(first.headers.get("x-osdb-cache"), "miss");
+    assert.equal(store.size, 1, "the 200 timeline is stored");
+    const stored = [...store.values()][0];
+    assert.equal(stored.headers.get("cache-tag"), "camera-3", "the stored entry stays purgeable by the record tag");
+    assert.doesNotMatch(stored.headers.get("cache-control") ?? "", /(^|[ ,])max-age=/, "no unpurgeable browser max-age");
+
+    const second = await GET(apiRequest("/api/cameras/3/events"));
+    assert.equal(second.status, 200);
+    assert.equal(second.headers.get("x-osdb-cache"), "hit");
+    assert.equal(d1.state.eventsQueried, 1, "a cache hit must not re-query D1");
+    assert.equal(callArgs("getD1").length, 1);
+    assert.equal((await responseBody(second)).events.length, 2);
+  }); } finally {
+    delete globalThis.caches;
+  }
+});
+
+test("GET does not use the worker cache when tag purge is not configured (no stale timeline after an action)", async () => {
+  const store = installFakeCache();
+  try {
+    const d1 = fakeD1({ camera: cameraRow("active") });
+    stub("getD1", async () => d1);
+    const { GET } = await route();
+    await GET(apiRequest("/api/cameras/3/events"));
+    await GET(apiRequest("/api/cameras/3/events"));
+    assert.equal(store.size, 0, "nothing is stored without purge credentials");
+    assert.equal(d1.state.eventsQueried, 2, "every view reads the fresh timeline");
+  } finally {
+    delete globalThis.caches;
+  }
+});
+
+test("GET never caches a 404 timeline (existence oracle stays fresh)", async () => {
+  const store = installFakeCache();
+  try { await withPurgeConfigured(async () => {
+    stub("getD1", async () => fakeD1({ camera: cameraRow("pending") }));
+    const { GET } = await route();
+    const response = await GET(apiRequest("/api/cameras/3/events"));
+    assert.equal(response.status, 404);
+    assert.equal(store.size, 0);
+  }); } finally {
+    delete globalThis.caches;
+  }
+});

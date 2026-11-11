@@ -8,7 +8,9 @@
 
 import Link from "next/link";
 import { LocaleToggle } from "./LocaleProvider";
-import { useMessages } from "../lib/use-messages";
+import { useDomainMessages } from "../lib/use-domain-messages";
+import { errorsByLocale } from "../lib/i18n/errors";
+import { moderationByLocale } from "../lib/i18n/moderation";
 import { SiteHeader } from "./SiteHeader";
 import { CameraQueueItem } from "./moderation/CameraQueueItem";
 import { CorrectionHistorySection } from "./moderation/CorrectionHistorySection";
@@ -19,8 +21,8 @@ import { QueueSection } from "./moderation/QueueSection";
 import { useModerationQueue } from "./moderation/useModerationQueue";
 
 export function ModerationDashboard() {
-  const messages = useMessages();
-  const t = messages.moderation;
+  const errors = useDomainMessages(errorsByLocale);
+  const t = useDomainMessages(moderationByLocale);
   const q = useModerationQueue();
 
   return <main id="main-content">
@@ -68,7 +70,7 @@ export function ModerationDashboard() {
         footer={(q.publishedCameras.length > 0 || q.publishedPagination.hasPrevious || q.publishedPagination.hasNext || q.publishedPagination.failed) && (
           <nav className="directory-pagination" aria-label={t.publishedRecords} aria-busy={q.publishedPagination.loading}>
             <button type="button" className="pagination-button" disabled={!q.publishedPagination.hasPrevious || q.publishedPagination.loading} onClick={q.publishedPagination.onPrevious}><span aria-hidden="true">←</span> {q.publishedPagination.previousLabel}</button>
-            {q.publishedPagination.failed && <button type="button" className="pagination-button" disabled={q.publishedPagination.loading} onClick={q.publishedPagination.onRetry}>{messages.errors.tryAgain}</button>}
+            {q.publishedPagination.failed && <button type="button" className="pagination-button" disabled={q.publishedPagination.loading} onClick={q.publishedPagination.onRetry}>{errors.tryAgain}</button>}
             <button type="button" className="pagination-button" disabled={!q.publishedPagination.hasNext || q.publishedPagination.loading} onClick={q.publishedPagination.onNext}>{q.publishedPagination.nextLabel} <span aria-hidden="true">→</span></button>
           </nav>
         )}
