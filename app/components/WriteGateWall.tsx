@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { useMessages } from "../lib/use-messages";
+import { useDomainMessages } from "../lib/use-domain-messages";
+import { authByLocale } from "../lib/i18n/auth";
 import { fetchSessionMe } from "../lib/session-fetch";
 
 /**
@@ -31,7 +32,7 @@ type WallState =
   | { kind: "verified" };
 
 export function WriteGateWall({ returnTo, children }: { returnTo: string; children: ReactNode }) {
-  const t = useMessages().auth;
+  const t = useDomainMessages(authByLocale);
   const [state, setState] = useState<WallState>({ kind: "checking" });
   const [resendBusy, setResendBusy] = useState(false);
   const [resendMessage, setResendMessage] = useState<string | null>(null);

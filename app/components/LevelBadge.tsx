@@ -1,7 +1,8 @@
 "use client";
 
 import { badgeKeyForLevel } from "../lib/trust-levels";
-import { useMessages } from "../lib/use-messages";
+import { useDomainMessages } from "../lib/use-domain-messages";
+import { communityByLocale } from "../lib/i18n/community";
 
 /**
  * Trust-level badge (COMMUNITY_PLAN §6.3 C1 — design review).
@@ -27,8 +28,7 @@ export function LevelBadge({
   verifiedCount: number;
   nextThreshold: number | null;
 }) {
-  const bundle = useMessages();
-  const t = bundle.community;
+  const t = useDomainMessages(communityByLocale);
   const badgeKey = badgeKeyForLevel(level);
   const remaining = nextThreshold === null ? 0 : Math.max(nextThreshold - verifiedCount, 0);
 

@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMessages } from "../lib/use-messages";
+import { useDomainMessages } from "../lib/use-domain-messages";
+import { authByLocale } from "../lib/i18n/auth";
 import { readCsrfToken } from "../lib/csrf";
 import { PublicNav } from "../components/PublicNav";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -49,7 +50,7 @@ import type { Contributor } from "./account-types";
  * state lives in the section or its hook (useContributions, usePasskeys).
  */
 export default function AccountPageBody() {
-  const t = useMessages().auth;
+  const t = useDomainMessages(authByLocale);
   const router = useRouter();
   const [contributor, setContributor] = useState<Contributor | null>(null);
   const [level, setLevel] = useState<TrustLevelMeta | null>(null);

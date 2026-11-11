@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { StarConfirmButton } from "./StarConfirmButton";
-import { useMessages } from "../lib/use-messages";
+import { useDomainMessages } from "../lib/use-domain-messages";
+import { commonByLocale } from "../lib/i18n/common";
+import { communityByLocale } from "../lib/i18n/community";
 import { isCsrfRejection, readCsrfToken } from "../lib/csrf";
 import type { TrustLevelMeta } from "../lib/trust-levels";
 
@@ -27,8 +29,8 @@ export function VerificationWidget({
   recordId: number;
   aggregateCount: number;
 }) {
-  const bundle = useMessages();
-  const community = bundle.community;
+  const common = useDomainMessages(commonByLocale);
+  const community = useDomainMessages(communityByLocale);
   const [confirmed, setConfirmed] = useState(false);
   const [confirmCount, setConfirmCount] = useState<number | null>(null);
   const [verificationGate, setVerificationGate] = useState<"checking" | "anonymous" | "level" | "error">("checking");
@@ -86,7 +88,7 @@ export function VerificationWidget({
         // expired token), which asks for a refresh instead. The toggle stays
         // disabled for this session either way.
         const body = await response.json().catch(() => null);
-        setConfirmError(isCsrfRejection(response.status, body) ? bundle.common.csrfExpired : community.errorSelfVerify);
+        setConfirmError(isCsrfRejection(response.status, body) ? common.csrfExpired : community.errorSelfVerify);
         setVerificationGate("error");
       } else if (response.status === 409) {
         setConfirmError(community.errorAlreadyVerified);

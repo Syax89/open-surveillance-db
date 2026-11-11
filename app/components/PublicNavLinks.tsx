@@ -3,13 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useLocale } from "./LocaleProvider";
-import { en as homeEn, it as homeIt } from "../lib/i18n/home";
-import type { Locale, Translation } from "../lib/i18n";
-
-const homeByLocale: Record<Locale, Translation<typeof homeEn>> = {
-  en: homeEn,
-  it: homeIt,
-};
+import { homeByLocale } from "../lib/i18n/home";
 
 /**
  * PublicNavLinks — the ONE public navigation set (header nav, task

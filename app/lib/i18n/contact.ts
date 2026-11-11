@@ -5,7 +5,7 @@
  * this domain, `it` is type-checked against it via `Translation<typeof en>`
  * (see `./types.ts`), so a missing or extra key fails `tsc --noEmit`.
  */
-import type { Translation } from "./types";
+import type { Locale, Translation } from "./types";
 
 export const en = {
   navigation: "Contacts navigation",
@@ -104,3 +104,10 @@ export const it: Translation<typeof en> = {
     "Le segnalazioni di sicurezza e le richieste relative alla privacy viaggiano su canali separati: advisory privati per le vulnerabilità, modulo di correzione e contatto privacy per le richieste dell'interessato.",
   footer: "Creato per la trasparenza, non per il tracciamento.",
 };
+
+/**
+ * This domain only, in every locale — what client components import (via
+ * `useDomainMessages`, app/lib/use-messages.ts) instead of the aggregated
+ * `messages` map, which would ship EVERY domain in BOTH locales.
+ */
+export const contactByLocale: Record<Locale, Translation<typeof en>> = { en, it };

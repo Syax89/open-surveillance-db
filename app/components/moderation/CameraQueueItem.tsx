@@ -4,7 +4,8 @@
 // Extracted from the ModerationDashboard monolith (kanban t_c7460073) so
 // the three camera sections stop duplicating the same card markup.
 
-import { useMessages } from "../../lib/use-messages";
+import { useDomainMessages } from "../../lib/use-domain-messages";
+import { moderationByLocale } from "../../lib/i18n/moderation";
 import { DecisionForm } from "./DecisionForm";
 import type { CameraInQueue, DecisionFormApi, ModerationAction } from "./types";
 
@@ -32,7 +33,7 @@ const variantConfig: Record<CameraVariant, {
 };
 
 export function CameraQueueItem({ camera, variant, queueBadge, api, readableDate }: Props) {
-  const t = useMessages().moderation;
+  const t = useDomainMessages(moderationByLocale);
   const config = variantConfig[variant];
   const key = `camera-${camera.id}`;
   const choices = api.metadataChoices(key);

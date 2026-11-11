@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useRef } from "react";
 import { isDomeKind } from "../../lib/camera-kinds";
 import { fovBearingFromPoint, fovBearingPoint, fovCircleRadiusMeters, fovPolygonPoints } from "../../lib/field-of-view";
-import { useMessages } from "../../lib/use-messages";
+import { useDomainMessages } from "../../lib/use-domain-messages";
+import { reportByLocale } from "../../lib/i18n/report";
 
 type ReportCoordinates = { latitude: number; longitude: number };
 
@@ -42,7 +43,7 @@ type Props = {
  */
 export function ReportMiniMap({ coordinates, onSelect, kind, direction, directionKnown, setDirection }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const t = useMessages().report;
+  const t = useDomainMessages(reportByLocale);
 
   // Leaflet handlers are bound once and read the LATEST props through
   // refs, so the click/drag handlers never go stale across re-renders.

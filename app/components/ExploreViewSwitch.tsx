@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useMessages } from "../lib/use-messages";
+import { useDomainMessages } from "../lib/use-domain-messages";
+import { commonByLocale } from "../lib/i18n/common";
 
 /**
  * The map and directory are two representations of the same public-record
@@ -17,7 +18,7 @@ export function ExploreViewSwitch({
   mapHref: string;
   directoryHref: string;
 }) {
-  const t = useMessages().common;
+  const t = useDomainMessages(commonByLocale);
   return (
     <nav className="explore-view-switch" aria-label={t.exploreViews}>
       <Link href={mapHref} aria-current={active === "map" ? "page" : undefined}>{t.toolMap}</Link>

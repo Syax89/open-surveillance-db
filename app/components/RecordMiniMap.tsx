@@ -3,7 +3,8 @@
 import { useEffect, useRef } from "react";
 import { isDomeKind } from "../lib/camera-kinds";
 import { fovCircleRadiusMeters, fovPolygonPoints } from "../lib/field-of-view";
-import { useMessages } from "../lib/use-messages";
+import { useDomainMessages } from "../lib/use-domain-messages";
+import { recordByLocale } from "../lib/i18n/record";
 
 /**
  * Record-page mini map (CEO 2026-08-07): a small Leaflet map on
@@ -48,7 +49,7 @@ export function RecordMiniMap({
   status?: string;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const t = useMessages().record;
+  const t = useDomainMessages(recordByLocale);
 
   useEffect(() => {
     const container = containerRef.current;

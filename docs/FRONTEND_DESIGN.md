@@ -886,6 +886,10 @@ results; coordinate forms at 1 column (≤480px).
   contact, correction, directory, errors, faq, footer, guide, home,
   manifesto, map, moderation, moderazione, record, report, rules, status,
   types` — type-checked parity (`Translation<typeof en>`).
+- **Client components import only their domains:**
+  `useDomainMessages(homeByLocale)` with `homeByLocale` from
+  `app/lib/i18n/home` — never the aggregated `messages` / `useMessages()`
+  (every domain, ~170 KB). Enforced by `tests/i18n-client-imports.test.mjs`.
 - **SSR locale:** `opensurveillancedb-locale` cookie, no EN→IT flash
   (ADR 0015); `<html lang>` from the root layout; `generateMetadata()`
   localises title/description/OG.

@@ -9,7 +9,9 @@
 // trust badge fresh.
 
 import Link from "next/link";
-import { useMessages } from "../lib/use-messages";
+import { useDomainMessages } from "../lib/use-domain-messages";
+import { authByLocale } from "../lib/i18n/auth";
+import { communityByLocale } from "../lib/i18n/community";
 import { useContributions } from "../lib/useContributions";
 import type { TrustLevelMeta } from "../lib/trust-levels";
 import { ContributionStats } from "./ContributionStats";
@@ -26,9 +28,8 @@ type Props = {
 };
 
 export function ContributionsSection({ contributor, onSessionLost, onLevel }: Props) {
-  const bundle = useMessages();
-  const t = bundle.auth;
-  const community = bundle.community;
+  const t = useDomainMessages(authByLocale);
+  const community = useDomainMessages(communityByLocale);
   const {
     contributions, pagination, filter, typeFilter, summary, page,
     contributionsLoading, contributionsError,

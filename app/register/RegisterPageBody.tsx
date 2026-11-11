@@ -3,15 +3,15 @@
 import { useState, useEffect, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMessages } from "../lib/use-messages";
+import { useDomainMessages } from "../lib/use-domain-messages";
+import { authByLocale } from "../lib/i18n/auth";
 import { PublicNav } from "../components/PublicNav";
 import { passwordRuleFailures } from "../lib/password-policy";
 import { hardNavigate } from "../lib/navigate";
 import { Art13Notice } from "../components/Art13Notice";
 
 export function RegisterPageBody() {
-  const bundle = useMessages();
-  const t = bundle.auth;
+  const t = useDomainMessages(authByLocale);
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

@@ -2,8 +2,9 @@
 
 import { useContext, useEffect, useId, useRef, useState } from "react";
 import { LocaleContext } from "../components/LocaleProvider";
-import { messages } from "../lib/i18n";
-import type { MessageBundle } from "../lib/i18n";
+import { commonByLocale } from "../lib/i18n/common";
+import { communityByLocale } from "../lib/i18n/community";
+import { DEFAULT_LOCALE, type Locale } from "../lib/i18n/types";
 import { isCsrfRejection, readCsrfToken } from "../lib/csrf";
 
 /**
@@ -38,6 +39,21 @@ import { isCsrfRejection, readCsrfToken } from "../lib/csrf";
  * menu action, Escape closes and restores focus to the trigger; errors
  * land in role="alert".
  */
+
+/**
+ * The i18n domains this widget renders — and nothing else: importing the
+ * aggregated `messages` here would ship every domain in both locales to the
+ * record page AND the map popup (app/lib/use-domain-messages.ts).
+ */
+export type CommunityActionsBundle = {
+  community: (typeof communityByLocale)[Locale];
+  common: (typeof commonByLocale)[Locale];
+};
+
+/** Resolve the widget's bundle for a locale (popup helper + context read). */
+export function communityActionsBundle(locale: Locale): CommunityActionsBundle {
+  return { community: communityByLocale[locale], common: commonByLocale[locale] };
+}
 
 export type ActionCounts = {
   like: number;
@@ -110,9 +126,10 @@ export function CommunityActions({
    * Leaflet popup is a separate React root outside the Next tree, where
    * LocaleProvider context is unavailable. The popup helper resolves the
    * locale itself and passes the bundle; the record page keeps the default
-   * context read. One widget, both mounts (D4).
+   * context read. One widget, both mounts (D4). Only the two domains the
+   * widget reads (a full `messages[locale]` bundle also fits the type).
    */
-  bundle?: MessageBundle;
+  bundle?: CommunityActionsBundle;
   /**
    * Server-confirmed counts reporter (BUG t_5bc23d61): called after every
    * successful toggle with the authoritative counts (the PUT response, or
@@ -126,15 +143,16 @@ export function CommunityActions({
   /**
    * Bundle resolution — two mounts, one widget:
    *   - inside the Next tree (record page): LocaleProvider context exists;
-   *     `useMessages()` reads it and `bundleProp` is undefined;
-   *   - standalone root (map popup): NO LocaleProvider — useMessages() would
-   *     throw. The popup helper resolves the locale itself and passes the
-   *     bundle; the context read falls back to the EN bundle which is then
+   *     the context locale picks the domain strings and `bundleProp` is
+   *     undefined;
+   *   - standalone root (map popup): NO LocaleProvider — useDomainMessages()
+   *     would throw. The popup helper resolves the locale itself and passes
+   *     the bundle; the context read falls back to EN which is then
    *     discarded (bundleProp wins). Reading the context directly (instead
-   *     of useMessages) is what keeps the standalone mount alive.
+   *     of useDomainMessages) is what keeps the standalone mount alive.
    */
   const context = useContext(LocaleContext);
-  const contextBundle = context ? messages[context.locale] : messages.en;
+  const contextBundle = communityActionsBundle(context?.locale ?? DEFAULT_LOCALE);
   const bundle = bundleProp ?? contextBundle;
   const actions = bundle.community.actions;
   const [counts, setCounts] = useState<ActionCounts>({

@@ -5,7 +5,9 @@ import { SurveillanceMap } from "../SurveillanceMap";
 import type { MapCamera } from "../SurveillanceMap";
 import type { ViewportBounds } from "../../lib/map-viewport";
 import type { Camera } from "../../lib/records";
-import { useMessages } from "../../lib/use-messages";
+import { useDomainMessages } from "../../lib/use-domain-messages";
+import { mapByLocale } from "../../lib/i18n/map";
+import { statusByLocale } from "../../lib/i18n/status";
 import { useLocale } from "../LocaleProvider";
 import { publicStatusLabel } from "../../lib/public-status";
 import { popupHtmlFor } from "../../lib/map-popup";
@@ -76,8 +78,8 @@ type Props = {
  * record matches" note lives inside the list).
  */
 export function MapPanel({ filteredRecords, visibleRecords, selectedId, onSelect, onPick, coordinates, focusBounds = null, focusIntent = 0, onFocusApplied, initialView = null, onViewChange, loading, notice, directoryHref = "/directory", onBoundsChange }: Props) {
-  const t = useMessages().map;
-  const statuses = useMessages().status;
+  const t = useDomainMessages(mapByLocale);
+  const statuses = useDomainMessages(statusByLocale);
   const { locale } = useLocale();
 
   // Map-first at every size: the points column starts compact and expands

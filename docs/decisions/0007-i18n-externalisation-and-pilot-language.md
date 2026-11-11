@@ -98,6 +98,15 @@ Structural invariants of the refactor:
 - `app/lib/i18n/types.ts` is untouched (`Translation<T>` is unchanged).
 - `app/lib/i18n/index.ts` assembles the per-domain files into the public
   `messages` shape; `useMessages()` consumption is unchanged.
+- *Amendment (JS size, 2026-11):* `messages` is now the SERVER-side API
+  (`getServerMessages()`). Each domain file also exports
+  `<domain>ByLocale: Record<Locale, Translation<typeof en>>`, and client
+  components read it through `useDomainMessages(<domain>ByLocale)`
+  (`app/lib/use-domain-messages.ts`), so a route ships only the domains it
+  renders (both locales: the toggle switches client-side). Importing the
+  aggregated map from client code shipped ~170 KB on 9 of 12 routes;
+  `tests/i18n-client-imports.test.mjs` forbids it (shrinking allow-list
+  for the legacy `useMessages()` callers).
 - Adding a language (point 6) still means adding `xx.ts` + extending
   `Locale` + registering in `index.ts`; after the refactor the new-language
   files mirror the per-domain layout (`<domain>.xx.ts` pairs).

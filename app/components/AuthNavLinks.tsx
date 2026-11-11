@@ -6,14 +6,8 @@ import { usePathname } from "next/navigation";
 // Header lives on EVERY page: import only the `auth` domain (F5 qa#5,
 // t_ab0d4c75) instead of the full dictionary via useMessages().
 import { useLocale } from "./LocaleProvider";
-import { en as authEn, it as authIt } from "../lib/i18n/auth";
-import type { Locale, Translation } from "../lib/i18n";
+import { authNavByLocale } from "../lib/i18n/auth-nav";
 import { fetchSessionMe } from "../lib/session-fetch";
-
-const authByLocale: Record<Locale, Translation<typeof authEn>> = {
-  en: authEn,
-  it: authIt,
-};
 
 /**
  * AuthNavLinks — login/register/account links of the shared public header
@@ -58,7 +52,7 @@ type AuthState =
 
 export function AuthNavLinks() {
   const { locale } = useLocale();
-  const t = authByLocale[locale];
+  const t = authNavByLocale[locale];
   const pathname = usePathname();
   const [auth, setAuth] = useState<AuthState>({ status: "unknown" });
 
