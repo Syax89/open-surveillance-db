@@ -28,7 +28,7 @@
 // the db layer.
 
 import { mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { fileURLToPath } from "node:url";
@@ -106,6 +106,13 @@ const REAL_DB_MODULES = [
   // cameras route now pulls in for optional contributor attribution; it must
   // exist in the tree so the transitive import resolves against the real db.
   { source: "db/auth.ts", output: "db/auth.mjs" },
+  // db/auth.ts is a barrel over the modules in db/auth/ (crypto, password,
+  // sessions, lockout, email-tokens, ...); mirror every one of them into
+  // db/auth/*.mjs so the barrel's ./auth/* re-exports resolve in the tree.
+  ...readdirSync(path.join(root, "db", "auth"))
+    .filter((name) => name.endsWith(".ts"))
+    .sort()
+    .map((name) => ({ source: `db/auth/${name}`, output: `db/auth/${name.replace(/\.ts$/, ".mjs")}` })),
   // db/passkeys.ts (Fase C) is imported by the recovery route (single-use
   // code redemption); compile it so the real SQL runs in the tree.
   { source: "db/passkeys.ts", output: "db/passkeys.mjs" },
@@ -218,6 +225,7 @@ async function buildTree() {
   await mkdir(path.join(tree, "db"), { recursive: true });
   for (const { source, output } of REAL_DB_MODULES) {
     const rewritten = rewriteSpecifiers(transpile(path.join(root, source)), workersMockUrl);
+    await mkdir(path.dirname(path.join(tree, output)), { recursive: true });
     await writeFile(path.join(tree, output), rewritten);
   }
 
