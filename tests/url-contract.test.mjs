@@ -193,20 +193,12 @@ test("harness: replace updates the current history entry without growing it", as
 });
 
 // ---------------------------------------------------------------------------
-// 3. F4 gate — activates when the real implementation lands
+// 3. useCameraFilters satisfies the URL contract
 // ---------------------------------------------------------------------------
 
-test("F4 GATE: useCameraFilters satisfies the URL contract (skipped until F4 lands)", async (t) => {
-  let mod;
-  try {
-    mod = await loadDomModule("app/lib/use-camera-filters.mjs");
-  } catch {
-    mod = null;
-  }
-  if (!mod) {
-    t.skip("F4 non ancora atterrato (t_522638a5): il contratto URL si attiva con la PR di F4. La suite resta verde per F0-F3.");
-    return;
-  }
+test("useCameraFilters satisfies the URL contract", async () => {
+  // No try/catch: a module that fails to load must fail this test, not skip it.
+  const mod = await loadDomModule("app/lib/use-camera-filters.mjs");
   const { parseCameraFilters: parse, stringifyCameraFilters: stringify } = mod;
   assert.equal(typeof parse, "function", "use-camera-filters must export parseCameraFilters");
   assert.equal(typeof stringify, "function", "use-camera-filters must export stringifyCameraFilters");

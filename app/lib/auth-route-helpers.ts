@@ -100,7 +100,9 @@ async function bucketLimit(
   route: string,
   bucket: "auth" | "session",
 ): Promise<Response | null> {
-  const key = callerKey(request);
+  // Pass env so TRUST_XFF is honoured behind a reverse proxy; without it every
+  // caller lacking cf-connecting-ip shares a single "unknown" bucket.
+  const key = callerKey(request, env);
   const limitOptions = limitsFor(bucket, env);
   const limit = await checkRateLimit(env, bucket, key, limitOptions);
   if (!limit.allowed) {

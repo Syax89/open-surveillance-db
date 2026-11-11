@@ -686,3 +686,27 @@ test("F7b: TRUST_XFF=true (opt-in esplicito t_b6f04976) ripristina i cap per-IP 
       `passare tutti. Status osservati: ${results.join(", ")}`,
   );
 });
+
+test("F7c: TRUST_XFF=true raggiunge anche il bucket auth di /api/auth/login (callerKey riceve env)", async () => {
+  const login = await loadE2ERoute("app/api/auth/login/route.mjs");
+  // Bucket auth stretto (2/min): senza env passato a callerKey ogni chiamante
+  // senza cf-connecting-ip finirebbe in "unknown" e il terzo login darebbe 429.
+  e2e.AUTH_RATE_LIMIT_MAX = "2";
+  e2e.TRUST_XFF = "true";
+
+  const results = [];
+  for (let index = 0; index < 3; index += 1) {
+    const response = await login.POST(
+      apiRequest("/api/auth/login", {
+        method: "POST",
+        headers: { "x-forwarded-for": `198.51.100.${10 + index}` },
+        body: { email: `nobody${index}@osdb.test`, password: "Sup3rsecret!" },
+      }),
+    );
+    results.push(response.status);
+  }
+  assert.ok(
+    !results.includes(429),
+    `con TRUST_XFF=true IP XFF distinti non devono condividere il bucket auth. Status: ${results.join(", ")}`,
+  );
+});
