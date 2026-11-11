@@ -2,13 +2,11 @@
  * B02 — the shared filter disclosure must survive a responsive round trip and
  * a manual mobile close.
  *
- * The desktop CSS hides `summary` when the group is closed, so a stale
- * `filtersOpen=false` left the controls unreachable (no way to reopen). The
- * native `toggle` event fires for the PROGRAMMATIC media-query sync too; only
- * a real user toggle may persist as a preference, and desktop always opens.
- *
- * jsdom fires `toggle` asynchronously when `open` changes (verified), so the
- * bug is reproducible in the harness.
+ * Historically the desktop CSS hid the native `summary`, so a stale
+ * `filtersOpen=false` left the controls unreachable (no way to reopen), and
+ * the programmatic media-query sync was mistaken for a user toggle. Since
+ * the CLS fix (perf 2026-11) the disclosure is a button + CSS-only
+ * breakpoint, so these tests pin that state never follows the viewport.
  */
 import assert from "node:assert/strict";
 import test, { afterEach, before } from "node:test";
@@ -73,42 +71,49 @@ async function activationClick(element) {
   });
 }
 
-test("B02: 1440 -> 390 -> 1440 keeps the filter group open and the controls reachable", async () => {
+// CLS fix (perf 2026-11): the disclosure no longer syncs to matchMedia at
+// all — the ≤820px breakpoint is pure CSS and desktop CSS ignores the open
+// state (tests/filters-bar-cls.test.mjs pins the CSS). B02 therefore holds by
+// construction: a breakpoint change never mutates the state, and a manual
+// mobile close can never hide the controls on desktop.
+
+test("B02: 1440 -> 390 -> 1440 never changes the disclosure state and the controls stay reachable", async () => {
   const media = installMedia(false); // desktop
   try {
     const { container } = await renderBar();
-    const details = container.querySelector(".filters-disclosure");
-    assert.equal(details.open, true, "desktop starts open");
+    const group = container.querySelector(".filters-disclosure");
+    const toggle = group.querySelector(".filters-disclosure-toggle");
+    assert.equal(group.dataset.open, "false", "collapsed state (desktop CSS shows the controls regardless)");
 
-    await media.setMatches(true); // 390px → compact, auto-closed
-    await rtl.waitFor(() => assert.equal(details.open, false, "the compact layout auto-closes the group"));
+    await media.setMatches(true); // 390px
+    assert.equal(group.dataset.open, "false", "no JS-driven change at the compact breakpoint (no layout shift)");
+    assert.equal(toggle.getAttribute("aria-expanded"), "false");
 
-    await media.setMatches(false); // back to 1440 → must be open again
-    await rtl.waitFor(() => assert.equal(details.open, true, "the wide layout reopens the group"));
+    await media.setMatches(false); // back to 1440
+    assert.equal(group.dataset.open, "false");
     assert.ok(container.querySelector("#record-kind-filter"), "the kind select stays reachable after the round trip");
   } finally {
     media.restore();
   }
 });
 
-test("B02: a manual mobile close does not leave the group stuck closed on desktop", async () => {
+test("B02: a manual mobile open/close is kept across a desktop round trip", async () => {
   const media = installMedia(true); // mobile
   try {
     const { container } = await renderBar();
-    const details = container.querySelector(".filters-disclosure");
-    await rtl.waitFor(() => assert.equal(details.open, false, "mobile starts compact"));
+    const group = container.querySelector(".filters-disclosure");
+    const toggle = group.querySelector(".filters-disclosure-toggle");
+    assert.equal(toggle.getAttribute("aria-expanded"), "false", "mobile starts compact");
 
-    // The user opens then CLOSES the group by hand on mobile.
-    await activationClick(details.querySelector("summary"));
-    await rtl.waitFor(() => assert.equal(details.open, true, "the user's open toggle is applied"));
-    await activationClick(details.querySelector("summary"));
-    await rtl.waitFor(() => assert.equal(details.open, false, "the user's close toggle is applied"));
+    await activationClick(toggle);
+    assert.equal(toggle.getAttribute("aria-expanded"), "true", "the user's open toggle is applied");
+    await activationClick(toggle);
+    assert.equal(toggle.getAttribute("aria-expanded"), "false", "the user's close toggle is applied");
 
-    // Resize to desktop: the summary is display:none there, so the group MUST
-    // be open (a manual mobile close can never carry over into an
-    // unreopenable desktop state).
+    // Desktop: the toggle is display:none and the controls are shown by CSS
+    // whatever the state, so the closed preference cannot strand them.
     await media.setMatches(false);
-    await rtl.waitFor(() => assert.equal(details.open, true, "desktop forces the group open"));
+    assert.equal(group.dataset.open, "false", "the user's preference is not overridden");
     assert.ok(container.querySelector("#record-freshness-filter"), "the freshness select is reachable on desktop");
   } finally {
     media.restore();

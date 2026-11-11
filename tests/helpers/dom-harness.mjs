@@ -149,8 +149,11 @@ async function buildDomTree() {
   }));
   await writeFile(path.join(nodeModules, "next", "link.mjs"),
     `import React from "react";
-export default function Link({ href, children, ...rest }) {
-  return React.createElement("a", { href, ...rest }, children);
+// \`prefetch\` is a next/link prop, not an <a> attribute: surface it as
+// data-prefetch so tests can assert the opt-out (React never warns).
+export default function Link({ href, children, prefetch, ...rest }) {
+  const extra = prefetch === undefined ? {} : { "data-prefetch": String(prefetch) };
+  return React.createElement("a", { href, ...rest, ...extra }, children);
 }
 `);
   // The navigation mock keeps a mutable state so tests can set the params

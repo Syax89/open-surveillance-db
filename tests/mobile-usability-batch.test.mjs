@@ -110,7 +110,7 @@ const chipLabels = (container, variant) =>
 const pagers = (container) => container.querySelectorAll(".directory-pagination");
 const pagerTop = (container) => container.querySelector(".directory-pagination-top");
 const pagerBottom = (container) => container.querySelector(".directory-pagination:not(.directory-pagination-top)");
-const summary = (container) => container.querySelector(".filters-disclosure > summary");
+const summary = (container) => container.querySelector(".filters-disclosure > .filters-disclosure-toggle");
 
 before(async () => {
   rtl = await setupDom();

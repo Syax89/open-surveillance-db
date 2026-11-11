@@ -106,6 +106,7 @@ export function AuthNavLinks() {
       <span className="auth-nav-links">
         <Link
           href="/account"
+          prefetch={false}
           className="nav-action"
           aria-label={t.accountAria}
           aria-current={pathname === "/account" ? "page" : undefined}
@@ -118,11 +119,12 @@ export function AuthNavLinks() {
 
   return (
     <span className="auth-nav-links">
-      <Link href="/login" aria-current={pathname === "/login" ? "page" : undefined}>
+      <Link href="/login" prefetch={false} aria-current={pathname === "/login" ? "page" : undefined}>
         {t.login}
       </Link>
       <Link
         href="/register"
+        prefetch={false}
         className="nav-action"
         aria-current={pathname === "/register" ? "page" : undefined}
       >

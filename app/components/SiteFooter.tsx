@@ -35,6 +35,11 @@ const footerByLocale: Record<Locale, Translation<typeof footerEn>> = {
  * type-checked for parity), so the footer is fully localised like the rest of
  * the interface.
  *
+ * Prefetch (perf 2026-11): every footer link sets prefetch={false}. The
+ * footer is visible on every short page, and next/link (vinext) prefetches
+ * each in-viewport link's RSC payload — up to 14 requests per view on
+ * /segnala and /correggi. Navigation still works as a client transition.
+ *
  * Note: the local moderation queue (/moderation) is deliberately NOT linked
  * from the public footer. The page itself states it is a local-only tool
  * ("not linked from the public experience"), and the publication-boundaries
@@ -53,7 +58,7 @@ export function SiteFooter() {
   return (
     <footer className="site-footer" aria-label={t.landmarkLabel}>
       <div className="footer-brand">
-        <Link className="brand" href="/" aria-label={t.homeAria} aria-current={pageCurrent("/")}>
+        <Link prefetch={false} className="brand" href="/" aria-label={t.homeAria} aria-current={pageCurrent("/")}>
           <span className="brand-mark" aria-hidden="true"><BrandMark /></span>
           <span>OpenSurveillanceDB</span>
         </Link>
@@ -62,14 +67,14 @@ export function SiteFooter() {
       <nav className="footer-links" aria-label={t.navigation}>
         <div className="footer-link-group">
           <p className="footer-link-group-title">{t.exploreGroup}</p>
-          <Link href="/mappa" aria-current={pageCurrent("/mappa")}>{t.toolMap}</Link>
-          <Link href="/directory" aria-current={pageCurrent("/directory")}>{t.toolDirectory}</Link>
+          <Link prefetch={false} href="/mappa" aria-current={pageCurrent("/mappa")}>{t.toolMap}</Link>
+          <Link prefetch={false} href="/directory" aria-current={pageCurrent("/directory")}>{t.toolDirectory}</Link>
         </div>
         <div className="footer-link-group">
           <p className="footer-link-group-title">{t.contributeGroup}</p>
-          <Link href="/segnala" aria-current={pageCurrent("/segnala")}>{t.toolReport}</Link>
-          <Link href="/correggi" aria-current={pageCurrent("/correggi")}>{t.toolCorrection}</Link>
-          <Link href="/regole" aria-current={pageCurrent("/regole")}>{t.rules}</Link>
+          <Link prefetch={false} href="/segnala" aria-current={pageCurrent("/segnala")}>{t.toolReport}</Link>
+          <Link prefetch={false} href="/correggi" aria-current={pageCurrent("/correggi")}>{t.toolCorrection}</Link>
+          <Link prefetch={false} href="/regole" aria-current={pageCurrent("/regole")}>{t.rules}</Link>
           {/* SEO fix (2026-10-15): link straight to the real destination
               instead of through the /moderazione compatibility redirect.
               That redirect exists for OLD external backlinks (see
@@ -81,24 +86,24 @@ export function SiteFooter() {
               distinct page — pageCurrent("/guide") would double-mark it
               alongside the real /guide footer link below when both are
               visited, which is an a11y regression (two "current" items). */}
-          <Link href="/guide#guide-publication-details">{t.moderation}</Link>
+          <Link prefetch={false} href="/guide#guide-publication-details">{t.moderation}</Link>
         </div>
         <div className="footer-link-group">
           <p className="footer-link-group-title">{t.projectGroup}</p>
-          <Link href="/guide" aria-current={pageCurrent("/guide")}>{t.guide}</Link>
-          <Link href="/manifesto" aria-current={pageCurrent("/manifesto")}>{t.manifesto}</Link>
-          <Link href="/fonti" aria-current={pageCurrent("/fonti")}>{t.sources}</Link>
-          <Link href="/api-docs" aria-current={pageCurrent("/api-docs")}>{t.apiDocs}</Link>
-          <Link href="/faq" aria-current={pageCurrent("/faq")}>{t.faq}</Link>
-          <Link href="/contatti" aria-current={pageCurrent("/contatti")}>{t.contact}</Link>
+          <Link prefetch={false} href="/guide" aria-current={pageCurrent("/guide")}>{t.guide}</Link>
+          <Link prefetch={false} href="/manifesto" aria-current={pageCurrent("/manifesto")}>{t.manifesto}</Link>
+          <Link prefetch={false} href="/fonti" aria-current={pageCurrent("/fonti")}>{t.sources}</Link>
+          <Link prefetch={false} href="/api-docs" aria-current={pageCurrent("/api-docs")}>{t.apiDocs}</Link>
+          <Link prefetch={false} href="/faq" aria-current={pageCurrent("/faq")}>{t.faq}</Link>
+          <Link prefetch={false} href="/contatti" aria-current={pageCurrent("/contatti")}>{t.contact}</Link>
         </div>
         <details className="footer-link-group footer-policy-group">
           <summary>{t.legalGroup}</summary>
           <div className="footer-policy-links">
-            <Link href="/privacy" aria-current={pageCurrent("/privacy")}>{t.privacy}</Link>
-            <Link href="/termini" aria-current={pageCurrent("/termini")}>{t.terms}</Link>
-            <Link href="/licenze" aria-current={pageCurrent("/licenze")}>{t.licenses}</Link>
-            <Link href="/accessibility" aria-current={pageCurrent("/accessibility")}>{t.accessibility}</Link>
+            <Link prefetch={false} href="/privacy" aria-current={pageCurrent("/privacy")}>{t.privacy}</Link>
+            <Link prefetch={false} href="/termini" aria-current={pageCurrent("/termini")}>{t.terms}</Link>
+            <Link prefetch={false} href="/licenze" aria-current={pageCurrent("/licenze")}>{t.licenses}</Link>
+            <Link prefetch={false} href="/accessibility" aria-current={pageCurrent("/accessibility")}>{t.accessibility}</Link>
           </div>
         </details>
       </nav>

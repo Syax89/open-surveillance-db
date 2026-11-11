@@ -1185,7 +1185,11 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
    type+freshness right, reset floating in a gap). */
 .directory-controls { display:grid; gap:12px; }
 .filters-disclosure { min-width:0; }
-.filters-disclosure > summary { display:none; }
+/* CLS fix (perf 2026-11): the filter disclosure toggle exists only ≤820px.
+   Wider layouts never render it and ALWAYS show the controls, whatever the
+   (server-rendered, collapsed) data-open state is — the breakpoint is pure
+   CSS, so server html == hydrated layout on every viewport (no shift). */
+.filters-disclosure > .filters-disclosure-toggle { display:none; }
 .filter-controls-row { display:grid; grid-template-columns:repeat(3, minmax(180px, 260px)); gap:12px 16px; align-items:end; }
 .record-search { min-width:0; }
 /* IT layout stability (t_690ed55e): the search input must not stretch its
@@ -1255,7 +1259,7 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
   .filter-chips-desktop { display:none; }
 }
 /* F1: the active-selection count inside the native disclosure summary. The
-   summary itself only renders ≤820px (see .filters-disclosure > summary); the
+   toggle itself only renders ≤820px (see .filters-disclosure-toggle); the
    count is phone-only (≤700px), so on every wider — desktop — layout it is
    removed from display and from the accessibility tree. */
 .filters-summary-count { display:none; }
@@ -1351,12 +1355,13 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 }
 @media (max-width:820px) {
   .filters-disclosure { border:1px solid var(--line); border-radius:var(--radius-md); background:var(--card-bg); }
-  .filters-disclosure > summary { display:flex; align-items:center; justify-content:space-between; min-height:40px; padding:0 11px; color:var(--nav-ink); cursor:pointer; font-size:var(--text-sm); font-weight:800; list-style:none; }
-  .filters-disclosure > summary::-webkit-details-marker { display:none; }
-  .filters-disclosure > summary::after { content:"+"; color:var(--focus); font-size:var(--text-xl); }
-  .filters-disclosure[open] > summary { border-bottom:1px solid var(--line); }
-  .filters-disclosure[open] > summary::after { content:"–"; }
-  .filters-disclosure[open] .filter-controls-row { padding:12px; }
+  .filters-disclosure > .filters-disclosure-toggle { display:flex; align-items:center; justify-content:space-between; width:100%; min-height:44px; margin:0; padding:0 11px; border:0; border-radius:var(--radius-md); background:transparent; color:var(--nav-ink); cursor:pointer; font:inherit; font-size:var(--text-sm); font-weight:800; text-align:left; }
+  .filters-disclosure > .filters-disclosure-toggle:focus-visible { outline:3px solid var(--focus); outline-offset:2px; }
+  .filters-disclosure-icon::before { content:"+"; color:var(--focus); font-size:var(--text-xl); }
+  .filters-disclosure[data-open="true"] > .filters-disclosure-toggle { border-bottom:1px solid var(--line); border-radius:var(--radius-md) var(--radius-md) 0 0; }
+  .filters-disclosure[data-open="true"] .filters-disclosure-icon::before { content:"–"; }
+  .filters-disclosure:not([data-open="true"]) > .filter-controls-row { display:none; }
+  .filters-disclosure[data-open="true"] > .filter-controls-row { padding:12px; }
 }
 /* Contributor auth (STATUS gap #1, ADR 0013): login / register / account.
    The auth cards inherit the shared 900px readable column (.record-detail
