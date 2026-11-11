@@ -664,21 +664,50 @@ export async function getPublicCameraFacets(nowIso: string = new Date().toISOStr
 }
 
 /**
+ * Hard cap on the features of the GeoJSON bbox layer (2026-11 bounds fix).
+ * The route asks for one probe row past it (limit = cap + 1) and answers
+ * `truncated: true` when the probe row comes back; same order of magnitude
+ * as PUBLIC_CAMERAS_BBOX_MAX_LIMIT (one dense viewport, one response).
+ */
+export const PUBLIC_CAMERAS_BBOX_GEOJSON_MAX_FEATURES = 10_000;
+
+/**
  * Bounding-box variant of the public list for the map marker layer
  * (FRONTEND_PLAN § 3.3: the map needs all points in the visible box, not a
  * page). Same shared predicate, publish-flag CASEs and ~10 m rounding as
  * every other public surface. `bbox` is [west, south, east, north] in
  * decimal degrees; the coordinates composite index serves the BETWEEN.
+ *
+ * Bounded (2026-11): the optional kind/freshness filters apply exactly as
+ * in listPublicCamerasInBboxPage, and the SELECT always carries a LIMIT —
+ * `options.limit` clamped to [1, PUBLIC_CAMERAS_BBOX_GEOJSON_MAX_FEATURES + 1]
+ * (the +1 is the caller's truncation probe). The area cap
+ * (BBOX_MAX_AREA_SQ_DEG) is enforced by the route with a 400.
  */
 export async function listPublicCamerasInBbox(
   bbox: { west: number; south: number; east: number; north: number },
-  nowIso: string = new Date().toISOString(),
+  nowIsoOrFilters?: string | Pick<PublicCameraFilters, "kind" | "freshness">,
+  options: { limit?: number } = {},
 ): Promise<PublicCameraRecord[]> {
   const d1 = await getD1();
+  // Same dual first argument as listPublicCamerasInBboxPage.
+  const filters = typeof nowIsoOrFilters === "string" ? undefined : nowIsoOrFilters;
+  const nowIso = typeof nowIsoOrFilters === "string" ? nowIsoOrFilters : new Date().toISOString();
+  const maxRows = PUBLIC_CAMERAS_BBOX_GEOJSON_MAX_FEATURES + 1;
+  const limit = Math.min(Math.max(Math.trunc(options.limit ?? maxRows) || maxRows, 1), maxRows);
   const { sql: publicPredicate, parameters: predicateParameters } = publicCameraPredicate(nowIso);
-  const parameters = [...predicateParameters, bbox.south, bbox.north, bbox.west, bbox.east];
-  const query = `SELECT id, title, kind, CASE WHEN publish_manufacturer = 1 THEN manufacturer ELSE NULL END AS manufacturer, CASE WHEN publish_observed_on = 1 THEN observed_on ELSE NULL END AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, latitude, longitude, direction, status, source, updated, description, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt FROM cameras WHERE ${publicPredicate} AND latitude BETWEEN ? AND ? AND longitude BETWEEN ? AND ? ORDER BY id DESC`;
-  const result = await d1.prepare(query).bind(...parameters).all<PublicCameraRecord>();
+  const parameters: (string | number)[] = [...predicateParameters, bbox.south, bbox.north, bbox.west, bbox.east];
+  let where = `${publicPredicate} AND latitude BETWEEN ? AND ? AND longitude BETWEEN ? AND ?`;
+  if (filters?.kind) {
+    where += " AND kind = ?";
+    parameters.push(filters.kind);
+  }
+  if (filters?.freshness && filters.freshness !== "all") {
+    where += " AND last_verified_at >= ?";
+    parameters.push(freshnessCutoff(filters.freshness));
+  }
+  const query = `SELECT id, title, kind, CASE WHEN publish_manufacturer = 1 THEN manufacturer ELSE NULL END AS manufacturer, CASE WHEN publish_observed_on = 1 THEN observed_on ELSE NULL END AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, latitude, longitude, direction, status, source, updated, description, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt FROM cameras WHERE ${where} ORDER BY id DESC LIMIT ?`;
+  const result = await d1.prepare(query).bind(...parameters, limit).all<PublicCameraRecord>();
   return result.results.map((record) => ({ ...record, latitude: roundPublicCoordinate(record.latitude), longitude: roundPublicCoordinate(record.longitude) }));
 }
 
