@@ -40,7 +40,11 @@ real-rendering checks (`.github/workflows/lighthouse.yml`; local check:
 - Map interactions are **keyboard-operable**: markers are focusable and open
   their popup with Enter/Space, Leaflet controls are focusable, and the
   geocode search is an ARIA combobox; the text directory remains the full
-  keyboard alternative for browsing.
+  keyboard alternative for browsing. In very dense street-level views (more
+  than 150 individual cameras in view) the non-selected cameras are drawn on
+  a single canvas for performance and are not individual tab stops there;
+  the selected camera stays a focusable marker, grid badges stay focusable,
+  and the map's side list / directory list every record in view as text.
 - Report-location selection by an optional one-tap device location (with browser permission), map click **or** validated manual coordinates; map/manual alternatives remain available.
 - English/Italian interface with a device-local language preference; the
   language choice does not affect API data.

@@ -587,6 +587,12 @@ otherwise 300 — never via CSS).
 - **Marker:** `.osm-camera-marker` 25px green circle (`#1a7c60`) with an
   inner mint dot; `.demo` = slate `#6177ac`; `.selected` = 6px outline
   `rgba(24,97,79,.22)`.
+- **Dense views (> 150 individual markers, z ≥ 12):** non-selected cameras
+  render as `L.circleMarker`s on one shared `L.canvas` (pane z-index 450,
+  `aria-hidden`) with the same look — r=11 + 3px white ring, `--marker` /
+  `--status-demo` fill, 4px `--mint` inner dot (no shadow). The selected /
+  open-popup record stays the focusable divIcon; a canvas click promotes the
+  record to a divIcon and opens its popup.
 
 #### 6.2.3 Geocode dropdown — `GeocodeSearch` ✅
 

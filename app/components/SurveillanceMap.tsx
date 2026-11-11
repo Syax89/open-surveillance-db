@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { isPublicStatus } from "../lib/public-status";
 import { BOUNDS_DEBOUNCE_MS, escapeHtml, longitudeInCopy, viewportCenterLongitude, type MapView, type ViewportBounds } from "../lib/map-viewport";
-import { markersForViewport } from "../lib/map-grid";
+import { MAX_INDIVIDUAL_MARKERS, markersForViewport } from "../lib/map-grid";
 import { useMessages } from "../lib/use-messages";
 import { useLatest } from "../lib/hooks/use-latest";
 import { useMapViewHeight } from "../lib/hooks/use-map-view-height";
@@ -122,7 +122,118 @@ type LeafletModule = typeof import("leaflet");
  * the popup is rendered (open / update), reading the entry's CURRENT camera,
  * so no popup HTML is built for the hundreds of markers that are never opened.
  */
-type MarkerEntry = { marker: import("leaflet").Marker; camera: MapCamera; content: () => string };
+type MarkerEntry = {
+  marker: import("leaflet").Marker | import("leaflet").CircleMarker;
+  /**
+   * Render path (perf, dense z>=12 views): "icon" = the focusable divIcon
+   * marker (role=button, tab stop, focus ring, popup); "dot" = a shared-canvas
+   * circle with tooltip + click only (no DOM node, no tab stop, no popup —
+   * a click promotes it to an "icon" entry, which carries the popup).
+   */
+  kind: "icon" | "dot";
+  camera: MapCamera;
+  content: () => string;
+};
+
+/**
+ * Canvas rendering threshold (perf: desktop z12 = ~1,070 divIcon DOM nodes,
+ * phone pans 185-456 ms scripting). Up to this many individual markers in
+ * view every record stays a focusable divIcon (the documented keyboard
+ * contract: "markers are focusable and open their popup with Enter/Space").
+ * ABOVE it — only reachable at z >= GRID_MAX_ZOOM, where the grid is off by
+ * design — non-selected records draw on ONE shared canvas; the selected
+ * record and the record whose popup is open stay divIcons, grid badges stay
+ * focusable, and the side list / directory remain the keyboard text
+ * alternative (docs/ACCESSIBILITY_STATEMENT.md). Same budget as the grid's
+ * DOM-marker cap, so the page never holds more than ~150 camera DOM nodes.
+ */
+export const CANVAS_MARKER_THRESHOLD = MAX_INDIVIDUAL_MARKERS;
+/** Custom pane for the canvas markers: above the FOV overlayPane (400, whose
+ * CSS sets pointer-events:none), below the divIcon markerPane (600). */
+const CAMERA_CANVAS_PANE = "osmCameraCanvas";
+
+/** Marker palette, resolved ONCE per map from the same CSS tokens as
+ * .osm-camera-marker (globals.css): --marker fill (active / non-public),
+ * --status-demo for .demo, a white 3px ring and the --mint inner dot. */
+type DotPalette = { marker: string; demo: string; ring: string; inner: string };
+const DOT_PALETTE_FALLBACK: DotPalette = { marker: "rgb(26 124 96)", demo: "rgb(97 119 172)", ring: "#ffffff", inner: "rgb(203 247 218)" };
+
+function readDotPalette(element: Element | null | undefined): DotPalette {
+  if (!element || typeof getComputedStyle !== "function") return DOT_PALETTE_FALLBACK;
+  const style = getComputedStyle(element);
+  const read = (name: string, fallback: string) => style.getPropertyValue(name)?.trim() || fallback;
+  return {
+    marker: read("--marker", DOT_PALETTE_FALLBACK.marker),
+    demo: read("--status-demo", DOT_PALETTE_FALLBACK.demo),
+    ring: DOT_PALETTE_FALLBACK.ring,
+    inner: read("--mint", DOT_PALETTE_FALLBACK.inner),
+  };
+}
+
+/**
+ * Canvas style matching .osm-camera-marker: 25px box (border-box) with a
+ * 3px white border → stroke centred at radius 11 (outer edge 12.5px). The
+ * status whitelist is the same as buildMarkerIcon: only a PUBLIC status may
+ * pick the status colour; anything else is the plain marker colour.
+ */
+export function cameraDotStyle(camera: Pick<MapCamera, "status">, palette: DotPalette = DOT_PALETTE_FALLBACK) {
+  const status = isPublicStatus(camera.status) ? camera.status : "";
+  return {
+    radius: 11,
+    weight: 3,
+    color: palette.ring,
+    opacity: 1,
+    fill: true,
+    fillColor: status === "demo" ? palette.demo : palette.marker,
+    fillOpacity: 1,
+    innerColor: palette.inner,
+    innerRadius: 4,
+  };
+}
+
+type DotOptions = import("leaflet").CircleMarkerOptions & { innerColor?: string; innerRadius?: number };
+type CameraDotClass = new (latlng: [number, number], options: DotOptions) => import("leaflet").CircleMarker;
+type DotInternals = {
+  _renderer?: { _ctx?: CanvasRenderingContext2D; _drawing?: boolean };
+  _point?: { x: number; y: number };
+  _empty?: () => boolean;
+  options: DotOptions;
+};
+const cameraDotClasses = new WeakMap<object, CameraDotClass>();
+
+/**
+ * L.CircleMarker that also paints the inner mint dot (the `<i>` of
+ * .osm-camera-marker) on the canvas right after Leaflet draws the circle.
+ * Falls back to a plain L.circleMarker where the class API is unavailable.
+ */
+function createCameraDot(L: LeafletModule, latlng: [number, number], options: DotOptions): import("leaflet").CircleMarker {
+  const Base = (L as unknown as { CircleMarker?: { extend?: (proto: object) => CameraDotClass; prototype?: { _updatePath?: () => void } } }).CircleMarker;
+  const baseUpdate = Base?.prototype?._updatePath;
+  if (!Base?.extend || !baseUpdate) return L.circleMarker(latlng, options);
+  let Cls = cameraDotClasses.get(L);
+  if (!Cls) {
+    Cls = Base.extend({
+      _updatePath(this: DotInternals) {
+        baseUpdate.call(this);
+        const renderer = this._renderer;
+        const ctx = renderer?._ctx;
+        const point = this._point;
+        if (!ctx || !renderer?._drawing || !point || this._empty?.()) return;
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, this.options.innerRadius ?? 4, 0, Math.PI * 2, false);
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = this.options.innerColor ?? DOT_PALETTE_FALLBACK.inner;
+        ctx.fill();
+      },
+    });
+    cameraDotClasses.set(L, Cls);
+  }
+  return new Cls(latlng, options);
+}
+
+function markerTooltipHtml(camera: MapCamera): string {
+  return `${escapeHtml(camera.title)}<br/><small>${escapeHtml(camera.kind)}</small>`;
+}
 
 function buildMarkerIcon(L: LeafletModule, camera: MapCamera, isSelected: boolean) {
   // Defense in depth: only whitelisted public statuses may style a
@@ -241,6 +352,10 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
   const mapRef = useRef<import("leaflet").Map | null>(null);
   const markersRef = useRef<import("leaflet").LayerGroup | null>(null);
   const markersByIdRef = useRef<Map<number, MarkerEntry> | null>(null);
+  // Shared canvas renderer for dense individual views (CANVAS_MARKER_THRESHOLD)
+  // and the marker palette read once (lazily) from the CSS tokens.
+  const canvasRendererRef = useRef<import("leaflet").Canvas | null>(null);
+  const dotPaletteRef = useRef<DotPalette | null>(null);
   // Grid badges (t_26ce96f3, reconcile t_bb310428): tracked SEPARATELY from
   // the individual markers — a badge is keyed by its 48px cell, never by a
   // record id, and never carries a popup, so badge churn (zoom/density
@@ -647,6 +762,18 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
           attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a> &middot; <a href="https://www.openstreetmap.org/fixthemap">Fix the map</a>',
         }).addTo(map);
         markersRef.current = L.layerGroup().addTo(map);
+        // Dense individual views (> CANVAS_MARKER_THRESHOLD at z >= 12): ONE
+        // shared canvas for the non-selected camera markers, in its own pane
+        // between the FOV overlay (400, pointer-events:none) and the divIcon
+        // marker pane (600), so the selected divIcon and the grid badges stay
+        // on top. The canvas is a visual duplicate of the records the side
+        // list exposes as text — hidden from assistive tech like the FOV pane.
+        const canvasPane = map.createPane?.(CAMERA_CANVAS_PANE);
+        if (canvasPane) {
+          canvasPane.style.zIndex = "450";
+          canvasPane.setAttribute("aria-hidden", "true");
+        }
+        canvasRendererRef.current = L.canvas({ padding: 0.5, pane: canvasPane ? CAMERA_CANVAS_PANE : "overlayPane" });
         // Field-of-view layer (t_f8b775ec): separate group so the cones and
         // circles can be cleared/redrawn without touching the markers. The
         // default renderer draws paths into the overlayPane, which sits
@@ -786,7 +913,7 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
         window.clearTimeout(boundsTimerRef.current);
         boundsTimerRef.current = null;
       }
-      mapRef.current?.remove(); mapRef.current = null; markersRef.current = null; fovLayerRef.current = null; markersByIdRef.current = null; pickPopupRef.current = null;
+      mapRef.current?.remove(); mapRef.current = null; markersRef.current = null; fovLayerRef.current = null; markersByIdRef.current = null; pickPopupRef.current = null; canvasRendererRef.current = null; dotPaletteRef.current = null;
       userLayerRef.current = null; geoButtonRef.current = null; geoActiveRef.current = false;
       badges.clear();
       // Reset the ready flag so a StrictMode remount (or any future
@@ -978,6 +1105,117 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
       }
       // 3) Reconcile individual markers (popup-bearing).
       const byId = markersByIdRef.current ?? new Map<number, MarkerEntry>();
+      // Canvas mode (perf, see CANVAS_MARKER_THRESHOLD): a dense individual
+      // view draws the non-selected records on the shared canvas. The
+      // SELECTED record and the record whose popup is open (D1 pin) always
+      // stay focusable divIcons, so the focus ring / aria / selection styling
+      // and the popup are exactly the divIcon ones.
+      const renderer = canvasRendererRef.current;
+      const canvasMode = renderer !== null && desiredMarkers.size > CANVAS_MARKER_THRESHOLD;
+      const kindFor = (id: number): MarkerEntry["kind"] => (
+        !canvasMode || id === selectedIdRef.current || id === activePopupIdRef.current || byId.get(id)?.marker.isPopupOpen?.()
+          ? "icon"
+          : "dot"
+      );
+      // Palette resolved lazily, ONCE per map, the first time a dot is drawn
+      // (getComputedStyle is skipped entirely for sparse views).
+      const dotPalette = () => (dotPaletteRef.current ??= readDotPalette(mapRef.current?.getContainer?.()));
+      const createEntry = (camera: MapCamera, kind: MarkerEntry["kind"], isSelected: boolean, popupFit: PopupGeometry): MarkerEntry => {
+        const id = camera.id;
+        if (kind === "dot" && renderer) {
+          // Canvas marker: tooltip + click only. No popup is bound (Leaflet's
+          // bindPopup would open a balloon on the dot that the promotion
+          // below immediately destroys) — the click PROMOTES the record to a
+          // divIcon entry, which carries the lazy popup.
+          const dot = createCameraDot(L, positionOf(camera), {
+            ...cameraDotStyle(camera, dotPalette()),
+            renderer,
+            pane: renderer.options?.pane,
+            interactive: true,
+            bubblingMouseEvents: false,
+          });
+          const dotEntry: MarkerEntry = { marker: dot, kind: "dot", camera, content: () => "" };
+          dot.bindTooltip(markerTooltipHtml(camera), { direction: "top", offset: [0, -12] });
+          dot.on("click", (event) => {
+            // Never the coordinate picker (same contract as the divIcon).
+            L.DomEvent.stopPropagation(event);
+            onSelect(id);
+            const live = markersByIdRef.current;
+            const current = live?.get(id);
+            if (!live || !current) return;
+            let target = current;
+            if (current.kind === "dot") {
+              layer.removeLayer(current.marker);
+              target = createEntry(current.camera, "icon", true, measuredPopupGeometry(mapRef.current));
+              target.marker.addTo(layer);
+              live.set(id, target);
+            }
+            if (!target.marker.isPopupOpen()) target.marker.openPopup();
+            activePopupIdRef.current = id;
+          });
+          return dotEntry;
+        }
+        const marker = L.marker(positionOf(camera), { icon: buildMarkerIcon(L, camera, isSelected), title: camera.title });
+        marker.bindTooltip(markerTooltipHtml(camera), { direction: "top", offset: [0, -12] });
+        // Lazy popup content (perf): Leaflet calls this only when the popup
+        // is rendered — the HTML (and its formatPublicDate) is never built for
+        // markers nobody opens. It reads the entry's CURRENT camera and the
+        // CURRENT popupHtmlFor, so a refreshed record / locale shows on open.
+        const entry: MarkerEntry = {
+          marker,
+          kind: "icon",
+          camera,
+          content: () => (popupHtmlForRef.current ? popupHtmlForRef.current(entry.camera) : defaultPopupHtml(entry.camera)),
+        };
+        marker.bindPopup(entry.content, {
+          // Balloon geometry (M01): identical options to the coordinate
+          // picker — ONE helper, derived from the actual map surface.
+          maxWidth: popupFit.maxWidth,
+          minWidth: popupFit.minWidth,
+          autoPan: true,
+          className: "osm-camera-popup",
+          // Clipping fix (empirical review 2026-08-07): markers near the map
+          // top opened a popup cut off above the container edge (title
+          // invisible, top=-72px). keepInView forces the popup fully inside
+          // the map bounds; autoPanPadding gives the view margin so the
+          // balloon never sits flush against an edge.
+          keepInView: true,
+          autoPanPadding: popupFit.autoPanPadding,
+          autoPanPaddingBottomRight: popupFit.autoPanPaddingBottomRight,
+        });
+        // Keyboard accessibility (P2-9, review 2026-08-07): Leaflet markers
+        // are focusable (role=button, tabindex) but had no keydown handler
+        // — Enter/Space left keyboard users in a focus trap. Open the popup
+        // and select the record exactly like a click does.
+        marker.on("keydown", (event) => {
+          const key = event.originalEvent?.key;
+          if (key !== "Enter" && key !== " ") return;
+          L.DomEvent.stopPropagation(event);
+          event.originalEvent?.preventDefault?.();
+          onSelect(id);
+          if (!marker.isPopupOpen()) marker.openPopup();
+          activePopupIdRef.current = id;
+        });
+        // Popup lifecycle (t_33b82720): stop the click from bubbling to the
+        // map — Leaflet bubbles marker clicks by default, and the map click
+        // handler would open the coordinate picker OVER the marker popup
+        // (the "popup appears and disappears" report). Open idempotently:
+        // one click opens once and stays open; a second click on the SAME
+        // marker keeps it open (the default bindPopup toggle is neutralised
+        // by re-opening here); a click on another marker transfers the
+        // popup once.
+        marker.on("click", (event) => {
+          L.DomEvent.stopPropagation(event);
+          onSelect(id);
+          if (!marker.isPopupOpen()) marker.openPopup();
+          // D1: record the OPEN popup synchronously, at the user action.
+          // The popupopen handler also sets this from the community mount
+          // node, but that mounts only when the popup carries the widget —
+          // the rebuild pin must not depend on the popup's HTML shape.
+          activePopupIdRef.current = id;
+        });
+        return entry;
+      };
       // P1-6 (review 2026-08-07): a record can leave the desired set for
       // THREE different reasons — out of view (pan), filtered out
       // (data-driven), or aggregated into a grid cell. Only the FIRST
@@ -1010,6 +1248,17 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
             if (activePopupIdRef.current === id) activePopupIdRef.current = null;
           }
         } else {
+          const kind = kindFor(id);
+          if (entry.kind !== kind) {
+            // Render-path swap (canvas threshold crossed, or a record became
+            // / stopped being the selected one). Never the open-popup record:
+            // kindFor pins it as an icon, so no balloon is closed here.
+            layer.removeLayer(entry.marker);
+            const swapped = createEntry(camera, kind, id === selectedIdRef.current, geometry);
+            swapped.marker.addTo(layer);
+            byId.set(id, swapped);
+            continue;
+          }
           // B03: keep the retained marker on the visible world copy — a pan
           // across the dateline moves it even when the record is unchanged.
           entry.marker.setLatLng?.(positionOf(camera));
@@ -1029,12 +1278,16 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
           const previous = entry.camera;
           entry.camera = camera;
           if (previous.title !== camera.title || previous.kind !== camera.kind) {
-            entry.marker.setTooltipContent(`${escapeHtml(camera.title)}<br/><small>${escapeHtml(camera.kind)}</small>`);
+            entry.marker.setTooltipContent(markerTooltipHtml(camera));
           }
           if (previous.status !== camera.status) {
-            entry.marker.setIcon(buildMarkerIcon(L, camera, camera.id === selectedIdRef.current));
+            if (entry.kind === "icon") {
+              (entry.marker as import("leaflet").Marker).setIcon(buildMarkerIcon(L, camera, camera.id === selectedIdRef.current));
+            } else {
+              (entry.marker as import("leaflet").CircleMarker).setStyle(cameraDotStyle(camera, dotPalette()));
+            }
           }
-          if (entry.marker.isPopupOpen?.() || activePopupIdRef.current === id) {
+          if (entry.kind === "icon" && (entry.marker.isPopupOpen?.() || activePopupIdRef.current === id)) {
             // Popup.setContent (not Marker.setPopupContent, whose typings
             // reject a function) keeps the content LAZY and re-renders the
             // open balloon in place — no popupclose/popupopen churn.
@@ -1059,66 +1312,8 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
       }
       for (const [id, camera] of desiredMarkers) {
         if (byId.has(id)) continue;
-        const isSelected = camera.id === selectedIdRef.current;
-        const marker = L.marker(positionOf(camera), { icon: buildMarkerIcon(L, camera, isSelected), title: camera.title });
-        marker.bindTooltip(`${escapeHtml(camera.title)}<br/><small>${escapeHtml(camera.kind)}</small>`, { direction: "top", offset: [0, -12] });
-        // Lazy popup content (perf): Leaflet calls this only when the popup
-        // is rendered — the HTML (and its formatPublicDate) is never built for
-        // markers nobody opens. It reads the entry's CURRENT camera and the
-        // CURRENT popupHtmlFor, so a refreshed record / locale shows on open.
-        const entry: MarkerEntry = {
-          marker,
-          camera,
-          content: () => (popupHtmlForRef.current ? popupHtmlForRef.current(entry.camera) : defaultPopupHtml(entry.camera)),
-        };
-        marker.bindPopup(entry.content, {
-          // Balloon geometry (M01): identical options to the coordinate
-          // picker — ONE helper, derived from the actual map surface.
-          maxWidth: geometry.maxWidth,
-          minWidth: geometry.minWidth,
-          autoPan: true,
-          className: "osm-camera-popup",
-          // Clipping fix (empirical review 2026-08-07): markers near the map
-          // top opened a popup cut off above the container edge (title
-          // invisible, top=-72px). keepInView forces the popup fully inside
-          // the map bounds; autoPanPadding gives the view margin so the
-          // balloon never sits flush against an edge.
-          keepInView: true,
-          autoPanPadding: geometry.autoPanPadding,
-          autoPanPaddingBottomRight: geometry.autoPanPaddingBottomRight,
-        });
-        // Keyboard accessibility (P2-9, review 2026-08-07): Leaflet markers
-        // are focusable (role=button, tabindex) but had no keydown handler
-        // — Enter/Space left keyboard users in a focus trap. Open the popup
-        // and select the record exactly like a click does.
-        marker.on("keydown", (event) => {
-          const key = event.originalEvent?.key;
-          if (key !== "Enter" && key !== " ") return;
-          L.DomEvent.stopPropagation(event);
-          event.originalEvent?.preventDefault?.();
-          onSelect(camera.id);
-          if (!marker.isPopupOpen()) marker.openPopup();
-          activePopupIdRef.current = camera.id;
-        });
-        // Popup lifecycle (t_33b82720): stop the click from bubbling to the
-        // map — Leaflet bubbles marker clicks by default, and the map click
-        // handler would open the coordinate picker OVER the marker popup
-        // (the "popup appears and disappears" report). Open idempotently:
-        // one click opens once and stays open; a second click on the SAME
-        // marker keeps it open (the default bindPopup toggle is neutralised
-        // by re-opening here); a click on another marker transfers the
-        // popup once.
-        marker.on("click", (event) => {
-          L.DomEvent.stopPropagation(event);
-          onSelect(camera.id);
-          if (!marker.isPopupOpen()) marker.openPopup();
-          // D1: record the OPEN popup synchronously, at the user action.
-          // The popupopen handler also sets this from the community mount
-          // node, but that mounts only when the popup carries the widget —
-          // the rebuild pin must not depend on the popup's HTML shape.
-          activePopupIdRef.current = camera.id;
-        });
-        marker.addTo(layer);
+        const entry = createEntry(camera, kindFor(id), camera.id === selectedIdRef.current, geometry);
+        entry.marker.addTo(layer);
         byId.set(id, entry);
       }
       markersByIdRef.current = byId;
@@ -1225,13 +1420,16 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
     const L = leafletRef.current; const byId = markersByIdRef.current; if (!L || !byId) return;
     const prev = prevSelectedIdRef.current;
     if (prev === selectedId) return;
+    // Only divIcon entries carry the selection class: in canvas mode the
+    // reconcile (which runs first, it also keys on selectedId) has already
+    // demoted the previous selection to a dot and promoted the new one.
     if (prev !== null) {
       const prevEntry = byId.get(prev);
-      if (prevEntry) prevEntry.marker.setIcon(buildMarkerIcon(L, prevEntry.camera, false));
+      if (prevEntry?.kind === "icon") (prevEntry.marker as import("leaflet").Marker).setIcon(buildMarkerIcon(L, prevEntry.camera, false));
     }
     const nextEntry = selectedId !== null ? byId.get(selectedId) : undefined;
     if (nextEntry) {
-      nextEntry.marker.setIcon(buildMarkerIcon(L, nextEntry.camera, true));
+      if (nextEntry.kind === "icon") (nextEntry.marker as import("leaflet").Marker).setIcon(buildMarkerIcon(L, nextEntry.camera, true));
       const map = mapRef.current;
       if (map) {
         const latlng = nextEntry.marker.getLatLng();
