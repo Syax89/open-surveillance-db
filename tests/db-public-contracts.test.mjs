@@ -717,6 +717,28 @@ test("listPublicCamerasInBboxPage clamps limit to the bbox max at the db boundar
   assert.deepEqual(negative.records.map((record) => record.title), ["Only"], "negative offset clamps to 0");
 });
 
+test("listPublicCamerasInBbox (GeoJSON layer) honours kind/freshness and always carries a LIMIT", async () => {
+  const { env, cameras } = await realDb();
+  await resetDb({ env, cameras });
+  await insertCamera(env, { title: "Geo dome", kind: "Fixed dome", latitude: 41.9, longitude: 12.49 });
+  await insertCamera(env, { title: "Geo ptz", kind: "PTZ", latitude: 41.91, longitude: 12.5 });
+  const fresh = await insertCamera(env, { title: "Geo ptz fresh", kind: "PTZ", latitude: 41.92, longitude: 12.51 });
+  await env.DB.prepare("UPDATE cameras SET last_verified_at = ? WHERE id = ?").bind(new Date().toISOString(), fresh.id).run();
+  const bbox = { west: 12.4, south: 41.8, east: 12.6, north: 42.0 };
+
+  const all = await cameras.listPublicCamerasInBbox(bbox);
+  assert.equal(all.length, 3, "no filters: every public point in the box");
+  const byKind = await cameras.listPublicCamerasInBbox(bbox, { kind: "PTZ" });
+  assert.deepEqual(byKind.map((record) => record.title).sort(), ["Geo ptz", "Geo ptz fresh"]);
+  const byFreshness = await cameras.listPublicCamerasInBbox(bbox, { freshness: "7d" });
+  assert.deepEqual(byFreshness.map((record) => record.title), ["Geo ptz fresh"]);
+  const limited = await cameras.listPublicCamerasInBbox(bbox, undefined, { limit: 2 });
+  assert.equal(limited.length, 2, "the LIMIT is applied in SQL");
+  const huge = await cameras.listPublicCamerasInBbox(bbox, undefined, { limit: 9_999_999 });
+  assert.equal(huge.length, 3, "a huge limit is clamped to PUBLIC_CAMERAS_BBOX_GEOJSON_MAX_FEATURES + 1");
+  assert.equal(cameras.PUBLIC_CAMERAS_BBOX_GEOJSON_MAX_FEATURES, 10_000, "mirror of tests/helpers/mocks/cameras.mjs");
+});
+
 test("createCorrectionRequest stores a pending private request", async () => {
   const { env, cameras, corrections } = await realDb();
   await resetDb({ env, cameras });

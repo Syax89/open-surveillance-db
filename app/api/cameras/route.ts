@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { createCamera, DOME_KIND, findNearbyPublicCameras, freshnessWindows, getPublicCameraFacets, getPublicCameraKinds, listPublicCameras, listPublicCamerasInBbox, listPublicCamerasInBboxPage, listPublicCamerasPage, PUBLIC_CAMERAS_BBOX_DEFAULT_LIMIT, PUBLIC_CAMERAS_BBOX_MAX_LIMIT, PUBLIC_CAMERAS_PAGE_DEFAULT_LIMIT, PUBLIC_CAMERAS_PAGE_MAX_LIMIT, PUBLIC_CAMERA_SORT_OPTIONS, type FreshnessWindow, type PublicCameraFacets, type PublicCameraFilters } from "../../../db/cameras";
+import { BBOX_MAX_AREA_SQ_DEG, createCamera, DOME_KIND, findNearbyPublicCameras, freshnessWindows, getPublicCameraFacets, getPublicCameraKinds, listPublicCameras, listPublicCamerasInBbox, listPublicCamerasInBboxPage, listPublicCamerasPage, PUBLIC_CAMERAS_BBOX_DEFAULT_LIMIT, PUBLIC_CAMERAS_BBOX_GEOJSON_MAX_FEATURES, PUBLIC_CAMERAS_BBOX_MAX_LIMIT, PUBLIC_CAMERAS_PAGE_DEFAULT_LIMIT, PUBLIC_CAMERAS_PAGE_MAX_LIMIT, PUBLIC_CAMERA_SORT_OPTIONS, type FreshnessWindow, type PublicCameraFacets, type PublicCameraFilters } from "../../../db/cameras";
 import { requiresDuplicateConfirmation } from "../../lib/duplicate-detection";
 import { requireWriteAuth } from "../../lib/write-gate";
 import { CSRF_REJECTED_ERROR, csrfVerified, sameOrigin } from "../../lib/csrf";
@@ -197,8 +197,52 @@ export async function GET(request: Request) {
         return Response.json({ error: "bbox must be a valid geographic rectangle: west<east and south<north within world bounds." }, { status: 400 });
       }
       if (format === "geojson") {
-        const records = await listPublicCamerasInBbox({ west, south, east, north });
-        return Response.json({ type: "FeatureCollection", license: DATA_LICENSE_ID, attribution: DATA_LICENSE_NOTICE, features: records.map((record) => ({ type: "Feature", geometry: { type: "Point", coordinates: [record.longitude, record.latitude] }, properties: { id: record.id, title: record.title, kind: record.kind, manufacturer: record.manufacturer, observedOn: record.observedOn, status: record.status, source: record.source, updated: record.updated, description: record.description, direction: record.direction } })) }, { headers: { "Cache-Control": "public, s-maxage=900, stale-while-revalidate=1800", "Cache-Tag": CACHE_TAGS.bbox } });
+        // GeoJSON bbox bounds (2026-11): this layer used to ignore kind /
+        // freshness and answer every row in the box — a world bbox returned
+        // the whole dataset. Unlike the JSON page (which decimates), the
+        // GeoJSON layer has no sampling contract, so an over-large box is
+        // rejected (BBOX_MAX_AREA_SQ_DEG: "reject continental viewports,
+        // force zoom in") and the features are capped at
+        // PUBLIC_CAMERAS_BBOX_GEOJSON_MAX_FEATURES, probed with one extra row
+        // so the collection can flag `truncated: true`.
+        if ((north - south) * (east - west) > BBOX_MAX_AREA_SQ_DEG) {
+          return Response.json(
+            { error: `bbox area must not exceed ${BBOX_MAX_AREA_SQ_DEG} square degrees for format=geojson; zoom in or use the JSON bbox list.` },
+            { status: 400 },
+          );
+        }
+        const rows = await listPublicCamerasInBbox(
+          { west, south, east, north },
+          { kind: filters.kind, freshness: filters.freshness },
+          { limit: PUBLIC_CAMERAS_BBOX_GEOJSON_MAX_FEATURES + 1 },
+        );
+        const truncated = rows.length > PUBLIC_CAMERAS_BBOX_GEOJSON_MAX_FEATURES;
+        const records = truncated ? rows.slice(0, PUBLIC_CAMERAS_BBOX_GEOJSON_MAX_FEATURES) : rows;
+        return Response.json(
+          {
+            type: "FeatureCollection",
+            license: DATA_LICENSE_ID,
+            attribution: DATA_LICENSE_NOTICE,
+            truncated,
+            features: records.map((record) => ({
+              type: "Feature",
+              geometry: { type: "Point", coordinates: [record.longitude, record.latitude] },
+              properties: {
+                id: record.id,
+                title: record.title,
+                kind: record.kind,
+                manufacturer: record.manufacturer,
+                observedOn: record.observedOn,
+                status: record.status,
+                source: record.source,
+                updated: record.updated,
+                description: record.description,
+                direction: record.direction,
+              },
+            })),
+          },
+          { headers: { "Cache-Control": "public, s-maxage=900, stale-while-revalidate=1800", "Cache-Tag": CACHE_TAGS.bbox } },
+        );
       }
       // JSON bbox contract (t_bb310428): the map viewport page. limit/offset
       // page through the bbox subset (bounded by PUBLIC_CAMERAS_BBOX_MAX_LIMIT

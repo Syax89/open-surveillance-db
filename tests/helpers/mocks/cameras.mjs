@@ -11,6 +11,9 @@ export const PUBLIC_CAMERAS_PAGE_MAX_LIMIT = 2000;
 // map viewport contract is bounded at the db boundary.
 export const PUBLIC_CAMERAS_BBOX_DEFAULT_LIMIT = 1000;
 export const PUBLIC_CAMERAS_BBOX_MAX_LIMIT = 10_000;
+// GeoJSON bbox bounds (2026-11): mirror of db/cameras.ts.
+export const PUBLIC_CAMERAS_BBOX_GEOJSON_MAX_FEATURES = 10_000;
+export const BBOX_MAX_AREA_SQ_DEG = 50.0;
 export const SEARCH_PAGE_DEFAULT_LIMIT = 25;
 export const SEARCH_PAGE_MAX_LIMIT = 100;
 export const NEARBY_PAGE_DEFAULT_LIMIT = 50;

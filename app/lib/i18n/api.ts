@@ -33,7 +33,7 @@ export const en = {
   endpointParamsList:
     "limit (page size, max 2000) · offset (page start) · kind (Fixed dome, Bullet, PTZ, Traffic / licence plate reader, Other / unknown) · freshness (7d, 30d, 90d) · sort (useful, recent, confirmations).",
   endpointParamsBbox:
-    "bbox=west,south,east,north (comma-separated) · kind · freshness · count=false. Returns the public cameras inside the viewport — this is what the interactive map uses. count=false skips the full-set COUNT scan and answers total: null (the client walks on nextOffset).",
+    "bbox=west,south,east,north (comma-separated) · kind · freshness · count=false. Returns the public cameras inside the viewport — this is what the interactive map uses. count=false skips the full-set COUNT scan and answers total: null (the client walks on nextOffset). With format=geojson the same kind and freshness filters apply, the box may cover at most 50 square degrees (larger boxes answer 400), and the FeatureCollection holds at most 10,000 features — when more match, it carries truncated: true (zoom in for the rest).",
   endpointParamsExport:
     "format=geojson or format=csv (default geojson). No pagination: the export is the full dataset. Exports are rate-limited more strictly.",
   endpointParamsRecord:
@@ -169,7 +169,7 @@ export const it: Translation<typeof en> = {
   endpointParamsList:
     "limit (dimensione pagina, max 2000) · offset (inizio pagina) · kind (Fixed dome, Bullet, PTZ, Traffic / licence plate reader, Other / unknown) · freshness (7d, 30d, 90d) · sort (useful, recent, confirmations).",
   endpointParamsBbox:
-    "bbox=ovest,sud,est,nord (separati da virgola) · kind · freshness · count=false. Restituisce le telecamere pubbliche dentro il viewport — è ciò che usa la mappa interattiva. count=false salta la COUNT completa e risponde total: null (il client pagina su nextOffset).",
+    "bbox=ovest,sud,est,nord (separati da virgola) · kind · freshness · count=false. Restituisce le telecamere pubbliche dentro il viewport — è ciò che usa la mappa interattiva. count=false salta la COUNT completa e risponde total: null (il client pagina su nextOffset). Con format=geojson valgono gli stessi filtri kind e freshness, il riquadro può coprire al massimo 50 gradi quadrati (oltre risponde 400) e la FeatureCollection contiene al massimo 10.000 feature — se ce ne sono di più riporta truncated: true (zooma per vedere il resto).",
   endpointParamsExport:
     "format=geojson oppure format=csv (predefinito geojson). Niente paginazione: l'export è il dataset completo. Gli export hanno limiti più severi.",
   endpointParamsRecord:
