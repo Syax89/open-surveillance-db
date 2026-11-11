@@ -136,7 +136,9 @@ test("ADR 0021 § 2.2 is implemented: no timer-driven review clock or freshness 
 
 test("sessions schema pins expires_at NOT NULL with an index, and auth rejects expired at read time", async () => {
   const schema = await readSource("db/schema.ts");
-  const auth = await readSource("db/auth.ts");
+  // db/auth.ts is a barrel since the db/auth/ split: the session lookup
+  // lives in db/auth/sessions.ts.
+  const auth = await readSource("db/auth/sessions.ts");
 
   assert.match(
     schema,

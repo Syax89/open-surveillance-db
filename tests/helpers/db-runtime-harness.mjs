@@ -20,6 +20,7 @@
 // state across tests.
 
 import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { readdirSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { fileURLToPath } from "node:url";
@@ -62,6 +63,13 @@ const DB_MODULES = [
   // db/auth.ts (contributor accounts and sessions, ADR 0013) imports getD1
   // from ./cameras; it runs against the same binding and in-memory D1.
   { source: "db/auth.ts", output: "db/auth.mjs" },
+  // db/auth.ts is a barrel over the modules in db/auth/ (crypto, password,
+  // sessions, lockout, email-tokens, ...), which import getD1 from
+  // ../cameras; mirror every one so the barrel's ./auth/* re-exports resolve.
+  ...readdirSync(path.join(root, "db", "auth"))
+    .filter((name) => name.endsWith(".ts"))
+    .sort()
+    .map((name) => ({ source: `db/auth/${name}`, output: `db/auth/${name.replace(/\.ts$/, ".mjs")}` })),
   // db/mailer.ts (transactional mailer, AUTH MULTI-METODO Fase A2) imports
   // getD1 from ./cameras and the pure templates from app/lib/email-templates;
   // the 1-per-5-minutes atomic re-send rate limit (issue #440) runs real
