@@ -1,7 +1,12 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { env } from "cloudflare:workers";
+import { headers } from "next/headers";
 import { getCommunityRecordById } from "../../../db/cameras";
-import { resolveInitialRecord } from "../../lib/record-initial";
+import { limitsFor } from "../../lib/rate-limit";
+import { rateLimitResponse } from "../../lib/rate-limit-response";
+import { cachedPublicRecordResponse } from "../../lib/public-record-response";
+import { canonicalRecordApiRequest, requestOrigin, resolveCachedInitialRecord, type InitialRecordSeed } from "../../lib/record-initial";
 import RecordPageBody from "./RecordPageBody";
 
 /**
@@ -13,7 +18,11 @@ import RecordPageBody from "./RecordPageBody";
  * GET /api/cameras/[id] route uses (public predicate + hidden/removed
  * tombstone, ADR 0021 §6.3) — see app/lib/record-initial.ts. The seed is
  * handed to RecordPageBody so the first HTML holds the h1, facts and
- * community status; the body keeps the full client surface (offline/error
+ * community status. The read goes through the API's own gates — the
+ * read-bucket rate limit and the shared worker-cache entry keyed on the
+ * canonical /api/cameras/<id> URL (same Cache-Tag, so moderation purges
+ * apply) — so a crawler walking /records/N never multiplies D1 reads.
+ * The body keeps the full client surface (offline/error
  * states, community widget, timeline, reload). A server read failure
  * passes no seed and the body falls back to the client fetch path.
  *
@@ -52,8 +61,35 @@ export default async function RecordPage({ params }: { params: Promise<{ id: str
   }
   // Same strict decimal grammar as the API route: "1e3"/"0x10" are integers
   // to Number() but not public ids — no seed, the client path decides.
-  const initial = /^\d+$/.test(id) ? await resolveInitialRecord(recordId, (value) => getCommunityRecordById(value)) : undefined;
+  const initial = /^\d+$/.test(id) ? await loadInitialRecord(recordId) : undefined;
   // key: a client navigation to another id remounts the body so the seed
   // (and the hook state it initializes) never belongs to the previous id.
   return <RecordPageBody key={recordId} id={recordId} initial={initial} />;
+}
+
+/**
+ * Seed the body through the same gates as GET /api/cameras/[id]. Without a
+ * resolvable origin (no Host header) there is no canonical cache key: no
+ * seed, the client path decides. Rate-limited / errors → no seed either.
+ */
+async function loadInitialRecord(recordId: number): Promise<InitialRecordSeed | undefined> {
+  let incoming: Headers;
+  try {
+    incoming = new Headers(await headers());
+  } catch {
+    return undefined;
+  }
+  const origin = requestOrigin(incoming);
+  if (!origin) return undefined;
+  const request = canonicalRecordApiRequest(origin, recordId, incoming);
+  return resolveCachedInitialRecord(request, recordId, {
+    rateLimit: (apiRequest) => rateLimitResponse(apiRequest, {
+      bucket: "read",
+      route: "/api/cameras/[id]",
+      env,
+      limits: limitsFor("read", env),
+      log: (key) => `/records/[id] server seed rate limited for caller ${key} (client fallback)`,
+    }),
+    cachedResponse: (apiRequest, value) => cachedPublicRecordResponse(apiRequest, value, (lookup) => getCommunityRecordById(lookup)),
+  });
 }

@@ -177,3 +177,127 @@ test("client mount with a seed does not refetch the record and never shows the l
   assert.equal(calls.filter((url) => url === "/api/cameras/7").length, 0, "no record refetch on mount");
   assert.equal(document.querySelector(".record-detail > .loading-note"), null);
 });
+
+// --- Server seed through the API's gates (worker cache + read rate limit) --
+
+/** Minimal Cache API double: keyed on the request URL, like caches.default. */
+function installFakeCache() {
+  const store = new Map();
+  globalThis.caches = {
+    default: {
+      async match(request) {
+        const hit = store.get(new URL(request.url).toString());
+        return hit ? hit.clone() : undefined;
+      },
+      async put(request, response) {
+        store.set(new URL(request.url).toString(), response.clone());
+      },
+    },
+  };
+  return store;
+}
+
+function uninstallFakeCache() {
+  delete globalThis.caches;
+}
+
+async function seedDeps({ load, env = {} }) {
+  const { cachedPublicRecordResponse } = await loadDomModule("app/lib/public-record-response.mjs");
+  const { rateLimitResponse } = await loadDomModule("app/lib/rate-limit-response.mjs");
+  const { limitsFor } = await loadDomModule("app/lib/rate-limit.mjs");
+  return {
+    // Same call the page makes (app/records/[id]/page.tsx loadInitialRecord).
+    rateLimit: (request) => rateLimitResponse(request, {
+      bucket: "read", route: "/api/cameras/[id]", env, limits: limitsFor("read", env), log: "test seed rate limited", recordBlock: false,
+    }),
+    cachedResponse: (request, id) => cachedPublicRecordResponse(request, id, load),
+  };
+}
+
+async function canonical(id, ip) {
+  const { canonicalRecordApiRequest, requestOrigin } = await loadDomModule("app/lib/record-initial.mjs");
+  const incoming = new Headers({ host: "osdb.test", "x-forwarded-proto": "https", "cf-connecting-ip": ip });
+  return canonicalRecordApiRequest(requestOrigin(incoming), id, incoming);
+}
+
+test("server seed: a second render of the same id is served from the shared worker cache", async () => {
+  const store = installFakeCache();
+  try {
+    const { resolveCachedInitialRecord } = await loadDomModule("app/lib/record-initial.mjs");
+    let reads = 0;
+    const deps = await seedDeps({ load: async () => { reads += 1; return publicRecord; } });
+    const first = await resolveCachedInitialRecord(await canonical(7, "198.51.100.10"), 7, deps);
+    const second = await resolveCachedInitialRecord(await canonical(7, "198.51.100.11"), 7, deps);
+    assert.equal(first.record.title, "Fixture Seeded Camera");
+    assert.deepEqual(second, first);
+    assert.equal(reads, 1, "the second render never reads D1");
+    // Same key and Cache-Tag as GET /api/cameras/[id] (moderation purge).
+    assert.deepEqual([...store.keys()], ["https://osdb.test/api/cameras/7"]);
+    const { CACHE_TAGS } = await loadDomModule("app/lib/cache-purge.mjs");
+    const entry = store.get("https://osdb.test/api/cameras/7");
+    assert.equal(entry.headers.get("Cache-Tag"), CACHE_TAGS.record(7));
+    assert.equal(entry.headers.get("Cache-Tag"), "camera-7");
+    assert.equal(entry.headers.get("Cache-Control"), "public, s-maxage=300, stale-while-revalidate=600");
+  } finally {
+    uninstallFakeCache();
+  }
+});
+
+test("server seed: the API route uses the same shared cached lookup", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const route = await readFile(new URL("../app/api/cameras/[id]/route.ts", import.meta.url), "utf8");
+  assert.match(route, /cachedPublicRecordResponse\(request, id, /);
+  assert.doesNotMatch(route, /withPublicCache\(/, "no second, divergent cache wrapper in the route");
+  const page = await readFile(new URL("../app/records/[id]/page.tsx", import.meta.url), "utf8");
+  assert.match(page, /cachedPublicRecordResponse\(/);
+  assert.match(page, /bucket: "read",\s*route: "\/api\/cameras\/\[id\]"/);
+});
+
+test("server seed: without the Cache API it falls back to the direct read", async () => {
+  uninstallFakeCache();
+  const { resolveCachedInitialRecord } = await loadDomModule("app/lib/record-initial.mjs");
+  let reads = 0;
+  const deps = await seedDeps({ load: async () => { reads += 1; return publicRecord; } });
+  assert.equal((await resolveCachedInitialRecord(await canonical(7, "198.51.100.20"), 7, deps)).record.id, 7);
+  assert.equal((await resolveCachedInitialRecord(await canonical(7, "198.51.100.20"), 7, deps)).record.id, 7);
+  assert.equal(reads, 2);
+  // Missing → not-found seed; DB error (503) → no seed (client path).
+  const missing = await seedDeps({ load: async () => null });
+  assert.deepEqual(await resolveCachedInitialRecord(await canonical(8, "198.51.100.20"), 8, missing), { record: null });
+  const originalError = console.error;
+  console.error = () => {};
+  try {
+    const failing = await seedDeps({ load: async () => { throw new Error("D1 down"); } });
+    assert.equal(await resolveCachedInitialRecord(await canonical(9, "198.51.100.20"), 9, failing), undefined);
+  } finally {
+    console.error = originalError;
+  }
+});
+
+test("server seed: a rate-limited caller gets no seed and the page renders the loading fallback", async () => {
+  const { resolveCachedInitialRecord } = await loadDomModule("app/lib/record-initial.mjs");
+  let reads = 0;
+  const deps = await seedDeps({ load: async () => { reads += 1; return publicRecord; }, env: { READ_RATE_LIMIT_MAX: "1" } });
+  const originalWarn = console.warn;
+  console.warn = () => {};
+  let limited;
+  try {
+    assert.ok(await resolveCachedInitialRecord(await canonical(7, "203.0.113.99"), 7, deps));
+    limited = await resolveCachedInitialRecord(await canonical(7, "203.0.113.99"), 7, deps);
+  } finally {
+    console.warn = originalWarn;
+  }
+  assert.equal(limited, undefined, "rate-limited → no server data");
+  assert.equal(reads, 1, "the blocked render never reads D1");
+  const html = await ssr({ id: 7, initial: limited });
+  assert.match(html, /Loading the public record/);
+  assert.doesNotMatch(html, /<h1>/);
+});
+
+test("requestOrigin: Host + X-Forwarded-Proto, https by default, http for local hosts", async () => {
+  const { requestOrigin } = await loadDomModule("app/lib/record-initial.mjs");
+  assert.equal(requestOrigin(new Headers({ host: "osdb.test" })), "https://osdb.test");
+  assert.equal(requestOrigin(new Headers({ host: "osdb.test", "x-forwarded-proto": "http" })), "http://osdb.test");
+  assert.equal(requestOrigin(new Headers({ host: "localhost:3000" })), "http://localhost:3000");
+  assert.equal(requestOrigin(new Headers()), null);
+});
