@@ -48,18 +48,20 @@ JSON bbox list instead), and returns at most **10,000 features**
 `FeatureCollection` signals that the cap was hit. Clients that previously
 requested continent- or world-sized GeoJSON boxes must now split them.
 
-Cache policy: the JSON list, the single-record route and the bbox/GeoJSON
-marker layer answer `Cache-Control: public, s-maxage=300,
-stale-while-revalidate=600` — the dataset changes through moderation
-decisions, never live feeds, so a bounded 5-minute edge/browser cache keeps
-the directory and map responsive while still converging after any decision
-(and the moderation write path purges the exact `Cache-Tag` immediately).
+Cache policy: the JSON list and the bbox/GeoJSON marker layer answer
+`Cache-Control: public, s-maxage=900, stale-while-revalidate=1800` (15
+minutes, raised 2026-08-12 to cut D1 rows-read); the single-record route
+answers `public, s-maxage=300, stale-while-revalidate=600`. The dataset
+changes through moderation decisions, never live feeds, so a bounded
+edge cache keeps the directory and map responsive while still converging
+after any decision (and the moderation write path purges the exact
+`Cache-Tag` immediately).
 The nearby, search, and revisions responses answer
 `Cache-Control: no-store` — they derive from moderation decisions or user
 input that must never be served stale. The CSV/GeoJSON exports answer
-`Cache-Control: public, max-age=3600`: a bounded 1 h staleness is
-acceptable for a download snapshot, and the URL's content does change when
-moderators act, so it is deliberately not `immutable`.
+`Cache-Control: public, s-maxage=86400` (24 hours): safe because the
+moderation write path purges the export cache-tag on every decision; it is
+deliberately not `immutable`.
 
 The JSON, CSV, GeoJSON, and nearby outputs derive from the same filtered
 public-record list (`status IN ('verified','demo')`), so a record appears in
@@ -189,7 +191,8 @@ anti-gaming layers (ADR 0018).
 | `GET` | Personal state → `{ "confirmed": bool }` (anonymous → `false`) | `404` invalid id · `429` rate limit |
 
 The public aggregate lives on the record payload as `confirmationCount`
-(JSON list + single-record route, `s-maxage=300, stale-while-revalidate=600`);
+(JSON list `s-maxage=900, stale-while-revalidate=1800`; single-record route
+`s-maxage=300, stale-while-revalidate=600`);
 the personal toggle state is always `no-store`.
 
 ### Contribution profile — `GET /api/auth/me/contributions`
