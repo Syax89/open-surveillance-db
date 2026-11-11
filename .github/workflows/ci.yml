@@ -18,7 +18,8 @@ jobs:
   ci:
     name: Lint · Typecheck · Test · Build
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Tests now run with coverage instrumentation (~19 min typical).
+    timeout-minutes: 45
     env:
       # Test the same public metadata that the production deploy builds.
       NEXT_PUBLIC_SITE_URL: https://opensurveillancedb.org
@@ -42,34 +43,15 @@ jobs:
       - name: Typecheck (tsc --noEmit)
         run: npx tsc --noEmit
 
-      - name: Test (build + node --test suite)
-        # Serialize node --test: the jsdom suites (client-account, client-edit-*)
-        # OOM the 7GB runner when several run in parallel (default concurrency
-        # = availableParallelism, 4 on ubuntu-latest) — SIGKILL on the largest
-        # processes (api-keys epic T18, run 31380300635).
-        run: npm run build && node --test --test-concurrency=1 "tests/*.test.mjs"
-
-  coverage:
-    name: Coverage (soglia righe)
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    env:
-      # The coverage command builds before executing the rendered sitemap tests.
-      NEXT_PUBLIC_SITE_URL: https://opensurveillancedb.org
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-
-      - name: Setup Node 22
-        uses: actions/setup-node@v5
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
+      # One run instead of two (2026-11): the suite used to run twice per PR,
+      # once here and once in a separate "Coverage" job that repeated npm ci,
+      # the build and all ~3,000 tests (~13 + ~19 runner minutes). It now runs
+      # ONCE, with V8 coverage, and the line threshold is checked right after,
+      # so both gates (tests green + coverage >= COVERAGE_LINES) stay blocking.
+      # `npm run coverage` builds first and serializes node --test
+      # (--test-concurrency=1): the jsdom suites (client-account,
+      # client-edit-*) OOM the 7GB runner when several run in parallel —
+      # SIGKILL on the largest processes (api-keys epic T18, run 31380300635).
       # Build + full suite con coverage, poi soglia minima sulle righe (solo
       # codice di produzione, esclusi test/helper/mock/fixture): sotto
       # COVERAGE_LINES (default 75) il job fallisce. Baseline in docs/QA_COVERAGE.md.
@@ -87,7 +69,7 @@ jobs:
       #    test (retry del change in waitFor, stesso pattern di t_18d6f344).
       #    Se il job torna rosso: controllare PRIMA i test falliti nel log, non
       #    il totale inline — un re-run pulito NON copre regressioni reali.
-      - name: Coverage run
+      - name: Build + test suite (with coverage)
         run: npm run coverage
 
       - name: Coverage threshold (righe)
