@@ -5,6 +5,7 @@ import { urlTooLong } from "../../../../lib/input-limits";
 import { limitsFor } from "../../../../lib/rate-limit";
 import { rateLimitResponse } from "../../../../lib/rate-limit-response";
 import { isRecordPageStatus } from "../../../../lib/public-status";
+import { withPublicCache } from "../../../../lib/public-cache";
 
 /**
  * Public lifecycle event history (ADR 0021 §7, kanban t_a9f23581 FASE 2):
@@ -22,6 +23,13 @@ import { isRecordPageStatus } from "../../../../lib/public-status";
  *
  * Caching: public, s-maxage=300, stale-while-revalidate=600 (ADR §7.1).
  * Cache-Tag per record so moderation invalidates it alongside the record.
+ * Worker cache (perf 2026-11): the record page fetches this on every view,
+ * so the database work is wrapped in withPublicCache like
+ * GET /api/cameras/[id] (only 200s are stored; 404s stay uncached). The
+ * stored entry keeps the per-record Cache-Tag, which the moderation route
+ * AND the community-action PUT purge (an accepted action appends a public
+ * event). Deliberately NO browser max-age: a browser copy cannot be purged
+ * and the record page refetches the timeline right after an action.
  * NEVER expose contributor ids, emails or IPs — only the aggregate event
  * stream (eventType + detail JSON).
  */
@@ -56,6 +64,7 @@ export async function GET(request: Request) {
     return Response.json({ error: "Camera not found." }, { status: 404 });
   }
 
+  return withPublicCache(request, 300, async () => {
   try {
     const d1 = await getD1();
     // Existence oracle gate (kanban t_c8c10689, P1): a non-public record
@@ -93,4 +102,5 @@ export async function GET(request: Request) {
     console.error("GET /api/cameras/[id]/events failed", error);
     return Response.json({ error: "Database unavailable" }, { status: 503 });
   }
+  });
 }

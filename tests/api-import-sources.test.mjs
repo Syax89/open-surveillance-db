@@ -9,7 +9,7 @@
 import assert from "node:assert/strict";
 import { after, beforeEach, test } from "node:test";
 import { apiRequest, cleanupRouteTree, loadRoute, responseBody } from "./helpers/api-harness.mjs";
-import { resetMockState, stub } from "./helpers/mock-state.mjs";
+import { callArgs, resetMockState, stub } from "./helpers/mock-state.mjs";
 
 let route;
 
@@ -45,7 +45,7 @@ test("GET /api/import-sources returns the committed batches with the attribution
   assert.match(response.headers.get("content-type") ?? "", /application\/json/);
   // Same bounded edge cache as the record list (batch list changes only
   // when an import lands).
-  assert.match(response.headers.get("cache-control") ?? "", /public, s-maxage=300/);
+  assert.match(response.headers.get("cache-control") ?? "", /^public, .*s-maxage=300/);
 
   const body = await responseBody(response);
   assert.equal(body.sources.length, 2);
@@ -68,4 +68,38 @@ test("GET /api/import-sources fails closed on a DB error (503, no internals leak
   assert.equal(response.status, 503);
   const body = await responseBody(response);
   assert.equal(body.error, "Database unavailable");
+});
+
+// Worker public cache (perf 2026-11): the batch list is read by every map
+// popup / directory mount, so it is wrapped in withPublicCache with its own
+// Cache-Tag, plus a short browser max-age (the list changes only when an
+// offline import lands, so a minute of browser staleness is acceptable).
+test("GET /api/import-sources is served from the worker public cache on repeat requests", async () => {
+  const store = new Map();
+  globalThis.caches = {
+    default: {
+      async match(request) {
+        return store.get(request.url)?.clone() ?? null;
+      },
+      async put(request, response) {
+        store.set(request.url, response.clone());
+      },
+    },
+  };
+  try {
+    stub("listCommittedImportBatches", async () => sourcesFixture);
+    const { GET } = await route();
+    const first = await GET(apiRequest("/api/import-sources"));
+    assert.equal(first.status, 200);
+    assert.equal(first.headers.get("x-osdb-cache"), "miss");
+    assert.equal(first.headers.get("cache-tag"), "import-sources");
+    assert.equal(first.headers.get("cache-control"), "public, max-age=60, s-maxage=300, stale-while-revalidate=600");
+
+    const second = await GET(apiRequest("/api/import-sources"));
+    assert.equal(second.headers.get("x-osdb-cache"), "hit");
+    assert.equal(callArgs("listCommittedImportBatches").length, 1, "a cache hit must not re-query D1");
+    assert.equal((await responseBody(second)).sources.length, 2);
+  } finally {
+    delete globalThis.caches;
+  }
 });
