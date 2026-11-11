@@ -342,7 +342,10 @@ export function map(el, opts) {
     // Field-of-view a11y (t_f8b775ec): getPane records attribute writes so
     // tests can assert the decorative overlay pane is aria-hidden.
     paneAttrs: {},
-    setView: (center, zoom, opts) => { m.views.push({ center, zoom, opts }); return m; }, // chainable, like the real Leaflet map API
+    // Real Leaflet applies the zoom synchronously, so getZoom() after
+    // setView reads it (perf fix: the initial ?zoom drives grid/FOV on the
+    // first render). Chainable, like the real Leaflet map API.
+    setView: (center, zoom, opts) => { m.views.push({ center, zoom, opts }); if (typeof zoom === "number" && Number.isFinite(zoom)) m.zoom = zoom; return m; },
     // Place-search area framing (B01): fitBounds records every call so a test
     // can assert a city/province/region selection frames the AREA rather than
     // dropping a centroid point (and that a small/invalid box never reaches
@@ -557,9 +560,18 @@ export function marker(latlng, opts) {
     // a resize can re-fit the EXISTING balloon without recreating the marker
     // (M01). popupOpts stays the same object for the menu of assertions that
     // already read it.
+    // Lazy content (perf): like real Leaflet, the content may be a FUNCTION
+    // that is only invoked when the popup is rendered. popupContent keeps
+    // what was bound; popupHtml (getter below) resolves it to the HTML.
     bindPopup: (html, opts) => {
-      m.popupHtml = html;
-      m.popup = { options: opts ?? {}, update: () => { m.popupUpdates = (m.popupUpdates ?? 0) + 1; } };
+      m.popupContent = html;
+      m.popup = {
+        options: opts ?? {},
+        update: () => { m.popupUpdates = (m.popupUpdates ?? 0) + 1; },
+        // Real Popup.setContent: swaps the (possibly lazy) content; the open
+        // balloon re-renders in place. Recorded so tests can count refreshes.
+        setContent: (content) => { m.popupContent = content; m.popupContentSets = (m.popupContentSets ?? 0) + 1; return m.popup; },
+      };
       m.popupOpts = m.popup.options;
       return m;
     },
@@ -581,8 +593,9 @@ export function marker(latlng, opts) {
         // from user input — safe to parse here, exactly like the real
         // Leaflet popup constructor does in the browser.
         const div = document.createElement("div");
-        if (typeof m.popupHtml === "string" && m.popupHtml.includes("osm-popup-community")) {
-          div.innerHTML = m.popupHtml;
+        const html = m.popupHtml;
+        if (typeof html === "string" && html.includes("osm-popup-community")) {
+          div.innerHTML = html;
         } else {
           div.innerHTML = '<div class="osm-popup-community"></div>';
         }
@@ -596,7 +609,7 @@ export function marker(latlng, opts) {
     isPopupOpen: () => m.popupOpened === true,
     // P0 t_bb310428 (reconcile): setPopupContent / setTooltipContent update
     // a KEPT marker in place — the open popup keeps its DOM.
-    setPopupContent: (html) => { m.popupHtml = html; return m; },
+    setPopupContent: (html) => { m.popupContent = html; return m; },
     setTooltipContent: () => m,
     getLatLng: () => latlng,
     // Report mini-map (t_ebbe0ea3): the rotation-handle marker is dragged —
@@ -620,6 +633,11 @@ export function marker(latlng, opts) {
     // the CURRENT icon (e.g. the selected-marker status class).
     setIcon: (icon) => { m.opts = { ...m.opts, icon }; return m; },
   };
+  Object.defineProperty(m, "popupHtml", {
+    get: () => (typeof m.popupContent === "function" ? m.popupContent(m) : m.popupContent),
+    set: (value) => { m.popupContent = value; },
+    enumerable: true,
+  });
   return m;
 }
 // Field-of-view geometry (t_f8b775ec): polygon/circle stubs record their

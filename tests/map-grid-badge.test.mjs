@@ -119,9 +119,11 @@ test("B07: badge Enter/Space run the click zoom action with stopPropagation and 
     let prevented = false;
     const evt = { originalEvent: { key, preventDefault: () => { prevented = true; } } };
     const before = map.views.length;
+    // The stub's setView applies the zoom like Leaflet: read it BEFORE the key.
+    const zoomAtKey = map.getZoom();
     badge.handlers.keydown[0](evt);
     assert.equal(map.views.length, before + 1, `${key} zooms like the click`);
-    assert.equal(map.views[map.views.length - 1].zoom, map.getZoom() + 2, `${key} uses the click's +2 zoom`);
+    assert.equal(map.views[map.views.length - 1].zoom, zoomAtKey + 2, `${key} uses the click's +2 zoom`);
     assert.equal(evt.__stopped, true, `${key} stops propagation`);
     assert.equal(prevented, true, `${key} prevents the default (no scroll)`);
   }
