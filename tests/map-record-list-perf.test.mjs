@@ -156,3 +156,12 @@ test("React.memo: an unrelated parent re-render does not re-render the rows", as
   assert.ok(rtl.screen.getByRole("button", { name: "tick 1" }), "the parent did re-render");
   assert.equal(statusCalls, before, "the memoized list did not re-render");
 });
+
+test("pages grown to reveal the selected row persist when an earlier row is selected", async () => {
+  const list = records(3 * N());
+  const props = baseProps({ visibleRecords: list, filteredRecords: list, selectedId: list[2 * N() + 5].id });
+  const view = await renderWithLocale(React.createElement(mod.MapRecordList, props));
+  assert.equal(rows(view.container).length, 3 * N(), "the list grew to the selected row's page");
+  view.rerender(await wrapWithLocale(React.createElement(mod.MapRecordList, { ...props, selectedId: list[3].id })));
+  assert.equal(rows(view.container).length, 3 * N(), "selecting an earlier row does not shrink the list (no jump)");
+});

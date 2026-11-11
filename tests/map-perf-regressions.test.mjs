@@ -159,3 +159,17 @@ test("(c) popup HTML is not built until the popup opens", async () => {
   assert.equal(dialog?.getAttribute("role"), "dialog", "the popup is still announced as a dialog");
   assert.equal(dialog?.getAttribute("aria-label"), "Via del Corso", "and labelled with the record title");
 });
+
+test("marker tooltips escape the user-supplied title and kind (no HTML injection)", async () => {
+  __setBounds(STREET_VIEW);
+  const hostile = STREET.map((camera, index) => index === 0
+    ? { ...camera, title: "<img src=x onerror=alert(1)>", kind: "<b>bold</b>" }
+    : camera);
+  await renderWithLocale(element({ cameras: hostile }));
+  await pause(60);
+  const marker = individualsOf(await leafletMarkers()).find((m) => String(m.tooltipHtml ?? "").includes("onerror"));
+  assert.ok(marker, "the hostile record has a tooltip");
+  assert.ok(!marker.tooltipHtml.includes("<img"), "the title is escaped, not rendered as an element");
+  assert.ok(!marker.tooltipHtml.includes("<b>"), "the kind is escaped");
+  assert.match(marker.tooltipHtml, /&lt;img src=x onerror=alert\(1\)&gt;/);
+});

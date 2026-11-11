@@ -551,7 +551,8 @@ export const layerGroup = () => {
 export function marker(latlng, opts) {
   const m = {
     latlng, opts,
-    bindTooltip: () => m, on: (event, handler) => { (m.handlers[event] ??= []).push(handler); return m; },
+    // The tooltip HTML is recorded so tests can assert it is escaped.
+    bindTooltip: (html) => { m.tooltipHtml = html; return m; }, on: (event, handler) => { (m.handlers[event] ??= []).push(handler); return m; },
     // Popup contract (t_702c10af): the bound HTML is recorded on the
     // marker so tests can assert the popup content (links, fields), and
     // openPopup() records that the balloon was requested.
@@ -610,7 +611,7 @@ export function marker(latlng, opts) {
     // P0 t_bb310428 (reconcile): setPopupContent / setTooltipContent update
     // a KEPT marker in place — the open popup keeps its DOM.
     setPopupContent: (html) => { m.popupContent = html; return m; },
-    setTooltipContent: () => m,
+    setTooltipContent: (html) => { m.tooltipHtml = html; return m; },
     getLatLng: () => latlng,
     // Report mini-map (t_ebbe0ea3): the rotation-handle marker is dragged —
     // setLatLng moves it (updating the recorded latlng so getLatLng reads

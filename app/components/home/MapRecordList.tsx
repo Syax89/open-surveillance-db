@@ -158,15 +158,18 @@ type ItemsProps = Pick<Props, "visibleRecords" | "selectedId" | "onSelect" | "la
 function MapRecordItems({ visibleRecords, selectedId, onSelect, labels, statusLabel }: ItemsProps) {
   const [paging, setPaging] = useState({ source: visibleRecords, pages: 1 });
   const [announce, setAnnounce] = useState("");
-  let pages = paging.pages;
-  if (paging.source !== visibleRecords) {
-    // Derived-state reset during render (no effect flash of the old pages).
-    pages = 1;
-    setPaging({ source: visibleRecords, pages });
-    setAnnounce("");
-  }
+  const sourceChanged = paging.source !== visibleRecords;
   const selectedIndex = selectedId === null ? -1 : visibleRecords.findIndex((camera) => camera.id === selectedId);
-  const limit = Math.max(pages, Math.ceil((selectedIndex + 1) / MAP_LIST_PAGE_SIZE)) * MAP_LIST_PAGE_SIZE;
+  // Pages the selected row needs. Persisted (not just used for this render):
+  // otherwise selecting an earlier row afterwards would shrink the list back
+  // and make it jump (review nit on the perf pass).
+  const pages = Math.max(sourceChanged ? 1 : paging.pages, Math.ceil((selectedIndex + 1) / MAP_LIST_PAGE_SIZE));
+  if (sourceChanged || pages !== paging.pages) {
+    // Derived-state update during render (no effect flash of the old pages).
+    setPaging({ source: visibleRecords, pages });
+    if (sourceChanged) setAnnounce("");
+  }
+  const limit = pages * MAP_LIST_PAGE_SIZE;
   const shown = visibleRecords.slice(0, limit);
   const remaining = visibleRecords.length - shown.length;
   const listRef = useRef<HTMLUListElement>(null);

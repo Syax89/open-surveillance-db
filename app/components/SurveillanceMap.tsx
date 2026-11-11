@@ -1029,7 +1029,7 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
           const previous = entry.camera;
           entry.camera = camera;
           if (previous.title !== camera.title || previous.kind !== camera.kind) {
-            entry.marker.setTooltipContent(`${camera.title}<br/><small>${camera.kind}</small>`);
+            entry.marker.setTooltipContent(`${escapeHtml(camera.title)}<br/><small>${escapeHtml(camera.kind)}</small>`);
           }
           if (previous.status !== camera.status) {
             entry.marker.setIcon(buildMarkerIcon(L, camera, camera.id === selectedIdRef.current));
@@ -1061,7 +1061,7 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
         if (byId.has(id)) continue;
         const isSelected = camera.id === selectedIdRef.current;
         const marker = L.marker(positionOf(camera), { icon: buildMarkerIcon(L, camera, isSelected), title: camera.title });
-        marker.bindTooltip(`${camera.title}<br/><small>${camera.kind}</small>`, { direction: "top", offset: [0, -12] });
+        marker.bindTooltip(`${escapeHtml(camera.title)}<br/><small>${escapeHtml(camera.kind)}</small>`, { direction: "top", offset: [0, -12] });
         // Lazy popup content (perf): Leaflet calls this only when the popup
         // is rendered — the HTML (and its formatPublicDate) is never built for
         // markers nobody opens. It reads the entry's CURRENT camera and the
