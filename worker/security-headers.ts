@@ -1,4 +1,5 @@
 /** Global security headers, CSP nonce and discovery Link header (split from worker/index.ts). */
+import { SESSION_COOKIE } from "../app/lib/csrf";
 import { PREPRODUCTION_HOST } from "./host";
 
 /**
@@ -162,4 +163,86 @@ export function withSecurityHeaders(response: Response, pathname?: string, hostn
     statusText: response.statusText,
     headers,
   });
+}
+
+/**
+ * HTML document cache policy (2026-11, bfcache / Lighthouse
+ * `MainResourceHasCacheControlNoStore`).
+ *
+ * vinext answers every dynamic page `Cache-Control: no-store,
+ * must-revalidate`, which disqualifies the page from the back/forward cache:
+ * Back then does a full reload + re-hydration. For PUBLIC, non-personalised
+ * HTML the edge rewrites that to `private, no-cache`:
+ * - `private`: shared caches (Cloudflare, proxies) must never store the
+ *   page, so a per-request CSP nonce is never served to another visitor;
+ * - `no-cache`: the browser may keep a copy (bfcache, history) but must
+ *   revalidate before reusing it on any normal navigation. HTML carries no
+ *   ETag / Last-Modified (stripped below), so revalidation can never end in
+ *   a 304 that reuses a stored body: every fresh navigation gets a full
+ *   render with a fresh nonce.
+ *
+ * `no-store` is KEPT (forced) for an HTML document when ANY of:
+ * - the request carries an `osdb_session` cookie: the shell (header, menus)
+ *   and several pages render per-user state, so the whole visit is personal;
+ * - the response sets a cookie (`Set-Cookie`);
+ * - the route is personal or an auth flow (PRIVATE_HTML_ROUTES: account,
+ *   moderation, record edit, login/register/password/verification pages,
+ *   whose URLs may also carry one-time tokens).
+ * Only 200 GET/HEAD documents whose app policy is vinext's dynamic no-store
+ * default are relaxed; errors, redirects, ISR/explicit app policies, RSC
+ * flight (text/x-component) and API JSON responses are left untouched.
+ */
+export const PUBLIC_HTML_CACHE_CONTROL = "private, no-cache";
+const VINEXT_DYNAMIC_CACHE_CONTROL = new Set(["no-store", "no-store, must-revalidate"]);
+const PRIVATE_HTML_ROUTES = new Set([
+  "/account",
+  "/moderation",
+  "/login",
+  "/register",
+  "/forgot-password",
+  "/reset-password",
+  "/verify-email",
+]);
+const PRIVATE_HTML_ROUTE_PATTERNS = [/^\/records\/[^/]+\/edit$/];
+
+/** `normalizedPath` is the router-equivalent path from normalizeGatePath. */
+export function isPrivateHtmlRoute(normalizedPath: string): boolean {
+  const key = normalizedPath.toLowerCase();
+  return PRIVATE_HTML_ROUTES.has(key) || PRIVATE_HTML_ROUTE_PATTERNS.some((pattern) => pattern.test(key));
+}
+
+export function hasSessionCookie(request: Request): boolean {
+  const cookie = request.headers.get("cookie");
+  if (!cookie) return false;
+  return cookie.split(";").some((part) => part.trim().startsWith(`${SESSION_COOKIE}=`));
+}
+
+/**
+ * Apply the HTML document cache policy above to `headers` (mutated in
+ * place) for a response rendered by the vinext page pipeline. Non-HTML
+ * responses are returned untouched.
+ */
+export function applyHtmlDocumentCachePolicy(
+  request: Request,
+  normalizedPath: string,
+  status: number,
+  headers: Headers,
+): void {
+  if (!(headers.get("content-type") ?? "").toLowerCase().startsWith("text/html")) return;
+  // Never offer a validator on an HTML document: a 304 would let the
+  // browser reuse a stored body whose CSP nonce belongs to an older render.
+  headers.delete("ETag");
+  headers.delete("Last-Modified");
+  if (hasSessionCookie(request) || headers.has("Set-Cookie") || isPrivateHtmlRoute(normalizedPath)) {
+    headers.set("Cache-Control", "no-store");
+    return;
+  }
+  const current = (headers.get("Cache-Control") ?? "").trim().toLowerCase();
+  if (
+    status === 200 &&
+    (request.method === "GET" || request.method === "HEAD") &&
+    VINEXT_DYNAMIC_CACHE_CONTROL.has(current)
+  ) {
+    headers.set("Cache-Control", PUBLIC_HTML_CACHE_CONTROL);
+  }
 }

@@ -6,13 +6,14 @@
 // page OUTSIDE the account card, after the erasure confirm, as before the
 // split; state comes from usePasskeys.
 
-import { useMessages } from "../lib/use-messages";
+import { useDomainMessages } from "../lib/use-domain-messages";
+import { authByLocale } from "../lib/i18n/auth";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { RecoveryCodesDialog } from "../components/RecoveryCodesDialog";
 import type { PasskeysApi } from "../lib/usePasskeys";
 
 export function PasskeyDialogs({ api }: { api: PasskeysApi }) {
-  const t = useMessages().auth;
+  const t = useDomainMessages(authByLocale);
   const { confirmRemove, setConfirmRemove, removingId, onRemovePasskey, recoveryCodes, setRecoveryCodes } = api;
 
   return (

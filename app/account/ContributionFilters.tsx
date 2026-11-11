@@ -4,7 +4,8 @@
 // native fieldset replaces two dense rows of chips: both dimensions stay
 // explicit, compact and keyboard-native. State lives in useContributions.
 
-import { useMessages } from "../lib/use-messages";
+import { useDomainMessages } from "../lib/use-domain-messages";
+import { communityByLocale } from "../lib/i18n/community";
 import { STATUS_FILTERS, TYPE_FILTERS } from "../lib/useContributions";
 import type { ContributionSummary, StatusFilter, TypeFilter } from "../lib/useContributions";
 
@@ -18,7 +19,7 @@ type Props = {
 };
 
 export function ContributionFilters({ filter, typeFilter, summary, selectFilter, selectTypeFilter, clearContributionFilters }: Props) {
-  const community = useMessages().community;
+  const community = useDomainMessages(communityByLocale);
   return (
     <fieldset className="contributions-filter-bar">
       <legend>{community.contributionFilters}</legend>

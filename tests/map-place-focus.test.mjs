@@ -230,8 +230,15 @@ test("B10: a distant place opens at most one intended popup AFTER the destinatio
   await rtl.waitFor(() => {
     assert.equal(screen.getByRole("button", { name: /Ferrara fixture/ }).getAttribute("aria-current"), "true", "the destination point is selected once its data arrives");
   }, { timeout: 3000 });
+  // The popup opens in the commit AFTER the selection (marker promotion +
+  // lazy popup content), so wait for it instead of sampling once — under a
+  // loaded full-suite run the single read could land between the two.
+  await rtl.waitFor(async () => {
+    const opened = (await leafletMarkers()).filter((m) => m.popupOpened);
+    assert.equal(opened.length, 1, "exactly one intended popup after the place-search landing");
+  }, { timeout: 3000 });
   const markers = await leafletMarkers();
-  assert.equal(markers.filter((m) => m.popupOpened).length, 1, "exactly one intended popup after the place-search landing");
+  assert.equal(markers.filter((m) => m.popupOpened).length, 1, "still exactly one popup once settled");
   assert.ok(!markers.some((m) => m.opts?.title === "Rome fixture" && m.popupOpened), "the old-area record is never auto-opened");
 });
 

@@ -1,7 +1,8 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { useMessages } from "../../lib/use-messages";
+import { useDomainMessages } from "../../lib/use-domain-messages";
+import { correctionByLocale } from "../../lib/i18n/correction";
 import { CorrectionForm } from "../home/CorrectionForm";
 import { WriteGateWall } from "../WriteGateWall";
 
@@ -17,7 +18,7 @@ import { WriteGateWall } from "../WriteGateWall";
  * that would fail with the raw server "Authentication required." string.
  */
 export function CorreggiTool() {
-  const t = useMessages().correction;
+  const t = useDomainMessages(correctionByLocale);
   const searchParams = useSearchParams();
   const recordParam = searchParams.get("record");
   const defaultRecordId = recordParam && /^\d+$/.test(recordParam) ? Number(recordParam) : null;

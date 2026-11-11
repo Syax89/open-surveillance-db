@@ -22,7 +22,7 @@ import { escapeHtml } from "./map-viewport";
 import { publicStatusLabel } from "./public-status";
 import { formatDirection } from "./compass";
 import { formatPublicDate } from "./format-date";
-import type { Locale } from "./i18n";
+import type { Locale } from "./i18n/types";
 import type { MapCamera } from "../components/SurveillanceMap";
 
 /** Localized strings the popup renders (a subset of the map dictionary). */

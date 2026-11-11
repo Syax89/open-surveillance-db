@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useLocale } from "../LocaleProvider";
-import { useMessages } from "../../lib/use-messages";
+import { useDomainMessages } from "../../lib/use-domain-messages";
+import { directoryByLocale } from "../../lib/i18n/directory";
+import { statusByLocale } from "../../lib/i18n/status";
 import { publicStatusLabel } from "../../lib/public-status";
 import { formatDistance } from "../../lib/search";
 import { formatLocation } from "../../lib/format-location";
@@ -70,8 +72,8 @@ type Props = {
  * Location shows address AND coordinates (format-location, CEO 2026-08-07).
  */
 export function PublicDirectory({ filteredRecords, loading, loadError, onRetryLoad, cameraKinds, search, setSearch, kindFilter, setKindFilter, freshnessFilter, setFreshnessFilter, setFreshnessCutoff, sortOrder, setSortOrder, stateFilter, setStateFilter, originFilter, setOriginFilter, page, setPage, totalRecords, serverPaginated, onInitialSeek, showRecordOnMap, setCoordinates, onResetFilters, mapHref = "#map", reportHref = "#report", showHeading = true, showMapLink = true, variant = "hub" }: Props) {
-  const t = useMessages().directory;
-  const statuses = useMessages().status;
+  const t = useDomainMessages(directoryByLocale);
+  const statuses = useDomainMessages(statusByLocale);
   const { locale } = useLocale();
   const place = usePlaceSearch(t, locale, (coordinates) => setCoordinates(coordinates));
   const [offline, setOffline] = useState(false);

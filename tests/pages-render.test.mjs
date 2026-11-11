@@ -330,6 +330,14 @@ for (const page of PAGES) {
     // o essere un'ancora / un file statico servito da /.
     for (const href of extractHrefs(html)) {
       if (href.startsWith("http") || href.startsWith("mailto:") || href.startsWith("#") || href === "/favicon.svg" || href === "/og.png") continue;
+      // Static files served from public/ (e.g. the explorer-only
+      // /explorer-view-transition.css stylesheet) resolve when they exist.
+      if (/^\/[\w.-]+\.(css|svg|png|json)$/.test(href) && existsSync(path.join(root, "public", href.slice(1)))) continue;
+      // The route-scoped map stylesheet (app/components/MapStyles.tsx): Vite
+      // injects /assets/map-<hash>.css at build time; outside Vite (this
+      // transpiled harness) the documented fallback href is rendered, and it
+      // must still correspond to the real source file.
+      if (href === "/assets/map.css" && existsSync(path.join(root, "app", "styles", "map.css"))) continue;
       if (href.startsWith("/records/")) continue; // route dinamica parametrica
       const pathOnly = href.split("?")[0];
       const withQuery = href.split("#")[0];

@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocale } from "../LocaleProvider";
-import { useMessages } from "../../lib/use-messages";
+import { useDomainMessages } from "../../lib/use-domain-messages";
+import { directoryByLocale } from "../../lib/i18n/directory";
+import { statusByLocale } from "../../lib/i18n/status";
 import { publicStatusLabel } from "../../lib/public-status";
 import { formatDistance } from "../../lib/search";
 import { formatPublicDate } from "../../lib/format-date";
@@ -100,8 +102,8 @@ type Props = {
  * sense for the filtered list.
  */
 export function DirectoryCatalog({ filteredRecords, loading, loadError, onRetryLoad, cameraKinds, search, setSearch, kindFilter, setKindFilter, freshnessFilter, setFreshnessFilter, sortOrder, setSortOrder, stateFilter, setStateFilter, originFilter, setOriginFilter, page = 1, setPage, totalRecords: serverTotalRecords, serverPaginated = false, onInitialSeek, showRecordOnMap, setCoordinates, onResetFilters, reportHref }: Props) {
-  const t = useMessages().directory;
-  const statuses = useMessages().status;
+  const t = useDomainMessages(directoryByLocale);
+  const statuses = useDomainMessages(statusByLocale);
   const { locale } = useLocale();
   const place = usePlaceSearch(t, locale, (coordinates) => setCoordinates(coordinates));
   // Offline state: the directory keeps working (records are already on the

@@ -16,7 +16,7 @@
 //  - revoked rows are muted and expose NO actions; active rows carry the
 //    "Revoke" trigger (aria-haspopup="dialog", opens ConfirmDialog).
 
-import type { Locale } from "../lib/i18n";
+import type { Locale } from "../lib/i18n/types";
 import { formatPublicDate } from "../lib/format-date";
 import { API_KEY_SCOPE_LABELS } from "../lib/useApiKeys";
 import type { ApiKey } from "../lib/useApiKeys";

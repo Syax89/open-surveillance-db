@@ -8,7 +8,8 @@
 // The resend state is local to the banner.
 
 import { useState } from "react";
-import { useMessages } from "../lib/use-messages";
+import { useDomainMessages } from "../lib/use-domain-messages";
+import { authByLocale } from "../lib/i18n/auth";
 
 type Props = {
   /** contributor.emailVerifiedAt from the profile read (null = unverified). */
@@ -16,7 +17,7 @@ type Props = {
 };
 
 export function VerifyEmailBanner({ emailVerifiedAt }: Props) {
-  const t = useMessages().auth;
+  const t = useDomainMessages(authByLocale);
   const [resendingVerification, setResendingVerification] = useState(false);
   const [verificationMessage, setVerificationMessage] = useState<string | null>(null);
 

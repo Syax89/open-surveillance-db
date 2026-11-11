@@ -1,3 +1,6 @@
+import { createHash } from "node:crypto";
+import { createRequire } from "node:module";
+import path from "node:path";
 import vinext from "vinext";
 import { defineConfig, type Plugin } from "vite";
 
@@ -96,6 +99,86 @@ function denyServerSource(): Plugin {
   };
 }
 
+/**
+ * Route-scoped stylesheets (perf 2026-11).
+ *
+ * vinext bundles every server component into ONE RSC chunk, so a `.css`
+ * import in a page would be merged back into the global stylesheet (and it
+ * would also break the node test harnesses that transpile the pages). The
+ * map-only CSS (Leaflet + app/styles/map.css) is therefore compiled here,
+ * with the lightningcss Vite itself uses to minify CSS and Vite's default
+ * build targets, into a content-hashed asset. Its URL reaches the app as the
+ * `__OSDB_MAP_CSS_HREF__` define (app/components/MapStyles.tsx); the client
+ * build emits the file under assets/ (immutable, public/_headers) and the
+ * dev server answers the same URL from the live source.
+ */
+const MAP_CSS_SOURCE = "app/styles/map.css";
+// Vite 8's "baseline-widely-available" CSS targets (chrome111 edge111
+// firefox114 safari16.4 ios16.4) in lightningcss' encoding.
+const LIGHTNINGCSS_TARGETS = { chrome: 111 << 16, edge: 111 << 16, firefox: 114 << 16, safari: (16 << 16) | (4 << 8), ios_saf: (16 << 16) | (4 << 8) };
+
+type LightningBundle = (options: {
+  filename: string;
+  minify: boolean;
+  targets: typeof LIGHTNINGCSS_TARGETS;
+  resolver: { resolve(specifier: string, from: string): string };
+}) => Promise<{ code: Uint8Array }>;
+
+async function compileRouteStylesheet(root: string): Promise<string> {
+  // Resolve lightningcss through Vite (its direct dependency): the same
+  // minifier that produces the main CSS bundle, no extra package.
+  const fromVite = createRequire(createRequire(path.join(root, "package.json")).resolve("vite/package.json"));
+  const { bundleAsync } = fromVite("lightningcss") as { bundleAsync: LightningBundle };
+  const resolveFromRoot = createRequire(path.join(root, "package.json"));
+  const { code } = await bundleAsync({
+    filename: path.join(root, MAP_CSS_SOURCE),
+    minify: true,
+    targets: LIGHTNINGCSS_TARGETS,
+    resolver: {
+      resolve(specifier, from) {
+        return specifier.startsWith(".") || path.isAbsolute(specifier)
+          ? path.resolve(path.dirname(from), specifier)
+          : resolveFromRoot.resolve(specifier);
+      },
+    },
+  });
+  return Buffer.from(code).toString("utf8");
+}
+
+function routeStylesheets(): Plugin {
+  let root = process.cwd();
+  let css = "";
+  let href = "";
+  return {
+    name: "osdb-route-stylesheets",
+    async config(userConfig) {
+      root = path.resolve(userConfig.root ?? process.cwd());
+      css = await compileRouteStylesheet(root);
+      const hash = createHash("sha256").update(css).digest("hex").slice(0, 10);
+      href = `/assets/map-${hash}.css`;
+      return { define: { __OSDB_MAP_CSS_HREF__: JSON.stringify(href) } };
+    },
+    configureServer(server) {
+      server.middlewares.use(async (req, res, next) => {
+        if ((req.url ?? "").split("?")[0] !== href) return next();
+        try {
+          res.setHeader("Content-Type", "text/css; charset=utf-8");
+          res.setHeader("Cache-Control", "no-store");
+          // Dev: recompile on every request so edits show up on reload
+          // (the URL keeps the startup hash; production URLs change).
+          res.end(await compileRouteStylesheet(root));
+        } catch (error) {
+          next(error);
+        }
+      });
+    },
+    generateBundle() {
+      if (this.environment.name !== "client") return;
+      this.emitFile({ type: "asset", fileName: href.slice(1), source: css });
+    },
+  };
+}
+
 export default defineConfig(async () => {
   // Keep Wrangler and Miniflare state project-local. These are non-secret tool
   // settings; application environment belongs in ignored `.env*` files.
@@ -139,6 +222,7 @@ export default defineConfig(async () => {
     },
     plugins: [
       denyServerSource(),
+      routeStylesheets(),
       vinext(),
       cloudflare({
         viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },

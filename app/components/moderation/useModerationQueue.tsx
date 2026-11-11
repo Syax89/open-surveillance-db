@@ -3,16 +3,17 @@
 // Moderation queue state hook — extracted from the ModerationDashboard monolith (kanban t_c7460073): fetch, decision state, formatters.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocale } from "../LocaleProvider";
-import { useMessages } from "../../lib/use-messages";
-import { LOCALE_BCP47 } from "../../lib/i18n";
+import { useDomainMessages } from "../../lib/use-domain-messages";
+import { communityByLocale } from "../../lib/i18n/community";
+import { moderationByLocale } from "../../lib/i18n/moderation";
+import { LOCALE_BCP47 } from "../../lib/i18n/types";
 import { readCsrfToken } from "../../lib/csrf";
 import { useBoundedQueues } from "./useBoundedQueues";
 import type { CameraInQueue, CorrectionInQueue, DecisionFormApi, EditRequestInQueue, ModerationAction, ModerationEvent, PublishedCursor, QueueEntity, QueueItem, QueuePayload, ReasonCode, Reviewer } from "./types";
 export function useModerationQueue() {
   const { locale } = useLocale();
-  const messages = useMessages();
-  const t = messages.moderation;
-  const community = messages.community;
+  const t = useDomainMessages(moderationByLocale);
+  const community = useDomainMessages(communityByLocale);
   const [cameras, setCameras] = useState<CameraInQueue[]>([]); const [publishedCameras, setPublishedCameras] = useState<CameraInQueue[]>([]);
   // Published-page cursor state; history holds the cursor of each page we came FROM (null = first page) so "previous" needs no total count.
   const [publishedNextCursor, setPublishedNextCursor] = useState<PublishedCursor | null>(null);

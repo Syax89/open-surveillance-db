@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useMessages } from "../lib/use-messages";
+import { useDomainMessages } from "../lib/use-domain-messages";
+import { authByLocale } from "../lib/i18n/auth";
 import { PublicNav } from "../components/PublicNav";
 
 /**
@@ -30,8 +31,7 @@ type VerifyState =
   | { kind: "error" };
 
 export function VerifyEmailBody() {
-  const bundle = useMessages();
-  const t = bundle.auth;
+  const t = useDomainMessages(authByLocale);
   const searchParams = useSearchParams();
   const token = searchParams.get("token") ?? "";
 

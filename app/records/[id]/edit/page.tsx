@@ -4,12 +4,16 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { LocaleToggle } from "../../../components/LocaleProvider";
-import { useMessages } from "../../../lib/use-messages";
+import { useDomainMessages } from "../../../lib/use-domain-messages";
+import { recordByLocale } from "../../../lib/i18n/record";
+import { communityByLocale } from "../../../lib/i18n/community";
+import { commonByLocale } from "../../../lib/i18n/common";
 import { SiteHeader } from "../../../components/SiteHeader";
 import { KIND_OPTIONS, isDomeKind } from "../../../lib/camera-kinds";
 import { formatDirection } from "../../../lib/compass";
 import { isCsrfRejection, readCsrfToken } from "../../../lib/csrf";
 import { EditPositionMap } from "../../../components/EditPositionMap";
+import { MapStyles } from "../../../components/MapStyles";
 
 /**
  * /records/[id]/edit — dedicated contribution edit page (COMMUNITY_PLAN §2.2,
@@ -77,10 +81,9 @@ type Phase = "loading" | "login" | "notFound" | "notOwner" | "error" | "ready";
 
 export default function RecordEditPage() {
   const params = useParams<{ id: string }>();
-  const bundle = useMessages();
-  const t = bundle.record;
-  const community = bundle.community;
-  const common = bundle.common;
+  const t = useDomainMessages(recordByLocale);
+  const community = useDomainMessages(communityByLocale);
+  const common = useDomainMessages(commonByLocale);
   const recordId = Number(params.id);
 
   const [phase, setPhase] = useState<Phase>("loading");
@@ -321,6 +324,8 @@ export default function RecordEditPage() {
 
   return (
     <main id="main-content" className="record-page">
+      {/* EditPositionMap is a Leaflet map: route-scoped map stylesheet (hoisted into <head>). */}
+      <MapStyles />
       <SiteHeader navLabel={t.navigation} toggle="none">
         <div className="nav-record-actions">
           <Link className="text-button" href={`/records/${recordId}`}>{t.backToDirectory}</Link>

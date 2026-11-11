@@ -11,7 +11,8 @@
 // listPublicCameraRevisions projection (AC-5).
 
 import { useState } from "react";
-import { useMessages } from "../../lib/use-messages";
+import { useDomainMessages } from "../../lib/use-domain-messages";
+import { moderationByLocale } from "../../lib/i18n/moderation";
 import type { ModerationEvent } from "./types";
 
 type HistoryRequest = {
@@ -41,7 +42,7 @@ type Props = {
 };
 
 export function CorrectionHistorySection({ readableDate, readableAction, readableReason, readableStatus, readableOutcome }: Props) {
-  const t = useMessages().moderation;
+  const t = useDomainMessages(moderationByLocale);
   const [recordId, setRecordId] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");

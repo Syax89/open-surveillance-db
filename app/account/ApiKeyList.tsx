@@ -7,7 +7,8 @@
 
 import Link from "next/link";
 import { useLocale } from "../components/LocaleProvider";
-import { useMessages } from "../lib/use-messages";
+import { useDomainMessages } from "../lib/use-domain-messages";
+import { authByLocale } from "../lib/i18n/auth";
 import { ApiKeyRow } from "./ApiKeyRow";
 import type { ApiKey } from "../lib/useApiKeys";
 
@@ -20,7 +21,7 @@ type Props = {
 
 export function ApiKeyList({ keys, revokingId, onRevoke, onRequestCreate }: Props) {
   const { locale } = useLocale();
-  const t = useMessages().auth;
+  const t = useDomainMessages(authByLocale);
 
   if (keys.length === 0) {
     return (

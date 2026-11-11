@@ -6,7 +6,8 @@
 // successful PATCH hands the updated profile back to the page.
 
 import { useEffect, useRef, useState } from "react";
-import { useMessages } from "../lib/use-messages";
+import { useDomainMessages } from "../lib/use-domain-messages";
+import { authByLocale } from "../lib/i18n/auth";
 import { readCsrfToken } from "../lib/csrf";
 import type { Contributor } from "./account-types";
 
@@ -17,7 +18,7 @@ type Props = {
 };
 
 export function DisplayNameField({ contributor, onContributorUpdated }: Props) {
-  const t = useMessages().auth;
+  const t = useDomainMessages(authByLocale);
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
   const [nameError, setNameError] = useState<string | null>(null);

@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useMessages } from "../../lib/use-messages";
+import { useDomainMessages } from "../../lib/use-domain-messages";
+import { directoryByLocale } from "../../lib/i18n/directory";
 import { usePublicCameras } from "../../lib/use-public-cameras";
 import { usePublicCamerasPage } from "../../lib/use-public-cameras-page";
 import {
@@ -61,7 +62,7 @@ import { ExploreViewSwitch } from "../ExploreViewSwitch";
  * (see use-public-cameras.ts pagination contract).
  */
 export function DirectoryTool() {
-  const t = useMessages().directory;
+  const t = useDomainMessages(directoryByLocale);
   const router = useRouter();
   const { filters, qInput, setQ, setType, setFreshness, setSort, setState, setOrigin, setPage, reset } = useCameraFilters();
   const [initial, setInitial] = useState<string | undefined>();

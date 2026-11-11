@@ -8,7 +8,7 @@
  * Both the 404 (app/not-found.tsx) and the 500 (app/error.tsx) render the
  * same <ErrorPage /> shell; only the status-specific copy differs.
  */
-import type { Translation } from "./types";
+import type { Locale, Translation } from "./types";
 
 export const en = {
   navigation: "Site navigation",
@@ -67,3 +67,10 @@ export const it: Translation<typeof en> = {
     "Questa parte del sito non è raggiungibile in questo momento. Riprova più tardi, oppure torna alla home.",
   serviceUnavailableMetaTitle: "Servizio non disponibile — OpenSurveillanceDB",
 };
+
+/**
+ * This domain only, in every locale — what client components import (via
+ * `useDomainMessages`, app/lib/use-messages.ts) instead of the aggregated
+ * `messages` map, which would ship EVERY domain in BOTH locales.
+ */
+export const errorsByLocale: Record<Locale, Translation<typeof en>> = { en, it };

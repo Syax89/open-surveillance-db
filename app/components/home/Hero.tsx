@@ -1,6 +1,7 @@
 "use client";
 
-import { useMessages } from "../../lib/use-messages";
+import { useDomainMessages } from "../../lib/use-domain-messages";
+import { homeByLocale } from "../../lib/i18n/home";
 import { usePublicCount } from "../../lib/use-public-count";
 import { HeroDirectorySearch } from "./HeroDirectorySearch";
 
@@ -21,7 +22,7 @@ import { HeroDirectorySearch } from "./HeroDirectorySearch";
  * #439) progressively enhances the same input with address autocomplete.
  */
 export function Hero() {
-  const t = useMessages().home;
+  const t = useDomainMessages(homeByLocale);
   const { total } = usePublicCount();
   return (
     <section className="hero" id="top">

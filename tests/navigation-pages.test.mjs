@@ -29,6 +29,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { importI18nModule } from "./helpers/i18n-module.mjs";
 import { Miniflare } from "miniflare";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -384,26 +385,9 @@ test("the loading-note colour is tracked as a known below-AA exception", async (
  * route handlers (data: URLs cannot carry query-string cache busters).
  */
 async function transpileAndImport(tsSourcePath) {
-  const { mkdtemp, writeFile, rm } = await import("node:fs/promises");
-  const os = await import("node:os");
-  const { pathToFileURL } = await import("node:url");
-  const ts = (await import("typescript")).default;
-  const source = await readFile(tsSourcePath, "utf8");
-  const output = ts.transpileModule(source, {
-    compilerOptions: {
-      module: ts.ModuleKind.ES2022,
-      target: ts.ScriptTarget.ES2022,
-    },
-    fileName: tsSourcePath,
-  }).outputText;
-  const dir = await mkdtemp(path.join(os.tmpdir(), "osdb-i18n-"));
-  const out = path.join(dir, "bundle.mjs");
-  await writeFile(out, output);
-  try {
-    return await import(`${pathToFileURL(out).href}?t=${Date.now()}`);
-  } finally {
-    await rm(dir, { recursive: true, force: true });
-  }
+  // Shared helper: follows relative value imports between i18n files
+  // (auth.ts spreads ./auth-nav).
+  return importI18nModule(tsSourcePath);
 }
 
 /** Collect every nested key path of a bundle object. */

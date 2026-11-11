@@ -6,13 +6,7 @@ import { SiteHeader } from "./SiteHeader";
 // Error boundary is part of the root graph: import only the `errors`
 // domain (F5 qa#5, t_ab0d4c75) instead of the full dictionary.
 import { useLocale } from "./LocaleProvider";
-import { en as errorsEn, it as errorsIt } from "../lib/i18n/errors";
-import type { Locale, Translation } from "../lib/i18n";
-
-const errorsByLocale: Record<Locale, Translation<typeof errorsEn>> = {
-  en: errorsEn,
-  it: errorsIt,
-};
+import { errorsByLocale } from "../lib/i18n/errors";
 
 /**
  * Custom error page shell shared by the 404 (app/not-found.tsx) and the

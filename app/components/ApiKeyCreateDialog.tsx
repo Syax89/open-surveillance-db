@@ -10,7 +10,8 @@
 // fetch (useApiKeys.createKey).
 
 import { useEffect, useRef, useState } from "react";
-import { useMessages } from "../lib/use-messages";
+import { useDomainMessages } from "../lib/use-domain-messages";
+import { authByLocale } from "../lib/i18n/auth";
 import { useModalScrollLock } from "../lib/hooks/use-modal-scroll-lock";
 import { API_KEY_SCOPES, API_KEY_SCOPE_GRANTS, API_KEY_SCOPE_LABELS } from "../lib/useApiKeys";
 import type { ApiKeyErrorKind, ApiKeyScope } from "../lib/useApiKeys";
@@ -34,7 +35,7 @@ function expiryIso(expiry: ExpiryChoice): string | null {
 }
 
 export function ApiKeyCreateDialog({ open, busy, error, onCreate, onCancel }: Props) {
-  const t = useMessages().auth;
+  const t = useDomainMessages(authByLocale);
   const [name, setName] = useState("");
   const [scopes, setScopes] = useState<ApiKeyScope[]>([...API_KEY_SCOPES]);
   const [expiry, setExpiry] = useState<ExpiryChoice>("365");

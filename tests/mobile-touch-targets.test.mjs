@@ -26,6 +26,7 @@ import { fileURLToPath } from "node:url";
 import {
   setupDom, loadDomModule, installFetchMock, jsonResponse, renderWithLocale, setNavState, React,
 } from "./helpers/dom-harness.mjs";
+import { readSiteCss } from "./helpers/site-css.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const readSource = (relative) => readFile(path.join(root, relative), "utf8");
@@ -168,7 +169,7 @@ test("the shared footer is not enlarged (explicit review constraint)", async () 
 // ---------------------------------------------------------------------------
 
 test("mini-map zoom reaches 44px on mobile without growing the card", async () => {
-  const css = await readSource("app/globals.css");
+  const css = await readSiteCss(root); // globals + map.css, cascade order (perf 2026-11)
   const mobile = mediaBlocks(css, "max-width", "768px").join("\n");
   const zoom = ruleBlocks(mobile, ".record-minimap .leaflet-control-zoom a")[0];
   assert.ok(zoom, "mobile gives the mini-map zoom its own target size");

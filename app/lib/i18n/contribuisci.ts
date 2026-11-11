@@ -9,7 +9,7 @@
  * Coffee + GitHub). Copy is sober civic-tech: no reward promises, no
  * tracking, no forms — just the two ways to support the project.
  */
-import type { Translation } from "./types";
+import type { Locale, Translation } from "./types";
 
 export const en = {
   navigation: "Support navigation",
@@ -66,3 +66,10 @@ export const it: Translation<typeof en> = {
   footnote:
     "OpenSurveillanceDB non vende dati e non mostra pubblicità. Qualsiasi supporto — un caffè o un commit — aiuta a mantenerlo aperto e accurato.",
 };
+
+/**
+ * This domain only, in every locale — what client components import (via
+ * `useDomainMessages`, app/lib/use-messages.ts) instead of the aggregated
+ * `messages` map, which would ship EVERY domain in BOTH locales.
+ */
+export const contribuisciByLocale: Record<Locale, Translation<typeof en>> = { en, it };
