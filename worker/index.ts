@@ -8,7 +8,7 @@ import { gatedPath, normalizeGatePath, requireModerationAuth, SCANNER_PATH_PATTE
 import { localeFromRequest, renderGateUnavailablePage, wantsHtml } from "./gate-page";
 import { injectIdentityAfterGate, stripIdentityHeaders } from "./identity";
 import { hostRedirect } from "./host";
-import { buildCspWithNonce, generateCspNonce, withSecurityHeaders } from "./security-headers";
+import { applyHtmlDocumentCachePolicy, buildCspWithNonce, generateCspNonce, withSecurityHeaders } from "./security-headers";
 import { AGENT_INDEX, AUTH_MD, MARKDOWN_PAGES, OAUTH_AUTHORIZATION_SERVER, OAUTH_PROTECTED_RESOURCE } from "./discovery";
 import { recordRequestAnalytics } from "./analytics";
 
@@ -288,10 +288,13 @@ async function dispatch(request: Request, env: Env, ctx: ExecutionContext, url: 
     // fallback (still used by every OTHER withSecurityHeaders call site in
     // this file, none of which render through vinext) — withSecurityHeaders
     // never overwrites a CSP that is already present, so this one wins over
-    // the static default for this response only. Every HTML page in this
-    // app answers `Cache-Control: no-store` (verified live), so a per-request
-    // nonce is safe: Cloudflare never caches an HTML response that could
-    // later be served to a different visitor with a stale nonce.
+    // the static default for this response only. A per-request nonce stays
+    // safe because no HTML page is ever SHARED-cacheable: personal pages and
+    // sessioned requests are `no-store`, public pages `private, no-cache`
+    // with no ETag/Last-Modified (applyHtmlDocumentCachePolicy), so neither
+    // Cloudflare nor a revalidating browser reuses a body carrying an older
+    // nonce on a fresh navigation (bfcache only restores the exact page that
+    // was already running, nonce and all).
     const nonce = generateCspNonce();
     const renderHeaders = new Headers(gated.headers);
     renderHeaders.set("Content-Security-Policy", buildCspWithNonce(nonce));
@@ -304,6 +307,9 @@ async function dispatch(request: Request, env: Env, ctx: ExecutionContext, url: 
     if (!taggedHeaders.has("Content-Security-Policy")) {
       taggedHeaders.set("Content-Security-Policy", buildCspWithNonce(nonce));
     }
+    // bfcache: public anonymous HTML -> `private, no-cache`; sessioned,
+    // personal/auth and cookie-setting HTML -> `no-store` (see the helper).
+    applyHtmlDocumentCachePolicy(request, gateTarget, rendered.status, taggedHeaders);
     const tagged = new Response(rendered.body, { status: rendered.status, statusText: rendered.statusText, headers: taggedHeaders });
     return withSecurityHeaders(tagged, url.pathname, url.hostname, routedThroughGate);
 }

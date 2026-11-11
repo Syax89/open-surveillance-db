@@ -1837,6 +1837,133 @@ test("scheduled() keep-warm tick is a no-op: no sweep runs on the every-minute c
   assert.equal(oidc.__calls.length, 0, "OIDC expiry sweep must NOT run on the keep-warm tick");
 });
 
+// ---------------------------------------------------------------------------
+// HTML document cache policy (bfcache, Lighthouse
+// MainResourceHasCacheControlNoStore): public anonymous pages are
+// `private, no-cache`; sessioned requests, personal/auth routes and
+// cookie-setting responses stay `no-store`; HTML never carries a validator.
+// ---------------------------------------------------------------------------
+
+const VINEXT_DYNAMIC = "no-store, must-revalidate";
+const htmlPage = (headers = {}) =>
+  new Response("<!DOCTYPE html><html><body>page</body></html>", {
+    status: 200,
+    headers: { "content-type": "text/html; charset=utf-8", "cache-control": VINEXT_DYNAMIC, ...headers },
+  });
+
+async function withAppResponse(app, make, run) {
+  const originalFetch = app.default.fetch;
+  app.default.fetch = async () => make();
+  try {
+    await run();
+  } finally {
+    app.default.fetch = originalFetch;
+  }
+}
+
+const PUBLIC_HTML_ROUTES = ["/", "/mappa", "/directory", "/records/42", "/faq", "/guide", "/segnala"];
+const PERSONAL_HTML_ROUTES = [
+  "/account", "/Account/", "/account.rsc", "/%61ccount",
+  "/records/42/edit", "/records/abc/edit/",
+  "/login", "/register", "/forgot-password", "/reset-password?token=fixture", "/verify-email?token=fixture",
+];
+
+test("html cache: public pages without a session are private, no-cache (bfcache-eligible)", async () => {
+  const { worker, app } = await loadWorker();
+  await withAppResponse(app, () => htmlPage(), async () => {
+    for (const route of PUBLIC_HTML_ROUTES) {
+      for (const method of ["GET", "HEAD"]) {
+        const response = await worker.fetch(request(route, { method, headers: { cookie: "osdb_locale=it" } }), testEnv(), ctx());
+        assert.equal(response.status, 200, route);
+        assert.equal(response.headers.get("cache-control"), "private, no-cache", `${method} ${route}`);
+        // The nonce CSP is still issued per request.
+        assert.match(response.headers.get("content-security-policy") ?? "", /'nonce-/, route);
+      }
+    }
+  });
+});
+
+test("html cache: an osdb_session cookie keeps no-store on every page", async () => {
+  const { worker, app } = await loadWorker();
+  await withAppResponse(app, () => htmlPage(), async () => {
+    for (const cookie of ["osdb_session=fixture-only", "osdb_locale=it; osdb_session=fixture-only", "osdb_session="]) {
+      for (const route of PUBLIC_HTML_ROUTES) {
+        const response = await worker.fetch(request(route, { headers: { cookie } }), testEnv(), ctx());
+        assert.equal(response.headers.get("cache-control"), "no-store", `${route} ${cookie}`);
+      }
+    }
+    // A look-alike cookie name is not a session.
+    const response = await worker.fetch(request("/", { headers: { cookie: "x_osdb_session=1" } }), testEnv(), ctx());
+    assert.equal(response.headers.get("cache-control"), "private, no-cache");
+  });
+});
+
+test("html cache: personal and auth routes stay no-store even anonymously", async () => {
+  const { worker, app } = await loadWorker();
+  // Even an app policy other than vinext's default is forced to no-store.
+  for (const appPolicy of [VINEXT_DYNAMIC, "public, max-age=60"]) {
+    await withAppResponse(app, () => htmlPage({ "cache-control": appPolicy }), async () => {
+      for (const route of PERSONAL_HTML_ROUTES) {
+        const response = await worker.fetch(request(route), testEnv(), ctx());
+        assert.equal(response.headers.get("cache-control"), "no-store", `${route} (${appPolicy})`);
+      }
+    });
+  }
+  // /moderation is gated: an admitted moderator page is no-store too.
+  await withAppResponse(app, () => htmlPage(), async () => {
+    const response = await worker.fetch(
+      request("/moderation", { headers: { authorization: PRIVATE_CACHE_AUTH } }),
+      testEnv(PRIVATE_CACHE_CONFIG),
+      ctx(),
+    );
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("cache-control"), "no-store");
+  });
+});
+
+test("html cache: a response that sets a cookie stays no-store", async () => {
+  const { worker, app } = await loadWorker();
+  await withAppResponse(app, () => htmlPage({ "set-cookie": "osdb_locale=en; Path=/; SameSite=Lax" }), async () => {
+    const response = await worker.fetch(request("/faq"), testEnv(), ctx());
+    assert.equal(response.headers.get("cache-control"), "no-store");
+    assert.match(response.headers.get("set-cookie") ?? "", /osdb_locale=en/);
+  });
+});
+
+test("html cache: HTML documents never carry ETag or Last-Modified", async () => {
+  const { worker, app } = await loadWorker();
+  const validators = { etag: '"fixture-etag"', "last-modified": "Wed, 11 Nov 2026 00:00:00 GMT" };
+  for (const [route, cookie] of [["/", undefined], ["/", "osdb_session=fixture-only"], ["/account", undefined]]) {
+    await withAppResponse(app, () => htmlPage(validators), async () => {
+      const response = await worker.fetch(request(route, { headers: cookie ? { cookie } : {} }), testEnv(), ctx());
+      assert.equal(response.headers.get("etag"), null, route);
+      assert.equal(response.headers.get("last-modified"), null, route);
+    });
+  }
+  // The default mock homepage (no validators at all) stays validator-free.
+  const response = await worker.fetch(request("/"), testEnv(), ctx());
+  assert.equal(response.headers.get("etag"), null);
+  assert.equal(response.headers.get("last-modified"), null);
+});
+
+test("html cache: errors, redirects, RSC flight, explicit app policies and API JSON are untouched", async () => {
+  const { worker, app } = await loadWorker();
+  const cases = [
+    ["/definitely-missing", () => new Response("<html>404</html>", { status: 404, headers: { "content-type": "text/html", "cache-control": VINEXT_DYNAMIC } }), VINEXT_DYNAMIC],
+    ["/faq", () => new Response("<html>500</html>", { status: 500, headers: { "content-type": "text/html", "cache-control": VINEXT_DYNAMIC } }), VINEXT_DYNAMIC],
+    ["/faq", () => new Response(null, { status: 307, headers: { location: "/guide", "cache-control": VINEXT_DYNAMIC } }), VINEXT_DYNAMIC],
+    ["/faq.rsc", () => new Response("0:{}", { status: 200, headers: { "content-type": "text/x-component", "cache-control": VINEXT_DYNAMIC } }), VINEXT_DYNAMIC],
+    ["/fonti", () => htmlPage({ "cache-control": "s-maxage=300, stale-while-revalidate" }), "s-maxage=300, stale-while-revalidate"],
+    ["/api/cameras", () => Response.json({ ok: true }, { headers: { "cache-control": "public, s-maxage=300, stale-while-revalidate=600" } }), "public, s-maxage=300, stale-while-revalidate=600"],
+  ];
+  for (const [route, make, expected] of cases) {
+    await withAppResponse(app, make, async () => {
+      const response = await worker.fetch(request(route), testEnv(), ctx());
+      assert.equal(response.headers.get("cache-control"), expected, route);
+    });
+  }
+});
+
 // Small helper: a no-op ExecutionContext shaped like the Worker API.
 function ctx() {
   return { waitUntil() {}, passThroughOnException() {} };

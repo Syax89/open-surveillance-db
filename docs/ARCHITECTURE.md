@@ -76,6 +76,18 @@ Public reads are cached in the worker with a fail-open Cache API wrapper
 from D1 read replicas; only HTTP 200 responses are stored and the cache can
 never take a route down.
 
+HTML pages are never shared-cacheable: each render carries a per-request CSP
+nonce. The worker edge (`applyHtmlDocumentCachePolicy` in
+`worker/security-headers.ts`) answers public, anonymous 200 HTML pages with
+`Cache-Control: private, no-cache` so the browser can keep them for the
+back/forward cache while every normal load still revalidates (HTML never
+carries `ETag`/`Last-Modified`, so no 304 reuses an old nonce). It forces
+`no-store` when the request carries an `osdb_session` cookie, when the
+response sets a cookie, and on personal/auth routes (`/account`,
+`/moderation`, `/records/*/edit`, `/login`, `/register`, `/forgot-password`,
+`/reset-password`, `/verify-email`). Errors, redirects, RSC flight responses
+and API JSON keep the headers their handlers set.
+
 ## Boundaries
 
 - **Public map:** `active`/`demo` records with intentionally limited location
