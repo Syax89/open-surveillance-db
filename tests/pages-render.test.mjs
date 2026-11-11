@@ -381,7 +381,7 @@ test("global CSP (worker edge) is compatible with the SSR markup these pages emi
   // <style data-vinext-fonts> — la CSP deve permetterli, altrimenti il
   // browser blocca la pagina pur essendo il render corretto. Guardia
   // statica: se la CSP cambia, questo test forza a rivalutarla insieme.
-  const workerSource = readFileSync(path.join(root, "worker", "index.ts"), "utf8");
+  const workerSource = readFileSync(path.join(root, "worker", "security-headers.ts"), "utf8");
   const cspMatch = workerSource.match(/Content-Security-Policy[^\n]*\n((?:.*\n)*?)\s*\]/);
   assert.ok(cspMatch, "CSP definita nel worker edge");
   const csp = cspMatch[1];

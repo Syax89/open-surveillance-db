@@ -288,8 +288,14 @@ async function buildTree() {
         "export function resetLastRequest() { lastRequest = null; }\n" +
         "export default { fetch: async (request) => { lastRequest = request; return new Response(\"handler-called\"); } };\n",
     );
-    const compiled = transpile(path.join(root, "worker", "index.ts"));
-    const rewritten = compiled
+    // worker/index.ts is the entry (tree-root worker.mjs); its sibling
+    // modules (worker/gate.ts, worker/security-headers.ts, ...) compile to
+    // tree/worker/*.mjs. All of them sit one level below the repo root in
+    // source, so the same ../db and ../app rebasing applies to every file.
+    const workerModuleDir = path.join(tree, "worker");
+    await mkdir(workerModuleDir, { recursive: true });
+    const rewriteWorker = (compiled) => compiled
+      .replace(/from\s*["']\.\/([\w-]+)["']/g, (_match, name) => `from "${pathToFileURL(path.join(workerModuleDir, `${name}.mjs`)).href}"`)
       // The worker sits at tree root (worker.mjs), so its ../db/retention
       // and ../db/oidc imports (db/*.ts → db/*.mjs inside the tree) must be
       // rebased to the in-tree path; the vinext and workers imports are
@@ -316,7 +322,13 @@ async function buildTree() {
       .replace(/from\s*["']vinext\/server\/app-router-entry["']/g, `from "${routerStubUrl}"`)
       .replace(/from\s*["']vinext\/server\/request-pipeline["']/g, `from "${import.meta.resolve("vinext/server/request-pipeline")}"`)
       .replace(/from\s*["']cloudflare:workers["']/g, `from "${workersMockUrl}"`);
-    await writeFile(path.join(tree, "worker.mjs"), rewritten);
+    const workerSourceDir = path.join(root, "worker");
+    for (const name of await readdir(workerSourceDir)) {
+      if (!name.endsWith(".ts") || name.endsWith(".d.ts")) continue;
+      const rewritten = rewriteWorker(transpile(path.join(workerSourceDir, name)));
+      const output = name === "index.ts" ? path.join(tree, "worker.mjs") : path.join(workerModuleDir, name.replace(/\.ts$/, ".mjs"));
+      await writeFile(output, rewritten);
+    }
   }
 
   return tree;

@@ -595,7 +595,7 @@ test("the public JSON output never contains the private notes field", async () =
 });
 
 test("moderation is gated at the worker edge and fails closed", async () => {
-  const worker = await readSource("worker/index.ts");
+  const worker = await readSource("worker/gate.ts");
 
   assert.match(worker, /moderationPath\s*=\s*\(/, "the worker must recognise moderation paths");
   assert.match(worker, /MODERATION_USER/, "the worker must read the moderator username from environment");
