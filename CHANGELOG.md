@@ -601,6 +601,20 @@ changes accumulate under `[Unreleased]`.
 
 ### Fixed
 
+- **Directory — natural "alphabetical" order (2026-11-11):** titles now sort
+  numeric-aware ("Telecamera 1, 2, 10, 100" instead of "1, 10, 100, 2") in
+  the directory and in `GET /api/cameras?sort=alphabetical`. D1 cannot
+  register custom collations, so migration `0046_cameras_title_sort_key`
+  adds a precomputed `cameras.title_sort_key` (ASCII case fold + digit runs
+  zero-padded to 10, `app/lib/title-sort-key.ts`), backfills existing rows
+  with the same function as a recursive CTE, and indexes
+  `(title_sort_key, id DESC)`. Every title write (submissions, owner edits,
+  approved edit requests, import runner) stores the key. The keyset cursor
+  now runs on `(title_sort_key, id)`; the wire format stays
+  `after_title`/`after_id` (the key is derived server-side), so existing
+  cursors remain valid. The A–Z seek is an index range on the key. Test:
+  `tests/title-sort-key.test.mjs`.
+
 - **Import — inserts and provenance events atomic (2026-11-11):** each
   import chunk now writes the camera INSERTs and their `imported` lifecycle
   events in a single transactional D1 batch (events resolved by

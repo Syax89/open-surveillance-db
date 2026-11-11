@@ -53,6 +53,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { Camera } from "./records";
 import { textMatches } from "./search";
+import { compareByTitleSortKey, titleSortKey } from "./title-sort-key";
 import type { ServerCameraFilters } from "./use-public-cameras";
 
 /** Whitelisted freshness windows (mirrors db/cameras.ts freshnessWindows). */
@@ -262,6 +263,13 @@ export function applyCameraFilters(records: Camera[], filters: CameraFilters, no
     if (filters.origin === "imported" && !camera.source.startsWith("import:")) return false;
     return true;
   });
+  // Natural-order keys, computed once per title (not once per comparison).
+  const sortKeys = new Map<string, string>();
+  const keyOf = (title: string) => {
+    let key = sortKeys.get(title);
+    if (key === undefined) { key = titleSortKey(title); sortKeys.set(title, key); }
+    return key;
+  };
   return matching.sort((first, second) => {
     switch (filters.sort) {
       case "useful":
@@ -278,7 +286,9 @@ export function applyCameraFilters(records: Camera[], filters: CameraFilters, no
       case "position":
         return first.latitude - second.latitude || first.longitude - second.longitude || first.title.localeCompare(second.title);
       default:
-        return first.title.localeCompare(second.title);
+        // Same natural order as the server (ORDER BY title_sort_key ASC,
+        // id DESC — migration 0046): "Telecamera 2" before "Telecamera 10".
+        return compareByTitleSortKey(first, second, keyOf);
     }
   });
 }

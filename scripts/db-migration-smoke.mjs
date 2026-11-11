@@ -210,6 +210,9 @@ const expectedIndexes = [
   "api_keys_key_hash_unique",
   "api_keys_contributor_idx",
   "api_keys_liveness_idx",
+  // Natural "alphabetical" directory order (0046): ORDER BY title_sort_key
+  // ASC, id DESC + the (title_sort_key, id) keyset cursor + the A–Z seek.
+  "cameras_title_sort_key_idx",
 ];
 // Tables that are not application schema but legitimately appear in a local
 // D1 database. Anything outside this set is an unexpected schema change.

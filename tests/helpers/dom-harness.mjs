@@ -43,6 +43,7 @@ import ts from "typescript";
 import { JSDOM } from "jsdom";
 import { after } from "node:test";
 import React from "react";
+import { titleSortKey } from "../../scripts/import/title-sort-key.mjs";
 
 export { React };
 
@@ -982,7 +983,7 @@ export function fakeCamerasPayload(cameras) {
  *   (title/address/kind/source LIKE), initial (title NOCASE LIKE 'x%'),
  *   state (confirmed = lastVerifiedAt non-null; never = null), origin
  *   (reports = source 'Community report'; imported = source LIKE 'import:%'),
- *   bbox (west,south,east,north) and sort=alphabetical (title NOCASE asc,
+ *   bbox (west,south,east,north) and sort=alphabetical (natural title_sort_key asc,
  *   id desc) — with keyset pagination (after_title/after_id) for the cursor
  *   hook, offset pagination for the legacy walk and count=true/false for
  *   the total field.
@@ -1035,18 +1036,18 @@ export function camerasApiResponse(input, records) {
   }
   if (p.get("sort") === "alphabetical") {
     rows.sort((a, b) => {
-      const ta = String(a.title ?? "").toLowerCase();
-      const tb = String(b.title ?? "").toLowerCase();
+      const ta = titleSortKey(String(a.title ?? ""));
+      const tb = titleSortKey(String(b.title ?? ""));
       return ta < tb ? -1 : ta > tb ? 1 : b.id - a.id;
     });
   }
   const afterTitle = p.get("after_title");
   const afterId = p.get("after_id");
   if (afterTitle !== null && afterId !== null) {
-    const cursorTitle = afterTitle.toLowerCase();
+    const cursorTitle = titleSortKey(afterTitle);
     const cursorId = Number(afterId);
     rows = rows.filter((c) => {
-      const ct = String(c.title ?? "").toLowerCase();
+      const ct = titleSortKey(String(c.title ?? ""));
       return ct > cursorTitle || (ct === cursorTitle && c.id < cursorId);
     });
   }

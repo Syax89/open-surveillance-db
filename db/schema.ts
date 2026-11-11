@@ -6,6 +6,13 @@ export const cameras = sqliteTable(
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
     title: text("title").notNull(),
+    // Natural-order sort key (migration 0046): titleSortKey(title) from
+    // app/lib/title-sort-key.ts — ASCII case fold + zero-padded digit runs,
+    // so "Telecamera 2" sorts before "Telecamera 10" under the default BINARY
+    // collation (D1 cannot register custom collations). Written by every
+    // path that writes `title`; backfilled by 0046. Nullable only because
+    // SQLite cannot ADD a NOT NULL column without a default.
+    titleSortKey: text("title_sort_key"),
     kind: text("kind").notNull(),
     manufacturer: text("manufacturer"),
     observedOn: text("observed_on"),
@@ -91,6 +98,10 @@ export const cameras = sqliteTable(
       .on(table.source, table.externalId)
       .where(sql`external_id IS NOT NULL`),
     index("cameras_import_batch_idx").on(table.importBatchId),
+    // Directory "alphabetical" order + keyset cursor (migration 0046):
+    // ORDER BY title_sort_key ASC, id DESC walks this index directly, and
+    // the A–Z seek is a range on its leading column.
+    index("cameras_title_sort_key_idx").on(table.titleSortKey, sql`id DESC`),
   ],
 );
 

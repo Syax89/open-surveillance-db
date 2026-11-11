@@ -233,6 +233,21 @@ test("freshnessCutoffFor derives the cutoff from the window (never separate stat
   assert.equal(freshnessCutoffFor("90d", now), now - 90 * 24 * 60 * 60 * 1000);
 });
 
+test("applyCameraFilters: alphabetical is natural and matches the server order (title_sort_key ASC, id DESC)", () => {
+  const records = [
+    makeCamera(1, { title: "Telecamera 10" }),
+    makeCamera(2, { title: "Telecamera 2" }),
+    makeCamera(3, { title: "telecamera 2" }),
+    makeCamera(4, { title: "Telecamera 1" }),
+    makeCamera(5, { title: "Telecamera 100" }),
+  ];
+  const sorted = applyCameraFilters(records, {
+    q: "", type: "all", freshness: "all", sort: "alphabetical", state: "all", focus: null,
+  });
+  assert.deepEqual(sorted.map((camera) => camera.id), [4, 3, 2, 1, 5],
+    '"2" before "10", case-only ties broken by id DESC');
+});
+
 test("applyCameraFilters: combined filters + sort, freshness anchored on lastVerifiedAt ?? updated", () => {
   const now = Date.parse("2026-08-01T00:00:00Z");
   const records = [
